@@ -103,6 +103,50 @@ body {
   box-shadow: 0 0 8px var(--accent-emerald);
 }
 
+/* Nav Tabs */
+.nav-tabs {
+  background: #111827;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  gap: 8px;
+  padding: 8px 32px 0 32px;
+  overflow-x: auto;
+}
+
+.tab-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 18px;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.tab-btn:hover {
+  color: var(--text-main);
+}
+
+.tab-btn.active {
+  color: var(--accent-emerald);
+  border-bottom-color: var(--accent-emerald);
+  background: rgba(16, 185, 129, 0.05);
+  border-top-left-radius: 6px;
+  border-top-right-radius: 6px;
+}
+
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+
 /* Buttons */
 .btn {
   padding: 8px 18px;
@@ -115,6 +159,11 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+.btn-sm {
+  padding: 5px 10px;
+  font-size: 12px;
 }
 
 .btn-primary {
@@ -132,6 +181,16 @@ body {
 }
 .btn-secondary:hover {
   background: #374151;
+}
+
+.btn-danger {
+  background: var(--accent-rose-subtle);
+  color: var(--accent-rose);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+.btn-danger:hover {
+  background: var(--accent-rose);
+  color: white;
 }
 
 .btn-text {
@@ -201,11 +260,12 @@ body {
   font-weight: 700;
   padding: 3px 8px;
   border-radius: 6px;
+  display: inline-block;
 }
 .badge-amber { background: var(--accent-amber-subtle); color: var(--accent-amber); border: 1px solid rgba(245, 158, 11, 0.3); }
-.badge-emerald { background: var(--accent-emerald-subtle); color: var(--accent-emerald); border: 1px solid rgba(16, 185, 129, 0.3); }
+.badge-emerald, .badge-green { background: var(--accent-emerald-subtle); color: var(--accent-emerald); border: 1px solid rgba(16, 185, 129, 0.3); }
 .badge-blue { background: var(--accent-blue-subtle); color: var(--accent-blue); border: 1px solid rgba(59, 130, 246, 0.3); }
-.badge-green { background: var(--accent-emerald-subtle); color: var(--accent-emerald); border: 1px solid rgba(16, 185, 129, 0.3); }
+.badge-rose { background: var(--accent-rose-subtle); color: var(--accent-rose); border: 1px solid rgba(239, 68, 68, 0.3); }
 
 /* Today Radar List */
 .radar-grid {
@@ -468,7 +528,7 @@ body {
   border: 1px solid var(--border-subtle);
   border-radius: 14px;
   width: 100%;
-  max-width: 580px;
+  max-width: 620px;
   padding: 24px;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
 }
