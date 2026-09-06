@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UTE Kontrol Merkezi V5 — Uludağ Tatil Evleri</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="brand-area">
+      <div class="brand-logo">🌲 UTE</div>
+      <div class="brand-meta">
+        <h1>KONTROL MERKEZİ V5</h1>
+        <p>Uludağ Tatil Evleri • Seyir • Doğuş • Zirve • Şirin • Nefes</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div class="period-pill">
+        <span class="dot live"></span>
+        <span id="currentPeriodLabel">Dönem: Eylül 2026</span>
+      </div>
+      <button class="btn btn-primary" onclick="openNewBookingModal()">+ Yeni Rezervasyon</button>
+      <button class="btn btn-secondary" onclick="openNewLeadModal()">+ Yeni Lead</button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="container">
+
+    <!-- 1. SECTION: TODAY ENGINE RADAR (MAX 6 ACTIONS) -->
+    <section class="card today-radar-card">
+      <div class="section-title-bar">
+        <div class="title-with-badge">
+          <h2>⚡ BUGÜN NE YAPMALIYIM? (GÜNLÜK AKSIYON RADARI)</h2>
+          <span class="badge badge-amber" id="radarBadge">5 Aksiyon Bekliyor</span>
+        </div>
+        <button class="btn-text" onclick="refreshTodayRadar()">🔄 Yenile</button>
+      </div>
+      <div class="radar-grid" id="todayRadarList">
+        <!-- Injected via JavaScript -->
+      </div>
+    </section>
+
+    <!-- 2. SECTION: BIG 4 FINANCIAL HEALTH KPI CARDS -->
+    <section class="kpi-cards-grid">
+      <div class="kpi-card">
+        <span class="kpi-label">NET KONAKLAMA GELİRİ</span>
+        <div class="kpi-value" id="kpiNetRevenue">₺327.000</div>
+        <div class="kpi-meta">
+          <span class="kpi-trend positive">↑ %12,4</span>
+          <span>Hedef: ₺400.000 (%81,8)</span>
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <span class="kpi-label">DOLULUK ORANI (OCCUPANCY)</span>
+        <div class="kpi-value" id="kpiOccupancy">%68,2</div>
+        <div class="kpi-meta">
+          <span class="kpi-trend positive">↑ %4,5</span>
+          <span>Satılan: 101 / 148 Gece</span>
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <span class="kpi-label">ADR (ORTALAMA GÜNLÜK ODA FİYATI)</span>
+        <div class="kpi-value" id="kpiADR">₺3.238</div>
+        <div class="kpi-meta">
+          <span class="kpi-trend positive">↑ ₺288</span>
+          <span>Geçen Ay: ₺2.950</span>
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <span class="kpi-label">RevPAR (SATILABİLİR GECE BAŞINA GELİR)</span>
+        <div class="kpi-value" id="kpiRevPAR">₺2.209</div>
+        <div class="kpi-meta">
+          <span class="kpi-trend positive">Sağlıklı</span>
+          <span>Net RevPAR: ₺1.745</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. SECTION: VILLA PERFORMANCE SCORECARD (5 VILLAS) -->
+    <section class="card">
+      <div class="section-title-bar">
+        <h2>🏆 5 VİLLA PERFORMANS SCORECARD</h2>
+        <span class="sub-text">Single Source of Truth ile otomatik derlenmiştir</span>
+      </div>
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>VİLLA</th>
+              <th>KAPASİTE</th>
+              <th>SATILAN GECE</th>
+              <th>DOLULUK %</th>
+              <th>ADR</th>
+              <th>RevPAR</th>
+              <th>NET CİRO</th>
+              <th>P1 / P2 BAKIM</th>
+              <th>DURUM</th>
+            </tr>
+          </thead>
+          <tbody id="villaScorecardBody">
+            <!-- Injected via JavaScript -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 4. SECTION: LEAD CRM & CHANNEL DISTRIBUTION -->
+    <div class="grid-2col">
+      <!-- Funnel -->
+      <section class="card">
+        <div class="section-title-bar">
+          <h2>🎯 SATIŞ & LEAD DÖNÜŞÜM HUNİSİ</h2>
+          <span class="badge badge-blue">CRM Motoru</span>
+        </div>
+        <div class="funnel-stats-grid" id="funnelStatsContainer">
+          <!-- Injected via JS -->
+        </div>
+      </section>
+
+      <!-- Channel Breakdown -->
+      <section class="card">
+        <div class="section-title-bar">
+          <h2>🌐 KANAL DAĞILIMI & DİREKT ORANI</h2>
+          <span class="badge badge-green" id="directShareBadge">%50,1 Direkt</span>
+        </div>
+        <div class="channel-progress-list" id="channelListContainer">
+          <!-- Injected via JS -->
+        </div>
+      </section>
+    </div>
+
+    <!-- 5. SECTION: GAP NIGHT & EXTENSION RADAR -->
+    <section class="card gap-radar-card">
+      <div class="section-title-bar">
+        <h2>💎 BOŞLUK GECELERİ & REVENUE EXTENSION MOTORU</h2>
+        <span class="badge badge-emerald">Ek Gelir Fırsatı</span>
+      </div>
+      <p class="section-desc">Floor Rate ve marjinal değişken maliyet (Isıtma + Temizlik) taban korumalı indirim önerileri:</p>
+      <div class="gap-grid" id="gapNightGrid">
+        <!-- Injected via JS -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Modal: Yeni Rezervasyon (Single Input -> Many Outputs) -->
+  <div class="modal-backdrop" id="bookingModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>➕ Yeni Rezervasyon Girişi</h3>
+        <button class="close-btn" onclick="closeBookingModal()">&times;</button>
+      </div>
+      <form id="bookingForm" onsubmit="handleNewBooking(event)">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Villa Seçin</label>
+            <select id="resVilla" required>
+              <option value="SEYIR">Seyir (6+2)</option>
+              <option value="DOGUS">Doğuş (11)</option>
+              <option value="ZIRVE">Zirve (9 - Jakuzi/Sauna)</option>
+              <option value="SIRIN">Şirin (7)</option>
+              <option value="NEFES">Nefes (12)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Misafir Adı</label>
+            <input type="text" id="resGuest" placeholder="Örn: Ahmet Yılmaz" required>
+          </div>
+          <div class="form-group">
+            <label>Giriş Tarihi (Check-in)</label>
+            <input type="date" id="resCheckIn" required>
+          </div>
+          <div class="form-group">
+            <label>Çıkış Tarihi (Check-out)</label>
+            <input type="date" id="resCheckOut" required>
+          </div>
+          <div class="form-group">
+            <label>Rezervasyon Kanalı</label>
+            <select id="resChannel" required onchange="handleChannelChange()">
+              <option value="WHATSAPP">WhatsApp (Direkt - %0)</option>
+              <option value="AIRBNB">Airbnb (OTA - %15)</option>
+              <option value="BOOKING">Booking.com (OTA - %18)</option>
+              <option value="INSTAGRAM">Instagram (Direkt - %0)</option>
+              <option value="WEBSITE">Website (Direkt - %0)</option>
+              <option value="REPEAT">Tekrar Misafir (%0)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Brüt Tutar (₺)</label>
+            <input type="number" id="resGross" placeholder="Örn: 30000" required oninput="calculateLivePreview()">
+          </div>
+        </div>
+
+        <div class="live-calculation-box" id="calcPreviewBox">
+          <div class="preview-item">
+            <span>Gece Sayısı:</span>
+            <strong id="prevNights">0 Gece</strong>
+          </div>
+          <div class="preview-item">
+            <span>OTA Komisyonu:</span>
+            <strong id="prevCommission">₺0</strong>
+          </div>
+          <div class="preview-item highlight">
+            <span>Saf Net Oda Geliri:</span>
+            <strong id="prevNetRevenue">₺0</strong>
+          </div>
+          <div class="preview-item">
+            <span>Gecelik Net (ADR Katkısı):</span>
+            <strong id="prevNightlyNet">₺0</strong>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeBookingModal()">Vazgeç</button>
+          <button type="submit" class="btn btn-primary">Kaydet ve Dashboard'u Güncelle</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
