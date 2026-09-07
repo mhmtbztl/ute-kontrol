@@ -2847,7 +2847,6 @@ function renderAll() {
   renderGapNights();
   renderTodayRadar();
   renderOtaRadar();
-  renderBankBalances();
   runWhatIfSimulation();
 
   // Badges
@@ -3025,20 +3024,6 @@ function renderFinanceModule() {
 
   // Render AI Financial Analyst
   renderAIFinancialAnalyst(totalRevenue, targetRev, targetPct, totalOpex, totalCapex, netCashProfit, netMargin, propStats);
-}
-
-// -------------------------------------------------------------
-// KASA / BANKA DURUMU RENDERER
-// -------------------------------------------------------------
-function renderBankBalances() {
-  const b = COMPANY_EXCEL_DATABASE.bankBalances;
-  if (!b) return;
-  const setEl = (id, text) => { const el = document.getElementById(id); if (el) el.innerText = text; };
-  setEl('kasaGaranti', `${Math.round(b.garanti).toLocaleString('tr-TR')} TL`);
-  setEl('kasaKuveyt', `${Math.round(b.kuveyt).toLocaleString('tr-TR')} TL`);
-  setEl('kasaNPara', `${Math.round(b.npara).toLocaleString('tr-TR')} TL`);
-  setEl('kasaNakit', `${Math.round(b.nakit).toLocaleString('tr-TR')} TL`);
-  setEl('kasaTotal', `${Math.round(b.total).toLocaleString('tr-TR')} TL`);
 }
 
 // -------------------------------------------------------------
@@ -3536,7 +3521,6 @@ Tarih: ${new Date().toLocaleDateString('tr-TR')}
 -----------------------------------------------------
 • Toplam Tarihsel Ciro: 5.004.165,40 TL (14 Ay Toplamı)
 • Toplam Satılan Gece: 457 Gece (Ortalama ADR: 10.950 TL)
-• Likit Kasa / Banka Mevcudu: 47.610,17 TL (Garanti, Kuveyt, N Para)
 • Ciro Momentumu (Son 3 Ay): +%80,7 Hızlanma (268k -> 467k -> 484k TL)
 • Net Kâr Marjı Stabilitesi: %29,5 – %33,9
 
