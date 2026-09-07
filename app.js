@@ -3149,6 +3149,7 @@ function renderAll() {
   renderTrajectoryRadar();
   renderDailyOps();
   renderTapeChart();
+  renderHousekeepingTab();
 
   // Badges
   const rBadge = document.getElementById('rezCountBadge');

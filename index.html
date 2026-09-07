@@ -1348,6 +1348,81 @@
     </div>
 
     <!-- ========================================== -->
+    <!-- TAB: TEMİZLİK & OPERASYON BORÇ DEFTERİ -->
+    <!-- ========================================== -->
+    <div id="tab-housekeeping" class="tab-content">
+      <!-- 1. KPI Kartları -->
+      <section class="kpi-cards-grid" style="margin-bottom: 20px;">
+        <div class="kpi-card" style="border-top: 3px solid #F59E0B;">
+          <div class="kpi-card-header">
+            <span class="kpi-label">BEKLEYEN TEMİZLİK BORCU</span>
+          </div>
+          <div class="kpi-value" id="hkKpiPendingDebt" style="color: #FBBF24;">₺0</div>
+          <div class="kpi-meta">
+            <span id="hkKpiPendingCount" style="color: #FBBF24; font-weight: 600;">0 Temizlik Ödeme Bekliyor</span>
+          </div>
+        </div>
+
+        <div class="kpi-card" style="border-top: 3px solid #10B981;">
+          <div class="kpi-card-header">
+            <span class="kpi-label">ÖDENEN TEMİZLİK BEDELİ</span>
+          </div>
+          <div class="kpi-value" id="hkKpiPaidAmount" style="color: #34D399;">₺0</div>
+          <div class="kpi-meta">
+            <span id="hkKpiPaidCount" style="color: #34D399; font-weight: 600;">0 Temizlik Ödendi</span>
+          </div>
+        </div>
+
+        <div class="kpi-card" style="border-top: 3px solid #3B82F6;">
+          <div class="kpi-card-header">
+            <span class="kpi-label">TOPLAM OPERASYON</span>
+          </div>
+          <div class="kpi-value" id="hkKpiTotalOps" style="color: #60A5FA;">0</div>
+          <div class="kpi-meta">
+            <span id="hkKpiTotalOpsMeta">5 Villa Toplamı</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. Temizlik & Borç Defteri Tablosu -->
+      <section class="card">
+        <div class="section-title-bar">
+          <div>
+            <h2>🧹 TEMİZLİK & OPERASYON BORÇ DEFTERİ</h2>
+            <p class="sub-text">Rezervasyonlardan gelen temizlikler, hangi evde hangi tarihte temizlik yapıldığı ve personel ödemeleri.</p>
+          </div>
+          <div class="table-actions" style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <select id="hkStatusFilter" class="form-control" style="width: auto; font-size: 12px; padding: 6px 10px; background: rgba(0,0,0,0.4); color: #fff; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px;" onchange="renderHousekeepingTab()">
+              <option value="ALL">Tüm Durumlar (Tümü)</option>
+              <option value="PENDING">⏳ Sadece Bekleyen Borçlar</option>
+              <option value="PAID">✅ Sadece Ödenenler</option>
+            </select>
+            <input type="text" id="hkSearchInput" placeholder="🔍 Ev, misafir, personel ara..." oninput="renderHousekeepingTab()" style="width: 220px; font-size: 12px; padding: 6px 12px; background: rgba(0,0,0,0.4); color: #fff; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px;">
+            <button class="btn btn-warning btn-sm" onclick="payAllPendingCleaning()" style="font-size: 12px; font-weight: 700; background: #F59E0B; color: #000;">💳 Tümünü Öde</button>
+            <button class="btn btn-primary btn-sm" onclick="openNewCleaningTaskModal()" style="font-size: 12px; font-weight: 700;">+ Yeni Temizlik Ekle</button>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>TEMİZLİK TARİHİ</th>
+                <th>VİLLA (EV)</th>
+                <th>MİSAFİR / GÖREV</th>
+                <th>PERSONEL / EKİP</th>
+                <th>BEDEL (TL)</th>
+                <th>DURUM</th>
+                <th>ÖDEME TARİHİ</th>
+                <th style="text-align: right;">İŞLEM</th>
+              </tr>
+            </thead>
+            <tbody id="hkTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- ========================================== -->
     <!-- TAB: LEAD CRM & WHATSAPP SATIŞ RADARI -->
     <!-- ========================================== -->
     <div id="tab-leads" class="tab-content">
