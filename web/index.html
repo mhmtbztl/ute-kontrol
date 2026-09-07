@@ -108,6 +108,11 @@
     </div>
 
         <div class="header-actions">
+      <!-- Başlangıç Rehberi Butonu -->
+      <button type="button" class="btn btn-secondary header-guide-btn" onclick="openHelpModal('terms')" style="background: rgba(139, 92, 246, 0.18); border: 1px solid rgba(139, 92, 246, 0.4); color: #DDD6FE; font-weight: 700; display: flex; align-items: center; gap: 6px;" title="Başlangıç Seviyesi Terimler Sözlüğü & Kılavuz">
+        <span>🎓</span>
+        <span class="guide-btn-text">Başlangıç Rehberi</span>
+      </button>
       <!-- Dropdown 1: Hızlı Ekle -->
       <div class="header-dropdown-wrap">
         <button type="button" class="btn btn-primary" onclick="toggleHeaderDropdown('quickAddMenu')" id="quickAddBtn" style="font-weight: 700;">
@@ -971,22 +976,22 @@
 
       <section class="kpi-cards-grid">
         <div class="kpi-card">
-          <span class="kpi-label">NET ODA GELİRİ</span>
+          <div class="kpi-card-header"><span class="kpi-label">NET ODA GELİRİ</span><button class="kpi-info-btn" onclick="showKpiExplanation('REVENUE')">ℹ️</button></div>
           <div class="kpi-value" id="kpiNetRevenue">₺0</div>
           <div class="kpi-meta"><span class="kpi-trend positive" id="kpiTargetPct">%0 Hedef</span><span id="kpiGrossRevenue">Brüt: ₺0</span></div>
         </div>
         <div class="kpi-card">
-          <span class="kpi-label">DOLULUK ORANI</span>
+          <div class="kpi-card-header"><span class="kpi-label">DOLULUK ORANI</span><button class="kpi-info-btn" onclick="showKpiExplanation('OCCUPANCY')">ℹ️</button></div>
           <div class="kpi-value" id="kpiOccupancy">%0.0</div>
           <div class="kpi-meta"><span class="kpi-trend positive" id="kpiNightsDetail">0 Gece</span><span id="kpiAvailableDetail">0 Gece</span></div>
         </div>
         <div class="kpi-card">
-          <span class="kpi-label">ADR</span>
+          <div class="kpi-card-header"><span class="kpi-label">ADR</span><button class="kpi-info-btn" onclick="showKpiExplanation('ADR')">ℹ️</button></div>
           <div class="kpi-value" id="kpiADR">₺0</div>
           <div class="kpi-meta"><span class="kpi-trend positive">Net / Gece</span><span>Komisyon Hariç</span></div>
         </div>
         <div class="kpi-card">
-          <span class="kpi-label">RevPAR</span>
+          <div class="kpi-card-header"><span class="kpi-label">RevPAR</span><button class="kpi-info-btn" onclick="showKpiExplanation('REVPAR')">ℹ️</button></div>
           <div class="kpi-value" id="kpiRevPAR">₺0</div>
           <div class="kpi-meta"><span class="kpi-trend positive">Kapasite</span><span id="kpiNRevPAR">NRevPAR: ₺0</span></div>
         </div>
@@ -1785,32 +1790,153 @@
 
     <!-- MODAL: VERİ SIFIRLAMA VE YÖNETİM MERKEZİ -->
     <!-- MODAL: KULLANIM KILAVUZU & İŞLETMECİ REHBERİ -->
+    <!-- ======================================================= -->
+  <!-- MODAL: BAŞLANGIÇ REHBERİ, TERİM SÖZLÜĞÜ & SAAS VİZYONU    -->
+  <!-- ======================================================= -->
   <div class="modal-backdrop" id="helpModal">
-    <div class="modal-card" style="max-width: 720px; max-height: 90vh; display: flex; flex-direction: column;">
-      <div class="modal-header">
-        <h3>❓ Lexbnb Kontrol Merkezi — Kullanım Kılavuzu & Rutin Rehberi</h3>
+    <div class="modal-card" style="max-width: 800px; max-height: 90vh; display: flex; flex-direction: column;">
+      <div class="modal-header" style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(15, 23, 42, 0.9));">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 24px;">🎓</span>
+          <div>
+            <h3 style="margin: 0; font-size: 18px; color: #FFFFFF;">Başlangıç Seviyesi Otel & Villa Yönetimi Rehberi</h3>
+            <span style="font-size: 11px; color: #C4B5FD;">Sıfırdan zirveye terimler, gelir taktikleri ve SaaS kiralama modeli</span>
+          </div>
+        </div>
         <button class="close-btn" onclick="closeHelpModal()">&times;</button>
       </div>
 
-      <div class="help-tabs-nav">
-        <button class="help-tab-btn active" onclick="switchHelpTab('routine')">🕒 Günlük İşletmeci Rutini</button>
-        <button class="help-tab-btn" onclick="switchHelpTab('terms')">📊 Finansal Terimler</button>
-        <button class="help-tab-btn" onclick="switchHelpTab('ops')">🛎️ Operasyon & Temizlik</button>
-        <button class="help-tab-btn" onclick="switchHelpTab('data')">🔄 Excel & Sıfırlama</button>
+      <div class="help-tabs-nav" style="display: flex; overflow-x: auto; gap: 6px; padding: 10px 16px; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.08);">
+        <button class="help-tab-btn active" id="helpTabBtn-terms" onclick="switchHelpTab('terms')">📖 Terimler Sözlüğü (A-Z)</button>
+        <button class="help-tab-btn" id="helpTabBtn-routine" onclick="switchHelpTab('routine')">🕒 Günlük Rutin (10 Saniye)</button>
+        <button class="help-tab-btn" id="helpTabBtn-pricing" onclick="switchHelpTab('pricing')">💰 Fiyatlama & Taktikler</button>
+        <button class="help-tab-btn" id="helpTabBtn-ops" onclick="switchHelpTab('ops')">🛎️ Operasyon & Temizlik</button>
+        <button class="help-tab-btn" id="helpTabBtn-saas" onclick="switchHelpTab('saas')" style="color: #FBBF24; font-weight: 700;">🚀 SaaS Olarak Kiralama</button>
+        <button class="help-tab-btn" id="helpTabBtn-data" onclick="switchHelpTab('data')">🔄 Veri & Sıfırlama</button>
       </div>
 
       <div style="padding: 20px; overflow-y: auto; flex: 1;">
-        <!-- TAB 1: GÜNLÜK RUTİN -->
-        <div id="helpTab-routine" class="help-tab-pane">
+        <!-- TAB 1: TERİMLER SÖZLÜĞÜ -->
+        <div id="helpTab-terms" class="help-tab-pane">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; gap: 12px; flex-wrap: wrap;">
+            <div>
+              <h4 style="margin: 0; color: #FFFFFF; font-size: 15px;">🔍 Akıllı Otelcilik & Finans Terimleri</h4>
+              <p style="margin: 2px 0 0 0; font-size: 12px; color: var(--text-muted);">Aşağıdaki arama kutusuna merak ettiğiniz kelimeyi yazarak anında bulun.</p>
+            </div>
+            <div style="flex: 1; max-width: 280px; min-width: 180px;">
+              <input type="text" id="helpGlossarySearch" placeholder="🔍 Terim ara (örn: ADR, Kâr, RevPAR)..." oninput="filterHelpGlossary()" style="width: 100%; padding: 8px 12px; border-radius: 8px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-size: 12px;">
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px;" id="glossaryGridContainer">
+            <!-- ADR -->
+            <div class="glossary-card-item" data-keywords="adr ortalama günlük fiyat satış oda gelir">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <strong style="color:#FBBF24; font-size:14px;">🏷️ ADR (Ortalama Günlük Fiyat)</strong>
+                <span class="badge badge-amber" style="font-size:10px;">Fiyat Gücü</span>
+              </div>
+              <p style="font-size:12px; color:#E2E8F0; margin:6px 0;"><strong>Basitçe:</strong> Evinizi bir geceliğine ortalama kaça sattınız? (Ciro ÷ Satılan Gece).</p>
+              <div style="font-size:11px; background:rgba(0,0,0,0.25); padding:6px 8px; border-radius:6px; color:#94A3B8; margin-bottom:6px;">
+                📐 <code>Toplam Ciro ÷ Satılan Gece</code>
+              </div>
+              <p style="font-size:11px; color:#FDE68A; margin:0;">💡 <strong>Altın Kural:</strong> Tüm evler doluyor ama para birikmiyorsa, evleri ucuza satıyorsunuz demektir. Fiyatı hemen artırın!</p>
+            </div>
+
+            <!-- RevPAR -->
+            <div class="glossary-card-item" data-keywords="revpar kapasite oda başına düşen gelir altın karne">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <strong style="color:#A78BFA; font-size:14px;">📈 RevPAR (Oda Başına Düşen Gelir)</strong>
+                <span class="badge badge-purple" style="font-size:10px;">Altın Karne</span>
+              </div>
+              <p style="font-size:12px; color:#E2E8F0; margin:6px 0;"><strong>Basitçe:</strong> Eviniz boş ya da dolu fark etmeksizin, takvimdeki her gün için size kaç TL kazandırdı?</p>
+              <div style="font-size:11px; background:rgba(0,0,0,0.25); padding:6px 8px; border-radius:6px; color:#94A3B8; margin-bottom:6px;">
+                📐 <code>Toplam Ciro ÷ Toplam Kapasite (5 Villa × 30 Gün)</code>
+              </div>
+              <p style="font-size:11px; color:#DDD6FE; margin:0;">💡 <strong>Neden Önemli?</strong> Bir villayı 20.000 TL'ye satıp ayda sadece 1 gün doldurursanız batarsınız. RevPAR hem fiyatı hem doluluğu aynı anda ölçer.</p>
+            </div>
+
+            <!-- Fiili Ciro -->
+            <div class="glossary-card-item" data-keywords="ciro brüt gelir konaklama para giriş">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <strong style="color:#60A5FA; font-size:14px;">💰 Fiili Ciro (Brüt Gelir)</strong>
+                <span class="badge badge-blue" style="font-size:10px;">Hacim</span>
+              </div>
+              <p style="font-size:12px; color:#E2E8F0; margin:6px 0;"><strong>Basitçe:</strong> Misafirlerin konaklaması karşılığında kasaya giren brüt toplam para.</p>
+              <div style="font-size:11px; background:rgba(0,0,0,0.25); padding:6px 8px; border-radius:6px; color:#94A3B8; margin-bottom:6px;">
+                📐 <code>Satılan Gece × ADR</code>
+              </div>
+              <p style="font-size:11px; color:#93C5FD; margin:0;">⚠️ <strong>Dikkat:</strong> Ciro kâr demek değildir! Elektrik, personel ve komisyonlar bu paranın içinden düşecektir.</p>
+            </div>
+
+            <!-- Net Nakit Kâr -->
+            <div class="glossary-card-item" data-keywords="net kâr nakit para kazanç cepte kalan margin">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <strong style="color:#34D399; font-size:14px;">💵 Net Nakit Kâr (Cash Profit)</strong>
+                <span class="badge badge-green" style="font-size:10px;">Cepte Kalan</span>
+              </div>
+              <p style="font-size:12px; color:#E2E8F0; margin:6px 0;"><strong>Basitçe:</strong> Cirodan tüm giderler ve yatırımlar çıktıktan sonra cebinizde kalan net nakit para.</p>
+              <div style="font-size:11px; background:rgba(0,0,0,0.25); padding:6px 8px; border-radius:6px; color:#94A3B8; margin-bottom:6px;">
+                📐 <code>Ciro - (OPEX + CAPEX)</code>
+              </div>
+              <p style="font-size:11px; color:#A7F3D0; margin:0;">💡 <strong>Hedef:</strong> Net kâr marjınızın en az %30-40 bandında kalmasını sağlayın.</p>
+            </div>
+
+            <!-- OPEX vs CAPEX -->
+            <div class="glossary-card-item" data-keywords="opex capex gider yatırım masraf harcama">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <strong style="color:#F472B6; font-size:14px;">⚡ OPEX vs 🏗️ CAPEX</strong>
+                <span class="badge badge-rose" style="font-size:10px;">Gider Ayrımı</span>
+              </div>
+              <p style="font-size:12px; color:#E2E8F0; margin:6px 0;"><strong>OPEX:</strong> Günlük elektrik, temizlik, komisyon, kömür gibi rutin masraflardır.<br><strong>CAPEX:</strong> Jakuzi yaptırmak, klima taktırmak gibi mülke değer katan büyük yatırımlardır.</p>
+              <p style="font-size:11px; color:#FBCFE8; margin:0;">💡 <strong>Tüyo:</strong> CAPEX bir masraf değil, villanın gecelik fiyatını artıracak kalıcı bir yatırımdır.</p>
+            </div>
+
+            <!-- Doluluk Oranı -->
+            <div class="glossary-card-item" data-keywords="doluluk oranı occupancy gece yüzde kapasite">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <strong style="color:#38BDF8; font-size:14px;">🌙 Doluluk Oranı (%)</strong>
+                <span class="badge badge-blue" style="font-size:10px;">Verimlilik</span>
+              </div>
+              <p style="font-size:12px; color:#E2E8F0; margin:6px 0;"><strong>Basitçe:</strong> 30 günün yüzde kaçında villalarda misafir vardı?</p>
+              <div style="font-size:11px; background:rgba(0,0,0,0.25); padding:6px 8px; border-radius:6px; color:#94A3B8; margin-bottom:6px;">
+                📐 <code>(Satılan Gece ÷ 150 Kapasite) × 100</code>
+              </div>
+              <p style="font-size:11px; color:#BAE6FD; margin:0;">💡 <strong>Taktik:</strong> %70 üstü mükemmeldir. %100 doluluk ise fiyatı çok ucuz tuttuğunuzun göstergesi olabilir!</p>
+            </div>
+
+            <!-- Gap Nights -->
+            <div class="glossary-card-item" data-keywords="gap geceleri boşluk yetim gece fırsat indirim">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <strong style="color:#FB923C; font-size:14px;">🧩 Boşluk Geceleri (Gap Nights)</strong>
+                <span class="badge badge-amber" style="font-size:10px;">Kurtarılan Para</span>
+              </div>
+              <p style="font-size:12px; color:#E2E8F0; margin:6px 0;"><strong>Basitçe:</strong> İki rezervasyon arasında sıkışıp kalan 1-2 günlük satılmamış boş günlerdir.</p>
+              <p style="font-size:11px; color:#FED7AA; margin:0;">💡 <strong>Taktik:</strong> O gün boş kalacağına %25 indirimle Instagram hikayelerinde "Son Dakika Fırsatı" olarak satın, doğrudan kâra dönüşsün.</p>
+            </div>
+
+            <!-- OTA vs Direkt -->
+            <div class="glossary-card-item" data-keywords="ota komisyon airbnb booking doğrudan whatsapp direkt">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <strong style="color:#4ADE80; font-size:14px;">🌐 OTA Komisyonu vs Doğrudan Satış</strong>
+                <span class="badge badge-green" style="font-size:10px;">Kâr Katlama</span>
+              </div>
+              <p style="font-size:12px; color:#E2E8F0; margin:6px 0;"><strong>Basitçe:</strong> Airbnb ve Booking sizden %15-20 komisyon keser. WhatsApp veya direkt satışta komisyon %0'dır.</p>
+              <p style="font-size:11px; color:#BBF7D0; margin:0;">💡 <strong>Taktik:</strong> OTA'yı misafiri bulmak için kullanın, bir sonraki gelişinde kartvizitinizle doğrudan sizden rezerve etmesini sağlayın.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 2: GÜNLÜK RUTİN -->
+        <div id="helpTab-routine" class="help-tab-pane" style="display: none;">
           <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 16px;">
-            Lexbnb Kontrol Merkezi, bir kısa dönem dağ evi işletmecisinin gün içindeki 3 ana ihtiyacına göre tasarlanmıştır:
+            Lexbnb Kontrol Merkezi, bir işletmecinin gün içindeki 3 ana rutinini 10 saniyede yönetmesi için tasarlanmıştır:
           </p>
 
           <div class="help-step-item">
             <div class="step-num-icon">1</div>
             <div class="step-body">
               <h4>Sabah (10 Saniye Kuralı) — Kokpit Kontrolü</h4>
-              <p>Güne başlarken <strong>"📊 Kokpit"</strong> sekmesini açın. Bugün kim giriş yapacak, kim çıkış yapacak ve açık acil (P1) arıza var mı tek bakışta görün.</p>
+              <p>Güne başlarken <strong>"📊 Kokpit"</strong> sekmesini açın. Bugün hangi villadan çıkış var, hangi eve yeni misafir gelecek ve açık acil (P1) arıza var mı tek bakışta görün.</p>
               <span class="step-tip">💡 İpucu: Temizlik ekibine talimat vermeden önce "Bugün Çıkışlar" tablosuna bakın.</span>
             </div>
           </div>
@@ -1818,82 +1944,122 @@
           <div class="help-step-item">
             <div class="step-num-icon">2</div>
             <div class="step-body">
-              <h4>Gün İçi (Satış & İletişim) — Lead ve Rezervasyon Girişi</h4>
-              <p>WhatsApp veya Instagram'dan fiyat soran misafirleri unutmamak için <strong>"🎯 Lead & Satış"</strong> sekmesine not alın. Anlaştığınız anda üstteki <strong>"+ Rezervasyon"</strong> butonu ile sisteme kaydedin.</p>
-              <span class="step-tip">💡 İpucu: Direkt WhatsApp satışında OTA komisyonu sıfırlandığı için kârınız %15 artar.</span>
+              <h4>Gün İçi (Satış & İletişim) — WhatsApp Mesaj Ayrıştırıcı</h4>
+              <p>WhatsApp'tan gelen mesajları tek tek elle girmek yerine, üst menüden <strong>"💬 WhatsApp Ayrıştırıcı"</strong>yı açın. Mesajı yapıştırın, misafir adı, telefon ve tarih 2 saniyede çözülüp takvime eklensin.</p>
+              <span class="step-tip">💡 İpucu: Direkt WhatsApp satışında komisyon sıfırlandığı için kâr marjınız %15 artar.</span>
             </div>
           </div>
 
           <div class="help-step-item">
             <div class="step-num-icon">3</div>
             <div class="step-body">
-              <h4>Akşam / Gün Sonu — Harcama Girişi & Finans Analizi</h4>
-              <p>O gün temizlik personeline yapılan ödemeyi, market alışverişini veya odun/pelet harcamasını üstteki <strong>"+ Gider / Yatırım"</strong> butonuna tıklayarak 5 saniyede kaydedin.</p>
-              <span class="step-tip">💡 İpucu: Ay sonunda <strong>"💰 Finans"</strong> sekmesini açarak cebinizde ne kadar net nakit kâr kaldığını görün.</span>
+              <h4>Akşam / Gün Sonu — Harcama Girişi & Net Kâr Takibi</h4>
+              <p>O gün personele yapılan ödemeyi, şömine odununu veya market alışverişini üstteki <strong>"➕ Hızlı Ekle > Gider Ekle"</strong> ile 5 saniyede kaydedin. Akşam kasanızda kaç TL net nakit kaldığını anında görün.</p>
+              <span class="step-tip">💡 İpucu: Harcamayı girdikten sonra <strong>"💰 Finans"</strong> sekmesindeki Net Kâr şelalesine bakın.</span>
             </div>
           </div>
         </div>
 
-        <!-- TAB 2: TERİMLER SÖZLÜĞÜ -->
-        <div id="helpTab-terms" class="help-tab-pane" style="display: none;">
-          <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 14px;">
-            Ekranda gördüğünüz ana finansal metriklerin işletmeniz için pratik anlamları:
+        <!-- TAB 3: FİYATLAMA VE TAKTİKLER -->
+        <div id="helpTab-pricing" class="help-tab-pane" style="display: none;">
+          <h4 style="color: #FBBF24; margin-top: 0;">🎯 Fiyatlandırma & Gelir Maksimizasyonu (Yield Management)</h4>
+          <p style="color: var(--text-muted); font-size: 0.9rem;">
+            Bir dağ evi veya bungalovda geliri %40 artıran basit ama altın kurallar:
           </p>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-            <div class="glossary-card">
-              <strong>📊 Fiili Ciro (Brüt Gelir)</strong>
-              <p>İlgili ayda villalarınızda konaklanan rezervasyonlardan kasaya giren toplam konaklama bedelidir.</p>
+
+          <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 14px;">
+            <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 10px; padding: 14px;">
+              <strong style="color: #FDE68A;">1. Doluluk %70'i Aştığında Fiyatı Hemen %15 Artırın</strong>
+              <p style="font-size: 12px; color: var(--text-secondary); margin: 6px 0 0 0;">
+                Tüm evleriniz 1 ay önceden doluyorsa bu bir başarı değil, ucuza sattığınızın kanıtıdır! Ayın 15'inde doluluk %70'e geldiyse kalan günlerin fiyatını en az %20 yükseltin.
+              </p>
             </div>
-            <div class="glossary-card">
-              <strong>💵 Net Nakit Kâr (Net Cash Profit)</strong>
-              <p>Ciro - Operasyonel Giderler (Maaş, temizlik, fatura) - Yatırımlar (Capex). Gerçekten cebinizde kalan serbest nakittir.</p>
+
+            <div style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 10px; padding: 14px;">
+              <strong style="color: #93C5FD;">2. Hafta Sonu Zirvesi, Hafta İçi Paket Satışı</strong>
+              <p style="font-size: 12px; color: var(--text-secondary); margin: 6px 0 0 0;">
+                Cuma-Pazar arasına taban fiyatın %40 üstünde premium fiyat koyun. Pazartesi-Perşembe arası boş kalmasın diye "2 Gece Alana +1 Gece Hediye" veya "Şömine & Kahvaltı Dahil Paket" sunun.
+              </p>
             </div>
-            <div class="glossary-card">
-              <strong>🏷️ ADR (Ortalama Günlük Fiyat)</strong>
-              <p>Sattığınız gecelerin ortalama fiyatıdır. (Toplam Ciro / Satılan Gece). Fiyat savunma gücünüzü gösterir.</p>
-            </div>
-            <div class="glossary-card">
-              <strong>📈 RevPAR (Kapasite Başı Gelir)</strong>
-              <p>Toplam cironun 30 güne bölünmesidir. Boş günlerin maliyetini de içerir. Villa başına gerçek verimlilik ölçütüdür.</p>
-            </div>
-            <div class="glossary-card">
-              <strong>💸 Opex (Operasyonel Gider)</strong>
-              <p>Personel maaşı, çamaşırhane, elektrik faturası, komisyon gibi günü kurtaran rutin harcamalardır.</p>
-            </div>
-            <div class="glossary-card">
-              <strong>🏗️ Capex (Yatırım Harcaması)</strong>
-              <p>Sauna yapımı, jakuzi, ısı pompası gibi mülkün değerini kalıcı olarak artıran uzun vadeli yatırımlardır.</p>
+
+            <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 10px; padding: 14px;">
+              <strong style="color: #A7F3D0;">3. Fırsat Boşluklarını (Gap Nights) Asla Boş Bırakmayın</strong>
+              <p style="font-size: 12px; color: var(--text-secondary); margin: 6px 0 0 0;">
+                İki rezervasyon arasındaki tek günlük boşlukları sistem otomatik listeler. Bu günleri Instagram hikayenizde "Bu Geceye Özel %30 Fırsat İndirimi" olarak duyurun. O gün sıfır çekeceğine kasanıza 4.000-5.000 TL net para girsin.
+              </p>
             </div>
           </div>
         </div>
 
-        <!-- TAB 3: OPERASYON -->
+        <!-- TAB 4: OPERASYON & TEMİZLİK -->
         <div id="helpTab-ops" class="help-tab-pane" style="display: none;">
-          <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 14px;">
-            Dağ evi operasyonunda günlük kontrol listesi:
-          </p>
-          <ul style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.6; padding-left: 20px;">
-            <li><strong>Giriş Hazırlığı:</strong> Şömine odunları hazırlandı mı, jakuzi suyu doldurulup ısıtıldı mı?</li>
-            <li><strong>P1 Arıza Kuralı:</strong> Isı pompası, jakuzi veya ana elektrik arızaları (P1) doğrudan rezervasyonu engeller; bakım sekmesinden anında takip edin.</li>
-            <li><strong>Boşluk Geceleri (Gap Nights):</strong> İki rezervasyon arasında kalan 1 veya 2 günlük boş günleri sistem otomatik tespit eder. Burayı fırsat fiyatıyla (%20 indirimli) Instagram hikayelerinden satın.</li>
+          <h4 style="color: #38BDF8; margin-top: 0;">🛎️ Operasyonel Mükemmellik & Temizlik Standardı</h4>
+          <ul style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.7; padding-left: 20px;">
+            <li><strong>P1 Acil Arıza Kuralı:</strong> Isı pompası, jakuzi veya elektrik arızaları P1 (en yüksek öncelik) olarak işaretlenmelidir. Jakuzisi çalışmayan bir eve misafir alınamaz.</li>
+            <li><strong>Giriş Öncesi 1 Saat Kuralı:</strong> Misafir gelmeden 1 saat önce jakuzi sıcaklığı kontrol edilmeli, kışın şömine odunları hazırlanmalı ve karşılama lambası açılmalıdır.</li>
+            <li><strong>Çıkış Kontrolü:</strong> Çıkış saatinde temizlik ekibi villaya girmeden önce hasar kontrolü yapmalı ve mini depozito iadesi öyle onaylanmalıdır.</li>
           </ul>
         </div>
 
-        <!-- TAB 4: EXCEL & SIFIRLAMA -->
+        <!-- TAB 5: SAAS OLARAK KİRALAMA REHBERİ -->
+        <div id="helpTab-saas" class="help-tab-pane" style="display: none;">
+          <div style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(139, 92, 246, 0.15)); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 12px; padding: 18px; margin-bottom: 16px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+              <span style="font-size: 24px;">🚀</span>
+              <h3 style="margin: 0; color: #FBBF24; font-size: 17px;">Bu Yazılımı Diğer İşletmelere Kiralama (SaaS Modeli)</h3>
+            </div>
+            <p style="margin: 0; font-size: 13px; color: #E2E8F0; line-height: 1.5;">
+              Bu kontrol panelini sadece kendi tesisiniz için değil, <strong>Sapanca, Fethiye, Kaş, Rize ve Bodrum'daki binlerce bungalov ve villa sahibine aylık abonelikle satabilirsiniz.</strong>
+            </p>
+          </div>
+
+          <h4 style="color: #FFFFFF; font-size: 14px; margin-bottom: 8px;">💼 Önerilen SaaS Abonelik Paketleri:</h4>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin-bottom: 18px;">
+            <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 14px;">
+              <div style="font-size: 12px; color: var(--text-muted); font-weight: 700;">BAŞLANGIÇ PAKETİ</div>
+              <div style="font-size: 20px; font-weight: 800; color: #60A5FA; margin: 4px 0;">990 TL <small style="font-size: 12px; color: var(--text-muted);">/ ay</small></div>
+              <div style="font-size: 11px; color: #94A3B8;">• 1 - 3 Villa / Bungalov<br>• WhatsApp Mesaj Çözücü<br>• Temel Finans & Takvim</div>
+            </div>
+
+            <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 10px; padding: 14px; position: relative;">
+              <span class="badge badge-amber" style="position: absolute; top: 8px; right: 8px; font-size: 9px;">EN POPÜLER</span>
+              <div style="font-size: 12px; color: #FDE68A; font-weight: 700;">PRO İŞLETME</div>
+              <div style="font-size: 20px; font-weight: 800; color: #FBBF24; margin: 4px 0;">1.990 TL <small style="font-size: 12px; color: var(--text-muted);">/ ay</small></div>
+              <div style="font-size: 11px; color: #E2E8F0;">• 4 - 10 Villa (Uludağ Paketi)<br>• Tam Finansal Şelale & KPI<br>• Canlı WhatsApp Gateway</div>
+            </div>
+
+            <div style="background: rgba(139, 92, 246, 0.08); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 10px; padding: 14px;">
+              <div style="font-size: 12px; color: #DDD6FE; font-weight: 700;">KURUMSAL / ZİNCİR</div>
+              <div style="font-size: 20px; font-weight: 800; color: #A78BFA; margin: 4px 0;">3.490 TL <small style="font-size: 12px; color: var(--text-muted);">/ ay</small></div>
+              <div style="font-size: 11px; color: #94A3B8;">• 10+ Villa / Otel Odası<br>• Çoklu Kullanıcı Rolleri<br>• Özel Alan Adı & Logo</div>
+            </div>
+          </div>
+
+          <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 10px; padding: 14px;">
+            <strong style="color: #34D399; font-size: 13px;">💰 Aylık Pasif Gelir Potansiyeli (MRR):</strong>
+            <p style="font-size: 12px; color: var(--text-secondary); margin: 6px 0 0 0;">
+              Sadece Sapanca ve Fethiye bölgesindeki <strong>50 bungalov işletmesi</strong> abone olduğunda, işletme başı ortalama 1.500 TL'den <strong>aylık 75.000 TL net düzenli yazılım geliri</strong> elde edersiniz.
+            </p>
+          </div>
+        </div>
+
+        <!-- TAB 6: VERİ VE SIFIRLAMA -->
         <div id="helpTab-data" class="help-tab-pane" style="display: none;">
-          <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 14px;">
-            Veri tabanı ve sıfırlama mekanizması:
-          </p>
+          <h4 style="color: #FFFFFF; margin-top: 0;">🔄 Veri Tabanı ve Sıfırlama Mekanizması</h4>
           <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px;">
             <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0 0 10px 0;">
               • <strong>Tüm Verileri Sıfırla (0 TL):</strong> Excel geçmişi dahil tüm verileri siler, kendi sıfır kasanızı başlatır. Sayfayı yenileseniz de 0 TL temiz kalır.<br>
-              • <strong>Excel Verilerini Geri Yükle:</strong> İstediğiniz zaman GENEL RAPOR.xlsx dosyasındaki 14 aylık resmi şirket veritabanını (5.004.165 TL ciro, 104 harcama kalemi) tek tuşla geri yükleyebilirsiniz.
+              • <strong>Excel Verilerini Geri Yükle:</strong> İstediğiniz zaman GENEL RAPOR.xlsx dosyasındaki 14 aylık resmi şirket veritabanını tek tuşla geri yükleyebilirsiniz.
             </p>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="closeHelpModal(); openResetModal();">
+              🗑️ Sıfırlama Menüsünü Aç
+            </button>
           </div>
         </div>
       </div>
 
-      <div class="modal-footer">
+      <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 11px; color: var(--text-muted);">💡 İpucu: Paneldeki herhangi bir ℹ️ butonuna tıklayarak da ilgili metriğin detayını görebilirsiniz.</span>
         <button type="button" class="btn btn-primary" onclick="closeHelpModal()">Anladım, Kapat</button>
       </div>
     </div>
@@ -2138,6 +2304,38 @@
             📅 Kesin Rezervasyona Dönüştür
           </button>
         </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ======================================================= -->
+  <!-- MODAL: METRİK AÇIKLAMALARI VE AKILLI İPUCU DANIŞMANI     -->
+  <!-- ======================================================= -->
+  <div class="modal-backdrop" id="kpiExplanationModal">
+    <div class="modal-card" style="max-width: 580px; border: 1px solid rgba(59, 130, 246, 0.35); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.75);">
+      <div class="modal-header" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(15, 23, 42, 0.9)); border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span id="kpiExplIcon" style="font-size: 26px; background: rgba(59, 130, 246, 0.2); padding: 6px; border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.4);">📊</span>
+          <div>
+            <h3 id="kpiExplTitle" style="margin: 0; font-size: 17px; color: #FFFFFF; font-weight: 800;">Metrik Açıklaması</h3>
+            <span id="kpiExplCategory" class="badge badge-blue" style="font-size: 10px; margin-top: 4px; display: inline-block;">FİNANS & GELİR YÖNETİMİ</span>
+          </div>
+        </div>
+        <button class="close-btn" onclick="closeKpiExplanationModal()">&times;</button>
+      </div>
+
+      <div style="padding: 22px; max-height: 65vh; overflow-y: auto;" id="kpiExplBody">
+        <!-- Injected dynamically via JS -->
+      </div>
+
+      <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; background: rgba(15, 23, 42, 0.5);">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="closeKpiExplanationModal(); openHelpModal('terms');">
+          🎓 Tüm Sözlüğü Aç
+        </button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="closeKpiExplanationModal()">
+          Anladım, Kapat
+        </button>
       </div>
     </div>
   </div>

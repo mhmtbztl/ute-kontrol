@@ -4539,17 +4539,7 @@ function renderOtaRadar() {
   });
 }
 
-function showKpiExplanation(code) {
-  const guides = {
-    'REVENUE': '📊 GERÇEKLEŞEN CİRO:\n\nAy içinde konaklanan rezervasyonlardan elde edilen toplam saf oda ve konaklama geliridir.',
-    'TARGET': '🎯 HEDEF CİRO:\n\nİşletme bütçeniz doğrultusunda ilgili ay için belirlediğiniz ciro eşiğidir.',
-    'NET_PROFIT': '💵 NET KÂR (NET CASH PROFIT):\n\nCiro - Operasyonel Giderler - Yatırımlar (Capex).\n\nYatırım harcamaları çıktıktan sonra işletme sahibinin cebinde kalan net nakittir.',
-    'TOTAL_EXPENSE': '💸 TOPLAM GİDER:\n\nOperasyonel Giderler (Maaş, temizlik, fatura) + Yatırım Harcamaları (Capex).',
-    'SOLD_NIGHTS': '🛌 SATILAN GECE:\n\nİlgili ayda misafirlerin villalarda fiilen konakladığı toplam gece sayısıdır.'
-  };
-  alert(guides[code] || 'KPI Tanımı');
-}
-
+// Replaced with enhanced modal
 // -------------------------------------------------------------
 // MANAGE BOOKINGS TABLE (CRUD + SEARCH)
 // -------------------------------------------------------------
@@ -5114,28 +5104,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 // -------------------------------------------------------------
-// ❓ KULLANIM KILAVUZU & İŞLETMECİ REHBERİ
-// -------------------------------------------------------------
-function openHelpModal() {
-  const modal = document.getElementById('helpModal');
-  if (modal) modal.classList.add('active');
-}
-
-function closeHelpModal() {
-  const modal = document.getElementById('helpModal');
-  if (modal) modal.classList.remove('active');
-}
-
-function switchHelpTab(tabKey) {
-  document.querySelectorAll('.help-tab-btn').forEach(btn => btn.classList.remove('active'));
-  document.querySelectorAll('.help-tab-pane').forEach(pane => pane.style.display = 'none');
-
-  if (event && event.target) event.target.classList.add('active');
-  const activePane = document.getElementById('helpTab-' + tabKey);
-  if (activePane) activePane.style.display = 'block';
-}
-
-
+// Replaced with enhanced help functions
 // -------------------------------------------------------------
 // 🛎️ GÜNLÜK GİRİŞ / ÇIKIŞ & TEMİZLİK OPERASYONU (HOUSEKEEPING)
 // -------------------------------------------------------------
@@ -6095,4 +6064,245 @@ function renderMonthlyKpiTracker() {
       tableBody.appendChild(tr);
     });
   }
+}
+
+
+
+// =============================================================
+// ❓ METRİK AÇIKLAMALARI VE AKILLI İPUCU DANIŞMANI (BAŞLANGIÇ REHBERİ)
+// =============================================================
+const KPI_EXPLANATION_GUIDES = {
+  'REVENUE': {
+    title: 'Gerçekleşen Ciro (Brüt Konaklama Geliri)',
+    icon: '💰',
+    category: 'TEMEL FİNANS',
+    badgeClass: 'badge-blue',
+    summary: 'İlgili ayda villalarınızda misafirlerin konaklaması karşılığında kasaya giren brüt toplam paradır.',
+    warning: '⚠️ Unutmayın: Ciro kâr demek değildir! Elektrik, personel, komisyon, kömür gibi tüm giderler bu paranın içinden düşecektir.',
+    formula: 'Satılan Gece Sayısı × Ortalama Gecelik Fiyat (ADR)',
+    example: 'Örn: Ağustos ayında 79 gece satıldı ve toplam 483.965 TL brüt ciro elde edildi.',
+    actionRule: 'Ciro hacminizi gösterir ama asıl odaklanmanız gereken rakam cebinizde kalan Net Kâr\'dır.'
+  },
+  'TARGET': {
+    title: 'Hedef Ciro & Bütçe Planlaması',
+    icon: '🎯',
+    category: 'STRATEJİ & HEDEF',
+    badgeClass: 'badge-amber',
+    summary: 'O ay için ulaşmayı planladığınız gelir eşiğidir. İşletmenizin rotasını ve başarı çıtasını belirler.',
+    warning: '💡 Sezona göre hedef koyun: Kış zirvesinde 1.000.000 TL hedef koyarken, ara sezon Eylül için 120.000 TL gerçekçi bir hedeftir.',
+    formula: 'Tahmini Satılabilir Gece × Hedeflenen ADR',
+    example: 'Örn: Hedef 300.000 TL iken gerçekleşen 483.965 TL ise hedefin %161,3\'ü tamamlanmış demektir.',
+    actionRule: 'Hedefe ayın ortasında ulaştıysanız hemen kalan günlerin fiyatını artırın (yield management). Geride kaldıysanız gap gecelerine indirim uygulayın.'
+  },
+  'NET_PROFIT': {
+    title: 'Net Nakit Kâr (Net Cash Profit)',
+    icon: '💵',
+    category: 'KASADA KALAN SERBEST NAKİT',
+    badgeClass: 'badge-green',
+    summary: 'Cirodan tüm operasyonel harcamalar (Opex) ve mülk yatırımları (Capex) düşüldükten sonra işletme sahibinin cebinde kalan net nakittir.',
+    warning: '🌟 En önemli rakam budur: 1 milyon TL ciro yapıp 950 bin TL harcarsanız kârınız sadece 50 bindir. 500 bin ciro ile 350 bin kâr edebilirsiniz!',
+    formula: 'Net Kâr = Fiili Ciro - (OPEX + CAPEX)',
+    example: 'Örn: Ocak 2026\'da 843.555 TL cirodan 331.058 TL gider düşülmüş ve 512.497 TL rekor net kâr kalmıştır.',
+    actionRule: 'Net marjınızın (Net Kâr / Ciro) %30\'un altına düşmemesine dikkat edin.'
+  },
+  'TOTAL_EXPENSE': {
+    title: 'Toplam Giderler (OPEX + CAPEX)',
+    icon: '💸',
+    category: 'GİDER YÖNETİMİ',
+    badgeClass: 'badge-rose',
+    summary: 'İşletmenin dönmesi ve villaların kalitesini koruması için harcanan her kuruşun toplamıdır.',
+    warning: 'Giderler ikiye ayrılır: 1) Yaşamsal rutin giderler (OPEX), 2) Mülkün değerini kalıcı artıran yatırımlar (CAPEX).',
+    formula: 'Toplam Gider = Operasyonel Giderler + Yatırımlar',
+    example: 'Örn: Temizlik, fatura, komisyon (337.306 TL) + su arıtma yatırımı (3.866 TL) = 341.172 TL.',
+    actionRule: 'Giderlerin ciroya oranı %70\'i aşıyorsa harcama kalemlerini (özellikle komisyon ve sarfiyatları) denetleyin.'
+  },
+  'SOLD_NIGHTS': {
+    title: 'Satılan Gece Sayısı (Oda-Gece Hacmi)',
+    icon: '🌙',
+    category: 'KAPASİTE & HACİM',
+    badgeClass: 'badge-blue',
+    summary: 'O ay boyunca villalarınızda misafirlerin fiilen konakladığı toplam gece sayısıdır.',
+    warning: '5 villanız varsa ve ay 30 gün çekiyorsa, satabileceğiniz maksimum gece sayısı 5 × 30 = 150 gecedir.',
+    formula: 'Tüm villaların ay içindeki rezerve gece toplamı.',
+    example: 'Örn: Ağustos ayında toplam 79 gece satılmış, geriye 71 satılabilir boş gece kalmıştır.',
+    actionRule: 'Yüksek sezonda satılan geceyi 70\'in üzerine çıkarmak doluluk başarısıdır.'
+  },
+  'ADR': {
+    title: 'ADR (Ortalama Günlük Satış Fiyatı)',
+    icon: '🏷️',
+    category: 'FİYATLANDIRMA GÜCÜ',
+    badgeClass: 'badge-amber',
+    summary: 'Villalarınızı bir geceliğine ortalama kaça sattığınızı gösteren fiyattır. (Average Daily Rate).',
+    warning: '🌟 Başlangıç Seviyesi Altın Kural: Tüm evleriniz doluyorsa ama ADR çok düşükse, evlerinizi ucuza satıyorsunuz demektir! Fiyatı hemen artırın.',
+    formula: 'ADR = Toplam Oda Cirosu ÷ Satılan Gece Sayısı',
+    example: 'Örn: Şubat 2026\'da 37 gece satılarak 749.467 TL kazanıldı. ADR = 749.467 ÷ 37 = 20.256 TL / Gece (Tarihsel Zirve).',
+    actionRule: 'Hafta sonu yüksek ADR, hafta içi doluluk odaklı dengeli ADR uygulayın.'
+  },
+  'REVPAR': {
+    title: 'RevPAR (Oda Başına Düşen Gelir)',
+    icon: '📈',
+    category: 'OTELCİLİĞİN ALTIN KARNESİ',
+    badgeClass: 'badge-purple',
+    summary: 'Villanız boş ya da dolu fark etmeksizin, takvimdeki her gün için size kaç TL kazandırdığını gösteren en dürüst başarı karnesidir.',
+    warning: 'Neden ADR\'den daha önemlidir? Bir villayı geceliği 20.000 TL\'ye satıp ayda sadece 1 gün doldurursanız batarsınız. RevPAR hem doluluğu hem fiyatı aynı anda ölçer!',
+    formula: 'RevPAR = Toplam Ciro ÷ Toplam Kapasite (Oda Sayısı × 30 Gün) VEYA RevPAR = ADR × Doluluk %',
+    example: 'Örn: Ağustos ayında 5 villa için 483.965 TL ciro / 150 kapasite = 3.226 TL günlük ortalama gelir.',
+    actionRule: 'RevPAR\'ı artırmanın yolu: Doluluk %70\'i aştığında fiyatı yükseltmektir.'
+  },
+  'OCCUPANCY': {
+    title: 'Doluluk Oranı (%)',
+    icon: '📊',
+    category: 'KAPASİTE VERİMLİLİĞİ',
+    badgeClass: 'badge-blue',
+    summary: 'Villalarınızın ayın yüzde kaçında misafirle dolu olduğunu gösterir.',
+    warning: '30 günün kaçında evlerde ışık yanıyordu? %70 ve üzeri harika performanstır. %40 altı ise fiyat indirimi veya tanıtım alarmıdır.',
+    formula: '(Satılan Gece Sayısı ÷ 150 Kapasite) × 100',
+    example: 'Örn: 150 gecelik kapasitenin 79\'u satıldı: (79 ÷ 150) × 100 = %52,7 Doluluk.',
+    actionRule: '%100 doluluk her zaman iyi değildir! %100 doluluk genellikle \'fiyatı çok ucuz tuttunuz\' anlamına gelir.'
+  },
+  'OPEX': {
+    title: 'OPEX (Operasyonel İşletme Giderleri)',
+    icon: '⚡',
+    category: 'RUTİN GİDERLER',
+    badgeClass: 'badge-rose',
+    summary: 'Tesisin günlük olarak çalışmaya devam etmesi için yapılan düzenli, tekrarlayan harcamalardır.',
+    warning: 'Temizlik ücreti, elektrik/su/internet faturası, şömine odunu, karşılama ikramları ve OTA komisyonları OPEX\'tir.',
+    formula: 'Tüm operasyonel cari fatura ve sarfiyat toplamı.',
+    example: 'Örn: Ağustos ayında elektrik, temizlik ve bakım giderleri toplamı 337.306 TL.',
+    actionRule: 'OPEX\'i kısmak zordur ama toplu alım (örneğin odunu yazdan almak) maliyeti %30 düşürür.'
+  },
+  'CAPEX': {
+    title: 'CAPEX (Sermaye & Yatırım Harcamaları)',
+    icon: '🏗️',
+    category: 'MÜLK DEĞER ARTIRMA',
+    badgeClass: 'badge-purple',
+    summary: 'Villanın değerini ve kalitesini kalıcı olarak artıran büyük, tek seferlik demirbaş yatırımlarıdır.',
+    warning: 'Bahçeye jakuzi yaptırmak, sauna eklemek, klima taktırmak CAPEX\'tir. Bu bir masraf değil, villanın gecelik fiyatını artıracak yatırımdır.',
+    formula: 'Demirbaş ve kalıcı renovasyon harcamaları toplamı.',
+    example: 'Örn: Ocak ayında yapılan 465.331 TL\'lik kış hazırlığı ve sauna yatırımı.',
+    actionRule: 'Doğru bir CAPEX yatırımı (örn: ısıtmalı jakuzi), kendini 2-3 ayda gecelik fiyat artışıyla geri öder.'
+  },
+  'GAP_NIGHTS': {
+    title: 'Boşluk Geceleri (Gap Nights & Yetim Geceler)',
+    icon: '🧩',
+    category: 'KAYIP KAZANÇ FIRSATI',
+    badgeClass: 'badge-amber',
+    summary: 'İki rezervasyon arasında sıkışıp kalan 1 veya 2 günlük boş günlerdir.',
+    warning: 'O gün boş kalırsa size maliyeti 0 TL değil, kayıp bir cirodur! O günü fırsat paketiyle satmak saf kârdır.',
+    formula: 'İki rezervasyon arasındaki satılmamış 1-2 günlük boşluklar.',
+    example: 'Örn: Sistemde 3 adet gap gecesi tespit edildi. %25 indirimle Instagram\'da satılıp 15.000 TL kurtarıldı.',
+    actionRule: 'Gap gecesini boş bırakmaktansa normal fiyatın %30 altına \'Son Dakika Fırsatı\' ile satın.'
+  },
+  'OTA_COMMISSION': {
+    title: 'OTA Komisyonları vs Doğrudan Satış',
+    icon: '🌐',
+    category: 'KOMİSYON TASARRUFU',
+    badgeClass: 'badge-green',
+    summary: 'Airbnb, Booking.com vb. platformların sizden kestiği %15 - %20 arası aracılık ücretidir.',
+    warning: '100.000 TL\'lik satışı Airbnb\'den yaparsanız cebinize 85.000 TL kalır. Doğrudan WhatsApp\'tan yaparsanız 100.000 TL\'nin tamamı sizindir!',
+    formula: 'OTA Satış Tutarı × Komisyon Oranı (%15)',
+    example: 'Örn: Doğrudan WhatsApp\'tan kapatılan 280.000 TL\'lik satış sayesinde 42.000 TL komisyon cepte kalmıştır.',
+    actionRule: 'OTA\'ları vitrin olarak kullanın; gelen misafire kartınızı vererek bir sonraki gelişinde doğrudan sizden rezerve etmesini sağlayın.'
+  }
+};
+
+function showKpiExplanation(code) {
+  const guide = KPI_EXPLANATION_GUIDES[code] || {
+    title: 'Metrik Bilgisi',
+    icon: 'ℹ️',
+    category: 'GENEL GÖSTERGE',
+    badgeClass: 'badge-blue',
+    summary: 'Bu metrik işletmenizin performansını takip etmenize yardımcı olur.',
+    warning: 'Detaylı bilgi için başlangıç rehberimizi inceleyebilirsiniz.',
+    formula: 'Veri tabanı hesaplaması',
+    example: 'Güncel dönem verisi',
+    actionRule: 'Düzenli takip ile gelirinizi optimize edin.'
+  };
+
+  const modal = document.getElementById('kpiExplanationModal');
+  const iconEl = document.getElementById('kpiExplIcon');
+  const titleEl = document.getElementById('kpiExplTitle');
+  const catEl = document.getElementById('kpiExplCategory');
+  const bodyEl = document.getElementById('kpiExplBody');
+
+  if (iconEl) iconEl.innerText = guide.icon;
+  if (titleEl) titleEl.innerText = guide.title;
+  if (catEl) {
+    catEl.innerText = guide.category;
+    catEl.className = 'badge ' + guide.badgeClass;
+  }
+
+  if (bodyEl) {
+    bodyEl.innerHTML = `
+      <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px; margin-bottom: 14px;">
+        <div style="font-size: 11px; color: #93C5FD; font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">👶 1 Cümlede Basitçe Nedir?</div>
+        <div style="font-size: 13px; color: #FFFFFF; font-weight: 600; line-height: 1.5;">${guide.summary}</div>
+      </div>
+
+      <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px;">
+        <div style="font-size: 11px; color: #FDE68A; font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">💡 Başlangıç Seviyesi İpucu</div>
+        <div style="font-size: 12px; color: #E2E8F0; line-height: 1.4;">${guide.warning}</div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px;">
+        <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 10px;">
+          <div style="font-size: 10px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">📐 Nasıl Hesaplanır?</div>
+          <div style="font-size: 11px; color: #60A5FA; font-family: var(--font-mono); margin-top: 4px; font-weight: 600;">${guide.formula}</div>
+        </div>
+        <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 10px;">
+          <div style="font-size: 10px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">📊 Pratik Örnek</div>
+          <div style="font-size: 11px; color: #34D399; margin-top: 4px;">${guide.example}</div>
+        </div>
+      </div>
+
+      <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 10px; padding: 12px 14px;">
+        <div style="font-size: 11px; color: #A7F3D0; font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">🚀 Ne Zaman Aksiyon Almalısın?</div>
+        <div style="font-size: 12px; color: #E2E8F0; line-height: 1.4;">${guide.actionRule}</div>
+      </div>
+    `;
+  }
+
+  if (modal) modal.classList.add('active');
+}
+
+function closeKpiExplanationModal() {
+  const modal = document.getElementById('kpiExplanationModal');
+  if (modal) modal.classList.remove('active');
+}
+
+function openHelpModal(targetTab = 'terms') {
+  const modal = document.getElementById('helpModal');
+  if (modal) modal.classList.add('active');
+  if (targetTab) switchHelpTab(targetTab);
+}
+
+function closeHelpModal() {
+  const modal = document.getElementById('helpModal');
+  if (modal) modal.classList.remove('active');
+}
+
+function switchHelpTab(tabKey) {
+  document.querySelectorAll('.help-tab-btn').forEach(btn => btn.classList.remove('active'));
+  document.querySelectorAll('.help-tab-pane').forEach(pane => pane.style.display = 'none');
+
+  const targetBtn = document.getElementById('helpTabBtn-' + tabKey);
+  if (targetBtn) targetBtn.classList.add('active');
+
+  const activePane = document.getElementById('helpTab-' + tabKey);
+  if (activePane) activePane.style.display = 'block';
+}
+
+function filterHelpGlossary() {
+  const query = (document.getElementById('helpGlossarySearch')?.value || '').toLowerCase().trim();
+  const items = document.querySelectorAll('.glossary-card-item');
+
+  items.forEach(item => {
+    const text = item.innerText.toLowerCase();
+    const keywords = (item.getAttribute('data-keywords') || '').toLowerCase();
+    if (!query || text.includes(query) || keywords.includes(query)) {
+      item.style.display = 'block';
+    } else {
+      item.style.display = 'none';
+    }
+  });
 }
