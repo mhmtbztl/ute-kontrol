@@ -1,4 +1,4 @@
-// UTE KONTROL MERKEZİ V5 - FULL MASTER CONTROL & KPI ENGINE
+// UTE KONTROL MERKEZİ V5 - FULL MASTER CONTROL, KPI & OTA ENGINE
 // Uludağ Tatil Evleri (Seyir, Doğuş, Zirve, Şirin, Nefes)
 
 const DEFAULT_VILLAS = {
@@ -16,7 +16,6 @@ const DEFAULT_TARGETS = {
   directShare: 50.0
 };
 
-// Seed Bookings
 const DEFAULT_BOOKINGS = [
   { id: 'REZ-001', villa: 'SEYIR', guest: 'Hakan Demir', checkIn: '2026-09-01', checkOut: '2026-09-04', nights: 3, channel: 'AIRBNB', gross: 28000, otaComm: 4200, cleanFee: 1500, net: 22300, pax: 6, status: 'COMPLETED' },
   { id: 'REZ-002', villa: 'DOGUS', guest: 'Murat Kaya', checkIn: '2026-09-03', checkOut: '2026-09-06', nights: 3, channel: 'WHATSAPP', gross: 36000, otaComm: 0, cleanFee: 0, net: 36000, pax: 10, status: 'COMPLETED' },
@@ -61,7 +60,6 @@ function loadAppData() {
     const saved = localStorage.getItem('UTE_V5_MASTER_DATA');
     if (saved) {
       appData = JSON.parse(saved);
-      // Fallback keys if older version
       if (!appData.villas) appData.villas = JSON.parse(JSON.stringify(DEFAULT_VILLAS));
       if (!appData.targets) appData.targets = JSON.parse(JSON.stringify(DEFAULT_TARGETS));
     } else {
@@ -102,6 +100,14 @@ function switchTab(tabId) {
   }
 }
 
+function isBookingInFilter(b) {
+  if (currentFilter.villa !== 'ALL' && b.villa !== currentFilter.villa) return false;
+  if (currentFilter.period === 'ALL') return true;
+  const bInMonth = b.checkIn.slice(0, 7);
+  const bOutMonth = b.checkOut.slice(0, 7);
+  return (bInMonth === currentFilter.period || bOutMonth === currentFilter.period);
+}
+
 // Master Render
 function renderAll() {
   renderKPIsAndDashboard();
@@ -111,22 +117,12 @@ function renderAll() {
   renderGapNights();
   renderTodayRadar();
   renderDeepKpis();
+  renderOtaRadar();
 
   // Badges
   document.getElementById('rezCountBadge').innerText = appData.bookings.length;
   document.getElementById('leadCountBadge').innerText = appData.leads.length;
   document.getElementById('maintCountBadge').innerText = appData.maintenance.filter(m => m.status === 'OPEN').length;
-}
-
-// Helper: Check if booking matches filter
-function isBookingInFilter(b) {
-  if (currentFilter.villa !== 'ALL' && b.villa !== currentFilter.villa) return false;
-  if (currentFilter.period === 'ALL') return true;
-
-  // Accrual / Month match
-  const bInMonth = b.checkIn.slice(0, 7);
-  const bOutMonth = b.checkOut.slice(0, 7);
-  return (bInMonth === currentFilter.period || bOutMonth === currentFilter.period);
 }
 
 // -------------------------------------------------------------
@@ -137,8 +133,6 @@ function renderKPIsAndDashboard() {
   let totalNet = 0;
   let totalPaidNights = 0;
   let directRevenue = 0;
-  let totalCommission = 0;
-  let totalCleaningFee = 0;
 
   const targetVillas = currentFilter.villa === 'ALL' ? Object.keys(appData.villas) : [currentFilter.villa];
 
@@ -147,14 +141,12 @@ function renderKPIsAndDashboard() {
     villaStats[vKey] = { nights: 0, netRevenue: 0, grossRevenue: 0, directRevenue: 0, p1Open: 0 };
   });
 
-  // Maintenance P1 Count
   appData.maintenance.forEach(m => {
     if (m.status === 'OPEN' && m.priority === 'P1' && villaStats[m.villa]) {
       villaStats[m.villa].p1Open += 1;
     }
   });
 
-  // Calculate filtered bookings
   appData.bookings.forEach(b => {
     if (b.status === 'CANCELLED') return;
     if (!isBookingInFilter(b)) return;
@@ -162,14 +154,10 @@ function renderKPIsAndDashboard() {
     const bGross = Number(b.gross) || 0;
     const bNet = Number(b.net) || 0;
     const bNights = Number(b.nights) || 0;
-    const bComm = Number(b.otaComm) || 0;
-    const bClean = Number(b.cleanFee) || 0;
 
     totalGross += bGross;
     totalNet += bNet;
     totalPaidNights += bNights;
-    totalCommission += bComm;
-    totalCleaningFee += bClean;
 
     if (villaStats[b.villa]) {
       villaStats[b.villa].nights += bNights;
@@ -184,7 +172,6 @@ function renderKPIsAndDashboard() {
     }
   });
 
-  // Available Nights
   const daysInPeriod = currentFilter.period === 'ALL' ? 90 : 30;
   const totalCalendarDays = daysInPeriod * targetVillas.length;
   const totalDowntime = appData.maintenance
@@ -198,11 +185,9 @@ function renderKPIsAndDashboard() {
   const variableCosts = (totalPaidNights * 750);
   const nrevpar = Math.max(0, (totalNet - variableCosts) / availableNights);
 
-  // Targets
   const targetRev = appData.targets.monthlyRevenue || 400000;
   const targetPct = targetRev > 0 ? (totalNet / targetRev) * 100 : 0;
 
-  // Render Big 4
   document.getElementById('kpiNetRevenue').innerText = `₺${Math.round(totalNet).toLocaleString('tr-TR')}`;
   document.getElementById('kpiGrossRevenue').innerText = `Brüt: ₺${Math.round(totalGross).toLocaleString('tr-TR')}`;
   document.getElementById('kpiTargetPct').innerText = `%${targetPct.toFixed(1)} Hedef Başarısı`;
@@ -215,7 +200,7 @@ function renderKPIsAndDashboard() {
   document.getElementById('kpiRevPAR').innerText = `₺${Math.round(revpar).toLocaleString('tr-TR')}`;
   document.getElementById('kpiNRevPAR').innerText = `Net RevPAR: ₺${Math.round(nrevpar).toLocaleString('tr-TR')}`;
 
-  // Scorecard
+  // Scorecard Table
   const tbody = document.getElementById('villaScorecardBody');
   tbody.innerHTML = '';
 
@@ -229,7 +214,7 @@ function renderKPIsAndDashboard() {
 
     let badgeHtml = '<span class="badge badge-emerald">🟢 Sağlıklı</span>';
     if (s.p1Open > 0) {
-      badgeHtml = '<span class="badge badge-rose">🔴 P1 Arıza Var</span>';
+      badgeHtml = '<span class="badge badge-rose">🔴 P1 Arıza</span>';
     } else if (vOcc < 40) {
       badgeHtml = '<span class="badge badge-amber">🟡 Düşük Doluluk</span>';
     }
@@ -244,13 +229,12 @@ function renderKPIsAndDashboard() {
       <td>₺${Math.round(vRevpar).toLocaleString('tr-TR')}</td>
       <td><strong>₺${Math.round(s.netRevenue).toLocaleString('tr-TR')}</strong></td>
       <td>%${vDirPct.toFixed(1)}</td>
-      <td>${s.p1Open > 0 ? `<strong style="color:var(--accent-rose);">${s.p1Open} P1 Açık</strong>` : 'Yok'}</td>
+      <td>${s.p1Open > 0 ? `<strong style="color:var(--accent-rose);">${s.p1Open} P1</strong>` : 'Yok'}</td>
       <td>${badgeHtml}</td>
     `;
     tbody.appendChild(tr);
   });
 
-  // Funnel & Channels
   renderFunnelAndChannels(directRevenue, totalNet);
 }
 
@@ -266,7 +250,7 @@ function renderFunnelAndChannels(directRev, totalNet) {
   const funnelBox = document.getElementById('funnelStatsContainer');
   funnelBox.innerHTML = `
     <div class="funnel-item">
-      <div class="label">TOPLAM LEAD (TALEP)</div>
+      <div class="label">TOPLAM TALEP (LEAD)</div>
       <div class="val">${totalLeads} Adet</div>
     </div>
     <div class="funnel-item">
@@ -278,7 +262,7 @@ function renderFunnelAndChannels(directRev, totalNet) {
       <div class="val">%${convRate.toFixed(1)}</div>
     </div>
     <div class="funnel-item">
-      <div class="label">LEAD BAŞINA NET GELİR (RPL)</div>
+      <div class="label">LEAD BAŞINA NET GELİR</div>
       <div class="val">₺${Math.round(rpl).toLocaleString('tr-TR')}</div>
     </div>
   `;
@@ -326,7 +310,6 @@ function renderTodayRadar() {
   container.innerHTML = '';
   const actions = [];
 
-  // P1 Arızalar
   appData.maintenance
     .filter(m => m.status === 'OPEN' && m.priority === 'P1')
     .forEach(m => {
@@ -334,25 +317,23 @@ function renderTodayRadar() {
         type: 'p1',
         badge: '[P1 ACİL]',
         title: `${appData.villas[m.villa]?.name || m.villa}: ${m.title}`,
-        meta: `Downtime Riski: ${m.downtime || 1} Gece | Sorumlu: ${m.assignee || 'Atanmadı'}`,
+        meta: `Downtime: ${m.downtime || 1} Gece | Sorumlu: ${m.assignee || 'Atanmadı'}`,
         action: 'Çöz'
       });
     });
 
-  // Sıcak Talepler
   appData.leads
     .filter(l => l.status === 'FOLLOW_UP')
     .forEach(l => {
       actions.push({
         type: 'lead',
         badge: '[SICAK LEAD]',
-        title: `${l.guest} (${appData.villas[l.villa]?.name || l.villa}): ₺${Number(l.quote).toLocaleString('tr-TR')} teklif yanıt bekliyor.`,
+        title: `${l.guest} (${appData.villas[l.villa]?.name || l.villa}): ₺${Number(l.quote).toLocaleString('tr-TR')} teklif bekliyor.`,
         meta: `Kanal: ${l.channel} | ${l.notes || 'Yanıt bekleniyor'}`,
         action: 'Follow-up'
       });
     });
 
-  // Giriş/Çıkışlar
   const todayStr = new Date().toISOString().split('T')[0];
   appData.bookings.forEach(b => {
     if (b.status === 'CANCELLED') return;
@@ -464,7 +445,105 @@ function renderGapNights() {
 }
 
 // -------------------------------------------------------------
-// 5. DERİN KPI & FİNANS ANALİZİ (TAB 2)
+// 5. OTA & KANAL RADARI ENGINE (YENİ)
+// -------------------------------------------------------------
+function renderOtaRadar() {
+  const channelData = {
+    'AIRBNB': { name: 'Airbnb', type: 'OTA', count: 0, gross: 0, comm: 0, net: 0 },
+    'BOOKING': { name: 'Booking.com', type: 'OTA', count: 0, gross: 0, comm: 0, net: 0 },
+    'WHATSAPP': { name: 'WhatsApp', type: 'Direkt', count: 0, gross: 0, comm: 0, net: 0 },
+    'INSTAGRAM': { name: 'Instagram', type: 'Direkt', count: 0, gross: 0, comm: 0, net: 0 },
+    'WEBSITE': { name: 'Website', type: 'Direkt', count: 0, gross: 0, comm: 0, net: 0 }
+  };
+
+  let savedCommissionTotal = 0;
+
+  appData.bookings.forEach(b => {
+    if (b.status === 'CANCELLED') return;
+    const chKey = b.channel ? b.channel.toUpperCase() : 'OTHER';
+    if (channelData[chKey]) {
+      channelData[chKey].count += 1;
+      channelData[chKey].gross += Number(b.gross) || 0;
+      channelData[chKey].comm += Number(b.otaComm) || 0;
+      channelData[chKey].net += Number(b.net) || 0;
+    }
+
+    const isDirect = ['WHATSAPP', 'INSTAGRAM', 'WEBSITE', 'REPEAT', 'PHONE'].includes(chKey);
+    if (isDirect) {
+      // Direct savings vs 15% OTA commission
+      savedCommissionTotal += (Number(b.gross) || 0) * 0.15;
+    }
+  });
+
+  // Update Direct Savings Counter
+  document.getElementById('otaSavedCommission').innerText = `₺${Math.round(savedCommissionTotal).toLocaleString('tr-TR')}`;
+
+  // Profitability Table
+  const tbody = document.getElementById('channelProfitabilityTableBody');
+  tbody.innerHTML = '';
+
+  Object.keys(channelData).forEach(k => {
+    const c = channelData[k];
+    const commPct = c.gross > 0 ? (c.comm / c.gross) * 100 : 0;
+    const netMargin = c.gross > 0 ? (c.net / c.gross) * 100 : 0;
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><strong>${c.name}</strong></td>
+      <td><span class="badge ${c.type === 'Direkt' ? 'badge-green' : 'badge-blue'}">${c.type}</span></td>
+      <td>${c.count} Rezervasyon</td>
+      <td>₺${Math.round(c.gross).toLocaleString('tr-TR')}</td>
+      <td style="color:var(--accent-rose);">₺${Math.round(c.comm).toLocaleString('tr-TR')}</td>
+      <td>%${commPct.toFixed(1)}</td>
+      <td><strong>₺${Math.round(c.net).toLocaleString('tr-TR')}</strong></td>
+      <td><span class="badge ${netMargin >= 85 ? 'badge-green' : 'badge-amber'}">%${netMargin.toFixed(1)}</span></td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  // Digital Listing Audit Table (5 Villas)
+  const auditBody = document.getElementById('digitalAuditTableBody');
+  const auditList = [
+    { villa: 'Seyir', photo: '🟢 Kış/Kar Güncel', parity: '🟢 %15 Fark Korundu', minStay: '2 Gece (Hafta Sonu)', cancel: 'Esnek', instant: 'Açık', score: '95 / 100', action: 'Listing güçlü' },
+    { villa: 'Doğuş', photo: '🟡 Yaz Fotoğrafı Var', parity: '🟢 Dengeli', minStay: '2 Gece', cancel: 'Orta', instant: 'Açık', score: '82 / 100', action: 'Kış bahçesi fotoğraflarını öne al' },
+    { villa: 'Zirve', photo: '🟢 Gece Jakuzi Aktif', parity: '🟢 Premium Korundu', minStay: '2 Gece', cancel: 'Katı', instant: 'Açık', score: '98 / 100', action: 'Superhost vitrin villası' },
+    { villa: 'Şirin', photo: '🔴 Teras Fotoğrafı Eksik', parity: '🟡 İnceleme Gerek', minStay: '1 Gece Esnetildi', cancel: 'Esnek', instant: 'Açık', score: '74 / 100', action: 'Başlık ve açıklama güncellenmeli' },
+    { villa: 'Nefes', photo: '🟢 Kalabalık Grup Odaklı', parity: '🟢 Dengeli', minStay: '2 Gece', cancel: 'Orta', instant: 'Açık', score: '88 / 100', action: 'Voleybol/şömine vurgusu iyi' }
+  ];
+
+  auditBody.innerHTML = '';
+  auditList.forEach(a => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><strong>${a.villa}</strong></td>
+      <td>${a.photo}</td>
+      <td>${a.parity}</td>
+      <td>${a.minStay}</td>
+      <td>${a.cancel}</td>
+      <td>${a.instant}</td>
+      <td><strong>${a.score}</strong></td>
+      <td><span class="badge badge-blue">${a.action}</span></td>
+    `;
+    auditBody.appendChild(tr);
+  });
+}
+
+// -------------------------------------------------------------
+// 6. INTERACTIVE KPI EXPLANATIONS (INFO POPUP)
+// -------------------------------------------------------------
+function showKpiExplanation(kpiCode) {
+  const guide = {
+    'NAR': '📊 NET ODA GELİRİ (Net Accommodation Revenue):\n\nMisafirin ödediği brüt ücretten Airbnb/Booking komisyonları ve temizlik ücretleri düşüldükten sonra kalan saf konaklama cirosudur.\n\nİşletmenizin gerçek yatak geliri bu rakamdır.',
+    'OCCUPANCY': '🛌 DOLULUK ORANI (Occupancy %):\n\n(Satılan Gece / Satılabilir Gece) x 100\n\nP1 arıza sebebiyle kapalı kalınan geceler satılamaz olduğundan paydadan düşülür ve doluluğu haksız yere düşürmez.',
+    'ADR': '💵 ADR (Average Daily Rate):\n\nNet Oda Geliri / Satılan Gece.\n\nVillalarınızı dolu olduğu gecelerde ortalama kaça sattığınızı gösterir. Doluluk yüksek ama ADR düşükse, gereğinden ucuza satıyorsunuz demektir.',
+    'REVPAR': '🏆 RevPAR (Revenue Per Available Room):\n\nNet Oda Geliri / Satılabilir Toplam Gece.\n\nKonaklama sektörünün EN ÖNEMLİ metriğidir. Boş geceler dahil tüm portföyün gece başına kaç TL ürettiğini gösterir.'
+  };
+
+  alert(guide[kpiCode] || 'KPI Açıklaması');
+}
+
+// -------------------------------------------------------------
+// 7. DERİN KPI & FİNANS ANALİZİ (TAB 3)
 // -------------------------------------------------------------
 function renderDeepKpis() {
   let gross = 0;
@@ -536,7 +615,7 @@ function renderDeepKpis() {
 }
 
 // -------------------------------------------------------------
-// 6. MANAGE BOOKINGS TABLE (CRUD + SEARCH)
+// 8. MANAGE BOOKINGS TABLE (CRUD + SEARCH)
 // -------------------------------------------------------------
 function renderManageBookingsTable() {
   const tbody = document.getElementById('manageBookingsTableBody');
@@ -705,7 +784,7 @@ function deleteBooking(id) {
 }
 
 // -------------------------------------------------------------
-// 7. SETTINGS & PRICING TIERS TABLE (TAB 6)
+// 9. SETTINGS & PRICING TIERS TABLE (TAB 7)
 // -------------------------------------------------------------
 function renderSettingsTable() {
   const tbody = document.getElementById('settingsTableBody');
@@ -753,7 +832,7 @@ function editTargetsModal() {
 }
 
 // -------------------------------------------------------------
-// 8. LEADS & MAINTENANCE CRUD
+// 10. LEADS & MAINTENANCE CRUD
 // -------------------------------------------------------------
 function renderManageLeadsTable() {
   const tbody = document.getElementById('manageLeadsTableBody');
@@ -942,7 +1021,7 @@ function deleteMaint(id) {
 }
 
 // -------------------------------------------------------------
-// 9. UTILITIES (RESET & EXPORT)
+// 11. UTILITIES (RESET & EXPORT)
 // -------------------------------------------------------------
 function resetToCleanState() {
   if (confirm('DİKKAT: Tüm mevcut rezervasyonları, talepleri ve arızaları temizleyip sıfır işletme kasası başlatmak istiyor musunuz?')) {
@@ -964,7 +1043,6 @@ function exportDataJSON() {
   downloadAnchor.remove();
 }
 
-// Startup
 document.addEventListener('DOMContentLoaded', () => {
   loadAppData();
   renderAll();

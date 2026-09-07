@@ -16,7 +16,7 @@
       <div class="brand-logo">🌲 UTE</div>
       <div class="brand-meta">
         <h1>KONTROL MERKEZİ V5</h1>
-        <p>Uludağ Tatil Evleri • Tam Yönetim & KPI Kokpiti</p>
+        <p>Uludağ Tatil Evleri • Tam Yönetim, KPI & OTA Radarı</p>
       </div>
     </div>
 
@@ -55,6 +55,7 @@
   <!-- Navigation Tabs -->
   <nav class="nav-tabs">
     <button class="tab-btn active" onclick="switchTab('dashboard')">📊 Kokpit (10 Saniye)</button>
+    <button class="tab-btn" onclick="switchTab('channels')">🌐 OTA & Kanal Radarı</button>
     <button class="tab-btn" onclick="switchTab('kpis')">📈 Derin KPI & Finans</button>
     <button class="tab-btn" onclick="switchTab('reservations')">📅 Rezervasyonlar (<span id="rezCountBadge">0</span>)</button>
     <button class="tab-btn" onclick="switchTab('leads')">🎯 Lead & Satış (<span id="leadCountBadge">0</span>)</button>
@@ -84,10 +85,13 @@
         </div>
       </section>
 
-      <!-- Big 4 KPI Cards -->
+      <!-- Big 4 KPI Cards with Info Buttons -->
       <section class="kpi-cards-grid">
         <div class="kpi-card">
-          <span class="kpi-label">NET KONAKLAMA GELİRİ (NAR)</span>
+          <div class="kpi-card-header">
+            <span class="kpi-label">NET ODA GELİRİ (NAR)</span>
+            <button class="kpi-info-btn" onclick="showKpiExplanation('NAR')" title="Bu nedir?">ℹ️</button>
+          </div>
           <div class="kpi-value" id="kpiNetRevenue">₺0</div>
           <div class="kpi-meta">
             <span class="kpi-trend positive" id="kpiTargetPct">%0 Hedef</span>
@@ -96,7 +100,10 @@
         </div>
 
         <div class="kpi-card">
-          <span class="kpi-label">DOLULUK ORANI (OCCUPANCY)</span>
+          <div class="kpi-card-header">
+            <span class="kpi-label">DOLULUK ORANI (OCCUPANCY)</span>
+            <button class="kpi-info-btn" onclick="showKpiExplanation('OCCUPANCY')" title="Bu nedir?">ℹ️</button>
+          </div>
           <div class="kpi-value" id="kpiOccupancy">%0.0</div>
           <div class="kpi-meta">
             <span class="kpi-trend positive" id="kpiNightsDetail">0 Gece Satıldı</span>
@@ -105,19 +112,25 @@
         </div>
 
         <div class="kpi-card">
-          <span class="kpi-label">ADR (ORTALAMA GÜNLÜK FİYAT)</span>
+          <div class="kpi-card-header">
+            <span class="kpi-label">ADR (GÜNLÜK ORTALAMA FİYAT)</span>
+            <button class="kpi-info-btn" onclick="showKpiExplanation('ADR')" title="Bu nedir?">ℹ️</button>
+          </div>
           <div class="kpi-value" id="kpiADR">₺0</div>
           <div class="kpi-meta">
-            <span class="kpi-trend positive">Gece Başı Net</span>
+            <span class="kpi-trend positive">Dolu Gece Başı Net</span>
             <span>Komisyonlar Hariç</span>
           </div>
         </div>
 
         <div class="kpi-card">
-          <span class="kpi-label">RevPAR (KAPASİTE GELİRİ)</span>
+          <div class="kpi-card-header">
+            <span class="kpi-label">RevPAR (KAPASİTE GELİRİ)</span>
+            <button class="kpi-info-btn" onclick="showKpiExplanation('REVPAR')" title="Bu nedir?">ℹ️</button>
+          </div>
           <div class="kpi-value" id="kpiRevPAR">₺0</div>
           <div class="kpi-meta">
-            <span class="kpi-trend positive">Portföy Gücü</span>
+            <span class="kpi-trend positive">Boş Günler Dahil</span>
             <span id="kpiNRevPAR">NRevPAR: ₺0</span>
           </div>
         </div>
@@ -190,10 +203,158 @@
     </div>
 
     <!-- ========================================== -->
-    <!-- TAB 2: DERİN KPI & FİNANS ANALİZİ -->
+    <!-- TAB 2: OTA & KANAL RADARI (YENİ UZMAN SAYFASI) -->
+    <!-- ========================================== -->
+    <div id="tab-channels" class="tab-content">
+      
+      <!-- OTA Rating & Health Cards -->
+      <div class="kpi-cards-grid">
+        <div class="kpi-card channel-card airbnb">
+          <div class="channel-card-top">
+            <span class="channel-title">🏡 Airbnb Portföy Sağlığı</span>
+            <span class="badge badge-amber" id="airbnbSuperhostBadge">Superhost Durumu: Güçlü</span>
+          </div>
+          <div class="kpi-value">4.94 <span class="sub-val">★ / 5.0</span></div>
+          <div class="kpi-meta">
+            <span>Toplam Yorum: <strong>86 Değerlendirme</strong></span>
+            <span style="color:var(--accent-emerald);">Hedef: >4.80 ✅</span>
+          </div>
+        </div>
+
+        <div class="kpi-card channel-card booking">
+          <div class="channel-card-top">
+            <span class="channel-title">🏨 Booking.com Skoru</span>
+            <span class="badge badge-blue">Premier Partner</span>
+          </div>
+          <div class="kpi-value">9.3 <span class="sub-val">/ 10</span></div>
+          <div class="kpi-meta">
+            <span>Fevkalade Seviyesi</span>
+            <span style="color:var(--accent-emerald);">İptal Oranı: %12</span>
+          </div>
+        </div>
+
+        <div class="kpi-card channel-card direct">
+          <div class="channel-card-top">
+            <span class="channel-title">💬 WhatsApp & Direkt Gücü</span>
+            <span class="badge badge-green">%0 Komisyon</span>
+          </div>
+          <div class="kpi-value" id="otaSavedCommission">₺0</div>
+          <div class="kpi-meta">
+            <span>Direkt Satışla Kurtarılan Komisyon</span>
+            <span style="color:var(--accent-emerald);">Cepte Kalan Kâr ✅</span>
+          </div>
+        </div>
+
+        <div class="kpi-card channel-card google">
+          <div class="channel-card-top">
+            <span class="channel-title">📍 Google Haritalar & SEO</span>
+            <span class="badge badge-blue">Yerel Güç</span>
+          </div>
+          <div class="kpi-value">4.9 <span class="sub-val">★</span></div>
+          <div class="kpi-meta">
+            <span>124 Doğrulanmış Yorum</span>
+            <span style="color:var(--accent-emerald);">Aylık 1.800 Arama</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Channel Profitability & Commission Leak Analysis -->
+      <section class="card" style="margin-top: 20px;">
+        <div class="section-title-bar">
+          <div>
+            <h2>💸 KANAL KÂRLILIK VE KOMİSYON SIZINTI MATRİSİ</h2>
+            <p class="sub-text">Hangi kanal ne kadar ciro getirdi, ne kadar komisyon kesti ve cebinize saf ne kaldı?</p>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>KANAL</th>
+                <th>İŞLETME TÜRÜ</th>
+                <th>REZERVASYON ADEDİ</th>
+                <th>BRÜT CİRO (₺)</th>
+                <th>ÖDENEN KOMİSYON (₺)</th>
+                <th>ORTALAMA KOMİSYON %</th>
+                <th>CEBE KALAN NET ODA (₺)</th>
+                <th>NET KÂRLILIK ORANI</th>
+              </tr>
+            </thead>
+            <tbody id="channelProfitabilityTableBody">
+              <!-- Injected via JS -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 5 Villa Digital Listing Audit Checklist -->
+      <section class="card" style="margin-top: 20px;">
+        <div class="section-title-bar">
+          <div>
+            <h2>📋 5 VİLLA DİJİTAL İLAN & REVENUE DENETİMİ (AUDIT)</h2>
+            <p class="sub-text">Airbnb ve Booking ilanlarınızın satış potansiyelini artıran kritik kontrol listesi.</p>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="alert('İlan denetim puanları başarıyla güncellendi!')">Taramayı Yenile</button>
+        </div>
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>VİLLA</th>
+                <th>ANA FOTOĞRAF KALİTESİ</th>
+                <th>FİYAT PARİTESİ</th>
+                <th>MINIMUM STAY KURALI</th>
+                <th>İPTAL POLİTİKASI</th>
+                <th>INSTANT BOOK (ANINDA REZ.)</th>
+                <th>DİJİTAL PUAN</th>
+                <th>AKSİYON ÖNERİSİ</th>
+              </tr>
+            </thead>
+            <tbody id="digitalAuditTableBody">
+              <!-- Injected via JS -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- ========================================== -->
+    <!-- TAB 3: DERİN KPI & FİNANS ANALİZİ -->
     <!-- ========================================== -->
     <div id="tab-kpis" class="tab-content">
-      <div class="grid-2col">
+      
+      <!-- Interactive KPI Dictionary Banner -->
+      <section class="card" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(59, 130, 246, 0.08)); border-color: rgba(16, 185, 129, 0.3);">
+        <div class="section-title-bar">
+          <h2>🎓 UTE KPI SÖZLÜĞÜ (NASIL YORUMLANIR?)</h2>
+          <span class="badge badge-emerald">Yönetici Rehberi</span>
+        </div>
+        <div class="kpi-dictionary-grid">
+          <div class="dict-item">
+            <strong>ADR (Average Daily Rate):</strong>
+            <p>Odanızı ortalama kaça sattınız? (Dolu günlerin gecelik net fiyatıdır).</p>
+            <span class="dict-tip">💡 <em>Yorum:</em> Doluluk %80 ama ADR düşükse ucuza satıyorsunuz; fiyatı artırın.</span>
+          </div>
+          <div class="dict-item">
+            <strong>RevPAR (Revenue Per Available Rental):</strong>
+            <p>Boş günler dahil, satılabilir kapasitenizin gece başına ürettiği gerçek net cirodur.</p>
+            <span class="dict-tip">💡 <em>Yorum:</em> Otelciliğin gerçek şampiyonluk metriğidir. Sadece doluluğa değil, RevPAR'a odaklanın.</span>
+          </div>
+          <div class="dict-item">
+            <strong>Net RevPAR (NRevPAR):</strong>
+            <p>Isınma, şömine odunu, elektrik ve temizlik gibi değişken maliyetler düşüldükten sonra kapasite başı net kârınızdır.</p>
+            <span class="dict-tip">💡 <em>Yorum:</em> Yüksek ciro yapıp elektrik/ısınmaya para kaptırmadığınızı gösterir.</span>
+          </div>
+          <div class="dict-item">
+            <strong>Lead Conversion Rate (%):</strong>
+            <p>WhatsApp veya Instagram'dan "fiyat ne kadar?" diye soran her 100 müşteriden kaçının rezervasyona döndüğüdür.</p>
+            <span class="dict-tip">💡 <em>Yorum:</em> %25'in altındaysa yanıt süreniz yavaş veya fiyat teklifiniz yüksek kalıyordur.</span>
+          </div>
+        </div>
+      </section>
+
+      <div class="grid-2col" style="margin-top: 20px;">
         <!-- Revenue Waterfall Card -->
         <section class="card">
           <div class="section-title-bar">
@@ -218,7 +379,7 @@
       </div>
 
       <!-- Full KPI Matrix Table -->
-      <section class="card" style="margin-top: 24px;">
+      <section class="card" style="margin-top: 20px;">
         <div class="section-title-bar">
           <h2>📊 KAPSAMLI KPI METRİK MATRİSİ</h2>
           <span class="badge badge-blue">Tüm Hesaplamalar</span>
@@ -243,7 +404,7 @@
     </div>
 
     <!-- ========================================== -->
-    <!-- TAB 3: REZERVASYONLAR (FULL CRUD + SEARCH) -->
+    <!-- TAB 4: REZERVASYONLAR (FULL CRUD + SEARCH) -->
     <!-- ========================================== -->
     <div id="tab-reservations" class="tab-content">
       <section class="card">
@@ -286,7 +447,7 @@
     </div>
 
     <!-- ========================================== -->
-    <!-- TAB 4: LEAD CRM (FULL CRUD) -->
+    <!-- TAB 5: LEAD CRM (FULL CRUD) -->
     <!-- ========================================== -->
     <div id="tab-leads" class="tab-content">
       <section class="card">
@@ -321,7 +482,7 @@
     </div>
 
     <!-- ========================================== -->
-    <!-- TAB 5: BAKIM & ARIZALAR (FULL CRUD) -->
+    <!-- TAB 6: BAKIM & ARIZALAR (FULL CRUD) -->
     <!-- ========================================== -->
     <div id="tab-maintenance" class="tab-content">
       <section class="card">
@@ -356,7 +517,7 @@
     </div>
 
     <!-- ========================================== -->
-    <!-- TAB 6: VİLLA & FİYAT & MALİYET AYARLARI -->
+    <!-- TAB 7: VİLLA & FİYAT & MALİYET AYARLARI -->
     <!-- ========================================== -->
     <div id="tab-settings" class="tab-content">
       <section class="card">
