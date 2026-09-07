@@ -170,9 +170,9 @@
 
         <div class="header-actions">
       <!-- Başlangıç Rehberi Butonu -->
-      <button type="button" class="btn btn-secondary header-cache-btn" onclick="forceHardRefresh()" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #FCA5A5; font-weight: 700; display: flex; align-items: center; gap: 5px;" title="Mobildeki eski önbellek ve çerezleri temizleyip en güncel canlı sürümü yükler">
+      <button type="button" class="btn btn-secondary header-cache-btn" onclick="window.location.reload()" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.15); color: #E2E8F0; font-weight: 600; display: flex; align-items: center; gap: 5px;" title="Sayfayı yeniden yükler (Verilerinizi ASLA silmez)">
         <span>🔄</span>
-        <span class="cache-btn-text">Önbelleği Temizle</span>
+        <span class="cache-btn-text">Sayfayı Yenile</span>
       </button>
       <button type="button" class="btn btn-secondary header-guide-btn" onclick="openHelpModal('terms')" style="background: rgba(139, 92, 246, 0.18); border: 1px solid rgba(139, 92, 246, 0.4); color: #DDD6FE; font-weight: 700; display: flex; align-items: center; gap: 6px;" title="Başlangıç Seviyesi Terimler Sözlüğü & Kılavuz">
         <span>🎓</span>
@@ -249,13 +249,7 @@
               <small>Tüm temizlik işleri, hakedişler ve personel borçları</small>
             </div>
           </button>
-          <button type="button" class="dropdown-item" onclick="forceHardRefresh(); closeAllHeaderDropdowns();" style="background: rgba(245, 158, 11, 0.1);">
-            <span class="dropdown-icon">🔄</span>
-            <div>
-              <strong style="color: #FBBF24;">Önbelleği & Çerezleri Sıfırla</strong>
-              <small>Mobildeki eski verileri silip canlı sürümü yeniden yükler</small>
-            </div>
-          </button>
+          
           <button type="button" class="dropdown-item" onclick="openImportModal(); closeAllHeaderDropdowns();">
             <span class="dropdown-icon">📥</span>
             <div>
@@ -285,11 +279,11 @@
             </div>
           </button>
           <div class="dropdown-divider"></div>
-          <button type="button" class="dropdown-item text-danger" onclick="openResetModal(); closeAllHeaderDropdowns();">
-            <span class="dropdown-icon">🗑️</span>
+          <button type="button" class="dropdown-item text-danger" onclick="confirmFactoryReset(); closeAllHeaderDropdowns();" style="border-top: 1px solid rgba(239, 68, 68, 0.2); background: rgba(239, 68, 68, 0.08); margin-top: 4px;">
+            <span class="dropdown-icon">⚠️</span>
             <div>
-              <strong style="color: #F87171;">Verileri Sıfırla / Geri Yükle</strong>
-              <small>0 TL temiz başlangıç veya Excel yükle</small>
+              <strong style="color: #F87171;">Her Şeyi Sıfırla (Fabrika Ayarları)</strong>
+              <small style="color: #FCA5A5;">Tüm verileri silip masaüstündeki GENEL RAPOR.xlsx'e döndürür</small>
             </div>
           </button>
         </div>

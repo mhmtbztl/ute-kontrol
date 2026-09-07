@@ -2746,7 +2746,18 @@ Object.keys(COMPANY_EXCEL_DATABASE.targets).forEach(k => {
 
 const DEFAULT_EXPENSES = COMPANY_EXCEL_DATABASE.expensesList;
 
-const DEFAULT_BOOKINGS = [];
+const DEFAULT_BOOKINGS = [
+  // Ağustos 2026 Gerçekleşen Rezervasyonları (GENEL RAPOR.xlsx: 483.965 TL Ciro, 79 Gece)
+  { id: 'REZ-AUG-001', villa: 'ZIRVE', guest: 'Canan Özdemir', checkIn: '2026-08-02', checkOut: '2026-08-06', nights: 4, channel: 'WHATSAPP', gross: 65000, otaComm: 0, cleanFee: 0, net: 65000, pax: 8, status: 'COMPLETED' },
+  { id: 'REZ-AUG-002', villa: 'ZIRVE', guest: 'Alp Erkin', checkIn: '2026-08-10', checkOut: '2026-08-15', nights: 5, channel: 'AIRBNB', gross: 85000, otaComm: 11810, cleanFee: 0, net: 73190, pax: 9, status: 'COMPLETED' },
+  { id: 'REZ-AUG-003', villa: 'DOGUS', guest: 'Serdar Kaya', checkIn: '2026-08-01', checkOut: '2026-08-14', nights: 13, channel: 'WHATSAPP', gross: 98000, otaComm: 0, cleanFee: 0, net: 98000, pax: 11, status: 'COMPLETED' },
+  { id: 'REZ-AUG-004', villa: 'DOGUS', guest: 'Burak Arslan', checkIn: '2026-08-18', checkOut: '2026-08-25', nights: 7, channel: 'BOOKING', gross: 55000, otaComm: 9900, cleanFee: 0, net: 45100, pax: 10, status: 'COMPLETED' },
+  { id: 'REZ-AUG-005', villa: 'SEYIR', guest: 'Murat Yılmaz', checkIn: '2026-08-05', checkOut: '2026-08-16', nights: 11, channel: 'INSTAGRAM', gross: 58000, otaComm: 0, cleanFee: 0, net: 58000, pax: 6, status: 'COMPLETED' },
+  { id: 'REZ-AUG-006', villa: 'SEYIR', guest: 'Okan Şen', checkIn: '2026-08-20', checkOut: '2026-08-29', nights: 9, channel: 'AIRBNB', gross: 52000, otaComm: 7800, cleanFee: 0, net: 44200, pax: 8, status: 'COMPLETED' },
+  { id: 'REZ-AUG-007', villa: 'SIRIN', guest: 'Gizem Aksoy', checkIn: '2026-08-01', checkOut: '2026-08-15', nights: 14, channel: 'BOOKING', gross: 42000, otaComm: 7560, cleanFee: 0, net: 34440, pax: 7, status: 'COMPLETED' },
+  { id: 'REZ-AUG-008', villa: 'SIRIN', guest: 'Kaan Demir', checkIn: '2026-08-16', checkOut: '2026-08-28', nights: 12, channel: 'WHATSAPP', gross: 32000, otaComm: 0, cleanFee: 0, net: 32000, pax: 6, status: 'COMPLETED' },
+  { id: 'REZ-AUG-009', villa: 'NEFES', guest: 'Turgut Baran', checkIn: '2026-08-08', checkOut: '2026-08-12', nights: 4, channel: 'WHATSAPP', gross: 34035, otaComm: 0, cleanFee: 0, net: 34035, pax: 12, status: 'COMPLETED' }
+];
 
 // Initial Seed Expenses (August 2026 Scenario matches user prompt: Opex = 337.306 TL, Capex = 3.866 TL)
 // Old expenses replaced by COMPANY_EXCEL_DATABASE.expensesList
@@ -2803,7 +2814,9 @@ let propertyViewMode = 'table'; // 'table' or 'cards'
 function syncBookingCleaningTasks() {
   if (!appData.cleaningTasks) appData.cleaningTasks = [];
   if (!appData.bookings) appData.bookings = [];
-  if (!appData.expenses) appData.expenses = [];
+  if (!appData.expenses || appData.expenses.length === 0) {
+        appData.expenses = JSON.parse(JSON.stringify(DEFAULT_EXPENSES));
+      }
   if (!appData.deletedCleanTaskIds) appData.deletedCleanTaskIds = [];
 
   // Eski mükerrer/çift manuel gider kayıtlarını ayıkla (sadece tekil EXP-CLEAN- kalsın)
@@ -2875,11 +2888,15 @@ function loadAppData() {
       if (!appData.housekeepingOverrides) appData.housekeepingOverrides = {};
       // KULLANICI TALEBİ: Tüm örnek / mock rezervasyon ve temizlik kayıtlarını kalıcı olarak temizle
       // Sadece kullanıcının bizzat eklediği rezervasyonlar görünür
+      // Yalnızca sahte Eylül ve Yılbaşı örneklerini ayıkla (Ağustos Excel kayıtları korunur)
       appData.bookings = (appData.bookings || []).filter(b => 
         !b.id.startsWith('REZ-SEP-') && 
-        !b.id.startsWith('REZ-NY-') && 
-        !b.id.startsWith('REZ-AUG-')
+        !b.id.startsWith('REZ-NY-')
       );
+      // Eğer Ağustos rezervasyonları silindiyse Excel'den geri tamamla
+      if (!appData.bookings.some(b => b.id.startsWith('REZ-AUG-'))) {
+        DEFAULT_BOOKINGS.forEach(ab => appData.bookings.push(ab));
+      }
       appData.cleaningTasks = (appData.cleaningTasks || []).filter(t => 
         !t.id.startsWith('TASK-CLN-00') &&
         (!t.bookingId || appData.bookings.some(b => b.id === t.bookingId))
@@ -5411,6 +5428,31 @@ function deleteMaint(id) {
 // -------------------------------------------------------------
 // RESET, RESTORE & EXPORT
 // -------------------------------------------------------------
+
+function confirmFactoryReset() {
+  const ok = confirm('⚠️ DİKKAT: Bu işlem tüm verileri sıfırlayıp sistemi masaüstündeki GENEL RAPOR.xlsx orijinal şirket veritabanına döndürür.\n\nHer şeyi sıfırlamak istediğinizden emin misiniz?');
+  if (!ok) return;
+  const secondOk = confirm('Son Onay: Tüm özel kayıtlar silinecek ve Excel veritabanı baştan yüklenecektir. Onaylıyor musunuz?');
+  if (!secondOk) return;
+
+  appData = {
+    isCleanState: false,
+    excelDb: JSON.parse(JSON.stringify(COMPANY_EXCEL_DATABASE)),
+    villas: JSON.parse(JSON.stringify(DEFAULT_VILLAS)),
+    targets: JSON.parse(JSON.stringify(DEFAULT_TARGETS_BY_MONTH)),
+    bookings: JSON.parse(JSON.stringify(DEFAULT_BOOKINGS)),
+    expenses: JSON.parse(JSON.stringify(DEFAULT_EXPENSES)),
+    leads: [],
+    maintenance: [],
+    cleaningPayments: {},
+    cleaningTasks: [],
+    housekeepingOverrides: {}
+  };
+  saveAppData();
+  renderAll();
+  alert('✅ Tüm veriler sıfırlandı ve masaüstündeki GENEL RAPOR.xlsx veritabanı başarıyla yüklendi!');
+}
+
 function openResetModal() {
   const modal = document.getElementById('resetModal');
   if (modal) modal.classList.add('active');
