@@ -3051,6 +3051,34 @@ function isExpenseInFilter(exp) {
   return expMonth === currentFilter.period;
 }
 
+
+// =============================================================
+// 📅 TÜRKİYE STANDARDI TARİH FORMATLAYICI (DD.MM.YYYY & DD.MM)
+// =============================================================
+function formatTrDate(dateStr, includeYear = true) {
+  if (!dateStr || typeof dateStr !== 'string') return '-';
+  const clean = dateStr.trim();
+  const parts = clean.split(/[-/.]/);
+  if (parts.length === 3) {
+    let y, m, d;
+    if (parts[0].length === 4) {
+      [y, m, d] = parts;
+    } else if (parts[2].length === 4) {
+      [d, m, y] = parts;
+    } else {
+      return clean;
+    }
+    const dd = String(d).padStart(2, '0');
+    const mm = String(m).padStart(2, '0');
+    return includeYear ? `${dd}.${mm}.${y}` : `${dd}.${mm}`;
+  }
+  return clean;
+}
+
+function formatShortDate(dateStr) {
+  return formatTrDate(dateStr, false);
+}
+
 // Master Render All Components
 function renderAll() {
   updateStepperLabels();
@@ -4086,7 +4114,7 @@ function renderExpensesTable() {
   filtered.forEach(exp => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${exp.date}</td>
+      <td>${formatTrDate(exp.date)}</td>
       <td><span class="badge ${exp.type === 'CAPEX' ? 'badge-amber' : 'badge-blue'}">${exp.type === 'CAPEX' ? 'Yatırım (Capex)' : 'Operasyonel (Opex)'}</span></td>
       <td><strong>${exp.category}</strong></td>
       <td>${exp.villa === 'ALL' ? 'Tüm Portföy' : (appData.villas[exp.villa]?.name || exp.villa)}</td>
@@ -4701,7 +4729,7 @@ function renderGapNights() {
         const offer = Math.max(Math.round((vConf.base || 7000) * 0.75), floorGuard);
         gaps.push({
           villaName: vConf.name,
-          dates: `${cur.checkOut.slice(5)} → ${next.checkIn.slice(5)} (${diffDays} Gece Boş)`,
+          dates: `${formatShortDate(cur.checkOut)} → ${formatShortDate(next.checkIn)} (${diffDays} Gece Boş)`,
           offer: '₺' + offer.toLocaleString('tr-TR') + ' / Gece',
           floor: '₺' + floorGuard.toLocaleString('tr-TR') + ' Taban',
           note: 'İki rezervasyon arası kör boşluk doldurma önerisi'
@@ -4719,7 +4747,7 @@ function renderGapNights() {
         const offer = Math.max(Math.round((vConf.base || 7000) * 0.75), floorGuard);
         gaps.push({
           villaName: vConf.name,
-          dates: `Hemen Giriş: ${todayStr.slice(5)} → ${firstB.checkIn.slice(5)} (${daysUntil} Gece)`,
+          dates: `Hemen Giriş: ${formatShortDate(todayStr)} → ${formatShortDate(firstB.checkIn)} (${daysUntil} Gece)`,
           offer: '₺' + offer.toLocaleString('tr-TR') + ' / Gece',
           floor: '₺' + floorGuard.toLocaleString('tr-TR') + ' Taban',
           note: 'İlk girişe kadar hızlı fırsat satışı'
@@ -4903,8 +4931,8 @@ function renderManageBookingsTable() {
       <td><strong>${vName}</strong> ${isNewYear ? ' <span class="badge badge-amber" style="font-size:10px;">🎄 Yılbaşı</span>' : ''}</td>
       <td>${b.guest}</td>
       <td><span class="badge ${b.channel === 'AIRBNB' ? 'badge-rose' : (b.channel === 'BOOKING' ? 'badge-blue' : 'badge-emerald')}">${b.channel}</span></td>
-      <td>${b.checkIn}</td>
-      <td>${b.checkOut}</td>
+      <td>${formatTrDate(b.checkIn)}</td>
+      <td>${formatTrDate(b.checkOut)}</td>
       <td><strong>${b.nights}</strong></td>
       <td>${Number(b.gross).toLocaleString('tr-TR')} ₺</td>
       <td>${Number(b.otaComm || 0).toLocaleString('tr-TR')} ₺</td>
@@ -5421,7 +5449,7 @@ function renderDailyOps() {
           <div style="font-size: 11px; color: #60A5FA; font-weight: 600; margin-bottom: 4px;">📅 Yaklaşan İlk Girişler:</div>
           ${upcoming.map(u => `
             <div style="font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between; padding: 2px 0;">
-              <span><strong>${u.checkIn.slice(5)}</strong> - ${u.guest}</span>
+              <span><strong>${formatShortDate(u.checkIn)}</strong> - ${u.guest}</span>
               <span style="color: #93C5FD;">${appData.villas[u.villa]?.name || u.villa}</span>
             </div>
           `).join('')}
@@ -5431,7 +5459,7 @@ function renderDailyOps() {
 
     inList.innerHTML = `
       <div style="color: var(--text-muted); font-size: 12px; padding: 6px 0;">
-        Bugün (${todayStr}) planlanan giriş bulunmuyor.
+        Bugün (${formatTrDate(todayStr)}) planlanan giriş bulunmuyor.
       </div>
       ${upcomingHtml}
     `;
@@ -5475,7 +5503,7 @@ function renderDailyOps() {
           <div style="font-size: 11px; color: #93C5FD; font-weight: 600; margin-bottom: 4px;">📅 Yaklaşan İlk Çıkışlar:</div>
           ${upcomingOut.map(u => `
             <div style="font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between; padding: 2px 0;">
-              <span><strong>${u.checkOut.slice(5)}</strong> - ${u.guest}</span>
+              <span><strong>${formatShortDate(u.checkOut)}</strong> - ${u.guest}</span>
               <span style="color: #93C5FD;">${appData.villas[u.villa]?.name || u.villa}</span>
             </div>
           `).join('')}
@@ -5485,7 +5513,7 @@ function renderDailyOps() {
 
     outList.innerHTML = `
       <div style="color: var(--text-muted); font-size: 12px; padding: 6px 0;">
-        Bugün (${todayStr}) planlanan çıkış bulunmuyor.
+        Bugün (${formatTrDate(todayStr)}) planlanan çıkış bulunmuyor.
       </div>
       ${upcomingOutHtml}
     `;
@@ -5579,16 +5607,16 @@ function renderDailyOps() {
         borderColor = 'rgba(245, 158, 11, 0.4)';
       } else if (activeBooking) {
         statusKey = 'OCCUPIED';
-        statusLabel = `🔵 Misafir İçeride (${activeBooking.guest} - Çıkış: ${activeBooking.checkOut})`;
+        statusLabel = `🔵 Misafir İçeride (${activeBooking.guest} - Çıkış: ${formatTrDate(activeBooking.checkOut)})`;
         statusBadge = '🔵 Dolu';
         badgeClass = 'badge-blue';
         borderColor = 'rgba(59, 130, 246, 0.4)';
       } else {
         statusKey = 'READY';
         if (nextBooking) {
-          statusLabel = `🟢 Hazır (Sonraki Giriş: ${nextBooking.checkIn.slice(5)} ${nextBooking.guest})`;
+          statusLabel = `🟢 Hazır (Sonraki Giriş: ${formatShortDate(nextBooking.checkIn)} ${nextBooking.guest})`;
         } else if (lastCheckout) {
-          statusLabel = `🟢 Temiz & Hazır (Son Çıkış: ${lastCheckout.checkOut.slice(5)} ${lastCheckout.guest})`;
+          statusLabel = `🟢 Temiz & Hazır (Son Çıkış: ${formatShortDate(lastCheckout.checkOut)} ${lastCheckout.guest})`;
         } else {
           statusLabel = '🟢 Temiz & Girişe Hazır';
         }
@@ -5920,7 +5948,7 @@ function renderHousekeepingTab() {
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td><strong>${task.date || '-'}</strong></td>
+      <td><strong>${formatTrDate(task.date)}</strong></td>
       <td><span class="villa-badge ${(task.villa || '').toLowerCase()}">${vName}</span></td>
       <td>
         <strong style="color: #FFFFFF;">${task.guest ? task.guest + ' Çıkışı' : (task.notes || 'Rutin Temizlik')}</strong>
@@ -5944,7 +5972,7 @@ function renderHousekeepingTab() {
         </button>
       </td>
       <td style="color: var(--text-muted); font-size: 11px;">
-        ${isPaid ? (task.paidDate || 'Ödendi') : '<span style="color: #F87171;">Bekliyor (Borç)</span>'}
+        ${isPaid ? (task.paidDate ? formatTrDate(task.paidDate) : 'Ödendi') : '<span style="color: #F87171;">Bekliyor (Borç)</span>'}
       </td>
       <td style="text-align: right;">
         <button class="btn btn-secondary btn-sm" onclick="openEditCleaningTaskModal('${task.id}')" style="padding: 3px 7px; font-size: 11px;" title="Detaylı Düzenle">✏️</button>
@@ -6276,7 +6304,7 @@ function renderTapeChart() {
           </div>
         </td>`;
       } else {
-        tableHtml += `<td class="tape-cell ${isToday ? 'today-cell' : ''}" title="${dateStr} - Müsait (Rezervasyon eklemek için tıklayın)" onclick="openBookingForDate('${vKey}', '${dateStr}')" style="cursor: pointer; ${isToday ? 'background: rgba(245, 158, 11, 0.05);' : ''}"></td>`;
+        tableHtml += `<td class="tape-cell ${isToday ? 'today-cell' : ''}" title="${formatTrDate(dateStr)} - Müsait (Rezervasyon eklemek için tıklayın)" onclick="openBookingForDate('${vKey}', '${dateStr}')" style="cursor: pointer; ${isToday ? 'background: rgba(245, 158, 11, 0.05);' : ''}"></td>`;
       }
     }
     tableHtml += '</tr>';
