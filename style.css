@@ -2668,3 +2668,266 @@ body {
   margin-top: 10px;
   line-height: 1.4;
 }
+
+
+/* ========================================================================== */
+/* 📱 KAPSAMLI MOBİL UYUMLULUK VE METİN ÇAKIŞMASI ÖNLEME (MOBILE OVERHAUL)   */
+/* ========================================================================== */
+
+/* 1. Tabloların mobilde ezilmesini ve harf çakışmasını engelleyen kurallar */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+/* Sütunların 20px'e sıkışıp harflerin üst üste binmesini engelleyen min-width sınırları */
+.data-table {
+  min-width: 780px !important;
+}
+
+.prop-exec-table {
+  min-width: 720px !important;
+}
+
+.tape-chart-table {
+  min-width: 850px !important;
+}
+
+/* 2. Kart içi metinlerin yatayda çarpışmasını engelleme */
+.kpi-meta {
+  display: flex;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 4px !important;
+  margin-top: 6px;
+}
+
+.kpi-trend {
+  white-space: nowrap;
+}
+
+/* 3. Genel Tablet ve Mobil Düzenlemeleri (<= 900px) */
+@media (max-width: 900px) {
+  .app-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+    padding: 12px 14px !important;
+  }
+
+  .brand-area {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+  }
+
+  .header-filters {
+    width: 100% !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+    padding: 10px 12px !important;
+  }
+
+  .filter-group {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+  }
+
+  .filter-group select {
+    max-width: 220px;
+    text-overflow: ellipsis;
+  }
+
+  .header-actions {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  .header-actions .btn {
+    width: 100% !important;
+    justify-content: center !important;
+    padding: 8px 10px !important;
+    font-size: 11px !important;
+    white-space: nowrap;
+  }
+
+  .nav-tabs {
+    padding: 6px 12px 0 12px !important;
+    gap: 4px !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tab-btn {
+    padding: 8px 12px !important;
+    font-size: 12px !important;
+  }
+
+  .container {
+    padding: 0 12px !important;
+    margin: 12px auto !important;
+  }
+
+  .card {
+    padding: 14px !important;
+  }
+
+  .kpi-cards-grid.five-cols {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+
+  .kpi-cards-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+}
+
+/* 4. Telefon Ekranları Özel Düzenlemeleri (<= 640px) */
+@media (max-width: 640px) {
+  /* Month Stepper: Önceki ve sonraki ay metinlerini gizle, sadece güncel ay kalsın */
+  .finance-top-bar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    padding: 12px !important;
+    gap: 10px !important;
+  }
+
+  .month-stepper {
+    justify-content: space-between !important;
+    width: 100% !important;
+  }
+
+  .stepper-sub-prev, .stepper-sub-next {
+    display: none !important;
+  }
+
+  .stepper-current {
+    font-size: 13px !important;
+    padding: 6px 12px !important;
+  }
+
+  .finance-top-meta {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 6px !important;
+  }
+
+  .meta-pill {
+    width: 100% !important;
+    text-align: center !important;
+    padding: 6px 10px !important;
+    font-size: 11px !important;
+  }
+
+  /* 1 Sütunlu KPI Kartları (Yazıların ferahça sığması için) */
+  .kpi-cards-grid.five-cols,
+  .kpi-cards-grid {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  .kpi-value {
+    font-size: 20px !important;
+  }
+
+  .target-comparison-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+
+  .target-stat-box {
+    padding: 10px !important;
+  }
+
+  .target-stat-box .val {
+    font-size: 15px !important;
+  }
+
+  /* Section Başlıkları */
+  .section-title-bar {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+
+  .section-title-bar .btn,
+  .section-title-bar .btn-group {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  /* Profit Bridge Şelalesi */
+  .profit-bridge-steps {
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+
+  .bridge-step {
+    min-width: 0 !important;
+    width: 100% !important;
+    padding: 12px !important;
+  }
+
+  .bridge-arrow {
+    transform: rotate(90deg) !important;
+    padding: 2px 0 !important;
+    align-self: center !important;
+  }
+
+  /* Operasyon & Temizlik Paneli */
+  .daily-ops-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  .ops-entry-card {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 6px !important;
+  }
+
+  /* Modallar */
+  .modal-card {
+    width: 95% !important;
+    max-height: 92vh !important;
+    padding: 14px !important;
+    margin: 10px auto !important;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  .modal-footer {
+    flex-direction: column-reverse !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  .modal-footer .btn {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  /* Mobil Kaydırma İpucu Bildirimi */
+  .table-responsive::after {
+    content: '👉 Tabloyu sağa kaydırarak tüm detayları görebilirsiniz';
+    display: block;
+    font-size: 10px;
+    color: #60A5FA;
+    padding: 6px 4px 0 4px;
+    text-align: right;
+    font-weight: 600;
+  }
+}
