@@ -3141,3 +3141,48 @@ body {
     padding: 8px 10px !important;
   }
 }
+
+/* Housekeeping & Cleaning Payment Controls */
+.btn-clean-paid {
+  background: rgba(16, 185, 129, 0.15) !important;
+  color: #34D399 !important;
+  border: 1px solid rgba(16, 185, 129, 0.4) !important;
+  padding: 4px 10px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  border-radius: 6px !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  transition: all 0.2s ease !important;
+}
+.btn-clean-paid:hover {
+  background: rgba(16, 185, 129, 0.25) !important;
+  border-color: #34D399 !important;
+}
+.btn-clean-pending {
+  background: rgba(245, 158, 11, 0.15) !important;
+  color: #FBBF24 !important;
+  border: 1px solid rgba(245, 158, 11, 0.4) !important;
+  padding: 4px 10px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  border-radius: 6px !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  transition: all 0.2s ease !important;
+}
+.btn-clean-pending:hover {
+  background: rgba(245, 158, 11, 0.25) !important;
+  border-color: #FBBF24 !important;
+}
+.ops-upcoming-box {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-top: 6px;
+}

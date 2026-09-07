@@ -2884,6 +2884,8 @@ function loadAppData() {
       if (!appData.expenses) appData.expenses = [];
       if (!appData.leads) appData.leads = [];
       if (!appData.maintenance) appData.maintenance = [];
+      if (!appData.cleaningPayments) appData.cleaningPayments = {};
+      if (!appData.housekeepingOverrides) appData.housekeepingOverrides = {};
 
       // Check if user has explicitly reset everything
       if (appData.isCleanState) {
@@ -2908,7 +2910,9 @@ function loadAppData() {
         bookings: JSON.parse(JSON.stringify(DEFAULT_BOOKINGS)),
         expenses: JSON.parse(JSON.stringify(DEFAULT_EXPENSES)),
         leads: JSON.parse(JSON.stringify(DEFAULT_LEADS)),
-        maintenance: JSON.parse(JSON.stringify(DEFAULT_MAINT))
+        maintenance: JSON.parse(JSON.stringify(DEFAULT_MAINT)),
+        cleaningPayments: {},
+        housekeepingOverrides: {}
       };
       saveAppData();
     }
@@ -4448,6 +4452,41 @@ function renderKPIsAndDashboard() {
   const revpar = totalNet / availableNights;
   const nrevpar = Math.max(0, (totalNet - (totalPaidNights * 750)) / availableNights);
 
+  // Populate Kokpit Top KPI Cards (Net Gelir, Doluluk, ADR, RevPAR)
+  const elNetRev = document.getElementById('kpiNetRevenue');
+  const elGrossRev = document.getElementById('kpiGrossRevenue');
+  const elTargetPct = document.getElementById('kpiTargetPct');
+  const elOcc = document.getElementById('kpiOccupancy');
+  const elNightsDetail = document.getElementById('kpiNightsDetail');
+  const elAvailDetail = document.getElementById('kpiAvailableDetail');
+  const elAdr = document.getElementById('kpiADR');
+  const elRevpar = document.getElementById('kpiRevPAR');
+  const elNRevpar = document.getElementById('kpiNRevPAR');
+
+  const currentTarget = (appData.targets && currentFilter.period !== 'ALL' && appData.targets[currentFilter.period]?.revenue)
+    ? Number(appData.targets[currentFilter.period].revenue)
+    : (appData.goals?.monthlyRevenue || 300000);
+
+  const targetPct = currentTarget > 0 ? ((totalNet / currentTarget) * 100).toFixed(0) : 0;
+
+  if (elNetRev) elNetRev.innerText = '₺' + Math.round(totalNet).toLocaleString('tr-TR');
+  if (elGrossRev) elGrossRev.innerText = 'Brüt: ₺' + Math.round(totalGross).toLocaleString('tr-TR');
+  if (elTargetPct) {
+    elTargetPct.innerText = '%' + targetPct + ' Hedef';
+    elTargetPct.className = 'kpi-trend ' + (Number(targetPct) >= 100 ? 'positive' : 'neutral');
+  }
+  if (elOcc) elOcc.innerText = '%' + occupancyRate.toFixed(1);
+  if (elNightsDetail) elNightsDetail.innerText = totalPaidNights + ' Gece Satıldı';
+  if (elAvailDetail) elAvailDetail.innerText = availableNights + ' Gece Kapasite';
+  if (elAdr) elAdr.innerText = '₺' + Math.round(adr).toLocaleString('tr-TR');
+  if (elRevpar) elRevpar.innerText = '₺' + Math.round(revpar).toLocaleString('tr-TR');
+  if (elNRevpar) elNRevpar.innerText = 'NRevPAR: ₺' + Math.round(nrevpar).toLocaleString('tr-TR');
+
+  // Render Kokpit Funnel and Channel Distribution
+  renderFunnelStats();
+  renderChannelDistribution();
+
+
   // Scorecard
   const tbody = document.getElementById('villaScorecardBody');
   if (tbody) {
@@ -4515,40 +4554,196 @@ function renderTodayRadar() {
   });
 }
 
+function renderFunnelStats() {
+  const container = document.getElementById('funnelStatsContainer');
+  if (!container) return;
+
+  const leads = appData.leads || [];
+  const totalLeads = leads.length;
+  const wonLeads = leads.filter(l => l.status === 'WON');
+  const lostLeads = leads.filter(l => l.status === 'LOST');
+  const activeLeads = leads.filter(l => l.status === 'FOLLOW_UP' || l.status === 'QUOTE_SENT');
+  const convRate = totalLeads > 0 ? ((wonLeads.length / totalLeads) * 100).toFixed(1) : 0;
+  const wonRevenue = wonLeads.reduce((sum, l) => sum + (Number(l.quote) || 0), 0);
+  const lostRevenue = lostLeads.reduce((sum, l) => sum + (Number(l.quote) || 0), 0);
+
+  container.innerHTML = `
+    <div class="funnel-item" style="border-left: 3px solid #60A5FA;">
+      <div class="label" style="color: #93C5FD;">📩 TOPLAM TALEP (LEAD)</div>
+      <div class="val" style="color: #FFFFFF;">${totalLeads} Adet</div>
+      <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Tüm Gelen Mesajlar</div>
+    </div>
+    <div class="funnel-item" style="border-left: 3px solid #FBBF24;">
+      <div class="label" style="color: #FDE68A;">⏳ TEKLİF & TAKİPTE</div>
+      <div class="val" style="color: #FBBF24;">${activeLeads.length} Adet</div>
+      <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Sıcak Müşteri Adayı</div>
+    </div>
+    <div class="funnel-item" style="border-left: 3px solid #34D399;">
+      <div class="label" style="color: #6EE7B7;">🏆 KAZANILAN (SATIŞ)</div>
+      <div class="val" style="color: #34D399;">${wonLeads.length} Adet (%${convRate})</div>
+      <div style="font-size: 11px; color: #34D399; margin-top: 4px; font-weight: 600;">₺${wonRevenue.toLocaleString('tr-TR')} Satış</div>
+    </div>
+    <div class="funnel-item" style="border-left: 3px solid #F87171;">
+      <div class="label" style="color: #FCA5A5;">❌ KAYBEDİLEN TALEP</div>
+      <div class="val" style="color: #F87171;">${lostLeads.length} Adet</div>
+      <div style="font-size: 11px; color: #F87171; margin-top: 4px;">₺${lostRevenue.toLocaleString('tr-TR')} Kaçan Fırsat</div>
+    </div>
+  `;
+}
+
+function renderChannelDistribution() {
+  const container = document.getElementById('channelListContainer');
+  const directBadge = document.getElementById('directShareBadge');
+  if (!container) return;
+
+  const relevantBookings = appData.bookings.filter(b => b.status !== 'CANCELLED' && isBookingInFilter(b));
+  const channelTotals = {};
+  let totalNet = 0;
+  let directNet = 0;
+
+  relevantBookings.forEach(b => {
+    const ch = (b.channel || 'DIRECT').toUpperCase();
+    const net = Number(b.net) || 0;
+    totalNet += net;
+
+    if (!channelTotals[ch]) {
+      channelTotals[ch] = { name: ch, count: 0, net: 0 };
+    }
+    channelTotals[ch].count += 1;
+    channelTotals[ch].net += net;
+
+    if (['WHATSAPP', 'INSTAGRAM', 'WEBSITE', 'REPEAT', 'PHONE', 'DIRECT'].includes(ch)) {
+      directNet += net;
+    }
+  });
+
+  const directPct = totalNet > 0 ? (directNet / totalNet) * 100 : 0;
+  if (directBadge) {
+    directBadge.innerText = '%' + directPct.toFixed(0) + ' Direkt Payı';
+    directBadge.className = directPct >= 50 ? 'badge badge-green' : 'badge badge-amber';
+  }
+
+  const sortedChannels = Object.values(channelTotals).sort((a, b) => b.net - a.net);
+
+  if (sortedChannels.length === 0) {
+    container.innerHTML = '<div style="color:var(--text-muted); font-size:12px; padding:12px; text-align:center;">Seçili dönemde rezervasyon kaydı bulunmuyor.</div>';
+    return;
+  }
+
+  const channelNames = {
+    'WHATSAPP': '💬 WhatsApp Direkt',
+    'INSTAGRAM': '📸 Instagram',
+    'AIRBNB': '🏡 Airbnb',
+    'BOOKING': '🏨 Booking.com',
+    'WEBSITE': '🌐 Web Sitesi',
+    'PHONE': '📞 Telefon'
+  };
+
+  container.innerHTML = '';
+  sortedChannels.forEach(ch => {
+    const chName = channelNames[ch.name] || ch.name;
+    const isDirect = ['WHATSAPP', 'INSTAGRAM', 'WEBSITE', 'PHONE', 'DIRECT', 'REPEAT'].includes(ch.name);
+    const pct = totalNet > 0 ? (ch.net / totalNet) * 100 : 0;
+
+    const div = document.createElement('div');
+    div.className = 'channel-progress-item';
+    div.innerHTML = `
+      <div class="channel-meta">
+        <span><strong>${chName}</strong> (${ch.count} Rez.)</span>
+        <span>₺${Math.round(ch.net).toLocaleString('tr-TR')} • %${pct.toFixed(1)}</span>
+      </div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill ${isDirect ? '' : 'ota'}" style="width: ${Math.min(100, Math.max(2, pct))}%;"></div>
+      </div>
+    `;
+    container.appendChild(div);
+  });
+}
+
 function renderGapNights() {
   const container = document.getElementById('gapNightGrid');
   if (!container) return;
   container.innerHTML = '';
   const gaps = [];
+  const todayStr = '2026-09-07';
 
+  // Check gaps between consecutive bookings for each villa
   Object.keys(appData.villas).forEach(vKey => {
-    const vConf = appData.villas[vKey];
+    const vConf = appData.villas[vKey] || DEFAULT_VILLAS[vKey];
+    if (!vConf) return;
+
     const pBookings = appData.bookings
       .filter(b => b.villa === vKey && b.status !== 'CANCELLED')
-      .sort((a, b) => new Date(a.checkIn) - new Date(b.checkIn));
+      .sort((a, b) => a.checkIn.localeCompare(b.checkIn));
 
+    // 1. Between bookings gap detection (1 to 4 days)
     for (let i = 0; i < pBookings.length - 1; i++) {
       const cur = pBookings[i];
       const next = pBookings[i + 1];
       const diffDays = Math.round((new Date(next.checkIn) - new Date(cur.checkOut)) / (1000 * 60 * 60 * 24));
 
-      if (diffDays === 1 || diffDays === 2) {
-        const floorGuard = vConf.floor + vConf.cleanCost + vConf.heatCost;
-        const offer = Math.max(Math.round(vConf.base * 0.75), floorGuard);
-        gaps.push({ villaName: vConf.name, dates: `${cur.checkOut} → ${next.checkIn} (${diffDays} Gece)`, offer: `₺${offer.toLocaleString('tr-TR')}`, floor: `₺${floorGuard.toLocaleString('tr-TR')} Taban` });
+      if (diffDays >= 1 && diffDays <= 4) {
+        const floorGuard = (vConf.floor || 4000) + (vConf.cleanCost || 1500) + (vConf.heatCost || 500);
+        const offer = Math.max(Math.round((vConf.base || 7000) * 0.75), floorGuard);
+        gaps.push({
+          villaName: vConf.name,
+          dates: `${cur.checkOut.slice(5)} → ${next.checkIn.slice(5)} (${diffDays} Gece Boş)`,
+          offer: '₺' + offer.toLocaleString('tr-TR') + ' / Gece',
+          floor: '₺' + floorGuard.toLocaleString('tr-TR') + ' Taban',
+          note: 'İki rezervasyon arası kör boşluk doldurma önerisi'
+        });
+      }
+    }
+
+    // 2. Upcoming immediate open windows (e.g. next 10 days if free)
+    const upcoming = pBookings.filter(b => b.checkIn >= todayStr);
+    if (upcoming.length > 0) {
+      const firstB = upcoming[0];
+      const daysUntil = Math.round((new Date(firstB.checkIn) - new Date(todayStr)) / (1000 * 60 * 60 * 24));
+      if (daysUntil >= 2 && daysUntil <= 5) {
+        const floorGuard = (vConf.floor || 4000) + (vConf.cleanCost || 1500) + (vConf.heatCost || 500);
+        const offer = Math.max(Math.round((vConf.base || 7000) * 0.75), floorGuard);
+        gaps.push({
+          villaName: vConf.name,
+          dates: `Hemen Giriş: ${todayStr.slice(5)} → ${firstB.checkIn.slice(5)} (${daysUntil} Gece)`,
+          offer: '₺' + offer.toLocaleString('tr-TR') + ' / Gece',
+          floor: '₺' + floorGuard.toLocaleString('tr-TR') + ' Taban',
+          note: 'İlk girişe kadar hızlı fırsat satışı'
+        });
       }
     }
   });
 
   if (gaps.length === 0) {
-    container.innerHTML = '<p class="sub-text" style="grid-column:span 2; padding:12px;">Şu anda takvimde 1-2 gecelik kritik boşluk bulunmuyor.</p>';
+    // If no 1-4 night gaps found, display positive optimized status card
+    container.innerHTML = `
+      <div style="grid-column: 1 / -1; padding: 14px 18px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 8px; display: flex; align-items: center; gap: 12px;">
+        <span style="font-size: 24px;">💎</span>
+        <div>
+          <strong style="color: #34D399; font-size: 13px;">Takvim Blokları Optimum Seviyede</strong>
+          <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+            Şu anda doldurulması gereken 1-4 gecelik kritik kör boşluk bulunmuyor. Rezervasyon aralıkları dengeli dağılmıştır.
+          </div>
+        </div>
+      </div>
+    `;
     return;
   }
 
   gaps.forEach(g => {
     const card = document.createElement('div');
     card.className = 'gap-card';
-    card.innerHTML = `<div class="gap-info"><strong>${g.villaName} • ${g.dates}</strong><span>Fırsat satışı önerilir.</span></div><div class="gap-pricing"><div class="offer-price">${g.offer}</div><div class="floor-hint">${g.floor}</div></div>`;
+    card.innerHTML = `
+      <div class="gap-info">
+        <strong style="color: #FFFFFF; font-size: 13px;">${g.villaName}</strong>
+        <span style="color: #60A5FA; font-size: 12px; font-weight: 600; margin-top: 2px;">${g.dates}</span>
+        <span style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">${g.note}</span>
+      </div>
+      <div class="gap-pricing">
+        <div class="offer-price" style="color: #34D399; font-size: 15px; font-weight: 800;">${g.offer}</div>
+        <div class="floor-hint" style="font-size: 10px; color: #FBBF24;">🛡️ ${g.floor}</div>
+      </div>
+    `;
     container.appendChild(card);
   });
 }
@@ -5174,6 +5369,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // -------------------------------------------------------------
 // Replaced with enhanced help functions
 // -------------------------------------------------------------
+// -------------------------------------------------------------
 // 🛎️ GÜNLÜK GİRİŞ / ÇIKIŞ & TEMİZLİK OPERASYONU (HOUSEKEEPING)
 // -------------------------------------------------------------
 function renderDailyOps() {
@@ -5182,20 +5378,48 @@ function renderDailyOps() {
   const hkList = document.getElementById('todayHousekeepingList');
   const inBadge = document.getElementById('todayCheckinBadge');
   const outBadge = document.getElementById('todayCheckoutBadge');
+  const hkBadge = document.getElementById('todayHousekeepingBadge');
 
   if (!inList || !outList || !hkList) return;
 
-  const nowStr = new Date().toISOString().split('T')[0];
-  const activeMonth = currentFilter.period === 'ALL' ? '2026-08' : currentFilter.period;
+  // Initialize cleaning payments store if needed
+  if (!appData.cleaningPayments) appData.cleaningPayments = {};
+  if (!appData.housekeepingOverrides) appData.housekeepingOverrides = {};
 
-  // Filter relevant bookings for the active period
-  const monthBookings = appData.bookings.filter(b => b.status !== 'CANCELLED' && isBookingInFilter(b));
+  const todayStr = '2026-09-07'; // Canonical system date
 
-  // Checkins
-  const checkins = monthBookings.slice(0, 3);
+  // 1. Check-ins for Today
+  const checkins = appData.bookings.filter(b => b.status !== 'CANCELLED' && b.checkIn === todayStr);
   if (inBadge) inBadge.innerText = checkins.length + ' Giriş';
+
   if (checkins.length === 0) {
-    inList.innerHTML = '<div style="color:var(--text-muted); font-size:12px; padding:10px 0;">Bugün planlanan giriş bulunmuyor.</div>';
+    // Find upcoming check-ins
+    const upcoming = appData.bookings
+      .filter(b => b.status !== 'CANCELLED' && b.checkIn > todayStr)
+      .sort((a, b) => a.checkIn.localeCompare(b.checkIn))
+      .slice(0, 2);
+
+    let upcomingHtml = '';
+    if (upcoming.length > 0) {
+      upcomingHtml = `
+        <div class="ops-upcoming-box">
+          <div style="font-size: 11px; color: #60A5FA; font-weight: 600; margin-bottom: 4px;">📅 Yaklaşan İlk Girişler:</div>
+          ${upcoming.map(u => `
+            <div style="font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between; padding: 2px 0;">
+              <span><strong>${u.checkIn.slice(5)}</strong> - ${u.guest}</span>
+              <span style="color: #93C5FD;">${appData.villas[u.villa]?.name || u.villa}</span>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    inList.innerHTML = `
+      <div style="color: var(--text-muted); font-size: 12px; padding: 6px 0;">
+        Bugün (${todayStr}) planlanan giriş bulunmuyor.
+      </div>
+      ${upcomingHtml}
+    `;
   } else {
     inList.innerHTML = '';
     checkins.forEach(b => {
@@ -5203,21 +5427,54 @@ function renderDailyOps() {
       const div = document.createElement('div');
       div.className = 'ops-entry-card';
       div.innerHTML = `
-        <div>
-          <div class="ops-guest-name">${b.guest}</div>
-          <div class="ops-guest-meta">${vName} • ${b.channel} • ${b.nights} Gece</div>
+        <div style="flex: 1;">
+          <div class="ops-guest-name" style="font-weight: 700; color: #FFFFFF; font-size: 13px;">${b.guest}</div>
+          <div class="ops-guest-meta" style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+            ${vName} • ${b.channel} • ${b.nights} Gece • ${b.pax || 2} Kişi
+          </div>
+          <div style="font-size: 11px; color: #34D399; margin-top: 2px;">Net Gelir: ₺${Number(b.net || 0).toLocaleString('tr-TR')}</div>
         </div>
-        <span class="badge badge-green">14:00 Giriş</span>
+        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+          <span class="badge badge-green" style="font-weight: 700;">🟢 14:00 Giriş</span>
+          <button class="btn btn-secondary btn-sm" style="font-size: 10px; padding: 2px 6px;" onclick="openReservationModal('${b.id}')">Detay</button>
+        </div>
       `;
       inList.appendChild(div);
     });
   }
 
-  // Checkouts
-  const checkouts = monthBookings.slice(1, 3);
+  // 2. Check-outs for Today
+  const checkouts = appData.bookings.filter(b => b.status !== 'CANCELLED' && b.checkOut === todayStr);
   if (outBadge) outBadge.innerText = checkouts.length + ' Çıkış';
+
   if (checkouts.length === 0) {
-    outList.innerHTML = '<div style="color:var(--text-muted); font-size:12px; padding:10px 0;">Bugün planlanan çıkış bulunmuyor.</div>';
+    // Find upcoming check-outs
+    const upcomingOut = appData.bookings
+      .filter(b => b.status !== 'CANCELLED' && b.checkOut > todayStr)
+      .sort((a, b) => a.checkOut.localeCompare(b.checkOut))
+      .slice(0, 2);
+
+    let upcomingOutHtml = '';
+    if (upcomingOut.length > 0) {
+      upcomingOutHtml = `
+        <div class="ops-upcoming-box">
+          <div style="font-size: 11px; color: #93C5FD; font-weight: 600; margin-bottom: 4px;">📅 Yaklaşan İlk Çıkışlar:</div>
+          ${upcomingOut.map(u => `
+            <div style="font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between; padding: 2px 0;">
+              <span><strong>${u.checkOut.slice(5)}</strong> - ${u.guest}</span>
+              <span style="color: #93C5FD;">${appData.villas[u.villa]?.name || u.villa}</span>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    outList.innerHTML = `
+      <div style="color: var(--text-muted); font-size: 12px; padding: 6px 0;">
+        Bugün (${todayStr}) planlanan çıkış bulunmuyor.
+      </div>
+      ${upcomingOutHtml}
+    `;
   } else {
     outList.innerHTML = '';
     checkouts.forEach(b => {
@@ -5225,44 +5482,241 @@ function renderDailyOps() {
       const div = document.createElement('div');
       div.className = 'ops-entry-card';
       div.innerHTML = `
-        <div>
-          <div class="ops-guest-name">${b.guest}</div>
-          <div class="ops-guest-meta">${vName} • Çıkış Günü</div>
+        <div style="flex: 1;">
+          <div class="ops-guest-name" style="font-weight: 700; color: #FFFFFF; font-size: 13px;">${b.guest}</div>
+          <div class="ops-guest-meta" style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+            ${vName} • ${b.channel} • Çıkış Günü
+          </div>
+          <div style="font-size: 11px; color: #FBBF24; margin-top: 2px;">🧹 Temizlik Planına Alındı</div>
         </div>
-        <span class="badge badge-blue">11:00 Çıkış</span>
+        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+          <span class="badge badge-blue" style="font-weight: 700;">🔵 11:00 Çıkış</span>
+          <button class="btn btn-secondary btn-sm" style="font-size: 10px; padding: 2px 6px;" onclick="openReservationModal('${b.id}')">Detay</button>
+        </div>
       `;
       outList.appendChild(div);
     });
   }
 
-  // Housekeeping Status for 5 villas
-  const hkStatus = [
-    { villa: 'SEYIR', name: 'Seyir Dağ Evi', status: 'READY', label: '🟢 Hazır (Nevresimler Tam)' },
-    { villa: 'ZIRVE', name: 'Zirve Dağ Evi', status: 'CLEANING', label: '🟡 Temizlikte (Jakuzi Bakımı)' },
-    { villa: 'DOGUS', name: 'Doğuş Dağ Evi', status: 'READY', label: '🟢 Hazır & Havalandırıldı' },
-    { villa: 'SIRIN', name: 'Şirin Dağ Evi', status: 'OCCUPIED', label: '🔵 Misafir İçeride' },
-    { villa: 'NEFES', name: 'Nefes Dağ Evi', status: 'READY', label: '🟢 Hazır' }
-  ];
-
+  // 3. Housekeeping Status & Cleaning Payment Tracking for 5 Villas
+  if (hkBadge) hkBadge.innerText = Object.keys(appData.villas).length + ' Villa';
   hkList.innerHTML = '';
-  hkStatus.forEach(h => {
+
+  Object.keys(appData.villas).forEach(vKey => {
+    const vConf = appData.villas[vKey] || DEFAULT_VILLAS[vKey];
+    if (!vConf) return;
+
+    // Real dynamic operational status
+    const activeBooking = appData.bookings.find(b => b.villa === vKey && b.status !== 'CANCELLED' && b.checkIn <= todayStr && b.checkOut > todayStr);
+    const checkoutToday = appData.bookings.find(b => b.villa === vKey && b.status !== 'CANCELLED' && b.checkOut === todayStr);
+    const checkinToday = appData.bookings.find(b => b.villa === vKey && b.status !== 'CANCELLED' && b.checkIn === todayStr);
+    const hasP1Maint = appData.maintenance.some(m => m.villa === vKey && m.status === 'OPEN' && m.priority === 'P1');
+    const lastCheckout = appData.bookings.filter(b => b.villa === vKey && b.status !== 'CANCELLED' && b.checkOut <= todayStr).sort((a,b) => b.checkOut.localeCompare(a.checkOut))[0];
+    const nextBooking = appData.bookings.filter(b => b.villa === vKey && b.status !== 'CANCELLED' && b.checkIn > todayStr).sort((a,b) => a.checkIn.localeCompare(b.checkIn))[0];
+
+    // Manual status override if set
+    const overrideStatus = appData.housekeepingOverrides[vKey];
+
+    let statusKey = 'READY';
+    let statusLabel = '🟢 Hazır (Nevresim & Jakuzi Tam)';
+    let statusBadge = '🟢 Hazır';
+    let badgeClass = 'badge-emerald';
+    let borderColor = 'rgba(16, 185, 129, 0.4)';
+
+    if (overrideStatus) {
+      if (overrideStatus === 'CLEANING') {
+        statusKey = 'CLEANING';
+        statusLabel = '🟡 Temizlik Yapılıyor (Manuel Seçildi)';
+        statusBadge = '🟡 Temizlikte';
+        badgeClass = 'badge-amber';
+        borderColor = 'rgba(245, 158, 11, 0.4)';
+      } else if (overrideStatus === 'READY') {
+        statusKey = 'READY';
+        statusLabel = '🟢 Temiz & Girişe Hazır';
+        statusBadge = '🟢 Hazır';
+        badgeClass = 'badge-emerald';
+        borderColor = 'rgba(16, 185, 129, 0.4)';
+      } else if (overrideStatus === 'OCCUPIED') {
+        statusKey = 'OCCUPIED';
+        statusLabel = '🔵 Misafir İçeride (Manuel)';
+        statusBadge = '🔵 Dolu';
+        badgeClass = 'badge-blue';
+        borderColor = 'rgba(59, 130, 246, 0.4)';
+      }
+    } else {
+      if (hasP1Maint) {
+        statusKey = 'MAINTENANCE';
+        statusLabel = '🔴 P1 Arıza Kaydı Var (Bakımda)';
+        statusBadge = '🔴 Bakımda';
+        badgeClass = 'badge-rose';
+        borderColor = 'rgba(239, 68, 68, 0.4)';
+      } else if (checkoutToday) {
+        statusKey = 'CLEANING';
+        statusLabel = `🟡 Çıkış Yapıldı • Temizlik Yapılıyor (${checkoutToday.guest})`;
+        statusBadge = '🟡 Temizlikte';
+        badgeClass = 'badge-amber';
+        borderColor = 'rgba(245, 158, 11, 0.4)';
+      } else if (checkinToday) {
+        statusKey = 'PREPARING';
+        statusLabel = `🟡 Giriş Günü • Son Kontroller Yapılıyor (${checkinToday.guest})`;
+        statusBadge = '🟡 Hazırlanıyor';
+        badgeClass = 'badge-amber';
+        borderColor = 'rgba(245, 158, 11, 0.4)';
+      } else if (activeBooking) {
+        statusKey = 'OCCUPIED';
+        statusLabel = `🔵 Misafir İçeride (${activeBooking.guest} - Çıkış: ${activeBooking.checkOut})`;
+        statusBadge = '🔵 Dolu';
+        badgeClass = 'badge-blue';
+        borderColor = 'rgba(59, 130, 246, 0.4)';
+      } else {
+        statusKey = 'READY';
+        if (nextBooking) {
+          statusLabel = `🟢 Hazır (Sonraki Giriş: ${nextBooking.checkIn.slice(5)} ${nextBooking.guest})`;
+        } else if (lastCheckout) {
+          statusLabel = `🟢 Temiz & Hazır (Son Çıkış: ${lastCheckout.checkOut.slice(5)} ${lastCheckout.guest})`;
+        } else {
+          statusLabel = '🟢 Temiz & Girişe Hazır';
+        }
+        statusBadge = '🟢 Hazır';
+        badgeClass = 'badge-emerald';
+        borderColor = 'rgba(16, 185, 129, 0.4)';
+      }
+    }
+
+    // Cleaning Payment Status
+    const cleanCost = vConf.cleanCost || 1500;
+    if (!appData.cleaningPayments[vKey]) {
+      appData.cleaningPayments[vKey] = {
+        paid: false,
+        amount: cleanCost,
+        lastUpdated: todayStr
+      };
+    }
+    const payInfo = appData.cleaningPayments[vKey];
+    const isPaid = !!payInfo.paid;
+
     const div = document.createElement('div');
     div.className = 'ops-entry-card';
+    div.style.borderLeft = `3px solid ${borderColor}`;
+    div.style.display = 'flex';
+    div.style.flexDirection = 'column';
+    div.style.gap = '8px';
+    div.style.padding = '10px 12px';
+    div.style.marginBottom = '8px';
+    div.style.background = 'rgba(255, 255, 255, 0.03)';
+    div.style.borderRadius = '8px';
+
     div.innerHTML = `
-      <div>
-        <strong style="font-size:12px; color:#FFFFFF;">${h.name}</strong>
-        <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">${h.label}</div>
+      <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div>
+          <strong style="font-size: 13px; color: #FFFFFF; display: flex; align-items: center; gap: 6px;">
+            ${vConf.name}
+          </strong>
+          <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+            ${statusLabel}
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <span class="badge ${badgeClass}" style="font-size: 10px; font-weight: 700;">${statusBadge}</span>
+          <button class="btn btn-secondary btn-sm" style="padding: 2px 5px; font-size: 10px;" onclick="cycleHkStatus('${vKey}')" title="Durumu döngüsel değiştir">🔄</button>
+        </div>
       </div>
-      <button class="btn btn-secondary btn-sm" onclick="toggleHkStatus('${h.villa}')">🔄 Değiştir</button>
+
+      <!-- Temizlik Ücreti & Ödendi/Ödenecek Buton Kontrolü -->
+      <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 6px; border-top: 1px dashed rgba(255, 255, 255, 0.1); font-size: 11px;">
+        <span style="color: var(--text-muted);">
+          🧹 Temizlik Bedeli: <b style="color: #FFFFFF;">₺${cleanCost.toLocaleString('tr-TR')}</b>
+        </span>
+        <button class="${isPaid ? 'btn-clean-paid' : 'btn-clean-pending'}" 
+                onclick="toggleCleaningPaid('${vKey}')" 
+                title="${isPaid ? 'Ödenmedi (Ödenecek) olarak değiştir' : 'Ödendi olarak işaretle'}">
+          ${isPaid ? '✅ ₺' + cleanCost.toLocaleString('tr-TR') + ' Ödendi' : '⏳ ₺' + cleanCost.toLocaleString('tr-TR') + ' Ödenecek'}
+        </button>
+      </div>
     `;
     hkList.appendChild(div);
   });
 }
 
-function toggleHkStatus(vKey) {
-  alert('Temizlik durumu güncellendi.');
+function toggleCleaningPaid(vKey) {
+  if (!appData.cleaningPayments) appData.cleaningPayments = {};
+  const vConf = appData.villas[vKey] || DEFAULT_VILLAS[vKey];
+  const cleanCost = vConf?.cleanCost || 1500;
+
+  if (!appData.cleaningPayments[vKey]) {
+    appData.cleaningPayments[vKey] = { paid: false, amount: cleanCost };
+  }
+
+  const currentStatus = !!appData.cleaningPayments[vKey].paid;
+  const newStatus = !currentStatus;
+  appData.cleaningPayments[vKey].paid = newStatus;
+  appData.cleaningPayments[vKey].amount = cleanCost;
+  appData.cleaningPayments[vKey].updatedAt = '2026-09-07';
+
+  // Synchronize with an expense entry
+  const todayStr = '2026-09-07';
+  const expId = 'EXP-CLEAN-MANUAL-' + vKey + '-' + todayStr.slice(0, 7);
+
+  if (newStatus) {
+    // Add/mark as paid expense in appData.expenses
+    const existingIdx = appData.expenses.findIndex(e => e.id === expId);
+    if (existingIdx !== -1) {
+      appData.expenses[existingIdx].amount = cleanCost;
+      appData.expenses[existingIdx].paid = true;
+      appData.expenses[existingIdx].description = `[${vConf?.name || vKey}] Temizlik Ücreti (Ödendi)`;
+    } else {
+      appData.expenses.push({
+        id: expId,
+        date: todayStr,
+        month: todayStr.slice(0, 7),
+        villa: vKey,
+        category: 'Temizlik',
+        type: 'OPEX',
+        amount: cleanCost,
+        description: `[${vConf?.name || vKey}] Temizlik Ücreti (Ödendi)`,
+        isAutoClean: false,
+        paid: true
+      });
+    }
+  } else {
+    // If set to Ödenecek, mark the expense as unpaid or remove the manual entry
+    const existingIdx = appData.expenses.findIndex(e => e.id === expId);
+    if (existingIdx !== -1) {
+      appData.expenses[existingIdx].paid = false;
+      appData.expenses[existingIdx].description = `[${vConf?.name || vKey}] Temizlik Ücreti (Bekliyor/Ödenecek)`;
+    }
+  }
+
+  saveAppData();
+  renderDailyOps();
+  renderExpensesTable();
+  renderFinanceModule();
+
+  const msg = newStatus 
+    ? `✅ ${vConf?.name || vKey} temizlik bedeli (₺${cleanCost.toLocaleString('tr-TR')}) "ÖDENDİ" olarak kaydedildi.`
+    : `⏳ ${vConf?.name || vKey} temizlik bedeli (₺${cleanCost.toLocaleString('tr-TR')}) "ÖDENECEK" olarak güncellendi.`;
+  
+  if (window.showToast) {
+    window.showToast(msg);
+  } else {
+    console.log(msg);
+  }
 }
 
+function cycleHkStatus(vKey) {
+  if (!appData.housekeepingOverrides) appData.housekeepingOverrides = {};
+  const current = appData.housekeepingOverrides[vKey];
+  const states = [null, 'CLEANING', 'READY', 'OCCUPIED'];
+  let nextIdx = 0;
+  if (current === 'CLEANING') nextIdx = 2; // READY
+  else if (current === 'READY') nextIdx = 3; // OCCUPIED
+  else if (current === 'OCCUPIED') nextIdx = 0; // AUTO (null)
+  else nextIdx = 1; // CLEANING
+
+  appData.housekeepingOverrides[vKey] = states[nextIdx];
+  saveAppData();
+  renderDailyOps();
+}
 
 // -------------------------------------------------------------
 // 📅 30 GÜNLÜK GÖRSEL DOLULUK ÇİZELGESİ (TAPE CHART)
