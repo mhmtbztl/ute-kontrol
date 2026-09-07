@@ -3,20 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>UTE Kontrol Merkezi V5 — Uludağ Tatil Evleri</title>
+  <title>Lexbnb — Finansal Performans & UTE Kontrol Merkezi V5</title>
   <link rel="stylesheet" href="style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
 
   <!-- App Header -->
   <header class="app-header">
     <div class="brand-area">
-      <div class="brand-logo">🌲 UTE</div>
+      <div class="brand-logo">🌲 LEXBNB</div>
       <div class="brand-meta">
         <h1>KONTROL MERKEZİ V5</h1>
-        <p>Uludağ Tatil Evleri • Tam Yönetim, KPI & OTA Radarı</p>
+        <p>Uludağ Tatil Evleri • Finansal Performans & Yönetim</p>
       </div>
     </div>
 
@@ -25,7 +25,9 @@
       <div class="filter-group">
         <label>DÖNEM:</label>
         <select id="globalPeriodFilter" onchange="handleFilterChange()">
-          <option value="2026-09" selected>Eylül 2026</option>
+          <option value="2026-07">Temmuz 2026</option>
+          <option value="2026-08" selected>Ağustos 2026</option>
+          <option value="2026-09">Eylül 2026</option>
           <option value="2026-10">Ekim 2026</option>
           <option value="2026-11">Kasım 2026</option>
           <option value="2026-12">Aralık 2026</option>
@@ -33,9 +35,9 @@
         </select>
       </div>
       <div class="filter-group">
-        <label>VİLLA:</label>
+        <label>PORTFÖY:</label>
         <select id="globalVillaFilter" onchange="handleFilterChange()">
-          <option value="ALL" selected>Tüm Portföy (5 Villa)</option>
+          <option value="ALL" selected>Tüm Mülkler (5 Villa)</option>
           <option value="SEYIR">Seyir (6+2)</option>
           <option value="DOGUS">Doğuş (11)</option>
           <option value="ZIRVE">Zirve (9 - Jakuzi/Sauna)</option>
@@ -47,6 +49,8 @@
 
     <div class="header-actions">
       <button class="btn btn-primary" onclick="openBookingModal()">+ Rezervasyon</button>
+      <button class="btn btn-secondary" onclick="openExpenseModal()">+ Gider / Yatırım</button>
+      <button class="btn btn-secondary" onclick="openImportModal()">📥 Rapor Yükle</button>
       <button class="btn btn-secondary" onclick="exportDataJSON()">💾 Yedek</button>
       <button class="btn btn-danger btn-sm" onclick="resetToCleanState()" title="Tüm verileri temizle">🗑️ Sıfırla</button>
     </div>
@@ -54,24 +58,412 @@
 
   <!-- Navigation Tabs -->
   <nav class="nav-tabs">
-    <button class="tab-btn active" onclick="switchTab('dashboard')">📊 Kokpit (10 Saniye)</button>
+    <button class="tab-btn active" onclick="switchTab('finance')">💰 Finans (Finansal Performans)</button>
+    <button class="tab-btn" onclick="switchTab('dashboard')">📊 Kokpit (10 Saniye)</button>
     <button class="tab-btn" onclick="switchTab('channels')">🌐 OTA & Kanal Radarı</button>
-    <button class="tab-btn" onclick="switchTab('kpis')">📈 Derin KPI & Finans</button>
     <button class="tab-btn" onclick="switchTab('reservations')">📅 Rezervasyonlar (<span id="rezCountBadge">0</span>)</button>
+    <button class="tab-btn" onclick="switchTab('expenses')">💸 Gider Defteri (<span id="expenseCountBadge">0</span>)</button>
     <button class="tab-btn" onclick="switchTab('leads')">🎯 Lead & Satış (<span id="leadCountBadge">0</span>)</button>
     <button class="tab-btn" onclick="switchTab('maintenance')">🛠️ Bakım & P1 (<span id="maintCountBadge">0</span>)</button>
-    <button class="tab-btn" onclick="switchTab('settings')">⚙️ Villa & Fiyat Ayarları</button>
+    <button class="tab-btn" onclick="switchTab('settings')">⚙️ Ayarlar & Hedefler</button>
   </nav>
 
   <!-- Main Container -->
   <main class="container">
 
-    <!-- ========================================== -->
-    <!-- TAB 1: KOKPİT (10 SANİYE KURALI) -->
-    <!-- ========================================== -->
-    <div id="tab-dashboard" class="tab-content active">
+    <!-- ======================================================= -->
+    <!-- TAB: FINANSAL PERFORMANS (ANA YENİ MODÜL) -->
+    <!-- ======================================================= -->
+    <div id="tab-finance" class="tab-content active">
 
-      <!-- Today Radar -->
+      <!-- 1. MONTH STEPPER & PORTFOLIO BANNER -->
+      <section class="card finance-top-bar">
+        <div class="month-stepper">
+          <button class="stepper-arrow-btn" onclick="stepMonth(-1)" title="Önceki Ay">‹</button>
+          <div class="month-stepper-display">
+            <span class="stepper-sub-prev" id="stepperPrevLabel">Temmuz 2026</span>
+            <strong class="stepper-current" id="stepperCurrentLabel">Ağustos 2026</strong>
+            <span class="stepper-sub-next" id="stepperNextLabel">Eylül 2026</span>
+          </div>
+          <button class="stepper-arrow-btn" onclick="stepMonth(1)" title="Sonraki Ay">›</button>
+        </div>
+
+        <div class="finance-top-meta">
+          <div class="meta-pill">
+            <span>Portföy:</span>
+            <strong id="finTopPropertyLabel">Tüm Mülkler (5 Villa)</strong>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="openGoalsModal()">⚙️ Hedefleri Düzenle</button>
+          <button class="btn btn-secondary btn-sm" onclick="openExpenseModal()">+ Gider Girişi</button>
+        </div>
+      </section>
+
+      <!-- 2. ANA KPI KARTLARI (5 SANİYEDE ANLAŞILIR) -->
+      <section class="kpi-cards-grid five-cols">
+        <!-- Gerçekleşen Ciro -->
+        <div class="kpi-card fin-kpi-card">
+          <div class="kpi-card-header">
+            <span class="kpi-label">GERÇEKLEŞEN CİRO</span>
+            <button class="kpi-info-btn" onclick="showKpiExplanation('REVENUE')">ℹ️</button>
+          </div>
+          <div class="kpi-value" id="finActualRevenue">483.965 TL</div>
+          <div class="kpi-meta">
+            <span class="kpi-trend positive" id="finRevTargetDelta">Hedefin %61 üzerinde</span>
+            <span id="finRevMoM">↑ %12 geçen aya göre</span>
+          </div>
+        </div>
+
+        <!-- Hedef Ciro -->
+        <div class="kpi-card fin-kpi-card">
+          <div class="kpi-card-header">
+            <span class="kpi-label">HEDEF CİRO</span>
+            <button class="kpi-info-btn" onclick="showKpiExplanation('TARGET')">ℹ️</button>
+          </div>
+          <div class="kpi-value" id="finTargetRevenue">300.000 TL</div>
+          <div class="kpi-meta">
+            <span class="kpi-trend positive" id="finTargetDiff">+183.965 TL fark</span>
+            <span>Aylık Bütçe</span>
+          </div>
+        </div>
+
+        <!-- Net Kâr (Ciro - Opex - Capex) -->
+        <div class="kpi-card fin-kpi-card highlight-profit">
+          <div class="kpi-card-header">
+            <span class="kpi-label">NET KÂR (CASH PROFIT)</span>
+            <button class="kpi-info-btn" onclick="showKpiExplanation('NET_PROFIT')">ℹ️</button>
+          </div>
+          <div class="kpi-value" id="finNetProfit">142.793 TL</div>
+          <div class="kpi-meta">
+            <span class="kpi-trend positive" id="finNetMarginLabel">%29,5 net kâr marjı</span>
+            <span id="finNetProfitMoM">↑ %18 geçen aya göre</span>
+          </div>
+        </div>
+
+        <!-- Toplam Gider (Opex + Capex) -->
+        <div class="kpi-card fin-kpi-card">
+          <div class="kpi-card-header">
+            <span class="kpi-label">TOPLAM GİDER (OPEX+CAPEX)</span>
+            <button class="kpi-info-btn" onclick="showKpiExplanation('TOTAL_EXPENSE')">ℹ️</button>
+          </div>
+          <div class="kpi-value" id="finTotalExpense">341.172 TL</div>
+          <div class="kpi-meta">
+            <span class="kpi-trend negative" id="finExpenseRatio">Cironun %70,5'i</span>
+            <span id="finExpenseMoM">↑ %8 geçen aya göre</span>
+          </div>
+        </div>
+
+        <!-- Satılan Gece & Ortalama Gelir -->
+        <div class="kpi-card fin-kpi-card">
+          <div class="kpi-card-header">
+            <span class="kpi-label">SATILAN GECE</span>
+            <button class="kpi-info-btn" onclick="showKpiExplanation('SOLD_NIGHTS')">ℹ️</button>
+          </div>
+          <div class="kpi-value" id="finSoldNights">79 gece</div>
+          <div class="kpi-meta">
+            <span class="kpi-trend positive" id="finAvgRevPerNight">6.126 TL / satılan gece</span>
+            <span id="finNightsMoM">↑ %9 geçen aya göre</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. CİRO HEDEFİ ANALİZİ (HEDEF VS GERÇEKLEŞEN) -->
+      <section class="card target-analysis-card">
+        <div class="section-title-bar">
+          <div>
+            <h2>🎯 CİRO HEDEFİ ANALİZİ (HEDEF VS GERÇEKLEŞEN)</h2>
+            <span class="sub-text">Ay içi ilerleme, hedef sapması ve dönem sonu tahmini</span>
+          </div>
+          <span class="badge badge-emerald" id="finTargetStatusBadge">%161,3 Hedef Gerçekleşti</span>
+        </div>
+
+        <div class="target-comparison-grid">
+          <div class="target-stat-box">
+            <span class="lbl">Hedef Ciro</span>
+            <strong class="val" id="tgtBoxTarget">300.000 TL</strong>
+          </div>
+          <div class="target-stat-box">
+            <span class="lbl">Gerçekleşen Ciro</span>
+            <strong class="val positive" id="tgtBoxActual">483.965 TL</strong>
+          </div>
+          <div class="target-stat-box">
+            <span class="lbl">Hedef Farkı</span>
+            <strong class="val positive" id="tgtBoxDiff">+183.965 TL</strong>
+          </div>
+          <div class="target-stat-box">
+            <span class="lbl">Gerçekleşme Oranı</span>
+            <strong class="val positive" id="tgtBoxPct">%161,3</strong>
+          </div>
+          <div class="target-stat-box">
+            <span class="lbl">Ay Sonu Tahmini Ciro</span>
+            <strong class="val" id="tgtBoxForecast">492.000 TL</strong>
+          </div>
+        </div>
+
+        <!-- Modern Progress Bar -->
+        <div class="target-progress-wrapper">
+          <div class="target-progress-header">
+            <span>İlerleme Çubuğu</span>
+            <span id="targetBarRatioText">483.965 TL / 300.000 TL (%161,3)</span>
+          </div>
+          <div class="progress-bar-bg target-bar-large">
+            <div class="progress-bar-fill target-bar-fill" id="targetBarFill" style="width: 100%;"></div>
+            <div class="target-threshold-marker" title="Hedef Noktası (%100)" style="left: 62%;"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. KÂR KÖPRÜSÜ (PROFIT WATERFALL BRIDGE) -->
+      <section class="card profit-bridge-card">
+        <div class="section-title-bar">
+          <div>
+            <h2>🌉 KÂR KÖPRÜSÜ (PROFIT WATERFALL)</h2>
+            <p class="sub-text">Cirodan başlayarak operasyonel kâra ve yatırımlar sonrası net nakit kârına adım adım geçiş</p>
+          </div>
+          <div class="bridge-tag">Operasyonel Kâr vs Yatırımlar Ayrıştırılmıştır</div>
+        </div>
+
+        <div class="profit-bridge-steps" id="profitBridgeContainer">
+          <!-- Step 1: Ciro -->
+          <div class="bridge-step ciro">
+            <span class="step-label">Ciro</span>
+            <strong class="step-val" id="brCiro">483.965 TL</strong>
+            <span class="step-sub">Brüt Oda & Hizmet Geliri</span>
+          </div>
+          <div class="bridge-arrow">↓</div>
+
+          <!-- Step 2: Opex -->
+          <div class="bridge-step minus opex">
+            <span class="step-label">Operasyonel Giderler</span>
+            <strong class="step-val" id="brOpex">-337.306 TL</strong>
+            <span class="step-sub">Maaş, temizlik, komisyon, fatura</span>
+          </div>
+          <div class="bridge-arrow">↓</div>
+
+          <!-- Step 3: Operating Profit -->
+          <div class="bridge-step op-profit">
+            <span class="step-label">Operasyonel Kâr</span>
+            <strong class="step-val" id="brOpProfit">146.659 TL</strong>
+            <span class="step-sub">Marj: %30,3 (Yatırımlar Öncesi)</span>
+          </div>
+          <div class="bridge-arrow">↓</div>
+
+          <!-- Step 4: Capex / Yatırımlar -->
+          <div class="bridge-step minus capex">
+            <span class="step-label">Yatırımlar (Capex)</span>
+            <strong class="step-val" id="brCapex">-3.866 TL</strong>
+            <span class="step-sub">Jakuzi, dekorasyon, ekipman alımı</span>
+          </div>
+          <div class="bridge-arrow">↓</div>
+
+          <!-- Step 5: Net Profit -->
+          <div class="bridge-step final-profit">
+            <span class="step-label">Net Kâr (Elde Kalan)</span>
+            <strong class="step-val" id="brNetProfit">142.793 TL</strong>
+            <span class="step-sub" id="brNetMargin">%29,5 Net Kâr Marjı</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. GİDER ANALİZİ (DONUT CHART & 10 KATEGORİ DETAYI) -->
+      <section class="card expense-analysis-card">
+        <div class="section-title-bar">
+          <div>
+            <h2>📊 GİDER ANALİZİ (KATEGORİ BAZLI DAĞILIM)</h2>
+            <p class="sub-text">Gider kalemlerinin toplam bütçe ve ciro içindeki payları ile geçen aya göre değişimleri</p>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="openExpenseModal()">+ Yeni Gider / Harcama Ekle</button>
+        </div>
+
+        <div class="expense-breakdown-grid">
+          <!-- Left: SVG Donut Chart -->
+          <div class="expense-chart-pane">
+            <div class="donut-chart-container" id="expenseDonutContainer">
+              <svg viewBox="0 0 200 200" class="donut-svg" id="expenseDonutSvg">
+                <!-- Injected via JS -->
+              </svg>
+              <div class="donut-center-info">
+                <span class="center-sub">Toplam Gider</span>
+                <strong class="center-val" id="donutCenterVal">341.172 TL</strong>
+              </div>
+            </div>
+            <div class="chart-summary-pills">
+              <span class="pill opex-pill">Operasyonel: <strong id="donutOpexVal">337.306 TL</strong></span>
+              <span class="pill capex-pill">Yatırım: <strong id="donutCapexVal">3.866 TL</strong></span>
+            </div>
+          </div>
+
+          <!-- Right: Interactive Category Table -->
+          <div class="expense-table-pane table-responsive">
+            <table class="data-table category-table">
+              <thead>
+                <tr>
+                  <th>GİDER KATEGORİSİ</th>
+                  <th>TUTAR (TL)</th>
+                  <th>GİDER İÇİ PAY %</th>
+                  <th>CİRO İÇİ PAY %</th>
+                  <th>GEÇEN AYA GÖRE</th>
+                  <th style="text-align: right;">İŞLEM</th>
+                </tr>
+              </thead>
+              <tbody id="expenseCategoryTableBody">
+                <!-- Injected via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 6. MÜLK BAZLI FİNANSAL PERFORMANS (5 VİLLA DETAY KARTLARI) -->
+      <section class="card property-finance-section">
+        <div class="section-title-bar">
+          <div>
+            <h2>🏡 MÜLK BAZLI FİNANSAL PERFORMANS (5 VİLLA)</h2>
+            <p class="sub-text">Hangi villa ne kadar ciro üretti, ne kadar gider tüketti ve kâra ne kadar katkı sağladı?</p>
+          </div>
+        </div>
+
+        <div class="property-finance-cards-grid" id="propertyFinanceCardsGrid">
+          <!-- Injected via JS -->
+        </div>
+      </section>
+
+      <!-- 7. MÜLK KARŞILAŞTIRMA & ANOMALİ TESPİTİ -->
+      <section class="card comparison-anomaly-section">
+        <div class="section-title-bar">
+          <div>
+            <h2>⚖️ MÜLK KARŞILAŞTIRMA VE STRATEJİK ANOMALİ TESPİTİ</h2>
+            <p class="sub-text">Fiyatlandırma veya doluluk açısından portföy ortalamasından sapan villalar</p>
+          </div>
+          <div class="metric-selector-wrapper">
+            <label>Karşılaştırma Metriği:</label>
+            <select id="compMetricSelect" onchange="renderPropertyComparisonChart()">
+              <option value="ciro" selected>Ciro (TL)</option>
+              <option value="netKar">Tahmini Net Kâr (TL)</option>
+              <option value="adr">ADR (Ortalama Günlük Fiyat)</option>
+              <option value="revpar">RevPAR (Kapasite Geliri)</option>
+              <option value="doluluk">Doluluk Oranı (%)</option>
+              <option value="satilanGece">Satılan Gece</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Comparison Bar Chart -->
+        <div class="comparison-bars-container" id="comparisonBarsContainer">
+          <!-- Injected via JS -->
+        </div>
+
+        <!-- Anomaly Detection Badges -->
+        <div class="anomalies-list" id="anomaliesListContainer">
+          <!-- Injected via JS: örn: Yüksek Doluluk + Düşük ADR -->
+        </div>
+      </section>
+
+      <!-- 8. AYLIK TREND VE GEÇEN YIL KARŞILAŞTIRMASI -->
+      <div class="grid-2col">
+        <!-- Monthly Trend Chart -->
+        <section class="card trend-card">
+          <div class="section-title-bar">
+            <div>
+              <h2>📈 AYLIK FİNANSAL TREND</h2>
+              <span class="sub-text">Ciro, Gider ve Net Kâr Evrimi</span>
+            </div>
+            <div class="trend-range-selector">
+              <button class="trend-btn active" onclick="setTrendRange('3M')">3 Ay</button>
+              <button class="trend-btn" onclick="setTrendRange('6M')">6 Ay</button>
+              <button class="trend-btn" onclick="setTrendRange('12M')">12 Ay</button>
+              <button class="trend-btn" onclick="setTrendRange('YTD')">YTD</button>
+            </div>
+          </div>
+          <div class="trend-chart-container" id="trendChartContainer">
+            <!-- Injected via JS (SVG Multi-Bar/Line Chart) -->
+          </div>
+          <div class="trend-legend">
+            <span class="legend-item"><span class="legend-dot ciro-dot"></span> Ciro</span>
+            <span class="legend-item"><span class="legend-dot opex-dot"></span> Giderler</span>
+            <span class="legend-item"><span class="legend-dot profit-dot"></span> Net Kâr</span>
+          </div>
+        </section>
+
+        <!-- YoY Comparison -->
+        <section class="card yoy-card">
+          <div class="section-title-bar">
+            <div>
+              <h2>📅 GEÇEN YIL KARŞILAŞTIRMASI (YOY)</h2>
+              <span class="sub-text" id="yoySubText">Ağustos 2025 vs Ağustos 2026</span>
+            </div>
+            <span class="badge badge-emerald" id="yoyBadge">Nominal: +%62,7</span>
+          </div>
+
+          <div class="yoy-comparison-boxes" id="yoyBoxesContainer">
+            <!-- Injected via JS -->
+          </div>
+        </section>
+      </div>
+
+      <!-- 9. LEXBNB AI FİNANS ANALİSTİ (4 BÖLÜM & AKSİYONA DÖNÜŞTÜR) -->
+      <section class="card ai-analyst-card">
+        <div class="section-title-bar">
+          <div class="title-with-badge">
+            <span class="ai-sparkle-icon">✨</span>
+            <h2>LEXBNB AI FİNANS ANALİSTİ</h2>
+            <span class="badge badge-purple">Veri Tabanlı Zeka Motoru</span>
+          </div>
+          <span class="sub-text">Rakam uydurmaz, gerçek operasyonel korelasyonları raporlar</span>
+        </div>
+
+        <div class="ai-analyst-grid">
+          <!-- Bölüm 1: Ne İyi Gitti? -->
+          <div class="ai-section-box good">
+            <div class="ai-sec-header">
+              <span class="sec-icon">🟢</span>
+              <h3>1. Ne İyi Gitti?</h3>
+            </div>
+            <div class="ai-sec-content" id="aiGoodContent">
+              <!-- Injected via JS -->
+            </div>
+          </div>
+
+          <!-- Bölüm 2: Ne Kötü Gitti? -->
+          <div class="ai-section-box bad">
+            <div class="ai-sec-header">
+              <span class="sec-icon">🔴</span>
+              <h3>2. Ne Kötü Gitti?</h3>
+            </div>
+            <div class="ai-sec-content" id="aiBadContent">
+              <!-- Injected via JS -->
+            </div>
+          </div>
+
+          <!-- Bölüm 3: Neden? -->
+          <div class="ai-section-box why">
+            <div class="ai-sec-header">
+              <span class="sec-icon">🔍</span>
+              <h3>3. Neden? (Kök Neden Korelasyonu)</h3>
+            </div>
+            <div class="ai-sec-content" id="aiWhyContent">
+              <!-- Injected via JS -->
+            </div>
+          </div>
+
+          <!-- Bölüm 4: Gelecek Ay Ne Yapmalıyım? (Aksiyona Dönüştür) -->
+          <div class="ai-section-box action">
+            <div class="ai-sec-header">
+              <span class="sec-icon">⚡</span>
+              <h3>4. Gelecek Ay Ne Yapmalıyım?</h3>
+            </div>
+            <div class="ai-sec-content" id="aiActionContent">
+              <!-- Injected via JS with "Görev Oluştur" buttons -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- ========================================== -->
+    <!-- TAB: KOKPİT (10 SANİYE KURALI) -->
+    <!-- ========================================== -->
+    <div id="tab-dashboard" class="tab-content">
       <section class="card today-radar-card">
         <div class="section-title-bar">
           <div class="title-with-badge">
@@ -80,479 +472,363 @@
           </div>
           <button class="btn-text" onclick="renderAll()">🔄 Yenile</button>
         </div>
-        <div class="radar-grid" id="todayRadarList">
-          <!-- Injected via JS -->
-        </div>
+        <div class="radar-grid" id="todayRadarList"></div>
       </section>
 
-      <!-- Big 4 KPI Cards with Info Buttons -->
       <section class="kpi-cards-grid">
         <div class="kpi-card">
-          <div class="kpi-card-header">
-            <span class="kpi-label">NET ODA GELİRİ (NAR)</span>
-            <button class="kpi-info-btn" onclick="showKpiExplanation('NAR')" title="Bu nedir?">ℹ️</button>
-          </div>
+          <span class="kpi-label">NET ODA GELİRİ</span>
           <div class="kpi-value" id="kpiNetRevenue">₺0</div>
-          <div class="kpi-meta">
-            <span class="kpi-trend positive" id="kpiTargetPct">%0 Hedef</span>
-            <span id="kpiGrossRevenue">Brüt: ₺0</span>
-          </div>
+          <div class="kpi-meta"><span class="kpi-trend positive" id="kpiTargetPct">%0 Hedef</span><span id="kpiGrossRevenue">Brüt: ₺0</span></div>
         </div>
-
         <div class="kpi-card">
-          <div class="kpi-card-header">
-            <span class="kpi-label">DOLULUK ORANI (OCCUPANCY)</span>
-            <button class="kpi-info-btn" onclick="showKpiExplanation('OCCUPANCY')" title="Bu nedir?">ℹ️</button>
-          </div>
+          <span class="kpi-label">DOLULUK ORANI</span>
           <div class="kpi-value" id="kpiOccupancy">%0.0</div>
-          <div class="kpi-meta">
-            <span class="kpi-trend positive" id="kpiNightsDetail">0 Gece Satıldı</span>
-            <span id="kpiAvailableDetail">0 Satılabilir Gece</span>
-          </div>
+          <div class="kpi-meta"><span class="kpi-trend positive" id="kpiNightsDetail">0 Gece</span><span id="kpiAvailableDetail">0 Gece</span></div>
         </div>
-
         <div class="kpi-card">
-          <div class="kpi-card-header">
-            <span class="kpi-label">ADR (GÜNLÜK ORTALAMA FİYAT)</span>
-            <button class="kpi-info-btn" onclick="showKpiExplanation('ADR')" title="Bu nedir?">ℹ️</button>
-          </div>
+          <span class="kpi-label">ADR</span>
           <div class="kpi-value" id="kpiADR">₺0</div>
-          <div class="kpi-meta">
-            <span class="kpi-trend positive">Dolu Gece Başı Net</span>
-            <span>Komisyonlar Hariç</span>
-          </div>
+          <div class="kpi-meta"><span class="kpi-trend positive">Net / Gece</span><span>Komisyon Hariç</span></div>
         </div>
-
         <div class="kpi-card">
-          <div class="kpi-card-header">
-            <span class="kpi-label">RevPAR (KAPASİTE GELİRİ)</span>
-            <button class="kpi-info-btn" onclick="showKpiExplanation('REVPAR')" title="Bu nedir?">ℹ️</button>
-          </div>
+          <span class="kpi-label">RevPAR</span>
           <div class="kpi-value" id="kpiRevPAR">₺0</div>
-          <div class="kpi-meta">
-            <span class="kpi-trend positive">Boş Günler Dahil</span>
-            <span id="kpiNRevPAR">NRevPAR: ₺0</span>
-          </div>
+          <div class="kpi-meta"><span class="kpi-trend positive">Kapasite</span><span id="kpiNRevPAR">NRevPAR: ₺0</span></div>
         </div>
       </section>
 
-      <!-- 5 Villa Scorecard -->
       <section class="card">
         <div class="section-title-bar">
           <h2>🏆 5 VİLLA PERFORMANS SCORECARD</h2>
-          <span class="sub-text">Seçilen dönem ve filtreye göre anlık hesaplanır</span>
         </div>
         <div class="table-responsive">
           <table class="data-table">
             <thead>
-              <tr>
-                <th>VİLLA</th>
-                <th>KAPASİTE</th>
-                <th>SATILAN GECE</th>
-                <th>DOLULUK %</th>
-                <th>ADR</th>
-                <th>RevPAR</th>
-                <th>NET GELİR</th>
-                <th>DİREKT PAYI %</th>
-                <th>AÇIK P1</th>
-                <th>DURUM</th>
-              </tr>
+              <tr><th>VİLLA</th><th>KAPASİTE</th><th>SATILAN GECE</th><th>DOLULUK %</th><th>ADR</th><th>RevPAR</th><th>NET GELİR</th><th>DİREKT %</th><th>P1</th><th>DURUM</th></tr>
             </thead>
-            <tbody id="villaScorecardBody">
-              <!-- Injected via JS -->
-            </tbody>
+            <tbody id="villaScorecardBody"></tbody>
           </table>
         </div>
       </section>
 
-      <!-- Sales & Channel Section -->
       <div class="grid-2col">
         <section class="card">
-          <div class="section-title-bar">
-            <h2>🎯 LEAD DÖNÜŞÜM HUNİSİ</h2>
-            <button class="btn btn-secondary btn-sm" onclick="openLeadModal()">+ Lead Ekle</button>
-          </div>
-          <div class="funnel-stats-grid" id="funnelStatsContainer">
-            <!-- Injected via JS -->
-          </div>
+          <div class="section-title-bar"><h2>🎯 LEAD DÖNÜŞÜM HUNİSİ</h2></div>
+          <div class="funnel-stats-grid" id="funnelStatsContainer"></div>
         </section>
-
         <section class="card">
-          <div class="section-title-bar">
-            <h2>🌐 KANAL DAĞILIMI & DİREKT SATIŞ PAYI</h2>
-            <span class="badge badge-green" id="directShareBadge">%0 Direkt</span>
-          </div>
-          <div class="channel-progress-list" id="channelListContainer">
-            <!-- Injected via JS -->
-          </div>
+          <div class="section-title-bar"><h2>🌐 KANAL DAĞILIMI</h2><span class="badge badge-green" id="directShareBadge">%0 Direkt</span></div>
+          <div class="channel-progress-list" id="channelListContainer"></div>
         </section>
       </div>
 
-      <!-- Gap Night Radar -->
       <section class="card gap-radar-card">
-        <div class="section-title-bar">
-          <h2>💎 BOŞLUK GECELERİ (GAP NIGHT EXTENSION MOTORU)</h2>
-          <span class="badge badge-emerald">Otomatik Taban Fiyat Korumalı</span>
-        </div>
-        <p class="section-desc">Mevcut rezervasyonlar arasındaki 1-2 gecelik yetim boşluklar ve villaların marjinal maliyet tabanlı indirimli teklifleri:</p>
-        <div class="gap-grid" id="gapNightGrid">
-          <!-- Injected via JS -->
-        </div>
+        <div class="section-title-bar"><h2>💎 BOŞLUK GECELERİ (GAP NIGHTS)</h2><span class="badge badge-emerald">Taban Korumalı</span></div>
+        <div class="gap-grid" id="gapNightGrid"></div>
       </section>
-
     </div>
 
     <!-- ========================================== -->
-    <!-- TAB 2: OTA & KANAL RADARI (YENİ UZMAN SAYFASI) -->
+    <!-- TAB: OTA & KANAL RADARI -->
     <!-- ========================================== -->
     <div id="tab-channels" class="tab-content">
-      
-      <!-- OTA Rating & Health Cards -->
       <div class="kpi-cards-grid">
         <div class="kpi-card channel-card airbnb">
-          <div class="channel-card-top">
-            <span class="channel-title">🏡 Airbnb Portföy Sağlığı</span>
-            <span class="badge badge-amber" id="airbnbSuperhostBadge">Superhost Durumu: Güçlü</span>
-          </div>
+          <div class="channel-card-top"><span class="channel-title">🏡 Airbnb Portföyü</span><span class="badge badge-amber">Superhost: Güçlü</span></div>
           <div class="kpi-value">4.94 <span class="sub-val">★ / 5.0</span></div>
-          <div class="kpi-meta">
-            <span>Toplam Yorum: <strong>86 Değerlendirme</strong></span>
-            <span style="color:var(--accent-emerald);">Hedef: >4.80 ✅</span>
-          </div>
+          <div class="kpi-meta"><span>86 Değerlendirme</span><span style="color:var(--accent-emerald);">Hedef: >4.80 ✅</span></div>
         </div>
-
         <div class="kpi-card channel-card booking">
-          <div class="channel-card-top">
-            <span class="channel-title">🏨 Booking.com Skoru</span>
-            <span class="badge badge-blue">Premier Partner</span>
-          </div>
+          <div class="channel-card-top"><span class="channel-title">🏨 Booking.com</span><span class="badge badge-blue">Premier Partner</span></div>
           <div class="kpi-value">9.3 <span class="sub-val">/ 10</span></div>
-          <div class="kpi-meta">
-            <span>Fevkalade Seviyesi</span>
-            <span style="color:var(--accent-emerald);">İptal Oranı: %12</span>
-          </div>
+          <div class="kpi-meta"><span>Fevkalade</span><span style="color:var(--accent-emerald);">İptal: %12</span></div>
         </div>
-
         <div class="kpi-card channel-card direct">
-          <div class="channel-card-top">
-            <span class="channel-title">💬 WhatsApp & Direkt Gücü</span>
-            <span class="badge badge-green">%0 Komisyon</span>
-          </div>
+          <div class="channel-card-top"><span class="channel-title">💬 WhatsApp & Direkt</span><span class="badge badge-green">%0 Komisyon</span></div>
           <div class="kpi-value" id="otaSavedCommission">₺0</div>
-          <div class="kpi-meta">
-            <span>Direkt Satışla Kurtarılan Komisyon</span>
-            <span style="color:var(--accent-emerald);">Cepte Kalan Kâr ✅</span>
-          </div>
+          <div class="kpi-meta"><span>Kurtarılan Komisyon</span><span style="color:var(--accent-emerald);">Cepte Kalan ✅</span></div>
         </div>
-
         <div class="kpi-card channel-card google">
-          <div class="channel-card-top">
-            <span class="channel-title">📍 Google Haritalar & SEO</span>
-            <span class="badge badge-blue">Yerel Güç</span>
-          </div>
+          <div class="channel-card-top"><span class="channel-title">📍 Google Haritalar</span><span class="badge badge-blue">Yerel Güç</span></div>
           <div class="kpi-value">4.9 <span class="sub-val">★</span></div>
-          <div class="kpi-meta">
-            <span>124 Doğrulanmış Yorum</span>
-            <span style="color:var(--accent-emerald);">Aylık 1.800 Arama</span>
-          </div>
+          <div class="kpi-meta"><span>124 Yorum</span><span style="color:var(--accent-emerald);">1.800 Arama</span></div>
         </div>
       </div>
 
-      <!-- Channel Profitability & Commission Leak Analysis -->
       <section class="card" style="margin-top: 20px;">
-        <div class="section-title-bar">
-          <div>
-            <h2>💸 KANAL KÂRLILIK VE KOMİSYON SIZINTI MATRİSİ</h2>
-            <p class="sub-text">Hangi kanal ne kadar ciro getirdi, ne kadar komisyon kesti ve cebinize saf ne kaldı?</p>
-          </div>
-        </div>
+        <div class="section-title-bar"><h2>💸 KANAL KÂRLILIK VE KOMİSYON SIZINTISI</h2></div>
         <div class="table-responsive">
           <table class="data-table">
             <thead>
-              <tr>
-                <th>KANAL</th>
-                <th>İŞLETME TÜRÜ</th>
-                <th>REZERVASYON ADEDİ</th>
-                <th>BRÜT CİRO (₺)</th>
-                <th>ÖDENEN KOMİSYON (₺)</th>
-                <th>ORTALAMA KOMİSYON %</th>
-                <th>CEBE KALAN NET ODA (₺)</th>
-                <th>NET KÂRLILIK ORANI</th>
-              </tr>
+              <tr><th>KANAL</th><th>TÜR</th><th>REZERVASYON</th><th>BRÜT (₺)</th><th>KOMİSYON (₺)</th><th>KOMİSYON %</th><th>NET ODA (₺)</th><th>KÂRLILIK</th></tr>
             </thead>
-            <tbody id="channelProfitabilityTableBody">
-              <!-- Injected via JS -->
-            </tbody>
+            <tbody id="channelProfitabilityTableBody"></tbody>
           </table>
         </div>
       </section>
 
-      <!-- 5 Villa Digital Listing Audit Checklist -->
       <section class="card" style="margin-top: 20px;">
-        <div class="section-title-bar">
-          <div>
-            <h2>📋 5 VİLLA DİJİTAL İLAN & REVENUE DENETİMİ (AUDIT)</h2>
-            <p class="sub-text">Airbnb ve Booking ilanlarınızın satış potansiyelini artıran kritik kontrol listesi.</p>
-          </div>
-          <button class="btn btn-secondary btn-sm" onclick="alert('İlan denetim puanları başarıyla güncellendi!')">Taramayı Yenile</button>
-        </div>
+        <div class="section-title-bar"><h2>📋 5 VİLLA DİJİTAL İLAN AUDIT (CHECKLIST)</h2></div>
         <div class="table-responsive">
           <table class="data-table">
             <thead>
-              <tr>
-                <th>VİLLA</th>
-                <th>ANA FOTOĞRAF KALİTESİ</th>
-                <th>FİYAT PARİTESİ</th>
-                <th>MINIMUM STAY KURALI</th>
-                <th>İPTAL POLİTİKASI</th>
-                <th>INSTANT BOOK (ANINDA REZ.)</th>
-                <th>DİJİTAL PUAN</th>
-                <th>AKSİYON ÖNERİSİ</th>
-              </tr>
+              <tr><th>VİLLA</th><th>FOTOĞRAF</th><th>FİYAT PARİTESİ</th><th>MIN STAY</th><th>İPTAL</th><th>INSTANT</th><th>PUAN</th><th>AKSİYON</th></tr>
             </thead>
-            <tbody id="digitalAuditTableBody">
-              <!-- Injected via JS -->
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-    </div>
-
-    <!-- ========================================== -->
-    <!-- TAB 3: DERİN KPI & FİNANS ANALİZİ -->
-    <!-- ========================================== -->
-    <div id="tab-kpis" class="tab-content">
-      
-      <!-- Interactive KPI Dictionary Banner -->
-      <section class="card" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(59, 130, 246, 0.08)); border-color: rgba(16, 185, 129, 0.3);">
-        <div class="section-title-bar">
-          <h2>🎓 UTE KPI SÖZLÜĞÜ (NASIL YORUMLANIR?)</h2>
-          <span class="badge badge-emerald">Yönetici Rehberi</span>
-        </div>
-        <div class="kpi-dictionary-grid">
-          <div class="dict-item">
-            <strong>ADR (Average Daily Rate):</strong>
-            <p>Odanızı ortalama kaça sattınız? (Dolu günlerin gecelik net fiyatıdır).</p>
-            <span class="dict-tip">💡 <em>Yorum:</em> Doluluk %80 ama ADR düşükse ucuza satıyorsunuz; fiyatı artırın.</span>
-          </div>
-          <div class="dict-item">
-            <strong>RevPAR (Revenue Per Available Rental):</strong>
-            <p>Boş günler dahil, satılabilir kapasitenizin gece başına ürettiği gerçek net cirodur.</p>
-            <span class="dict-tip">💡 <em>Yorum:</em> Otelciliğin gerçek şampiyonluk metriğidir. Sadece doluluğa değil, RevPAR'a odaklanın.</span>
-          </div>
-          <div class="dict-item">
-            <strong>Net RevPAR (NRevPAR):</strong>
-            <p>Isınma, şömine odunu, elektrik ve temizlik gibi değişken maliyetler düşüldükten sonra kapasite başı net kârınızdır.</p>
-            <span class="dict-tip">💡 <em>Yorum:</em> Yüksek ciro yapıp elektrik/ısınmaya para kaptırmadığınızı gösterir.</span>
-          </div>
-          <div class="dict-item">
-            <strong>Lead Conversion Rate (%):</strong>
-            <p>WhatsApp veya Instagram'dan "fiyat ne kadar?" diye soran her 100 müşteriden kaçının rezervasyona döndüğüdür.</p>
-            <span class="dict-tip">💡 <em>Yorum:</em> %25'in altındaysa yanıt süreniz yavaş veya fiyat teklifiniz yüksek kalıyordur.</span>
-          </div>
-        </div>
-      </section>
-
-      <div class="grid-2col" style="margin-top: 20px;">
-        <!-- Revenue Waterfall Card -->
-        <section class="card">
-          <div class="section-title-bar">
-            <h2>💰 USALI GELİR ŞELALESİ (WATERFALL)</h2>
-            <span class="sub-text">Brüt Satıştan Net Kâra Geçiş</span>
-          </div>
-          <div class="waterfall-list" id="waterfallList">
-            <!-- Injected via JS -->
-          </div>
-        </section>
-
-        <!-- KPI Performance Targets -->
-        <section class="card">
-          <div class="section-title-bar">
-            <h2>🎯 DÖNEM HEDEFİ VE GERÇEKLEŞME</h2>
-            <button class="btn btn-secondary btn-sm" onclick="editTargetsModal()">⚙️ Hedefleri Düzenle</button>
-          </div>
-          <div class="target-bars-container" id="targetBarsContainer">
-            <!-- Injected via JS -->
-          </div>
-        </section>
-      </div>
-
-      <!-- Full KPI Matrix Table -->
-      <section class="card" style="margin-top: 20px;">
-        <div class="section-title-bar">
-          <h2>📊 KAPSAMLI KPI METRİK MATRİSİ</h2>
-          <span class="badge badge-blue">Tüm Hesaplamalar</span>
-        </div>
-        <div class="table-responsive">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>METRİK ADI</th>
-                <th>TANIM / FORMÜL</th>
-                <th>GERÇEKLEŞEN DEĞER</th>
-                <th>SEKTÖR STANDARDI (BENCHMARK)</th>
-                <th>DURUM</th>
-              </tr>
-            </thead>
-            <tbody id="fullKpiMatrixBody">
-              <!-- Injected via JS -->
-            </tbody>
+            <tbody id="digitalAuditTableBody"></tbody>
           </table>
         </div>
       </section>
     </div>
 
     <!-- ========================================== -->
-    <!-- TAB 4: REZERVASYONLAR (FULL CRUD + SEARCH) -->
+    <!-- TAB: REZERVASYONLAR (FULL CRUD) -->
     <!-- ========================================== -->
     <div id="tab-reservations" class="tab-content">
       <section class="card">
         <div class="section-title-bar">
-          <div>
-            <h2>📅 REZERVASYON YÖNETİM MERKEZİ</h2>
-            <p class="sub-text">Tüm geçmiş ve gelecek rezervasyonları düzenleyin, silin veya filtreleyin.</p>
-          </div>
+          <div><h2>📅 REZERVASYON YÖNETİMİ</h2><p class="sub-text">Tüm geçmiş ve gelecek rezervasyonları düzenleyin, silin veya filtreleyin.</p></div>
           <div class="table-actions">
             <input type="text" id="rezSearchInput" placeholder="🔍 Misafir veya Villa ara..." oninput="renderManageBookingsTable()">
             <button class="btn btn-primary" onclick="openBookingModal()">+ Yeni Rezervasyon</button>
           </div>
         </div>
-
         <div class="table-responsive">
           <table class="data-table">
             <thead>
-              <tr>
-                <th>VİLLA</th>
-                <th>MİSAFİR</th>
-                <th>KANAL</th>
-                <th>GİRİŞ</th>
-                <th>ÇIKIŞ</th>
-                <th>GECE</th>
-                <th>BRÜT (₺)</th>
-                <th>KOMİSYON (₺)</th>
-                <th>TEMİZLİK (₺)</th>
-                <th>NET ODA (₺)</th>
-                <th>GECELİK (₺)</th>
-                <th>DURUM</th>
-                <th style="text-align: right;">İŞLEM</th>
-              </tr>
+              <tr><th>VİLLA</th><th>MİSAFİR</th><th>KANAL</th><th>GİRİŞ</th><th>ÇIKIŞ</th><th>GECE</th><th>BRÜT (₺)</th><th>KOMİSYON (₺)</th><th>TEMİZLİK (₺)</th><th>NET ODA (₺)</th><th>GECELİK (₺)</th><th>DURUM</th><th style="text-align: right;">İŞLEM</th></tr>
             </thead>
-            <tbody id="manageBookingsTableBody">
-              <!-- Injected via JS -->
-            </tbody>
+            <tbody id="manageBookingsTableBody"></tbody>
           </table>
         </div>
       </section>
     </div>
 
     <!-- ========================================== -->
-    <!-- TAB 5: LEAD CRM (FULL CRUD) -->
+    <!-- TAB: GİDER DEFTERİ (FULL CRUD) -->
+    <!-- ========================================== -->
+    <div id="tab-expenses" class="tab-content">
+      <section class="card">
+        <div class="section-title-bar">
+          <div><h2>💸 GİDER VE YATIRIM DEFTERİ</h2><p class="sub-text">Tüm operasyonel (Opex) ve yatırım (Capex) harcamaları.</p></div>
+          <div class="table-actions">
+            <input type="text" id="expSearchInput" placeholder="🔍 Açıklama veya Kategori ara..." oninput="renderExpensesTable()">
+            <button class="btn btn-primary" onclick="openExpenseModal()">+ Yeni Gider Ekle</button>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr><th>TARİH</th><th>TÜR</th><th>KATEGORİ</th><th>MÜLK / KAPSAM</th><th>AÇIKLAMA</th><th>TUTAR (TL)</th><th style="text-align: right;">İŞLEM</th></tr>
+            </thead>
+            <tbody id="expensesTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- TAB: LEAD CRM -->
     <!-- ========================================== -->
     <div id="tab-leads" class="tab-content">
       <section class="card">
         <div class="section-title-bar">
-          <div>
-            <h2>🎯 LEAD VE MÜŞTERİ TALEPLERİ</h2>
-            <p class="sub-text">WhatsApp, Instagram ve telefon tekliflerini takip edin; rezervasyona dönüştürün.</p>
-          </div>
+          <div><h2>🎯 LEAD VE MÜŞTERİ TALEPLERİ</h2><p class="sub-text">WhatsApp, Instagram ve telefon teklifleri.</p></div>
           <button class="btn btn-primary" onclick="openLeadModal()">+ Yeni Lead Ekle</button>
         </div>
-
         <div class="table-responsive">
           <table class="data-table">
-            <thead>
-              <tr>
-                <th>MİSAFİR</th>
-                <th>İLGİLENİLEN VİLLA</th>
-                <th>KANAL</th>
-                <th>TEKLİF TUTARI (₺)</th>
-                <th>DURUM</th>
-                <th>KAYIP NEDENİ</th>
-                <th>NOTLAR</th>
-                <th style="text-align: right;">İŞLEM</th>
-              </tr>
-            </thead>
-            <tbody id="manageLeadsTableBody">
-              <!-- Injected via JS -->
-            </tbody>
+            <thead><tr><th>MİSAFİR</th><th>İLGİLENİLEN VİLLA</th><th>KANAL</th><th>TEKLİF (₺)</th><th>DURUM</th><th>KAYIP NEDENİ</th><th>NOTLAR</th><th style="text-align: right;">İŞLEM</th></tr></thead>
+            <tbody id="manageLeadsTableBody"></tbody>
           </table>
         </div>
       </section>
     </div>
 
     <!-- ========================================== -->
-    <!-- TAB 6: BAKIM & ARIZALAR (FULL CRUD) -->
+    <!-- TAB: BAKIM & P1 -->
     <!-- ========================================== -->
     <div id="tab-maintenance" class="tab-content">
       <section class="card">
         <div class="section-title-bar">
-          <div>
-            <h2>🛠️ BAKIM, ONARIM VE ARIZA DEFTERİ</h2>
-            <p class="sub-text">P1 (Kritik / Downtime), P2 (Konfor) ve P3 arızalarını yönetin.</p>
-          </div>
+          <div><h2>🛠️ BAKIM, ONARIM VE ARIZA DEFTERİ</h2><p class="sub-text">P1, P2 ve P3 arıza kayıtları.</p></div>
           <button class="btn btn-primary" onclick="openMaintModal()">+ Yeni Arıza Ekle</button>
         </div>
-
         <div class="table-responsive">
           <table class="data-table">
-            <thead>
-              <tr>
-                <th>ÖNCELİK</th>
-                <th>VİLLA</th>
-                <th>YAPILACAK İŞ / SORUN</th>
-                <th>SORUMLU</th>
-                <th>MALİYET (₺)</th>
-                <th>DOWNTIME (GECE)</th>
-                <th>DURUM</th>
-                <th style="text-align: right;">İŞLEM</th>
-              </tr>
-            </thead>
-            <tbody id="manageMaintTableBody">
-              <!-- Injected via JS -->
-            </tbody>
+            <thead><tr><th>ÖNCELİK</th><th>VİLLA</th><th>YAPILACAK İŞ / SORUN</th><th>SORUMLU</th><th>MALİYET (₺)</th><th>DOWNTIME (GECE)</th><th>DURUM</th><th style="text-align: right;">İŞLEM</th></tr></thead>
+            <tbody id="manageMaintTableBody"></tbody>
           </table>
         </div>
       </section>
     </div>
 
     <!-- ========================================== -->
-    <!-- TAB 7: VİLLA & FİYAT & MALİYET AYARLARI -->
+    <!-- TAB: AYARLAR & HEDEFLER -->
     <!-- ========================================== -->
     <div id="tab-settings" class="tab-content">
       <section class="card">
         <div class="section-title-bar">
-          <div>
-            <h2>⚙️ VİLLA ÖZELLİKLERİ, FİYAT BASAMAKLARI VE MARJİNAL MALİYETLER</h2>
-            <p class="sub-text">Fiyatları ve maliyetleri buradan doğrudan değiştirebilirsiniz. Tüm hesaplamalar bu ayarlara göre anında güncellenir.</p>
-          </div>
+          <div><h2>⚙️ VİLLA FİYAT BASAMAKLARI VE MALİYETLER</h2><p class="sub-text">Taban, baz, hedef, premium ve peak fiyatlar.</p></div>
           <button class="btn btn-primary" onclick="saveAllSettings()">💾 Ayarları Kaydet</button>
         </div>
-
         <div class="table-responsive">
-          <table class="data-table" id="settingsTable">
-            <thead>
-              <tr>
-                <th>VİLLA</th>
-                <th>KAPASİTE</th>
-                <th>TABAN FİYAT (FLOOR ₺)</th>
-                <th>HAFTA İÇİ BAZ (BASE ₺)</th>
-                <th>HAFTA SONU (TARGET ₺)</th>
-                <th>PREMIUM SEZON (₺)</th>
-                <th>ZİRVE / YILBAŞI (PEAK ₺)</th>
-                <th>TEMİZLİK MALİYETİ (₺)</th>
-                <th>GÜNLÜK ISITMA (₺)</th>
-              </tr>
-            </thead>
-            <tbody id="settingsTableBody">
-              <!-- Injected via JS -->
-            </tbody>
+          <table class="data-table">
+            <thead><tr><th>VİLLA</th><th>KAPASİTE</th><th>TABAN (FLOOR ₺)</th><th>BAZ (BASE ₺)</th><th>TARGET (₺)</th><th>PREMIUM (₺)</th><th>PEAK (₺)</th><th>TEMİZLİK (₺)</th><th>ISITMA (₺)</th></tr></thead>
+            <tbody id="settingsTableBody"></tbody>
           </table>
         </div>
       </section>
     </div>
 
   </main>
+
+  <!-- ========================================== -->
+  <!-- MODAL: YENİ GİDER / YATIRIM EKLE -->
+  <!-- ========================================== -->
+  <div class="modal-backdrop" id="expenseModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="expenseModalTitle">💸 Yeni Gider / Yatırım Girişi</h3>
+        <button class="close-btn" onclick="closeExpenseModal()">&times;</button>
+      </div>
+      <form id="expenseForm" onsubmit="saveExpense(event)">
+        <input type="hidden" id="expEditId">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Harcama Türü</label>
+            <select id="expType" required>
+              <option value="OPEX" selected>Operasyonel Gider (Opex)</option>
+              <option value="CAPEX">Yatırım Harcaması (Capex / Ekipman)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Gider Kategorisi</label>
+            <select id="expCategory" required>
+              <option value="Maaş">Maaş (Personel / Yönetici)</option>
+              <option value="Temizlik">Temizlik & Çamaşırhane</option>
+              <option value="Bakım">Bakım, Onarım & Tesisat</option>
+              <option value="Reklam">Reklam & Pazarlama (Meta/Google)</option>
+              <option value="Akaryakıt">Akaryakıt & Ulaşım</option>
+              <option value="Fatura">Fatura (Elektrik, Su, İnternet)</option>
+              <option value="Muhasebe">Muhasebe & Hukuk</option>
+              <option value="Kredi Kartı / Komisyon">Kredi Kartı / Komisyon</option>
+              <option value="Danışmanlık">Danışmanlık & Yazılım</option>
+              <option value="Diğer">Diğer Giderler</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>İlgili Mülk / Kapsam</label>
+            <select id="expVilla" required>
+              <option value="ALL">Tüm Portföy (Genel İşletme)</option>
+              <option value="SEYIR">Seyir</option>
+              <option value="DOGUS">Doğuş</option>
+              <option value="ZIRVE">Zirve</option>
+              <option value="SIRIN">Şirin</option>
+              <option value="NEFES">Nefes</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Tarih</label>
+            <input type="date" id="expDate" required>
+          </div>
+          <div class="form-group">
+            <label>Tutar (TL)</label>
+            <input type="number" id="expAmount" placeholder="Örn: 15000" required>
+          </div>
+          <div class="form-group">
+            <label>Ödeme / Fiş No</label>
+            <input type="text" id="expReceipt" placeholder="Örn: Fiş #1024">
+          </div>
+          <div class="form-group" style="grid-column: span 2;">
+            <label>Açıklama</label>
+            <input type="text" id="expDesc" placeholder="Örn: Ağustos ayı temizlik ekibi hakedişi" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeExpenseModal()">Vazgeç</button>
+          <button type="submit" class="btn btn-primary">Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: HEDEFLERİ DÜZENLE (CİRO, KÂR, MARJ, DOLULUK, ADR) -->
+  <!-- ========================================== -->
+  <div class="modal-backdrop" id="goalsModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>🎯 Aylık Finansal Hedefleri Düzenle</h3>
+        <button class="close-btn" onclick="closeGoalsModal()">&times;</button>
+      </div>
+      <form id="goalsForm" onsubmit="saveMonthlyGoals(event)">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Hedef Ciro (TL)</label>
+            <input type="number" id="goalRevenue" required>
+          </div>
+          <div class="form-group">
+            <label>Hedef Net Kâr (TL)</label>
+            <input type="number" id="goalNetProfit" required>
+          </div>
+          <div class="form-group">
+            <label>Hedef Net Kâr Marjı (%)</label>
+            <input type="number" step="0.1" id="goalMargin" required>
+          </div>
+          <div class="form-group">
+            <label>Hedef Doluluk (%)</label>
+            <input type="number" step="0.1" id="goalOccupancy" required>
+          </div>
+          <div class="form-group">
+            <label>Hedef ADR (TL)</label>
+            <input type="number" id="goalADR" required>
+          </div>
+          <div class="form-group">
+            <label>Hedef RevPAR (TL)</label>
+            <input type="number" id="goalRevPAR" required>
+          </div>
+          <div class="form-group" style="grid-column: span 2;">
+            <label>Maksimum Gider Hedefi (TL / Tavan Bütçe)</label>
+            <input type="number" id="goalMaxExpense" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeGoalsModal()">Vazgeç</button>
+          <button type="submit" class="btn btn-primary">Hedefleri Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: EXCEL / CSV RAPOR YÜKLEME -->
+  <!-- ========================================== -->
+  <div class="modal-backdrop" id="importModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>📥 Excel / CSV Finans Raporu Yükle</h3>
+        <button class="close-btn" onclick="closeImportModal()">&times;</button>
+      </div>
+      <div class="import-modal-body">
+        <p class="sub-text" style="margin-bottom: 12px;">Sistem yüklediğiniz dosyadaki Ay, Yıl, Mülk, Ciro, Gider ve Satılan Gece sütunlarını otomatik algılar.</p>
+        <div class="upload-dropzone" onclick="document.getElementById('csvFileInput').click()">
+          <span style="font-size: 36px;">📁</span>
+          <strong>CSV veya Excel Raporunuzu Buraya Sürükleyin</strong>
+          <span>veya dosya seçmek için tıklayın (.csv, .xlsx)</span>
+          <input type="file" id="csvFileInput" accept=".csv, .txt, .json" style="display:none;" onchange="handleFileImport(event)">
+        </div>
+        <div class="import-preview-box" id="importPreviewBox" style="display:none;">
+          <strong>Algılanan Veri Özeti:</strong>
+          <p id="importPreviewText">0 satır veri algılandı.</p>
+          <button class="btn btn-primary" onclick="applyImportedData()">Sisteme Aktar</button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeImportModal()">Kapat</button>
+      </div>
+    </div>
+  </div>
 
   <!-- ========================================== -->
   <!-- MODAL: REZERVASYON EKLE / DÜZENLE -->
@@ -628,22 +904,10 @@
         </div>
 
         <div class="live-calculation-box">
-          <div class="preview-item">
-            <span>Gece Sayısı:</span>
-            <strong id="prevNights">0 Gece</strong>
-          </div>
-          <div class="preview-item">
-            <span>OTA Komisyonu:</span>
-            <strong id="prevCommission">₺0</strong>
-          </div>
-          <div class="preview-item highlight">
-            <span>Saf Net Oda Geliri:</span>
-            <strong id="prevNetRevenue">₺0</strong>
-          </div>
-          <div class="preview-item">
-            <span>Gecelik Net (ADR Katkısı):</span>
-            <strong id="prevNightlyNet">₺0</strong>
-          </div>
+          <div class="preview-item"><span>Gece Sayısı:</span><strong id="prevNights">0 Gece</strong></div>
+          <div class="preview-item"><span>OTA Komisyonu:</span><strong id="prevCommission">₺0</strong></div>
+          <div class="preview-item highlight"><span>Saf Net Oda Geliri:</span><strong id="prevNetRevenue">₺0</strong></div>
+          <div class="preview-item"><span>Gecelik Net (ADR Katkısı):</span><strong id="prevNightlyNet">₺0</strong></div>
         </div>
 
         <div class="modal-footer">
