@@ -2880,13 +2880,7 @@ function loadAppData() {
       if (!appData.villas) appData.villas = JSON.parse(JSON.stringify(DEFAULT_VILLAS));
       if (!appData.targets) appData.targets = {};
       if (!appData.bookings) appData.bookings = [];
-      // Ensure New Year bookings exist
-      if (!appData.bookings.some(b => b.id === 'REZ-NY-001')) {
-        appData.bookings.push({ id: 'REZ-NY-001', villa: 'ZIRVE', guest: 'Yılbaşı Konuğu 1 (Zirve Dağ Evi)', checkIn: '2026-12-31', checkOut: '2027-01-03', nights: 3, channel: 'WHATSAPP', gross: 90000, otaComm: 0, cleanFee: 0, net: 90000, pax: 8, status: 'CONFIRMED' });
-      }
-      if (!appData.bookings.some(b => b.id === 'REZ-NY-002')) {
-        appData.bookings.push({ id: 'REZ-NY-002', villa: 'DOGUS', guest: 'Yılbaşı Konuğu 2 (Doğuş Dağ Evi)', checkIn: '2026-12-31', checkOut: '2027-01-03', nights: 3, channel: 'WHATSAPP', gross: 75000, otaComm: 0, cleanFee: 0, net: 75000, pax: 10, status: 'CONFIRMED' });
-      }
+      // User can freely edit or delete any booking permanently
       if (!appData.expenses) appData.expenses = [];
       if (!appData.leads) appData.leads = [];
       if (!appData.maintenance) appData.maintenance = [];
