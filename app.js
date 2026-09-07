@@ -2826,60 +2826,107 @@ let propertyViewMode = 'table'; // 'table' or 'cards'
 // Initialize and Load Data
 
 // =============================================================
-// REZERVASYON TEMİZLİK GİDERLERİ OTOMATİK SENKRONİZASYONU
+// REZERVASYON TEMİZLİK GÖREVLERİ & GİDER SENKRONİZASYONU (MUHASEBE MANTIĞI)
 // =============================================================
-function syncBookingCleaningExpenses() {
-  if (!appData.expenses) appData.expenses = [];
+// KURAL: Gelecek rezervasyonların temizlikleri "Temizlik & Borç" defterine
+// "ÖDENECEK (Borç)" olarak işlenir. Ancak kullanıcı fiilen ödeyip "Ödendi"
+// yapana kadar Gider Defteri'ne (nakit çıkışına) İŞLENMEZ!
+function syncBookingCleaningTasks() {
+  if (!appData.cleaningTasks) appData.cleaningTasks = [];
   if (!appData.bookings) appData.bookings = [];
+  if (!appData.expenses) appData.expenses = [];
 
-  // 1. Remove orphaned auto-clean expenses whose booking no longer exists or cleanFee is 0
+  // 1. Her rezervasyon için "Temizlik & Borç Defteri"ne (appData.cleaningTasks) görev ekle/güncelle
+  appData.bookings.forEach(b => {
+    const cleanFee = Number(b.cleanFee) || 0;
+    if (cleanFee <= 0 || b.status === 'CANCELLED') {
+      // İptal edilen veya temizlik ücreti 0 olan rezervasyonun görevini kaldır
+      appData.cleaningTasks = appData.cleaningTasks.filter(t => t.bookingId !== b.id);
+      return;
+    }
+
+    const taskId = 'TASK-CLN-' + b.id;
+    let existing = appData.cleaningTasks.find(t => t.id === taskId || t.bookingId === b.id);
+    const vName = (appData.villas && appData.villas[b.villa]?.name) ? appData.villas[b.villa].name : b.villa;
+
+    if (!existing) {
+      // Henüz gelmemiş veya yeni girilen rezervasyonun temizliği "ÖDENECEK (Borç)" olarak eklenir
+      // Gider defterine HENÜZ İŞLENMEZ!
+      appData.cleaningTasks.push({
+        id: taskId,
+        bookingId: b.id,
+        villa: b.villa,
+        guest: b.guest,
+        date: b.checkOut,
+        cleaner: 'Fatma Hanım (Temizlik Ekibi)',
+        amount: cleanFee,
+        paid: false,
+        paidDate: null,
+        notes: `${b.guest} Çıkış Temizliği (${vName})`
+      });
+    } else {
+      // Güncelleme: Tarih, misafir, villa güncellenir (kullanıcının belirlediği özel tutar veya ödendi durumu korunur)
+      existing.date = b.checkOut;
+      existing.guest = b.guest;
+      existing.villa = b.villa;
+      if (!existing.notes) existing.notes = `${b.guest} Çıkış Temizliği (${vName})`;
+    }
+  });
+
+  // 2. Gider Defteri (appData.expenses) ile Senkronizasyon:
+  // KURAL: Temizlik gideri SADECE ve SADECE "paid === true" (Ödendi) ise Gider Defteri'nde yer alır!
+  // Henüz ödenmemiş (paid === false) temizlikler Gider Defteri'nden temizlenir (nakit çıkışını yanıltmasın).
   appData.expenses = appData.expenses.filter(exp => {
-    if (!exp.isAutoClean && !exp.bookingId) return true;
-    const booking = appData.bookings.find(b => b.id === exp.bookingId || ('EXP-CLEAN-' + b.id) === exp.id);
-    if (!booking || booking.status === 'CANCELLED' || !booking.cleanFee || Number(booking.cleanFee) <= 0) {
+    if (!exp.isAutoClean && !exp.cleanTaskId && !exp.bookingId) return true;
+    
+    // Check if this expense belongs to a cleaning task
+    const task = appData.cleaningTasks.find(t => 
+      t.id === exp.cleanTaskId || 
+      t.bookingId === exp.bookingId || 
+      ('EXP-CLEAN-' + t.id) === exp.id ||
+      ('EXP-CLEAN-' + t.bookingId) === exp.id ||
+      ('EXP-CLEAN-TASK-' + t.id) === exp.id
+    );
+
+    // Eğer ilgili temizlik görevi yoksa veya henüz ÖDENMEMİŞSE (paid === false), gider defterinde duramaz!
+    if (!task || !task.paid) {
       return false;
     }
     return true;
   });
 
-  // 2. Add or update cleaning expense for each booking with cleanFee > 0
-  appData.bookings.forEach(b => {
-    const cleanFee = Number(b.cleanFee) || 0;
-    if (cleanFee <= 0 || b.status === 'CANCELLED') return;
+  // Ödenmiş (paid === true) görevlerin gider defterindeki kaydını garantile
+  appData.cleaningTasks.forEach(task => {
+    if (!task.paid) return;
+    const expId = 'EXP-CLEAN-TASK-' + task.id;
+    const existingIdx = appData.expenses.findIndex(e => e.id === expId || e.cleanTaskId === task.id || (task.bookingId && e.bookingId === task.bookingId));
+    const vName = (appData.villas && appData.villas[task.villa]?.name) ? appData.villas[task.villa].name : task.villa;
+    const expDate = task.paidDate || task.date || '2026-09-07';
 
-    const expId = 'EXP-CLEAN-' + b.id;
-    const expDate = b.checkOut || b.checkIn || new Date().toISOString().split('T')[0];
-    const month = expDate.slice(0, 7);
-    const vName = (appData.villas && appData.villas[b.villa]?.name) ? appData.villas[b.villa].name : b.villa;
-    const desc = `[${b.guest}] Rezervasyon Temizlik & Çamaşır (${vName})`;
-
-    const existingIdx = appData.expenses.findIndex(e => e.id === expId || e.bookingId === b.id);
     if (existingIdx !== -1) {
-      appData.expenses[existingIdx].amount = cleanFee;
+      appData.expenses[existingIdx].amount = task.amount;
       appData.expenses[existingIdx].date = expDate;
-      appData.expenses[existingIdx].villa = b.villa;
-      appData.expenses[existingIdx].month = month;
-      appData.expenses[existingIdx].description = desc;
-      appData.expenses[existingIdx].category = 'Temizlik';
-      appData.expenses[existingIdx].type = 'OPEX';
-      appData.expenses[existingIdx].bookingId = b.id;
-      appData.expenses[existingIdx].isAutoClean = true;
+      appData.expenses[existingIdx].month = expDate.slice(0, 7);
+      appData.expenses[existingIdx].paid = true;
     } else {
       appData.expenses.push({
         id: expId,
-        bookingId: b.id,
-        type: 'OPEX',
-        category: 'Temizlik',
-        villa: b.villa,
+        cleanTaskId: task.id,
+        bookingId: task.bookingId || null,
         date: expDate,
-        amount: cleanFee,
-        description: desc,
-        month: month,
-        isAutoClean: true
+        month: expDate.slice(0, 7),
+        villa: task.villa,
+        category: 'Temizlik',
+        type: 'OPEX',
+        amount: task.amount,
+        description: `[Temizlik Ödendi] ${task.guest || vName} - ${task.cleaner || 'Ekip'}`,
+        isAutoClean: true,
+        paid: true
       });
     }
   });
 }
+
 
 function loadAppData() {
   try {
@@ -2929,7 +2976,7 @@ function loadAppData() {
       };
       saveAppData();
     }
-  syncBookingCleaningExpenses();
+  syncBookingCleaningTasks();
   } catch (e) {
     console.error('Error loading state:', e);
   }
@@ -4153,7 +4200,7 @@ function renderExpensesTable() {
   const filtered = appData.expenses.filter(exp => {
     if (!isExpenseInFilter(exp)) return false;
     if (!search) return true;
-    return exp.description.toLowerCase().includes(search) || exp.category.toLowerCase().includes(search);
+    return (exp.description || exp.desc || "").toLowerCase().includes(search) || (exp.category || "").toLowerCase().includes(search);
   });
 
   if (filtered.length === 0) {
@@ -4167,7 +4214,7 @@ function renderExpensesTable() {
       <td><span class="badge ${exp.type === 'CAPEX' ? 'badge-amber' : 'badge-blue'}">${exp.type === 'CAPEX' ? 'Yatırım (Capex)' : 'Operasyonel (Opex)'}</span></td>
       <td><strong>${exp.category}</strong></td>
       <td>${exp.villa === 'ALL' ? 'Tüm Portföy' : (appData.villas[exp.villa]?.name || exp.villa)}</td>
-      <td>${exp.description} ${(exp.isAutoClean || exp.bookingId) ? '<span class="badge badge-emerald" style="font-size: 10px; margin-left: 6px;">🧹 Rezervasyon</span>' : ''}</td>
+      <td>${exp.description || exp.desc || "-"} ${(exp.isAutoClean || exp.bookingId) ? '<span class="badge badge-emerald" style="font-size: 10px; margin-left: 6px;">🧹 Rezervasyon</span>' : ''}</td>
       <td><strong>${Number(exp.amount).toLocaleString('tr-TR')} TL</strong></td>
       <td style="text-align: right; white-space: nowrap;">
         <button class="btn btn-secondary btn-sm" onclick="editExpense('${exp.id}')">✏️</button>
@@ -5103,7 +5150,7 @@ function saveBooking(e) {
     appData.bookings.push({ id: newId, villa, guest, checkIn, checkOut, channel, gross, otaComm, cleanFee, net, nights, pax, status });
   }
 
-  syncBookingCleaningExpenses();
+  syncBookingCleaningTasks();
   saveAppData();
   closeBookingModal();
   renderAll();
@@ -5113,7 +5160,7 @@ function editBooking(id) { openBookingModal(id); }
 function deleteBooking(id) {
   if (confirm('Bu rezervasyonu silmek istediğinizden emin misiniz?')) {
     appData.bookings = appData.bookings.filter(b => b.id !== id);
-    syncBookingCleaningExpenses();
+    syncBookingCleaningTasks();
     saveAppData();
     renderAll();
   }
