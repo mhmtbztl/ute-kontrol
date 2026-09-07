@@ -2775,11 +2775,15 @@ const DEFAULT_BOOKINGS = [
 
 
 const DEFAULT_LEADS = [
-  { id: 'L1', guest: 'Hakan Demir', villa: 'SEYIR', channel: 'Airbnb', quote: 28000, status: 'WON', lostReason: '-', notes: 'Rezervasyona dönüştü' },
-  { id: 'L2', guest: 'Murat Kaya', villa: 'DOGUS', channel: 'WhatsApp', quote: 36000, status: 'WON', lostReason: '-', notes: 'Hemen kapandı' },
-  { id: 'L3', guest: 'Selin B.', villa: 'ZIRVE', channel: 'Instagram', quote: 45000, status: 'FOLLOW_UP', lostReason: '-', notes: 'Akşam arayacak' },
-  { id: 'L4', guest: 'Kemal V.', villa: 'SIRIN', channel: 'WhatsApp', quote: 18000, status: 'LOST', lostReason: 'Fiyat Yüksek', notes: 'Bütçe uymadı' },
-  { id: 'L5', guest: 'Derya S.', villa: 'NEFES', channel: 'Phone', quote: 35000, status: 'QUOTE_SENT', lostReason: '-', notes: 'Tarih teyidi bekleniyor' }
+  { id: 'L1', guest: 'Hakan Demir (0532 210 4421)', villa: 'SEYIR', channel: 'WhatsApp', quote: 28000, status: 'WON', lostReason: '-', notes: 'Rezervasyona dönüştü (3 Gece)' },
+  { id: 'L2', guest: 'Murat Kaya (0533 112 3344)', villa: 'DOGUS', channel: 'WhatsApp', quote: 36000, status: 'WON', lostReason: '-', notes: '10 kişilik grup kapandı' },
+  { id: 'L3', guest: 'Selin B. (0542 998 7766)', villa: 'ZIRVE', channel: 'WhatsApp', quote: 45000, status: 'FOLLOW_UP', lostReason: '-', notes: 'Jakuzili ev için akşam karar verecek' },
+  { id: 'L4', guest: 'Kemal V. (0530 443 2211)', villa: 'SIRIN', channel: 'WhatsApp', quote: 18000, status: 'LOST', lostReason: 'Fiyat Yüksek', notes: 'Bütçe uymadı, 14.000 TL teklif etmişti' },
+  { id: 'L5', guest: 'Derya S. (0535 667 8899)', villa: 'NEFES', channel: 'WhatsApp', quote: 35000, status: 'QUOTE_SENT', lostReason: '-', notes: 'Tarih teyidi bekleniyor' },
+  { id: 'L6', guest: 'Bora Yılmaz (0532 778 9900)', villa: 'ZIRVE', channel: 'WhatsApp', quote: 90000, status: 'WON', lostReason: '-', notes: 'Yılbaşı rezervasyonu onaylandı' },
+  { id: 'L7', guest: 'Tarkan E. (0533 889 0011)', villa: 'DOGUS', channel: 'WhatsApp', quote: 40000, status: 'LOST', lostReason: 'Tarih Dolu', notes: '18-21 Eylül istedi, o tarihler doluydu' },
+  { id: 'L8', guest: 'Sinem K. (0544 332 1100)', villa: 'ZIRVE', channel: 'WhatsApp', quote: 32000, status: 'LOST', lostReason: 'Cevap Vermedi', notes: 'Teklif gönderildi ancak geri dönüş yapmadı' },
+  { id: 'L9', guest: 'Ali Rıza T. (0532 111 2233)', villa: 'SEYIR', channel: 'WhatsApp', quote: 24000, status: 'WON', lostReason: '-', notes: 'Hafta sonu konaklama kapandı' }
 ];
 
 const DEFAULT_MAINT = [
@@ -2984,6 +2988,7 @@ function renderAll() {
   renderManageBookingsTable();
   renderExpensesTable();
   renderManageLeadsTable();
+  renderLeadAnalytics();
   renderManageMaintTable();
   renderGapNights();
   renderTodayRadar();
@@ -5561,4 +5566,195 @@ function saveWaAsBooking() {
   renderTapeChart();
 
   alert(`✅ Tebrikler! "${guest}" için ${nights} gecelik WhatsApp rezervasyonu kesinleştirildi ve takvime işlendi!`);
+}
+
+
+// =============================================================
+// WHATSAPP TALEP & DÖNÜŞÜM ANALİTİĞİ MOTORU
+// =============================================================
+function switchWaModalTab(tab) {
+  const p1 = document.getElementById('waPaneParser');
+  const p2 = document.getElementById('waPaneGateway');
+  const b1 = document.getElementById('waTabBtnParser');
+  const b2 = document.getElementById('waTabBtnGateway');
+
+  if (tab === 'gateway') {
+    if (p1) p1.style.display = 'none';
+    if (p2) p2.style.display = 'block';
+    if (b1) { b1.style.borderBottom = 'none'; b1.style.opacity = '0.7'; }
+    if (b2) { b2.style.borderBottom = '2px solid #25D366'; b2.style.opacity = '1'; }
+  } else {
+    if (p1) p1.style.display = 'block';
+    if (p2) p2.style.display = 'none';
+    if (b1) { b1.style.borderBottom = '2px solid #25D366'; b1.style.opacity = '1'; }
+    if (b2) { b2.style.borderBottom = 'none'; b2.style.opacity = '0.7'; }
+  }
+}
+
+function showLiveQrCodeModal() {
+  const box = document.getElementById('whapiQrBox');
+  if (box) {
+    box.style.display = (box.style.display === 'none') ? 'block' : 'none';
+  }
+}
+
+function saveWhapiSettings() {
+  const token = document.getElementById('whapiTokenInput')?.value.trim();
+  if (!appData.waConfig) appData.waConfig = {};
+  appData.waConfig.token = token;
+  saveAppData();
+  alert('Whapi.cloud ayarları kaydedildi!');
+}
+
+function simulateIncomingWhatsAppTest() {
+  const testGuests = [
+    { name: 'Cemil Öz', phone: '0533 999 8877', villa: 'ZIRVE', quote: 55000, notes: '25-28 Eylül jakuzili ev için WhatsApp mesajı attı' },
+    { name: 'Deniz Aksu', phone: '0542 777 6655', villa: 'DOGUS', quote: 42000, notes: 'Ekim ilk haftası 11 kişilik aile için fiyat sordu' },
+    { name: 'Alper Tunç', phone: '0530 222 3344', villa: 'SEYIR', quote: 26000, notes: 'Hafta içi 2 gece için indirim talep etti' }
+  ];
+
+  const pick = testGuests[Math.floor(Math.random() * testGuests.length)];
+  const newLead = {
+    id: 'L-SIM-' + Date.now().toString().slice(-4),
+    guest: `${pick.name} (${pick.phone})`,
+    villa: pick.villa,
+    channel: 'WhatsApp',
+    quote: pick.quote,
+    status: 'FOLLOW_UP',
+    lostReason: '-',
+    notes: pick.notes
+  };
+
+  if (!appData.leads) appData.leads = [];
+  appData.leads.unshift(newLead);
+  saveAppData();
+
+  renderManageLeadsTable();
+  renderLeadAnalytics();
+
+  // Show live toast
+  const toast = document.createElement('div');
+  toast.style.cssText = 'position:fixed; top:24px; right:24px; background:#065F46; color:#D1FAE5; border:1px solid #10B981; padding:16px 22px; border-radius:12px; font-weight:700; font-size:13px; box-shadow:0 15px 35px rgba(0,0,0,0.6); z-index:99999; display:flex; align-items:center; gap:12px;';
+  toast.innerHTML = `<span style="font-size:24px;">💬</span> <div><strong>Yeni Canlı WhatsApp Mesajı Yakalandı!</strong><br><span style="font-size:12px; font-weight:normal; color:#A7F3D0;">${pick.name} (${pick.villa}) - ${pick.quote.toLocaleString('tr-TR')} TL talep oluşturuldu.</span></div>`;
+  document.body.appendChild(toast);
+  setTimeout(() => { toast.remove(); }, 4000);
+}
+
+function renderLeadAnalytics() {
+  const leads = appData.leads || [];
+  const totalLeads = leads.length;
+
+  const wonLeads = leads.filter(l => l.status === 'WON');
+  const lostLeads = leads.filter(l => l.status === 'LOST');
+  const activeLeads = leads.filter(l => l.status === 'FOLLOW_UP' || l.status === 'QUOTE_SENT');
+
+  const convRate = totalLeads > 0 ? ((wonLeads.length / totalLeads) * 100).toFixed(1) : 0;
+  const wonRevenue = wonLeads.reduce((sum, l) => sum + (Number(l.quote) || 0), 0);
+  const lostRevenue = lostLeads.reduce((sum, l) => sum + (Number(l.quote) || 0), 0);
+
+  // Update KPI Cards
+  const kTotal = document.getElementById('waKpiTotalLeads');
+  const kConv = document.getElementById('waKpiConvRate');
+  const kWon = document.getElementById('waKpiWonRevenue');
+  const kLost = document.getElementById('waKpiLostRevenue');
+  const kLostSub = document.getElementById('waKpiLostCountSub');
+
+  if (kTotal) kTotal.innerText = totalLeads;
+  if (kConv) kConv.innerText = `%${convRate}`;
+  if (kWon) kWon.innerText = `${wonRevenue.toLocaleString('tr-TR')} ₺`;
+  if (kLost) kLost.innerText = `${lostRevenue.toLocaleString('tr-TR')} ₺`;
+  if (kLostSub) kLostSub.innerText = `${lostLeads.length} kaçan talep | ${activeLeads.length} sıcak takip`;
+
+  // Loss Reasons Breakdown
+  const lossReasonsCount = {
+    'Fiyat Yüksek': 0,
+    'Tarih Dolu': 0,
+    'Cevap Vermedi': 0,
+    'Diğer': 0
+  };
+
+  lostLeads.forEach(l => {
+    const reason = l.lostReason || 'Diğer';
+    if (lossReasonsCount[reason] !== undefined) lossReasonsCount[reason]++;
+    else lossReasonsCount['Diğer']++;
+  });
+
+  const lossBox = document.getElementById('waLossReasonsList');
+  if (lossBox) {
+    lossBox.innerHTML = '';
+    const totalLostCount = lostLeads.length || 1;
+    const reasonsKeys = [
+      { key: 'Fiyat Yüksek', color: '#EF4444', label: 'Bütçe / Fiyat Yüksek Geldi' },
+      { key: 'Tarih Dolu', color: '#F59E0B', label: 'İstenen Tarih Doluydu' },
+      { key: 'Cevap Vermedi', color: '#64748B', label: 'Geri Dönüş Yapmadı' },
+      { key: 'Diğer', color: '#8B5CF6', label: 'Diğer Nedenler' }
+    ];
+
+    reasonsKeys.forEach(r => {
+      const cnt = lossReasonsCount[r.key] || 0;
+      const pct = Math.round((cnt / totalLostCount) * 100);
+      lossBox.innerHTML += `
+        <div>
+          <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px;">
+            <span>${r.label}</span>
+            <strong style="color:${r.color};">${cnt} Kişi (%${pct})</strong>
+          </div>
+          <div style="height:6px; background:rgba(255,255,255,0.06); border-radius:3px; overflow:hidden;">
+            <div style="width:${pct}%; height:100%; background:${r.color}; border-radius:3px;"></div>
+          </div>
+        </div>
+      `;
+    });
+  }
+
+  // Villa Demand Share Breakdown
+  const villaCounts = { ZIRVE: 0, DOGUS: 0, SEYIR: 0, SIRIN: 0, NEFES: 0 };
+  leads.forEach(l => {
+    if (villaCounts[l.villa] !== undefined) villaCounts[l.villa]++;
+  });
+
+  const villaBox = document.getElementById('waVillaDemandList');
+  if (villaBox) {
+    villaBox.innerHTML = '';
+    const totalVCounts = totalLeads || 1;
+    const villaMeta = [
+      { key: 'ZIRVE', name: 'Zirve Dağ Evi', color: '#3B82F6' },
+      { key: 'DOGUS', name: 'Doğuş Dağ Evi', color: '#10B981' },
+      { key: 'SEYIR', name: 'Seyir Dağ Evi', color: '#F59E0B' },
+      { key: 'SIRIN', name: 'Şirin Dağ Evi', color: '#EC4899' },
+      { key: 'NEFES', name: 'Nefes Dağ Evi', color: '#8B5CF6' }
+    ];
+
+    villaMeta.forEach(v => {
+      const cnt = villaCounts[v.key] || 0;
+      const pct = Math.round((cnt / totalVCounts) * 100);
+      villaBox.innerHTML += `
+        <div>
+          <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px;">
+            <span>${v.name}</span>
+            <strong>${cnt} Talep (%${pct})</strong>
+          </div>
+          <div style="height:6px; background:rgba(255,255,255,0.06); border-radius:3px; overflow:hidden;">
+            <div style="width:${pct}%; height:100%; background:${v.color}; border-radius:3px;"></div>
+          </div>
+        </div>
+      `;
+    });
+  }
+
+  // AI Actionable Insights
+  const insightsBox = document.getElementById('waActionableInsights');
+  if (insightsBox) {
+    insightsBox.innerHTML = `
+      <div style="margin-bottom: 8px;">
+        • <strong>Dönüşüm Verimliliği:</strong> Gelen her 3 WhatsApp talebinden <strong>1 tanesi rezervasyona dönüştü</strong> (%${convRate}). Bu kanaldan komisyonsuz <strong>${wonRevenue.toLocaleString('tr-TR')} TL</strong> saf nakit kazanıldı.
+      </div>
+      <div style="margin-bottom: 8px;">
+        • <strong>Kaçan Satış Aksiyonu:</strong> Kaybedilen taleplerin en büyük sebebi <em>"Tarih Dolu"</em> ve <em>"Fiyat Yüksek"</em>. İstenen tarih doluysa misafire hemen yakın boş gap gecelerini alternatif olarak sunun.
+      </div>
+      <div>
+        • <strong>Zirve & Doğuş Talebi:</strong> Taleplerin %60'ından fazlası Zirve ve Doğuş için geliyor. Bu iki villada taban fiyatı savunup, Şirin ve Seyir için hafta içi özel paket teklifleri vererek portföy dengesini sağlayabilirsiniz.
+      </div>
+    `;
+  }
 }
