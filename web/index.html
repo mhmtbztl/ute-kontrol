@@ -112,6 +112,7 @@
       <button class="btn btn-secondary" onclick="openExpenseModal()">+ Gider / Yatırım</button>
       <button class="btn btn-secondary" onclick="openImportModal()">📥 Rapor Yükle</button>
       <button class="btn btn-secondary" onclick="exportDataJSON()">💾 Yedek</button>
+      <button class="btn btn-secondary" onclick="openWhatsAppModal()" style="border-color: #25D366; color: #4ADE80; font-weight: 700;"><span style="font-size: 14px;">💬</span> WhatsApp'tan Aktar</button>
       <button class="btn btn-secondary" onclick="openGoalsModal()">🎯 Hedef Belirle</button>
       <button class="btn btn-secondary btn-sm" onclick="copySecretShareLink()" title="Şifresiz doğrudan erişim linkini kopyala">🔗 Yetkili Linki Al</button>
       <button class="btn btn-secondary btn-sm" onclick="openHelpModal()" title="Hızlı Başlangıç & İşletmeci Kılavuzu">❓ Nasıl Kullanılır?</button>
@@ -944,6 +945,7 @@
             <h2>📋 TÜM REZERVASYONLAR LİSTESİ</h2>
             <p class="sub-text">Geçmiş, güncel ve yılbaşı dahil tüm gelecek rezervasyonlar. Düzenleyin, silin veya filtreleyin.</p>
           </div>
+          <button class="btn btn-secondary" onclick="openWhatsAppModal('reservation')" style="border-color: #25D366; color: #4ADE80; margin-right: 8px;"><span style="font-size: 14px;">💬</span> WhatsApp'tan Rezervasyona Aktar</button>
           <button class="btn btn-primary" onclick="openBookingModal()">+ Yeni Rezervasyon Ekle</button>
         </div>
 
@@ -1044,6 +1046,7 @@
       <section class="card">
         <div class="section-title-bar">
           <div><h2>🎯 LEAD VE MÜŞTERİ TALEPLERİ</h2><p class="sub-text">WhatsApp, Instagram ve telefon teklifleri.</p></div>
+          <button class="btn btn-secondary" onclick="openWhatsAppModal('lead')" style="border-color: #25D366; color: #4ADE80; margin-right: 8px;"><span style="font-size: 14px;">💬</span> WhatsApp Mesajı Yapıştır</button>
           <button class="btn btn-primary" onclick="openLeadModal()">+ Yeni Lead Ekle</button>
         </div>
         <div class="table-responsive">
@@ -1675,5 +1678,109 @@
   </div>
 
   <script src="app.js"></script>
+
+  <!-- ======================================================= -->
+  <!-- MODAL: WHATSAPP BUSINESS AKILLI MESAJ AYRIŞTIRICI -->
+  <!-- ======================================================= -->
+  <div class="modal-backdrop" id="whatsappModal">
+    <div class="modal-card" style="max-width: 680px; max-height: 90vh; display: flex; flex-direction: column;">
+      <div class="modal-header" style="background: linear-gradient(135deg, rgba(37, 211, 102, 0.15), rgba(18, 140, 126, 0.1)); border-bottom: 1px solid rgba(37, 211, 102, 0.3);">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 26px;">💬</span>
+          <div>
+            <h3 style="color: #4ADE80; margin: 0;">WhatsApp Business Akıllı Mesaj Aktarıcı</h3>
+            <p style="font-size: 12px; color: var(--text-muted); margin: 2px 0 0 0;">WhatsApp'tan kopyaladığınız mesajı yapıştırın; isim, villa, tarih ve fiyat otomatik çözümlensin.</p>
+          </div>
+        </div>
+        <button class="close-btn" onclick="closeWhatsAppModal()">&times;</button>
+      </div>
+
+      <div style="padding: 20px; overflow-y: auto; flex: 1;">
+        <!-- Input Area -->
+        <div class="form-group" style="margin-bottom: 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <label style="font-weight: 700; color: #FFFFFF; font-size: 13px;">WhatsApp Mesaj Metnini Buraya Yapıştırın:</label>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="loadSampleWhatsAppMsg()" style="font-size: 11px; padding: 3px 8px;">📋 Örnek Mesaj Doldur</button>
+          </div>
+          <textarea id="waRawInput" rows="4" placeholder="Örnek: 'Ahmet Yılmaz: 18-21 Eylül arası 3 gece Zirve Dağ Evi için 45.000 TL konuştuk, 8 kişiyiz onaylıyoruz. Tel: 0532 555 1234'" style="width: 100%; padding: 12px; background: rgba(0,0,0,0.4); border: 1px solid rgba(37, 211, 102, 0.3); border-radius: 8px; color: #fff; font-size: 13px; font-family: monospace;" oninput="parseWhatsAppMessage()"></textarea>
+          <span style="font-size: 11px; color: var(--text-muted); margin-top: 4px; display: block;">💡 İpucu: Tek bir mesaj veya WhatsApp sohbetinden kopyalanmış birkaç satırı doğrudan yapıştırabilirsiniz.</span>
+        </div>
+
+        <div style="text-align: right; margin-bottom: 16px;">
+          <button type="button" class="btn btn-secondary" onclick="parseWhatsAppMessage()" style="padding: 6px 14px; font-size: 12px;">⚡ Yeniden Ayrıştır / Çözümle</button>
+        </div>
+
+        <!-- Parsed Preview Box -->
+        <div id="waParsedResultBox" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 10px; padding: 16px; margin-bottom: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 8px;">
+            <strong style="color: #60A5FA; font-size: 13px; display: flex; align-items: center; gap: 6px;">
+              <span>🔍</span> Algılanan Bilgiler (Kontrol Edip Değiştirebilirsiniz):
+            </strong>
+            <span id="waConfidenceBadge" class="badge badge-emerald" style="font-size: 11px;">Otomatik Algılandı</span>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label style="font-size: 11px; color: var(--text-muted);">Misafir Adı</label>
+              <input type="text" id="waParsedGuest" placeholder="Misafir Adı" style="width: 100%; padding: 8px 10px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px; font-weight: 700;">
+            </div>
+            <div class="form-group">
+              <label style="font-size: 11px; color: var(--text-muted);">Telefon / İletişim</label>
+              <input type="text" id="waParsedPhone" placeholder="Örn: 0532 123 4567" style="width: 100%; padding: 8px 10px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px;">
+            </div>
+            <div class="form-group">
+              <label style="font-size: 11px; color: var(--text-muted);">İlgilenilen Villa</label>
+              <select id="waParsedVilla" style="width: 100%; padding: 8px 10px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px; font-weight: 600;">
+                <option value="ZIRVE">Zirve Dağ Evi (9 - Jakuzi/Sauna)</option>
+                <option value="DOGUS">Doğuş Dağ Evi (11)</option>
+                <option value="SEYIR">Seyir Dağ Evi (6+2)</option>
+                <option value="SIRIN">Şirin Dağ Evi (7)</option>
+                <option value="NEFES">Nefes Dağ Evi (12)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label style="font-size: 11px; color: var(--text-muted);">Tutar / Teklif (₺)</label>
+              <input type="number" id="waParsedAmount" placeholder="Örn: 45000" style="width: 100%; padding: 8px 10px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #34D399; font-size: 14px; font-weight: 700;">
+            </div>
+            <div class="form-group">
+              <label style="font-size: 11px; color: var(--text-muted);">Giriş Tarihi (Check-in)</label>
+              <input type="date" id="waParsedCheckIn" style="width: 100%; padding: 8px 10px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px;">
+            </div>
+            <div class="form-group">
+              <label style="font-size: 11px; color: var(--text-muted);">Çıkış Tarihi (Check-out)</label>
+              <input type="date" id="waParsedCheckOut" style="width: 100%; padding: 8px 10px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px;">
+            </div>
+            <div class="form-group">
+              <label style="font-size: 11px; color: var(--text-muted);">Kişi Sayısı</label>
+              <input type="number" id="waParsedPax" value="6" style="width: 100%; padding: 8px 10px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px;">
+            </div>
+            <div class="form-group">
+              <label style="font-size: 11px; color: var(--text-muted);">Notlar / Durum</label>
+              <input type="text" id="waParsedNotes" placeholder="Örn: WhatsApp teklifi" style="width: 100%; padding: 8px 10px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px;">
+            </div>
+          </div>
+        </div>
+
+        <!-- Automation Guide Hint -->
+        <div style="background: rgba(37, 211, 102, 0.08); border: 1px solid rgba(37, 211, 102, 0.2); border-radius: 8px; padding: 12px; font-size: 12px; color: #D1FAE5; line-height: 1.5;">
+          <strong>🤖 Sıfır Dokunuş / Otomatik Entegrasyon mu İstiyorsunuz?</strong>
+          <p style="margin: 4px 0 0 0; color: #A7F3D0;">WhatsApp Business Cloud API veya Make.com / Zapier webhook kurarak müşterilerinizin yazdığı mesajların buraya hiç kopyala-yapıştır yapmadan otomatik düşmesini sağlayabilirsiniz. Detaylı kurulum rehberi için kılavuza göz atın.</p>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+        <button type="button" class="btn btn-secondary" onclick="closeWhatsAppModal()">Kapat</button>
+        <div style="display: flex; gap: 10px;">
+          <button type="button" class="btn btn-secondary" onclick="saveWaAsLead()" style="border-color: #F59E0B; color: #FBBF24; font-weight: 700;">
+            🎯 Sıcak Lead Olarak Kaydet
+          </button>
+          <button type="button" class="btn btn-primary" onclick="saveWaAsBooking()" style="background: #059669; border-color: #10B981; font-weight: 700;">
+            📅 Kesin Rezervasyona Dönüştür
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>

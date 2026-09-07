@@ -5341,3 +5341,224 @@ function openBookingForDate(villa, dateStr) {
   if (vSelect) vSelect.value = villa;
   if (ciInput) ciInput.value = dateStr;
 }
+
+
+// =============================================================
+// WHATSAPP BUSINESS AKILLI MESAJ AYRIŞTIRICI (SMART PARSER)
+// =============================================================
+let waTargetMode = 'lead'; // 'lead' or 'reservation'
+
+function openWhatsAppModal(mode = 'lead') {
+  waTargetMode = mode;
+  const modal = document.getElementById('whatsappModal');
+  if (modal) {
+    modal.classList.add('active');
+    setTimeout(() => {
+      const input = document.getElementById('waRawInput');
+      if (input) input.focus();
+    }, 100);
+  }
+}
+
+function closeWhatsAppModal() {
+  const modal = document.getElementById('whatsappModal');
+  if (modal) modal.classList.remove('active');
+}
+
+function loadSampleWhatsAppMsg() {
+  const sample = "Ahmet Yılmaz: Selamlar, 18-21 Eylül arası 3 gece Zirve Dağ Evi için 45.000 TL teklif vermiştik. 8 kişiyiz, onaylıyoruz. Tel: 0532 555 1234";
+  const input = document.getElementById('waRawInput');
+  if (input) {
+    input.value = sample;
+    parseWhatsAppMessage();
+  }
+}
+
+const MONTH_MAP_TR = {
+  'ocak': '01', 'şubat': '02', 'subat': '02', 'mart': '03', 'nisan': '04',
+  'mayıs': '05', 'mayis': '05', 'haziran': '06', 'temmuz': '07', 'ağustos': '08',
+  'agustos': '08', 'eylül': '09', 'eylul': '09', 'ekim': '10', 'kasım': '11',
+  'kasim': '11', 'aralık': '12', 'aralik': '12'
+};
+
+function parseWhatsAppMessage() {
+  const text = (document.getElementById('waRawInput')?.value || '').trim();
+  if (!text) return;
+
+  const lower = text.toLowerCase();
+
+  // 1. Detect Villa
+  let detectedVilla = 'ZIRVE';
+  if (lower.includes('zirve')) detectedVilla = 'ZIRVE';
+  else if (lower.includes('doğuş') || lower.includes('dogus')) detectedVilla = 'DOGUS';
+  else if (lower.includes('seyir')) detectedVilla = 'SEYIR';
+  else if (lower.includes('şirin') || lower.includes('sirin')) detectedVilla = 'SIRIN';
+  else if (lower.includes('nefes')) detectedVilla = 'NEFES';
+
+  // 2. Detect Guest Name
+  let detectedGuest = '';
+  const prefixMatch = text.match(/(?:misafir|isim|ad\s*soyad|ad|konuk)\s*[:=-]\s*([A-Za-zÇĞİÖŞÜçğıöşü\s]{3,30})/i);
+  if (prefixMatch) {
+    detectedGuest = prefixMatch[1].trim();
+  } else {
+    const waHeaderMatch = text.match(/^(?:\[[\d\.\,\:\s]+\]\s*)?([A-Za-zÇĞİÖŞÜçğıöşü\s]{3,25}):/m);
+    if (waHeaderMatch) {
+      detectedGuest = waHeaderMatch[1].trim();
+    } else {
+      const wordsMatch = text.match(/\b([A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+))\b/);
+      if (wordsMatch && !['Zirve', 'Doğuş', 'Seyir', 'Şirin', 'Nefes', 'WhatsApp', 'Airbnb', 'Booking', 'Selamlar', 'Merhaba'].includes(wordsMatch[1])) {
+        detectedGuest = wordsMatch[1];
+      }
+    }
+  }
+
+  // 3. Detect Phone Number
+  let detectedPhone = '';
+  const phoneMatch = text.match(/(?:\+?90\s*|\b0)?\s*(5\d{2})[\s\.-]*(\d{3})[\s\.-]*(\d{2})[\s\.-]*(\d{2})\b/);
+  if (phoneMatch) {
+    detectedPhone = `0${phoneMatch[1]} ${phoneMatch[2]} ${phoneMatch[3]} ${phoneMatch[4]}`;
+  }
+
+  // 4. Detect Price / Amount
+  let detectedAmount = 0;
+  const kMatch = text.match(/(\d+)\s*(?:bin|k)\b/i);
+  if (kMatch) {
+    detectedAmount = Number(kMatch[1]) * 1000;
+  } else {
+    const priceMatch = text.match(/(\d{1,3}(?:\.\d{3})+|\d{4,7})\s*(?:tl|₺|euro|usd|lira)?/i);
+    if (priceMatch) {
+      detectedAmount = Number(priceMatch[1].replace(/\./g, '')) || 0;
+    }
+  }
+
+  // 5. Detect Pax (Kişi Sayısı)
+  let detectedPax = 6;
+  const paxMatch = text.match(/(\d{1,2})\s*(?:kişi|kisi|pax|yetişkin|yetiskin|konuk)/i);
+  if (paxMatch) {
+    detectedPax = Number(paxMatch[1]);
+  }
+
+  // 6. Detect Dates
+  let checkIn = '';
+  let checkOut = '';
+  const currentYear = 2026;
+
+  const sameMonthMatch = text.match(/(\d{1,2})\s*[-–/]\s*(\d{1,2})\s+([a-zA-ZçğıöşüÇĞİÖŞÜ]+)/i);
+  const diffMonthMatch = text.match(/(\d{1,2})\s+([a-zA-ZçğıöşüÇĞİÖŞÜ]+)\s*[-–/]\s*(\d{1,2})\s+([a-zA-ZçğıöşüÇĞİÖŞÜ]+)/i);
+  const isoMatch = text.match(/(\d{1,2})[\.\/](d{1,2})[\.\/](d{4})\s*[-–]\s*(\d{1,2})[\.\/](d{1,2})[\.\/](d{4})/);
+
+  if (isoMatch) {
+    checkIn = `${isoMatch[3]}-${isoMatch[2].padStart(2, '0')}-${isoMatch[1].padStart(2, '0')}`;
+    checkOut = `${isoMatch[6]}-${isoMatch[5].padStart(2, '0')}-${isoMatch[4].padStart(2, '0')}`;
+  } else if (diffMonthMatch) {
+    const d1 = diffMonthMatch[1].padStart(2, '0');
+    const m1Name = diffMonthMatch[2].toLowerCase();
+    const d2 = diffMonthMatch[3].padStart(2, '0');
+    const m2Name = diffMonthMatch[4].toLowerCase();
+    const m1 = MONTH_MAP_TR[m1Name];
+    const m2 = MONTH_MAP_TR[m2Name];
+
+    if (m1 && m2) {
+      const y1 = currentYear;
+      const y2 = (m1 === '12' && m2 === '01') ? (currentYear + 1) : currentYear;
+      checkIn = `${y1}-${m1}-${d1}`;
+      checkOut = `${y2}-${m2}-${d2}`;
+    }
+  } else if (sameMonthMatch) {
+    const d1 = sameMonthMatch[1].padStart(2, '0');
+    const d2 = sameMonthMatch[2].padStart(2, '0');
+    const mName = sameMonthMatch[3].toLowerCase();
+    const m = MONTH_MAP_TR[mName];
+    if (m) {
+      checkIn = `${currentYear}-${m}-${d1}`;
+      checkOut = `${currentYear}-${m}-${d2}`;
+    }
+  }
+
+  // Populate preview form
+  if (detectedGuest) document.getElementById('waParsedGuest').value = detectedGuest;
+  if (detectedPhone) document.getElementById('waParsedPhone').value = detectedPhone;
+  document.getElementById('waParsedVilla').value = detectedVilla;
+  if (detectedAmount > 0) document.getElementById('waParsedAmount').value = detectedAmount;
+  if (checkIn) document.getElementById('waParsedCheckIn').value = checkIn;
+  if (checkOut) document.getElementById('waParsedCheckOut').value = checkOut;
+  if (detectedPax) document.getElementById('waParsedPax').value = detectedPax;
+  
+  const notes = `WhatsApp mesajından aktarıldı: ${text.slice(0, 60)}...`;
+  document.getElementById('waParsedNotes').value = notes;
+}
+
+function saveWaAsLead() {
+  const guest = document.getElementById('waParsedGuest').value.trim() || 'WhatsApp Misafiri';
+  const villa = document.getElementById('waParsedVilla').value;
+  const quote = Number(document.getElementById('waParsedAmount').value) || 0;
+  const phone = document.getElementById('waParsedPhone').value.trim();
+  const notes = document.getElementById('waParsedNotes').value.trim();
+
+  const newLead = {
+    id: 'L-' + Date.now().toString().slice(-4),
+    guest: phone ? `${guest} (${phone})` : guest,
+    villa: villa,
+    channel: 'WhatsApp',
+    quote: quote,
+    status: 'FOLLOW_UP',
+    lostReason: '-',
+    notes: notes || 'WhatsApp Business talebi'
+  };
+
+  if (!appData.leads) appData.leads = [];
+  appData.leads.unshift(newLead);
+  saveAppData();
+  closeWhatsAppModal();
+
+  switchTab('leads');
+  renderManageLeadsTable();
+
+  alert(`✅ WhatsApp talebi "${guest}" başarıyla Lead & Satış listesine kaydedildi!`);
+}
+
+function saveWaAsBooking() {
+  const guest = document.getElementById('waParsedGuest').value.trim() || 'WhatsApp Misafiri';
+  const villa = document.getElementById('waParsedVilla').value;
+  const gross = Number(document.getElementById('waParsedAmount').value) || 0;
+  const checkIn = document.getElementById('waParsedCheckIn').value;
+  const checkOut = document.getElementById('waParsedCheckOut').value;
+  const pax = Number(document.getElementById('waParsedPax').value) || 6;
+  const phone = document.getElementById('waParsedPhone').value.trim();
+
+  if (!checkIn || !checkOut) {
+    alert('Lütfen rezervasyon için giriş ve çıkış tarihlerini seçiniz!');
+    return;
+  }
+
+  const d1 = new Date(checkIn);
+  const d2 = new Date(checkOut);
+  const nights = Math.max(1, Math.round((d2 - d1) / (1000 * 60 * 60 * 24)));
+
+  const newRez = {
+    id: 'REZ-WA-' + Date.now().toString().slice(-4),
+    villa: villa,
+    guest: phone ? `${guest} (${phone})` : guest,
+    checkIn: checkIn,
+    checkOut: checkOut,
+    nights: nights,
+    channel: 'WHATSAPP',
+    gross: gross,
+    otaComm: 0,
+    cleanFee: 0,
+    net: gross,
+    pax: pax,
+    status: 'CONFIRMED'
+  };
+
+  if (!appData.bookings) appData.bookings = [];
+  appData.bookings.unshift(newRez);
+  saveAppData();
+  closeWhatsAppModal();
+
+  switchTab('reservations');
+  renderManageBookingsTable();
+  renderTapeChart();
+
+  alert(`✅ Tebrikler! "${guest}" için ${nights} gecelik WhatsApp rezervasyonu kesinleştirildi ve takvime işlendi!`);
+}
