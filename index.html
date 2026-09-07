@@ -118,42 +118,66 @@
 
     <!-- Global Period & Villa Filter -->
     <div class="header-filters">
-      <div class="filter-group">
-        <label>DÖNEM:</label>
+            <div class="filter-group">
+        <label style="display: flex; align-items: center; gap: 4px;"><span>📅</span> DÖNEM / TARİH:</label>
         <select id="globalPeriodFilter" onchange="handleFilterChange()">
-          <option value="2026-09" selected>Eylül 2026 (Güncel Aktif Ay)</option>
-          <option value="2026-10">Ekim 2026</option>
-          <option value="2026-11">Kasım 2026</option>
-          <option value="2026-12">Aralık 2026 (Yılbaşı Sezonu 🎄)</option>
-          <option value="2027-01">Ocak 2027 (Kış Zirvesi / Sömestr ❄️)</option>
-          <option value="2027-02">Şubat 2027 (Kayak Sezonu ⛷️)</option>
-          <option value="2027-03">Mart 2027</option>
-          <option value="2027-04">Nisan 2027</option>
-          <option value="2027-05">Mayıs 2027</option>
-          <option value="2027-06">Haziran 2027</option>
-          <option value="2027-07">Temmuz 2027</option>
-          <option value="2027-08">Ağustos 2027</option>
-          <option value="2027-09">Eylül 2027</option>
-          <option value="2027-10">Ekim 2027</option>
-          <option value="2027-11">Kasım 2027</option>
-          <option value="2027-12">Aralık 2027 (Yılbaşı 2028)</option>
-          <option value="ALL">Tüm Zamanlar (Tüm Veriler)</option>
-          <!-- Geçmiş Aylar (Resmi Şirket Veritabanı) -->
-          <option value="2026-08">Ağustos 2026</option>
-          <option value="2026-07">Temmuz 2026</option>
-          <option value="2026-06">Haziran 2026</option>
-          <option value="2026-05">Mayıs 2026</option>
-          <option value="2026-04">Nisan 2026</option>
-          <option value="2026-03">Mart 2026</option>
-          <option value="2026-02">Şubat 2026</option>
-          <option value="2026-01">Ocak 2026</option>
-          <option value="2025-12">Aralık 2025</option>
-          <option value="2025-11">Kasım 2025</option>
-          <option value="2025-10">Ekim 2025</option>
-          <option value="2025-09">Eylül 2025</option>
-          <option value="2025-08">Ağustos 2025</option>
-          <option value="2025-07">Temmuz 2025</option>
+          <!-- Genel & Hızlı Tarih Aralıkları -->
+          <optgroup label="🌐 GENEL & TARİH ARALIKLARI">
+            <option value="ALL">🌐 Tüm Zamanlar (Temmuz 2025 - Günümüz)</option>
+            <option value="2026-YEAR">📅 2026 Yılı Tamamı (Ocak - Aralık 2026)</option>
+            <option value="2025-YEAR">📅 2025 Yılı (Temmuz - Aralık 2025)</option>
+            <option value="CUSTOM">📆 Özel Tarih Aralığı Seç...</option>
+          </optgroup>
+
+          <!-- 2025 Yılı: Temmuz 2025'ten İtibaren Kronolojik Sırayla -->
+          <optgroup label="📆 2025 YILI (Temmuz 2025'ten İtibaren)">
+            <option value="2025-07">Temmuz 2025</option>
+            <option value="2025-08">Ağustos 2025</option>
+            <option value="2025-09">Eylül 2025</option>
+            <option value="2025-10">Ekim 2025</option>
+            <option value="2025-11">Kasım 2025</option>
+            <option value="2025-12">Aralık 2025</option>
+          </optgroup>
+
+          <!-- 2026 Yılı: Resmi Şirket Raporları & Güncel Canlı Operasyon -->
+          <optgroup label="📆 2026 YILI (Resmi Veriler & Aktif Sezon)">
+            <option value="2026-01">Ocak 2026</option>
+            <option value="2026-02">Şubat 2026</option>
+            <option value="2026-03">Mart 2026</option>
+            <option value="2026-04">Nisan 2026</option>
+            <option value="2026-05">Mayıs 2026</option>
+            <option value="2026-06">Haziran 2026</option>
+            <option value="2026-07">Temmuz 2026</option>
+            <option value="2026-08">Ağustos 2026 (Son Kapanan Ay)</option>
+            <option value="2026-09" selected>⭐ Eylül 2026 (Güncel Aktif Ay)</option>
+            <option value="2026-10">Ekim 2026</option>
+            <option value="2026-11">Kasım 2026</option>
+            <option value="2026-12">Aralık 2026 (Yılbaşı Sezonu 🎄)</option>
+          </optgroup>
+
+          <!-- 2027 Yılı: Gelecek Kış & Yaz Sezonları -->
+          <optgroup label="📆 2027 YILI (Gelecek Sezonlar)">
+            <option value="2027-01">Ocak 2027 (Kış Zirvesi / Sömestr ❄️)</option>
+            <option value="2027-02">Şubat 2027 (Kayak Sezonu ⛷️)</option>
+            <option value="2027-03">Mart 2027</option>
+            <option value="2027-04">Nisan 2027</option>
+            <option value="2027-05">Mayıs 2027</option>
+            <option value="2027-06">Haziran 2027</option>
+            <option value="2027-07">Temmuz 2027</option>
+            <option value="2027-08">Ağustos 2027</option>
+            <option value="2027-09">Eylül 2027</option>
+            <option value="2027-10">Ekim 2027</option>
+            <option value="2027-11">Kasım 2027</option>
+            <option value="2027-12">Aralık 2027 (Yılbaşı 2028)</option>
+          </optgroup>
         </select>
+      </div>
+
+      <!-- Özel Tarih Aralığı Seçim Kutusu (Sadece 'Özel Tarih Aralığı' seçilince görünür) -->
+      <div id="customDateRangeWrap" style="display: none; align-items: center; gap: 6px; background: rgba(0,0,0,0.3); padding: 4px 8px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15);">
+        <input type="date" id="customFilterStart" value="2026-08-01" onchange="handleFilterChange()" title="Başlangıç Tarihi" style="padding: 6px 8px; background: rgba(30,41,59,0.9); border: 1px solid rgba(255,255,255,0.25); border-radius: 6px; color: #fff; font-size: 12px; font-weight: 600;">
+        <span style="color: #94A3B8; font-weight: 700; font-size: 13px;">–</span>
+        <input type="date" id="customFilterEnd" value="2026-09-30" onchange="handleFilterChange()" title="Bitiş Tarihi" style="padding: 6px 8px; background: rgba(30,41,59,0.9); border: 1px solid rgba(255,255,255,0.25); border-radius: 6px; color: #fff; font-size: 12px; font-weight: 600;">
       </div>
       <div class="filter-group">
         <label>PORTFÖY:</label>
@@ -1260,13 +1284,42 @@
             <select id="rezPeriodFilter" onchange="renderManageBookingsTable()" style="padding: 8px 12px; background: rgba(30,41,59,0.9); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px;">
               <option value="ALL" selected>Tüm Rezervasyonlar (Tarih Bağımsız)</option>
               <option value="UPCOMING">Gelecek & Aktif Rezervasyonlar</option>
-              <option value="2026-09">Eylül 2026 (Güncel Ay)</option>
-              <option value="2026-10">Ekim 2026</option>
-              <option value="2026-11">Kasım 2026</option>
-              <option value="2026-12">Aralık 2026 (Yılbaşı Sezonu 🎄)</option>
-              <option value="2027-01">Ocak 2027 (Kış Zirvesi ❄️)</option>
-              <option value="2027-02">Şubat 2027</option>
-              <option value="2026-08">Ağustos 2026</option>
+              <optgroup label="2025 YILI (Temmuz'dan İtibaren)">
+                <option value="2025-07">Temmuz 2025</option>
+                <option value="2025-08">Ağustos 2025</option>
+                <option value="2025-09">Eylül 2025</option>
+                <option value="2025-10">Ekim 2025</option>
+                <option value="2025-11">Kasım 2025</option>
+                <option value="2025-12">Aralık 2025</option>
+              </optgroup>
+              <optgroup label="2026 YILI (Resmi Veriler & Güncel)">
+                <option value="2026-01">Ocak 2026</option>
+                <option value="2026-02">Şubat 2026</option>
+                <option value="2026-03">Mart 2026</option>
+                <option value="2026-04">Nisan 2026</option>
+                <option value="2026-05">Mayıs 2026</option>
+                <option value="2026-06">Haziran 2026</option>
+                <option value="2026-07">Temmuz 2026</option>
+                <option value="2026-08">Ağustos 2026</option>
+                <option value="2026-09">Eylül 2026 (Güncel Ay)</option>
+                <option value="2026-10">Ekim 2026</option>
+                <option value="2026-11">Kasım 2026</option>
+                <option value="2026-12">Aralık 2026 (Yılbaşı Sezonu 🎄)</option>
+              </optgroup>
+              <optgroup label="2027 YILI">
+                <option value="2027-01">Ocak 2027 (Kış Zirvesi ❄️)</option>
+                <option value="2027-02">Şubat 2027 (Kayak Sezonu ⛷️)</option>
+                <option value="2027-03">Mart 2027</option>
+                <option value="2027-04">Nisan 2027</option>
+                <option value="2027-05">Mayıs 2027</option>
+                <option value="2027-06">Haziran 2027</option>
+                <option value="2027-07">Temmuz 2027</option>
+                <option value="2027-08">Ağustos 2027</option>
+                <option value="2027-09">Eylül 2027</option>
+                <option value="2027-10">Ekim 2027</option>
+                <option value="2027-11">Kasım 2027</option>
+                <option value="2027-12">Aralık 2027</option>
+              </optgroup>
             </select>
           </div>
           <div>

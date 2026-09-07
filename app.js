@@ -2796,7 +2796,9 @@ let appData = {
 // Global Active Filter
 let currentFilter = {
   period: '2026-09',
-  villa: 'ALL'
+  villa: 'ALL',
+  startDate: '2026-09-01',
+  endDate: '2026-09-30'
 };
 
 let activeTrendRange = '6M';
@@ -2958,6 +2960,10 @@ const ALL_FINANCIAL_MONTHS = [
 ];
 
 const ALL_MONTH_NAMES = {
+  'ALL': '🌐 Tüm Zamanlar (Temmuz 2025 - Günümüz)',
+  '2026-YEAR': '📅 2026 Yılı Tamamı (Ocak - Aralık 2026)',
+  '2025-YEAR': '📅 2025 Yılı (Temmuz - Aralık 2025)',
+  'CUSTOM': '📆 Özel Tarih Aralığı',
   '2025-07': 'Temmuz 2025',
   '2025-08': 'Ağustos 2025',
   '2025-09': 'Eylül 2025',
@@ -2971,8 +2977,8 @@ const ALL_MONTH_NAMES = {
   '2026-05': 'Mayıs 2026',
   '2026-06': 'Haziran 2026',
   '2026-07': 'Temmuz 2026',
-  '2026-08': 'Ağustos 2026',
-  '2026-09': 'Eylül 2026 (Güncel Ay)',
+  '2026-08': 'Ağustos 2026 (Son Kapanan Ay)',
+  '2026-09': '⭐ Eylül 2026 (Güncel Aktif Ay)',
   '2026-10': 'Ekim 2026',
   '2026-11': 'Kasım 2026',
   '2026-12': 'Aralık 2026 (Yılbaşı Sezonu 🎄)',
@@ -2987,13 +2993,45 @@ const ALL_MONTH_NAMES = {
   '2027-09': 'Eylül 2027',
   '2027-10': 'Ekim 2027',
   '2027-11': 'Kasım 2027',
-  '2027-12': 'Aralık 2027 (Yılbaşı 2028)',
-  'ALL': 'Tüm Zamanlar'
+  '2027-12': 'Aralık 2027 (Yılbaşı 2028)'
 };
 
 function handleFilterChange() {
-  currentFilter.period = document.getElementById('globalPeriodFilter').value;
-  currentFilter.villa = document.getElementById('globalVillaFilter').value;
+  const periodVal = document.getElementById('globalPeriodFilter') ? document.getElementById('globalPeriodFilter').value : '2026-09';
+  currentFilter.period = periodVal;
+  const villaSelect = document.getElementById('globalVillaFilter');
+  if (villaSelect) currentFilter.villa = villaSelect.value;
+
+  const customWrap = document.getElementById('customDateRangeWrap');
+  if (periodVal === 'CUSTOM') {
+    if (customWrap) customWrap.style.display = 'inline-flex';
+    const sInput = document.getElementById('customFilterStart');
+    const eInput = document.getElementById('customFilterEnd');
+    currentFilter.startDate = (sInput && sInput.value) ? sInput.value : '2026-08-01';
+    currentFilter.endDate = (eInput && eInput.value) ? eInput.value : '2026-09-30';
+  } else {
+    if (customWrap) customWrap.style.display = 'none';
+    if (periodVal === '2026-YEAR') {
+      currentFilter.startDate = '2026-01-01';
+      currentFilter.endDate = '2026-12-31';
+    } else if (periodVal === '2025-YEAR') {
+      currentFilter.startDate = '2025-07-01';
+      currentFilter.endDate = '2025-12-31';
+    } else if (periodVal === 'ALL') {
+      currentFilter.startDate = null;
+      currentFilter.endDate = null;
+    } else {
+      currentFilter.startDate = `${periodVal}-01`;
+      const parts = periodVal.split('-').map(Number);
+      if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+        const lastDay = new Date(parts[0], parts[1], 0).getDate();
+        currentFilter.endDate = `${periodVal}-${String(lastDay).padStart(2, '0')}`;
+      } else {
+        currentFilter.endDate = null;
+      }
+    }
+  }
+
   updateStepperLabels();
   renderAll();
 }
@@ -3013,7 +3051,12 @@ function stepMonth(delta) {
 
 function updateStepperLabels() {
   const curIdx = ALL_FINANCIAL_MONTHS.indexOf(currentFilter.period);
-  const curLabel = ALL_MONTH_NAMES[currentFilter.period] || currentFilter.period;
+  let curLabel = ALL_MONTH_NAMES[currentFilter.period] || currentFilter.period;
+  if (currentFilter.period === 'CUSTOM') {
+    const s = currentFilter.startDate ? formatTrDate(currentFilter.startDate) : 'Başlangıç';
+    const e = currentFilter.endDate ? formatTrDate(currentFilter.endDate) : 'Bitiş';
+    curLabel = `📅 ${s} – ${e}`;
+  }
 
   const curEl = document.getElementById('stepperCurrentLabel');
   if (curEl) curEl.innerText = curLabel;
@@ -3048,15 +3091,35 @@ function switchTab(tabId) {
 function isBookingInFilter(b) {
   if (currentFilter.villa !== 'ALL' && b.villa !== currentFilter.villa) return false;
   if (currentFilter.period === 'ALL') return true;
-  const bInMonth = b.checkIn.slice(0, 7);
-  const bOutMonth = b.checkOut.slice(0, 7);
+
+  const bIn = b.checkIn || '';
+  const bOut = b.checkOut || b.checkIn || '';
+
+  if (currentFilter.period === 'CUSTOM' || (currentFilter.startDate && currentFilter.endDate && (currentFilter.period === '2026-YEAR' || currentFilter.period === '2025-YEAR'))) {
+    const s = currentFilter.startDate || '2025-07-01';
+    const e = currentFilter.endDate || '2099-12-31';
+    return (bIn <= e && bOut >= s);
+  }
+
+  const bInMonth = bIn ? bIn.slice(0, 7) : '';
+  const bOutMonth = bOut ? bOut.slice(0, 7) : '';
   return (bInMonth === currentFilter.period || bOutMonth === currentFilter.period);
 }
 
 function isExpenseInFilter(exp) {
   if (currentFilter.villa !== 'ALL' && exp.villa !== 'ALL' && exp.villa !== currentFilter.villa) return false;
   if (currentFilter.period === 'ALL') return true;
+
   const expMonth = exp.monthKey || exp.month || (exp.date ? exp.date.substring(0, 7) : '');
+  const expDate = exp.date || (expMonth ? expMonth + '-15' : '');
+
+  if (currentFilter.period === 'CUSTOM' || (currentFilter.startDate && currentFilter.endDate && (currentFilter.period === '2026-YEAR' || currentFilter.period === '2025-YEAR'))) {
+    const s = currentFilter.startDate || '2025-07-01';
+    const e = currentFilter.endDate || '2099-12-31';
+    if (expDate) return (expDate >= s && expDate <= e);
+    return true;
+  }
+
   return expMonth === currentFilter.period;
 }
 
@@ -3215,6 +3278,57 @@ function renderFinanceModule() {
       propStats.ZIRVE = { name: 'Zirve Dağ Evi', revenue: att.villas.zirve.rev, nights: att.villas.zirve.days, adr: Math.round(att.villas.zirve.rev / att.villas.zirve.days), share: Number(((att.villas.zirve.rev / totalRevenue)*100).toFixed(1)), occupancy: Number(((att.villas.zirve.days / (14*30))*100).toFixed(1)), revpar: Math.round(att.villas.zirve.rev / (14*30)) };
       propStats.SIRIN = { name: 'Şirin Dağ Evi', revenue: att.villas.sirin.rev, nights: att.villas.sirin.days, adr: Math.round(att.villas.sirin.rev / att.villas.sirin.days), share: Number(((att.villas.sirin.rev / totalRevenue)*100).toFixed(1)), occupancy: Number(((att.villas.sirin.days / (14*30))*100).toFixed(1)), revpar: Math.round(att.villas.sirin.rev / (14*30)) };
       propStats.NEFES = { name: 'Nefes Dağ Evi', revenue: att.villas.nefes.rev, nights: att.villas.nefes.days, adr: Math.round(att.villas.nefes.rev / att.villas.nefes.days), share: Number(((att.villas.nefes.rev / totalRevenue)*100).toFixed(1)), occupancy: Number(((att.villas.nefes.days / (14*30))*100).toFixed(1)), revpar: Math.round(att.villas.nefes.rev / (14*30)) };
+
+    } else if (currentFilter.period === '2026-YEAR' || currentFilter.period === '2025-YEAR' || currentFilter.period === 'CUSTOM') {
+      let monthsToAggregate = [];
+      if (currentFilter.period === '2026-YEAR') {
+        monthsToAggregate = Object.keys(activeExcel.monthlyFinancials).filter(k => k.startsWith('2026-'));
+      } else if (currentFilter.period === '2025-YEAR') {
+        monthsToAggregate = Object.keys(activeExcel.monthlyFinancials).filter(k => k.startsWith('2025-'));
+      } else if (currentFilter.period === 'CUSTOM') {
+        const sM = (currentFilter.startDate || '2025-07').slice(0, 7);
+        const eM = (currentFilter.endDate || '2099-12').slice(0, 7);
+        monthsToAggregate = Object.keys(activeExcel.monthlyFinancials).filter(k => k >= sM && k <= eM);
+      }
+
+      monthsToAggregate.forEach(m => {
+        const mf = activeExcel.monthlyFinancials[m];
+        if (mf) {
+          totalRevenue += mf.ciro || 0;
+          totalOpex += mf.opex || 0;
+          totalCapex += mf.capex || 0;
+          totalSoldNights += mf.daysSold || 0;
+          targetRev += (activeExcel.targets && activeExcel.targets[m]) || 350000;
+        }
+        const pm = activeExcel.propertyMonthly && activeExcel.propertyMonthly[m];
+        if (pm && pm.villas) {
+          pm.villas.forEach(v => {
+            if (!propStats[v.id]) propStats[v.id] = { name: v.name, revenue: 0, nights: 0, adr: 0, share: 0, occupancy: 0, revpar: 0 };
+            propStats[v.id].revenue += v.rev || 0;
+            propStats[v.id].nights += v.days || 0;
+          });
+        }
+      });
+      avgRevPerNight = totalSoldNights > 0 ? Math.round(totalRevenue / totalSoldNights) : 0;
+      const totalDaysCapacity = Math.max(1, monthsToAggregate.length * 30);
+      Object.keys(propStats).forEach(vKey => {
+        const p = propStats[vKey];
+        p.adr = p.nights > 0 ? Math.round(p.revenue / p.nights) : 0;
+        p.share = totalRevenue > 0 ? Number(((p.revenue / totalRevenue) * 100).toFixed(1)) : 20;
+        p.occupancy = Number(((p.nights / totalDaysCapacity) * 100).toFixed(1));
+        p.revpar = Math.round(p.revenue / totalDaysCapacity);
+      });
+
+      if (currentFilter.villa !== 'ALL' && propStats[currentFilter.villa]) {
+        const vData = propStats[currentFilter.villa];
+        totalRevenue = vData.revenue;
+        totalSoldNights = vData.nights;
+        avgRevPerNight = vData.adr;
+        const vShare = vData.share > 0 ? vData.share / 100 : 0.2;
+        totalOpex = Math.round(totalOpex * vShare);
+        totalCapex = Math.round(totalCapex * vShare);
+        targetRev = Math.round(targetRev * 0.2);
+      }
 
     } else {
       // Specific Month from Official Database
@@ -4277,38 +4391,10 @@ function deleteExpense(id) {
 // -------------------------------------------------------------
 // HEDEFLER DÜZENLEME (GOALS MODAL & SETTINGS)
 // -------------------------------------------------------------
-const GOAL_MONTHS = [
-  { id: '2026-09', name: 'Eylül 2026 (Güncel Aktif Ay)' },
-  { id: '2026-10', name: 'Ekim 2026' },
-  { id: '2026-11', name: 'Kasım 2026' },
-  { id: '2026-12', name: 'Aralık 2026 (Yılbaşı Sezonu 🎄)' },
-  { id: '2027-01', name: 'Ocak 2027 (Kış Zirvesi ❄️)' },
-  { id: '2027-02', name: 'Şubat 2027 (Kayak Sezonu ⛷️)' },
-  { id: '2027-03', name: 'Mart 2027' },
-  { id: '2027-04', name: 'Nisan 2027' },
-  { id: '2027-05', name: 'Mayıs 2027' },
-  { id: '2027-06', name: 'Haziran 2027' },
-  { id: '2027-07', name: 'Temmuz 2027' },
-  { id: '2027-08', name: 'Ağustos 2027' },
-  { id: '2027-09', name: 'Eylül 2027' },
-  { id: '2027-10', name: 'Ekim 2027' },
-  { id: '2027-11', name: 'Kasım 2027' },
-  { id: '2027-12', name: 'Aralık 2027' },
-  { id: '2026-08', name: 'Ağustos 2026' },
-  { id: '2026-07', name: 'Temmuz 2026' },
-  { id: '2026-06', name: 'Haziran 2026' },
-  { id: '2026-05', name: 'Mayıs 2026' },
-  { id: '2026-04', name: 'Nisan 2026' },
-  { id: '2026-03', name: 'Mart 2026' },
-  { id: '2026-02', name: 'Şubat 2026' },
-  { id: '2026-01', name: 'Ocak 2026' },
-  { id: '2025-12', name: 'Aralık 2025' },
-  { id: '2025-11', name: 'Kasım 2025' },
-  { id: '2025-10', name: 'Ekim 2025' },
-  { id: '2025-09', name: 'Eylül 2025' },
-  { id: '2025-08', name: 'Ağustos 2025' },
-  { id: '2025-07', name: 'Temmuz 2025' }
-];
+const GOAL_MONTHS = ALL_FINANCIAL_MONTHS.map(m => ({
+  id: m,
+  name: ALL_MONTH_NAMES[m] || m
+}));
 
 function openGoalsModal(targetPeriod) {
   const select = document.getElementById('goalPeriodSelect');
@@ -6015,7 +6101,16 @@ function renderHousekeepingTab() {
 
   // Period filter
   if (currentFilter.period !== 'ALL') {
-    filtered = filtered.filter(t => (t.date && t.date.slice(0, 7) === currentFilter.period) || (t.paidDate && t.paidDate.slice(0, 7) === currentFilter.period));
+    filtered = filtered.filter(t => {
+      const taskDate = t.date || t.paidDate || '';
+      if (!taskDate) return true;
+      if (currentFilter.period === 'CUSTOM' || (currentFilter.startDate && currentFilter.endDate && (currentFilter.period === '2026-YEAR' || currentFilter.period === '2025-YEAR'))) {
+        const s = currentFilter.startDate || '2025-07-01';
+        const e = currentFilter.endDate || '2099-12-31';
+        return taskDate >= s && taskDate <= e;
+      }
+      return taskDate.slice(0, 7) === currentFilter.period;
+    });
   }
 
   // Status filter
@@ -6039,8 +6134,15 @@ function renderHousekeepingTab() {
   // KPI Calculations
   const allInScope = appData.cleaningTasks.filter(t => {
     if (currentFilter.villa !== 'ALL' && t.villa !== currentFilter.villa) return false;
-    if (currentFilter.period !== 'ALL' && t.date && t.date.slice(0, 7) !== currentFilter.period) return false;
-    return true;
+    if (currentFilter.period === 'ALL') return true;
+    const taskDate = t.date || t.paidDate || '';
+    if (!taskDate) return true;
+    if (currentFilter.period === 'CUSTOM' || (currentFilter.startDate && currentFilter.endDate && (currentFilter.period === '2026-YEAR' || currentFilter.period === '2025-YEAR'))) {
+      const s = currentFilter.startDate || '2025-07-01';
+      const e = currentFilter.endDate || '2099-12-31';
+      return taskDate >= s && taskDate <= e;
+    }
+    return taskDate.slice(0, 7) === currentFilter.period;
   });
 
   const pendingList = allInScope.filter(t => !t.paid);
