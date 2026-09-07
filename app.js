@@ -2815,6 +2815,63 @@ let pendingImportRows = null;
 let propertyViewMode = 'table'; // 'table' or 'cards'
 
 // Initialize and Load Data
+
+// =============================================================
+// REZERVASYON TEMİZLİK GİDERLERİ OTOMATİK SENKRONİZASYONU
+// =============================================================
+function syncBookingCleaningExpenses() {
+  if (!appData.expenses) appData.expenses = [];
+  if (!appData.bookings) appData.bookings = [];
+
+  // 1. Remove orphaned auto-clean expenses whose booking no longer exists or cleanFee is 0
+  appData.expenses = appData.expenses.filter(exp => {
+    if (!exp.isAutoClean && !exp.bookingId) return true;
+    const booking = appData.bookings.find(b => b.id === exp.bookingId || ('EXP-CLEAN-' + b.id) === exp.id);
+    if (!booking || booking.status === 'CANCELLED' || !booking.cleanFee || Number(booking.cleanFee) <= 0) {
+      return false;
+    }
+    return true;
+  });
+
+  // 2. Add or update cleaning expense for each booking with cleanFee > 0
+  appData.bookings.forEach(b => {
+    const cleanFee = Number(b.cleanFee) || 0;
+    if (cleanFee <= 0 || b.status === 'CANCELLED') return;
+
+    const expId = 'EXP-CLEAN-' + b.id;
+    const expDate = b.checkOut || b.checkIn || new Date().toISOString().split('T')[0];
+    const month = expDate.slice(0, 7);
+    const vName = (appData.villas && appData.villas[b.villa]?.name) ? appData.villas[b.villa].name : b.villa;
+    const desc = `[${b.guest}] Rezervasyon Temizlik & Çamaşır (${vName})`;
+
+    const existingIdx = appData.expenses.findIndex(e => e.id === expId || e.bookingId === b.id);
+    if (existingIdx !== -1) {
+      appData.expenses[existingIdx].amount = cleanFee;
+      appData.expenses[existingIdx].date = expDate;
+      appData.expenses[existingIdx].villa = b.villa;
+      appData.expenses[existingIdx].month = month;
+      appData.expenses[existingIdx].description = desc;
+      appData.expenses[existingIdx].category = 'Temizlik';
+      appData.expenses[existingIdx].type = 'OPEX';
+      appData.expenses[existingIdx].bookingId = b.id;
+      appData.expenses[existingIdx].isAutoClean = true;
+    } else {
+      appData.expenses.push({
+        id: expId,
+        bookingId: b.id,
+        type: 'OPEX',
+        category: 'Temizlik',
+        villa: b.villa,
+        date: expDate,
+        amount: cleanFee,
+        description: desc,
+        month: month,
+        isAutoClean: true
+      });
+    }
+  });
+}
+
 function loadAppData() {
   try {
     const saved = localStorage.getItem('LEXBNB_V5_MASTER_DATA');
@@ -2861,6 +2918,7 @@ function loadAppData() {
       };
       saveAppData();
     }
+  syncBookingCleaningExpenses();
   } catch (e) {
     console.error('Error loading state:', e);
   }
@@ -2977,7 +3035,8 @@ function isBookingInFilter(b) {
 function isExpenseInFilter(exp) {
   if (currentFilter.villa !== 'ALL' && exp.villa !== 'ALL' && exp.villa !== currentFilter.villa) return false;
   if (currentFilter.period === 'ALL') return true;
-  return exp.monthKey === currentFilter.period || exp.month === currentFilter.period;
+  const expMonth = exp.monthKey || exp.month || (exp.date ? exp.date.substring(0, 7) : '');
+  return expMonth === currentFilter.period;
 }
 
 // Master Render All Components
@@ -3150,7 +3209,8 @@ function renderFinanceModule() {
     } else {
       categoryTotals['Diğer'] = (categoryTotals['Diğer'] || 0) + amt;
     }
-    if (!activeExcel) {
+    const isDynamicExpensePeriod = !hasStaticExcelMonth && (!activeExcel || currentFilter.period !== 'ALL');
+    if (isDynamicExpensePeriod) {
       if (exp.type === 'CAPEX') totalCapex += amt;
       else totalOpex += amt;
     }
@@ -4018,7 +4078,7 @@ function renderExpensesTable() {
       <td><span class="badge ${exp.type === 'CAPEX' ? 'badge-amber' : 'badge-blue'}">${exp.type === 'CAPEX' ? 'Yatırım (Capex)' : 'Operasyonel (Opex)'}</span></td>
       <td><strong>${exp.category}</strong></td>
       <td>${exp.villa === 'ALL' ? 'Tüm Portföy' : (appData.villas[exp.villa]?.name || exp.villa)}</td>
-      <td>${exp.description}</td>
+      <td>${exp.description} ${(exp.isAutoClean || exp.bookingId) ? '<span class="badge badge-emerald" style="font-size: 10px; margin-left: 6px;">🧹 Rezervasyon</span>' : ''}</td>
       <td><strong>${Number(exp.amount).toLocaleString('tr-TR')} TL</strong></td>
       <td style="text-align: right; white-space: nowrap;">
         <button class="btn btn-secondary btn-sm" onclick="editExpense('${exp.id}')">✏️</button>
@@ -4090,8 +4150,17 @@ function editExpense(id) {
 
 function deleteExpense(id) {
   if (confirm('Bu harcamayı silmek istediğinizden emin misiniz?')) {
+    const exp = appData.expenses.find(e => e.id === id);
+    if (exp && exp.bookingId) {
+      const b = appData.bookings.find(b => b.id === exp.bookingId);
+      if (b) {
+        b.cleanFee = 0;
+        b.net = Math.max(0, (Number(b.gross) || 0) - (Number(b.otaComm) || 0));
+      }
+    }
     appData.expenses = appData.expenses.filter(e => e.id !== id);
     saveAppData();
+    renderAll();
   }
 }
 
@@ -4754,15 +4823,19 @@ function saveBooking(e) {
     appData.bookings.push({ id: newId, villa, guest, checkIn, checkOut, channel, gross, otaComm, cleanFee, net, nights, pax, status });
   }
 
+  syncBookingCleaningExpenses();
   saveAppData();
   closeBookingModal();
+  renderAll();
 }
 
 function editBooking(id) { openBookingModal(id); }
 function deleteBooking(id) {
   if (confirm('Bu rezervasyonu silmek istediğinizden emin misiniz?')) {
     appData.bookings = appData.bookings.filter(b => b.id !== id);
+    syncBookingCleaningExpenses();
     saveAppData();
+    renderAll();
   }
 }
 
