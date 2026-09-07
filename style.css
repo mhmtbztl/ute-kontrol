@@ -3061,3 +3061,44 @@ body {
     padding: 14px 14px 28px 14px !important;
   }
 }
+
+
+
+/* ============================================================= */
+/* MONTHLY KPI TRACKER STYLES                                    */
+/* ============================================================= */
+.monthly-kpi-tracker-card {
+  border: 1px solid rgba(59, 130, 246, 0.25) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+}
+
+.kpi-tracker-bar-col:hover .kpi-bar-fill {
+  filter: brightness(1.25);
+  transform: scaleY(1.04);
+}
+
+.kpi-tracker-bar-col:hover {
+  transform: translateY(-2px);
+}
+
+.kpi-tracker-bar-col.active .kpi-bar-fill {
+  filter: brightness(1.15);
+}
+
+#kpiTrackerVisualBars::-webkit-scrollbar {
+  height: 6px;
+}
+
+#kpiTrackerVisualBars::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+#kpiTrackerVisualBars::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+
+#kpiTrackerVisualBars::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}

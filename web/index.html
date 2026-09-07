@@ -546,6 +546,94 @@
         </div>
       </section>
 
+            <!-- ======================================================= -->
+      <!-- AYLARA GÖRE KPI TAKİP VE GELİŞİM MATRİSİ (14+ AY)      -->
+      <!-- ======================================================= -->
+      <section class="card monthly-kpi-tracker-card" style="margin-top: 24px;">
+        <div class="section-title-bar">
+          <div>
+            <div class="title-with-badge">
+              <span style="font-size: 20px;">📊</span>
+              <h2>AYLARA GÖRE KPI TAKİP & GELİŞİM MATRİSİ (14+ AY)</h2>
+              <span class="badge badge-blue">Tarihsel Performans</span>
+            </div>
+            <p class="sub-text">Şirketin kuruluşundan bugüne tüm aylık metrikleri: Ciro, Net Kâr, ADR, Doluluk ve Hedef başarıları.</p>
+          </div>
+
+          <!-- Metric Selector for Visual Chart -->
+          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+            <button type="button" class="btn btn-secondary btn-sm" id="kpiTrackBtn-ciro" onclick="setKpiTrackerMetric('ciro')" style="background: rgba(59,130,246,0.2); border-color: #3B82F6; color: #93C5FD; font-weight: 700;">💰 Ciro</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="kpiTrackBtn-netProfit" onclick="setKpiTrackerMetric('netProfit')">💵 Net Kâr</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="kpiTrackBtn-adr" onclick="setKpiTrackerMetric('adr')">🏷️ ADR</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="kpiTrackBtn-occupancy" onclick="setKpiTrackerMetric('occupancy')">🌙 Doluluk %</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="kpiTrackBtn-opex" onclick="setKpiTrackerMetric('opex')">💸 Giderler</button>
+          </div>
+        </div>
+
+        <!-- 4 Historical Peak Metric Pills -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 18px;">
+          <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 10px; padding: 12px 14px;">
+            <div style="font-size: 11px; color: #A7F3D0; font-weight: 700; text-transform: uppercase;">🏆 Ciro Şampiyonu Ay</div>
+            <div style="font-size: 17px; font-weight: 800; color: #34D399; margin: 4px 0;" id="kpiPeakRev">Ocak 2026 (843.555 TL)</div>
+            <div style="font-size: 11px; color: var(--text-muted);">Kış zirvesi ve yüksek talep</div>
+          </div>
+
+          <div style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 10px; padding: 12px 14px;">
+            <div style="font-size: 11px; color: #93C5FD; font-weight: 700; text-transform: uppercase;">💎 En Yüksek ADR (Gecelik)</div>
+            <div style="font-size: 17px; font-weight: 800; color: #60A5FA; margin: 4px 0;" id="kpiPeakAdr">Şubat 2026 (20.256 TL)</div>
+            <div style="font-size: 11px; color: var(--text-muted);">Sömestr tatilinde premium fiyatlama</div>
+          </div>
+
+          <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 10px; padding: 12px 14px;">
+            <div style="font-size: 11px; color: #FDE68A; font-weight: 700; text-transform: uppercase;">📈 En Çok Gece Satılan Ay</div>
+            <div style="font-size: 17px; font-weight: 800; color: #FBBF24; margin: 4px 0;" id="kpiPeakNights">Ağustos 2026 (79 Gece)</div>
+            <div style="font-size: 11px; color: var(--text-muted);">Yaz sezonu hacim lideri</div>
+          </div>
+
+          <div style="background: rgba(139, 92, 246, 0.08); border: 1px solid rgba(139, 92, 246, 0.25); border-radius: 10px; padding: 12px 14px;">
+            <div style="font-size: 11px; color: #DDD6FE; font-weight: 700; text-transform: uppercase;">💵 En Kârlı Ay (Net Kâr)</div>
+            <div style="font-size: 17px; font-weight: 800; color: #A78BFA; margin: 4px 0;" id="kpiPeakProfit">Ocak 2026 (512.497 TL)</div>
+            <div style="font-size: 11px; color: var(--text-muted);">%60,8 operasyonel marj rekoru</div>
+          </div>
+        </div>
+
+        <!-- Visual Monthly Bar Trend Chart -->
+        <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 16px; margin-bottom: 20px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+            <strong style="font-size: 13px; color: #FFFFFF;" id="kpiChartActiveTitle">💰 Aylara Göre Ciro Evrimi (TL)</strong>
+            <span style="font-size: 11px; color: #93C5FD;">💡 Çubuklara tıklayarak doğrudan o ayın raporuna gidebilirsiniz</span>
+          </div>
+          <div id="kpiTrackerVisualBars" style="display: flex; align-items: flex-end; gap: 8px; height: 160px; padding-top: 24px; padding-bottom: 6px; overflow-x: auto; -webkit-overflow-scrolling: touch;">
+            <!-- Injected via JS -->
+          </div>
+        </div>
+
+        <!-- Comprehensive Monthly Matrix Table -->
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>DÖNEM / AY</th>
+                <th>CİRO (TL)</th>
+                <th>HEDEF CİRO</th>
+                <th>HEDEF BAŞARISI</th>
+                <th>NET KÂR (TL)</th>
+                <th>MARJ (%)</th>
+                <th>SATILAN GECE</th>
+                <th>DOLULUK (%)</th>
+                <th>ADR (₺/GECE)</th>
+                <th>RevPAR (₺)</th>
+                <th>GİDER (TL)</th>
+                <th style="text-align: right;">İŞLEM</th>
+              </tr>
+            </thead>
+            <tbody id="monthlyKpiTableBody">
+              <!-- Injected via JS -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <!-- 8. AYLIK TREND VE GEÇEN YIL KARŞILAŞTIRMASI -->
       <div class="grid-2col">
         <!-- Monthly Trend Chart -->

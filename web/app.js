@@ -3214,6 +3214,9 @@ function renderFinanceModule() {
   // Render Property Comparison Chart
   renderPropertyComparisonChart(propStats);
 
+  // Render Monthly KPI Tracker
+  renderMonthlyKpiTracker();
+
   // Render Monthly Trend Chart
   renderMonthlyTrendChart();
 
@@ -5781,3 +5784,315 @@ document.addEventListener('click', function(e) {
     closeAllHeaderDropdowns();
   }
 });
+
+
+
+// =============================================================
+// AYLARA GÖRE KPI TAKİP VE GELİŞİM MATRİSİ (14+ AY MOTORU)
+// =============================================================
+let activeKpiTrackerMetric = 'ciro'; // 'ciro', 'netProfit', 'adr', 'occupancy', 'opex'
+
+function setKpiTrackerMetric(metric) {
+  activeKpiTrackerMetric = metric;
+  renderMonthlyKpiTracker();
+}
+
+function filterByPeriod(period) {
+  currentFilter.period = period;
+  const select = document.getElementById('globalPeriodFilter');
+  if (select) select.value = period;
+  updateStepperLabels();
+  renderAll();
+
+  // Smooth scroll to finance or tracker
+  const target = document.querySelector('.monthly-kpi-tracker-card') || document.getElementById('globalPeriodFilter');
+  if (target) {
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+function getMonthlyKpiDataset() {
+  const months = [
+    '2025-07', '2025-08', '2025-09', '2025-10', '2025-11', '2025-12',
+    '2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06',
+    '2026-07', '2026-08', '2026-09', '2026-10', '2026-11', '2026-12'
+  ];
+
+  const dataset = [];
+
+  months.forEach(m => {
+    const hasStatic = (!appData.isCleanState && COMPANY_EXCEL_DATABASE.monthlyFinancials && COMPANY_EXCEL_DATABASE.monthlyFinancials[m]);
+    
+    let ciro = 0;
+    let opex = 0;
+    let capex = 0;
+    let netProfit = 0;
+    let nights = 0;
+    let adr = 0;
+    let occupancy = 0;
+    let revpar = 0;
+    let margin = 0;
+    let target = (appData.targets && appData.targets[m]) || (COMPANY_EXCEL_DATABASE.targets && COMPANY_EXCEL_DATABASE.targets[m]) || 0;
+    const monthName = ALL_MONTH_NAMES[m] || m;
+
+    if (hasStatic) {
+      const mf = COMPANY_EXCEL_DATABASE.monthlyFinancials[m];
+      ciro = Number(mf.ciro) || 0;
+      opex = Number(mf.opex) || 0;
+      capex = Number(mf.capex) || 0;
+      netProfit = Number(mf.netProfit) || (ciro - opex - capex);
+      nights = Number(mf.daysSold) || 0;
+      adr = nights > 0 ? Math.round(ciro / nights) : (Math.round(mf.avgDaily) || 0);
+      margin = Number(mf.opMargin || mf.netMargin || (ciro > 0 ? ((netProfit / ciro) * 100) : 0));
+      occupancy = Number(((nights / 150) * 100).toFixed(1));
+      revpar = Math.round(ciro / 150);
+      if (mf.targetCiro && !target) target = Number(mf.targetCiro);
+    } else {
+      // Dynamic calculation from appData.bookings and appData.expenses
+      (appData.bookings || []).forEach(b => {
+        if (b.status === 'CANCELLED') return;
+        const bIn = b.checkIn ? b.checkIn.substring(0, 7) : '';
+        const bOut = b.checkOut ? b.checkOut.substring(0, 7) : '';
+        if (bIn === m || bOut === m) {
+          ciro += Number(b.gross || b.net || 0);
+          nights += Number(b.nights || 0);
+        }
+      });
+
+      (appData.expenses || []).forEach(exp => {
+        const expM = exp.monthKey || exp.month || (exp.date ? exp.date.substring(0, 7) : '');
+        if (expM === m) {
+          const amt = Number(exp.amount) || 0;
+          if (exp.type === 'CAPEX') capex += amt;
+          else opex += amt;
+        }
+      });
+
+      netProfit = ciro - opex - capex;
+      adr = nights > 0 ? Math.round(ciro / nights) : 0;
+      margin = ciro > 0 ? Number(((netProfit / ciro) * 100).toFixed(1)) : 0;
+      occupancy = Number(((nights / 150) * 100).toFixed(1));
+      revpar = Math.round(ciro / 150);
+      if (!target) {
+        if (m === '2026-09') target = 120000;
+        else if (m === '2026-12') target = 500000;
+      }
+    }
+
+    const totalExp = opex + capex;
+    const targetPct = target > 0 ? Number(((ciro / target) * 100).toFixed(1)) : null;
+
+    dataset.push({
+      key: m,
+      monthName,
+      ciro,
+      opex,
+      capex,
+      totalExp,
+      netProfit,
+      nights,
+      adr,
+      occupancy,
+      revpar,
+      margin,
+      target,
+      targetPct,
+      isCurrentMonth: (m === '2026-09'),
+      isSelected: (currentFilter.period === m)
+    });
+  });
+
+  return dataset;
+}
+
+function renderMonthlyKpiTracker() {
+  const tableBody = document.getElementById('monthlyKpiTableBody');
+  const barsContainer = document.getElementById('kpiTrackerVisualBars');
+  if (!tableBody && !barsContainer) return;
+
+  const dataset = getMonthlyKpiDataset();
+
+  // 1. Update Historical Peak Cards
+  let maxRevItem = dataset[0], maxAdrItem = dataset[0], maxNightsItem = dataset[0], maxProfitItem = dataset[0];
+  dataset.forEach(d => {
+    if (d.ciro > maxRevItem.ciro) maxRevItem = d;
+    if (d.adr > maxAdrItem.adr) maxAdrItem = d;
+    if (d.nights > maxNightsItem.nights) maxNightsItem = d;
+    if (d.netProfit > maxProfitItem.netProfit) maxProfitItem = d;
+  });
+
+  const pRev = document.getElementById('kpiPeakRev');
+  if (pRev && maxRevItem) pRev.innerText = `${maxRevItem.monthName.split(' ')[0]} ${maxRevItem.key.split('-')[0]} (${Math.round(maxRevItem.ciro).toLocaleString('tr-TR')} TL)`;
+
+  const pAdr = document.getElementById('kpiPeakAdr');
+  if (pAdr && maxAdrItem) pAdr.innerText = `${maxAdrItem.monthName.split(' ')[0]} ${maxAdrItem.key.split('-')[0]} (${Math.round(maxAdrItem.adr).toLocaleString('tr-TR')} TL)`;
+
+  const pNights = document.getElementById('kpiPeakNights');
+  if (pNights && maxNightsItem) pNights.innerText = `${maxNightsItem.monthName.split(' ')[0]} ${maxNightsItem.key.split('-')[0]} (${maxNightsItem.nights} Gece)`;
+
+  const pProfit = document.getElementById('kpiPeakProfit');
+  if (pProfit && maxProfitItem) pProfit.innerText = `${maxProfitItem.monthName.split(' ')[0]} ${maxProfitItem.key.split('-')[0]} (${Math.round(maxProfitItem.netProfit).toLocaleString('tr-TR')} TL)`;
+
+  // 2. Metric Buttons State & Chart Title
+  const metricConfigs = {
+    ciro: {
+      title: '💰 Aylara Göre Ciro Evrimi (TL)',
+      color: '#3B82F6',
+      activeBtnStyle: 'background: rgba(59,130,246,0.25); border-color: #3B82F6; color: #93C5FD; font-weight: 700;',
+      format: (val) => Math.round(val).toLocaleString('tr-TR') + ' ₺'
+    },
+    netProfit: {
+      title: '💵 Aylara Göre Net Nakit Kâr Dağılımı (TL)',
+      color: '#10B981',
+      activeBtnStyle: 'background: rgba(16,185,129,0.25); border-color: #10B981; color: #A7F3D0; font-weight: 700;',
+      format: (val) => Math.round(val).toLocaleString('tr-TR') + ' ₺'
+    },
+    adr: {
+      title: '🏷️ Aylara Göre Ortalama Günlük Satış Fiyatı - ADR (₺/Gece)',
+      color: '#F59E0B',
+      activeBtnStyle: 'background: rgba(245,158,11,0.25); border-color: #F59E0B; color: #FDE68A; font-weight: 700;',
+      format: (val) => Math.round(val).toLocaleString('tr-TR') + ' ₺'
+    },
+    occupancy: {
+      title: '🌙 Aylara Göre Doluluk Oranı Dağılımı (%)',
+      color: '#8B5CF6',
+      activeBtnStyle: 'background: rgba(139,92,246,0.25); border-color: #8B5CF6; color: #DDD6FE; font-weight: 700;',
+      format: (val) => '%' + Number(val).toFixed(1)
+    },
+    opex: {
+      title: '💸 Aylara Göre Toplam Giderler (OPEX + CAPEX) (TL)',
+      color: '#EC4899',
+      activeBtnStyle: 'background: rgba(236,72,153,0.25); border-color: #EC4899; color: #FBCFE8; font-weight: 700;',
+      format: (val) => Math.round(val).toLocaleString('tr-TR') + ' ₺'
+    }
+  };
+
+  const activeConf = metricConfigs[activeKpiTrackerMetric] || metricConfigs.ciro;
+  const titleEl = document.getElementById('kpiChartActiveTitle');
+  if (titleEl) titleEl.innerText = activeConf.title;
+
+  ['ciro', 'netProfit', 'adr', 'occupancy', 'opex'].forEach(mKey => {
+    const btn = document.getElementById('kpiTrackBtn-' + mKey);
+    if (btn) {
+      if (mKey === activeKpiTrackerMetric) {
+        btn.setAttribute('style', activeConf.activeBtnStyle);
+      } else {
+        btn.setAttribute('style', 'background: transparent; border-color: var(--border-color); color: var(--text-muted); font-weight: 500;');
+      }
+    }
+  });
+
+  // 3. Render Visual Monthly Bars
+  if (barsContainer) {
+    barsContainer.innerHTML = '';
+    
+    // Find max value for scaling
+    let maxVal = 1;
+    dataset.forEach(d => {
+      let val = 0;
+      if (activeKpiTrackerMetric === 'ciro') val = d.ciro;
+      else if (activeKpiTrackerMetric === 'netProfit') val = Math.max(0, d.netProfit);
+      else if (activeKpiTrackerMetric === 'adr') val = d.adr;
+      else if (activeKpiTrackerMetric === 'occupancy') val = d.occupancy;
+      else if (activeKpiTrackerMetric === 'opex') val = d.totalExp;
+      if (val > maxVal) maxVal = val;
+    });
+
+    dataset.forEach(d => {
+      let val = 0;
+      if (activeKpiTrackerMetric === 'ciro') val = d.ciro;
+      else if (activeKpiTrackerMetric === 'netProfit') val = d.netProfit;
+      else if (activeKpiTrackerMetric === 'adr') val = d.adr;
+      else if (activeKpiTrackerMetric === 'occupancy') val = d.occupancy;
+      else if (activeKpiTrackerMetric === 'opex') val = d.totalExp;
+
+      const pctOfMax = maxVal > 0 ? Math.max(6, Math.min(100, Math.round((Math.max(0, val) / maxVal) * 100))) : 6;
+      const barHeightPx = Math.round((pctOfMax / 100) * 95);
+
+      const parts = d.key.split('-');
+      const shortMonth = ALL_MONTH_NAMES[d.key] ? ALL_MONTH_NAMES[d.key].split(' ')[0].substring(0, 3) : parts[1];
+      const shortYear = parts[0].substring(2);
+      const isCurrentFilter = (currentFilter.period === d.key);
+
+      const barColor = (val < 0 && activeKpiTrackerMetric === 'netProfit') ? '#EF4444' : activeConf.color;
+      const borderStyle = isCurrentFilter ? 'border: 2px solid #FFFFFF; box-shadow: 0 0 12px ' + activeConf.color + ';' : 'border: 1px solid rgba(255,255,255,0.15);';
+
+      const barEl = document.createElement('div');
+      barEl.className = 'kpi-tracker-bar-col' + (isCurrentFilter ? ' active' : '');
+      barEl.style.cssText = 'flex: 1; min-width: 44px; max-width: 58px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; cursor: pointer; position: relative; transition: all 0.2s ease;';
+      barEl.title = `${d.monthName}\n${activeConf.title.split('(')[0].trim()}: ${activeConf.format(val)}\n(Bu ayın raporunu açmak için tıklayın)`;
+      barEl.onclick = () => filterByPeriod(d.key);
+
+      barEl.innerHTML = `
+        <div style="font-size: 10px; font-weight: 700; color: ${isCurrentFilter ? '#FFFFFF' : '#94A3B8'}; margin-bottom: 4px; white-space: nowrap; text-align: center;">
+          ${activeKpiTrackerMetric === 'occupancy' ? ('%' + Number(val).toFixed(0)) : (val >= 1000 ? Math.round(val / 1000) + 'k' : Math.round(val))}
+        </div>
+        <div class="kpi-bar-fill" style="width: 100%; height: ${barHeightPx}px; background: ${barColor}; opacity: ${isCurrentFilter ? '1' : '0.8'}; border-radius: 4px 4px 1px 1px; ${borderStyle}"></div>
+        <div style="font-size: 10px; color: ${isCurrentFilter ? '#60A5FA' : 'var(--text-muted)'}; font-weight: ${isCurrentFilter ? '800' : '500'}; margin-top: 6px; white-space: nowrap;">
+          ${shortMonth} ${shortYear}
+        </div>
+      `;
+
+      barsContainer.appendChild(barEl);
+    });
+  }
+
+  // 4. Render Table Body
+  if (tableBody) {
+    tableBody.innerHTML = '';
+
+    dataset.forEach(d => {
+      const isSelected = (currentFilter.period === d.key);
+      const rowStyle = isSelected 
+        ? 'background: rgba(59, 130, 246, 0.12); border-left: 4px solid #3B82F6;' 
+        : (d.isCurrentMonth ? 'background: rgba(16, 185, 129, 0.05);' : '');
+
+      let targetBadge = '<span style="color: var(--text-muted);">-</span>';
+      if (d.target > 0 && d.targetPct !== null) {
+        const isTargetWon = d.targetPct >= 100;
+        const color = isTargetWon ? '#34D399' : (d.targetPct >= 75 ? '#FBBF24' : '#F87171');
+        targetBadge = `
+          <div>
+            <span style="font-weight: 800; color: ${color};">%${d.targetPct}</span>
+            <div style="height: 4px; width: 60px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; margin-top: 2px;">
+              <div style="width: ${Math.min(100, d.targetPct)}%; height: 100%; background: ${color};"></div>
+            </div>
+          </div>
+        `;
+      }
+
+      const profitColor = d.netProfit >= 0 ? '#34D399' : '#F87171';
+      const marginBadge = d.margin >= 40 ? 'badge-green' : (d.margin >= 20 ? 'badge-blue' : (d.margin > 0 ? 'badge-yellow' : 'badge-red'));
+
+      let periodLabel = d.monthName;
+      if (d.isCurrentMonth) periodLabel += ' <span class="badge badge-green" style="font-size:10px; margin-left:4px;">GÜNCEL AY</span>';
+      if (d.key === '2026-01') periodLabel += ' <span class="badge badge-blue" style="font-size:10px; margin-left:4px;">REKOR CİRO</span>';
+      if (d.key === '2026-08') periodLabel += ' <span class="badge badge-yellow" style="font-size:10px; margin-left:4px;">HACİM LİDERİ</span>';
+      if (d.key === '2026-12') periodLabel += ' <span class="badge badge-purple" style="font-size:10px; margin-left:4px;">YILBAŞI 🎄</span>';
+
+      const tr = document.createElement('tr');
+      if (rowStyle) tr.setAttribute('style', rowStyle);
+
+      tr.innerHTML = `
+        <td style="font-weight: 700; white-space: nowrap;">${periodLabel}</td>
+        <td style="font-weight: 800; color: #60A5FA; white-space: nowrap;">${Math.round(d.ciro).toLocaleString('tr-TR')} ₺</td>
+        <td style="color: var(--text-muted); white-space: nowrap;">${d.target > 0 ? (Math.round(d.target).toLocaleString('tr-TR') + ' ₺') : '-'}</td>
+        <td style="white-space: nowrap;">${targetBadge}</td>
+        <td style="font-weight: 800; color: ${profitColor}; white-space: nowrap;">${Math.round(d.netProfit).toLocaleString('tr-TR')} ₺</td>
+        <td style="white-space: nowrap;"><span class="badge ${marginBadge}">%${d.margin}</span></td>
+        <td style="font-weight: 700; white-space: nowrap;">${d.nights} Gece</td>
+        <td style="font-weight: 700; white-space: nowrap;">%${d.occupancy}</td>
+        <td style="font-weight: 700; color: #FBBF24; white-space: nowrap;">${d.adr > 0 ? (Math.round(d.adr).toLocaleString('tr-TR') + ' ₺') : '-'}</td>
+        <td style="font-weight: 600; color: #DDD6FE; white-space: nowrap;">${d.revpar > 0 ? (Math.round(d.revpar).toLocaleString('tr-TR') + ' ₺') : '-'}</td>
+        <td style="color: #F87171; font-weight: 600; white-space: nowrap;">${Math.round(d.totalExp).toLocaleString('tr-TR')} ₺</td>
+        <td style="text-align: right; white-space: nowrap;">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="filterByPeriod('${d.key}')" style="padding: 4px 8px; font-size: 11px;">
+            🔍 ${isSelected ? 'Seçili' : 'Aya Git'}
+          </button>
+        </td>
+      `;
+
+      tableBody.appendChild(tr);
+    });
+  }
+}
