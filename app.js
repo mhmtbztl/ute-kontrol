@@ -5758,3 +5758,26 @@ function renderLeadAnalytics() {
     `;
   }
 }
+
+
+// =============================================================
+// HEADER AÇILIR MENÜLERİ YÖNETİMİ (HEADER DROPDOWNS)
+// =============================================================
+function toggleHeaderDropdown(menuId) {
+  const menu = document.getElementById(menuId);
+  const isOpen = menu && menu.classList.contains('show');
+  closeAllHeaderDropdowns();
+  if (!isOpen && menu) {
+    menu.classList.add('show');
+  }
+}
+
+function closeAllHeaderDropdowns() {
+  document.querySelectorAll('.header-dropdown-menu').forEach(m => m.classList.remove('show'));
+}
+
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.header-dropdown-wrap')) {
+    closeAllHeaderDropdowns();
+  }
+});

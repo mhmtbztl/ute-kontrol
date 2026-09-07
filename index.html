@@ -107,16 +107,102 @@
       </div>
     </div>
 
-    <div class="header-actions">
-      <button class="btn btn-primary" onclick="openBookingModal()">+ Rezervasyon</button>
-      <button class="btn btn-secondary" onclick="openExpenseModal()">+ Gider / Yatırım</button>
-      <button class="btn btn-secondary" onclick="openImportModal()">📥 Rapor Yükle</button>
-      <button class="btn btn-secondary" onclick="exportDataJSON()">💾 Yedek</button>
-      <button class="btn btn-secondary" onclick="openWhatsAppModal()" style="border-color: #25D366; color: #4ADE80; font-weight: 700;"><span style="font-size: 14px;">💬</span> WhatsApp'tan Aktar</button>
-      <button class="btn btn-secondary" onclick="openGoalsModal()">🎯 Hedef Belirle</button>
-      <button class="btn btn-secondary btn-sm" onclick="copySecretShareLink()" title="Şifresiz doğrudan erişim linkini kopyala">🔗 Yetkili Linki Al</button>
-      <button class="btn btn-secondary btn-sm" onclick="openHelpModal()" title="Hızlı Başlangıç & İşletmeci Kılavuzu">❓ Nasıl Kullanılır?</button>
-      <button class="btn btn-danger btn-sm" onclick="openResetModal()" title="Verileri sıfırla veya geri yükle">🗑️ Sıfırla</button>
+        <div class="header-actions">
+      <!-- Dropdown 1: Hızlı Ekle -->
+      <div class="header-dropdown-wrap">
+        <button type="button" class="btn btn-primary" onclick="toggleHeaderDropdown('quickAddMenu')" id="quickAddBtn" style="font-weight: 700;">
+          <span>➕</span> Hızlı Ekle <span style="font-size: 10px; margin-left: 2px;">▼</span>
+        </button>
+        <div class="header-dropdown-menu" id="quickAddMenu">
+          <button type="button" class="dropdown-item" onclick="openBookingModal(); closeAllHeaderDropdowns();">
+            <span class="dropdown-icon">📅</span>
+            <div>
+              <strong>Yeni Rezervasyon Girişi</strong>
+              <small>Giriş, çıkış, misafir ve fiyat kaydı</small>
+            </div>
+          </button>
+          <button type="button" class="dropdown-item" onclick="openExpenseModal(); closeAllHeaderDropdowns();">
+            <span class="dropdown-icon">💸</span>
+            <div>
+              <strong>Gider / Yatırım Ekle</strong>
+              <small>Opex veya Capex harcaması kaydedin</small>
+            </div>
+          </button>
+          <button type="button" class="dropdown-item highlight-green" onclick="openWhatsAppModal('parser'); closeAllHeaderDropdowns();">
+            <span class="dropdown-icon">💬</span>
+            <div>
+              <strong>WhatsApp'tan Mesaj Ayrıştır</strong>
+              <small>Mesajı yapıştırın, 2 saniyede çözülsün</small>
+            </div>
+          </button>
+          <button type="button" class="dropdown-item" onclick="openGoalsModal(); closeAllHeaderDropdowns();">
+            <span class="dropdown-icon">🎯</span>
+            <div>
+              <strong>Aylık Hedef Belirle</strong>
+              <small>Ciro, net kâr ve doluluk hedefleri</small>
+            </div>
+          </button>
+          <button type="button" class="dropdown-item" onclick="openLeadModal(); closeAllHeaderDropdowns();">
+            <span class="dropdown-icon">🎯</span>
+            <div>
+              <strong>Yeni Lead / Müşteri Talebi</strong>
+              <small>Fiyat soran misafir teklifi</small>
+            </div>
+          </button>
+          <button type="button" class="dropdown-item" onclick="openMaintModal(); closeAllHeaderDropdowns();">
+            <span class="dropdown-icon">🛠️</span>
+            <div>
+              <strong>Arıza / Bakım İşi Bildir</strong>
+              <small>P1 kritik veya rutin arıza kaydı</small>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Dropdown 2: Araçlar & Yönetim -->
+      <div class="header-dropdown-wrap">
+        <button type="button" class="btn btn-secondary" onclick="toggleHeaderDropdown('toolsMenu')" id="toolsBtn" style="font-weight: 700;">
+          <span>⚙️</span> Araçlar <span style="font-size: 10px; margin-left: 2px;">▼</span>
+        </button>
+        <div class="header-dropdown-menu" id="toolsMenu">
+          <button type="button" class="dropdown-item" onclick="openImportModal(); closeAllHeaderDropdowns();">
+            <span class="dropdown-icon">📥</span>
+            <div>
+              <strong>Excel / CSV Rapor Yükle</strong>
+              <small>Finansal verileri sisteme aktarın</small>
+            </div>
+          </button>
+          <button type="button" class="dropdown-item" onclick="exportDataJSON(); closeAllHeaderDropdowns();">
+            <span class="dropdown-icon">💾</span>
+            <div>
+              <strong>Veri Tabanı Yedeği İndir</strong>
+              <small>Tüm kayıtları JSON olarak indirin</small>
+            </div>
+          </button>
+          <button type="button" class="dropdown-item" onclick="copySecretShareLink(); closeAllHeaderDropdowns();">
+            <span class="dropdown-icon">🔗</span>
+            <div>
+              <strong>Yetkili Erişim Linkini Al</strong>
+              <small>Şifre ekranını atlayan gizli link</small>
+            </div>
+          </button>
+          <button type="button" class="dropdown-item" onclick="openHelpModal(); closeAllHeaderDropdowns();">
+            <span class="dropdown-icon">❓</span>
+            <div>
+              <strong>Nasıl Kullanılır?</strong>
+              <small>Günlük işletmeci rutini ve terimler</small>
+            </div>
+          </button>
+          <div class="dropdown-divider"></div>
+          <button type="button" class="dropdown-item text-danger" onclick="openResetModal(); closeAllHeaderDropdowns();">
+            <span class="dropdown-icon">🗑️</span>
+            <div>
+              <strong style="color: #F87171;">Verileri Sıfırla / Geri Yükle</strong>
+              <small>0 TL temiz başlangıç veya Excel yükle</small>
+            </div>
+          </button>
+        </div>
+      </div>
     </div>
   </header>
 

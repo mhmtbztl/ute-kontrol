@@ -2931,3 +2931,133 @@ body {
     font-weight: 600;
   }
 }
+
+
+/* ========================================================================== */
+/* 🔽 HEADER AÇILIR MENÜ (DROPDOWN MENUS) STİLLERİ                            */
+/* ========================================================================== */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.header-dropdown-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.header-dropdown-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: #151D2F;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
+  min-width: 270px;
+  max-width: 320px;
+  z-index: 1000;
+  padding: 6px;
+  flex-direction: column;
+  gap: 2px;
+  animation: dropdownFadeIn 0.18s ease-out;
+}
+
+@keyframes dropdownFadeIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.header-dropdown-menu.show {
+  display: flex !important;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: #FFFFFF;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s;
+  width: 100%;
+}
+
+.dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.dropdown-item.highlight-green:hover {
+  background: rgba(37, 211, 102, 0.15);
+}
+
+.dropdown-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  width: 26px;
+  text-align: center;
+}
+
+.dropdown-item strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: #FFFFFF;
+}
+
+.dropdown-item small {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.dropdown-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 4px 0;
+}
+
+/* Mobilde açılır menü alttan açılan şık bir sayfa (Action Sheet) gibi davranır */
+@media (max-width: 768px) {
+  .header-actions {
+    display: flex !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  .header-dropdown-wrap {
+    flex: 1 1 50% !important;
+    width: 50% !important;
+  }
+
+  .header-dropdown-wrap .btn {
+    width: 100% !important;
+    justify-content: center !important;
+    padding: 10px 8px !important;
+    font-size: 13px !important;
+  }
+
+  .header-dropdown-menu {
+    position: fixed !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    top: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 100% !important;
+    background: #0F172A !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    border-radius: 16px 16px 0 0 !important;
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.8) !important;
+    z-index: 10000 !important;
+    padding: 14px 14px 28px 14px !important;
+  }
+}
