@@ -1,4 +1,62 @@
-<!DOCTYPE html>
+
+  <!-- ========================================== -->
+  <!-- MODAL: TEMİZLİK / BORÇ KAYDI EKLE & DÜZENLE -->
+  <!-- ========================================== -->
+  <div class="modal-backdrop" id="cleaningTaskModal">
+    <div class="modal-card" style="max-width: 500px;">
+      <div class="modal-header">
+        <h3 id="cleaningTaskModalTitle">🧹 Temizlik & Personel Hakediş Kaydı</h3>
+        <button class="close-btn" onclick="closeCleaningTaskModal()">&times;</button>
+      </div>
+      <form id="cleaningTaskForm" onsubmit="saveCleaningTask(event)">
+        <input type="hidden" id="hkEditTaskId">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Villa / Mülk</label>
+            <select id="hkVilla" required>
+              <option value="SEYIR">Seyir Dağ Evi</option>
+              <option value="ZIRVE">Zirve Dağ Evi</option>
+              <option value="DOGUS">Doğuş Dağ Evi</option>
+              <option value="SIRIN">Şirin Dağ Evi</option>
+              <option value="NEFES">Nefes Dağ Evi</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Temizlik Tarihi</label>
+            <input type="date" id="hkDate" required>
+          </div>
+          <div class="form-group">
+            <label>Temizlik Personeli / Ekip</label>
+            <input type="text" id="hkCleaner" placeholder="Örn: Fatma Hanım, Ayşe Hanım" required>
+          </div>
+          <div class="form-group">
+            <label>Temizlik Ücreti (TL)</label>
+            <input type="number" id="hkAmount" step="50" min="0" placeholder="1500" required style="font-weight: 700; color: #60A5FA; font-size: 15px;">
+          </div>
+          <div class="form-group full-width">
+            <label>Açıklama / Misafir Çıkışı</label>
+            <input type="text" id="hkDesc" placeholder="Örn: Hakan Demir çıkışı sonrası rutin temizlik ve nevresim">
+          </div>
+          <div class="form-group full-width">
+            <label>Ödeme Durumu</label>
+            <select id="hkPaidStatus" required>
+              <option value="PENDING">⏳ Ödenecek (Personele Borç)</option>
+              <option value="PAID">✅ Ödendi (Kapatıldı & Gider Tablosuna Ekle)</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px;">
+          <button type="button" class="btn btn-danger btn-sm" id="hkDeleteBtn" onclick="deleteCleaningTaskFromModal()" style="display: none;">🗑️ Sil</button>
+          <div style="display: flex; gap: 8px; margin-left: auto;">
+            <button type="button" class="btn btn-secondary" onclick="closeCleaningTaskModal()">Vazgeç</button>
+            <button type="submit" class="btn btn-primary" id="hkSaveBtn">Kaydet</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!DOCTYPE html>
 <html lang="tr">
 <head>
   <meta charset="UTF-8">
@@ -126,6 +184,13 @@
               <small>Giriş, çıkış, misafir ve fiyat kaydı</small>
             </div>
           </button>
+          <button type="button" class="dropdown-item" onclick="openNewCleaningTaskModal(); closeAllHeaderDropdowns();">
+            <span class="dropdown-icon">🧹</span>
+            <div>
+              <strong>Temizlik & Borç Kaydı Ekle</strong>
+              <small>Personel temizlik hakedişi ve ödeme takibi</small>
+            </div>
+          </button>
           <button type="button" class="dropdown-item" onclick="openExpenseModal(); closeAllHeaderDropdowns();">
             <span class="dropdown-icon">💸</span>
             <div>
@@ -218,6 +283,7 @@
     <button class="tab-btn" onclick="switchTab('channels')">🌐 OTA & Kanal Radarı</button>
     <button class="tab-btn" onclick="switchTab('reservations')">📅 Rezervasyonlar (<span id="rezCountBadge">0</span>)</button>
     <button class="tab-btn" onclick="switchTab('expenses')">💸 Gider Defteri (<span id="expenseCountBadge">0</span>)</button>
+    <button class="tab-btn" onclick="switchTab('housekeeping')">🧹 Temizlik & Borç (<span id="cleanDebtBadge" style="color: #FBBF24; font-weight: 700;">₺0 Borç</span>)</button>
     <button class="tab-btn" onclick="switchTab('leads')">🎯 Lead & Satış (<span id="leadCountBadge">0</span>)</button>
     <button class="tab-btn" onclick="switchTab('maintenance')">🛠️ Bakım & P1 (<span id="maintCountBadge">0</span>)</button>
     <button class="tab-btn" onclick="switchTab('settings')">⚙️ Ayarlar & Hedefler</button>
@@ -970,6 +1036,14 @@
               <span class="badge badge-amber" id="todayHousekeepingBadge">5 Villa</span>
             </div>
             <div id="todayHousekeepingList"></div>
+            <div id="kokpitHkFooter" style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 11px; color: #FBBF24; font-weight: 600;">
+                ⏳ Temizlik Borcu: <strong id="kokpitCleanDebtSummary" style="color: #FBBF24;">₺0</strong>
+              </span>
+              <button class="btn btn-secondary btn-sm" onclick="switchTab('housekeeping')" style="font-size: 10px; padding: 3px 8px;" title="Tüm Temizlik ve Borç Defterini Aç">
+                🧹 Borç Defteri ›
+              </button>
+            </div>
           </div>
         </div>
       </section>
