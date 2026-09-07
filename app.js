@@ -3140,10 +3140,17 @@ function renderAll() {
   renderHousekeepingTab();
 
   // Badges
+  // Badges (Seçili Dönem Filtresine Göre Dinamik Sayım)
   const rBadge = document.getElementById('rezCountBadge');
-  if (rBadge) rBadge.innerText = appData.bookings.length;
+  if (rBadge) {
+    const activeBookings = (appData.bookings || []).filter(b => isBookingInFilter(b));
+    rBadge.innerText = activeBookings.length;
+  }
   const eBadge = document.getElementById('expenseCountBadge');
-  if (eBadge) eBadge.innerText = appData.expenses.length;
+  if (eBadge) {
+    const activeExpenses = (appData.expenses || []).filter(exp => isExpenseInFilter(exp));
+    eBadge.innerText = activeExpenses.length;
+  }
   const lBadge = document.getElementById('leadCountBadge');
   if (lBadge) lBadge.innerText = appData.leads.length;
   const mBadge = document.getElementById('maintCountBadge');
