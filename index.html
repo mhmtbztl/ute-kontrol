@@ -60,22 +60,38 @@
       <div class="filter-group">
         <label>DÖNEM:</label>
         <select id="globalPeriodFilter" onchange="handleFilterChange()">
-          <option value="2025-07">Temmuz 2025</option>
-          <option value="2025-08">Ağustos 2025</option>
-          <option value="2025-09">Eylül 2025</option>
-          <option value="2025-10">Ekim 2025</option>
-          <option value="2025-11">Kasım 2025</option>
-          <option value="2025-12">Aralık 2025</option>
-          <option value="2026-01">Ocak 2026</option>
-          <option value="2026-02">Şubat 2026</option>
-          <option value="2026-03">Mart 2026</option>
-          <option value="2026-04">Nisan 2026</option>
-          <option value="2026-05">Mayıs 2026</option>
-          <option value="2026-06">Haziran 2026</option>
+          <option value="2026-09" selected>Eylül 2026 (Güncel Aktif Ay)</option>
+          <option value="2026-10">Ekim 2026</option>
+          <option value="2026-11">Kasım 2026</option>
+          <option value="2026-12">Aralık 2026 (Yılbaşı Sezonu 🎄)</option>
+          <option value="2027-01">Ocak 2027 (Kış Zirvesi / Sömestr ❄️)</option>
+          <option value="2027-02">Şubat 2027 (Kayak Sezonu ⛷️)</option>
+          <option value="2027-03">Mart 2027</option>
+          <option value="2027-04">Nisan 2027</option>
+          <option value="2027-05">Mayıs 2027</option>
+          <option value="2027-06">Haziran 2027</option>
+          <option value="2027-07">Temmuz 2027</option>
+          <option value="2027-08">Ağustos 2027</option>
+          <option value="2027-09">Eylül 2027</option>
+          <option value="2027-10">Ekim 2027</option>
+          <option value="2027-11">Kasım 2027</option>
+          <option value="2027-12">Aralık 2027 (Yılbaşı 2028)</option>
+          <option value="ALL">Tüm Zamanlar (Tüm Veriler)</option>
+          <!-- Geçmiş Aylar (Resmi Şirket Veritabanı) -->
+          <option value="2026-08">Ağustos 2026</option>
           <option value="2026-07">Temmuz 2026</option>
-          <option value="2026-08" selected>Ağustos 2026</option>
-          <option value="2026-09">Eylül 2026</option>
-          <option value="ALL">Tüm Zamanlar (14 Ay - 5.004.165 TL Ciro)</option>
+          <option value="2026-06">Haziran 2026</option>
+          <option value="2026-05">Mayıs 2026</option>
+          <option value="2026-04">Nisan 2026</option>
+          <option value="2026-03">Mart 2026</option>
+          <option value="2026-02">Şubat 2026</option>
+          <option value="2026-01">Ocak 2026</option>
+          <option value="2025-12">Aralık 2025</option>
+          <option value="2025-11">Kasım 2025</option>
+          <option value="2025-10">Ekim 2025</option>
+          <option value="2025-09">Eylül 2025</option>
+          <option value="2025-08">Ağustos 2025</option>
+          <option value="2025-07">Temmuz 2025</option>
         </select>
       </div>
       <div class="filter-group">
@@ -128,9 +144,9 @@
         <div class="month-stepper">
           <button class="stepper-arrow-btn" onclick="stepMonth(-1)" title="Önceki Ay">‹</button>
           <div class="month-stepper-display">
-            <span class="stepper-sub-prev" id="stepperPrevLabel">Temmuz 2026</span>
-            <strong class="stepper-current" id="stepperCurrentLabel">Ağustos 2026</strong>
-            <span class="stepper-sub-next" id="stepperNextLabel">Eylül 2026</span>
+            <span class="stepper-sub-prev" id="stepperPrevLabel">Ağustos 2026</span>
+            <strong class="stepper-current" id="stepperCurrentLabel">Eylül 2026</strong>
+            <span class="stepper-sub-next" id="stepperNextLabel">Ekim 2026</span>
           </div>
           <button class="stepper-arrow-btn" onclick="stepMonth(1)" title="Sonraki Ay">›</button>
         </div>
@@ -892,30 +908,105 @@
       <section class="card tape-chart-card">
         <div class="section-title-bar">
           <div>
-            <h2>📅 30 GÜNLÜK GÖRSEL DOLULUK ÇİZELGESİ (TAPE CHART)</h2>
-            <p class="sub-text">5 villanın yatay takvim şeritleri, dolu/boş günleri ve gap boşlukları</p>
+            <h2>📅 VİLLA DOLULUK VE REZERVASYON TAKVİMİ (TAPE CHART)</h2>
+            <p class="sub-text">5 villanın gün gün doluluk durumu. Boş günlere tıklayarak doğrudan rezervasyon girebilirsiniz.</p>
           </div>
           <div style="display: flex; gap: 12px; align-items: center; font-size: 11px;">
             <span style="display: inline-flex; align-items: center; gap: 4px;"><span style="width: 10px; height: 10px; border-radius: 2px; background: #E11D48;"></span> Airbnb</span>
             <span style="display: inline-flex; align-items: center; gap: 4px;"><span style="width: 10px; height: 10px; border-radius: 2px; background: #1D4ED8;"></span> Booking</span>
-            <span style="display: inline-flex; align-items: center; gap: 4px;"><span style="width: 10px; height: 10px; border-radius: 2px; background: #059669;"></span> WhatsApp/Direkt</span>
+            <span style="display: inline-flex; align-items: center; gap: 4px;"><span style="width: 10px; height: 10px; border-radius: 2px; background: #059669;"></span> WhatsApp / Direkt</span>
           </div>
         </div>
+
+        <!-- Takvim Gezinme ve Hızlı Atlama Araç Çubuğu -->
+        <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); padding: 12px 16px; border-radius: 8px; margin-top: 10px; margin-bottom: 12px; flex-wrap: wrap; gap: 10px; border: 1px solid rgba(255,255,255,0.08);">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="stepTapeChartMonth(-1)" title="Önceki Ay">‹ Önceki Ay</button>
+            <select id="tapeChartMonthSelect" onchange="setTapeChartMonth(this.value)" style="padding: 7px 14px; background: #1E293B; border: 1px solid rgba(255,255,255,0.25); border-radius: 6px; color: #fff; font-weight: 700; font-size: 13px; cursor: pointer;">
+              <!-- Populated dynamically via JS -->
+            </select>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="stepTapeChartMonth(1)" title="Sonraki Ay">Sonraki Ay ›</button>
+          </div>
+          
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="setTapeChartMonth('2026-09')">📅 Güncel Ay (Eylül 2026)</button>
+            <button type="button" class="btn btn-primary btn-sm" onclick="setTapeChartMonth('2026-12')" style="background: linear-gradient(135deg, #D97706, #B45309); border-color: #F59E0B; font-weight: 700;">🎄 Yılbaşına Git (Aralık 2026)</button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="setTapeChartMonth('2027-01')">❄️ Ocak 2027 (Kış Zirvesi)</button>
+          </div>
+        </div>
+
         <div class="tape-chart-wrapper" id="tapeChartContainer"></div>
       </section>
 
       <section class="card">
         <div class="section-title-bar">
-          <div><h2>📋 DETAYLI REZERVASYON LİSTESİ</h2><p class="sub-text">Tüm geçmiş ve gelecek rezervasyonları düzenleyin, silin veya filtreleyin.</p></div>
-          <div class="table-actions">
-            <input type="text" id="rezSearchInput" placeholder="🔍 Misafir veya Villa ara..." oninput="renderManageBookingsTable()">
-            <button class="btn btn-primary" onclick="openBookingModal()">+ Yeni Rezervasyon</button>
+          <div>
+            <h2>📋 TÜM REZERVASYONLAR LİSTESİ</h2>
+            <p class="sub-text">Geçmiş, güncel ve yılbaşı dahil tüm gelecek rezervasyonlar. Düzenleyin, silin veya filtreleyin.</p>
+          </div>
+          <button class="btn btn-primary" onclick="openBookingModal()">+ Yeni Rezervasyon Ekle</button>
+        </div>
+
+        <!-- Rezervasyon Tablosu Filtreleme ve Arama Çubuğu -->
+        <div style="display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; background: rgba(0,0,0,0.25); padding: 12px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
+          <div style="flex: 1; min-width: 200px;">
+            <input type="text" id="rezSearchInput" placeholder="🔍 Misafir adı veya villa ara..." oninput="renderManageBookingsTable()" style="width: 100%; padding: 8px 12px; background: rgba(30,41,59,0.8); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff;">
+          </div>
+          <div>
+            <select id="rezPeriodFilter" onchange="renderManageBookingsTable()" style="padding: 8px 12px; background: rgba(30,41,59,0.9); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px;">
+              <option value="ALL" selected>Tüm Rezervasyonlar (Tarih Bağımsız)</option>
+              <option value="UPCOMING">Gelecek & Aktif Rezervasyonlar</option>
+              <option value="2026-09">Eylül 2026 (Güncel Ay)</option>
+              <option value="2026-10">Ekim 2026</option>
+              <option value="2026-11">Kasım 2026</option>
+              <option value="2026-12">Aralık 2026 (Yılbaşı Sezonu 🎄)</option>
+              <option value="2027-01">Ocak 2027 (Kış Zirvesi ❄️)</option>
+              <option value="2027-02">Şubat 2027</option>
+              <option value="2026-08">Ağustos 2026</option>
+            </select>
+          </div>
+          <div>
+            <select id="rezVillaFilter" onchange="renderManageBookingsTable()" style="padding: 8px 12px; background: rgba(30,41,59,0.9); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px;">
+              <option value="ALL" selected>Tüm Villalar</option>
+              <option value="SEYIR">Seyir Dağ Evi</option>
+              <option value="DOGUS">Doğuş Dağ Evi</option>
+              <option value="ZIRVE">Zirve Dağ Evi</option>
+              <option value="SIRIN">Şirin Dağ Evi</option>
+              <option value="NEFES">Nefes Dağ Evi</option>
+            </select>
+          </div>
+          <div>
+            <select id="rezStatusFilter" onchange="renderManageBookingsTable()" style="padding: 8px 12px; background: rgba(30,41,59,0.9); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px;">
+              <option value="ALL" selected>Tüm Durumlar</option>
+              <option value="CONFIRMED">Onaylandı</option>
+              <option value="CHECKED_IN">İçeride (Konaklıyor)</option>
+              <option value="COMPLETED">Tamamlandı</option>
+              <option value="CANCELLED">İptal</option>
+            </select>
+          </div>
+          <div id="rezTableSummaryPill" style="font-size: 12px; color: #93C5FD; font-weight: 700; padding: 4px 8px; background: rgba(59,130,246,0.15); border-radius: 6px;">
+            <!-- Rendered dynamically -->
           </div>
         </div>
+
         <div class="table-responsive">
           <table class="data-table">
             <thead>
-              <tr><th>VİLLA</th><th>MİSAFİR</th><th>KANAL</th><th>GİRİŞ</th><th>ÇIKIŞ</th><th>GECE</th><th>BRÜT (₺)</th><th>KOMİSYON (₺)</th><th>TEMİZLİK (₺)</th><th>NET ODA (₺)</th><th>GECELİK (₺)</th><th>DURUM</th><th style="text-align: right;">İŞLEM</th></tr>
+              <tr>
+                <th>VİLLA</th>
+                <th>MİSAFİR</th>
+                <th>KANAL</th>
+                <th>GİRİŞ</th>
+                <th>ÇIKIŞ</th>
+                <th>GECE</th>
+                <th>BRÜT (₺)</th>
+                <th>KOMİSYON (₺)</th>
+                <th>TEMİZLİK (₺)</th>
+                <th>NET ODA (₺)</th>
+                <th>GECELİK (₺)</th>
+                <th>DURUM</th>
+                <th style="text-align: right;">İŞLEM</th>
+              </tr>
             </thead>
             <tbody id="manageBookingsTableBody"></tbody>
           </table>

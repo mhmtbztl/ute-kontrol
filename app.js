@@ -2755,6 +2755,10 @@ const DEFAULT_BOOKINGS = [
   { id: 'REZ-AUG-008', villa: 'SIRIN', guest: 'Kaan Demir', checkIn: '2026-08-16', checkOut: '2026-08-28', nights: 12, channel: 'WHATSAPP', gross: 32000, otaComm: 0, cleanFee: 0, net: 32000, pax: 6, status: 'COMPLETED' },
   { id: 'REZ-AUG-009', villa: 'NEFES', guest: 'Turgut Baran', checkIn: '2026-08-08', checkOut: '2026-08-12', nights: 4, channel: 'WHATSAPP', gross: 34035, otaComm: 0, cleanFee: 0, net: 34035, pax: 12, status: 'COMPLETED' },
 
+  // Aralık 2026 - Yılbaşı Rezervasyonları (Kullanıcının tutulan 2 evi)
+  { id: 'REZ-NY-001', villa: 'ZIRVE', guest: 'Yılbaşı Konuğu 1 (Zirve Dağ Evi)', checkIn: '2026-12-31', checkOut: '2027-01-03', nights: 3, channel: 'WHATSAPP', gross: 90000, otaComm: 0, cleanFee: 0, net: 90000, pax: 8, status: 'CONFIRMED' },
+  { id: 'REZ-NY-002', villa: 'DOGUS', guest: 'Yılbaşı Konuğu 2 (Doğuş Dağ Evi)', checkIn: '2026-12-31', checkOut: '2027-01-03', nights: 3, channel: 'WHATSAPP', gross: 75000, otaComm: 0, cleanFee: 0, net: 75000, pax: 10, status: 'CONFIRMED' },
+
   // Eylül 2026 Bookings
   { id: 'REZ-SEP-001', villa: 'SEYIR', guest: 'Hakan Demir', checkIn: '2026-09-01', checkOut: '2026-09-04', nights: 3, channel: 'AIRBNB', gross: 28000, otaComm: 4200, cleanFee: 1500, net: 22300, pax: 6, status: 'COMPLETED' },
   { id: 'REZ-SEP-002', villa: 'DOGUS', guest: 'Murat Kaya', checkIn: '2026-09-03', checkOut: '2026-09-06', nights: 3, channel: 'WHATSAPP', gross: 36000, otaComm: 0, cleanFee: 0, net: 36000, pax: 10, status: 'COMPLETED' },
@@ -2798,7 +2802,7 @@ let appData = {
 
 // Global Active Filter
 let currentFilter = {
-  period: '2026-08',
+  period: '2026-09',
   villa: 'ALL'
 };
 
@@ -2815,6 +2819,13 @@ function loadAppData() {
       if (!appData.villas) appData.villas = JSON.parse(JSON.stringify(DEFAULT_VILLAS));
       if (!appData.targets) appData.targets = {};
       if (!appData.bookings) appData.bookings = [];
+      // Ensure New Year bookings exist
+      if (!appData.bookings.some(b => b.id === 'REZ-NY-001')) {
+        appData.bookings.push({ id: 'REZ-NY-001', villa: 'ZIRVE', guest: 'Yılbaşı Konuğu 1 (Zirve Dağ Evi)', checkIn: '2026-12-31', checkOut: '2027-01-03', nights: 3, channel: 'WHATSAPP', gross: 90000, otaComm: 0, cleanFee: 0, net: 90000, pax: 8, status: 'CONFIRMED' });
+      }
+      if (!appData.bookings.some(b => b.id === 'REZ-NY-002')) {
+        appData.bookings.push({ id: 'REZ-NY-002', villa: 'DOGUS', guest: 'Yılbaşı Konuğu 2 (Doğuş Dağ Evi)', checkIn: '2026-12-31', checkOut: '2027-01-03', nights: 3, channel: 'WHATSAPP', gross: 75000, otaComm: 0, cleanFee: 0, net: 75000, pax: 10, status: 'CONFIRMED' });
+      }
       if (!appData.expenses) appData.expenses = [];
       if (!appData.leads) appData.leads = [];
       if (!appData.maintenance) appData.maintenance = [];
@@ -2859,7 +2870,9 @@ function saveAppData() {
 const ALL_FINANCIAL_MONTHS = [
   '2025-07', '2025-08', '2025-09', '2025-10', '2025-11', '2025-12',
   '2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06',
-  '2026-07', '2026-08', '2026-09'
+  '2026-07', '2026-08', '2026-09', '2026-10', '2026-11', '2026-12',
+  '2027-01', '2027-02', '2027-03', '2027-04', '2027-05', '2027-06',
+  '2027-07', '2027-08', '2027-09', '2027-10', '2027-11', '2027-12'
 ];
 
 const ALL_MONTH_NAMES = {
@@ -2877,8 +2890,23 @@ const ALL_MONTH_NAMES = {
   '2026-06': 'Haziran 2026',
   '2026-07': 'Temmuz 2026',
   '2026-08': 'Ağustos 2026',
-  '2026-09': 'Eylül 2026',
-  'ALL': 'Tüm Zamanlar (14 Ay)'
+  '2026-09': 'Eylül 2026 (Güncel Ay)',
+  '2026-10': 'Ekim 2026',
+  '2026-11': 'Kasım 2026',
+  '2026-12': 'Aralık 2026 (Yılbaşı Sezonu 🎄)',
+  '2027-01': 'Ocak 2027 (Kış Zirvesi ❄️)',
+  '2027-02': 'Şubat 2027 (Kayak Sezonu ⛷️)',
+  '2027-03': 'Mart 2027',
+  '2027-04': 'Nisan 2027',
+  '2027-05': 'Mayıs 2027',
+  '2027-06': 'Haziran 2027',
+  '2027-07': 'Temmuz 2027',
+  '2027-08': 'Ağustos 2027',
+  '2027-09': 'Eylül 2027',
+  '2027-10': 'Ekim 2027',
+  '2027-11': 'Kasım 2027',
+  '2027-12': 'Aralık 2027 (Yılbaşı 2028)',
+  'ALL': 'Tüm Zamanlar'
 };
 
 function handleFilterChange() {
@@ -3031,6 +3059,10 @@ function renderFinanceModule() {
         avgRevPerNight = mf.avgDaily ? Math.round(mf.avgDaily) : (totalSoldNights > 0 ? Math.round(totalRevenue / totalSoldNights) : 0);
         const userPeriodTarget = (appData.targets && appData.targets[currentFilter.period]) ? appData.targets[currentFilter.period].revenue : null;
         targetRev = userPeriodTarget || activeExcel.targets[currentFilter.period] || 300000;
+      } else {
+        // Current or Future Month (e.g. 2026-09, 2026-10, 2026-12 Yılbaşı): Read from real-time bookings & expenses
+        const userPeriodTarget = (appData.targets && appData.targets[currentFilter.period]) ? appData.targets[currentFilter.period].revenue : null;
+        targetRev = userPeriodTarget || (activeExcel && activeExcel.targets ? activeExcel.targets[currentFilter.period] : null) || (currentFilter.period === '2026-12' ? 1200000 : 350000);
       }
 
       if (pm && pm.villas) {
@@ -3071,7 +3103,9 @@ function renderFinanceModule() {
     manualBookingRev += bNet;
     manualBookingNights += bNights;
 
-    if (!activeExcel) {
+    // If no static excel record for this month (e.g. September, December Yılbaşı), populate stats from bookings
+    const hasStaticExcel = (activeExcel && activeExcel.monthlyFinancials && activeExcel.monthlyFinancials[currentFilter.period]);
+    if (!hasStaticExcel) {
       if (propStats[b.villa]) {
         propStats[b.villa].revenue += bNet;
         propStats[b.villa].nights += bNights;
@@ -3079,12 +3113,12 @@ function renderFinanceModule() {
     }
   });
 
-  if (!activeExcel) {
+  const hasStaticExcelMonth = (activeExcel && activeExcel.monthlyFinancials && activeExcel.monthlyFinancials[currentFilter.period]);
+  if (!hasStaticExcelMonth) {
     totalRevenue = manualBookingRev;
     totalSoldNights = manualBookingNights;
     avgRevPerNight = totalSoldNights > 0 ? Math.round(totalRevenue / totalSoldNights) : 0;
-    targetRev = (appData.targets && appData.targets[currentFilter.period]) ? (appData.targets[currentFilter.period].revenue || 0) : 0;
-
+    
     const daysInPeriod = currentFilter.period === 'ALL' ? (14 * 30) : 30;
     Object.keys(propStats).forEach(vKey => {
       const s = propStats[vKey];
@@ -4057,7 +4091,23 @@ function deleteExpense(id) {
 // HEDEFLER DÜZENLEME (GOALS MODAL & SETTINGS)
 // -------------------------------------------------------------
 const GOAL_MONTHS = [
-  { id: '2026-08', name: 'Ağustos 2026 (Aktif Ay)' },
+  { id: '2026-09', name: 'Eylül 2026 (Güncel Aktif Ay)' },
+  { id: '2026-10', name: 'Ekim 2026' },
+  { id: '2026-11', name: 'Kasım 2026' },
+  { id: '2026-12', name: 'Aralık 2026 (Yılbaşı Sezonu 🎄)' },
+  { id: '2027-01', name: 'Ocak 2027 (Kış Zirvesi ❄️)' },
+  { id: '2027-02', name: 'Şubat 2027 (Kayak Sezonu ⛷️)' },
+  { id: '2027-03', name: 'Mart 2027' },
+  { id: '2027-04', name: 'Nisan 2027' },
+  { id: '2027-05', name: 'Mayıs 2027' },
+  { id: '2027-06', name: 'Haziran 2027' },
+  { id: '2027-07', name: 'Temmuz 2027' },
+  { id: '2027-08', name: 'Ağustos 2027' },
+  { id: '2027-09', name: 'Eylül 2027' },
+  { id: '2027-10', name: 'Ekim 2027' },
+  { id: '2027-11', name: 'Kasım 2027' },
+  { id: '2027-12', name: 'Aralık 2027' },
+  { id: '2026-08', name: 'Ağustos 2026' },
   { id: '2026-07', name: 'Temmuz 2026' },
   { id: '2026-06', name: 'Haziran 2026' },
   { id: '2026-05', name: 'Mayıs 2026' },
@@ -4501,45 +4551,99 @@ function renderManageBookingsTable() {
   tbody.innerHTML = '';
 
   const search = (document.getElementById('rezSearchInput')?.value || '').toLowerCase();
+  const periodFilter = document.getElementById('rezPeriodFilter')?.value || 'ALL';
+  const villaFilter = document.getElementById('rezVillaFilter')?.value || 'ALL';
+  const statusFilter = document.getElementById('rezStatusFilter')?.value || 'ALL';
 
+  const todayStr = '2026-09-07';
+
+  let totalGross = 0;
+  let totalNet = 0;
+  let totalNights = 0;
+
+  // Filter bookings
   const filtered = appData.bookings.filter(b => {
-    if (!isBookingInFilter(b)) return false;
-    if (!search) return true;
-    const vName = (appData.villas[b.villa]?.name || b.villa).toLowerCase();
-    const gName = (b.guest || '').toLowerCase();
-    return vName.includes(search) || gName.includes(search);
+    // Villa Filter
+    if (villaFilter !== 'ALL' && b.villa !== villaFilter) return false;
+    
+    // Status Filter
+    if (statusFilter !== 'ALL' && b.status !== statusFilter) return false;
+
+    // Period Filter
+    if (periodFilter === 'UPCOMING') {
+      if (b.checkOut < todayStr) return false;
+    } else if (periodFilter !== 'ALL') {
+      const bInMonth = b.checkIn.slice(0, 7);
+      const bOutMonth = b.checkOut.slice(0, 7);
+      if (bInMonth !== periodFilter && bOutMonth !== periodFilter) return false;
+    }
+
+    // Search
+    if (search) {
+      const vName = (appData.villas[b.villa]?.name || b.villa).toLowerCase();
+      const gName = (b.guest || '').toLowerCase();
+      const chName = (b.channel || '').toLowerCase();
+      if (!vName.includes(search) && !gName.includes(search) && !chName.includes(search)) return false;
+    }
+
+    return true;
   });
 
+  // Sort: Upcoming and current first, then by checkIn ascending
+  filtered.sort((a, b) => a.checkIn.localeCompare(b.checkIn));
+
+  // Update Summary Pill
+  filtered.forEach(b => {
+    if (b.status !== 'CANCELLED') {
+      totalGross += Number(b.gross) || 0;
+      totalNet += Number(b.net) || 0;
+      totalNights += Number(b.nights) || 0;
+    }
+  });
+
+  const summaryPill = document.getElementById('rezTableSummaryPill');
+  if (summaryPill) {
+    summaryPill.innerHTML = `📊 Gösterilen: <strong>${filtered.length} Rezervasyon</strong> | 🌙 ${totalNights} Gece | 💰 Net: ${totalNet.toLocaleString('tr-TR')} TL`;
+  }
+
   if (filtered.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="13" style="text-align:center; padding: 25px; color: var(--color-slate-400);">Kayıtlı rezervasyon bulunmamaktadır. "+ Rezervasyon" butonu ile yeni kayıt ekleyebilirsiniz.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="13" style="text-align:center; padding: 30px; color: var(--color-slate-400);">Kriterlere uygun rezervasyon bulunamadı. "+ Yeni Rezervasyon Ekle" butonu ile ekleyebilirsiniz.</td></tr>';
     return;
   }
+
   filtered.forEach(b => {
     const vName = appData.villas[b.villa]?.name || b.villa;
-    const nightly = b.nights > 0 ? Math.round(b.net / b.nights) : 0;
+    const nightly = b.nights > 0 ? Math.round((b.net || b.gross) / b.nights) : 0;
 
     let statusBadge = '<span class="badge badge-green">Onaylandı</span>';
     if (b.status === 'CANCELLED') statusBadge = '<span class="badge badge-rose">İptal</span>';
     if (b.status === 'CHECKED_IN') statusBadge = '<span class="badge badge-blue">İçeride</span>';
-    if (b.status === 'COMPLETED') statusBadge = '<span class="badge badge-amber">Tamamlandı</span>';
+    if (b.status === 'COMPLETED') statusBadge = '<span class="badge badge-slate">Tamamlandı</span>';
+
+    // Highlight New Year / future special dates
+    const isNewYear = (b.checkIn.includes('2026-12') || b.checkOut.includes('2027-01'));
 
     const tr = document.createElement('tr');
+    if (isNewYear) {
+      tr.style.background = 'rgba(217, 119, 6, 0.08)';
+    }
+
     tr.innerHTML = `
-      <td><strong>${vName}</strong></td>
+      <td><strong>${vName}</strong> ${isNewYear ? ' <span class="badge badge-amber" style="font-size:10px;">🎄 Yılbaşı</span>' : ''}</td>
       <td>${b.guest}</td>
-      <td><span class="badge ${['WHATSAPP','INSTAGRAM','WEBSITE'].includes(b.channel) ? 'badge-green' : 'badge-blue'}">${b.channel}</span></td>
+      <td><span class="badge ${b.channel === 'AIRBNB' ? 'badge-rose' : (b.channel === 'BOOKING' ? 'badge-blue' : 'badge-emerald')}">${b.channel}</span></td>
       <td>${b.checkIn}</td>
       <td>${b.checkOut}</td>
-      <td>${b.nights}</td>
-      <td>₺${Number(b.gross).toLocaleString('tr-TR')}</td>
-      <td>₺${Number(b.otaComm).toLocaleString('tr-TR')}</td>
-      <td>₺${Number(b.cleanFee).toLocaleString('tr-TR')}</td>
-      <td><strong>₺${Number(b.net).toLocaleString('tr-TR')}</strong></td>
-      <td>₺${nightly.toLocaleString('tr-TR')}</td>
+      <td><strong>${b.nights}</strong></td>
+      <td>${Number(b.gross).toLocaleString('tr-TR')} ₺</td>
+      <td>${Number(b.otaComm || 0).toLocaleString('tr-TR')} ₺</td>
+      <td>${Number(b.cleanFee || 0).toLocaleString('tr-TR')} ₺</td>
+      <td style="color: #34D399; font-weight: 700;">${Number(b.net).toLocaleString('tr-TR')} ₺</td>
+      <td>${nightly.toLocaleString('tr-TR')} ₺</td>
       <td>${statusBadge}</td>
       <td style="text-align: right; white-space: nowrap;">
-        <button class="btn btn-secondary btn-sm" onclick="editBooking('${b.id}')">✏️</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteBooking('${b.id}')">🗑️</button>
+        <button class="btn btn-secondary btn-sm" onclick="editBooking('${b.id}')" title="Düzenle">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteBooking('${b.id}')" title="Sil">🗑️</button>
       </td>
     `;
     tbody.appendChild(tr);
@@ -5118,19 +5222,73 @@ function toggleHkStatus(vKey) {
 // -------------------------------------------------------------
 // 📅 30 GÜNLÜK GÖRSEL DOLULUK ÇİZELGESİ (TAPE CHART)
 // -------------------------------------------------------------
+let tapeChartMonth = '2026-09';
+
+function populateTapeChartMonthSelect() {
+  const select = document.getElementById('tapeChartMonthSelect');
+  if (!select) return;
+  select.innerHTML = '';
+
+  ALL_FINANCIAL_MONTHS.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m;
+    let label = ALL_MONTH_NAMES[m] || m;
+    if (m === '2026-09') label = 'Eylül 2026 (Güncel Ay)';
+    if (m === '2026-12') label = 'Aralık 2026 (Yılbaşı 🎄)';
+    if (m === '2027-01') label = 'Ocak 2027 (Kış Zirvesi ❄️)';
+    opt.textContent = label;
+    select.appendChild(opt);
+  });
+
+  select.value = tapeChartMonth;
+}
+
+function setTapeChartMonth(month) {
+  tapeChartMonth = month;
+  const select = document.getElementById('tapeChartMonthSelect');
+  if (select) select.value = month;
+  renderTapeChart();
+}
+
+function stepTapeChartMonth(delta) {
+  let idx = ALL_FINANCIAL_MONTHS.indexOf(tapeChartMonth);
+  if (idx === -1) idx = ALL_FINANCIAL_MONTHS.indexOf('2026-09');
+  let newIdx = idx + delta;
+  if (newIdx >= 0 && newIdx < ALL_FINANCIAL_MONTHS.length) {
+    setTapeChartMonth(ALL_FINANCIAL_MONTHS[newIdx]);
+  }
+}
+
 function renderTapeChart() {
   const container = document.getElementById('tapeChartContainer');
   if (!container) return;
 
-  const daysInMonth = 31;
+  populateTapeChartMonthSelect();
+
+  const [yStr, mStr] = tapeChartMonth.split('-');
+  const year = Number(yStr) || 2026;
+  const month = Number(mStr) || 9;
+  
+  // Exact days in month (30 for Sep, 31 for Dec, 28/29 for Feb)
+  const daysInMonth = new Date(year, month, 0).getDate();
   const vKeys = ['SEYIR', 'DOGUS', 'ZIRVE', 'SIRIN', 'NEFES'];
-  const monthStr = currentFilter.period === 'ALL' ? '2026-08' : currentFilter.period;
+  
+  const dayNamesShort = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
+  const todayStr = '2026-09-07';
 
   let tableHtml = '<table class="tape-chart-table"><thead><tr><th class="tape-villa-th">VİLLA \ GÜNLER</th>';
   for (let d = 1; d <= daysInMonth; d++) {
-    const dayOfWeek = (d % 7);
-    const isWeekend = (dayOfWeek === 5 || dayOfWeek === 6);
-    tableHtml += `<th class="tape-day-th ${isWeekend ? 'weekend' : ''}">${d}</th>`;
+    const dStr = (d < 10 ? '0' : '') + d;
+    const curDateStr = `${tapeChartMonth}-${dStr}`;
+    const dateObj = new Date(year, month - 1, d);
+    const dayOfWeek = dateObj.getDay();
+    const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+    const isToday = (curDateStr === todayStr);
+
+    tableHtml += `<th class="tape-day-th ${isWeekend ? 'weekend' : ''} ${isToday ? 'today' : ''}" style="${isToday ? 'background: rgba(245, 158, 11, 0.25); color: #FCD34D; border-bottom: 2px solid #F59E0B;' : ''}">
+      ${d}<br>
+      <span style="font-size:9px; font-weight:normal; opacity:0.8;">${dayNamesShort[dayOfWeek]}</span>
+    </th>`;
   }
   tableHtml += '</tr></thead><tbody>';
 
@@ -5143,7 +5301,8 @@ function renderTapeChart() {
 
     for (let d = 1; d <= daysInMonth; d++) {
       const dStr = (d < 10 ? '0' : '') + d;
-      const dateStr = `${monthStr}-${dStr}`;
+      const dateStr = `${tapeChartMonth}-${dStr}`;
+      const isToday = (dateStr === todayStr);
 
       // Check if booked
       const booking = vBookings.find(b => {
@@ -5156,9 +5315,16 @@ function renderTapeChart() {
         else if (booking.channel === 'BOOKING') chClass = 'tape-booking';
         else if (['WHATSAPP', 'INSTAGRAM', 'WEBSITE', 'DIRECT'].includes(booking.channel)) chClass = 'tape-direct';
 
-        tableHtml += `<td class="tape-cell" title="${booking.guest} (${booking.channel}) - ${booking.checkIn} / ${booking.checkOut}"><div class="tape-booked ${chClass}">${booking.guest.split(' ')[0]}</div></td>`;
+        const isCheckInDay = (booking.checkIn === dateStr);
+        const isCheckOutDay = (booking.checkOut === dateStr);
+
+        tableHtml += `<td class="tape-cell ${isToday ? 'today-cell' : ''}" title="${booking.guest} (${booking.channel}) | ${booking.checkIn} - ${booking.checkOut} | Toplam: ${booking.gross} TL (Tıklayarak düzenleyin)" onclick="editBooking('${booking.id}')" style="cursor: pointer;">
+          <div class="tape-booked ${chClass}" style="${isCheckInDay ? 'border-left: 3px solid #FCD34D;' : ''}">
+            ${booking.guest.split(' ')[0]}
+          </div>
+        </td>`;
       } else {
-        tableHtml += `<td class="tape-cell" title="${dateStr} - Boş / Müsait" onclick="openBookingForDate('${vKey}', '${dateStr}')"></td>`;
+        tableHtml += `<td class="tape-cell ${isToday ? 'today-cell' : ''}" title="${dateStr} - Müsait (Rezervasyon eklemek için tıklayın)" onclick="openBookingForDate('${vKey}', '${dateStr}')" style="cursor: pointer; ${isToday ? 'background: rgba(245, 158, 11, 0.05);' : ''}"></td>`;
       }
     }
     tableHtml += '</tr>';
