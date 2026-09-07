@@ -3008,7 +3008,8 @@ function renderFinanceModule() {
       avgRevPerNight = att.avgDailyRate;
       totalOpex = att.totalOpex;
       totalCapex = att.totalCapex;
-      targetRev = att.targetCiro;
+      const userAllTarget = (appData.targets && appData.targets['ALL']) ? appData.targets['ALL'].revenue : null;
+      targetRev = userAllTarget || att.targetCiro;
 
       // All-time per villa
       propStats.SEYIR = { name: 'Seyir Dağ Evi', revenue: att.villas.seyir.rev, nights: att.villas.seyir.days, adr: Math.round(att.villas.seyir.rev / att.villas.seyir.days), share: Number(((att.villas.seyir.rev / totalRevenue)*100).toFixed(1)), occupancy: Number(((att.villas.seyir.days / (14*30))*100).toFixed(1)), revpar: Math.round(att.villas.seyir.rev / (14*30)) };
@@ -3028,7 +3029,8 @@ function renderFinanceModule() {
         totalCapex = mf.capex;
         totalSoldNights = mf.daysSold || (pm ? pm.totalDays : 0);
         avgRevPerNight = mf.avgDaily ? Math.round(mf.avgDaily) : (totalSoldNights > 0 ? Math.round(totalRevenue / totalSoldNights) : 0);
-        targetRev = activeExcel.targets[currentFilter.period] || 300000;
+        const userPeriodTarget = (appData.targets && appData.targets[currentFilter.period]) ? appData.targets[currentFilter.period].revenue : null;
+        targetRev = userPeriodTarget || activeExcel.targets[currentFilter.period] || 300000;
       }
 
       if (pm && pm.villas) {
@@ -4052,19 +4054,111 @@ function deleteExpense(id) {
 }
 
 // -------------------------------------------------------------
-// HEDEFLER DÜZENLEME (GOALS MODAL)
+// HEDEFLER DÜZENLEME (GOALS MODAL & SETTINGS)
 // -------------------------------------------------------------
-function openGoalsModal() {
-  const curGoals = appData.targets[currentFilter.period] || DEFAULT_TARGETS_BY_MONTH['2026-08'];
-  document.getElementById('goalRevenue').value = curGoals.revenue || 300000;
-  document.getElementById('goalNetProfit').value = curGoals.netProfit || 90000;
-  document.getElementById('goalMargin').value = curGoals.margin || 30.0;
-  document.getElementById('goalOccupancy').value = curGoals.occupancy || 65.0;
-  document.getElementById('goalADR').value = curGoals.adr || 5000;
-  document.getElementById('goalRevPAR').value = curGoals.revpar || 3250;
-  document.getElementById('goalMaxExpense').value = curGoals.maxExpense || 220000;
+const GOAL_MONTHS = [
+  { id: '2026-08', name: 'Ağustos 2026 (Aktif Ay)' },
+  { id: '2026-07', name: 'Temmuz 2026' },
+  { id: '2026-06', name: 'Haziran 2026' },
+  { id: '2026-05', name: 'Mayıs 2026' },
+  { id: '2026-04', name: 'Nisan 2026' },
+  { id: '2026-03', name: 'Mart 2026' },
+  { id: '2026-02', name: 'Şubat 2026' },
+  { id: '2026-01', name: 'Ocak 2026' },
+  { id: '2025-12', name: 'Aralık 2025' },
+  { id: '2025-11', name: 'Kasım 2025' },
+  { id: '2025-10', name: 'Ekim 2025' },
+  { id: '2025-09', name: 'Eylül 2025' },
+  { id: '2025-08', name: 'Ağustos 2025' },
+  { id: '2025-07', name: 'Temmuz 2025' }
+];
 
+function openGoalsModal(targetPeriod) {
+  const select = document.getElementById('goalPeriodSelect');
+  if (select) {
+    select.innerHTML = '';
+    GOAL_MONTHS.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m.id;
+      opt.textContent = m.name;
+      select.appendChild(opt);
+    });
+    const periodToSelect = targetPeriod || (currentFilter.period !== 'ALL' ? currentFilter.period : '2026-08');
+    select.value = periodToSelect;
+  }
+  loadSelectedPeriodGoal();
   document.getElementById('goalsModal').classList.add('active');
+}
+
+function loadSelectedPeriodGoal() {
+  const select = document.getElementById('goalPeriodSelect');
+  const period = select ? select.value : (currentFilter.period !== 'ALL' ? currentFilter.period : '2026-08');
+  
+  const saved = appData.targets && appData.targets[period];
+  const excelTarget = (COMPANY_EXCEL_DATABASE && COMPANY_EXCEL_DATABASE.targets) ? COMPANY_EXCEL_DATABASE.targets[period] : 300000;
+  
+  const rev = (saved && saved.revenue) ? saved.revenue : (excelTarget || 300000);
+  const netProfit = (saved && saved.netProfit) ? saved.netProfit : Math.round(rev * 0.35);
+  const maxExpense = (saved && saved.maxExpense) ? saved.maxExpense : Math.round(rev * 0.65);
+  const nights = (saved && saved.nights) ? saved.nights : (saved && saved.occupancy ? Math.round(150 * (saved.occupancy / 100)) : 75);
+  const adr = (saved && saved.adr) ? saved.adr : (nights > 0 ? Math.round(rev / nights) : 5500);
+
+  const revEl = document.getElementById('goalRevenue');
+  const netEl = document.getElementById('goalNetProfit');
+  const expEl = document.getElementById('goalMaxExpense');
+  const nEl = document.getElementById('goalOccupancyNights');
+  const adrEl = document.getElementById('goalADR');
+  const hintEl = document.getElementById('goalRevenueHint');
+
+  if (revEl) revEl.value = rev;
+  if (netEl) netEl.value = netProfit;
+  if (expEl) expEl.value = maxExpense;
+  if (nEl) nEl.value = nights;
+  if (adrEl) adrEl.value = adr;
+  
+  if (hintEl) {
+    const defaultVal = excelTarget || 300000;
+    hintEl.textContent = `Varsayılan / Excel: ${defaultVal.toLocaleString('tr-TR')} TL`;
+  }
+  
+  const occLabel = document.getElementById('goalCalcOccLabel');
+  if (occLabel) {
+    const occPct = Math.min(100, Math.round((nights / 150) * 100));
+    occLabel.textContent = `%${occPct} (${nights}/150 gece)`;
+  }
+}
+
+function autoCalculateGoalSubmetrics() {
+  const rev = Number(document.getElementById('goalRevenue').value) || 0;
+  if (rev > 0) {
+    document.getElementById('goalNetProfit').value = Math.round(rev * 0.35);
+    document.getElementById('goalMaxExpense').value = Math.round(rev * 0.65);
+    const nights = Number(document.getElementById('goalOccupancyNights').value) || 75;
+    if (nights > 0) {
+      document.getElementById('goalADR').value = Math.round(rev / nights);
+    }
+  }
+}
+
+function autoCalculateGoalAdr() {
+  const nights = Number(document.getElementById('goalOccupancyNights').value) || 0;
+  const rev = Number(document.getElementById('goalRevenue').value) || 0;
+  const occLabel = document.getElementById('goalCalcOccLabel');
+  if (occLabel) {
+    const occPct = Math.min(100, Math.round((nights / 150) * 100));
+    occLabel.textContent = `%${occPct} (${nights}/150 gece)`;
+  }
+  if (rev > 0 && nights > 0) {
+    document.getElementById('goalADR').value = Math.round(rev / nights);
+  }
+}
+
+function setGoalPreset(amount) {
+  const revEl = document.getElementById('goalRevenue');
+  if (revEl) {
+    revEl.value = amount;
+    autoCalculateGoalSubmetrics();
+  }
 }
 
 function closeGoalsModal() {
@@ -4072,19 +4166,42 @@ function closeGoalsModal() {
 }
 
 function saveMonthlyGoals(e) {
-  e.preventDefault();
+  if (e) e.preventDefault();
+  const select = document.getElementById('goalPeriodSelect');
+  const period = select ? select.value : (currentFilter.period !== 'ALL' ? currentFilter.period : '2026-08');
+  
   const revenue = Number(document.getElementById('goalRevenue').value) || 300000;
-  const netProfit = Number(document.getElementById('goalNetProfit').value) || 90000;
-  const margin = Number(document.getElementById('goalMargin').value) || 30.0;
-  const occupancy = Number(document.getElementById('goalOccupancy').value) || 65.0;
-  const adr = Number(document.getElementById('goalADR').value) || 5000;
-  const revpar = Number(document.getElementById('goalRevPAR').value) || 3250;
-  const maxExpense = Number(document.getElementById('goalMaxExpense').value) || 220000;
+  const netProfit = Number(document.getElementById('goalNetProfit').value) || Math.round(revenue * 0.35);
+  const maxExpense = Number(document.getElementById('goalMaxExpense').value) || Math.round(revenue * 0.65);
+  const nights = Number(document.getElementById('goalOccupancyNights').value) || 75;
+  const adr = Number(document.getElementById('goalADR').value) || (nights > 0 ? Math.round(revenue / nights) : 5500);
+  const occupancy = Number(((nights / 150) * 100).toFixed(1));
+  const margin = Number(((netProfit / revenue) * 100).toFixed(1));
+  const revpar = Math.round(revenue / 150);
 
-  appData.targets[currentFilter.period] = { revenue, netProfit, margin, occupancy, adr, revpar, maxExpense };
+  if (!appData.targets) appData.targets = {};
+  appData.targets[period] = {
+    revenue,
+    netProfit,
+    maxExpense,
+    nights,
+    adr,
+    occupancy,
+    margin,
+    revpar
+  };
+
   saveAppData();
   closeGoalsModal();
-  alert('Aylık finansal hedefler başarıyla güncellendi!');
+  renderFinanceModule();
+  renderSettingsGoalsTable();
+
+  // Show friendly notification toast
+  const toast = document.createElement('div');
+  toast.style.cssText = 'position:fixed; bottom:24px; right:24px; background:#10B981; color:#fff; padding:14px 20px; border-radius:10px; font-weight:700; font-size:14px; box-shadow:0 10px 25px rgba(0,0,0,0.5); z-index:99999; display:flex; align-items:center; gap:8px;';
+  toast.innerHTML = `<span>✓</span> <strong>${period}</strong> hedefi ${revenue.toLocaleString('tr-TR')} TL olarak güncellendi!`;
+  document.body.appendChild(toast);
+  setTimeout(() => { toast.remove(); }, 3500);
 }
 
 // -------------------------------------------------------------
@@ -4549,7 +4666,61 @@ function deleteBooking(id) {
 // -------------------------------------------------------------
 // SETTINGS TABLE (PRICING TIERS)
 // -------------------------------------------------------------
+function renderSettingsGoalsTable() {
+  const tbody = document.getElementById('settingsGoalsTableBody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  GOAL_MONTHS.forEach(m => {
+    const period = m.id;
+    const saved = appData.targets && appData.targets[period];
+    const excelTarget = (COMPANY_EXCEL_DATABASE && COMPANY_EXCEL_DATABASE.targets) ? COMPANY_EXCEL_DATABASE.targets[period] : 300000;
+    
+    const rev = (saved && saved.revenue) ? saved.revenue : (excelTarget || 300000);
+    const netProfit = (saved && saved.netProfit) ? saved.netProfit : Math.round(rev * 0.35);
+    const maxExpense = (saved && saved.maxExpense) ? saved.maxExpense : Math.round(rev * 0.65);
+    const nights = (saved && saved.nights) ? saved.nights : (saved && saved.occupancy ? Math.round(150 * (saved.occupancy / 100)) : 75);
+    const occ = saved && saved.occupancy ? saved.occupancy : Math.round((nights / 150) * 100);
+    const adr = (saved && saved.adr) ? saved.adr : (nights > 0 ? Math.round(rev / nights) : 5500);
+
+    const isCurrent = (currentFilter.period === period);
+    const tr = document.createElement('tr');
+    if (isCurrent) {
+      tr.style.background = 'rgba(59, 130, 246, 0.08)';
+    }
+
+    tr.innerHTML = `
+      <td>
+        <strong>${m.name}</strong>
+        ${isCurrent ? ' <span class="badge badge-blue" style="font-size:10px; margin-left:4px;">Seçili Dönem</span>' : ''}
+      </td>
+      <td>
+        <strong style="color: #60A5FA;">${rev.toLocaleString('tr-TR')} TL</strong>
+      </td>
+      <td style="color: #34D399; font-weight: 600;">
+        ${netProfit.toLocaleString('tr-TR')} TL
+      </td>
+      <td>
+        <span class="badge badge-amber">%${occ} (${nights} Gece)</span>
+      </td>
+      <td>
+        ${adr.toLocaleString('tr-TR')} TL
+      </td>
+      <td style="color: #F87171;">
+        ${maxExpense.toLocaleString('tr-TR')} TL
+      </td>
+      <td style="text-align: right;">
+        <button class="btn btn-secondary btn-sm" onclick="openGoalsModal('${period}')" style="padding: 4px 10px; font-size: 11px;">
+          ✏️ Düzenle
+        </button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
 function renderSettingsTable() {
+  renderSettingsGoalsTable();
   const tbody = document.getElementById('settingsTableBody');
   if (!tbody) return;
   tbody.innerHTML = '';

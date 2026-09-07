@@ -96,6 +96,7 @@
       <button class="btn btn-secondary" onclick="openExpenseModal()">+ Gider / Yatırım</button>
       <button class="btn btn-secondary" onclick="openImportModal()">📥 Rapor Yükle</button>
       <button class="btn btn-secondary" onclick="exportDataJSON()">💾 Yedek</button>
+      <button class="btn btn-secondary" onclick="openGoalsModal()">🎯 Hedef Belirle</button>
       <button class="btn btn-secondary btn-sm" onclick="copySecretShareLink()" title="Şifresiz doğrudan erişim linkini kopyala">🔗 Yetkili Linki Al</button>
       <button class="btn btn-secondary btn-sm" onclick="openHelpModal()" title="Hızlı Başlangıç & İşletmeci Kılavuzu">❓ Nasıl Kullanılır?</button>
       <button class="btn btn-danger btn-sm" onclick="openResetModal()" title="Verileri sıfırla veya geri yükle">🗑️ Sıfırla</button>
@@ -159,16 +160,19 @@
           </div>
         </div>
 
-        <!-- Hedef Ciro -->
-        <div class="kpi-card fin-kpi-card">
+        <!-- Hedef Ciro (Doğrudan Tıklanabilir & Düzenlenebilir) -->
+        <div class="kpi-card fin-kpi-card" onclick="openGoalsModal()" style="cursor: pointer;" title="Hedefi değiştirmek için tıklayın">
           <div class="kpi-card-header">
             <span class="kpi-label">HEDEF CİRO</span>
-            <button class="kpi-info-btn" onclick="showKpiExplanation('TARGET')">ℹ️</button>
+            <div style="display: flex; gap: 4px;">
+              <button class="kpi-info-btn" onclick="event.stopPropagation(); openGoalsModal()" title="Hedefi Hızlı Değiştir">✏️</button>
+              <button class="kpi-info-btn" onclick="event.stopPropagation(); showKpiExplanation('TARGET')">ℹ️</button>
+            </div>
           </div>
           <div class="kpi-value" id="finTargetRevenue">300.000 TL</div>
           <div class="kpi-meta">
             <span class="kpi-trend positive" id="finTargetDiff">+183.965 TL fark</span>
-            <span>Aylık Bütçe</span>
+            <span style="color: #60A5FA; font-weight: 600;">✏️ Hedefi Değiştir ›</span>
           </div>
         </div>
 
@@ -219,7 +223,10 @@
             <h2>🎯 CİRO HEDEFİ ANALİZİ (HEDEF VS GERÇEKLEŞEN)</h2>
             <span class="sub-text">Ay içi ilerleme, hedef sapması ve dönem sonu tahmini</span>
           </div>
-          <span class="badge badge-emerald" id="finTargetStatusBadge">%161,3 Hedef Gerçekleşti</span>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span class="badge badge-emerald" id="finTargetStatusBadge">%161,3 Hedef Gerçekleşti</span>
+            <button class="btn btn-primary btn-sm" onclick="openGoalsModal()">🎯 Hedefi Değiştir</button>
+          </div>
         </div>
 
         <div class="target-comparison-grid">
@@ -979,6 +986,35 @@
     <!-- TAB: AYARLAR & HEDEFLER -->
     <!-- ========================================== -->
     <div id="tab-settings" class="tab-content">
+      <!-- AYLIK CİRO VE BÜTÇE HEDEFLERİ YÖNETİMİ -->
+      <section class="card" style="margin-bottom: 24px;">
+        <div class="section-title-bar">
+          <div>
+            <h2>🎯 AYLIK CİRO VE KÂR HEDEFLERİ LİSTESİ</h2>
+            <p class="sub-text">Yılın tüm ayları için belirlenen bütçe hedefleri. İstediğiniz ayın hedefini tek tıkla değiştirebilirsiniz.</p>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="openGoalsModal()">+ Hedef Belirle / Düzenle</button>
+        </div>
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>DÖNEM / AY</th>
+                <th>HEDEF CİRO</th>
+                <th>HEDEF NET KÂR</th>
+                <th>HEDEF DOLULUK</th>
+                <th>HEDEF ADR</th>
+                <th>TAVAN GİDER</th>
+                <th style="text-align: right;">İŞLEM</th>
+              </tr>
+            </thead>
+            <tbody id="settingsGoalsTableBody">
+              <!-- Injected via JS -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <section class="card">
         <div class="section-title-bar">
           <div><h2>⚙️ VİLLA FİYAT BASAMAKLARI VE MALİYETLER</h2><p class="sub-text">Taban, baz, hedef, premium ve peak fiyatlar.</p></div>
@@ -1066,48 +1102,70 @@
   </div>
 
   <!-- ========================================== -->
-  <!-- MODAL: HEDEFLERİ DÜZENLE (CİRO, KÂR, MARJ, DOLULUK, ADR) -->
+  <!-- MODAL: AYLIK FİNANSAL HEDEFLERİ DÜZENLE -->
   <!-- ========================================== -->
   <div class="modal-backdrop" id="goalsModal">
-    <div class="modal-card">
+    <div class="modal-card" style="max-width: 540px;">
       <div class="modal-header">
-        <h3>🎯 Aylık Finansal Hedefleri Düzenle</h3>
+        <h3>🎯 Finansal Hedef Belirleme & Düzenleme</h3>
         <button class="close-btn" onclick="closeGoalsModal()">&times;</button>
       </div>
       <form id="goalsForm" onsubmit="saveMonthlyGoals(event)">
-        <div class="form-grid">
-          <div class="form-group">
-            <label>Hedef Ciro (TL)</label>
-            <input type="number" id="goalRevenue" required>
+        <div style="padding: 20px;">
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label style="font-weight: 700; color: #FFFFFF; font-size: 13px;">Hangi Dönem İçin Hedef Belirliyorsunuz?</label>
+            <select id="goalPeriodSelect" onchange="loadSelectedPeriodGoal()" style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 13px; font-weight: 600; margin-top: 4px;">
+              <!-- Populated dynamically with all months -->
+            </select>
           </div>
-          <div class="form-group">
-            <label>Hedef Net Kâr (TL)</label>
-            <input type="number" id="goalNetProfit" required>
+
+          <div class="form-group" style="margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <label style="font-weight: 700; color: #FFFFFF; font-size: 13px;">🎯 Aylık Hedef Ciro (TL)</label>
+              <span id="goalRevenueHint" style="font-size: 11px; color: #93C5FD;"></span>
+            </div>
+            <input type="number" id="goalRevenue" step="5000" required oninput="autoCalculateGoalSubmetrics()" style="font-size: 16px; font-weight: 700; padding: 12px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff;">
+            
+            <!-- Quick preset buttons -->
+            <div style="display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap;">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="setGoalPreset(250000)">250.000 TL</button>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="setGoalPreset(350000)">350.000 TL</button>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="setGoalPreset(500000)">500.000 TL</button>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="setGoalPreset(750000)">750.000 TL</button>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="setGoalPreset(1000000)">1.000.000 TL</button>
+            </div>
           </div>
-          <div class="form-group">
-            <label>Hedef Net Kâr Marjı (%)</label>
-            <input type="number" step="0.1" id="goalMargin" required>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+            <div class="form-group">
+              <label style="font-size: 12px; font-weight: 600;">🌙 Hedef Gece Sayısı</label>
+              <input type="number" id="goalOccupancyNights" placeholder="Örn: 75" oninput="autoCalculateGoalAdr()" style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
+              <span style="font-size: 10px; color: var(--text-muted); margin-top: 3px; display: block;">Tahmini doluluk: <strong id="goalCalcOccLabel" style="color:#60A5FA;">%50</strong></span>
+            </div>
+            <div class="form-group">
+              <label style="font-size: 12px; font-weight: 600;">🏷️ Hedef Ortalama ADR</label>
+              <input type="number" id="goalADR" placeholder="Örn: 6.000" style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
+              <span style="font-size: 10px; color: var(--text-muted); margin-top: 3px; display: block;">Gecelik ortalama fiyat</span>
+            </div>
           </div>
-          <div class="form-group">
-            <label>Hedef Doluluk (%)</label>
-            <input type="number" step="0.1" id="goalOccupancy" required>
-          </div>
-          <div class="form-group">
-            <label>Hedef ADR (TL)</label>
-            <input type="number" id="goalADR" required>
-          </div>
-          <div class="form-group">
-            <label>Hedef RevPAR (TL)</label>
-            <input type="number" id="goalRevPAR" required>
-          </div>
-          <div class="form-group" style="grid-column: span 2;">
-            <label>Maksimum Gider Hedefi (TL / Tavan Bütçe)</label>
-            <input type="number" id="goalMaxExpense" required>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 8px;">
+            <div class="form-group">
+              <label style="font-size: 12px; font-weight: 600;">💵 Hedef Net Kâr (TL)</label>
+              <input type="number" id="goalNetProfit" required style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
+              <span style="font-size: 10px; color: #34D399; margin-top: 3px; display: block;">Cironun yaklaşık %35'i</span>
+            </div>
+            <div class="form-group">
+              <label style="font-size: 12px; font-weight: 600;">💸 Tavan Gider (TL)</label>
+              <input type="number" id="goalMaxExpense" required style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
+              <span style="font-size: 10px; color: #FCA5A5; margin-top: 3px; display: block;">Aşılmaması gereken gider</span>
+            </div>
           </div>
         </div>
+
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="closeGoalsModal()">Vazgeç</button>
-          <button type="submit" class="btn btn-primary">Hedefleri Kaydet</button>
+          <button type="submit" class="btn btn-primary" style="padding: 10px 24px;">💾 Hedefleri Kaydet</button>
         </div>
       </form>
     </div>
