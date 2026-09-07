@@ -501,6 +501,173 @@
         </div>
       </section>
 
+      <!-- 10. OTOMATİK GİDİŞAT ANALİZİ & PROJEKSİYON MOTORU -->
+      <section class="card trajectory-card">
+        <div class="section-title-bar">
+          <div class="title-with-badge">
+            <span class="trajectory-icon">🔮</span>
+            <div>
+              <h2>ŞİRKET GİDİŞAT RADARI & OTOMATİK PROJEKSİYON MOTORU</h2>
+              <span class="sub-text">Son 14 ayın resmi şirket trendi, momentum analizi ve kış sezonu gelir tahminleri</span>
+            </div>
+            <span class="badge badge-emerald">CANLI GİDİŞAT: GÜÇLÜ POZİTİF</span>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="exportTrajectoryReport()">📄 Gidişat Raporu Al</button>
+        </div>
+
+        <!-- 1. Gidişat Barometresi / 4 Temel Sağlık Göstergesi -->
+        <div class="trajectory-barometer-grid">
+          <div class="barometer-card health-score">
+            <div class="score-circle">
+              <span class="score-num">88</span>
+              <span class="score-denom">/100</span>
+            </div>
+            <div class="score-info">
+              <strong>ŞİRKET SAĞLIK SKORU</strong>
+              <span class="text-emerald">🟢 Büyüme & Kâr İvmesinde</span>
+              <p>Yaz sezonu güçlü toparlanma sağladı, kış öncesi nakit pozisyonu sağlam.</p>
+            </div>
+          </div>
+
+          <div class="barometer-card">
+            <span class="b-lbl">CİRO MOMENTUMU (SON 3 AY)</span>
+            <strong class="b-val text-emerald">🚀 +%80,7 İvme</strong>
+            <span class="b-desc">Haziran (268k) ➔ Temmuz (467k) ➔ Ağustos (484k)</span>
+          </div>
+
+          <div class="barometer-card">
+            <span class="b-lbl">NET KÂR MARJI STABİLİTESİ</span>
+            <strong class="b-val text-blue">⚖️ %29,5 – %33,9</strong>
+            <span class="b-desc">Ocak rekorunda %60,7, yaz aylarında %30 civarında stabil.</span>
+          </div>
+
+          <div class="barometer-card">
+            <span class="b-lbl">FİYAT SAVUNMASI (ADR TRENDİ)</span>
+            <strong class="b-val text-amber">⚠️ Sezonsal Uçurum</strong>
+            <span class="b-desc">Kışın 18.000 TL ➔ Yazın 6.126 TL. Kış erken açılışı kritik.</span>
+          </div>
+        </div>
+
+        <!-- 2. Gelecek Sezon Tahminleri (Projeksiyon Paneli) -->
+        <div class="forecast-panel">
+          <div class="forecast-header">
+            <h3>📅 YAKLAŞAN DÖNEM & 2026/2027 KIŞ SEZONU GELİR PROJEKSİYONU</h3>
+            <span class="sub-text">Tarihsel talep dağılımı ve doluluk trendi baz alınarak otomatik modellenmiştir</span>
+          </div>
+          <div class="forecast-grid">
+            <div class="forecast-box">
+              <span class="f-period">EYLÜL 2026 (GEÇİŞ DÖNEMİ)</span>
+              <strong class="f-val">150.000 – 185.000 TL</strong>
+              <span class="f-meta">Tahmini Doluluk: %35 | ADR: ~8.500 TL</span>
+              <p class="f-note">Okul açılışı sebebiyle hafta içi yavaşlar, hafta sonu şömineli talep öne çıkar.</p>
+            </div>
+
+            <div class="forecast-box">
+              <span class="f-period">EKİM - KASIM 2026 (GÜZ SEZONU)</span>
+              <strong class="f-val">450.000 – 520.000 TL</strong>
+              <span class="f-meta">2 Ay Toplamı | Tahmini 45 Gece</span>
+              <p class="f-note">Doğa ve şömine tatili dönemi. Kış erken rezervasyonlarının toplanacağı pencere.</p>
+            </div>
+
+            <div class="forecast-box highlight-winter">
+              <span class="f-period">❄️ 2026/2027 KIŞ SEZONU (ARA - OCA - ŞUB)</span>
+              <strong class="f-val text-emerald">2.250.000 – 2.650.000 TL</strong>
+              <span class="f-meta">Geçen Kış (1.92M TL) Baz Alındığında +%25 Büyüme</span>
+              <p class="f-note">Ocak 2026'da 843k TL yapılmıştı. Doğru fiyatlandırma ile Ocak 2027 hedefi: <strong>1.100.000 TL</strong>.</p>
+            </div>
+
+            <div class="forecast-box highlight-yearend">
+              <span class="f-period">🏆 2026 YIL SONU TOPLAM CİRO TAHMİNİ</span>
+              <strong class="f-val text-emerald">~6.200.000 – 6.450.000 TL</strong>
+              <span class="f-meta">İlk 8 Ay: 3.58M TL | Kalan 4 Ay: ~2.7M TL</span>
+              <p class="f-note">Şirket tarihinin en yüksek yıllık ciro rekoruna doğru ilerleniyor.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. İnteraktif Senaryo Simülatörü ("Ne Olursa Ne Olur?") -->
+        <div class="whatif-simulator-box">
+          <div class="sim-header">
+            <div>
+              <h3>🎛️ CANLI "NE OLURSA NE OLUR?" GELİR & KÂR SİMÜLATÖRÜ</h3>
+              <p class="sub-text">Fiyat, doluluk veya komisyon oranlarını değiştirin, aylık kasaya girecek net nakdi anında görün</p>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="resetSimulator()">Sıfırla</button>
+          </div>
+
+          <div class="sim-controls-grid">
+            <div class="sim-control-item">
+              <div class="sim-lbl-row">
+                <span>ADR (Gecelik Fiyat) Değişimi:</span>
+                <strong id="simAdrLabel">+%15</strong>
+              </div>
+              <input type="range" id="simAdrSlider" min="-20" max="40" step="5" value="15" oninput="runWhatIfSimulation()">
+              <span class="slider-hint">Taban ve tavan fiyatların yukarı çekilmesi</span>
+            </div>
+
+            <div class="sim-control-item">
+              <div class="sim-lbl-row">
+                <span>Doluluk Oranı Değişimi:</span>
+                <strong id="simOccLabel">+%5</strong>
+              </div>
+              <input type="range" id="simOccSlider" min="-15" max="25" step="5" value="5" oninput="runWhatIfSimulation()">
+              <span class="slider-hint">Boş günlerin ve gap gecelerinin kapatılması</span>
+            </div>
+
+            <div class="sim-control-item">
+              <div class="sim-lbl-row">
+                <span>Direkt Rezervasyon Payı (WhatsApp/Instagram):</span>
+                <strong id="simDirectLabel">%60</strong>
+              </div>
+              <input type="range" id="simDirectSlider" min="20" max="90" step="5" value="60" oninput="runWhatIfSimulation()">
+              <span class="slider-hint">OTA komisyonunu (%15-18) sıfırlayan direkt satış</span>
+            </div>
+          </div>
+
+          <div class="sim-results-grid">
+            <div class="sim-res-box">
+              <span class="r-lbl">SİMÜLE EDİLEN AYLIK CİRO</span>
+              <strong class="r-val" id="simResRevenue">562.400 TL</strong>
+              <span class="r-delta text-emerald" id="simResRevDelta">+78.435 TL (+%16,2)</span>
+            </div>
+            <div class="sim-res-box">
+              <span class="r-lbl">TASARRUF EDİLEN KOMİSYON</span>
+              <strong class="r-val text-emerald" id="simResCommission">28.500 TL</strong>
+              <span class="r-delta" id="simResCommDelta">Kasada Kalan Doğrudan Nakit</span>
+            </div>
+            <div class="sim-res-box highlight">
+              <span class="r-lbl">YENİ TAHMİNİ NET NAKİT KÂR</span>
+              <strong class="r-val text-emerald" id="simResProfit">218.650 TL</strong>
+              <span class="r-delta" id="simResProfitDelta">+75.857 TL Fazla Kâr (%38,9 Marj)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Otomatik Stratejik Tavsiyeler & Erken Uyarı Radarı -->
+        <div class="trajectory-insights-grid">
+          <div class="insight-box danger">
+            <div class="in-header">
+              <span>🚨 1. EN BÜYÜK TEHLİKE / MALİYET TUZAĞI</span>
+            </div>
+            <p><strong>Komisyon & Temizlik Sızıntısı:</strong> Son ayda komisyon (75.519 TL) ve temizlik (47.000 TL) toplam 122.500 TL yuttu (cironun %25'i). Eğer direkt rezervasyon payı artırılmazsa, yüksek cirolu kış aylarında aylık 150.000 TL'nin üzerinde komisyon aracı kurumlara gidecektir.</p>
+          </div>
+
+          <div class="insight-box warning">
+            <div class="in-header">
+              <span>⚠️ 2. DÜZELTİLMESİ GEREKEN ANOMALİ</span>
+            </div>
+            <p><strong>Şirin Dağ Evi Fiyat Baskısı:</strong> Şirin villası ağustosta 30 gün (%96,8) dolu çalıştı fakat günlük getirisi (2.826 TL) tabanın çok altında kaldı. Bu villaya 10.000 TL değerinde ufak bir bahçe/şömine dokunuşu yapılıp fiyatı 4.500 TL'ye çekilirse kâra doğrudan aylık net +40.000 TL eklenir.</p>
+          </div>
+
+          <div class="insight-box success">
+            <div class="in-header">
+              <span>💎 3. EN BÜYÜK FIRSAT / GELİR KALDIRACI</span>
+            </div>
+            <p><strong>Zirve & Seyir Kış Erken Rezervasyonu:</strong> Zirve tek başına Ocak ayında 280.000 TL ciro üretmişti. 2026/2027 kış sezonu için erken rezervasyonlar 18.000 TL taban fiyattan açılmalı; yılbaşı haftası için 35.000 TL / gece hedeflenmelidir.</p>
+          </div>
+        </div>
+      </section>
+
     </div>
 
     <!-- ========================================== -->

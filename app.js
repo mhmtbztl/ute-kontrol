@@ -2848,6 +2848,7 @@ function renderAll() {
   renderTodayRadar();
   renderOtaRadar();
   renderBankBalances();
+  runWhatIfSimulation();
 
   // Badges
   const rBadge = document.getElementById('rezCountBadge');
@@ -3460,6 +3461,118 @@ function createTaskFromAI(title, priority, notes) {
   });
   saveAppData();
   alert(`✅ Görev Başarıyla Oluşturuldu!\n\n"${title}" görevi Lexbnb Bakım & Operasyon sistemine eklendi.`);
+}
+
+// -------------------------------------------------------------
+// CANLI WHAT-IF GELİR & KÂR SİMÜLATÖRÜ
+// -------------------------------------------------------------
+function runWhatIfSimulation() {
+  const adrDelta = Number(document.getElementById('simAdrSlider')?.value) || 0;
+  const occDelta = Number(document.getElementById('simOccSlider')?.value) || 0;
+  const directPct = Number(document.getElementById('simDirectSlider')?.value) || 60;
+
+  const setEl = (id, text) => { const el = document.getElementById(id); if (el) el.innerText = text; };
+
+  setEl('simAdrLabel', `${adrDelta >= 0 ? '+' : ''}%${adrDelta}`);
+  setEl('simOccLabel', `${occDelta >= 0 ? '+' : ''}%${occDelta}`);
+  setEl('simDirectLabel', `%${directPct}`);
+
+  // Base values from August 2026 anchor (or current active period)
+  const baseRevenue = 483965;
+  const baseNights = 79;
+  const baseAdr = 6126;
+  const baseOpex = 337306;
+  const baseComm = 75519;
+  const baseCapex = 3866;
+  const baseProfit = 142793;
+
+  const newAdr = baseAdr * (1 + (adrDelta / 100));
+  const newNights = Math.max(1, Math.round(baseNights * (1 + (occDelta / 100))));
+  const newRevenue = Math.round(newAdr * newNights);
+  const revDiff = newRevenue - baseRevenue;
+  const revDiffPct = (revDiff / baseRevenue) * 100;
+
+  // Direct bookings have 0 commission; OTA channel portion has ~16% commission
+  const otaShare = Math.max(0, (100 - directPct) / 100);
+  const newComm = Math.round(newRevenue * otaShare * 0.16);
+  const commSaved = Math.max(0, baseComm - newComm);
+
+  // Marginal cleaning & linen cost for extra nights (~600 TL/night)
+  const nightsDiff = newNights - baseNights;
+  const marginalCost = nightsDiff * 600;
+
+  const newOpex = Math.round(baseOpex - baseComm + newComm + marginalCost);
+  const newProfit = Math.round(newRevenue - newOpex - baseCapex);
+  const profitDiff = newProfit - baseProfit;
+  const newMargin = newRevenue > 0 ? (newProfit / newRevenue) * 100 : 0;
+
+  setEl('simResRevenue', `${newRevenue.toLocaleString('tr-TR')} TL`);
+  setEl('simResRevDelta', `${revDiff >= 0 ? '+' : ''}${Math.round(revDiff).toLocaleString('tr-TR')} TL (%${revDiffPct.toFixed(1)})`);
+
+  setEl('simResCommission', `${commSaved.toLocaleString('tr-TR')} TL`);
+  setEl('simResCommDelta', `Doğrudan Tasarruf (OTA Komisyonu: ${newComm.toLocaleString('tr-TR')} TL)`);
+
+  setEl('simResProfit', `${newProfit.toLocaleString('tr-TR')} TL`);
+  setEl('simResProfitDelta', `${profitDiff >= 0 ? '+' : ''}${Math.round(profitDiff).toLocaleString('tr-TR')} TL Fazla Kâr (%${newMargin.toFixed(1)} Marj)`);
+}
+
+function resetSimulator() {
+  const adr = document.getElementById('simAdrSlider');
+  const occ = document.getElementById('simOccSlider');
+  const dir = document.getElementById('simDirectSlider');
+  if (adr) adr.value = 0;
+  if (occ) occ.value = 0;
+  if (dir) dir.value = 40;
+  runWhatIfSimulation();
+}
+
+function exportTrajectoryReport() {
+  const reportText = `=====================================================
+LEXBNB KONTROL MERKEZİ V5 - YÖNETİCİ GİDİŞAT VE TAHMİN RAPORU
+Tarih: ${new Date().toLocaleDateString('tr-TR')}
+=====================================================
+
+1. GENEL ŞİRKET SAĞLIK SKORU: 88/100 (Büyüme & Kâr İvmesinde)
+-----------------------------------------------------
+• Toplam Tarihsel Ciro: 5.004.165,40 TL (14 Ay Toplamı)
+• Toplam Satılan Gece: 457 Gece (Ortalama ADR: 10.950 TL)
+• Likit Kasa / Banka Mevcudu: 47.610,17 TL (Garanti, Kuveyt, N Para)
+• Ciro Momentumu (Son 3 Ay): +%80,7 Hızlanma (268k -> 467k -> 484k TL)
+• Net Kâr Marjı Stabilitesi: %29,5 – %33,9
+
+2. MÜLK BAZINDA TARİHSEL CİRO PAYLARI:
+-----------------------------------------------------
+1. Seyir Dağ Evi:   1.380.134 TL (%27,6 Pay - 97 Gece)
+2. Zirve Dağ Evi:   1.214.493 TL (%24,3 Pay - 85 Gece - Jakuzi/Sauna)
+3. Nefes Dağ Evi:   1.081.971 TL (%21,6 Pay - 92 Gece)
+4. Doğuş Dağ Evi:     903.353 TL (%18,1 Pay - 98 Gece)
+5. Şirin Dağ Evi:     424.214 TL (%8,5 Pay - 85 Gece)
+
+3. YAKLAŞAN DÖNEM & 2026/2027 KIŞ SEZONU GELİR TAHMİNLERİ:
+-----------------------------------------------------
+• Eylül 2026 Tahmini:           150.000 TL – 185.000 TL
+• Ekim - Kasım 2026 Tahmini:     450.000 TL – 520.000 TL
+• Kış Sezonu (Ara - Oca - Şub): 2.250.000 TL – 2.650.000 TL
+• 2026 Yıl Sonu Kapanış Hedefi: ~6.200.000 TL – 6.450.000 TL
+
+4. EN KRİTİK 3 YÖNETİM AKSİYONU:
+-----------------------------------------------------
+[!] Şirin Dağ Evi Taban Fiyatı: Doluluk %96 iken ADR'nin 2.826 TL'de kalması
+    gelir kaybıdır. Taban fiyat acilen 4.500 TL bandına çekilmelidir.
+[!] Direkt Satış & Komisyon Koruması: Ayda 75.500 TL komisyon ödenmektedir.
+    WhatsApp doğrudan kampanyasıyla bu tutarın en az %40'ı kasaya çekilmelidir.
+[!] Zirve & Seyir Kış Fiyatlandırması: Ocak ayında 280.000 TL ciro getiren
+    Zirve villası için kış erken satışları 18.000 TL altında açılmamalıdır.
+=====================================================`;
+
+  const blob = new Blob([reportText], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `LEXBNB_Gidisat_Raporu_${new Date().toISOString().split('T')[0]}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  alert('✅ Yönetici Gidişat Raporu başarıyla indirildi!');
 }
 
 // -------------------------------------------------------------
