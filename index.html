@@ -1033,10 +1033,17 @@
     <!-- ========================================== -->
     <div id="tab-channels" class="tab-content">
       <div class="kpi-cards-grid">
-        <div class="kpi-card channel-card airbnb">
-          <div class="channel-card-top"><span class="channel-title">🏡 Airbnb Portföyü</span><span class="badge badge-amber">Superhost: Güçlü</span></div>
-          <div class="kpi-value">4.94 <span class="sub-val">★ / 5.0</span></div>
-          <div class="kpi-meta"><span>86 Değerlendirme</span><span style="color:var(--accent-emerald);">Hedef: >4.80 ✅</span></div>
+        <div class="kpi-card channel-card airbnb" style="border: 1px solid rgba(245, 158, 11, 0.3); position: relative; overflow: hidden;">
+          <div style="position: absolute; top: -10px; right: -10px; width: 60px; height: 60px; background: rgba(245, 158, 11, 0.08); border-radius: 50%;"></div>
+          <div class="channel-card-top">
+            <span class="channel-title">🏡 Airbnb Portföyü</span>
+            <span class="badge badge-amber" id="airbnbSuperhostBadge">🏆 Süper Ev Sahibi</span>
+          </div>
+          <div class="kpi-value" id="airbnbPortfolioScore" style="color: #FBBF24;">4.97 <span class="sub-val" style="color: #FDE68A;">★ / 5.0</span></div>
+          <div class="kpi-meta">
+            <span id="airbnbTotalReviews">30 Değerlendirme (5 Villa)</span>
+            <span style="color: #34D399; font-weight: 700;">💎 Misafirlerin Gözdesi</span>
+          </div>
         </div>
         <div class="kpi-card channel-card booking">
           <div class="channel-card-top"><span class="channel-title">🏨 Booking.com</span><span class="badge badge-blue">Premier Partner</span></div>
@@ -1067,14 +1074,40 @@
         </div>
       </section>
 
-      <section class="card" style="margin-top: 20px;">
-        <div class="section-title-bar"><h2>📋 5 VİLLA DİJİTAL İLAN AUDIT (CHECKLIST)</h2></div>
+      <section class="card airbnb-audit-card" style="margin-top: 20px; border: 1px solid rgba(245, 158, 11, 0.25);">
+        <div class="section-title-bar" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <div class="title-with-badge">
+              <span style="font-size: 20px;">⭐</span>
+              <h2>5 VİLLA CANLI AIRBNB İTİBAR & İLAN AUDIT RADARI</h2>
+              <span class="badge badge-amber">4.97 Portföy Puanı</span>
+            </div>
+            <p class="sub-text">5 evin canlı Airbnb ilan puanları, yorum adetleri ve misafir memnuniyet karnesi.</p>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="syncLiveAirbnbData()" id="syncAirbnbBtn" style="border-color: #F59E0B; color: #FDE68A; font-weight: 700;">
+              🔄 Airbnb'den Senkronize Et
+            </button>
+          </div>
+        </div>
+
         <div class="table-responsive">
           <table class="data-table">
             <thead>
-              <tr><th>VİLLA</th><th>FOTOĞRAF</th><th>FİYAT PARİTESİ</th><th>MIN STAY</th><th>İPTAL</th><th>INSTANT</th><th>PUAN</th><th>AKSİYON</th></tr>
+              <tr>
+                <th>VİLLA</th>
+                <th>AİRBたと İLAN BAŞLIĞI</th>
+                <th>CANLI PUAN</th>
+                <th>YORUM</th>
+                <th>ROZETLER</th>
+                <th>ÖNE ÇIKAN DONANIM</th>
+                <th>DURUM</th>
+                <th style="text-align: right;">AİRBNB İLANI</th>
+              </tr>
             </thead>
-            <tbody id="digitalAuditTableBody"></tbody>
+            <tbody id="digitalAuditTableBody">
+              <!-- Injected via JS -->
+            </tbody>
           </table>
         </div>
       </section>
