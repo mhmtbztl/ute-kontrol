@@ -2068,3 +2068,482 @@ body {
 .insight-box.success .in-header { color: #6EE7B7; }
 
 
+
+
+/* =============================================================
+   MÜLK BAZLI FİNANSAL PERFORMANS (YÖNETİCİ MATRİSİ & PREMİUM KARTLAR)
+   ============================================================= */
+.prop-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.view-toggle-group {
+  display: inline-flex;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 3px;
+  gap: 4px;
+}
+
+.view-toggle-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.view-toggle-btn.active {
+  background: var(--accent-blue);
+  color: #FFFFFF;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.view-toggle-btn:hover:not(.active) {
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Executive Table Matrix */
+.prop-exec-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 14px;
+}
+
+.prop-exec-table th {
+  background: rgba(0, 0, 0, 0.35);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.prop-exec-table td {
+  padding: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 13px;
+  vertical-align: middle;
+}
+
+.prop-exec-table tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+  margin-right: 8px;
+}
+
+.rank-1 { background: rgba(245, 158, 11, 0.2); color: #F59E0B; border: 1px solid rgba(245, 158, 11, 0.4); }
+.rank-2 { background: rgba(148, 163, 184, 0.2); color: #E2E8F0; border: 1px solid rgba(148, 163, 184, 0.4); }
+.rank-3 { background: rgba(217, 119, 6, 0.2); color: #D97706; border: 1px solid rgba(217, 119, 6, 0.4); }
+
+.prop-name-col {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.villa-icon-avatar {
+  font-size: 22px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.villa-text-meta h4 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.villa-text-meta span {
+  font-size: 11px;
+  color: var(--text-muted);
+  display: block;
+  margin-top: 2px;
+}
+
+/* Share & Occupancy Mini Bars */
+.table-bar-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 110px;
+}
+
+.table-bar-track {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.table-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.bar-emerald { background: #10B981; }
+.bar-blue { background: #3B82F6; }
+.bar-amber { background: #F59E0B; }
+.bar-rose { background: #EF4444; }
+
+/* Redesigned Premium Cards */
+.prop-cards-grid-new {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 18px;
+  margin-top: 14px;
+}
+
+.prop-card-premium {
+  background: linear-gradient(180deg, rgba(26, 34, 52, 0.8) 0%, rgba(17, 24, 39, 0.95) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: relative;
+  transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+  cursor: pointer;
+}
+
+.prop-card-premium:hover {
+  transform: translateY(-3px);
+  border-color: var(--accent-blue);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+}
+
+.prop-card-premium.leader-card {
+  border-color: rgba(245, 158, 11, 0.4);
+  background: linear-gradient(180deg, rgba(35, 30, 20, 0.8) 0%, rgba(17, 24, 39, 0.95) 100%);
+}
+
+.prop-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.prop-hero-ciro-box {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.hero-ciro-val {
+  font-size: 22px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  color: #FFFFFF;
+}
+
+.prop-submetrics-2x2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.subm-box {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+.subm-box .s-lbl {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  display: block;
+  font-weight: 700;
+}
+
+.subm-box .s-val {
+  font-size: 14px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  margin-top: 2px;
+  display: block;
+}
+
+/* =============================================================
+   ❓ NASIL KULLANILIR? REHBER MODALI
+   ============================================================= */
+.help-tabs-nav {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0 20px;
+  overflow-x: auto;
+}
+
+.help-tab-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+}
+
+.help-tab-btn.active {
+  color: #3B82F6;
+  border-bottom-color: #3B82F6;
+}
+
+.help-step-item {
+  display: flex;
+  gap: 16px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  margin-bottom: 12px;
+}
+
+.step-num-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: #93C5FD;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.step-body h4 {
+  margin: 0 0 4px 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #FFFFFF;
+}
+
+.step-body p {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.step-tip {
+  font-size: 11px;
+  color: #34D399;
+  background: rgba(16, 185, 129, 0.1);
+  padding: 4px 8px;
+  border-radius: 6px;
+  display: inline-block;
+}
+
+.glossary-card {
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+}
+
+.glossary-card strong {
+  color: #60A5FA;
+  font-size: 13px;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.glossary-card p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* =============================================================
+   🛎️ GÜNLÜK GİRİŞ / ÇIKIŞ & TEMİZLİK OPERASYONLARI (HOUSEKEEPING)
+   ============================================================= */
+.daily-ops-section {
+  margin-bottom: 24px;
+}
+
+.daily-ops-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  margin-top: 14px;
+}
+
+.ops-column-box {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.ops-col-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+}
+
+.ops-col-header h3 {
+  font-size: 13px;
+  font-weight: 700;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ops-entry-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ops-guest-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #FFFFFF;
+}
+
+.ops-guest-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* =============================================================
+   📅 30 GÜNLÜK GÖRSEL DOLULUK ÇİZELGESİ (TAPE CHART)
+   ============================================================= */
+.tape-chart-card {
+  margin-bottom: 24px;
+}
+
+.tape-chart-wrapper {
+  overflow-x: auto;
+  margin-top: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.tape-chart-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 900px;
+}
+
+.tape-chart-table th, .tape-chart-table td {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  text-align: center;
+  padding: 6px 2px;
+}
+
+.tape-villa-th, .tape-villa-td {
+  position: sticky;
+  left: 0;
+  background: #151D2F;
+  z-index: 2;
+  text-align: left !important;
+  padding: 10px 14px !important;
+  font-weight: 700;
+  min-width: 160px;
+  border-right: 2px solid rgba(255, 255, 255, 0.15) !important;
+}
+
+.tape-day-th {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  width: 28px;
+  padding: 8px 2px;
+}
+
+.tape-day-th.weekend {
+  background: rgba(59, 130, 246, 0.1);
+  color: #93C5FD;
+}
+
+.tape-cell {
+  height: 38px;
+  position: relative;
+  background: rgba(255, 255, 255, 0.01);
+  transition: background 0.15s;
+}
+
+.tape-cell:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.tape-booked {
+  border-radius: 4px;
+  height: 28px;
+  margin: 4px 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #FFFFFF;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+  overflow: hidden;
+  white-space: nowrap;
+  padding: 0 4px;
+  cursor: pointer;
+}
+
+.tape-airbnb { background: linear-gradient(135deg, #E11D48 0%, #BE123C 100%); }
+.tape-booking { background: linear-gradient(135deg, #1D4ED8 0%, #1E40AF 100%); }
+.tape-direct { background: linear-gradient(135deg, #059669 0%, #047857 100%); }
+.tape-other { background: linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%); }

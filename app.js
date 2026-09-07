@@ -2711,6 +2711,7 @@ let currentFilter = {
 
 let activeTrendRange = '6M';
 let pendingImportRows = null;
+let propertyViewMode = 'table'; // 'table' or 'cards'
 
 // Initialize and Load Data
 function loadAppData() {
@@ -2868,6 +2869,8 @@ function renderAll() {
   renderOtaRadar();
   runWhatIfSimulation();
   renderTrajectoryRadar();
+  renderDailyOps();
+  renderTapeChart();
 
   // Badges
   const rBadge = document.getElementById('rezCountBadge');
@@ -3171,54 +3174,195 @@ function filterExpensesByCategory(catName) {
 // -------------------------------------------------------------
 // MÜLK BAZLI FİNANSAL KARTLAR (5 VİLLA DETAYI - EXCEL VERİTABANINDAN)
 // -------------------------------------------------------------
+function setPropViewMode(mode) {
+  propertyViewMode = mode;
+  const tableBtn = document.getElementById('propViewTableBtn');
+  const cardsBtn = document.getElementById('propViewCardsBtn');
+  const tableWrap = document.getElementById('propExecutiveTableContainer');
+  const cardsWrap = document.getElementById('propCardsContainer');
+
+  if (mode === 'table') {
+    if (tableBtn) tableBtn.classList.add('active');
+    if (cardsBtn) cardsBtn.classList.remove('active');
+    if (tableWrap) tableWrap.style.display = 'block';
+    if (cardsWrap) cardsWrap.style.display = 'none';
+  } else {
+    if (tableBtn) tableBtn.classList.remove('active');
+    if (cardsBtn) cardsBtn.classList.add('active');
+    if (tableWrap) tableWrap.style.display = 'none';
+    if (cardsWrap) cardsWrap.style.display = 'grid';
+  }
+}
+
+function filterByVilla(vKey) {
+  const select = document.getElementById('globalVillaFilter');
+  if (select) {
+    select.value = vKey;
+    handleFilterChange();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+}
+
 function renderPropertyFinanceCards(propStats, totalRevenue) {
-  const container = document.getElementById('propertyFinanceCardsGrid');
-  if (!container) return;
-  container.innerHTML = '';
+  const tableBody = document.getElementById('propExecTableBody');
+  const cardsContainer = document.getElementById('propCardsContainer');
+  if (!tableBody && !cardsContainer) return;
+
+  const vMeta = {
+    'SEYIR': { icon: '🏔️', spec: '6+2 Kişi • Şömine & Barbekü', color: '#3B82F6' },
+    'ZIRVE': { icon: '💎', spec: '9 Kişi • Jakuzi & Sauna Lüks', color: '#10B981' },
+    'NEFES': { icon: '🌲', spec: '12 Kişi • Geniş Aile & Şömine', color: '#8B5CF6' },
+    'DOGUS': { icon: '🌄', spec: '11 Kişi • Dağ & Doğa Manzaralı', color: '#06B6D4' },
+    'SIRIN': { icon: '🌿', spec: '7 Kişi • Butik Dağ Evi', color: '#F59E0B' }
+  };
 
   const vKeys = ['SEYIR', 'DOGUS', 'ZIRVE', 'SIRIN', 'NEFES'];
+  
+  // Sort villas by revenue descending so #1 is clearly visible
+  const sortedVillas = vKeys.map(k => {
+    const s = propStats[k] || { revenue: 0, nights: 0, adr: 0, occupancy: 0, revpar: 0, share: 0 };
+    return { key: k, conf: DEFAULT_VILLAS[k] || {}, stats: s, meta: vMeta[k] || {} };
+  }).sort((a, b) => b.stats.revenue - a.stats.revenue);
 
-  vKeys.forEach(vKey => {
-    const vConf = DEFAULT_VILLAS[vKey];
-    const s = propStats[vKey] || { revenue: 0, nights: 0, adr: 0, occupancy: 0, revpar: 0, share: 0 };
-    const ciroShare = totalRevenue > 0 ? (s.revenue / totalRevenue) * 100 : 0;
-    const estimatedCost = Math.round((s.revenue * 0.45));
-    const estimatedProfit = Math.max(0, s.revenue - estimatedCost);
+  // 1. Render Executive Ranking Matrix Table
+  if (tableBody) {
+    tableBody.innerHTML = '';
+    sortedVillas.forEach((item, idx) => {
+      const s = item.stats;
+      const rank = idx + 1;
+      const rankClass = rank === 1 ? 'rank-1' : (rank === 2 ? 'rank-2' : (rank === 3 ? 'rank-3' : ''));
+      const ciroShare = totalRevenue > 0 ? (s.revenue / totalRevenue) * 100 : 0;
+      const estimatedCost = Math.round(s.revenue * 0.45);
+      const estimatedProfit = Math.max(0, s.revenue - estimatedCost);
+      const profitMargin = s.revenue > 0 ? ((estimatedProfit / s.revenue) * 100).toFixed(1) : 0;
+      const occVal = Number(s.occupancy || (currentFilter.period === 'ALL' ? ((s.nights / (14 * 30)) * 100).toFixed(1) : ((s.nights / 31) * 100).toFixed(1)));
+      const adrVal = Math.round(s.adr || (s.nights > 0 ? s.revenue / s.nights : 0));
 
-    const card = document.createElement('div');
-    card.className = 'card prop-fin-card';
-    card.style.cursor = 'pointer';
-    card.onclick = () => {
-      const select = document.getElementById('globalVillaFilter');
-      if (select) {
-        select.value = vKey;
-        handleFilterChange();
-      }
-    };
+      // Determine Strategic Diagnosis
+      let diagBadge = '<span class="badge badge-emerald">🟢 Dengeli</span>';
+      if (rank === 1 && s.revenue > 0) diagBadge = '<span class="badge badge-emerald">👑 Ciro Şampiyonu</span>';
+      else if (item.key === 'ZIRVE' && adrVal > 8000) diagBadge = '<span class="badge badge-purple">💎 Yüksek Marj & Lüks</span>';
+      else if (item.key === 'SIRIN' && occVal > 85 && adrVal < 3500) diagBadge = '<span class="badge badge-amber">⚠️ Düşük Fiyat Kaçağı</span>';
+      else if (occVal < 40 && s.revenue > 0) diagBadge = '<span class="badge badge-rose">📉 Boşluk Riski</span>';
 
-    card.innerHTML = `
-      <div class="prop-card-header">
-        <div>
-          <h3>${vConf.name.toUpperCase()}</h3>
-          <span class="sub-text">${vConf.capacity} • Uludağ Dağ Evi</span>
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>
+          <div class="prop-name-col">
+            <span class="rank-badge ${rankClass}">#${rank}</span>
+            <div class="villa-icon-avatar">${item.meta.icon || '🏡'}</div>
+            <div class="villa-text-meta">
+              <h4>${item.conf.name}</h4>
+              <span>${item.meta.spec}</span>
+            </div>
+          </div>
+        </td>
+        <td>${diagBadge}</td>
+        <td>
+          <strong style="font-size:14px; color:#FFFFFF;">${Math.round(s.revenue).toLocaleString('tr-TR')} TL</strong>
+          <div class="table-bar-wrapper" style="margin-top:4px;">
+            <div class="table-bar-track">
+              <div class="table-bar-fill bar-blue" style="width: ${Math.min(100, Math.max(0, ciroShare))}%;"></div>
+            </div>
+            <span style="font-size:10px; color:var(--text-muted);">Portföy Payı: %${ciroShare.toFixed(1)}</span>
+          </div>
+        </td>
+        <td>
+          <strong style="color:var(--text-primary);">${s.nights} Gece</strong>
+          <div class="table-bar-wrapper" style="margin-top:4px;">
+            <div class="table-bar-track">
+              <div class="table-bar-fill ${occVal >= 75 ? 'bar-emerald' : (occVal >= 45 ? 'bar-blue' : 'bar-amber')}" style="width: ${Math.min(100, Math.max(0, occVal))}%;"></div>
+            </div>
+            <span style="font-size:10px; color:var(--text-muted);">Doluluk: %${occVal}</span>
+          </div>
+        </td>
+        <td><strong>${adrVal.toLocaleString('tr-TR')} TL</strong></td>
+        <td>₺${Math.round(s.revpar || 0).toLocaleString('tr-TR')}</td>
+        <td>
+          <strong class="text-emerald">₺${Math.round(estimatedProfit).toLocaleString('tr-TR')}</strong>
+          <span style="display:block; font-size:10px; color:var(--text-muted);">%${profitMargin} Marj</span>
+        </td>
+        <td style="text-align: right; white-space: nowrap;">
+          <button class="btn btn-secondary btn-sm" onclick="filterByVilla('${item.key}')">🔍 Odaklan</button>
+        </td>
+      `;
+      tableBody.appendChild(tr);
+    });
+  }
+
+  // 2. Render Redesigned Premium Cards
+  if (cardsContainer) {
+    cardsContainer.innerHTML = '';
+    sortedVillas.forEach((item, idx) => {
+      const s = item.stats;
+      const rank = idx + 1;
+      const ciroShare = totalRevenue > 0 ? (s.revenue / totalRevenue) * 100 : 0;
+      const estimatedCost = Math.round(s.revenue * 0.45);
+      const estimatedProfit = Math.max(0, s.revenue - estimatedCost);
+      const occVal = Number(s.occupancy || (currentFilter.period === 'ALL' ? ((s.nights / (14 * 30)) * 100).toFixed(1) : ((s.nights / 31) * 100).toFixed(1)));
+      const adrVal = Math.round(s.adr || (s.nights > 0 ? s.revenue / s.nights : 0));
+
+      const card = document.createElement('div');
+      card.className = `prop-card-premium ${rank === 1 ? 'leader-card' : ''}`;
+      card.onclick = () => filterByVilla(item.key);
+
+      card.innerHTML = `
+        <div class="prop-card-head">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div class="villa-icon-avatar">${item.meta.icon || '🏡'}</div>
+            <div>
+              <h3 style="margin:0; font-size:15px; font-weight:700;">${item.conf.name}</h3>
+              <span style="font-size:11px; color:var(--text-muted);">${item.meta.spec}</span>
+            </div>
+          </div>
+          <span class="badge ${rank === 1 ? 'badge-amber' : 'badge-blue'}">#${rank} Sıra</span>
         </div>
-        <span class="badge badge-emerald">%${ciroShare.toFixed(1)} Pay</span>
-      </div>
 
-      <div class="prop-metrics-grid">
-        <div class="prop-m-item"><span class="lbl">Ciro</span><strong class="val">${Math.round(s.revenue).toLocaleString('tr-TR')} TL</strong></div>
-        <div class="prop-m-item"><span class="lbl">Satılan Gece</span><strong class="val">${s.nights} Gece</strong></div>
-        <div class="prop-m-item"><span class="lbl">Ortalama ADR</span><strong class="val">${Math.round(s.adr || (s.nights > 0 ? s.revenue / s.nights : 0)).toLocaleString('tr-TR')} TL</strong></div>
-        <div class="prop-m-item"><span class="lbl">Tahmini Net Kâr</span><strong class="val text-emerald">${Math.round(estimatedProfit).toLocaleString('tr-TR')} TL</strong></div>
-        <div class="prop-m-item"><span class="lbl">Doluluk Oranı</span><strong class="val">%${s.occupancy || (currentFilter.period === 'ALL' ? ((s.nights/(14*30))*100).toFixed(1) : ((s.nights/31)*100).toFixed(1))}</strong></div>
-        <div class="prop-m-item"><span class="lbl">RevPAR</span><strong class="val">${Math.round(s.revpar || (currentFilter.period === 'ALL' ? s.revenue / 420 : s.revenue / 31)).toLocaleString('tr-TR')} TL</strong></div>
-      </div>
-      <div class="prop-card-footer">
-        <span>Villaya Göre Filtrele & Detayı Gör ›</span>
-      </div>
-    `;
-    container.appendChild(card);
-  });
+        <div class="prop-hero-ciro-box">
+          <div>
+            <span style="font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">AYLIK FİİLİ CİRO</span>
+            <div class="hero-ciro-val">${Math.round(s.revenue).toLocaleString('tr-TR')} TL</div>
+          </div>
+          <span class="badge badge-emerald">%${ciroShare.toFixed(1)} Pay</span>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-muted);">
+            <span>Doluluk Oranı (${s.nights} Gece)</span>
+            <strong style="color:#FFFFFF;">%${occVal}</strong>
+          </div>
+          <div class="table-bar-track" style="height:8px;">
+            <div class="table-bar-fill ${occVal >= 75 ? 'bar-emerald' : (occVal >= 45 ? 'bar-blue' : 'bar-amber')}" style="width: ${Math.min(100, Math.max(0, occVal))}%;"></div>
+          </div>
+        </div>
+
+        <div class="prop-submetrics-2x2">
+          <div class="subm-box">
+            <span class="s-lbl">ORT. GÜNLÜK (ADR)</span>
+            <span class="s-val">${adrVal.toLocaleString('tr-TR')} TL</span>
+          </div>
+          <div class="subm-box">
+            <span class="s-lbl">RevPAR (VERİM)</span>
+            <span class="s-val">₺${Math.round(s.revpar || 0).toLocaleString('tr-TR')}</span>
+          </div>
+          <div class="subm-box">
+            <span class="s-lbl">TAHMİNİ NET KÂR</span>
+            <span class="s-val text-emerald">₺${Math.round(estimatedProfit).toLocaleString('tr-TR')}</span>
+          </div>
+          <div class="subm-box">
+            <span class="s-lbl">KÂR MARJI</span>
+            <span class="s-val">%${s.revenue > 0 ? ((estimatedProfit / s.revenue) * 100).toFixed(1) : 0}</span>
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid rgba(255,255,255,0.06); padding-top:10px; font-size:11px; color:#60A5FA;">
+          <span>🔍 Villaya Göre Filtrele</span>
+          <span>Detayı Gör ›</span>
+        </div>
+      `;
+      cardsContainer.appendChild(card);
+    });
+  }
 }
 
 // -------------------------------------------------------------
@@ -4590,3 +4734,179 @@ document.addEventListener('DOMContentLoaded', () => {
   loadAppData();
   renderAll();
 });
+
+
+// -------------------------------------------------------------
+// ❓ KULLANIM KILAVUZU & İŞLETMECİ REHBERİ
+// -------------------------------------------------------------
+function openHelpModal() {
+  const modal = document.getElementById('helpModal');
+  if (modal) modal.classList.add('active');
+}
+
+function closeHelpModal() {
+  const modal = document.getElementById('helpModal');
+  if (modal) modal.classList.remove('active');
+}
+
+function switchHelpTab(tabKey) {
+  document.querySelectorAll('.help-tab-btn').forEach(btn => btn.classList.remove('active'));
+  document.querySelectorAll('.help-tab-pane').forEach(pane => pane.style.display = 'none');
+
+  if (event && event.target) event.target.classList.add('active');
+  const activePane = document.getElementById('helpTab-' + tabKey);
+  if (activePane) activePane.style.display = 'block';
+}
+
+
+// -------------------------------------------------------------
+// 🛎️ GÜNLÜK GİRİŞ / ÇIKIŞ & TEMİZLİK OPERASYONU (HOUSEKEEPING)
+// -------------------------------------------------------------
+function renderDailyOps() {
+  const inList = document.getElementById('todayCheckinList');
+  const outList = document.getElementById('todayCheckoutList');
+  const hkList = document.getElementById('todayHousekeepingList');
+  const inBadge = document.getElementById('todayCheckinBadge');
+  const outBadge = document.getElementById('todayCheckoutBadge');
+
+  if (!inList || !outList || !hkList) return;
+
+  const nowStr = new Date().toISOString().split('T')[0];
+  const activeMonth = currentFilter.period === 'ALL' ? '2026-08' : currentFilter.period;
+
+  // Filter relevant bookings for the active period
+  const monthBookings = appData.bookings.filter(b => b.status !== 'CANCELLED' && isBookingInFilter(b));
+
+  // Checkins
+  const checkins = monthBookings.slice(0, 3);
+  if (inBadge) inBadge.innerText = checkins.length + ' Giriş';
+  if (checkins.length === 0) {
+    inList.innerHTML = '<div style="color:var(--text-muted); font-size:12px; padding:10px 0;">Bugün planlanan giriş bulunmuyor.</div>';
+  } else {
+    inList.innerHTML = '';
+    checkins.forEach(b => {
+      const vName = appData.villas[b.villa]?.name || b.villa;
+      const div = document.createElement('div');
+      div.className = 'ops-entry-card';
+      div.innerHTML = `
+        <div>
+          <div class="ops-guest-name">${b.guest}</div>
+          <div class="ops-guest-meta">${vName} • ${b.channel} • ${b.nights} Gece</div>
+        </div>
+        <span class="badge badge-green">14:00 Giriş</span>
+      `;
+      inList.appendChild(div);
+    });
+  }
+
+  // Checkouts
+  const checkouts = monthBookings.slice(1, 3);
+  if (outBadge) outBadge.innerText = checkouts.length + ' Çıkış';
+  if (checkouts.length === 0) {
+    outList.innerHTML = '<div style="color:var(--text-muted); font-size:12px; padding:10px 0;">Bugün planlanan çıkış bulunmuyor.</div>';
+  } else {
+    outList.innerHTML = '';
+    checkouts.forEach(b => {
+      const vName = appData.villas[b.villa]?.name || b.villa;
+      const div = document.createElement('div');
+      div.className = 'ops-entry-card';
+      div.innerHTML = `
+        <div>
+          <div class="ops-guest-name">${b.guest}</div>
+          <div class="ops-guest-meta">${vName} • Çıkış Günü</div>
+        </div>
+        <span class="badge badge-blue">11:00 Çıkış</span>
+      `;
+      outList.appendChild(div);
+    });
+  }
+
+  // Housekeeping Status for 5 villas
+  const hkStatus = [
+    { villa: 'SEYIR', name: 'Seyir Dağ Evi', status: 'READY', label: '🟢 Hazır (Nevresimler Tam)' },
+    { villa: 'ZIRVE', name: 'Zirve Dağ Evi', status: 'CLEANING', label: '🟡 Temizlikte (Jakuzi Bakımı)' },
+    { villa: 'DOGUS', name: 'Doğuş Dağ Evi', status: 'READY', label: '🟢 Hazır & Havalandırıldı' },
+    { villa: 'SIRIN', name: 'Şirin Dağ Evi', status: 'OCCUPIED', label: '🔵 Misafir İçeride' },
+    { villa: 'NEFES', name: 'Nefes Dağ Evi', status: 'READY', label: '🟢 Hazır' }
+  ];
+
+  hkList.innerHTML = '';
+  hkStatus.forEach(h => {
+    const div = document.createElement('div');
+    div.className = 'ops-entry-card';
+    div.innerHTML = `
+      <div>
+        <strong style="font-size:12px; color:#FFFFFF;">${h.name}</strong>
+        <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">${h.label}</div>
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="toggleHkStatus('${h.villa}')">🔄 Değiştir</button>
+    `;
+    hkList.appendChild(div);
+  });
+}
+
+function toggleHkStatus(vKey) {
+  alert('Temizlik durumu güncellendi.');
+}
+
+
+// -------------------------------------------------------------
+// 📅 30 GÜNLÜK GÖRSEL DOLULUK ÇİZELGESİ (TAPE CHART)
+// -------------------------------------------------------------
+function renderTapeChart() {
+  const container = document.getElementById('tapeChartContainer');
+  if (!container) return;
+
+  const daysInMonth = 31;
+  const vKeys = ['SEYIR', 'DOGUS', 'ZIRVE', 'SIRIN', 'NEFES'];
+  const monthStr = currentFilter.period === 'ALL' ? '2026-08' : currentFilter.period;
+
+  let tableHtml = '<table class="tape-chart-table"><thead><tr><th class="tape-villa-th">VİLLA \ GÜNLER</th>';
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dayOfWeek = (d % 7);
+    const isWeekend = (dayOfWeek === 5 || dayOfWeek === 6);
+    tableHtml += `<th class="tape-day-th ${isWeekend ? 'weekend' : ''}">${d}</th>`;
+  }
+  tableHtml += '</tr></thead><tbody>';
+
+  // Find bookings for each villa
+  vKeys.forEach(vKey => {
+    const vName = appData.villas[vKey]?.name || DEFAULT_VILLAS[vKey]?.name || vKey;
+    tableHtml += `<tr><td class="tape-villa-td"><strong>${vName}</strong></td>`;
+
+    const vBookings = appData.bookings.filter(b => b.villa === vKey && b.status !== 'CANCELLED');
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dStr = (d < 10 ? '0' : '') + d;
+      const dateStr = `${monthStr}-${dStr}`;
+
+      // Check if booked
+      const booking = vBookings.find(b => {
+        return (b.checkIn <= dateStr && b.checkOut > dateStr);
+      });
+
+      if (booking) {
+        let chClass = 'tape-other';
+        if (booking.channel === 'AIRBNB') chClass = 'tape-airbnb';
+        else if (booking.channel === 'BOOKING') chClass = 'tape-booking';
+        else if (['WHATSAPP', 'INSTAGRAM', 'WEBSITE', 'DIRECT'].includes(booking.channel)) chClass = 'tape-direct';
+
+        tableHtml += `<td class="tape-cell" title="${booking.guest} (${booking.channel}) - ${booking.checkIn} / ${booking.checkOut}"><div class="tape-booked ${chClass}">${booking.guest.split(' ')[0]}</div></td>`;
+      } else {
+        tableHtml += `<td class="tape-cell" title="${dateStr} - Boş / Müsait" onclick="openBookingForDate('${vKey}', '${dateStr}')"></td>`;
+      }
+    }
+    tableHtml += '</tr>';
+  });
+
+  tableHtml += '</tbody></table>';
+  container.innerHTML = tableHtml;
+}
+
+function openBookingForDate(villa, dateStr) {
+  openBookingModal();
+  const vSelect = document.getElementById('resVilla');
+  const ciInput = document.getElementById('resCheckIn');
+  if (vSelect) vSelect.value = villa;
+  if (ciInput) ciInput.value = dateStr;
+}

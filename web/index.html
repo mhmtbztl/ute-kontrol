@@ -61,6 +61,7 @@
       <button class="btn btn-secondary" onclick="openExpenseModal()">+ Gider / Yatırım</button>
       <button class="btn btn-secondary" onclick="openImportModal()">📥 Rapor Yükle</button>
       <button class="btn btn-secondary" onclick="exportDataJSON()">💾 Yedek</button>
+      <button class="btn btn-secondary btn-sm" onclick="openHelpModal()" title="Hızlı Başlangıç & İşletmeci Kılavuzu">❓ Nasıl Kullanılır?</button>
       <button class="btn btn-danger btn-sm" onclick="openResetModal()" title="Verileri sıfırla veya geri yükle">🗑️ Sıfırla</button>
     </div>
   </header>
@@ -322,16 +323,48 @@
         </div>
       </section>
 
-      <!-- 6. MÜLK BAZLI FİNANSAL PERFORMANS (5 VİLLA DETAY KARTLARI) -->
+      <!-- 6. MÜLK BAZLI FİNANSAL PERFORMANS (YÖNETİCİ SIRALAMA TABLOSU & PREMİUM KARTLAR) -->
       <section class="card property-finance-section">
         <div class="section-title-bar">
           <div>
             <h2>🏡 MÜLK BAZLI FİNANSAL PERFORMANS (5 VİLLA)</h2>
-            <p class="sub-text">Hangi villa ne kadar ciro üretti, ne kadar gider tüketti ve kâra ne kadar katkı sağladı?</p>
+            <p class="sub-text">Ciro üretimi, doluluk oranları, gecelik fiyat savunması ve net kâr katkısı</p>
+          </div>
+          <div class="prop-header-actions">
+            <div class="view-toggle-group">
+              <button class="view-toggle-btn active" id="propViewTableBtn" onclick="setPropViewMode('table')">
+                📋 Yönetici Sıralama Tablosu
+              </button>
+              <button class="view-toggle-btn" id="propViewCardsBtn" onclick="setPropViewMode('cards')">
+                🎴 Kart Görünümü
+              </button>
+            </div>
           </div>
         </div>
 
-        <div class="property-finance-cards-grid" id="propertyFinanceCardsGrid">
+        <!-- Görünüm 1: Yönetici Sıralama Tablosu (Varsayılan - Tek Bakışta Net) -->
+        <div id="propExecutiveTableContainer" class="table-responsive">
+          <table class="prop-exec-table">
+            <thead>
+              <tr>
+                <th>🏆 SIRA & MÜLK</th>
+                <th>STRATEJİK DURUM</th>
+                <th>CİRO & PORTFÖY PAYI</th>
+                <th>DOLULUK & SATILAN GECE</th>
+                <th>ORT. GÜNLÜK (ADR)</th>
+                <th>RevPAR</th>
+                <th>TAHMİNİ NET KÂR</th>
+                <th style="text-align: right;">İŞLEM</th>
+              </tr>
+            </thead>
+            <tbody id="propExecTableBody">
+              <!-- Injected via JS -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Görünüm 2: Yenilenen Premium Kartlar Grid -->
+        <div id="propCardsContainer" class="prop-cards-grid-new" style="display: none;">
           <!-- Injected via JS -->
         </div>
       </section>
@@ -662,6 +695,46 @@
         <div class="radar-grid" id="todayRadarList"></div>
       </section>
 
+      <!-- GÜNLÜK GİRİŞ / ÇIKIŞ & TEMİZLİK OPERASYON PANOSU -->
+      <section class="card daily-ops-section">
+        <div class="section-title-bar">
+          <div>
+            <h2>🛎️ GÜNLÜK OPERASYON & TEMİZLİK KONTROL MERKEZİ</h2>
+            <p class="sub-text">Bugün giriş-çıkış yapacak misafirler ve villaların hazırlık durumu</p>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="openBookingModal()">+ Hızlı Rezervasyon</button>
+        </div>
+
+        <div class="daily-ops-grid">
+          <!-- Col 1: Girişler -->
+          <div class="ops-column-box">
+            <div class="ops-col-header">
+              <h3 style="color: #6EE7B7;">🧳 BUGÜN GİRİŞLER (CHECK-IN)</h3>
+              <span class="badge badge-emerald" id="todayCheckinBadge">0 Giriş</span>
+            </div>
+            <div id="todayCheckinList"></div>
+          </div>
+
+          <!-- Col 2: Çıkışlar -->
+          <div class="ops-column-box">
+            <div class="ops-col-header">
+              <h3 style="color: #93C5FD;">🔑 BUGÜN ÇIKIŞLAR (CHECK-OUT)</h3>
+              <span class="badge badge-blue" id="todayCheckoutBadge">0 Çıkış</span>
+            </div>
+            <div id="todayCheckoutList"></div>
+          </div>
+
+          <!-- Col 3: Temizlik Durumu -->
+          <div class="ops-column-box">
+            <div class="ops-col-header">
+              <h3 style="color: #FCD34D;">🧹 TEMİZLİK & HAZIRLIK DURUMU</h3>
+              <span class="badge badge-amber" id="todayHousekeepingBadge">5 Villa</span>
+            </div>
+            <div id="todayHousekeepingList"></div>
+          </div>
+        </div>
+      </section>
+
       <section class="kpi-cards-grid">
         <div class="kpi-card">
           <span class="kpi-label">NET ODA GELİRİ</span>
@@ -772,9 +845,25 @@
     <!-- TAB: REZERVASYONLAR (FULL CRUD) -->
     <!-- ========================================== -->
     <div id="tab-reservations" class="tab-content">
+      <!-- 30 GÜNLÜK GÖRSEL DOLULUK ÇİZELGESİ (TAPE CHART) -->
+      <section class="card tape-chart-card">
+        <div class="section-title-bar">
+          <div>
+            <h2>📅 30 GÜNLÜK GÖRSEL DOLULUK ÇİZELGESİ (TAPE CHART)</h2>
+            <p class="sub-text">5 villanın yatay takvim şeritleri, dolu/boş günleri ve gap boşlukları</p>
+          </div>
+          <div style="display: flex; gap: 12px; align-items: center; font-size: 11px;">
+            <span style="display: inline-flex; align-items: center; gap: 4px;"><span style="width: 10px; height: 10px; border-radius: 2px; background: #E11D48;"></span> Airbnb</span>
+            <span style="display: inline-flex; align-items: center; gap: 4px;"><span style="width: 10px; height: 10px; border-radius: 2px; background: #1D4ED8;"></span> Booking</span>
+            <span style="display: inline-flex; align-items: center; gap: 4px;"><span style="width: 10px; height: 10px; border-radius: 2px; background: #059669;"></span> WhatsApp/Direkt</span>
+          </div>
+        </div>
+        <div class="tape-chart-wrapper" id="tapeChartContainer"></div>
+      </section>
+
       <section class="card">
         <div class="section-title-bar">
-          <div><h2>📅 REZERVASYON YÖNETİMİ</h2><p class="sub-text">Tüm geçmiş ve gelecek rezervasyonları düzenleyin, silin veya filtreleyin.</p></div>
+          <div><h2>📋 DETAYLI REZERVASYON LİSTESİ</h2><p class="sub-text">Tüm geçmiş ve gelecek rezervasyonları düzenleyin, silin veya filtreleyin.</p></div>
           <div class="table-actions">
             <input type="text" id="rezSearchInput" placeholder="🔍 Misafir veya Villa ara..." oninput="renderManageBookingsTable()">
             <button class="btn btn-primary" onclick="openBookingModal()">+ Yeni Rezervasyon</button>
@@ -1240,7 +1329,122 @@
   </div>
 
     <!-- MODAL: VERİ SIFIRLAMA VE YÖNETİM MERKEZİ -->
-  <div class="modal-backdrop" id="resetModal">
+    <!-- MODAL: KULLANIM KILAVUZU & İŞLETMECİ REHBERİ -->
+  <div class="modal-backdrop" id="helpModal">
+    <div class="modal-card" style="max-width: 720px; max-height: 90vh; display: flex; flex-direction: column;">
+      <div class="modal-header">
+        <h3>❓ Lexbnb Kontrol Merkezi — Kullanım Kılavuzu & Rutin Rehberi</h3>
+        <button class="close-btn" onclick="closeHelpModal()">&times;</button>
+      </div>
+
+      <div class="help-tabs-nav">
+        <button class="help-tab-btn active" onclick="switchHelpTab('routine')">🕒 Günlük İşletmeci Rutini</button>
+        <button class="help-tab-btn" onclick="switchHelpTab('terms')">📊 Finansal Terimler</button>
+        <button class="help-tab-btn" onclick="switchHelpTab('ops')">🛎️ Operasyon & Temizlik</button>
+        <button class="help-tab-btn" onclick="switchHelpTab('data')">🔄 Excel & Sıfırlama</button>
+      </div>
+
+      <div style="padding: 20px; overflow-y: auto; flex: 1;">
+        <!-- TAB 1: GÜNLÜK RUTİN -->
+        <div id="helpTab-routine" class="help-tab-pane">
+          <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 16px;">
+            Lexbnb Kontrol Merkezi, bir kısa dönem dağ evi işletmecisinin gün içindeki 3 ana ihtiyacına göre tasarlanmıştır:
+          </p>
+
+          <div class="help-step-item">
+            <div class="step-num-icon">1</div>
+            <div class="step-body">
+              <h4>Sabah (10 Saniye Kuralı) — Kokpit Kontrolü</h4>
+              <p>Güne başlarken <strong>"📊 Kokpit"</strong> sekmesini açın. Bugün kim giriş yapacak, kim çıkış yapacak ve açık acil (P1) arıza var mı tek bakışta görün.</p>
+              <span class="step-tip">💡 İpucu: Temizlik ekibine talimat vermeden önce "Bugün Çıkışlar" tablosuna bakın.</span>
+            </div>
+          </div>
+
+          <div class="help-step-item">
+            <div class="step-num-icon">2</div>
+            <div class="step-body">
+              <h4>Gün İçi (Satış & İletişim) — Lead ve Rezervasyon Girişi</h4>
+              <p>WhatsApp veya Instagram'dan fiyat soran misafirleri unutmamak için <strong>"🎯 Lead & Satış"</strong> sekmesine not alın. Anlaştığınız anda üstteki <strong>"+ Rezervasyon"</strong> butonu ile sisteme kaydedin.</p>
+              <span class="step-tip">💡 İpucu: Direkt WhatsApp satışında OTA komisyonu sıfırlandığı için kârınız %15 artar.</span>
+            </div>
+          </div>
+
+          <div class="help-step-item">
+            <div class="step-num-icon">3</div>
+            <div class="step-body">
+              <h4>Akşam / Gün Sonu — Harcama Girişi & Finans Analizi</h4>
+              <p>O gün temizlik personeline yapılan ödemeyi, market alışverişini veya odun/pelet harcamasını üstteki <strong>"+ Gider / Yatırım"</strong> butonuna tıklayarak 5 saniyede kaydedin.</p>
+              <span class="step-tip">💡 İpucu: Ay sonunda <strong>"💰 Finans"</strong> sekmesini açarak cebinizde ne kadar net nakit kâr kaldığını görün.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 2: TERİMLER SÖZLÜĞÜ -->
+        <div id="helpTab-terms" class="help-tab-pane" style="display: none;">
+          <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 14px;">
+            Ekranda gördüğünüz ana finansal metriklerin işletmeniz için pratik anlamları:
+          </p>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="glossary-card">
+              <strong>📊 Fiili Ciro (Brüt Gelir)</strong>
+              <p>İlgili ayda villalarınızda konaklanan rezervasyonlardan kasaya giren toplam konaklama bedelidir.</p>
+            </div>
+            <div class="glossary-card">
+              <strong>💵 Net Nakit Kâr (Net Cash Profit)</strong>
+              <p>Ciro - Operasyonel Giderler (Maaş, temizlik, fatura) - Yatırımlar (Capex). Gerçekten cebinizde kalan serbest nakittir.</p>
+            </div>
+            <div class="glossary-card">
+              <strong>🏷️ ADR (Ortalama Günlük Fiyat)</strong>
+              <p>Sattığınız gecelerin ortalama fiyatıdır. (Toplam Ciro / Satılan Gece). Fiyat savunma gücünüzü gösterir.</p>
+            </div>
+            <div class="glossary-card">
+              <strong>📈 RevPAR (Kapasite Başı Gelir)</strong>
+              <p>Toplam cironun 30 güne bölünmesidir. Boş günlerin maliyetini de içerir. Villa başına gerçek verimlilik ölçütüdür.</p>
+            </div>
+            <div class="glossary-card">
+              <strong>💸 Opex (Operasyonel Gider)</strong>
+              <p>Personel maaşı, çamaşırhane, elektrik faturası, komisyon gibi günü kurtaran rutin harcamalardır.</p>
+            </div>
+            <div class="glossary-card">
+              <strong>🏗️ Capex (Yatırım Harcaması)</strong>
+              <p>Sauna yapımı, jakuzi, ısı pompası gibi mülkün değerini kalıcı olarak artıran uzun vadeli yatırımlardır.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 3: OPERASYON -->
+        <div id="helpTab-ops" class="help-tab-pane" style="display: none;">
+          <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 14px;">
+            Dağ evi operasyonunda günlük kontrol listesi:
+          </p>
+          <ul style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.6; padding-left: 20px;">
+            <li><strong>Giriş Hazırlığı:</strong> Şömine odunları hazırlandı mı, jakuzi suyu doldurulup ısıtıldı mı?</li>
+            <li><strong>P1 Arıza Kuralı:</strong> Isı pompası, jakuzi veya ana elektrik arızaları (P1) doğrudan rezervasyonu engeller; bakım sekmesinden anında takip edin.</li>
+            <li><strong>Boşluk Geceleri (Gap Nights):</strong> İki rezervasyon arasında kalan 1 veya 2 günlük boş günleri sistem otomatik tespit eder. Burayı fırsat fiyatıyla (%20 indirimli) Instagram hikayelerinden satın.</li>
+          </ul>
+        </div>
+
+        <!-- TAB 4: EXCEL & SIFIRLAMA -->
+        <div id="helpTab-data" class="help-tab-pane" style="display: none;">
+          <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 14px;">
+            Veri tabanı ve sıfırlama mekanizması:
+          </p>
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px;">
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0 0 10px 0;">
+              • <strong>Tüm Verileri Sıfırla (0 TL):</strong> Excel geçmişi dahil tüm verileri siler, kendi sıfır kasanızı başlatır. Sayfayı yenileseniz de 0 TL temiz kalır.<br>
+              • <strong>Excel Verilerini Geri Yükle:</strong> İstediğiniz zaman GENEL RAPOR.xlsx dosyasındaki 14 aylık resmi şirket veritabanını (5.004.165 TL ciro, 104 harcama kalemi) tek tuşla geri yükleyebilirsiniz.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" onclick="closeHelpModal()">Anladım, Kapat</button>
+      </div>
+    </div>
+  </div>
+
+<div class="modal-backdrop" id="resetModal">
     <div class="modal-card" style="max-width: 580px;">
       <div class="modal-header">
         <h3>🗑️ Veri Sıfırlama ve Yönetim</h3>
