@@ -5601,155 +5601,173 @@ function renderDailyOps() {
     });
   }
 
-  // 3. Housekeeping Status & Cleaning Payment Tracking for 5 Villas
-  if (hkBadge) hkBadge.innerText = Object.keys(appData.villas).length + ' Villa';
+  // 3. Housekeeping Status & Cleaning Payment Tracking (Rezervasyon Temizlik & Hazırlık Takvimi)
   hkList.innerHTML = '';
+  hkList.style.maxHeight = '540px';
+  hkList.style.overflowY = 'auto';
+  hkList.style.paddingRight = '4px';
 
   let totalPendingDebtKokpit = 0;
 
+  // 3A. Üst Kısım: 5 Villa Fiziksel Hazırlık Durumu (Kompakt Şerit)
+  const villaBar = document.createElement('div');
+  villaBar.style.marginBottom = '12px';
+  villaBar.style.padding = '8px 10px';
+  villaBar.style.background = 'rgba(255, 255, 255, 0.03)';
+  villaBar.style.border = '1px solid rgba(255, 255, 255, 0.08)';
+  villaBar.style.borderRadius = '8px';
+
+  let villaCardsHtml = '';
   Object.keys(appData.villas).forEach(vKey => {
     const vConf = appData.villas[vKey] || DEFAULT_VILLAS[vKey];
     if (!vConf) return;
 
-    // Real dynamic operational status
     const activeBooking = appData.bookings.find(b => b.villa === vKey && b.status !== 'CANCELLED' && b.checkIn <= todayStr && b.checkOut > todayStr);
     const checkoutToday = appData.bookings.find(b => b.villa === vKey && b.status !== 'CANCELLED' && b.checkOut === todayStr);
     const checkinToday = appData.bookings.find(b => b.villa === vKey && b.status !== 'CANCELLED' && b.checkIn === todayStr);
     const hasP1Maint = appData.maintenance.some(m => m.villa === vKey && m.status === 'OPEN' && m.priority === 'P1');
-    const lastCheckout = appData.bookings.filter(b => b.villa === vKey && b.status !== 'CANCELLED' && b.checkOut <= todayStr).sort((a,b) => b.checkOut.localeCompare(a.checkOut))[0];
-    const nextBooking = appData.bookings.filter(b => b.villa === vKey && b.status !== 'CANCELLED' && b.checkIn > todayStr).sort((a,b) => a.checkIn.localeCompare(b.checkIn))[0];
-
     const overrideStatus = appData.housekeepingOverrides[vKey];
 
-    let statusKey = 'READY';
-    let statusLabel = '🟢 Hazır (Nevresim & Jakuzi Tam)';
     let statusBadge = '🟢 Hazır';
     let badgeClass = 'badge-emerald';
-    let borderColor = 'rgba(16, 185, 129, 0.4)';
 
     if (overrideStatus) {
-      if (overrideStatus === 'CLEANING') {
-        statusKey = 'CLEANING';
-        statusLabel = '🟡 Temizlik Yapılıyor (Manuel Seçildi)';
-        statusBadge = '🟡 Temizlikte';
-        badgeClass = 'badge-amber';
-        borderColor = 'rgba(245, 158, 11, 0.4)';
-      } else if (overrideStatus === 'READY') {
-        statusKey = 'READY';
-        statusLabel = '🟢 Temiz & Girişe Hazır';
-        statusBadge = '🟢 Hazır';
-        badgeClass = 'badge-emerald';
-        borderColor = 'rgba(16, 185, 129, 0.4)';
-      } else if (overrideStatus === 'OCCUPIED') {
-        statusKey = 'OCCUPIED';
-        statusLabel = '🔵 Misafir İçeride (Manuel)';
-        statusBadge = '🔵 Dolu';
-        badgeClass = 'badge-blue';
-        borderColor = 'rgba(59, 130, 246, 0.4)';
-      }
+      if (overrideStatus === 'CLEANING') { statusBadge = '🟡 Temizlikte'; badgeClass = 'badge-amber'; }
+      else if (overrideStatus === 'OCCUPIED') { statusBadge = '🔵 Dolu'; badgeClass = 'badge-blue'; }
     } else {
-      if (hasP1Maint) {
-        statusKey = 'MAINTENANCE';
-        statusLabel = '🔴 P1 Arıza Kaydı Var (Bakımda)';
-        statusBadge = '🔴 Bakımda';
-        badgeClass = 'badge-rose';
-        borderColor = 'rgba(239, 68, 68, 0.4)';
-      } else if (checkoutToday) {
-        statusKey = 'CLEANING';
-        statusLabel = `🟡 Çıkış Yapıldı • Temizlik Yapılıyor (${checkoutToday.guest})`;
-        statusBadge = '🟡 Temizlikte';
-        badgeClass = 'badge-amber';
-        borderColor = 'rgba(245, 158, 11, 0.4)';
-      } else if (checkinToday) {
-        statusKey = 'PREPARING';
-        statusLabel = `🟡 Giriş Günü • Son Kontroller Yapılıyor (${checkinToday.guest})`;
-        statusBadge = '🟡 Hazırlanıyor';
-        badgeClass = 'badge-amber';
-        borderColor = 'rgba(245, 158, 11, 0.4)';
-      } else if (activeBooking) {
-        statusKey = 'OCCUPIED';
-        statusLabel = `🔵 Misafir İçeride (${activeBooking.guest} - Çıkış: ${formatTrDate(activeBooking.checkOut)})`;
-        statusBadge = '🔵 Dolu';
-        badgeClass = 'badge-blue';
-        borderColor = 'rgba(59, 130, 246, 0.4)';
-      } else {
-        statusKey = 'READY';
-        if (nextBooking) {
-          statusLabel = `🟢 Hazır (Sonraki Giriş: ${formatShortDate(nextBooking.checkIn)} ${nextBooking.guest})`;
-        } else if (lastCheckout) {
-          statusLabel = `🟢 Temiz & Hazır (Son Çıkış: ${formatShortDate(lastCheckout.checkOut)} ${lastCheckout.guest})`;
-        } else {
-          statusLabel = '🟢 Temiz & Girişe Hazır';
-        }
-        statusBadge = '🟢 Hazır';
-        badgeClass = 'badge-emerald';
-        borderColor = 'rgba(16, 185, 129, 0.4)';
-      }
+      if (hasP1Maint) { statusBadge = '🔴 Bakımda'; badgeClass = 'badge-rose'; }
+      else if (checkoutToday) { statusBadge = '🟡 Çıkış/Temizlik'; badgeClass = 'badge-amber'; }
+      else if (checkinToday) { statusBadge = '🟡 Giriş/Kontrol'; badgeClass = 'badge-amber'; }
+      else if (activeBooking) { statusBadge = '🔵 Dolu'; badgeClass = 'badge-blue'; }
     }
 
-    // Editable Cleaning Payment Amount
-    if (!appData.cleaningPayments[vKey]) {
-      appData.cleaningPayments[vKey] = {
-        paid: false,
-        amount: vConf.cleanCost || 1500,
-        lastUpdated: todayStr
-      };
-    }
-    const payInfo = appData.cleaningPayments[vKey];
-    const cleanCost = Number(payInfo.amount) || vConf.cleanCost || 1500;
-    const isPaid = !!payInfo.paid;
-
-    if (!isPaid) {
-      totalPendingDebtKokpit += cleanCost;
-    }
-
-    const div = document.createElement('div');
-    div.className = 'ops-entry-card';
-    div.style.borderLeft = `3px solid ${borderColor}`;
-    div.style.display = 'flex';
-    div.style.flexDirection = 'column';
-    div.style.gap = '8px';
-    div.style.padding = '10px 12px';
-    div.style.marginBottom = '8px';
-    div.style.background = 'rgba(255, 255, 255, 0.03)';
-    div.style.borderRadius = '8px';
-
-    div.innerHTML = `
-      <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-        <div>
-          <strong style="font-size: 13px; color: #FFFFFF; display: flex; align-items: center; gap: 6px;">
-            ${vConf.name}
-          </strong>
-          <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
-            ${statusLabel}
-          </div>
-        </div>
-        <div style="display: flex; align-items: center; gap: 4px;">
-          <span class="badge ${badgeClass}" style="font-size: 10px; font-weight: 700;">${statusBadge}</span>
-          <button class="btn btn-secondary btn-sm" style="padding: 2px 5px; font-size: 10px;" onclick="cycleHkStatus('${vKey}')" title="Fiziksel durumu döngüsel değiştir">🔄</button>
-        </div>
-      </div>
-
-      <!-- Temizlik Ücreti (DÜZENLENEBİLİR) & Ödendi/Ödenecek Buton Kontrolü -->
-      <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 6px; border-top: 1px dashed rgba(255, 255, 255, 0.1); font-size: 11px;">
-        <span style="color: var(--text-muted); display: flex; align-items: center; gap: 4px;">
-          🧹 Bedel: 
-          <b style="color: #60A5FA; cursor: pointer; text-decoration: underline dashed; font-size: 12px;" 
-             onclick="promptEditCleaningAmount('${vKey}')" 
-             title="Miktarı değiştirmek için tıklayın">
-            ₺${cleanCost.toLocaleString('tr-TR')} ✏️
-          </b>
-        </span>
-        <button class="${isPaid ? 'btn-clean-paid' : 'btn-clean-pending'}" 
-                onclick="toggleCleaningPaid('${vKey}')" 
-                title="${isPaid ? 'Ödenmedi (Ödenecek) olarak işaretle' : 'Ödendi olarak işaretle ve gidere işle'}">
-          ${isPaid ? '✅ ₺' + cleanCost.toLocaleString('tr-TR') + ' Ödendi' : '⏳ ₺' + cleanCost.toLocaleString('tr-TR') + ' Ödenecek'}
-        </button>
+    villaCardsHtml += `
+      <div style="display: inline-flex; align-items: center; gap: 4px; background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.07); padding: 3px 6px; border-radius: 6px; font-size: 11px; margin: 2px;">
+        <span style="color: #FFFFFF; font-weight: 600;">${vConf.name.split(' ')[0]}:</span>
+        <span class="badge ${badgeClass}" style="font-size: 9px; padding: 1px 5px; cursor: pointer;" onclick="cycleHkStatus('${vKey}')" title="Fiziksel durumu değiştirmek için tıklayın">${statusBadge}</span>
       </div>
     `;
-    hkList.appendChild(div);
   });
 
+  villaBar.innerHTML = `
+    <div style="font-size: 10px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
+      <span>🏡 Villa Fiziksel Durumları</span>
+      <span style="color: #93C5FD; font-size: 10px;">Durum Değiştir 🔄</span>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 2px;">
+      ${villaCardsHtml}
+    </div>
+  `;
+  hkList.appendChild(villaBar);
+
+  // 3B. Ana Bölüm: Rezervasyon Temizlik & Hazırlık Takvimi (Tarihleriyle Sıralı)
+  const taskListHeader = document.createElement('div');
+  taskListHeader.style.fontSize = '11px';
+  taskListHeader.style.fontWeight = '700';
+  taskListHeader.style.color = '#FCD34D';
+  taskListHeader.style.marginBottom = '6px';
+  taskListHeader.style.display = 'flex';
+  taskListHeader.style.justifyContent = 'space-between';
+  taskListHeader.style.alignItems = 'center';
+  taskListHeader.innerHTML = `
+    <span>📅 Planlanan Temizlik & Borçlar (Tarih Sıralı):</span>
+    <span style="font-size: 10px; color: var(--text-muted);">Tarihe Göre</span>
+  `;
+  hkList.appendChild(taskListHeader);
+
+  // Görevleri tarihe göre sırala (Bugün ve gelecekteki görevler)
+  const allTasks = (appData.cleaningTasks || []).slice().sort((a, b) => {
+    return (a.date || '').localeCompare(b.date || '');
+  });
+
+  if (allTasks.length === 0) {
+    const emptyDiv = document.createElement('div');
+    emptyDiv.style.color = 'var(--text-muted)';
+    emptyDiv.style.fontSize = '12px';
+    emptyDiv.style.padding = '12px';
+    emptyDiv.style.textAlign = 'center';
+    emptyDiv.style.background = 'rgba(255, 255, 255, 0.02)';
+    emptyDiv.style.borderRadius = '8px';
+    emptyDiv.innerText = 'Henüz planlanan temizlik kaydı bulunmuyor. Rezervasyon oluştururken temizlik maliyeti girdiğinizde tarihleriyle buraya düşecektir.';
+    hkList.appendChild(emptyDiv);
+  } else {
+    allTasks.forEach(task => {
+      const vConf = appData.villas[task.villa] || DEFAULT_VILLAS[task.villa];
+      const vName = vConf?.name || task.villa;
+      const amt = Number(task.amount) || 0;
+      const isPaid = !!task.paid;
+
+      if (!isPaid) {
+        totalPendingDebtKokpit += amt;
+      }
+
+      const isToday = (task.date === todayStr);
+      const isPast = (task.date && task.date < todayStr);
+
+      let dateBadge = `<span class="badge badge-blue" style="font-size: 10px; font-weight: 700;">📅 ${formatTrDate(task.date)}</span>`;
+      let borderColor = 'rgba(59, 130, 246, 0.4)';
+
+      if (isToday) {
+        dateBadge = `<span class="badge badge-amber" style="font-size: 10px; font-weight: 800; background: rgba(245, 158, 11, 0.25); border: 1px solid #F59E0B;">⚡ BUGÜN (${formatShortDate(task.date)})</span>`;
+        borderColor = 'rgba(245, 158, 11, 0.8)';
+      } else if (isPast) {
+        dateBadge = `<span class="badge" style="font-size: 10px; font-weight: 600; background: rgba(148, 163, 184, 0.15); color: #94A3B8;">🕒 ${formatTrDate(task.date)}</span>`;
+        borderColor = 'rgba(148, 163, 184, 0.3)';
+      }
+
+      const div = document.createElement('div');
+      div.className = 'ops-entry-card';
+      div.style.borderLeft = `3px solid ${borderColor}`;
+      div.style.display = 'flex';
+      div.style.flexDirection = 'column';
+      div.style.gap = '8px';
+      div.style.padding = '10px 12px';
+      div.style.marginBottom = '8px';
+      div.style.background = isToday ? 'rgba(245, 158, 11, 0.06)' : 'rgba(255, 255, 255, 0.03)';
+      div.style.borderRadius = '8px';
+
+      div.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+              ${dateBadge}
+              <strong style="font-size: 13px; color: #FFFFFF;">${vName}</strong>
+            </div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px;">
+              ${task.guest ? `<strong>${task.guest}</strong> • Çıkış Temizliği & Hazırlık` : (task.notes || 'Rutin Temizlik')}
+            </div>
+          </div>
+          <span class="badge ${isPaid ? 'badge-emerald' : 'badge-amber'}" style="font-size: 10px; font-weight: 700; white-space: nowrap;">
+            ${isPaid ? '✅ Ödendi' : '⏳ Borç'}
+          </span>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 6px; border-top: 1px dashed rgba(255, 255, 255, 0.1); font-size: 11px;">
+          <span style="color: var(--text-muted); display: flex; align-items: center; gap: 4px;">
+            🧹 Bedel: 
+            <b style="color: #60A5FA; cursor: pointer; text-decoration: underline dashed; font-size: 12px;" 
+               onclick="promptEditTaskAmount('${task.id}')" 
+               title="Maliyeti değiştirmek için tıklayın">
+              ₺${amt.toLocaleString('tr-TR')} ✏️
+            </b>
+          </span>
+          <button class="${isPaid ? 'btn-clean-paid' : 'btn-clean-pending'}" 
+                  onclick="toggleTaskPaid('${task.id}')" 
+                  title="${isPaid ? 'Ödenmedi (Borç) olarak işaretle' : 'Ödendi olarak işaretle ve Gider Defterine işle'}">
+            ${isPaid ? '✅ ₺' + amt.toLocaleString('tr-TR') + ' Ödendi' : '⏳ ₺' + amt.toLocaleString('tr-TR') + ' Ödenecek'}
+          </button>
+        </div>
+      `;
+      hkList.appendChild(div);
+    });
+  }
+
+  // Update badge in column header
+  const pendingCount = (appData.cleaningTasks || []).filter(t => !t.paid).length;
+  if (hkBadge) {
+    hkBadge.innerText = `${pendingCount} Ödenecek (${allTasks.length} Görev)`;
+    hkBadge.className = pendingCount > 0 ? 'badge badge-amber' : 'badge badge-emerald';
+  }
   // Update Kokpit debt summary badge
   const debtSumEl = document.getElementById('kokpitCleanDebtSummary');
   if (debtSumEl) debtSumEl.innerText = '₺' + totalPendingDebtKokpit.toLocaleString('tr-TR');
