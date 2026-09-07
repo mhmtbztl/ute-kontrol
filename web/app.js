@@ -1,11 +1,5 @@
 
-const DEFAULT_CLEANING_TASKS = [
-  { id: 'TASK-CLN-001', villa: 'SEYIR', guest: 'Hakan Demir', date: '2026-09-04', cleaner: 'Fatma Hanım (Temizlik Ekibi)', amount: 1500, paid: false, paidDate: null, notes: 'Rutin çıkış temizliği ve çamaşır' },
-  { id: 'TASK-CLN-002', villa: 'DOGUS', guest: 'Murat Kaya', date: '2026-09-06', cleaner: 'Fatma Hanım (Temizlik Ekibi)', amount: 1500, paid: false, paidDate: null, notes: 'Çıkış temizliği - Ödeme bekliyor' },
-  { id: 'TASK-CLN-003', villa: 'ZIRVE', guest: 'Ahmet Yıldız', date: '2026-09-10', cleaner: 'Ayşe Hanım (Özel Ekip)', amount: 2000, paid: false, paidDate: null, notes: 'Jakuzili ev çıkış temizliği' },
-  { id: 'TASK-CLN-004', villa: 'SIRIN', guest: 'Emre Can', date: '2026-09-11', cleaner: 'Fatma Hanım (Temizlik Ekibi)', amount: 1000, paid: false, paidDate: null, notes: 'Rutin çıkış temizliği' },
-  { id: 'TASK-CLN-005', villa: 'NEFES', guest: 'Ayşe Yılmaz', date: '2026-09-15', cleaner: 'Fatma Hanım (Temizlik Ekibi)', amount: 1500, paid: false, paidDate: null, notes: '12 kişilik grup sonrası temizlik' }
-];
+const DEFAULT_CLEANING_TASKS = [];
 
 
 // =============================================================
@@ -2752,32 +2746,7 @@ Object.keys(COMPANY_EXCEL_DATABASE.targets).forEach(k => {
 
 const DEFAULT_EXPENSES = COMPANY_EXCEL_DATABASE.expensesList;
 
-const DEFAULT_BOOKINGS = [
-  // Ağustos 2026 Bookings (Produces 483.965 TL Revenue, 79 Sold Nights)
-  { id: 'REZ-AUG-001', villa: 'ZIRVE', guest: 'Canan Özdemir', checkIn: '2026-08-02', checkOut: '2026-08-06', nights: 4, channel: 'WHATSAPP', gross: 65000, otaComm: 0, cleanFee: 0, net: 65000, pax: 8, status: 'COMPLETED' },
-  { id: 'REZ-AUG-002', villa: 'ZIRVE', guest: 'Alp Erkin', checkIn: '2026-08-10', checkOut: '2026-08-15', nights: 5, channel: 'AIRBNB', gross: 85000, otaComm: 11810, cleanFee: 0, net: 73190, pax: 9, status: 'COMPLETED' },
-  { id: 'REZ-AUG-003', villa: 'DOGUS', guest: 'Serdar Kaya', checkIn: '2026-08-01', checkOut: '2026-08-14', nights: 13, channel: 'WHATSAPP', gross: 98000, otaComm: 0, cleanFee: 0, net: 98000, pax: 11, status: 'COMPLETED' },
-  { id: 'REZ-AUG-004', villa: 'DOGUS', guest: 'Burak Arslan', checkIn: '2026-08-18', checkOut: '2026-08-25', nights: 7, channel: 'BOOKING', gross: 55000, otaComm: 9900, cleanFee: 0, net: 45100, pax: 10, status: 'COMPLETED' },
-  { id: 'REZ-AUG-005', villa: 'SEYIR', guest: 'Murat Yılmaz', checkIn: '2026-08-05', checkOut: '2026-08-16', nights: 11, channel: 'INSTAGRAM', gross: 58000, otaComm: 0, cleanFee: 0, net: 58000, pax: 6, status: 'COMPLETED' },
-  { id: 'REZ-AUG-006', villa: 'SEYIR', guest: 'Okan Şen', checkIn: '2026-08-20', checkOut: '2026-08-29', nights: 9, channel: 'AIRBNB', gross: 52000, otaComm: 7800, cleanFee: 0, net: 44200, pax: 8, status: 'COMPLETED' },
-  { id: 'REZ-AUG-007', villa: 'SIRIN', guest: 'Gizem Aksoy', checkIn: '2026-08-01', checkOut: '2026-08-15', nights: 14, channel: 'BOOKING', gross: 42000, otaComm: 7560, cleanFee: 0, net: 34440, pax: 7, status: 'COMPLETED' },
-  { id: 'REZ-AUG-008', villa: 'SIRIN', guest: 'Kaan Demir', checkIn: '2026-08-16', checkOut: '2026-08-28', nights: 12, channel: 'WHATSAPP', gross: 32000, otaComm: 0, cleanFee: 0, net: 32000, pax: 6, status: 'COMPLETED' },
-  { id: 'REZ-AUG-009', villa: 'NEFES', guest: 'Turgut Baran', checkIn: '2026-08-08', checkOut: '2026-08-12', nights: 4, channel: 'WHATSAPP', gross: 34035, otaComm: 0, cleanFee: 0, net: 34035, pax: 12, status: 'COMPLETED' },
-
-  // Aralık 2026 - Yılbaşı Rezervasyonları (Kullanıcının tutulan 2 evi)
-  { id: 'REZ-NY-001', villa: 'ZIRVE', guest: 'Yılbaşı Konuğu 1 (Zirve Dağ Evi)', checkIn: '2026-12-31', checkOut: '2027-01-03', nights: 3, channel: 'WHATSAPP', gross: 90000, otaComm: 0, cleanFee: 0, net: 90000, pax: 8, status: 'CONFIRMED' },
-  { id: 'REZ-NY-002', villa: 'DOGUS', guest: 'Yılbaşı Konuğu 2 (Doğuş Dağ Evi)', checkIn: '2026-12-31', checkOut: '2027-01-03', nights: 3, channel: 'WHATSAPP', gross: 75000, otaComm: 0, cleanFee: 0, net: 75000, pax: 10, status: 'CONFIRMED' },
-
-  // Eylül 2026 Bookings
-  { id: 'REZ-SEP-001', villa: 'SEYIR', guest: 'Hakan Demir', checkIn: '2026-09-01', checkOut: '2026-09-04', nights: 3, channel: 'AIRBNB', gross: 28000, otaComm: 4200, cleanFee: 1500, net: 22300, pax: 6, status: 'COMPLETED' },
-  { id: 'REZ-SEP-002', villa: 'DOGUS', guest: 'Murat Kaya', checkIn: '2026-09-03', checkOut: '2026-09-06', nights: 3, channel: 'WHATSAPP', gross: 36000, otaComm: 0, cleanFee: 0, net: 36000, pax: 10, status: 'COMPLETED' },
-  { id: 'REZ-SEP-003', villa: 'ZIRVE', guest: 'Ahmet Yıldız', checkIn: '2026-09-07', checkOut: '2026-09-10', nights: 3, channel: 'AIRBNB', gross: 48000, otaComm: 7200, cleanFee: 2000, net: 38800, pax: 8, status: 'COMPLETED' },
-  { id: 'REZ-SEP-004', villa: 'SIRIN', guest: 'Emre Can', checkIn: '2026-09-08', checkOut: '2026-09-11', nights: 3, channel: 'BOOKING', gross: 21000, otaComm: 3780, cleanFee: 1000, net: 16220, pax: 6, status: 'COMPLETED' },
-  { id: 'REZ-SEP-005', villa: 'NEFES', guest: 'Ayşe Yılmaz', checkIn: '2026-09-12', checkOut: '2026-09-15', nights: 3, channel: 'WHATSAPP', gross: 38000, otaComm: 0, cleanFee: 0, net: 38000, pax: 12, status: 'CONFIRMED' },
-  { id: 'REZ-SEP-006', villa: 'SEYIR', guest: 'Cemil Öz', checkIn: '2026-09-15', checkOut: '2026-09-18', nights: 3, channel: 'INSTAGRAM', gross: 24000, otaComm: 0, cleanFee: 0, net: 24000, pax: 6, status: 'CONFIRMED' },
-  { id: 'REZ-SEP-007', villa: 'ZIRVE', guest: 'Burak Tan', checkIn: '2026-09-18', checkOut: '2026-09-21', nights: 3, channel: 'WHATSAPP', gross: 45000, otaComm: 0, cleanFee: 0, net: 45000, pax: 8, status: 'CONFIRMED' },
-  { id: 'REZ-SEP-008', villa: 'SEYIR', guest: 'Ali Kemal', checkIn: '2026-09-29', checkOut: '2026-10-03', nights: 4, channel: 'AIRBNB', gross: 40000, otaComm: 6000, cleanFee: 2000, net: 32000, pax: 6, status: 'CONFIRMED' }
-];
+const DEFAULT_BOOKINGS = [];
 
 // Initial Seed Expenses (August 2026 Scenario matches user prompt: Opex = 337.306 TL, Capex = 3.866 TL)
 // Old expenses replaced by COMPANY_EXCEL_DATABASE.expensesList
@@ -2904,6 +2873,25 @@ function loadAppData() {
       }
       if (!appData.deletedCleanTaskIds) appData.deletedCleanTaskIds = [];
       if (!appData.housekeepingOverrides) appData.housekeepingOverrides = {};
+      // KULLANICI TALEBİ: Tüm örnek / mock rezervasyon ve temizlik kayıtlarını kalıcı olarak temizle
+      // Sadece kullanıcının bizzat eklediği rezervasyonlar görünür
+      appData.bookings = (appData.bookings || []).filter(b => 
+        !b.id.startsWith('REZ-SEP-') && 
+        !b.id.startsWith('REZ-NY-') && 
+        !b.id.startsWith('REZ-AUG-')
+      );
+      appData.cleaningTasks = (appData.cleaningTasks || []).filter(t => 
+        !t.id.startsWith('TASK-CLN-00') &&
+        (!t.bookingId || appData.bookings.some(b => b.id === t.bookingId))
+      );
+      if (appData.expenses) {
+        appData.expenses = appData.expenses.filter(e => 
+          !e.id.startsWith('EXP-CLEAN-TASK-TASK-CLN-00') &&
+          !e.id.startsWith('EXP-CLEAN-TASK-CLN-00') &&
+          (!e.cleanTaskId || appData.cleaningTasks.some(t => t.id === e.cleanTaskId))
+        );
+      }
+
 
       // Check if user has explicitly reset everything
       if (appData.isCleanState) {
@@ -5121,10 +5109,18 @@ function saveBooking(e) {
 function editBooking(id) { openBookingModal(id); }
 function deleteBooking(id) {
   if (confirm('Bu rezervasyonu silmek istediğinizden emin misiniz?')) {
-    appData.bookings = appData.bookings.filter(b => b.id !== id);
+    appData.bookings = (appData.bookings || []).filter(b => b.id !== id);
+    const taskId = 'TASK-CLN-' + id;
+    if (appData.cleaningTasks) {
+      appData.cleaningTasks = appData.cleaningTasks.filter(t => t.id !== taskId && t.bookingId !== id);
+    }
+    if (appData.expenses) {
+      appData.expenses = appData.expenses.filter(e => e.cleanTaskId !== taskId && e.id !== 'EXP-CLEAN-' + taskId);
+    }
     syncBookingCleaningTasks();
     saveAppData();
     renderAll();
+    if (window.showToast) window.showToast('🗑️ Rezervasyon kalıcı olarak silindi.');
   }
 }
 
@@ -5489,7 +5485,7 @@ function renderDailyOps() {
 
   // Initialize stores
   if (!appData.cleaningPayments) appData.cleaningPayments = {};
-  if (!appData.cleaningTasks) appData.cleaningTasks = JSON.parse(JSON.stringify(DEFAULT_CLEANING_TASKS));
+  if (!appData.cleaningTasks) appData.cleaningTasks = [];
   if (!appData.housekeepingOverrides) appData.housekeepingOverrides = {};
 
   const todayStr = '2026-09-07'; // Canonical system date
