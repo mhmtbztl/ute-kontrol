@@ -1,3 +1,96 @@
+
+// =============================================================
+// GÜVENLİK VE GİZLİ ERİŞİM YÖNETİMİ (SECURITY & AUTH SHIELD)
+// =============================================================
+const MASTER_PINS = ['2026', '1907', 'lexbnb', 'lexbnb2026', 'ute2026'];
+const SECRET_ACCESS_KEY = 'lexbnb2026';
+
+function checkAuthStatus() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const keyParam = urlParams.get('key') || urlParams.get('auth') || urlParams.get('token');
+
+  // 1. Direct Secret Link check (sadece linki attığınız kişiler otomatik açsın)
+  if (keyParam && (MASTER_PINS.includes(keyParam.toLowerCase()) || keyParam === SECRET_ACCESS_KEY)) {
+    sessionStorage.setItem('LEXBNB_AUTHENTICATED', 'true');
+    localStorage.setItem('LEXBNB_REMEMBER_AUTH', 'true');
+    hideLockOverlay();
+    return true;
+  }
+
+  // 2. Remember Me in LocalStorage check (30 gün)
+  if (localStorage.getItem('LEXBNB_REMEMBER_AUTH') === 'true') {
+    hideLockOverlay();
+    return true;
+  }
+
+  // 3. Active Session check
+  if (sessionStorage.getItem('LEXBNB_AUTHENTICATED') === 'true') {
+    hideLockOverlay();
+    return true;
+  }
+
+  // 4. Otherwise show lock screen
+  showLockOverlay();
+  return false;
+}
+
+function showLockOverlay() {
+  const overlay = document.getElementById('securityLockOverlay');
+  if (overlay) {
+    overlay.style.display = 'flex';
+    setTimeout(() => {
+      const pinInput = document.getElementById('authPinInput');
+      if (pinInput) pinInput.focus();
+    }, 100);
+  }
+}
+
+function hideLockOverlay() {
+  const overlay = document.getElementById('securityLockOverlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+function handleAuthSubmit(e) {
+  e.preventDefault();
+  const input = document.getElementById('authPinInput');
+  const err = document.getElementById('authErrorMessage');
+  const remember = document.getElementById('authRememberCheckbox')?.checked;
+  const val = (input ? input.value : '').trim().toLowerCase();
+
+  if (MASTER_PINS.includes(val)) {
+    sessionStorage.setItem('LEXBNB_AUTHENTICATED', 'true');
+    if (remember) {
+      localStorage.setItem('LEXBNB_REMEMBER_AUTH', 'true');
+    }
+    if (err) err.style.display = 'none';
+    hideLockOverlay();
+  } else {
+    if (err) {
+      err.style.display = 'block';
+      err.innerText = '⚠️ Hatalı PIN kodu! (Varsayılan PIN: 2026)';
+    }
+    if (input) {
+      input.value = '';
+      input.focus();
+    }
+  }
+}
+
+function copySecretShareLink() {
+  const baseUrl = window.location.origin + window.location.pathname;
+  const secretUrl = `${baseUrl}?key=${SECRET_ACCESS_KEY}`;
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(secretUrl).then(() => {
+      alert(`✅ Yetkili Erişim Linki Kopyalandı!\n\n🔗 ${secretUrl}\n\nBu linki gönderdiğiniz kişiler şifre girmeden doğrudan paneli açabilir.\nBu linke veya PIN koduna sahip olmayan hiç kimse şirket verilerinizi göremez.`);
+    }).catch(() => {
+      prompt('Aşağıdaki yetkili erişim linkini kopyalayıp paylaşabilirsiniz:', secretUrl);
+    });
+  } else {
+    prompt('Aşağıdaki yetkili erişim linkini kopyalayıp paylaşabilirsiniz:', secretUrl);
+  }
+}
+
 // LEXBNB KONTROL MERKEZİ V5 - FULL MASTER FINANCE, KPI & OTA APPLICATION ENGINE
 // Uludağ Tatil Evleri (Seyir, Doğuş, Zirve, Şirin, Nefes)
 // RESMİ ŞİRKET VERİTABANI: GENEL RAPOR.xlsx üzerinden tamamen işlenmiştir.
@@ -4731,6 +4824,7 @@ function exportDataJSON() {
 
 // Initialize on DOM Ready
 document.addEventListener('DOMContentLoaded', () => {
+  checkAuthStatus();
   loadAppData();
   renderAll();
 });

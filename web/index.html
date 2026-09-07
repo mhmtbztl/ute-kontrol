@@ -4,11 +4,46 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Lexbnb — Finansal Performans & UTE Kontrol Merkezi V5</title>
+  <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
   <link rel="stylesheet" href="style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
+  <!-- GÜVENLİK VE GİZLİLİK KİLİT EKRANI (GİZLİ ERİŞİM KORUMASI) -->
+  <div id="securityLockOverlay" class="security-lock-overlay" style="display: none;">
+    <div class="security-lock-card">
+      <div class="lock-icon-badge">🔒</div>
+      <h2>LEXBNB KONTROL MERKEZİ</h2>
+      <span class="lock-sub-brand">Uludağ Tatil Evleri • Yetkili Yönetici Girişi</span>
+      
+      <p class="lock-description">
+        Bu sistem şirkete özel <strong>hassas finansal cirolar, operasyonel kârlar ve misafir kayıtları</strong> içermektedir. Yalnızca bağlantı verdiğiniz yetkili kişiler erişebilir.
+      </p>
+
+      <form id="authLoginForm" onsubmit="handleAuthSubmit(event)">
+        <div class="lock-input-group">
+          <input type="password" id="authPinInput" placeholder="Yetkili PIN Kodunu Giriniz (Örn: 2026)" autocomplete="current-password" autofocus required>
+          <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 700;">🔓 Güvenli Giriş Yap</button>
+        </div>
+        <div id="authErrorMessage" class="auth-error-msg" style="display: none;">
+          ⚠️ Hatalı PIN kodu veya şifre! Lütfen tekrar deneyin.
+        </div>
+        <div class="remember-row">
+          <label style="font-size: 12px; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+            <input type="checkbox" id="authRememberCheckbox" checked>
+            Bu cihazda beni hatırla (30 gün)
+          </label>
+        </div>
+      </form>
+
+      <div class="lock-footer-hint">
+        💡 <strong>Özel Erişim Linki:</strong> Şirket yöneticisinin size gönderdiği özel anahtarlı link ile giriş yapıyorsanız şifre sormadan otomatik açılır.
+      </div>
+    </div>
+  </div>
+
+
 
   <!-- App Header -->
   <header class="app-header">
@@ -61,6 +96,7 @@
       <button class="btn btn-secondary" onclick="openExpenseModal()">+ Gider / Yatırım</button>
       <button class="btn btn-secondary" onclick="openImportModal()">📥 Rapor Yükle</button>
       <button class="btn btn-secondary" onclick="exportDataJSON()">💾 Yedek</button>
+      <button class="btn btn-secondary btn-sm" onclick="copySecretShareLink()" title="Şifresiz doğrudan erişim linkini kopyala">🔗 Yetkili Linki Al</button>
       <button class="btn btn-secondary btn-sm" onclick="openHelpModal()" title="Hızlı Başlangıç & İşletmeci Kılavuzu">❓ Nasıl Kullanılır?</button>
       <button class="btn btn-danger btn-sm" onclick="openResetModal()" title="Verileri sıfırla veya geri yükle">🗑️ Sıfırla</button>
     </div>

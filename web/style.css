@@ -2547,3 +2547,124 @@ body {
 .tape-booking { background: linear-gradient(135deg, #1D4ED8 0%, #1E40AF 100%); }
 .tape-direct { background: linear-gradient(135deg, #059669 0%, #047857 100%); }
 .tape-other { background: linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%); }
+
+
+/* =============================================================
+   GÜVENLİK VE GİZLİLİK KİLİT EKRANI (SECURITY SHIELD)
+   ============================================================= */
+.security-lock-overlay {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(21, 29, 47, 0.98) 0%, rgba(10, 14, 23, 0.99) 100%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.security-lock-card {
+  max-width: 440px;
+  width: 100%;
+  background: linear-gradient(180deg, rgba(26, 34, 52, 0.95) 0%, rgba(17, 24, 39, 0.98) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  padding: 32px 28px;
+  text-align: center;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  animation: lockCardPop 0.3s ease-out;
+}
+
+@keyframes lockCardPop {
+  from { opacity: 0; transform: scale(0.95) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.lock-icon-badge {
+  width: 60px;
+  height: 60px;
+  border-radius: 16px;
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  font-size: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px auto;
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
+}
+
+.security-lock-card h2 {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: #FFFFFF;
+  margin: 0 0 4px 0;
+}
+
+.lock-sub-brand {
+  font-size: 12px;
+  color: #93C5FD;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 14px;
+}
+
+.lock-description {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-bottom: 22px;
+}
+
+.lock-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.lock-input-group input {
+  width: 100%;
+  padding: 12px 14px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  color: #FFFFFF;
+  font-size: 14px;
+  text-align: center;
+  letter-spacing: 2px;
+  font-weight: 700;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.lock-input-group input:focus {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+}
+
+.auth-error-msg {
+  color: #FCA5A5;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 11px;
+  margin-bottom: 12px;
+}
+
+.remember-row {
+  margin-bottom: 16px;
+}
+
+.lock-footer-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 14px;
+  margin-top: 10px;
+  line-height: 1.4;
+}
