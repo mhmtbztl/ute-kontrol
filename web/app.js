@@ -3130,7 +3130,7 @@ function formatShortDate(dateStr) {
 // =============================================================
 // 🔄 MOBİL ÖNBELLEK (CACHE) & ÇEREZ TEMİZLEME MOTORU
 // =============================================================
-const CURRENT_APP_BUILD_VERSION = '5.5.1-20260907';
+const CURRENT_APP_BUILD_VERSION = '5.5.2-20260907';
 
 async function forceHardRefresh() {
   const confirmed = confirm('Tarayıcı ve mobildeki eski önbellek (cache) ve çerez kalıntıları temizlenip en güncel canlı sürüm yüklensin mi?\n\n(Not: Yetkili PIN şifreniz korunacaktır.)');

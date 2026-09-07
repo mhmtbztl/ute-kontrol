@@ -66,7 +66,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=5.5.1">
+  <link rel="stylesheet" href="style.css?v=5.5.2">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
@@ -242,6 +242,13 @@
           <span>⚙️</span> Araçlar <span style="font-size: 10px; margin-left: 2px;">▼</span>
         </button>
         <div class="header-dropdown-menu" id="toolsMenu">
+          <button type="button" class="dropdown-item" onclick="switchTab('housekeeping'); closeAllHeaderDropdowns();" style="background: rgba(245, 158, 11, 0.12); border-bottom: 1px solid rgba(255,255,255,0.08);">
+            <span class="dropdown-icon">🧹</span>
+            <div>
+              <strong style="color: #FCD34D;">Temizlik & Borç Defteri</strong>
+              <small>Tüm temizlik işleri, hakedişler ve personel borçları</small>
+            </div>
+          </button>
           <button type="button" class="dropdown-item" onclick="forceHardRefresh(); closeAllHeaderDropdowns();" style="background: rgba(245, 158, 11, 0.1);">
             <span class="dropdown-icon">🔄</span>
             <div>
@@ -297,7 +304,7 @@
     <button class="tab-btn" onclick="switchTab('channels')">🌐 OTA & Kanal Radarı</button>
     <button class="tab-btn" onclick="switchTab('reservations')">📅 Rezervasyonlar (<span id="rezCountBadge">0</span>)</button>
     <button class="tab-btn" onclick="switchTab('expenses')">💸 Gider Defteri (<span id="expenseCountBadge">0</span>)</button>
-    <button class="tab-btn" onclick="switchTab('housekeeping')">🧹 Temizlik & Borç (<span id="cleanDebtBadge" style="color: #FBBF24; font-weight: 700;">₺0 Borç</span>)</button>
+    <button class="tab-btn" onclick="switchTab('housekeeping')" style="background: rgba(245, 158, 11, 0.08); border-radius: 6px; margin: 0 2px;">🧹 Temizlik & Borç (<span id="cleanDebtBadge" style="color: #FBBF24; font-weight: 700;">₺0 Borç</span>)</button>
     <button class="tab-btn" onclick="switchTab('leads')">🎯 Lead & Satış (<span id="leadCountBadge">0</span>)</button>
     <button class="tab-btn" onclick="switchTab('maintenance')">🛠️ Bakım & P1 (<span id="maintCountBadge">0</span>)</button>
     <button class="tab-btn" onclick="switchTab('settings')">⚙️ Ayarlar & Hedefler</button>
@@ -1050,12 +1057,13 @@
               <span class="badge badge-amber" id="todayHousekeepingBadge">5 Villa</span>
             </div>
             <div id="todayHousekeepingList"></div>
-            <div id="kokpitHkFooter" style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center;">
-              <span style="font-size: 11px; color: #FBBF24; font-weight: 600;">
-                ⏳ Temizlik Borcu: <strong id="kokpitCleanDebtSummary" style="color: #FBBF24;">₺0</strong>
-              </span>
-              <button class="btn btn-secondary btn-sm" onclick="switchTab('housekeeping')" style="font-size: 10px; padding: 3px 8px;" title="Tüm Temizlik ve Borç Defterini Aç">
-                🧹 Borç Defteri ›
+            <div id="kokpitHkFooter" style="margin-top: 12px; padding: 10px 14px; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 8px; display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+              <div>
+                <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Bekleyen Temizlik Borcu</div>
+                <div style="font-size: 15px; font-weight: 800; color: #FBBF24; margin-top: 2px;" id="kokpitCleanDebtSummary">₺0</div>
+              </div>
+              <button class="btn btn-warning btn-sm" onclick="switchTab('housekeeping')" style="font-size: 11px; font-weight: 700; padding: 6px 12px; background: #F59E0B; color: #000; border: none; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 5px; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);" title="Tüm Temizlik ve Personel Borç Defterini Aç">
+                <span>🧹</span> <strong>Temizlik Defterini Aç ›</strong>
               </button>
             </div>
           </div>
@@ -2232,7 +2240,7 @@
     </div>
   </div>
 
-  <script src="app.js?v=5.5.1"></script>
+  <script src="app.js?v=5.5.2"></script>
 
   <!-- ======================================================= -->
   <!-- MODAL: WHATSAPP BUSINESS AKILLI MESAJ AYRIŞTIRICI -->
