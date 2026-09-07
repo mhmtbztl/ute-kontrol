@@ -1,6 +1,6 @@
 
 const DEFAULT_CLEANING_TASKS = [
-  { id: 'TASK-CLN-001', villa: 'SEYIR', guest: 'Hakan Demir', date: '2026-09-04', cleaner: 'Fatma Hanım (Temizlik Ekibi)', amount: 1500, paid: true, paidDate: '2026-09-04', notes: 'Rutin çıkış temizliği ve çamaşır' },
+  { id: 'TASK-CLN-001', villa: 'SEYIR', guest: 'Hakan Demir', date: '2026-09-04', cleaner: 'Fatma Hanım (Temizlik Ekibi)', amount: 1500, paid: false, paidDate: null, notes: 'Rutin çıkış temizliği ve çamaşır' },
   { id: 'TASK-CLN-002', villa: 'DOGUS', guest: 'Murat Kaya', date: '2026-09-06', cleaner: 'Fatma Hanım (Temizlik Ekibi)', amount: 1500, paid: false, paidDate: null, notes: 'Çıkış temizliği - Ödeme bekliyor' },
   { id: 'TASK-CLN-003', villa: 'ZIRVE', guest: 'Ahmet Yıldız', date: '2026-09-10', cleaner: 'Ayşe Hanım (Özel Ekip)', amount: 2000, paid: false, paidDate: null, notes: 'Jakuzili ev çıkış temizliği' },
   { id: 'TASK-CLN-004', villa: 'SIRIN', guest: 'Emre Can', date: '2026-09-11', cleaner: 'Fatma Hanım (Temizlik Ekibi)', amount: 1000, paid: false, paidDate: null, notes: 'Rutin çıkış temizliği' },
@@ -2835,31 +2835,35 @@ function syncBookingCleaningTasks() {
   if (!appData.cleaningTasks) appData.cleaningTasks = [];
   if (!appData.bookings) appData.bookings = [];
   if (!appData.expenses) appData.expenses = [];
-      appData.expenses = appData.expenses.filter(e => !e.isAutoClean && !(e.id && e.id.startsWith("EXP-CLEAN-")) && !e.cleanTaskId);
+  if (!appData.deletedCleanTaskIds) appData.deletedCleanTaskIds = [];
 
-  // Eski kalıntı otomatik temizlik giderlerini Gider Defteri'nden temizle
-  appData.expenses = appData.expenses.filter(exp => {
-    if (exp.isAutoClean || (exp.id && exp.id.startsWith('EXP-CLEAN-')) || exp.cleanTaskId) {
-      return false;
-    }
-    return true;
-  });
+  // Eski mükerrer/çift manuel gider kayıtlarını ayıkla (sadece tekil EXP-CLEAN- kalsın)
+  appData.expenses = appData.expenses.filter(e => !e.isAutoClean && !(e.id && e.id.startsWith('EXP-CLEAN-MANUAL-')));
 
-  // Rezervasyonları temizlik görevleri listesine (Temizlik & Borç Defteri) senkronize et
+  // Rezervasyonları temizlik görevleri listesine (Temizlik & Borç Defteri) BORÇ olarak ekle
   appData.bookings.forEach(b => {
     const cleanFee = Number(b.cleanFee) || 0;
     if (cleanFee <= 0 || b.status === 'CANCELLED') {
-      appData.cleaningTasks = appData.cleaningTasks.filter(t => t.bookingId !== b.id);
+      const tIdx = appData.cleaningTasks.findIndex(t => t.bookingId === b.id);
+      if (tIdx !== -1) {
+        const taskId = appData.cleaningTasks[tIdx].id;
+        appData.cleaningTasks.splice(tIdx, 1);
+        if (appData.expenses) {
+          appData.expenses = appData.expenses.filter(e => e.cleanTaskId !== taskId && e.id !== 'EXP-CLEAN-' + taskId);
+        }
+      }
       return;
     }
 
     const taskId = 'TASK-CLN-' + b.id;
-    // Kullanıcı bu görevi daha önce sildiyse tekrar otomatik OLUŞTURMA!
+    // Kullanıcı bu görevi özellikle sildiyse tekrar türetme
     if (appData.deletedCleanTaskIds && appData.deletedCleanTaskIds.includes(taskId)) return;
+
     let existing = appData.cleaningTasks.find(t => t.id === taskId || t.bookingId === b.id);
     const vName = (appData.villas && appData.villas[b.villa]?.name) ? appData.villas[b.villa].name : b.villa;
 
     if (!existing) {
+      // REZERVASYON EKRANINDA TEMİZLİK BORCU EKLENDİ (paid: false - Henüz ödenmedi)
       appData.cleaningTasks.push({
         id: taskId,
         bookingId: b.id,
@@ -2876,6 +2880,7 @@ function syncBookingCleaningTasks() {
       existing.date = b.checkOut;
       existing.guest = b.guest;
       existing.villa = b.villa;
+      existing.amount = cleanFee;
       if (!existing.notes) existing.notes = `${b.guest} Çıkış Temizliği (${vName})`;
     }
   });
@@ -4238,7 +4243,17 @@ function editExpense(id) {
 
 function deleteExpense(id) {
   if (confirm('Bu harcamayı silmek istediğinizden emin misiniz?')) {
-    // Harcama kalıcı olarak silinir, arka plandan ASLA tekrar oluşturulmaz
+    const exp = (appData.expenses || []).find(e => e.id === id);
+    if (exp && exp.cleanTaskId && appData.cleaningTasks) {
+      const task = appData.cleaningTasks.find(t => t.id === exp.cleanTaskId);
+      if (task) {
+        task.paid = false;
+        task.paidDate = null;
+        if (appData.cleaningPayments && appData.cleaningPayments[task.villa]) {
+          appData.cleaningPayments[task.villa].paid = false;
+        }
+      }
+    }
     appData.expenses = appData.expenses.filter(e => e.id !== id);
     saveAppData();
     renderAll();
@@ -5769,7 +5784,13 @@ function promptEditCleaningAmount(vKey) {
   // Also sync in cleaningTasks if a task exists for this villa
   if (appData.cleaningTasks) {
     const task = appData.cleaningTasks.find(t => t.villa === vKey);
-    if (task) task.amount = newAmount;
+    if (task) {
+      task.amount = newAmount;
+      if (task.paid && appData.expenses) {
+        const exp = appData.expenses.find(e => e.cleanTaskId === task.id || e.id === 'EXP-CLEAN-' + task.id);
+        if (exp) exp.amount = newAmount;
+      }
+    }
   }
 
 
@@ -5815,39 +5836,81 @@ function promptEditTaskAmount(taskId) {
 
 function toggleCleaningPaid(vKey) {
   if (!appData.cleaningPayments) appData.cleaningPayments = {};
+  if (!appData.cleaningTasks) appData.cleaningTasks = [];
+  if (!appData.expenses) appData.expenses = [];
   const vConf = appData.villas[vKey] || DEFAULT_VILLAS[vKey];
   const cleanCost = Number(appData.cleaningPayments[vKey]?.amount) || vConf?.cleanCost || 1500;
 
-  if (!appData.cleaningPayments[vKey]) {
-    appData.cleaningPayments[vKey] = { paid: false, amount: cleanCost };
+  const currentPaid = !!appData.cleaningPayments[vKey]?.paid;
+  const newPaid = !currentPaid;
+
+  appData.cleaningPayments[vKey] = {
+    paid: newPaid,
+    amount: cleanCost,
+    updatedAt: '2026-09-07'
+  };
+
+  // İlgili villa için görevi bul veya oluştur
+  const vTasks = appData.cleaningTasks.filter(t => t.villa === vKey).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  let task = vTasks.find(t => (newPaid ? !t.paid : t.paid)) || vTasks[0];
+
+  if (!task) {
+    task = {
+      id: 'TASK-CLN-' + vKey + '-' + Date.now().toString().slice(-4),
+      villa: vKey,
+      guest: '',
+      date: '2026-09-07',
+      cleaner: 'Fatma Hanım (Temizlik Ekibi)',
+      amount: cleanCost,
+      paid: newPaid,
+      paidDate: newPaid ? '2026-09-07' : null,
+      notes: `${vConf?.name || vKey} Rutin Temizlik`
+    };
+    appData.cleaningTasks.push(task);
+  } else {
+    task.paid = newPaid;
+    task.paidDate = newPaid ? '2026-09-07' : null;
   }
 
-  const currentStatus = !!appData.cleaningPayments[vKey].paid;
-  const newStatus = !currentStatus;
-  appData.cleaningPayments[vKey].paid = newStatus;
-  appData.cleaningPayments[vKey].amount = cleanCost;
-  appData.cleaningPayments[vKey].updatedAt = '2026-09-07';
+  const expId = 'EXP-CLEAN-' + task.id;
+  const vName = (appData.villas && appData.villas[vKey]?.name) ? appData.villas[vKey].name : vKey;
+  const desc = `[${vName}] Temizlik Ücreti - ${task.cleaner || 'Fatma Hanım'} (${task.guest || 'Çıkış Temizliği'})`;
 
-  // Sadece Temizlik & Borç Defteri'ndeki görevin durumunu güncelle
-  if (appData.cleaningTasks) {
-    const task = appData.cleaningTasks.find(t => t.villa === vKey);
-    if (task) {
-      task.paid = newStatus;
-      task.paidDate = newStatus ? '2026-09-07' : null;
+  if (newPaid) {
+    const existingIdx = appData.expenses.findIndex(e => e.id === expId || e.cleanTaskId === task.id);
+    if (existingIdx !== -1) {
+      appData.expenses[existingIdx].amount = Number(task.amount) || cleanCost;
+      appData.expenses[existingIdx].paid = true;
+      appData.expenses[existingIdx].description = desc;
+      appData.expenses[existingIdx].cleanTaskId = task.id;
+    } else {
+      appData.expenses.push({
+        id: expId,
+        date: '2026-09-07',
+        month: '2026-09',
+        villa: vKey,
+        category: 'Temizlik',
+        type: 'OPEX',
+        amount: Number(task.amount) || cleanCost,
+        description: desc,
+        cleanTaskId: task.id,
+        paid: true
+      });
     }
+  } else {
+    appData.expenses = appData.expenses.filter(e => e.id !== expId && e.cleanTaskId !== task.id);
   }
 
-  // KULLANICI TALEBİ: Gider Defteri'ne ASLA otomatik gider eklenmez!
   saveAppData();
   renderDailyOps();
   renderHousekeepingTab();
+  renderExpensesTable();
+  renderFinanceModule();
 
-  const msg = newStatus 
-    ? `✅ ${vConf?.name || vKey} temizlik bedeli (₺${cleanCost.toLocaleString('tr-TR')}) "ÖDENDİ" olarak işaretlendi.`
-    : `⏳ ${vConf?.name || vKey} temizlik bedeli (₺${cleanCost.toLocaleString('tr-TR')}) "ÖDENECEK" olarak güncellendi.`;
-  
+  const msg = newPaid 
+    ? `✅ [${vName}] temizlik bedeli (₺${cleanCost.toLocaleString('tr-TR')}) "ÖDENDİ" yapıldı ve Gider Defteri'ne işlendi.`
+    : `⏳ [${vName}] temizlik bedeli (₺${cleanCost.toLocaleString('tr-TR')}) "ÖDENECEK (Borç)" yapıldı, Gider Defteri'nden çıkarıldı.`;
   if (window.showToast) window.showToast(msg);
-  else console.log(msg);
 }
 
 function cycleHkStatus(vKey) {
@@ -5995,18 +6058,56 @@ function toggleTaskPaid(taskId) {
   task.paid = newPaid;
   task.paidDate = newPaid ? '2026-09-07' : null;
 
-  // Sync to villa level cleaningPayments
-  if (appData.cleaningPayments && appData.cleaningPayments[task.villa]) {
+  // Kokpit villa durumu ile senkronize et
+  if (!appData.cleaningPayments) appData.cleaningPayments = {};
+  if (!appData.cleaningPayments[task.villa]) {
+    appData.cleaningPayments[task.villa] = { paid: newPaid, amount: task.amount };
+  } else {
     appData.cleaningPayments[task.villa].paid = newPaid;
     appData.cleaningPayments[task.villa].amount = task.amount;
   }
 
-  // KULLANICI TALEBİ: Gider Defteri'ne otomatik kayıt eklenmez!
+  if (!appData.expenses) appData.expenses = [];
+  const expId = 'EXP-CLEAN-' + task.id;
+  const vName = (appData.villas && appData.villas[task.villa]?.name) ? appData.villas[task.villa].name : task.villa;
+  const desc = `[${vName}] Temizlik Ücreti - ${task.cleaner || 'Fatma Hanım'} (${task.guest || 'Çıkış Temizliği'})`;
+
+  if (newPaid) {
+    // Tuşa basılınca Gider Defteri'ne TAM 1 TANE gider kalemi girilir (Mükerrer kontrolü ile)
+    const existingIdx = appData.expenses.findIndex(e => e.id === expId || e.cleanTaskId === task.id);
+    if (existingIdx !== -1) {
+      appData.expenses[existingIdx].amount = Number(task.amount) || 0;
+      appData.expenses[existingIdx].paid = true;
+      appData.expenses[existingIdx].description = desc;
+      appData.expenses[existingIdx].cleanTaskId = task.id;
+    } else {
+      appData.expenses.push({
+        id: expId,
+        date: task.paidDate || '2026-09-07',
+        month: (task.paidDate || '2026-09-07').slice(0, 7),
+        villa: task.villa,
+        category: 'Temizlik',
+        type: 'OPEX',
+        amount: Number(task.amount) || 0,
+        description: desc,
+        cleanTaskId: task.id,
+        paid: true
+      });
+    }
+  } else {
+    // Ödendi iptal edilip tekrar borç yapıldığında gider kalemi geri alınır
+    appData.expenses = appData.expenses.filter(e => e.id !== expId && e.cleanTaskId !== task.id);
+  }
+
   saveAppData();
   renderHousekeepingTab();
   renderDailyOps();
+  renderExpensesTable();
+  renderFinanceModule();
 
-  const msg = newPaid ? '✅ Temizlik durumu "ÖDENDİ" olarak kaydedildi.' : '⏳ Temizlik durumu "ÖDENECEK (Borç)" olarak güncellendi.';
+  const msg = newPaid 
+    ? `✅ [${vName}] temizlik ücreti (₺${Number(task.amount).toLocaleString('tr-TR')}) "ÖDENDİ" yapıldı ve Gider Defteri'ne işlendi.` 
+    : `⏳ [${vName}] temizlik ücreti (₺${Number(task.amount).toLocaleString('tr-TR')}) "ÖDENECEK (Borç)" durumuna alındı.`;
   if (window.showToast) window.showToast(msg);
 }
 
@@ -6019,25 +6120,54 @@ function payAllPendingCleaning() {
   }
 
   const totalDebt = pending.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
-  const confirmPay = confirm(`Toplam ${pending.length} adet bekleyen temizlik borcu (₺${totalDebt.toLocaleString('tr-TR')}) "ÖDENDİ" olarak kapatılsın mı?`);
+  const confirmPay = confirm(`Toplam ${pending.length} adet bekleyen temizlik borcu (₺${totalDebt.toLocaleString('tr-TR')}) "ÖDENDİ" olarak kapatılıp Gider Defteri'ne işlensin mi?`);
   if (!confirmPay) return;
 
   const todayStr = '2026-09-07';
+  if (!appData.expenses) appData.expenses = [];
+
   pending.forEach(t => {
     t.paid = true;
     t.paidDate = todayStr;
 
     if (appData.cleaningPayments && appData.cleaningPayments[t.villa]) {
       appData.cleaningPayments[t.villa].paid = true;
+      appData.cleaningPayments[t.villa].amount = t.amount;
+    }
+
+    const expId = 'EXP-CLEAN-' + t.id;
+    const vName = (appData.villas && appData.villas[t.villa]?.name) ? appData.villas[t.villa].name : t.villa;
+    const desc = `[${vName}] Temizlik Ücreti - ${t.cleaner || 'Fatma Hanım'} (${t.guest || 'Çıkış'})`;
+
+    const existingIdx = appData.expenses.findIndex(e => e.id === expId || e.cleanTaskId === t.id);
+    if (existingIdx !== -1) {
+      appData.expenses[existingIdx].amount = Number(t.amount) || 0;
+      appData.expenses[existingIdx].paid = true;
+      appData.expenses[existingIdx].description = desc;
+      appData.expenses[existingIdx].cleanTaskId = t.id;
+    } else {
+      appData.expenses.push({
+        id: expId,
+        date: todayStr,
+        month: todayStr.slice(0, 7),
+        villa: t.villa,
+        category: 'Temizlik',
+        type: 'OPEX',
+        amount: Number(t.amount) || 0,
+        description: desc,
+        cleanTaskId: t.id,
+        paid: true
+      });
     }
   });
 
-  // KULLANICI TALEBİ: Gider Defteri'ne otomatik gider yazılmaz!
   saveAppData();
   renderHousekeepingTab();
   renderDailyOps();
+  renderExpensesTable();
+  renderFinanceModule();
 
-  if (window.showToast) window.showToast(`✅ ${pending.length} temizlik borcu (₺${totalDebt.toLocaleString('tr-TR')}) başarıyla ödendi olarak kapatıldı.`);
+  if (window.showToast) window.showToast(`✅ ${pending.length} temizlik borcu (₺${totalDebt.toLocaleString('tr-TR')}) başarıyla ödendi ve Gider Defteri'ne işlendi.`);
 }
 
 function openNewCleaningTaskModal() {
@@ -6139,14 +6269,18 @@ function deleteCleaningTask(taskId) {
   if (!appData.deletedCleanTaskIds.includes(taskId)) appData.deletedCleanTaskIds.push(taskId);
   appData.cleaningTasks = appData.cleaningTasks.filter(t => t.id !== taskId);
   
-
+  // Bağlı gider kaydı varsa onu da temizle
+  if (appData.expenses) {
+    appData.expenses = appData.expenses.filter(e => e.cleanTaskId !== taskId && e.id !== 'EXP-CLEAN-' + taskId);
+  }
 
   saveAppData();
   renderHousekeepingTab();
   renderDailyOps();
   renderExpensesTable();
+  renderFinanceModule();
 
-  if (window.showToast) window.showToast('🗑️ Temizlik kaydı silindi.');
+  if (window.showToast) window.showToast('🗑️ Temizlik kaydı ve bağlı gideri silindi.');
 }
 
 function deleteCleaningTaskFromModal() {
