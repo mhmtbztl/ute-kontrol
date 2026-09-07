@@ -2826,32 +2826,40 @@ let propertyViewMode = 'table'; // 'table' or 'cards'
 // Initialize and Load Data
 
 // =============================================================
-// REZERVASYON TEMİZLİK GÖREVLERİ & GİDER SENKRONİZASYONU (MUHASEBE MANTIĞI)
+// REZERVASYON TEMİZLİK GÖREVLERİ SENKRONİZASYONU
 // =============================================================
-// KURAL: Gelecek rezervasyonların temizlikleri "Temizlik & Borç" defterine
-// "ÖDENECEK (Borç)" olarak işlenir. Ancak kullanıcı fiilen ödeyip "Ödendi"
-// yapana kadar Gider Defteri'ne (nakit çıkışına) İŞLENMEZ!
+// KULLANICI TALEBİ: Gider Defteri'ne ASLA otomatik temizlik gideri EKLENMEZ!
+// Gider Defteri %100 kullanıcının manuel kontrolündedir. Kullanıcı bir gideri
+// sildiğinde o gider kalıcı olarak silinir, arka plandan tekrar oluşturulmaz.
 function syncBookingCleaningTasks() {
   if (!appData.cleaningTasks) appData.cleaningTasks = [];
   if (!appData.bookings) appData.bookings = [];
   if (!appData.expenses) appData.expenses = [];
+      appData.expenses = appData.expenses.filter(e => !e.isAutoClean && !(e.id && e.id.startsWith("EXP-CLEAN-")) && !e.cleanTaskId);
 
-  // 1. Her rezervasyon için "Temizlik & Borç Defteri"ne (appData.cleaningTasks) görev ekle/güncelle
+  // Eski kalıntı otomatik temizlik giderlerini Gider Defteri'nden temizle
+  appData.expenses = appData.expenses.filter(exp => {
+    if (exp.isAutoClean || (exp.id && exp.id.startsWith('EXP-CLEAN-')) || exp.cleanTaskId) {
+      return false;
+    }
+    return true;
+  });
+
+  // Rezervasyonları temizlik görevleri listesine (Temizlik & Borç Defteri) senkronize et
   appData.bookings.forEach(b => {
     const cleanFee = Number(b.cleanFee) || 0;
     if (cleanFee <= 0 || b.status === 'CANCELLED') {
-      // İptal edilen veya temizlik ücreti 0 olan rezervasyonun görevini kaldır
       appData.cleaningTasks = appData.cleaningTasks.filter(t => t.bookingId !== b.id);
       return;
     }
 
     const taskId = 'TASK-CLN-' + b.id;
+    // Kullanıcı bu görevi daha önce sildiyse tekrar otomatik OLUŞTURMA!
+    if (appData.deletedCleanTaskIds && appData.deletedCleanTaskIds.includes(taskId)) return;
     let existing = appData.cleaningTasks.find(t => t.id === taskId || t.bookingId === b.id);
     const vName = (appData.villas && appData.villas[b.villa]?.name) ? appData.villas[b.villa].name : b.villa;
 
     if (!existing) {
-      // Henüz gelmemiş veya yeni girilen rezervasyonun temizliği "ÖDENECEK (Borç)" olarak eklenir
-      // Gider defterine HENÜZ İŞLENMEZ!
       appData.cleaningTasks.push({
         id: taskId,
         bookingId: b.id,
@@ -2865,68 +2873,13 @@ function syncBookingCleaningTasks() {
         notes: `${b.guest} Çıkış Temizliği (${vName})`
       });
     } else {
-      // Güncelleme: Tarih, misafir, villa güncellenir (kullanıcının belirlediği özel tutar veya ödendi durumu korunur)
       existing.date = b.checkOut;
       existing.guest = b.guest;
       existing.villa = b.villa;
       if (!existing.notes) existing.notes = `${b.guest} Çıkış Temizliği (${vName})`;
     }
   });
-
-  // 2. Gider Defteri (appData.expenses) ile Senkronizasyon:
-  // KURAL: Temizlik gideri SADECE ve SADECE "paid === true" (Ödendi) ise Gider Defteri'nde yer alır!
-  // Henüz ödenmemiş (paid === false) temizlikler Gider Defteri'nden temizlenir (nakit çıkışını yanıltmasın).
-  appData.expenses = appData.expenses.filter(exp => {
-    if (!exp.isAutoClean && !exp.cleanTaskId && !exp.bookingId) return true;
-    
-    // Check if this expense belongs to a cleaning task
-    const task = appData.cleaningTasks.find(t => 
-      t.id === exp.cleanTaskId || 
-      t.bookingId === exp.bookingId || 
-      ('EXP-CLEAN-' + t.id) === exp.id ||
-      ('EXP-CLEAN-' + t.bookingId) === exp.id ||
-      ('EXP-CLEAN-TASK-' + t.id) === exp.id
-    );
-
-    // Eğer ilgili temizlik görevi yoksa veya henüz ÖDENMEMİŞSE (paid === false), gider defterinde duramaz!
-    if (!task || !task.paid) {
-      return false;
-    }
-    return true;
-  });
-
-  // Ödenmiş (paid === true) görevlerin gider defterindeki kaydını garantile
-  appData.cleaningTasks.forEach(task => {
-    if (!task.paid) return;
-    const expId = 'EXP-CLEAN-TASK-' + task.id;
-    const existingIdx = appData.expenses.findIndex(e => e.id === expId || e.cleanTaskId === task.id || (task.bookingId && e.bookingId === task.bookingId));
-    const vName = (appData.villas && appData.villas[task.villa]?.name) ? appData.villas[task.villa].name : task.villa;
-    const expDate = task.paidDate || task.date || '2026-09-07';
-
-    if (existingIdx !== -1) {
-      appData.expenses[existingIdx].amount = task.amount;
-      appData.expenses[existingIdx].date = expDate;
-      appData.expenses[existingIdx].month = expDate.slice(0, 7);
-      appData.expenses[existingIdx].paid = true;
-    } else {
-      appData.expenses.push({
-        id: expId,
-        cleanTaskId: task.id,
-        bookingId: task.bookingId || null,
-        date: expDate,
-        month: expDate.slice(0, 7),
-        villa: task.villa,
-        category: 'Temizlik',
-        type: 'OPEX',
-        amount: task.amount,
-        description: `[Temizlik Ödendi] ${task.guest || vName} - ${task.cleaner || 'Ekip'}`,
-        isAutoClean: true,
-        paid: true
-      });
-    }
-  });
 }
-
 
 function loadAppData() {
   try {
@@ -2941,9 +2894,10 @@ function loadAppData() {
       if (!appData.leads) appData.leads = [];
       if (!appData.maintenance) appData.maintenance = [];
       if (!appData.cleaningPayments) appData.cleaningPayments = {};
-      if (!appData.cleaningTasks || appData.cleaningTasks.length === 0) {
-        appData.cleaningTasks = JSON.parse(JSON.stringify(DEFAULT_CLEANING_TASKS));
+      if (!appData.cleaningTasks) {
+        appData.cleaningTasks = [];
       }
+      if (!appData.deletedCleanTaskIds) appData.deletedCleanTaskIds = [];
       if (!appData.housekeepingOverrides) appData.housekeepingOverrides = {};
 
       // Check if user has explicitly reset everything
@@ -2953,9 +2907,7 @@ function loadAppData() {
         if (!appData.excelDb) {
           appData.excelDb = JSON.parse(JSON.stringify(COMPANY_EXCEL_DATABASE));
         }
-        if (!appData.expenses || appData.expenses.length === 0) {
-          appData.expenses = JSON.parse(JSON.stringify(DEFAULT_EXPENSES));
-        }
+        // Gider Defteri kullanıcının sildiği şekilde kalır, otomatik doldurulmaz
         if (Object.keys(appData.targets).length === 0) {
           appData.targets = JSON.parse(JSON.stringify(DEFAULT_TARGETS_BY_MONTH));
         }
@@ -4214,7 +4166,7 @@ function renderExpensesTable() {
       <td><span class="badge ${exp.type === 'CAPEX' ? 'badge-amber' : 'badge-blue'}">${exp.type === 'CAPEX' ? 'Yatırım (Capex)' : 'Operasyonel (Opex)'}</span></td>
       <td><strong>${exp.category}</strong></td>
       <td>${exp.villa === 'ALL' ? 'Tüm Portföy' : (appData.villas[exp.villa]?.name || exp.villa)}</td>
-      <td>${exp.description || exp.desc || "-"} ${(exp.isAutoClean || exp.bookingId) ? '<span class="badge badge-emerald" style="font-size: 10px; margin-left: 6px;">🧹 Rezervasyon</span>' : ''}</td>
+      <td>${exp.description || exp.desc || "-"}</td>
       <td><strong>${Number(exp.amount).toLocaleString('tr-TR')} TL</strong></td>
       <td style="text-align: right; white-space: nowrap;">
         <button class="btn btn-secondary btn-sm" onclick="editExpense('${exp.id}')">✏️</button>
@@ -4286,17 +4238,11 @@ function editExpense(id) {
 
 function deleteExpense(id) {
   if (confirm('Bu harcamayı silmek istediğinizden emin misiniz?')) {
-    const exp = appData.expenses.find(e => e.id === id);
-    if (exp && exp.bookingId) {
-      const b = appData.bookings.find(b => b.id === exp.bookingId);
-      if (b) {
-        b.cleanFee = 0;
-        b.net = Math.max(0, (Number(b.gross) || 0) - (Number(b.otaComm) || 0));
-      }
-    }
+    // Harcama kalıcı olarak silinir, arka plandan ASLA tekrar oluşturulmaz
     appData.expenses = appData.expenses.filter(e => e.id !== id);
     saveAppData();
     renderAll();
+    if (window.showToast) window.showToast('🗑️ Harcama başarıyla silindi.');
   }
 }
 
@@ -5348,6 +5294,8 @@ function deleteLead(id) {
   if (confirm('Bu talebi silmek istediğinizden emin misiniz?')) {
     appData.leads = appData.leads.filter(l => l.id !== id);
     saveAppData();
+    renderAll();
+    if (window.showToast) window.showToast('🗑️ Talep başarıyla silindi.');
   }
 }
 
@@ -5436,6 +5384,8 @@ function deleteMaint(id) {
   if (confirm('Bu arızayı silmek istediğinizden emin misiniz?')) {
     appData.maintenance = appData.maintenance.filter(m => m.id !== id);
     saveAppData();
+    renderAll();
+    if (window.showToast) window.showToast('🗑️ Arıza kaydı silindi.');
   }
 }
 
@@ -5822,12 +5772,7 @@ function promptEditCleaningAmount(vKey) {
     if (task) task.amount = newAmount;
   }
 
-  // Also update linked expense if already created
-  const expId = 'EXP-CLEAN-MANUAL-' + vKey + '-2026-09';
-  const expIdx = appData.expenses.findIndex(e => e.id === expId);
-  if (expIdx !== -1) {
-    appData.expenses[expIdx].amount = newAmount;
-  }
+
 
   saveAppData();
   renderDailyOps();
@@ -5858,12 +5803,7 @@ function promptEditTaskAmount(taskId) {
     appData.cleaningPayments[task.villa].amount = newAmount;
   }
 
-  // Sync expense if exists
-  const expId = 'EXP-CLEAN-TASK-' + task.id;
-  const expIdx = appData.expenses.findIndex(e => e.id === expId);
-  if (expIdx !== -1) {
-    appData.expenses[expIdx].amount = newAmount;
-  }
+
 
   saveAppData();
   renderHousekeepingTab();
@@ -5888,7 +5828,7 @@ function toggleCleaningPaid(vKey) {
   appData.cleaningPayments[vKey].amount = cleanCost;
   appData.cleaningPayments[vKey].updatedAt = '2026-09-07';
 
-  // Also update corresponding task in cleaningTasks
+  // Sadece Temizlik & Borç Defteri'ndeki görevin durumunu güncelle
   if (appData.cleaningTasks) {
     const task = appData.cleaningTasks.find(t => t.villa === vKey);
     if (task) {
@@ -5897,46 +5837,13 @@ function toggleCleaningPaid(vKey) {
     }
   }
 
-  // Synchronize with an expense entry
-  const todayStr = '2026-09-07';
-  const expId = 'EXP-CLEAN-MANUAL-' + vKey + '-' + todayStr.slice(0, 7);
-
-  if (newStatus) {
-    const existingIdx = appData.expenses.findIndex(e => e.id === expId);
-    if (existingIdx !== -1) {
-      appData.expenses[existingIdx].amount = cleanCost;
-      appData.expenses[existingIdx].paid = true;
-      appData.expenses[existingIdx].description = `[${vConf?.name || vKey}] Temizlik Ücreti (Ödendi)`;
-    } else {
-      appData.expenses.push({
-        id: expId,
-        date: todayStr,
-        month: todayStr.slice(0, 7),
-        villa: vKey,
-        category: 'Temizlik',
-        type: 'OPEX',
-        amount: cleanCost,
-        description: `[${vConf?.name || vKey}] Temizlik Ücreti (Ödendi)`,
-        isAutoClean: false,
-        paid: true
-      });
-    }
-  } else {
-    const existingIdx = appData.expenses.findIndex(e => e.id === expId);
-    if (existingIdx !== -1) {
-      appData.expenses[existingIdx].paid = false;
-      appData.expenses[existingIdx].description = `[${vConf?.name || vKey}] Temizlik Ücreti (Bekliyor/Ödenecek)`;
-    }
-  }
-
+  // KULLANICI TALEBİ: Gider Defteri'ne ASLA otomatik gider eklenmez!
   saveAppData();
   renderDailyOps();
   renderHousekeepingTab();
-  renderExpensesTable();
-  renderFinanceModule();
 
   const msg = newStatus 
-    ? `✅ ${vConf?.name || vKey} temizlik bedeli (₺${cleanCost.toLocaleString('tr-TR')}) "ÖDENDİ" olarak kaydedildi.`
+    ? `✅ ${vConf?.name || vKey} temizlik bedeli (₺${cleanCost.toLocaleString('tr-TR')}) "ÖDENDİ" olarak işaretlendi.`
     : `⏳ ${vConf?.name || vKey} temizlik bedeli (₺${cleanCost.toLocaleString('tr-TR')}) "ÖDENECEK" olarak güncellendi.`;
   
   if (window.showToast) window.showToast(msg);
@@ -5966,7 +5873,7 @@ function renderHousekeepingTab() {
   if (!tbody) return;
 
   if (!appData.cleaningTasks) {
-    appData.cleaningTasks = JSON.parse(JSON.stringify(DEFAULT_CLEANING_TASKS));
+    appData.cleaningTasks = [];
   }
 
   const statusFilter = document.getElementById('hkStatusFilter')?.value || 'ALL';
@@ -6094,39 +6001,12 @@ function toggleTaskPaid(taskId) {
     appData.cleaningPayments[task.villa].amount = task.amount;
   }
 
-  // Sync to expenses
-  const expId = 'EXP-CLEAN-TASK-' + task.id;
-  if (newPaid) {
-    const existingIdx = appData.expenses.findIndex(e => e.id === expId);
-    const desc = `[${appData.villas[task.villa]?.name || task.villa}] Temizlik - ${task.cleaner} (${task.guest || 'Hakediş'})`;
-    if (existingIdx !== -1) {
-      appData.expenses[existingIdx].amount = task.amount;
-      appData.expenses[existingIdx].paid = true;
-    } else {
-      appData.expenses.push({
-        id: expId,
-        date: task.paidDate || '2026-09-07',
-        month: (task.paidDate || '2026-09-07').slice(0, 7),
-        villa: task.villa,
-        category: 'Temizlik',
-        type: 'OPEX',
-        amount: task.amount,
-        description: desc,
-        isAutoClean: false,
-        paid: true
-      });
-    }
-  } else {
-    appData.expenses = appData.expenses.filter(e => e.id !== expId);
-  }
-
+  // KULLANICI TALEBİ: Gider Defteri'ne otomatik kayıt eklenmez!
   saveAppData();
   renderHousekeepingTab();
   renderDailyOps();
-  renderExpensesTable();
-  renderFinanceModule();
 
-  const msg = newPaid ? '✅ Temizlik ücreti "ÖDENDİ" olarak kaydedildi.' : '⏳ Temizlik ücreti "ÖDENECEK (Borç)" olarak güncellendi.';
+  const msg = newPaid ? '✅ Temizlik durumu "ÖDENDİ" olarak kaydedildi.' : '⏳ Temizlik durumu "ÖDENECEK (Borç)" olarak güncellendi.';
   if (window.showToast) window.showToast(msg);
 }
 
@@ -6139,7 +6019,7 @@ function payAllPendingCleaning() {
   }
 
   const totalDebt = pending.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
-  const confirmPay = confirm(`Toplam ${pending.length} adet bekleyen temizlik borcu (₺${totalDebt.toLocaleString('tr-TR')}) "ÖDENDİ" olarak kapatılıp gider defterine işlensin mi?`);
+  const confirmPay = confirm(`Toplam ${pending.length} adet bekleyen temizlik borcu (₺${totalDebt.toLocaleString('tr-TR')}) "ÖDENDİ" olarak kapatılsın mı?`);
   if (!confirmPay) return;
 
   const todayStr = '2026-09-07';
@@ -6147,33 +6027,15 @@ function payAllPendingCleaning() {
     t.paid = true;
     t.paidDate = todayStr;
 
-    // Add to expenses
-    const expId = 'EXP-CLEAN-TASK-' + t.id;
-    if (!appData.expenses.some(e => e.id === expId)) {
-      appData.expenses.push({
-        id: expId,
-        date: todayStr,
-        month: todayStr.slice(0, 7),
-        villa: t.villa,
-        category: 'Temizlik',
-        type: 'OPEX',
-        amount: t.amount,
-        description: `[${appData.villas[t.villa]?.name || t.villa}] Temizlik - ${t.cleaner} (${t.guest || 'Hakediş'})`,
-        isAutoClean: false,
-        paid: true
-      });
-    }
-
     if (appData.cleaningPayments && appData.cleaningPayments[t.villa]) {
       appData.cleaningPayments[t.villa].paid = true;
     }
   });
 
+  // KULLANICI TALEBİ: Gider Defteri'ne otomatik gider yazılmaz!
   saveAppData();
   renderHousekeepingTab();
   renderDailyOps();
-  renderExpensesTable();
-  renderFinanceModule();
 
   if (window.showToast) window.showToast(`✅ ${pending.length} temizlik borcu (₺${totalDebt.toLocaleString('tr-TR')}) başarıyla ödendi olarak kapatıldı.`);
 }
@@ -6273,11 +6135,11 @@ function saveCleaningTask(e) {
 function deleteCleaningTask(taskId) {
   if (!confirm('Bu temizlik kaydını silmek istediğinize emin misiniz?')) return;
   if (!appData.cleaningTasks) return;
+  if (!appData.deletedCleanTaskIds) appData.deletedCleanTaskIds = [];
+  if (!appData.deletedCleanTaskIds.includes(taskId)) appData.deletedCleanTaskIds.push(taskId);
   appData.cleaningTasks = appData.cleaningTasks.filter(t => t.id !== taskId);
   
-  // Also remove linked expense
-  const expId = 'EXP-CLEAN-TASK-' + taskId;
-  appData.expenses = appData.expenses.filter(e => e.id !== expId);
+
 
   saveAppData();
   renderHousekeepingTab();
