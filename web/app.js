@@ -2,8 +2,8 @@
 // =============================================================
 // GÜVENLİK VE GİZLİ ERİŞİM YÖNETİMİ (SECURITY & AUTH SHIELD)
 // =============================================================
-const MASTER_PINS = ['2026', '1907', 'lexbnb', 'lexbnb2026', 'ute2026'];
-const SECRET_ACCESS_KEY = 'lexbnb2026';
+const MASTER_PINS = ['uludagtatil2026.', 'uludagtatil2026'];
+const SECRET_ACCESS_KEY = 'uludagtatil2026.';
 
 function checkAuthStatus() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -67,7 +67,7 @@ function handleAuthSubmit(e) {
   } else {
     if (err) {
       err.style.display = 'block';
-      err.innerText = '⚠️ Hatalı PIN kodu! (Varsayılan PIN: 2026)';
+      err.innerText = '⚠️ Hatalı PIN kodu! Lütfen yetkili master şifreyi giriniz.';
     }
     if (input) {
       input.value = '';
