@@ -63,7 +63,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Lexbnb — Finansal Performans & UTE Kontrol Merkezi V5</title>
   <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
-  <link rel="stylesheet" href="style.css">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <link rel="stylesheet" href="style.css?v=5.5.1">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
@@ -167,6 +170,10 @@
 
         <div class="header-actions">
       <!-- Başlangıç Rehberi Butonu -->
+      <button type="button" class="btn btn-secondary header-cache-btn" onclick="forceHardRefresh()" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #FCA5A5; font-weight: 700; display: flex; align-items: center; gap: 5px;" title="Mobildeki eski önbellek ve çerezleri temizleyip en güncel canlı sürümü yükler">
+        <span>🔄</span>
+        <span class="cache-btn-text">Önbelleği Temizle</span>
+      </button>
       <button type="button" class="btn btn-secondary header-guide-btn" onclick="openHelpModal('terms')" style="background: rgba(139, 92, 246, 0.18); border: 1px solid rgba(139, 92, 246, 0.4); color: #DDD6FE; font-weight: 700; display: flex; align-items: center; gap: 6px;" title="Başlangıç Seviyesi Terimler Sözlüğü & Kılavuz">
         <span>🎓</span>
         <span class="guide-btn-text">Başlangıç Rehberi</span>
@@ -235,6 +242,13 @@
           <span>⚙️</span> Araçlar <span style="font-size: 10px; margin-left: 2px;">▼</span>
         </button>
         <div class="header-dropdown-menu" id="toolsMenu">
+          <button type="button" class="dropdown-item" onclick="forceHardRefresh(); closeAllHeaderDropdowns();" style="background: rgba(245, 158, 11, 0.1);">
+            <span class="dropdown-icon">🔄</span>
+            <div>
+              <strong style="color: #FBBF24;">Önbelleği & Çerezleri Sıfırla</strong>
+              <small>Mobildeki eski verileri silip canlı sürümü yeniden yükler</small>
+            </div>
+          </button>
           <button type="button" class="dropdown-item" onclick="openImportModal(); closeAllHeaderDropdowns();">
             <span class="dropdown-icon">📥</span>
             <div>
@@ -2217,7 +2231,7 @@
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=5.5.1"></script>
 
   <!-- ======================================================= -->
   <!-- MODAL: WHATSAPP BUSINESS AKILLI MESAJ AYRIŞTIRICI -->

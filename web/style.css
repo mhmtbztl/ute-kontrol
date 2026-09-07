@@ -3186,3 +3186,20 @@ body {
   padding: 8px 10px;
   margin-top: 6px;
 }
+
+/* Cache Refresh Button */
+.header-cache-btn {
+  transition: all 0.2s ease !important;
+}
+.header-cache-btn:hover {
+  background: rgba(239, 68, 68, 0.28) !important;
+  border-color: #EF4444 !important;
+}
+@media (max-width: 640px) {
+  .cache-btn-text {
+    display: none;
+  }
+  .header-cache-btn {
+    padding: 6px 10px !important;
+  }
+}

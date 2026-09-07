@@ -3079,6 +3079,55 @@ function formatShortDate(dateStr) {
   return formatTrDate(dateStr, false);
 }
 
+
+// =============================================================
+// 🔄 MOBİL ÖNBELLEK (CACHE) & ÇEREZ TEMİZLEME MOTORU
+// =============================================================
+const CURRENT_APP_BUILD_VERSION = '5.5.1-20260907';
+
+async function forceHardRefresh() {
+  const confirmed = confirm('Tarayıcı ve mobildeki eski önbellek (cache) ve çerez kalıntıları temizlenip en güncel canlı sürüm yüklensin mi?\n\n(Not: Yetkili PIN şifreniz korunacaktır.)');
+  if (!confirmed) return;
+
+  if (window.showToast) {
+    window.showToast('🔄 Önbellek temizleniyor, en güncel sürüm yükleniyor...');
+  }
+
+  try {
+    // 1. Delete all Service Worker / Browser Cache API items
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+
+    // 2. Preserve Master PIN and reset stale local storage
+    const savedPin = localStorage.getItem('LEXBNB_MASTER_PIN_AUTH') || localStorage.getItem('LEXBNB_AUTH_KEY') || 'uludagtatil2026.';
+    
+    // Clear known storage keys
+    const removeKeys = [
+      'LEXBNB_V5_MASTER_DATA',
+      'LEXBNB_APP_DATA_V4',
+      'LEXBNB_V3_STATE',
+      'LEXBNB_APP_DATA'
+    ];
+    removeKeys.forEach(k => localStorage.removeItem(k));
+
+    // Restore PIN and set current version
+    localStorage.setItem('LEXBNB_MASTER_PIN_AUTH', savedPin);
+    localStorage.setItem('LEXBNB_AUTH_KEY', savedPin);
+    localStorage.setItem('LEXBNB_APP_VERSION', CURRENT_APP_BUILD_VERSION);
+
+    // 3. Force hard navigation with timestamp cache-buster
+    const url = new URL(window.location.href);
+    url.searchParams.set('v', Date.now());
+    url.searchParams.set('key', savedPin);
+    window.location.replace(url.toString());
+  } catch (err) {
+    console.error('Hard refresh error:', err);
+    window.location.reload(true);
+  }
+}
+
 // Master Render All Components
 function renderAll() {
   updateStepperLabels();
