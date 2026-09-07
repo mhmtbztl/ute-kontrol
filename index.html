@@ -61,7 +61,7 @@
       <button class="btn btn-secondary" onclick="openExpenseModal()">+ Gider / Yatırım</button>
       <button class="btn btn-secondary" onclick="openImportModal()">📥 Rapor Yükle</button>
       <button class="btn btn-secondary" onclick="exportDataJSON()">💾 Yedek</button>
-      <button class="btn btn-danger btn-sm" onclick="resetToCleanState()" title="Tüm verileri temizle">🗑️ Sıfırla</button>
+      <button class="btn btn-danger btn-sm" onclick="openResetModal()" title="Verileri sıfırla veya geri yükle">🗑️ Sıfırla</button>
     </div>
   </header>
 
@@ -476,41 +476,52 @@
               <h2>ŞİRKET GİDİŞAT RADARI & OTOMATİK PROJEKSİYON MOTORU</h2>
               <span class="sub-text">Son 14 ayın resmi şirket trendi, momentum analizi ve kış sezonu gelir tahminleri</span>
             </div>
-            <span class="badge badge-emerald">CANLI GİDİŞAT: GÜÇLÜ POZİTİF</span>
+            <span class="badge badge-emerald" id="trajectoryStatusBadge">CANLI GİDİŞAT: GÜÇLÜ POZİTİF</span>
           </div>
           <button class="btn btn-secondary btn-sm" onclick="exportTrajectoryReport()">📄 Gidişat Raporu Al</button>
+        </div>
+
+        <!-- Sıfırlama Bilgilendirme Bannerı (Yalnızca Temiz Kasada Görünür) -->
+        <div id="trajectoryRadarBanner" style="display: none; background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.35); border-radius: 10px; padding: 14px 18px; margin-bottom: 20px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div style="color: #93c5fd; font-size: 0.9rem;">
+              ℹ️ <strong>Sistem verileri sıfırlandı (Temiz Kasa Başlatıldı - 0 TL).</strong><br>
+              Yeni rezervasyon veya harcama girdikçe projeksiyonlar otomatik hesaplanacaktır. GENEL RAPOR.xlsx resmi şirket verilerini geri getirmek için <strong>"Excel Verilerini Geri Yükle"</strong> butonuna basabilirsiniz.
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="restoreExcelData()">🔄 Excel Verilerini Geri Yükle</button>
+          </div>
         </div>
 
         <!-- 1. Gidişat Barometresi / 4 Temel Sağlık Göstergesi -->
         <div class="trajectory-barometer-grid">
           <div class="barometer-card health-score">
             <div class="score-circle">
-              <span class="score-num">88</span>
+              <span class="score-num" id="trajectoryScoreNum">88</span>
               <span class="score-denom">/100</span>
             </div>
             <div class="score-info">
               <strong>ŞİRKET SAĞLIK SKORU</strong>
-              <span class="text-emerald">🟢 Büyüme & Kâr İvmesinde</span>
-              <p>Yaz sezonu güçlü toparlanma sağladı, kış öncesi nakit pozisyonu sağlam.</p>
+              <span class="text-emerald" id="trajectoryHealthStatus">🟢 Büyüme & Kâr İvmesinde</span>
+              <p id="trajectoryHealthDesc">Yaz sezonu güçlü toparlanma sağladı, kış öncesi nakit pozisyonu sağlam.</p>
             </div>
           </div>
 
           <div class="barometer-card">
             <span class="b-lbl">CİRO MOMENTUMU (SON 3 AY)</span>
-            <strong class="b-val text-emerald">🚀 +%80,7 İvme</strong>
-            <span class="b-desc">Haziran (268k) ➔ Temmuz (467k) ➔ Ağustos (484k)</span>
+            <strong class="b-val text-emerald" id="trajectoryMomentumVal">🚀 +%80,7 İvme</strong>
+            <span class="b-desc" id="trajectoryMomentumDesc">Haziran (268k) ➔ Temmuz (467k) ➔ Ağustos (484k)</span>
           </div>
 
           <div class="barometer-card">
             <span class="b-lbl">NET KÂR MARJI STABİLİTESİ</span>
-            <strong class="b-val text-blue">⚖️ %29,5 – %33,9</strong>
-            <span class="b-desc">Ocak rekorunda %60,7, yaz aylarında %30 civarında stabil.</span>
+            <strong class="b-val text-blue" id="trajectoryMarginVal">⚖️ %29,5 – %33,9</strong>
+            <span class="b-desc" id="trajectoryMarginDesc">Ocak rekorunda %60,7, yaz aylarında %30 civarında stabil.</span>
           </div>
 
           <div class="barometer-card">
             <span class="b-lbl">FİYAT SAVUNMASI (ADR TRENDİ)</span>
-            <strong class="b-val text-amber">⚠️ Sezonsal Uçurum</strong>
-            <span class="b-desc">Kışın 18.000 TL ➔ Yazın 6.126 TL. Kış erken açılışı kritik.</span>
+            <strong class="b-val text-amber" id="trajectoryAdrVal">⚠️ Sezonsal Uçurum</strong>
+            <span class="b-desc" id="trajectoryAdrDesc">Kışın 18.000 TL ➔ Yazın 6.126 TL. Kış erken açılışı kritik.</span>
           </div>
         </div>
 
@@ -1225,6 +1236,52 @@
           <button type="submit" class="btn btn-primary">Kaydet</button>
         </div>
       </form>
+    </div>
+  </div>
+
+    <!-- MODAL: VERİ SIFIRLAMA VE YÖNETİM MERKEZİ -->
+  <div class="modal-backdrop" id="resetModal">
+    <div class="modal-card" style="max-width: 580px;">
+      <div class="modal-header">
+        <h3>🗑️ Veri Sıfırlama ve Yönetim</h3>
+        <button class="close-btn" onclick="closeResetModal()">&times;</button>
+      </div>
+      <div style="padding: 20px;">
+        <p style="color: var(--color-slate-300); font-size: 0.95rem; margin-bottom: 20px;">
+          Lexbnb finans ve operasyon verilerini nasıl yönetmek istediğinizi seçin:
+        </p>
+
+        <div style="display: flex; flex-direction: column; gap: 15px;">
+          <!-- Seçenek 1: Temiz Sıfırlama -->
+          <div style="border: 1px solid rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.08); border-radius: 10px; padding: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+              <strong style="color: #fca5a5; font-size: 1rem;">🧹 Excel Verilerini ve Tüm Sistemi Sıfırla (0 TL)</strong>
+            </div>
+            <p style="color: var(--color-slate-300); font-size: 0.85rem; line-height: 1.4; margin-bottom: 12px;">
+              GENEL RAPOR.xlsx'ten aktarılan 14 aylık geçmiş ciroyu, 104 harcama kalemini ve tüm rezervasyonları tamamen temizler. Bütün paneller 0 TL olur, sıfırdan kendi kayıtlarınızı girebilirsiniz.
+            </p>
+            <button class="btn btn-danger" onclick="cleanResetAll()" style="width: 100%;">
+              🗑️ Excel ve Tüm Verileri Tamamen Sıfırla (0 TL)
+            </button>
+          </div>
+
+          <!-- Seçenek 2: Excel Verilerini Geri Yükle -->
+          <div style="border: 1px solid rgba(59, 130, 246, 0.4); background: rgba(59, 130, 246, 0.08); border-radius: 10px; padding: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+              <strong style="color: #93c5fd; font-size: 1rem;">📊 Excel Raporunu Tekrar Yükle (GENEL RAPOR.xlsx)</strong>
+            </div>
+            <p style="color: var(--color-slate-300); font-size: 0.85rem; line-height: 1.4; margin-bottom: 12px;">
+              GENEL RAPOR.xlsx dosyasındaki 14 aylık resmi şirket veritabanını (5.004.165 TL ciro, 457 geceleme, 104 gider kalemi ve kış projeksiyonları) eksiksiz olarak geri yükler.
+            </p>
+            <button class="btn btn-primary" onclick="restoreExcelData()" style="width: 100%;">
+              🔄 Excel Verilerini Geri Yükle
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeResetModal()">Vazgeç / Kapat</button>
+      </div>
     </div>
   </div>
 

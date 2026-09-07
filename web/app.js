@@ -2693,6 +2693,8 @@ const DEFAULT_MAINT = [
 
 // App State Container
 let appData = {
+  isCleanState: false,
+  excelDb: null,
   villas: {},
   targets: {},
   bookings: [],
@@ -2717,13 +2719,30 @@ function loadAppData() {
     if (saved) {
       appData = JSON.parse(saved);
       if (!appData.villas) appData.villas = JSON.parse(JSON.stringify(DEFAULT_VILLAS));
-      if (!appData.targets) appData.targets = JSON.parse(JSON.stringify(DEFAULT_TARGETS_BY_MONTH));
-      // Ensure company expenses from GENEL RAPOR.xlsx are loaded
-      if (!appData.expenses || appData.expenses.length < 50) {
-        appData.expenses = JSON.parse(JSON.stringify(DEFAULT_EXPENSES));
+      if (!appData.targets) appData.targets = {};
+      if (!appData.bookings) appData.bookings = [];
+      if (!appData.expenses) appData.expenses = [];
+      if (!appData.leads) appData.leads = [];
+      if (!appData.maintenance) appData.maintenance = [];
+
+      // Check if user has explicitly reset everything
+      if (appData.isCleanState) {
+        appData.excelDb = null;
+      } else {
+        if (!appData.excelDb) {
+          appData.excelDb = JSON.parse(JSON.stringify(COMPANY_EXCEL_DATABASE));
+        }
+        if (!appData.expenses || appData.expenses.length === 0) {
+          appData.expenses = JSON.parse(JSON.stringify(DEFAULT_EXPENSES));
+        }
+        if (Object.keys(appData.targets).length === 0) {
+          appData.targets = JSON.parse(JSON.stringify(DEFAULT_TARGETS_BY_MONTH));
+        }
       }
     } else {
       appData = {
+        isCleanState: false,
+        excelDb: JSON.parse(JSON.stringify(COMPANY_EXCEL_DATABASE)),
         villas: JSON.parse(JSON.stringify(DEFAULT_VILLAS)),
         targets: JSON.parse(JSON.stringify(DEFAULT_TARGETS_BY_MONTH)),
         bookings: JSON.parse(JSON.stringify(DEFAULT_BOOKINGS)),
@@ -2848,6 +2867,7 @@ function renderAll() {
   renderTodayRadar();
   renderOtaRadar();
   runWhatIfSimulation();
+  renderTrajectoryRadar();
 
   // Badges
   const rBadge = document.getElementById('rezCountBadge');
@@ -2881,82 +2901,123 @@ function renderFinanceModule() {
   const categoryTotals = {};
   EXPENSE_CATEGORIES.forEach(c => { categoryTotals[c.name] = 0; });
 
-  if (currentFilter.period === 'ALL') {
-    // All-time Totals (14 Months from GENEL RAPOR.xlsx)
-    const att = COMPANY_EXCEL_DATABASE.allTimeTotals;
-    totalRevenue = att.totalRevenue;
-    totalSoldNights = att.totalNights;
-    avgRevPerNight = att.avgDailyRate;
-    totalOpex = att.totalOpex;
-    totalCapex = att.totalCapex;
-    targetRev = att.targetCiro;
+  const activeExcel = (!appData.isCleanState && appData.excelDb) ? appData.excelDb : null;
 
-    // All-time per villa
-    propStats.SEYIR = { name: 'Seyir Dağ Evi', revenue: att.villas.seyir.rev, nights: att.villas.seyir.days, adr: Math.round(att.villas.seyir.rev / att.villas.seyir.days), share: Number(((att.villas.seyir.rev / totalRevenue)*100).toFixed(1)), occupancy: Number(((att.villas.seyir.days / (14*30))*100).toFixed(1)), revpar: Math.round(att.villas.seyir.rev / (14*30)) };
-    propStats.DOGUS = { name: 'Doğuş Dağ Evi', revenue: att.villas.dogus.rev, nights: att.villas.dogus.days, adr: Math.round(att.villas.dogus.rev / att.villas.dogus.days), share: Number(((att.villas.dogus.rev / totalRevenue)*100).toFixed(1)), occupancy: Number(((att.villas.dogus.days / (14*30))*100).toFixed(1)), revpar: Math.round(att.villas.dogus.rev / (14*30)) };
-    propStats.ZIRVE = { name: 'Zirve Dağ Evi', revenue: att.villas.zirve.rev, nights: att.villas.zirve.days, adr: Math.round(att.villas.zirve.rev / att.villas.zirve.days), share: Number(((att.villas.zirve.rev / totalRevenue)*100).toFixed(1)), occupancy: Number(((att.villas.zirve.days / (14*30))*100).toFixed(1)), revpar: Math.round(att.villas.zirve.rev / (14*30)) };
-    propStats.SIRIN = { name: 'Şirin Dağ Evi', revenue: att.villas.sirin.rev, nights: att.villas.sirin.days, adr: Math.round(att.villas.sirin.rev / att.villas.sirin.days), share: Number(((att.villas.sirin.rev / totalRevenue)*100).toFixed(1)), occupancy: Number(((att.villas.sirin.days / (14*30))*100).toFixed(1)), revpar: Math.round(att.villas.sirin.rev / (14*30)) };
-    propStats.NEFES = { name: 'Nefes Dağ Evi', revenue: att.villas.nefes.rev, nights: att.villas.nefes.days, adr: Math.round(att.villas.nefes.rev / att.villas.nefes.days), share: Number(((att.villas.nefes.rev / totalRevenue)*100).toFixed(1)), occupancy: Number(((att.villas.nefes.days / (14*30))*100).toFixed(1)), revpar: Math.round(att.villas.nefes.rev / (14*30)) };
+  if (activeExcel) {
+    if (currentFilter.period === 'ALL') {
+      // All-time Totals (14 Months from GENEL RAPOR.xlsx)
+      const att = activeExcel.allTimeTotals;
+      totalRevenue = att.totalRevenue;
+      totalSoldNights = att.totalNights;
+      avgRevPerNight = att.avgDailyRate;
+      totalOpex = att.totalOpex;
+      totalCapex = att.totalCapex;
+      targetRev = att.targetCiro;
 
-    // Sum all expenses
-    appData.expenses.forEach(exp => {
-      const amt = Number(exp.amount) || 0;
-      if (categoryTotals[exp.category] !== undefined) categoryTotals[exp.category] += amt;
-      else categoryTotals['Diğer'] = (categoryTotals['Diğer'] || 0) + amt;
+      // All-time per villa
+      propStats.SEYIR = { name: 'Seyir Dağ Evi', revenue: att.villas.seyir.rev, nights: att.villas.seyir.days, adr: Math.round(att.villas.seyir.rev / att.villas.seyir.days), share: Number(((att.villas.seyir.rev / totalRevenue)*100).toFixed(1)), occupancy: Number(((att.villas.seyir.days / (14*30))*100).toFixed(1)), revpar: Math.round(att.villas.seyir.rev / (14*30)) };
+      propStats.DOGUS = { name: 'Doğuş Dağ Evi', revenue: att.villas.dogus.rev, nights: att.villas.dogus.days, adr: Math.round(att.villas.dogus.rev / att.villas.dogus.days), share: Number(((att.villas.dogus.rev / totalRevenue)*100).toFixed(1)), occupancy: Number(((att.villas.dogus.days / (14*30))*100).toFixed(1)), revpar: Math.round(att.villas.dogus.rev / (14*30)) };
+      propStats.ZIRVE = { name: 'Zirve Dağ Evi', revenue: att.villas.zirve.rev, nights: att.villas.zirve.days, adr: Math.round(att.villas.zirve.rev / att.villas.zirve.days), share: Number(((att.villas.zirve.rev / totalRevenue)*100).toFixed(1)), occupancy: Number(((att.villas.zirve.days / (14*30))*100).toFixed(1)), revpar: Math.round(att.villas.zirve.rev / (14*30)) };
+      propStats.SIRIN = { name: 'Şirin Dağ Evi', revenue: att.villas.sirin.rev, nights: att.villas.sirin.days, adr: Math.round(att.villas.sirin.rev / att.villas.sirin.days), share: Number(((att.villas.sirin.rev / totalRevenue)*100).toFixed(1)), occupancy: Number(((att.villas.sirin.days / (14*30))*100).toFixed(1)), revpar: Math.round(att.villas.sirin.rev / (14*30)) };
+      propStats.NEFES = { name: 'Nefes Dağ Evi', revenue: att.villas.nefes.rev, nights: att.villas.nefes.days, adr: Math.round(att.villas.nefes.rev / att.villas.nefes.days), share: Number(((att.villas.nefes.rev / totalRevenue)*100).toFixed(1)), occupancy: Number(((att.villas.nefes.days / (14*30))*100).toFixed(1)), revpar: Math.round(att.villas.nefes.rev / (14*30)) };
+
+    } else {
+      // Specific Month from Official Database
+      const mf = activeExcel.monthlyFinancials[currentFilter.period];
+      const pm = activeExcel.propertyMonthly[currentFilter.period];
+
+      if (mf) {
+        totalRevenue = mf.ciro;
+        totalOpex = mf.opex;
+        totalCapex = mf.capex;
+        totalSoldNights = mf.daysSold || (pm ? pm.totalDays : 0);
+        avgRevPerNight = mf.avgDaily ? Math.round(mf.avgDaily) : (totalSoldNights > 0 ? Math.round(totalRevenue / totalSoldNights) : 0);
+        targetRev = activeExcel.targets[currentFilter.period] || 300000;
+      }
+
+      if (pm && pm.villas) {
+        pm.villas.forEach(v => {
+          propStats[v.id] = {
+            name: v.name,
+            revenue: v.rev,
+            nights: v.days,
+            adr: v.adr,
+            share: v.share,
+            occupancy: v.occupancy,
+            revpar: v.revpar
+          };
+        });
+      }
+
+      // Filter single villa if specified
+      if (currentFilter.villa !== 'ALL' && propStats[currentFilter.villa]) {
+        const vData = propStats[currentFilter.villa];
+        totalRevenue = vData.revenue;
+        totalSoldNights = vData.nights;
+        avgRevPerNight = vData.adr;
+        const vShare = vData.share > 0 ? vData.share / 100 : 0.2;
+        totalOpex = Math.round(totalOpex * vShare);
+        totalCapex = Math.round(totalCapex * vShare);
+        targetRev = Math.round(targetRev * 0.2);
+      }
+    }
+  }
+
+  // Include user-entered bookings (in clean state, ALL revenue comes from here!)
+  let manualBookingRev = 0;
+  let manualBookingNights = 0;
+  appData.bookings.forEach(b => {
+    if (b.status === 'CANCELLED' || !isBookingInFilter(b)) return;
+    const bNet = Number(b.net || b.gross) || 0;
+    const bNights = Number(b.nights) || 0;
+    manualBookingRev += bNet;
+    manualBookingNights += bNights;
+
+    if (!activeExcel) {
+      if (propStats[b.villa]) {
+        propStats[b.villa].revenue += bNet;
+        propStats[b.villa].nights += bNights;
+      }
+    }
+  });
+
+  if (!activeExcel) {
+    totalRevenue = manualBookingRev;
+    totalSoldNights = manualBookingNights;
+    avgRevPerNight = totalSoldNights > 0 ? Math.round(totalRevenue / totalSoldNights) : 0;
+    targetRev = (appData.targets && appData.targets[currentFilter.period]) ? (appData.targets[currentFilter.period].revenue || 0) : 0;
+
+    const daysInPeriod = currentFilter.period === 'ALL' ? (14 * 30) : 30;
+    Object.keys(propStats).forEach(vKey => {
+      const s = propStats[vKey];
+      s.adr = s.nights > 0 ? Math.round(s.revenue / s.nights) : 0;
+      s.share = totalRevenue > 0 ? Number(((s.revenue / totalRevenue) * 100).toFixed(1)) : 0;
+      s.occupancy = Number(((s.nights / daysInPeriod) * 100).toFixed(1));
+      s.revpar = Math.round(s.revenue / daysInPeriod);
     });
 
-  } else {
-    // Specific Month from Official Database
-    const mf = COMPANY_EXCEL_DATABASE.monthlyFinancials[currentFilter.period];
-    const pm = COMPANY_EXCEL_DATABASE.propertyMonthly[currentFilter.period];
-
-    if (mf) {
-      totalRevenue = mf.ciro;
-      totalOpex = mf.opex;
-      totalCapex = mf.capex;
-      totalSoldNights = mf.daysSold || (pm ? pm.totalDays : 0);
-      avgRevPerNight = mf.avgDaily ? Math.round(mf.avgDaily) : (totalSoldNights > 0 ? Math.round(totalRevenue / totalSoldNights) : 0);
-      targetRev = COMPANY_EXCEL_DATABASE.targets[currentFilter.period] || 300000;
-    }
-
-    if (pm && pm.villas) {
-      pm.villas.forEach(v => {
-        propStats[v.id] = {
-          name: v.name,
-          revenue: v.rev,
-          nights: v.days,
-          adr: v.adr,
-          share: v.share,
-          occupancy: v.occupancy,
-          revpar: v.revpar
-        };
-      });
-    }
-
-    // Filter single villa if specified
     if (currentFilter.villa !== 'ALL' && propStats[currentFilter.villa]) {
       const vData = propStats[currentFilter.villa];
       totalRevenue = vData.revenue;
       totalSoldNights = vData.nights;
       avgRevPerNight = vData.adr;
-      // Villa's approximate share of opex and capex based on revenue share
-      const vShare = vData.share > 0 ? vData.share / 100 : 0.2;
-      totalOpex = Math.round(totalOpex * vShare);
-      totalCapex = Math.round(totalCapex * vShare);
-      targetRev = Math.round(targetRev * 0.2);
     }
-
-    // Categorical expenses for this specific month
-    appData.expenses.forEach(exp => {
-      if (!isExpenseInFilter(exp)) return;
-      const amt = Number(exp.amount) || 0;
-      if (categoryTotals[exp.category] !== undefined) {
-        categoryTotals[exp.category] += amt;
-      } else {
-        categoryTotals['Diğer'] = (categoryTotals['Diğer'] || 0) + amt;
-      }
-    });
   }
+
+  // Categorical expenses
+  appData.expenses.forEach(exp => {
+    if (!isExpenseInFilter(exp)) return;
+    const amt = Number(exp.amount) || 0;
+    if (categoryTotals[exp.category] !== undefined) {
+      categoryTotals[exp.category] += amt;
+    } else {
+      categoryTotals['Diğer'] = (categoryTotals['Diğer'] || 0) + amt;
+    }
+    if (!activeExcel) {
+      if (exp.type === 'CAPEX') totalCapex += amt;
+      else totalOpex += amt;
+    }
+  });
 
   // Hierarchy calculations
   const operatingProfit = totalRevenue - totalOpex;
@@ -3240,6 +3301,18 @@ function renderMonthlyTrendChart() {
   if (!container) return;
   container.innerHTML = '';
 
+  const activeExcel = (!appData.isCleanState && appData.excelDb) ? appData.excelDb : null;
+  if (!activeExcel) {
+    container.innerHTML = `
+      <div style="text-align:center; padding: 45px 20px; color: var(--color-slate-400);">
+        <div style="font-size: 2.2rem; margin-bottom: 8px;">📊</div>
+        <strong style="color:var(--color-slate-200); font-size:1.05rem;">Sistem Verileri Sıfırlandı (Temiz Kasa)</strong>
+        <p style="font-size: 0.85rem; margin-top: 6px;">Yeni rezervasyonlar ve harcamalar eklendikçe aylık trend sütunları burada otomatik oluşacaktır.</p>
+      </div>
+    `;
+    return;
+  }
+
   const mfKeys = [
     '2025-10', '2025-11', '2025-12', '2026-01', '2026-02', '2026-03',
     '2026-04', '2026-05', '2026-06', '2026-07', '2026-08'
@@ -3251,13 +3324,13 @@ function renderMonthlyTrendChart() {
   if (activeTrendRange === 'YTD') keysToShow = mfKeys.filter(k => k.startsWith('2026'));
 
   const displayData = keysToShow.map(k => {
-    const f = COMPANY_EXCEL_DATABASE.monthlyFinancials[k];
+    const f = activeExcel.monthlyFinancials[k] || { monthName: '', year: '', ciro: 0, opex: 0, netProfit: 0 };
     return {
       key: k,
-      month: (f.monthName.slice(0, 3) + ' ' + f.year.slice(2)),
-      ciro: f.ciro,
-      opex: f.opex,
-      profit: Math.max(0, f.netProfit)
+      month: (f.monthName ? f.monthName.slice(0, 3) + ' ' + f.year.slice(2) : k),
+      ciro: f.ciro || 0,
+      opex: f.opex || 0,
+      profit: Math.max(0, f.netProfit || 0)
     };
   });
 
@@ -3323,15 +3396,33 @@ function renderMonthlyTrendChart() {
 }
 
 function renderYoYComparison(actualRevenue, actualOpex, actualNetProfit, actualNights) {
+  const activeExcel = (!appData.isCleanState && appData.excelDb) ? appData.excelDb : null;
+  const subEl = document.getElementById('yoySubText');
+  const badgeEl = document.getElementById('yoyBadge');
+  const container = document.getElementById('yoyBoxesContainer');
+
+  if (!activeExcel) {
+    if (subEl) subEl.innerText = 'Temiz Kasa';
+    if (badgeEl) badgeEl.innerText = 'Veriler Sıfırlandı';
+    if (container) {
+      container.innerHTML = `
+        <div style="text-align:center; padding: 25px; color: var(--color-slate-400); grid-column: span 3;">
+          Veriler sıfırlandı. Karşılaştırma yapabilmek için geçmiş dönem verisi bekleniyor.
+        </div>
+      `;
+    }
+    return;
+  }
+
   let prevKey = '2025-08';
   if (currentFilter.period && currentFilter.period.startsWith('2026-')) {
     prevKey = '2025-' + currentFilter.period.split('-')[1];
   }
 
-  const prevMf = COMPANY_EXCEL_DATABASE.monthlyFinancials[prevKey] || COMPANY_EXCEL_DATABASE.monthlyFinancials['2025-08'];
-  const prevRevenue = prevMf.ciro || 297507;
-  const prevNights = prevMf.daysSold || 22;
-  const prevNetProfit = prevMf.netProfit || 118000;
+  const prevMf = activeExcel.monthlyFinancials[prevKey] || activeExcel.monthlyFinancials['2025-08'] || {};
+  const prevRevenue = prevMf.ciro || 0;
+  const prevNights = prevMf.daysSold || 0;
+  const prevNetProfit = prevMf.netProfit || 0;
 
   const revDeltaNominal = actualRevenue - prevRevenue;
   const revDeltaPct = prevRevenue > 0 ? (revDeltaNominal / prevRevenue) * 100 : 0;
@@ -3340,13 +3431,9 @@ function renderYoYComparison(actualRevenue, actualOpex, actualNetProfit, actualN
   const nightsDelta = actualNights - prevNights;
   const nightsDeltaPct = prevNights > 0 ? (nightsDelta / prevNights) * 100 : 0;
 
-  const subEl = document.getElementById('yoySubText');
   if (subEl) subEl.innerText = `${prevMf.monthName} ${prevMf.year} vs ${document.getElementById('stepperCurrentLabel')?.innerText || ''}`;
-
-  const badgeEl = document.getElementById('yoyBadge');
   if (badgeEl) badgeEl.innerText = `Nominal Büyüme: %${revDeltaPct >= 0 ? '+' : ''}${revDeltaPct.toFixed(1)}`;
 
-  const container = document.getElementById('yoyBoxesContainer');
   if (!container) return;
   container.innerHTML = `
     <div class="yoy-row">
@@ -3374,7 +3461,19 @@ function renderYoYComparison(actualRevenue, actualOpex, actualNetProfit, actualN
 // LEXBNB AI FİNANS ANALİSTİ (GERÇEK VERİ KORELASYON MOTORU)
 // -------------------------------------------------------------
 function renderAIFinancialAnalyst(revenue, targetRev, targetPct, opex, capex, netProfit, netMargin, propStats) {
+  const activeExcel = (!appData.isCleanState && appData.excelDb) ? appData.excelDb : null;
   const goodBox = document.getElementById('aiGoodContent');
+  const badBox = document.getElementById('aiBadContent');
+  const whyBox = document.getElementById('aiWhyContent');
+  const actionBox = document.getElementById('aiActionContent');
+
+  if (!activeExcel && revenue === 0) {
+    if (goodBox) goodBox.innerHTML = '<p>• <strong>Temiz Başlangıç:</strong> Sistem verileri sıfırlandı. Yeni rezervasyonlar girildikçe finansal analizler burada anlık oluşturulacaktır.</p>';
+    if (badBox) badBox.innerHTML = '<p>• <strong>Kaçak Yok:</strong> Şu anda kayıtlı maliyet kaçağı veya düşük fiyat anomalisi bulunmuyor.</p>';
+    if (whyBox) whyBox.innerHTML = '<p>• <strong>Korelasyon:</strong> Rezervasyon ve harcama girişi yapıldıkça maliyet korelasyonları tespit edilecektir.</p>';
+    if (actionBox) actionBox.innerHTML = '<div style="padding: 15px; color: var(--color-slate-400); text-align:center;">Yeni rezervasyon veya harcama kaydı bekleniyor.</div>';
+    return;
+  }
   if (goodBox) {
     goodBox.innerHTML = `
       <p>• <strong>Ciro Başarısı:</strong> Hedeflenen ${targetRev.toLocaleString('tr-TR')} TL ciroya karşılık ${Math.round(revenue).toLocaleString('tr-TR')} TL gerçekleşerek <strong>%${targetPct.toFixed(1)}</strong> gerçekleşme oranı elde edildi.</p>
@@ -3383,7 +3482,6 @@ function renderAIFinancialAnalyst(revenue, targetRev, targetPct, opex, capex, ne
     `;
   }
 
-  const badBox = document.getElementById('aiBadContent');
   if (badBox) {
     badBox.innerHTML = `
       <p>• <strong>Gider / Ciro Oranı:</strong> Toplam giderler cironun <strong>%${revenue > 0 ? (((opex + capex) / revenue)*100).toFixed(1) : 0}</strong> seviyesinde seyrediyor. Maaş, temizlik ve komisyon kalemleri operasyonel kârı baskılıyor.</p>
@@ -3392,7 +3490,6 @@ function renderAIFinancialAnalyst(revenue, targetRev, targetPct, opex, capex, ne
     `;
   }
 
-  const whyBox = document.getElementById('aiWhyContent');
   if (whyBox) {
     whyBox.innerHTML = `
       <p>• <strong>Korelasyon 1:</strong> Şirin\'de minimum konaklama kuralı ve erken rezervasyon indirimi geniş tutulduğu için takvim erkenden düşük rakamlarla doldu.</p>
@@ -3401,7 +3498,6 @@ function renderAIFinancialAnalyst(revenue, targetRev, targetPct, opex, capex, ne
     `;
   }
 
-  const actionBox = document.getElementById('aiActionContent');
   if (actionBox) {
     actionBox.innerHTML = `
       <div class="ai-action-item">
@@ -3462,14 +3558,25 @@ function runWhatIfSimulation() {
   setEl('simOccLabel', `${occDelta >= 0 ? '+' : ''}%${occDelta}`);
   setEl('simDirectLabel', `%${directPct}`);
 
-  // Base values from August 2026 anchor (or current active period)
-  const baseRevenue = 483965;
-  const baseNights = 79;
-  const baseAdr = 6126;
-  const baseOpex = 337306;
-  const baseComm = 75519;
-  const baseCapex = 3866;
-  const baseProfit = 142793;
+  // Base values from August 2026 anchor (or 0 if clean state)
+  const activeExcel = (!appData.isCleanState && appData.excelDb) ? appData.excelDb : null;
+  const baseRevenue = activeExcel ? 483965 : 0;
+  const baseNights = activeExcel ? 79 : 0;
+  const baseAdr = activeExcel ? 6126 : 0;
+  const baseOpex = activeExcel ? 337306 : 0;
+  const baseComm = activeExcel ? 75519 : 0;
+  const baseCapex = activeExcel ? 3866 : 0;
+  const baseProfit = activeExcel ? 142793 : 0;
+
+  if (baseRevenue === 0) {
+    setEl('simResRevenue', '0 TL');
+    setEl('simResRevDelta', 'Veri bekleniyor');
+    setEl('simResCommission', '0 TL');
+    setEl('simResCommDelta', 'OTA komisyonu yok');
+    setEl('simResProfit', '0 TL');
+    setEl('simResProfitDelta', 'Kayıt bekleniyor');
+    return;
+  }
 
   const newAdr = baseAdr * (1 + (adrDelta / 100));
   const newNights = Math.max(1, Math.round(baseNights * (1 + (occDelta / 100))));
@@ -3499,6 +3606,50 @@ function runWhatIfSimulation() {
 
   setEl('simResProfit', `${newProfit.toLocaleString('tr-TR')} TL`);
   setEl('simResProfitDelta', `${profitDiff >= 0 ? '+' : ''}${Math.round(profitDiff).toLocaleString('tr-TR')} TL Fazla Kâr (%${newMargin.toFixed(1)} Marj)`);
+}
+
+// -------------------------------------------------------------
+// ŞİRKET GİDİŞAT RADARI & DİNAMİK BAROMETRE
+// -------------------------------------------------------------
+function renderTrajectoryRadar() {
+  const activeExcel = (!appData.isCleanState && appData.excelDb) ? appData.excelDb : null;
+  const banner = document.getElementById('trajectoryRadarBanner');
+  const badge = document.getElementById('trajectoryStatusBadge');
+  const scoreNum = document.getElementById('trajectoryScoreNum');
+  const healthStatus = document.getElementById('trajectoryHealthStatus');
+  const healthDesc = document.getElementById('trajectoryHealthDesc');
+  const momVal = document.getElementById('trajectoryMomentumVal');
+  const momDesc = document.getElementById('trajectoryMomentumDesc');
+  const marVal = document.getElementById('trajectoryMarginVal');
+  const marDesc = document.getElementById('trajectoryMarginDesc');
+  const adrVal = document.getElementById('trajectoryAdrVal');
+  const adrDesc = document.getElementById('trajectoryAdrDesc');
+
+  if (activeExcel) {
+    if (banner) banner.style.display = 'none';
+    if (badge) { badge.className = 'badge badge-emerald'; badge.innerText = 'CANLI GİDİŞAT: GÜÇLÜ POZİTİF'; }
+    if (scoreNum) scoreNum.innerText = '88';
+    if (healthStatus) { healthStatus.className = 'text-emerald'; healthStatus.innerText = '🟢 Büyüme & Kâr İvmesinde'; }
+    if (healthDesc) healthDesc.innerText = 'Yaz sezonu güçlü toparlanma sağladı, kış öncesi nakit pozisyonu sağlam.';
+    if (momVal) { momVal.className = 'b-val text-emerald'; momVal.innerText = '🚀 +%80,7 İvme'; }
+    if (momDesc) momDesc.innerText = 'Haziran (268k) ➔ Temmuz (467k) ➔ Ağustos (484k)';
+    if (marVal) { marVal.className = 'b-val text-blue'; marVal.innerText = '⚖️ %29,5 – %33,9'; }
+    if (marDesc) marDesc.innerText = 'Ocak rekorunda %60,7, yaz aylarında %30 civarında stabil.';
+    if (adrVal) { adrVal.className = 'b-val text-amber'; adrVal.innerText = '⚠️ Sezonsal Uçurum'; }
+    if (adrDesc) adrDesc.innerText = 'Kışın 18.000 TL ➔ Yazın 6.126 TL. Kış erken açılışı kritik.';
+  } else {
+    if (banner) banner.style.display = 'block';
+    if (badge) { badge.className = 'badge badge-rose'; badge.innerText = 'VERİLER SIFIRLANDI (TEMİZ KASA)'; }
+    if (scoreNum) scoreNum.innerText = '0';
+    if (healthStatus) { healthStatus.className = 'text-amber'; healthStatus.innerText = '⚪ Temiz Kasa / Sıfırlandı'; }
+    if (healthDesc) healthDesc.innerText = 'Geçmiş veriler temizlendi. Yeni rezervasyon ve gider kayıtları bekleniyor.';
+    if (momVal) { momVal.className = 'b-val text-slate'; momVal.innerText = '—'; }
+    if (momDesc) momDesc.innerText = 'Kayıt girildikçe ivme hesaplanacaktır.';
+    if (marVal) { marVal.className = 'b-val text-slate'; marVal.innerText = '—'; }
+    if (marDesc) marDesc.innerText = 'Kayıt girildikçe marj hesaplanacaktır.';
+    if (adrVal) { adrVal.className = 'b-val text-slate'; adrVal.innerText = '—'; }
+    if (adrDesc) adrDesc.innerText = 'Kayıt girildikçe ADR trendi hesaplanacaktır.';
+  }
 }
 
 function resetSimulator() {
@@ -3575,6 +3726,10 @@ function renderExpensesTable() {
     return exp.description.toLowerCase().includes(search) || exp.category.toLowerCase().includes(search);
   });
 
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 25px; color: var(--color-slate-400);">Kayıtlı gider bulunmamaktadır. "+ Gider / Yatırım" butonu ile yeni kayıt ekleyebilirsiniz.</td></tr>';
+    return;
+  }
   filtered.forEach(exp => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -4001,6 +4156,10 @@ function renderManageBookingsTable() {
     return vName.includes(search) || gName.includes(search);
   });
 
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="13" style="text-align:center; padding: 25px; color: var(--color-slate-400);">Kayıtlı rezervasyon bulunmamaktadır. "+ Rezervasyon" butonu ile yeni kayıt ekleyebilirsiniz.</td></tr>';
+    return;
+  }
   filtered.forEach(b => {
     const vName = appData.villas[b.villa]?.name || b.villa;
     const nightly = b.nights > 0 ? Math.round(b.net / b.nights) : 0;
@@ -4370,16 +4529,49 @@ function deleteMaint(id) {
 }
 
 // -------------------------------------------------------------
-// RESET & EXPORT
+// RESET, RESTORE & EXPORT
 // -------------------------------------------------------------
-function resetToCleanState() {
-  if (confirm('DİKKAT: Tüm mevcut rezervasyonları, harcamaları ve talepleri sıfırlayıp temiz bir kasa başlatmak istiyor musunuz?')) {
+function openResetModal() {
+  const modal = document.getElementById('resetModal');
+  if (modal) modal.classList.add('active');
+}
+
+function closeResetModal() {
+  const modal = document.getElementById('resetModal');
+  if (modal) modal.classList.remove('active');
+}
+
+function cleanResetAll() {
+  if (confirm('DİKKAT: Excel\'den aktarılan 14 aylık tüm geçmiş cirolar, 104 harcama kalemi, rezervasyonlar ve arıza kayıtları SIFIRLANACAKTIR.\n\nTüm finansal metrikler 0 TL olacak ve tertemiz boş bir sistem başlayacaktır.\n\nOnaylıyor musunuz?')) {
+    appData.isCleanState = true;
+    appData.excelDb = null;
     appData.bookings = [];
     appData.expenses = [];
     appData.leads = [];
     appData.maintenance = [];
+    appData.targets = {};
     saveAppData();
-    alert('Sistem tamamen temizlendi! Artık sıfırdan kendi verilerinizi girebilirsiniz.');
+    closeResetModal();
+    alert('✅ Tüm sistem ve Excel verileri başarıyla sıfırlandı! Tüm finansal göstergeler 0 TL temiz duruma getirildi.');
+  }
+}
+
+function resetToCleanState() {
+  openResetModal();
+}
+
+function restoreExcelData() {
+  if (confirm('GENEL RAPOR.xlsx dosyasındaki 14 aylık resmi şirket veritabanını (5.004.165 TL ciro, 104 harcama kalemi ve kış projeksiyonları) geri yüklemek istiyor musunuz?')) {
+    appData.isCleanState = false;
+    appData.excelDb = JSON.parse(JSON.stringify(COMPANY_EXCEL_DATABASE));
+    appData.expenses = JSON.parse(JSON.stringify(COMPANY_EXCEL_DATABASE.expensesList));
+    appData.bookings = JSON.parse(JSON.stringify(DEFAULT_BOOKINGS));
+    appData.leads = JSON.parse(JSON.stringify(DEFAULT_LEADS));
+    appData.maintenance = JSON.parse(JSON.stringify(DEFAULT_MAINT));
+    appData.targets = JSON.parse(JSON.stringify(DEFAULT_TARGETS_BY_MONTH));
+    saveAppData();
+    closeResetModal();
+    alert('✅ GENEL RAPOR.xlsx resmi şirket verileri başarıyla geri yüklendi!');
   }
 }
 
