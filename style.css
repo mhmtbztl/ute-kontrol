@@ -3442,3 +3442,102 @@ body {
   border-top: 3px solid #10B981;
   background: linear-gradient(180deg, rgba(16, 185, 129, 0.08), rgba(0, 0, 0, 0.35));
 }
+
+
+/* ======================================================= */
+/* 🧠 STR UZMANI OTA ALGORİTMA & CRITIC MODÜLÜ STILLERI     */
+/* ======================================================= */
+.str-pillars-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.str-pillar-card {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 12px;
+  border-top: 3px solid #8B5CF6;
+}
+.str-pillar-card h4 {
+  margin: 0 0 4px 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #DDD6FE;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.str-pillar-card p {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+.critic-panel {
+  background: linear-gradient(135deg, rgba(88, 28, 135, 0.25), rgba(15, 23, 42, 0.95));
+  border: 1px solid rgba(168, 85, 247, 0.4);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+.critic-input-group {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 14px 0;
+}
+.critic-preset-btns {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.critic-results-card {
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 18px;
+  margin-top: 16px;
+}
+.critic-section-title {
+  font-size: 13px;
+  font-weight: 800;
+  margin: 14px 0 8px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.roast-item {
+  background: rgba(239, 68, 68, 0.08);
+  border-left: 3px solid #EF4444;
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: #FCA5A5;
+  line-height: 1.4;
+}
+.action-item {
+  background: rgba(16, 185, 129, 0.08);
+  border-left: 3px solid #10B981;
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: #6EE7B7;
+  line-height: 1.4;
+}
+.operator-note-box {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  padding: 6px;
+  width: 100%;
+  min-width: 170px;
+  font-size: 11px;
+  color: #F8FAFC;
+  resize: vertical;
+}

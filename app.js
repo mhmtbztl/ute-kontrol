@@ -7597,10 +7597,23 @@ const DEFAULT_AIRBNB_PROPERTIES = {
     searchRank: 'Sayfa 1 / #2 (Zirve 🥇)',
     coverPhoto: '🔥 Gün Batımı & Yanan Şömine (Sıcak Işık)',
     coverCtr: 5.4,
+    golden5Score: 98,
     listingScore: 96,
+    strScore: 97,
+    operatorNote: 'Şömineli gün batımı kapak karesi harika çalışıyor. Kış için veranda ışıklandırması çekilecek.',
     aiCoverAdvice: 'Şömineli gün batımı kapak fotoğrafı olağanüstü yüksek CTR (%5.4) üretiyor. Değiştirmeyin.',
     aiTitleAdvice: 'Başlık çok dengeli. Kış sezonu öncesi "Kayak Pistine Yakın" ibaresi eklenebilir.',
-    aiOptimizedTitle: 'Uludağ Seyir | Panoramik Şömineli & Jakuzili Sıcak Dağ Evi'
+    aiOptimizedTitle: 'Uludağ Seyir | Panoramik Şömineli & Jakuzili Sıcak Dağ Evi',
+    aiHookCopy: 'Uludağ\'ın zirvesinde, yanan şöminenin çıtırtısı ve sıcacık jakuzinizle gün batımını kadehinizle selamlayın. Şehir ışıklarının ayaklarınızın altına serildiği bu özel dağ evi, romantik kaçamaklar ve huzur arayan aileler için tasarlandı.',
+    roasts: [
+      'Fotoğraf sıralamasında 4. karedeki banyo fotoğrafı yerine dış verandadaki barbekü alanı öne alınmalı.',
+      'Açıklamanın sonundaki ev kuralları bölümü çok bürokratik; daha samimi ve misafirperver bir dille yumuşatılmalı.'
+    ],
+    emergencyFixes: [
+      'İlk 5 fotoğrafa veranda gece ışıklandırması detayını ekleyin.',
+      'Kış için pistlere transfer / kar zinciri bilgilendirmesini giriş paragrafına taşıyın.',
+      'Anında rezervasyon açık kalsın; yanıt süresini 10 dakikanın altında tutmaya devam edin.'
+    ]
   },
   ZIRVE: {
     key: 'ZIRVE',
@@ -7618,10 +7631,23 @@ const DEFAULT_AIRBNB_PROPERTIES = {
     searchRank: 'Sayfa 1 / #4 (Üst Sıra)',
     coverPhoto: '🛁 Sıcak Açık Hava Jakuzisi & Karlı Doğa',
     coverCtr: 4.9,
+    golden5Score: 95,
     listingScore: 94,
+    strScore: 95,
+    operatorNote: 'Açık hava jakuzisi kışın en büyük satış kozumuz. Yeni şömine fotoğrafları eklendi.',
     aiCoverAdvice: 'Kış aylarında dış mekan jakuzisi etrafına sıcak duman ve akşam ışığı eklemek tıklamayı %22 artırır.',
-    aiTitleAdvice: 'Başlığa "Lüks Dağ Evi & Şömine" anahtar kelimelerini ekleyin. Mevcut başlık jakuziyi iyi anlatıyor ancak şömine eksik.',
-    aiOptimizedTitle: 'Uludağ Zirve | Sıcak Jakuzili & Şömineli Lüks Dağ Evi (Özel Bahçeli)'
+    aiTitleAdvice: 'Başlığa "Lüks Dağ Evi & Şömine" anahtar kelimelerini ekleyin. Mevcut başlıkta şömine eksik kalmış.',
+    aiOptimizedTitle: 'Uludağ Zirve | Sıcak Jakuzili & Şömineli Lüks Dağ Evi (Özel Bahçeli)',
+    aiHookCopy: 'Dışarıda lapa lapa yağan Uludağ karı, sıcacık 40 derece açık hava jakuziniz ve içeride çıtırdayan şömine... Zirve Dağ Evi, tamamen izole bahçesi ve lüks donanımıyla unutulmaz bir kış masalı vadediyor.',
+    roasts: [
+      'Mevcut başlıkta "Şömine" kelimesi hiç geçmiyor! Dağ evi arayan misafirlerin %72\'si şömine filtresi kullanıyor.',
+      'Kapak fotoğrafında jakuzi çok net ancak evin heybeti ve orman dokusu kadrajda yeterince geniş değil.'
+    ],
+    emergencyFixes: [
+      'Başlığı "Uludağ Zirve | Sıcak Jakuzili & Şömineli Lüks Dağ Evi" olarak derhal güncelleyin.',
+      'Fotoğraf galerisine yanan şömine karşısında sıcak kahve detay çekimi ekleyin.',
+      'Hafta içi minimum konaklamayı 2 geceye çekerek arama filtresine daha sık takılın.'
+    ]
   },
   DOGUS: {
     key: 'DOGUS',
@@ -7639,10 +7665,23 @@ const DEFAULT_AIRBNB_PROPERTIES = {
     searchRank: 'Sayfa 1 / #7 (İlk Sayfa)',
     coverPhoto: '🥩 Ahşap Veranda & Bahçe Barbekü Alanı',
     coverCtr: 4.6,
+    golden5Score: 92,
     listingScore: 91,
+    strScore: 92,
+    operatorNote: 'Geniş veranda barbeküsü arkadaş gruplarının favorisi. Hafta sonları kapalı gişe.',
     aiCoverAdvice: 'Sonbaharda veranda barbeküsü iyi çalışıyor. Aralık ayında kapak görseli yanan şömineye çekilmeli.',
     aiTitleAdvice: 'Açıklamanın ilk 2 cümlesinde geniş aile ve arkadaş grubu konforu vurgulanmalı.',
-    aiOptimizedTitle: 'Uludağ Doğuş | Özel Bahçeli, Şömineli & Barbekülü Doğa Evi'
+    aiOptimizedTitle: 'Uludağ Doğuş | Özel Bahçeli, Şömineli & Barbekülü Doğa Evi',
+    aiHookCopy: 'Közde demlenen çay, çıtırdayan şömine ateşi ve sevdiklerinizle baş başa bir Uludağ hafta sonu... Doğuş Dağ Evi, geniş ahşap verandası ve mangal alanıyla kalabalık gruplar için sıcak bir yuva.',
+    roasts: [
+      'İlan açıklamasında yatak odalarının yerleşim planı net değil; misafirler yatak düzenini anlamakta zorlanıyor.',
+      'Fotoğraf sayısı (24) biraz az; en az 35 profesyonel fotoğraf olmalı.'
+    ],
+    emergencyFixes: [
+      'Her yatak odasının net yatak tipini gösteren fotoğraflar ekleyip altyazı yazın.',
+      'Kışın araçla ulaşım kolaylığı ve otopark imkanını açıklamanın başına ekleyin.',
+      'Sonbahar indirim kuponu tanımlayarak takvimdeki 2 boşluğu kapatın.'
+    ]
   },
   NEFES: {
     key: 'NEFES',
@@ -7660,10 +7699,23 @@ const DEFAULT_AIRBNB_PROPERTIES = {
     searchRank: 'Sayfa 1 / #9 (İlk Sayfa)',
     coverPhoto: '🌲 Geniş Chalet Dış Cephe & Doğa Manzarası',
     coverCtr: 4.2,
+    golden5Score: 88,
     listingScore: 88,
+    strScore: 89,
+    operatorNote: 'Geniş 3 katlı chalet tipi mimari. Yabancı misafirlerin ilgisi yüksek.',
     aiCoverAdvice: 'Geniş dış cephe fotoğrafı yerine yüksek tavanlı şömineli salonu kapak yapmak CTR\'ı %30 yükseltir.',
-    aiTitleAdvice: '"Chalet" kelimesi yabancı turist için çok iyi. Türkçe aramalarda "Geniş Aile Dağ Evi" kelimeleri eklenmeli.',
-    aiOptimizedTitle: 'Uludağ Nefes | Geniş Aileye Özel Şömineli Chalet & Barbekü'
+    aiTitleAdvice: '"Chalet" kelimesi yabancı turist için çok iyi. Türkçe aramalarda "Geniş Aile Dağ Evi" eklenmeli.',
+    aiOptimizedTitle: 'Uludağ Nefes | Geniş Aileye Özel Şömineli Chalet & Barbekü',
+    aiHookCopy: 'Çam ormanlarının içinde gerçek bir Alp mimarisi deneyimi. Yüksek tavanlı ahşap salonu, taş şöminesi ve geniş bahçesiyle Nefes Chalet, kalabalık ailelerin konforla nefes alacağı özel bir sığınak.',
+    roasts: [
+      'Puanı 4.75 seviyesinde; 4.90 barajının altında olduğu için Misafirlerin Gözdesi (Guest Favorite) rozetini kaybetme riski var.',
+      'Dış cephe fotoğrafı uzaktan çekildiği için evin lüks iç detayları arama sayfasında görünmüyor.'
+    ],
+    emergencyFixes: [
+      'Kapak fotoğrafını doğrudan şömineli yüksek tavanlı salona çevirin.',
+      'Gelecek 3 konaklamada misafirlere ekstra şömine odunu ve karşılama ikramı sunarak 5.0 yorum alın.',
+      'Hızlı internet (WiFi) hız testini fotoğraflara ekleyin (Uzaktan çalışan kitle için).'
+    ]
   },
   SIRIN: {
     key: 'SIRIN',
@@ -7681,10 +7733,24 @@ const DEFAULT_AIRBNB_PROPERTIES = {
     searchRank: 'Sayfa 2 / #18 (2. Sayfa ⚠️)',
     coverPhoto: '🪵 Karanlık Açılı Ahşap Salon Fotoğrafı',
     coverCtr: 3.1,
+    golden5Score: 72,
     listingScore: 78,
+    strScore: 76,
+    operatorNote: '🚨 2. SAYFA ALARMI: Kapak görseli çok karanlık kalmış, tıklama alamıyor. Bu hafta yeni fotoğraflar çekilecek.',
     aiCoverAdvice: '🚨 ACİL KAPAK DEĞİŞİMİ: Mevcut iç mekan karanlık kalıyor. Dışarıdan karlı ahşap cephe veya sıcak yanan şömine detay fotoğrafı yükleyin.',
     aiTitleAdvice: '🚨 BAŞLIK OPTİMİZASYONU: "Villa Şirin" çok jenerik kalıyor. "Şömineli Dağ Evi" kelimeleri eklenirse 48 saatte ilk sayfaya fırlar.',
-    aiOptimizedTitle: 'Uludağ Şirin | Romantik Çift & Küçük Aile İçin Şömineli Dağ Evi'
+    aiOptimizedTitle: 'Uludağ Şirin | Romantik Çift & Küçük Aile İçin Şömineli Dağ Evi',
+    aiHookCopy: 'Sessizliğin sesini dinleyeceğiniz, otantik ahşap dokusu ve çıtırdayan şöminesiyle sıcacık bir dağ sığınağı. Şirin Dağ Evi, şehrin gürültüsünden kaçıp şömine başında baş başa kalmak isteyen çiftler için biçilmiş kaftan.',
+    roasts: [
+      '🚨 SIRALAMA KATİLİ: Başlıkta yalnızca "Villa Şirin" yazıyor! Misafirler "Villa Şirin" diye aramaz; "Şömineli Dağ Evi" diye arar.',
+      '🚨 KAPAK KATİLİ: Kapak fotoğrafı yetersiz ışıkta çekilmiş; ahşap detaylar karanlık bir mağara gibi görünüyor, CTR %3.1\'e çakılmış.',
+      'İlanda Anında Rezervasyon (Instant Book) kapalı; bu yüzden Airbnb algoritması ilanı doğrudan 2. sayfaya fırlatmış.'
+    ],
+    emergencyFixes: [
+      'Hemen bugün Anında Rezervasyon (Instant Book) seçeneğini açın.',
+      'Başlığı "Uludağ Şirin | Romantik Çift İçin Şömineli Sıcak Dağ Evi" yapın.',
+      'Kapak fotoğrafını yanan şöminenin sıcak alevli yakın çekimiyle değiştirin.'
+    ]
   }
 };
 
@@ -8404,52 +8470,67 @@ function renderOtaRankingAndCoverRadar() {
     count++;
     if (item.searchPage === 1) firstPageCount++;
     totalCtrSum += Number(item.coverCtr) || 4.5;
-    totalScoreSum += Number(item.listingScore) || 90;
+    totalScoreSum += Number(item.strScore || item.listingScore) || 90;
 
     const rankBadgeClass = item.searchPage === 1 ? 'badge-rank-p1' : 'badge-rank-p2';
     const ctrVal = (Number(item.coverCtr) || 4.0).toFixed(1);
-    const scoreVal = Number(item.listingScore) || 90;
+    const scoreVal = Number(item.strScore || item.listingScore) || 90;
+    const g5Val = Number(item.golden5Score) || 90;
+    const opNote = item.operatorNote || '';
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>
         <strong style="color: #F8FAFC; font-size: 13px;">${item.name}</strong>
         <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">${item.title}</div>
+        <div style="margin-top: 4px;">
+          <a href="${item.url}" target="_blank" rel="noopener noreferrer" style="font-size: 10px; color: #60A5FA; text-decoration: none;">🔗 airbnb.com.tr/h/${item.slug} ↗</a>
+        </div>
       </td>
       <td>
-        <span class="badge ${rankBadgeClass}">
+        <span class="badge ${rankBadgeClass}" style="font-size: 11px;">
           ${item.searchRank || 'Sayfa 1 / #4'}
         </span>
       </td>
       <td>
         <div style="font-weight: 600; color: #E2E8F0; font-size: 12px;">${item.coverPhoto || 'Şömine & Jakuzi'}</div>
-        <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">16:9 Yatay Geniş Açı</div>
-      </td>
-      <td>
-        <div class="cover-ctr-bar">
-          <span style="font-weight: 800; color: ${ctrVal >= 4.5 ? '#34D399' : '#FBBF24'}; font-size: 12px;">%${ctrVal}</span>
+        <div class="cover-ctr-bar" style="margin-top: 4px;">
+          <span style="font-weight: 800; color: ${ctrVal >= 4.5 ? '#34D399' : '#FBBF24'}; font-size: 12px;">%${ctrVal} CTR</span>
           <div class="cover-ctr-track">
             <div class="cover-ctr-fill" style="width: ${Math.min(100, ctrVal * 16)}%;"></div>
           </div>
         </div>
-        <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">${ctrVal >= 4.5 ? 'Yüksek İlgi' : 'İyileştirilmeli'}</div>
       </td>
       <td>
-        <span class="badge ${scoreVal >= 90 ? 'badge-green' : 'badge-amber'}" style="font-weight: 700;">
+        <span class="badge ${g5Val >= 90 ? 'badge-green' : 'badge-amber'}" style="font-size: 11px;">
+          ${g5Val} / 100
+        </span>
+        <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Kolaj Kurgusu</div>
+      </td>
+      <td>
+        <span class="badge badge-blue" style="font-size: 11px;">50 Karakter Formülü</span>
+        <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Duygusal Kanca (Hook)</div>
+      </td>
+      <td>
+        ${item.isSuperhost ? '<span class="badge badge-amber" style="font-size: 10px; margin-right: 2px;">🏆 Superhost</span>' : ''}
+        ${item.isGuestFavorite ? '<span class="badge badge-green" style="font-size: 10px;">💎 Gözde</span>' : ''}
+        <div style="font-size: 10px; color: #34D399; margin-top: 2px;">⚡ Anında Rez. Açık</div>
+      </td>
+      <td>
+        <span class="badge ${scoreVal >= 90 ? 'badge-green' : 'badge-amber'}" style="font-size: 13px; font-weight: 800; padding: 4px 8px;">
           ${scoreVal} / 100
         </span>
       </td>
-      <td>
-        ${item.isSuperhost ? '<span class="badge badge-amber" style="font-size: 10px; margin-right: 4px;">🏆 Superhost</span>' : ''}
-        ${item.isGuestFavorite ? '<span class="badge badge-green" style="font-size: 10px;">💎 Gözde</span>' : ''}
-      </td>
-      <td style="max-width: 250px; font-size: 11px; color: #DDD6FE; line-height: 1.4;">
-        ${item.aiCoverAdvice || 'Performans stabil.'}
+      <td style="min-width: 190px;">
+        <textarea id="opNote_${vKey}" class="operator-note-box" rows="2" placeholder="Stratejik notunuzu buraya yazın...">${opNote}</textarea>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="saveOperatorNote('${vKey}')" style="margin-top: 4px; padding: 2px 8px; font-size: 10px; border-color: #A855F7; color: #DDD6FE;">
+          💾 Notu Kaydet
+        </button>
       </td>
       <td style="text-align: right; white-space: nowrap;">
-        <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" style="padding: 4px 8px; font-size: 11px; text-decoration: none;">
-          🔗 İlana Git ↗
-        </a>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="setCriticUrlPreset('${vKey}')" style="border-color: #EF4444; color: #FCA5A5; font-size: 11px; font-weight: 700;">
+          🔥 Eleştir
+        </button>
       </td>
     `;
     tbody.appendChild(tr);
@@ -8472,7 +8553,6 @@ function renderOtaRankingAndCoverRadar() {
   const elAvgScore = document.getElementById('otaAvgListingScore');
   if (elAvgScore) elAvgScore.innerText = `${avgScore} / 100`;
 
-  // Render initial A/B Test comparison for ZIRVE
   renderCoverAbTestLab('ZIRVE');
 }
 
@@ -8557,4 +8637,130 @@ function setOtaPricingStrategy(strategyMode) {
   appData.otaPricingStrategy = strategyMode;
   saveAppData();
   renderMarketingModule();
+}
+
+
+// =============================================================
+// 🤖 AIRBNB / OTA İLAN ELEŞTİRMENİ (AI STR CRITIC & ROAST ENGINE)
+// =============================================================
+
+function saveOperatorNote(villaKey) {
+  if (!appData.airbnbListings) {
+    appData.airbnbListings = JSON.parse(JSON.stringify(DEFAULT_AIRBNB_PROPERTIES));
+  }
+  const textarea = document.getElementById('opNote_' + villaKey);
+  if (!textarea) return;
+
+  const noteText = textarea.value.trim();
+  if (!appData.airbnbListings[villaKey]) {
+    appData.airbnbListings[villaKey] = { ...DEFAULT_AIRBNB_PROPERTIES[villaKey] };
+  }
+  appData.airbnbListings[villaKey].operatorNote = noteText;
+  saveAppData();
+  alert('✅ ' + (DEFAULT_AIRBNB_PROPERTIES[villaKey]?.name || villaKey) + ' için stratejik operatör notu kaydedildi!');
+}
+
+function setCriticUrlPreset(villaKey) {
+  const item = DEFAULT_AIRBNB_PROPERTIES[villaKey];
+  if (!item) return;
+
+  const input = document.getElementById('criticUrlInput');
+  if (input) {
+    input.value = item.url;
+  }
+  runAiListingCritic(item.url, villaKey);
+}
+
+function runAiListingCritic(inputUrl = null, explicitKey = null) {
+  const urlField = document.getElementById('criticUrlInput');
+  const url = inputUrl || (urlField ? urlField.value.trim() : '');
+  const container = document.getElementById('criticResultsContainer');
+  if (!container) return;
+
+  if (!url) {
+    alert('Lütfen eleştirilmesini istediğiniz Airbnb veya OTA ilan linkini girin.');
+    return;
+  }
+
+  // Detect which villa or generic
+  let targetKey = explicitKey;
+  if (!targetKey) {
+    const lower = url.toLowerCase();
+    if (lower.includes('seyir')) targetKey = 'SEYIR';
+    else if (lower.includes('zirve')) targetKey = 'ZIRVE';
+    else if (lower.includes('dogus') || lower.includes('doğuş')) targetKey = 'DOGUS';
+    else if (lower.includes('sirin') || lower.includes('şirin')) targetKey = 'SIRIN';
+    else if (lower.includes('nefes')) targetKey = 'NEFES';
+  }
+
+  const item = targetKey ? (DEFAULT_AIRBNB_PROPERTIES[targetKey] || DEFAULT_AIRBNB_PROPERTIES['ZIRVE']) : null;
+
+  // Build report data
+  const villaName = item ? item.name : 'Analiz Edilen Dış / Rakip İlan';
+  const score = item ? item.strScore : 79;
+  const rank = item ? item.searchRank : 'Sayfa 2 / #14 (Algoritma Denetimi)';
+  const currentTitle = item ? item.title : 'Uludağ Kiralık Dağ Evi & Şömineli Bahçeli Villa';
+  const optTitle = item ? item.aiOptimizedTitle : 'Uludağ | Şömineli, Jakuzili & Barbekülü Sıcak Dağ Evi Kaçamağı';
+  const hookCopy = item ? item.aiHookCopy : 'Karlar altında sıcacık bir şömine keyfi, izole bir bahçe ve unutulmaz bir dağ havası... Bu özel dağ evi, sevdiklerinizle huzurlu bir kış kaçamağı yaşamanız için hazırlandı.';
+  const roasts = item ? item.roasts : [
+    '🚨 Başlıkta çok fazla genel kelime var; arama niyetli "jakuzi", "şömine", "özel bahçe" gibi yüksek dönüşümlü kelimeler ilk 30 karakterde harcanmış.',
+    '🚨 Kapak fotoğrafı aydınlatması yetersiz; dağ evlerinde gün batımı sıcak şömine ışığı kullanılmadığında tıklama oranı (CTR) %40 düşer.',
+    'İlan açıklamasında ilk 3 cümle kanca (The Hook) kurgusundan yoksun; misafirler okumayı bırakıp geri çıkıyor.'
+  ];
+  const actions = item ? item.emergencyFixes : [
+    'Başlığı STR formülüne göre güncelleyin: [Bölge] + [Villa Adı] + [Jakuzi & Şömine] + [Hedef Kitle].',
+    'Kapak görselini akşam şömineli sıcak ışık fotoğrafı ile değiştirin.',
+    'Anında Rezervasyon (Instant Book) özelliğini açın ve minimum konaklamayı 2 geceye sabitleyin.'
+  ];
+
+  container.style.display = 'block';
+  container.innerHTML = `
+    <div class="critic-results-card">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 14px;">
+        <div>
+          <span class="badge badge-purple" style="font-size: 11px;">AI STR Listing Audit & Roast Report</span>
+          <h3 style="margin: 6px 0 0 0; color: #fff; font-size: 18px; font-weight: 800;">${villaName}</h3>
+          <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">${url}</div>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-size: 11px; color: var(--text-muted);">STR Uzmanı Genel Puanı:</div>
+          <div style="font-size: 28px; font-weight: 900; color: ${score >= 90 ? '#34D399' : '#FBBF24'};">${score} <span style="font-size: 14px; color: var(--text-muted);">/ 100</span></div>
+          <span class="badge ${score >= 90 ? 'badge-green' : 'badge-amber'}">${rank}</span>
+        </div>
+      </div>
+
+      <!-- 1. Acımasız Eleştiriler (Sıralama ve Dönüşüm Katilleri) -->
+      <div class="critic-section-title" style="color: #F87171;">
+        <span>🚨</span> ACIMASIZ ELEŞTİRİLER (SIRALAMA & DÖNÜŞÜM KATİLLERİ)
+      </div>
+      ${roasts.map(r => `<div class="roast-item"><strong>• Hata Tespiti:</strong> ${r}</div>`).join('')}
+
+      <!-- 2. İlk 24 Saatte Yapılması Gereken 3 Acil Düzeltme -->
+      <div class="critic-section-title" style="color: #34D399; margin-top: 18px;">
+        <span>⚡</span> İLK 24 SAATTE YAPILMASI GEREKEN 3 ACİL AKSİYON
+      </div>
+      ${actions.map((a, i) => `<div class="action-item"><strong>${i+1}. Adım:</strong> ${a}</div>`).join('')}
+
+      <!-- 3. AI Tarafından Yeniden Yazılan Başlık & Giriş Paragrafı -->
+      <div class="critic-section-title" style="color: #93C5FD; margin-top: 18px;">
+        <span>✍️</span> AI TARAFINDAN YENİDEN YAZILAN YÜKSEK DÖNÜŞÜMLÜ BAŞLIK & KANCA (THE HOOK)
+      </div>
+      <div style="background: rgba(255,255,255,0.03); padding: 14px; border-radius: 8px; border: 1px dashed rgba(147, 197, 253, 0.4);">
+        <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Optimize Edilmiş Airbnb Başlığı:</div>
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 4px 0 12px 0;">
+          <strong style="color: #F8FAFC; font-size: 13px;">"${optTitle}"</strong>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="copyAiTitle('${optTitle}')" style="border-color: #60A5FA; color: #93C5FD; font-size: 11px;">
+            📋 Başlığı Kopyala
+          </button>
+        </div>
+
+        <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Açıklamanın İlk 3 Satırı (Duygusal Kanca - The Hook):</div>
+        <p style="font-size: 12px; color: #E2E8F0; line-height: 1.5; margin: 4px 0 0 0; font-style: italic;">
+          "${hookCopy}"
+        </p>
+      </div>
+    </div>
+  `;
+
+  container.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }

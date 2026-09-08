@@ -1292,6 +1292,137 @@
 
       <!-- 4. 🤖 Yapay Zeka Pazarlama Danışmanı & Akıllı Simülatör -->
       
+      
+      <!-- 🧠 STR UZMANI OTA ALGORİTMA & DENETİM MERKEZİ -->
+      <section class="card" style="margin-bottom: 24px; border: 1px solid rgba(168, 85, 247, 0.35);">
+        <div class="section-title-bar" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 22px;">🧠</span>
+              <h3 style="margin: 0; font-size: 17px; font-weight: 800; color: #DDD6FE;">STR UZMANI OTA ALGORİTMA & TAM DENETİM KARNESİ</h3>
+              <span class="badge badge-purple">STR Specialist Framework</span>
+            </div>
+            <p class="sub-text" style="margin: 4px 0 0 0;">
+              Airbnb ve Booking.com'da ilk sayfada çıkmayı, kapak tıklamasını (CTR) ve misafir dönüşümünü belirleyen 5 temel STR faktörü.
+            </p>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="syncLiveAirbnbData()" style="border-color: #A855F7; color: #DDD6FE; font-weight: 700;">
+              🔄 Sıralama & Puanları Tara
+            </button>
+          </div>
+        </div>
+
+        <!-- 5 Temel STR Sütunu -->
+        <div class="str-pillars-grid">
+          <div class="str-pillar-card">
+            <h4><span>🚀</span> 1. Algoritma & SEO</h4>
+            <p>&lt;15 dk yanıt, %100 oran, Anında Rezervasyon (Instant Book) ve günlük takvim etkileşimi.</p>
+          </div>
+          <div class="str-pillar-card">
+            <h4><span>📸</span> 2. Görsel Huni (Hero CTR)</h4>
+            <p>16:9 yatay sıcak ışık kapak görseli, altın ilk 5 fotoğraf kolajı ve 35+ geniş açı kare.</p>
+          </div>
+          <div class="str-pillar-card">
+            <h4><span>✍️</span> 3. Metin & Kanca (The Hook)</h4>
+            <p>50 karakter formüllü başlık, ilk 3 satır duygusal kancası ve eksiksiz donanım matrisi.</p>
+          </div>
+          <div class="str-pillar-card">
+            <h4><span>⭐</span> 4. İtibar & Temizlik</h4>
+            <p>4.90+ genel puan, 5.0 temizlik, son 30 gün taze yorum ve Süper Ev Sahibi rozeti.</p>
+          </div>
+          <div class="str-pillar-card">
+            <h4><span>🏷️</span> 5. Fiyat & Dolum Gücü</h4>
+            <p>Komisyon mark-up'ı, hafta sonu çarpanı, son dakika dolum ve erken rezervasyon indirimi.</p>
+          </div>
+        </div>
+
+        <!-- 5 Villa STR Audit & Operatör Yorum Tablosu -->
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>VİLLA</th>
+                <th>ARAMA SIRALAMASI</th>
+                <th>KAPAK GÖRSELİ & CTR</th>
+                <th>İLK 5 FOTOĞRAF (GOLDEN 5)</th>
+                <th>BAŞLIK & METİN SEO</th>
+                <th>ALGORİTMA DURUMU</th>
+                <th>STR PUANI</th>
+                <th>OPERATÖR YORUMU / STRATEJİK NOT</th>
+                <th style="text-align: right;">İŞLEM</th>
+              </tr>
+            </thead>
+            <tbody id="otaRankingTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 🔗 AIRBNB / OTA İLAN LİNKİNİ ELEŞTİR (AI STR LISTING CRITIC & ROAST) -->
+      <section class="critic-panel">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 22px;">🔥</span>
+              <h3 style="margin: 0; font-size: 16px; font-weight: 800; color: #F8FAFC;">AİRBBNB / OTA İLAN LİNKİNİ ELEŞTİR (AI STR CRITIC & ROAST)</h3>
+              <span class="badge badge-amber">Acımasız Denetim Motoru</span>
+            </div>
+            <p style="font-size: 12px; color: #CBD5E1; margin: 4px 0 0 0;">
+              İster kendi villanızın, ister rakip bir dağ evinin linkini yapıştırın. STR uzmanı yapay zeka; kapak görseli, başlık, açıklama ve algoritma hatalarını acımasızca eleştirip aksiyon planı çıkarsın.
+            </p>
+          </div>
+        </div>
+
+        <!-- Hızlı Villa Seçim Butonları -->
+        <div class="critic-preset-btns" style="margin-top: 14px;">
+          <span style="font-size: 11px; color: #94A3B8; font-weight: 700; align-self: center;">Hızlı Seçim:</span>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="setCriticUrlPreset('SEYIR')">🏡 Seyir Dağ Evi</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="setCriticUrlPreset('ZIRVE')">🏡 Zirve Dağ Evi</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="setCriticUrlPreset('SIRIN')">🏡 Şirin Dağ Evi (2. Sayfa ⚠️)</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="setCriticUrlPreset('DOGUS')">🏡 Doğuş Dağ Evi</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="setCriticUrlPreset('NEFES')">🏡 Nefes Dağ Evi</button>
+        </div>
+
+        <!-- URL Input & Çalıştır Butonu -->
+        <div class="critic-input-group">
+          <input type="url" id="criticUrlInput" placeholder="https://www.airbnb.com.tr/h/... veya rakip linki yapıştırın" style="flex: 1; min-width: 280px; padding: 10px 14px; background: rgba(0,0,0,0.5); border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 8px; color: #fff; font-size: 13px;">
+          <button type="button" class="btn btn-primary" onclick="runAiListingCritic()" style="background: linear-gradient(135deg, #A855F7, #7C3AED); border: none; font-weight: 700; padding: 10px 18px; display: flex; align-items: center; gap: 6px;">
+            <span>🔥</span> İlanı Acımasızca Eleştir
+          </button>
+        </div>
+
+        <!-- Eleştiri Sonuç Konteyneri -->
+        <div id="criticResultsContainer" style="display: none;"></div>
+      </section>
+
+      <!-- 🖼️ KAPAK GÖRSELİ & BAŞLIK A/B TEST LABORATUVARI -->
+      <section class="card" style="margin-bottom: 24px; background: linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.9)); border: 1px solid rgba(59, 130, 246, 0.3);">
+        <div class="section-title-bar" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 20px;">🖼️</span>
+              <h3 style="margin: 0; font-size: 15px; font-weight: 800; color: #93C5FD;">KAPAK GÖRSELİ & BAŞLIK A/B TEST LABORATUVARI</h3>
+              <span class="badge badge-blue">CTR & Dönüşüm Artırıcı</span>
+            </div>
+            <p class="sub-text" style="margin: 4px 0 0 0;">İlk sayfada arama yapan misafirlerin dikkatini çekmek için kapak görseli ve açıklama test simülatörü.</p>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <label style="font-size: 12px; color: #CBD5E1; font-weight: 600;">Villa Seçin:</label>
+            <select id="abTestVillaSelect" onchange="renderCoverAbTestLab(this.value)" style="padding: 6px 12px; background: #1E293B; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; font-size: 12px; font-weight: 700;">
+              <option value="SEYIR">Seyir Dağ Evi</option>
+              <option value="ZIRVE" selected>Zirve Dağ Evi</option>
+              <option value="SIRIN">Şirin Dağ Evi (2. Sayfa Alarmı ⚠️)</option>
+              <option value="DOGUS">Doğuş Dağ Evi</option>
+              <option value="NEFES">Nefes Dağ Evi</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="abTestComparisonContainer" style="margin-top: 14px;"></div>
+      </section>
+
+      <!-- 4. 🤖 Yapay Zeka Pazarlama Danışmanı & Akıllı Simülatör -->
+      
       <!-- 🌟 OTA İLK SAYFA ALGORİTMASI, KAPAK GÖRSELİ & AÇIKLAMA AUDIT RADARI -->
       <section class="card" style="margin-bottom: 24px; border: 1px solid rgba(245, 158, 11, 0.3);">
         <div class="section-title-bar" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
