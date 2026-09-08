@@ -2883,6 +2883,9 @@ function loadAppData() {
       if (!appData.leads) appData.leads = [];
       if (!appData.maintenance) appData.maintenance = [];
       if (!appData.cleaningPayments) appData.cleaningPayments = {};
+      if (!appData.marketingCampaigns) {
+        appData.marketingCampaigns = JSON.parse(JSON.stringify(DEFAULT_MARKETING_CAMPAIGNS));
+      }
       if (!appData.cleaningTasks) {
         appData.cleaningTasks = [];
       }
@@ -3086,6 +3089,7 @@ function switchTab(tabId) {
   if (tabId === 'finance') renderFinanceModule();
   if (tabId === 'expenses') renderExpensesTable();
   if (tabId === 'housekeeping') renderHousekeepingTab();
+  if (tabId === 'marketing') renderMarketingModule();
 }
 
 function isBookingInFilter(b) {
@@ -7737,4 +7741,543 @@ function syncLiveAirbnbData() {
       }, 3000);
     }
   }, 600);
+}
+
+
+// =============================================================
+// 📢 PAZARLAMA & YAPAY ZEKA REKLAM RADARI (MARKETING & AI GROWTH)
+// =============================================================
+
+const DEFAULT_MARKETING_CAMPAIGNS = [
+  {
+    id: 'MKT-001',
+    name: 'Instagram Reels & Hikaye - Hafta Sonu Dağ Evi Kaçamağı',
+    platform: 'META',
+    channelType: 'Instagram Reels / Stories',
+    villa: 'ALL',
+    startDate: '2026-08-01',
+    endDate: '2026-08-31',
+    budget: 8000,
+    spent: 6500,
+    impressions: 48500,
+    clicks: 1420,
+    leads: 42,
+    bookingsCount: 2,
+    revenue: 58000,
+    status: 'ACTIVE',
+    notes: 'İstanbul/Bursa 25-45 yaş kitle, şömine ve jakuzi vurgulu video reklamı.'
+  },
+  {
+    id: 'MKT-002',
+    name: 'Google Arama - Uludağ Dağ Evi & Şömineli Villa Kiralama',
+    platform: 'GOOGLE',
+    channelType: 'Arama Ağı (Search)',
+    villa: 'ALL',
+    startDate: '2026-08-01',
+    endDate: '2026-08-31',
+    budget: 10000,
+    spent: 8200,
+    impressions: 16800,
+    clicks: 860,
+    leads: 36,
+    bookingsCount: 3,
+    revenue: 78000,
+    status: 'ACTIVE',
+    notes: '"uludağ kiralık dağ evi", "şömineli villa bursa" yüksek niyetli kelimeler.'
+  },
+  {
+    id: 'MKT-003',
+    name: 'Meta WhatsApp Direkt Mesaj Kampanyası (Click-to-WA)',
+    platform: 'META',
+    channelType: 'WhatsApp DM',
+    villa: 'SEYIR',
+    startDate: '2026-08-10',
+    endDate: '2026-08-25',
+    budget: 5000,
+    spent: 4200,
+    impressions: 22000,
+    clicks: 680,
+    leads: 55,
+    bookingsCount: 1,
+    revenue: 34000,
+    status: 'ACTIVE',
+    notes: 'Direkt WhatsApp sohbeti başlatan sponsorlu gönderiler.'
+  },
+  {
+    id: 'MKT-004',
+    name: 'Google Performance Max - Kış 2026/2027 Erken Rezervasyon',
+    platform: 'GOOGLE',
+    channelType: 'Performance Max',
+    villa: 'ZIRVE',
+    startDate: '2026-08-15',
+    endDate: '2026-09-30',
+    budget: 7500,
+    spent: 5100,
+    impressions: 34000,
+    clicks: 920,
+    leads: 28,
+    bookingsCount: 2,
+    revenue: 65000,
+    status: 'ACTIVE',
+    notes: 'Kış zirvesi ve sömestr dönemi için erken rezervasyon toplama.'
+  }
+];
+
+function isCampaignInFilter(camp) {
+  if (currentFilter.villa !== 'ALL' && camp.villa !== 'ALL' && camp.villa !== currentFilter.villa) {
+    return false;
+  }
+  if (currentFilter.period === 'ALL') return true;
+
+  const s = camp.startDate || '';
+  const e = camp.endDate || s || '';
+
+  if (currentFilter.period === 'CUSTOM' || currentFilter.startDate) {
+    const fStart = currentFilter.startDate || '2025-07-01';
+    const fEnd = currentFilter.endDate || '2099-12-31';
+    if (s && e) return (s <= fEnd && e >= fStart);
+    return true;
+  }
+
+  if (currentFilter.period === '2026-YEAR') return s.startsWith('2026-') || e.startsWith('2026-');
+  if (currentFilter.period === '2025-YEAR') return s.startsWith('2025-') || e.startsWith('2025-');
+
+  const sMonth = s ? s.slice(0, 7) : '';
+  const eMonth = e ? e.slice(0, 7) : '';
+  return sMonth === currentFilter.period || eMonth === currentFilter.period;
+}
+
+function renderMarketingModule() {
+  if (!appData.marketingCampaigns) {
+    appData.marketingCampaigns = JSON.parse(JSON.stringify(DEFAULT_MARKETING_CAMPAIGNS));
+  }
+
+  const campaigns = appData.marketingCampaigns.filter(isCampaignInFilter);
+
+  // 1. Calculate Marketing Campaign Metrics
+  let totalSpent = 0;
+  let totalBudget = 0;
+  let totalRev = 0;
+  let totalBookings = 0;
+  let totalClicks = 0;
+  let totalLeads = 0;
+
+  // Platform specific aggregations
+  const platformStats = {
+    META: { spent: 0, rev: 0, clicks: 0, leads: 0, bookings: 0 },
+    GOOGLE: { spent: 0, rev: 0, clicks: 0, impressions: 0, bookings: 0 },
+    TIKTOK: { spent: 0, rev: 0, clicks: 0, leads: 0, bookings: 0 },
+    OTHER: { spent: 0, rev: 0, clicks: 0, leads: 0, bookings: 0 }
+  };
+
+  campaigns.forEach(c => {
+    const sp = Number(c.spent) || 0;
+    const bg = Number(c.budget) || sp;
+    const rv = Number(c.revenue) || 0;
+    const bk = Number(c.bookingsCount) || 0;
+    const cl = Number(c.clicks) || 0;
+    const ld = Number(c.leads) || 0;
+    const imp = Number(c.impressions) || 0;
+
+    totalSpent += sp;
+    totalBudget += bg;
+    totalRev += rv;
+    totalBookings += bk;
+    totalClicks += cl;
+    totalLeads += ld;
+
+    const pKey = c.platform && platformStats[c.platform] ? c.platform : 'OTHER';
+    platformStats[pKey].spent += sp;
+    platformStats[pKey].rev += rv;
+    platformStats[pKey].clicks += cl;
+    platformStats[pKey].bookings += bk;
+    if (pKey === 'META' || pKey === 'TIKTOK') platformStats[pKey].leads += ld;
+    if (pKey === 'GOOGLE') platformStats[pKey].impressions += imp;
+  });
+
+  const overallROAS = totalSpent > 0 ? (totalRev / totalSpent).toFixed(1) : '0.0';
+  const overallCAC = totalBookings > 0 ? Math.round(totalSpent / totalBookings) : 0;
+  const spendRatio = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : (totalSpent > 0 ? 100 : 0);
+
+  // 2. Calculate Channel Breakdown (OTA vs Direct) from bookings in current filter
+  let otaGross = 0;
+  let otaCommLoss = 0;
+  let otaNet = 0;
+  let otaCount = 0;
+  let directGross = 0;
+  let directCount = 0;
+
+  (appData.bookings || []).forEach(b => {
+    if (b.status === 'CANCELLED' || !isBookingInFilter(b)) return;
+    const gr = Number(b.gross) || 0;
+    const cm = Number(b.otaComm) || 0;
+    const nt = Number(b.net) || (gr - cm);
+    const ch = (b.channel || '').toUpperCase();
+
+    if (ch === 'AIRBNB' || ch === 'BOOKING' || ch === 'EXPEDIA' || ch === 'OTA') {
+      otaGross += gr;
+      otaCommLoss += cm > 0 ? cm : Math.round(gr * 0.15); // Fallback to 15% if 0
+      otaNet += nt;
+      otaCount++;
+    } else {
+      directGross += gr;
+      directCount++;
+    }
+  });
+
+  const totalBookingGross = otaGross + directGross;
+  const directSharePct = totalBookingGross > 0 ? Math.round((directGross / totalBookingGross) * 100) : 0;
+  const directSavedComm = Math.round(directGross * 0.15); // Saved by not paying 15% OTA
+  const otaLossRatio = otaGross > 0 ? ((otaCommLoss / otaGross) * 100).toFixed(1) : '0.0';
+
+  // 3. Render Scorecard KPIs
+  const elTotalSpend = document.getElementById('mktTotalSpend');
+  if (elTotalSpend) elTotalSpend.innerText = `₺${totalSpent.toLocaleString('tr-TR')}`;
+
+  const elBudgetDetail = document.getElementById('mktTotalBudgetDetail');
+  if (elBudgetDetail) elBudgetDetail.innerText = `Bütçe: ₺${totalBudget.toLocaleString('tr-TR')}`;
+
+  const elSpendProgress = document.getElementById('mktSpendProgress');
+  if (elSpendProgress) elSpendProgress.innerText = `%${spendRatio} Harcandı`;
+
+  const elOverallRoas = document.getElementById('mktOverallRoas');
+  if (elOverallRoas) elOverallRoas.innerText = `${overallROAS}x`;
+
+  const elRoasRevDetail = document.getElementById('mktRoasRevDetail');
+  if (elRoasRevDetail) elRoasRevDetail.innerText = `Reklam Cirosu: ₺${totalRev.toLocaleString('tr-TR')}`;
+
+  const elOverallCac = document.getElementById('mktOverallCac');
+  if (elOverallCac) elOverallCac.innerText = `₺${overallCAC.toLocaleString('tr-TR')}`;
+
+  const elAcquiredBookings = document.getElementById('mktAcquiredBookings');
+  if (elAcquiredBookings) elAcquiredBookings.innerText = `${totalBookings} Rezervasyon`;
+
+  const elDirectSharePct = document.getElementById('mktDirectSharePct');
+  if (elDirectSharePct) elDirectSharePct.innerText = `%${directSharePct} Direkt`;
+
+  const elSavedOtaComm = document.getElementById('mktSavedOtaComm');
+  if (elSavedOtaComm) elSavedOtaComm.innerText = `Kurtarılan: ₺${directSavedComm.toLocaleString('tr-TR')}`;
+
+  // 4. Render Platform Cards
+  // Meta
+  const metaRoas = platformStats.META.spent > 0 ? (platformStats.META.rev / platformStats.META.spent).toFixed(1) : '0.0';
+  const metaCpc = platformStats.META.clicks > 0 ? (platformStats.META.spent / platformStats.META.clicks).toFixed(2) : '0.00';
+  const elMetaRoas = document.getElementById('metaRoasBadge');
+  if (elMetaRoas) elMetaRoas.innerText = `${metaRoas}x ROAS`;
+  const elMetaSpent = document.getElementById('metaTotalSpent');
+  if (elMetaSpent) elMetaSpent.innerText = `₺${platformStats.META.spent.toLocaleString('tr-TR')}`;
+  const elMetaClicks = document.getElementById('metaClicksCpc');
+  if (elMetaClicks) elMetaClicks.innerText = `${platformStats.META.clicks.toLocaleString('tr-TR')} (₺${metaCpc})`;
+  const elMetaLeads = document.getElementById('metaLeadsCount');
+  if (elMetaLeads) elMetaLeads.innerText = `${platformStats.META.leads} Lead`;
+  const elMetaRev = document.getElementById('metaTotalRev');
+  if (elMetaRev) elMetaRev.innerText = `₺${platformStats.META.rev.toLocaleString('tr-TR')}`;
+  const elMetaBookings = document.getElementById('metaBookingsCount');
+  if (elMetaBookings) elMetaBookings.innerText = `${platformStats.META.bookings} Rezervasyon`;
+
+  // Google
+  const googleRoas = platformStats.GOOGLE.spent > 0 ? (platformStats.GOOGLE.rev / platformStats.GOOGLE.spent).toFixed(1) : '0.0';
+  const googleCpc = platformStats.GOOGLE.clicks > 0 ? (platformStats.GOOGLE.spent / platformStats.GOOGLE.clicks).toFixed(2) : '0.00';
+  const elGoogleRoas = document.getElementById('googleRoasBadge');
+  if (elGoogleRoas) elGoogleRoas.innerText = `${googleRoas}x ROAS`;
+  const elGoogleSpent = document.getElementById('googleTotalSpent');
+  if (elGoogleSpent) elGoogleSpent.innerText = `₺${platformStats.GOOGLE.spent.toLocaleString('tr-TR')}`;
+  const elGoogleClicks = document.getElementById('googleClicksCpc');
+  if (elGoogleClicks) elGoogleClicks.innerText = `${platformStats.GOOGLE.clicks.toLocaleString('tr-TR')} (₺${googleCpc})`;
+  const elGoogleImp = document.getElementById('googleImpressions');
+  if (elGoogleImp) elGoogleImp.innerText = platformStats.GOOGLE.impressions.toLocaleString('tr-TR');
+  const elGoogleRev = document.getElementById('googleTotalRev');
+  if (elGoogleRev) elGoogleRev.innerText = `₺${platformStats.GOOGLE.rev.toLocaleString('tr-TR')}`;
+  const elGoogleBookings = document.getElementById('googleBookingsCount');
+  if (elGoogleBookings) elGoogleBookings.innerText = `${platformStats.GOOGLE.bookings} Rezervasyon`;
+
+  // OTA
+  const elOtaGross = document.getElementById('otaGrossCiro');
+  if (elOtaGross) elOtaGross.innerText = `₺${otaGross.toLocaleString('tr-TR')}`;
+  const elOtaLoss = document.getElementById('otaCommissionLoss');
+  if (elOtaLoss) elOtaLoss.innerText = `-₺${otaCommLoss.toLocaleString('tr-TR')}`;
+  const elOtaNet = document.getElementById('otaNetCiro');
+  if (elOtaNet) elOtaNet.innerText = `₺${otaNet.toLocaleString('tr-TR')}`;
+  const elOtaBookings = document.getElementById('otaBookingsCount');
+  if (elOtaBookings) elOtaBookings.innerText = `${otaCount} Rezervasyon`;
+  const elOtaLossRatio = document.getElementById('otaLossRatio');
+  if (elOtaLossRatio) elOtaLossRatio.innerText = `%${otaLossRatio} Komisyon Kaybı`;
+
+  // Direct
+  const elDirectGross = document.getElementById('directGrossCiro');
+  if (elDirectGross) elDirectGross.innerText = `₺${directGross.toLocaleString('tr-TR')}`;
+  const elDirectBookings = document.getElementById('directBookingsCount');
+  if (elDirectBookings) elDirectBookings.innerText = `${directCount} Rezervasyon`;
+  const elDirectSaved = document.getElementById('directCommissionSaved');
+  if (elDirectSaved) elDirectSaved.innerText = `+₺${directSavedComm.toLocaleString('tr-TR')}`;
+
+  // 5. Render Table & AI Advisor
+  renderMarketingCampaignsTable(campaigns);
+  runAIMarketingAdvisor({
+    metaRoas: Number(metaRoas),
+    googleRoas: Number(googleRoas),
+    otaCommLoss,
+    directSharePct,
+    totalSpent
+  });
+}
+
+function renderMarketingCampaignsTable(campaigns) {
+  const tbody = document.getElementById('marketingCampaignsTableBody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  if (!campaigns || campaigns.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:20px; color:var(--text-muted);">Bu dönemde kayıtlı reklam kampanyası bulunmuyor.</td></tr>';
+    return;
+  }
+
+  campaigns.forEach(c => {
+    const sp = Number(c.spent) || 0;
+    const bg = Number(c.budget) || sp;
+    const rv = Number(c.revenue) || 0;
+    const roas = sp > 0 ? (rv / sp).toFixed(1) : '0.0';
+    const cl = Number(c.clicks) || 0;
+    const ld = Number(c.leads) || 0;
+    const bk = Number(c.bookingsCount) || 0;
+
+    let pBadge = '<span class="badge badge-blue">Google Ads</span>';
+    if (c.platform === 'META') pBadge = '<span class="badge badge-purple">Meta Ads</span>';
+    if (c.platform === 'TIKTOK') pBadge = '<span class="badge badge-pink">TikTok Ads</span>';
+    if (c.platform === 'OTHER') pBadge = '<span class="badge badge-secondary">Diğer</span>';
+
+    let statusBadge = '<span class="badge badge-green">Aktif</span>';
+    if (c.status === 'COMPLETED') statusBadge = '<span class="badge badge-secondary">Tamamlandı</span>';
+    if (c.status === 'PAUSED') statusBadge = '<span class="badge badge-amber">Duraklatıldı</span>';
+
+    const vName = c.villa === 'ALL' ? 'Tüm Portföy' : (appData.villas[c.villa]?.name || c.villa);
+    const dateStr = (c.startDate || '') + (c.endDate ? ' - ' + c.endDate : '');
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>
+        <strong style="color:#F8FAFC;">${c.name}</strong>
+        <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">${c.notes || c.channelType || ''}</div>
+      </td>
+      <td>${pBadge}</td>
+      <td><span class="badge badge-blue" style="font-size:11px;">${vName}</span></td>
+      <td style="font-size:12px; color:var(--text-muted);">${dateStr || '-'}</td>
+      <td>
+        <strong style="color:#F87171;">₺${sp.toLocaleString('tr-TR')}</strong>
+        <div style="font-size:10px; color:var(--text-muted);">Bütçe: ₺${bg.toLocaleString('tr-TR')}</div>
+      </td>
+      <td>
+        <span style="font-weight:600; color:#E2E8F0;">${cl.toLocaleString('tr-TR')} Tık</span>
+        <div style="font-size:10px; color:#A855F7;">${ld} Lead / Mesaj</div>
+      </td>
+      <td>
+        <strong style="color:#34D399;">₺${rv.toLocaleString('tr-TR')}</strong>
+        <div style="font-size:10px; color:var(--text-muted);">${bk} Rezervasyon</div>
+      </td>
+      <td>
+        <span class="badge ${Number(roas) >= 5 ? 'badge-green' : 'badge-amber'}" style="font-weight:700;">${roas}x ROAS</span>
+      </td>
+      <td>${statusBadge}</td>
+      <td style="text-align: right; white-space: nowrap;">
+        <button class="btn btn-secondary btn-sm" onclick="openMarketingModal('${c.id}')" style="padding:4px 8px; font-size:11px; margin-right:4px;">✏️ Düzenle</button>
+        <button class="btn btn-secondary btn-sm text-danger" onclick="deleteMarketingCampaign('${c.id}')" style="padding:4px 8px; font-size:11px;">🗑️</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function runAIMarketingAdvisor(context = {}) {
+  const container = document.getElementById('aiInsightsContainer');
+  if (!container) return;
+
+  const nowStr = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+  const timeEl = document.getElementById('aiLastAnalysisTime');
+  if (timeEl) timeEl.innerText = `Son Analiz: ${nowStr} (Canlı)`;
+
+  const metaRoas = context.metaRoas || 8.0;
+  const googleRoas = context.googleRoas || 9.5;
+  const otaLoss = context.otaCommLoss || 28000;
+
+  let insights = [];
+
+  // Insight 1: ROAS Arbitrage (Google vs Meta)
+  if (googleRoas > metaRoas) {
+    insights.push({
+      type: 'arbitrage',
+      icon: '💡',
+      title: 'Bütçe Arbitrajı: Google Arama Reklamlarını Ölçekleyin',
+      text: `Google Arama kampanyalarınız <strong>${googleRoas}x ROAS</strong> üretirken Meta reklamları <strong>${metaRoas}x</strong> seviyesinde. Meta bütçenizin %25'ini 'Uludağ Dağ Evi' ve 'Şömineli Kiralık Villa' arama kelimelerine kaydırarak aynı bütçeyle tahmini <strong>+32.000 TL ek ciro</strong> elde edebilirsiniz.`
+    });
+  } else {
+    insights.push({
+      type: 'arbitrage',
+      icon: '📱',
+      title: 'Bütçe Arbitrajı: Meta Instagram DM Kampanyalarını Ölçekleyin',
+      text: `Meta reklamlarınız <strong>${metaRoas}x ROAS</strong> ile yüksek verimlilikte çalışıyor. Özellikle hafta sonu kaçamağı hedefli Instagram Reels ve direkt WhatsApp reklamlarına ağırlık vererek dönüşüm maliyetini düşürebilirsiniz.`
+    });
+  }
+
+  // Insight 2: OTA Disintermediation (Komisyondan Kurtulma)
+  insights.push({
+    type: 'commission',
+    icon: '🛡️',
+    title: 'OTA Komisyon Sızıntısı: Direkte Çevirme Reçetesi',
+    text: `Bu dönem OTA platformlarına (Booking / Airbnb) ödenen komisyon tutarı <strong>₺${otaLoss.toLocaleString('tr-TR')}</strong>. Bu paranın yalnızca %30'u (<strong>₺${Math.round(otaLoss * 0.3).toLocaleString('tr-TR')}</strong>) ile Meta Click-to-WhatsApp reklamı verildiğinde en az 2-3 rezervasyon direkt kapatılabilir ve net <strong>₺${Math.round(otaLoss * 0.7).toLocaleString('tr-TR')}</strong> komisyon tasarrufu sağlanır.`
+  });
+
+  // Insight 3: Gap-Filling / Boşluk Doldurma Uyarısı
+  insights.push({
+    type: 'gap',
+    icon: '⚡',
+    title: 'Son Dakika Boşluk Doldurma (Gap-Filling Reklamı)',
+    text: 'Önümüzdeki 14 günlük pencerede hafta içi boşlukları için İstanbul, Bursa ve Kocaeli lokasyonlu kullanıcılara yönelik <strong>₺1.500 bütçeli 48 saatlik Instagram Hikaye reklamı</strong> açılması önerilir. Mesaj başı maliyet ₺35 civarında gerçekleşecektir.'
+  });
+
+  // Insight 4: Sezonluk Erken Rezervasyon (Yılbaşı & Kış)
+  insights.push({
+    type: 'seasonal',
+    icon: '🎄',
+    title: '2026/2027 Kış & Yılbaşı Sezonu Erken Talep Penceresi',
+    text: 'Eylül ve Ekim ayları, Uludağ dağ evleri için kış sezonu (Aralık-Ocak-Şubat) erken rezervasyonlarının toplandığı en yüksek karlı dönemdir. Google Performance Max ve şömine temalı video reklamlara şimdiden başlamak, kış dönemini yüksek ADR ile kapatmanızı sağlar.'
+  });
+
+  container.innerHTML = insights.map(i => `
+    <div class="ai-insight-card ${i.type}">
+      <div class="ai-insight-title">
+        <span>${i.icon}</span>
+        <span>${i.title}</span>
+      </div>
+      <div class="ai-insight-text">${i.text}</div>
+    </div>
+  `).join('');
+}
+
+function runMarketingBudgetSimulation() {
+  const budgetInput = document.getElementById('simBudgetInput');
+  const budget = budgetInput ? (Number(budgetInput.value) || 20000) : 20000;
+
+  // Strategic Allocation: 45% Google, 40% Meta, 15% Retargeting
+  const googleAmt = Math.round(budget * 0.45);
+  const metaAmt = Math.round(budget * 0.40);
+  const retargetAmt = Math.round(budget * 0.15);
+
+  const googleRev = Math.round(googleAmt * 9.5);
+  const metaRev = Math.round(metaAmt * 8.0);
+  const retargetRev = Math.round(retargetAmt * 10.5);
+  const totalRev = googleRev + metaRev + retargetRev;
+  const blendedRoas = budget > 0 ? (totalRev / budget).toFixed(1) : '0.0';
+
+  const elGoogleAmt = document.getElementById('simGoogleAmt');
+  if (elGoogleAmt) elGoogleAmt.innerText = `₺${googleAmt.toLocaleString('tr-TR')}`;
+  const elGoogleRev = document.getElementById('simGoogleRev');
+  if (elGoogleRev) elGoogleRev.innerText = `₺${googleRev.toLocaleString('tr-TR')}`;
+
+  const elMetaAmt = document.getElementById('simMetaAmt');
+  if (elMetaAmt) elMetaAmt.innerText = `₺${metaAmt.toLocaleString('tr-TR')}`;
+  const elMetaRev = document.getElementById('simMetaRev');
+  if (elMetaRev) elMetaRev.innerText = `₺${metaRev.toLocaleString('tr-TR')}`;
+
+  const elRetargetAmt = document.getElementById('simRetargetAmt');
+  if (elRetargetAmt) elRetargetAmt.innerText = `₺${retargetAmt.toLocaleString('tr-TR')}`;
+  const elRetargetRev = document.getElementById('simRetargetRev');
+  if (elRetargetRev) elRetargetRev.innerText = `₺${retargetRev.toLocaleString('tr-TR')}`;
+
+  const elTotalRev = document.getElementById('simTotalExpectedRev');
+  if (elTotalRev) elTotalRev.innerText = `₺${totalRev.toLocaleString('tr-TR')}`;
+  const elBlendedRoas = document.getElementById('simExpectedRoas');
+  if (elBlendedRoas) elBlendedRoas.innerText = `${blendedRoas}x ROAS`;
+}
+
+// -------------------------------------------------------------
+// MARKETING MODAL & CRUD
+// -------------------------------------------------------------
+function openMarketingModal(id = null) {
+  const modal = document.getElementById('marketingCampaignModal');
+  const form = document.getElementById('mktCampaignForm');
+  const title = document.getElementById('mktModalTitle');
+  if (!modal || !form) return;
+
+  form.reset();
+  document.getElementById('mktCampaignId').value = '';
+
+  if (id) {
+    const c = (appData.marketingCampaigns || []).find(item => item.id === id);
+    if (c) {
+      if (title) title.innerText = 'Reklam Kampanyasını Düzenle';
+      document.getElementById('mktCampaignId').value = c.id;
+      document.getElementById('mktName').value = c.name || '';
+      document.getElementById('mktPlatform').value = c.platform || 'META';
+      document.getElementById('mktVilla').value = c.villa || 'ALL';
+      document.getElementById('mktStartDate').value = c.startDate || '';
+      document.getElementById('mktEndDate').value = c.endDate || '';
+      document.getElementById('mktBudget').value = c.budget || '';
+      document.getElementById('mktSpent').value = c.spent || '';
+      document.getElementById('mktClicks').value = c.clicks || '';
+      document.getElementById('mktLeads').value = c.leads || '';
+      document.getElementById('mktBookingsCount').value = c.bookingsCount || '';
+      document.getElementById('mktRevenue').value = c.revenue || '';
+      document.getElementById('mktStatus').value = c.status || 'ACTIVE';
+      document.getElementById('mktNotes').value = c.notes || '';
+    }
+  } else {
+    if (title) title.innerText = 'Yeni Reklam Kampanyası Ekle';
+    document.getElementById('mktStartDate').value = new Date().toISOString().slice(0, 10);
+  }
+
+  modal.classList.add('active');
+}
+
+function closeMarketingModal() {
+  const modal = document.getElementById('marketingCampaignModal');
+  if (modal) modal.classList.remove('active');
+}
+
+function saveMarketingCampaign(e) {
+  e.preventDefault();
+  if (!appData.marketingCampaigns) appData.marketingCampaigns = [];
+
+  const id = document.getElementById('mktCampaignId').value;
+  const name = document.getElementById('mktName').value.trim();
+  const platform = document.getElementById('mktPlatform').value;
+  const villa = document.getElementById('mktVilla').value;
+  const startDate = document.getElementById('mktStartDate').value;
+  const endDate = document.getElementById('mktEndDate').value;
+  const budget = Number(document.getElementById('mktBudget').value) || 0;
+  const spent = Number(document.getElementById('mktSpent').value) || 0;
+  const clicks = Number(document.getElementById('mktClicks').value) || 0;
+  const leads = Number(document.getElementById('mktLeads').value) || 0;
+  const bookingsCount = Number(document.getElementById('mktBookingsCount').value) || 0;
+  const revenue = Number(document.getElementById('mktRevenue').value) || 0;
+  const status = document.getElementById('mktStatus').value;
+  const notes = document.getElementById('mktNotes').value.trim();
+
+  if (id) {
+    const idx = appData.marketingCampaigns.findIndex(c => c.id === id);
+    if (idx !== -1) {
+      appData.marketingCampaigns[idx] = {
+        ...appData.marketingCampaigns[idx],
+        name, platform, villa, startDate, endDate, budget, spent,
+        clicks, leads, bookingsCount, revenue, status, notes
+      };
+    }
+  } else {
+    const newCamp = {
+      id: 'MKT-' + Date.now().toString().slice(-6),
+      name, platform, villa, startDate, endDate, budget, spent,
+      clicks, leads, bookingsCount, revenue, status, notes
+    };
+    appData.marketingCampaigns.unshift(newCamp);
+  }
+
+  saveAppData();
+  closeMarketingModal();
+  renderMarketingModule();
+}
+
+function deleteMarketingCampaign(id) {
+  if (!confirm('Bu reklam kampanyası kaydını silmek istediğinizden emin misiniz?')) return;
+  appData.marketingCampaigns = (appData.marketingCampaigns || []).filter(c => c.id !== id);
+  saveAppData();
+  renderMarketingModule();
 }

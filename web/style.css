@@ -3203,3 +3203,180 @@ body {
     padding: 6px 10px !important;
   }
 }
+
+
+/* ======================================================= */
+/* 📢 PAZARLAMA & AI REKLAM RADARI MODÜLÜ STILLERI          */
+/* ======================================================= */
+.marketing-header-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95));
+  padding: 16px 20px;
+  border-radius: 12px;
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  margin-bottom: 20px;
+}
+.mkt-platform-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.mkt-platform-card {
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 16px;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+.mkt-platform-card:hover {
+  transform: translateY(-2px);
+}
+.mkt-platform-card.meta {
+  border-color: rgba(168, 85, 247, 0.35);
+  background: linear-gradient(180deg, rgba(168, 85, 247, 0.06), rgba(15, 23, 42, 0.9));
+}
+.mkt-platform-card.google {
+  border-color: rgba(59, 130, 246, 0.35);
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.06), rgba(15, 23, 42, 0.9));
+}
+.mkt-platform-card.ota {
+  border-color: rgba(245, 158, 11, 0.35);
+  background: linear-gradient(180deg, rgba(245, 158, 11, 0.06), rgba(15, 23, 42, 0.9));
+}
+.mkt-platform-card.direct {
+  border-color: rgba(16, 185, 129, 0.35);
+  background: linear-gradient(180deg, rgba(16, 185, 129, 0.06), rgba(15, 23, 42, 0.9));
+}
+.mkt-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.mkt-platform-title {
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #F8FAFC;
+}
+.mkt-stats-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 12px;
+}
+.mkt-stats-row:last-child {
+  border-bottom: none;
+}
+.mkt-stats-label {
+  color: var(--text-muted);
+}
+.mkt-stats-val {
+  font-weight: 700;
+  color: #E2E8F0;
+}
+.ai-advisor-container {
+  background: linear-gradient(135deg, rgba(88, 28, 135, 0.2), rgba(15, 23, 42, 0.95));
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+.ai-insights-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+.ai-insight-card {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 14px;
+  position: relative;
+}
+.ai-insight-card.arbitrage {
+  border-left: 4px solid #3B82F6;
+}
+.ai-insight-card.gap {
+  border-left: 4px solid #F59E0B;
+}
+.ai-insight-card.commission {
+  border-left: 4px solid #10B981;
+}
+.ai-insight-card.seasonal {
+  border-left: 4px solid #EC4899;
+}
+.ai-insight-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #F8FAFC;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ai-insight-text {
+  font-size: 12px;
+  color: #CBD5E1;
+  line-height: 1.5;
+}
+.mkt-simulator-box {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 16px;
+  margin-top: 16px;
+}
+.mkt-sim-inputs {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.mkt-sim-bars {
+  display: flex;
+  height: 18px;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 10px;
+  background: #1E293B;
+}
+.mkt-sim-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 800;
+  color: #fff;
+  transition: width 0.4s ease;
+}
+.mkt-sim-bar.google { background: #3B82F6; }
+.mkt-sim-bar.meta { background: #8B5CF6; }
+.mkt-sim-bar.retargeting { background: #10B981; }
+.badge-meta {
+  background: rgba(168, 85, 247, 0.2);
+  color: #DDD6FE;
+  border: 1px solid rgba(168, 85, 247, 0.4);
+}
+.badge-google {
+  background: rgba(59, 130, 246, 0.2);
+  color: #93C5FD;
+  border: 1px solid rgba(59, 130, 246, 0.4);
+}
+.badge-tiktok {
+  background: rgba(236, 72, 153, 0.2);
+  color: #FBCFE8;
+  border: 1px solid rgba(236, 72, 153, 0.4);
+}

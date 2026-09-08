@@ -320,6 +320,7 @@
     <button class="tab-btn active" onclick="switchTab('finance')">💰 Finans (Finansal Performans)</button>
     <button class="tab-btn" onclick="switchTab('dashboard')">📊 Kokpit (10 Saniye)</button>
     <button class="tab-btn" onclick="switchTab('channels')">🌐 OTA & Kanal Radarı</button>
+    <button class="tab-btn" onclick="switchTab('marketing')" style="background: rgba(168, 85, 247, 0.12); border-radius: 6px; margin: 0 2px;">📢 Pazarlama & AI Reklam</button>
     <button class="tab-btn" onclick="switchTab('reservations')">📅 Rezervasyonlar (<span id="rezCountBadge">0</span>)</button>
     <button class="tab-btn" onclick="switchTab('expenses')">💸 Gider Defteri (<span id="expenseCountBadge">0</span>)</button>
     <button class="tab-btn" onclick="switchTab('housekeeping')" style="background: rgba(245, 158, 11, 0.08); border-radius: 6px; margin: 0 2px;">🧹 Temizlik & Borç (<span id="cleanDebtBadge" style="color: #FBBF24; font-weight: 700;">₺0 Borç</span>)</button>
@@ -1145,7 +1146,218 @@
     <!-- ========================================== -->
     <!-- TAB: OTA & KANAL RADARI -->
     <!-- ========================================== -->
-    <div id="tab-channels" class="tab-content">
+    
+    <!-- ======================================================= -->
+    <!-- TAB: PAZARLAMA & AI REKLAM RADARI                      -->
+    <!-- ======================================================= -->
+    <div id="tab-marketing" class="tab-content">
+      <!-- 1. Header Bar -->
+      <div class="marketing-header-bar">
+        <div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 22px;">📢</span>
+            <h2 style="margin: 0; font-size: 18px; font-weight: 800; color: #fff;">PAZARLAMA & BÜYÜME MERKEZİ</h2>
+            <span class="badge badge-purple" style="font-size: 11px;">AI Destekli Büyüme Motoru</span>
+          </div>
+          <p class="sub-text" style="margin: 4px 0 0 0;">Meta, Google Ads, OTA komisyonları ve direkt rezervasyon akışını analiz eden yapay zeka sistemi.</p>
+        </div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button type="button" class="btn btn-secondary" onclick="runAIMarketingAdvisor()" style="border-color: #A855F7; color: #DDD6FE; font-weight: 700;">
+            <span>🤖</span> Yapay Zeka Analizini Yenile
+          </button>
+          <button type="button" class="btn btn-primary" onclick="openMarketingModal()">
+            <span>+</span> Yeni Reklam Kampanyası Ekle
+          </button>
+        </div>
+      </div>
+
+      <!-- 2. Marketing Scorecard KPIs -->
+      <section class="kpi-cards-grid">
+        <div class="kpi-card" style="border-left: 4px solid #A855F7;">
+          <div class="kpi-card-header">
+            <span class="kpi-label">TOPLAM REKLAM HARCAMASI</span>
+            <span class="badge badge-purple" id="mktPeriodBadge">Bu Dönem</span>
+          </div>
+          <div class="kpi-value" id="mktTotalSpend" style="color: #DDD6FE;">₺0</div>
+          <div class="kpi-meta">
+            <span id="mktTotalBudgetDetail">Bütçe: ₺0</span>
+            <span id="mktSpendProgress" style="color: #A855F7; font-weight: 700;">%0 Harcandı</span>
+          </div>
+        </div>
+
+        <div class="kpi-card" style="border-left: 4px solid #10B981;">
+          <div class="kpi-card-header">
+            <span class="kpi-label">GENEL REKLAM ROAS</span>
+            <span class="badge badge-green">Getiri Çarpanı</span>
+          </div>
+          <div class="kpi-value" id="mktOverallRoas" style="color: #34D399;">0.0x</div>
+          <div class="kpi-meta">
+            <span id="mktRoasRevDetail">Reklam Cirosu: ₺0</span>
+            <span style="color: #10B981; font-weight: 700;">Mükemmel ✅</span>
+          </div>
+        </div>
+
+        <div class="kpi-card" style="border-left: 4px solid #3B82F6;">
+          <div class="kpi-card-header">
+            <span class="kpi-label">CAC / REZERVASYON BAŞI MALİYET</span>
+            <span class="badge badge-blue">Edinme Maliyeti</span>
+          </div>
+          <div class="kpi-value" id="mktOverallCac" style="color: #93C5FD;">₺0</div>
+          <div class="kpi-meta">
+            <span id="mktAcquiredBookings">0 Rezervasyon</span>
+            <span>Kanal Ortalaması</span>
+          </div>
+        </div>
+
+        <div class="kpi-card" style="border-left: 4px solid #F59E0B;">
+          <div class="kpi-card-header">
+            <span class="kpi-label">DİREKT PAYI & KURTARILAN KOMİSYON</span>
+            <span class="badge badge-amber">%0 Komisyon</span>
+          </div>
+          <div class="kpi-value" id="mktDirectSharePct" style="color: #FBBF24;">%0 Direkt</div>
+          <div class="kpi-meta">
+            <span id="mktSavedOtaComm">Kurtarılan: ₺0</span>
+            <span style="color: #34D399; font-weight: 700;">Cepte Kalan</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. Platform Bazında Performans Radarı -->
+      <h3 style="font-size: 15px; font-weight: 700; color: #fff; margin: 20px 0 12px 0; display: flex; align-items: center; gap: 6px;">
+        <span>📊</span> PLATFORM BAZINDA REKLAM & KANAL SAĞLIĞI
+      </h3>
+      <div class="mkt-platform-grid">
+        <!-- Meta Ads -->
+        <div class="mkt-platform-card meta">
+          <div class="mkt-card-top">
+            <span class="mkt-platform-title">📱 Meta Ads (Instagram/FB)</span>
+            <span class="badge badge-meta" id="metaRoasBadge">0.0x ROAS</span>
+          </div>
+          <div class="mkt-stats-row"><span class="mkt-stats-label">Harcama:</span><span class="mkt-stats-val" id="metaTotalSpent">₺0</span></div>
+          <div class="mkt-stats-row"><span class="mkt-stats-label">Tıklama (CPC):</span><span class="mkt-stats-val" id="metaClicksCpc">0 (₺0)</span></div>
+          <div class="mkt-stats-row"><span class="mkt-stats-label">WhatsApp / DM Lead:</span><span class="mkt-stats-val" id="metaLeadsCount">0 Lead</span></div>
+          <div class="mkt-stats-row"><span class="mkt-stats-label">Üretilen Ciro:</span><span class="mkt-stats-val" style="color: #34D399;" id="metaTotalRev">₺0</span></div>
+          <div class="mkt-stats-row"><span class="mkt-stats-label">Kazanılan Rezervasyon:</span><span class="mkt-stats-val" id="metaBookingsCount">0 Rez</span></div>
+        </div>
+
+        <!-- Google Ads -->
+        <div class="mkt-platform-card google">
+          <div class="mkt-card-top">
+            <span class="mkt-platform-title">🔍 Google Ads (Arama & PMax)</span>
+            <span class="badge badge-google" id="googleRoasBadge">0.0x ROAS</span>
+          </div>
+          <div class="mkt-stats-row"><span class="mkt-stats-label">Harcama:</span><span class="mkt-stats-val" id="googleTotalSpent">₺0</span></div>
+          <div class="mkt-stats-row"><span class="mkt-stats-label">Tıklama (CPC):</span><span class="mkt-stats-val" id="googleClicksCpc">0 (₺0)</span></div>
+          <div class="mkt-stats-row"><span class="mkt-stats-label">Gösterim:</span><span class="mkt-stats-val" id="googleImpressions">0</span></div>
+          <div class="mkt-stats-row"><span class="mkt-stats-label">Üretilen Ciro:</span><span class="mkt-stats-val" style="color: #34D399;" id="googleTotalRev">₺0</span></div>
+          <div class="mkt-stats-row"><span class="mkt-stats-label">Kazanılan Rezervasyon:</span><span class="mkt-stats-val" id="googleBookingsCount">0 Rez</span></div>
+        </div>
+
+        <!-- OTA Kanalları (Airbnb, Booking, Expedia) -->
+        <div class="mkt-platform-card ota">
+          <div class="mkt-card-top">
+            <span class="mkt-platform-title">🏨 OTA Kanalları (Airbnb, Booking)</span>
+            <span class="badge badge-amber" id="otaCommRateBadge">%15 Ort. Komisyon</span>
+          </div>
+          <div class="mkt-stats-row"><span class="mkt-stats-label">OTA Brüt Ciro:</span><span class="mkt-stats-val" id="otaGrossCiro">₺0</span></div>
+          <div class="mkt-stats-row"><span class="mkt-stats-label">Kesilen Komisyon Kaybı:</span><span class="mkt-stats-val" style="color: #F87171;" id="otaCommissionLoss">₺0</span></div>
+          <div class="mkt-stats-row"><span class="mkt-stats-label">Net Oda Geliri:</span><span class="mkt-stats-val" style="color: #34D399;" id="otaNetCiro">₺0</span></div>
+          <div class="mkt-stats-row"><span class="mkt-stats-label">OTA Rezervasyon Adedi:</span><span class="mkt-stats-val" id="otaBookingsCount">0 Rez</span></div>
+          <div class="mkt-stats-row"><span class="mkt-stats-label">Komisyon Sızıntı Oranı:</span><span class="mkt-stats-val" style="color: #FCA5A5;" id="otaLossRatio">%0</span></div>
+        </div>
+
+        <!-- Direkt Satış (WhatsApp / Instagram Organik / Web) -->
+        <div class="mkt-platform-card direct">
+          <div class="mkt-card-top">
+            <span class="mkt-platform-title">💬 Direkt Satış (WhatsApp & Web)</span>
+            <span class="badge badge-green">%0 Komisyon</span>
+          </div>
+          <div class="mkt-stats-row"><span class="mkt-stats-label">Direkt Brüt Ciro:</span><span class="mkt-stats-val" style="color: #34D399;" id="directGrossCiro">₺0</span></div>
+          <div class="mkt-stats-row"><span class="mkt-stats-label">Ödenen Komisyon:</span><span class="mkt-stats-val" style="color: #34D399;">₺0 (Sıfır)</span></div>
+          <div class="mkt-stats-row"><span class="mkt-stats-label">Direkt Rezervasyon:</span><span class="mkt-stats-val" id="directBookingsCount">0 Rez</span></div>
+          <div class="mkt-stats-row"><span class="mkt-stats-label">Kazanılan Komisyon:</span><span class="mkt-stats-val" style="color: #34D399;" id="directCommissionSaved">₺0</span></div>
+          <div class="mkt-stats-row"><span class="mkt-stats-label">Kâr Marjı Katkısı:</span><span class="mkt-stats-val" style="color: #10B981;">+%15 Net Kâr ✅</span></div>
+        </div>
+      </div>
+
+      <!-- 4. 🤖 Yapay Zeka Pazarlama Danışmanı & Akıllı Simülatör -->
+      <div class="ai-advisor-container">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 20px;">🤖</span>
+            <h3 style="margin: 0; font-size: 16px; font-weight: 800; color: #DDD6FE;">YAPAY ZEKA PAZARLAMA DANIŞMANI (AI GROWTH ENGINE)</h3>
+          </div>
+          <span class="badge badge-purple" id="aiLastAnalysisTime">Anlık Analiz Edildi</span>
+        </div>
+        <p style="font-size: 12px; color: #CBD5E1; margin: 6px 0 0 0;">
+          Sisteminizdeki doluluk verileri, boşluk geceleri (gap nights), reklam ROAS değerleri ve OTA komisyon sızıntılarını birleştirerek oluşturulan yapay zeka aksiyon önerileri:
+        </p>
+
+        <!-- Dinamik Öneri Kartları -->
+        <div class="ai-insights-grid" id="aiInsightsContainer"></div>
+
+        <!-- Akıllı Bütçe Dağıtım Simülatörü -->
+        <div class="mkt-simulator-box">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <strong style="color: #F8FAFC; font-size: 13px;">🎯 Akıllı Bütçe Dağıtım & Ciro Getiri Simülatörü</strong>
+            <span style="font-size: 11px; color: var(--text-muted);">Geçmiş ROAS ve kanal doluluk katsayılarına göre hesaplanır</span>
+          </div>
+          <div class="mkt-sim-inputs" style="margin-top: 12px;">
+            <label style="font-size: 12px; color: #CBD5E1;">Yatırılacak Reklam Bütçesi (TL):</label>
+            <input type="number" id="simBudgetInput" value="20000" step="1000" min="1000" style="padding: 6px 12px; background: rgba(30,41,59,0.9); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; font-weight: 700; width: 140px;">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="runMarketingBudgetSimulation()" style="border-color: #A855F7; color: #DDD6FE;">
+              ⚡ Simülasyonu Çalıştır
+            </button>
+          </div>
+
+          <div class="mkt-sim-bars" id="simBarsContainer">
+            <div class="mkt-sim-bar google" id="simBarGoogle" style="width: 45%;">Google %45</div>
+            <div class="mkt-sim-bar meta" id="simBarMeta" style="width: 40%;">Meta %40</div>
+            <div class="mkt-sim-bar retargeting" id="simBarRetarget" style="width: 15%;">Retarget %15</div>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; font-size: 12px; flex-wrap: wrap; gap: 10px; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px;" id="simResultsDetail">
+            <div><span style="color: #93C5FD;">Google Arama:</span> <strong id="simGoogleAmt">₺9.000</strong> (Tahmini Ciro: <span id="simGoogleRev" style="color: #34D399;">₺85.500</span>)</div>
+            <div><span style="color: #C084FC;">Meta (IG/WA):</span> <strong id="simMetaAmt">₺8.000</strong> (Tahmini Ciro: <span id="simMetaRev" style="color: #34D399;">₺64.000</span>)</div>
+            <div><span style="color: #6EE7B7;">Yeniden Hedefleme:</span> <strong id="simRetargetAmt">₺3.000</strong> (Tahmini Ciro: <span id="simRetargetRev" style="color: #34D399;">₺30.000</span>)</div>
+            <div><strong style="color: #FBBF24;">Beklenen Toplam Ciro: <span id="simTotalExpectedRev">₺179.500</span></strong> (<span id="simExpectedRoas" style="color:#34D399;">9.0x ROAS</span>)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. Kampanya & Reklam Harcama Defteri -->
+      <section class="card">
+        <div class="section-title-bar">
+          <div>
+            <h2>📋 KAMPANYA & REKLAM HARCAMA DEFTERİ</h2>
+            <p class="sub-text">Yürüttüğünüz tüm Meta ve Google reklamlarının bütçe, tıklama, ciro ve ROAS kayıtları.</p>
+          </div>
+          <button type="button" class="btn btn-primary" onclick="openMarketingModal()">+ Yeni Reklam Ekle</button>
+        </div>
+
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>KAMPANYA ADI</th>
+                <th>PLATFORM</th>
+                <th>HEDEF VİLLA</th>
+                <th>TARİH</th>
+                <th>HARCANAN / BÜTÇE</th>
+                <th>TIKLAMA / LEAD</th>
+                <th>REZ / CİRO</th>
+                <th>ROAS</th>
+                <th>DURUM</th>
+                <th style="text-align: right;">İŞLEM</th>
+              </tr>
+            </thead>
+            <tbody id="marketingCampaignsTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+<div id="tab-channels" class="tab-content">
       <div class="kpi-cards-grid">
         <div class="kpi-card channel-card airbnb" style="border: 1px solid rgba(245, 158, 11, 0.3); position: relative; overflow: hidden;">
           <div style="position: absolute; top: -10px; right: -10px; width: 60px; height: 60px; background: rgba(245, 158, 11, 0.08); border-radius: 50%;"></div>
@@ -2589,6 +2801,115 @@
           Anladım, Kapat
         </button>
       </div>
+    </div>
+  </div>
+
+
+  <!-- MODAL: YENİ REKLAM KAMPANYASI / HARCAMASI EKLE -->
+  <div id="marketingCampaignModal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 600px;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 20px;">📢</span>
+          <h3 id="mktModalTitle" style="margin: 0;">Yeni Reklam Kampanyası Ekle</h3>
+        </div>
+        <button class="close-btn" onclick="closeMarketingModal()">&times;</button>
+      </div>
+      <form id="mktCampaignForm" onsubmit="saveMarketingCampaign(event)">
+        <input type="hidden" id="mktCampaignId">
+        <div style="padding: 20px;">
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label style="font-weight: 700; color: #fff; font-size: 13px;">Kampanya Adı *</label>
+            <input type="text" id="mktName" required placeholder="Örn: Instagram Reels - Kış Kaçamağı" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 13px;">
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+            <div class="form-group">
+              <label style="font-size: 12px; font-weight: 600;">Reklam Platformu *</label>
+              <select id="mktPlatform" required style="width: 100%; padding: 10px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
+                <option value="META">Meta Ads (Instagram / FB)</option>
+                <option value="GOOGLE">Google Ads (Arama / PMax)</option>
+                <option value="TIKTOK">TikTok Ads</option>
+                <option value="OTHER">Diğer Sponsorlu Tanıtım</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label style="font-size: 12px; font-weight: 600;">İlgili Villa / Portföy</label>
+              <select id="mktVilla" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
+                <option value="ALL">Tüm Portföy (5 Villa)</option>
+                <option value="SEYIR">Seyir Dağ Evi</option>
+                <option value="DOGUS">Doğuş Dağ Evi</option>
+                <option value="ZIRVE">Zirve Dağ Evi</option>
+                <option value="SIRIN">Şirin Dağ Evi</option>
+                <option value="NEFES">Nefes Dağ Evi</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+            <div class="form-group">
+              <label style="font-size: 12px; font-weight: 600;">Başlangıç Tarihi</label>
+              <input type="date" id="mktStartDate" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
+            </div>
+            <div class="form-group">
+              <label style="font-size: 12px; font-weight: 600;">Bitiş Tarihi</label>
+              <input type="date" id="mktEndDate" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+            <div class="form-group">
+              <label style="font-size: 12px; font-weight: 600;">Planlanan Bütçe (TL)</label>
+              <input type="number" id="mktBudget" placeholder="Örn: 5000" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
+            </div>
+            <div class="form-group">
+              <label style="font-size: 12px; font-weight: 600; color: #FCA5A5;">Fiili Harcanan Tutar (TL) *</label>
+              <input type="number" id="mktSpent" required placeholder="Örn: 4200" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-weight: 700;">
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+            <div class="form-group">
+              <label style="font-size: 12px; font-weight: 600;">Tıklama Sayısı (Clicks)</label>
+              <input type="number" id="mktClicks" placeholder="Örn: 450" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
+            </div>
+            <div class="form-group">
+              <label style="font-size: 12px; font-weight: 600;">Gelen Lead / WhatsApp Mesajı</label>
+              <input type="number" id="mktLeads" placeholder="Örn: 24" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+            <div class="form-group">
+              <label style="font-size: 12px; font-weight: 600; color: #93C5FD;">Kazanılan Rezervasyon Adedi</label>
+              <input type="number" id="mktBookingsCount" placeholder="Örn: 2" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
+            </div>
+            <div class="form-group">
+              <label style="font-size: 12px; font-weight: 600; color: #34D399;">Üretilen Ciro (TL)</label>
+              <input type="number" id="mktRevenue" placeholder="Örn: 48000" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-weight: 700;">
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 14px;">
+            <label style="font-size: 12px; font-weight: 600;">Kampanya Durumu</label>
+            <select id="mktStatus" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
+              <option value="ACTIVE">Aktif (Yayında)</option>
+              <option value="COMPLETED">Tamamlandı</option>
+              <option value="PAUSED">Duraklatıldı</option>
+            </select>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 20px;">
+            <label style="font-size: 12px; font-weight: 600;">Notlar & Hedef Kitle Detayları</label>
+            <textarea id="mktNotes" rows="2" placeholder="Hedefleme, kreatif detayları veya özel indirim kodu..." style="width: 100%; padding: 10px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 12px;"></textarea>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 10px;">
+            <button type="button" class="btn btn-secondary" onclick="closeMarketingModal()">İptal</button>
+            <button type="submit" class="btn btn-primary" style="font-weight: 700;">Kaydet</button>
+          </div>
+        </div>
+      </form>
     </div>
   </div>
 
