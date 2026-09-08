@@ -2883,6 +2883,9 @@ function loadAppData() {
       if (!appData.leads) appData.leads = [];
       if (!appData.maintenance) appData.maintenance = [];
       if (!appData.cleaningPayments) appData.cleaningPayments = {};
+      if (!appData.otaPricingStrategy) {
+        appData.otaPricingStrategy = 'MARKUP'; // Kullanıcı stratejisi: Komisyon fiyata ekleniyor
+      }
       if (!appData.marketingCampaigns) {
         appData.marketingCampaigns = JSON.parse(JSON.stringify(DEFAULT_MARKETING_CAMPAIGNS));
       }
@@ -7995,8 +7998,32 @@ function renderMarketingModule() {
   const elDirectSharePct = document.getElementById('mktDirectSharePct');
   if (elDirectSharePct) elDirectSharePct.innerText = `%${directSharePct} Direkt`;
 
+  const isMarkup = (appData.otaPricingStrategy !== 'ABSORBED');
   const elSavedOtaComm = document.getElementById('mktSavedOtaComm');
-  if (elSavedOtaComm) elSavedOtaComm.innerText = `Kurtarılan: ₺${directSavedComm.toLocaleString('tr-TR')}`;
+  if (elSavedOtaComm) {
+    if (isMarkup) {
+      elSavedOtaComm.innerText = `Misafire İndirim: ₺${directSavedComm.toLocaleString('tr-TR')}`;
+    } else {
+      elSavedOtaComm.innerText = `Kurtarılan: ₺${directSavedComm.toLocaleString('tr-TR')}`;
+    }
+  }
+
+  // Update Strategy Switcher Button States
+  const btnMarkup = document.getElementById('btnStrategyMarkup');
+  const btnAbsorbed = document.getElementById('btnStrategyAbsorbed');
+  if (btnMarkup && btnAbsorbed) {
+    if (isMarkup) {
+      btnMarkup.className = 'btn btn-sm btn-primary';
+      btnMarkup.style.fontWeight = '700';
+      btnAbsorbed.className = 'btn btn-sm btn-secondary';
+      btnAbsorbed.style.fontWeight = 'normal';
+    } else {
+      btnMarkup.className = 'btn btn-sm btn-secondary';
+      btnMarkup.style.fontWeight = 'normal';
+      btnAbsorbed.className = 'btn btn-sm btn-primary';
+      btnAbsorbed.style.fontWeight = '700';
+    }
+  }
 
   // 4. Render Platform Cards
   // Meta
@@ -8031,17 +8058,37 @@ function renderMarketingModule() {
   const elGoogleBookings = document.getElementById('googleBookingsCount');
   if (elGoogleBookings) elGoogleBookings.innerText = `${platformStats.GOOGLE.bookings} Rezervasyon`;
 
-  // OTA
+  // OTA Platform Metrics (Stratejiye göre dinamik)
+  const isMarkupModel = (appData.otaPricingStrategy !== 'ABSORBED');
   const elOtaGross = document.getElementById('otaGrossCiro');
   if (elOtaGross) elOtaGross.innerText = `₺${otaGross.toLocaleString('tr-TR')}`;
+
   const elOtaLoss = document.getElementById('otaCommissionLoss');
-  if (elOtaLoss) elOtaLoss.innerText = `-₺${otaCommLoss.toLocaleString('tr-TR')}`;
+  if (elOtaLoss) {
+    if (isMarkupModel) {
+      elOtaLoss.innerText = `+₺${otaCommLoss.toLocaleString('tr-TR')} (Misafir Ödedi)`;
+      elOtaLoss.style.color = '#93C5FD';
+    } else {
+      elOtaLoss.innerText = `-₺${otaCommLoss.toLocaleString('tr-TR')}`;
+      elOtaLoss.style.color = '#F87171';
+    }
+  }
+
   const elOtaNet = document.getElementById('otaNetCiro');
   if (elOtaNet) elOtaNet.innerText = `₺${otaNet.toLocaleString('tr-TR')}`;
   const elOtaBookings = document.getElementById('otaBookingsCount');
   if (elOtaBookings) elOtaBookings.innerText = `${otaCount} Rezervasyon`;
+
   const elOtaLossRatio = document.getElementById('otaLossRatio');
-  if (elOtaLossRatio) elOtaLossRatio.innerText = `%${otaLossRatio} Komisyon Kaybı`;
+  if (elOtaLossRatio) {
+    if (isMarkupModel) {
+      elOtaLossRatio.innerText = 'İşletme Kaybı: ₺0 (%100 Korundu ✅)';
+      elOtaLossRatio.style.color = '#34D399';
+    } else {
+      elOtaLossRatio.innerText = `%${otaLossRatio} Komisyon Kaybı`;
+      elOtaLossRatio.style.color = '#FCA5A5';
+    }
+  }
 
   // Direct
   const elDirectGross = document.getElementById('directGrossCiro');
@@ -8159,13 +8206,23 @@ function runAIMarketingAdvisor(context = {}) {
     });
   }
 
-  // Insight 2: OTA Disintermediation (Komisyondan Kurtulma)
-  insights.push({
-    type: 'commission',
-    icon: '🛡️',
-    title: 'OTA Komisyon Sızıntısı: Direkte Çevirme Reçetesi',
-    text: `Bu dönem OTA platformlarına (Booking / Airbnb) ödenen komisyon tutarı <strong>₺${otaLoss.toLocaleString('tr-TR')}</strong>. Bu paranın yalnızca %30'u (<strong>₺${Math.round(otaLoss * 0.3).toLocaleString('tr-TR')}</strong>) ile Meta Click-to-WhatsApp reklamı verildiğinde en az 2-3 rezervasyon direkt kapatılabilir ve net <strong>₺${Math.round(otaLoss * 0.7).toLocaleString('tr-TR')}</strong> komisyon tasarrufu sağlanır.`
-  });
+  // Insight 2: OTA Stratejisi (Mark-up vs Standart)
+  const isUserMarkup = (appData.otaPricingStrategy !== 'ABSORBED');
+  if (isUserMarkup) {
+    insights.push({
+      type: 'commission',
+      icon: '🏷️',
+      title: 'Fiyatlandırma Stratejisi: Komisyon Misafire Yansıtılıyor (Mark-up)',
+      text: `Fiyatlarınız OTA komisyonu oranında artırılarak listelendiği için <strong>net kârınız %100 korunuyor (Sıfır kâr kaybı)</strong>. Bu stratejinin asıl avantajı direkt satışta ortaya çıkar: WhatsApp ve web sitenizde misafire <strong>'Komisyonsuz En İyi Fiyat Garantisi' (%15 indirim)</strong> sunarak OTA'da sizi görüp arayan misafirleri doğrudan kapatabilirsiniz.`
+    });
+  } else {
+    insights.push({
+      type: 'commission',
+      icon: '🛡️',
+      title: 'OTA Komisyon Sızıntısı: Direkte Çevirme Reçetesi',
+      text: `Bu dönem OTA platformlarına ödenen komisyon tutarı <strong>₺${otaLoss.toLocaleString('tr-TR')}</strong>. Bu bütçenin bir kısmı ile Meta Click-to-WhatsApp reklamı verilerek komisyon tasarrufu sağlanabilir.`
+    });
+  }
 
   // Insight 3: Gap-Filling / Boşluk Doldurma Uyarısı
   insights.push({
@@ -8493,4 +8550,11 @@ function copyAiTitle(titleText) {
   }).catch(() => {
     alert('Başlık: ' + titleText);
   });
+}
+
+
+function setOtaPricingStrategy(strategyMode) {
+  appData.otaPricingStrategy = strategyMode;
+  saveAppData();
+  renderMarketingModule();
 }

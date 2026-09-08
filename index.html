@@ -1161,12 +1161,22 @@
           </div>
           <p class="sub-text" style="margin: 4px 0 0 0;">Meta, Google Ads, OTA komisyonları ve direkt rezervasyon akışını analiz eden yapay zeka sistemi.</p>
         </div>
-        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-          <button type="button" class="btn btn-secondary" onclick="runAIMarketingAdvisor()" style="border-color: #A855F7; color: #DDD6FE; font-weight: 700;">
-            <span>🤖</span> Yapay Zeka Analizini Yenile
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+          <!-- OTA Fiyatlandırma Stratejisi Seçici -->
+          <div style="display: flex; align-items: center; gap: 6px; background: rgba(0,0,0,0.35); padding: 4px 8px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15);">
+            <span style="font-size: 11px; color: #CBD5E1; font-weight: 600;">OTA Fiyat Modeli:</span>
+            <button type="button" id="btnStrategyMarkup" class="btn btn-sm btn-primary" onclick="setOtaPricingStrategy('MARKUP')" style="font-size: 11px; padding: 4px 8px; font-weight: 700;" title="Fiyatlar OTA komisyonu kadar artırılmıştır, komisyonu misafir öder (Net cironuz korunur)">
+              🏷️ Fiyata Ekleniyor (Mark-up)
+            </button>
+            <button type="button" id="btnStrategyAbsorbed" class="btn btn-sm btn-secondary" onclick="setOtaPricingStrategy('ABSORBED')" style="font-size: 11px; padding: 4px 8px;" title="Tüm kanallarda fiyat aynıdır, komisyon işletme kârından kesilir">
+              💸 Fiyat Sabit (Komisyon İşletmeden)
+            </button>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="runAIMarketingAdvisor()" style="border-color: #A855F7; color: #DDD6FE; font-weight: 700; padding: 6px 12px;">
+            <span>🤖</span> AI Analizini Yenile
           </button>
-          <button type="button" class="btn btn-primary" onclick="openMarketingModal()">
-            <span>+</span> Yeni Reklam Kampanyası Ekle
+          <button type="button" class="btn btn-primary btn-sm" onclick="openMarketingModal()" style="padding: 6px 12px;">
+            <span>+</span> Yeni Reklam Ekle
           </button>
         </div>
       </div>
