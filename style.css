@@ -3380,3 +3380,65 @@ body {
   color: #FBCFE8;
   border: 1px solid rgba(236, 72, 153, 0.4);
 }
+
+
+/* OTA Ranking & Cover Audit Styles */
+.badge-rank-p1 {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34D399;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.badge-rank-p2 {
+  background: rgba(245, 158, 11, 0.2);
+  color: #FBBF24;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.cover-ctr-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cover-ctr-track {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+  min-width: 60px;
+}
+.cover-ctr-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #3B82F6, #10B981);
+}
+.ab-test-card-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 768px) {
+  .ab-test-card-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.ab-box {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 16px;
+}
+.ab-box.current {
+  border-top: 3px solid #94A3B8;
+}
+.ab-box.ai-optimized {
+  border-top: 3px solid #10B981;
+  background: linear-gradient(180deg, rgba(16, 185, 129, 0.08), rgba(0, 0, 0, 0.35));
+}

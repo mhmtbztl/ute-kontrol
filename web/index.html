@@ -1256,14 +1256,14 @@
         <!-- OTA Kanalları (Airbnb, Booking, Expedia) -->
         <div class="mkt-platform-card ota">
           <div class="mkt-card-top">
-            <span class="mkt-platform-title">🏨 OTA Kanalları (Airbnb, Booking)</span>
-            <span class="badge badge-amber" id="otaCommRateBadge">%15 Ort. Komisyon</span>
+            <span class="mkt-platform-title">🏨 OTA Algoritma & Sıralama (Airbnb/Booking)</span>
+            <span class="badge badge-amber" id="otaRankSummaryBadge">1. Sayfada: %80</span>
           </div>
-          <div class="mkt-stats-row"><span class="mkt-stats-label">OTA Brüt Ciro:</span><span class="mkt-stats-val" id="otaGrossCiro">₺0</span></div>
-          <div class="mkt-stats-row"><span class="mkt-stats-label">Kesilen Komisyon Kaybı:</span><span class="mkt-stats-val" style="color: #F87171;" id="otaCommissionLoss">₺0</span></div>
-          <div class="mkt-stats-row"><span class="mkt-stats-label">Net Oda Geliri:</span><span class="mkt-stats-val" style="color: #34D399;" id="otaNetCiro">₺0</span></div>
-          <div class="mkt-stats-row"><span class="mkt-stats-label">OTA Rezervasyon Adedi:</span><span class="mkt-stats-val" id="otaBookingsCount">0 Rez</span></div>
-          <div class="mkt-stats-row"><span class="mkt-stats-label">Komisyon Sızıntı Oranı:</span><span class="mkt-stats-val" style="color: #FCA5A5;" id="otaLossRatio">%0</span></div>
+          <div class="mkt-stats-row"><span class="mkt-stats-label">Arama Sıralaması:</span><span class="mkt-stats-val" style="color: #FBBF24;" id="otaAvgRankVal">Sayfa 1 / Ort. #4</span></div>
+          <div class="mkt-stats-row"><span class="mkt-stats-label">Kapak Görseli Tıklama (CTR):</span><span class="mkt-stats-val" style="color: #34D399;" id="otaAvgCoverCtr">%4.8 (Yüksek)</span></div>
+          <div class="mkt-stats-row"><span class="mkt-stats-label">Başlık & Açıklama SEO:</span><span class="mkt-stats-val" id="otaAvgListingScore">92 / 100</span></div>
+          <div class="mkt-stats-row"><span class="mkt-stats-label">Süper Ev Sahibi & Gözde:</span><span class="mkt-stats-val" style="color: #34D399;">5/5 Villa Rozetli 🏆</span></div>
+          <div class="mkt-stats-row"><span class="mkt-stats-label">OTA Rezervasyon / Ciro:</span><span class="mkt-stats-val" id="otaBookingsCiroDetail">9 Rez (₺483.965)</span></div>
         </div>
 
         <!-- Direkt Satış (WhatsApp / Instagram Organik / Web) -->
@@ -1281,7 +1281,73 @@
       </div>
 
       <!-- 4. 🤖 Yapay Zeka Pazarlama Danışmanı & Akıllı Simülatör -->
-      <div class="ai-advisor-container">
+      
+      <!-- 🌟 OTA İLK SAYFA ALGORİTMASI, KAPAK GÖRSELİ & AÇIKLAMA AUDIT RADARI -->
+      <section class="card" style="margin-bottom: 24px; border: 1px solid rgba(245, 158, 11, 0.3);">
+        <div class="section-title-bar" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 20px;">⭐</span>
+              <h3 style="margin: 0; font-size: 16px; font-weight: 800; color: #FBBF24;">5 VİLLA OTA İLK SAYFA SIRALAMA, KAPAK GÖRSELİ & AÇIKLAMA DENETİMİ</h3>
+              <span class="badge badge-amber" id="otaFirstPageBadge">%80 İlk Sayfada</span>
+            </div>
+            <p class="sub-text" style="margin: 4px 0 0 0;">
+              Airbnb ve Booking.com arama algoritmasında ilk sayfada çıkma pozisyonları, kapak görseli tıklama başarıları (CTR) ve başlık/açıklama SEO puanları.
+            </p>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="syncLiveAirbnbData()" style="border-color: #F59E0B; color: #FDE68A; font-weight: 700;">
+              🔄 Sıralama & Puanları Tara
+            </button>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>VİLLA</th>
+                <th>ARAMA SIRALAMASI</th>
+                <th>YAYINDAKİ KAPAK GÖRSELİ</th>
+                <th>KAPAK CTR (TIKLAMA %)</th>
+                <th>BAŞLIK & AÇIKLAMA SEO</th>
+                <th>ALGORİTMA ROZETİ</th>
+                <th>AI KAPAK & BAŞLIK TAVSİYESİ</th>
+                <th style="text-align: right;">İLAN</th>
+              </tr>
+            </thead>
+            <tbody id="otaRankingTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 🖼️ KAPAK GÖRSELİ & BAŞLIK A/B TEST LABORATUVARI -->
+      <section class="card" style="margin-bottom: 24px; background: linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.9)); border: 1px solid rgba(59, 130, 246, 0.3);">
+        <div class="section-title-bar" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 20px;">🖼️</span>
+              <h3 style="margin: 0; font-size: 15px; font-weight: 800; color: #93C5FD;">KAPAK GÖRSELİ & BAŞLIK A/B TEST LABORATUVARI</h3>
+              <span class="badge badge-blue">CTR & Dönüşüm Artırıcı</span>
+            </div>
+            <p class="sub-text" style="margin: 4px 0 0 0;">İlk sayfada arama yapan misafirlerin dikkatini çekmek için kapak görseli ve açıklama test simülatörü.</p>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <label style="font-size: 12px; color: #CBD5E1; font-weight: 600;">Villa Seçin:</label>
+            <select id="abTestVillaSelect" onchange="renderCoverAbTestLab(this.value)" style="padding: 6px 12px; background: #1E293B; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; font-size: 12px; font-weight: 700;">
+              <option value="SEYIR">Seyir Dağ Evi</option>
+              <option value="ZIRVE" selected>Zirve Dağ Evi</option>
+              <option value="SIRIN">Şirin Dağ Evi (2. Sayfa Alarmı ⚠️)</option>
+              <option value="DOGUS">Doğuş Dağ Evi</option>
+              <option value="NEFES">Nefes Dağ Evi</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="abTestComparisonContainer" style="margin-top: 14px;"></div>
+      </section>
+
+<div class="ai-advisor-container">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
           <div style="display: flex; align-items: center; gap: 8px;">
             <span style="font-size: 20px;">🤖</span>
