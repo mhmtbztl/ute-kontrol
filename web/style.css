@@ -3653,3 +3653,16 @@ body {
   border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
+/* ======================================================= */
+/* SAAS AUTHENTICATION & MULTI-TENANT STYLES               */
+/* ======================================================= */
+.saas-tab-btn {
+  transition: all 0.2s ease;
+}
+.saas-tab-btn:hover {
+  opacity: 0.95;
+}
+#userProfileBtn:hover {
+  background: rgba(139, 92, 246, 0.15);
+}
+

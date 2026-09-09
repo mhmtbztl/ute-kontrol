@@ -73,25 +73,49 @@
 </head>
 <body>
   <!-- GÜVENLİK VE GİZLİLİK KİLİT EKRANI (GİZLİ ERİŞİM KORUMASI) -->
+  <!-- ======================================================= -->
+  <!-- SAAS AUTHENTICATION & MULTI-TENANT GATEWAY             -->
+  <!-- ======================================================= -->
   <div id="securityLockOverlay" class="security-lock-overlay" style="display: none;">
-    <div class="security-lock-card">
-      <div class="lock-icon-badge">🔒</div>
-      <h2>LEXBNB KONTROL MERKEZİ</h2>
-      <span class="lock-sub-brand">Uludağ Tatil Evleri • Yetkili Yönetici Girişi</span>
-      
-      <p class="lock-description">
-        Bu sistem şirkete özel <strong>hassas finansal cirolar, operasyonel kârlar ve misafir kayıtları</strong> içermektedir. Yalnızca bağlantı verdiğiniz yetkili kişiler erişebilir.
-      </p>
+    <div class="security-lock-card" style="max-width: 480px; width: 92%; padding: 28px 24px;">
+      <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 6px;">
+        <span style="font-size: 28px;">🌲</span>
+        <h2 style="margin: 0; font-size: 22px; font-weight: 900; letter-spacing: 0.5px; color: #fff;">LEXBNB <span style="font-size: 13px; color: #A855F7; border: 1px solid rgba(168, 85, 247, 0.4); padding: 2px 6px; border-radius: 4px; vertical-align: middle;">SaaS</span></h2>
+      </div>
+      <span class="lock-sub-brand" style="display: block; margin-bottom: 14px; font-size: 12px; color: #CBD5E1;">
+        Kısa Dönem Kiralama, Villa & Bungalov Operasyon Merkezi
+      </span>
 
-      <form id="authLoginForm" onsubmit="handleAuthSubmit(event)">
-        <div class="lock-input-group">
-          <input type="password" id="authPinInput" placeholder="Yetkili Master PIN Giriniz" autocomplete="current-password" autofocus required>
-          <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 700;">🔓 Güvenli Giriş Yap</button>
+      <!-- SaaS Auth Tabs -->
+      <div class="saas-auth-tabs" style="display: flex; background: rgba(0,0,0,0.4); padding: 4px; border-radius: 8px; margin-bottom: 18px; border: 1px solid rgba(255,255,255,0.1);">
+        <button type="button" id="tabBtnLogin" class="saas-tab-btn active" onclick="switchAuthTab('login')" style="flex: 1; padding: 8px; border: none; background: #8B5CF6; color: #fff; font-weight: 700; border-radius: 6px; cursor: pointer; font-size: 13px;">
+          🔑 Giriş Yap
+        </button>
+        <button type="button" id="tabBtnRegister" class="saas-tab-btn" onclick="switchAuthTab('register')" style="flex: 1; padding: 8px; border: none; background: transparent; color: #94A3B8; font-weight: 600; border-radius: 6px; cursor: pointer; font-size: 13px;">
+          ✨ Yeni Hesap Aç
+        </button>
+      </div>
+
+      <!-- FORM 1: Giriş Yap -->
+      <form id="saasLoginForm" onsubmit="handleSaaSLogin(event)" style="display: block;">
+        <div class="form-group" style="margin-bottom: 12px; text-align: left;">
+          <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Kullanıcı Adı veya E-posta:</label>
+          <input type="text" id="saasLoginUser" placeholder="Örn: ute veya e-posta adresiniz" required autocomplete="username" style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 13px;">
         </div>
-        <div id="authErrorMessage" class="auth-error-msg" style="display: none;">
-          ⚠️ Hatalı PIN kodu veya şifre! Lütfen tekrar deneyin.
+        <div class="form-group" style="margin-bottom: 14px; text-align: left;">
+          <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Şifre:</label>
+          <input type="password" id="saasLoginPass" placeholder="Şifrenizi giriniz" required autocomplete="current-password" style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 13px;">
         </div>
-        <div class="remember-row">
+
+        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 800; font-size: 14px; background: linear-gradient(135deg, #8B5CF6, #6D28D9); border: none; border-radius: 8px;">
+          🔓 Hesabıma Giriş Yap
+        </button>
+
+        <div id="authErrorMessage" class="auth-error-msg" style="display: none; margin-top: 10px;">
+          ⚠️ Hatalı kullanıcı adı veya şifre! Lütfen tekrar deneyin.
+        </div>
+
+        <div class="remember-row" style="margin-top: 12px;">
           <label style="font-size: 12px; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
             <input type="checkbox" id="authRememberCheckbox" checked>
             Bu cihazda beni hatırla (30 gün)
@@ -99,13 +123,41 @@
         </div>
       </form>
 
-      <div class="lock-footer-hint">
-        💡 <strong>Özel Erişim Linki:</strong> Şirket yöneticisinin size gönderdiği özel anahtarlı link ile giriş yapıyorsanız şifre sormadan otomatik açılır.
+      <!-- FORM 2: Yeni Hesap Aç (Register) -->
+      <form id="saasRegisterForm" onsubmit="handleSaaSRegister(event)" style="display: none; text-align: left;">
+        <div class="form-group" style="margin-bottom: 10px;">
+          <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">İşletme / Marka Adı:</label>
+          <input type="text" id="saasRegCompany" placeholder="Örn: Bodrum Luxury Villas, Sapanca Doğa Evleri" required style="width: 100%; padding: 9px 12px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 13px;">
+        </div>
+        <div class="form-group" style="margin-bottom: 10px;">
+          <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Yetkili Ad Soyad:</label>
+          <input type="text" id="saasRegManager" placeholder="Örn: Ahmet Demir" required style="width: 100%; padding: 9px 12px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 13px;">
+        </div>
+        <div class="form-group" style="margin-bottom: 10px;">
+          <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">E-posta Adresi (Giriş için):</label>
+          <input type="email" id="saasRegEmail" placeholder="ahmet@isletme.com" required style="width: 100%; padding: 9px 12px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 13px;">
+        </div>
+        <div class="form-group" style="margin-bottom: 14px;">
+          <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Şifre Belirleyin:</label>
+          <input type="password" id="saasRegPass" placeholder="En az 6 karakter" required minlength="4" style="width: 100%; padding: 9px 12px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 13px;">
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 800; font-size: 14px; background: linear-gradient(135deg, #10B981, #059669); border: none; border-radius: 8px;">
+          ✨ Hesabımı Oluştur ve Başla
+        </button>
+      </form>
+
+      <!-- Hızlı Kurumsal Demo Girişi (UTE) -->
+      <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.1);">
+        <button type="button" class="btn btn-secondary" onclick="loginWithUteDemo()" style="width: 100%; padding: 10px; font-size: 12px; font-weight: 700; border-color: #F59E0B; color: #FDE68A; background: rgba(245, 158, 11, 0.08); display: flex; align-items: center; justify-content: center; gap: 6px;">
+          <span>🌟</span> Uludağ Tatil Evleri (Resmi Kurumsal Demo) ile Giriş Yap
+        </button>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 8px; text-align: center;">
+          Şirket yöneticisinin özel linkiyle geldiyseniz otomatik açılır.
+        </div>
       </div>
     </div>
   </div>
-
-
 
   <!-- App Header -->
   <header class="app-header">
@@ -313,6 +365,50 @@
           </button>
         </div>
       </div>
+
+      <!-- Dropdown 3: SaaS Kullanıcı Hesabı & Profil -->
+      <div class="header-dropdown-wrap">
+        <button type="button" class="btn btn-secondary" onclick="toggleHeaderDropdown('userProfileMenu')" id="userProfileBtn" style="border-color: #8B5CF6; color: #DDD6FE; font-weight: 700;">
+          <span id="headerUserAvatar">👤</span> <span id="headerCompanyName">Uludağ Tatil Evleri</span> <span style="font-size: 10px; margin-left: 2px;">▼</span>
+        </button>
+        <div class="header-dropdown-menu" id="userProfileMenu" style="min-width: 220px;">
+          <div style="padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,0.08); background: rgba(139, 92, 246, 0.1);">
+            <div style="font-size: 13px; font-weight: 800; color: #F8FAFC;" id="menuCompanyTitle">Uludağ Tatil Evleri</div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;" id="menuUserEmail">admin@uludagtatilevleri.com</div>
+            <span class="badge badge-purple" id="menuPlanBadge" style="margin-top: 6px; font-size: 10px;">Enterprise Plan 🚀</span>
+          </div>
+          <button type="button" class="dropdown-item" onclick="openPropertyModal(); closeAllHeaderDropdowns();">
+            <span class="dropdown-icon">🏡</span>
+            <div>
+              <strong>Yeni Villa / Mülk Ekle</strong>
+              <small>Portföyünüze yeni ev ekleyin</small>
+            </div>
+          </button>
+          <button type="button" class="dropdown-item" onclick="openImportModal(); closeAllHeaderDropdowns();">
+            <span class="dropdown-icon">📥</span>
+            <div>
+              <strong>Excel'den Rapor Yükle</strong>
+              <small>Kendi verilerinizi aktarın</small>
+            </div>
+          </button>
+          <button type="button" class="dropdown-item" onclick="loginWithUteDemo(); closeAllHeaderDropdowns();">
+            <span class="dropdown-icon">🌟</span>
+            <div>
+              <strong>UTE Resmi Demo Hesabı</strong>
+              <small>Uludağ Tatil Evleri verilerine geç</small>
+            </div>
+          </button>
+          <div class="dropdown-divider"></div>
+          <button type="button" class="dropdown-item text-danger" onclick="logoutSaaSUser(); closeAllHeaderDropdowns();">
+            <span class="dropdown-icon">🚪</span>
+            <div>
+              <strong style="color: #F87171;">Oturumu Kapat</strong>
+              <small>Güvenli çıkış yapın</small>
+            </div>
+          </button>
+        </div>
+      </div>
+
     </div>
   </header>
 
@@ -3389,6 +3485,59 @@
     </div>
   </div>
 
+
+  <!-- ========================================== -->
+  <!-- MODAL: DİNAMİK VİLLA / MÜLK EKLE & DÜZENLE -->
+  <!-- ========================================== -->
+  <div class="modal-backdrop" id="propertyModal">
+    <div class="modal-card" style="max-width: 540px;">
+      <div class="modal-header">
+        <h3 id="propertyModalTitle">🏡 Yeni Villa / Mülk Ekle</h3>
+        <button class="close-btn" onclick="closePropertyModal()">&times;</button>
+      </div>
+      <form id="propertyForm" onsubmit="saveProperty(event)">
+        <input type="hidden" id="propEditKey">
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Villa / Mülk Adı:</label>
+          <input type="text" id="propName" placeholder="Örn: Sunset Luxury Villa, Doğa Dağ Evi" required style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff;">
+        </div>
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+          <div class="form-group">
+            <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Sistem Kodu (Tekil):</label>
+            <input type="text" id="propKey" placeholder="Örn: SUNSET" required style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; text-transform: uppercase;">
+          </div>
+          <div class="form-group">
+            <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Kapasite (Kişi):</label>
+            <input type="text" id="propCapacity" placeholder="Örn: 8 Kişilik (4+2)" style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff;">
+          </div>
+        </div>
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+          <div class="form-group">
+            <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Gecelik Taban Fiyat (₺):</label>
+            <input type="number" id="propBasePrice" placeholder="Örn: 20000" required style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff;">
+          </div>
+          <div class="form-group">
+            <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Temizlik Maliyeti (₺):</label>
+            <input type="number" id="propCleanCost" placeholder="Örn: 1500" value="0" style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff;">
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Öne Çıkan Özellikler & Olanaklar:</label>
+          <input type="text" id="propAmenities" placeholder="Örn: Özel Havuz, Isıtmalı Jakuzi, Meşe Şöminesi, Sauna, Barbekü" style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff;">
+        </div>
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Airbnb / OTA İlan Linki (Opsiyonel):</label>
+          <input type="url" id="propUrl" placeholder="https://www.airbnb.com.tr/rooms/..." style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff;">
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+          <button type="button" class="btn btn-secondary" onclick="closePropertyModal()">İptal</button>
+          <button type="submit" class="btn btn-primary" style="background: linear-gradient(135deg, #8B5CF6, #6D28D9); border: none; font-weight: 700;">
+            💾 Mülkü Kaydet
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
 
 </body>
 </html>

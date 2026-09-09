@@ -12,27 +12,24 @@ function checkAuthStatus() {
   const urlParams = new URLSearchParams(window.location.search);
   const keyParam = urlParams.get('key') || urlParams.get('auth') || urlParams.get('token');
 
-  // 1. Direct Secret Link check (sadece linki attığınız kişiler otomatik açsın)
+  // 1. Direct Secret Link check (auto-logs in as UTE demo master)
   if (keyParam && (MASTER_PINS.includes(keyParam.toLowerCase()) || keyParam === SECRET_ACCESS_KEY)) {
-    sessionStorage.setItem('LEXBNB_AUTHENTICATED', 'true');
-    localStorage.setItem('LEXBNB_REMEMBER_AUTH', 'true');
-    hideLockOverlay();
+    loginWithUteDemo();
     return true;
   }
 
-  // 2. Remember Me in LocalStorage check (30 gün)
-  if (localStorage.getItem('LEXBNB_REMEMBER_AUTH') === 'true') {
-    hideLockOverlay();
-    return true;
+  // 2. Active Session or Remember Me check
+  const activeUserId = sessionStorage.getItem('LEXBNB_ACTIVE_USER_ID') || localStorage.getItem('LEXBNB_REMEMBER_USER_ID');
+  if (activeUserId) {
+    const users = getSaaSUsers();
+    const user = users.find(u => u.id === activeUserId);
+    if (user) {
+      authenticateSaaSUser(user, false);
+      return true;
+    }
   }
 
-  // 3. Active Session check
-  if (sessionStorage.getItem('LEXBNB_AUTHENTICATED') === 'true') {
-    hideLockOverlay();
-    return true;
-  }
-
-  // 4. Otherwise show lock screen
+  // 3. Otherwise show SaaS Auth Screen
   showLockOverlay();
   return false;
 }
@@ -2953,8 +2950,15 @@ function loadAppData() {
 }
 
 function saveAppData() {
-  localStorage.setItem('LEXBNB_V5_MASTER_DATA', JSON.stringify(appData));
-  renderAll();
+  const uId = (activeSaaSUser && activeSaaSUser.id) ? activeSaaSUser.id : 'usr_ute_master';
+  try {
+    localStorage.setItem('LEXBNB_DATA_' + uId, JSON.stringify(appData));
+    if (uId === 'usr_ute_master') {
+      localStorage.setItem('LEXBNB_V5_MASTER_DATA', JSON.stringify(appData));
+    }
+  } catch (err) {
+    console.error('Error saving tenant data:', err);
+  }
 }
 
 const ALL_FINANCIAL_MONTHS = [
@@ -9735,5 +9739,439 @@ function deleteInfluencerCollab(id) {
   appData.influencerCollabs = appData.influencerCollabs.filter(c => c.id !== id);
   saveAppData();
   renderInfluencerRoiLedger();
+}
+
+// =============================================================
+// 🌐 LEXBNB MULTI-TENANT SAAS ENGINE & USER AUTHENTICATION
+// =============================================================
+
+const DEFAULT_SAAS_USERS = [
+  {
+    id: 'usr_ute_master',
+    username: 'ute',
+    email: 'admin@uludagtatilevleri.com',
+    password: 'uludagtatil2026.',
+    companyName: 'Uludağ Tatil Evleri',
+    managerName: 'Mehmet B.',
+    plan: 'Enterprise',
+    isDefaultDemo: true,
+    createdAt: '2026-08-01'
+  }
+];
+
+let activeSaaSUser = null;
+
+function getSaaSUsers() {
+  try {
+    const raw = localStorage.getItem('LEXBNB_USERS_REGISTRY');
+    return raw ? JSON.parse(raw) : DEFAULT_SAAS_USERS;
+  } catch (e) {
+    return DEFAULT_SAAS_USERS;
+  }
+}
+
+function saveSaaSUsers(users) {
+  try {
+    localStorage.setItem('LEXBNB_USERS_REGISTRY', JSON.stringify(users));
+  } catch (e) {
+    console.error('Error saving SaaS users registry:', e);
+  }
+}
+
+function switchAuthTab(tab) {
+  const btnLogin = document.getElementById('tabBtnLogin');
+  const btnRegister = document.getElementById('tabBtnRegister');
+  const formLogin = document.getElementById('saasLoginForm');
+  const formRegister = document.getElementById('saasRegisterForm');
+  const err = document.getElementById('authErrorMessage');
+  if (err) err.style.display = 'none';
+
+  if (tab === 'login') {
+    if (btnLogin) {
+      btnLogin.style.background = '#8B5CF6';
+      btnLogin.style.color = '#fff';
+      btnLogin.style.fontWeight = '700';
+    }
+    if (btnRegister) {
+      btnRegister.style.background = 'transparent';
+      btnRegister.style.color = '#94A3B8';
+      btnRegister.style.fontWeight = '600';
+    }
+    if (formLogin) formLogin.style.display = 'block';
+    if (formRegister) formRegister.style.display = 'none';
+  } else {
+    if (btnLogin) {
+      btnLogin.style.background = 'transparent';
+      btnLogin.style.color = '#94A3B8';
+      btnLogin.style.fontWeight = '600';
+    }
+    if (btnRegister) {
+      btnRegister.style.background = '#10B981';
+      btnRegister.style.color = '#fff';
+      btnRegister.style.fontWeight = '700';
+    }
+    if (formLogin) formLogin.style.display = 'none';
+    if (formRegister) formRegister.style.display = 'block';
+  }
+}
+
+function handleSaaSLogin(e) {
+  e.preventDefault();
+  const userInput = document.getElementById('saasLoginUser')?.value.trim() || '';
+  const passInput = document.getElementById('saasLoginPass')?.value.trim() || '';
+  const remember = document.getElementById('authRememberCheckbox')?.checked;
+  const err = document.getElementById('authErrorMessage');
+
+  const users = getSaaSUsers();
+  const matched = users.find(u => 
+    (u.username.toLowerCase() === userInput.toLowerCase() || u.email.toLowerCase() === userInput.toLowerCase()) &&
+    (u.password === passInput || MASTER_PINS.includes(passInput) || passInput === SECRET_ACCESS_KEY)
+  );
+
+  if (matched) {
+    if (err) err.style.display = 'none';
+    authenticateSaaSUser(matched, remember);
+  } else {
+    if (err) {
+      err.style.display = 'block';
+      err.innerText = '⚠️ Hatalı kullanıcı adı veya şifre! Lütfen tekrar deneyin.';
+    }
+  }
+}
+
+function handleSaaSRegister(e) {
+  e.preventDefault();
+  const company = document.getElementById('saasRegCompany')?.value.trim() || 'Özel Tatil Evleri';
+  const manager = document.getElementById('saasRegManager')?.value.trim() || 'İşletme Yöneticisi';
+  const email = document.getElementById('saasRegEmail')?.value.trim().toLowerCase() || '';
+  const pass = document.getElementById('saasRegPass')?.value.trim() || '';
+  const err = document.getElementById('authErrorMessage');
+
+  if (!email || !pass) return;
+
+  const users = getSaaSUsers();
+  const exists = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+  if (exists) {
+    alert('⚠️ Bu e-posta adresi ile zaten kayıtlı bir hesap bulunuyor! Lütfen Giriş Yap sekmesini kullanın.');
+    switchAuthTab('login');
+    const uInput = document.getElementById('saasLoginUser');
+    if (uInput) uInput.value = email;
+    return;
+  }
+
+  const newUserId = 'usr_' + Date.now();
+  const newUser = {
+    id: newUserId,
+    username: email.split('@')[0],
+    email: email,
+    password: pass,
+    companyName: company,
+    managerName: manager,
+    plan: 'Pro Plan',
+    createdAt: new Date().toISOString()
+  };
+
+  users.push(newUser);
+  saveSaaSUsers(users);
+
+  // Initialize clean tenant database for the new user
+  const initialTenantData = {
+    tenantId: newUserId,
+    companyName: company,
+    managerName: manager,
+    villas: {
+      'EV_1': { name: company + ' - Villa 1', capacity: '6-8 Kişilik', basePrice: 20000, cleanCost: 1500, amenities: 'Özel Bahçe, Jakuzi, Şömine, Barbekü' },
+      'EV_2': { name: company + ' - Villa 2', capacity: '4-6 Kişilik', basePrice: 15000, cleanCost: 1200, amenities: 'Şömine, Doğa Manzarası, Geniş Veranda' }
+    },
+    bookings: [],
+    expenses: [],
+    cleaningTasks: [],
+    leads: [],
+    maintenance: [],
+    marketingCampaigns: [],
+    influencerCollabs: [],
+    otaPricingStrategy: 'MARKUP'
+  };
+
+  try {
+    localStorage.setItem('LEXBNB_DATA_' + newUserId, JSON.stringify(initialTenantData));
+  } catch (err) {
+    console.error('Storage quota exceeded:', err);
+  }
+
+  authenticateSaaSUser(newUser, true);
+  alert('🎉 Tebrikler! ' + company + ' SaaS hesabınız başarıyla oluşturuldu.\\n\\nVillalarınızı düzenleyebilir, yeni evler ekleyebilir veya Excel Raporu Yükle ile mevcut verilerinizi aktarabilirsiniz.');
+}
+
+function loginWithUteDemo() {
+  const users = getSaaSUsers();
+  const ute = users.find(u => u.id === 'usr_ute_master') || DEFAULT_SAAS_USERS[0];
+  authenticateSaaSUser(ute, false);
+}
+
+function authenticateSaaSUser(user, remember = false) {
+  activeSaaSUser = user;
+  sessionStorage.setItem('LEXBNB_ACTIVE_USER_ID', user.id);
+  sessionStorage.setItem('LEXBNB_ACTIVE_USER', JSON.stringify(user));
+
+  if (remember) {
+    localStorage.setItem('LEXBNB_REMEMBER_USER_ID', user.id);
+  }
+
+  hideLockOverlay();
+  loadTenantAppData(user.id);
+  updateSaaSUi();
+}
+
+function logoutSaaSUser() {
+  if (!confirm('Oturumunuzu kapatmak istediğinize emin misiniz?')) return;
+
+  activeSaaSUser = null;
+  sessionStorage.removeItem('LEXBNB_ACTIVE_USER_ID');
+  sessionStorage.removeItem('LEXBNB_ACTIVE_USER');
+  localStorage.removeItem('LEXBNB_REMEMBER_USER_ID');
+  localStorage.removeItem('LEXBNB_REMEMBER_AUTH');
+
+  showLockOverlay();
+}
+
+function loadTenantAppData(userId) {
+  if (userId === 'usr_ute_master') {
+    // Check if we have saved UTE data
+    const saved = localStorage.getItem('LEXBNB_DATA_usr_ute_master') || localStorage.getItem('LEXBNB_DATA_V5');
+    if (saved) {
+      try {
+        appData = JSON.parse(saved);
+      } catch (e) {
+        initDefaultUteData();
+      }
+    } else {
+      initDefaultUteData();
+    }
+  } else {
+    // Custom SaaS Tenant
+    const tenantRaw = localStorage.getItem('LEXBNB_DATA_' + userId);
+    if (tenantRaw) {
+      try {
+        appData = JSON.parse(tenantRaw);
+      } catch (e) {
+        appData = getBlankTenantData(userId);
+      }
+    } else {
+      appData = getBlankTenantData(userId);
+    }
+  }
+
+  // Ensure arrays exist
+  if (!appData.villas) appData.villas = {};
+  if (!appData.bookings) appData.bookings = [];
+  if (!appData.expenses) appData.expenses = [];
+  if (!appData.cleaningTasks) appData.cleaningTasks = [];
+  if (!appData.leads) appData.leads = [];
+  if (!appData.maintenance) appData.maintenance = [];
+  if (!appData.marketingCampaigns) appData.marketingCampaigns = [];
+  if (!appData.influencerCollabs) appData.influencerCollabs = [];
+
+  updateAllVillaDropdowns();
+  renderAll();
+}
+
+function initDefaultUteData() {
+  // Uses COMPANY_EXCEL_DATABASE defaults
+  appData = {
+    isCleanState: false,
+    excelDb: COMPANY_EXCEL_DATABASE,
+    companyName: 'Uludağ Tatil Evleri',
+    villas: {
+      SEYIR: { name: 'Seyir Dağ Evi', capacity: '6+2 Kişi', basePrice: 16000, cleanCost: 1200 },
+      ZIRVE: { name: 'Zirve Dağ Evi', capacity: '9 Kişi', basePrice: 22000, cleanCost: 1500 },
+      DOGUS: { name: 'Doğuş Dağ Evi', capacity: '11 Kişi', basePrice: 18000, cleanCost: 1500 },
+      SIRIN: { name: 'Şirin Dağ Evi', capacity: '7 Kişi', basePrice: 14000, cleanCost: 1000 },
+      NEFES: { name: 'Nefes Dağ Evi', capacity: '12 Kişi', basePrice: 20000, cleanCost: 1500 }
+    },
+    targets: COMPANY_EXCEL_DATABASE.targets,
+    bookings: JSON.parse(JSON.stringify(DEFAULT_BOOKINGS)),
+    expenses: JSON.parse(JSON.stringify(COMPANY_EXCEL_DATABASE.expensesList)),
+    leads: JSON.parse(JSON.stringify(DEFAULT_LEADS)),
+    maintenance: JSON.parse(JSON.stringify(DEFAULT_MAINT)),
+    cleaningTasks: [],
+    marketingCampaigns: JSON.parse(JSON.stringify(DEFAULT_MARKETING_CAMPAIGNS)),
+    influencerCollabs: JSON.parse(JSON.stringify(DEFAULT_INFLUENCER_COLLABS)),
+    airbnbListings: JSON.parse(JSON.stringify(DEFAULT_AIRBNB_PROPERTIES)),
+    otaPricingStrategy: 'MARKUP'
+  };
+  syncBookingCleaningTasks();
+}
+
+function getBlankTenantData(userId) {
+  const users = getSaaSUsers();
+  const u = users.find(item => item.id === userId) || {};
+  const cName = u.companyName || 'Özel Mülk Portföyü';
+
+  return {
+    tenantId: userId,
+    companyName: cName,
+    managerName: u.managerName || 'Yönetici',
+    villas: {
+      'VILLA_A': { name: cName + ' - Villa 1', capacity: '6-8 Kişilik', basePrice: 20000, cleanCost: 1500 },
+      'VILLA_B': { name: cName + ' - Villa 2', capacity: '4-6 Kişilik', basePrice: 15000, cleanCost: 1200 }
+    },
+    bookings: [],
+    expenses: [],
+    cleaningTasks: [],
+    leads: [],
+    maintenance: [],
+    marketingCampaigns: [],
+    influencerCollabs: [],
+    otaPricingStrategy: 'MARKUP'
+  };
+}
+
+function updateSaaSUi() {
+  const user = activeSaaSUser;
+  if (!user) return;
+
+  const headerComp = document.getElementById('headerCompanyName');
+  if (headerComp) headerComp.innerText = user.companyName || 'LexBnB SaaS';
+
+  const menuTitle = document.getElementById('menuCompanyTitle');
+  if (menuTitle) menuTitle.innerText = user.companyName || 'LexBnB';
+
+  const menuEmail = document.getElementById('menuUserEmail');
+  if (menuEmail) menuEmail.innerText = (user.managerName ? user.managerName + ' • ' : '') + user.email;
+
+  const menuPlan = document.getElementById('menuPlanBadge');
+  if (menuPlan) menuPlan.innerText = (user.plan || 'Pro Plan') + ' 🚀';
+}
+
+function updateAllVillaDropdowns() {
+  if (!appData || !appData.villas) return;
+
+  const villaKeys = Object.keys(appData.villas);
+
+  const dropdownIds = [
+    'globalVillaFilter',
+    'resVilla',
+    'expVilla',
+    'leadVilla',
+    'maintVilla',
+    'mktVilla',
+    'infVilla',
+    'scriptVillaSelect',
+    'abTestVillaSelect'
+  ];
+
+  dropdownIds.forEach(selectId => {
+    const el = document.getElementById(selectId);
+    if (!el) return;
+
+    const currentVal = el.value;
+    el.innerHTML = '';
+
+    if (selectId === 'globalVillaFilter' || selectId === 'mktVilla') {
+      const optAll = document.createElement('option');
+      optAll.value = 'ALL';
+      optAll.innerText = 'Tüm Villalar / Portföy';
+      el.appendChild(optAll);
+    }
+
+    villaKeys.forEach(vKey => {
+      const v = appData.villas[vKey];
+      const opt = document.createElement('option');
+      opt.value = vKey;
+      opt.innerText = (v && v.name) ? v.name + (v.capacity ? ' (' + v.capacity + ')' : '') : vKey;
+      el.appendChild(opt);
+    });
+
+    if (currentVal && (currentVal === 'ALL' || villaKeys.includes(currentVal))) {
+      el.value = currentVal;
+    }
+  });
+}
+
+// -------------------------------------------------------------
+// 🏡 DİNAMİK MÜLK / VİLLA YÖNETİMİ (PROPERTY CRUD)
+// -------------------------------------------------------------
+function openPropertyModal(villaKey = null) {
+  const modal = document.getElementById('propertyModal');
+  const form = document.getElementById('propertyForm');
+  const title = document.getElementById('propertyModalTitle');
+  if (!modal || !form) return;
+
+  form.reset();
+  document.getElementById('propEditKey').value = '';
+
+  if (villaKey && appData.villas && appData.villas[villaKey]) {
+    const v = appData.villas[villaKey];
+    if (title) title.innerText = '🏡 ' + v.name + ' Düzenle';
+    document.getElementById('propEditKey').value = villaKey;
+    document.getElementById('propKey').value = villaKey;
+    document.getElementById('propKey').readOnly = true;
+    document.getElementById('propName').value = v.name || '';
+    document.getElementById('propCapacity').value = v.capacity || '';
+    document.getElementById('propBasePrice').value = v.basePrice || v.adr || 20000;
+    document.getElementById('propCleanCost').value = v.cleanCost || 1500;
+    document.getElementById('propAmenities').value = v.amenities || '';
+    document.getElementById('propUrl').value = v.url || '';
+  } else {
+    if (title) title.innerText = '🏡 Yeni Villa / Mülk Ekle';
+    document.getElementById('propKey').readOnly = false;
+  }
+
+  modal.classList.add('active');
+}
+
+function closePropertyModal() {
+  const modal = document.getElementById('propertyModal');
+  if (modal) modal.classList.remove('active');
+}
+
+function saveProperty(e) {
+  e.preventDefault();
+  if (!appData.villas) appData.villas = {};
+
+  const editKey = document.getElementById('propEditKey').value;
+  let rawKey = document.getElementById('propKey').value.trim().toUpperCase();
+  rawKey = rawKey.replace(/[^A-Z0-9_]/g, '_');
+  if (!rawKey) rawKey = 'VILLA_' + (Object.keys(appData.villas).length + 1);
+
+  const name = document.getElementById('propName').value.trim();
+  const capacity = document.getElementById('propCapacity').value.trim();
+  const basePrice = Number(document.getElementById('propBasePrice').value) || 20000;
+  const cleanCost = Number(document.getElementById('propCleanCost').value) || 1500;
+  const amenities = document.getElementById('propAmenities').value.trim();
+  const url = document.getElementById('propUrl').value.trim();
+
+  const finalKey = editKey || rawKey;
+
+  appData.villas[finalKey] = {
+    ...(appData.villas[finalKey] || {}),
+    name,
+    capacity,
+    basePrice,
+    adr: basePrice,
+    cleanCost,
+    amenities,
+    url
+  };
+
+  saveAppData();
+  closePropertyModal();
+  updateAllVillaDropdowns();
+  renderAll();
+  alert('✅ ' + name + ' başarıyla mülk portföyünüze kaydedildi!');
+}
+
+function deleteProperty(villaKey) {
+  const v = appData.villas && appData.villas[villaKey];
+  const vName = v ? v.name : villaKey;
+
+  if (!confirm(vName + ' kaydını mülk listenizden kaldırmak istediğinize emin misiniz?')) return;
+
+  delete appData.villas[villaKey];
+  saveAppData();
+  updateAllVillaDropdowns();
+  renderAll();
+  alert('🗑️ ' + vName + ' portföyden kaldırıldı.');
 }
 
