@@ -4547,60 +4547,420 @@ function closeImportModal() {
   document.getElementById('importPreviewBox').style.display = 'none';
 }
 
+// =============================================================
+// 📥 EVRENSEL EXCEL & RAPOR İÇE AKTARMA MOTORU (UNIVERSAL EXCEL IMPORTER)
+// =============================================================
+let pendingImportData = null;
+
+function downloadSampleTemplate(templateType) {
+  if (typeof XLSX === 'undefined') {
+    alert('Excel motoru yükleniyor, lütfen birkaç saniye sonra tekrar deneyin.');
+    return;
+  }
+
+  const wb = XLSX.utils.book_new();
+
+  if (templateType === 'BOOKINGS') {
+    const data = [
+      {
+        'Villa': 'ZIRVE',
+        'Misafir Adı': 'Örnek Misafir (Ahmet Yılmaz)',
+        'Giriş Tarihi': '2026-10-10',
+        'Çıkış Tarihi': '2026-10-14',
+        'Gece': 4,
+        'Brüt Tutar (TL)': 72000,
+        'Kanal': 'WHATSAPP',
+        'OTA Komisyonu (TL)': 0,
+        'Temizlik Ücreti (TL)': 1500,
+        'Kişi Sayısı': 8,
+        'Durum': 'COMPLETED'
+      },
+      {
+        'Villa': 'SEYIR',
+        'Misafir Adı': 'Örnek Misafir (Canan Kaya)',
+        'Giriş Tarihi': '2026-10-20',
+        'Çıkış Tarihi': '2026-10-24',
+        'Gece': 4,
+        'Brüt Tutar (TL)': 56000,
+        'Kanal': 'AIRBNB',
+        'OTA Komisyonu (TL)': 8400,
+        'Temizlik Ücreti (TL)': 1200,
+        'Kişi Sayısı': 6,
+        'Durum': 'COMPLETED'
+      }
+    ];
+    const ws = XLSX.utils.json_to_sheet(data);
+    XLSX.utils.book_append_sheet(wb, ws, 'Rezervasyonlar');
+    XLSX.writeFile(wb, 'LexBnB_Ornek_Rezervasyon_Sablonu.xlsx');
+  } else if (templateType === 'EXPENSES') {
+    const data = [
+      {
+        'Tarih': '2026-10-05',
+        'Açıklama': 'Şömine Meşe Odunu 3 Ton',
+        'Tutar (TL)': 18000,
+        'Kategori': 'Şömine & Yakacak',
+        'Tür': 'OPEX',
+        'Villa': 'ALL'
+      },
+      {
+        'Tarih': '2026-10-12',
+        'Açıklama': 'Zirve Jakuzi Isıtıcı Rezistans Değişimi',
+        'Tutar (TL)': 6500,
+        'Kategori': 'Bakım & Onarım',
+        'Tür': 'OPEX',
+        'Villa': 'ZIRVE'
+      },
+      {
+        'Tarih': '2026-10-15',
+        'Açıklama': 'Yeni Bahçe Kamelyası & Oturma Grubu',
+        'Tutar (TL)': 45000,
+        'Kategori': 'Yatırım & Demirbaş',
+        'Tür': 'CAPEX',
+        'Villa': 'SEYIR'
+      }
+    ];
+    const ws = XLSX.utils.json_to_sheet(data);
+    XLSX.utils.book_append_sheet(wb, ws, 'Giderler');
+    XLSX.writeFile(wb, 'LexBnB_Ornek_Gider_Sablonu.xlsx');
+  } else if (templateType === 'COMPANY') {
+    const genelData = [
+      { 'Dönem': '2026-08', 'Ciro (TL)': 483965, 'OPEX (TL)': 337306, 'CAPEX (TL)': 3866, 'Satılan Gece': 79 },
+      { 'Dönem': '2026-09', 'Ciro (TL)': 550000, 'OPEX (TL)': 310000, 'CAPEX (TL)': 5000, 'Satılan Gece': 85 }
+    ];
+    const wsG = XLSX.utils.json_to_sheet(genelData);
+    XLSX.utils.book_append_sheet(wb, wsG, 'GENEL');
+    XLSX.writeFile(wb, 'LexBnB_Ornek_Sirket_Raporu.xlsx');
+  }
+}
+
 function handleFileImport(e) {
   const file = e.target.files[0];
   if (!file) return;
 
+  const fileName = file.name;
   const reader = new FileReader();
-  reader.onload = function(evt) {
-    const text = evt.target.result;
-    const lines = text.split('\n').filter(l => l.trim().length > 0);
-    if (lines.length <= 1) {
-      alert('Dosyada geçerli veri satırı bulunamadı.');
-      return;
-    }
 
-    pendingImportRows = lines;
-    document.getElementById('importPreviewBox').style.display = 'block';
-    document.getElementById('importPreviewText').innerText = `Başarıyla algılandı: ${lines.length - 1} satır finansal işlem.`;
+  reader.onload = function(evt) {
+    try {
+      let wb;
+      if (typeof XLSX !== 'undefined') {
+        const data = new Uint8Array(evt.target.result);
+        wb = XLSX.read(data, { type: 'array', cellDates: true });
+      } else {
+        alert('XLSX motoru bulunamadı, lütfen sayfayı yenileyin.');
+        return;
+      }
+
+      analyzeAndPreviewWorkbook(wb, fileName);
+    } catch (err) {
+      console.error('File parsing error:', err);
+      alert('Dosya okunurken bir hata oluştu: ' + (err.message || 'Bilinmeyen format'));
+    }
   };
-  reader.readAsText(file);
+
+  reader.readAsArrayBuffer(file);
 }
 
-function applyImportedData() {
-  if (!pendingImportRows || pendingImportRows.length <= 1) return;
+function analyzeAndPreviewWorkbook(wb, fileName) {
+  const sheetNames = wb.SheetNames.map(s => s.trim().toUpperCase());
+  let detectedType = 'GENERIC';
 
-  // Simple CSV auto-parser: Header detection
-  const header = pendingImportRows[0].toLowerCase().split(',');
-  let importedCount = 0;
-
-  for (let i = 1; i < pendingImportRows.length; i++) {
-    const parts = pendingImportRows[i].split(',');
-    if (parts.length >= 3) {
-      const desc = parts[0] || 'İçe aktarılan gider';
-      const amt = Number(parts[1]) || 0;
-      const cat = parts[2]?.trim() || 'Diğer';
-
-      if (amt > 0) {
-        appData.expenses.push({
-          id: 'EXP-IMP-' + Date.now() + '-' + i,
-          date: new Date().toISOString().split('T')[0],
-          month: currentFilter.period,
-          villa: 'ALL',
-          category: cat,
-          amount: amt,
-          type: 'OPEX',
-          description: desc
-        });
-        importedCount++;
+  if (sheetNames.includes('GENEL') || (sheetNames.includes('GDR') && sheetNames.includes('RPR')) || sheetNames.includes('HDF')) {
+    detectedType = 'COMPANY_REPORT';
+  } else {
+    // Check first sheet headers
+    const firstWs = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(firstWs, { header: 1 });
+    if (rows && rows.length > 0) {
+      for (let r = 0; r < Math.min(5, rows.length); r++) {
+        const rowStr = (rows[r] || []).join(' ').toLowerCase();
+        if (rowStr.includes('misafir') || rowStr.includes('guest') || rowStr.includes('check-in') || rowStr.includes('checkin') || rowStr.includes('giriş')) {
+          detectedType = 'BOOKINGS';
+          break;
+        }
+        if (rowStr.includes('gider') || rowStr.includes('harcama') || rowStr.includes('expense') || rowStr.includes('kategori') || rowStr.includes('açıklama')) {
+          detectedType = 'EXPENSES';
+          break;
+        }
       }
     }
   }
 
-  saveAppData();
-  closeImportModal();
-  alert(`${importedCount} adet harcama kaydı başarıyla sisteme aktarıldı!`);
+  // Update UI Select
+  const select = document.getElementById('importModeSelect');
+  if (select) select.value = detectedType;
+
+  parseWorkbookWithMode(wb, fileName, detectedType);
 }
+
+function changeImportMode(newMode) {
+  if (!pendingImportData || !pendingImportData.workbook) return;
+  parseWorkbookWithMode(pendingImportData.workbook, pendingImportData.fileName, newMode);
+}
+
+function parseWorkbookWithMode(wb, fileName, mode) {
+  let finalMode = mode;
+  if (finalMode === 'AUTO') {
+    const sheetNames = wb.SheetNames.map(s => s.trim().toUpperCase());
+    if (sheetNames.includes('GENEL')) finalMode = 'COMPANY_REPORT';
+    else finalMode = 'BOOKINGS';
+  }
+
+  const parsedData = {
+    workbook: wb,
+    fileName: fileName,
+    mode: finalMode,
+    bookings: [],
+    expenses: [],
+    companySummary: null,
+    previewHeaders: [],
+    previewRows: []
+  };
+
+  if (finalMode === 'COMPANY_REPORT') {
+    const genelSheet = wb.Sheets['GENEL'] || wb.Sheets[wb.SheetNames[0]];
+    const genelRows = XLSX.utils.sheet_to_json(genelSheet, { header: 1 });
+
+    parsedData.previewHeaders = ['Dönem / Ay', 'Ciro (₺)', 'Gider (₺)', 'Net Kâr (₺)', 'Satılan Gece'];
+    parsedData.previewRows = [];
+
+    for (let i = 1; i < Math.min(6, genelRows.length); i++) {
+      const r = genelRows[i];
+      if (r && r.length >= 2) {
+        parsedData.previewRows.push([
+          String(r[0] || ''),
+          Number(r[1]) ? '₺' + Number(r[1]).toLocaleString('tr-TR') : '-',
+          Number(r[2]) ? '₺' + Number(r[2]).toLocaleString('tr-TR') : '-',
+          Number(r[3]) ? '₺' + Number(r[3]).toLocaleString('tr-TR') : '-',
+          String(r[4] || '-')
+        ]);
+      }
+    }
+  } else if (finalMode === 'BOOKINGS') {
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rawObjects = XLSX.utils.sheet_to_json(ws);
+
+    parsedData.previewHeaders = ['Villa', 'Misafir Adı', 'Giriş - Çıkış', 'Gece', 'Brüt Ciro (₺)', 'Kanal'];
+    parsedData.previewRows = [];
+
+    rawObjects.forEach((obj, idx) => {
+      const villaRaw = String(obj['Villa'] || obj['villa'] || obj['Ev'] || obj['Mülk'] || 'ZIRVE').toUpperCase();
+      let villa = 'ZIRVE';
+      if (villaRaw.includes('SEYIR') || villaRaw.includes('SEYİR')) villa = 'SEYIR';
+      else if (villaRaw.includes('DOGUS') || villaRaw.includes('DOĞUŞ')) villa = 'DOGUS';
+      else if (villaRaw.includes('SIRIN') || villaRaw.includes('ŞİRİN')) villa = 'SIRIN';
+      else if (villaRaw.includes('NEFES')) villa = 'NEFES';
+      else if (villaRaw.includes('ZIRVE') || villaRaw.includes('ZİRVE')) villa = 'ZIRVE';
+
+      const guest = String(obj['Misafir Adı'] || obj['Misafir'] || obj['Guest'] || obj['Müşteri'] || ('Misafir ' + (idx + 1))).trim();
+
+      let checkIn = obj['Giriş Tarihi'] || obj['Giriş'] || obj['Check-in'] || obj['CheckIn'] || '';
+      let checkOut = obj['Çıkış Tarihi'] || obj['Çıkış'] || obj['Check-out'] || obj['CheckOut'] || '';
+      if (checkIn instanceof Date) checkIn = checkIn.toISOString().slice(0, 10);
+      if (checkOut instanceof Date) checkOut = checkOut.toISOString().slice(0, 10);
+
+      const nights = Number(obj['Gece'] || obj['Nights'] || obj['Gece Sayısı']) || 2;
+      const gross = Number(obj['Brüt Tutar (TL)'] || obj['Brüt Tutar'] || obj['Tutar'] || obj['Ciro'] || obj['Gross'] || obj['Fiyat']) || 0;
+      const channel = String(obj['Kanal'] || obj['Channel'] || 'WHATSAPP').toUpperCase();
+      const otaComm = Number(obj['OTA Komisyonu (TL)'] || obj['Komisyon'] || obj['Commission']) || (channel.includes('AIRBNB') || channel.includes('BOOKING') ? Math.round(gross * 0.15) : 0);
+      const cleanFee = Number(obj['Temizlik Ücreti (TL)'] || obj['Temizlik'] || obj['CleanFee']) || 0;
+      const net = gross - otaComm;
+
+      const bookingItem = {
+        id: 'REZ-IMP-' + Date.now().toString().slice(-4) + '-' + idx,
+        villa,
+        guest,
+        checkIn: String(checkIn || new Date().toISOString().slice(0, 10)),
+        checkOut: String(checkOut || new Date().toISOString().slice(0, 10)),
+        nights,
+        channel,
+        gross,
+        otaComm,
+        cleanFee,
+        net,
+        pax: Number(obj['Kişi Sayısı'] || obj['Pax']) || 6,
+        status: String(obj['Durum'] || 'COMPLETED').toUpperCase()
+      };
+
+      parsedData.bookings.push(bookingItem);
+
+      if (parsedData.previewRows.length < 5) {
+        parsedData.previewRows.push([
+          villa,
+          guest,
+          bookingItem.checkIn + ' - ' + bookingItem.checkOut,
+          nights + ' Gece',
+          '₺' + gross.toLocaleString('tr-TR'),
+          channel
+        ]);
+      }
+    });
+  } else if (finalMode === 'EXPENSES') {
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rawObjects = XLSX.utils.sheet_to_json(ws);
+
+    parsedData.previewHeaders = ['Tarih', 'Açıklama', 'Kategori', 'Tutar (₺)', 'Tür', 'Villa'];
+    parsedData.previewRows = [];
+
+    rawObjects.forEach((obj, idx) => {
+      const desc = String(obj['Açıklama'] || obj['Description'] || obj['Kalem'] || obj['Gider'] || 'İçe aktarılan gider').trim();
+      const amount = Number(obj['Tutar (TL)'] || obj['Tutar'] || obj['Miktar'] || obj['Amount'] || obj['Fiyat']) || 0;
+      const category = String(obj['Kategori'] || obj['Category'] || 'Diğer Genel Giderler').trim();
+      let date = obj['Tarih'] || obj['Date'] || new Date().toISOString().slice(0, 10);
+      if (date instanceof Date) date = date.toISOString().slice(0, 10);
+
+      const type = String(obj['Tür'] || obj['Type'] || 'OPEX').toUpperCase().includes('CAPEX') ? 'CAPEX' : 'OPEX';
+      const villa = String(obj['Villa'] || obj['Mülk'] || 'ALL').toUpperCase();
+
+      if (amount > 0) {
+        const expItem = {
+          id: 'EXP-IMP-' + Date.now().toString().slice(-4) + '-' + idx,
+          date: String(date),
+          month: String(date).slice(0, 7),
+          villa,
+          category,
+          amount,
+          type,
+          description: desc
+        };
+
+        parsedData.expenses.push(expItem);
+
+        if (parsedData.previewRows.length < 5) {
+          parsedData.previewRows.push([
+            expItem.date,
+            desc,
+            category,
+            '₺' + amount.toLocaleString('tr-TR'),
+            type,
+            villa
+          ]);
+        }
+      }
+    });
+  }
+
+  pendingImportData = parsedData;
+  renderImportPreviewBox();
+}
+
+function renderImportPreviewBox() {
+  if (!pendingImportData) return;
+
+  const box = document.getElementById('importPreviewBox');
+  if (!box) return;
+  box.style.display = 'block';
+
+  document.getElementById('importFileName').innerText = pendingImportData.fileName;
+
+  const badge = document.getElementById('importTypeBadge');
+  const stats = document.getElementById('importFileStats');
+
+  if (pendingImportData.mode === 'COMPANY_REPORT') {
+    if (badge) {
+      badge.innerText = '🏆 Şirket Genel Raporu (GENEL RAPOR)';
+      badge.className = 'badge badge-green';
+    }
+    if (stats) stats.innerText = '14 Aylık Finans Özeti, Hedefler ve Gider Kalemleri algılandı.';
+  } else if (pendingImportData.mode === 'BOOKINGS') {
+    if (badge) {
+      badge.innerText = '📋 Rezervasyon Defteri';
+      badge.className = 'badge badge-purple';
+    }
+    if (stats) stats.innerText = pendingImportData.bookings.length + ' adet rezervasyon kaydı algılandı.';
+  } else if (pendingImportData.mode === 'EXPENSES') {
+    if (badge) {
+      badge.innerText = '💸 Gider / Harcama Defteri';
+      badge.className = 'badge badge-amber';
+    }
+    if (stats) stats.innerText = pendingImportData.expenses.length + ' adet gider kaydı algılandı.';
+  }
+
+  // Render Preview Table
+  const thead = document.getElementById('importPreviewTableHead');
+  const tbody = document.getElementById('importPreviewTableBody');
+  if (!thead || !tbody) return;
+
+  thead.innerHTML = '<tr>' + (pendingImportData.previewHeaders || []).map(h => '<th>' + h + '</th>').join('') + '</tr>';
+
+  tbody.innerHTML = '';
+  (pendingImportData.previewRows || []).forEach(row => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = row.map(c => '<td>' + c + '</td>').join('');
+    tbody.appendChild(tr);
+  });
+}
+
+function resetImportPreview() {
+  pendingImportData = null;
+  const box = document.getElementById('importPreviewBox');
+  if (box) box.style.display = 'none';
+  const fileInput = document.getElementById('excelFileInput');
+  if (fileInput) fileInput.value = '';
+}
+
+function applyImportedData() {
+  if (!pendingImportData) {
+    alert('Lütfen önce bir dosya seçin.');
+    return;
+  }
+
+  const strategy = document.getElementById('importStrategySelect')?.value || 'APPEND';
+  const isOverwrite = (strategy === 'OVERWRITE');
+
+  if (pendingImportData.mode === 'COMPANY_REPORT') {
+    restoreExcelData();
+    closeImportModal();
+    alert('✅ Şirket Genel Raporu başarıyla içe aktarıldı ve tüm finansal paneller güncellendi!');
+    return;
+  }
+
+  if (pendingImportData.mode === 'BOOKINGS') {
+    if (pendingImportData.bookings.length === 0) {
+      alert('İçe aktarılacak rezervasyon bulunamadı.');
+      return;
+    }
+
+    if (isOverwrite) {
+      appData.bookings = pendingImportData.bookings;
+    } else {
+      if (!appData.bookings) appData.bookings = [];
+      appData.bookings = appData.bookings.concat(pendingImportData.bookings);
+    }
+
+    const importedCount = pendingImportData.bookings.length;
+    syncBookingCleaningTasks();
+    saveAppData();
+    renderAll();
+    closeImportModal();
+    resetImportPreview();
+    alert('🎉 ' + importedCount + ' adet rezervasyon başarıyla sisteme aktarıldı!');
+    return;
+  }
+
+  if (pendingImportData.mode === 'EXPENSES') {
+    if (pendingImportData.expenses.length === 0) {
+      alert('İçe aktarılacak gider kalemi bulunamadı.');
+      return;
+    }
+
+    if (isOverwrite) {
+      appData.expenses = pendingImportData.expenses;
+    } else {
+      if (!appData.expenses) appData.expenses = [];
+      appData.expenses = appData.expenses.concat(pendingImportData.expenses);
+    }
+
+    const importedCount = pendingImportData.expenses.length;
+    saveAppData();
+    renderAll();
+    closeImportModal();
+    resetImportPreview();
+    alert('🎉 ' + importedCount + ' adet harcama kaydı başarıyla sisteme aktarıldı!');
+    return;
+  }
+}
+
 
 // -------------------------------------------------------------
 // EXISTING DASHBOARD, LEADS, MAINTENANCE & SETTINGS LOGIC
@@ -8157,6 +8517,9 @@ function renderMarketingModule() {
   }
 
   // Direct
+  const elOtaBookingsCiro = document.getElementById('otaBookingsCiroDetail');
+  if (elOtaBookingsCiro) elOtaBookingsCiro.innerText = `${otaCount} Rez (₺${otaGross.toLocaleString('tr-TR')})`;
+
   const elDirectGross = document.getElementById('directGrossCiro');
   if (elDirectGross) elDirectGross.innerText = `₺${directGross.toLocaleString('tr-TR')}`;
   const elDirectBookings = document.getElementById('directBookingsCount');
@@ -8767,7 +9130,9 @@ function runAiListingCritic(inputUrl = null, explicitKey = null) {
     </div>
   `;
 
-  container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (container && typeof container.scrollIntoView === 'function') {
+    container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 }
 
 // =============================================================
