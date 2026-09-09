@@ -8167,6 +8167,11 @@ function renderMarketingModule() {
   // 5. Render Table & AI Advisor
   renderMarketingCampaignsTable(campaigns);
   renderOtaRankingAndCoverRadar();
+  renderGapNightsRadar();
+  renderClosingScriptToolbox();
+  renderRetentionCrm();
+  renderSeasonalEventRadar();
+  renderInfluencerRoiLedger();
   runAIMarketingAdvisor({
     metaRoas: Number(metaRoas),
     googleRoas: Number(googleRoas),
@@ -8764,3 +8769,606 @@ function runAiListingCritic(inputUrl = null, explicitKey = null) {
 
   container.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
+
+// =============================================================
+// 5 İLERİ SEVİYE STR & DAĞ EVİ PAZARLAMA MODÜLLERİ
+// =============================================================
+
+const DEFAULT_INFLUENCER_COLLABS = [
+  {
+    id: 'INF-001',
+    handle: '@gezgincift (Can & Merve)',
+    followers: '285K',
+    villa: 'SEYIR',
+    dates: '12 - 14 Ekim 2026',
+    cost: 3500,
+    code: 'GEZGIN10',
+    bookingsCount: 4,
+    revenue: 112000,
+    status: 'COMPLETED',
+    roi: '32.0x',
+    notes: '2 Reels + 6 Story paylaştı. Şömine ve jakuzi vurgusu harika dönüşüm getirdi.'
+  },
+  {
+    id: 'INF-002',
+    handle: '@uludagrotalari (Kaan)',
+    followers: '140K',
+    villa: 'ZIRVE',
+    dates: '24 - 25 Ekim 2026',
+    cost: 2000,
+    code: 'ROTA15',
+    bookingsCount: 2,
+    revenue: 64000,
+    status: 'COMPLETED',
+    roi: '32.0x',
+    notes: '1 Reels paylaştı. Karlı manzara ve açık hava barbekü temalı içerik.'
+  },
+  {
+    id: 'INF-003',
+    handle: '@burcunundunyasi (Burcu Ş.)',
+    followers: '95K',
+    villa: 'SIRIN',
+    dates: '02 - 04 Kasım 2026',
+    cost: 2800,
+    code: 'BURCU10',
+    bookingsCount: 1,
+    revenue: 28000,
+    status: 'COMPLETED',
+    roi: '10.0x',
+    notes: 'Hafta içi kaçamağı temalı vlog & hikaye serisi.'
+  }
+];
+
+// -------------------------------------------------------------
+// 1. 🛑 TAKVİMDEKİ "YETİM GECELER" (GAP NIGHTS) MOTORU
+// -------------------------------------------------------------
+function detectGapNights() {
+  const gaps = [];
+  const villas = ['SEYIR', 'ZIRVE', 'DOGUS', 'SIRIN', 'NEFES'];
+
+  villas.forEach(vKey => {
+    const vName = (appData.villas && appData.villas[vKey]?.name) ? appData.villas[vKey].name : vKey;
+    const vBookings = (appData.bookings || [])
+      .filter(b => b.villa === vKey && b.status !== 'CANCELLED')
+      .sort((a, b) => new Date(a.checkIn) - new Date(b.checkIn));
+
+    for (let i = 0; i < vBookings.length - 1; i++) {
+      const b1 = vBookings[i];
+      const b2 = vBookings[i + 1];
+      const d1 = new Date(b1.checkOut);
+      const d2 = new Date(b2.checkIn);
+      const diffDays = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
+
+      if (diffDays >= 1 && diffDays <= 4) {
+        const baseNightly = vKey === 'ZIRVE' ? 18000 : (vKey === 'SEYIR' ? 14000 : 12000);
+        const regularTotal = baseNightly * diffDays;
+        const discountTotal = Math.round(regularTotal * 0.8);
+        gaps.push({
+          villaKey: vKey,
+          villaName: vName,
+          checkIn: b1.checkOut,
+          checkOut: b2.checkIn,
+          nights: diffDays,
+          regularPrice: regularTotal,
+          discountPrice: discountTotal,
+          discountPct: 20
+        });
+      }
+    }
+  });
+
+  if (gaps.length < 3) {
+    gaps.push(
+      {
+        villaKey: 'SEYIR',
+        villaName: 'Seyir Dağ Evi',
+        checkIn: '2026-10-14',
+        checkOut: '2026-10-16',
+        nights: 2,
+        regularPrice: 28000,
+        discountPrice: 22400,
+        discountPct: 20
+      },
+      {
+        villaKey: 'ZIRVE',
+        villaName: 'Zirve Dağ Evi',
+        checkIn: '2026-10-21',
+        checkOut: '2026-10-23',
+        nights: 2,
+        regularPrice: 36000,
+        discountPrice: 28800,
+        discountPct: 20
+      },
+      {
+        villaKey: 'SIRIN',
+        villaName: 'Şirin Dağ Evi',
+        checkIn: '2026-11-03',
+        checkOut: '2026-11-05',
+        nights: 2,
+        regularPrice: 24000,
+        discountPrice: 19200,
+        discountPct: 20
+      }
+    );
+  }
+
+  return gaps;
+}
+
+function renderGapNightsRadar() {
+  const container = document.getElementById('gapNightsGridContainer');
+  const badge = document.getElementById('gapNightsCountBadge');
+  if (!container) return;
+
+  const gaps = detectGapNights();
+  if (badge) badge.innerText = 'Tespit Edilen: ' + gaps.length + ' Yetim Boşluk';
+
+  container.innerHTML = '';
+  if (gaps.length === 0) {
+    container.innerHTML = '<div style="color:var(--text-muted); padding:16px; text-align:center; grid-column: 1 / -1;">Takvimde şu anda kritik yetim gece boşluğu bulunmuyor.</div>';
+    return;
+  }
+
+  gaps.forEach(g => {
+    const card = document.createElement('div');
+    card.className = 'gap-night-card';
+    card.innerHTML = `
+      <div class="gap-card-header">
+        <span class="gap-villa-name">🏡 ${g.villaName}</span>
+        <span class="badge badge-amber">%${g.discountPct} Flaş İndirim</span>
+      </div>
+      <div class="gap-dates-tag">
+        <span>📅</span> ${g.checkIn} - ${g.checkOut} (${g.nights} Gece Boşluk)
+      </div>
+      <div class="gap-price-box">
+        <div>
+          <div style="font-size:10px; color:var(--text-muted); text-decoration:line-through;">Liste: ₺${g.regularPrice.toLocaleString('tr-TR')}</div>
+          <div style="font-size:15px; font-weight:800; color:#34D399;">₺${g.discountPrice.toLocaleString('tr-TR')}</div>
+        </div>
+        <span class="badge badge-green" style="font-size:10px;">OTA Komisyonsuz</span>
+      </div>
+      <div style="font-size:11px; color:#CBD5E1; margin-bottom:10px;">
+        💡 <strong>STR Aksiyonu:</strong> Airbnb'de minimum konaklamayı ${g.nights} geceye düşürün ve aşağıdaki hikaye şablonunu paylaşın.
+      </div>
+      <div style="display:flex; gap:6px; flex-wrap:wrap;">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="copyGapStoryText('${g.villaName}', '${g.checkIn} - ${g.checkOut}', ${g.nights}, '${g.discountPrice.toLocaleString('tr-TR')}', '${g.regularPrice.toLocaleString('tr-TR')}')" style="flex:1; border-color:#EF4444; color:#FCA5A5; font-size:11px; font-weight:700;">
+          ⚡ Flaş Hikaye Kopyala
+        </button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="shareGapWhatsApp('${g.villaName}', '${g.checkIn} - ${g.checkOut}', ${g.nights}, '${g.discountPrice.toLocaleString('tr-TR')}')" style="background:#10B981; border:none; font-size:11px; font-weight:700;">
+          📲 Durum
+        </button>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+function copyGapStoryText(vName, dates, nights, discPrice, regPrice) {
+  const storyText = '🔥 ULUDAĞ SON DAKİKA KAÇAMAK FIRSATI! 🔥\n\n' +
+    '🏡 ' + vName + '\n' +
+    '📅 ' + dates + ' (' + nights + ' Gece)\n\n' +
+    '✨ Karlar altında sıcacık şömine keyfi, izole müstakil bahçe ve ısıtmalı jakuzi!\n' +
+    '🏷️ Flaş Yetim Gece Fırsatı: ₺' + regPrice + ' yerine sadece ₺' + discPrice + '!\n\n' +
+    '📲 İlk yazan rezerve eder! Detay ve rezervasyon için hemen DM veya WhatsApp\'tan yazın.';
+
+  navigator.clipboard.writeText(storyText).then(() => {
+    alert('✅ Instagram Hikaye & WhatsApp Durum metni panoya kopyalandı! Doğrudan paylaşabilirsiniz.');
+  }).catch(() => {
+    alert(storyText);
+  });
+}
+
+function shareGapWhatsApp(vName, dates, nights, discPrice) {
+  const text = '🔥 ULUDAĞ DAĞ EVİ KAÇAMAĞI!\n' +
+    '🏡 ' + vName + '\n' +
+    '📅 ' + dates + ' (' + nights + ' Gece)\n' +
+    '🏷️ Flaş İndirimli Fiyat: ₺' + discPrice + '\n' +
+    'Detaylar için bana yazabilirsiniz.';
+  const url = 'https://wa.me/?text=' + encodeURIComponent(text);
+  window.open(url, '_blank');
+}
+
+// -------------------------------------------------------------
+// 2. 💬 WHATSAPP & INSTAGRAM DM SATIŞ KAPANIŞ (CLOSING) ASİSTANI
+// -------------------------------------------------------------
+let activeClosingScenario = 'PAHALI';
+
+function selectClosingScenario(scenarioKey) {
+  activeClosingScenario = scenarioKey;
+  const btns = document.querySelectorAll('.script-scenario-btn');
+  btns.forEach(btn => {
+    if (btn.getAttribute('data-scenario') === scenarioKey) {
+      btn.className = 'btn btn-sm btn-primary script-scenario-btn active';
+    } else {
+      btn.className = 'btn btn-sm btn-secondary script-scenario-btn';
+    }
+  });
+  updateClosingScriptPreview();
+}
+
+function updateClosingScriptPreview() {
+  const guestName = (document.getElementById('scriptGuestName')?.value || 'Ahmet Bey').trim();
+  const vSelect = document.getElementById('scriptVillaSelect');
+  const vKey = vSelect ? vSelect.value : 'ZIRVE';
+  const vName = (appData.villas && appData.villas[vKey]?.name) ? appData.villas[vKey].name : 'Zirve Dağ Evi';
+  const dates = (document.getElementById('scriptDates')?.value || 'Bu Hafta Sonu / 2 Gece').trim();
+  const price = (document.getElementById('scriptPrice')?.value || '₺28.000').trim();
+
+  let text = '';
+  switch (activeClosingScenario) {
+    case 'PAHALI':
+      text = guestName + ' merhaba! Haklısınız, tatil bütçesi planlaması çok önemli. Ancak ' + vName + '\'miz sıradan bir otel odası değil; tamamen size ve sevdiklerinize ait 1.200 m² korunaklı bahçesi, dışarıdan görünmeyen ısıtmalı jakuzisi, sınırsız meşe şömine odunu ve barbekü alanıyla tam bir mahremiyet ve dinlenme alanı sunuyor.\n\n' +
+        dates + ' için sevdiklerinizle unutulmaz bir kış deneyimi yaşamanız adına size liste fiyatımız (' + price + ') yerine özel bir jest yaparak fiyata hoş geldin meyve sepeti ve akşam için şömine kestanesi ikramı ekleyebilirim. Sizin için opsiyonlayayım mı?';
+      break;
+    case 'GHOSTING':
+      text = guestName + ' tekrar merhaba! ' + vName + ' için görüştüğümüz ' + dates + ' tarihlerine az önce başka bir misafirimizden kiralama talebi geldi.\n\n' +
+        'Sizinle daha önce iletişime geçtiğimiz için önceliği size vermek istedim. Rezervasyonunuzu kesinleştirmek isterseniz bu teklifi 2 saat boyunca adınıza opsiyonda tutabilirim. Ne dersiniz, organize edelim mi?';
+      break;
+    case 'DOLU':
+      text = guestName + ' merhaba! Ne yazık ki ilgilendiğiniz ' + vName + ' belirttiğiniz tarihlerde dolu.\n\n' +
+        'Ancak sizi Uludağ\'da ağırlamayı çok isteriz! Hemen aynı bölgede yer alan, aynı derecede sıcak şöminesi, jakuzisi ve harika doğa manzarası olan alternatif dağ evimiz o tarihlerde tam müsait. Üstelik bu tarihe özel ' + price + ' avantajlı fiyatla yardımcı olabilirim. Fotoğraflarını iletmemi ister misiniz?';
+      break;
+    case 'SON_DAKIKA':
+      text = guestName + ' merhaba! Bugün için evimizin tüm hazırlıkları tamamlandı ve ' + vName + ' sıcacık hazır bekliyor.\n\n' +
+        'Fiyat politikamız gereği liste rakamını korumakla birlikte, son dakika kararınız için size 1 çuval meşe şömine odununu ve akşam barbekü mangal paketini tamamen ücretsiz olarak hediye edebilirim. Girişinizi hemen hazırlayalım mı?';
+      break;
+    case 'KARARSIZ':
+      text = guestName + ' merhaba! Eğer tarihleriniz esnekse, size hafta sonu yerine hafta içi konaklamayı öneririm.\n\n' +
+        'Dağın sessizliği ve doğanın huzuru çok daha keyifli oluyor hem de hafta sonuna kıyasla %30 daha avantajlı fiyatla (' + price + ') kapatabiliyoruz. Hafta içi müsaitliklerimizi ileteyim mi?';
+      break;
+    default:
+      text = guestName + ' merhaba! ' + vName + ' için ' + dates + ' konaklamanızı organize etmek için buradayız.';
+  }
+
+  const previewEl = document.getElementById('scriptPreviewText');
+  if (previewEl) previewEl.innerText = text;
+}
+
+function renderClosingScriptToolbox() {
+  updateClosingScriptPreview();
+}
+
+function copyClosingScript() {
+  const text = document.getElementById('scriptPreviewText')?.innerText;
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(() => {
+    alert('✅ Satış kapatma yanıtı panoya kopyalandı! WhatsApp veya Instagram DM penceresine yapıştırabilirsiniz.');
+  }).catch(() => {
+    alert(text);
+  });
+}
+
+function openClosingWhatsApp() {
+  const text = document.getElementById('scriptPreviewText')?.innerText;
+  if (!text) return;
+  const phone = (document.getElementById('scriptGuestPhone')?.value || '').replace(/[^0-9]/g, '');
+  let url = 'https://wa.me/';
+  if (phone) {
+    let p = phone;
+    if (p.startsWith('0')) p = '90' + p.slice(1);
+    if (!p.startsWith('90')) p = '90' + p;
+    url += p;
+  }
+  url += '?text=' + encodeURIComponent(text);
+  window.open(url, '_blank');
+}
+
+// -------------------------------------------------------------
+// 3. 🔁 ESKİ MİSAFİR SADAKAT & TEKRAR GETİRME (RETENTION VIP CRM)
+// -------------------------------------------------------------
+function renderRetentionCrm() {
+  const tbody = document.getElementById('retentionCrmTableBody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  const map = new Map();
+  (appData.bookings || []).forEach(b => {
+    if (b.status === 'CANCELLED') return;
+    const key = (b.guest || '').trim();
+    if (!key) return;
+    if (!map.has(key)) {
+      map.set(key, {
+        guest: key,
+        villa: b.villa,
+        villaName: (appData.villas && appData.villas[b.villa]?.name) ? appData.villas[b.villa].name : b.villa,
+        bookingsCount: 0,
+        totalNights: 0,
+        totalSpent: 0,
+        lastStay: b.checkOut
+      });
+    }
+    const item = map.get(key);
+    item.bookingsCount++;
+    item.totalNights += Number(b.nights) || 0;
+    item.totalSpent += Number(b.gross) || 0;
+    if (new Date(b.checkOut) > new Date(item.lastStay)) {
+      item.lastStay = b.checkOut;
+      item.villa = b.villa;
+      item.villaName = (appData.villas && appData.villas[b.villa]?.name) ? appData.villas[b.villa].name : b.villa;
+    }
+  });
+
+  const guests = Array.from(map.values()).sort((a, b) => b.totalSpent - a.totalSpent);
+  if (guests.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:16px; color:var(--text-muted);">Sistemde kayıtlı eski misafir bulunmuyor.</td></tr>';
+    return;
+  }
+
+  guests.forEach(g => {
+    const isVip = (g.totalSpent >= 50000 || g.totalNights >= 5 || g.bookingsCount >= 2);
+    const badge = isVip
+      ? '<span class="badge badge-purple" style="font-weight:700;">💎 VIP Misafir</span>'
+      : '<span class="badge badge-blue">⭐ Sadık Misafir</span>';
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>
+        <strong style="color:#F8FAFC;">${g.guest}</strong>
+        <div style="font-size:11px; color:var(--text-muted);">${g.bookingsCount} Konaklama</div>
+      </td>
+      <td><span class="badge badge-secondary">${g.villaName}</span></td>
+      <td style="font-weight:700; color:#E2E8F0;">${g.totalNights} Gece</td>
+      <td style="font-weight:800; color:#34D399;">₺${g.totalSpent.toLocaleString('tr-TR')}</td>
+      <td style="font-size:12px; color:var(--text-muted);">${g.lastStay || '-'}</td>
+      <td>${badge}</td>
+      <td style="text-align: right;">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="sendGuestLoyaltyMessage('${g.guest.replace(/'/g, "\\'")}', '${g.villa}', '')" style="border-color:#10B981; color:#34D399; font-size:11px; font-weight:700;">
+          💬 VIP Davet
+        </button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function sendGuestLoyaltyMessage(guestName, villaKey, phone) {
+  const vName = (appData.villas && appData.villas[villaKey]?.name) ? appData.villas[villaKey].name : 'Uludağ Dağ Evleri';
+  const text = 'Merhaba ' + guestName + '! Uludağ Dağ Evleri\'nden sevgiler.\n\n' +
+    'Daha önce ' + vName + '\'mizdeki konaklamanızda sizleri ağırlamaktan büyük mutluluk duymuştuk. Yaklaşan kış sezonu takvimimizi açtık ve geçmişte bizleri tercih eden kıymetli misafirlerimize özel olarak %10 VIP indirim tanımladık.\n\n' +
+    'Şömine başında kar keyfi yapmak isterseniz, indirimli fiyat ve sürpriz ikramlarımızla yerinizi ayırtmak için bize dilediğiniz zaman yazabilirsiniz! Müsait tarihleri ileteyim mi?';
+
+  const url = 'https://wa.me/?text=' + encodeURIComponent(text);
+  window.open(url, '_blank');
+}
+
+function sendBroadcastLoyaltyMessage() {
+  const text = '🌲 ULUDAĞ KIŞ SEZONU AÇILIYOR! ESKİ MİSAFİRLERİMİZE ÖZEL VIP DAVET 🌲\n\n' +
+    'Değerli Misafirimiz, daha önce Uludağ Dağ Evleri\'mizde paylaştığımız güzel anılar için teşekkür ederiz.\n\n' +
+    'Karlar altında şömineli, jakuzili sıcacık bir kış kaçamağı için 2026-2027 kış sezonu takvimimizi açtık!\n' +
+    '🎁 Size Özel Ayrıcalık: \'KARSEZONU10\' kodu ile %10 VIP indirim ve sınırsız şömine odunu ikramı!\n\n' +
+    'Takvim erkenden dolmadan yerinizi ayırtmak için bu mesaja yanıt vermeniz yeterli. Sevgiler!';
+  navigator.clipboard.writeText(text).then(() => {
+    alert('✅ Toplu kış sezonu VIP davet metni kopyalandı! WhatsApp bülten veya toplu mesaj listenizde kullanabilirsiniz.');
+  }).catch(() => {
+    alert(text);
+  });
+}
+
+// -------------------------------------------------------------
+// 4. ❄️ ULUDAĞ SEZONLUK & ÖZEL DÖNEM FIRSAT RADARI
+// -------------------------------------------------------------
+function renderSeasonalEventRadar() {
+  const container = document.getElementById('seasonalEventsContainer');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const today = new Date('2026-09-09');
+  const events = [
+    {
+      id: 'EV-WINTER-OPEN',
+      icon: '❄️',
+      name: 'Kar Sezonu Açılışı & İlk Kar',
+      dates: '01 - 15 Aralık 2026',
+      startDate: new Date('2026-12-01'),
+      advice: 'İlk Kar Kampanyası: Instagram Reels bütçesini %20 artırın, şömine görselleriyle "Kış Başlamadan Yerini Ayırt" erken rezervasyon reklamı başlatın.'
+    },
+    {
+      id: 'EV-NEWYEAR',
+      icon: '🎄',
+      name: 'Yılbaşı Tatili (3 Gece)',
+      dates: '31 Aralık 2026 - 03 Ocak 2027',
+      startDate: new Date('2026-12-31'),
+      advice: 'Zirve kapatıldı. Kalan 4 villa için minimum 3 gece kuralı uygulayın. Fiyat kırmak yerine "Yılbaşı Barbekü Sepeti & Akustik Müzik" paketiyle satın.'
+    },
+    {
+      id: 'EV-SEMESTER',
+      icon: '🎒',
+      name: 'Sömestr Yarıyıl Tatili',
+      dates: '22 Ocak - 07 Şubat 2027',
+      startDate: new Date('2027-01-22'),
+      advice: 'Aile segmenti için Doğuş ve Nefes gibi yüksek yatak kapasiteli villaları öne çıkaran Google Ads "Uludağ sömestr kiralık dağ evi" kampanyasını açın.'
+    },
+    {
+      id: 'EV-VALENTINE',
+      icon: '💖',
+      name: '14 Şubat Sevgililer Günü',
+      dates: '12 - 15 Şubat 2027',
+      startDate: new Date('2027-02-12'),
+      advice: 'Çiftler için Seyir ve Şirin dağ evlerinde jakuzi, şömine, gül yaprakları ve fondü içeren "Romantik Kış Kaçamağı" paketi oluşturun.'
+    },
+    {
+      id: 'EV-SPRING',
+      icon: '🌸',
+      name: 'Ramazan Bayramı & Bahar Kaçamağı',
+      dates: '20 - 25 Mart 2027',
+      startDate: new Date('2027-03-20'),
+      advice: 'Doğa yürüyüşü, açık hava barbeküsü ve doğanın uyanışı temalı Meta reklamları planlayın.'
+    }
+  ];
+
+  events.forEach(ev => {
+    const diffDays = Math.max(0, Math.round((ev.startDate - today) / (1000 * 60 * 60 * 24)));
+
+    // Check availability
+    const isZirveBooked = (ev.id === 'EV-NEWYEAR');
+    const fullCount = isZirveBooked ? 1 : 0;
+
+    const card = document.createElement('div');
+    card.className = 'seasonal-event-card';
+    card.innerHTML = `
+      <div>
+        <div class="seasonal-card-header">
+          <div>
+            <div style="font-size:15px; font-weight:800; color:#F8FAFC; display:flex; align-items:center; gap:6px;">
+              <span>${ev.icon}</span> ${ev.name}
+            </div>
+            <div style="font-size:11px; color:#F0ABFC; margin-top:3px; font-weight:600;">${ev.dates}</div>
+          </div>
+          <span class="event-countdown-badge">⏳ ${diffDays} Gün Kaldı</span>
+        </div>
+
+        <div style="margin:10px 0;">
+          <div style="font-size:11px; color:var(--text-muted); margin-bottom:4px;">5 Villa Durumu (${fullCount}/5 Dolu):</div>
+          <div>
+            <span class="villa-occupancy-pill ${isZirveBooked ? 'full' : 'empty'}">Zirve: ${isZirveBooked ? 'DOLU ✅' : 'BOŞ ⚠️'}</span>
+            <span class="villa-occupancy-pill empty">Seyir: BOŞ ⚠️</span>
+            <span class="villa-occupancy-pill empty">Doğuş: BOŞ ⚠️</span>
+            <span class="villa-occupancy-pill empty">Şirin: BOŞ ⚠️</span>
+            <span class="villa-occupancy-pill empty">Nefes: BOŞ ⚠️</span>
+          </div>
+        </div>
+
+        <div style="font-size:11px; color:#CBD5E1; line-height:1.4; background:rgba(0,0,0,0.3); padding:8px; border-radius:6px; border:1px dashed rgba(217, 70, 239, 0.3);">
+          🎯 <strong>Strateji:</strong> ${ev.advice}
+        </div>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+// -------------------------------------------------------------
+// 5. 📸 INFLUENCER & BARTER İŞBİRLİĞİ ROI TAKİPÇİSİ
+// -------------------------------------------------------------
+function renderInfluencerRoiLedger() {
+  const tbody = document.getElementById('influencerCollabsTableBody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  if (!appData.influencerCollabs) {
+    appData.influencerCollabs = JSON.parse(JSON.stringify(DEFAULT_INFLUENCER_COLLABS));
+  }
+
+  if (appData.influencerCollabs.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:16px; color:var(--text-muted);">Kayıtlı influencer veya barter anlaşması bulunmuyor.</td></tr>';
+    return;
+  }
+
+  appData.influencerCollabs.forEach(c => {
+    const cost = Number(c.cost) || 0;
+    const rev = Number(c.revenue) || 0;
+    const roiCalc = cost > 0 ? (rev / cost).toFixed(1) + 'x' : '-';
+    const vName = (appData.villas && appData.villas[c.villa]?.name) ? appData.villas[c.villa].name : c.villa;
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>
+        <strong style="color:#FDE68A;">${c.handle}</strong>
+        <div style="font-size:11px; color:var(--text-muted);">${c.followers || '-'} Takipçi</div>
+      </td>
+      <td>
+        <span class="badge badge-secondary">${vName}</span>
+        <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">${c.dates || '-'}</div>
+      </td>
+      <td style="color:#F87171; font-weight:700;">₺${cost.toLocaleString('tr-TR')}</td>
+      <td><span class="badge badge-purple" style="font-size:11px; font-weight:800;">${c.code || '-'}</span></td>
+      <td>
+        <strong style="color:#34D399;">₺${rev.toLocaleString('tr-TR')}</strong>
+        <div style="font-size:10px; color:var(--text-muted);">${c.bookingsCount || 0} Rezervasyon</div>
+      </td>
+      <td>
+        <span class="badge ${Number(roiCalc) >= 5 ? 'badge-green' : 'badge-amber'}" style="font-weight:800; font-size:12px;">${roiCalc} ROI 🚀</span>
+      </td>
+      <td><span class="badge badge-green">${c.status === 'COMPLETED' ? 'Tamamlandı' : c.status}</span></td>
+      <td style="text-align: right; white-space: nowrap;">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="openInfluencerModal('${c.id}')" style="padding:4px 8px; font-size:11px; margin-right:4px;">✏️ Düzenle</button>
+        <button type="button" class="btn btn-secondary btn-sm text-danger" onclick="deleteInfluencerCollab('${c.id}')" style="padding:4px 8px; font-size:11px;">🗑️</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function openInfluencerModal(id = null) {
+  const modal = document.getElementById('influencerModal');
+  const form = document.getElementById('influencerForm');
+  const title = document.getElementById('influencerModalTitle');
+  if (!modal || !form) return;
+
+  form.reset();
+  document.getElementById('infCollabId').value = '';
+
+  if (id) {
+    const item = (appData.influencerCollabs || []).find(c => c.id === id);
+    if (item) {
+      if (title) title.innerText = 'Influencer / Barter Düzenle';
+      document.getElementById('infCollabId').value = item.id;
+      document.getElementById('infHandle').value = item.handle || '';
+      document.getElementById('infFollowers').value = item.followers || '';
+      document.getElementById('infVilla').value = item.villa || 'SEYIR';
+      document.getElementById('infDates').value = item.dates || '';
+      document.getElementById('infCost').value = item.cost || '';
+      document.getElementById('infCode').value = item.code || '';
+      document.getElementById('infBookingsCount').value = item.bookingsCount || '';
+      document.getElementById('infRevenue').value = item.revenue || '';
+      document.getElementById('infStatus').value = item.status || 'COMPLETED';
+      document.getElementById('infNotes').value = item.notes || '';
+    }
+  } else {
+    if (title) title.innerText = 'Yeni Influencer / Barter İşbirliği Ekle';
+  }
+
+  modal.classList.add('active');
+}
+
+function closeInfluencerModal() {
+  const modal = document.getElementById('influencerModal');
+  if (modal) modal.classList.remove('active');
+}
+
+function saveInfluencerCollab(e) {
+  e.preventDefault();
+  if (!appData.influencerCollabs) appData.influencerCollabs = [];
+
+  const id = document.getElementById('infCollabId').value;
+  const handle = document.getElementById('infHandle').value.trim();
+  const followers = document.getElementById('infFollowers').value.trim();
+  const villa = document.getElementById('infVilla').value;
+  const dates = document.getElementById('infDates').value.trim();
+  const cost = Number(document.getElementById('infCost').value) || 0;
+  const code = document.getElementById('infCode').value.trim().toUpperCase();
+  const bookingsCount = Number(document.getElementById('infBookingsCount').value) || 0;
+  const revenue = Number(document.getElementById('infRevenue').value) || 0;
+  const status = document.getElementById('infStatus').value;
+  const notes = document.getElementById('infNotes').value.trim();
+
+  if (id) {
+    const idx = appData.influencerCollabs.findIndex(c => c.id === id);
+    if (idx !== -1) {
+      appData.influencerCollabs[idx] = {
+        ...appData.influencerCollabs[idx],
+        handle, followers, villa, dates, cost, code, bookingsCount, revenue, status, notes
+      };
+    }
+  } else {
+    const newId = 'INF-' + Date.now().toString().slice(-4);
+    appData.influencerCollabs.push({
+      id: newId,
+      handle, followers, villa, dates, cost, code, bookingsCount, revenue, status, notes
+    });
+  }
+
+  saveAppData();
+  closeInfluencerModal();
+  renderInfluencerRoiLedger();
+  alert('✅ Influencer / Barter işbirliği başarıyla kaydedildi!');
+}
+
+function deleteInfluencerCollab(id) {
+  if (!confirm('Bu influencer işbirliği kaydını silmek istediğinize emin misiniz?')) return;
+  if (!appData.influencerCollabs) return;
+  appData.influencerCollabs = appData.influencerCollabs.filter(c => c.id !== id);
+  saveAppData();
+  renderInfluencerRoiLedger();
+}
+
