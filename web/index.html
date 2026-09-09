@@ -100,16 +100,20 @@
       <form id="saasLoginForm" onsubmit="handleSaaSLogin(event)" style="display: block;">
         <div class="form-group" style="margin-bottom: 12px; text-align: left;">
           <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Kullanıcı Adı veya E-posta:</label>
-          <input type="text" id="saasLoginUser" placeholder="Örn: ute veya e-posta adresiniz" required autocomplete="username" style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 13px;">
+          <input type="text" id="saasLoginUser" placeholder="Örn: lexbnb veya e-posta adresiniz" required autocomplete="username" style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 13px;">
         </div>
         <div class="form-group" style="margin-bottom: 14px; text-align: left;">
           <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Şifre:</label>
-          <input type="password" id="saasLoginPass" placeholder="Şifrenizi giriniz" required autocomplete="current-password" style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 13px;">
+          <input type="password" id="saasLoginPass" placeholder="Örn: lexbnb" required autocomplete="current-password" style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 13px;">
         </div>
 
         <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 800; font-size: 14px; background: linear-gradient(135deg, #8B5CF6, #6D28D9); border: none; border-radius: 8px;">
           🔓 Hesabıma Giriş Yap
         </button>
+
+        <div style="background: rgba(139, 92, 246, 0.12); border: 1px dashed rgba(139, 92, 246, 0.35); border-radius: 6px; padding: 8px 10px; margin-top: 10px; font-size: 11px; color: #DDD6FE; text-align: center;">
+          💡 <strong>Hızlı Demo Girişi:</strong> Kullanıcı Adı: <code style="background: rgba(0,0,0,0.4); padding: 1px 5px; border-radius: 3px; color: #FDE68A; font-weight: 700;">lexbnb</code> &bull; Şifre: <code style="background: rgba(0,0,0,0.4); padding: 1px 5px; border-radius: 3px; color: #FDE68A; font-weight: 700;">lexbnb</code>
+        </div>
 
         <div id="authErrorMessage" class="auth-error-msg" style="display: none; margin-top: 10px;">
           ⚠️ Hatalı kullanıcı adı veya şifre! Lütfen tekrar deneyin.
@@ -150,7 +154,7 @@
       <!-- Hızlı Kurumsal Demo Girişi (UTE) -->
       <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.1);">
         <button type="button" class="btn btn-secondary" onclick="loginWithUteDemo()" style="width: 100%; padding: 10px; font-size: 12px; font-weight: 700; border-color: #F59E0B; color: #FDE68A; background: rgba(245, 158, 11, 0.08); display: flex; align-items: center; justify-content: center; gap: 6px;">
-          <span>🌟</span> Uludağ Tatil Evleri (Resmi Kurumsal Demo) ile Giriş Yap
+          <span>🌟</span> LexBnB Demo Hesabı ile 1-Tıkla Giriş Yap
         </button>
         <div style="font-size: 11px; color: var(--text-muted); margin-top: 8px; text-align: center;">
           Şirket yöneticisinin özel linkiyle geldiyseniz otomatik açılır.
@@ -165,7 +169,7 @@
       <div class="brand-logo">🌲 LEXBNB</div>
       <div class="brand-meta">
         <h1>KONTROL MERKEZİ V5</h1>
-        <p>Uludağ Tatil Evleri • Finansal Performans & Yönetim</p>
+        <p id="brandSubTitle">Kısa Dönem Kiralama & Finansal Performans Portalı</p>
       </div>
     </div>
 
@@ -369,12 +373,12 @@
       <!-- Dropdown 3: SaaS Kullanıcı Hesabı & Profil -->
       <div class="header-dropdown-wrap">
         <button type="button" class="btn btn-secondary" onclick="toggleHeaderDropdown('userProfileMenu')" id="userProfileBtn" style="border-color: #8B5CF6; color: #DDD6FE; font-weight: 700;">
-          <span id="headerUserAvatar">👤</span> <span id="headerCompanyName">Uludağ Tatil Evleri</span> <span style="font-size: 10px; margin-left: 2px;">▼</span>
+          <span id="headerUserAvatar">👤</span> <span id="headerCompanyName">LexBnB Portföyü</span> <span style="font-size: 10px; margin-left: 2px;">▼</span>
         </button>
         <div class="header-dropdown-menu" id="userProfileMenu" style="min-width: 220px;">
           <div style="padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,0.08); background: rgba(139, 92, 246, 0.1);">
-            <div style="font-size: 13px; font-weight: 800; color: #F8FAFC;" id="menuCompanyTitle">Uludağ Tatil Evleri</div>
-            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;" id="menuUserEmail">admin@uludagtatilevleri.com</div>
+            <div style="font-size: 13px; font-weight: 800; color: #F8FAFC;" id="menuCompanyTitle">LexBnB Portföyü</div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;" id="menuUserEmail">demo@lexbnb.com</div>
             <span class="badge badge-purple" id="menuPlanBadge" style="margin-top: 6px; font-size: 10px;">Enterprise Plan 🚀</span>
           </div>
           <button type="button" class="dropdown-item" onclick="openPropertyModal(); closeAllHeaderDropdowns();">
@@ -394,8 +398,8 @@
           <button type="button" class="dropdown-item" onclick="loginWithUteDemo(); closeAllHeaderDropdowns();">
             <span class="dropdown-icon">🌟</span>
             <div>
-              <strong>UTE Resmi Demo Hesabı</strong>
-              <small>Uludağ Tatil Evleri verilerine geç</small>
+              <strong>LexBnB Demo Hesabı</strong>
+              <small>Tüm örnek mülk ve verilere geç</small>
             </div>
           </button>
           <div class="dropdown-divider"></div>

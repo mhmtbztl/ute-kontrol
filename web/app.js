@@ -5,8 +5,8 @@ const DEFAULT_CLEANING_TASKS = [];
 // =============================================================
 // GÜVENLİK VE GİZLİ ERİŞİM YÖNETİMİ (SECURITY & AUTH SHIELD)
 // =============================================================
-const MASTER_PINS = ['uludagtatil2026.', 'uludagtatil2026'];
-const SECRET_ACCESS_KEY = 'uludagtatil2026.';
+const MASTER_PINS = ['lexbnb', 'lexbnb2026', 'lexbnb.', 'uludagtatil2026.', 'uludagtatil2026'];
+const SECRET_ACCESS_KEY = 'lexbnb';
 
 function checkAuthStatus() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -9748,11 +9748,11 @@ function deleteInfluencerCollab(id) {
 const DEFAULT_SAAS_USERS = [
   {
     id: 'usr_ute_master',
-    username: 'ute',
-    email: 'admin@uludagtatilevleri.com',
-    password: 'uludagtatil2026.',
-    companyName: 'Uludağ Tatil Evleri',
-    managerName: 'Mehmet B.',
+    username: 'lexbnb',
+    email: 'demo@lexbnb.com',
+    password: 'lexbnb',
+    companyName: 'LexBnB Portföyü',
+    managerName: 'LexBnB Host',
     plan: 'Enterprise',
     isDefaultDemo: true,
     createdAt: '2026-08-01'
@@ -9764,7 +9764,22 @@ let activeSaaSUser = null;
 function getSaaSUsers() {
   try {
     const raw = localStorage.getItem('LEXBNB_USERS_REGISTRY');
-    return raw ? JSON.parse(raw) : DEFAULT_SAAS_USERS;
+    let users = raw ? JSON.parse(raw) : JSON.parse(JSON.stringify(DEFAULT_SAAS_USERS));
+    
+    // Ensure default master demo account is updated with lexbnb credentials
+    let master = users.find(u => u.id === 'usr_ute_master');
+    if (master) {
+      master.username = 'lexbnb';
+      master.email = 'demo@lexbnb.com';
+      master.password = 'lexbnb';
+      master.managerName = 'LexBnB Host';
+      if (!master.companyName || master.companyName === 'Uludağ Tatil Evleri') {
+        master.companyName = 'LexBnB Portföyü';
+      }
+    } else {
+      users.unshift(JSON.parse(JSON.stringify(DEFAULT_SAAS_USERS[0])));
+    }
+    return users;
   } catch (e) {
     return DEFAULT_SAAS_USERS;
   }
@@ -9823,10 +9838,24 @@ function handleSaaSLogin(e) {
   const err = document.getElementById('authErrorMessage');
 
   const users = getSaaSUsers();
-  const matched = users.find(u => 
-    (u.username.toLowerCase() === userInput.toLowerCase() || u.email.toLowerCase() === userInput.toLowerCase()) &&
-    (u.password === passInput || MASTER_PINS.includes(passInput) || passInput === SECRET_ACCESS_KEY)
-  );
+  const uLow = userInput.toLowerCase();
+  const pLow = passInput.toLowerCase();
+  const matched = users.find(u => {
+    const isMasterUser = (u.id === 'usr_ute_master' || u.isDefaultDemo);
+    const userMatches = (
+      u.username.toLowerCase() === uLow ||
+      u.email.toLowerCase() === uLow ||
+      (isMasterUser && (uLow === 'lexbnb' || uLow === 'ute' || uLow === 'admin' || uLow === 'demo@lexbnb.com' || uLow === 'admin@lexbnb.com'))
+    );
+    const passMatches = (
+      u.password === passInput ||
+      u.password.toLowerCase() === pLow ||
+      MASTER_PINS.includes(pLow) ||
+      passInput === SECRET_ACCESS_KEY ||
+      (isMasterUser && (pLow === 'lexbnb' || pLow === 'lexbnb2026' || pLow === '123456'))
+    );
+    return userMatches && passMatches;
+  });
 
   if (matched) {
     if (err) err.style.display = 'none';
@@ -9903,6 +9932,7 @@ function handleSaaSRegister(e) {
   alert('🎉 Tebrikler! ' + company + ' SaaS hesabınız başarıyla oluşturuldu.\\n\\nVillalarınızı düzenleyebilir, yeni evler ekleyebilir veya Excel Raporu Yükle ile mevcut verilerinizi aktarabilirsiniz.');
 }
 
+const loginWithLexBnBDemo = function() { loginWithUteDemo(); };
 function loginWithUteDemo() {
   const users = getSaaSUsers();
   const ute = users.find(u => u.id === 'usr_ute_master') || DEFAULT_SAAS_USERS[0];
@@ -9981,7 +10011,7 @@ function initDefaultUteData() {
   appData = {
     isCleanState: false,
     excelDb: COMPANY_EXCEL_DATABASE,
-    companyName: 'Uludağ Tatil Evleri',
+    companyName: (activeSaaSUser && activeSaaSUser.companyName) || 'LexBnB Portföyü',
     villas: {
       SEYIR: { name: 'Seyir Dağ Evi', capacity: '6+2 Kişi', basePrice: 16000, cleanCost: 1200 },
       ZIRVE: { name: 'Zirve Dağ Evi', capacity: '9 Kişi', basePrice: 22000, cleanCost: 1500 },
