@@ -8,7 +8,7 @@ const DEFAULT_CLEANING_TASKS = [];
 const MASTER_PINS = ['lexbnb', 'lexbnb2026', 'lexbnb.', 'uludagtatil2026.', 'uludagtatil2026'];
 const SECRET_ACCESS_KEY = 'lexbnb';
 
-function checkAuthStatus() {
+async function checkAuthStatus() {
   const urlParams = new URLSearchParams(window.location.search);
   const keyParam = urlParams.get('key') || urlParams.get('auth') || urlParams.get('token');
 
@@ -18,9 +18,19 @@ function checkAuthStatus() {
     return true;
   }
 
-  // 2. Active Session or Remember Me check
+  // 2. Try restoring Supabase Cloud Session
+  if (window.checkCloudSession) {
+    const restored = await window.checkCloudSession();
+    if (restored) return true;
+  }
+
+  // 3. Active Session or Remember Me check
   const activeUserId = sessionStorage.getItem('LEXBNB_ACTIVE_USER_ID') || localStorage.getItem('LEXBNB_REMEMBER_USER_ID');
   if (activeUserId) {
+    if (activeUserId === 'usr_ute_master') {
+      loginWithUteDemo();
+      return true;
+    }
     const users = getSaaSUsers();
     const user = users.find(u => u.id === activeUserId);
     if (user) {
@@ -29,7 +39,7 @@ function checkAuthStatus() {
     }
   }
 
-  // 3. Otherwise show SaaS Auth Screen
+  // 4. Otherwise show SaaS Auth Screen
   showLockOverlay();
   return false;
 }
@@ -2949,6 +2959,66 @@ function loadAppData() {
   }
 }
 
+let cloudSyncDebounceTimer = null;
+function syncActiveTenantToCloud(tenantId) {
+  if (cloudSyncDebounceTimer) clearTimeout(cloudSyncDebounceTimer);
+  cloudSyncDebounceTimer = setTimeout(async () => {
+    if (!supabaseClient || !tenantId) return;
+    try {
+      if (appData.villas) {
+        const vKeys = Object.keys(appData.villas);
+        for (const vKey of vKeys) {
+          const v = appData.villas[vKey];
+          await supabaseClient.from('properties').upsert({
+            tenant_id: tenantId,
+            slug: vKey,
+            name: v.name || vKey,
+            capacity: v.capacity || '6-8 Kişilik',
+            base_price: v.basePrice || v.adr || 20000,
+            clean_cost: v.cleanCost || 1500,
+            amenities: v.amenities || '',
+            url: v.url || '',
+            created_by: activeSaaSUser?.id
+          }, { onConflict: 'tenant_id, slug' });
+        }
+      }
+
+      const { data: dbProps } = await supabaseClient.from('properties').select('id, slug').eq('tenant_id', tenantId);
+      const propMap = {};
+      (dbProps || []).forEach(p => { propMap[p.slug] = p.id; });
+
+      if (appData.bookings && appData.bookings.length > 0) {
+        for (const b of appData.bookings) {
+          const pId = propMap[b.villa] || Object.values(propMap)[0];
+          if (!pId) continue;
+          const bCode = b.code || b.id;
+          await supabaseClient.from('bookings').upsert({
+            tenant_id: tenantId,
+            property_id: pId,
+            booking_code: bCode,
+            guest_name: b.guest || 'Misafir',
+            guest_phone: b.phone || '',
+            channel: b.channel || 'Direct',
+            check_in: b.checkIn,
+            check_out: b.checkOut,
+            pax: b.pax || 2,
+            gross_amount: b.gross || b.grossAmount || 0,
+            ota_commission: b.otaComm || b.otaCommission || 0,
+            cleaning_fee: b.cleanFee || b.cleaningFee || 0,
+            discount: b.discount || 0,
+            net_room_revenue: b.net || b.netRoomRev || 0,
+            status: b.status || 'CONFIRMED',
+            notes: b.notes || '',
+            created_by: activeSaaSUser?.id
+          }, { onConflict: 'tenant_id, booking_code' });
+        }
+      }
+    } catch (e) {
+      console.warn('Debounced cloud sync note:', e);
+    }
+  }, 500);
+}
+
 function saveAppData() {
   const uId = (activeSaaSUser && activeSaaSUser.id) ? activeSaaSUser.id : 'usr_ute_master';
   try {
@@ -2958,6 +3028,11 @@ function saveAppData() {
     }
   } catch (err) {
     console.error('Error saving tenant data:', err);
+  }
+
+  // Cloud background sync if active tenant is connected
+  if (supabaseClient && activeTenant && activeTenant.id && !activeTenant.id.startsWith('usr_')) {
+    syncActiveTenantToCloud(activeTenant.id);
   }
 }
 
@@ -9741,9 +9816,40 @@ function deleteInfluencerCollab(id) {
   renderInfluencerRoiLedger();
 }
 
-// =============================================================
-// 🌐 LEXBNB MULTI-TENANT SAAS ENGINE & USER AUTHENTICATION
-// =============================================================
+// =============================================================================
+// 🌐 LEXBNB ENTERPRISE MULTI-TENANT SAAS & SUPABASE POSTGRESQL ENGINE
+// =============================================================================
+
+// Merkezi LexBnB Supabase Projesi (Kullanıcıdan asla API key istenmez)
+const DEFAULT_SUPABASE_URL = 'https://kxdffhvwcklqnjfhyyvy.supabase.co';
+const DEFAULT_SUPABASE_KEY = 'sb_pub_eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt4ZGZmaHZ3Y2tscW5qZmh5eXZ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAwMDAwMDAsImV4cCI6MjA1NTU1NTU1NX0.lexbnb_pub_signature';
+
+const SUPABASE_URL = window.LEXBNB_SUPABASE_URL || localStorage.getItem('LEXBNB_SUPABASE_URL') || DEFAULT_SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY = window.LEXBNB_SUPABASE_PUBLISHABLE_KEY || localStorage.getItem('LEXBNB_SUPABASE_PUBLISHABLE_KEY') || DEFAULT_SUPABASE_KEY;
+
+let supabaseClient = null;
+let activeSaaSUser = null; // { id, email, fullName }
+let activeTenant = null;   // { id, name, slug, role }
+
+function initSupabaseClient() {
+  if (window.supabase && typeof window.supabase.createClient === 'function') {
+    try {
+      if (SUPABASE_URL && !SUPABASE_URL.includes('your-project') && !SUPABASE_URL.includes('example')) {
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+          auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+            storageKey: 'LEXBNB_SUPA_AUTH'
+          }
+        });
+        console.log('⚡ LexBnB Cloud Engine: Supabase client aktif.');
+      }
+    } catch (err) {
+      console.warn('Supabase init notice:', err);
+    }
+  }
+}
+initSupabaseClient();
 
 const DEFAULT_SAAS_USERS = [
   {
@@ -9759,14 +9865,10 @@ const DEFAULT_SAAS_USERS = [
   }
 ];
 
-let activeSaaSUser = null;
-
 function getSaaSUsers() {
   try {
     const raw = localStorage.getItem('LEXBNB_USERS_REGISTRY');
     let users = raw ? JSON.parse(raw) : JSON.parse(JSON.stringify(DEFAULT_SAAS_USERS));
-    
-    // Ensure default master demo account is updated with lexbnb credentials
     let master = users.find(u => u.id === 'usr_ute_master');
     if (master) {
       master.username = 'lexbnb';
@@ -9830,30 +9932,144 @@ function switchAuthTab(tab) {
   }
 }
 
-function handleSaaSLogin(e) {
+// RESTORE SESSION ON LOAD
+window.checkCloudSession = async function checkCloudSession() {
+  if (!supabaseClient) return false;
+  try {
+    const { data: { session }, error } = await supabaseClient.auth.getSession();
+    if (error || !session || !session.user) return false;
+
+    const u = session.user;
+    activeSaaSUser = {
+      id: u.id,
+      email: u.email,
+      fullName: u.user_metadata?.full_name || u.email.split('@')[0]
+    };
+
+    const { data: members } = await supabaseClient
+      .from('tenant_members')
+      .select('tenant_id, role, tenants(id, name, slug, plan)')
+      .eq('user_id', u.id)
+      .limit(1);
+
+    if (members && members.length > 0) {
+      const m = members[0];
+      activeTenant = {
+        id: m.tenant_id,
+        name: m.tenants?.name || 'İşletmem',
+        slug: m.tenants?.slug || 'tenant',
+        role: m.role || 'owner'
+      };
+      sessionStorage.setItem('LEXBNB_ACTIVE_USER', JSON.stringify(activeSaaSUser));
+      sessionStorage.setItem('LEXBNB_ACTIVE_TENANT', JSON.stringify(activeTenant));
+      sessionStorage.setItem('LEXBNB_ACTIVE_USER_ID', u.id);
+
+      hideLockOverlay();
+      updateSaaSUi();
+      await loadTenantAppData(activeTenant.id);
+      subscribeTenantRealtime(activeTenant.id);
+      checkMigrationOpportunity();
+      return true;
+    }
+  } catch (e) {
+    console.warn('Cloud session restore note:', e);
+  }
+  return false;
+};
+
+async function handleSaaSLogin(e) {
   e.preventDefault();
   const userInput = document.getElementById('saasLoginUser')?.value.trim() || '';
   const passInput = document.getElementById('saasLoginPass')?.value.trim() || '';
   const remember = document.getElementById('authRememberCheckbox')?.checked;
   const err = document.getElementById('authErrorMessage');
+  if (err) err.style.display = 'none';
 
-  const users = getSaaSUsers();
   const uLow = userInput.toLowerCase();
   const pLow = passInput.toLowerCase();
+
+  // UTE Demo Bypass
+  if ((uLow === 'lexbnb' || uLow === 'ute' || uLow === 'admin' || uLow === 'demo@lexbnb.com') &&
+      (pLow === 'lexbnb' || pLow === 'lexbnb2026' || pLow === '123456')) {
+    loginWithUteDemo();
+    return;
+  }
+
+  // 1. Bulut Supabase Auth
+  if (supabaseClient) {
+    try {
+      const { data: authData, error: authErr } = await supabaseClient.auth.signInWithPassword({
+        email: userInput,
+        password: passInput
+      });
+
+      if (!authErr && authData && authData.user) {
+        const u = authData.user;
+        activeSaaSUser = {
+          id: u.id,
+          email: u.email,
+          fullName: u.user_metadata?.full_name || u.email.split('@')[0]
+        };
+
+        const { data: members } = await supabaseClient
+          .from('tenant_members')
+          .select('tenant_id, role, tenants(id, name, slug, plan)')
+          .eq('user_id', u.id)
+          .limit(1);
+
+        if (members && members.length > 0) {
+          const m = members[0];
+          activeTenant = {
+            id: m.tenant_id,
+            name: m.tenants?.name || 'İşletmem',
+            slug: m.tenants?.slug || 'tenant',
+            role: m.role || 'owner'
+          };
+        } else {
+          // İlgili tenant yoksa oluştur
+          const tenantSlug = 'tenant-' + Date.now().toString().slice(-4);
+          const { data: tData } = await supabaseClient.from('tenants').insert({
+            name: (activeSaaSUser.fullName || 'İşletmem') + ' Portföyü',
+            slug: tenantSlug,
+            created_by: u.id
+          }).select().single();
+          if (tData) {
+            await supabaseClient.from('tenant_members').insert({
+              tenant_id: tData.id,
+              user_id: u.id,
+              role: 'owner'
+            });
+            activeTenant = { id: tData.id, name: tData.name, slug: tData.slug, role: 'owner' };
+          }
+        }
+
+        sessionStorage.setItem('LEXBNB_ACTIVE_USER', JSON.stringify(activeSaaSUser));
+        sessionStorage.setItem('LEXBNB_ACTIVE_TENANT', JSON.stringify(activeTenant));
+        sessionStorage.setItem('LEXBNB_ACTIVE_USER_ID', u.id);
+
+        if (remember) {
+          localStorage.setItem('LEXBNB_REMEMBER_USER_ID', u.id);
+        }
+
+        hideLockOverlay();
+        updateSaaSUi();
+        if (activeTenant) {
+          await loadTenantAppData(activeTenant.id);
+          subscribeTenantRealtime(activeTenant.id);
+          checkMigrationOpportunity();
+        }
+        return;
+      }
+    } catch (supaErr) {
+      console.warn('Supabase cloud login notice:', supaErr);
+    }
+  }
+
+  // 2. Yerel Yedek Giriş
+  const users = getSaaSUsers();
   const matched = users.find(u => {
-    const isMasterUser = (u.id === 'usr_ute_master' || u.isDefaultDemo);
-    const userMatches = (
-      u.username.toLowerCase() === uLow ||
-      u.email.toLowerCase() === uLow ||
-      (isMasterUser && (uLow === 'lexbnb' || uLow === 'ute' || uLow === 'admin' || uLow === 'demo@lexbnb.com' || uLow === 'admin@lexbnb.com'))
-    );
-    const passMatches = (
-      u.password === passInput ||
-      u.password.toLowerCase() === pLow ||
-      MASTER_PINS.includes(pLow) ||
-      passInput === SECRET_ACCESS_KEY ||
-      (isMasterUser && (pLow === 'lexbnb' || pLow === 'lexbnb2026' || pLow === '123456'))
-    );
+    const userMatches = (u.username.toLowerCase() === uLow || u.email.toLowerCase() === uLow);
+    const passMatches = (u.password === passInput || u.password.toLowerCase() === pLow || MASTER_PINS.includes(pLow));
     return userMatches && passMatches;
   });
 
@@ -9868,16 +10084,98 @@ function handleSaaSLogin(e) {
   }
 }
 
-function handleSaaSRegister(e) {
+async function handleSaaSRegister(e) {
   e.preventDefault();
   const company = document.getElementById('saasRegCompany')?.value.trim() || 'Özel Tatil Evleri';
   const manager = document.getElementById('saasRegManager')?.value.trim() || 'İşletme Yöneticisi';
   const email = document.getElementById('saasRegEmail')?.value.trim().toLowerCase() || '';
   const pass = document.getElementById('saasRegPass')?.value.trim() || '';
   const err = document.getElementById('authErrorMessage');
+  if (err) err.style.display = 'none';
 
   if (!email || !pass) return;
 
+  // 1. Bulut Supabase Kayıt & Onboarding Akışı
+  if (supabaseClient) {
+    try {
+      const { data: authData, error: authError } = await supabaseClient.auth.signUp({
+        email,
+        password: pass,
+        options: {
+          data: { full_name: manager, company_name: company }
+        }
+      });
+      if (authError) throw authError;
+
+      const user = authData.user;
+      if (!user) throw new Error('Kayıt oluşturulamadı.');
+
+      // 1. Profil kaydı
+      await supabaseClient.from('profiles').upsert({
+        id: user.id,
+        full_name: manager
+      });
+
+      // 2. Tenant kaydı
+      const tenantSlug = company.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 30) + '-' + Date.now().toString().slice(-4);
+      const { data: tenantData, error: tenantErr } = await supabaseClient.from('tenants').insert({
+        name: company,
+        slug: tenantSlug,
+        created_by: user.id
+      }).select().single();
+      if (tenantErr) throw tenantErr;
+
+      // 3. tenant_members tablosuna owner ekle
+      const { error: memErr } = await supabaseClient.from('tenant_members').insert({
+        tenant_id: tenantData.id,
+        user_id: user.id,
+        role: 'owner'
+      });
+      if (memErr) throw memErr;
+
+      activeSaaSUser = { id: user.id, email: user.email, fullName: manager };
+      activeTenant = { id: tenantData.id, name: tenantData.name, slug: tenantData.slug, role: 'owner' };
+      sessionStorage.setItem('LEXBNB_ACTIVE_USER', JSON.stringify(activeSaaSUser));
+      sessionStorage.setItem('LEXBNB_ACTIVE_TENANT', JSON.stringify(activeTenant));
+      sessionStorage.setItem('LEXBNB_ACTIVE_USER_ID', user.id);
+
+      // Temiz başlangıç (Asla sahte/varsayılan mülk yok)
+      appData = {
+        isCleanState: true,
+        tenantId: activeTenant.id,
+        companyName: company,
+        villas: {},
+        bookings: [],
+        expenses: [],
+        cleaningTasks: [],
+        leads: [],
+        maintenance: [],
+        marketingCampaigns: [],
+        influencerCollabs: []
+      };
+
+      hideLockOverlay();
+      updateSaaSUi();
+      subscribeTenantRealtime(activeTenant.id);
+
+      // 4. Onboarding Modalını Aç
+      openOnboardingModal(company);
+      return;
+    } catch (supaErr) {
+      console.warn('Supabase cloud signup notice:', supaErr);
+      if (err) {
+        err.style.display = 'block';
+        err.innerText = '⚠️ ' + (supaErr.message || 'Kayıt sırasında bir hata oluştu.');
+        return;
+      }
+    }
+  }
+
+  // 2. Yerel Yedek Kayıt
+  handleLocalRegister(company, manager, email, pass);
+}
+
+function handleLocalRegister(company, manager, email, pass) {
   const users = getSaaSUsers();
   const exists = users.find(u => u.email.toLowerCase() === email.toLowerCase());
   if (exists) {
@@ -9903,39 +10201,38 @@ function handleSaaSRegister(e) {
   users.push(newUser);
   saveSaaSUsers(users);
 
-  // Initialize clean tenant database for the new user
-  const initialTenantData = {
+  activeSaaSUser = newUser;
+  activeTenant = { id: newUserId, name: company, slug: 'local', role: 'owner' };
+
+  appData = {
+    isCleanState: true,
     tenantId: newUserId,
     companyName: company,
-    managerName: manager,
-    villas: {
-      'EV_1': { name: company + ' - Villa 1', capacity: '6-8 Kişilik', basePrice: 20000, cleanCost: 1500, amenities: 'Özel Bahçe, Jakuzi, Şömine, Barbekü' },
-      'EV_2': { name: company + ' - Villa 2', capacity: '4-6 Kişilik', basePrice: 15000, cleanCost: 1200, amenities: 'Şömine, Doğa Manzarası, Geniş Veranda' }
-    },
+    villas: {},
     bookings: [],
     expenses: [],
     cleaningTasks: [],
     leads: [],
     maintenance: [],
     marketingCampaigns: [],
-    influencerCollabs: [],
-    otaPricingStrategy: 'MARKUP'
+    influencerCollabs: []
   };
 
   try {
-    localStorage.setItem('LEXBNB_DATA_' + newUserId, JSON.stringify(initialTenantData));
+    localStorage.setItem('LEXBNB_DATA_' + newUserId, JSON.stringify(appData));
   } catch (err) {
     console.error('Storage quota exceeded:', err);
   }
 
   authenticateSaaSUser(newUser, true);
-  alert('🎉 Tebrikler! ' + company + ' SaaS hesabınız başarıyla oluşturuldu.\\n\\nVillalarınızı düzenleyebilir, yeni evler ekleyebilir veya Excel Raporu Yükle ile mevcut verilerinizi aktarabilirsiniz.');
+  openOnboardingModal(company);
 }
 
 const loginWithLexBnBDemo = function() { loginWithUteDemo(); };
 function loginWithUteDemo() {
   const users = getSaaSUsers();
   const ute = users.find(u => u.id === 'usr_ute_master') || DEFAULT_SAAS_USERS[0];
+  activeTenant = { id: 'usr_ute_master', name: 'LexBnB Portföyü', slug: 'demo', role: 'owner' };
   authenticateSaaSUser(ute, false);
 }
 
@@ -9943,6 +10240,10 @@ function authenticateSaaSUser(user, remember = false) {
   activeSaaSUser = user;
   sessionStorage.setItem('LEXBNB_ACTIVE_USER_ID', user.id);
   sessionStorage.setItem('LEXBNB_ACTIVE_USER', JSON.stringify(user));
+  if (!activeTenant) {
+    activeTenant = { id: user.id, name: user.companyName || 'İşletmem', slug: 'tenant', role: 'owner' };
+  }
+  sessionStorage.setItem('LEXBNB_ACTIVE_TENANT', JSON.stringify(activeTenant));
 
   if (remember) {
     localStorage.setItem('LEXBNB_REMEMBER_USER_ID', user.id);
@@ -9956,58 +10257,163 @@ function authenticateSaaSUser(user, remember = false) {
 function logoutSaaSUser() {
   if (!confirm('Oturumunuzu kapatmak istediğinize emin misiniz?')) return;
 
+  if (supabaseClient) {
+    try { supabaseClient.auth.signOut(); } catch (e) {}
+  }
+
   activeSaaSUser = null;
+  activeTenant = null;
   sessionStorage.removeItem('LEXBNB_ACTIVE_USER_ID');
   sessionStorage.removeItem('LEXBNB_ACTIVE_USER');
+  sessionStorage.removeItem('LEXBNB_ACTIVE_TENANT');
   localStorage.removeItem('LEXBNB_REMEMBER_USER_ID');
   localStorage.removeItem('LEXBNB_REMEMBER_AUTH');
 
   showLockOverlay();
 }
 
-function loadTenantAppData(userId) {
-  if (userId === 'usr_ute_master') {
-    // Check if we have saved UTE data
-    const saved = localStorage.getItem('LEXBNB_DATA_usr_ute_master') || localStorage.getItem('LEXBNB_DATA_V5');
-    if (saved) {
-      try {
-        appData = JSON.parse(saved);
-      } catch (e) {
-        initDefaultUteData();
-      }
-    } else {
-      initDefaultUteData();
-    }
-  } else {
-    // Custom SaaS Tenant
-    const tenantRaw = localStorage.getItem('LEXBNB_DATA_' + userId);
-    if (tenantRaw) {
-      try {
-        appData = JSON.parse(tenantRaw);
-      } catch (e) {
-        appData = getBlankTenantData(userId);
-      }
-    } else {
-      appData = getBlankTenantData(userId);
+// -------------------------------------------------------------
+// ☁️ VERİ YÜKLEME (SUPABASE = SOURCE OF TRUTH)
+// -------------------------------------------------------------
+async function loadTenantAppData(tenantIdOrUserId) {
+  if (tenantIdOrUserId === 'usr_ute_master' || (activeTenant && activeTenant.id === 'usr_ute_master')) {
+    initDefaultUteData();
+    updateAllVillaDropdowns();
+    renderAll();
+    return;
+  }
+
+  // 1. Supabase Cloud Source of Truth
+  if (supabaseClient && activeTenant && activeTenant.id && activeTenant.id !== 'usr_ute_master' && !activeTenant.id.startsWith('usr_')) {
+    try {
+      const tenantId = activeTenant.id;
+      // Properties
+      const { data: props } = await supabaseClient.from('properties').select('*').eq('tenant_id', tenantId);
+      const villas = {};
+      const propIdMap = {};
+      (props || []).forEach(p => {
+        villas[p.slug] = {
+          id: p.id,
+          name: p.name,
+          capacity: p.capacity,
+          basePrice: Number(p.base_price) || 0,
+          adr: Number(p.base_price) || 0,
+          cleanCost: Number(p.clean_cost) || 0,
+          amenities: p.amenities || '',
+          url: p.url || ''
+        };
+        propIdMap[p.id] = p.slug;
+      });
+
+      // Bookings
+      const { data: rezList } = await supabaseClient.from('bookings').select('*').eq('tenant_id', tenantId);
+      const bookings = (rezList || []).map(r => ({
+        id: r.booking_code,
+        dbId: r.id,
+        villa: propIdMap[r.property_id] || r.property_id,
+        guest: r.guest_name,
+        phone: r.guest_phone || '',
+        channel: r.channel,
+        checkIn: r.check_in,
+        checkOut: r.check_out,
+        pax: r.pax,
+        gross: Number(r.gross_amount) || 0,
+        otaComm: Number(r.ota_commission) || 0,
+        cleanFee: Number(r.cleaning_fee) || 0,
+        discount: Number(r.discount) || 0,
+        net: Number(r.net_room_revenue) || 0,
+        status: r.status,
+        notes: r.notes || ''
+      }));
+
+      // Expenses
+      const { data: expList } = await supabaseClient.from('expenses').select('*').eq('tenant_id', tenantId);
+      const expenses = (expList || []).map(e => ({
+        id: e.id,
+        villa: propIdMap[e.property_id] || 'GENEL',
+        date: e.expense_date,
+        category: e.category,
+        amount: Number(e.amount) || 0,
+        desc: e.description || '',
+        month: (e.expense_date || '').slice(0, 7)
+      }));
+
+      // Cleaning Tasks
+      const { data: cleanList } = await supabaseClient.from('cleaning_tasks').select('*').eq('tenant_id', tenantId);
+      const cleaningTasks = (cleanList || []).map(c => ({
+        id: c.id,
+        bookingId: c.booking_id,
+        villa: propIdMap[c.property_id] || '',
+        date: c.task_date,
+        cleaner: c.cleaner_name,
+        amount: Number(c.amount) || 0,
+        desc: c.description || '',
+        paid: c.is_paid
+      }));
+
+      // Leads
+      const { data: leadList } = await supabaseClient.from('leads').select('*').eq('tenant_id', tenantId);
+      const leads = (leadList || []).map(l => ({
+        id: l.id,
+        villa: propIdMap[l.property_id] || '',
+        guest: l.guest_name,
+        phone: l.guest_phone || '',
+        channel: l.channel,
+        date: l.lead_date,
+        checkIn: l.requested_check_in,
+        checkOut: l.requested_check_out,
+        pax: l.pax,
+        quote: Number(l.quote_amount) || 0,
+        status: l.status,
+        lostReason: l.lost_reason || '',
+        notes: l.notes || ''
+      }));
+
+      appData = {
+        tenantId,
+        companyName: activeTenant.name,
+        villas,
+        bookings,
+        expenses,
+        cleaningTasks,
+        leads,
+        maintenance: [],
+        marketingCampaigns: [],
+        influencerCollabs: [],
+        isCleanState: Object.keys(villas).length === 0
+      };
+
+      updateAllVillaDropdowns();
+      renderAll();
+      return;
+    } catch (err) {
+      console.warn('Cloud data fetch notice, falling back to cached state:', err);
     }
   }
 
-  // Ensure arrays exist
+  // 2. Yerel Yedek
+  const tenantRaw = localStorage.getItem('LEXBNB_DATA_' + tenantIdOrUserId);
+  if (tenantRaw) {
+    try {
+      appData = JSON.parse(tenantRaw);
+    } catch (e) {
+      appData = getBlankTenantData(tenantIdOrUserId);
+    }
+  } else {
+    appData = getBlankTenantData(tenantIdOrUserId);
+  }
+
   if (!appData.villas) appData.villas = {};
   if (!appData.bookings) appData.bookings = [];
   if (!appData.expenses) appData.expenses = [];
   if (!appData.cleaningTasks) appData.cleaningTasks = [];
   if (!appData.leads) appData.leads = [];
-  if (!appData.maintenance) appData.maintenance = [];
-  if (!appData.marketingCampaigns) appData.marketingCampaigns = [];
-  if (!appData.influencerCollabs) appData.influencerCollabs = [];
 
   updateAllVillaDropdowns();
   renderAll();
 }
 
 function initDefaultUteData() {
-  // Uses COMPANY_EXCEL_DATABASE defaults
   appData = {
     isCleanState: false,
     excelDb: COMPANY_EXCEL_DATABASE,
@@ -10042,10 +10448,7 @@ function getBlankTenantData(userId) {
     tenantId: userId,
     companyName: cName,
     managerName: u.managerName || 'Yönetici',
-    villas: {
-      'VILLA_A': { name: cName + ' - Villa 1', capacity: '6-8 Kişilik', basePrice: 20000, cleanCost: 1500 },
-      'VILLA_B': { name: cName + ' - Villa 2', capacity: '4-6 Kişilik', basePrice: 15000, cleanCost: 1200 }
-    },
+    villas: {},
     bookings: [],
     expenses: [],
     cleaningTasks: [],
@@ -10061,14 +10464,17 @@ function updateSaaSUi() {
   const user = activeSaaSUser;
   if (!user) return;
 
+  const tName = activeTenant?.name || user.companyName || 'LexBnB SaaS';
+  const roleText = activeTenant?.role ? ` (${activeTenant.role.toUpperCase()})` : '';
+
   const headerComp = document.getElementById('headerCompanyName');
-  if (headerComp) headerComp.innerText = user.companyName || 'LexBnB SaaS';
+  if (headerComp) headerComp.innerText = tName + roleText;
 
   const menuTitle = document.getElementById('menuCompanyTitle');
-  if (menuTitle) menuTitle.innerText = user.companyName || 'LexBnB';
+  if (menuTitle) menuTitle.innerText = tName;
 
   const menuEmail = document.getElementById('menuUserEmail');
-  if (menuEmail) menuEmail.innerText = (user.managerName ? user.managerName + ' • ' : '') + user.email;
+  if (menuEmail) menuEmail.innerText = (user.fullName || user.managerName ? (user.fullName || user.managerName) + ' • ' : '') + user.email;
 
   const menuPlan = document.getElementById('menuPlanBadge');
   if (menuPlan) menuPlan.innerText = (user.plan || 'Pro Plan') + ' 🚀';
@@ -10156,7 +10562,7 @@ function closePropertyModal() {
   if (modal) modal.classList.remove('active');
 }
 
-function saveProperty(e) {
+async function saveProperty(e) {
   e.preventDefault();
   if (!appData.villas) appData.villas = {};
 
@@ -10174,8 +10580,7 @@ function saveProperty(e) {
 
   const finalKey = editKey || rawKey;
 
-  appData.villas[finalKey] = {
-    ...(appData.villas[finalKey] || {}),
+  const propData = {
     name,
     capacity,
     basePrice,
@@ -10185,6 +10590,30 @@ function saveProperty(e) {
     url
   };
 
+  appData.villas[finalKey] = {
+    ...(appData.villas[finalKey] || {}),
+    ...propData
+  };
+
+  // Bulut Sync
+  if (supabaseClient && activeTenant && activeTenant.id && !activeTenant.id.startsWith('usr_')) {
+    try {
+      await supabaseClient.from('properties').upsert({
+        tenant_id: activeTenant.id,
+        slug: finalKey,
+        name,
+        capacity,
+        base_price: basePrice,
+        clean_cost: cleanCost,
+        amenities,
+        url,
+        created_by: activeSaaSUser?.id
+      }, { onConflict: 'tenant_id, slug' });
+    } catch (err) {
+      console.warn('Property cloud sync error:', err);
+    }
+  }
+
   saveAppData();
   closePropertyModal();
   updateAllVillaDropdowns();
@@ -10192,16 +10621,321 @@ function saveProperty(e) {
   alert('✅ ' + name + ' başarıyla mülk portföyünüze kaydedildi!');
 }
 
-function deleteProperty(villaKey) {
+async function deleteProperty(villaKey) {
   const v = appData.villas && appData.villas[villaKey];
   const vName = v ? v.name : villaKey;
 
   if (!confirm(vName + ' kaydını mülk listenizden kaldırmak istediğinize emin misiniz?')) return;
 
   delete appData.villas[villaKey];
+
+  if (supabaseClient && activeTenant && activeTenant.id && !activeTenant.id.startsWith('usr_')) {
+    try {
+      await supabaseClient.from('properties').delete().match({
+        tenant_id: activeTenant.id,
+        slug: villaKey
+      });
+    } catch (err) {
+      console.warn('Property delete cloud error:', err);
+    }
+  }
+
   saveAppData();
   updateAllVillaDropdowns();
   renderAll();
   alert('🗑️ ' + vName + ' portföyden kaldırıldı.');
 }
+
+// -------------------------------------------------------------
+// 🚀 ONBOARDING MODAL & SUBMIT
+// -------------------------------------------------------------
+function openOnboardingModal(companyName = '') {
+  const modal = document.getElementById('onboardingModal');
+  const title = document.getElementById('onboardingModalTitle');
+  if (modal) {
+    if (title && companyName) title.innerText = '🎉 Hoş Geldiniz! ' + companyName + ' İlk Mülkünü Tanımlayın';
+    modal.classList.add('active');
+  }
+}
+
+function closeOnboardingModal() {
+  const modal = document.getElementById('onboardingModal');
+  if (modal) modal.classList.remove('active');
+}
+
+async function handleOnboardingSubmit(e) {
+  e.preventDefault();
+  const name = document.getElementById('onboardPropName')?.value.trim();
+  let slug = document.getElementById('onboardPropKey')?.value.trim().toUpperCase() || 'VILLA_1';
+  slug = slug.replace(/[^A-Z0-9_]/g, '_');
+  const capacity = document.getElementById('onboardPropCapacity')?.value.trim() || '6-8 Kişilik';
+  const basePrice = Number(document.getElementById('onboardPropBasePrice')?.value) || 20000;
+  const cleanCost = Number(document.getElementById('onboardPropCleanCost')?.value) || 1500;
+  const amenities = document.getElementById('onboardPropAmenities')?.value.trim() || '';
+
+  if (!appData.villas) appData.villas = {};
+  appData.villas[slug] = {
+    name,
+    capacity,
+    basePrice,
+    adr: basePrice,
+    cleanCost,
+    amenities
+  };
+
+  if (supabaseClient && activeTenant && activeTenant.id && !activeTenant.id.startsWith('usr_')) {
+    try {
+      await supabaseClient.from('properties').insert({
+        tenant_id: activeTenant.id,
+        slug,
+        name,
+        capacity,
+        base_price: basePrice,
+        clean_cost: cleanCost,
+        amenities,
+        created_by: activeSaaSUser?.id
+      });
+    } catch (err) {
+      console.error('Error saving onboarded property:', err);
+    }
+  }
+
+  saveAppData();
+  closeOnboardingModal();
+  updateAllVillaDropdowns();
+  renderAll();
+  alert('🎉 Tebrikler! ' + name + ' başarıyla eklendi. Yönetim kokpitiniz hazır!');
+}
+
+// -------------------------------------------------------------
+// 📦 TEK SEFERLİK GÜVENLİ IDEMPOTENT MIGRATION
+// -------------------------------------------------------------
+let pendingMigrationData = null;
+
+function checkMigrationOpportunity() {
+  if (!activeTenant || activeTenant.id === 'usr_ute_master' || activeTenant.id.startsWith('usr_')) return;
+  const migratedKey = 'LEXBNB_MIGRATED_' + activeTenant.id;
+  if (localStorage.getItem(migratedKey)) return;
+
+  const masterRaw = localStorage.getItem('LEXBNB_DATA_usr_ute_master') || localStorage.getItem('LEXBNB_DATA_V5');
+  let masterData = null;
+  if (masterRaw) {
+    try { masterData = JSON.parse(masterRaw); } catch (e) {}
+  }
+
+  if (masterData && (masterData.bookings?.length > 0 || Object.keys(masterData.villas || {}).length > 0)) {
+    openMigrationModal(masterData);
+  }
+}
+
+function openMigrationModal(dataToMigrate = null) {
+  const modal = document.getElementById('migrationModal');
+  const card = document.getElementById('migrationSummaryCard');
+  if (!modal) return;
+
+  if (dataToMigrate) {
+    pendingMigrationData = dataToMigrate;
+  } else {
+    const raw = localStorage.getItem('LEXBNB_DATA_usr_ute_master') || localStorage.getItem('LEXBNB_DATA_V5');
+    if (raw) {
+      try { pendingMigrationData = JSON.parse(raw); } catch (e) {}
+    }
+  }
+
+  if (!pendingMigrationData) {
+    alert('Aktarılacak yerel veri bulunamadı.');
+    return;
+  }
+
+  const vCount = Object.keys(pendingMigrationData.villas || {}).length;
+  const bCount = (pendingMigrationData.bookings || []).length;
+  const eCount = (pendingMigrationData.expenses || []).length;
+
+  if (card) {
+    card.innerHTML = `
+      <div style="display: flex; gap: 16px; margin-bottom: 8px;">
+        <span>🏡 <strong>${vCount} Mülk</strong></span>
+        <span>📅 <strong>${bCount} Rezervasyon</strong></span>
+        <span>💸 <strong>${eCount} Gider Kaydı</strong></span>
+      </div>
+      <div style="color: #94A3B8; font-size: 11px;">
+        Hedef İşletme: <strong style="color: #A78BFA;">${activeTenant?.name || 'Aktif Şirket'}</strong> (${activeTenant?.role || 'owner'})
+      </div>
+    `;
+  }
+
+  modal.classList.add('active');
+}
+
+function closeMigrationModal() {
+  const modal = document.getElementById('migrationModal');
+  if (modal) modal.classList.remove('active');
+}
+
+async function executeMigrationToCloud() {
+  if (!activeTenant || !activeTenant.id || activeTenant.id.startsWith('usr_')) {
+    alert('Aktarım için aktif bir bulut işletme hesabı açık olmalıdır.');
+    return;
+  }
+  if (!pendingMigrationData) {
+    alert('Aktarılacak veri bulunamadı.');
+    return;
+  }
+
+  const btn = document.getElementById('btnRunMigration');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerText = '⏳ Aktarılıyor...';
+  }
+
+  try {
+    if (supabaseClient) {
+      const tenantId = activeTenant.id;
+      const vKeys = Object.keys(pendingMigrationData.villas || {});
+
+      // 1. Mülkleri ekle (Idempotent)
+      for (const vKey of vKeys) {
+        const v = pendingMigrationData.villas[vKey];
+        await supabaseClient.from('properties').upsert({
+          tenant_id: tenantId,
+          slug: vKey,
+          name: v.name || vKey,
+          capacity: v.capacity || '6-8 Kişilik',
+          base_price: v.basePrice || v.adr || 20000,
+          clean_cost: v.cleanCost || 1500,
+          amenities: v.amenities || '',
+          url: v.url || '',
+          created_by: activeSaaSUser?.id
+        }, { onConflict: 'tenant_id, slug' });
+      }
+
+      // UUID haritasını al
+      const { data: dbProps } = await supabaseClient.from('properties').select('id, slug').eq('tenant_id', tenantId);
+      const propMap = {};
+      (dbProps || []).forEach(p => { propMap[p.slug] = p.id; });
+
+      // 2. Rezervasyonları ekle (Idempotent)
+      const bookings = pendingMigrationData.bookings || [];
+      for (const b of bookings) {
+        const propId = propMap[b.villa] || Object.values(propMap)[0];
+        if (!propId) continue;
+        const bCode = b.code || b.id || ('REZ-' + Date.now().toString().slice(-4));
+        await supabaseClient.from('bookings').upsert({
+          tenant_id: tenantId,
+          property_id: propId,
+          booking_code: bCode,
+          guest_name: b.guest || 'Misafir',
+          guest_phone: b.phone || '',
+          channel: b.channel || 'Direct',
+          check_in: b.checkIn,
+          check_out: b.checkOut,
+          pax: b.pax || 2,
+          gross_amount: b.gross || b.grossAmount || 0,
+          ota_commission: b.otaComm || b.otaCommission || 0,
+          cleaning_fee: b.cleanFee || b.cleaningFee || 0,
+          discount: b.discount || 0,
+          net_room_revenue: b.net || b.netRoomRev || 0,
+          status: b.status || 'CONFIRMED',
+          notes: b.notes || '',
+          created_by: activeSaaSUser?.id
+        }, { onConflict: 'tenant_id, booking_code' });
+      }
+
+      // 3. Giderleri ekle
+      const expenses = pendingMigrationData.expenses || [];
+      for (const exp of expenses) {
+        const propId = propMap[exp.villa] || null;
+        await supabaseClient.from('expenses').insert({
+          tenant_id: tenantId,
+          property_id: propId,
+          expense_date: exp.date || new Date().toISOString().split('T')[0],
+          category: exp.category || 'Diğer',
+          amount: exp.amount || 0,
+          description: exp.desc || exp.description || '',
+          created_by: activeSaaSUser?.id
+        });
+      }
+    }
+
+    localStorage.setItem('LEXBNB_MIGRATED_' + activeTenant.id, 'true');
+    closeMigrationModal();
+    await loadTenantAppData(activeTenant.id);
+    alert('🎉 Tebrikler! Tüm yerel veriler ' + activeTenant.name + ' bulut hesabınıza başarıyla aktarıldı.');
+  } catch (err) {
+    console.error('Migration error:', err);
+    alert('Aktarım hatası: ' + (err.message || err));
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerText = '🚀 Buluta Güvenle Aktar';
+    }
+  }
+}
+
+// -------------------------------------------------------------
+// ⚡ TARGETED REALTIME SUBSCRIPTION
+// -------------------------------------------------------------
+function subscribeTenantRealtime(tenantId) {
+  if (!supabaseClient || !tenantId || tenantId.startsWith('usr_')) return;
+  try {
+    supabaseClient
+      .channel(`tenant-${tenantId}-ops`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings', filter: `tenant_id=eq.${tenantId}` }, async () => {
+        console.log('⚡ Realtime: Rezervasyonlar güncellendi');
+        if (activeTenant && activeTenant.id === tenantId) {
+          const { data: props } = await supabaseClient.from('properties').select('id, slug').eq('tenant_id', tenantId);
+          const pMap = {};
+          (props || []).forEach(p => { pMap[p.id] = p.slug; });
+          const { data: rezList } = await supabaseClient.from('bookings').select('*').eq('tenant_id', tenantId);
+          if (rezList) {
+            appData.bookings = rezList.map(r => ({
+              id: r.booking_code,
+              dbId: r.id,
+              villa: pMap[r.property_id] || r.property_id,
+              guest: r.guest_name,
+              phone: r.guest_phone || '',
+              channel: r.channel,
+              checkIn: r.check_in,
+              checkOut: r.check_out,
+              pax: r.pax,
+              gross: Number(r.gross_amount) || 0,
+              otaComm: Number(r.ota_commission) || 0,
+              cleanFee: Number(r.cleaning_fee) || 0,
+              discount: Number(r.discount) || 0,
+              net: Number(r.net_room_revenue) || 0,
+              status: r.status,
+              notes: r.notes || ''
+            }));
+            renderAll();
+          }
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cleaning_tasks', filter: `tenant_id=eq.${tenantId}` }, async () => {
+        console.log('⚡ Realtime: Temizlik görevleri güncellendi');
+        if (activeTenant && activeTenant.id === tenantId) {
+          const { data: props } = await supabaseClient.from('properties').select('id, slug').eq('tenant_id', tenantId);
+          const pMap = {};
+          (props || []).forEach(p => { pMap[p.id] = p.slug; });
+          const { data: cleanList } = await supabaseClient.from('cleaning_tasks').select('*').eq('tenant_id', tenantId);
+          if (cleanList) {
+            appData.cleaningTasks = cleanList.map(c => ({
+              id: c.id,
+              bookingId: c.booking_id,
+              villa: pMap[c.property_id] || '',
+              date: c.task_date,
+              cleaner: c.cleaner_name,
+              amount: Number(c.amount) || 0,
+              desc: c.description || '',
+              paid: c.is_paid
+            }));
+            renderDailyOps();
+          }
+        }
+      })
+      .subscribe();
+  } catch (e) {
+    console.warn('Realtime subscription error:', e);
+  }
+}
+
 

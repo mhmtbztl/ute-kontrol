@@ -1,62 +1,4 @@
-
-  <!-- ========================================== -->
-  <!-- MODAL: TEMİZLİK / BORÇ KAYDI EKLE & DÜZENLE -->
-  <!-- ========================================== -->
-  <div class="modal-backdrop" id="cleaningTaskModal">
-    <div class="modal-card" style="max-width: 500px;">
-      <div class="modal-header">
-        <h3 id="cleaningTaskModalTitle">🧹 Temizlik & Personel Hakediş Kaydı</h3>
-        <button class="close-btn" onclick="closeCleaningTaskModal()">&times;</button>
-      </div>
-      <form id="cleaningTaskForm" onsubmit="saveCleaningTask(event)">
-        <input type="hidden" id="hkEditTaskId">
-        <div class="form-grid">
-          <div class="form-group">
-            <label>Villa / Mülk</label>
-            <select id="hkVilla" required>
-              <option value="SEYIR">Seyir Dağ Evi</option>
-              <option value="ZIRVE">Zirve Dağ Evi</option>
-              <option value="DOGUS">Doğuş Dağ Evi</option>
-              <option value="SIRIN">Şirin Dağ Evi</option>
-              <option value="NEFES">Nefes Dağ Evi</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Temizlik Tarihi</label>
-            <input type="date" id="hkDate" required>
-          </div>
-          <div class="form-group">
-            <label>Temizlik Personeli / Ekip</label>
-            <input type="text" id="hkCleaner" placeholder="Örn: Fatma Hanım, Ayşe Hanım" required>
-          </div>
-          <div class="form-group">
-            <label>Temizlik Ücreti (TL)</label>
-            <input type="number" id="hkAmount" step="50" min="0" placeholder="1500" required style="font-weight: 700; color: #60A5FA; font-size: 15px;">
-          </div>
-          <div class="form-group full-width">
-            <label>Açıklama / Misafir Çıkışı</label>
-            <input type="text" id="hkDesc" placeholder="Örn: Hakan Demir çıkışı sonrası rutin temizlik ve nevresim">
-          </div>
-          <div class="form-group full-width">
-            <label>Ödeme Durumu</label>
-            <select id="hkPaidStatus" required>
-              <option value="PENDING">⏳ Ödenecek (Personele Borç)</option>
-              <option value="PAID">✅ Ödendi (Kapatıldı & Gider Tablosuna Ekle)</option>
-            </select>
-          </div>
-        </div>
-        <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px;">
-          <button type="button" class="btn btn-danger btn-sm" id="hkDeleteBtn" onclick="deleteCleaningTaskFromModal()" style="display: none;">🗑️ Sil</button>
-          <div style="display: flex; gap: 8px; margin-left: auto;">
-            <button type="button" class="btn btn-secondary" onclick="closeCleaningTaskModal()">Vazgeç</button>
-            <button type="submit" class="btn btn-primary" id="hkSaveBtn">Kaydet</button>
-          </div>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="tr">
 <head>
   <meta charset="UTF-8">
@@ -69,6 +11,7 @@
   <link rel="stylesheet" href="style.css?v=5.5.2">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="xlsx.full.min.js"></script>
 </head>
 <body>
@@ -3540,6 +3483,140 @@
           </button>
         </div>
       </form>
+    </div>
+  </div>
+  <!-- ========================================== -->
+  <!-- MODAL: TEMİZLİK / BORÇ KAYDI EKLE & DÜZENLE -->
+  <!-- ========================================== -->
+  <div class="modal-backdrop" id="cleaningTaskModal">
+    <div class="modal-card" style="max-width: 500px;">
+      <div class="modal-header">
+        <h3 id="cleaningTaskModalTitle">🧹 Temizlik & Personel Hakediş Kaydı</h3>
+        <button class="close-btn" onclick="closeCleaningTaskModal()">&times;</button>
+      </div>
+      <form id="cleaningTaskForm" onsubmit="saveCleaningTask(event)">
+        <input type="hidden" id="hkEditTaskId">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Villa / Mülk</label>
+            <select id="hkVilla" required>
+              <option value="SEYIR">Seyir Dağ Evi</option>
+              <option value="ZIRVE">Zirve Dağ Evi</option>
+              <option value="DOGUS">Doğuş Dağ Evi</option>
+              <option value="SIRIN">Şirin Dağ Evi</option>
+              <option value="NEFES">Nefes Dağ Evi</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Temizlik Tarihi</label>
+            <input type="date" id="hkDate" required>
+          </div>
+          <div class="form-group">
+            <label>Temizlik Personeli / Ekip</label>
+            <input type="text" id="hkCleaner" placeholder="Örn: Fatma Hanım, Ayşe Hanım" required>
+          </div>
+          <div class="form-group">
+            <label>Temizlik Ücreti (TL)</label>
+            <input type="number" id="hkAmount" step="50" min="0" placeholder="1500" required style="font-weight: 700; color: #60A5FA; font-size: 15px;">
+          </div>
+          <div class="form-group full-width">
+            <label>Açıklama / Misafir Çıkışı</label>
+            <input type="text" id="hkDesc" placeholder="Örn: Hakan Demir çıkışı sonrası rutin temizlik ve nevresim">
+          </div>
+          <div class="form-group full-width">
+            <label>Ödeme Durumu</label>
+            <select id="hkPaidStatus" required>
+              <option value="PENDING">⏳ Ödenecek (Personele Borç)</option>
+              <option value="PAID">✅ Ödendi (Kapatıldı & Gider Tablosuna Ekle)</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px;">
+          <button type="button" class="btn btn-danger btn-sm" id="hkDeleteBtn" onclick="deleteCleaningTaskFromModal()" style="display: none;">🗑️ Sil</button>
+          <div style="display: flex; gap: 8px; margin-left: auto;">
+            <button type="button" class="btn btn-secondary" onclick="closeCleaningTaskModal()">Vazgeç</button>
+            <button type="submit" class="btn btn-primary" id="hkSaveBtn">Kaydet</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: ONBOARDING - İLK MÜLKÜNÜZÜ EKLEYİN  -->
+  <!-- ========================================== -->
+  <div class="modal-backdrop" id="onboardingModal">
+    <div class="modal-card" style="max-width: 540px; border: 1px solid rgba(139, 92, 246, 0.4); box-shadow: 0 20px 50px rgba(0,0,0,0.8);">
+      <div class="modal-header" style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(109, 40, 217, 0.1));">
+        <div>
+          <h3 id="onboardingModalTitle" style="margin: 0; color: #F8FAFC;">🎉 Hoş Geldiniz! İlk Mülkünüzü Tanımlayın</h3>
+          <p style="margin: 4px 0 0 0; font-size: 12px; color: #CBD5E1;">İşletmeniz başarıyla oluşturuldu. Portföyünüzdeki ilk villayı veya daireyi ekleyin.</p>
+        </div>
+      </div>
+      <form id="onboardingForm" onsubmit="handleOnboardingSubmit(event)">
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Villa / Mülk Adı:</label>
+          <input type="text" id="onboardPropName" placeholder="Örn: Sunset Luxury Villa, Doğa Dağ Evi 1" required style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff;">
+        </div>
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+          <div class="form-group">
+            <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Sistem Kodu (Tekil):</label>
+            <input type="text" id="onboardPropKey" placeholder="Örn: VILLA_1" required style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; text-transform: uppercase;">
+          </div>
+          <div class="form-group">
+            <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Kapasite:</label>
+            <input type="text" id="onboardPropCapacity" placeholder="Örn: 6-8 Kişilik" style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff;">
+          </div>
+        </div>
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+          <div class="form-group">
+            <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Gecelik Taban Fiyat (₺):</label>
+            <input type="number" id="onboardPropBasePrice" placeholder="Örn: 20000" required style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff;">
+          </div>
+          <div class="form-group">
+            <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Temizlik Maliyeti (₺):</label>
+            <input type="number" id="onboardPropCleanCost" placeholder="Örn: 1500" value="0" style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff;">
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Öne Çıkan Özellikler & Olanaklar:</label>
+          <input type="text" id="onboardPropAmenities" placeholder="Örn: Özel Havuz, Jakuzi, Şömine, Barbekü" style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff;">
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: flex-end;">
+          <button type="submit" class="btn btn-primary" style="background: linear-gradient(135deg, #10B981, #059669); border: none; font-weight: 700; padding: 10px 20px;">
+            🚀 Kaydet ve Kokpite Başla
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: TEK SEFERLİK BULUT VERİ AKTARIMI    -->
+  <!-- ========================================== -->
+  <div class="modal-backdrop" id="migrationModal">
+    <div class="modal-card" style="max-width: 520px; border: 1px solid rgba(245, 158, 11, 0.4);">
+      <div class="modal-header" style="background: rgba(245, 158, 11, 0.1);">
+        <h3 style="color: #FBBF24; margin: 0;">📦 Yerel Verileri Buluta Aktar</h3>
+        <button class="close-btn" onclick="closeMigrationModal()">&times;</button>
+      </div>
+      <div style="padding: 16px 20px;">
+        <p style="font-size: 13px; color: #CBD5E1; margin: 0 0 14px 0;">
+          Tarayıcınızın hafızasında önceki oturumdan kalan operasyon verileri bulundu. Bu verileri aktif işletme hesabınıza aktarmak ister misiniz?
+        </p>
+        <div id="migrationSummaryCard" style="background: rgba(0,0,0,0.4); border-radius: 8px; padding: 12px; font-size: 12px; color: #E2E8F0; margin-bottom: 16px;">
+          <!-- JS dinamik dolduracak -->
+        </div>
+        <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 16px;">
+          🔒 <strong>Güvenli ve Tek Seferlik:</strong> Mükerrer kayıt oluşturulmaz; var olan rezervasyon kodları korunur.
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <button type="button" class="btn btn-secondary" onclick="closeMigrationModal()">Daha Sonra</button>
+          <button type="button" class="btn btn-primary" id="btnRunMigration" onclick="executeMigrationToCloud()" style="background: linear-gradient(135deg, #F59E0B, #D97706); border: none; font-weight: 700;">
+            🚀 Buluta Güvenle Aktar
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
