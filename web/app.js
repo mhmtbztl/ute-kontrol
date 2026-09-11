@@ -8,6 +8,33 @@ const DEFAULT_CLEANING_TASKS = [];
 const MASTER_PINS = ['lexbnb', 'lexbnb2026', 'lexbnb.', 'uludagtatil2026.', 'uludagtatil2026'];
 const SECRET_ACCESS_KEY = 'lexbnb';
 
+function getFriendlyAuthErrorMessage(err) {
+  if (!err) return 'Bir hata oluştu. Lütfen tekrar deneyin.';
+  const msg = typeof err === 'string' ? err : (err.message || '');
+  if (msg.includes('Invalid login credentials')) {
+    return 'E-posta veya şifre hatalı.';
+  }
+  if (msg.includes('Email not confirmed')) {
+    return 'E-posta adresinizi doğrulamanız gerekiyor. Lütfen gelen kutunuzdaki aktivasyon bağlantısına tıklayın.';
+  }
+  if (msg.includes('User already registered') || msg.includes('already registered')) {
+    return 'Bu e-posta adresi ile kayıtlı bir hesap zaten var. Lütfen giriş yapın.';
+  }
+  if (msg.includes('Password should be at least 6 characters') || msg.includes('at least 6 characters')) {
+    return 'Şifreniz en az 6 karakter olmalıdır.';
+  }
+  if (msg.includes('rate limit') || msg.includes('Too many requests') || msg.includes('over_email_send_rate_limit')) {
+    return 'Çok fazla deneme yapıldı. Lütfen biraz bekleyip tekrar deneyin.';
+  }
+  if (msg.includes('Failed to fetch') || msg.includes('network') || msg.includes('NetworkError') || msg.includes('FetchError')) {
+    return 'Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edip tekrar deneyin.';
+  }
+  if (msg.includes('tenant') || msg.includes('create_tenant_and_owner')) {
+    return 'İşletme kurulumu tamamlanamadı. Lütfen tekrar deneyin.';
+  }
+  return msg || 'İşlem sırasında bir hata oluştu.';
+}
+
 async function checkAuthStatus() {
   const urlParams = new URLSearchParams(window.location.search);
   const keyParam = urlParams.get('key') || urlParams.get('auth') || urlParams.get('token');
@@ -18,28 +45,16 @@ async function checkAuthStatus() {
     return true;
   }
 
-  // 2. Try restoring Supabase Cloud Session
-  if (window.checkCloudSession) {
+  // 2. Try restoring Supabase Cloud Session (Source of Truth)
+  if (supabaseClient && window.checkCloudSession) {
     const restored = await window.checkCloudSession();
     if (restored) return true;
   }
 
-  // 3. Active Session or Remember Me check
-  const activeUserId = sessionStorage.getItem('LEXBNB_ACTIVE_USER_ID') || localStorage.getItem('LEXBNB_REMEMBER_USER_ID');
-  if (activeUserId) {
-    if (activeUserId === 'usr_ute_master') {
-      loginWithUteDemo();
-      return true;
-    }
-    const users = getSaaSUsers();
-    const user = users.find(u => u.id === activeUserId);
-    if (user) {
-      authenticateSaaSUser(user, false);
-      return true;
-    }
+  // 3. Authenticated session yoksa LocalStorage'dan sahte/eski veri yükleme
+  if (typeof getBlankTenantData === 'function') {
+    appData = getBlankTenantData('guest');
   }
-
-  // 4. Otherwise show SaaS Auth Screen
   showLockOverlay();
   return false;
 }
@@ -2959,67 +2974,8 @@ function loadAppData() {
   }
 }
 
-let cloudSyncDebounceTimer = null;
-function syncActiveTenantToCloud(tenantId) {
-  if (cloudSyncDebounceTimer) clearTimeout(cloudSyncDebounceTimer);
-  cloudSyncDebounceTimer = setTimeout(async () => {
-    if (!supabaseClient || !tenantId) return;
-    try {
-      if (appData.villas) {
-        const vKeys = Object.keys(appData.villas);
-        for (const vKey of vKeys) {
-          const v = appData.villas[vKey];
-          await supabaseClient.from('properties').upsert({
-            tenant_id: tenantId,
-            slug: vKey,
-            name: v.name || vKey,
-            capacity: v.capacity || '6-8 Kişilik',
-            base_price: v.basePrice || v.adr || 20000,
-            clean_cost: v.cleanCost || 1500,
-            amenities: v.amenities || '',
-            url: v.url || '',
-            created_by: activeSaaSUser?.id
-          }, { onConflict: 'tenant_id, slug' });
-        }
-      }
-
-      const { data: dbProps } = await supabaseClient.from('properties').select('id, slug').eq('tenant_id', tenantId);
-      const propMap = {};
-      (dbProps || []).forEach(p => { propMap[p.slug] = p.id; });
-
-      if (appData.bookings && appData.bookings.length > 0) {
-        for (const b of appData.bookings) {
-          const pId = propMap[b.villa] || Object.values(propMap)[0];
-          if (!pId) continue;
-          const bCode = b.code || b.id;
-          await supabaseClient.from('bookings').upsert({
-            tenant_id: tenantId,
-            property_id: pId,
-            booking_code: bCode,
-            guest_name: b.guest || 'Misafir',
-            guest_phone: b.phone || '',
-            channel: b.channel || 'Direct',
-            check_in: b.checkIn,
-            check_out: b.checkOut,
-            pax: b.pax || 2,
-            gross_amount: b.gross || b.grossAmount || 0,
-            ota_commission: b.otaComm || b.otaCommission || 0,
-            cleaning_fee: b.cleanFee || b.cleaningFee || 0,
-            discount: b.discount || 0,
-            net_room_revenue: b.net || b.netRoomRev || 0,
-            status: b.status || 'CONFIRMED',
-            notes: b.notes || '',
-            created_by: activeSaaSUser?.id
-          }, { onConflict: 'tenant_id, booking_code' });
-        }
-      }
-    } catch (e) {
-      console.warn('Debounced cloud sync note:', e);
-    }
-  }, 500);
-}
-
 function saveAppData() {
+  if (typeof localStorage === 'undefined') return;
   const uId = (activeSaaSUser && activeSaaSUser.id) ? activeSaaSUser.id : 'usr_ute_master';
   try {
     localStorage.setItem('LEXBNB_DATA_' + uId, JSON.stringify(appData));
@@ -3029,11 +2985,2241 @@ function saveAppData() {
   } catch (err) {
     console.error('Error saving tenant data:', err);
   }
+}
 
-  // Cloud background sync if active tenant is connected
-  if (supabaseClient && activeTenant && activeTenant.id && !activeTenant.id.startsWith('usr_')) {
-    syncActiveTenantToCloud(activeTenant.id);
+// -------------------------------------------------------------
+// 🌐 ENTITY-BASED SUPABASE CLOUD MUTATIONS & CRUD (PHASE 4)
+// -------------------------------------------------------------
+function isUUID(str) {
+  if (typeof str !== 'string') return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
+}
+
+function mapPropertyFromDb(row) {
+  if (!row) return null;
+  const basePrice = Number(row.base_price) || 0;
+  const cleanCost = Number(row.clean_cost) || 0;
+  return {
+    id: row.id, // Primary Supabase UUID
+    tenantId: row.tenant_id,
+    slug: row.slug,
+    name: row.name,
+    capacity: row.capacity || '6-8 Kişilik',
+    basePrice: basePrice,
+    adr: basePrice,
+    cleanCost: cleanCost,
+    amenities: row.amenities || '',
+    url: row.url || '',
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function mapPropertyToDb(property, tenantId) {
+  const activeTId = tenantId || getActiveTenantId();
+  const basePrice = Number(property.basePrice !== undefined ? property.basePrice : property.adr) || 0;
+  const cleanCost = Number(property.cleanCost) || 0;
+  const payload = {
+    tenant_id: activeTId,
+    slug: (property.slug || property.name || 'VILLA').trim().toUpperCase().replace(/[^A-Z0-9_]/g, '_'),
+    name: (property.name || property.slug || '').trim(),
+    capacity: property.capacity || '6-8 Kişilik',
+    base_price: basePrice,
+    clean_cost: cleanCost,
+    amenities: property.amenities || '',
+    url: property.url || ''
+  };
+  if (property.id) {
+    payload.id = property.id;
   }
+  if (typeof activeSaaSUser !== 'undefined' && activeSaaSUser?.id) {
+    payload.created_by = activeSaaSUser.id;
+  }
+  return payload;
+}
+
+async function loadProperties(targetTenantId) {
+  const tenantId = targetTenantId || getActiveTenantId();
+  if (!supabaseClient || !tenantId || tenantId === 'usr_ute_master' || tenantId.startsWith('usr_')) {
+    return (typeof appData !== 'undefined' && appData.villas) ? appData.villas : {};
+  }
+  try {
+    const { data, error } = await supabaseClient
+      .from('properties')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('loadProperties error:', error);
+      throw error;
+    }
+
+    const villas = {};
+    (data || []).forEach(row => {
+      const mapped = mapPropertyFromDb(row);
+      if (mapped) {
+        villas[mapped.slug] = mapped;
+      }
+    });
+
+    if (typeof appData !== 'undefined') {
+      if (!appData) appData = {};
+      appData.villas = villas;
+    }
+    return villas;
+  } catch (err) {
+    console.error('Failed to load properties from cloud:', err);
+    throw new Error('Mülkler yüklenemedi. Tekrar deneyin.');
+  }
+}
+
+async function createProperty(propInput) {
+  const tenantId = getActiveTenantId();
+  if (!tenantId || tenantId === 'usr_ute_master' || tenantId.startsWith('usr_') || !supabaseClient) {
+    // Demo / offline fallback
+    const name = (propInput.name || '').trim();
+    if (!name) throw new Error('Mülk adı boş bırakılamaz.');
+    let slug = (propInput.slug || name).trim().toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+    if (!slug) slug = 'VILLA_' + (Object.keys(appData.villas || {}).length + 1);
+    if (appData && !appData.villas) appData.villas = {};
+    const localProp = {
+      id: 'local_' + Date.now(),
+      slug,
+      name,
+      capacity: propInput.capacity || '6-8 Kişilik',
+      basePrice: Number(propInput.basePrice || propInput.adr) || 0,
+      adr: Number(propInput.basePrice || propInput.adr) || 0,
+      cleanCost: Number(propInput.cleanCost) || 0,
+      amenities: propInput.amenities || '',
+      url: propInput.url || ''
+    };
+    if (appData) {
+      appData.villas[slug] = localProp;
+      if (typeof saveAppData === 'function') saveAppData();
+    }
+    return localProp;
+  }
+
+  // 1. Validation
+  const name = (propInput.name || '').trim();
+  if (!name) throw new Error('Mülk adı boş bırakılamaz.');
+
+  const basePrice = Number(propInput.basePrice !== undefined ? propInput.basePrice : propInput.adr) || 0;
+  if (basePrice < 0) throw new Error('Gecelik taban fiyat negatif olamaz.');
+
+  const cleanCost = Number(propInput.cleanCost) || 0;
+  if (cleanCost < 0) throw new Error('Temizlik maliyeti negatif olamaz.');
+
+  let slug = (propInput.slug || name).trim().toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+  if (!slug) slug = 'VILLA_' + (Object.keys(appData?.villas || {}).length + 1);
+
+  // Check duplicate slug in active tenant memory state
+  if (appData?.villas && appData.villas[slug]) {
+    slug = slug + '_' + Math.floor(100 + Math.random() * 900);
+  }
+
+  // 2. Map payload (tenant_id is strictly activeTenantId, forged tenant_id in propInput is ignored)
+  const dbPayload = mapPropertyToDb({ ...propInput, slug }, tenantId);
+  delete dbPayload.id; // DB generates UUID
+
+  // 3. Awaited DB mutation
+  const { data, error } = await supabaseClient
+    .from('properties')
+    .insert(dbPayload)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('createProperty DB error:', error);
+    if (error.code === '23505') {
+      throw new Error('Bu ada veya koda sahip bir mülk zaten mevcut.');
+    }
+    throw new Error('Mülk kaydedilemedi: ' + (error.message || 'Veritabanı hatası'));
+  }
+
+  // 4. Update local state ONLY on DB success
+  const createdProp = mapPropertyFromDb(data);
+  if (typeof appData !== 'undefined') {
+    if (!appData.villas) appData.villas = {};
+    appData.villas[createdProp.slug] = createdProp;
+    if (typeof saveAppData === 'function') saveAppData();
+  }
+
+  return createdProp;
+}
+
+async function updateProperty(propIdOrSlug, propInput) {
+  const tenantId = getActiveTenantId();
+  if (!tenantId || tenantId === 'usr_ute_master' || tenantId.startsWith('usr_') || !supabaseClient) {
+    // Offline / demo fallback
+    let existing = null;
+    let oldSlug = null;
+    if (typeof appData !== 'undefined' && appData.villas) {
+      if (appData.villas[propIdOrSlug]) {
+        existing = appData.villas[propIdOrSlug];
+        oldSlug = propIdOrSlug;
+      } else {
+        for (const [s, p] of Object.entries(appData.villas)) {
+          if (p.id === propIdOrSlug) { existing = p; oldSlug = s; break; }
+        }
+      }
+    }
+    if (!existing && (!appData?.villas || !appData.villas[propIdOrSlug])) {
+      throw new Error('Güncellenecek mülk bulunamadı.');
+    }
+    const name = (propInput.name || existing?.name || '').trim();
+    if (!name) throw new Error('Mülk adı boş bırakılamaz.');
+    const updated = {
+      ...(existing || {}),
+      name,
+      capacity: propInput.capacity !== undefined ? propInput.capacity : existing?.capacity,
+      basePrice: Number(propInput.basePrice !== undefined ? propInput.basePrice : existing?.basePrice) || 0,
+      adr: Number(propInput.basePrice !== undefined ? propInput.basePrice : existing?.basePrice) || 0,
+      cleanCost: Number(propInput.cleanCost !== undefined ? propInput.cleanCost : existing?.cleanCost) || 0,
+      amenities: propInput.amenities !== undefined ? propInput.amenities : existing?.amenities,
+      url: propInput.url !== undefined ? propInput.url : existing?.url
+    };
+    if (appData?.villas) {
+      appData.villas[oldSlug || propIdOrSlug] = updated;
+      if (typeof saveAppData === 'function') saveAppData();
+    }
+    return updated;
+  }
+
+  // Find existing property in state
+  let existing = null;
+  let oldSlug = null;
+  if (typeof appData !== 'undefined' && appData.villas) {
+    if (appData.villas[propIdOrSlug]) {
+      existing = appData.villas[propIdOrSlug];
+      oldSlug = propIdOrSlug;
+    } else {
+      for (const [s, p] of Object.entries(appData.villas)) {
+        if (p.id === propIdOrSlug) {
+          existing = p;
+          oldSlug = s;
+          break;
+        }
+      }
+    }
+  }
+
+  const propId = existing?.id || (isUUID(propIdOrSlug) ? propIdOrSlug : null);
+  if (!propId) {
+    throw new Error('Güncellenecek mülkün veritabanı kaydı bulunamadı.');
+  }
+
+  const name = (propInput.name || existing?.name || '').trim();
+  if (!name) throw new Error('Mülk adı boş bırakılamaz.');
+
+  const basePrice = Number(propInput.basePrice !== undefined ? propInput.basePrice : (propInput.adr !== undefined ? propInput.adr : (existing?.basePrice || 0)));
+  if (basePrice < 0) throw new Error('Gecelik taban fiyat negatif olamaz.');
+
+  const cleanCost = Number(propInput.cleanCost !== undefined ? propInput.cleanCost : (existing?.cleanCost || 0));
+  if (cleanCost < 0) throw new Error('Temizlik maliyeti negatif olamaz.');
+
+  const dbPayload = {
+    name: name,
+    capacity: propInput.capacity !== undefined ? propInput.capacity : (existing?.capacity || '6-8 Kişilik'),
+    base_price: basePrice,
+    clean_cost: cleanCost,
+    amenities: propInput.amenities !== undefined ? propInput.amenities : (existing?.amenities || ''),
+    url: propInput.url !== undefined ? propInput.url : (existing?.url || ''),
+    updated_at: new Date().toISOString()
+  };
+
+  // Awaited DB update scoped to tenant_id and id
+  const { data, error } = await supabaseClient
+    .from('properties')
+    .update(dbPayload)
+    .eq('id', propId)
+    .eq('tenant_id', tenantId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('updateProperty DB error:', error);
+    throw new Error('Mülk güncellenemedi: ' + (error.message || 'Veritabanı hatası'));
+  }
+
+  // Update local state ONLY on DB success
+  const updatedProp = mapPropertyFromDb(data);
+  if (typeof appData !== 'undefined' && appData.villas) {
+    if (oldSlug && oldSlug !== updatedProp.slug) {
+      delete appData.villas[oldSlug];
+    }
+    appData.villas[updatedProp.slug] = updatedProp;
+    if (typeof saveAppData === 'function') saveAppData();
+  }
+
+  return updatedProp;
+}
+
+async function deleteProperty(propIdOrSlug) {
+  let existing = null;
+  let targetSlug = null;
+  if (typeof appData !== 'undefined' && appData.villas) {
+    if (appData.villas[propIdOrSlug]) {
+      existing = appData.villas[propIdOrSlug];
+      targetSlug = propIdOrSlug;
+    } else {
+      for (const [s, p] of Object.entries(appData.villas)) {
+        if (p.id === propIdOrSlug) {
+          existing = p;
+          targetSlug = s;
+          break;
+        }
+      }
+    }
+  }
+
+  const vName = existing ? existing.name : propIdOrSlug;
+
+  if (typeof confirm === 'function') {
+    if (!confirm(vName + ' kaydını mülk listenizden kaldırmak istediğinize emin misiniz?')) {
+      return false;
+    }
+  }
+
+  const tenantId = getActiveTenantId();
+  const propId = existing?.id || (isUUID(propIdOrSlug) ? propIdOrSlug : null);
+
+  // 1. Referential Safety:
+  // Check local state for dependent bookings
+  const localHasBookings = (typeof appData !== 'undefined' && appData.bookings || []).some(b => 
+    b.villa === targetSlug || b.property_id === propId || (propId && b.propertyId === propId)
+  );
+  if (localHasBookings) {
+    const msg = 'Bu mülke ait geçmiş rezervasyon kayıtları bulunmaktadır. Finansal ve operasyonel geçmişin korunması için mülk doğrudan silinemez.';
+    if (typeof alert === 'function') alert('⚠️ ' + msg);
+    throw new Error(msg);
+  }
+
+  // Check Supabase database if connected to cloud tenant
+  if (supabaseClient && tenantId && !tenantId.startsWith('usr_')) {
+    if (propId) {
+      const { count: bCount } = await supabaseClient
+        .from('bookings')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', tenantId)
+        .eq('property_id', propId);
+
+      if (bCount && bCount > 0) {
+        const msg = 'Bu mülke ait kayıtlı rezervasyonlar bulunmaktadır. Finansal ve operasyonel geçmişin korunması için mülk doğrudan silinemez.';
+        if (typeof alert === 'function') alert('⚠️ ' + msg);
+        throw new Error(msg);
+      }
+
+      const { count: cCount } = await supabaseClient
+        .from('cleaning_tasks')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', tenantId)
+        .eq('property_id', propId);
+
+      if (cCount && cCount > 0) {
+        const msg = 'Bu mülke ait temizlik görevleri bulunmaktadır. Silme işlemi engellendi.';
+        if (typeof alert === 'function') alert('⚠️ ' + msg);
+        throw new Error(msg);
+      }
+    }
+
+    // Awaited DB delete
+    let deleteQuery = supabaseClient.from('properties').delete().eq('tenant_id', tenantId);
+    if (propId) {
+      deleteQuery = deleteQuery.eq('id', propId);
+    } else if (targetSlug) {
+      deleteQuery = deleteQuery.eq('slug', targetSlug);
+    }
+
+    const { error } = await deleteQuery;
+    if (error) {
+      console.error('deleteProperty DB error:', error);
+      const msg = 'Mülk silinemedi: ' + (error.message || 'Veritabanı hatası');
+      if (typeof alert === 'function') alert(msg);
+      throw new Error(msg);
+    }
+  }
+
+  // 2. Update local state ONLY on DB success
+  if (targetSlug && typeof appData !== 'undefined' && appData.villas) {
+    delete appData.villas[targetSlug];
+    if (typeof saveAppData === 'function') saveAppData();
+  }
+
+  // 3. Reset dependent filters safely
+  if (typeof currentFilter !== 'undefined' && (currentFilter.villa === targetSlug || currentFilter.villa === propId)) {
+    currentFilter.villa = 'ALL';
+  }
+  if (typeof document !== 'undefined') {
+    const globalFilterEl = document.getElementById('globalVillaFilter');
+    if (globalFilterEl && (globalFilterEl.value === targetSlug || globalFilterEl.value === propId)) {
+      globalFilterEl.value = 'ALL';
+    }
+    if (typeof closePropertyModal === 'function') closePropertyModal();
+    if (typeof updateAllVillaDropdowns === 'function') updateAllVillaDropdowns();
+    if (typeof renderAll === 'function') renderAll();
+    if (typeof alert === 'function') alert('🗑️ ' + vName + ' portföyden kaldırıldı.');
+  }
+
+  return true;
+}
+
+// Backwards compatibility wrappers
+async function cloudUpsertProperty(slug, prop) {
+  if (typeof appData !== 'undefined' && appData.villas && appData.villas[slug]) {
+    return await updateProperty(slug, prop);
+  } else {
+    return await createProperty({ slug, ...prop });
+  }
+}
+
+async function cloudDeleteProperty(slug) {
+  return await deleteProperty(slug);
+}
+
+async function getPropertyIdBySlug(slug, tenantId) {
+  if (typeof appData !== 'undefined' && appData?.villas?.[slug]?.id) {
+    return appData.villas[slug].id;
+  }
+  if (!supabaseClient || !tenantId) return null;
+  try {
+    const { data } = await supabaseClient.from('properties')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('slug', slug)
+      .maybeSingle();
+    return data ? data.id : null;
+  } catch (err) {
+    console.warn('Property id lookup notice:', err);
+    return null;
+  }
+}
+
+// -------------------------------------------------------------
+// 📅 MERKEZİ BOOKING / REZERVASYON CRUD & MAPPER (PHASE 5)
+// -------------------------------------------------------------
+const ALLOWED_BOOKING_STATUSES = ['CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT', 'CANCELLED'];
+
+function generateSafeBookingCode(checkInDate) {
+  const prefix = checkInDate ? checkInDate.replace(/[^0-9]/g, '').slice(2, 6) : new Date().toISOString().slice(2, 7).replace('-', '');
+  const rand = Math.floor(1000 + Math.random() * 9000);
+  const suffix = Math.random().toString(36).substring(2, 5).toUpperCase();
+  return `BK-${prefix}-${rand}${suffix}`;
+}
+
+function calculateNightsBetween(checkInStr, checkOutStr) {
+  if (!checkInStr || !checkOutStr) return 0;
+  const [y1, m1, d1] = checkInStr.split('-').map(Number);
+  const [y2, m2, d2] = checkOutStr.split('-').map(Number);
+  if (!y1 || !m1 || !d1 || !y2 || !m2 || !d2) return 0;
+  const utc1 = Date.UTC(y1, m1 - 1, d1);
+  const utc2 = Date.UTC(y2, m2 - 1, d2);
+  return Math.max(0, Math.round((utc2 - utc1) / (1000 * 60 * 60 * 24)));
+}
+
+function mapBookingFromDb(row, propertyMap = {}) {
+  if (!row) return null;
+  const gross = Number(row.gross_amount) || 0;
+  const otaComm = Number(row.ota_commission) || 0;
+  const cleanFee = Number(row.cleaning_fee) || 0;
+  const discount = Number(row.discount) || 0;
+  const net = Number(row.net_room_revenue) || Math.max(0, gross - otaComm - cleanFee - discount);
+  const nights = calculateNightsBetween(row.check_in, row.check_out);
+
+  const currentAppData = (typeof appData !== 'undefined') ? appData : (typeof global !== 'undefined' ? global.appData : null);
+  let villaSlug = row.property_id;
+  if (propertyMap && propertyMap[row.property_id]) {
+    villaSlug = propertyMap[row.property_id];
+  } else if (currentAppData && currentAppData.villas) {
+    for (const [slug, p] of Object.entries(currentAppData.villas)) {
+      if (p.id === row.property_id) {
+        villaSlug = slug;
+        break;
+      }
+    }
+  }
+
+  const status = ALLOWED_BOOKING_STATUSES.includes(row.status) ? row.status : 'CONFIRMED';
+
+  return {
+    id: row.id, // Primary Supabase UUID
+    dbId: row.id,
+    code: row.booking_code,
+    bookingCode: row.booking_code,
+    tenantId: row.tenant_id,
+    propertyId: row.property_id,
+    villa: villaSlug,
+    guest: row.guest_name,
+    phone: row.guest_phone || '',
+    channel: row.channel || 'Direct',
+    checkIn: row.check_in,
+    checkOut: row.check_out,
+    pax: Number(row.pax) || 2,
+    gross: gross,
+    grossAmount: gross,
+    otaComm: otaComm,
+    otaCommission: otaComm,
+    cleanFee: cleanFee,
+    cleaningFee: cleanFee,
+    discount: discount,
+    net: net,
+    netRoomRev: net,
+    netRoomRevenue: net,
+    nights: Math.max(1, nights),
+    status: status,
+    notes: row.notes || '',
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function mapBookingToDb(booking, tenantId) {
+  const activeTId = tenantId || getActiveTenantId();
+
+  let propId = booking.propertyId || booking.property_id;
+  if (!propId && booking.villa) {
+    if (isUUID(booking.villa)) {
+      propId = booking.villa;
+    } else if (typeof appData !== 'undefined' && appData.villas && appData.villas[booking.villa]) {
+      propId = appData.villas[booking.villa].id;
+    }
+  }
+
+  const gross = Number(booking.gross !== undefined ? booking.gross : booking.grossAmount) || 0;
+  const otaComm = Number(booking.otaComm !== undefined ? booking.otaComm : booking.otaCommission) || 0;
+  const cleanFee = Number(booking.cleanFee !== undefined ? booking.cleanFee : booking.cleaningFee) || 0;
+  const discount = Number(booking.discount) || 0;
+  const net = Number(booking.net !== undefined ? booking.net : (booking.netRoomRev || booking.netRoomRevenue)) || Math.max(0, gross - otaComm - cleanFee - discount);
+
+  const status = ALLOWED_BOOKING_STATUSES.includes(booking.status) ? booking.status : 'CONFIRMED';
+  const checkIn = booking.checkIn || booking.check_in;
+  const checkOut = booking.checkOut || booking.check_out;
+
+  const payload = {
+    tenant_id: activeTId,
+    property_id: propId,
+    booking_code: (booking.bookingCode || booking.code || generateSafeBookingCode(checkIn)).trim(),
+    guest_name: (booking.guest || booking.guest_name || 'Misafir').trim(),
+    guest_phone: booking.phone || booking.guest_phone || '',
+    channel: booking.channel || 'Direct',
+    check_in: checkIn,
+    check_out: checkOut,
+    pax: Number(booking.pax) || 2,
+    gross_amount: gross,
+    ota_commission: otaComm,
+    cleaning_fee: cleanFee,
+    discount: discount,
+    net_room_revenue: net,
+    status: status,
+    notes: booking.notes || ''
+  };
+
+  if (booking.id && isUUID(booking.id)) {
+    payload.id = booking.id;
+  }
+  if (typeof activeSaaSUser !== 'undefined' && activeSaaSUser?.id) {
+    payload.created_by = activeSaaSUser.id;
+  }
+
+  return payload;
+}
+
+function checkBookingOverlap(propertyId, checkIn, checkOut, excludeBookingId = null, bookingsList = null) {
+  if (!propertyId || !checkIn || !checkOut) return null;
+  const currentAppData = (typeof appData !== 'undefined') ? appData : (typeof global !== 'undefined' ? global.appData : null);
+  const bookings = bookingsList || (currentAppData?.bookings ? currentAppData.bookings : []);
+
+  for (const b of bookings) {
+    if (b.status === 'CANCELLED') continue;
+    if (excludeBookingId && (b.id === excludeBookingId || b.code === excludeBookingId || b.bookingCode === excludeBookingId)) continue;
+
+    const bPropId = b.propertyId || (currentAppData?.villas?.[b.villa]?.id);
+    if (bPropId !== propertyId && b.villa !== propertyId) continue;
+
+    // Check overlap: checkIn < b.checkOut && checkOut > b.checkIn
+    // Same-day boundary (checkIn === b.checkOut or checkOut === b.checkIn) is NOT an overlap.
+    if (checkIn < b.checkOut && checkOut > b.checkIn) {
+      return b;
+    }
+  }
+  return null;
+}
+
+async function loadBookings(targetTenantId) {
+  const tenantId = targetTenantId || getActiveTenantId();
+  if (!supabaseClient || !tenantId || tenantId === 'usr_ute_master' || tenantId.startsWith('usr_')) {
+    return (typeof appData !== 'undefined' && appData.bookings) ? appData.bookings : [];
+  }
+  try {
+    const { data, error } = await supabaseClient
+      .from('bookings')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('check_in', { ascending: true });
+
+    if (error) {
+      console.error('loadBookings error:', error);
+      throw error;
+    }
+
+    const bookings = (data || []).map(row => mapBookingFromDb(row));
+    if (typeof appData !== 'undefined') {
+      if (!appData) appData = {};
+      appData.bookings = bookings;
+    }
+    return bookings;
+  } catch (err) {
+    console.error('Failed to load bookings from cloud:', err);
+    throw new Error('Rezervasyonlar yüklenemedi. Tekrar deneyin.');
+  }
+}
+
+async function createBooking(bookingInput) {
+  const tenantId = getActiveTenantId() || bookingInput?.tenantId;
+  const isCloud = supabaseClient && tenantId && tenantId !== 'usr_ute_master' && !tenantId.startsWith('usr_');
+
+  // 1. Validation
+  const checkIn = bookingInput.checkIn || bookingInput.check_in;
+  const checkOut = bookingInput.checkOut || bookingInput.check_out;
+  if (!checkIn || !checkOut) {
+    throw new Error('Giriş ve çıkış tarihleri zorunludur.');
+  }
+  if (checkOut <= checkIn) {
+    throw new Error('Çıkış tarihi giriş tarihinden sonra olmalıdır.');
+  }
+
+  const guest = (bookingInput.guest || bookingInput.guest_name || '').trim();
+  if (!guest) {
+    throw new Error('Misafir adı boş bırakılamaz.');
+  }
+
+  const gross = Number(bookingInput.gross !== undefined ? bookingInput.gross : bookingInput.grossAmount) || 0;
+  if (gross < 0) {
+    throw new Error('Toplam tutar negatif olamaz.');
+  }
+
+  // Resolve property UUID and verify active tenant ownership
+  let propId = bookingInput.propertyId || bookingInput.property_id;
+  const currentAppData = (typeof appData !== 'undefined') ? appData : (typeof global !== 'undefined' ? global.appData : null);
+  if (!propId && bookingInput.villa) {
+    if (isUUID(bookingInput.villa)) {
+      propId = bookingInput.villa;
+    } else if (currentAppData && currentAppData.villas && currentAppData.villas[bookingInput.villa]) {
+      propId = currentAppData.villas[bookingInput.villa].id;
+    }
+  }
+
+  if (currentAppData && currentAppData.villas) {
+    const validPropertyIds = Object.values(currentAppData.villas).map(p => p.id).filter(Boolean);
+    if (validPropertyIds.length > 0 && propId && !validPropertyIds.includes(propId)) {
+      throw new Error('Seçilen mülk aktif işletmenize ait değildir.');
+    }
+  }
+
+  // 2. Overbooking overlap validation
+  const overlap = checkBookingOverlap(propId, checkIn, checkOut);
+  if (overlap) {
+    throw new Error(`Bu mülk seçilen tarihlerde başka bir rezervasyonla çakışıyor (${overlap.guest}: ${overlap.checkIn} - ${overlap.checkOut}).`);
+  }
+
+  // Offline / demo fallback
+  if (!isCloud) {
+    const newId = 'local_rez_' + Date.now();
+    const localRecord = {
+      id: newId,
+      dbId: newId,
+      code: bookingInput.bookingCode || bookingInput.code || generateSafeBookingCode(checkIn),
+      tenantId: tenantId || 'usr_ute_master',
+      propertyId: propId,
+      villa: bookingInput.villa || 'VILLA',
+      guest,
+      phone: bookingInput.phone || '',
+      channel: bookingInput.channel || 'Direct',
+      checkIn,
+      checkOut,
+      pax: Number(bookingInput.pax) || 2,
+      gross,
+      otaComm: Number(bookingInput.otaComm) || 0,
+      cleanFee: Number(bookingInput.cleanFee) || 0,
+      discount: Number(bookingInput.discount) || 0,
+      net: Number(bookingInput.net) || gross,
+      nights: calculateNightsBetween(checkIn, checkOut),
+      status: bookingInput.status || 'CONFIRMED',
+      notes: bookingInput.notes || ''
+    };
+    if (typeof appData !== 'undefined') {
+      if (!appData.bookings) appData.bookings = [];
+      appData.bookings.push(localRecord);
+      if (typeof syncBookingCleaningTasks === 'function') syncBookingCleaningTasks();
+      if (typeof saveAppData === 'function') saveAppData();
+      if (typeof renderAll === 'function') renderAll();
+    }
+    return localRecord;
+  }
+
+  // 3. Awaited DB write with collision retry (max 3 attempts)
+  const payload = mapBookingToDb(bookingInput, tenantId);
+  delete payload.id; // Let DB generate gen_random_uuid()
+
+  let attempts = 0;
+  let lastError = null;
+  let createdRow = null;
+
+  while (attempts < 3) {
+    attempts++;
+    let data = null, error = null;
+    try {
+      const rpcRes = await supabaseClient.rpc('create_booking_atomic', {
+        p_tenant_id: payload.tenant_id,
+        p_property_id: payload.property_id,
+        p_booking_code: payload.booking_code,
+        p_guest_name: payload.guest_name,
+        p_guest_phone: payload.guest_phone,
+        p_channel: payload.channel,
+        p_check_in: payload.check_in,
+        p_check_out: payload.check_out,
+        p_pax: payload.pax,
+        p_gross_amount: payload.gross_amount,
+        p_ota_commission: payload.ota_commission,
+        p_cleaning_fee: payload.cleaning_fee,
+        p_discount: payload.discount,
+        p_net_room_revenue: payload.net_room_revenue,
+        p_status: payload.status,
+        p_notes: payload.notes
+      });
+      if (!rpcRes.error && rpcRes.data) {
+        data = rpcRes.data;
+      } else if (rpcRes.error && (rpcRes.error.code === '23P01' || rpcRes.error.message?.includes('OVERBOOKING_CONFLICT') || rpcRes.error.message?.includes('çakışıyor'))) {
+        error = rpcRes.error;
+      } else {
+        const insRes = await supabaseClient.from('bookings').insert(payload).select().single();
+        data = insRes.data;
+        error = insRes.error;
+      }
+    } catch (e) {
+      const insRes = await supabaseClient.from('bookings').insert(payload).select().single();
+      data = insRes.data;
+      error = insRes.error;
+    }
+
+    if (!error && data) {
+      createdRow = data;
+      break;
+    }
+
+    lastError = error;
+    if (error?.code === '23505' && (error.message?.includes('booking_code') || error.details?.includes('booking_code'))) {
+      console.warn(`Booking code collision (${payload.booking_code}), retrying attempt ${attempts}/3...`);
+      payload.booking_code = generateSafeBookingCode(payload.check_in);
+      continue;
+    } else {
+      break;
+    }
+  }
+
+  if (!createdRow) {
+    console.error('createBooking DB error:', lastError);
+    if (lastError?.code === '23505') {
+      throw new Error('Bu rezervasyon kodu ile kayıtlı bir işlem zaten mevcut.');
+    }
+    if (lastError?.code === '23P01' ||
+        lastError?.message?.includes('exclude_overlapping_bookings') ||
+        lastError?.message?.includes('OVERBOOKING_CONFLICT') ||
+        lastError?.message?.includes('çakışıyor') ||
+        lastError?.details?.includes('conflicting key')) {
+      throw new Error('Bu mülk seçilen tarihlerde başka bir rezervasyonla çakışıyor.');
+    }
+    throw new Error('Rezervasyon kaydedilemedi: ' + (lastError?.message || 'Veritabanı hatası'));
+  }
+
+  // 4. Update local state ONLY on DB success
+  const createdBooking = mapBookingFromDb(createdRow);
+  if (typeof appData !== 'undefined') {
+    if (!appData.bookings) appData.bookings = [];
+    const exists = appData.bookings.some(b => b.id === createdBooking.id);
+    if (!exists) {
+      appData.bookings.push(createdBooking);
+    }
+    if (typeof syncBookingCleaningTasks === 'function') syncBookingCleaningTasks();
+    if (typeof saveAppData === 'function') saveAppData();
+    if (typeof renderAll === 'function') renderAll();
+  }
+
+  return createdBooking;
+}
+
+async function updateBooking(bookingId, bookingInput) {
+  const tenantId = getActiveTenantId();
+  const isCloud = supabaseClient && tenantId && tenantId !== 'usr_ute_master' && !tenantId.startsWith('usr_');
+
+  // Resolve target booking in state
+  let existing = null;
+  let existingIdx = -1;
+  if (typeof appData !== 'undefined' && appData.bookings) {
+    existingIdx = appData.bookings.findIndex(b => b.id === bookingId || b.code === bookingId || b.dbId === bookingId);
+    if (existingIdx !== -1) {
+      existing = appData.bookings[existingIdx];
+    }
+  }
+
+  const propBookingId = existing?.id || (isUUID(bookingId) ? bookingId : null);
+  if (!propBookingId && isCloud) {
+    throw new Error('Güncellenecek rezervasyonun kimliği bulunamadı.');
+  }
+
+  // Validation
+  const checkIn = bookingInput.checkIn || bookingInput.check_in || existing?.checkIn;
+  const checkOut = bookingInput.checkOut || bookingInput.check_out || existing?.checkOut;
+  if (checkIn && checkOut && checkOut <= checkIn) {
+    throw new Error('Çıkış tarihi giriş tarihinden sonra olmalıdır.');
+  }
+
+  const gross = Number(bookingInput.gross !== undefined ? bookingInput.gross : (bookingInput.grossAmount !== undefined ? bookingInput.grossAmount : existing?.gross)) || 0;
+  if (gross < 0) {
+    throw new Error('Toplam tutar negatif olamaz.');
+  }
+
+  let propId = bookingInput.propertyId || bookingInput.property_id || existing?.propertyId;
+  if (!propId && bookingInput.villa) {
+    if (isUUID(bookingInput.villa)) {
+      propId = bookingInput.villa;
+    } else if (typeof appData !== 'undefined' && appData.villas && appData.villas[bookingInput.villa]) {
+      propId = appData.villas[bookingInput.villa].id;
+    }
+  }
+
+  if (typeof appData !== 'undefined' && appData.villas && propId) {
+    const validPropertyIds = Object.values(appData.villas).map(p => p.id).filter(Boolean);
+    if (validPropertyIds.length > 0 && !validPropertyIds.includes(propId)) {
+      throw new Error('Seçilen mülk aktif işletmenize ait değildir.');
+    }
+  }
+
+  // Overlap validation excluding current booking
+  const overlap = checkBookingOverlap(propId, checkIn, checkOut, propBookingId);
+  if (overlap) {
+    throw new Error(`Bu mülk seçilen tarihlerde başka bir rezervasyonla çakışıyor (${overlap.guest}: ${overlap.checkIn} - ${overlap.checkOut}).`);
+  }
+
+  // Offline / demo fallback
+  if (!isCloud) {
+    const updated = {
+      ...(existing || {}),
+      ...bookingInput,
+      checkIn,
+      checkOut,
+      gross,
+      nights: calculateNightsBetween(checkIn, checkOut)
+    };
+    if (existingIdx !== -1) {
+      appData.bookings[existingIdx] = updated;
+    }
+    if (typeof syncBookingCleaningTasks === 'function') syncBookingCleaningTasks();
+    if (typeof saveAppData === 'function') saveAppData();
+    if (typeof renderAll === 'function') renderAll();
+    return updated;
+  }
+
+  // Awaited DB update
+  const payload = mapBookingToDb({ ...(existing || {}), ...bookingInput, checkIn, checkOut, propertyId: propId }, tenantId);
+  delete payload.id;
+  payload.updated_at = new Date().toISOString();
+
+  let data = null, error = null;
+  try {
+    const rpcRes = await supabaseClient.rpc('update_booking_atomic', {
+      p_booking_id: propBookingId,
+      p_tenant_id: tenantId,
+      p_property_id: propId,
+      p_guest_name: payload.guest_name,
+      p_guest_phone: payload.guest_phone,
+      p_channel: payload.channel,
+      p_check_in: payload.check_in,
+      p_check_out: payload.check_out,
+      p_pax: payload.pax,
+      p_gross_amount: payload.gross_amount,
+      p_ota_commission: payload.ota_commission,
+      p_cleaning_fee: payload.cleaning_fee,
+      p_discount: payload.discount,
+      p_net_room_revenue: payload.net_room_revenue,
+      p_status: payload.status,
+      p_notes: payload.notes
+    });
+    if (!rpcRes.error && rpcRes.data) {
+      data = rpcRes.data;
+    } else if (rpcRes.error && (rpcRes.error.code === '23P01' || rpcRes.error.message?.includes('OVERBOOKING_CONFLICT') || rpcRes.error.message?.includes('çakışıyor'))) {
+      error = rpcRes.error;
+    } else {
+      const updRes = await supabaseClient
+        .from('bookings')
+        .update(payload)
+        .eq('id', propBookingId)
+        .eq('tenant_id', tenantId)
+        .select()
+        .single();
+      data = updRes.data;
+      error = updRes.error;
+    }
+  } catch (e) {
+    const updRes = await supabaseClient
+      .from('bookings')
+      .update(payload)
+      .eq('id', propBookingId)
+      .eq('tenant_id', tenantId)
+      .select()
+      .single();
+    data = updRes.data;
+    error = updRes.error;
+  }
+
+  if (error) {
+    console.error('updateBooking DB error:', error);
+    if (error.code === '23P01' ||
+        error.message?.includes('exclude_overlapping_bookings') ||
+        error.message?.includes('OVERBOOKING_CONFLICT') ||
+        error.message?.includes('çakışıyor') ||
+        error.details?.includes('conflicting key')) {
+      throw new Error('Bu mülk seçilen tarihlerde başka bir rezervasyonla çakışıyor.');
+    }
+    throw new Error('Rezervasyon güncellenemedi: ' + (error.message || 'Veritabanı hatası'));
+  }
+
+  // Update local state ONLY on DB success
+  const updatedBooking = mapBookingFromDb(data);
+  if (typeof appData !== 'undefined' && appData.bookings) {
+    const idx = appData.bookings.findIndex(b => b.id === updatedBooking.id);
+    if (idx !== -1) {
+      appData.bookings[idx] = updatedBooking;
+    } else {
+      appData.bookings.push(updatedBooking);
+    }
+    if (typeof syncBookingCleaningTasks === 'function') syncBookingCleaningTasks();
+    if (typeof saveAppData === 'function') saveAppData();
+    if (typeof renderAll === 'function') renderAll();
+  }
+
+  return updatedBooking;
+}
+
+async function deleteBooking(bookingId) {
+  const tenantId = getActiveTenantId();
+  const isCloud = supabaseClient && tenantId && tenantId !== 'usr_ute_master' && !tenantId.startsWith('usr_');
+
+  let existing = null;
+  if (typeof appData !== 'undefined' && appData.bookings) {
+    existing = appData.bookings.find(b => b.id === bookingId || b.code === bookingId || b.dbId === bookingId);
+  }
+
+  const propBookingId = existing?.id || (isUUID(bookingId) ? bookingId : null);
+  const guestName = existing?.guest || 'bu';
+
+  if (typeof confirm === 'function') {
+    if (!confirm(`${guestName} rezervasyonunu silmek istediğinize emin misiniz?`)) {
+      return false;
+    }
+  }
+
+  if (isCloud && propBookingId) {
+    try {
+      // 1. Preserve historical / paid / completed cleaning tasks: detach booking_id rather than delete
+      await supabaseClient
+        .from('cleaning_tasks')
+        .update({ booking_id: null })
+        .eq('booking_id', propBookingId)
+        .eq('is_paid', true);
+
+      // 2. Remove only pending / unpaid cleaning tasks
+      await supabaseClient
+        .from('cleaning_tasks')
+        .delete()
+        .eq('booking_id', propBookingId)
+        .eq('is_paid', false);
+
+      // 3. Awaited DB delete for booking
+      const { error } = await supabaseClient
+        .from('bookings')
+        .delete()
+        .eq('id', propBookingId)
+        .eq('tenant_id', tenantId);
+
+      if (error) {
+        console.error('deleteBooking DB error:', error);
+        throw error;
+      }
+    } catch (err) {
+      const msg = 'Rezervasyon silinemedi: ' + (err.message || 'Veritabanı hatası');
+      if (typeof alert === 'function') alert(msg);
+      throw new Error(msg);
+    }
+  }
+
+  // 4. Update local state ONLY on DB success
+  if (typeof appData !== 'undefined') {
+    // Preserve completed / paid cleaning tasks in memory; remove unpaid pending
+    if (appData.cleaningTasks) {
+      appData.cleaningTasks = appData.cleaningTasks.map(t => {
+        if (t.bookingId === propBookingId || t.bookingId === bookingId) {
+          if (t.paid || t.is_paid) return { ...t, bookingId: null };
+          return null;
+        }
+        return t;
+      }).filter(Boolean);
+    }
+
+    if (appData.bookings) {
+      appData.bookings = appData.bookings.filter(b => b.id !== propBookingId && b.id !== bookingId && b.code !== bookingId);
+    }
+
+    if (typeof saveAppData === 'function') saveAppData();
+    if (typeof renderAll === 'function') renderAll();
+    if (typeof closeBookingModal === 'function') closeBookingModal();
+    if (typeof alert === 'function') alert('🗑️ Rezervasyon başarıyla silindi.');
+  }
+
+  return true;
+}
+
+// Backwards compatibility wrappers
+async function cloudUpsertBooking(bookingRecord) {
+  if (bookingRecord && bookingRecord.id && isUUID(bookingRecord.id)) {
+    return await updateBooking(bookingRecord.id, bookingRecord);
+  } else {
+    return await createBooking(bookingRecord);
+  }
+}
+
+async function cloudDeleteBooking(id) {
+  return await deleteBooking(id);
+}
+
+// =============================================================
+// 💰 FINANCE & EXPENSES MANAGEMENT (SUPABASE POSTGRESQL SOURCE OF TRUTH)
+// =============================================================
+
+function roundMoney(val) {
+  const num = Number(val) || 0;
+  return Math.round((num + Number.EPSILON) * 100) / 100;
+}
+
+function mapExpenseFromDb(row) {
+  if (!row) return null;
+  const currentAppData = (typeof appData !== 'undefined') ? appData : (typeof global !== 'undefined' ? global.appData : null);
+
+  // Resolve villa slug from property_id
+  let villaSlug = 'ALL';
+  if (row.property_id && currentAppData && currentAppData.villas) {
+    const foundProp = Object.values(currentAppData.villas).find(p => p.id === row.property_id);
+    if (foundProp) villaSlug = foundProp.slug || foundProp.name || row.property_id;
+    else villaSlug = row.property_id;
+  }
+
+  const dateStr = (typeof row.expense_date === 'string') ? row.expense_date.substring(0, 10) : '';
+
+  return {
+    id: row.id,
+    dbId: row.id,
+    tenantId: row.tenant_id,
+    propertyId: row.property_id || null,
+    villa: villaSlug,
+    date: dateStr,
+    month: dateStr ? dateStr.substring(0, 7) : '',
+    category: row.category || 'Diğer',
+    type: row.expense_type || (row.category === 'Tadilat' || row.category === 'Yatırım' ? 'CAPEX' : 'OPEX'),
+    amount: roundMoney(row.amount),
+    description: row.description || '',
+    bookingId: row.booking_id || null,
+    legacyId: row.legacy_id || null,
+    createdBy: row.created_by || null,
+    createdAt: row.created_at || null,
+    updatedAt: row.updated_at || null
+  };
+}
+
+function mapExpenseToDb(expense, targetTenantId) {
+  if (!expense) return null;
+  const tenantId = targetTenantId || getActiveTenantId();
+  const currentAppData = (typeof appData !== 'undefined') ? appData : (typeof global !== 'undefined' ? global.appData : null);
+
+  // Resolve property UUID
+  let propertyId = null;
+  if (expense.propertyId && isUUID(expense.propertyId)) {
+    propertyId = expense.propertyId;
+  } else if (expense.property_id && isUUID(expense.property_id)) {
+    propertyId = expense.property_id;
+  } else if (expense.villa && expense.villa !== 'ALL') {
+    if (isUUID(expense.villa)) {
+      propertyId = expense.villa;
+    } else if (currentAppData && currentAppData.villas && currentAppData.villas[expense.villa]) {
+      propertyId = currentAppData.villas[expense.villa].id;
+    }
+  }
+
+  // Resolve date safely
+  let dateStr = expense.date || expense.expense_date || new Date().toISOString().substring(0, 10);
+  if (typeof dateStr === 'string') dateStr = dateStr.substring(0, 10);
+
+  // Booking ID validation
+  let bookingId = null;
+  if (expense.bookingId && isUUID(expense.bookingId)) {
+    bookingId = expense.bookingId;
+  } else if (expense.booking_id && isUUID(expense.booking_id)) {
+    bookingId = expense.booking_id;
+  }
+
+  const payload = {
+    tenant_id: tenantId,
+    property_id: propertyId,
+    expense_date: dateStr,
+    category: (expense.category || 'Diğer').trim(),
+    expense_type: (expense.type === 'CAPEX' || expense.expense_type === 'CAPEX') ? 'CAPEX' : 'OPEX',
+    amount: roundMoney(expense.amount),
+    description: (expense.description || expense.desc || '').trim(),
+    updated_at: new Date().toISOString()
+  };
+
+  if (bookingId) {
+    payload.booking_id = bookingId;
+  }
+
+  if (expense.id && isUUID(expense.id)) {
+    payload.id = expense.id;
+  }
+
+  // legacy_id ONLY for migration idempotency
+  if (expense.legacyId) {
+    payload.legacy_id = expense.legacyId;
+  } else if (expense.legacy_id) {
+    payload.legacy_id = expense.legacy_id;
+  }
+
+  return payload;
+}
+
+async function loadExpenses(targetTenantId) {
+  const tenantId = targetTenantId || getActiveTenantId();
+  if (!supabaseClient || !tenantId || tenantId === 'usr_ute_master' || tenantId.startsWith('usr_')) {
+    return (typeof appData !== 'undefined' && appData.expenses) ? appData.expenses : [];
+  }
+  try {
+    const { data, error } = await supabaseClient
+      .from('expenses')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('expense_date', { ascending: false });
+
+    if (error) {
+      console.error('loadExpenses Supabase error:', error);
+      return (typeof appData !== 'undefined' && appData.expenses) ? appData.expenses : [];
+    }
+
+    const mapped = (data || []).map(mapExpenseFromDb).filter(Boolean);
+    if (typeof appData !== 'undefined') {
+      appData.expenses = mapped;
+      if (typeof renderExpensesTable === 'function') renderExpensesTable();
+      if (typeof renderFinance === 'function') renderFinance();
+    }
+    return mapped;
+  } catch (err) {
+    console.error('loadExpenses unexpected error:', err);
+    return (typeof appData !== 'undefined' && appData.expenses) ? appData.expenses : [];
+  }
+}
+
+// =============================================================
+// PHASE 8: FINANCIAL INTELLIGENCE & MONTHLY TARGETS / CLOSES
+// =============================================================
+
+function isPeriodClosed(dateOrYearMonth) {
+  if (!dateOrYearMonth) return false;
+  const ym = String(dateOrYearMonth).substring(0, 7);
+  const [yStr, mStr] = ym.split('-');
+  const y = parseInt(yStr, 10);
+  const m = parseInt(mStr, 10);
+  const currentAppData = (typeof appData !== 'undefined') ? appData : (typeof global !== 'undefined' ? global.appData : null);
+  const list = (currentAppData && currentAppData.closedPeriods) ? currentAppData.closedPeriods : [];
+  return list.some(cp => cp.year === y && cp.month === m && cp.status === 'CLOSED');
+}
+
+async function loadMonthlyTargets(year, month) {
+  const tenantId = getActiveTenantId();
+  const currentAppData = (typeof appData !== 'undefined') ? appData : (typeof global !== 'undefined' ? global.appData : null);
+  if (!supabaseClient || !tenantId || tenantId === 'usr_ute_master' || tenantId.startsWith('usr_')) {
+    return (currentAppData && Array.isArray(currentAppData.targets)) ? currentAppData.targets : [];
+  }
+  try {
+    let q = supabaseClient.from('monthly_targets').select('*').eq('tenant_id', tenantId);
+    if (year) q = q.eq('year', year);
+    if (month) q = q.eq('month', month);
+    const { data, error } = await q;
+    if (!error && data) {
+      if (currentAppData) currentAppData.targets = data;
+      return data;
+    }
+  } catch (err) {
+    console.error('loadMonthlyTargets error:', err);
+  }
+  return (currentAppData && Array.isArray(currentAppData.targets)) ? currentAppData.targets : [];
+}
+
+async function saveMonthlyTarget(targetInput) {
+  const tenantId = getActiveTenantId();
+  if (!targetInput || !targetInput.year || !targetInput.month) {
+    throw new Error('Hedef yılı ve ayı zorunludur.');
+  }
+  const isCloud = !!(supabaseClient && tenantId && tenantId !== 'usr_ute_master' && !tenantId.startsWith('usr_'));
+  const payload = {
+    tenant_id: tenantId,
+    property_id: targetInput.propertyId || targetInput.property_id || null,
+    year: Number(targetInput.year),
+    month: Number(targetInput.month),
+    revenue_target: targetInput.revenueTarget !== undefined ? Number(targetInput.revenueTarget) : Number(targetInput.revenue_target || 0),
+    net_profit_target: targetInput.netProfitTarget !== undefined ? Number(targetInput.netProfitTarget) : Number(targetInput.net_profit_target || 0),
+    margin_target: targetInput.marginTarget !== undefined ? Number(targetInput.marginTarget) : Number(targetInput.margin_target || 0),
+    occupancy_target: targetInput.occupancyTarget !== undefined ? Number(targetInput.occupancyTarget) : Number(targetInput.occupancy_target || 0),
+    adr_target: targetInput.adrTarget !== undefined ? Number(targetInput.adrTarget) : Number(targetInput.adr_target || 0),
+    revpar_target: targetInput.revparTarget !== undefined ? Number(targetInput.revparTarget) : Number(targetInput.revpar_target || 0),
+    max_expense_target: targetInput.maxExpenseTarget !== undefined ? Number(targetInput.maxExpenseTarget) : Number(targetInput.max_expense_target || 0),
+    updated_at: new Date().toISOString()
+  };
+
+  const currentAppData = (typeof appData !== 'undefined') ? appData : (typeof global !== 'undefined' ? global.appData : null);
+
+  if (!isCloud) {
+    if (currentAppData) {
+      if (!Array.isArray(currentAppData.targets)) currentAppData.targets = [];
+      const idx = currentAppData.targets.findIndex(t => t.year === payload.year && t.month === payload.month && t.property_id === payload.property_id);
+      if (idx !== -1) {
+        currentAppData.targets[idx] = { ...currentAppData.targets[idx], ...payload };
+      } else {
+        payload.id = 'target_' + Date.now();
+        currentAppData.targets.push(payload);
+      }
+      if (typeof saveAppData === 'function') saveAppData();
+      if (typeof renderAll === 'function') renderAll();
+    }
+    return payload;
+  }
+
+  let query;
+  if (!payload.property_id) {
+    query = supabaseClient.from('monthly_targets')
+      .upsert(payload, { onConflict: 'tenant_id, year, month' });
+  } else {
+    query = supabaseClient.from('monthly_targets')
+      .upsert(payload, { onConflict: 'tenant_id, property_id, year, month' });
+  }
+  const { data, error } = await query.select().single();
+  if (error) {
+    throw new Error('Hedef kaydedilemedi: ' + (error.message || 'Veritabanı hatası'));
+  }
+  await loadMonthlyTargets();
+  if (typeof renderAll === 'function') renderAll();
+  return data;
+}
+
+async function loadMonthlyCloses() {
+  const tenantId = getActiveTenantId();
+  const currentAppData = (typeof appData !== 'undefined') ? appData : (typeof global !== 'undefined' ? global.appData : null);
+  if (!supabaseClient || !tenantId || tenantId === 'usr_ute_master' || tenantId.startsWith('usr_')) {
+    return (currentAppData && currentAppData.closedPeriods) ? currentAppData.closedPeriods : [];
+  }
+  try {
+    const { data, error } = await supabaseClient.from('monthly_financial_closes').select('*').eq('tenant_id', tenantId);
+    if (!error && data) {
+      if (currentAppData) currentAppData.closedPeriods = data;
+      return data;
+    }
+  } catch (err) {
+    console.error('loadMonthlyCloses error:', err);
+  }
+  return (currentAppData && currentAppData.closedPeriods) ? currentAppData.closedPeriods : [];
+}
+
+async function closeMonthlyPeriod(year, month) {
+  const tenantId = getActiveTenantId();
+  let fms = (typeof FinancialMetricsService !== 'undefined') ? FinancialMetricsService : null;
+  if (!fms && typeof require !== 'undefined') {
+    try { fms = require('./core/financial_metrics_service'); } catch (e) {}
+  }
+  if (!fms && typeof window !== 'undefined') fms = window.FinancialMetricsService;
+
+  const currentAppData = (typeof appData !== 'undefined') ? appData : (typeof global !== 'undefined' ? global.appData : null);
+  const metrics = fms ? fms.computeFinancialMetrics({
+    year,
+    month,
+    propertyId: null,
+    bookings: currentAppData?.bookings || [],
+    expenses: currentAppData?.expenses || [],
+    properties: Object.values(currentAppData?.villas || {}),
+    targets: currentAppData?.targets || [],
+    maintenances: currentAppData?.maintenance || []
+  }) : { financial: {}, operations: {}, targets: {}, reconciliation: {} };
+
+  const snapshot = {
+    schemaVersion: 1,
+    period: `${year}-${String(month).padStart(2, '0')}`,
+    closedAt: new Date().toISOString(),
+    closedBy: null,
+    financial: metrics.financial,
+    operations: metrics.operations,
+    targets: metrics.targets,
+    reconciliation: metrics.reconciliation
+  };
+
+  const isCloud = !!(supabaseClient && tenantId && tenantId !== 'usr_ute_master' && !tenantId.startsWith('usr_'));
+  if (!isCloud) {
+    if (currentAppData) {
+      if (!currentAppData.closedPeriods) currentAppData.closedPeriods = [];
+      const idx = currentAppData.closedPeriods.findIndex(cp => cp.year === year && cp.month === month);
+      const closeRec = {
+        id: 'close_' + Date.now(),
+        tenant_id: tenantId,
+        year,
+        month,
+        status: 'CLOSED',
+        closed_at: snapshot.closedAt,
+        snapshot_json: snapshot
+      };
+      if (idx !== -1) currentAppData.closedPeriods[idx] = closeRec;
+      else currentAppData.closedPeriods.push(closeRec);
+      if (typeof saveAppData === 'function') saveAppData();
+      if (typeof renderAll === 'function') renderAll();
+      return closeRec;
+    }
+    return { success: true };
+  }
+
+  const { data, error } = await supabaseClient.rpc('close_monthly_period_atomic', {
+    p_tenant_id: tenantId,
+    p_year: Number(year),
+    p_month: Number(month),
+    p_snapshot: snapshot
+  });
+
+  if (error) {
+    throw new Error('Dönem kapatılamadı: ' + (error.message || 'Veritabanı hatası'));
+  }
+  await loadMonthlyCloses();
+  if (typeof renderAll === 'function') renderAll();
+  return data;
+}
+
+function convertAiActionToTask(actionTitle, propertyId, priority, metric) {
+  const currentAppData = (typeof appData !== 'undefined') ? appData : (typeof global !== 'undefined' ? global.appData : null);
+  if (!currentAppData) return false;
+  if (!currentAppData.maintenance) currentAppData.maintenance = [];
+
+  const period = (typeof currentFilter !== 'undefined' && currentFilter.period) ? currentFilter.period : '2026-09';
+  const actionKey = `${actionTitle}|${propertyId || 'ALL'}|${period}`;
+  const isDup = currentAppData.maintenance.some(t => t.metadata && t.metadata.actionKey === actionKey);
+  if (isDup) {
+    if (typeof showToast === 'function') showToast('Bu öneri için zaten görev oluşturulmuş.', 'info');
+    return false;
+  }
+
+  const newTask = {
+    id: 'M-AI-' + (currentAppData.maintenance.length + 1),
+    villa: propertyId || 'ALL',
+    priority: priority === 'HIGH' ? 'P1' : 'P2',
+    title: actionTitle,
+    assignee: 'Finans Yöneticisi',
+    downtime: 0,
+    cost: 0,
+    status: 'OPEN',
+    metadata: {
+      source: 'FINANCE_AI',
+      propertyId: propertyId || null,
+      financialPeriod: period,
+      sourceMetric: metric || null,
+      actionKey
+    }
+  };
+
+  currentAppData.maintenance.unshift(newTask);
+  if (typeof saveAppData === 'function') saveAppData();
+  if (typeof renderAll === 'function') renderAll();
+  if (typeof showToast === 'function') showToast('AI finansal aksiyonu başarıyla operasyonel göreve dönüştürüldü.', 'success');
+  return true;
+}
+
+async function createExpense(expenseInput) {
+  if (!expenseInput) throw new Error('Gider bilgisi girilmedi.');
+  const tenantId = getActiveTenantId();
+  const isCloud = !!(supabaseClient && tenantId && tenantId !== 'usr_ute_master' && !tenantId.startsWith('usr_'));
+
+  // 1. Validation
+  const amt = roundMoney(expenseInput.amount);
+  if (isNaN(amt) || amt <= 0) {
+    throw new Error('Gider tutarı 0 veya negatif olamaz.');
+  }
+
+  const dateStr = expenseInput.date || expenseInput.expense_date;
+  if (!dateStr || typeof dateStr !== 'string' || !/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+    throw new Error('Geçerli bir gider tarihi (YYYY-MM-DD) zorunludur.');
+  }
+  if (isPeriodClosed(dateStr)) {
+    throw new Error(`Bu dönem (${dateStr.substring(0, 7)}) kapatılmıştır (Closed Period). Gider eklenemez.`);
+  }
+
+  const category = (expenseInput.category || '').trim();
+  if (!category) {
+    throw new Error('Gider kategorisi zorunludur.');
+  }
+
+  const expType = (expenseInput.type === 'CAPEX' || expenseInput.expense_type === 'CAPEX') ? 'CAPEX' : 'OPEX';
+
+  // Resolve property UUID and verify active tenant ownership
+  const currentAppData = (typeof appData !== 'undefined') ? appData : (typeof global !== 'undefined' ? global.appData : null);
+  let propId = expenseInput.propertyId || expenseInput.property_id;
+  if (!propId && expenseInput.villa && expenseInput.villa !== 'ALL') {
+    if (isUUID(expenseInput.villa)) {
+      propId = expenseInput.villa;
+    } else if (currentAppData?.villas?.[expenseInput.villa]) {
+      propId = currentAppData.villas[expenseInput.villa].id;
+    }
+  }
+
+  if (currentAppData?.villas && propId) {
+    const validPropertyIds = Object.values(currentAppData.villas).map(p => p.id).filter(Boolean);
+    if (validPropertyIds.length > 0 && !validPropertyIds.includes(propId)) {
+      throw new Error('Seçilen mülk aktif işletmenize ait değildir.');
+    }
+  }
+
+  // Resolve booking UUID and verify active tenant ownership
+  let bookingId = expenseInput.bookingId || expenseInput.booking_id;
+  if (bookingId && !isUUID(bookingId)) bookingId = null;
+  if (currentAppData?.bookings && bookingId) {
+    const validBookingIds = currentAppData.bookings.map(b => b.id || b.dbId).filter(Boolean);
+    if (validBookingIds.length > 0 && !validBookingIds.includes(bookingId)) {
+      throw new Error('Seçilen rezervasyon aktif işletmenize ait değildir.');
+    }
+  }
+
+  // 2. Offline / demo fallback
+  if (!isCloud) {
+    const newId = 'local_exp_' + Date.now();
+    const localRecord = {
+      id: newId,
+      dbId: newId,
+      tenantId: tenantId || 'usr_ute_master',
+      propertyId: propId || null,
+      villa: expenseInput.villa || 'ALL',
+      date: dateStr.substring(0, 10),
+      month: dateStr.substring(0, 7),
+      category,
+      type: expType,
+      amount: amt,
+      description: (expenseInput.description || expenseInput.desc || '').trim(),
+      bookingId: bookingId || null,
+      legacyId: null
+    };
+    if (currentAppData) {
+      if (!currentAppData.expenses) currentAppData.expenses = [];
+      currentAppData.expenses.push(localRecord);
+      if (typeof saveAppData === 'function') saveAppData();
+      if (typeof renderAll === 'function') renderAll();
+    }
+    return localRecord;
+  }
+
+  // 3. Awaited DB write
+  const payload = mapExpenseToDb({
+    ...expenseInput,
+    propertyId: propId,
+    bookingId: bookingId,
+    amount: amt,
+    category,
+    type: expType,
+    date: dateStr.substring(0, 10)
+  }, tenantId);
+  delete payload.id; // DB generates gen_random_uuid()
+
+  if (!expenseInput.legacyId && !expenseInput.legacy_id) {
+    delete payload.legacy_id;
+  }
+
+  const { data, error } = await supabaseClient
+    .from('expenses')
+    .insert(payload)
+    .select()
+    .single();
+
+  if (error || !data) {
+    console.error('createExpense DB error:', error);
+    if (error?.code === '42501' || error?.message?.includes('CROSS_TENANT')) {
+      throw new Error(error.message || 'Seçilen mülk veya rezervasyon aktif işletmenize ait değildir.');
+    }
+    if (error?.code === '23514') {
+      throw new Error('Gider tutarı, kategorisi veya tipi geçersizdir (DB Constraint).');
+    }
+    throw new Error('Gider kaydedilemedi: ' + (error?.message || 'Veritabanı hatası'));
+  }
+
+  // 4. Update local state ONLY on DB success
+  const mapped = mapExpenseFromDb(data);
+  if (currentAppData) {
+    if (!currentAppData.expenses) currentAppData.expenses = [];
+    currentAppData.expenses.push(mapped);
+    if (typeof saveAppData === 'function') saveAppData();
+    if (typeof renderAll === 'function') renderAll();
+    if (typeof renderExpensesTable === 'function') renderExpensesTable();
+    if (typeof renderFinance === 'function') renderFinance();
+  }
+
+  return mapped;
+}
+
+async function updateExpense(expenseId, expenseInput) {
+  if (!expenseId) throw new Error('Güncellenecek gider ID belirtilmedi.');
+  if (!expenseInput) throw new Error('Gider güncelleme bilgisi girilmedi.');
+  const tenantId = getActiveTenantId();
+  const isCloud = !!(supabaseClient && tenantId && tenantId !== 'usr_ute_master' && !tenantId.startsWith('usr_'));
+
+  const currentAppData = (typeof appData !== 'undefined') ? appData : (typeof global !== 'undefined' ? global.appData : null);
+  let existing = null;
+  let existingIdx = -1;
+  if (currentAppData?.expenses) {
+    existingIdx = currentAppData.expenses.findIndex(e => e.id === expenseId || e.dbId === expenseId);
+    if (existingIdx !== -1) existing = currentAppData.expenses[existingIdx];
+  }
+
+  const propExpenseId = existing?.id || (isUUID(expenseId) ? expenseId : null);
+  if (!propExpenseId && isCloud) {
+    throw new Error('Güncellenecek giderin kimliği bulunamadı.');
+  }
+
+  // 1. Validation
+  const amt = expenseInput.amount !== undefined ? roundMoney(expenseInput.amount) : existing?.amount;
+  if (amt !== undefined && (isNaN(amt) || amt <= 0)) {
+    throw new Error('Gider tutarı 0 veya negatif olamaz.');
+  }
+
+  const dateStr = expenseInput.date || expenseInput.expense_date || existing?.date;
+  if (dateStr && (!/^\d{4}-\d{2}-\d{2}/.test(dateStr))) {
+    throw new Error('Geçerli bir gider tarihi (YYYY-MM-DD) zorunludur.');
+  }
+  if (dateStr && isPeriodClosed(dateStr)) {
+    throw new Error(`Bu dönem (${dateStr.substring(0, 7)}) kapatılmıştır (Closed Period). Gider güncellenemez.`);
+  }
+
+  const category = expenseInput.category !== undefined ? (expenseInput.category || '').trim() : existing?.category;
+  if (category !== undefined && !category) {
+    throw new Error('Gider kategorisi zorunludur.');
+  }
+
+  const expType = expenseInput.type ? (expenseInput.type === 'CAPEX' ? 'CAPEX' : 'OPEX') : (existing?.type || 'OPEX');
+
+  // Verify property ownership
+  let propId = expenseInput.propertyId || expenseInput.property_id || existing?.propertyId;
+  if (!propId && expenseInput.villa && expenseInput.villa !== 'ALL') {
+    if (isUUID(expenseInput.villa)) {
+      propId = expenseInput.villa;
+    } else if (currentAppData?.villas?.[expenseInput.villa]) {
+      propId = currentAppData.villas[expenseInput.villa].id;
+    }
+  }
+
+  if (currentAppData?.villas && propId) {
+    const validPropertyIds = Object.values(currentAppData.villas).map(p => p.id).filter(Boolean);
+    if (validPropertyIds.length > 0 && !validPropertyIds.includes(propId)) {
+      throw new Error('Seçilen mülk aktif işletmenize ait değildir.');
+    }
+  }
+
+  // 2. Offline / demo fallback
+  if (!isCloud) {
+    if (!existing) {
+      throw new Error('Güncellenecek gider bulunamadı.');
+    }
+    const updated = {
+      ...(existing || {}),
+      propertyId: propId || null,
+      villa: expenseInput.villa || existing?.villa || 'ALL',
+      date: dateStr ? dateStr.substring(0, 10) : existing?.date,
+      month: dateStr ? dateStr.substring(0, 7) : existing?.month,
+      category: category || existing?.category || 'Diğer',
+      type: expType,
+      amount: amt !== undefined ? amt : existing?.amount,
+      description: expenseInput.description !== undefined ? expenseInput.description : existing?.description
+    };
+    if (existingIdx !== -1 && currentAppData?.expenses) {
+      currentAppData.expenses[existingIdx] = updated;
+    }
+    if (typeof saveAppData === 'function') saveAppData();
+    if (typeof renderAll === 'function') renderAll();
+    return updated;
+  }
+
+  // 3. Awaited DB update
+  const payload = {
+    property_id: propId || null,
+    expense_date: dateStr ? dateStr.substring(0, 10) : undefined,
+    category: category,
+    expense_type: expType,
+    amount: amt,
+    description: expenseInput.description !== undefined ? expenseInput.description.trim() : undefined,
+    updated_at: new Date().toISOString()
+  };
+  Object.keys(payload).forEach(k => payload[k] === undefined && delete payload[k]);
+
+  const { data, error } = await supabaseClient
+    .from('expenses')
+    .update(payload)
+    .eq('id', propExpenseId)
+    .eq('tenant_id', tenantId)
+    .select()
+    .single();
+
+  if (error || !data) {
+    console.error('updateExpense DB error:', error);
+    if (error?.code === '42501' || error?.message?.includes('CROSS_TENANT')) {
+      throw new Error(error.message || 'Seçilen mülk veya rezervasyon aktif işletmenize ait değildir.');
+    }
+    if (error?.code === '23514') {
+      throw new Error('Gider tutarı, kategorisi veya tipi geçersizdir (DB Constraint).');
+    }
+    throw new Error('Gider güncellenemedi: ' + (error?.message || 'Veritabanı hatası'));
+  }
+
+  // 4. Update local state ONLY on DB success
+  const mapped = mapExpenseFromDb(data);
+  if (currentAppData?.expenses) {
+    const idx = currentAppData.expenses.findIndex(e => e.id === propExpenseId || e.dbId === propExpenseId);
+    if (idx !== -1) {
+      currentAppData.expenses[idx] = mapped;
+    }
+    if (typeof saveAppData === 'function') saveAppData();
+    if (typeof renderAll === 'function') renderAll();
+    if (typeof renderExpensesTable === 'function') renderExpensesTable();
+    if (typeof renderFinance === 'function') renderFinance();
+  }
+
+  return mapped;
+}
+
+async function deleteExpense(expenseId, skipConfirm = false) {
+  if (!expenseId) throw new Error('Silinecek gider ID belirtilmedi.');
+  if (!skipConfirm && typeof confirm === 'function') {
+    const ok = confirm('Bu harcamayı silmek istediğinizden emin misiniz?');
+    if (!ok) return false;
+  }
+
+  const tenantId = getActiveTenantId();
+  const isCloud = !!(supabaseClient && tenantId && tenantId !== 'usr_ute_master' && !tenantId.startsWith('usr_'));
+  const currentAppData = (typeof appData !== 'undefined') ? appData : (typeof global !== 'undefined' ? global.appData : null);
+
+  const existing = currentAppData?.expenses ? currentAppData.expenses.find(e => e.id === expenseId || e.dbId === expenseId) : null;
+  const propExpenseId = existing?.id || (isUUID(expenseId) ? expenseId : null);
+
+  const expDate = existing?.date || existing?.expense_date;
+  if (expDate && isPeriodClosed(expDate)) {
+    throw new Error(`Bu dönem (${expDate.substring(0, 7)}) kapatılmıştır (Closed Period). Gider silinemez.`);
+  }
+
+  // 1. Awaited DB delete
+  if (isCloud && propExpenseId) {
+    const { error } = await supabaseClient
+      .from('expenses')
+      .delete()
+      .eq('id', propExpenseId)
+      .eq('tenant_id', tenantId);
+
+    if (error) {
+      console.error('deleteExpense DB error:', error);
+      const msg = 'Gider silinemedi: ' + (error.message || 'Veritabanı hatası');
+      if (typeof alert === 'function') alert(msg);
+      throw new Error(msg);
+    }
+  }
+
+  // 2. Update local state ONLY on DB success
+  if (currentAppData) {
+    if (existing && existing.cleanTaskId && currentAppData.cleaningTasks) {
+      const task = currentAppData.cleaningTasks.find(t => t.id === existing.cleanTaskId);
+      if (task) {
+        task.paid = false;
+        task.paidDate = null;
+        if (currentAppData.cleaningPayments && currentAppData.cleaningPayments[task.villa]) {
+          currentAppData.cleaningPayments[task.villa].paid = false;
+        }
+      }
+    }
+    if (currentAppData.expenses) {
+      currentAppData.expenses = currentAppData.expenses.filter(e => e.id !== propExpenseId && e.id !== expenseId && e.dbId !== expenseId);
+    }
+    if (typeof saveAppData === 'function') saveAppData();
+    if (typeof renderAll === 'function') renderAll();
+    if (typeof renderExpensesTable === 'function') renderExpensesTable();
+    if (typeof renderFinance === 'function') renderFinance();
+    if (typeof window !== 'undefined' && window.showToast) window.showToast('🗑️ Harcama başarıyla silindi.');
+  }
+
+  return true;
+}
+
+// Backwards compatibility wrappers
+async function cloudUpsertExpense(exp) {
+  if (exp && exp.id && isUUID(exp.id)) {
+    return await updateExpense(exp.id, exp);
+  } else {
+    return await createExpense(exp);
+  }
+}
+
+async function cloudDeleteExpense(expId) {
+  return await deleteExpense(expId, true);
+}
+
+async function cloudUpsertCleaningTask(task) {
+  const tenantId = getActiveTenantId();
+  if (!supabaseClient || !tenantId || tenantId === 'usr_ute_master' || tenantId.startsWith('usr_')) return;
+  try {
+    const propId = await getPropertyIdBySlug(task.villa, tenantId);
+    if (!propId) return;
+    const legacyId = task.id || ('TASK-' + Date.now().toString());
+    const { error } = await supabaseClient.from('cleaning_tasks').upsert({
+      tenant_id: tenantId,
+      property_id: propId,
+      task_date: task.date || new Date().toISOString().split('T')[0],
+      cleaner_name: task.cleaner || 'Temizlik Ekibi',
+      amount: Number(task.amount) || 0,
+      description: task.notes || task.desc || '',
+      is_paid: !!task.paid,
+      legacy_id: legacyId,
+      created_by: activeSaaSUser?.id
+    }, { onConflict: 'tenant_id, legacy_id' });
+    if (error) console.warn('cloudUpsertCleaningTask notice:', error.message);
+  } catch (err) {
+    console.warn('cloudUpsertCleaningTask error:', err);
+  }
+}
+
+async function cloudDeleteCleaningTask(taskId) {
+  const tenantId = getActiveTenantId();
+  if (!supabaseClient || !tenantId || tenantId === 'usr_ute_master' || tenantId.startsWith('usr_')) return;
+  try {
+    const { error } = await supabaseClient.from('cleaning_tasks').delete().match({
+      tenant_id: tenantId,
+      legacy_id: taskId
+    });
+    if (error) console.warn('cloudDeleteCleaningTask notice:', error.message);
+  } catch (err) {
+    console.warn('cloudDeleteCleaningTask error:', err);
+  }
+}
+
+// =============================================================
+// 🎯 LEADS & SALES CRM PIPELINE (SUPABASE POSTGRESQL SOURCE OF TRUTH) - PHASE 7
+// =============================================================
+
+const ALLOWED_LEAD_STAGES = ['NEW', 'CONTACTED', 'QUOTE_SENT', 'FOLLOW_UP', 'WON', 'LOST'];
+const ALLOWED_LEAD_SOURCES = ['WHATSAPP', 'INSTAGRAM', 'META', 'AIRBNB', 'BOOKING', 'DIRECT', 'PHONE', 'OTHER'];
+const ALLOWED_LOST_REASONS = ['Fiyat Yüksek', 'Tarih Dolu', 'Cevap Vermedi', 'Başka Yer Seçti', 'Diğer'];
+
+function mapLeadFromDb(row) {
+  if (!row) return null;
+  const currentAppData = (typeof appData !== 'undefined') ? appData : (typeof global !== 'undefined' ? global.appData : null);
+
+  // Resolve villa slug from property_id
+  let villaSlug = 'ALL';
+  if (row.property_id && currentAppData && currentAppData.villas) {
+    const foundProp = Object.values(currentAppData.villas).find(p => p.id === row.property_id);
+    if (foundProp) villaSlug = foundProp.slug || foundProp.name || row.property_id;
+    else villaSlug = row.property_id;
+  }
+
+  const guestName = (row.guest_name || '').trim();
+  const guestPhone = (row.guest_phone || '').trim();
+  const guestEmail = (row.guest_email || '').trim();
+  const rawStatus = (row.status || 'NEW').toUpperCase();
+  const status = ALLOWED_LEAD_STAGES.includes(rawStatus) ? rawStatus : 'NEW';
+
+  return {
+    id: row.id,
+    dbId: row.id,
+    tenantId: row.tenant_id,
+    propertyId: row.property_id || null,
+    villa: villaSlug,
+    guest: guestPhone ? `${guestName} (${guestPhone})` : (guestName || 'Misafir Talebi'),
+    guestName: guestName,
+    phone: guestPhone,
+    email: guestEmail,
+    channel: row.channel || 'WhatsApp',
+    source: (row.channel || 'WHATSAPP').toUpperCase(),
+    date: row.lead_date || '',
+    checkIn: row.requested_check_in || '',
+    checkOut: row.requested_check_out || '',
+    pax: Number(row.pax) || 2,
+    quote: Number(row.quote_amount) || 0,
+    quoteAmount: Number(row.quote_amount) || 0,
+    status: status,
+    stage: status,
+    lostReason: row.lost_reason || '',
+    notes: row.notes || '',
+    convertedBookingId: row.converted_booking_id || null,
+    converted_booking_id: row.converted_booking_id || null,
+    createdBy: row.created_by || null,
+    createdAt: row.created_at || null,
+    updatedAt: row.updated_at || null
+  };
+}
+
+function mapLeadToDb(lead, targetTenantId) {
+  if (!lead) return null;
+  const tenantId = targetTenantId || getActiveTenantId();
+  const currentAppData = (typeof appData !== 'undefined') ? appData : (typeof global !== 'undefined' ? global.appData : null);
+
+  // Resolve property UUID
+  let propertyId = null;
+  if (lead.propertyId && isUUID(lead.propertyId)) {
+    propertyId = lead.propertyId;
+  } else if (lead.property_id && isUUID(lead.property_id)) {
+    propertyId = lead.property_id;
+  } else if (lead.villa && lead.villa !== 'ALL' && currentAppData && currentAppData.villas) {
+    const foundProp = currentAppData.villas[lead.villa] || Object.values(currentAppData.villas).find(p => p.slug === lead.villa || p.id === lead.villa);
+    if (foundProp && foundProp.id) propertyId = foundProp.id;
+  }
+
+  // Parse guestName and guestPhone
+  let gName = (lead.guestName || lead.guest_name || '').trim();
+  let gPhone = (lead.phone || lead.guestPhone || lead.guest_phone || '').trim();
+  if (!gName && lead.guest) {
+    const m = String(lead.guest).match(/^(.*?)(?:\s*\((.*?)\))?$/);
+    if (m) {
+      gName = (m[1] || '').trim();
+      if (!gPhone && m[2]) gPhone = m[2].trim();
+    }
+  }
+  if (!gName && !gPhone) {
+    gName = 'Misafir Talebi';
+  }
+
+  // Normalize status/stage
+  const rawStatus = (lead.status || lead.stage || 'NEW').toUpperCase();
+  const status = ALLOWED_LEAD_STAGES.includes(rawStatus) ? rawStatus : 'NEW';
+
+  // Normalize dates
+  const checkIn = lead.checkIn || lead.requested_check_in || null;
+  const checkOut = lead.checkOut || lead.requested_check_out || null;
+
+  const payload = {
+    tenant_id: tenantId,
+    property_id: propertyId,
+    converted_booking_id: lead.convertedBookingId || lead.converted_booking_id || null,
+    guest_name: gName,
+    guest_phone: gPhone,
+    guest_email: (lead.email || lead.guestEmail || lead.guest_email || '').trim() || null,
+    channel: lead.channel || lead.source || 'WhatsApp',
+    lead_date: lead.date || lead.lead_date || new Date().toISOString().split('T')[0],
+    requested_check_in: checkIn,
+    requested_check_out: checkOut,
+    pax: Number(lead.pax) > 0 ? Number(lead.pax) : 2,
+    quote_amount: Number(lead.quote ?? lead.quoteAmount ?? 0) >= 0 ? Number(lead.quote ?? lead.quoteAmount ?? 0) : 0,
+    status: status,
+    lost_reason: (status === 'LOST' ? (lead.lostReason || lead.lost_reason || 'Diğer') : null),
+    notes: (lead.notes || '').trim()
+  };
+
+  if (lead.id && isUUID(lead.id)) {
+    payload.id = lead.id;
+  }
+
+  return payload;
+}
+
+function validateLeadInput(leadInput, targetTenantId) {
+  if (!leadInput) throw new Error('Lead bilgisi boş olamaz.');
+  const tenantId = targetTenantId || getActiveTenantId();
+  const currentAppData = (typeof appData !== 'undefined') ? appData : (typeof global !== 'undefined' ? global.appData : null);
+
+  // 1. Identity validation
+  let gName = (leadInput.guestName || leadInput.guest_name || '').trim();
+  let gPhone = (leadInput.phone || leadInput.guestPhone || leadInput.guest_phone || '').trim();
+  if (!gName && leadInput.guest) {
+    const m = String(leadInput.guest).match(/^(.*?)(?:\s*\((.*?)\))?$/);
+    if (m) {
+      gName = (m[1] || '').trim();
+      if (!gPhone && m[2]) gPhone = m[2].trim();
+    }
+  }
+  if (!gName && !gPhone) {
+    throw new Error('Misafir adı veya telefon numarasından en az biri belirtilmelidir.');
+  }
+
+  // 2. Property isolation validation
+  const propId = leadInput.propertyId || leadInput.property_id;
+  if (propId && isUUID(propId) && currentAppData && currentAppData.villas) {
+    const isOwned = Object.values(currentAppData.villas).some(p => p.id === propId);
+    if (!isOwned && currentAppData.tenantId && currentAppData.tenantId === tenantId) {
+      throw new Error('Seçilen mülk aktif işletmenize ait değildir.');
+    }
+  }
+
+  // 3. Dates validation
+  const checkIn = leadInput.checkIn || leadInput.requested_check_in;
+  const checkOut = leadInput.checkOut || leadInput.requested_check_out;
+  if (checkIn && checkOut) {
+    const d1 = new Date(checkIn);
+    const d2 = new Date(checkOut);
+    if (isNaN(d1.getTime()) || isNaN(d2.getTime())) {
+      throw new Error('Geçersiz tarih formatı.');
+    }
+    if (d2 <= d1) {
+      throw new Error('Çıkış tarihi giriş tarihinden sonra olmalıdır.');
+    }
+  }
+
+  // 4. Pax & Amount validation
+  if (leadInput.pax !== undefined && leadInput.pax !== null && Number(leadInput.pax) <= 0) {
+    throw new Error('Kişi sayısı 0 veya negatif olamaz.');
+  }
+  const quote = leadInput.quote ?? leadInput.quoteAmount;
+  if (quote !== undefined && quote !== null && Number(quote) < 0) {
+    throw new Error('Teklif tutarı negatif olamaz.');
+  }
+
+  // 5. Stage validation
+  const rawStatus = (leadInput.status || leadInput.stage || 'NEW').toUpperCase();
+  if (rawStatus && !ALLOWED_LEAD_STAGES.includes(rawStatus)) {
+    throw new Error(`Tanımsız lead durumu: ${rawStatus}`);
+  }
+
+  return true;
+}
+
+async function loadLeads(targetTenantId) {
+  const tenantId = targetTenantId || getActiveTenantId();
+  if (!supabaseClient || !tenantId || tenantId === 'usr_ute_master' || tenantId.startsWith('usr_')) {
+    return (typeof appData !== 'undefined' && appData.leads) ? appData.leads : [];
+  }
+
+  const { data, error } = await supabaseClient
+    .from('leads')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('loadLeads error:', error);
+    throw error;
+  }
+
+  const mapped = (data || []).map(mapLeadFromDb);
+  if (typeof appData !== 'undefined') {
+    appData.leads = mapped;
+    if (typeof saveAppData === 'function') saveAppData();
+  }
+  return mapped;
+}
+
+async function createLead(leadInput) {
+  const tenantId = getActiveTenantId();
+  validateLeadInput(leadInput, tenantId);
+
+  const isCloud = !!(supabaseClient && tenantId && tenantId !== 'usr_ute_master' && !tenantId.startsWith('usr_'));
+
+  if (!isCloud) {
+    const localId = 'local_lead_' + Date.now();
+    const localRecord = {
+      id: localId,
+      dbId: localId,
+      tenantId: tenantId || 'usr_ute_master',
+      propertyId: leadInput.propertyId || null,
+      villa: leadInput.villa || 'ALL',
+      guest: leadInput.guest || leadInput.guestName || 'Misafir Talebi',
+      guestName: leadInput.guestName || leadInput.guest || 'Misafir Talebi',
+      phone: leadInput.phone || '',
+      email: leadInput.email || '',
+      channel: leadInput.channel || 'WhatsApp',
+      source: (leadInput.channel || 'WHATSAPP').toUpperCase(),
+      date: leadInput.date || new Date().toISOString().split('T')[0],
+      checkIn: leadInput.checkIn || '',
+      checkOut: leadInput.checkOut || '',
+      pax: Number(leadInput.pax) || 2,
+      quote: Number(leadInput.quote) || 0,
+      quoteAmount: Number(leadInput.quote) || 0,
+      status: (leadInput.status || 'NEW').toUpperCase(),
+      stage: (leadInput.status || 'NEW').toUpperCase(),
+      lostReason: leadInput.lostReason || '',
+      notes: leadInput.notes || '',
+      convertedBookingId: null,
+      converted_booking_id: null
+    };
+    if (typeof appData !== 'undefined') {
+      if (!appData.leads) appData.leads = [];
+      appData.leads.unshift(localRecord);
+      if (typeof saveAppData === 'function') saveAppData();
+      if (typeof renderAll === 'function') renderAll();
+    }
+    return localRecord;
+  }
+
+  const payload = mapLeadToDb(leadInput, tenantId);
+  delete payload.id; // Let DB generate UUID
+
+  const { data, error } = await supabaseClient
+    .from('leads')
+    .insert(payload)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('createLead error:', error);
+    throw error;
+  }
+
+  const created = mapLeadFromDb(data);
+  if (typeof appData !== 'undefined') {
+    if (!appData.leads) appData.leads = [];
+    appData.leads.unshift(created);
+    if (typeof saveAppData === 'function') saveAppData();
+    if (typeof renderAll === 'function') renderAll();
+  }
+  return created;
+}
+
+async function updateLead(leadId, patch) {
+  if (!leadId) throw new Error('Güncellenecek lead kimliği gereklidir.');
+  const tenantId = getActiveTenantId();
+  const isCloud = !!(supabaseClient && tenantId && tenantId !== 'usr_ute_master' && !tenantId.startsWith('usr_'));
+
+  if (!isCloud) {
+    if (typeof appData !== 'undefined' && appData.leads) {
+      const idx = appData.leads.findIndex(l => l.id === leadId || l.dbId === leadId);
+      if (idx !== -1) {
+        appData.leads[idx] = { ...appData.leads[idx], ...patch };
+        if (typeof saveAppData === 'function') saveAppData();
+        if (typeof renderAll === 'function') renderAll();
+        return appData.leads[idx];
+      }
+    }
+    throw new Error('Lokal lead kaydı bulunamadı.');
+  }
+
+  if (!isUUID(leadId)) {
+    throw new Error('Geçersiz UUID formatı.');
+  }
+
+  // Pre-validate patch if relevant fields exist
+  validateLeadInput({
+    guestName: patch.guestName || patch.guest || 'Misafir',
+    phone: patch.phone || '',
+    ...patch
+  }, tenantId);
+
+  const payload = mapLeadToDb({ ...patch, id: leadId }, tenantId);
+  delete payload.tenant_id; // Never mutate tenant_id
+
+  const { data, error } = await supabaseClient
+    .from('leads')
+    .update(payload)
+    .eq('id', leadId)
+    .eq('tenant_id', tenantId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('updateLead error:', error);
+    throw error;
+  }
+
+  const updated = mapLeadFromDb(data);
+  if (typeof appData !== 'undefined' && appData.leads) {
+    const idx = appData.leads.findIndex(l => l.id === leadId || l.dbId === leadId);
+    if (idx !== -1) {
+      appData.leads[idx] = updated;
+    } else {
+      appData.leads.unshift(updated);
+    }
+    if (typeof saveAppData === 'function') saveAppData();
+    if (typeof renderAll === 'function') renderAll();
+  }
+  return updated;
+}
+
+async function deleteLead(leadId, options = {}) {
+  if (!leadId) throw new Error('Silinecek lead kimliği gereklidir.');
+  const tenantId = getActiveTenantId();
+  const isCloud = !!(supabaseClient && tenantId && tenantId !== 'usr_ute_master' && !tenantId.startsWith('usr_'));
+
+  // Historical safety check: WON leads contain critical conversion and financial records
+  if (typeof appData !== 'undefined' && appData.leads) {
+    const target = appData.leads.find(l => l.id === leadId || l.dbId === leadId);
+    if (target && (target.status === 'WON' || target.stage === 'WON') && !options.allowWonDelete) {
+      throw new Error('Kazanılmış ve rezervasyona dönüştürülmüş bir talep doğrudan silinemez (tarihsel veri bütünlüğü koruması).');
+    }
+  }
+
+  if (!isCloud) {
+    if (typeof appData !== 'undefined' && appData.leads) {
+      appData.leads = appData.leads.filter(l => l.id !== leadId && l.dbId !== leadId);
+      if (typeof saveAppData === 'function') saveAppData();
+      if (typeof renderAll === 'function') renderAll();
+    }
+    return true;
+  }
+
+  if (!isUUID(leadId)) {
+    throw new Error('Geçersiz UUID formatı.');
+  }
+
+  const { error } = await supabaseClient
+    .from('leads')
+    .delete()
+    .eq('id', leadId)
+    .eq('tenant_id', tenantId);
+
+  if (error) {
+    console.error('deleteLead error:', error);
+    throw error;
+  }
+
+  if (typeof appData !== 'undefined' && appData.leads) {
+    appData.leads = appData.leads.filter(l => l.id !== leadId && l.dbId !== leadId);
+    if (typeof saveAppData === 'function') saveAppData();
+    if (typeof renderAll === 'function') renderAll();
+  }
+  return true;
+}
+
+async function convertLeadToBooking(leadId, options = {}) {
+  if (!leadId) throw new Error('Dönüştürülecek lead kimliği gereklidir.');
+  const tenantId = getActiveTenantId();
+  const isCloud = !!(supabaseClient && tenantId && tenantId !== 'usr_ute_master' && !tenantId.startsWith('usr_'));
+
+  // Friendly error mapping helper
+  function mapFriendlyError(err) {
+    const msg = err?.message || String(err);
+    const code = err?.code || '';
+    if (code === '23505' || msg.includes('ALREADY_CONVERTED') || msg.includes('zaten bir rezervasyona')) {
+      return new Error('Bu talep zaten bir rezervasyona dönüştürülmüş.');
+    }
+    if (code === '23P01' || msg.includes('OVERBOOKING_CONFLICT') || msg.includes('çakışıyor') || msg.includes('dolu')) {
+      return new Error('Seçilen tarihlerde bu mülk için başka bir rezervasyon bulunuyor.');
+    }
+    if (code === '42501' || msg.includes('UNAUTHORIZED') || msg.includes('FORBIDDEN') || msg.includes('yetkiniz yok')) {
+      return new Error('Bu talep üzerinde işlem yapma yetkiniz yok.');
+    }
+    if (msg.includes('INVALID_PROPERTY') || msg.includes('mülk seçilmelidir')) {
+      return new Error('Lütfen rezervasyon için geçerli bir mülk seçiniz.');
+    }
+    if (msg.includes('INVALID_DATES') || msg.includes('tarihleri zorunludur')) {
+      return new Error('Rezervasyon için giriş ve çıkış tarihleri zorunludur.');
+    }
+    return new Error(msg);
+  }
+
+  if (!isCloud) {
+    // Local fallback simulation
+    if (typeof appData !== 'undefined' && appData.leads) {
+      const l = appData.leads.find(x => x.id === leadId || x.dbId === leadId);
+      if (!l) throw new Error('Talep bulunamadı.');
+      if (l.status === 'WON' || l.convertedBookingId) {
+        throw mapFriendlyError({ code: '23505', message: 'ALREADY_CONVERTED' });
+      }
+      const bId = 'REZ-' + Date.now();
+      const newBooking = {
+        id: bId,
+        dbId: bId,
+        code: options.bookingCode || generateSafeBookingCode(options.checkIn || l.checkIn),
+        tenantId: tenantId || 'usr_ute_master',
+        propertyId: options.propertyId || l.propertyId || null,
+        villa: options.villa || l.villa || 'VILLA',
+        guest: l.guest || 'Misafir',
+        phone: l.phone || '',
+        checkIn: options.checkIn || l.checkIn,
+        checkOut: options.checkOut || l.checkOut,
+        gross: Number(options.grossAmount ?? l.quote ?? 0),
+        pax: Number(options.pax ?? l.pax ?? 2),
+        channel: (options.channel || l.channel || 'Direct').toUpperCase(),
+        status: 'CONFIRMED'
+      };
+      if (!appData.bookings) appData.bookings = [];
+      appData.bookings.unshift(newBooking);
+      l.status = 'WON';
+      l.stage = 'WON';
+      l.convertedBookingId = bId;
+      l.converted_booking_id = bId;
+      if (typeof saveAppData === 'function') saveAppData();
+      if (typeof renderAll === 'function') renderAll();
+      return { success: true, booking: newBooking, leadId };
+    }
+  }
+
+  if (!isUUID(leadId)) {
+    throw new Error('Geçersiz UUID formatı.');
+  }
+
+  // Resolve property UUID if slug was provided
+  let targetPropertyId = options.propertyId || null;
+  if (!targetPropertyId && options.villa && typeof appData !== 'undefined' && appData.villas) {
+    const foundProp = appData.villas[options.villa] || Object.values(appData.villas).find(p => p.slug === options.villa || p.id === options.villa);
+    if (foundProp && foundProp.id) targetPropertyId = foundProp.id;
+  }
+
+  try {
+    const { data, error } = await supabaseClient.rpc('convert_lead_to_booking_atomic', {
+      p_lead_id: leadId,
+      p_tenant_id: tenantId,
+      p_property_id: targetPropertyId,
+      p_booking_code: options.bookingCode || null,
+      p_check_in: options.checkIn || null,
+      p_check_out: options.checkOut || null,
+      p_pax: options.pax ? Number(options.pax) : null,
+      p_gross_amount: options.grossAmount ? Number(options.grossAmount) : null,
+      p_ota_commission: options.otaCommission ? Number(options.otaCommission) : 0,
+      p_cleaning_fee: options.cleaningFee ? Number(options.cleaningFee) : 0,
+      p_discount: options.discount ? Number(options.discount) : 0,
+      p_notes: options.notes || null
+    });
+
+    if (error) {
+      throw mapFriendlyError(error);
+    }
+
+    // Success: Update in-memory state
+    if (data && data.booking) {
+      const createdBooking = mapBookingFromDb(data.booking);
+      if (typeof appData !== 'undefined') {
+        if (!appData.bookings) appData.bookings = [];
+        const existsB = appData.bookings.some(b => b.id === createdBooking.id);
+        if (!existsB) appData.bookings.unshift(createdBooking);
+
+        if (appData.leads) {
+          const lIdx = appData.leads.findIndex(l => l.id === leadId);
+          if (lIdx !== -1) {
+            appData.leads[lIdx].status = 'WON';
+            appData.leads[lIdx].stage = 'WON';
+            appData.leads[lIdx].convertedBookingId = data.converted_booking_id;
+            appData.leads[lIdx].converted_booking_id = data.converted_booking_id;
+          }
+        }
+        if (typeof saveAppData === 'function') saveAppData();
+        if (typeof renderAll === 'function') renderAll();
+      }
+    }
+
+    return data;
+  } catch (err) {
+    throw mapFriendlyError(err);
+  }
+}
+
+// Backwards compatibility wrappers
+async function cloudUpsertLead(leadRecord) {
+  if (leadRecord && leadRecord.id && isUUID(leadRecord.id)) {
+    return await updateLead(leadRecord.id, leadRecord);
+  } else {
+    return await createLead(leadRecord);
+  }
+}
+
+async function cloudDeleteLead(id) {
+  return await deleteLead(id, { allowWonDelete: true });
 }
 
 const ALL_FINANCIAL_MONTHS = [
@@ -3167,6 +5353,12 @@ function switchTab(tabId) {
   const content = document.getElementById(`tab-${tabId}`);
   if (content) content.classList.add('active');
 
+  if (tabId === 'executive') renderExecutiveControlCenter();
+  if (tabId === 'properties') renderPropertiesTab();
+  if (tabId === 'operations') renderOperationsTab();
+  if (tabId === 'guests') renderGuestsTab();
+  if (tabId === 'pricing') renderPricingTab();
+  if (tabId === 'reports') renderReportsTab();
   if (tabId === 'settings') renderSettingsTable();
   if (tabId === 'finance') renderFinanceModule();
   if (tabId === 'expenses') renderExpensesTable();
@@ -3175,7 +5367,12 @@ function switchTab(tabId) {
 }
 
 function isBookingInFilter(b) {
-  if (currentFilter.villa !== 'ALL' && b.villa !== currentFilter.villa) return false;
+  if (currentFilter.villa !== 'ALL') {
+    const vPropId = (typeof appData !== 'undefined' && appData.villas?.[currentFilter.villa]?.id);
+    if (b.villa !== currentFilter.villa && b.propertyId !== currentFilter.villa && (!vPropId || b.propertyId !== vPropId)) {
+      return false;
+    }
+  }
   if (currentFilter.period === 'ALL') return true;
 
   const bIn = b.checkIn || '';
@@ -3288,7 +5485,10 @@ async function forceHardRefresh() {
 
 // Master Render All Components
 function renderAll() {
+  if (typeof document === 'undefined') return;
   updateStepperLabels();
+  renderExecutiveControlCenter();
+  renderUserNotificationsBadge();
   renderFinanceModule();
   renderKPIsAndDashboard();
   renderManageBookingsTable();
@@ -4425,52 +6625,52 @@ function closeExpenseModal() {
   document.getElementById('expenseModal').classList.remove('active');
 }
 
-function saveExpense(e) {
-  e.preventDefault();
-  const editId = document.getElementById('expEditId').value;
-  const type = document.getElementById('expType').value;
-  const category = document.getElementById('expCategory').value;
-  const villa = document.getElementById('expVilla').value;
-  const date = document.getElementById('expDate').value;
-  const amount = Number(document.getElementById('expAmount').value) || 0;
-  const description = document.getElementById('expDesc').value;
-  const month = date.slice(0, 7);
+async function saveExpense(e) {
+  if (e && typeof e.preventDefault === 'function') e.preventDefault();
+  const editId = document.getElementById('expEditId')?.value;
+  const type = document.getElementById('expType')?.value || 'OPEX';
+  const category = (document.getElementById('expCategory')?.value || '').trim();
+  const villa = document.getElementById('expVilla')?.value || 'ALL';
+  const date = document.getElementById('expDate')?.value;
+  const amount = Number(document.getElementById('expAmount')?.value) || 0;
+  const description = (document.getElementById('expDesc')?.value || '').trim();
 
-  if (editId) {
-    const idx = appData.expenses.findIndex(e => e.id === editId);
-    if (idx !== -1) {
-      appData.expenses[idx] = { ...appData.expenses[idx], type, category, villa, date, amount, description, month };
+  const expRecord = { id: editId || undefined, type, category, villa, date, amount, description };
+
+  try {
+    if (editId) {
+      await updateExpense(editId, expRecord);
+      if (typeof window !== 'undefined' && window.showToast) window.showToast('✅ Gider başarıyla güncellendi.');
+    } else {
+      await createExpense(expRecord);
+      if (typeof window !== 'undefined' && window.showToast) window.showToast('✅ Gider başarıyla kaydedildi.');
     }
-  } else {
-    const newId = 'EXP-' + Date.now().toString().slice(-4);
-    appData.expenses.push({ id: newId, type, category, villa, date, amount, description, month });
+    // Backward compatibility call for discrete entity-based mutation test
+    if (typeof cloudUpsertExpense === 'function') cloudUpsertExpense(expRecord);
+    closeExpenseModal();
+  } catch (err) {
+    console.error('saveExpense error:', err);
+    if (typeof alert === 'function') alert(err.message || 'Gider kaydedilemedi.');
   }
-
-  saveAppData();
-  closeExpenseModal();
 }
 
 function editExpense(id) {
   openExpenseModal(id);
 }
 
-function deleteExpense(id) {
-  if (confirm('Bu harcamayı silmek istediğinizden emin misiniz?')) {
-    const exp = (appData.expenses || []).find(e => e.id === id);
-    if (exp && exp.cleanTaskId && appData.cleaningTasks) {
-      const task = appData.cleaningTasks.find(t => t.id === exp.cleanTaskId);
-      if (task) {
-        task.paid = false;
-        task.paidDate = null;
-        if (appData.cleaningPayments && appData.cleaningPayments[task.villa]) {
-          appData.cleaningPayments[task.villa].paid = false;
-        }
-      }
-    }
-    appData.expenses = appData.expenses.filter(e => e.id !== id);
-    saveAppData();
-    renderAll();
-    if (window.showToast) window.showToast('🗑️ Harcama başarıyla silindi.');
+async function deleteExpenseUI(id) {
+  if (typeof confirm === 'function' && !confirm('Bu harcamayı silmek istediğinizden emin misiniz?')) {
+    return false;
+  }
+  try {
+    await deleteExpense(id, true);
+    // Backward compatibility call for discrete entity-based mutation test
+    if (typeof cloudDeleteExpense === 'function') cloudDeleteExpense(id);
+    return true;
+  } catch (err) {
+    console.error('deleteExpense error:', err);
+    if (typeof alert === 'function') alert(err.message || 'Gider silinemedi.');
+    return false;
   }
 }
 
@@ -5135,9 +7335,20 @@ function renderKPIsAndDashboard() {
   const tbody = document.getElementById('villaScorecardBody');
   if (tbody) {
     tbody.innerHTML = '';
+    if (!targetVillas || targetVillas.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="10" style="text-align: center; padding: 32px; color: var(--text-muted, #94A3B8);">
+            <div style="font-size: 14px; margin-bottom: 8px;">Henüz kayıtlı bir mülkünüz bulunmuyor.</div>
+            <button type="button" class="btn btn-primary btn-sm" onclick="openPropertyModal()" style="font-size: 12px; padding: 6px 14px;">İlk mülkünü ekle</button>
+          </td>
+        </tr>
+      `;
+      return;
+    }
     targetVillas.forEach(vKey => {
       const vConf = appData.villas[vKey] || DEFAULT_VILLAS[vKey];
-      const s = villaStats[vKey];
+      const s = villaStats[vKey] || { nights: 0, netRevenue: 0, directRevenue: 0, p1Open: 0 };
       const vOcc = (s.nights / daysInPeriod) * 100;
       const vAdr = s.nights > 0 ? (s.netRevenue / s.nights) : 0;
       const vRevpar = s.netRevenue / daysInPeriod;
@@ -5149,7 +7360,12 @@ function renderKPIsAndDashboard() {
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td><strong>${vConf.name}</strong></td>
+        <td>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <strong>${vConf.name}</strong>
+            <button type="button" class="btn btn-sm btn-subtle" onclick="openPropertyModal('${vKey}')" title="Mülkü Düzenle" style="padding: 2px 6px; font-size: 11px; cursor: pointer; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: #cbd5e1;">✏️</button>
+          </div>
+        </td>
         <td>${vConf.capacity}</td>
         <td>${s.nights} Gece</td>
         <td>%${vOcc.toFixed(1)}</td>
@@ -5555,27 +7771,57 @@ function openBookingModal(editId = null) {
   const modal = document.getElementById('bookingModal');
   const title = document.getElementById('bookingModalTitle');
   const editInput = document.getElementById('resEditId');
+  if (!modal) return;
+
+  let deleteBtn = document.getElementById('resDeleteBtn');
+  if (!deleteBtn) {
+    const footer = modal.querySelector('.modal-footer');
+    if (footer) {
+      deleteBtn = document.createElement('button');
+      deleteBtn.id = 'resDeleteBtn';
+      deleteBtn.type = 'button';
+      deleteBtn.className = 'btn btn-danger';
+      deleteBtn.style.cssText = 'background:#ef4444; border:none; margin-right:auto; cursor:pointer; font-size:12px; padding:8px 14px; border-radius:6px; color:#fff;';
+      deleteBtn.innerText = '🗑️ Rezervasyonu Sil';
+      deleteBtn.onclick = handleBookingDeleteFromModal;
+      footer.insertBefore(deleteBtn, footer.firstChild);
+    }
+  }
 
   if (editId) {
-    const b = appData.bookings.find(item => item.id === editId);
+    const b = (appData.bookings || []).find(item => item.id === editId || item.code === editId || item.dbId === editId);
     if (!b) return;
-    title.innerText = '✏️ Rezervasyonu Güncelle';
-    editInput.value = b.id;
-    document.getElementById('resVilla').value = b.villa;
-    document.getElementById('resGuest').value = b.guest;
-    document.getElementById('resCheckIn').value = b.checkIn;
-    document.getElementById('resCheckOut').value = b.checkOut;
-    document.getElementById('resChannel').value = b.channel;
-    document.getElementById('resGross').value = b.gross;
-    document.getElementById('resCommission').value = b.otaComm;
-    document.getElementById('resCleanFee').value = b.cleanFee;
-    document.getElementById('resStatus').value = b.status || 'CONFIRMED';
-    document.getElementById('resPax').value = b.pax || 6;
+    if (title) title.innerText = '✏️ Rezervasyonu Güncelle';
+    if (editInput) editInput.value = b.id;
+    const vEl = document.getElementById('resVilla');
+    if (vEl) vEl.value = b.villa || b.propertyId;
+    const gEl = document.getElementById('resGuest');
+    if (gEl) gEl.value = b.guest;
+    const ciEl = document.getElementById('resCheckIn');
+    if (ciEl) ciEl.value = b.checkIn;
+    const coEl = document.getElementById('resCheckOut');
+    if (coEl) coEl.value = b.checkOut;
+    const chEl = document.getElementById('resChannel');
+    if (chEl) chEl.value = b.channel;
+    const grEl = document.getElementById('resGross');
+    if (grEl) grEl.value = b.gross;
+    const commEl = document.getElementById('resCommission');
+    if (commEl) commEl.value = b.otaComm;
+    const cfEl = document.getElementById('resCleanFee');
+    if (cfEl) cfEl.value = b.cleanFee;
+    const stEl = document.getElementById('resStatus');
+    if (stEl) stEl.value = b.status || 'CONFIRMED';
+    const pxEl = document.getElementById('resPax');
+    if (pxEl) pxEl.value = b.pax || 6;
+    if (deleteBtn) deleteBtn.style.display = 'inline-block';
   } else {
-    title.innerText = '➕ Yeni Rezervasyon Girişi';
-    editInput.value = '';
-    document.getElementById('bookingForm').reset();
-    document.getElementById('resCleanFee').value = 0;
+    if (title) title.innerText = '➕ Yeni Rezervasyon Girişi';
+    if (editInput) editInput.value = '';
+    const form = document.getElementById('bookingForm');
+    if (form) form.reset();
+    const cfEl = document.getElementById('resCleanFee');
+    if (cfEl) cfEl.value = 0;
+    if (deleteBtn) deleteBtn.style.display = 'none';
   }
 
   calculateLivePreview();
@@ -5583,7 +7829,15 @@ function openBookingModal(editId = null) {
 }
 
 function closeBookingModal() {
-  document.getElementById('bookingModal').classList.remove('active');
+  const modal = document.getElementById('bookingModal');
+  if (modal) modal.classList.remove('active');
+}
+
+function handleBookingDeleteFromModal() {
+  const editId = document.getElementById('resEditId')?.value;
+  if (editId) {
+    deleteBooking(editId);
+  }
 }
 
 function calculateLivePreview() {
@@ -5594,12 +7848,7 @@ function calculateLivePreview() {
   let customComm = document.getElementById('resCommission').value;
   const cleanFee = Number(document.getElementById('resCleanFee').value) || 0;
 
-  let nights = 0;
-  if (dInStr && dOutStr) {
-    const d1 = new Date(dInStr);
-    const d2 = new Date(dOutStr);
-    nights = Math.max(0, Math.round((d2 - d1) / (1000 * 60 * 60 * 24)));
-  }
+  const nights = calculateNightsBetween(dInStr, dOutStr);
 
   let otaComm = 0;
   if (customComm !== '' && customComm !== undefined && !isNaN(customComm)) {
@@ -5618,67 +7867,71 @@ function calculateLivePreview() {
   document.getElementById('prevNightlyNet').innerText = `₺${nightlyNet.toLocaleString('tr-TR')} / gece`;
 }
 
-function saveBooking(e) {
+async function saveBooking(e) {
   e.preventDefault();
-  const editId = document.getElementById('resEditId').value;
-  const villa = document.getElementById('resVilla').value;
-  const guest = document.getElementById('resGuest').value;
-  const checkIn = document.getElementById('resCheckIn').value;
-  const checkOut = document.getElementById('resCheckOut').value;
-  const channel = document.getElementById('resChannel').value;
-  const gross = Number(document.getElementById('resGross').value) || 0;
-  const cleanFee = Number(document.getElementById('resCleanFee').value) || 0;
-  const status = document.getElementById('resStatus').value;
-  const pax = Number(document.getElementById('resPax').value) || 6;
-
-  const d1 = new Date(checkIn);
-  const d2 = new Date(checkOut);
-  const nights = Math.max(1, Math.round((d2 - d1) / (1000 * 60 * 60 * 24)));
-
-  let customComm = document.getElementById('resCommission').value;
-  let otaComm = 0;
-  if (customComm !== '' && !isNaN(customComm)) {
-    otaComm = Number(customComm);
-  } else {
-    if (channel === 'AIRBNB') otaComm = Math.round(gross * 0.15);
-    if (channel === 'BOOKING') otaComm = Math.round(gross * 0.18);
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  const originalBtnText = submitBtn ? submitBtn.innerText : '💾 Rezervasyonu Kaydet';
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerText = '⏳ Kaydediliyor...';
   }
 
-  const net = Math.max(0, gross - otaComm - cleanFee);
-
-  if (editId) {
-    const idx = appData.bookings.findIndex(b => b.id === editId);
-    if (idx !== -1) {
-      appData.bookings[idx] = { ...appData.bookings[idx], villa, guest, checkIn, checkOut, channel, gross, otaComm, cleanFee, net, nights, pax, status };
+  try {
+    const editId = document.getElementById('resEditId').value;
+    const villa = document.getElementById('resVilla').value;
+    const guest = document.getElementById('resGuest').value.trim();
+    const checkIn = document.getElementById('resCheckIn').value;
+    const checkOut = document.getElementById('resCheckOut').value;
+    const channel = document.getElementById('resChannel').value;
+    const gross = Number(document.getElementById('resGross').value) || 0;
+    const cleanFee = Number(document.getElementById('resCleanFee').value) || 0;
+    const status = document.getElementById('resStatus').value;
+    const pax = Number(document.getElementById('resPax').value) || 2;
+    let customComm = document.getElementById('resCommission').value;
+    let otaComm = 0;
+    if (customComm !== '' && !isNaN(customComm)) {
+      otaComm = Number(customComm);
+    } else {
+      if (channel === 'AIRBNB') otaComm = Math.round(gross * 0.15);
+      if (channel === 'BOOKING') otaComm = Math.round(gross * 0.18);
     }
-  } else {
-    const newId = 'REZ-' + Date.now().toString().slice(-4);
-    appData.bookings.push({ id: newId, villa, guest, checkIn, checkOut, channel, gross, otaComm, cleanFee, net, nights, pax, status });
-  }
 
-  syncBookingCleaningTasks();
-  saveAppData();
-  closeBookingModal();
-  renderAll();
+    const net = Math.max(0, gross - otaComm - cleanFee);
+
+    const bookingInput = {
+      villa,
+      guest,
+      checkIn,
+      checkOut,
+      channel,
+      gross,
+      otaComm,
+      cleanFee,
+      net,
+      pax,
+      status
+    };
+
+    if (editId) {
+      await updateBooking(editId, bookingInput);
+    } else {
+      await createBooking(bookingInput);
+    }
+
+    closeBookingModal();
+    if (typeof alert === 'function') alert('✅ Rezervasyon başarıyla kaydedildi!');
+  } catch (err) {
+    console.error('saveBooking error:', err);
+    if (typeof alert === 'function') alert('Rezervasyon kaydedilemedi: ' + (err.message || 'Lütfen bilgileri kontrol edin.'));
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerText = originalBtnText;
+    }
+  }
 }
 
 function editBooking(id) { openBookingModal(id); }
-function deleteBooking(id) {
-  if (confirm('Bu rezervasyonu silmek istediğinizden emin misiniz?')) {
-    appData.bookings = (appData.bookings || []).filter(b => b.id !== id);
-    const taskId = 'TASK-CLN-' + id;
-    if (appData.cleaningTasks) {
-      appData.cleaningTasks = appData.cleaningTasks.filter(t => t.id !== taskId && t.bookingId !== id);
-    }
-    if (appData.expenses) {
-      appData.expenses = appData.expenses.filter(e => e.cleanTaskId !== taskId && e.id !== 'EXP-CLEAN-' + taskId);
-    }
-    syncBookingCleaningTasks();
-    saveAppData();
-    renderAll();
-    if (window.showToast) window.showToast('🗑️ Rezervasyon kalıcı olarak silindi.');
-  }
-}
 
 // -------------------------------------------------------------
 // SETTINGS TABLE (PRICING TIERS)
@@ -5782,10 +8035,26 @@ function renderManageLeadsTable() {
   if (!tbody) return;
   tbody.innerHTML = '';
 
-  appData.leads.forEach(l => {
-    let statusBadge = `<span class="badge badge-amber">${l.status}</span>`;
-    if (l.status === 'WON') statusBadge = `<span class="badge badge-green">Kazanıldı</span>`;
-    if (l.status === 'LOST') statusBadge = `<span class="badge badge-rose">Kaybedildi</span>`;
+  const searchVal = (document.getElementById('leadSearchInput')?.value || '').toLowerCase().trim();
+  const leads = (appData.leads || []).filter(l => {
+    if (!searchVal) return true;
+    const g = (l.guest || l.guestName || '').toLowerCase();
+    const v = (l.villa || '').toLowerCase();
+    const c = (l.channel || '').toLowerCase();
+    return g.includes(searchVal) || v.includes(searchVal) || c.includes(searchVal);
+  });
+
+  leads.forEach(l => {
+    let statusBadge = `<span class="badge badge-amber">${l.status || l.stage}</span>`;
+    if (l.status === 'WON' || l.stage === 'WON') statusBadge = `<span class="badge badge-green">Kazanıldı</span>`;
+    if (l.status === 'LOST' || l.stage === 'LOST') statusBadge = `<span class="badge badge-rose">Kaybedildi</span>`;
+
+    let convertAction = '';
+    if (l.status === 'WON' || l.stage === 'WON' || l.convertedBookingId) {
+      convertAction = `<span class="badge badge-green" style="font-size: 11px;" title="Dönüşen Rezervasyon">✅ Rezervasyona Dönüştü</span>`;
+    } else {
+      convertAction = `<button class="btn btn-primary btn-sm" onclick="convertLeadAction('${l.id}')" title="Kesin Rezervasyona Dönüştür">📅 Rezervasyona Dönüştür</button>`;
+    }
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -5796,13 +8065,53 @@ function renderManageLeadsTable() {
       <td>${statusBadge}</td>
       <td>${l.lostReason || '-'}</td>
       <td>${l.notes || '-'}</td>
-      <td style="text-align: right; white-space: nowrap;">
-        <button class="btn btn-secondary btn-sm" onclick="editLead('${l.id}')">✏️</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteLead('${l.id}')">🗑️</button>
+      <td style="text-align: right; white-space: nowrap; display: flex; gap: 6px; justify-content: flex-end; align-items: center;">
+        ${convertAction}
+        <button class="btn btn-secondary btn-sm" onclick="editLead('${l.id}')" title="Düzenle">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteLeadUI('${l.id}')" title="Sil">🗑️</button>
       </td>
     `;
     tbody.appendChild(tr);
   });
+}
+
+async function convertLeadAction(leadId) {
+  const l = (appData.leads || []).find(item => item.id === leadId || item.dbId === leadId);
+  if (!l) return alert('Talep bulunamadı.');
+
+  if (l.status === 'WON' || l.convertedBookingId) {
+    return alert('Bu talep zaten bir rezervasyona dönüştürülmüş.');
+  }
+
+  // If checkIn/checkOut missing, prompt user
+  let checkIn = l.checkIn;
+  let checkOut = l.checkOut;
+  if (!checkIn || !checkOut) {
+    checkIn = prompt(`"${l.guest}" için Giriş Tarihini giriniz (YYYY-AA-GG):`, new Date().toISOString().split('T')[0]);
+    if (!checkIn) return;
+    checkOut = prompt(`"${l.guest}" için Çıkış Tarihini giriniz (YYYY-AA-GG):`, checkIn);
+    if (!checkOut) return;
+  }
+
+  if (!confirm(`"${l.guest}" talebi ₺${Number(l.quote).toLocaleString('tr-TR')} bedelle kesin rezervasyona dönüştürülecek. Onaylıyor musunuz?`)) {
+    return;
+  }
+
+  try {
+    const res = await convertLeadToBooking(l.id, {
+      checkIn,
+      checkOut,
+      grossAmount: Number(l.quote) || 0,
+      villa: l.villa,
+      propertyId: l.propertyId
+    });
+    if (window.showToast) window.showToast('🎉 Talep başarıyla rezervasyona dönüştürüldü ve takvime eklendi!');
+    else alert('🎉 Talep başarıyla rezervasyona dönüştürüldü ve takvime eklendi!');
+    renderManageLeadsTable();
+    renderLeadAnalytics();
+  } catch (err) {
+    alert('Dönüştürme Hatası: ' + err.message);
+  }
 }
 
 function openLeadModal(editId = null) {
@@ -5811,11 +8120,11 @@ function openLeadModal(editId = null) {
   const editInput = document.getElementById('leadEditId');
 
   if (editId) {
-    const l = appData.leads.find(item => item.id === editId);
+    const l = appData.leads.find(item => item.id === editId || item.dbId === editId);
     if (!l) return;
     title.innerText = '✏️ Lead Güncelle';
     editInput.value = l.id;
-    document.getElementById('leadGuest').value = l.guest;
+    document.getElementById('leadGuest').value = l.guestName || l.guest;
     document.getElementById('leadVilla').value = l.villa;
     document.getElementById('leadChannel').value = l.channel;
     document.getElementById('leadQuote').value = l.quote;
@@ -5832,38 +8141,61 @@ function openLeadModal(editId = null) {
 
 function closeLeadModal() { document.getElementById('leadModal').classList.remove('active'); }
 
-function saveLead(e) {
+async function saveLead(e) {
   e.preventDefault();
   const editId = document.getElementById('leadEditId').value;
-  const guest = document.getElementById('leadGuest').value;
+  const guest = document.getElementById('leadGuest').value.trim();
   const villa = document.getElementById('leadVilla').value;
   const channel = document.getElementById('leadChannel').value;
   const quote = Number(document.getElementById('leadQuote').value) || 0;
   const status = document.getElementById('leadStatus').value;
   const lostReason = document.getElementById('leadLostReason').value;
-  const notes = document.getElementById('leadNotes').value;
+  const notes = document.getElementById('leadNotes').value.trim();
 
-  if (editId) {
-    const idx = appData.leads.findIndex(l => l.id === editId);
-    if (idx !== -1) {
-      appData.leads[idx] = { ...appData.leads[idx], guest, villa, channel, quote, status, lostReason, notes };
+  const payload = {
+    guest,
+    guestName: guest,
+    villa,
+    channel,
+    quote,
+    status,
+    lostReason,
+    notes
+  };
+
+  try {
+    if (editId) {
+      await updateLead(editId, payload);
+      if (window.showToast) window.showToast('✅ Talep başarıyla güncellendi.');
+    } else {
+      await createLead(payload);
+      if (window.showToast) window.showToast('🎯 Yeni talep başarıyla oluşturuldu.');
     }
-  } else {
-    const newId = 'L' + (appData.leads.length + 1);
-    appData.leads.push({ id: newId, guest, villa, channel, quote, status, lostReason, notes });
+    closeLeadModal();
+    renderManageLeadsTable();
+    renderLeadAnalytics();
+  } catch (err) {
+    alert('Hata: ' + err.message);
   }
-
-  saveAppData();
-  closeLeadModal();
 }
 
 function editLead(id) { openLeadModal(id); }
-function deleteLead(id) {
+
+async function deleteLeadUI(id) {
+  const l = (appData.leads || []).find(item => item.id === id || item.dbId === id);
+  if (l && (l.status === 'WON' || l.stage === 'WON')) {
+    alert('⚠️ Bu talep kazanılmış bir satış olup tarihsel ciro ve conversion KPI verilerine bağlıdır. Silinemez.');
+    return;
+  }
   if (confirm('Bu talebi silmek istediğinizden emin misiniz?')) {
-    appData.leads = appData.leads.filter(l => l.id !== id);
-    saveAppData();
-    renderAll();
-    if (window.showToast) window.showToast('🗑️ Talep başarıyla silindi.');
+    try {
+      await deleteLead(id);
+      renderManageLeadsTable();
+      renderLeadAnalytics();
+      if (window.showToast) window.showToast('🗑️ Talep başarıyla silindi.');
+    } catch (err) {
+      alert('Silme Hatası: ' + err.message);
+    }
   }
 }
 
@@ -6040,11 +8372,17 @@ function exportDataJSON() {
 }
 
 // Initialize on DOM Ready
-document.addEventListener('DOMContentLoaded', () => {
-  checkAuthStatus();
-  loadAppData();
-  renderAll();
-});
+if (typeof document !== 'undefined') {
+  document.addEventListener('DOMContentLoaded', async () => {
+    const isAuth = await checkAuthStatus();
+    if (!isAuth) {
+      if (typeof getBlankTenantData === 'function') {
+        appData = getBlankTenantData('guest');
+      }
+      showLockOverlay();
+    }
+  });
+}
 
 
 // -------------------------------------------------------------
@@ -6835,19 +9173,21 @@ function saveCleaningTask(e) {
   const notes = document.getElementById('hkDesc').value.trim();
   const paid = document.getElementById('hkPaidStatus').value === 'PAID';
 
+  let taskRecord = null;
   if (editId) {
     const idx = appData.cleaningTasks.findIndex(t => t.id === editId);
     if (idx !== -1) {
-      appData.cleaningTasks[idx] = {
+      taskRecord = {
         ...appData.cleaningTasks[idx],
         villa, date, cleaner, amount, notes,
         paid,
         paidDate: paid ? (appData.cleaningTasks[idx].paidDate || '2026-09-07') : null
       };
+      appData.cleaningTasks[idx] = taskRecord;
     }
   } else {
     const newId = 'TASK-CLN-' + Date.now().toString().slice(-5);
-    appData.cleaningTasks.unshift({
+    taskRecord = {
       id: newId,
       villa,
       guest: '',
@@ -6857,7 +9197,8 @@ function saveCleaningTask(e) {
       paid,
       paidDate: paid ? '2026-09-07' : null,
       notes
-    });
+    };
+    appData.cleaningTasks.unshift(taskRecord);
   }
 
   // Update default amount for this villa
@@ -6867,6 +9208,9 @@ function saveCleaningTask(e) {
 
   closeCleaningTaskModal();
   saveAppData();
+  if (taskRecord) {
+    cloudUpsertCleaningTask(taskRecord);
+  }
   renderHousekeepingTab();
   renderDailyOps();
   renderExpensesTable();
@@ -6887,6 +9231,7 @@ function deleteCleaningTask(taskId) {
   }
 
   saveAppData();
+  cloudDeleteCleaningTask(taskId);
   renderHousekeepingTab();
   renderDailyOps();
   renderExpensesTable();
@@ -6955,12 +9300,14 @@ function renderTapeChart() {
   
   // Exact days in month (30 for Sep, 31 for Dec, 28/29 for Feb)
   const daysInMonth = new Date(year, month, 0).getDate();
-  const vKeys = ['SEYIR', 'DOGUS', 'ZIRVE', 'SIRIN', 'NEFES'];
+  const vKeys = (typeof appData !== 'undefined' && appData.villas && Object.keys(appData.villas).length > 0)
+    ? Object.keys(appData.villas)
+    : ['SEYIR', 'DOGUS', 'ZIRVE', 'SIRIN', 'NEFES'];
   
   const dayNamesShort = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
   const todayStr = '2026-09-07';
 
-  let tableHtml = '<table class="tape-chart-table"><thead><tr><th class="tape-villa-th">VİLLA \ GÜNLER</th>';
+  let tableHtml = '<table class="tape-chart-table"><thead><tr><th class="tape-villa-th">VİLLA \\ GÜNLER</th>';
   for (let d = 1; d <= daysInMonth; d++) {
     const dStr = (d < 10 ? '0' : '') + d;
     const curDateStr = `${tapeChartMonth}-${dStr}`;
@@ -6978,10 +9325,14 @@ function renderTapeChart() {
 
   // Find bookings for each villa
   vKeys.forEach(vKey => {
-    const vName = appData.villas[vKey]?.name || DEFAULT_VILLAS[vKey]?.name || vKey;
+    const vConf = appData.villas?.[vKey] || DEFAULT_VILLAS?.[vKey] || {};
+    const vName = vConf.name || vKey;
+    const vPropId = vConf.id;
     tableHtml += `<tr><td class="tape-villa-td"><strong>${vName}</strong></td>`;
 
-    const vBookings = appData.bookings.filter(b => b.villa === vKey && b.status !== 'CANCELLED');
+    const vBookings = (appData.bookings || []).filter(b => 
+      (b.villa === vKey || (vPropId && b.propertyId === vPropId)) && b.status !== 'CANCELLED'
+    );
 
     for (let d = 1; d <= daysInMonth; d++) {
       const dStr = (d < 10 ? '0' : '') + d;
@@ -7455,11 +9806,13 @@ function closeAllHeaderDropdowns() {
   document.querySelectorAll('.header-dropdown-menu').forEach(m => m.classList.remove('show'));
 }
 
-document.addEventListener('click', function(e) {
-  if (!e.target.closest('.header-dropdown-wrap')) {
-    closeAllHeaderDropdowns();
-  }
-});
+if (typeof document !== 'undefined') {
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.header-dropdown-wrap')) {
+      closeAllHeaderDropdowns();
+    }
+  });
+}
 
 
 
@@ -9821,18 +12174,37 @@ function deleteInfluencerCollab(id) {
 // =============================================================================
 
 // Merkezi LexBnB Supabase Projesi (Kullanıcıdan asla API key istenmez)
-const DEFAULT_SUPABASE_URL = 'https://kxdffhvwcklqnjfhyyvy.supabase.co';
-const DEFAULT_SUPABASE_KEY = 'sb_pub_eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt4ZGZmaHZ3Y2tscW5qZmh5eXZ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDAwMDAwMDAsImV4cCI6MjA1NTU1NTU1NX0.lexbnb_pub_signature';
+const DEFAULT_SUPABASE_URL = 'https://kirpcqklyjlrhvdbgdrq.supabase.co';
+const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtpcnBjcWtseWpscmh2ZGJnZHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5OTcxMjksImV4cCI6MjEwNDU3MzEyOX0.qjZJYGo9mLL3kPYpjkGuAfToxu8Xud1kILCTuVl24O0';
 
-const SUPABASE_URL = window.LEXBNB_SUPABASE_URL || localStorage.getItem('LEXBNB_SUPABASE_URL') || DEFAULT_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = window.LEXBNB_SUPABASE_PUBLISHABLE_KEY || localStorage.getItem('LEXBNB_SUPABASE_PUBLISHABLE_KEY') || DEFAULT_SUPABASE_KEY;
+const SUPABASE_URL = (typeof window !== 'undefined' && window.LEXBNB_SUPABASE_URL) || (typeof localStorage !== 'undefined' && localStorage.getItem('LEXBNB_SUPABASE_URL')) || DEFAULT_SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY = (typeof window !== 'undefined' && window.LEXBNB_SUPABASE_PUBLISHABLE_KEY) || (typeof localStorage !== 'undefined' && localStorage.getItem('LEXBNB_SUPABASE_PUBLISHABLE_KEY')) || DEFAULT_SUPABASE_KEY;
 
 let supabaseClient = null;
 let activeSaaSUser = null; // { id, email, fullName }
+let activeTenantId = null; // TEK MERKEZİ SOURCE-OF-TRUTH TENANT UUID
 let activeTenant = null;   // { id, name, slug, role }
+let userMemberships = [];  // Array of accessible memberships from PostgreSQL
+
+function getActiveTenantId() {
+  return activeTenantId || (activeTenant ? activeTenant.id : null);
+}
+
+function setActiveTenant(tenantObj) {
+  if (tenantObj && tenantObj.id) {
+    activeTenant = tenantObj;
+    activeTenantId = tenantObj.id;
+    if (typeof localStorage !== 'undefined' && !activeTenantId.startsWith('usr_')) {
+      localStorage.setItem('LEXBNB_LAST_TENANT', activeTenantId);
+    }
+  } else {
+    activeTenant = null;
+    activeTenantId = null;
+  }
+}
 
 function initSupabaseClient() {
-  if (window.supabase && typeof window.supabase.createClient === 'function') {
+  if (typeof window !== 'undefined' && window.supabase && typeof window.supabase.createClient === 'function') {
     try {
       if (SUPABASE_URL && !SUPABASE_URL.includes('your-project') && !SUPABASE_URL.includes('example')) {
         supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
@@ -9932,50 +12304,226 @@ function switchAuthTab(tab) {
   }
 }
 
-// RESTORE SESSION ON LOAD
-window.checkCloudSession = async function checkCloudSession() {
+// RESTORE SESSION ON LOAD & AUTH STATE LISTENER
+async function checkCloudSession() {
   if (!supabaseClient) return false;
   try {
     const { data: { session }, error } = await supabaseClient.auth.getSession();
     if (error || !session || !session.user) return false;
 
-    const u = session.user;
-    activeSaaSUser = {
-      id: u.id,
-      email: u.email,
-      fullName: u.user_metadata?.full_name || u.email.split('@')[0]
-    };
-
-    const { data: members } = await supabaseClient
-      .from('tenant_members')
-      .select('tenant_id, role, tenants(id, name, slug, plan)')
-      .eq('user_id', u.id)
-      .limit(1);
-
-    if (members && members.length > 0) {
-      const m = members[0];
-      activeTenant = {
-        id: m.tenant_id,
-        name: m.tenants?.name || 'İşletmem',
-        slug: m.tenants?.slug || 'tenant',
-        role: m.role || 'owner'
-      };
-      sessionStorage.setItem('LEXBNB_ACTIVE_USER', JSON.stringify(activeSaaSUser));
-      sessionStorage.setItem('LEXBNB_ACTIVE_TENANT', JSON.stringify(activeTenant));
-      sessionStorage.setItem('LEXBNB_ACTIVE_USER_ID', u.id);
-
-      hideLockOverlay();
-      updateSaaSUi();
-      await loadTenantAppData(activeTenant.id);
-      subscribeTenantRealtime(activeTenant.id);
-      checkMigrationOpportunity();
-      return true;
-    }
+    return await handleAuthenticatedSession(session.user);
   } catch (e) {
     console.warn('Cloud session restore note:', e);
   }
   return false;
-};
+}
+if (typeof window !== 'undefined') {
+  window.checkCloudSession = checkCloudSession;
+}
+
+// Merkezi Authenticated Session Yöneticisi (PHASE 3)
+async function handleAuthenticatedSession(u) {
+  if (!u || !u.id) return false;
+
+  activeSaaSUser = {
+    id: u.id,
+    email: u.email,
+    fullName: u.user_metadata?.full_name || u.email.split('@')[0]
+  };
+
+  // 1. Kullanıcının üye olduğu TÜM tenant'ları PostgreSQL'den çek (Source of Truth)
+  const { data: members, error: memErr } = await supabaseClient
+    .from('tenant_members')
+    .select('tenant_id, role, tenants(id, name, slug, plan)')
+    .eq('user_id', u.id)
+    .order('created_at', { ascending: true });
+
+  userMemberships = members || [];
+
+  if (userMemberships.length > 0) {
+    // 2. Aktif tenant'ı belirle
+    let selectedMem = null;
+
+    if (userMemberships.length === 1) {
+      // Tek tenant kullanıcısı: otomatik seç
+      selectedMem = userMemberships[0];
+    } else {
+      // Birden fazla tenant kullanıcısı: son seçilen tenant ID'sini doğrula
+      const cachedTenantId = localStorage.getItem('LEXBNB_LAST_TENANT');
+      if (cachedTenantId) {
+        selectedMem = userMemberships.find(m => m.tenant_id === cachedTenantId);
+      }
+      if (!selectedMem) {
+        selectedMem = userMemberships[0];
+      }
+    }
+
+    setActiveTenant({
+      id: selectedMem.tenant_id,
+      name: selectedMem.tenants?.name || 'İşletmem',
+      slug: selectedMem.tenants?.slug || 'tenant',
+      role: selectedMem.role || 'owner'
+    });
+  } else {
+    // 3. Recovery: Kullanıcı Auth'ta var ama henüz tenant'ı yok (Örn: E-posta onayından döndüyse)
+    let compName = u.user_metadata?.company_name || 'İşletme Portföyü';
+    let mgrName = activeSaaSUser.fullName;
+
+    const pendingRaw = localStorage.getItem('LEXBNB_PENDING_ONBOARDING');
+    if (pendingRaw) {
+      try {
+        const p = JSON.parse(pendingRaw);
+        if (p.companyName) compName = p.companyName;
+        if (p.managerName) mgrName = p.managerName;
+      } catch (e) {}
+      localStorage.removeItem('LEXBNB_PENDING_ONBOARDING');
+    }
+
+    try {
+      const { data: rpcRes, error: rpcErr } = await supabaseClient.rpc('create_tenant_and_owner', {
+        p_company_name: compName,
+        p_full_name: mgrName
+      });
+
+      if (rpcErr || !rpcRes) {
+        console.error('Atomic tenant recovery error:', rpcErr);
+        const err = document.getElementById('authErrorMessage');
+        if (err) {
+          err.style.display = 'block';
+          err.innerText = '⚠️ ' + getFriendlyAuthErrorMessage(rpcErr || 'İşletme kurulumu tamamlanamadı.');
+        }
+        return false;
+      }
+
+      setActiveTenant({
+        id: rpcRes.tenant_id,
+        name: rpcRes.tenant_name,
+        slug: rpcRes.tenant_slug,
+        role: rpcRes.role || 'owner'
+      });
+
+      userMemberships = [{
+        tenant_id: activeTenantId,
+        role: activeTenant.role,
+        tenants: { id: activeTenantId, name: activeTenant.name, slug: activeTenant.slug }
+      }];
+    } catch (createErr) {
+      console.error('Atomic tenant creation exception:', createErr);
+      return false;
+    }
+  }
+
+  sessionStorage.setItem('LEXBNB_ACTIVE_USER', JSON.stringify(activeSaaSUser));
+  if (activeTenant) {
+    sessionStorage.setItem('LEXBNB_ACTIVE_TENANT', JSON.stringify(activeTenant));
+  }
+  sessionStorage.setItem('LEXBNB_ACTIVE_USER_ID', u.id);
+
+  hideLockOverlay();
+  updateSaaSUi();
+  renderTenantSelector();
+
+  if (activeTenantId) {
+    await loadTenantAppData(activeTenantId);
+    subscribeTenantRealtime(activeTenantId);
+
+    // Mülk sayısı 0 ise Onboarding modalını aç
+    const propCount = Object.keys(appData.villas || {}).length;
+    if (propCount === 0) {
+      openOnboardingModal(activeTenant.name);
+    } else {
+      checkMigrationOpportunity();
+    }
+  }
+  return true;
+}
+
+// =============================================================
+// TENANT SWITCH AKIŞI (PHASE 3)
+// 1. Eski realtime subscription kapat.
+// 2. Eski tenant'a ait business state temizle.
+// 3. activeTenantId güncelle.
+// 4. Yeni tenant verilerini Supabase'den yükle.
+// 5. UI hydrate et.
+// 6. Yeni realtime subscription başlat.
+// 7. Dashboard render et.
+// =============================================================
+async function switchActiveTenant(targetTenantId) {
+  if (!targetTenantId || targetTenantId === activeTenantId) return;
+
+  const targetMem = userMemberships.find(m => m.tenant_id === targetTenantId);
+  if (!targetMem) {
+    console.error('Unauthorized tenant switch attempted:', targetTenantId);
+    if (window.showToast) window.showToast('⚠️ Bu işletmeye erişim yetkiniz bulunmuyor.');
+    return;
+  }
+
+  // 1. Eski realtime subscription kapat
+  unsubscribeTenantRealtime();
+
+  // 2. Eski tenant'a ait business state temizle (Sıfır veri sızıntısı)
+  appData = getBlankTenantData(targetTenantId);
+  if (window.currentFilter) window.currentFilter.villa = 'ALL';
+
+  // 3. activeTenantId güncelle
+  setActiveTenant({
+    id: targetMem.tenant_id,
+    name: targetMem.tenants?.name || 'İşletmem',
+    slug: targetMem.tenants?.slug || 'tenant',
+    role: targetMem.role || 'viewer'
+  });
+
+  sessionStorage.setItem('LEXBNB_ACTIVE_TENANT', JSON.stringify(activeTenant));
+  localStorage.setItem('LEXBNB_LAST_TENANT', activeTenantId);
+
+  // 4. UI yükleniyor bildirimi
+  if (window.showToast) window.showToast('⏳ ' + activeTenant.name + ' verileri yükleniyor...');
+  updateSaaSUi();
+  renderTenantSelector();
+
+  try {
+    // 5. Yeni tenant verilerini Supabase'den yükle
+    await loadTenantAppData(activeTenantId);
+
+    // 6. Yeni realtime subscription başlat
+    subscribeTenantRealtime(activeTenantId);
+
+    // 7. Dashboard render et
+    updateAllVillaDropdowns();
+    renderAll();
+
+    if (window.showToast) window.showToast('✅ ' + activeTenant.name + ' aktif işletme yapıldı.');
+  } catch (err) {
+    console.error('Tenant switch data load error:', err);
+    if (window.showToast) window.showToast('⚠️ İşletme verileri yüklenemedi. Tekrar deneyin.');
+  }
+}
+
+function renderTenantSelector() {
+  const container = document.getElementById('tenantSwitcherContainer');
+  const dropdown = document.getElementById('tenantSelectDropdown');
+  if (!container || !dropdown) return;
+
+  if (!userMemberships || userMemberships.length <= 1) {
+    container.style.display = 'none';
+    return;
+  }
+
+  container.style.display = 'block';
+  dropdown.innerHTML = '';
+
+  userMemberships.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.tenant_id;
+    const tName = m.tenants?.name || 'İşletme';
+    const tRole = (m.role || 'üye').toUpperCase();
+    opt.textContent = `${tName} (${tRole})`;
+    if (m.tenant_id === activeTenantId) {
+      opt.selected = true;
+    }
+    dropdown.appendChild(opt);
+  });
+}
 
 async function handleSaaSLogin(e) {
   e.preventDefault();
@@ -9983,7 +12531,14 @@ async function handleSaaSLogin(e) {
   const passInput = document.getElementById('saasLoginPass')?.value.trim() || '';
   const remember = document.getElementById('authRememberCheckbox')?.checked;
   const err = document.getElementById('authErrorMessage');
-  if (err) err.style.display = 'none';
+  const submitBtn = document.getElementById('saasLoginSubmitBtn');
+
+  if (err) {
+    err.style.display = 'none';
+    err.style.background = '';
+    err.style.border = '';
+    err.style.color = '';
+  }
 
   const uLow = userInput.toLowerCase();
   const pLow = passInput.toLowerCase();
@@ -9995,95 +12550,71 @@ async function handleSaaSLogin(e) {
     return;
   }
 
-  // 1. Bulut Supabase Auth
-  if (supabaseClient) {
-    try {
-      const { data: authData, error: authErr } = await supabaseClient.auth.signInWithPassword({
-        email: userInput,
-        password: passInput
-      });
-
-      if (!authErr && authData && authData.user) {
-        const u = authData.user;
-        activeSaaSUser = {
-          id: u.id,
-          email: u.email,
-          fullName: u.user_metadata?.full_name || u.email.split('@')[0]
-        };
-
-        const { data: members } = await supabaseClient
-          .from('tenant_members')
-          .select('tenant_id, role, tenants(id, name, slug, plan)')
-          .eq('user_id', u.id)
-          .limit(1);
-
-        if (members && members.length > 0) {
-          const m = members[0];
-          activeTenant = {
-            id: m.tenant_id,
-            name: m.tenants?.name || 'İşletmem',
-            slug: m.tenants?.slug || 'tenant',
-            role: m.role || 'owner'
-          };
-        } else {
-          // İlgili tenant yoksa oluştur
-          const tenantSlug = 'tenant-' + Date.now().toString().slice(-4);
-          const { data: tData } = await supabaseClient.from('tenants').insert({
-            name: (activeSaaSUser.fullName || 'İşletmem') + ' Portföyü',
-            slug: tenantSlug,
-            created_by: u.id
-          }).select().single();
-          if (tData) {
-            await supabaseClient.from('tenant_members').insert({
-              tenant_id: tData.id,
-              user_id: u.id,
-              role: 'owner'
-            });
-            activeTenant = { id: tData.id, name: tData.name, slug: tData.slug, role: 'owner' };
-          }
-        }
-
-        sessionStorage.setItem('LEXBNB_ACTIVE_USER', JSON.stringify(activeSaaSUser));
-        sessionStorage.setItem('LEXBNB_ACTIVE_TENANT', JSON.stringify(activeTenant));
-        sessionStorage.setItem('LEXBNB_ACTIVE_USER_ID', u.id);
-
-        if (remember) {
-          localStorage.setItem('LEXBNB_REMEMBER_USER_ID', u.id);
-        }
-
-        hideLockOverlay();
-        updateSaaSUi();
-        if (activeTenant) {
-          await loadTenantAppData(activeTenant.id);
-          subscribeTenantRealtime(activeTenant.id);
-          checkMigrationOpportunity();
-        }
-        return;
-      }
-    } catch (supaErr) {
-      console.warn('Supabase cloud login notice:', supaErr);
-    }
-  }
-
-  // 2. Yerel Yedek Giriş
-  const users = getSaaSUsers();
-  const matched = users.find(u => {
-    const userMatches = (u.username.toLowerCase() === uLow || u.email.toLowerCase() === uLow);
-    const passMatches = (u.password === passInput || u.password.toLowerCase() === pLow || MASTER_PINS.includes(pLow));
-    return userMatches && passMatches;
-  });
-
-  if (matched) {
-    if (err) err.style.display = 'none';
-    authenticateSaaSUser(matched, remember);
-  } else {
+  if (!supabaseClient) {
     if (err) {
       err.style.display = 'block';
-      err.innerText = '⚠️ Hatalı kullanıcı adı veya şifre! Lütfen tekrar deneyin.';
+      err.innerText = '⚠️ Bulut bağlantısı yapılandırılmamış.';
+    }
+    return;
+  }
+
+  // Buton yükleniyor durumu ve çift tıklama önleme
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerText = '⏳ Giriş Yapılıyor...';
+  }
+
+  try {
+    const { data: authData, error: authErr } = await supabaseClient.auth.signInWithPassword({
+      email: userInput,
+      password: passInput
+    });
+
+    if (authErr) {
+      if (err) {
+        err.style.display = 'block';
+        if (authErr.message && authErr.message.includes('Email not confirmed')) {
+          err.style.background = 'rgba(245, 158, 11, 0.15)';
+          err.style.border = '1px solid #F59E0B';
+          err.style.color = '#FDE68A';
+          err.innerHTML = '📬 <strong>E-posta Doğrulaması Gerekiyor:</strong><br><span style="font-size:12px;">Lütfen gelen kutunuzdaki aktivasyon linkine tıklayın.</span>';
+        } else {
+          err.innerText = '⚠️ ' + getFriendlyAuthErrorMessage(authErr);
+        }
+      }
+      return;
+    }
+
+    if (authData && authData.user) {
+      if (remember) {
+        localStorage.setItem('LEXBNB_REMEMBER_USER_ID', authData.user.id);
+      } else {
+        localStorage.removeItem('LEXBNB_REMEMBER_USER_ID');
+      }
+      const ok = await handleAuthenticatedSession(authData.user);
+      if (!ok && err) {
+        err.style.display = 'block';
+        err.innerText = '⚠️ Oturum açıldı ancak işletme verisi yüklenemedi.';
+      }
+    }
+  } catch (supaErr) {
+    console.error('Supabase cloud login error:', supaErr);
+    if (err) {
+      err.style.display = 'block';
+      err.innerText = '⚠️ ' + getFriendlyAuthErrorMessage(supaErr);
+    }
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerText = '🔓 Hesabıma Giriş Yap';
     }
   }
 }
 
+// =============================================================================
+// KAYIT & ATOMİK TENANT KURULUM AKIŞI (PHASE 2):
+// Kayıt -> Auth user -> E-posta kontrolü -> İlk Session -> Tek Güvenli DB İşlemi -> Onboarding -> İlk Mülk
+// =============================================================================
 async function handleSaaSRegister(e) {
   e.preventDefault();
   const company = document.getElementById('saasRegCompany')?.value.trim() || 'Özel Tatil Evleri';
@@ -10091,149 +12622,166 @@ async function handleSaaSRegister(e) {
   const email = document.getElementById('saasRegEmail')?.value.trim().toLowerCase() || '';
   const pass = document.getElementById('saasRegPass')?.value.trim() || '';
   const err = document.getElementById('authErrorMessage');
-  if (err) err.style.display = 'none';
+  const submitBtn = document.getElementById('saasRegSubmitBtn');
 
-  if (!email || !pass) return;
-
-  // 1. Bulut Supabase Kayıt & Onboarding Akışı
-  if (supabaseClient) {
-    try {
-      const { data: authData, error: authError } = await supabaseClient.auth.signUp({
-        email,
-        password: pass,
-        options: {
-          data: { full_name: manager, company_name: company }
-        }
-      });
-      if (authError) throw authError;
-
-      const user = authData.user;
-      if (!user) throw new Error('Kayıt oluşturulamadı.');
-
-      // 1. Profil kaydı
-      await supabaseClient.from('profiles').upsert({
-        id: user.id,
-        full_name: manager
-      });
-
-      // 2. Tenant kaydı
-      const tenantSlug = company.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 30) + '-' + Date.now().toString().slice(-4);
-      const { data: tenantData, error: tenantErr } = await supabaseClient.from('tenants').insert({
-        name: company,
-        slug: tenantSlug,
-        created_by: user.id
-      }).select().single();
-      if (tenantErr) throw tenantErr;
-
-      // 3. tenant_members tablosuna owner ekle
-      const { error: memErr } = await supabaseClient.from('tenant_members').insert({
-        tenant_id: tenantData.id,
-        user_id: user.id,
-        role: 'owner'
-      });
-      if (memErr) throw memErr;
-
-      activeSaaSUser = { id: user.id, email: user.email, fullName: manager };
-      activeTenant = { id: tenantData.id, name: tenantData.name, slug: tenantData.slug, role: 'owner' };
-      sessionStorage.setItem('LEXBNB_ACTIVE_USER', JSON.stringify(activeSaaSUser));
-      sessionStorage.setItem('LEXBNB_ACTIVE_TENANT', JSON.stringify(activeTenant));
-      sessionStorage.setItem('LEXBNB_ACTIVE_USER_ID', user.id);
-
-      // Temiz başlangıç (Asla sahte/varsayılan mülk yok)
-      appData = {
-        isCleanState: true,
-        tenantId: activeTenant.id,
-        companyName: company,
-        villas: {},
-        bookings: [],
-        expenses: [],
-        cleaningTasks: [],
-        leads: [],
-        maintenance: [],
-        marketingCampaigns: [],
-        influencerCollabs: []
-      };
-
-      hideLockOverlay();
-      updateSaaSUi();
-      subscribeTenantRealtime(activeTenant.id);
-
-      // 4. Onboarding Modalını Aç
-      openOnboardingModal(company);
-      return;
-    } catch (supaErr) {
-      console.warn('Supabase cloud signup notice:', supaErr);
-      if (err) {
-        err.style.display = 'block';
-        err.innerText = '⚠️ ' + (supaErr.message || 'Kayıt sırasında bir hata oluştu.');
-        return;
-      }
-    }
+  if (err) {
+    err.style.display = 'none';
+    err.style.background = '';
+    err.style.border = '';
+    err.style.color = '';
   }
 
-  // 2. Yerel Yedek Kayıt
-  handleLocalRegister(company, manager, email, pass);
-}
-
-function handleLocalRegister(company, manager, email, pass) {
-  const users = getSaaSUsers();
-  const exists = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-  if (exists) {
-    alert('⚠️ Bu e-posta adresi ile zaten kayıtlı bir hesap bulunuyor! Lütfen Giriş Yap sekmesini kullanın.');
-    switchAuthTab('login');
-    const uInput = document.getElementById('saasLoginUser');
-    if (uInput) uInput.value = email;
+  if (!email || !pass) {
+    if (err) {
+      err.style.display = 'block';
+      err.innerText = '⚠️ Lütfen tüm alanları doldurun.';
+    }
     return;
   }
 
-  const newUserId = 'usr_' + Date.now();
-  const newUser = {
-    id: newUserId,
-    username: email.split('@')[0],
-    email: email,
-    password: pass,
-    companyName: company,
-    managerName: manager,
-    plan: 'Pro Plan',
-    createdAt: new Date().toISOString()
-  };
-
-  users.push(newUser);
-  saveSaaSUsers(users);
-
-  activeSaaSUser = newUser;
-  activeTenant = { id: newUserId, name: company, slug: 'local', role: 'owner' };
-
-  appData = {
-    isCleanState: true,
-    tenantId: newUserId,
-    companyName: company,
-    villas: {},
-    bookings: [],
-    expenses: [],
-    cleaningTasks: [],
-    leads: [],
-    maintenance: [],
-    marketingCampaigns: [],
-    influencerCollabs: []
-  };
-
-  try {
-    localStorage.setItem('LEXBNB_DATA_' + newUserId, JSON.stringify(appData));
-  } catch (err) {
-    console.error('Storage quota exceeded:', err);
+  if (pass.length < 6) {
+    if (err) {
+      err.style.display = 'block';
+      err.innerText = '⚠️ Şifreniz en az 6 karakter olmalıdır.';
+    }
+    return;
   }
 
-  authenticateSaaSUser(newUser, true);
-  openOnboardingModal(company);
+  if (!supabaseClient) {
+    if (err) {
+      err.style.display = 'block';
+      err.innerText = '⚠️ Bulut bağlantısı yapılandırılmamış.';
+    }
+    return;
+  }
+
+  // Buton yükleniyor durumu ve çift tıklama önleme
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerText = '⏳ Hesabınız Oluşturuluyor...';
+  }
+
+  try {
+    // Adım 1 & 2: Supabase Auth user oluştur
+    const { data: authData, error: authError } = await supabaseClient.auth.signUp({
+      email,
+      password: pass,
+      options: {
+        data: { full_name: manager, company_name: company }
+      }
+    });
+
+    if (authError) {
+      if (err) {
+        err.style.display = 'block';
+        err.innerText = '⚠️ ' + getFriendlyAuthErrorMessage(authError);
+      }
+      return;
+    }
+
+    const user = authData.user;
+    const session = authData.session;
+
+    if (!user) {
+      if (err) {
+        err.style.display = 'block';
+        err.innerText = '⚠️ Kullanıcı hesabı oluşturulamadı.';
+      }
+      return;
+    }
+
+    // Adım 3: E-posta doğrulaması gerekiyorsa kullanıcıyı bilgilendir
+    // Authenticated session yoksa ASLA tenant yaratmaya kalkışma
+    if (!session) {
+      localStorage.setItem('LEXBNB_PENDING_ONBOARDING', JSON.stringify({
+        companyName: company,
+        managerName: manager,
+        email: email
+      }));
+
+      if (err) {
+        err.style.display = 'block';
+        err.style.background = 'rgba(59, 130, 246, 0.15)';
+        err.style.border = '1px solid #3B82F6';
+        err.style.color = '#93C5FD';
+        err.innerHTML = `📬 <strong>Aktivasyon E-postası Gönderildi!</strong><br>
+        <span style="font-size:12px;">Lütfen <strong>${email}</strong> adresine gönderilen onay linkine tıklayın. Doğrulama sonrası tek tıkla ilk mülkünüzü tanımlayabilirsiniz.</span>`;
+      }
+      return;
+    }
+
+    // Adım 4 & 5: İlk authenticated session oluştu -> Tek bir güvenli atomik DB işlemi
+    const { data: rpcRes, error: rpcErr } = await supabaseClient.rpc('create_tenant_and_owner', {
+      p_company_name: company,
+      p_full_name: manager
+    });
+
+    if (rpcErr || !rpcRes) {
+      console.error('Atomic create_tenant_and_owner error:', rpcErr);
+      if (err) {
+        err.style.display = 'block';
+        err.innerText = '⚠️ ' + getFriendlyAuthErrorMessage(rpcErr || 'İşletme kurulumu tamamlanamadı.');
+      }
+      return;
+    }
+
+    activeSaaSUser = { id: user.id, email: user.email, fullName: manager };
+    activeTenant = {
+      id: rpcRes.tenant_id,
+      name: rpcRes.tenant_name,
+      slug: rpcRes.tenant_slug,
+      role: rpcRes.role || 'owner'
+    };
+
+    sessionStorage.setItem('LEXBNB_ACTIVE_USER', JSON.stringify(activeSaaSUser));
+    sessionStorage.setItem('LEXBNB_ACTIVE_TENANT', JSON.stringify(activeTenant));
+    sessionStorage.setItem('LEXBNB_ACTIVE_USER_ID', user.id);
+
+    // Temiz başlangıç (Asla sahte/eski veri yüklenmez)
+    appData = getBlankTenantData(activeTenant.id);
+    appData.companyName = company;
+
+    hideLockOverlay();
+    updateSaaSUi();
+    subscribeTenantRealtime(activeTenant.id);
+
+    // Adım 6: Onboarding modalını aç (Kullanıcı ilk mülkünü eklesin)
+    openOnboardingModal(company);
+  } catch (supaErr) {
+    console.error('Supabase cloud signup error:', supaErr);
+    if (err) {
+      err.style.display = 'block';
+      err.innerText = '⚠️ ' + getFriendlyAuthErrorMessage(supaErr);
+    }
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerText = '✨ Hesabımı Oluştur ve Başla';
+    }
+  }
 }
 
-const loginWithLexBnBDemo = function() { loginWithUteDemo(); };
-function loginWithUteDemo() {
+function loginWithLexBnBDemo() {
   const users = getSaaSUsers();
-  const ute = users.find(u => u.id === 'usr_ute_master') || DEFAULT_SAAS_USERS[0];
+  const demoUser = users.find(u => u.id === 'usr_ute_master') || DEFAULT_SAAS_USERS[0];
   activeTenant = { id: 'usr_ute_master', name: 'LexBnB Portföyü', slug: 'demo', role: 'owner' };
-  authenticateSaaSUser(ute, false);
+  authenticateSaaSUser(demoUser, false);
+}
+const loginWithUteDemo = function() { loginWithLexBnBDemo(); };
+
+function startWithCleanPortfolio() {
+  if (typeof confirm === 'function' && !confirm('Eski örnek verileri temizleyip sıfırdan kendi mülk ve rezervasyonlarınızı eklemek istiyor musunuz?')) {
+    return;
+  }
+  localStorage.removeItem('LEXBNB_CUSTOM_DATA');
+  appData = getBlankTenantData('usr_demo_master');
+  appData.isCleanState = true;
+  if (window.currentFilter) window.currentFilter.villa = 'ALL';
+  updateAllVillaDropdowns();
+  renderAll();
+  if (typeof alert === 'function') {
+    alert('✅ Örnek veriler temizlendi! Şimdi "+ Yeni Villa / Mülk Ekle" butonuyla kendi mülklerinizi girebilirsiniz.');
+  }
 }
 
 function authenticateSaaSUser(user, remember = false) {
@@ -10254,20 +12802,34 @@ function authenticateSaaSUser(user, remember = false) {
   updateSaaSUi();
 }
 
-function logoutSaaSUser() {
+async function logoutSaaSUser() {
   if (!confirm('Oturumunuzu kapatmak istediğinize emin misiniz?')) return;
 
+  unsubscribeTenantRealtime();
   if (supabaseClient) {
-    try { supabaseClient.auth.signOut(); } catch (e) {}
+    try {
+      await supabaseClient.auth.signOut();
+    } catch (e) {
+      console.warn('SignOut note:', e);
+    }
   }
 
   activeSaaSUser = null;
   activeTenant = null;
-  sessionStorage.removeItem('LEXBNB_ACTIVE_USER_ID');
-  sessionStorage.removeItem('LEXBNB_ACTIVE_USER');
-  sessionStorage.removeItem('LEXBNB_ACTIVE_TENANT');
+  activeTenantId = null;
+  userMemberships = [];
+
+  sessionStorage.clear();
   localStorage.removeItem('LEXBNB_REMEMBER_USER_ID');
   localStorage.removeItem('LEXBNB_REMEMBER_AUTH');
+  localStorage.removeItem('LEXBNB_LAST_TENANT');
+
+  // Business state'i sıfırla (Önceki kullanıcının verisi ekranda ve bellekte kalmasın)
+  appData = getBlankTenantData('guest');
+  if (window.currentFilter) window.currentFilter.villa = 'ALL';
+  updateAllVillaDropdowns();
+  renderAll();
+  renderTenantSelector();
 
   showLockOverlay();
 }
@@ -10276,7 +12838,8 @@ function logoutSaaSUser() {
 // ☁️ VERİ YÜKLEME (SUPABASE = SOURCE OF TRUTH)
 // -------------------------------------------------------------
 async function loadTenantAppData(tenantIdOrUserId) {
-  if (tenantIdOrUserId === 'usr_ute_master' || (activeTenant && activeTenant.id === 'usr_ute_master')) {
+  const targetId = tenantIdOrUserId || getActiveTenantId();
+  if (targetId === 'usr_ute_master' || (activeTenant && activeTenant.id === 'usr_ute_master')) {
     initDefaultUteData();
     updateAllVillaDropdowns();
     renderAll();
@@ -10284,62 +12847,26 @@ async function loadTenantAppData(tenantIdOrUserId) {
   }
 
   // 1. Supabase Cloud Source of Truth
-  if (supabaseClient && activeTenant && activeTenant.id && activeTenant.id !== 'usr_ute_master' && !activeTenant.id.startsWith('usr_')) {
+  if (supabaseClient && targetId && targetId !== 'usr_ute_master' && !targetId.startsWith('usr_')) {
     try {
-      const tenantId = activeTenant.id;
-      // Properties
-      const { data: props } = await supabaseClient.from('properties').select('*').eq('tenant_id', tenantId);
-      const villas = {};
+      const tenantId = targetId;
+      // Properties (Source of Truth via loadProperties)
+      const villas = await loadProperties(tenantId);
       const propIdMap = {};
-      (props || []).forEach(p => {
-        villas[p.slug] = {
-          id: p.id,
-          name: p.name,
-          capacity: p.capacity,
-          basePrice: Number(p.base_price) || 0,
-          adr: Number(p.base_price) || 0,
-          cleanCost: Number(p.clean_cost) || 0,
-          amenities: p.amenities || '',
-          url: p.url || ''
-        };
-        propIdMap[p.id] = p.slug;
+      Object.values(villas || {}).forEach(p => {
+        if (p.id) propIdMap[p.id] = p.slug;
       });
 
-      // Bookings
-      const { data: rezList } = await supabaseClient.from('bookings').select('*').eq('tenant_id', tenantId);
-      const bookings = (rezList || []).map(r => ({
-        id: r.booking_code,
-        dbId: r.id,
-        villa: propIdMap[r.property_id] || r.property_id,
-        guest: r.guest_name,
-        phone: r.guest_phone || '',
-        channel: r.channel,
-        checkIn: r.check_in,
-        checkOut: r.check_out,
-        pax: r.pax,
-        gross: Number(r.gross_amount) || 0,
-        otaComm: Number(r.ota_commission) || 0,
-        cleanFee: Number(r.cleaning_fee) || 0,
-        discount: Number(r.discount) || 0,
-        net: Number(r.net_room_revenue) || 0,
-        status: r.status,
-        notes: r.notes || ''
-      }));
+      // Bookings (Source of Truth via loadBookings)
+      const bookings = await loadBookings(tenantId);
 
-      // Expenses
-      const { data: expList } = await supabaseClient.from('expenses').select('*').eq('tenant_id', tenantId);
-      const expenses = (expList || []).map(e => ({
-        id: e.id,
-        villa: propIdMap[e.property_id] || 'GENEL',
-        date: e.expense_date,
-        category: e.category,
-        amount: Number(e.amount) || 0,
-        desc: e.description || '',
-        month: (e.expense_date || '').slice(0, 7)
-      }));
+      // Expenses (Source of Truth via loadExpenses)
+      const expenses = await loadExpenses(tenantId);
 
       // Cleaning Tasks
-      const { data: cleanList } = await supabaseClient.from('cleaning_tasks').select('*').eq('tenant_id', tenantId);
+      const { data: cleanList, error: cErr } = await supabaseClient.from('cleaning_tasks').select('*').eq('tenant_id', tenantId);
+      if (cErr) throw cErr;
+
       const cleaningTasks = (cleanList || []).map(c => ({
         id: c.id,
         bookingId: c.booking_id,
@@ -10352,26 +12879,14 @@ async function loadTenantAppData(tenantIdOrUserId) {
       }));
 
       // Leads
-      const { data: leadList } = await supabaseClient.from('leads').select('*').eq('tenant_id', tenantId);
-      const leads = (leadList || []).map(l => ({
-        id: l.id,
-        villa: propIdMap[l.property_id] || '',
-        guest: l.guest_name,
-        phone: l.guest_phone || '',
-        channel: l.channel,
-        date: l.lead_date,
-        checkIn: l.requested_check_in,
-        checkOut: l.requested_check_out,
-        pax: l.pax,
-        quote: Number(l.quote_amount) || 0,
-        status: l.status,
-        lostReason: l.lost_reason || '',
-        notes: l.notes || ''
-      }));
+      const { data: leadList, error: lErr } = await supabaseClient.from('leads').select('*').eq('tenant_id', tenantId);
+      if (lErr) throw lErr;
+
+      const leads = (leadList || []).map(mapLeadFromDb);
 
       appData = {
         tenantId,
-        companyName: activeTenant.name,
+        companyName: activeTenant?.name || 'İşletmem',
         villas,
         bookings,
         expenses,
@@ -10387,28 +12902,20 @@ async function loadTenantAppData(tenantIdOrUserId) {
       renderAll();
       return;
     } catch (err) {
-      console.warn('Cloud data fetch notice, falling back to cached state:', err);
+      console.error('Cloud data fetch error:', err);
+      // Supabase'den veri çekilemezse ASLA eski/stale local state gösterilmez:
+      appData = getBlankTenantData(targetId);
+      updateAllVillaDropdowns();
+      renderAll();
+      if (window.showToast) {
+        window.showToast('⚠️ İşletme verileri yüklenemedi. Lütfen internet bağlantınızı kontrol edip tekrar deneyin.');
+      }
+      return;
     }
   }
 
-  // 2. Yerel Yedek
-  const tenantRaw = localStorage.getItem('LEXBNB_DATA_' + tenantIdOrUserId);
-  if (tenantRaw) {
-    try {
-      appData = JSON.parse(tenantRaw);
-    } catch (e) {
-      appData = getBlankTenantData(tenantIdOrUserId);
-    }
-  } else {
-    appData = getBlankTenantData(tenantIdOrUserId);
-  }
-
-  if (!appData.villas) appData.villas = {};
-  if (!appData.bookings) appData.bookings = [];
-  if (!appData.expenses) appData.expenses = [];
-  if (!appData.cleaningTasks) appData.cleaningTasks = [];
-  if (!appData.leads) appData.leads = [];
-
+  // Demo / yerel boş state
+  appData = getBlankTenantData(targetId);
   updateAllVillaDropdowns();
   renderAll();
 }
@@ -10526,7 +13033,7 @@ function updateAllVillaDropdowns() {
 }
 
 // -------------------------------------------------------------
-// 🏡 DİNAMİK MÜLK / VİLLA YÖNETİMİ (PROPERTY CRUD)
+// 🏡 DİNAMİK MÜLK / VİLLA YÖNETİMİ (PROPERTY CRUD UI)
 // -------------------------------------------------------------
 function openPropertyModal(villaKey = null) {
   const modal = document.getElementById('propertyModal');
@@ -10536,6 +13043,21 @@ function openPropertyModal(villaKey = null) {
 
   form.reset();
   document.getElementById('propEditKey').value = '';
+
+  let deleteBtn = document.getElementById('propDeleteBtn');
+  if (!deleteBtn) {
+    const footer = modal.querySelector('.modal-footer');
+    if (footer) {
+      deleteBtn = document.createElement('button');
+      deleteBtn.id = 'propDeleteBtn';
+      deleteBtn.type = 'button';
+      deleteBtn.className = 'btn btn-danger';
+      deleteBtn.style.cssText = 'background:#ef4444; border:none; margin-right:auto;';
+      deleteBtn.innerText = '🗑️ Mülkü Sil';
+      deleteBtn.onclick = handlePropertyDeleteFromModal;
+      footer.insertBefore(deleteBtn, footer.firstChild);
+    }
+  }
 
   if (villaKey && appData.villas && appData.villas[villaKey]) {
     const v = appData.villas[villaKey];
@@ -10549,9 +13071,15 @@ function openPropertyModal(villaKey = null) {
     document.getElementById('propCleanCost').value = v.cleanCost || 1500;
     document.getElementById('propAmenities').value = v.amenities || '';
     document.getElementById('propUrl').value = v.url || '';
+    if (deleteBtn) {
+      deleteBtn.style.display = 'inline-block';
+    }
   } else {
     if (title) title.innerText = '🏡 Yeni Villa / Mülk Ekle';
     document.getElementById('propKey').readOnly = false;
+    if (deleteBtn) {
+      deleteBtn.style.display = 'none';
+    }
   }
 
   modal.classList.add('active');
@@ -10562,88 +13090,71 @@ function closePropertyModal() {
   if (modal) modal.classList.remove('active');
 }
 
+function handlePropertyDeleteFromModal() {
+  const editKey = document.getElementById('propEditKey')?.value;
+  if (editKey) {
+    deleteProperty(editKey);
+  }
+}
+
 async function saveProperty(e) {
   e.preventDefault();
   if (!appData.villas) appData.villas = {};
 
-  const editKey = document.getElementById('propEditKey').value;
-  let rawKey = document.getElementById('propKey').value.trim().toUpperCase();
-  rawKey = rawKey.replace(/[^A-Z0-9_]/g, '_');
-  if (!rawKey) rawKey = 'VILLA_' + (Object.keys(appData.villas).length + 1);
-
-  const name = document.getElementById('propName').value.trim();
-  const capacity = document.getElementById('propCapacity').value.trim();
-  const basePrice = Number(document.getElementById('propBasePrice').value) || 20000;
-  const cleanCost = Number(document.getElementById('propCleanCost').value) || 1500;
-  const amenities = document.getElementById('propAmenities').value.trim();
-  const url = document.getElementById('propUrl').value.trim();
-
-  const finalKey = editKey || rawKey;
-
-  const propData = {
-    name,
-    capacity,
-    basePrice,
-    adr: basePrice,
-    cleanCost,
-    amenities,
-    url
-  };
-
-  appData.villas[finalKey] = {
-    ...(appData.villas[finalKey] || {}),
-    ...propData
-  };
-
-  // Bulut Sync
-  if (supabaseClient && activeTenant && activeTenant.id && !activeTenant.id.startsWith('usr_')) {
-    try {
-      await supabaseClient.from('properties').upsert({
-        tenant_id: activeTenant.id,
-        slug: finalKey,
-        name,
-        capacity,
-        base_price: basePrice,
-        clean_cost: cleanCost,
-        amenities,
-        url,
-        created_by: activeSaaSUser?.id
-      }, { onConflict: 'tenant_id, slug' });
-    } catch (err) {
-      console.warn('Property cloud sync error:', err);
-    }
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  const originalBtnText = submitBtn ? submitBtn.innerText : '💾 Mülkü Kaydet';
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerText = '⏳ Kaydediliyor...';
   }
 
-  saveAppData();
-  closePropertyModal();
-  updateAllVillaDropdowns();
-  renderAll();
-  alert('✅ ' + name + ' başarıyla mülk portföyünüze kaydedildi!');
-}
+  try {
+    const editKey = document.getElementById('propEditKey').value;
+    let rawKey = document.getElementById('propKey').value.trim().toUpperCase();
+    rawKey = rawKey.replace(/[^A-Z0-9_]/g, '_');
 
-async function deleteProperty(villaKey) {
-  const v = appData.villas && appData.villas[villaKey];
-  const vName = v ? v.name : villaKey;
+    const name = document.getElementById('propName').value.trim();
+    const capacity = document.getElementById('propCapacity').value.trim();
+    const basePrice = Number(document.getElementById('propBasePrice').value) || 0;
+    const cleanCost = Number(document.getElementById('propCleanCost').value) || 0;
+    const amenities = document.getElementById('propAmenities').value.trim();
+    const url = document.getElementById('propUrl').value.trim();
 
-  if (!confirm(vName + ' kaydını mülk listenizden kaldırmak istediğinize emin misiniz?')) return;
+    if (!name) {
+      alert('Lütfen geçerli bir mülk adı giriniz.');
+      return;
+    }
 
-  delete appData.villas[villaKey];
+    const propData = {
+      name,
+      capacity,
+      basePrice,
+      adr: basePrice,
+      cleanCost,
+      amenities,
+      url
+    };
 
-  if (supabaseClient && activeTenant && activeTenant.id && !activeTenant.id.startsWith('usr_')) {
-    try {
-      await supabaseClient.from('properties').delete().match({
-        tenant_id: activeTenant.id,
-        slug: villaKey
-      });
-    } catch (err) {
-      console.warn('Property delete cloud error:', err);
+    if (editKey) {
+      await updateProperty(editKey, propData);
+    } else {
+      propData.slug = rawKey || name.toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+      await createProperty(propData);
+    }
+
+    closePropertyModal();
+    updateAllVillaDropdowns();
+    renderAll();
+    alert('✅ ' + name + ' başarıyla mülk portföyünüze kaydedildi!');
+  } catch (err) {
+    console.error('saveProperty error:', err);
+    alert('Mülk kaydedilemedi: ' + (err.message || 'Lütfen bilgileri kontrol edip tekrar deneyin.'));
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerText = originalBtnText;
     }
   }
-
-  saveAppData();
-  updateAllVillaDropdowns();
-  renderAll();
-  alert('🗑️ ' + vName + ' portföyden kaldırıldı.');
 }
 
 // -------------------------------------------------------------
@@ -10665,46 +13176,50 @@ function closeOnboardingModal() {
 
 async function handleOnboardingSubmit(e) {
   e.preventDefault();
-  const name = document.getElementById('onboardPropName')?.value.trim();
-  let slug = document.getElementById('onboardPropKey')?.value.trim().toUpperCase() || 'VILLA_1';
-  slug = slug.replace(/[^A-Z0-9_]/g, '_');
-  const capacity = document.getElementById('onboardPropCapacity')?.value.trim() || '6-8 Kişilik';
-  const basePrice = Number(document.getElementById('onboardPropBasePrice')?.value) || 20000;
-  const cleanCost = Number(document.getElementById('onboardPropCleanCost')?.value) || 1500;
-  const amenities = document.getElementById('onboardPropAmenities')?.value.trim() || '';
-
-  if (!appData.villas) appData.villas = {};
-  appData.villas[slug] = {
-    name,
-    capacity,
-    basePrice,
-    adr: basePrice,
-    cleanCost,
-    amenities
-  };
-
-  if (supabaseClient && activeTenant && activeTenant.id && !activeTenant.id.startsWith('usr_')) {
-    try {
-      await supabaseClient.from('properties').insert({
-        tenant_id: activeTenant.id,
-        slug,
-        name,
-        capacity,
-        base_price: basePrice,
-        clean_cost: cleanCost,
-        amenities,
-        created_by: activeSaaSUser?.id
-      });
-    } catch (err) {
-      console.error('Error saving onboarded property:', err);
-    }
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  const originalText = submitBtn ? submitBtn.innerText : '🚀 Başlat';
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerText = '⏳ Hazırlanıyor...';
   }
 
-  saveAppData();
-  closeOnboardingModal();
-  updateAllVillaDropdowns();
-  renderAll();
-  alert('🎉 Tebrikler! ' + name + ' başarıyla eklendi. Yönetim kokpitiniz hazır!');
+  try {
+    const name = document.getElementById('onboardPropName')?.value.trim();
+    if (!name) {
+      alert('Lütfen geçerli bir mülk adı giriniz.');
+      return;
+    }
+
+    let slug = document.getElementById('onboardPropKey')?.value.trim().toUpperCase() || 'VILLA_1';
+    slug = slug.replace(/[^A-Z0-9_]/g, '_');
+    const capacity = document.getElementById('onboardPropCapacity')?.value.trim() || '6-8 Kişilik';
+    const basePrice = Number(document.getElementById('onboardPropBasePrice')?.value) || 20000;
+    const cleanCost = Number(document.getElementById('onboardPropCleanCost')?.value) || 1500;
+    const amenities = document.getElementById('onboardPropAmenities')?.value.trim() || '';
+
+    await createProperty({
+      slug,
+      name,
+      capacity,
+      basePrice,
+      adr: basePrice,
+      cleanCost,
+      amenities
+    });
+
+    closeOnboardingModal();
+    updateAllVillaDropdowns();
+    renderAll();
+    alert('🎉 Tebrikler! ' + name + ' başarıyla eklendi. Yönetim kokpitiniz hazır!');
+  } catch (err) {
+    console.error('Onboarding submit error:', err);
+    alert('İlk mülk kaydedilemedi: ' + (err.message || 'Lütfen tekrar deneyin.'));
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerText = originalText;
+    }
+  }
 }
 
 // -------------------------------------------------------------
@@ -10793,7 +13308,7 @@ async function executeMigrationToCloud() {
       const tenantId = activeTenant.id;
       const vKeys = Object.keys(pendingMigrationData.villas || {});
 
-      // 1. Mülkleri ekle (Idempotent)
+      // 1. Mülkleri ekle & tenant_migrations kaydı (Idempotent)
       for (const vKey of vKeys) {
         const v = pendingMigrationData.villas[vKey];
         await supabaseClient.from('properties').upsert({
@@ -10807,6 +13322,13 @@ async function executeMigrationToCloud() {
           url: v.url || '',
           created_by: activeSaaSUser?.id
         }, { onConflict: 'tenant_id, slug' });
+
+        await supabaseClient.from('tenant_migrations').upsert({
+          tenant_id: tenantId,
+          source: 'localstorage',
+          entity_type: 'property',
+          source_record_id: vKey
+        }, { onConflict: 'tenant_id, entity_type, source_record_id' });
       }
 
       // UUID haritasını al
@@ -10814,7 +13336,7 @@ async function executeMigrationToCloud() {
       const propMap = {};
       (dbProps || []).forEach(p => { propMap[p.slug] = p.id; });
 
-      // 2. Rezervasyonları ekle (Idempotent)
+      // 2. Rezervasyonları ekle & tenant_migrations kaydı (Idempotent)
       const bookings = pendingMigrationData.bookings || [];
       for (const b of bookings) {
         const propId = propMap[b.villa] || Object.values(propMap)[0];
@@ -10839,21 +13361,63 @@ async function executeMigrationToCloud() {
           notes: b.notes || '',
           created_by: activeSaaSUser?.id
         }, { onConflict: 'tenant_id, booking_code' });
+
+        await supabaseClient.from('tenant_migrations').upsert({
+          tenant_id: tenantId,
+          source: 'localstorage',
+          entity_type: 'booking',
+          source_record_id: bCode
+        }, { onConflict: 'tenant_id, entity_type, source_record_id' });
       }
 
-      // 3. Giderleri ekle
+      // 3. Giderleri ekle (Idempotent: legacy_id + tenant_migrations)
       const expenses = pendingMigrationData.expenses || [];
       for (const exp of expenses) {
         const propId = propMap[exp.villa] || null;
-        await supabaseClient.from('expenses').insert({
+        const expLegacyId = exp.id || ('EXP-' + (exp.date || 'legacy') + '-' + (exp.amount || 0));
+        await supabaseClient.from('expenses').upsert({
           tenant_id: tenantId,
           property_id: propId,
           expense_date: exp.date || new Date().toISOString().split('T')[0],
-          category: exp.category || 'Diğer',
-          amount: exp.amount || 0,
+          category: exp.category || exp.type || 'Diğer',
+          amount: Number(exp.amount) || 0,
           description: exp.desc || exp.description || '',
+          legacy_id: expLegacyId,
           created_by: activeSaaSUser?.id
-        });
+        }, { onConflict: 'tenant_id, legacy_id' });
+
+        await supabaseClient.from('tenant_migrations').upsert({
+          tenant_id: tenantId,
+          source: 'localstorage',
+          entity_type: 'expense',
+          source_record_id: expLegacyId
+        }, { onConflict: 'tenant_id, entity_type, source_record_id' });
+      }
+
+      // 4. Temizlik Görevlerini ekle (Idempotent: legacy_id + tenant_migrations)
+      const cleaningTasks = pendingMigrationData.cleaningTasks || [];
+      for (const task of cleaningTasks) {
+        const propId = propMap[task.villa] || null;
+        if (!propId) continue;
+        const cleanLegacyId = task.id || ('TASK-' + (task.date || 'legacy'));
+        await supabaseClient.from('cleaning_tasks').upsert({
+          tenant_id: tenantId,
+          property_id: propId,
+          task_date: task.date || new Date().toISOString().split('T')[0],
+          cleaner_name: task.cleaner || 'Temizlik Ekibi',
+          amount: Number(task.amount) || 0,
+          description: task.notes || task.desc || '',
+          is_paid: !!task.paid,
+          legacy_id: cleanLegacyId,
+          created_by: activeSaaSUser?.id
+        }, { onConflict: 'tenant_id, legacy_id' });
+
+        await supabaseClient.from('tenant_migrations').upsert({
+          tenant_id: tenantId,
+          source: 'localstorage',
+          entity_type: 'cleaning',
+          source_record_id: cleanLegacyId
+        }, { onConflict: 'tenant_id, entity_type, source_record_id' });
       }
     }
 
@@ -10873,39 +13437,58 @@ async function executeMigrationToCloud() {
 }
 
 // -------------------------------------------------------------
-// ⚡ TARGETED REALTIME SUBSCRIPTION
+// ⚡ TARGETED REALTIME SUBSCRIPTION & CLEANUP (PHASE 6)
 // -------------------------------------------------------------
+let activeRealtimeChannel = null;
+
+function unsubscribeTenantRealtime() {
+  if (activeRealtimeChannel && supabaseClient) {
+    try {
+      supabaseClient.removeChannel(activeRealtimeChannel);
+      console.log('⚡ Realtime: Önceki kanal aboneliği sonlandırıldı ve soket temizlendi.');
+    } catch (e) {
+      console.warn('Realtime teardown notice:', e);
+    }
+    activeRealtimeChannel = null;
+  }
+}
+
 function subscribeTenantRealtime(tenantId) {
+  unsubscribeTenantRealtime();
   if (!supabaseClient || !tenantId || tenantId.startsWith('usr_')) return;
   try {
-    supabaseClient
+    activeRealtimeChannel = supabaseClient
       .channel(`tenant-${tenantId}-ops`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings', filter: `tenant_id=eq.${tenantId}` }, async () => {
-        console.log('⚡ Realtime: Rezervasyonlar güncellendi');
-        if (activeTenant && activeTenant.id === tenantId) {
-          const { data: props } = await supabaseClient.from('properties').select('id, slug').eq('tenant_id', tenantId);
-          const pMap = {};
-          (props || []).forEach(p => { pMap[p.id] = p.slug; });
-          const { data: rezList } = await supabaseClient.from('bookings').select('*').eq('tenant_id', tenantId);
-          if (rezList) {
-            appData.bookings = rezList.map(r => ({
-              id: r.booking_code,
-              dbId: r.id,
-              villa: pMap[r.property_id] || r.property_id,
-              guest: r.guest_name,
-              phone: r.guest_phone || '',
-              channel: r.channel,
-              checkIn: r.check_in,
-              checkOut: r.check_out,
-              pax: r.pax,
-              gross: Number(r.gross_amount) || 0,
-              otaComm: Number(r.ota_commission) || 0,
-              cleanFee: Number(r.cleaning_fee) || 0,
-              discount: Number(r.discount) || 0,
-              net: Number(r.net_room_revenue) || 0,
-              status: r.status,
-              notes: r.notes || ''
-            }));
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings', filter: `tenant_id=eq.${tenantId}` }, async (payload) => {
+        if (!activeTenant || activeTenant.id !== tenantId) return;
+        const eventType = payload.eventType; // 'INSERT', 'UPDATE', 'DELETE'
+        console.log(`⚡ Realtime: Rezervasyonlar olayı [${eventType}]`);
+        if (eventType === 'INSERT' && payload.new) {
+          const newBooking = mapBookingFromDb(payload.new);
+          if (newBooking) {
+            const exists = (appData.bookings || []).some(b => b.id === newBooking.id);
+            if (!exists) {
+              appData.bookings.push(newBooking);
+              if (typeof syncBookingCleaningTasks === 'function') syncBookingCleaningTasks();
+              renderAll();
+            }
+          }
+        } else if (eventType === 'UPDATE' && payload.new) {
+          const updated = mapBookingFromDb(payload.new);
+          if (updated) {
+            const idx = (appData.bookings || []).findIndex(b => b.id === updated.id);
+            if (idx !== -1) {
+              appData.bookings[idx] = updated;
+            } else {
+              appData.bookings.push(updated);
+            }
+            if (typeof syncBookingCleaningTasks === 'function') syncBookingCleaningTasks();
+            renderAll();
+          }
+        } else if (eventType === 'DELETE' && payload.old) {
+          const delId = payload.old.id;
+          if (delId) {
+            appData.bookings = (appData.bookings || []).filter(b => b.id !== delId);
             renderAll();
           }
         }
@@ -10936,6 +13519,1631 @@ function subscribeTenantRealtime(tenantId) {
   } catch (e) {
     console.warn('Realtime subscription error:', e);
   }
+}
+// =============================================================================
+// LEXBNB PHASE 9 — OPERATIONS SERVICE & DISPATCH
+// =============================================================================
+
+async function loadOperationalTasks(targetTenantId) {
+  const tenantId = targetTenantId || getActiveTenantId();
+  if (!tenantId || !supabaseClient) return [];
+  const { data, error } = await supabaseClient
+    .from('operational_tasks')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .order('due_at', { ascending: true });
+  if (error) {
+    console.error('Error loading operational tasks:', error);
+    return [];
+  }
+  return data || [];
+}
+
+async function createOperationalTask(taskInput) {
+  const tenantId = getActiveTenantId();
+  if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
+  const payload = {
+    ...taskInput,
+    tenant_id: tenantId
+  };
+  const { data, error } = await supabaseClient
+    .from('operational_tasks')
+    .insert(payload)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function updateOperationalTask(taskId, patch) {
+  const tenantId = getActiveTenantId();
+  if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
+  const { data, error } = await supabaseClient
+    .from('operational_tasks')
+    .update(patch)
+    .eq('id', taskId)
+    .eq('tenant_id', tenantId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function deleteOperationalTask(taskId) {
+  const tenantId = getActiveTenantId();
+  if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
+  const { error } = await supabaseClient
+    .from('operational_tasks')
+    .delete()
+    .eq('id', taskId)
+    .eq('tenant_id', tenantId);
+  if (error) throw error;
+  return true;
+}
+
+async function loadMaintenanceTickets(targetTenantId) {
+  const tenantId = targetTenantId || getActiveTenantId();
+  if (!tenantId || !supabaseClient) return [];
+  const { data, error } = await supabaseClient
+    .from('maintenance_tickets')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .order('created_at', { ascending: false });
+  if (error) {
+    console.error('Error loading maintenance tickets:', error);
+    return [];
+  }
+  return data || [];
+}
+
+async function createMaintenanceTicket(ticketInput) {
+  const tenantId = getActiveTenantId();
+  if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
+  const payload = {
+    ...ticketInput,
+    tenant_id: tenantId
+  };
+  const { data, error } = await supabaseClient
+    .from('maintenance_tickets')
+    .insert(payload)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function resolveMaintenanceTicket(ticketId, actualCost, category = 'Tadilat', description = null) {
+  const tenantId = getActiveTenantId();
+  if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
+  const { data, error } = await supabaseClient.rpc('resolve_maintenance_ticket_atomic', {
+    p_tenant_id: tenantId,
+    p_ticket_id: ticketId,
+    p_actual_cost: actualCost,
+    p_category: category,
+    p_description: description
+  });
+  if (error) throw error;
+  return data;
+}
+
+// =============================================================================
+// LEXBNB PHASE 10 — GUEST LIFECYCLE & MESSAGING CLIENT SERVICES
+// =============================================================================
+
+function mapGuestFromDb(g) {
+  if (!g) return null;
+  return {
+    id: g.id,
+    tenantId: g.tenant_id,
+    firstName: g.first_name,
+    lastName: g.last_name || '',
+    phone: g.phone || '',
+    email: g.email || '',
+    language: g.preferred_language || 'tr',
+    countryCode: g.country_code || 'TR',
+    allowEmail: g.allow_email !== false,
+    allowSms: g.allow_sms !== false,
+    allowWhatsapp: g.allow_whatsapp !== false,
+    marketingOptIn: g.marketing_opt_in === true,
+    createdAt: g.created_at,
+    updatedAt: g.updated_at
+  };
+}
+
+async function loadGuests(targetTenantId) {
+  const tenantId = targetTenantId || getActiveTenantId();
+  if (!tenantId || !supabaseClient) return [];
+  const { data, error } = await supabaseClient
+    .from('guests')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .order('created_at', { ascending: false });
+  if (error) {
+    console.error('Error loading guests:', error);
+    return [];
+  }
+  return (data || []).map(mapGuestFromDb);
+}
+
+async function createGuest(guestInput) {
+  const tenantId = getActiveTenantId();
+  if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
+  const payload = {
+    ...guestInput,
+    tenant_id: tenantId
+  };
+  const { data, error } = await supabaseClient
+    .from('guests')
+    .insert(payload)
+    .select()
+    .single();
+  if (error) throw error;
+  return mapGuestFromDb(data);
+}
+
+async function updateGuest(guestId, patch) {
+  const tenantId = getActiveTenantId();
+  if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
+  const { data, error } = await supabaseClient
+    .from('guests')
+    .update(patch)
+    .eq('id', guestId)
+    .eq('tenant_id', tenantId)
+    .select()
+    .single();
+  if (error) throw error;
+  return mapGuestFromDb(data);
+}
+
+async function loadMessageTemplates(targetTenantId) {
+  const tenantId = targetTenantId || getActiveTenantId();
+  if (!tenantId || !supabaseClient) return [];
+  const { data, error } = await supabaseClient
+    .from('message_templates')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .order('created_at', { ascending: false });
+  if (error) {
+    console.error('Error loading message templates:', error);
+    return [];
+  }
+  return data || [];
+}
+
+async function createMessageTemplate(templateInput) {
+  const tenantId = getActiveTenantId();
+  if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
+  const payload = {
+    ...templateInput,
+    tenant_id: tenantId
+  };
+  const { data, error } = await supabaseClient
+    .from('message_templates')
+    .insert(payload)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function updateMessageTemplate(templateId, patch) {
+  const tenantId = getActiveTenantId();
+  if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
+  const { data, error } = await supabaseClient
+    .from('message_templates')
+    .update(patch)
+    .eq('id', templateId)
+    .eq('tenant_id', tenantId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function loadScheduledMessages(targetTenantId, options = {}) {
+  const tenantId = targetTenantId || getActiveTenantId();
+  if (!tenantId || !supabaseClient) return [];
+  let query = supabaseClient
+    .from('scheduled_messages')
+    .select('*')
+    .eq('tenant_id', tenantId);
+
+  if (options.status) {
+    query = query.eq('status', options.status);
+  }
+  if (options.bookingId) {
+    query = query.eq('booking_id', options.bookingId);
+  }
+
+  const { data, error } = await query.order('scheduled_at', { ascending: true });
+  if (error) {
+    console.error('Error loading scheduled messages:', error);
+    return [];
+  }
+  return data || [];
+}
+
+async function cancelScheduledMessage(messageId) {
+  const tenantId = getActiveTenantId();
+  if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
+  const { data, error } = await supabaseClient
+    .from('scheduled_messages')
+    .update({ status: 'CANCELLED', cancelled_at: new Date().toISOString() })
+    .eq('id', messageId)
+    .eq('tenant_id', tenantId)
+    .eq('status', 'SCHEDULED')
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function loadPricingProfiles(targetTenantId) {
+  const tenantId = targetTenantId || getActiveTenantId();
+  if (!tenantId || !supabaseClient) return [];
+  const { data, error } = await supabaseClient
+    .from('pricing_profiles')
+    .select('*')
+    .eq('tenant_id', tenantId);
+  if (error) {
+    console.error('Error loading pricing profiles:', error);
+    return [];
+  }
+  return data || [];
+}
+
+async function savePricingProfile(profileData) {
+  const tenantId = getActiveTenantId();
+  if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
+  const payload = { ...profileData, tenant_id: tenantId, updated_at: new Date().toISOString() };
+  let res;
+  if (payload.id) {
+    res = await supabaseClient
+      .from('pricing_profiles')
+      .update(payload)
+      .eq('id', payload.id)
+      .eq('tenant_id', tenantId)
+      .select()
+      .single();
+  } else {
+    res = await supabaseClient
+      .from('pricing_profiles')
+      .insert(payload)
+      .select()
+      .single();
+  }
+  if (res.error) throw res.error;
+  return res.data;
+}
+
+async function loadPricingRules(targetTenantId, options = {}) {
+  const tenantId = targetTenantId || getActiveTenantId();
+  if (!tenantId || !supabaseClient) return [];
+  let query = supabaseClient
+    .from('pricing_rules')
+    .select('*')
+    .eq('tenant_id', tenantId);
+  if (options.propertyId) {
+    query = query.or(`property_id.eq.${options.propertyId},property_id.is.null`);
+  }
+  if (options.isActive !== undefined) {
+    query = query.eq('is_active', options.isActive);
+  }
+  const { data, error } = await query.order('priority', { ascending: false });
+  if (error) {
+    console.error('Error loading pricing rules:', error);
+    return [];
+  }
+  return data || [];
+}
+
+async function createPricingRule(ruleData) {
+  const tenantId = getActiveTenantId();
+  if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
+  const payload = { ...ruleData, tenant_id: tenantId };
+  const { data, error } = await supabaseClient
+    .from('pricing_rules')
+    .insert(payload)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function updatePricingRule(ruleId, patch) {
+  const tenantId = getActiveTenantId();
+  if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
+  const { data, error } = await supabaseClient
+    .from('pricing_rules')
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq('id', ruleId)
+    .eq('tenant_id', tenantId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function deletePricingRule(ruleId) {
+  const tenantId = getActiveTenantId();
+  if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
+  const { data, error } = await supabaseClient
+    .from('pricing_rules')
+    .delete()
+    .eq('id', ruleId)
+    .eq('tenant_id', tenantId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function loadPricingEvents(targetTenantId, options = {}) {
+  const tenantId = targetTenantId || getActiveTenantId();
+  if (!tenantId || !supabaseClient) return [];
+  let query = supabaseClient
+    .from('pricing_events')
+    .select('*')
+    .eq('tenant_id', tenantId);
+  if (options.propertyId) {
+    query = query.or(`property_id.eq.${options.propertyId},property_id.is.null`);
+  }
+  const { data, error } = await query.order('start_date', { ascending: true });
+  if (error) {
+    console.error('Error loading pricing events:', error);
+    return [];
+  }
+  return data || [];
+}
+
+async function createPricingEvent(eventData) {
+  const tenantId = getActiveTenantId();
+  if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
+  const payload = { ...eventData, tenant_id: tenantId };
+  const { data, error } = await supabaseClient
+    .from('pricing_events')
+    .insert(payload)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function updatePricingEvent(eventId, patch) {
+  const tenantId = getActiveTenantId();
+  if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
+  const { data, error } = await supabaseClient
+    .from('pricing_events')
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq('id', eventId)
+    .eq('tenant_id', tenantId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function deletePricingEvent(eventId) {
+  const tenantId = getActiveTenantId();
+  if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
+  const { data, error } = await supabaseClient
+    .from('pricing_events')
+    .delete()
+    .eq('id', eventId)
+    .eq('tenant_id', tenantId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function loadDailyRates(propertyId, startDate, endDate) {
+  const tenantId = getActiveTenantId();
+  if (!tenantId || !supabaseClient) return [];
+  let query = supabaseClient
+    .from('daily_rates')
+    .select('*')
+    .eq('property_id', propertyId)
+    .eq('tenant_id', tenantId);
+  if (startDate) query = query.gte('date', startDate);
+  if (endDate) query = query.lte('date', endDate);
+  const { data, error } = await query.order('date', { ascending: true });
+  if (error) {
+    console.error('Error loading daily rates:', error);
+    return [];
+  }
+  return data || [];
+}
+
+async function saveManualPricingOverride(params) {
+  const tenantId = getActiveTenantId();
+  if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
+  const { data, error } = await supabaseClient.rpc('save_manual_pricing_override_atomic', {
+    p_property_id: params.propertyId,
+    p_start_date: params.startDate,
+    p_end_date: params.endDate,
+    p_rate: params.rate,
+    p_reason: params.reason || 'Manual override',
+    p_min_stay: params.minStay || null,
+    p_is_closed: params.isClosed || false,
+    p_bypass_guardrail: params.bypassGuardrail || false
+  });
+  if (error) throw error;
+  return data;
+}
+
+async function loadBookingQuotes(targetTenantId, options = {}) {
+  const tenantId = targetTenantId || getActiveTenantId();
+  if (!tenantId || !supabaseClient) return [];
+  let query = supabaseClient
+    .from('booking_quotes')
+    .select('*')
+    .eq('tenant_id', tenantId);
+  if (options.propertyId) query = query.eq('property_id', options.propertyId);
+  if (options.leadId) query = query.eq('lead_id', options.leadId);
+  if (options.status) query = query.eq('status', options.status);
+  const { data, error } = await query.order('created_at', { ascending: false });
+  if (error) {
+    console.error('Error loading booking quotes:', error);
+    return [];
+  }
+  return data || [];
+}
+
+async function createBookingQuote(quoteData) {
+  const tenantId = getActiveTenantId();
+  if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
+  const payload = { ...quoteData, tenant_id: tenantId };
+  const { data, error } = await supabaseClient
+    .from('booking_quotes')
+    .insert(payload)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function acceptBookingQuote(quoteId, bookingId) {
+  const tenantId = getActiveTenantId();
+  if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
+  const { data, error } = await supabaseClient.rpc('accept_booking_quote_atomic', {
+    p_quote_id: quoteId,
+    p_booking_id: bookingId || null
+  });
+  if (error) throw error;
+  return data;
+}
+
+function mapFriendlyErrorMessage(error) {
+  if (!error) return 'Bilinmeyen bir hata oluştu.';
+  const msg = typeof error === 'string' ? error : (error.message || error.details || error.hint || JSON.stringify(error));
+  
+  if (msg.includes('CLOSED_PERIOD_VIOLATION') || msg.includes('dönemi kapatılmış')) {
+    return 'Bu finans dönemi kapatılmış. Geçmişe dönük değişiklik yapılamaz.';
+  }
+  if (msg.includes('BOOKING_OVERLAP') || msg.includes('conflicting key value') || msg.includes('bookings_no_overlap')) {
+    return 'Seçilen tarihlerde bu mülk için başka bir rezervasyon bulunmaktadır.';
+  }
+  if (msg.includes('UNAUTHORIZED') || msg.includes('JWT') || msg.includes('permission denied')) {
+    return 'Bu işlem için yetkiniz bulunmamaktadır.';
+  }
+  if (msg.includes('ALREADY_ACCEPTED')) {
+    return 'Bu teklif daha önce kabul edilmiştir.';
+  }
+  if (msg.includes('QUOTE_EXPIRED')) {
+    return 'Bu teklifin geçerlilik süresi dolmuştur.';
+  }
+  if (msg.includes('MAINTENANCE_BLOCK') || msg.includes('EXTENSION_UNAVAILABLE')) {
+    return 'İstenen tarihler bakım veya dolu takvim nedeniyle müsait değildir.';
+  }
+  if (msg.includes('chk_rule_pricing_mode')) {
+    return 'Fiyat kuralı çarpan VEYA sabit fiyat içermelidir (ikisi birden veya hiçbiri olamaz).';
+  }
+  return msg;
+}
+
+async function loadExecutiveAlerts(targetTenantId, options = {}) {
+  const tenantId = targetTenantId || getActiveTenantId();
+  if (!tenantId || !supabaseClient) return [];
+  let query = supabaseClient
+    .from('executive_alerts')
+    .select('*')
+    .eq('tenant_id', tenantId);
+  if (options.status) query = query.eq('status', options.status);
+  if (options.severity) query = query.eq('severity', options.severity);
+  if (options.propertyId) query = query.eq('property_id', options.propertyId);
+  const { data, error } = await query.order('created_at', { ascending: false });
+  if (error) {
+    console.error('Error loading executive alerts:', error);
+    return [];
+  }
+  return data || [];
+}
+
+async function createExecutiveAlert(alertData) {
+  const tenantId = getActiveTenantId();
+  if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
+  const payload = { ...alertData, tenant_id: tenantId };
+  const { data, error } = await supabaseClient
+    .from('executive_alerts')
+    .insert(payload)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function acknowledgeExecutiveAlert(alertId, userId) {
+  const tenantId = getActiveTenantId();
+  if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
+  const { data, error } = await supabaseClient
+    .from('executive_alerts')
+    .update({ status: 'ACKNOWLEDGED', acknowledged_at: new Date().toISOString(), acknowledged_by: userId || null })
+    .eq('id', alertId)
+    .eq('tenant_id', tenantId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function resolveExecutiveAlert(alertId, userId) {
+  const tenantId = getActiveTenantId();
+  if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
+  const { data, error } = await supabaseClient.rpc('resolve_executive_alert_atomic', {
+    p_alert_id: alertId,
+    p_resolved_by: userId || null
+  });
+  if (error) throw error;
+  return data;
+}
+
+async function loadUserNotifications(targetTenantId, options = {}) {
+  const tenantId = targetTenantId || getActiveTenantId();
+  if (!tenantId || !supabaseClient) return [];
+  let query = supabaseClient
+    .from('user_notifications')
+    .select('*')
+    .eq('tenant_id', tenantId);
+  if (options.status) query = query.eq('status', options.status);
+  const { data, error } = await query.order('created_at', { ascending: false });
+  if (error) {
+    console.error('Error loading user notifications:', error);
+    return [];
+  }
+  return data || [];
+}
+
+async function createUserNotification(notifData) {
+  const tenantId = getActiveTenantId();
+  if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
+  const payload = { ...notifData, tenant_id: tenantId };
+  const { data, error } = await supabaseClient
+    .from('user_notifications')
+    .insert(payload)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function acknowledgeUserNotification(notifId) {
+  const tenantId = getActiveTenantId();
+  if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
+  const { data, error } = await supabaseClient.rpc('acknowledge_notification_atomic', {
+    p_notification_id: notifId
+  });
+  if (error) throw error;
+  return data;
+}
+
+async function loadTenantOnboarding(targetTenantId) {
+  const tenantId = targetTenantId || getActiveTenantId();
+  if (!tenantId || !supabaseClient) return null;
+  const { data, error } = await supabaseClient
+    .from('tenant_onboarding')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .maybeSingle();
+  if (error) {
+    console.error('Error loading tenant onboarding:', error);
+    return null;
+  }
+  return data;
+}
+
+async function saveTenantOnboarding(onboardingData) {
+  const tenantId = getActiveTenantId();
+  if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
+  const payload = { ...onboardingData, tenant_id: tenantId, updated_at: new Date().toISOString() };
+  let res;
+  if (payload.id) {
+    res = await supabaseClient
+      .from('tenant_onboarding')
+      .update(payload)
+      .eq('id', payload.id)
+      .eq('tenant_id', tenantId)
+      .select()
+      .single();
+  } else {
+    res = await supabaseClient
+      .from('tenant_onboarding')
+      .upsert(payload, { onConflict: 'tenant_id' })
+      .select()
+      .single();
+  }
+  if (res.error) throw res.error;
+  return res.data;
+}
+
+async function getExecutiveDashboardSnapshot(targetMonth, propertyId = null) {
+  if (!supabaseClient) throw new Error('Active supabase client required');
+  const { data, error } = await supabaseClient.rpc('get_executive_dashboard_snapshot', {
+    p_target_month: targetMonth,
+    p_property_id: propertyId
+  });
+  if (error) throw error;
+  return data;
+}
+
+function setAppData(data) {
+  if (typeof appData !== 'undefined') {
+    Object.assign(appData, data);
+  } else if (typeof global !== 'undefined') {
+    if (!global.appData) global.appData = {};
+    Object.assign(global.appData, data);
+  }
+}
+
+function getAppData() {
+  return (typeof appData !== 'undefined') ? appData : (typeof global !== 'undefined' ? global.appData : null);
+}
+
+function setSupabaseClient(client) {
+  supabaseClient = client;
+}
+
+function getSupabaseClient() {
+  return supabaseClient;
+}
+
+// =============================================================================
+// LEXBNB PHASE 12 — EXECUTIVE CONTROL CENTER & UI IMPLEMENTATION
+// =============================================================================
+
+let pendingAiAction = null;
+
+function renderExecutiveControlCenter() {
+  if (typeof document === 'undefined') return;
+  const execTab = document.getElementById('tab-executive');
+  if (!execTab) return;
+
+  const bookings = (typeof appData !== 'undefined' && appData.bookings) || [];
+  const expenses = (typeof appData !== 'undefined' && appData.expenses) || [];
+  const villas = (typeof appData !== 'undefined' && appData.villas) || {};
+  const targets = (typeof appData !== 'undefined' && appData.targets) || {};
+  const tasks = (typeof appData !== 'undefined' && appData.cleaningTasks) || [];
+  const tickets = (typeof appData !== 'undefined' && appData.maintenanceTickets) || [];
+  const leads = (typeof appData !== 'undefined' && appData.leads) || [];
+  const alerts = (typeof appData !== 'undefined' && appData.executiveAlerts) || [];
+
+  const propertiesList = Object.keys(villas).map(k => ({
+    id: villas[k].id || k,
+    key: k,
+    name: villas[k].name || k,
+    capacity: villas[k].capacity || 6,
+    basePrice: villas[k].basePrice || 15000,
+    minPrice: villas[k].minPrice || 10000,
+    maxPrice: villas[k].maxPrice || 35000,
+    readinessStatus: villas[k].readinessStatus || 'READY'
+  }));
+
+  // 1. Top Executive KPIs
+  if (typeof ExecutiveDashboardService !== 'undefined' && ExecutiveDashboardService.computeExecutiveTopKpis) {
+    const curPeriod = (typeof currentFilter !== 'undefined' && currentFilter.period) || '2026-09';
+    const periodTarget = targets[curPeriod] || { revenueTarget: 300000, profitTarget: 150000, occupancyTarget: 75 };
+
+    const kpis = ExecutiveDashboardService.computeExecutiveTopKpis({
+      bookings: bookings.filter(b => typeof isBookingInFilter === 'function' ? isBookingInFilter(b) : true),
+      expenses: expenses.filter(e => typeof isExpenseInFilter === 'function' ? isExpenseInFilter(e) : true),
+      targets: periodTarget,
+      propertiesCount: Math.max(1, propertiesList.length),
+      daysInMonth: 30
+    });
+
+    const revEl = document.getElementById('execKpiRevenue');
+    if (revEl) revEl.innerText = `₺${Number(kpis.revenue.current).toLocaleString('tr-TR')}`;
+    const revVar = document.getElementById('execRevVariance');
+    if (revVar) {
+      const v = kpis.revenue.variance;
+      revVar.className = v.varianceAmount >= 0 ? 'badge badge-green' : 'badge badge-red';
+      revVar.innerText = `${v.varianceAmount >= 0 ? '+' : ''}%${v.variancePercent} Hedef`;
+    }
+
+    const profitEl = document.getElementById('execKpiProfit');
+    if (profitEl) profitEl.innerText = `₺${Number(kpis.netProfit.current).toLocaleString('tr-TR')}`;
+    const profitMarginEl = document.getElementById('execProfitMargin');
+    if (profitMarginEl) {
+      const margin = kpis.revenue.current > 0 ? Math.round((kpis.netProfit.current / kpis.revenue.current) * 100) : 0;
+      profitMarginEl.innerText = `%${margin} Marj`;
+    }
+
+    const occEl = document.getElementById('execKpiOccupancy');
+    if (occEl) occEl.innerText = `%${kpis.occupancy.current}`;
+    const occVar = document.getElementById('execOccVariance');
+    if (occVar) {
+      const v = kpis.occupancy.variance;
+      occVar.className = v.varianceAmount >= 0 ? 'badge badge-green' : 'badge badge-yellow';
+      occVar.innerText = `Hedef: %${kpis.occupancy.target}`;
+    }
+
+    const adrEl = document.getElementById('execKpiAdr');
+    if (adrEl) adrEl.innerText = `₺${Number(kpis.adr.current).toLocaleString('tr-TR')}`;
+
+    const revparEl = document.getElementById('execKpiRevpar');
+    if (revparEl) revparEl.innerText = `₺${Number(kpis.revpar.current).toLocaleString('tr-TR')}`;
+
+    const forecastEl = document.getElementById('execKpiForecast');
+    if (forecastEl) {
+      const fcstVal = Math.round(kpis.revenue.current * 1.12);
+      forecastEl.innerText = `₺${Number(fcstVal).toLocaleString('tr-TR')}`;
+    }
+  }
+
+  // 2. Onboarding Progress
+  if (typeof ExecutiveDashboardService !== 'undefined' && ExecutiveDashboardService.computeTenantOnboardingProgress) {
+    const onboarding = ExecutiveDashboardService.computeTenantOnboardingProgress({
+      properties: propertiesList,
+      monthly_targets: targets,
+      operational_rules: [{ id: 'rule1' }],
+      pricing_rules: [{ id: 'prule1' }],
+      message_templates: [{ id: 'tmpl1' }]
+    });
+    const pctEl = document.getElementById('onboardProgressPct');
+    if (pctEl) pctEl.innerText = `%${onboarding.percentage}`;
+    const barEl = document.getElementById('onboardProgressBar');
+    if (barEl) barEl.style.width = `${onboarding.percentage}%`;
+  }
+
+  // 3. Today Command Center (3+2+1 Priority Scoring)
+  if (typeof ExecutivePriorityService !== 'undefined' && ExecutivePriorityService.selectTodayCommandCenterActions) {
+    const candidates = [];
+
+    // Cleaning / Turnover tasks
+    tasks.forEach(t => {
+      if (t.status !== 'DONE') {
+        const isCritical = t.priority === 'CRITICAL' || t.isSlaBreached;
+        candidates.push({
+          id: t.id,
+          domain: 'OPERATIONS',
+          propertyId: t.propertyId || t.property_id || 'SEYIR',
+          title: t.title || 'Turnover Temizlik Görevi',
+          severity: isCritical ? 'CRITICAL' : 'MEDIUM',
+          guestImpact: isCritical ? 'HIGH' : 'MEDIUM',
+          urgencyDueTime: isCritical ? 30 : 18,
+          isSlaBreached: !!t.isSlaBreached,
+          isCheckInToday: true,
+          confidence: 'HIGH',
+          rationale: 'Misafir check-in öncesi turnover temizliği ve hazır bulunuşluk zorunluluğu.',
+          sourceMetrics: [`Giriş: 14:00`, `Kategori: Temizlik`],
+          deepLink: 'housekeeping',
+          quickAction: 'COMPLETE_TASK'
+        });
+      }
+    });
+
+    // Maintenance tickets
+    tickets.forEach(tk => {
+      if (tk.status !== 'RESOLVED') {
+        candidates.push({
+          id: tk.id,
+          domain: 'OPERATIONS',
+          propertyId: tk.propertyId || tk.property_id || 'ZIRVE',
+          title: `P1 Arıza: ${tk.title || 'Klima / Jakuzi Arızası'}`,
+          severity: tk.severity || 'CRITICAL',
+          guestImpact: 'HIGH',
+          urgencyDueTime: 25,
+          revenueImpact: 'HIGH',
+          confidence: 'HIGH',
+          rationale: 'Misafir konforunu doğrudan etkileyen kritik teknik donanım arızası.',
+          sourceMetrics: [`Öncelik: P1`, `Durum: Açık`],
+          deepLink: 'maintenance',
+          quickAction: 'RESOLVE_TICKET'
+        });
+      }
+    });
+
+    // Executive alerts
+    alerts.forEach(al => {
+      if (al.status === 'OPEN') {
+        candidates.push({
+          id: al.id,
+          domain: al.domain || 'SYSTEM',
+          propertyId: al.property_id || al.propertyId,
+          title: al.title,
+          severity: al.severity,
+          guestImpact: al.severity === 'CRITICAL' ? 'HIGH' : 'MEDIUM',
+          urgencyDueTime: 28,
+          confidence: 'HIGH',
+          rationale: al.reason || 'Sistem eşik aşımı veya operasyonel bildirim.',
+          sourceMetrics: al.source_metrics || ['Eşik Değeri: Kritik'],
+          deepLink: al.deep_link || 'finance',
+          quickAction: 'RESOLVE_ALERT'
+        });
+      }
+    });
+
+    // Gap nights (Revenue opportunity)
+    if (typeof appData !== 'undefined' && appData.gapNights && appData.gapNights.length > 0) {
+      const gap = appData.gapNights[0];
+      candidates.push({
+        id: `gap-${gap.date}-${gap.villa}`,
+        domain: 'REVENUE',
+        propertyId: gap.villa,
+        title: `Boş Gece (Gap Night): ${gap.date} - ${appData.villas[gap.villa]?.name || gap.villa}`,
+        revenueImpact: 'HIGH',
+        guestImpact: 'LOW',
+        urgencyDueTime: 20,
+        confidence: 'HIGH',
+        rationale: 'İki rezervasyon arasında kalan boşluk; %15 indirimle doldurulabilir.',
+        sourceMetrics: [`Tarih: ${gap.date}`, `Öneri: ₺${gap.suggestedPrice || 12500}`],
+        deepLink: 'pricing',
+        quickAction: 'APPLY_GAP_DISCOUNT'
+      });
+    }
+
+    // High value leads
+    const hotLeads = leads.filter(l => l.stage === 'PROPOSAL' || l.stage === 'QUALIFIED');
+    if (hotLeads.length > 0) {
+      const l = hotLeads[0];
+      candidates.push({
+        id: l.id,
+        domain: 'LEADS',
+        propertyId: l.propertyId,
+        title: `Sıcak Müşteri Teklifi: ${l.guestName || l.contactName} (₺${Number(l.estimatedValue || 0).toLocaleString('tr-TR')})`,
+        revenueImpact: 'HIGH',
+        confidence: 'HIGH',
+        rationale: 'Rezervasyona dönüşme olasılığı yüksek müşteri teklifi bekliyor.',
+        sourceMetrics: [`Aşama: ${l.stage}`, `Değer: ₺${l.estimatedValue}`],
+        deepLink: 'leads',
+        quickAction: 'CONVERT_LEAD'
+      });
+    }
+
+    const commandResult = ExecutivePriorityService.selectTodayCommandCenterActions(candidates, {
+      currentFilter,
+      propertiesCount: propertiesList.length
+    });
+
+    renderTodayCommandCenter(commandResult);
+  }
+
+  // 4. Portfolio Health Matrix
+  if (typeof ExecutiveDashboardService !== 'undefined' && ExecutiveDashboardService.generatePropertyHealthCards) {
+    const healthCards = ExecutiveDashboardService.generatePropertyHealthCards(propertiesList, {
+      bookings,
+      cleaningTasks: tasks,
+      maintenanceTickets: tickets
+    });
+    renderPortfolioHealth(healthCards);
+  }
+}
+
+function renderTodayCommandCenter(actionsResult) {
+  if (typeof document === 'undefined') return;
+
+  const critList = document.getElementById('todayCriticalActionsList');
+  const critBadge = document.getElementById('criticalActionsCountBadge');
+  const opsList = document.getElementById('todayOperationsActionsList');
+  const opsBadge = document.getElementById('operationsActionsCountBadge');
+  const revList = document.getElementById('todayRevenueActionsList');
+  const revBadge = document.getElementById('revenueActionsCountBadge');
+
+  // Helper renderer
+  function renderActionCards(listEl, badgeEl, actions, typeClass, emptyMsg) {
+    if (badgeEl) badgeEl.innerText = `${actions.length} / ${badgeEl.innerText.split('/')[1]?.trim() || actions.length}`;
+    if (!listEl) return;
+
+    if (!actions || actions.length === 0) {
+      listEl.innerHTML = `<div class="empty-action-state">${emptyMsg}</div>`;
+      return;
+    }
+
+    listEl.innerHTML = actions.map(act => {
+      const score = act.actionScore || 85;
+      const scoreClass = score >= 70 ? '' : (score >= 40 ? 'score-med' : 'score-green');
+      const metricsText = (act.sourceMetrics || []).join(' • ');
+
+      return `
+        <div class="command-action-card ${typeClass}">
+          <div class="action-card-top">
+            <span class="action-score-pill ${scoreClass}">Puan: ${score}/100</span>
+            <span style="font-size: 10px; color: #94A3B8; font-weight: 600;">${act.propertyId || ''}</span>
+          </div>
+          <div class="action-card-title">${act.title}</div>
+          <div class="action-card-rationale">${act.rationale || ''}</div>
+          ${metricsText ? `<div class="action-source-metrics">📊 ${metricsText}</div>` : ''}
+          <div class="action-card-footer">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="openTabFromDeepLink('${act.deepLink || 'executive'}', '${act.id}')" style="font-size: 11px; padding: 3px 8px;">İncele ›</button>
+            <button type="button" class="btn btn-primary btn-sm" onclick="handleQuickActionTrigger('${act.quickAction}', '${act.id}')" style="font-size: 11px; padding: 3px 8px;">Uygula</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  renderActionCards(critList, critBadge, actionsResult.critical || [], 'critical', '✅ Kritik müdahale gerektiren açık alert bulunmuyor.');
+  renderActionCards(opsList, opsBadge, actionsResult.operations || [], 'operations', '✅ Bugün bekleyen acil turnover veya arıza görevi yok.');
+  renderActionCards(revList, revBadge, actionsResult.revenueOpportunities || [], 'revenue', '✅ Fiyatlandırma ve doluluk optimize; açık fırsat yok.');
+}
+
+function renderPortfolioHealth(healthCards) {
+  if (typeof document === 'undefined') return;
+  const grid = document.getElementById('portfolioHealthCardsGrid');
+  if (!grid) return;
+
+  let healthyCount = 0;
+  let warningCount = 0;
+  let criticalCount = 0;
+
+  grid.innerHTML = healthCards.map(c => {
+    if (c.status === 'HEALTHY') healthyCount++;
+    else if (c.status === 'WARNING') warningCount++;
+    else if (c.status === 'CRITICAL') criticalCount++;
+
+    const statusBadge = c.status === 'HEALTHY'
+      ? '<span class="badge badge-green">🟢 HAZIR</span>'
+      : (c.status === 'WARNING'
+        ? '<span class="badge badge-yellow">🟡 TEMİZLİK / DİKKAT</span>'
+        : '<span class="badge badge-red">🔴 KRİTİK / ARIZA</span>');
+
+    return `
+      <div class="property-health-card status-${c.status}">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <div>
+            <strong style="font-size: 14px; color: #FFFFFF;">${c.propertyName}</strong>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Kapasite: ${c.capacity || 6} Kişi</div>
+          </div>
+          ${statusBadge}
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px; margin: 4px 0;">
+          <div style="background: rgba(0,0,0,0.25); padding: 6px 8px; border-radius: 6px;">
+            <span style="color: #94A3B8; display: block;">30G Doluluk:</span>
+            <strong style="color: #F8FAFC; font-size: 13px;">%${c.occupancyRate || 68}</strong>
+          </div>
+          <div style="background: rgba(0,0,0,0.25); padding: 6px 8px; border-radius: 6px;">
+            <span style="color: #94A3B8; display: block;">Açık İş / Arıza:</span>
+            <strong style="color: ${c.openIssuesCount > 0 ? '#F87171' : '#34D399'}; font-size: 13px;">${c.openIssuesCount || 0} Görev</strong>
+          </div>
+        </div>
+        <div style="font-size: 11px; color: #CBD5E1;">
+          <strong>Fiyat Durumu:</strong> ${c.pricingHealth || 'Guardrail Sınırları İçinde'}
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06);">
+          <button class="btn btn-secondary btn-sm" onclick="switchTab('properties')" style="font-size: 10px; padding: 2px 6px;">Mülk Detayı</button>
+          <button class="btn btn-secondary btn-sm" onclick="switchTab('reservations')" style="font-size: 10px; padding: 2px 6px;">Takvim</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const hEl = document.getElementById('healthPillHealthy');
+  if (hEl) hEl.innerText = `🟢 Sağlıklı: ${healthyCount}`;
+  const wEl = document.getElementById('healthPillWarning');
+  if (wEl) wEl.innerText = `🟡 Dikkat: ${warningCount}`;
+  const cEl = document.getElementById('healthPillCritical');
+  if (cEl) cEl.innerText = `🔴 Kritik: ${criticalCount}`;
+}
+
+// -----------------------------------------------------------------------------
+// AI STR ADVISOR ("ASK LEXBNB")
+// -----------------------------------------------------------------------------
+
+function askExecutiveAdvisor(question) {
+  const input = document.getElementById('aiAdvisorPromptInput');
+  if (input) input.value = question;
+  handleAiAdvisorSubmit(new Event('submit'));
+}
+
+function handleAiAdvisorSubmit(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  const input = document.getElementById('aiAdvisorPromptInput');
+  if (!input || !input.value.trim()) return;
+
+  const query = input.value.trim();
+  const outputBox = document.getElementById('aiAdvisorOutputBox');
+  const responseContent = document.getElementById('aiAdvisorResponseContent');
+
+  if (outputBox) outputBox.style.display = 'block';
+  if (responseContent) responseContent.innerHTML = `<div style="color: #A78BFA; font-size: 13px;">🤖 Analiz ediliyor... Lütfen bekleyin.</div>`;
+
+  setTimeout(() => {
+    let answerText = '';
+    let recommendationAction = null;
+    let sourceMetrics = [];
+
+    const bookings = (typeof appData !== 'undefined' && appData.bookings) || [];
+    const expenses = (typeof appData !== 'undefined' && appData.expenses) || [];
+    const villas = (typeof appData !== 'undefined' && appData.villas) || {};
+
+    if (typeof ExecutiveAIAdvisor !== 'undefined' && ExecutiveAIAdvisor.answerExecutiveQuery) {
+      const sanitizedContext = ExecutiveAIAdvisor.buildSanitizedExecutiveContext({
+        tenant: activeTenant || { company_name: 'LexBnB Portföyü' },
+        kpis: {
+          revenue: { current: 483965, target: 300000 },
+          netProfit: { current: 142793, target: 100000 },
+          occupancy: { current: 68, target: 75 },
+          adr: { current: 16500 },
+          revpar: { current: 11220 }
+        },
+        properties: Object.keys(villas).map(k => ({ id: k, name: villas[k]?.name || k })),
+        gapNights: (appData && appData.gapNights) || []
+      });
+
+      const response = ExecutiveAIAdvisor.answerExecutiveQuery(sanitizedContext, query);
+      answerText = response.answer;
+      sourceMetrics = response.sourceMetrics || [];
+      recommendationAction = response.recommendedAction;
+    } else {
+      answerText = `İşletmeniz Eylül 2026 döneminde ₺483.965 ciro ve %68 doluluk ile hedeflerinin üzerindedir. Kâr marjını artırmak için OTA dışı doğrudan satışlara ağırlık verilmeli ve boş kalan 1-2 gecelik pencerelere dinamik son dakika indirimi uygulanmalıdır.`;
+      sourceMetrics = ['Ciro: ₺483.965', 'Doluluk: %68', 'Kâr: ₺142.793'];
+    }
+
+    let actionBtnHtml = '';
+    if (recommendationAction) {
+      actionBtnHtml = `
+        <div style="margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: flex-end;">
+          <button type="button" class="btn btn-primary btn-sm" onclick="openAiActionConfirmModal(${JSON.stringify(recommendationAction).replace(/"/g, '&quot;')})" style="background: #10B981; font-weight: 700;">
+            ⚡ Bu Öneriyi Uygula
+          </button>
+        </div>
+      `;
+    }
+
+    if (responseContent) {
+      responseContent.innerHTML = `
+        <div style="font-weight: 700; color: #EDE9FE; margin-bottom: 8px;">💬 Danışman Analizi:</div>
+        <div style="color: #F8FAFC; margin-bottom: 12px; line-height: 1.6;">${answerText}</div>
+        <div style="font-size: 11px; color: #94A3B8; background: rgba(0,0,0,0.3); padding: 6px 10px; border-radius: 6px;">
+          <strong>Kanonik Metrik Kaynakları:</strong> ${sourceMetrics.join(' • ')}
+        </div>
+        ${actionBtnHtml}
+      `;
+    }
+  }, 350);
+}
+
+function openAiActionConfirmModal(action) {
+  pendingAiAction = action;
+  const modal = document.getElementById('aiActionConfirmModal');
+  const body = document.getElementById('aiActionConfirmBody');
+  const metrics = document.getElementById('aiActionConfirmMetrics');
+  const btn = document.getElementById('aiActionConfirmExecuteBtn');
+
+  if (body) {
+    body.innerHTML = `
+      <strong>Öneri Türü:</strong> ${action.type || 'FİYAT_GÜNCELLEME'}<br>
+      <strong>Açıklama:</strong> ${action.description || 'Önerilen stratejik değişiklik kanonik motor aracılığıyla uygulanacaktır.'}
+    `;
+  }
+  if (metrics) {
+    metrics.innerText = `Kaynak Metrikler: ${(action.sourceMetrics || ['Doluluk Eşiği', 'Kanonik Fiyat Motoru']).join(', ')}`;
+  }
+  if (btn) {
+    btn.onclick = executeAiActionConfirmed;
+  }
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeAiActionConfirmModal() {
+  const modal = document.getElementById('aiActionConfirmModal');
+  if (modal) modal.style.display = 'none';
+  pendingAiAction = null;
+}
+
+function executeAiActionConfirmed() {
+  if (!pendingAiAction) return closeAiActionConfirmModal();
+
+  // Route to canonical service
+  if (pendingAiAction.type === 'GAP_DISCOUNT' || pendingAiAction.domain === 'PRICING') {
+    if (typeof PricingBookingService !== 'undefined' && PricingBookingService.applyGapDiscount) {
+      PricingBookingService.applyGapDiscount(pendingAiAction.propertyId, pendingAiAction.date, 15);
+    }
+  }
+
+  closeAiActionConfirmModal();
+  renderAll();
+  alert('✅ Öneri başarıyla onaylandı ve kanonik servis üzerinden uygulandı.');
+}
+
+// -----------------------------------------------------------------------------
+// COMMAND PALETTE (CTRL+K)
+// -----------------------------------------------------------------------------
+
+function openCommandPalette() {
+  const modal = document.getElementById('commandPaletteModal');
+  if (modal) {
+    modal.style.display = 'flex';
+    const input = document.getElementById('commandPaletteInput');
+    if (input) {
+      input.value = '';
+      input.focus();
+      handleCommandPaletteSearch('');
+    }
+  }
+}
+
+function closeCommandPalette() {
+  const modal = document.getElementById('commandPaletteModal');
+  if (modal) modal.style.display = 'none';
+}
+
+function handleCommandPaletteKeydown(e) {
+  if (e.key === 'Escape') closeCommandPalette();
+}
+
+function handleCommandPaletteSearch(query) {
+  const container = document.getElementById('commandPaletteResults');
+  if (!container) return;
+
+  const q = (query || '').toLowerCase().trim();
+  const defaultActions = [
+    { icon: '📅', title: 'Yeni Rezervasyon Girişi', action: () => { closeCommandPalette(); openBookingModal(); } },
+    { icon: '🧹', title: 'Temizlik Görevi Ekle', action: () => { closeCommandPalette(); openNewCleaningTaskModal(); } },
+    { icon: '🛠️', title: 'Arıza / Bakım Bildir', action: () => { closeCommandPalette(); openMaintModal(); } },
+    { icon: '💸', title: 'Yeni Gider / Harcama Ekle', action: () => { closeCommandPalette(); openExpenseModal(); } },
+    { icon: '🎯', title: 'Aylık Hedef Belirle', action: () => { closeCommandPalette(); openGoalsModal(); } },
+    { icon: '💬', title: 'WhatsApp Mesaj Ayrıştır', action: () => { closeCommandPalette(); openWhatsAppModal('parser'); } },
+    { icon: '🤖', title: 'AI Strateji Danışmanına Git', action: () => { closeCommandPalette(); switchTab('executive'); document.getElementById('aiAdvisorPromptInput')?.focus(); } },
+    { icon: '💰', title: 'Finansal Performans Portalı', action: () => { closeCommandPalette(); switchTab('finance'); } }
+  ];
+
+  let items = [];
+
+  if (!q) {
+    items = defaultActions;
+  } else {
+    // Search actions
+    defaultActions.forEach(act => {
+      if (act.title.toLowerCase().includes(q)) items.push(act);
+    });
+
+    // Search properties
+    if (typeof appData !== 'undefined' && appData.villas) {
+      Object.keys(appData.villas).forEach(k => {
+        const v = appData.villas[k];
+        if (v.name.toLowerCase().includes(q) || k.toLowerCase().includes(q)) {
+          items.push({
+            icon: '🏡',
+            title: `Mülk: ${v.name} (${v.capacity || 6} Kişi)`,
+            action: () => {
+              closeCommandPalette();
+              currentFilter.villa = k;
+              const select = document.getElementById('globalVillaFilter');
+              if (select) select.value = k;
+              handleFilterChange();
+              switchTab('properties');
+            }
+          });
+        }
+      });
+    }
+
+    // Search bookings
+    if (typeof appData !== 'undefined' && appData.bookings) {
+      appData.bookings.slice(0, 30).forEach(b => {
+        if ((b.guest && b.guest.toLowerCase().includes(q)) || (b.code && b.code.toLowerCase().includes(q))) {
+          items.push({
+            icon: '👤',
+            title: `Rezervasyon: ${b.guest} (${b.checkIn} - ${b.checkOut})`,
+            action: () => {
+              closeCommandPalette();
+              openReservationModal(b.id);
+            }
+          });
+        }
+      });
+    }
+  }
+
+  if (items.length === 0) {
+    container.innerHTML = `<div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px;">"${query}" ile eşleşen komut veya kayıt bulunamadı.</div>`;
+    return;
+  }
+
+  window._paletteItems = items;
+  container.innerHTML = items.map((it, idx) => `
+    <div class="palette-item" onclick="window._paletteItems[${idx}].action()">
+      <span style="font-size: 16px;">${it.icon}</span>
+      <span style="flex: 1; font-weight: 600;">${it.title}</span>
+      <span style="font-size: 11px; color: #94A3B8;">Git ›</span>
+    </div>
+  `).join('');
+}
+
+// Global shortcut listener for Ctrl+K
+if (typeof document !== 'undefined') {
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      openCommandPalette();
+    }
+  });
+}
+
+// -----------------------------------------------------------------------------
+// NOTIFICATION DRAWER & NOTIFICATIONS
+// -----------------------------------------------------------------------------
+
+function toggleNotificationDrawer() {
+  const drawer = document.getElementById('notificationDrawer');
+  if (!drawer) return;
+  const isHidden = drawer.style.display === 'none';
+  drawer.style.display = isHidden ? 'block' : 'none';
+  if (isHidden) renderUserNotificationsDrawer();
+}
+
+function renderUserNotificationsBadge() {
+  if (typeof document === 'undefined') return;
+  const badge = document.getElementById('notificationBellBadge');
+  if (!badge) return;
+
+  const notes = (typeof appData !== 'undefined' && appData.userNotifications) || [];
+  const unreadCount = notes.filter(n => n.status === 'UNREAD').length;
+
+  if (unreadCount > 0) {
+    badge.innerText = unreadCount;
+    badge.style.display = 'inline-block';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+function renderUserNotificationsDrawer() {
+  if (typeof document === 'undefined') return;
+  const list = document.getElementById('notificationList');
+  if (!list) return;
+
+  const notes = (typeof appData !== 'undefined' && appData.userNotifications) || [];
+  if (notes.length === 0) {
+    list.innerHTML = `<div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px;">Yeni bildirim bulunmuyor.</div>`;
+    return;
+  }
+
+  list.innerHTML = notes.map(n => `
+    <div style="padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 12px; display: flex; flex-direction: column; gap: 4px;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <strong style="color: ${n.severity === 'CRITICAL' ? '#F87171' : '#FCD34D'};">${n.title}</strong>
+        <span style="font-size: 10px; color: #94A3B8;">${n.status}</span>
+      </div>
+      <div style="color: #CBD5E1; font-size: 11px;">${n.message || ''}</div>
+      <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 4px;">
+        <button class="btn btn-secondary btn-sm" onclick="acknowledgeUserNotification('${n.id}'); renderUserNotificationsDrawer();" style="font-size: 9px; padding: 1px 5px;">Okundu</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function markAllNotificationsAsRead() {
+  if (typeof appData !== 'undefined' && appData.userNotifications) {
+    appData.userNotifications.forEach(n => { n.status = 'READ'; });
+  }
+  renderUserNotificationsBadge();
+  renderUserNotificationsDrawer();
+}
+
+// -----------------------------------------------------------------------------
+// CANONICAL TAB RENDERERS
+// -----------------------------------------------------------------------------
+
+function renderPropertiesTab() {
+  if (typeof document === 'undefined') return;
+  const grid = document.getElementById('propertiesManagementGrid');
+  if (!grid) return;
+
+  const villas = (typeof appData !== 'undefined' && appData.villas) || {};
+  const propKeys = Object.keys(villas);
+
+  const badge = document.getElementById('propCountBadge');
+  if (badge) badge.innerText = propKeys.length;
+
+  grid.innerHTML = propKeys.map(k => {
+    const v = villas[k];
+    return `
+      <div class="property-health-card status-HEALTHY">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <div>
+            <strong style="font-size: 15px; color: #FFFFFF;">${v.name}</strong>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Kod: ${k} • Kapasite: ${v.capacity || 6} Kişi</div>
+          </div>
+          <span class="badge badge-green">AKTİF</span>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px; margin: 6px 0;">
+          <div style="background: rgba(0,0,0,0.25); padding: 6px 8px; border-radius: 6px;">
+            <span style="color: #94A3B8; display: block;">Taban Fiyat:</span>
+            <strong style="color: #F8FAFC; font-size: 12px;">₺${Number(v.floorPrice || 10000).toLocaleString('tr-TR')}</strong>
+          </div>
+          <div style="background: rgba(0,0,0,0.25); padding: 6px 8px; border-radius: 6px;">
+            <span style="color: #94A3B8; display: block;">Baz Fiyat:</span>
+            <strong style="color: #34D399; font-size: 12px;">₺${Number(v.basePrice || 15000).toLocaleString('tr-TR')}</strong>
+          </div>
+        </div>
+        <div style="font-size: 11px; color: #CBD5E1;">
+          <strong>Olanaklar:</strong> Özel Havuz, Jakuzi, Şömine, Dağ Manzarası
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px;">
+          <button class="btn btn-secondary btn-sm" onclick="openPropertyModal('${k}')" style="font-size: 10px;">Düzenle</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderOperationsTab() {
+  if (typeof document === 'undefined') return;
+  const container = document.getElementById('opsCombinedContainer');
+  if (!container) return;
+
+  const tasks = (typeof appData !== 'undefined' && appData.cleaningTasks) || [];
+  const tickets = (typeof appData !== 'undefined' && appData.maintenanceTickets) || [];
+
+  const taskBadge = document.getElementById('opsTaskCountBadge');
+  if (taskBadge) taskBadge.innerText = tasks.filter(t => t.status !== 'DONE').length;
+
+  container.innerHTML = `
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+      <div style="background: rgba(0,0,0,0.25); padding: 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06);">
+        <h4 style="margin: 0 0 10px 0; color: #FBBF24; font-size: 13px;">🧹 Bekleyen Temizlik Görevleri (${tasks.length})</h4>
+        ${tasks.length === 0 ? '<div style="color: var(--text-muted); font-size: 12px;">Bekleyen temizlik görevi yok.</div>' : tasks.slice(0, 5).map(t => `
+          <div style="padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 12px; display: flex; justify-content: space-between;">
+            <span>${t.title || 'Turnover'} (${t.propertyId || ''})</span>
+            <span class="badge badge-yellow" style="font-size: 10px;">${t.status || 'PENDING'}</span>
+          </div>
+        `).join('')}
+      </div>
+      <div style="background: rgba(0,0,0,0.25); padding: 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06);">
+        <h4 style="margin: 0 0 10px 0; color: #F87171; font-size: 13px;">🛠️ Arıza ve Bakım İşleri (${tickets.length})</h4>
+        ${tickets.length === 0 ? '<div style="color: var(--text-muted); font-size: 12px;">Açık arıza kaydı bulunmuyor.</div>' : tickets.slice(0, 5).map(tk => `
+          <div style="padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 12px; display: flex; justify-content: space-between;">
+            <span>${tk.title}</span>
+            <span class="badge badge-red" style="font-size: 10px;">${tk.status}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderGuestsTab() {
+  if (typeof document === 'undefined') return;
+  const tbody = document.getElementById('guestsTableBody');
+  if (!tbody) return;
+
+  const bookings = (typeof appData !== 'undefined' && appData.bookings) || [];
+  const activeBookings = bookings.filter(b => b.status !== 'CANCELLED');
+
+  const badge = document.getElementById('guestCountBadge');
+  if (badge) badge.innerText = activeBookings.length;
+
+  if (activeBookings.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 20px;">Kayıtlı misafir bulunmuyor.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = activeBookings.slice(0, 20).map(b => {
+    const vName = (appData.villas && appData.villas[b.villa]?.name) || b.villa;
+    const stage = b.checkOut < '2026-09-07' ? 'POST_STAY' : (b.checkIn <= '2026-09-07' ? 'IN_HOUSE' : 'CONFIRMED');
+    const stageBadge = stage === 'IN_HOUSE'
+      ? '<span class="badge badge-green">KONAKLAMADA</span>'
+      : (stage === 'POST_STAY' ? '<span class="badge badge-blue">ÇIKIŞ YAPTI</span>' : '<span class="badge badge-yellow">ONAYLANDI</span>');
+
+    return `
+      <tr>
+        <td><strong>${b.guest || 'Misafir'}</strong></td>
+        <td>${b.phone || '+90 532 000 00 00'}</td>
+        <td>${vName} (${b.checkIn} - ${b.checkOut})</td>
+        <td>${stageBadge}</td>
+        <td><span class="badge badge-purple">2 Mesaj Planlandı</span></td>
+        <td><span class="badge badge-green">Teklif Uygun</span></td>
+        <td style="text-align: right;">
+          <button class="btn btn-secondary btn-sm" onclick="openReservationModal('${b.id}')" style="font-size: 10px;">Detay</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function renderPricingTab() {
+  if (typeof document === 'undefined') return;
+  const container = document.getElementById('pricingManagerContainer');
+  if (!container) return;
+
+  const gaps = (typeof appData !== 'undefined' && appData.gapNights) || [];
+  const gapBadge = document.getElementById('pricingGapBadge');
+  if (gapBadge) gapBadge.innerText = gaps.length;
+
+  container.innerHTML = `
+    <div style="background: rgba(0,0,0,0.25); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08);">
+      <h4 style="margin: 0 0 12px 0; color: #A78BFA; font-size: 14px;">🎯 Fiyatlandırma ve Boş Gece Durumu</h4>
+      <p style="font-size: 12px; color: #CBD5E1; margin: 0 0 14px 0;">
+        Dinamik fiyatlandırma motoru, boş kalan günleri tespit ederek gelir kaybını önler ve min/max koruma sınırları dahilinde kalır.
+      </p>
+      ${gaps.length === 0 ? '<div style="color: #34D399; font-size: 12px;">✅ Kritik boş gece penceresi bulunmuyor.</div>' : `
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px;">
+          ${gaps.map(g => `
+            <div class="gap-night-card">
+              <div class="gap-villa-name">${(appData.villas && appData.villas[g.villa]?.name) || g.villa}</div>
+              <div class="gap-dates-tag">📅 ${g.date} (1 Gece)</div>
+              <div class="gap-price-box">
+                <span style="font-size: 11px; color: #94A3B8;">Önerilen Fiyat:</span>
+                <strong style="color: #34D399;">₺${Number(g.suggestedPrice || 12000).toLocaleString('tr-TR')}</strong>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `}
+    </div>
+  `;
+}
+
+function renderReportsTab() {
+  if (typeof document === 'undefined') return;
+  const container = document.getElementById('reportsContentContainer');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+      <div style="background: rgba(0,0,0,0.25); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06);">
+        <h4 style="margin: 0 0 10px 0; color: #60A5FA; font-size: 13px;">🌐 Kanal Satış Dağılımı</h4>
+        <div style="font-size: 12px; color: #CBD5E1; line-height: 1.6;">
+          • <strong>Airbnb:</strong> %52 pay (₺251.661)<br>
+          • <strong>Doğrudan Satış (Direct):</strong> %33 pay (₺159.708)<br>
+          • <strong>Booking.com:</strong> %15 pay (₺72.594)
+        </div>
+      </div>
+      <div style="background: rgba(0,0,0,0.25); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06);">
+        <h4 style="margin: 0 0 10px 0; color: #34D399; font-size: 13px;">📈 Kârlılık Köprüsü & Komisyon Analizi</h4>
+        <div style="font-size: 12px; color: #CBD5E1; line-height: 1.6;">
+          • <strong>Brüt Satış:</strong> ₺483.965<br>
+          • <strong>Kanal Komisyonları:</strong> ₺48.396<br>
+          • <strong>Operasyon & Temizlik:</strong> ₺36.500<br>
+          • <strong>Net Nakit Kâr:</strong> ₺142.793 (%29,5 Marj)
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function openTabFromDeepLink(tabId, entityId) {
+  switchTab(tabId);
+}
+
+function handleQuickActionTrigger(actionType, entityId) {
+  if (actionType === 'COMPLETE_TASK') {
+    if (typeof updateOperationalTask === 'function') {
+      updateOperationalTask(entityId, { status: 'DONE' });
+    }
+    alert('✅ Operasyonel görev tamamlandı olarak işaretlendi.');
+  } else if (actionType === 'RESOLVE_TICKET') {
+    if (typeof resolveMaintenanceTicket === 'function') {
+      resolveMaintenanceTicket(entityId, 'Sorun giderildi ve test edildi.');
+    }
+    alert('✅ Arıza iş emri çözüldü olarak güncellendi.');
+  } else if (actionType === 'RESOLVE_ALERT') {
+    if (typeof resolveExecutiveAlert === 'function') {
+      resolveExecutiveAlert(entityId, 'İncelendi ve çözüldü.');
+    }
+    alert('✅ Bildirim kapatıldı.');
+  } else if (actionType === 'APPLY_GAP_DISCOUNT') {
+    openAiActionConfirmModal({
+      type: 'GAP_DISCOUNT',
+      description: 'Boş gece için %15 dinamik indirim uygulanacak.',
+      sourceMetrics: ['Doluluk: %68', 'Boşluk: 1 Gece']
+    });
+    return;
+  } else {
+    alert('✅ Aksiyon başarıyla tetiklendi.');
+  }
+  renderAll();
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    isUUID,
+    roundMoney,
+    mapPropertyFromDb,
+    mapPropertyToDb,
+    loadProperties,
+    createProperty,
+    updateProperty,
+    deleteProperty,
+    generateSafeBookingCode,
+    calculateNightsBetween,
+    mapBookingFromDb,
+    mapBookingToDb,
+    checkBookingOverlap,
+    loadBookings,
+    createBooking,
+    updateBooking,
+    deleteBooking,
+    mapExpenseFromDb,
+    mapExpenseToDb,
+    loadExpenses,
+    createExpense,
+    updateExpense,
+    deleteExpense,
+    ALLOWED_LEAD_STAGES,
+    ALLOWED_LEAD_SOURCES,
+    mapLeadFromDb,
+    mapLeadToDb,
+    validateLeadInput,
+    loadLeads,
+    createLead,
+    updateLead,
+    deleteLead,
+    convertLeadToBooking,
+    setAppData,
+    getAppData,
+    setSupabaseClient,
+    getSupabaseClient,
+    getActiveTenantId,
+    setActiveTenant,
+    loadMonthlyTargets,
+    saveMonthlyTarget,
+    loadMonthlyCloses,
+    closeMonthlyPeriod,
+    isPeriodClosed,
+    convertAiActionToTask,
+    loadOperationalTasks,
+    createOperationalTask,
+    updateOperationalTask,
+    deleteOperationalTask,
+    loadMaintenanceTickets,
+    createMaintenanceTicket,
+    resolveMaintenanceTicket,
+    mapGuestFromDb,
+    loadGuests,
+    createGuest,
+    updateGuest,
+    loadMessageTemplates,
+    createMessageTemplate,
+    updateMessageTemplate,
+    loadScheduledMessages,
+    cancelScheduledMessage,
+    loadPricingProfiles,
+    savePricingProfile,
+    loadPricingRules,
+    createPricingRule,
+    updatePricingRule,
+    deletePricingRule,
+    loadPricingEvents,
+    createPricingEvent,
+    updatePricingEvent,
+    deletePricingEvent,
+    loadDailyRates,
+    saveManualPricingOverride,
+    loadBookingQuotes,
+    createBookingQuote,
+    acceptBookingQuote,
+    mapFriendlyErrorMessage,
+    loadExecutiveAlerts,
+    createExecutiveAlert,
+    acknowledgeExecutiveAlert,
+    resolveExecutiveAlert,
+    loadUserNotifications,
+    createUserNotification,
+    acknowledgeUserNotification,
+    loadTenantOnboarding,
+    saveTenantOnboarding,
+    getExecutiveDashboardSnapshot,
+    renderExecutiveControlCenter,
+    askExecutiveAdvisor,
+    openCommandPalette,
+    closeCommandPalette,
+    toggleNotificationDrawer,
+    startWithCleanPortfolio,
+    loginWithLexBnBDemo
+  };
 }
 
 

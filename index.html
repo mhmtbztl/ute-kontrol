@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lexbnb — Finansal Performans & UTE Kontrol Merkezi V5</title>
+  <title>Lexbnb — Kısa Dönem Kiralama & Executive Kontrol Merkezi</title>
   <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
@@ -50,7 +50,7 @@
           <input type="password" id="saasLoginPass" placeholder="Örn: lexbnb" required autocomplete="current-password" style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 13px;">
         </div>
 
-        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 800; font-size: 14px; background: linear-gradient(135deg, #8B5CF6, #6D28D9); border: none; border-radius: 8px;">
+        <button type="submit" id="saasLoginSubmitBtn" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 800; font-size: 14px; background: linear-gradient(135deg, #8B5CF6, #6D28D9); border: none; border-radius: 8px;">
           🔓 Hesabıma Giriş Yap
         </button>
 
@@ -86,17 +86,17 @@
         </div>
         <div class="form-group" style="margin-bottom: 14px;">
           <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Şifre Belirleyin:</label>
-          <input type="password" id="saasRegPass" placeholder="En az 6 karakter" required minlength="4" style="width: 100%; padding: 9px 12px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 13px;">
+          <input type="password" id="saasRegPass" placeholder="En az 6 karakter" required minlength="6" style="width: 100%; padding: 9px 12px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 13px;">
         </div>
 
-        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 800; font-size: 14px; background: linear-gradient(135deg, #10B981, #059669); border: none; border-radius: 8px;">
+        <button type="submit" id="saasRegSubmitBtn" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 800; font-size: 14px; background: linear-gradient(135deg, #10B981, #059669); border: none; border-radius: 8px;">
           ✨ Hesabımı Oluştur ve Başla
         </button>
       </form>
 
-      <!-- Hızlı Kurumsal Demo Girişi (UTE) -->
+      <!-- Hızlı Kurumsal Demo Girişi (LexBnB) -->
       <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.1);">
-        <button type="button" class="btn btn-secondary" onclick="loginWithUteDemo()" style="width: 100%; padding: 10px; font-size: 12px; font-weight: 700; border-color: #F59E0B; color: #FDE68A; background: rgba(245, 158, 11, 0.08); display: flex; align-items: center; justify-content: center; gap: 6px;">
+        <button type="button" class="btn btn-secondary" onclick="loginWithLexBnBDemo()" style="width: 100%; padding: 10px; font-size: 12px; font-weight: 700; border-color: #F59E0B; color: #FDE68A; background: rgba(245, 158, 11, 0.08); display: flex; align-items: center; justify-content: center; gap: 6px;">
           <span>🌟</span> LexBnB Demo Hesabı ile 1-Tıkla Giriş Yap
         </button>
         <div style="font-size: 11px; color: var(--text-muted); margin-top: 8px; text-align: center;">
@@ -193,6 +193,30 @@
     </div>
 
         <div class="header-actions">
+      <!-- Komuta Paleti Butonu (Ctrl+K) -->
+      <button type="button" class="btn btn-secondary header-palette-btn" onclick="openCommandPalette()" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.18); color: #E2E8F0; font-weight: 600; display: flex; align-items: center; gap: 6px;" title="Komuta Paleti (Kısayol: Ctrl+K)">
+        <span>🔍</span>
+        <span class="palette-btn-text">Ara / Komut</span>
+        <kbd style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; padding: 1px 5px; font-size: 10px; font-family: monospace;">Ctrl+K</kbd>
+      </button>
+
+      <!-- Bildirim Merkezi (Notification Bell & Drawer) -->
+      <div class="header-dropdown-wrap">
+        <button type="button" class="btn btn-secondary header-bell-btn" onclick="toggleNotificationDrawer()" id="notificationBellBtn" style="position: relative; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.18); color: #E2E8F0; font-weight: 700; padding: 8px 12px;" title="Bildirim Merkezi">
+          <span>🔔</span>
+          <span id="notificationBellBadge" class="badge badge-red" style="position: absolute; top: -5px; right: -5px; padding: 2px 6px; font-size: 10px; border-radius: 10px; display: none; background: #EF4444; color: #fff;">0</span>
+        </button>
+        <div class="header-dropdown-menu notification-drawer-menu" id="notificationDrawer" style="display: none; width: 360px; right: 0; max-height: 480px; overflow-y: auto; padding: 0; background: #0F172A; border: 1px solid rgba(139, 92, 246, 0.3); box-shadow: 0 15px 35px rgba(0,0,0,0.7); z-index: 1000;">
+          <div style="padding: 12px 16px; background: rgba(30, 41, 59, 0.95); border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center;">
+            <strong style="color: #F8FAFC; font-size: 13px;">🔔 Bildirim Merkezi</strong>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="markAllNotificationsAsRead()" style="font-size: 10px; padding: 2px 6px;">Tümünü Okundu Say</button>
+          </div>
+          <div id="notificationList" style="padding: 8px;">
+            <div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px;">Yeni bildirim bulunmuyor.</div>
+          </div>
+        </div>
+      </div>
+
       <!-- Başlangıç Rehberi Butonu -->
       <button type="button" class="btn btn-secondary header-cache-btn" onclick="window.location.reload()" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.15); color: #E2E8F0; font-weight: 600; display: flex; align-items: center; gap: 5px;" title="Sayfayı yeniden yükler (Verilerinizi ASLA silmez)">
         <span>🔄</span>
@@ -303,11 +327,18 @@
             </div>
           </button>
           <div class="dropdown-divider"></div>
+          <button type="button" class="dropdown-item" onclick="startWithCleanPortfolio(); closeAllHeaderDropdowns();" style="border-top: 1px solid rgba(139, 92, 246, 0.25); background: rgba(139, 92, 246, 0.08); margin-top: 4px;">
+            <span class="dropdown-icon">✨</span>
+            <div>
+              <strong style="color: #DDD6FE;">Temiz Boş Portföy Başlat</strong>
+              <small style="color: #CBD5E1;">Demo kayıtlarını kaldırıp kendi mülklerinizi sıfırdan ekleyin</small>
+            </div>
+          </button>
           <button type="button" class="dropdown-item text-danger" onclick="confirmFactoryReset(); closeAllHeaderDropdowns();" style="border-top: 1px solid rgba(239, 68, 68, 0.2); background: rgba(239, 68, 68, 0.08); margin-top: 4px;">
             <span class="dropdown-icon">⚠️</span>
             <div>
-              <strong style="color: #F87171;">Her Şeyi Sıfırla (Fabrika Ayarları)</strong>
-              <small style="color: #FCA5A5;">Tüm verileri silip masaüstündeki GENEL RAPOR.xlsx'e döndürür</small>
+              <strong style="color: #F87171;">Demo Verilerini Sıfırla</strong>
+              <small style="color: #FCA5A5;">Örnek portföy verilerini fabrika ayarlarına döndürür</small>
             </div>
           </button>
         </div>
@@ -324,11 +355,23 @@
             <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;" id="menuUserEmail">demo@lexbnb.com</div>
             <span class="badge badge-purple" id="menuPlanBadge" style="margin-top: 6px; font-size: 10px;">Enterprise Plan 🚀</span>
           </div>
+          <div id="tenantSwitcherContainer" style="display: none; padding: 8px 14px; border-bottom: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.25);">
+            <label style="font-size: 10px; color: #A78BFA; text-transform: uppercase; font-weight: 700; display: block; margin-bottom: 4px;">Aktif İşletme:</label>
+            <select id="tenantSelectDropdown" onchange="switchActiveTenant(this.value); closeAllHeaderDropdowns();" style="width: 100%; padding: 6px 8px; font-size: 12px; border-radius: 6px; background: #1E1B4B; color: #EDE9FE; border: 1px solid #6366F1; outline: none; cursor: pointer;">
+            </select>
+          </div>
           <button type="button" class="dropdown-item" onclick="openPropertyModal(); closeAllHeaderDropdowns();">
             <span class="dropdown-icon">🏡</span>
             <div>
               <strong>Yeni Villa / Mülk Ekle</strong>
               <small>Portföyünüze yeni ev ekleyin</small>
+            </div>
+          </button>
+          <button type="button" class="dropdown-item" onclick="startWithCleanPortfolio(); closeAllHeaderDropdowns();">
+            <span class="dropdown-icon">✨</span>
+            <div>
+              <strong style="color: #DDD6FE;">Temiz Boş Portföy Başlat</strong>
+              <small>Örnekleri temizleyip kendi mülkünü kur</small>
             </div>
           </button>
           <button type="button" class="dropdown-item" onclick="openImportModal(); closeAllHeaderDropdowns();">
@@ -338,7 +381,7 @@
               <small>Kendi verilerinizi aktarın</small>
             </div>
           </button>
-          <button type="button" class="dropdown-item" onclick="loginWithUteDemo(); closeAllHeaderDropdowns();">
+          <button type="button" class="dropdown-item" onclick="loginWithLexBnBDemo(); closeAllHeaderDropdowns();">
             <span class="dropdown-icon">🌟</span>
             <div>
               <strong>LexBnB Demo Hesabı</strong>
@@ -359,27 +402,252 @@
     </div>
   </header>
 
-  <!-- Navigation Tabs -->
+  <!-- Navigation Tabs: 10 Canonical Sections -->
   <nav class="nav-tabs">
-    <button class="tab-btn active" onclick="switchTab('finance')">💰 Finans (Finansal Performans)</button>
-    <button class="tab-btn" onclick="switchTab('dashboard')">📊 Kokpit (10 Saniye)</button>
-    <button class="tab-btn" onclick="switchTab('channels')">🌐 OTA & Kanal Radarı</button>
-    <button class="tab-btn" onclick="switchTab('marketing')" style="background: rgba(168, 85, 247, 0.12); border-radius: 6px; margin: 0 2px;">📢 Pazarlama & AI Reklam</button>
+    <button class="tab-btn active" onclick="switchTab('executive')">🎯 Kontrol Merkezi</button>
     <button class="tab-btn" onclick="switchTab('reservations')">📅 Rezervasyonlar (<span id="rezCountBadge">0</span>)</button>
-    <button class="tab-btn" onclick="switchTab('expenses')">💸 Gider Defteri (<span id="expenseCountBadge">0</span>)</button>
-    <button class="tab-btn" onclick="switchTab('housekeeping')" style="background: rgba(245, 158, 11, 0.08); border-radius: 6px; margin: 0 2px;">🧹 Temizlik & Borç (<span id="cleanDebtBadge" style="color: #FBBF24; font-weight: 700;">₺0 Borç</span>)</button>
-    <button class="tab-btn" onclick="switchTab('leads')">🎯 Lead & Satış (<span id="leadCountBadge">0</span>)</button>
-    <button class="tab-btn" onclick="switchTab('maintenance')">🛠️ Bakım & P1 (<span id="maintCountBadge">0</span>)</button>
-    <button class="tab-btn" onclick="switchTab('settings')">⚙️ Ayarlar & Hedefler</button>
+    <button class="tab-btn" onclick="switchTab('properties')">🏡 Mülkler (<span id="propCountBadge">5</span>)</button>
+    <button class="tab-btn" onclick="switchTab('operations')">🧹 Operasyon (<span id="opsTaskCountBadge">0</span>)</button>
+    <button class="tab-btn" onclick="switchTab('guests')">👥 Misafirler</button>
+    <button class="tab-btn" onclick="switchTab('leads')">🎯 Satış / CRM (<span id="leadCountBadge">0</span>)</button>
+    <button class="tab-btn" onclick="switchTab('pricing')">🏷️ Fiyatlandırma</button>
+    <button class="tab-btn" onclick="switchTab('finance')">💰 Finans</button>
+    <button class="tab-btn" onclick="switchTab('reports')">📊 Raporlar</button>
+    <button class="tab-btn" onclick="switchTab('settings')">⚙️ Ayarlar</button>
   </nav>
 
   <!-- Main Container -->
   <main class="container">
 
     <!-- ======================================================= -->
-    <!-- TAB: FINANSAL PERFORMANS (ANA YENİ MODÜL) -->
+    <!-- TAB: EXECUTIVE CONTROL CENTER (KONTROL MERKEZİ)         -->
     <!-- ======================================================= -->
-    <div id="tab-finance" class="tab-content active">
+    <div id="tab-executive" class="tab-content active">
+
+      <!-- 1. TENANT ONBOARDING PROGRESS BANNER -->
+      <section class="card onboarding-banner" id="execOnboardingBanner" style="background: linear-gradient(135deg, rgba(30, 27, 75, 0.6), rgba(15, 23, 42, 0.8)); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 12px; padding: 16px 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+        <div style="flex: 1; min-width: 260px;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+            <span style="font-size: 18px;">🚀</span>
+            <strong style="color: #F8FAFC; font-size: 14px;">İşletme Kurulum Durumu: <span id="onboardProgressPct" style="color: #A78BFA;">%100</span></strong>
+          </div>
+          <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; margin-bottom: 8px;">
+            <div id="onboardProgressBar" style="width: 100%; height: 100%; background: linear-gradient(90deg, #8B5CF6, #10B981); border-radius: 3px;"></div>
+          </div>
+          <div id="onboardStepsList" style="display: flex; gap: 12px; flex-wrap: wrap; font-size: 11px; color: #CBD5E1;">
+            <span>✅ Mülk Tanımı</span>
+            <span>✅ Finansal Hedef</span>
+            <span>✅ Operasyon Kuralları</span>
+            <span>✅ Dinamik Fiyatlandırma</span>
+            <span>✅ Misafir Şablonları</span>
+          </div>
+        </div>
+        <div>
+          <button class="btn btn-secondary btn-sm" onclick="openGoalsModal()" style="font-size: 11px;">⚙️ Hedefleri Düzenle</button>
+        </div>
+      </section>
+
+      <!-- 2. TOP EXECUTIVE KPI STRIP (6 CARDS) -->
+      <section class="executive-kpi-grid">
+        <!-- 1. Realized Revenue -->
+        <div class="executive-kpi-card" id="execCardRevenue">
+          <div class="kpi-card-header">
+            <span class="kpi-label">GERÇEKLEŞEN CİRO</span>
+            <button class="kpi-info-btn" onclick="showKpiExplanation('REVENUE')">ℹ️</button>
+          </div>
+          <div class="kpi-val" id="execKpiRevenue">₺0</div>
+          <div class="kpi-meta">
+            <span class="badge badge-green" id="execRevVariance">+%0 Hedef</span>
+            <span id="execRevMoM" style="color: #94A3B8;">↑ %0 Geçen Ay</span>
+          </div>
+        </div>
+
+        <!-- 2. Net Cash Profit -->
+        <div class="executive-kpi-card highlight-profit" id="execCardProfit">
+          <div class="kpi-card-header">
+            <span class="kpi-label">NET KÂR (CASH PROFIT)</span>
+            <button class="kpi-info-btn" onclick="showKpiExplanation('NET_PROFIT')">ℹ️</button>
+          </div>
+          <div class="kpi-val" id="execKpiProfit" style="color: #34D399;">₺0</div>
+          <div class="kpi-meta">
+            <span class="badge badge-green" id="execProfitMargin">%0 Marj</span>
+            <span id="execProfitVariance" style="color: #94A3B8;">Hedefle başa baş</span>
+          </div>
+        </div>
+
+        <!-- 3. Occupancy -->
+        <div class="executive-kpi-card" id="execCardOccupancy">
+          <div class="kpi-card-header">
+            <span class="kpi-label">DOLULUK ORANI</span>
+            <button class="kpi-info-btn" onclick="showKpiExplanation('OCCUPANCY')">ℹ️</button>
+          </div>
+          <div class="kpi-val" id="execKpiOccupancy">0%</div>
+          <div class="kpi-meta">
+            <span class="badge badge-blue" id="execOccVariance">Hedef: %75</span>
+            <span id="execSoldNightsLabel" style="color: #94A3B8;">0 Gece</span>
+          </div>
+        </div>
+
+        <!-- 4. ADR -->
+        <div class="executive-kpi-card" id="execCardAdr">
+          <div class="kpi-card-header">
+            <span class="kpi-label">ADR (ORT. GÜNLÜK FİYAT)</span>
+            <button class="kpi-info-btn" onclick="showKpiExplanation('ADR')">ℹ️</button>
+          </div>
+          <div class="kpi-val" id="execKpiAdr">₺0</div>
+          <div class="kpi-meta">
+            <span style="color: #94A3B8;">Satılan Gece Başına</span>
+            <span id="execAdrTrend" style="color: #A78BFA;">Stabil</span>
+          </div>
+        </div>
+
+        <!-- 5. RevPAR -->
+        <div class="executive-kpi-card" id="execCardRevpar">
+          <div class="kpi-card-header">
+            <span class="kpi-label">RevPAR (ODA BAŞI GELİR)</span>
+            <button class="kpi-info-btn" onclick="showKpiExplanation('REVPAR')">ℹ️</button>
+          </div>
+          <div class="kpi-val" id="execKpiRevpar">₺0</div>
+          <div class="kpi-meta">
+            <span style="color: #94A3B8;">Mevcut Kapasite Başına</span>
+            <span id="execRevparTrend" style="color: #A78BFA;">Verimli</span>
+          </div>
+        </div>
+
+        <!-- 6. Month-End Forecast -->
+        <div class="executive-kpi-card" id="execCardForecast">
+          <div class="kpi-card-header">
+            <span class="kpi-label">AY SONU TAHMİNİ</span>
+            <span class="badge badge-purple" style="font-size: 9px;">AI MODEL</span>
+          </div>
+          <div class="kpi-val" id="execKpiForecast" style="color: #C084FC;">₺0</div>
+          <div class="kpi-meta">
+            <span id="execForecastPacing" style="color: #E2E8F0;">Pacing: %100</span>
+            <span class="badge badge-green" id="execForecastConfidence" style="font-size: 9px;">Yüksek Güven</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. TODAY COMMAND CENTER (ÖNCELİK SIRALI KOMUTA MERKEZİ - 3+2+1) -->
+      <section class="card" style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 20px; margin-bottom: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <h3 style="margin: 0; font-size: 16px; color: #F8FAFC; display: flex; align-items: center; gap: 8px;">
+              <span>🎯</span> BUGÜNÜN KOMUTA MERKEZİ (ÖNCELİK SIRALI İŞLER)
+            </h3>
+            <p style="margin: 4px 0 0 0; font-size: 12px; color: #94A3B8;">
+              Puan & Etki Sıralaması: Maks. 3 Kritik Eylem + 2 Operasyon Görevi + 1 Gelir Fırsatı. Sahte/zayıf kart doldurulmaz.
+            </p>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-secondary btn-sm" onclick="renderExecutiveControlCenter()" style="font-size: 11px;">🔄 Yenile</button>
+          </div>
+        </div>
+
+        <div class="command-center-container">
+          <!-- Column 1: Critical Actions (Max 3) -->
+          <div class="command-center-col">
+            <div class="command-center-col-header">
+              <div class="command-col-title">
+                <span style="color: #EF4444;">🚨</span> KRİTİK EYLEMLER
+              </div>
+              <span class="command-col-badge badge-red" id="criticalActionsCountBadge">0 / 3</span>
+            </div>
+            <div id="todayCriticalActionsList">
+              <div class="empty-action-state">✅ Kritik müdahale gerektiren açık alert bulunmuyor.</div>
+            </div>
+          </div>
+
+          <!-- Column 2: Operations Tasks (Max 2) -->
+          <div class="command-center-col">
+            <div class="command-center-col-header">
+              <div class="command-col-title">
+                <span style="color: #F59E0B;">🧹</span> OPERASYON GÖREVLERİ
+              </div>
+              <span class="command-col-badge badge-yellow" id="operationsActionsCountBadge">0 / 2</span>
+            </div>
+            <div id="todayOperationsActionsList">
+              <div class="empty-action-state">✅ Bugün bekleyen acil turnover veya arıza görevi yok.</div>
+            </div>
+          </div>
+
+          <!-- Column 3: Revenue Opportunities (Max 1) -->
+          <div class="command-center-col">
+            <div class="command-center-col-header">
+              <div class="command-col-title">
+                <span style="color: #10B981;">💡</span> GELİR FIRSATLARI
+              </div>
+              <span class="command-col-badge badge-green" id="revenueActionsCountBadge">0 / 1</span>
+            </div>
+            <div id="todayRevenueActionsList">
+              <div class="empty-action-state">✅ Fiyatlandırma ve doluluk optimize; açık fırsat yok.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. PORTFOLIO HEALTH MATRIX (MÜLK SAĞLIĞI ANALİZİ) -->
+      <section class="card" style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 20px; margin-bottom: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <h3 style="margin: 0; font-size: 15px; color: #F8FAFC; display: flex; align-items: center; gap: 8px;">
+              <span>🏡</span> PORTFÖY SAĞLIK MATRİSİ
+            </h3>
+            <p style="margin: 3px 0 0 0; font-size: 11px; color: #94A3B8;">
+              Tüm mülklerin operasyonel hazırlık, arıza, doluluk ve fiyatlandırma sağlık durumu.
+            </p>
+          </div>
+          <div style="display: flex; gap: 6px;">
+            <span class="badge badge-green" id="healthPillHealthy">🟢 Sağlıklı: 5</span>
+            <span class="badge badge-yellow" id="healthPillWarning">🟡 Dikkat: 0</span>
+            <span class="badge badge-red" id="healthPillCritical">🔴 Kritik: 0</span>
+          </div>
+        </div>
+
+        <div class="portfolio-health-grid" id="portfolioHealthCardsGrid">
+          <!-- Dinamik olarak Mülk Sağlık Kartları eklenecek -->
+        </div>
+      </section>
+
+      <!-- 5. AI STR ADVISOR ("ASK LEXBNB" PANELİ) -->
+      <section class="ai-advisor-container">
+        <div class="ai-advisor-header">
+          <div>
+            <h3 style="margin: 0; font-size: 16px; color: #EDE9FE; display: flex; align-items: center; gap: 8px;">
+              <span>🤖</span> LEXBNB YAPAY ZEKA STRATEJİ DANIŞMANI (AI STR ADVISOR)
+            </h3>
+            <p style="margin: 4px 0 0 0; font-size: 12px; color: #A78BFA;">
+              Finans, doluluk ve operasyon verilerinizle beslenen kanonik danışman. Halüsinasyon yapmaz; önerileri onayınızla kanonik servislere yönlendirir.
+            </p>
+          </div>
+          <span class="badge badge-purple" style="font-size: 10px;">Korumalı & Salt-Okunur</span>
+        </div>
+
+        <div class="ai-suggestion-chips">
+          <button type="button" class="ai-chip-btn" onclick="askExecutiveAdvisor('Bu ay net kârımı nasıl %15 artırırım?')">💡 Bu ay net kârımı nasıl %15 artırırım?</button>
+          <button type="button" class="ai-chip-btn" onclick="askExecutiveAdvisor('Ekim ayında doluluğu nasıl artırabilirim?')">📅 Ekim ayında doluluğu nasıl artırabilirim?</button>
+          <button type="button" class="ai-chip-btn" onclick="askExecutiveAdvisor('Zirve villası için fiyat optimizasyonu nedir?')">🏡 Zirve villası için fiyat optimizasyonu nedir?</button>
+          <button type="button" class="ai-chip-btn" onclick="askExecutiveAdvisor('Operasyonel arıza ve temizlik darboğazları nelerdir?')">🛠️ Operasyonel darboğazlar nelerdir?</button>
+        </div>
+
+        <form onsubmit="handleAiAdvisorSubmit(event)" class="ai-chat-input-row">
+          <input type="text" id="aiAdvisorPromptInput" class="ai-chat-input" placeholder="İşletmeniz, portföyünüz veya fiyat stratejiniz hakkında bir soru yazın...">
+          <button type="submit" class="btn btn-primary" style="background: linear-gradient(135deg, #8B5CF6, #6D28D9); border: none; font-weight: 700; padding: 10px 20px;">
+            <span>✨</span> Sor
+          </button>
+        </form>
+
+        <div id="aiAdvisorOutputBox" class="ai-advisor-output" style="display: none;">
+          <div id="aiAdvisorResponseContent"></div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- ======================================================= -->
+    <!-- TAB: FINANSAL PERFORMANS (FINANS)                       -->
+    <!-- ======================================================= -->
+    <div id="tab-finance" class="tab-content">
 
       <!-- 1. MONTH STEPPER & PORTFOLIO BANNER -->
       <section class="card finance-top-bar">
@@ -2233,6 +2501,179 @@
       </section>
     </div>
 
+    <!-- ======================================================= -->
+    <!-- TAB: MÜLKLER (PORTFÖY YÖNETİMİ)                         -->
+    <!-- ======================================================= -->
+    <div id="tab-properties" class="tab-content">
+      <section class="card" style="margin-bottom: 24px;">
+        <div class="section-title-bar">
+          <div>
+            <h2>🏡 PORTFÖY & MÜLK YÖNETİMİ</h2>
+            <p class="sub-text">Sistemdeki tüm villalar, operasyonel hazırlık durumları, baz fiyatlar ve koruma sınırları.</p>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="openPropertyModal()">+ Yeni Villa / Mülk Ekle</button>
+        </div>
+        <div class="portfolio-health-grid" id="propertiesManagementGrid">
+          <!-- JS dinamik dolduracak -->
+        </div>
+      </section>
+    </div>
+
+    <!-- ======================================================= -->
+    <!-- TAB: OPERASYON (HOUSEKEEPING & MAINTENANCE BİRLEŞİK)   -->
+    <!-- ======================================================= -->
+    <div id="tab-operations" class="tab-content">
+      <section class="card" style="margin-bottom: 20px;">
+        <div class="section-title-bar">
+          <div>
+            <h2>🧹 OPERASYON KONTROL MERKEZİ</h2>
+            <p class="sub-text">Günlük turnover temizlikleri, personel hakedişleri, borç takibi ve P1 acil bakım işleri.</p>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-secondary btn-sm" onclick="switchTab('housekeeping')">🧹 Temizlik Defteri Detayı</button>
+            <button class="btn btn-secondary btn-sm" onclick="switchTab('maintenance')">🛠️ Arıza / Bakım Detayı</button>
+            <button class="btn btn-primary btn-sm" onclick="openNewCleaningTaskModal()">+ Temizlik Görevi Ekle</button>
+            <button class="btn btn-primary btn-sm" onclick="openMaintModal()">+ Arıza Bildir</button>
+          </div>
+        </div>
+        <div class="kpi-cards-grid five-cols" style="margin-bottom: 20px;">
+          <div class="kpi-card">
+            <span class="kpi-label">HAZIR MÜLKLER</span>
+            <div class="kpi-value" id="opsReadyPropsVal" style="color: #34D399;">5 / 5</div>
+            <div class="kpi-meta">Misafir kabulüne hazır</div>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">BUGÜNKÜ TURNOVER</span>
+            <div class="kpi-value" id="opsTurnoverVal" style="color: #60A5FA;">0 Görev</div>
+            <div class="kpi-meta">Giriş / Çıkış temizliği</div>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">AÇIK ARIZALAR (P1)</span>
+            <div class="kpi-value" id="opsOpenMaintVal" style="color: #F87171;">0 İş</div>
+            <div class="kpi-meta">Kritik müdahale</div>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">TEMİZLİK BORCU</span>
+            <div class="kpi-value" id="opsDebtVal" style="color: #FBBF24;">₺0</div>
+            <div class="kpi-meta">Personele ödenecek</div>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">SLA PERFORMANSI</span>
+            <div class="kpi-value" id="opsSlaVal" style="color: #A78BFA;">%100</div>
+            <div class="kpi-meta">Zamanında tamamlanan</div>
+          </div>
+        </div>
+        <div id="opsCombinedContainer">
+          <!-- Operasyon görevleri ve bakım listesi -->
+        </div>
+      </section>
+    </div>
+
+    <!-- ======================================================= -->
+    <!-- TAB: MİSAFİRLER (LIFECYCLE & İLETİŞİM)                  -->
+    <!-- ======================================================= -->
+    <div id="tab-guests" class="tab-content">
+      <section class="card" style="margin-bottom: 24px;">
+        <div class="section-title-bar">
+          <div>
+            <h2>👥 MİSAFİR REHBERİ & YAŞAM DÖNGÜSÜ</h2>
+            <p class="sub-text">Misafir yaşam döngüsü (Onaylandı › Varış Öncesi › Konaklamada › Çıkış Sonrası) ve otomatik mesajlaşma.</p>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-secondary btn-sm" onclick="openWhatsAppModal('parser')">💬 WhatsApp Ayrıştır</button>
+            <button class="btn btn-primary btn-sm" onclick="openBookingModal()">+ Yeni Rezervasyon / Misafir</button>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>MİSAFİR ADI</th>
+                <th>İLETİŞİM</th>
+                <th>MÜLK & TARİHLER</th>
+                <th>DÖNGÜ AŞAMASI</th>
+                <th>PLANLANAN MESAJLAR</th>
+                <th>UZATMA TEKLİFİ</th>
+                <th style="text-align: right;">İŞLEM</th>
+              </tr>
+            </thead>
+            <tbody id="guestsTableBody">
+              <!-- JS dinamik dolduracak -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- ======================================================= -->
+    <!-- TAB: FİYATLANDIRMA (DYNAMIC PRICING & REVENUE)          -->
+    <!-- ======================================================= -->
+    <div id="tab-pricing" class="tab-content">
+      <section class="card" style="margin-bottom: 24px;">
+        <div class="section-title-bar">
+          <div>
+            <h2>🏷️ GELİR YÖNETİMİ & DİNAMİK FİYATLANDIRMA</h2>
+            <p class="sub-text">Deterministik gelir motoru, boş gece (gap night) tespiti, sezonsal katsayılar ve fiyat guardrail koruması.</p>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-secondary btn-sm" onclick="openGoalsModal()">🎯 Hedefleri Yönet</button>
+          </div>
+        </div>
+        <div class="kpi-cards-grid five-cols" style="margin-bottom: 20px;">
+          <div class="kpi-card">
+            <span class="kpi-label">YILLIK HEDEF CİRO</span>
+            <div class="kpi-value" style="color: #60A5FA;">₺4.800.000</div>
+            <div class="kpi-meta">2026 Bütçesi</div>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">ORTALAMA ADR</span>
+            <div class="kpi-value" id="pricingAdrVal" style="color: #34D399;">₺16.500</div>
+            <div class="kpi-meta">Aktif ay ortalaması</div>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">BOŞ GECE (GAP NIGHTS)</span>
+            <div class="kpi-value" id="pricingGapCountVal" style="color: #F87171;">0 Gece</div>
+            <div class="kpi-meta">Doldurulabilir boşluklar</div>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">KORUMA LİMİTLERİ</span>
+            <div class="kpi-value" style="color: #A78BFA;">AKTİF</div>
+            <div class="kpi-meta">Min/Max Guardrail açık</div>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-label">UZATMA DÖNÜŞÜMÜ</span>
+            <div class="kpi-value" style="color: #FBBF24;">%45</div>
+            <div class="kpi-meta">Misafir erken check-in/out</div>
+          </div>
+        </div>
+        <div id="pricingManagerContainer">
+          <!-- Dinamik fiyatlandırma detayları ve gap night kartları -->
+        </div>
+      </section>
+    </div>
+
+    <!-- ======================================================= -->
+    <!-- TAB: RAPORLAR (OTA & KANAL RADARI, PERFORMANS)           -->
+    <!-- ======================================================= -->
+    <div id="tab-reports" class="tab-content">
+      <section class="card" style="margin-bottom: 24px;">
+        <div class="section-title-bar">
+          <div>
+            <h2>📊 PORTFÖY PERFORMANSI & KANAL RAPORLARI</h2>
+            <p class="sub-text">Kanal dağılımı (Airbnb, Booking.com, Doğrudan Satış), komisyon analizleri ve kârlılık köprüsü.</p>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-secondary btn-sm" onclick="exportDataJSON()">💾 Raporu İndir (JSON)</button>
+            <button class="btn btn-secondary btn-sm" onclick="switchTab('channels')">🌐 OTA Radarına Git</button>
+            <button class="btn btn-secondary btn-sm" onclick="switchTab('marketing')">📢 Pazarlama Modülüne Git</button>
+          </div>
+        </div>
+        <div id="reportsContentContainer">
+          <!-- Rapor içerikleri JS ile doldurulacak -->
+        </div>
+      </section>
+    </div>
+
   </main>
 
   <!-- ========================================== -->
@@ -2553,9 +2994,12 @@
           <div class="preview-item"><span>Gecelik Net (ADR Katkısı):</span><strong id="prevNightlyNet">₺0</strong></div>
         </div>
 
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" onclick="closeBookingModal()">Vazgeç</button>
-          <button type="submit" class="btn btn-primary" id="saveBookingBtn">Kaydet</button>
+        <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+          <button type="button" id="resDeleteBtn" class="btn btn-danger" style="display: none; background: #EF4444; border: none; font-size: 12px; padding: 8px 14px; border-radius: 6px; color: #fff; cursor: pointer;" onclick="handleBookingDeleteFromModal()">🗑️ Rezervasyonu Sil</button>
+          <div style="display: flex; gap: 10px; margin-left: auto;">
+            <button type="button" class="btn btn-secondary" onclick="closeBookingModal()">Vazgeç</button>
+            <button type="submit" class="btn btn-primary" id="saveBookingBtn">Kaydet</button>
+          </div>
         </div>
       </form>
     </div>
@@ -3017,6 +3461,8 @@
     </div>
   </div>
 
+  <script src="core/financial_metrics_service.js"></script>
+  <script src="core/finance_import_engine.js"></script>
   <script src="app.js?v=5.5.2"></script>
 
   <!-- ======================================================= -->
@@ -3477,10 +3923,13 @@
           <input type="url" id="propUrl" placeholder="https://www.airbnb.com.tr/rooms/..." style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff;">
         </div>
         <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
-          <button type="button" class="btn btn-secondary" onclick="closePropertyModal()">İptal</button>
-          <button type="submit" class="btn btn-primary" style="background: linear-gradient(135deg, #8B5CF6, #6D28D9); border: none; font-weight: 700;">
-            💾 Mülkü Kaydet
-          </button>
+          <button type="button" id="propDeleteBtn" class="btn btn-danger" style="display: none; background: #EF4444; border: none; font-size: 12px; padding: 8px 14px; border-radius: 6px; color: #fff; cursor: pointer;" onclick="handlePropertyDeleteFromModal()">🗑️ Mülkü Sil</button>
+          <div style="display: flex; gap: 10px; margin-left: auto;">
+            <button type="button" class="btn btn-secondary" onclick="closePropertyModal()">İptal</button>
+            <button type="submit" id="propSubmitBtn" class="btn btn-primary" style="background: linear-gradient(135deg, #8B5CF6, #6D28D9); border: none; font-weight: 700;">
+              💾 Mülkü Kaydet
+            </button>
+          </div>
         </div>
       </form>
     </div>
@@ -3620,5 +4069,64 @@
     </div>
   </div>
 
+  <!-- ========================================== -->
+  <!-- MODAL: COMMAND PALETTE (CTRL+K LAUNCHER)   -->
+  <!-- ========================================== -->
+  <div class="modal-backdrop" id="commandPaletteModal" style="display: none;">
+    <div class="modal-card command-palette-card" style="max-width: 600px; padding: 0; border: 1px solid rgba(139, 92, 246, 0.4); box-shadow: 0 25px 60px rgba(0,0,0,0.85); overflow: hidden; background: #0F172A;">
+      <div style="padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; gap: 10px; background: #1E293B;">
+        <span style="font-size: 18px;">🔍</span>
+        <input type="text" id="commandPaletteInput" placeholder="Mülk, misafir, rezervasyon ara veya komut yaz... (ESC ile kapat)" oninput="handleCommandPaletteSearch(this.value)" onkeydown="handleCommandPaletteKeydown(event)" style="flex: 1; background: transparent; border: none; outline: none; color: #fff; font-size: 14px; font-weight: 500;">
+        <kbd style="font-size: 11px; background: rgba(0,0,0,0.4); padding: 2px 6px; border-radius: 4px; color: #94A3B8;">ESC</kbd>
+      </div>
+      <div id="commandPaletteResults" style="max-height: 380px; overflow-y: auto; padding: 8px;">
+        <!-- Dinamik komuta önerileri ve sonuçları -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: AI ACTION CONFIRMATION              -->
+  <!-- ========================================== -->
+  <div class="modal-backdrop" id="aiActionConfirmModal" style="display: none;">
+    <div class="modal-card" style="max-width: 480px; border: 1px solid rgba(16, 185, 129, 0.4);">
+      <div class="modal-header" style="background: rgba(16, 185, 129, 0.1);">
+        <h3 style="color: #34D399; margin: 0; font-size: 15px;">🤖 AI Önerisini Uygula</h3>
+        <button class="close-btn" onclick="closeAiActionConfirmModal()">&times;</button>
+      </div>
+      <div style="padding: 16px 20px;">
+        <div id="aiActionConfirmBody" style="font-size: 13px; color: #E2E8F0; line-height: 1.5; margin-bottom: 16px;">
+        </div>
+        <div style="background: rgba(0,0,0,0.3); border-left: 3px solid #10B981; padding: 8px 12px; font-size: 11px; color: #94A3B8; margin-bottom: 16px;" id="aiActionConfirmMetrics">
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 8px;">
+          <button type="button" class="btn btn-secondary" onclick="closeAiActionConfirmModal()">İptal</button>
+          <button type="button" class="btn btn-primary" id="aiActionConfirmExecuteBtn" style="background: #10B981; font-weight: 700;">Onayla ve Uygula</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="core/operations_priority_engine.js"></script>
+  <script src="core/operations_sla_service.js"></script>
+  <script src="core/property_readiness_service.js"></script>
+  <script src="core/operations_engine.js"></script>
+  <script src="core/recurring_tasks_service.js"></script>
+  <script src="core/today_operations_service.js"></script>
+  <script src="core/guest_contact_utils.js"></script>
+  <script src="core/message_template_engine.js"></script>
+  <script src="core/messaging_provider.js"></script>
+  <script src="core/extension_offer_service.js"></script>
+  <script src="core/guest_messaging_engine.js"></script>
+  <script src="core/message_delivery_service.js"></script>
+  <script src="core/pricing_engine.js"></script>
+  <script src="core/gap_night_service.js"></script>
+  <script src="core/pricing_booking_service.js"></script>
+  <script src="core/revenue_forecast_service.js"></script>
+  <script src="core/executive_priority_service.js"></script>
+  <script src="core/executive_dashboard_service.js"></script>
+  <script src="core/executive_ai_advisor.js"></script>
+  <script src="core/notification_center_service.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>

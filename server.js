@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 const PORT = 3000;
-const WEB_DIR = path.join(__dirname, 'web');
+const WEB_DIR = __dirname;
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=UTF-8',
@@ -11,11 +11,12 @@ const MIME_TYPES = {
   '.js': 'application/javascript; charset=UTF-8',
   '.json': 'application/json',
   '.png': 'image/png',
-  '.jpg': 'image/jpeg'
+  '.jpg': 'image/jpeg',
+  '.svg': 'image/svg+xml'
 };
 
 const server = http.createServer((req, res) => {
-  let reqPath = req.url === '/' ? '/index.html' : req.url;
+  let reqPath = req.url === '/' ? '/index.html' : req.url.split('?')[0];
   let filePath = path.join(WEB_DIR, reqPath);
 
   fs.readFile(filePath, (err, data) => {
@@ -32,5 +33,6 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`UTE Kontrol Merkezi Web Server running at http://0.0.0.0:${PORT}/`);
+  console.log(`🌲 Lexbnb Executive Control Center running at http://localhost:${PORT}/`);
 });
+
