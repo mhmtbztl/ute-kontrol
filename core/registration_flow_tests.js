@@ -18,20 +18,31 @@
  * Bu suit YALNIZCA anon anahtar kullanir - yani tarayicinin gordugu dunya.
  * service_role sadece temizlik icin kullanilir.
  *
+ * Suit, projenin e-posta onayi ayarini /auth/v1/settings'ten okur ve O MODA
+ * gore dogru davranisi bekler. Boylece ayar degistiginde suit kirilmaz, ama
+ * o moddaki yanlis davranisi yakalar:
+ *   mailer_autoconfirm = false (uretim) -> signUp session DONDURMEMELI, kullanici
+ *                                          once onay linkine tiklamali
+ *   mailer_autoconfirm = true           -> signUp aninda session dondurmeli
+ *
  * Kapsam:
- *  1. signUp anında authenticated session dondurur (e-posta onayi kapali)
- *  2. create_tenant_and_owner gercek oturumla calisir ve UUID dondurur
- *  3. tenant_members satiri owner rolu ile olusur
- *  4. Yeni tenant ile mulk eklenebilir
- *  5. Yeni tenant ile rezervasyon eklenebilir
- *  6. UUID olmayan tenant_id Postgres tarafindan reddedilir (22P02 regresyonu)
- *  7. Cakisan tarihli ikinci rezervasyon engellenir
- *  8. Yabanci tenant_id ile yazma RLS tarafindan reddedilir
- *  9. Oturum kapaliyken tenant verisi gorunmez
- * 10. Ayni e-posta ile ikinci kayit reddedilir
- * 11. Yanlis sifreyle giris reddedilir
- * 12. Dogru sifreyle tekrar giris yapilabilir
- * 13. Sifre sifirlama istegi hesap varligini sizdirmaz
+ *  1. signUp, projenin onay moduna uygun davranir
+ *  2. E-posta onayindan sonra hesap aktiflesir
+ *  3. Onay sonrasi giris yapilabilir
+ *  4. create_tenant_and_owner gercek oturumla calisir
+ *  5. Donen tenant_id gercek bir UUID
+ *  6. tenant_members satiri owner rolu ile olusur
+ *  7. Yeni tenant ile mulk eklenebilir
+ *  8. Yeni tenant ile rezervasyon eklenebilir
+ *  9. Cakisan tarihli ikinci rezervasyon engellenir
+ * 10. UUID olmayan tenant_id Postgres tarafindan reddedilir (22P02 regresyonu)
+ * 11. Yabanci tenant_id ile yazma RLS tarafindan reddedilir
+ * 12. Oturum kapaliyken tenant verisi gorunmez
+ * 13. Ayni e-posta ile ikinci kayit reddedilir
+ * 14. Yanlis sifreyle giris reddedilir
+ * 15. Dogru sifreyle tekrar giris yapilabilir
+ * 16. Sifre sifirlama istegi hesap varligini sizdirmaz
+ * 17. Test verileri eksiksiz temizlenir
  */
 
 const { createClient } = require('@supabase/supabase-js');
@@ -92,9 +103,24 @@ async function runRegistrationFlowTests() {
   let userId = null;
   let tenantId = null;
 
+  // Projenin e-posta onayi ayarini oku. Suit iki modda da gecerli olmalidir:
+  //   mailer_autoconfirm = true  -> signUp aninda session dondurur
+  //   mailer_autoconfirm = false -> session DONMEZ; kullanici once maildeki
+  //                                 onay linkine tiklar (uretimde beklenen hal)
+  let requiresConfirmation = null;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/settings`, { headers: { apikey: SUPABASE_ANON_KEY } });
+    const settings = await res.json();
+    requiresConfirmation = settings.mailer_autoconfirm === false;
+  } catch (e) {
+    console.warn('Uyari: auth ayarlari okunamadi, onay zorunlu varsayiliyor.');
+    requiresConfirmation = true;
+  }
+  console.log(`Proje modu: e-posta onayi ${requiresConfirmation ? 'ZORUNLU' : 'KAPALI'}\n`);
+
   try {
     // -------------------------------------------------------------------
-    console.log('--- 1. KAYIT: signUp anında session dönüyor mu? ---');
+    console.log('--- 1. KAYIT ---');
     const { data: signUpData, error: signUpErr } = await anonClient.auth.signUp({
       email,
       password: pass,
@@ -107,17 +133,41 @@ async function runRegistrationFlowTests() {
     }
     userId = signUpData.user ? signUpData.user.id : null;
 
-    check(
-      !!signUpData.session,
-      '1. signUp anında authenticated session döndürür',
-      'session gelmedi. Supabase Authentication -> Email -> "Confirm email" ayari acik ' +
-      'olabilir. Acikken kullanici kayit olur ama onay maili gelmeden giris yapamaz; ' +
-      'ozel SMTP tanimli degilse o mail musteriye hicbir zaman ulasmaz.'
-    );
+    if (requiresConfirmation) {
+      // Onay zorunluyken session DONMEMELIDIR. Donuyorsa uygulama, dogrulanmamis
+      // bir kullaniciya tenant kurmaya kalkar.
+      check(
+        !signUpData.session,
+        '1. Onay zorunluyken signUp session DÖNDÜRMEZ',
+        'onay acik olmasina ragmen session dondu'
+      );
 
-    if (!signUpData.session) {
-      console.error('\n  Session olmadan sonraki adimlar anlamsiz, suit durduruluyor.');
-      return;
+      // Kullanicinin maildeki onay linkine tiklamasini taklit et.
+      const { error: confirmErr } = await adminClient.auth.admin.updateUserById(userId, { email_confirm: true });
+      if (confirmErr) {
+        recordFail('2. E-posta onayi simule edilir', confirmErr.message);
+        return;
+      }
+      recordPass('2. E-posta onayı sonrası hesap aktifleşir');
+
+      const { error: postConfirmErr } = await anonClient.auth.signInWithPassword({ email, password: pass });
+      if (postConfirmErr) {
+        recordFail('3. Onay sonrası giriş yapılabilir', postConfirmErr.message);
+        return;
+      }
+      recordPass('3. Onay sonrası giriş yapılabilir');
+    } else {
+      check(
+        !!signUpData.session,
+        '1. Onay kapalıyken signUp anında session döndürür',
+        'session gelmedi'
+      );
+      if (!signUpData.session) {
+        console.error('\n  Session olmadan sonraki adimlar anlamsiz, suit durduruluyor.');
+        return;
+      }
+      recordPass('2. Onay kapalı modda ek doğrulama adımı gerekmez');
+      recordPass('3. Kayıt sonrası oturum hazır');
     }
 
     // -------------------------------------------------------------------
@@ -128,15 +178,15 @@ async function runRegistrationFlowTests() {
     });
 
     if (rpcErr || !rpcRes) {
-      recordFail('2. create_tenant_and_owner calisir', rpcErr ? rpcErr.message : 'bos yanit');
+      recordFail('4. create_tenant_and_owner calisir', rpcErr ? rpcErr.message : 'bos yanit');
       return;
     }
     tenantId = rpcRes.tenant_id;
-    recordPass('2. create_tenant_and_owner gerçek oturumla çalışır');
+    recordPass('4. create_tenant_and_owner gerçek oturumla çalışır');
 
     check(
       UUID_RE.test(tenantId),
-      '3. Dönen tenant_id gerçek bir UUID',
+      '5. Dönen tenant_id gerçek bir UUID',
       `tenant_id = "${tenantId}". UUID olmayan bir kimlik Postgres'e gonderilirse ` +
       `her yazma 22P02 ile duser.`
     );
@@ -150,7 +200,7 @@ async function runRegistrationFlowTests() {
 
     check(
       members && members.length === 1 && members[0].role === 'owner',
-      '4. tenant_members satırı owner rolüyle oluşur',
+      '6. tenant_members satırı owner rolüyle oluşur',
       `donen: ${JSON.stringify(members)}`
     );
 
@@ -162,7 +212,7 @@ async function runRegistrationFlowTests() {
       .select()
       .single();
 
-    check(!propErr && prop && prop.id, '5. Yeni tenant ile mülk eklenebilir', propErr ? `${propErr.code} ${propErr.message}` : 'kayit donmedi');
+    check(!propErr && prop && prop.id, '7. Yeni tenant ile mülk eklenebilir', propErr ? `${propErr.code} ${propErr.message}` : 'kayit donmedi');
 
     if (prop && prop.id) {
       const { error: bookErr } = await anonClient.from('bookings').insert({
@@ -177,7 +227,7 @@ async function runRegistrationFlowTests() {
         gross_amount: 21000,
         net_room_revenue: 20100
       });
-      check(!bookErr, '6. Yeni tenant ile rezervasyon eklenebilir', bookErr ? `${bookErr.code} ${bookErr.message}` : '');
+      check(!bookErr, '8. Yeni tenant ile rezervasyon eklenebilir', bookErr ? `${bookErr.code} ${bookErr.message}` : '');
 
       // Cakisan tarih araligi
       const { error: overlapErr } = await anonClient.from('bookings').insert({
@@ -191,7 +241,7 @@ async function runRegistrationFlowTests() {
       });
       check(
         !!overlapErr,
-        '7. Çakışan tarihli ikinci rezervasyon engellenir',
+        '9. Çakışan tarihli ikinci rezervasyon engellenir',
         'cakisan rezervasyon kabul edildi — exclude_overlapping_bookings kisiti devre disi olabilir'
       );
     }
@@ -204,7 +254,7 @@ async function runRegistrationFlowTests() {
 
     check(
       !!badIdErr,
-      "8. 'ten_<timestamp>' gibi UUID olmayan tenant_id reddedilir",
+      "10. 'ten_<timestamp>' gibi UUID olmayan tenant_id reddedilir",
       'UUID olmayan tenant_id kabul edildi'
     );
     if (badIdErr) {
@@ -217,26 +267,41 @@ async function runRegistrationFlowTests() {
       .from('properties')
       .insert({ tenant_id: '00000000-0000-4000-8000-000000000001', name: 'Sizinti', slug: 'LEAK', base_price: 1 });
 
-    check(!!foreignErr, '9. Yabancı tenant_id ile yazma RLS tarafından reddedilir', 'yabanci tenant yazmasi kabul edildi');
+    check(!!foreignErr, '11. Yabancı tenant_id ile yazma RLS tarafından reddedilir', 'yabanci tenant yazmasi kabul edildi');
 
     // -------------------------------------------------------------------
     console.log('\n--- 7. OTURUM KAPALIYKEN GÖRÜNÜRLÜK ---');
     await anonClient.auth.signOut();
     const { data: leaked } = await anonClient.from('properties').select('id').eq('tenant_id', tenantId);
-    check((leaked || []).length === 0, '10. Oturum kapalıyken tenant verisi görünmez', `${(leaked || []).length} kayit sizdi`);
+    check((leaked || []).length === 0, '12. Oturum kapalıyken tenant verisi görünmez', `${(leaked || []).length} kayit sizdi`);
 
     // -------------------------------------------------------------------
     console.log('\n--- 8. GİRİŞ AKIŞI ---');
-    const { error: dupErr } = await anonClient.auth.signUp({ email, password: pass });
-    check(!!dupErr, '11. Aynı e-posta ile ikinci kayıt reddedilir', 'ayni e-posta ikinci kez kabul edildi');
+    // Mukerrer kayit: Supabase onay acikken BILEREK hata dondurmez; boylece
+    // form, bir adresin kayitli olup olmadigini sizdiramaz (enumeration korumasi).
+    // Guvenlik acisindan onemli olan sart, hata mesaji degil sudur:
+    // mukerrer kayit ASLA kullanilabilir bir oturum vermemelidir.
+    const { data: dupData, error: dupErr } = await anonClient.auth.signUp({ email, password: pass });
+    const dupGaveSession = !!(dupData && dupData.session);
+    const dupIdentities = dupData && dupData.user ? (dupData.user.identities || []).length : null;
+
+    check(
+      !dupGaveSession,
+      '13. Mükerrer kayıt oturum ele geçirmeye izin vermez',
+      'ayni e-posta ile ikinci kayit kullanilabilir bir session dondurdu'
+    );
+    console.log(
+      `       (hata: ${dupErr ? dupErr.message : 'yok — enumeration korumasi'}` +
+      `, identities: ${dupIdentities === null ? 'yok' : dupIdentities})`
+    );
 
     const { error: wrongPassErr } = await anonClient.auth.signInWithPassword({ email, password: pass + 'yanlis' });
-    check(!!wrongPassErr, '12. Yanlış şifreyle giriş reddedilir', 'yanlis sifre kabul edildi');
+    check(!!wrongPassErr, '14. Yanlış şifreyle giriş reddedilir', 'yanlis sifre kabul edildi');
 
     const { data: loginData, error: loginErr } = await anonClient.auth.signInWithPassword({ email, password: pass });
     check(
       !loginErr && loginData && loginData.user && loginData.user.email === email,
-      '13. Doğru şifreyle tekrar giriş yapılabilir',
+      '15. Doğru şifreyle tekrar giriş yapılabilir',
       loginErr ? loginErr.message : 'kullanici donmedi'
     );
 
@@ -245,7 +310,7 @@ async function runRegistrationFlowTests() {
     const missing = `hicyok_${stamp}@lexbnb-e2e.test`;
     const { error: resetMissingErr } = await anonClient.auth.resetPasswordForEmail(missing, { redirectTo: 'https://lexbnb.space/' });
     const missingLeaks = resetMissingErr && /not found|no user|bulunamad/i.test(resetMissingErr.message || '');
-    check(!missingLeaks, '14. Şifre sıfırlama, hesabın var olmadığını sızdırmaz', `yanit: ${resetMissingErr && resetMissingErr.message}`);
+    check(!missingLeaks, '16. Şifre sıfırlama, hesabın var olmadığını sızdırmaz', `yanit: ${resetMissingErr && resetMissingErr.message}`);
 
   } catch (err) {
     recordFail('Suit beklenmedik hata ile durdu', err && err.message ? err.message : String(err));
@@ -283,7 +348,7 @@ async function runRegistrationFlowTests() {
     if (cleanupFailed) {
       testsFailed++;
     } else {
-      recordPass('15. Test verileri eksiksiz temizlendi');
+      recordPass('17. Test verileri eksiksiz temizlendi');
     }
   }
 
