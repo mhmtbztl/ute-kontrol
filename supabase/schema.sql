@@ -312,71 +312,57 @@ GRANT EXECUTE ON FUNCTION public.log_audit_event TO authenticated;
 -- =============================================================================
 -- GUARDRAIL: SON OWNER KORUMASI (Bir İşletme Asla Sahipsiz Kalamaz)
 -- =============================================================================
+-- Cascade tespiti: ust isletme kaydi gitmisse koruma tetikleyicileri atlanir.
+CREATE OR REPLACE FUNCTION public.fn_tenant_is_being_deleted(p_tenant_id UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+SET search_path = ''
+AS $
+    SELECT NOT EXISTS (SELECT 1 FROM public.tenants WHERE id = p_tenant_id);
+$;
+
 CREATE OR REPLACE FUNCTION public.fn_guard_last_tenant_owner()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $$
+AS $
 DECLARE
     v_owner_count INT;
 BEGIN
-    IF (TG_OP = 'DELETE' AND OLD.role = 'owner') OR 
+    IF TG_OP = 'DELETE' THEN
+        -- Ust kayit zaten silindiyse bu bir cascade'dir, kullanicinin
+        -- "son sahibi cikarma" girisimi degil. Korumayi uygulama.
+        IF NOT EXISTS (SELECT 1 FROM public.tenants WHERE id = OLD.tenant_id) THEN
+            RETURN OLD;
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM auth.users WHERE id = OLD.user_id) THEN
+            RETURN OLD;
+        END IF;
+    END IF;
+
+    IF (TG_OP = 'DELETE' AND OLD.role = 'owner') OR
        (TG_OP = 'UPDATE' AND OLD.role = 'owner' AND NEW.role <> 'owner') THEN
-        
+
         SELECT COUNT(*) INTO v_owner_count
         FROM public.tenant_members
         WHERE tenant_id = OLD.tenant_id AND role = 'owner' AND id <> OLD.id;
-        
+
         IF v_owner_count = 0 THEN
             RAISE EXCEPTION 'İşletmenin son sahibi (owner) silinemez veya rolü düşürülemez!';
         END IF;
     END IF;
-    
+
     IF TG_OP = 'DELETE' THEN
         RETURN OLD;
     ELSE
         RETURN NEW;
     END IF;
 END;
-$$;
-
-DROP TRIGGER IF EXISTS trg_guard_last_tenant_owner ON public.tenant_members;
-CREATE TRIGGER trg_guard_last_tenant_owner
-BEFORE UPDATE OR DELETE ON public.tenant_members
-FOR EACH ROW EXECUTE FUNCTION public.fn_guard_last_tenant_owner();
-
--- Cross-Tenant Foreign Reference Protection Trigger for Expenses
-CREATE OR REPLACE FUNCTION public.check_expense_tenant_isolation()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-BEGIN
-    IF NEW.property_id IS NOT NULL THEN
-        IF NOT EXISTS (
-            SELECT 1 FROM public.properties
-            WHERE id = NEW.property_id AND tenant_id = NEW.tenant_id
-        ) THEN
-            RAISE EXCEPTION 'CROSS_TENANT_PROPERTY_VIOLATION: Seçilen mülk aktif işletmeye ait değildir.'
-                USING ERRCODE = '42501';
-        END IF;
-    END IF;
-
-    IF NEW.booking_id IS NOT NULL THEN
-        IF NOT EXISTS (
-            SELECT 1 FROM public.bookings
-            WHERE id = NEW.booking_id AND tenant_id = NEW.tenant_id
-        ) THEN
-            RAISE EXCEPTION 'CROSS_TENANT_BOOKING_VIOLATION: Seçilen rezervasyon aktif işletmeye ait değildir.'
-                USING ERRCODE = '42501';
-        END IF;
-    END IF;
-
-    RETURN NEW;
-END;
-$$;
+$;
 
 DROP TRIGGER IF EXISTS trg_verify_expense_tenant_isolation ON public.expenses;
 CREATE TRIGGER trg_verify_expense_tenant_isolation
@@ -1117,13 +1103,18 @@ RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $$
+AS $
 DECLARE
     v_date DATE;
     v_tenant_id UUID;
     v_is_closed BOOLEAN;
 BEGIN
     IF TG_OP = 'DELETE' THEN
+        -- Isletme siliniyorsa bu cascade'dir, kullanici girisimi degil.
+        IF public.fn_tenant_is_being_deleted(OLD.tenant_id) THEN
+            RETURN OLD;
+        END IF;
+
         v_date := OLD.expense_date;
         v_tenant_id := OLD.tenant_id;
     ELSE
@@ -1151,7 +1142,7 @@ BEGIN
         RETURN NEW;
     END IF;
 END;
-$$;
+$;
 
 DROP TRIGGER IF EXISTS trg_guard_expense_closed_period ON public.expenses;
 CREATE TRIGGER trg_guard_expense_closed_period
@@ -1164,27 +1155,32 @@ RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $$
+AS $
 DECLARE
     v_check_in DATE;
     v_tenant_id UUID;
     v_is_closed BOOLEAN;
 BEGIN
     IF TG_OP = 'DELETE' THEN
+        -- Isletme siliniyorsa bu cascade'dir, kullanici girisimi degil.
+        IF public.fn_tenant_is_being_deleted(OLD.tenant_id) THEN
+            RETURN OLD;
+        END IF;
+
         v_check_in := OLD.check_in;
         v_tenant_id := OLD.tenant_id;
     ELSE
         v_check_in := NEW.check_in;
         v_tenant_id := NEW.tenant_id;
-        
+
         IF TG_OP = 'UPDATE' THEN
-            IF OLD.check_in IS NOT DISTINCT FROM NEW.check_in 
-               AND OLD.check_out IS NOT DISTINCT FROM NEW.check_out 
-               AND OLD.gross_amount IS NOT DISTINCT FROM NEW.gross_amount 
-               AND OLD.ota_commission IS NOT DISTINCT FROM NEW.ota_commission 
-               AND OLD.cleaning_fee IS NOT DISTINCT FROM NEW.cleaning_fee 
-               AND OLD.discount IS NOT DISTINCT FROM NEW.discount 
-               AND OLD.status IS NOT DISTINCT FROM NEW.status 
+            IF OLD.check_in IS NOT DISTINCT FROM NEW.check_in
+               AND OLD.check_out IS NOT DISTINCT FROM NEW.check_out
+               AND OLD.gross_amount IS NOT DISTINCT FROM NEW.gross_amount
+               AND OLD.ota_commission IS NOT DISTINCT FROM NEW.ota_commission
+               AND OLD.cleaning_fee IS NOT DISTINCT FROM NEW.cleaning_fee
+               AND OLD.discount IS NOT DISTINCT FROM NEW.discount
+               AND OLD.status IS NOT DISTINCT FROM NEW.status
                AND OLD.property_id IS NOT DISTINCT FROM NEW.property_id THEN
                 RETURN NEW;
             END IF;
@@ -1211,7 +1207,7 @@ BEGIN
         RETURN NEW;
     END IF;
 END;
-$$;
+$;
 
 DROP TRIGGER IF EXISTS trg_guard_booking_closed_period ON public.bookings;
 CREATE TRIGGER trg_guard_booking_closed_period
@@ -2105,9 +2101,14 @@ RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
-AS $$
+AS $
 BEGIN
     IF TG_OP = 'DELETE' THEN
+        -- Isletme siliniyorsa bu cascade'dir, kullanici girisimi degil.
+        IF public.fn_tenant_is_being_deleted(OLD.tenant_id) THEN
+            RETURN OLD;
+        END IF;
+
         IF OLD.status = 'SENT' THEN
             RAISE EXCEPTION 'IMMUTABILITY_BREACH: Gönderilmiş mesaj silinemez (Audit Trail)' USING ERRCODE = '42501';
         END IF;
@@ -2116,7 +2117,6 @@ BEGIN
 
     IF TG_OP = 'UPDATE' THEN
         IF OLD.status = 'SENT' THEN
-            -- Only allow updated_at timestamp or identical fields
             IF NEW.status != 'SENT' OR NEW.rendered_body != OLD.rendered_body OR NEW.recipient_snapshot != OLD.recipient_snapshot THEN
                 RAISE EXCEPTION 'IMMUTABILITY_BREACH: Gönderilmiş mesajın içeriği veya durumu değiştirilemez' USING ERRCODE = '42501';
             END IF;
@@ -2124,7 +2124,7 @@ BEGIN
     END IF;
     RETURN NEW;
 END;
-$$;
+$;
 
 DROP TRIGGER IF EXISTS trg_guard_scheduled_message_sent_immutability ON public.scheduled_messages;
 CREATE TRIGGER trg_guard_scheduled_message_sent_immutability
@@ -2690,8 +2690,12 @@ RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
-AS $$
+AS $
 BEGIN
+    IF TG_OP = 'DELETE' AND public.fn_tenant_is_being_deleted(OLD.tenant_id) THEN
+        RETURN OLD;
+    END IF;
+
     IF OLD.status = 'ACCEPTED' THEN
         IF TG_OP = 'DELETE' THEN
             RAISE EXCEPTION 'IMMUTABILITY_BREACH: Kabul edilmiş fiyat teklifi silinemez' USING ERRCODE = '42501';
@@ -2700,9 +2704,13 @@ BEGIN
             RAISE EXCEPTION 'IMMUTABILITY_BREACH: Kabul edilmiş fiyat teklifinin içeriği değiştirilemez' USING ERRCODE = '42501';
         END IF;
     END IF;
+
+    IF TG_OP = 'DELETE' THEN
+        RETURN OLD;
+    END IF;
     RETURN NEW;
 END;
-$$;
+$;
 
 DROP TRIGGER IF EXISTS trg_guard_quote_accepted_immutability ON public.booking_quotes;
 CREATE TRIGGER trg_guard_quote_accepted_immutability
