@@ -5,8 +5,8 @@ const DEFAULT_CLEANING_TASKS = [];
 // =============================================================
 // GÜVENLİK VE GİZLİ ERİŞİM YÖNETİMİ (SECURITY & AUTH SHIELD)
 // =============================================================
-const MASTER_PINS = ['lexbnb', 'lexbnb2026', 'lexbnb.', 'uludagtatil2026.', 'uludagtatil2026'];
-const SECRET_ACCESS_KEY = 'lexbnb';
+// NOT: Sabit kodlu master PIN'ler ve '?key=' ile paylasilan gizli erisim linki
+// kaldirildi. Kimlik dogrulamanin tek kaynagi Supabase Auth'tur.
 
 function getFriendlyAuthErrorMessage(err) {
   if (!err) return 'Bir hata oluştu. Lütfen tekrar deneyin.';
@@ -36,22 +36,13 @@ function getFriendlyAuthErrorMessage(err) {
 }
 
 async function checkAuthStatus() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const keyParam = urlParams.get('key') || urlParams.get('auth') || urlParams.get('token');
-
-  // 1. Direct Secret Link check (auto-logs in as UTE demo master)
-  if (keyParam && (MASTER_PINS.includes(keyParam.toLowerCase()) || keyParam === SECRET_ACCESS_KEY)) {
-    loginWithUteDemo();
-    return true;
-  }
-
-  // 2. Try restoring Supabase Cloud Session (Source of Truth)
+  // 1. Supabase Cloud Session'i geri yukle (Source of Truth)
   if (supabaseClient && window.checkCloudSession) {
     const restored = await window.checkCloudSession();
     if (restored) return true;
   }
 
-  // 3. Authenticated session yoksa LocalStorage'dan sahte/eski veri yükleme
+  // 2. Authenticated session yoksa LocalStorage'dan sahte/eski veri yükleme
   if (typeof getBlankTenantData === 'function') {
     appData = getBlankTenantData('guest');
   }
@@ -64,8 +55,8 @@ function showLockOverlay() {
   if (overlay) {
     overlay.style.display = 'flex';
     setTimeout(() => {
-      const pinInput = document.getElementById('authPinInput');
-      if (pinInput) pinInput.focus();
+      const emailInput = document.getElementById('saasLoginUser');
+      if (emailInput) emailInput.focus();
     }, 100);
   }
 }
@@ -73,47 +64,6 @@ function showLockOverlay() {
 function hideLockOverlay() {
   const overlay = document.getElementById('securityLockOverlay');
   if (overlay) overlay.style.display = 'none';
-}
-
-function handleAuthSubmit(e) {
-  e.preventDefault();
-  const input = document.getElementById('authPinInput');
-  const err = document.getElementById('authErrorMessage');
-  const remember = document.getElementById('authRememberCheckbox')?.checked;
-  const val = (input ? input.value : '').trim().toLowerCase();
-
-  if (MASTER_PINS.includes(val)) {
-    sessionStorage.setItem('LEXBNB_AUTHENTICATED', 'true');
-    if (remember) {
-      localStorage.setItem('LEXBNB_REMEMBER_AUTH', 'true');
-    }
-    if (err) err.style.display = 'none';
-    hideLockOverlay();
-  } else {
-    if (err) {
-      err.style.display = 'block';
-      err.innerText = '⚠️ Hatalı PIN kodu! Lütfen yetkili master şifreyi giriniz.';
-    }
-    if (input) {
-      input.value = '';
-      input.focus();
-    }
-  }
-}
-
-function copySecretShareLink() {
-  const baseUrl = window.location.origin + window.location.pathname;
-  const secretUrl = `${baseUrl}?key=${SECRET_ACCESS_KEY}`;
-
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(secretUrl).then(() => {
-      alert(`✅ Yetkili Erişim Linki Kopyalandı!\n\n🔗 ${secretUrl}\n\nBu linki gönderdiğiniz kişiler şifre girmeden doğrudan paneli açabilir.\nBu linke veya PIN koduna sahip olmayan hiç kimse şirket verilerinizi göremez.`);
-    }).catch(() => {
-      prompt('Aşağıdaki yetkili erişim linkini kopyalayıp paylaşabilirsiniz:', secretUrl);
-    });
-  } else {
-    prompt('Aşağıdaki yetkili erişim linkini kopyalayıp paylaşabilirsiniz:', secretUrl);
-  }
 }
 
 // LEXBNB KONTROL MERKEZİ - EXECUTIVE STR CONTROL & REVENUE MANAGEMENT ENGINE
