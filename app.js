@@ -36,6 +36,16 @@ function getFriendlyAuthErrorMessage(err) {
 }
 
 async function checkAuthStatus() {
+  // 0. Sifre sifirlama linkiyle gelindiyse: recovery session'i uygulamaya
+  //    sokma, once yeni sifre belirlet.
+  if (isPasswordRecoveryRedirect()) {
+    if (typeof getBlankTenantData === 'function') {
+      appData = getBlankTenantData('guest');
+    }
+    showNewPasswordForm();
+    return false;
+  }
+
   // 1. Supabase Cloud Session'i geri yukle (Source of Truth)
   if (supabaseClient && window.checkCloudSession) {
     const restored = await window.checkCloudSession();
@@ -10990,6 +11000,204 @@ function switchAuthTab(tab) {
     if (formLogin) formLogin.style.display = 'none';
     if (formRegister) formRegister.style.display = 'block';
   }
+
+  // Sifre sifirlama ve yeni sifre formlari sekme disidir; tab degisiminde kapanir.
+  const formForgot = document.getElementById('saasForgotForm');
+  const formNewPass = document.getElementById('saasNewPassForm');
+  const tabs = document.querySelector('.saas-auth-tabs');
+  if (formForgot) formForgot.style.display = 'none';
+  if (formNewPass) formNewPass.style.display = 'none';
+  if (tabs) tabs.style.display = 'flex';
+}
+
+// -------------------------------------------------------------
+// SIFRE SIFIRLAMA AKISI
+// Kullanici e-posta ister -> Supabase recovery linki yollar -> link ile
+// donuldugunde (#type=recovery) yeni sifre formu acilir -> updateUser().
+// -------------------------------------------------------------
+function showForgotPasswordForm() {
+  const formLogin = document.getElementById('saasLoginForm');
+  const formRegister = document.getElementById('saasRegisterForm');
+  const formForgot = document.getElementById('saasForgotForm');
+  const err = document.getElementById('authErrorMessage');
+  if (err) err.style.display = 'none';
+  if (formLogin) formLogin.style.display = 'none';
+  if (formRegister) formRegister.style.display = 'none';
+  if (formForgot) formForgot.style.display = 'block';
+
+  // Giris ekraninda yazilan e-postayi tasi
+  const typed = document.getElementById('saasLoginUser')?.value.trim();
+  const target = document.getElementById('saasForgotEmail');
+  if (typed && target && typed.includes('@')) target.value = typed;
+  if (target) setTimeout(() => target.focus(), 50);
+}
+
+async function handleSaaSForgotPassword(e) {
+  e.preventDefault();
+  const email = document.getElementById('saasForgotEmail')?.value.trim().toLowerCase() || '';
+  const err = document.getElementById('authErrorMessage');
+  const submitBtn = document.getElementById('saasForgotSubmitBtn');
+
+  if (err) {
+    err.style.display = 'none';
+    err.style.background = '';
+    err.style.border = '';
+    err.style.color = '';
+  }
+
+  if (!email || !email.includes('@')) {
+    if (err) {
+      err.style.display = 'block';
+      err.innerText = '⚠️ Lütfen geçerli bir e-posta adresi girin.';
+    }
+    return;
+  }
+
+  if (!supabaseClient) {
+    if (err) {
+      err.style.display = 'block';
+      err.innerText = '⚠️ Bulut bağlantısı kurulamadı. İnternet bağlantınızı kontrol edip sayfayı yenileyin.';
+    }
+    return;
+  }
+
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerText = '⏳ Gönderiliyor...';
+  }
+
+  try {
+    const redirectTo = window.location.origin + window.location.pathname;
+    const { error } = await supabaseClient.auth.resetPasswordForEmail(email, { redirectTo });
+
+    // Hesabin var olup olmadigini ASLA sizdirma: her iki durumda ayni mesaj.
+    if (error && !/rate limit|Too many requests/i.test(error.message || '')) {
+      console.warn('Password reset notice:', error);
+    }
+
+    if (err) {
+      err.style.display = 'block';
+      if (error && /rate limit|Too many requests/i.test(error.message || '')) {
+        err.innerText = '⚠️ ' + getFriendlyAuthErrorMessage(error);
+      } else {
+        err.style.background = 'rgba(59, 130, 246, 0.15)';
+        err.style.border = '1px solid #3B82F6';
+        err.style.color = '#93C5FD';
+        err.innerHTML = `📬 <strong>Sıfırlama Bağlantısı Gönderildi</strong><br>
+        <span style="font-size:12px;">Bu adrese ait bir hesap varsa, <strong>${email}</strong> adresine şifre yenileme bağlantısı gönderildi. Gelen kutunuzu ve spam klasörünü kontrol edin.</span>`;
+      }
+    }
+  } catch (ex) {
+    console.error('Password reset error:', ex);
+    if (err) {
+      err.style.display = 'block';
+      err.innerText = '⚠️ ' + getFriendlyAuthErrorMessage(ex);
+    }
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerText = '📧 Sıfırlama Bağlantısı Gönder';
+    }
+  }
+}
+
+function showNewPasswordForm() {
+  showLockOverlay();
+  const tabs = document.querySelector('.saas-auth-tabs');
+  ['saasLoginForm', 'saasRegisterForm', 'saasForgotForm'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+  if (tabs) tabs.style.display = 'none';
+  const form = document.getElementById('saasNewPassForm');
+  if (form) form.style.display = 'block';
+  setTimeout(() => document.getElementById('saasNewPass1')?.focus(), 80);
+}
+
+async function handleSaaSNewPassword(e) {
+  e.preventDefault();
+  const p1 = document.getElementById('saasNewPass1')?.value.trim() || '';
+  const p2 = document.getElementById('saasNewPass2')?.value.trim() || '';
+  const err = document.getElementById('authErrorMessage');
+  const submitBtn = document.getElementById('saasNewPassSubmitBtn');
+
+  if (err) {
+    err.style.display = 'none';
+    err.style.background = '';
+    err.style.border = '';
+    err.style.color = '';
+  }
+
+  if (p1.length < 6) {
+    if (err) {
+      err.style.display = 'block';
+      err.innerText = '⚠️ Şifreniz en az 6 karakter olmalıdır.';
+    }
+    return;
+  }
+
+  if (p1 !== p2) {
+    if (err) {
+      err.style.display = 'block';
+      err.innerText = '⚠️ Girdiğiniz iki şifre birbiriyle uyuşmuyor.';
+    }
+    return;
+  }
+
+  if (!supabaseClient) return;
+
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerText = '⏳ Güncelleniyor...';
+  }
+
+  try {
+    const { error } = await supabaseClient.auth.updateUser({ password: p1 });
+    if (error) {
+      if (err) {
+        err.style.display = 'block';
+        err.innerText = '⚠️ ' + getFriendlyAuthErrorMessage(error);
+      }
+      return;
+    }
+
+    // URL'deki recovery token'ini temizle, gecmise sizmasin
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (session && session.user) {
+      await handleAuthenticatedSession(session.user);
+    } else {
+      switchAuthTab('login');
+      if (err) {
+        err.style.display = 'block';
+        err.style.background = 'rgba(16, 185, 129, 0.15)';
+        err.style.border = '1px solid #10B981';
+        err.style.color = '#A7F3D0';
+        err.innerText = '✅ Şifreniz güncellendi. Yeni şifrenizle giriş yapabilirsiniz.';
+      }
+    }
+  } catch (ex) {
+    console.error('Update password error:', ex);
+    if (err) {
+      err.style.display = 'block';
+      err.innerText = '⚠️ ' + getFriendlyAuthErrorMessage(ex);
+    }
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerText = '🔒 Şifremi Güncelle';
+    }
+  }
+}
+
+// Supabase recovery linkiyle donuldugunde token URL hash'inde gelir.
+function isPasswordRecoveryRedirect() {
+  const hash = (window.location.hash || '').replace(/^#/, '');
+  if (hash && new URLSearchParams(hash).get('type') === 'recovery') return true;
+  return new URLSearchParams(window.location.search).get('type') === 'recovery';
 }
 
 // RESTORE SESSION ON LOAD & AUTH STATE LISTENER

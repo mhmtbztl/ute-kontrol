@@ -58,8 +58,8 @@
           💡 <strong>Hızlı Demo Girişi:</strong> E-posta: <code style="background: rgba(0,0,0,0.4); padding: 1px 5px; border-radius: 3px; color: #FDE68A; font-weight: 700;">demo@lexbnb.com</code> &bull; Şifre: <code style="background: rgba(0,0,0,0.4); padding: 1px 5px; border-radius: 3px; color: #FDE68A; font-weight: 700;">lexbnb</code>
         </div>
 
-        <div id="authErrorMessage" class="auth-error-msg" style="display: none; margin-top: 10px;">
-          ⚠️ Hatalı kullanıcı adı veya şifre! Lütfen tekrar deneyin.
+        <div style="text-align: center; margin-top: 10px;">
+          <a href="#" onclick="showForgotPasswordForm(); return false;" style="color: #94A3B8; font-size: 12px; text-decoration: underline;">Şifremi unuttum</a>
         </div>
 
         <div class="remember-row" style="margin-top: 12px;">
@@ -93,6 +93,46 @@
           ✨ Hesabımı Oluştur ve Başla
         </button>
       </form>
+
+      <!-- FORM 3: Şifremi Unuttum -->
+      <form id="saasForgotForm" onsubmit="handleSaaSForgotPassword(event)" style="display: none; text-align: left;">
+        <p style="font-size: 12px; color: #94A3B8; margin: 0 0 12px; text-align: center;">
+          Hesabınızın e-posta adresini girin, şifre yenileme bağlantısını gönderelim.
+        </p>
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label style="font-size: 12px; color: var(--text-muted);">E-posta Adresi:</label>
+          <input type="text" inputmode="email" id="saasForgotEmail" placeholder="ornek@isletmeniz.com" required autocomplete="email" style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 13px;">
+        </div>
+        <button type="submit" id="saasForgotSubmitBtn" class="btn btn-primary" style="width: 100%;">
+          📧 Sıfırlama Bağlantısı Gönder
+        </button>
+        <div style="text-align: center; margin-top: 10px;">
+          <a href="#" onclick="switchAuthTab('login'); return false;" style="color: #94A3B8; font-size: 12px; text-decoration: underline;">← Girişe dön</a>
+        </div>
+      </form>
+
+      <!-- FORM 4: Yeni Şifre Belirle (recovery linkiyle gelindiğinde) -->
+      <form id="saasNewPassForm" onsubmit="handleSaaSNewPassword(event)" style="display: none; text-align: left;">
+        <p style="font-size: 12px; color: #94A3B8; margin: 0 0 12px; text-align: center;">
+          Yeni şifrenizi belirleyin.
+        </p>
+        <div class="form-group" style="margin-bottom: 10px;">
+          <label style="font-size: 12px; color: var(--text-muted);">Yeni Şifre:</label>
+          <input type="password" id="saasNewPass1" placeholder="En az 6 karakter" required minlength="6" autocomplete="new-password" style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 13px;">
+        </div>
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label style="font-size: 12px; color: var(--text-muted);">Yeni Şifre (Tekrar):</label>
+          <input type="password" id="saasNewPass2" placeholder="Şifrenizi tekrar girin" required minlength="6" autocomplete="new-password" style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 13px;">
+        </div>
+        <button type="submit" id="saasNewPassSubmitBtn" class="btn btn-primary" style="width: 100%;">
+          🔒 Şifremi Güncelle
+        </button>
+      </form>
+
+      <!-- Tüm auth formlarının paylaştığı mesaj alanı -->
+      <div id="authErrorMessage" class="auth-error-msg" style="display: none; margin-top: 12px;">
+        ⚠️ Hatalı e-posta veya şifre! Lütfen tekrar deneyin.
+      </div>
 
       <!-- Hızlı Kurumsal Demo Girişi (LexBnB) -->
       <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.1);">
