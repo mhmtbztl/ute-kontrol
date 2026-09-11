@@ -254,14 +254,41 @@ async function runTeamManagementTests() {
       if (c && c.client) { try { await c.client.auth.signOut(); } catch (e) {} }
     }
 
+    // Silme cagrilari ara sira gecici olarak basarisiz olabiliyor (GoTrue admin
+    // uclarinda hiz siniri). Sessizce birakmak uretim projesinde artik hesap
+    // biriktirir, o yuzden geri cekilmeli tekrar denenir ve sonuc DOGRULANIR.
+    async function deleteWithRetry(label, fn) {
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        const { error } = await fn();
+        if (!error) return true;
+        if (attempt === 3) {
+          console.error(`[FAIL] ${label} silinemedi (3 deneme): ${error.message}`);
+          return false;
+        }
+        await new Promise(r => setTimeout(r, attempt * 400));
+      }
+      return false;
+    }
+
     if (tenantId) {
-      const { error } = await admin.from('tenants').delete().eq('id', tenantId);
-      if (error) { cleanupFailed = true; console.error(`[FAIL] Tenant silinemedi: ${error.message}`); }
+      if (!await deleteWithRetry(`Tenant ${tenantId}`, () => admin.from('tenants').delete().eq('id', tenantId))) {
+        cleanupFailed = true;
+      }
     }
 
     for (const uid of createdUserIds) {
-      const { error } = await admin.auth.admin.deleteUser(uid);
-      if (error) { cleanupFailed = true; console.error(`[FAIL] Kullanici silinemedi (${uid}): ${error.message}`); }
+      if (!await deleteWithRetry(`Kullanici ${uid}`, () => admin.auth.admin.deleteUser(uid))) {
+        cleanupFailed = true;
+      }
+    }
+
+    // Silindigini VARSAYMA - dogrula. Suitin kendi raporu, uretim
+    // veritabaninin gercek durumundan daha az guvenilirdir.
+    const { data: check } = await admin.auth.admin.listUsers({ perPage: 1000 });
+    const survivors = (check ? check.users : []).filter(u => createdUserIds.includes(u.id));
+    if (survivors.length) {
+      cleanupFailed = true;
+      console.error(`[FAIL] ${survivors.length} test hesabi hala duruyor: ${survivors.map(u => u.email).join(', ')}`);
     }
 
     if (cleanupFailed) testsFailed++;

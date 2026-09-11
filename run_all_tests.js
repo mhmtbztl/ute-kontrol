@@ -53,7 +53,10 @@ const testFiles = [
   'multi_tenant_e2e_tests.js',
 
   // Gercek tarayici kayit/giris akisi (anon key) - diger suitler bu yolu atliyor
-  'registration_flow_tests.js'
+  'registration_flow_tests.js',
+
+  // Ekip daveti ve rol yonetimi (Phase 16)
+  'team_management_tests.js'
 ];
 
 console.log('=============================================================================');
@@ -109,7 +112,14 @@ for (let i = 0; i < testFiles.length; i++) {
     suiteResults.push({ file, status: 'FAIL', passes: 0, error: errMsg });
     console.log(`FAIL ❌`);
     console.error(`\n--- ERROR IN ${file} ---`);
-    console.error(errMsg.substring(0, 1000));
+    // Kor bir substring, ciktinin SONUNDAKI temizlik hatalarini gizliyordu.
+    // Once her [FAIL] satirini goster, sonra baglam icin bir ozet parca ver.
+    const failLines = errMsg.split(/\r?\n/).filter(l => l.includes('[FAIL]'));
+    if (failLines.length) {
+      console.error(failLines.join('\n'));
+      console.error('  ...');
+    }
+    console.error(errMsg.substring(0, 1200));
     console.error('------------------------\n');
   }
 }
