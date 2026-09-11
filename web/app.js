@@ -8141,7 +8141,7 @@ function closeWhatsAppModal() {
 }
 
 function loadSampleWhatsAppMsg() {
-  const sample = "Ahmet Yılmaz: Selamlar, 18-21 Eylül arası 3 gece Zirve Dağ Evi için 45.000 TL teklif vermiştik. 8 kişiyiz, onaylıyoruz. Tel: 0532 555 1234";
+  const sample = "Alexander Wright: Selamlar, 18-23 Eylül arası 5 gece Villa Azure Bay için 85.000 TL konuştuk, 8 kişiyiz onaylıyoruz. Tel: +90 532 555 1234";
   const input = document.getElementById('waRawInput');
   if (input) {
     input.value = sample;
@@ -8163,12 +8163,12 @@ function parseWhatsAppMessage() {
   const lower = text.toLowerCase();
 
   // 1. Detect Villa
-  let detectedVilla = 'ZIRVE';
-  if (lower.includes('zirve')) detectedVilla = 'ZIRVE';
-  else if (lower.includes('doğuş') || lower.includes('dogus')) detectedVilla = 'DOGUS';
-  else if (lower.includes('seyir')) detectedVilla = 'SEYIR';
-  else if (lower.includes('şirin') || lower.includes('sirin')) detectedVilla = 'SIRIN';
-  else if (lower.includes('nefes')) detectedVilla = 'NEFES';
+  let detectedVilla = 'VILLA_AZURE';
+  if (lower.includes('bella')) detectedVilla = 'VILLA_BELLA';
+  else if (lower.includes('olive')) detectedVilla = 'VILLA_OLIVE';
+  else if (lower.includes('sunset')) detectedVilla = 'VILLA_SUNSET';
+  else if (lower.includes('azure')) detectedVilla = 'VILLA_AZURE';
+  else if (lower.includes('palm')) detectedVilla = 'VILLA_PALM';
 
   // 2. Detect Guest Name
   let detectedGuest = '';
@@ -10834,7 +10834,7 @@ function openInfluencerModal(id = null) {
       document.getElementById('infCollabId').value = item.id;
       document.getElementById('infHandle').value = item.handle || '';
       document.getElementById('infFollowers').value = item.followers || '';
-      document.getElementById('infVilla').value = item.villa || 'SEYIR';
+      document.getElementById('infVilla').value = item.villa || 'VILLA_AZURE';
       document.getElementById('infDates').value = item.dates || '';
       document.getElementById('infCost').value = item.cost || '';
       document.getElementById('infCode').value = item.code || '';

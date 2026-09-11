@@ -3626,6 +3626,11 @@
             <strong style="color: #FFFFFF; font-size: 13px; display: block; margin-bottom: 4px;">WhatsApp Business > Bağlı Cihazlar > Cihaz Bağla</strong>
             <p style="color: var(--text-muted); font-size: 11px; margin: 0;">Telefonunuzun kamerasını bu koda doğrulttuğunuzda bağlantı otomatik olarak canlıya geçer.</p>
           </div>
+          <!-- Automation Guide Hint -->
+          <div style="background: rgba(37, 211, 102, 0.08); border: 1px solid rgba(37, 211, 102, 0.2); border-radius: 8px; padding: 12px; font-size: 12px; color: #D1FAE5; line-height: 1.5; margin-top: 14px;">
+            <strong>🤖 Sıfır Dokunuş / Otomatik Entegrasyon mu İstiyorsunuz?</strong>
+            <p style="margin: 4px 0 0 0; color: #A7F3D0;">WhatsApp Business Cloud API veya Make.com / Zapier webhook kurarak müşterilerinizin yazdığı mesajların buraya hiç kopyala-yapıştır yapmadan otomatik düşmesini sağlayabilirsiniz. Detaylı kurulum rehberi için kılavuza göz atın.</p>
+          </div>
         </div>
       </div>
 
@@ -3643,26 +3648,6 @@
     </div>
   </div>
 
-        <!-- Automation Guide Hint -->
-        <div style="background: rgba(37, 211, 102, 0.08); border: 1px solid rgba(37, 211, 102, 0.2); border-radius: 8px; padding: 12px; font-size: 12px; color: #D1FAE5; line-height: 1.5;">
-          <strong>🤖 Sıfır Dokunuş / Otomatik Entegrasyon mu İstiyorsunuz?</strong>
-          <p style="margin: 4px 0 0 0; color: #A7F3D0;">WhatsApp Business Cloud API veya Make.com / Zapier webhook kurarak müşterilerinizin yazdığı mesajların buraya hiç kopyala-yapıştır yapmadan otomatik düşmesini sağlayabilirsiniz. Detaylı kurulum rehberi için kılavuza göz atın.</p>
-        </div>
-      </div>
-
-      <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
-        <button type="button" class="btn btn-secondary" onclick="closeWhatsAppModal()">Kapat</button>
-        <div style="display: flex; gap: 10px;">
-          <button type="button" class="btn btn-secondary" onclick="saveWaAsLead()" style="border-color: #F59E0B; color: #FBBF24; font-weight: 700;">
-            🎯 Sıcak Lead Olarak Kaydet
-          </button>
-          <button type="button" class="btn btn-primary" onclick="saveWaAsBooking()" style="background: #059669; border-color: #10B981; font-weight: 700;">
-            📅 Kesin Rezervasyona Dönüştür
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
 
 
   <!-- ======================================================= -->
@@ -3698,8 +3683,8 @@
 
 
   <!-- MODAL: YENİ REKLAM KAMPANYASI / HARCAMASI EKLE -->
-  <div id="marketingCampaignModal" class="modal-overlay">
-    <div class="modal-content" style="max-width: 600px;">
+  <div id="marketingCampaignModal" class="modal-backdrop modal-overlay">
+    <div class="modal-card modal-content" style="max-width: 600px;">
       <div class="modal-header">
         <div style="display: flex; align-items: center; gap: 8px;">
           <span style="font-size: 20px;">📢</span>
@@ -3807,11 +3792,11 @@
 
 
   <!-- Modal: Influencer & Barter İşbirliği Ekle / Düzenle -->
-  <div id="influencerModal" class="modal-overlay">
-    <div class="modal-content" style="max-width: 520px;">
+  <div id="influencerModal" class="modal-backdrop modal-overlay">
+    <div class="modal-card modal-content" style="max-width: 520px;">
       <div class="modal-header">
         <h3 id="influencerModalTitle">Yeni Influencer / Barter İşbirliği Ekle</h3>
-        <button type="button" class="btn-close" onclick="closeInfluencerModal()">✕</button>
+        <button type="button" class="close-btn btn-close" onclick="closeInfluencerModal()">&times;</button>
       </div>
       <form id="influencerForm" onsubmit="saveInfluencerCollab(event)">
         <input type="hidden" id="infCollabId">

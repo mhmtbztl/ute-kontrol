@@ -666,7 +666,8 @@ body {
 }
 
 /* Modal */
-.modal-backdrop {
+.modal-backdrop,
+.modal-overlay {
   display: none;
   position: fixed;
   top: 0;
@@ -679,11 +680,13 @@ body {
   align-items: center;
   justify-content: center;
 }
-.modal-backdrop.active {
-  display: flex;
+.modal-backdrop.active,
+.modal-overlay.active {
+  display: flex !important;
 }
 
-.modal-card {
+.modal-card,
+.modal-content {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: 14px;
@@ -691,6 +694,9 @@ body {
   max-width: 620px;
   padding: 22px;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+  position: relative;
+  max-height: 92vh;
+  overflow-y: auto;
 }
 
 .modal-header {
