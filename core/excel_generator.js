@@ -405,7 +405,7 @@ async function buildWorkbook() {
   });
 
   // Save workbook
-  const outputPath = path.join(__dirname, '..', 'UTE_Kontrol_Merkezi_V5.xlsx');
+  const outputPath = path.join(__dirname, '..', 'Lexbnb_Portfoy_Raporu.xlsx');
   await workbook.xlsx.writeFile(outputPath);
   console.log(`[SUCCESS] Excel Workbook generated: ${outputPath}`);
 }

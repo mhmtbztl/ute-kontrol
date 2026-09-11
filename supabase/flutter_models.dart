@@ -1,5 +1,5 @@
-// UTE Kontrol Merkezi V5 - Flutter Domain Models & Data Architecture
-// Uludağ Tatil Evleri: Seyir, Doğuş, Zirve, Şirin, Nefes
+// Lexbnb Mobile Flutter Domain Models
+// Lexbnb Luxury Portfolio
 
 import 'package:flutter/foundation.dart';
 

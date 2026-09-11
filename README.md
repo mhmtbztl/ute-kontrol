@@ -1,52 +1,40 @@
-# UTE KONTROL MERKEZİ V5 (ULUDAĞ TATİL EVLERİ)
-## Executive Operations & Revenue Management System
+# LEXBNB — EXECUTIVE CONTROL CENTER & STR REVENUE ENGINE
 
-Uludağ Tatil Evleri (Seyir, Doğuş, Zirve, Şirin, Nefes) için geliştirilmiş V5 Kontrol Merkezi; **"One Input → Many Outputs" (Tek Veri Girişi → Çoklu Çıktı)** prensibiyle çalışan bir işletme, gelir yönetimi ve karar kokpitidir.
+Lexbnb, lüks kısa dönem kiralama (STR) ve villa portföy işletmeleri için geliştirilmiş uçtan uca operasyon, gelir yönetimi ve yönetici karar kokpitidir.
 
----
-
-### 📂 Proje Dizin Yapısı
-
-* **`UTE_Kontrol_Merkezi_V5.xlsx`**: Excel ve Google Sheets için hazırlanmış, formülleri ve koşullu biçimlendirmeleri hazır ana çalışma kitabı.
-* **`core/`**
-  * `engine.js`: USALI standardında gece bölme, ADR, RevPAR, Lead CRM, Gap Night ve Today Radar hesaplama motoru.
-  * `tests.js`: Phase 1-11 için otomatik Acceptance Test Suite (%100 PASS).
-  * `excel_generator.js`: ExcelJS tabanlı tablo üretim motoru.
-* **`apps_script/`**
-  * `Code.gs`: Google Sheets için özel menü, Bugün Ne Yapmalıyım radarı ve Gap Night tarayıcısı.
-* **`web/`**
-  * `index.html`: Modern, responsive yönetici kokpiti ve rezervasyon simülatörü.
-  * `style.css`: Dağ/kış temalı lüks UI tasarım sistemi.
-  * `app.js`: Canlı veri etkileşimi ve formül motoru.
-* **`supabase/`**
-  * `schema.sql`: PostgreSQL / Supabase üretim şeması, tetikleyiciler (Triggers) ve RLS güvenlik politikaları.
-  * `flutter_models.dart`: Mobil uygulama geliştirme için Dart veri modelleri.
+Canlı Web Sürümü: [https://lexbnb.space](https://lexbnb.space)
 
 ---
 
-### 🚀 Hızlı Başlangıç
+### 📂 Proje Mimarisi
 
-#### 1. Excel / Google Sheets Kullanımı
-* `c:\Users\pc\Desktop\lexbnb\UTE_Kontrol_Merkezi_V5.xlsx` dosyasını doğrudan Microsoft Excel ile açabilir veya Google Drive'a yükleyerek Google Sheets olarak içe aktarabilirsiniz.
-* Google Sheets'te **Uzantılar > Apps Script** menüsüne gidip `apps_script/Code.gs` kodunu yapıştırdığınızda üst menüde **"🌲 UTE Kontrol Merkezi"** otomasyon araçları aktif hale gelecektir.
-
-#### 2. Web Kokpitini Görüntüleme
-* `web/index.html` dosyasını herhangi bir internet tarayıcısında (Chrome, Edge vb.) doğrudan çift tıklayarak açabilirsiniz.
-
-#### 3. Testleri Çalıştırma
-Konsolda testleri yeniden çalıştırmak için:
-```bash
-node core/tests.js
-```
+* **`app.js` & `index.html`**: Modern SaaS yönetici kokpiti, dinamik gelir yönetimi ve rezervasyon simülatörü.
+* **`core/`**:
+  * `engine.js`: USALI standartlarında gece bölme, ADR, RevPAR, Lead CRM, Gap Night ve Today Radar motoru.
+  * `pricing_engine.js`: Deterministik ve kural tabanlı dinamik fiyatlama ve gelir optimizasyon motoru.
+  * `executive_dashboard_service.js`: CEO / Executive kontrol merkezi snapshot servisi.
+  * `notification_service.js`: Kritik operasyonel ve finansal bildirim merkezi.
+  * `run_all_tests.js`: 43 test suite'lik kapsamlı master regresyon test koşucusu.
+* **`web/`**: GitHub Pages / CDN canlı dağıtım dizini.
+* **`supabase/`**: PostgreSQL / Supabase multi-tenant veri modeli, RLS politikaları ve trigger fonksiyonları.
 
 ---
 
-### 🏆 5 Villa Özellikleri ve Fiyat Basamakları
+### 🏆 Örnek Demo Portföyü (Akdeniz & Ege Lüks Villa Koleksiyonu)
 
-| Villa | Kapasite | Floor Rate | Base Rate | Target Rate | Premium Rate | Peak Rate | Öne Çıkan Özellikler |
+| Villa | Konum | Kapasite | Taban Fiyat | Baz Fiyat | Hedef Fiyat | Premium | Öne Çıkan Özellikler |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Seyir** | 6+2 | ₺3.500 | ₺4.500 | ₺6.000 | ₺8.500 | ₺12.000 | Şömine, soba, kış bahçesi |
-| **Doğuş** | 11 | ₺5.000 | ₺6.500 | ₺9.000 | ₺13.000 | ₺18.000 | 4 oda, büyük lüks kış bahçesi |
-| **Zirve** | 9 | ₺6.500 | ₺8.500 | ₺12.000 | ₺16.500 | ₺24.000 | Isıtmalı jakuzi, sauna, kapalı çardak |
-| **Şirin** | 7 | ₺3.000 | ₺4.000 | ₺5.500 | ₺7.500 | ₺11.000 | Üst teras, kapalı veranda |
-| **Nefes** | 12 | ₺5.500 | ₺7.000 | ₺9.500 | ₺14.000 | ₺19.000 | Voleybol alanı, mini kale, 3 banyo |
+| **Villa Bella Vista** | Kaş | 6+2 Kişi | ₺4.500 | ₺6.000 | ₺8.500 | ₺12.000 | Isıtmalı Sonsuzluk Havuzu, Meis Manzarası, Teras Jakuzisi |
+| **Villa Olive Garden** | Bodrum | 8 Kişi | ₺6.000 | ₺8.500 | ₺12.000 | ₺17.000 | 1000m² Zeytinlik, Özel Havuz, Açık Şömine, Taş Mimari |
+| **Villa Sunset Horizon** | Kalkan | 4 Kişi | ₺3.500 | ₺5.000 | ₺7.000 | ₺10.000 | Panoramik Körfez Manzarası, Teras Jakuzisi, Korunaklı Havuz |
+| **Villa Azure Bay** | Göcek | 10 Kişi | ₺8.000 | ₺11.000 | ₺16.000 | ₺22.500 | Özel İskele, Tekne Bağlama Alanı, Özel Hamam, Sauna |
+| **Villa Palm Breeze** | Alaçatı | 6 Kişi | ₺5.000 | ₺7.000 | ₺10.000 | ₺14.500 | Otantik Alaçatı Taş Ev, Isıtmalı Havuz, Korunaklı İç Avlu |
+
+---
+
+### 🚀 Testleri Çalıştırma
+
+Tüm modülleri ve regresyon testlerini çalıştırmak için:
+```bash
+node run_all_tests.js
+```

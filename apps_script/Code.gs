@@ -1,6 +1,6 @@
 /**
- * UTE KONTROL MERKEZİ V5 - GOOGLE APPS SCRIPT AUTOMATION ENGINE
- * Uludağ Tatil Evleri (Seyir, Doğuş, Zirve, Şirin, Nefes)
+ * LEXBNB KONTROL MERKEZİ - GOOGLE APPS SCRIPT AUTOMATION ENGINE
+ * Lexbnb Lüks Villa Portföyü
  * 
  * Instructions:
  * 1. Google Sheets dosyanızı açın (Extensions > Apps Script).

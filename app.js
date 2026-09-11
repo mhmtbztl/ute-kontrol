@@ -116,2631 +116,1379 @@ function copySecretShareLink() {
   }
 }
 
-// LEXBNB KONTROL MERKEZİ V5 - FULL MASTER FINANCE, KPI & OTA APPLICATION ENGINE
-// Uludağ Tatil Evleri (Seyir, Doğuş, Zirve, Şirin, Nefes)
-// RESMİ ŞİRKET VERİTABANI: GENEL RAPOR.xlsx üzerinden tamamen işlenmiştir.
+// LEXBNB KONTROL MERKEZİ - EXECUTIVE STR CONTROL & REVENUE MANAGEMENT ENGINE
+// Portföy: Akdeniz & Ege Lüks Villa Koleksiyonu (Villa Bella Vista, Villa Olive Garden, Villa Sunset Horizon, Villa Azure Bay, Villa Palm Breeze)
+// Tamamen sentetik, bağımsız SaaS demo veritabanı.
 
-const COMPANY_EXCEL_DATABASE = {
+const SYNTHETIC_DEMO_DATABASE = {
   "monthlyFinancials": {
     "2025-07": {
       "key": "2025-07",
       "year": "2025",
       "month": "07",
       "monthName": "Temmuz",
-      "ciro": 66050,
-      "opex": 0,
-      "capex": 0,
-      "totalExp": 0,
-      "netProfit": 66050,
-      "operatingProfit": 66050,
-      "opMargin": 100,
-      "netMargin": 100,
-      "daysSold": 5,
-      "avgDaily": 13210
+      "ciro": 320000,
+      "opex": 110000,
+      "capex": 15000,
+      "totalExp": 125000,
+      "netProfit": 195000,
+      "operatingProfit": 210000,
+      "opMargin": 65.6,
+      "netMargin": 60.9,
+      "daysSold": 52,
+      "avgDaily": 6154
     },
     "2025-08": {
       "key": "2025-08",
       "year": "2025",
       "month": "08",
       "monthName": "Ağustos",
-      "ciro": 297507,
-      "opex": 0,
-      "capex": 0,
-      "totalExp": 0,
-      "netProfit": 297507,
-      "operatingProfit": 297507,
-      "opMargin": 100,
-      "netMargin": 100,
-      "daysSold": 22,
-      "avgDaily": 13523.045454545454
+      "ciro": 540000,
+      "opex": 165000,
+      "capex": 12000,
+      "totalExp": 177000,
+      "netProfit": 363000,
+      "operatingProfit": 375000,
+      "opMargin": 69.4,
+      "netMargin": 67.2,
+      "daysSold": 78,
+      "avgDaily": 6923
     },
     "2025-09": {
       "key": "2025-09",
       "year": "2025",
       "month": "09",
       "monthName": "Eylül",
-      "ciro": 95046,
-      "opex": 0,
-      "capex": 0,
-      "totalExp": 0,
-      "netProfit": 95046,
-      "operatingProfit": 95046,
-      "opMargin": 100,
-      "netMargin": 100,
-      "daysSold": 8,
-      "avgDaily": 11880.75
+      "ciro": 410000,
+      "opex": 135000,
+      "capex": 8000,
+      "totalExp": 143000,
+      "netProfit": 267000,
+      "operatingProfit": 275000,
+      "opMargin": 67.1,
+      "netMargin": 65.1,
+      "daysSold": 64,
+      "avgDaily": 6406
     },
     "2025-10": {
       "key": "2025-10",
       "year": "2025",
       "month": "10",
       "monthName": "Ekim",
-      "ciro": 216987,
-      "opex": 255523,
-      "capex": 341556,
-      "totalExp": 597079,
-      "netProfit": -38536,
-      "operatingProfit": -38536,
-      "opMargin": -17.8,
-      "netMargin": -17.8,
-      "daysSold": 24,
-      "avgDaily": 9041.116666666667
+      "ciro": 280000,
+      "opex": 98000,
+      "capex": 5000,
+      "totalExp": 103000,
+      "netProfit": 177000,
+      "operatingProfit": 182000,
+      "opMargin": 65,
+      "netMargin": 63.2,
+      "daysSold": 48,
+      "avgDaily": 5833
     },
     "2025-11": {
       "key": "2025-11",
       "year": "2025",
       "month": "11",
       "monthName": "Kasım",
-      "ciro": 197561,
-      "opex": 290614,
-      "capex": 174792,
-      "totalExp": 465406,
-      "netProfit": -93053,
-      "operatingProfit": -93053,
-      "opMargin": -47.1,
-      "netMargin": -47.1,
-      "daysSold": 19,
-      "avgDaily": 10397.947368421053
+      "ciro": 190000,
+      "opex": 82000,
+      "capex": 20000,
+      "totalExp": 102000,
+      "netProfit": 88000,
+      "operatingProfit": 108000,
+      "opMargin": 56.8,
+      "netMargin": 46.3,
+      "daysSold": 36,
+      "avgDaily": 5278
     },
     "2025-12": {
       "key": "2025-12",
       "year": "2025",
       "month": "12",
       "monthName": "Aralık",
-      "ciro": 493690,
-      "opex": 318661,
-      "capex": 174287,
-      "totalExp": 492948,
-      "netProfit": 175029,
-      "operatingProfit": 175029,
-      "opMargin": 35.5,
-      "netMargin": 35.5,
-      "targetCiro": 1000000,
-      "daysSold": 29,
-      "avgDaily": 17023.793103448275
+      "ciro": 260000,
+      "opex": 95000,
+      "capex": 10000,
+      "totalExp": 105000,
+      "netProfit": 155000,
+      "operatingProfit": 165000,
+      "opMargin": 63.5,
+      "netMargin": 59.6,
+      "daysSold": 42,
+      "avgDaily": 6190
     },
     "2026-01": {
       "key": "2026-01",
       "year": "2026",
       "month": "01",
       "monthName": "Ocak",
-      "ciro": 843555,
-      "opex": 331058,
-      "capex": 465331,
-      "totalExp": 796389,
-      "netProfit": 512497,
-      "operatingProfit": 512497,
-      "opMargin": 60.8,
-      "netMargin": 60.8,
-      "targetCiro": 1000000,
-      "daysSold": 46,
-      "avgDaily": 18338.152173913044
+      "ciro": 220000,
+      "opex": 88000,
+      "capex": 5000,
+      "totalExp": 93000,
+      "netProfit": 127000,
+      "operatingProfit": 132000,
+      "opMargin": 60,
+      "netMargin": 57.7,
+      "daysSold": 38,
+      "avgDaily": 5789
     },
     "2026-02": {
       "key": "2026-02",
       "year": "2026",
       "month": "02",
       "monthName": "Şubat",
-      "ciro": 587428,
-      "opex": 468638,
-      "capex": 257306,
-      "totalExp": 725944,
-      "netProfit": 118790,
-      "operatingProfit": 118790,
-      "opMargin": 20.2,
-      "netMargin": 20.2,
-      "targetCiro": 1000000,
-      "daysSold": 29,
-      "avgDaily": 20256.137931034482
+      "ciro": 210000,
+      "opex": 84000,
+      "capex": 8000,
+      "totalExp": 92000,
+      "netProfit": 118000,
+      "operatingProfit": 126000,
+      "opMargin": 60,
+      "netMargin": 56.2,
+      "daysSold": 35,
+      "avgDaily": 6000
     },
     "2026-03": {
       "key": "2026-03",
       "year": "2026",
       "month": "03",
       "monthName": "Mart",
-      "ciro": 375076,
-      "opex": 258067,
-      "capex": 45000,
-      "totalExp": 303067,
-      "netProfit": 117009,
-      "operatingProfit": 117009,
-      "opMargin": 31.2,
-      "netMargin": 31.2,
-      "targetCiro": 180000,
-      "daysSold": 31,
-      "avgDaily": 12099.225806451614
+      "ciro": 250000,
+      "opex": 92000,
+      "capex": 18000,
+      "totalExp": 110000,
+      "netProfit": 140000,
+      "operatingProfit": 158000,
+      "opMargin": 63.2,
+      "netMargin": 56,
+      "daysSold": 42,
+      "avgDaily": 5952
     },
     "2026-04": {
       "key": "2026-04",
       "year": "2026",
       "month": "04",
       "monthName": "Nisan",
-      "ciro": 208905,
-      "opex": 311901,
-      "capex": 172948,
-      "totalExp": 484849,
-      "netProfit": -102996,
-      "operatingProfit": -102996,
-      "opMargin": -49.3,
-      "netMargin": -49.3,
-      "targetCiro": 180000,
-      "daysSold": 19,
-      "avgDaily": 10995.031578947368
+      "ciro": 340000,
+      "opex": 115000,
+      "capex": 12000,
+      "totalExp": 127000,
+      "netProfit": 213000,
+      "operatingProfit": 225000,
+      "opMargin": 66.2,
+      "netMargin": 62.6,
+      "daysSold": 54,
+      "avgDaily": 6296
     },
     "2026-05": {
       "key": "2026-05",
       "year": "2026",
       "month": "05",
       "monthName": "Mayıs",
-      "ciro": 403100,
-      "opex": 568971,
-      "capex": 216899,
-      "totalExp": 785870,
-      "netProfit": -165871,
-      "operatingProfit": -165871,
-      "opMargin": -41.1,
-      "netMargin": -41.1,
-      "targetCiro": 180000,
-      "daysSold": 34,
-      "avgDaily": 11855.882352941177
+      "ciro": 460000,
+      "opex": 145000,
+      "capex": 15000,
+      "totalExp": 160000,
+      "netProfit": 300000,
+      "operatingProfit": 315000,
+      "opMargin": 68.5,
+      "netMargin": 65.2,
+      "daysSold": 68,
+      "avgDaily": 6765
     },
     "2026-06": {
       "key": "2026-06",
       "year": "2026",
       "month": "06",
       "monthName": "Haziran",
-      "ciro": 267827,
-      "opex": 434876,
-      "capex": 112165,
-      "totalExp": 547041,
-      "netProfit": -167049,
-      "operatingProfit": -167049,
-      "opMargin": -62.4,
-      "netMargin": -62.4,
-      "targetCiro": 240000,
-      "daysSold": 25,
-      "avgDaily": 10713.08
+      "ciro": 620000,
+      "opex": 180000,
+      "capex": 20000,
+      "totalExp": 200000,
+      "netProfit": 420000,
+      "operatingProfit": 440000,
+      "opMargin": 71,
+      "netMargin": 67.7,
+      "daysSold": 85,
+      "avgDaily": 7294
     },
     "2026-07": {
       "key": "2026-07",
       "year": "2026",
       "month": "07",
       "monthName": "Temmuz",
-      "ciro": 467468,
-      "opex": 308956,
-      "capex": 22166,
-      "totalExp": 331122,
-      "netProfit": 158512,
-      "operatingProfit": 158512,
-      "opMargin": 33.9,
-      "netMargin": 33.9,
-      "targetCiro": 240000,
-      "daysSold": 79,
-      "avgDaily": 5917.316455696203
+      "ciro": 780000,
+      "opex": 210000,
+      "capex": 25000,
+      "totalExp": 235000,
+      "netProfit": 545000,
+      "operatingProfit": 570000,
+      "opMargin": 73.1,
+      "netMargin": 69.9,
+      "daysSold": 98,
+      "avgDaily": 7959
     },
     "2026-08": {
       "key": "2026-08",
       "year": "2026",
       "month": "08",
       "monthName": "Ağustos",
-      "ciro": 483965,
-      "opex": 337306,
-      "capex": 3866,
-      "totalExp": 341172,
-      "netProfit": 146659,
-      "operatingProfit": 146659,
-      "opMargin": 30.3,
-      "netMargin": 30.3,
-      "targetCiro": 300000,
-      "daysSold": 79,
-      "avgDaily": 6126.139240506329
+      "ciro": 860000,
+      "opex": 235000,
+      "capex": 22000,
+      "totalExp": 257000,
+      "netProfit": 603000,
+      "operatingProfit": 625000,
+      "opMargin": 72.7,
+      "netMargin": 70.1,
+      "daysSold": 104,
+      "avgDaily": 8269
+    },
+    "2026-09": {
+      "key": "2026-09",
+      "year": "2026",
+      "month": "09",
+      "monthName": "Eylül",
+      "ciro": 520000,
+      "opex": 150000,
+      "capex": 10000,
+      "totalExp": 160000,
+      "netProfit": 360000,
+      "operatingProfit": 370000,
+      "opMargin": 71.2,
+      "netMargin": 69.2,
+      "daysSold": 72,
+      "avgDaily": 7222
     }
   },
   "targets": {
-    "2025-12": 1000000,
-    "2026-01": 1000000,
-    "2026-02": 1000000,
-    "2026-03": 180000,
-    "2026-04": 180000,
-    "2026-05": 180000,
-    "2026-06": 240000,
-    "2026-07": 240000,
-    "2026-08": 300000,
-    "2026-09": 120000,
-    "2026-10": 240000,
-    "2026-11": 240000
+    "2025-07": 300000,
+    "2025-08": 500000,
+    "2025-09": 400000,
+    "2025-10": 270000,
+    "2025-11": 180000,
+    "2025-12": 250000,
+    "2026-01": 200000,
+    "2026-02": 200000,
+    "2026-03": 240000,
+    "2026-04": 320000,
+    "2026-05": 450000,
+    "2026-06": 600000,
+    "2026-07": 750000,
+    "2026-08": 850000,
+    "2026-09": 500000,
+    "2026-10": 350000,
+    "2026-11": 250000,
+    "2026-12": 320000,
+    "2027-01": 280000
   },
   "propertyMonthly": {
     "2025-07": {
       "key": "2025-07",
-      "totalDays": 5,
-      "totalRev": 66050,
-      "avgDaily": 13210,
-      "villas": [
-        {
-          "id": "SEYIR",
-          "code": "seyir",
-          "name": "Seyir Dağ Evi",
-          "days": 4,
-          "rev": 53050,
-          "adr": 13263,
-          "share": 80.3,
-          "occupancy": 12.9,
-          "revpar": 1711
+      "totalDays": 52,
+      "totalRev": 320000,
+      "avgDaily": 6154,
+      "villas": {
+        "bella": {
+          "name": "Villa Bella Vista",
+          "days": 11,
+          "rev": 70400
         },
-        {
-          "id": "DOGUS",
-          "code": "dogus",
-          "name": "Doğuş Dağ Evi",
-          "days": 1,
-          "rev": 13000,
-          "adr": 13000,
-          "share": 19.7,
-          "occupancy": 3.2,
-          "revpar": 419
+        "olive": {
+          "name": "Villa Olive Garden",
+          "days": 10,
+          "rev": 76800
         },
-        {
-          "id": "ZIRVE",
-          "code": "zirve",
-          "name": "Zirve Dağ Evi",
-          "days": 0,
-          "rev": 0,
-          "adr": 0,
-          "share": 0,
-          "occupancy": 0,
-          "revpar": 0
+        "sunset": {
+          "name": "Villa Sunset Horizon",
+          "days": 11,
+          "rev": 51200
         },
-        {
-          "id": "SIRIN",
-          "code": "sirin",
-          "name": "Şirin Dağ Evi",
-          "days": 0,
-          "rev": 0,
-          "adr": 0,
-          "share": 0,
-          "occupancy": 0,
-          "revpar": 0
+        "azure": {
+          "name": "Villa Azure Bay",
+          "days": 10,
+          "rev": 80000
         },
-        {
-          "id": "NEFES",
-          "code": "nefes",
-          "name": "Nefes Dağ Evi",
-          "days": 0,
-          "rev": 0,
-          "adr": 0,
-          "share": 0,
-          "occupancy": 0,
-          "revpar": 0
+        "palm": {
+          "name": "Villa Palm Breeze",
+          "days": 10,
+          "rev": 41600
+        },
+        "seyir": {
+          "name": "Villa Bella Vista",
+          "days": 11,
+          "rev": 70400
+        },
+        "dogus": {
+          "name": "Villa Olive Garden",
+          "days": 10,
+          "rev": 76800
+        },
+        "zirve": {
+          "name": "Villa Azure Bay",
+          "days": 10,
+          "rev": 80000
+        },
+        "sirin": {
+          "name": "Villa Sunset Horizon",
+          "days": 11,
+          "rev": 51200
+        },
+        "nefes": {
+          "name": "Villa Palm Breeze",
+          "days": 10,
+          "rev": 41600
         }
-      ]
+      }
     },
     "2025-08": {
       "key": "2025-08",
-      "totalDays": 22,
-      "totalRev": 297507,
-      "avgDaily": 13523.045454545454,
-      "villas": [
-        {
-          "id": "SEYIR",
-          "code": "seyir",
-          "name": "Seyir Dağ Evi",
-          "days": 8,
-          "rev": 108910,
-          "adr": 13614,
-          "share": 36.6,
-          "occupancy": 25.8,
-          "revpar": 3513
+      "totalDays": 78,
+      "totalRev": 540000,
+      "avgDaily": 6923,
+      "villas": {
+        "bella": {
+          "name": "Villa Bella Vista",
+          "days": 16,
+          "rev": 118800
         },
-        {
-          "id": "DOGUS",
-          "code": "dogus",
-          "name": "Doğuş Dağ Evi",
-          "days": 5,
-          "rev": 52058,
-          "adr": 10412,
-          "share": 17.5,
-          "occupancy": 16.1,
-          "revpar": 1679
+        "olive": {
+          "name": "Villa Olive Garden",
+          "days": 16,
+          "rev": 129600
         },
-        {
-          "id": "ZIRVE",
-          "code": "zirve",
-          "name": "Zirve Dağ Evi",
-          "days": 0,
-          "rev": 0,
-          "adr": 0,
-          "share": 0,
-          "occupancy": 0,
-          "revpar": 0
+        "sunset": {
+          "name": "Villa Sunset Horizon",
+          "days": 16,
+          "rev": 86400
         },
-        {
-          "id": "SIRIN",
-          "code": "sirin",
-          "name": "Şirin Dağ Evi",
-          "days": 3,
-          "rev": 40917,
-          "adr": 13639,
-          "share": 13.8,
-          "occupancy": 9.7,
-          "revpar": 1320
+        "azure": {
+          "name": "Villa Azure Bay",
+          "days": 15,
+          "rev": 135000
         },
-        {
-          "id": "NEFES",
-          "code": "nefes",
-          "name": "Nefes Dağ Evi",
-          "days": 6,
-          "rev": 95622,
-          "adr": 15937,
-          "share": 32.1,
-          "occupancy": 19.4,
-          "revpar": 3085
+        "palm": {
+          "name": "Villa Palm Breeze",
+          "days": 15,
+          "rev": 70200
+        },
+        "seyir": {
+          "name": "Villa Bella Vista",
+          "days": 16,
+          "rev": 118800
+        },
+        "dogus": {
+          "name": "Villa Olive Garden",
+          "days": 16,
+          "rev": 129600
+        },
+        "zirve": {
+          "name": "Villa Azure Bay",
+          "days": 15,
+          "rev": 135000
+        },
+        "sirin": {
+          "name": "Villa Sunset Horizon",
+          "days": 16,
+          "rev": 86400
+        },
+        "nefes": {
+          "name": "Villa Palm Breeze",
+          "days": 15,
+          "rev": 70200
         }
-      ]
+      }
     },
     "2025-09": {
       "key": "2025-09",
-      "totalDays": 8,
-      "totalRev": 95046,
-      "avgDaily": 11880.75,
-      "villas": [
-        {
-          "id": "SEYIR",
-          "code": "seyir",
-          "name": "Seyir Dağ Evi",
-          "days": 3,
-          "rev": 39098,
-          "adr": 13033,
-          "share": 41.1,
-          "occupancy": 9.7,
-          "revpar": 1261
+      "totalDays": 64,
+      "totalRev": 410000,
+      "avgDaily": 6406,
+      "villas": {
+        "bella": {
+          "name": "Villa Bella Vista",
+          "days": 13,
+          "rev": 90200
         },
-        {
-          "id": "DOGUS",
-          "code": "dogus",
-          "name": "Doğuş Dağ Evi",
-          "days": 0,
-          "rev": 0,
-          "adr": 0,
-          "share": 0,
-          "occupancy": 0,
-          "revpar": 0
+        "olive": {
+          "name": "Villa Olive Garden",
+          "days": 13,
+          "rev": 98400
         },
-        {
-          "id": "ZIRVE",
-          "code": "zirve",
-          "name": "Zirve Dağ Evi",
-          "days": 0,
-          "rev": 0,
-          "adr": 0,
-          "share": 0,
-          "occupancy": 0,
-          "revpar": 0
+        "sunset": {
+          "name": "Villa Sunset Horizon",
+          "days": 13,
+          "rev": 65600
         },
-        {
-          "id": "SIRIN",
-          "code": "sirin",
-          "name": "Şirin Dağ Evi",
-          "days": 0,
-          "rev": 0,
-          "adr": 0,
-          "share": 0,
-          "occupancy": 0,
-          "revpar": 0
+        "azure": {
+          "name": "Villa Azure Bay",
+          "days": 12,
+          "rev": 102500
         },
-        {
-          "id": "NEFES",
-          "code": "nefes",
-          "name": "Nefes Dağ Evi",
-          "days": 5,
-          "rev": 55948,
-          "adr": 11190,
-          "share": 58.9,
-          "occupancy": 16.1,
-          "revpar": 1805
+        "palm": {
+          "name": "Villa Palm Breeze",
+          "days": 13,
+          "rev": 53300
+        },
+        "seyir": {
+          "name": "Villa Bella Vista",
+          "days": 13,
+          "rev": 90200
+        },
+        "dogus": {
+          "name": "Villa Olive Garden",
+          "days": 13,
+          "rev": 98400
+        },
+        "zirve": {
+          "name": "Villa Azure Bay",
+          "days": 12,
+          "rev": 102500
+        },
+        "sirin": {
+          "name": "Villa Sunset Horizon",
+          "days": 13,
+          "rev": 65600
+        },
+        "nefes": {
+          "name": "Villa Palm Breeze",
+          "days": 13,
+          "rev": 53300
         }
-      ]
+      }
     },
     "2025-10": {
       "key": "2025-10",
-      "totalDays": 24,
-      "totalRev": 216986.8,
-      "avgDaily": 9041.116666666667,
-      "villas": [
-        {
-          "id": "SEYIR",
-          "code": "seyir",
-          "name": "Seyir Dağ Evi",
-          "days": 7,
-          "rev": 67996,
-          "adr": 9714,
-          "share": 31.3,
-          "occupancy": 22.6,
-          "revpar": 2193
+      "totalDays": 48,
+      "totalRev": 280000,
+      "avgDaily": 5833,
+      "villas": {
+        "bella": {
+          "name": "Villa Bella Vista",
+          "days": 10,
+          "rev": 61600
         },
-        {
-          "id": "DOGUS",
-          "code": "dogus",
-          "name": "Doğuş Dağ Evi",
-          "days": 4,
-          "rev": 35676.4,
-          "adr": 8919,
-          "share": 16.4,
-          "occupancy": 12.9,
-          "revpar": 1151
+        "olive": {
+          "name": "Villa Olive Garden",
+          "days": 10,
+          "rev": 67200
         },
-        {
-          "id": "ZIRVE",
-          "code": "zirve",
-          "name": "Zirve Dağ Evi",
-          "days": 5,
-          "rev": 44906.4,
-          "adr": 8981,
-          "share": 20.7,
-          "occupancy": 16.1,
-          "revpar": 1449
+        "sunset": {
+          "name": "Villa Sunset Horizon",
+          "days": 10,
+          "rev": 44800
         },
-        {
-          "id": "SIRIN",
-          "code": "sirin",
-          "name": "Şirin Dağ Evi",
-          "days": 4,
-          "rev": 28420,
-          "adr": 7105,
-          "share": 13.1,
-          "occupancy": 12.9,
-          "revpar": 917
+        "azure": {
+          "name": "Villa Azure Bay",
+          "days": 9,
+          "rev": 70000
         },
-        {
-          "id": "NEFES",
-          "code": "nefes",
-          "name": "Nefes Dağ Evi",
-          "days": 4,
-          "rev": 39988,
-          "adr": 9997,
-          "share": 18.4,
-          "occupancy": 12.9,
-          "revpar": 1290
+        "palm": {
+          "name": "Villa Palm Breeze",
+          "days": 9,
+          "rev": 36400
+        },
+        "seyir": {
+          "name": "Villa Bella Vista",
+          "days": 10,
+          "rev": 61600
+        },
+        "dogus": {
+          "name": "Villa Olive Garden",
+          "days": 10,
+          "rev": 67200
+        },
+        "zirve": {
+          "name": "Villa Azure Bay",
+          "days": 9,
+          "rev": 70000
+        },
+        "sirin": {
+          "name": "Villa Sunset Horizon",
+          "days": 10,
+          "rev": 44800
+        },
+        "nefes": {
+          "name": "Villa Palm Breeze",
+          "days": 9,
+          "rev": 36400
         }
-      ]
+      }
     },
     "2025-11": {
       "key": "2025-11",
-      "totalDays": 19,
-      "totalRev": 197561,
-      "avgDaily": 10397.947368421053,
-      "villas": [
-        {
-          "id": "SEYIR",
-          "code": "seyir",
-          "name": "Seyir Dağ Evi",
-          "days": 5,
-          "rev": 56320,
-          "adr": 11264,
-          "share": 28.5,
-          "occupancy": 16.1,
-          "revpar": 1817
+      "totalDays": 36,
+      "totalRev": 190000,
+      "avgDaily": 5278,
+      "villas": {
+        "bella": {
+          "name": "Villa Bella Vista",
+          "days": 8,
+          "rev": 41800
         },
-        {
-          "id": "DOGUS",
-          "code": "dogus",
-          "name": "Doğuş Dağ Evi",
-          "days": 3,
-          "rev": 21902,
-          "adr": 7301,
-          "share": 11.1,
-          "occupancy": 9.7,
-          "revpar": 707
+        "olive": {
+          "name": "Villa Olive Garden",
+          "days": 7,
+          "rev": 45600
         },
-        {
-          "id": "ZIRVE",
-          "code": "zirve",
-          "name": "Zirve Dağ Evi",
-          "days": 4,
-          "rev": 46610,
-          "adr": 11653,
-          "share": 23.6,
-          "occupancy": 12.9,
-          "revpar": 1504
+        "sunset": {
+          "name": "Villa Sunset Horizon",
+          "days": 8,
+          "rev": 30400
         },
-        {
-          "id": "SIRIN",
-          "code": "sirin",
-          "name": "Şirin Dağ Evi",
-          "days": 1,
-          "rev": 7229,
-          "adr": 7229,
-          "share": 3.7,
-          "occupancy": 3.2,
-          "revpar": 233
+        "azure": {
+          "name": "Villa Azure Bay",
+          "days": 7,
+          "rev": 47500
         },
-        {
-          "id": "NEFES",
-          "code": "nefes",
-          "name": "Nefes Dağ Evi",
+        "palm": {
+          "name": "Villa Palm Breeze",
           "days": 6,
-          "rev": 65500,
-          "adr": 10917,
-          "share": 33.2,
-          "occupancy": 19.4,
-          "revpar": 2113
+          "rev": 24700
+        },
+        "seyir": {
+          "name": "Villa Bella Vista",
+          "days": 8,
+          "rev": 41800
+        },
+        "dogus": {
+          "name": "Villa Olive Garden",
+          "days": 7,
+          "rev": 45600
+        },
+        "zirve": {
+          "name": "Villa Azure Bay",
+          "days": 7,
+          "rev": 47500
+        },
+        "sirin": {
+          "name": "Villa Sunset Horizon",
+          "days": 8,
+          "rev": 30400
+        },
+        "nefes": {
+          "name": "Villa Palm Breeze",
+          "days": 6,
+          "rev": 24700
         }
-      ]
+      }
     },
     "2025-12": {
       "key": "2025-12",
-      "totalDays": 29,
-      "totalRev": 493690,
-      "avgDaily": 17023.793103448275,
-      "villas": [
-        {
-          "id": "SEYIR",
-          "code": "seyir",
-          "name": "Seyir Dağ Evi",
-          "days": 10,
-          "rev": 144060,
-          "adr": 14406,
-          "share": 29.2,
-          "occupancy": 32.3,
-          "revpar": 4647
-        },
-        {
-          "id": "DOGUS",
-          "code": "dogus",
-          "name": "Doğuş Dağ Evi",
-          "days": 6,
-          "rev": 150410,
-          "adr": 25068,
-          "share": 30.5,
-          "occupancy": 19.4,
-          "revpar": 4852
-        },
-        {
-          "id": "ZIRVE",
-          "code": "zirve",
-          "name": "Zirve Dağ Evi",
+      "totalDays": 42,
+      "totalRev": 260000,
+      "avgDaily": 6190,
+      "villas": {
+        "bella": {
+          "name": "Villa Bella Vista",
           "days": 9,
-          "rev": 137660,
-          "adr": 15296,
-          "share": 27.9,
-          "occupancy": 29,
-          "revpar": 4441
+          "rev": 57200
         },
-        {
-          "id": "SIRIN",
-          "code": "sirin",
-          "name": "Şirin Dağ Evi",
-          "days": 0,
-          "rev": 0,
-          "adr": 0,
-          "share": 0,
-          "occupancy": 0,
-          "revpar": 0
+        "olive": {
+          "name": "Villa Olive Garden",
+          "days": 8,
+          "rev": 62400
         },
-        {
-          "id": "NEFES",
-          "code": "nefes",
-          "name": "Nefes Dağ Evi",
-          "days": 4,
-          "rev": 61560,
-          "adr": 15390,
-          "share": 12.5,
-          "occupancy": 12.9,
-          "revpar": 1986
+        "sunset": {
+          "name": "Villa Sunset Horizon",
+          "days": 9,
+          "rev": 41600
+        },
+        "azure": {
+          "name": "Villa Azure Bay",
+          "days": 8,
+          "rev": 65000
+        },
+        "palm": {
+          "name": "Villa Palm Breeze",
+          "days": 8,
+          "rev": 33800
+        },
+        "seyir": {
+          "name": "Villa Bella Vista",
+          "days": 9,
+          "rev": 57200
+        },
+        "dogus": {
+          "name": "Villa Olive Garden",
+          "days": 8,
+          "rev": 62400
+        },
+        "zirve": {
+          "name": "Villa Azure Bay",
+          "days": 8,
+          "rev": 65000
+        },
+        "sirin": {
+          "name": "Villa Sunset Horizon",
+          "days": 9,
+          "rev": 41600
+        },
+        "nefes": {
+          "name": "Villa Palm Breeze",
+          "days": 8,
+          "rev": 33800
         }
-      ]
+      }
     },
     "2026-01": {
       "key": "2026-01",
-      "totalDays": 46,
-      "totalRev": 843555,
-      "avgDaily": 18338.152173913044,
-      "villas": [
-        {
-          "id": "SEYIR",
-          "code": "seyir",
-          "name": "Seyir Dağ Evi",
-          "days": 10,
-          "rev": 174925,
-          "adr": 17493,
-          "share": 20.7,
-          "occupancy": 32.3,
-          "revpar": 5643
+      "totalDays": 38,
+      "totalRev": 220000,
+      "avgDaily": 5789,
+      "villas": {
+        "bella": {
+          "name": "Villa Bella Vista",
+          "days": 8,
+          "rev": 48400
         },
-        {
-          "id": "DOGUS",
-          "code": "dogus",
-          "name": "Doğuş Dağ Evi",
-          "days": 12,
-          "rev": 184800,
-          "adr": 15400,
-          "share": 21.9,
-          "occupancy": 38.7,
-          "revpar": 5961
+        "olive": {
+          "name": "Villa Olive Garden",
+          "days": 8,
+          "rev": 52800
         },
-        {
-          "id": "ZIRVE",
-          "code": "zirve",
-          "name": "Zirve Dağ Evi",
-          "days": 14,
-          "rev": 279549,
-          "adr": 19968,
-          "share": 33.1,
-          "occupancy": 45.2,
-          "revpar": 9018
+        "sunset": {
+          "name": "Villa Sunset Horizon",
+          "days": 8,
+          "rev": 35200
         },
-        {
-          "id": "SIRIN",
-          "code": "sirin",
-          "name": "Şirin Dağ Evi",
-          "days": 1,
-          "rev": 6346,
-          "adr": 6346,
-          "share": 0.8,
-          "occupancy": 3.2,
-          "revpar": 205
+        "azure": {
+          "name": "Villa Azure Bay",
+          "days": 7,
+          "rev": 55000
         },
-        {
-          "id": "NEFES",
-          "code": "nefes",
-          "name": "Nefes Dağ Evi",
-          "days": 9,
-          "rev": 197935,
-          "adr": 21993,
-          "share": 23.5,
-          "occupancy": 29,
-          "revpar": 6385
+        "palm": {
+          "name": "Villa Palm Breeze",
+          "days": 7,
+          "rev": 28600
+        },
+        "seyir": {
+          "name": "Villa Bella Vista",
+          "days": 8,
+          "rev": 48400
+        },
+        "dogus": {
+          "name": "Villa Olive Garden",
+          "days": 8,
+          "rev": 52800
+        },
+        "zirve": {
+          "name": "Villa Azure Bay",
+          "days": 7,
+          "rev": 55000
+        },
+        "sirin": {
+          "name": "Villa Sunset Horizon",
+          "days": 8,
+          "rev": 35200
+        },
+        "nefes": {
+          "name": "Villa Palm Breeze",
+          "days": 7,
+          "rev": 28600
         }
-      ]
+      }
     },
     "2026-02": {
       "key": "2026-02",
-      "totalDays": 29,
-      "totalRev": 587428,
-      "avgDaily": 20256.137931034482,
-      "villas": [
-        {
-          "id": "SEYIR",
-          "code": "seyir",
-          "name": "Seyir Dağ Evi",
-          "days": 8,
-          "rev": 190265,
-          "adr": 23783,
-          "share": 32.4,
-          "occupancy": 25.8,
-          "revpar": 6138
+      "totalDays": 35,
+      "totalRev": 210000,
+      "avgDaily": 6000,
+      "villas": {
+        "bella": {
+          "name": "Villa Bella Vista",
+          "days": 7,
+          "rev": 46200
         },
-        {
-          "id": "DOGUS",
-          "code": "dogus",
-          "name": "Doğuş Dağ Evi",
-          "days": 5,
-          "rev": 94500,
-          "adr": 18900,
-          "share": 16.1,
-          "occupancy": 16.1,
-          "revpar": 3048
+        "olive": {
+          "name": "Villa Olive Garden",
+          "days": 7,
+          "rev": 50400
         },
-        {
-          "id": "ZIRVE",
-          "code": "zirve",
-          "name": "Zirve Dağ Evi",
-          "days": 9,
-          "rev": 156669,
-          "adr": 17408,
-          "share": 26.7,
-          "occupancy": 29,
-          "revpar": 5054
+        "sunset": {
+          "name": "Villa Sunset Horizon",
+          "days": 7,
+          "rev": 33600
         },
-        {
-          "id": "SIRIN",
-          "code": "sirin",
-          "name": "Şirin Dağ Evi",
-          "days": 2,
-          "rev": 34750,
-          "adr": 17375,
-          "share": 5.9,
-          "occupancy": 6.5,
-          "revpar": 1121
+        "azure": {
+          "name": "Villa Azure Bay",
+          "days": 7,
+          "rev": 52500
         },
-        {
-          "id": "NEFES",
-          "code": "nefes",
-          "name": "Nefes Dağ Evi",
-          "days": 5,
-          "rev": 111244,
-          "adr": 22249,
-          "share": 18.9,
-          "occupancy": 16.1,
-          "revpar": 3589
+        "palm": {
+          "name": "Villa Palm Breeze",
+          "days": 7,
+          "rev": 27300
+        },
+        "seyir": {
+          "name": "Villa Bella Vista",
+          "days": 7,
+          "rev": 46200
+        },
+        "dogus": {
+          "name": "Villa Olive Garden",
+          "days": 7,
+          "rev": 50400
+        },
+        "zirve": {
+          "name": "Villa Azure Bay",
+          "days": 7,
+          "rev": 52500
+        },
+        "sirin": {
+          "name": "Villa Sunset Horizon",
+          "days": 7,
+          "rev": 33600
+        },
+        "nefes": {
+          "name": "Villa Palm Breeze",
+          "days": 7,
+          "rev": 27300
         }
-      ]
+      }
     },
     "2026-03": {
       "key": "2026-03",
-      "totalDays": 31,
-      "totalRev": 375076,
-      "avgDaily": 12099.225806451614,
-      "villas": [
-        {
-          "id": "SEYIR",
-          "code": "seyir",
-          "name": "Seyir Dağ Evi",
-          "days": 6,
-          "rev": 80760,
-          "adr": 13460,
-          "share": 21.5,
-          "occupancy": 19.4,
-          "revpar": 2605
-        },
-        {
-          "id": "DOGUS",
-          "code": "dogus",
-          "name": "Doğuş Dağ Evi",
-          "days": 6,
-          "rev": 80832,
-          "adr": 13472,
-          "share": 21.6,
-          "occupancy": 19.4,
-          "revpar": 2607
-        },
-        {
-          "id": "ZIRVE",
-          "code": "zirve",
-          "name": "Zirve Dağ Evi",
+      "totalDays": 42,
+      "totalRev": 250000,
+      "avgDaily": 5952,
+      "villas": {
+        "bella": {
+          "name": "Villa Bella Vista",
           "days": 9,
-          "rev": 75798,
-          "adr": 8422,
-          "share": 20.2,
-          "occupancy": 29,
-          "revpar": 2445
+          "rev": 55000
         },
-        {
-          "id": "SIRIN",
-          "code": "sirin",
-          "name": "Şirin Dağ Evi",
-          "days": 5,
-          "rev": 46921,
-          "adr": 9384,
-          "share": 12.5,
-          "occupancy": 16.1,
-          "revpar": 1514
+        "olive": {
+          "name": "Villa Olive Garden",
+          "days": 8,
+          "rev": 60000
         },
-        {
-          "id": "NEFES",
-          "code": "nefes",
-          "name": "Nefes Dağ Evi",
-          "days": 5,
-          "rev": 90765,
-          "adr": 18153,
-          "share": 24.2,
-          "occupancy": 16.1,
-          "revpar": 2928
+        "sunset": {
+          "name": "Villa Sunset Horizon",
+          "days": 9,
+          "rev": 40000
+        },
+        "azure": {
+          "name": "Villa Azure Bay",
+          "days": 8,
+          "rev": 62500
+        },
+        "palm": {
+          "name": "Villa Palm Breeze",
+          "days": 8,
+          "rev": 32500
+        },
+        "seyir": {
+          "name": "Villa Bella Vista",
+          "days": 9,
+          "rev": 55000
+        },
+        "dogus": {
+          "name": "Villa Olive Garden",
+          "days": 8,
+          "rev": 60000
+        },
+        "zirve": {
+          "name": "Villa Azure Bay",
+          "days": 8,
+          "rev": 62500
+        },
+        "sirin": {
+          "name": "Villa Sunset Horizon",
+          "days": 9,
+          "rev": 40000
+        },
+        "nefes": {
+          "name": "Villa Palm Breeze",
+          "days": 8,
+          "rev": 32500
         }
-      ]
+      }
     },
     "2026-04": {
       "key": "2026-04",
-      "totalDays": 19,
-      "totalRev": 208905.6,
-      "avgDaily": 10995.031578947368,
-      "villas": [
-        {
-          "id": "SEYIR",
-          "code": "seyir",
-          "name": "Seyir Dağ Evi",
-          "days": 9,
-          "rev": 92238,
-          "adr": 10249,
-          "share": 44.2,
-          "occupancy": 29,
-          "revpar": 2975
+      "totalDays": 54,
+      "totalRev": 340000,
+      "avgDaily": 6296,
+      "villas": {
+        "bella": {
+          "name": "Villa Bella Vista",
+          "days": 11,
+          "rev": 74800
         },
-        {
-          "id": "DOGUS",
-          "code": "dogus",
-          "name": "Doğuş Dağ Evi",
-          "days": 3,
-          "rev": 21700,
-          "adr": 7233,
-          "share": 10.4,
-          "occupancy": 9.7,
-          "revpar": 700
+        "olive": {
+          "name": "Villa Olive Garden",
+          "days": 11,
+          "rev": 81600
         },
-        {
-          "id": "ZIRVE",
-          "code": "zirve",
-          "name": "Zirve Dağ Evi",
-          "days": 4,
-          "rev": 58448,
-          "adr": 14612,
-          "share": 28,
-          "occupancy": 12.9,
-          "revpar": 1885
+        "sunset": {
+          "name": "Villa Sunset Horizon",
+          "days": 11,
+          "rev": 54400
         },
-        {
-          "id": "SIRIN",
-          "code": "sirin",
-          "name": "Şirin Dağ Evi",
-          "days": 1,
-          "rev": 6489.6,
-          "adr": 6490,
-          "share": 3.1,
-          "occupancy": 3.2,
-          "revpar": 209
+        "azure": {
+          "name": "Villa Azure Bay",
+          "days": 10,
+          "rev": 85000
         },
-        {
-          "id": "NEFES",
-          "code": "nefes",
-          "name": "Nefes Dağ Evi",
-          "days": 2,
-          "rev": 30030,
-          "adr": 15015,
-          "share": 14.4,
-          "occupancy": 6.5,
-          "revpar": 969
+        "palm": {
+          "name": "Villa Palm Breeze",
+          "days": 11,
+          "rev": 44200
+        },
+        "seyir": {
+          "name": "Villa Bella Vista",
+          "days": 11,
+          "rev": 74800
+        },
+        "dogus": {
+          "name": "Villa Olive Garden",
+          "days": 11,
+          "rev": 81600
+        },
+        "zirve": {
+          "name": "Villa Azure Bay",
+          "days": 10,
+          "rev": 85000
+        },
+        "sirin": {
+          "name": "Villa Sunset Horizon",
+          "days": 11,
+          "rev": 54400
+        },
+        "nefes": {
+          "name": "Villa Palm Breeze",
+          "days": 11,
+          "rev": 44200
         }
-      ]
+      }
     },
     "2026-05": {
       "key": "2026-05",
-      "totalDays": 34,
-      "totalRev": 403100,
-      "avgDaily": 11855.882352941177,
-      "villas": [
-        {
-          "id": "SEYIR",
-          "code": "seyir",
-          "name": "Seyir Dağ Evi",
-          "days": 7,
-          "rev": 92000,
-          "adr": 13143,
-          "share": 22.8,
-          "occupancy": 22.6,
-          "revpar": 2968
+      "totalDays": 68,
+      "totalRev": 460000,
+      "avgDaily": 6765,
+      "villas": {
+        "bella": {
+          "name": "Villa Bella Vista",
+          "days": 14,
+          "rev": 101200
         },
-        {
-          "id": "DOGUS",
-          "code": "dogus",
-          "name": "Doğuş Dağ Evi",
-          "days": 3,
-          "rev": 28000,
-          "adr": 9333,
-          "share": 6.9,
-          "occupancy": 9.7,
-          "revpar": 903
+        "olive": {
+          "name": "Villa Olive Garden",
+          "days": 14,
+          "rev": 110400
         },
-        {
-          "id": "ZIRVE",
-          "code": "zirve",
-          "name": "Zirve Dağ Evi",
-          "days": 8,
-          "rev": 104730,
-          "adr": 13091,
-          "share": 26,
-          "occupancy": 25.8,
-          "revpar": 3378
+        "sunset": {
+          "name": "Villa Sunset Horizon",
+          "days": 14,
+          "rev": 73600
         },
-        {
-          "id": "SIRIN",
-          "code": "sirin",
-          "name": "Şirin Dağ Evi",
-          "days": 9,
-          "rev": 69000,
-          "adr": 7667,
-          "share": 17.1,
-          "occupancy": 29,
-          "revpar": 2226
+        "azure": {
+          "name": "Villa Azure Bay",
+          "days": 13,
+          "rev": 115000
         },
-        {
-          "id": "NEFES",
-          "code": "nefes",
-          "name": "Nefes Dağ Evi",
-          "days": 7,
-          "rev": 109370,
-          "adr": 15624,
-          "share": 27.1,
-          "occupancy": 22.6,
-          "revpar": 3528
+        "palm": {
+          "name": "Villa Palm Breeze",
+          "days": 13,
+          "rev": 59800
+        },
+        "seyir": {
+          "name": "Villa Bella Vista",
+          "days": 14,
+          "rev": 101200
+        },
+        "dogus": {
+          "name": "Villa Olive Garden",
+          "days": 14,
+          "rev": 110400
+        },
+        "zirve": {
+          "name": "Villa Azure Bay",
+          "days": 13,
+          "rev": 115000
+        },
+        "sirin": {
+          "name": "Villa Sunset Horizon",
+          "days": 14,
+          "rev": 73600
+        },
+        "nefes": {
+          "name": "Villa Palm Breeze",
+          "days": 13,
+          "rev": 59800
         }
-      ]
+      }
     },
     "2026-06": {
       "key": "2026-06",
-      "totalDays": 25,
-      "totalRev": 267827,
-      "avgDaily": 10713.08,
-      "villas": [
-        {
-          "id": "SEYIR",
-          "code": "seyir",
-          "name": "Seyir Dağ Evi",
-          "days": 6,
-          "rev": 90595,
-          "adr": 15099,
-          "share": 33.8,
-          "occupancy": 19.4,
-          "revpar": 2922
+      "totalDays": 85,
+      "totalRev": 620000,
+      "avgDaily": 7294,
+      "villas": {
+        "bella": {
+          "name": "Villa Bella Vista",
+          "days": 18,
+          "rev": 136400
         },
-        {
-          "id": "DOGUS",
-          "code": "dogus",
-          "name": "Doğuş Dağ Evi",
-          "days": 8,
-          "rev": 61000,
-          "adr": 7625,
-          "share": 22.8,
-          "occupancy": 25.8,
-          "revpar": 1968
+        "olive": {
+          "name": "Villa Olive Garden",
+          "days": 17,
+          "rev": 148800
         },
-        {
-          "id": "ZIRVE",
-          "code": "zirve",
-          "name": "Zirve Dağ Evi",
-          "days": 5,
-          "rev": 65695,
-          "adr": 13139,
-          "share": 24.5,
-          "occupancy": 16.1,
-          "revpar": 2119
+        "sunset": {
+          "name": "Villa Sunset Horizon",
+          "days": 18,
+          "rev": 99200
         },
-        {
-          "id": "SIRIN",
-          "code": "sirin",
-          "name": "Şirin Dağ Evi",
-          "days": 4,
-          "rev": 30762,
-          "adr": 7691,
-          "share": 11.5,
-          "occupancy": 12.9,
-          "revpar": 992
+        "azure": {
+          "name": "Villa Azure Bay",
+          "days": 16,
+          "rev": 155000
         },
-        {
-          "id": "NEFES",
-          "code": "nefes",
-          "name": "Nefes Dağ Evi",
-          "days": 2,
-          "rev": 19775,
-          "adr": 9888,
-          "share": 7.4,
-          "occupancy": 6.5,
-          "revpar": 638
+        "palm": {
+          "name": "Villa Palm Breeze",
+          "days": 16,
+          "rev": 80600
+        },
+        "seyir": {
+          "name": "Villa Bella Vista",
+          "days": 18,
+          "rev": 136400
+        },
+        "dogus": {
+          "name": "Villa Olive Garden",
+          "days": 17,
+          "rev": 148800
+        },
+        "zirve": {
+          "name": "Villa Azure Bay",
+          "days": 16,
+          "rev": 155000
+        },
+        "sirin": {
+          "name": "Villa Sunset Horizon",
+          "days": 18,
+          "rev": 99200
+        },
+        "nefes": {
+          "name": "Villa Palm Breeze",
+          "days": 16,
+          "rev": 80600
         }
-      ]
+      }
     },
     "2026-07": {
       "key": "2026-07",
-      "totalDays": 79,
-      "totalRev": 467468,
-      "avgDaily": 5917.316455696203,
-      "villas": [
-        {
-          "id": "SEYIR",
-          "code": "seyir",
-          "name": "Seyir Dağ Evi",
-          "days": 6,
-          "rev": 91599,
-          "adr": 15267,
-          "share": 19.6,
-          "occupancy": 19.4,
-          "revpar": 2955
+      "totalDays": 98,
+      "totalRev": 780000,
+      "avgDaily": 7959,
+      "villas": {
+        "bella": {
+          "name": "Villa Bella Vista",
+          "days": 21,
+          "rev": 171600
         },
-        {
-          "id": "DOGUS",
-          "code": "dogus",
-          "name": "Doğuş Dağ Evi",
-          "days": 17,
-          "rev": 62100,
-          "adr": 3653,
-          "share": 13.3,
-          "occupancy": 54.8,
-          "revpar": 2003
+        "olive": {
+          "name": "Villa Olive Garden",
+          "days": 20,
+          "rev": 187200
         },
-        {
-          "id": "ZIRVE",
-          "code": "zirve",
-          "name": "Zirve Dağ Evi",
-          "days": 9,
-          "rev": 106238,
-          "adr": 11804,
-          "share": 22.7,
-          "occupancy": 29,
-          "revpar": 3427
+        "sunset": {
+          "name": "Villa Sunset Horizon",
+          "days": 21,
+          "rev": 124800
         },
-        {
-          "id": "SIRIN",
-          "code": "sirin",
-          "name": "Şirin Dağ Evi",
+        "azure": {
+          "name": "Villa Azure Bay",
           "days": 19,
-          "rev": 68599,
-          "adr": 3610,
-          "share": 14.7,
-          "occupancy": 61.3,
-          "revpar": 2213
+          "rev": 195000
         },
-        {
-          "id": "NEFES",
-          "code": "nefes",
-          "name": "Nefes Dağ Evi",
-          "days": 28,
-          "rev": 138932,
-          "adr": 4962,
-          "share": 29.7,
-          "occupancy": 90.3,
-          "revpar": 4482
+        "palm": {
+          "name": "Villa Palm Breeze",
+          "days": 17,
+          "rev": 101400
+        },
+        "seyir": {
+          "name": "Villa Bella Vista",
+          "days": 21,
+          "rev": 171600
+        },
+        "dogus": {
+          "name": "Villa Olive Garden",
+          "days": 20,
+          "rev": 187200
+        },
+        "zirve": {
+          "name": "Villa Azure Bay",
+          "days": 19,
+          "rev": 195000
+        },
+        "sirin": {
+          "name": "Villa Sunset Horizon",
+          "days": 21,
+          "rev": 124800
+        },
+        "nefes": {
+          "name": "Villa Palm Breeze",
+          "days": 17,
+          "rev": 101400
         }
-      ]
+      }
     },
     "2026-08": {
       "key": "2026-08",
-      "totalDays": 79,
-      "totalRev": 483965,
-      "avgDaily": 6126.139240506329,
-      "villas": [
-        {
-          "id": "SEYIR",
-          "code": "seyir",
-          "name": "Seyir Dağ Evi",
-          "days": 8,
-          "rev": 98318,
-          "adr": 12290,
-          "share": 20.3,
-          "occupancy": 25.8,
-          "revpar": 3172
+      "totalDays": 104,
+      "totalRev": 860000,
+      "avgDaily": 8269,
+      "villas": {
+        "bella": {
+          "name": "Villa Bella Vista",
+          "days": 22,
+          "rev": 189200
         },
-        {
-          "id": "DOGUS",
-          "code": "dogus",
-          "name": "Doğuş Dağ Evi",
-          "days": 24,
-          "rev": 97375,
-          "adr": 4057,
-          "share": 20.1,
-          "occupancy": 77.4,
-          "revpar": 3141
+        "olive": {
+          "name": "Villa Olive Garden",
+          "days": 21,
+          "rev": 206400
         },
-        {
-          "id": "ZIRVE",
-          "code": "zirve",
-          "name": "Zirve Dağ Evi",
-          "days": 9,
-          "rev": 138190,
-          "adr": 15354,
-          "share": 28.6,
-          "occupancy": 29,
-          "revpar": 4458
+        "sunset": {
+          "name": "Villa Sunset Horizon",
+          "days": 22,
+          "rev": 137600
         },
-        {
-          "id": "SIRIN",
-          "code": "sirin",
-          "name": "Şirin Dağ Evi",
-          "days": 30,
-          "rev": 84780,
-          "adr": 2826,
-          "share": 17.5,
-          "occupancy": 96.8,
-          "revpar": 2735
+        "azure": {
+          "name": "Villa Azure Bay",
+          "days": 20,
+          "rev": 215000
         },
-        {
-          "id": "NEFES",
-          "code": "nefes",
-          "name": "Nefes Dağ Evi",
-          "days": 8,
-          "rev": 65302,
-          "adr": 8163,
-          "share": 13.5,
-          "occupancy": 25.8,
-          "revpar": 2107
+        "palm": {
+          "name": "Villa Palm Breeze",
+          "days": 19,
+          "rev": 111800
+        },
+        "seyir": {
+          "name": "Villa Bella Vista",
+          "days": 22,
+          "rev": 189200
+        },
+        "dogus": {
+          "name": "Villa Olive Garden",
+          "days": 21,
+          "rev": 206400
+        },
+        "zirve": {
+          "name": "Villa Azure Bay",
+          "days": 20,
+          "rev": 215000
+        },
+        "sirin": {
+          "name": "Villa Sunset Horizon",
+          "days": 22,
+          "rev": 137600
+        },
+        "nefes": {
+          "name": "Villa Palm Breeze",
+          "days": 19,
+          "rev": 111800
         }
-      ]
+      }
     },
     "2026-09": {
       "key": "2026-09",
-      "totalDays": 8,
-      "totalRev": 0,
-      "avgDaily": 0,
-      "villas": [
-        {
-          "id": "SEYIR",
-          "code": "seyir",
-          "name": "Seyir Dağ Evi",
-          "days": 0,
-          "rev": 0,
-          "adr": 0,
-          "share": 0,
-          "occupancy": 0,
-          "revpar": 0
+      "totalDays": 72,
+      "totalRev": 520000,
+      "avgDaily": 7222,
+      "villas": {
+        "bella": {
+          "name": "Villa Bella Vista",
+          "days": 15,
+          "rev": 114400
         },
-        {
-          "id": "DOGUS",
-          "code": "dogus",
-          "name": "Doğuş Dağ Evi",
-          "days": 1,
-          "rev": 0,
-          "adr": 0,
-          "share": 0,
-          "occupancy": 3.2,
-          "revpar": 0
+        "olive": {
+          "name": "Villa Olive Garden",
+          "days": 14,
+          "rev": 124800
         },
-        {
-          "id": "ZIRVE",
-          "code": "zirve",
-          "name": "Zirve Dağ Evi",
-          "days": 0,
-          "rev": 0,
-          "adr": 0,
-          "share": 0,
-          "occupancy": 0,
-          "revpar": 0
+        "sunset": {
+          "name": "Villa Sunset Horizon",
+          "days": 15,
+          "rev": 83200
         },
-        {
-          "id": "SIRIN",
-          "code": "sirin",
-          "name": "Şirin Dağ Evi",
-          "days": 6,
-          "rev": 0,
-          "adr": 0,
-          "share": 0,
-          "occupancy": 19.4,
-          "revpar": 0
+        "azure": {
+          "name": "Villa Azure Bay",
+          "days": 14,
+          "rev": 130000
         },
-        {
-          "id": "NEFES",
-          "code": "nefes",
-          "name": "Nefes Dağ Evi",
-          "days": 1,
-          "rev": 0,
-          "adr": 0,
-          "share": 0,
-          "occupancy": 3.2,
-          "revpar": 0
+        "palm": {
+          "name": "Villa Palm Breeze",
+          "days": 14,
+          "rev": 67600
+        },
+        "seyir": {
+          "name": "Villa Bella Vista",
+          "days": 15,
+          "rev": 114400
+        },
+        "dogus": {
+          "name": "Villa Olive Garden",
+          "days": 14,
+          "rev": 124800
+        },
+        "zirve": {
+          "name": "Villa Azure Bay",
+          "days": 14,
+          "rev": 130000
+        },
+        "sirin": {
+          "name": "Villa Sunset Horizon",
+          "days": 15,
+          "rev": 83200
+        },
+        "nefes": {
+          "name": "Villa Palm Breeze",
+          "days": 14,
+          "rev": 67600
         }
-      ]
+      }
     }
   },
   "expensesList": [
     {
-      "id": "exp-1001",
-      "monthKey": "2025-10",
-      "month": "2025-10",
-      "date": "2025-10-15",
-      "category": "Reklam",
-      "type": "OPEX",
-      "amount": 76322,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Reklam Aylık Ödemesi (EKİM 2025) - Excel Raporu"
-    },
-    {
-      "id": "exp-1002",
-      "monthKey": "2025-10",
-      "month": "2025-10",
-      "date": "2025-10-15",
-      "category": "Akaryakıt",
-      "type": "OPEX",
-      "amount": 6020,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Akaryakıt Aylık Ödemesi (EKİM 2025) - Excel Raporu"
-    },
-    {
-      "id": "exp-1003",
-      "monthKey": "2025-10",
-      "month": "2025-10",
-      "date": "2025-10-15",
+      "id": "EXP-SYN-001",
+      "monthKey": "2026-08",
+      "month": "2026-08",
+      "date": "2026-08-01",
       "category": "Bakım",
       "type": "OPEX",
-      "amount": 34268,
+      "amount": 14500,
       "villa": "ALL",
       "property": "Tümü",
-      "notes": "Bakım Aylık Ödemesi (EKİM 2025) - Excel Raporu"
+      "notes": "Tüm villalar havuz robotu filtre değişimi ve klorlama"
     },
     {
-      "id": "exp-1004",
-      "monthKey": "2025-10",
-      "month": "2025-10",
-      "date": "2025-10-15",
+      "id": "EXP-SYN-002",
+      "monthKey": "2026-08",
+      "month": "2026-08",
+      "date": "2026-08-03",
+      "category": "Reklam",
+      "type": "OPEX",
+      "amount": 32000,
+      "villa": "ALL",
+      "property": "Tümü",
+      "notes": "Google Ads & Meta Avrupa yaz sezonu reklam kampanyaları"
+    },
+    {
+      "id": "EXP-SYN-003",
+      "monthKey": "2026-08",
+      "month": "2026-08",
+      "date": "2026-08-05",
       "category": "Fatura",
       "type": "OPEX",
-      "amount": 6293,
+      "amount": 18400,
       "villa": "ALL",
       "property": "Tümü",
-      "notes": "Fatura Aylık Ödemesi (EKİM 2025) - Excel Raporu"
+      "notes": "Tüm villalar fiber internet, Wi-Fi 6 mesh ve akıllı kilit abonelikleri"
     },
     {
-      "id": "exp-1005",
-      "monthKey": "2025-10",
-      "month": "2025-10",
-      "date": "2025-10-15",
-      "category": "Muhasebe",
-      "type": "OPEX",
-      "amount": 7363,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Muhasebe Aylık Ödemesi (EKİM 2025) - Excel Raporu"
-    },
-    {
-      "id": "exp-1006",
-      "monthKey": "2025-10",
-      "month": "2025-10",
-      "date": "2025-10-15",
+      "id": "EXP-SYN-004",
+      "monthKey": "2026-08",
+      "month": "2026-08",
+      "date": "2026-08-08",
       "category": "Temizlik",
-      "type": "OPEX",
-      "amount": 32500,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Temizlik Aylık Ödemesi (EKİM 2025) - Excel Raporu"
-    },
-    {
-      "id": "exp-1007",
-      "monthKey": "2025-10",
-      "month": "2025-10",
-      "date": "2025-10-15",
-      "category": "Kredi Kartı / Komisyon",
-      "type": "OPEX",
-      "amount": 4030,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Kredi Kartı / Komisyon Aylık Ödemesi (EKİM 2025) - Excel Raporu"
-    },
-    {
-      "id": "exp-1008",
-      "monthKey": "2025-10",
-      "month": "2025-10",
-      "date": "2025-10-15",
-      "category": "Maaş",
-      "type": "OPEX",
-      "amount": 40000,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Maaş Aylık Ödemesi (EKİM 2025) - Excel Raporu"
-    },
-    {
-      "id": "exp-1009",
-      "monthKey": "2025-10",
-      "month": "2025-10",
-      "date": "2025-10-15",
-      "category": "Danışmanlık",
-      "type": "OPEX",
-      "amount": 15000,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Danışmanlık Aylık Ödemesi (EKİM 2025) - Excel Raporu"
-    },
-    {
-      "id": "exp-1010",
-      "monthKey": "2025-11",
-      "month": "2025-11",
-      "date": "2025-11-15",
-      "category": "Akaryakıt",
-      "type": "OPEX",
-      "amount": 14006,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Akaryakıt Aylık Ödemesi (KASIM 2025) - Excel Raporu"
-    },
-    {
-      "id": "exp-1011",
-      "monthKey": "2025-11",
-      "month": "2025-11",
-      "date": "2025-11-15",
-      "category": "Bakım",
-      "type": "OPEX",
-      "amount": 61000,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Bakım Aylık Ödemesi (KASIM 2025) - Excel Raporu"
-    },
-    {
-      "id": "exp-1012",
-      "monthKey": "2025-11",
-      "month": "2025-11",
-      "date": "2025-11-15",
-      "category": "Fatura",
-      "type": "OPEX",
-      "amount": 13168,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Fatura Aylık Ödemesi (KASIM 2025) - Excel Raporu"
-    },
-    {
-      "id": "exp-1013",
-      "monthKey": "2025-11",
-      "month": "2025-11",
-      "date": "2025-11-15",
-      "category": "Muhasebe",
-      "type": "OPEX",
-      "amount": 11056,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Muhasebe Aylık Ödemesi (KASIM 2025) - Excel Raporu"
-    },
-    {
-      "id": "exp-1014",
-      "monthKey": "2025-11",
-      "month": "2025-11",
-      "date": "2025-11-15",
-      "category": "Reklam",
-      "type": "OPEX",
-      "amount": 81115,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Reklam Aylık Ödemesi (KASIM 2025) - Excel Raporu"
-    },
-    {
-      "id": "exp-1015",
-      "monthKey": "2025-11",
-      "month": "2025-11",
-      "date": "2025-11-15",
-      "category": "Temizlik",
-      "type": "OPEX",
-      "amount": 24000,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Temizlik Aylık Ödemesi (KASIM 2025) - Excel Raporu"
-    },
-    {
-      "id": "exp-1016",
-      "monthKey": "2025-11",
-      "month": "2025-11",
-      "date": "2025-11-15",
-      "category": "Kredi Kartı / Komisyon",
-      "type": "OPEX",
-      "amount": 7336,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Kredi Kartı / Komisyon Aylık Ödemesi (KASIM 2025) - Excel Raporu"
-    },
-    {
-      "id": "exp-1017",
-      "monthKey": "2025-11",
-      "month": "2025-11",
-      "date": "2025-11-15",
-      "category": "Maaş",
-      "type": "OPEX",
-      "amount": 40000,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Maaş Aylık Ödemesi (KASIM 2025) - Excel Raporu"
-    },
-    {
-      "id": "exp-1018",
-      "monthKey": "2025-11",
-      "month": "2025-11",
-      "date": "2025-11-15",
-      "category": "Danışmanlık",
-      "type": "OPEX",
-      "amount": 15000,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Danışmanlık Aylık Ödemesi (KASIM 2025) - Excel Raporu"
-    },
-    {
-      "id": "exp-1019",
-      "monthKey": "2025-12",
-      "month": "2025-12",
-      "date": "2025-12-15",
-      "category": "Akaryakıt",
-      "type": "OPEX",
-      "amount": 13401,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Akaryakıt Aylık Ödemesi (ARALIK 2025) - Excel Raporu"
-    },
-    {
-      "id": "exp-1020",
-      "monthKey": "2025-12",
-      "month": "2025-12",
-      "date": "2025-12-15",
-      "category": "Bakım",
-      "type": "OPEX",
-      "amount": 48000,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Bakım Aylık Ödemesi (ARALIK 2025) - Excel Raporu"
-    },
-    {
-      "id": "exp-1021",
-      "monthKey": "2025-12",
-      "month": "2025-12",
-      "date": "2025-12-15",
-      "category": "Fatura",
-      "type": "OPEX",
-      "amount": 8148,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Fatura Aylık Ödemesi (ARALIK 2025) - Excel Raporu"
-    },
-    {
-      "id": "exp-1022",
-      "monthKey": "2025-12",
-      "month": "2025-12",
-      "date": "2025-12-15",
-      "category": "Muhasebe",
-      "type": "OPEX",
-      "amount": 17278,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Muhasebe Aylık Ödemesi (ARALIK 2025) - Excel Raporu"
-    },
-    {
-      "id": "exp-1023",
-      "monthKey": "2025-12",
-      "month": "2025-12",
-      "date": "2025-12-15",
-      "category": "Reklam",
-      "type": "OPEX",
-      "amount": 62715,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Reklam Aylık Ödemesi (ARALIK 2025) - Excel Raporu"
-    },
-    {
-      "id": "exp-1024",
-      "monthKey": "2025-12",
-      "month": "2025-12",
-      "date": "2025-12-15",
-      "category": "Temizlik",
-      "type": "OPEX",
-      "amount": 26200,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Temizlik Aylık Ödemesi (ARALIK 2025) - Excel Raporu"
-    },
-    {
-      "id": "exp-1025",
-      "monthKey": "2025-12",
-      "month": "2025-12",
-      "date": "2025-12-15",
-      "category": "Kredi Kartı / Komisyon",
-      "type": "OPEX",
-      "amount": 52090,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Kredi Kartı / Komisyon Aylık Ödemesi (ARALIK 2025) - Excel Raporu"
-    },
-    {
-      "id": "exp-1026",
-      "monthKey": "2025-12",
-      "month": "2025-12",
-      "date": "2025-12-15",
-      "category": "Maaş",
-      "type": "OPEX",
-      "amount": 40000,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Maaş Aylık Ödemesi (ARALIK 2025) - Excel Raporu"
-    },
-    {
-      "id": "exp-1027",
-      "monthKey": "2025-12",
-      "month": "2025-12",
-      "date": "2025-12-15",
-      "category": "Danışmanlık",
-      "type": "OPEX",
-      "amount": 15000,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Danışmanlık Aylık Ödemesi (ARALIK 2025) - Excel Raporu"
-    },
-    {
-      "id": "exp-1028",
-      "monthKey": "2026-01",
-      "month": "2026-01",
-      "date": "2026-01-15",
-      "category": "Akaryakıt",
-      "type": "OPEX",
-      "amount": 12866,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Akaryakıt Aylık Ödemesi (OCAK 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1029",
-      "monthKey": "2026-01",
-      "month": "2026-01",
-      "date": "2026-01-15",
-      "category": "Bakım",
-      "type": "OPEX",
-      "amount": 36100,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Bakım Aylık Ödemesi (OCAK 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1030",
-      "monthKey": "2026-01",
-      "month": "2026-01",
-      "date": "2026-01-15",
-      "category": "Fatura",
-      "type": "OPEX",
-      "amount": 6271,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Fatura Aylık Ödemesi (OCAK 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1031",
-      "monthKey": "2026-01",
-      "month": "2026-01",
-      "date": "2026-01-15",
-      "category": "Muhasebe",
-      "type": "OPEX",
-      "amount": 36886,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Muhasebe Aylık Ödemesi (OCAK 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1032",
-      "monthKey": "2026-01",
-      "month": "2026-01",
-      "date": "2026-01-15",
-      "category": "Reklam",
-      "type": "OPEX",
-      "amount": 35788,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Reklam Aylık Ödemesi (OCAK 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1033",
-      "monthKey": "2026-01",
-      "month": "2026-01",
-      "date": "2026-01-15",
-      "category": "Temizlik",
-      "type": "OPEX",
-      "amount": 42900,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Temizlik Aylık Ödemesi (OCAK 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1034",
-      "monthKey": "2026-01",
-      "month": "2026-01",
-      "date": "2026-01-15",
-      "category": "Kredi Kartı / Komisyon",
-      "type": "OPEX",
-      "amount": 58254,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Kredi Kartı / Komisyon Aylık Ödemesi (OCAK 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1035",
-      "monthKey": "2026-01",
-      "month": "2026-01",
-      "date": "2026-01-15",
-      "category": "Maaş",
-      "type": "OPEX",
-      "amount": 40000,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Maaş Aylık Ödemesi (OCAK 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1036",
-      "monthKey": "2026-01",
-      "month": "2026-01",
-      "date": "2026-01-15",
-      "category": "Danışmanlık",
-      "type": "OPEX",
-      "amount": 15000,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Danışmanlık Aylık Ödemesi (OCAK 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1037",
-      "monthKey": "2026-02",
-      "month": "2026-02",
-      "date": "2026-02-15",
-      "category": "Maaş",
-      "type": "OPEX",
-      "amount": 40000,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Maaş Aylık Ödemesi (ŞUBAT 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1038",
-      "monthKey": "2026-02",
-      "month": "2026-02",
-      "date": "2026-02-15",
-      "category": "Danışmanlık",
-      "type": "OPEX",
-      "amount": 15000,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Danışmanlık Aylık Ödemesi (ŞUBAT 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1039",
-      "monthKey": "2026-02",
-      "month": "2026-02",
-      "date": "2026-02-15",
-      "category": "Akaryakıt",
-      "type": "OPEX",
-      "amount": 19715,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Akaryakıt Aylık Ödemesi (ŞUBAT 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1040",
-      "monthKey": "2026-02",
-      "month": "2026-02",
-      "date": "2026-02-15",
-      "category": "Bakım",
-      "type": "OPEX",
-      "amount": 57650,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Bakım Aylık Ödemesi (ŞUBAT 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1041",
-      "monthKey": "2026-02",
-      "month": "2026-02",
-      "date": "2026-02-15",
-      "category": "Fatura",
-      "type": "OPEX",
-      "amount": 127158,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Fatura Aylık Ödemesi (ŞUBAT 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1042",
-      "monthKey": "2026-02",
-      "month": "2026-02",
-      "date": "2026-02-15",
-      "category": "Muhasebe",
-      "type": "OPEX",
-      "amount": 46673,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Muhasebe Aylık Ödemesi (ŞUBAT 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1043",
-      "monthKey": "2026-02",
-      "month": "2026-02",
-      "date": "2026-02-15",
-      "category": "Reklam",
-      "type": "OPEX",
-      "amount": 42736,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Reklam Aylık Ödemesi (ŞUBAT 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1044",
-      "monthKey": "2026-02",
-      "month": "2026-02",
-      "date": "2026-02-15",
-      "category": "Temizlik",
-      "type": "OPEX",
-      "amount": 31000,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Temizlik Aylık Ödemesi (ŞUBAT 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1045",
-      "monthKey": "2026-02",
-      "month": "2026-02",
-      "date": "2026-02-15",
-      "category": "Kredi Kartı / Komisyon",
-      "type": "OPEX",
-      "amount": 51003,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Kredi Kartı / Komisyon Aylık Ödemesi (ŞUBAT 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1046",
-      "monthKey": "2026-03",
-      "month": "2026-03",
-      "date": "2026-03-15",
-      "category": "Temizlik",
-      "type": "OPEX",
-      "amount": 40000,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Temizlik Aylık Ödemesi (MART 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1047",
-      "monthKey": "2026-03",
-      "month": "2026-03",
-      "date": "2026-03-15",
-      "category": "Bakım",
-      "type": "OPEX",
-      "amount": 10000,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Bakım Aylık Ödemesi (MART 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1048",
-      "monthKey": "2026-03",
-      "month": "2026-03",
-      "date": "2026-03-15",
-      "category": "Akaryakıt",
-      "type": "OPEX",
-      "amount": 8344,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Akaryakıt Aylık Ödemesi (MART 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1049",
-      "monthKey": "2026-03",
-      "month": "2026-03",
-      "date": "2026-03-15",
-      "category": "Muhasebe",
-      "type": "OPEX",
-      "amount": 39860,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Muhasebe Aylık Ödemesi (MART 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1050",
-      "monthKey": "2026-03",
-      "month": "2026-03",
-      "date": "2026-03-15",
-      "category": "Reklam",
-      "type": "OPEX",
-      "amount": 65863,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Reklam Aylık Ödemesi (MART 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1051",
-      "monthKey": "2026-03",
-      "month": "2026-03",
-      "date": "2026-03-15",
-      "category": "Maaş",
       "type": "OPEX",
       "amount": 36000,
       "villa": "ALL",
       "property": "Tümü",
-      "notes": "Maaş Aylık Ödemesi (MART 2026) - Excel Raporu"
+      "notes": "Ağustos ayı profesyonel temizlik ekibi ve çamaşırhane hizmeti"
     },
     {
-      "id": "exp-1052",
-      "monthKey": "2026-03",
-      "month": "2026-03",
-      "date": "2026-03-15",
-      "category": "Fatura",
-      "type": "OPEX",
-      "amount": 5826,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Fatura Aylık Ödemesi (MART 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1053",
-      "monthKey": "2026-03",
-      "month": "2026-03",
-      "date": "2026-03-15",
-      "category": "Kredi Kartı / Komisyon",
-      "type": "OPEX",
-      "amount": 24548,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Kredi Kartı / Komisyon Aylık Ödemesi (MART 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1054",
-      "monthKey": "2026-04",
-      "month": "2026-04",
-      "date": "2026-04-15",
-      "category": "Temizlik",
-      "type": "OPEX",
-      "amount": 28000,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Temizlik Aylık Ödemesi (NİSAN 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1055",
-      "monthKey": "2026-04",
-      "month": "2026-04",
-      "date": "2026-04-15",
+      "id": "EXP-SYN-005",
+      "monthKey": "2026-08",
+      "month": "2026-08",
+      "date": "2026-08-10",
       "category": "Bakım",
       "type": "OPEX",
-      "amount": 52756,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Bakım Aylık Ödemesi (NİSAN 2026) - Excel Raporu"
+      "amount": 9800,
+      "villa": "VILLA_OLIVE",
+      "property": "Villa Olive Garden",
+      "notes": "Zeytinlik bahçesi otomatik sulama sistemi vana revizyonu"
     },
     {
-      "id": "exp-1056",
-      "monthKey": "2026-04",
-      "month": "2026-04",
-      "date": "2026-04-15",
-      "category": "Akaryakıt",
-      "type": "OPEX",
-      "amount": 4214,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Akaryakıt Aylık Ödemesi (NİSAN 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1057",
-      "monthKey": "2026-04",
-      "month": "2026-04",
-      "date": "2026-04-15",
-      "category": "Muhasebe",
-      "type": "OPEX",
-      "amount": 46400,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Muhasebe Aylık Ödemesi (NİSAN 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1058",
-      "monthKey": "2026-04",
-      "month": "2026-04",
-      "date": "2026-04-15",
-      "category": "Reklam",
-      "type": "OPEX",
-      "amount": 54367,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Reklam Aylık Ödemesi (NİSAN 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1059",
-      "monthKey": "2026-04",
-      "month": "2026-04",
-      "date": "2026-04-15",
-      "category": "Maaş",
-      "type": "OPEX",
-      "amount": 85075,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Maaş Aylık Ödemesi (NİSAN 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1060",
-      "monthKey": "2026-04",
-      "month": "2026-04",
-      "date": "2026-04-15",
-      "category": "Fatura",
-      "type": "OPEX",
-      "amount": 5826,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Fatura Aylık Ödemesi (NİSAN 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1061",
-      "monthKey": "2026-04",
-      "month": "2026-04",
-      "date": "2026-04-15",
-      "category": "Kredi Kartı / Komisyon",
-      "type": "OPEX",
-      "amount": 24178,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Kredi Kartı / Komisyon Aylık Ödemesi (NİSAN 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1062",
-      "monthKey": "2026-05",
-      "month": "2026-05",
-      "date": "2026-05-15",
-      "category": "Temizlik",
-      "type": "OPEX",
-      "amount": 42500,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Temizlik Aylık Ödemesi (MAYIS 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1063",
-      "monthKey": "2026-05",
-      "month": "2026-05",
-      "date": "2026-05-15",
+      "id": "EXP-SYN-006",
+      "monthKey": "2026-08",
+      "month": "2026-08",
+      "date": "2026-08-12",
       "category": "Bakım",
       "type": "OPEX",
-      "amount": 57875,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Bakım Aylık Ödemesi (MAYIS 2026) - Excel Raporu"
+      "amount": 12500,
+      "villa": "VILLA_AZURE",
+      "property": "Villa Azure Bay",
+      "notes": "Özel iskele ve deniz basamağı periyodik sezon bakımı"
     },
     {
-      "id": "exp-1064",
-      "monthKey": "2026-05",
-      "month": "2026-05",
-      "date": "2026-05-15",
-      "category": "Akaryakıt",
-      "type": "OPEX",
-      "amount": 10268,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Akaryakıt Aylık Ödemesi (MAYIS 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1065",
-      "monthKey": "2026-05",
-      "month": "2026-05",
-      "date": "2026-05-15",
+      "id": "EXP-SYN-007",
+      "monthKey": "2026-08",
+      "month": "2026-08",
+      "date": "2026-08-15",
       "category": "Muhasebe",
       "type": "OPEX",
-      "amount": 235378,
+      "amount": 15000,
       "villa": "ALL",
       "property": "Tümü",
-      "notes": "Muhasebe Aylık Ödemesi (MAYIS 2026) - Excel Raporu"
+      "notes": "Mali müşavirlik, e-fatura ve yasal beyanname hizmet bedeli"
     },
     {
-      "id": "exp-1066",
-      "monthKey": "2026-05",
-      "month": "2026-05",
-      "date": "2026-05-15",
-      "category": "Reklam",
+      "id": "EXP-SYN-008",
+      "monthKey": "2026-08",
+      "month": "2026-08",
+      "date": "2026-08-18",
+      "category": "Diğer",
       "type": "OPEX",
-      "amount": 45746,
+      "amount": 18500,
       "villa": "ALL",
       "property": "Tümü",
-      "notes": "Reklam Aylık Ödemesi (MAYIS 2026) - Excel Raporu"
+      "notes": "Misafir karşılama organik zeytinyağı, şarap ve ikram setleri"
     },
     {
-      "id": "exp-1067",
-      "monthKey": "2026-05",
-      "month": "2026-05",
-      "date": "2026-05-15",
-      "category": "Maaş",
-      "type": "OPEX",
-      "amount": 85075,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Maaş Aylık Ödemesi (MAYIS 2026) - Excel Raporu"
+      "id": "EXP-SYN-009",
+      "monthKey": "2026-08",
+      "month": "2026-08",
+      "date": "2026-08-20",
+      "category": "Bakım",
+      "type": "CAPEX",
+      "amount": 22000,
+      "villa": "VILLA_BELLA",
+      "property": "Villa Bella Vista",
+      "notes": "Teras jakuzisi yeni nesil inverter ısı pompası montajı"
     },
     {
-      "id": "exp-1068",
-      "monthKey": "2026-05",
-      "month": "2026-05",
-      "date": "2026-05-15",
-      "category": "Fatura",
-      "type": "OPEX",
-      "amount": 48744,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Fatura Aylık Ödemesi (MAYIS 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1069",
-      "monthKey": "2026-05",
-      "month": "2026-05",
-      "date": "2026-05-15",
+      "id": "EXP-SYN-010",
+      "monthKey": "2026-08",
+      "month": "2026-08",
+      "date": "2026-08-25",
       "category": "Kredi Kartı / Komisyon",
       "type": "OPEX",
-      "amount": 55067,
+      "amount": 58000,
       "villa": "ALL",
       "property": "Tümü",
-      "notes": "Kredi Kartı / Komisyon Aylık Ödemesi (MAYIS 2026) - Excel Raporu"
+      "notes": "Sanal POS ve OTA platform işlem komisyonları"
     },
     {
-      "id": "exp-1070",
-      "monthKey": "2026-06",
-      "month": "2026-06",
-      "date": "2026-06-15",
-      "category": "Muhasebe",
+      "id": "EXP-SYN-011",
+      "monthKey": "2026-09",
+      "month": "2026-09",
+      "date": "2026-09-02",
+      "category": "Bakım",
       "type": "OPEX",
-      "amount": 90338,
+      "amount": 11200,
       "villa": "ALL",
       "property": "Tümü",
-      "notes": "Muhasebe Aylık Ödemesi (HAZİRAN 2026) - Excel Raporu"
+      "notes": "Eylül ayı havuz kışlama öncesi kontroller ve kimyasallar"
     },
     {
-      "id": "exp-1071",
-      "monthKey": "2026-06",
-      "month": "2026-06",
-      "date": "2026-06-15",
-      "category": "Temizlik",
+      "id": "EXP-SYN-012",
+      "monthKey": "2026-09",
+      "month": "2026-09",
+      "date": "2026-09-05",
+      "category": "Reklam",
       "type": "OPEX",
       "amount": 24000,
       "villa": "ALL",
       "property": "Tümü",
-      "notes": "Temizlik Aylık Ödemesi (HAZİRAN 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1072",
-      "monthKey": "2026-06",
-      "month": "2026-06",
-      "date": "2026-06-15",
-      "category": "Reklam",
-      "type": "OPEX",
-      "amount": 55262,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Reklam Aylık Ödemesi (HAZİRAN 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1073",
-      "monthKey": "2026-06",
-      "month": "2026-06",
-      "date": "2026-06-15",
-      "category": "Maaş",
-      "type": "OPEX",
-      "amount": 85075,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Maaş Aylık Ödemesi (HAZİRAN 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1074",
-      "monthKey": "2026-06",
-      "month": "2026-06",
-      "date": "2026-06-15",
-      "category": "Akaryakıt",
-      "type": "OPEX",
-      "amount": 22670,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Akaryakıt Aylık Ödemesi (HAZİRAN 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1075",
-      "monthKey": "2026-06",
-      "month": "2026-06",
-      "date": "2026-06-15",
-      "category": "Fatura",
-      "type": "OPEX",
-      "amount": 49271,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Fatura Aylık Ödemesi (HAZİRAN 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1076",
-      "monthKey": "2026-06",
-      "month": "2026-06",
-      "date": "2026-06-15",
-      "category": "Bakım",
-      "type": "OPEX",
-      "amount": 51500,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Bakım Aylık Ödemesi (HAZİRAN 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1077",
-      "monthKey": "2026-06",
-      "month": "2026-06",
-      "date": "2026-06-15",
-      "category": "Kredi Kartı / Komisyon",
-      "type": "OPEX",
-      "amount": 41000,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Kredi Kartı / Komisyon Aylık Ödemesi (HAZİRAN 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1078",
-      "monthKey": "2026-07",
-      "month": "2026-07",
-      "date": "2026-07-15",
-      "category": "Muhasebe",
-      "type": "OPEX",
-      "amount": 43907,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Muhasebe Aylık Ödemesi (TEMMUZ 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1079",
-      "monthKey": "2026-07",
-      "month": "2026-07",
-      "date": "2026-07-15",
-      "category": "Temizlik",
-      "type": "OPEX",
-      "amount": 31000,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Temizlik Aylık Ödemesi (TEMMUZ 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1080",
-      "monthKey": "2026-07",
-      "month": "2026-07",
-      "date": "2026-07-15",
-      "category": "Reklam",
-      "type": "OPEX",
-      "amount": 18880,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Reklam Aylık Ödemesi (TEMMUZ 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1081",
-      "monthKey": "2026-07",
-      "month": "2026-07",
-      "date": "2026-07-15",
-      "category": "Maaş",
-      "type": "OPEX",
-      "amount": 85075.5,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Maaş Aylık Ödemesi (TEMMUZ 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1082",
-      "monthKey": "2026-07",
-      "month": "2026-07",
-      "date": "2026-07-15",
-      "category": "Akaryakıt",
-      "type": "OPEX",
-      "amount": 19338,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Akaryakıt Aylık Ödemesi (TEMMUZ 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1083",
-      "monthKey": "2026-07",
-      "month": "2026-07",
-      "date": "2026-07-15",
-      "category": "Fatura",
-      "type": "OPEX",
-      "amount": 8034,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Fatura Aylık Ödemesi (TEMMUZ 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1084",
-      "monthKey": "2026-07",
-      "month": "2026-07",
-      "date": "2026-07-15",
-      "category": "Bakım",
-      "type": "OPEX",
-      "amount": 60800,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Bakım Aylık Ödemesi (TEMMUZ 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1085",
-      "monthKey": "2026-07",
-      "month": "2026-07",
-      "date": "2026-07-15",
-      "category": "Kredi Kartı / Komisyon",
-      "type": "OPEX",
-      "amount": 28604,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Kredi Kartı / Komisyon Aylık Ödemesi (TEMMUZ 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1086",
-      "monthKey": "2026-08",
-      "month": "2026-08",
-      "date": "2026-08-15",
-      "category": "Muhasebe",
-      "type": "OPEX",
-      "amount": 44655,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Muhasebe Aylık Ödemesi (AĞUSTOS 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1087",
-      "monthKey": "2026-08",
-      "month": "2026-08",
-      "date": "2026-08-15",
-      "category": "Temizlik",
-      "type": "OPEX",
-      "amount": 47000,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Temizlik Aylık Ödemesi (AĞUSTOS 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1088",
-      "monthKey": "2026-08",
-      "month": "2026-08",
-      "date": "2026-08-15",
-      "category": "Reklam",
-      "type": "OPEX",
-      "amount": 20116,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Reklam Aylık Ödemesi (AĞUSTOS 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1089",
-      "monthKey": "2026-08",
-      "month": "2026-08",
-      "date": "2026-08-15",
-      "category": "Maaş",
-      "type": "OPEX",
-      "amount": 85075,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Maaş Aylık Ödemesi (AĞUSTOS 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1090",
-      "monthKey": "2026-08",
-      "month": "2026-08",
-      "date": "2026-08-15",
-      "category": "Akaryakıt",
-      "type": "OPEX",
-      "amount": 21388,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Akaryakıt Aylık Ödemesi (AĞUSTOS 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1091",
-      "monthKey": "2026-08",
-      "month": "2026-08",
-      "date": "2026-08-15",
-      "category": "Fatura",
-      "type": "OPEX",
-      "amount": 17279,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Fatura Aylık Ödemesi (AĞUSTOS 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1092",
-      "monthKey": "2026-08",
-      "month": "2026-08",
-      "date": "2026-08-15",
-      "category": "Bakım",
-      "type": "OPEX",
-      "amount": 7050,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Bakım Aylık Ödemesi (AĞUSTOS 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1093",
-      "monthKey": "2026-08",
-      "month": "2026-08",
-      "date": "2026-08-15",
-      "category": "Kredi Kartı / Komisyon",
-      "type": "OPEX",
-      "amount": 75519,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Kredi Kartı / Komisyon Aylık Ödemesi (AĞUSTOS 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1094",
-      "monthKey": "2025-10",
-      "month": "2025-10",
-      "date": "2025-10-25",
-      "category": "Diğer",
-      "type": "OPEX",
-      "amount": 33727,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Diğer Genel Giderler & Kesintiler (Ekim 2025) - Excel Raporu"
-    },
-    {
-      "id": "exp-1095",
-      "monthKey": "2025-10",
-      "month": "2025-10",
-      "date": "2025-10-28",
-      "category": "Bakım",
-      "type": "CAPEX",
-      "amount": 341556,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Yatırım / Ekipman / Tesis İyileştirme (Ekim 2025) - Excel Raporu"
-    },
-    {
-      "id": "exp-1096",
-      "monthKey": "2025-11",
-      "month": "2025-11",
-      "date": "2025-11-25",
-      "category": "Diğer",
-      "type": "OPEX",
-      "amount": 23933,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Diğer Genel Giderler & Kesintiler (Kasım 2025) - Excel Raporu"
-    },
-    {
-      "id": "exp-1097",
-      "monthKey": "2025-11",
-      "month": "2025-11",
-      "date": "2025-11-28",
-      "category": "Bakım",
-      "type": "CAPEX",
-      "amount": 174792,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Yatırım / Ekipman / Tesis İyileştirme (Kasım 2025) - Excel Raporu"
-    },
-    {
-      "id": "exp-1098",
-      "monthKey": "2025-12",
-      "month": "2025-12",
-      "date": "2025-12-25",
-      "category": "Diğer",
-      "type": "OPEX",
-      "amount": 35829,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Diğer Genel Giderler & Kesintiler (Aralık 2025) - Excel Raporu"
-    },
-    {
-      "id": "exp-1099",
-      "monthKey": "2025-12",
-      "month": "2025-12",
-      "date": "2025-12-28",
-      "category": "Bakım",
-      "type": "CAPEX",
-      "amount": 174287,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Yatırım / Ekipman / Tesis İyileştirme (Aralık 2025) - Excel Raporu"
-    },
-    {
-      "id": "exp-1100",
-      "monthKey": "2026-01",
-      "month": "2026-01",
-      "date": "2026-01-25",
-      "category": "Diğer",
-      "type": "OPEX",
-      "amount": 46993,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Diğer Genel Giderler & Kesintiler (Ocak 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1101",
-      "monthKey": "2026-01",
-      "month": "2026-01",
-      "date": "2026-01-28",
-      "category": "Bakım",
-      "type": "CAPEX",
-      "amount": 465331,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Yatırım / Ekipman / Tesis İyileştirme (Ocak 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1102",
-      "monthKey": "2026-02",
-      "month": "2026-02",
-      "date": "2026-02-25",
-      "category": "Diğer",
-      "type": "OPEX",
-      "amount": 37703,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Diğer Genel Giderler & Kesintiler (Şubat 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1103",
-      "monthKey": "2026-02",
-      "month": "2026-02",
-      "date": "2026-02-28",
-      "category": "Bakım",
-      "type": "CAPEX",
-      "amount": 257306,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Yatırım / Ekipman / Tesis İyileştirme (Şubat 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1104",
-      "monthKey": "2026-03",
-      "month": "2026-03",
-      "date": "2026-03-25",
-      "category": "Diğer",
-      "type": "OPEX",
-      "amount": 27626,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Diğer Genel Giderler & Kesintiler (Mart 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1105",
-      "monthKey": "2026-03",
-      "month": "2026-03",
-      "date": "2026-03-28",
-      "category": "Bakım",
-      "type": "CAPEX",
-      "amount": 45000,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Yatırım / Ekipman / Tesis İyileştirme (Mart 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1106",
-      "monthKey": "2026-04",
-      "month": "2026-04",
-      "date": "2026-04-25",
-      "category": "Diğer",
-      "type": "OPEX",
-      "amount": 11085,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Diğer Genel Giderler & Kesintiler (Nisan 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1107",
-      "monthKey": "2026-04",
-      "month": "2026-04",
-      "date": "2026-04-28",
-      "category": "Bakım",
-      "type": "CAPEX",
-      "amount": 172948,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Yatırım / Ekipman / Tesis İyileştirme (Nisan 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1108",
-      "monthKey": "2026-05",
-      "month": "2026-05",
-      "date": "2026-05-28",
-      "category": "Bakım",
-      "type": "CAPEX",
-      "amount": 216899,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Yatırım / Ekipman / Tesis İyileştirme (Mayıs 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1109",
-      "monthKey": "2026-06",
-      "month": "2026-06",
-      "date": "2026-06-25",
-      "category": "Diğer",
-      "type": "OPEX",
-      "amount": 15760,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Diğer Genel Giderler & Kesintiler (Haziran 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1110",
-      "monthKey": "2026-06",
-      "month": "2026-06",
-      "date": "2026-06-28",
-      "category": "Bakım",
-      "type": "CAPEX",
-      "amount": 112165,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Yatırım / Ekipman / Tesis İyileştirme (Haziran 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1111",
-      "monthKey": "2026-07",
-      "month": "2026-07",
-      "date": "2026-07-25",
-      "category": "Diğer",
-      "type": "OPEX",
-      "amount": 13317.5,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Diğer Genel Giderler & Kesintiler (Temmuz 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1112",
-      "monthKey": "2026-07",
-      "month": "2026-07",
-      "date": "2026-07-28",
-      "category": "Bakım",
-      "type": "CAPEX",
-      "amount": 22166,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Yatırım / Ekipman / Tesis İyileştirme (Temmuz 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1113",
-      "monthKey": "2026-08",
-      "month": "2026-08",
-      "date": "2026-08-25",
-      "category": "Diğer",
-      "type": "OPEX",
-      "amount": 19224,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Diğer Genel Giderler & Kesintiler (Ağustos 2026) - Excel Raporu"
-    },
-    {
-      "id": "exp-1114",
-      "monthKey": "2026-08",
-      "month": "2026-08",
-      "date": "2026-08-28",
-      "category": "Bakım",
-      "type": "CAPEX",
-      "amount": 3866,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Yatırım / Ekipman / Tesis İyileştirme (Ağustos 2026) - Excel Raporu"
+      "notes": "Sonbahar ve butik düğün kaçamakları dijital reklamları"
     }
   ],
   "bankBalances": {
     "month": "2026-08",
-    "garanti": 42292.93,
-    "kuveyt": 4377.98,
-    "npara": 939.26,
-    "nakit": 0,
-    "total": 47610.170000000006
+    "garanti": 385000,
+    "kuveyt": 142000,
+    "npara": 68000,
+    "nakit": 35000,
+    "total": 630000
   },
   "allTimeTotals": {
-    "totalRevenue": 5004165.4,
-    "totalNights": 457,
-    "avgDailyRate": 10950,
-    "totalOpex": 3884571,
-    "totalCapex": 1986316,
-    "totalExpense": 5870887,
-    "netCashProfit": -866721.5999999996,
-    "targetCiro": 4920000,
+    "totalRevenue": 5560000,
+    "totalNights": 846,
+    "avgDailyRate": 6572,
+    "totalOpex": 1887000,
+    "totalCapex": 187000,
+    "totalExpense": 2074000,
+    "netCashProfit": 3486000,
+    "targetCiro": 5400000,
     "villas": {
+      "bella": {
+        "name": "Villa Bella Vista",
+        "days": 178,
+        "rev": 1180000
+      },
+      "olive": {
+        "name": "Villa Olive Garden",
+        "days": 165,
+        "rev": 1320000
+      },
+      "sunset": {
+        "name": "Villa Sunset Horizon",
+        "days": 172,
+        "rev": 890000
+      },
+      "azure": {
+        "name": "Villa Azure Bay",
+        "days": 158,
+        "rev": 1420000
+      },
+      "palm": {
+        "name": "Villa Palm Breeze",
+        "days": 173,
+        "rev": 750000
+      },
       "seyir": {
-        "name": "Seyir Dağ Evi",
-        "days": 97,
-        "rev": 1380134
+        "name": "Villa Bella Vista",
+        "days": 178,
+        "rev": 1180000
       },
       "dogus": {
-        "name": "Doğuş Dağ Evi",
-        "days": 98,
-        "rev": 903353.4
+        "name": "Villa Olive Garden",
+        "days": 165,
+        "rev": 1320000
       },
       "zirve": {
-        "name": "Zirve Dağ Evi",
-        "days": 85,
-        "rev": 1214493.4
+        "name": "Villa Azure Bay",
+        "days": 158,
+        "rev": 1420000
       },
       "sirin": {
-        "name": "Şirin Dağ Evi",
-        "days": 85,
-        "rev": 424213.6
+        "name": "Villa Sunset Horizon",
+        "days": 172,
+        "rev": 890000
       },
       "nefes": {
-        "name": "Nefes Dağ Evi",
-        "days": 92,
-        "rev": 1081971
+        "name": "Villa Palm Breeze",
+        "days": 173,
+        "rev": 750000
       }
     }
   }
 };
+const COMPANY_EXCEL_DATABASE = SYNTHETIC_DEMO_DATABASE;
 
 const DEFAULT_VILLAS = {
-  'SEYIR': { name: 'Seyir Dağ Evi', code: 'seyir', capacity: '6+2 Kişi', floor: 3500, base: 4500, target: 6000, premium: 8500, peak: 12000, cleanCost: 800, heatCost: 350 },
-  'DOGUS': { name: 'Doğuş Dağ Evi', code: 'dogus', capacity: '11 Kişi', floor: 5000, base: 6500, target: 9000, premium: 13000, peak: 18000, cleanCost: 1200, heatCost: 500 },
-  'ZIRVE': { name: 'Zirve Dağ Evi (Jakuzi/Sauna)', code: 'zirve', capacity: '9 Kişi', floor: 6500, base: 8500, target: 12000, premium: 16500, peak: 24000, cleanCost: 1500, heatCost: 700 },
-  'SIRIN': { name: 'Şirin Dağ Evi', code: 'sirin', capacity: '7 Kişi', floor: 3000, base: 4000, target: 5500, premium: 7500, peak: 11000, cleanCost: 750, heatCost: 300 },
-  'NEFES': { name: 'Nefes Dağ Evi', code: 'nefes', capacity: '12 Kişi', floor: 5500, base: 7000, target: 9500, premium: 14000, peak: 19000, cleanCost: 1400, heatCost: 550 }
+  'VILLA_BELLA': { id: 'VILLA_BELLA', name: 'Villa Bella Vista (Kaş)', code: 'bella', capacity: '6+2 Kişi', floor: 4500, base: 6000, target: 8500, premium: 12000, peak: 16500, cleanCost: 1000, heatCost: 350 },
+  'VILLA_OLIVE': { id: 'VILLA_OLIVE', name: 'Villa Olive Garden (Bodrum)', code: 'olive', capacity: '8 Kişi', floor: 6000, base: 8500, target: 12000, premium: 17000, peak: 24000, cleanCost: 1400, heatCost: 400 },
+  'VILLA_SUNSET': { id: 'VILLA_SUNSET', name: 'Villa Sunset Horizon (Kalkan)', code: 'sunset', capacity: '4 Kişi', floor: 3500, base: 5000, target: 7000, premium: 10000, peak: 14000, cleanCost: 850, heatCost: 300 },
+  'VILLA_AZURE': { id: 'VILLA_AZURE', name: 'Villa Azure Bay (Göcek)', code: 'azure', capacity: '10 Kişi', floor: 8000, base: 11000, target: 16000, premium: 22500, peak: 32000, cleanCost: 1800, heatCost: 600 },
+  'VILLA_PALM': { id: 'VILLA_PALM', name: 'Villa Palm Breeze (Alaçatı)', code: 'palm', capacity: '6 Kişi', floor: 5000, base: 7000, target: 10000, premium: 14500, peak: 20000, cleanCost: 1200, heatCost: 400 }
 };
+
+// Backwards compatibility aliases for tests and internal keys
+DEFAULT_VILLAS['SEYIR'] = DEFAULT_VILLAS['VILLA_BELLA'];
+DEFAULT_VILLAS['DOGUS'] = DEFAULT_VILLAS['VILLA_OLIVE'];
+DEFAULT_VILLAS['ZIRVE'] = DEFAULT_VILLAS['VILLA_AZURE'];
+DEFAULT_VILLAS['SIRIN'] = DEFAULT_VILLAS['VILLA_SUNSET'];
+DEFAULT_VILLAS['NEFES'] = DEFAULT_VILLAS['VILLA_PALM'];
 
 const EXPENSE_CATEGORIES = [
   { name: 'Maaş', color: '#3B82F6' },
@@ -2759,48 +1507,40 @@ const DEFAULT_TARGETS_BY_MONTH = {};
 Object.keys(COMPANY_EXCEL_DATABASE.targets).forEach(k => {
   DEFAULT_TARGETS_BY_MONTH[k] = {
     revenue: COMPANY_EXCEL_DATABASE.targets[k],
-    netProfit: Math.round(COMPANY_EXCEL_DATABASE.targets[k] * 0.3),
-    margin: 30.0,
-    occupancy: 65.0,
-    adr: 5500
+    netProfit: Math.round(COMPANY_EXCEL_DATABASE.targets[k] * 0.4),
+    margin: 40.0,
+    occupancy: 70.0,
+    adr: 6800
   };
 });
 
 const DEFAULT_EXPENSES = COMPANY_EXCEL_DATABASE.expensesList;
 
 const DEFAULT_BOOKINGS = [
-  // Ağustos 2026 Gerçekleşen Rezervasyonları (GENEL RAPOR.xlsx: 483.965 TL Ciro, 79 Gece)
-  { id: 'REZ-AUG-001', villa: 'ZIRVE', guest: 'Canan Özdemir', checkIn: '2026-08-02', checkOut: '2026-08-06', nights: 4, channel: 'WHATSAPP', gross: 65000, otaComm: 0, cleanFee: 0, net: 65000, pax: 8, status: 'COMPLETED' },
-  { id: 'REZ-AUG-002', villa: 'ZIRVE', guest: 'Alp Erkin', checkIn: '2026-08-10', checkOut: '2026-08-15', nights: 5, channel: 'AIRBNB', gross: 85000, otaComm: 11810, cleanFee: 0, net: 73190, pax: 9, status: 'COMPLETED' },
-  { id: 'REZ-AUG-003', villa: 'DOGUS', guest: 'Serdar Kaya', checkIn: '2026-08-01', checkOut: '2026-08-14', nights: 13, channel: 'WHATSAPP', gross: 98000, otaComm: 0, cleanFee: 0, net: 98000, pax: 11, status: 'COMPLETED' },
-  { id: 'REZ-AUG-004', villa: 'DOGUS', guest: 'Burak Arslan', checkIn: '2026-08-18', checkOut: '2026-08-25', nights: 7, channel: 'BOOKING', gross: 55000, otaComm: 9900, cleanFee: 0, net: 45100, pax: 10, status: 'COMPLETED' },
-  { id: 'REZ-AUG-005', villa: 'SEYIR', guest: 'Murat Yılmaz', checkIn: '2026-08-05', checkOut: '2026-08-16', nights: 11, channel: 'INSTAGRAM', gross: 58000, otaComm: 0, cleanFee: 0, net: 58000, pax: 6, status: 'COMPLETED' },
-  { id: 'REZ-AUG-006', villa: 'SEYIR', guest: 'Okan Şen', checkIn: '2026-08-20', checkOut: '2026-08-29', nights: 9, channel: 'AIRBNB', gross: 52000, otaComm: 7800, cleanFee: 0, net: 44200, pax: 8, status: 'COMPLETED' },
-  { id: 'REZ-AUG-007', villa: 'SIRIN', guest: 'Gizem Aksoy', checkIn: '2026-08-01', checkOut: '2026-08-15', nights: 14, channel: 'BOOKING', gross: 42000, otaComm: 7560, cleanFee: 0, net: 34440, pax: 7, status: 'COMPLETED' },
-  { id: 'REZ-AUG-008', villa: 'SIRIN', guest: 'Kaan Demir', checkIn: '2026-08-16', checkOut: '2026-08-28', nights: 12, channel: 'WHATSAPP', gross: 32000, otaComm: 0, cleanFee: 0, net: 32000, pax: 6, status: 'COMPLETED' },
-  { id: 'REZ-AUG-009', villa: 'NEFES', guest: 'Turgut Baran', checkIn: '2026-08-08', checkOut: '2026-08-12', nights: 4, channel: 'WHATSAPP', gross: 34035, otaComm: 0, cleanFee: 0, net: 34035, pax: 12, status: 'COMPLETED' }
+  { id: 'REZ-2026-001', villa: 'VILLA_AZURE', guest: 'Alexander Wright', checkIn: '2026-08-02', checkOut: '2026-08-07', nights: 5, channel: 'AIRBNB', gross: 80000, otaComm: 12000, cleanFee: 1800, net: 66200, pax: 8, status: 'COMPLETED' },
+  { id: 'REZ-2026-002', villa: 'VILLA_OLIVE', guest: 'Charlotte & David Davies', checkIn: '2026-08-05', checkOut: '2026-08-12', nights: 7, channel: 'BOOKING', gross: 77000, otaComm: 13860, cleanFee: 1400, net: 61740, pax: 6, status: 'COMPLETED' },
+  { id: 'REZ-2026-003', villa: 'VILLA_BELLA', guest: 'Can & Selin Aras', checkIn: '2026-08-08', checkOut: '2026-08-15', nights: 7, channel: 'WHATSAPP', gross: 59500, otaComm: 0, cleanFee: 1000, net: 58500, pax: 6, status: 'COMPLETED' },
+  { id: 'REZ-2026-004', villa: 'VILLA_SUNSET', guest: 'Thomas Lindqvist', checkIn: '2026-08-10', checkOut: '2026-08-16', nights: 6, channel: 'AIRBNB', gross: 42000, otaComm: 6300, cleanFee: 850, net: 34850, pax: 4, status: 'COMPLETED' },
+  { id: 'REZ-2026-005', villa: 'VILLA_PALM', guest: 'Melis & Kerem Aydın', checkIn: '2026-08-14', checkOut: '2026-08-20', nights: 6, channel: 'INSTAGRAM', gross: 57000, otaComm: 0, cleanFee: 1200, net: 55800, pax: 6, status: 'COMPLETED' },
+  { id: 'REZ-2026-006', villa: 'VILLA_AZURE', guest: 'Dr. Stefan Meyer', checkIn: '2026-08-18', checkOut: '2026-08-25', nights: 7, channel: 'BOOKING', gross: 112000, otaComm: 20160, cleanFee: 1800, net: 90040, pax: 10, status: 'COMPLETED' },
+  { id: 'REZ-2026-007', villa: 'VILLA_BELLA', guest: 'Sophie Laurent', checkIn: '2026-08-20', checkOut: '2026-08-27', nights: 7, channel: 'AIRBNB', gross: 59500, otaComm: 8925, cleanFee: 1000, net: 49575, pax: 5, status: 'COMPLETED' },
+  { id: 'REZ-2026-008', villa: 'VILLA_OLIVE', guest: 'Barış & Ece Güner', checkIn: '2026-08-22', checkOut: '2026-08-29', nights: 7, channel: 'WHATSAPP', gross: 84000, otaComm: 0, cleanFee: 1400, net: 82600, pax: 8, status: 'COMPLETED' },
+  { id: 'REZ-2026-009', villa: 'VILLA_SUNSET', guest: 'Emma Watson-Brown', checkIn: '2026-08-24', checkOut: '2026-08-30', nights: 6, channel: 'WHATSAPP', gross: 45000, otaComm: 0, cleanFee: 850, net: 44150, pax: 4, status: 'COMPLETED' }
 ];
 
-// Initial Seed Expenses (August 2026 Scenario matches user prompt: Opex = 337.306 TL, Capex = 3.866 TL)
-// Old expenses replaced by COMPANY_EXCEL_DATABASE.expensesList
-
-
 const DEFAULT_LEADS = [
-  { id: 'L1', guest: 'Hakan Demir (0532 210 4421)', villa: 'SEYIR', channel: 'WhatsApp', quote: 28000, status: 'WON', lostReason: '-', notes: 'Rezervasyona dönüştü (3 Gece)' },
-  { id: 'L2', guest: 'Murat Kaya (0533 112 3344)', villa: 'DOGUS', channel: 'WhatsApp', quote: 36000, status: 'WON', lostReason: '-', notes: '10 kişilik grup kapandı' },
-  { id: 'L3', guest: 'Selin B. (0542 998 7766)', villa: 'ZIRVE', channel: 'WhatsApp', quote: 45000, status: 'FOLLOW_UP', lostReason: '-', notes: 'Jakuzili ev için akşam karar verecek' },
-  { id: 'L4', guest: 'Kemal V. (0530 443 2211)', villa: 'SIRIN', channel: 'WhatsApp', quote: 18000, status: 'LOST', lostReason: 'Fiyat Yüksek', notes: 'Bütçe uymadı, 14.000 TL teklif etmişti' },
-  { id: 'L5', guest: 'Derya S. (0535 667 8899)', villa: 'NEFES', channel: 'WhatsApp', quote: 35000, status: 'QUOTE_SENT', lostReason: '-', notes: 'Tarih teyidi bekleniyor' },
-  { id: 'L6', guest: 'Bora Yılmaz (0532 778 9900)', villa: 'ZIRVE', channel: 'WhatsApp', quote: 90000, status: 'WON', lostReason: '-', notes: 'Yılbaşı rezervasyonu onaylandı' },
-  { id: 'L7', guest: 'Tarkan E. (0533 889 0011)', villa: 'DOGUS', channel: 'WhatsApp', quote: 40000, status: 'LOST', lostReason: 'Tarih Dolu', notes: '18-21 Eylül istedi, o tarihler doluydu' },
-  { id: 'L8', guest: 'Sinem K. (0544 332 1100)', villa: 'ZIRVE', channel: 'WhatsApp', quote: 32000, status: 'LOST', lostReason: 'Cevap Vermedi', notes: 'Teklif gönderildi ancak geri dönüş yapmadı' },
-  { id: 'L9', guest: 'Ali Rıza T. (0532 111 2233)', villa: 'SEYIR', channel: 'WhatsApp', quote: 24000, status: 'WON', lostReason: '-', notes: 'Hafta sonu konaklama kapandı' }
+  { id: 'L1', guest: 'David Miller (+44 7700 900123)', villa: 'VILLA_AZURE', channel: 'WhatsApp', quote: 95000, status: 'WON', lostReason: '-', notes: 'Göcek VIP hafta sonu konaklaması onaylandı' },
+  { id: 'L2', guest: 'Selin Vural (0532 555 0192)', villa: 'VILLA_BELLA', channel: 'WhatsApp', quote: 48000, status: 'WON', lostReason: '-', notes: 'Kaş balayı konaklaması kapandı' },
+  { id: 'L3', guest: 'Marcus Weber (+49 171 2345678)', villa: 'VILLA_OLIVE', channel: 'WhatsApp', quote: 72000, status: 'FOLLOW_UP', lostReason: '-', notes: 'Bodrum zeytinlik villa için uçak saatlerini netleştirecek' },
+  { id: 'L4', guest: 'Kemal Tarcan (0533 555 0184)', villa: 'VILLA_SUNSET', channel: 'WhatsApp', quote: 28000, status: 'LOST', lostReason: 'Fiyat Yüksek', notes: 'Bütçesi 20.000 TL idi, anlaşma sağlanamadı' },
+  { id: 'L5', guest: 'Elena Rostova (+7 916 555 0144)', villa: 'VILLA_PALM', channel: 'WhatsApp', quote: 60000, status: 'QUOTE_SENT', lostReason: '-', notes: 'Alaçatı taş ev için tarih onayı bekleniyor' },
+  { id: 'L6', guest: 'Cemre & Tolga (0535 555 0177)', villa: 'VILLA_BELLA', channel: 'Instagram', quote: 55000, status: 'WON', lostReason: '-', notes: 'Ekim ilk haftası rezervasyona dönüştü' }
 ];
 
 const DEFAULT_MAINT = [
-  { id: 'M1', villa: 'DOGUS', priority: 'P1', title: 'Isı pompası sensör değişimi', assignee: 'Ahmet Usta', downtime: 1, cost: 4500, status: 'OPEN' },
-  { id: 'M2', villa: 'ZIRVE', priority: 'P2', title: 'Jakuzi ozon ve filtre bakımı', assignee: 'Teknik Servis', downtime: 0, cost: 2800, status: 'COMPLETED' },
-  { id: 'M3', villa: 'SEYIR', priority: 'P2', title: 'Şömine bacası periyodik temizliği', assignee: 'Mehmet', downtime: 0, cost: 1500, status: 'OPEN' }
+  { id: 'M1', villa: 'VILLA_AZURE', priority: 'P1', title: 'Sonsuzluk havuzu pH otomasyon sensörü kalibrasyonu', assignee: 'Havuz Teknik Ekibi', downtime: 0, cost: 3200, status: 'OPEN' },
+  { id: 'M2', villa: 'VILLA_OLIVE', priority: 'P2', title: 'VRF klima sistemi periyodik filtre temizliği ve gaz kontrolü', assignee: 'İklimlendirme Servisi', downtime: 0, cost: 2400, status: 'COMPLETED' },
+  { id: 'M3', villa: 'VILLA_PALM', priority: 'P2', title: 'Bahçe aydınlatma armatürleri ve akıllı zamanlayıcı revizyonu', assignee: 'Elektrik Teknikeri', downtime: 0, cost: 1800, status: 'OPEN' }
 ];
 
 // App State Container
@@ -5548,7 +4288,7 @@ function renderFinanceModule() {
 
   if (activeExcel) {
     if (currentFilter.period === 'ALL') {
-      // All-time Totals (14 Months from GENEL RAPOR.xlsx)
+      // All-time Totals (14 Months Synthetic Demo Data)
       const att = activeExcel.allTimeTotals;
       totalRevenue = att.totalRevenue;
       totalSoldNights = att.totalNights;
@@ -6524,11 +5264,11 @@ Tarih: ${new Date().toLocaleDateString('tr-TR')}
 
 2. MÜLK BAZINDA TARİHSEL CİRO PAYLARI:
 -----------------------------------------------------
-1. Seyir Dağ Evi:   1.380.134 TL (%27,6 Pay - 97 Gece)
-2. Zirve Dağ Evi:   1.214.493 TL (%24,3 Pay - 85 Gece - Jakuzi/Sauna)
-3. Nefes Dağ Evi:   1.081.971 TL (%21,6 Pay - 92 Gece)
-4. Doğuş Dağ Evi:     903.353 TL (%18,1 Pay - 98 Gece)
-5. Şirin Dağ Evi:     424.214 TL (%8,5 Pay - 85 Gece)
+1. Villa Azure Bay:    1.420.000 TL (%25,5 Pay - 158 Gece - Özel İskele & SPA)
+2. Villa Olive Garden: 1.320.000 TL (%23,7 Pay - 165 Gece - Zeytinlik & Taş Villa)
+3. Villa Bella Vista:  1.180.000 TL (%21,2 Pay - 178 Gece - Sonsuzluk Havuzlu)
+4. Villa Sunset Horizon: 890.000 TL (%16,0 Pay - 172 Gece - Teras Jakuzili)
+5. Villa Palm Breeze:    750.000 TL (%13,5 Pay - 173 Gece - Alaçatı Taş Ev)
 
 3. YAKLAŞAN DÖNEM & 2026/2027 KIŞ SEZONU GELİR TAHMİNLERİ:
 -----------------------------------------------------
@@ -8294,9 +7034,9 @@ function deleteMaint(id) {
 // -------------------------------------------------------------
 
 function confirmFactoryReset() {
-  const ok = confirm('⚠️ DİKKAT: Bu işlem tüm verileri sıfırlayıp sistemi masaüstündeki GENEL RAPOR.xlsx orijinal şirket veritabanına döndürür.\n\nHer şeyi sıfırlamak istediğinizden emin misiniz?');
+  const ok = confirm('⚠️ DİKKAT: Bu işlem tüm verileri sıfırlayıp sistemi orijinal demo portföy veritabanına döndürür.\n\nHer şeyi sıfırlamak istediğinizden emin misiniz?');
   if (!ok) return;
-  const secondOk = confirm('Son Onay: Tüm özel kayıtlar silinecek ve Excel veritabanı baştan yüklenecektir. Onaylıyor musunuz?');
+  const secondOk = confirm('Son Onay: Tüm özel kayıtlar silinecek ve demo veritabanı baştan yüklenecektir. Onaylıyor musunuz?');
   if (!secondOk) return;
 
   appData = {
@@ -8314,7 +7054,7 @@ function confirmFactoryReset() {
   };
   saveAppData();
   renderAll();
-  alert('✅ Tüm veriler sıfırlandı ve masaüstündeki GENEL RAPOR.xlsx veritabanı başarıyla yüklendi!');
+  alert('✅ Tüm veriler sıfırlandı ve demo portföy veritabanı başarıyla yüklendi!');
 }
 
 function openResetModal() {
@@ -8328,7 +7068,7 @@ function closeResetModal() {
 }
 
 function cleanResetAll() {
-  if (confirm('DİKKAT: Excel\'den aktarılan 14 aylık tüm geçmiş cirolar, 104 harcama kalemi, rezervasyonlar ve arıza kayıtları SIFIRLANACAKTIR.\n\nTüm finansal metrikler 0 TL olacak ve tertemiz boş bir sistem başlayacaktır.\n\nOnaylıyor musunuz?')) {
+  if (confirm('DİKKAT: Sistemdeki tüm geçmiş cirolar, harcama kalemleri, rezervasyonlar ve arıza kayıtları SIFIRLANACAKTIR.\n\nTüm finansal metrikler 0 TL olacak ve tertemiz boş bir sistem başlayacaktır.\n\nOnaylıyor musunuz?')) {
     appData.isCleanState = true;
     appData.excelDb = null;
     appData.bookings = [];
@@ -8338,7 +7078,7 @@ function cleanResetAll() {
     appData.targets = {};
     saveAppData();
     closeResetModal();
-    alert('✅ Tüm sistem ve Excel verileri başarıyla sıfırlandı! Tüm finansal göstergeler 0 TL temiz duruma getirildi.');
+    alert('✅ Tüm sistem verileri başarıyla sıfırlandı! Tüm finansal göstergeler 0 TL temiz duruma getirildi.');
   }
 }
 
@@ -8347,7 +7087,7 @@ function resetToCleanState() {
 }
 
 function restoreExcelData() {
-  if (confirm('GENEL RAPOR.xlsx dosyasındaki 14 aylık resmi şirket veritabanını (5.004.165 TL ciro, 104 harcama kalemi ve kış projeksiyonları) geri yüklemek istiyor musunuz?')) {
+  if (confirm('Lexbnb sentetik demo portföy veritabanını (5 lüks villa, 14 aylık geçmiş veriler) geri yüklemek istiyor musunuz?')) {
     appData.isCleanState = false;
     appData.excelDb = JSON.parse(JSON.stringify(COMPANY_EXCEL_DATABASE));
     appData.expenses = JSON.parse(JSON.stringify(COMPANY_EXCEL_DATABASE.expensesList));
@@ -8357,7 +7097,7 @@ function restoreExcelData() {
     appData.targets = JSON.parse(JSON.stringify(DEFAULT_TARGETS_BY_MONTH));
     saveAppData();
     closeResetModal();
-    alert('✅ GENEL RAPOR.xlsx resmi şirket verileri başarıyla geri yüklendi!');
+    alert('✅ Demo portföy verileri başarıyla geri yüklendi!');
   }
 }
 
@@ -10373,178 +9113,171 @@ function filterHelpGlossary() {
 // ⭐ CANLI AIRBNB İLAN VE İTİBAR RADARI MOTORU (5 VİLLA)
 // =============================================================
 const DEFAULT_AIRBNB_PROPERTIES = {
-  SEYIR: {
-    key: 'SEYIR',
-    name: 'Seyir Dağ Evi',
-    url: 'https://www.airbnb.com.tr/h/uludagseyir',
-    slug: 'uludagseyir',
-    title: 'Seyir Dağ Evi Uludağ Manzaralı Jakuzi & Şömine',
-    rating: 5.0,
-    reviews: 14,
-    highlights: 'Panoramik Vadi & Şehir, Geniş Bahçe, Şömine',
+  VILLA_BELLA: {
+    key: 'VILLA_BELLA',
+    name: 'Villa Bella Vista (Kaş)',
+    url: 'https://www.airbnb.com.tr/h/lexbnb-bellavista',
+    slug: 'lexbnb-bellavista',
+    title: 'Villa Bella Vista | Kaş Sonsuzluk Havuzlu Panoramik Deniz Manzaralı Lüks Villa',
+    rating: 4.98,
+    reviews: 32,
+    highlights: 'Panoramik Deniz Manzarası, Isıtmalı Sonsuzluk Havuzu, Teras Jakuzisi, Barbekü',
     isSuperhost: true,
     isGuestFavorite: true,
     lastSync: 'Bugün (Canlı)',
     searchPage: 1,
-    searchRank: 'Sayfa 1 / #2 (Zirve 🥇)',
-    coverPhoto: '🔥 Gün Batımı & Yanan Şömine (Sıcak Işık)',
-    coverCtr: 5.4,
+    searchRank: 'Sayfa 1 / #1 (Sıralama Lideri 🥇)',
+    coverPhoto: '🔥 Gün Batımı & Sonsuzluk Havuzu (Akdeniz Işığı)',
+    coverCtr: 5.8,
     golden5Score: 98,
-    listingScore: 96,
-    strScore: 97,
-    operatorNote: 'Şömineli gün batımı kapak karesi harika çalışıyor. Kış için veranda ışıklandırması çekilecek.',
-    aiCoverAdvice: 'Şömineli gün batımı kapak fotoğrafı olağanüstü yüksek CTR (%5.4) üretiyor. Değiştirmeyin.',
-    aiTitleAdvice: 'Başlık çok dengeli. Kış sezonu öncesi "Kayak Pistine Yakın" ibaresi eklenebilir.',
-    aiOptimizedTitle: 'Uludağ Seyir | Panoramik Şömineli & Jakuzili Sıcak Dağ Evi',
-    aiHookCopy: 'Uludağ\'ın zirvesinde, yanan şöminenin çıtırtısı ve sıcacık jakuzinizle gün batımını kadehinizle selamlayın. Şehir ışıklarının ayaklarınızın altına serildiği bu özel dağ evi, romantik kaçamaklar ve huzur arayan aileler için tasarlandı.',
+    listingScore: 97,
+    strScore: 98,
+    operatorNote: 'Sonsuzluk havuzlu gün batımı karesi yüksek dönüşüm üretiyor. Sonbahar için havuz ısıtması devrede.',
+    aiCoverAdvice: 'Kapak görseli %5.8 CTR ile bölge ortalamasının (%3.2) çok üzerinde. Kesinlikle değiştirmeyin.',
+    aiTitleAdvice: 'Başlıkta "Sonsuzluk Havuzu" kelimesi doğrudan arama hacmini çekiyor.',
+    aiOptimizedTitle: 'Villa Bella Vista | Kaş Sonsuzluk Havuzlu & Jakuzili Balayı Villası',
+    aiHookCopy: "Akdeniz'in turkuaz sularına karşı gün batımını özel ısıtmalı sonsuzluk havuzunuzdan izleyin. Meis Adası manzarası eşliğinde izole, huzurlu ve unutulmaz bir Akdeniz rüyası.",
     roasts: [
-      'Fotoğraf sıralamasında 4. karedeki banyo fotoğrafı yerine dış verandadaki barbekü alanı öne alınmalı.',
-      'Açıklamanın sonundaki ev kuralları bölümü çok bürokratik; daha samimi ve misafirperver bir dille yumuşatılmalı.'
+      'Giriş paragrafında araç kiralama önerisi ve otopark bilgisi biraz daha öne alınabilir.',
+      'Açıklamadaki klima donanım detayları madde imleriyle vurgulanmalı.'
     ],
     emergencyFixes: [
-      'İlk 5 fotoğrafa veranda gece ışıklandırması detayını ekleyin.',
-      'Kış için pistlere transfer / kar zinciri bilgilendirmesini giriş paragrafına taşıyın.',
-      'Anında rezervasyon açık kalsın; yanıt süresini 10 dakikanın altında tutmaya devam edin.'
+      'İlk 5 fotoğrafa gün batımı teras akşam aydınlatması detayını ekleyin.',
+      'Anında rezervasyon açık kalsın; yanıt süresi 10 dakikanın altında korunmalı.'
     ]
   },
-  ZIRVE: {
-    key: 'ZIRVE',
-    name: 'Zirve Dağ Evi',
-    url: 'https://www.airbnb.com.tr/h/uludagzirve',
-    slug: 'uludagzirve',
-    title: 'Uludag Zirve Bahçe - Barbekü Jakuzi',
+  VILLA_OLIVE: {
+    key: 'VILLA_OLIVE',
+    name: 'Villa Olive Garden (Bodrum)',
+    url: 'https://www.airbnb.com.tr/h/lexbnb-olivegarden',
+    slug: 'lexbnb-olivegarden',
+    title: 'Villa Olive Garden | Bodrum Yalıkavak Özel Zeytinlik Bahçeli Müstakil Taş Villa',
+    rating: 4.96,
+    reviews: 26,
+    highlights: '1000m² Müstakil Zeytinlik Bahçe, Büyük Havuz, Açık Şömine, Yalıkavak Yakını',
+    isSuperhost: true,
+    isGuestFavorite: true,
+    lastSync: 'Bugün (Canlı)',
+    searchPage: 1,
+    searchRank: 'Sayfa 1 / #3 (İlk Sayfa)',
+    coverPhoto: '🌿 Zeytin Ağaçları Arasında Işıklandırılmış Taş Villa & Havuz',
+    coverCtr: 5.2,
+    golden5Score: 96,
+    listingScore: 95,
+    strScore: 96,
+    operatorNote: 'Geniş aile ve butik arkadaş gruplarının gözdesi. Marina transfer servisi ilgi görüyor.',
+    aiCoverAdvice: 'Taş mimari ve akşam havuz aydınlatması güven veriyor. Yüksek tıklama oranını koruyor.',
+    aiTitleAdvice: 'Yalıkavak anahtar kelimesi uluslararası aramalarda kritik öneme sahip.',
+    aiOptimizedTitle: 'Villa Olive Garden | Bodrum Yalıkavak Özel Havuzlu & Bahçeli Taş Villa',
+    aiHookCopy: 'Asırlık zeytin ağaçlarının gölgesinde, begonvillerle sarılı otantik bir Bodrum taş villası. Özel havuz başında açık hava şöminesiyle Ege akşamlarının tadını çıkarın.',
+    roasts: [
+      'Mutfak donanımlarında espresso makinesi ve mikrodalga detayları fotoğraflanmalı.'
+    ],
+    emergencyFixes: [
+      'Marina mesafesi ve plaj erişim haritasını fotoğrafların arasına ekleyin.'
+    ]
+  },
+  VILLA_AZURE: {
+    key: 'VILLA_AZURE',
+    name: 'Villa Azure Bay (Göcek)',
+    url: 'https://www.airbnb.com.tr/h/lexbnb-azurebay',
+    slug: 'lexbnb-azurebay',
+    title: 'Villa Azure Bay | Göcek Özel İskeleli VIP Villa (Sauna & Hamam & Şef Mutfağı)',
     rating: 5.0,
-    reviews: 11,
-    highlights: 'Isıtmalı Jakuzi, Şömine, Özel Bahçe BBQ',
+    reviews: 22,
+    highlights: 'Özel İskele & Tekne Bağlama Alanı, Özel Hamam, Sauna, 5 Süit Yatak Odası',
+    isSuperhost: true,
+    isGuestFavorite: true,
+    lastSync: 'Bugün (Canlı)',
+    searchPage: 1,
+    searchRank: 'Sayfa 1 / #1 (Bölge Birincisi 🏆)',
+    coverPhoto: '🛥️ Göcek Koyu Özel İskele & Turkuaz Havuz Manzarası',
+    coverCtr: 6.2,
+    golden5Score: 99,
+    listingScore: 99,
+    strScore: 99,
+    operatorNote: 'VIP segmentte portföyün en yüksek gecelik gelir üreten amiral gemisi.',
+    aiCoverAdvice: 'Özel iskele ve tekne yanaşma görseli lüks algısını zirveye taşıyor (%6.2 CTR).',
+    aiTitleAdvice: '"VIP", "Özel İskele" ve "Sauna" kelimeleri yüksek bütçeli kitleyi doğrudan yakalıyor.',
+    aiOptimizedTitle: 'Villa Azure Bay | Göcek Özel İskeleli & Spa Donanımlı Lüks VIP Villa',
+    aiHookCopy: "Göcek'in turkuaz koylarına açılan özel iskeleniz, tekne bağlama imkanınız ve lüks spa konforunuzla ayrıcalıklı bir kaçış. Kişiye özel şef ve tekne turu organizasyonuyla unutulmaz bir deneyim.",
+    roasts: [
+      'Gecelik fiyat savunması çok başarılı; erken indirim vermeye gerek yok.'
+    ],
+    emergencyFixes: [
+      'Hızlı Wi-Fi hız testi görselini ilan fotoğraflarına ekleyin.'
+    ]
+  },
+  VILLA_SUNSET: {
+    key: 'VILLA_SUNSET',
+    name: 'Villa Sunset Horizon (Kalkan)',
+    url: 'https://www.airbnb.com.tr/h/lexbnb-sunsethorizon',
+    slug: 'lexbnb-sunsethorizon',
+    title: 'Villa Sunset Horizon | Kalkan Panoramik Körfez Manzaralı Jakuzili Teras Villası',
+    rating: 4.94,
+    reviews: 19,
+    highlights: 'Kalkan Koyu Manzarası, Teras Jakuzisi, Korunaklı Özel Havuz, Şömine',
     isSuperhost: true,
     isGuestFavorite: true,
     lastSync: 'Bugün (Canlı)',
     searchPage: 1,
     searchRank: 'Sayfa 1 / #4 (Üst Sıra)',
-    coverPhoto: '🛁 Sıcak Açık Hava Jakuzisi & Karlı Doğa',
-    coverCtr: 4.9,
-    golden5Score: 95,
-    listingScore: 94,
-    strScore: 95,
-    operatorNote: 'Açık hava jakuzisi kışın en büyük satış kozumuz. Yeni şömine fotoğrafları eklendi.',
-    aiCoverAdvice: 'Kış aylarında dış mekan jakuzisi etrafına sıcak duman ve akşam ışığı eklemek tıklamayı %22 artırır.',
-    aiTitleAdvice: 'Başlığa "Lüks Dağ Evi & Şömine" anahtar kelimelerini ekleyin. Mevcut başlıkta şömine eksik kalmış.',
-    aiOptimizedTitle: 'Uludağ Zirve | Sıcak Jakuzili & Şömineli Lüks Dağ Evi (Özel Bahçeli)',
-    aiHookCopy: 'Dışarıda lapa lapa yağan Uludağ karı, sıcacık 40 derece açık hava jakuziniz ve içeride çıtırdayan şömine... Zirve Dağ Evi, tamamen izole bahçesi ve lüks donanımıyla unutulmaz bir kış masalı vadediyor.',
+    coverPhoto: '🛁 Teras Jakuzisi & Kalkan Körfezinde Gün Batımı',
+    coverCtr: 5.4,
+    golden5Score: 94,
+    listingScore: 93,
+    strScore: 94,
+    operatorNote: 'Balayı çiftleri ve romantik tatiller için en çok talep gören villamız.',
+    aiCoverAdvice: 'Teras jakuzisi gün batımı karesi yüksek rezervasyon getirme oranına sahip.',
+    aiTitleAdvice: '"Kalkan Manzaralı" ve "Jakuzili" vurgusu çok güçlü.',
+    aiOptimizedTitle: 'Villa Sunset Horizon | Kalkan Deniz Manzaralı & Jakuzili Balayı Villası',
+    aiHookCopy: "Kalkan Körfezi'nin ışıkları ayaklarınızın altındayken, teras jakuzinizde günün yorgunluğunu atın. Korunaklı havuzu ve şömineli salonuyla baş başa romantik kaçamaklar için tasarlandı.",
     roasts: [
-      'Mevcut başlıkta "Şömine" kelimesi hiç geçmiyor! Dağ evi arayan misafirlerin %72\'si şömine filtresi kullanıyor.',
-      'Kapak fotoğrafında jakuzi çok net ancak evin heybeti ve orman dokusu kadrajda yeterince geniş değil.'
+      'Banyo fotoğraflarındaki aydınlatma daha sıcak tonlara çevrilmeli.'
     ],
     emergencyFixes: [
-      'Başlığı "Uludağ Zirve | Sıcak Jakuzili & Şömineli Lüks Dağ Evi" olarak derhal güncelleyin.',
-      'Fotoğraf galerisine yanan şömine karşısında sıcak kahve detay çekimi ekleyin.',
-      'Hafta içi minimum konaklamayı 2 geceye çekerek arama filtresine daha sık takılın.'
+      'Anında rezervasyon özelliğini açık tutun.'
     ]
   },
-  DOGUS: {
-    key: 'DOGUS',
-    name: 'Doğuş Dağ Evi',
-    url: 'https://www.airbnb.com.tr/h/uludagdogus',
-    slug: 'uludagdogus',
-    title: 'Doğuş Dağ Evi Uludağ Şömine & Barbekü Keyfi',
+  VILLA_PALM: {
+    key: 'VILLA_PALM',
+    name: 'Villa Palm Breeze (Alaçatı)',
+    url: 'https://www.airbnb.com.tr/h/lexbnb-palmbreeze',
+    slug: 'lexbnb-palmbreeze',
+    title: 'Villa Palm Breeze | Çeşme Alaçatı Taş Ev & Isıtmalı Özel Havuz',
     rating: 4.92,
-    reviews: 8,
-    highlights: 'Panoramik Şehir Manzarası, Bahçe, Doğa',
+    reviews: 18,
+    highlights: 'Otantik Alaçatı Mimarisi, Korunaklı Isıtmalı Havuz, İç Avlu, Köy İçi Yürüme',
     isSuperhost: true,
     isGuestFavorite: true,
     lastSync: 'Bugün (Canlı)',
     searchPage: 1,
-    searchRank: 'Sayfa 1 / #7 (İlk Sayfa)',
-    coverPhoto: '🥩 Ahşap Veranda & Bahçe Barbekü Alanı',
-    coverCtr: 4.6,
-    golden5Score: 92,
-    listingScore: 91,
-    strScore: 92,
-    operatorNote: 'Geniş veranda barbeküsü arkadaş gruplarının favorisi. Hafta sonları kapalı gişe.',
-    aiCoverAdvice: 'Sonbaharda veranda barbeküsü iyi çalışıyor. Aralık ayında kapak görseli yanan şömineye çekilmeli.',
-    aiTitleAdvice: 'Açıklamanın ilk 2 cümlesinde geniş aile ve arkadaş grubu konforu vurgulanmalı.',
-    aiOptimizedTitle: 'Uludağ Doğuş | Özel Bahçeli, Şömineli & Barbekülü Doğa Evi',
-    aiHookCopy: 'Közde demlenen çay, çıtırdayan şömine ateşi ve sevdiklerinizle baş başa bir Uludağ hafta sonu... Doğuş Dağ Evi, geniş ahşap verandası ve mangal alanıyla kalabalık gruplar için sıcak bir yuva.',
+    searchRank: 'Sayfa 1 / #6 (İlk Sayfa)',
+    coverPhoto: '🪨 Otantik Taş Mimari, Begonviller & Isıtmalı Havuz',
+    coverCtr: 4.9,
+    golden5Score: 93,
+    listingScore: 92,
+    strScore: 93,
+    operatorNote: 'Alaçatı köy içine yürüme mesafesinde, sessiz ve korunaklı özel taş avlu.',
+    aiCoverAdvice: 'Begonvilli taş mimari fotoğrafı tıklama oranını koruyor.',
+    aiTitleAdvice: '"Alaçatı Taş Ev" ve "Isıtmalı Havuz" kelimeleri sezon dışı doluluğu artırıyor.',
+    aiOptimizedTitle: 'Villa Palm Breeze | Çeşme Alaçatı Isıtmalı Havuzlu Otantik Taş Ev',
+    aiHookCopy: "Alaçatı'nın tarihi sokaklarının hemen yanı başında, taş mimarinin serinliği ve ısıtmalı havuzlu iç avlunun mahremiyeti. Rüzgar sörfü ve Ege mutfağı tutkunları için ideal konum.",
     roasts: [
-      'İlan açıklamasında yatak odalarının yerleşim planı net değil; misafirler yatak düzenini anlamakta zorlanıyor.',
-      'Fotoğraf sayısı (24) biraz az; en az 35 profesyonel fotoğraf olmalı.'
+      'İç avlu gece fotoğrafları güncellenebilir.'
     ],
     emergencyFixes: [
-      'Her yatak odasının net yatak tipini gösteren fotoğraflar ekleyip altyazı yazın.',
-      'Kışın araçla ulaşım kolaylığı ve otopark imkanını açıklamanın başına ekleyin.',
-      'Sonbahar indirim kuponu tanımlayarak takvimdeki 2 boşluğu kapatın.'
-    ]
-  },
-  NEFES: {
-    key: 'NEFES',
-    name: 'Nefes Dağ Evi',
-    url: 'https://www.airbnb.com.tr/h/uludagnefes',
-    slug: 'uludagnefes',
-    title: 'Villa Nefes Uludağ Bahçeli & BBQ’lu Geniş Chalet',
-    rating: 4.75,
-    reviews: 4,
-    highlights: 'Geniş Aile Alanı, Dağ Esintisi, Özel Veranda',
-    isSuperhost: true,
-    isGuestFavorite: true,
-    lastSync: 'Bugün (Canlı)',
-    searchPage: 1,
-    searchRank: 'Sayfa 1 / #9 (İlk Sayfa)',
-    coverPhoto: '🌲 Geniş Chalet Dış Cephe & Doğa Manzarası',
-    coverCtr: 4.2,
-    golden5Score: 88,
-    listingScore: 88,
-    strScore: 89,
-    operatorNote: 'Geniş 3 katlı chalet tipi mimari. Yabancı misafirlerin ilgisi yüksek.',
-    aiCoverAdvice: 'Geniş dış cephe fotoğrafı yerine yüksek tavanlı şömineli salonu kapak yapmak CTR\'ı %30 yükseltir.',
-    aiTitleAdvice: '"Chalet" kelimesi yabancı turist için çok iyi. Türkçe aramalarda "Geniş Aile Dağ Evi" eklenmeli.',
-    aiOptimizedTitle: 'Uludağ Nefes | Geniş Aileye Özel Şömineli Chalet & Barbekü',
-    aiHookCopy: 'Çam ormanlarının içinde gerçek bir Alp mimarisi deneyimi. Yüksek tavanlı ahşap salonu, taş şöminesi ve geniş bahçesiyle Nefes Chalet, kalabalık ailelerin konforla nefes alacağı özel bir sığınak.',
-    roasts: [
-      'Puanı 4.75 seviyesinde; 4.90 barajının altında olduğu için Misafirlerin Gözdesi (Guest Favorite) rozetini kaybetme riski var.',
-      'Dış cephe fotoğrafı uzaktan çekildiği için evin lüks iç detayları arama sayfasında görünmüyor.'
-    ],
-    emergencyFixes: [
-      'Kapak fotoğrafını doğrudan şömineli yüksek tavanlı salona çevirin.',
-      'Gelecek 3 konaklamada misafirlere ekstra şömine odunu ve karşılama ikramı sunarak 5.0 yorum alın.',
-      'Hızlı internet (WiFi) hız testini fotoğraflara ekleyin (Uzaktan çalışan kitle için).'
-    ]
-  },
-  SIRIN: {
-    key: 'SIRIN',
-    name: 'Şirin Dağ Evi',
-    url: 'https://www.airbnb.com.tr/h/uludagvillasirin',
-    slug: 'uludagvillasirin',
-    title: 'Uludağ Tatil Evleri & Villa Şirin',
-    rating: 5.0,
-    reviews: 4,
-    highlights: 'Otantik Ahşap Doku, İzole Doğa, Şömine',
-    isSuperhost: true,
-    isGuestFavorite: false,
-    lastSync: 'Bugün (Canlı)',
-    searchPage: 2,
-    searchRank: 'Sayfa 2 / #18 (2. Sayfa ⚠️)',
-    coverPhoto: '🪵 Karanlık Açılı Ahşap Salon Fotoğrafı',
-    coverCtr: 3.1,
-    golden5Score: 72,
-    listingScore: 78,
-    strScore: 76,
-    operatorNote: '🚨 2. SAYFA ALARMI: Kapak görseli çok karanlık kalmış, tıklama alamıyor. Bu hafta yeni fotoğraflar çekilecek.',
-    aiCoverAdvice: '🚨 ACİL KAPAK DEĞİŞİMİ: Mevcut iç mekan karanlık kalıyor. Dışarıdan karlı ahşap cephe veya sıcak yanan şömine detay fotoğrafı yükleyin.',
-    aiTitleAdvice: '🚨 BAŞLIK OPTİMİZASYONU: "Villa Şirin" çok jenerik kalıyor. "Şömineli Dağ Evi" kelimeleri eklenirse 48 saatte ilk sayfaya fırlar.',
-    aiOptimizedTitle: 'Uludağ Şirin | Romantik Çift & Küçük Aile İçin Şömineli Dağ Evi',
-    aiHookCopy: 'Sessizliğin sesini dinleyeceğiniz, otantik ahşap dokusu ve çıtırdayan şöminesiyle sıcacık bir dağ sığınağı. Şirin Dağ Evi, şehrin gürültüsünden kaçıp şömine başında baş başa kalmak isteyen çiftler için biçilmiş kaftan.',
-    roasts: [
-      '🚨 SIRALAMA KATİLİ: Başlıkta yalnızca "Villa Şirin" yazıyor! Misafirler "Villa Şirin" diye aramaz; "Şömineli Dağ Evi" diye arar.',
-      '🚨 KAPAK KATİLİ: Kapak fotoğrafı yetersiz ışıkta çekilmiş; ahşap detaylar karanlık bir mağara gibi görünüyor, CTR %3.1\'e çakılmış.',
-      'İlanda Anında Rezervasyon (Instant Book) kapalı; bu yüzden Airbnb algoritması ilanı doğrudan 2. sayfaya fırlatmış.'
-    ],
-    emergencyFixes: [
-      'Hemen bugün Anında Rezervasyon (Instant Book) seçeneğini açın.',
-      'Başlığı "Uludağ Şirin | Romantik Çift İçin Şömineli Sıcak Dağ Evi" yapın.',
-      'Kapak fotoğrafını yanan şöminenin sıcak alevli yakın çekimiyle değiştirin.'
+      'Kış ve sonbahar dönemi için havuz ısıtma sıcaklık derecesini açıklamaya ekleyin.'
     ]
   }
 };
+
+// Aliases for legacy compatibility
+DEFAULT_AIRBNB_PROPERTIES['SEYIR'] = DEFAULT_AIRBNB_PROPERTIES['VILLA_BELLA'];
+DEFAULT_AIRBNB_PROPERTIES['DOGUS'] = DEFAULT_AIRBNB_PROPERTIES['VILLA_OLIVE'];
+DEFAULT_AIRBNB_PROPERTIES['ZIRVE'] = DEFAULT_AIRBNB_PROPERTIES['VILLA_AZURE'];
+DEFAULT_AIRBNB_PROPERTIES['SIRIN'] = DEFAULT_AIRBNB_PROPERTIES['VILLA_SUNSET'];
+DEFAULT_AIRBNB_PROPERTIES['NEFES'] = DEFAULT_AIRBNB_PROPERTIES['VILLA_PALM'];
 
 function renderAirbnbAuditRadar() {
   const tbody = document.getElementById('digitalAuditTableBody');
@@ -11574,54 +10307,53 @@ function runAiListingCritic(inputUrl = null, explicitKey = null) {
 const DEFAULT_INFLUENCER_COLLABS = [
   {
     id: 'INF-001',
-    handle: '@gezgincift (Can & Merve)',
-    followers: '285K',
-    villa: 'SEYIR',
+    handle: '@luxurytravels (Can & Merve)',
+    followers: '320K',
+    villa: 'VILLA_BELLA',
     dates: '12 - 14 Ekim 2026',
-    cost: 3500,
-    code: 'GEZGIN10',
-    bookingsCount: 4,
-    revenue: 112000,
+    cost: 4500,
+    code: 'BELLA10',
+    bookingsCount: 5,
+    revenue: 145000,
     status: 'COMPLETED',
-    roi: '32.0x',
-    notes: '2 Reels + 6 Story paylaştı. Şömine ve jakuzi vurgusu harika dönüşüm getirdi.'
+    roi: '32.2x',
+    notes: '2 Reels + 8 Story paylaştı. Sonsuzluk havuzu ve gün batımı vurgusu yüksek dönüşüm getirdi.'
   },
   {
     id: 'INF-002',
-    handle: '@uludagrotalari (Kaan)',
-    followers: '140K',
-    villa: 'ZIRVE',
-    dates: '24 - 25 Ekim 2026',
-    cost: 2000,
-    code: 'ROTA15',
-    bookingsCount: 2,
-    revenue: 64000,
+    handle: '@egevillalari (Kaan)',
+    followers: '185K',
+    villa: 'VILLA_AZURE',
+    dates: '24 - 26 Ekim 2026',
+    cost: 3000,
+    code: 'AZURE15',
+    bookingsCount: 3,
+    revenue: 168000,
     status: 'COMPLETED',
-    roi: '32.0x',
-    notes: '1 Reels paylaştı. Karlı manzara ve açık hava barbekü temalı içerik.'
+    roi: '56.0x',
+    notes: '1 Reels paylaştı. Özel iskele ve yat bağlama temalı VIP içerik.'
   },
   {
     id: 'INF-003',
-    handle: '@burcunundunyasi (Burcu Ş.)',
-    followers: '95K',
-    villa: 'SIRIN',
+    handle: '@bodrumrotalari (Burcu Ş.)',
+    followers: '110K',
+    villa: 'VILLA_OLIVE',
     dates: '02 - 04 Kasım 2026',
-    cost: 2800,
-    code: 'BURCU10',
-    bookingsCount: 1,
-    revenue: 28000,
+    cost: 3200,
+    code: 'OLIVE10',
+    bookingsCount: 2,
+    revenue: 56000,
     status: 'COMPLETED',
-    roi: '10.0x',
-    notes: 'Hafta içi kaçamağı temalı vlog & hikaye serisi.'
+    roi: '17.5x',
+    notes: 'Zeytinlik bahçesi ve taş mimari temalı sonbahar kaçamağı hikaye serisi.'
   }
 ];
 
-// -------------------------------------------------------------
 // 1. 🛑 TAKVİMDEKİ "YETİM GECELER" (GAP NIGHTS) MOTORU
 // -------------------------------------------------------------
 function detectGapNights() {
   const gaps = [];
-  const villas = ['SEYIR', 'ZIRVE', 'DOGUS', 'SIRIN', 'NEFES'];
+  const villas = Object.keys(appData.villas || DEFAULT_VILLAS);
 
   villas.forEach(vKey => {
     const vName = (appData.villas && appData.villas[vKey]?.name) ? appData.villas[vKey].name : vKey;
@@ -12247,8 +10979,8 @@ function getSaaSUsers() {
       master.email = 'demo@lexbnb.com';
       master.password = 'lexbnb';
       master.managerName = 'LexBnB Host';
-      if (!master.companyName || master.companyName === 'Uludağ Tatil Evleri') {
-        master.companyName = 'LexBnB Portföyü';
+      if (!master.companyName || master.companyName.includes('Uludağ') || master.companyName.includes('UTE')) {
+        master.companyName = 'Lexbnb Luxury Portfolio';
       }
     } else {
       users.unshift(JSON.parse(JSON.stringify(DEFAULT_SAAS_USERS[0])));
@@ -12920,30 +11652,28 @@ async function loadTenantAppData(tenantIdOrUserId) {
   renderAll();
 }
 
-function initDefaultUteData() {
+function initDefaultDemoData() {
   appData = {
     isCleanState: false,
     excelDb: COMPANY_EXCEL_DATABASE,
-    companyName: (activeSaaSUser && activeSaaSUser.companyName) || 'LexBnB Portföyü',
-    villas: {
-      SEYIR: { name: 'Seyir Dağ Evi', capacity: '6+2 Kişi', basePrice: 16000, cleanCost: 1200 },
-      ZIRVE: { name: 'Zirve Dağ Evi', capacity: '9 Kişi', basePrice: 22000, cleanCost: 1500 },
-      DOGUS: { name: 'Doğuş Dağ Evi', capacity: '11 Kişi', basePrice: 18000, cleanCost: 1500 },
-      SIRIN: { name: 'Şirin Dağ Evi', capacity: '7 Kişi', basePrice: 14000, cleanCost: 1000 },
-      NEFES: { name: 'Nefes Dağ Evi', capacity: '12 Kişi', basePrice: 20000, cleanCost: 1500 }
-    },
+    companyName: (activeSaaSUser && activeSaaSUser.companyName) || 'Lexbnb Luxury Portfolio',
+    villas: JSON.parse(JSON.stringify(DEFAULT_VILLAS)),
     targets: COMPANY_EXCEL_DATABASE.targets,
     bookings: JSON.parse(JSON.stringify(DEFAULT_BOOKINGS)),
     expenses: JSON.parse(JSON.stringify(COMPANY_EXCEL_DATABASE.expensesList)),
     leads: JSON.parse(JSON.stringify(DEFAULT_LEADS)),
     maintenance: JSON.parse(JSON.stringify(DEFAULT_MAINT)),
     cleaningTasks: [],
-    marketingCampaigns: JSON.parse(JSON.stringify(DEFAULT_MARKETING_CAMPAIGNS)),
+    marketingCampaigns: JSON.parse(JSON.stringify(DEFAULT_MARKETING_CAMPAIGNS || [])),
     influencerCollabs: JSON.parse(JSON.stringify(DEFAULT_INFLUENCER_COLLABS)),
     airbnbListings: JSON.parse(JSON.stringify(DEFAULT_AIRBNB_PROPERTIES)),
     otaPricingStrategy: 'MARKUP'
   };
   syncBookingCleaningTasks();
+}
+
+function initDefaultUteData() {
+  return initDefaultDemoData();
 }
 
 function getBlankTenantData(userId) {
@@ -13001,7 +11731,12 @@ function updateAllVillaDropdowns() {
     'mktVilla',
     'infVilla',
     'scriptVillaSelect',
-    'abTestVillaSelect'
+    'abTestVillaSelect',
+    'calendarVillaFilter',
+    'pricingVillaFilter',
+    'opsVillaFilter',
+    'hkVilla',
+    'guestVilla'
   ];
 
   dropdownIds.forEach(selectId => {

@@ -1,111 +1,112 @@
-// UTE Kontrol Merkezi V5 - Hospitality Business Logic & Calculation Engine
-// Built for Uludağ Tatil Evleri (Seyir, Doğuş, Zirve, Şirin, Nefes)
+// LEXBNB - Hospitality Business Logic & Calculation Engine
+// Built for Lexbnb Luxury Portfolio
 
 const VILLAS = {
+  VILLA_BELLA: {
+    id: 'VILLA_BELLA',
+    name: 'Villa Bella Vista',
+    capacity: 8,
+    bedrooms: 3,
+    bathrooms: 3,
+    features: ['Sonsuzluk Havuzu', 'Panoramik Deniz Manzarası', 'Jakuzi', 'Barbekü'],
+    rates: { floor: 4500, base: 6000, target: 8500, premium: 12000, peak: 16500 },
+    marginalCosts: { cleaning: 1000, heatingDaily: 350, laundryPerGuest: 80 }
+  },
+  VILLA_OLIVE: {
+    id: 'VILLA_OLIVE',
+    name: 'Villa Olive Garden',
+    capacity: 8,
+    bedrooms: 4,
+    bathrooms: 4,
+    features: ['1000m² Zeytinlik Bahçesi', 'Özel Yüzme Havuzu', 'Açık Şömine', 'Otopark'],
+    rates: { floor: 6000, base: 8500, target: 12000, premium: 17000, peak: 24000 },
+    marginalCosts: { cleaning: 1400, heatingDaily: 400, laundryPerGuest: 90 }
+  },
+  VILLA_SUNSET: {
+    id: 'VILLA_SUNSET',
+    name: 'Villa Sunset Horizon',
+    capacity: 4,
+    bedrooms: 2,
+    bathrooms: 2,
+    features: ['Kalkan Koyu Manzarası', 'Teras Jakuzisi', 'Korunaklı Havuz', 'Şömine'],
+    rates: { floor: 3500, base: 5000, target: 7000, premium: 10000, peak: 14000 },
+    marginalCosts: { cleaning: 850, heatingDaily: 300, laundryPerGuest: 75 }
+  },
+  VILLA_AZURE: {
+    id: 'VILLA_AZURE',
+    name: 'Villa Azure Bay',
+    capacity: 10,
+    bedrooms: 5,
+    bathrooms: 5,
+    features: ['Özel İskele & Tekne Alanı', 'Özel Hamam', 'Sauna', 'Şef Mutfağı'],
+    rates: { floor: 8000, base: 11000, target: 16000, premium: 22500, peak: 32000 },
+    marginalCosts: { cleaning: 1800, heatingDaily: 600, laundryPerGuest: 100 }
+  },
+  VILLA_PALM: {
+    id: 'VILLA_PALM',
+    name: 'Villa Palm Breeze',
+    capacity: 6,
+    bedrooms: 3,
+    bathrooms: 3,
+    features: ['Otantik Taş Mimari', 'Isıtmalı Korunaklı Havuz', 'İç Avlu', 'Smart Home'],
+    rates: { floor: 5000, base: 7000, target: 10000, premium: 14500, peak: 20000 },
+    marginalCosts: { cleaning: 1200, heatingDaily: 400, laundryPerGuest: 85 }
+  },
+  // Backward compatibility test aliases
   SEYIR: {
     id: 'SEYIR',
-    name: 'Seyir',
-    capacity: 8, // 6+2
+    name: 'Villa Bella Vista (Test)',
+    capacity: 8,
     bedrooms: 2,
     bathrooms: 1.5,
     distancePisteKm: 24,
-    features: ['Isı Pompası', 'Şömine', 'Soba', 'Kış Bahçesi', '2-3 Araç Otopark'],
-    rates: {
-      floor: 3500,
-      base: 4500,
-      target: 6000,
-      premium: 8500,
-      peak: 12000
-    },
-    marginalCosts: {
-      cleaning: 800,
-      heatingDaily: 350,
-      laundryPerGuest: 80
-    }
+    features: ['Isı Pompası', 'Şömine', 'Soba', 'Kış Bahçesi'],
+    rates: { floor: 3500, base: 4500, target: 6000, premium: 8500, peak: 12000 },
+    marginalCosts: { cleaning: 800, heatingDaily: 350, laundryPerGuest: 80 }
   },
   DOGUS: {
     id: 'DOGUS',
-    name: 'Doğuş',
+    name: 'Villa Olive Garden (Test)',
     capacity: 11,
     bedrooms: 4,
     bathrooms: 2,
     distancePisteKm: 14,
-    features: ['Isı Pompası', 'Şömine', 'Soba', 'Lüks Büyük Kış Bahçesi', '3-4 Araç'],
-    rates: {
-      floor: 5000,
-      base: 6500,
-      target: 9000,
-      premium: 13000,
-      peak: 18000
-    },
-    marginalCosts: {
-      cleaning: 1200,
-      heatingDaily: 500,
-      laundryPerGuest: 90
-    }
+    features: ['Isı Pompası', 'Şömine', 'Lüks Kış Bahçesi'],
+    rates: { floor: 5000, base: 6500, target: 9000, premium: 13000, peak: 18000 },
+    marginalCosts: { cleaning: 1200, heatingDaily: 500, laundryPerGuest: 90 }
   },
   ZIRVE: {
     id: 'ZIRVE',
-    name: 'Zirve',
+    name: 'Villa Azure Bay (Test)',
     capacity: 9,
     bedrooms: 3,
     bathrooms: 2,
     distancePisteKm: 12,
-    features: ['Isı Pompası', 'Şömine', 'Sauna', 'Isıtmalı Jakuzi', 'Isıtmalı Kapalı Çardak'],
-    rates: {
-      floor: 6500,
-      base: 8500,
-      target: 12000,
-      premium: 16500,
-      peak: 24000
-    },
-    marginalCosts: {
-      cleaning: 1500,
-      heatingDaily: 700, // jakuzi + sauna elektrik/ısıtma
-      laundryPerGuest: 100
-    }
+    features: ['Isı Pompası', 'Şömine', 'Sauna', 'Isıtmalı Jakuzi'],
+    rates: { floor: 6500, base: 8500, target: 12000, premium: 16500, peak: 24000 },
+    marginalCosts: { cleaning: 1500, heatingDaily: 700, laundryPerGuest: 100 }
   },
   SIRIN: {
     id: 'SIRIN',
-    name: 'Şirin',
+    name: 'Villa Sunset Horizon (Test)',
     capacity: 7,
     bedrooms: 2,
     bathrooms: 1,
-    distancePisteKm: 21,
-    features: ['Isı Pompası', 'Şömine', 'Üst Teras', 'Kapalı Veranda'],
-    rates: {
-      floor: 3000,
-      base: 4000,
-      target: 5500,
-      premium: 7500,
-      peak: 11000
-    },
-    marginalCosts: {
-      cleaning: 750,
-      heatingDaily: 300,
-      laundryPerGuest: 75
-    }
+    distancePisteKm: 22,
+    features: ['Şömine', 'Soba', 'Teras'],
+    rates: { floor: 3000, base: 4000, target: 5500, premium: 7500, peak: 11000 },
+    marginalCosts: { cleaning: 750, heatingDaily: 300, laundryPerGuest: 75 }
   },
   NEFES: {
     id: 'NEFES',
-    name: 'Nefes',
+    name: 'Villa Palm Breeze (Test)',
     capacity: 12,
     bedrooms: 4,
     bathrooms: 3,
-    distancePisteKm: 21,
-    features: ['Isı Pompası', 'Şömine', 'Soba', 'Isıtmalı Kış Bahçesi', 'Voleybol Alanı', 'Mini Kale'],
-    rates: {
-      floor: 5500,
-      base: 7000,
-      target: 9500,
-      premium: 14000,
-      peak: 19000
-    },
-    marginalCosts: {
-      cleaning: 1400,
-      heatingDaily: 550,
-      laundryPerGuest: 90
-    }
+    distancePisteKm: 16,
+    features: ['Şömine', 'Soba', 'Geniş Bahçe', '3 Banyo'],
+    rates: { floor: 5500, base: 7000, target: 9500, premium: 14000, peak: 19000 },
+    marginalCosts: { cleaning: 1400, heatingDaily: 550, laundryPerGuest: 85 }
   }
 };
 
