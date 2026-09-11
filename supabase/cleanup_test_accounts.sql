@@ -1,56 +1,115 @@
 -- =============================================================================
 -- TEST HESAPLARI TEMİZLİĞİ
 -- =============================================================================
--- migration_phase13_user_deletion.sql ÇALIŞTIRILDIKTAN SONRA kullanılır.
--- Öncesinde çalıştırırsanız foreign key'ler silmeyi bloke eder.
+-- NASIL KULLANILIR:
+--   1. Bu dosyanın TAMAMINI kopyalayın.
+--   2. Supabase Dashboard -> SQL Editor -> yapıştırın -> Run.
+--   3. Alttaki "Results" / "Messages" sekmesinde raporu okuyun.
 --
--- Regresyon test koşucusu (run_all_tests.js) her koşuda Supabase'de gerçek
--- kullanıcı açıyor ve temizliği tam çalışmıyor. Bu dosya artıkları siler.
+--   Başka hiçbir şey yapmanız gerekmiyor. Tek seferde çalışır.
 --
--- ÇALIŞTIRMA: Supabase Dashboard -> SQL Editor
+-- NE YAPAR:
+--   Yalnızca otomatik regresyon testlerinin açtığı hesapları siler. Hedef,
+--   yalnızca şu test alan adlarıdır:
+--       @lexbnb-e2e.test   @lexbnb.test   @lexbnbtest.com   @lexbnb-test.com
+--
+--   Gerçek bir müşteri adresi (gmail.com, sirketiniz.com, vb.) bu desene
+--   ASLA uymaz. Silmeden önce korunacak hesapları tek tek listeler; blok
+--   ayrıca desene uymayan bir hesabı silmeye kalkarsa kendini iptal eder.
+--
+-- ÖN KOŞUL:
+--   migration_phase13_user_deletion.sql ve migration_phase14_owner_guard_fix.sql
+--   çalıştırılmış olmalı. Aksi halde silme bloke olur ve blok bunu söyler.
 -- =============================================================================
 
--- -----------------------------------------------------------------------------
--- ADIM 1: ÖNCE SAYIMI GÖR (hiçbir şey silmez — önce bunu çalıştırın)
--- -----------------------------------------------------------------------------
-SELECT
-    COUNT(*) FILTER (WHERE email ~* '@(lexbnb-e2e\.test|lexbnb\.test|lexbnbtest\.com|lexbnb-test\.com)$') AS silinecek_test_hesabi,
-    COUNT(*) FILTER (WHERE email !~* '@(lexbnb-e2e\.test|lexbnb\.test|lexbnbtest\.com|lexbnb-test\.com)$') AS korunacak_gercek_hesap,
-    COUNT(*) AS toplam
-FROM auth.users;
+DO $$
+DECLARE
+    -- Test hesaplarini tanimlayan tek desen.
+    c_test_pattern CONSTANT TEXT := '@(lexbnb-e2e\.test|lexbnb\.test|lexbnbtest\.com|lexbnb-test\.com)$';
 
--- -----------------------------------------------------------------------------
--- ADIM 2: KORUNACAK HESAPLARI GÖZLE DOĞRULAYIN
--- Bu listede silinmesini istemediğiniz TÜM adresler görünmeli.
--- -----------------------------------------------------------------------------
-SELECT email, created_at, email_confirmed_at
-FROM auth.users
-WHERE email !~* '@(lexbnb-e2e\.test|lexbnb\.test|lexbnbtest\.com|lexbnb-test\.com)$'
-ORDER BY created_at;
+    v_total        INT;
+    v_to_delete    INT;
+    v_to_keep      INT;
+    v_tenants_del  INT;
+    v_users_del    INT;
+    r              RECORD;
+BEGIN
+    SELECT COUNT(*),
+           COUNT(*) FILTER (WHERE email ~* c_test_pattern),
+           COUNT(*) FILTER (WHERE email !~* c_test_pattern)
+      INTO v_total, v_to_delete, v_to_keep
+    FROM auth.users;
 
--- -----------------------------------------------------------------------------
--- ADIM 3: SİLME
--- Yukarıdaki listeyi doğruladıktan SONRA bu bloğu çalıştırın.
--- Yalnızca test alan adlarını hedefler; gerçek müşteri adresleri eşleşmez.
--- tenants/properties/bookings, tenant_members üzerinden CASCADE ile temizlenir.
--- -----------------------------------------------------------------------------
--- Once sahipsiz kalacak tenant'lari sil (created_by artik SET NULL oldugu icin
--- kullanicilar silinince tenant'lar ortada kalirdi).
-DELETE FROM public.tenants t
-WHERE EXISTS (
-    SELECT 1 FROM auth.users u
-    WHERE u.id = t.created_by
-      AND u.email ~* '@(lexbnb-e2e\.test|lexbnb\.test|lexbnbtest\.com|lexbnb-test\.com)$'
-);
+    RAISE NOTICE '=====================================================';
+    RAISE NOTICE 'BASLANGIC DURUMU';
+    RAISE NOTICE '  Toplam hesap        : %', v_total;
+    RAISE NOTICE '  Silinecek (test)    : %', v_to_delete;
+    RAISE NOTICE '  Korunacak (gercek)  : %', v_to_keep;
+    RAISE NOTICE '=====================================================';
 
-DELETE FROM auth.users
-WHERE email ~* '@(lexbnb-e2e\.test|lexbnb\.test|lexbnbtest\.com|lexbnb-test\.com)$';
+    -- Korunacak hesaplari acikca listele ki gozle dogrulayabilesiniz.
+    RAISE NOTICE 'KORUNACAK HESAPLAR:';
+    FOR r IN
+        SELECT email, created_at
+        FROM auth.users
+        WHERE email !~* c_test_pattern
+        ORDER BY created_at
+    LOOP
+        RAISE NOTICE '  KORUNUYOR -> %  (kayit: %)', r.email, r.created_at::DATE;
+    END LOOP;
 
--- -----------------------------------------------------------------------------
--- ADIM 4: DOĞRULAMA
--- -----------------------------------------------------------------------------
+    IF v_to_delete = 0 THEN
+        RAISE NOTICE '=====================================================';
+        RAISE NOTICE 'Silinecek test hesabi yok. Veritabani zaten temiz.';
+        RAISE NOTICE '=====================================================';
+        RETURN;
+    END IF;
+
+    -- GUVENLIK KILIDI: desene uymayan tek bir hesap bile hedeflenirse iptal et.
+    IF EXISTS (
+        SELECT 1 FROM auth.users
+        WHERE email ~* c_test_pattern
+          AND email !~* '@(lexbnb-e2e\.test|lexbnb\.test|lexbnbtest\.com|lexbnb-test\.com)$'
+    ) THEN
+        RAISE EXCEPTION 'GUVENLIK: hedef listesi beklenmedik bir adres iceriyor, hicbir sey silinmedi.';
+    END IF;
+
+    -- 1) Test kullanicilarinin kurdugu isletmeleri sil.
+    --    properties / bookings / expenses / tenant_members bunlara cascade ile bagli.
+    WITH silinen AS (
+        DELETE FROM public.tenants t
+        WHERE EXISTS (
+            SELECT 1 FROM auth.users u
+            WHERE u.id = t.created_by
+              AND u.email ~* c_test_pattern
+        )
+        RETURNING 1
+    )
+    SELECT COUNT(*) INTO v_tenants_del FROM silinen;
+
+    -- 2) Test kullanicilarini sil.
+    WITH silinen AS (
+        DELETE FROM auth.users
+        WHERE email ~* c_test_pattern
+        RETURNING 1
+    )
+    SELECT COUNT(*) INTO v_users_del FROM silinen;
+
+    RAISE NOTICE '=====================================================';
+    RAISE NOTICE 'TEMIZLIK TAMAMLANDI';
+    RAISE NOTICE '  Silinen isletme     : %', v_tenants_del;
+    RAISE NOTICE '  Silinen hesap       : %', v_users_del;
+    RAISE NOTICE '=====================================================';
+END $$;
+
+-- =============================================================================
+-- SON DURUM (Results sekmesinde tablo olarak görünür)
+-- =============================================================================
 SELECT
     (SELECT COUNT(*) FROM auth.users)        AS kalan_hesap,
-    (SELECT COUNT(*) FROM public.tenants)    AS kalan_tenant,
+    (SELECT COUNT(*) FROM public.tenants)    AS kalan_isletme,
     (SELECT COUNT(*) FROM public.properties) AS kalan_mulk,
-    (SELECT COUNT(*) FROM public.bookings)   AS kalan_rezervasyon;
+    (SELECT COUNT(*) FROM public.bookings)   AS kalan_rezervasyon,
+    (SELECT COUNT(*) FROM auth.users
+      WHERE email ~* '@(lexbnb-e2e\.test|lexbnb\.test|lexbnbtest\.com|lexbnb-test\.com)$')
+                                             AS kalan_test_hesabi;  -- 0 OLMALI
