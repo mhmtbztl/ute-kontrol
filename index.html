@@ -2491,6 +2491,65 @@
     <!-- TAB: AYARLAR & HEDEFLER -->
     <!-- ========================================== -->
     <div id="tab-settings" class="tab-content">
+      <!-- EKİP VE ROL YÖNETİMİ -->
+      <section class="card" style="margin-bottom: 24px;">
+        <div class="section-title-bar">
+          <div>
+            <h2>👥 EKİP VE ROL YÖNETİMİ</h2>
+            <p class="sub-text">İşletmenize kullanıcı davet edin ve her birinin yetki seviyesini belirleyin.</p>
+          </div>
+          <button class="btn btn-primary btn-sm" id="inviteMemberBtn" onclick="openInviteMemberModal()">+ Ekibe Üye Davet Et</button>
+        </div>
+
+        <div id="teamRoleLegend" style="display: flex; flex-wrap: wrap; gap: 8px; padding: 0 4px 14px;">
+          <span class="badge badge-purple">Sahip</span><span class="sub-text" style="font-size: 11px;">tam yetki, ekip ve rol yönetimi</span>
+          <span class="badge badge-blue" style="margin-left: 10px;">Yönetici</span><span class="sub-text" style="font-size: 11px;">davet gönderebilir, veri yönetir</span>
+          <span class="badge badge-emerald" style="margin-left: 10px;">Operasyon</span><span class="sub-text" style="font-size: 11px;">rezervasyon ve operasyon</span>
+          <span class="badge badge-amber" style="margin-left: 10px;">Personel</span><span class="sub-text" style="font-size: 11px;">günlük görevler</span>
+          <span class="badge badge-rose" style="margin-left: 10px;">İzleyici</span><span class="sub-text" style="font-size: 11px;">yalnızca görüntüleme</span>
+        </div>
+
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>AD</th>
+                <th>E-POSTA</th>
+                <th>ROL</th>
+                <th>KATILIM</th>
+                <th style="text-align: right;">İŞLEM</th>
+              </tr>
+            </thead>
+            <tbody id="teamMembersTableBody">
+              <!-- Injected via JS -->
+            </tbody>
+          </table>
+        </div>
+
+        <div id="pendingInvitationsWrap" style="display: none; margin-top: 22px;">
+          <div class="section-title-bar" style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 16px;">
+            <div>
+              <h2 style="font-size: 15px;">✉️ BEKLEYEN DAVETLER</h2>
+              <p class="sub-text">Davet edilen kişi bu e-posta ile kayıt olup giriş yaptığında ekibinize otomatik katılır.</p>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>E-POSTA</th>
+                  <th>ROL</th>
+                  <th>GÖNDERİLDİ</th>
+                  <th>GEÇERLİLİK</th>
+                  <th style="text-align: right;">İŞLEM</th>
+                </tr>
+              </thead>
+              <tbody id="pendingInvitationsTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       <!-- AYLIK CİRO VE BÜTÇE HEDEFLERİ YÖNETİMİ -->
       <section class="card" style="margin-bottom: 24px;">
         <div class="section-title-bar">
@@ -2782,6 +2841,47 @@
   <!-- ========================================== -->
   <!-- MODAL: AYLIK FİNANSAL HEDEFLERİ DÜZENLE -->
   <!-- ========================================== -->
+  <!-- ======================================================= -->
+  <!-- MODAL: EKİBE ÜYE DAVET ET                               -->
+  <!-- ======================================================= -->
+  <div class="modal-backdrop" id="inviteMemberModal">
+    <div class="modal-card" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3>👥 Ekibe Üye Davet Et</h3>
+        <button class="close-btn" onclick="closeInviteMemberModal()">&times;</button>
+      </div>
+      <form id="inviteMemberForm" onsubmit="submitMemberInvite(event)">
+        <div style="padding: 20px;">
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label style="font-weight: 700; color: #FFFFFF; font-size: 13px;">E-posta Adresi</label>
+            <input type="text" inputmode="email" id="inviteMemberEmail" required placeholder="ekip.arkadasi@sirketiniz.com" autocomplete="off" style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 13px; margin-top: 4px;">
+          </div>
+
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label style="font-weight: 700; color: #FFFFFF; font-size: 13px;">Yetki Seviyesi</label>
+            <select id="inviteMemberRole" onchange="updateInviteRoleHint()" style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 13px; font-weight: 600; margin-top: 4px;">
+              <option value="admin">Yönetici (admin)</option>
+              <option value="manager" selected>Operasyon (manager)</option>
+              <option value="staff">Personel (staff)</option>
+              <option value="viewer">İzleyici (viewer)</option>
+            </select>
+            <p id="inviteRoleHint" class="sub-text" style="font-size: 11px; margin-top: 8px;"></p>
+          </div>
+
+          <div style="background: rgba(59, 130, 246, 0.12); border: 1px dashed rgba(59, 130, 246, 0.35); border-radius: 6px; padding: 10px 12px; font-size: 11px; color: #93C5FD;">
+            Davet ettiğiniz kişi bu e-posta adresiyle kayıt olup giriş yaptığında ekibinize otomatik olarak katılır. Davet 14 gün geçerlidir.
+          </div>
+
+          <div id="inviteMemberError" class="auth-error-msg" style="display: none; margin-top: 12px;"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeInviteMemberModal()">Vazgeç</button>
+          <button type="submit" class="btn btn-primary" id="inviteMemberSubmitBtn">✉️ Daveti Gönder</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div class="modal-backdrop" id="goalsModal">
     <div class="modal-card" style="max-width: 540px;">
       <div class="modal-header">

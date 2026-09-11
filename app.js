@@ -4066,6 +4066,7 @@ function switchTab(tabId) {
   if (tabId === 'pricing') renderPricingTab();
   if (tabId === 'reports') renderReportsTab();
   if (tabId === 'settings') renderSettingsTable();
+  if (tabId === 'settings') renderTeamManagement();
   if (tabId === 'finance') renderFinanceModule();
   if (tabId === 'expenses') renderExpensesTable();
   if (tabId === 'housekeeping') renderHousekeepingTab();
@@ -6693,6 +6694,297 @@ function renderSettingsGoalsTable() {
     `;
     tbody.appendChild(tr);
   });
+}
+
+// =============================================================================
+// 👥 EKİP VE ROL YÖNETİMİ (PHASE 16)
+// Tum yetki kararlari sunucuda (RLS + SECURITY DEFINER RPC) verilir. Buradaki
+// gizleme/gosterme yalnizca arayuz kolayligidir, guvenlik siniri DEGILDIR.
+// =============================================================================
+
+const TEAM_ROLES = {
+  owner:   { label: 'Sahip',     badge: 'badge-purple',  hint: 'Tam yetki. Ekip ve rolleri yönetir, işletmeyi silebilir.' },
+  admin:   { label: 'Yönetici',  badge: 'badge-blue',    hint: 'Davet gönderebilir, tüm verileri yönetir. Rol değiştiremez.' },
+  manager: { label: 'Operasyon', badge: 'badge-emerald', hint: 'Rezervasyon, fiyatlama ve operasyonu yönetir.' },
+  staff:   { label: 'Personel',  badge: 'badge-amber',   hint: 'Günlük operasyon görevlerini görür ve günceller.' },
+  viewer:  { label: 'İzleyici',  badge: 'badge-rose',    hint: 'Yalnızca görüntüler, hiçbir veriyi değiştiremez.' }
+};
+
+function roleBadgeHtml(role) {
+  const r = TEAM_ROLES[role] || { label: role, badge: 'badge-rose' };
+  return `<span class="badge ${r.badge}">${escapeHtml(r.label)}</span>`;
+}
+
+function escapeHtml(str) {
+  return String(str === null || str === undefined ? '' : str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function formatTeamDate(value) {
+  if (!value) return '—';
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+async function renderTeamManagement() {
+  const memberBody = document.getElementById('teamMembersTableBody');
+  const inviteWrap = document.getElementById('pendingInvitationsWrap');
+  const inviteBody = document.getElementById('pendingInvitationsTableBody');
+  const inviteBtn = document.getElementById('inviteMemberBtn');
+  if (!memberBody) return;
+
+  const tenantId = getActiveTenantId();
+
+  // Demo / yerel kum havuzunda bulut ekibi yoktur.
+  if (!isCloudTenant(tenantId)) {
+    memberBody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:22px;" class="sub-text">
+      Ekip yönetimi bulut hesabına özeldir. Demo modunda kullanılamaz.</td></tr>`;
+    if (inviteWrap) inviteWrap.style.display = 'none';
+    if (inviteBtn) inviteBtn.style.display = 'none';
+    return;
+  }
+
+  memberBody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:22px;" class="sub-text">Ekip yükleniyor…</td></tr>`;
+
+  const { data: members, error: memErr } = await supabaseClient.rpc('get_tenant_members', { p_tenant_id: tenantId });
+
+  if (memErr) {
+    memberBody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:22px; color:#FCA5A5;">
+      Ekip listesi yüklenemedi: ${escapeHtml(memErr.message)}</td></tr>`;
+    return;
+  }
+
+  const myRole = (activeTenant && activeTenant.role) || 'viewer';
+  const canManageRoles = myRole === 'owner';
+  const canInvite = myRole === 'owner' || myRole === 'admin';
+  const ownerCount = (members || []).filter(m => m.role === 'owner').length;
+
+  if (inviteBtn) inviteBtn.style.display = canInvite ? '' : 'none';
+
+  memberBody.innerHTML = (members || []).map(m => {
+    const isLastOwner = m.role === 'owner' && ownerCount === 1;
+
+    // NOT: Satir ici onclick'e veri gomulmez. escapeHtml kesme isaretini &#39;
+    // yapar, tarayici HTML varliklarini JS ayristirmasindan ONCE cozer ve
+    // o'brien@x.com gibi gecerli bir adres handler'i kirardi. Veri data-*
+    // niteliginde tasinir, olaylar asagida delegasyonla baglanir.
+    let roleCell;
+    if (canManageRoles && !m.is_self && !isLastOwner) {
+      const opts = Object.keys(TEAM_ROLES).map(k =>
+        `<option value="${k}"${k === m.role ? ' selected' : ''}>${escapeHtml(TEAM_ROLES[k].label)}</option>`
+      ).join('');
+      roleCell = `<select data-action="role" data-user="${escapeHtml(m.user_id)}"
+        style="padding:6px 8px; background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.15);
+        border-radius:6px; color:#fff; font-size:12px; font-weight:600;">${opts}</select>`;
+    } else {
+      roleCell = roleBadgeHtml(m.role) + (isLastOwner
+        ? ' <span class="sub-text" style="font-size:10px;">(tek sahip)</span>' : '');
+    }
+
+    const canRemove = canManageRoles && !m.is_self && !isLastOwner;
+    const actionCell = canRemove
+      ? `<button class="btn btn-secondary btn-sm" data-action="remove"
+           data-user="${escapeHtml(m.user_id)}" data-email="${escapeHtml(m.email)}">Çıkar</button>`
+      : '<span class="sub-text" style="font-size:11px;">—</span>';
+
+    return `<tr>
+      <td><strong>${escapeHtml(m.full_name)}</strong>${m.is_self ? ' <span class="sub-text" style="font-size:10px;">(siz)</span>' : ''}</td>
+      <td>${escapeHtml(m.email)}</td>
+      <td>${roleCell}</td>
+      <td>${formatTeamDate(m.joined_at)}</td>
+      <td style="text-align:right;">${actionCell}</td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="5" style="text-align:center; padding:22px;" class="sub-text">Henüz ekip üyesi yok.</td></tr>`;
+
+  // Erken return yollarindan once bagla; uye tablosu her durumda calissin.
+  bindTeamTableEvents();
+
+  // Bekleyen davetler yalnizca owner/admin icin
+  if (!canInvite) {
+    if (inviteWrap) inviteWrap.style.display = 'none';
+    return;
+  }
+
+  const { data: invites, error: invErr } = await supabaseClient.rpc('get_tenant_invitations', { p_tenant_id: tenantId });
+
+  if (invErr || !invites || invites.length === 0) {
+    if (inviteWrap) inviteWrap.style.display = 'none';
+    return;
+  }
+
+  if (inviteWrap) inviteWrap.style.display = 'block';
+  if (inviteBody) {
+    inviteBody.innerHTML = invites.map(i => `<tr>
+      <td>${escapeHtml(i.email)}</td>
+      <td>${roleBadgeHtml(i.role)}</td>
+      <td>${formatTeamDate(i.created_at)}</td>
+      <td>${i.expired
+        ? '<span class="badge badge-rose">Süresi doldu</span>'
+        : formatTeamDate(i.expires_at) + ' tarihine kadar'}</td>
+      <td style="text-align:right;">
+        <button class="btn btn-secondary btn-sm" data-action="revoke"
+          data-invite="${escapeHtml(i.id)}" data-email="${escapeHtml(i.email)}">İptal Et</button>
+      </td>
+    </tr>`).join('');
+    bindTeamTableEvents();
+  }
+}
+
+// Olay delegasyonu: satirlar her tazelemede yeniden uretildigi icin
+// dinleyiciler tbody uzerinde tutulur, her satira ayri ayri baglanmaz.
+function bindTeamTableEvents() {
+  const memberBody = document.getElementById('teamMembersTableBody');
+  const inviteBody = document.getElementById('pendingInvitationsTableBody');
+
+  if (memberBody && !memberBody.dataset.bound) {
+    memberBody.dataset.bound = '1';
+    memberBody.addEventListener('change', (ev) => {
+      const el = ev.target.closest('[data-action="role"]');
+      if (el) changeMemberRole(el.dataset.user, el.value);
+    });
+    memberBody.addEventListener('click', (ev) => {
+      const el = ev.target.closest('[data-action="remove"]');
+      if (el) removeTeamMember(el.dataset.user, el.dataset.email);
+    });
+  }
+
+  if (inviteBody && !inviteBody.dataset.bound) {
+    inviteBody.dataset.bound = '1';
+    inviteBody.addEventListener('click', (ev) => {
+      const el = ev.target.closest('[data-action="revoke"]');
+      if (el) revokeMemberInvite(el.dataset.invite, el.dataset.email);
+    });
+  }
+}
+
+function updateInviteRoleHint() {
+  const sel = document.getElementById('inviteMemberRole');
+  const hint = document.getElementById('inviteRoleHint');
+  if (!sel || !hint) return;
+  const r = TEAM_ROLES[sel.value];
+  hint.textContent = r ? r.hint : '';
+}
+
+function openInviteMemberModal() {
+  const modal = document.getElementById('inviteMemberModal');
+  if (!modal) return;
+
+  const emailInput = document.getElementById('inviteMemberEmail');
+  const roleSelect = document.getElementById('inviteMemberRole');
+  const err = document.getElementById('inviteMemberError');
+  if (emailInput) emailInput.value = '';
+  if (err) err.style.display = 'none';
+
+  // Admin, 'admin' rolunde davet gonderemez (sunucu da reddeder).
+  const myRole = (activeTenant && activeTenant.role) || 'viewer';
+  if (roleSelect) {
+    const adminOpt = roleSelect.querySelector('option[value="admin"]');
+    if (adminOpt) adminOpt.disabled = (myRole !== 'owner');
+    if (myRole !== 'owner' && roleSelect.value === 'admin') roleSelect.value = 'manager';
+  }
+
+  updateInviteRoleHint();
+  modal.classList.add('active');
+  setTimeout(() => emailInput && emailInput.focus(), 80);
+}
+
+function closeInviteMemberModal() {
+  const modal = document.getElementById('inviteMemberModal');
+  if (modal) modal.classList.remove('active');
+}
+
+function showInviteError(message) {
+  const err = document.getElementById('inviteMemberError');
+  if (!err) { alert(message); return; }
+  err.style.display = 'block';
+  err.innerText = '⚠️ ' + message;
+}
+
+async function submitMemberInvite(e) {
+  if (e) e.preventDefault();
+  const email = (document.getElementById('inviteMemberEmail')?.value || '').trim().toLowerCase();
+  const role = document.getElementById('inviteMemberRole')?.value || 'viewer';
+  const btn = document.getElementById('inviteMemberSubmitBtn');
+  const err = document.getElementById('inviteMemberError');
+  if (err) err.style.display = 'none';
+
+  if (!email.includes('@')) {
+    showInviteError('Geçerli bir e-posta adresi girin.');
+    return;
+  }
+
+  const tenantId = getActiveTenantId();
+  if (!isCloudTenant(tenantId)) {
+    showInviteError('Ekip yönetimi bulut hesabına özeldir.');
+    return;
+  }
+
+  if (btn) { btn.disabled = true; btn.innerText = '⏳ Gönderiliyor...'; }
+
+  try {
+    const { error } = await supabaseClient.rpc('create_tenant_invitation', {
+      p_tenant_id: tenantId, p_email: email, p_role: role
+    });
+    if (error) { showInviteError(error.message); return; }
+
+    closeInviteMemberModal();
+    await renderTeamManagement();
+    alert(`✉️ Davet oluşturuldu.\n\n${email} bu adresle kayıt olup giriş yaptığında ekibinize otomatik katılacak.\nDavet 14 gün geçerlidir.`);
+  } catch (ex) {
+    showInviteError(ex && ex.message ? ex.message : 'Davet gönderilemedi.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerText = '✉️ Daveti Gönder'; }
+  }
+}
+
+async function changeMemberRole(userId, newRole) {
+  const tenantId = getActiveTenantId();
+  if (!isCloudTenant(tenantId)) return;
+
+  const { error } = await supabaseClient
+    .from('tenant_members')
+    .update({ role: newRole })
+    .eq('tenant_id', tenantId)
+    .eq('user_id', userId);
+
+  if (error) {
+    alert('⚠️ Rol değiştirilemedi: ' + error.message);
+  }
+  // Basarili da olsa hatali da olsa listeyi sunucudan tazele: acilir menu
+  // asla sunucudaki gercek rolden farkli bir sey gostermesin.
+  await renderTeamManagement();
+}
+
+async function removeTeamMember(userId, email) {
+  if (!confirm(`${email} adlı kullanıcıyı ekipten çıkarmak istediğinize emin misiniz?\n\nBu kişi işletme verilerine anında erişimini kaybeder.`)) return;
+
+  const tenantId = getActiveTenantId();
+  if (!isCloudTenant(tenantId)) return;
+
+  const { error } = await supabaseClient
+    .from('tenant_members')
+    .delete()
+    .eq('tenant_id', tenantId)
+    .eq('user_id', userId);
+
+  if (error) {
+    alert('⚠️ Üye çıkarılamadı: ' + error.message);
+    return;
+  }
+  await renderTeamManagement();
+}
+
+async function revokeMemberInvite(invitationId, email) {
+  if (!confirm(`${email} adresine gönderilen daveti iptal etmek istiyor musunuz?`)) return;
+
+  const { error } = await supabaseClient.rpc('revoke_tenant_invitation', { p_invitation_id: invitationId });
+  if (error) {
+    alert('⚠️ Davet iptal edilemedi: ' + error.message);
+    return;
+  }
+  await renderTeamManagement();
 }
 
 function renderSettingsTable() {
@@ -11226,6 +11518,22 @@ async function handleAuthenticatedSession(u) {
     email: u.email,
     fullName: u.user_metadata?.full_name || u.email.split('@')[0]
   };
+
+  // 0. Bu adrese gonderilmis bekleyen davetleri uyelige cevir.
+  //    Uyelikler asagida okunacagi icin bundan ONCE calismali, aksi halde
+  //    davet edilen kullanici ilk girisinde isletmeyi goremez.
+  //    Hata olursa giris akisini KESME - davet ikincil bir yoldur.
+  try {
+    const { data: accepted, error: acceptErr } = await supabaseClient.rpc('accept_pending_invitations');
+    if (acceptErr) {
+      console.warn('Bekleyen davetler kontrol edilemedi:', acceptErr.message);
+    } else if (accepted && accepted.joined > 0) {
+      console.log(`✉️ ${accepted.joined} davet kabul edildi.`);
+      window.LEXBNB_JUST_JOINED = accepted.joined;
+    }
+  } catch (e) {
+    console.warn('Bekleyen davet kontrolu atlandi:', e);
+  }
 
   // 1. Kullanıcının üye olduğu TÜM tenant'ları PostgreSQL'den çek (Source of Truth)
   const { data: members, error: memErr } = await supabaseClient
