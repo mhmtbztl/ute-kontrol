@@ -319,16 +319,16 @@ LANGUAGE sql
 SECURITY DEFINER
 STABLE
 SET search_path = ''
-AS $
+AS $$
     SELECT NOT EXISTS (SELECT 1 FROM public.tenants WHERE id = p_tenant_id);
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION public.fn_guard_last_tenant_owner()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
     v_owner_count INT;
 BEGIN
@@ -362,7 +362,44 @@ BEGIN
         RETURN NEW;
     END IF;
 END;
-$;
+$$;
+
+DROP TRIGGER IF EXISTS trg_guard_last_tenant_owner ON public.tenant_members;
+CREATE TRIGGER trg_guard_last_tenant_owner
+BEFORE UPDATE OR DELETE ON public.tenant_members
+FOR EACH ROW EXECUTE FUNCTION public.fn_guard_last_tenant_owner();
+
+-- Cross-Tenant Foreign Reference Protection Trigger for Expenses
+CREATE OR REPLACE FUNCTION public.check_expense_tenant_isolation()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+    IF NEW.property_id IS NOT NULL THEN
+        IF NOT EXISTS (
+            SELECT 1 FROM public.properties
+            WHERE id = NEW.property_id AND tenant_id = NEW.tenant_id
+        ) THEN
+            RAISE EXCEPTION 'CROSS_TENANT_PROPERTY_VIOLATION: Seçilen mülk aktif işletmeye ait değildir.'
+                USING ERRCODE = '42501';
+        END IF;
+    END IF;
+
+    IF NEW.booking_id IS NOT NULL THEN
+        IF NOT EXISTS (
+            SELECT 1 FROM public.bookings
+            WHERE id = NEW.booking_id AND tenant_id = NEW.tenant_id
+        ) THEN
+            RAISE EXCEPTION 'CROSS_TENANT_BOOKING_VIOLATION: Seçilen rezervasyon aktif işletmeye ait değildir.'
+                USING ERRCODE = '42501';
+        END IF;
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
 
 DROP TRIGGER IF EXISTS trg_verify_expense_tenant_isolation ON public.expenses;
 CREATE TRIGGER trg_verify_expense_tenant_isolation
@@ -1103,7 +1140,7 @@ RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
     v_date DATE;
     v_tenant_id UUID;
@@ -1142,7 +1179,7 @@ BEGIN
         RETURN NEW;
     END IF;
 END;
-$;
+$$;
 
 DROP TRIGGER IF EXISTS trg_guard_expense_closed_period ON public.expenses;
 CREATE TRIGGER trg_guard_expense_closed_period
@@ -1155,7 +1192,7 @@ RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
     v_check_in DATE;
     v_tenant_id UUID;
@@ -1207,7 +1244,7 @@ BEGIN
         RETURN NEW;
     END IF;
 END;
-$;
+$$;
 
 DROP TRIGGER IF EXISTS trg_guard_booking_closed_period ON public.bookings;
 CREATE TRIGGER trg_guard_booking_closed_period
@@ -2101,7 +2138,7 @@ RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
-AS $
+AS $$
 BEGIN
     IF TG_OP = 'DELETE' THEN
         -- Isletme siliniyorsa bu cascade'dir, kullanici girisimi degil.
@@ -2124,7 +2161,7 @@ BEGIN
     END IF;
     RETURN NEW;
 END;
-$;
+$$;
 
 DROP TRIGGER IF EXISTS trg_guard_scheduled_message_sent_immutability ON public.scheduled_messages;
 CREATE TRIGGER trg_guard_scheduled_message_sent_immutability
@@ -2690,7 +2727,7 @@ RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
-AS $
+AS $$
 BEGIN
     IF TG_OP = 'DELETE' AND public.fn_tenant_is_being_deleted(OLD.tenant_id) THEN
         RETURN OLD;
@@ -2710,7 +2747,7 @@ BEGIN
     END IF;
     RETURN NEW;
 END;
-$;
+$$;
 
 DROP TRIGGER IF EXISTS trg_guard_quote_accepted_immutability ON public.booking_quotes;
 CREATE TRIGGER trg_guard_quote_accepted_immutability
