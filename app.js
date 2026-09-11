@@ -1735,6 +1735,12 @@ function isUUID(str) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
 }
 
+// Bulut yolu YALNIZCA gercek bir Supabase UUID tenant'i icin acilir (whitelist).
+// 'usr_*' demo ve 'ten_*' gibi yerel kimlikler asla Postgres'e gonderilmez.
+function isCloudTenant(tenantId) {
+  return !!(supabaseClient && isUUID(tenantId));
+}
+
 function mapPropertyFromDb(row) {
   if (!row) return null;
   const basePrice = Number(row.base_price) || 0;
@@ -1781,7 +1787,7 @@ function mapPropertyToDb(property, tenantId) {
 
 async function loadProperties(targetTenantId) {
   const tenantId = targetTenantId || getActiveTenantId();
-  if (!supabaseClient || !tenantId || tenantId === 'usr_ute_master' || tenantId.startsWith('usr_')) {
+  if (!isCloudTenant(tenantId)) {
     return (typeof appData !== 'undefined' && appData.villas) ? appData.villas : {};
   }
   try {
@@ -1817,7 +1823,7 @@ async function loadProperties(targetTenantId) {
 
 async function createProperty(propInput) {
   const tenantId = getActiveTenantId();
-  if (!tenantId || tenantId === 'usr_ute_master' || tenantId.startsWith('usr_') || !supabaseClient) {
+  if (!isCloudTenant(tenantId)) {
     // Demo / offline fallback
     const name = (propInput.name || '').trim();
     if (!name) throw new Error('Mülk adı boş bırakılamaz.');
@@ -1892,7 +1898,7 @@ async function createProperty(propInput) {
 
 async function updateProperty(propIdOrSlug, propInput) {
   const tenantId = getActiveTenantId();
-  if (!tenantId || tenantId === 'usr_ute_master' || tenantId.startsWith('usr_') || !supabaseClient) {
+  if (!isCloudTenant(tenantId)) {
     // Offline / demo fallback
     let existing = null;
     let oldSlug = null;
@@ -2038,7 +2044,7 @@ async function deleteProperty(propIdOrSlug) {
   }
 
   // Check Supabase database if connected to cloud tenant
-  if (supabaseClient && tenantId && !tenantId.startsWith('usr_')) {
+  if (isCloudTenant(tenantId)) {
     if (propId) {
       const { count: bCount } = await supabaseClient
         .from('bookings')
@@ -2290,7 +2296,7 @@ function checkBookingOverlap(propertyId, checkIn, checkOut, excludeBookingId = n
 
 async function loadBookings(targetTenantId) {
   const tenantId = targetTenantId || getActiveTenantId();
-  if (!supabaseClient || !tenantId || tenantId === 'usr_ute_master' || tenantId.startsWith('usr_')) {
+  if (!isCloudTenant(tenantId)) {
     return (typeof appData !== 'undefined' && appData.bookings) ? appData.bookings : [];
   }
   try {
@@ -2319,7 +2325,7 @@ async function loadBookings(targetTenantId) {
 
 async function createBooking(bookingInput) {
   const tenantId = getActiveTenantId() || bookingInput?.tenantId;
-  const isCloud = supabaseClient && tenantId && tenantId !== 'usr_ute_master' && !tenantId.startsWith('usr_');
+  const isCloud = isCloudTenant(tenantId);
 
   // 1. Validation
   const checkIn = bookingInput.checkIn || bookingInput.check_in;
@@ -2493,7 +2499,7 @@ async function createBooking(bookingInput) {
 
 async function updateBooking(bookingId, bookingInput) {
   const tenantId = getActiveTenantId();
-  const isCloud = supabaseClient && tenantId && tenantId !== 'usr_ute_master' && !tenantId.startsWith('usr_');
+  const isCloud = isCloudTenant(tenantId);
 
   // Resolve target booking in state
   let existing = null;
@@ -2646,7 +2652,7 @@ async function updateBooking(bookingId, bookingInput) {
 
 async function deleteBooking(bookingId) {
   const tenantId = getActiveTenantId();
-  const isCloud = supabaseClient && tenantId && tenantId !== 'usr_ute_master' && !tenantId.startsWith('usr_');
+  const isCloud = isCloudTenant(tenantId);
 
   let existing = null;
   if (typeof appData !== 'undefined' && appData.bookings) {
@@ -2840,7 +2846,7 @@ function mapExpenseToDb(expense, targetTenantId) {
 
 async function loadExpenses(targetTenantId) {
   const tenantId = targetTenantId || getActiveTenantId();
-  if (!supabaseClient || !tenantId || tenantId === 'usr_ute_master' || tenantId.startsWith('usr_')) {
+  if (!isCloudTenant(tenantId)) {
     return (typeof appData !== 'undefined' && appData.expenses) ? appData.expenses : [];
   }
   try {
@@ -2886,7 +2892,7 @@ function isPeriodClosed(dateOrYearMonth) {
 async function loadMonthlyTargets(year, month) {
   const tenantId = getActiveTenantId();
   const currentAppData = (typeof appData !== 'undefined') ? appData : (typeof global !== 'undefined' ? global.appData : null);
-  if (!supabaseClient || !tenantId || tenantId === 'usr_ute_master' || tenantId.startsWith('usr_')) {
+  if (!isCloudTenant(tenantId)) {
     return (currentAppData && Array.isArray(currentAppData.targets)) ? currentAppData.targets : [];
   }
   try {
@@ -2909,7 +2915,7 @@ async function saveMonthlyTarget(targetInput) {
   if (!targetInput || !targetInput.year || !targetInput.month) {
     throw new Error('Hedef yılı ve ayı zorunludur.');
   }
-  const isCloud = !!(supabaseClient && tenantId && tenantId !== 'usr_ute_master' && !tenantId.startsWith('usr_'));
+  const isCloud = !!(isCloudTenant(tenantId));
   const payload = {
     tenant_id: tenantId,
     property_id: targetInput.propertyId || targetInput.property_id || null,
@@ -2963,7 +2969,7 @@ async function saveMonthlyTarget(targetInput) {
 async function loadMonthlyCloses() {
   const tenantId = getActiveTenantId();
   const currentAppData = (typeof appData !== 'undefined') ? appData : (typeof global !== 'undefined' ? global.appData : null);
-  if (!supabaseClient || !tenantId || tenantId === 'usr_ute_master' || tenantId.startsWith('usr_')) {
+  if (!isCloudTenant(tenantId)) {
     return (currentAppData && currentAppData.closedPeriods) ? currentAppData.closedPeriods : [];
   }
   try {
@@ -3009,7 +3015,7 @@ async function closeMonthlyPeriod(year, month) {
     reconciliation: metrics.reconciliation
   };
 
-  const isCloud = !!(supabaseClient && tenantId && tenantId !== 'usr_ute_master' && !tenantId.startsWith('usr_'));
+  const isCloud = !!(isCloudTenant(tenantId));
   if (!isCloud) {
     if (currentAppData) {
       if (!currentAppData.closedPeriods) currentAppData.closedPeriods = [];
@@ -3088,7 +3094,7 @@ function convertAiActionToTask(actionTitle, propertyId, priority, metric) {
 async function createExpense(expenseInput) {
   if (!expenseInput) throw new Error('Gider bilgisi girilmedi.');
   const tenantId = getActiveTenantId();
-  const isCloud = !!(supabaseClient && tenantId && tenantId !== 'usr_ute_master' && !tenantId.startsWith('usr_'));
+  const isCloud = !!(isCloudTenant(tenantId));
 
   // 1. Validation
   const amt = roundMoney(expenseInput.amount);
@@ -3217,7 +3223,7 @@ async function updateExpense(expenseId, expenseInput) {
   if (!expenseId) throw new Error('Güncellenecek gider ID belirtilmedi.');
   if (!expenseInput) throw new Error('Gider güncelleme bilgisi girilmedi.');
   const tenantId = getActiveTenantId();
-  const isCloud = !!(supabaseClient && tenantId && tenantId !== 'usr_ute_master' && !tenantId.startsWith('usr_'));
+  const isCloud = !!(isCloudTenant(tenantId));
 
   const currentAppData = (typeof appData !== 'undefined') ? appData : (typeof global !== 'undefined' ? global.appData : null);
   let existing = null;
@@ -3349,7 +3355,7 @@ async function deleteExpense(expenseId, skipConfirm = false) {
   }
 
   const tenantId = getActiveTenantId();
-  const isCloud = !!(supabaseClient && tenantId && tenantId !== 'usr_ute_master' && !tenantId.startsWith('usr_'));
+  const isCloud = !!(isCloudTenant(tenantId));
   const currentAppData = (typeof appData !== 'undefined') ? appData : (typeof global !== 'undefined' ? global.appData : null);
 
   const existing = currentAppData?.expenses ? currentAppData.expenses.find(e => e.id === expenseId || e.dbId === expenseId) : null;
@@ -3416,7 +3422,7 @@ async function cloudDeleteExpense(expId) {
 
 async function cloudUpsertCleaningTask(task) {
   const tenantId = getActiveTenantId();
-  if (!supabaseClient || !tenantId || tenantId === 'usr_ute_master' || tenantId.startsWith('usr_')) return;
+  if (!isCloudTenant(tenantId)) return;
   try {
     const propId = await getPropertyIdBySlug(task.villa, tenantId);
     if (!propId) return;
@@ -3440,7 +3446,7 @@ async function cloudUpsertCleaningTask(task) {
 
 async function cloudDeleteCleaningTask(taskId) {
   const tenantId = getActiveTenantId();
-  if (!supabaseClient || !tenantId || tenantId === 'usr_ute_master' || tenantId.startsWith('usr_')) return;
+  if (!isCloudTenant(tenantId)) return;
   try {
     const { error } = await supabaseClient.from('cleaning_tasks').delete().match({
       tenant_id: tenantId,
@@ -3633,7 +3639,7 @@ function validateLeadInput(leadInput, targetTenantId) {
 
 async function loadLeads(targetTenantId) {
   const tenantId = targetTenantId || getActiveTenantId();
-  if (!supabaseClient || !tenantId || tenantId === 'usr_ute_master' || tenantId.startsWith('usr_')) {
+  if (!isCloudTenant(tenantId)) {
     return (typeof appData !== 'undefined' && appData.leads) ? appData.leads : [];
   }
 
@@ -3660,7 +3666,7 @@ async function createLead(leadInput) {
   const tenantId = getActiveTenantId();
   validateLeadInput(leadInput, tenantId);
 
-  const isCloud = !!(supabaseClient && tenantId && tenantId !== 'usr_ute_master' && !tenantId.startsWith('usr_'));
+  const isCloud = !!(isCloudTenant(tenantId));
 
   if (!isCloud) {
     const localId = 'local_lead_' + Date.now();
@@ -3725,7 +3731,7 @@ async function createLead(leadInput) {
 async function updateLead(leadId, patch) {
   if (!leadId) throw new Error('Güncellenecek lead kimliği gereklidir.');
   const tenantId = getActiveTenantId();
-  const isCloud = !!(supabaseClient && tenantId && tenantId !== 'usr_ute_master' && !tenantId.startsWith('usr_'));
+  const isCloud = !!(isCloudTenant(tenantId));
 
   if (!isCloud) {
     if (typeof appData !== 'undefined' && appData.leads) {
@@ -3784,7 +3790,7 @@ async function updateLead(leadId, patch) {
 async function deleteLead(leadId, options = {}) {
   if (!leadId) throw new Error('Silinecek lead kimliği gereklidir.');
   const tenantId = getActiveTenantId();
-  const isCloud = !!(supabaseClient && tenantId && tenantId !== 'usr_ute_master' && !tenantId.startsWith('usr_'));
+  const isCloud = !!(isCloudTenant(tenantId));
 
   // Historical safety check: WON leads contain critical conversion and financial records
   if (typeof appData !== 'undefined' && appData.leads) {
@@ -3829,7 +3835,7 @@ async function deleteLead(leadId, options = {}) {
 async function convertLeadToBooking(leadId, options = {}) {
   if (!leadId) throw new Error('Dönüştürülecek lead kimliği gereklidir.');
   const tenantId = getActiveTenantId();
-  const isCloud = !!(supabaseClient && tenantId && tenantId !== 'usr_ute_master' && !tenantId.startsWith('usr_'));
+  const isCloud = !!(isCloudTenant(tenantId));
 
   // Friendly error mapping helper
   function mapFriendlyError(err) {
@@ -10926,7 +10932,7 @@ function setActiveTenant(tenantObj) {
   if (tenantObj && tenantObj.id) {
     activeTenant = tenantObj;
     activeTenantId = tenantObj.id;
-    if (typeof localStorage !== 'undefined' && !activeTenantId.startsWith('usr_')) {
+    if (typeof localStorage !== 'undefined' && isUUID(activeTenantId)) {
       localStorage.setItem('LEXBNB_LAST_TENANT', activeTenantId);
     }
   } else {
@@ -11282,21 +11288,19 @@ async function handleSaaSLogin(e) {
     return;
   }
 
-  // 2. Yerel Kayıtlı Kullanıcı Kontrolü (Hızlı ve Kesintisiz Giriş)
-  const users = getSaaSUsers();
-  const localUser = users.find(u =>
-    (u.email.toLowerCase() === uLow || (u.username && u.username.toLowerCase() === uLow)) &&
-    u.password === passInput
-  );
-  if (localUser) {
-    authenticateSaaSUser(localUser, remember);
+  // 2. Giriş yalnızca e-posta ile yapılır (Supabase Auth source-of-truth)
+  if (!userInput.includes('@')) {
+    if (err) {
+      err.style.display = 'block';
+      err.innerText = '⚠️ Lütfen kullanıcı adı değil, hesabınızın e-posta adresini girin.';
+    }
     return;
   }
 
   if (!supabaseClient) {
     if (err) {
       err.style.display = 'block';
-      err.innerText = '⚠️ Kullanıcı adı veya şifre hatalı. Lütfen tekrar deneyin veya Demo hesabını kullanın.';
+      err.innerText = '⚠️ Bulut bağlantısı kurulamadı. İnternet bağlantınızı kontrol edip sayfayı yenileyin.';
     }
     return;
   }
@@ -11390,103 +11394,117 @@ async function handleSaaSRegister(e) {
     return;
   }
 
+  if (!supabaseClient) {
+    if (err) {
+      err.style.display = 'block';
+      err.innerText = '⚠️ Bulut bağlantısı kurulamadı. İnternet bağlantınızı kontrol edip sayfayı yenileyin.';
+    }
+    return;
+  }
+
+  // Buton yükleniyor durumu ve çift tıklama önleme
   if (submitBtn) {
     submitBtn.disabled = true;
     submitBtn.innerText = '⏳ Hesabınız Oluşturuluyor...';
   }
 
-  // Yerel ve kesintisiz hesap aktivatörü (Kullanıcı e-posta beklemeden anında başlar)
-  const activateLocalAccount = () => {
-    const localId = 'usr_' + Date.now();
-    const localTenantId = 'ten_' + Date.now();
-    const newUser = {
-      id: localId,
-      username: email.split('@')[0],
-      email: email,
+  try {
+    // Adım 1: Supabase Auth kullanıcısı oluştur
+    const { data: authData, error: authError } = await supabaseClient.auth.signUp({
+      email,
       password: pass,
-      companyName: company,
-      managerName: manager,
-      plan: 'Professional',
-      createdAt: new Date().toISOString().slice(0, 10)
-    };
+      options: { data: { full_name: manager, company_name: company } }
+    });
 
-    const users = getSaaSUsers();
-    users.push(newUser);
-    saveSaaSUsers(users);
+    if (authError) {
+      if (err) {
+        err.style.display = 'block';
+        err.innerText = '⚠️ ' + getFriendlyAuthErrorMessage(authError);
+      }
+      return;
+    }
 
-    activeSaaSUser = newUser;
-    activeTenant = {
-      id: localTenantId,
-      name: company,
-      slug: company.toLowerCase().replace(/[^a-z0-9]/g, '-'),
-      role: 'owner'
-    };
+    const user = authData?.user;
+    if (!user) {
+      if (err) {
+        err.style.display = 'block';
+        err.innerText = '⚠️ Kullanıcı hesabı oluşturulamadı. Lütfen tekrar deneyin.';
+      }
+      return;
+    }
+
+    // Adım 2: E-posta onayı zorunluysa session gelmez. Authenticated session
+    // olmadan ASLA tenant yaratmaya kalkışma; kullanıcıyı bilgilendir.
+    if (!authData.session) {
+      localStorage.setItem('LEXBNB_PENDING_ONBOARDING', JSON.stringify({
+        companyName: company,
+        managerName: manager,
+        email: email
+      }));
+
+      if (err) {
+        err.style.display = 'block';
+        err.style.background = 'rgba(59, 130, 246, 0.15)';
+        err.style.border = '1px solid #3B82F6';
+        err.style.color = '#93C5FD';
+        err.innerHTML = `📬 <strong>Aktivasyon E-postası Gönderildi!</strong><br>
+        <span style="font-size:12px;">Lütfen <strong>${email}</strong> adresine gönderilen onay linkine tıklayın. Doğrulama sonrası kaldığınız yerden devam edebilirsiniz.</span>`;
+      }
+      return;
+    }
+
+    // Adım 3: Authenticated session var -> tek atomik DB işlemiyle tenant + owner kur
+    const { data: rpcRes, error: rpcErr } = await supabaseClient.rpc('create_tenant_and_owner', {
+      p_company_name: company,
+      p_full_name: manager
+    });
+
+    if (rpcErr || !rpcRes) {
+      console.error('Atomic create_tenant_and_owner error:', rpcErr);
+      if (err) {
+        err.style.display = 'block';
+        err.innerText = '⚠️ ' + getFriendlyAuthErrorMessage(rpcErr || 'İşletme kurulumu tamamlanamadı.');
+      }
+      return;
+    }
+
+    activeSaaSUser = { id: user.id, email: user.email, fullName: manager };
+    setActiveTenant({
+      id: rpcRes.tenant_id,
+      name: rpcRes.tenant_name,
+      slug: rpcRes.tenant_slug,
+      role: rpcRes.role || 'owner'
+    });
 
     sessionStorage.setItem('LEXBNB_ACTIVE_USER', JSON.stringify(activeSaaSUser));
     sessionStorage.setItem('LEXBNB_ACTIVE_TENANT', JSON.stringify(activeTenant));
-    sessionStorage.setItem('LEXBNB_ACTIVE_USER_ID', localId);
+    sessionStorage.setItem('LEXBNB_ACTIVE_USER_ID', user.id);
 
-    appData = getBlankTenantData(localTenantId);
+    // Temiz başlangıç (Asla sahte/eski veri yüklenmez)
+    appData = getBlankTenantData(activeTenant.id);
     appData.companyName = company;
     saveAppData();
 
     hideLockOverlay();
     updateSaaSUi();
+    subscribeTenantRealtime(activeTenant.id);
     updateAllVillaDropdowns();
     renderAll();
 
-    setTimeout(() => {
-      alert(`🎉 Hoş Geldiniz ${manager}!\n\n"${company}" işletmeniz başarıyla oluşturuldu.\nŞimdi "🏡 Mülkler" sekmesinden kendi villalarınızı tanımlayabilir veya rezervasyon ekleyebilirsiniz.`);
-    }, 200);
-  };
-
-  // Bulut (Supabase) senkronizasyon denemesi
-  if (supabaseClient) {
-    try {
-      const { data: authData, error: authError } = await supabaseClient.auth.signUp({
-        email,
-        password: pass,
-        options: { data: { full_name: manager, company_name: company } }
-      });
-
-      if (!authError && authData?.session && authData?.user) {
-        const user = authData.user;
-        const { data: rpcRes, error: rpcErr } = await supabaseClient.rpc('create_tenant_and_owner', {
-          p_company_name: company,
-          p_full_name: manager
-        });
-
-        if (!rpcErr && rpcRes) {
-          activeSaaSUser = { id: user.id, email: user.email, fullName: manager };
-          activeTenant = {
-            id: rpcRes.tenant_id,
-            name: rpcRes.tenant_name,
-            slug: rpcRes.tenant_slug,
-            role: rpcRes.role || 'owner'
-          };
-          sessionStorage.setItem('LEXBNB_ACTIVE_USER', JSON.stringify(activeSaaSUser));
-          sessionStorage.setItem('LEXBNB_ACTIVE_TENANT', JSON.stringify(activeTenant));
-          sessionStorage.setItem('LEXBNB_ACTIVE_USER_ID', user.id);
-
-          appData = getBlankTenantData(activeTenant.id);
-          appData.companyName = company;
-          saveAppData();
-
-          hideLockOverlay();
-          updateSaaSUi();
-          subscribeTenantRealtime(activeTenant.id);
-          updateAllVillaDropdowns();
-          renderAll();
-          return;
-        }
-      }
-    } catch (e) {
-      console.warn('Cloud signup note, fallback to instant local creation:', e);
+    // Adım 4: Onboarding modalı (kullanıcı ilk mülkünü eklesin)
+    openOnboardingModal(company);
+  } catch (supaErr) {
+    console.error('Supabase cloud signup error:', supaErr);
+    if (err) {
+      err.style.display = 'block';
+      err.innerText = '⚠️ ' + getFriendlyAuthErrorMessage(supaErr);
+    }
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerText = '✨ Hesabımı Oluştur ve Başla';
     }
   }
-
-  // Bulut e-posta onayı istese veya yanıt vermese dahi kullanıcıyı bekletmeden anında aç!
-  activateLocalAccount();
 }
 
 function loginWithLexBnBDemo() {
@@ -11575,7 +11593,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
   }
 
   // 1. Supabase Cloud Source of Truth
-  if (supabaseClient && targetId && targetId !== 'usr_ute_master' && !targetId.startsWith('usr_')) {
+  if (isCloudTenant(targetId)) {
     try {
       const tenantId = targetId;
       // Properties (Source of Truth via loadProperties)
@@ -11959,7 +11977,7 @@ async function handleOnboardingSubmit(e) {
 let pendingMigrationData = null;
 
 function checkMigrationOpportunity() {
-  if (!activeTenant || activeTenant.id === 'usr_ute_master' || activeTenant.id.startsWith('usr_')) return;
+  if (!activeTenant || !isCloudTenant(activeTenant.id)) return;
   const migratedKey = 'LEXBNB_MIGRATED_' + activeTenant.id;
   if (localStorage.getItem(migratedKey)) return;
 
@@ -12019,7 +12037,7 @@ function closeMigrationModal() {
 }
 
 async function executeMigrationToCloud() {
-  if (!activeTenant || !activeTenant.id || activeTenant.id.startsWith('usr_')) {
+  if (!activeTenant || !isCloudTenant(activeTenant.id)) {
     alert('Aktarım için aktif bir bulut işletme hesabı açık olmalıdır.');
     return;
   }
@@ -12186,7 +12204,7 @@ function unsubscribeTenantRealtime() {
 
 function subscribeTenantRealtime(tenantId) {
   unsubscribeTenantRealtime();
-  if (!supabaseClient || !tenantId || tenantId.startsWith('usr_')) return;
+  if (!isCloudTenant(tenantId)) return;
   try {
     activeRealtimeChannel = supabaseClient
       .channel(`tenant-${tenantId}-ops`)

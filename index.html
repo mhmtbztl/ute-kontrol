@@ -42,12 +42,12 @@
       <!-- FORM 1: Giriş Yap -->
       <form id="saasLoginForm" onsubmit="handleSaaSLogin(event)" style="display: block;">
         <div class="form-group" style="margin-bottom: 12px; text-align: left;">
-          <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Kullanıcı Adı veya E-posta:</label>
-          <input type="text" id="saasLoginUser" placeholder="Örn: lexbnb veya e-posta adresiniz" required autocomplete="username" style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 13px;">
+          <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">E-posta Adresi:</label>
+          <input type="text" inputmode="email" id="saasLoginUser" placeholder="ornek@isletmeniz.com" required autocomplete="email" style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 13px;">
         </div>
         <div class="form-group" style="margin-bottom: 14px; text-align: left;">
           <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Şifre:</label>
-          <input type="password" id="saasLoginPass" placeholder="Örn: lexbnb" required autocomplete="current-password" style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 13px;">
+          <input type="password" id="saasLoginPass" placeholder="Şifreniz" required autocomplete="current-password" style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 13px;">
         </div>
 
         <button type="submit" id="saasLoginSubmitBtn" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 800; font-size: 14px; background: linear-gradient(135deg, #8B5CF6, #6D28D9); border: none; border-radius: 8px;">
@@ -55,7 +55,7 @@
         </button>
 
         <div style="background: rgba(139, 92, 246, 0.12); border: 1px dashed rgba(139, 92, 246, 0.35); border-radius: 6px; padding: 8px 10px; margin-top: 10px; font-size: 11px; color: #DDD6FE; text-align: center;">
-          💡 <strong>Hızlı Demo Girişi:</strong> Kullanıcı Adı: <code style="background: rgba(0,0,0,0.4); padding: 1px 5px; border-radius: 3px; color: #FDE68A; font-weight: 700;">lexbnb</code> &bull; Şifre: <code style="background: rgba(0,0,0,0.4); padding: 1px 5px; border-radius: 3px; color: #FDE68A; font-weight: 700;">lexbnb</code>
+          💡 <strong>Hızlı Demo Girişi:</strong> E-posta: <code style="background: rgba(0,0,0,0.4); padding: 1px 5px; border-radius: 3px; color: #FDE68A; font-weight: 700;">demo@lexbnb.com</code> &bull; Şifre: <code style="background: rgba(0,0,0,0.4); padding: 1px 5px; border-radius: 3px; color: #FDE68A; font-weight: 700;">lexbnb</code>
         </div>
 
         <div id="authErrorMessage" class="auth-error-msg" style="display: none; margin-top: 10px;">
