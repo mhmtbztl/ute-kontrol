@@ -39,6 +39,9 @@ must fail strict aggregation instead of being silently converted.
   check-out is exclusive.
 - Lead time and cancellation rate are booking-cohort metrics. They must use a
   real booking creation timestamp and are not mixed into stay-date metrics.
+- Cohort start is inclusive and cohort end is exclusive. A record without a
+  valid creation timestamp is excluded and reported as missing provenance.
+- Average lead time and average length of stay use only non-cancelled bookings.
 - A booking that overlaps a reporting period contributes only the nights inside
   that period.
 
@@ -75,4 +78,4 @@ presented as channel inventory.
 - ADR is `null` when no room nights exist.
 - Channel RevPAR is `null` without channel availability.
 - Totals reconcile exactly to the sum of channel rows.
-
+- Booking-cohort cancellation rate never uses stay-date filtering.

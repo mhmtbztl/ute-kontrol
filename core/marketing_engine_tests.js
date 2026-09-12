@@ -1,5 +1,10 @@
 const assert = require('assert');
-const { CANONICAL_CHANNELS, normalizeChannel, computeChannelEconomics } = require('./marketing_engine');
+const {
+  CANONICAL_CHANNELS,
+  normalizeChannel,
+  computeChannelEconomics,
+  computeBookingCohortMetrics
+} = require('./marketing_engine');
 
 let totalTests = 0;
 let passedTests = 0;
@@ -134,6 +139,58 @@ runTest('Channel totals reconcile to portfolio totals', () => {
 
 runTest('Invalid reporting periods are rejected', () => {
   assert.throws(() => computeChannelEconomics({ bookings: [], periodStart: '2026-10-01', periodEndExclusive: '2026-10-01' }), /INVALID_PERIOD/);
+});
+
+runTest('Booking cohort uses created_at rather than stay month', () => {
+  const result = computeBookingCohortMetrics({
+    cohortStart: '2026-09-01T00:00:00Z', cohortEndExclusive: '2026-10-01T00:00:00Z',
+    bookings: [{ id: 'B1', channel: 'AIRBNB', created_at: '2026-09-10T12:00:00Z', check_in: '2026-12-01', check_out: '2026-12-05', status: 'CONFIRMED' }]
+  });
+  assert.strictEqual(result.totals.createdReservations, 1);
+  assert.strictEqual(result.totals.averageLeadTimeDays, 82);
+  assert.strictEqual(result.totals.averageLengthOfStay, 4);
+});
+
+runTest('Cancellation rate is calculated inside the booking-created cohort', () => {
+  const result = computeBookingCohortMetrics({
+    cohortStart: '2026-09-01', cohortEndExclusive: '2026-10-01',
+    bookings: [
+      { id: 'B1', channel: 'Booking.com', created_at: '2026-09-02', check_in: '2026-10-01', check_out: '2026-10-03', status: 'CONFIRMED' },
+      { id: 'B2', channel: 'Booking.com', created_at: '2026-09-03', check_in: '2026-10-05', check_out: '2026-10-08', status: 'CANCELLED' }
+    ]
+  });
+  assert.strictEqual(result.totals.createdReservations, 2);
+  assert.strictEqual(result.totals.cancelledReservations, 1);
+  assert.strictEqual(result.totals.cancellationRatePercent, 50);
+  assert.strictEqual(result.totals.lengthOfStaySampleSize, 1);
+});
+
+runTest('Missing creation timestamps are excluded rather than assigned to a cohort', () => {
+  const result = computeBookingCohortMetrics({
+    bookings: [{ id: 'B1', channel: 'DIRECT', check_in: '2026-09-01', check_out: '2026-09-03', status: 'CONFIRMED' }]
+  });
+  assert.strictEqual(result.totals.createdReservations, 0);
+  assert.strictEqual(result.dataQuality.missingCreatedAtReservations, 1);
+  assert.strictEqual(result.dataQuality.status, 'NEEDS_REVIEW');
+});
+
+runTest('Invalid negative lead time is excluded and reported', () => {
+  const result = computeBookingCohortMetrics({
+    bookings: [{ id: 'B1', channel: 'DIRECT', created_at: '2026-09-10T18:00:00Z', check_in: '2026-09-09', check_out: '2026-09-12', status: 'CONFIRMED' }]
+  });
+  assert.strictEqual(result.totals.averageLeadTimeDays, null);
+  assert.strictEqual(result.dataQuality.invalidLeadTimeReservations, 1);
+});
+
+runTest('Booking cohort respects property scope', () => {
+  const result = computeBookingCohortMetrics({
+    propertyId: 'P1',
+    bookings: [
+      { id: 'A', property_id: 'P1', channel: 'AIRBNB', created_at: '2026-09-01', check_in: '2026-09-10', check_out: '2026-09-12', status: 'CONFIRMED' },
+      { id: 'B', property_id: 'P2', channel: 'AIRBNB', created_at: '2026-09-01', check_in: '2026-09-10', check_out: '2026-09-12', status: 'CONFIRMED' }
+    ]
+  });
+  assert.strictEqual(result.totals.createdReservations, 1);
 });
 
 console.log(`\nTEST SUMMARY: ${passedTests} / ${totalTests} TESTS PASSED`);

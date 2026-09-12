@@ -97,6 +97,156 @@
     };
   }
 
+  function parseInstant(value) {
+    if (!value) return null;
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  function parseUtcDate(value) {
+    if (!value) return null;
+    const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!match) return null;
+    const parsed = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  function differenceInDays(later, earlier) {
+    return (later.getTime() - earlier.getTime()) / 86400000;
+  }
+
+  function newCohortAccumulator(channel) {
+    return {
+      channel,
+      createdReservations: 0,
+      confirmedReservations: 0,
+      cancelledReservations: 0,
+      leadTimeDays: 0,
+      leadTimeSampleSize: 0,
+      lengthOfStayNights: 0,
+      lengthOfStaySampleSize: 0,
+      rawChannels: new Set()
+    };
+  }
+
+  function finalizeCohortAccumulator(acc) {
+    return {
+      channel: acc.channel,
+      createdReservations: acc.createdReservations,
+      confirmedReservations: acc.confirmedReservations,
+      cancelledReservations: acc.cancelledReservations,
+      cancellationRatePercent: acc.createdReservations > 0
+        ? roundMoney(acc.cancelledReservations / acc.createdReservations * 100) : null,
+      averageLeadTimeDays: acc.leadTimeSampleSize > 0
+        ? roundMoney(acc.leadTimeDays / acc.leadTimeSampleSize) : null,
+      leadTimeSampleSize: acc.leadTimeSampleSize,
+      averageLengthOfStay: acc.lengthOfStaySampleSize > 0
+        ? roundMoney(acc.lengthOfStayNights / acc.lengthOfStaySampleSize) : null,
+      lengthOfStaySampleSize: acc.lengthOfStaySampleSize,
+      rawChannels: Array.from(acc.rawChannels).sort()
+    };
+  }
+
+  function computeBookingCohortMetrics(params) {
+    const {
+      bookings = [], propertyId = null, cohortStart = null, cohortEndExclusive = null
+    } = params || {};
+
+    const start = parseInstant(cohortStart);
+    const end = parseInstant(cohortEndExclusive);
+    if ((cohortStart && !start) || (cohortEndExclusive && !end) || (start && end && end <= start)) {
+      throw new Error('INVALID_COHORT_PERIOD');
+    }
+
+    const groups = new Map();
+    const total = newCohortAccumulator('ALL');
+    const unknownRawChannels = new Set();
+    let missingCreatedAtReservations = 0;
+    let invalidLeadTimeReservations = 0;
+
+    bookings.forEach(booking => {
+      const bookingPropertyId = firstDefined(booking, ['propertyId', 'property_id', 'villa'], null);
+      if (propertyId && bookingPropertyId !== propertyId) return;
+
+      const createdAt = parseInstant(firstDefined(booking, ['createdAt', 'created_at', 'bookedAt', 'booked_at'], null));
+      if (!createdAt) {
+        missingCreatedAtReservations += 1;
+        return;
+      }
+      if (start && createdAt < start) return;
+      if (end && createdAt >= end) return;
+
+      const channelInfo = normalizeChannel(firstDefined(booking, ['channel'], null));
+      if (channelInfo.canonicalChannel === 'UNKNOWN') unknownRawChannels.add(channelInfo.rawChannel || '(missing)');
+      if (!groups.has(channelInfo.canonicalChannel)) groups.set(channelInfo.canonicalChannel, newCohortAccumulator(channelInfo.canonicalChannel));
+
+      const group = groups.get(channelInfo.canonicalChannel);
+      const status = normalizeToken(firstDefined(booking, ['status'], 'CONFIRMED'));
+      const isCancelled = status === 'CANCELLED';
+
+      [group, total].forEach(acc => {
+        acc.createdReservations += 1;
+        acc.rawChannels.add(channelInfo.rawChannel || '(missing)');
+        if (isCancelled) {
+          acc.cancelledReservations += 1;
+          return;
+        }
+
+        acc.confirmedReservations += 1;
+        const checkIn = parseUtcDate(firstDefined(booking, ['checkIn', 'check_in'], null));
+        const checkOut = parseUtcDate(firstDefined(booking, ['checkOut', 'check_out'], null));
+        if (checkIn) {
+          const createdDate = new Date(Date.UTC(createdAt.getUTCFullYear(), createdAt.getUTCMonth(), createdAt.getUTCDate()));
+          const leadTime = differenceInDays(checkIn, createdDate);
+          if (leadTime >= 0) {
+            acc.leadTimeDays += leadTime;
+            acc.leadTimeSampleSize += 1;
+          }
+        }
+        if (checkIn && checkOut) {
+          const stayLength = differenceInDays(checkOut, checkIn);
+          if (stayLength > 0) {
+            acc.lengthOfStayNights += stayLength;
+            acc.lengthOfStaySampleSize += 1;
+          }
+        }
+      });
+
+      if (!isCancelled) {
+        const checkIn = parseUtcDate(firstDefined(booking, ['checkIn', 'check_in'], null));
+        if (!checkIn) {
+          invalidLeadTimeReservations += 1;
+        } else {
+          const createdDate = new Date(Date.UTC(createdAt.getUTCFullYear(), createdAt.getUTCMonth(), createdAt.getUTCDate()));
+          if (differenceInDays(checkIn, createdDate) < 0) invalidLeadTimeReservations += 1;
+        }
+      }
+    });
+
+    const channels = Array.from(groups.values())
+      .map(finalizeCohortAccumulator)
+      .sort((a, b) => b.createdReservations - a.createdReservations || a.channel.localeCompare(b.channel));
+
+    return {
+      contractVersion: '17.1',
+      cohort: {
+        start: cohortStart,
+        endExclusive: cohortEndExclusive,
+        dateBasis: 'BOOKING_CREATED_AT'
+      },
+      scope: { propertyId },
+      channels,
+      totals: finalizeCohortAccumulator(total),
+      dataQuality: {
+        status: unknownRawChannels.size > 0 || missingCreatedAtReservations > 0 || invalidLeadTimeReservations > 0
+          ? 'NEEDS_REVIEW' : 'OK',
+        unknownRawChannels: Array.from(unknownRawChannels).sort(),
+        missingCreatedAtReservations,
+        invalidLeadTimeReservations
+      }
+    };
+  }
+
   function newAccumulator(channel) {
     return {
       channel, bookingIds: new Set(), bookedNights: 0, bookingRevenueAfterDiscount: 0,
@@ -219,5 +369,5 @@
     };
   }
 
-  return { CANONICAL_CHANNELS, normalizeChannel, computeChannelEconomics };
+  return { CANONICAL_CHANNELS, normalizeChannel, computeChannelEconomics, computeBookingCohortMetrics };
 }));
