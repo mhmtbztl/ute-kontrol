@@ -19,6 +19,7 @@
   const state = {
     view: 'economics',
     snapshotFormOpen: false,
+    listingFormOpen: false,
     listings: [],
     snapshots: [],
     findings: [],
@@ -41,7 +42,8 @@
     ['MarketingPriorityService', 'core/marketing_priority_service.js?v=f6e216ff'],
     ['MarketingDataService', 'core/marketing_data_service.js?v=06308c56'],
     ['MarketingReviewService', 'core/marketing_review_service.js?v=9207dee5'],
-    ['MarketingSnapshotService', 'core/marketing_snapshot_service.js?v=184ad517']
+    ['MarketingSnapshotService', 'core/marketing_snapshot_service.js?v=184ad517'],
+    ['MarketingChannelListingService', 'core/marketing_channel_listing_service.js?v=0e34cbca']
   ]);
   let dependencyPromise = null;
 
@@ -134,6 +136,9 @@
     return {
       period,
       selectedProperty,
+      properties: Object.entries(input.villas || {}).map(([slug, property]) => ({
+        slug, id: property && property.id, name: property && property.name || slug
+      })),
       economics,
       listings: Array.isArray(input.listings) ? input.listings.filter(item => String(item.status || 'ACTIVE').toUpperCase() !== 'ARCHIVED') : [],
       snapshots: Array.isArray(input.snapshots) ? input.snapshots : [],
@@ -203,21 +208,22 @@
   }
 
   function renderFunnel(model) {
-    const toolbar = `<div style="display:flex;justify-content:flex-end;margin-bottom:12px"><button type="button" class="btn btn-primary btn-sm" data-marketing-open-snapshot>＋ Manuel snapshot ekle</button></div>`;
+    const toolbar = `<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-bottom:12px"><button type="button" class="btn btn-secondary btn-sm" data-marketing-open-listing>＋ Kanal ilanı ekle</button><button type="button" class="btn btn-primary btn-sm" data-marketing-open-snapshot>＋ Manuel snapshot ekle</button></div>`;
+    const listingForm = state.listingFormOpen ? renderListingForm(model) : '';
     const form = state.snapshotFormOpen ? renderSnapshotForm(model) : '';
     if (!model.snapshots.length) {
-      return `${toolbar}${form}${emptyState('Huni verisi henüz yok', 'Airbnb/OTA panelinden manuel veya API tabanlı bir görünürlük snapshot’ı gelmeden oran üretilmez.')}`;
+      return `${toolbar}${listingForm}${form}${emptyState('Huni verisi henüz yok', 'Airbnb/OTA panelinden manuel veya API tabanlı bir görünürlük snapshot’ı gelmeden oran üretilmez.')}`;
     }
     const funnel = services.MarketingFunnelService;
     const latest = selectLatestSnapshot(model.snapshots);
     const derived = funnel && funnel.deriveFunnelMetrics ? funnel.deriveFunnelMetrics(latest) : null;
     if (!derived || !derived.validation.valid) {
-      return emptyState('Huni snapshot’ı doğrulanamadı', 'Sayaç sıralamasını ve negatif/eksik değerleri kontrol edin.');
+      return `${toolbar}${listingForm}${form}${emptyState('Huni snapshot’ı doğrulanamadı', 'Sayaç sıralamasını ve negatif/eksik değerleri kontrol edin.')}`;
     }
     const c = derived.validation.counters;
     const r = derived.rates;
     const findings = rankFindings(model.findings);
-    return `${toolbar}${form}<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+    return `${toolbar}${listingForm}${form}<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
       ${kpi('Gösterim', number(c.impressions), `Kapsama: ${number(derived.validation.coveragePercent, '%')}`)}
       ${kpi('İlan görüntüleme', number(c.listingViews), `Arama → görüntüleme: ${number(r.searchToViewCtrPercent, '%')}`)}
       ${kpi('Rezervasyon denemesi', number(c.bookingAttempts), `Görüntüleme → deneme: ${number(r.viewToAttemptConversionPercent, '%')}`)}
@@ -231,6 +237,31 @@
       const bKey = String(b.periodEndExclusive || b.period_end_exclusive || b.createdAt || b.created_at || '');
       return bKey.localeCompare(aKey);
     })[0] || null;
+  }
+
+  function renderListingForm(model) {
+    const properties = model.properties.filter(item => item.id);
+    if (!properties.length) return emptyState('Mülk kaydı bulunamadı', 'Kanal ilanı eklemek için önce bulut hesabında bir mülk oluşturulmalıdır.');
+    const selectedId = model.selectedProperty === 'ALL' ? null
+      : (properties.find(item => item.slug === model.selectedProperty) || {}).id;
+    const propertyOptions = properties.map(item => `<option value="${escapeHtml(item.id)}"${item.id === selectedId ? ' selected' : ''}>${escapeHtml(item.name)}</option>`).join('');
+    const channelOptions = [
+      ['AIRBNB', 'Airbnb'], ['BOOKING_COM', 'Booking.com'], ['VRBO', 'Vrbo'],
+      ['EXPEDIA', 'Expedia'], ['DIRECT', 'Direkt'], ['OTHER_OTA', 'Diğer OTA']
+    ].map(([value, label]) => `<option value="${value}">${label}</option>`).join('');
+    return `<form data-marketing-listing-form class="card" style="padding:16px;margin-bottom:14px">
+      <h3 style="margin:0 0 12px">Kanal ilanı tanımla</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px">
+        <label style="display:grid;gap:5px;font-size:12px">Mülk<select class="form-control" name="propertyId" required>${propertyOptions}</select></label>
+        <label style="display:grid;gap:5px;font-size:12px">Kanal<select class="form-control" name="channelCode" required>${channelOptions}</select></label>
+        <label style="display:grid;gap:5px;font-size:12px">İlan ID / sabit referans<input class="form-control" name="externalListingId" maxlength="200" required placeholder="Örn. Airbnb ilan ID"></label>
+        <label style="display:grid;gap:5px;font-size:12px">Görünen ad<input class="form-control" name="displayName" maxlength="200" placeholder="Örn. Villa Azure Airbnb"></label>
+        <label style="display:grid;gap:5px;font-size:12px">İlan URL’si<input class="form-control" type="url" name="externalUrl" placeholder="https://..."></label>
+        <label style="display:grid;gap:5px;font-size:12px">Ödeme para birimi<input class="form-control" name="payoutCurrency" value="TRY" minlength="3" maxlength="3" required></label>
+      </div>
+      <div class="sub-text" style="margin-top:10px">Sabit referans aynı kanal içinde tekrar gönderilirse mevcut kayıt güncellenir; başka mülke taşınmaz.</div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button type="button" class="btn btn-secondary btn-sm" data-marketing-cancel-listing>Vazgeç</button><button type="submit" class="btn btn-primary btn-sm">Kanal ilanını kaydet</button></div>
+    </form>`;
   }
 
   function renderSnapshotForm(model) {
@@ -432,6 +463,28 @@
     }
   }
 
+  async function handleListingSubmit(form) {
+    const client = typeof supabaseClient !== 'undefined' ? supabaseClient : null;
+    const scope = cloudScope();
+    if (!client || !scope || !services.MarketingChannelListingService) throw new Error('CHANNEL_LISTING_SETUP_UNAVAILABLE');
+    const values = Object.fromEntries(new FormData(form).entries());
+    const submit = form.querySelector('[type="submit"]');
+    if (submit) submit.disabled = true;
+    try {
+      const result = await services.MarketingChannelListingService.saveChannelListing(client, {
+        ...values, tenantId: scope.tenantId
+      });
+      state.listingFormOpen = false;
+      state.remoteStatus = 'LOADING';
+      render();
+      await hydrateCloudData();
+      render();
+      return result;
+    } finally {
+      if (submit) submit.disabled = false;
+    }
+  }
+
   function initializeBrowser() {
     if (typeof document === 'undefined') return;
     document.querySelectorAll('[data-marketing-view]').forEach(button => button.addEventListener('click', () => {
@@ -442,8 +495,12 @@
     if (content) content.addEventListener('click', event => {
       const open = event.target.closest('[data-marketing-open-snapshot]');
       const cancel = event.target.closest('[data-marketing-cancel-snapshot]');
-      if (open) { state.snapshotFormOpen = true; render(); return; }
+      const openListing = event.target.closest('[data-marketing-open-listing]');
+      const cancelListing = event.target.closest('[data-marketing-cancel-listing]');
+      if (open) { state.snapshotFormOpen = true; state.listingFormOpen = false; render(); return; }
       if (cancel) { state.snapshotFormOpen = false; render(); return; }
+      if (openListing) { state.listingFormOpen = true; state.snapshotFormOpen = false; render(); return; }
+      if (cancelListing) { state.listingFormOpen = false; render(); return; }
       const actionButton = event.target.closest('[data-marketing-action][data-finding-id]');
       if (!actionButton) return;
       handleFindingAction(actionButton).catch(error => {
@@ -452,6 +509,15 @@
       });
     });
     if (content) content.addEventListener('submit', event => {
+      const listingForm = event.target.closest('[data-marketing-listing-form]');
+      if (listingForm) {
+        event.preventDefault();
+        handleListingSubmit(listingForm).catch(error => {
+          const status = document.getElementById('marketingWorkspaceStatus');
+          if (status) status.textContent = `Kanal ilanı kaydedilemedi: ${error.message}`;
+        });
+        return;
+      }
       const form = event.target.closest('[data-marketing-snapshot-form]');
       if (!form) return;
       event.preventDefault();
@@ -477,5 +543,5 @@
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') initializeBrowser();
 
-  return { periodFromFilter, scopeBookings, buildWorkspaceModel, selectLatestSnapshot, renderWorkspaceHtml, renderFindingActions, renderSnapshotForm, escapeHtml, setData, render };
+  return { periodFromFilter, scopeBookings, buildWorkspaceModel, selectLatestSnapshot, renderWorkspaceHtml, renderFindingActions, renderListingForm, renderSnapshotForm, escapeHtml, setData, render };
 }));
