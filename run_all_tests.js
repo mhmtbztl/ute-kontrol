@@ -61,7 +61,8 @@ const testFiles = [
   // Phase 17 Revenue & Distribution Intelligence (pure unit suite)
   'marketing_engine_tests.js',
   'marketing_schema_tests.js',
-  'marketing_funnel_tests.js'
+  'marketing_funnel_tests.js',
+  'marketing_media_schema_tests.js'
 ];
 
 console.log('=============================================================================');
