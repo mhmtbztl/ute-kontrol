@@ -131,3 +131,18 @@ presented as channel inventory.
   it is not profit or total contribution margin.
 - Persisted health snapshots are immutable, backend-derived and idempotent for
   the same property, input fingerprint and scoring version.
+
+## Marketing-action priority contract
+
+- Workspace ranking uses a versioned, explainable
+  `impact × confidence × urgency × revenue multiplier ÷ effort` score.
+- The revenue multiplier is `1 + log10(1 + opportunity)` so zero opportunity
+  remains finite and valid.
+- Explicit effort is bounded from 1–5; otherwise a conservative default is
+  derived from the action kind. Physical work ranks as more costly than review.
+- Terminal findings and `KEEP` observations are excluded. Duplicate active
+  fingerprints are collapsed defensively to the most recently observed record.
+- At most three real marketing actions are returned. Empty capacity is never
+  filled with weak or fabricated recommendations.
+- Marketing workspace ranking does not replace the Executive Today engine;
+  adapted findings still pass through Today's existing cross-domain quota.
