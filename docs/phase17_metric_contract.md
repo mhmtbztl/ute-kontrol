@@ -146,3 +146,14 @@ presented as channel inventory.
   filled with weak or fabricated recommendations.
 - Marketing workspace ranking does not replace the Executive Today engine;
   adapted findings still pass through Today's existing cross-domain quota.
+
+## Seasonal-creative contract
+
+- Seasonal logic is advisory only. It cannot update channel cover placement.
+- The initial calendar is explicit for the Turkey/northern-hemisphere product
+  context: winter 15 November–15 March and summer 15 May–15 September, with
+  spring and autumn covering the intervening dates.
+- Recommendations require a season-tagged candidate, minimum confidence and a
+  meaningful cover-score improvement. Weak changes create no noisy finding.
+- A seasonal recommendation becomes a digital human-review finding. If accepted,
+  the cover change should start a before/after measurement window.

@@ -69,7 +69,8 @@ const testFiles = [
   'marketing_impact_schema_tests.js',
   'photo_intelligence_tests.js',
   'marketing_health_tests.js',
-  'marketing_priority_tests.js'
+  'marketing_priority_tests.js',
+  'seasonal_marketing_tests.js'
 ];
 
 console.log('=============================================================================');
