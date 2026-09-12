@@ -435,7 +435,7 @@
     </div>
   </header>
 
-  <!-- Navigation Tabs: 10 Canonical Sections -->
+  <!-- Navigation Tabs: Canonical Sections -->
   <nav class="nav-tabs">
     <button class="tab-btn active" onclick="switchTab('executive')">🎯 Kontrol Merkezi</button>
     <button class="tab-btn" onclick="switchTab('reservations')">📅 Rezervasyonlar (<span id="rezCountBadge">0</span>)</button>
@@ -445,6 +445,7 @@
     <button class="tab-btn" onclick="switchTab('leads')">🎯 Satış / CRM (<span id="leadCountBadge">0</span>)</button>
     <button class="tab-btn" onclick="switchTab('pricing')">🏷️ Fiyatlandırma</button>
     <button class="tab-btn" onclick="switchTab('finance')">💰 Finans</button>
+    <button class="tab-btn" onclick="switchTab('marketing')">📈 Gelir & Dağıtım</button>
     <button class="tab-btn" onclick="switchTab('reports')">📊 Raporlar</button>
     <button class="tab-btn" onclick="switchTab('settings')">⚙️ Ayarlar</button>
   </nav>
@@ -1496,6 +1497,25 @@
     <!-- TAB: PAZARLAMA & AI REKLAM RADARI                      -->
     <!-- ======================================================= -->
     <div id="tab-marketing" class="tab-content">
+      <div class="section-title-bar" style="align-items: flex-start; gap: 16px; flex-wrap: wrap;">
+        <div>
+          <h2 style="margin: 0;">📈 GELİR, DAĞITIM & İLAN ZEKÂSI</h2>
+          <p class="sub-text" style="margin: 5px 0 0;">Kanal ekonomisi, ölçülebilir dönüşüm hunisi ve doğrulanabilir galeri kararları.</p>
+        </div>
+        <span id="marketingDataQualityBadge" class="badge badge-secondary">Veri kontrol ediliyor</span>
+      </div>
+
+      <div role="tablist" aria-label="Pazarlama çalışma alanları" style="display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0;">
+        <button type="button" class="btn btn-primary btn-sm" data-marketing-view="economics">🌐 Kanal Ekonomisi</button>
+        <button type="button" class="btn btn-secondary btn-sm" data-marketing-view="funnel">🔻 Huni & Bulgular</button>
+        <button type="button" class="btn btn-secondary btn-sm" data-marketing-view="gallery">📸 Fotoğraf & Deneyler</button>
+      </div>
+
+      <div id="marketingWorkspaceStatus" class="card" style="padding: 14px; margin-bottom: 14px;">Pazarlama motoru hazırlanıyor…</div>
+      <div id="marketingWorkspaceContent" aria-live="polite"></div>
+    </div>
+
+    <div id="tab-marketing-legacy" class="tab-content" hidden aria-hidden="true">
       <!-- 1. Header Bar -->
       <div class="marketing-header-bar">
         <div>
@@ -4251,5 +4271,6 @@
   <script src="core/executive_ai_advisor.js?v=93c10c3e"></script>
   <script src="core/notification_center_service.js?v=7fb8bdee"></script>
   <script src="app.js?v=e936ca18"></script>
+  <script src="core/marketing_ui.js?v=d16ae8ee"></script>
 </body>
 </html>
