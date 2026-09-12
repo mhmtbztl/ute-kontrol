@@ -78,7 +78,8 @@ const testFiles = [
   'marketing_manual_snapshot_schema_tests.js',
   'marketing_snapshot_service_tests.js',
   'marketing_channel_listing_schema_tests.js',
-  'marketing_channel_listing_service_tests.js'
+  'marketing_channel_listing_service_tests.js',
+  'marketing_media_upload_service_tests.js'
 ];
 
 console.log('=============================================================================');
