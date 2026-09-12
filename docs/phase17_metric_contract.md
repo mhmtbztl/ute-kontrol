@@ -98,3 +98,21 @@ presented as channel inventory.
   prove that the change had no effect.
 - Experiment evidence points to immutable raw performance snapshots so the
   inputs remain auditable.
+
+## Photo-intelligence contract
+
+- Vision providers return `photo-analysis-v1`; unstructured text is not a
+  trusted analysis result.
+- Cache identity includes the immutable media hash, property-context hash,
+  prompt version and result-schema version. A cache hit expires after 30 days
+  by default, and a record without a validated result is never reused.
+- Returned run, property and media identifiers must match the submitted scope.
+  Cover candidates and story-order entries cannot introduce unseen media IDs.
+- Scores are bounded, duplicate media/order entries are rejected, and only the
+  explicit safe-edit operation allowlist is accepted.
+- The model must explicitly state that it did not recommend fabrication.
+  Adding amenities, rooms or views that do not exist is never an allowed edit.
+- Missing visual coverage is a low-confidence observation requiring human
+  review. It is not proof that an amenity is absent from the property.
+- Only `RESHOOT` results become physical-work candidates, and even those require
+  explicit user acceptance before an operational task can be created.

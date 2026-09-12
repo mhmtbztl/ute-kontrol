@@ -38,6 +38,14 @@ async function runTest(name, fn) {
     );
   });
 
+  await runTest('Different source entities create different finding identities', async () => {
+    const base = { tenantId: 'T1', propertyId: 'P1', sourceDomain: 'PHOTO_ANALYSIS', findingCode: 'PHOTO_RESHOOT_REQUIRED', metric: 'PHOTO_COMMERCIAL_SCORE' };
+    assert.notStrictEqual(
+      await buildFindingFingerprint({ ...base, sourceEntityId: 'MEDIA-1' }),
+      await buildFindingFingerprint({ ...base, sourceEntityId: 'MEDIA-2' })
+    );
+  });
+
   await runTest('Marketing findings enter the existing Today revenue bucket', () => {
     const action = adaptFindingToExecutiveAction({
       id: 'F1', propertyId: 'P1', title: 'CTR referansın altında', metric: 'CTR',

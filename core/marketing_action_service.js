@@ -52,6 +52,7 @@
       tenantId: identity.tenantId,
       propertyId: identity.propertyId,
       channelListingId: identity.channelListingId || null,
+      sourceEntityId: identity.sourceEntityId || null,
       sourceDomain: normalizeEnum(identity.sourceDomain),
       findingCode: normalizeEnum(identity.findingCode),
       metric: normalizeEnum(identity.metric),

@@ -66,7 +66,8 @@ const testFiles = [
   'marketing_action_tests.js',
   'marketing_actions_schema_tests.js',
   'marketing_impact_tests.js',
-  'marketing_impact_schema_tests.js'
+  'marketing_impact_schema_tests.js',
+  'photo_intelligence_tests.js'
 ];
 
 console.log('=============================================================================');
