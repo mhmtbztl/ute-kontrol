@@ -10,8 +10,15 @@
 // 6. Yaklaşan (24-48h upcoming operations)
 // =============================================================================
 
-const { evaluateTaskSla } = require('./operations_sla_service.js');
-const { computeTaskPriority } = require('./operations_priority_engine.js');
+// Node tarafinda bagimliliklar require ile gelir. Tarayicida ayni
+// fonksiyonlar onceki <script> etiketleriyle zaten global kapsamdadir;
+// ust seviyede const ile yeniden bildirmek SyntaxError verir ve bu
+// dosyanin tamamen calismamasina yol acar.
+if (typeof require !== 'undefined') {
+  var { evaluateTaskSla } = require('./operations_sla_service.js');
+  var { computeTaskPriority } = require('./operations_priority_engine.js');
+}
+
 
 /**
  * Resolves local date string (YYYY-MM-DD) for a given timezone.

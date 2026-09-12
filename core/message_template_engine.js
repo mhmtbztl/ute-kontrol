@@ -183,7 +183,8 @@ function maskSensitiveContent(text) {
     .replace(/\b\d{4,8}\b/g, '[PIN_MASKED]');
 }
 
-module.exports = {
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
   VARIABLE_WHITELIST,
   extractVariables,
   validateTemplateVariables,
@@ -191,3 +192,4 @@ module.exports = {
   renderTemplate,
   maskSensitiveContent
 };
+}

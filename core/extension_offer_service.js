@@ -153,9 +153,11 @@ function validateOfferAcceptance(offer, booking, existingBookings = []) {
   return { valid: true };
 }
 
-module.exports = {
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
   evaluateExtensionAvailability,
   calculateExtensionPrice,
   createOfferSnapshot,
   validateOfferAcceptance
 };
+}

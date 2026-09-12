@@ -138,7 +138,9 @@ function detectGapNights(params) {
   return gapResults;
 }
 
-module.exports = {
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
   getAffectedRecomputeWindow,
   detectGapNights
 };
+}

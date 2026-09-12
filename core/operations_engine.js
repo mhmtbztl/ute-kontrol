@@ -5,8 +5,15 @@
 // manages tight-turnover detection, checklist snapshots, and type-specific cancellations.
 // =============================================================================
 
-const { computeTaskPriority } = require('./operations_priority_engine.js');
-const { calculateSlaDeadline } = require('./operations_sla_service.js');
+// Node tarafinda bagimliliklar require ile gelir. Tarayicida ayni
+// fonksiyonlar onceki <script> etiketleriyle zaten global kapsamdadir;
+// ust seviyede const ile yeniden bildirmek SyntaxError verir ve bu
+// dosyanin tamamen calismamasina yol acar.
+if (typeof require !== 'undefined') {
+  var { computeTaskPriority } = require('./operations_priority_engine.js');
+  var { calculateSlaDeadline } = require('./operations_sla_service.js');
+}
+
 
 const DEFAULT_CLEANING_CHECKLIST = [
   { id: 'chk_linen', text: 'Yatak çarşafları ve nevresimler değiştirildi', completed: false, required: true },

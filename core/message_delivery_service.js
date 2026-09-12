@@ -4,9 +4,16 @@
 // Effectively-Once Delivery, and Sanitized Audit Logs
 // =============================================================================
 
-const { getProviderForChannel } = require('./messaging_provider.js');
-const { normalizePhone, normalizeEmail } = require('./guest_contact_utils.js');
-const { evaluateExtensionAvailability } = require('./extension_offer_service.js');
+// Node tarafinda bagimliliklar require ile gelir. Tarayicida ayni
+// fonksiyonlar onceki <script> etiketleriyle zaten global kapsamdadir;
+// ust seviyede const ile yeniden bildirmek SyntaxError verir ve bu
+// dosyanin tamamen calismamasina yol acar.
+if (typeof require !== 'undefined') {
+  var { getProviderForChannel } = require('./messaging_provider.js');
+  var { normalizePhone, normalizeEmail } = require('./guest_contact_utils.js');
+  var { evaluateExtensionAvailability } = require('./extension_offer_service.js');
+}
+
 
 class MessageDeliveryService {
   constructor(options = {}) {
@@ -227,6 +234,8 @@ class MessageDeliveryService {
   }
 }
 
-module.exports = {
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
   MessageDeliveryService
 };
+}

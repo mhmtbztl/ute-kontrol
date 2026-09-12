@@ -4,9 +4,16 @@
 // Send-Time Recipient Resolution, Consent Enforcement, and Audit Protection
 // =============================================================================
 
-const { renderTemplate, resolveTemplate } = require('./message_template_engine.js');
-const { evaluateExtensionAvailability, calculateExtensionPrice } = require('./extension_offer_service.js');
-const { normalizePhone, normalizeEmail } = require('./guest_contact_utils.js');
+// Node tarafinda bagimliliklar require ile gelir. Tarayicida ayni
+// fonksiyonlar onceki <script> etiketleriyle zaten global kapsamdadir;
+// ust seviyede const ile yeniden bildirmek SyntaxError verir ve bu
+// dosyanin tamamen calismamasina yol acar.
+if (typeof require !== 'undefined') {
+  var { renderTemplate, resolveTemplate } = require('./message_template_engine.js');
+  var { evaluateExtensionAvailability, calculateExtensionPrice } = require('./extension_offer_service.js');
+  var { normalizePhone, normalizeEmail } = require('./guest_contact_utils.js');
+}
+
 
 /**
  * Calculates scheduled timestamp in local timezone.
@@ -339,8 +346,10 @@ function reconcileBookingMessages(params) {
   return { scheduled, updated, cancelled, skipped };
 }
 
-module.exports = {
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
   calculateTriggerDateTime,
   buildTemplateContext,
   reconcileBookingMessages
 };
+}

@@ -265,7 +265,8 @@ function getProviderForChannel(channel, customProvider = null) {
   }
 }
 
-module.exports = {
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
   CHANNEL_CAPABILITIES,
   MessagingProvider,
   MockDeliveryProvider,
@@ -276,3 +277,4 @@ module.exports = {
   BookingProvider,
   getProviderForChannel
 };
+}
