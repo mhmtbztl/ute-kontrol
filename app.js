@@ -13264,17 +13264,38 @@ function renderExecutiveControlCenter() {
 
   // 2. Onboarding Progress
   if (typeof ExecutiveDashboardService !== 'undefined' && ExecutiveDashboardService.computeTenantOnboardingProgress) {
+    // computeTenantOnboardingProgress'in BEKLEDIGI sekil bu; onceki cagri
+    // properties/monthly_targets/... gonderiyordu, yani hicbir adim
+    // okunamiyordu ve donen alan `percentage` diye okunuyordu - oysa servis
+    // `progressPercent` donduruyor. Sonuc: yeni musteri "%undefined" goruyordu.
     const onboarding = ExecutiveDashboardService.computeTenantOnboardingProgress({
-      properties: propertiesList,
-      monthly_targets: targets,
-      operational_rules: [{ id: 'rule1' }],
-      pricing_rules: [{ id: 'prule1' }],
-      message_templates: [{ id: 'tmpl1' }]
+      tenantId: getActiveTenantId(),
+      propertiesCount: propertiesList.length,
+      bookingsCount: bookings.length,
+      hasMonthlyTargets: Object.keys(targets || {}).length > 0,
+      hasFinanceTransactions: expenses.length > 0,
+      hasCleaningChecklist: tasks.length > 0,
+      hasPricingProfile: !!(appData && appData.pricingProfiles && appData.pricingProfiles.length),
+      hasGuestSettings: !!(appData && appData.guests && appData.guests.length),
+      hasMessageTemplates: !!(appData && appData.messageTemplates && appData.messageTemplates.length),
+      hasTeamMembers: (typeof userMemberships !== 'undefined' && userMemberships.length > 1)
+        || !!(appData && appData.teamMemberCount > 1)
     });
     const pctEl = document.getElementById('onboardProgressPct');
-    if (pctEl) pctEl.innerText = `%${onboarding.percentage}`;
+    if (pctEl) pctEl.innerText = `%${onboarding.progressPercent}`;
+
+    // Adim listesi statik HTML'di ve BES MADDESI DE ✅ isaretliydi; sifir
+    // mulklu bir hesapta bile "her sey tamam" diyordu. Artik gercek durumu
+    // yansitir.
+    const stepsEl = document.getElementById('onboardStepsList');
+    if (stepsEl && Array.isArray(onboarding.steps)) {
+      stepsEl.innerHTML = onboarding.steps.map(s =>
+        `<span style="opacity:${s.completed ? 1 : 0.5};">${s.completed ? '✅' : '⬜'} ${escapeHtml(s.title)}</span>`
+      ).join('');
+    }
+
     const barEl = document.getElementById('onboardProgressBar');
-    if (barEl) barEl.style.width = `${onboarding.percentage}%`;
+    if (barEl) barEl.style.width = `${onboarding.progressPercent}%`;
   }
 
   // 3. Today Command Center (3+2+1 Priority Scoring)
