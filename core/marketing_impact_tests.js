@@ -81,6 +81,12 @@ test('Invalid funnel ordering is rejected as insufficient evidence', () => {
   assert(result.insufficiencies.includes('BEFORE_FUNNEL_ORDER_INVALID'));
 });
 
+test('Null counters remain missing instead of becoming numeric zero', () => {
+  const result = evaluateListingChange({ ...base, before: { ...base.before, impressions: null } });
+  assert.strictEqual(result.verdict, 'INSUFFICIENT_DATA');
+  assert(result.insufficiencies.includes('COUNTERS_MISSING_OR_INVALID'));
+});
+
 test('Windows may not cross the recorded change date', () => {
   assert.throws(() => evaluateListingChange({ ...base, before: { ...base.before, endDateExclusive: '2026-08-16' } }), /OVERLAP_CHANGE/);
 });

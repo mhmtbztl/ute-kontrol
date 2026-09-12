@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "marketing:photo-worker": "node scripts/run_photo_analysis_worker.js"
+    "marketing:photo-worker": "node scripts/run_photo_analysis_worker.js",
+    "marketing:experiment-worker": "node scripts/run_marketing_experiment_worker.js"
   },
   "keywords": [],
   "author": "",

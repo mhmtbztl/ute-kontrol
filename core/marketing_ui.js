@@ -457,7 +457,7 @@
   function renderExperiments(experiments, propertyId) {
     const scoped = experiments.filter(item => !propertyId || (item.propertyId || item.property_id) === propertyId).slice(0, 5);
     if (!scoped.length) return '';
-    const statusLabels = { COLLECTING: 'Veri toplanıyor', READY: 'Değerlendirmeye hazır', EVALUATED: 'Değerlendirildi', CANCELLED: 'İptal' };
+    const statusLabels = { COLLECTING: 'Veri toplanıyor', READY: 'Değerlendirmeye hazır', PROCESSING: 'Değerlendiriliyor', EVALUATED: 'Değerlendirildi', FAILED: 'Değerlendirme başarısız', CANCELLED: 'İptal' };
     const verdictLabels = { POSITIVE_ASSOCIATION: 'Pozitif ilişki', NEGATIVE_ASSOCIATION: 'Negatif ilişki', NO_CLEAR_CHANGE: 'Belirgin değişim yok', CONFOUNDED: 'Karıştırıcı etken var', INSUFFICIENT_DATA: 'Yetersiz veri' };
     return `<div class="card" style="padding:14px;margin-top:12px"><strong>Gözlemsel değişiklik ölçümleri</strong><div style="display:grid;gap:8px;margin-top:10px">${scoped.map(item => {
       const status = String(item.status || '').toUpperCase();

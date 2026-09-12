@@ -89,7 +89,11 @@ const testFiles = [
   'gemini_photo_analysis_provider_tests.js',
   'photo_analysis_worker_entrypoint_tests.js',
   'marketing_photo_results_service_tests.js',
-  'marketing_health_results_service_tests.js'
+  'marketing_health_results_service_tests.js',
+  'marketing_experiment_worker_tests.js',
+  'marketing_experiment_worker_repository_tests.js',
+  'marketing_experiment_worker_schema_tests.js',
+  'marketing_experiment_worker_entrypoint_tests.js'
 ];
 
 console.log('=============================================================================');

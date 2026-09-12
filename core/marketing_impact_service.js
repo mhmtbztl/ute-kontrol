@@ -47,6 +47,7 @@
   function readCount(window, key) {
     const snake = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
     const value = window[key] !== undefined ? window[key] : window[snake];
+    if (value === null || value === undefined || value === '') return null;
     if (!Number.isInteger(Number(value)) || Number(value) < 0) return null;
     return Number(value);
   }

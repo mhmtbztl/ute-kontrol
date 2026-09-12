@@ -59,7 +59,7 @@ const valid = {
     const sql = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'migration_phase17_change_impact_idempotency.sql'), 'utf8');
     assert.match(sql, /pg_advisory_xact_lock/i);
     assert.match(sql, /old_media_id IS NOT DISTINCT FROM p_old_media_id/i);
-    assert.match(sql, /status IN \('COLLECTING', 'READY'\)/i);
+    assert.match(sql, /status IN \('COLLECTING', 'READY', 'PROCESSING'\)/i);
     assert.match(sql, /IF v_experiment_id IS NOT NULL THEN RETURN v_experiment_id/i);
   });
 

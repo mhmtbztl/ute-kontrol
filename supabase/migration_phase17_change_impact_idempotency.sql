@@ -61,7 +61,7 @@ BEGIN
       AND experiment.primary_metric = v_primary_metric
       AND experiment.old_media_id IS NOT DISTINCT FROM p_old_media_id
       AND experiment.new_media_id IS NOT DISTINCT FROM p_new_media_id
-      AND experiment.status IN ('COLLECTING', 'READY')
+      AND experiment.status IN ('COLLECTING', 'READY', 'PROCESSING')
     ORDER BY experiment.created_at DESC
     LIMIT 1;
 

@@ -264,6 +264,11 @@ runTest('Evaluated experiments retain the non-causal disclosure', () => {
   assert.match(html, /nedensellik kanıtı olarak sunulmaz/);
 });
 
+runTest('Experiment worker lifecycle states remain visible', () => {
+  assert.match(MarketingUI.renderExperiments([{ status: 'PROCESSING' }], null), /Değerlendiriliyor/);
+  assert.match(MarketingUI.renderExperiments([{ status: 'FAILED' }], null), /Değerlendirme başarısız/);
+});
+
 runTest('Index integrates one independent marketing entry without app.js edits', () => {
   const index = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   assert.strictEqual((index.match(/id="tab-marketing"/g) || []).length, 1);
