@@ -97,6 +97,29 @@ runTest('Terminal findings expose no lifecycle buttons', () => {
   assert.strictEqual(MarketingUI.renderFindingActions({ id: 'F2', status: 'DISMISSED', action_kind: 'RESHOOT' }), '');
 });
 
+runTest('Manual snapshot form uses scoped listings and leaves unknown counters blank', () => {
+  const model = MarketingUI.buildWorkspaceModel({
+    filter: { period: '2026-09', villa: 'ALL' }, bookings: [],
+    listings: [
+      { id: 'L1', channel_code: 'AIRBNB', display_name: 'Airbnb Ana İlan', status: 'ACTIVE' },
+      { id: 'L2', channel_code: 'VRBO', status: 'ARCHIVED' }
+    ]
+  });
+  const html = MarketingUI.renderSnapshotForm(model);
+  assert.match(html, /value="L1"/);
+  assert.doesNotMatch(html, /value="L2"/);
+  assert.match(html, /name="periodEndExclusive" value="2026-10-01"/);
+  assert.match(html, /name="listingViews" placeholder="Bilinmiyorsa boş bırakın"/);
+});
+
+runTest('Funnel selects the newest snapshot regardless of query array order', () => {
+  const latest = MarketingUI.selectLatestSnapshot([
+    { id: 'new', period_end_exclusive: '2026-10-01' },
+    { id: 'old', period_end_exclusive: '2026-09-01' }
+  ]);
+  assert.strictEqual(latest.id, 'new');
+});
+
 runTest('Index integrates one independent marketing entry without app.js edits', () => {
   const index = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   assert.strictEqual((index.match(/id="tab-marketing"/g) || []).length, 1);
@@ -111,7 +134,7 @@ runTest('Marketing bootstrap and lazy dependencies carry current content hashes'
   const uiSource = fs.readFileSync(path.join(__dirname, 'marketing_ui.js'), 'utf8');
   const hash = file => crypto.createHash('sha1').update(fs.readFileSync(file)).digest('hex').slice(0, 8);
   assert.match(index, new RegExp(`core/marketing_ui\\.js\\?v=${hash(path.join(__dirname, 'marketing_ui.js'))}`));
-  ['marketing_engine.js', 'marketing_funnel_service.js', 'marketing_priority_service.js', 'marketing_data_service.js', 'marketing_review_service.js'].forEach(file => {
+  ['marketing_engine.js', 'marketing_funnel_service.js', 'marketing_priority_service.js', 'marketing_data_service.js', 'marketing_review_service.js', 'marketing_snapshot_service.js'].forEach(file => {
     assert.match(uiSource, new RegExp(`${file.replace('.', '\\.') }\\?v=${hash(path.join(__dirname, file))}`));
   });
 });

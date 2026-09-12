@@ -18,6 +18,8 @@
 
   const state = {
     view: 'economics',
+    snapshotFormOpen: false,
+    listings: [],
     snapshots: [],
     findings: [],
     media: [],
@@ -38,7 +40,8 @@
     ['MarketingFunnelService', 'core/marketing_funnel_service.js?v=a5ecbdaa'],
     ['MarketingPriorityService', 'core/marketing_priority_service.js?v=f6e216ff'],
     ['MarketingDataService', 'core/marketing_data_service.js?v=06308c56'],
-    ['MarketingReviewService', 'core/marketing_review_service.js?v=9207dee5']
+    ['MarketingReviewService', 'core/marketing_review_service.js?v=9207dee5'],
+    ['MarketingSnapshotService', 'core/marketing_snapshot_service.js?v=184ad517']
   ]);
   let dependencyPromise = null;
 
@@ -132,6 +135,7 @@
       period,
       selectedProperty,
       economics,
+      listings: Array.isArray(input.listings) ? input.listings.filter(item => String(item.status || 'ACTIVE').toUpperCase() !== 'ARCHIVED') : [],
       snapshots: Array.isArray(input.snapshots) ? input.snapshots : [],
       findings: Array.isArray(input.findings) ? input.findings : [],
       media: Array.isArray(input.media) ? input.media : [],
@@ -199,11 +203,13 @@
   }
 
   function renderFunnel(model) {
+    const toolbar = `<div style="display:flex;justify-content:flex-end;margin-bottom:12px"><button type="button" class="btn btn-primary btn-sm" data-marketing-open-snapshot>＋ Manuel snapshot ekle</button></div>`;
+    const form = state.snapshotFormOpen ? renderSnapshotForm(model) : '';
     if (!model.snapshots.length) {
-      return emptyState('Huni verisi henüz yok', 'Airbnb/OTA panelinden manuel veya API tabanlı bir görünürlük snapshot’ı gelmeden oran üretilmez.');
+      return `${toolbar}${form}${emptyState('Huni verisi henüz yok', 'Airbnb/OTA panelinden manuel veya API tabanlı bir görünürlük snapshot’ı gelmeden oran üretilmez.')}`;
     }
     const funnel = services.MarketingFunnelService;
-    const latest = model.snapshots[model.snapshots.length - 1];
+    const latest = selectLatestSnapshot(model.snapshots);
     const derived = funnel && funnel.deriveFunnelMetrics ? funnel.deriveFunnelMetrics(latest) : null;
     if (!derived || !derived.validation.valid) {
       return emptyState('Huni snapshot’ı doğrulanamadı', 'Sayaç sıralamasını ve negatif/eksik değerleri kontrol edin.');
@@ -211,12 +217,39 @@
     const c = derived.validation.counters;
     const r = derived.rates;
     const findings = rankFindings(model.findings);
-    return `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+    return `${toolbar}${form}<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
       ${kpi('Gösterim', number(c.impressions), `Kapsama: ${number(derived.validation.coveragePercent, '%')}`)}
       ${kpi('İlan görüntüleme', number(c.listingViews), `Arama → görüntüleme: ${number(r.searchToViewCtrPercent, '%')}`)}
       ${kpi('Rezervasyon denemesi', number(c.bookingAttempts), `Görüntüleme → deneme: ${number(r.viewToAttemptConversionPercent, '%')}`)}
       ${kpi('Platform rezervasyonu', number(c.platformReportedBookings), `Görüntüleme → rezervasyon: ${number(r.viewToBookingConversionPercent, '%')}`)}
     </div>${renderFindings(findings)}`;
+  }
+
+  function selectLatestSnapshot(snapshots = []) {
+    return snapshots.slice().sort((a, b) => {
+      const aKey = String(a.periodEndExclusive || a.period_end_exclusive || a.createdAt || a.created_at || '');
+      const bKey = String(b.periodEndExclusive || b.period_end_exclusive || b.createdAt || b.created_at || '');
+      return bKey.localeCompare(aKey);
+    })[0] || null;
+  }
+
+  function renderSnapshotForm(model) {
+    if (!model.listings.length) return emptyState('Kanal ilanı bulunamadı', 'Snapshot kaydetmeden önce bu mülk için aktif bir kanal ilanı tanımlanmalıdır.');
+    const start = model.period.start || '';
+    const end = model.period.endExclusive || '';
+    const options = model.listings.map(item => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.display_name || item.displayName || item.channel_code || item.channelCode || item.id)}</option>`).join('');
+    const field = (name, label) => `<label style="display:grid;gap:5px;font-size:12px">${label}<input class="form-control" type="number" min="0" step="1" name="${name}" placeholder="Bilinmiyorsa boş bırakın"></label>`;
+    return `<form data-marketing-snapshot-form class="card" style="padding:16px;margin-bottom:14px">
+      <h3 style="margin:0 0 12px">Manuel huni snapshot’ı</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
+        <label style="display:grid;gap:5px;font-size:12px">Kanal ilanı<select class="form-control" name="channelListingId" required>${options}</select></label>
+        <label style="display:grid;gap:5px;font-size:12px">Başlangıç<input class="form-control" type="date" name="periodStart" value="${escapeHtml(start)}" required></label>
+        <label style="display:grid;gap:5px;font-size:12px">Bitiş (hariç)<input class="form-control" type="date" name="periodEndExclusive" value="${escapeHtml(end)}" required></label>
+        ${field('impressions', 'Gösterim')}${field('listingViews', 'İlan görüntüleme')}${field('bookingAttempts', 'Rezervasyon denemesi')}${field('platformReportedBookings', 'Platform rezervasyonu')}${field('wishlistSaves', 'Favoriye kaydetme')}
+      </div>
+      <label style="display:grid;gap:5px;font-size:12px;margin-top:10px">Not<input class="form-control" type="text" name="notes" maxlength="500"></label>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button type="button" class="btn btn-secondary btn-sm" data-marketing-cancel-snapshot>Vazgeç</button><button type="submit" class="btn btn-primary btn-sm">Snapshot’ı kaydet</button></div>
+    </form>`;
   }
 
   function rankFindings(findings) {
@@ -286,7 +319,7 @@
     const scope = cloudScope();
     if (!client || !scope) {
       if (state.remoteScopeKey) {
-        ['snapshots', 'findings', 'media', 'analysisRuns', 'experiments'].forEach(key => { state[key] = []; });
+        ['listings', 'snapshots', 'findings', 'media', 'analysisRuns', 'experiments'].forEach(key => { state[key] = []; });
       }
       state.remoteScopeKey = null;
       state.remoteStatus = 'LOCAL';
@@ -296,12 +329,12 @@
     const scopeKey = `${scope.tenantId}:${scope.propertyId || 'ALL'}`;
     if (state.remoteScopeKey === scopeKey && ['OK', 'PARTIAL', 'UNAVAILABLE'].includes(state.remoteStatus)) return null;
     state.remoteScopeKey = scopeKey;
-    ['snapshots', 'findings', 'media', 'analysisRuns', 'experiments'].forEach(key => { state[key] = []; });
+    ['listings', 'snapshots', 'findings', 'media', 'analysisRuns', 'experiments'].forEach(key => { state[key] = []; });
     state.remoteStatus = 'LOADING';
     state.remoteErrors = [];
     const result = await services.MarketingDataService.loadMarketingWorkspaceData(client, scope);
     if (state.remoteScopeKey !== scopeKey) return null;
-    ['snapshots', 'findings', 'media', 'analysisRuns', 'experiments'].forEach(key => { state[key] = result[key]; });
+    ['listings', 'snapshots', 'findings', 'media', 'analysisRuns', 'experiments'].forEach(key => { state[key] = result[key]; });
     state.remoteStatus = result.status;
     state.remoteErrors = result.errors;
     return result;
@@ -343,7 +376,7 @@
   }
 
   function setData(next = {}) {
-    ['snapshots', 'findings', 'media', 'analysisRuns', 'experiments'].forEach(key => {
+    ['listings', 'snapshots', 'findings', 'media', 'analysisRuns', 'experiments'].forEach(key => {
       if (Array.isArray(next[key])) state[key] = next[key].slice();
     });
     if (typeof window !== 'undefined' && !services.MarketingEngine && typeof window.renderMarketingModule === 'function') {
@@ -377,6 +410,28 @@
     }
   }
 
+  async function handleSnapshotSubmit(form) {
+    const client = typeof supabaseClient !== 'undefined' ? supabaseClient : null;
+    const scope = cloudScope();
+    if (!client || !scope || !services.MarketingSnapshotService) throw new Error('MANUAL_SNAPSHOT_UNAVAILABLE');
+    const values = Object.fromEntries(new FormData(form).entries());
+    const submit = form.querySelector('[type="submit"]');
+    if (submit) submit.disabled = true;
+    try {
+      const result = await services.MarketingSnapshotService.recordManualSnapshot(client, {
+        ...values, tenantId: scope.tenantId
+      });
+      state.snapshotFormOpen = false;
+      state.remoteStatus = 'LOADING';
+      render();
+      await hydrateCloudData();
+      render();
+      return result;
+    } finally {
+      if (submit) submit.disabled = false;
+    }
+  }
+
   function initializeBrowser() {
     if (typeof document === 'undefined') return;
     document.querySelectorAll('[data-marketing-view]').forEach(button => button.addEventListener('click', () => {
@@ -385,11 +440,24 @@
     }));
     const content = document.getElementById('marketingWorkspaceContent');
     if (content) content.addEventListener('click', event => {
-      const button = event.target.closest('[data-marketing-action][data-finding-id]');
-      if (!button) return;
-      handleFindingAction(button).catch(error => {
+      const open = event.target.closest('[data-marketing-open-snapshot]');
+      const cancel = event.target.closest('[data-marketing-cancel-snapshot]');
+      if (open) { state.snapshotFormOpen = true; render(); return; }
+      if (cancel) { state.snapshotFormOpen = false; render(); return; }
+      const actionButton = event.target.closest('[data-marketing-action][data-finding-id]');
+      if (!actionButton) return;
+      handleFindingAction(actionButton).catch(error => {
         const status = document.getElementById('marketingWorkspaceStatus');
         if (status) status.textContent = `Bulgu güncellenemedi: ${error.message}`;
+      });
+    });
+    if (content) content.addEventListener('submit', event => {
+      const form = event.target.closest('[data-marketing-snapshot-form]');
+      if (!form) return;
+      event.preventDefault();
+      handleSnapshotSubmit(form).catch(error => {
+        const status = document.getElementById('marketingWorkspaceStatus');
+        if (status) status.textContent = `Snapshot kaydedilemedi: ${error.message}`;
       });
     });
     // switchTab() in app.js invokes this global hook. Replacing it prevents the
@@ -409,5 +477,5 @@
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') initializeBrowser();
 
-  return { periodFromFilter, scopeBookings, buildWorkspaceModel, renderWorkspaceHtml, renderFindingActions, escapeHtml, setData, render };
+  return { periodFromFilter, scopeBookings, buildWorkspaceModel, selectLatestSnapshot, renderWorkspaceHtml, renderFindingActions, renderSnapshotForm, escapeHtml, setData, render };
 }));
