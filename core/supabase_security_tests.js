@@ -323,7 +323,7 @@ runTest('Multi-Tenant RLS Simulation: Isolation & Role Enforcement', () => {
       'usr-owner-b': { id: 'usr-owner-b', email: 'owner@tenantb.com' }
     },
     tenants: {
-      'tenant-a': { id: 'tenant-a', name: 'Uludağ Dağ Evleri' },
+      'tenant-a': { id: 'tenant-a', name: 'Akdeniz Villaları' },
       'tenant-b': { id: 'tenant-b', name: 'Sapanca Villaları' }
     },
     members: [
@@ -332,7 +332,7 @@ runTest('Multi-Tenant RLS Simulation: Isolation & Role Enforcement', () => {
       { tenant_id: 'tenant-b', user_id: 'usr-owner-b', role: 'owner' }
     ],
     properties: [
-      { id: 'p1', tenant_id: 'tenant-a', name: 'Seyir Dağ Evi' },
+      { id: 'p1', tenant_id: 'tenant-a', name: 'Villa Bella Vista' },
       { id: 'p2', tenant_id: 'tenant-b', name: 'Sapanca Göl Evi' }
     ],
     bookings: [
@@ -353,7 +353,7 @@ runTest('Multi-Tenant RLS Simulation: Isolation & Role Enforcement', () => {
   // 1. Cross-tenant query simulation: User A selects properties
   const userA_Properties = db.properties.filter(p => is_tenant_member(p.tenant_id, 'usr-owner-a'));
   assert.strictEqual(userA_Properties.length, 1);
-  assert.strictEqual(userA_Properties[0].name, 'Seyir Dağ Evi');
+  assert.strictEqual(userA_Properties[0].name, 'Villa Bella Vista');
 
   // User B's properties must NOT be visible to User A
   const userA_sees_TenantB = userA_Properties.some(p => p.tenant_id === 'tenant-b');

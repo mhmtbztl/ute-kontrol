@@ -375,31 +375,6 @@ const SYNTHETIC_DEMO_DATABASE = {
           "name": "Villa Palm Breeze",
           "days": 10,
           "rev": 41600
-        },
-        "seyir": {
-          "name": "Villa Bella Vista",
-          "days": 11,
-          "rev": 70400
-        },
-        "dogus": {
-          "name": "Villa Olive Garden",
-          "days": 10,
-          "rev": 76800
-        },
-        "zirve": {
-          "name": "Villa Azure Bay",
-          "days": 10,
-          "rev": 80000
-        },
-        "sirin": {
-          "name": "Villa Sunset Horizon",
-          "days": 11,
-          "rev": 51200
-        },
-        "nefes": {
-          "name": "Villa Palm Breeze",
-          "days": 10,
-          "rev": 41600
         }
       }
     },
@@ -430,31 +405,6 @@ const SYNTHETIC_DEMO_DATABASE = {
           "rev": 135000
         },
         "palm": {
-          "name": "Villa Palm Breeze",
-          "days": 15,
-          "rev": 70200
-        },
-        "seyir": {
-          "name": "Villa Bella Vista",
-          "days": 16,
-          "rev": 118800
-        },
-        "dogus": {
-          "name": "Villa Olive Garden",
-          "days": 16,
-          "rev": 129600
-        },
-        "zirve": {
-          "name": "Villa Azure Bay",
-          "days": 15,
-          "rev": 135000
-        },
-        "sirin": {
-          "name": "Villa Sunset Horizon",
-          "days": 16,
-          "rev": 86400
-        },
-        "nefes": {
           "name": "Villa Palm Breeze",
           "days": 15,
           "rev": 70200
@@ -491,31 +441,6 @@ const SYNTHETIC_DEMO_DATABASE = {
           "name": "Villa Palm Breeze",
           "days": 13,
           "rev": 53300
-        },
-        "seyir": {
-          "name": "Villa Bella Vista",
-          "days": 13,
-          "rev": 90200
-        },
-        "dogus": {
-          "name": "Villa Olive Garden",
-          "days": 13,
-          "rev": 98400
-        },
-        "zirve": {
-          "name": "Villa Azure Bay",
-          "days": 12,
-          "rev": 102500
-        },
-        "sirin": {
-          "name": "Villa Sunset Horizon",
-          "days": 13,
-          "rev": 65600
-        },
-        "nefes": {
-          "name": "Villa Palm Breeze",
-          "days": 13,
-          "rev": 53300
         }
       }
     },
@@ -546,31 +471,6 @@ const SYNTHETIC_DEMO_DATABASE = {
           "rev": 70000
         },
         "palm": {
-          "name": "Villa Palm Breeze",
-          "days": 9,
-          "rev": 36400
-        },
-        "seyir": {
-          "name": "Villa Bella Vista",
-          "days": 10,
-          "rev": 61600
-        },
-        "dogus": {
-          "name": "Villa Olive Garden",
-          "days": 10,
-          "rev": 67200
-        },
-        "zirve": {
-          "name": "Villa Azure Bay",
-          "days": 9,
-          "rev": 70000
-        },
-        "sirin": {
-          "name": "Villa Sunset Horizon",
-          "days": 10,
-          "rev": 44800
-        },
-        "nefes": {
           "name": "Villa Palm Breeze",
           "days": 9,
           "rev": 36400
@@ -607,31 +507,6 @@ const SYNTHETIC_DEMO_DATABASE = {
           "name": "Villa Palm Breeze",
           "days": 6,
           "rev": 24700
-        },
-        "seyir": {
-          "name": "Villa Bella Vista",
-          "days": 8,
-          "rev": 41800
-        },
-        "dogus": {
-          "name": "Villa Olive Garden",
-          "days": 7,
-          "rev": 45600
-        },
-        "zirve": {
-          "name": "Villa Azure Bay",
-          "days": 7,
-          "rev": 47500
-        },
-        "sirin": {
-          "name": "Villa Sunset Horizon",
-          "days": 8,
-          "rev": 30400
-        },
-        "nefes": {
-          "name": "Villa Palm Breeze",
-          "days": 6,
-          "rev": 24700
         }
       }
     },
@@ -662,31 +537,6 @@ const SYNTHETIC_DEMO_DATABASE = {
           "rev": 65000
         },
         "palm": {
-          "name": "Villa Palm Breeze",
-          "days": 8,
-          "rev": 33800
-        },
-        "seyir": {
-          "name": "Villa Bella Vista",
-          "days": 9,
-          "rev": 57200
-        },
-        "dogus": {
-          "name": "Villa Olive Garden",
-          "days": 8,
-          "rev": 62400
-        },
-        "zirve": {
-          "name": "Villa Azure Bay",
-          "days": 8,
-          "rev": 65000
-        },
-        "sirin": {
-          "name": "Villa Sunset Horizon",
-          "days": 9,
-          "rev": 41600
-        },
-        "nefes": {
           "name": "Villa Palm Breeze",
           "days": 8,
           "rev": 33800
@@ -723,31 +573,6 @@ const SYNTHETIC_DEMO_DATABASE = {
           "name": "Villa Palm Breeze",
           "days": 7,
           "rev": 28600
-        },
-        "seyir": {
-          "name": "Villa Bella Vista",
-          "days": 8,
-          "rev": 48400
-        },
-        "dogus": {
-          "name": "Villa Olive Garden",
-          "days": 8,
-          "rev": 52800
-        },
-        "zirve": {
-          "name": "Villa Azure Bay",
-          "days": 7,
-          "rev": 55000
-        },
-        "sirin": {
-          "name": "Villa Sunset Horizon",
-          "days": 8,
-          "rev": 35200
-        },
-        "nefes": {
-          "name": "Villa Palm Breeze",
-          "days": 7,
-          "rev": 28600
         }
       }
     },
@@ -778,31 +603,6 @@ const SYNTHETIC_DEMO_DATABASE = {
           "rev": 52500
         },
         "palm": {
-          "name": "Villa Palm Breeze",
-          "days": 7,
-          "rev": 27300
-        },
-        "seyir": {
-          "name": "Villa Bella Vista",
-          "days": 7,
-          "rev": 46200
-        },
-        "dogus": {
-          "name": "Villa Olive Garden",
-          "days": 7,
-          "rev": 50400
-        },
-        "zirve": {
-          "name": "Villa Azure Bay",
-          "days": 7,
-          "rev": 52500
-        },
-        "sirin": {
-          "name": "Villa Sunset Horizon",
-          "days": 7,
-          "rev": 33600
-        },
-        "nefes": {
           "name": "Villa Palm Breeze",
           "days": 7,
           "rev": 27300
@@ -839,31 +639,6 @@ const SYNTHETIC_DEMO_DATABASE = {
           "name": "Villa Palm Breeze",
           "days": 8,
           "rev": 32500
-        },
-        "seyir": {
-          "name": "Villa Bella Vista",
-          "days": 9,
-          "rev": 55000
-        },
-        "dogus": {
-          "name": "Villa Olive Garden",
-          "days": 8,
-          "rev": 60000
-        },
-        "zirve": {
-          "name": "Villa Azure Bay",
-          "days": 8,
-          "rev": 62500
-        },
-        "sirin": {
-          "name": "Villa Sunset Horizon",
-          "days": 9,
-          "rev": 40000
-        },
-        "nefes": {
-          "name": "Villa Palm Breeze",
-          "days": 8,
-          "rev": 32500
         }
       }
     },
@@ -894,31 +669,6 @@ const SYNTHETIC_DEMO_DATABASE = {
           "rev": 85000
         },
         "palm": {
-          "name": "Villa Palm Breeze",
-          "days": 11,
-          "rev": 44200
-        },
-        "seyir": {
-          "name": "Villa Bella Vista",
-          "days": 11,
-          "rev": 74800
-        },
-        "dogus": {
-          "name": "Villa Olive Garden",
-          "days": 11,
-          "rev": 81600
-        },
-        "zirve": {
-          "name": "Villa Azure Bay",
-          "days": 10,
-          "rev": 85000
-        },
-        "sirin": {
-          "name": "Villa Sunset Horizon",
-          "days": 11,
-          "rev": 54400
-        },
-        "nefes": {
           "name": "Villa Palm Breeze",
           "days": 11,
           "rev": 44200
@@ -955,31 +705,6 @@ const SYNTHETIC_DEMO_DATABASE = {
           "name": "Villa Palm Breeze",
           "days": 13,
           "rev": 59800
-        },
-        "seyir": {
-          "name": "Villa Bella Vista",
-          "days": 14,
-          "rev": 101200
-        },
-        "dogus": {
-          "name": "Villa Olive Garden",
-          "days": 14,
-          "rev": 110400
-        },
-        "zirve": {
-          "name": "Villa Azure Bay",
-          "days": 13,
-          "rev": 115000
-        },
-        "sirin": {
-          "name": "Villa Sunset Horizon",
-          "days": 14,
-          "rev": 73600
-        },
-        "nefes": {
-          "name": "Villa Palm Breeze",
-          "days": 13,
-          "rev": 59800
         }
       }
     },
@@ -1010,31 +735,6 @@ const SYNTHETIC_DEMO_DATABASE = {
           "rev": 155000
         },
         "palm": {
-          "name": "Villa Palm Breeze",
-          "days": 16,
-          "rev": 80600
-        },
-        "seyir": {
-          "name": "Villa Bella Vista",
-          "days": 18,
-          "rev": 136400
-        },
-        "dogus": {
-          "name": "Villa Olive Garden",
-          "days": 17,
-          "rev": 148800
-        },
-        "zirve": {
-          "name": "Villa Azure Bay",
-          "days": 16,
-          "rev": 155000
-        },
-        "sirin": {
-          "name": "Villa Sunset Horizon",
-          "days": 18,
-          "rev": 99200
-        },
-        "nefes": {
           "name": "Villa Palm Breeze",
           "days": 16,
           "rev": 80600
@@ -1071,31 +771,6 @@ const SYNTHETIC_DEMO_DATABASE = {
           "name": "Villa Palm Breeze",
           "days": 17,
           "rev": 101400
-        },
-        "seyir": {
-          "name": "Villa Bella Vista",
-          "days": 21,
-          "rev": 171600
-        },
-        "dogus": {
-          "name": "Villa Olive Garden",
-          "days": 20,
-          "rev": 187200
-        },
-        "zirve": {
-          "name": "Villa Azure Bay",
-          "days": 19,
-          "rev": 195000
-        },
-        "sirin": {
-          "name": "Villa Sunset Horizon",
-          "days": 21,
-          "rev": 124800
-        },
-        "nefes": {
-          "name": "Villa Palm Breeze",
-          "days": 17,
-          "rev": 101400
         }
       }
     },
@@ -1129,31 +804,6 @@ const SYNTHETIC_DEMO_DATABASE = {
           "name": "Villa Palm Breeze",
           "days": 19,
           "rev": 111800
-        },
-        "seyir": {
-          "name": "Villa Bella Vista",
-          "days": 22,
-          "rev": 189200
-        },
-        "dogus": {
-          "name": "Villa Olive Garden",
-          "days": 21,
-          "rev": 206400
-        },
-        "zirve": {
-          "name": "Villa Azure Bay",
-          "days": 20,
-          "rev": 215000
-        },
-        "sirin": {
-          "name": "Villa Sunset Horizon",
-          "days": 22,
-          "rev": 137600
-        },
-        "nefes": {
-          "name": "Villa Palm Breeze",
-          "days": 19,
-          "rev": 111800
         }
       }
     },
@@ -1184,31 +834,6 @@ const SYNTHETIC_DEMO_DATABASE = {
           "rev": 130000
         },
         "palm": {
-          "name": "Villa Palm Breeze",
-          "days": 14,
-          "rev": 67600
-        },
-        "seyir": {
-          "name": "Villa Bella Vista",
-          "days": 15,
-          "rev": 114400
-        },
-        "dogus": {
-          "name": "Villa Olive Garden",
-          "days": 14,
-          "rev": 124800
-        },
-        "zirve": {
-          "name": "Villa Azure Bay",
-          "days": 14,
-          "rev": 130000
-        },
-        "sirin": {
-          "name": "Villa Sunset Horizon",
-          "days": 15,
-          "rev": 83200
-        },
-        "nefes": {
           "name": "Villa Palm Breeze",
           "days": 14,
           "rev": 67600
@@ -1404,31 +1029,6 @@ const SYNTHETIC_DEMO_DATABASE = {
         "name": "Villa Palm Breeze",
         "days": 173,
         "rev": 750000
-      },
-      "seyir": {
-        "name": "Villa Bella Vista",
-        "days": 178,
-        "rev": 1180000
-      },
-      "dogus": {
-        "name": "Villa Olive Garden",
-        "days": 165,
-        "rev": 1320000
-      },
-      "zirve": {
-        "name": "Villa Azure Bay",
-        "days": 158,
-        "rev": 1420000
-      },
-      "sirin": {
-        "name": "Villa Sunset Horizon",
-        "days": 172,
-        "rev": 890000
-      },
-      "nefes": {
-        "name": "Villa Palm Breeze",
-        "days": 173,
-        "rev": 750000
       }
     }
   }
@@ -1444,11 +1044,11 @@ const DEFAULT_VILLAS = {
 };
 
 // Backwards compatibility aliases for tests and internal keys
-DEFAULT_VILLAS['SEYIR'] = DEFAULT_VILLAS['VILLA_BELLA'];
-DEFAULT_VILLAS['DOGUS'] = DEFAULT_VILLAS['VILLA_OLIVE'];
-DEFAULT_VILLAS['ZIRVE'] = DEFAULT_VILLAS['VILLA_AZURE'];
-DEFAULT_VILLAS['SIRIN'] = DEFAULT_VILLAS['VILLA_SUNSET'];
-DEFAULT_VILLAS['NEFES'] = DEFAULT_VILLAS['VILLA_PALM'];
+DEFAULT_VILLAS['BELLA'] = DEFAULT_VILLAS['VILLA_BELLA'];
+DEFAULT_VILLAS['OLIVE'] = DEFAULT_VILLAS['VILLA_OLIVE'];
+DEFAULT_VILLAS['AZURE'] = DEFAULT_VILLAS['VILLA_AZURE'];
+DEFAULT_VILLAS['SUNSET'] = DEFAULT_VILLAS['VILLA_SUNSET'];
+DEFAULT_VILLAS['PALM'] = DEFAULT_VILLAS['VILLA_PALM'];
 
 const EXPENSE_CATEGORIES = [
   { name: 'Maaş', color: '#3B82F6' },
@@ -4162,9 +3762,6 @@ async function forceHardRefresh() {
       await Promise.all(keys.map(k => caches.delete(k)));
     }
 
-    // 2. Preserve Master PIN and reset stale local storage
-    const savedPin = localStorage.getItem('LEXBNB_MASTER_PIN_AUTH') || localStorage.getItem('LEXBNB_AUTH_KEY') || 'uludagtatil2026.';
-    
     // Clear known storage keys
     const removeKeys = [
       'LEXBNB_V5_MASTER_DATA',
@@ -4174,15 +3771,11 @@ async function forceHardRefresh() {
     ];
     removeKeys.forEach(k => localStorage.removeItem(k));
 
-    // Restore PIN and set current version
-    localStorage.setItem('LEXBNB_MASTER_PIN_AUTH', savedPin);
-    localStorage.setItem('LEXBNB_AUTH_KEY', savedPin);
     localStorage.setItem('LEXBNB_APP_VERSION', CURRENT_APP_BUILD_VERSION);
 
     // 3. Force hard navigation with timestamp cache-buster
     const url = new URL(window.location.href);
     url.searchParams.set('v', Date.now());
-    url.searchParams.set('key', savedPin);
     window.location.replace(url.toString());
   } catch (err) {
     console.error('Hard refresh error:', err);
@@ -4242,11 +3835,11 @@ function renderFinanceModule() {
   let avgRevPerNight = 0;
   let targetRev = 300000;
   let propStats = {
-    SEYIR: { name: 'Seyir Dağ Evi', revenue: 0, nights: 0, adr: 0, occupancy: 0, revpar: 0, share: 0 },
-    DOGUS: { name: 'Doğuş Dağ Evi', revenue: 0, nights: 0, adr: 0, occupancy: 0, revpar: 0, share: 0 },
-    ZIRVE: { name: 'Zirve Dağ Evi', revenue: 0, nights: 0, adr: 0, occupancy: 0, revpar: 0, share: 0 },
-    SIRIN: { name: 'Şirin Dağ Evi', revenue: 0, nights: 0, adr: 0, occupancy: 0, revpar: 0, share: 0 },
-    NEFES: { name: 'Nefes Dağ Evi', revenue: 0, nights: 0, adr: 0, occupancy: 0, revpar: 0, share: 0 }
+    BELLA: { name: 'Villa Bella Vista', revenue: 0, nights: 0, adr: 0, occupancy: 0, revpar: 0, share: 0 },
+    OLIVE: { name: 'Villa Olive Garden', revenue: 0, nights: 0, adr: 0, occupancy: 0, revpar: 0, share: 0 },
+    AZURE: { name: 'Villa Azure Bay', revenue: 0, nights: 0, adr: 0, occupancy: 0, revpar: 0, share: 0 },
+    SUNSET: { name: 'Villa Sunset Horizon', revenue: 0, nights: 0, adr: 0, occupancy: 0, revpar: 0, share: 0 },
+    PALM: { name: 'Villa Palm Breeze', revenue: 0, nights: 0, adr: 0, occupancy: 0, revpar: 0, share: 0 }
   };
 
   const categoryTotals = {};
@@ -4267,11 +3860,11 @@ function renderFinanceModule() {
       targetRev = userAllTarget || att.targetCiro;
 
       // All-time per villa
-      propStats.SEYIR = { name: 'Seyir Dağ Evi', revenue: att.villas.seyir.rev, nights: att.villas.seyir.days, adr: Math.round(att.villas.seyir.rev / att.villas.seyir.days), share: Number(((att.villas.seyir.rev / totalRevenue)*100).toFixed(1)), occupancy: Number(((att.villas.seyir.days / (14*30))*100).toFixed(1)), revpar: Math.round(att.villas.seyir.rev / (14*30)) };
-      propStats.DOGUS = { name: 'Doğuş Dağ Evi', revenue: att.villas.dogus.rev, nights: att.villas.dogus.days, adr: Math.round(att.villas.dogus.rev / att.villas.dogus.days), share: Number(((att.villas.dogus.rev / totalRevenue)*100).toFixed(1)), occupancy: Number(((att.villas.dogus.days / (14*30))*100).toFixed(1)), revpar: Math.round(att.villas.dogus.rev / (14*30)) };
-      propStats.ZIRVE = { name: 'Zirve Dağ Evi', revenue: att.villas.zirve.rev, nights: att.villas.zirve.days, adr: Math.round(att.villas.zirve.rev / att.villas.zirve.days), share: Number(((att.villas.zirve.rev / totalRevenue)*100).toFixed(1)), occupancy: Number(((att.villas.zirve.days / (14*30))*100).toFixed(1)), revpar: Math.round(att.villas.zirve.rev / (14*30)) };
-      propStats.SIRIN = { name: 'Şirin Dağ Evi', revenue: att.villas.sirin.rev, nights: att.villas.sirin.days, adr: Math.round(att.villas.sirin.rev / att.villas.sirin.days), share: Number(((att.villas.sirin.rev / totalRevenue)*100).toFixed(1)), occupancy: Number(((att.villas.sirin.days / (14*30))*100).toFixed(1)), revpar: Math.round(att.villas.sirin.rev / (14*30)) };
-      propStats.NEFES = { name: 'Nefes Dağ Evi', revenue: att.villas.nefes.rev, nights: att.villas.nefes.days, adr: Math.round(att.villas.nefes.rev / att.villas.nefes.days), share: Number(((att.villas.nefes.rev / totalRevenue)*100).toFixed(1)), occupancy: Number(((att.villas.nefes.days / (14*30))*100).toFixed(1)), revpar: Math.round(att.villas.nefes.rev / (14*30)) };
+      propStats.BELLA = { name: 'Villa Bella Vista', revenue: att.villas.bella.rev, nights: att.villas.bella.days, adr: Math.round(att.villas.bella.rev / att.villas.bella.days), share: Number(((att.villas.bella.rev / totalRevenue)*100).toFixed(1)), occupancy: Number(((att.villas.bella.days / (14*30))*100).toFixed(1)), revpar: Math.round(att.villas.bella.rev / (14*30)) };
+      propStats.OLIVE = { name: 'Villa Olive Garden', revenue: att.villas.olive.rev, nights: att.villas.olive.days, adr: Math.round(att.villas.olive.rev / att.villas.olive.days), share: Number(((att.villas.olive.rev / totalRevenue)*100).toFixed(1)), occupancy: Number(((att.villas.olive.days / (14*30))*100).toFixed(1)), revpar: Math.round(att.villas.olive.rev / (14*30)) };
+      propStats.AZURE = { name: 'Villa Azure Bay', revenue: att.villas.azure.rev, nights: att.villas.azure.days, adr: Math.round(att.villas.azure.rev / att.villas.azure.days), share: Number(((att.villas.azure.rev / totalRevenue)*100).toFixed(1)), occupancy: Number(((att.villas.azure.days / (14*30))*100).toFixed(1)), revpar: Math.round(att.villas.azure.rev / (14*30)) };
+      propStats.SUNSET = { name: 'Villa Sunset Horizon', revenue: att.villas.sunset.rev, nights: att.villas.sunset.days, adr: Math.round(att.villas.sunset.rev / att.villas.sunset.days), share: Number(((att.villas.sunset.rev / totalRevenue)*100).toFixed(1)), occupancy: Number(((att.villas.sunset.days / (14*30))*100).toFixed(1)), revpar: Math.round(att.villas.sunset.rev / (14*30)) };
+      propStats.PALM = { name: 'Villa Palm Breeze', revenue: att.villas.palm.rev, nights: att.villas.palm.days, adr: Math.round(att.villas.palm.rev / att.villas.palm.days), share: Number(((att.villas.palm.rev / totalRevenue)*100).toFixed(1)), occupancy: Number(((att.villas.palm.days / (14*30))*100).toFixed(1)), revpar: Math.round(att.villas.palm.rev / (14*30)) };
 
     } else if (currentFilter.period === '2026-YEAR' || currentFilter.period === '2025-YEAR' || currentFilter.period === 'CUSTOM') {
       let monthsToAggregate = [];
@@ -4620,14 +4213,14 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
   if (!tableBody && !cardsContainer) return;
 
   const vMeta = {
-    'SEYIR': { icon: '🏔️', spec: '6+2 Kişi • Şömine & Barbekü', color: '#3B82F6' },
-    'ZIRVE': { icon: '💎', spec: '9 Kişi • Jakuzi & Sauna Lüks', color: '#10B981' },
-    'NEFES': { icon: '🌲', spec: '12 Kişi • Geniş Aile & Şömine', color: '#8B5CF6' },
-    'DOGUS': { icon: '🌄', spec: '11 Kişi • Dağ & Doğa Manzaralı', color: '#06B6D4' },
-    'SIRIN': { icon: '🌿', spec: '7 Kişi • Butik Dağ Evi', color: '#F59E0B' }
+    'BELLA': { icon: '🏔️', spec: '6+2 Kişi • Şömine & Barbekü', color: '#3B82F6' },
+    'AZURE': { icon: '💎', spec: '9 Kişi • Jakuzi & Sauna Lüks', color: '#10B981' },
+    'PALM': { icon: '🌲', spec: '12 Kişi • Geniş Aile & Şömine', color: '#8B5CF6' },
+    'OLIVE': { icon: '🌄', spec: '11 Kişi • Dağ & Doğa Manzaralı', color: '#06B6D4' },
+    'SUNSET': { icon: '🌿', spec: '7 Kişi • Butik Villa', color: '#F59E0B' }
   };
 
-  const vKeys = ['SEYIR', 'DOGUS', 'ZIRVE', 'SIRIN', 'NEFES'];
+  const vKeys = ['BELLA', 'OLIVE', 'AZURE', 'SUNSET', 'PALM'];
   
   // Sort villas by revenue descending so #1 is clearly visible
   const sortedVillas = vKeys.map(k => {
@@ -4652,8 +4245,8 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
       // Determine Strategic Diagnosis
       let diagBadge = '<span class="badge badge-emerald">🟢 Dengeli</span>';
       if (rank === 1 && s.revenue > 0) diagBadge = '<span class="badge badge-emerald">👑 Ciro Şampiyonu</span>';
-      else if (item.key === 'ZIRVE' && adrVal > 8000) diagBadge = '<span class="badge badge-purple">💎 Yüksek Marj & Lüks</span>';
-      else if (item.key === 'SIRIN' && occVal > 85 && adrVal < 3500) diagBadge = '<span class="badge badge-amber">⚠️ Düşük Fiyat Kaçağı</span>';
+      else if (item.key === 'AZURE' && adrVal > 8000) diagBadge = '<span class="badge badge-purple">💎 Yüksek Marj & Lüks</span>';
+      else if (item.key === 'SUNSET' && occVal > 85 && adrVal < 3500) diagBadge = '<span class="badge badge-amber">⚠️ Düşük Fiyat Kaçağı</span>';
       else if (occVal < 40 && s.revenue > 0) diagBadge = '<span class="badge badge-rose">📉 Boşluk Riski</span>';
 
       const tr = document.createElement('tr');
@@ -4785,7 +4378,7 @@ function renderPropertyComparisonChart(propStats) {
   if (!container) return;
   container.innerHTML = '';
 
-  const vKeys = ['SEYIR', 'DOGUS', 'ZIRVE', 'SIRIN', 'NEFES'];
+  const vKeys = ['BELLA', 'OLIVE', 'AZURE', 'SUNSET', 'PALM'];
   const values = [];
 
   vKeys.forEach(vKey => {
@@ -4823,11 +4416,11 @@ function renderPropertyComparisonChart(propStats) {
 
     const anomalies = [];
     if (currentFilter.period === '2026-08' || currentFilter.period === 'ALL') {
-      anomalies.push({ type: 'warning', text: '⚠️ ŞİRİN: Yüksek Doluluk (30 Gece / %96,8) ancak Düşük ADR (2.826 TL) — Fiyat savunması zayıf, talep varken taban fiyat derhal artırılmalı.' });
-      anomalies.push({ type: 'success', text: '💎 ZİRVE: Sadece 9 satılan gece ile portföyün en yüksek cirosunu (138.190 TL, 15.354 TL/gece) üretti — Premium jakuzi/sauna fiyatlama gücü kanıtlandı.' });
-      anomalies.push({ type: 'warning', text: '⚠️ NEFES: 12 kişilik yüksek kapasiteye rağmen ciro (65.302 TL) portföy ortalamasının altında kaldı — Grup rezervasyonları için esnek paketler tavsiye edilir.' });
+      anomalies.push({ type: 'warning', text: '⚠️ VILLA SUNSET HORIZON: Yüksek Doluluk (30 Gece / %96,8) ancak Düşük ADR (2.826 TL) — Fiyat savunması zayıf, talep varken taban fiyat derhal artırılmalı.' });
+      anomalies.push({ type: 'success', text: '💎 VILLA AZURE BAY: Sadece 9 satılan gece ile portföyün en yüksek cirosunu (138.190 TL, 15.354 TL/gece) üretti — Premium jakuzi/sauna fiyatlama gücü kanıtlandı.' });
+      anomalies.push({ type: 'warning', text: '⚠️ PALM: 12 kişilik yüksek kapasiteye rağmen ciro (65.302 TL) portföy ortalamasının altında kaldı — Grup rezervasyonları için esnek paketler tavsiye edilir.' });
     } else if (currentFilter.period === '2026-01') {
-      anomalies.push({ type: 'success', text: '🔥 REKOR AY: Ocak 2026\'da 843.555 TL ciro ve 512.497 TL net kâr ile şirket rekoru kırıldı. Zirve 279.549 TL tek başına ciro getirdi.' });
+      anomalies.push({ type: 'success', text: '🔥 REKOR AY: Temmuz 2025\'te 320.000 TL ciro ve 195.000 TL net kâr ile portföy rekoru kırıldı. Villa Azure Bay 80.000 TL ile en yüksek katkıyı sağladı.' });
     } else {
       anomalies.push({ type: 'info', text: `📌 ${ALL_MONTH_NAMES[currentFilter.period] || currentFilter.period} dönemi resmi şirket raporu verileri başarıyla incelendi.` });
     }
@@ -5032,23 +4625,23 @@ function renderAIFinancialAnalyst(revenue, targetRev, targetPct, opex, capex, ne
   if (goodBox) {
     goodBox.innerHTML = `
       <p>• <strong>Ciro Başarısı:</strong> Hedeflenen ${targetRev.toLocaleString('tr-TR')} TL ciroya karşılık ${Math.round(revenue).toLocaleString('tr-TR')} TL gerçekleşerek <strong>%${targetPct.toFixed(1)}</strong> gerçekleşme oranı elde edildi.</p>
-      <p>• <strong>Zirve Dağ Evi Liderliği:</strong> Zirve, sauna ve jakuzi donanımı ile yüksek gecelik gelir savunmasını yaparak ciroya en büyük nakit katkıyı getirdi.</p>
-      <p>• <strong>Tarihsel Ölçek:</strong> Şirket kuruluşundan bu yana toplam <strong>5.004.165 TL</strong> ciro ve <strong>457 satılan geceye</strong> ulaşarak Uludağ bölgesindeki liderliğini pekiştirdi.</p>
+      <p>• <strong>Villa Azure Bay Liderliği:</strong> Villa Azure Bay, sauna ve jakuzi donanımı ile yüksek gecelik gelir savunmasını yaparak ciroya en büyük nakit katkıyı getirdi.</p>
+      <p>• <strong>Tarihsel Ölçek:</strong> Şirket kuruluşundan bu yana toplam <strong>5.004.165 TL</strong> ciro ve <strong>457 satılan geceye</strong> ulaşarak Akdeniz bölgesindeki liderliğini pekiştirdi.</p>
     `;
   }
 
   if (badBox) {
     badBox.innerHTML = `
       <p>• <strong>Gider / Ciro Oranı:</strong> Toplam giderler cironun <strong>%${revenue > 0 ? (((opex + capex) / revenue)*100).toFixed(1) : 0}</strong> seviyesinde seyrediyor. Maaş, temizlik ve komisyon kalemleri operasyonel kârı baskılıyor.</p>
-      <p>• <strong>Şirin Dağ Evi Düşük ADR:</strong> 30 gece satılmasına rağmen ortalama günlük fiyat 2.826 TL\'de kaldı; kapasite yüksek talep döneminde gereğinden ucuza kapatıldı.</p>
-      <p>• <strong>Nefes Kapasite Kullanımı:</strong> 12 kişilik en büyük villa olmasına karşın ciro potansiyeli portföy ortalamasının gerisinde kaldı.</p>
+      <p>• <strong>Villa Sunset Horizon Düşük ADR:</strong> 30 gece satılmasına rağmen ortalama günlük fiyat 2.826 TL\'de kaldı; kapasite yüksek talep döneminde gereğinden ucuza kapatıldı.</p>
+      <p>• <strong>Villa Palm Breeze Kapasite Kullanımı:</strong> 12 kişilik en büyük villa olmasına karşın ciro potansiyeli portföy ortalamasının gerisinde kaldı.</p>
     `;
   }
 
   if (whyBox) {
     whyBox.innerHTML = `
-      <p>• <strong>Korelasyon 1:</strong> Şirin\'de minimum konaklama kuralı ve erken rezervasyon indirimi geniş tutulduğu için takvim erkenden düşük rakamlarla doldu.</p>
-      <p>• <strong>Korelasyon 2:</strong> Zirve ve Doğuş villalarında elektrik tüketimi ve kış bakımları fatura maliyetlerini artırdı.</p>
+      <p>• <strong>Korelasyon 1:</strong> Villa Sunset Horizon\'de minimum konaklama kuralı ve erken rezervasyon indirimi geniş tutulduğu için takvim erkenden düşük rakamlarla doldu.</p>
+      <p>• <strong>Korelasyon 2:</strong> Villa Azure Bay ve Villa Olive Garden villalarında elektrik tüketimi ve kış bakımları fatura maliyetlerini artırdı.</p>
       <p>• <strong>Korelasyon 3:</strong> Kredi kartı ve OTA komisyon giderleri (özellikle Booking/Airbnb) toplam 75.519 TL kesintiye yol açtı.</p>
     `;
   }
@@ -5057,10 +4650,10 @@ function renderAIFinancialAnalyst(revenue, targetRev, targetPct, opex, capex, ne
     actionBox.innerHTML = `
       <div class="ai-action-item">
         <div class="action-text">
-          <strong>1. Şirin Villası Taban Fiyatını %30 Artır</strong>
+          <strong>1. Villa Sunset Horizon Villası Taban Fiyatını %30 Artır</strong>
           <p>Hafta sonu taban fiyatını 4.500 TL\'ye çekerek doluluk kaybı yaşamadan ADR\'yi yükseltin.</p>
         </div>
-        <button class="btn btn-primary btn-sm" onclick="createTaskFromAI('Şirin Taban Fiyatını Artır', 'P2', 'Şirin hafta sonu taban fiyatını 4.500 TL olarak güncelle.')">⚡ Görev Oluştur</button>
+        <button class="btn btn-primary btn-sm" onclick="createTaskFromAI('Villa Sunset Horizon Taban Fiyatını Artır', 'P2', 'Villa Sunset Horizon hafta sonu taban fiyatını 4.500 TL olarak güncelle.')">⚡ Görev Oluştur</button>
       </div>
 
       <div class="ai-action-item">
@@ -5086,7 +4679,7 @@ function createTaskFromAI(title, priority, notes) {
   const newId = 'M' + (appData.maintenance.length + 1);
   appData.maintenance.push({
     id: newId,
-    villa: currentFilter.villa === 'ALL' ? 'ZIRVE' : currentFilter.villa,
+    villa: currentFilter.villa === 'ALL' ? 'AZURE' : currentFilter.villa,
     priority: priority,
     title: title,
     assignee: 'İşletme Müdürü',
@@ -5247,12 +4840,12 @@ Tarih: ${new Date().toLocaleDateString('tr-TR')}
 
 4. EN KRİTİK 3 YÖNETİM AKSİYONU:
 -----------------------------------------------------
-[!] Şirin Dağ Evi Taban Fiyatı: Doluluk %96 iken ADR'nin 2.826 TL'de kalması
+[!] Villa Sunset Horizon Taban Fiyatı: Doluluk %96 iken ADR'nin 2.826 TL'de kalması
     gelir kaybıdır. Taban fiyat acilen 4.500 TL bandına çekilmelidir.
 [!] Direkt Satış & Komisyon Koruması: Ayda 75.500 TL komisyon ödenmektedir.
     WhatsApp doğrudan kampanyasıyla bu tutarın en az %40'ı kasaya çekilmelidir.
-[!] Zirve & Seyir Kış Fiyatlandırması: Ocak ayında 280.000 TL ciro getiren
-    Zirve villası için kış erken satışları 18.000 TL altında açılmamalıdır.
+[!] Villa Azure Bay & Villa Bella Vista Kış Fiyatlandırması: Ocak ayında 280.000 TL ciro getiren
+    Villa Azure Bay villası için kış erken satışları 18.000 TL altında açılmamalıdır.
 =====================================================`;
 
   const blob = new Blob([reportText], { type: 'text/plain;charset=utf-8' });
@@ -5550,7 +5143,7 @@ function downloadSampleTemplate(templateType) {
   if (templateType === 'BOOKINGS') {
     const data = [
       {
-        'Villa': 'ZIRVE',
+        'Villa': 'AZURE',
         'Misafir Adı': 'Örnek Misafir (Ahmet Yılmaz)',
         'Giriş Tarihi': '2026-10-10',
         'Çıkış Tarihi': '2026-10-14',
@@ -5563,7 +5156,7 @@ function downloadSampleTemplate(templateType) {
         'Durum': 'COMPLETED'
       },
       {
-        'Villa': 'SEYIR',
+        'Villa': 'BELLA',
         'Misafir Adı': 'Örnek Misafir (Canan Kaya)',
         'Giriş Tarihi': '2026-10-20',
         'Çıkış Tarihi': '2026-10-24',
@@ -5591,11 +5184,11 @@ function downloadSampleTemplate(templateType) {
       },
       {
         'Tarih': '2026-10-12',
-        'Açıklama': 'Zirve Jakuzi Isıtıcı Rezistans Değişimi',
+        'Açıklama': 'Villa Azure Bay Jakuzi Isıtıcı Rezistans Değişimi',
         'Tutar (TL)': 6500,
         'Kategori': 'Bakım & Onarım',
         'Tür': 'OPEX',
-        'Villa': 'ZIRVE'
+        'Villa': 'AZURE'
       },
       {
         'Tarih': '2026-10-15',
@@ -5603,7 +5196,7 @@ function downloadSampleTemplate(templateType) {
         'Tutar (TL)': 45000,
         'Kategori': 'Yatırım & Demirbaş',
         'Tür': 'CAPEX',
-        'Villa': 'SEYIR'
+        'Villa': 'BELLA'
       }
     ];
     const ws = XLSX.utils.json_to_sheet(data);
@@ -5731,13 +5324,13 @@ function parseWorkbookWithMode(wb, fileName, mode) {
     parsedData.previewRows = [];
 
     rawObjects.forEach((obj, idx) => {
-      const villaRaw = String(obj['Villa'] || obj['villa'] || obj['Ev'] || obj['Mülk'] || 'ZIRVE').toUpperCase();
-      let villa = 'ZIRVE';
-      if (villaRaw.includes('SEYIR') || villaRaw.includes('SEYİR')) villa = 'SEYIR';
-      else if (villaRaw.includes('DOGUS') || villaRaw.includes('DOĞUŞ')) villa = 'DOGUS';
-      else if (villaRaw.includes('SIRIN') || villaRaw.includes('ŞİRİN')) villa = 'SIRIN';
-      else if (villaRaw.includes('NEFES')) villa = 'NEFES';
-      else if (villaRaw.includes('ZIRVE') || villaRaw.includes('ZİRVE')) villa = 'ZIRVE';
+      const villaRaw = String(obj['Villa'] || obj['villa'] || obj['Ev'] || obj['Mülk'] || 'AZURE').toUpperCase();
+      let villa = 'AZURE';
+      if (villaRaw.includes('BELLA')) villa = 'BELLA';
+      else if (villaRaw.includes('OLIVE')) villa = 'OLIVE';
+      else if (villaRaw.includes('SUNSET')) villa = 'SUNSET';
+      else if (villaRaw.includes('PALM')) villa = 'PALM';
+      else if (villaRaw.includes('AZURE')) villa = 'AZURE';
 
       const guest = String(obj['Misafir Adı'] || obj['Misafir'] || obj['Guest'] || obj['Müşteri'] || ('Misafir ' + (idx + 1))).trim();
 
@@ -8122,7 +7715,7 @@ function payAllPendingCleaning() {
 function openNewCleaningTaskModal() {
   document.getElementById('cleaningTaskModalTitle').innerText = '🧹 Yeni Temizlik / Borç Girişi';
   document.getElementById('hkEditTaskId').value = '';
-  document.getElementById('hkVilla').value = currentFilter.villa !== 'ALL' ? currentFilter.villa : 'SEYIR';
+  document.getElementById('hkVilla').value = currentFilter.villa !== 'ALL' ? currentFilter.villa : 'BELLA';
   document.getElementById('hkDate').value = '2026-09-07';
   document.getElementById('hkCleaner').value = 'Fatma Hanım (Temizlik Ekibi)';
   
@@ -8301,7 +7894,7 @@ function renderTapeChart() {
   const daysInMonth = new Date(year, month, 0).getDate();
   const vKeys = (typeof appData !== 'undefined' && appData.villas && Object.keys(appData.villas).length > 0)
     ? Object.keys(appData.villas)
-    : ['SEYIR', 'DOGUS', 'ZIRVE', 'SIRIN', 'NEFES'];
+    : ['BELLA', 'OLIVE', 'AZURE', 'SUNSET', 'PALM'];
   
   const dayNamesShort = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
   const todayStr = '2026-09-07';
@@ -8440,7 +8033,7 @@ function parseWhatsAppMessage() {
       detectedGuest = waHeaderMatch[1].trim();
     } else {
       const wordsMatch = text.match(/\b([A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+))\b/);
-      if (wordsMatch && !['Zirve', 'Doğuş', 'Seyir', 'Şirin', 'Nefes', 'WhatsApp', 'Airbnb', 'Booking', 'Selamlar', 'Merhaba'].includes(wordsMatch[1])) {
+      if (wordsMatch && !['Villa Azure Bay', 'Villa Olive Garden', 'Villa Bella Vista', 'Villa Sunset Horizon', 'Villa Palm Breeze', 'WhatsApp', 'Airbnb', 'Booking', 'Selamlar', 'Merhaba'].includes(wordsMatch[1])) {
         detectedGuest = wordsMatch[1];
       }
     }
@@ -8637,9 +8230,9 @@ function saveWhapiSettings() {
 
 function simulateIncomingWhatsAppTest() {
   const testGuests = [
-    { name: 'Cemil Öz', phone: '0533 999 8877', villa: 'ZIRVE', quote: 55000, notes: '25-28 Eylül jakuzili ev için WhatsApp mesajı attı' },
-    { name: 'Deniz Aksu', phone: '0542 777 6655', villa: 'DOGUS', quote: 42000, notes: 'Ekim ilk haftası 11 kişilik aile için fiyat sordu' },
-    { name: 'Alper Tunç', phone: '0530 222 3344', villa: 'SEYIR', quote: 26000, notes: 'Hafta içi 2 gece için indirim talep etti' }
+    { name: 'Cemil Öz', phone: '0533 999 8877', villa: 'AZURE', quote: 55000, notes: '25-28 Eylül jakuzili ev için WhatsApp mesajı attı' },
+    { name: 'Deniz Aksu', phone: '0542 777 6655', villa: 'OLIVE', quote: 42000, notes: 'Ekim ilk haftası 11 kişilik aile için fiyat sordu' },
+    { name: 'Alper Tunç', phone: '0530 222 3344', villa: 'BELLA', quote: 26000, notes: 'Hafta içi 2 gece için indirim talep etti' }
   ];
 
   const pick = testGuests[Math.floor(Math.random() * testGuests.length)];
@@ -8737,7 +8330,7 @@ function renderLeadAnalytics() {
   }
 
   // Villa Demand Share Breakdown
-  const villaCounts = { ZIRVE: 0, DOGUS: 0, SEYIR: 0, SIRIN: 0, NEFES: 0 };
+  const villaCounts = { AZURE: 0, OLIVE: 0, BELLA: 0, SUNSET: 0, PALM: 0 };
   leads.forEach(l => {
     if (villaCounts[l.villa] !== undefined) villaCounts[l.villa]++;
   });
@@ -8747,11 +8340,11 @@ function renderLeadAnalytics() {
     villaBox.innerHTML = '';
     const totalVCounts = totalLeads || 1;
     const villaMeta = [
-      { key: 'ZIRVE', name: 'Zirve Dağ Evi', color: '#3B82F6' },
-      { key: 'DOGUS', name: 'Doğuş Dağ Evi', color: '#10B981' },
-      { key: 'SEYIR', name: 'Seyir Dağ Evi', color: '#F59E0B' },
-      { key: 'SIRIN', name: 'Şirin Dağ Evi', color: '#EC4899' },
-      { key: 'NEFES', name: 'Nefes Dağ Evi', color: '#8B5CF6' }
+      { key: 'AZURE', name: 'Villa Azure Bay', color: '#3B82F6' },
+      { key: 'OLIVE', name: 'Villa Olive Garden', color: '#10B981' },
+      { key: 'BELLA', name: 'Villa Bella Vista', color: '#F59E0B' },
+      { key: 'SUNSET', name: 'Villa Sunset Horizon', color: '#EC4899' },
+      { key: 'PALM', name: 'Villa Palm Breeze', color: '#8B5CF6' }
     ];
 
     villaMeta.forEach(v => {
@@ -8782,7 +8375,7 @@ function renderLeadAnalytics() {
         • <strong>Kaçan Satış Aksiyonu:</strong> Kaybedilen taleplerin en büyük sebebi <em>"Tarih Dolu"</em> ve <em>"Fiyat Yüksek"</em>. İstenen tarih doluysa misafire hemen yakın boş gap gecelerini alternatif olarak sunun.
       </div>
       <div>
-        • <strong>Zirve & Doğuş Talebi:</strong> Taleplerin %60'ından fazlası Zirve ve Doğuş için geliyor. Bu iki villada taban fiyatı savunup, Şirin ve Seyir için hafta içi özel paket teklifleri vererek portföy dengesini sağlayabilirsiniz.
+        • <strong>Villa Azure Bay & Villa Olive Garden Talebi:</strong> Taleplerin %60'ından fazlası Villa Azure Bay ve Villa Olive Garden için geliyor. Bu iki villada taban fiyatı savunup, Villa Sunset Horizon ve Villa Bella Vista için hafta içi özel paket teklifleri vererek portföy dengesini sağlayabilirsiniz.
       </div>
     `;
   }
@@ -9161,7 +8754,7 @@ const KPI_EXPLANATION_GUIDES = {
     summary: 'Cirodan tüm operasyonel harcamalar (Opex) ve mülk yatırımları (Capex) düşüldükten sonra işletme sahibinin cebinde kalan net nakittir.',
     warning: '🌟 En önemli rakam budur: 1 milyon TL ciro yapıp 950 bin TL harcarsanız kârınız sadece 50 bindir. 500 bin ciro ile 350 bin kâr edebilirsiniz!',
     formula: 'Net Kâr = Fiili Ciro - (OPEX + CAPEX)',
-    example: 'Örn: Ocak 2026\'da 843.555 TL cirodan 331.058 TL gider düşülmüş ve 512.497 TL rekor net kâr kalmıştır.',
+    example: 'Örn: Temmuz 2025\'te 320.000 TL cirodan 125.000 TL gider düşülmüş ve 195.000 TL rekor net kâr kalmıştır.',
     actionRule: 'Net marjınızın (Net Kâr / Ciro) %30\'un altına düşmemesine dikkat edin.'
   },
   'TOTAL_EXPENSE': {
@@ -9532,11 +9125,11 @@ const DEFAULT_AIRBNB_PROPERTIES = {
 };
 
 // Aliases for legacy compatibility
-DEFAULT_AIRBNB_PROPERTIES['SEYIR'] = DEFAULT_AIRBNB_PROPERTIES['VILLA_BELLA'];
-DEFAULT_AIRBNB_PROPERTIES['DOGUS'] = DEFAULT_AIRBNB_PROPERTIES['VILLA_OLIVE'];
-DEFAULT_AIRBNB_PROPERTIES['ZIRVE'] = DEFAULT_AIRBNB_PROPERTIES['VILLA_AZURE'];
-DEFAULT_AIRBNB_PROPERTIES['SIRIN'] = DEFAULT_AIRBNB_PROPERTIES['VILLA_SUNSET'];
-DEFAULT_AIRBNB_PROPERTIES['NEFES'] = DEFAULT_AIRBNB_PROPERTIES['VILLA_PALM'];
+DEFAULT_AIRBNB_PROPERTIES['BELLA'] = DEFAULT_AIRBNB_PROPERTIES['VILLA_BELLA'];
+DEFAULT_AIRBNB_PROPERTIES['OLIVE'] = DEFAULT_AIRBNB_PROPERTIES['VILLA_OLIVE'];
+DEFAULT_AIRBNB_PROPERTIES['AZURE'] = DEFAULT_AIRBNB_PROPERTIES['VILLA_AZURE'];
+DEFAULT_AIRBNB_PROPERTIES['SUNSET'] = DEFAULT_AIRBNB_PROPERTIES['VILLA_SUNSET'];
+DEFAULT_AIRBNB_PROPERTIES['PALM'] = DEFAULT_AIRBNB_PROPERTIES['VILLA_PALM'];
 
 function renderAirbnbAuditRadar() {
   const tbody = document.getElementById('digitalAuditTableBody');
@@ -9644,7 +9237,7 @@ function syncLiveAirbnbData() {
 const DEFAULT_MARKETING_CAMPAIGNS = [
   {
     id: 'MKT-001',
-    name: 'Instagram Reels & Hikaye - Hafta Sonu Dağ Evi Kaçamağı',
+    name: 'Instagram Reels & Hikaye - Hafta Sonu Villa Kaçamağı',
     platform: 'META',
     channelType: 'Instagram Reels / Stories',
     villa: 'ALL',
@@ -9662,7 +9255,7 @@ const DEFAULT_MARKETING_CAMPAIGNS = [
   },
   {
     id: 'MKT-002',
-    name: 'Google Arama - Uludağ Dağ Evi & Şömineli Villa Kiralama',
+    name: 'Google Arama - Kaş & Kalkan Lüks Villa Kiralama',
     platform: 'GOOGLE',
     channelType: 'Arama Ağı (Search)',
     villa: 'ALL',
@@ -9676,14 +9269,14 @@ const DEFAULT_MARKETING_CAMPAIGNS = [
     bookingsCount: 3,
     revenue: 78000,
     status: 'ACTIVE',
-    notes: '"uludağ kiralık dağ evi", "şömineli villa bursa" yüksek niyetli kelimeler.'
+    notes: '"kaş kiralık villa", "özel havuzlu villa kalkan" yüksek niyetli kelimeler.'
   },
   {
     id: 'MKT-003',
     name: 'Meta WhatsApp Direkt Mesaj Kampanyası (Click-to-WA)',
     platform: 'META',
     channelType: 'WhatsApp DM',
-    villa: 'SEYIR',
+    villa: 'BELLA',
     startDate: '2026-08-10',
     endDate: '2026-08-25',
     budget: 5000,
@@ -9701,7 +9294,7 @@ const DEFAULT_MARKETING_CAMPAIGNS = [
     name: 'Google Performance Max - Kış 2026/2027 Erken Rezervasyon',
     platform: 'GOOGLE',
     channelType: 'Performance Max',
-    villa: 'ZIRVE',
+    villa: 'AZURE',
     startDate: '2026-08-15',
     endDate: '2026-09-30',
     budget: 7500,
@@ -10053,7 +9646,7 @@ function runAIMarketingAdvisor(context = {}) {
       type: 'arbitrage',
       icon: '💡',
       title: 'Bütçe Arbitrajı: Google Arama Reklamlarını Ölçekleyin',
-      text: `Google Arama kampanyalarınız <strong>${googleRoas}x ROAS</strong> üretirken Meta reklamları <strong>${metaRoas}x</strong> seviyesinde. Meta bütçenizin %25'ini 'Uludağ Dağ Evi' ve 'Şömineli Kiralık Villa' arama kelimelerine kaydırarak aynı bütçeyle tahmini <strong>+32.000 TL ek ciro</strong> elde edebilirsiniz.`
+      text: `Google Arama kampanyalarınız <strong>${googleRoas}x ROAS</strong> üretirken Meta reklamları <strong>${metaRoas}x</strong> seviyesinde. Meta bütçenizin %25'ini 'Kaş Kiralık Villa' ve 'Özel Havuzlu Villa' arama kelimelerine kaydırarak aynı bütçeyle tahmini <strong>+32.000 TL ek ciro</strong> elde edebilirsiniz.`
     });
   } else {
     insights.push({
@@ -10095,7 +9688,7 @@ function runAIMarketingAdvisor(context = {}) {
     type: 'seasonal',
     icon: '🎄',
     title: '2026/2027 Kış & Yılbaşı Sezonu Erken Talep Penceresi',
-    text: 'Eylül ve Ekim ayları, Uludağ dağ evleri için kış sezonu (Aralık-Ocak-Şubat) erken rezervasyonlarının toplandığı en yüksek karlı dönemdir. Google Performance Max ve şömine temalı video reklamlara şimdiden başlamak, kış dönemini yüksek ADR ile kapatmanızı sağlar.'
+    text: 'Eylül ve Ekim ayları, Akdeniz villaları için yaz sezonu (Haziran-Temmuz-Ağustos) erken rezervasyonlarının toplandığı en yüksek karlı dönemdir. Google Performance Max ve şömine temalı video reklamlara şimdiden başlamak, kış dönemini yüksek ADR ile kapatmanızı sağlar.'
   });
 
   container.innerHTML = insights.map(i => `
@@ -10345,10 +9938,10 @@ function renderOtaRankingAndCoverRadar() {
   const elAvgScore = document.getElementById('otaAvgListingScore');
   if (elAvgScore) elAvgScore.innerText = `${avgScore} / 100`;
 
-  renderCoverAbTestLab('ZIRVE');
+  renderCoverAbTestLab('AZURE');
 }
 
-function renderCoverAbTestLab(villaKey = 'ZIRVE') {
+function renderCoverAbTestLab(villaKey = 'AZURE') {
   const container = document.getElementById('abTestComparisonContainer');
   if (!container) return;
 
@@ -10356,7 +9949,7 @@ function renderCoverAbTestLab(villaKey = 'ZIRVE') {
     ? appData.airbnbListings
     : DEFAULT_AIRBNB_PROPERTIES;
 
-  const item = listings[villaKey] || listings['ZIRVE'];
+  const item = listings[villaKey] || listings['AZURE'];
   if (!item) return;
 
   const currentCtr = (Number(item.coverCtr) || 4.2).toFixed(1);
@@ -10478,25 +10071,25 @@ function runAiListingCritic(inputUrl = null, explicitKey = null) {
   let targetKey = explicitKey;
   if (!targetKey) {
     const lower = url.toLowerCase();
-    if (lower.includes('seyir')) targetKey = 'SEYIR';
-    else if (lower.includes('zirve')) targetKey = 'ZIRVE';
-    else if (lower.includes('dogus') || lower.includes('doğuş')) targetKey = 'DOGUS';
-    else if (lower.includes('sirin') || lower.includes('şirin')) targetKey = 'SIRIN';
-    else if (lower.includes('nefes')) targetKey = 'NEFES';
+    if (lower.includes('bella')) targetKey = 'BELLA';
+    else if (lower.includes('azure')) targetKey = 'AZURE';
+    else if (lower.includes('olive')) targetKey = 'OLIVE';
+    else if (lower.includes('sunset')) targetKey = 'SUNSET';
+    else if (lower.includes('palm')) targetKey = 'PALM';
   }
 
-  const item = targetKey ? (DEFAULT_AIRBNB_PROPERTIES[targetKey] || DEFAULT_AIRBNB_PROPERTIES['ZIRVE']) : null;
+  const item = targetKey ? (DEFAULT_AIRBNB_PROPERTIES[targetKey] || DEFAULT_AIRBNB_PROPERTIES['AZURE']) : null;
 
   // Build report data
   const villaName = item ? item.name : 'Analiz Edilen Dış / Rakip İlan';
   const score = item ? item.strScore : 79;
   const rank = item ? item.searchRank : 'Sayfa 2 / #14 (Algoritma Denetimi)';
-  const currentTitle = item ? item.title : 'Uludağ Kiralık Dağ Evi & Şömineli Bahçeli Villa';
-  const optTitle = item ? item.aiOptimizedTitle : 'Uludağ | Şömineli, Jakuzili & Barbekülü Sıcak Dağ Evi Kaçamağı';
-  const hookCopy = item ? item.aiHookCopy : 'Karlar altında sıcacık bir şömine keyfi, izole bir bahçe ve unutulmaz bir dağ havası... Bu özel dağ evi, sevdiklerinizle huzurlu bir kış kaçamağı yaşamanız için hazırlandı.';
+  const currentTitle = item ? item.title : 'Kaş Kiralık Lüks Villa & Özel Havuzlu Bahçeli Ev';
+  const optTitle = item ? item.aiOptimizedTitle : 'Kaş | Özel Havuzlu, Jakuzili & Barbekülü Lüks Villa Evi Kaçamağı';
+  const hookCopy = item ? item.aiHookCopy : 'Karlar altında sıcacık bir şömine keyfi, izole bir bahçe ve unutulmaz bir dağ havası... Bu özel villa, sevdiklerinizle huzurlu bir kış kaçamağı yaşamanız için hazırlandı.';
   const roasts = item ? item.roasts : [
     '🚨 Başlıkta çok fazla genel kelime var; arama niyetli "jakuzi", "şömine", "özel bahçe" gibi yüksek dönüşümlü kelimeler ilk 30 karakterde harcanmış.',
-    '🚨 Kapak fotoğrafı aydınlatması yetersiz; dağ evlerinde gün batımı sıcak şömine ışığı kullanılmadığında tıklama oranı (CTR) %40 düşer.',
+    '🚨 Kapak fotoğrafı aydınlatması yetersiz; villalarında gün batımı sıcak şömine ışığı kullanılmadığında tıklama oranı (CTR) %40 düşer.',
     'İlan açıklamasında ilk 3 cümle kanca (The Hook) kurgusundan yoksun; misafirler okumayı bırakıp geri çıkıyor.'
   ];
   const actions = item ? item.emergencyFixes : [
@@ -10560,7 +10153,7 @@ function runAiListingCritic(inputUrl = null, explicitKey = null) {
 }
 
 // =============================================================
-// 5 İLERİ SEVİYE STR & DAĞ EVİ PAZARLAMA MODÜLLERİ
+// 5 İLERİ SEVİYE STR & VILLA PAZARLAMA MODÜLLERİ
 // =============================================================
 
 const DEFAULT_INFLUENCER_COLLABS = [
@@ -10628,7 +10221,7 @@ function detectGapNights() {
       const diffDays = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
 
       if (diffDays >= 1 && diffDays <= 4) {
-        const baseNightly = vKey === 'ZIRVE' ? 18000 : (vKey === 'SEYIR' ? 14000 : 12000);
+        const baseNightly = vKey === 'AZURE' ? 18000 : (vKey === 'BELLA' ? 14000 : 12000);
         const regularTotal = baseNightly * diffDays;
         const discountTotal = Math.round(regularTotal * 0.8);
         gaps.push({
@@ -10648,8 +10241,8 @@ function detectGapNights() {
   if (gaps.length < 3) {
     gaps.push(
       {
-        villaKey: 'SEYIR',
-        villaName: 'Seyir Dağ Evi',
+        villaKey: 'BELLA',
+        villaName: 'Villa Bella Vista',
         checkIn: '2026-10-14',
         checkOut: '2026-10-16',
         nights: 2,
@@ -10658,8 +10251,8 @@ function detectGapNights() {
         discountPct: 20
       },
       {
-        villaKey: 'ZIRVE',
-        villaName: 'Zirve Dağ Evi',
+        villaKey: 'AZURE',
+        villaName: 'Villa Azure Bay',
         checkIn: '2026-10-21',
         checkOut: '2026-10-23',
         nights: 2,
@@ -10668,8 +10261,8 @@ function detectGapNights() {
         discountPct: 20
       },
       {
-        villaKey: 'SIRIN',
-        villaName: 'Şirin Dağ Evi',
+        villaKey: 'SUNSET',
+        villaName: 'Villa Sunset Horizon',
         checkIn: '2026-11-03',
         checkOut: '2026-11-05',
         nights: 2,
@@ -10732,7 +10325,7 @@ function renderGapNightsRadar() {
 }
 
 function copyGapStoryText(vName, dates, nights, discPrice, regPrice) {
-  const storyText = '🔥 ULUDAĞ SON DAKİKA KAÇAMAK FIRSATI! 🔥\n\n' +
+  const storyText = '🔥 SON DAKİKA KAÇAMAK FIRSATI! 🔥\n\n' +
     '🏡 ' + vName + '\n' +
     '📅 ' + dates + ' (' + nights + ' Gece)\n\n' +
     '✨ Karlar altında sıcacık şömine keyfi, izole müstakil bahçe ve ısıtmalı jakuzi!\n' +
@@ -10747,7 +10340,7 @@ function copyGapStoryText(vName, dates, nights, discPrice, regPrice) {
 }
 
 function shareGapWhatsApp(vName, dates, nights, discPrice) {
-  const text = '🔥 ULUDAĞ DAĞ EVİ KAÇAMAĞI!\n' +
+  const text = '🔥 AKDENİZ VİLLA KAÇAMAĞI!\n' +
     '🏡 ' + vName + '\n' +
     '📅 ' + dates + ' (' + nights + ' Gece)\n' +
     '🏷️ Flaş İndirimli Fiyat: ₺' + discPrice + '\n' +
@@ -10777,8 +10370,8 @@ function selectClosingScenario(scenarioKey) {
 function updateClosingScriptPreview() {
   const guestName = (document.getElementById('scriptGuestName')?.value || 'Ahmet Bey').trim();
   const vSelect = document.getElementById('scriptVillaSelect');
-  const vKey = vSelect ? vSelect.value : 'ZIRVE';
-  const vName = (appData.villas && appData.villas[vKey]?.name) ? appData.villas[vKey].name : 'Zirve Dağ Evi';
+  const vKey = vSelect ? vSelect.value : 'AZURE';
+  const vName = (appData.villas && appData.villas[vKey]?.name) ? appData.villas[vKey].name : 'Villa Azure Bay';
   const dates = (document.getElementById('scriptDates')?.value || 'Bu Hafta Sonu / 2 Gece').trim();
   const price = (document.getElementById('scriptPrice')?.value || '₺28.000').trim();
 
@@ -10794,7 +10387,7 @@ function updateClosingScriptPreview() {
       break;
     case 'DOLU':
       text = guestName + ' merhaba! Ne yazık ki ilgilendiğiniz ' + vName + ' belirttiğiniz tarihlerde dolu.\n\n' +
-        'Ancak sizi Uludağ\'da ağırlamayı çok isteriz! Hemen aynı bölgede yer alan, aynı derecede sıcak şöminesi, jakuzisi ve harika doğa manzarası olan alternatif dağ evimiz o tarihlerde tam müsait. Üstelik bu tarihe özel ' + price + ' avantajlı fiyatla yardımcı olabilirim. Fotoğraflarını iletmemi ister misiniz?';
+        'Ancak sizi Akdeniz kıyısında ağırlamayı çok isteriz! Hemen aynı bölgede yer alan, aynı derecede sıcak şöminesi, jakuzisi ve harika doğa manzarası olan alternatif villamiz o tarihlerde tam müsait. Üstelik bu tarihe özel ' + price + ' avantajlı fiyatla yardımcı olabilirim. Fotoğraflarını iletmemi ister misiniz?';
       break;
     case 'SON_DAKIKA':
       text = guestName + ' merhaba! Bugün için evimizin tüm hazırlıkları tamamlandı ve ' + vName + ' sıcacık hazır bekliyor.\n\n' +
@@ -10910,8 +10503,8 @@ function renderRetentionCrm() {
 }
 
 function sendGuestLoyaltyMessage(guestName, villaKey, phone) {
-  const vName = (appData.villas && appData.villas[villaKey]?.name) ? appData.villas[villaKey].name : 'Uludağ Dağ Evleri';
-  const text = 'Merhaba ' + guestName + '! Uludağ Dağ Evleri\'nden sevgiler.\n\n' +
+  const vName = (appData.villas && appData.villas[villaKey]?.name) ? appData.villas[villaKey].name : 'Lexbnb Villaları';
+  const text = 'Merhaba ' + guestName + '! Lexbnb Villaları\'nden sevgiler.\n\n' +
     'Daha önce ' + vName + '\'mizdeki konaklamanızda sizleri ağırlamaktan büyük mutluluk duymuştuk. Yaklaşan kış sezonu takvimimizi açtık ve geçmişte bizleri tercih eden kıymetli misafirlerimize özel olarak %10 VIP indirim tanımladık.\n\n' +
     'Şömine başında kar keyfi yapmak isterseniz, indirimli fiyat ve sürpriz ikramlarımızla yerinizi ayırtmak için bize dilediğiniz zaman yazabilirsiniz! Müsait tarihleri ileteyim mi?';
 
@@ -10920,8 +10513,8 @@ function sendGuestLoyaltyMessage(guestName, villaKey, phone) {
 }
 
 function sendBroadcastLoyaltyMessage() {
-  const text = '🌲 ULUDAĞ KIŞ SEZONU AÇILIYOR! ESKİ MİSAFİRLERİMİZE ÖZEL VIP DAVET 🌲\n\n' +
-    'Değerli Misafirimiz, daha önce Uludağ Dağ Evleri\'mizde paylaştığımız güzel anılar için teşekkür ederiz.\n\n' +
+  const text = '🌲 YAZ SEZONU AÇILIYOR! ESKİ MİSAFİRLERİMİZE ÖZEL VIP DAVET 🌲\n\n' +
+    'Değerli Misafirimiz, daha önce Lexbnb Villaları\'mizde paylaştığımız güzel anılar için teşekkür ederiz.\n\n' +
     'Karlar altında şömineli, jakuzili sıcacık bir kış kaçamağı için 2026-2027 kış sezonu takvimimizi açtık!\n' +
     '🎁 Size Özel Ayrıcalık: \'KARSEZONU10\' kodu ile %10 VIP indirim ve sınırsız şömine odunu ikramı!\n\n' +
     'Takvim erkenden dolmadan yerinizi ayırtmak için bu mesaja yanıt vermeniz yeterli. Sevgiler!';
@@ -10933,7 +10526,7 @@ function sendBroadcastLoyaltyMessage() {
 }
 
 // -------------------------------------------------------------
-// 4. ❄️ ULUDAĞ SEZONLUK & ÖZEL DÖNEM FIRSAT RADARI
+// 4. ❄️ SEZONLUK & ÖZEL DÖNEM FIRSAT RADARI
 // -------------------------------------------------------------
 function renderSeasonalEventRadar() {
   const container = document.getElementById('seasonalEventsContainer');
@@ -10956,7 +10549,7 @@ function renderSeasonalEventRadar() {
       name: 'Yılbaşı Tatili (3 Gece)',
       dates: '31 Aralık 2026 - 03 Ocak 2027',
       startDate: new Date('2026-12-31'),
-      advice: 'Zirve kapatıldı. Kalan 4 villa için minimum 3 gece kuralı uygulayın. Fiyat kırmak yerine "Yılbaşı Barbekü Sepeti & Akustik Müzik" paketiyle satın.'
+      advice: 'Villa Azure Bay kapatıldı. Kalan 4 villa için minimum 3 gece kuralı uygulayın. Fiyat kırmak yerine "Yılbaşı Barbekü Sepeti & Akustik Müzik" paketiyle satın.'
     },
     {
       id: 'EV-SEMESTER',
@@ -10964,7 +10557,7 @@ function renderSeasonalEventRadar() {
       name: 'Sömestr Yarıyıl Tatili',
       dates: '22 Ocak - 07 Şubat 2027',
       startDate: new Date('2027-01-22'),
-      advice: 'Aile segmenti için Doğuş ve Nefes gibi yüksek yatak kapasiteli villaları öne çıkaran Google Ads "Uludağ sömestr kiralık dağ evi" kampanyasını açın.'
+      advice: 'Aile segmenti için Villa Olive Garden ve Villa Palm Breeze gibi yüksek yatak kapasiteli villaları öne çıkaran Google Ads "Akdeniz tatil villası kiralık" kampanyasını açın.'
     },
     {
       id: 'EV-VALENTINE',
@@ -10972,7 +10565,7 @@ function renderSeasonalEventRadar() {
       name: '14 Şubat Sevgililer Günü',
       dates: '12 - 15 Şubat 2027',
       startDate: new Date('2027-02-12'),
-      advice: 'Çiftler için Seyir ve Şirin dağ evlerinde jakuzi, şömine, gül yaprakları ve fondü içeren "Romantik Kış Kaçamağı" paketi oluşturun.'
+      advice: 'Çiftler için Villa Bella Vista ve Villa Sunset Horizon villalarında jakuzi, şömine, gül yaprakları ve fondü içeren "Romantik Kış Kaçamağı" paketi oluşturun.'
     },
     {
       id: 'EV-SPRING',
@@ -11008,11 +10601,11 @@ function renderSeasonalEventRadar() {
         <div style="margin:10px 0;">
           <div style="font-size:11px; color:var(--text-muted); margin-bottom:4px;">5 Villa Durumu (${fullCount}/5 Dolu):</div>
           <div>
-            <span class="villa-occupancy-pill ${isZirveBooked ? 'full' : 'empty'}">Zirve: ${isZirveBooked ? 'DOLU ✅' : 'BOŞ ⚠️'}</span>
-            <span class="villa-occupancy-pill empty">Seyir: BOŞ ⚠️</span>
-            <span class="villa-occupancy-pill empty">Doğuş: BOŞ ⚠️</span>
-            <span class="villa-occupancy-pill empty">Şirin: BOŞ ⚠️</span>
-            <span class="villa-occupancy-pill empty">Nefes: BOŞ ⚠️</span>
+            <span class="villa-occupancy-pill ${isZirveBooked ? 'full' : 'empty'}">Villa Azure Bay: ${isZirveBooked ? 'DOLU ✅' : 'BOŞ ⚠️'}</span>
+            <span class="villa-occupancy-pill empty">Villa Bella Vista: BOŞ ⚠️</span>
+            <span class="villa-occupancy-pill empty">Villa Olive Garden: BOŞ ⚠️</span>
+            <span class="villa-occupancy-pill empty">Villa Sunset Horizon: BOŞ ⚠️</span>
+            <span class="villa-occupancy-pill empty">Villa Palm Breeze: BOŞ ⚠️</span>
           </div>
         </div>
 
@@ -11238,7 +10831,7 @@ function getSaaSUsers() {
       master.email = 'demo@lexbnb.com';
       master.password = 'lexbnb';
       master.managerName = 'LexBnB Host';
-      if (!master.companyName || master.companyName.includes('Uludağ') || master.companyName.includes('UTE')) {
+      if (!master.companyName || master.companyName.includes('Akdeniz') || master.companyName.includes('UTE')) {
         master.companyName = 'Lexbnb Luxury Portfolio';
       }
     } else {
@@ -13553,7 +13146,7 @@ function renderExecutiveControlCenter() {
         candidates.push({
           id: t.id,
           domain: 'OPERATIONS',
-          propertyId: t.propertyId || t.property_id || 'SEYIR',
+          propertyId: t.propertyId || t.property_id || 'BELLA',
           title: t.title || 'Turnover Temizlik Görevi',
           severity: isCritical ? 'CRITICAL' : 'MEDIUM',
           guestImpact: isCritical ? 'HIGH' : 'MEDIUM',
@@ -13575,7 +13168,7 @@ function renderExecutiveControlCenter() {
         candidates.push({
           id: tk.id,
           domain: 'OPERATIONS',
-          propertyId: tk.propertyId || tk.property_id || 'ZIRVE',
+          propertyId: tk.propertyId || tk.property_id || 'AZURE',
           title: `P1 Arıza: ${tk.title || 'Klima / Jakuzi Arızası'}`,
           severity: tk.severity || 'CRITICAL',
           guestImpact: 'HIGH',

@@ -34,7 +34,7 @@ function runTest(name, fn) {
 // TEST 1: CSV Parsing with Comma and Semicolon Delimiters
 // -------------------------------------------------------------
 runTest('1. CSV Parsing: Parses comma and semicolon delimited text accurately', () => {
-  const csvComma = `Tarih,Kategori,Tutar,Açıklama,Ev\n2026-08-01,Elektrik,3500,"Ağustos faturası",Seyir`;
+  const csvComma = `Tarih,Kategori,Tutar,Açıklama,Ev\n2026-08-01,Elektrik,3500,"Ağustos faturası",Villa Bella Vista`;
   const parsed1 = parseCSV(csvComma);
   assert.strictEqual(parsed1.headers.length, 5);
   assert.strictEqual(parsed1.rows.length, 1);
@@ -68,10 +68,10 @@ runTest('2. Header Auto-Detection: Maps Turkish and English headers to standard 
 // -------------------------------------------------------------
 runTest('3. Row Validation: Separates valid rows from malformed dates, amounts, and categories', () => {
   const rows = [
-    { date: '2026-08-10', category: 'Temizlik', amount: '1500', desc: 'Genel temizlik', property: 'Seyir' },
-    { date: 'gecersiz-tarih', category: 'Elektrik', amount: '2000', desc: 'Hatalı', property: 'Seyir' }, // Invalid date
-    { date: '2026-08-12', category: 'Su', amount: '-500', desc: 'Negatif tutar', property: 'Seyir' },     // Invalid amount
-    { date: '2026-08-14', category: '', amount: '800', desc: 'Kategori boş', property: 'Seyir' }          // Empty category
+    { date: '2026-08-10', category: 'Temizlik', amount: '1500', desc: 'Genel temizlik', property: 'Villa Bella Vista' },
+    { date: 'gecersiz-tarih', category: 'Elektrik', amount: '2000', desc: 'Hatalı', property: 'Villa Bella Vista' }, // Invalid date
+    { date: '2026-08-12', category: 'Su', amount: '-500', desc: 'Negatif tutar', property: 'Villa Bella Vista' },     // Invalid amount
+    { date: '2026-08-14', category: '', amount: '800', desc: 'Kategori boş', property: 'Villa Bella Vista' }          // Empty category
   ];
 
   const columnMap = {
@@ -83,7 +83,7 @@ runTest('3. Row Validation: Separates valid rows from malformed dates, amounts, 
   };
 
   const context = {
-    properties: [{ id: 'PROP-SEYIR', slug: 'seyir', name: 'Seyir' }]
+    properties: [{ id: 'PROP-BELLA', slug: 'bella', name: 'Villa Bella Vista' }]
   };
 
   const report = validateImportRows(rows, columnMap, context);

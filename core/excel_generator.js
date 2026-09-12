@@ -53,7 +53,7 @@ async function buildWorkbook() {
   // Header Banner
   wsDash.mergeCells('B2:I3');
   const titleCell = wsDash.getCell('B2');
-  titleCell.value = '🌲 ULUDAĞ TATİL EVLERİ (UTE) — KONTROL MERKEZİ V5';
+  titleCell.value = '🌲 AKDENİZ TATİL EVLERİ (UTE) — KONTROL MERKEZİ V5';
   titleCell.font = fontTitle;
   titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
   titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.headerDark } };
@@ -78,11 +78,11 @@ async function buildWorkbook() {
   radarHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.subHeader } };
 
   const radarItems = [
-    ['[P1 ACİL]', 'Doğuş: Isı Pompası sensör hatası giderilmeli (Girişe 48 saat var).', 'Sorumlu: Ahmet Usta', 'Hemen Çöz'],
-    ['[CHECK-IN]', 'Zirve: 9 kişilik misafir girişi var (Saat 15:00). Şömine ve jakuzi hazırlandı.', 'Sorumlu: Resepsiyon', 'Kontrol Et'],
+    ['[P1 ACİL]', 'Villa Olive Garden: Isı Pompası sensör hatası giderilmeli (Girişe 48 saat var).', 'Sorumlu: Ahmet Usta', 'Hemen Çöz'],
+    ['[CHECK-IN]', 'Villa Azure Bay: 9 kişilik misafir girişi var (Saat 15:00). Şömine ve jakuzi hazırlandı.', 'Sorumlu: Resepsiyon', 'Kontrol Et'],
     ['[SICAK LEAD]', 'Selin B. (Instagram): 24 saat dolmak üzere. Teklif: ₺45.000.', 'Sorumlu: Satış', 'Follow-up Yap'],
-    ['[EK GECE]', 'Seyir: Yarın boş. İçerideki misafire ₺3.500 taban fiyatla uzatma teklif et.', 'Sorumlu: Satış', 'Teklif Gönder'],
-    ['[OPERASYON]', 'Şirin: Çıkış sonrası detaylı kış bahçesi temizliği.', 'Sorumlu: Temizlik', 'Takip Et']
+    ['[EK GECE]', 'Villa Bella Vista: Yarın boş. İçerideki misafire ₺3.500 taban fiyatla uzatma teklif et.', 'Sorumlu: Satış', 'Teklif Gönder'],
+    ['[OPERASYON]', 'Villa Sunset Horizon: Çıkış sonrası detaylı kış bahçesi temizliği.', 'Sorumlu: Temizlik', 'Takip Et']
   ];
 
   radarItems.forEach((item, idx) => {
@@ -145,11 +145,11 @@ async function buildWorkbook() {
   });
 
   const villaRows = [
-    ['Seyir', '6+2 Kişi', 21, '70.0%', 4200, 2940, 88200, '🟢 Güçlü'],
-    ['Doğuş', '11 Kişi', 18, '60.0%', 5500, 3300, 99000, '🟡 Takip (P1)'],
-    ['Zirve (Jakuzi/Sauna)', '9 Kişi', 23, '76.7%', 7800, 5980, 179400, '🟢 Premium Star'],
-    ['Şirin', '7 Kişi', 16, '53.3%', 3800, 2027, 60800, '🔴 Düşük ADR'],
-    ['Nefes', '12 Kişi', 19, '63.3%', 5200, 3293, 98800, '🟢 Dengeli']
+    ['Villa Bella Vista', '6+2 Kişi', 21, '70.0%', 4200, 2940, 88200, '🟢 Güçlü'],
+    ['Villa Olive Garden', '11 Kişi', 18, '60.0%', 5500, 3300, 99000, '🟡 Takip (P1)'],
+    ['Villa Azure Bay (Jakuzi/Sauna)', '9 Kişi', 23, '76.7%', 7800, 5980, 179400, '🟢 Premium Star'],
+    ['Villa Sunset Horizon', '7 Kişi', 16, '53.3%', 3800, 2027, 60800, '🔴 Düşük ADR'],
+    ['Villa Palm Breeze', '12 Kişi', 19, '63.3%', 5200, 3293, 98800, '🟢 Dengeli']
   ];
 
   villaRows.forEach((row, rIdx) => {
@@ -241,14 +241,14 @@ async function buildWorkbook() {
   resHeaderRow.alignment = { horizontal: 'center' };
 
   const sampleBookings = [
-    ['REZ-2026-001', 'Seyir', 'Hakan Demir', 'Airbnb', '2026-09-01', '2026-09-04', 3, 6, 28000, 4200, 1500, 22300, 7433, 'Tamamlandı', 'Memnun ayrıldı'],
-    ['REZ-2026-002', 'Doğuş', 'Murat Kaya', 'WhatsApp', '2026-09-03', '2026-09-06', 3, 10, 36000, 0, 0, 36000, 12000, 'Tamamlandı', 'Şömine odunu ikramı'],
-    ['REZ-2026-003', 'Zirve', 'Ahmet Yıldız', 'Airbnb', '2026-09-07', '2026-09-10', 3, 8, 48000, 7200, 2000, 38800, 12933, 'Tamamlandı', 'Sauna/Jakuzi aktif'],
-    ['REZ-2026-004', 'Şirin', 'Emre Can', 'Booking', '2026-09-08', '2026-09-11', 3, 6, 21000, 3780, 1000, 16220, 5407, 'Tamamlandı', 'Geç check-out talep etti'],
-    ['REZ-2026-005', 'Nefes', 'Ayşe Yılmaz', 'WhatsApp', '2026-09-12', '2026-09-15', 3, 12, 38000, 0, 0, 38000, 12667, 'Onaylandı', 'Voleybol filesi kurulacak'],
-    ['REZ-2026-006', 'Seyir', 'Cemil Öz', 'Instagram', '2026-09-15', '2026-09-18', 3, 6, 24000, 0, 0, 24000, 8000, 'Onaylandı', 'Direkt rezervasyon'],
-    ['REZ-2026-007', 'Zirve', 'Burak Tan', 'WhatsApp', '2026-09-18', '2026-09-21', 3, 8, 45000, 0, 0, 45000, 15000, 'Onaylandı', 'Peşin havale'],
-    ['REZ-2026-008', 'Seyir', 'Ali Kemal', 'Airbnb', '2026-09-29', '2026-10-03', 4, 6, 40000, 6000, 2000, 32000, 8000, 'Onaylandı', 'Split Month (2 Eyl + 2 Eki)']
+    ['REZ-2026-001', 'Villa Bella Vista', 'Hakan Demir', 'Airbnb', '2026-09-01', '2026-09-04', 3, 6, 28000, 4200, 1500, 22300, 7433, 'Tamamlandı', 'Memnun ayrıldı'],
+    ['REZ-2026-002', 'Villa Olive Garden', 'Murat Kaya', 'WhatsApp', '2026-09-03', '2026-09-06', 3, 10, 36000, 0, 0, 36000, 12000, 'Tamamlandı', 'Şömine odunu ikramı'],
+    ['REZ-2026-003', 'Villa Azure Bay', 'Ahmet Yıldız', 'Airbnb', '2026-09-07', '2026-09-10', 3, 8, 48000, 7200, 2000, 38800, 12933, 'Tamamlandı', 'Sauna/Jakuzi aktif'],
+    ['REZ-2026-004', 'Villa Sunset Horizon', 'Emre Can', 'Booking', '2026-09-08', '2026-09-11', 3, 6, 21000, 3780, 1000, 16220, 5407, 'Tamamlandı', 'Geç check-out talep etti'],
+    ['REZ-2026-005', 'Villa Palm Breeze', 'Ayşe Yılmaz', 'WhatsApp', '2026-09-12', '2026-09-15', 3, 12, 38000, 0, 0, 38000, 12667, 'Onaylandı', 'Voleybol filesi kurulacak'],
+    ['REZ-2026-006', 'Villa Bella Vista', 'Cemil Öz', 'Instagram', '2026-09-15', '2026-09-18', 3, 6, 24000, 0, 0, 24000, 8000, 'Onaylandı', 'Direkt rezervasyon'],
+    ['REZ-2026-007', 'Villa Azure Bay', 'Burak Tan', 'WhatsApp', '2026-09-18', '2026-09-21', 3, 8, 45000, 0, 0, 45000, 15000, 'Onaylandı', 'Peşin havale'],
+    ['REZ-2026-008', 'Villa Bella Vista', 'Ali Kemal', 'Airbnb', '2026-09-29', '2026-10-03', 4, 6, 40000, 6000, 2000, 32000, 8000, 'Onaylandı', 'Split Month (2 Eyl + 2 Eki)']
   ];
 
   sampleBookings.forEach((b, idx) => {
@@ -281,11 +281,11 @@ async function buildWorkbook() {
   leadHeaderRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.headerDark } };
 
   const sampleLeads = [
-    ['LEAD-001', '2026-09-01', 'Hakan Demir', 'Seyir', 'Airbnb', '01-04 Eylül', 28000, 'Rezervasyon', '-', 'Onaylandı (REZ-001)'],
-    ['LEAD-002', '2026-09-02', 'Murat Kaya', 'Doğuş', 'WhatsApp', '03-06 Eylül', 36000, 'Rezervasyon', '-', 'Direkt kapatıldı'],
-    ['LEAD-003', '2026-09-04', 'Selin B.', 'Zirve', 'Instagram', '25-28 Eylül', 45000, 'Follow-up', '-', 'Bütçe istişaresi yapıyor'],
-    ['LEAD-004', '2026-09-05', 'Kemal V.', 'Şirin', 'WhatsApp', '18-20 Eylül', 18000, 'Kaybedildi', 'Fiyat Yüksek', 'Başka otele gitti'],
-    ['LEAD-005', '2026-09-05', 'Derya S.', 'Nefes', 'Telefon', '02-04 Ekim', 35000, 'Teklif Verildi', '-', 'Tarih teyidi bekleniyor']
+    ['LEAD-001', '2026-09-01', 'Hakan Demir', 'Villa Bella Vista', 'Airbnb', '01-04 Eylül', 28000, 'Rezervasyon', '-', 'Onaylandı (REZ-001)'],
+    ['LEAD-002', '2026-09-02', 'Murat Kaya', 'Villa Olive Garden', 'WhatsApp', '03-06 Eylül', 36000, 'Rezervasyon', '-', 'Direkt kapatıldı'],
+    ['LEAD-003', '2026-09-04', 'Selin B.', 'Villa Azure Bay', 'Instagram', '25-28 Eylül', 45000, 'Follow-up', '-', 'Bütçe istişaresi yapıyor'],
+    ['LEAD-004', '2026-09-05', 'Kemal V.', 'Villa Sunset Horizon', 'WhatsApp', '18-20 Eylül', 18000, 'Kaybedildi', 'Fiyat Yüksek', 'Başka otele gitti'],
+    ['LEAD-005', '2026-09-05', 'Derya S.', 'Villa Palm Breeze', 'Telefon', '02-04 Ekim', 35000, 'Teklif Verildi', '-', 'Tarih teyidi bekleniyor']
   ];
 
   sampleLeads.forEach((l, idx) => {
@@ -320,11 +320,11 @@ async function buildWorkbook() {
   maintHeaderRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.headerDark } };
 
   const sampleTasks = [
-    ['TSK-001', 'Doğuş', 'Isı Pompası Sensör Değişimi', 'Isıtma', 'P1', 'Devam Ediyor', 'Ahmet Usta', 4500, 0, 1, 4.8, 'Hemen Yap'],
-    ['TSK-002', 'Zirve', 'Jakuzi Filtre ve Ozon Bakımı', 'Tesisat', 'P2', 'Tamamlandı', 'Teknik Servis', 2800, 2800, 0, 3.6, 'Bu Ay Yap'],
-    ['TSK-003', 'Seyir', 'Şömine Bacası Temizliği', 'Güvenlik', 'P2', 'Planlandı', 'Mehmet', 1500, 0, 0, 3.4, 'Bu Ay Yap'],
-    ['TSK-004', 'Şirin', 'Teras Korkuluk Boyası', 'Dekorasyon', 'P3', 'Beklemede', 'İç Ekip', 8000, 0, 0, 1.6, 'Yapma / Beklet'],
-    ['TSK-005', 'Nefes', 'Voleybol Sahası Tel Örgü', 'Bahçe', 'P3', 'Planlandı', 'Dış Usta', 12000, 0, 0, 2.1, 'Sonra Değerlendir']
+    ['TSK-001', 'Villa Olive Garden', 'Isı Pompası Sensör Değişimi', 'Isıtma', 'P1', 'Devam Ediyor', 'Ahmet Usta', 4500, 0, 1, 4.8, 'Hemen Yap'],
+    ['TSK-002', 'Villa Azure Bay', 'Jakuzi Filtre ve Ozon Bakımı', 'Tesisat', 'P2', 'Tamamlandı', 'Teknik Servis', 2800, 2800, 0, 3.6, 'Bu Ay Yap'],
+    ['TSK-003', 'Villa Bella Vista', 'Şömine Bacası Temizliği', 'Güvenlik', 'P2', 'Planlandı', 'Mehmet', 1500, 0, 0, 3.4, 'Bu Ay Yap'],
+    ['TSK-004', 'Villa Sunset Horizon', 'Teras Korkuluk Boyası', 'Dekorasyon', 'P3', 'Beklemede', 'İç Ekip', 8000, 0, 0, 1.6, 'Yapma / Beklet'],
+    ['TSK-005', 'Villa Palm Breeze', 'Voleybol Sahası Tel Örgü', 'Bahçe', 'P3', 'Planlandı', 'Dış Usta', 12000, 0, 0, 2.1, 'Sonra Değerlendir']
   ];
 
   sampleTasks.forEach((t, idx) => {
@@ -357,8 +357,8 @@ async function buildWorkbook() {
 
   const sampleGoals = [
     [1, '2026-09-01', 'Direkt Rezervasyon Teşvik Kampanyası (WhatsApp karşılama hediyesi)', 'Satış Ekibi', '2026-09-20', 5000, 'Direct Booking %', 'Devam Ediyor', 'Direkt payı %43\'ten %50\'ye çıktı'],
-    [2, '2026-09-01', 'Zirve Villası Gece Jakuzi Aydınlatma ve Fotoğraf Çekimi', 'Pazarlama', '2026-09-25', 12000, 'ADR / Premium Rate', 'Planlandı', 'Fotoğrafçı randevusu alındı'],
-    [3, '2026-09-01', 'Şirin Villası İptal Oranını Düşürmek İçin Kural Esnetme', 'Operasyon', '2026-09-10', 0, 'Occupancy %', 'Tamamlandı', 'Esnek iptal açıldı']
+    [2, '2026-09-01', 'Villa Azure Bay Villası Gece Jakuzi Aydınlatma ve Fotoğraf Çekimi', 'Pazarlama', '2026-09-25', 12000, 'ADR / Premium Rate', 'Planlandı', 'Fotoğrafçı randevusu alındı'],
+    [3, '2026-09-01', 'Villa Sunset Horizon Villası İptal Oranını Düşürmek İçin Kural Esnetme', 'Operasyon', '2026-09-10', 0, 'Occupancy %', 'Tamamlandı', 'Esnek iptal açıldı']
   ];
 
   sampleGoals.forEach((g, idx) => {
@@ -392,11 +392,11 @@ async function buildWorkbook() {
   paramsHeaderRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.subHeader } };
 
   const paramRows = [
-    ['SEYIR', 'Seyir', '6+2', 30, 3500, 4500, 6000, 8500, 12000, 800, 350],
-    ['DOGUS', 'Doğuş', '11', 19, 5000, 6500, 9000, 13000, 18000, 1200, 500],
-    ['ZIRVE', 'Zirve', '9', 15, 6500, 8500, 12000, 16500, 24000, 1500, 700],
-    ['SIRIN', 'Şirin', '7', 34, 3000, 4000, 5500, 7500, 11000, 750, 300],
-    ['NEFES', 'Nefes', '12', 34, 5500, 7000, 9500, 14000, 19000, 1400, 550]
+    ['BELLA', 'Villa Bella Vista', '6+2', 30, 3500, 4500, 6000, 8500, 12000, 800, 350],
+    ['OLIVE', 'Villa Olive Garden', '11', 19, 5000, 6500, 9000, 13000, 18000, 1200, 500],
+    ['AZURE', 'Villa Azure Bay', '9', 15, 6500, 8500, 12000, 16500, 24000, 1500, 700],
+    ['SUNSET', 'Villa Sunset Horizon', '7', 34, 3000, 4000, 5500, 7500, 11000, 750, 300],
+    ['PALM', 'Villa Palm Breeze', '12', 34, 5500, 7000, 9500, 14000, 19000, 1400, 550]
   ];
 
   paramRows.forEach(p => {

@@ -37,7 +37,7 @@ function runTest(name, fn) {
 // -------------------------------------------------------------
 runTest('1. AI Payload Sanitization: Generates deterministic summary without raw DB dump', () => {
   const properties = [
-    { id: 'PROP-1', slug: 'SEYIR', name: 'Seyir Dağ Evi', is_active: true }
+    { id: 'PROP-1', slug: 'BELLA', name: 'Villa Bella Vista', is_active: true }
   ];
 
   const bookings = [
@@ -83,7 +83,7 @@ runTest('1. AI Payload Sanitization: Generates deterministic summary without raw
   assert.strictEqual(aiPayload.operationsSummary.roomRevenue, 72000);
   assert.strictEqual(aiPayload.operationsSummary.soldNights, 10);
   assert(Array.isArray(aiPayload.properties) && aiPayload.properties.length === 1);
-  assert.strictEqual(aiPayload.properties[0].name, 'Seyir Dağ Evi');
+  assert.strictEqual(aiPayload.properties[0].name, 'Villa Bella Vista');
 
   // Ensure no raw SQL or DB internal metadata leaked
   assert(!aiPayload.tenant_members, 'Must not leak tenant_members');

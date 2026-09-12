@@ -38,13 +38,13 @@ async function runMessageTemplateTests() {
 
   const context1 = {
     guest_first_name: 'Ahmet',
-    property_name: 'Villa Seyir',
+    property_name: 'Villa Bella Vista',
     check_in_date: '2026-10-15',
     check_in_time: '15:00'
   };
 
   const res1 = renderTemplate(tmpl1, context1);
-  assert.strictEqual(res1.renderedSubject, 'Rezervasyon Onayı: Villa Seyir');
+  assert.strictEqual(res1.renderedSubject, 'Rezervasyon Onayı: Villa Bella Vista');
   assert.strictEqual(res1.renderedBody, 'Sayın Ahmet, 2026-10-15 tarihindeki rezervasyonunuz onaylandı. Giriş saati: 15:00.');
   assert.strictEqual(res1.containsSensitiveVariables, false);
 
@@ -84,15 +84,15 @@ async function runMessageTemplateTests() {
   const templates = [
     { id: 't_port_tr', property_id: null, lifecycle_stage: 'CHECKIN_DAY', channel: 'WHATSAPP', language: 'tr', version: 1, is_active: true },
     { id: 't_port_en', property_id: null, lifecycle_stage: 'CHECKIN_DAY', channel: 'WHATSAPP', language: 'en', version: 1, is_active: true },
-    { id: 't_prop_tr', property_id: 'prop_seyir', lifecycle_stage: 'CHECKIN_DAY', channel: 'WHATSAPP', language: 'tr', version: 2, is_active: true }
+    { id: 't_prop_tr', property_id: 'prop_bella', lifecycle_stage: 'CHECKIN_DAY', channel: 'WHATSAPP', language: 'tr', version: 2, is_active: true }
   ];
 
   // Property + TR resolves to property template
-  const match1 = resolveTemplate(templates, { propertyId: 'prop_seyir', lifecycleStage: 'CHECKIN_DAY', channel: 'WHATSAPP', language: 'tr' });
+  const match1 = resolveTemplate(templates, { propertyId: 'prop_bella', lifecycleStage: 'CHECKIN_DAY', channel: 'WHATSAPP', language: 'tr' });
   assert.strictEqual(match1.id, 't_prop_tr');
 
   // Property + EN falls back to portfolio default EN
-  const match2 = resolveTemplate(templates, { propertyId: 'prop_seyir', lifecycleStage: 'CHECKIN_DAY', channel: 'WHATSAPP', language: 'en' });
+  const match2 = resolveTemplate(templates, { propertyId: 'prop_bella', lifecycleStage: 'CHECKIN_DAY', channel: 'WHATSAPP', language: 'en' });
   assert.strictEqual(match2.id, 't_port_en');
 
   // Other property falls back to portfolio default TR

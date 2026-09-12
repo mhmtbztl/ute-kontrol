@@ -271,7 +271,7 @@ async function main() {
       const { data: propA } = await clientA.from('properties').upsert({
         tenant_id: tenantAId,
         slug: 'VILLA_A1',
-        name: 'Uludağ Dağ Evi',
+        name: 'Villa Bella Vista',
         base_price: 20000
       }).select('id').single();
 

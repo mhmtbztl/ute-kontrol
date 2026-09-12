@@ -53,8 +53,8 @@ const VILLAS = {
     marginalCosts: { cleaning: 1200, heatingDaily: 400, laundryPerGuest: 85 }
   },
   // Backward compatibility test aliases
-  SEYIR: {
-    id: 'SEYIR',
+  BELLA: {
+    id: 'BELLA',
     name: 'Villa Bella Vista (Test)',
     capacity: 8,
     bedrooms: 2,
@@ -64,8 +64,8 @@ const VILLAS = {
     rates: { floor: 3500, base: 4500, target: 6000, premium: 8500, peak: 12000 },
     marginalCosts: { cleaning: 800, heatingDaily: 350, laundryPerGuest: 80 }
   },
-  DOGUS: {
-    id: 'DOGUS',
+  OLIVE: {
+    id: 'OLIVE',
     name: 'Villa Olive Garden (Test)',
     capacity: 11,
     bedrooms: 4,
@@ -75,8 +75,8 @@ const VILLAS = {
     rates: { floor: 5000, base: 6500, target: 9000, premium: 13000, peak: 18000 },
     marginalCosts: { cleaning: 1200, heatingDaily: 500, laundryPerGuest: 90 }
   },
-  ZIRVE: {
-    id: 'ZIRVE',
+  AZURE: {
+    id: 'AZURE',
     name: 'Villa Azure Bay (Test)',
     capacity: 9,
     bedrooms: 3,
@@ -86,8 +86,8 @@ const VILLAS = {
     rates: { floor: 6500, base: 8500, target: 12000, premium: 16500, peak: 24000 },
     marginalCosts: { cleaning: 1500, heatingDaily: 700, laundryPerGuest: 100 }
   },
-  SIRIN: {
-    id: 'SIRIN',
+  SUNSET: {
+    id: 'SUNSET',
     name: 'Villa Sunset Horizon (Test)',
     capacity: 7,
     bedrooms: 2,
@@ -97,8 +97,8 @@ const VILLAS = {
     rates: { floor: 3000, base: 4000, target: 5500, premium: 7500, peak: 11000 },
     marginalCosts: { cleaning: 750, heatingDaily: 300, laundryPerGuest: 75 }
   },
-  NEFES: {
-    id: 'NEFES',
+  PALM: {
+    id: 'PALM',
     name: 'Villa Palm Breeze (Test)',
     capacity: 12,
     bedrooms: 4,

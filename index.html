@@ -659,7 +659,7 @@
         <div class="ai-suggestion-chips">
           <button type="button" class="ai-chip-btn" onclick="askExecutiveAdvisor('Bu ay net kârımı nasıl %15 artırırım?')">💡 Bu ay net kârımı nasıl %15 artırırım?</button>
           <button type="button" class="ai-chip-btn" onclick="askExecutiveAdvisor('Ekim ayında doluluğu nasıl artırabilirim?')">📅 Ekim ayında doluluğu nasıl artırabilirim?</button>
-          <button type="button" class="ai-chip-btn" onclick="askExecutiveAdvisor('Zirve villası için fiyat optimizasyonu nedir?')">🏡 Zirve villası için fiyat optimizasyonu nedir?</button>
+          <button type="button" class="ai-chip-btn" onclick="askExecutiveAdvisor('Villa Azure Bay villası için fiyat optimizasyonu nedir?')">🏡 Villa Azure Bay villası için fiyat optimizasyonu nedir?</button>
           <button type="button" class="ai-chip-btn" onclick="askExecutiveAdvisor('Operasyonel arıza ve temizlik darboğazları nelerdir?')">🛠️ Operasyonel darboğazlar nelerdir?</button>
         </div>
 
@@ -1030,7 +1030,7 @@
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 18px;">
           <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 10px; padding: 12px 14px;">
             <div style="font-size: 11px; color: #A7F3D0; font-weight: 700; text-transform: uppercase;">🏆 Ciro Şampiyonu Ay</div>
-            <div style="font-size: 17px; font-weight: 800; color: #34D399; margin: 4px 0;" id="kpiPeakRev">Ocak 2026 (843.555 TL)</div>
+            <div style="font-size: 17px; font-weight: 800; color: #34D399; margin: 4px 0;" id="kpiPeakRev">—</div>
             <div style="font-size: 11px; color: var(--text-muted);">Kış zirvesi ve yüksek talep</div>
           </div>
 
@@ -1048,7 +1048,7 @@
 
           <div style="background: rgba(139, 92, 246, 0.08); border: 1px solid rgba(139, 92, 246, 0.25); border-radius: 10px; padding: 12px 14px;">
             <div style="font-size: 11px; color: #DDD6FE; font-weight: 700; text-transform: uppercase;">💵 En Kârlı Ay (Net Kâr)</div>
-            <div style="font-size: 17px; font-weight: 800; color: #A78BFA; margin: 4px 0;" id="kpiPeakProfit">Ocak 2026 (512.497 TL)</div>
+            <div style="font-size: 17px; font-weight: 800; color: #A78BFA; margin: 4px 0;" id="kpiPeakProfit">—</div>
             <div style="font-size: 11px; color: var(--text-muted);">%60,8 operasyonel marj rekoru</div>
           </div>
         </div>
@@ -1713,7 +1713,7 @@
               <span class="badge badge-amber">Acımasız Denetim Motoru</span>
             </div>
             <p style="font-size: 12px; color: #CBD5E1; margin: 4px 0 0 0;">
-              İster kendi villanızın, ister rakip bir dağ evinin linkini yapıştırın. STR uzmanı yapay zeka; kapak görseli, başlık, açıklama ve algoritma hatalarını acımasızca eleştirip aksiyon planı çıkarsın.
+              İster kendi villanızın, ister rakip bir villanin linkini yapıştırın. STR uzmanı yapay zeka; kapak görseli, başlık, açıklama ve algoritma hatalarını acımasızca eleştirip aksiyon planı çıkarsın.
             </p>
           </div>
         </div>
@@ -1899,17 +1899,17 @@
         </div>
       </section>
 
-      <!-- ❄️ ULUDAĞ SEZONLUK & ÖZEL DÖNEM FIRSAT RADARI (EVENT COUNTDOWN) -->
+      <!-- ❄️ SEZONLUK & ÖZEL DÖNEM FIRSAT RADARI (EVENT COUNTDOWN) -->
       <section class="card" style="margin-bottom: 24px; border: 1px solid rgba(217, 70, 239, 0.35); background: linear-gradient(135deg, rgba(112, 26, 117, 0.2), rgba(15, 23, 42, 0.95));">
         <div class="section-title-bar" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
           <div>
             <div style="display: flex; align-items: center; gap: 8px;">
               <span style="font-size: 20px;">❄️</span>
-              <h3 style="margin: 0; font-size: 16px; font-weight: 800; color: #F0ABFC;">ULUDAĞ SEZONLUK & ÖZEL DÖNEM FIRSAT RADARI</h3>
+              <h3 style="margin: 0; font-size: 16px; font-weight: 800; color: #F0ABFC;">SEZONLUK & ÖZEL DÖNEM FIRSAT RADARI</h3>
               <span class="badge badge-pink">Yüksek Sezon Alarmı</span>
             </div>
             <p class="sub-text" style="margin: 4px 0 0 0;">
-              Dağ evlerinin en yüksek cirolu özel dönemleri için geri sayım, 5 villanın anlık doluluk durumu ve erken rezervasyon stratejileri.
+              Villaların en yüksek cirolu özel dönemleri için geri sayım, 5 villanın anlık doluluk durumu ve erken rezervasyon stratejileri.
             </p>
           </div>
         </div>
@@ -3157,8 +3157,8 @@
           <div class="form-group">
             <label>İlgilenilen Villa</label>
             <select id="leadVilla" required>
-              <option value="ZIRVE">Zirve</option>
-              <option value="DOGUS">Doğuş</option>
+              <option value="AZURE">Villa Azure Bay</option>
+              <option value="OLIVE">Villa Olive Garden</option>
               <option value="VILLA_BELLA">Villa Bella Vista</option>
               <option value="VILLA_OLIVE">Villa Olive Garden</option>
               <option value="VILLA_SUNSET">Villa Sunset Horizon</option>
@@ -3227,8 +3227,8 @@
           <div class="form-group">
             <label>Villa</label>
             <select id="maintVilla" required>
-              <option value="DOGUS">Doğuş</option>
-              <option value="ZIRVE">Zirve</option>
+              <option value="OLIVE">Villa Olive Garden</option>
+              <option value="AZURE">Villa Azure Bay</option>
               <option value="VILLA_BELLA">Villa Bella Vista</option>
               <option value="VILLA_OLIVE">Villa Olive Garden</option>
               <option value="VILLA_SUNSET">Villa Sunset Horizon</option>
@@ -3452,7 +3452,7 @@
         <div id="helpTab-pricing" class="help-tab-pane" style="display: none;">
           <h4 style="color: #FBBF24; margin-top: 0;">🎯 Fiyatlandırma & Gelir Maksimizasyonu (Yield Management)</h4>
           <p style="color: var(--text-muted); font-size: 0.9rem;">
-            Bir dağ evi veya bungalovda geliri %40 artıran basit ama altın kurallar:
+            Bir villa veya bungalovda geliri %40 artıran basit ama altın kurallar:
           </p>
 
           <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 14px;">
@@ -3513,7 +3513,7 @@
               <span class="badge badge-amber" style="position: absolute; top: 8px; right: 8px; font-size: 9px;">EN POPÜLER</span>
               <div style="font-size: 12px; color: #FDE68A; font-weight: 700;">PRO İŞLETME</div>
               <div style="font-size: 20px; font-weight: 800; color: #FBBF24; margin: 4px 0;">1.990 TL <small style="font-size: 12px; color: var(--text-muted);">/ ay</small></div>
-              <div style="font-size: 11px; color: #E2E8F0;">• 4 - 10 Villa (Uludağ Paketi)<br>• Tam Finansal Şelale & KPI<br>• Canlı WhatsApp Gateway</div>
+              <div style="font-size: 11px; color: #E2E8F0;">• 4 - 10 Villa (Portföy Paketi)<br>• Tam Finansal Şelale & KPI<br>• Canlı WhatsApp Gateway</div>
             </div>
 
             <div style="background: rgba(139, 92, 246, 0.08); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 10px; padding: 14px;">
@@ -4013,7 +4013,7 @@
         <input type="hidden" id="propEditKey">
         <div class="form-group" style="margin-bottom: 12px;">
           <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Villa / Mülk Adı:</label>
-          <input type="text" id="propName" placeholder="Örn: Sunset Luxury Villa, Doğa Dağ Evi" required style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff;">
+          <input type="text" id="propName" placeholder="Örn: Sunset Luxury Villa, Doğa Villa" required style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff;">
         </div>
         <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
           <div class="form-group">
@@ -4127,7 +4127,7 @@
       <form id="onboardingForm" onsubmit="handleOnboardingSubmit(event)">
         <div class="form-group" style="margin-bottom: 12px;">
           <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Villa / Mülk Adı:</label>
-          <input type="text" id="onboardPropName" placeholder="Örn: Sunset Luxury Villa, Doğa Dağ Evi 1" required style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff;">
+          <input type="text" id="onboardPropName" placeholder="Örn: Sunset Luxury Villa, Doğa Villa 1" required style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff;">
         </div>
         <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
           <div class="form-group">
@@ -4250,6 +4250,6 @@
   <script src="core/executive_dashboard_service.js?v=651e8e45"></script>
   <script src="core/executive_ai_advisor.js?v=93c10c3e"></script>
   <script src="core/notification_center_service.js?v=7fb8bdee"></script>
-  <script src="app.js?v=c55e3ec8"></script>
+  <script src="app.js?v=e936ca18"></script>
 </body>
 </html>

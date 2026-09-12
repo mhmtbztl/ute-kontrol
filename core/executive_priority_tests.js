@@ -63,7 +63,7 @@ function runExecutivePriorityTests() {
     {
       id: 'act-clean',
       propertyId: 'p101',
-      propertyName: 'Villa Zirve',
+      propertyName: 'Villa Azure Bay',
       title: 'Temizlik tamamlanmadı',
       reason: 'Turnover temizliği henüz onaylanmadı',
       priorityScore: 75,
@@ -74,7 +74,7 @@ function runExecutivePriorityTests() {
     {
       id: 'act-notready',
       propertyId: 'p101',
-      propertyName: 'Villa Zirve',
+      propertyName: 'Villa Azure Bay',
       title: 'Mülk hazır değil',
       reason: 'Girişe 2 saat kala mülk NOT_READY durumunda',
       priorityScore: 85,
@@ -85,7 +85,7 @@ function runExecutivePriorityTests() {
     {
       id: 'act-standalone',
       propertyId: 'p202',
-      propertyName: 'Dağ Evi',
+      propertyName: 'Villa Palm Breeze',
       title: 'Rutin kontrol',
       reason: 'Aylık yangın tüpü kontrolü',
       priorityScore: 40,
