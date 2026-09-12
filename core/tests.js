@@ -34,11 +34,11 @@ function runTest(name, fn) {
 // TEST PHASE 1: RESERVATION ENGINE & SPLIT-MONTH ACCRUAL
 // -------------------------------------------------------------
 runTest('Phase 1: Split-Month Accrual & Revenue Attribution Test', () => {
-  // Scenario from prompt: Seyir 29.09.2026 to 03.10.2026 (4 nights)
+  // Scenario from prompt: Villa Bella Vista 29.09.2026 to 03.10.2026 (4 nights)
   // Gross: 40.000 TL, Commission: 6.000 TL, Cleaning Fee: 2.000 TL -> Net Room Revenue: 32.000 TL
   const res = processReservation({
     id: 'RES-001',
-    propertyId: 'SEYIR',
+    propertyId: 'BELLA',
     checkIn: '2026-09-29',
     checkOut: '2026-10-03',
     channel: 'AIRBNB',
@@ -77,13 +77,13 @@ runTest('Phase 1: Split-Month Accrual & Revenue Attribution Test', () => {
 // TEST PHASE 2: CORE DASHBOARD KPI VERIFICATION (ADR, RevPAR, Occupancy)
 // -------------------------------------------------------------
 runTest('Phase 2: Core Dashboard KPI Calculation Verification', () => {
-  // Scenario: 1 property (Seyir) in Sept 2026 (30 days).
+  // Scenario: 1 property (Villa Bella Vista) in Sept 2026 (30 days).
   // 2 days P1 maintenance downtime -> Available Nights = 28.
   // 14 paid nights, Total Net Revenue = 70.000 TL.
   const dummyBookings = [
     {
       id: 'B1',
-      propertyId: 'SEYIR',
+      propertyId: 'BELLA',
       checkIn: '2026-09-01',
       checkOut: '2026-09-15', // 14 nights
       channel: 'WHATSAPP',
@@ -98,7 +98,7 @@ runTest('Phase 2: Core Dashboard KPI Calculation Verification', () => {
   const maintenances = [
     {
       id: 'M1',
-      propertyId: 'SEYIR',
+      propertyId: 'BELLA',
       yearMonth: '2026-09',
       priority: 'P1',
       status: 'IN_PROGRESS',
@@ -110,7 +110,7 @@ runTest('Phase 2: Core Dashboard KPI Calculation Verification', () => {
   const perf = calculateMonthlyPerformance({
     year: 2026,
     month: 9,
-    propertyId: 'SEYIR',
+    propertyId: 'BELLA',
     bookings: dummyBookings,
     maintenances
   });
@@ -154,7 +154,7 @@ runTest('Phase 4: Channel OTA vs Direct Performance', () => {
   const bookings = [
     {
       id: 'B1',
-      propertyId: 'ZIRVE',
+      propertyId: 'AZURE',
       checkIn: '2026-09-01',
       checkOut: '2026-09-03', // 2 nights
       channel: 'AIRBNB',
@@ -166,7 +166,7 @@ runTest('Phase 4: Channel OTA vs Direct Performance', () => {
     },
     {
       id: 'B2',
-      propertyId: 'ZIRVE',
+      propertyId: 'AZURE',
       checkIn: '2026-09-05',
       checkOut: '2026-09-07', // 2 nights
       channel: 'WHATSAPP',
@@ -181,7 +181,7 @@ runTest('Phase 4: Channel OTA vs Direct Performance', () => {
   const perf = calculateMonthlyPerformance({
     year: 2026,
     month: 9,
-    propertyId: 'ZIRVE',
+    propertyId: 'AZURE',
     bookings
   });
 
@@ -230,28 +230,28 @@ runTest('Phase 8: Gap Night Detection & Floor Rate Guardrail', () => {
   const bookings = [
     {
       id: 'B1',
-      propertyId: 'ZIRVE',
+      propertyId: 'AZURE',
       checkIn: '2026-10-10',
       checkOut: '2026-10-12',
       status: 'CONFIRMED'
     },
     {
       id: 'B2',
-      propertyId: 'ZIRVE',
+      propertyId: 'AZURE',
       checkIn: '2026-10-13', // 1 night gap: 12th to 13th
       checkOut: '2026-10-15',
       status: 'CONFIRMED'
     }
   ];
 
-  const gaps = detectGapNights({ propertyId: 'ZIRVE', bookings });
+  const gaps = detectGapNights({ propertyId: 'AZURE', bookings });
   assert.strictEqual(gaps.length, 1, 'Should detect exactly 1 orphan night gap');
   assert.strictEqual(gaps[0].gapDays, 1, 'Gap days should be 1');
   assert.strictEqual(gaps[0].startDate, '2026-10-12', 'Gap starts at 2026-10-12');
   assert.strictEqual(gaps[0].endDate, '2026-10-13', 'Gap ends at 2026-10-13');
 
   // Guardrail check:
-  // Zirve Floor = 6500, Cleaning = 1500, Heating = 700 -> Min variable floor = 8700 TL
+  // Villa Azure Bay Floor = 6500, Cleaning = 1500, Heating = 700 -> Min variable floor = 8700 TL
   // Base rate = 8500 -> 25% disc = 6375 TL
   // Recommended offer price must NOT drop below floorWithMarginal (8700 TL)
   assert.strictEqual(gaps[0].recommendedOfferPrice, 8700, 'Recommended offer price must respect floor guardrail');
@@ -264,16 +264,16 @@ runTest('Phase 10: Today Radar Rule Constraints (Max 3 + 2 + 1)', () => {
   const radar = generateTodayRadar({
     todayStr: '2026-09-06',
     bookings: [
-      { id: 'B1', propertyId: 'SEYIR', checkOut: '2026-09-06', guestName: 'Ahmet Y.', status: 'CONFIRMED' },
-      { id: 'B2', propertyId: 'DOGUS', checkIn: '2026-09-06', guestName: 'Mehmet K.', status: 'CONFIRMED' },
-      { id: 'B3', propertyId: 'NEFES', checkOut: '2026-09-06', guestName: 'Can T.', status: 'CONFIRMED' }
+      { id: 'B1', propertyId: 'BELLA', checkOut: '2026-09-06', guestName: 'Ahmet Y.', status: 'CONFIRMED' },
+      { id: 'B2', propertyId: 'OLIVE', checkIn: '2026-09-06', guestName: 'Mehmet K.', status: 'CONFIRMED' },
+      { id: 'B3', propertyId: 'PALM', checkOut: '2026-09-06', guestName: 'Can T.', status: 'CONFIRMED' }
     ],
     leads: [
-      { id: 'L1', propertyId: 'ZIRVE', guestName: 'Selin B.', status: 'FOLLOW_UP', quoteAmount: 45000, channel: 'WHATSAPP' },
-      { id: 'L2', propertyId: 'SIRIN', guestName: 'Ali V.', status: 'QUOTE_SENT', quoteAmount: 20000, channel: 'INSTAGRAM' }
+      { id: 'L1', propertyId: 'AZURE', guestName: 'Selin B.', status: 'FOLLOW_UP', quoteAmount: 45000, channel: 'WHATSAPP' },
+      { id: 'L2', propertyId: 'SUNSET', guestName: 'Ali V.', status: 'QUOTE_SENT', quoteAmount: 20000, channel: 'INSTAGRAM' }
     ],
     maintenances: [
-      { id: 'M1', propertyId: 'DOGUS', title: 'Şömine Camı', priority: 'P1', status: 'IN_PROGRESS', downtimeNights: 1 }
+      { id: 'M1', propertyId: 'OLIVE', title: 'Şömine Camı', priority: 'P1', status: 'IN_PROGRESS', downtimeNights: 1 }
     ]
   });
 

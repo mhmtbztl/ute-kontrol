@@ -222,8 +222,8 @@ runTest('6. Anomaly Detection: Category expense growth > 25% and > ₺5,000 trig
 // -------------------------------------------------------------
 runTest('7. Property Scorecards: Computes direct revenue, direct expense, and operating contribution per villa', () => {
   const properties = [
-    { id: 'P-1', slug: 'SEYIR', name: 'Seyir Dağ Evi', is_active: true },
-    { id: 'P-2', slug: 'ZIRVE', name: 'Zirve Dağ Evi', is_active: true }
+    { id: 'P-1', slug: 'BELLA', name: 'Villa Bella Vista', is_active: true },
+    { id: 'P-2', slug: 'AZURE', name: 'Villa Azure Bay', is_active: true }
   ];
 
   const bookings = [
@@ -246,16 +246,16 @@ runTest('7. Property Scorecards: Computes direct revenue, direct expense, and op
 
   assert.strictEqual(scorecards.length, 2, 'Scorecards must cover both active properties');
   
-  const seyir = scorecards.find(s => s.slug === 'SEYIR');
-  assert.strictEqual(seyir.revenue, 60000);
-  assert.strictEqual(seyir.roomRevenue, 58000);
-  assert.strictEqual(seyir.directOperatingExpense, 15000);
-  assert.strictEqual(seyir.estimatedOperatingContribution, 45000); // 60k - 15k = 45k
+  const bella = scorecards.find(s => s.slug === 'BELLA');
+  assert.strictEqual(bella.revenue, 60000);
+  assert.strictEqual(bella.roomRevenue, 58000);
+  assert.strictEqual(bella.directOperatingExpense, 15000);
+  assert.strictEqual(bella.estimatedOperatingContribution, 45000); // 60k - 15k = 45k
 
-  const zirve = scorecards.find(s => s.slug === 'ZIRVE');
-  assert.strictEqual(zirve.revenue, 120000);
-  assert.strictEqual(zirve.directOperatingExpense, 35000);
-  assert.strictEqual(zirve.estimatedOperatingContribution, 85000); // 120k - 35k = 85k
+  const azure = scorecards.find(s => s.slug === 'AZURE');
+  assert.strictEqual(azure.revenue, 120000);
+  assert.strictEqual(azure.directOperatingExpense, 35000);
+  assert.strictEqual(azure.estimatedOperatingContribution, 85000); // 120k - 35k = 85k
 });
 
 // -------------------------------------------------------------
