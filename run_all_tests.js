@@ -62,7 +62,10 @@ const testFiles = [
   'account_deletion_tests.js',
 
   // Yeni musteriye demo verisi sizmasi regresyonu
-  'fresh_tenant_isolation_tests.js'
+  'fresh_tenant_isolation_tests.js',
+
+  // USALI gelir/gider siniflandirmasi (yonetici-finans tutarliligi)
+  'usali_revenue_treatment_tests.js'
 ];
 
 console.log('=============================================================================');

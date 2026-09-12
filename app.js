@@ -4048,10 +4048,17 @@ function renderFinanceModule() {
   // Include user-entered bookings (in clean state, ALL revenue comes from here!)
   let manualBookingRev = 0;
   let manualBookingNights = 0;
+  // USALI: ciro, misafirin odedigi BRUT tutardir. OTA komisyonu ve temizlik
+  // maliyeti gelirden dusulmez, gider tarafinda raporlanir (bkz.
+  // bookingDistributionCost). Onceki hal b.net (brut - komisyon - temizlik)
+  // kullandigi icin ciro oldugundan dusuk gorunuyor ve ayni ay icin yonetici
+  // paneliyle farkli net kar veriyordu.
+  let bookingDistributionCost = 0;
   appData.bookings.forEach(b => {
     if (b.status === 'CANCELLED' || !isBookingInFilter(b)) return;
-    const bNet = Number(b.net || b.gross) || 0;
+    const bNet = Number(b.gross !== undefined ? b.gross : b.net) || 0;
     const bNights = Number(b.nights) || 0;
+    bookingDistributionCost += (Number(b.otaCommission) || 0) + (Number(b.cleaningFee) || 0);
     manualBookingRev += bNet;
     manualBookingNights += bNights;
 
@@ -4103,6 +4110,10 @@ function renderFinanceModule() {
       else totalOpex += amt;
     }
   });
+
+  // USALI: dagitim (OTA komisyonu) ve temizlik maliyeti operasyonel giderdir.
+  // Ciro brut alindigi icin bu tutarlar burada gider tarafina eklenir.
+  totalOpex += bookingDistributionCost;
 
   // Hierarchy calculations
   const operatingProfit = totalRevenue - totalOpex;
