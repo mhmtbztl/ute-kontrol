@@ -41,11 +41,12 @@
     ['MarketingEngine', 'core/marketing_engine.js?v=2756f4ec'],
     ['MarketingFunnelService', 'core/marketing_funnel_service.js?v=a5ecbdaa'],
     ['MarketingPriorityService', 'core/marketing_priority_service.js?v=f6e216ff'],
-    ['MarketingDataService', 'core/marketing_data_service.js?v=06308c56'],
+    ['MarketingDataService', 'core/marketing_data_service.js?v=8304fc0d'],
     ['MarketingReviewService', 'core/marketing_review_service.js?v=9207dee5'],
     ['MarketingSnapshotService', 'core/marketing_snapshot_service.js?v=184ad517'],
     ['MarketingChannelListingService', 'core/marketing_channel_listing_service.js?v=0e34cbca'],
-    ['MarketingMediaUploadService', 'core/marketing_media_upload_service.js?v=52d4d9ce']
+    ['MarketingMediaUploadService', 'core/marketing_media_upload_service.js?v=52d4d9ce'],
+    ['MarketingPhotoAnalysisService', 'core/marketing_photo_analysis_service.js?v=bcb0fb90']
   ]);
   let dependencyPromise = null;
 
@@ -313,7 +314,15 @@
   }
 
   function renderGallery(model) {
-    const toolbar = `<div style="display:flex;justify-content:flex-end;margin-bottom:12px"><button type="button" class="btn btn-primary btn-sm" data-marketing-open-media>＋ Fotoğraf yükle</button></div>`;
+    const selected = model.selectedProperty === 'ALL' ? null : model.properties.find(item => item.slug === model.selectedProperty);
+    const selectedId = selected && selected.id;
+    const activeMedia = model.media.filter(item => (!selectedId || (item.propertyId || item.property_id) === selectedId)
+      && String(item.mediaStatus || item.media_status || '').toUpperCase() === 'ACTIVE');
+    const activeRun = model.analysisRuns.find(item => (!selectedId || (item.propertyId || item.property_id) === selectedId)
+      && ['QUEUED', 'PROCESSING'].includes(String(item.status || '').toUpperCase()));
+    const analysisDisabled = !selectedId || !activeMedia.length || Boolean(activeRun);
+    const analysisLabel = activeRun ? 'Analiz sürüyor' : 'AI ile analiz et';
+    const toolbar = `<div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:12px"><button type="button" class="btn btn-secondary btn-sm" data-marketing-request-analysis${analysisDisabled ? ' disabled' : ''}>${analysisLabel}</button><button type="button" class="btn btn-primary btn-sm" data-marketing-open-media>＋ Fotoğraf yükle</button></div>`;
     const form = state.mediaFormOpen ? renderMediaUploadForm(model) : '';
     if (!model.media.length && !model.analysisRuns.length && !model.experiments.length) {
       return `${toolbar}${form}${emptyState('Galeri analizi henüz yok', 'Özel medya kaydı ve tamamlanmış analiz işi olmadan kalite puanı veya değişiklik önerisi üretilmez.')}`;
@@ -322,7 +331,18 @@
       ${kpi('Medya kaydı', number(model.media.length), 'Yetkili özel medya')}
       ${kpi('Analiz çalışması', number(model.analysisRuns.length), 'Durumu izlenen işler')}
       ${kpi('Gözlemsel deney', number(model.experiments.length), 'A/B testi olarak sunulmaz')}
-    </div><div class="card" style="padding:14px;margin-top:12px">Fotoğraf kararları yalnızca yapılandırılmış analiz sonucu ve doğrulanmış kapsam ile gösterilir.</div>`;
+    </div>${renderAnalysisRuns(model.analysisRuns, selectedId)}<div class="card" style="padding:14px;margin-top:12px">Fotoğraf kararları yalnızca yapılandırılmış analiz sonucu ve doğrulanmış kapsam ile gösterilir.</div>`;
+  }
+
+  function renderAnalysisRuns(runs, propertyId) {
+    const scoped = runs.filter(item => !propertyId || (item.propertyId || item.property_id) === propertyId).slice(0, 5);
+    if (!scoped.length) return '';
+    const labels = { QUEUED: 'Sırada', PROCESSING: 'İşleniyor', PARTIAL: 'Kısmi', SUCCEEDED: 'Tamamlandı', FAILED: 'Başarısız', CANCELLED: 'İptal' };
+    return `<div class="card" style="padding:14px;margin-top:12px"><strong>Son analiz talepleri</strong><div style="display:grid;gap:8px;margin-top:10px">${scoped.map(item => {
+      const status = String(item.status || '').toUpperCase();
+      const requestedAt = item.requestedAt || item.requested_at || '';
+      return `<div style="display:flex;justify-content:space-between;gap:12px"><span>${escapeHtml(requestedAt || 'Tarih yok')}</span><strong>${escapeHtml(labels[status] || status || 'Bilinmiyor')}</strong></div>`;
+    }).join('')}</div></div>`;
   }
 
   function renderMediaUploadForm(model) {
@@ -536,6 +556,25 @@
     }
   }
 
+  async function handleAnalysisRequest(button) {
+    const client = typeof supabaseClient !== 'undefined' ? supabaseClient : null;
+    const scope = cloudScope();
+    if (!client || !scope || !scope.propertyId || !services.MarketingPhotoAnalysisService) throw new Error('PHOTO_ANALYSIS_REQUEST_UNAVAILABLE');
+    button.disabled = true;
+    try {
+      const result = await services.MarketingPhotoAnalysisService.requestPhotoAnalysis(client, {
+        tenantId: scope.tenantId, propertyId: scope.propertyId, media: state.media
+      });
+      state.remoteStatus = 'LOADING';
+      render();
+      await hydrateCloudData();
+      render();
+      return result;
+    } finally {
+      button.disabled = false;
+    }
+  }
+
   function initializeBrowser() {
     if (typeof document === 'undefined') return;
     document.querySelectorAll('[data-marketing-view]').forEach(button => button.addEventListener('click', () => {
@@ -550,12 +589,20 @@
       const cancelListing = event.target.closest('[data-marketing-cancel-listing]');
       const openMedia = event.target.closest('[data-marketing-open-media]');
       const cancelMedia = event.target.closest('[data-marketing-cancel-media]');
+      const requestAnalysis = event.target.closest('[data-marketing-request-analysis]');
       if (open) { state.snapshotFormOpen = true; state.listingFormOpen = false; render(); return; }
       if (cancel) { state.snapshotFormOpen = false; render(); return; }
       if (openListing) { state.listingFormOpen = true; state.snapshotFormOpen = false; render(); return; }
       if (cancelListing) { state.listingFormOpen = false; render(); return; }
       if (openMedia) { state.mediaFormOpen = true; render(); return; }
       if (cancelMedia) { state.mediaFormOpen = false; render(); return; }
+      if (requestAnalysis) {
+        handleAnalysisRequest(requestAnalysis).catch(error => {
+          const status = document.getElementById('marketingWorkspaceStatus');
+          if (status) status.textContent = `Fotoğraf analizi istenemedi: ${error.message}`;
+        });
+        return;
+      }
       const actionButton = event.target.closest('[data-marketing-action][data-finding-id]');
       if (!actionButton) return;
       handleFindingAction(actionButton).catch(error => {
@@ -607,5 +654,5 @@
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') initializeBrowser();
 
-  return { periodFromFilter, scopeBookings, buildWorkspaceModel, selectLatestSnapshot, renderWorkspaceHtml, renderFindingActions, renderListingForm, renderSnapshotForm, renderMediaUploadForm, escapeHtml, setData, render };
+  return { periodFromFilter, scopeBookings, buildWorkspaceModel, selectLatestSnapshot, renderWorkspaceHtml, renderFindingActions, renderListingForm, renderSnapshotForm, renderMediaUploadForm, renderAnalysisRuns, escapeHtml, setData, render };
 }));

@@ -27,7 +27,7 @@
     return {
       listings: request('property_channel_listings', 'id,property_id,channel_code,display_name,status', 'created_at', 100, valid.propertyId),
       findings: request('marketing_findings', '*', 'last_seen_at', max.findings, valid.propertyId),
-      media: request('property_media', 'id,property_id,media_status,room_category,width_px,height_px,created_at', 'created_at', max.media, valid.propertyId),
+      media: request('property_media', 'id,property_id,media_status,room_category,content_sha256,width_px,height_px,created_at', 'created_at', max.media, valid.propertyId),
       analysisRuns: request('photo_analysis_runs', '*', 'requested_at', max.analysisRuns, valid.propertyId),
       experiments: request('listing_change_experiments', '*', 'created_at', max.experiments, valid.propertyId)
     };

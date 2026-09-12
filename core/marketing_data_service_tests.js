@@ -77,6 +77,13 @@ function mockClient(rowsByTable = {}, errorsByTable = {}) {
     assert.deepStrictEqual(result.snapshots, []);
   });
 
+  await runTest('Media reads include the content hash required for deterministic analysis requests', async () => {
+    const client = mockClient();
+    await MarketingDataService.loadMarketingWorkspaceData(client, { tenantId: TENANT, propertyId: PROPERTY });
+    const mediaCall = client.calls.find(call => call.table === 'property_media');
+    assert.match(mediaCall.selected, /content_sha256/);
+  });
+
   await runTest('One unavailable Phase 17 table degrades to partial data', async () => {
     const client = mockClient({}, { marketing_findings: { code: '42P01', message: 'relation missing' } });
     const result = await MarketingDataService.loadMarketingWorkspaceData(client, { tenantId: TENANT });

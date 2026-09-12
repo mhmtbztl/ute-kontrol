@@ -144,6 +144,32 @@ runTest('Private media form scopes the property and constrains accepted image ty
   assert.doesNotMatch(html, /image\/svg/);
 });
 
+runTest('Gallery enables analysis only for a selected property with active media', () => {
+  const propertyId = '22222222-2222-4222-8222-222222222222';
+  const model = MarketingUI.buildWorkspaceModel({
+    filter: { period: 'ALL', villa: 'AZURE' }, bookings: [],
+    villas: { AZURE: { id: propertyId, name: 'Villa Azure' } },
+    media: [{ id: 'M1', property_id: propertyId, media_status: 'ACTIVE' }]
+  });
+  const html = MarketingUI.renderWorkspaceHtml(model, 'gallery');
+  assert.match(html, /data-marketing-request-analysis>AI ile analiz et/);
+  assert.doesNotMatch(html, /data-marketing-request-analysis disabled/);
+});
+
+runTest('Gallery reports an active analysis without presenting invented results', () => {
+  const propertyId = '22222222-2222-4222-8222-222222222222';
+  const model = MarketingUI.buildWorkspaceModel({
+    filter: { period: 'ALL', villa: 'AZURE' }, bookings: [],
+    villas: { AZURE: { id: propertyId, name: 'Villa Azure' } },
+    media: [{ id: 'M1', property_id: propertyId, media_status: 'ACTIVE' }],
+    analysisRuns: [{ property_id: propertyId, status: 'PROCESSING', requested_at: '2026-09-12T10:00:00Z' }]
+  });
+  const html = MarketingUI.renderWorkspaceHtml(model, 'gallery');
+  assert.match(html, /data-marketing-request-analysis disabled>Analiz sürüyor/);
+  assert.match(html, /İşleniyor/);
+  assert.doesNotMatch(html, /Galeri puanı/);
+});
+
 runTest('Index integrates one independent marketing entry without app.js edits', () => {
   const index = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   assert.strictEqual((index.match(/id="tab-marketing"/g) || []).length, 1);
@@ -158,7 +184,7 @@ runTest('Marketing bootstrap and lazy dependencies carry current content hashes'
   const uiSource = fs.readFileSync(path.join(__dirname, 'marketing_ui.js'), 'utf8');
   const hash = file => crypto.createHash('sha1').update(fs.readFileSync(file)).digest('hex').slice(0, 8);
   assert.match(index, new RegExp(`core/marketing_ui\\.js\\?v=${hash(path.join(__dirname, 'marketing_ui.js'))}`));
-  ['marketing_engine.js', 'marketing_funnel_service.js', 'marketing_priority_service.js', 'marketing_data_service.js', 'marketing_review_service.js', 'marketing_snapshot_service.js', 'marketing_channel_listing_service.js', 'marketing_media_upload_service.js'].forEach(file => {
+  ['marketing_engine.js', 'marketing_funnel_service.js', 'marketing_priority_service.js', 'marketing_data_service.js', 'marketing_review_service.js', 'marketing_snapshot_service.js', 'marketing_channel_listing_service.js', 'marketing_media_upload_service.js', 'marketing_photo_analysis_service.js'].forEach(file => {
     assert.match(uiSource, new RegExp(`${file.replace('.', '\\.') }\\?v=${hash(path.join(__dirname, file))}`));
   });
 });
