@@ -80,975 +80,12 @@ function hideLockOverlay() {
 // Portföy: Akdeniz & Ege Lüks Villa Koleksiyonu (Villa Bella Vista, Villa Olive Garden, Villa Sunset Horizon, Villa Azure Bay, Villa Palm Breeze)
 // Tamamen sentetik, bağımsız SaaS demo veritabanı.
 
-const SYNTHETIC_DEMO_DATABASE = {
-  "monthlyFinancials": {
-    "2025-07": {
-      "key": "2025-07",
-      "year": "2025",
-      "month": "07",
-      "monthName": "Temmuz",
-      "ciro": 320000,
-      "opex": 110000,
-      "capex": 15000,
-      "totalExp": 125000,
-      "netProfit": 195000,
-      "operatingProfit": 210000,
-      "opMargin": 65.6,
-      "netMargin": 60.9,
-      "daysSold": 52,
-      "avgDaily": 6154
-    },
-    "2025-08": {
-      "key": "2025-08",
-      "year": "2025",
-      "month": "08",
-      "monthName": "Ağustos",
-      "ciro": 540000,
-      "opex": 165000,
-      "capex": 12000,
-      "totalExp": 177000,
-      "netProfit": 363000,
-      "operatingProfit": 375000,
-      "opMargin": 69.4,
-      "netMargin": 67.2,
-      "daysSold": 78,
-      "avgDaily": 6923
-    },
-    "2025-09": {
-      "key": "2025-09",
-      "year": "2025",
-      "month": "09",
-      "monthName": "Eylül",
-      "ciro": 410000,
-      "opex": 135000,
-      "capex": 8000,
-      "totalExp": 143000,
-      "netProfit": 267000,
-      "operatingProfit": 275000,
-      "opMargin": 67.1,
-      "netMargin": 65.1,
-      "daysSold": 64,
-      "avgDaily": 6406
-    },
-    "2025-10": {
-      "key": "2025-10",
-      "year": "2025",
-      "month": "10",
-      "monthName": "Ekim",
-      "ciro": 280000,
-      "opex": 98000,
-      "capex": 5000,
-      "totalExp": 103000,
-      "netProfit": 177000,
-      "operatingProfit": 182000,
-      "opMargin": 65,
-      "netMargin": 63.2,
-      "daysSold": 48,
-      "avgDaily": 5833
-    },
-    "2025-11": {
-      "key": "2025-11",
-      "year": "2025",
-      "month": "11",
-      "monthName": "Kasım",
-      "ciro": 190000,
-      "opex": 82000,
-      "capex": 20000,
-      "totalExp": 102000,
-      "netProfit": 88000,
-      "operatingProfit": 108000,
-      "opMargin": 56.8,
-      "netMargin": 46.3,
-      "daysSold": 36,
-      "avgDaily": 5278
-    },
-    "2025-12": {
-      "key": "2025-12",
-      "year": "2025",
-      "month": "12",
-      "monthName": "Aralık",
-      "ciro": 260000,
-      "opex": 95000,
-      "capex": 10000,
-      "totalExp": 105000,
-      "netProfit": 155000,
-      "operatingProfit": 165000,
-      "opMargin": 63.5,
-      "netMargin": 59.6,
-      "daysSold": 42,
-      "avgDaily": 6190
-    },
-    "2026-01": {
-      "key": "2026-01",
-      "year": "2026",
-      "month": "01",
-      "monthName": "Ocak",
-      "ciro": 220000,
-      "opex": 88000,
-      "capex": 5000,
-      "totalExp": 93000,
-      "netProfit": 127000,
-      "operatingProfit": 132000,
-      "opMargin": 60,
-      "netMargin": 57.7,
-      "daysSold": 38,
-      "avgDaily": 5789
-    },
-    "2026-02": {
-      "key": "2026-02",
-      "year": "2026",
-      "month": "02",
-      "monthName": "Şubat",
-      "ciro": 210000,
-      "opex": 84000,
-      "capex": 8000,
-      "totalExp": 92000,
-      "netProfit": 118000,
-      "operatingProfit": 126000,
-      "opMargin": 60,
-      "netMargin": 56.2,
-      "daysSold": 35,
-      "avgDaily": 6000
-    },
-    "2026-03": {
-      "key": "2026-03",
-      "year": "2026",
-      "month": "03",
-      "monthName": "Mart",
-      "ciro": 250000,
-      "opex": 92000,
-      "capex": 18000,
-      "totalExp": 110000,
-      "netProfit": 140000,
-      "operatingProfit": 158000,
-      "opMargin": 63.2,
-      "netMargin": 56,
-      "daysSold": 42,
-      "avgDaily": 5952
-    },
-    "2026-04": {
-      "key": "2026-04",
-      "year": "2026",
-      "month": "04",
-      "monthName": "Nisan",
-      "ciro": 340000,
-      "opex": 115000,
-      "capex": 12000,
-      "totalExp": 127000,
-      "netProfit": 213000,
-      "operatingProfit": 225000,
-      "opMargin": 66.2,
-      "netMargin": 62.6,
-      "daysSold": 54,
-      "avgDaily": 6296
-    },
-    "2026-05": {
-      "key": "2026-05",
-      "year": "2026",
-      "month": "05",
-      "monthName": "Mayıs",
-      "ciro": 460000,
-      "opex": 145000,
-      "capex": 15000,
-      "totalExp": 160000,
-      "netProfit": 300000,
-      "operatingProfit": 315000,
-      "opMargin": 68.5,
-      "netMargin": 65.2,
-      "daysSold": 68,
-      "avgDaily": 6765
-    },
-    "2026-06": {
-      "key": "2026-06",
-      "year": "2026",
-      "month": "06",
-      "monthName": "Haziran",
-      "ciro": 620000,
-      "opex": 180000,
-      "capex": 20000,
-      "totalExp": 200000,
-      "netProfit": 420000,
-      "operatingProfit": 440000,
-      "opMargin": 71,
-      "netMargin": 67.7,
-      "daysSold": 85,
-      "avgDaily": 7294
-    },
-    "2026-07": {
-      "key": "2026-07",
-      "year": "2026",
-      "month": "07",
-      "monthName": "Temmuz",
-      "ciro": 780000,
-      "opex": 210000,
-      "capex": 25000,
-      "totalExp": 235000,
-      "netProfit": 545000,
-      "operatingProfit": 570000,
-      "opMargin": 73.1,
-      "netMargin": 69.9,
-      "daysSold": 98,
-      "avgDaily": 7959
-    },
-    "2026-08": {
-      "key": "2026-08",
-      "year": "2026",
-      "month": "08",
-      "monthName": "Ağustos",
-      "ciro": 860000,
-      "opex": 235000,
-      "capex": 22000,
-      "totalExp": 257000,
-      "netProfit": 603000,
-      "operatingProfit": 625000,
-      "opMargin": 72.7,
-      "netMargin": 70.1,
-      "daysSold": 104,
-      "avgDaily": 8269
-    },
-    "2026-09": {
-      "key": "2026-09",
-      "year": "2026",
-      "month": "09",
-      "monthName": "Eylül",
-      "ciro": 520000,
-      "opex": 150000,
-      "capex": 10000,
-      "totalExp": 160000,
-      "netProfit": 360000,
-      "operatingProfit": 370000,
-      "opMargin": 71.2,
-      "netMargin": 69.2,
-      "daysSold": 72,
-      "avgDaily": 7222
-    }
-  },
-  "targets": {
-    "2025-07": 300000,
-    "2025-08": 500000,
-    "2025-09": 400000,
-    "2025-10": 270000,
-    "2025-11": 180000,
-    "2025-12": 250000,
-    "2026-01": 200000,
-    "2026-02": 200000,
-    "2026-03": 240000,
-    "2026-04": 320000,
-    "2026-05": 450000,
-    "2026-06": 600000,
-    "2026-07": 750000,
-    "2026-08": 850000,
-    "2026-09": 500000,
-    "2026-10": 350000,
-    "2026-11": 250000,
-    "2026-12": 320000,
-    "2027-01": 280000
-  },
-  "propertyMonthly": {
-    "2025-07": {
-      "key": "2025-07",
-      "totalDays": 52,
-      "totalRev": 320000,
-      "avgDaily": 6154,
-      "villas": {
-        "bella": {
-          "name": "Villa Bella Vista",
-          "days": 11,
-          "rev": 70400
-        },
-        "olive": {
-          "name": "Villa Olive Garden",
-          "days": 10,
-          "rev": 76800
-        },
-        "sunset": {
-          "name": "Villa Sunset Horizon",
-          "days": 11,
-          "rev": 51200
-        },
-        "azure": {
-          "name": "Villa Azure Bay",
-          "days": 10,
-          "rev": 80000
-        },
-        "palm": {
-          "name": "Villa Palm Breeze",
-          "days": 10,
-          "rev": 41600
-        }
-      }
-    },
-    "2025-08": {
-      "key": "2025-08",
-      "totalDays": 78,
-      "totalRev": 540000,
-      "avgDaily": 6923,
-      "villas": {
-        "bella": {
-          "name": "Villa Bella Vista",
-          "days": 16,
-          "rev": 118800
-        },
-        "olive": {
-          "name": "Villa Olive Garden",
-          "days": 16,
-          "rev": 129600
-        },
-        "sunset": {
-          "name": "Villa Sunset Horizon",
-          "days": 16,
-          "rev": 86400
-        },
-        "azure": {
-          "name": "Villa Azure Bay",
-          "days": 15,
-          "rev": 135000
-        },
-        "palm": {
-          "name": "Villa Palm Breeze",
-          "days": 15,
-          "rev": 70200
-        }
-      }
-    },
-    "2025-09": {
-      "key": "2025-09",
-      "totalDays": 64,
-      "totalRev": 410000,
-      "avgDaily": 6406,
-      "villas": {
-        "bella": {
-          "name": "Villa Bella Vista",
-          "days": 13,
-          "rev": 90200
-        },
-        "olive": {
-          "name": "Villa Olive Garden",
-          "days": 13,
-          "rev": 98400
-        },
-        "sunset": {
-          "name": "Villa Sunset Horizon",
-          "days": 13,
-          "rev": 65600
-        },
-        "azure": {
-          "name": "Villa Azure Bay",
-          "days": 12,
-          "rev": 102500
-        },
-        "palm": {
-          "name": "Villa Palm Breeze",
-          "days": 13,
-          "rev": 53300
-        }
-      }
-    },
-    "2025-10": {
-      "key": "2025-10",
-      "totalDays": 48,
-      "totalRev": 280000,
-      "avgDaily": 5833,
-      "villas": {
-        "bella": {
-          "name": "Villa Bella Vista",
-          "days": 10,
-          "rev": 61600
-        },
-        "olive": {
-          "name": "Villa Olive Garden",
-          "days": 10,
-          "rev": 67200
-        },
-        "sunset": {
-          "name": "Villa Sunset Horizon",
-          "days": 10,
-          "rev": 44800
-        },
-        "azure": {
-          "name": "Villa Azure Bay",
-          "days": 9,
-          "rev": 70000
-        },
-        "palm": {
-          "name": "Villa Palm Breeze",
-          "days": 9,
-          "rev": 36400
-        }
-      }
-    },
-    "2025-11": {
-      "key": "2025-11",
-      "totalDays": 36,
-      "totalRev": 190000,
-      "avgDaily": 5278,
-      "villas": {
-        "bella": {
-          "name": "Villa Bella Vista",
-          "days": 8,
-          "rev": 41800
-        },
-        "olive": {
-          "name": "Villa Olive Garden",
-          "days": 7,
-          "rev": 45600
-        },
-        "sunset": {
-          "name": "Villa Sunset Horizon",
-          "days": 8,
-          "rev": 30400
-        },
-        "azure": {
-          "name": "Villa Azure Bay",
-          "days": 7,
-          "rev": 47500
-        },
-        "palm": {
-          "name": "Villa Palm Breeze",
-          "days": 6,
-          "rev": 24700
-        }
-      }
-    },
-    "2025-12": {
-      "key": "2025-12",
-      "totalDays": 42,
-      "totalRev": 260000,
-      "avgDaily": 6190,
-      "villas": {
-        "bella": {
-          "name": "Villa Bella Vista",
-          "days": 9,
-          "rev": 57200
-        },
-        "olive": {
-          "name": "Villa Olive Garden",
-          "days": 8,
-          "rev": 62400
-        },
-        "sunset": {
-          "name": "Villa Sunset Horizon",
-          "days": 9,
-          "rev": 41600
-        },
-        "azure": {
-          "name": "Villa Azure Bay",
-          "days": 8,
-          "rev": 65000
-        },
-        "palm": {
-          "name": "Villa Palm Breeze",
-          "days": 8,
-          "rev": 33800
-        }
-      }
-    },
-    "2026-01": {
-      "key": "2026-01",
-      "totalDays": 38,
-      "totalRev": 220000,
-      "avgDaily": 5789,
-      "villas": {
-        "bella": {
-          "name": "Villa Bella Vista",
-          "days": 8,
-          "rev": 48400
-        },
-        "olive": {
-          "name": "Villa Olive Garden",
-          "days": 8,
-          "rev": 52800
-        },
-        "sunset": {
-          "name": "Villa Sunset Horizon",
-          "days": 8,
-          "rev": 35200
-        },
-        "azure": {
-          "name": "Villa Azure Bay",
-          "days": 7,
-          "rev": 55000
-        },
-        "palm": {
-          "name": "Villa Palm Breeze",
-          "days": 7,
-          "rev": 28600
-        }
-      }
-    },
-    "2026-02": {
-      "key": "2026-02",
-      "totalDays": 35,
-      "totalRev": 210000,
-      "avgDaily": 6000,
-      "villas": {
-        "bella": {
-          "name": "Villa Bella Vista",
-          "days": 7,
-          "rev": 46200
-        },
-        "olive": {
-          "name": "Villa Olive Garden",
-          "days": 7,
-          "rev": 50400
-        },
-        "sunset": {
-          "name": "Villa Sunset Horizon",
-          "days": 7,
-          "rev": 33600
-        },
-        "azure": {
-          "name": "Villa Azure Bay",
-          "days": 7,
-          "rev": 52500
-        },
-        "palm": {
-          "name": "Villa Palm Breeze",
-          "days": 7,
-          "rev": 27300
-        }
-      }
-    },
-    "2026-03": {
-      "key": "2026-03",
-      "totalDays": 42,
-      "totalRev": 250000,
-      "avgDaily": 5952,
-      "villas": {
-        "bella": {
-          "name": "Villa Bella Vista",
-          "days": 9,
-          "rev": 55000
-        },
-        "olive": {
-          "name": "Villa Olive Garden",
-          "days": 8,
-          "rev": 60000
-        },
-        "sunset": {
-          "name": "Villa Sunset Horizon",
-          "days": 9,
-          "rev": 40000
-        },
-        "azure": {
-          "name": "Villa Azure Bay",
-          "days": 8,
-          "rev": 62500
-        },
-        "palm": {
-          "name": "Villa Palm Breeze",
-          "days": 8,
-          "rev": 32500
-        }
-      }
-    },
-    "2026-04": {
-      "key": "2026-04",
-      "totalDays": 54,
-      "totalRev": 340000,
-      "avgDaily": 6296,
-      "villas": {
-        "bella": {
-          "name": "Villa Bella Vista",
-          "days": 11,
-          "rev": 74800
-        },
-        "olive": {
-          "name": "Villa Olive Garden",
-          "days": 11,
-          "rev": 81600
-        },
-        "sunset": {
-          "name": "Villa Sunset Horizon",
-          "days": 11,
-          "rev": 54400
-        },
-        "azure": {
-          "name": "Villa Azure Bay",
-          "days": 10,
-          "rev": 85000
-        },
-        "palm": {
-          "name": "Villa Palm Breeze",
-          "days": 11,
-          "rev": 44200
-        }
-      }
-    },
-    "2026-05": {
-      "key": "2026-05",
-      "totalDays": 68,
-      "totalRev": 460000,
-      "avgDaily": 6765,
-      "villas": {
-        "bella": {
-          "name": "Villa Bella Vista",
-          "days": 14,
-          "rev": 101200
-        },
-        "olive": {
-          "name": "Villa Olive Garden",
-          "days": 14,
-          "rev": 110400
-        },
-        "sunset": {
-          "name": "Villa Sunset Horizon",
-          "days": 14,
-          "rev": 73600
-        },
-        "azure": {
-          "name": "Villa Azure Bay",
-          "days": 13,
-          "rev": 115000
-        },
-        "palm": {
-          "name": "Villa Palm Breeze",
-          "days": 13,
-          "rev": 59800
-        }
-      }
-    },
-    "2026-06": {
-      "key": "2026-06",
-      "totalDays": 85,
-      "totalRev": 620000,
-      "avgDaily": 7294,
-      "villas": {
-        "bella": {
-          "name": "Villa Bella Vista",
-          "days": 18,
-          "rev": 136400
-        },
-        "olive": {
-          "name": "Villa Olive Garden",
-          "days": 17,
-          "rev": 148800
-        },
-        "sunset": {
-          "name": "Villa Sunset Horizon",
-          "days": 18,
-          "rev": 99200
-        },
-        "azure": {
-          "name": "Villa Azure Bay",
-          "days": 16,
-          "rev": 155000
-        },
-        "palm": {
-          "name": "Villa Palm Breeze",
-          "days": 16,
-          "rev": 80600
-        }
-      }
-    },
-    "2026-07": {
-      "key": "2026-07",
-      "totalDays": 98,
-      "totalRev": 780000,
-      "avgDaily": 7959,
-      "villas": {
-        "bella": {
-          "name": "Villa Bella Vista",
-          "days": 21,
-          "rev": 171600
-        },
-        "olive": {
-          "name": "Villa Olive Garden",
-          "days": 20,
-          "rev": 187200
-        },
-        "sunset": {
-          "name": "Villa Sunset Horizon",
-          "days": 21,
-          "rev": 124800
-        },
-        "azure": {
-          "name": "Villa Azure Bay",
-          "days": 19,
-          "rev": 195000
-        },
-        "palm": {
-          "name": "Villa Palm Breeze",
-          "days": 17,
-          "rev": 101400
-        }
-      }
-    },
-    "2026-08": {
-      "key": "2026-08",
-      "totalDays": 104,
-      "totalRev": 860000,
-      "avgDaily": 8269,
-      "villas": {
-        "bella": {
-          "name": "Villa Bella Vista",
-          "days": 22,
-          "rev": 189200
-        },
-        "olive": {
-          "name": "Villa Olive Garden",
-          "days": 21,
-          "rev": 206400
-        },
-        "sunset": {
-          "name": "Villa Sunset Horizon",
-          "days": 22,
-          "rev": 137600
-        },
-        "azure": {
-          "name": "Villa Azure Bay",
-          "days": 20,
-          "rev": 215000
-        },
-        "palm": {
-          "name": "Villa Palm Breeze",
-          "days": 19,
-          "rev": 111800
-        }
-      }
-    },
-    "2026-09": {
-      "key": "2026-09",
-      "totalDays": 72,
-      "totalRev": 520000,
-      "avgDaily": 7222,
-      "villas": {
-        "bella": {
-          "name": "Villa Bella Vista",
-          "days": 15,
-          "rev": 114400
-        },
-        "olive": {
-          "name": "Villa Olive Garden",
-          "days": 14,
-          "rev": 124800
-        },
-        "sunset": {
-          "name": "Villa Sunset Horizon",
-          "days": 15,
-          "rev": 83200
-        },
-        "azure": {
-          "name": "Villa Azure Bay",
-          "days": 14,
-          "rev": 130000
-        },
-        "palm": {
-          "name": "Villa Palm Breeze",
-          "days": 14,
-          "rev": 67600
-        }
-      }
-    }
-  },
-  "expensesList": [
-    {
-      "id": "EXP-SYN-001",
-      "monthKey": "2026-08",
-      "month": "2026-08",
-      "date": "2026-08-01",
-      "category": "Bakım",
-      "type": "OPEX",
-      "amount": 14500,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Tüm villalar havuz robotu filtre değişimi ve klorlama"
-    },
-    {
-      "id": "EXP-SYN-002",
-      "monthKey": "2026-08",
-      "month": "2026-08",
-      "date": "2026-08-03",
-      "category": "Reklam",
-      "type": "OPEX",
-      "amount": 32000,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Google Ads & Meta Avrupa yaz sezonu reklam kampanyaları"
-    },
-    {
-      "id": "EXP-SYN-003",
-      "monthKey": "2026-08",
-      "month": "2026-08",
-      "date": "2026-08-05",
-      "category": "Fatura",
-      "type": "OPEX",
-      "amount": 18400,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Tüm villalar fiber internet, Wi-Fi 6 mesh ve akıllı kilit abonelikleri"
-    },
-    {
-      "id": "EXP-SYN-004",
-      "monthKey": "2026-08",
-      "month": "2026-08",
-      "date": "2026-08-08",
-      "category": "Temizlik",
-      "type": "OPEX",
-      "amount": 36000,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Ağustos ayı profesyonel temizlik ekibi ve çamaşırhane hizmeti"
-    },
-    {
-      "id": "EXP-SYN-005",
-      "monthKey": "2026-08",
-      "month": "2026-08",
-      "date": "2026-08-10",
-      "category": "Bakım",
-      "type": "OPEX",
-      "amount": 9800,
-      "villa": "VILLA_OLIVE",
-      "property": "Villa Olive Garden",
-      "notes": "Zeytinlik bahçesi otomatik sulama sistemi vana revizyonu"
-    },
-    {
-      "id": "EXP-SYN-006",
-      "monthKey": "2026-08",
-      "month": "2026-08",
-      "date": "2026-08-12",
-      "category": "Bakım",
-      "type": "OPEX",
-      "amount": 12500,
-      "villa": "VILLA_AZURE",
-      "property": "Villa Azure Bay",
-      "notes": "Özel iskele ve deniz basamağı periyodik sezon bakımı"
-    },
-    {
-      "id": "EXP-SYN-007",
-      "monthKey": "2026-08",
-      "month": "2026-08",
-      "date": "2026-08-15",
-      "category": "Muhasebe",
-      "type": "OPEX",
-      "amount": 15000,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Mali müşavirlik, e-fatura ve yasal beyanname hizmet bedeli"
-    },
-    {
-      "id": "EXP-SYN-008",
-      "monthKey": "2026-08",
-      "month": "2026-08",
-      "date": "2026-08-18",
-      "category": "Diğer",
-      "type": "OPEX",
-      "amount": 18500,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Misafir karşılama organik zeytinyağı, şarap ve ikram setleri"
-    },
-    {
-      "id": "EXP-SYN-009",
-      "monthKey": "2026-08",
-      "month": "2026-08",
-      "date": "2026-08-20",
-      "category": "Bakım",
-      "type": "CAPEX",
-      "amount": 22000,
-      "villa": "VILLA_BELLA",
-      "property": "Villa Bella Vista",
-      "notes": "Teras jakuzisi yeni nesil inverter ısı pompası montajı"
-    },
-    {
-      "id": "EXP-SYN-010",
-      "monthKey": "2026-08",
-      "month": "2026-08",
-      "date": "2026-08-25",
-      "category": "Kredi Kartı / Komisyon",
-      "type": "OPEX",
-      "amount": 58000,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Sanal POS ve OTA platform işlem komisyonları"
-    },
-    {
-      "id": "EXP-SYN-011",
-      "monthKey": "2026-09",
-      "month": "2026-09",
-      "date": "2026-09-02",
-      "category": "Bakım",
-      "type": "OPEX",
-      "amount": 11200,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Eylül ayı havuz kışlama öncesi kontroller ve kimyasallar"
-    },
-    {
-      "id": "EXP-SYN-012",
-      "monthKey": "2026-09",
-      "month": "2026-09",
-      "date": "2026-09-05",
-      "category": "Reklam",
-      "type": "OPEX",
-      "amount": 24000,
-      "villa": "ALL",
-      "property": "Tümü",
-      "notes": "Sonbahar ve butik düğün kaçamakları dijital reklamları"
-    }
-  ],
-  "bankBalances": {
-    "month": "2026-08",
-    "garanti": 385000,
-    "kuveyt": 142000,
-    "npara": 68000,
-    "nakit": 35000,
-    "total": 630000
-  },
-  "allTimeTotals": {
-    "totalRevenue": 5560000,
-    "totalNights": 846,
-    "avgDailyRate": 6572,
-    "totalOpex": 1887000,
-    "totalCapex": 187000,
-    "totalExpense": 2074000,
-    "netCashProfit": 3486000,
-    "targetCiro": 5400000,
-    "villas": {
-      "bella": {
-        "name": "Villa Bella Vista",
-        "days": 178,
-        "rev": 1180000
-      },
-      "olive": {
-        "name": "Villa Olive Garden",
-        "days": 165,
-        "rev": 1320000
-      },
-      "sunset": {
-        "name": "Villa Sunset Horizon",
-        "days": 172,
-        "rev": 890000
-      },
-      "azure": {
-        "name": "Villa Azure Bay",
-        "days": 158,
-        "rev": 1420000
-      },
-      "palm": {
-        "name": "Villa Palm Breeze",
-        "days": 173,
-        "rev": 750000
-      }
-    }
-  }
-};
-const COMPANY_EXCEL_DATABASE = SYNTHETIC_DEMO_DATABASE;
-
-const DEFAULT_VILLAS = {
-  'VILLA_BELLA': { id: 'VILLA_BELLA', name: 'Villa Bella Vista (Kaş)', code: 'bella', capacity: '6+2 Kişi', floor: 4500, base: 6000, target: 8500, premium: 12000, peak: 16500, cleanCost: 1000, heatCost: 350 },
-  'VILLA_OLIVE': { id: 'VILLA_OLIVE', name: 'Villa Olive Garden (Bodrum)', code: 'olive', capacity: '8 Kişi', floor: 6000, base: 8500, target: 12000, premium: 17000, peak: 24000, cleanCost: 1400, heatCost: 400 },
-  'VILLA_SUNSET': { id: 'VILLA_SUNSET', name: 'Villa Sunset Horizon (Kalkan)', code: 'sunset', capacity: '4 Kişi', floor: 3500, base: 5000, target: 7000, premium: 10000, peak: 14000, cleanCost: 850, heatCost: 300 },
-  'VILLA_AZURE': { id: 'VILLA_AZURE', name: 'Villa Azure Bay (Göcek)', code: 'azure', capacity: '10 Kişi', floor: 8000, base: 11000, target: 16000, premium: 22500, peak: 32000, cleanCost: 1800, heatCost: 600 },
-  'VILLA_PALM': { id: 'VILLA_PALM', name: 'Villa Palm Breeze (Alaçatı)', code: 'palm', capacity: '6 Kişi', floor: 5000, base: 7000, target: 10000, premium: 14500, peak: 20000, cleanCost: 1200, heatCost: 400 }
-};
-
 // Backwards compatibility aliases for tests and internal keys
-DEFAULT_VILLAS['BELLA'] = DEFAULT_VILLAS['VILLA_BELLA'];
-DEFAULT_VILLAS['OLIVE'] = DEFAULT_VILLAS['VILLA_OLIVE'];
-DEFAULT_VILLAS['AZURE'] = DEFAULT_VILLAS['VILLA_AZURE'];
-DEFAULT_VILLAS['SUNSET'] = DEFAULT_VILLAS['VILLA_SUNSET'];
-DEFAULT_VILLAS['PALM'] = DEFAULT_VILLAS['VILLA_PALM'];
+
+// OTA ilan analizi modulu eskiden 5 villalik demo portfoyu gosteriyordu.
+// Gercek ilan verisi tenant'a baglanana kadar BOS baslar; uydurma ilan
+// gostermek, musteriye sahip olmadigi mulkler icin tavsiye vermek demekti.
+const DEFAULT_AIRBNB_PROPERTIES = {};
 
 const EXPENSE_CATEGORIES = [
   { name: 'Maaş', color: '#3B82F6' },
@@ -1063,45 +100,6 @@ const EXPENSE_CATEGORIES = [
   { name: 'Diğer', color: '#94A3B8' }
 ];
 
-const DEFAULT_TARGETS_BY_MONTH = {};
-Object.keys(COMPANY_EXCEL_DATABASE.targets).forEach(k => {
-  DEFAULT_TARGETS_BY_MONTH[k] = {
-    revenue: COMPANY_EXCEL_DATABASE.targets[k],
-    netProfit: Math.round(COMPANY_EXCEL_DATABASE.targets[k] * 0.4),
-    margin: 40.0,
-    occupancy: 70.0,
-    adr: 6800
-  };
-});
-
-const DEFAULT_EXPENSES = COMPANY_EXCEL_DATABASE.expensesList;
-
-const DEFAULT_BOOKINGS = [
-  { id: 'REZ-2026-001', villa: 'VILLA_AZURE', guest: 'Alexander Wright', checkIn: '2026-08-02', checkOut: '2026-08-07', nights: 5, channel: 'AIRBNB', gross: 80000, otaComm: 12000, cleanFee: 1800, net: 66200, pax: 8, status: 'COMPLETED' },
-  { id: 'REZ-2026-002', villa: 'VILLA_OLIVE', guest: 'Charlotte & David Davies', checkIn: '2026-08-05', checkOut: '2026-08-12', nights: 7, channel: 'BOOKING', gross: 77000, otaComm: 13860, cleanFee: 1400, net: 61740, pax: 6, status: 'COMPLETED' },
-  { id: 'REZ-2026-003', villa: 'VILLA_BELLA', guest: 'Can & Selin Aras', checkIn: '2026-08-08', checkOut: '2026-08-15', nights: 7, channel: 'WHATSAPP', gross: 59500, otaComm: 0, cleanFee: 1000, net: 58500, pax: 6, status: 'COMPLETED' },
-  { id: 'REZ-2026-004', villa: 'VILLA_SUNSET', guest: 'Thomas Lindqvist', checkIn: '2026-08-10', checkOut: '2026-08-16', nights: 6, channel: 'AIRBNB', gross: 42000, otaComm: 6300, cleanFee: 850, net: 34850, pax: 4, status: 'COMPLETED' },
-  { id: 'REZ-2026-005', villa: 'VILLA_PALM', guest: 'Melis & Kerem Aydın', checkIn: '2026-08-14', checkOut: '2026-08-20', nights: 6, channel: 'INSTAGRAM', gross: 57000, otaComm: 0, cleanFee: 1200, net: 55800, pax: 6, status: 'COMPLETED' },
-  { id: 'REZ-2026-006', villa: 'VILLA_AZURE', guest: 'Dr. Stefan Meyer', checkIn: '2026-08-18', checkOut: '2026-08-25', nights: 7, channel: 'BOOKING', gross: 112000, otaComm: 20160, cleanFee: 1800, net: 90040, pax: 10, status: 'COMPLETED' },
-  { id: 'REZ-2026-007', villa: 'VILLA_BELLA', guest: 'Sophie Laurent', checkIn: '2026-08-20', checkOut: '2026-08-27', nights: 7, channel: 'AIRBNB', gross: 59500, otaComm: 8925, cleanFee: 1000, net: 49575, pax: 5, status: 'COMPLETED' },
-  { id: 'REZ-2026-008', villa: 'VILLA_OLIVE', guest: 'Barış & Ece Güner', checkIn: '2026-08-22', checkOut: '2026-08-29', nights: 7, channel: 'WHATSAPP', gross: 84000, otaComm: 0, cleanFee: 1400, net: 82600, pax: 8, status: 'COMPLETED' },
-  { id: 'REZ-2026-009', villa: 'VILLA_SUNSET', guest: 'Emma Watson-Brown', checkIn: '2026-08-24', checkOut: '2026-08-30', nights: 6, channel: 'WHATSAPP', gross: 45000, otaComm: 0, cleanFee: 850, net: 44150, pax: 4, status: 'COMPLETED' }
-];
-
-const DEFAULT_LEADS = [
-  { id: 'L1', guest: 'David Miller (+44 7700 900123)', villa: 'VILLA_AZURE', channel: 'WhatsApp', quote: 95000, status: 'WON', lostReason: '-', notes: 'Göcek VIP hafta sonu konaklaması onaylandı' },
-  { id: 'L2', guest: 'Selin Vural (0532 555 0192)', villa: 'VILLA_BELLA', channel: 'WhatsApp', quote: 48000, status: 'WON', lostReason: '-', notes: 'Kaş balayı konaklaması kapandı' },
-  { id: 'L3', guest: 'Marcus Weber (+49 171 2345678)', villa: 'VILLA_OLIVE', channel: 'WhatsApp', quote: 72000, status: 'FOLLOW_UP', lostReason: '-', notes: 'Bodrum zeytinlik villa için uçak saatlerini netleştirecek' },
-  { id: 'L4', guest: 'Kemal Tarcan (0533 555 0184)', villa: 'VILLA_SUNSET', channel: 'WhatsApp', quote: 28000, status: 'LOST', lostReason: 'Fiyat Yüksek', notes: 'Bütçesi 20.000 TL idi, anlaşma sağlanamadı' },
-  { id: 'L5', guest: 'Elena Rostova (+7 916 555 0144)', villa: 'VILLA_PALM', channel: 'WhatsApp', quote: 60000, status: 'QUOTE_SENT', lostReason: '-', notes: 'Alaçatı taş ev için tarih onayı bekleniyor' },
-  { id: 'L6', guest: 'Cemre & Tolga (0535 555 0177)', villa: 'VILLA_BELLA', channel: 'Instagram', quote: 55000, status: 'WON', lostReason: '-', notes: 'Ekim ilk haftası rezervasyona dönüştü' }
-];
-
-const DEFAULT_MAINT = [
-  { id: 'M1', villa: 'VILLA_AZURE', priority: 'P1', title: 'Sonsuzluk havuzu pH otomasyon sensörü kalibrasyonu', assignee: 'Havuz Teknik Ekibi', downtime: 0, cost: 3200, status: 'OPEN' },
-  { id: 'M2', villa: 'VILLA_OLIVE', priority: 'P2', title: 'VRF klima sistemi periyodik filtre temizliği ve gaz kontrolü', assignee: 'İklimlendirme Servisi', downtime: 0, cost: 2400, status: 'COMPLETED' },
-  { id: 'M3', villa: 'VILLA_PALM', priority: 'P2', title: 'Bahçe aydınlatma armatürleri ve akıllı zamanlayıcı revizyonu', assignee: 'Elektrik Teknikeri', downtime: 0, cost: 1800, status: 'OPEN' }
-];
 
 // App State Container
 let appData = {
@@ -1197,88 +195,6 @@ function syncBookingCleaningTasks() {
   });
 }
 
-function loadAppData() {
-  try {
-    const saved = localStorage.getItem('LEXBNB_V5_MASTER_DATA');
-    if (saved) {
-      appData = JSON.parse(saved);
-      if (!appData.villas) appData.villas = JSON.parse(JSON.stringify(DEFAULT_VILLAS));
-      if (!appData.targets) appData.targets = {};
-      if (!appData.bookings) appData.bookings = [];
-      // User can freely edit or delete any booking permanently
-      if (!appData.expenses) appData.expenses = [];
-      if (!appData.leads) appData.leads = [];
-      if (!appData.maintenance) appData.maintenance = [];
-      if (!appData.cleaningPayments) appData.cleaningPayments = {};
-      if (!appData.otaPricingStrategy) {
-        appData.otaPricingStrategy = 'MARKUP'; // Kullanıcı stratejisi: Komisyon fiyata ekleniyor
-      }
-      if (!appData.marketingCampaigns) {
-        appData.marketingCampaigns = JSON.parse(JSON.stringify(DEFAULT_MARKETING_CAMPAIGNS));
-      }
-      if (!appData.cleaningTasks) {
-        appData.cleaningTasks = [];
-      }
-      if (!appData.deletedCleanTaskIds) appData.deletedCleanTaskIds = [];
-      if (!appData.housekeepingOverrides) appData.housekeepingOverrides = {};
-      // KULLANICI TALEBİ: Tüm örnek / mock rezervasyon ve temizlik kayıtlarını kalıcı olarak temizle
-      // Sadece kullanıcının bizzat eklediği rezervasyonlar görünür
-      // Yalnızca sahte Eylül ve Yılbaşı örneklerini ayıkla (Ağustos Excel kayıtları korunur)
-      appData.bookings = (appData.bookings || []).filter(b => 
-        !b.id.startsWith('REZ-SEP-') && 
-        !b.id.startsWith('REZ-NY-')
-      );
-      // Eğer Ağustos rezervasyonları silindiyse Excel'den geri tamamla
-      if (!appData.bookings.some(b => b.id.startsWith('REZ-AUG-'))) {
-        DEFAULT_BOOKINGS.forEach(ab => appData.bookings.push(ab));
-      }
-      appData.cleaningTasks = (appData.cleaningTasks || []).filter(t => 
-        !t.id.startsWith('TASK-CLN-00') &&
-        (!t.bookingId || appData.bookings.some(b => b.id === t.bookingId))
-      );
-      if (appData.expenses) {
-        appData.expenses = appData.expenses.filter(e => 
-          !e.id.startsWith('EXP-CLEAN-TASK-TASK-CLN-00') &&
-          !e.id.startsWith('EXP-CLEAN-TASK-CLN-00') &&
-          (!e.cleanTaskId || appData.cleaningTasks.some(t => t.id === e.cleanTaskId))
-        );
-      }
-
-
-      // Check if user has explicitly reset everything
-      if (appData.isCleanState) {
-        appData.excelDb = null;
-      } else {
-        if (!appData.excelDb) {
-          appData.excelDb = JSON.parse(JSON.stringify(COMPANY_EXCEL_DATABASE));
-        }
-        // Gider Defteri kullanıcının sildiği şekilde kalır, otomatik doldurulmaz
-        if (Object.keys(appData.targets).length === 0) {
-          appData.targets = JSON.parse(JSON.stringify(DEFAULT_TARGETS_BY_MONTH));
-        }
-      }
-    } else {
-      appData = {
-        isCleanState: false,
-        excelDb: JSON.parse(JSON.stringify(COMPANY_EXCEL_DATABASE)),
-        villas: JSON.parse(JSON.stringify(DEFAULT_VILLAS)),
-        targets: JSON.parse(JSON.stringify(DEFAULT_TARGETS_BY_MONTH)),
-        bookings: JSON.parse(JSON.stringify(DEFAULT_BOOKINGS)),
-        expenses: JSON.parse(JSON.stringify(DEFAULT_EXPENSES)),
-        leads: JSON.parse(JSON.stringify(DEFAULT_LEADS)),
-        maintenance: JSON.parse(JSON.stringify(DEFAULT_MAINT)),
-        cleaningPayments: {},
-        cleaningTasks: JSON.parse(JSON.stringify(DEFAULT_CLEANING_TASKS)),
-        housekeepingOverrides: {}
-      };
-      saveAppData();
-    }
-  syncBookingCleaningTasks();
-  } catch (e) {
-    console.error('Error loading state:', e);
-  }
-}
-
 function saveAppData() {
   if (typeof localStorage === 'undefined') return;
   const uId = (activeSaaSUser && activeSaaSUser.id) ? activeSaaSUser.id : 'usr_ute_master';
@@ -1304,6 +220,26 @@ function isUUID(str) {
 // 'usr_*' demo ve 'ten_*' gibi yerel kimlikler asla Postgres'e gonderilmez.
 function isCloudTenant(tenantId) {
   return !!(supabaseClient && isUUID(tenantId));
+}
+
+// -------------------------------------------------------------
+// BULUT YAZMA KORUMASI (Asama 2)
+// Demo kaldirildiktan sonra isCloudTenant() yalnizca baglanti kopuk oldugunda
+// false doner. Eskiden bu durumda kayit sessizce localStorage'a yaziliyordu:
+// kullanici veriyi girdi saniyor, sayfayi yenileyince kaybediyordu. Artik
+// yazma islemleri acik bir hatayla durur; okuma ekranlari calismaya devam eder.
+// -------------------------------------------------------------
+function requireCloudForWrite(islem, tenantId) {
+  // Node (regresyon testleri) tarayici degildir: orada yerel yol, kayit
+  // katmanindan bagimsiz olarak dogrulama mantiginin test yuzeyidir.
+  // Koruma yalnizca gercek kullanicinin oturumunu ilgilendirir.
+  if (typeof window === 'undefined') return;
+  if (isCloudTenant(tenantId !== undefined ? tenantId : getActiveTenantId())) return;
+  throw new Error(
+    (islem ? islem + ' kaydedilemedi. ' : '') +
+    'Bulut bağlantısı kurulamadı. Değişiklikleriniz kaydedilmez — ' +
+    'internet bağlantınızı kontrol edip sayfayı yenileyin.'
+  );
 }
 
 function mapPropertyFromDb(row) {
@@ -1389,6 +325,7 @@ async function loadProperties(targetTenantId) {
 async function createProperty(propInput) {
   const tenantId = getActiveTenantId();
   if (!isCloudTenant(tenantId)) {
+    requireCloudForWrite('Mülk', tenantId);
     // Demo / offline fallback
     const name = (propInput.name || '').trim();
     if (!name) throw new Error('Mülk adı boş bırakılamaz.');
@@ -1464,6 +401,7 @@ async function createProperty(propInput) {
 async function updateProperty(propIdOrSlug, propInput) {
   const tenantId = getActiveTenantId();
   if (!isCloudTenant(tenantId)) {
+    requireCloudForWrite('Mülk güncellemesi', tenantId);
     // Offline / demo fallback
     let existing = null;
     let oldSlug = null;
@@ -1891,6 +829,7 @@ async function loadBookings(targetTenantId) {
 async function createBooking(bookingInput) {
   const tenantId = getActiveTenantId() || bookingInput?.tenantId;
   const isCloud = isCloudTenant(tenantId);
+  requireCloudForWrite('Rezervasyon', tenantId);
 
   // 1. Validation
   const checkIn = bookingInput.checkIn || bookingInput.check_in;
@@ -2660,6 +1599,7 @@ async function createExpense(expenseInput) {
   if (!expenseInput) throw new Error('Gider bilgisi girilmedi.');
   const tenantId = getActiveTenantId();
   const isCloud = !!(isCloudTenant(tenantId));
+  requireCloudForWrite('Gider', tenantId);
 
   // 1. Validation
   const amt = roundMoney(expenseInput.amount);
@@ -2988,6 +1928,7 @@ async function cloudDeleteExpense(expId) {
 async function cloudUpsertCleaningTask(task) {
   const tenantId = getActiveTenantId();
   if (!isCloudTenant(tenantId)) return;
+    requireCloudForWrite('Temizlik görevi', tenantId);
   try {
     const propId = await getPropertyIdBySlug(task.villa, tenantId);
     if (!propId) return;
@@ -3012,6 +1953,7 @@ async function cloudUpsertCleaningTask(task) {
 async function cloudDeleteCleaningTask(taskId) {
   const tenantId = getActiveTenantId();
   if (!isCloudTenant(tenantId)) return;
+    requireCloudForWrite('Temizlik görevi silme', tenantId);
   try {
     const { error } = await supabaseClient.from('cleaning_tasks').delete().match({
       tenant_id: tenantId,
@@ -3232,6 +2174,7 @@ async function createLead(leadInput) {
   validateLeadInput(leadInput, tenantId);
 
   const isCloud = !!(isCloudTenant(tenantId));
+  requireCloudForWrite('Talep', tenantId);
 
   if (!isCloud) {
     const localId = 'local_lead_' + Date.now();
@@ -4426,7 +3369,7 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
   // Sort villas by revenue descending so #1 is clearly visible
   const sortedVillas = vKeys.map(k => {
     const s = propStats[k] || { revenue: 0, nights: 0, adr: 0, occupancy: 0, revpar: 0, share: 0 };
-    return { key: k, conf: DEFAULT_VILLAS[k] || {}, stats: s, meta: vMeta[k] || {} };
+    return { key: k, conf: (appData.villas && appData.villas[k]) || {}, stats: s, meta: vMeta[k] || {} };
   }).sort((a, b) => b.stats.revenue - a.stats.revenue);
 
   // 1. Render Executive Ranking Matrix Table
@@ -4591,7 +3534,7 @@ function renderPropertyComparisonChart(propStats) {
     if (metric === 'revpar') val = s.revpar || Math.round(s.revenue / getPeriodDayCount());
     if (metric === 'doluluk') val = Number(s.occupancy || ((s.nights / getPeriodDayCount()) * 100).toFixed(1));
     if (metric === 'satilanGece') val = s.nights;
-    values.push({ key: vKey, name: DEFAULT_VILLAS[vKey].name, val });
+    values.push({ key: vKey, name: ((appData.villas && appData.villas[vKey] && appData.villas[vKey].name) || vKey), val });
   });
 
   const maxVal = Math.max(1, ...values.map(v => v.val));
@@ -5206,7 +4149,8 @@ function loadSelectedPeriodGoal() {
   const period = select ? select.value : (currentFilter.period !== 'ALL' ? currentFilter.period : '2026-08');
   
   const saved = appData.targets && appData.targets[period];
-  const excelTarget = (COMPANY_EXCEL_DATABASE && COMPANY_EXCEL_DATABASE.targets) ? COMPANY_EXCEL_DATABASE.targets[period] : 300000;
+  // Demo hedefleri musteriye UYGULANMAZ. Tenant kendi hedefini belirlemediyse 0.
+    const excelTarget = 0;
   
   const rev = (saved && saved.revenue) ? saved.revenue : (excelTarget || 300000);
   const netProfit = (saved && saved.netProfit) ? saved.netProfit : Math.round(rev * 0.35);
@@ -5690,9 +4634,11 @@ function applyImportedData() {
   const isOverwrite = (strategy === 'OVERWRITE');
 
   if (pendingImportData.mode === 'COMPANY_REPORT') {
-    restoreExcelData();
+    // Eskiden burada restoreExcelData() cagrilip DEMO veri seti yukleniyor ve
+    // kullaniciya "raporunuz ice aktarildi" deniyordu. Gercek bir ice aktarma
+    // degildi; kullanicinin dosyasi hic okunmuyordu.
     closeImportModal();
-    alert('✅ Şirket Genel Raporu başarıyla içe aktarıldı ve tüm finansal paneller güncellendi!');
+    alert('⚠️ Şirket Genel Raporu içe aktarımı henüz desteklenmiyor. Mülk, rezervasyon ve gider dosyalarını ayrı ayrı içe aktarabilirsiniz.');
     return;
   }
 
@@ -5849,7 +4795,7 @@ function renderKPIsAndDashboard() {
       return;
     }
     targetVillas.forEach(vKey => {
-      const vConf = appData.villas[vKey] || DEFAULT_VILLAS[vKey];
+      const vConf = appData.villas[vKey];
       const s = villaStats[vKey] || { nights: 0, netRevenue: 0, directRevenue: 0, p1Open: 0 };
       const vOcc = (s.nights / daysInPeriod) * 100;
       const vAdr = s.nights > 0 ? (s.netRevenue / s.nights) : 0;
@@ -6031,7 +4977,7 @@ function renderGapNights() {
 
   // Check gaps between consecutive bookings for each villa
   Object.keys(appData.villas).forEach(vKey => {
-    const vConf = appData.villas[vKey] || DEFAULT_VILLAS[vKey];
+    const vConf = appData.villas[vKey];
     if (!vConf) return;
 
     const pBookings = appData.bookings
@@ -6446,7 +5392,8 @@ function renderSettingsGoalsTable() {
   GOAL_MONTHS.forEach(m => {
     const period = m.id;
     const saved = appData.targets && appData.targets[period];
-    const excelTarget = (COMPANY_EXCEL_DATABASE && COMPANY_EXCEL_DATABASE.targets) ? COMPANY_EXCEL_DATABASE.targets[period] : 300000;
+    // Demo hedefleri musteriye UYGULANMAZ. Tenant kendi hedefini belirlemediyse 0.
+    const excelTarget = 0;
     
     const rev = (saved && saved.revenue) ? saved.revenue : (excelTarget || 300000);
     const netProfit = (saved && saved.netProfit) ? saved.netProfit : Math.round(rev * 0.35);
@@ -7227,30 +6174,6 @@ function deleteMaint(id) {
 // RESET, RESTORE & EXPORT
 // -------------------------------------------------------------
 
-function confirmFactoryReset() {
-  const ok = confirm('⚠️ DİKKAT: Bu işlem tüm verileri sıfırlayıp sistemi orijinal demo portföy veritabanına döndürür.\n\nHer şeyi sıfırlamak istediğinizden emin misiniz?');
-  if (!ok) return;
-  const secondOk = confirm('Son Onay: Tüm özel kayıtlar silinecek ve demo veritabanı baştan yüklenecektir. Onaylıyor musunuz?');
-  if (!secondOk) return;
-
-  appData = {
-    isCleanState: false,
-    excelDb: JSON.parse(JSON.stringify(COMPANY_EXCEL_DATABASE)),
-    villas: JSON.parse(JSON.stringify(DEFAULT_VILLAS)),
-    targets: JSON.parse(JSON.stringify(DEFAULT_TARGETS_BY_MONTH)),
-    bookings: JSON.parse(JSON.stringify(DEFAULT_BOOKINGS)),
-    expenses: JSON.parse(JSON.stringify(DEFAULT_EXPENSES)),
-    leads: [],
-    maintenance: [],
-    cleaningPayments: {},
-    cleaningTasks: [],
-    housekeepingOverrides: {}
-  };
-  saveAppData();
-  renderAll();
-  alert('✅ Tüm veriler sıfırlandı ve demo portföy veritabanı başarıyla yüklendi!');
-}
-
 function openResetModal() {
   const modal = document.getElementById('resetModal');
   if (modal) modal.classList.add('active');
@@ -7262,6 +6185,14 @@ function closeResetModal() {
 }
 
 function cleanResetAll() {
+  // Bu islem YALNIZCA tarayicidaki gorunumu temizler. Bulut hesabinda kayitlar
+  // Supabase'de durur ve sayfa yenilenince geri gelir; "her sey silindi" demek
+  // yaniltici olurdu.
+  if (isCloudTenant(getActiveTenantId())) {
+    alert('Bu işlem bulut hesabınızdaki kayıtları silmez. Rezervasyon, gider ve mülkleri kendi ekranlarından tek tek silebilirsiniz. Hesabınızı tamamen kapatmak için Ayarlar > Tehlikeli Bölge bölümünü kullanın.');
+    closeResetModal();
+    return;
+  }
   if (confirm('DİKKAT: Sistemdeki tüm geçmiş cirolar, harcama kalemleri, rezervasyonlar ve arıza kayıtları SIFIRLANACAKTIR.\n\nTüm finansal metrikler 0 TL olacak ve tertemiz boş bir sistem başlayacaktır.\n\nOnaylıyor musunuz?')) {
     appData.isCleanState = true;
     appData.excelDb = null;
@@ -7278,21 +6209,6 @@ function cleanResetAll() {
 
 function resetToCleanState() {
   openResetModal();
-}
-
-function restoreExcelData() {
-  if (confirm('Lexbnb sentetik demo portföy veritabanını (5 lüks villa, 14 aylık geçmiş veriler) geri yüklemek istiyor musunuz?')) {
-    appData.isCleanState = false;
-    appData.excelDb = JSON.parse(JSON.stringify(COMPANY_EXCEL_DATABASE));
-    appData.expenses = JSON.parse(JSON.stringify(COMPANY_EXCEL_DATABASE.expensesList));
-    appData.bookings = JSON.parse(JSON.stringify(DEFAULT_BOOKINGS));
-    appData.leads = JSON.parse(JSON.stringify(DEFAULT_LEADS));
-    appData.maintenance = JSON.parse(JSON.stringify(DEFAULT_MAINT));
-    appData.targets = JSON.parse(JSON.stringify(DEFAULT_TARGETS_BY_MONTH));
-    saveAppData();
-    closeResetModal();
-    alert('✅ Demo portföy verileri başarıyla geri yüklendi!');
-  }
 }
 
 function exportDataJSON() {
@@ -7469,7 +6385,7 @@ function renderDailyOps() {
 
   let villaCardsHtml = '';
   Object.keys(appData.villas).forEach(vKey => {
-    const vConf = appData.villas[vKey] || DEFAULT_VILLAS[vKey];
+    const vConf = appData.villas[vKey];
     if (!vConf) return;
 
     const activeBooking = appData.bookings.find(b => b.villa === vKey && b.status !== 'CANCELLED' && b.checkIn <= todayStr && b.checkOut > todayStr);
@@ -7542,7 +6458,7 @@ function renderDailyOps() {
     hkList.appendChild(emptyDiv);
   } else {
     allTasks.forEach(task => {
-      const vConf = appData.villas[task.villa] || DEFAULT_VILLAS[task.villa];
+      const vConf = appData.villas[task.villa];
       const vName = vConf?.name || task.villa;
       const amt = Number(task.amount) || 0;
       const isPaid = !!task.paid;
@@ -7634,7 +6550,7 @@ function renderDailyOps() {
 // ✏️ TEMİZLİK TUTARINI DEĞİŞTİRME FONKSİYONLARI (Kullanıcı İsteği)
 // -------------------------------------------------------------
 function promptEditCleaningAmount(vKey) {
-  const vConf = appData.villas[vKey] || DEFAULT_VILLAS[vKey];
+  const vConf = appData.villas[vKey];
   const currentAmount = (appData.cleaningPayments && appData.cleaningPayments[vKey] && appData.cleaningPayments[vKey].amount) || vConf?.cleanCost || 1500;
   
   const input = prompt(`${vConf?.name || vKey} temizlik bedelini giriniz (TL):`, currentAmount);
@@ -7706,7 +6622,7 @@ function toggleCleaningPaid(vKey) {
   if (!appData.cleaningPayments) appData.cleaningPayments = {};
   if (!appData.cleaningTasks) appData.cleaningTasks = [];
   if (!appData.expenses) appData.expenses = [];
-  const vConf = appData.villas[vKey] || DEFAULT_VILLAS[vKey];
+  const vConf = appData.villas[vKey];
   const cleanCost = Number(appData.cleaningPayments[vKey]?.amount) || vConf?.cleanCost || 1500;
 
   const currentPaid = !!appData.cleaningPayments[vKey]?.paid;
@@ -8062,7 +6978,7 @@ function openNewCleaningTaskModal() {
   document.getElementById('hkCleaner').value = 'Fatma Hanım (Temizlik Ekibi)';
   
   const vKey = document.getElementById('hkVilla').value;
-  const vConf = appData.villas[vKey] || DEFAULT_VILLAS[vKey];
+  const vConf = appData.villas[vKey];
   document.getElementById('hkAmount').value = vConf?.cleanCost || 1500;
   
   document.getElementById('hkDesc').value = '';
@@ -8259,7 +7175,7 @@ function renderTapeChart() {
 
   // Find bookings for each villa
   vKeys.forEach(vKey => {
-    const vConf = appData.villas?.[vKey] || DEFAULT_VILLAS?.[vKey] || {};
+    const vConf = appData.villas?.[vKey] || {};
     const vName = vConf.name || vKey;
     const vPropId = vConf.id;
     tableHtml += `<tr><td class="tape-villa-td"><strong>${vName}</strong></td>`;
@@ -8784,7 +7700,7 @@ function getMonthlyKpiDataset() {
   const dataset = [];
 
   months.forEach(m => {
-    const hasStatic = (!appData.isCleanState && COMPANY_EXCEL_DATABASE.monthlyFinancials && COMPANY_EXCEL_DATABASE.monthlyFinancials[m]);
+    const hasStatic = false;   // demo veri seti kaldirildi
     
     let ciro = 0;
     let opex = 0;
@@ -8795,11 +7711,11 @@ function getMonthlyKpiDataset() {
     let occupancy = 0;
     let revpar = 0;
     let margin = 0;
-    let target = (appData.targets && appData.targets[m]) || (COMPANY_EXCEL_DATABASE.targets && COMPANY_EXCEL_DATABASE.targets[m]) || 0;
+    let target = (appData.targets && appData.targets[m]) || 0;
     const monthName = ALL_MONTH_NAMES[m] || m;
 
     if (hasStatic) {
-      const mf = COMPANY_EXCEL_DATABASE.monthlyFinancials[m];
+      const mf = null;   // demo veri seti kaldirildi
       ciro = Number(mf.ciro) || 0;
       opex = Number(mf.opex) || 0;
       capex = Number(mf.capex) || 0;
@@ -9306,172 +8222,7 @@ function filterHelpGlossary() {
 // =============================================================
 // ⭐ CANLI AIRBNB İLAN VE İTİBAR RADARI MOTORU (5 VİLLA)
 // =============================================================
-const DEFAULT_AIRBNB_PROPERTIES = {
-  VILLA_BELLA: {
-    key: 'VILLA_BELLA',
-    name: 'Villa Bella Vista (Kaş)',
-    url: 'https://www.airbnb.com.tr/h/lexbnb-bellavista',
-    slug: 'lexbnb-bellavista',
-    title: 'Villa Bella Vista | Kaş Sonsuzluk Havuzlu Panoramik Deniz Manzaralı Lüks Villa',
-    rating: 4.98,
-    reviews: 32,
-    highlights: 'Panoramik Deniz Manzarası, Isıtmalı Sonsuzluk Havuzu, Teras Jakuzisi, Barbekü',
-    isSuperhost: true,
-    isGuestFavorite: true,
-    lastSync: 'Bugün (Canlı)',
-    searchPage: 1,
-    searchRank: 'Sayfa 1 / #1 (Sıralama Lideri 🥇)',
-    coverPhoto: '🔥 Gün Batımı & Sonsuzluk Havuzu (Akdeniz Işığı)',
-    coverCtr: 5.8,
-    golden5Score: 98,
-    listingScore: 97,
-    strScore: 98,
-    operatorNote: 'Sonsuzluk havuzlu gün batımı karesi yüksek dönüşüm üretiyor. Sonbahar için havuz ısıtması devrede.',
-    aiCoverAdvice: 'Kapak görseli %5.8 CTR ile bölge ortalamasının (%3.2) çok üzerinde. Kesinlikle değiştirmeyin.',
-    aiTitleAdvice: 'Başlıkta "Sonsuzluk Havuzu" kelimesi doğrudan arama hacmini çekiyor.',
-    aiOptimizedTitle: 'Villa Bella Vista | Kaş Sonsuzluk Havuzlu & Jakuzili Balayı Villası',
-    aiHookCopy: "Akdeniz'in turkuaz sularına karşı gün batımını özel ısıtmalı sonsuzluk havuzunuzdan izleyin. Meis Adası manzarası eşliğinde izole, huzurlu ve unutulmaz bir Akdeniz rüyası.",
-    roasts: [
-      'Giriş paragrafında araç kiralama önerisi ve otopark bilgisi biraz daha öne alınabilir.',
-      'Açıklamadaki klima donanım detayları madde imleriyle vurgulanmalı.'
-    ],
-    emergencyFixes: [
-      'İlk 5 fotoğrafa gün batımı teras akşam aydınlatması detayını ekleyin.',
-      'Anında rezervasyon açık kalsın; yanıt süresi 10 dakikanın altında korunmalı.'
-    ]
-  },
-  VILLA_OLIVE: {
-    key: 'VILLA_OLIVE',
-    name: 'Villa Olive Garden (Bodrum)',
-    url: 'https://www.airbnb.com.tr/h/lexbnb-olivegarden',
-    slug: 'lexbnb-olivegarden',
-    title: 'Villa Olive Garden | Bodrum Yalıkavak Özel Zeytinlik Bahçeli Müstakil Taş Villa',
-    rating: 4.96,
-    reviews: 26,
-    highlights: '1000m² Müstakil Zeytinlik Bahçe, Büyük Havuz, Açık Şömine, Yalıkavak Yakını',
-    isSuperhost: true,
-    isGuestFavorite: true,
-    lastSync: 'Bugün (Canlı)',
-    searchPage: 1,
-    searchRank: 'Sayfa 1 / #3 (İlk Sayfa)',
-    coverPhoto: '🌿 Zeytin Ağaçları Arasında Işıklandırılmış Taş Villa & Havuz',
-    coverCtr: 5.2,
-    golden5Score: 96,
-    listingScore: 95,
-    strScore: 96,
-    operatorNote: 'Geniş aile ve butik arkadaş gruplarının gözdesi. Marina transfer servisi ilgi görüyor.',
-    aiCoverAdvice: 'Taş mimari ve akşam havuz aydınlatması güven veriyor. Yüksek tıklama oranını koruyor.',
-    aiTitleAdvice: 'Yalıkavak anahtar kelimesi uluslararası aramalarda kritik öneme sahip.',
-    aiOptimizedTitle: 'Villa Olive Garden | Bodrum Yalıkavak Özel Havuzlu & Bahçeli Taş Villa',
-    aiHookCopy: 'Asırlık zeytin ağaçlarının gölgesinde, begonvillerle sarılı otantik bir Bodrum taş villası. Özel havuz başında açık hava şöminesiyle Ege akşamlarının tadını çıkarın.',
-    roasts: [
-      'Mutfak donanımlarında espresso makinesi ve mikrodalga detayları fotoğraflanmalı.'
-    ],
-    emergencyFixes: [
-      'Marina mesafesi ve plaj erişim haritasını fotoğrafların arasına ekleyin.'
-    ]
-  },
-  VILLA_AZURE: {
-    key: 'VILLA_AZURE',
-    name: 'Villa Azure Bay (Göcek)',
-    url: 'https://www.airbnb.com.tr/h/lexbnb-azurebay',
-    slug: 'lexbnb-azurebay',
-    title: 'Villa Azure Bay | Göcek Özel İskeleli VIP Villa (Sauna & Hamam & Şef Mutfağı)',
-    rating: 5.0,
-    reviews: 22,
-    highlights: 'Özel İskele & Tekne Bağlama Alanı, Özel Hamam, Sauna, 5 Süit Yatak Odası',
-    isSuperhost: true,
-    isGuestFavorite: true,
-    lastSync: 'Bugün (Canlı)',
-    searchPage: 1,
-    searchRank: 'Sayfa 1 / #1 (Bölge Birincisi 🏆)',
-    coverPhoto: '🛥️ Göcek Koyu Özel İskele & Turkuaz Havuz Manzarası',
-    coverCtr: 6.2,
-    golden5Score: 99,
-    listingScore: 99,
-    strScore: 99,
-    operatorNote: 'VIP segmentte portföyün en yüksek gecelik gelir üreten amiral gemisi.',
-    aiCoverAdvice: 'Özel iskele ve tekne yanaşma görseli lüks algısını zirveye taşıyor (%6.2 CTR).',
-    aiTitleAdvice: '"VIP", "Özel İskele" ve "Sauna" kelimeleri yüksek bütçeli kitleyi doğrudan yakalıyor.',
-    aiOptimizedTitle: 'Villa Azure Bay | Göcek Özel İskeleli & Spa Donanımlı Lüks VIP Villa',
-    aiHookCopy: "Göcek'in turkuaz koylarına açılan özel iskeleniz, tekne bağlama imkanınız ve lüks spa konforunuzla ayrıcalıklı bir kaçış. Kişiye özel şef ve tekne turu organizasyonuyla unutulmaz bir deneyim.",
-    roasts: [
-      'Gecelik fiyat savunması çok başarılı; erken indirim vermeye gerek yok.'
-    ],
-    emergencyFixes: [
-      'Hızlı Wi-Fi hız testi görselini ilan fotoğraflarına ekleyin.'
-    ]
-  },
-  VILLA_SUNSET: {
-    key: 'VILLA_SUNSET',
-    name: 'Villa Sunset Horizon (Kalkan)',
-    url: 'https://www.airbnb.com.tr/h/lexbnb-sunsethorizon',
-    slug: 'lexbnb-sunsethorizon',
-    title: 'Villa Sunset Horizon | Kalkan Panoramik Körfez Manzaralı Jakuzili Teras Villası',
-    rating: 4.94,
-    reviews: 19,
-    highlights: 'Kalkan Koyu Manzarası, Teras Jakuzisi, Korunaklı Özel Havuz, Şömine',
-    isSuperhost: true,
-    isGuestFavorite: true,
-    lastSync: 'Bugün (Canlı)',
-    searchPage: 1,
-    searchRank: 'Sayfa 1 / #4 (Üst Sıra)',
-    coverPhoto: '🛁 Teras Jakuzisi & Kalkan Körfezinde Gün Batımı',
-    coverCtr: 5.4,
-    golden5Score: 94,
-    listingScore: 93,
-    strScore: 94,
-    operatorNote: 'Balayı çiftleri ve romantik tatiller için en çok talep gören villamız.',
-    aiCoverAdvice: 'Teras jakuzisi gün batımı karesi yüksek rezervasyon getirme oranına sahip.',
-    aiTitleAdvice: '"Kalkan Manzaralı" ve "Jakuzili" vurgusu çok güçlü.',
-    aiOptimizedTitle: 'Villa Sunset Horizon | Kalkan Deniz Manzaralı & Jakuzili Balayı Villası',
-    aiHookCopy: "Kalkan Körfezi'nin ışıkları ayaklarınızın altındayken, teras jakuzinizde günün yorgunluğunu atın. Korunaklı havuzu ve şömineli salonuyla baş başa romantik kaçamaklar için tasarlandı.",
-    roasts: [
-      'Banyo fotoğraflarındaki aydınlatma daha sıcak tonlara çevrilmeli.'
-    ],
-    emergencyFixes: [
-      'Anında rezervasyon özelliğini açık tutun.'
-    ]
-  },
-  VILLA_PALM: {
-    key: 'VILLA_PALM',
-    name: 'Villa Palm Breeze (Alaçatı)',
-    url: 'https://www.airbnb.com.tr/h/lexbnb-palmbreeze',
-    slug: 'lexbnb-palmbreeze',
-    title: 'Villa Palm Breeze | Çeşme Alaçatı Taş Ev & Isıtmalı Özel Havuz',
-    rating: 4.92,
-    reviews: 18,
-    highlights: 'Otantik Alaçatı Mimarisi, Korunaklı Isıtmalı Havuz, İç Avlu, Köy İçi Yürüme',
-    isSuperhost: true,
-    isGuestFavorite: true,
-    lastSync: 'Bugün (Canlı)',
-    searchPage: 1,
-    searchRank: 'Sayfa 1 / #6 (İlk Sayfa)',
-    coverPhoto: '🪨 Otantik Taş Mimari, Begonviller & Isıtmalı Havuz',
-    coverCtr: 4.9,
-    golden5Score: 93,
-    listingScore: 92,
-    strScore: 93,
-    operatorNote: 'Alaçatı köy içine yürüme mesafesinde, sessiz ve korunaklı özel taş avlu.',
-    aiCoverAdvice: 'Begonvilli taş mimari fotoğrafı tıklama oranını koruyor.',
-    aiTitleAdvice: '"Alaçatı Taş Ev" ve "Isıtmalı Havuz" kelimeleri sezon dışı doluluğu artırıyor.',
-    aiOptimizedTitle: 'Villa Palm Breeze | Çeşme Alaçatı Isıtmalı Havuzlu Otantik Taş Ev',
-    aiHookCopy: "Alaçatı'nın tarihi sokaklarının hemen yanı başında, taş mimarinin serinliği ve ısıtmalı havuzlu iç avlunun mahremiyeti. Rüzgar sörfü ve Ege mutfağı tutkunları için ideal konum.",
-    roasts: [
-      'İç avlu gece fotoğrafları güncellenebilir.'
-    ],
-    emergencyFixes: [
-      'Kış ve sonbahar dönemi için havuz ısıtma sıcaklık derecesini açıklamaya ekleyin.'
-    ]
-  }
-};
-
 // Aliases for legacy compatibility
-DEFAULT_AIRBNB_PROPERTIES['BELLA'] = DEFAULT_AIRBNB_PROPERTIES['VILLA_BELLA'];
-DEFAULT_AIRBNB_PROPERTIES['OLIVE'] = DEFAULT_AIRBNB_PROPERTIES['VILLA_OLIVE'];
-DEFAULT_AIRBNB_PROPERTIES['AZURE'] = DEFAULT_AIRBNB_PROPERTIES['VILLA_AZURE'];
-DEFAULT_AIRBNB_PROPERTIES['SUNSET'] = DEFAULT_AIRBNB_PROPERTIES['VILLA_SUNSET'];
-DEFAULT_AIRBNB_PROPERTIES['PALM'] = DEFAULT_AIRBNB_PROPERTIES['VILLA_PALM'];
 
 function renderAirbnbAuditRadar() {
   const tbody = document.getElementById('digitalAuditTableBody');
@@ -9575,81 +8326,6 @@ function syncLiveAirbnbData() {
 // =============================================================
 // 📢 PAZARLAMA & YAPAY ZEKA REKLAM RADARI (MARKETING & AI GROWTH)
 // =============================================================
-
-const DEFAULT_MARKETING_CAMPAIGNS = [
-  {
-    id: 'MKT-001',
-    name: 'Instagram Reels & Hikaye - Hafta Sonu Villa Kaçamağı',
-    platform: 'META',
-    channelType: 'Instagram Reels / Stories',
-    villa: 'ALL',
-    startDate: '2026-08-01',
-    endDate: '2026-08-31',
-    budget: 8000,
-    spent: 6500,
-    impressions: 48500,
-    clicks: 1420,
-    leads: 42,
-    bookingsCount: 2,
-    revenue: 58000,
-    status: 'ACTIVE',
-    notes: 'İstanbul/Bursa 25-45 yaş kitle, şömine ve jakuzi vurgulu video reklamı.'
-  },
-  {
-    id: 'MKT-002',
-    name: 'Google Arama - Kaş & Kalkan Lüks Villa Kiralama',
-    platform: 'GOOGLE',
-    channelType: 'Arama Ağı (Search)',
-    villa: 'ALL',
-    startDate: '2026-08-01',
-    endDate: '2026-08-31',
-    budget: 10000,
-    spent: 8200,
-    impressions: 16800,
-    clicks: 860,
-    leads: 36,
-    bookingsCount: 3,
-    revenue: 78000,
-    status: 'ACTIVE',
-    notes: '"kaş kiralık villa", "özel havuzlu villa kalkan" yüksek niyetli kelimeler.'
-  },
-  {
-    id: 'MKT-003',
-    name: 'Meta WhatsApp Direkt Mesaj Kampanyası (Click-to-WA)',
-    platform: 'META',
-    channelType: 'WhatsApp DM',
-    villa: 'BELLA',
-    startDate: '2026-08-10',
-    endDate: '2026-08-25',
-    budget: 5000,
-    spent: 4200,
-    impressions: 22000,
-    clicks: 680,
-    leads: 55,
-    bookingsCount: 1,
-    revenue: 34000,
-    status: 'ACTIVE',
-    notes: 'Direkt WhatsApp sohbeti başlatan sponsorlu gönderiler.'
-  },
-  {
-    id: 'MKT-004',
-    name: 'Google Performance Max - Kış 2026/2027 Erken Rezervasyon',
-    platform: 'GOOGLE',
-    channelType: 'Performance Max',
-    villa: 'AZURE',
-    startDate: '2026-08-15',
-    endDate: '2026-09-30',
-    budget: 7500,
-    spent: 5100,
-    impressions: 34000,
-    clicks: 920,
-    leads: 28,
-    bookingsCount: 2,
-    revenue: 65000,
-    status: 'ACTIVE',
-    notes: 'Kış zirvesi ve sömestr dönemi için erken rezervasyon toplama.'
-  }
-];
 
 function isCampaignInFilter(camp) {
   if (currentFilter.villa !== 'ALL' && camp.villa !== 'ALL' && camp.villa !== currentFilter.villa) {
@@ -10498,56 +9174,11 @@ function runAiListingCritic(inputUrl = null, explicitKey = null) {
 // 5 İLERİ SEVİYE STR & VILLA PAZARLAMA MODÜLLERİ
 // =============================================================
 
-const DEFAULT_INFLUENCER_COLLABS = [
-  {
-    id: 'INF-001',
-    handle: '@luxurytravels (Can & Merve)',
-    followers: '320K',
-    villa: 'VILLA_BELLA',
-    dates: '12 - 14 Ekim 2026',
-    cost: 4500,
-    code: 'BELLA10',
-    bookingsCount: 5,
-    revenue: 145000,
-    status: 'COMPLETED',
-    roi: '32.2x',
-    notes: '2 Reels + 8 Story paylaştı. Sonsuzluk havuzu ve gün batımı vurgusu yüksek dönüşüm getirdi.'
-  },
-  {
-    id: 'INF-002',
-    handle: '@egevillalari (Kaan)',
-    followers: '185K',
-    villa: 'VILLA_AZURE',
-    dates: '24 - 26 Ekim 2026',
-    cost: 3000,
-    code: 'AZURE15',
-    bookingsCount: 3,
-    revenue: 168000,
-    status: 'COMPLETED',
-    roi: '56.0x',
-    notes: '1 Reels paylaştı. Özel iskele ve yat bağlama temalı VIP içerik.'
-  },
-  {
-    id: 'INF-003',
-    handle: '@bodrumrotalari (Burcu Ş.)',
-    followers: '110K',
-    villa: 'VILLA_OLIVE',
-    dates: '02 - 04 Kasım 2026',
-    cost: 3200,
-    code: 'OLIVE10',
-    bookingsCount: 2,
-    revenue: 56000,
-    status: 'COMPLETED',
-    roi: '17.5x',
-    notes: 'Zeytinlik bahçesi ve taş mimari temalı sonbahar kaçamağı hikaye serisi.'
-  }
-];
-
 // 1. 🛑 TAKVİMDEKİ "YETİM GECELER" (GAP NIGHTS) MOTORU
 // -------------------------------------------------------------
 function detectGapNights() {
   const gaps = [];
-  const villas = Object.keys(appData.villas || DEFAULT_VILLAS);
+  const villas = Object.keys(appData.villas || {});
 
   villas.forEach(vKey => {
     const vName = (appData.villas && appData.villas[vKey]?.name) ? appData.villas[vKey].name : vKey;
@@ -11674,12 +10305,8 @@ async function handleSaaSLogin(e) {
   const uLow = userInput.toLowerCase();
   const pLow = passInput.toLowerCase();
 
-  // 1. UTE / LexBnB Demo Bypass
-  if ((uLow === 'lexbnb' || uLow === 'ute' || uLow === 'admin' || uLow === 'demo@lexbnb.com') &&
-      (pLow === 'lexbnb' || pLow === 'lexbnb2026' || pLow === '123456')) {
-    loginWithUteDemo();
-    return;
-  }
+  // Yerel demo bypass'i kaldirildi. Girisin tek yolu Supabase Auth'tur;
+  // demo hesabi da gercek bir bulut hesabi olacak.
 
   // 2. Giriş yalnızca e-posta ile yapılır (Supabase Auth source-of-truth)
   if (!userInput.includes('@')) {
@@ -11900,14 +10527,6 @@ async function handleSaaSRegister(e) {
   }
 }
 
-function loginWithLexBnBDemo() {
-  const users = getSaaSUsers();
-  const demoUser = users.find(u => u.id === 'usr_ute_master') || DEFAULT_SAAS_USERS[0];
-  activeTenant = { id: 'usr_ute_master', name: 'LexBnB Portföyü', slug: 'demo', role: 'owner' };
-  authenticateSaaSUser(demoUser, false);
-}
-const loginWithUteDemo = function() { loginWithLexBnBDemo(); };
-
 function startWithCleanPortfolio() {
   if (typeof confirm === 'function' && !confirm('Eski örnek verileri temizleyip sıfırdan kendi mülk ve rezervasyonlarınızı eklemek istiyor musunuz?')) {
     return;
@@ -11978,12 +10597,6 @@ async function logoutSaaSUser() {
 // -------------------------------------------------------------
 async function loadTenantAppData(tenantIdOrUserId) {
   const targetId = tenantIdOrUserId || getActiveTenantId();
-  if (targetId === 'usr_ute_master' || (activeTenant && activeTenant.id === 'usr_ute_master')) {
-    initDefaultUteData();
-    updateAllVillaDropdowns();
-    renderAll();
-    return;
-  }
 
   // 1. Supabase Cloud Source of Truth
   if (isCloudTenant(targetId)) {
@@ -12057,30 +10670,6 @@ async function loadTenantAppData(tenantIdOrUserId) {
   appData = getBlankTenantData(targetId);
   updateAllVillaDropdowns();
   renderAll();
-}
-
-function initDefaultDemoData() {
-  appData = {
-    isCleanState: false,
-    excelDb: COMPANY_EXCEL_DATABASE,
-    companyName: (activeSaaSUser && activeSaaSUser.companyName) || 'Lexbnb Luxury Portfolio',
-    villas: JSON.parse(JSON.stringify(DEFAULT_VILLAS)),
-    targets: COMPANY_EXCEL_DATABASE.targets,
-    bookings: JSON.parse(JSON.stringify(DEFAULT_BOOKINGS)),
-    expenses: JSON.parse(JSON.stringify(COMPANY_EXCEL_DATABASE.expensesList)),
-    leads: JSON.parse(JSON.stringify(DEFAULT_LEADS)),
-    maintenance: JSON.parse(JSON.stringify(DEFAULT_MAINT)),
-    cleaningTasks: [],
-    marketingCampaigns: JSON.parse(JSON.stringify(DEFAULT_MARKETING_CAMPAIGNS || [])),
-    influencerCollabs: JSON.parse(JSON.stringify(DEFAULT_INFLUENCER_COLLABS)),
-    airbnbListings: JSON.parse(JSON.stringify(DEFAULT_AIRBNB_PROPERTIES)),
-    otaPricingStrategy: 'MARKUP'
-  };
-  syncBookingCleaningTasks();
-}
-
-function initDefaultUteData() {
-  return initDefaultDemoData();
 }
 
 function getBlankTenantData(userId) {
@@ -14355,8 +12944,7 @@ if (typeof module !== 'undefined' && module.exports) {
     openCommandPalette,
     closeCommandPalette,
     toggleNotificationDrawer,
-    startWithCleanPortfolio,
-    loginWithLexBnBDemo
+    startWithCleanPortfolio
   };
 }
 

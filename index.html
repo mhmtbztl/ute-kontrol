@@ -54,9 +54,6 @@
           🔓 Hesabıma Giriş Yap
         </button>
 
-        <div style="background: rgba(139, 92, 246, 0.12); border: 1px dashed rgba(139, 92, 246, 0.35); border-radius: 6px; padding: 8px 10px; margin-top: 10px; font-size: 11px; color: #DDD6FE; text-align: center;">
-          💡 <strong>Hızlı Demo Girişi:</strong> E-posta: <code style="background: rgba(0,0,0,0.4); padding: 1px 5px; border-radius: 3px; color: #FDE68A; font-weight: 700;">demo@lexbnb.com</code> &bull; Şifre: <code style="background: rgba(0,0,0,0.4); padding: 1px 5px; border-radius: 3px; color: #FDE68A; font-weight: 700;">lexbnb</code>
-        </div>
 
         <div style="text-align: center; margin-top: 10px;">
           <a href="#" onclick="showForgotPasswordForm(); return false;" style="color: #94A3B8; font-size: 12px; text-decoration: underline;">Şifremi unuttum</a>
@@ -134,15 +131,6 @@
         ⚠️ Hatalı e-posta veya şifre! Lütfen tekrar deneyin.
       </div>
 
-      <!-- Hızlı Kurumsal Demo Girişi (LexBnB) -->
-      <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.1);">
-        <button type="button" class="btn btn-secondary" onclick="loginWithLexBnBDemo()" style="width: 100%; padding: 10px; font-size: 12px; font-weight: 700; border-color: #F59E0B; color: #FDE68A; background: rgba(245, 158, 11, 0.08); display: flex; align-items: center; justify-content: center; gap: 6px;">
-          <span>🌟</span> LexBnB Demo Hesabı ile 1-Tıkla Giriş Yap
-        </button>
-        <div style="font-size: 11px; color: var(--text-muted); margin-top: 8px; text-align: center;">
-          Şirket yöneticisinin özel linkiyle geldiyseniz otomatik açılır.
-        </div>
-      </div>
     </div>
   </div>
 
@@ -367,13 +355,6 @@
               <small style="color: #CBD5E1;">Demo kayıtlarını kaldırıp kendi mülklerinizi sıfırdan ekleyin</small>
             </div>
           </button>
-          <button type="button" class="dropdown-item text-danger" onclick="confirmFactoryReset(); closeAllHeaderDropdowns();" style="border-top: 1px solid rgba(239, 68, 68, 0.2); background: rgba(239, 68, 68, 0.08); margin-top: 4px;">
-            <span class="dropdown-icon">⚠️</span>
-            <div>
-              <strong style="color: #F87171;">Demo Verilerini Sıfırla</strong>
-              <small style="color: #FCA5A5;">Örnek portföy verilerini fabrika ayarlarına döndürür</small>
-            </div>
-          </button>
         </div>
       </div>
 
@@ -412,13 +393,6 @@
             <div>
               <strong>Excel'den Rapor Yükle</strong>
               <small>Kendi verilerinizi aktarın</small>
-            </div>
-          </button>
-          <button type="button" class="dropdown-item" onclick="loginWithLexBnBDemo(); closeAllHeaderDropdowns();">
-            <span class="dropdown-icon">🌟</span>
-            <div>
-              <strong>LexBnB Demo Hesabı</strong>
-              <small>Tüm örnek mülk ve verilere geç</small>
             </div>
           </button>
           <div class="dropdown-divider"></div>
@@ -1201,16 +1175,6 @@
           <button class="btn btn-secondary btn-sm" onclick="exportTrajectoryReport()">📄 Gidişat Raporu Al</button>
         </div>
 
-        <!-- Sıfırlama Bilgilendirme Bannerı (Yalnızca Temiz Kasada Görünür) -->
-        <div id="trajectoryRadarBanner" style="display: none; background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.35); border-radius: 10px; padding: 14px 18px; margin-bottom: 20px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-            <div style="color: #93c5fd; font-size: 0.9rem;">
-              ℹ️ <strong>Sistem verileri sıfırlandı (Temiz Kasa Başlatıldı - 0 TL).</strong><br>
-              Yeni rezervasyon veya harcama girdikçe projeksiyonlar otomatik hesaplanacaktır. Portföy demo verilerini geri getirmek için <strong>"Demo Verilerini Geri Yükle"</strong> butonuna basabilirsiniz.
-            </div>
-            <button class="btn btn-primary btn-sm" onclick="restoreExcelData()">🔄 Demo Verilerini Geri Yükle</button>
-          </div>
-        </div>
 
         <!-- 1. Gidişat Barometresi / 4 Temel Sağlık Göstergesi -->
         <div class="trajectory-barometer-grid">
@@ -3628,18 +3592,6 @@
             </button>
           </div>
 
-          <!-- Seçenek 2: Demo Verilerini Geri Yükle -->
-          <div style="border: 1px solid rgba(59, 130, 246, 0.4); background: rgba(59, 130, 246, 0.08); border-radius: 10px; padding: 16px;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
-              <strong style="color: #93c5fd; font-size: 1rem;">📊 Demo Portföy Verilerini Tekrar Yükle (Lexbnb Demo)</strong>
-            </div>
-            <p style="color: var(--color-slate-300); font-size: 0.85rem; line-height: 1.4; margin-bottom: 12px;">
-              Lexbnb lüks Akdeniz villa portföyünün 14 aylık sentetik demo veritabanını (5 lüks villa, 5.560.000 TL ciro, operasyonel ve finansal kayıtlar) eksiksiz olarak geri yükler.
-            </p>
-            <button class="btn btn-primary" onclick="restoreExcelData()" style="width: 100%;">
-              🔄 Demo Verilerini Geri Yükle
-            </button>
-          </div>
         </div>
       </div>
       <div class="modal-footer">
@@ -4300,6 +4252,6 @@
   <script src="core/executive_dashboard_service.js?v=cf7e1f87"></script>
   <script src="core/executive_ai_advisor.js?v=93c10c3e"></script>
   <script src="core/notification_center_service.js?v=7fb8bdee"></script>
-  <script src="app.js?v=70ebf018"></script>
+  <script src="app.js?v=2da052e1"></script>
 </body>
 </html>
