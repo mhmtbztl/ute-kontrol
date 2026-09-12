@@ -199,9 +199,26 @@ async function run() {
 
     // -------------------------------------------------------------------
     console.log('\n--- 5. YETKİSİZ ÇAĞRI ---');
+    // Supabase, public semasindaki yeni fonksiyonlara varsayilan olarak anon'a
+    // EXECUTE verir ve `REVOKE ... FROM PUBLIC` bunu kaldirmaz. Tek bir
+    // fonksiyonu degil, oturum gerektiren TUM RPC'leri tara.
     const anon = newClient();
-    const { error: anonErr } = await anon.rpc('delete_my_account', { p_confirmation: 'HESABIMI SIL' });
-    check(!!anonErr, '12. Oturumsuz çağrı reddedilir', 'anon delete_my_account calistirabildi!');
+    const anonProbes = [
+      ['delete_my_account', { p_confirmation: 'HESABIMI SIL' }],
+      ['get_account_deletion_impact', {}],
+      ['accept_pending_invitations', {}],
+      ['create_tenant_and_owner', { p_company_name: 'anon', p_full_name: 'anon' }],
+      ['get_tenant_members', { p_tenant_id: sharedTenant }],
+      ['get_tenant_invitations', { p_tenant_id: sharedTenant }],
+      ['create_tenant_invitation', { p_tenant_id: sharedTenant, p_email: 'a@lexbnb-e2e.test', p_role: 'viewer' }],
+    ];
+    const leaky = [];
+    for (const [fn, args] of anonProbes) {
+      const { error } = await anon.rpc(fn, args);
+      if (!error) leaky.push(fn);
+    }
+    check(leaky.length === 0, '12. Oturumsuz (anon) çağrılar reddedilir',
+      'anon su fonksiyonlari calistirabildi: ' + leaky.join(', '));
 
   } catch (err) {
     recordFail('Suit beklenmedik hata ile durdu', err && err.message ? err.message : String(err));
