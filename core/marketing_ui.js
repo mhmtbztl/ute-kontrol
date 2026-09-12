@@ -21,6 +21,7 @@
     snapshotFormOpen: false,
     listingFormOpen: false,
     mediaFormOpen: false,
+    experimentFormOpen: false,
     listings: [],
     snapshots: [],
     findings: [],
@@ -46,7 +47,8 @@
     ['MarketingSnapshotService', 'core/marketing_snapshot_service.js?v=184ad517'],
     ['MarketingChannelListingService', 'core/marketing_channel_listing_service.js?v=0e34cbca'],
     ['MarketingMediaUploadService', 'core/marketing_media_upload_service.js?v=52d4d9ce'],
-    ['MarketingPhotoAnalysisService', 'core/marketing_photo_analysis_service.js?v=bcb0fb90']
+    ['MarketingPhotoAnalysisService', 'core/marketing_photo_analysis_service.js?v=bcb0fb90'],
+    ['MarketingExperimentService', 'core/marketing_experiment_service.js?v=4a2ffb14']
   ]);
   let dependencyPromise = null;
 
@@ -320,18 +322,21 @@
       && String(item.mediaStatus || item.media_status || '').toUpperCase() === 'ACTIVE');
     const activeRun = model.analysisRuns.find(item => (!selectedId || (item.propertyId || item.property_id) === selectedId)
       && ['QUEUED', 'PROCESSING'].includes(String(item.status || '').toUpperCase()));
+    const scopedListings = model.listings.filter(item => !selectedId || (item.propertyId || item.property_id) === selectedId);
     const analysisDisabled = !selectedId || !activeMedia.length || Boolean(activeRun);
     const analysisLabel = activeRun ? 'Analiz sürüyor' : 'AI ile analiz et';
-    const toolbar = `<div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:12px"><button type="button" class="btn btn-secondary btn-sm" data-marketing-request-analysis${analysisDisabled ? ' disabled' : ''}>${analysisLabel}</button><button type="button" class="btn btn-primary btn-sm" data-marketing-open-media>＋ Fotoğraf yükle</button></div>`;
+    const experimentDisabled = !selectedId || !scopedListings.length || activeMedia.length < 2;
+    const toolbar = `<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-bottom:12px"><button type="button" class="btn btn-secondary btn-sm" data-marketing-open-experiment${experimentDisabled ? ' disabled' : ''}>Kapak değişikliğini ölç</button><button type="button" class="btn btn-secondary btn-sm" data-marketing-request-analysis${analysisDisabled ? ' disabled' : ''}>${analysisLabel}</button><button type="button" class="btn btn-primary btn-sm" data-marketing-open-media>＋ Fotoğraf yükle</button></div>`;
     const form = state.mediaFormOpen ? renderMediaUploadForm(model) : '';
+    const experimentForm = state.experimentFormOpen ? renderExperimentForm(model) : '';
     if (!model.media.length && !model.analysisRuns.length && !model.experiments.length) {
-      return `${toolbar}${form}${emptyState('Galeri analizi henüz yok', 'Özel medya kaydı ve tamamlanmış analiz işi olmadan kalite puanı veya değişiklik önerisi üretilmez.')}`;
+      return `${toolbar}${form}${experimentForm}${emptyState('Galeri analizi henüz yok', 'Özel medya kaydı ve tamamlanmış analiz işi olmadan kalite puanı veya değişiklik önerisi üretilmez.')}`;
     }
-    return `${toolbar}${form}<div style="display:flex;gap:10px;flex-wrap:wrap">
+    return `${toolbar}${form}${experimentForm}<div style="display:flex;gap:10px;flex-wrap:wrap">
       ${kpi('Medya kaydı', number(model.media.length), 'Yetkili özel medya')}
       ${kpi('Analiz çalışması', number(model.analysisRuns.length), 'Durumu izlenen işler')}
       ${kpi('Gözlemsel deney', number(model.experiments.length), 'A/B testi olarak sunulmaz')}
-    </div>${renderAnalysisRuns(model.analysisRuns, selectedId)}<div class="card" style="padding:14px;margin-top:12px">Fotoğraf kararları yalnızca yapılandırılmış analiz sonucu ve doğrulanmış kapsam ile gösterilir.</div>`;
+    </div>${renderAnalysisRuns(model.analysisRuns, selectedId)}${renderExperiments(model.experiments, selectedId)}<div class="card" style="padding:14px;margin-top:12px">Fotoğraf kararları yalnızca yapılandırılmış analiz sonucu ve doğrulanmış kapsam ile gösterilir.</div>`;
   }
 
   function renderAnalysisRuns(runs, propertyId) {
@@ -367,6 +372,48 @@
       <div class="sub-text" style="margin-top:10px">JPEG, PNG, WebP veya HEIC · en fazla 25 MiB · dosya özel bucket’ta tutulur.</div>
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button type="button" class="btn btn-secondary btn-sm" data-marketing-cancel-media>Vazgeç</button><button type="submit" class="btn btn-primary btn-sm">Fotoğrafı yükle</button></div>
     </form>`;
+  }
+
+  function renderExperimentForm(model) {
+    const selected = model.selectedProperty === 'ALL' ? null : model.properties.find(item => item.slug === model.selectedProperty);
+    const propertyId = selected && selected.id;
+    const listings = model.listings.filter(item => (item.propertyId || item.property_id) === propertyId);
+    const media = model.media.filter(item => (item.propertyId || item.property_id) === propertyId
+      && String(item.mediaStatus || item.media_status || '').toUpperCase() === 'ACTIVE');
+    if (!propertyId || !listings.length || media.length < 2) {
+      return emptyState('Ölçüm kapsamı hazır değil', 'Tek bir mülk, en az bir kanal ilanı ve iki aktif fotoğraf seçilebilir olmalıdır.');
+    }
+    const listingOptions = listings.map(item => `<option value="${escapeHtml(item.id)}">${escapeHtml(CHANNEL_LABELS[item.channelCode || item.channel_code] || item.displayName || item.display_name || 'Kanal ilanı')}</option>`).join('');
+    const mediaOptions = media.map(item => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.roomCategory || item.room_category || 'Fotoğraf')} · ${escapeHtml(String(item.id).slice(0, 8))}</option>`).join('');
+    return `<form data-marketing-experiment-form class="card" style="padding:16px;margin-bottom:14px">
+      <h3 style="margin:0 0 6px">Kapak değişikliğinin etkisini izle</h3>
+      <div class="sub-text" style="margin-bottom:12px">Bu bir A/B testi değildir; sonuç yalnızca gözlemsel ilişki olarak raporlanır. Her pencere en az 14 gün olmalıdır.</div>
+      <input type="hidden" name="changeType" value="COVER_MEDIA">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px">
+        <label style="display:grid;gap:5px;font-size:12px">Kanal ilanı<select class="form-control" name="channelListingId" required>${listingOptions}</select></label>
+        <label style="display:grid;gap:5px;font-size:12px">Eski kapak<select class="form-control" name="oldMediaId" required>${mediaOptions}</select></label>
+        <label style="display:grid;gap:5px;font-size:12px">Yeni kapak<select class="form-control" name="newMediaId" required>${mediaOptions}</select></label>
+        <label style="display:grid;gap:5px;font-size:12px">Değişiklik tarihi<input class="form-control" type="date" name="changeDate" required></label>
+        <label style="display:grid;gap:5px;font-size:12px">Önce başlangıç<input class="form-control" type="date" name="beforeStartDate" required></label>
+        <label style="display:grid;gap:5px;font-size:12px">Önce bitiş (hariç)<input class="form-control" type="date" name="beforeEndExclusive" required></label>
+        <label style="display:grid;gap:5px;font-size:12px">Sonra başlangıç<input class="form-control" type="date" name="afterStartDate" required></label>
+        <label style="display:grid;gap:5px;font-size:12px">Sonra bitiş (hariç)<input class="form-control" type="date" name="afterEndExclusive" required></label>
+        <label style="display:grid;gap:5px;font-size:12px">Birincil metrik<select class="form-control" name="primaryMetric"><option value="SEARCH_TO_VIEW_CTR_PERCENT">Arama → görüntüleme CTR</option><option value="VIEW_TO_BOOKING_CONVERSION_PERCENT">Görüntüleme → rezervasyon</option></select></label>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button type="button" class="btn btn-secondary btn-sm" data-marketing-cancel-experiment>Vazgeç</button><button type="submit" class="btn btn-primary btn-sm">Ölçümü başlat</button></div>
+    </form>`;
+  }
+
+  function renderExperiments(experiments, propertyId) {
+    const scoped = experiments.filter(item => !propertyId || (item.propertyId || item.property_id) === propertyId).slice(0, 5);
+    if (!scoped.length) return '';
+    const statusLabels = { COLLECTING: 'Veri toplanıyor', READY: 'Değerlendirmeye hazır', EVALUATED: 'Değerlendirildi', CANCELLED: 'İptal' };
+    const verdictLabels = { POSITIVE_ASSOCIATION: 'Pozitif ilişki', NEGATIVE_ASSOCIATION: 'Negatif ilişki', NO_CLEAR_CHANGE: 'Belirgin değişim yok', CONFOUNDED: 'Karıştırıcı etken var', INSUFFICIENT_DATA: 'Yetersiz veri' };
+    return `<div class="card" style="padding:14px;margin-top:12px"><strong>Gözlemsel değişiklik ölçümleri</strong><div style="display:grid;gap:8px;margin-top:10px">${scoped.map(item => {
+      const status = String(item.status || '').toUpperCase();
+      const verdict = String(item.verdict || '').toUpperCase();
+      return `<div style="display:flex;justify-content:space-between;gap:12px"><span>${escapeHtml(item.change_date || item.changeDate || 'Tarih yok')} · ${escapeHtml(item.primary_metric || item.primaryMetric || '')}</span><strong>${escapeHtml(verdictLabels[verdict] || statusLabels[status] || status || 'Bilinmiyor')}</strong></div>`;
+    }).join('')}</div><div class="sub-text" style="margin-top:8px">Sonuçlar nedensellik kanıtı olarak sunulmaz.</div></div>`;
   }
 
   function renderWorkspaceHtml(model, view) {
@@ -575,6 +622,28 @@
     }
   }
 
+  async function handleExperimentSubmit(form) {
+    const client = typeof supabaseClient !== 'undefined' ? supabaseClient : null;
+    const scope = cloudScope();
+    if (!client || !scope || !scope.propertyId || !services.MarketingExperimentService) throw new Error('EXPERIMENT_REQUEST_UNAVAILABLE');
+    const values = Object.fromEntries(new FormData(form).entries());
+    const submit = form.querySelector('[type="submit"]');
+    if (submit) submit.disabled = true;
+    try {
+      const result = await services.MarketingExperimentService.requestEvaluation(client, {
+        ...values, tenantId: scope.tenantId, propertyId: scope.propertyId
+      });
+      state.experimentFormOpen = false;
+      state.remoteStatus = 'LOADING';
+      render();
+      await hydrateCloudData();
+      render();
+      return result;
+    } finally {
+      if (submit) submit.disabled = false;
+    }
+  }
+
   function initializeBrowser() {
     if (typeof document === 'undefined') return;
     document.querySelectorAll('[data-marketing-view]').forEach(button => button.addEventListener('click', () => {
@@ -590,12 +659,16 @@
       const openMedia = event.target.closest('[data-marketing-open-media]');
       const cancelMedia = event.target.closest('[data-marketing-cancel-media]');
       const requestAnalysis = event.target.closest('[data-marketing-request-analysis]');
+      const openExperiment = event.target.closest('[data-marketing-open-experiment]');
+      const cancelExperiment = event.target.closest('[data-marketing-cancel-experiment]');
       if (open) { state.snapshotFormOpen = true; state.listingFormOpen = false; render(); return; }
       if (cancel) { state.snapshotFormOpen = false; render(); return; }
       if (openListing) { state.listingFormOpen = true; state.snapshotFormOpen = false; render(); return; }
       if (cancelListing) { state.listingFormOpen = false; render(); return; }
-      if (openMedia) { state.mediaFormOpen = true; render(); return; }
+      if (openMedia) { state.mediaFormOpen = true; state.experimentFormOpen = false; render(); return; }
       if (cancelMedia) { state.mediaFormOpen = false; render(); return; }
+      if (openExperiment) { state.experimentFormOpen = true; state.mediaFormOpen = false; render(); return; }
+      if (cancelExperiment) { state.experimentFormOpen = false; render(); return; }
       if (requestAnalysis) {
         handleAnalysisRequest(requestAnalysis).catch(error => {
           const status = document.getElementById('marketingWorkspaceStatus');
@@ -611,6 +684,15 @@
       });
     });
     if (content) content.addEventListener('submit', event => {
+      const experimentForm = event.target.closest('[data-marketing-experiment-form]');
+      if (experimentForm) {
+        event.preventDefault();
+        handleExperimentSubmit(experimentForm).catch(error => {
+          const status = document.getElementById('marketingWorkspaceStatus');
+          if (status) status.textContent = `Değişiklik ölçümü başlatılamadı: ${error.message}`;
+        });
+        return;
+      }
       const mediaForm = event.target.closest('[data-marketing-media-form]');
       if (mediaForm) {
         event.preventDefault();
@@ -654,5 +736,5 @@
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') initializeBrowser();
 
-  return { periodFromFilter, scopeBookings, buildWorkspaceModel, selectLatestSnapshot, renderWorkspaceHtml, renderFindingActions, renderListingForm, renderSnapshotForm, renderMediaUploadForm, renderAnalysisRuns, escapeHtml, setData, render };
+  return { periodFromFilter, scopeBookings, buildWorkspaceModel, selectLatestSnapshot, renderWorkspaceHtml, renderFindingActions, renderListingForm, renderSnapshotForm, renderMediaUploadForm, renderExperimentForm, renderAnalysisRuns, renderExperiments, escapeHtml, setData, render };
 }));
