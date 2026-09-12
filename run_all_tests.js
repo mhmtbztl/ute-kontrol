@@ -70,7 +70,8 @@ const testFiles = [
   'photo_intelligence_tests.js',
   'marketing_health_tests.js',
   'marketing_priority_tests.js',
-  'seasonal_marketing_tests.js'
+  'seasonal_marketing_tests.js',
+  'photo_analysis_job_tests.js'
 ];
 
 console.log('=============================================================================');

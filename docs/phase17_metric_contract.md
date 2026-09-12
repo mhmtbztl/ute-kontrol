@@ -157,3 +157,14 @@ presented as channel inventory.
   meaningful cover-score improvement. Weak changes create no noisy finding.
 - A seasonal recommendation becomes a digital human-review finding. If accepted,
   the cover change should start a before/after measurement window.
+
+## Photo-analysis job contract
+
+- Repeated requests for the same active property/context return the existing
+  run ID. A different context is rejected while that run is active.
+- A matching `SUCCEEDED` or `PARTIAL` run may be reused during the five-minute
+  cooldown. Failed and cancelled runs are never reused as successful work.
+- Run transitions are one-way: queued → processing → terminal. Terminal runs
+  cannot be restarted or rewritten into another lifecycle.
+- Completion requires the expected unique media set. Mixed successes and
+  failures produce `PARTIAL`; total failure requires an explicit error code.
