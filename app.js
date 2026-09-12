@@ -1138,9 +1138,14 @@ let propertyViewMode = 'table'; // 'table' or 'cards'
 function syncBookingCleaningTasks() {
   if (!appData.cleaningTasks) appData.cleaningTasks = [];
   if (!appData.bookings) appData.bookings = [];
-  if (!appData.expenses || appData.expenses.length === 0) {
-        appData.expenses = JSON.parse(JSON.stringify(DEFAULT_EXPENSES));
-      }
+  // Bos bir gider defteri BOS KALIR. Burada eskiden DEFAULT_EXPENSES (12 kayit,
+  // 271.900 TL sentetik demo gideri) enjekte ediliyordu; gideri olmayan HER
+  // musteri -yani her yeni musteri- rezervasyon ekler eklemez defterinde
+  // uydurma giderler buluyordu. Bu kayitlar veritabaninda olmadigi icin
+  // sayfa yenilenince kayboluyor, arada net kar ve marj raporlarini
+  // sapitiyordu. Hemen ustteki yorum da zaten bunun yapilMAmasi gerektigini
+  // soyluyor.
+  if (!appData.expenses) appData.expenses = [];
   if (!appData.deletedCleanTaskIds) appData.deletedCleanTaskIds = [];
 
   // Eski mükerrer/çift manuel gider kayıtlarını ayıkla (sadece tekil EXP-CLEAN- kalsın)

@@ -59,7 +59,10 @@ const testFiles = [
   'team_management_tests.js',
 
   // Hesap kapatma / KVKK silme (Phase 18)
-  'account_deletion_tests.js'
+  'account_deletion_tests.js',
+
+  // Yeni musteriye demo verisi sizmasi regresyonu
+  'fresh_tenant_isolation_tests.js'
 ];
 
 console.log('=============================================================================');
