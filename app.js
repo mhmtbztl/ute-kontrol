@@ -3708,6 +3708,26 @@ function isBookingInFilter(b) {
 // trendleri `dummyMoMDeltas` adli sabit bir tablodan geliyordu; hangi donem
 // secilirse secilsin ayni yuzdeler gorunuyordu. Artik gercekten hesaplanir.
 // -------------------------------------------------------------
+// -------------------------------------------------------------
+// DÖNEMDEKİ GÜN SAYISI
+// Doluluk ve RevPAR paydasi uygulamada tutarsizdi: bir yerde 30, baska bir
+// yerde 31, bir digerinde 90 gun kullaniliyordu. Ayni ay icin farkli ekranlar
+// farkli doluluk gosteriyordu. Artik tek kaynak ve GERCEK ay uzunlugu.
+// -------------------------------------------------------------
+function getPeriodDayCount(periodKey) {
+  const p = periodKey || (currentFilter && currentFilter.period);
+  if (!p || p === 'ALL') return 365;
+  if (/^\d{4}-YEAR$/.test(p)) {
+    const y = Number(p.slice(0, 4));
+    return ((y % 4 === 0 && y % 100 !== 0) || y % 400 === 0) ? 366 : 365;
+  }
+  if (/^\d{4}-\d{2}$/.test(p)) {
+    const [y, m] = p.split('-').map(Number);
+    return new Date(y, m, 0).getDate();   // ayin gercek gun sayisi
+  }
+  return 30;
+}
+
 function getPreviousPeriodKey(periodKey) {
   if (!periodKey || !/^\d{4}-\d{2}$/.test(periodKey)) return null;
   const [y, m] = periodKey.split('-').map(Number);
@@ -4078,7 +4098,7 @@ function renderFinanceModule() {
     totalSoldNights = manualBookingNights;
     avgRevPerNight = totalSoldNights > 0 ? Math.round(totalRevenue / totalSoldNights) : 0;
     
-    const daysInPeriod = currentFilter.period === 'ALL' ? (14 * 30) : 30;
+    const daysInPeriod = getPeriodDayCount();
     Object.keys(propStats).forEach(vKey => {
       const s = propStats[vKey];
       s.adr = s.nights > 0 ? Math.round(s.revenue / s.nights) : 0;
@@ -4114,6 +4134,13 @@ function renderFinanceModule() {
   // USALI: dagitim (OTA komisyonu) ve temizlik maliyeti operasyonel giderdir.
   // Ciro brut alindigi icin bu tutarlar burada gider tarafina eklenir.
   totalOpex += bookingDistributionCost;
+
+  // Bu tutarlar rezervasyonlardan OTOMATIK gelir. Kullanici ayni maliyeti bir de
+  // Gider Defteri'ne elle girerse iki kez dusulur; bunu gizlemek yerine ekranda
+  // acikca gosteriyoruz ki mukerrer giris yapilmasin.
+  setEl('finAutoDerivedCost', bookingDistributionCost > 0
+    ? `Bunun ${Math.round(bookingDistributionCost).toLocaleString('tr-TR')} TL'si rezervasyonlardan otomatik (OTA komisyonu + temizlik). Aynı tutarları Gider Defteri'ne tekrar girmeyin.`
+    : '');
 
   // Hierarchy calculations
   const operatingProfit = totalRevenue - totalOpex;
@@ -4345,7 +4372,7 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
       const estimatedCost = Math.round(s.revenue * 0.45);
       const estimatedProfit = Math.max(0, s.revenue - estimatedCost);
       const profitMargin = s.revenue > 0 ? ((estimatedProfit / s.revenue) * 100).toFixed(1) : 0;
-      const occVal = Number(s.occupancy || (currentFilter.period === 'ALL' ? ((s.nights / (14 * 30)) * 100).toFixed(1) : ((s.nights / 31) * 100).toFixed(1)));
+      const occVal = Number(s.occupancy || ((s.nights / getPeriodDayCount()) * 100).toFixed(1));
       const adrVal = Math.round(s.adr || (s.nights > 0 ? s.revenue / s.nights : 0));
 
       // Determine Strategic Diagnosis
@@ -4409,7 +4436,7 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
       const ciroShare = totalRevenue > 0 ? (s.revenue / totalRevenue) * 100 : 0;
       const estimatedCost = Math.round(s.revenue * 0.45);
       const estimatedProfit = Math.max(0, s.revenue - estimatedCost);
-      const occVal = Number(s.occupancy || (currentFilter.period === 'ALL' ? ((s.nights / (14 * 30)) * 100).toFixed(1) : ((s.nights / 31) * 100).toFixed(1)));
+      const occVal = Number(s.occupancy || ((s.nights / getPeriodDayCount()) * 100).toFixed(1));
       const adrVal = Math.round(s.adr || (s.nights > 0 ? s.revenue / s.nights : 0));
 
       const card = document.createElement('div');
@@ -4493,8 +4520,8 @@ function renderPropertyComparisonChart(propStats) {
     if (metric === 'ciro') val = s.revenue;
     if (metric === 'netKar') val = Math.round(s.revenue * 0.4);
     if (metric === 'adr') val = s.adr || (s.nights > 0 ? Math.round(s.revenue / s.nights) : 0);
-    if (metric === 'revpar') val = s.revpar || Math.round(s.revenue / 31);
-    if (metric === 'doluluk') val = Number(s.occupancy || ((s.nights / 31) * 100).toFixed(1));
+    if (metric === 'revpar') val = s.revpar || Math.round(s.revenue / getPeriodDayCount());
+    if (metric === 'doluluk') val = Number(s.occupancy || ((s.nights / getPeriodDayCount()) * 100).toFixed(1));
     if (metric === 'satilanGece') val = s.nights;
     values.push({ key: vKey, name: DEFAULT_VILLAS[vKey].name, val });
   });
@@ -5691,7 +5718,7 @@ function renderKPIsAndDashboard() {
     }
   });
 
-  const daysInPeriod = currentFilter.period === 'ALL' ? 90 : 30;
+  const daysInPeriod = getPeriodDayCount();
   const totalCalendarDays = daysInPeriod * targetVillas.length;
   const totalDowntime = appData.maintenance
     .filter(m => m.status === 'OPEN' && m.priority === 'P1' && targetVillas.includes(m.villa))
@@ -13325,7 +13352,7 @@ function renderExecutiveControlCenter() {
       expenses: expenses.filter(e => typeof isExpenseInFilter === 'function' ? isExpenseInFilter(e) : true),
       targets: periodTarget,
       propertiesCount: Math.max(1, propertiesList.length),
-      daysInMonth: 30
+      daysInMonth: getPeriodDayCount()
     });
 
     const revEl = document.getElementById('execKpiRevenue');
