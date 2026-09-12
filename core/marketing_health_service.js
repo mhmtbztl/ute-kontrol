@@ -51,7 +51,7 @@
     if (!Number.isFinite(sampleSize) || !Number.isFinite(minSampleSize) || sampleSize < minSampleSize) {
       return unavailable('SAMPLE_TOO_SMALL', { sampleSize, minSampleSize });
     }
-    const confidence = input.confidence === undefined
+    const confidence = input.confidence === undefined || input.confidence === null || input.confidence === ''
       ? bounded(sampleSize / Math.max(minSampleSize * 4, 1), 0.5, 1)
       : Number(input.confidence);
     return available(bounded((value / reference) * 100, 0, 100), confidence, {

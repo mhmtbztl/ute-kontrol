@@ -66,6 +66,12 @@ test('Ratio scores are capped rather than rewarding unbounded benchmark outperfo
   assert.strictEqual(component.score, 100);
 });
 
+test('A null optional confidence uses sample-derived confidence', () => {
+  const component = service.ratioComponent({ value: 4, reference: 5, sampleSize: 1000, minSampleSize: 500, confidence: null });
+  assert.strictEqual(component.status, 'AVAILABLE');
+  assert.strictEqual(component.confidence, 0.5);
+});
+
 test('Net economics uses room revenue after recorded distribution cost', () => {
   const component = service.netEconomicsComponent({
     roomRevenueBeforeDistribution: 10000,

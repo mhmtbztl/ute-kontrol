@@ -96,7 +96,12 @@ const testFiles = [
   'marketing_experiment_worker_entrypoint_tests.js',
   'seasonal_marketing_worker_tests.js',
   'seasonal_marketing_worker_repository_tests.js',
-  'seasonal_marketing_worker_entrypoint_tests.js'
+  'seasonal_marketing_worker_entrypoint_tests.js',
+  'marketing_health_input_service_tests.js',
+  'marketing_health_worker_tests.js',
+  'marketing_health_worker_repository_tests.js',
+  'marketing_health_worker_schema_tests.js',
+  'marketing_health_worker_entrypoint_tests.js'
 ];
 
 console.log('=============================================================================');
