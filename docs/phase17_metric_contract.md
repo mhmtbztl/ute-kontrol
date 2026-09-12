@@ -116,3 +116,18 @@ presented as channel inventory.
   review. It is not proof that an amenity is absent from the property.
 - Only `RESHOOT` results become physical-work candidates, and even those require
   explicit user acceptance before an operational task can be created.
+
+## Marketing-health contract
+
+- The eight component weights total 100, but a missing component remains
+  `UNAVAILABLE`; no neutral score is inserted in its place.
+- Available components are renormalized only after at least 50% weighted data
+  coverage is present.
+- Coverage and confidence are separate. A numerically complete but unreliable
+  input set still produces `INSUFFICIENT_DATA` and no headline score.
+- Every component carries evidence and provenance. Ratio-based components must
+  satisfy their own denominator and sample thresholds.
+- Net economics means retained room revenue after recorded distribution cost;
+  it is not profit or total contribution margin.
+- Persisted health snapshots are immutable, backend-derived and idempotent for
+  the same property, input fingerprint and scoring version.
