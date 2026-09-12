@@ -132,6 +132,18 @@ runTest('Channel listing form preserves property scope and constrained channel v
   assert.match(html, /&lt;Eski&gt;/);
 });
 
+runTest('Private media form scopes the property and constrains accepted image types', () => {
+  const model = MarketingUI.buildWorkspaceModel({
+    filter: { period: 'ALL', villa: 'AZURE' }, bookings: [],
+    villas: { AZURE: { id: 'P1', name: 'Villa Azure' } }
+  });
+  const html = MarketingUI.renderMediaUploadForm(model);
+  assert.match(html, /value="P1" selected/);
+  assert.match(html, /accept="image\/jpeg,image\/png,image\/webp,image\/heic"/);
+  assert.match(html, /en fazla 25 MiB/);
+  assert.doesNotMatch(html, /image\/svg/);
+});
+
 runTest('Index integrates one independent marketing entry without app.js edits', () => {
   const index = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   assert.strictEqual((index.match(/id="tab-marketing"/g) || []).length, 1);
@@ -146,7 +158,7 @@ runTest('Marketing bootstrap and lazy dependencies carry current content hashes'
   const uiSource = fs.readFileSync(path.join(__dirname, 'marketing_ui.js'), 'utf8');
   const hash = file => crypto.createHash('sha1').update(fs.readFileSync(file)).digest('hex').slice(0, 8);
   assert.match(index, new RegExp(`core/marketing_ui\\.js\\?v=${hash(path.join(__dirname, 'marketing_ui.js'))}`));
-  ['marketing_engine.js', 'marketing_funnel_service.js', 'marketing_priority_service.js', 'marketing_data_service.js', 'marketing_review_service.js', 'marketing_snapshot_service.js', 'marketing_channel_listing_service.js'].forEach(file => {
+  ['marketing_engine.js', 'marketing_funnel_service.js', 'marketing_priority_service.js', 'marketing_data_service.js', 'marketing_review_service.js', 'marketing_snapshot_service.js', 'marketing_channel_listing_service.js', 'marketing_media_upload_service.js'].forEach(file => {
     assert.match(uiSource, new RegExp(`${file.replace('.', '\\.') }\\?v=${hash(path.join(__dirname, file))}`));
   });
 });

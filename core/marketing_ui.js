@@ -20,6 +20,7 @@
     view: 'economics',
     snapshotFormOpen: false,
     listingFormOpen: false,
+    mediaFormOpen: false,
     listings: [],
     snapshots: [],
     findings: [],
@@ -43,7 +44,8 @@
     ['MarketingDataService', 'core/marketing_data_service.js?v=06308c56'],
     ['MarketingReviewService', 'core/marketing_review_service.js?v=9207dee5'],
     ['MarketingSnapshotService', 'core/marketing_snapshot_service.js?v=184ad517'],
-    ['MarketingChannelListingService', 'core/marketing_channel_listing_service.js?v=0e34cbca']
+    ['MarketingChannelListingService', 'core/marketing_channel_listing_service.js?v=0e34cbca'],
+    ['MarketingMediaUploadService', 'core/marketing_media_upload_service.js?v=52d4d9ce']
   ]);
   let dependencyPromise = null;
 
@@ -311,14 +313,40 @@
   }
 
   function renderGallery(model) {
+    const toolbar = `<div style="display:flex;justify-content:flex-end;margin-bottom:12px"><button type="button" class="btn btn-primary btn-sm" data-marketing-open-media>＋ Fotoğraf yükle</button></div>`;
+    const form = state.mediaFormOpen ? renderMediaUploadForm(model) : '';
     if (!model.media.length && !model.analysisRuns.length && !model.experiments.length) {
-      return emptyState('Galeri analizi henüz yok', 'Özel medya kaydı ve tamamlanmış analiz işi olmadan kalite puanı veya değişiklik önerisi üretilmez.');
+      return `${toolbar}${form}${emptyState('Galeri analizi henüz yok', 'Özel medya kaydı ve tamamlanmış analiz işi olmadan kalite puanı veya değişiklik önerisi üretilmez.')}`;
     }
-    return `<div style="display:flex;gap:10px;flex-wrap:wrap">
+    return `${toolbar}${form}<div style="display:flex;gap:10px;flex-wrap:wrap">
       ${kpi('Medya kaydı', number(model.media.length), 'Yetkili özel medya')}
       ${kpi('Analiz çalışması', number(model.analysisRuns.length), 'Durumu izlenen işler')}
       ${kpi('Gözlemsel deney', number(model.experiments.length), 'A/B testi olarak sunulmaz')}
     </div><div class="card" style="padding:14px;margin-top:12px">Fotoğraf kararları yalnızca yapılandırılmış analiz sonucu ve doğrulanmış kapsam ile gösterilir.</div>`;
+  }
+
+  function renderMediaUploadForm(model) {
+    const properties = model.properties.filter(item => item.id);
+    if (!properties.length) return emptyState('Mülk kaydı bulunamadı', 'Fotoğraf yüklemek için önce bulut hesabında bir mülk oluşturulmalıdır.');
+    const selectedId = model.selectedProperty === 'ALL' ? null
+      : (properties.find(item => item.slug === model.selectedProperty) || {}).id;
+    const propertyOptions = properties.map(item => `<option value="${escapeHtml(item.id)}"${item.id === selectedId ? ' selected' : ''}>${escapeHtml(item.name)}</option>`).join('');
+    const categories = [
+      ['EXTERIOR', 'Dış mekân'], ['LIVING_ROOM', 'Salon'], ['BEDROOM', 'Yatak odası'],
+      ['BATHROOM', 'Banyo'], ['KITCHEN', 'Mutfak'], ['DINING', 'Yemek alanı'],
+      ['POOL', 'Havuz'], ['SPA', 'Spa / jakuzi'], ['VIEW_TERRACE', 'Manzara / teras'],
+      ['AMENITY', 'Olanak'], ['OTHER', 'Diğer']
+    ].map(([value, label]) => `<option value="${value}">${label}</option>`).join('');
+    return `<form data-marketing-media-form class="card" style="padding:16px;margin-bottom:14px">
+      <h3 style="margin:0 0 12px">Özel galeriye fotoğraf yükle</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px">
+        <label style="display:grid;gap:5px;font-size:12px">Mülk<select class="form-control" name="propertyId" required>${propertyOptions}</select></label>
+        <label style="display:grid;gap:5px;font-size:12px">Alan kategorisi<select class="form-control" name="roomCategory" required>${categories}</select></label>
+        <label style="display:grid;gap:5px;font-size:12px">Fotoğraf<input class="form-control" type="file" name="mediaFile" accept="image/jpeg,image/png,image/webp,image/heic" required></label>
+      </div>
+      <div class="sub-text" style="margin-top:10px">JPEG, PNG, WebP veya HEIC · en fazla 25 MiB · dosya özel bucket’ta tutulur.</div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button type="button" class="btn btn-secondary btn-sm" data-marketing-cancel-media>Vazgeç</button><button type="submit" class="btn btn-primary btn-sm">Fotoğrafı yükle</button></div>
+    </form>`;
   }
 
   function renderWorkspaceHtml(model, view) {
@@ -485,6 +513,29 @@
     }
   }
 
+  async function handleMediaSubmit(form) {
+    const client = typeof supabaseClient !== 'undefined' ? supabaseClient : null;
+    const scope = cloudScope();
+    if (!client || !scope || !services.MarketingMediaUploadService) throw new Error('MEDIA_UPLOAD_UNAVAILABLE');
+    const values = Object.fromEntries(new FormData(form).entries());
+    const submit = form.querySelector('[type="submit"]');
+    if (submit) submit.disabled = true;
+    try {
+      const result = await services.MarketingMediaUploadService.uploadPropertyMedia(client, {
+        tenantId: scope.tenantId, propertyId: values.propertyId,
+        roomCategory: values.roomCategory, file: values.mediaFile
+      });
+      state.mediaFormOpen = false;
+      state.remoteStatus = 'LOADING';
+      render();
+      await hydrateCloudData();
+      render();
+      return result;
+    } finally {
+      if (submit) submit.disabled = false;
+    }
+  }
+
   function initializeBrowser() {
     if (typeof document === 'undefined') return;
     document.querySelectorAll('[data-marketing-view]').forEach(button => button.addEventListener('click', () => {
@@ -497,10 +548,14 @@
       const cancel = event.target.closest('[data-marketing-cancel-snapshot]');
       const openListing = event.target.closest('[data-marketing-open-listing]');
       const cancelListing = event.target.closest('[data-marketing-cancel-listing]');
+      const openMedia = event.target.closest('[data-marketing-open-media]');
+      const cancelMedia = event.target.closest('[data-marketing-cancel-media]');
       if (open) { state.snapshotFormOpen = true; state.listingFormOpen = false; render(); return; }
       if (cancel) { state.snapshotFormOpen = false; render(); return; }
       if (openListing) { state.listingFormOpen = true; state.snapshotFormOpen = false; render(); return; }
       if (cancelListing) { state.listingFormOpen = false; render(); return; }
+      if (openMedia) { state.mediaFormOpen = true; render(); return; }
+      if (cancelMedia) { state.mediaFormOpen = false; render(); return; }
       const actionButton = event.target.closest('[data-marketing-action][data-finding-id]');
       if (!actionButton) return;
       handleFindingAction(actionButton).catch(error => {
@@ -509,6 +564,15 @@
       });
     });
     if (content) content.addEventListener('submit', event => {
+      const mediaForm = event.target.closest('[data-marketing-media-form]');
+      if (mediaForm) {
+        event.preventDefault();
+        handleMediaSubmit(mediaForm).catch(error => {
+          const status = document.getElementById('marketingWorkspaceStatus');
+          if (status) status.textContent = `Fotoğraf yüklenemedi: ${error.message}`;
+        });
+        return;
+      }
       const listingForm = event.target.closest('[data-marketing-listing-form]');
       if (listingForm) {
         event.preventDefault();
@@ -543,5 +607,5 @@
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') initializeBrowser();
 
-  return { periodFromFilter, scopeBookings, buildWorkspaceModel, selectLatestSnapshot, renderWorkspaceHtml, renderFindingActions, renderListingForm, renderSnapshotForm, escapeHtml, setData, render };
+  return { periodFromFilter, scopeBookings, buildWorkspaceModel, selectLatestSnapshot, renderWorkspaceHtml, renderFindingActions, renderListingForm, renderSnapshotForm, renderMediaUploadForm, escapeHtml, setData, render };
 }));
