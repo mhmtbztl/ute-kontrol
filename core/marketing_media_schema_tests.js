@@ -67,9 +67,9 @@ runTest('Authenticated users cannot directly forge AI results', () => {
 });
 
 runTest('Composite parent versions cannot null mandatory tenant keys on delete', () => {
-  const constraint = sql.match(/CONSTRAINT fk_media_version_parent_tenant_property[\s\S]*?ON DELETE (?:RESTRICT|CASCADE|SET NULL),/i);
+  const constraint = sql.match(/CONSTRAINT fk_media_version_parent_tenant_property[\s\S]*?ON DELETE (?:RESTRICT|CASCADE|SET NULL|NO ACTION DEFERRABLE INITIALLY DEFERRED),/i);
   assert(constraint, 'Parent-version FK was not found');
-  assert.match(constraint[0], /ON DELETE RESTRICT/i);
+  assert.match(constraint[0], /ON DELETE NO ACTION DEFERRABLE INITIALLY DEFERRED/i);
 });
 
 runTest('Analysis requests validate role and property ownership', () => {

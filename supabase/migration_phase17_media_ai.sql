@@ -128,7 +128,7 @@ CREATE TABLE IF NOT EXISTS public.property_media_versions (
     CONSTRAINT fk_media_version_parent_tenant_property
         FOREIGN KEY (tenant_id, property_id, parent_version_id)
         REFERENCES public.property_media_versions (tenant_id, property_id, id)
-        ON DELETE RESTRICT,
+        ON DELETE NO ACTION DEFERRABLE INITIALLY DEFERRED,
     CONSTRAINT chk_media_version_storage_prefix
         CHECK (storage_path LIKE tenant_id::TEXT || '/' || property_id::TEXT || '/%')
 );
