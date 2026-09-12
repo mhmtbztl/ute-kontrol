@@ -8,7 +8,8 @@
     module.exports = factory({
       MarketingEngine: require('./marketing_engine'),
       MarketingFunnelService: require('./marketing_funnel_service'),
-      MarketingPriorityService: require('./marketing_priority_service')
+      MarketingPriorityService: require('./marketing_priority_service'),
+      MarketingPhotoResultsService: require('./marketing_photo_results_service')
     });
   } else {
     root.LexBnBMarketingUI = factory(root);
@@ -48,7 +49,8 @@
     ['MarketingChannelListingService', 'core/marketing_channel_listing_service.js?v=0e34cbca'],
     ['MarketingMediaUploadService', 'core/marketing_media_upload_service.js?v=52d4d9ce'],
     ['MarketingPhotoAnalysisService', 'core/marketing_photo_analysis_service.js?v=639eaf5b'],
-    ['MarketingExperimentService', 'core/marketing_experiment_service.js?v=4a2ffb14']
+    ['MarketingExperimentService', 'core/marketing_experiment_service.js?v=4a2ffb14'],
+    ['MarketingPhotoResultsService', 'core/marketing_photo_results_service.js?v=19d43eea']
   ]);
   let dependencyPromise = null;
 
@@ -336,7 +338,26 @@
       ${kpi('Medya kaydı', number(model.media.length), 'Yetkili özel medya')}
       ${kpi('Analiz çalışması', number(model.analysisRuns.length), 'Durumu izlenen işler')}
       ${kpi('Gözlemsel deney', number(model.experiments.length), 'A/B testi olarak sunulmaz')}
-    </div>${renderAnalysisRuns(model.analysisRuns, selectedId)}${renderExperiments(model.experiments, selectedId)}<div class="card" style="padding:14px;margin-top:12px">Fotoğraf kararları yalnızca yapılandırılmış analiz sonucu ve doğrulanmış kapsam ile gösterilir.</div>`;
+    </div>${renderPhotoAnalysisResult(model, selectedId)}${renderAnalysisRuns(model.analysisRuns, selectedId)}${renderExperiments(model.experiments, selectedId)}<div class="card" style="padding:14px;margin-top:12px">Fotoğraf kararları yalnızca yapılandırılmış analiz sonucu ve doğrulanmış kapsam ile gösterilir.</div>`;
+  }
+
+  function renderPhotoAnalysisResult(model, propertyId) {
+    if (!propertyId || !services.MarketingPhotoResultsService) return '';
+    const view = services.MarketingPhotoResultsService.buildPhotoResultView({
+      runs: model.analysisRuns, propertyId, media: model.media
+    });
+    if (!view.available) {
+      if (!view.runId) return '';
+      const message = view.reason === 'GALLERY_CHANGED_SINCE_ANALYSIS'
+        ? 'Galeri son analizden sonra değişti. Güncel sonuç için yeniden analiz isteyin.'
+        : 'Son analiz sonucu doğrulanamadığı için gösterilmiyor.';
+      return `<div class="card" style="padding:14px;margin-top:12px"><strong>Analiz sonucu kullanılamıyor</strong><div class="sub-text" style="margin-top:5px">${message}</div></div>`;
+    }
+    const candidates = view.coverCandidates.length ? `<div style="margin-top:12px"><strong>Kapak adayları</strong>${view.coverCandidates.map(item => `<div style="margin-top:7px">${escapeHtml(String(item.mediaId).slice(0, 8))} · ${number(item.score, '/100')} — ${escapeHtml(item.reason)}</div>`).join('')}</div>` : '';
+    const recommendations = view.recommendations.length ? `<div style="margin-top:12px"><strong>Fotoğraf önerileri</strong>${view.recommendations.map(item => `<div style="margin-top:7px"><span class="badge ${item.improvementType === 'RESHOOT' ? 'badge-red' : 'badge-amber'}">${item.improvementType === 'RESHOOT' ? 'Yeniden çekim' : 'Düzenleme'}</span> ${escapeHtml(String(item.mediaId).slice(0, 8))} · ticari ${number(item.commercialScore, '/100')} — ${escapeHtml(item.recommendations.join(' · ') || 'İnsan incelemesi gerekli')}</div>`).join('')}</div>` : '';
+    const gaps = view.missingCoverage.length ? `<div style="margin-top:12px"><strong>Eksik kapsam kontrolleri</strong>${view.missingCoverage.map(item => `<div class="sub-text" style="margin-top:5px">${escapeHtml(item.explanation)}</div>`).join('')}</div>` : '';
+    const uncertainty = view.uncertainClaims.length ? `<div class="sub-text" style="margin-top:10px">Belirsiz gözlemler: ${escapeHtml(view.uncertainClaims.join(' · '))}</div>` : '';
+    return `<div class="card" style="padding:16px;margin-top:12px"><div style="display:flex;gap:10px;flex-wrap:wrap">${kpi('Galeri sağlık skoru', number(view.galleryScore, '/100'), 'Şema doğrulanmış AI gözlemi')}${kpi('Analiz güveni', number(view.confidencePercent, '%'), 'Kesinlik veya nedensellik değildir')}</div>${view.currentCover ? `<div style="margin-top:12px">Mevcut kapak: ${escapeHtml(String(view.currentCover.mediaId).slice(0, 8))} · ${number(view.currentCover.score, '/100')}</div>` : '<div class="sub-text" style="margin-top:12px">Kanal bazlı mevcut kapak belirtilmedi.</div>'}${candidates}${recommendations}${gaps}${uncertainty}</div>`;
   }
 
   function renderAnalysisRuns(runs, propertyId) {
@@ -738,5 +759,5 @@
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') initializeBrowser();
 
-  return { periodFromFilter, scopeBookings, buildWorkspaceModel, selectLatestSnapshot, renderWorkspaceHtml, renderFindingActions, renderListingForm, renderSnapshotForm, renderMediaUploadForm, renderExperimentForm, renderAnalysisRuns, renderExperiments, escapeHtml, setData, render };
+  return { periodFromFilter, scopeBookings, buildWorkspaceModel, selectLatestSnapshot, renderWorkspaceHtml, renderFindingActions, renderListingForm, renderSnapshotForm, renderMediaUploadForm, renderExperimentForm, renderPhotoAnalysisResult, renderAnalysisRuns, renderExperiments, escapeHtml, setData, render };
 }));

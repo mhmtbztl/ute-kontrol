@@ -170,6 +170,33 @@ runTest('Gallery reports an active analysis without presenting invented results'
   assert.doesNotMatch(html, /Galeri puanı/);
 });
 
+runTest('Gallery renders only schema-validated analysis results for the current media set', () => {
+  const propertyId = '22222222-2222-4222-8222-222222222222';
+  const runId = '33333333-3333-4333-8333-333333333333';
+  const mediaId = '44444444-4444-4444-8444-444444444444';
+  const model = MarketingUI.buildWorkspaceModel({
+    filter: { period: 'ALL', villa: 'AZURE' }, bookings: [],
+    villas: { AZURE: { id: propertyId, name: 'Villa Azure' } },
+    media: [{ id: mediaId, property_id: propertyId, media_status: 'ACTIVE' }],
+    analysisRuns: [{
+      id: runId, property_id: propertyId, status: 'SUCCEEDED', completed_at: '2026-09-13T10:00:00Z',
+      result_schema_validated_at: '2026-09-13T10:00:00Z',
+      result_payload: {
+        schemaVersion: 'photo-analysis-v1', runId, propertyId, overallGalleryScore: 84, confidence: 0.88,
+        coverAnalysis: { currentCoverMediaId: null, currentCoverScore: null, bestCoverCandidates: [{ mediaId, score: 91, reason: '<iyi aday>' }] },
+        photoEvaluations: [{ mediaId, roomCategory: 'POOL', technicalScore: 80, commercialScore: 72, improvementType: 'EDITABLE', actionableRecommendations: ['Pozlamayı düzelt'] }],
+        missingCoverage: [], recommendedStoryOrder: [{ suggestedIndex: 1, mediaId, roleInStory: 'HERO' }],
+        trustAssessment: { fabricationSuggested: false, uncertainClaims: [] }
+      }
+    }]
+  });
+  const html = MarketingUI.renderWorkspaceHtml(model, 'gallery');
+  assert.match(html, /Galeri sağlık skoru/);
+  assert.match(html, /84\/100/);
+  assert.match(html, /&lt;iyi aday&gt;/);
+  assert.match(html, /Kanal bazlı mevcut kapak belirtilmedi/);
+});
+
 runTest('Cover-change form requires scoped listing, distinct media choices and observational windows', () => {
   const propertyId = '22222222-2222-4222-8222-222222222222';
   const model = MarketingUI.buildWorkspaceModel({
@@ -212,7 +239,7 @@ runTest('Marketing bootstrap and lazy dependencies carry current content hashes'
   const uiSource = fs.readFileSync(path.join(__dirname, 'marketing_ui.js'), 'utf8');
   const hash = file => crypto.createHash('sha1').update(fs.readFileSync(file)).digest('hex').slice(0, 8);
   assert.match(index, new RegExp(`core/marketing_ui\\.js\\?v=${hash(path.join(__dirname, 'marketing_ui.js'))}`));
-  ['marketing_engine.js', 'marketing_funnel_service.js', 'marketing_priority_service.js', 'marketing_data_service.js', 'marketing_review_service.js', 'marketing_snapshot_service.js', 'marketing_channel_listing_service.js', 'marketing_media_upload_service.js', 'marketing_photo_analysis_service.js', 'marketing_experiment_service.js'].forEach(file => {
+  ['marketing_engine.js', 'marketing_funnel_service.js', 'marketing_priority_service.js', 'marketing_data_service.js', 'marketing_review_service.js', 'marketing_snapshot_service.js', 'marketing_channel_listing_service.js', 'marketing_media_upload_service.js', 'marketing_photo_analysis_service.js', 'marketing_experiment_service.js', 'marketing_photo_results_service.js'].forEach(file => {
     assert.match(uiSource, new RegExp(`${file.replace('.', '\\.') }\\?v=${hash(path.join(__dirname, file))}`));
   });
 });
