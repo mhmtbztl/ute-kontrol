@@ -72,7 +72,8 @@ const testFiles = [
   'marketing_priority_tests.js',
   'seasonal_marketing_tests.js',
   'photo_analysis_job_tests.js',
-  'marketing_ui_tests.js'
+  'marketing_ui_tests.js',
+  'marketing_data_service_tests.js'
 ];
 
 console.log('=============================================================================');

@@ -22,7 +22,10 @@
     findings: [],
     media: [],
     analysisRuns: [],
-    experiments: []
+    experiments: [],
+    remoteScopeKey: null,
+    remoteStatus: 'LOCAL',
+    remoteErrors: []
   };
 
   const CHANNEL_LABELS = Object.freeze({
@@ -33,7 +36,8 @@
   const BROWSER_DEPENDENCIES = Object.freeze([
     ['MarketingEngine', 'core/marketing_engine.js?v=2756f4ec'],
     ['MarketingFunnelService', 'core/marketing_funnel_service.js?v=a5ecbdaa'],
-    ['MarketingPriorityService', 'core/marketing_priority_service.js?v=f6e216ff']
+    ['MarketingPriorityService', 'core/marketing_priority_service.js?v=f6e216ff'],
+    ['MarketingDataService', 'core/marketing_data_service.js?v=06308c56']
   ]);
   let dependencyPromise = null;
 
@@ -131,7 +135,9 @@
       findings: Array.isArray(input.findings) ? input.findings : [],
       media: Array.isArray(input.media) ? input.media : [],
       analysisRuns: Array.isArray(input.analysisRuns) ? input.analysisRuns : [],
-      experiments: Array.isArray(input.experiments) ? input.experiments : []
+      experiments: Array.isArray(input.experiments) ? input.experiments : [],
+      remoteStatus: input.remoteStatus || 'LOCAL',
+      remoteErrors: Array.isArray(input.remoteErrors) ? input.remoteErrors : []
     };
   }
 
@@ -246,6 +252,44 @@
     return { ...state, bookings: data.bookings || [], villas: data.villas || {}, filter, baseCurrency: 'TRY' };
   }
 
+  function cloudScope() {
+    const tenantId = typeof getActiveTenantId === 'function' ? getActiveTenantId() : null;
+    if (!services.MarketingDataService || !services.MarketingDataService.UUID_RE.test(String(tenantId || ''))) return null;
+    const data = typeof appData !== 'undefined' ? appData : {};
+    const filter = typeof currentFilter !== 'undefined' ? currentFilter : {};
+    const selectedProperty = filter.villa || 'ALL';
+    if (selectedProperty === 'ALL') return { tenantId, propertyId: null };
+    const propertyId = data.villas && data.villas[selectedProperty] && data.villas[selectedProperty].id;
+    if (!services.MarketingDataService.UUID_RE.test(String(propertyId || ''))) return null;
+    return { tenantId, propertyId };
+  }
+
+  async function hydrateCloudData() {
+    const client = typeof supabaseClient !== 'undefined' ? supabaseClient : null;
+    const scope = cloudScope();
+    if (!client || !scope) {
+      if (state.remoteScopeKey) {
+        ['snapshots', 'findings', 'media', 'analysisRuns', 'experiments'].forEach(key => { state[key] = []; });
+      }
+      state.remoteScopeKey = null;
+      state.remoteStatus = 'LOCAL';
+      state.remoteErrors = [];
+      return null;
+    }
+    const scopeKey = `${scope.tenantId}:${scope.propertyId || 'ALL'}`;
+    if (state.remoteScopeKey === scopeKey && ['OK', 'PARTIAL', 'UNAVAILABLE'].includes(state.remoteStatus)) return null;
+    state.remoteScopeKey = scopeKey;
+    ['snapshots', 'findings', 'media', 'analysisRuns', 'experiments'].forEach(key => { state[key] = []; });
+    state.remoteStatus = 'LOADING';
+    state.remoteErrors = [];
+    const result = await services.MarketingDataService.loadMarketingWorkspaceData(client, scope);
+    if (state.remoteScopeKey !== scopeKey) return null;
+    ['snapshots', 'findings', 'media', 'analysisRuns', 'experiments'].forEach(key => { state[key] = result[key]; });
+    state.remoteStatus = result.status;
+    state.remoteErrors = result.errors;
+    return result;
+  }
+
   function render() {
     if (typeof document === 'undefined') return null;
     const content = document.getElementById('marketingWorkspaceContent');
@@ -254,7 +298,11 @@
     try {
       const model = buildWorkspaceModel(browserInput());
       content.innerHTML = renderWorkspaceHtml(model, state.view);
-      status.innerHTML = `<strong>${escapeHtml(model.period.label)}</strong> · ${model.selectedProperty === 'ALL' ? 'Tüm mülkler' : escapeHtml(model.selectedProperty)} · Kalış tarihine göre`;
+      const sourceLabel = model.remoteStatus === 'LOADING' ? 'Bulut verisi yükleniyor'
+        : model.remoteStatus === 'OK' ? 'Bulut verisi güncel'
+          : model.remoteStatus === 'PARTIAL' ? `Kısmi bulut verisi (${model.remoteErrors.length} kaynak kullanılamıyor)`
+            : model.remoteStatus === 'UNAVAILABLE' ? 'Bulut pazarlama verisi kullanılamıyor' : 'Yerel rezervasyon verisi';
+      status.innerHTML = `<strong>${escapeHtml(model.period.label)}</strong> · ${model.selectedProperty === 'ALL' ? 'Tüm mülkler' : escapeHtml(model.selectedProperty)} · Kalış tarihine göre · ${escapeHtml(sourceLabel)}`;
       status.style.display = '';
       const badge = document.getElementById('marketingDataQualityBadge');
       if (badge) {
@@ -296,9 +344,12 @@
     // switchTab() in app.js invokes this global hook. Replacing it prevents the
     // hidden legacy demo from rendering while preserving the existing router.
     window.renderMarketingModule = function renderMarketingWorkspace() {
-      return ensureBrowserDependencies().then(render).catch(error => {
+      return ensureBrowserDependencies().then(() => {
+        render();
+        return hydrateCloudData();
+      }).then(render).catch(error => {
         const status = document.getElementById('marketingWorkspaceStatus');
-        if (status) status.textContent = `Pazarlama bağımlılıkları yüklenemedi: ${error.message}`;
+        if (status) status.textContent = `Pazarlama verisi yüklenemedi: ${error.message}`;
         return null;
       });
     };

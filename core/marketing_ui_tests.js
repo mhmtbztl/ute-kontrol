@@ -1,4 +1,5 @@
 const assert = require('assert');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const MarketingUI = require('./marketing_ui');
@@ -89,6 +90,17 @@ runTest('Index integrates one independent marketing entry without app.js edits',
   assert.strictEqual((index.match(/src="core\/marketing_ui\.js(?:\?v=[a-f0-9]{8})?"/g) || []).length, 1);
   assert.match(index, /id="tab-marketing-legacy"[^>]*hidden[^>]*aria-hidden="true"/);
   assert.match(index, /onclick="switchTab\('marketing'\)"[^>]*>📈 Gelir & Dağıtım/);
+});
+
+runTest('Marketing bootstrap and lazy dependencies carry current content hashes', () => {
+  const root = path.join(__dirname, '..');
+  const index = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  const uiSource = fs.readFileSync(path.join(__dirname, 'marketing_ui.js'), 'utf8');
+  const hash = file => crypto.createHash('sha1').update(fs.readFileSync(file)).digest('hex').slice(0, 8);
+  assert.match(index, new RegExp(`core/marketing_ui\\.js\\?v=${hash(path.join(__dirname, 'marketing_ui.js'))}`));
+  ['marketing_engine.js', 'marketing_funnel_service.js', 'marketing_priority_service.js', 'marketing_data_service.js'].forEach(file => {
+    assert.match(uiSource, new RegExp(`${file.replace('.', '\\.') }\\?v=${hash(path.join(__dirname, file))}`));
+  });
 });
 
 console.log(`\nTEST SUMMARY: ${passedTests} / ${totalTests} TESTS PASSED`);
