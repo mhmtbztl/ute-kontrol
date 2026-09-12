@@ -81,7 +81,8 @@ const testFiles = [
   'marketing_channel_listing_service_tests.js',
   'marketing_media_upload_service_tests.js',
   'marketing_photo_analysis_service_tests.js',
-  'marketing_experiment_service_tests.js'
+  'marketing_experiment_service_tests.js',
+  'marketing_finding_orchestrator_tests.js'
 ];
 
 console.log('=============================================================================');
