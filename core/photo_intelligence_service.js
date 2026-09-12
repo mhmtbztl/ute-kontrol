@@ -144,9 +144,12 @@
 
     if (!isPlainObject(payload.coverAnalysis)) errors.push('coverAnalysis:OBJECT_REQUIRED');
     else {
-      if (!payload.coverAnalysis.currentCoverMediaId) errors.push('coverAnalysis.currentCoverMediaId:REQUIRED');
-      else if (expected.size > 0 && !expected.has(payload.coverAnalysis.currentCoverMediaId)) errors.push('coverAnalysis.currentCoverMediaId:OUT_OF_SCOPE');
-      validateScore(payload.coverAnalysis.currentCoverScore, 'coverAnalysis.currentCoverScore', errors);
+      const currentCoverId = payload.coverAnalysis.currentCoverMediaId;
+      if (currentCoverId !== null && (typeof currentCoverId !== 'string' || !currentCoverId)) errors.push('coverAnalysis.currentCoverMediaId:INVALID');
+      else if (currentCoverId !== null && expected.size > 0 && !expected.has(currentCoverId)) errors.push('coverAnalysis.currentCoverMediaId:OUT_OF_SCOPE');
+      if (currentCoverId === null) {
+        if (payload.coverAnalysis.currentCoverScore !== null) errors.push('coverAnalysis.currentCoverScore:MUST_BE_NULL_WITHOUT_COVER');
+      } else validateScore(payload.coverAnalysis.currentCoverScore, 'coverAnalysis.currentCoverScore', errors);
       if (!Array.isArray(payload.coverAnalysis.bestCoverCandidates)) errors.push('coverAnalysis.bestCoverCandidates:ARRAY_REQUIRED');
       else payload.coverAnalysis.bestCoverCandidates.forEach((candidate, index) => {
         if (!candidate || !candidate.mediaId || typeof candidate.reason !== 'string') errors.push(`coverAnalysis.bestCoverCandidates[${index}]:INVALID`);

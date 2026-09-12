@@ -104,6 +104,19 @@ function validPayload(overrides = {}) {
     assert.deepStrictEqual(result, { valid: true, errors: [] });
   });
 
+  await test('Unknown property-level cover remains explicit instead of being invented', () => {
+    const payload = validPayload({
+      coverAnalysis: { currentCoverMediaId: null, currentCoverScore: null, bestCoverCandidates: [] }
+    });
+    assert.strictEqual(service.validateAnalysisResult(payload, {
+      runId: 'run-1', propertyId: 'property-1', expectedMediaIds: ['media-1']
+    }).valid, true);
+    payload.coverAnalysis.currentCoverScore = 70;
+    assert(service.validateAnalysisResult(payload, {
+      runId: 'run-1', propertyId: 'property-1', expectedMediaIds: ['media-1']
+    }).errors.some(error => error.includes('MUST_BE_NULL')));
+  });
+
   await test('Run, property and analyzed media scope cannot be spoofed', () => {
     const result = service.validateAnalysisResult(validPayload({ runId: 'wrong' }), { runId: 'run-1', propertyId: 'property-1', expectedMediaIds: ['media-1', 'media-2'] });
     assert.strictEqual(result.valid, false);

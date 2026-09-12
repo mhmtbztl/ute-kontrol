@@ -27,8 +27,8 @@
       "additionalProperties": false,
       "required": ["currentCoverMediaId", "currentCoverScore", "bestCoverCandidates"],
       "properties": {
-        "currentCoverMediaId": { "type": "string", "minLength": 1 },
-        "currentCoverScore": { "type": "number", "minimum": 0, "maximum": 100 },
+        "currentCoverMediaId": { "type": ["string", "null"], "minLength": 1 },
+        "currentCoverScore": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
         "bestCoverCandidates": {
           "type": "array",
           "items": {

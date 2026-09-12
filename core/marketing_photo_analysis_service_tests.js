@@ -33,6 +33,20 @@ async function test(name, fn) {
     assert.deepStrictEqual(built.context.media.map(item => item.id), [MEDIA_A]);
   });
 
+  await test('Declared amenities and capacity participate in cache invalidation', async () => {
+    const one = await service.buildPropertyContext({ propertyId: PROPERTY, property: { capacity: 4, amenities: ['Pool', 'Sauna'] }, media: [
+      { id: MEDIA_A, property_id: PROPERTY, media_status: 'ACTIVE', content_sha256: 'a'.repeat(64) }
+    ] });
+    const same = await service.buildPropertyContext({ propertyId: PROPERTY, property: { capacity: 4, amenities: { sauna: true, pool: true } }, media: [
+      { id: MEDIA_A, property_id: PROPERTY, media_status: 'ACTIVE', content_sha256: 'a'.repeat(64) }
+    ] });
+    const changed = await service.buildPropertyContext({ propertyId: PROPERTY, property: { capacity: 6, amenities: ['Pool', 'Sauna'] }, media: [
+      { id: MEDIA_A, property_id: PROPERTY, media_status: 'ACTIVE', content_sha256: 'a'.repeat(64) }
+    ] });
+    assert.strictEqual(one.propertyContextHash, same.propertyContextHash);
+    assert.notStrictEqual(one.propertyContextHash, changed.propertyContextHash);
+  });
+
   await test('An analysis cannot be requested without active hashed media', async () => {
     await assert.rejects(() => service.buildPropertyContext({ propertyId: PROPERTY, media: [] }), /ACTIVE_PROPERTY_MEDIA_REQUIRED/);
     await assert.rejects(() => service.buildPropertyContext({ propertyId: PROPERTY, media: [
@@ -45,6 +59,7 @@ async function test(name, fn) {
     const client = { rpc: async (name, args) => { calls.push({ name, args }); return { data: MEDIA_B, error: null }; } };
     const result = await service.requestPhotoAnalysis(client, {
       tenantId: TENANT, propertyId: PROPERTY,
+      property: { capacity: 4, amenities: ['pool'] },
       media: [{ id: MEDIA_A, property_id: PROPERTY, media_status: 'ACTIVE', content_sha256: 'a'.repeat(64) }]
     });
     assert.strictEqual(calls.length, 1);

@@ -47,7 +47,7 @@
     ['MarketingSnapshotService', 'core/marketing_snapshot_service.js?v=184ad517'],
     ['MarketingChannelListingService', 'core/marketing_channel_listing_service.js?v=0e34cbca'],
     ['MarketingMediaUploadService', 'core/marketing_media_upload_service.js?v=52d4d9ce'],
-    ['MarketingPhotoAnalysisService', 'core/marketing_photo_analysis_service.js?v=bcb0fb90'],
+    ['MarketingPhotoAnalysisService', 'core/marketing_photo_analysis_service.js?v=639eaf5b'],
     ['MarketingExperimentService', 'core/marketing_experiment_service.js?v=4a2ffb14']
   ]);
   let dependencyPromise = null;
@@ -609,8 +609,10 @@
     if (!client || !scope || !scope.propertyId || !services.MarketingPhotoAnalysisService) throw new Error('PHOTO_ANALYSIS_REQUEST_UNAVAILABLE');
     button.disabled = true;
     try {
+      const data = typeof appData !== 'undefined' ? appData : {};
+      const property = Object.values(data.villas || {}).find(item => item && item.id === scope.propertyId) || {};
       const result = await services.MarketingPhotoAnalysisService.requestPhotoAnalysis(client, {
-        tenantId: scope.tenantId, propertyId: scope.propertyId, media: state.media
+        tenantId: scope.tenantId, propertyId: scope.propertyId, property, media: state.media
       });
       state.remoteStatus = 'LOADING';
       render();

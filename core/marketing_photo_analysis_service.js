@@ -41,11 +41,22 @@
     throw new Error('SHA256_UNAVAILABLE');
   }
 
+  function propertyFacts(property = {}) {
+    const source = property.amenities;
+    const amenities = Array.isArray(source) ? source.map(String)
+      : source && typeof source === 'object' ? Object.keys(source).filter(key => source[key]) : [];
+    const capacity = Number(property.capacity);
+    return {
+      capacity: Number.isFinite(capacity) && capacity >= 0 ? capacity : null,
+      amenities: [...new Set(amenities.map(value => value.trim().toLowerCase()).filter(Boolean))].sort()
+    };
+  }
+
   async function buildPropertyContext(input = {}) {
     if (!UUID_RE.test(String(input.propertyId || ''))) throw new Error('VALID_PROPERTY_ID_REQUIRED');
     const normalizedMedia = activeMedia(input.media, input.propertyId);
     if (!normalizedMedia.length) throw new Error('ACTIVE_PROPERTY_MEDIA_REQUIRED');
-    const context = { propertyId: input.propertyId, media: normalizedMedia };
+    const context = { propertyId: input.propertyId, property: propertyFacts(input.property), media: normalizedMedia };
     return { context, propertyContextHash: await sha256(JSON.stringify(context)) };
   }
 
@@ -72,5 +83,5 @@
     };
   }
 
-  return { PROMPT_VERSION, SCHEMA_VERSION, activeMedia, buildPropertyContext, requestPhotoAnalysis };
+  return { PROMPT_VERSION, SCHEMA_VERSION, activeMedia, propertyFacts, buildPropertyContext, requestPhotoAnalysis };
 }));
