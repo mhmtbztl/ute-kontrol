@@ -293,13 +293,14 @@ async function runTeamManagementTests() {
 
     if (cleanupFailed) testsFailed++;
     else recordPass('21. Test verileri eksiksiz temizlendi');
+
+    // Ozet ve cikis kodu FINALLY icinde: try icindeki bir `return`
+    // bunlari atlarsa suit hatali oldugu halde 0 ile cikar ve
+    // kosucu tarafindan PASS sayilir.
+    console.log(`TEST SUMMARY: ${testsPassed} / ${testsPassed + testsFailed} TESTS PASSED (${testsFailed} FAILED)`);
+    console.log('=============================================================================\n');
+    if (testsFailed > 0) process.exit(1);
   }
-
-  console.log('\n=============================================================================');
-  console.log(`TEST SUMMARY: ${testsPassed} / ${testsPassed + testsFailed} TESTS PASSED (${testsFailed} FAILED)`);
-  console.log('=============================================================================\n');
-
-  if (testsFailed > 0) process.exit(1);
 }
 
 runTeamManagementTests();

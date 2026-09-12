@@ -3667,6 +3667,7 @@ function switchTab(tabId) {
   if (tabId === 'reports') renderReportsTab();
   if (tabId === 'settings') renderSettingsTable();
   if (tabId === 'settings') renderTeamManagement();
+  if (tabId === 'settings') loadDeletionImpact();
   if (tabId === 'finance') renderFinanceModule();
   if (tabId === 'expenses') renderExpensesTable();
   if (tabId === 'housekeeping') renderHousekeepingTab();
@@ -6450,6 +6451,147 @@ function bindTeamTableEvents() {
       const el = ev.target.closest('[data-action="revoke"]');
       if (el) revokeMemberInvite(el.dataset.invite, el.dataset.email);
     });
+  }
+}
+
+// =============================================================================
+// ⚠️ HESAP KAPATMA (PHASE 18 — KVKK / GDPR)
+// Silme kararini ve kapsamini SUNUCU verir; buradaki onizleme yalnizca
+// kullanicinin ne kaybedecegini gormesi icindir.
+// =============================================================================
+
+const DELETE_ACCOUNT_PHRASE = 'HESABIMI SIL';
+
+function describeDeletionImpact(impact) {
+  const del = (impact && impact.tenants_to_delete) || [];
+  const leave = (impact && impact.tenants_to_leave) || [];
+  const parts = [];
+
+  if (del.length) {
+    const rows = del.map(t =>
+      `<li><strong>${escapeHtml(t.name)}</strong> — ${t.properties} mülk, ${t.bookings} rezervasyon, ${t.members} üye</li>`
+    ).join('');
+    parts.push(
+      `<div style="color:#FCA5A5; margin-bottom:10px;">
+         <strong>Kalıcı olarak silinecek işletmeler</strong> (tek sahibi sizsiniz):
+         <ul style="margin:6px 0 0 18px; padding:0;">${rows}</ul>
+       </div>`
+    );
+  }
+
+  if (leave.length) {
+    const rows = leave.map(t =>
+      `<li>${escapeHtml(t.name)} <span class="sub-text" style="font-size:11px;">(${escapeHtml(t.role)})</span></li>`
+    ).join('');
+    parts.push(
+      `<div style="color:#93C5FD;">
+         <strong>Yalnızca üyeliğiniz kaldırılacak</strong> (işletme ve verisi kalır):
+         <ul style="margin:6px 0 0 18px; padding:0;">${rows}</ul>
+       </div>`
+    );
+  }
+
+  if (!parts.length) {
+    parts.push('<span class="sub-text">Bu hesaba bağlı bir işletme yok. Yalnızca hesabınız silinecek.</span>');
+  }
+  return parts.join('');
+}
+
+async function loadDeletionImpact() {
+  const box = document.getElementById('deletionImpactBox');
+  const card = document.getElementById('dangerZoneCard');
+  if (!box) return null;
+
+  // Demo / yerel kum havuzunda kapatilacak bulut hesabi yoktur.
+  if (!isCloudTenant(getActiveTenantId())) {
+    if (card) card.style.display = 'none';
+    return null;
+  }
+  if (card) card.style.display = '';
+
+  const { data, error } = await supabaseClient.rpc('get_account_deletion_impact');
+  if (error) {
+    box.innerHTML = `<span style="color:#FCA5A5;">Etki bilgisi alınamadı: ${escapeHtml(error.message)}</span>`;
+    return null;
+  }
+
+  const del = (data && data.tenants_to_delete) || [];
+  box.innerHTML = del.length
+    ? `Hesabınızı kapatırsanız <strong style="color:#FCA5A5;">${del.length} işletme</strong> ve tüm verisi kalıcı olarak silinir.`
+    : 'Hesabınızı kapatırsanız yalnızca hesabınız silinir; işletmeler diğer sahiplerinde kalır.';
+  return data;
+}
+
+async function openDeleteAccountModal() {
+  const modal = document.getElementById('deleteAccountModal');
+  if (!modal) return;
+
+  const input = document.getElementById('deleteAccountConfirm');
+  const err = document.getElementById('deleteAccountError');
+  const detail = document.getElementById('deleteAccountImpact');
+  if (input) input.value = '';
+  if (err) err.style.display = 'none';
+  updateDeleteAccountButton();
+
+  modal.classList.add('active');
+  if (detail) detail.innerHTML = 'Yükleniyor…';
+
+  const { data, error } = await supabaseClient.rpc('get_account_deletion_impact');
+  if (detail) {
+    detail.innerHTML = error
+      ? `<span style="color:#FCA5A5;">Etki bilgisi alınamadı: ${escapeHtml(error.message)}</span>`
+      : describeDeletionImpact(data);
+  }
+  setTimeout(() => input && input.focus(), 80);
+}
+
+function closeDeleteAccountModal() {
+  const modal = document.getElementById('deleteAccountModal');
+  if (modal) modal.classList.remove('active');
+}
+
+// Onay metni birebir yazilmadan buton acilmaz. Sunucu da ayrica dogrular.
+function updateDeleteAccountButton() {
+  const input = document.getElementById('deleteAccountConfirm');
+  const btn = document.getElementById('deleteAccountSubmitBtn');
+  if (!btn) return;
+  const typed = (input && input.value ? input.value : '').trim().toUpperCase();
+  btn.disabled = typed !== DELETE_ACCOUNT_PHRASE;
+}
+
+async function submitAccountDeletion(e) {
+  if (e) e.preventDefault();
+  const input = document.getElementById('deleteAccountConfirm');
+  const btn = document.getElementById('deleteAccountSubmitBtn');
+  const err = document.getElementById('deleteAccountError');
+  const phrase = (input && input.value ? input.value : '').trim().toUpperCase();
+
+  if (err) err.style.display = 'none';
+  if (phrase !== DELETE_ACCOUNT_PHRASE) {
+    if (err) { err.style.display = 'block'; err.innerText = '⚠️ Onay metnini birebir yazın.'; }
+    return;
+  }
+
+  if (btn) { btn.disabled = true; btn.innerText = '⏳ Siliniyor...'; }
+
+  try {
+    const { data, error } = await supabaseClient.rpc('delete_my_account', { p_confirmation: phrase });
+    if (error) {
+      if (err) { err.style.display = 'block'; err.innerText = '⚠️ ' + error.message; }
+      return;
+    }
+
+    // Yerel izleri temizle ve giris ekranina don.
+    try { await supabaseClient.auth.signOut(); } catch (ex) {}
+    try { sessionStorage.clear(); localStorage.clear(); } catch (ex) {}
+
+    const n = (data && data.deleted_tenants) || 0;
+    alert(`Hesabınız kalıcı olarak kapatıldı.${n ? `\n${n} işletme ve tüm verisi silindi.` : ''}\n\nİlginiz için teşekkür ederiz.`);
+    window.location.replace(window.location.pathname);
+  } catch (ex) {
+    if (err) { err.style.display = 'block'; err.innerText = '⚠️ ' + (ex && ex.message ? ex.message : 'Hesap kapatılamadı.'); }
+  } finally {
+    if (btn) { btn.innerText = 'Hesabımı Kalıcı Olarak Sil'; updateDeleteAccountButton(); }
   }
 }
 

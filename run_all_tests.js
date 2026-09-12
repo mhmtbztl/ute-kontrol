@@ -56,7 +56,10 @@ const testFiles = [
   'registration_flow_tests.js',
 
   // Ekip daveti ve rol yonetimi (Phase 16)
-  'team_management_tests.js'
+  'team_management_tests.js',
+
+  // Hesap kapatma / KVKK silme (Phase 18)
+  'account_deletion_tests.js'
 ];
 
 console.log('=============================================================================');
@@ -75,8 +78,11 @@ for (let i = 0; i < testFiles.length; i++) {
   process.stdout.write(`[${String(i + 1).padStart(2, ' ')}/${testFiles.length}] Running ${file.padEnd(40, ' ')} ... `);
 
   try {
-    const output = execSync(`node "${filePath}"`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
-    
+    // stderr'i de yakala. [FAIL] satirlari console.error ile yazildigi icin
+    // yalnizca stdout okunursa asagidaki "sifir cikis koduyla [FAIL]" agi
+    // HIC calismaz - bu kontrolun var olma sebebi tam olarak buydu.
+    const output = execSync(`node "${filePath}" 2>&1`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+
     // Parse pass count from output: [PASS] or X / X TESTS PASSED
     const passMatches = output.match(/\[PASS\]/g);
     const summaryMatch = output.match(/TEST SUMMARY:\s*(\d+)\s*\/\s*(\d+)\s*TESTS PASSED/i) ||

@@ -2591,6 +2591,24 @@
           </table>
         </div>
       </section>
+
+      <!-- TEHLİKELİ BÖLGE: HESAP KAPATMA -->
+      <section class="card" id="dangerZoneCard" style="margin-top: 24px; border: 1px solid rgba(239, 68, 68, 0.35);">
+        <div class="section-title-bar">
+          <div>
+            <h2 style="color: #FCA5A5;">⚠️ TEHLİKELİ BÖLGE</h2>
+            <p class="sub-text">Hesabınızı kalıcı olarak kapatın. Bu işlem geri alınamaz.</p>
+          </div>
+        </div>
+        <div style="padding: 4px 4px 16px;">
+          <div id="deletionImpactBox" class="sub-text" style="font-size: 12px; margin-bottom: 14px;">
+            Etki bilgisi yükleniyor…
+          </div>
+          <button class="btn btn-danger" id="openDeleteAccountBtn" onclick="openDeleteAccountModal()">
+            Hesabımı Kalıcı Olarak Kapat
+          </button>
+        </div>
+      </section>
     </div>
 
     <!-- ======================================================= -->
@@ -2841,6 +2859,41 @@
   <!-- ========================================== -->
   <!-- MODAL: AYLIK FİNANSAL HEDEFLERİ DÜZENLE -->
   <!-- ========================================== -->
+  <!-- ======================================================= -->
+  <!-- MODAL: HESABI KALICI OLARAK KAPAT                       -->
+  <!-- ======================================================= -->
+  <div class="modal-backdrop" id="deleteAccountModal">
+    <div class="modal-card" style="max-width: 560px; border: 1px solid rgba(239, 68, 68, 0.45);">
+      <div class="modal-header" style="background: linear-gradient(135deg, rgba(239, 68, 68, 0.18), rgba(153, 27, 27, 0.1));">
+        <h3 style="color: #FCA5A5;">⚠️ Hesabınızı Kalıcı Olarak Kapatın</h3>
+        <button class="close-btn" onclick="closeDeleteAccountModal()">&times;</button>
+      </div>
+      <form id="deleteAccountForm" onsubmit="submitAccountDeletion(event)">
+        <div style="padding: 20px;">
+          <div id="deleteAccountImpact" style="font-size: 12px; color: #E2E8F0; margin-bottom: 16px;">
+            Yükleniyor…
+          </div>
+
+          <div style="background: rgba(239, 68, 68, 0.12); border: 1px dashed rgba(239, 68, 68, 0.4); border-radius: 6px; padding: 10px 12px; font-size: 11px; color: #FCA5A5; margin-bottom: 16px;">
+            Bu işlem <strong>geri alınamaz</strong>. Silinen işletmelerin mülkleri, rezervasyonları, giderleri ve tüm geçmişi kalıcı olarak kaybolur.
+            İşletmenizi başkasına devretmek istiyorsanız, önce <strong>Ekip ve Rol Yönetimi</strong> bölümünden bir üyeyi <strong>Sahip</strong> yapın; o zaman işletme silinmez.
+          </div>
+
+          <div class="form-group">
+            <label style="font-weight: 700; color: #FFFFFF; font-size: 13px;">Onaylamak için <code style="background: rgba(0,0,0,0.4); padding: 1px 6px; border-radius: 3px; color: #FDE68A;">HESABIMI SIL</code> yazın</label>
+            <input type="text" id="deleteAccountConfirm" autocomplete="off" placeholder="HESABIMI SIL" oninput="updateDeleteAccountButton()" style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 13px; margin-top: 6px;">
+          </div>
+
+          <div id="deleteAccountError" class="auth-error-msg" style="display: none; margin-top: 12px;"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeDeleteAccountModal()">Vazgeç</button>
+          <button type="submit" class="btn btn-danger" id="deleteAccountSubmitBtn" disabled>Hesabımı Kalıcı Olarak Sil</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- ======================================================= -->
   <!-- MODAL: EKİBE ÜYE DAVET ET                               -->
   <!-- ======================================================= -->
@@ -4250,6 +4303,6 @@
   <script src="core/executive_dashboard_service.js?v=651e8e45"></script>
   <script src="core/executive_ai_advisor.js?v=93c10c3e"></script>
   <script src="core/notification_center_service.js?v=7fb8bdee"></script>
-  <script src="app.js?v=e936ca18"></script>
+  <script src="app.js?v=fd7dac26"></script>
 </body>
 </html>
