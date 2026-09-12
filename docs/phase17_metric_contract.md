@@ -79,3 +79,22 @@ presented as channel inventory.
 - Channel RevPAR is `null` without channel availability.
 - Totals reconcile exactly to the sum of channel rows.
 - Booking-cohort cancellation rate never uses stay-date filtering.
+
+## Change-impact evaluation contract
+
+- A single-listing before/after comparison is observational; it is not an A/B
+  test and never produces a causal claim.
+- The default evidence threshold is 14 complete days and 300 search
+  impressions in each window for CTR. Conversion uses listing views as its
+  denominator and requires at least 50 views in each window.
+- Windows are start-inclusive and end-exclusive. The before window must end on
+  or before the recorded change date, and the after window must start on or
+  after it.
+- A result is not evaluated before the after window has completed.
+- Displayed-price drift over 15%, season transitions, campaigns and other known
+  concurrent changes mark the comparison as `CONFOUNDED` rather than assigning
+  the observed movement to the listing change.
+- A small or statistically unclear movement is `NO_CLEAR_CHANGE`; this does not
+  prove that the change had no effect.
+- Experiment evidence points to immutable raw performance snapshots so the
+  inputs remain auditable.

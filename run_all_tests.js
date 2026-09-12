@@ -64,7 +64,9 @@ const testFiles = [
   'marketing_funnel_tests.js',
   'marketing_media_schema_tests.js',
   'marketing_action_tests.js',
-  'marketing_actions_schema_tests.js'
+  'marketing_actions_schema_tests.js',
+  'marketing_impact_tests.js',
+  'marketing_impact_schema_tests.js'
 ];
 
 console.log('=============================================================================');
