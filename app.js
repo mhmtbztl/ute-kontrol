@@ -1174,26 +1174,15 @@ async function deleteBooking(bookingId) {
 
   if (isCloud && propBookingId) {
     try {
-      // 1. Preserve historical / paid / completed cleaning tasks: detach booking_id rather than delete
-      await supabaseClient
-        .from('cleaning_tasks')
-        .update({ booking_id: null })
-        .eq('booking_id', propBookingId)
-        .eq('is_paid', true);
-
-      // 2. Remove only pending / unpaid cleaning tasks
-      await supabaseClient
-        .from('cleaning_tasks')
-        .delete()
-        .eq('booking_id', propBookingId)
-        .eq('is_paid', false);
-
-      // 3. Awaited DB delete for booking
-      const { error } = await supabaseClient
-        .from('bookings')
-        .delete()
-        .eq('id', propBookingId)
-        .eq('tenant_id', tenantId);
+      // Tek transaction. Onceden burada UC ayri sorgu vardi: odenmisleri ayir,
+      // odenmemisleri sil, rezervasyonu sil. Ucuncu adim kapanmis donem korumasina
+      // takilirsa ikinci adim GERI ALINMIYORDU - kullanici "silinemedi" hatasi
+      // aliyor ama temizlikciye olan borc kaydini kaybediyordu (canli dogrulandi).
+      // Odenmis gorevlerin baglantisini FK zaten ON DELETE SET NULL ile bosaltir.
+      const { error } = await supabaseClient.rpc('delete_booking_atomic', {
+        p_booking_id: propBookingId,
+        p_tenant_id: tenantId
+      });
 
       if (error) {
         console.error('deleteBooking DB error:', error);

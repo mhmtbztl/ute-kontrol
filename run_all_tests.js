@@ -68,7 +68,10 @@ const testFiles = [
   'usali_revenue_treatment_tests.js',
 
   // Veri gibi gorunen statik arayuz degerleri denetimi
-  'static_ui_value_tests.js'
+  'static_ui_value_tests.js',
+
+  // Rezervasyon silme atomikligi (Phase 19)
+  'booking_delete_atomicity_tests.js'
 ];
 
 console.log('=============================================================================');
