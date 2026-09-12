@@ -84,6 +84,17 @@ function mockClient(rowsByTable = {}, errorsByTable = {}) {
     assert.match(mediaCall.selected, /content_sha256/);
   });
 
+  await runTest('Health snapshots are read by property and newest evidence time', async () => {
+    const client = mockClient();
+    const result = await MarketingDataService.loadMarketingWorkspaceData(client, { tenantId: TENANT, propertyId: PROPERTY });
+    const call = client.calls.find(item => item.table === 'property_marketing_health_snapshots');
+    assert.deepStrictEqual(call.filters.find(filter => filter.column === 'property_id'), {
+      kind: 'eq', column: 'property_id', value: PROPERTY
+    });
+    assert.deepStrictEqual(call.order, { column: 'as_of', ascending: false });
+    assert.deepStrictEqual(result.healthSnapshots, []);
+  });
+
   await runTest('One unavailable Phase 17 table degrades to partial data', async () => {
     const client = mockClient({}, { marketing_findings: { code: '42P01', message: 'relation missing' } });
     const result = await MarketingDataService.loadMarketingWorkspaceData(client, { tenantId: TENANT });

@@ -66,6 +66,45 @@ runTest('Unknown channels remain visible in the rendered economics table', () =>
   assert.match(html, /Eşleme gerekli/);
 });
 
+runTest('Economics renders only a reportable backend health snapshot', () => {
+  const propertyId = '22222222-2222-4222-8222-222222222222';
+  const model = MarketingUI.buildWorkspaceModel({
+    filter: { period: 'ALL', villa: 'AZURE' }, bookings: [],
+    villas: { AZURE: { id: propertyId, name: 'Villa Azure' } },
+    healthSnapshots: [{
+      id: 'H1', property_id: propertyId, as_of: '2026-09-13T08:00:00Z',
+      scoring_version: 'health-v1', status: 'REPORTABLE', score: 82.5,
+      coverage_percent: 75, confidence_index: 0.73, confidence_tier: 'MEDIUM',
+      components: [], missing_components: [],
+      scoring_method: 'RENORMALIZED_AVAILABLE_COMPONENTS', missing_data_imputed: false
+    }]
+  });
+  const html = MarketingUI.renderWorkspaceHtml(model, 'economics');
+  assert.match(html, /Pazarlama sağlık skoru/);
+  assert.match(html, /82,5\/100/);
+  assert.match(html, /Eksik veri puanlanmadı/);
+  assert.match(html, /health-v1/);
+});
+
+runTest('Insufficient health evidence remains scoreless in the UI', () => {
+  const propertyId = '22222222-2222-4222-8222-222222222222';
+  const model = MarketingUI.buildWorkspaceModel({
+    filter: { period: 'ALL', villa: 'AZURE' }, bookings: [],
+    villas: { AZURE: { id: propertyId, name: 'Villa Azure' } },
+    healthSnapshots: [{
+      id: 'H1', property_id: propertyId, as_of: '2026-09-13T08:00:00Z',
+      status: 'INSUFFICIENT_DATA', score: null, coverage_percent: 35,
+      confidence_index: 0.3, confidence_tier: 'INSUFFICIENT', components: [],
+      missing_components: [{ key: 'PHOTO_QUALITY', reason: '<missing>' }],
+      scoring_method: 'RENORMALIZED_AVAILABLE_COMPONENTS', missing_data_imputed: false
+    }]
+  });
+  const html = MarketingUI.renderWorkspaceHtml(model, 'economics');
+  assert.match(html, /Pazarlama sağlığı hesaplanamadı/);
+  assert.match(html, /veri kapsamı yetersiz \(35%\)/);
+  assert.doesNotMatch(html, />70</);
+});
+
 runTest('Missing funnel and gallery inputs render explicit empty states', () => {
   const model = MarketingUI.buildWorkspaceModel({ filter: { period: 'ALL', villa: 'ALL' }, bookings: [] });
   assert.match(MarketingUI.renderWorkspaceHtml(model, 'funnel'), /Huni verisi henüz yok/);
@@ -239,7 +278,7 @@ runTest('Marketing bootstrap and lazy dependencies carry current content hashes'
   const uiSource = fs.readFileSync(path.join(__dirname, 'marketing_ui.js'), 'utf8');
   const hash = file => crypto.createHash('sha1').update(fs.readFileSync(file)).digest('hex').slice(0, 8);
   assert.match(index, new RegExp(`core/marketing_ui\\.js\\?v=${hash(path.join(__dirname, 'marketing_ui.js'))}`));
-  ['marketing_engine.js', 'marketing_funnel_service.js', 'marketing_priority_service.js', 'marketing_data_service.js', 'marketing_review_service.js', 'marketing_snapshot_service.js', 'marketing_channel_listing_service.js', 'marketing_media_upload_service.js', 'marketing_photo_analysis_service.js', 'marketing_experiment_service.js', 'marketing_photo_results_service.js'].forEach(file => {
+  ['marketing_engine.js', 'marketing_funnel_service.js', 'marketing_priority_service.js', 'marketing_data_service.js', 'marketing_review_service.js', 'marketing_snapshot_service.js', 'marketing_channel_listing_service.js', 'marketing_media_upload_service.js', 'marketing_photo_analysis_service.js', 'marketing_experiment_service.js', 'marketing_photo_results_service.js', 'marketing_health_results_service.js'].forEach(file => {
     assert.match(uiSource, new RegExp(`${file.replace('.', '\\.') }\\?v=${hash(path.join(__dirname, file))}`));
   });
 });

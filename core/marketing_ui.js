@@ -9,7 +9,8 @@
       MarketingEngine: require('./marketing_engine'),
       MarketingFunnelService: require('./marketing_funnel_service'),
       MarketingPriorityService: require('./marketing_priority_service'),
-      MarketingPhotoResultsService: require('./marketing_photo_results_service')
+      MarketingPhotoResultsService: require('./marketing_photo_results_service'),
+      MarketingHealthResultsService: require('./marketing_health_results_service')
     });
   } else {
     root.LexBnBMarketingUI = factory(root);
@@ -29,6 +30,7 @@
     media: [],
     analysisRuns: [],
     experiments: [],
+    healthSnapshots: [],
     remoteScopeKey: null,
     remoteStatus: 'LOCAL',
     remoteErrors: []
@@ -43,14 +45,15 @@
     ['MarketingEngine', 'core/marketing_engine.js?v=2756f4ec'],
     ['MarketingFunnelService', 'core/marketing_funnel_service.js?v=a5ecbdaa'],
     ['MarketingPriorityService', 'core/marketing_priority_service.js?v=f6e216ff'],
-    ['MarketingDataService', 'core/marketing_data_service.js?v=8304fc0d'],
+    ['MarketingDataService', 'core/marketing_data_service.js?v=78f30016'],
     ['MarketingReviewService', 'core/marketing_review_service.js?v=9207dee5'],
     ['MarketingSnapshotService', 'core/marketing_snapshot_service.js?v=184ad517'],
     ['MarketingChannelListingService', 'core/marketing_channel_listing_service.js?v=0e34cbca'],
     ['MarketingMediaUploadService', 'core/marketing_media_upload_service.js?v=52d4d9ce'],
     ['MarketingPhotoAnalysisService', 'core/marketing_photo_analysis_service.js?v=639eaf5b'],
     ['MarketingExperimentService', 'core/marketing_experiment_service.js?v=4a2ffb14'],
-    ['MarketingPhotoResultsService', 'core/marketing_photo_results_service.js?v=19d43eea']
+    ['MarketingPhotoResultsService', 'core/marketing_photo_results_service.js?v=19d43eea'],
+    ['MarketingHealthResultsService', 'core/marketing_health_results_service.js?v=662edeea']
   ]);
   let dependencyPromise = null;
 
@@ -153,6 +156,7 @@
       media: Array.isArray(input.media) ? input.media : [],
       analysisRuns: Array.isArray(input.analysisRuns) ? input.analysisRuns : [],
       experiments: Array.isArray(input.experiments) ? input.experiments : [],
+      healthSnapshots: Array.isArray(input.healthSnapshots) ? input.healthSnapshots : [],
       remoteStatus: input.remoteStatus || 'LOCAL',
       remoteErrors: Array.isArray(input.remoteErrors) ? input.remoteErrors : []
     };
@@ -182,6 +186,31 @@
     return `<div class="card" style="padding:16px;min-width:170px;flex:1"><div class="sub-text" style="font-size:11px;text-transform:uppercase">${escapeHtml(label)}</div><div style="font-size:24px;font-weight:800;margin:5px 0">${escapeHtml(value)}</div><div class="sub-text" style="font-size:11px">${escapeHtml(note)}</div></div>`;
   }
 
+  function renderMarketingHealth(model) {
+    if (!services.MarketingHealthResultsService) return '';
+    if (model.selectedProperty === 'ALL') {
+      return `<div class="card" style="padding:14px;margin-bottom:12px"><strong>Pazarlama sağlığı</strong><div class="sub-text" style="margin-top:5px">Birleştirilmiş skor üretilmez. Sağlık snapshot’ını görmek için tek bir mülk seçin.</div></div>`;
+    }
+    const selected = model.properties.find(item => item.slug === model.selectedProperty);
+    const view = services.MarketingHealthResultsService.buildHealthView({
+      snapshots: model.healthSnapshots, propertyId: selected && selected.id
+    });
+    if (!view.available) {
+      const detail = view.reason === 'INSUFFICIENT_DATA'
+        ? `Raporlanabilir skor için veri kapsamı yetersiz (${number(view.coveragePercent, '%')}). Eksik veri puanla doldurulmadı.`
+        : view.reason === 'NO_SNAPSHOT'
+          ? 'Bu mülk için backend tarafından üretilmiş sağlık snapshot’ı henüz yok.'
+          : 'Sağlık snapshot’ı doğrulanamadığı için skor gösterilmiyor.';
+      const missing = Array.isArray(view.missingComponents) && view.missingComponents.length
+        ? `<div class="sub-text" style="margin-top:6px">Eksik bileşenler: ${escapeHtml(view.missingComponents.map(item => item.key).join(', '))}</div>` : '';
+      return `<div class="card" style="padding:14px;margin-bottom:12px"><strong>Pazarlama sağlığı hesaplanamadı</strong><div class="sub-text" style="margin-top:5px">${detail}</div>${missing}</div>`;
+    }
+    const tier = { HIGH: 'Yüksek', MEDIUM: 'Orta' }[view.confidenceTier] || view.confidenceTier;
+    const missing = view.missingComponents.length
+      ? `Eksik: ${view.missingComponents.map(item => item.key).join(', ')}` : 'Tüm bileşenler mevcut';
+    return `<div class="card" style="padding:14px;margin-bottom:12px"><div style="display:flex;gap:10px;flex-wrap:wrap">${kpi('Pazarlama sağlık skoru', number(view.score, '/100'), 'Değişmez backend snapshot’ı')}${kpi('Veri kapsamı', number(view.coveragePercent, '%'), 'Eksik veri puanlanmadı')}${kpi('Güven', `${escapeHtml(tier)} · ${number(view.confidenceIndex * 100, '%')}`, 'İstatistiksel kesinlik değildir')}</div><div class="sub-text" style="margin-top:8px">${escapeHtml(missing)} · Ölçüm zamanı: ${escapeHtml(view.asOf || 'belirtilmedi')} · Sürüm: ${escapeHtml(view.scoringVersion || 'belirtilmedi')}</div></div>`;
+  }
+
   function renderEconomics(model) {
     const report = model.economics;
     const totals = report.totals;
@@ -199,7 +228,7 @@
     if (report.dataQuality.assumedCurrencyReservationCount) warnings.push(`${report.dataQuality.assumedCurrencyReservationCount} rezervasyonda para birimi TRY varsayıldı.`);
     warnings.push('Kanal bazlı müsait gece verilmediği için RevPAR gösterilmiyor.');
 
-    return `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+    return `${renderMarketingHealth(model)}<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
       ${kpi('Oda geliri', money(totals.roomRevenueBeforeDistribution, report.currency), 'Temizlik hariç, komisyon öncesi')}
       ${kpi('Dağıtım maliyeti', money(totals.distributionCost, report.currency), 'Yalnızca kaydedilmiş komisyon')}
       ${kpi('Net oda geliri', money(totals.roomRevenueAfterDistribution, report.currency), 'Komisyon sonrası')}
@@ -466,7 +495,7 @@
     const scope = cloudScope();
     if (!client || !scope) {
       if (state.remoteScopeKey) {
-        ['listings', 'snapshots', 'findings', 'media', 'analysisRuns', 'experiments'].forEach(key => { state[key] = []; });
+        ['listings', 'snapshots', 'findings', 'media', 'analysisRuns', 'experiments', 'healthSnapshots'].forEach(key => { state[key] = []; });
       }
       state.remoteScopeKey = null;
       state.remoteStatus = 'LOCAL';
@@ -476,12 +505,12 @@
     const scopeKey = `${scope.tenantId}:${scope.propertyId || 'ALL'}`;
     if (state.remoteScopeKey === scopeKey && ['OK', 'PARTIAL', 'UNAVAILABLE'].includes(state.remoteStatus)) return null;
     state.remoteScopeKey = scopeKey;
-    ['listings', 'snapshots', 'findings', 'media', 'analysisRuns', 'experiments'].forEach(key => { state[key] = []; });
+    ['listings', 'snapshots', 'findings', 'media', 'analysisRuns', 'experiments', 'healthSnapshots'].forEach(key => { state[key] = []; });
     state.remoteStatus = 'LOADING';
     state.remoteErrors = [];
     const result = await services.MarketingDataService.loadMarketingWorkspaceData(client, scope);
     if (state.remoteScopeKey !== scopeKey) return null;
-    ['listings', 'snapshots', 'findings', 'media', 'analysisRuns', 'experiments'].forEach(key => { state[key] = result[key]; });
+    ['listings', 'snapshots', 'findings', 'media', 'analysisRuns', 'experiments', 'healthSnapshots'].forEach(key => { state[key] = result[key]; });
     state.remoteStatus = result.status;
     state.remoteErrors = result.errors;
     return result;
@@ -523,7 +552,7 @@
   }
 
   function setData(next = {}) {
-    ['listings', 'snapshots', 'findings', 'media', 'analysisRuns', 'experiments'].forEach(key => {
+    ['listings', 'snapshots', 'findings', 'media', 'analysisRuns', 'experiments', 'healthSnapshots'].forEach(key => {
       if (Array.isArray(next[key])) state[key] = next[key].slice();
     });
     if (typeof window !== 'undefined' && !services.MarketingEngine && typeof window.renderMarketingModule === 'function') {
@@ -759,5 +788,5 @@
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') initializeBrowser();
 
-  return { periodFromFilter, scopeBookings, buildWorkspaceModel, selectLatestSnapshot, renderWorkspaceHtml, renderFindingActions, renderListingForm, renderSnapshotForm, renderMediaUploadForm, renderExperimentForm, renderPhotoAnalysisResult, renderAnalysisRuns, renderExperiments, escapeHtml, setData, render };
+  return { periodFromFilter, scopeBookings, buildWorkspaceModel, selectLatestSnapshot, renderWorkspaceHtml, renderMarketingHealth, renderFindingActions, renderListingForm, renderSnapshotForm, renderMediaUploadForm, renderExperimentForm, renderPhotoAnalysisResult, renderAnalysisRuns, renderExperiments, escapeHtml, setData, render };
 }));
