@@ -65,7 +65,10 @@ const testFiles = [
   'fresh_tenant_isolation_tests.js',
 
   // USALI gelir/gider siniflandirmasi (yonetici-finans tutarliligi)
-  'usali_revenue_treatment_tests.js'
+  'usali_revenue_treatment_tests.js',
+
+  // Veri gibi gorunen statik arayuz degerleri denetimi
+  'static_ui_value_tests.js'
 ];
 
 console.log('=============================================================================');
