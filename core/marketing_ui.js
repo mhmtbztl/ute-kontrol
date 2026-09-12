@@ -37,7 +37,8 @@
     ['MarketingEngine', 'core/marketing_engine.js?v=2756f4ec'],
     ['MarketingFunnelService', 'core/marketing_funnel_service.js?v=a5ecbdaa'],
     ['MarketingPriorityService', 'core/marketing_priority_service.js?v=f6e216ff'],
-    ['MarketingDataService', 'core/marketing_data_service.js?v=06308c56']
+    ['MarketingDataService', 'core/marketing_data_service.js?v=06308c56'],
+    ['MarketingReviewService', 'core/marketing_review_service.js?v=9207dee5']
   ]);
   let dependencyPromise = null;
 
@@ -226,7 +227,23 @@
 
   function renderFindings(findings) {
     if (!findings.length) return emptyState('Açık pazarlama bulgusu yok', 'Yeterli örneklem oluştuğunda kanıta dayalı bulgular burada listelenecek.');
-    return `<div class="card" style="padding:16px"><h3 style="margin-top:0">Öncelikli bulgular</h3>${findings.map(item => `<div style="padding:12px 0;border-top:1px solid rgba(148,163,184,.2)"><strong>${escapeHtml(item.title || item.findingCode || item.finding_code || 'Pazarlama bulgusu')}</strong><div class="sub-text">${escapeHtml(item.evidenceText || item.evidence_text || item.observation || 'Kanıt açıklaması bekleniyor.')}</div><div style="margin-top:6px;font-size:12px">Güven: ${escapeHtml(item.confidenceTier || item.confidence_tier || 'BELİRSİZ')}${item.priority ? ` · Öncelik: ${number(item.priority.score)}` : ''}</div></div>`).join('')}</div>`;
+    return `<div class="card" style="padding:16px"><h3 style="margin-top:0">Öncelikli bulgular</h3>${findings.map(item => `<div style="padding:12px 0;border-top:1px solid rgba(148,163,184,.2)"><strong>${escapeHtml(item.title || item.findingCode || item.finding_code || 'Pazarlama bulgusu')}</strong><div class="sub-text">${escapeHtml(item.evidenceText || item.evidence_text || item.observation || 'Kanıt açıklaması bekleniyor.')}</div><div style="margin-top:6px;font-size:12px">Güven: ${escapeHtml(item.confidenceTier || item.confidence_tier || 'BELİRSİZ')}${item.priority ? ` · Öncelik: ${number(item.priority.score)}` : ''}</div>${renderFindingActions(item)}</div>`).join('')}</div>`;
+  }
+
+  function renderFindingActions(item) {
+    const id = item.id;
+    const status = String(item.status || 'OPEN').toUpperCase();
+    if (!id || !['OPEN', 'ACKNOWLEDGED'].includes(status)) return '';
+    const actionKind = String(item.actionKind || item.action_kind || '').toUpperCase();
+    const button = (action, label, className = 'btn-secondary') => `<button type="button" class="btn btn-sm ${className}" data-marketing-action="${action}" data-finding-id="${escapeHtml(id)}">${label}</button>`;
+    const actions = [];
+    if (status === 'OPEN') actions.push(button('ACKNOWLEDGE', 'İncelendi'));
+    if (['RESHOOT', 'ON_SITE_CONTENT'].includes(actionKind) && !item.acceptedForTask && !item.accepted_for_task) {
+      actions.push(button('ACCEPT_TASK', 'Operasyon görevi oluştur', 'btn-primary'));
+    }
+    actions.push(button('RESOLVE', 'Çözüldü'));
+    actions.push(button('DISMISS', 'Reddet'));
+    return `<div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:10px">${actions.join('')}</div>`;
   }
 
   function renderGallery(model) {
@@ -335,12 +352,46 @@
     return render();
   }
 
+  async function handleFindingAction(button) {
+    const client = typeof supabaseClient !== 'undefined' ? supabaseClient : null;
+    const finding = state.findings.find(item => String(item.id) === String(button.dataset.findingId));
+    if (!client || !finding || !services.MarketingReviewService) throw new Error('FINDING_REVIEW_UNAVAILABLE');
+    const action = button.dataset.marketingAction;
+    let reason = null;
+    if (action === 'DISMISS') {
+      reason = window.prompt('Bu bulguyu neden reddediyorsunuz?');
+      if (reason === null) return null;
+    }
+    button.disabled = true;
+    try {
+      const result = await services.MarketingReviewService.reviewFinding(client, {
+        findingId: finding.id, action, reason, finding
+      });
+      state.remoteStatus = 'LOADING';
+      render();
+      await hydrateCloudData();
+      render();
+      return result;
+    } finally {
+      button.disabled = false;
+    }
+  }
+
   function initializeBrowser() {
     if (typeof document === 'undefined') return;
     document.querySelectorAll('[data-marketing-view]').forEach(button => button.addEventListener('click', () => {
       state.view = button.dataset.marketingView;
       render();
     }));
+    const content = document.getElementById('marketingWorkspaceContent');
+    if (content) content.addEventListener('click', event => {
+      const button = event.target.closest('[data-marketing-action][data-finding-id]');
+      if (!button) return;
+      handleFindingAction(button).catch(error => {
+        const status = document.getElementById('marketingWorkspaceStatus');
+        if (status) status.textContent = `Bulgu güncellenemedi: ${error.message}`;
+      });
+    });
     // switchTab() in app.js invokes this global hook. Replacing it prevents the
     // hidden legacy demo from rendering while preserving the existing router.
     window.renderMarketingModule = function renderMarketingWorkspace() {
@@ -358,5 +409,5 @@
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') initializeBrowser();
 
-  return { periodFromFilter, scopeBookings, buildWorkspaceModel, renderWorkspaceHtml, escapeHtml, setData, render };
+  return { periodFromFilter, scopeBookings, buildWorkspaceModel, renderWorkspaceHtml, renderFindingActions, escapeHtml, setData, render };
 }));
