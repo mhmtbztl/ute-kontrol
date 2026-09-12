@@ -93,7 +93,10 @@ const testFiles = [
   'marketing_experiment_worker_tests.js',
   'marketing_experiment_worker_repository_tests.js',
   'marketing_experiment_worker_schema_tests.js',
-  'marketing_experiment_worker_entrypoint_tests.js'
+  'marketing_experiment_worker_entrypoint_tests.js',
+  'seasonal_marketing_worker_tests.js',
+  'seasonal_marketing_worker_repository_tests.js',
+  'seasonal_marketing_worker_entrypoint_tests.js'
 ];
 
 console.log('=============================================================================');

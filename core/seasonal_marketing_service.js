@@ -57,7 +57,8 @@
       confidence: numericConfidence(candidate),
       seasonTags: tags(candidate)
     })).filter(candidate => candidate.mediaId && candidate.coverScore !== null && candidate.confidence !== null);
-    const eligible = candidates.filter(candidate => candidate.confidence >= minConfidence && candidate.seasonTags.includes(season));
+    const eligible = candidates.filter(candidate => candidate.confidence >= minConfidence
+      && (candidate.seasonTags.includes(season) || candidate.seasonTags.includes('ALL_SEASON')));
     if (eligible.length === 0) {
       return { status: 'NO_ELIGIBLE_MEDIA', season, autoApply: false, recommendation: null };
     }

@@ -6,7 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "marketing:photo-worker": "node scripts/run_photo_analysis_worker.js",
-    "marketing:experiment-worker": "node scripts/run_marketing_experiment_worker.js"
+    "marketing:experiment-worker": "node scripts/run_marketing_experiment_worker.js",
+    "marketing:seasonal-worker": "node scripts/run_seasonal_marketing_worker.js"
   },
   "keywords": [],
   "author": "",

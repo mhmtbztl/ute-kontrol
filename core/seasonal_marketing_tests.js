@@ -47,6 +47,15 @@ function test(name, fn) {
     assert.strictEqual(result.status, 'NO_ELIGIBLE_MEDIA');
   });
 
+  await test('All-season media remains eligible in every seasonal window', () => {
+    const result = service.recommendSeasonalCover({
+      asOfDate: '2026-12-01', currentCoverMediaId: null,
+      candidates: [{ id: 'evergreen', seasonTags: ['ALL_SEASON'], coverScore: 82, confidence: 0.8 }]
+    });
+    assert.strictEqual(result.status, 'REVIEW_RECOMMENDED');
+    assert.strictEqual(result.recommendation.proposedCoverMediaId, 'evergreen');
+  });
+
   await test('Tiny score differences do not create noisy recommendations', () => {
     const result = service.recommendSeasonalCover({ ...input, candidates: [
       { id: 'current', seasonTags: ['ALL_SEASON'], coverScore: 85, confidence: 0.9 },
