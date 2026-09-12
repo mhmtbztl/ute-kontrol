@@ -3702,6 +3702,81 @@ function isBookingInFilter(b) {
   return (bInMonth === currentFilter.period || bOutMonth === currentFilter.period);
 }
 
+// -------------------------------------------------------------
+// AY ÜSTÜ AY (MoM) KARŞILAŞTIRMASI
+// Finans ekranindaki "geçen aya göre" rozetleri statik HTML'di ve kategori
+// trendleri `dummyMoMDeltas` adli sabit bir tablodan geliyordu; hangi donem
+// secilirse secilsin ayni yuzdeler gorunuyordu. Artik gercekten hesaplanir.
+// -------------------------------------------------------------
+function getPreviousPeriodKey(periodKey) {
+  if (!periodKey || !/^\d{4}-\d{2}$/.test(periodKey)) return null;
+  const [y, m] = periodKey.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m - 2, 1));   // bir onceki ay
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+function inPeriodKey(dateStr, periodKey) {
+  return typeof dateStr === 'string' && periodKey && dateStr.slice(0, 7) === periodKey;
+}
+
+function matchesVillaFilter(record) {
+  if (!currentFilter || currentFilter.villa === 'ALL') return true;
+  return record.villa === currentFilter.villa || record.villa === 'ALL';
+}
+
+function computePreviousPeriodCategoryTotals() {
+  const prev = getPreviousPeriodKey(currentFilter && currentFilter.period);
+  const totals = {};
+  EXPENSE_CATEGORIES.forEach(c => { totals[c.name] = 0; });
+  if (!prev || !appData || !Array.isArray(appData.expenses)) return totals;
+  appData.expenses.forEach(e => {
+    if (!inPeriodKey(e.date || e.expense_date, prev)) return;
+    if (!matchesVillaFilter(e)) return;
+    if (totals[e.category] !== undefined) totals[e.category] += Number(e.amount) || 0;
+  });
+  return totals;
+}
+
+function computePreviousPeriodTotals() {
+  const prev = getPreviousPeriodKey(currentFilter && currentFilter.period);
+  const out = { revenue: 0, expense: 0, netProfit: 0, hasData: false };
+  if (!prev || !appData) return out;
+
+  (appData.bookings || []).forEach(b => {
+    const ci = b.checkin || b.checkIn;
+    if (!inPeriodKey(ci, prev)) return;
+    if (!matchesVillaFilter(b)) return;
+    out.revenue += Number(b.netRoomRevenue !== undefined ? b.netRoomRevenue : b.gross) || 0;
+    out.hasData = true;
+  });
+  (appData.expenses || []).forEach(e => {
+    if (!inPeriodKey(e.date || e.expense_date, prev)) return;
+    if (!matchesVillaFilter(e)) return;
+    out.expense += Number(e.amount) || 0;
+    out.hasData = true;
+  });
+  out.netProfit = out.revenue - out.expense;
+  return out;
+}
+
+// Onceki donemde veri yoksa YUZDE UYDURMA - "—" goster.
+function formatMoMDelta(current, previous) {
+  const cur = Number(current) || 0;
+  const prv = Number(previous) || 0;
+  if (prv === 0) return cur === 0 ? '—' : 'yeni';
+  const pct = ((cur - prv) / Math.abs(prv)) * 100;
+  if (!isFinite(pct)) return '—';
+  const ok = pct >= 0 ? '↑' : '↓';
+  return `${ok} %${Math.abs(pct).toFixed(0)}`;
+}
+
+function formatMoMLabel(current, previous) {
+  const d = formatMoMDelta(current, previous);
+  if (d === '—') return 'geçen ay veri yok';
+  if (d === 'yeni') return 'geçen ay kayıt yok';
+  return `${d} geçen aya göre`;
+}
+
 function isExpenseInFilter(exp) {
   if (currentFilter.villa !== 'ALL' && exp.villa !== 'ALL' && exp.villa !== currentFilter.villa) return false;
   if (currentFilter.period === 'ALL') return true;
@@ -4078,6 +4153,17 @@ function renderFinanceModule() {
   setEl('brNetProfit', `${Math.round(netCashProfit).toLocaleString('tr-TR')} TL`);
   setEl('brNetMargin', `%${netMargin.toFixed(1)} Net Kâr Marjı`);
 
+  // Operasyonel kar marji index.html'de "%30,3" olarak KODA GOMULUYDU ve hicbir
+  // zaman guncellenmiyordu; hemen altindaki net marj dogru hesaplanirken bu
+  // sabit kaliyordu, yani iki satir birbirini yalanliyordu.
+  const opMargin = totalRevenue > 0 ? (operatingProfit / totalRevenue) * 100 : 0;
+  setEl('brOpMargin', `Marj: %${opMargin.toFixed(1)} (Yatırımlar Öncesi)`);
+
+  // "geçen aya göre" rozetleri de statik HTML'di.
+  const prevTotals = computePreviousPeriodTotals();
+  setEl('finNetProfitMoM', formatMoMLabel(netCashProfit, prevTotals.netProfit));
+  setEl('finExpenseMoM', formatMoMLabel(totalExpense, prevTotals.expense));
+
   // Render Expense Donut Chart & Category Table
   renderExpenseDonutAndTable(categoryTotals, totalExpense, totalRevenue, totalOpex, totalCapex);
 
@@ -4152,13 +4238,16 @@ function renderExpenseDonutAndTable(categoryTotals, totalExpense, totalRevenue, 
   const tbody = document.getElementById('expenseCategoryTableBody');
   tbody.innerHTML = '';
 
-  const dummyMoMDeltas = { 'Temizlik': '↑ %14', 'Maaş': '↑ %4', 'Bakım': '↑ %22', 'Fatura': '↓ %5', 'Reklam': '↑ %8' };
+  // Onceki donemin kategori toplamlari. Burada eskiden `dummyMoMDeltas` adinda
+  // sabit bir tablo vardi ("↑ %14", "↑ %4"...) ve musteriye gercek trendmis
+  // gibi gosteriliyordu - hangi ay secilirse secilsin ayni sayilar.
+  const prevCategoryTotals = computePreviousPeriodCategoryTotals();
 
   EXPENSE_CATEGORIES.forEach(cat => {
     const amt = categoryTotals[cat.name] || 0;
     const shareExpense = totalExpense > 0 ? (amt / totalExpense) * 100 : 0;
     const shareRev = totalRevenue > 0 ? (amt / totalRevenue) * 100 : 0;
-    const deltaStr = dummyMoMDeltas[cat.name] || '—';
+    const deltaStr = formatMoMDelta(amt, prevCategoryTotals[cat.name] || 0);
 
     const tr = document.createElement('tr');
     tr.className = 'clickable-row';
