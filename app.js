@@ -4044,7 +4044,7 @@ function updateStepperLabels() {
   const nextEl = document.getElementById('stepperNextLabel');
   if (nextEl) nextEl.innerText = curIdx >= 0 && curIdx < ALL_FINANCIAL_MONTHS.length - 1 ? ALL_MONTH_NAMES[ALL_FINANCIAL_MONTHS[curIdx + 1]] : '';
 
-  const vLabel = currentFilter.villa === 'ALL' ? 'Tüm Mülkler (5 Villa)' : (appData.villas[currentFilter.villa]?.name || currentFilter.villa);
+  const vLabel = currentFilter.villa === 'ALL' ? ('Tüm Mülkler (' + portfolioLabel() + ')') : (appData.villas[currentFilter.villa]?.name || currentFilter.villa);
   const vEl = document.getElementById('finTopPropertyLabel');
   if (vEl) vEl.innerText = vLabel;
 }
@@ -4193,6 +4193,7 @@ async function forceHardRefresh() {
 // Master Render All Components
 function renderAll() {
   if (typeof document === 'undefined') return;
+  refreshPortfolioCountLabels();
   updateStepperLabels();
   renderExecutiveControlCenter();
   renderUserNotificationsBadge();
@@ -7945,7 +7946,7 @@ function renderHousekeepingTab() {
   if (elPaidAmount) elPaidAmount.innerText = '₺' + paidAmount.toLocaleString('tr-TR');
   if (elPaidCount) elPaidCount.innerText = paidList.length + ' Temizlik Ödendi';
   if (elTotalOps) elTotalOps.innerText = allInScope.length;
-  if (elTotalOpsMeta) elTotalOpsMeta.innerText = currentFilter.villa === 'ALL' ? '5 Villa Toplamı' : (appData.villas[currentFilter.villa]?.name || currentFilter.villa);
+  if (elTotalOpsMeta) elTotalOpsMeta.innerText = currentFilter.villa === 'ALL' ? portfolioLabel(' Toplamı') : (appData.villas[currentFilter.villa]?.name || currentFilter.villa);
 
   // Table Population
   tbody.innerHTML = '';
@@ -9602,7 +9603,7 @@ function renderAirbnbAuditRadar() {
   if (pScoreEl) pScoreEl.innerHTML = `${portfolioAvg.toFixed(2)} <span class="sub-val" style="color: #FDE68A;">★ / 5.0</span>`;
 
   const pReviewsEl = document.getElementById('airbnbTotalReviews');
-  if (pReviewsEl) pReviewsEl.innerText = `${totalReviews} Değerlendirme (5 Villa)`;
+  if (pReviewsEl) pReviewsEl.innerText = `${totalReviews} Değerlendirme (${portfolioLabel()})`;
 }
 
 function syncLiveAirbnbData() {
@@ -12195,6 +12196,27 @@ function updateSaaSUi() {
 
   const menuPlan = document.getElementById('menuPlanBadge');
   if (menuPlan) menuPlan.innerText = (user.plan || 'Pro Plan') + ' 🚀';
+}
+
+// Portfoydeki mulk sayisi. Uygulama 5 villalik demo portfoye gore yazilmisti
+// ve bircok etiket "5 Villa" olarak KODA GOMULUYDU; 1 mulklu bir musteri de
+// "Mulkler (5)" goruyordu. Bu sayilar artik tek yerden turetilir.
+function getPortfolioVillaCount() {
+  return (appData && appData.villas) ? Object.keys(appData.villas).length : 0;
+}
+
+function portfolioLabel(suffix) {
+  return getPortfolioVillaCount() + ' Villa' + (suffix || '');
+}
+
+function refreshPortfolioCountLabels() {
+  if (typeof document === 'undefined') return;
+  const badge = document.getElementById('propCountBadge');
+  if (badge) badge.innerText = String(getPortfolioVillaCount());
+  const hkBadge = document.getElementById('todayHousekeepingBadge');
+  if (hkBadge) hkBadge.innerText = portfolioLabel();
+  const hkMeta = document.getElementById('hkKpiTotalOpsMeta');
+  if (hkMeta) hkMeta.innerText = portfolioLabel(' Toplamı');
 }
 
 function updateAllVillaDropdowns() {

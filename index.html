@@ -8,11 +8,11 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=5.5.2">
+  <link rel="stylesheet" href="style.css?v=aa9a44e7">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="xlsx.full.min.js"></script>
+  <script src="xlsx.full.min.js?v=7f749f81"></script>
 </head>
 <body>
   <!-- GÜVENLİK VE GİZLİLİK KİLİT EKRANI (GİZLİ ERİŞİM KORUMASI) -->
@@ -222,7 +222,7 @@
       <div class="filter-group">
         <label>PORTFÖY:</label>
         <select id="globalVillaFilter" onchange="handleFilterChange()">
-          <option value="ALL" selected>Tüm Mülkler (5 Villa)</option>
+          <option value="ALL" selected>Tüm Villalar / Portföy</option>
           <option value="VILLA_BELLA">Villa Bella Vista (6+2)</option>
           <option value="VILLA_OLIVE">Villa Olive Garden (8)</option>
           <option value="VILLA_SUNSET">Villa Sunset Horizon (4)</option>
@@ -439,7 +439,7 @@
   <nav class="nav-tabs">
     <button class="tab-btn active" onclick="switchTab('executive')">🎯 Kontrol Merkezi</button>
     <button class="tab-btn" onclick="switchTab('reservations')">📅 Rezervasyonlar (<span id="rezCountBadge">0</span>)</button>
-    <button class="tab-btn" onclick="switchTab('properties')">🏡 Mülkler (<span id="propCountBadge">5</span>)</button>
+    <button class="tab-btn" onclick="switchTab('properties')">🏡 Mülkler (<span id="propCountBadge">0</span>)</button>
     <button class="tab-btn" onclick="switchTab('operations')">🧹 Operasyon (<span id="opsTaskCountBadge">0</span>)</button>
     <button class="tab-btn" onclick="switchTab('guests')">👥 Misafirler</button>
     <button class="tab-btn" onclick="switchTab('leads')">🎯 Satış / CRM (<span id="leadCountBadge">0</span>)</button>
@@ -697,7 +697,7 @@
         <div class="finance-top-meta">
           <div class="meta-pill">
             <span>Portföy:</span>
-            <strong id="finTopPropertyLabel">Tüm Mülkler (5 Villa)</strong>
+            <strong id="finTopPropertyLabel">Tüm Villalar / Portföy</strong>
           </div>
           <button class="btn btn-secondary btn-sm" onclick="openGoalsModal()">⚙️ Hedefleri Düzenle</button>
           <button class="btn btn-secondary btn-sm" onclick="openExpenseModal()">+ Gider Girişi</button>
@@ -1418,7 +1418,7 @@
           <div class="ops-column-box">
             <div class="ops-col-header">
               <h3 style="color: #FCD34D;">🧹 TEMİZLİK & HAZIRLIK DURUMU</h3>
-              <span class="badge badge-amber" id="todayHousekeepingBadge">5 Villa</span>
+              <span class="badge badge-amber" id="todayHousekeepingBadge">—</span>
             </div>
             <div id="todayHousekeepingList"></div>
             <div id="kokpitHkFooter" style="margin-top: 12px; padding: 10px 14px; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 8px; display: flex; justify-content: space-between; align-items: center; gap: 8px;">
@@ -2043,7 +2043,7 @@
           </div>
           <div class="kpi-value" id="airbnbPortfolioScore" style="color: #FBBF24;">4.97 <span class="sub-val" style="color: #FDE68A;">★ / 5.0</span></div>
           <div class="kpi-meta">
-            <span id="airbnbTotalReviews">30 Değerlendirme (5 Villa)</span>
+            <span id="airbnbTotalReviews">—</span>
             <span style="color: #34D399; font-weight: 700;">💎 Misafirlerin Gözdesi</span>
           </div>
         </div>
@@ -2314,7 +2314,7 @@
           </div>
           <div class="kpi-value" id="hkKpiTotalOps" style="color: #60A5FA;">0</div>
           <div class="kpi-meta">
-            <span id="hkKpiTotalOpsMeta">5 Villa Toplamı</span>
+            <span id="hkKpiTotalOpsMeta">—</span>
           </div>
         </div>
       </section>
@@ -3338,7 +3338,7 @@
               </div>
               <p style="font-size:12px; color:#E2E8F0; margin:6px 0;"><strong>Basitçe:</strong> Eviniz boş ya da dolu fark etmeksizin, takvimdeki her gün için size kaç TL kazandırdı?</p>
               <div style="font-size:11px; background:rgba(0,0,0,0.25); padding:6px 8px; border-radius:6px; color:#94A3B8; margin-bottom:6px;">
-                📐 <code>Toplam Ciro ÷ Toplam Kapasite (5 Villa × 30 Gün)</code>
+                📐 <code>Toplam Ciro ÷ Toplam Kapasite (Mülk Sayısı × Gün Sayısı)</code>
               </div>
               <p style="font-size:11px; color:#DDD6FE; margin:0;">💡 <strong>Neden Önemli?</strong> Bir villayı 20.000 TL'ye satıp ayda sadece 1 gün doldurursanız batarsınız. RevPAR hem fiyatı hem doluluğu aynı anda ölçer.</p>
             </div>
@@ -3598,8 +3598,8 @@
     </div>
   </div>
 
-  <script src="core/financial_metrics_service.js"></script>
-  <script src="core/finance_import_engine.js"></script>
+  <script src="core/financial_metrics_service.js?v=279181c5"></script>
+  <script src="core/finance_import_engine.js?v=65999b8e"></script>
 
   <!-- ======================================================= -->
   <!-- MODAL: WHATSAPP BUSINESS AKILLI MESAJ AYRIŞTIRICI -->
@@ -3846,7 +3846,7 @@
             <div class="form-group">
               <label style="font-size: 12px; font-weight: 600;">İlgili Villa / Portföy</label>
               <select id="mktVilla" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
-                <option value="ALL">Tüm Portföy (5 Villa)</option>
+                <option value="ALL">Tüm Villalar / Portföy</option>
                 <option value="VILLA_BELLA">Villa Bella Vista</option>
               <option value="VILLA_OLIVE">Villa Olive Garden</option>
               <option value="VILLA_SUNSET">Villa Sunset Horizon</option>
@@ -4122,6 +4122,7 @@
           <h3 id="onboardingModalTitle" style="margin: 0; color: #F8FAFC;">🎉 Hoş Geldiniz! İlk Mülkünüzü Tanımlayın</h3>
           <p style="margin: 4px 0 0 0; font-size: 12px; color: #CBD5E1;">İşletmeniz başarıyla oluşturuldu. Portföyünüzdeki ilk villayı veya daireyi ekleyin.</p>
         </div>
+        <button type="button" class="close-btn" onclick="closeOnboardingModal()" aria-label="Kapat" title="Şimdilik atla">&times;</button>
       </div>
       <form id="onboardingForm" onsubmit="handleOnboardingSubmit(event)">
         <div class="form-group" style="margin-bottom: 12px;">
@@ -4152,7 +4153,8 @@
           <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Öne Çıkan Özellikler & Olanaklar:</label>
           <input type="text" id="onboardPropAmenities" placeholder="Örn: Özel Havuz, Jakuzi, Şömine, Barbekü" style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff;">
         </div>
-        <div class="modal-footer" style="display: flex; justify-content: flex-end;">
+        <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+          <button type="button" class="btn btn-secondary" onclick="closeOnboardingModal()">Şimdilik Atla</button>
           <button type="submit" class="btn btn-primary" style="background: linear-gradient(135deg, #10B981, #059669); border: none; font-weight: 700; padding: 10px 20px;">
             🚀 Kaydet ve Kokpite Başla
           </button>
@@ -4228,26 +4230,26 @@
     </div>
   </div>
 
-  <script src="core/operations_priority_engine.js"></script>
-  <script src="core/operations_sla_service.js"></script>
-  <script src="core/property_readiness_service.js"></script>
-  <script src="core/operations_engine.js"></script>
-  <script src="core/recurring_tasks_service.js"></script>
-  <script src="core/today_operations_service.js"></script>
-  <script src="core/guest_contact_utils.js"></script>
-  <script src="core/message_template_engine.js"></script>
-  <script src="core/messaging_provider.js"></script>
-  <script src="core/extension_offer_service.js"></script>
-  <script src="core/guest_messaging_engine.js"></script>
-  <script src="core/message_delivery_service.js"></script>
-  <script src="core/pricing_engine.js"></script>
-  <script src="core/gap_night_service.js"></script>
-  <script src="core/pricing_booking_service.js"></script>
-  <script src="core/revenue_forecast_service.js"></script>
-  <script src="core/executive_priority_service.js"></script>
-  <script src="core/executive_dashboard_service.js"></script>
-  <script src="core/executive_ai_advisor.js"></script>
-  <script src="core/notification_center_service.js"></script>
-  <script src="app.js?v=5.5.2"></script>
+  <script src="core/operations_priority_engine.js?v=ebac0ea2"></script>
+  <script src="core/operations_sla_service.js?v=70305ff3"></script>
+  <script src="core/property_readiness_service.js?v=482f07e5"></script>
+  <script src="core/operations_engine.js?v=cbfce0c3"></script>
+  <script src="core/recurring_tasks_service.js?v=dc2f5008"></script>
+  <script src="core/today_operations_service.js?v=bc4705ba"></script>
+  <script src="core/guest_contact_utils.js?v=6393d608"></script>
+  <script src="core/message_template_engine.js?v=f20ac98d"></script>
+  <script src="core/messaging_provider.js?v=ad9cbf8a"></script>
+  <script src="core/extension_offer_service.js?v=af0b58f1"></script>
+  <script src="core/guest_messaging_engine.js?v=b137782b"></script>
+  <script src="core/message_delivery_service.js?v=6f7e81cd"></script>
+  <script src="core/pricing_engine.js?v=c5a168e6"></script>
+  <script src="core/gap_night_service.js?v=ad922f72"></script>
+  <script src="core/pricing_booking_service.js?v=8dc947e5"></script>
+  <script src="core/revenue_forecast_service.js?v=74698272"></script>
+  <script src="core/executive_priority_service.js?v=334b2c4f"></script>
+  <script src="core/executive_dashboard_service.js?v=651e8e45"></script>
+  <script src="core/executive_ai_advisor.js?v=93c10c3e"></script>
+  <script src="core/notification_center_service.js?v=7fb8bdee"></script>
+  <script src="app.js?v=c55e3ec8"></script>
 </body>
 </html>
