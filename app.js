@@ -3667,8 +3667,10 @@ function switchTab(tabId) {
   if (tabId === 'executive') renderExecutiveControlCenter();
   if (tabId === 'properties') renderPropertiesTab();
   if (tabId === 'operations') renderOperationsTab();
+  if (tabId === 'operations') renderOperationsKpiStrip();
   if (tabId === 'guests') renderGuestsTab();
   if (tabId === 'pricing') renderPricingTab();
+  if (tabId === 'pricing') renderPricingKpiStrip();
   if (tabId === 'reports') renderReportsTab();
   if (tabId === 'settings') renderSettingsTable();
   if (tabId === 'settings') renderTeamManagement();
@@ -3708,6 +3710,68 @@ function isBookingInFilter(b) {
 // trendleri `dummyMoMDeltas` adli sabit bir tablodan geliyordu; hangi donem
 // secilirse secilsin ayni yuzdeler gorunuyordu. Artik gercekten hesaplanir.
 // -------------------------------------------------------------
+// -------------------------------------------------------------
+// OPERASYON & FİYATLANDIRMA KPI ŞERİTLERİ
+// Bu kartlar index.html'de SABIT degerlerle duruyordu ("5 / 5", "₺16.500",
+// "%100") ve hicbir render fonksiyonu onlara dokunmuyordu; her musteri ayni
+// uydurma rakamlari goruyordu. Artik gercek veriden turetilir.
+// -------------------------------------------------------------
+function renderOperationsKpiStrip() {
+  if (typeof document === 'undefined' || !appData) return;
+  const villas = appData.villas || {};
+  const villaKeys = Object.keys(villas);
+  const tasks = appData.cleaningTasks || [];
+  const tickets = appData.maintenance || [];
+
+  const hazir = villaKeys.filter(k => {
+    const st = villas[k].readinessStatus;
+    return !st || st === 'READY';
+  }).length;
+  setEl('opsReadyPropsVal', `${hazir} / ${villaKeys.length}`);
+
+  const bugun = new Date().toISOString().slice(0, 10);
+  const bugunkuTurnover = tasks.filter(t => (t.date || '').slice(0, 10) === bugun).length;
+  setEl('opsTurnoverVal', `${bugunkuTurnover} Görev`);
+
+  const acikP1 = tickets.filter(t => {
+    const durum = String(t.status || '').toUpperCase();
+    const oncelik = String(t.priority || t.oncelik || '').toUpperCase();
+    return durum !== 'DONE' && durum !== 'CLOSED' && durum !== 'TAMAMLANDI'
+      && (oncelik === 'P1' || oncelik === 'KRITIK' || oncelik === 'CRITICAL');
+  }).length;
+  setEl('opsOpenMaintVal', `${acikP1} İş`);
+
+  const borc = tasks.filter(t => !t.paid).reduce((a, t) => a + (Number(t.amount) || 0), 0);
+  setEl('opsDebtVal', `₺${Math.round(borc).toLocaleString('tr-TR')}`);
+
+  // SLA: tamamlanmis gorevlerin zamaninda bitenlerin orani. Hic tamamlanmis
+  // gorev yoksa YUZDE UYDURMA - "—" goster.
+  const tamamlanan = tasks.filter(t => t.completed || t.status === 'DONE');
+  if (tamamlanan.length === 0) {
+    setEl('opsSlaVal', '—');
+  } else {
+    const zamaninda = tamamlanan.filter(t => !t.slaBreached && !t.isLate).length;
+    setEl('opsSlaVal', `%${Math.round((zamaninda / tamamlanan.length) * 100)}`);
+  }
+}
+
+function renderPricingKpiStrip() {
+  if (typeof document === 'undefined' || !appData) return;
+  const bookings = (appData.bookings || []).filter(b => b.status !== 'CANCELLED' && isBookingInFilter(b));
+  const geceler = bookings.reduce((a, b) => a + (Number(b.nights) || 0), 0);
+  const ciro = bookings.reduce((a, b) => a + (Number(b.gross) || 0), 0);
+  setEl('pricingAdrVal', geceler > 0 ? `₺${Math.round(ciro / geceler).toLocaleString('tr-TR')}` : '—');
+
+  let gapSayisi = 0;
+  try {
+    if (typeof GapNightService !== 'undefined' && GapNightService.detectGapNights) {
+      const g = GapNightService.detectGapNights({ bookings, properties: Object.values(appData.villas || {}) });
+      gapSayisi = Array.isArray(g) ? g.length : (g && g.gapNights ? g.gapNights.length : 0);
+    }
+  } catch (e) { gapSayisi = 0; }
+  setEl('pricingGapCountVal', `${gapSayisi} Gece`);
+}
+
 // -------------------------------------------------------------
 // DÖNEMDEKİ GÜN SAYISI
 // Doluluk ve RevPAR paydasi uygulamada tutarsizdi: bir yerde 30, baska bir
@@ -3759,14 +3823,16 @@ function computePreviousPeriodCategoryTotals() {
 
 function computePreviousPeriodTotals() {
   const prev = getPreviousPeriodKey(currentFilter && currentFilter.period);
-  const out = { revenue: 0, expense: 0, netProfit: 0, hasData: false };
+  const out = { revenue: 0, expense: 0, nights: 0, netProfit: 0, hasData: false };
   if (!prev || !appData) return out;
 
   (appData.bookings || []).forEach(b => {
     const ci = b.checkin || b.checkIn;
     if (!inPeriodKey(ci, prev)) return;
     if (!matchesVillaFilter(b)) return;
-    out.revenue += Number(b.netRoomRevenue !== undefined ? b.netRoomRevenue : b.gross) || 0;
+    out.revenue += Number(b.gross !== undefined ? b.gross : b.netRoomRevenue) || 0;
+    out.nights += Number(b.nights) || 0;
+    out.expense += (Number(b.otaCommission) || 0) + (Number(b.cleaningFee) || 0);
     out.hasData = true;
   });
   (appData.expenses || []).forEach(e => {
@@ -4201,6 +4267,8 @@ function renderFinanceModule() {
   const prevTotals = computePreviousPeriodTotals();
   setEl('finNetProfitMoM', formatMoMLabel(netCashProfit, prevTotals.netProfit));
   setEl('finExpenseMoM', formatMoMLabel(totalExpense, prevTotals.expense));
+  setEl('finRevMoM', formatMoMLabel(totalRevenue, prevTotals.revenue));
+  setEl('finNightsMoM', formatMoMLabel(totalSoldNights, prevTotals.nights));
 
   // Render Expense Donut Chart & Category Table
   renderExpenseDonutAndTable(categoryTotals, totalExpense, totalRevenue, totalOpex, totalCapex);
@@ -11081,13 +11149,20 @@ function initSupabaseClient() {
 }
 initSupabaseClient();
 
+// Yerel demo hesabinin tanimi. Buradaki tek amac demo kum havuzuna bir isim ve
+// isletme adi vermektir.
+//
+// NOT: Bu kayitta eskiden bir `password: 'lexbnb'` alani ve bunlari
+// localStorage'a yazan bir saveSaaSUsers() vardi. Yerel sifre karsilastirmasi
+// kaldirildiginda alan okunmaz hale geldi ama kalmaya devam etti: her ziyaretcinin
+// tarayicisinda duz metin bir sifre. Kimlik dogrulama artik yalnizca Supabase
+// Auth'tur; alan da, yazici da kaldirildi.
 const DEFAULT_SAAS_USERS = [
   {
     id: 'usr_ute_master',
     username: 'lexbnb',
     email: 'demo@lexbnb.com',
-    password: 'lexbnb',
-    companyName: 'LexBnB Portföyü',
+    companyName: 'Lexbnb Luxury Portfolio',
     managerName: 'LexBnB Host',
     plan: 'Enterprise',
     isDefaultDemo: true,
@@ -11096,34 +11171,18 @@ const DEFAULT_SAAS_USERS = [
 ];
 
 function getSaaSUsers() {
-  try {
-    const raw = localStorage.getItem('LEXBNB_USERS_REGISTRY');
-    let users = raw ? JSON.parse(raw) : JSON.parse(JSON.stringify(DEFAULT_SAAS_USERS));
-    let master = users.find(u => u.id === 'usr_ute_master');
-    if (master) {
-      master.username = 'lexbnb';
-      master.email = 'demo@lexbnb.com';
-      master.password = 'lexbnb';
-      master.managerName = 'LexBnB Host';
-      if (!master.companyName || master.companyName.includes('Akdeniz') || master.companyName.includes('UTE')) {
-        master.companyName = 'Lexbnb Luxury Portfolio';
-      }
-    } else {
-      users.unshift(JSON.parse(JSON.stringify(DEFAULT_SAAS_USERS[0])));
-    }
-    return users;
-  } catch (e) {
-    return DEFAULT_SAAS_USERS;
-  }
+  // Sabit tanimin kopyasi doner; kalici bir kullanici kaydi TUTULMAZ.
+  return JSON.parse(JSON.stringify(DEFAULT_SAAS_USERS));
 }
 
-function saveSaaSUsers(users) {
+// Eski surumlerin tarayiciya yazdigi duz metin sifreli kaydi temizle.
+(function purgeLegacyUserRegistry() {
   try {
-    localStorage.setItem('LEXBNB_USERS_REGISTRY', JSON.stringify(users));
-  } catch (e) {
-    console.error('Error saving SaaS users registry:', e);
-  }
-}
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('LEXBNB_USERS_REGISTRY')) {
+      localStorage.removeItem('LEXBNB_USERS_REGISTRY');
+    }
+  } catch (e) { /* private mode vb. */ }
+})();
 
 function switchAuthTab(tab) {
   const btnLogin = document.getElementById('tabBtnLogin');
@@ -13352,8 +13411,38 @@ function renderExecutiveControlCenter() {
       expenses: expenses.filter(e => typeof isExpenseInFilter === 'function' ? isExpenseInFilter(e) : true),
       targets: periodTarget,
       propertiesCount: Math.max(1, propertiesList.length),
-      daysInMonth: getPeriodDayCount()
+      daysInMonth: getPeriodDayCount(),
+      // Servis prior alanlarini destekliyordu ama beslenmiyordu; bu yuzden
+      // "Gecen Ay" etiketleri index.html'de sabit kalmisti.
+      priorPeriodMetrics: (function () {
+        const p = computePreviousPeriodTotals();
+        if (!p.hasData) return null;
+        const gunler = getPeriodDayCount(getPreviousPeriodKey(currentFilter && currentFilter.period));
+        const kapasite = Math.max(1, propertiesList.length * gunler);
+        return {
+          revenue: p.revenue,
+          netProfit: p.netProfit,
+          occupancy: Number(((p.nights / kapasite) * 100).toFixed(2)),
+          adr: p.nights > 0 ? Math.round(p.revenue / p.nights) : 0,
+          revpar: Math.round(p.revenue / kapasite)
+        };
+      })()
     });
+
+    // Sabit "↑ %0 Geçen Ay" / "0 Gece" / "Pacing: %100" etiketleri
+    setEl('execRevMoM', (kpis.revenue.prior === null || kpis.revenue.prior === undefined)
+      ? 'geçen ay veri yok'
+      : formatMoMDelta(kpis.revenue.current, kpis.revenue.prior) + ' Geçen Ay');
+
+    const satilanGece = bookings
+      .filter(b => b.status !== 'CANCELLED' && (typeof isBookingInFilter === 'function' ? isBookingInFilter(b) : true))
+      .reduce((a, b) => a + (Number(b.nights) || 0), 0);
+    setEl('execSoldNightsLabel', satilanGece + ' Gece');
+
+    const hedefCiro = Number((periodTarget && (periodTarget.revenue_target || periodTarget.revenueTarget)) || 0);
+    setEl('execForecastPacing', hedefCiro > 0
+      ? 'Pacing: %' + Math.round((kpis.forecast.monthEndRevenue / hedefCiro) * 100)
+      : 'Hedef belirlenmemiş');
 
     const revEl = document.getElementById('execKpiRevenue');
     if (revEl) revEl.innerText = `₺${Number(kpis.revenue.current).toLocaleString('tr-TR')}`;
