@@ -1100,29 +1100,35 @@ async function updateBooking(bookingId, bookingInput) {
     });
     if (!rpcRes.error && rpcRes.data) {
       data = rpcRes.data;
-    } else if (rpcRes.error && (rpcRes.error.code === '23P01' || rpcRes.error.message?.includes('OVERBOOKING_CONFLICT') || rpcRes.error.message?.includes('çakışıyor'))) {
-      error = rpcRes.error;
+    } else if (rpcRes.error) {
+      // RPC BILINCLI olarak reddettiyse onun mesajini koru. Onceden buradan
+      // dogrudan tablo guncellemesine dusuluyordu. RLS ayni rolleri zaten
+      // engelledigi icin veri guvendeydi (canli dogrulandi: viewer denemesinde
+      // kayit degismedi), ama kullanici RPC'nin net mesaji yerine
+      // "PGRST116 Cannot coerce the result to a single JSON object" goruyordu.
+      // Yalnizca fonksiyon HENUZ YOKSA (goc uygulanmamissa) yedege dus.
+      const fonksiyonYok = rpcRes.error.code === 'PGRST202'
+        || (rpcRes.error.message || '').includes('Could not find the function');
+
+      if (!fonksiyonYok) {
+        error = rpcRes.error;
+      } else {
+        const updRes = await supabaseClient
+          .from('bookings')
+          .update(payload)
+          .eq('id', propBookingId)
+          .eq('tenant_id', tenantId)
+          .select()
+          .single();
+        data = updRes.data;
+        error = updRes.error;
+      }
     } else {
-      const updRes = await supabaseClient
-        .from('bookings')
-        .update(payload)
-        .eq('id', propBookingId)
-        .eq('tenant_id', tenantId)
-        .select()
-        .single();
-      data = updRes.data;
-      error = updRes.error;
+      error = new Error('Rezervasyon güncellenemedi: sunucudan boş yanıt döndü.');
     }
   } catch (e) {
-    const updRes = await supabaseClient
-      .from('bookings')
-      .update(payload)
-      .eq('id', propBookingId)
-      .eq('tenant_id', tenantId)
-      .select()
-      .single();
-    data = updRes.data;
-    error = updRes.error;
+    // Beklenmedik istisna: sessizce zayif yola dusme, hatayi oldugu gibi bildir.
+    error = e;
   }
 
   if (error) {
