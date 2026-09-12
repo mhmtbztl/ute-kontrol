@@ -56,7 +56,10 @@ const testFiles = [
   'registration_flow_tests.js',
 
   // Ekip daveti ve rol yonetimi (Phase 16)
-  'team_management_tests.js'
+  'team_management_tests.js',
+
+  // Phase 17 Revenue & Distribution Intelligence (pure unit suite)
+  'marketing_engine_tests.js'
 ];
 
 console.log('=============================================================================');
