@@ -4788,6 +4788,22 @@ function changeImportMode(newMode) {
 // createBooking/createExpense uzerinden — cakisma kontrolu, kapali donem
 // korumasi ve tenant dogrulamasi devrede.
 
+/**
+ * Ice aktarilan satirlarin en son ait oldugu ay ('YYYY-MM').
+ * Rezervasyonda giris tarihine, giderde gider tarihine bakar.
+ */
+function enSonVeriAyi(satirlar, rezMi) {
+  let enSon = null;
+  (satirlar || []).forEach(v => {
+    const t = rezMi ? v.checkIn : v.date;
+    if (!t) return;
+    const ym = String(t).slice(0, 7);
+    if (!/^\d{4}-\d{2}$/.test(ym)) return;
+    if (!enSon || ym > enSon) enSon = ym;
+  });
+  return enSon;
+}
+
 function getImportEngine() {
   if (typeof FinanceImportEngine !== 'undefined') return FinanceImportEngine;
   if (typeof window !== 'undefined' && window.FinanceImportEngine) return window.FinanceImportEngine;
@@ -5079,11 +5095,34 @@ async function applyImportedData() {
   await loadTenantAppData(tenantId);
   if (btn) { btn.disabled = false; }
 
+  // Ice aktarilan kayitlarin bulundugu SON aya gec.
+  //
+  // Bunsuz, gecmis veri aktaran kullanici hicbir sey gormuyordu: donem filtresi
+  // icinde bulunulan ayda kaliyor, o ayda kayit olmadigi icin panel bos, rozet
+  // "Rezervasyonlar (0)" gosteriyordu. Kayitlar veritabaninda duruyor olmasina
+  // ragmen "aktarim olmadi" izlenimi veriyordu.
+  const gidilenAy = enSonVeriAyi(yazilacaklar, rezMi);
+  let ayDegisti = false;
+  if (gidilenAy && gidilenAy !== currentFilter.period) {
+    currentFilter.period = gidilenAy;
+    currentFilter.startDate = gidilenAy + '-01';
+    const sg = new Date(Date.UTC(Number(gidilenAy.slice(0, 4)), Number(gidilenAy.slice(5, 7)), 0)).getUTCDate();
+    currentFilter.endDate = gidilenAy + '-' + String(sg).padStart(2, '0');
+    ayDegisti = true;
+    const secici = document.getElementById('globalPeriodFilter');
+    if (secici) {
+      refreshPeriodSelectors();
+      if (secici.querySelector(`option[value="${gidilenAy}"]`)) secici.value = gidilenAy;
+    }
+    renderAll();
+  }
+
   if (basarisiz.length === 0) {
     closeImportModal();
     resetImportPreview();
     if (typeof showToast === 'function') {
-      showToast(`${basarili.length} kayıt içe aktarıldı.`, 'success');
+      const ek = ayDegisti ? ` Dönem ${getPeriodDisplayName(gidilenAy)} olarak değiştirildi.` : '';
+      showToast(`${basarili.length} kayıt içe aktarıldı.${ek}`, 'success');
     }
   } else {
     // Kismi basari: NE YAZILDI, NE YAZILMADI acikca soylenir.
