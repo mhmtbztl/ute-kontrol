@@ -3342,7 +3342,9 @@ function renderFinanceModule() {
   const forecastEndMonth = Math.round(totalRevenue * 1.018);
 
   // Update Top 5 KPI Cards
-  const setEl = (id, text) => { const el = document.getElementById(id); if (el) el.innerText = text; };
+  // setEl artik genel kapsamda tanimli. Burada yerel bir const olarak
+  // duruyordu ve fonksiyonun BASINDA kullanildigi icin TDZ hatasi veriyordu:
+  //   ReferenceError: Cannot access 'setEl' before initialization
 
   setEl('finActualRevenue', `${Math.round(totalRevenue).toLocaleString('tr-TR')} TL`);
   setEl('finRevTargetDelta', `Hedefin %${Math.round(Math.abs(targetPct - 100))} ${targetDiff >= 0 ? 'üzerinde' : 'altında'}`);
@@ -4132,7 +4134,9 @@ function runWhatIfSimulation() {
   const occDelta = Number(document.getElementById('simOccSlider')?.value) || 0;
   const directPct = Number(document.getElementById('simDirectSlider')?.value) || 60;
 
-  const setEl = (id, text) => { const el = document.getElementById(id); if (el) el.innerText = text; };
+  // setEl artik genel kapsamda tanimli. Burada yerel bir const olarak
+  // duruyordu ve fonksiyonun BASINDA kullanildigi icin TDZ hatasi veriyordu:
+  //   ReferenceError: Cannot access 'setEl' before initialization
 
   setEl('simAdrLabel', `${adrDelta >= 0 ? '+' : ''}%${adrDelta}`);
   setEl('simOccLabel', `${occDelta >= 0 ? '+' : ''}%${occDelta}`);
@@ -13828,7 +13832,14 @@ if (typeof module !== 'undefined' && module.exports) {
     openCommandPalette,
     closeCommandPalette,
     toggleNotificationDrawer,
-    startWithCleanPortfolio
+    startWithCleanPortfolio,
+    // Tarayici render hatti. core/render_pipeline_tests.js bunlari sahte bir
+    // DOM ile GERCEKTEN calistirir; setEl gibi tanimsiz referanslar ancak
+    // boyle yakalanir (statik tarama regex literalleri yuzunden guvenilmez).
+    renderAll,
+    setEl,
+    showToast,
+    setActiveTenantForTests: (t) => { activeTenant = t; }
   };
 }
 

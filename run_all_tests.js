@@ -83,7 +83,11 @@ const testFiles = [
   'demo_residue_tests.js',
 
   // Isletme verisini sifirlama (Phase 21)
-  'tenant_reset_tests.js'
+  'tenant_reset_tests.js',
+
+  // Tarayici render hatti — sahte DOM ile renderAll GERCEKTEN calisir.
+  // setEl gibi tanimsiz referanslari yalnizca bu suit yakalar.
+  'render_pipeline_tests.js'
 ];
 
 console.log('=============================================================================');
