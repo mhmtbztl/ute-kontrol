@@ -179,9 +179,17 @@ ve kısmi veriyle daha kötü bir duruma yol açar. Bayrak işlem sonunda kapanm
 ### 4.1 Commit öncesi
 ```bash
 node stamp_assets.js     # varlıkları içerik hash'iyle damgala (ZORUNLU)
-node run_all_tests.js    # 54 süit, ~600 iddia
+node run_all_tests.js    # 112 süit, ~1000 iddia
 ```
 `stamp_assets.js --check` güncel değilse hata verir — CI'ya konabilir.
+
+**Damgalayıcı iki yeri birden kapsar.** `index.html`'deki `src`/`href` damgalarına ek
+olarak, `core/marketing_ui.js` bağımlılıklarını `<script>` etiketiyle değil kendi
+içindeki bir tabloyla (`'core/marketing_engine.js?v=xxxxxxxx'`) çalışma anında
+yüklüyor. Bu damgalar bir zamanlar elle yazılmıştı ve **15'inin 15'i de** dosya
+içeriğiyle uyuşmuyordu — yani o dosyalar için önbellek kırma hiç çalışmıyordu.
+Yeni bir çalışma anı yükleyici eklerseniz dosyayı `stamp_assets.js` içindeki
+`SATELLITE_FILES` listesine ekleyin, yoksa `--check` onu görmez.
 
 `index.html` kendi başına 10 dakika önbelleklenir (GitHub Pages `max-age=600`, başlık
 değiştiremiyoruz). Deploy sonrası eski sürüm görürseniz `Ctrl+Shift+R`.
@@ -193,12 +201,20 @@ sonunda kendi doğrulama bloğu vardır; başarısızsa `RAISE EXCEPTION` ile du
 
 Uygulanmış göçler: phase13 (kullanıcı silinebilirliği), phase14 (son-sahip koruması),
 phase15 (cascade istisnaları), phase16 (ekip daveti), phase18 (hesap kapatma),
-phase19 (atomik rezervasyon silme).
+phase19 (atomik rezervasyon silme), phase20 (ay kapanışı bütünlüğü),
+phase21 (veri sıfırlama), phase17 (pazarlama — 14 tablo + 20 fonksiyon,
+2026-09-13 doğrulandı).
 
-phase20 (ay kapanışı bütünlüğü).
+**Bekleyen:** phase22 (`migration_phase22_marketing_anon_revoke.sql`) — Phase 17
+fonksiyonlarından `anon` yetkisini geri alır. Uygulanana kadar kimliği
+doğrulanmamış çağrılar bu fonksiyonların gövdesine girebilir; içerideki
+`auth.uid()` / `SERVICE_ROLE_REQUIRED` kontrolleri onları reddeder, yani veri
+sızıntısı yoktur ama ilk savunma katmanı eksiktir.
 
-**Bekleyen:** phase21 (veri sıfırlama) — uygulanana kadar
-`tenant_reset_tests.js` kırmızı kalır, bu beklenen durumdur.
+Göçün uygulanıp uygulanmadığını doğrulamanın en hızlı yolu şemayı okumak değil,
+**PostgREST'e anon anahtarıyla sormaktır**: fonksiyon gövdesindeki hatayı
+(`MARKETING_FINDING_NOT_FOUND`) görüyorsanız anon hâlâ çalıştırabiliyordur;
+`permission denied for function` görüyorsanız göç uygulanmıştır.
 
 ### 4.3 Paralel çalışma (Codex / Antigravity)
 Bu repoda başka AI araçları da çalışıyor. **Dosya bazında bölüşün.**
@@ -251,7 +267,11 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 | Rezervasyon düzenleme/silme akışı analizi | tamamlandı (phase19) |
 | Ay kapatma akışı analizi | tamamlandı (phase20) |
 | Demo artığı taraması | tamamlandı — ağı `demo_residue_tests` |
-| Veri sıfırlama | tamamlandı (phase21) — **göç uygulanmayı bekliyor** |
+| Veri sıfırlama | tamamlandı (phase21) — göç uygulandı |
+| Phase 17 pazarlama (Codex, PR #1) | birleştirildi; tablolar + RPC'ler üretimde |
+| Phase 17 `anon` yetkisi | **phase22 göçü uygulanmayı bekliyor** — ağı `marketing_anon_grant_tests` |
+| Fotoğraf AI worker'ı | `GEMINI_API_KEY` yok; Actions adımı güvenle atlanıyor — **harici bağımlılık** |
+| `get_executive_dashboard_snapshot` | tanımlı ama arayüzde **hiç çağrılmıyor**; içinde tahakkuk ve gece sayımı hataları var (§3.4) |
 | Excel içe/dışa aktarma | "Şirket Genel Raporu" içe aktarımı devre dışı bırakıldı, gerçek uygulama yok |
 | Bildirim merkezi analizi | yapılmadı |
 | OTA ilan analizi (`runAiListingCritic`) | veri bağlantısı yok; artık skor uydurmuyor, durumu açıkça söylüyor |
@@ -273,6 +293,20 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
   REVOKE ALL ON FUNCTION public.fn(...) FROM anon;
   GRANT EXECUTE ON FUNCTION public.fn(...) TO authenticated;
   ```
+  **Bu kural 2026-09-13'te yeniden ihlal edildi:** Phase 17'nin 15 göç dosyasının
+  hiçbiri `anon`'u revoke etmedi. Beşi `FROM PUBLIC` yazıp doğru olanı yaptığını
+  sandı. Üretimde doğrulandı — anon anahtarıyla `review_marketing_finding`
+  çağrısı SECURITY DEFINER gövdesine kadar girdi.
+
+  Kural bu yüzden **iki katlıdır**: grant'i geri alın **ve** her SECURITY DEFINER
+  fonksiyonun gövdesine kendi yetki kontrolünü (`auth.uid()` + `get_tenant_role()`,
+  worker'larda `SERVICE_ROLE_REQUIRED`) koyun. Phase 17'de veri sızmamasının tek
+  sebebi ikinci kattı. Ağı `core/marketing_anon_grant_tests.js` tutuyor.
+
+  Yetki kontrolünü **kayıt aramadan önce** yapın. `review_marketing_finding` önce
+  `SELECT ... FOR UPDATE` yapıp sonra yetkiye bakıyor: kimliği doğrulanmamış bir
+  çağrı rastgele satırlara kilit alabiliyor ve hata mesajı ("bulunamadı" ile
+  "yetkisiz" farklı) bir UUID'nin var olup olmadığını sızdırıyor.
 - **Yetki yükseltme:** `admin` rolü yalnızca `manager/staff/viewer` verebilir. Bir zamanlar
   doğrudan `owner` ekleyebiliyordu — işletmeyi devralma yolu.
 - **Koruma tetikleyicileri cascade'i engellememeli.** Beş tetikleyici (son sahip, kapanmış dönem ×2,
