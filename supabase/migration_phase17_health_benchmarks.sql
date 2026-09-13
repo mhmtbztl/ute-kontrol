@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS public.property_marketing_benchmarks (
     view_to_booking_conversion_percent NUMERIC(8,3) CHECK (view_to_booking_conversion_percent IS NULL OR view_to_booking_conversion_percent > 0),
     normalized_impressions_per_listing_day NUMERIC(14,3) CHECK (normalized_impressions_per_listing_day IS NULL OR normalized_impressions_per_listing_day > 0),
     recommended_active_media_count INTEGER CHECK (recommended_active_media_count IS NULL OR recommended_active_media_count > 0),
+    max_distribution_cost_percent NUMERIC(6,3) CHECK (max_distribution_cost_percent IS NULL OR (max_distribution_cost_percent >= 0 AND max_distribution_cost_percent <= 100)),
+    minimum_direct_reservation_share_percent NUMERIC(6,3) CHECK (minimum_direct_reservation_share_percent IS NULL OR (minimum_direct_reservation_share_percent >= 0 AND minimum_direct_reservation_share_percent <= 100)),
     confidence NUMERIC(4,3) NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
     evidence JSONB NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(evidence) = 'object'),
     recorded_by UUID DEFAULT auth.uid() REFERENCES auth.users(id) ON DELETE SET NULL,
@@ -24,9 +26,23 @@ CREATE TABLE IF NOT EXISTS public.property_marketing_benchmarks (
     CONSTRAINT chk_marketing_benchmark_window CHECK (effective_to_exclusive IS NULL OR effective_to_exclusive > effective_from),
     CONSTRAINT chk_marketing_benchmark_has_value CHECK (num_nonnulls(
         search_to_view_ctr_percent, view_to_booking_conversion_percent,
-        normalized_impressions_per_listing_day, recommended_active_media_count
+        normalized_impressions_per_listing_day, recommended_active_media_count,
+        max_distribution_cost_percent, minimum_direct_reservation_share_percent
     ) > 0)
 );
+
+-- Keep reruns safe when this migration existed before the economics fields.
+ALTER TABLE public.property_marketing_benchmarks
+    ADD COLUMN IF NOT EXISTS max_distribution_cost_percent NUMERIC(6,3)
+        CHECK (max_distribution_cost_percent IS NULL OR (max_distribution_cost_percent >= 0 AND max_distribution_cost_percent <= 100)),
+    ADD COLUMN IF NOT EXISTS minimum_direct_reservation_share_percent NUMERIC(6,3)
+        CHECK (minimum_direct_reservation_share_percent IS NULL OR (minimum_direct_reservation_share_percent >= 0 AND minimum_direct_reservation_share_percent <= 100));
+ALTER TABLE public.property_marketing_benchmarks DROP CONSTRAINT IF EXISTS chk_marketing_benchmark_has_value;
+ALTER TABLE public.property_marketing_benchmarks ADD CONSTRAINT chk_marketing_benchmark_has_value CHECK (num_nonnulls(
+    search_to_view_ctr_percent, view_to_booking_conversion_percent,
+    normalized_impressions_per_listing_day, recommended_active_media_count,
+    max_distribution_cost_percent, minimum_direct_reservation_share_percent
+) > 0);
 
 CREATE INDEX IF NOT EXISTS idx_property_marketing_benchmarks_effective
     ON public.property_marketing_benchmarks (tenant_id, property_id, effective_from DESC);
@@ -36,13 +52,17 @@ CREATE POLICY "Members view property marketing benchmarks"
 ON public.property_marketing_benchmarks FOR SELECT
 USING (public.is_tenant_member(tenant_id));
 
+DROP FUNCTION IF EXISTS public.record_property_marketing_benchmark(
+    UUID, UUID, TEXT, TEXT, TEXT, DATE, DATE, NUMERIC, NUMERIC, NUMERIC, INTEGER, NUMERIC, JSONB
+);
 CREATE OR REPLACE FUNCTION public.record_property_marketing_benchmark(
     p_tenant_id UUID, p_property_id UUID, p_benchmark_fingerprint TEXT,
     p_source_kind TEXT, p_source_record_id TEXT, p_effective_from DATE,
     p_effective_to_exclusive DATE, p_search_to_view_ctr_percent NUMERIC,
     p_view_to_booking_conversion_percent NUMERIC,
     p_normalized_impressions_per_listing_day NUMERIC,
-    p_recommended_active_media_count INTEGER, p_confidence NUMERIC, p_evidence JSONB
+    p_recommended_active_media_count INTEGER, p_max_distribution_cost_percent NUMERIC,
+    p_minimum_direct_reservation_share_percent NUMERIC, p_confidence NUMERIC, p_evidence JSONB
 )
 RETURNS UUID
 LANGUAGE plpgsql
@@ -67,12 +87,14 @@ BEGIN
         tenant_id, property_id, benchmark_fingerprint, source_kind, source_record_id,
         effective_from, effective_to_exclusive, search_to_view_ctr_percent,
         view_to_booking_conversion_percent, normalized_impressions_per_listing_day,
-        recommended_active_media_count, confidence, evidence
+        recommended_active_media_count, max_distribution_cost_percent,
+        minimum_direct_reservation_share_percent, confidence, evidence
     ) VALUES (
         p_tenant_id, p_property_id, p_benchmark_fingerprint, upper(trim(p_source_kind)),
         NULLIF(trim(p_source_record_id), ''), p_effective_from, p_effective_to_exclusive,
         p_search_to_view_ctr_percent, p_view_to_booking_conversion_percent,
         p_normalized_impressions_per_listing_day, p_recommended_active_media_count,
+        p_max_distribution_cost_percent, p_minimum_direct_reservation_share_percent,
         p_confidence, COALESCE(p_evidence, '{}'::jsonb)
     ) RETURNING id INTO v_id;
     RETURN v_id;
@@ -80,10 +102,10 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.record_property_marketing_benchmark(
-    UUID, UUID, TEXT, TEXT, TEXT, DATE, DATE, NUMERIC, NUMERIC, NUMERIC, INTEGER, NUMERIC, JSONB
+    UUID, UUID, TEXT, TEXT, TEXT, DATE, DATE, NUMERIC, NUMERIC, NUMERIC, INTEGER, NUMERIC, NUMERIC, NUMERIC, JSONB
 ) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.record_property_marketing_benchmark(
-    UUID, UUID, TEXT, TEXT, TEXT, DATE, DATE, NUMERIC, NUMERIC, NUMERIC, INTEGER, NUMERIC, JSONB
+    UUID, UUID, TEXT, TEXT, TEXT, DATE, DATE, NUMERIC, NUMERIC, NUMERIC, INTEGER, NUMERIC, NUMERIC, NUMERIC, JSONB
 ) TO authenticated;
 
 -- No direct mutation policies: benchmark history is append-only through the RPC.

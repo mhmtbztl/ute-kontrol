@@ -24,6 +24,13 @@
     return number;
   }
 
+  function optionalPercent(value, name) {
+    if (value === null || value === undefined || value === '') return null;
+    const number = Number(value);
+    if (!Number.isFinite(number) || number < 0 || number > 100) throw new Error(`INVALID_${name}`);
+    return number;
+  }
+
   function validate(input = {}) {
     if (!UUID_RE.test(String(input.tenantId || ''))) throw new Error('VALID_TENANT_ID_REQUIRED');
     if (!UUID_RE.test(String(input.propertyId || ''))) throw new Error('VALID_PROPERTY_ID_REQUIRED');
@@ -36,7 +43,9 @@
       searchToViewCtrPercent: optionalPositive(input.searchToViewCtrPercent, 'SEARCH_TO_VIEW_CTR_PERCENT'),
       viewToBookingConversionPercent: optionalPositive(input.viewToBookingConversionPercent, 'VIEW_TO_BOOKING_CONVERSION_PERCENT'),
       normalizedImpressionsPerListingDay: optionalPositive(input.normalizedImpressionsPerListingDay, 'NORMALIZED_IMPRESSIONS_PER_LISTING_DAY'),
-      recommendedActiveMediaCount: optionalPositive(input.recommendedActiveMediaCount, 'RECOMMENDED_ACTIVE_MEDIA_COUNT', true)
+      recommendedActiveMediaCount: optionalPositive(input.recommendedActiveMediaCount, 'RECOMMENDED_ACTIVE_MEDIA_COUNT', true),
+      maxDistributionCostPercent: optionalPercent(input.maxDistributionCostPercent, 'MAX_DISTRIBUTION_COST_PERCENT'),
+      minimumDirectReservationSharePercent: optionalPercent(input.minimumDirectReservationSharePercent, 'MINIMUM_DIRECT_RESERVATION_SHARE_PERCENT')
     };
     if (!Object.values(values).some(value => value !== null)) throw new Error('AT_LEAST_ONE_BENCHMARK_REQUIRED');
     const confidence = Number(input.confidence);
@@ -82,6 +91,8 @@
       p_view_to_booking_conversion_percent: valid.viewToBookingConversionPercent,
       p_normalized_impressions_per_listing_day: valid.normalizedImpressionsPerListingDay,
       p_recommended_active_media_count: valid.recommendedActiveMediaCount,
+      p_max_distribution_cost_percent: valid.maxDistributionCostPercent,
+      p_minimum_direct_reservation_share_percent: valid.minimumDirectReservationSharePercent,
       p_confidence: valid.confidence, p_evidence: valid.evidence
     });
     if (response && response.error) throw response.error;
