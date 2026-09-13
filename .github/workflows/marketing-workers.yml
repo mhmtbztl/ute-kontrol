@@ -30,6 +30,7 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Process one photo analysis job
+        if: env.GEMINI_API_KEY != ''
         run: npm run marketing:photo-worker
       - name: Process one completed observation window
         run: npm run marketing:experiment-worker
