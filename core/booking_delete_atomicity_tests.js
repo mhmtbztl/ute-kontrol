@@ -125,8 +125,11 @@ async function run() {
     // --- 3 & 4: kapanmis donem + atomiklik -----------------------------------
     console.log('\n--- 2. KAPANMIŞ DÖNEM & ATOMİKLİK ---');
     const r2 = await rezervasyonEkle(owner.client, A.tenantId, A.propertyId, 'D-3', '05', false);
-    const { error: ce } = await owner.client.from('monthly_financial_closes')
-      .insert({ tenant_id: A.tenantId, year: 2026, month: 5, status: 'CLOSED' });
+    // Phase20'den beri kapanis kaydi yalnizca RPC ile yazilir; dogrudan INSERT
+    // degistirilemezlik tetikleyicisi tarafindan reddedilir.
+    const { error: ce } = await owner.client.rpc('close_monthly_period_atomic', {
+      p_tenant_id: A.tenantId, p_year: 2026, p_month: 5, p_snapshot: {}
+    });
     if (ce) throw new Error('donem kapatilamadi: ' + ce.message);
 
     const { error: e3 } = await owner.client.rpc('delete_booking_atomic', {
