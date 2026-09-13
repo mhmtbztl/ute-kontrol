@@ -42,7 +42,19 @@
       }
     });
 
-    let currentExpenses = 0;
+    // USALI: OTA komisyonu ve temizlik maliyeti GELIRDEN DUSULMEZ, GIDERDIR.
+    // Onceki hal komisyonu ve temizligi hicbir yerde saymiyordu; ciro brut
+    // aliniyor ama bu iki maliyet gider toplamina girmedigi icin net kar
+    // oldugundan yuksek cikiyordu. Finans ekrani ise ayni tutarlari gelirden
+    // dusuyordu; iki ekran ayni ay icin farkli net kar raporluyordu.
+    let distributionAndCleaningCost = 0;
+    bookings.forEach(b => {
+      if (b.status === 'CANCELLED') return;
+      distributionAndCleaningCost += Number(b.ota_commission || b.otaCommission || 0);
+      distributionAndCleaningCost += Number(b.cleaning_fee || b.cleaningFee || 0);
+    });
+
+    let currentExpenses = distributionAndCleaningCost;
     expenses.forEach(e => {
       currentExpenses += Number(e.amount || 0);
     });

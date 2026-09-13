@@ -107,7 +107,43 @@ const testFiles = [
   'marketing_health_source_repository_tests.js',
   'marketing_health_source_entrypoint_tests.js',
   'marketing_funnel_worker_tests.js',
-  'marketing_funnel_worker_entrypoint_tests.js'
+  'marketing_funnel_worker_entrypoint_tests.js',
+  'marketing_economics_finding_service_tests.js',
+  'marketing_economics_worker_repository_tests.js',
+  'marketing_economics_worker_tests.js',
+  'marketing_economics_worker_entrypoint_tests.js',
+  'marketing_cover_change_service_tests.js',
+
+  // Hesap kapatma / KVKK silme (Phase 18)
+  'account_deletion_tests.js',
+
+  // Yeni musteriye demo verisi sizmasi regresyonu
+  'fresh_tenant_isolation_tests.js',
+
+  // USALI gelir/gider siniflandirmasi (yonetici-finans tutarliligi)
+  'usali_revenue_treatment_tests.js',
+
+  // Veri gibi gorunen statik arayuz degerleri denetimi
+  'static_ui_value_tests.js',
+
+  // Rezervasyon silme atomikligi (Phase 19)
+  'booking_delete_atomicity_tests.js',
+
+  // Gelirin doneme dagitilmasi (aylari kesen rezervasyonda cift sayim)
+  'revenue_attribution_tests.js',
+
+  // Ay kapanisi butunlugu (Phase 20)
+  'month_close_integrity_tests.js',
+
+  // Demo artigi denetimi (uydurma villa/rakam/tarih kaynak taramasi)
+  'demo_residue_tests.js',
+
+  // Isletme verisini sifirlama (Phase 21)
+  'tenant_reset_tests.js',
+
+  // Tarayici render hatti — sahte DOM ile renderAll GERCEKTEN calisir.
+  // setEl gibi tanimsiz referanslari yalnizca bu suit yakalar.
+  'render_pipeline_tests.js'
 ];
 
 console.log('=============================================================================');
@@ -126,8 +162,11 @@ for (let i = 0; i < testFiles.length; i++) {
   process.stdout.write(`[${String(i + 1).padStart(2, ' ')}/${testFiles.length}] Running ${file.padEnd(40, ' ')} ... `);
 
   try {
-    const output = execSync(`node "${filePath}"`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
-    
+    // stderr'i de yakala. [FAIL] satirlari console.error ile yazildigi icin
+    // yalnizca stdout okunursa asagidaki "sifir cikis koduyla [FAIL]" agi
+    // HIC calismaz - bu kontrolun var olma sebebi tam olarak buydu.
+    const output = execSync(`node "${filePath}" 2>&1`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+
     // Parse pass count from output: [PASS] or X / X TESTS PASSED
     const passMatches = output.match(/\[PASS\]/g);
     const summaryMatch = output.match(/TEST SUMMARY:\s*(\d+)\s*\/\s*(\d+)\s*TESTS PASSED/i) ||

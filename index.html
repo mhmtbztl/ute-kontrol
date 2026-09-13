@@ -54,9 +54,6 @@
           🔓 Hesabıma Giriş Yap
         </button>
 
-        <div style="background: rgba(139, 92, 246, 0.12); border: 1px dashed rgba(139, 92, 246, 0.35); border-radius: 6px; padding: 8px 10px; margin-top: 10px; font-size: 11px; color: #DDD6FE; text-align: center;">
-          💡 <strong>Hızlı Demo Girişi:</strong> E-posta: <code style="background: rgba(0,0,0,0.4); padding: 1px 5px; border-radius: 3px; color: #FDE68A; font-weight: 700;">demo@lexbnb.com</code> &bull; Şifre: <code style="background: rgba(0,0,0,0.4); padding: 1px 5px; border-radius: 3px; color: #FDE68A; font-weight: 700;">lexbnb</code>
-        </div>
 
         <div style="text-align: center; margin-top: 10px;">
           <a href="#" onclick="showForgotPasswordForm(); return false;" style="color: #94A3B8; font-size: 12px; text-decoration: underline;">Şifremi unuttum</a>
@@ -134,15 +131,6 @@
         ⚠️ Hatalı e-posta veya şifre! Lütfen tekrar deneyin.
       </div>
 
-      <!-- Hızlı Kurumsal Demo Girişi (LexBnB) -->
-      <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.1);">
-        <button type="button" class="btn btn-secondary" onclick="loginWithLexBnBDemo()" style="width: 100%; padding: 10px; font-size: 12px; font-weight: 700; border-color: #F59E0B; color: #FDE68A; background: rgba(245, 158, 11, 0.08); display: flex; align-items: center; justify-content: center; gap: 6px;">
-          <span>🌟</span> LexBnB Demo Hesabı ile 1-Tıkla Giriş Yap
-        </button>
-        <div style="font-size: 11px; color: var(--text-muted); margin-top: 8px; text-align: center;">
-          Şirket yöneticisinin özel linkiyle geldiyseniz otomatik açılır.
-        </div>
-      </div>
     </div>
   </div>
 
@@ -161,54 +149,11 @@
             <div class="filter-group">
         <label style="display: flex; align-items: center; gap: 4px;"><span>📅</span> DÖNEM / TARİH:</label>
         <select id="globalPeriodFilter" onchange="handleFilterChange()">
-          <!-- Genel & Hızlı Tarih Aralıkları -->
-          <optgroup label="🌐 GENEL & TARİH ARALIKLARI">
-            <option value="ALL">🌐 Tüm Zamanlar (Temmuz 2025 - Günümüz)</option>
-            <option value="2026-YEAR">📅 2026 Yılı Tamamı (Ocak - Aralık 2026)</option>
-            <option value="2025-YEAR">📅 2025 Yılı (Temmuz - Aralık 2025)</option>
-            <option value="CUSTOM">📆 Özel Tarih Aralığı Seç...</option>
-          </optgroup>
-
-          <!-- 2025 Yılı: Temmuz 2025'ten İtibaren Kronolojik Sırayla -->
-          <optgroup label="📆 2025 YILI (Temmuz 2025'ten İtibaren)">
-            <option value="2025-07">Temmuz 2025</option>
-            <option value="2025-08">Ağustos 2025</option>
-            <option value="2025-09">Eylül 2025</option>
-            <option value="2025-10">Ekim 2025</option>
-            <option value="2025-11">Kasım 2025</option>
-            <option value="2025-12">Aralık 2025</option>
-          </optgroup>
-
-          <!-- 2026 Yılı: Resmi Şirket Raporları & Güncel Canlı Operasyon -->
-          <optgroup label="📆 2026 YILI (Resmi Veriler & Aktif Sezon)">
-            <option value="2026-01">Ocak 2026</option>
-            <option value="2026-02">Şubat 2026</option>
-            <option value="2026-03">Mart 2026</option>
-            <option value="2026-04">Nisan 2026</option>
-            <option value="2026-05">Mayıs 2026</option>
-            <option value="2026-06">Haziran 2026</option>
-            <option value="2026-07">Temmuz 2026</option>
-            <option value="2026-08">Ağustos 2026 (Son Kapanan Ay)</option>
-            <option value="2026-09" selected>⭐ Eylül 2026 (Güncel Aktif Ay)</option>
-            <option value="2026-10">Ekim 2026</option>
-            <option value="2026-11">Kasım 2026</option>
-            <option value="2026-12">Aralık 2026 (Yılbaşı Sezonu 🎄)</option>
-          </optgroup>
-
-          <!-- 2027 Yılı: Gelecek Kış & Yaz Sezonları -->
-          <optgroup label="📆 2027 YILI (Gelecek Sezonlar)">
-            <option value="2027-01">Ocak 2027 (Kış Zirvesi / Sömestr ❄️)</option>
-            <option value="2027-02">Şubat 2027 (Kayak Sezonu ⛷️)</option>
-            <option value="2027-03">Mart 2027</option>
-            <option value="2027-04">Nisan 2027</option>
-            <option value="2027-05">Mayıs 2027</option>
-            <option value="2027-06">Haziran 2027</option>
-            <option value="2027-07">Temmuz 2027</option>
-            <option value="2027-08">Ağustos 2027</option>
-            <option value="2027-09">Eylül 2027</option>
-            <option value="2027-10">Ekim 2027</option>
-            <option value="2027-11">Kasım 2027</option>
-            <option value="2027-12">Aralık 2027 (Yılbaşı 2028)</option>
+          <!-- Bu liste refreshPeriodSelectors() tarafindan musterinin kendi
+               veri araligindan yeniden kurulur. Asagisi yalnizca yedektir. -->
+          <optgroup label="GENEL & TARİH ARALIKLARI">
+            <option value="ALL">Tüm Zamanlar</option>
+            <option value="CUSTOM">Özel Tarih Aralığı Seç…</option>
           </optgroup>
         </select>
       </div>
@@ -222,13 +167,8 @@
       <div class="filter-group">
         <label>PORTFÖY:</label>
         <select id="globalVillaFilter" onchange="handleFilterChange()">
-          <option value="ALL" selected>Tüm Villalar / Portföy</option>
-          <option value="VILLA_BELLA">Villa Bella Vista (6+2)</option>
-          <option value="VILLA_OLIVE">Villa Olive Garden (8)</option>
-          <option value="VILLA_SUNSET">Villa Sunset Horizon (4)</option>
-          <option value="VILLA_AZURE">Villa Azure Bay (10)</option>
-          <option value="VILLA_PALM">Villa Palm Breeze (6)</option>
-        </select>
+              <option value="ALL">Tüm Villalar / Portföy</option>
+            </select>
       </div>
     </div>
 
@@ -367,13 +307,6 @@
               <small style="color: #CBD5E1;">Demo kayıtlarını kaldırıp kendi mülklerinizi sıfırdan ekleyin</small>
             </div>
           </button>
-          <button type="button" class="dropdown-item text-danger" onclick="confirmFactoryReset(); closeAllHeaderDropdowns();" style="border-top: 1px solid rgba(239, 68, 68, 0.2); background: rgba(239, 68, 68, 0.08); margin-top: 4px;">
-            <span class="dropdown-icon">⚠️</span>
-            <div>
-              <strong style="color: #F87171;">Demo Verilerini Sıfırla</strong>
-              <small style="color: #FCA5A5;">Örnek portföy verilerini fabrika ayarlarına döndürür</small>
-            </div>
-          </button>
         </div>
       </div>
 
@@ -412,13 +345,6 @@
             <div>
               <strong>Excel'den Rapor Yükle</strong>
               <small>Kendi verilerinizi aktarın</small>
-            </div>
-          </button>
-          <button type="button" class="dropdown-item" onclick="loginWithLexBnBDemo(); closeAllHeaderDropdowns();">
-            <span class="dropdown-icon">🌟</span>
-            <div>
-              <strong>LexBnB Demo Hesabı</strong>
-              <small>Tüm örnek mülk ve verilere geç</small>
             </div>
           </button>
           <div class="dropdown-divider"></div>
@@ -463,17 +389,13 @@
         <div style="flex: 1; min-width: 260px;">
           <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
             <span style="font-size: 18px;">🚀</span>
-            <strong style="color: #F8FAFC; font-size: 14px;">İşletme Kurulum Durumu: <span id="onboardProgressPct" style="color: #A78BFA;">%100</span></strong>
+            <strong style="color: #F8FAFC; font-size: 14px;">İşletme Kurulum Durumu: <span id="onboardProgressPct" style="color: #A78BFA;">—</span></strong>
           </div>
           <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; margin-bottom: 8px;">
             <div id="onboardProgressBar" style="width: 100%; height: 100%; background: linear-gradient(90deg, #8B5CF6, #10B981); border-radius: 3px;"></div>
           </div>
           <div id="onboardStepsList" style="display: flex; gap: 12px; flex-wrap: wrap; font-size: 11px; color: #CBD5E1;">
-            <span>✅ Mülk Tanımı</span>
-            <span>✅ Finansal Hedef</span>
-            <span>✅ Operasyon Kuralları</span>
-            <span>✅ Dinamik Fiyatlandırma</span>
-            <span>✅ Misafir Şablonları</span>
+            <!-- JS ile doldurulur: renderExecutiveControlCenter -->
           </div>
         </div>
         <div>
@@ -491,8 +413,8 @@
           </div>
           <div class="kpi-val" id="execKpiRevenue">₺0</div>
           <div class="kpi-meta">
-            <span class="badge badge-green" id="execRevVariance">+%0 Hedef</span>
-            <span id="execRevMoM" style="color: #94A3B8;">↑ %0 Geçen Ay</span>
+            <span class="badge badge-green" id="execRevVariance">—</span>
+            <span id="execRevMoM" style="color: #94A3B8;">—</span>
           </div>
         </div>
 
@@ -517,7 +439,7 @@
           </div>
           <div class="kpi-val" id="execKpiOccupancy">0%</div>
           <div class="kpi-meta">
-            <span class="badge badge-blue" id="execOccVariance">Hedef: %75</span>
+            <span class="badge badge-blue" id="execOccVariance">—</span>
             <span id="execSoldNightsLabel" style="color: #94A3B8;">0 Gece</span>
           </div>
         </div>
@@ -556,7 +478,7 @@
           </div>
           <div class="kpi-val" id="execKpiForecast" style="color: #C084FC;">₺0</div>
           <div class="kpi-meta">
-            <span id="execForecastPacing" style="color: #E2E8F0;">Pacing: %100</span>
+            <span id="execForecastPacing" style="color: #E2E8F0;">—</span>
             <span class="badge badge-green" id="execForecastConfidence" style="font-size: 9px;">Yüksek Güven</span>
           </div>
         </div>
@@ -585,7 +507,7 @@
               <div class="command-col-title">
                 <span style="color: #EF4444;">🚨</span> KRİTİK EYLEMLER
               </div>
-              <span class="command-col-badge badge-red" id="criticalActionsCountBadge">0 / 3</span>
+              <span class="command-col-badge badge-red" id="criticalActionsCountBadge">—</span>
             </div>
             <div id="todayCriticalActionsList">
               <div class="empty-action-state">✅ Kritik müdahale gerektiren açık alert bulunmuyor.</div>
@@ -598,7 +520,7 @@
               <div class="command-col-title">
                 <span style="color: #F59E0B;">🧹</span> OPERASYON GÖREVLERİ
               </div>
-              <span class="command-col-badge badge-yellow" id="operationsActionsCountBadge">0 / 2</span>
+              <span class="command-col-badge badge-yellow" id="operationsActionsCountBadge">—</span>
             </div>
             <div id="todayOperationsActionsList">
               <div class="empty-action-state">✅ Bugün bekleyen acil turnover veya arıza görevi yok.</div>
@@ -611,7 +533,7 @@
               <div class="command-col-title">
                 <span style="color: #10B981;">💡</span> GELİR FIRSATLARI
               </div>
-              <span class="command-col-badge badge-green" id="revenueActionsCountBadge">0 / 1</span>
+              <span class="command-col-badge badge-green" id="revenueActionsCountBadge">—</span>
             </div>
             <div id="todayRevenueActionsList">
               <div class="empty-action-state">✅ Fiyatlandırma ve doluluk optimize; açık fırsat yok.</div>
@@ -632,9 +554,9 @@
             </p>
           </div>
           <div style="display: flex; gap: 6px;">
-            <span class="badge badge-green" id="healthPillHealthy">🟢 Sağlıklı: 5</span>
-            <span class="badge badge-yellow" id="healthPillWarning">🟡 Dikkat: 0</span>
-            <span class="badge badge-red" id="healthPillCritical">🔴 Kritik: 0</span>
+            <span class="badge badge-green" id="healthPillHealthy">—</span>
+            <span class="badge badge-yellow" id="healthPillWarning">—</span>
+            <span class="badge badge-red" id="healthPillCritical">—</span>
           </div>
         </div>
 
@@ -660,7 +582,7 @@
         <div class="ai-suggestion-chips">
           <button type="button" class="ai-chip-btn" onclick="askExecutiveAdvisor('Bu ay net kârımı nasıl %15 artırırım?')">💡 Bu ay net kârımı nasıl %15 artırırım?</button>
           <button type="button" class="ai-chip-btn" onclick="askExecutiveAdvisor('Ekim ayında doluluğu nasıl artırabilirim?')">📅 Ekim ayında doluluğu nasıl artırabilirim?</button>
-          <button type="button" class="ai-chip-btn" onclick="askExecutiveAdvisor('Villa Azure Bay villası için fiyat optimizasyonu nedir?')">🏡 Villa Azure Bay villası için fiyat optimizasyonu nedir?</button>
+          <button type="button" class="ai-chip-btn" onclick="askExecutiveAdvisor('Hangi mülkümde fiyat optimizasyonu gerekiyor?')">🏡 Hangi mülkümde fiyat optimizasyonu gerekiyor?</button>
           <button type="button" class="ai-chip-btn" onclick="askExecutiveAdvisor('Operasyonel arıza ve temizlik darboğazları nelerdir?')">🛠️ Operasyonel darboğazlar nelerdir?</button>
         </div>
 
@@ -688,9 +610,9 @@
         <div class="month-stepper">
           <button class="stepper-arrow-btn" onclick="stepMonth(-1)" title="Önceki Ay">‹</button>
           <div class="month-stepper-display">
-            <span class="stepper-sub-prev" id="stepperPrevLabel">Ağustos 2026</span>
-            <strong class="stepper-current" id="stepperCurrentLabel">Eylül 2026</strong>
-            <span class="stepper-sub-next" id="stepperNextLabel">Ekim 2026</span>
+            <span class="stepper-sub-prev" id="stepperPrevLabel">—</span>
+            <strong class="stepper-current" id="stepperCurrentLabel">—</strong>
+            <span class="stepper-sub-next" id="stepperNextLabel">—</span>
           </div>
           <button class="stepper-arrow-btn" onclick="stepMonth(1)" title="Sonraki Ay">›</button>
         </div>
@@ -705,6 +627,24 @@
         </div>
       </section>
 
+      <!-- 1b. AY KAPANIŞI -->
+      <section class="card" id="monthCloseCard" style="border-left: 3px solid #475569;">
+        <div style="display:flex; flex-wrap:wrap; align-items:center; gap:14px; justify-content:space-between;">
+          <div style="min-width:240px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <strong style="font-size:14px;">Dönem Durumu</strong>
+              <span id="monthCloseBadge" class="badge">—</span>
+            </div>
+            <p class="sub-text" id="monthCloseDetail" style="margin:4px 0 0; font-size:11px;">—</p>
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button type="button" class="btn btn-secondary btn-sm" id="monthCloseBtn" onclick="openMonthCloseModal()">🔒 Bu Ayı Kapat</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="monthReopenBtn" onclick="openMonthReopenModal()" hidden>🔓 Dönemi Yeniden Aç</button>
+          </div>
+        </div>
+        <div id="monthCloseHistory" class="sub-text" style="font-size:10px; margin-top:8px; color:#94A3B8;"></div>
+      </section>
+
       <!-- 2. ANA KPI KARTLARI (5 SANİYEDE ANLAŞILIR) -->
       <section class="kpi-cards-grid five-cols">
         <!-- Gerçekleşen Ciro -->
@@ -713,10 +653,10 @@
             <span class="kpi-label">GERÇEKLEŞEN CİRO</span>
             <button class="kpi-info-btn" onclick="showKpiExplanation('REVENUE')">ℹ️</button>
           </div>
-          <div class="kpi-value" id="finActualRevenue">483.965 TL</div>
+          <div class="kpi-value" id="finActualRevenue">—</div>
           <div class="kpi-meta">
-            <span class="kpi-trend positive" id="finRevTargetDelta">Hedefin %61 üzerinde</span>
-            <span id="finRevMoM">↑ %12 geçen aya göre</span>
+            <span class="kpi-trend positive" id="finRevTargetDelta">—</span>
+            <span id="finRevMoM">—</span>
           </div>
         </div>
 
@@ -729,9 +669,9 @@
               <button class="kpi-info-btn" onclick="event.stopPropagation(); showKpiExplanation('TARGET')">ℹ️</button>
             </div>
           </div>
-          <div class="kpi-value" id="finTargetRevenue">300.000 TL</div>
+          <div class="kpi-value" id="finTargetRevenue">—</div>
           <div class="kpi-meta">
-            <span class="kpi-trend positive" id="finTargetDiff">+183.965 TL fark</span>
+            <span class="kpi-trend positive" id="finTargetDiff">—</span>
             <span style="color: #60A5FA; font-weight: 600;">✏️ Hedefi Değiştir ›</span>
           </div>
         </div>
@@ -742,10 +682,10 @@
             <span class="kpi-label">NET KÂR (CASH PROFIT)</span>
             <button class="kpi-info-btn" onclick="showKpiExplanation('NET_PROFIT')">ℹ️</button>
           </div>
-          <div class="kpi-value" id="finNetProfit">142.793 TL</div>
+          <div class="kpi-value" id="finNetProfit">—</div>
           <div class="kpi-meta">
-            <span class="kpi-trend positive" id="finNetMarginLabel">%29,5 net kâr marjı</span>
-            <span id="finNetProfitMoM">↑ %18 geçen aya göre</span>
+            <span class="kpi-trend positive" id="finNetMarginLabel">—</span>
+            <span id="finNetProfitMoM">—</span>
           </div>
         </div>
 
@@ -755,10 +695,11 @@
             <span class="kpi-label">TOPLAM GİDER (OPEX+CAPEX)</span>
             <button class="kpi-info-btn" onclick="showKpiExplanation('TOTAL_EXPENSE')">ℹ️</button>
           </div>
-          <div class="kpi-value" id="finTotalExpense">341.172 TL</div>
+          <div class="kpi-value" id="finTotalExpense">—</div>
           <div class="kpi-meta">
-            <span class="kpi-trend negative" id="finExpenseRatio">Cironun %70,5'i</span>
-            <span id="finExpenseMoM">↑ %8 geçen aya göre</span>
+            <span class="kpi-trend negative" id="finExpenseRatio">—</span>
+            <span id="finExpenseMoM">—</span>
+            <div id="finAutoDerivedCost" class="sub-text" style="font-size:10px; margin-top:6px; color:#93C5FD;"></div>
           </div>
         </div>
 
@@ -768,10 +709,10 @@
             <span class="kpi-label">SATILAN GECE</span>
             <button class="kpi-info-btn" onclick="showKpiExplanation('SOLD_NIGHTS')">ℹ️</button>
           </div>
-          <div class="kpi-value" id="finSoldNights">79 gece</div>
+          <div class="kpi-value" id="finSoldNights">—</div>
           <div class="kpi-meta">
-            <span class="kpi-trend positive" id="finAvgRevPerNight">6.126 TL / satılan gece</span>
-            <span id="finNightsMoM">↑ %9 geçen aya göre</span>
+            <span class="kpi-trend positive" id="finAvgRevPerNight">—</span>
+            <span id="finNightsMoM">—</span>
           </div>
         </div>
       </section>
@@ -784,7 +725,7 @@
             <span class="sub-text">Ay içi ilerleme, hedef sapması ve dönem sonu tahmini</span>
           </div>
           <div style="display: flex; align-items: center; gap: 10px;">
-            <span class="badge badge-emerald" id="finTargetStatusBadge">%161,3 Hedef Gerçekleşti</span>
+            <span class="badge badge-emerald" id="finTargetStatusBadge">—</span>
             <button class="btn btn-primary btn-sm" onclick="openGoalsModal()">🎯 Hedefi Değiştir</button>
           </div>
         </div>
@@ -792,23 +733,23 @@
         <div class="target-comparison-grid">
           <div class="target-stat-box">
             <span class="lbl">Hedef Ciro</span>
-            <strong class="val" id="tgtBoxTarget">300.000 TL</strong>
+            <strong class="val" id="tgtBoxTarget">—</strong>
           </div>
           <div class="target-stat-box">
             <span class="lbl">Gerçekleşen Ciro</span>
-            <strong class="val positive" id="tgtBoxActual">483.965 TL</strong>
+            <strong class="val positive" id="tgtBoxActual">—</strong>
           </div>
           <div class="target-stat-box">
             <span class="lbl">Hedef Farkı</span>
-            <strong class="val positive" id="tgtBoxDiff">+183.965 TL</strong>
+            <strong class="val positive" id="tgtBoxDiff">—</strong>
           </div>
           <div class="target-stat-box">
             <span class="lbl">Gerçekleşme Oranı</span>
-            <strong class="val positive" id="tgtBoxPct">%161,3</strong>
+            <strong class="val positive" id="tgtBoxPct">—</strong>
           </div>
           <div class="target-stat-box">
             <span class="lbl">Ay Sonu Tahmini Ciro</span>
-            <strong class="val" id="tgtBoxForecast">492.000 TL</strong>
+            <strong class="val" id="tgtBoxForecast">—</strong>
           </div>
         </div>
 
@@ -816,7 +757,7 @@
         <div class="target-progress-wrapper">
           <div class="target-progress-header">
             <span>İlerleme Çubuğu</span>
-            <span id="targetBarRatioText">483.965 TL / 300.000 TL (%161,3)</span>
+            <span id="targetBarRatioText">—</span>
           </div>
           <div class="progress-bar-bg target-bar-large">
             <div class="progress-bar-fill target-bar-fill" id="targetBarFill" style="width: 100%;"></div>
@@ -839,7 +780,7 @@
           <!-- Step 1: Ciro -->
           <div class="bridge-step ciro">
             <span class="step-label">Ciro</span>
-            <strong class="step-val" id="brCiro">483.965 TL</strong>
+            <strong class="step-val" id="brCiro">—</strong>
             <span class="step-sub">Brüt Oda & Hizmet Geliri</span>
           </div>
           <div class="bridge-arrow">↓</div>
@@ -847,7 +788,7 @@
           <!-- Step 2: Opex -->
           <div class="bridge-step minus opex">
             <span class="step-label">Operasyonel Giderler</span>
-            <strong class="step-val" id="brOpex">-337.306 TL</strong>
+            <strong class="step-val" id="brOpex">—</strong>
             <span class="step-sub">Maaş, temizlik, komisyon, fatura</span>
           </div>
           <div class="bridge-arrow">↓</div>
@@ -855,15 +796,15 @@
           <!-- Step 3: Operating Profit -->
           <div class="bridge-step op-profit">
             <span class="step-label">Operasyonel Kâr</span>
-            <strong class="step-val" id="brOpProfit">146.659 TL</strong>
-            <span class="step-sub">Marj: %30,3 (Yatırımlar Öncesi)</span>
+            <strong class="step-val" id="brOpProfit">—</strong>
+            <span class="step-sub" id="brOpMargin">Marj: — (Yatırımlar Öncesi)</span>
           </div>
           <div class="bridge-arrow">↓</div>
 
           <!-- Step 4: Capex / Yatırımlar -->
           <div class="bridge-step minus capex">
             <span class="step-label">Yatırımlar (Capex)</span>
-            <strong class="step-val" id="brCapex">-3.866 TL</strong>
+            <strong class="step-val" id="brCapex">—</strong>
             <span class="step-sub">Jakuzi, dekorasyon, ekipman alımı</span>
           </div>
           <div class="bridge-arrow">↓</div>
@@ -871,8 +812,8 @@
           <!-- Step 5: Net Profit -->
           <div class="bridge-step final-profit">
             <span class="step-label">Net Kâr (Elde Kalan)</span>
-            <strong class="step-val" id="brNetProfit">142.793 TL</strong>
-            <span class="step-sub" id="brNetMargin">%29,5 Net Kâr Marjı</span>
+            <strong class="step-val" id="brNetProfit">—</strong>
+            <span class="step-sub" id="brNetMargin">—</span>
           </div>
         </div>
       </section>
@@ -896,12 +837,12 @@
               </svg>
               <div class="donut-center-info">
                 <span class="center-sub">Toplam Gider</span>
-                <strong class="center-val" id="donutCenterVal">341.172 TL</strong>
+                <strong class="center-val" id="donutCenterVal">—</strong>
               </div>
             </div>
             <div class="chart-summary-pills">
-              <span class="pill opex-pill">Operasyonel: <strong id="donutOpexVal">337.306 TL</strong></span>
-              <span class="pill capex-pill">Yatırım: <strong id="donutCapexVal">3.866 TL</strong></span>
+              <span class="pill opex-pill">Operasyonel: <strong id="donutOpexVal">—</strong></span>
+              <span class="pill capex-pill">Yatırım: <strong id="donutCapexVal">—</strong></span>
             </div>
           </div>
 
@@ -1037,13 +978,13 @@
 
           <div style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 10px; padding: 12px 14px;">
             <div style="font-size: 11px; color: #93C5FD; font-weight: 700; text-transform: uppercase;">💎 En Yüksek ADR (Gecelik)</div>
-            <div style="font-size: 17px; font-weight: 800; color: #60A5FA; margin: 4px 0;" id="kpiPeakAdr">Şubat 2026 (20.256 TL)</div>
+            <div style="font-size: 17px; font-weight: 800; color: #60A5FA; margin: 4px 0;" id="kpiPeakAdr">—</div>
             <div style="font-size: 11px; color: var(--text-muted);">Sömestr tatilinde premium fiyatlama</div>
           </div>
 
           <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 10px; padding: 12px 14px;">
             <div style="font-size: 11px; color: #FDE68A; font-weight: 700; text-transform: uppercase;">📈 En Çok Gece Satılan Ay</div>
-            <div style="font-size: 17px; font-weight: 800; color: #FBBF24; margin: 4px 0;" id="kpiPeakNights">Ağustos 2026 (79 Gece)</div>
+            <div style="font-size: 17px; font-weight: 800; color: #FBBF24; margin: 4px 0;" id="kpiPeakNights">—</div>
             <div style="font-size: 11px; color: var(--text-muted);">Yaz sezonu hacim lideri</div>
           </div>
 
@@ -1122,9 +1063,9 @@
           <div class="section-title-bar">
             <div>
               <h2>📅 GEÇEN YIL KARŞILAŞTIRMASI (YOY)</h2>
-              <span class="sub-text" id="yoySubText">Ağustos 2025 vs Ağustos 2026</span>
+              <span class="sub-text" id="yoySubText">—</span>
             </div>
-            <span class="badge badge-emerald" id="yoyBadge">Nominal: +%62,7</span>
+            <span class="badge badge-emerald" id="yoyBadge">—</span>
           </div>
 
           <div class="yoy-comparison-boxes" id="yoyBoxesContainer">
@@ -1205,22 +1146,12 @@
           <button class="btn btn-secondary btn-sm" onclick="exportTrajectoryReport()">📄 Gidişat Raporu Al</button>
         </div>
 
-        <!-- Sıfırlama Bilgilendirme Bannerı (Yalnızca Temiz Kasada Görünür) -->
-        <div id="trajectoryRadarBanner" style="display: none; background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.35); border-radius: 10px; padding: 14px 18px; margin-bottom: 20px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-            <div style="color: #93c5fd; font-size: 0.9rem;">
-              ℹ️ <strong>Sistem verileri sıfırlandı (Temiz Kasa Başlatıldı - 0 TL).</strong><br>
-              Yeni rezervasyon veya harcama girdikçe projeksiyonlar otomatik hesaplanacaktır. Portföy demo verilerini geri getirmek için <strong>"Demo Verilerini Geri Yükle"</strong> butonuna basabilirsiniz.
-            </div>
-            <button class="btn btn-primary btn-sm" onclick="restoreExcelData()">🔄 Demo Verilerini Geri Yükle</button>
-          </div>
-        </div>
 
         <!-- 1. Gidişat Barometresi / 4 Temel Sağlık Göstergesi -->
         <div class="trajectory-barometer-grid">
           <div class="barometer-card health-score">
             <div class="score-circle">
-              <span class="score-num" id="trajectoryScoreNum">88</span>
+              <span class="score-num" id="trajectoryScoreNum">—</span>
               <span class="score-denom">/100</span>
             </div>
             <div class="score-info">
@@ -1232,20 +1163,20 @@
 
           <div class="barometer-card">
             <span class="b-lbl">CİRO MOMENTUMU (SON 3 AY)</span>
-            <strong class="b-val text-emerald" id="trajectoryMomentumVal">🚀 +%80,7 İvme</strong>
-            <span class="b-desc" id="trajectoryMomentumDesc">Haziran (268k) ➔ Temmuz (467k) ➔ Ağustos (484k)</span>
+            <strong class="b-val text-emerald" id="trajectoryMomentumVal">—</strong>
+            <span class="b-desc" id="trajectoryMomentumDesc">—</span>
           </div>
 
           <div class="barometer-card">
             <span class="b-lbl">NET KÂR MARJI STABİLİTESİ</span>
-            <strong class="b-val text-blue" id="trajectoryMarginVal">⚖️ %29,5 – %33,9</strong>
-            <span class="b-desc" id="trajectoryMarginDesc">Ocak rekorunda %60,7, yaz aylarında %30 civarında stabil.</span>
+            <strong class="b-val text-blue" id="trajectoryMarginVal">—</strong>
+            <span class="b-desc" id="trajectoryMarginDesc">—</span>
           </div>
 
           <div class="barometer-card">
             <span class="b-lbl">FİYAT SAVUNMASI (ADR TRENDİ)</span>
             <strong class="b-val text-amber" id="trajectoryAdrVal">⚠️ Sezonsal Uçurum</strong>
-            <span class="b-desc" id="trajectoryAdrDesc">Kışın 18.000 TL ➔ Yazın 6.126 TL. Kış erken açılışı kritik.</span>
+            <span class="b-desc" id="trajectoryAdrDesc">—</span>
           </div>
         </div>
 
@@ -1300,7 +1231,7 @@
             <div class="sim-control-item">
               <div class="sim-lbl-row">
                 <span>ADR (Gecelik Fiyat) Değişimi:</span>
-                <strong id="simAdrLabel">+%15</strong>
+                <strong id="simAdrLabel">—</strong>
               </div>
               <input type="range" id="simAdrSlider" min="-20" max="40" step="5" value="15" oninput="runWhatIfSimulation()">
               <span class="slider-hint">Taban ve tavan fiyatların yukarı çekilmesi</span>
@@ -1309,7 +1240,7 @@
             <div class="sim-control-item">
               <div class="sim-lbl-row">
                 <span>Doluluk Oranı Değişimi:</span>
-                <strong id="simOccLabel">+%5</strong>
+                <strong id="simOccLabel">—</strong>
               </div>
               <input type="range" id="simOccSlider" min="-15" max="25" step="5" value="5" oninput="runWhatIfSimulation()">
               <span class="slider-hint">Boş günlerin ve gap gecelerinin kapatılması</span>
@@ -1318,7 +1249,7 @@
             <div class="sim-control-item">
               <div class="sim-lbl-row">
                 <span>Direkt Rezervasyon Payı (WhatsApp/Instagram):</span>
-                <strong id="simDirectLabel">%60</strong>
+                <strong id="simDirectLabel">—</strong>
               </div>
               <input type="range" id="simDirectSlider" min="20" max="90" step="5" value="60" oninput="runWhatIfSimulation()">
               <span class="slider-hint">OTA komisyonunu (%15-18) sıfırlayan direkt satış</span>
@@ -1328,18 +1259,18 @@
           <div class="sim-results-grid">
             <div class="sim-res-box">
               <span class="r-lbl">SİMÜLE EDİLEN AYLIK CİRO</span>
-              <strong class="r-val" id="simResRevenue">562.400 TL</strong>
-              <span class="r-delta text-emerald" id="simResRevDelta">+78.435 TL (+%16,2)</span>
+              <strong class="r-val" id="simResRevenue">—</strong>
+              <span class="r-delta text-emerald" id="simResRevDelta">—</span>
             </div>
             <div class="sim-res-box">
               <span class="r-lbl">TASARRUF EDİLEN KOMİSYON</span>
-              <strong class="r-val text-emerald" id="simResCommission">28.500 TL</strong>
+              <strong class="r-val text-emerald" id="simResCommission">—</strong>
               <span class="r-delta" id="simResCommDelta">Kasada Kalan Doğrudan Nakit</span>
             </div>
             <div class="sim-res-box highlight">
               <span class="r-lbl">YENİ TAHMİNİ NET NAKİT KÂR</span>
-              <strong class="r-val text-emerald" id="simResProfit">218.650 TL</strong>
-              <span class="r-delta" id="simResProfitDelta">+75.857 TL Fazla Kâr (%38,9 Marj)</span>
+              <strong class="r-val text-emerald" id="simResProfit">—</strong>
+              <span class="r-delta" id="simResProfitDelta">—</span>
             </div>
           </div>
         </div>
@@ -1350,21 +1281,21 @@
             <div class="in-header">
               <span>🚨 1. EN BÜYÜK TEHLİKE / MALİYET TUZAĞI</span>
             </div>
-            <p><strong>Komisyon & Temizlik Sızıntısı:</strong> Son ayda komisyon (75.519 TL) ve temizlik (47.000 TL) toplam 122.500 TL yuttu (cironun %25'i). Eğer direkt rezervasyon payı artırılmazsa, yüksek cirolu kış aylarında aylık 150.000 TL'nin üzerinde komisyon aracı kurumlara gidecektir.</p>
+            <p id="trajDangerText">—</p>
           </div>
 
           <div class="insight-box warning">
             <div class="in-header">
               <span>⚠️ 2. DÜZELTİLMESİ GEREKEN ANOMALİ</span>
             </div>
-            <p><strong>Villa Sunset Horizon Fiyat Baskısı:</strong> Sunset villası ağustosta yüksek dolulukla çalıştı fakat ortalama gecelik fiyat tabanın altında kaldı. Taban fiyatı 5.000 TL bandına çekilerek kâra doğrudan aylık net katkı sağlanabilir.</p>
+            <p id="trajAnomalyText">—</p>
           </div>
 
           <div class="insight-box success">
             <div class="in-header">
               <span>💎 3. EN BÜYÜK FIRSAT / GELİR KALDIRACI</span>
             </div>
-            <p><strong>Villa Azure Bay & Olive Garden Erken Rezervasyonu:</strong> Azure Bay yüksek gecelik gelir savunmasıyla portföy lideridir. Yaklaşan dönem için erken rezervasyonlar taban fiyat korunarak açılmalı; özel iskele ve VIP paketlerle katma değer artırılmalıdır.</p>
+            <p id="trajOpportunityText">—</p>
           </div>
         </div>
       </section>
@@ -1439,7 +1370,7 @@
         <div class="kpi-card">
           <div class="kpi-card-header"><span class="kpi-label">NET ODA GELİRİ</span><button class="kpi-info-btn" onclick="showKpiExplanation('REVENUE')">ℹ️</button></div>
           <div class="kpi-value" id="kpiNetRevenue">₺0</div>
-          <div class="kpi-meta"><span class="kpi-trend positive" id="kpiTargetPct">%0 Hedef</span><span id="kpiGrossRevenue">Brüt: ₺0</span></div>
+          <div class="kpi-meta"><span class="kpi-trend positive" id="kpiTargetPct">%0 Hedef</span><span id="kpiGrossRevenue">—</span></div>
         </div>
         <div class="kpi-card">
           <div class="kpi-card-header"><span class="kpi-label">DOLULUK ORANI</span><button class="kpi-info-btn" onclick="showKpiExplanation('OCCUPANCY')">ℹ️</button></div>
@@ -1454,7 +1385,7 @@
         <div class="kpi-card">
           <div class="kpi-card-header"><span class="kpi-label">RevPAR</span><button class="kpi-info-btn" onclick="showKpiExplanation('REVPAR')">ℹ️</button></div>
           <div class="kpi-value" id="kpiRevPAR">₺0</div>
-          <div class="kpi-meta"><span class="kpi-trend positive">Kapasite</span><span id="kpiNRevPAR">NRevPAR: ₺0</span></div>
+          <div class="kpi-meta"><span class="kpi-trend positive">Kapasite</span><span id="kpiNRevPAR">—</span></div>
         </div>
       </section>
 
@@ -1555,7 +1486,7 @@
           </div>
           <div class="kpi-value" id="mktTotalSpend" style="color: #DDD6FE;">₺0</div>
           <div class="kpi-meta">
-            <span id="mktTotalBudgetDetail">Bütçe: ₺0</span>
+            <span id="mktTotalBudgetDetail">—</span>
             <span id="mktSpendProgress" style="color: #A855F7; font-weight: 700;">%0 Harcandı</span>
           </div>
         </div>
@@ -1567,7 +1498,7 @@
           </div>
           <div class="kpi-value" id="mktOverallRoas" style="color: #34D399;">0.0x</div>
           <div class="kpi-meta">
-            <span id="mktRoasRevDetail">Reklam Cirosu: ₺0</span>
+            <span id="mktRoasRevDetail">—</span>
             <span style="color: #10B981; font-weight: 700;">Mükemmel ✅</span>
           </div>
         </div>
@@ -1591,7 +1522,7 @@
           </div>
           <div class="kpi-value" id="mktDirectSharePct" style="color: #FBBF24;">%0 Direkt</div>
           <div class="kpi-meta">
-            <span id="mktSavedOtaComm">Kurtarılan: ₺0</span>
+            <span id="mktSavedOtaComm">—</span>
             <span style="color: #34D399; font-weight: 700;">Cepte Kalan</span>
           </div>
         </div>
@@ -1606,10 +1537,10 @@
         <div class="mkt-platform-card meta">
           <div class="mkt-card-top">
             <span class="mkt-platform-title">📱 Meta Ads (Instagram/FB)</span>
-            <span class="badge badge-meta" id="metaRoasBadge">0.0x ROAS</span>
+            <span class="badge badge-meta" id="metaRoasBadge">—</span>
           </div>
           <div class="mkt-stats-row"><span class="mkt-stats-label">Harcama:</span><span class="mkt-stats-val" id="metaTotalSpent">₺0</span></div>
-          <div class="mkt-stats-row"><span class="mkt-stats-label">Tıklama (CPC):</span><span class="mkt-stats-val" id="metaClicksCpc">0 (₺0)</span></div>
+          <div class="mkt-stats-row"><span class="mkt-stats-label">Tıklama (CPC):</span><span class="mkt-stats-val" id="metaClicksCpc">—</span></div>
           <div class="mkt-stats-row"><span class="mkt-stats-label">WhatsApp / DM Lead:</span><span class="mkt-stats-val" id="metaLeadsCount">0 Lead</span></div>
           <div class="mkt-stats-row"><span class="mkt-stats-label">Üretilen Ciro:</span><span class="mkt-stats-val" style="color: #34D399;" id="metaTotalRev">₺0</span></div>
           <div class="mkt-stats-row"><span class="mkt-stats-label">Kazanılan Rezervasyon:</span><span class="mkt-stats-val" id="metaBookingsCount">0 Rez</span></div>
@@ -1619,10 +1550,10 @@
         <div class="mkt-platform-card google">
           <div class="mkt-card-top">
             <span class="mkt-platform-title">🔍 Google Ads (Arama & PMax)</span>
-            <span class="badge badge-google" id="googleRoasBadge">0.0x ROAS</span>
+            <span class="badge badge-google" id="googleRoasBadge">—</span>
           </div>
           <div class="mkt-stats-row"><span class="mkt-stats-label">Harcama:</span><span class="mkt-stats-val" id="googleTotalSpent">₺0</span></div>
-          <div class="mkt-stats-row"><span class="mkt-stats-label">Tıklama (CPC):</span><span class="mkt-stats-val" id="googleClicksCpc">0 (₺0)</span></div>
+          <div class="mkt-stats-row"><span class="mkt-stats-label">Tıklama (CPC):</span><span class="mkt-stats-val" id="googleClicksCpc">—</span></div>
           <div class="mkt-stats-row"><span class="mkt-stats-label">Gösterim:</span><span class="mkt-stats-val" id="googleImpressions">0</span></div>
           <div class="mkt-stats-row"><span class="mkt-stats-label">Üretilen Ciro:</span><span class="mkt-stats-val" style="color: #34D399;" id="googleTotalRev">₺0</span></div>
           <div class="mkt-stats-row"><span class="mkt-stats-label">Kazanılan Rezervasyon:</span><span class="mkt-stats-val" id="googleBookingsCount">0 Rez</span></div>
@@ -1632,13 +1563,13 @@
         <div class="mkt-platform-card ota">
           <div class="mkt-card-top">
             <span class="mkt-platform-title">🏨 OTA Algoritma & Sıralama (Airbnb/Booking)</span>
-            <span class="badge badge-amber" id="otaRankSummaryBadge">1. Sayfada: %80</span>
+            <span class="badge badge-amber" id="otaRankSummaryBadge">—</span>
           </div>
           <div class="mkt-stats-row"><span class="mkt-stats-label">Arama Sıralaması:</span><span class="mkt-stats-val" style="color: #FBBF24;" id="otaAvgRankVal">Sayfa 1 / Ort. #4</span></div>
-          <div class="mkt-stats-row"><span class="mkt-stats-label">Kapak Görseli Tıklama (CTR):</span><span class="mkt-stats-val" style="color: #34D399;" id="otaAvgCoverCtr">%4.8 (Yüksek)</span></div>
-          <div class="mkt-stats-row"><span class="mkt-stats-label">Başlık & Açıklama SEO:</span><span class="mkt-stats-val" id="otaAvgListingScore">92 / 100</span></div>
+          <div class="mkt-stats-row"><span class="mkt-stats-label">Kapak Görseli Tıklama (CTR):</span><span class="mkt-stats-val" style="color: #34D399;" id="otaAvgCoverCtr">—</span></div>
+          <div class="mkt-stats-row"><span class="mkt-stats-label">Başlık & Açıklama SEO:</span><span class="mkt-stats-val" id="otaAvgListingScore">—</span></div>
           <div class="mkt-stats-row"><span class="mkt-stats-label">Süper Ev Sahibi & Gözde:</span><span class="mkt-stats-val" style="color: #34D399;">5/5 Villa Rozetli 🏆</span></div>
-          <div class="mkt-stats-row"><span class="mkt-stats-label">OTA Rezervasyon / Ciro:</span><span class="mkt-stats-val" id="otaBookingsCiroDetail">9 Rez (₺483.965)</span></div>
+          <div class="mkt-stats-row"><span class="mkt-stats-label">OTA Rezervasyon / Ciro:</span><span class="mkt-stats-val" id="otaBookingsCiroDetail">—</span></div>
         </div>
 
         <!-- Direkt Satış (WhatsApp / Instagram Organik / Web) -->
@@ -1741,11 +1672,8 @@
         <!-- Hızlı Villa Seçim Butonları -->
         <div class="critic-preset-btns" style="margin-top: 14px;">
           <span style="font-size: 11px; color: #94A3B8; font-weight: 700; align-self: center;">Hızlı Seçim:</span>
-          <button type="button" class="btn btn-secondary btn-sm" onclick="setCriticUrlPreset('VILLA_BELLA')">🏡 Villa Bella Vista</button>
-          <button type="button" class="btn btn-secondary btn-sm" onclick="setCriticUrlPreset('VILLA_AZURE')">🏡 Villa Azure Bay</button>
-          <button type="button" class="btn btn-secondary btn-sm" onclick="setCriticUrlPreset('VILLA_OLIVE')">🏡 Villa Olive Garden</button>
-          <button type="button" class="btn btn-secondary btn-sm" onclick="setCriticUrlPreset('VILLA_SUNSET')">🏡 Villa Sunset Horizon</button>
-          <button type="button" class="btn btn-secondary btn-sm" onclick="setCriticUrlPreset('VILLA_PALM')">🏡 Villa Palm Breeze</button>
+          <!-- Müşterinin ilan bağlantısı olan mülkleri; renderCriticPresets() doldurur. -->
+          <span id="criticPresetList" style="display: contents;"></span>
         </div>
 
         <!-- URL Input & Çalıştır Butonu -->
@@ -1774,11 +1702,7 @@
           <div style="display: flex; align-items: center; gap: 8px;">
             <label style="font-size: 12px; color: #CBD5E1; font-weight: 600;">Villa Seçin:</label>
             <select id="abTestVillaSelect" onchange="renderCoverAbTestLab(this.value)" style="padding: 6px 12px; background: #1E293B; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; font-size: 12px; font-weight: 700;">
-              <option value="VILLA_BELLA">Villa Bella Vista</option>
-              <option value="VILLA_AZURE" selected>Villa Azure Bay</option>
-              <option value="VILLA_OLIVE">Villa Olive Garden</option>
-              <option value="VILLA_SUNSET">Villa Sunset Horizon</option>
-              <option value="VILLA_PALM">Villa Palm Breeze</option>
+              <!-- updateAllVillaDropdowns() musterinin mulkleriyle doldurur -->
             </select>
           </div>
         </div>
@@ -1794,7 +1718,7 @@
             <div style="display: flex; align-items: center; gap: 8px;">
               <span style="font-size: 20px;">🛑</span>
               <h3 style="margin: 0; font-size: 16px; font-weight: 800; color: #FCA5A5;">TAKVİMDEKİ "YETİM GECELER" (GAP NIGHTS) KURTARMA MOTORU</h3>
-              <span class="badge badge-amber" id="gapNightsCountBadge">Tespit Edilen: 0 Boşluk</span>
+              <span class="badge badge-amber" id="gapNightsCountBadge">—</span>
             </div>
             <p class="sub-text" style="margin: 4px 0 0 0;">
               Rezervasyonlar arasında kalan satışı zor 1-3 günlük "yetim boşlukları" anlık yakalayın; tek tıkla Instagram Hikaye ve WhatsApp Durum flaş indirim şablonu kopyalayın.
@@ -1843,11 +1767,7 @@
           <div style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 11px; color: var(--text-muted);">Villa:</label>
             <select id="scriptVillaSelect" onchange="updateClosingScriptPreview()" style="padding: 6px 10px; background: #1E293B; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; font-size: 12px; width: 140px;">
-              <option value="VILLA_BELLA">Villa Bella Vista</option>
-              <option value="VILLA_OLIVE">Villa Olive Garden</option>
-              <option value="VILLA_SUNSET">Villa Sunset Horizon</option>
-              <option value="VILLA_AZURE">Villa Azure Bay</option>
-              <option value="VILLA_PALM">Villa Palm Breeze</option>
+              <!-- updateAllVillaDropdowns() musterinin mulkleriyle doldurur -->
             </select>
           </div>
           <div style="display: flex; flex-direction: column; gap: 4px;">
@@ -2013,10 +1933,10 @@
           </div>
 
           <div style="display: flex; justify-content: space-between; font-size: 12px; flex-wrap: wrap; gap: 10px; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px;" id="simResultsDetail">
-            <div><span style="color: #93C5FD;">Google Arama:</span> <strong id="simGoogleAmt">₺9.000</strong> (Tahmini Ciro: <span id="simGoogleRev" style="color: #34D399;">₺85.500</span>)</div>
-            <div><span style="color: #C084FC;">Meta (IG/WA):</span> <strong id="simMetaAmt">₺8.000</strong> (Tahmini Ciro: <span id="simMetaRev" style="color: #34D399;">₺64.000</span>)</div>
-            <div><span style="color: #6EE7B7;">Yeniden Hedefleme:</span> <strong id="simRetargetAmt">₺3.000</strong> (Tahmini Ciro: <span id="simRetargetRev" style="color: #34D399;">₺30.000</span>)</div>
-            <div><strong style="color: #FBBF24;">Beklenen Toplam Ciro: <span id="simTotalExpectedRev">₺179.500</span></strong> (<span id="simExpectedRoas" style="color:#34D399;">9.0x ROAS</span>)</div>
+            <div><span style="color: #93C5FD;">Google Arama:</span> <strong id="simGoogleAmt">—</strong> (Tahmini Ciro: <span id="simGoogleRev" style="color: #34D399;">—</span>)</div>
+            <div><span style="color: #C084FC;">Meta (IG/WA):</span> <strong id="simMetaAmt">—</strong> (Tahmini Ciro: <span id="simMetaRev" style="color: #34D399;">—</span>)</div>
+            <div><span style="color: #6EE7B7;">Yeniden Hedefleme:</span> <strong id="simRetargetAmt">—</strong> (Tahmini Ciro: <span id="simRetargetRev" style="color: #34D399;">—</span>)</div>
+            <div><strong style="color: #FBBF24;">Beklenen Toplam Ciro: <span id="simTotalExpectedRev">—</span></strong> (<span id="simExpectedRoas" style="color:#34D399;">—</span>)</div>
           </div>
         </div>
       </div>
@@ -2061,7 +1981,7 @@
             <span class="channel-title">🏡 Airbnb Portföyü</span>
             <span class="badge badge-amber" id="airbnbSuperhostBadge">🏆 Süper Ev Sahibi</span>
           </div>
-          <div class="kpi-value" id="airbnbPortfolioScore" style="color: #FBBF24;">4.97 <span class="sub-val" style="color: #FDE68A;">★ / 5.0</span></div>
+          <div class="kpi-value" id="airbnbPortfolioScore" style="color: #FBBF24;">—<span class="sub-val" style="color: #FDE68A;">★ / 5.0</span></div>
           <div class="kpi-meta">
             <span id="airbnbTotalReviews">—</span>
             <span style="color: #34D399; font-weight: 700;">💎 Misafirlerin Gözdesi</span>
@@ -2190,54 +2110,14 @@
           </div>
           <div>
             <select id="rezPeriodFilter" onchange="renderManageBookingsTable()" style="padding: 8px 12px; background: rgba(30,41,59,0.9); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px;">
-              <option value="ALL" selected>Tüm Rezervasyonlar (Tarih Bağımsız)</option>
+              <!-- refreshPeriodSelectors() yeniden kurar; yedek liste. -->
+              <option value="ALL" selected>Tüm Rezervasyonlar</option>
               <option value="UPCOMING">Gelecek & Aktif Rezervasyonlar</option>
-              <optgroup label="2025 YILI (Temmuz'dan İtibaren)">
-                <option value="2025-07">Temmuz 2025</option>
-                <option value="2025-08">Ağustos 2025</option>
-                <option value="2025-09">Eylül 2025</option>
-                <option value="2025-10">Ekim 2025</option>
-                <option value="2025-11">Kasım 2025</option>
-                <option value="2025-12">Aralık 2025</option>
-              </optgroup>
-              <optgroup label="2026 YILI (Resmi Veriler & Güncel)">
-                <option value="2026-01">Ocak 2026</option>
-                <option value="2026-02">Şubat 2026</option>
-                <option value="2026-03">Mart 2026</option>
-                <option value="2026-04">Nisan 2026</option>
-                <option value="2026-05">Mayıs 2026</option>
-                <option value="2026-06">Haziran 2026</option>
-                <option value="2026-07">Temmuz 2026</option>
-                <option value="2026-08">Ağustos 2026</option>
-                <option value="2026-09">Eylül 2026 (Güncel Ay)</option>
-                <option value="2026-10">Ekim 2026</option>
-                <option value="2026-11">Kasım 2026</option>
-                <option value="2026-12">Aralık 2026 (Yılbaşı Sezonu 🎄)</option>
-              </optgroup>
-              <optgroup label="2027 YILI">
-                <option value="2027-01">Ocak 2027 (Kış Zirvesi ❄️)</option>
-                <option value="2027-02">Şubat 2027 (Kayak Sezonu ⛷️)</option>
-                <option value="2027-03">Mart 2027</option>
-                <option value="2027-04">Nisan 2027</option>
-                <option value="2027-05">Mayıs 2027</option>
-                <option value="2027-06">Haziran 2027</option>
-                <option value="2027-07">Temmuz 2027</option>
-                <option value="2027-08">Ağustos 2027</option>
-                <option value="2027-09">Eylül 2027</option>
-                <option value="2027-10">Ekim 2027</option>
-                <option value="2027-11">Kasım 2027</option>
-                <option value="2027-12">Aralık 2027</option>
-              </optgroup>
             </select>
           </div>
           <div>
             <select id="rezVillaFilter" onchange="renderManageBookingsTable()" style="padding: 8px 12px; background: rgba(30,41,59,0.9); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px;">
-              <option value="ALL" selected>Tüm Villalar</option>
-              <option value="VILLA_BELLA">Villa Bella Vista</option>
-              <option value="VILLA_OLIVE">Villa Olive Garden</option>
-              <option value="VILLA_SUNSET">Villa Sunset Horizon</option>
-              <option value="VILLA_AZURE">Villa Azure Bay</option>
-              <option value="VILLA_PALM">Villa Palm Breeze</option>
+              <option value="ALL">Tüm Villalar / Portföy</option>
             </select>
           </div>
           <div>
@@ -2314,7 +2194,7 @@
           </div>
           <div class="kpi-value" id="hkKpiPendingDebt" style="color: #FBBF24;">₺0</div>
           <div class="kpi-meta">
-            <span id="hkKpiPendingCount" style="color: #FBBF24; font-weight: 600;">0 Temizlik Ödeme Bekliyor</span>
+            <span id="hkKpiPendingCount" style="color: #FBBF24; font-weight: 600;">—</span>
           </div>
         </div>
 
@@ -2324,7 +2204,7 @@
           </div>
           <div class="kpi-value" id="hkKpiPaidAmount" style="color: #34D399;">₺0</div>
           <div class="kpi-meta">
-            <span id="hkKpiPaidCount" style="color: #34D399; font-weight: 600;">0 Temizlik Ödendi</span>
+            <span id="hkKpiPaidCount" style="color: #34D399; font-weight: 600;">—</span>
           </div>
         </div>
 
@@ -2414,13 +2294,13 @@
           </div>
           <div class="kpi-card" style="border-left: 4px solid #10B981;">
             <div class="kpi-title">💰 KAZANILAN DİREKT CİRO</div>
-            <div class="kpi-value" id="waKpiWonRevenue">0 ₺</div>
+            <div class="kpi-value" id="waKpiWonRevenue">—</div>
             <div class="kpi-sub" style="color: #34D399;">%0 OTA Komisyonu (Net Kâr)</div>
           </div>
           <div class="kpi-card" style="border-left: 4px solid #EF4444;">
             <div class="kpi-title">📉 KAÇAN POTANSİYEL CİRO</div>
-            <div class="kpi-value" id="waKpiLostRevenue">0 ₺</div>
-            <div class="kpi-sub" id="waKpiLostCountSub">0 adet kaçan talep</div>
+            <div class="kpi-value" id="waKpiLostRevenue">—</div>
+            <div class="kpi-sub" id="waKpiLostCountSub">—</div>
           </div>
         </div>
 
@@ -2611,6 +2491,24 @@
           </table>
         </div>
       </section>
+
+      <!-- TEHLİKELİ BÖLGE: HESAP KAPATMA -->
+      <section class="card" id="dangerZoneCard" style="margin-top: 24px; border: 1px solid rgba(239, 68, 68, 0.35);">
+        <div class="section-title-bar">
+          <div>
+            <h2 style="color: #FCA5A5;">⚠️ TEHLİKELİ BÖLGE</h2>
+            <p class="sub-text">Hesabınızı kalıcı olarak kapatın. Bu işlem geri alınamaz.</p>
+          </div>
+        </div>
+        <div style="padding: 4px 4px 16px;">
+          <div id="deletionImpactBox" class="sub-text" style="font-size: 12px; margin-bottom: 14px;">
+            Etki bilgisi yükleniyor…
+          </div>
+          <button class="btn btn-danger" id="openDeleteAccountBtn" onclick="openDeleteAccountModal()">
+            Hesabımı Kalıcı Olarak Kapat
+          </button>
+        </div>
+      </section>
     </div>
 
     <!-- ======================================================= -->
@@ -2651,7 +2549,7 @@
         <div class="kpi-cards-grid five-cols" style="margin-bottom: 20px;">
           <div class="kpi-card">
             <span class="kpi-label">HAZIR MÜLKLER</span>
-            <div class="kpi-value" id="opsReadyPropsVal" style="color: #34D399;">5 / 5</div>
+            <div class="kpi-value" id="opsReadyPropsVal" style="color: #34D399;">—</div>
             <div class="kpi-meta">Misafir kabulüne hazır</div>
           </div>
           <div class="kpi-card">
@@ -2671,7 +2569,7 @@
           </div>
           <div class="kpi-card">
             <span class="kpi-label">SLA PERFORMANSI</span>
-            <div class="kpi-value" id="opsSlaVal" style="color: #A78BFA;">%100</div>
+            <div class="kpi-value" id="opsSlaVal" style="color: #A78BFA;">—</div>
             <div class="kpi-meta">Zamanında tamamlanan</div>
           </div>
         </div>
@@ -2739,7 +2637,7 @@
           </div>
           <div class="kpi-card">
             <span class="kpi-label">ORTALAMA ADR</span>
-            <div class="kpi-value" id="pricingAdrVal" style="color: #34D399;">₺16.500</div>
+            <div class="kpi-value" id="pricingAdrVal" style="color: #34D399;">—</div>
             <div class="kpi-meta">Aktif ay ortalaması</div>
           </div>
           <div class="kpi-card">
@@ -2825,12 +2723,7 @@
           <div class="form-group">
             <label>İlgili Mülk / Kapsam</label>
             <select id="expVilla" required>
-              <option value="ALL">Tüm Portföy (Genel İşletme)</option>
-              <option value="VILLA_BELLA">Villa Bella Vista</option>
-              <option value="VILLA_OLIVE">Villa Olive Garden</option>
-              <option value="VILLA_SUNSET">Villa Sunset Horizon</option>
-              <option value="VILLA_AZURE">Villa Azure Bay</option>
-              <option value="VILLA_PALM">Villa Palm Breeze</option>
+              <option value="ALL">Tüm Villalar / Portföy</option>
             </select>
           </div>
           <div class="form-group">
@@ -2861,6 +2754,105 @@
   <!-- ========================================== -->
   <!-- MODAL: AYLIK FİNANSAL HEDEFLERİ DÜZENLE -->
   <!-- ========================================== -->
+  <!-- ======================================================= -->
+  <!-- MODAL: AYI KAPAT                                        -->
+  <!-- ======================================================= -->
+  <div class="modal-backdrop" id="monthCloseModal">
+    <div class="modal-card" style="max-width: 560px;">
+      <div class="modal-header">
+        <h3>🔒 Dönemi Kapat</h3>
+        <button class="close-btn" onclick="closeMonthCloseModal()">&times;</button>
+      </div>
+      <form id="monthCloseForm" onsubmit="submitMonthClose(event)">
+        <div style="padding: 20px;">
+          <p class="sub-text" style="margin-top:0; font-size:12px;">
+            Kapatılan dönemde rezervasyon ve gider kayıtları <strong>değiştirilemez, eklenemez, silinemez</strong>.
+            Konaklaması bu aya taşan rezervasyonlar da kilitlenir. Kapanış anındaki rakamlar sunucuda hesaplanıp
+            saklanır; bu, dönemin resmî kaydıdır.
+          </p>
+
+          <div id="monthCloseSummary" style="background: rgba(15,23,42,0.6); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:12px; font-size:12px; color:#E2E8F0;">
+            Yükleniyor…
+          </div>
+
+          <div id="monthCloseError" class="auth-error-msg" style="display:none; margin-top:12px;"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeMonthCloseModal()">Vazgeç</button>
+          <button type="submit" class="btn btn-primary" id="monthCloseSubmitBtn">Dönemi Kapat</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ======================================================= -->
+  <!-- MODAL: DÖNEMİ YENİDEN AÇ                                -->
+  <!-- ======================================================= -->
+  <div class="modal-backdrop" id="monthReopenModal">
+    <div class="modal-card" style="max-width: 560px; border: 1px solid rgba(245, 158, 11, 0.45);">
+      <div class="modal-header" style="background: linear-gradient(135deg, rgba(245,158,11,0.18), rgba(120,53,15,0.1));">
+        <h3 style="color:#FCD34D;">🔓 Dönemi Yeniden Aç</h3>
+        <button class="close-btn" onclick="closeMonthReopenModal()">&times;</button>
+      </div>
+      <form id="monthReopenForm" onsubmit="submitMonthReopen(event)">
+        <div style="padding: 20px;">
+          <div style="background: rgba(245,158,11,0.12); border:1px dashed rgba(245,158,11,0.4); border-radius:6px; padding:10px 12px; font-size:11px; color:#FDE68A; margin-bottom:16px;">
+            Mühürlenmiş bir dönemi açmak <strong>denetim kaydına işlenir</strong>. Kapanış anlık görüntüsü silinmez;
+            kim, ne zaman ve hangi gerekçeyle açtığı kalıcı olarak saklanır. Bu işlemi yalnızca işletme sahibi
+            veya yönetici yapabilir.
+          </div>
+
+          <div class="form-group">
+            <label style="font-weight:700; color:#FFFFFF; font-size:13px;">Gerekçe <span style="color:#FCA5A5;">*</span></label>
+            <textarea id="monthReopenReason" rows="3" placeholder="Örn: Nisan elektrik faturası geç geldi, gider kaydı eksik kalmıştı." oninput="updateMonthReopenButton()" style="width:100%; padding:10px 12px; background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.15); border-radius:8px; color:#fff; font-size:13px; margin-top:6px; resize:vertical;"></textarea>
+            <p class="sub-text" style="font-size:10px; margin:6px 0 0;">En az 10 karakter. <span id="monthReopenCharCount">0</span> karakter yazıldı.</p>
+          </div>
+
+          <div id="monthReopenError" class="auth-error-msg" style="display:none; margin-top:12px;"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeMonthReopenModal()">Vazgeç</button>
+          <button type="submit" class="btn btn-danger" id="monthReopenSubmitBtn" disabled>Dönemi Yeniden Aç</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ======================================================= -->
+  <!-- MODAL: HESABI KALICI OLARAK KAPAT                       -->
+  <!-- ======================================================= -->
+  <div class="modal-backdrop" id="deleteAccountModal">
+    <div class="modal-card" style="max-width: 560px; border: 1px solid rgba(239, 68, 68, 0.45);">
+      <div class="modal-header" style="background: linear-gradient(135deg, rgba(239, 68, 68, 0.18), rgba(153, 27, 27, 0.1));">
+        <h3 style="color: #FCA5A5;">⚠️ Hesabınızı Kalıcı Olarak Kapatın</h3>
+        <button class="close-btn" onclick="closeDeleteAccountModal()">&times;</button>
+      </div>
+      <form id="deleteAccountForm" onsubmit="submitAccountDeletion(event)">
+        <div style="padding: 20px;">
+          <div id="deleteAccountImpact" style="font-size: 12px; color: #E2E8F0; margin-bottom: 16px;">
+            Yükleniyor…
+          </div>
+
+          <div style="background: rgba(239, 68, 68, 0.12); border: 1px dashed rgba(239, 68, 68, 0.4); border-radius: 6px; padding: 10px 12px; font-size: 11px; color: #FCA5A5; margin-bottom: 16px;">
+            Bu işlem <strong>geri alınamaz</strong>. Silinen işletmelerin mülkleri, rezervasyonları, giderleri ve tüm geçmişi kalıcı olarak kaybolur.
+            İşletmenizi başkasına devretmek istiyorsanız, önce <strong>Ekip ve Rol Yönetimi</strong> bölümünden bir üyeyi <strong>Sahip</strong> yapın; o zaman işletme silinmez.
+          </div>
+
+          <div class="form-group">
+            <label style="font-weight: 700; color: #FFFFFF; font-size: 13px;">Onaylamak için <code style="background: rgba(0,0,0,0.4); padding: 1px 6px; border-radius: 3px; color: #FDE68A;">HESABIMI SIL</code> yazın</label>
+            <input type="text" id="deleteAccountConfirm" autocomplete="off" placeholder="HESABIMI SIL" oninput="updateDeleteAccountButton()" style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 13px; margin-top: 6px;">
+          </div>
+
+          <div id="deleteAccountError" class="auth-error-msg" style="display: none; margin-top: 12px;"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeDeleteAccountModal()">Vazgeç</button>
+          <button type="submit" class="btn btn-danger" id="deleteAccountSubmitBtn" disabled>Hesabımı Kalıcı Olarak Sil</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- ======================================================= -->
   <!-- MODAL: EKİBE ÜYE DAVET ET                               -->
   <!-- ======================================================= -->
@@ -2938,7 +2930,7 @@
             <div class="form-group">
               <label style="font-size: 12px; font-weight: 600;">🌙 Hedef Gece Sayısı</label>
               <input type="number" id="goalOccupancyNights" placeholder="Örn: 75" oninput="autoCalculateGoalAdr()" style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
-              <span style="font-size: 10px; color: var(--text-muted); margin-top: 3px; display: block;">Tahmini doluluk: <strong id="goalCalcOccLabel" style="color:#60A5FA;">%50</strong></span>
+              <span style="font-size: 10px; color: var(--text-muted); margin-top: 3px; display: block;">Tahmini doluluk: <strong id="goalCalcOccLabel" style="color:#60A5FA;">—</strong></span>
             </div>
             <div class="form-group">
               <label style="font-size: 12px; font-weight: 600;">🏷️ Hedef Ortalama ADR</label>
@@ -3017,7 +3009,7 @@
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 10px; margin-bottom: 10px;">
               <div>
                 <strong id="importFileName" style="color: #fff; font-size: 13px;">dosya.xlsx</strong>
-                <div id="importFileStats" style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">0 satır veri algılandı.</div>
+                <div id="importFileStats" style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">—</div>
               </div>
               <span class="badge badge-purple" id="importTypeBadge" style="font-size: 11px; font-weight: 700;">Otomatik Algılandı</span>
             </div>
@@ -3081,11 +3073,7 @@
           <div class="form-group">
             <label>Villa Seçin</label>
             <select id="resVilla" required onchange="calculateLivePreview()">
-              <option value="VILLA_BELLA">Villa Bella Vista</option>
-              <option value="VILLA_OLIVE">Villa Olive Garden</option>
-              <option value="VILLA_SUNSET">Villa Sunset Horizon</option>
-              <option value="VILLA_AZURE">Villa Azure Bay</option>
-              <option value="VILLA_PALM">Villa Palm Breeze</option>
+              <!-- updateAllVillaDropdowns() musterinin mulkleriyle doldurur -->
             </select>
           </div>
           <div class="form-group">
@@ -3177,13 +3165,7 @@
           <div class="form-group">
             <label>İlgilenilen Villa</label>
             <select id="leadVilla" required>
-              <option value="AZURE">Villa Azure Bay</option>
-              <option value="OLIVE">Villa Olive Garden</option>
-              <option value="VILLA_BELLA">Villa Bella Vista</option>
-              <option value="VILLA_OLIVE">Villa Olive Garden</option>
-              <option value="VILLA_SUNSET">Villa Sunset Horizon</option>
-              <option value="VILLA_AZURE">Villa Azure Bay</option>
-              <option value="VILLA_PALM">Villa Palm Breeze</option>
+              <!-- updateAllVillaDropdowns() musterinin mulkleriyle doldurur -->
             </select>
           </div>
           <div class="form-group">
@@ -3247,13 +3229,7 @@
           <div class="form-group">
             <label>Villa</label>
             <select id="maintVilla" required>
-              <option value="OLIVE">Villa Olive Garden</option>
-              <option value="AZURE">Villa Azure Bay</option>
-              <option value="VILLA_BELLA">Villa Bella Vista</option>
-              <option value="VILLA_OLIVE">Villa Olive Garden</option>
-              <option value="VILLA_SUNSET">Villa Sunset Horizon</option>
-              <option value="VILLA_AZURE">Villa Azure Bay</option>
-              <option value="VILLA_PALM">Villa Palm Breeze</option>
+              <!-- updateAllVillaDropdowns() musterinin mulkleriyle doldurur -->
             </select>
           </div>
           <div class="form-group">
@@ -3585,31 +3561,34 @@
         </p>
 
         <div style="display: flex; flex-direction: column; gap: 15px;">
-          <!-- Seçenek 1: Temiz Sıfırlama -->
           <div style="border: 1px solid rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.08); border-radius: 10px; padding: 16px;">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
-              <strong style="color: #fca5a5; font-size: 1rem;">🧹 Demo Verilerini ve Tüm Sistemi Sıfırla (0 TL)</strong>
+              <strong style="color: #fca5a5; font-size: 1rem;">🧹 Tüm İşletme Verilerini Sıfırla</strong>
             </div>
-            <p style="color: var(--color-slate-300); font-size: 0.85rem; line-height: 1.4; margin-bottom: 12px;">
-              Sistemdeki tüm geçmiş ciroyu, harcama kalemlerini ve rezervasyonları tamamen temizler. Bütün paneller 0 TL olur, sıfırdan kendi kayıtlarınızı girebilirsiniz.
+            <p style="color: var(--color-slate-300); font-size: 0.85rem; line-height: 1.4; margin-bottom: 10px;">
+              Mülkler, rezervasyonlar, giderler, temizlik görevleri, talepler, misafirler, fiyat kuralları,
+              mesajlar, hedefler ve ay kapanışları dahil <strong>bütün kayıtlarınız kalıcı olarak silinir</strong>.
+              Kapatılmış dönemler de dahildir. İşletmeniz ve ekip üyeleriniz kalır; yalnızca defterler boşalır.
             </p>
-            <button class="btn btn-danger" onclick="cleanResetAll()" style="width: 100%;">
-              🗑️ Tüm Verileri Tamamen Sıfırla (0 TL)
+
+            <div id="resetImpact" style="font-size: 12px; color: #E2E8F0; background: rgba(0,0,0,0.3); border-radius: 6px; padding: 10px 12px; margin-bottom: 12px;">
+              Yükleniyor…
+            </div>
+
+            <label style="font-weight: 700; color: #FFFFFF; font-size: 12px;">
+              Onaylamak için <code style="background: rgba(0,0,0,0.4); padding: 1px 6px; border-radius: 3px; color: #FDE68A;">VERILERI SIFIRLA</code> yazın
+            </label>
+            <input type="text" id="resetConfirmInput" autocomplete="off" placeholder="VERILERI SIFIRLA"
+                   oninput="updateResetButton()"
+                   style="width: 100%; padding: 9px 12px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 13px; margin: 6px 0 12px;">
+
+            <div id="resetError" class="auth-error-msg" style="display: none; margin-bottom: 12px;"></div>
+
+            <button class="btn btn-danger" id="resetSubmitBtn" onclick="cleanResetAll()" style="width: 100%;" disabled>
+              🗑️ Tüm Verileri Kalıcı Olarak Sıfırla
             </button>
           </div>
 
-          <!-- Seçenek 2: Demo Verilerini Geri Yükle -->
-          <div style="border: 1px solid rgba(59, 130, 246, 0.4); background: rgba(59, 130, 246, 0.08); border-radius: 10px; padding: 16px;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
-              <strong style="color: #93c5fd; font-size: 1rem;">📊 Demo Portföy Verilerini Tekrar Yükle (Lexbnb Demo)</strong>
-            </div>
-            <p style="color: var(--color-slate-300); font-size: 0.85rem; line-height: 1.4; margin-bottom: 12px;">
-              Lexbnb lüks Akdeniz villa portföyünün 14 aylık sentetik demo veritabanını (5 lüks villa, 5.560.000 TL ciro, operasyonel ve finansal kayıtlar) eksiksiz olarak geri yükler.
-            </p>
-            <button class="btn btn-primary" onclick="restoreExcelData()" style="width: 100%;">
-              🔄 Demo Verilerini Geri Yükle
-            </button>
-          </div>
         </div>
       </div>
       <div class="modal-footer">
@@ -3655,7 +3634,7 @@
               <label style="font-weight: 700; color: #FFFFFF; font-size: 13px;">WhatsApp Mesaj Metnini Buraya Yapıştırın:</label>
               <button type="button" class="btn btn-secondary btn-sm" onclick="loadSampleWhatsAppMsg()" style="font-size: 11px; padding: 3px 8px;">📋 Örnek Mesaj Doldur</button>
             </div>
-            <textarea id="waRawInput" rows="3" placeholder="Örnek: 'Alexander Wright: 18-23 Eylül arası 5 gece Villa Azure Bay için 85.000 TL konuştuk, 8 kişiyiz onaylıyoruz. Tel: +90 532 555 1234'" style="width: 100%; padding: 12px; background: rgba(0,0,0,0.4); border: 1px solid rgba(37, 211, 102, 0.3); border-radius: 8px; color: #fff; font-size: 13px; font-family: monospace;" oninput="parseWhatsAppMessage()"></textarea>
+            <textarea id="waRawInput" rows="3" placeholder="Örnek: 'Ahmet Yılmaz: 18-23 Eylül arası 5 gece için 85.000 TL konuştuk, 8 kişiyiz onaylıyoruz. Tel: +90 532 555 1234'" style="width: 100%; padding: 12px; background: rgba(0,0,0,0.4); border: 1px solid rgba(37, 211, 102, 0.3); border-radius: 8px; color: #fff; font-size: 13px; font-family: monospace;" oninput="parseWhatsAppMessage()"></textarea>
             <span style="font-size: 11px; color: var(--text-muted); margin-top: 4px; display: block;">💡 İpucu: Misafirin yazdığı mesajı olduğu gibi yapıştırın; yapay zeka isim, villa, tarih ve tutarı saniyesinde ayıklar.</span>
           </div>
 
@@ -3684,12 +3663,8 @@
               <div class="form-group">
                 <label style="font-size: 11px; color: var(--text-muted);">İlgilenilen Villa</label>
                 <select id="waParsedVilla" style="width: 100%; padding: 8px 10px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px; font-weight: 600;">
-                  <option value="VILLA_BELLA">Villa Bella Vista</option>
-                  <option value="VILLA_OLIVE">Villa Olive Garden</option>
-                  <option value="VILLA_SUNSET">Villa Sunset Horizon</option>
-                  <option value="VILLA_AZURE" selected>Villa Azure Bay</option>
-                  <option value="VILLA_PALM">Villa Palm Breeze</option>
-                </select>
+              <!-- updateAllVillaDropdowns() musterinin mulkleriyle doldurur -->
+            </select>
               </div>
               <div class="form-group">
                 <label style="font-size: 11px; color: var(--text-muted);">Tutar / Teklif (₺)</label>
@@ -3866,13 +3841,8 @@
             <div class="form-group">
               <label style="font-size: 12px; font-weight: 600;">İlgili Villa / Portföy</label>
               <select id="mktVilla" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
-                <option value="ALL">Tüm Villalar / Portföy</option>
-                <option value="VILLA_BELLA">Villa Bella Vista</option>
-              <option value="VILLA_OLIVE">Villa Olive Garden</option>
-              <option value="VILLA_SUNSET">Villa Sunset Horizon</option>
-              <option value="VILLA_AZURE">Villa Azure Bay</option>
-              <option value="VILLA_PALM">Villa Palm Breeze</option>
-              </select>
+              <option value="ALL">Tüm Villalar / Portföy</option>
+            </select>
             </div>
           </div>
 
@@ -3965,11 +3935,7 @@
           <div class="form-group">
             <label>Tahsis Edilen Villa:</label>
             <select id="infVilla" style="width:100%; padding:8px; background:var(--bg-input); border:1px solid rgba(255,255,255,0.2); border-radius:6px; color:#fff;">
-              <option value="VILLA_BELLA">Villa Bella Vista</option>
-              <option value="VILLA_OLIVE">Villa Olive Garden</option>
-              <option value="VILLA_SUNSET">Villa Sunset Horizon</option>
-              <option value="VILLA_AZURE">Villa Azure Bay</option>
-              <option value="VILLA_PALM">Villa Palm Breeze</option>
+              <!-- updateAllVillaDropdowns() musterinin mulkleriyle doldurur -->
             </select>
           </div>
         </div>
@@ -4090,11 +4056,7 @@
           <div class="form-group">
             <label>Villa / Mülk</label>
             <select id="hkVilla" required>
-              <option value="VILLA_BELLA">Villa Bella Vista</option>
-              <option value="VILLA_OLIVE">Villa Olive Garden</option>
-              <option value="VILLA_SUNSET">Villa Sunset Horizon</option>
-              <option value="VILLA_AZURE">Villa Azure Bay</option>
-              <option value="VILLA_PALM">Villa Palm Breeze</option>
+              <!-- updateAllVillaDropdowns() musterinin mulkleriyle doldurur -->
             </select>
           </div>
           <div class="form-group">
@@ -4267,10 +4229,10 @@
   <script src="core/pricing_booking_service.js?v=8dc947e5"></script>
   <script src="core/revenue_forecast_service.js?v=74698272"></script>
   <script src="core/executive_priority_service.js?v=334b2c4f"></script>
-  <script src="core/executive_dashboard_service.js?v=651e8e45"></script>
+  <script src="core/executive_dashboard_service.js?v=cf7e1f87"></script>
   <script src="core/executive_ai_advisor.js?v=93c10c3e"></script>
   <script src="core/notification_center_service.js?v=7fb8bdee"></script>
-  <script src="app.js?v=e936ca18"></script>
+  <script src="app.js?v=0055f25e"></script>
   <script src="core/marketing_ui.js?v=ababfb6c"></script>
 </body>
 </html>
