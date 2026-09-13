@@ -142,6 +142,9 @@ const testFiles = [
   // Isletme verisini sifirlama (Phase 21)
   'tenant_reset_tests.js',
 
+  // Ice aktarma motoru (ayristirma, dogrulama, mukerrer, cakisma)
+  'import_engine_tests.js',
+
   // Tarayici render hatti — sahte DOM ile renderAll GERCEKTEN calisir.
   // setEl gibi tanimsiz referanslari yalnizca bu suit yakalar.
   'render_pipeline_tests.js'

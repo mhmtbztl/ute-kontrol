@@ -4773,146 +4773,68 @@ function changeImportMode(newMode) {
   parseWorkbookWithMode(pendingImportData.workbook, pendingImportData.fileName, newMode);
 }
 
+// -----------------------------------------------------------------------------
+// İÇE AKTARMA: AYRIŞTIR -> DOĞRULA -> ÖNİZLE -> YAZ
+// -----------------------------------------------------------------------------
+// Bu blok bastan yazildi (2026-09-13). Onceki hali "calisiyormus gibi"
+// yapiyordu: onay yolu appData'ya concat edip saveAppData() cagiriyor,
+// "142 rezervasyon basariyla aktarildi!" diyordu. Supabase'e HIC gitmiyordu;
+// sayfa yenilenince her sey kayboluyordu. Ayrica villa eslemesi bes uydurma
+// villaya sabitti (varsayilan 'AZURE'), eksik alanlar sessizce uyduruluyordu
+// (gece=2, tarih=bugun, kisi=6, misafir="Misafir 3") ve hatali satir raporu
+// yoktu.
+//
+// Artik: dogrulama core/finance_import_engine.js'te, yazma ise
+// createBooking/createExpense uzerinden — cakisma kontrolu, kapali donem
+// korumasi ve tenant dogrulamasi devrede.
+
+function getImportEngine() {
+  if (typeof FinanceImportEngine !== 'undefined') return FinanceImportEngine;
+  if (typeof window !== 'undefined' && window.FinanceImportEngine) return window.FinanceImportEngine;
+  return null;
+}
+
+/** Aktif isletmenin mulkleri, motorun bekledigi bicimde. */
+function getImportProperties() {
+  return Object.entries((appData && appData.villas) || {})
+    .map(([anahtar, v]) => ({ id: v.id, slug: anahtar, key: anahtar, name: v.name || anahtar }));
+}
+
 function parseWorkbookWithMode(wb, fileName, mode) {
+  const E = getImportEngine();
+  if (!E) { alert('İçe aktarma motoru yüklenemedi. Sayfayı yenileyin.'); return; }
+
   let finalMode = mode;
   if (finalMode === 'AUTO') {
-    const sheetNames = wb.SheetNames.map(s => s.trim().toUpperCase());
-    if (sheetNames.includes('GENEL')) finalMode = 'COMPANY_REPORT';
-    else finalMode = 'BOOKINGS';
+    const adlar = wb.SheetNames.map(s => s.trim().toUpperCase());
+    finalMode = adlar.includes('GENEL') ? 'COMPANY_REPORT' : 'BOOKINGS';
   }
+
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rawRows = (finalMode === 'COMPANY_REPORT') ? [] : XLSX.utils.sheet_to_json(ws, { defval: '', raw: true });
+  const headers = rawRows.length ? Object.keys(rawRows[0]) : [];
 
   const parsedData = {
     workbook: wb,
     fileName: fileName,
     mode: finalMode,
-    bookings: [],
-    expenses: [],
-    companySummary: null,
-    previewHeaders: [],
-    previewRows: []
+    headers,
+    columnMap: null,
+    result: null
   };
 
   if (finalMode === 'COMPANY_REPORT') {
-    const genelSheet = wb.Sheets['GENEL'] || wb.Sheets[wb.SheetNames[0]];
-    const genelRows = XLSX.utils.sheet_to_json(genelSheet, { header: 1 });
-
-    parsedData.previewHeaders = ['Dönem / Ay', 'Ciro (₺)', 'Gider (₺)', 'Net Kâr (₺)', 'Satılan Gece'];
-    parsedData.previewRows = [];
-
-    for (let i = 1; i < Math.min(6, genelRows.length); i++) {
-      const r = genelRows[i];
-      if (r && r.length >= 2) {
-        parsedData.previewRows.push([
-          String(r[0] || ''),
-          Number(r[1]) ? '₺' + Number(r[1]).toLocaleString('tr-TR') : '-',
-          Number(r[2]) ? '₺' + Number(r[2]).toLocaleString('tr-TR') : '-',
-          Number(r[3]) ? '₺' + Number(r[3]).toLocaleString('tr-TR') : '-',
-          String(r[4] || '-')
-        ]);
-      }
-    }
-  } else if (finalMode === 'BOOKINGS') {
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const rawObjects = XLSX.utils.sheet_to_json(ws);
-
-    parsedData.previewHeaders = ['Villa', 'Misafir Adı', 'Giriş - Çıkış', 'Gece', 'Brüt Ciro (₺)', 'Kanal'];
-    parsedData.previewRows = [];
-
-    rawObjects.forEach((obj, idx) => {
-      const villaRaw = String(obj['Villa'] || obj['villa'] || obj['Ev'] || obj['Mülk'] || 'AZURE').toUpperCase();
-      let villa = 'AZURE';
-      if (villaRaw.includes('BELLA')) villa = 'BELLA';
-      else if (villaRaw.includes('OLIVE')) villa = 'OLIVE';
-      else if (villaRaw.includes('SUNSET')) villa = 'SUNSET';
-      else if (villaRaw.includes('PALM')) villa = 'PALM';
-      else if (villaRaw.includes('AZURE')) villa = 'AZURE';
-
-      const guest = String(obj['Misafir Adı'] || obj['Misafir'] || obj['Guest'] || obj['Müşteri'] || ('Misafir ' + (idx + 1))).trim();
-
-      let checkIn = obj['Giriş Tarihi'] || obj['Giriş'] || obj['Check-in'] || obj['CheckIn'] || '';
-      let checkOut = obj['Çıkış Tarihi'] || obj['Çıkış'] || obj['Check-out'] || obj['CheckOut'] || '';
-      if (checkIn instanceof Date) checkIn = checkIn.toISOString().slice(0, 10);
-      if (checkOut instanceof Date) checkOut = checkOut.toISOString().slice(0, 10);
-
-      const nights = Number(obj['Gece'] || obj['Nights'] || obj['Gece Sayısı']) || 2;
-      const gross = Number(obj['Brüt Tutar (TL)'] || obj['Brüt Tutar'] || obj['Tutar'] || obj['Ciro'] || obj['Gross'] || obj['Fiyat']) || 0;
-      const channel = String(obj['Kanal'] || obj['Channel'] || 'WHATSAPP').toUpperCase();
-      const otaComm = Number(obj['OTA Komisyonu (TL)'] || obj['Komisyon'] || obj['Commission']) || (channel.includes('AIRBNB') || channel.includes('BOOKING') ? Math.round(gross * 0.15) : 0);
-      const cleanFee = Number(obj['Temizlik Ücreti (TL)'] || obj['Temizlik'] || obj['CleanFee']) || 0;
-      const net = gross - otaComm;
-
-      const bookingItem = {
-        id: 'REZ-IMP-' + Date.now().toString().slice(-4) + '-' + idx,
-        villa,
-        guest,
-        checkIn: String(checkIn || new Date().toISOString().slice(0, 10)),
-        checkOut: String(checkOut || new Date().toISOString().slice(0, 10)),
-        nights,
-        channel,
-        gross,
-        otaComm,
-        cleanFee,
-        net,
-        pax: Number(obj['Kişi Sayısı'] || obj['Pax']) || 6,
-        status: String(obj['Durum'] || 'COMPLETED').toUpperCase()
-      };
-
-      parsedData.bookings.push(bookingItem);
-
-      if (parsedData.previewRows.length < 5) {
-        parsedData.previewRows.push([
-          villa,
-          guest,
-          bookingItem.checkIn + ' - ' + bookingItem.checkOut,
-          nights + ' Gece',
-          '₺' + gross.toLocaleString('tr-TR'),
-          channel
-        ]);
-      }
-    });
-  } else if (finalMode === 'EXPENSES') {
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const rawObjects = XLSX.utils.sheet_to_json(ws);
-
-    parsedData.previewHeaders = ['Tarih', 'Açıklama', 'Kategori', 'Tutar (₺)', 'Tür', 'Villa'];
-    parsedData.previewRows = [];
-
-    rawObjects.forEach((obj, idx) => {
-      const desc = String(obj['Açıklama'] || obj['Description'] || obj['Kalem'] || obj['Gider'] || 'İçe aktarılan gider').trim();
-      const amount = Number(obj['Tutar (TL)'] || obj['Tutar'] || obj['Miktar'] || obj['Amount'] || obj['Fiyat']) || 0;
-      const category = String(obj['Kategori'] || obj['Category'] || 'Diğer Genel Giderler').trim();
-      let date = obj['Tarih'] || obj['Date'] || new Date().toISOString().slice(0, 10);
-      if (date instanceof Date) date = date.toISOString().slice(0, 10);
-
-      const type = String(obj['Tür'] || obj['Type'] || 'OPEX').toUpperCase().includes('CAPEX') ? 'CAPEX' : 'OPEX';
-      const villa = String(obj['Villa'] || obj['Mülk'] || 'ALL').toUpperCase();
-
-      if (amount > 0) {
-        const expItem = {
-          id: 'EXP-IMP-' + Date.now().toString().slice(-4) + '-' + idx,
-          date: String(date),
-          month: String(date).slice(0, 7),
-          villa,
-          category,
-          amount,
-          type,
-          description: desc
-        };
-
-        parsedData.expenses.push(expItem);
-
-        if (parsedData.previewRows.length < 5) {
-          parsedData.previewRows.push([
-            expItem.date,
-            desc,
-            category,
-            '₺' + amount.toLocaleString('tr-TR'),
-            type,
-            villa
-          ]);
-        }
-      }
-    });
+    parsedData.result = null;   // onizleme kutusu kendi mesajini yazar
+  } else {
+    const ctx = {
+      properties: getImportProperties(),
+      isPeriodClosed: (d) => (typeof isPeriodClosed === 'function' ? isPeriodClosed(d) : false),
+      isStayPeriodClosed: (a, b) => (typeof isStayPeriodClosed === 'function' ? isStayPeriodClosed(a, b) : false)
+    };
+    parsedData.columnMap = E.autoDetectColumnMap(headers, finalMode);
+    parsedData.result = (finalMode === 'BOOKINGS')
+      ? E.validateBookingRows(rawRows, parsedData.columnMap, ctx)
+      : E.validateExpenseRows(rawRows, parsedData.columnMap, ctx);
   }
 
   pendingImportData = parsedData;
@@ -4921,49 +4843,127 @@ function parseWorkbookWithMode(wb, fileName, mode) {
 
 function renderImportPreviewBox() {
   if (!pendingImportData) return;
-
   const box = document.getElementById('importPreviewBox');
   if (!box) return;
   box.style.display = 'block';
 
-  document.getElementById('importFileName').innerText = pendingImportData.fileName;
+  setEl('importFileName', pendingImportData.fileName);
 
   const badge = document.getElementById('importTypeBadge');
   const stats = document.getElementById('importFileStats');
-
-  if (pendingImportData.mode === 'COMPANY_REPORT') {
-    if (badge) {
-      badge.innerText = '🏆 Şirket Genel Raporu (GENEL RAPOR)';
-      badge.className = 'badge badge-green';
-    }
-    if (stats) stats.innerText = '14 Aylık Finans Özeti, Hedefler ve Gider Kalemleri algılandı.';
-  } else if (pendingImportData.mode === 'BOOKINGS') {
-    if (badge) {
-      badge.innerText = '📋 Rezervasyon Defteri';
-      badge.className = 'badge badge-purple';
-    }
-    if (stats) stats.innerText = pendingImportData.bookings.length + ' adet rezervasyon kaydı algılandı.';
-  } else if (pendingImportData.mode === 'EXPENSES') {
-    if (badge) {
-      badge.innerText = '💸 Gider / Harcama Defteri';
-      badge.className = 'badge badge-amber';
-    }
-    if (stats) stats.innerText = pendingImportData.expenses.length + ' adet gider kaydı algılandı.';
-  }
-
-  // Render Preview Table
   const thead = document.getElementById('importPreviewTableHead');
   const tbody = document.getElementById('importPreviewTableBody');
-  if (!thead || !tbody) return;
+  const btn = document.getElementById('importConfirmBtn');
+  const r = pendingImportData.result;
 
-  thead.innerHTML = '<tr>' + (pendingImportData.previewHeaders || []).map(h => '<th>' + h + '</th>').join('') + '</tr>';
+  // --- Sirket Genel Raporu: coklu sayfali ozet, satir bazli veri icermiyor ---
+  if (pendingImportData.mode === 'COMPANY_REPORT') {
+    if (badge) { badge.innerText = 'Şirket Genel Raporu'; badge.className = 'badge badge-amber'; }
+    if (stats) stats.innerText = 'Bu dosya aylık özet içeriyor, satır bazlı kayıt içermiyor.';
+    if (thead) thead.innerHTML = '';
+    if (tbody) {
+      tbody.innerHTML = '<tr><td style="padding:14px; color:var(--text-muted); font-size:12px; line-height:1.6;">' +
+        'Genel rapor dosyaları aylık <strong>toplamlardan</strong> oluşur (ay, ciro, gider, kâr). ' +
+        'Uygulama ciroyu tek tek rezervasyonlardan, gideri tek tek gider kayıtlarından hesaplar; ' +
+        'aylık toplamdan rezervasyon üretmek uydurma veri olurdu.<br><br>' +
+        '<strong>Yapılacak:</strong> Rezervasyon defterinizi ve gider defterinizi ayrı dosyalar hâlinde ' +
+        'içe aktarın. Şablonları yukarıdan indirebilirsiniz.</td></tr>';
+    }
+    if (btn) { btn.disabled = true; btn.innerText = 'Bu dosya içe aktarılamaz'; }
+    return;
+  }
 
-  tbody.innerHTML = '';
-  (pendingImportData.previewRows || []).forEach(row => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = row.map(c => '<td>' + c + '</td>').join('');
-    tbody.appendChild(tr);
-  });
+  if (!r) return;
+
+  const rezMi = pendingImportData.mode === 'BOOKINGS';
+  const tl = n => Math.round(Number(n) || 0).toLocaleString('tr-TR');
+
+  if (badge) {
+    badge.innerText = rezMi ? 'Rezervasyon Defteri' : 'Gider Defteri';
+    badge.className = rezMi ? 'badge badge-purple' : 'badge badge-amber';
+  }
+
+  // --- Eslesmeyen zorunlu sutun var mi? ---
+  const zorunlu = rezMi
+    ? { property: 'Villa', guest: 'Misafir Adı', checkIn: 'Giriş Tarihi', checkOut: 'Çıkış Tarihi', gross: 'Brüt Tutar' }
+    : { date: 'Tarih', category: 'Kategori', amount: 'Tutar' };
+  const eksikSutun = Object.keys(zorunlu).filter(k => !pendingImportData.columnMap[k]).map(k => zorunlu[k]);
+
+  const yazilacak = r.validCount - (r.duplicateCount || 0);
+
+  if (stats) {
+    const p = [`${r.totalRows} satır okundu`];
+    p.push(`${yazilacak} kayıt eklenecek`);
+    if (r.duplicateCount) p.push(`${r.duplicateCount} mükerrer atlanacak`);
+    if (r.invalidCount) p.push(`${r.invalidCount} hatalı`);
+    if (r.overlaps && r.overlaps.length) p.push(`${r.overlaps.length} tarih çakışması`);
+    p.push(rezMi ? `toplam ${tl(r.totalGross)} TL / ${r.totalNights} gece` : `toplam ${tl(r.totalAmount)} TL`);
+    stats.innerText = p.join(' · ');
+  }
+
+  // --- Tablo ---
+  const basliklar = rezMi
+    ? ['Satır', 'Villa', 'Misafir', 'Giriş → Çıkış', 'Gece', 'Brüt (₺)', 'Durum']
+    : ['Satır', 'Tarih', 'Kategori', 'Açıklama', 'Mülk', 'Tutar (₺)', 'Durum'];
+  if (thead) thead.innerHTML = '<tr>' + basliklar.map(h => '<th>' + escapeHtml(h) + '</th>').join('') + '</tr>';
+
+  if (tbody) {
+    tbody.innerHTML = '';
+
+    if (eksikSutun.length) {
+      tbody.innerHTML = `<tr><td colspan="${basliklar.length}" style="padding:14px; color:#FCA5A5; font-size:12px; line-height:1.6;">
+        <strong>Dosya içe aktarılamaz:</strong> zorunlu sütun bulunamadı — ${escapeHtml(eksikSutun.join(', '))}.<br>
+        Dosyanızın ilk satırı başlık satırı olmalı ve bu sütunları içermeli.
+        En kolayı yukarıdan örnek şablonu indirip kendi verinizi oraya yapıştırmak.<br><br>
+        <span style="color:#94A3B8;">Bulunan sütunlar: ${escapeHtml((pendingImportData.headers || []).join(', ') || '—')}</span>
+      </td></tr>`;
+      if (btn) { btn.disabled = true; btn.innerText = 'Zorunlu sütun eksik'; }
+      return;
+    }
+
+    const satirYaz = (hucreler, renk, notMetni) => {
+      const tr = document.createElement('tr');
+      if (renk) tr.style.background = renk;
+      tr.innerHTML = hucreler.map(c => '<td>' + escapeHtml(String(c)) + '</td>').join('');
+      if (notMetni) tr.title = notMetni;
+      tbody.appendChild(tr);
+    };
+
+    // Once HATALI satirlar: kullanicinin gormesi gereken bunlar.
+    const hatalar = (r.errors || []).concat(r.overlaps || []);
+    hatalar.slice(0, 15).forEach(e => {
+      const bos = new Array(basliklar.length - 2).fill('');
+      satirYaz([e.rowNum, ...bos, '✕ ' + e.errors.join(' ')], 'rgba(239,68,68,0.10)', e.errors.join('\n'));
+    });
+
+    // Sonra gecerli satirlardan ornek
+    (r.validatedRows || []).slice(0, Math.max(0, 15 - hatalar.length)).forEach(v => {
+      const durum = v.isPotentialDuplicate ? '⊘ mükerrer, atlanacak' : '✓ eklenecek';
+      const renk = v.isPotentialDuplicate ? 'rgba(245,158,11,0.10)' : '';
+      if (rezMi) {
+        satirYaz([v.rowNum, v.propertyName, v.guest, v.checkIn + ' → ' + v.checkOut,
+                  v.nights, tl(v.gross), durum], renk);
+      } else {
+        satirYaz([v.rowNum, v.date, v.category, v.description || '—',
+                  v.propertyId ? (v.propertyKey || '—') : 'Tüm portföy', tl(v.amount), durum], renk);
+      }
+    });
+
+    const gosterilen = Math.min(15, hatalar.length + (r.validatedRows || []).length);
+    const kalan = (hatalar.length + (r.validatedRows || []).length) - gosterilen;
+    if (kalan > 0) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td colspan="${basliklar.length}" style="text-align:center; color:var(--text-muted); font-size:11px;">… ${kalan} satır daha</td>`;
+      tbody.appendChild(tr);
+    }
+  }
+
+  if (btn) {
+    btn.disabled = yazilacak <= 0;
+    btn.innerText = yazilacak > 0
+      ? `${yazilacak} kaydı içe aktar`
+      : 'İçe aktarılacak geçerli kayıt yok';
+  }
 }
 
 function resetImportPreview() {
@@ -4974,67 +4974,124 @@ function resetImportPreview() {
   if (fileInput) fileInput.value = '';
 }
 
-function applyImportedData() {
-  if (!pendingImportData) {
-    alert('Lütfen önce bir dosya seçin.');
+/**
+ * Onaylanan satirlari GERCEKTEN yazar.
+ *
+ * createBooking / createExpense uzerinden gider: cakisma kontrolu, kapali
+ * donem korumasi, rol ve tenant dogrulamasi bu yollarda zaten var. Kismi
+ * basari normaldir; her satirin sonucu ayri raporlanir.
+ */
+async function applyImportedData() {
+  if (!pendingImportData || !pendingImportData.result) {
+    if (typeof showToast === 'function') showToast('Önce bir dosya seçin.', 'info');
     return;
   }
 
-  const strategy = document.getElementById('importStrategySelect')?.value || 'APPEND';
-  const isOverwrite = (strategy === 'OVERWRITE');
-
-  if (pendingImportData.mode === 'COMPANY_REPORT') {
-    // Eskiden burada restoreExcelData() cagrilip DEMO veri seti yukleniyor ve
-    // kullaniciya "raporunuz ice aktarildi" deniyordu. Gercek bir ice aktarma
-    // degildi; kullanicinin dosyasi hic okunmuyordu.
-    closeImportModal();
-    alert('⚠️ Şirket Genel Raporu içe aktarımı henüz desteklenmiyor. Mülk, rezervasyon ve gider dosyalarını ayrı ayrı içe aktarabilirsiniz.');
+  const tenantId = getActiveTenantId();
+  try {
+    requireCloudForWrite('İçe aktarma', tenantId);
+  } catch (e) {
+    if (typeof showToast === 'function') showToast(e.message, 'error');
     return;
   }
 
-  if (pendingImportData.mode === 'BOOKINGS') {
-    if (pendingImportData.bookings.length === 0) {
-      alert('İçe aktarılacak rezervasyon bulunamadı.');
-      return;
-    }
+  const r = pendingImportData.result;
+  const rezMi = pendingImportData.mode === 'BOOKINGS';
+  const yazilacaklar = (r.validatedRows || []).filter(v => !v.isPotentialDuplicate);
+  if (yazilacaklar.length === 0) {
+    if (typeof showToast === 'function') showToast('İçe aktarılacak geçerli kayıt yok.', 'info');
+    return;
+  }
 
-    if (isOverwrite) {
-      appData.bookings = pendingImportData.bookings;
-    } else {
-      if (!appData.bookings) appData.bookings = [];
-      appData.bookings = appData.bookings.concat(pendingImportData.bookings);
-    }
+  // Dosya parmak izi: ayni dosya iki kez yuklenmesin.
+  const E = getImportEngine();
+  const parmakIzi = E ? E.computeHash(
+    pendingImportData.fileName + '|' + r.totalRows + '|' +
+    (rezMi ? r.totalGross : r.totalAmount) + '|' + tenantId) : null;
 
-    const importedCount = pendingImportData.bookings.length;
-    syncBookingCleaningTasks();
-    saveAppData();
-    renderAll();
+  if (parmakIzi && supabaseClient) {
+    const { data: onceki } = await supabaseClient.from('finance_import_batches')
+      .select('id,filename,imported_at,row_count').eq('tenant_id', tenantId).eq('file_hash', parmakIzi).maybeSingle();
+    if (onceki) {
+      const t = onceki.imported_at ? new Date(onceki.imported_at).toLocaleString('tr-TR') : '';
+      const devam = typeof confirm === 'function'
+        ? confirm(`Bu dosya daha önce içe aktarılmış (${onceki.filename}, ${t}, ${onceki.row_count} satır).\n\nAynı kayıtları ikinci kez eklemek cironuzu ve giderinizi iki katına çıkarır.\n\nYine de devam etmek istiyor musunuz?`)
+        : false;
+      if (!devam) return;
+    }
+  }
+
+  const btn = document.getElementById('importConfirmBtn');
+  if (btn) { btn.disabled = true; btn.innerText = 'Aktarılıyor… (0/' + yazilacaklar.length + ')'; }
+
+  const basarili = [], basarisiz = [];
+  for (let i = 0; i < yazilacaklar.length; i++) {
+    const v = yazilacaklar[i];
+    try {
+      if (rezMi) {
+        await createBooking({
+          propertyId: v.propertyId,
+          villa: v.propertyKey,
+          guest: v.guest,
+          checkIn: v.checkIn,
+          checkOut: v.checkOut,
+          gross: v.gross,
+          otaCommission: v.otaCommission,
+          cleaningFee: v.cleaningFee,
+          channel: v.channel,
+          pax: v.pax || undefined,
+          status: v.status,
+          code: v.code || undefined
+        });
+      } else {
+        await createExpense({
+          date: v.date,
+          category: v.category,
+          amount: v.amount,
+          description: v.description,
+          propertyId: v.propertyId || undefined,
+          villa: v.propertyKey || 'ALL',
+          type: v.expenseType
+        });
+      }
+      basarili.push(v.rowNum);
+    } catch (err) {
+      basarisiz.push({ rowNum: v.rowNum, mesaj: (err && err.message) ? err.message : String(err) });
+    }
+    if (btn && (i % 5 === 0 || i === yazilacaklar.length - 1)) {
+      btn.innerText = `Aktarılıyor… (${i + 1}/${yazilacaklar.length})`;
+    }
+  }
+
+  // Basarili bir aktarim kaydi birak (mukerrer engeli bunu okur).
+  if (parmakIzi && supabaseClient && basarili.length > 0) {
+    try {
+      await supabaseClient.from('finance_import_batches').insert({
+        tenant_id: tenantId,
+        file_hash: parmakIzi,
+        filename: String(pendingImportData.fileName || 'dosya').slice(0, 255),
+        row_count: basarili.length,
+        imported_amount: rezMi ? r.totalGross : r.totalAmount
+      });
+    } catch (e) { /* kayit tutulamazsa aktarim yine de gecerlidir */ }
+  }
+
+  await loadTenantAppData(tenantId);
+  if (btn) { btn.disabled = false; }
+
+  if (basarisiz.length === 0) {
     closeImportModal();
     resetImportPreview();
-    alert('🎉 ' + importedCount + ' adet rezervasyon başarıyla sisteme aktarıldı!');
-    return;
-  }
-
-  if (pendingImportData.mode === 'EXPENSES') {
-    if (pendingImportData.expenses.length === 0) {
-      alert('İçe aktarılacak gider kalemi bulunamadı.');
-      return;
+    if (typeof showToast === 'function') {
+      showToast(`${basarili.length} kayıt içe aktarıldı.`, 'success');
     }
-
-    if (isOverwrite) {
-      appData.expenses = pendingImportData.expenses;
-    } else {
-      if (!appData.expenses) appData.expenses = [];
-      appData.expenses = appData.expenses.concat(pendingImportData.expenses);
-    }
-
-    const importedCount = pendingImportData.expenses.length;
-    saveAppData();
-    renderAll();
-    closeImportModal();
-    resetImportPreview();
-    alert('🎉 ' + importedCount + ' adet harcama kaydı başarıyla sisteme aktarıldı!');
-    return;
+  } else {
+    // Kismi basari: NE YAZILDI, NE YAZILMADI acikca soylenir.
+    const ozet = basarisiz.slice(0, 5).map(f => `satır ${f.rowNum}: ${f.mesaj}`).join('\n');
+    const kalan = basarisiz.length > 5 ? `\n… ${basarisiz.length - 5} hata daha` : '';
+    alert(`${basarili.length} kayıt eklendi, ${basarisiz.length} kayıt eklenemedi.\n\n${ozet}${kalan}\n\n` +
+          `Eklenen kayıtlar sistemde kaldı. Hatalı satırları dosyanızda düzeltip yeniden yükleyebilirsiniz.`);
+    renderImportPreviewBox();
   }
 }
 
