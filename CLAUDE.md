@@ -128,10 +128,49 @@ Bu kural tesadüfi değil: bu oturumda bulunan hataların çoğu tam bu kalıpt�
 `pricingAdrVal "₺16.500"`, `opsReadyPropsVal "5 / 5"`, `dummyMoMDeltas`,
 `finActualRevenue "483.965 TL"`. Toplam 100'den fazla nokta.
 
-### 3.6 Demo yok
+### 3.6 Demo yok / uydurma veri yok
 Demo portföyü ve paralel yerel yolu **tamamen kaldırıldı** (2026-09-13).
 Yeniden kurulacaksa **Supabase'de gerçek bir tenant** olarak kurulmalı — paralel kod yolu değil.
 Sebep: test edilmeyen ikinci bir yürütme yolu üretimde çalışıyordu ve bulunan her hata sınıfının kaynağıydı.
+
+**Uydurma veri yasağı (2026-09-13 taraması).** Demo portföyü kaldırıldıktan sonra
+artıkları uygulamanın içinde kaldı ve müşteriye gösterilmeye devam etti:
+indirilebilir yönetici raporu sabit "5.004.165 TL ciro / 88-100 skor" yazıyordu,
+AI finans analisti cirosu sıfırdan büyük **herkese** "Villa Azure Bay liderliği"
+diyordu, ilan eleştirmeni her URL için 79/100 uyduruyordu, boşluk gecesi motoru
+gerçek boşluk yoksa üç tane uyduruyordu.
+
+Kural: **hesaplanamayan yerde rakam yazılmaz.** Bir özellik gerçek veriyi
+ölçemiyorsa (ör. OTA ilan puanı) bunu açıkça söyler; skor uydurmaz.
+
+Ağı `core/demo_residue_tests.js` tutuyor — kaynak taraması. Uydurma villa adları,
+sabit tarihler, ilk müşterinin rakamları, silinmiş `DEFAULT_*` referansları,
+kapsam dışı villa seçicileri ve "yoksa uydur" kalıbı için kırılır.
+
+**"Bugün" sabit yazılmaz.** Tek kaynak `getTodayStr()`. Bir zamanlar 20 ayrı
+yerde `'2026-09-07'` sabitti ve yalnızca ekranı değil **kayıtları da** bozuyordu:
+temizlik ödemesi hangi gün işaretlenirse işaretlensin ödeme tarihi 2026-09-07
+kaydediliyordu.
+
+**Dönem ve mülk listeleri müşterinin verisinden üretilir.** Dönem seçicileri
+2025-07..2027-12 arasında sabitti (`refreshPeriodSelectors` +
+`computeFinancialMonthRange` ile düzeltildi); villa seçicilerinin tamamı
+`updateAllVillaDropdowns` kapsamında olmalı.
+
+### 3.7 Veri sıfırlama
+"Sıfırla" tuşu bulut hesabında **hiçbir şey yapmıyordu** — yalnızca "bu işlem bulut
+hesabınızdaki kayıtları silmez" uyarısı gösteriyordu.
+
+`reset_tenant_data(tenant_id, 'VERILERI SIFIRLA')` — tek transaction, **yalnızca
+owner**, yazılı onay zorunlu, 33 tablo. **İşletme ve ekip üyeleri korunur**; sadece
+defterler boşalır. Hesabı tamamen kapatmak ayrı bir işlemdir (`delete_my_account`).
+
+Sıfırlama sırasında beş koruma `fn_tenant_reset_in_progress()` ile askıya alınır
+(kapanmış dönem ×2, kapanış kaydı, kabul edilmiş teklif, gönderilmiş mesaj).
+Yeni bir koruma eklerken aynı istisnayı tanımlayın — yoksa sıfırlama yarıda kalır
+ve kısmi veriyle daha kötü bir duruma yol açar. Bayrak işlem sonunda kapanmalı;
+`tenant_reset_tests` 13. iddia bunu ölçer.
+
 
 ---
 
@@ -140,7 +179,7 @@ Sebep: test edilmeyen ikinci bir yürütme yolu üretimde çalışıyordu ve bul
 ### 4.1 Commit öncesi
 ```bash
 node stamp_assets.js     # varlıkları içerik hash'iyle damgala (ZORUNLU)
-node run_all_tests.js    # 49 süit, ~540 iddia
+node run_all_tests.js    # 54 süit, ~600 iddia
 ```
 `stamp_assets.js --check` güncel değilse hata verir — CI'ya konabilir.
 
@@ -156,8 +195,10 @@ Uygulanmış göçler: phase13 (kullanıcı silinebilirliği), phase14 (son-sahi
 phase15 (cascade istisnaları), phase16 (ekip daveti), phase18 (hesap kapatma),
 phase19 (atomik rezervasyon silme).
 
-**Bekleyen:** phase20 (ay kapanışı bütünlüğü) — uygulanana kadar
-`month_close_integrity_tests.js` kırmızı kalır, bu beklenen durumdur.
+phase20 (ay kapanışı bütünlüğü).
+
+**Bekleyen:** phase21 (veri sıfırlama) — uygulanana kadar
+`tenant_reset_tests.js` kırmızı kalır, bu beklenen durumdur.
 
 ### 4.3 Paralel çalışma (Codex / Antigravity)
 Bu repoda başka AI araçları da çalışıyor. **Dosya bazında bölüşün.**
@@ -208,9 +249,12 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 | Konu | Durum |
 |---|---|
 | Rezervasyon düzenleme/silme akışı analizi | tamamlandı (phase19) |
-| Ay kapatma akışı analizi | tamamlandı (phase20) — göç uygulanmayı bekliyor |
+| Ay kapatma akışı analizi | tamamlandı (phase20) |
+| Demo artığı taraması | tamamlandı — ağı `demo_residue_tests` |
+| Veri sıfırlama | tamamlandı (phase21) — **göç uygulanmayı bekliyor** |
 | Excel içe/dışa aktarma | "Şirket Genel Raporu" içe aktarımı devre dışı bırakıldı, gerçek uygulama yok |
 | Bildirim merkezi analizi | yapılmadı |
+| OTA ilan analizi (`runAiListingCritic`) | veri bağlantısı yok; artık skor uydurmuyor, durumu açıkça söylüyor |
 | Demo'yu Supabase'de gerçek tenant olarak yeniden kurma | yapılmadı |
 | Pazarlama ROAS'ı | kampanya gelir alanı kullanıcı girdisi; "ölçülmüş" gibi sunuluyor, etiketlenmeli |
 | Kullanıcı davet e-postası | davet oluşuyor ama davetliye **mail gitmiyor**; kişi kendi kayıt olmalı |
