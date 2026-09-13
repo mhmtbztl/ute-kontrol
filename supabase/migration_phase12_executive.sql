@@ -241,10 +241,9 @@ BEGIN
   -- Aggregate expenses
   SELECT COALESCE(SUM(e.amount), 0)
   INTO v_total_expenses
-  FROM public.finance_transactions e
+  FROM public.expenses e
   WHERE e.tenant_id = v_tenant_id
-    AND e.type = 'EXPENSE'
-    AND to_char(e.transaction_date, 'YYYY-MM') = p_target_month
+    AND to_char(e.expense_date, 'YYYY-MM') = p_target_month
     AND (p_property_id IS NULL OR e.property_id = p_property_id);
 
   v_net_profit := v_total_revenue - v_total_expenses;

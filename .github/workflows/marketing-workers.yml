@@ -1,0 +1,61 @@
+name: Marketing workers
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/15 * * * *'
+    - cron: '17 2 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marketing-workers-${{ github.event.schedule || 'manual' }}
+  cancel-in-progress: false
+
+jobs:
+  queue-workers:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '*/15 * * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Process one photo analysis job
+        if: env.GEMINI_API_KEY != ''
+        run: npm run marketing:photo-worker
+      - name: Process one completed observation window
+        run: npm run marketing:experiment-worker
+
+  daily-findings:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '17 2 * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Collect native health evidence
+        run: npm run marketing:health-source-collector
+      - name: Create immutable health snapshots
+        run: npm run marketing:health-worker
+      - name: Refresh funnel findings
+        run: npm run marketing:funnel-worker
+      - name: Refresh channel economics findings
+        run: npm run marketing:economics-worker
+      - name: Refresh seasonal cover reviews
+        run: npm run marketing:seasonal-worker

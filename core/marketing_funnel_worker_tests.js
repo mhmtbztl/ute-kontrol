@@ -1,0 +1,13 @@
+const assert = require('assert'); const service = require('./marketing_funnel_worker_service');
+let total = 0; let passed = 0; async function test(name, fn) { total += 1; try { await fn(); passed += 1; console.log(`[PASS] ${name}`); } catch (e) { console.error(`[FAIL] ${name}\n       ${e.stack || e.message}`); } }
+const listing = { id: 'L1', tenant_id: 'T1', property_id: 'P1', payout_currency: 'TRY' };
+const snapshot = { id: 'S1', period_start: '2026-09-01', period_end_exclusive: '2026-09-15', impressions: 1000, listing_views: 60, platform_reported_bookings: 1 };
+const benchmark = { search_to_view_ctr_percent: 8, view_to_booking_conversion_percent: 4, normalized_impressions_per_listing_day: 150 };
+function repo(overrides = {}) { const findings = []; return { findings, async loadActiveListings() { return [listing]; }, async loadLatestSnapshot() { return snapshot; }, async loadBenchmark() { return benchmark; }, async persistFinding(d) { findings.push(d); return 'F'; }, ...overrides }; }
+(async () => {
+  await test('Low visibility, click and conversion create evidence-based findings', async () => { const r = repo(); const result = await service.runFunnelFindings(r, { asOfDate: '2026-09-20' }); assert.strictEqual(result.persisted, 3); assert.deepStrictEqual(r.findings.map(f => f.findingCode), ['VISIBILITY_BELOW_REFERENCE', 'CLICK_RATE_BELOW_REFERENCE', 'CONVERSION_RATE_BELOW_REFERENCE']); assert.ok(r.findings.every(f => f.observation.causalClaim === false)); });
+  await test('Missing benchmark creates no fabricated finding', async () => { const r = repo({ async loadBenchmark() { return null; } }); const result = await service.runFunnelFindings(r, { asOfDate: '2026-09-20' }); assert.strictEqual(result.persisted, 0); assert.strictEqual(result.skipped[0].reason, 'LIMITED_DATA'); });
+  await test('Missing snapshot is explicitly skipped', async () => { const r = repo({ async loadLatestSnapshot() { return null; } }); const result = await service.runFunnelFindings(r, { asOfDate: '2026-09-20' }); assert.strictEqual(result.skipped[0].reason, 'NO_SNAPSHOT'); });
+  await test('One listing failure does not abort the batch', async () => { const r = repo({ async loadActiveListings() { return [listing, { ...listing, id: 'L2' }]; }, async loadLatestSnapshot(t, id) { if (id === 'L2') throw new Error('read failed'); return snapshot; } }); const result = await service.runFunnelFindings(r, { asOfDate: '2026-09-20' }); assert.strictEqual(result.status, 'PARTIAL'); assert.strictEqual(result.errors.length, 1); });
+  console.log(`\nTEST SUMMARY: ${passed} / ${total} TESTS PASSED`); if (passed !== total) process.exit(1);
+})();

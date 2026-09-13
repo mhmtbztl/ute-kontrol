@@ -99,15 +99,21 @@
         standaloneActions.push(act);
         return;
       }
-      if (!propertyGroups.has(propId)) {
-        propertyGroups.set(propId, []);
+      // Optional domain adapter boundary: actions for the same property may be
+      // intentionally kept in separate collapse groups (for example an urgent
+      // cleaning issue versus a marketing revenue opportunity).
+      const groupKey = act.collapseKey || propId;
+      if (!propertyGroups.has(groupKey)) {
+        propertyGroups.set(groupKey, { propertyId: propId, actions: [] });
       }
-      propertyGroups.get(propId).push(act);
+      propertyGroups.get(groupKey).actions.push(act);
     });
 
     const collapsedList = [...standaloneActions];
 
-    propertyGroups.forEach((groupActions, propId) => {
+    propertyGroups.forEach(group => {
+      const groupActions = group.actions;
+      const propId = group.propertyId;
       if (groupActions.length === 1) {
         collapsedList.push(groupActions[0]);
         return;

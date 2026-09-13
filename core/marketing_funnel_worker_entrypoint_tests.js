@@ -1,0 +1,4 @@
+const assert = require('assert'); const fs = require('fs'); const path = require('path'); const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'))); const source = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'run_marketing_funnel_worker.js'), 'utf8');
+let total = 0; let passed = 0; function test(n, f) { total += 1; try { f(); passed += 1; console.log(`[PASS] ${n}`); } catch (e) { console.error(`[FAIL] ${n}\n       ${e.message}`); } }
+test('Package exposes funnel worker', () => assert.strictEqual(pkg.scripts['marketing:funnel-worker'], 'node scripts/run_marketing_funnel_worker.js')); test('Worker requires service role', () => assert.match(source, /SUPABASE_SERVICE_ROLE_KEY/)); test('Worker has tenant and batch controls', () => { assert.match(source, /MARKETING_TENANT_ID/); assert.match(source, /MARKETING_FUNNEL_LIMIT/); });
+console.log(`\nTEST SUMMARY: ${passed} / ${total} TESTS PASSED`); if (passed !== total) process.exit(1);

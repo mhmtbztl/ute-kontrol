@@ -4,7 +4,14 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "marketing:photo-worker": "node scripts/run_photo_analysis_worker.js",
+    "marketing:experiment-worker": "node scripts/run_marketing_experiment_worker.js",
+    "marketing:seasonal-worker": "node scripts/run_seasonal_marketing_worker.js",
+    "marketing:health-worker": "node scripts/run_marketing_health_worker.js",
+    "marketing:health-source-collector": "node scripts/run_marketing_health_source_collector.js",
+    "marketing:funnel-worker": "node scripts/run_marketing_funnel_worker.js",
+    "marketing:economics-worker": "node scripts/run_marketing_economics_worker.js"
   },
   "keywords": [],
   "author": "",
