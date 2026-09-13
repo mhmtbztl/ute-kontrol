@@ -77,15 +77,15 @@ function hideLockOverlay() {
 }
 
 // LEXBNB KONTROL MERKEZİ - EXECUTIVE STR CONTROL & REVENUE MANAGEMENT ENGINE
-// Portföy: Akdeniz & Ege Lüks Villa Koleksiyonu (Villa Bella Vista, Villa Olive Garden, Villa Sunset Horizon, Villa Azure Bay, Villa Palm Breeze)
-// Tamamen sentetik, bağımsız SaaS demo veritabanı.
+// Çok kiracılı (multi-tenant) ticari SaaS. Portföy her müşteriye özeldir ve
+// Supabase'den yüklenir; uygulamada sabit villa listesi bulunmaz.
 
 // Backwards compatibility aliases for tests and internal keys
 
 // OTA ilan analizi modulu eskiden 5 villalik demo portfoyu gosteriyordu.
-// Gercek ilan verisi tenant'a baglanana kadar BOS baslar; uydurma ilan
-// gostermek, musteriye sahip olmadigi mulkler icin tavsiye vermek demekti.
-const DEFAULT_AIRBNB_PROPERTIES = {};
+// Ilan verisi (airbnbListings) tenant bazlidir; uygulamada sabit ilan sozlugu
+// bulunmaz. Eskiden DEFAULT_AIRBNB_PROPERTIES bes uydurma villanin ilan
+// puanini/siralamasini tasiyordu.
 
 const EXPENSE_CATEGORIES = [
   { name: 'Maaş', color: '#3B82F6' },
@@ -114,12 +114,20 @@ let appData = {
 };
 
 // Global Active Filter
-let currentFilter = {
-  period: '2026-09',
-  villa: 'ALL',
-  startDate: '2026-09-01',
-  endDate: '2026-09-30'
-};
+// Baslangic donemi: icinde bulunulan ay. Sabit '2026-09' yaziliydi; takvim
+// ilerledikce uygulama gecmis bir ayi "guncel" gostermeye devam ederdi.
+let currentFilter = (() => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const sonGun = new Date(y, d.getMonth() + 1, 0).getDate();
+  return {
+    period: `${y}-${m}`,
+    villa: 'ALL',
+    startDate: `${y}-${m}-01`,
+    endDate: `${y}-${m}-${String(sonGun).padStart(2, '0')}`
+  };
+})();
 
 let activeTrendRange = '6M';
 let pendingImportRows = null;
@@ -2548,50 +2556,56 @@ async function cloudDeleteLead(id) {
   return await deleteLead(id, { allowWonDelete: true });
 }
 
-const ALL_FINANCIAL_MONTHS = [
-  '2025-07', '2025-08', '2025-09', '2025-10', '2025-11', '2025-12',
-  '2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06',
-  '2026-07', '2026-08', '2026-09', '2026-10', '2026-11', '2026-12',
-  '2027-01', '2027-02', '2027-03', '2027-04', '2027-05', '2027-06',
-  '2027-07', '2027-08', '2027-09', '2027-10', '2027-11', '2027-12'
-];
+/**
+ * Uygulamanin calisma ay araligi.
+ *
+ * Sabit bir 2025-07 ... 2027-12 listesiydi ve ay adlari ilk musterinin
+ * takvimini anlatiyordu ("Agustos 2026 (Son Kapanan Ay)", "Aralik 2027
+ * (Yilbasi 2028)"). Bu liste ay adimlayiciyi, hedef ekranini, tape chart'i ve
+ * trend grafiklerini besliyor. Sonuc: 2024 verisiyle gelen musteri o aylara
+ * hic ulasamiyor, 2028'e gelindiginde de liste bitiyordu.
+ *
+ * Artik musterinin kendi verisinden uretiliyor; refreshPeriodSelectors() her
+ * render'da tazeler.
+ */
+function computeFinancialMonthRange() {
+  const tarihler = [];
+  const ekle = d => { if (d && /^\d{4}-\d{2}/.test(String(d))) tarihler.push(String(d).slice(0, 7)); };
+  const veri = (typeof appData !== 'undefined') ? appData
+             : (typeof global !== 'undefined' ? global.appData : null);
+  if (veri) {
+    (veri.bookings || []).forEach(b => { ekle(b.checkIn); ekle(b.checkOut); });
+    (veri.expenses || []).forEach(e => ekle(e.date || e.expense_date));
+    (veri.cleaningTasks || []).forEach(t => ekle(t.date));
+  }
 
-const ALL_MONTH_NAMES = {
-  'ALL': '🌐 Tüm Zamanlar (Temmuz 2025 - Günümüz)',
-  '2026-YEAR': '📅 2026 Yılı Tamamı (Ocak - Aralık 2026)',
-  '2025-YEAR': '📅 2025 Yılı (Temmuz - Aralık 2025)',
-  'CUSTOM': '📆 Özel Tarih Aralığı',
-  '2025-07': 'Temmuz 2025',
-  '2025-08': 'Ağustos 2025',
-  '2025-09': 'Eylül 2025',
-  '2025-10': 'Ekim 2025',
-  '2025-11': 'Kasım 2025',
-  '2025-12': 'Aralık 2025',
-  '2026-01': 'Ocak 2026',
-  '2026-02': 'Şubat 2026',
-  '2026-03': 'Mart 2026',
-  '2026-04': 'Nisan 2026',
-  '2026-05': 'Mayıs 2026',
-  '2026-06': 'Haziran 2026',
-  '2026-07': 'Temmuz 2026',
-  '2026-08': 'Ağustos 2026 (Son Kapanan Ay)',
-  '2026-09': '⭐ Eylül 2026 (Güncel Aktif Ay)',
-  '2026-10': 'Ekim 2026',
-  '2026-11': 'Kasım 2026',
-  '2026-12': 'Aralık 2026 (Yılbaşı Sezonu 🎄)',
-  '2027-01': 'Ocak 2027 (Kış Zirvesi ❄️)',
-  '2027-02': 'Şubat 2027 (Kayak Sezonu ⛷️)',
-  '2027-03': 'Mart 2027',
-  '2027-04': 'Nisan 2027',
-  '2027-05': 'Mayıs 2027',
-  '2027-06': 'Haziran 2027',
-  '2027-07': 'Temmuz 2027',
-  '2027-08': 'Ağustos 2027',
-  '2027-09': 'Eylül 2027',
-  '2027-10': 'Ekim 2027',
-  '2027-11': 'Kasım 2027',
-  '2027-12': 'Aralık 2027 (Yılbaşı 2028)'
-};
+  const ayNo = ym => parseInt(ym.slice(0, 4), 10) * 12 + parseInt(ym.slice(5, 7), 10) - 1;
+  const ymStr = n => Math.floor(n / 12) + '-' + String((n % 12) + 1).padStart(2, '0');
+  const bugunAy = ayNo(getTodayStr().slice(0, 7));
+
+  let bas = tarihler.length ? Math.min(...tarihler.map(ayNo)) : bugunAy - 11;
+  let bit = tarihler.length ? Math.max(...tarihler.map(ayNo), bugunAy + 12) : bugunAy + 12;
+  if (bit - bas > 180) bas = bit - 180;   // bozuk tarih listeyi sismesin
+
+  const liste = [];
+  for (let n = bas; n <= bit; n++) liste.push(ymStr(n));
+  return liste;
+}
+
+let ALL_FINANCIAL_MONTHS = computeFinancialMonthRange();
+
+/**
+ * Bir donem anahtarinin ekranda gorunen adi.
+ * Sabit bir sozlukten geliyordu; artik hesaplaniyor.
+ */
+function getPeriodDisplayName(key) {
+  if (!key) return '';
+  if (key === 'ALL') return 'Tüm Zamanlar';
+  if (key === 'CUSTOM') return 'Özel Tarih Aralığı';
+  const yil = /^(\d{4})-YEAR$/.exec(key);
+  if (yil) return yil[1] + ' Yılı Tamamı';
+  return formatPeriodLabel(key);
+}
 
 function handleFilterChange() {
   const periodVal = document.getElementById('globalPeriodFilter') ? document.getElementById('globalPeriodFilter').value : '2026-09';
@@ -2604,16 +2618,19 @@ function handleFilterChange() {
     if (customWrap) customWrap.style.display = 'inline-flex';
     const sInput = document.getElementById('customFilterStart');
     const eInput = document.getElementById('customFilterEnd');
-    currentFilter.startDate = (sInput && sInput.value) ? sInput.value : '2026-08-01';
-    currentFilter.endDate = (eInput && eInput.value) ? eInput.value : '2026-09-30';
+    // Varsayilan ozel aralik: icinde bulunulan ay. '2026-08-01' / '2026-09-30'
+    // sabit yaziliydi.
+    currentFilter.startDate = (sInput && sInput.value) ? sInput.value : getTodayStr().slice(0, 7) + '-01';
+    currentFilter.endDate = (eInput && eInput.value) ? eInput.value : getTodayStr();
   } else {
     if (customWrap) customWrap.style.display = 'none';
-    if (periodVal === '2026-YEAR') {
-      currentFilter.startDate = '2026-01-01';
-      currentFilter.endDate = '2026-12-31';
-    } else if (periodVal === '2025-YEAR') {
-      currentFilter.startDate = '2025-07-01';
-      currentFilter.endDate = '2025-12-31';
+    // Yil secenekleri artik musterinin veri araligindan uretiliyor; yalnizca
+    // '2026-YEAR' ve '2025-YEAR' taninirsa 2024 verisi olan bir musteride
+    // "2024 Yili Tamami" secildiginde startDate '2024-YEAR-01' oluyordu.
+    const yilEslesme = /^(\d{4})-YEAR$/.exec(periodVal);
+    if (yilEslesme) {
+      currentFilter.startDate = yilEslesme[1] + '-01-01';
+      currentFilter.endDate = yilEslesme[1] + '-12-31';
     } else if (periodVal === 'ALL') {
       currentFilter.startDate = null;
       currentFilter.endDate = null;
@@ -2635,7 +2652,7 @@ function handleFilterChange() {
 
 function stepMonth(delta) {
   let idx = ALL_FINANCIAL_MONTHS.indexOf(currentFilter.period);
-  if (idx === -1) idx = ALL_FINANCIAL_MONTHS.indexOf('2026-08');
+  if (idx === -1) idx = ALL_FINANCIAL_MONTHS.indexOf(getTodayStr().slice(0, 7));
 
   let newIdx = idx + delta;
   if (newIdx >= 0 && newIdx < ALL_FINANCIAL_MONTHS.length) {
@@ -2648,7 +2665,7 @@ function stepMonth(delta) {
 
 function updateStepperLabels() {
   const curIdx = ALL_FINANCIAL_MONTHS.indexOf(currentFilter.period);
-  let curLabel = ALL_MONTH_NAMES[currentFilter.period] || currentFilter.period;
+  let curLabel = getPeriodDisplayName(currentFilter.period);
   if (currentFilter.period === 'CUSTOM') {
     const s = currentFilter.startDate ? formatTrDate(currentFilter.startDate) : 'Başlangıç';
     const e = currentFilter.endDate ? formatTrDate(currentFilter.endDate) : 'Bitiş';
@@ -2659,10 +2676,10 @@ function updateStepperLabels() {
   if (curEl) curEl.innerText = curLabel;
 
   const prevEl = document.getElementById('stepperPrevLabel');
-  if (prevEl) prevEl.innerText = curIdx > 0 ? ALL_MONTH_NAMES[ALL_FINANCIAL_MONTHS[curIdx - 1]] : '';
+  if (prevEl) prevEl.innerText = curIdx > 0 ? getPeriodDisplayName(ALL_FINANCIAL_MONTHS[curIdx - 1]) : '';
 
   const nextEl = document.getElementById('stepperNextLabel');
-  if (nextEl) nextEl.innerText = curIdx >= 0 && curIdx < ALL_FINANCIAL_MONTHS.length - 1 ? ALL_MONTH_NAMES[ALL_FINANCIAL_MONTHS[curIdx + 1]] : '';
+  if (nextEl) nextEl.innerText = curIdx >= 0 && curIdx < ALL_FINANCIAL_MONTHS.length - 1 ? getPeriodDisplayName(ALL_FINANCIAL_MONTHS[curIdx + 1]) : '';
 
   const vLabel = currentFilter.villa === 'ALL' ? ('Tüm Mülkler (' + portfolioLabel() + ')') : (appData.villas[currentFilter.villa]?.name || currentFilter.villa);
   const vEl = document.getElementById('finTopPropertyLabel');
@@ -3048,6 +3065,7 @@ async function forceHardRefresh() {
 function renderAll() {
   if (typeof document === 'undefined') return;
   refreshPortfolioCountLabels();
+  refreshPeriodSelectors();
   updateStepperLabels();
   renderMonthCloseCard();
   renderExecutiveControlCenter();
@@ -3064,6 +3082,8 @@ function renderAll() {
   renderOtaRadar();
   runWhatIfSimulation();
   renderTrajectoryRadar();
+  renderTrajectoryInsights();
+  renderCriticPresets();
   renderDailyOps();
   renderTapeChart();
   renderHousekeepingTab();
@@ -3095,14 +3115,18 @@ function renderFinanceModule() {
   let totalCapex = 0;
   let totalSoldNights = 0;
   let avgRevPerNight = 0;
-  let targetRev = 300000;
-  let propStats = {
-    BELLA: { name: 'Villa Bella Vista', revenue: 0, nights: 0, adr: 0, occupancy: 0, revpar: 0, share: 0 },
-    OLIVE: { name: 'Villa Olive Garden', revenue: 0, nights: 0, adr: 0, occupancy: 0, revpar: 0, share: 0 },
-    AZURE: { name: 'Villa Azure Bay', revenue: 0, nights: 0, adr: 0, occupancy: 0, revpar: 0, share: 0 },
-    SUNSET: { name: 'Villa Sunset Horizon', revenue: 0, nights: 0, adr: 0, occupancy: 0, revpar: 0, share: 0 },
-    PALM: { name: 'Villa Palm Breeze', revenue: 0, nights: 0, adr: 0, occupancy: 0, revpar: 0, share: 0 }
-  };
+  let targetRev = 0;
+  // Mulk istatistikleri MUSTERININ KENDI mulklerinden kurulur. Burada bes
+  // uydurma villa (Bella Vista, Olive Garden, Azure Bay, Sunset Horizon,
+  // Palm Breeze) sabit yaziliydi: ilk musterinin portfoyu. Baska her musteri
+  // finans ekraninda sahibi olmadigi bes villayi goruyordu.
+  let propStats = {};
+  Object.keys(appData.villas || {}).forEach(vKey => {
+    propStats[vKey] = {
+      name: (appData.villas[vKey] && appData.villas[vKey].name) || vKey,
+      revenue: 0, nights: 0, adr: 0, occupancy: 0, revpar: 0, share: 0
+    };
+  });
 
   const categoryTotals = {};
   EXPENSE_CATEGORIES.forEach(c => { categoryTotals[c.name] = 0; });
@@ -3122,11 +3146,10 @@ function renderFinanceModule() {
       targetRev = userAllTarget || att.targetCiro;
 
       // All-time per villa
-      propStats.BELLA = { name: 'Villa Bella Vista', revenue: att.villas.bella.rev, nights: att.villas.bella.days, adr: Math.round(att.villas.bella.rev / att.villas.bella.days), share: Number(((att.villas.bella.rev / totalRevenue)*100).toFixed(1)), occupancy: Number(((att.villas.bella.days / (14*30))*100).toFixed(1)), revpar: Math.round(att.villas.bella.rev / (14*30)) };
-      propStats.OLIVE = { name: 'Villa Olive Garden', revenue: att.villas.olive.rev, nights: att.villas.olive.days, adr: Math.round(att.villas.olive.rev / att.villas.olive.days), share: Number(((att.villas.olive.rev / totalRevenue)*100).toFixed(1)), occupancy: Number(((att.villas.olive.days / (14*30))*100).toFixed(1)), revpar: Math.round(att.villas.olive.rev / (14*30)) };
-      propStats.AZURE = { name: 'Villa Azure Bay', revenue: att.villas.azure.rev, nights: att.villas.azure.days, adr: Math.round(att.villas.azure.rev / att.villas.azure.days), share: Number(((att.villas.azure.rev / totalRevenue)*100).toFixed(1)), occupancy: Number(((att.villas.azure.days / (14*30))*100).toFixed(1)), revpar: Math.round(att.villas.azure.rev / (14*30)) };
-      propStats.SUNSET = { name: 'Villa Sunset Horizon', revenue: att.villas.sunset.rev, nights: att.villas.sunset.days, adr: Math.round(att.villas.sunset.rev / att.villas.sunset.days), share: Number(((att.villas.sunset.rev / totalRevenue)*100).toFixed(1)), occupancy: Number(((att.villas.sunset.days / (14*30))*100).toFixed(1)), revpar: Math.round(att.villas.sunset.rev / (14*30)) };
-      propStats.PALM = { name: 'Villa Palm Breeze', revenue: att.villas.palm.rev, nights: att.villas.palm.days, adr: Math.round(att.villas.palm.rev / att.villas.palm.days), share: Number(((att.villas.palm.rev / totalRevenue)*100).toFixed(1)), occupancy: Number(((att.villas.palm.days / (14*30))*100).toFixed(1)), revpar: Math.round(att.villas.palm.rev / (14*30)) };
+      // Buradaki bes satir, silinmis excelDb demo veri setinden bes uydurma
+      // villanin (Bella Vista, Olive Garden, Azure Bay, Sunset Horizon,
+      // Palm Breeze) istatistigini kuruyordu. activeExcel artik hicbir zaman
+      // dolmuyor; dal olu, isimler de artikti.
 
     } else if (currentFilter.period === '2026-YEAR' || currentFilter.period === '2025-YEAR' || currentFilter.period === 'CUSTOM') {
       let monthsToAggregate = [];
@@ -3677,7 +3700,10 @@ function renderPropertyComparisonChart(propStats) {
   if (!container) return;
   container.innerHTML = '';
 
-  const vKeys = ['BELLA', 'OLIVE', 'AZURE', 'SUNSET', 'PALM'];
+  // Musterinin GERCEK mulkleri. Sabit ['BELLA','OLIVE','AZURE','SUNSET','PALM']
+  // yaziliydi: ilk musterinin villalari. Baska herkes kendi villalarini hic
+  // gormuyor, bunun yerine sahibi olmadigi bes bos cubuk goruyordu.
+  const vKeys = Object.keys(propStats || {}).filter(k => propStats[k]);
   const values = [];
 
   vKeys.forEach(vKey => {
@@ -3713,15 +3739,48 @@ function renderPropertyComparisonChart(propStats) {
   if (anomContainer) {
     anomContainer.innerHTML = '';
 
+    // Anomaliler MUSTERININ KENDI verisinden cikarilir.
+    //
+    // Burada uc sabit metin vardi ve secili doneme gore diziliyordu: Agustos
+    // 2026'da "VILLA SUNSET HORIZON %96,8 doluluk, 2.826 TL ADR", Ocak
+    // 2026'da "Temmuz 2025'te 320.000 TL ciro rekoru", diger her ayda ise
+    // "resmi sirket raporu verileri basariyla incelendi". Hicbiri hesaplanmis
+    // degildi; hepsi ilk musterinin rakamlariydi ve bos bir hesapta bile
+    // gorunuyordu.
     const anomalies = [];
-    if (currentFilter.period === '2026-08' || currentFilter.period === 'ALL') {
-      anomalies.push({ type: 'warning', text: '⚠️ VILLA SUNSET HORIZON: Yüksek Doluluk (30 Gece / %96,8) ancak Düşük ADR (2.826 TL) — Fiyat savunması zayıf, talep varken taban fiyat derhal artırılmalı.' });
-      anomalies.push({ type: 'success', text: '💎 VILLA AZURE BAY: Sadece 9 satılan gece ile portföyün en yüksek cirosunu (138.190 TL, 15.354 TL/gece) üretti — Premium jakuzi/sauna fiyatlama gücü kanıtlandı.' });
-      anomalies.push({ type: 'warning', text: '⚠️ PALM: 12 kişilik yüksek kapasiteye rağmen ciro (65.302 TL) portföy ortalamasının altında kaldı — Grup rezervasyonları için esnek paketler tavsiye edilir.' });
-    } else if (currentFilter.period === '2026-01') {
-      anomalies.push({ type: 'success', text: '🔥 REKOR AY: Temmuz 2025\'te 320.000 TL ciro ve 195.000 TL net kâr ile portföy rekoru kırıldı. Villa Azure Bay 80.000 TL ile en yüksek katkıyı sağladı.' });
+    const aktif = vKeys
+      .map(k => ({ key: k, s: propStats[k], ad: ((appData.villas && appData.villas[k] && appData.villas[k].name) || k) }))
+      .filter(v => v.s && Number(v.s.nights) > 0);
+
+    if (aktif.length === 0) {
+      anomalies.push({ type: 'info', text: 'Bu dönemde satılan gece bulunmuyor; karşılaştırılacak veri yok.' });
     } else {
-      anomalies.push({ type: 'info', text: `📌 ${ALL_MONTH_NAMES[currentFilter.period] || currentFilter.period} dönemi resmi şirket raporu verileri başarıyla incelendi.` });
+      const adrOf = v => Number(v.s.adr) || (v.s.nights > 0 ? v.s.revenue / v.s.nights : 0);
+      const ortAdr = aktif.reduce((a, v) => a + adrOf(v), 0) / aktif.length;
+      const ortDoluluk = aktif.reduce((a, v) => a + (Number(v.s.occupancy) || 0), 0) / aktif.length;
+      const tl = n => Math.round(n).toLocaleString('tr-TR');
+
+      const enIyi = aktif.slice().sort((a, b) => adrOf(b) - adrOf(a))[0];
+      anomalies.push({
+        type: 'success',
+        text: `💎 ${enIyi.ad}: dönemin en yüksek gecelik fiyatı — ${tl(adrOf(enIyi))} TL/gece (${enIyi.s.nights} gece, ${tl(enIyi.s.revenue)} TL).`
+      });
+
+      // Talep var ama fiyat dusuk: doluluk ortalamanin ustunde, ADR altinda.
+      aktif
+        .filter(v => (Number(v.s.occupancy) || 0) > ortDoluluk && adrOf(v) < ortAdr)
+        .slice(0, 2)
+        .forEach(v => anomalies.push({
+          type: 'warning',
+          text: `⚠️ ${v.ad}: doluluk portföy ortalamasının üstünde (%${(Number(v.s.occupancy) || 0).toFixed(1)}) ama gecelik fiyat altında (${tl(adrOf(v))} TL, ortalama ${tl(ortAdr)} TL). Talep varken taban fiyat gözden geçirilmeli.`
+        }));
+
+      // Hic satmayan mulkler
+      const bos = vKeys.filter(k => propStats[k] && !(Number(propStats[k].nights) > 0));
+      if (bos.length) {
+        const adlar = bos.map(k => ((appData.villas && appData.villas[k] && appData.villas[k].name) || k)).join(', ');
+        anomalies.push({ type: 'warning', text: `⚠️ Bu dönemde hiç satılmayan mülk: ${adlar}.` });
+      }
     }
 
     anomalies.forEach(anom => {
@@ -3921,56 +3980,130 @@ function renderAIFinancialAnalyst(revenue, targetRev, targetPct, opex, capex, ne
     if (actionBox) actionBox.innerHTML = '<div style="padding: 15px; color: var(--color-slate-400); text-align:center;">Yeni rezervasyon veya harcama kaydı bekleniyor.</div>';
     return;
   }
+  // BURADA UYDURMA METIN VARDI. Geliri sifirdan buyuk olan HER musteri, kendi
+  // rakamlarindan bagimsiz olarak su sabit cumleleri goruyordu:
+  //   "Villa Azure Bay Liderligi", "5.004.165 TL tarihsel ciro / 457 gece",
+  //   "Villa Sunset Horizon 30 gece satti, ADR 2.826 TL'de kaldi",
+  //   "OTA komisyonlari 75.519 TL kesintiye yol acti",
+  //   "Camasirhane gideri 47.000 TL'ye ulasti".
+  // Hicbiri hesaplanmiyordu. Artik her cumle musterinin kendi verisinden
+  // uretiliyor; uretilemiyorsa yazilmiyor.
+  const tl = n => Math.round(Number(n) || 0).toLocaleString('tr-TR');
+  const donemAdi = getPeriodDisplayName(currentFilter.period);
+
+  const donemBk = (appData.bookings || []).filter(b => b.status !== 'CANCELLED' && isBookingInFilter(b));
+  const paylar = donemBk.map(b => ({ b, p: getBookingFilterShare(b) }));
+  const donemGece = paylar.reduce((a, x) => a + x.p.nights, 0);
+  const komisyon = paylar.reduce((a, x) => a + (Number(x.b.otaCommission) || 0) * x.p.ratio, 0);
+  const temizlik = paylar.reduce((a, x) => a + (Number(x.b.cleaningFee) || 0) * x.p.ratio, 0);
+
+  // Mulk bazinda: en iyi ve en zayif gecelik fiyat
+  const mulkStat = Object.keys(propStats || {})
+    .map(k => ({ k, s: propStats[k], ad: (propStats[k] && propStats[k].name) || k }))
+    .filter(v => v.s && Number(v.s.nights) > 0)
+    .map(v => ({ ...v, adr: Number(v.s.adr) || (v.s.revenue / v.s.nights) }))
+    .sort((a, b) => b.adr - a.adr);
+
+  // Gider kategorisi liderligi
+  const donemGid = (appData.expenses || []).filter(e => isExpenseInFilter(e));
+  const katTop = {};
+  donemGid.forEach(e => { katTop[e.category || 'Diğer'] = (katTop[e.category || 'Diğer'] || 0) + (Number(e.amount) || 0); });
+  const enBuyukKat = Object.entries(katTop).sort((a, b) => b[1] - a[1])[0];
+
   if (goodBox) {
-    goodBox.innerHTML = `
-      <p>• <strong>Ciro Başarısı:</strong> Hedeflenen ${targetRev.toLocaleString('tr-TR')} TL ciroya karşılık ${Math.round(revenue).toLocaleString('tr-TR')} TL gerçekleşerek <strong>%${targetPct.toFixed(1)}</strong> gerçekleşme oranı elde edildi.</p>
-      <p>• <strong>Villa Azure Bay Liderliği:</strong> Villa Azure Bay, sauna ve jakuzi donanımı ile yüksek gecelik gelir savunmasını yaparak ciroya en büyük nakit katkıyı getirdi.</p>
-      <p>• <strong>Tarihsel Ölçek:</strong> Şirket kuruluşundan bu yana toplam <strong>5.004.165 TL</strong> ciro ve <strong>457 satılan geceye</strong> ulaşarak Akdeniz bölgesindeki liderliğini pekiştirdi.</p>
-    `;
+    const satirlar = [];
+    if (targetRev > 0) {
+      satirlar.push(`<p>• <strong>Hedef Gerçekleşmesi:</strong> ${tl(targetRev)} TL hedefe karşılık ${tl(revenue)} TL gerçekleşti — <strong>%${targetPct.toFixed(1)}</strong>.</p>`);
+    } else {
+      satirlar.push(`<p>• <strong>Ciro:</strong> ${donemAdi} döneminde ${tl(revenue)} TL ciro, ${donemGece} satılan gece. (Bu dönem için hedef girilmemiş.)</p>`);
+    }
+    if (mulkStat.length) {
+      const en = mulkStat[0];
+      satirlar.push(`<p>• <strong>En Güçlü Mülk:</strong> ${escapeHtml(en.ad)} — ${tl(en.adr)} TL/gece ile dönemin en yüksek gecelik fiyatı (${en.s.nights} gece, ${tl(en.s.revenue)} TL).</p>`);
+    }
+    if (netProfit > 0) {
+      satirlar.push(`<p>• <strong>Net Kâr:</strong> ${tl(netProfit)} TL${netMargin ? ` (marj %${Number(netMargin).toFixed(1)})` : ''}.</p>`);
+    }
+    goodBox.innerHTML = satirlar.join('') || '<p>• Bu dönem için öne çıkarılacak bir sonuç yok.</p>';
   }
 
   if (badBox) {
-    badBox.innerHTML = `
-      <p>• <strong>Gider / Ciro Oranı:</strong> Toplam giderler cironun <strong>%${revenue > 0 ? (((opex + capex) / revenue)*100).toFixed(1) : 0}</strong> seviyesinde seyrediyor. Maaş, temizlik ve komisyon kalemleri operasyonel kârı baskılıyor.</p>
-      <p>• <strong>Villa Sunset Horizon Düşük ADR:</strong> 30 gece satılmasına rağmen ortalama günlük fiyat 2.826 TL\'de kaldı; kapasite yüksek talep döneminde gereğinden ucuza kapatıldı.</p>
-      <p>• <strong>Villa Palm Breeze Kapasite Kullanımı:</strong> 12 kişilik en büyük villa olmasına karşın ciro potansiyeli portföy ortalamasının gerisinde kaldı.</p>
-    `;
+    const satirlar = [];
+    if (revenue > 0) {
+      satirlar.push(`<p>• <strong>Gider / Ciro Oranı:</strong> Toplam giderler cironun <strong>%${(((opex + capex) / revenue) * 100).toFixed(1)}</strong>'i seviyesinde.</p>`);
+    }
+    if (mulkStat.length > 1) {
+      const ortAdr = mulkStat.reduce((a, v) => a + v.adr, 0) / mulkStat.length;
+      const zayif = mulkStat[mulkStat.length - 1];
+      if (zayif.adr < ortAdr) {
+        satirlar.push(`<p>• <strong>Düşük Gecelik Fiyat:</strong> ${escapeHtml(zayif.ad)} ${zayif.s.nights} gece sattı ama gecelik ${tl(zayif.adr)} TL'de kaldı; portföy ortalaması ${tl(ortAdr)} TL.</p>`);
+      }
+    }
+    if (enBuyukKat) {
+      satirlar.push(`<p>• <strong>En Büyük Gider Kalemi:</strong> ${escapeHtml(enBuyukKat[0])} — ${tl(enBuyukKat[1])} TL.</p>`);
+    }
+    badBox.innerHTML = satirlar.join('') || '<p>• Bu dönemde öne çıkan bir maliyet anomalisi yok.</p>';
   }
 
   if (whyBox) {
-    whyBox.innerHTML = `
-      <p>• <strong>Korelasyon 1:</strong> Villa Sunset Horizon\'de minimum konaklama kuralı ve erken rezervasyon indirimi geniş tutulduğu için takvim erkenden düşük rakamlarla doldu.</p>
-      <p>• <strong>Korelasyon 2:</strong> Villa Azure Bay ve Villa Olive Garden villalarında elektrik tüketimi ve kış bakımları fatura maliyetlerini artırdı.</p>
-      <p>• <strong>Korelasyon 3:</strong> Kredi kartı ve OTA komisyon giderleri (özellikle Booking/Airbnb) toplam 75.519 TL kesintiye yol açtı.</p>
-    `;
+    const satirlar = [];
+    if (komisyon > 0) {
+      const oran = revenue > 0 ? ((komisyon / revenue) * 100).toFixed(1) : null;
+      satirlar.push(`<p>• <strong>OTA Komisyonu:</strong> ${tl(komisyon)} TL${oran ? ` (cironun %${oran}'i)` : ''}. Doğrudan satışa kayan her rezervasyon bu kalemi düşürür.</p>`);
+    }
+    if (temizlik > 0) {
+      satirlar.push(`<p>• <strong>Temizlik Maliyeti:</strong> ${tl(temizlik)} TL. USALI gereği gelirden düşülmez, gider tarafında raporlanır.</p>`);
+    }
+    if (capex > 0) {
+      satirlar.push(`<p>• <strong>Yatırım (CAPEX):</strong> ${tl(capex)} TL. Bu tutar işletme kârını değil nakit akışını etkiler.</p>`);
+    }
+    whyBox.innerHTML = satirlar.join('') || '<p>• Bu dönemde açıklanacak belirgin bir maliyet korelasyonu yok.</p>';
   }
 
   if (actionBox) {
-    actionBox.innerHTML = `
-      <div class="ai-action-item">
-        <div class="action-text">
-          <strong>1. Villa Sunset Horizon Villası Taban Fiyatını %30 Artır</strong>
-          <p>Hafta sonu taban fiyatını 4.500 TL\'ye çekerek doluluk kaybı yaşamadan ADR\'yi yükseltin.</p>
-        </div>
-        <button class="btn btn-primary btn-sm" onclick="createTaskFromAI('Villa Sunset Horizon Taban Fiyatını Artır', 'P2', 'Villa Sunset Horizon hafta sonu taban fiyatını 4.500 TL olarak güncelle.')">⚡ Görev Oluştur</button>
-      </div>
+    const oneriler = [];
+    if (mulkStat.length > 1) {
+      const ortAdr = mulkStat.reduce((a, v) => a + v.adr, 0) / mulkStat.length;
+      const zayif = mulkStat[mulkStat.length - 1];
+      if (zayif.adr < ortAdr * 0.85) {
+        const hedef = Math.round(ortAdr / 100) * 100;
+        oneriler.push({
+          baslik: `${zayif.ad} taban fiyatını gözden geçirin`,
+          metin: `Gecelik ${tl(zayif.adr)} TL ile portföy ortalamasının (${tl(ortAdr)} TL) altında. Doluluk korunuyorsa taban fiyat ${tl(hedef)} TL bandına çekilebilir.`,
+          gorev: `${zayif.ad} taban fiyatını gözden geçir`
+        });
+      }
+    }
+    if (komisyon > 0) {
+      oneriler.push({
+        baslik: 'Doğrudan satış payını artırın',
+        metin: `Bu dönem ${tl(komisyon)} TL OTA komisyonu ödendi. Tekrar gelen misafirlere doğrudan kanaldan teklif götürmek bu kalemi doğrudan azaltır.`,
+        gorev: 'Doğrudan rezervasyon kampanyası planla'
+      });
+    }
+    if (enBuyukKat && revenue > 0 && enBuyukKat[1] > revenue * 0.15) {
+      oneriler.push({
+        baslik: `${enBuyukKat[0]} giderini inceleyin`,
+        metin: `${tl(enBuyukKat[1])} TL ile cironun %${((enBuyukKat[1] / revenue) * 100).toFixed(1)}'ini oluşturuyor. Tedarikçi veya sözleşme koşulları gözden geçirilmeli.`,
+        gorev: `${enBuyukKat[0]} gideri için tedarikçi görüşmesi`
+      });
+    }
 
+    actionBox.innerHTML = oneriler.length
+      ? oneriler.map((o, i) => `
       <div class="ai-action-item">
         <div class="action-text">
-          <strong>2. Çamaşırhane ve Temizlik Birim Maliyetlerini Revize Et</strong>
-          <p>47.000 TL\'ye ulaşan aylık temizlik giderinde parça başı sabit paket anlaşması yapın.</p>
+          <strong>${i + 1}. ${escapeHtml(o.baslik)}</strong>
+          <p>${escapeHtml(o.metin)}</p>
         </div>
-        <button class="btn btn-primary btn-sm" onclick="createTaskFromAI('Temizlik Anlaşması Revizyonu', 'P2', 'Çamaşırhane ve temizlik hizmeti ile sabit paket anlaşması yap.')">⚡ Görev Oluştur</button>
-      </div>
+        <button class="btn btn-primary btn-sm" data-ai-task="${escapeHtml(o.gorev)}">⚡ Görev Oluştur</button>
+      </div>`).join('')
+      : '<div style="padding: 15px; color: var(--color-slate-400); text-align:center;">Bu dönem verisinden çıkarılabilecek somut bir aksiyon önerisi yok.</div>';
 
-      <div class="ai-action-item">
-        <div class="action-text">
-          <strong>3. Direkt WhatsApp & Tekrar Gelen Misafir Kampanyası</strong>
-          <p>Geçmiş misafirlere %10 özel indirim sunarak 75.000 TL\'lik komisyon sızıntısını kesin.</p>
-        </div>
-        <button class="btn btn-primary btn-sm" onclick="createTaskFromAI('Direkt Rezervasyon Kampanyası', 'P2', 'WhatsApp üzerinden eski misafirlere kış sezonu %10 direkt indirim mesajı ilet.')">⚡ Görev Oluştur</button>
-      </div>
-    `;
+    // Inline onclick yerine delegasyon: mulk adinda tirnak olabilir.
+    actionBox.querySelectorAll('[data-ai-task]').forEach(btn => {
+      btn.addEventListener('click', () => createTaskFromAI(btn.getAttribute('data-ai-task'), 'P2', ''));
+    });
   }
 }
 
@@ -4110,51 +4243,94 @@ function resetSimulator() {
 }
 
 function exportTrajectoryReport() {
+  // Bu rapor TAMAMEN UYDURMAYDI. Sabit metin olarak "5.004.165,40 TL toplam
+  // ciro", "88/100 saglik skoru", bes hayali villanin ciro paylari ve 2027 kis
+  // sezonu tahminleri iceriyordu; hicbiri hesaplanmiyordu ve bos bir hesapta
+  // bile ayni rakamlarla iniyordu. Musteri bunu yatirimcisina goturebilirdi.
+  //
+  // Artik yalnizca musterinin kendi kayitlarindan uretiliyor. Hesaplanamayan
+  // yerde rakam uydurulmaz.
+  const tl = n => Math.round(Number(n) || 0).toLocaleString('tr-TR');
+  const bookings = (appData.bookings || []).filter(b => b.status !== 'CANCELLED');
+  const expenses = appData.expenses || [];
+
+  if (bookings.length === 0 && expenses.length === 0) {
+    alert('Rapor oluşturulamadı: henüz kayıtlı rezervasyon veya gider yok.');
+    return;
+  }
+
+  // --- Tum zamanlar toplami (tahakkuk gerekmez; butun kayitlar dahil) -------
+  const toplamCiro = bookings.reduce((a, b) => a + (Number(b.gross) || 0), 0);
+  const toplamGece = bookings.reduce((a, b) => a + (Number(b.nights) || 0), 0);
+  const dagitimMaliyeti = bookings.reduce(
+    (a, b) => a + (Number(b.otaCommission) || 0) + (Number(b.cleaningFee) || 0), 0);
+  const elleGider = expenses.filter(e => e.type !== 'CAPEX').reduce((a, e) => a + (Number(e.amount) || 0), 0);
+  const capex = expenses.filter(e => e.type === 'CAPEX').reduce((a, e) => a + (Number(e.amount) || 0), 0);
+  const opex = elleGider + dagitimMaliyeti;
+  const netKar = toplamCiro - opex - capex;
+  const marj = toplamCiro > 0 ? (netKar / toplamCiro) * 100 : null;
+  const adr = toplamGece > 0 ? toplamCiro / toplamGece : null;
+
+  // --- Kapsanan donem -------------------------------------------------------
+  const tarihler = bookings.map(b => b.checkIn).filter(Boolean).sort();
+  const ilk = tarihler[0], sonT = tarihler[tarihler.length - 1];
+
+  // --- Mulk bazinda paylar --------------------------------------------------
+  const mulk = {};
+  bookings.forEach(b => {
+    const k = b.villa || b.propertyId || '—';
+    if (!mulk[k]) mulk[k] = { ciro: 0, gece: 0 };
+    mulk[k].ciro += Number(b.gross) || 0;
+    mulk[k].gece += Number(b.nights) || 0;
+  });
+  const mulkSatirlari = Object.entries(mulk)
+    .sort((a, b) => b[1].ciro - a[1].ciro)
+    .map(([k, v], i) => {
+      const ad = (appData.villas && appData.villas[k] && appData.villas[k].name) || k;
+      const pay = toplamCiro > 0 ? ((v.ciro / toplamCiro) * 100).toFixed(1) : '—';
+      const mAdr = v.gece > 0 ? tl(v.ciro / v.gece) + ' TL/gece' : 'gece kaydı yok';
+      return `${i + 1}. ${ad}: ${tl(v.ciro)} TL (%${pay} pay - ${v.gece} gece - ${mAdr})`;
+    });
+
   const reportText = `=====================================================
-LEXBNB KONTROL MERKEZİ V5 - YÖNETİCİ GİDİŞAT VE TAHMİN RAPORU
-Tarih: ${new Date().toLocaleDateString('tr-TR')}
+LEXBNB - YÖNETİCİ GİDİŞAT RAPORU
+Rapor tarihi: ${new Date().toLocaleDateString('tr-TR')}
+${ilk ? `Kapsanan dönem: ${ilk} – ${sonT}` : 'Kapsanan dönem: —'}
 =====================================================
 
-1. GENEL ŞİRKET SAĞLIK SKORU: 88/100 (Büyüme & Kâr İvmesinde)
+1. TOPLAM
 -----------------------------------------------------
-• Toplam Tarihsel Ciro: 5.004.165,40 TL (14 Ay Toplamı)
-• Toplam Satılan Gece: 457 Gece (Ortalama ADR: 10.950 TL)
-• Ciro Momentumu (Son 3 Ay): +%80,7 Hızlanma (268k -> 467k -> 484k TL)
-• Net Kâr Marjı Stabilitesi: %29,5 – %33,9
+• Rezervasyon sayısı:  ${bookings.length}
+• Toplam ciro (brüt):  ${tl(toplamCiro)} TL
+• Satılan gece:        ${toplamGece}
+• Ortalama gecelik:    ${adr === null ? '—' : tl(adr) + ' TL'}
 
-2. MÜLK BAZINDA TARİHSEL CİRO PAYLARI:
+2. GİDER VE KÂR (USALI)
 -----------------------------------------------------
-1. Villa Azure Bay:    1.420.000 TL (%25,5 Pay - 158 Gece - Özel İskele & SPA)
-2. Villa Olive Garden: 1.320.000 TL (%23,7 Pay - 165 Gece - Zeytinlik & Taş Villa)
-3. Villa Bella Vista:  1.180.000 TL (%21,2 Pay - 178 Gece - Sonsuzluk Havuzlu)
-4. Villa Sunset Horizon: 890.000 TL (%16,0 Pay - 172 Gece - Teras Jakuzili)
-5. Villa Palm Breeze:    750.000 TL (%13,5 Pay - 173 Gece - Alaçatı Taş Ev)
+• Elle girilen gider:              ${tl(elleGider)} TL
+• Rezervasyondan otomatik gider:   ${tl(dagitimMaliyeti)} TL (OTA komisyonu + temizlik)
+• Toplam işletme gideri (OPEX):    ${tl(opex)} TL
+• Yatırım (CAPEX):                 ${tl(capex)} TL
+• NET KÂR:                         ${tl(netKar)} TL
+• Net kâr marjı:                   ${marj === null ? '—' : '%' + marj.toFixed(1)}
 
-3. YAKLAŞAN DÖNEM & 2026/2027 KIŞ SEZONU GELİR TAHMİNLERİ:
+3. MÜLK BAZINDA CİRO PAYLARI
 -----------------------------------------------------
-• Eylül 2026 Tahmini:           150.000 TL – 185.000 TL
-• Ekim - Kasım 2026 Tahmini:     450.000 TL – 520.000 TL
-• Kış Sezonu (Ara - Oca - Şub): 2.250.000 TL – 2.650.000 TL
-• 2026 Yıl Sonu Kapanış Hedefi: ~6.200.000 TL – 6.450.000 TL
+${mulkSatirlari.length ? mulkSatirlari.join('\n') : '(kayıtlı rezervasyon yok)'}
 
-4. EN KRİTİK 3 YÖNETİM AKSİYONU:
 -----------------------------------------------------
-[!] Villa Sunset Horizon Taban Fiyatı: Doluluk %96 iken ADR'nin 2.826 TL'de kalması
-    gelir kaybıdır. Taban fiyat acilen 4.500 TL bandına çekilmelidir.
-[!] Direkt Satış & Komisyon Koruması: Ayda 75.500 TL komisyon ödenmektedir.
-    WhatsApp doğrudan kampanyasıyla bu tutarın en az %40'ı kasaya çekilmelidir.
-[!] Villa Azure Bay & Villa Bella Vista Kış Fiyatlandırması: Ocak ayında 280.000 TL ciro getiren
-    Villa Azure Bay villası için kış erken satışları 18.000 TL altında açılmamalıdır.
+Bu rapordaki tüm rakamlar sistemdeki kendi kayıtlarınızdan
+hesaplanmıştır. Gelecek dönem tahmini içermez.
 =====================================================`;
 
   const blob = new Blob([reportText], { type: 'text/plain;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `LEXBNB_Gidisat_Raporu_${new Date().toISOString().split('T')[0]}.txt`;
+  a.download = `LEXBNB_Gidisat_Raporu_${getTodayStr()}.txt`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  alert('✅ Yönetici Gidişat Raporu başarıyla indirildi!');
+  if (typeof showToast === 'function') showToast('Yönetici gidişat raporu indirildi.', 'success');
 }
 
 // -------------------------------------------------------------
@@ -4277,16 +4453,18 @@ async function deleteExpenseUI(id) {
 // -------------------------------------------------------------
 // HEDEFLER DÜZENLEME (GOALS MODAL & SETTINGS)
 // -------------------------------------------------------------
-const GOAL_MONTHS = ALL_FINANCIAL_MONTHS.map(m => ({
-  id: m,
-  name: ALL_MONTH_NAMES[m] || m
-}));
+// Sabit bir liste degil: musterinin veri araligindan her cagrida uretilir.
+// Const olarak dosya yuklenirken hesaplaniyordu; o an appData henuz bos oldugu
+// icin hedef ekrani musterinin gercek aylarini hic gormuyordu.
+function getGoalMonths() {
+  return ALL_FINANCIAL_MONTHS.map(m => ({ id: m, name: getPeriodDisplayName(m) }));
+}
 
 function openGoalsModal(targetPeriod) {
   const select = document.getElementById('goalPeriodSelect');
   if (select) {
     select.innerHTML = '';
-    GOAL_MONTHS.forEach(m => {
+    getGoalMonths().forEach(m => {
       const opt = document.createElement('option');
       opt.value = m.id;
       opt.textContent = m.name;
@@ -4440,13 +4618,26 @@ function downloadSampleTemplate(templateType) {
 
   const wb = XLSX.utils.book_new();
 
+  // Sablondaki ornek satirlar MUSTERININ kendi mulk anahtarlarini ve
+  // BUGUNE gore tarihleri kullanir. Eskiden 'AZURE'/'BELLA' gibi olmayan
+  // mulkler ve 2026-10 tarihleri sabitti: musteri sablonu indirip oldugu gibi
+  // doldurdugunda tanimsiz mulke, gecmis bir aya kayit girmis oluyordu.
+  const mulkAnahtarlari = Object.keys(appData.villas || {});
+  const m1 = mulkAnahtarlari[0] || 'MULK_KODU';
+  const m2 = mulkAnahtarlari[1] || m1;
+  const gunEkle = (n) => {
+    const d = new Date(getTodayStr() + 'T00:00:00');
+    d.setDate(d.getDate() + n);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  };
+
   if (templateType === 'BOOKINGS') {
     const data = [
       {
-        'Villa': 'AZURE',
+        'Villa': m1,
         'Misafir Adı': 'Örnek Misafir (Ahmet Yılmaz)',
-        'Giriş Tarihi': '2026-10-10',
-        'Çıkış Tarihi': '2026-10-14',
+        'Giriş Tarihi': gunEkle(7),
+        'Çıkış Tarihi': gunEkle(11),
         'Gece': 4,
         'Brüt Tutar (TL)': 72000,
         'Kanal': 'WHATSAPP',
@@ -4456,10 +4647,10 @@ function downloadSampleTemplate(templateType) {
         'Durum': 'COMPLETED'
       },
       {
-        'Villa': 'BELLA',
+        'Villa': m2,
         'Misafir Adı': 'Örnek Misafir (Canan Kaya)',
-        'Giriş Tarihi': '2026-10-20',
-        'Çıkış Tarihi': '2026-10-24',
+        'Giriş Tarihi': gunEkle(17),
+        'Çıkış Tarihi': gunEkle(21),
         'Gece': 4,
         'Brüt Tutar (TL)': 56000,
         'Kanal': 'AIRBNB',
@@ -4475,28 +4666,28 @@ function downloadSampleTemplate(templateType) {
   } else if (templateType === 'EXPENSES') {
     const data = [
       {
-        'Tarih': '2026-10-05',
-        'Açıklama': 'Şömine Meşe Odunu 3 Ton',
+        'Tarih': gunEkle(-10),
+        'Açıklama': 'Örnek: yakacak / elektrik faturası',
         'Tutar (TL)': 18000,
         'Kategori': 'Şömine & Yakacak',
         'Tür': 'OPEX',
         'Villa': 'ALL'
       },
       {
-        'Tarih': '2026-10-12',
-        'Açıklama': 'Villa Azure Bay Jakuzi Isıtıcı Rezistans Değişimi',
+        'Tarih': gunEkle(-6),
+        'Açıklama': 'Örnek: kombi bakımı / arıza onarımı',
         'Tutar (TL)': 6500,
         'Kategori': 'Bakım & Onarım',
         'Tür': 'OPEX',
-        'Villa': 'AZURE'
+        'Villa': m1
       },
       {
-        'Tarih': '2026-10-15',
-        'Açıklama': 'Yeni Bahçe Kamelyası & Oturma Grubu',
+        'Tarih': gunEkle(-3),
+        'Açıklama': 'Örnek: mobilya / demirbaş alımı',
         'Tutar (TL)': 45000,
         'Kategori': 'Yatırım & Demirbaş',
         'Tür': 'CAPEX',
-        'Villa': 'BELLA'
+        'Villa': m2
       }
     ];
     const ws = XLSX.utils.json_to_sheet(data);
@@ -5129,7 +5320,7 @@ function renderGapNights() {
   if (!container) return;
   container.innerHTML = '';
   const gaps = [];
-  const todayStr = '2026-09-07';
+  const todayStr = getTodayStr();
 
   // Check gaps between consecutive bookings for each villa
   Object.keys(appData.villas).forEach(vKey => {
@@ -5277,7 +5468,7 @@ function renderManageBookingsTable() {
   const villaFilter = document.getElementById('rezVillaFilter')?.value || 'ALL';
   const statusFilter = document.getElementById('rezStatusFilter')?.value || 'ALL';
 
-  const todayStr = '2026-09-07';
+  const todayStr = getTodayStr();
 
   let totalGross = 0;
   let totalNet = 0;
@@ -5546,7 +5737,7 @@ function renderSettingsGoalsTable() {
   if (!tbody) return;
   tbody.innerHTML = '';
 
-  GOAL_MONTHS.forEach(m => {
+  getGoalMonths().forEach(m => {
     const period = m.id;
     const saved = appData.targets && appData.targets[period];
     // Demo hedefleri musteriye UYGULANMAZ. Tenant kendi hedefini belirlemediyse 0.
@@ -5956,6 +6147,90 @@ function renderMonthCloseCard() {
       }).join('<br>');
     }
   }
+}
+
+/**
+ * Donem secicilerini MUSTERININ KENDI VERISINDEN uretir.
+ *
+ * Iki secici de (globalPeriodFilter, rezPeriodFilter) 2025-07 ... 2027-12
+ * arasinda SABIT yaziliydi ve etiketleri ilk musterinin takvimini anlatiyordu
+ * ("2026 YILI (Resmi Veriler & Aktif Sezon)", "Aralik 2027 (Yilbasi 2028)").
+ * 2024 verisiyle gelen bir musteri o aylari hic secemezdi; 2028'e gelindiginde
+ * de liste biterdi.
+ *
+ * Kural: en eski kayittan, bugunden 12 ay sonrasina kadar. Veri yoksa
+ * icinde bulunulan yilin tamami.
+ */
+function refreshPeriodSelectors() {
+  if (typeof document === 'undefined') return;
+
+  // Tek kaynak: ay araligi computeFinancialMonthRange() ile hesaplanir; ay
+  // adimlayici, hedefler ve tape chart da ayni listeyi kullanir.
+  ALL_FINANCIAL_MONTHS = computeFinancialMonthRange();
+  const aylar = ALL_FINANCIAL_MONTHS;
+  const bugun = getTodayStr().slice(0, 7);
+
+  const yillar = [];
+  aylar.forEach(ym => {
+    const y = ym.slice(0, 4);
+    let grup = yillar.find(g => g.yil === y);
+    if (!grup) { grup = { yil: y, aylar: [] }; yillar.push(grup); }
+    grup.aylar.push({ deger: ym, etiket: formatPeriodLabel(ym) });
+  });
+
+  const ilkEtiket = aylar.length
+    ? `${formatPeriodLabel(aylar[0])} – Günümüz`
+    : 'Tüm Zamanlar';
+
+  function kur(id, ustSecenekler) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const onceki = el.value;
+    const parcalar = [ustSecenekler];
+    yillar.forEach(g => {
+      parcalar.push(`<optgroup label="${g.yil}">` +
+        g.aylar.map(a => `<option value="${a.deger}">${a.etiket}</option>`).join('') +
+        '</optgroup>');
+    });
+    el.innerHTML = parcalar.join('');
+    // Onceki secim hala listede varsa korunur; yoksa icinde bulunulan aya duser.
+    if (onceki && el.querySelector(`option[value="${onceki}"]`)) el.value = onceki;
+    else if (el.querySelector(`option[value="${bugun}"]`)) el.value = bugun;
+  }
+
+  const yilSecenekleri = yillar
+    .map(g => `<option value="${g.yil}-YEAR">${g.yil} Yılı Tamamı</option>`).join('');
+
+  kur('globalPeriodFilter',
+    '<optgroup label="GENEL &amp; TARİH ARALIKLARI">' +
+    `<option value="ALL">Tüm Zamanlar (${ilkEtiket})</option>` +
+    yilSecenekleri +
+    '<option value="CUSTOM">Özel Tarih Aralığı Seç…</option>' +
+    '</optgroup>');
+
+  kur('rezPeriodFilter',
+    '<optgroup label="GENEL">' +
+    '<option value="ALL">Tüm Rezervasyonlar</option>' +
+    '<option value="UPCOMING">Gelecek &amp; Aktif Rezervasyonlar</option>' +
+    '</optgroup>');
+}
+
+/**
+ * Bugunun tarihi, 'YYYY-MM-DD'.
+ *
+ * Uygulamada "bugun" 20 ayri yerde 2026-09-07 olarak SABIT yaziliydi.
+ * Yalnizca goruntuyu degil KAYITLARI da bozuyordu: bir temizlik odemesi
+ * isaretlendiginde odeme tarihi gercek gun ne olursa olsun 2026-09-07 olarak
+ * yaziliyordu. Musteri kendi odeme gecmisini yanlis goruyordu.
+ *
+ * Yerel saat dilimine gore hesaplanir; toISOString() UTC'ye cevirdigi icin
+ * aksam saatlerinde bir onceki gunu verebiliyor.
+ */
+function getTodayStr() {
+  const d = new Date();
+  return d.getFullYear() + '-' +
+         String(d.getMonth() + 1).padStart(2, '0') + '-' +
+         String(d.getDate()).padStart(2, '0');
 }
 
 /** 'YYYY-MM' -> 'Nisan 2026' */
@@ -6558,7 +6833,14 @@ function deleteMaint(id) {
 
 function openResetModal() {
   const modal = document.getElementById('resetModal');
-  if (modal) modal.classList.add('active');
+  if (!modal) return;
+  const input = document.getElementById('resetConfirmInput');
+  const err = document.getElementById('resetError');
+  if (input) input.value = '';
+  if (err) err.style.display = 'none';
+  updateResetButton();
+  modal.classList.add('active');
+  renderResetImpact();
 }
 
 function closeResetModal() {
@@ -6566,26 +6848,80 @@ function closeResetModal() {
   if (modal) modal.classList.remove('active');
 }
 
-function cleanResetAll() {
-  // Bu islem YALNIZCA tarayicidaki gorunumu temizler. Bulut hesabinda kayitlar
-  // Supabase'de durur ve sayfa yenilenince geri gelir; "her sey silindi" demek
-  // yaniltici olurdu.
-  if (isCloudTenant(getActiveTenantId())) {
-    alert('Bu işlem bulut hesabınızdaki kayıtları silmez. Rezervasyon, gider ve mülkleri kendi ekranlarından tek tek silebilirsiniz. Hesabınızı tamamen kapatmak için Ayarlar > Tehlikeli Bölge bölümünü kullanın.');
-    closeResetModal();
+/** Sifirlamanin ne silecegini ONCEDEN gosterir. */
+function renderResetImpact() {
+  const kutu = document.getElementById('resetImpact');
+  if (!kutu) return;
+  const say = (arr) => Array.isArray(arr) ? arr.length : 0;
+  const satirlar = [
+    ['Mülk', Object.keys(appData.villas || {}).length],
+    ['Rezervasyon', say(appData.bookings)],
+    ['Gider kaydı', say(appData.expenses)],
+    ['Temizlik görevi', say(appData.cleaningTasks)],
+    ['Talep (lead)', say(appData.leads)],
+    ['Kapatılmış dönem', (appData.closedPeriods || []).filter(c => c.status === 'CLOSED').length]
+  ].filter(([, n]) => n > 0);
+
+  kutu.innerHTML = satirlar.length
+    ? '<strong>Silinecek kayıtlar:</strong><br>' +
+      satirlar.map(([ad, n]) => `• ${ad}: <strong>${n}</strong>`).join('<br>') +
+      '<br><span style="color:#94A3B8;">Ekip üyeleriniz ve işletme hesabınız korunur.</span>'
+    : 'Sıfırlanacak kayıt bulunmuyor; işletmeniz zaten boş.';
+}
+
+function updateResetButton() {
+  const input = document.getElementById('resetConfirmInput');
+  const btn = document.getElementById('resetSubmitBtn');
+  if (btn) btn.disabled = !input || input.value.trim() !== 'VERILERI SIFIRLA';
+}
+
+/**
+ * Isletmenin TUM verisini siler.
+ *
+ * Eskiden bulut hesabinda HICBIR SEY yapmiyordu: yalnizca "bu islem bulut
+ * hesabinizdaki kayitlari silmez" uyarisi cikip kapaniyordu. Yerel modda ise
+ * sadece bellegi bosaltiyor, appData.targets'i dizi yerine NESNE ({}) yapip
+ * hedef listesini de bozuyordu.
+ *
+ * Artik tek transaction'da sunucuda calisir (reset_tenant_data): isletme
+ * sahibine ozel, yazili onay zorunlu, kapatilmis donemler dahil her sey silinir.
+ */
+async function cleanResetAll() {
+  const err = document.getElementById('resetError');
+  const btn = document.getElementById('resetSubmitBtn');
+  const input = document.getElementById('resetConfirmInput');
+  const onay = input ? input.value.trim() : '';
+  if (err) err.style.display = 'none';
+
+  if (onay !== 'VERILERI SIFIRLA') {
+    if (err) { err.textContent = 'Onaylamak için tam olarak "VERILERI SIFIRLA" yazın.'; err.style.display = 'block'; }
     return;
   }
-  if (confirm('DİKKAT: Sistemdeki tüm geçmiş cirolar, harcama kalemleri, rezervasyonlar ve arıza kayıtları SIFIRLANACAKTIR.\n\nTüm finansal metrikler 0 TL olacak ve tertemiz boş bir sistem başlayacaktır.\n\nOnaylıyor musunuz?')) {
-    appData.isCleanState = true;
-    appData.excelDb = null;
-    appData.bookings = [];
-    appData.expenses = [];
-    appData.leads = [];
-    appData.maintenance = [];
-    appData.targets = {};
-    saveAppData();
+
+  const tenantId = getActiveTenantId();
+  requireCloudForWrite('Veri sıfırlama', tenantId);
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Sıfırlanıyor…'; }
+  try {
+    const { data, error } = await supabaseClient.rpc('reset_tenant_data', {
+      p_tenant_id: tenantId,
+      p_confirm: onay
+    });
+    if (error) throw new Error(error.message || 'Veritabanı hatası');
+
+    await loadTenantAppData(tenantId);
     closeResetModal();
-    alert('✅ Tüm sistem verileri başarıyla sıfırlandı! Tüm finansal göstergeler 0 TL temiz duruma getirildi.');
+    const adet = (data && data.total_deleted) || 0;
+    if (typeof showToast === 'function') {
+      showToast(adet > 0
+        ? `${adet} kayıt silindi. İşletmeniz sıfırlandı.`
+        : 'İşletmenizde silinecek kayıt yoktu.', 'success');
+    }
+  } catch (e) {
+    if (err) { err.textContent = 'Sıfırlanamadı: ' + (e.message || 'bilinmeyen hata'); err.style.display = 'block'; }
+  } finally {
+    if (btn) { btn.textContent = '🗑️ Tüm Verileri Kalıcı Olarak Sıfırla'; }
+    updateResetButton();
   }
 }
 
@@ -6639,7 +6975,7 @@ function renderDailyOps() {
   if (!appData.cleaningTasks) appData.cleaningTasks = [];
   if (!appData.housekeepingOverrides) appData.housekeepingOverrides = {};
 
-  const todayStr = '2026-09-07'; // Canonical system date
+  const todayStr = getTodayStr(); // Canonical system date
 
   // 1. Check-ins for Today
   const checkins = appData.bookings.filter(b => b.status !== 'CANCELLED' && b.checkIn === todayStr);
@@ -7013,7 +7349,7 @@ function toggleCleaningPaid(vKey) {
   appData.cleaningPayments[vKey] = {
     paid: newPaid,
     amount: cleanCost,
-    updatedAt: '2026-09-07'
+    updatedAt: getTodayStr()
   };
 
   // İlgili villa için görevi bul veya oluştur
@@ -7025,17 +7361,17 @@ function toggleCleaningPaid(vKey) {
       id: 'TASK-CLN-' + vKey + '-' + Date.now().toString().slice(-4),
       villa: vKey,
       guest: '',
-      date: '2026-09-07',
+      date: getTodayStr(),
       cleaner: 'Fatma Hanım (Temizlik Ekibi)',
       amount: cleanCost,
       paid: newPaid,
-      paidDate: newPaid ? '2026-09-07' : null,
+      paidDate: newPaid ? getTodayStr() : null,
       notes: `${vConf?.name || vKey} Rutin Temizlik`
     };
     appData.cleaningTasks.push(task);
   } else {
     task.paid = newPaid;
-    task.paidDate = newPaid ? '2026-09-07' : null;
+    task.paidDate = newPaid ? getTodayStr() : null;
   }
 
   const expId = 'EXP-CLEAN-' + task.id;
@@ -7052,7 +7388,7 @@ function toggleCleaningPaid(vKey) {
     } else {
       appData.expenses.push({
         id: expId,
-        date: '2026-09-07',
+        date: getTodayStr(),
         month: '2026-09',
         villa: vKey,
         category: 'Temizlik',
@@ -7238,7 +7574,7 @@ function toggleTaskPaid(taskId) {
 
   const newPaid = !task.paid;
   task.paid = newPaid;
-  task.paidDate = newPaid ? '2026-09-07' : null;
+  task.paidDate = newPaid ? getTodayStr() : null;
 
   // Kokpit villa durumu ile senkronize et
   if (!appData.cleaningPayments) appData.cleaningPayments = {};
@@ -7265,8 +7601,8 @@ function toggleTaskPaid(taskId) {
     } else {
       appData.expenses.push({
         id: expId,
-        date: task.paidDate || '2026-09-07',
-        month: (task.paidDate || '2026-09-07').slice(0, 7),
+        date: task.paidDate || getTodayStr(),
+        month: (task.paidDate || getTodayStr()).slice(0, 7),
         villa: task.villa,
         category: 'Temizlik',
         type: 'OPEX',
@@ -7305,7 +7641,7 @@ function payAllPendingCleaning() {
   const confirmPay = confirm(`Toplam ${pending.length} adet bekleyen temizlik borcu (₺${totalDebt.toLocaleString('tr-TR')}) "ÖDENDİ" olarak kapatılıp Gider Defteri'ne işlensin mi?`);
   if (!confirmPay) return;
 
-  const todayStr = '2026-09-07';
+  const todayStr = getTodayStr();
   if (!appData.expenses) appData.expenses = [];
 
   pending.forEach(t => {
@@ -7356,7 +7692,7 @@ function openNewCleaningTaskModal() {
   document.getElementById('cleaningTaskModalTitle').innerText = '🧹 Yeni Temizlik / Borç Girişi';
   document.getElementById('hkEditTaskId').value = '';
   document.getElementById('hkVilla').value = currentFilter.villa !== 'ALL' ? currentFilter.villa : 'BELLA';
-  document.getElementById('hkDate').value = '2026-09-07';
+  document.getElementById('hkDate').value = getTodayStr();
   document.getElementById('hkCleaner').value = 'Fatma Hanım (Temizlik Ekibi)';
   
   const vKey = document.getElementById('hkVilla').value;
@@ -7378,7 +7714,7 @@ function openEditCleaningTaskModal(taskId) {
   document.getElementById('cleaningTaskModalTitle').innerText = '✏️ Temizlik Kaydını Düzenle';
   document.getElementById('hkEditTaskId').value = task.id;
   document.getElementById('hkVilla').value = task.villa;
-  document.getElementById('hkDate').value = task.date || '2026-09-07';
+  document.getElementById('hkDate').value = task.date || getTodayStr();
   document.getElementById('hkCleaner').value = task.cleaner || 'Fatma Hanım';
   document.getElementById('hkAmount').value = task.amount;
   document.getElementById('hkDesc').value = task.notes || task.guest || '';
@@ -7413,7 +7749,7 @@ function saveCleaningTask(e) {
         ...appData.cleaningTasks[idx],
         villa, date, cleaner, amount, notes,
         paid,
-        paidDate: paid ? (appData.cleaningTasks[idx].paidDate || '2026-09-07') : null
+        paidDate: paid ? (appData.cleaningTasks[idx].paidDate || getTodayStr()) : null
       };
       appData.cleaningTasks[idx] = taskRecord;
     }
@@ -7427,7 +7763,7 @@ function saveCleaningTask(e) {
       cleaner,
       amount,
       paid,
-      paidDate: paid ? '2026-09-07' : null,
+      paidDate: paid ? getTodayStr() : null,
       notes
     };
     appData.cleaningTasks.unshift(taskRecord);
@@ -7493,7 +7829,7 @@ function populateTapeChartMonthSelect() {
   ALL_FINANCIAL_MONTHS.forEach(m => {
     const opt = document.createElement('option');
     opt.value = m;
-    let label = ALL_MONTH_NAMES[m] || m;
+    let label = getPeriodDisplayName(m);
     if (m === '2026-09') label = 'Eylül 2026 (Güncel Ay)';
     if (m === '2026-12') label = 'Aralık 2026 (Yılbaşı 🎄)';
     if (m === '2027-01') label = 'Ocak 2027 (Kış Zirvesi ❄️)';
@@ -7513,7 +7849,7 @@ function setTapeChartMonth(month) {
 
 function stepTapeChartMonth(delta) {
   let idx = ALL_FINANCIAL_MONTHS.indexOf(tapeChartMonth);
-  if (idx === -1) idx = ALL_FINANCIAL_MONTHS.indexOf('2026-09');
+  if (idx === -1) idx = ALL_FINANCIAL_MONTHS.indexOf(getTodayStr().slice(0, 7));
   let newIdx = idx + delta;
   if (newIdx >= 0 && newIdx < ALL_FINANCIAL_MONTHS.length) {
     setTapeChartMonth(ALL_FINANCIAL_MONTHS[newIdx]);
@@ -7537,7 +7873,7 @@ function renderTapeChart() {
     : ['BELLA', 'OLIVE', 'AZURE', 'SUNSET', 'PALM'];
   
   const dayNamesShort = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
-  const todayStr = '2026-09-07';
+  const todayStr = getTodayStr();
 
   let tableHtml = '<table class="tape-chart-table"><thead><tr><th class="tape-villa-th">VİLLA \\ GÜNLER</th>';
   for (let d = 1; d <= daysInMonth; d++) {
@@ -7633,7 +7969,8 @@ function closeWhatsAppModal() {
 }
 
 function loadSampleWhatsAppMsg() {
-  const sample = "Alexander Wright: Selamlar, 18-23 Eylül arası 5 gece Villa Azure Bay için 85.000 TL konuştuk, 8 kişiyiz onaylıyoruz. Tel: +90 532 555 1234";
+  const ornekVilla = Object.values(appData.villas || {})[0];
+  const sample = "Örnek Misafir: Selamlar, 18-23 Eylül arası 5 gece " + ((ornekVilla && ornekVilla.name) || "villanız") + " için 85.000 TL konuştuk, 8 kişiyiz onaylıyoruz. Tel: +90 532 555 1234";
   const input = document.getElementById('waRawInput');
   if (input) {
     input.value = sample;
@@ -7654,13 +7991,23 @@ function parseWhatsAppMessage() {
 
   const lower = text.toLowerCase();
 
-  // 1. Detect Villa
-  let detectedVilla = 'VILLA_AZURE';
-  if (lower.includes('bella')) detectedVilla = 'VILLA_BELLA';
-  else if (lower.includes('olive')) detectedVilla = 'VILLA_OLIVE';
-  else if (lower.includes('sunset')) detectedVilla = 'VILLA_SUNSET';
-  else if (lower.includes('azure')) detectedVilla = 'VILLA_AZURE';
-  else if (lower.includes('palm')) detectedVilla = 'VILLA_PALM';
+  // 1. Mulk tespiti — MUSTERININ KENDI mulk adlarina gore.
+  // Burada bes uydurma villanin ('bella', 'olive', 'azure'...) adi sabit
+  // araniyordu; gercek mulkler hicbir zaman eslesmiyor, mesaj her zaman
+  // VILLA_AZURE'a atanıyordu.
+  const mulkler = Object.entries(appData.villas || {});
+  let detectedVilla = mulkler.length ? mulkler[0][0] : '';
+  for (const [anahtar, v] of mulkler) {
+    const ad = ((v && v.name) || '').toLowerCase();
+    // Ad icindeki en ayirt edici kelime (3 harften uzun ilk kelime)
+    const kelime = ad.split(/\s+/).find(w => w.length > 3);
+    if ((ad && lower.includes(ad)) ||
+        (kelime && lower.includes(kelime)) ||
+        lower.includes(String(anahtar).toLowerCase())) {
+      detectedVilla = anahtar;
+      break;
+    }
+  }
 
   // 2. Detect Guest Name
   let detectedGuest = '';
@@ -7673,7 +8020,14 @@ function parseWhatsAppMessage() {
       detectedGuest = waHeaderMatch[1].trim();
     } else {
       const wordsMatch = text.match(/\b([A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+))\b/);
-      if (wordsMatch && !['Villa Azure Bay', 'Villa Olive Garden', 'Villa Bella Vista', 'Villa Sunset Horizon', 'Villa Palm Breeze', 'WhatsApp', 'Airbnb', 'Booking', 'Selamlar', 'Merhaba'].includes(wordsMatch[1])) {
+      // Misafir adi sanilmamasi gereken kelimeler: musterinin KENDI mulk
+      // adlari + kanal ve selamlama sozcukleri. Burada bes uydurma villa adi
+      // sabit yaziliydi; gercek mulk adlari ise listede olmadigi icin misafir
+      // adi olarak algilanabiliyordu.
+      const mulkAdlari = Object.values((typeof appData !== 'undefined' && appData.villas) || {})
+        .map(v => v && v.name).filter(Boolean);
+      const yasakli = mulkAdlari.concat(['WhatsApp', 'Airbnb', 'Booking', 'Selamlar', 'Merhaba', 'İyi Günler']);
+      if (wordsMatch && !yasakli.includes(wordsMatch[1])) {
         detectedGuest = wordsMatch[1];
       }
     }
@@ -7979,13 +8333,18 @@ function renderLeadAnalytics() {
   if (villaBox) {
     villaBox.innerHTML = '';
     const totalVCounts = totalLeads || 1;
-    const villaMeta = [
-      { key: 'AZURE', name: 'Villa Azure Bay', color: '#3B82F6' },
-      { key: 'OLIVE', name: 'Villa Olive Garden', color: '#10B981' },
-      { key: 'BELLA', name: 'Villa Bella Vista', color: '#F59E0B' },
-      { key: 'SUNSET', name: 'Villa Sunset Horizon', color: '#EC4899' },
-      { key: 'PALM', name: 'Villa Palm Breeze', color: '#8B5CF6' }
-    ];
+    // Musterinin kendi mulkleri. Bes uydurma villa sabit yaziliydi ve talep
+    // grafigi herkese ayni bes ismi gosteriyordu.
+    const RENKLER = ['#3B82F6', '#10B981', '#F59E0B', '#EC4899', '#8B5CF6', '#F97316', '#14B8A6'];
+    const villaMeta = Object.keys(appData.villas || {}).map((k, i) => ({
+      key: k,
+      name: (appData.villas[k] && appData.villas[k].name) || k,
+      color: RENKLER[i % RENKLER.length]
+    }));
+
+    if (villaMeta.length === 0) {
+      villaBox.innerHTML = '<div style="font-size:12px; color:var(--text-muted);">Henüz mülk eklenmemiş.</div>';
+    }
 
     villaMeta.forEach(v => {
       const cnt = villaCounts[v.key] || 0;
@@ -8014,9 +8373,21 @@ function renderLeadAnalytics() {
       <div style="margin-bottom: 8px;">
         • <strong>Kaçan Satış Aksiyonu:</strong> Kaybedilen taleplerin en büyük sebebi <em>"Tarih Dolu"</em> ve <em>"Fiyat Yüksek"</em>. İstenen tarih doluysa misafire hemen yakın boş gap gecelerini alternatif olarak sunun.
       </div>
-      <div>
-        • <strong>Villa Azure Bay & Villa Olive Garden Talebi:</strong> Taleplerin %60'ından fazlası Villa Azure Bay ve Villa Olive Garden için geliyor. Bu iki villada taban fiyatı savunup, Villa Sunset Horizon ve Villa Bella Vista için hafta içi özel paket teklifleri vererek portföy dengesini sağlayabilirsiniz.
-      </div>
+      ${(() => {
+        // Bu cumle sabitti: "Taleplerin %60'indan fazlasi Villa Azure Bay ve
+        // Villa Olive Garden icin geliyor" — hicbir hesaba dayanmiyordu.
+        const siralı = Object.entries(villaCounts)
+          .filter(([, n]) => n > 0)
+          .sort((a, b) => b[1] - a[1]);
+        if (!siralı.length) return '';
+        const ad = k => escapeHtml((appData.villas && appData.villas[k] && appData.villas[k].name) || k);
+        const top = siralı[0];
+        const pay = totalLeads > 0 ? Math.round((top[1] / totalLeads) * 100) : 0;
+        const zayif = siralı.length > 1 ? siralı[siralı.length - 1] : null;
+        return `<div>
+        • <strong>Talep Yoğunluğu:</strong> Taleplerin %${pay}'i <strong>${ad(top[0])}</strong> için geliyor (${top[1]} talep). Bu mülkte taban fiyatı savunun${zayif ? `; en az talep gören <strong>${ad(zayif[0])}</strong> için hafta içi paket teklifi deneyin` : ''}.
+      </div>`;
+      })()}
     `;
   }
 }
@@ -8094,7 +8465,7 @@ function getMonthlyKpiDataset() {
     let revpar = 0;
     let margin = 0;
     let target = (appData.targets && appData.targets[m]) || 0;
-    const monthName = ALL_MONTH_NAMES[m] || m;
+    const monthName = getPeriodDisplayName(m);
 
     if (hasStatic) {
       const mf = null;   // demo veri seti kaldirildi
@@ -8271,7 +8642,7 @@ function renderMonthlyKpiTracker() {
       const barHeightPx = Math.round((pctOfMax / 100) * 95);
 
       const parts = d.key.split('-');
-      const shortMonth = ALL_MONTH_NAMES[d.key] ? ALL_MONTH_NAMES[d.key].split(' ')[0].substring(0, 3) : parts[1];
+      const shortMonth = getPeriodDisplayName(d.key) ? getPeriodDisplayName(d.key).split(' ')[0].substring(0, 3) : parts[1];
       const shortYear = parts[0].substring(2);
       const isCurrentFilter = (currentFilter.period === d.key);
 
@@ -8612,8 +8983,8 @@ function renderAirbnbAuditRadar() {
   tbody.innerHTML = '';
 
   const listings = (appData.airbnbListings && Object.keys(appData.airbnbListings).length > 0) 
-    ? appData.airbnbListings 
-    : DEFAULT_AIRBNB_PROPERTIES;
+    ? appData.airbnbListings
+    : {};
 
   let totalWeightedScore = 0;
   let totalReviews = 0;
@@ -8684,7 +9055,7 @@ function syncLiveAirbnbData() {
   setTimeout(() => {
     // Save live synced data
     if (!appData.airbnbListings) {
-      appData.airbnbListings = JSON.parse(JSON.stringify(DEFAULT_AIRBNB_PROPERTIES));
+      appData.airbnbListings = {};  // DEFAULT_AIRBNB_PROPERTIES demo temizliginde silindi (ReferenceError)
     }
     const nowStr = 'Şimdi (' + new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) + ')';
     Object.keys(appData.airbnbListings).forEach(k => {
@@ -8735,7 +9106,9 @@ function isCampaignInFilter(camp) {
 
 function renderMarketingModule() {
   if (!appData.marketingCampaigns) {
-    appData.marketingCampaigns = JSON.parse(JSON.stringify(DEFAULT_MARKETING_CAMPAIGNS));
+    // DEFAULT_MARKETING_CAMPAIGNS demo temizliginde silindi; bu satir
+    // ReferenceError firlatiyordu. Bos liste dogru davranis.
+    appData.marketingCampaigns = [];
   }
 
   const campaigns = appData.marketingCampaigns.filter(isCampaignInFilter);
@@ -9244,7 +9617,7 @@ function renderOtaRankingAndCoverRadar() {
 
   const listings = (appData.airbnbListings && Object.keys(appData.airbnbListings).length > 0)
     ? appData.airbnbListings
-    : DEFAULT_AIRBNB_PROPERTIES;
+    : {};
 
   let firstPageCount = 0;
   let totalCtrSum = 0;
@@ -9348,9 +9721,9 @@ function renderCoverAbTestLab(villaKey = 'AZURE') {
 
   const listings = (appData.airbnbListings && Object.keys(appData.airbnbListings).length > 0)
     ? appData.airbnbListings
-    : DEFAULT_AIRBNB_PROPERTIES;
+    : {};
 
-  const item = listings[villaKey] || listings['AZURE'];
+  const item = listings[villaKey];
   if (!item) return;
 
   const currentCtr = (Number(item.coverCtr) || 4.2).toFixed(1);
@@ -9432,125 +9805,88 @@ function setOtaPricingStrategy(strategyMode) {
 
 function saveOperatorNote(villaKey) {
   if (!appData.airbnbListings) {
-    appData.airbnbListings = JSON.parse(JSON.stringify(DEFAULT_AIRBNB_PROPERTIES));
+    appData.airbnbListings = {};  // DEFAULT_AIRBNB_PROPERTIES demo temizliginde silindi (ReferenceError)
   }
   const textarea = document.getElementById('opNote_' + villaKey);
   if (!textarea) return;
 
   const noteText = textarea.value.trim();
   if (!appData.airbnbListings[villaKey]) {
-    appData.airbnbListings[villaKey] = { ...DEFAULT_AIRBNB_PROPERTIES[villaKey] };
+    appData.airbnbListings[villaKey] = {};
   }
   appData.airbnbListings[villaKey].operatorNote = noteText;
   saveAppData();
-  alert('✅ ' + (DEFAULT_AIRBNB_PROPERTIES[villaKey]?.name || villaKey) + ' için stratejik operatör notu kaydedildi!');
+  const mAd = (appData.villas && appData.villas[villaKey] && appData.villas[villaKey].name) || villaKey;
+  if (typeof showToast === 'function') showToast(mAd + ' için operatör notu kaydedildi.', 'success');
 }
 
 function setCriticUrlPreset(villaKey) {
-  const item = DEFAULT_AIRBNB_PROPERTIES[villaKey];
-  if (!item) return;
-
-  const input = document.getElementById('criticUrlInput');
-  if (input) {
-    input.value = item.url;
+  // DEFAULT_AIRBNB_PROPERTIES demo temizliginde silinmisti; bu fonksiyon
+  // tiklandiginda ReferenceError firlatiyordu. Artik musterinin kendi
+  // mulkunun ilan baglantisini kullanir.
+  const v = (appData.villas || {})[villaKey];
+  if (!v || !v.url) {
+    if (typeof showToast === 'function') showToast('Bu mülk için kayıtlı bir ilan bağlantısı yok.', 'info');
+    return;
   }
-  runAiListingCritic(item.url, villaKey);
+  const input = document.getElementById('criticUrlInput');
+  if (input) input.value = v.url;
+  runAiListingCritic(v.url, villaKey);
+}
+
+/** Ilan bagi olan mulkler icin hizli secim butonlari. */
+function renderCriticPresets() {
+  const kap = document.getElementById('criticPresetList');
+  if (!kap) return;
+  const kayitlar = Object.entries(appData.villas || {}).filter(([, v]) => v && v.url);
+  if (!kayitlar.length) {
+    kap.innerHTML = '<span style="font-size:11px; color:var(--text-muted);">İlan bağlantısı kayıtlı mülk yok. Mülk ekranından ekleyebilirsiniz.</span>';
+    return;
+  }
+  kap.innerHTML = kayitlar.map(([k, v]) =>
+    `<button type="button" class="btn btn-secondary btn-sm" data-critic-villa="${escapeHtml(k)}">🏡 ${escapeHtml(v.name || k)}</button>`
+  ).join('');
+  kap.querySelectorAll('[data-critic-villa]').forEach(b => {
+    b.addEventListener('click', () => setCriticUrlPreset(b.getAttribute('data-critic-villa')));
+  });
 }
 
 function runAiListingCritic(inputUrl = null, explicitKey = null) {
-  const urlField = document.getElementById('criticUrlInput');
-  const url = inputUrl || (urlField ? urlField.value.trim() : '');
-  const container = document.getElementById('criticResultsContainer');
+  // BU FONKSIYON ANALIZ UYDURUYORDU.
+  //
+  // Girilen HERHANGI bir URL icin sabit bir skor (79/100) ve sabit bir arama
+  // sirasi ("Sayfa 2 / #14") yaziyordu. Ilan sayfasina hicbir zaman erisilmiyor,
+  // hicbir olcum yapilmiyordu; bes uydurma villadan biriyle eslesirse onun
+  // sabit skorunu, eslesmezse 79'u gosteriyordu. Musteri bunu kendi ilaninin
+  // gercek performansi saniyordu.
+  //
+  // Gercek ilan analizi icin OTA tarafindan saglanan bir veri kaynagi gerekir;
+  // sistemde boyle bir baglanti yok. Uydurma skor gostermektense durumu
+  // acikca soyluyoruz.
+  const urlField = document.getElementById("criticUrlInput");
+  const url = inputUrl || (urlField ? urlField.value.trim() : "");
+  const container = document.getElementById("criticResultsContainer");
   if (!container) return;
 
   if (!url) {
-    alert('Lütfen eleştirilmesini istediğiniz Airbnb veya OTA ilan linkini girin.');
+    if (typeof showToast === "function") showToast("Önce ilan bağlantısını girin.", "info");
     return;
   }
 
-  // Detect which villa or generic
-  let targetKey = explicitKey;
-  if (!targetKey) {
-    const lower = url.toLowerCase();
-    if (lower.includes('bella')) targetKey = 'BELLA';
-    else if (lower.includes('azure')) targetKey = 'AZURE';
-    else if (lower.includes('olive')) targetKey = 'OLIVE';
-    else if (lower.includes('sunset')) targetKey = 'SUNSET';
-    else if (lower.includes('palm')) targetKey = 'PALM';
-  }
-
-  const item = targetKey ? (DEFAULT_AIRBNB_PROPERTIES[targetKey] || DEFAULT_AIRBNB_PROPERTIES['AZURE']) : null;
-
-  // Build report data
-  const villaName = item ? item.name : 'Analiz Edilen Dış / Rakip İlan';
-  const score = item ? item.strScore : 79;
-  const rank = item ? item.searchRank : 'Sayfa 2 / #14 (Algoritma Denetimi)';
-  const currentTitle = item ? item.title : 'Kaş Kiralık Lüks Villa & Özel Havuzlu Bahçeli Ev';
-  const optTitle = item ? item.aiOptimizedTitle : 'Kaş | Özel Havuzlu, Jakuzili & Barbekülü Lüks Villa Evi Kaçamağı';
-  const hookCopy = item ? item.aiHookCopy : 'Karlar altında sıcacık bir şömine keyfi, izole bir bahçe ve unutulmaz bir dağ havası... Bu özel villa, sevdiklerinizle huzurlu bir kış kaçamağı yaşamanız için hazırlandı.';
-  const roasts = item ? item.roasts : [
-    '🚨 Başlıkta çok fazla genel kelime var; arama niyetli "jakuzi", "şömine", "özel bahçe" gibi yüksek dönüşümlü kelimeler ilk 30 karakterde harcanmış.',
-    '🚨 Kapak fotoğrafı aydınlatması yetersiz; villalarında gün batımı sıcak şömine ışığı kullanılmadığında tıklama oranı (CTR) %40 düşer.',
-    'İlan açıklamasında ilk 3 cümle kanca (The Hook) kurgusundan yoksun; misafirler okumayı bırakıp geri çıkıyor.'
-  ];
-  const actions = item ? item.emergencyFixes : [
-    'Başlığı STR formülüne göre güncelleyin: [Bölge] + [Villa Adı] + [Jakuzi & Şömine] + [Hedef Kitle].',
-    'Kapak görselini akşam şömineli sıcak ışık fotoğrafı ile değiştirin.',
-    'Anında Rezervasyon (Instant Book) özelliğini açın ve minimum konaklamayı 2 geceye sabitleyin.'
-  ];
-
-  container.style.display = 'block';
-  container.innerHTML = `
-    <div class="critic-results-card">
-      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 14px;">
-        <div>
-          <span class="badge badge-purple" style="font-size: 11px;">AI STR Listing Audit & Roast Report</span>
-          <h3 style="margin: 6px 0 0 0; color: #fff; font-size: 18px; font-weight: 800;">${villaName}</h3>
-          <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">${url}</div>
-        </div>
-        <div style="text-align: right;">
-          <div style="font-size: 11px; color: var(--text-muted);">STR Uzmanı Genel Puanı:</div>
-          <div style="font-size: 28px; font-weight: 900; color: ${score >= 90 ? '#34D399' : '#FBBF24'};">${score} <span style="font-size: 14px; color: var(--text-muted);">/ 100</span></div>
-          <span class="badge ${score >= 90 ? 'badge-green' : 'badge-amber'}">${rank}</span>
-        </div>
-      </div>
-
-      <!-- 1. Acımasız Eleştiriler (Sıralama ve Dönüşüm Katilleri) -->
-      <div class="critic-section-title" style="color: #F87171;">
-        <span>🚨</span> ACIMASIZ ELEŞTİRİLER (SIRALAMA & DÖNÜŞÜM KATİLLERİ)
-      </div>
-      ${roasts.map(r => `<div class="roast-item"><strong>• Hata Tespiti:</strong> ${r}</div>`).join('')}
-
-      <!-- 2. İlk 24 Saatte Yapılması Gereken 3 Acil Düzeltme -->
-      <div class="critic-section-title" style="color: #34D399; margin-top: 18px;">
-        <span>⚡</span> İLK 24 SAATTE YAPILMASI GEREKEN 3 ACİL AKSİYON
-      </div>
-      ${actions.map((a, i) => `<div class="action-item"><strong>${i+1}. Adım:</strong> ${a}</div>`).join('')}
-
-      <!-- 3. AI Tarafından Yeniden Yazılan Başlık & Giriş Paragrafı -->
-      <div class="critic-section-title" style="color: #93C5FD; margin-top: 18px;">
-        <span>✍️</span> AI TARAFINDAN YENİDEN YAZILAN YÜKSEK DÖNÜŞÜMLÜ BAŞLIK & KANCA (THE HOOK)
-      </div>
-      <div style="background: rgba(255,255,255,0.03); padding: 14px; border-radius: 8px; border: 1px dashed rgba(147, 197, 253, 0.4);">
-        <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Optimize Edilmiş Airbnb Başlığı:</div>
-        <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 4px 0 12px 0;">
-          <strong style="color: #F8FAFC; font-size: 13px;">"${optTitle}"</strong>
-          <button type="button" class="btn btn-secondary btn-sm" onclick="copyAiTitle('${optTitle}')" style="border-color: #60A5FA; color: #93C5FD; font-size: 11px;">
-            📋 Başlığı Kopyala
-          </button>
-        </div>
-
-        <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Açıklamanın İlk 3 Satırı (Duygusal Kanca - The Hook):</div>
-        <p style="font-size: 12px; color: #E2E8F0; line-height: 1.5; margin: 4px 0 0 0; font-style: italic;">
-          "${hookCopy}"
-        </p>
-      </div>
-    </div>
-  `;
-
-  if (container && typeof container.scrollIntoView === 'function') {
-    container.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
+  container.style.display = "block";
+  container.innerHTML =
+    '<div style="background: rgba(0,0,0,0.3); border: 1px dashed rgba(168, 85, 247, 0.4); border-radius: 10px; padding: 16px;">' +
+      '<strong style="color:#D8B4FE; font-size:14px;">İlan analizi henüz bağlı değil</strong>' +
+      '<p style="font-size:12px; color:#CBD5E1; line-height:1.5; margin:8px 0 0;">' +
+        'Bu bölüm ilan sayfanızı otomatik puanlayabilmek için OTA tarafından sağlanan bir ' +
+        'veri bağlantısı gerektiriyor; sistemde böyle bir bağlantı henüz yok. Bu yüzden ' +
+        'burada <strong>puan veya sıralama gösterilmiyor</strong> — ölçülmemiş bir rakamı ' +
+        'ölçülmüş gibi sunmuyoruz.' +
+      '</p>' +
+      '<p style="font-size:11px; color:#94A3B8; margin:10px 0 0; word-break:break-all;">' +
+        'Girilen bağlantı: ' + escapeHtml(url) +
+      '</p>' +
+    '</div>';
 }
 
 // =============================================================
@@ -9594,40 +9930,10 @@ function detectGapNights() {
     }
   });
 
-  if (gaps.length < 3) {
-    gaps.push(
-      {
-        villaKey: 'BELLA',
-        villaName: 'Villa Bella Vista',
-        checkIn: '2026-10-14',
-        checkOut: '2026-10-16',
-        nights: 2,
-        regularPrice: 28000,
-        discountPrice: 22400,
-        discountPct: 20
-      },
-      {
-        villaKey: 'AZURE',
-        villaName: 'Villa Azure Bay',
-        checkIn: '2026-10-21',
-        checkOut: '2026-10-23',
-        nights: 2,
-        regularPrice: 36000,
-        discountPrice: 28800,
-        discountPct: 20
-      },
-      {
-        villaKey: 'SUNSET',
-        villaName: 'Villa Sunset Horizon',
-        checkIn: '2026-11-03',
-        checkOut: '2026-11-05',
-        nights: 2,
-        regularPrice: 24000,
-        discountPrice: 19200,
-        discountPct: 20
-      }
-    );
-  }
+  // Gercek bosluk yoksa UYDURULMAZ. Burada, gaps.length < 3 ise ucu birden
+  // sahte olarak eklenirdi: olmayan villalar (Bella Vista, Azure Bay, Sunset
+  // Horizon), uydurma tarihler ve "%20 indirim" fiyatlari. Yeni musteri
+  // sahip olmadigi villalar icin firsat listesi goruyordu.
 
   return gaps;
 }
@@ -9726,8 +10032,8 @@ function selectClosingScenario(scenarioKey) {
 function updateClosingScriptPreview() {
   const guestName = (document.getElementById('scriptGuestName')?.value || 'Ahmet Bey').trim();
   const vSelect = document.getElementById('scriptVillaSelect');
-  const vKey = vSelect ? vSelect.value : 'AZURE';
-  const vName = (appData.villas && appData.villas[vKey]?.name) ? appData.villas[vKey].name : 'Villa Azure Bay';
+  const vKey = vSelect ? vSelect.value : Object.keys(appData.villas || {})[0];
+  const vName = (appData.villas && appData.villas[vKey]?.name) ? appData.villas[vKey].name : (vKey || 'mülkünüz');
   const dates = (document.getElementById('scriptDates')?.value || 'Bu Hafta Sonu / 2 Gece').trim();
   const price = (document.getElementById('scriptPrice')?.value || '₺28.000').trim();
 
@@ -9882,6 +10188,80 @@ function sendBroadcastLoyaltyMessage() {
 }
 
 // -------------------------------------------------------------
+/**
+ * Gidişat sekmesindeki üç stratejik kutu.
+ *
+ * index.html'de SABIT metin olarak duruyorlardi: "komisyon (75.519 TL) ve
+ * temizlik (47.000 TL) toplam 122.500 TL yuttu", "Villa Sunset Horizon fiyat
+ * baskisi", "Villa Azure Bay portfoy lideri". Hicbiri hesaplanmiyordu; bos bir
+ * hesapta bile ayni rakamlarla goruntuleniyordu.
+ */
+function renderTrajectoryInsights() {
+  if (typeof document === 'undefined') return;
+  const tehlike = document.getElementById('trajDangerText');
+  const anomali = document.getElementById('trajAnomalyText');
+  const firsat = document.getElementById('trajOpportunityText');
+  if (!tehlike && !anomali && !firsat) return;
+
+  const tl = n => Math.round(Number(n) || 0).toLocaleString('tr-TR');
+  const bk = (appData.bookings || []).filter(b => b.status !== 'CANCELLED' && isBookingInFilter(b));
+  const paylar = bk.map(b => ({ b, p: getBookingFilterShare(b) }));
+  const ciro = paylar.reduce((a, x) => a + (Number(x.b.gross) || 0) * x.p.ratio, 0);
+  const komisyon = paylar.reduce((a, x) => a + (Number(x.b.otaCommission) || 0) * x.p.ratio, 0);
+  const temizlik = paylar.reduce((a, x) => a + (Number(x.b.cleaningFee) || 0) * x.p.ratio, 0);
+  const donem = getPeriodDisplayName(currentFilter.period);
+
+  if (tehlike) {
+    if (komisyon + temizlik <= 0) {
+      tehlike.textContent = bk.length
+        ? 'Bu dönemde OTA komisyonu veya temizlik maliyeti kaydedilmemiş.'
+        : 'Bu dönemde rezervasyon kaydı yok.';
+    } else {
+      const oran = ciro > 0 ? ((komisyon + temizlik) / ciro) * 100 : null;
+      tehlike.innerHTML = `<strong>Komisyon & Temizlik Sızıntısı:</strong> ${donem} döneminde komisyon ${tl(komisyon)} TL, temizlik ${tl(temizlik)} TL — toplam <strong>${tl(komisyon + temizlik)} TL</strong>${oran !== null ? ` (cironun %${oran.toFixed(1)}'i)` : ''}. Doğrudan rezervasyon payını artırmak bu kalemi doğrudan düşürür.`;
+    }
+  }
+
+  // Mulk bazinda gecelik fiyat karsilastirmasi
+  const mulk = {};
+  paylar.forEach(({ b, p }) => {
+    const k = b.villa || b.propertyId || '—';
+    if (!mulk[k]) mulk[k] = { ciro: 0, gece: 0 };
+    mulk[k].ciro += (Number(b.gross) || 0) * p.ratio;
+    mulk[k].gece += p.nights;
+  });
+  const liste = Object.entries(mulk)
+    .filter(([, v]) => v.gece > 0)
+    .map(([k, v]) => ({
+      ad: (appData.villas && appData.villas[k] && appData.villas[k].name) || k,
+      adr: v.ciro / v.gece, gece: v.gece, ciro: v.ciro
+    }))
+    .sort((a, b) => b.adr - a.adr);
+
+  if (anomali) {
+    if (liste.length < 2) {
+      anomali.textContent = 'Karşılaştırma için bu dönemde en az iki mülkte satış olmalı.';
+    } else {
+      const ort = liste.reduce((a, v) => a + v.adr, 0) / liste.length;
+      const z = liste[liste.length - 1];
+      anomali.innerHTML = z.adr < ort
+        ? `<strong>${escapeHtml(z.ad)} Fiyat Baskısı:</strong> ${z.gece} gece satıldı ama gecelik ${tl(z.adr)} TL'de kaldı; portföy ortalaması ${tl(ort)} TL. Doluluk korunuyorsa taban fiyat yükseltilebilir.`
+        : 'Bu dönemde mülkler arasında belirgin bir fiyat anomalisi yok.';
+    }
+  }
+
+  if (firsat) {
+    if (!liste.length) {
+      firsat.textContent = 'Bu dönemde satış kaydı yok.';
+    } else {
+      const e = liste[0];
+      const pay = ciro > 0 ? ((e.ciro / ciro) * 100).toFixed(1) : null;
+      firsat.innerHTML = `<strong>${escapeHtml(e.ad)} Öne Çıkıyor:</strong> ${tl(e.adr)} TL/gece ile en yüksek gecelik fiyat${pay ? `, dönem cirosunun %${pay}'i` : ''}. Bu mülkte taban fiyatı koruyup erken rezervasyon açmak en yüksek getiriyi sağlar.`;
+    }
+  }
+}
+
+// -------------------------------------------------------------
 // 4. ❄️ SEZONLUK & ÖZEL DÖNEM FIRSAT RADARI
 // -------------------------------------------------------------
 function renderSeasonalEventRadar() {
@@ -9889,56 +10269,78 @@ function renderSeasonalEventRadar() {
   if (!container) return;
   container.innerHTML = '';
 
-  const today = new Date('2026-09-09');
-  const events = [
-    {
-      id: 'EV-WINTER-OPEN',
-      icon: '❄️',
-      name: 'Kar Sezonu Açılışı & İlk Kar',
-      dates: '01 - 15 Aralık 2026',
-      startDate: new Date('2026-12-01'),
-      advice: 'İlk Kar Kampanyası: Instagram Reels bütçesini %20 artırın, şömine görselleriyle "Kış Başlamadan Yerini Ayırt" erken rezervasyon reklamı başlatın.'
-    },
-    {
-      id: 'EV-NEWYEAR',
-      icon: '🎄',
-      name: 'Yılbaşı Tatili (3 Gece)',
-      dates: '31 Aralık 2026 - 03 Ocak 2027',
-      startDate: new Date('2026-12-31'),
-      advice: 'Villa Azure Bay kapatıldı. Kalan 4 villa için minimum 3 gece kuralı uygulayın. Fiyat kırmak yerine "Yılbaşı Barbekü Sepeti & Akustik Müzik" paketiyle satın.'
-    },
-    {
-      id: 'EV-SEMESTER',
-      icon: '🎒',
-      name: 'Sömestr Yarıyıl Tatili',
-      dates: '22 Ocak - 07 Şubat 2027',
-      startDate: new Date('2027-01-22'),
-      advice: 'Aile segmenti için Villa Olive Garden ve Villa Palm Breeze gibi yüksek yatak kapasiteli villaları öne çıkaran Google Ads "Akdeniz tatil villası kiralık" kampanyasını açın.'
-    },
-    {
-      id: 'EV-VALENTINE',
-      icon: '💖',
-      name: '14 Şubat Sevgililer Günü',
-      dates: '12 - 15 Şubat 2027',
-      startDate: new Date('2027-02-12'),
-      advice: 'Çiftler için Villa Bella Vista ve Villa Sunset Horizon villalarında jakuzi, şömine, gül yaprakları ve fondü içeren "Romantik Kış Kaçamağı" paketi oluşturun.'
-    },
-    {
-      id: 'EV-SPRING',
-      icon: '🌸',
-      name: 'Ramazan Bayramı & Bahar Kaçamağı',
-      dates: '20 - 25 Mart 2027',
-      startDate: new Date('2027-03-20'),
-      advice: 'Doğa yürüyüşü, açık hava barbeküsü ve doğanın uyanışı temalı Meta reklamları planlayın.'
-    }
+  // Bu bolum bastan asagi sabitti:
+  //   - "bugun" = 2026-09-09 olarak yaziliydi, geri sayim hep ayni cikiyordu
+  //   - etkinlik tarihleri 2026/2027'ye sabitti, 2028'de liste olurdu
+  //   - doluluk rozetleri gercek rezervasyonlara BAKMIYORDU: her zaman
+  //     "Villa Azure Bay DOLU, diger 4 villa BOS" yaziyordu; ustelik o
+  //     villalar musterinin degildi
+  //   - strateji metinleri olmayan villalarin adini veriyordu
+  const bugun = new Date(getTodayStr() + 'T00:00:00');
+
+  // Etkinlikler yila gore uretilir; gecmis kalanlar bir sonraki yila kayar.
+  function tarih(yil, ay, gun) { return new Date(Date.UTC(yil, ay - 1, gun)); }
+  const y = bugun.getUTCFullYear ? bugun.getFullYear() : new Date().getFullYear();
+
+  const sablonlar = [
+    { id: 'EV-WINTER-OPEN', icon: '❄️', name: 'Kar Sezonu Açılışı', ay: 12, gun: 1, bitAy: 12, bitGun: 15,
+      advice: 'Erken rezervasyon kampanyası: sosyal medya bütçesini artırın, şömine ve kış görselleriyle "yerini şimdiden ayırt" mesajını öne çıkarın.' },
+    { id: 'EV-NEWYEAR', icon: '🎄', name: 'Yılbaşı Tatili', ay: 12, gun: 31, bitAy: 1, bitGun: 3,
+      advice: 'Minimum konaklama kuralı uygulayın. Fiyat kırmak yerine paket (barbekü sepeti, ikram, müzik) ile değer katın.' },
+    { id: 'EV-SEMESTER', icon: '🎒', name: 'Sömestr Yarıyıl Tatili', ay: 1, gun: 22, bitAy: 2, bitGun: 7,
+      advice: 'Aile segmentine yönelin: yüksek yatak kapasiteli mülkleri öne çıkaran arama reklamları planlayın.' },
+    { id: 'EV-VALENTINE', icon: '💖', name: 'Sevgililer Günü', ay: 2, gun: 12, bitAy: 2, bitGun: 15,
+      advice: 'Çiftlere yönelik kısa konaklama paketi kurgulayın: jakuzi, şömine, özel akşam yemeği.' },
+    { id: 'EV-SPRING', icon: '🌸', name: 'Bahar Kaçamağı', ay: 3, gun: 20, bitAy: 3, bitGun: 25,
+      advice: 'Doğa yürüyüşü, açık hava barbeküsü ve bahar teması üzerinden sosyal medya reklamları planlayın.' }
   ];
 
-  events.forEach(ev => {
-    const diffDays = Math.max(0, Math.round((ev.startDate - today) / (1000 * 60 * 60 * 24)));
+  const AYLAR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+                 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+  const iki = n => String(n).padStart(2, '0');
 
-    // Check availability
-    const isZirveBooked = (ev.id === 'EV-NEWYEAR');
-    const fullCount = isZirveBooked ? 1 : 0;
+  const events = sablonlar.map(t => {
+    let yil = y;
+    let bas = tarih(yil, t.ay, t.gun);
+    // Gecmisse bir sonraki yila kaydir
+    if (bas < bugun) { yil = y + 1; bas = tarih(yil, t.ay, t.gun); }
+    const bitYil = t.bitAy < t.ay ? yil + 1 : yil;
+    const bit = tarih(bitYil, t.bitAy, t.bitGun);
+    return {
+      ...t,
+      startDate: bas,
+      endDate: bit,
+      basStr: `${yil}-${iki(t.ay)}-${iki(t.gun)}`,
+      bitStr: `${bitYil}-${iki(t.bitAy)}-${iki(t.bitGun)}`,
+      dates: `${t.gun} ${AYLAR[t.ay - 1]} ${yil} – ${t.bitGun} ${AYLAR[t.bitAy - 1]} ${bitYil}`
+    };
+  }).sort((a, b) => a.startDate - b.startDate);
+
+  const villaKeys = Object.keys(appData.villas || {});
+  if (villaKeys.length === 0) {
+    container.innerHTML = '<div style="color:var(--text-muted); padding:16px; text-align:center;">Sezon fırsatlarını görebilmek için önce mülk ekleyin.</div>';
+    return;
+  }
+
+  // Bir mulk, verilen aralikta gercekten dolu mu? (Gerçek rezervasyonlardan.)
+  function doluMu(vKey, basStr, bitStr) {
+    return (appData.bookings || []).some(b => {
+      if (b.status === 'CANCELLED') return false;
+      const eslesme = b.villa === vKey || b.propertyId === vKey ||
+        (appData.villas[vKey] && b.propertyId === appData.villas[vKey].id);
+      if (!eslesme) return false;
+      const ci = b.checkIn || '', co = b.checkOut || '';
+      return ci && co && ci <= bitStr && co > basStr;
+    });
+  }
+
+  events.forEach(ev => {
+    const diffDays = Math.max(0, Math.round((ev.startDate - bugun) / (1000 * 60 * 60 * 24)));
+    const durumlar = villaKeys.map(k => ({
+      ad: (appData.villas[k] && appData.villas[k].name) || k,
+      dolu: doluMu(k, ev.basStr, ev.bitStr)
+    }));
+    const doluSayi = durumlar.filter(d => d.dolu).length;
 
     const card = document.createElement('div');
     card.className = 'seasonal-event-card';
@@ -9947,26 +10349,22 @@ function renderSeasonalEventRadar() {
         <div class="seasonal-card-header">
           <div>
             <div style="font-size:15px; font-weight:800; color:#F8FAFC; display:flex; align-items:center; gap:6px;">
-              <span>${ev.icon}</span> ${ev.name}
+              <span>${ev.icon}</span> ${escapeHtml(ev.name)}
             </div>
-            <div style="font-size:11px; color:#F0ABFC; margin-top:3px; font-weight:600;">${ev.dates}</div>
+            <div style="font-size:11px; color:#F0ABFC; margin-top:3px; font-weight:600;">${escapeHtml(ev.dates)}</div>
           </div>
           <span class="event-countdown-badge">⏳ ${diffDays} Gün Kaldı</span>
         </div>
 
         <div style="margin:10px 0;">
-          <div style="font-size:11px; color:var(--text-muted); margin-bottom:4px;">5 Villa Durumu (${fullCount}/5 Dolu):</div>
+          <div style="font-size:11px; color:var(--text-muted); margin-bottom:4px;">Mülk Durumu (${doluSayi}/${durumlar.length} dolu):</div>
           <div>
-            <span class="villa-occupancy-pill ${isZirveBooked ? 'full' : 'empty'}">Villa Azure Bay: ${isZirveBooked ? 'DOLU ✅' : 'BOŞ ⚠️'}</span>
-            <span class="villa-occupancy-pill empty">Villa Bella Vista: BOŞ ⚠️</span>
-            <span class="villa-occupancy-pill empty">Villa Olive Garden: BOŞ ⚠️</span>
-            <span class="villa-occupancy-pill empty">Villa Sunset Horizon: BOŞ ⚠️</span>
-            <span class="villa-occupancy-pill empty">Villa Palm Breeze: BOŞ ⚠️</span>
+            ${durumlar.map(d => `<span class="villa-occupancy-pill ${d.dolu ? 'full' : 'empty'}">${escapeHtml(d.ad)}: ${d.dolu ? 'DOLU ✅' : 'BOŞ ⚠️'}</span>`).join('')}
           </div>
         </div>
 
         <div style="font-size:11px; color:#CBD5E1; line-height:1.4; background:rgba(0,0,0,0.3); padding:8px; border-radius:6px; border:1px dashed rgba(217, 70, 239, 0.3);">
-          🎯 <strong>Strateji:</strong> ${ev.advice}
+          🎯 <strong>Strateji:</strong> ${escapeHtml(ev.advice)}
         </div>
       </div>
     `;
@@ -9983,7 +10381,8 @@ function renderInfluencerRoiLedger() {
   tbody.innerHTML = '';
 
   if (!appData.influencerCollabs) {
-    appData.influencerCollabs = JSON.parse(JSON.stringify(DEFAULT_INFLUENCER_COLLABS));
+    // DEFAULT_INFLUENCER_COLLABS demo temizliginde silindi.
+    appData.influencerCollabs = [];
   }
 
   if (appData.influencerCollabs.length === 0) {
@@ -10042,7 +10441,7 @@ function openInfluencerModal(id = null) {
       document.getElementById('infCollabId').value = item.id;
       document.getElementById('infHandle').value = item.handle || '';
       document.getElementById('infFollowers').value = item.followers || '';
-      document.getElementById('infVilla').value = item.villa || 'VILLA_AZURE';
+      document.getElementById('infVilla').value = item.villa || Object.keys(appData.villas || {})[0] || '';
       document.getElementById('infDates').value = item.dates || '';
       document.getElementById('infCost').value = item.cost || '';
       document.getElementById('infCode').value = item.code || '';
@@ -10171,22 +10570,12 @@ initSupabaseClient();
 // kaldirildiginda alan okunmaz hale geldi ama kalmaya devam etti: her ziyaretcinin
 // tarayicisinda duz metin bir sifre. Kimlik dogrulama artik yalnizca Supabase
 // Auth'tur; alan da, yazici da kaldirildi.
-const DEFAULT_SAAS_USERS = [
-  {
-    id: 'usr_ute_master',
-    username: 'lexbnb',
-    email: 'demo@lexbnb.com',
-    companyName: 'Lexbnb Luxury Portfolio',
-    managerName: 'LexBnB Host',
-    plan: 'Enterprise',
-    isDefaultDemo: true,
-    createdAt: '2026-08-01'
-  }
-];
-
+// Uygulamada yerel kullanici kaydi YOKTUR. Burada 'usr_ute_master' /
+// 'demo@lexbnb.com' adinda bir demo hesabi duruyordu; getBlankTenantData()
+// isletme adini oradan okumaya calisiyordu. Kimlik ve isletme bilgisi yalnizca
+// Supabase'den gelir.
 function getSaaSUsers() {
-  // Sabit tanimin kopyasi doner; kalici bir kullanici kaydi TUTULMAZ.
-  return JSON.parse(JSON.stringify(DEFAULT_SAAS_USERS));
+  return [];
 }
 
 // Eski surumlerin tarayiciya yazdigi duz metin sifreli kaydi temizle.
@@ -11153,7 +11542,11 @@ function updateAllVillaDropdowns() {
     'pricingVillaFilter',
     'opsVillaFilter',
     'hkVilla',
-    'guestVilla'
+    'guestVilla',
+    // Bu ikisi listede yoktu: markup'taki bes uydurma villa hicbir zaman
+    // yenilenmiyor, musteri kendi mulklerini burada goremiyordu.
+    'rezVillaFilter',
+    'waParsedVilla'
   ];
 
   dropdownIds.forEach(selectId => {
@@ -11163,11 +11556,24 @@ function updateAllVillaDropdowns() {
     const currentVal = el.value;
     el.innerHTML = '';
 
-    if (selectId === 'globalVillaFilter' || selectId === 'mktVilla') {
+    // "Tüm portföy" secenegi olmasi gerekenler. expVilla ve rezVillaFilter
+    // markup'ta bu secenege sahipti ama listeye alinmadigi icin JS onlari
+    // yeniden kurarken secenek kayboluyordu.
+    const TUMU_OLANLAR = ['globalVillaFilter', 'mktVilla', 'expVilla', 'rezVillaFilter',
+                          'calendarVillaFilter', 'pricingVillaFilter', 'opsVillaFilter'];
+    if (TUMU_OLANLAR.includes(selectId)) {
       const optAll = document.createElement('option');
       optAll.value = 'ALL';
       optAll.innerText = 'Tüm Villalar / Portföy';
       el.appendChild(optAll);
+    }
+
+    if (villaKeys.length === 0) {
+      const bos = document.createElement('option');
+      bos.value = '';
+      bos.innerText = 'Henüz mülk eklenmemiş';
+      bos.disabled = true;
+      el.appendChild(bos);
     }
 
     villaKeys.forEach(vKey => {
@@ -13142,7 +13548,7 @@ function renderGuestsTab() {
 
   tbody.innerHTML = activeBookings.slice(0, 20).map(b => {
     const vName = (appData.villas && appData.villas[b.villa]?.name) || b.villa;
-    const stage = b.checkOut < '2026-09-07' ? 'POST_STAY' : (b.checkIn <= '2026-09-07' ? 'IN_HOUSE' : 'CONFIRMED');
+    const stage = b.checkOut < getTodayStr() ? 'POST_STAY' : (b.checkIn <= getTodayStr() ? 'IN_HOUSE' : 'CONFIRMED');
     const stageBadge = stage === 'IN_HOUSE'
       ? '<span class="badge badge-green">KONAKLAMADA</span>'
       : (stage === 'POST_STAY' ? '<span class="badge badge-blue">ÇIKIŞ YAPTI</span>' : '<span class="badge badge-yellow">ONAYLANDI</span>');

@@ -149,54 +149,11 @@
             <div class="filter-group">
         <label style="display: flex; align-items: center; gap: 4px;"><span>📅</span> DÖNEM / TARİH:</label>
         <select id="globalPeriodFilter" onchange="handleFilterChange()">
-          <!-- Genel & Hızlı Tarih Aralıkları -->
-          <optgroup label="🌐 GENEL & TARİH ARALIKLARI">
-            <option value="ALL">🌐 Tüm Zamanlar (Temmuz 2025 - Günümüz)</option>
-            <option value="2026-YEAR">📅 2026 Yılı Tamamı (Ocak - Aralık 2026)</option>
-            <option value="2025-YEAR">📅 2025 Yılı (Temmuz - Aralık 2025)</option>
-            <option value="CUSTOM">📆 Özel Tarih Aralığı Seç...</option>
-          </optgroup>
-
-          <!-- 2025 Yılı: Temmuz 2025'ten İtibaren Kronolojik Sırayla -->
-          <optgroup label="📆 2025 YILI (Temmuz 2025'ten İtibaren)">
-            <option value="2025-07">Temmuz 2025</option>
-            <option value="2025-08">Ağustos 2025</option>
-            <option value="2025-09">Eylül 2025</option>
-            <option value="2025-10">Ekim 2025</option>
-            <option value="2025-11">Kasım 2025</option>
-            <option value="2025-12">Aralık 2025</option>
-          </optgroup>
-
-          <!-- 2026 Yılı: Resmi Şirket Raporları & Güncel Canlı Operasyon -->
-          <optgroup label="📆 2026 YILI (Resmi Veriler & Aktif Sezon)">
-            <option value="2026-01">Ocak 2026</option>
-            <option value="2026-02">Şubat 2026</option>
-            <option value="2026-03">Mart 2026</option>
-            <option value="2026-04">Nisan 2026</option>
-            <option value="2026-05">Mayıs 2026</option>
-            <option value="2026-06">Haziran 2026</option>
-            <option value="2026-07">Temmuz 2026</option>
-            <option value="2026-08">Ağustos 2026</option>
-            <option value="2026-09" selected>Eylül 2026</option>
-            <option value="2026-10">Ekim 2026</option>
-            <option value="2026-11">Kasım 2026</option>
-            <option value="2026-12">Aralık 2026</option>
-          </optgroup>
-
-          <!-- 2027 Yılı: Gelecek Kış & Yaz Sezonları -->
-          <optgroup label="📆 2027 YILI (Gelecek Sezonlar)">
-            <option value="2027-01">Ocak 2027 (Kış Zirvesi / Sömestr ❄️)</option>
-            <option value="2027-02">Şubat 2027 (Kayak Sezonu ⛷️)</option>
-            <option value="2027-03">Mart 2027</option>
-            <option value="2027-04">Nisan 2027</option>
-            <option value="2027-05">Mayıs 2027</option>
-            <option value="2027-06">Haziran 2027</option>
-            <option value="2027-07">Temmuz 2027</option>
-            <option value="2027-08">Ağustos 2027</option>
-            <option value="2027-09">Eylül 2027</option>
-            <option value="2027-10">Ekim 2027</option>
-            <option value="2027-11">Kasım 2027</option>
-            <option value="2027-12">Aralık 2027 (Yılbaşı 2028)</option>
+          <!-- Bu liste refreshPeriodSelectors() tarafindan musterinin kendi
+               veri araligindan yeniden kurulur. Asagisi yalnizca yedektir. -->
+          <optgroup label="GENEL & TARİH ARALIKLARI">
+            <option value="ALL">Tüm Zamanlar</option>
+            <option value="CUSTOM">Özel Tarih Aralığı Seç…</option>
           </optgroup>
         </select>
       </div>
@@ -210,13 +167,8 @@
       <div class="filter-group">
         <label>PORTFÖY:</label>
         <select id="globalVillaFilter" onchange="handleFilterChange()">
-          <option value="ALL" selected>Tüm Villalar / Portföy</option>
-          <option value="VILLA_BELLA">Villa Bella Vista (6+2)</option>
-          <option value="VILLA_OLIVE">Villa Olive Garden (8)</option>
-          <option value="VILLA_SUNSET">Villa Sunset Horizon (4)</option>
-          <option value="VILLA_AZURE">Villa Azure Bay (10)</option>
-          <option value="VILLA_PALM">Villa Palm Breeze (6)</option>
-        </select>
+              <option value="ALL">Tüm Villalar / Portföy</option>
+            </select>
       </div>
     </div>
 
@@ -629,7 +581,7 @@
         <div class="ai-suggestion-chips">
           <button type="button" class="ai-chip-btn" onclick="askExecutiveAdvisor('Bu ay net kârımı nasıl %15 artırırım?')">💡 Bu ay net kârımı nasıl %15 artırırım?</button>
           <button type="button" class="ai-chip-btn" onclick="askExecutiveAdvisor('Ekim ayında doluluğu nasıl artırabilirim?')">📅 Ekim ayında doluluğu nasıl artırabilirim?</button>
-          <button type="button" class="ai-chip-btn" onclick="askExecutiveAdvisor('Villa Azure Bay villası için fiyat optimizasyonu nedir?')">🏡 Villa Azure Bay villası için fiyat optimizasyonu nedir?</button>
+          <button type="button" class="ai-chip-btn" onclick="askExecutiveAdvisor('Hangi mülkümde fiyat optimizasyonu gerekiyor?')">🏡 Hangi mülkümde fiyat optimizasyonu gerekiyor?</button>
           <button type="button" class="ai-chip-btn" onclick="askExecutiveAdvisor('Operasyonel arıza ve temizlik darboğazları nelerdir?')">🛠️ Operasyonel darboğazlar nelerdir?</button>
         </div>
 
@@ -1328,21 +1280,21 @@
             <div class="in-header">
               <span>🚨 1. EN BÜYÜK TEHLİKE / MALİYET TUZAĞI</span>
             </div>
-            <p><strong>Komisyon & Temizlik Sızıntısı:</strong> Son ayda komisyon (75.519 TL) ve temizlik (47.000 TL) toplam 122.500 TL yuttu (cironun %25'i). Eğer direkt rezervasyon payı artırılmazsa, yüksek cirolu kış aylarında aylık 150.000 TL'nin üzerinde komisyon aracı kurumlara gidecektir.</p>
+            <p id="trajDangerText">—</p>
           </div>
 
           <div class="insight-box warning">
             <div class="in-header">
               <span>⚠️ 2. DÜZELTİLMESİ GEREKEN ANOMALİ</span>
             </div>
-            <p><strong>Villa Sunset Horizon Fiyat Baskısı:</strong> Sunset villası ağustosta yüksek dolulukla çalıştı fakat ortalama gecelik fiyat tabanın altında kaldı. Taban fiyatı 5.000 TL bandına çekilerek kâra doğrudan aylık net katkı sağlanabilir.</p>
+            <p id="trajAnomalyText">—</p>
           </div>
 
           <div class="insight-box success">
             <div class="in-header">
               <span>💎 3. EN BÜYÜK FIRSAT / GELİR KALDIRACI</span>
             </div>
-            <p><strong>Villa Azure Bay & Olive Garden Erken Rezervasyonu:</strong> Azure Bay yüksek gecelik gelir savunmasıyla portföy lideridir. Yaklaşan dönem için erken rezervasyonlar taban fiyat korunarak açılmalı; özel iskele ve VIP paketlerle katma değer artırılmalıdır.</p>
+            <p id="trajOpportunityText">—</p>
           </div>
         </div>
       </section>
@@ -1700,11 +1652,8 @@
         <!-- Hızlı Villa Seçim Butonları -->
         <div class="critic-preset-btns" style="margin-top: 14px;">
           <span style="font-size: 11px; color: #94A3B8; font-weight: 700; align-self: center;">Hızlı Seçim:</span>
-          <button type="button" class="btn btn-secondary btn-sm" onclick="setCriticUrlPreset('VILLA_BELLA')">🏡 Villa Bella Vista</button>
-          <button type="button" class="btn btn-secondary btn-sm" onclick="setCriticUrlPreset('VILLA_AZURE')">🏡 Villa Azure Bay</button>
-          <button type="button" class="btn btn-secondary btn-sm" onclick="setCriticUrlPreset('VILLA_OLIVE')">🏡 Villa Olive Garden</button>
-          <button type="button" class="btn btn-secondary btn-sm" onclick="setCriticUrlPreset('VILLA_SUNSET')">🏡 Villa Sunset Horizon</button>
-          <button type="button" class="btn btn-secondary btn-sm" onclick="setCriticUrlPreset('VILLA_PALM')">🏡 Villa Palm Breeze</button>
+          <!-- Müşterinin ilan bağlantısı olan mülkleri; renderCriticPresets() doldurur. -->
+          <span id="criticPresetList" style="display: contents;"></span>
         </div>
 
         <!-- URL Input & Çalıştır Butonu -->
@@ -1733,11 +1682,7 @@
           <div style="display: flex; align-items: center; gap: 8px;">
             <label style="font-size: 12px; color: #CBD5E1; font-weight: 600;">Villa Seçin:</label>
             <select id="abTestVillaSelect" onchange="renderCoverAbTestLab(this.value)" style="padding: 6px 12px; background: #1E293B; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; font-size: 12px; font-weight: 700;">
-              <option value="VILLA_BELLA">Villa Bella Vista</option>
-              <option value="VILLA_AZURE" selected>Villa Azure Bay</option>
-              <option value="VILLA_OLIVE">Villa Olive Garden</option>
-              <option value="VILLA_SUNSET">Villa Sunset Horizon</option>
-              <option value="VILLA_PALM">Villa Palm Breeze</option>
+              <!-- updateAllVillaDropdowns() musterinin mulkleriyle doldurur -->
             </select>
           </div>
         </div>
@@ -1802,11 +1747,7 @@
           <div style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 11px; color: var(--text-muted);">Villa:</label>
             <select id="scriptVillaSelect" onchange="updateClosingScriptPreview()" style="padding: 6px 10px; background: #1E293B; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; font-size: 12px; width: 140px;">
-              <option value="VILLA_BELLA">Villa Bella Vista</option>
-              <option value="VILLA_OLIVE">Villa Olive Garden</option>
-              <option value="VILLA_SUNSET">Villa Sunset Horizon</option>
-              <option value="VILLA_AZURE">Villa Azure Bay</option>
-              <option value="VILLA_PALM">Villa Palm Breeze</option>
+              <!-- updateAllVillaDropdowns() musterinin mulkleriyle doldurur -->
             </select>
           </div>
           <div style="display: flex; flex-direction: column; gap: 4px;">
@@ -2149,54 +2090,14 @@
           </div>
           <div>
             <select id="rezPeriodFilter" onchange="renderManageBookingsTable()" style="padding: 8px 12px; background: rgba(30,41,59,0.9); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px;">
-              <option value="ALL" selected>Tüm Rezervasyonlar (Tarih Bağımsız)</option>
+              <!-- refreshPeriodSelectors() yeniden kurar; yedek liste. -->
+              <option value="ALL" selected>Tüm Rezervasyonlar</option>
               <option value="UPCOMING">Gelecek & Aktif Rezervasyonlar</option>
-              <optgroup label="2025 YILI (Temmuz'dan İtibaren)">
-                <option value="2025-07">Temmuz 2025</option>
-                <option value="2025-08">Ağustos 2025</option>
-                <option value="2025-09">Eylül 2025</option>
-                <option value="2025-10">Ekim 2025</option>
-                <option value="2025-11">Kasım 2025</option>
-                <option value="2025-12">Aralık 2025</option>
-              </optgroup>
-              <optgroup label="2026 YILI (Resmi Veriler & Güncel)">
-                <option value="2026-01">Ocak 2026</option>
-                <option value="2026-02">Şubat 2026</option>
-                <option value="2026-03">Mart 2026</option>
-                <option value="2026-04">Nisan 2026</option>
-                <option value="2026-05">Mayıs 2026</option>
-                <option value="2026-06">Haziran 2026</option>
-                <option value="2026-07">Temmuz 2026</option>
-                <option value="2026-08">Ağustos 2026</option>
-                <option value="2026-09">Eylül 2026 (Güncel Ay)</option>
-                <option value="2026-10">Ekim 2026</option>
-                <option value="2026-11">Kasım 2026</option>
-                <option value="2026-12">Aralık 2026</option>
-              </optgroup>
-              <optgroup label="2027 YILI">
-                <option value="2027-01">Ocak 2027 (Kış Zirvesi ❄️)</option>
-                <option value="2027-02">Şubat 2027 (Kayak Sezonu ⛷️)</option>
-                <option value="2027-03">Mart 2027</option>
-                <option value="2027-04">Nisan 2027</option>
-                <option value="2027-05">Mayıs 2027</option>
-                <option value="2027-06">Haziran 2027</option>
-                <option value="2027-07">Temmuz 2027</option>
-                <option value="2027-08">Ağustos 2027</option>
-                <option value="2027-09">Eylül 2027</option>
-                <option value="2027-10">Ekim 2027</option>
-                <option value="2027-11">Kasım 2027</option>
-                <option value="2027-12">Aralık 2027</option>
-              </optgroup>
             </select>
           </div>
           <div>
             <select id="rezVillaFilter" onchange="renderManageBookingsTable()" style="padding: 8px 12px; background: rgba(30,41,59,0.9); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px;">
-              <option value="ALL" selected>Tüm Villalar</option>
-              <option value="VILLA_BELLA">Villa Bella Vista</option>
-              <option value="VILLA_OLIVE">Villa Olive Garden</option>
-              <option value="VILLA_SUNSET">Villa Sunset Horizon</option>
-              <option value="VILLA_AZURE">Villa Azure Bay</option>
-              <option value="VILLA_PALM">Villa Palm Breeze</option>
+              <option value="ALL">Tüm Villalar / Portföy</option>
             </select>
           </div>
           <div>
@@ -2802,12 +2703,7 @@
           <div class="form-group">
             <label>İlgili Mülk / Kapsam</label>
             <select id="expVilla" required>
-              <option value="ALL">Tüm Portföy (Genel İşletme)</option>
-              <option value="VILLA_BELLA">Villa Bella Vista</option>
-              <option value="VILLA_OLIVE">Villa Olive Garden</option>
-              <option value="VILLA_SUNSET">Villa Sunset Horizon</option>
-              <option value="VILLA_AZURE">Villa Azure Bay</option>
-              <option value="VILLA_PALM">Villa Palm Breeze</option>
+              <option value="ALL">Tüm Villalar / Portföy</option>
             </select>
           </div>
           <div class="form-group">
@@ -3157,11 +3053,7 @@
           <div class="form-group">
             <label>Villa Seçin</label>
             <select id="resVilla" required onchange="calculateLivePreview()">
-              <option value="VILLA_BELLA">Villa Bella Vista</option>
-              <option value="VILLA_OLIVE">Villa Olive Garden</option>
-              <option value="VILLA_SUNSET">Villa Sunset Horizon</option>
-              <option value="VILLA_AZURE">Villa Azure Bay</option>
-              <option value="VILLA_PALM">Villa Palm Breeze</option>
+              <!-- updateAllVillaDropdowns() musterinin mulkleriyle doldurur -->
             </select>
           </div>
           <div class="form-group">
@@ -3253,13 +3145,7 @@
           <div class="form-group">
             <label>İlgilenilen Villa</label>
             <select id="leadVilla" required>
-              <option value="AZURE">Villa Azure Bay</option>
-              <option value="OLIVE">Villa Olive Garden</option>
-              <option value="VILLA_BELLA">Villa Bella Vista</option>
-              <option value="VILLA_OLIVE">Villa Olive Garden</option>
-              <option value="VILLA_SUNSET">Villa Sunset Horizon</option>
-              <option value="VILLA_AZURE">Villa Azure Bay</option>
-              <option value="VILLA_PALM">Villa Palm Breeze</option>
+              <!-- updateAllVillaDropdowns() musterinin mulkleriyle doldurur -->
             </select>
           </div>
           <div class="form-group">
@@ -3323,13 +3209,7 @@
           <div class="form-group">
             <label>Villa</label>
             <select id="maintVilla" required>
-              <option value="OLIVE">Villa Olive Garden</option>
-              <option value="AZURE">Villa Azure Bay</option>
-              <option value="VILLA_BELLA">Villa Bella Vista</option>
-              <option value="VILLA_OLIVE">Villa Olive Garden</option>
-              <option value="VILLA_SUNSET">Villa Sunset Horizon</option>
-              <option value="VILLA_AZURE">Villa Azure Bay</option>
-              <option value="VILLA_PALM">Villa Palm Breeze</option>
+              <!-- updateAllVillaDropdowns() musterinin mulkleriyle doldurur -->
             </select>
           </div>
           <div class="form-group">
@@ -3661,16 +3541,31 @@
         </p>
 
         <div style="display: flex; flex-direction: column; gap: 15px;">
-          <!-- Seçenek 1: Temiz Sıfırlama -->
           <div style="border: 1px solid rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.08); border-radius: 10px; padding: 16px;">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
-              <strong style="color: #fca5a5; font-size: 1rem;">🧹 Demo Verilerini ve Tüm Sistemi Sıfırla (0 TL)</strong>
+              <strong style="color: #fca5a5; font-size: 1rem;">🧹 Tüm İşletme Verilerini Sıfırla</strong>
             </div>
-            <p style="color: var(--color-slate-300); font-size: 0.85rem; line-height: 1.4; margin-bottom: 12px;">
-              Sistemdeki tüm geçmiş ciroyu, harcama kalemlerini ve rezervasyonları tamamen temizler. Bütün paneller 0 TL olur, sıfırdan kendi kayıtlarınızı girebilirsiniz.
+            <p style="color: var(--color-slate-300); font-size: 0.85rem; line-height: 1.4; margin-bottom: 10px;">
+              Mülkler, rezervasyonlar, giderler, temizlik görevleri, talepler, misafirler, fiyat kuralları,
+              mesajlar, hedefler ve ay kapanışları dahil <strong>bütün kayıtlarınız kalıcı olarak silinir</strong>.
+              Kapatılmış dönemler de dahildir. İşletmeniz ve ekip üyeleriniz kalır; yalnızca defterler boşalır.
             </p>
-            <button class="btn btn-danger" onclick="cleanResetAll()" style="width: 100%;">
-              🗑️ Tüm Verileri Tamamen Sıfırla (0 TL)
+
+            <div id="resetImpact" style="font-size: 12px; color: #E2E8F0; background: rgba(0,0,0,0.3); border-radius: 6px; padding: 10px 12px; margin-bottom: 12px;">
+              Yükleniyor…
+            </div>
+
+            <label style="font-weight: 700; color: #FFFFFF; font-size: 12px;">
+              Onaylamak için <code style="background: rgba(0,0,0,0.4); padding: 1px 6px; border-radius: 3px; color: #FDE68A;">VERILERI SIFIRLA</code> yazın
+            </label>
+            <input type="text" id="resetConfirmInput" autocomplete="off" placeholder="VERILERI SIFIRLA"
+                   oninput="updateResetButton()"
+                   style="width: 100%; padding: 9px 12px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 13px; margin: 6px 0 12px;">
+
+            <div id="resetError" class="auth-error-msg" style="display: none; margin-bottom: 12px;"></div>
+
+            <button class="btn btn-danger" id="resetSubmitBtn" onclick="cleanResetAll()" style="width: 100%;" disabled>
+              🗑️ Tüm Verileri Kalıcı Olarak Sıfırla
             </button>
           </div>
 
@@ -3719,7 +3614,7 @@
               <label style="font-weight: 700; color: #FFFFFF; font-size: 13px;">WhatsApp Mesaj Metnini Buraya Yapıştırın:</label>
               <button type="button" class="btn btn-secondary btn-sm" onclick="loadSampleWhatsAppMsg()" style="font-size: 11px; padding: 3px 8px;">📋 Örnek Mesaj Doldur</button>
             </div>
-            <textarea id="waRawInput" rows="3" placeholder="Örnek: 'Alexander Wright: 18-23 Eylül arası 5 gece Villa Azure Bay için 85.000 TL konuştuk, 8 kişiyiz onaylıyoruz. Tel: +90 532 555 1234'" style="width: 100%; padding: 12px; background: rgba(0,0,0,0.4); border: 1px solid rgba(37, 211, 102, 0.3); border-radius: 8px; color: #fff; font-size: 13px; font-family: monospace;" oninput="parseWhatsAppMessage()"></textarea>
+            <textarea id="waRawInput" rows="3" placeholder="Örnek: 'Ahmet Yılmaz: 18-23 Eylül arası 5 gece için 85.000 TL konuştuk, 8 kişiyiz onaylıyoruz. Tel: +90 532 555 1234'" style="width: 100%; padding: 12px; background: rgba(0,0,0,0.4); border: 1px solid rgba(37, 211, 102, 0.3); border-radius: 8px; color: #fff; font-size: 13px; font-family: monospace;" oninput="parseWhatsAppMessage()"></textarea>
             <span style="font-size: 11px; color: var(--text-muted); margin-top: 4px; display: block;">💡 İpucu: Misafirin yazdığı mesajı olduğu gibi yapıştırın; yapay zeka isim, villa, tarih ve tutarı saniyesinde ayıklar.</span>
           </div>
 
@@ -3748,12 +3643,8 @@
               <div class="form-group">
                 <label style="font-size: 11px; color: var(--text-muted);">İlgilenilen Villa</label>
                 <select id="waParsedVilla" style="width: 100%; padding: 8px 10px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px; font-weight: 600;">
-                  <option value="VILLA_BELLA">Villa Bella Vista</option>
-                  <option value="VILLA_OLIVE">Villa Olive Garden</option>
-                  <option value="VILLA_SUNSET">Villa Sunset Horizon</option>
-                  <option value="VILLA_AZURE" selected>Villa Azure Bay</option>
-                  <option value="VILLA_PALM">Villa Palm Breeze</option>
-                </select>
+              <!-- updateAllVillaDropdowns() musterinin mulkleriyle doldurur -->
+            </select>
               </div>
               <div class="form-group">
                 <label style="font-size: 11px; color: var(--text-muted);">Tutar / Teklif (₺)</label>
@@ -3930,13 +3821,8 @@
             <div class="form-group">
               <label style="font-size: 12px; font-weight: 600;">İlgili Villa / Portföy</label>
               <select id="mktVilla" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
-                <option value="ALL">Tüm Villalar / Portföy</option>
-                <option value="VILLA_BELLA">Villa Bella Vista</option>
-              <option value="VILLA_OLIVE">Villa Olive Garden</option>
-              <option value="VILLA_SUNSET">Villa Sunset Horizon</option>
-              <option value="VILLA_AZURE">Villa Azure Bay</option>
-              <option value="VILLA_PALM">Villa Palm Breeze</option>
-              </select>
+              <option value="ALL">Tüm Villalar / Portföy</option>
+            </select>
             </div>
           </div>
 
@@ -4029,11 +3915,7 @@
           <div class="form-group">
             <label>Tahsis Edilen Villa:</label>
             <select id="infVilla" style="width:100%; padding:8px; background:var(--bg-input); border:1px solid rgba(255,255,255,0.2); border-radius:6px; color:#fff;">
-              <option value="VILLA_BELLA">Villa Bella Vista</option>
-              <option value="VILLA_OLIVE">Villa Olive Garden</option>
-              <option value="VILLA_SUNSET">Villa Sunset Horizon</option>
-              <option value="VILLA_AZURE">Villa Azure Bay</option>
-              <option value="VILLA_PALM">Villa Palm Breeze</option>
+              <!-- updateAllVillaDropdowns() musterinin mulkleriyle doldurur -->
             </select>
           </div>
         </div>
@@ -4154,11 +4036,7 @@
           <div class="form-group">
             <label>Villa / Mülk</label>
             <select id="hkVilla" required>
-              <option value="VILLA_BELLA">Villa Bella Vista</option>
-              <option value="VILLA_OLIVE">Villa Olive Garden</option>
-              <option value="VILLA_SUNSET">Villa Sunset Horizon</option>
-              <option value="VILLA_AZURE">Villa Azure Bay</option>
-              <option value="VILLA_PALM">Villa Palm Breeze</option>
+              <!-- updateAllVillaDropdowns() musterinin mulkleriyle doldurur -->
             </select>
           </div>
           <div class="form-group">
@@ -4334,6 +4212,6 @@
   <script src="core/executive_dashboard_service.js?v=cf7e1f87"></script>
   <script src="core/executive_ai_advisor.js?v=93c10c3e"></script>
   <script src="core/notification_center_service.js?v=7fb8bdee"></script>
-  <script src="app.js?v=1645ae47"></script>
+  <script src="app.js?v=8afe429d"></script>
 </body>
 </html>

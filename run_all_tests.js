@@ -77,7 +77,13 @@ const testFiles = [
   'revenue_attribution_tests.js',
 
   // Ay kapanisi butunlugu (Phase 20)
-  'month_close_integrity_tests.js'
+  'month_close_integrity_tests.js',
+
+  // Demo artigi denetimi (uydurma villa/rakam/tarih kaynak taramasi)
+  'demo_residue_tests.js',
+
+  // Isletme verisini sifirlama (Phase 21)
+  'tenant_reset_tests.js'
 ];
 
 console.log('=============================================================================');
