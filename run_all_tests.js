@@ -113,6 +113,7 @@ const testFiles = [
   'marketing_economics_worker_tests.js',
   'marketing_economics_worker_entrypoint_tests.js',
   'marketing_cover_change_service_tests.js',
+  'marketing_scheduler_tests.js',
 
   // Hesap kapatma / KVKK silme (Phase 18)
   'account_deletion_tests.js',
