@@ -2492,6 +2492,26 @@
         </div>
       </section>
 
+      <!-- VERİ SIFIRLAMA -->
+      <section class="card" id="dataResetCard" style="margin-top: 24px; border: 1px solid rgba(245, 158, 11, 0.35);">
+        <div class="section-title-bar">
+          <div>
+            <h2 style="color: #FCD34D;">🗑️ Veri Sıfırlama</h2>
+            <p class="sub-text">Tüm kayıtlarınızı silip sıfırdan başlayın. İşletmeniz ve ekibiniz kalır.</p>
+          </div>
+        </div>
+        <div style="padding: 0 4px 4px;">
+          <p style="font-size: 12px; color: #CBD5E1; line-height: 1.6; margin: 0 0 12px;">
+            Mülkler, rezervasyonlar, giderler, temizlik görevleri, talepler, hedefler ve ay kapanışları
+            dahil bütün kayıtlar kalıcı olarak silinir. Kapatılmış dönemler de dahildir.
+            Deneme verisi yükleyip temizlemek için bunu kullanın.
+          </p>
+          <button type="button" class="btn btn-secondary" onclick="openResetModal()">
+            🗑️ Veri Sıfırlama Menüsünü Aç
+          </button>
+        </div>
+      </section>
+
       <!-- TEHLİKELİ BÖLGE: HESAP KAPATMA -->
       <section class="card" id="dangerZoneCard" style="margin-top: 24px; border: 1px solid rgba(239, 68, 68, 0.35);">
         <div class="section-title-bar">
@@ -3533,8 +3553,11 @@
           <h4 style="color: #FFFFFF; margin-top: 0;">🔄 Veri Tabanı ve Sıfırlama Mekanizması</h4>
           <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px;">
             <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0 0 10px 0;">
-              • <strong>Tüm Verileri Sıfırla (0 TL):</strong> Portföy geçmişi dahil tüm verileri siler, kendi sıfır kasanızı başlatır. Sayfayı yenileseniz de 0 TL temiz kalır.<br>
-              • <strong>Demo Verilerini Geri Yükle:</strong> İstediğiniz zaman 14 aylık sentetik demo portföy veritabanını tek tuşla geri yükleyebilirsiniz.
+              • <strong>Tüm Verilerinizi Sıfırlayın:</strong> Mülkler, rezervasyonlar, giderler, temizlik görevleri,
+              talepler, hedefler ve ay kapanışları dahil bütün kayıtlarınız kalıcı olarak silinir. Kapatılmış
+              dönemler de dahildir. <strong>İşletmeniz ve ekip üyeleriniz kalır</strong> — hesap kapanmaz.<br>
+              • Onaylamak için <code>VERILERI SIFIRLA</code> yazmanız gerekir; işlemi yalnızca işletme sahibi yapabilir.<br>
+              • Aynı ekrana <strong>Ayarlar → Veri Sıfırlama</strong> bölümünden de ulaşabilirsiniz.
             </p>
             <button type="button" class="btn btn-secondary btn-sm" onclick="closeHelpModal(); openResetModal();">
               🗑️ Sıfırlama Menüsünü Aç
