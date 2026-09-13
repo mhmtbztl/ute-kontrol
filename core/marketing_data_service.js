@@ -9,7 +9,7 @@
   'use strict';
 
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  const DEFAULT_LIMITS = Object.freeze({ snapshots: 100, findings: 50, media: 200, analysisRuns: 30, experiments: 30, healthSnapshots: 30 });
+  const DEFAULT_LIMITS = Object.freeze({ snapshots: 100, findings: 50, media: 200, placements: 300, analysisRuns: 30, experiments: 30, healthSnapshots: 30 });
 
   function assertScope(scope = {}) {
     if (!UUID_RE.test(String(scope.tenantId || ''))) throw new Error('VALID_TENANT_ID_REQUIRED');
@@ -28,6 +28,7 @@
       listings: request('property_channel_listings', 'id,property_id,channel_code,display_name,status', 'created_at', 100, valid.propertyId),
       findings: request('marketing_findings', '*', 'last_seen_at', max.findings, valid.propertyId),
       media: request('property_media', 'id,property_id,media_status,room_category,content_sha256,width_px,height_px,created_at', 'created_at', max.media, valid.propertyId),
+      placements: request('channel_media_placements', 'id,property_id,channel_listing_id,media_id,display_order,is_cover,is_active,updated_at', 'updated_at', max.placements, valid.propertyId),
       analysisRuns: request('photo_analysis_runs', '*', 'requested_at', max.analysisRuns, valid.propertyId),
       experiments: request('listing_change_experiments', '*', 'created_at', max.experiments, valid.propertyId),
       healthSnapshots: request('property_marketing_health_snapshots', '*', 'as_of', max.healthSnapshots, valid.propertyId)
@@ -80,7 +81,7 @@
         .map(([name, spec]) => safelyLoad(name, () => executeRequest(client, valid.tenantId, spec)))))
     ];
 
-    const result = { listings: [], snapshots: [], findings: [], media: [], analysisRuns: [], experiments: [], healthSnapshots: [], errors: [] };
+    const result = { listings: [], snapshots: [], findings: [], media: [], placements: [], analysisRuns: [], experiments: [], healthSnapshots: [], errors: [] };
     loaders.forEach(item => {
       result[item.name] = item.data;
       if (item.error) result.errors.push({ dataset: item.name, ...item.error });

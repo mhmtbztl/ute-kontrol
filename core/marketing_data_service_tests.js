@@ -84,6 +84,15 @@ function mockClient(rowsByTable = {}, errorsByTable = {}) {
     assert.match(mediaCall.selected, /content_sha256/);
   });
 
+  await runTest('Channel placement reads expose the recorded cover without crossing property scope', async () => {
+    const client = mockClient({ channel_media_placements: [{ id: 'placement', is_cover: true }] });
+    const result = await MarketingDataService.loadMarketingWorkspaceData(client, { tenantId: TENANT, propertyId: PROPERTY });
+    const call = client.calls.find(item => item.table === 'channel_media_placements');
+    assert.ok(call.filters.some(filter => filter.column === 'property_id' && filter.value === PROPERTY));
+    assert.match(call.selected, /is_cover/);
+    assert.strictEqual(result.placements.length, 1);
+  });
+
   await runTest('Health snapshots are read by property and newest evidence time', async () => {
     const client = mockClient();
     const result = await MarketingDataService.loadMarketingWorkspaceData(client, { tenantId: TENANT, propertyId: PROPERTY });

@@ -28,6 +28,7 @@
     snapshots: [],
     findings: [],
     media: [],
+    placements: [],
     analysisRuns: [],
     experiments: [],
     healthSnapshots: [],
@@ -45,7 +46,7 @@
     ['MarketingEngine', 'core/marketing_engine.js?v=2756f4ec'],
     ['MarketingFunnelService', 'core/marketing_funnel_service.js?v=a5ecbdaa'],
     ['MarketingPriorityService', 'core/marketing_priority_service.js?v=f6e216ff'],
-    ['MarketingDataService', 'core/marketing_data_service.js?v=78f30016'],
+    ['MarketingDataService', 'core/marketing_data_service.js?v=da2eb808'],
     ['MarketingReviewService', 'core/marketing_review_service.js?v=9207dee5'],
     ['MarketingSnapshotService', 'core/marketing_snapshot_service.js?v=184ad517'],
     ['MarketingChannelListingService', 'core/marketing_channel_listing_service.js?v=0e34cbca'],
@@ -154,6 +155,7 @@
       snapshots: Array.isArray(input.snapshots) ? input.snapshots : [],
       findings: Array.isArray(input.findings) ? input.findings : [],
       media: Array.isArray(input.media) ? input.media : [],
+      placements: Array.isArray(input.placements) ? input.placements : [],
       analysisRuns: Array.isArray(input.analysisRuns) ? input.analysisRuns : [],
       experiments: Array.isArray(input.experiments) ? input.experiments : [],
       healthSnapshots: Array.isArray(input.healthSnapshots) ? input.healthSnapshots : [],
@@ -495,7 +497,7 @@
     const scope = cloudScope();
     if (!client || !scope) {
       if (state.remoteScopeKey) {
-        ['listings', 'snapshots', 'findings', 'media', 'analysisRuns', 'experiments', 'healthSnapshots'].forEach(key => { state[key] = []; });
+        ['listings', 'snapshots', 'findings', 'media', 'placements', 'analysisRuns', 'experiments', 'healthSnapshots'].forEach(key => { state[key] = []; });
       }
       state.remoteScopeKey = null;
       state.remoteStatus = 'LOCAL';
@@ -505,12 +507,12 @@
     const scopeKey = `${scope.tenantId}:${scope.propertyId || 'ALL'}`;
     if (state.remoteScopeKey === scopeKey && ['OK', 'PARTIAL', 'UNAVAILABLE'].includes(state.remoteStatus)) return null;
     state.remoteScopeKey = scopeKey;
-    ['listings', 'snapshots', 'findings', 'media', 'analysisRuns', 'experiments', 'healthSnapshots'].forEach(key => { state[key] = []; });
+    ['listings', 'snapshots', 'findings', 'media', 'placements', 'analysisRuns', 'experiments', 'healthSnapshots'].forEach(key => { state[key] = []; });
     state.remoteStatus = 'LOADING';
     state.remoteErrors = [];
     const result = await services.MarketingDataService.loadMarketingWorkspaceData(client, scope);
     if (state.remoteScopeKey !== scopeKey) return null;
-    ['listings', 'snapshots', 'findings', 'media', 'analysisRuns', 'experiments', 'healthSnapshots'].forEach(key => { state[key] = result[key]; });
+    ['listings', 'snapshots', 'findings', 'media', 'placements', 'analysisRuns', 'experiments', 'healthSnapshots'].forEach(key => { state[key] = result[key]; });
     state.remoteStatus = result.status;
     state.remoteErrors = result.errors;
     return result;
@@ -552,7 +554,7 @@
   }
 
   function setData(next = {}) {
-    ['listings', 'snapshots', 'findings', 'media', 'analysisRuns', 'experiments', 'healthSnapshots'].forEach(key => {
+    ['listings', 'snapshots', 'findings', 'media', 'placements', 'analysisRuns', 'experiments', 'healthSnapshots'].forEach(key => {
       if (Array.isArray(next[key])) state[key] = next[key].slice();
     });
     if (typeof window !== 'undefined' && !services.MarketingEngine && typeof window.renderMarketingModule === 'function') {
