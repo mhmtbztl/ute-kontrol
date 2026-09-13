@@ -3004,16 +3004,17 @@
                 <option value="EXPENSES">💸 Gider Defteri (Harcama & Masraflar)</option>
               </select>
 
-              <label style="font-size: 12px; color: #CBD5E1; font-weight: 600; margin-left: 10px;">İşlem Yöntemi:</label>
-              <select id="importStrategySelect" style="padding: 6px 10px; background: #1E293B; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; font-size: 12px; font-weight: 700;">
-                <option value="APPEND" selected>➕ Mevcut Verilerin Üzerine Ekle</option>
-                <option value="OVERWRITE">🔄 Mevcut Verileri Temizleyip Sıfırdan Yükle</option>
-              </select>
             </div>
+            <!--
+              "İşlem Yöntemi" seçicisi kaldırıldı: OVERWRITE seçeneği mevcut
+              tüm kayıtları silecekmiş gibi duruyordu ama yalnızca bellekteki
+              listeyi değiştiriyordu. Veritabanını temizlemek ayrı ve onaylı
+              bir işlemdir (Ayarlar → Veri Sıfırlama). İçe aktarma her zaman
+              mevcut kayıtların üzerine EKLER.
+            -->
 
-            <!-- İlk 5 Satır Canlı Tablo Önizlemesi -->
-            <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px; font-weight: 700;">CANLI VERİ ÖNİZLEMESİ (İLK 5 SATIR):</div>
-            <div class="table-responsive" style="max-height: 180px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.06); border-radius: 6px;">
+            <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px; font-weight: 700;">ÖNİZLEME — önce hatalı satırlar gösterilir:</div>
+            <div class="table-responsive" style="max-height: 260px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.06); border-radius: 6px;">
               <table class="data-table" style="font-size: 11px; margin: 0;">
                 <thead id="importPreviewTableHead"></thead>
                 <tbody id="importPreviewTableBody"></tbody>
@@ -3023,8 +3024,8 @@
             <!-- Onay Butonu -->
             <div style="margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px;">
               <button type="button" class="btn btn-secondary btn-sm" onclick="resetImportPreview()">İptal</button>
-              <button type="button" class="btn btn-primary" onclick="applyImportedData()" style="background: linear-gradient(135deg, #10B981, #059669); border: none; font-weight: 700; padding: 8px 16px;">
-                ✅ Verileri Sisteme Aktar
+              <button type="button" class="btn btn-primary" id="importConfirmBtn" onclick="applyImportedData()" style="background: linear-gradient(135deg, #10B981, #059669); border: none; font-weight: 700; padding: 8px 16px;">
+                Verileri Sisteme Aktar
               </button>
             </div>
           </div>
@@ -3578,7 +3579,7 @@
   </div>
 
   <script src="core/financial_metrics_service.js?v=279181c5"></script>
-  <script src="core/finance_import_engine.js?v=65999b8e"></script>
+  <script src="core/finance_import_engine.js?v=28ed61e5"></script>
 
   <!-- ======================================================= -->
   <!-- MODAL: WHATSAPP BUSINESS AKILLI MESAJ AYRIŞTIRICI -->
@@ -4212,6 +4213,6 @@
   <script src="core/executive_dashboard_service.js?v=cf7e1f87"></script>
   <script src="core/executive_ai_advisor.js?v=93c10c3e"></script>
   <script src="core/notification_center_service.js?v=7fb8bdee"></script>
-  <script src="app.js?v=0055f25e"></script>
+  <script src="app.js?v=5893aa97"></script>
 </body>
 </html>
