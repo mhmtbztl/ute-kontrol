@@ -5805,6 +5805,71 @@ function roleBadgeHtml(role) {
   return `<span class="badge ${r.badge}">${escapeHtml(r.label)}</span>`;
 }
 
+/**
+ * Kisa bildirim kutusu.
+ *
+ * Uygulamada 34 yerde cagriliyordu ama HIC TANIMLI DEGILDI. Cagrilarin hepsi
+ * `if (typeof showToast === 'function')` ile korumali oldugu icin hata da
+ * vermiyor, sessizce hicbir sey yapmiyorlardi: kullanici ay kapattiginda,
+ * veriyi sifirladiginda ya da bir kayit olusturdugunda hicbir onay gormuyordu.
+ *
+ * @param {string} mesaj
+ * @param {'success'|'error'|'info'} tur
+ */
+function showToast(mesaj, tur = 'info') {
+  if (typeof document === 'undefined' || !document.body) return;
+
+  let kap = document.getElementById('lexToastWrap');
+  if (!kap) {
+    kap = document.createElement('div');
+    kap.id = 'lexToastWrap';
+    kap.setAttribute('role', 'status');
+    kap.setAttribute('aria-live', 'polite');
+    kap.style.cssText = 'position:fixed;right:18px;bottom:18px;z-index:99999;' +
+      'display:flex;flex-direction:column;gap:8px;max-width:min(380px,calc(100vw - 36px));';
+    document.body.appendChild(kap);
+  }
+
+  const renk = tur === 'success' ? '#34D399' : (tur === 'error' ? '#F87171' : '#60A5FA');
+  const el = document.createElement('div');
+  el.style.cssText = 'background:rgba(15,23,42,0.97);color:#E2E8F0;border:1px solid rgba(255,255,255,0.12);' +
+    'border-left:3px solid ' + renk + ';border-radius:8px;padding:11px 14px;font-size:13px;line-height:1.45;' +
+    'box-shadow:0 8px 24px rgba(0,0,0,0.45);opacity:0;transform:translateY(6px);' +
+    'transition:opacity .18s ease,transform .18s ease;word-break:break-word;';
+  el.textContent = String(mesaj == null ? '' : mesaj);
+  kap.appendChild(el);
+  requestAnimationFrame(() => { el.style.opacity = '1'; el.style.transform = 'translateY(0)'; });
+
+  const sure = tur === 'error' ? 7000 : 4000;
+  setTimeout(() => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(6px)';
+    setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 220);
+  }, sure);
+}
+
+/**
+ * Bir elemanin metnini yazar; eleman yoksa sessizce gecer.
+ *
+ * Bu yardimci iki fonksiyonun ICINDE yerel olarak tanimliydi
+ * (renderFinanceModule, renderKPIsAndDashboard). renderExecutiveControlCenter
+ * de onu kullaniyordu ama kendi kapsaminda yoktu:
+ *
+ *   ReferenceError: setEl is not defined
+ *     at renderExecutiveControlCenter
+ *     at renderAll
+ *     at loadTenantAppData        <-- catch bloguna dusuyordu
+ *
+ * Sonuc: oturum acan HER kullanicida veri yukleme catch'e dusuyor, appData
+ * bos duruma cekiliyor ve "Isletme verileri yuklenemedi" uyarisi cikiyordu.
+ * Node testleri renderAll'i hic calistirmadigi icin yakalanmamisti.
+ */
+function setEl(id, text) {
+  if (typeof document === 'undefined') return;
+  const el = document.getElementById(id);
+  if (el) el.innerText = text;
+}
+
 function escapeHtml(str) {
   return String(str === null || str === undefined ? '' : str)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
