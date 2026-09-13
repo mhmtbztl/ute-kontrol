@@ -47,7 +47,7 @@ test('One source snapshot cannot be counted twice in an experiment', () => {
 });
 
 test('Only managers may request an evaluation', () => {
-  assert.match(sql, /get_tenant_role\(p_tenant_id\) NOT IN \('owner', 'admin', 'manager'\)/i);
+  assert.match(sql, /COALESCE\(public\.get_tenant_role\(p_tenant_id\), ''\) NOT IN \('owner', 'admin', 'manager'\)/i);
   assert.match(sql, /GRANT EXECUTE ON FUNCTION public\.request_listing_change_evaluation[\s\S]*?TO authenticated/i);
 });
 

@@ -28,7 +28,7 @@ DECLARE
     v_present_count INTEGER;
 BEGIN
     IF auth.uid() IS NULL
-       OR public.get_tenant_role(p_tenant_id) NOT IN ('owner', 'admin', 'manager', 'staff') THEN
+       OR COALESCE(public.get_tenant_role(p_tenant_id), '') NOT IN ('owner', 'admin', 'manager', 'staff') THEN
         RAISE EXCEPTION 'UNAUTHORIZED_MARKETING_SNAPSHOT' USING ERRCODE = '42501';
     END IF;
 

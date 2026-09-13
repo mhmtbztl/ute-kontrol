@@ -21,7 +21,7 @@ DECLARE
 BEGIN
     IF auth.uid() IS NULL
        OR NOT public.is_tenant_member(p_tenant_id)
-       OR public.get_tenant_role(p_tenant_id) NOT IN ('owner', 'admin', 'manager') THEN
+       OR COALESCE(public.get_tenant_role(p_tenant_id), '') NOT IN ('owner', 'admin', 'manager') THEN
         RAISE EXCEPTION 'UNAUTHORIZED_PHOTO_ANALYSIS_REQUEST' USING ERRCODE = '42501';
     END IF;
 

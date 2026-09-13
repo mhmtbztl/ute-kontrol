@@ -57,7 +57,7 @@ runTest('Authenticated clients can only read findings directly', () => {
 runTest('Finding review requires manager role and locks the row', () => {
   assert.match(sql, /FUNCTION public\.review_marketing_finding/i);
   assert.match(sql, /FOR UPDATE/i);
-  assert.match(sql, /get_tenant_role\(v_finding\.tenant_id\) NOT IN \('owner', 'admin', 'manager'\)/i);
+  assert.match(sql, /COALESCE\(public\.get_tenant_role\(v_finding\.tenant_id\), ''\) NOT IN \('owner', 'admin', 'manager'\)/i);
 });
 
 runTest('Operational tasks require ACCEPT_TASK and a physical action kind', () => {

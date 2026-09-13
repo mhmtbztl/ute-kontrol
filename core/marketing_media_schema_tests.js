@@ -74,7 +74,7 @@ runTest('Composite parent versions cannot null mandatory tenant keys on delete',
 
 runTest('Analysis requests validate role and property ownership', () => {
   assert.match(sql, /FUNCTION public\.request_photo_analysis/i);
-  assert.match(sql, /get_tenant_role\(p_tenant_id\) NOT IN \('owner', 'admin', 'manager'\)/i);
+  assert.match(sql, /COALESCE\(public\.get_tenant_role\(p_tenant_id\), ''\) NOT IN \('owner', 'admin', 'manager'\)/i);
   assert.match(sql, /PROPERTY_TENANT_MISMATCH/i);
 });
 

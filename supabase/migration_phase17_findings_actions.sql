@@ -296,7 +296,7 @@ BEGIN
     END IF;
 
     IF auth.uid() IS NULL
-       OR public.get_tenant_role(v_finding.tenant_id) NOT IN ('owner', 'admin', 'manager') THEN
+       OR COALESCE(public.get_tenant_role(v_finding.tenant_id), '') NOT IN ('owner', 'admin', 'manager') THEN
         RAISE EXCEPTION 'UNAUTHORIZED_MARKETING_REVIEW' USING ERRCODE = '42501';
     END IF;
 

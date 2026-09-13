@@ -43,7 +43,7 @@ const valid = {
   });
   await test('Benchmark schema is immutable and manager-scoped', () => {
     const sql = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'migration_phase17_health_benchmarks.sql'), 'utf8');
-    assert.match(sql, /get_tenant_role\(p_tenant_id\) NOT IN \('owner', 'admin', 'manager'\)/i);
+    assert.match(sql, /COALESCE\(public\.get_tenant_role\(p_tenant_id\), ''\) NOT IN \('owner', 'admin', 'manager'\)/i);
     assert.match(sql, /pg_advisory_xact_lock/i);
     assert.match(sql, /max_distribution_cost_percent[\s\S]+minimum_direct_reservation_share_percent/i);
     assert.match(sql, /DROP FUNCTION IF EXISTS public\.record_property_marketing_benchmark/i);

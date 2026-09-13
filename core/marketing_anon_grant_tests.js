@@ -129,6 +129,59 @@ runTest('Every SECURITY DEFINER marketing function guards itself', () => {
     `Govdesinde yetki kontrolu olmayan SECURITY DEFINER fonksiyon: ${unguarded.join(', ')}`);
 });
 
+/**
+ * NULL-GUVENSIZ KIRACI KORUMASI
+ *
+ * get_tenant_role(), cagiran kisi HEDEF kiracinin uyesi degilse NULL doner.
+ * SQL uc degerli mantiginda NULL NOT IN (...) sonucu TRUE degil NULL'dir,
+ * dolayisiyla "IF ... NOT IN (...) THEN RAISE" korumasi tam da korumasi
+ * gereken durumda calismaz. Uretimde dogrulandi: B kiracisinin sahibi
+ * A kiracisinin mulkune ilan yazabiliyordu.
+ */
+const GUARD_SQL_DIR = SUPABASE_DIR;
+const PHASE23 = path.join(SUPABASE_DIR, 'migration_phase23_marketing_tenant_guard.sql');
+const GUARDED_FUNCTIONS = [
+  'save_property_channel_listing', 'record_manual_channel_snapshot',
+  'record_property_marketing_benchmark', 'review_marketing_finding',
+  'request_listing_change_evaluation', 'request_photo_analysis',
+  'change_channel_cover_and_measure'
+];
+
+runTest('No SQL file guards a tenant with a NULL-unsafe NOT IN', () => {
+  const offenders = [];
+  for (const file of fs.readdirSync(GUARD_SQL_DIR).filter(f => f.endsWith('.sql'))) {
+    const lines = fs.readFileSync(path.join(GUARD_SQL_DIR, file), 'utf8').split(/\r?\n/);
+    lines.forEach((line, i) => {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('--')) return;            // aciklama satiri
+      if (trimmed.indexOf('strpos(') >= 0) return;     // dogrulama blogunun metin literali
+      const call = line.indexOf('get_tenant_role(');
+      if (call < 0) return;
+      if (line.indexOf('NOT IN', call) < 0) return;
+      // COALESCE(...) sarmalayicisi veya onceki satirdaki "v_role IS NULL OR" kabul edilir.
+      if (line.indexOf('COALESCE(') >= 0 && line.indexOf('COALESCE(') < call) return;
+      const prev = (lines[i - 1] || '') + line;
+      if (/\bv_\w*role\w*\s+IS NULL\s+OR/i.test(prev)) return;
+      offenders.push(`${file}:${i + 1}`);
+    });
+  }
+  assert.deepStrictEqual(offenders, [],
+    `NULL-guvensiz kiraci korumasi: ${offenders.join(', ')}`);
+});
+
+runTest('Phase 23 redefines every function that carried the broken guard', () => {
+  assert.ok(fs.existsSync(PHASE23), 'supabase/migration_phase23_marketing_tenant_guard.sql bulunamadi');
+  const sql = fs.readFileSync(PHASE23, 'utf8');
+  GUARDED_FUNCTIONS.forEach(name => {
+    assert.ok(sql.includes(`CREATE OR REPLACE FUNCTION public.${name}(`),
+      `${name} phase23'te yeniden tanimlanmali`);
+  });
+  assert.match(sql, /RAISE EXCEPTION 'PHASE23_GUARD_STILL_NULL_UNSAFE/,
+    'Koruma hala bozuksa goc durmali');
+  assert.ok(sql.includes('pg_get_functiondef'),
+    'Dogrulama canli fonksiyon tanimini okumali, dosyayi degil');
+});
+
 runTest('Marketing RPCs never publish to an OTA automatically', () => {
   const offenders = [];
   for (const file of phase17Files()) {

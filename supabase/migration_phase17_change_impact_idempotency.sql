@@ -28,7 +28,7 @@ DECLARE
     v_primary_metric TEXT := upper(trim(p_primary_metric));
 BEGIN
     IF auth.uid() IS NULL
-       OR public.get_tenant_role(p_tenant_id) NOT IN ('owner', 'admin', 'manager') THEN
+       OR COALESCE(public.get_tenant_role(p_tenant_id), '') NOT IN ('owner', 'admin', 'manager') THEN
         RAISE EXCEPTION 'UNAUTHORIZED_LISTING_CHANGE_EVALUATION' USING ERRCODE = '42501';
     END IF;
 

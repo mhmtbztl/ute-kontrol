@@ -9,7 +9,7 @@ runTest('RPC is security-definer with a locked search path', () => {
   assert.match(sql, /save_property_channel_listing[\s\S]*?SECURITY DEFINER[\s\S]*?SET search_path = ''/i);
 });
 runTest('Only manager roles may write channel listings', () => {
-  assert.match(sql, /get_tenant_role\(p_tenant_id\) NOT IN \('owner', 'admin', 'manager'\)/i);
+  assert.match(sql, /COALESCE\(public\.get_tenant_role\(p_tenant_id\), ''\) NOT IN \('owner', 'admin', 'manager'\)/i);
   assert.doesNotMatch(sql, /NOT IN \([^)]*'staff'/i);
 });
 runTest('Property ownership is checked with tenant and property ids', () => {

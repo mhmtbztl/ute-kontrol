@@ -62,6 +62,7 @@ const testFiles = [
   'marketing_engine_tests.js',
   'marketing_schema_tests.js',
   'marketing_anon_grant_tests.js',
+  'marketing_tenant_isolation_tests.js',
   'marketing_funnel_tests.js',
   'marketing_media_schema_tests.js',
   'marketing_action_tests.js',

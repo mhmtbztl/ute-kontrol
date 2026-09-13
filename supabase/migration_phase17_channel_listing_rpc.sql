@@ -23,7 +23,7 @@ DECLARE
     v_listing public.property_channel_listings%ROWTYPE;
 BEGIN
     IF auth.uid() IS NULL
-       OR public.get_tenant_role(p_tenant_id) NOT IN ('owner', 'admin', 'manager') THEN
+       OR COALESCE(public.get_tenant_role(p_tenant_id), '') NOT IN ('owner', 'admin', 'manager') THEN
         RAISE EXCEPTION 'UNAUTHORIZED_CHANNEL_LISTING_WRITE' USING ERRCODE = '42501';
     END IF;
     IF v_channel NOT IN ('AIRBNB', 'BOOKING_COM', 'VRBO', 'EXPEDIA', 'DIRECT', 'OTHER_OTA') THEN

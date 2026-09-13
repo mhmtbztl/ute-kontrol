@@ -205,11 +205,12 @@ phase19 (atomik rezervasyon silme), phase20 (ay kapanışı bütünlüğü),
 phase21 (veri sıfırlama), phase17 (pazarlama — 14 tablo + 20 fonksiyon,
 2026-09-13 doğrulandı).
 
-**Bekleyen:** phase22 (`migration_phase22_marketing_anon_revoke.sql`) — Phase 17
-fonksiyonlarından `anon` yetkisini geri alır. Uygulanana kadar kimliği
-doğrulanmamış çağrılar bu fonksiyonların gövdesine girebilir; içerideki
-`auth.uid()` / `SERVICE_ROLE_REQUIRED` kontrolleri onları reddeder, yani veri
-sızıntısı yoktur ama ilk savunma katmanı eksiktir.
+phase22 (Phase 17 fonksiyonlarından `anon` yetkisinin geri alınması) uygulandı.
+
+**Bekleyen — ACİL:** phase23 (`migration_phase23_marketing_tenant_guard.sql`).
+Çapraz kiracı yazma açığını kapatır (§7'ye bakın). Uygulanana kadar
+`marketing_tenant_isolation_tests.js` **kırmızı kalır ve kırmızı kalması
+doğrudur** — üretimde gerçekten yabancı kiracı yazabiliyor demektir.
 
 Göçün uygulanıp uygulanmadığını doğrulamanın en hızlı yolu şemayı okumak değil,
 **PostgREST'e anon anahtarıyla sormaktır**: fonksiyon gövdesindeki hatayı
@@ -269,7 +270,8 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 | Demo artığı taraması | tamamlandı — ağı `demo_residue_tests` |
 | Veri sıfırlama | tamamlandı (phase21) — göç uygulandı |
 | Phase 17 pazarlama (Codex, PR #1) | birleştirildi; tablolar + RPC'ler üretimde |
-| Phase 17 `anon` yetkisi | **phase22 göçü uygulanmayı bekliyor** — ağı `marketing_anon_grant_tests` |
+| Phase 17 `anon` yetkisi | tamamlandı (phase22 uygulandı) — ağı `marketing_anon_grant_tests` |
+| Çapraz kiracı yazma açığı | **phase23 göçü uygulanmayı bekliyor — ACİL** — ağı `marketing_tenant_isolation_tests` |
 | Fotoğraf AI worker'ı | `GEMINI_API_KEY` yok; Actions adımı güvenle atlanıyor — **harici bağımlılık** |
 | `get_executive_dashboard_snapshot` | tanımlı ama arayüzde **hiç çağrılmıyor**; içinde tahakkuk ve gece sayımı hataları var (§3.4) |
 | Excel içe/dışa aktarma | "Şirket Genel Raporu" içe aktarımı devre dışı bırakıldı, gerçek uygulama yok |
@@ -307,6 +309,37 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
   `SELECT ... FOR UPDATE` yapıp sonra yetkiye bakıyor: kimliği doğrulanmamış bir
   çağrı rastgele satırlara kilit alabiliyor ve hata mesajı ("bulunamadı" ile
   "yetkisiz" farklı) bir UUID'nin var olup olmadığını sızdırıyor.
+- **`NULL NOT IN (...)` bir koruma DEĞİLDİR.** Phase 17'nin yetki kontrolü şuydu:
+
+  ```sql
+  IF auth.uid() IS NULL
+     OR public.get_tenant_role(p_tenant_id) NOT IN ('owner','admin','manager') THEN
+      RAISE EXCEPTION 'UNAUTHORIZED...';
+  END IF;
+  ```
+
+  Çağıran kişi **hedef kiracının üyesi değilse** `get_tenant_role` NULL döner.
+  SQL üç değerli mantığında `NULL NOT IN (...)` sonucu TRUE değil **NULL**'dır;
+  `FALSE OR NULL` → NULL; `IF NULL THEN` çalışmaz. Yani koruma **tam da
+  korumasi gereken anda** — yabancı kiracıdan gelen çağrıda — sessizce atlanır.
+
+  Üretimde kanıtlandı (2026-09-14): B kiracısının sahibi, A kiracısının
+  defterine kanal ilanı, kanal snapshot'ı ve pazarlama referansı yazdı.
+  Okuma tarafı RLS ile korunuyordu (sızıntı yok); kırılan **yazma bütünlüğüydü**.
+
+  Phase 16 aynı kontrolü doğru yazıyordu: `IF v_role IS NULL OR v_role NOT IN (...)`.
+  Phase 17 `IS NULL` yarısını düşürdü. Doğru kalıp ikisinden biri:
+
+  ```sql
+  COALESCE(public.get_tenant_role(p_tenant_id), '') NOT IN ('owner','admin','manager')
+  v_role IS NULL OR v_role NOT IN ('owner','admin','manager')
+  ```
+
+  RLS politikaları **pozitif** `IN` kullandığı için etkilenmedi (NULL → izin yok).
+  Tehlike yalnızca prosedürel `IF ... NOT IN` kalıbındadır.
+
+  İki ağ birden tutuyor: `marketing_anon_grant_tests` kaynakta kalıbı yasaklar,
+  `marketing_tenant_isolation_tests` üretime karşı davranışı ölçer.
 - **Yetki yükseltme:** `admin` rolü yalnızca `manager/staff/viewer` verebilir. Bir zamanlar
   doğrudan `owner` ekleyebiliyordu — işletmeyi devralma yolu.
 - **Koruma tetikleyicileri cascade'i engellememeli.** Beş tetikleyici (son sahip, kapanmış dönem ×2,

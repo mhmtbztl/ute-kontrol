@@ -15,7 +15,7 @@ runTest('Manual snapshot uses one security-definer RPC with a locked search path
   assert.match(sql, /CREATE OR REPLACE FUNCTION public\.record_manual_channel_snapshot[\s\S]*?SECURITY DEFINER[\s\S]*?SET search_path = ''/i);
 });
 runTest('Caller role and tenant-owned listing are verified', () => {
-  assert.match(sql, /get_tenant_role\(p_tenant_id\) NOT IN \('owner', 'admin', 'manager', 'staff'\)/i);
+  assert.match(sql, /COALESCE\(public\.get_tenant_role\(p_tenant_id\), ''\) NOT IN \('owner', 'admin', 'manager', 'staff'\)/i);
   assert.match(sql, /property_channel_listings[\s\S]*?tenant_id = p_tenant_id AND id = p_channel_listing_id/i);
 });
 runTest('Empty, negative and impossible funnels fail before insert', () => {

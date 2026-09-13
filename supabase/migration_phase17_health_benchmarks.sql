@@ -71,7 +71,7 @@ SET search_path = ''
 AS $$
 DECLARE v_id UUID;
 BEGIN
-    IF auth.uid() IS NULL OR public.get_tenant_role(p_tenant_id) NOT IN ('owner', 'admin', 'manager') THEN
+    IF auth.uid() IS NULL OR COALESCE(public.get_tenant_role(p_tenant_id), '') NOT IN ('owner', 'admin', 'manager') THEN
         RAISE EXCEPTION 'UNAUTHORIZED_MARKETING_BENCHMARK' USING ERRCODE = '42501';
     END IF;
     IF NOT EXISTS (SELECT 1 FROM public.properties WHERE tenant_id = p_tenant_id AND id = p_property_id) THEN
