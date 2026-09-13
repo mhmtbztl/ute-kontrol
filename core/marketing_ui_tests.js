@@ -257,7 +257,7 @@ runTest('Gallery renders only schema-validated analysis results for the current 
   assert.match(html, /Kanal bazlı mevcut kapak belirtilmedi/);
 });
 
-runTest('Cover-change form requires scoped listing, distinct media choices and observational windows', () => {
+runTest('Cover-change form uses the recorded cover and creates fixed observational windows atomically', () => {
   const propertyId = '22222222-2222-4222-8222-222222222222';
   const model = MarketingUI.buildWorkspaceModel({
     filter: { period: 'ALL', villa: 'AZURE' }, bookings: [],
@@ -266,14 +266,17 @@ runTest('Cover-change form requires scoped listing, distinct media choices and o
     media: [
       { id: 'M1', property_id: propertyId, media_status: 'ACTIVE', room_category: 'POOL' },
       { id: 'M2', property_id: propertyId, media_status: 'ACTIVE', room_category: 'EXTERIOR' }
+    ],
+    placements: [
+      { channel_listing_id: 'L1', media_id: 'M1', is_active: true, is_cover: true },
+      { channel_listing_id: 'L1', media_id: 'M2', is_active: true, is_cover: false }
     ]
   });
   const html = MarketingUI.renderExperimentForm(model);
-  assert.match(html, /name="changeType" value="COVER_MEDIA"/);
-  assert.match(html, /name="oldMediaId" required/);
+  assert.match(html, /name="expectedOldMediaId" value="M1"/);
   assert.match(html, /name="newMediaId" required/);
-  assert.match(html, /en az 14 gün/);
-  assert.match(html, /bir A\/B testi değildir/);
+  assert.match(html, /14\+14 gün/);
+  assert.match(html, /OTA’ya yayın yapılmaz/);
 });
 
 runTest('Evaluated experiments retain the non-causal disclosure', () => {
@@ -304,7 +307,7 @@ runTest('Marketing bootstrap and lazy dependencies carry current content hashes'
   const uiSource = fs.readFileSync(path.join(__dirname, 'marketing_ui.js'), 'utf8');
   const hash = file => crypto.createHash('sha1').update(fs.readFileSync(file)).digest('hex').slice(0, 8);
   assert.match(index, new RegExp(`core/marketing_ui\\.js\\?v=${hash(path.join(__dirname, 'marketing_ui.js'))}`));
-  ['marketing_engine.js', 'marketing_funnel_service.js', 'marketing_priority_service.js', 'marketing_benchmark_service.js', 'marketing_data_service.js', 'marketing_review_service.js', 'marketing_snapshot_service.js', 'marketing_channel_listing_service.js', 'marketing_media_upload_service.js', 'marketing_photo_analysis_service.js', 'marketing_experiment_service.js', 'marketing_photo_results_service.js', 'marketing_health_results_service.js'].forEach(file => {
+  ['marketing_engine.js', 'marketing_funnel_service.js', 'marketing_priority_service.js', 'marketing_benchmark_service.js', 'marketing_cover_change_service.js', 'marketing_data_service.js', 'marketing_review_service.js', 'marketing_snapshot_service.js', 'marketing_channel_listing_service.js', 'marketing_media_upload_service.js', 'marketing_photo_analysis_service.js', 'marketing_experiment_service.js', 'marketing_photo_results_service.js', 'marketing_health_results_service.js'].forEach(file => {
     assert.match(uiSource, new RegExp(`${file.replace('.', '\\.') }\\?v=${hash(path.join(__dirname, file))}`));
   });
 });

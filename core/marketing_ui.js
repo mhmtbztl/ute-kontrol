@@ -10,6 +10,8 @@
       MarketingFunnelService: require('./marketing_funnel_service'),
       MarketingPriorityService: require('./marketing_priority_service'),
       MarketingBenchmarkService: require('./marketing_benchmark_service'),
+      MarketingCoverChangeService: require('./marketing_cover_change_service'),
+      MarketingCoverChangeService: require('./marketing_cover_change_service'),
       MarketingPhotoResultsService: require('./marketing_photo_results_service'),
       MarketingHealthResultsService: require('./marketing_health_results_service')
     });
@@ -50,6 +52,8 @@
     ['MarketingFunnelService', 'core/marketing_funnel_service.js?v=a5ecbdaa'],
     ['MarketingPriorityService', 'core/marketing_priority_service.js?v=f6e216ff'],
     ['MarketingBenchmarkService', 'core/marketing_benchmark_service.js?v=05187d46'],
+    ['MarketingCoverChangeService', 'core/marketing_cover_change_service.js?v=81211a39'],
+    ['MarketingCoverChangeService', 'core/marketing_cover_change_service.js?v=81211a39'],
     ['MarketingDataService', 'core/marketing_data_service.js?v=a048dab9'],
     ['MarketingReviewService', 'core/marketing_review_service.js?v=9207dee5'],
     ['MarketingSnapshotService', 'core/marketing_snapshot_service.js?v=184ad517'],
@@ -406,7 +410,7 @@
     const analysisDisabled = !selectedId || !activeMedia.length || Boolean(activeRun);
     const analysisLabel = activeRun ? 'Analiz sürüyor' : 'AI ile analiz et';
     const experimentDisabled = !selectedId || !scopedListings.length || activeMedia.length < 2;
-    const toolbar = `<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-bottom:12px"><button type="button" class="btn btn-secondary btn-sm" data-marketing-open-experiment${experimentDisabled ? ' disabled' : ''}>Kapak değişikliğini ölç</button><button type="button" class="btn btn-secondary btn-sm" data-marketing-request-analysis${analysisDisabled ? ' disabled' : ''}>${analysisLabel}</button><button type="button" class="btn btn-primary btn-sm" data-marketing-open-media>＋ Fotoğraf yükle</button></div>`;
+    const toolbar = `<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-bottom:12px"><button type="button" class="btn btn-secondary btn-sm" data-marketing-open-experiment${experimentDisabled ? ' disabled' : ''}>Kapağı değiştir ve ölç</button><button type="button" class="btn btn-secondary btn-sm" data-marketing-request-analysis${analysisDisabled ? ' disabled' : ''}>${analysisLabel}</button><button type="button" class="btn btn-primary btn-sm" data-marketing-open-media>＋ Fotoğraf yükle</button></div>`;
     const form = state.mediaFormOpen ? renderMediaUploadForm(model) : '';
     const experimentForm = state.experimentFormOpen ? renderExperimentForm(model) : '';
     if (!model.media.length && !model.analysisRuns.length && !model.experiments.length) {
@@ -479,28 +483,18 @@
     const listings = model.listings.filter(item => (item.propertyId || item.property_id) === propertyId);
     const media = model.media.filter(item => (item.propertyId || item.property_id) === propertyId
       && String(item.mediaStatus || item.media_status || '').toUpperCase() === 'ACTIVE');
-    if (!propertyId || !listings.length || media.length < 2) {
-      return emptyState('Ölçüm kapsamı hazır değil', 'Tek bir mülk, en az bir kanal ilanı ve iki aktif fotoğraf seçilebilir olmalıdır.');
-    }
-    const listingOptions = listings.map(item => `<option value="${escapeHtml(item.id)}">${escapeHtml(CHANNEL_LABELS[item.channelCode || item.channel_code] || item.displayName || item.display_name || 'Kanal ilanı')}</option>`).join('');
-    const mediaOptions = media.map(item => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.roomCategory || item.room_category || 'Fotoğraf')} · ${escapeHtml(String(item.id).slice(0, 8))}</option>`).join('');
-    return `<form data-marketing-experiment-form class="card" style="padding:16px;margin-bottom:14px">
-      <h3 style="margin:0 0 6px">Kapak değişikliğinin etkisini izle</h3>
-      <div class="sub-text" style="margin-bottom:12px">Bu bir A/B testi değildir; sonuç yalnızca gözlemsel ilişki olarak raporlanır. Her pencere en az 14 gün olmalıdır.</div>
-      <input type="hidden" name="changeType" value="COVER_MEDIA">
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px">
-        <label style="display:grid;gap:5px;font-size:12px">Kanal ilanı<select class="form-control" name="channelListingId" required>${listingOptions}</select></label>
-        <label style="display:grid;gap:5px;font-size:12px">Eski kapak<select class="form-control" name="oldMediaId" required>${mediaOptions}</select></label>
-        <label style="display:grid;gap:5px;font-size:12px">Yeni kapak<select class="form-control" name="newMediaId" required>${mediaOptions}</select></label>
-        <label style="display:grid;gap:5px;font-size:12px">Değişiklik tarihi<input class="form-control" type="date" name="changeDate" required></label>
-        <label style="display:grid;gap:5px;font-size:12px">Önce başlangıç<input class="form-control" type="date" name="beforeStartDate" required></label>
-        <label style="display:grid;gap:5px;font-size:12px">Önce bitiş (hariç)<input class="form-control" type="date" name="beforeEndExclusive" required></label>
-        <label style="display:grid;gap:5px;font-size:12px">Sonra başlangıç<input class="form-control" type="date" name="afterStartDate" required></label>
-        <label style="display:grid;gap:5px;font-size:12px">Sonra bitiş (hariç)<input class="form-control" type="date" name="afterEndExclusive" required></label>
-        <label style="display:grid;gap:5px;font-size:12px">Birincil metrik<select class="form-control" name="primaryMetric"><option value="SEARCH_TO_VIEW_CTR_PERCENT">Arama → görüntüleme CTR</option><option value="VIEW_TO_BOOKING_CONVERSION_PERCENT">Görüntüleme → rezervasyon</option></select></label>
-      </div>
-      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button type="button" class="btn btn-secondary btn-sm" data-marketing-cancel-experiment>Vazgeç</button><button type="submit" class="btn btn-primary btn-sm">Ölçümü başlat</button></div>
-    </form>`;
+    if (!propertyId || !listings.length || media.length < 2) return emptyState('Kapak değişimi hazır değil', 'Tek bir mülk, kanal ilanı ve en az iki aktif fotoğraf gerekir.');
+    const forms = listings.map(listing => {
+      const cover = services.MarketingCoverChangeService && services.MarketingCoverChangeService.currentCover(model.placements, listing.id);
+      if (!cover) return `<div class="sub-text">${escapeHtml(listing.displayName || listing.display_name || listing.channelCode || listing.channel_code)}: ölçülebilir değişim için önce mevcut kapak yerleşimi tanımlanmalıdır.</div>`;
+      const oldMediaId = cover.mediaId || cover.media_id;
+      const placedIds = new Set(model.placements.filter(row => (row.channelListingId || row.channel_listing_id) === listing.id && (row.isActive !== undefined ? row.isActive : row.is_active) !== false).map(row => row.mediaId || row.media_id));
+      const candidates = media.filter(item => item.id !== oldMediaId && placedIds.has(item.id));
+      if (!candidates.length) return `<div class="sub-text">${escapeHtml(listing.displayName || listing.display_name || listing.channelCode || listing.channel_code)}: aktif yerleşimde alternatif kapak yok.</div>`;
+      const options = candidates.map(item => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.roomCategory || item.room_category || 'Fotoğraf')} · ${escapeHtml(String(item.id).slice(0, 8))}</option>`).join('');
+      return `<form data-marketing-experiment-form style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;align-items:end"><input type="hidden" name="channelListingId" value="${escapeHtml(listing.id)}"><input type="hidden" name="expectedOldMediaId" value="${escapeHtml(oldMediaId)}"><label style="display:grid;gap:5px;font-size:12px">Yeni kapak<select class="form-control" name="newMediaId" required>${options}</select></label><label style="display:grid;gap:5px;font-size:12px">İzlenecek metrik<select class="form-control" name="primaryMetric"><option value="SEARCH_TO_VIEW_CTR_PERCENT">Arama → görüntüleme CTR</option><option value="VIEW_TO_BOOKING_CONVERSION_PERCENT">Görüntüleme → rezervasyon</option></select></label><button type="submit" class="btn btn-primary btn-sm">Değiştir ve 14+14 gün izle</button></form>`;
+    }).join('<hr style="border:0;border-top:1px solid rgba(148,163,184,.2);margin:12px 0">');
+    return `<div class="card" style="padding:16px;margin-bottom:14px"><h3 style="margin:0 0 6px">Kayıtlı kanal kapağını değiştir</h3><div class="sub-text" style="margin-bottom:12px">Yalnızca Lexbnb yerleşimi değişir; OTA’ya yayın yapılmaz. Eski kapak eşleşmezse işlem durur ve 14+14 günlük gözlemsel ölçüm atomik olarak açılır.</div>${forms}<div style="display:flex;justify-content:flex-end;margin-top:12px"><button type="button" class="btn btn-secondary btn-sm" data-marketing-cancel-experiment>Vazgeç</button></div></div>`;
   }
 
   function renderExperiments(experiments, propertyId) {
@@ -744,12 +738,12 @@
   async function handleExperimentSubmit(form) {
     const client = typeof supabaseClient !== 'undefined' ? supabaseClient : null;
     const scope = cloudScope();
-    if (!client || !scope || !scope.propertyId || !services.MarketingExperimentService) throw new Error('EXPERIMENT_REQUEST_UNAVAILABLE');
+    if (!client || !scope || !scope.propertyId || !services.MarketingCoverChangeService) throw new Error('COVER_CHANGE_UNAVAILABLE');
     const values = Object.fromEntries(new FormData(form).entries());
     const submit = form.querySelector('[type="submit"]');
     if (submit) submit.disabled = true;
     try {
-      const result = await services.MarketingExperimentService.requestEvaluation(client, {
+      const result = await services.MarketingCoverChangeService.changeCoverAndMeasure(client, {
         ...values, tenantId: scope.tenantId, propertyId: scope.propertyId
       });
       state.experimentFormOpen = false;
