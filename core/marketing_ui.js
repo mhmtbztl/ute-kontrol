@@ -48,21 +48,20 @@
   });
 
   const BROWSER_DEPENDENCIES = Object.freeze([
-    ['MarketingEngine', 'core/marketing_engine.js?v=2756f4ec'],
-    ['MarketingFunnelService', 'core/marketing_funnel_service.js?v=a5ecbdaa'],
-    ['MarketingPriorityService', 'core/marketing_priority_service.js?v=f6e216ff'],
-    ['MarketingBenchmarkService', 'core/marketing_benchmark_service.js?v=05187d46'],
-    ['MarketingCoverChangeService', 'core/marketing_cover_change_service.js?v=81211a39'],
-    ['MarketingCoverChangeService', 'core/marketing_cover_change_service.js?v=81211a39'],
-    ['MarketingDataService', 'core/marketing_data_service.js?v=a048dab9'],
-    ['MarketingReviewService', 'core/marketing_review_service.js?v=9207dee5'],
-    ['MarketingSnapshotService', 'core/marketing_snapshot_service.js?v=184ad517'],
-    ['MarketingChannelListingService', 'core/marketing_channel_listing_service.js?v=0e34cbca'],
-    ['MarketingMediaUploadService', 'core/marketing_media_upload_service.js?v=52d4d9ce'],
-    ['MarketingPhotoAnalysisService', 'core/marketing_photo_analysis_service.js?v=639eaf5b'],
-    ['MarketingExperimentService', 'core/marketing_experiment_service.js?v=4a2ffb14'],
-    ['MarketingPhotoResultsService', 'core/marketing_photo_results_service.js?v=19d43eea'],
-    ['MarketingHealthResultsService', 'core/marketing_health_results_service.js?v=662edeea']
+    ['MarketingEngine', 'core/marketing_engine.js?v=0b2cf1ad'],
+    ['MarketingFunnelService', 'core/marketing_funnel_service.js?v=64989a7a'],
+    ['MarketingPriorityService', 'core/marketing_priority_service.js?v=3a417ad7'],
+    ['MarketingBenchmarkService', 'core/marketing_benchmark_service.js?v=6108d03a'],
+    ['MarketingCoverChangeService', 'core/marketing_cover_change_service.js?v=912ec2cb'],
+    ['MarketingDataService', 'core/marketing_data_service.js?v=cd923b28'],
+    ['MarketingReviewService', 'core/marketing_review_service.js?v=067c5889'],
+    ['MarketingSnapshotService', 'core/marketing_snapshot_service.js?v=4d5f61d1'],
+    ['MarketingChannelListingService', 'core/marketing_channel_listing_service.js?v=51df5778'],
+    ['MarketingMediaUploadService', 'core/marketing_media_upload_service.js?v=e0df6011'],
+    ['MarketingPhotoAnalysisService', 'core/marketing_photo_analysis_service.js?v=83dd4cdd'],
+    ['MarketingExperimentService', 'core/marketing_experiment_service.js?v=fe7721a0'],
+    ['MarketingPhotoResultsService', 'core/marketing_photo_results_service.js?v=f8de9513'],
+    ['MarketingHealthResultsService', 'core/marketing_health_results_service.js?v=3648f2e7']
   ]);
   let dependencyPromise = null;
 
