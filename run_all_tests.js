@@ -102,7 +102,10 @@ const testFiles = [
   'marketing_health_worker_repository_tests.js',
   'marketing_health_worker_schema_tests.js',
   'marketing_health_worker_entrypoint_tests.js',
-  'marketing_benchmark_service_tests.js'
+  'marketing_benchmark_service_tests.js',
+  'marketing_health_source_collector_tests.js',
+  'marketing_health_source_repository_tests.js',
+  'marketing_health_source_entrypoint_tests.js'
 ];
 
 console.log('=============================================================================');

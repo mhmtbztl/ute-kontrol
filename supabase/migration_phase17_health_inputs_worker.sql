@@ -57,6 +57,46 @@ USING (public.is_tenant_member(tenant_id));
 ALTER TABLE public.property_marketing_health_snapshots
     ADD COLUMN IF NOT EXISTS source_input_ids UUID[] NOT NULL DEFAULT ARRAY[]::UUID[];
 
+CREATE OR REPLACE FUNCTION public.record_property_marketing_health_input(
+    p_tenant_id UUID, p_property_id UUID, p_component_key TEXT, p_measurement_kind TEXT,
+    p_status TEXT, p_observed_value NUMERIC, p_reference_value NUMERIC,
+    p_sample_size NUMERIC, p_min_sample_size NUMERIC, p_confidence NUMERIC,
+    p_reason TEXT, p_source_kind TEXT, p_source_record_id TEXT, p_evidence JSONB,
+    p_input_fingerprint TEXT, p_as_of TIMESTAMPTZ, p_expires_at TIMESTAMPTZ
+)
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE v_id UUID;
+BEGIN
+    IF auth.role() IS DISTINCT FROM 'service_role' THEN
+        RAISE EXCEPTION 'SERVICE_ROLE_REQUIRED' USING ERRCODE = '42501';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM public.properties WHERE tenant_id = p_tenant_id AND id = p_property_id) THEN
+        RAISE EXCEPTION 'HEALTH_INPUT_PROPERTY_SCOPE_MISMATCH' USING ERRCODE = '42501';
+    END IF;
+    INSERT INTO public.property_marketing_health_inputs (
+        tenant_id, property_id, component_key, measurement_kind, status,
+        observed_value, reference_value, sample_size, min_sample_size, confidence,
+        reason, source_kind, source_record_id, evidence, input_fingerprint, as_of, expires_at
+    ) VALUES (
+        p_tenant_id, p_property_id, upper(trim(p_component_key)), upper(trim(p_measurement_kind)), upper(trim(p_status)),
+        p_observed_value, p_reference_value, p_sample_size, p_min_sample_size, p_confidence,
+        NULLIF(trim(p_reason), ''), upper(trim(p_source_kind)), NULLIF(trim(p_source_record_id), ''),
+        COALESCE(p_evidence, '{}'::jsonb), p_input_fingerprint, p_as_of, p_expires_at
+    ) ON CONFLICT (tenant_id, property_id, component_key, input_fingerprint)
+      DO NOTHING RETURNING id INTO v_id;
+    IF v_id IS NULL THEN
+        SELECT id INTO v_id FROM public.property_marketing_health_inputs
+        WHERE tenant_id = p_tenant_id AND property_id = p_property_id
+          AND component_key = upper(trim(p_component_key)) AND input_fingerprint = p_input_fingerprint;
+    END IF;
+    RETURN v_id;
+END;
+$$;
+
 CREATE OR REPLACE FUNCTION public.persist_property_marketing_health_snapshot(
     p_tenant_id UUID,
     p_property_id UUID,
@@ -120,6 +160,8 @@ $$;
 
 REVOKE ALL ON FUNCTION public.persist_property_marketing_health_snapshot(UUID, UUID, TEXT, TEXT, TIMESTAMPTZ, JSONB, UUID[]) FROM PUBLIC, authenticated;
 GRANT EXECUTE ON FUNCTION public.persist_property_marketing_health_snapshot(UUID, UUID, TEXT, TEXT, TIMESTAMPTZ, JSONB, UUID[]) TO service_role;
+REVOKE ALL ON FUNCTION public.record_property_marketing_health_input(UUID, UUID, TEXT, TEXT, TEXT, NUMERIC, NUMERIC, NUMERIC, NUMERIC, NUMERIC, TEXT, TEXT, TEXT, JSONB, TEXT, TIMESTAMPTZ, TIMESTAMPTZ) FROM PUBLIC, authenticated;
+GRANT EXECUTE ON FUNCTION public.record_property_marketing_health_input(UUID, UUID, TEXT, TEXT, TEXT, NUMERIC, NUMERIC, NUMERIC, NUMERIC, NUMERIC, TEXT, TEXT, TEXT, JSONB, TEXT, TIMESTAMPTZ, TIMESTAMPTZ) TO service_role;
 
 -- No INSERT/UPDATE/DELETE policies are intentional. Trusted service-role importers
 -- append raw component inputs; only the worker RPC writes final snapshots.

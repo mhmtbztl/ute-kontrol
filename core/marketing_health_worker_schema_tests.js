@@ -22,6 +22,10 @@ test('Only service role can persist final snapshots', () => {
   assert.match(sql, /auth\.role\(\) IS DISTINCT FROM 'service_role'/i);
   assert.match(sql, /REVOKE ALL ON FUNCTION public\.persist_property_marketing_health_snapshot.*FROM PUBLIC, authenticated/i);
 });
+test('Only service role can append collector inputs', () => {
+  assert.match(sql, /CREATE OR REPLACE FUNCTION public\.record_property_marketing_health_input[\s\S]*?auth\.role\(\) IS DISTINCT FROM 'service_role'/i);
+  assert.match(sql, /REVOKE ALL ON FUNCTION public\.record_property_marketing_health_input[\s\S]*?FROM PUBLIC, authenticated/i);
+});
 test('Final snapshots require same-property source evidence and no imputation', () => {
   assert.match(sql, /HEALTH_SOURCE_SCOPE_MISMATCH/i);
   assert.match(sql, /'missingDataImputed' IS DISTINCT FROM 'false'::jsonb/i);
