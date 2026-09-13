@@ -86,6 +86,27 @@ runTest('Economics renders only a reportable backend health snapshot', () => {
   assert.match(html, /health-v1/);
 });
 
+runTest('Economics exposes source-attributed benchmark history without invented defaults', () => {
+  const propertyId = '22222222-2222-4222-8222-222222222222';
+  const model = MarketingUI.buildWorkspaceModel({ filter: { period: 'ALL', villa: 'AZURE' }, bookings: [],
+    villas: { AZURE: { id: propertyId, name: 'Villa Azure' } }, benchmarks: [{ property_id: propertyId,
+      source_kind: 'MANUAL_RESEARCH', effective_from: '2026-09-01', confidence: 0.8,
+      max_distribution_cost_percent: 15, minimum_direct_reservation_share_percent: 20 }] });
+  const html = MarketingUI.renderWorkspaceHtml(model, 'economics');
+  assert.match(html, /Geçerli pazarlama referansı/); assert.match(html, /MANUAL_RESEARCH/);
+  assert.match(html, /Azami dağıtım maliyeti: 15%/); assert.match(html, /Asgari direkt pay: 20%/);
+  assert.match(MarketingUI.renderBenchmarkForm(model), /Kaydedilen referans geçmişi değiştirilemez/);
+});
+
+runTest('Future and expired benchmarks are not presented as current', () => {
+  const propertyId = 'P1'; const rows = [
+    { property_id: propertyId, id: 'expired', effective_from: '2026-01-01', effective_to_exclusive: '2026-02-01' },
+    { property_id: propertyId, id: 'current', effective_from: '2026-08-01', effective_to_exclusive: null },
+    { property_id: propertyId, id: 'future', effective_from: '2026-10-01', effective_to_exclusive: null }
+  ];
+  assert.strictEqual(MarketingUI.selectCurrentBenchmark(rows, propertyId, '2026-09-13').id, 'current');
+});
+
 runTest('Insufficient health evidence remains scoreless in the UI', () => {
   const propertyId = '22222222-2222-4222-8222-222222222222';
   const model = MarketingUI.buildWorkspaceModel({
@@ -283,7 +304,7 @@ runTest('Marketing bootstrap and lazy dependencies carry current content hashes'
   const uiSource = fs.readFileSync(path.join(__dirname, 'marketing_ui.js'), 'utf8');
   const hash = file => crypto.createHash('sha1').update(fs.readFileSync(file)).digest('hex').slice(0, 8);
   assert.match(index, new RegExp(`core/marketing_ui\\.js\\?v=${hash(path.join(__dirname, 'marketing_ui.js'))}`));
-  ['marketing_engine.js', 'marketing_funnel_service.js', 'marketing_priority_service.js', 'marketing_data_service.js', 'marketing_review_service.js', 'marketing_snapshot_service.js', 'marketing_channel_listing_service.js', 'marketing_media_upload_service.js', 'marketing_photo_analysis_service.js', 'marketing_experiment_service.js', 'marketing_photo_results_service.js', 'marketing_health_results_service.js'].forEach(file => {
+  ['marketing_engine.js', 'marketing_funnel_service.js', 'marketing_priority_service.js', 'marketing_benchmark_service.js', 'marketing_data_service.js', 'marketing_review_service.js', 'marketing_snapshot_service.js', 'marketing_channel_listing_service.js', 'marketing_media_upload_service.js', 'marketing_photo_analysis_service.js', 'marketing_experiment_service.js', 'marketing_photo_results_service.js', 'marketing_health_results_service.js'].forEach(file => {
     assert.match(uiSource, new RegExp(`${file.replace('.', '\\.') }\\?v=${hash(path.join(__dirname, file))}`));
   });
 });

@@ -93,6 +93,14 @@ function mockClient(rowsByTable = {}, errorsByTable = {}) {
     assert.strictEqual(result.placements.length, 1);
   });
 
+  await runTest('Benchmark history is read-only and property scoped', async () => {
+    const client = mockClient({ property_marketing_benchmarks: [{ id: 'benchmark' }] });
+    const result = await MarketingDataService.loadMarketingWorkspaceData(client, { tenantId: TENANT, propertyId: PROPERTY });
+    const call = client.calls.find(item => item.table === 'property_marketing_benchmarks');
+    assert.ok(call.filters.some(filter => filter.column === 'property_id' && filter.value === PROPERTY));
+    assert.strictEqual(result.benchmarks.length, 1);
+  });
+
   await runTest('Health snapshots are read by property and newest evidence time', async () => {
     const client = mockClient();
     const result = await MarketingDataService.loadMarketingWorkspaceData(client, { tenantId: TENANT, propertyId: PROPERTY });

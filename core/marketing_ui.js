@@ -9,6 +9,7 @@
       MarketingEngine: require('./marketing_engine'),
       MarketingFunnelService: require('./marketing_funnel_service'),
       MarketingPriorityService: require('./marketing_priority_service'),
+      MarketingBenchmarkService: require('./marketing_benchmark_service'),
       MarketingPhotoResultsService: require('./marketing_photo_results_service'),
       MarketingHealthResultsService: require('./marketing_health_results_service')
     });
@@ -24,11 +25,13 @@
     listingFormOpen: false,
     mediaFormOpen: false,
     experimentFormOpen: false,
+    benchmarkFormOpen: false,
     listings: [],
     snapshots: [],
     findings: [],
     media: [],
     placements: [],
+    benchmarks: [],
     analysisRuns: [],
     experiments: [],
     healthSnapshots: [],
@@ -46,7 +49,8 @@
     ['MarketingEngine', 'core/marketing_engine.js?v=2756f4ec'],
     ['MarketingFunnelService', 'core/marketing_funnel_service.js?v=a5ecbdaa'],
     ['MarketingPriorityService', 'core/marketing_priority_service.js?v=f6e216ff'],
-    ['MarketingDataService', 'core/marketing_data_service.js?v=da2eb808'],
+    ['MarketingBenchmarkService', 'core/marketing_benchmark_service.js?v=05187d46'],
+    ['MarketingDataService', 'core/marketing_data_service.js?v=a048dab9'],
     ['MarketingReviewService', 'core/marketing_review_service.js?v=9207dee5'],
     ['MarketingSnapshotService', 'core/marketing_snapshot_service.js?v=184ad517'],
     ['MarketingChannelListingService', 'core/marketing_channel_listing_service.js?v=0e34cbca'],
@@ -156,6 +160,7 @@
       findings: Array.isArray(input.findings) ? input.findings : [],
       media: Array.isArray(input.media) ? input.media : [],
       placements: Array.isArray(input.placements) ? input.placements : [],
+      benchmarks: Array.isArray(input.benchmarks) ? input.benchmarks : [],
       analysisRuns: Array.isArray(input.analysisRuns) ? input.analysisRuns : [],
       experiments: Array.isArray(input.experiments) ? input.experiments : [],
       healthSnapshots: Array.isArray(input.healthSnapshots) ? input.healthSnapshots : [],
@@ -230,7 +235,7 @@
     if (report.dataQuality.assumedCurrencyReservationCount) warnings.push(`${report.dataQuality.assumedCurrencyReservationCount} rezervasyonda para birimi TRY varsayıldı.`);
     warnings.push('Kanal bazlı müsait gece verilmediği için RevPAR gösterilmiyor.');
 
-    return `${renderMarketingHealth(model)}<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+    return `${renderMarketingHealth(model)}${renderBenchmarkPanel(model)}<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
       ${kpi('Oda geliri', money(totals.roomRevenueBeforeDistribution, report.currency), 'Temizlik hariç, komisyon öncesi')}
       ${kpi('Dağıtım maliyeti', money(totals.distributionCost, report.currency), 'Yalnızca kaydedilmiş komisyon')}
       ${kpi('Net oda geliri', money(totals.roomRevenueAfterDistribution, report.currency), 'Komisyon sonrası')}
@@ -243,6 +248,48 @@
       </tr></thead><tbody>${rows || '<tr><td colspan="7" style="padding:24px;text-align:center">Bu dönemde rezervasyon yok.</td></tr>'}</tbody></table>
     </div>
     <div class="card" style="padding:14px;margin-top:12px"><strong>Veri notları</strong><ul style="margin:8px 0 0;padding-left:20px">${warnings.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul></div>`;
+  }
+
+  function renderBenchmarkPanel(model) {
+    const selected = model.selectedProperty === 'ALL' ? null : model.properties.find(item => item.slug === model.selectedProperty);
+    const propertyId = selected && selected.id;
+    const current = selectCurrentBenchmark(model.benchmarks, propertyId, new Date().toISOString().slice(0, 10));
+    const button = `<button type="button" class="btn btn-secondary btn-sm" data-marketing-open-benchmark${propertyId ? '' : ' disabled'}>＋ Referans ekle</button>`;
+    const form = state.benchmarkFormOpen ? renderBenchmarkForm(model) : '';
+    if (!current) return `<div class="card" style="padding:14px;margin-bottom:12px"><div style="display:flex;justify-content:space-between;gap:12px;align-items:center"><div><strong>Pazarlama referansı yok</strong><div class="sub-text">Karşılaştırma bulguları, kaynağı ve geçerlilik tarihi belirtilmiş bir referans olmadan üretilmez.</div></div>${button}</div>${form}</div>`;
+    const values = [
+      ['CTR', current.searchToViewCtrPercent ?? current.search_to_view_ctr_percent, '%'],
+      ['Dönüşüm', current.viewToBookingConversionPercent ?? current.view_to_booking_conversion_percent, '%'],
+      ['Gösterim / ilan-gün', current.normalizedImpressionsPerListingDay ?? current.normalized_impressions_per_listing_day, ''],
+      ['Aktif medya', current.recommendedActiveMediaCount ?? current.recommended_active_media_count, ''],
+      ['Azami dağıtım maliyeti', current.maxDistributionCostPercent ?? current.max_distribution_cost_percent, '%'],
+      ['Asgari direkt pay', current.minimumDirectReservationSharePercent ?? current.minimum_direct_reservation_share_percent, '%']
+    ].filter(([, value]) => value !== null && value !== undefined).map(([label, value, suffix]) => `${label}: ${number(value, suffix)}`).join(' · ');
+    return `<div class="card" style="padding:14px;margin-bottom:12px"><div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start"><div><strong>Geçerli pazarlama referansı</strong><div class="sub-text">${escapeHtml(current.sourceKind || current.source_kind || 'Kaynak belirtilmedi')} · ${escapeHtml(current.effectiveFrom || current.effective_from || 'Tarih yok')} · güven ${number(Number(current.confidence) * 100, '%')}</div><div style="margin-top:7px;font-size:12px">${escapeHtml(values || 'Sayısal değer yok')}</div></div>${button}</div>${form}</div>`;
+  }
+
+  function selectCurrentBenchmark(benchmarks = [], propertyId, asOfDate) {
+    return benchmarks.filter(item => (!propertyId || (item.propertyId || item.property_id) === propertyId)
+      && String(item.effectiveFrom || item.effective_from || '') <= asOfDate
+      && (!(item.effectiveToExclusive || item.effective_to_exclusive) || String(item.effectiveToExclusive || item.effective_to_exclusive) > asOfDate))
+      .sort((a, b) => String(b.effectiveFrom || b.effective_from || '').localeCompare(String(a.effectiveFrom || a.effective_from || '')))[0] || null;
+  }
+
+  function renderBenchmarkForm(model) {
+    const selected = model.properties.find(item => item.slug === model.selectedProperty);
+    if (!selected || !selected.id) return '';
+    const numeric = (name, label, max = '', step = '0.001') => `<label style="display:grid;gap:5px;font-size:12px">${label}<input class="form-control" type="number" min="0"${max ? ` max="${max}"` : ''} step="${step}" name="${name}" placeholder="Boş bırakılabilir"></label>`;
+    return `<form data-marketing-benchmark-form style="margin-top:14px;border-top:1px solid rgba(148,163,184,.2);padding-top:14px"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px">
+      <label style="display:grid;gap:5px;font-size:12px">Kaynak türü<select class="form-control" name="sourceKind" required><option value="PORTFOLIO_HISTORY">Portföy geçmişi</option><option value="MARKET_PROVIDER">Pazar veri sağlayıcısı</option><option value="MANUAL_RESEARCH">Manuel araştırma</option></select></label>
+      <label style="display:grid;gap:5px;font-size:12px">Kaynak kaydı<input class="form-control" name="sourceRecordId" maxlength="300" placeholder="Rapor/dosya/sorgu referansı"></label>
+      <label style="display:grid;gap:5px;font-size:12px">Geçerlilik başlangıcı<input class="form-control" type="date" name="effectiveFrom" value="${new Date().toISOString().slice(0, 10)}" required></label>
+      <label style="display:grid;gap:5px;font-size:12px">Geçerlilik bitişi (hariç)<input class="form-control" type="date" name="effectiveToExclusive"></label>
+      ${numeric('searchToViewCtrPercent', 'Arama → görüntüleme CTR (%)', '100')}${numeric('viewToBookingConversionPercent', 'Görüntüleme → rezervasyon (%)', '100')}
+      ${numeric('normalizedImpressionsPerListingDay', 'Gösterim / ilan-gün')}${numeric('recommendedActiveMediaCount', 'Önerilen aktif medya', '', '1')}
+      ${numeric('maxDistributionCostPercent', 'Azami dağıtım maliyeti (%)', '100')}${numeric('minimumDirectReservationSharePercent', 'Asgari direkt rezervasyon payı (%)', '100')}
+      <label style="display:grid;gap:5px;font-size:12px">Güven (0–1)<input class="form-control" type="number" min="0" max="1" step="0.05" name="confidence" value="0.7" required></label>
+      <label style="display:grid;gap:5px;font-size:12px">Kanıt notu<input class="form-control" name="evidenceNote" maxlength="500"></label>
+    </div><div class="sub-text" style="margin-top:9px">En az bir sayısal değer gerekir. Kaydedilen referans geçmişi değiştirilemez.</div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button type="button" class="btn btn-secondary btn-sm" data-marketing-cancel-benchmark>Vazgeç</button><button type="submit" class="btn btn-primary btn-sm">Referansı kaydet</button></div></form>`;
   }
 
   function renderFunnel(model) {
@@ -497,7 +544,7 @@
     const scope = cloudScope();
     if (!client || !scope) {
       if (state.remoteScopeKey) {
-        ['listings', 'snapshots', 'findings', 'media', 'placements', 'analysisRuns', 'experiments', 'healthSnapshots'].forEach(key => { state[key] = []; });
+        ['listings', 'snapshots', 'findings', 'media', 'placements', 'benchmarks', 'analysisRuns', 'experiments', 'healthSnapshots'].forEach(key => { state[key] = []; });
       }
       state.remoteScopeKey = null;
       state.remoteStatus = 'LOCAL';
@@ -507,12 +554,12 @@
     const scopeKey = `${scope.tenantId}:${scope.propertyId || 'ALL'}`;
     if (state.remoteScopeKey === scopeKey && ['OK', 'PARTIAL', 'UNAVAILABLE'].includes(state.remoteStatus)) return null;
     state.remoteScopeKey = scopeKey;
-    ['listings', 'snapshots', 'findings', 'media', 'placements', 'analysisRuns', 'experiments', 'healthSnapshots'].forEach(key => { state[key] = []; });
+    ['listings', 'snapshots', 'findings', 'media', 'placements', 'benchmarks', 'analysisRuns', 'experiments', 'healthSnapshots'].forEach(key => { state[key] = []; });
     state.remoteStatus = 'LOADING';
     state.remoteErrors = [];
     const result = await services.MarketingDataService.loadMarketingWorkspaceData(client, scope);
     if (state.remoteScopeKey !== scopeKey) return null;
-    ['listings', 'snapshots', 'findings', 'media', 'placements', 'analysisRuns', 'experiments', 'healthSnapshots'].forEach(key => { state[key] = result[key]; });
+    ['listings', 'snapshots', 'findings', 'media', 'placements', 'benchmarks', 'analysisRuns', 'experiments', 'healthSnapshots'].forEach(key => { state[key] = result[key]; });
     state.remoteStatus = result.status;
     state.remoteErrors = result.errors;
     return result;
@@ -554,7 +601,7 @@
   }
 
   function setData(next = {}) {
-    ['listings', 'snapshots', 'findings', 'media', 'placements', 'analysisRuns', 'experiments', 'healthSnapshots'].forEach(key => {
+    ['listings', 'snapshots', 'findings', 'media', 'placements', 'benchmarks', 'analysisRuns', 'experiments', 'healthSnapshots'].forEach(key => {
       if (Array.isArray(next[key])) state[key] = next[key].slice();
     });
     if (typeof window !== 'undefined' && !services.MarketingEngine && typeof window.renderMarketingModule === 'function') {
@@ -608,6 +655,24 @@
     } finally {
       if (submit) submit.disabled = false;
     }
+  }
+
+  async function handleBenchmarkSubmit(form) {
+    const client = typeof supabaseClient !== 'undefined' ? supabaseClient : null;
+    const scope = cloudScope();
+    if (!client || !scope || !scope.propertyId || !services.MarketingBenchmarkService) throw new Error('MARKETING_BENCHMARK_UNAVAILABLE');
+    const values = Object.fromEntries(new FormData(form).entries());
+    const submit = form.querySelector('[type="submit"]');
+    if (submit) submit.disabled = true;
+    try {
+      const result = await services.MarketingBenchmarkService.recordBenchmark(client, {
+        ...values, tenantId: scope.tenantId, propertyId: scope.propertyId,
+        evidence: values.evidenceNote ? { note: values.evidenceNote } : {}
+      });
+      state.benchmarkFormOpen = false;
+      state.remoteStatus = 'LOADING'; render(); await hydrateCloudData(); render();
+      return result;
+    } finally { if (submit) submit.disabled = false; }
   }
 
   async function handleListingSubmit(form) {
@@ -715,6 +780,8 @@
       const requestAnalysis = event.target.closest('[data-marketing-request-analysis]');
       const openExperiment = event.target.closest('[data-marketing-open-experiment]');
       const cancelExperiment = event.target.closest('[data-marketing-cancel-experiment]');
+      const openBenchmark = event.target.closest('[data-marketing-open-benchmark]');
+      const cancelBenchmark = event.target.closest('[data-marketing-cancel-benchmark]');
       if (open) { state.snapshotFormOpen = true; state.listingFormOpen = false; render(); return; }
       if (cancel) { state.snapshotFormOpen = false; render(); return; }
       if (openListing) { state.listingFormOpen = true; state.snapshotFormOpen = false; render(); return; }
@@ -723,6 +790,8 @@
       if (cancelMedia) { state.mediaFormOpen = false; render(); return; }
       if (openExperiment) { state.experimentFormOpen = true; state.mediaFormOpen = false; render(); return; }
       if (cancelExperiment) { state.experimentFormOpen = false; render(); return; }
+      if (openBenchmark) { state.benchmarkFormOpen = true; render(); return; }
+      if (cancelBenchmark) { state.benchmarkFormOpen = false; render(); return; }
       if (requestAnalysis) {
         handleAnalysisRequest(requestAnalysis).catch(error => {
           const status = document.getElementById('marketingWorkspaceStatus');
@@ -738,6 +807,15 @@
       });
     });
     if (content) content.addEventListener('submit', event => {
+      const benchmarkForm = event.target.closest('[data-marketing-benchmark-form]');
+      if (benchmarkForm) {
+        event.preventDefault();
+        handleBenchmarkSubmit(benchmarkForm).catch(error => {
+          const status = document.getElementById('marketingWorkspaceStatus');
+          if (status) status.textContent = `Pazarlama referansı kaydedilemedi: ${error.message}`;
+        });
+        return;
+      }
       const experimentForm = event.target.closest('[data-marketing-experiment-form]');
       if (experimentForm) {
         event.preventDefault();
@@ -790,5 +868,5 @@
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') initializeBrowser();
 
-  return { periodFromFilter, scopeBookings, buildWorkspaceModel, selectLatestSnapshot, renderWorkspaceHtml, renderMarketingHealth, renderFindingActions, renderListingForm, renderSnapshotForm, renderMediaUploadForm, renderExperimentForm, renderPhotoAnalysisResult, renderAnalysisRuns, renderExperiments, escapeHtml, setData, render };
+  return { periodFromFilter, scopeBookings, buildWorkspaceModel, selectLatestSnapshot, selectCurrentBenchmark, renderWorkspaceHtml, renderMarketingHealth, renderBenchmarkPanel, renderBenchmarkForm, renderFindingActions, renderListingForm, renderSnapshotForm, renderMediaUploadForm, renderExperimentForm, renderPhotoAnalysisResult, renderAnalysisRuns, renderExperiments, escapeHtml, setData, render };
 }));
