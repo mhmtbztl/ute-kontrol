@@ -71,7 +71,13 @@ const testFiles = [
   'static_ui_value_tests.js',
 
   // Rezervasyon silme atomikligi (Phase 19)
-  'booking_delete_atomicity_tests.js'
+  'booking_delete_atomicity_tests.js',
+
+  // Gelirin doneme dagitilmasi (aylari kesen rezervasyonda cift sayim)
+  'revenue_attribution_tests.js',
+
+  // Ay kapanisi butunlugu (Phase 20)
+  'month_close_integrity_tests.js'
 ];
 
 console.log('=============================================================================');

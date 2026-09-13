@@ -80,6 +80,45 @@ farklı net kâr raporluyorlardı.
 Doluluk/RevPAR paydası: `getPeriodDayCount()` — **ayın gerçek gün sayısı**.
 Bir zamanlar bir ekranda 30, diğerinde 31, bir başkasında 90 kullanılıyordu.
 
+**Gelirin aya yazılması — tahakkuk (accrual):**
+Gelir **gecelere eşit bölünür**, her ay yalnızca kendi gecelerinin payını alır.
+Ay sınırını kesen bir rezervasyonda bu şart:
+
+```
+04-28 → 05-03, 50.000 TL, 5 gece
+  Nisan: 3 gece → 30.000 TL      Mayıs: 2 gece → 20.000 TL
+```
+
+Tek kaynak `getBookingFilterShare(b)` (app.js). Rezervasyondan para veya gece
+toplayan **her** yer bu payı uygulamak zorundadır — altı ayrı toplama noktası var.
+
+Bir zamanlar `isBookingInFilter()` yalnızca **giriş ve çıkış ayına** bakıyordu ve
+Finans ekranı tutarın **tamamını** o aya yazıyordu. İki ayrı bozukluk:
+- 04-28 → 05-03 rezervasyonu Nisan'da da 50.000, Mayıs'ta da 50.000 görünüyordu
+  (**aynı para iki kez**, aylık toplamların toplamı gerçek cironun üstünde).
+- 04-28 → 06-02 rezervasyonu Mayıs'ta **hiç görünmüyordu**, oysa Mayıs'ın 31
+  gecesinin tamamı ona aitti.
+
+`core/financial_metrics_service.js` (yönetici paneli) baştan beri gece bazında
+dağıtıyordu; bu yüzden aynı ay için iki ekran farklı ciro veriyordu — 3.4'ün
+başındaki hatanın başka bir kılıkta tekrarı. Ağı `core/revenue_attribution_tests.js`
+tutuyor.
+
+### 3.4.1 Ay kapanışı
+Kapatılan dönem **mühürlüdür**. Koruma tetikleyicileri konaklamanın **tüm gece
+aralığına** bakar ve hem **eski** hem **yeni** satırı kontrol eder — yoksa kayıt
+kapalı aydan açık aya taşınarak kaçırılır.
+
+Kapanış kaydı yalnızca RPC ile değişir; doğrudan `INSERT/UPDATE/DELETE`
+reddedilir. Dönemi açmak ayrı bir işlemdir: `reopen_monthly_period_atomic`,
+yalnızca **owner/admin**, **gerekçe zorunlu**, kayıt silinmez, `history_json`'a işlenir.
+
+Kapanış anlık görüntüsü **sunucuda** hesaplanır (`compute_month_close_snapshot`).
+İstemcininki de saklanır ve karşılaştırılır (`client_matches_server`,
+`revenue_delta`). Bir muhasebe kapanışının rakamını tarayıcıya hesaplatmayın.
+
+Henüz **başlamamış** bir ay kapatılamaz.
+
 ### 3.5 Arayüzde sabit değer yasağı
 `index.html`'de **sayı içeren hiçbir id** sabit bir değerle duramaz. Ya JS yazar ve
 başlangıç değeri nötrdür (`—`), ya da gerekçesiyle `core/static_ui_value_tests.js`
@@ -114,7 +153,11 @@ DDL, PostgREST üzerinden çalıştırılamaz ve `.env`'de doğrudan Postgres ba
 sonunda kendi doğrulama bloğu vardır; başarısızsa `RAISE EXCEPTION` ile durur.
 
 Uygulanmış göçler: phase13 (kullanıcı silinebilirliği), phase14 (son-sahip koruması),
-phase15 (cascade istisnaları), phase16 (ekip daveti), phase18 (hesap kapatma).
+phase15 (cascade istisnaları), phase16 (ekip daveti), phase18 (hesap kapatma),
+phase19 (atomik rezervasyon silme).
+
+**Bekleyen:** phase20 (ay kapanışı bütünlüğü) — uygulanana kadar
+`month_close_integrity_tests.js` kırmızı kalır, bu beklenen durumdur.
 
 ### 4.3 Paralel çalışma (Codex / Antigravity)
 Bu repoda başka AI araçları da çalışıyor. **Dosya bazında bölüşün.**
@@ -145,6 +188,10 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
    hesap kalırsa koşu başarısız sayılır. Temizlik: `supabase/cleanup_test_accounts.sql`.
 5. **Yeni bir test yazdığınızda, eski koda karşı çalıştırıp KIRILDIĞINI görün.**
    Kırılmıyorsa regresyon ağı değildir.
+6. **Tam koşuyu arka arkaya tekrarlamayın.** Her süit auth kullanıcısı yaratıyor;
+   iki-üç ardışık tam koşudan sonra Supabase `Request rate limit reached` döner ve
+   **10'a yakın süit sahte biçimde kırmızı olur**. Kod regresyonu sanmayın:
+   süiti tek başına koşun, geçiyorsa hız limitidir. Birkaç dakika bekleyin.
 
 ### Kabuk tuzakları (Windows / Git Bash)
 - Heredoc (`<<'SCRIPT'`) bir kaçış seviyesi yiyor: `'\\b'` dosyada `'\b'` (backspace) oluyor
@@ -160,8 +207,8 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 
 | Konu | Durum |
 |---|---|
-| Rezervasyon düzenleme/silme akışı analizi | yapılmadı |
-| Ay kapatma akışı analizi | yapılmadı |
+| Rezervasyon düzenleme/silme akışı analizi | tamamlandı (phase19) |
+| Ay kapatma akışı analizi | tamamlandı (phase20) — göç uygulanmayı bekliyor |
 | Excel içe/dışa aktarma | "Şirket Genel Raporu" içe aktarımı devre dışı bırakıldı, gerçek uygulama yok |
 | Bildirim merkezi analizi | yapılmadı |
 | Demo'yu Supabase'de gerçek tenant olarak yeniden kurma | yapılmadı |

@@ -98,7 +98,10 @@ function run() {
   const i = APP.indexOf('let manualBookingRev = 0;');
   const blok = i === -1 ? '' : APP.slice(i, i + 1600);
 
-  check(/const bNet = Number\(b\.gross !== undefined \? b\.gross : b\.net\)/.test(blok),
+  // Brut once, net yedek. (Tutar ayrica doneme dusen gece oraniyla carpilir;
+  // bkz. getBookingFilterShare — orani buraya sokmak cironun brut olmasini
+  // degistirmez.)
+  check(/Number\(b\.gross !== undefined \? b\.gross : b\.net\)/.test(blok),
     '7. Finans modülü brüt ciro kullanır',
     'hala b.net (brut - komisyon - temizlik) kullaniliyor olabilir');
 

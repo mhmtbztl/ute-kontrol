@@ -840,6 +840,9 @@ async function createBooking(bookingInput) {
   if (checkOut <= checkIn) {
     throw new Error('Çıkış tarihi giriş tarihinden sonra olmalıdır.');
   }
+  if (isStayPeriodClosed(checkIn, checkOut)) {
+    throw new Error('Bu konaklama kapatılmış bir döneme denk geliyor. Rezervasyon eklenemez. Önce dönemi yeniden açın.');
+  }
 
   const guest = (bookingInput.guest || bookingInput.guest_name || '').trim();
   if (!guest) {
@@ -1026,6 +1029,14 @@ async function updateBooking(bookingId, bookingInput) {
   if (checkIn && checkOut && checkOut <= checkIn) {
     throw new Error('Çıkış tarihi giriş tarihinden sonra olmalıdır.');
   }
+  // Hem kaydin BULUNDUGU donem hem de TASINMAK ISTENEN donem acik olmali.
+  // Yalnizca yeniyi kontrol etmek, kaydi kapali aydan kacirmaya izin verirdi.
+  if (existing && isStayPeriodClosed(existing.checkIn, existing.checkOut)) {
+    throw new Error('Bu rezervasyonun konakladığı dönem kapatılmıştır. Değiştirilemez. Önce dönemi yeniden açın.');
+  }
+  if (isStayPeriodClosed(checkIn, checkOut)) {
+    throw new Error('Yeni tarihler kapatılmış bir döneme denk geliyor. Rezervasyon buraya taşınamaz.');
+  }
 
   const gross = Number(bookingInput.gross !== undefined ? bookingInput.gross : (bookingInput.grossAmount !== undefined ? bookingInput.grossAmount : existing?.gross)) || 0;
   if (gross < 0) {
@@ -1171,6 +1182,10 @@ async function deleteBooking(bookingId) {
 
   const propBookingId = existing?.id || (isUUID(bookingId) ? bookingId : null);
   const guestName = existing?.guest || 'bu';
+
+  if (existing && isStayPeriodClosed(existing.checkIn, existing.checkOut)) {
+    throw new Error('Bu rezervasyonun konakladığı dönem kapatılmıştır. Silinemez. Önce dönemi yeniden açın.');
+  }
 
   if (typeof confirm === 'function') {
     if (!confirm(`${guestName} rezervasyonunu silmek istediğinize emin misiniz?`)) {
@@ -1388,6 +1403,35 @@ function isPeriodClosed(dateOrYearMonth) {
   return list.some(cp => cp.year === y && cp.month === m && cp.status === 'CLOSED');
 }
 
+/**
+ * Bir konaklamanin gecelerinden HERHANGI BIRI kapali bir aya dusuyor mu?
+ *
+ * Yalnizca giris ayina bakmak yetmez: 04-28 -> 05-03 rezervasyonu Mayis
+ * kapaliyken de kapali doneme 2 gece ciro ekler. Sunucudaki
+ * fn_range_touches_closed_period() ile ayni kurali uygular.
+ */
+function isStayPeriodClosed(checkIn, checkOut) {
+  if (!checkIn) return false;
+  if (!checkOut) return isPeriodClosed(checkIn);
+
+  const gun = 86400000;
+  const bas = Date.parse(String(checkIn).substring(0, 10) + 'T00:00:00Z');
+  const bit = Date.parse(String(checkOut).substring(0, 10) + 'T00:00:00Z');
+  if (!isFinite(bas) || !isFinite(bit) || bit <= bas) return isPeriodClosed(checkIn);
+
+  // Geceler [checkIn, checkOut-1]. Ay ay ilerlemek yeterli; tum gunleri
+  // dolasmaya gerek yok.
+  const sonGece = bit - gun;
+  let imlec = Date.UTC(new Date(bas).getUTCFullYear(), new Date(bas).getUTCMonth(), 1);
+  while (imlec <= sonGece) {
+    const d = new Date(imlec);
+    const ym = d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0');
+    if (isPeriodClosed(ym)) return true;
+    imlec = Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1);
+  }
+  return false;
+}
+
 async function loadMonthlyTargets(year, month) {
   const tenantId = getActiveTenantId();
   const currentAppData = (typeof appData !== 'undefined') ? appData : (typeof global !== 'undefined' ? global.appData : null);
@@ -1546,6 +1590,39 @@ async function closeMonthlyPeriod(year, month) {
 
   if (error) {
     throw new Error('Dönem kapatılamadı: ' + (error.message || 'Veritabanı hatası'));
+  }
+  await loadMonthlyCloses();
+  if (typeof renderAll === 'function') renderAll();
+  return data;
+}
+
+/**
+ * Kapatilmis bir donemi yeniden acar.
+ *
+ * Kapatmaktan daha agir bir islemdir: yalnizca owner/admin yapabilir ve
+ * gerekce zorunludur. Kapanis kaydi SILINMEZ; anlik goruntu korunur ve
+ * islem history_json'a islenir. Yetki ve gerekce denetimi sunucudadir
+ * (reopen_monthly_period_atomic); buradaki kontroller yalnizca kullaniciyi
+ * bosuna bekletmemek icin.
+ */
+async function reopenMonthlyPeriod(year, month, reason) {
+  const tenantId = getActiveTenantId();
+  requireCloudForWrite('Dönem açma', tenantId);
+
+  const gerekce = (reason || '').trim();
+  if (gerekce.length < 10) {
+    throw new Error('Dönemi yeniden açmak için en az 10 karakterlik bir gerekçe yazmalısınız. Bu gerekçe denetim kaydına işlenir.');
+  }
+
+  const { data, error } = await supabaseClient.rpc('reopen_monthly_period_atomic', {
+    p_tenant_id: tenantId,
+    p_year: Number(year),
+    p_month: Number(month),
+    p_reason: gerekce
+  });
+
+  if (error) {
+    throw new Error('Dönem yeniden açılamadı: ' + (error.message || 'Veritabanı hatası'));
   }
   await loadMonthlyCloses();
   if (typeof renderAll === 'function') renderAll();
@@ -2637,9 +2714,87 @@ function isBookingInFilter(b) {
     return (bIn <= e && bOut >= s);
   }
 
-  const bInMonth = bIn ? bIn.slice(0, 7) : '';
-  const bOutMonth = bOut ? bOut.slice(0, 7) : '';
-  return (bInMonth === currentFilter.period || bOutMonth === currentFilter.period);
+  // Konaklama araligi bu ayla kesisiyor mu?
+  // Onceki hal yalnizca GIRIS ve CIKIS ayina bakiyordu. 04-28 -> 06-02
+  // rezervasyonu Mayis filtresinde hic gorunmuyordu; oysa Mayis'in 31
+  // gecesinin tamami bu rezervasyona ait.
+  // Geceler [checkIn, checkOut-1] araligidir; checkOut cikis gunu, gece degil.
+  const ayBas = currentFilter.period + '-01';
+  const ayBit = currentFilter.period + '-31';
+  return (bIn <= ayBit && bOut > ayBas);
+}
+
+/**
+ * Rezervasyonun secili doneme dusen gece sayisi ve tutar orani.
+ *
+ * USALI tahakkuk esasi: aylari kesen bir rezervasyonun geliri gecelere esit
+ * bolunur, her donem yalnizca kendi gecelerinin payini alir.
+ *
+ * Bu fonksiyon olmadan onceki hal, aylari kesen rezervasyonu hem giris hem
+ * cikis ayina TAM tutarla yaziyordu: 04-28 -> 05-03 arasi 50.000 TL'lik bir
+ * rezervasyon Nisan'da da 50.000, Mayis'ta da 50.000 gorunuyordu. Ayni para
+ * iki kez sayiliyor, aylik toplamlarin toplami gercek cironun uzerine
+ * cikiyordu. core/financial_metrics_service.js ve sunucudaki
+ * compute_month_close_snapshot() bastan beri gece bazinda dagitiyordu; bu
+ * yuzden Finans ekrani ile yonetici paneli ayni ay icin farkli ciro veriyordu.
+ *
+ * @returns {{nights:number, total:number, ratio:number}}
+ */
+function getBookingFilterShare(b) {
+  const bos = { nights: 0, total: 0, ratio: 0 };
+  if (!b) return bos;
+  const ci = b.checkIn || b.check_in;
+  const co = b.checkOut || b.check_out;
+  if (!ci || !co) {
+    // Tarihi olmayan kayit bolunemez; filtreden gectiyse tamami sayilir.
+    const n = Number(b.nights) || 0;
+    return { nights: n, total: n, ratio: 1 };
+  }
+  const gun = 86400000;
+  const bas = Date.parse(ci + 'T00:00:00Z');
+  const bit = Date.parse(co + 'T00:00:00Z');
+  if (!isFinite(bas) || !isFinite(bit)) return bos;
+  const toplam = Math.round((bit - bas) / gun);
+  if (toplam <= 0) return bos;
+
+  const aralik = getFilterDateRange();
+  if (!aralik) return { nights: toplam, total: toplam, ratio: 1 };
+
+  let icerde = 0;
+  for (let i = 0; i < toplam; i++) {
+    const g = new Date(bas + i * gun).toISOString().slice(0, 10);
+    if (g >= aralik.start && g <= aralik.end) icerde++;
+  }
+  return { nights: icerde, total: toplam, ratio: icerde / toplam };
+}
+
+/**
+ * Secili filtrenin tarih araligi (dahil-dahil). Donem 'ALL' ise null.
+ */
+function getFilterDateRange() {
+  if (typeof currentFilter === 'undefined' || !currentFilter) return null;
+  if (!currentFilter.period || currentFilter.period === 'ALL') return null;
+
+  if (currentFilter.period === 'CUSTOM' ||
+      (currentFilter.startDate && currentFilter.endDate &&
+       (currentFilter.period === '2026-YEAR' || currentFilter.period === '2025-YEAR'))) {
+    return {
+      start: currentFilter.startDate || '2025-07-01',
+      end: currentFilter.endDate || '2099-12-31'
+    };
+  }
+
+  if (/^\d{4}-\d{2}$/.test(currentFilter.period)) {
+    const y = parseInt(currentFilter.period.slice(0, 4), 10);
+    const m = parseInt(currentFilter.period.slice(5, 7), 10);
+    const sonGun = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    return {
+      start: currentFilter.period + '-01',
+      end: currentFilter.period + '-' + String(sonGun).padStart(2, '0')
+    };
+  }
+
+  return null;
 }
 
 // -------------------------------------------------------------
@@ -2696,8 +2851,9 @@ function renderOperationsKpiStrip() {
 function renderPricingKpiStrip() {
   if (typeof document === 'undefined' || !appData) return;
   const bookings = (appData.bookings || []).filter(b => b.status !== 'CANCELLED' && isBookingInFilter(b));
-  const geceler = bookings.reduce((a, b) => a + (Number(b.nights) || 0), 0);
-  const ciro = bookings.reduce((a, b) => a + (Number(b.gross) || 0), 0);
+  // Aylari kesen rezervasyonun yalnizca bu doneme dusen gecesi ve payi sayilir.
+  const geceler = bookings.reduce((a, b) => a + getBookingFilterShare(b).nights, 0);
+  const ciro = bookings.reduce((a, b) => a + (Number(b.gross) || 0) * getBookingFilterShare(b).ratio, 0);
   setEl('pricingAdrVal', geceler > 0 ? `₺${Math.round(ciro / geceler).toLocaleString('tr-TR')}` : '—');
 
   let gapSayisi = 0;
@@ -2893,6 +3049,7 @@ function renderAll() {
   if (typeof document === 'undefined') return;
   refreshPortfolioCountLabels();
   updateStepperLabels();
+  renderMonthCloseCard();
   renderExecutiveControlCenter();
   renderUserNotificationsBadge();
   renderFinanceModule();
@@ -3080,9 +3237,12 @@ function renderFinanceModule() {
   let bookingDistributionCost = 0;
   appData.bookings.forEach(b => {
     if (b.status === 'CANCELLED' || !isBookingInFilter(b)) return;
-    const bNet = Number(b.gross !== undefined ? b.gross : b.net) || 0;
-    const bNights = Number(b.nights) || 0;
-    bookingDistributionCost += (Number(b.otaCommission) || 0) + (Number(b.cleaningFee) || 0);
+    // USALI tahakkuk: aylari kesen rezervasyonun yalnizca bu doneme dusen payi.
+    const pay = getBookingFilterShare(b);
+    if (pay.nights === 0 && pay.ratio === 0) return;
+    const bNet = (Number(b.gross !== undefined ? b.gross : b.net) || 0) * pay.ratio;
+    const bNights = pay.nights;
+    bookingDistributionCost += ((Number(b.otaCommission) || 0) + (Number(b.cleaningFee) || 0)) * pay.ratio;
     manualBookingRev += bNet;
     manualBookingNights += bNights;
 
@@ -4707,9 +4867,10 @@ function renderKPIsAndDashboard() {
 
   appData.bookings.forEach(b => {
     if (b.status === 'CANCELLED' || !isBookingInFilter(b)) return;
-    const bGross = Number(b.gross) || 0;
-    const bNet = Number(b.net) || 0;
-    const bNights = Number(b.nights) || 0;
+    const pay = getBookingFilterShare(b);
+    const bGross = (Number(b.gross) || 0) * pay.ratio;
+    const bNet = (Number(b.net) || 0) * pay.ratio;
+    const bNights = pay.nights;
 
     totalGross += bGross;
     totalNet += bNet;
@@ -4906,7 +5067,7 @@ function renderChannelDistribution() {
 
   relevantBookings.forEach(b => {
     const ch = (b.channel || 'DIRECT').toUpperCase();
-    const net = Number(b.net) || 0;
+    const net = (Number(b.net) || 0) * getBookingFilterShare(b).ratio;
     totalNet += net;
 
     if (!channelTotals[ch]) {
@@ -5068,11 +5229,12 @@ function renderOtaRadar() {
   appData.bookings.forEach(b => {
     if (b.status === 'CANCELLED' || !isBookingInFilter(b)) return;
     const ch = b.channel ? b.channel.toUpperCase() : 'OTHER';
+    const oran = getBookingFilterShare(b).ratio;
     if (channelData[ch]) {
       channelData[ch].count += 1;
-      channelData[ch].gross += (Number(b.gross) || 0);
-      channelData[ch].comm += (Number(b.otaComm) || 0);
-      channelData[ch].net += (Number(b.net) || 0);
+      channelData[ch].gross += (Number(b.gross) || 0) * oran;
+      channelData[ch].comm += (Number(b.otaComm) || 0) * oran;
+      channelData[ch].net += (Number(b.net) || 0) * oran;
     }
     if (['WHATSAPP', 'INSTAGRAM', 'WEBSITE'].includes(ch)) {
       savedComm += (Number(b.gross) || 0) * 0.15;
@@ -5690,6 +5852,231 @@ async function openDeleteAccountModal() {
 function closeDeleteAccountModal() {
   const modal = document.getElementById('deleteAccountModal');
   if (modal) modal.classList.remove('active');
+}
+
+// =============================================================
+// AY KAPANISI ARAYUZU
+// =============================================================
+// Bu ozellik veritabaninda bastan beri vardi (close_monthly_period_atomic,
+// koruma tetikleyicileri) ama arayuzde HICBIR giris noktasi yoktu: hicbir
+// yerden cagrilmiyordu. Ustelik loadTenantAppData() kapanislari cekmedigi
+// icin isPeriodClosed() her zaman false donuyordu.
+
+/** Secili donemin kapanis kaydi (yoksa null). */
+function getCurrentPeriodClose() {
+  if (typeof currentFilter === 'undefined' || !currentFilter) return null;
+  const p = currentFilter.period || '';
+  if (!/^\d{4}-\d{2}$/.test(p)) return null;
+  const y = parseInt(p.slice(0, 4), 10);
+  const m = parseInt(p.slice(5, 7), 10);
+  const list = (appData && appData.closedPeriods) ? appData.closedPeriods : [];
+  return list.find(cp => Number(cp.year) === y && Number(cp.month) === m) || null;
+}
+
+function canManageMonthClose() {
+  const rol = (typeof activeTenant !== 'undefined' && activeTenant && activeTenant.role) || 'viewer';
+  return ['owner', 'admin', 'manager'].includes(rol);
+}
+
+function canReopenMonthClose() {
+  const rol = (typeof activeTenant !== 'undefined' && activeTenant && activeTenant.role) || 'viewer';
+  return ['owner', 'admin'].includes(rol);
+}
+
+function renderMonthCloseCard() {
+  const kart = document.getElementById('monthCloseCard');
+  if (!kart) return;
+
+  const rozet = document.getElementById('monthCloseBadge');
+  const detay = document.getElementById('monthCloseDetail');
+  const kapatBtn = document.getElementById('monthCloseBtn');
+  const acBtn = document.getElementById('monthReopenBtn');
+  const gecmis = document.getElementById('monthCloseHistory');
+  const p = (typeof currentFilter !== 'undefined' && currentFilter) ? currentFilter.period : '';
+
+  // Ay disi filtrelerde (ALL, yil, ozel aralik) kapanis islemi anlamsiz.
+  if (!/^\d{4}-\d{2}$/.test(p || '')) {
+    kart.hidden = true;
+    return;
+  }
+  kart.hidden = false;
+
+  const kayit = getCurrentPeriodClose();
+  const kapali = !!(kayit && kayit.status === 'CLOSED');
+  const ayAdi = formatPeriodLabel(p);
+
+  if (rozet) {
+    rozet.textContent = kapali ? 'KAPALI' : 'AÇIK';
+    rozet.style.background = kapali ? 'rgba(239,68,68,0.18)' : 'rgba(52,211,153,0.15)';
+    rozet.style.color = kapali ? '#FCA5A5' : '#6EE7B7';
+  }
+
+  if (detay) {
+    if (kapali) {
+      const t = kayit.closed_at ? new Date(kayit.closed_at).toLocaleString('tr-TR') : '—';
+      let metin = `${ayAdi} kapatıldı (${t}). Bu döneme ait rezervasyon ve gider kayıtları değiştirilemez.`;
+      if (kayit.client_matches_server === false) {
+        metin += ' ⚠️ Kapanış anında ekrandaki rakam ile sunucunun hesabı farklıydı; kayıtta ikisi de saklı.';
+      }
+      detay.textContent = metin;
+    } else if (kayit) {
+      const t = kayit.reopened_at ? new Date(kayit.reopened_at).toLocaleString('tr-TR') : '—';
+      detay.textContent = `${ayAdi} daha önce kapatılmış, ${t} tarihinde yeniden açılmış. Kayıtlar düzenlenebilir.`;
+    } else {
+      detay.textContent = `${ayAdi} açık. Ay bittikten sonra kapatarak rakamları mühürleyebilirsiniz.`;
+    }
+  }
+
+  const yetkili = canManageMonthClose();
+  const gelecek = periodStartsInFuture(p);
+
+  if (kapatBtn) {
+    kapatBtn.hidden = kapali;
+    kapatBtn.disabled = !yetkili || gelecek;
+    kapatBtn.title = !yetkili
+      ? 'Dönem kapatmak için yönetici yetkisi gerekir.'
+      : (gelecek ? 'Henüz başlamamış bir dönem kapatılamaz.' : '');
+  }
+  if (acBtn) {
+    acBtn.hidden = !kapali;
+    acBtn.disabled = !canReopenMonthClose();
+    acBtn.title = canReopenMonthClose() ? '' : 'Dönemi yeniden açmak için işletme sahibi veya yönetici olmalısınız.';
+  }
+
+  if (gecmis) {
+    const kayitlar = (kayit && Array.isArray(kayit.history_json)) ? kayit.history_json : [];
+    if (!kayitlar.length) {
+      gecmis.textContent = '';
+    } else {
+      gecmis.innerHTML = kayitlar.slice(-4).map(h => {
+        const ne = h.action === 'REOPENED' ? 'Yeniden açıldı' : 'Kapatıldı';
+        const ne2 = h.at ? new Date(h.at).toLocaleString('tr-TR') : '—';
+        const gerekce = h.reason ? ' — ' + escapeHtml(String(h.reason)) : '';
+        return `• ${ne}: ${escapeHtml(ne2)}${gerekce}`;
+      }).join('<br>');
+    }
+  }
+}
+
+/** 'YYYY-MM' -> 'Nisan 2026' */
+function formatPeriodLabel(p) {
+  if (!/^\d{4}-\d{2}$/.test(p || '')) return p || '—';
+  const aylar = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+                 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+  return `${aylar[parseInt(p.slice(5, 7), 10) - 1]} ${p.slice(0, 4)}`;
+}
+
+/** Donem henuz baslamadi mi? Sunucu da bunu reddeder. */
+function periodStartsInFuture(p) {
+  if (!/^\d{4}-\d{2}$/.test(p || '')) return false;
+  const bugun = new Date();
+  const buAy = bugun.getFullYear() * 12 + bugun.getMonth();
+  const hedef = parseInt(p.slice(0, 4), 10) * 12 + (parseInt(p.slice(5, 7), 10) - 1);
+  return hedef > buAy;
+}
+
+function openMonthCloseModal() {
+  const modal = document.getElementById('monthCloseModal');
+  if (!modal) return;
+  const err = document.getElementById('monthCloseError');
+  const ozet = document.getElementById('monthCloseSummary');
+  const btn = document.getElementById('monthCloseSubmitBtn');
+  if (err) err.style.display = 'none';
+  if (btn) btn.disabled = false;
+
+  const p = currentFilter.period;
+  if (ozet) {
+    const bkl = (appData.bookings || []).filter(b => b.status !== 'CANCELLED' && isBookingInFilter(b));
+    const geceler = bkl.reduce((a, b) => a + getBookingFilterShare(b).nights, 0);
+    const ciro = bkl.reduce((a, b) => a + (Number(b.gross) || 0) * getBookingFilterShare(b).ratio, 0);
+    const gid = (appData.expenses || []).filter(e => isExpenseInFilter(e));
+    const gidTop = gid.reduce((a, e) => a + (Number(e.amount) || 0), 0);
+    ozet.innerHTML = `
+      <div style="font-weight:700; margin-bottom:8px;">${escapeHtml(formatPeriodLabel(p))}</div>
+      <div>Rezervasyon: <strong>${bkl.length}</strong> &nbsp;•&nbsp; Satılan gece: <strong>${geceler}</strong></div>
+      <div>Ciro (tahakkuk): <strong>${Math.round(ciro).toLocaleString('tr-TR')} TL</strong></div>
+      <div>Gider kaydı: <strong>${gid.length}</strong> &nbsp;•&nbsp; <strong>${Math.round(gidTop).toLocaleString('tr-TR')} TL</strong></div>
+      <p class="sub-text" style="font-size:10px; margin:10px 0 0;">
+        Bu rakamlar ekrandaki hesaptır. Kaydedilecek resmî rakam kapanış anında sunucuda yeniden hesaplanır.
+      </p>`;
+  }
+  modal.classList.add('active');
+}
+
+function closeMonthCloseModal() {
+  const modal = document.getElementById('monthCloseModal');
+  if (modal) modal.classList.remove('active');
+}
+
+async function submitMonthClose(event) {
+  if (event && event.preventDefault) event.preventDefault();
+  const err = document.getElementById('monthCloseError');
+  const btn = document.getElementById('monthCloseSubmitBtn');
+  const p = currentFilter.period;
+  if (err) err.style.display = 'none';
+  if (btn) { btn.disabled = true; btn.textContent = 'Kapatılıyor…'; }
+
+  try {
+    const sonuc = await closeMonthlyPeriod(parseInt(p.slice(0, 4), 10), parseInt(p.slice(5, 7), 10));
+    closeMonthCloseModal();
+    if (typeof showToast === 'function') {
+      const uyari = (sonuc && sonuc.client_matches_server === false)
+        ? ' Ekrandaki rakamla sunucunun hesabı farklıydı; kayıtta ikisi de saklandı.'
+        : '';
+      showToast(`${formatPeriodLabel(p)} kapatıldı.` + uyari, uyari ? 'info' : 'success');
+    }
+  } catch (e) {
+    if (err) { err.textContent = e.message || 'Dönem kapatılamadı.'; err.style.display = 'block'; }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Dönemi Kapat'; }
+  }
+}
+
+function openMonthReopenModal() {
+  const modal = document.getElementById('monthReopenModal');
+  if (!modal) return;
+  const ta = document.getElementById('monthReopenReason');
+  const err = document.getElementById('monthReopenError');
+  if (ta) ta.value = '';
+  if (err) err.style.display = 'none';
+  updateMonthReopenButton();
+  modal.classList.add('active');
+  setTimeout(() => ta && ta.focus(), 80);
+}
+
+function closeMonthReopenModal() {
+  const modal = document.getElementById('monthReopenModal');
+  if (modal) modal.classList.remove('active');
+}
+
+function updateMonthReopenButton() {
+  const ta = document.getElementById('monthReopenReason');
+  const btn = document.getElementById('monthReopenSubmitBtn');
+  const sayac = document.getElementById('monthReopenCharCount');
+  const n = ta ? ta.value.trim().length : 0;
+  if (sayac) sayac.textContent = String(n);
+  if (btn) btn.disabled = n < 10;
+}
+
+async function submitMonthReopen(event) {
+  if (event && event.preventDefault) event.preventDefault();
+  const ta = document.getElementById('monthReopenReason');
+  const err = document.getElementById('monthReopenError');
+  const btn = document.getElementById('monthReopenSubmitBtn');
+  const p = currentFilter.period;
+  if (err) err.style.display = 'none';
+  if (btn) { btn.disabled = true; btn.textContent = 'Açılıyor…'; }
+
+  try {
+    await reopenMonthlyPeriod(parseInt(p.slice(0, 4), 10), parseInt(p.slice(5, 7), 10), ta ? ta.value : '');
+    closeMonthReopenModal();
+    if (typeof showToast === 'function') showToast(`${formatPeriodLabel(p)} yeniden açıldı. İşlem denetim kaydına işlendi.`, 'success');
+  } catch (e) {
+    if (err) { err.textContent = e.message || 'Dönem yeniden açılamadı.'; err.style.display = 'block'; }
+  } finally {
+    if (btn) { btn.textContent = 'Dönemi Yeniden Aç'; }
+    updateMonthReopenButton();
+  }
 }
 
 // Onay metni birebir yazilmadan buton acilmaz. Sunucu da ayrica dogrular.
@@ -8408,9 +8795,10 @@ function renderMarketingModule() {
 
   (appData.bookings || []).forEach(b => {
     if (b.status === 'CANCELLED' || !isBookingInFilter(b)) return;
-    const gr = Number(b.gross) || 0;
-    const cm = Number(b.otaComm) || 0;
-    const nt = Number(b.net) || (gr - cm);
+    const oran = getBookingFilterShare(b).ratio;
+    const gr = (Number(b.gross) || 0) * oran;
+    const cm = (Number(b.otaComm) || 0) * oran;
+    const nt = (Number(b.net) || 0) * oran || (gr - cm);
     const ch = (b.channel || '').toUpperCase();
 
     if (ch === 'AIRBNB' || ch === 'BOOKING' || ch === 'EXPEDIA' || ch === 'OTA') {
@@ -10631,6 +11019,19 @@ async function loadTenantAppData(tenantIdOrUserId) {
 
       const leads = (leadList || []).map(mapLeadFromDb);
 
+      // Ay kapanislari ve hedefler. Bunlar yuklenmedigi surece isPeriodClosed()
+      // HER ZAMAN false doner ve arayuzdeki kapali donem uyarilari hic
+      // calismaz; kullanici formu doldurup kaydete bastiktan sonra ham
+      // veritabani hatasi gorur. Koruma veritabaninda zaten var, ama kullaniciyi
+      // pesin uyarabilmek icin bu iki liste gerekli.
+      const { data: closeList, error: clErr } = await supabaseClient
+        .from('monthly_financial_closes').select('*').eq('tenant_id', tenantId);
+      if (clErr) throw clErr;
+
+      const { data: targetList, error: tgErr } = await supabaseClient
+        .from('monthly_targets').select('*').eq('tenant_id', tenantId);
+      if (tgErr) throw tgErr;
+
       appData = {
         tenantId,
         companyName: activeTenant?.name || 'İşletmem',
@@ -10639,6 +11040,8 @@ async function loadTenantAppData(tenantIdOrUserId) {
         expenses,
         cleaningTasks,
         leads,
+        closedPeriods: closeList || [],
+        targets: targetList || [],
         maintenance: [],
         marketingCampaigns: [],
         influencerCollabs: [],
@@ -10681,6 +11084,8 @@ function getBlankTenantData(userId) {
     expenses: [],
     cleaningTasks: [],
     leads: [],
+    closedPeriods: [],
+    targets: [],
     maintenance: [],
     marketingCampaigns: [],
     influencerCollabs: [],
@@ -11946,6 +12351,13 @@ function getAppData() {
   return (typeof appData !== 'undefined') ? appData : (typeof global !== 'undefined' ? global.appData : null);
 }
 
+// Donem filtresini disaridan ayarlamak icin. Testler gelir dagitiminin
+// (getBookingFilterShare) donem sinirlarinda dogru davrandigini boyle olcer.
+function setCurrentFilter(filter) {
+  Object.assign(currentFilter, filter || {});
+  return currentFilter;
+}
+
 function setSupabaseClient(client) {
   supabaseClient = client;
 }
@@ -12890,7 +13302,13 @@ if (typeof module !== 'undefined' && module.exports) {
     saveMonthlyTarget,
     loadMonthlyCloses,
     closeMonthlyPeriod,
+    reopenMonthlyPeriod,
     isPeriodClosed,
+    isStayPeriodClosed,
+    setCurrentFilter,
+    isBookingInFilter,
+    getFilterDateRange,
+    getBookingFilterShare,
     convertAiActionToTask,
     loadOperationalTasks,
     createOperationalTask,
