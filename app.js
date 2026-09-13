@@ -87,6 +87,28 @@ function hideLockOverlay() {
 // bulunmaz. Eskiden DEFAULT_AIRBNB_PROPERTIES bes uydurma villanin ilan
 // puanini/siralamasini tasiyordu.
 
+/**
+ * Serbest yazilmis bir gider kategorisini bilinen kategorilerden birine esler.
+ *
+ * Karsilastirma buyuk-kucuk harf ve Turkce karakter duyarsizdir: dosyadan
+ * gelen "TEMİZLİK", "temizlik", "Temizlik" hepsi ayni kovaya duser.
+ * Eslesme yoksa "Diğer".
+ */
+function eslesenGiderKategorisi(ham) {
+  const t = String(ham || '').trim();
+  if (!t) return 'Diğer';
+  const sadelestir = s => String(s).toLocaleLowerCase('tr-TR')
+    .replace(/ı/g, 'i').replace(/ş/g, 's').replace(/ğ/g, 'g')
+    .replace(/ü/g, 'u').replace(/ö/g, 'o').replace(/ç/g, 'c')
+    .replace(/[^a-z0-9]/g, '');
+  const hedef = sadelestir(t);
+  const bulunan = EXPENSE_CATEGORIES.find(c => sadelestir(c.name) === hedef);
+  if (bulunan) return bulunan.name;
+  // Yaygin kisaltmalar
+  if (hedef === 'kkarti' || hedef === 'kredikarti' || hedef === 'komisyon') return 'Kredi Kartı / Komisyon';
+  return 'Diğer';
+}
+
 const EXPENSE_CATEGORIES = [
   { name: 'Maaş', color: '#3B82F6' },
   { name: 'Temizlik', color: '#10B981' },
@@ -3306,11 +3328,11 @@ function renderFinanceModule() {
   appData.expenses.forEach(exp => {
     if (!isExpenseInFilter(exp)) return;
     const amt = Number(exp.amount) || 0;
-    if (categoryTotals[exp.category] !== undefined) {
-      categoryTotals[exp.category] += amt;
-    } else {
-      categoryTotals['Diğer'] = (categoryTotals['Diğer'] || 0) + amt;
-    }
+    // Kategori eslemesi BUYUK-KUCUK HARF DUYARSIZ olmali. Eskiden birebir
+    // karsilastiriliyordu: "TEMİZLİK" (ice aktarilan dosyadaki hali) listedeki
+    // "Temizlik" ile eslesmiyor, gider grafiginde her sey "Diger"e dusuyordu.
+    const kat = eslesenGiderKategorisi(exp.category);
+    categoryTotals[kat] = (categoryTotals[kat] || 0) + amt;
     const isDynamicExpensePeriod = !hasStaticExcelMonth && (!activeExcel || currentFilter.period !== 'ALL');
     if (isDynamicExpensePeriod) {
       if (exp.type === 'CAPEX') totalCapex += amt;
