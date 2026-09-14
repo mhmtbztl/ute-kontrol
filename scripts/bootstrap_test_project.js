@@ -150,15 +150,27 @@ async function main() {
   console.log('=============================================================================\n');
 
   try {
-    await client.query(`CREATE TABLE IF NOT EXISTS ${LEDGER_TABLE} (
-      filename    TEXT PRIMARY KEY,
-      sha256      TEXT NOT NULL,
-      applied_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`);
-
+    // --check gercekten salt okunur olmali: defteri YARATMAZ, yalnizca varsa
+    // okur. Tabloyu yaratmak da bir yazmadir; "hicbir sey yazmaz" diyen bir
+    // secenegin sema degistirmesi, raporun kendisini guvenilmez kilardi.
     const applied = new Map();
-    const { rows } = await client.query(`SELECT filename, sha256 FROM ${LEDGER_TABLE}`);
-    rows.forEach(row => applied.set(row.filename, row.sha256));
+    const ledgerExists = (await client.query(
+      'SELECT to_regclass($1) IS NOT NULL AS present', [LEDGER_TABLE]
+    )).rows[0].present;
+
+    if (!ledgerExists && checkOnly) {
+      console.log('  (defter tablosu henuz yok — hicbir dosya uygulanmamis kabul ediliyor)\n');
+    } else {
+      if (!ledgerExists) {
+        await client.query(`CREATE TABLE ${LEDGER_TABLE} (
+          filename    TEXT PRIMARY KEY,
+          sha256      TEXT NOT NULL,
+          applied_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`);
+      }
+      const { rows } = await client.query(`SELECT filename, sha256 FROM ${LEDGER_TABLE}`);
+      rows.forEach(row => applied.set(row.filename, row.sha256));
+    }
 
     let appliedCount = 0;
     let skippedCount = 0;

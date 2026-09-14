@@ -179,33 +179,35 @@ async function runPricingConcurrencyTests() {
     const { data: prop } = await client.from('properties').insert({
       tenant_id: tenantId,
       name: 'Conc Villa',
-      base_price: 3000,
-      currency: 'TRY'
+      slug: 'CONC' + testRunId,
+      base_price: 3000
     }).select().single();
     propId = prop.id;
 
-    const { data: liveQuote } = await client.from('booking_quotes').insert({
+    const liveQuoteRes = await client.from('booking_quotes').insert({
       tenant_id: tenantId,
       property_id: propId,
       check_in: '2026-11-01',
       check_out: '2026-11-03',
-      nights: 2,
-      pax: 2,
-      base_rate_snapshot: 3000,
-      subtotal: 6000,
-      total_amount: 6000,
+      quoted_total: 6000,
+      nightly_breakdown: [
+        { date: '2026-11-01', rate: 3000 },
+        { date: '2026-11-02', rate: 3000 }
+      ],
       status: 'ACTIVE',
       expires_at: new Date(Date.now() + 86400000).toISOString()
     }).select().single();
+    if (liveQuoteRes.error) {
+      throw new Error('booking_quotes insert: ' + liveQuoteRes.error.message);
+    }
+    const liveQuote = liveQuoteRes.data;
 
     // Fire 5 concurrent RPC calls
-    const results = await Promise.all([
-      client.rpc('accept_booking_quote_atomic', { p_quote_id: liveQuote.id }),
-      client.rpc('accept_booking_quote_atomic', { p_quote_id: liveQuote.id }),
-      client.rpc('accept_booking_quote_atomic', { p_quote_id: liveQuote.id }),
-      client.rpc('accept_booking_quote_atomic', { p_quote_id: liveQuote.id }),
-      client.rpc('accept_booking_quote_atomic', { p_quote_id: liveQuote.id })
-    ]);
+    const results = await Promise.all(Array.from({ length: 5 }, () =>
+      client.rpc('accept_booking_quote_atomic', {
+        p_tenant_id: tenantId, p_quote_id: liveQuote.id
+      })
+    ));
 
     const liveSuccesses = results.filter(r => r.data && r.data.success);
     assert.strictEqual(liveSuccesses.length, 1, 'Only 1 live RPC call can succeed');
@@ -213,7 +215,13 @@ async function runPricingConcurrencyTests() {
 
   } finally {
     if (userId) await adminClient.auth.admin.deleteUser(userId).catch(() => {});
-    if (tenantId) await adminClient.from('tenants').delete().eq('id', tenantId).catch(() => {});
+    // .catch() PostgREST sorgu nesnesinde tanimli degil (CLAUDE.md 5.1:
+    // Supabase JS firlatmaz, { error } dondurur). Attigi TypeError, finally'den
+    // once olusan asil hatayi gizliyordu.
+    if (tenantId) {
+      const { error } = await adminClient.from('tenants').delete().eq('id', tenantId);
+      if (error) console.error(`[CLEANUP] Tenant silinemedi: ${error.message}`);
+    }
   }
 
   console.log(`\n=============================================================================`);

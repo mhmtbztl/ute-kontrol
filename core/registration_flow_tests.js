@@ -90,7 +90,13 @@ async function runRegistrationFlowTests() {
   console.log('=============================================================================\n');
 
   const stamp = Date.now();
-  const email = `regflow_${stamp}@lexbnb-e2e.test`;
+  // Bu suit, diger suitlerden farkli olarak GERCEK signUp() kullanir (tarayici
+  // yolu). Supabase yeni projelerde .test uzantisini gecersiz e-posta sayar
+  // (RFC 2606 ayrilmis alan adi) ve kaydi "Email address is invalid" ile
+  // reddeder; admin.createUser kullanan suitler bu dogrulamayi atladigi icin
+  // etkilenmez. Alan adi, kosu sonundaki sizinti denetiminin tanidigi listede
+  // kalmali (run_all_tests.js TEST_EMAIL_RE).
+  const email = `regflow_${stamp}@lexbnb-test.com`;
   const pass = 'RegFlow!' + stamp;
   const company = 'Regresyon Test Isletmesi';
 
@@ -301,7 +307,7 @@ async function runRegistrationFlowTests() {
 
     // -------------------------------------------------------------------
     console.log('\n--- 9. ŞİFRE SIFIRLAMA: HESAP VARLIĞI SIZMAMALI ---');
-    const missing = `hicyok_${stamp}@lexbnb-e2e.test`;
+    const missing = `hicyok_${stamp}@lexbnb-test.com`;
     const { error: resetMissingErr } = await anonClient.auth.resetPasswordForEmail(missing, { redirectTo: 'https://lexbnb.space/' });
     const missingLeaks = resetMissingErr && /not found|no user|bulunamad/i.test(resetMissingErr.message || '');
     check(!missingLeaks, '16. Şifre sıfırlama, hesabın var olmadığını sızdırmaz', `yanit: ${resetMissingErr && resetMissingErr.message}`);

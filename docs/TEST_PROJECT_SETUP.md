@@ -47,9 +47,22 @@ Test projesinin panelinde (`.../project/<ref>/auth/...`):
   düşüktür. `CLAUDE.md` §5.6'daki "iki-üç ardışık koşudan sonra 10 süit sahte
   biçimde kırmızı oluyor" sorunu buradan gelir. Saatlik kullanıcı oluşturma ve
   oturum açma limitlerini yükseltin.
-- **E-posta onayı** (`.../auth/providers`): açık ya da kapalı olabilir.
-  `registration_flow_tests` iki durumu da ölçer ve gerekirse kullanıcıyı
-  `service_role` ile kendisi onaylar.
+- **E-posta onayı** (`.../auth/providers` → Email → *Confirm email*): **kapatın.**
+  Bu bir tercih değil, zorunluluk. Onay açıkken her `signUp()` bir onay maili
+  tetikler; custom SMTP kurmadığınız için (ki kurmamalısınız, yukarıya bakın)
+  Supabase'in yerleşik göndericisi devreye girer ve ücretsiz projede saatte
+  yalnızca birkaç maile izin verir. `registration_flow_tests` gerçek `signUp()`
+  kullanan tek süittir ve ikinci koşuda `email rate limit exceeded` ile düşer.
+
+  Bu limit kontrolü adres doğrulamasından **önce** çalışır, yani asıl hatayı da
+  maskeler: "invalid email" sorununu ararken elinizde yalnızca "rate limit"
+  kalır.
+
+  İkinci sebep: Supabase yeni projelerde `signUp()` adresinin alan adını
+  **teslim edilebilirlik** açısından doğrular. `@lexbnb.test` ve
+  `@lexbnb-test.com` MX kaydı olmadığı için reddedilir. `admin.createUser()`
+  bu doğrulamayı atladığından diğer 21 süit etkilenmez — yalnızca gerçek kayıt
+  akışını ölçen süit takılır.
 
 ## 3. Anahtarlar ve bağlantı dizesi
 
