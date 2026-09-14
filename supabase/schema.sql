@@ -2,6 +2,8 @@
 -- LEXBNB ENTERPRISE MULTI-TENANT DATABASE SCHEMA (SUPABASE / POSTGRESQL)
 -- Production-Grade Security, Hardened RLS & Zero-Escalation Architecture
 -- =============================================================================
+-- Canonical deployment: apply this baseline, then every file and checksum in
+-- migration_manifest.txt in order. Never deploy this snapshot by itself.
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS btree_gist;
@@ -307,7 +309,8 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION public.log_audit_event FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.log_audit_event TO authenticated;
+REVOKE ALL ON FUNCTION public.log_audit_event FROM anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.log_audit_event TO service_role;
 
 -- =============================================================================
 -- GUARDRAIL: SON OWNER KORUMASI (Bir İşletme Asla Sahipsiz Kalamaz)

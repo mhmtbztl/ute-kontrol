@@ -4,7 +4,7 @@
  * USALI (Uniform System of Accounts for the Lodging Industry):
  *   - Ciro, misafirin odedigi BRUT tutardir.
  *   - OTA komisyonu bir DAGITIM GIDERIDIR, gelirden dusulmez.
- *   - Misafirden alinan temizlik ucreti gelirdir; temizlik maliyeti giderdir.
+ *   - Misafirden alinan temizlik ucreti gelirdir; yalnız kaydedilmiş temizlikçi ödemesi giderdir.
  *
  * 2026-09-12'de uretimde su tutarsizlik bulundu: ayni ay icin yonetici paneli
  * 44.000 TL, finans ekrani 43.100 TL net kar raporluyordu.
@@ -18,10 +18,10 @@
  * Kapsam:
  *  1. Ciro brut tutardir (komisyon/temizlik dusulmez)
  *  2. OTA komisyonu gider tarafinda sayilir
- *  3. Temizlik ucreti gider tarafinda sayilir
- *  4. Net kar = brut ciro - (komisyon + temizlik + diger giderler)
+ *  3. Misafir temizlik ücreti gider sayılmaz
+ *  4. Net kar = brut ciro - (komisyon + kaydedilmiş giderler)
  *  5. Iptal edilen rezervasyonun komisyonu gider sayilmaz
- *  6. ADR brut ciro uzerinden hesaplanir
+ *  6. ADR oda geliri uzerinden hesaplanir
  *  7. app.js finans modulu de brut ciro kullanir (kaynak denetimi)
  *  8. app.js finans modulu dagitim maliyetini gidere ekler (kaynak denetimi)
  */
@@ -56,10 +56,11 @@ function run() {
 
   check(ciro === 49000, '1. Ciro brüt tutardır (49.000)', `donen: ${ciro}`);
 
-  // Beklenen gider: 3750 + 900 + 5000 = 9650 -> net kar 39.350
-  check(kar === 49000 - (3750 + 900 + 5000),
-    '4. Net kâr = brüt ciro − (komisyon + temizlik + diğer gider)',
-    `beklenen ${49000 - 9650}, donen ${kar}`);
+  // Beklenen gider: 3750 + 5000 = 8750 -> net kar 40.250. Misafirden tahsil
+  // edilen 900 TL temizlik bedeli ayrıca maliyet değildir.
+  check(kar === 49000 - (3750 + 5000),
+    '4. Net kâr = brüt ciro − (komisyon + kaydedilmiş gider)',
+    `beklenen ${49000 - 8750}, donen ${kar}`);
 
   // Komisyon ve temizligin AYRI AYRI sayildigini dogrula
   const komisyonsuz = Svc.computeExecutiveTopKpis({
@@ -75,8 +76,8 @@ function run() {
     expenses: [{ amount: 5000 }], propertiesCount: 2, daysInMonth: 30
   });
   const karTemizliksiz = temizliksiz.netProfit.current;
-  check(karTemizliksiz - kar === 900, '3. Temizlik ücreti gider olarak sayılır',
-    `fark ${karTemizliksiz - kar}, 900 bekleniyordu`);
+  check(karTemizliksiz - kar === 0, '3. Misafir temizlik ücreti gider olarak sayılmaz',
+    `fark ${karTemizliksiz - kar}, 0 bekleniyordu`);
 
   // Iptal edilen rezervasyon hicbir sey katmamali
   const iptalli = Svc.computeExecutiveTopKpis({
@@ -90,8 +91,8 @@ function run() {
   check(karIptalli === kar, '5. İptal edilen rezervasyonun komisyonu gider sayılmaz',
     `iptalli ${karIptalli}, normal ${kar}`);
 
-  check(adr === Math.round(49000 / 7), '6. ADR brüt ciro üzerinden hesaplanır',
-    `donen ${adr}, ${Math.round(49000 / 7)} bekleniyordu`);
+  check(adr === Math.round((49000 - 900) / 7 * 100) / 100, '6. ADR oda geliri üzerinden hesaplanır',
+    `donen ${adr}, ${Math.round((49000 - 900) / 7 * 100) / 100} bekleniyordu`);
 
   // --- Kaynak denetimi: app.js finans modulu ---------------------------------
   const APP = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');

@@ -68,7 +68,7 @@ runTest('Phase 2 & 4: SECURITY DEFINER Hardening & search_path Sanitization', ()
   assert(schemaContent.includes('REVOKE ALL ON FUNCTION public.create_tenant_and_owner(TEXT, TEXT) FROM PUBLIC;'));
   assert(schemaContent.includes('GRANT EXECUTE ON FUNCTION public.create_tenant_and_owner(TEXT, TEXT) TO authenticated;'));
   assert(schemaContent.includes('REVOKE ALL ON FUNCTION public.log_audit_event FROM PUBLIC;'));
-  assert(schemaContent.includes('GRANT EXECUTE ON FUNCTION public.log_audit_event TO authenticated;'));
+  assert(schemaContent.includes('GRANT EXECUTE ON FUNCTION public.log_audit_event TO service_role;'));
 });
 
 // -----------------------------------------------------------------------------

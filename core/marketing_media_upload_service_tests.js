@@ -4,7 +4,8 @@ let totalTests = 0, passedTests = 0;
 async function runTest(name, fn) { totalTests++; try { await fn(); passedTests++; console.log(`[PASS] ${name}`); } catch (e) { console.error(`[FAIL] ${name}`); console.error(`       ${e.stack || e.message}`); } }
 const TENANT = '11111111-1111-4111-8111-111111111111';
 const PROPERTY = '22222222-2222-4222-8222-222222222222';
-const file = { name: 'pool.jpg', type: 'image/jpeg', size: 3, arrayBuffer: async () => Uint8Array.from([1, 2, 3]).buffer };
+const jpegBytes = Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
+const file = { name: 'pool.jpg', type: 'image/jpeg', size: jpegBytes.length, arrayBuffer: async () => jpegBytes.buffer };
 
 function mockClient(options = {}) {
   const calls = [];
@@ -36,7 +37,14 @@ function mockClient(options = {}) {
     assert.throws(() => Service.validateUpload({ tenantId: TENANT, propertyId: PROPERTY, file: { ...file, size: Service.MAX_BYTES + 1 } }), /BYTE_SIZE/);
   });
   await runTest('Content hash is deterministic over file bytes', async () => {
-    assert.strictEqual(await Service.sha256File(file), '039058c6f2c0cb492c533b0a4d14ef77cc0f78abccced5287d84a1a2011cfb81');
+    assert.strictEqual(await Service.sha256File(file), '474ebe266cd7f9ed28807fa3fdfe0c04cdb3cef9313cdda5c08b15910fcc8184');
+  });
+  await runTest('Declared MIME must match the file magic bytes', async () => {
+    assert.strictEqual(await Service.assertImageSignature(file), true);
+    await assert.rejects(
+      () => Service.assertImageSignature({ ...file, type: 'image/png' }),
+      /IMAGE_SIGNATURE_MISMATCH/
+    );
   });
   await runTest('Storage path is tenant and property scoped with a generated media id', () => {
     const valid = Service.validateUpload({ tenantId: TENANT, propertyId: PROPERTY, file });

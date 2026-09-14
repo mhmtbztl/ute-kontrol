@@ -1,4 +1,6 @@
 -- =============================================================================
+
+BEGIN;
 -- LEXBNB PHASE 25 — PAZARLAMA BULGUSU INCELEMESINDE YETKI SIRASI
 --
 -- phase23 sonrasi review_marketing_finding'in korumasi DOGRUYDU ama YERI yanlisti:
@@ -205,3 +207,9 @@ BEGIN
     RAISE NOTICE 'PHASE 25 OK — yetki kilitten once, varlik oraculu kapali.';
 END
 $verify$;
+
+INSERT INTO public.schema_migrations(version, name)
+VALUES (25, 'phase25_marketing_review_authz_order')
+ON CONFLICT (version) DO NOTHING;
+
+COMMIT;

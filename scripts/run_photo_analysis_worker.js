@@ -15,6 +15,9 @@ async function main() {
   const supabaseUrl = requiredEnvironment('SUPABASE_URL');
   const serviceRoleKey = requiredEnvironment('SUPABASE_SERVICE_ROLE_KEY');
   const geminiApiKey = requiredEnvironment('GEMINI_API_KEY');
+  if (requiredEnvironment('AI_DATA_PROCESSING_APPROVED') !== '1') {
+    throw new Error('AI_DATA_PROCESSING_APPROVAL_REQUIRED');
+  }
   const client = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
   });

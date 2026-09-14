@@ -22,6 +22,8 @@ jobs:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      AI_DATA_PROCESSING_APPROVED: ${{ secrets.AI_DATA_PROCESSING_APPROVED }}
+      LEXBNB_PUBLIC_URL: ${{ secrets.LEXBNB_PUBLIC_URL }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -30,8 +32,11 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Process one photo analysis job
-        if: env.GEMINI_API_KEY != ''
+        if: env.GEMINI_API_KEY != '' && env.AI_DATA_PROCESSING_APPROVED == '1'
         run: npm run marketing:photo-worker
+      - name: Deliver pending tenant invitations
+        if: env.LEXBNB_PUBLIC_URL != ''
+        run: npm run invitations:worker
       - name: Process one completed observation window
         run: npm run marketing:experiment-worker
 

@@ -1,6 +1,70 @@
 
 const DEFAULT_CLEANING_TASKS = [];
 
+// -----------------------------------------------------------------------------
+// CENTRAL HTML SINK HARDENING
+// -----------------------------------------------------------------------------
+// Legacy modules still build trusted layout fragments with innerHTML. Install a
+// narrow sanitizer at the browser boundary so values coming from Supabase can
+// never introduce executable markup while those layouts are migrated to DOM APIs.
+function installInnerHtmlSecurityBoundary() {
+  if (typeof Element === 'undefined' || typeof document === 'undefined') return;
+  const descriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML');
+  if (!descriptor || !descriptor.set || Element.prototype.__lexbnbHtmlGuard) return;
+
+  const forbiddenTags = new Set([
+    'SCRIPT', 'IFRAME', 'OBJECT', 'EMBED', 'BASE', 'META', 'LINK', 'FORM',
+    'MATH', 'SVG', 'TEMPLATE'
+  ]);
+  // Only the application's existing action verbs may appear in legacy inline
+  // handlers. Property access (window.*, document.*, event.*), assignments and
+  // arbitrary expressions remain forbidden.
+  const allowedHandlerName = /^(?:acknowledge|apply|ask|auto|calculate|change|clean|close|convert|copy|cycle|delete|download|edit|execute|export|filter|handle|load|logout|mark|open|parse|pay|prompt|render|reset|run|save|select|send|set|share|show|simulate|start|step|submit|switch|sync|toggle|update)[A-Za-z0-9_$]*$/;
+
+  function handlerIsTrusted(source) {
+    const chunks = String(source || '').split(';').map(s => s.trim()).filter(Boolean);
+    return chunks.length > 0 && chunks.every(chunk => {
+      const match = chunk.match(/^([A-Za-z_$][\w$]*)\((.*)\)$/s);
+      if (!match || !allowedHandlerName.test(match[1])) return false;
+      const args = match[2];
+      const withoutCodec = args.replace(/(?:encode|decode)URIComponent\(\s*(['"])[A-Za-z0-9_.%~\-]*\1\s*\)/g, "''");
+      return !/[`(){};=<>\n\r]/.test(withoutCodec);
+    });
+  }
+
+  function sanitizeHtml(value) {
+    const template = document.createElement('template');
+    descriptor.set.call(template, String(value == null ? '' : value));
+    template.content.querySelectorAll('*').forEach(node => {
+      if (forbiddenTags.has(node.tagName)) {
+        node.remove();
+        return;
+      }
+      Array.from(node.attributes || []).forEach(attr => {
+        const name = attr.name.toLowerCase();
+        const val = String(attr.value || '').trim();
+        if (name.startsWith('on') && !handlerIsTrusted(val)) node.removeAttribute(attr.name);
+        if (['href', 'src', 'xlink:href', 'formaction'].includes(name) &&
+            /^(?:javascript|vbscript|data):/i.test(val)) node.removeAttribute(attr.name);
+        if (name === 'srcdoc' || (name === 'style' && /(?:url\s*\(|expression\s*\(|@import)/i.test(val))) {
+          node.removeAttribute(attr.name);
+        }
+      });
+    });
+    return descriptor.get.call(template);
+  }
+
+  Object.defineProperty(Element.prototype, 'innerHTML', {
+    configurable: descriptor.configurable,
+    enumerable: descriptor.enumerable,
+    get: descriptor.get,
+    set(value) { descriptor.set.call(this, sanitizeHtml(value)); }
+  });
+  Object.defineProperty(Element.prototype, '__lexbnbHtmlGuard', { value: true });
+}
+
+installInnerHtmlSecurityBoundary();
+
 
 // =============================================================
 // GÜVENLİK VE GİZLİ ERİŞİM YÖNETİMİ (SECURITY & AUTH SHIELD)
@@ -209,7 +273,7 @@ function syncBookingCleaningTasks() {
         villa: b.villa,
         guest: b.guest,
         date: b.checkOut,
-        cleaner: 'Fatma Hanım (Temizlik Ekibi)',
+        cleaner: '',
         amount: cleanFee,
         paid: false,
         paidDate: null,
@@ -229,12 +293,12 @@ function saveAppData() {
   if (typeof localStorage === 'undefined') return;
   const uId = (activeSaaSUser && activeSaaSUser.id) ? activeSaaSUser.id : 'usr_ute_master';
   try {
-    localStorage.setItem('LEXBNB_DATA_' + uId, JSON.stringify(appData));
-    if (uId === 'usr_ute_master') {
-      localStorage.setItem('LEXBNB_V5_MASTER_DATA', JSON.stringify(appData));
-    }
+    // Postgres is the sole business-data source. Remove legacy caches containing
+    // guest PII and financial records instead of refreshing them indefinitely.
+    localStorage.removeItem('LEXBNB_DATA_' + uId);
+    localStorage.removeItem('LEXBNB_V5_MASTER_DATA');
   } catch (err) {
-    console.error('Error saving tenant data:', err);
+    console.error('Error removing legacy tenant cache:', err);
   }
 }
 
@@ -250,6 +314,35 @@ function isUUID(str) {
 // 'usr_*' demo ve 'ten_*' gibi yerel kimlikler asla Postgres'e gonderilmez.
 function isCloudTenant(tenantId) {
   return !!(supabaseClient && isUUID(tenantId));
+}
+
+function clearLexbnbBrowserStorage() {
+  if (typeof localStorage !== 'undefined') {
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('LEXBNB_')) localStorage.removeItem(key);
+    }
+  }
+  if (typeof sessionStorage !== 'undefined') {
+    for (let i = sessionStorage.length - 1; i >= 0; i--) {
+      const key = sessionStorage.key(i);
+      if (key && key.startsWith('LEXBNB_')) sessionStorage.removeItem(key);
+    }
+  }
+}
+
+const CLOUD_PAGE_SIZE = 500;
+
+async function fetchAllCloudRows(buildQuery, pageSize = CLOUD_PAGE_SIZE) {
+  const rows = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await buildQuery().range(from, from + pageSize - 1);
+    if (error) throw error;
+    const page = data || [];
+    rows.push(...page);
+    if (page.length < pageSize) break;
+  }
+  return rows;
 }
 
 // -------------------------------------------------------------
@@ -289,7 +382,11 @@ function mapPropertyFromDb(row) {
     url: row.url || '',
     createdBy: row.created_by,
     createdAt: row.created_at,
-    updatedAt: row.updated_at
+    updatedAt: row.updated_at,
+    isActive: row.is_active !== false && !row.archived_at,
+    activationDate: row.activated_on || (row.created_at || '').slice(0, 10),
+    deactivationDate: row.deactivated_on || null,
+    archivedAt: row.archived_at || null
   };
 }
 
@@ -322,16 +419,9 @@ async function loadProperties(targetTenantId) {
     return (typeof appData !== 'undefined' && appData.villas) ? appData.villas : {};
   }
   try {
-    const { data, error } = await supabaseClient
-      .from('properties')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .order('created_at', { ascending: true });
-
-    if (error) {
-      console.error('loadProperties error:', error);
-      throw error;
-    }
+    const data = await fetchAllCloudRows(() => supabaseClient
+      .from('properties').select('*').eq('tenant_id', tenantId)
+      .order('created_at', { ascending: true }));
 
     const villas = {};
     (data || []).forEach(row => {
@@ -557,7 +647,7 @@ async function deleteProperty(propIdOrSlug) {
   const vName = existing ? existing.name : propIdOrSlug;
 
   if (typeof confirm === 'function') {
-    if (!confirm(vName + ' kaydını mülk listenizden kaldırmak istediğinize emin misiniz?')) {
+    if (!confirm(vName + ' kaydını arşivlemek istediğinize emin misiniz? Geçmiş finans ve rezervasyon kayıtları korunacaktır.')) {
       return false;
     }
   }
@@ -565,47 +655,16 @@ async function deleteProperty(propIdOrSlug) {
   const tenantId = getActiveTenantId();
   const propId = existing?.id || (isUUID(propIdOrSlug) ? propIdOrSlug : null);
 
-  // 1. Referential Safety:
-  // Check local state for dependent bookings
-  const localHasBookings = (typeof appData !== 'undefined' && appData.bookings || []).some(b => 
-    b.villa === targetSlug || b.property_id === propId || (propId && b.propertyId === propId)
-  );
-  if (localHasBookings) {
-    const msg = 'Bu mülke ait geçmiş rezervasyon kayıtları bulunmaktadır. Finansal ve operasyonel geçmişin korunması için mülk doğrudan silinemez.';
-    if (typeof alert === 'function') alert('⚠️ ' + msg);
-    throw new Error(msg);
-  }
-
-  // Check Supabase database if connected to cloud tenant
+  // Physical deletion is intentionally unavailable. Archiving preserves every
+  // historical booking, expense and closed-period report.
   if (isCloudTenant(tenantId)) {
-    if (propId) {
-      const { count: bCount } = await supabaseClient
-        .from('bookings')
-        .select('id', { count: 'exact', head: true })
-        .eq('tenant_id', tenantId)
-        .eq('property_id', propId);
-
-      if (bCount && bCount > 0) {
-        const msg = 'Bu mülke ait kayıtlı rezervasyonlar bulunmaktadır. Finansal ve operasyonel geçmişin korunması için mülk doğrudan silinemez.';
-        if (typeof alert === 'function') alert('⚠️ ' + msg);
-        throw new Error(msg);
-      }
-
-      const { count: cCount } = await supabaseClient
-        .from('cleaning_tasks')
-        .select('id', { count: 'exact', head: true })
-        .eq('tenant_id', tenantId)
-        .eq('property_id', propId);
-
-      if (cCount && cCount > 0) {
-        const msg = 'Bu mülke ait temizlik görevleri bulunmaktadır. Silme işlemi engellendi.';
-        if (typeof alert === 'function') alert('⚠️ ' + msg);
-        throw new Error(msg);
-      }
-    }
-
-    // Awaited DB delete
-    let deleteQuery = supabaseClient.from('properties').delete().eq('tenant_id', tenantId);
+    const archivedAt = new Date().toISOString();
+    let deleteQuery = supabaseClient.from('properties').update({
+      is_active: false,
+      deactivated_on: archivedAt.slice(0, 10),
+      archived_at: archivedAt,
+      updated_at: archivedAt
+    }).eq('tenant_id', tenantId);
     if (propId) {
       deleteQuery = deleteQuery.eq('id', propId);
     } else if (targetSlug) {
@@ -614,8 +673,8 @@ async function deleteProperty(propIdOrSlug) {
 
     const { error } = await deleteQuery;
     if (error) {
-      console.error('deleteProperty DB error:', error);
-      const msg = 'Mülk silinemedi: ' + (error.message || 'Veritabanı hatası');
+      console.error('archiveProperty DB error:', error);
+      const msg = 'Mülk arşivlenemedi: ' + (error.message || 'Veritabanı hatası');
       if (typeof alert === 'function') alert(msg);
       throw new Error(msg);
     }
@@ -623,7 +682,12 @@ async function deleteProperty(propIdOrSlug) {
 
   // 2. Update local state ONLY on DB success
   if (targetSlug && typeof appData !== 'undefined' && appData.villas) {
-    delete appData.villas[targetSlug];
+    appData.villas[targetSlug] = {
+      ...appData.villas[targetSlug],
+      isActive: false,
+      deactivationDate: getTodayStr(),
+      archivedAt: new Date().toISOString()
+    };
     if (typeof saveAppData === 'function') saveAppData();
   }
 
@@ -639,7 +703,7 @@ async function deleteProperty(propIdOrSlug) {
     if (typeof closePropertyModal === 'function') closePropertyModal();
     if (typeof updateAllVillaDropdowns === 'function') updateAllVillaDropdowns();
     if (typeof renderAll === 'function') renderAll();
-    if (typeof alert === 'function') alert('🗑️ ' + vName + ' portföyden kaldırıldı.');
+    if (typeof alert === 'function') alert('📦 ' + vName + ' arşivlendi; geçmiş kayıtları korundu.');
   }
 
   return true;
@@ -682,7 +746,7 @@ async function getPropertyIdBySlug(slug, tenantId) {
 const ALLOWED_BOOKING_STATUSES = ['CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT', 'CANCELLED'];
 
 function generateSafeBookingCode(checkInDate) {
-  const prefix = checkInDate ? checkInDate.replace(/[^0-9]/g, '').slice(2, 6) : new Date().toISOString().slice(2, 7).replace('-', '');
+  const prefix = checkInDate ? checkInDate.replace(/[^0-9]/g, '').slice(2, 6) : getTodayStr().slice(2, 7).replace('-', '');
   const rand = Math.floor(1000 + Math.random() * 9000);
   const suffix = Math.random().toString(36).substring(2, 5).toUpperCase();
   return `BK-${prefix}-${rand}${suffix}`;
@@ -833,16 +897,9 @@ async function loadBookings(targetTenantId) {
     return (typeof appData !== 'undefined' && appData.bookings) ? appData.bookings : [];
   }
   try {
-    const { data, error } = await supabaseClient
-      .from('bookings')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .order('check_in', { ascending: true });
-
-    if (error) {
-      console.error('loadBookings error:', error);
-      throw error;
-    }
+    const data = await fetchAllCloudRows(() => supabaseClient
+      .from('bookings').select('*').eq('tenant_id', tenantId)
+      .order('check_in', { ascending: true }));
 
     const bookings = (data || []).map(row => mapBookingFromDb(row));
     if (typeof appData !== 'undefined') {
@@ -1348,7 +1405,7 @@ function mapExpenseToDb(expense, targetTenantId) {
   }
 
   // Resolve date safely
-  let dateStr = expense.date || expense.expense_date || new Date().toISOString().substring(0, 10);
+  let dateStr = expense.date || expense.expense_date || getTodayStr();
   if (typeof dateStr === 'string') dateStr = dateStr.substring(0, 10);
 
   // Booking ID validation
@@ -1394,16 +1451,9 @@ async function loadExpenses(targetTenantId) {
     return (typeof appData !== 'undefined' && appData.expenses) ? appData.expenses : [];
   }
   try {
-    const { data, error } = await supabaseClient
-      .from('expenses')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .order('expense_date', { ascending: false });
-
-    if (error) {
-      console.error('loadExpenses Supabase error:', error);
-      return (typeof appData !== 'undefined' && appData.expenses) ? appData.expenses : [];
-    }
+    const data = await fetchAllCloudRows(() => supabaseClient
+      .from('expenses').select('*').eq('tenant_id', tenantId)
+      .order('expense_date', { ascending: false }));
 
     const mapped = (data || []).map(mapExpenseFromDb).filter(Boolean);
     if (typeof appData !== 'undefined') {
@@ -2038,7 +2088,7 @@ async function cloudUpsertCleaningTask(task) {
     const { error } = await supabaseClient.from('cleaning_tasks').upsert({
       tenant_id: tenantId,
       property_id: propId,
-      task_date: task.date || new Date().toISOString().split('T')[0],
+      task_date: task.date || getTodayStr(),
       cleaner_name: task.cleaner || 'Temizlik Ekibi',
       amount: Number(task.amount) || 0,
       description: task.notes || task.desc || '',
@@ -2169,7 +2219,7 @@ function mapLeadToDb(lead, targetTenantId) {
     guest_phone: gPhone,
     guest_email: (lead.email || lead.guestEmail || lead.guest_email || '').trim() || null,
     channel: lead.channel || lead.source || 'WhatsApp',
-    lead_date: lead.date || lead.lead_date || new Date().toISOString().split('T')[0],
+    lead_date: lead.date || lead.lead_date || getTodayStr(),
     requested_check_in: checkIn,
     requested_check_out: checkOut,
     pax: Number(lead.pax) > 0 ? Number(lead.pax) : 2,
@@ -2252,16 +2302,9 @@ async function loadLeads(targetTenantId) {
     return (typeof appData !== 'undefined' && appData.leads) ? appData.leads : [];
   }
 
-  const { data, error } = await supabaseClient
-    .from('leads')
-    .select('*')
-    .eq('tenant_id', tenantId)
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    console.error('loadLeads error:', error);
-    throw error;
-  }
+  const data = await fetchAllCloudRows(() => supabaseClient
+    .from('leads').select('*').eq('tenant_id', tenantId)
+    .order('created_at', { ascending: false }));
 
   const mapped = (data || []).map(mapLeadFromDb);
   if (typeof appData !== 'undefined') {
@@ -2292,7 +2335,7 @@ async function createLead(leadInput) {
       email: leadInput.email || '',
       channel: leadInput.channel || 'WhatsApp',
       source: (leadInput.channel || 'WHATSAPP').toUpperCase(),
-      date: leadInput.date || new Date().toISOString().split('T')[0],
+      date: leadInput.date || getTodayStr(),
       checkIn: leadInput.checkIn || '',
       checkOut: leadInput.checkOut || '',
       pax: Number(leadInput.pax) || 2,
@@ -2812,14 +2855,21 @@ function getBookingFilterShare(b) {
  */
 function getFilterDateRange() {
   if (typeof currentFilter === 'undefined' || !currentFilter) return null;
-  if (!currentFilter.period || currentFilter.period === 'ALL') return null;
+  if (!currentFilter.period || currentFilter.period === 'ALL') {
+    const dates = [];
+    (appData?.bookings || []).forEach(b => { if (b.checkIn) dates.push(b.checkIn); if (b.checkOut) dates.push(b.checkOut); });
+    (appData?.expenses || []).forEach(e => { if (e.date || e.expense_date) dates.push(e.date || e.expense_date); });
+    dates.sort();
+    return dates.length ? { start: dates[0].slice(0, 10), end: dates[dates.length - 1].slice(0, 10) } : null;
+  }
 
   if (currentFilter.period === 'CUSTOM' ||
       (currentFilter.startDate && currentFilter.endDate &&
-       (currentFilter.period === '2026-YEAR' || currentFilter.period === '2025-YEAR'))) {
+       /^\d{4}-YEAR$/.test(currentFilter.period))) {
+    if (!currentFilter.startDate || !currentFilter.endDate) return null;
     return {
-      start: currentFilter.startDate || '2025-07-01',
-      end: currentFilter.endDate || '2099-12-31'
+      start: currentFilter.startDate,
+      end: currentFilter.endDate
     };
   }
 
@@ -2861,7 +2911,7 @@ function renderOperationsKpiStrip() {
   }).length;
   setEl('opsReadyPropsVal', `${hazir} / ${villaKeys.length}`);
 
-  const bugun = new Date().toISOString().slice(0, 10);
+  const bugun = getTodayStr();
   const bugunkuTurnover = tasks.filter(t => (t.date || '').slice(0, 10) === bugun).length;
   setEl('opsTurnoverVal', `${bugunkuTurnover} Görev`);
 
@@ -2913,7 +2963,7 @@ function renderPricingKpiStrip() {
 // -------------------------------------------------------------
 function getPeriodDayCount(periodKey) {
   const p = periodKey || (currentFilter && currentFilter.period);
-  if (!p || p === 'ALL') return 365;
+  if (!p) return null;
   if (/^\d{4}-YEAR$/.test(p)) {
     const y = Number(p.slice(0, 4));
     return ((y % 4 === 0 && y % 100 !== 0) || y % 400 === 0) ? 366 : 365;
@@ -2922,7 +2972,12 @@ function getPeriodDayCount(periodKey) {
     const [y, m] = p.split('-').map(Number);
     return new Date(y, m, 0).getDate();   // ayin gercek gun sayisi
   }
-  return 30;
+  const range = getFilterDateRange();
+  if (!range) return null;
+  const start = Date.parse(range.start + 'T00:00:00Z');
+  const end = Date.parse(range.end + 'T00:00:00Z');
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return null;
+  return Math.floor((end - start) / 86400000) + 1;
 }
 
 function getPreviousPeriodKey(periodKey) {
@@ -3131,13 +3186,49 @@ function renderAll() {
 // =============================================================
 // 1. PROFESYONEL FİNANSAL PERFORMANS MODÜLÜ (GENEL RAPOR ENTEGRELİ)
 // =============================================================
+function getConfiguredRevenueTarget(filter, targets, villaKey = 'ALL') {
+  const property = villaKey !== 'ALL' ? appData.villas?.[villaKey] : null;
+  const propertyId = property?.id || null;
+  const rows = Array.isArray(targets) ? targets : [];
+  if (rows.length) {
+    const matchingScope = rows.filter(t => propertyId
+      ? (t.property_id === propertyId || t.propertyId === propertyId)
+      : !(t.property_id || t.propertyId));
+    let selected = matchingScope;
+    if (/^\d{4}-\d{2}$/.test(filter.period || '')) {
+      const [year, month] = filter.period.split('-').map(Number);
+      selected = matchingScope.filter(t => Number(t.year) === year && Number(t.month) === month);
+    } else if (filter.period === 'CUSTOM' && filter.startDate && filter.endDate) {
+      const start = filter.startDate.slice(0, 7);
+      const end = filter.endDate.slice(0, 7);
+      selected = matchingScope.filter(t => {
+        const ym = `${t.year}-${String(t.month).padStart(2, '0')}`;
+        return ym >= start && ym <= end;
+      });
+    } else if (/^\d{4}-YEAR$/.test(filter.period || '')) {
+      const year = Number(filter.period.slice(0, 4));
+      selected = matchingScope.filter(t => Number(t.year) === year);
+    }
+    if (!selected.length) return null;
+    return selected.reduce((sum, t) => sum + Number(t.revenue_target ?? t.revenue ?? 0), 0);
+  }
+
+  if (targets && typeof targets === 'object') {
+    const candidate = targets[filter.period];
+    if (candidate && Number.isFinite(Number(candidate.revenue ?? candidate.revenue_target))) {
+      return Number(candidate.revenue ?? candidate.revenue_target);
+    }
+  }
+  return null;
+}
+
 function renderFinanceModule() {
   let totalRevenue = 0;
   let totalOpex = 0;
   let totalCapex = 0;
   let totalSoldNights = 0;
   let avgRevPerNight = 0;
-  let targetRev = 0;
+  let targetRev = null;
   // Mulk istatistikleri MUSTERININ KENDI mulklerinden kurulur. Burada bes
   // uydurma villa (Bella Vista, Olive Garden, Azure Bay, Sunset Horizon,
   // Palm Breeze) sabit yaziliydi: ilk musterinin portfoyu. Baska her musteri
@@ -3165,7 +3256,7 @@ function renderFinanceModule() {
       totalOpex = att.totalOpex;
       totalCapex = att.totalCapex;
       const userAllTarget = (appData.targets && appData.targets['ALL']) ? appData.targets['ALL'].revenue : null;
-      targetRev = userAllTarget || att.targetCiro;
+      targetRev = userAllTarget || att.targetCiro || null;
 
       // All-time per villa
       // Buradaki bes satir, silinmis excelDb demo veri setinden bes uydurma
@@ -3192,7 +3283,8 @@ function renderFinanceModule() {
           totalOpex += mf.opex || 0;
           totalCapex += mf.capex || 0;
           totalSoldNights += mf.daysSold || 0;
-          targetRev += (activeExcel.targets && activeExcel.targets[m]) || 350000;
+          const monthTarget = activeExcel.targets && activeExcel.targets[m];
+          if (Number.isFinite(Number(monthTarget))) targetRev = (targetRev || 0) + Number(monthTarget);
         }
         const pm = activeExcel.propertyMonthly && activeExcel.propertyMonthly[m];
         if (pm && pm.villas) {
@@ -3208,7 +3300,7 @@ function renderFinanceModule() {
       Object.keys(propStats).forEach(vKey => {
         const p = propStats[vKey];
         p.adr = p.nights > 0 ? Math.round(p.revenue / p.nights) : 0;
-        p.share = totalRevenue > 0 ? Number(((p.revenue / totalRevenue) * 100).toFixed(1)) : 20;
+        p.share = totalRevenue > 0 ? Number(((p.revenue / totalRevenue) * 100).toFixed(1)) : 0;
         p.occupancy = Number(((p.nights / totalDaysCapacity) * 100).toFixed(1));
         p.revpar = Math.round(p.revenue / totalDaysCapacity);
       });
@@ -3218,10 +3310,10 @@ function renderFinanceModule() {
         totalRevenue = vData.revenue;
         totalSoldNights = vData.nights;
         avgRevPerNight = vData.adr;
-        const vShare = vData.share > 0 ? vData.share / 100 : 0.2;
+        const vShare = vData.share > 0 ? vData.share / 100 : 0;
         totalOpex = Math.round(totalOpex * vShare);
         totalCapex = Math.round(totalCapex * vShare);
-        targetRev = Math.round(targetRev * 0.2);
+        targetRev = targetRev === null ? null : Math.round(targetRev * vShare);
       }
 
     } else {
@@ -3236,11 +3328,11 @@ function renderFinanceModule() {
         totalSoldNights = mf.daysSold || (pm ? pm.totalDays : 0);
         avgRevPerNight = mf.avgDaily ? Math.round(mf.avgDaily) : (totalSoldNights > 0 ? Math.round(totalRevenue / totalSoldNights) : 0);
         const userPeriodTarget = (appData.targets && appData.targets[currentFilter.period]) ? appData.targets[currentFilter.period].revenue : null;
-        targetRev = userPeriodTarget || activeExcel.targets[currentFilter.period] || 300000;
+        targetRev = userPeriodTarget || activeExcel.targets[currentFilter.period] || null;
       } else {
         // Current or Future Month (e.g. 2026-09, 2026-10, 2026-12 Yılbaşı): Read from real-time bookings & expenses
         const userPeriodTarget = (appData.targets && appData.targets[currentFilter.period]) ? appData.targets[currentFilter.period].revenue : null;
-        targetRev = userPeriodTarget || (activeExcel && activeExcel.targets ? activeExcel.targets[currentFilter.period] : null) || (currentFilter.period === '2026-12' ? 1200000 : 350000);
+        targetRev = userPeriodTarget || (activeExcel && activeExcel.targets ? activeExcel.targets[currentFilter.period] : null) || null;
       }
 
       if (pm && pm.villas) {
@@ -3263,31 +3355,32 @@ function renderFinanceModule() {
         totalRevenue = vData.revenue;
         totalSoldNights = vData.nights;
         avgRevPerNight = vData.adr;
-        const vShare = vData.share > 0 ? vData.share / 100 : 0.2;
+        const vShare = vData.share > 0 ? vData.share / 100 : 0;
         totalOpex = Math.round(totalOpex * vShare);
         totalCapex = Math.round(totalCapex * vShare);
-        targetRev = Math.round(targetRev * 0.2);
+        targetRev = targetRev === null ? null : Math.round(targetRev * vShare);
       }
     }
   }
 
+  // Resolve only explicitly configured targets. Missing data stays missing.
+  if (targetRev === null) targetRev = getConfiguredRevenueTarget(currentFilter, appData.targets, currentFilter.villa);
+
   // Include user-entered bookings (in clean state, ALL revenue comes from here!)
   let manualBookingRev = 0;
   let manualBookingNights = 0;
-  // USALI: ciro, misafirin odedigi BRUT tutardir. OTA komisyonu ve temizlik
-  // maliyeti gelirden dusulmez, gider tarafinda raporlanir (bkz.
-  // bookingDistributionCost). Onceki hal b.net (brut - komisyon - temizlik)
-  // kullandigi icin ciro oldugundan dusuk gorunuyor ve ayni ay icin yonetici
-  // paneliyle farkli net kar veriyordu.
+  // Canonical contract: recognized revenue = gross - discount. Guest cleaning
+  // charge remains revenue; OTA commission is distribution OPEX; actual cleaner
+  // payout is an expense/cleaning-task amount and is never inferred from the fee.
   let bookingDistributionCost = 0;
   appData.bookings.forEach(b => {
     if (b.status === 'CANCELLED' || !isBookingInFilter(b)) return;
     // USALI tahakkuk: aylari kesen rezervasyonun yalnizca bu doneme dusen payi.
     const pay = getBookingFilterShare(b);
     if (pay.nights === 0 && pay.ratio === 0) return;
-    const bNet = (Number(b.gross !== undefined ? b.gross : b.net) || 0) * pay.ratio;
+    const bNet = Math.max(0, (Number(b.gross !== undefined ? b.gross : b.net) || 0) - (Number(b.discount) || 0)) * pay.ratio;
     const bNights = pay.nights;
-    bookingDistributionCost += ((Number(b.otaCommission) || 0) + (Number(b.cleaningFee) || 0)) * pay.ratio;
+    bookingDistributionCost += (Number(b.otaCommission) || Number(b.otaComm) || 0) * pay.ratio;
     manualBookingRev += bNet;
     manualBookingNights += bNights;
 
@@ -3340,15 +3433,15 @@ function renderFinanceModule() {
     }
   });
 
-  // USALI: dagitim (OTA komisyonu) ve temizlik maliyeti operasyonel giderdir.
-  // Ciro brut alindigi icin bu tutarlar burada gider tarafina eklenir.
+  // Only OTA commission is derived from a booking. Cleaning fee is guest income;
+  // cleaner payout belongs in the expense ledger.
   totalOpex += bookingDistributionCost;
 
   // Bu tutarlar rezervasyonlardan OTOMATIK gelir. Kullanici ayni maliyeti bir de
   // Gider Defteri'ne elle girerse iki kez dusulur; bunu gizlemek yerine ekranda
   // acikca gosteriyoruz ki mukerrer giris yapilmasin.
   setEl('finAutoDerivedCost', bookingDistributionCost > 0
-    ? `Bunun ${Math.round(bookingDistributionCost).toLocaleString('tr-TR')} TL'si rezervasyonlardan otomatik (OTA komisyonu + temizlik). Aynı tutarları Gider Defteri'ne tekrar girmeyin.`
+    ? `Bunun ${Math.round(bookingDistributionCost).toLocaleString('tr-TR')} TL'si rezervasyonlardan otomatik OTA komisyonudur. Aynı komisyonu Gider Defteri'ne tekrar girmeyin.`
     : '');
 
   // Hierarchy calculations
@@ -3359,9 +3452,10 @@ function renderFinanceModule() {
   const expenseRatio = totalRevenue > 0 ? (totalExpense / totalRevenue) * 100 : 0;
 
   // Monthly Target Comparison
-  const targetDiff = totalRevenue - targetRev;
-  const targetPct = targetRev > 0 ? (totalRevenue / targetRev) * 100 : 0;
-  const forecastEndMonth = Math.round(totalRevenue * 1.018);
+  const hasTarget = Number.isFinite(Number(targetRev)) && Number(targetRev) > 0;
+  const targetDiff = hasTarget ? totalRevenue - Number(targetRev) : null;
+  const targetPct = hasTarget ? (totalRevenue / Number(targetRev)) * 100 : null;
+  const forecastEndMonth = null; // A forecast is shown only when a real forecast model supplies one.
 
   // Update Top 5 KPI Cards
   // setEl artik genel kapsamda tanimli. Burada yerel bir const olarak
@@ -3369,9 +3463,9 @@ function renderFinanceModule() {
   //   ReferenceError: Cannot access 'setEl' before initialization
 
   setEl('finActualRevenue', `${Math.round(totalRevenue).toLocaleString('tr-TR')} TL`);
-  setEl('finRevTargetDelta', `Hedefin %${Math.round(Math.abs(targetPct - 100))} ${targetDiff >= 0 ? 'üzerinde' : 'altında'}`);
-  setEl('finTargetRevenue', `${Math.round(targetRev).toLocaleString('tr-TR')} TL`);
-  setEl('finTargetDiff', `${targetDiff >= 0 ? '+' : ''}${Math.round(targetDiff).toLocaleString('tr-TR')} TL fark`);
+  setEl('finRevTargetDelta', hasTarget ? `Hedefin %${Math.round(Math.abs(targetPct - 100))} ${targetDiff >= 0 ? 'üzerinde' : 'altında'}` : 'Hedef belirlenmedi');
+  setEl('finTargetRevenue', hasTarget ? `${Math.round(targetRev).toLocaleString('tr-TR')} TL` : '—');
+  setEl('finTargetDiff', hasTarget ? `${targetDiff >= 0 ? '+' : ''}${Math.round(targetDiff).toLocaleString('tr-TR')} TL fark` : '—');
 
   setEl('finNetProfit', `${Math.round(netCashProfit).toLocaleString('tr-TR')} TL`);
   setEl('finNetMarginLabel', `%${netMargin.toFixed(1)} net kâr marjı`);
@@ -3383,16 +3477,16 @@ function renderFinanceModule() {
   setEl('finAvgRevPerNight', `${avgRevPerNight.toLocaleString('tr-TR')} TL / satılan gece`);
 
   // Target Analysis Box
-  setEl('tgtBoxTarget', `${Math.round(targetRev).toLocaleString('tr-TR')} TL`);
+  setEl('tgtBoxTarget', hasTarget ? `${Math.round(targetRev).toLocaleString('tr-TR')} TL` : '—');
   setEl('tgtBoxActual', `${Math.round(totalRevenue).toLocaleString('tr-TR')} TL`);
-  setEl('tgtBoxDiff', `${targetDiff >= 0 ? '+' : ''}${Math.round(targetDiff).toLocaleString('tr-TR')} TL`);
-  setEl('tgtBoxPct', `%${targetPct.toFixed(1)}`);
-  setEl('tgtBoxForecast', `${forecastEndMonth.toLocaleString('tr-TR')} TL`);
-  setEl('finTargetStatusBadge', `%${targetPct.toFixed(1)} Hedef Başarısı`);
-  setEl('targetBarRatioText', `${Math.round(totalRevenue).toLocaleString('tr-TR')} TL / ${Math.round(targetRev).toLocaleString('tr-TR')} TL (%${targetPct.toFixed(1)})`);
+  setEl('tgtBoxDiff', hasTarget ? `${targetDiff >= 0 ? '+' : ''}${Math.round(targetDiff).toLocaleString('tr-TR')} TL` : '—');
+  setEl('tgtBoxPct', hasTarget ? `%${targetPct.toFixed(1)}` : '—');
+  setEl('tgtBoxForecast', forecastEndMonth === null ? '—' : `${forecastEndMonth.toLocaleString('tr-TR')} TL`);
+  setEl('finTargetStatusBadge', hasTarget ? `%${targetPct.toFixed(1)} Hedef Başarısı` : 'Hedef belirlenmedi');
+  setEl('targetBarRatioText', hasTarget ? `${Math.round(totalRevenue).toLocaleString('tr-TR')} TL / ${Math.round(targetRev).toLocaleString('tr-TR')} TL (%${targetPct.toFixed(1)})` : `${Math.round(totalRevenue).toLocaleString('tr-TR')} TL / —`);
 
   const fillEl = document.getElementById('targetBarFill');
-  if (fillEl) fillEl.style.width = `${Math.min(100, Math.max(0, targetPct))}%`;
+  if (fillEl) fillEl.style.width = hasTarget ? `${Math.min(100, Math.max(0, targetPct))}%` : '0%';
 
   // Profit Waterfall Bridge
   setEl('brCiro', `${Math.round(totalRevenue).toLocaleString('tr-TR')} TL`);
@@ -3831,38 +3925,27 @@ function renderMonthlyTrendChart() {
   if (!container) return;
   container.innerHTML = '';
 
-  const activeExcel = (!appData.isCleanState && appData.excelDb) ? appData.excelDb : null;
-  if (!activeExcel) {
+  const allTrendData = getMonthlyKpiDataset().filter(d => d.ciro !== 0 || d.totalExp !== 0 || d.nights !== 0);
+  if (!allTrendData.length) {
     container.innerHTML = `
       <div style="text-align:center; padding: 45px 20px; color: var(--color-slate-400);">
         <div style="font-size: 2.2rem; margin-bottom: 8px;">📊</div>
-        <strong style="color:var(--color-slate-200); font-size:1.05rem;">Sistem Verileri Sıfırlandı (Temiz Kasa)</strong>
+        <strong style="color:var(--color-slate-200); font-size:1.05rem;">Henüz aylık finans verisi yok</strong>
         <p style="font-size: 0.85rem; margin-top: 6px;">Yeni rezervasyonlar ve harcamalar eklendikçe aylık trend sütunları burada otomatik oluşacaktır.</p>
       </div>
     `;
     return;
   }
 
-  const mfKeys = [
-    '2025-10', '2025-11', '2025-12', '2026-01', '2026-02', '2026-03',
-    '2026-04', '2026-05', '2026-06', '2026-07', '2026-08'
-  ];
-
-  let keysToShow = mfKeys;
-  if (activeTrendRange === '3M') keysToShow = mfKeys.slice(-3);
-  if (activeTrendRange === '6M') keysToShow = mfKeys.slice(-6);
-  if (activeTrendRange === 'YTD') keysToShow = mfKeys.filter(k => k.startsWith('2026'));
-
-  const displayData = keysToShow.map(k => {
-    const f = activeExcel.monthlyFinancials[k] || { monthName: '', year: '', ciro: 0, opex: 0, netProfit: 0 };
-    return {
-      key: k,
-      month: (f.monthName ? f.monthName.slice(0, 3) + ' ' + f.year.slice(2) : k),
-      ciro: f.ciro || 0,
-      opex: f.opex || 0,
-      profit: Math.max(0, f.netProfit || 0)
-    };
-  });
+  let selectedTrendData = allTrendData;
+  if (activeTrendRange === '3M') selectedTrendData = allTrendData.slice(-3);
+  if (activeTrendRange === '6M') selectedTrendData = allTrendData.slice(-6);
+  if (activeTrendRange === '12M') selectedTrendData = allTrendData.slice(-12);
+  if (activeTrendRange === 'YTD') selectedTrendData = allTrendData.filter(d => d.key.startsWith(String(new Date().getFullYear())));
+  const displayData = selectedTrendData.map(d => ({
+    key: d.key, month: d.monthName, ciro: d.ciro, opex: d.opex,
+    profit: Math.max(0, d.netProfit)
+  }));
 
   const maxVal = Math.max(100000, ...displayData.map(d => Math.max(d.ciro, d.opex)));
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -4164,15 +4247,16 @@ function runWhatIfSimulation() {
   setEl('simOccLabel', `${occDelta >= 0 ? '+' : ''}%${occDelta}`);
   setEl('simDirectLabel', `%${directPct}`);
 
-  // Base values from August 2026 anchor (or 0 if clean state)
-  const activeExcel = (!appData.isCleanState && appData.excelDb) ? appData.excelDb : null;
-  const baseRevenue = activeExcel ? 483965 : 0;
-  const baseNights = activeExcel ? 79 : 0;
-  const baseAdr = activeExcel ? 6126 : 0;
-  const baseOpex = activeExcel ? 337306 : 0;
-  const baseComm = activeExcel ? 75519 : 0;
-  const baseCapex = activeExcel ? 3866 : 0;
-  const baseProfit = activeExcel ? 142793 : 0;
+  const scopedBookings = (appData.bookings || []).filter(b => b.status !== 'CANCELLED' && isBookingInFilter(b));
+  const baseRevenue = scopedBookings.reduce((sum, b) => sum + Math.max(0, Number(b.gross || 0) - Number(b.discount || 0)), 0);
+  const baseNights = scopedBookings.reduce((sum, b) => sum + Number(b.nights || 0), 0);
+  const baseRoomRevenue = scopedBookings.reduce((sum, b) => sum + Math.max(0, Number(b.gross || 0) - Number(b.cleaningFee || b.cleanFee || 0) - Number(b.discount || 0)), 0);
+  const baseAdr = baseNights > 0 ? baseRoomRevenue / baseNights : 0;
+  const scopedExpenses = (appData.expenses || []).filter(isExpenseInFilter);
+  const baseOpex = scopedExpenses.filter(e => (e.type || e.expense_type || 'OPEX') !== 'CAPEX').reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const baseComm = scopedBookings.reduce((sum, b) => sum + Number(b.otaCommission || b.otaComm || 0), 0);
+  const baseCapex = scopedExpenses.filter(e => (e.type || e.expense_type) === 'CAPEX').reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const baseProfit = baseRevenue - baseOpex - baseComm - baseCapex;
 
   if (baseRevenue === 0) {
     setEl('simResRevenue', '0 TL');
@@ -4384,13 +4468,13 @@ function renderExpensesTable() {
     tr.innerHTML = `
       <td>${formatTrDate(exp.date)}</td>
       <td><span class="badge ${exp.type === 'CAPEX' ? 'badge-amber' : 'badge-blue'}">${exp.type === 'CAPEX' ? 'Yatırım (Capex)' : 'Operasyonel (Opex)'}</span></td>
-      <td><strong>${exp.category}</strong></td>
-      <td>${exp.villa === 'ALL' ? 'Tüm Portföy' : (appData.villas[exp.villa]?.name || exp.villa)}</td>
-      <td>${exp.description || exp.desc || "-"}</td>
+      <td><strong>${escapeHtml(exp.category)}</strong></td>
+      <td>${escapeHtml(exp.villa === 'ALL' ? 'Tüm Portföy' : (appData.villas[exp.villa]?.name || exp.villa))}</td>
+      <td>${escapeHtml(exp.description || exp.desc || "-")}</td>
       <td><strong>${Number(exp.amount).toLocaleString('tr-TR')} TL</strong></td>
       <td style="text-align: right; white-space: nowrap;">
-        <button class="btn btn-secondary btn-sm" onclick="editExpense('${exp.id}')">✏️</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteExpense('${exp.id}')">🗑️</button>
+        <button class="btn btn-secondary btn-sm" onclick="editExpense(decodeURIComponent('${encodeURIComponent(String(exp.id))}'))">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteExpense(decodeURIComponent('${encodeURIComponent(String(exp.id))}'))">🗑️</button>
       </td>
     `;
     tbody.appendChild(tr);
@@ -4417,7 +4501,7 @@ function openExpenseModal(editId = null) {
     title.innerText = '💸 Yeni Gider / Yatırım Girişi';
     editInput.value = '';
     document.getElementById('expenseForm').reset();
-    document.getElementById('expDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('expDate').value = getTodayStr();
   }
 
   modal.classList.add('active');
@@ -4486,6 +4570,24 @@ function getGoalMonths() {
   return ALL_FINANCIAL_MONTHS.map(m => ({ id: m, name: getPeriodDisplayName(m) }));
 }
 
+function getTargetRecordForPeriod(period) {
+  if (!appData.targets) return null;
+  if (!Array.isArray(appData.targets)) return appData.targets[period] || null;
+  const [year, month] = String(period || '').split('-').map(Number);
+  return appData.targets.find(t => Number(t.year) === year && Number(t.month) === month && !t.property_id) || null;
+}
+
+function getAvailableNightsForMonth(period) {
+  if (!/^\d{4}-\d{2}$/.test(period || '')) return null;
+  const [year, month] = period.split('-').map(Number);
+  if (typeof FinancialMetricsService !== 'undefined') {
+    return FinancialMetricsService.calculateAvailableNights(
+      Object.values(appData.villas || {}), year, month, appData.maintenance || []
+    );
+  }
+  return null;
+}
+
 function openGoalsModal(targetPeriod) {
   const select = document.getElementById('goalPeriodSelect');
   if (select) {
@@ -4496,7 +4598,7 @@ function openGoalsModal(targetPeriod) {
       opt.textContent = m.name;
       select.appendChild(opt);
     });
-    const periodToSelect = targetPeriod || (currentFilter.period !== 'ALL' ? currentFilter.period : '2026-08');
+    const periodToSelect = targetPeriod || (/^\d{4}-\d{2}$/.test(currentFilter.period) ? currentFilter.period : getTodayStr().slice(0, 7));
     select.value = periodToSelect;
   }
   loadSelectedPeriodGoal();
@@ -4505,17 +4607,14 @@ function openGoalsModal(targetPeriod) {
 
 function loadSelectedPeriodGoal() {
   const select = document.getElementById('goalPeriodSelect');
-  const period = select ? select.value : (currentFilter.period !== 'ALL' ? currentFilter.period : '2026-08');
+  const period = select ? select.value : (/^\d{4}-\d{2}$/.test(currentFilter.period) ? currentFilter.period : getTodayStr().slice(0, 7));
   
-  const saved = appData.targets && appData.targets[period];
-  // Demo hedefleri musteriye UYGULANMAZ. Tenant kendi hedefini belirlemediyse 0.
-    const excelTarget = 0;
-  
-  const rev = (saved && saved.revenue) ? saved.revenue : (excelTarget || 300000);
-  const netProfit = (saved && saved.netProfit) ? saved.netProfit : Math.round(rev * 0.35);
-  const maxExpense = (saved && saved.maxExpense) ? saved.maxExpense : Math.round(rev * 0.65);
-  const nights = (saved && saved.nights) ? saved.nights : (saved && saved.occupancy ? Math.round(150 * (saved.occupancy / 100)) : 75);
-  const adr = (saved && saved.adr) ? saved.adr : (nights > 0 ? Math.round(rev / nights) : 5500);
+  const saved = getTargetRecordForPeriod(period);
+  const rev = saved ? (saved.revenue ?? saved.revenue_target ?? '') : '';
+  const netProfit = saved ? (saved.netProfit ?? saved.net_profit_target ?? '') : '';
+  const maxExpense = saved ? (saved.maxExpense ?? saved.max_expense_target ?? '') : '';
+  const nights = saved ? (saved.nights ?? saved.sold_nights_target ?? '') : '';
+  const adr = saved ? (saved.adr ?? saved.adr_target ?? '') : '';
 
   const revEl = document.getElementById('goalRevenue');
   const netEl = document.getElementById('goalNetProfit');
@@ -4531,26 +4630,22 @@ function loadSelectedPeriodGoal() {
   if (adrEl) adrEl.value = adr;
   
   if (hintEl) {
-    const defaultVal = excelTarget || 300000;
-    hintEl.textContent = `Varsayılan / Excel: ${defaultVal.toLocaleString('tr-TR')} TL`;
+    hintEl.textContent = saved ? 'Kayıtlı hedef değerleri gösteriliyor.' : 'Bu dönem için henüz hedef belirlenmedi.';
   }
   
   const occLabel = document.getElementById('goalCalcOccLabel');
   if (occLabel) {
-    const occPct = Math.min(100, Math.round((nights / 150) * 100));
-    occLabel.textContent = `%${occPct} (${nights}/150 gece)`;
+    const capacity = getAvailableNightsForMonth(period);
+    const occPct = capacity > 0 && Number(nights) >= 0 ? Math.min(100, Math.round((Number(nights) / capacity) * 100)) : null;
+    occLabel.textContent = occPct === null ? 'Kullanılabilir gece hesaplanamadı' : `%${occPct} (${nights}/${capacity} gece)`;
   }
 }
 
 function autoCalculateGoalSubmetrics() {
   const rev = Number(document.getElementById('goalRevenue').value) || 0;
-  if (rev > 0) {
-    document.getElementById('goalNetProfit').value = Math.round(rev * 0.35);
-    document.getElementById('goalMaxExpense').value = Math.round(rev * 0.65);
-    const nights = Number(document.getElementById('goalOccupancyNights').value) || 75;
-    if (nights > 0) {
-      document.getElementById('goalADR').value = Math.round(rev / nights);
-    }
+  const nights = Number(document.getElementById('goalOccupancyNights').value) || 0;
+  if (rev > 0 && nights > 0) {
+    document.getElementById('goalADR').value = Math.round(rev / nights);
   }
 }
 
@@ -4559,8 +4654,10 @@ function autoCalculateGoalAdr() {
   const rev = Number(document.getElementById('goalRevenue').value) || 0;
   const occLabel = document.getElementById('goalCalcOccLabel');
   if (occLabel) {
-    const occPct = Math.min(100, Math.round((nights / 150) * 100));
-    occLabel.textContent = `%${occPct} (${nights}/150 gece)`;
+    const period = document.getElementById('goalPeriodSelect')?.value;
+    const capacity = getAvailableNightsForMonth(period);
+    const occPct = capacity > 0 ? Math.min(100, Math.round((nights / capacity) * 100)) : null;
+    occLabel.textContent = occPct === null ? 'Kullanılabilir gece hesaplanamadı' : `%${occPct} (${nights}/${capacity} gece)`;
   }
   if (rev > 0 && nights > 0) {
     document.getElementById('goalADR').value = Math.round(rev / nights);
@@ -4579,33 +4676,29 @@ function closeGoalsModal() {
   document.getElementById('goalsModal').classList.remove('active');
 }
 
-function saveMonthlyGoals(e) {
+async function saveMonthlyGoals(e) {
   if (e) e.preventDefault();
   const select = document.getElementById('goalPeriodSelect');
-  const period = select ? select.value : (currentFilter.period !== 'ALL' ? currentFilter.period : '2026-08');
+  const period = select ? select.value : (/^\d{4}-\d{2}$/.test(currentFilter.period) ? currentFilter.period : getTodayStr().slice(0, 7));
   
-  const revenue = Number(document.getElementById('goalRevenue').value) || 300000;
-  const netProfit = Number(document.getElementById('goalNetProfit').value) || Math.round(revenue * 0.35);
-  const maxExpense = Number(document.getElementById('goalMaxExpense').value) || Math.round(revenue * 0.65);
-  const nights = Number(document.getElementById('goalOccupancyNights').value) || 75;
-  const adr = Number(document.getElementById('goalADR').value) || (nights > 0 ? Math.round(revenue / nights) : 5500);
-  const occupancy = Number(((nights / 150) * 100).toFixed(1));
-  const margin = Number(((netProfit / revenue) * 100).toFixed(1));
-  const revpar = Math.round(revenue / 150);
+  const revenue = Number(document.getElementById('goalRevenue').value);
+  if (!Number.isFinite(revenue) || revenue <= 0) {
+    alert('Aylık ciro hedefini girin. Sistem hedef uydurmaz.');
+    return;
+  }
+  const netProfit = Number(document.getElementById('goalNetProfit').value) || 0;
+  const maxExpense = Number(document.getElementById('goalMaxExpense').value) || 0;
+  const nights = Number(document.getElementById('goalOccupancyNights').value) || 0;
+  const adr = Number(document.getElementById('goalADR').value) || 0;
+  const capacity = getAvailableNightsForMonth(period);
+  const occupancy = capacity > 0 ? Number(((nights / capacity) * 100).toFixed(1)) : 0;
+  const margin = revenue > 0 ? Number(((netProfit / revenue) * 100).toFixed(1)) : 0;
+  const revpar = capacity > 0 ? Math.round(revenue / capacity) : 0;
+  const [year, month] = period.split('-').map(Number);
 
-  if (!appData.targets) appData.targets = {};
-  appData.targets[period] = {
-    revenue,
-    netProfit,
-    maxExpense,
-    nights,
-    adr,
-    occupancy,
-    margin,
-    revpar
-  };
-
-  saveAppData();
+  await saveMonthlyTarget({ year, month, revenueTarget: revenue, netProfitTarget: netProfit,
+    maxExpenseTarget: maxExpense, occupancyTarget: occupancy, adrTarget: adr,
+    revparTarget: revpar, marginTarget: margin });
   closeGoalsModal();
   renderFinanceModule();
   renderSettingsGoalsTable();
@@ -4720,11 +4813,7 @@ function downloadSampleTemplate(templateType) {
     XLSX.utils.book_append_sheet(wb, ws, 'Giderler');
     XLSX.writeFile(wb, 'LexBnB_Ornek_Gider_Sablonu.xlsx');
   } else if (templateType === 'COMPANY') {
-    const genelData = [
-      { 'Dönem': '2026-08', 'Ciro (TL)': 483965, 'OPEX (TL)': 337306, 'CAPEX (TL)': 3866, 'Satılan Gece': 79 },
-      { 'Dönem': '2026-09', 'Ciro (TL)': 550000, 'OPEX (TL)': 310000, 'CAPEX (TL)': 5000, 'Satılan Gece': 85 }
-    ];
-    const wsG = XLSX.utils.json_to_sheet(genelData);
+    const wsG = XLSX.utils.aoa_to_sheet([['Dönem', 'Ciro (TL)', 'OPEX (TL)', 'CAPEX (TL)', 'Satılan Gece']]);
     XLSX.utils.book_append_sheet(wb, wsG, 'GENEL');
     XLSX.writeFile(wb, 'LexBnB_Ornek_Sirket_Raporu.xlsx');
   }
@@ -5163,10 +5252,13 @@ async function applyImportedData() {
 function renderKPIsAndDashboard() {
   let totalGross = 0;
   let totalNet = 0;
+  let totalRoomRevenue = 0;
   let totalPaidNights = 0;
   let directRevenue = 0;
 
-  const targetVillas = currentFilter.villa === 'ALL' ? Object.keys(appData.villas) : [currentFilter.villa];
+  const targetVillas = currentFilter.villa === 'ALL'
+    ? Object.keys(appData.villas).filter(k => appData.villas[k]?.isActive !== false && !appData.villas[k]?.archivedAt)
+    : [currentFilter.villa];
   const villaStats = {};
   targetVillas.forEach(vKey => {
     villaStats[vKey] = { nights: 0, netRevenue: 0, grossRevenue: 0, directRevenue: 0, p1Open: 0 };
@@ -5182,11 +5274,13 @@ function renderKPIsAndDashboard() {
     if (b.status === 'CANCELLED' || !isBookingInFilter(b)) return;
     const pay = getBookingFilterShare(b);
     const bGross = (Number(b.gross) || 0) * pay.ratio;
-    const bNet = (Number(b.net) || 0) * pay.ratio;
+    const bNet = Math.max(0, Number(b.gross || 0) - Number(b.discount || 0)) * pay.ratio;
+    const bRoom = Math.max(0, Number(b.gross || 0) - Number(b.cleaningFee || b.cleanFee || 0) - Number(b.discount || 0)) * pay.ratio;
     const bNights = pay.nights;
 
     totalGross += bGross;
     totalNet += bNet;
+    totalRoomRevenue += bRoom;
     totalPaidNights += bNights;
 
     if (villaStats[b.villa]) {
@@ -5201,17 +5295,24 @@ function renderKPIsAndDashboard() {
     }
   });
 
-  const daysInPeriod = getPeriodDayCount();
-  const totalCalendarDays = daysInPeriod * targetVillas.length;
-  const totalDowntime = appData.maintenance
-    .filter(m => m.status === 'OPEN' && m.priority === 'P1' && targetVillas.includes(m.villa))
-    .reduce((sum, m) => sum + (Number(m.downtime) || 0), 0);
-
-  const availableNights = Math.max(1, totalCalendarDays - totalDowntime);
-  const occupancyRate = (totalPaidNights / availableNights) * 100;
-  const adr = totalPaidNights > 0 ? (totalNet / totalPaidNights) : 0;
-  const revpar = totalNet / availableNights;
-  const nrevpar = Math.max(0, (totalNet - (totalPaidNights * 750)) / availableNights);
+  let availableNights = null;
+  if (/^\d{4}-\d{2}$/.test(currentFilter.period || '') && typeof FinancialMetricsService !== 'undefined') {
+    const [year, month] = currentFilter.period.split('-').map(Number);
+    availableNights = FinancialMetricsService.calculateAvailableNights(
+      targetVillas.map(k => appData.villas[k]).filter(Boolean), year, month, appData.maintenance || []
+    );
+  } else {
+    const daysInPeriod = getPeriodDayCount();
+    if (daysInPeriod !== null) availableNights = daysInPeriod * targetVillas.length;
+  }
+  const occupancyRate = availableNights > 0 ? (totalPaidNights / availableNights) * 100 : null;
+  const adr = totalPaidNights > 0 ? (totalRoomRevenue / totalPaidNights) : null;
+  const revpar = availableNights > 0 ? totalRoomRevenue / availableNights : null;
+  const scopedOpex = (appData.expenses || []).filter(e => isExpenseInFilter(e) && (e.type || e.expense_type || 'OPEX') !== 'CAPEX')
+    .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const scopedOta = (appData.bookings || []).filter(b => b.status !== 'CANCELLED' && isBookingInFilter(b))
+    .reduce((sum, b) => sum + Number(b.otaCommission || b.otaComm || 0) * getBookingFilterShare(b).ratio, 0);
+  const nrevpar = availableNights > 0 ? (totalNet - scopedOpex - scopedOta) / availableNights : null;
 
   // Populate Kokpit Top KPI Cards (Net Gelir, Doluluk, ADR, RevPAR)
   const elNetRev = document.getElementById('kpiNetRevenue');
@@ -5224,24 +5325,22 @@ function renderKPIsAndDashboard() {
   const elRevpar = document.getElementById('kpiRevPAR');
   const elNRevpar = document.getElementById('kpiNRevPAR');
 
-  const currentTarget = (appData.targets && currentFilter.period !== 'ALL' && appData.targets[currentFilter.period]?.revenue)
-    ? Number(appData.targets[currentFilter.period].revenue)
-    : (appData.goals?.monthlyRevenue || 300000);
+  const currentTarget = getConfiguredRevenueTarget(currentFilter, appData.targets, currentFilter.villa);
 
-  const targetPct = currentTarget > 0 ? ((totalNet / currentTarget) * 100).toFixed(0) : 0;
+  const targetPct = currentTarget > 0 ? ((totalNet / currentTarget) * 100).toFixed(0) : null;
 
   if (elNetRev) elNetRev.innerText = '₺' + Math.round(totalNet).toLocaleString('tr-TR');
   if (elGrossRev) elGrossRev.innerText = 'Brüt: ₺' + Math.round(totalGross).toLocaleString('tr-TR');
   if (elTargetPct) {
-    elTargetPct.innerText = '%' + targetPct + ' Hedef';
-    elTargetPct.className = 'kpi-trend ' + (Number(targetPct) >= 100 ? 'positive' : 'neutral');
+    elTargetPct.innerText = targetPct === null ? 'Hedef belirlenmedi' : '%' + targetPct + ' Hedef';
+    elTargetPct.className = 'kpi-trend ' + (targetPct !== null && Number(targetPct) >= 100 ? 'positive' : 'neutral');
   }
-  if (elOcc) elOcc.innerText = '%' + occupancyRate.toFixed(1);
+  if (elOcc) elOcc.innerText = occupancyRate === null ? '—' : '%' + occupancyRate.toFixed(1);
   if (elNightsDetail) elNightsDetail.innerText = totalPaidNights + ' Gece Satıldı';
-  if (elAvailDetail) elAvailDetail.innerText = availableNights + ' Gece Kapasite';
-  if (elAdr) elAdr.innerText = '₺' + Math.round(adr).toLocaleString('tr-TR');
-  if (elRevpar) elRevpar.innerText = '₺' + Math.round(revpar).toLocaleString('tr-TR');
-  if (elNRevpar) elNRevpar.innerText = 'NRevPAR: ₺' + Math.round(nrevpar).toLocaleString('tr-TR');
+  if (elAvailDetail) elAvailDetail.innerText = availableNights === null ? 'Kapasite hesaplanamadı' : availableNights + ' Gece Kapasite';
+  if (elAdr) elAdr.innerText = adr === null ? '—' : '₺' + Math.round(adr).toLocaleString('tr-TR');
+  if (elRevpar) elRevpar.innerText = revpar === null ? '—' : '₺' + Math.round(revpar).toLocaleString('tr-TR');
+  if (elNRevpar) elNRevpar.innerText = nrevpar === null ? 'NRevPAR: —' : 'NRevPAR: ₺' + Math.round(nrevpar).toLocaleString('tr-TR');
 
   // Render Kokpit Funnel and Channel Distribution
   renderFunnelStats();
@@ -5266,28 +5365,33 @@ function renderKPIsAndDashboard() {
     targetVillas.forEach(vKey => {
       const vConf = appData.villas[vKey];
       const s = villaStats[vKey] || { nights: 0, netRevenue: 0, directRevenue: 0, p1Open: 0 };
-      const vOcc = (s.nights / daysInPeriod) * 100;
+      let propertyAvailable = getPeriodDayCount();
+      if (/^\d{4}-\d{2}$/.test(currentFilter.period || '') && typeof FinancialMetricsService !== 'undefined') {
+        const [year, month] = currentFilter.period.split('-').map(Number);
+        propertyAvailable = FinancialMetricsService.calculateAvailableNights([vConf], year, month, appData.maintenance || []);
+      }
+      const vOcc = propertyAvailable > 0 ? (s.nights / propertyAvailable) * 100 : null;
       const vAdr = s.nights > 0 ? (s.netRevenue / s.nights) : 0;
-      const vRevpar = s.netRevenue / daysInPeriod;
+      const vRevpar = propertyAvailable > 0 ? s.netRevenue / propertyAvailable : null;
       const vDirPct = s.netRevenue > 0 ? (s.directRevenue / s.netRevenue) * 100 : 0;
 
       let badgeHtml = '<span class="badge badge-emerald">🟢 Sağlıklı</span>';
       if (s.p1Open > 0) badgeHtml = '<span class="badge badge-rose">🔴 P1 Arıza</span>';
-      else if (vOcc < 40) badgeHtml = '<span class="badge badge-amber">🟡 Düşük Doluluk</span>';
+      else if (vOcc !== null && vOcc < 40) badgeHtml = '<span class="badge badge-amber">🟡 Düşük Doluluk</span>';
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>
           <div style="display: flex; align-items: center; gap: 6px;">
-            <strong>${vConf.name}</strong>
-            <button type="button" class="btn btn-sm btn-subtle" onclick="openPropertyModal('${vKey}')" title="Mülkü Düzenle" style="padding: 2px 6px; font-size: 11px; cursor: pointer; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: #cbd5e1;">✏️</button>
+            <strong>${escapeHtml(vConf.name || 'Adsız mülk')}</strong>
+            <button type="button" class="btn btn-sm btn-subtle" onclick="openPropertyModal(decodeURIComponent('${encodeURIComponent(String(vKey))}'))" title="Mülkü Düzenle" style="padding: 2px 6px; font-size: 11px; cursor: pointer; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: #cbd5e1;">✏️</button>
           </div>
         </td>
-        <td>${vConf.capacity}</td>
+        <td>${escapeHtml(vConf.capacity || 'Belirtilmedi')}</td>
         <td>${s.nights} Gece</td>
-        <td>%${vOcc.toFixed(1)}</td>
+        <td>${vOcc === null ? '—' : '%' + vOcc.toFixed(1)}</td>
         <td>₺${Math.round(vAdr).toLocaleString('tr-TR')}</td>
-        <td>₺${Math.round(vRevpar).toLocaleString('tr-TR')}</td>
+        <td>${vRevpar === null ? '—' : '₺' + Math.round(vRevpar).toLocaleString('tr-TR')}</td>
         <td><strong>₺${Math.round(s.netRevenue).toLocaleString('tr-TR')}</strong></td>
         <td>%${vDirPct.toFixed(1)}</td>
         <td>${s.p1Open > 0 ? `<strong style="color:var(--accent-rose);">${s.p1Open} P1</strong>` : 'Yok'}</td>
@@ -5656,7 +5760,7 @@ function renderManageBookingsTable() {
     if (b.status === 'COMPLETED') statusBadge = '<span class="badge badge-slate">Tamamlandı</span>';
 
     // Highlight New Year / future special dates
-    const isNewYear = (b.checkIn.includes('2026-12') || b.checkOut.includes('2027-01'));
+    const isNewYear = String(b.checkIn || '').slice(5, 10) === '12-31';
 
     const tr = document.createElement('tr');
     if (isNewYear) {
@@ -5664,9 +5768,9 @@ function renderManageBookingsTable() {
     }
 
     tr.innerHTML = `
-      <td><strong>${vName}</strong> ${isNewYear ? ' <span class="badge badge-amber" style="font-size:10px;">🎄 Yılbaşı</span>' : ''}</td>
-      <td>${b.guest}</td>
-      <td><span class="badge ${b.channel === 'AIRBNB' ? 'badge-rose' : (b.channel === 'BOOKING' ? 'badge-blue' : 'badge-emerald')}">${b.channel}</span></td>
+      <td><strong>${escapeHtml(vName)}</strong> ${isNewYear ? ' <span class="badge badge-amber" style="font-size:10px;">🎄 Yılbaşı</span>' : ''}</td>
+      <td>${escapeHtml(b.guest || 'Belirtilmedi')}</td>
+      <td><span class="badge ${b.channel === 'AIRBNB' ? 'badge-rose' : (b.channel === 'BOOKING' ? 'badge-blue' : 'badge-emerald')}">${escapeHtml(b.channel || 'Belirtilmedi')}</span></td>
       <td>${formatTrDate(b.checkIn)}</td>
       <td>${formatTrDate(b.checkOut)}</td>
       <td><strong>${b.nights}</strong></td>
@@ -5677,8 +5781,8 @@ function renderManageBookingsTable() {
       <td>${nightly.toLocaleString('tr-TR')} ₺</td>
       <td>${statusBadge}</td>
       <td style="text-align: right; white-space: nowrap;">
-        <button class="btn btn-secondary btn-sm" onclick="editBooking('${b.id}')" title="Düzenle">✏️</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteBooking('${b.id}')" title="Sil">🗑️</button>
+        <button class="btn btn-secondary btn-sm" onclick="editBooking(decodeURIComponent('${encodeURIComponent(String(b.id))}'))" title="Düzenle">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteBooking(decodeURIComponent('${encodeURIComponent(String(b.id))}'))" title="Sil">🗑️</button>
       </td>
     `;
     tbody.appendChild(tr);
@@ -5861,16 +5965,13 @@ function renderSettingsGoalsTable() {
 
   getGoalMonths().forEach(m => {
     const period = m.id;
-    const saved = appData.targets && appData.targets[period];
-    // Demo hedefleri musteriye UYGULANMAZ. Tenant kendi hedefini belirlemediyse 0.
-    const excelTarget = 0;
-    
-    const rev = (saved && saved.revenue) ? saved.revenue : (excelTarget || 300000);
-    const netProfit = (saved && saved.netProfit) ? saved.netProfit : Math.round(rev * 0.35);
-    const maxExpense = (saved && saved.maxExpense) ? saved.maxExpense : Math.round(rev * 0.65);
-    const nights = (saved && saved.nights) ? saved.nights : (saved && saved.occupancy ? Math.round(150 * (saved.occupancy / 100)) : 75);
-    const occ = saved && saved.occupancy ? saved.occupancy : Math.round((nights / 150) * 100);
-    const adr = (saved && saved.adr) ? saved.adr : (nights > 0 ? Math.round(rev / nights) : 5500);
+    const saved = getTargetRecordForPeriod(period);
+    const rev = saved ? Number(saved.revenue ?? saved.revenue_target) : null;
+    const netProfit = saved ? Number(saved.netProfit ?? saved.net_profit_target) : null;
+    const maxExpense = saved ? Number(saved.maxExpense ?? saved.max_expense_target) : null;
+    const nights = saved ? Number(saved.nights ?? saved.sold_nights_target) : null;
+    const occ = saved ? Number(saved.occupancy ?? saved.occupancy_target) : null;
+    const adr = saved ? Number(saved.adr ?? saved.adr_target) : null;
 
     const isCurrent = (currentFilter.period === period);
     const tr = document.createElement('tr');
@@ -5884,19 +5985,19 @@ function renderSettingsGoalsTable() {
         ${isCurrent ? ' <span class="badge badge-blue" style="font-size:10px; margin-left:4px;">Seçili Dönem</span>' : ''}
       </td>
       <td>
-        <strong style="color: #60A5FA;">${rev.toLocaleString('tr-TR')} TL</strong>
+        <strong style="color: #60A5FA;">${Number.isFinite(rev) ? rev.toLocaleString('tr-TR') + ' TL' : '—'}</strong>
       </td>
       <td style="color: #34D399; font-weight: 600;">
-        ${netProfit.toLocaleString('tr-TR')} TL
+        ${Number.isFinite(netProfit) ? netProfit.toLocaleString('tr-TR') + ' TL' : '—'}
       </td>
       <td>
-        <span class="badge badge-amber">%${occ} (${nights} Gece)</span>
+        <span class="badge badge-amber">${Number.isFinite(occ) ? '%' + occ : '—'}${Number.isFinite(nights) ? ` (${nights} Gece)` : ''}</span>
       </td>
       <td>
-        ${adr.toLocaleString('tr-TR')} TL
+        ${Number.isFinite(adr) ? adr.toLocaleString('tr-TR') + ' TL' : '—'}
       </td>
       <td style="color: #F87171;">
-        ${maxExpense.toLocaleString('tr-TR')} TL
+        ${Number.isFinite(maxExpense) ? maxExpense.toLocaleString('tr-TR') + ' TL' : '—'}
       </td>
       <td style="text-align: right;">
         <button class="btn btn-secondary btn-sm" onclick="openGoalsModal('${period}')" style="padding: 4px 10px; font-size: 11px;">
@@ -6414,10 +6515,19 @@ function refreshPeriodSelectors() {
  * aksam saatlerinde bir onceki gunu verebiliyor.
  */
 function getTodayStr() {
-  const d = new Date();
-  return d.getFullYear() + '-' +
-         String(d.getMonth() + 1).padStart(2, '0') + '-' +
-         String(d.getDate()).padStart(2, '0');
+  const timezone = 'Europe/Istanbul';
+  try {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit'
+    }).formatToParts(new Date()).reduce((result, part) => {
+      result[part.type] = part.value;
+      return result;
+    }, {});
+    return `${parts.year}-${parts.month}-${parts.day}`;
+  } catch (_) {
+    // Invalid tenant timezones never fall back to the browser's local zone.
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul' }).format(new Date());
+  }
 }
 
 /** 'YYYY-MM' -> 'Nisan 2026' */
@@ -6574,7 +6684,7 @@ async function submitAccountDeletion(e) {
 
     // Yerel izleri temizle ve giris ekranina don.
     try { await supabaseClient.auth.signOut(); } catch (ex) {}
-    try { sessionStorage.clear(); localStorage.clear(); } catch (ex) {}
+    try { clearLexbnbBrowserStorage(); } catch (ex) {}
 
     const n = (data && data.deleted_tenants) || 0;
     alert(`Hesabınız kalıcı olarak kapatıldı.${n ? `\n${n} işletme ve tüm verisi silindi.` : ''}\n\nİlginiz için teşekkür ederiz.`);
@@ -6658,7 +6768,7 @@ async function submitMemberInvite(e) {
 
     closeInviteMemberModal();
     await renderTeamManagement();
-    alert(`✉️ Davet oluşturuldu.\n\n${email} bu adresle kayıt olup giriş yaptığında ekibinize otomatik katılacak.\nDavet 14 gün geçerlidir.`);
+    alert(`✉️ Davet oluşturuldu ve e-posta teslim kuyruğuna alındı.\n\n${email} bu adresle kayıt olup giriş yaptığında ekibinize otomatik katılacak.\nDavet 14 gün geçerlidir.`);
   } catch (ex) {
     showInviteError(ex && ex.message ? ex.message : 'Davet gönderilemedi.');
   } finally {
@@ -6812,7 +6922,7 @@ async function convertLeadAction(leadId) {
   let checkIn = l.checkIn;
   let checkOut = l.checkOut;
   if (!checkIn || !checkOut) {
-    checkIn = prompt(`"${l.guest}" için Giriş Tarihini giriniz (YYYY-AA-GG):`, new Date().toISOString().split('T')[0]);
+    checkIn = prompt(`"${l.guest}" için Giriş Tarihini giriniz (YYYY-AA-GG):`, getTodayStr());
     if (!checkIn) return;
     checkOut = prompt(`"${l.guest}" için Çıkış Tarihini giriniz (YYYY-AA-GG):`, checkIn);
     if (!checkOut) return;
@@ -6937,15 +7047,15 @@ function renderManageMaintTable() {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${priBadge}</td>
-      <td><strong>${appData.villas[m.villa]?.name || m.villa}</strong></td>
-      <td>${m.title}</td>
-      <td>${m.assignee || 'Atanmadı'}</td>
+      <td><strong>${escapeHtml(appData.villas[m.villa]?.name || m.villa)}</strong></td>
+      <td>${escapeHtml(m.title || '')}</td>
+      <td>${escapeHtml(m.assignee || 'Atanmadı')}</td>
       <td>₺${Number(m.cost).toLocaleString('tr-TR')}</td>
       <td>${m.downtime || 0} Gece</td>
       <td>${m.status === 'COMPLETED' ? '<span class="badge badge-green">Tamamlandı</span>' : '<span class="badge badge-rose">Açık</span>'}</td>
       <td style="text-align: right; white-space: nowrap;">
-        <button class="btn btn-secondary btn-sm" onclick="editMaint('${m.id}')">✏️</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteMaint('${m.id}')">🗑️</button>
+        <button class="btn btn-secondary btn-sm" onclick="editMaint(decodeURIComponent('${encodeURIComponent(String(m.id))}'))">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteMaint(decodeURIComponent('${encodeURIComponent(String(m.id))}'))">Arşivle</button>
       </td>
     `;
     tbody.appendChild(tr);
@@ -6966,7 +7076,9 @@ function openMaintModal(editId = null) {
     document.getElementById('maintPriority').value = m.priority;
     document.getElementById('maintTitle').value = m.title;
     document.getElementById('maintAssignee').value = m.assignee || '';
-    document.getElementById('maintDowntime').value = m.downtime || 0;
+    document.getElementById('maintBlocksAvailability').checked = !!(m.blocks_availability || m.blocksAvailability);
+    document.getElementById('maintDowntimeStart').value = m.downtime_start || m.downtimeStart || '';
+    document.getElementById('maintDowntimeEnd').value = m.downtime_end || m.downtimeEnd || '';
     document.getElementById('maintCost').value = m.cost || 0;
     document.getElementById('maintStatus').value = m.status;
   } else {
@@ -6979,38 +7091,67 @@ function openMaintModal(editId = null) {
 
 function closeMaintModal() { document.getElementById('maintModal').classList.remove('active'); }
 
-function saveMaint(e) {
+async function saveMaint(e) {
   e.preventDefault();
   const editId = document.getElementById('maintEditId').value;
   const villa = document.getElementById('maintVilla').value;
   const priority = document.getElementById('maintPriority').value;
   const title = document.getElementById('maintTitle').value;
-  const assignee = document.getElementById('maintAssignee').value;
-  const downtime = Number(document.getElementById('maintDowntime').value) || 0;
+  const assignee = document.getElementById('maintAssignee').value.trim();
+  const blocksAvailability = document.getElementById('maintBlocksAvailability').checked;
+  const downtimeStart = document.getElementById('maintDowntimeStart').value || null;
+  const downtimeEnd = document.getElementById('maintDowntimeEnd').value || null;
   const cost = Number(document.getElementById('maintCost').value) || 0;
   const status = document.getElementById('maintStatus').value;
 
-  if (editId) {
-    const idx = appData.maintenance.findIndex(m => m.id === editId);
-    if (idx !== -1) {
-      appData.maintenance[idx] = { ...appData.maintenance[idx], villa, priority, title, assignee, downtime, cost, status };
-    }
-  } else {
-    const newId = 'M' + (appData.maintenance.length + 1);
-    appData.maintenance.push({ id: newId, villa, priority, title, assignee, downtime, cost, status });
+  if (blocksAvailability && (!downtimeStart || !downtimeEnd || downtimeEnd < downtimeStart)) {
+    alert('Takvimi kapatan bakım için geçerli başlangıç ve bitiş tarihleri zorunludur.');
+    return;
   }
-
-  saveAppData();
-  closeMaintModal();
+  const tenantId = getActiveTenantId();
+  requireCloudForWrite('Bakım kaydı', tenantId);
+  const propertyId = appData.villas[villa]?.id;
+  const payload = {
+    property_id: propertyId,
+    category: 'MAINTENANCE',
+    severity: priority === 'P1' ? 'CRITICAL' : (priority === 'P2' ? 'HIGH' : 'LOW'),
+    title: title.trim(),
+    description: assignee ? `Sorumlu: ${assignee}` : null,
+    status,
+    estimated_cost: cost,
+    blocks_availability: blocksAvailability,
+    downtime_start: blocksAvailability ? downtimeStart : null,
+    downtime_end: blocksAvailability ? downtimeEnd : null
+  };
+  try {
+    if (editId) {
+      const { error } = await supabaseClient.from('maintenance_tickets').update(payload)
+        .eq('tenant_id', tenantId).eq('id', editId);
+      if (error) throw error;
+    } else {
+      await createMaintenanceTicket(payload);
+    }
+    await loadTenantAppData(tenantId);
+    closeMaintModal();
+  } catch (err) {
+    alert('Bakım kaydı kaydedilemedi: ' + getFriendlyAuthErrorMessage(err));
+  }
 }
 
 function editMaint(id) { openMaintModal(id); }
-function deleteMaint(id) {
-  if (confirm('Bu arızayı silmek istediğinizden emin misiniz?')) {
-    appData.maintenance = appData.maintenance.filter(m => m.id !== id);
-    saveAppData();
-    renderAll();
-    if (window.showToast) window.showToast('🗑️ Arıza kaydı silindi.');
+async function deleteMaint(id) {
+  if (confirm('Bu bakım kaydını iptal ederek arşivlemek istediğinize emin misiniz?')) {
+    const tenantId = getActiveTenantId();
+    try {
+      const { error } = await supabaseClient.from('maintenance_tickets')
+        .update({ status: 'CANCELLED', blocks_availability: false, downtime_start: null, downtime_end: null })
+        .eq('tenant_id', tenantId).eq('id', id);
+      if (error) throw error;
+      await loadTenantAppData(tenantId);
+      if (window.showToast) window.showToast('Bakım kaydı iptal edilerek arşivlendi.');
+    } catch (err) {
+      alert('Bakım kaydı arşivlenemedi: ' + getFriendlyAuthErrorMessage(err));
+    }
   }
 }
 
@@ -7120,7 +7261,7 @@ function exportDataJSON() {
   const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData, null, 2));
   const downloadAnchor = document.createElement('a');
   downloadAnchor.setAttribute("href", dataStr);
-  downloadAnchor.setAttribute("download", `LEXBNB_Finans_Yedek_${new Date().toISOString().split('T')[0]}.json`);
+  downloadAnchor.setAttribute("download", `LEXBNB_Finans_Yedek_${getTodayStr()}.json`);
   document.body.appendChild(downloadAnchor);
   downloadAnchor.click();
   downloadAnchor.remove();
@@ -7549,7 +7690,7 @@ function toggleCleaningPaid(vKey) {
       villa: vKey,
       guest: '',
       date: getTodayStr(),
-      cleaner: 'Fatma Hanım (Temizlik Ekibi)',
+      cleaner: '',
       amount: cleanCost,
       paid: newPaid,
       paidDate: newPaid ? getTodayStr() : null,
@@ -7563,7 +7704,7 @@ function toggleCleaningPaid(vKey) {
 
   const expId = 'EXP-CLEAN-' + task.id;
   const vName = (appData.villas && appData.villas[vKey]?.name) ? appData.villas[vKey].name : vKey;
-  const desc = `[${vName}] Temizlik Ücreti - ${task.cleaner || 'Fatma Hanım'} (${task.guest || 'Çıkış Temizliği'})`;
+  const desc = `[${vName}] Temizlik Ücreti - ${task.cleaner || 'Temizlik personeli belirtilmedi'} (${task.guest || 'Çıkış Temizliği'})`;
 
   if (newPaid) {
     const existingIdx = appData.expenses.findIndex(e => e.id === expId || e.cleanTaskId === task.id);
@@ -7720,24 +7861,24 @@ function renderHousekeepingTab() {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><strong>${formatTrDate(task.date)}</strong></td>
-      <td><span class="villa-badge ${(task.villa || '').toLowerCase()}">${vName}</span></td>
+      <td><span class="villa-badge">${escapeHtml(vName)}</span></td>
       <td>
-        <strong style="color: #FFFFFF;">${task.guest ? task.guest + ' Çıkışı' : (task.notes || 'Rutin Temizlik')}</strong>
-        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">${task.notes || '-'}</div>
+        <strong style="color: #FFFFFF;">${escapeHtml(task.guest ? task.guest + ' Çıkışı' : (task.notes || 'Rutin Temizlik'))}</strong>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">${escapeHtml(task.notes || '-')}</div>
       </td>
       <td>
-        <span style="color: #93C5FD; font-weight: 500;">👤 ${task.cleaner || 'Temizlik Personeli'}</span>
+        <span style="color: #93C5FD; font-weight: 500;">👤 ${escapeHtml(task.cleaner || 'Temizlik personeli belirtilmedi')}</span>
       </td>
       <td>
         <b style="color: #60A5FA; cursor: pointer; text-decoration: underline dashed; font-size: 13px;" 
-           onclick="promptEditTaskAmount('${task.id}')" 
+           onclick="promptEditTaskAmount(decodeURIComponent('${encodeURIComponent(String(task.id))}'))"
            title="Tıklayarak tutarı anında değiştirin">
           ₺${amount.toLocaleString('tr-TR')} ✏️
         </b>
       </td>
       <td>
         <button class="${isPaid ? 'btn-clean-paid' : 'btn-clean-pending'}" 
-                onclick="toggleTaskPaid('${task.id}')" 
+                onclick="toggleTaskPaid(decodeURIComponent('${encodeURIComponent(String(task.id))}'))"
                 title="${isPaid ? 'Ödenmedi olarak değiştir' : 'Ödendi olarak işaretle'}">
           ${isPaid ? '✅ ÖDENDİ' : '⏳ ÖDENECEK'}
         </button>
@@ -7746,8 +7887,8 @@ function renderHousekeepingTab() {
         ${isPaid ? (task.paidDate ? formatTrDate(task.paidDate) : 'Ödendi') : '<span style="color: #F87171;">Bekliyor (Borç)</span>'}
       </td>
       <td style="text-align: right;">
-        <button class="btn btn-secondary btn-sm" onclick="openEditCleaningTaskModal('${task.id}')" style="padding: 3px 7px; font-size: 11px;" title="Detaylı Düzenle">✏️</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteCleaningTask('${task.id}')" style="padding: 3px 7px; font-size: 11px; margin-left: 4px;" title="Sil">🗑️</button>
+        <button class="btn btn-secondary btn-sm" onclick="openEditCleaningTaskModal(decodeURIComponent('${encodeURIComponent(String(task.id))}'))" style="padding: 3px 7px; font-size: 11px;" title="Detaylı Düzenle">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteCleaningTask(decodeURIComponent('${encodeURIComponent(String(task.id))}'))" style="padding: 3px 7px; font-size: 11px; margin-left: 4px;" title="Sil">🗑️</button>
       </td>
     `;
     tbody.appendChild(tr);
@@ -7775,7 +7916,7 @@ function toggleTaskPaid(taskId) {
   if (!appData.expenses) appData.expenses = [];
   const expId = 'EXP-CLEAN-' + task.id;
   const vName = (appData.villas && appData.villas[task.villa]?.name) ? appData.villas[task.villa].name : task.villa;
-  const desc = `[${vName}] Temizlik Ücreti - ${task.cleaner || 'Fatma Hanım'} (${task.guest || 'Çıkış Temizliği'})`;
+  const desc = `[${vName}] Temizlik Ücreti - ${task.cleaner || 'Temizlik personeli belirtilmedi'} (${task.guest || 'Çıkış Temizliği'})`;
 
   if (newPaid) {
     // Tuşa basılınca Gider Defteri'ne TAM 1 TANE gider kalemi girilir (Mükerrer kontrolü ile)
@@ -7842,7 +7983,7 @@ function payAllPendingCleaning() {
 
     const expId = 'EXP-CLEAN-' + t.id;
     const vName = (appData.villas && appData.villas[t.villa]?.name) ? appData.villas[t.villa].name : t.villa;
-    const desc = `[${vName}] Temizlik Ücreti - ${t.cleaner || 'Fatma Hanım'} (${t.guest || 'Çıkış'})`;
+    const desc = `[${vName}] Temizlik Ücreti - ${t.cleaner || 'Temizlik personeli belirtilmedi'} (${t.guest || 'Çıkış'})`;
 
     const existingIdx = appData.expenses.findIndex(e => e.id === expId || e.cleanTaskId === t.id);
     if (existingIdx !== -1) {
@@ -7880,7 +8021,7 @@ function openNewCleaningTaskModal() {
   document.getElementById('hkEditTaskId').value = '';
   document.getElementById('hkVilla').value = currentFilter.villa !== 'ALL' ? currentFilter.villa : 'BELLA';
   document.getElementById('hkDate').value = getTodayStr();
-  document.getElementById('hkCleaner').value = 'Fatma Hanım (Temizlik Ekibi)';
+  document.getElementById('hkCleaner').value = '';
   
   const vKey = document.getElementById('hkVilla').value;
   const vConf = appData.villas[vKey];
@@ -7902,7 +8043,7 @@ function openEditCleaningTaskModal(taskId) {
   document.getElementById('hkEditTaskId').value = task.id;
   document.getElementById('hkVilla').value = task.villa;
   document.getElementById('hkDate').value = task.date || getTodayStr();
-  document.getElementById('hkCleaner').value = task.cleaner || 'Fatma Hanım';
+  document.getElementById('hkCleaner').value = task.cleaner || '';
   document.getElementById('hkAmount').value = task.amount;
   document.getElementById('hkDesc').value = task.notes || task.guest || '';
   document.getElementById('hkPaidStatus').value = task.paid ? 'PAID' : 'PENDING';
@@ -7923,7 +8064,11 @@ function saveCleaningTask(e) {
   const editId = document.getElementById('hkEditTaskId').value;
   const villa = document.getElementById('hkVilla').value;
   const date = document.getElementById('hkDate').value;
-  const cleaner = document.getElementById('hkCleaner').value.trim() || 'Fatma Hanım';
+  const cleaner = document.getElementById('hkCleaner').value.trim();
+  if (!cleaner) {
+    alert('Lütfen temizlik personelini belirtin.');
+    return;
+  }
   const amount = parseFloat(document.getElementById('hkAmount').value) || 1500;
   const notes = document.getElementById('hkDesc').value.trim();
   const paid = document.getElementById('hkPaidStatus').value === 'PAID';
@@ -8006,7 +8151,7 @@ function deleteCleaningTaskFromModal() {
 // -------------------------------------------------------------
 // 📅 30 GÜNLÜK GÖRSEL DOLULUK ÇİZELGESİ (TAPE CHART)
 // -------------------------------------------------------------
-let tapeChartMonth = '2026-09';
+let tapeChartMonth = getTodayStr().slice(0, 7);
 
 function populateTapeChartMonthSelect() {
   const select = document.getElementById('tapeChartMonthSelect');
@@ -8017,9 +8162,7 @@ function populateTapeChartMonthSelect() {
     const opt = document.createElement('option');
     opt.value = m;
     let label = getPeriodDisplayName(m);
-    if (m === '2026-09') label = 'Eylül 2026 (Güncel Ay)';
-    if (m === '2026-12') label = 'Aralık 2026 (Yılbaşı 🎄)';
-    if (m === '2027-01') label = 'Ocak 2027 (Kış Zirvesi ❄️)';
+    if (m === getTodayStr().slice(0, 7)) label += ' (Güncel Ay)';
     opt.textContent = label;
     select.appendChild(opt);
   });
@@ -8631,11 +8774,7 @@ function filterByPeriod(period) {
 }
 
 function getMonthlyKpiDataset() {
-  const months = [
-    '2025-07', '2025-08', '2025-09', '2025-10', '2025-11', '2025-12',
-    '2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06',
-    '2026-07', '2026-08', '2026-09', '2026-10', '2026-11', '2026-12'
-  ];
+  const months = ALL_FINANCIAL_MONTHS.slice();
 
   const dataset = [];
 
@@ -8651,7 +8790,9 @@ function getMonthlyKpiDataset() {
     let occupancy = 0;
     let revpar = 0;
     let margin = 0;
-    let target = (appData.targets && appData.targets[m]) || 0;
+    const [metricYear, metricMonth] = m.split('-').map(Number);
+    const targetFilter = { period: m };
+    let target = getConfiguredRevenueTarget(targetFilter, appData.targets, 'ALL') || 0;
     const monthName = getPeriodDisplayName(m);
 
     if (hasStatic) {
@@ -8670,12 +8811,18 @@ function getMonthlyKpiDataset() {
       // Dynamic calculation from appData.bookings and appData.expenses
       (appData.bookings || []).forEach(b => {
         if (b.status === 'CANCELLED') return;
-        const bIn = b.checkIn ? b.checkIn.substring(0, 7) : '';
-        const bOut = b.checkOut ? b.checkOut.substring(0, 7) : '';
-        if (bIn === m || bOut === m) {
-          ciro += Number(b.gross || b.net || 0);
-          nights += Number(b.nights || 0);
+        const totalNights = Math.max(0, Math.round((Date.parse(b.checkOut + 'T00:00:00Z') - Date.parse(b.checkIn + 'T00:00:00Z')) / 86400000));
+        if (!totalNights) return;
+        const start = new Date(b.checkIn + 'T00:00:00Z');
+        let monthNights = 0;
+        for (let i = 0; i < totalNights; i++) {
+          const d = new Date(start.getTime() + i * 86400000);
+          if (`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}` === m) monthNights++;
         }
+        const ratio = monthNights / totalNights;
+        ciro += Math.max(0, Number(b.gross || 0) - Number(b.discount || 0)) * ratio;
+        opex += Number(b.otaCommission || b.otaComm || 0) * ratio;
+        nights += monthNights;
       });
 
       (appData.expenses || []).forEach(exp => {
@@ -8690,12 +8837,11 @@ function getMonthlyKpiDataset() {
       netProfit = ciro - opex - capex;
       adr = nights > 0 ? Math.round(ciro / nights) : 0;
       margin = ciro > 0 ? Number(((netProfit / ciro) * 100).toFixed(1)) : 0;
-      occupancy = Number(((nights / 150) * 100).toFixed(1));
-      revpar = Math.round(ciro / 150);
-      if (!target) {
-        if (m === '2026-09') target = 120000;
-        else if (m === '2026-12') target = 500000;
-      }
+      const available = typeof FinancialMetricsService !== 'undefined'
+        ? FinancialMetricsService.calculateAvailableNights(Object.values(appData.villas || {}), metricYear, metricMonth, appData.maintenance || [])
+        : null;
+      occupancy = available > 0 ? Number(((nights / available) * 100).toFixed(1)) : null;
+      revpar = available > 0 ? Math.round(ciro / available) : null;
     }
 
     const totalExp = opex + capex;
@@ -8885,9 +9031,6 @@ function renderMonthlyKpiTracker() {
 
       let periodLabel = d.monthName;
       if (d.isCurrentMonth) periodLabel += ' <span class="badge badge-green" style="font-size:10px; margin-left:4px;">GÜNCEL AY</span>';
-      if (d.key === '2026-01') periodLabel += ' <span class="badge badge-blue" style="font-size:10px; margin-left:4px;">REKOR CİRO</span>';
-      if (d.key === '2026-08') periodLabel += ' <span class="badge badge-yellow" style="font-size:10px; margin-left:4px;">HACİM LİDERİ</span>';
-      if (d.key === '2026-12') periodLabel += ' <span class="badge badge-purple" style="font-size:10px; margin-left:4px;">YILBAŞI 🎄</span>';
 
       const tr = document.createElement('tr');
       if (rowStyle) tr.setAttribute('style', rowStyle);
@@ -8900,7 +9043,7 @@ function renderMonthlyKpiTracker() {
         <td style="font-weight: 800; color: ${profitColor}; white-space: nowrap;">${Math.round(d.netProfit).toLocaleString('tr-TR')} ₺</td>
         <td style="white-space: nowrap;"><span class="badge ${marginBadge}">%${d.margin}</span></td>
         <td style="font-weight: 700; white-space: nowrap;">${d.nights} Gece</td>
-        <td style="font-weight: 700; white-space: nowrap;">%${d.occupancy}</td>
+        <td style="font-weight: 700; white-space: nowrap;">${d.occupancy === null ? '—' : '%' + d.occupancy}</td>
         <td style="font-weight: 700; color: #FBBF24; white-space: nowrap;">${d.adr > 0 ? (Math.round(d.adr).toLocaleString('tr-TR') + ' ₺') : '-'}</td>
         <td style="font-weight: 600; color: #DDD6FE; white-space: nowrap;">${d.revpar > 0 ? (Math.round(d.revpar).toLocaleString('tr-TR') + ' ₺') : '-'}</td>
         <td style="color: #F87171; font-weight: 600; white-space: nowrap;">${Math.round(d.totalExp).toLocaleString('tr-TR')} ₺</td>
@@ -8985,7 +9128,7 @@ const KPI_EXPLANATION_GUIDES = {
     summary: 'Villalarınızı bir geceliğine ortalama kaça sattığınızı gösteren fiyattır. (Average Daily Rate).',
     warning: '🌟 Başlangıç Seviyesi Altın Kural: Tüm evleriniz doluyorsa ama ADR çok düşükse, evlerinizi ucuza satıyorsunuz demektir! Fiyatı hemen artırın.',
     formula: 'ADR = Toplam Oda Cirosu ÷ Satılan Gece Sayısı',
-    example: 'Örn: Şubat 2026\'da 37 gece satılarak 749.467 TL kazanıldı. ADR = 749.467 ÷ 37 = 20.256 TL / Gece (Tarihsel Zirve).',
+    example: 'Örnek: 10.000 TL oda geliri ve 2 satılan gece için ADR 5.000 TL/gecedir.',
     actionRule: 'Hafta sonu yüksek ADR, hafta içi doluluk odaklı dengeli ADR uygulayın.'
   },
   'REVPAR': {
@@ -8995,8 +9138,8 @@ const KPI_EXPLANATION_GUIDES = {
     badgeClass: 'badge-purple',
     summary: 'Villanız boş ya da dolu fark etmeksizin, takvimdeki her gün için size kaç TL kazandırdığını gösteren en dürüst başarı karnesidir.',
     warning: 'Neden ADR\'den daha önemlidir? Bir villayı geceliği 20.000 TL\'ye satıp ayda sadece 1 gün doldurursanız batarsınız. RevPAR hem doluluğu hem fiyatı aynı anda ölçer!',
-    formula: 'RevPAR = Toplam Ciro ÷ Toplam Kapasite (Oda Sayısı × 30 Gün) VEYA RevPAR = ADR × Doluluk %',
-    example: 'Örn: Ağustos ayında 5 villa için 483.965 TL ciro / 150 kapasite = 3.226 TL günlük ortalama gelir.',
+    formula: 'RevPAR = Oda Geliri ÷ Kullanılabilir Gece VEYA RevPAR = ADR × Doluluk %',
+    example: 'Örnek: 10.000 TL oda geliri ve 20 kullanılabilir gece için RevPAR 500 TL’dir.',
     actionRule: 'RevPAR\'ı artırmanın yolu: Doluluk %70\'i aştığında fiyatı yükseltmektir.'
   },
   'OCCUPANCY': {
@@ -9006,8 +9149,8 @@ const KPI_EXPLANATION_GUIDES = {
     badgeClass: 'badge-blue',
     summary: 'Villalarınızın ayın yüzde kaçında misafirle dolu olduğunu gösterir.',
     warning: '30 günün kaçında evlerde ışık yanıyordu? %70 ve üzeri harika performanstır. %40 altı ise fiyat indirimi veya tanıtım alarmıdır.',
-    formula: '(Satılan Gece Sayısı ÷ 150 Kapasite) × 100',
-    example: 'Örn: 150 gecelik kapasitenin 79\'u satıldı: (79 ÷ 150) × 100 = %52,7 Doluluk.',
+    formula: '(Satılan Gece Sayısı ÷ Kullanılabilir Gece Sayısı) × 100',
+    example: 'Örnek: 20 kullanılabilir gecenin 10’u satıldıysa doluluk %50’dir.',
     actionRule: '%100 doluluk her zaman iyi değildir! %100 doluluk genellikle \'fiyatı çok ucuz tuttunuz\' anlamına gelir.'
   },
   'OPEX': {
@@ -9016,7 +9159,7 @@ const KPI_EXPLANATION_GUIDES = {
     category: 'RUTİN GİDERLER',
     badgeClass: 'badge-rose',
     summary: 'Tesisin günlük olarak çalışmaya devam etmesi için yapılan düzenli, tekrarlayan harcamalardır.',
-    warning: 'Temizlik ücreti, elektrik/su/internet faturası, şömine odunu, karşılama ikramları ve OTA komisyonları OPEX\'tir.',
+    warning: 'Gerçek temizlik maliyeti, elektrik/su/internet faturası, sarfiyat ve OTA komisyonları OPEX’tir. Misafirden alınan temizlik bedeli gelir bileşenidir.',
     formula: 'Tüm operasyonel cari fatura ve sarfiyat toplamı.',
     example: 'Örn: Ağustos ayında elektrik, temizlik ve bakım giderleri toplamı 337.306 TL.',
     actionRule: 'OPEX\'i kısmak zordur ama toplu alım (örneğin odunu yazdan almak) maliyeti %30 düşürür.'
@@ -9732,7 +9875,7 @@ function openMarketingModal(id = null) {
     }
   } else {
     if (title) title.innerText = 'Yeni Reklam Kampanyası Ekle';
-    document.getElementById('mktStartDate').value = new Date().toISOString().slice(0, 10);
+    document.getElementById('mktStartDate').value = getTodayStr();
   }
 
   modal.classList.add('active');
@@ -10333,16 +10476,16 @@ function renderRetentionCrm() {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>
-        <strong style="color:#F8FAFC;">${g.guest}</strong>
+        <strong style="color:#F8FAFC;">${escapeHtml(g.guest)}</strong>
         <div style="font-size:11px; color:var(--text-muted);">${g.bookingsCount} Konaklama</div>
       </td>
-      <td><span class="badge badge-secondary">${g.villaName}</span></td>
+      <td><span class="badge badge-secondary">${escapeHtml(g.villaName || 'Belirtilmedi')}</span></td>
       <td style="font-weight:700; color:#E2E8F0;">${g.totalNights} Gece</td>
       <td style="font-weight:800; color:#34D399;">₺${g.totalSpent.toLocaleString('tr-TR')}</td>
       <td style="font-size:12px; color:var(--text-muted);">${g.lastStay || '-'}</td>
       <td>${badge}</td>
       <td style="text-align: right;">
-        <button type="button" class="btn btn-secondary btn-sm" onclick="sendGuestLoyaltyMessage('${g.guest.replace(/'/g, "\\'")}', '${g.villa}', '')" style="border-color:#10B981; color:#34D399; font-size:11px; font-weight:700;">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="sendGuestLoyaltyMessage(decodeURIComponent('${encodeURIComponent(g.guest)}'), decodeURIComponent('${encodeURIComponent(String(g.villa || ''))}'), '')" style="border-color:#10B981; color:#34D399; font-size:11px; font-weight:700;">
           💬 VIP Davet
         </button>
       </td>
@@ -10353,20 +10496,18 @@ function renderRetentionCrm() {
 
 function sendGuestLoyaltyMessage(guestName, villaKey, phone) {
   const vName = (appData.villas && appData.villas[villaKey]?.name) ? appData.villas[villaKey].name : 'Lexbnb Villaları';
-  const text = 'Merhaba ' + guestName + '! Lexbnb Villaları\'nden sevgiler.\n\n' +
-    'Daha önce ' + vName + '\'mizdeki konaklamanızda sizleri ağırlamaktan büyük mutluluk duymuştuk. Yaklaşan kış sezonu takvimimizi açtık ve geçmişte bizleri tercih eden kıymetli misafirlerimize özel olarak %10 VIP indirim tanımladık.\n\n' +
-    'Şömine başında kar keyfi yapmak isterseniz, indirimli fiyat ve sürpriz ikramlarımızla yerinizi ayırtmak için bize dilediğiniz zaman yazabilirsiniz! Müsait tarihleri ileteyim mi?';
+  const text = 'Merhaba ' + guestName + '!\n\n' +
+    'Daha önce ' + vName + ' konaklamanızda sizi ağırlamaktan mutluluk duymuştuk. ' +
+    'Yeni bir konaklama düşünüyorsanız güncel müsaitlik ve fiyat bilgisini paylaşabiliriz. Müsait tarihleri iletmemizi ister misiniz?';
 
   const url = 'https://wa.me/?text=' + encodeURIComponent(text);
   window.open(url, '_blank');
 }
 
 function sendBroadcastLoyaltyMessage() {
-  const text = '🌲 YAZ SEZONU AÇILIYOR! ESKİ MİSAFİRLERİMİZE ÖZEL VIP DAVET 🌲\n\n' +
-    'Değerli Misafirimiz, daha önce Lexbnb Villaları\'mizde paylaştığımız güzel anılar için teşekkür ederiz.\n\n' +
-    'Karlar altında şömineli, jakuzili sıcacık bir kış kaçamağı için 2026-2027 kış sezonu takvimimizi açtık!\n' +
-    '🎁 Size Özel Ayrıcalık: \'KARSEZONU10\' kodu ile %10 VIP indirim ve sınırsız şömine odunu ikramı!\n\n' +
-    'Takvim erkenden dolmadan yerinizi ayırtmak için bu mesaja yanıt vermeniz yeterli. Sevgiler!';
+    const text = 'Değerli Misafirimiz, daha önce bizi tercih ettiğiniz için teşekkür ederiz.\n\n' +
+    'Yeni bir konaklama düşünüyorsanız güncel müsaitlik ve fiyat bilgisini memnuniyetle paylaşabiliriz. ' +
+    'Bilgi almak için bu mesaja yanıt vermeniz yeterli.';
   navigator.clipboard.writeText(text).then(() => {
     alert('✅ Toplu kış sezonu VIP davet metni kopyalandı! WhatsApp bülten veya toplu mesaj listenizde kullanabilirsiniz.');
   }).catch(() => {
@@ -10586,15 +10727,15 @@ function renderInfluencerRoiLedger() {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>
-        <strong style="color:#FDE68A;">${c.handle}</strong>
-        <div style="font-size:11px; color:var(--text-muted);">${c.followers || '-'} Takipçi</div>
+        <strong style="color:#FDE68A;">${escapeHtml(c.handle || 'Belirtilmedi')}</strong>
+        <div style="font-size:11px; color:var(--text-muted);">${escapeHtml(c.followers || '-')} Takipçi</div>
       </td>
       <td>
-        <span class="badge badge-secondary">${vName}</span>
-        <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">${c.dates || '-'}</div>
+        <span class="badge badge-secondary">${escapeHtml(vName || 'Belirtilmedi')}</span>
+        <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">${escapeHtml(c.dates || '-')}</div>
       </td>
       <td style="color:#F87171; font-weight:700;">₺${cost.toLocaleString('tr-TR')}</td>
-      <td><span class="badge badge-purple" style="font-size:11px; font-weight:800;">${c.code || '-'}</span></td>
+      <td><span class="badge badge-purple" style="font-size:11px; font-weight:800;">${escapeHtml(c.code || '-')}</span></td>
       <td>
         <strong style="color:#34D399;">₺${rev.toLocaleString('tr-TR')}</strong>
         <div style="font-size:10px; color:var(--text-muted);">${c.bookingsCount || 0} Rezervasyon</div>
@@ -10602,10 +10743,10 @@ function renderInfluencerRoiLedger() {
       <td>
         <span class="badge ${Number(roiCalc) >= 5 ? 'badge-green' : 'badge-amber'}" style="font-weight:800; font-size:12px;">${roiCalc} ROI 🚀</span>
       </td>
-      <td><span class="badge badge-green">${c.status === 'COMPLETED' ? 'Tamamlandı' : c.status}</span></td>
+      <td><span class="badge badge-green">${escapeHtml(c.status === 'COMPLETED' ? 'Tamamlandı' : (c.status || 'Belirtilmedi'))}</span></td>
       <td style="text-align: right; white-space: nowrap;">
-        <button type="button" class="btn btn-secondary btn-sm" onclick="openInfluencerModal('${c.id}')" style="padding:4px 8px; font-size:11px; margin-right:4px;">✏️ Düzenle</button>
-        <button type="button" class="btn btn-secondary btn-sm text-danger" onclick="deleteInfluencerCollab('${c.id}')" style="padding:4px 8px; font-size:11px;">🗑️</button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="openInfluencerModal(decodeURIComponent('${encodeURIComponent(String(c.id))}'))" style="padding:4px 8px; font-size:11px; margin-right:4px;">✏️ Düzenle</button>
+        <button type="button" class="btn btn-secondary btn-sm text-danger" onclick="deleteInfluencerCollab(decodeURIComponent('${encodeURIComponent(String(c.id))}'))" style="padding:4px 8px; font-size:11px;">🗑️</button>
       </td>
     `;
     tbody.appendChild(tr);
@@ -11090,13 +11231,14 @@ async function handleAuthenticatedSession(u) {
     let compName = u.user_metadata?.company_name || 'İşletme Portföyü';
     let mgrName = activeSaaSUser.fullName;
 
-    const pendingRaw = localStorage.getItem('LEXBNB_PENDING_ONBOARDING');
+    const pendingRaw = sessionStorage.getItem('LEXBNB_PENDING_ONBOARDING') || localStorage.getItem('LEXBNB_PENDING_ONBOARDING');
     if (pendingRaw) {
       try {
         const p = JSON.parse(pendingRaw);
         if (p.companyName) compName = p.companyName;
         if (p.managerName) mgrName = p.managerName;
       } catch (e) {}
+      sessionStorage.removeItem('LEXBNB_PENDING_ONBOARDING');
       localStorage.removeItem('LEXBNB_PENDING_ONBOARDING');
     }
 
@@ -11415,7 +11557,7 @@ async function handleSaaSRegister(e) {
     // Adım 2: E-posta onayı zorunluysa session gelmez. Authenticated session
     // olmadan ASLA tenant yaratmaya kalkışma; kullanıcıyı bilgilendir.
     if (!authData.session) {
-      localStorage.setItem('LEXBNB_PENDING_ONBOARDING', JSON.stringify({
+      sessionStorage.setItem('LEXBNB_PENDING_ONBOARDING', JSON.stringify({
         companyName: company,
         managerName: manager,
         email: email
@@ -11536,7 +11678,7 @@ async function logoutSaaSUser() {
   activeTenantId = null;
   userMemberships = [];
 
-  sessionStorage.clear();
+  clearLexbnbBrowserStorage(sessionStorage);
   localStorage.removeItem('LEXBNB_REMEMBER_USER_ID');
   localStorage.removeItem('LEXBNB_REMEMBER_AUTH');
   localStorage.removeItem('LEXBNB_LAST_TENANT');
@@ -11561,22 +11703,23 @@ async function loadTenantAppData(tenantIdOrUserId) {
   if (isCloudTenant(targetId)) {
     try {
       const tenantId = targetId;
-      // Properties (Source of Truth via loadProperties)
-      const villas = await loadProperties(tenantId);
+      // Independent datasets are loaded concurrently and every list is paged;
+      // Supabase's per-response cap must never silently truncate a dashboard.
+      const [villas, bookings, expenses, cleanList, leads, closeList, targetList, maintenanceTickets, financialTransactions] = await Promise.all([
+        loadProperties(tenantId),
+        loadBookings(tenantId),
+        loadExpenses(tenantId),
+        fetchAllCloudRows(() => supabaseClient.from('cleaning_tasks').select('*').eq('tenant_id', tenantId).order('task_date', { ascending: false })),
+        loadLeads(tenantId),
+        fetchAllCloudRows(() => supabaseClient.from('monthly_financial_closes').select('*').eq('tenant_id', tenantId).order('year', { ascending: false }).order('month', { ascending: false })),
+        fetchAllCloudRows(() => supabaseClient.from('monthly_targets').select('*').eq('tenant_id', tenantId).order('year', { ascending: false }).order('month', { ascending: false })),
+        fetchAllCloudRows(() => supabaseClient.from('maintenance_tickets').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false })),
+        fetchAllCloudRows(() => supabaseClient.from('financial_transactions').select('*').eq('tenant_id', tenantId).order('occurred_on', { ascending: false }))
+      ]);
       const propIdMap = {};
       Object.values(villas || {}).forEach(p => {
         if (p.id) propIdMap[p.id] = p.slug;
       });
-
-      // Bookings (Source of Truth via loadBookings)
-      const bookings = await loadBookings(tenantId);
-
-      // Expenses (Source of Truth via loadExpenses)
-      const expenses = await loadExpenses(tenantId);
-
-      // Cleaning Tasks
-      const { data: cleanList, error: cErr } = await supabaseClient.from('cleaning_tasks').select('*').eq('tenant_id', tenantId);
-      if (cErr) throw cErr;
 
       const cleaningTasks = (cleanList || []).map(c => ({
         id: c.id,
@@ -11589,25 +11732,6 @@ async function loadTenantAppData(tenantIdOrUserId) {
         paid: c.is_paid
       }));
 
-      // Leads
-      const { data: leadList, error: lErr } = await supabaseClient.from('leads').select('*').eq('tenant_id', tenantId);
-      if (lErr) throw lErr;
-
-      const leads = (leadList || []).map(mapLeadFromDb);
-
-      // Ay kapanislari ve hedefler. Bunlar yuklenmedigi surece isPeriodClosed()
-      // HER ZAMAN false doner ve arayuzdeki kapali donem uyarilari hic
-      // calismaz; kullanici formu doldurup kaydete bastiktan sonra ham
-      // veritabani hatasi gorur. Koruma veritabaninda zaten var, ama kullaniciyi
-      // pesin uyarabilmek icin bu iki liste gerekli.
-      const { data: closeList, error: clErr } = await supabaseClient
-        .from('monthly_financial_closes').select('*').eq('tenant_id', tenantId);
-      if (clErr) throw clErr;
-
-      const { data: targetList, error: tgErr } = await supabaseClient
-        .from('monthly_targets').select('*').eq('tenant_id', tenantId);
-      if (tgErr) throw tgErr;
-
       appData = {
         tenantId,
         companyName: activeTenant?.name || 'İşletmem',
@@ -11618,9 +11742,21 @@ async function loadTenantAppData(tenantIdOrUserId) {
         leads,
         closedPeriods: closeList || [],
         targets: targetList || [],
-        maintenance: [],
+        maintenance: maintenanceTickets.map(t => ({
+          ...t,
+          villa: propIdMap[t.property_id] || t.property_id,
+          priority: t.severity === 'CRITICAL' ? 'P1' : (t.severity === 'HIGH' ? 'P2' : 'P3'),
+          assignee: t.assigned_to || '',
+          cost: Number(t.actual_cost || t.estimated_cost || 0),
+          downtime: t.blocks_availability && t.downtime_start && t.downtime_end
+            ? Math.floor((Date.parse(t.downtime_end + 'T00:00:00Z') - Date.parse(t.downtime_start + 'T00:00:00Z')) / 86400000) + 1 : 0,
+          status: t.status === 'RESOLVED' ? 'COMPLETED' : t.status
+        })),
+        maintenanceTickets,
+        financialTransactions: financialTransactions || [],
         marketingCampaigns: [],
         influencerCollabs: [],
+        loadState: { status: 'READY', stale: false, loadedAt: new Date().toISOString() },
         isCleanState: Object.keys(villas).length === 0
       };
 
@@ -11629,12 +11765,11 @@ async function loadTenantAppData(tenantIdOrUserId) {
       return;
     } catch (err) {
       console.error('Cloud data fetch error:', err);
-      // Supabase'den veri çekilemezse ASLA eski/stale local state gösterilmez:
-      appData = getBlankTenantData(targetId);
-      updateAllVillaDropdowns();
-      renderAll();
+      // Keep the last verified in-memory view visible, but explicitly mark it as
+      // stale. Never replace a transport error with a misleading empty company.
+      appData.loadState = { status: 'ERROR', stale: true, message: getFriendlyAuthErrorMessage(err) };
       if (window.showToast) {
-        window.showToast('⚠️ İşletme verileri yüklenemedi. Lütfen internet bağlantınızı kontrol edip tekrar deneyin.');
+        window.showToast('⚠️ İşletme verileri yenilenemedi; ekrandaki son doğrulanmış görünüm korunuyor. Lütfen tekrar deneyin.', 'error');
       }
       return;
     }
@@ -11663,6 +11798,8 @@ function getBlankTenantData(userId) {
     closedPeriods: [],
     targets: [],
     maintenance: [],
+    maintenanceTickets: [],
+    financialTransactions: [],
     marketingCampaigns: [],
     influencerCollabs: [],
     otaPricingStrategy: 'MARKUP'
@@ -11693,7 +11830,9 @@ function updateSaaSUi() {
 // ve bircok etiket "5 Villa" olarak KODA GOMULUYDU; 1 mulklu bir musteri de
 // "Mulkler (5)" goruyordu. Bu sayilar artik tek yerden turetilir.
 function getPortfolioVillaCount() {
-  return (appData && appData.villas) ? Object.keys(appData.villas).length : 0;
+  return (appData && appData.villas)
+    ? Object.values(appData.villas).filter(v => v && v.isActive !== false && !v.archivedAt).length
+    : 0;
 }
 
 function portfolioLabel(suffix) {
@@ -11713,7 +11852,10 @@ function refreshPortfolioCountLabels() {
 function updateAllVillaDropdowns() {
   if (!appData || !appData.villas) return;
 
-  const villaKeys = Object.keys(appData.villas);
+  const villaKeys = Object.keys(appData.villas).filter(k => {
+    const v = appData.villas[k];
+    return v && v.isActive !== false && !v.archivedAt;
+  });
 
   const dropdownIds = [
     'globalVillaFilter',
@@ -12123,7 +12265,7 @@ async function executeMigrationToCloud() {
         await supabaseClient.from('expenses').upsert({
           tenant_id: tenantId,
           property_id: propId,
-          expense_date: exp.date || new Date().toISOString().split('T')[0],
+          expense_date: exp.date || getTodayStr(),
           category: exp.category || exp.type || 'Diğer',
           amount: Number(exp.amount) || 0,
           description: exp.desc || exp.description || '',
@@ -12148,7 +12290,7 @@ async function executeMigrationToCloud() {
         await supabaseClient.from('cleaning_tasks').upsert({
           tenant_id: tenantId,
           property_id: propId,
-          task_date: task.date || new Date().toISOString().split('T')[0],
+          task_date: task.date || getTodayStr(),
           cleaner_name: task.cleaner || 'Temizlik Ekibi',
           amount: Number(task.amount) || 0,
           description: task.notes || task.desc || '',
@@ -12923,7 +13065,10 @@ async function saveTenantOnboarding(onboardingData) {
 
 async function getExecutiveDashboardSnapshot(targetMonth, propertyId = null) {
   if (!supabaseClient) throw new Error('Active supabase client required');
+  const tenantId = getActiveTenantId();
+  if (!isCloudTenant(tenantId)) throw new Error('Active tenant session required');
   const { data, error } = await supabaseClient.rpc('get_executive_dashboard_snapshot', {
+    p_tenant_id: tenantId,
     p_target_month: targetMonth,
     p_property_id: propertyId
   });
@@ -12983,24 +13128,39 @@ function renderExecutiveControlCenter() {
     id: villas[k].id || k,
     key: k,
     name: villas[k].name || k,
-    capacity: villas[k].capacity || 6,
-    basePrice: villas[k].basePrice || 15000,
-    minPrice: villas[k].minPrice || 10000,
-    maxPrice: villas[k].maxPrice || 35000,
-    readinessStatus: villas[k].readinessStatus || 'READY'
+    capacity: villas[k].capacity ?? null,
+    basePrice: villas[k].basePrice ?? null,
+    minPrice: villas[k].minPrice ?? null,
+    maxPrice: villas[k].maxPrice ?? null,
+    readinessStatus: villas[k].readinessStatus || 'UNKNOWN'
   }));
 
   // 1. Top Executive KPIs
   if (typeof ExecutiveDashboardService !== 'undefined' && ExecutiveDashboardService.computeExecutiveTopKpis) {
-    const curPeriod = (typeof currentFilter !== 'undefined' && currentFilter.period) || '2026-09';
-    const periodTarget = targets[curPeriod] || { revenueTarget: 300000, profitTarget: 150000, occupancyTarget: 75 };
+    const curPeriod = (typeof currentFilter !== 'undefined' && currentFilter.period) || 'ALL';
+    const periodTarget = getTargetRecordForPeriod(curPeriod) || {};
+    const scopedBookings = bookings
+      .filter(b => typeof isBookingInFilter === 'function' ? isBookingInFilter(b) : true)
+      .map(b => {
+        const share = getBookingFilterShare(b);
+        return {
+          ...b,
+          gross_amount: Number(b.gross ?? b.grossAmount ?? b.gross_amount ?? 0) * share.ratio,
+          cleaning_fee: Number(b.cleaningFee ?? b.cleaning_fee ?? 0) * share.ratio,
+          discount: Number(b.discount || 0) * share.ratio,
+          ota_commission: Number(b.otaCommission ?? b.otaComm ?? b.ota_commission ?? 0) * share.ratio,
+          nights: share.nights
+        };
+      });
+    const exactAvailableNights = getAvailableNightsForMonth(curPeriod);
 
     const kpis = ExecutiveDashboardService.computeExecutiveTopKpis({
-      bookings: bookings.filter(b => typeof isBookingInFilter === 'function' ? isBookingInFilter(b) : true),
+      bookings: scopedBookings,
       expenses: expenses.filter(e => typeof isExpenseInFilter === 'function' ? isExpenseInFilter(e) : true),
       targets: periodTarget,
-      propertiesCount: Math.max(1, propertiesList.length),
+      propertiesCount: propertiesList.filter(p => villas[p.key]?.isActive !== false && !villas[p.key]?.archivedAt).length,
       daysInMonth: getPeriodDayCount(),
+      availableNights: exactAvailableNights,
       // Servis prior alanlarini destekliyordu ama beslenmiyordu; bu yuzden
       // "Gecen Ay" etiketleri index.html'de sabit kalmisti.
       priorPeriodMetrics: (function () {
@@ -13023,8 +13183,8 @@ function renderExecutiveControlCenter() {
       ? 'geçen ay veri yok'
       : formatMoMDelta(kpis.revenue.current, kpis.revenue.prior) + ' Geçen Ay');
 
-    const satilanGece = bookings
-      .filter(b => b.status !== 'CANCELLED' && (typeof isBookingInFilter === 'function' ? isBookingInFilter(b) : true))
+    const satilanGece = scopedBookings
+      .filter(b => b.status !== 'CANCELLED')
       .reduce((a, b) => a + (Number(b.nights) || 0), 0);
     setEl('execSoldNightsLabel', satilanGece + ' Gece');
 
@@ -13051,24 +13211,25 @@ function renderExecutiveControlCenter() {
     }
 
     const occEl = document.getElementById('execKpiOccupancy');
-    if (occEl) occEl.innerText = `%${kpis.occupancy.current}`;
+    if (occEl) occEl.innerText = kpis.occupancy.current == null ? '—' : `%${kpis.occupancy.current}`;
     const occVar = document.getElementById('execOccVariance');
     if (occVar) {
       const v = kpis.occupancy.variance;
       occVar.className = v.varianceAmount >= 0 ? 'badge badge-green' : 'badge badge-yellow';
-      occVar.innerText = `Hedef: %${kpis.occupancy.target}`;
+      occVar.innerText = kpis.occupancy.target > 0 ? `Hedef: %${kpis.occupancy.target}` : 'Hedef belirlenmemiş';
     }
 
     const adrEl = document.getElementById('execKpiAdr');
-    if (adrEl) adrEl.innerText = `₺${Number(kpis.adr.current).toLocaleString('tr-TR')}`;
+    if (adrEl) adrEl.innerText = kpis.adr.current == null ? '—' : `₺${Number(kpis.adr.current).toLocaleString('tr-TR')}`;
 
     const revparEl = document.getElementById('execKpiRevpar');
-    if (revparEl) revparEl.innerText = `₺${Number(kpis.revpar.current).toLocaleString('tr-TR')}`;
+    if (revparEl) revparEl.innerText = kpis.revpar.current == null ? '—' : `₺${Number(kpis.revpar.current).toLocaleString('tr-TR')}`;
 
     const forecastEl = document.getElementById('execKpiForecast');
     if (forecastEl) {
-      const fcstVal = Math.round(kpis.revenue.current * 1.12);
-      forecastEl.innerText = `₺${Number(fcstVal).toLocaleString('tr-TR')}`;
+      forecastEl.innerText = kpis.forecast.monthEndRevenue == null
+        ? '—'
+        : `₺${Number(kpis.forecast.monthEndRevenue).toLocaleString('tr-TR')}`;
     }
   }
 
@@ -13304,15 +13465,15 @@ function renderPortfolioHealth(healthCards) {
       <div class="property-health-card status-${c.status}">
         <div style="display: flex; justify-content: space-between; align-items: flex-start;">
           <div>
-            <strong style="font-size: 14px; color: #FFFFFF;">${c.propertyName}</strong>
-            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Kapasite: ${c.capacity || 6} Kişi</div>
+            <strong style="font-size: 14px; color: #FFFFFF;">${escapeHtml(c.propertyName)}</strong>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Kapasite: ${c.capacity == null ? 'Belirtilmedi' : `${escapeHtml(c.capacity)} Kişi`}</div>
           </div>
           ${statusBadge}
         </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px; margin: 4px 0;">
           <div style="background: rgba(0,0,0,0.25); padding: 6px 8px; border-radius: 6px;">
             <span style="color: #94A3B8; display: block;">30G Doluluk:</span>
-            <strong style="color: #F8FAFC; font-size: 13px;">%${c.occupancyRate || 68}</strong>
+            <strong style="color: #F8FAFC; font-size: 13px;">${c.occupancyRate == null ? '—' : `%${escapeHtml(c.occupancyRate)}`}</strong>
           </div>
           <div style="background: rgba(0,0,0,0.25); padding: 6px 8px; border-radius: 6px;">
             <span style="color: #94A3B8; display: block;">Açık İş / Arıza:</span>
@@ -13320,7 +13481,7 @@ function renderPortfolioHealth(healthCards) {
           </div>
         </div>
         <div style="font-size: 11px; color: #CBD5E1;">
-          <strong>Fiyat Durumu:</strong> ${c.pricingHealth || 'Guardrail Sınırları İçinde'}
+          <strong>Fiyat Durumu:</strong> ${escapeHtml(c.pricingHealth || 'Değerlendirilmedi')}
         </div>
         <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06);">
           <button class="btn btn-secondary btn-sm" onclick="switchTab('properties')" style="font-size: 10px; padding: 2px 6px;">Mülk Detayı</button>
@@ -13370,17 +13531,36 @@ function handleAiAdvisorSubmit(e) {
     const villas = (typeof appData !== 'undefined' && appData.villas) || {};
 
     if (typeof ExecutiveAIAdvisor !== 'undefined' && ExecutiveAIAdvisor.answerExecutiveQuery) {
+      const period = (currentFilter && currentFilter.period) || 'ALL';
+      const target = getTargetRecordForPeriod(period) || {};
+      const activeBookings = bookings.filter(b => b.status !== 'CANCELLED' && isBookingInFilter(b));
+      const soldNights = activeBookings.reduce((sum, b) => sum + getBookingFilterShare(b).nights, 0);
+      const revenue = activeBookings.reduce((sum, b) => {
+        const share = getBookingFilterShare(b).ratio;
+        return sum + (Number(b.gross ?? b.grossAmount ?? b.gross_amount ?? 0) - Number(b.discount || 0)) * share;
+      }, 0);
+      const roomRevenue = activeBookings.reduce((sum, b) => {
+        const share = getBookingFilterShare(b).ratio;
+        return sum + (Number(b.gross ?? b.grossAmount ?? b.gross_amount ?? 0) - Number(b.cleaningFee ?? b.cleaning_fee ?? 0) - Number(b.discount || 0)) * share;
+      }, 0);
+      const otaCost = activeBookings.reduce((sum, b) => sum + Number(b.otaCommission ?? b.otaComm ?? b.ota_commission ?? 0) * getBookingFilterShare(b).ratio, 0);
+      const manualCost = expenses.filter(isExpenseInFilter).reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
+      const availableNights = getAvailableNightsForMonth(period);
       const sanitizedContext = ExecutiveAIAdvisor.buildSanitizedExecutiveContext({
         tenant: activeTenant || { company_name: 'LexBnB Portföyü' },
         kpis: {
-          revenue: { current: 483965, target: 300000 },
-          netProfit: { current: 142793, target: 100000 },
-          occupancy: { current: 68, target: 75 },
-          adr: { current: 16500 },
-          revpar: { current: 11220 }
+          revenue: { current: revenue, target: Number(target.revenue_target || target.revenueTarget || 0) },
+          netProfit: { current: revenue - otaCost - manualCost, target: Number(target.net_profit_target || target.profit_target || target.profitTarget || 0) },
+          occupancy: { current: availableNights > 0 ? soldNights / availableNights * 100 : null, target: Number(target.occupancy_target || target.occupancyTarget || 0) },
+          adr: { current: soldNights > 0 ? roomRevenue / soldNights : null },
+          revpar: { current: availableNights > 0 ? roomRevenue / availableNights : null }
         },
         properties: Object.keys(villas).map(k => ({ id: k, name: villas[k]?.name || k })),
-        gapNights: (appData && appData.gapNights) || []
+        gapNights: (appData && appData.gapNights) || [],
+        tasks: (appData && appData.cleaningTasks) || [],
+        tickets: (appData && appData.maintenanceTickets) || [],
+        leads: (appData && appData.leads) || [],
+        targets: target
       });
 
       const response = ExecutiveAIAdvisor.answerExecutiveQuery(sanitizedContext, query);
@@ -13388,8 +13568,8 @@ function handleAiAdvisorSubmit(e) {
       sourceMetrics = response.sourceMetrics || [];
       recommendationAction = response.recommendedAction;
     } else {
-      answerText = `İşletmeniz Eylül 2026 döneminde ₺483.965 ciro ve %68 doluluk ile hedeflerinin üzerindedir. Kâr marjını artırmak için OTA dışı doğrudan satışlara ağırlık verilmeli ve boş kalan 1-2 gecelik pencerelere dinamik son dakika indirimi uygulanmalıdır.`;
-      sourceMetrics = ['Ciro: ₺483.965', 'Doluluk: %68', 'Kâr: ₺142.793'];
+      answerText = 'Yönetici danışmanı şu anda kullanılamıyor. Doğrulanmamış bir değerlendirme üretilmedi.';
+      sourceMetrics = [];
     }
 
     let actionBtnHtml = '';
@@ -13518,7 +13698,7 @@ function handleCommandPaletteSearch(query) {
         if (v.name.toLowerCase().includes(q) || k.toLowerCase().includes(q)) {
           items.push({
             icon: '🏡',
-            title: `Mülk: ${v.name} (${v.capacity || 6} Kişi)`,
+            title: `Mülk: ${v.name}${v.capacity ? ` (${v.capacity})` : ''}`,
             action: () => {
               closeCommandPalette();
               currentFilter.villa = k;
@@ -13550,18 +13730,30 @@ function handleCommandPaletteSearch(query) {
   }
 
   if (items.length === 0) {
-    container.innerHTML = `<div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px;">"${query}" ile eşleşen komut veya kayıt bulunamadı.</div>`;
+    container.innerHTML = `<div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px;">"${escapeHtml(query)}" ile eşleşen komut veya kayıt bulunamadı.</div>`;
     return;
   }
 
-  window._paletteItems = items;
   container.innerHTML = items.map((it, idx) => `
-    <div class="palette-item" onclick="window._paletteItems[${idx}].action()">
-      <span style="font-size: 16px;">${it.icon}</span>
-      <span style="flex: 1; font-weight: 600;">${it.title}</span>
+    <div class="palette-item" data-palette-index="${idx}" role="button" tabindex="0">
+      <span style="font-size: 16px;">${escapeHtml(it.icon)}</span>
+      <span style="flex: 1; font-weight: 600;">${escapeHtml(it.title)}</span>
       <span style="font-size: 11px; color: #94A3B8;">Git ›</span>
     </div>
   `).join('');
+  container.querySelectorAll('[data-palette-index]').forEach(element => {
+    const activate = () => {
+      const selected = items[Number(element.dataset.paletteIndex)];
+      if (selected && typeof selected.action === 'function') selected.action();
+    };
+    element.addEventListener('click', activate);
+    element.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        activate();
+      }
+    });
+  });
 }
 
 // Global shortcut listener for Ctrl+K
@@ -13616,10 +13808,10 @@ function renderUserNotificationsDrawer() {
   list.innerHTML = notes.map(n => `
     <div style="padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 12px; display: flex; flex-direction: column; gap: 4px;">
       <div style="display: flex; justify-content: space-between; align-items: center;">
-        <strong style="color: ${n.severity === 'CRITICAL' ? '#F87171' : '#FCD34D'};">${n.title}</strong>
-        <span style="font-size: 10px; color: #94A3B8;">${n.status}</span>
+        <strong style="color: ${n.severity === 'CRITICAL' ? '#F87171' : '#FCD34D'};">${escapeHtml(n.title || '')}</strong>
+        <span style="font-size: 10px; color: #94A3B8;">${escapeHtml(n.status || '')}</span>
       </div>
-      <div style="color: #CBD5E1; font-size: 11px;">${n.message || ''}</div>
+      <div style="color: #CBD5E1; font-size: 11px;">${escapeHtml(n.message || '')}</div>
       <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 4px;">
         <button class="btn btn-secondary btn-sm" onclick="acknowledgeUserNotification('${n.id}'); renderUserNotificationsDrawer();" style="font-size: 9px; padding: 1px 5px;">Okundu</button>
       </div>
@@ -13645,7 +13837,7 @@ function renderPropertiesTab() {
   if (!grid) return;
 
   const villas = (typeof appData !== 'undefined' && appData.villas) || {};
-  const propKeys = Object.keys(villas);
+  const propKeys = Object.keys(villas).filter(k => villas[k] && villas[k].isActive !== false && !villas[k].archivedAt);
 
   const badge = document.getElementById('propCountBadge');
   if (badge) badge.innerText = propKeys.length;
@@ -13656,23 +13848,23 @@ function renderPropertiesTab() {
       <div class="property-health-card status-HEALTHY">
         <div style="display: flex; justify-content: space-between; align-items: flex-start;">
           <div>
-            <strong style="font-size: 15px; color: #FFFFFF;">${v.name}</strong>
-            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Kod: ${k} • Kapasite: ${v.capacity || 6} Kişi</div>
+            <strong style="font-size: 15px; color: #FFFFFF;">${escapeHtml(v.name || 'Adsız mülk')}</strong>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Kod: ${escapeHtml(k)} • Kapasite: ${escapeHtml(v.capacity || 'Belirtilmedi')}</div>
           </div>
           <span class="badge badge-green">AKTİF</span>
         </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px; margin: 6px 0;">
           <div style="background: rgba(0,0,0,0.25); padding: 6px 8px; border-radius: 6px;">
             <span style="color: #94A3B8; display: block;">Taban Fiyat:</span>
-            <strong style="color: #F8FAFC; font-size: 12px;">₺${Number(v.floorPrice || 10000).toLocaleString('tr-TR')}</strong>
+            <strong style="color: #F8FAFC; font-size: 12px;">${Number.isFinite(Number(v.floorPrice)) ? '₺' + Number(v.floorPrice).toLocaleString('tr-TR') : '—'}</strong>
           </div>
           <div style="background: rgba(0,0,0,0.25); padding: 6px 8px; border-radius: 6px;">
             <span style="color: #94A3B8; display: block;">Baz Fiyat:</span>
-            <strong style="color: #34D399; font-size: 12px;">₺${Number(v.basePrice || 15000).toLocaleString('tr-TR')}</strong>
+            <strong style="color: #34D399; font-size: 12px;">${Number.isFinite(Number(v.basePrice)) ? '₺' + Number(v.basePrice).toLocaleString('tr-TR') : '—'}</strong>
           </div>
         </div>
         <div style="font-size: 11px; color: #CBD5E1;">
-          <strong>Olanaklar:</strong> Özel Havuz, Jakuzi, Şömine, Dağ Manzarası
+          <strong>Olanaklar:</strong> ${escapeHtml(v.amenities || 'Belirtilmedi')}
         </div>
         <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px;">
           <button class="btn btn-secondary btn-sm" onclick="openPropertyModal('${k}')" style="font-size: 10px;">Düzenle</button>
@@ -13699,8 +13891,8 @@ function renderOperationsTab() {
         <h4 style="margin: 0 0 10px 0; color: #FBBF24; font-size: 13px;">🧹 Bekleyen Temizlik Görevleri (${tasks.length})</h4>
         ${tasks.length === 0 ? '<div style="color: var(--text-muted); font-size: 12px;">Bekleyen temizlik görevi yok.</div>' : tasks.slice(0, 5).map(t => `
           <div style="padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 12px; display: flex; justify-content: space-between;">
-            <span>${t.title || 'Turnover'} (${t.propertyId || ''})</span>
-            <span class="badge badge-yellow" style="font-size: 10px;">${t.status || 'PENDING'}</span>
+            <span>${escapeHtml(t.title || 'Turnover')} (${escapeHtml(t.propertyId || '')})</span>
+            <span class="badge badge-yellow" style="font-size: 10px;">${escapeHtml(t.status || 'PENDING')}</span>
           </div>
         `).join('')}
       </div>
@@ -13708,8 +13900,8 @@ function renderOperationsTab() {
         <h4 style="margin: 0 0 10px 0; color: #F87171; font-size: 13px;">🛠️ Arıza ve Bakım İşleri (${tickets.length})</h4>
         ${tickets.length === 0 ? '<div style="color: var(--text-muted); font-size: 12px;">Açık arıza kaydı bulunmuyor.</div>' : tickets.slice(0, 5).map(tk => `
           <div style="padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 12px; display: flex; justify-content: space-between;">
-            <span>${tk.title}</span>
-            <span class="badge badge-red" style="font-size: 10px;">${tk.status}</span>
+            <span>${escapeHtml(tk.title || 'Belirtilmedi')}</span>
+            <span class="badge badge-red" style="font-size: 10px;">${escapeHtml(tk.status || 'OPEN')}</span>
           </div>
         `).join('')}
       </div>
@@ -13742,12 +13934,12 @@ function renderGuestsTab() {
 
     return `
       <tr>
-        <td><strong>${b.guest || 'Misafir'}</strong></td>
-        <td>${b.phone || '+90 532 000 00 00'}</td>
-        <td>${vName} (${b.checkIn} - ${b.checkOut})</td>
+        <td><strong>${escapeHtml(b.guest || 'Belirtilmedi')}</strong></td>
+        <td>${escapeHtml(b.phone || 'Belirtilmedi')}</td>
+        <td>${escapeHtml(vName)} (${escapeHtml(b.checkIn || '—')} - ${escapeHtml(b.checkOut || '—')})</td>
         <td>${stageBadge}</td>
-        <td><span class="badge badge-purple">2 Mesaj Planlandı</span></td>
-        <td><span class="badge badge-green">Teklif Uygun</span></td>
+        <td><span class="badge badge-slate">Entegrasyon verisi yok</span></td>
+        <td><span class="badge badge-slate">Değerlendirilmedi</span></td>
         <td style="text-align: right;">
           <button class="btn btn-secondary btn-sm" onclick="openReservationModal('${b.id}')" style="font-size: 10px;">Detay</button>
         </td>

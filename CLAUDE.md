@@ -179,7 +179,9 @@ ve kısmi veriyle daha kötü bir duruma yol açar. Bayrak işlem sonunda kapanm
 ### 4.1 Commit öncesi
 ```bash
 node stamp_assets.js     # varlıkları içerik hash'iyle damgala (ZORUNLU)
-node run_all_tests.js    # 112 süit, ~1000 iddia
+npm run verify:migrations # şema + 34 göçün içerik bütünlüğü
+npm test                  # 84 çevrimdışı/güvenli süit
+npm run test:live         # yalnız ayrı test projesi + açık destructive-test onayı
 ```
 `stamp_assets.js --check` güncel değilse hata verir — CI'ya konabilir.
 
@@ -279,7 +281,9 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 | OTA ilan analizi (`runAiListingCritic`) | veri bağlantısı yok; artık skor uydurmuyor, durumu açıkça söylüyor |
 | Demo'yu Supabase'de gerçek tenant olarak yeniden kurma | yapılmadı |
 | Pazarlama ROAS'ı | kampanya gelir alanı kullanıcı girdisi; "ölçülmüş" gibi sunuluyor, etiketlenmeli |
-| Kullanıcı davet e-postası | davet oluşuyor ama davetliye **mail gitmiyor**; kişi kendi kayıt olmalı |
+| RGVQI denetim düzeltmeleri | phase24 ve phase25, 14 Eylül 2026'da üretime uygulandı ve readiness denetimiyle doğrulandı; uygulama/worker dağıtımı ayrıca izlenmeli |
+| Güvenli test kapısı | `npm test` yalnızca çevrimdışı suite'leri çalıştırır; canlı suite için ayrı test projesi ve açık onay gerekir |
+| Kullanıcı davet e-postası | phase24 outbox + `npm run invitations:worker`; üretimde worker secret'ları kurulmalı |
 
 ---
 

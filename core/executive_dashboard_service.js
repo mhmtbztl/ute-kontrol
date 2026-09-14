@@ -26,8 +26,9 @@
       expenses = [],
       targets = {},
       forecast = {},
-      propertiesCount = 1,
-      daysInMonth = 30,
+      propertiesCount = 0,
+      daysInMonth = 0,
+      availableNights = null,
       priorPeriodMetrics = null
     } = params;
 
@@ -36,25 +37,22 @@
 
     bookings.forEach(b => {
       if (b.status !== 'CANCELLED') {
-        currentRevenue += Number(b.gross_amount || b.grossAmount || 0);
+        currentRevenue += Number(b.gross_amount || b.grossAmount || 0) - Number(b.discount || 0);
         const nights = b.nights || 1;
         bookedNights += nights;
       }
     });
 
-    // USALI: OTA komisyonu ve temizlik maliyeti GELIRDEN DUSULMEZ, GIDERDIR.
-    // Onceki hal komisyonu ve temizligi hicbir yerde saymiyordu; ciro brut
-    // aliniyor ama bu iki maliyet gider toplamina girmedigi icin net kar
-    // oldugundan yuksek cikiyordu. Finans ekrani ise ayni tutarlari gelirden
-    // dusuyordu; iki ekran ayni ay icin farkli net kar raporluyordu.
-    let distributionAndCleaningCost = 0;
+    // OTA commission is a distribution expense. The cleaning fee charged to
+    // the guest remains revenue; only an actual cleaner payment in expenses is
+    // a cost.
+    let distributionCost = 0;
     bookings.forEach(b => {
       if (b.status === 'CANCELLED') return;
-      distributionAndCleaningCost += Number(b.ota_commission || b.otaCommission || 0);
-      distributionAndCleaningCost += Number(b.cleaning_fee || b.cleaningFee || 0);
+      distributionCost += Number(b.ota_commission || b.otaCommission || 0);
     });
 
-    let currentExpenses = distributionAndCleaningCost;
+    let currentExpenses = distributionCost;
     expenses.forEach(e => {
       currentExpenses += Number(e.amount || 0);
     });
@@ -63,16 +61,21 @@
     currentExpenses = roundMoney(currentExpenses);
     const netCashProfit = roundMoney(currentRevenue - currentExpenses);
 
-    const totalAvailableRoomNights = Math.max(1, propertiesCount * daysInMonth);
-    const occupancyRate = roundMoney((bookedNights / totalAvailableRoomNights) * 100);
-    const adr = bookedNights > 0 ? roundMoney(currentRevenue / bookedNights) : 0;
-    const revpar = roundMoney(currentRevenue / totalAvailableRoomNights);
-    const forecastedTotalRevenue = forecast.forecastedTotalRevenue || currentRevenue;
+    const calculatedCapacity = availableNights !== null && availableNights !== undefined && Number.isFinite(Number(availableNights))
+      ? Number(availableNights) : Number(propertiesCount) * Number(daysInMonth);
+    const totalAvailableRoomNights = calculatedCapacity > 0 ? calculatedCapacity : null;
+    const occupancyRate = totalAvailableRoomNights ? roundMoney((bookedNights / totalAvailableRoomNights) * 100) : null;
+    const roomRevenue = bookings.reduce((sum, b) => b.status === 'CANCELLED' ? sum : sum +
+      Number(b.gross_amount || b.grossAmount || 0) - Number(b.cleaning_fee || b.cleaningFee || 0) - Number(b.discount || 0), 0);
+    const adr = bookedNights > 0 ? roundMoney(roomRevenue / bookedNights) : null;
+    const revpar = totalAvailableRoomNights ? roundMoney(roomRevenue / totalAvailableRoomNights) : null;
+    const forecastedTotalRevenue = Number.isFinite(Number(forecast.forecastedTotalRevenue))
+      ? Number(forecast.forecastedTotalRevenue) : null;
 
     // Target comparisons
     const targetRevenue = Number(targets.revenue_target || targets.revenueTarget || 0);
     const targetProfit = Number(targets.profit_target || targets.profitTarget || 0);
-    const targetOccupancy = Number(targets.occupancy_target || targets.occupancyTarget || 75);
+    const targetOccupancy = Number(targets.occupancy_target || targets.occupancyTarget || 0);
 
     function calcVariance(current, target) {
       if (!target || target === 0) return { varianceAmount: 0, variancePercent: 0, status: 'NEUTRAL' };

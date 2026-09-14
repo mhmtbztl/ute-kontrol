@@ -40,6 +40,22 @@
     throw new Error('SHA256_UNAVAILABLE');
   }
 
+  async function assertImageSignature(file) {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const isJpeg = bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+    const isPng = bytes.length >= 8 && [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a].every((value, index) => bytes[index] === value);
+    const isWebp = bytes.length >= 12 && String.fromCharCode(...bytes.slice(0, 4)) === 'RIFF' && String.fromCharCode(...bytes.slice(8, 12)) === 'WEBP';
+    const isHeic = bytes.length >= 12 && String.fromCharCode(...bytes.slice(4, 8)) === 'ftyp' && /^(?:heic|heix|hevc|hevx|mif1|msf1)$/.test(String.fromCharCode(...bytes.slice(8, 12)));
+    const matches = {
+      'image/jpeg': isJpeg,
+      'image/png': isPng,
+      'image/webp': isWebp,
+      'image/heic': isHeic
+    };
+    if (!matches[file.type]) throw new Error('IMAGE_SIGNATURE_MISMATCH');
+    return true;
+  }
+
   function newUuid() {
     if (CryptoProvider && typeof CryptoProvider.randomUUID === 'function') return CryptoProvider.randomUUID();
     throw new Error('RANDOM_UUID_UNAVAILABLE');
@@ -68,6 +84,7 @@
       throw new Error('SUPABASE_CLIENT_REQUIRED');
     }
     const valid = validateUpload(input);
+    await assertImageSignature(valid.file);
     const hash = await sha256File(valid.file);
     const existing = await findExisting(client, valid, hash);
     if (existing && existing.media_status !== 'FAILED') return { mediaId: existing.id, reused: true, storagePath: existing.original_storage_path };
@@ -110,5 +127,5 @@
     }
   }
 
-  return { BUCKET, MAX_BYTES, MIME_EXTENSIONS, ROOM_CATEGORIES, validateUpload, sha256File, storagePath, uploadPropertyMedia };
+  return { BUCKET, MAX_BYTES, MIME_EXTENSIONS, ROOM_CATEGORIES, validateUpload, assertImageSignature, sha256File, storagePath, uploadPropertyMedia };
 }));

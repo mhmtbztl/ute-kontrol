@@ -96,9 +96,6 @@ function calculateAvailableNights(properties = [], year, month, maintenances = [
   let totalAvailable = 0;
 
   properties.forEach(p => {
-    // Check if property is active
-    if (p.is_active === false || p.isActive === false) return;
-
     // Check activation window (if activation date exists)
     let pStart = monthStart;
     let pEnd = monthEnd;
@@ -109,8 +106,10 @@ function calculateAvailableNights(properties = [], year, month, maintenances = [
       if (actDate > monthStart) pStart = actDate; // Mid-month activation
     }
 
-    if (p.deactivationDate) {
-      const deactDate = parseDate(p.deactivationDate);
+    const deactivationValue = p.deactivationDate || p.deactivated_on || p.archivedAt || p.archived_at;
+    if ((p.is_active === false || p.isActive === false) && !deactivationValue) return;
+    if (deactivationValue) {
+      const deactDate = parseDate(deactivationValue);
       if (deactDate < monthStart) return;
       if (deactDate < monthEnd) pEnd = deactDate;
     }
@@ -119,17 +118,29 @@ function calculateAvailableNights(properties = [], year, month, maintenances = [
     
     // Deduct P1 maintenance downtime for this property
     const propKey = p.id || p.slug;
-    let downtime = 0;
+    const blockedDates = new Set();
     maintenances.forEach(m => {
       const mVilla = m.villa || m.property_id || m.propertyId;
       if (mVilla === propKey || mVilla === p.slug || mVilla === p.id) {
-        if (m.priority === 'P1' && (m.status === 'OPEN' || m.downtime > 0)) {
-          downtime += Number(m.downtime || 1);
+        if (m.blocks_availability === true || m.blocksAvailability === true) {
+          const start = parseDate(m.downtime_start || m.downtimeStart);
+          const end = parseDate(m.downtime_end || m.downtimeEnd);
+          const cur = new Date(Math.max(start.getTime(), pStart.getTime(), monthStart.getTime()));
+          const last = new Date(Math.min(end.getTime(), pEnd.getTime(), monthEnd.getTime()));
+          while (cur <= last) {
+            blockedDates.add(formatDate(cur));
+            cur.setDate(cur.getDate() + 1);
+          }
+        } else if (m.priority === 'P1' && (m.status === 'OPEN' || m.downtime > 0)) {
+          // Legacy records had only a day count. Keep compatibility, but no
+          // implicit one-day deduction when no duration was recorded.
+          const legacyDays = Math.max(0, Number(m.downtime || 0));
+          for (let i = 0; i < legacyDays; i++) blockedDates.add(`legacy-${i}`);
         }
       }
     });
 
-    totalAvailable += Math.max(0, propDays - downtime);
+    totalAvailable += Math.max(0, propDays - blockedDates.size);
   });
 
   return totalAvailable;
@@ -228,6 +239,18 @@ function computeFinancialMetrics({
     categoryTotals[eCat] = roundMoney((categoryTotals[eCat] || 0) + eAmt);
   });
 
+  // Canonical booking contract:
+  // - gross - discount is recognized revenue;
+  // - guest cleaning fee is a revenue component, never an inferred cost;
+  // - OTA commission recorded on the booking is distribution OPEX;
+  // - actual cleaning payout comes only from the expense ledger.
+  totalOpex += totalBookedOtaCommission;
+  if (totalBookedOtaCommission > 0) {
+    categoryTotals['OTA Komisyonu'] = roundMoney(
+      (categoryTotals['OTA Komisyonu'] || 0) + totalBookedOtaCommission
+    );
+  }
+
   // 5. Financial & STR Calculations (Guarded against NaN & Infinity)
   const finRevenue = roundMoney(targetFinancialRevenue);
   const finOpex = roundMoney(totalOpex);
@@ -275,12 +298,15 @@ function computeFinancialMetrics({
 
   // 7. Reconciliation (Booked Room Revenue vs Recorded Financial Revenue)
   const reconciliationDiff = roundMoney(finRevenue - roomRevenue);
+  const reconciliationVariance = roundMoney(reconciliationDiff - cleaningRevenue);
   const reconciliationPayload = {
     bookedRoomRevenue: roomRevenue,
     recordedFinancialRevenue: finRevenue,
     difference: reconciliationDiff,
-    hasWarning: false,
-    warningCode: null
+    expectedCleaningRevenueDifference: cleaningRevenue,
+    variance: reconciliationVariance,
+    hasWarning: Math.abs(reconciliationVariance) >= 0.01,
+    warningCode: Math.abs(reconciliationVariance) >= 0.01 ? 'FINANCIAL_RECONCILIATION_MISMATCH' : null
   };
 
   return {

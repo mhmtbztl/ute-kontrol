@@ -4,7 +4,11 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node scripts/run_safe_tests.js",
+    "test:live": "node run_all_tests.js",
+    "verify:migrations": "node scripts/verify_migration_chain.js",
+    "production:readiness": "node scripts/check_production_readiness.js",
+    "invitations:worker": "node scripts/run_invitation_worker.js",
     "marketing:photo-worker": "node scripts/run_photo_analysis_worker.js",
     "marketing:experiment-worker": "node scripts/run_marketing_experiment_worker.js",
     "marketing:seasonal-worker": "node scripts/run_seasonal_marketing_worker.js",

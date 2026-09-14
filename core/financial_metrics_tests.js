@@ -141,9 +141,8 @@ runTest('3. Critical Test 14: Booking Room Rev 10k, Cleaning 2k, OTA 1.5k; Finan
   // Cleaning Revenue = 2,000 TL
   // Gross = 12,000 TL
   // OTA Commission = 1,500 TL
-  // Finance records:
-  // Financial Revenue = 12,000 TL
-  // OTA Commission Expense = 1,500 TL (in expenses table as OPEX)
+  // Financial Revenue = 12,000 TL. OTA Commission Expense is derived once from
+  // the booking contract; it is not copied into the manual expense ledger.
   
   const booking = {
     id: 'BK-CRIT-14',
@@ -157,15 +156,7 @@ runTest('3. Critical Test 14: Booking Room Rev 10k, Cleaning 2k, OTA 1.5k; Finan
     status: 'CONFIRMED'
   };
 
-  const expenses = [
-    {
-      expense_date: '2026-10-02',
-      amount: 1500,
-      expense_type: 'OPEX',
-      category: 'Komisyon',
-      property_id: 'PROP-ALPHA'
-    }
-  ];
+  const expenses = [];
 
   const properties = [{ id: 'PROP-ALPHA', is_active: true }];
 

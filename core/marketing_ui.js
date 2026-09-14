@@ -57,7 +57,7 @@
     ['MarketingReviewService', 'core/marketing_review_service.js?v=067c5889'],
     ['MarketingSnapshotService', 'core/marketing_snapshot_service.js?v=4d5f61d1'],
     ['MarketingChannelListingService', 'core/marketing_channel_listing_service.js?v=51df5778'],
-    ['MarketingMediaUploadService', 'core/marketing_media_upload_service.js?v=e0df6011'],
+    ['MarketingMediaUploadService', 'core/marketing_media_upload_service.js?v=3eaf2842'],
     ['MarketingPhotoAnalysisService', 'core/marketing_photo_analysis_service.js?v=83dd4cdd'],
     ['MarketingExperimentService', 'core/marketing_experiment_service.js?v=fe7721a0'],
     ['MarketingPhotoResultsService', 'core/marketing_photo_results_service.js?v=f8de9513'],

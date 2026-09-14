@@ -2,7 +2,7 @@
 const path = require('path');
 const fs = require('fs');
 
-const testFiles = [
+const allTestFiles = [
   // Prior 29 Regression Suites (Phases 1-10)
   'auth_lifecycle_tests.js',
   'booking_crud_tests.js',
@@ -149,11 +149,50 @@ const testFiles = [
 
   // Tarayici render hatti — sahte DOM ile renderAll GERCEKTEN calisir.
   // setEl gibi tanimsiz referanslari yalnizca bu suit yakalar.
-  'render_pipeline_tests.js'
+  'render_pipeline_tests.js',
+  'audit_remediation_tests.js'
 ];
 
+const allowLiveTests = process.env.LEXBNB_ALLOW_DESTRUCTIVE_TESTS === '1';
+const liveTestFiles = new Set(allTestFiles.filter(file => {
+  const source = fs.readFileSync(path.join(__dirname, 'core', file), 'utf8');
+  return source.includes('@supabase/supabase-js') || source.includes('SUPABASE_SERVICE_ROLE_KEY');
+}));
+
+function readLocalEnv() {
+  const result = {};
+  const envPath = path.join(__dirname, '.env');
+  if (!fs.existsSync(envPath)) return result;
+  fs.readFileSync(envPath, 'utf8').split(/\r?\n/).forEach(line => {
+    const [key, ...parts] = line.split('=');
+    if (key && parts.length) result[key.trim()] = parts.join('=').trim().replace(/^['"]|['"]$/g, '');
+  });
+  return result;
+}
+
+if (allowLiveTests) {
+  const env = { ...readLocalEnv(), ...process.env };
+  const target = String(env.SUPABASE_URL || '');
+  const declaredTestTarget = String(env.TEST_SUPABASE_URL || '');
+  if (!target || !declaredTestTarget || target !== declaredTestTarget) {
+    throw new Error('LIVE_TEST_GUARD: SUPABASE_URL must exactly equal an explicit TEST_SUPABASE_URL.');
+  }
+  const host = new URL(target).hostname.toLowerCase();
+  const clearlyNonProduction = host === 'localhost' || host === '127.0.0.1' || /(?:test|staging|dev)/.test(host);
+  if (!clearlyNonProduction && env.LEXBNB_CONFIRM_REMOTE_TEST_PROJECT !== host) {
+    throw new Error('LIVE_TEST_GUARD: confirm the dedicated remote test hostname with LEXBNB_CONFIRM_REMOTE_TEST_PROJECT.');
+  }
+}
+
+const testFiles = allowLiveTests
+  ? allTestFiles
+  : allTestFiles.filter(file => !liveTestFiles.has(file));
+
 console.log('=============================================================================');
-console.log(`🚀 LEXBNB FINAL MASTER REGRESSION RUNNER — ${testFiles.length} TEST SUITES`);
+console.log(`🚀 LEXBNB SAFE REGRESSION RUNNER — ${testFiles.length} TEST SUITES`);
+if (!allowLiveTests && liveTestFiles.size) {
+  console.log(`🔒 ${liveTestFiles.size} live database suites skipped. They require an explicit dedicated test project.\n`);
+}
 console.log('=============================================================================\n');
 
 let totalPassedAcrossSuites = 0;
@@ -253,7 +292,7 @@ async function auditLeakedTestAccounts() {
 }
 
 (async () => {
-leakedAccounts = await auditLeakedTestAccounts();
+leakedAccounts = allowLiveTests ? await auditLeakedTestAccounts() : [];
 
 console.log('\n=============================================================================');
 console.log('🏁 GRAND FINAL REGRESSION SUMMARY');
@@ -271,7 +310,9 @@ if (unparsedSuites.length) {
 }
 
 let leakFailed = false;
-if (leakedAccounts === null) {
+if (!allowLiveTests) {
+  console.log('🔒 Canlı hesap sızıntısı denetimi atlandı; güvenli test koşusu dış sisteme bağlanmaz.');
+} else if (leakedAccounts === null) {
   console.log('⚠️  Sizinti denetimi calistirilamadi (.env veya servis anahtari okunamadi).');
 } else if (leakedAccounts.length > 0) {
   leakFailed = true;
