@@ -245,6 +245,14 @@ phase21 (veri sıfırlama), phase17 (pazarlama — 14 tablo + 20 fonksiyon,
 phase22 (`anon` yetkisinin geri alınması), phase23 (çapraz kiracı yazma açığı),
 phase24 (RGVQI denetim düzeltmeleri), phase25 (bulgu incelemesinde yetki sırası)
 ve phase26 (mülk koruması istisnaları) **14 Eylül 2026'da uygulandı.**
+
+phase27 (misafir CRM bağlantısı) ve phase28 (misafir tercihleri, iç notlar,
+izin geçmişi) **15 Eylül 2026'da uygulandı**; üretime sorularak doğrulandı
+(§4.2 sütun sorgusu: `bookings.primary_guest_id`, `guests.preferences`,
+`guests.tags`, `guest_consent_events` — hepsi mevcut). İkisi ayrıca test
+projesine `npm run test:bootstrap` ile uygulandı ve sıfırdan kurulan bir
+şemada temiz çalıştıkları görüldü.
+
 **Bekleyen göç yok.**
 
 **Bir göçün uygulanıp uygulanmadığı, dosyaya bakarak anlaşılmaz.** Dosya repoda
@@ -389,7 +397,7 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 | Demo'yu Supabase'de gerçek tenant olarak yeniden kurma | yapılmadı |
 | Pazarlama ROAS'ı | kampanya gelir alanı kullanıcı girdisi; "ölçülmüş" gibi sunuluyor, etiketlenmeli |
 | RGVQI denetim düzeltmeleri | phase24 ve phase25, 14 Eylül 2026'da üretime uygulandı ve readiness denetimiyle doğrulandı; uygulama/worker dağıtımı ayrıca izlenmeli |
-| Misafir CRM kanonik profil bağlantısı | phase27 hazır, **üretime uygulanmadı** — kod push edilmeden önce Supabase SQL Editor'da ayrı onayla uygulanmalı |
+| Misafir CRM (phase27 + phase28) | göçler **üretimde uygulandı ve doğrulandı** (15 Eylül 2026, sütun sorgusuyla); test projesinde de kurulu |
 | Güvenli test kapısı | tamamlandı — canlı/çevrimdışı ayrımı artık `@supabase/supabase-js` require'ına bakıyor. Eski kaba dizgi taraması 8 çevrimdışı süiti (worker giriş noktaları) yanlışlıkla atlıyordu; güvenli koşu 85 → 94 süit |
 | Kullanıcı davet e-postası | phase24 outbox + `npm run invitations:worker`; üretimde worker secret'ları kurulmalı |
 
