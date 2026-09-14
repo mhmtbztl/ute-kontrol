@@ -14334,7 +14334,7 @@ function renderOperationsTab() {
   `;
 }
 
-const guestDirectoryState = { query: '', segment: 'ALL', sort: 'RECENT', page: 1, pageSize: 20 };
+const guestDirectoryState = { query: '', segment: 'ALL', sort: 'RECENT', direction: 'DESC', dateStart: '', dateEnd: '', page: 1, pageSize: 20 };
 
 function getGuestCrmApi() {
   if (typeof LexbnbGuestCrm !== 'undefined') return LexbnbGuestCrm;
@@ -14357,6 +14357,32 @@ function getGuestCrmView() {
 function setGuestDirectoryQuery(value) { guestDirectoryState.query = value || ''; guestDirectoryState.page = 1; renderGuestsTab(); }
 function setGuestDirectorySegment(value) { guestDirectoryState.segment = value || 'ALL'; guestDirectoryState.page = 1; renderGuestsTab(); }
 function setGuestDirectorySort(value) { guestDirectoryState.sort = value || 'RECENT'; guestDirectoryState.page = 1; renderGuestsTab(); }
+function setGuestDirectorySortDirection(value) { guestDirectoryState.direction = value === 'ASC' ? 'ASC' : 'DESC'; guestDirectoryState.page = 1; renderGuestsTab(); }
+function setGuestDirectoryDateRange() {
+  const startInput = document.getElementById('guestDirectoryDateStart');
+  const endInput = document.getElementById('guestDirectoryDateEnd');
+  const start = startInput?.value || '';
+  const end = endInput?.value || '';
+  if (endInput) endInput.setCustomValidity(start && end && end < start ? 'Bitiş tarihi başlangıç tarihinden önce olamaz.' : '');
+  if (start && end && end < start) {
+    endInput?.reportValidity();
+    return;
+  }
+  guestDirectoryState.dateStart = start;
+  guestDirectoryState.dateEnd = end;
+  guestDirectoryState.page = 1;
+  renderGuestsTab();
+}
+function resetGuestDirectoryDateRange() {
+  const startInput = document.getElementById('guestDirectoryDateStart');
+  const endInput = document.getElementById('guestDirectoryDateEnd');
+  if (startInput) startInput.value = '';
+  if (endInput) { endInput.value = ''; endInput.setCustomValidity(''); }
+  guestDirectoryState.dateStart = '';
+  guestDirectoryState.dateEnd = '';
+  guestDirectoryState.page = 1;
+  renderGuestsTab();
+}
 function setGuestDirectoryPage(value) { guestDirectoryState.page = Math.max(1, Number(value) || 1); renderGuestsTab(); }
 
 function setGuestMetric(id, value) {
@@ -14404,7 +14430,16 @@ function renderGuestsTab() {
     tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:24px;">${hasProfiles ? 'Arama veya segmente uyan misafir yok.' : 'Henüz gerçek misafir profili yok. Yeni rezervasyonda telefon veya e-posta girildiğinde profil güvenle oluşur.'}</td></tr>`;
   } else {
     tbody.innerHTML = pageRows.map(row => {
-      const dateBooking = row.nextStay || row.lastStay;
+      const rangeBookings = (row.bookings || []).filter(booking => {
+        const checkIn = String(booking.checkIn || '');
+        const checkOut = String(booking.checkOut || checkIn);
+        if (guestDirectoryState.dateStart && checkOut <= guestDirectoryState.dateStart) return false;
+        if (guestDirectoryState.dateEnd && checkIn > guestDirectoryState.dateEnd) return false;
+        return true;
+      });
+      const dateBooking = (guestDirectoryState.dateStart || guestDirectoryState.dateEnd)
+        ? rangeBookings.sort((a, b) => String(b.checkIn || '').localeCompare(String(a.checkIn || '')))[0]
+        : (row.nextStay || row.lastStay);
       const dateValue = dateBooking ? `${formatTrDate(dateBooking.checkIn)} – ${formatTrDate(dateBooking.checkOut)}` : '—';
       const lifecycleClass = row.lifecycle.code === 'IN_HOUSE' ? 'badge-green' : (row.lifecycle.code === 'UPCOMING' ? 'badge-yellow' : 'badge-blue');
       const segment = row.isRepeat ? '<span class="badge badge-purple">TEKRAR</span>' : '<span class="badge badge-slate">İLK KONAKLAMA</span>';

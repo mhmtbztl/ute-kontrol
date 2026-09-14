@@ -34,6 +34,9 @@ console.log('[PASS] Misafirler screen renders canonical profiles with working de
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 assert(html.includes('id="guestDirectorySearch"'));
 assert(html.includes('id="guestDirectorySegment"'));
+assert(html.includes('id="guestDirectoryDateStart"'));
+assert(html.includes('id="guestDirectoryDateEnd"'));
+assert(html.includes('id="guestDirectorySortDirection"'));
 assert(html.includes('id="guestProfileModal"'));
 assert(html.includes('id="resGuestPhone"'));
 assert(html.includes('id="resGuestEmail"'));

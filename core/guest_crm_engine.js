@@ -145,22 +145,41 @@
   function filterGuestRows(rows, options = {}) {
     const query = String(options.query || '').trim().toLocaleLowerCase('tr-TR');
     const segment = String(options.segment || 'ALL');
+    const dateStart = String(options.dateStart || '');
+    const dateEnd = String(options.dateEnd || '');
     const result = (rows || []).filter(row => {
       if (segment === 'REPEAT' && !row.isRepeat) return false;
       if (segment === 'UPCOMING' && row.lifecycle.code !== 'UPCOMING') return false;
       if (segment === 'IN_HOUSE' && row.lifecycle.code !== 'IN_HOUSE') return false;
       if (segment === 'CONTACTABLE' && !row.phone && !row.email) return false;
+      if (dateStart || dateEnd) {
+        const hasBookingInRange = (row.bookings || []).some(booking => {
+          const checkIn = String(booking.checkIn || booking.check_in || '');
+          const checkOut = String(booking.checkOut || booking.check_out || checkIn);
+          if (dateStart && checkOut <= dateStart) return false;
+          if (dateEnd && checkIn > dateEnd) return false;
+          return true;
+        });
+        if (!hasBookingInRange) return false;
+      }
       if (!query) return true;
       return [row.name, row.phone, row.email].some(value => String(value || '').toLocaleLowerCase('tr-TR').includes(query));
     });
     const sort = String(options.sort || 'RECENT');
+    const direction = String(options.direction || 'DESC') === 'ASC' ? 1 : -1;
     result.sort((a, b) => {
-      if (sort === 'VALUE') return b.lifetimeRevenue - a.lifetimeRevenue || a.name.localeCompare(b.name, 'tr');
-      if (sort === 'STAYS') return b.stayCount - a.stayCount || a.name.localeCompare(b.name, 'tr');
-      if (sort === 'NAME') return a.name.localeCompare(b.name, 'tr');
-      const aDate = a.nextStay?.checkIn || a.nextStay?.check_in || a.lastStay?.checkOut || a.lastStay?.check_out || '';
-      const bDate = b.nextStay?.checkIn || b.nextStay?.check_in || b.lastStay?.checkOut || b.lastStay?.check_out || '';
-      return String(bDate).localeCompare(String(aDate)) || a.name.localeCompare(b.name, 'tr');
+      let comparison = 0;
+      if (sort === 'VALUE') comparison = a.lifetimeRevenue - b.lifetimeRevenue;
+      else if (sort === 'STAYS') comparison = a.stayCount - b.stayCount;
+      else if (sort === 'NIGHTS') comparison = a.nights - b.nights;
+      else if (sort === 'NAME') comparison = a.name.localeCompare(b.name, 'tr');
+      else {
+        const aDate = a.nextStay?.checkIn || a.nextStay?.check_in || a.lastStay?.checkOut || a.lastStay?.check_out || '';
+        const bDate = b.nextStay?.checkIn || b.nextStay?.check_in || b.lastStay?.checkOut || b.lastStay?.check_out || '';
+        comparison = String(aDate).localeCompare(String(bDate));
+      }
+      if (comparison !== 0) return comparison * direction;
+      return a.name.localeCompare(b.name, 'tr');
     });
     return result;
   }

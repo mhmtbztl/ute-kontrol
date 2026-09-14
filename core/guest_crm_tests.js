@@ -59,4 +59,10 @@ assert.deepStrictEqual(filterGuestRows(view.rows, { query: 'example.com' }).map(
 assert.strictEqual(filterGuestRows(view.rows, { sort: 'VALUE' })[0].id, 'g1');
 ok('Arama, segment ve sıralama kanonik satırlarda çalışır');
 
+assert.deepStrictEqual(filterGuestRows(view.rows, { dateStart: '2026-10-01', dateEnd: '2026-10-31' }).map(row => row.id), ['g1']);
+assert.deepStrictEqual(filterGuestRows(view.rows, { dateStart: '2026-09-01', dateEnd: '2026-09-30' }).map(row => row.id), ['g2']);
+assert.strictEqual(filterGuestRows(view.rows, { sort: 'VALUE', direction: 'ASC' })[0].id, 'g3');
+assert.strictEqual(filterGuestRows(view.rows, { sort: 'NIGHTS', direction: 'DESC' })[0].id, 'g1');
+ok('Tarih aralığı ve artan/azalan yön seçimi doğru uygulanır');
+
 console.log(`TEST SUMMARY: ${passed} / ${passed} TESTS PASSED (0 FAILED)`);
