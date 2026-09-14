@@ -34,7 +34,12 @@ Firmalara satılacak — kişisel araç veya demo değil. Bu, kalite çıtasın�
 - **DNS + alan adı:** Hostinger. Apex A kayıtları GitHub Pages IP'lerine bakar — **onlara dokunmayın.**
 - **E-posta:** Resend ücretsiz katman, `lexbnb.space` doğrulanmış. Supabase'e custom SMTP olarak bağlı
   (`smtp.resend.com:465`, kullanıcı adı birebir `resend`, gönderen `noreply@lexbnb.space`).
-- **Supabase proje ref:** `kirpcqklyjlrhvdbgdrq`
+- **Supabase proje ref (ÜRETİM):** `kirpcqklyjlrhvdbgdrq`
+- **Supabase proje ref (TEST):** `pdeiorpgxetksyogrmbi` — veritabanına yazan 22 süit
+  yalnızca buraya koşar. Üretim `core/test_env.js` içinde **kara listededir**: onay
+  değişkeni doldurulsa bile hedeflenemez. Test projesinde custom SMTP **yoktur** ve
+  e-posta onayı **kapalıdır**; ikisi de zorunlu, gerekçeleri
+  `docs/TEST_PROJECT_SETUP.md` içinde.
 
 Supabase panelinde bulması zor ayarlar (menüde arama, doğrudan gidin):
 ```
@@ -208,9 +213,10 @@ ve kısmi veriyle daha kötü bir duruma yol açar. Bayrak işlem sonunda kapanm
 ### 4.1 Commit öncesi
 ```bash
 node stamp_assets.js     # varlıkları içerik hash'iyle damgala (ZORUNLU)
-npm run verify:migrations # şema + 34 göçün içerik bütünlüğü
-npm test                  # 94 çevrimdışı/güvenli süit
-npm run test:live         # yalnız ayrı Supabase test projesine karşı (docs/TEST_PROJECT_SETUP.md)
+npm run verify:migrations # göçlerin içerik bütünlüğü + bağımlılık sırası
+npm test                  # 97 çevrimdışı/güvenli süit
+npm run test:bootstrap    # test projesine eksik göçleri uygula (--check salt okunur)
+npm run test:live         # 119 süit, yalnız ayrı test projesine karşı
 ```
 `stamp_assets.js --check` güncel değilse hata verir — CI'ya konabilir.
 
@@ -318,6 +324,36 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
    iki-üç ardışık tam koşudan sonra Supabase `Request rate limit reached` döner ve
    **10'a yakın süit sahte biçimde kırmızı olur**. Kod regresyonu sanmayın:
    süiti tek başına koşun, geçiyorsa hız limitidir. Birkaç dakika bekleyin.
+7. **Manifest sırası, bağımlılık sırasıdır.** Dosyalar tek tek doğru görünüp
+   veritabanı yine de **sıfırdan kurulamayabilir**. `change_impact`,
+   `media_ai`'nin yarattığı tabloya ve unique indekse dayanıyordu ama manifest
+   onu sonra listeliyordu; boş bir projede 16. dosyada duruyordu. Üretimde
+   görünmemişti, çünkü göçler orada elle ve çalışan bir sırayla uygulanmıştı —
+   kimse sıfırdan kurmayı denememişti. `npm run verify:migrations` artık tablo
+   düzeyinde ileri referansı yakalar; kısıt/indeks düzeyinin hakemi boş bir
+   projeye karşı `npm run test:bootstrap`.
+8. **PostgREST sorgu nesnesinde `.catch()` YOKTUR.** `.catch(() => {})` yazmak
+   hatayı yutmaz, `TypeError` fırlatır — üstelik genelde `finally` içinde, yani
+   **asıl hatayı tamamen siler**. İki fiyatlandırma süiti bu yüzden yıllarca
+   sebebi görünmeyen bir şekilde kırmızıydı ve canlı bölümlerini hiç
+   çalıştırmamışlardı. Supabase JS fırlatmaz (madde 1): `{ error }` okunur.
+9. **`{ data }` alıp `{ error }` okumamak, hatayı bir sonraki satıra taşır.**
+   Belirti `Cannot read properties of null` olur ve gerçek sebep (eksik sütun,
+   RLS reddi) hiçbir yerde yazmaz. Canlı süitlerde her çağrıyı hatayı yüzeye
+   çıkaran bir yardımcıdan geçirin.
+10. **`signUp()` ile `admin.createUser()` aynı kapıdan geçmez.** Supabase
+   `signUp` adresinin alan adını teslim edilebilirlik açısından doğrular:
+   `@lexbnb.test` ve `@lexbnb-test.com` MX kaydı olmadığı için reddedilir.
+   `admin.createUser` bu doğrulamayı atlar — bu yüzden 21 süit etkilenmez,
+   yalnızca gerçek kayıt akışını ölçen `registration_flow_tests` takılır.
+   Ayrıca e-posta onayı açıkken her `signUp` bir mail tetikler ve gönderim
+   limiti doğrulamadan **önce** çalışıp asıl hatayı maskeler. Test projesinde
+   onay bu yüzden kapalıdır.
+11. **SQL dosyalarında UTF-8 BOM var** (`schema.sql` + üç göç). Postgres'e
+   olduğu gibi gönderilirse ilk ifade sözdizimi hatası verir. Dosyadan
+   silinemez: manifest hash'leri BOM dahil metin üzerinden üretildi ve göçler
+   değişmezdir. `bootstrap_test_project.js` çalıştırdığı metinden ayıklar,
+   hash'ten ayıklamaz.
 
 ### Kabuk tuzakları (Windows / Git Bash)
 - Heredoc (`<<'SCRIPT'`) bir kaçış seviyesi yiyor: `'\\b'` dosyada `'\b'` (backspace) oluyor
@@ -343,7 +379,8 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 | Bulgu incelemesinde yetki sırası | tamamlandı (phase25 uygulandı) |
 | Mülk koruması sıfırlamayı kilitliyordu | tamamlandı (phase26 uygulandı) — ağı `tenant_reset_tests`, `account_deletion_tests` |
 | Rezervasyon ekranı: temizlik gelir/gider ayrımı, komisyon oranı, tek takvimli tarih | tamamlandı — ağı `booking_form_economics_tests` |
-| Ayrı Supabase test projesi | altyapı tamamlandı — kapı, bootstrap betiği, uykuda CI iş akışı ve ağı (`test_gate_tests`) yerinde. **Projenin Supabase panelinden açılması kullanıcıya kaldı** (docs/TEST_PROJECT_SETUP.md); açılana kadar 22 canlı süit koşulamaz |
+| Ayrı Supabase test projesi | **tamamlandı** (15 Eylül 2026) — proje `pdeiorpgxetksyogrmbi`, şema bootstrap ile kuruldu, tam koşu 119/119 yeşil. Geriye yalnızca CI'nin açılması kaldı (aşağıdaki satır) |
+| Canlı süitlerin CI'da otomatik koşması | `.github/workflows/live-tests.yml` hazır ama **uykuda**: `LIVE_TESTS_ENABLED` repo değişkeni `true` olana kadar atlanır. Secret'lar ve değişkenler eklenmeli — docs/TEST_PROJECT_SETUP.md son bölüm |
 | Fotoğraf AI worker'ı | `GEMINI_API_KEY` yok; Actions adımı güvenle atlanıyor — **harici bağımlılık** |
 | `get_executive_dashboard_snapshot` | tanımlı ama arayüzde **hiç çağrılmıyor**; içinde tahakkuk ve gece sayımı hataları var (§3.4) |
 | Excel içe/dışa aktarma | "Şirket Genel Raporu" içe aktarımı devre dışı bırakıldı, gerçek uygulama yok |

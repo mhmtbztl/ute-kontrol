@@ -51,6 +51,15 @@ Mevcut yerleşim:
 İş bitince dal `master`'a birleştirilir. Çakışma çıkarsa git **söyler** ve
 görerek çözülür — sessiz kayıp olmaz. Asıl kazanç budur.
 
+**Kural klasöre değil, çalışan örneğe bakar.** Aynı aracın iki oturumu da ayrı
+sayılır. 2026-09-14'te bir Claude oturumu, başka bir Claude oturumunun
+worktree'sindeki dala commit attı (`docs(agents): komut sozlugu`); içerik doğruydu
+ama commit, o dalda çalışan oturumun teslim raporunda **kendine ait olmayan bir
+commit** olarak göründü ve push sırasında "bu benim mi?" sorusunu doğurdu.
+Kimin ne yazdığını commit mesajından anlarsınız: Claude commit'leri
+`Co-Authored-By` ve `Claude-Session` satırı taşır, oturum kimliği farklıysa
+**başka bir oturumdur**; Codex commit'lerinde bu satırlar hiç yoktur.
+
 ## Kural 2 — Kimse başkasının dosyasını commit'lemez
 
 **`git add -A` ve `git add .` yasaktır.** Yalnızca kendi dokunduğunuz
@@ -142,7 +151,17 @@ dalında kalır ve **haber vermeden `master`'a dokunmaz.**
    - Sonunda kendi doğrulama bloğu bulunur; başarısızsa `RAISE EXCEPTION`
      ile durur.
    - `supabase/migration_manifest.txt`'e dosya adı + sha256 kaydedilir.
-   - `npm run verify:migrations` ile hash doğrulaması yapılır.
+   - `npm run verify:migrations` hem hash'leri hem **bağımlılık sırasını**
+     doğrular. Manifest sırası "hangi dosyalar" değil **"hangi sırayla"**
+     sözleşmesidir; sona eklemek her zaman güvenli değildir. Göçünüz daha
+     önce tanımlanmamış bir tabloya ya da kısıta dayanıyorsa satırın yeri
+     önemlidir.
+   - **`npm run test:bootstrap` ile test projesine uygulayın.** Test projesi
+     kendiliğinden güncellenmez ve canlı süitler oraya koşar; uygulamazsanız
+     süitler eski şemaya karşı çalışır. Bu adım aynı zamanda göçün sıfırdan
+     kurulan bir veritabanında **gerçekten çalıştığının** tek kanıtıdır —
+     üretim elle ve çalışan bir sırayla kurulduğu için oradaki başarı bunu
+     göstermez (`CLAUDE.md` §5.7).
 
 5. **Üretim göçü ayrı ve açık onayla uygulanır**
    Göçler Supabase Dashboard → SQL Editor'den **elle** çalıştırılır.
