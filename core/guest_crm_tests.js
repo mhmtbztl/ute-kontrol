@@ -7,15 +7,17 @@ function ok(name) { passed++; console.log('[PASS] ' + name); }
 const guests = [
   { id: 'g1', firstName: 'Ayşe', lastName: 'Yılmaz', phone: '+905321111111', marketingOptIn: true },
   { id: 'g2', firstName: 'Can', email: 'can@example.com' },
-  { id: 'g3', firstName: 'Deniz' }
+  { id: 'g3', firstName: 'Deniz' },
+  { id: 'g4', firstName: 'Ece', phone: '+905322222222', allowWhatsapp: true, marketingOptIn: true }
 ];
 const bookings = [
-  { id: 'b1', primaryGuestId: 'g1', guest: 'Ayşe Yılmaz', checkIn: '2026-01-01', checkOut: '2026-01-04', nights: 3, gross: 30000, channel: 'AIRBNB', status: 'CHECKED_OUT' },
-  { id: 'b2', primaryGuestId: 'g1', guest: 'Ayşe Yılmaz', checkIn: '2026-10-01', checkOut: '2026-10-05', nights: 4, gross: 50000, channel: 'WHATSAPP', status: 'CONFIRMED' },
-  { id: 'b3', primaryGuestId: 'g2', guest: 'Can', checkIn: '2026-09-10', checkOut: '2026-09-16', nights: 6, gross: 60000, channel: 'BOOKING', status: 'CHECKED_IN' },
+  { id: 'b1', primaryGuestId: 'g1', propertyId: 'p1', guest: 'Ayşe Yılmaz', checkIn: '2026-01-01', checkOut: '2026-01-04', nights: 3, gross: 30000, channel: 'AIRBNB', status: 'CHECKED_OUT' },
+  { id: 'b2', primaryGuestId: 'g1', propertyId: 'p2', guest: 'Ayşe Yılmaz', checkIn: '2026-10-01', checkOut: '2026-10-05', nights: 4, gross: 50000, channel: 'WHATSAPP', status: 'CONFIRMED' },
+  { id: 'b3', primaryGuestId: 'g2', propertyId: 'p2', guest: 'Can', checkIn: '2026-09-10', checkOut: '2026-09-16', nights: 6, gross: 60000, channel: 'BOOKING', status: 'CHECKED_IN' },
   { id: 'b4', guest: 'Bağlantısız Kayıt', checkIn: '2026-08-01', checkOut: '2026-08-02', gross: 10000, status: 'CONFIRMED' },
   { id: 'b5', guest: 'TOPLU AKTARIM — Temmuz 2025', checkIn: '2025-07-01', checkOut: '2025-07-05', gross: 53050, status: 'CONFIRMED' },
-  { id: 'b6', primaryGuestId: 'g1', guest: 'Ayşe Yılmaz', checkIn: '2026-02-01', checkOut: '2026-02-03', gross: 20000, status: 'CANCELLED' }
+  { id: 'b6', primaryGuestId: 'g1', propertyId: 'p1', guest: 'Ayşe Yılmaz', checkIn: '2026-02-01', checkOut: '2026-02-03', gross: 20000, status: 'CANCELLED' },
+  { id: 'b7', primaryGuestId: 'g4', propertyId: 'p3', guest: 'Ece', checkIn: '2026-09-01', checkOut: '2026-09-03', nights: 2, gross: 12000, channel: 'DIRECT', status: 'CHECKED_OUT' }
 ];
 
 assert.strictEqual(isBulkSummaryBooking(bookings[4]), true);
@@ -29,11 +31,13 @@ const view = buildGuestCrmView({
   offers: [{ booking_id: 'b2', status: 'OFFERED', created_at: '2026-09-14T10:00:00Z' }],
   today: '2026-09-14'
 });
-assert.strictEqual(view.metrics.totalGuests, 3);
+assert.strictEqual(view.metrics.totalGuests, 4);
 assert.strictEqual(view.metrics.repeatGuests, 1);
-assert.strictEqual(view.metrics.repeatRate, 1 / 3);
+assert.strictEqual(view.metrics.repeatRate, 1 / 4);
 assert.strictEqual(view.metrics.repeatRevenue, 80000);
-assert.strictEqual(view.metrics.contactableGuests, 2);
+assert.strictEqual(view.metrics.contactableGuests, 3);
+assert.strictEqual(view.metrics.marketingEligibleGuests, 2);
+assert.strictEqual(view.metrics.rebookingOpportunityCount, 1);
 assert.strictEqual(view.metrics.unlinkedBookingCount, 1);
 assert.strictEqual(view.metrics.excludedAggregateBookingCount, 1);
 ok('KPI değerleri yalnız kanonik profiller ve bağlı rezervasyonlardan hesaplanır');
@@ -54,13 +58,24 @@ assert.strictEqual(can.stayCount, 1);
 assert.strictEqual(can.isRepeat, false);
 ok('Konaklamadaki misafirin yaşam döngüsü doğru belirlenir');
 
+const ece = view.rows.find(row => row.id === 'g4');
+assert.strictEqual(ece.rebookingEligible, true);
+assert.strictEqual(ece.daysSinceLastStay, 11);
+assert.strictEqual(ayse.rebookingEligible, false);
+ok('Yeniden rezervasyon fırsatı açık onay, telefon ve gelecek rezervasyonu kurallarıyla belirlenir');
+
 assert.deepStrictEqual(filterGuestRows(view.rows, { segment: 'REPEAT' }).map(row => row.id), ['g1']);
 assert.deepStrictEqual(filterGuestRows(view.rows, { query: 'example.com' }).map(row => row.id), ['g2']);
 assert.strictEqual(filterGuestRows(view.rows, { sort: 'VALUE' })[0].id, 'g1');
 ok('Arama, segment ve sıralama kanonik satırlarda çalışır');
 
+assert.deepStrictEqual(filterGuestRows(view.rows, { segment: 'REBOOKING' }).map(row => row.id), ['g4']);
+assert.deepStrictEqual(filterGuestRows(view.rows, { segment: 'NO_CONTACT' }).map(row => row.id), ['g3']);
+assert.deepStrictEqual(filterGuestRows(view.rows, { propertyId: 'p1' }).map(row => row.id), ['g1']);
+ok('STR fırsat, veri kalitesi ve mülk filtreleri doğru çalışır');
+
 assert.deepStrictEqual(filterGuestRows(view.rows, { dateStart: '2026-10-01', dateEnd: '2026-10-31' }).map(row => row.id), ['g1']);
-assert.deepStrictEqual(filterGuestRows(view.rows, { dateStart: '2026-09-01', dateEnd: '2026-09-30' }).map(row => row.id), ['g2']);
+assert.deepStrictEqual(filterGuestRows(view.rows, { dateStart: '2026-09-01', dateEnd: '2026-09-30' }).map(row => row.id), ['g2', 'g4']);
 assert.strictEqual(filterGuestRows(view.rows, { sort: 'VALUE', direction: 'ASC' })[0].id, 'g3');
 assert.strictEqual(filterGuestRows(view.rows, { sort: 'NIGHTS', direction: 'DESC' })[0].id, 'g1');
 ok('Tarih aralığı ve artan/azalan yön seçimi doğru uygulanır');

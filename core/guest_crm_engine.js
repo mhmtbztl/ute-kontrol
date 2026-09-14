@@ -36,6 +36,24 @@
     return Number.isFinite(value) ? value : 0;
   }
 
+  function bookingPropertyId(booking) {
+    return booking?.propertyId || booking?.property_id || booking?.villa || '';
+  }
+
+  function bookingDate(booking, field) {
+    if (!booking) return '';
+    return field === 'in'
+      ? String(booking.checkIn || booking.check_in || '')
+      : String(booking.checkOut || booking.check_out || '');
+  }
+
+  function dayDifference(fromDate, toDate) {
+    const from = Date.parse(String(fromDate || '') + 'T00:00:00Z');
+    const to = Date.parse(String(toDate || '') + 'T00:00:00Z');
+    if (!Number.isFinite(from) || !Number.isFinite(to)) return null;
+    return Math.max(0, Math.floor((to - from) / 86400000));
+  }
+
   function displayName(guest) {
     return [guest?.firstName || guest?.first_name, guest?.lastName || guest?.last_name]
       .filter(Boolean).join(' ').trim() || 'İsimsiz misafir';
@@ -100,6 +118,16 @@
       const latestOffer = guestOffers.slice().sort((a, b) => String(b.created_at || b.createdAt || '').localeCompare(String(a.created_at || a.createdAt || '')))[0] || null;
       const lastStay = stays.find(b => (b.checkOut || b.check_out) <= today) || null;
       const nextStay = stays.slice().reverse().find(b => (b.checkIn || b.check_in) > today) || null;
+      const daysSinceLastStay = lastStay ? dayDifference(bookingDate(lastStay, 'out'), today) : null;
+      // Yeniden rezervasyon adayi yalnizca gercek ve eyleme hazir sinyallerle
+      // belirlenir: tamamlanmis konaklama, gelecekte rezervasyon olmamasi,
+      // WhatsApp izni + telefon ve ayrica acik kampanya onayi. Tahmini gelir
+      // veya keyfi bir "AI skoru" uretilmez.
+      const rebookingEligible = !!(
+        lastStay && !nextStay && guest.phone && guest.allow_whatsapp !== false &&
+        guest.allowWhatsapp !== false &&
+        (guest.marketingOptIn === true || guest.marketing_opt_in === true)
+      );
       return {
         id: guest.id,
         guest,
@@ -114,6 +142,8 @@
         lifetimeRevenue: stays.reduce((sum, booking) => sum + bookingGross(booking), 0),
         directCount,
         directShare: stays.length ? directCount / stays.length : null,
+        rebookingEligible,
+        daysSinceLastStay,
         lifecycle: lifecycleFor(stays, today),
         lastStay,
         nextStay,
@@ -136,6 +166,8 @@
         repeatRate: rows.length ? repeatRows.length / rows.length : null,
         repeatRevenue: repeatRows.reduce((sum, row) => sum + row.lifetimeRevenue, 0),
         contactableGuests: rows.filter(row => row.phone || row.email).length,
+        marketingEligibleGuests: rows.filter(row => row.marketingOptIn && (row.phone || row.email)).length,
+        rebookingOpportunityCount: rows.filter(row => row.rebookingEligible).length,
         unlinkedBookingCount,
         excludedAggregateBookingCount
       }
@@ -152,6 +184,11 @@
       if (segment === 'UPCOMING' && row.lifecycle.code !== 'UPCOMING') return false;
       if (segment === 'IN_HOUSE' && row.lifecycle.code !== 'IN_HOUSE') return false;
       if (segment === 'CONTACTABLE' && !row.phone && !row.email) return false;
+      if (segment === 'POST_STAY' && row.lifecycle.code !== 'POST_STAY') return false;
+      if (segment === 'CONSENTED' && !(row.marketingOptIn && (row.phone || row.email))) return false;
+      if (segment === 'REBOOKING' && !row.rebookingEligible) return false;
+      if (segment === 'NO_CONTACT' && (row.phone || row.email)) return false;
+      if (options.propertyId && !(row.bookings || []).some(booking => bookingPropertyId(booking) === options.propertyId)) return false;
       if (dateStart || dateEnd) {
         const hasBookingInRange = (row.bookings || []).some(booking => {
           const checkIn = String(booking.checkIn || booking.check_in || '');
@@ -174,8 +211,8 @@
       else if (sort === 'NIGHTS') comparison = a.nights - b.nights;
       else if (sort === 'NAME') comparison = a.name.localeCompare(b.name, 'tr');
       else {
-        const aDate = a.nextStay?.checkIn || a.nextStay?.check_in || a.lastStay?.checkOut || a.lastStay?.check_out || '';
-        const bDate = b.nextStay?.checkIn || b.nextStay?.check_in || b.lastStay?.checkOut || b.lastStay?.check_out || '';
+        const aDate = a.nextStay?.checkIn || a.nextStay?.check_in || a.lifecycle?.booking?.checkIn || a.lifecycle?.booking?.check_in || a.lastStay?.checkOut || a.lastStay?.check_out || '';
+        const bDate = b.nextStay?.checkIn || b.nextStay?.check_in || b.lifecycle?.booking?.checkIn || b.lifecycle?.booking?.check_in || b.lastStay?.checkOut || b.lastStay?.check_out || '';
         comparison = String(aDate).localeCompare(String(bDate));
       }
       if (comparison !== 0) return comparison * direction;

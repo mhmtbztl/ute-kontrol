@@ -2611,13 +2611,15 @@
             <button class="btn btn-primary btn-sm" id="newGuestProfileBtn" onclick="openGuestProfileModal()">+ Yeni Misafir</button>
           </div>
         </div>
-        <div class="kpi-cards-grid five-cols" style="margin-bottom: 16px;">
+        <div class="kpi-cards-grid" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); margin-bottom: 16px;">
           <div class="kpi-card"><span class="kpi-label">MİSAFİR PROFİLİ</span><div class="kpi-value" id="guestKpiTotal">—</div><div class="kpi-meta">Gerçek kişi profili</div></div>
           <div class="kpi-card"><span class="kpi-label">TEKRAR EDEN</span><div class="kpi-value" id="guestKpiRepeat">—</div><div class="kpi-meta" id="guestKpiRepeatRate">—</div></div>
           <div class="kpi-card"><span class="kpi-label">TEKRAR CİROSU</span><div class="kpi-value" id="guestKpiRepeatRevenue">—</div><div class="kpi-meta">Bağlı konaklamaların brütü</div></div>
           <div class="kpi-card"><span class="kpi-label">ULAŞILABİLİR</span><div class="kpi-value" id="guestKpiContactable">—</div><div class="kpi-meta">Telefon veya e-posta var</div></div>
+          <div class="kpi-card"><span class="kpi-label">YENİDEN REZERVASYON</span><div class="kpi-value" id="guestKpiRebooking">—</div><div class="kpi-meta">İzinli ve gelecekte rezervasyonu yok</div></div>
           <div class="kpi-card"><span class="kpi-label">BAĞLANTISIZ REZ.</span><div class="kpi-value" id="guestKpiUnlinked">—</div><div class="kpi-meta">Profil eşleştirmesi bekliyor</div></div>
         </div>
+        <div id="guestOpportunityNotice" style="display:none; margin-bottom:12px; padding:12px; border-radius:10px; background:rgba(16,185,129,.08); border:1px solid rgba(16,185,129,.25); color:#D1FAE5; font-size:12px;"></div>
         <div id="guestDataNotice" style="display:none; margin-bottom:12px; padding:10px 12px; border-radius:8px; background:rgba(245,158,11,.08); border:1px solid rgba(245,158,11,.25); color:#FDE68A; font-size:12px;"></div>
         <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
           <input id="guestDirectorySearch" type="search" placeholder="İsim, telefon veya e-posta ara" oninput="setGuestDirectoryQuery(this.value)" style="min-width:240px; flex:1;">
@@ -2629,7 +2631,14 @@
             <option value="REPEAT">Tekrar edenler</option>
             <option value="UPCOMING">Yaklaşanlar</option>
             <option value="IN_HOUSE">Konaklamada</option>
+            <option value="POST_STAY">Çıkış yapanlar</option>
+            <option value="REBOOKING">Yeniden rezervasyon fırsatı</option>
+            <option value="CONSENTED">Kampanya izni olanlar</option>
             <option value="CONTACTABLE">İletişim bilgisi olanlar</option>
+            <option value="NO_CONTACT">İletişim bilgisi eksik</option>
+          </select>
+          <select id="guestDirectoryProperty" onchange="setGuestDirectoryProperty(this.value)" style="min-width:170px;" aria-label="Konaklanan mülk">
+            <option value="">Tüm mülkler</option>
           </select>
           <select id="guestDirectorySort" onchange="setGuestDirectorySort(this.value)" style="min-width:160px;">
             <option value="RECENT">Konaklama tarihi</option>
@@ -2654,7 +2663,8 @@
                 <th>GECE</th>
                 <th>YAŞAM BOYU CİRO</th>
                 <th>SONRAKİ / SON KONAKLAMA</th>
-                <th>SEGMENT</th>
+                <th>KANAL / İZİN</th>
+                <th>DURUM</th>
                 <th style="text-align: right;">İŞLEM</th>
               </tr>
             </thead>
@@ -3131,7 +3141,13 @@
           <label><input id="guestAllowEmail" type="checkbox" checked> E-posta işlemsel iletişim</label>
           <label><input id="guestMarketingOptIn" type="checkbox"> Kampanya iletişimi için açık onay</label>
         </div>
+        <div class="form-grid">
+          <div class="form-group"><label for="guestTags">Etiketler</label><input id="guestTags" type="text" maxlength="400" placeholder="VIP, balayı, aile (virgülle ayırın)"><small class="field-note">En fazla 20 etiket.</small></div>
+          <div class="form-group"><label for="guestPreferences">Tercihler</label><textarea id="guestPreferences" maxlength="2000" rows="3" placeholder="Yastık, beslenme, giriş saati gibi hizmet tercihleri"></textarea></div>
+          <div class="form-group" style="grid-column:1/-1;"><label for="guestInternalNotes">Ekip içi not</label><textarea id="guestInternalNotes" maxlength="5000" rows="3" placeholder="Yalnız işletme ekibinin göreceği operasyonel not"></textarea></div>
+        </div>
         <div id="guestProfileInsights" style="display:none; margin-top:14px; padding-top:14px; border-top:1px solid rgba(255,255,255,.08);"></div>
+        <div id="guestRebookingAction" style="display:none; margin-top:14px; padding:12px; border-radius:10px; background:rgba(16,185,129,.08); border:1px solid rgba(16,185,129,.25);"></div>
         <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:10px;">
           <button type="button" class="btn btn-secondary" onclick="closeGuestProfileModal()">Vazgeç</button>
           <button type="submit" class="btn btn-primary">Misafiri Kaydet</button>
@@ -4383,7 +4399,7 @@
   <script src="core/recurring_tasks_service.js?v=c499718d"></script>
   <script src="core/today_operations_service.js?v=b03f0d0a"></script>
   <script src="core/guest_contact_utils.js?v=84fd6474"></script>
-  <script src="core/guest_crm_engine.js?v=0f15fa4c"></script>
+  <script src="core/guest_crm_engine.js?v=cbced6b5"></script>
   <script src="core/message_template_engine.js?v=f127f603"></script>
   <script src="core/messaging_provider.js?v=8f2e1a1e"></script>
   <script src="core/extension_offer_service.js?v=d1f68035"></script>
@@ -4397,7 +4413,7 @@
   <script src="core/executive_dashboard_service.js?v=8065c637"></script>
   <script src="core/executive_ai_advisor.js?v=4b235c67"></script>
   <script src="core/notification_center_service.js?v=710f8a91"></script>
-  <script src="app.js?v=fb0360dc"></script>
+  <script src="app.js?v=bcf86d49"></script>
   <script src="core/marketing_ui.js?v=2e506018"></script>
 </body>
 </html>

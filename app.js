@@ -12055,7 +12055,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
       const tenantId = targetId;
       // Independent datasets are loaded concurrently and every list is paged;
       // Supabase's per-response cap must never silently truncate a dashboard.
-      const [villas, bookings, expenses, cleanList, leads, closeList, targetList, maintenanceTickets, financialTransactions, guests, scheduledMessages, extensionOffers] = await Promise.all([
+      const [villas, bookings, expenses, cleanList, leads, closeList, targetList, maintenanceTickets, financialTransactions, guests, guestConsentEvents, scheduledMessages, extensionOffers] = await Promise.all([
         loadProperties(tenantId),
         loadBookings(tenantId),
         loadExpenses(tenantId),
@@ -12066,6 +12066,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
         fetchAllCloudRows(() => supabaseClient.from('maintenance_tickets').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false })),
         fetchAllCloudRows(() => supabaseClient.from('financial_transactions').select('*').eq('tenant_id', tenantId).order('occurred_on', { ascending: false })),
         fetchAllCloudRows(() => supabaseClient.from('guests').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false })),
+        fetchAllCloudRows(() => supabaseClient.from('guest_consent_events').select('*').eq('tenant_id', tenantId).order('recorded_at', { ascending: false })),
         fetchAllCloudRows(() => supabaseClient.from('scheduled_messages').select('*').eq('tenant_id', tenantId).order('scheduled_at', { ascending: true })),
         fetchAllCloudRows(() => supabaseClient.from('extension_offers').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false }))
       ]);
@@ -12092,6 +12093,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
         villas,
         bookings: bookingsWithVillaSlugs,
         guests: (guests || []).map(mapGuestFromDb),
+        guestConsentEvents: guestConsentEvents || [],
         scheduledMessages: scheduledMessages || [],
         extensionOffers: extensionOffers || [],
         expenses,
@@ -12150,6 +12152,7 @@ function getBlankTenantData(userId) {
     villas: {},
     bookings: [],
     guests: [],
+    guestConsentEvents: [],
     scheduledMessages: [],
     extensionOffers: [],
     expenses: [],
@@ -12892,6 +12895,9 @@ function mapGuestFromDb(g) {
     allowSms: g.allow_sms !== false,
     allowWhatsapp: g.allow_whatsapp !== false,
     marketingOptIn: g.marketing_opt_in === true,
+    preferences: g.preferences || '',
+    internalNotes: g.internal_notes || '',
+    tags: Array.isArray(g.tags) ? g.tags : [],
     createdAt: g.created_at,
     updatedAt: g.updated_at
   };
@@ -12908,7 +12914,11 @@ function mapGuestToDb(guestInput = {}) {
     allow_email: guestInput.allowEmail !== false && guestInput.allow_email !== false,
     allow_sms: guestInput.allowSms !== false && guestInput.allow_sms !== false,
     allow_whatsapp: guestInput.allowWhatsapp !== false && guestInput.allow_whatsapp !== false,
-    marketing_opt_in: guestInput.marketingOptIn === true || guestInput.marketing_opt_in === true
+    marketing_opt_in: guestInput.marketingOptIn === true || guestInput.marketing_opt_in === true,
+    preferences: String(guestInput.preferences || '').trim() || null,
+    internal_notes: String(guestInput.internalNotes || guestInput.internal_notes || '').trim() || null,
+    tags: Array.from(new Set((Array.isArray(guestInput.tags) ? guestInput.tags : [])
+      .map(tag => String(tag || '').trim()).filter(Boolean))).slice(0, 20)
   };
 }
 
@@ -14334,7 +14344,7 @@ function renderOperationsTab() {
   `;
 }
 
-const guestDirectoryState = { query: '', segment: 'ALL', sort: 'RECENT', direction: 'DESC', dateStart: '', dateEnd: '', page: 1, pageSize: 20 };
+const guestDirectoryState = { query: '', segment: 'ALL', propertyId: '', sort: 'RECENT', direction: 'DESC', dateStart: '', dateEnd: '', page: 1, pageSize: 20 };
 
 function getGuestCrmApi() {
   if (typeof LexbnbGuestCrm !== 'undefined') return LexbnbGuestCrm;
@@ -14356,6 +14366,7 @@ function getGuestCrmView() {
 
 function setGuestDirectoryQuery(value) { guestDirectoryState.query = value || ''; guestDirectoryState.page = 1; renderGuestsTab(); }
 function setGuestDirectorySegment(value) { guestDirectoryState.segment = value || 'ALL'; guestDirectoryState.page = 1; renderGuestsTab(); }
+function setGuestDirectoryProperty(value) { guestDirectoryState.propertyId = value || ''; guestDirectoryState.page = 1; renderGuestsTab(); }
 function setGuestDirectorySort(value) { guestDirectoryState.sort = value || 'RECENT'; guestDirectoryState.page = 1; renderGuestsTab(); }
 function setGuestDirectorySortDirection(value) { guestDirectoryState.direction = value === 'ASC' ? 'ASC' : 'DESC'; guestDirectoryState.page = 1; renderGuestsTab(); }
 function setGuestDirectoryDateRange() {
@@ -14390,6 +14401,12 @@ function setGuestMetric(id, value) {
   if (element) element.innerText = value;
 }
 
+function formatGuestDateTime(value) {
+  const date = new Date(value);
+  if (!value || Number.isNaN(date.getTime())) return '—';
+  return new Intl.DateTimeFormat('tr-TR', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+}
+
 function renderGuestsTab() {
   if (typeof document === 'undefined') return;
   const tbody = document.getElementById('guestsTableBody');
@@ -14404,7 +14421,17 @@ function renderGuestsTab() {
   setGuestMetric('guestKpiRepeatRate', repeatRate + (metrics.repeatRate == null ? '' : ' tekrar oranı'));
   setGuestMetric('guestKpiRepeatRevenue', metrics.repeatRevenue == null ? '—' : '₺' + Number(metrics.repeatRevenue).toLocaleString('tr-TR'));
   setGuestMetric('guestKpiContactable', metrics.contactableGuests ?? '—');
+  setGuestMetric('guestKpiRebooking', metrics.rebookingOpportunityCount ?? '—');
   setGuestMetric('guestKpiUnlinked', metrics.unlinkedBookingCount ?? '—');
+
+  const opportunityNotice = document.getElementById('guestOpportunityNotice');
+  if (opportunityNotice) {
+    const count = Number(metrics.rebookingOpportunityCount || 0);
+    opportunityNotice.innerHTML = count
+      ? `<strong>🎯 ${count} yeniden rezervasyon fırsatı:</strong> Konaklaması tamamlanmış, gelecekte rezervasyonu olmayan ve kampanya iletişimine açık onay vermiş misafir. <button type="button" class="btn btn-secondary btn-sm" style="margin-left:8px;" onclick="setGuestDirectorySegment('REBOOKING'); document.getElementById('guestDirectorySegment').value='REBOOKING';">Fırsatları göster</button>`
+      : '';
+    opportunityNotice.style.display = count ? 'block' : 'none';
+  }
 
   const notice = document.getElementById('guestDataNotice');
   if (notice) {
@@ -14419,6 +14446,16 @@ function renderGuestsTab() {
   const newButton = document.getElementById('newGuestProfileBtn');
   if (newButton) newButton.style.display = editAllowed ? '' : 'none';
 
+  const propertySelect = document.getElementById('guestDirectoryProperty');
+  if (propertySelect) {
+    const selected = guestDirectoryState.propertyId;
+    const options = Object.entries(appData.villas || {}).map(([key, villa]) =>
+      `<option value="${escapeHtml(key)}">${escapeHtml(villa?.name || key)}</option>`
+    ).join('');
+    propertySelect.innerHTML = '<option value="">Tüm mülkler</option>' + options;
+    propertySelect.value = selected;
+  }
+
   const filtered = api ? api.filterGuestRows(view.rows, guestDirectoryState) : [];
   const pageCount = Math.max(1, Math.ceil(filtered.length / guestDirectoryState.pageSize));
   guestDirectoryState.page = Math.min(guestDirectoryState.page, pageCount);
@@ -14427,7 +14464,7 @@ function renderGuestsTab() {
 
   if (pageRows.length === 0) {
     const hasProfiles = (metrics.totalGuests || 0) > 0;
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:24px;">${hasProfiles ? 'Arama veya segmente uyan misafir yok.' : 'Henüz gerçek misafir profili yok. Yeni rezervasyonda telefon veya e-posta girildiğinde profil güvenle oluşur.'}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:var(--text-muted); padding:24px;">${hasProfiles ? 'Arama veya segmente uyan misafir yok.' : 'Henüz gerçek misafir profili yok. Yeni rezervasyonda telefon veya e-posta girildiğinde profil güvenle oluşur.'}</td></tr>`;
   } else {
     tbody.innerHTML = pageRows.map(row => {
       const rangeBookings = (row.bookings || []).filter(booking => {
@@ -14439,19 +14476,25 @@ function renderGuestsTab() {
       });
       const dateBooking = (guestDirectoryState.dateStart || guestDirectoryState.dateEnd)
         ? rangeBookings.sort((a, b) => String(b.checkIn || '').localeCompare(String(a.checkIn || '')))[0]
-        : (row.nextStay || row.lastStay);
+        : (row.nextStay || row.lifecycle?.booking || row.lastStay);
       const dateValue = dateBooking ? `${formatTrDate(dateBooking.checkIn)} – ${formatTrDate(dateBooking.checkOut)}` : '—';
       const lifecycleClass = row.lifecycle.code === 'IN_HOUSE' ? 'badge-green' : (row.lifecycle.code === 'UPCOMING' ? 'badge-yellow' : 'badge-blue');
       const segment = row.isRepeat ? '<span class="badge badge-purple">TEKRAR</span>' : '<span class="badge badge-slate">İLK KONAKLAMA</span>';
-      const contact = [row.phone, row.email].filter(Boolean).map(escapeHtml).join('<br>') || '—';
+      const opportunity = row.rebookingEligible ? '<br><span class="badge badge-green" style="margin-top:4px;">YENİDEN REZERVASYON</span>' : '';
+      const contact = [row.phone, row.email].filter(Boolean).map(escapeHtml).join('<br>') || '<span style="color:var(--text-muted);">Eksik</span>';
+      const consent = row.marketingOptIn ? '<span class="badge badge-green">KAMPANYA İZNİ VAR</span>' : '<span class="badge badge-slate">KAMPANYA İZNİ YOK</span>';
+      const directShare = row.directShare == null ? '—' : `%${Math.round(row.directShare * 100)} doğrudan`;
+      const villaKey = dateBooking?.villa || dateBooking?.propertyId || '';
+      const villaName = villaKey ? (appData.villas?.[villaKey]?.name || villaKey) : '';
       return `<tr>
         <td><strong>${escapeHtml(row.name)}</strong><br><small>${escapeHtml(String(row.language || 'tr').toUpperCase())}</small></td>
         <td>${contact}</td>
         <td><strong>${row.stayCount}</strong></td>
         <td>${row.nights}</td>
         <td><strong>₺${Number(row.lifetimeRevenue).toLocaleString('tr-TR')}</strong></td>
-        <td>${escapeHtml(dateValue)}<br><span class="badge ${lifecycleClass}">${escapeHtml(row.lifecycle.label)}</span></td>
-        <td>${segment}</td>
+        <td>${escapeHtml(dateValue)}${villaName ? `<br><small>${escapeHtml(villaName)}</small>` : ''}</td>
+        <td><span>${escapeHtml(directShare)}</span><br>${consent}</td>
+        <td><span class="badge ${lifecycleClass}">${escapeHtml(row.lifecycle.label)}</span><br>${segment}${opportunity}</td>
         <td style="text-align:right;"><button class="btn btn-secondary btn-sm" onclick="openGuestProfileModal(decodeURIComponent('${encodeURIComponent(String(row.id))}'))">Detay</button></td>
       </tr>`;
     }).join('');
@@ -14484,6 +14527,11 @@ function openGuestProfileModal(guestId = null) {
   document.getElementById('guestAllowSms').checked = guest ? guest.allowSms !== false : true;
   document.getElementById('guestAllowEmail').checked = guest ? guest.allowEmail !== false : true;
   document.getElementById('guestMarketingOptIn').checked = guest?.marketingOptIn === true;
+  document.getElementById('guestPreferences').value = guest?.preferences || '';
+  document.getElementById('guestInternalNotes').value = guest?.internalNotes || '';
+  document.getElementById('guestTags').value = (guest?.tags || []).join(', ');
+
+  const rebookingAction = document.getElementById('guestRebookingAction');
 
   const insights = document.getElementById('guestProfileInsights');
   const row = guest ? getGuestCrmView().rows.find(item => item.id === guest.id) : null;
@@ -14493,13 +14541,41 @@ function openGuestProfileModal(guestId = null) {
       return `<div style="padding:7px 0; border-bottom:1px solid rgba(255,255,255,.06);">${escapeHtml(villaName)} · ${formatTrDate(booking.checkIn)} – ${formatTrDate(booking.checkOut)} · ₺${Number(booking.gross || 0).toLocaleString('tr-TR')} <button type="button" class="btn btn-secondary btn-sm" style="float:right;" onclick="closeGuestProfileModal(); openBookingModal(decodeURIComponent('${encodeURIComponent(String(booking.id))}'))">Rezervasyon</button></div>`;
     }).join('') : '<div style="color:var(--text-muted);">Bu profile bağlı rezervasyon yok.</div>';
     const offerStatus = row.latestOffer ? escapeHtml(row.latestOffer.status || '—') : '—';
-    insights.innerHTML = `<div class="kpi-cards-grid" style="grid-template-columns:repeat(4,minmax(0,1fr)); margin-bottom:12px;"><div class="kpi-card"><span class="kpi-label">KONAKLAMA</span><div class="kpi-value">${row.stayCount}</div></div><div class="kpi-card"><span class="kpi-label">GECE</span><div class="kpi-value">${row.nights}</div></div><div class="kpi-card"><span class="kpi-label">CİRO</span><div class="kpi-value">₺${Number(row.lifetimeRevenue).toLocaleString('tr-TR')}</div></div><div class="kpi-card"><span class="kpi-label">PLANLI MESAJ</span><div class="kpi-value">${row.scheduledCount}</div><div class="kpi-meta">Uzatma: ${offerStatus}</div></div></div><h4>Konaklama Geçmişi</h4>${history}`;
+    const directShare = row.directShare == null ? '—' : '%' + Math.round(row.directShare * 100);
+    const consentEvents = (appData.guestConsentEvents || []).filter(event => event.guest_id === row.id);
+    const consentHistory = consentEvents.length
+      ? consentEvents.map(event => `<div style="padding:5px 0; font-size:12px;"><span class="badge ${event.marketing_opt_in ? 'badge-green' : 'badge-slate'}">${event.marketing_opt_in ? 'İZİN VERİLDİ' : 'İZİN GERİ ÇEKİLDİ'}</span> ${escapeHtml(formatGuestDateTime(event.recorded_at))} · ${escapeHtml(event.source || 'APPLICATION')}</div>`).join('')
+      : '<div style="color:var(--text-muted); font-size:12px;">Henüz kaydedilmiş izin değişikliği yok.</div>';
+    const tagBadges = (guest.tags || []).length ? `<div style="margin-bottom:10px;">${guest.tags.map(tag => `<span class="badge badge-purple" style="margin-right:5px;">${escapeHtml(tag)}</span>`).join('')}</div>` : '';
+    insights.innerHTML = `<div class="kpi-cards-grid" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); margin-bottom:12px;"><div class="kpi-card"><span class="kpi-label">KONAKLAMA</span><div class="kpi-value">${row.stayCount}</div></div><div class="kpi-card"><span class="kpi-label">GECE</span><div class="kpi-value">${row.nights}</div></div><div class="kpi-card"><span class="kpi-label">CİRO</span><div class="kpi-value">₺${Number(row.lifetimeRevenue).toLocaleString('tr-TR')}</div></div><div class="kpi-card"><span class="kpi-label">DOĞRUDAN PAY</span><div class="kpi-value">${directShare}</div></div><div class="kpi-card"><span class="kpi-label">PLANLI MESAJ</span><div class="kpi-value">${row.scheduledCount}</div><div class="kpi-meta">Uzatma: ${offerStatus}</div></div></div>${tagBadges}<h4>Konaklama Geçmişi</h4>${history}<h4 style="margin-top:14px;">Kampanya İzni Geçmişi</h4>${consentHistory}`;
     insights.style.display = 'block';
+    if (rebookingAction) {
+      rebookingAction.innerHTML = row.rebookingEligible
+        ? `<strong>🎯 Yeniden rezervasyon fırsatı</strong><br><span style="font-size:12px; color:var(--text-muted);">Son çıkışın üzerinden ${row.daysSinceLastStay ?? '—'} gün geçti; gelecekte rezervasyon yok ve kampanya izni mevcut.</span><button type="button" class="btn btn-primary btn-sm" style="float:right; margin-top:-8px;" onclick="openGuestRebookingWhatsApp(decodeURIComponent('${encodeURIComponent(String(row.id))}'))">WhatsApp'ta davet hazırla</button>`
+        : '';
+      rebookingAction.style.display = row.rebookingEligible ? 'block' : 'none';
+    }
   } else if (insights) {
     insights.innerHTML = '';
     insights.style.display = 'none';
+    if (rebookingAction) { rebookingAction.innerHTML = ''; rebookingAction.style.display = 'none'; }
   }
   modal.classList.add('active');
+}
+
+function openGuestRebookingWhatsApp(guestId) {
+  const row = getGuestCrmView().rows.find(item => item.id === guestId);
+  if (!row || !row.rebookingEligible) {
+    if (typeof alert === 'function') alert('Bu misafir için telefon, WhatsApp izni, kampanya açık onayı ve tamamlanmış konaklama birlikte bulunmalıdır.');
+    return;
+  }
+  const phone = String(row.phone || '').replace(/\D/g, '');
+  if (!phone) return;
+  const firstName = row.guest?.firstName || row.guest?.first_name || row.name;
+  const text = `Merhaba ${firstName}, sizi yeniden ağırlamaktan memnuniyet duyarız. Yeni seyahat tarihleriniz için size yardımcı olabiliriz.`;
+  if (typeof window !== 'undefined' && typeof window.open === 'function') {
+    window.open(`https://wa.me/${encodeURIComponent(phone)}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+  }
 }
 
 async function saveGuestProfile(event) {
@@ -14523,7 +14599,10 @@ async function saveGuestProfile(event) {
       allowWhatsapp: document.getElementById('guestAllowWhatsapp').checked,
       allowSms: document.getElementById('guestAllowSms').checked,
       allowEmail: document.getElementById('guestAllowEmail').checked,
-      marketingOptIn: document.getElementById('guestMarketingOptIn').checked
+      marketingOptIn: document.getElementById('guestMarketingOptIn').checked,
+      preferences: document.getElementById('guestPreferences').value.trim(),
+      internalNotes: document.getElementById('guestInternalNotes').value.trim(),
+      tags: document.getElementById('guestTags').value.split(',').map(tag => tag.trim()).filter(Boolean)
     };
     const duplicate = detectDuplicateCandidates(
       { id: id || null, tenant_id: getActiveTenantId(), phone: input.phone, email: input.email },
