@@ -10,15 +10,7 @@ const fs = require('fs');
 const { createClient } = require('@supabase/supabase-js');
 const { maskSensitiveContent, VARIABLE_WHITELIST } = require('./message_template_engine.js');
 
-const env = Object.fromEntries(
-  fs.readFileSync('.env', 'utf8')
-    .split('\n')
-    .filter(line => line.includes('='))
-    .map(line => {
-      const [k, ...v] = line.trim().split('=');
-      return [k.trim(), v.join('=').trim()];
-    })
-);
+const env = require('./test_env.js').loadTestEnv();
 
 const SUPABASE_URL = env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = env.SUPABASE_SERVICE_ROLE_KEY;

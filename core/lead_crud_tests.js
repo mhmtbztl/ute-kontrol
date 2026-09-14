@@ -51,18 +51,7 @@ const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
 
 // Parse .env file
-const envPath = path.resolve(__dirname, '../.env');
-const envContent = fs.readFileSync(envPath, 'utf8');
-const env = {};
-envContent.split(/\r?\n/).forEach(line => {
-  const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
-  if (match) {
-    let value = match[2] || '';
-    if (value.startsWith('"') && value.endsWith('"')) value = value.slice(1, -1);
-    if (value.startsWith("'") && value.endsWith("'")) value = value.slice(1, -1);
-    env[match[1]] = value;
-  }
-});
+const env = require('./test_env.js').loadTestEnv();
 
 const SUPABASE_URL = env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = env.SUPABASE_ANON_KEY;

@@ -122,9 +122,20 @@ dalında kalır ve **haber vermeden `master`'a dokunmaz.**
    Üçü de yeşil olmalı.
 
 3. **Veritabanına dokunan değişiklik yaptıysanız**
-   Canlı süitler varsayılan koşuda **atlanır** (güvenli test kapısı).
-   İlgili canlı süiti ayrıca elle koşun:
-   `node core/<ilgili>_tests.js`
+   Canlı süitler varsayılan koşuda **atlanır** (güvenli test kapısı) ve
+   **üretime karşı koşulamaz** — kapı reddeder. Ayrı bir Supabase test
+   projesi gerekir; kurulum ve gerekçe: [`docs/TEST_PROJECT_SETUP.md`](docs/TEST_PROJECT_SETUP.md).
+
+   ```powershell
+   $env:LEXBNB_ALLOW_DESTRUCTIVE_TESTS = "1"
+   $env:LEXBNB_CONFIRM_REMOTE_TEST_PROJECT = "<test-ref>.supabase.co"
+   npm run test:live                 # tamamı
+   node core/<ilgili>_tests.js       # tek süit (aynı iki değişken gerekir)
+   ```
+
+   Kimlik bilgisini okuyan tek yer `core/test_env.js`'dir. Yeni bir canlı süit
+   yazarken `.env` dosyasını kendiniz **okumayın**; `loadTestEnv()` çağırın.
+   Okursanız `core/test_gate_tests.js` kırılır.
 
 4. **Yeni göç eklediyseniz**
    - Dosya `supabase/migration_phase<N>_<konu>.sql` olarak eklenir.
@@ -157,7 +168,8 @@ Kullanıcı bu kelimeleri tek başına yazabilir; **her araç aynı şeyi anlar.
 1. `git status --short` ve `git diff --cached --name-only` — staged listede
    yalnızca senin dosyaların olmalı.
 2. `npm test`, `npm run verify:migrations`, `node stamp_assets.js --check`.
-3. Veritabanına dokunduysan ilgili canlı süiti elle koş.
+3. Veritabanına dokunduysan ilgili canlı süiti **test projesine karşı** koş
+   (teslim protokolü 3 — üretime koşulamaz).
 4. Kendi dalına commit at.
 5. Şunu raporla: ne değişti, hangi dosyalar, test sonuçları, **uygulanması
    gereken göç var mı**, push için hazır mı.
@@ -184,7 +196,9 @@ Karşılıklı denetim — aşağıya bakın.
 
 ### `GÖÇ UYGULANDI`
 Kullanıcı bir göçü Supabase panelinden çalıştırdı. Dosyaya bakarak değil,
-**üretime sorarak** doğrula (§4.2'deki üç yöntem) ve ilgili canlı süiti koş.
+**üretime sorarak** doğrula (§4.2'deki yöntemler). Canlı süitler artık üretimi
+hedefleyemez; davranışı test projesinde ölçün, üretimde göçün varlığını anon
+RPC ya da sütun sorgusuyla doğrulayın.
 
 ---
 

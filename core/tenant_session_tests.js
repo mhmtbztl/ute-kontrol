@@ -8,13 +8,7 @@ const fs = require('fs');
 const path = require('path');
 
 // Read .env
-const envPath = path.join(__dirname, '..', '.env');
-const envContent = fs.readFileSync(envPath, 'utf8');
-const env = {};
-envContent.split(/\r?\n/).forEach(line => {
-  const [k, ...v] = line.split('=');
-  if (k && v.length) env[k.trim()] = v.join('=').trim().replace(/^['"]|['"]$/g, '');
-});
+const env = require('./test_env.js').loadTestEnv();
 
 const SUPABASE_URL = env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = env.SUPABASE_ANON_KEY;

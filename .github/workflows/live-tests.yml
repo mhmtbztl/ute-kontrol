@@ -1,0 +1,50 @@
+name: Live database regression
+
+# Veritabanina yazan 22 suit. Ayri bir Supabase TEST projesi gerektirir.
+# Kurulum: docs/TEST_PROJECT_SETUP.md
+#
+# Bu is akisi LIVE_TESTS_ENABLED repo degiskeni 'true' olana kadar UYKUDADIR.
+# Sebep: secret'lar tanimli degilken her gece kirmizi bir kosu uretmek, gercek
+# bir kirilmayi da gorunmez kilar.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Gecelik tek kosu. Ardisik tam kosular Supabase hiz limitine takilir ve
+    # suitleri sahte bicimde kirmiziya cevirir (CLAUDE.md 5.6).
+    - cron: '0 3 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  # Ayni anda iki kosu, ayni test projesinde birbirinin kullanicilarini siler.
+  group: live-tests
+  cancel-in-progress: false
+
+jobs:
+  live-regression:
+    if: vars.LIVE_TESTS_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      LEXBNB_ALLOW_DESTRUCTIVE_TESTS: '1'
+      LEXBNB_CONFIRM_REMOTE_TEST_PROJECT: ${{ vars.TEST_SUPABASE_HOST }}
+      SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
+      TEST_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY }}
+      SUPABASE_PUBLISHABLE_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.TEST_SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify immutable migration chain
+        run: npm run verify:migrations
+      - name: Run full regression against the dedicated test project
+        # test:live kapiyi kendisi dogrular: hedef uretimse veya beyan
+        # edilmemisse kosmadan durur.
+        run: npm run test:live

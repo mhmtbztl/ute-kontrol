@@ -209,8 +209,8 @@ ve kısmi veriyle daha kötü bir duruma yol açar. Bayrak işlem sonunda kapanm
 ```bash
 node stamp_assets.js     # varlıkları içerik hash'iyle damgala (ZORUNLU)
 npm run verify:migrations # şema + 34 göçün içerik bütünlüğü
-npm test                  # 84 çevrimdışı/güvenli süit
-npm run test:live         # yalnız ayrı test projesi + açık destructive-test onayı
+npm test                  # 94 çevrimdışı/güvenli süit
+npm run test:live         # yalnız ayrı Supabase test projesine karşı (docs/TEST_PROJECT_SETUP.md)
 ```
 `stamp_assets.js --check` güncel değilse hata verir — CI'ya konabilir.
 
@@ -250,6 +250,10 @@ durur; veritabanı uygulanmamış olabilir. Doğrulamanın yolu üretime sormakt
 - **Davranış göçleri** → ilgili canlı süiti koşun. `tenant_reset_tests` ve
   `account_deletion_tests` phase26'yı, `marketing_tenant_isolation_tests`
   phase23'ü böyle ölçer.
+  **Ama bu süitler artık üretimi hedefleyemez** (§5.4): davranışı *test
+  projesinde* ölçerler. Bir göçün **üretimde** olduğunu doğrulamak için
+  yukarıdaki yetki ve sütun sorgularını kullanın — onlar salt okunurdur ve
+  üretime kayıt bırakmaz.
 - **Sütun/tablo göçleri** → `select=<sutun>&limit=0` ile sorun; `42703`
   dönüyorsa uygulanmamıştır.
 
@@ -294,9 +298,20 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
    Süit hatalı olduğu hâlde 0 ile çıkar. Özeti `finally` içine koyun.
 3. **`execSync` yalnızca stdout döndürür.** `[FAIL]` satırları `console.error` ile stderr'e gider.
    Koşucu `2>&1` ile ikisini de yakalar — bu olmadan "sıfır çıkış koduyla [FAIL]" ağı hiç çalışmaz.
-4. **Testler üretim Supabase'ine karşı koşar.** Koşucu sonunda sızıntı denetimi yapar;
-   `@lexbnb-e2e.test`, `@lexbnb.test`, `@lexbnbtest.com`, `@lexbnb-test.com` alan adlı
-   hesap kalırsa koşu başarısız sayılır. Temizlik: `supabase/cleanup_test_accounts.sql`.
+4. **Canlı süitler ayrı bir Supabase test projesine yazar; üretim kara listededir.**
+   Kimlik bilgisini okuyan tek yer `core/test_env.js`. Kapı üç şey ister:
+   `LEXBNB_ALLOW_DESTRUCTIVE_TESTS=1`, `SUPABASE_URL` == `TEST_SUPABASE_URL` ve uzak
+   proje için `LEXBNB_CONFIRM_REMOTE_TEST_PROJECT` hostname onayı. Üretim reddi
+   **kapatılamaz** — onay değişkeni onu geçmez. Kurulum: `docs/TEST_PROJECT_SETUP.md`.
+
+   Bir zamanlar 22 süit `.env`'i kendi başına, **üç ayrı biçimde** okuyordu
+   (`path.join`, `path.resolve` ve çalışma dizinine bağımlı `readFileSync('.env')`).
+   Hedefi değiştirmenin tek yolu dosyayı elle takas etmekti; yani varsayılan hedef
+   **üretimdi** ve aşağıdaki 525 hesap böyle birikti. Ağı `core/test_gate_tests.js`.
+
+   Koşu sonunda sızıntı denetimi yapılır; `@lexbnb-e2e.test`, `@lexbnb.test`,
+   `@lexbnbtest.com`, `@lexbnb-test.com` alan adlı hesap kalırsa koşu başarısız
+   sayılır. Temizlik: `supabase/cleanup_test_accounts.sql`.
 5. **Yeni bir test yazdığınızda, eski koda karşı çalıştırıp KIRILDIĞINI görün.**
    Kırılmıyorsa regresyon ağı değildir.
 6. **Tam koşuyu arka arkaya tekrarlamayın.** Her süit auth kullanıcısı yaratıyor;
@@ -328,7 +343,7 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 | Bulgu incelemesinde yetki sırası | tamamlandı (phase25 uygulandı) |
 | Mülk koruması sıfırlamayı kilitliyordu | tamamlandı (phase26 uygulandı) — ağı `tenant_reset_tests`, `account_deletion_tests` |
 | Rezervasyon ekranı: temizlik gelir/gider ayrımı, komisyon oranı, tek takvimli tarih | tamamlandı — ağı `booking_form_economics_tests` |
-| Ayrı Supabase test projesi | **yapılmadı** — canlı süitler (30 adet) varsayılan koşuda atlanıyor, kimse otomatik koşmuyor |
+| Ayrı Supabase test projesi | altyapı tamamlandı — kapı, bootstrap betiği, uykuda CI iş akışı ve ağı (`test_gate_tests`) yerinde. **Projenin Supabase panelinden açılması kullanıcıya kaldı** (docs/TEST_PROJECT_SETUP.md); açılana kadar 22 canlı süit koşulamaz |
 | Fotoğraf AI worker'ı | `GEMINI_API_KEY` yok; Actions adımı güvenle atlanıyor — **harici bağımlılık** |
 | `get_executive_dashboard_snapshot` | tanımlı ama arayüzde **hiç çağrılmıyor**; içinde tahakkuk ve gece sayımı hataları var (§3.4) |
 | Excel içe/dışa aktarma | "Şirket Genel Raporu" içe aktarımı devre dışı bırakıldı, gerçek uygulama yok |
@@ -338,7 +353,7 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 | Pazarlama ROAS'ı | kampanya gelir alanı kullanıcı girdisi; "ölçülmüş" gibi sunuluyor, etiketlenmeli |
 | RGVQI denetim düzeltmeleri | phase24 ve phase25, 14 Eylül 2026'da üretime uygulandı ve readiness denetimiyle doğrulandı; uygulama/worker dağıtımı ayrıca izlenmeli |
 | Misafir CRM kanonik profil bağlantısı | phase27 hazır, **üretime uygulanmadı** — kod push edilmeden önce Supabase SQL Editor'da ayrı onayla uygulanmalı |
-| Güvenli test kapısı | `npm test` yalnızca çevrimdışı suite'leri çalıştırır; canlı suite için ayrı test projesi ve açık onay gerekir |
+| Güvenli test kapısı | tamamlandı — canlı/çevrimdışı ayrımı artık `@supabase/supabase-js` require'ına bakıyor. Eski kaba dizgi taraması 8 çevrimdışı süiti (worker giriş noktaları) yanlışlıkla atlıyordu; güvenli koşu 85 → 94 süit |
 | Kullanıcı davet e-postası | phase24 outbox + `npm run invitations:worker`; üretimde worker secret'ları kurulmalı |
 
 ---

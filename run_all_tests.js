@@ -155,41 +155,58 @@ const allTestFiles = [
   // Ice aktarma motoru (ayristirma, dogrulama, mukerrer, cakisma)
   'import_engine_tests.js',
 
+  // Canli test kapisi: suitler hangi projeye yaziyor (kara liste + siniflandirma)
+  'test_gate_tests.js',
+
   // Tarayici render hatti — sahte DOM ile renderAll GERCEKTEN calisir.
   // setEl gibi tanimsiz referanslari yalnizca bu suit yakalar.
   'render_pipeline_tests.js',
   'audit_remediation_tests.js'
 ];
 
-const allowLiveTests = process.env.LEXBNB_ALLOW_DESTRUCTIVE_TESTS === '1';
-const liveTestFiles = new Set(allTestFiles.filter(file => {
-  const source = fs.readFileSync(path.join(__dirname, 'core', file), 'utf8');
-  return source.includes('@supabase/supabase-js') || source.includes('SUPABASE_SERVICE_ROLE_KEY');
-}));
+const testEnv = require('./core/test_env.js');
 
-function readLocalEnv() {
-  const result = {};
-  const envPath = path.join(__dirname, '.env');
-  if (!fs.existsSync(envPath)) return result;
-  fs.readFileSync(envPath, 'utf8').split(/\r?\n/).forEach(line => {
-    const [key, ...parts] = line.split('=');
-    if (key && parts.length) result[key.trim()] = parts.join('=').trim().replace(/^['"]|['"]$/g, '');
-  });
-  return result;
+const allowLiveTests = testEnv.destructiveTestsAllowed();
+
+// -----------------------------------------------------------------------------
+// CANLI SUIT SINIFLANDIRMASI
+// Eskiden bu ayrim kaba bir metin taramasiydi:
+//   source.includes('@supabase/supabase-js') || source.includes('SUPABASE_SERVICE_ROLE_KEY')
+// Worker giris noktasi suitleri o dizgiyi assert.match(...) IDDIASININ ICINDE
+// tasiyordu; yani hicbir baglanti acmadiklari halde 8 cevrimdisi suit guvenli
+// kosudan atiliyordu.
+//
+// Olcut artik tek ve kesin: bir suit ancak Supabase ISTEMCISINI require
+// ediyorsa veritabanina dokunabilir. Kapiyi (test_env.js) require etmek olcut
+// DEGILDIR — kapinin kendi denetim suiti de onu require eder ama hicbir
+// baglanti acmaz; olcut o olsaydi denetim suiti kendini guvenli kosudan
+// atardi ve CI'da hic calismazdi.
+// -----------------------------------------------------------------------------
+const GATE_REQUIRE = /require\((['"])\.\/test_env\.js\1\)/;
+const CLIENT_REQUIRE = /require\((['"])@supabase\/supabase-js\1\)/;
+
+const liveTestFiles = new Set();
+const ungatedSuites = [];
+for (const file of allTestFiles) {
+  const source = fs.readFileSync(path.join(__dirname, 'core', file), 'utf8');
+  if (!CLIENT_REQUIRE.test(source)) continue;
+  liveTestFiles.add(file);
+  // Supabase istemcisi yaratip kapidan gecmeyen bir suit, kapinin hic
+  // olmadigi eski duruma geri donustur. Sessizce siniflandirmak yerine dur.
+  if (!GATE_REQUIRE.test(source)) ungatedSuites.push(file);
+}
+if (ungatedSuites.length) {
+  throw new Error(
+    'LIVE_TEST_GUARD: su suitler Supabase istemcisi yaratiyor ama core/test_env.js\n' +
+    '  kapisini kullanmiyor — kimlik bilgisini oradan alacak sekilde duzeltin:\n  ' +
+    ungatedSuites.join('\n  ')
+  );
 }
 
+// Hedef dogrulamasi tek yerde: core/test_env.js. Koruma burada tekrar
+// yazilsaydi iki kopya kacinilmaz olarak ayrisirdi.
 if (allowLiveTests) {
-  const env = { ...readLocalEnv(), ...process.env };
-  const target = String(env.SUPABASE_URL || '');
-  const declaredTestTarget = String(env.TEST_SUPABASE_URL || '');
-  if (!target || !declaredTestTarget || target !== declaredTestTarget) {
-    throw new Error('LIVE_TEST_GUARD: SUPABASE_URL must exactly equal an explicit TEST_SUPABASE_URL.');
-  }
-  const host = new URL(target).hostname.toLowerCase();
-  const clearlyNonProduction = host === 'localhost' || host === '127.0.0.1' || /(?:test|staging|dev)/.test(host);
-  if (!clearlyNonProduction && env.LEXBNB_CONFIRM_REMOTE_TEST_PROJECT !== host) {
-    throw new Error('LIVE_TEST_GUARD: confirm the dedicated remote test hostname with LEXBNB_CONFIRM_REMOTE_TEST_PROJECT.');
-  }
+  testEnv.loadTestEnv();
 }
 
 const testFiles = allowLiveTests
@@ -280,12 +297,8 @@ let leakedAccounts = null;
 async function auditLeakedTestAccounts() {
   try {
     const { createClient } = require('@supabase/supabase-js');
-    const envPath = path.join(__dirname, '.env');
-    const env = {};
-    fs.readFileSync(envPath, 'utf8').split(/\r?\n/).forEach(line => {
-      const [k, ...v] = line.split('=');
-      if (k && v.length) env[k.trim()] = v.join('=').trim().replace(/^['"]|['"]$/g, '');
-    });
+    // Suitlerin yazdigi projeyi denetler — kapinin onayladigi hedefin aynisi.
+    const env = testEnv.loadTestEnv();
     if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return null;
 
     const admin = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {

@@ -6,20 +6,10 @@ const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
 const path = require('path');
 
-// Load environment variables from .env if present
-const envPath = path.join(__dirname, '..', '.env');
-if (fs.existsSync(envPath)) {
-  const envContent = fs.readFileSync(envPath, 'utf8');
-  envContent.split('\n').forEach(line => {
-    const trimmed = line.trim();
-    if (trimmed && !trimmed.startsWith('#')) {
-      const [key, ...valParts] = trimmed.split('=');
-      const val = valParts.join('=').trim().replace(/^["']|["']$/g, '');
-      if (key && !process.env[key.trim()]) {
-        process.env[key.trim()] = val;
-      }
-    }
-  });
+// Canli test ortami: hedef ve koruma core/test_env.js icinde.
+const env = require('./test_env.js').loadTestEnv();
+for (const [key, value] of Object.entries(env)) {
+  if (process.env[key] === undefined) process.env[key] = value;
 }
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.LEXBNB_SUPABASE_URL;
