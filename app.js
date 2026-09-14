@@ -245,8 +245,21 @@ function syncBookingCleaningTasks() {
 
   // Rezervasyonları temizlik görevleri listesine (Temizlik & Borç Defteri) BORÇ olarak ekle
   appData.bookings.forEach(b => {
-    const cleanFee = Number(b.cleanFee) || 0;
-    if (cleanFee <= 0 || b.status === 'CANCELLED') {
+    // Borc defterine yazilan tutar TEMIZLIK MALIYETIDIR (personele odenen),
+    // misafirden alinan temizlik ucreti DEGIL. Ikisi bir zamanlar tek alandi.
+    //
+    // Maliyetin kalici adresi bu defterdir (cleaning_tasks.amount): bookings'te
+    // ayri bir sutun acmak ayni sayiyi iki yerde tutmak olurdu. Bu yuzden
+    // rezervasyon buluttan yeni yuklendiginde (b.cleanCost tanimsiz) deger
+    // mevcut gorevden GERI OKUNUR; boyle bir gorev yoksa kayit ayrimdan
+    // oncesinden geliyordur ve eski davranis korunur (maliyet = ucret) ki
+    // mevcut borclar silinmesin.
+    const linkedTask = appData.cleaningTasks.find(t => t.bookingId === b.id || t.id === 'TASK-CLN-' + b.id);
+    if (b.cleanCost === undefined || b.cleanCost === null) {
+      b.cleanCost = linkedTask ? (Number(linkedTask.amount) || 0) : (Number(b.cleanFee) || 0);
+    }
+    const cleanCost = Math.max(0, Number(b.cleanCost) || 0);
+    if (cleanCost <= 0 || b.status === 'CANCELLED') {
       const tIdx = appData.cleaningTasks.findIndex(t => t.bookingId === b.id);
       if (tIdx !== -1) {
         const taskId = appData.cleaningTasks[tIdx].id;
@@ -274,7 +287,7 @@ function syncBookingCleaningTasks() {
         guest: b.guest,
         date: b.checkOut,
         cleaner: '',
-        amount: cleanFee,
+        amount: cleanCost,
         paid: false,
         paidDate: null,
         notes: `${b.guest} Çıkış Temizliği (${vName})`
@@ -283,7 +296,7 @@ function syncBookingCleaningTasks() {
       existing.date = b.checkOut;
       existing.guest = b.guest;
       existing.villa = b.villa;
-      existing.amount = cleanFee;
+      existing.amount = cleanCost;
       if (!existing.notes) existing.notes = `${b.guest} Çıkış Temizliği (${vName})`;
     }
   });
@@ -806,6 +819,9 @@ function mapBookingFromDb(row, propertyMap = {}) {
     otaCommission: otaComm,
     cleanFee: cleanFee,
     cleaningFee: cleanFee,
+    // cleanCost BILEREK yok: temizlik maliyeti bookings'te degil, temizlik
+    // borc defterinde (cleaning_tasks.amount) durur. syncBookingCleaningTasks()
+    // yuklemeden sonra bu alani oradan doldurur.
     discount: discount,
     net: net,
     netRoomRev: net,
@@ -834,6 +850,7 @@ function mapBookingToDb(booking, tenantId) {
   const gross = Number(booking.gross !== undefined ? booking.gross : booking.grossAmount) || 0;
   const otaComm = Number(booking.otaComm !== undefined ? booking.otaComm : booking.otaCommission) || 0;
   const cleanFee = Number(booking.cleanFee !== undefined ? booking.cleanFee : booking.cleaningFee) || 0;
+  const cleanCost = Math.max(0, Number(booking.cleanCost) || 0);
   const discount = Number(booking.discount) || 0;
   const net = Number(booking.net !== undefined ? booking.net : (booking.netRoomRev || booking.netRoomRevenue)) || Math.max(0, gross - otaComm - cleanFee - discount);
 
@@ -854,6 +871,9 @@ function mapBookingToDb(booking, tenantId) {
     gross_amount: gross,
     ota_commission: otaComm,
     cleaning_fee: cleanFee,
+    // Temizlik MALIYETI bookings tablosunda durmaz; dogal yeri temizlik borc
+    // defteridir (cleaning_tasks.amount). Ayni sayiyi iki tabloda tutmak,
+    // hangisinin dogru oldugu sorusunu aciyordu.
     discount: discount,
     net_room_revenue: net,
     status: status,
@@ -984,6 +1004,7 @@ async function createBooking(bookingInput) {
       gross,
       otaComm: Number(bookingInput.otaComm) || 0,
       cleanFee: Number(bookingInput.cleanFee) || 0,
+      cleanCost: Number(bookingInput.cleanCost) || 0,
       discount: Number(bookingInput.discount) || 0,
       net: Number(bookingInput.net) || gross,
       nights: calculateNightsBetween(checkIn, checkOut),
@@ -5819,18 +5840,24 @@ function openBookingModal(editId = null) {
     if (vEl) vEl.value = b.villa || b.propertyId;
     const gEl = document.getElementById('resGuest');
     if (gEl) gEl.value = b.guest;
-    const ciEl = document.getElementById('resCheckIn');
-    if (ciEl) ciEl.value = b.checkIn;
-    const coEl = document.getElementById('resCheckOut');
-    if (coEl) coEl.value = b.checkOut;
+    setResDateRange(b.checkIn, b.checkOut);
     const chEl = document.getElementById('resChannel');
     if (chEl) chEl.value = b.channel;
     const grEl = document.getElementById('resGross');
     if (grEl) grEl.value = b.gross;
     const commEl = document.getElementById('resCommission');
     if (commEl) commEl.value = b.otaComm;
+    const rateEl = document.getElementById('resCommissionRate');
+    if (rateEl) {
+      const g = Number(b.gross) || 0;
+      rateEl.value = g > 0 ? ((Number(b.otaComm) || 0) / g * 100).toFixed(2) : '';
+    }
     const cfEl = document.getElementById('resCleanFee');
     if (cfEl) cfEl.value = b.cleanFee;
+    const ccEl = document.getElementById('resCleanCost');
+    // Ayrimdan onceki kayitlarda maliyet alani yoktur; eski davranista bu
+    // tutar temizlik ucretiyle ayni sayiydi, o yuzden oradan doldurulur.
+    if (ccEl) ccEl.value = (b.cleanCost === undefined || b.cleanCost === null) ? (b.cleanFee || 0) : b.cleanCost;
     const stEl = document.getElementById('resStatus');
     if (stEl) stEl.value = b.status || 'CONFIRMED';
     const pxEl = document.getElementById('resPax');
@@ -5843,6 +5870,12 @@ function openBookingModal(editId = null) {
     if (form) form.reset();
     const cfEl = document.getElementById('resCleanFee');
     if (cfEl) cfEl.value = 0;
+    const ccEl = document.getElementById('resCleanCost');
+    if (ccEl) ccEl.value = 0;
+    const rateEl = document.getElementById('resCommissionRate');
+    if (rateEl) rateEl.value = '';
+    // form.reset() gizli inputlari bosaltir ama takvim durumu JS'te tutulur.
+    clearResDateRange();
     if (deleteBtn) deleteBtn.style.display = 'none';
   }
 
@@ -5862,31 +5895,280 @@ function handleBookingDeleteFromModal() {
   }
 }
 
-function calculateLivePreview() {
-  const dInStr = document.getElementById('resCheckIn').value;
-  const dOutStr = document.getElementById('resCheckOut').value;
-  const gross = Number(document.getElementById('resGross').value) || 0;
-  const channel = document.getElementById('resChannel').value;
-  let customComm = document.getElementById('resCommission').value;
-  const cleanFee = Number(document.getElementById('resCleanFee').value) || 0;
+// Kanalin varsayilan OTA komisyon orani (%). Direkt kanallarda komisyon yoktur.
+const CHANNEL_COMMISSION_RATES = Object.freeze({
+  AIRBNB: 15,
+  BOOKING: 18
+});
 
-  const nights = calculateNightsBetween(dInStr, dOutStr);
+function getChannelCommissionRate(channel) {
+  return CHANNEL_COMMISSION_RATES[channel] || 0;
+}
 
-  let otaComm = 0;
-  if (customComm !== '' && customComm !== undefined && !isNaN(customComm)) {
-    otaComm = Number(customComm);
+/**
+ * Rezervasyon ekonomisinin TEK hesaplama noktasi.
+ *
+ * Temizlik iki AYRI kalemdir ve birbirine karistirilmaz:
+ *   - cleanFee  : misafirden alinan temizlik ucreti  -> GELIR (brute dahildir)
+ *   - cleanCost : personele odenen temizlik maliyeti -> GIDER (borc defteri)
+ *
+ * Bir zamanlar tek alan ikisini birden temsil ediyordu: ayni sayi hem
+ * bookings.cleaning_fee'ye gelir olarak yaziliyor hem de temizlik gorevinin
+ * personele odenecek tutari oluyordu. Kar marji bu yuzden yanlis cikiyordu.
+ */
+function computeBookingEconomics(input) {
+  const gross = Math.max(0, Number(input.gross) || 0);
+  const cleanFee = Math.max(0, Number(input.cleanFee) || 0);
+  const cleanCost = Math.max(0, Number(input.cleanCost) || 0);
+  const nights = Math.max(0, Number(input.nights) || 0);
+
+  // Temizlik ucreti brutun icindedir; oda geliri geri kalanidir.
+  const roomRevenue = Math.max(0, gross - cleanFee);
+
+  let otaComm;
+  if (input.commission !== '' && input.commission !== null && input.commission !== undefined
+      && !isNaN(Number(input.commission))) {
+    otaComm = Math.max(0, Number(input.commission));
   } else {
-    if (channel === 'AIRBNB') otaComm = Math.round(gross * 0.15);
-    if (channel === 'BOOKING') otaComm = Math.round(gross * 0.18);
+    otaComm = Math.round(gross * getChannelCommissionRate(input.channel) / 100);
+  }
+  otaComm = Math.min(otaComm, gross);
+
+  const commissionRate = gross > 0 ? (otaComm / gross) * 100 : 0;
+  const netAfterCommission = gross - otaComm;      // bize gecen tutar
+  const netToUs = netAfterCommission - cleanCost;  // temizlik odendikten sonra kalan
+
+  // ADR tabani: komisyon ve temizlik geliri disinda kalan saf oda geliri.
+  const netRoomRevenue = Math.max(0, roomRevenue - otaComm);
+
+  return {
+    gross, cleanFee, cleanCost, nights, roomRevenue,
+    otaComm, commissionRate, netAfterCommission, netToUs, netRoomRevenue,
+    nightlyNet: nights > 0 ? Math.round(netRoomRevenue / nights) : 0
+  };
+}
+
+function readBookingFormEconomics() {
+  const el = id => document.getElementById(id);
+  const dInStr = el('resCheckIn') ? el('resCheckIn').value : '';
+  const dOutStr = el('resCheckOut') ? el('resCheckOut').value : '';
+  return computeBookingEconomics({
+    gross: el('resGross') ? el('resGross').value : 0,
+    cleanFee: el('resCleanFee') ? el('resCleanFee').value : 0,
+    cleanCost: el('resCleanCost') ? el('resCleanCost').value : 0,
+    channel: el('resChannel') ? el('resChannel').value : '',
+    commission: el('resCommission') ? el('resCommission').value : '',
+    nights: calculateNightsBetween(dInStr, dOutStr)
+  });
+}
+
+// Oran yazildiginda tutari, tutar yazildiginda orani guncelle. Ikisi de
+// kullanicinin elindedir; hangisini yazarsa digeri turetilir.
+function syncCommissionFromRate() {
+  const rateEl = document.getElementById('resCommissionRate');
+  const commEl = document.getElementById('resCommission');
+  const gross = Number((document.getElementById('resGross') || {}).value) || 0;
+  if (rateEl && commEl && rateEl.value !== '' && !isNaN(Number(rateEl.value))) {
+    commEl.value = Math.round(gross * Number(rateEl.value) / 100);
+  }
+  calculateLivePreview();
+}
+
+function syncRateFromCommission() {
+  const rateEl = document.getElementById('resCommissionRate');
+  const commEl = document.getElementById('resCommission');
+  const gross = Number((document.getElementById('resGross') || {}).value) || 0;
+  if (rateEl && commEl && commEl.value !== '' && !isNaN(Number(commEl.value)) && gross > 0) {
+    rateEl.value = (Number(commEl.value) / gross * 100).toFixed(2);
+  }
+  calculateLivePreview();
+}
+
+function calculateLivePreview() {
+  const e = readBookingFormEconomics();
+  const money = v => `₺${Math.round(v).toLocaleString('tr-TR')}`;
+  const put = (id, text) => { const el = document.getElementById(id); if (el) el.innerText = text; };
+
+  put('prevNights', e.nights > 0 ? `${e.nights} Gece` : '—');
+  put('prevRoomRevenue', money(e.roomRevenue));
+  put('prevCleanRevenue', money(e.cleanFee));
+  put('prevGrossTotal', money(e.gross));
+  put('prevCommissionRate', e.gross > 0 ? `(%${e.commissionRate.toFixed(2)})` : '');
+  put('prevCommission', e.otaComm > 0 ? `− ${money(e.otaComm)}` : money(0));
+  put('prevNetAfterCommission', money(e.netAfterCommission));
+  put('prevCleanCost', e.cleanCost > 0 ? `− ${money(e.cleanCost)}` : money(0));
+  put('prevNetToUs', money(e.netToUs));
+  put('prevNetRevenue', money(e.netRoomRevenue));
+  put('prevNightlyNet', e.nights > 0 ? `${money(e.nightlyNet)} / gece` : '—');
+}
+
+/* ===========================================================================
+   KONAKLAMA TARIHI SECICI (tek takvimde aralik — Airbnb kalibi)
+   Giris ve cikis ayri iki <input type="date"> idi; kullanici cikisin girisden
+   once olmadigini kendi kontrol etmek zorundaydi ve kac gece oldugunu ancak
+   kaydettikten sonra goruyordu.
+   resCheckIn / resCheckOut gizli input olarak KORUNUR: kaydetme, duzenleme,
+   fiyatlandirma ve testler o iki degeri okumaya devam eder.
+   =========================================================================== */
+const RES_CAL_MONTHS_TR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+  'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+const RES_CAL_DOW_TR = ['Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct', 'Pa'];
+
+let resCalAnchor = null;   // gorunen ilk ayin 1'i
+let resRangeStart = null;  // 'YYYY-MM-DD'
+let resRangeEnd = null;    // 'YYYY-MM-DD'
+
+function resDateKey(year, monthIndex, day) {
+  return `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function resParseKey(key) {
+  if (!key || typeof key !== 'string') return null;
+  const parts = key.split('-').map(Number);
+  if (parts.length !== 3 || parts.some(isNaN)) return null;
+  return new Date(parts[0], parts[1] - 1, parts[2]);
+}
+
+function resFormatHuman(key) {
+  const d = resParseKey(key);
+  if (!d) return '—';
+  return `${d.getDate()} ${RES_CAL_MONTHS_TR[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+function resAnchorFrom(key) {
+  const d = resParseKey(key) || resParseKey(getTodayStr()) || new Date();
+  return new Date(d.getFullYear(), d.getMonth(), 1);
+}
+
+function toggleResDatePicker(forceOpen) {
+  const panel = document.getElementById('resDatePicker');
+  const btn = document.getElementById('resDateRangeBtn');
+  if (!panel) return;
+  const open = typeof forceOpen === 'boolean' ? forceOpen : panel.hidden;
+  panel.hidden = !open;
+  if (btn) btn.setAttribute('aria-expanded', String(open));
+  if (open) {
+    resCalAnchor = resCalAnchor || resAnchorFrom(resRangeStart);
+    renderResCalendar();
+  }
+}
+
+function shiftResCalendar(delta) {
+  resCalAnchor = resCalAnchor || resAnchorFrom(resRangeStart);
+  resCalAnchor = new Date(resCalAnchor.getFullYear(), resCalAnchor.getMonth() + delta, 1);
+  renderResCalendar();
+}
+
+function clearResDateRange() {
+  resRangeStart = null;
+  resRangeEnd = null;
+  syncResDateInputs();
+  renderResCalendar();
+}
+
+function pickResDate(key) {
+  if (!resRangeStart || (resRangeStart && resRangeEnd)) {
+    // Yeni bir aralik baslat
+    resRangeStart = key;
+    resRangeEnd = null;
+  } else if (key <= resRangeStart) {
+    // Girisden onceki (veya ayni) gun secildiyse yeni giris say — cikis
+    // girisden once olamaz, bu yuzden sessizce gecersiz aralik uretmeyiz.
+    resRangeStart = key;
+    resRangeEnd = null;
+  } else {
+    resRangeEnd = key;
+  }
+  syncResDateInputs();
+  renderResCalendar();
+  if (resRangeStart && resRangeEnd) toggleResDatePicker(false);
+}
+
+function syncResDateInputs() {
+  const inEl = document.getElementById('resCheckIn');
+  const outEl = document.getElementById('resCheckOut');
+  if (inEl) inEl.value = resRangeStart || '';
+  if (outEl) outEl.value = resRangeEnd || '';
+
+  const inLbl = document.getElementById('resDateInLabel');
+  const outLbl = document.getElementById('resDateOutLabel');
+  const badge = document.getElementById('resDateNightsBadge');
+  const hint = document.getElementById('resDateHint');
+  if (inLbl) inLbl.innerText = resRangeStart ? resFormatHuman(resRangeStart) : '—';
+  if (outLbl) outLbl.innerText = resRangeEnd ? resFormatHuman(resRangeEnd) : '—';
+
+  const nights = calculateNightsBetween(resRangeStart, resRangeEnd);
+  if (badge) badge.innerText = nights > 0 ? `${nights} gece` : '—';
+  if (hint) {
+    hint.innerText = !resRangeStart ? 'Giriş tarihini seçin'
+      : !resRangeEnd ? 'Çıkış tarihini seçin'
+      : `${nights} gece seçildi`;
+  }
+  calculateLivePreview();
+}
+
+/** Disaridan (duzenleme ekrani, WhatsApp ayristirici) aralik yuklemek icin. */
+function setResDateRange(checkIn, checkOut) {
+  resRangeStart = checkIn || null;
+  resRangeEnd = checkOut || null;
+  resCalAnchor = resAnchorFrom(resRangeStart);
+  syncResDateInputs();
+  renderResCalendar();
+}
+
+function renderResCalendarMonth(anchor) {
+  const year = anchor.getFullYear();
+  const month = anchor.getMonth();
+  const today = getTodayStr();
+  const first = new Date(year, month, 1);
+  // Pazartesi=0 olacak sekilde kaydir (JS'te Pazar=0).
+  const lead = (first.getDay() + 6) % 7;
+  const dayCount = new Date(year, month + 1, 0).getDate();
+
+  let cells = '';
+  RES_CAL_DOW_TR.forEach(d => { cells += `<div class="daterange-dow">${d}</div>`; });
+  for (let i = 0; i < lead; i++) cells += '<span class="daterange-day is-empty"></span>';
+
+  for (let day = 1; day <= dayCount; day++) {
+    const key = resDateKey(year, month, day);
+    const classes = ['daterange-day'];
+    if (key === today) classes.push('is-today');
+    if (resRangeStart && key === resRangeStart) classes.push('is-start');
+    if (resRangeEnd && key === resRangeEnd) classes.push('is-end');
+    if (resRangeStart && resRangeEnd && key > resRangeStart && key < resRangeEnd) classes.push('in-range');
+    cells += `<button type="button" class="${classes.join(' ')}" data-res-date="${key}">${day}</button>`;
   }
 
-  const net = Math.max(0, gross - otaComm - cleanFee);
-  const nightlyNet = nights > 0 ? Math.round(net / nights) : 0;
+  return `<div><div class="daterange-month-name">${RES_CAL_MONTHS_TR[month]} ${year}</div>`
+    + `<div class="daterange-grid">${cells}</div></div>`;
+}
 
-  document.getElementById('prevNights').innerText = `${nights} Gece`;
-  document.getElementById('prevCommission').innerText = `₺${otaComm.toLocaleString('tr-TR')}`;
-  document.getElementById('prevNetRevenue').innerText = `₺${net.toLocaleString('tr-TR')}`;
-  document.getElementById('prevNightlyNet').innerText = `₺${nightlyNet.toLocaleString('tr-TR')} / gece`;
+function renderResCalendar() {
+  const host = document.getElementById('resCalMonths');
+  if (!host) return;
+  resCalAnchor = resCalAnchor || resAnchorFrom(resRangeStart);
+  const second = new Date(resCalAnchor.getFullYear(), resCalAnchor.getMonth() + 1, 1);
+  host.innerHTML = renderResCalendarMonth(resCalAnchor) + renderResCalendarMonth(second);
+
+  const title = document.getElementById('resCalTitle');
+  if (title) {
+    title.innerText = `${RES_CAL_MONTHS_TR[resCalAnchor.getMonth()]} ${resCalAnchor.getFullYear()}`
+      + ` – ${RES_CAL_MONTHS_TR[second.getMonth()]} ${second.getFullYear()}`;
+  }
+}
+
+if (typeof document !== 'undefined' && document.addEventListener) {
+  // Gun butonlari her render'da yeniden uretildigi icin olay delegasyonu.
+  document.addEventListener('click', event => {
+    const dayBtn = event.target.closest && event.target.closest('[data-res-date]');
+    if (dayBtn) { pickResDate(dayBtn.dataset.resDate); return; }
+    const panel = document.getElementById('resDatePicker');
+    if (!panel || panel.hidden) return;
+    if (event.target.closest && !event.target.closest('.daterange-group')) toggleResDatePicker(false);
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') toggleResDatePicker(false);
+  });
 }
 
 async function saveBooking(e) {
@@ -5905,20 +6187,29 @@ async function saveBooking(e) {
     const checkIn = document.getElementById('resCheckIn').value;
     const checkOut = document.getElementById('resCheckOut').value;
     const channel = document.getElementById('resChannel').value;
-    const gross = Number(document.getElementById('resGross').value) || 0;
-    const cleanFee = Number(document.getElementById('resCleanFee').value) || 0;
     const status = document.getElementById('resStatus').value;
     const pax = Number(document.getElementById('resPax').value) || 2;
-    let customComm = document.getElementById('resCommission').value;
-    let otaComm = 0;
-    if (customComm !== '' && !isNaN(customComm)) {
-      otaComm = Number(customComm);
-    } else {
-      if (channel === 'AIRBNB') otaComm = Math.round(gross * 0.15);
-      if (channel === 'BOOKING') otaComm = Math.round(gross * 0.18);
+
+    // Tarihler artik gizli input; tarayici "required" dogrulamasi gizli
+    // alanlara uygulanmaz, bu yuzden burada acikca kontrol edilir.
+    if (!checkIn || !checkOut) {
+      throw new Error('Konaklama tarihlerini seçin.');
+    }
+    if (calculateNightsBetween(checkIn, checkOut) <= 0) {
+      throw new Error('Çıkış tarihi giriş tarihinden sonra olmalıdır.');
     }
 
-    const net = Math.max(0, gross - otaComm - cleanFee);
+    const economics = readBookingFormEconomics();
+    const cleanFee = economics.cleanFee;
+    const cleanCost = economics.cleanCost;
+    const gross = economics.gross;
+    const otaComm = economics.otaComm;
+
+    if (cleanFee > gross) {
+      throw new Error('Temizlik ücreti brüt tutardan büyük olamaz; brüt tutara dâhildir.');
+    }
+
+    const net = economics.netRoomRevenue;
 
     const bookingInput = {
       villa,
@@ -5929,6 +6220,7 @@ async function saveBooking(e) {
       gross,
       otaComm,
       cleanFee,
+      cleanCost,
       net,
       pax,
       status
@@ -8019,7 +8311,9 @@ function payAllPendingCleaning() {
 function openNewCleaningTaskModal() {
   document.getElementById('cleaningTaskModalTitle').innerText = '🧹 Yeni Temizlik / Borç Girişi';
   document.getElementById('hkEditTaskId').value = '';
-  document.getElementById('hkVilla').value = currentFilter.villa !== 'ALL' ? currentFilter.villa : 'BELLA';
+  document.getElementById('hkVilla').value = currentFilter.villa !== 'ALL'
+    ? currentFilter.villa
+    : (Object.keys((typeof appData !== 'undefined' && appData.villas) || {})[0] || '');
   document.getElementById('hkDate').value = getTodayStr();
   document.getElementById('hkCleaner').value = '';
   
@@ -8069,7 +8363,7 @@ function saveCleaningTask(e) {
     alert('Lütfen temizlik personelini belirtin.');
     return;
   }
-  const amount = parseFloat(document.getElementById('hkAmount').value) || 1500;
+  const amount = parseFloat(document.getElementById('hkAmount').value) || 0;
   const notes = document.getElementById('hkDesc').value.trim();
   const paid = document.getElementById('hkPaidStatus').value === 'PAID';
 
@@ -8270,9 +8564,12 @@ function renderTapeChart() {
 function openBookingForDate(villa, dateStr) {
   openBookingModal();
   const vSelect = document.getElementById('resVilla');
-  const ciInput = document.getElementById('resCheckIn');
   if (vSelect) vSelect.value = villa;
-  if (ciInput) ciInput.value = dateStr;
+  // Takvimden gelen gun giris tarihi olarak yuklenir; cikis kullanicinin
+  // secimine birakilir. Gizli inputa dogrudan yazmak takvim durumunu
+  // guncellemezdi, bu yuzden aralik API'si uzerinden gidilir.
+  setResDateRange(dateStr, null);
+  toggleResDatePicker(true);
 }
 
 
@@ -14094,6 +14391,9 @@ if (typeof module !== 'undefined' && module.exports) {
     isBookingInFilter,
     getFilterDateRange,
     getBookingFilterShare,
+    computeBookingEconomics,
+    getChannelCommissionRate,
+    syncBookingCleaningTasks,
     convertAiActionToTask,
     loadOperationalTasks,
     createOperationalTask,

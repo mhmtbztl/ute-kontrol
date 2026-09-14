@@ -68,14 +68,43 @@ Node'da (testler) muaf; orada yerel yol doğrulama mantığının test yüzeyidi
 ### 3.4 Finansal hesaplama — USALI
 ```
 CİRO   = Σ rezervasyon.brütTutar              (iptaller hariç, temizlik ücreti dahil)
+       ├─ oda geliri      = brüt − temizlik ücreti
+       └─ temizlik geliri = misafirden alınan temizlik ücreti
 OPEX   = elle girilen giderler
-       + Σ OTA komisyonu        ← rezervasyondan otomatik
-       + Σ temizlik ücreti      ← rezervasyondan otomatik
+       + Σ OTA komisyonu          ← rezervasyondan otomatik
+       + Σ temizlik MALİYETİ      ← rezervasyondan otomatik (personele ödenen)
 NET KÂR = CİRO − OPEX − CAPEX
 ```
-Komisyon ve temizlik **gelirden düşülmez, gider yazılır.** Yönetici paneli ve Finans ekranı
+Komisyon **gelirden düşülmez, gider yazılır.** Yönetici paneli ve Finans ekranı
 aynı tabanı kullanmalı — bir zamanlar biri brüt, diğeri net kullanıyordu ve aynı ay için
 farklı net kâr raporluyorlardı.
+
+**Temizlik iki ayrı kalemdir; asla tek sayıya indirgenmez (2026-09-14 kararı).**
+
+| | Alan | Nerede durur | Ne |
+|---|---|---|---|
+| Gelir | `cleaning_fee` | `bookings.cleaning_fee` | Misafirden alınan temizlik ücreti. **Brüt tutarın içindedir**, ayrı gelir kalemi olarak raporlanır. |
+| Gider | `cleanCost` | `cleaning_tasks.amount` | Personele ödenen temizlik maliyeti. Temizlik & Borç defterine borç yazılır; "Ödendi" işaretlenince gider defterine geçer. |
+
+Maliyet için `bookings`'e **yeni sütun açılmadı, bilerek.** Denendi ve kırdı:
+göçler Supabase panelinden elle uygulanıyor ama GitHub Pages push ile anında
+yayına alıyor; yeni sütuna bağlı kod, göç uygulanana kadar **rezervasyon
+kaydını tamamen kırıyor** (`booking_crud_tests` bu şekilde kırmızı oldu, çünkü
+o test `mapBookingToDb()` çıktısını doğrudan insert ediyor). Maliyetin zaten
+kalıcı ve doğal adresi temizlik borç defteridir; aynı sayıyı iki tabloda
+tutmak ayrıca "hangisi doğru" sorusunu açardı. `syncBookingCleaningTasks()`
+yüklemeden sonra değeri oradan geri okur.
+
+Bir zamanlar rezervasyon ekranında **tek bir "Temizlik Ücreti" alanı** vardı ve o sayı
+aynı anda hem `cleaning_fee` olarak (gelir) kaydediliyor hem de temizlik görevinin
+personele ödenecek tutarı (gider) oluyordu. Misafirden 1.500 TL alıp personele
+1.200 TL ödeyen işletmede aradaki 300 TL yok sayılıyordu: kâr marjı ve temizlik
+borcu aynı anda yanlıştı. Ağı `core/booking_form_economics_tests.js` tutuyor.
+
+Rezervasyonun bağlı bir temizlik görevi **yoksa** kayıt bu ayrımdan öncedir; doğru
+maliyet bilinmiyordur ve **uydurulmaz** (§3.6). İstemci o durumda eski davranışa
+düşer (maliyet = ücret); işletme rezervasyonu düzenleyip gerçek maliyeti girdikçe
+veri düzelir.
 
 Doluluk/RevPAR paydası: `getPeriodDayCount()` — **ayın gerçek gün sayısı**.
 Bir zamanlar bir ekranda 30, diğerinde 31, bir başkasında 90 kullanılıyordu.

@@ -10,7 +10,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=ce561f2c">
+  <link rel="stylesheet" href="style.css?v=c376f039">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -3090,13 +3090,34 @@
             <label>Misafir Adı</label>
             <input type="text" id="resGuest" placeholder="Örn: Ahmet Yılmaz" required>
           </div>
-          <div class="form-group">
-            <label>Giriş Tarihi (Check-in)</label>
-            <input type="date" id="resCheckIn" required onchange="calculateLivePreview()">
-          </div>
-          <div class="form-group">
-            <label>Çıkış Tarihi (Check-out)</label>
-            <input type="date" id="resCheckOut" required onchange="calculateLivePreview()">
+          <div class="form-group daterange-group">
+            <label>Konaklama Tarihleri</label>
+            <button type="button" id="resDateRangeBtn" class="daterange-trigger" onclick="toggleResDatePicker()" aria-haspopup="dialog" aria-expanded="false">
+              <span class="daterange-leg">
+                <span class="daterange-cap">Giriş</span>
+                <strong id="resDateInLabel">—</strong>
+              </span>
+              <span class="daterange-arrow">→</span>
+              <span class="daterange-leg">
+                <span class="daterange-cap">Çıkış</span>
+                <strong id="resDateOutLabel">—</strong>
+              </span>
+              <span class="daterange-nights" id="resDateNightsBadge">—</span>
+            </button>
+            <div id="resDatePicker" class="daterange-panel" role="dialog" aria-label="Konaklama tarihleri" hidden>
+              <div class="daterange-head">
+                <button type="button" class="daterange-nav" onclick="shiftResCalendar(-1)" aria-label="Önceki ay">‹</button>
+                <div class="daterange-title" id="resCalTitle">—</div>
+                <button type="button" class="daterange-nav" onclick="shiftResCalendar(1)" aria-label="Sonraki ay">›</button>
+              </div>
+              <div class="daterange-months" id="resCalMonths"></div>
+              <div class="daterange-foot">
+                <span id="resDateHint">Giriş tarihini seçin</span>
+                <button type="button" class="daterange-clear" onclick="clearResDateRange()">Temizle</button>
+              </div>
+            </div>
+            <input type="hidden" id="resCheckIn">
+            <input type="hidden" id="resCheckOut">
           </div>
           <div class="form-group">
             <label>Rezervasyon Kanalı</label>
@@ -3113,15 +3134,27 @@
           <div class="form-group">
             <label>Brüt Tutar (₺)</label>
             <input type="number" id="resGross" placeholder="Örn: 40000" required oninput="calculateLivePreview()">
+            <small class="field-note">Misafirin ödediği toplam. Temizlik ücreti bu tutara dâhildir.</small>
+          </div>
+          <div class="form-group">
+            <label>OTA Komisyon Oranı (%)</label>
+            <input type="number" id="resCommissionRate" step="0.01" min="0" max="100" placeholder="Kanala göre otomatik" oninput="syncCommissionFromRate()">
+            <small class="field-note">Boş bırakırsanız kanalın varsayılan oranı uygulanır.</small>
           </div>
           <div class="form-group">
             <label>OTA Komisyonu (₺)</label>
-            <input type="number" id="resCommission" placeholder="Otomatik veya Manuel" oninput="calculateLivePreview()">
+            <input type="number" id="resCommission" placeholder="Otomatik veya Manuel" oninput="syncRateFromCommission()">
+            <small class="field-note">Oran ve tutar birbirini günceller; hangisini yazarsanız diğeri hesaplanır.</small>
           </div>
           <div class="form-group">
-            <label>Temizlik Ücreti (₺)</label>
+            <label>Temizlik Ücreti — Misafirden Alınan (₺)</label>
             <input type="number" id="resCleanFee" placeholder="Örn: 1500" value="0" oninput="calculateLivePreview()">
-            <small style="font-size: 11px; color: #93C5FD; display: block; margin-top: 4px;">ℹ️ Bu tutar "Temizlik & Borç" defterine ödenecek borç olarak eklenir. Siz personele ödeyip "Ödendi" yapana kadar gider defterine nakit çıkışı yazılmaz.</small>
+            <small class="field-note note-revenue">▲ <strong>Gelir kalemi.</strong> Brüt tutarın içindedir; oda gelirinden ayrı raporlanır.</small>
+          </div>
+          <div class="form-group">
+            <label>Temizlik Maliyeti — Personele Ödenen (₺)</label>
+            <input type="number" id="resCleanCost" placeholder="Örn: 1200" value="0" oninput="calculateLivePreview()">
+            <small class="field-note note-expense">▼ <strong>Gider kalemi.</strong> "Temizlik &amp; Borç" defterine borç olarak yazılır; siz "Ödendi" yapana kadar kasadan çıkış görünmez.</small>
           </div>
           <div class="form-group">
             <label>Rezervasyon Durumu</label>
@@ -3139,10 +3172,23 @@
         </div>
 
         <div class="live-calculation-box">
-          <div class="preview-item"><span>Gece Sayısı:</span><strong id="prevNights">0 Gece</strong></div>
-          <div class="preview-item"><span>OTA Komisyonu:</span><strong id="prevCommission">₺0</strong></div>
-          <div class="preview-item highlight"><span>Saf Net Oda Geliri:</span><strong id="prevNetRevenue">₺0</strong></div>
-          <div class="preview-item"><span>Gecelik Net (ADR Katkısı):</span><strong id="prevNightlyNet">₺0</strong></div>
+          <div class="preview-item"><span>Gece Sayısı:</span><strong id="prevNights">—</strong></div>
+
+          <div class="preview-section">Gelir</div>
+          <div class="preview-item"><span>Oda Geliri:</span><strong id="prevRoomRevenue">—</strong></div>
+          <div class="preview-item"><span>Temizlik Geliri:</span><strong id="prevCleanRevenue">—</strong></div>
+          <div class="preview-item"><span>Brüt Toplam:</span><strong id="prevGrossTotal">—</strong></div>
+
+          <div class="preview-section">Kesintiler</div>
+          <div class="preview-item"><span>OTA Komisyonu <em id="prevCommissionRate">—</em>:</span><strong id="prevCommission" class="text-negative">—</strong></div>
+          <div class="preview-item highlight"><span>Komisyon Sonrası Net (bize geçen):</span><strong id="prevNetAfterCommission">—</strong></div>
+
+          <div class="preview-section">Gider</div>
+          <div class="preview-item"><span>Temizlik Maliyeti:</span><strong id="prevCleanCost" class="text-negative">—</strong></div>
+
+          <div class="preview-item preview-total"><span>Bize Kalan Net:</span><strong id="prevNetToUs">—</strong></div>
+          <div class="preview-item"><span>Saf Net Oda Geliri (ADR tabanı):</span><strong id="prevNetRevenue">—</strong></div>
+          <div class="preview-item"><span>Gecelik Net (ADR Katkısı):</span><strong id="prevNightlyNet">—</strong></div>
         </div>
 
         <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
@@ -4252,7 +4298,7 @@
   <script src="core/executive_dashboard_service.js?v=8065c637"></script>
   <script src="core/executive_ai_advisor.js?v=4b235c67"></script>
   <script src="core/notification_center_service.js?v=710f8a91"></script>
-  <script src="app.js?v=e31c828e"></script>
+  <script src="app.js?v=955495b9"></script>
   <script src="core/marketing_ui.js?v=2e506018"></script>
 </body>
 </html>

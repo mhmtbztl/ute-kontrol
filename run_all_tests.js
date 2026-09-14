@@ -135,6 +135,10 @@ const allTestFiles = [
   // Gelirin doneme dagitilmasi (aylari kesen rezervasyonda cift sayim)
   'revenue_attribution_tests.js',
 
+  // Rezervasyon ekrani: temizlik geliri/gideri ayrimi, komisyon seffafligi,
+  // tek takvimli tarih araligi
+  'booking_form_economics_tests.js',
+
   // Ay kapanisi butunlugu (Phase 20)
   'month_close_integrity_tests.js',
 

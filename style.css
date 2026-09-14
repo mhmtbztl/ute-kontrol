@@ -4029,3 +4029,186 @@ body {
   background: rgba(139, 92, 246, 0.2);
   color: #FFFFFF;
 }
+
+/* ===========================================================================
+   REZERVASYON FORMU — TARIH ARALIGI SECICI + GELIR/GIDER AYRIMI
+   Giris ve cikis ayri iki kutu yerine tek takvimde secilir (Airbnb kalibi).
+   resCheckIn / resCheckOut gizli input olarak korunur; tum mevcut mantik
+   ve testler o iki degeri okumaya devam eder.
+   =========================================================================== */
+
+.daterange-group { grid-column: 1 / -1; position: relative; }
+
+.daterange-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  color: var(--text-main);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: border-color .15s ease, background .15s ease;
+}
+.daterange-trigger:hover { border-color: var(--accent-emerald); }
+.daterange-trigger[aria-expanded="true"] {
+  border-color: var(--accent-emerald);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.daterange-leg { display: flex; flex-direction: column; gap: 2px; min-width: 104px; }
+.daterange-cap {
+  font-size: 10px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.daterange-leg strong { font-size: 14px; font-weight: 700; color: var(--text-main); }
+.daterange-arrow { color: var(--text-dim); font-size: 16px; }
+.daterange-nights {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-emerald);
+  background: var(--accent-emerald-subtle);
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.daterange-panel {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: var(--bg-surface-elevated);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  padding: 14px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, .55);
+}
+.daterange-panel[hidden] { display: none !important; }
+
+.daterange-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.daterange-title { font-size: 13px; font-weight: 700; color: var(--text-main); }
+.daterange-nav {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--text-main);
+  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+.daterange-nav:hover { background: rgba(255, 255, 255, 0.12); }
+
+.daterange-months { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+@media (max-width: 640px) { .daterange-months { grid-template-columns: 1fr; } }
+
+.daterange-month-name {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.daterange-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.daterange-dow {
+  font-size: 10px;
+  text-align: center;
+  color: var(--text-dim);
+  padding-bottom: 4px;
+}
+
+.daterange-day {
+  aspect-ratio: 1;
+  border: none;
+  background: transparent;
+  color: var(--text-main);
+  font-size: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 0;
+}
+.daterange-day:hover:not(:disabled) { background: rgba(255, 255, 255, 0.12); }
+.daterange-day:disabled { color: var(--text-dim); cursor: default; opacity: .35; }
+.daterange-day.is-empty { cursor: default; }
+.daterange-day.is-today { box-shadow: inset 0 0 0 1px var(--accent-blue); }
+.daterange-day.in-range { background: var(--accent-emerald-subtle); border-radius: 0; }
+.daterange-day.is-start,
+.daterange-day.is-end {
+  background: var(--accent-emerald);
+  color: #04211A;
+  font-weight: 800;
+}
+.daterange-day.is-start { border-radius: 8px 0 0 8px; }
+.daterange-day.is-end { border-radius: 0 8px 8px 0; }
+.daterange-day.is-start.is-end { border-radius: 8px; }
+
+.daterange-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.daterange-clear {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: var(--text-muted);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 11px;
+  font-family: inherit;
+}
+.daterange-clear:hover { color: var(--text-main); border-color: var(--accent-rose); }
+
+/* --- Alan aciklamalari: gelir mi gider mi, bakisla ayrilsin --- */
+.field-note {
+  font-size: 11px;
+  color: var(--text-muted);
+  display: block;
+  margin-top: 4px;
+  line-height: 1.45;
+}
+.field-note.note-revenue { color: #6EE7B7; }
+.field-note.note-expense { color: #FCA5A5; }
+
+/* --- Canli onizleme: bolum basliklari ve toplam --- */
+.preview-section {
+  grid-column: 1 / -1;
+  font-size: 10px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 3px;
+  margin-top: 4px;
+}
+.preview-item em { font-style: normal; color: var(--text-dim); }
+.preview-item .text-negative { color: #FCA5A5; }
+.preview-item.preview-total {
+  grid-column: 1 / -1;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 7px;
+  margin-top: 3px;
+  color: var(--accent-emerald);
+}
+.preview-item.preview-total strong { font-size: 15px; }
