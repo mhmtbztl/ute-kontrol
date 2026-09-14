@@ -19,7 +19,10 @@ if (missing.length) throw new Error(`Unlisted migrations: ${missing.join(', ')}`
 for (const entry of entries) {
   const filePath = path.join(root, entry.file);
   if (!fs.existsSync(filePath)) throw new Error(`Missing migration: ${entry.file}`);
-  const digest = crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
+  // Git may materialize the same SQL with LF or CRLF depending on platform.
+  // Hash canonical LF text so Windows and CI verify identical content.
+  const canonicalSql = fs.readFileSync(filePath, 'utf8').replace(/\r\n?/g, '\n');
+  const digest = crypto.createHash('sha256').update(canonicalSql, 'utf8').digest('hex');
   if (digest !== entry.sha256) {
     throw new Error(`Immutable migration changed: ${entry.file}. Add a forward-fix migration instead.`);
   }
