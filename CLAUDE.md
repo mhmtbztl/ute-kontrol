@@ -273,6 +273,12 @@ ile `index.html` (~265 KB) gibi dev ortak dosyalara dokunuyor.
    `node stamp_assets.js --check` yeşil olmalı.
 5. `master` dalına aynı anda tek araç dokunur; diğeri haber vermeden merge/push yapmaz.
 
+`AGENTS.md` ayrıca bir **komut sözlüğü** tanımlar — kullanıcı tek kelime yazar,
+her araç aynı şeyi anlar: `TESLİM` (bitir, raporla, **push etme**), `PUSH`
+(şimdi master'a gönder), `REBASE` (diğeri push etti, üstüne al), `DENETLE`
+(karşılıklı denetim), `GÖÇ UYGULANDI` (üretime sorarak doğrula).
+"İşi bitirmek" ile "push etmek" bilerek ayrı adımlardır.
+
 Üretim şeması **hiçbir araç tarafından kendiliğinden değiştirilmez**: göçler
 Supabase panelinden elle ve **ayrı açık onayla** uygulanır (§4.2).
 

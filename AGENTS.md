@@ -146,13 +146,56 @@ dalında kalır ve **haber vermeden `master`'a dokunmaz.**
 
 ---
 
+## Komut sözlüğü
+
+Kullanıcı bu kelimeleri tek başına yazabilir; **her araç aynı şeyi anlar.**
+"İşi bitirmek" ile "push etmek" bilerek **iki ayrı adımdır**: Kural 5 gereği
+`master`'a aynı anda tek araç dokunur, sırayı kullanıcı verir.
+
+### `TESLİM`
+İşi tamamla ama **push etme.** Sırayla:
+1. `git status --short` ve `git diff --cached --name-only` — staged listede
+   yalnızca senin dosyaların olmalı.
+2. `npm test`, `npm run verify:migrations`, `node stamp_assets.js --check`.
+3. Veritabanına dokunduysan ilgili canlı süiti elle koş.
+4. Kendi dalına commit at.
+5. Şunu raporla: ne değişti, hangi dosyalar, test sonuçları, **uygulanması
+   gereken göç var mı**, push için hazır mı.
+
+Push izni ayrıca istenir. Kendiliğinden `master`'a dokunma.
+
+### `PUSH`
+Şimdi `master`'a gönder. Önce:
+```bash
+git fetch origin
+git log --oneline origin/master..HEAD    # yalnızca senin commit'lerin olmalı
+```
+Yabancı commit görüyorsan **dur ve sor.** `master` dalının atası değilse
+rebase et, çakışmayı görerek çöz, testleri yeniden koş, sonra push et.
+**Force push yok.**
+
+### `REBASE`
+Diğer araç `master`'a push etti. `git fetch origin` + `git rebase origin/master`,
+çakışmaları görerek çöz, `npm test` ve `node stamp_assets.js --check` yeşile
+dönene kadar teslim etme.
+
+### `DENETLE`
+Karşılıklı denetim — aşağıya bakın.
+
+### `GÖÇ UYGULANDI`
+Kullanıcı bir göçü Supabase panelinden çalıştırdı. Dosyaya bakarak değil,
+**üretime sorarak** doğrula (§4.2'deki üç yöntem) ve ilgili canlı süiti koş.
+
+---
+
 ## Karşılıklı denetim
 
 Biri işini push ettikten sonra diğerine verilecek istek şudur:
 
 > "Son N commit'i denetle: tam test paketini koştur, göçlerin üretimde
 > uygulanıp uygulanmadığını doğrula, `CLAUDE.md` ve `AGENTS.md` kurallarına
-> aykırı bir şey var mı bak."
+> aykırı bir şey var mı bak. Bulduğun hatayı düzelt ama karşı tarafın yarım
+> işine dokunma."
 
 Denetleyen taraf **düzeltmeyi de yapar**, ama karşı tarafın yarım işine
 dokunmaz: düzeltme ya yeni bir dosyadır (göç, test) ya da kendi
@@ -160,3 +203,7 @@ worktree'sindeki dalında durur.
 
 Denetim raporu şu başlıkları taşır: doğrulananlar, bulunan hatalar, yapılan
 düzeltmeler ve commit'ler, test sonuçları, üretim kontrolü, hâlâ eksik kalanlar.
+
+**Denetim kod okumakla bitmez.** 2026-09-14'te iki gerçek hata çıktı ve ikisini
+de kod okuyan bir AI değil, testler yakaladı. Denetim yapan taraf testleri
+gerçekten koşmak zorundadır; "diff temiz görünüyor" denetim değildir.
