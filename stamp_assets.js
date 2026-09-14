@@ -36,7 +36,8 @@ const ATTR_RE = /\b(src|href)="(?!https?:|\/\/|data:|#|mailto:)([^"?#]+)(\?[^"#]
 function hashFile(rel) {
   const abs = path.join(ROOT, rel);
   if (!fs.existsSync(abs)) return null;
-  return crypto.createHash('sha1').update(fs.readFileSync(abs)).digest('hex').slice(0, 8);
+  const canonicalContent = fs.readFileSync(abs, 'utf8').replace(/\r\n?/g, '\n');
+  return crypto.createHash('sha1').update(canonicalContent, 'utf8').digest('hex').slice(0, 8);
 }
 
 // -----------------------------------------------------------------------------

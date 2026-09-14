@@ -305,7 +305,9 @@ runTest('Marketing bootstrap and lazy dependencies carry current content hashes'
   const root = path.join(__dirname, '..');
   const index = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   const uiSource = fs.readFileSync(path.join(__dirname, 'marketing_ui.js'), 'utf8');
-  const hash = file => crypto.createHash('sha1').update(fs.readFileSync(file)).digest('hex').slice(0, 8);
+  const hash = file => crypto.createHash('sha1')
+    .update(fs.readFileSync(file, 'utf8').replace(/\r\n?/g, '\n'), 'utf8')
+    .digest('hex').slice(0, 8);
   assert.match(index, new RegExp(`core/marketing_ui\\.js\\?v=${hash(path.join(__dirname, 'marketing_ui.js'))}`));
   ['marketing_engine.js', 'marketing_funnel_service.js', 'marketing_priority_service.js', 'marketing_benchmark_service.js', 'marketing_cover_change_service.js', 'marketing_data_service.js', 'marketing_review_service.js', 'marketing_snapshot_service.js', 'marketing_channel_listing_service.js', 'marketing_media_upload_service.js', 'marketing_photo_analysis_service.js', 'marketing_experiment_service.js', 'marketing_photo_results_service.js', 'marketing_health_results_service.js'].forEach(file => {
     assert.match(uiSource, new RegExp(`${file.replace('.', '\\.') }\\?v=${hash(path.join(__dirname, file))}`));
