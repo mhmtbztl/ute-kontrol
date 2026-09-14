@@ -223,16 +223,27 @@ function run() {
     '34 çağrı var; tanım yoksa hepsi "typeof" koruması yüzünden SESSİZCE yutulur ve ' +
     'kullanıcı hiçbir onay görmez.');
 
+  const uuidRezervasyon = [{ id: 'b-uuid', propertyId: 'p1', villa: 'p1', guest: 'Ali' }];
+  const slugEslesmis = app.attachBookingVillaSlugs(uuidRezervasyon, doluVeri().villas);
+  check(slugEslesmis[0].villa === 'V1',
+    '10. Paralel ilk yüklemede rezervasyon property UUID değeri villa slug değerine çevrilir',
+    JSON.stringify(slugEslesmis[0]));
+
+  const eslesmeyen = app.attachBookingVillaSlugs([{ propertyId: 'bilinmeyen', villa: 'bilinmeyen' }], doluVeri().villas);
+  check(eslesmeyen[0].villa === 'bilinmeyen',
+    '11. Eşleşmeyen property kimliği veri kaybı olmadan korunur',
+    JSON.stringify(eslesmeyen[0]));
+
   // showToast gercekten bir sey yaziyor mu?
   try {
     domKur();
     app.showToast('deneme mesajı', 'success');
     const kap = global.document.getElementById('lexToastWrap');
     check(kap && kap.children.length === 1 && kap.children[0].textContent === 'deneme mesajı',
-      '10. showToast ekrana gerçekten bir bildirim ekler',
+      '12. showToast ekrana gerçekten bir bildirim ekler',
       'kapsayıcı: ' + (kap ? kap.children.length + ' çocuk' : 'yok'));
   } catch (e) {
-    no('10. showToast ekrana gerçekten bir bildirim ekler', hataOzeti(e));
+    no('12. showToast ekrana gerçekten bir bildirim ekler', hataOzeti(e));
   }
 
   console.log('\n=============================================================================');

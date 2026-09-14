@@ -835,6 +835,23 @@ function mapBookingFromDb(row, propertyMap = {}) {
   };
 }
 
+/**
+ * Mulkler ve rezervasyonlar ilk acilista paralel yuklenir. Rezervasyon
+ * mapper'i mulklerden once biterse villa alaninda slug yerine property UUID
+ * kalir. Iki sorgu da tamamlandiktan sonra UUID -> slug bagini kesinlestirir.
+ */
+function attachBookingVillaSlugs(bookings = [], villas = {}) {
+  const slugByPropertyId = {};
+  Object.entries(villas || {}).forEach(([key, property]) => {
+    if (property && property.id) slugByPropertyId[property.id] = property.slug || key;
+  });
+  return (bookings || []).map(booking => {
+    const propertyId = booking && (booking.propertyId || booking.property_id);
+    const slug = propertyId ? slugByPropertyId[propertyId] : null;
+    return slug && booking.villa !== slug ? { ...booking, villa: slug } : booking;
+  });
+}
+
 function mapBookingToDb(booking, tenantId) {
   const activeTId = tenantId || getActiveTenantId();
 
@@ -12018,6 +12035,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
       Object.values(villas || {}).forEach(p => {
         if (p.id) propIdMap[p.id] = p.slug;
       });
+      const bookingsWithVillaSlugs = attachBookingVillaSlugs(bookings, villas);
 
       const cleaningTasks = (cleanList || []).map(c => ({
         id: c.id,
@@ -12034,7 +12052,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
         tenantId,
         companyName: activeTenant?.name || 'İşletmem',
         villas,
-        bookings,
+        bookings: bookingsWithVillaSlugs,
         expenses,
         cleaningTasks,
         leads,
@@ -14353,6 +14371,7 @@ if (typeof module !== 'undefined' && module.exports) {
     generateSafeBookingCode,
     calculateNightsBetween,
     mapBookingFromDb,
+    attachBookingVillaSlugs,
     mapBookingToDb,
     checkBookingOverlap,
     loadBookings,
