@@ -182,6 +182,50 @@ runTest('Phase 23 redefines every function that carried the broken guard', () =>
     'Dogrulama canli fonksiyon tanimini okumali, dosyayi degil');
 });
 
+/**
+ * YETKI, SATIR KILIDINDEN ONCE GELMELI
+ *
+ * review_marketing_finding once SELECT ... FOR UPDATE yapip sonra yetkiye
+ * bakiyordu. Yetkisiz cagiran baska bir kiracinin satirina kilit koydurabiliyor,
+ * ayrica "bulunamadi" (P0002) ile "yetkisiz" (42501) ayrimi bir bulgu
+ * kimliginin var olup olmadigini sizdiriyordu. phase25 sirayi duzeltir ve
+ * iki durumu tek hataya indirir.
+ */
+const PHASE25 = path.join(SUPABASE_DIR, 'migration_phase25_marketing_review_authz_order.sql');
+
+runTest('Review RPC authorizes before it locks a row', () => {
+  assert.ok(fs.existsSync(PHASE25), 'supabase/migration_phase25_marketing_review_authz_order.sql bulunamadi');
+  const sql = fs.readFileSync(PHASE25, 'utf8');
+  const fn = sql.slice(sql.indexOf('CREATE OR REPLACE FUNCTION public.review_marketing_finding('));
+  const body = fn.slice(0, fn.indexOf('$$;'));
+  const authz = body.indexOf('UNAUTHORIZED_MARKETING_REVIEW');
+  const lock = body.indexOf('FOR UPDATE');
+  assert.ok(authz > 0 && lock > 0, 'Yetki kontrolu veya kilit bulunamadi');
+  assert.ok(authz < lock, 'Yetki kontrolu FOR UPDATE kilidinden once gelmeli');
+});
+
+runTest('Review RPC no longer leaks whether a finding id exists', () => {
+  const sql = fs.readFileSync(PHASE25, 'utf8');
+  const fn = sql.slice(sql.indexOf('CREATE OR REPLACE FUNCTION public.review_marketing_finding('));
+  const body = fn.slice(0, fn.indexOf('$$;'));
+  assert.ok(!body.includes('MARKETING_FINDING_NOT_FOUND'),
+    'Bulunamadi ve yetkisiz durumlari ayni hatayi dondurmeli (varlik oraculu)');
+  assert.match(sql, /RAISE EXCEPTION 'PHASE25_EXISTENCE_ORACLE_STILL_OPEN/,
+    'Goc, oracle yeniden acilirsa durmali');
+  assert.match(sql, /RAISE EXCEPTION 'PHASE25_LOCK_STILL_BEFORE_AUTHZ/,
+    'Goc, sira bozulursa durmali');
+});
+
+runTest('Phase 25 keeps the null-safe guard and the anon revoke', () => {
+  const sql = fs.readFileSync(PHASE25, 'utf8');
+  assert.ok(sql.includes("COALESCE(public.get_tenant_role(v_tenant_id), '') NOT IN"),
+    'phase23 NULL-guvenli korumasi korunmali');
+  assert.match(sql, /REVOKE ALL ON FUNCTION public\.review_marketing_finding\(UUID, TEXT, TEXT\) FROM anon/,
+    'phase22 anon revoke korunmali');
+  assert.match(sql, /GRANT EXECUTE ON FUNCTION public\.review_marketing_finding\(UUID, TEXT, TEXT\) TO authenticated/,
+    'Kullanici erisimi korunmali');
+});
+
 runTest('Marketing RPCs never publish to an OTA automatically', () => {
   const offenders = [];
   for (const file of phase17Files()) {
