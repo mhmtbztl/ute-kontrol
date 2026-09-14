@@ -369,7 +369,7 @@
     <button class="tab-btn" onclick="switchTab('reservations')">📅 Rezervasyonlar (<span id="rezCountBadge">0</span>)</button>
     <button class="tab-btn" onclick="switchTab('properties')">🏡 Mülkler (<span id="propCountBadge">0</span>)</button>
     <button class="tab-btn" onclick="switchTab('operations')">🧹 Operasyon (<span id="opsTaskCountBadge">0</span>)</button>
-    <button class="tab-btn" onclick="switchTab('guests')">👥 Misafirler</button>
+    <button class="tab-btn" onclick="switchTab('guests')">👥 Misafirler (<span id="guestCountBadge">—</span>)</button>
     <button class="tab-btn" onclick="switchTab('leads')">🎯 Satış / CRM (<span id="leadCountBadge">0</span>)</button>
     <button class="tab-btn" onclick="switchTab('pricing')">🏷️ Fiyatlandırma</button>
     <button class="tab-btn" onclick="switchTab('finance')">💰 Finans</button>
@@ -2604,12 +2604,36 @@
         <div class="section-title-bar">
           <div>
             <h2>👥 MİSAFİR REHBERİ & YAŞAM DÖNGÜSÜ</h2>
-            <p class="sub-text">Misafir yaşam döngüsü (Onaylandı › Varış Öncesi › Konaklamada › Çıkış Sonrası) ve otomatik mesajlaşma.</p>
+            <p class="sub-text">Kanonik misafir profilleri, tekrar konaklama değeri ve izinli doğrudan satış takibi.</p>
           </div>
           <div style="display: flex; gap: 8px;">
             <button class="btn btn-secondary btn-sm" onclick="openWhatsAppModal('parser')">💬 WhatsApp Ayrıştır</button>
-            <button class="btn btn-primary btn-sm" onclick="openBookingModal()">+ Yeni Rezervasyon / Misafir</button>
+            <button class="btn btn-primary btn-sm" id="newGuestProfileBtn" onclick="openGuestProfileModal()">+ Yeni Misafir</button>
           </div>
+        </div>
+        <div class="kpi-cards-grid five-cols" style="margin-bottom: 16px;">
+          <div class="kpi-card"><span class="kpi-label">MİSAFİR PROFİLİ</span><div class="kpi-value" id="guestKpiTotal">—</div><div class="kpi-meta">Gerçek kişi profili</div></div>
+          <div class="kpi-card"><span class="kpi-label">TEKRAR EDEN</span><div class="kpi-value" id="guestKpiRepeat">—</div><div class="kpi-meta" id="guestKpiRepeatRate">—</div></div>
+          <div class="kpi-card"><span class="kpi-label">TEKRAR CİROSU</span><div class="kpi-value" id="guestKpiRepeatRevenue">—</div><div class="kpi-meta">Bağlı konaklamaların brütü</div></div>
+          <div class="kpi-card"><span class="kpi-label">ULAŞILABİLİR</span><div class="kpi-value" id="guestKpiContactable">—</div><div class="kpi-meta">Telefon veya e-posta var</div></div>
+          <div class="kpi-card"><span class="kpi-label">BAĞLANTISIZ REZ.</span><div class="kpi-value" id="guestKpiUnlinked">—</div><div class="kpi-meta">Profil eşleştirmesi bekliyor</div></div>
+        </div>
+        <div id="guestDataNotice" style="display:none; margin-bottom:12px; padding:10px 12px; border-radius:8px; background:rgba(245,158,11,.08); border:1px solid rgba(245,158,11,.25); color:#FDE68A; font-size:12px;"></div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+          <input id="guestDirectorySearch" type="search" placeholder="İsim, telefon veya e-posta ara" oninput="setGuestDirectoryQuery(this.value)" style="min-width:240px; flex:1;">
+          <select id="guestDirectorySegment" onchange="setGuestDirectorySegment(this.value)" style="min-width:160px;">
+            <option value="ALL">Tüm misafirler</option>
+            <option value="REPEAT">Tekrar edenler</option>
+            <option value="UPCOMING">Yaklaşanlar</option>
+            <option value="IN_HOUSE">Konaklamada</option>
+            <option value="CONTACTABLE">İletişim bilgisi olanlar</option>
+          </select>
+          <select id="guestDirectorySort" onchange="setGuestDirectorySort(this.value)" style="min-width:160px;">
+            <option value="RECENT">En yakın konaklama</option>
+            <option value="STAYS">Konaklama sayısı</option>
+            <option value="VALUE">Yaşam boyu ciro</option>
+            <option value="NAME">İsme göre</option>
+          </select>
         </div>
         <div class="table-responsive">
           <table class="data-table">
@@ -2617,10 +2641,11 @@
               <tr>
                 <th>MİSAFİR ADI</th>
                 <th>İLETİŞİM</th>
-                <th>MÜLK & TARİHLER</th>
-                <th>DÖNGÜ AŞAMASI</th>
-                <th>PLANLANAN MESAJLAR</th>
-                <th>UZATMA TEKLİFİ</th>
+                <th>KONAKLAMA</th>
+                <th>GECE</th>
+                <th>YAŞAM BOYU CİRO</th>
+                <th>SONRAKİ / SON KONAKLAMA</th>
+                <th>SEGMENT</th>
                 <th style="text-align: right;">İŞLEM</th>
               </tr>
             </thead>
@@ -2629,6 +2654,7 @@
             </tbody>
           </table>
         </div>
+        <div id="guestDirectoryPagination" style="display:flex; justify-content:flex-end; align-items:center; gap:8px; margin-top:12px;"></div>
       </section>
     </div>
 
@@ -3069,6 +3095,43 @@
   </div>
 
   <!-- ========================================== -->
+  <!-- MODAL: MİSAFİR PROFİLİ -->
+  <!-- ========================================== -->
+  <div class="modal-backdrop" id="guestProfileModal">
+    <div class="modal-card" style="max-width:760px;">
+      <div class="modal-header">
+        <h3 id="guestProfileModalTitle">👤 Misafir Profili</h3>
+        <button class="close-btn" onclick="closeGuestProfileModal()" aria-label="Kapat">&times;</button>
+      </div>
+      <form id="guestProfileForm" onsubmit="saveGuestProfile(event)">
+        <input type="hidden" id="guestProfileId">
+        <div class="form-grid">
+          <div class="form-group"><label>Ad</label><input id="guestFirstName" type="text" required autocomplete="given-name"></div>
+          <div class="form-group"><label>Soyad</label><input id="guestLastName" type="text" autocomplete="family-name"></div>
+          <div class="form-group"><label>Telefon</label><input id="guestPhone" type="tel" autocomplete="tel" placeholder="0532 123 45 67"></div>
+          <div class="form-group"><label>E-posta</label><input id="guestEmail" type="email" autocomplete="email"></div>
+          <div class="form-group">
+            <label>İletişim Dili</label>
+            <select id="guestLanguage"><option value="tr">Türkçe</option><option value="en">English</option><option value="de">Deutsch</option><option value="ru">Русский</option><option value="ar">العربية</option></select>
+          </div>
+          <div class="form-group"><label>Ülke Kodu</label><input id="guestCountryCode" type="text" value="TR" maxlength="10"></div>
+        </div>
+        <div style="display:flex; gap:16px; flex-wrap:wrap; margin:12px 0; font-size:12px;">
+          <label><input id="guestAllowWhatsapp" type="checkbox" checked> WhatsApp işlemsel iletişim</label>
+          <label><input id="guestAllowSms" type="checkbox" checked> SMS işlemsel iletişim</label>
+          <label><input id="guestAllowEmail" type="checkbox" checked> E-posta işlemsel iletişim</label>
+          <label><input id="guestMarketingOptIn" type="checkbox"> Kampanya iletişimi için açık onay</label>
+        </div>
+        <div id="guestProfileInsights" style="display:none; margin-top:14px; padding-top:14px; border-top:1px solid rgba(255,255,255,.08);"></div>
+        <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:10px;">
+          <button type="button" class="btn btn-secondary" onclick="closeGuestProfileModal()">Vazgeç</button>
+          <button type="submit" class="btn btn-primary">Misafiri Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
   <!-- MODAL: REZERVASYON EKLE / DÜZENLE -->
   <!-- ========================================== -->
   <div class="modal-backdrop" id="bookingModal">
@@ -3079,6 +3142,7 @@
       </div>
       <form id="bookingForm" onsubmit="saveBooking(event)">
         <input type="hidden" id="resEditId">
+        <input type="hidden" id="resGuestId">
         <div class="form-grid">
           <div class="form-group">
             <label>Villa Seçin</label>
@@ -3089,6 +3153,31 @@
           <div class="form-group">
             <label>Misafir Adı</label>
             <input type="text" id="resGuest" placeholder="Örn: Ahmet Yılmaz" required>
+          </div>
+          <div class="form-group">
+            <label>Misafir Telefonu</label>
+            <input type="tel" id="resGuestPhone" placeholder="Örn: 0532 123 45 67" autocomplete="tel">
+            <small class="field-note">Tekrar eden misafiri güvenilir biçimde tanımak için telefon veya e-posta girin.</small>
+          </div>
+          <div class="form-group">
+            <label>Misafir E-postası</label>
+            <input type="email" id="resGuestEmail" placeholder="ornek@email.com" autocomplete="email">
+          </div>
+          <div class="form-group">
+            <label>İletişim Dili</label>
+            <select id="resGuestLanguage">
+              <option value="tr">Türkçe</option>
+              <option value="en">English</option>
+              <option value="de">Deutsch</option>
+              <option value="ru">Русский</option>
+              <option value="ar">العربية</option>
+            </select>
+          </div>
+          <div class="form-group" style="justify-content: flex-end;">
+            <label style="display:flex; gap:8px; align-items:flex-start; cursor:pointer;">
+              <input type="checkbox" id="resGuestMarketingOptIn" style="width:auto; margin-top:2px;">
+              <span>Kampanya iletişimi izni alındı<small class="field-note" style="display:block;">İşlemsel konaklama mesajlarından ayrıdır; yalnız açık onay varsa işaretleyin.</small></span>
+            </label>
           </div>
           <div class="form-group daterange-group">
             <label>Konaklama Tarihleri</label>
@@ -4285,6 +4374,7 @@
   <script src="core/recurring_tasks_service.js?v=c499718d"></script>
   <script src="core/today_operations_service.js?v=b03f0d0a"></script>
   <script src="core/guest_contact_utils.js?v=84fd6474"></script>
+  <script src="core/guest_crm_engine.js?v=db0bf04a"></script>
   <script src="core/message_template_engine.js?v=f127f603"></script>
   <script src="core/messaging_provider.js?v=8f2e1a1e"></script>
   <script src="core/extension_offer_service.js?v=d1f68035"></script>
@@ -4298,7 +4388,7 @@
   <script src="core/executive_dashboard_service.js?v=8065c637"></script>
   <script src="core/executive_ai_advisor.js?v=4b235c67"></script>
   <script src="core/notification_center_service.js?v=710f8a91"></script>
-  <script src="app.js?v=a73b4e04"></script>
+  <script src="app.js?v=460c4d5c"></script>
   <script src="core/marketing_ui.js?v=2e506018"></script>
 </body>
 </html>

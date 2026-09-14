@@ -809,6 +809,7 @@ function mapBookingFromDb(row, propertyMap = {}) {
     villa: villaSlug,
     guest: row.guest_name,
     phone: row.guest_phone || '',
+    primaryGuestId: row.primary_guest_id || null,
     channel: row.channel || 'Direct',
     checkIn: row.check_in,
     checkOut: row.check_out,
@@ -903,6 +904,8 @@ function mapBookingToDb(booking, tenantId) {
   if (typeof activeSaaSUser !== 'undefined' && activeSaaSUser?.id) {
     payload.created_by = activeSaaSUser.id;
   }
+  const primaryGuestId = booking.primaryGuestId || booking.primary_guest_id;
+  if (primaryGuestId) payload.primary_guest_id = primaryGuestId;
 
   return payload;
 }
@@ -5858,6 +5861,17 @@ function openBookingModal(editId = null) {
     if (vEl) vEl.value = b.villa || b.propertyId;
     const gEl = document.getElementById('resGuest');
     if (gEl) gEl.value = b.guest;
+    const linkedGuest = (appData.guests || []).find(guest => guest.id === b.primaryGuestId);
+    const gidEl = document.getElementById('resGuestId');
+    if (gidEl) gidEl.value = linkedGuest?.id || '';
+    const phoneEl = document.getElementById('resGuestPhone');
+    if (phoneEl) phoneEl.value = linkedGuest?.phone || b.phone || '';
+    const emailEl = document.getElementById('resGuestEmail');
+    if (emailEl) emailEl.value = linkedGuest?.email || '';
+    const langEl = document.getElementById('resGuestLanguage');
+    if (langEl) langEl.value = linkedGuest?.language || 'tr';
+    const marketingEl = document.getElementById('resGuestMarketingOptIn');
+    if (marketingEl) marketingEl.checked = linkedGuest?.marketingOptIn === true;
     setResDateRange(b.checkIn, b.checkOut);
     const chEl = document.getElementById('resChannel');
     if (chEl) chEl.value = b.channel;
@@ -5886,6 +5900,8 @@ function openBookingModal(editId = null) {
     if (editInput) editInput.value = '';
     const form = document.getElementById('bookingForm');
     if (form) form.reset();
+    const gidEl = document.getElementById('resGuestId');
+    if (gidEl) gidEl.value = '';
     const cfEl = document.getElementById('resCleanFee');
     if (cfEl) cfEl.value = 0;
     const ccEl = document.getElementById('resCleanCost');
@@ -6202,6 +6218,10 @@ async function saveBooking(e) {
     const editId = document.getElementById('resEditId').value;
     const villa = document.getElementById('resVilla').value;
     const guest = document.getElementById('resGuest').value.trim();
+    const guestPhone = document.getElementById('resGuestPhone')?.value.trim() || '';
+    const guestEmail = document.getElementById('resGuestEmail')?.value.trim() || '';
+    const guestLanguage = document.getElementById('resGuestLanguage')?.value || 'tr';
+    const guestMarketingOptIn = document.getElementById('resGuestMarketingOptIn')?.checked === true;
     const checkIn = document.getElementById('resCheckIn').value;
     const checkOut = document.getElementById('resCheckOut').value;
     const channel = document.getElementById('resChannel').value;
@@ -6232,6 +6252,7 @@ async function saveBooking(e) {
     const bookingInput = {
       villa,
       guest,
+      phone: guestPhone,
       checkIn,
       checkOut,
       channel,
@@ -6244,14 +6265,28 @@ async function saveBooking(e) {
       status
     };
 
-    if (editId) {
-      await updateBooking(editId, bookingInput);
-    } else {
-      await createBooking(bookingInput);
+    const savedBooking = editId
+      ? await updateBooking(editId, bookingInput)
+      : await createBooking(bookingInput);
+
+    let guestProfileWarning = '';
+    if (guestPhone || guestEmail) {
+      try {
+        await linkBookingGuestProfile(savedBooking.id, {
+          fullName: guest,
+          phone: guestPhone,
+          email: guestEmail,
+          language: guestLanguage,
+          marketingOptIn: guestMarketingOptIn
+        });
+      } catch (guestErr) {
+        console.error('Guest profile link error:', guestErr);
+        guestProfileWarning = '\n\nRezervasyon kaydedildi; ancak misafir profili bağlanamadı: ' + (guestErr.message || 'Bilinmeyen hata');
+      }
     }
 
     closeBookingModal();
-    if (typeof alert === 'function') alert('✅ Rezervasyon başarıyla kaydedildi!');
+    if (typeof alert === 'function') alert('✅ Rezervasyon başarıyla kaydedildi!' + guestProfileWarning);
   } catch (err) {
     console.error('saveBooking error:', err);
     if (typeof alert === 'function') alert('Rezervasyon kaydedilemedi: ' + (err.message || 'Lütfen bilgileri kontrol edin.'));
@@ -12020,7 +12055,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
       const tenantId = targetId;
       // Independent datasets are loaded concurrently and every list is paged;
       // Supabase's per-response cap must never silently truncate a dashboard.
-      const [villas, bookings, expenses, cleanList, leads, closeList, targetList, maintenanceTickets, financialTransactions] = await Promise.all([
+      const [villas, bookings, expenses, cleanList, leads, closeList, targetList, maintenanceTickets, financialTransactions, guests, scheduledMessages, extensionOffers] = await Promise.all([
         loadProperties(tenantId),
         loadBookings(tenantId),
         loadExpenses(tenantId),
@@ -12029,7 +12064,10 @@ async function loadTenantAppData(tenantIdOrUserId) {
         fetchAllCloudRows(() => supabaseClient.from('monthly_financial_closes').select('*').eq('tenant_id', tenantId).order('year', { ascending: false }).order('month', { ascending: false })),
         fetchAllCloudRows(() => supabaseClient.from('monthly_targets').select('*').eq('tenant_id', tenantId).order('year', { ascending: false }).order('month', { ascending: false })),
         fetchAllCloudRows(() => supabaseClient.from('maintenance_tickets').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false })),
-        fetchAllCloudRows(() => supabaseClient.from('financial_transactions').select('*').eq('tenant_id', tenantId).order('occurred_on', { ascending: false }))
+        fetchAllCloudRows(() => supabaseClient.from('financial_transactions').select('*').eq('tenant_id', tenantId).order('occurred_on', { ascending: false })),
+        fetchAllCloudRows(() => supabaseClient.from('guests').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false })),
+        fetchAllCloudRows(() => supabaseClient.from('scheduled_messages').select('*').eq('tenant_id', tenantId).order('scheduled_at', { ascending: true })),
+        fetchAllCloudRows(() => supabaseClient.from('extension_offers').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false }))
       ]);
       const propIdMap = {};
       Object.values(villas || {}).forEach(p => {
@@ -12053,6 +12091,9 @@ async function loadTenantAppData(tenantIdOrUserId) {
         companyName: activeTenant?.name || 'İşletmem',
         villas,
         bookings: bookingsWithVillaSlugs,
+        guests: (guests || []).map(mapGuestFromDb),
+        scheduledMessages: scheduledMessages || [],
+        extensionOffers: extensionOffers || [],
         expenses,
         cleaningTasks,
         leads,
@@ -12108,6 +12149,9 @@ function getBlankTenantData(userId) {
     managerName: u.managerName || 'Yönetici',
     villas: {},
     bookings: [],
+    guests: [],
+    scheduledMessages: [],
+    extensionOffers: [],
     expenses: [],
     cleaningTasks: [],
     leads: [],
@@ -12853,6 +12897,21 @@ function mapGuestFromDb(g) {
   };
 }
 
+function mapGuestToDb(guestInput = {}) {
+  return {
+    first_name: String(guestInput.firstName || guestInput.first_name || '').trim(),
+    last_name: String(guestInput.lastName || guestInput.last_name || '').trim() || null,
+    phone: String(guestInput.phone || '').trim() || null,
+    email: String(guestInput.email || '').trim().toLowerCase() || null,
+    preferred_language: guestInput.language || guestInput.preferred_language || 'tr',
+    country_code: guestInput.countryCode || guestInput.country_code || 'TR',
+    allow_email: guestInput.allowEmail !== false && guestInput.allow_email !== false,
+    allow_sms: guestInput.allowSms !== false && guestInput.allow_sms !== false,
+    allow_whatsapp: guestInput.allowWhatsapp !== false && guestInput.allow_whatsapp !== false,
+    marketing_opt_in: guestInput.marketingOptIn === true || guestInput.marketing_opt_in === true
+  };
+}
+
 async function loadGuests(targetTenantId) {
   const tenantId = targetTenantId || getActiveTenantId();
   if (!tenantId || !supabaseClient) return [];
@@ -12872,7 +12931,7 @@ async function createGuest(guestInput) {
   const tenantId = getActiveTenantId();
   if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
   const payload = {
-    ...guestInput,
+    ...mapGuestToDb(guestInput),
     tenant_id: tenantId
   };
   const { data, error } = await supabaseClient
@@ -12887,15 +12946,65 @@ async function createGuest(guestInput) {
 async function updateGuest(guestId, patch) {
   const tenantId = getActiveTenantId();
   if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
+  const existing = (appData.guests || []).find(guest => guest.id === guestId) || {};
   const { data, error } = await supabaseClient
     .from('guests')
-    .update(patch)
+    .update({ ...mapGuestToDb({ ...existing, ...patch }), updated_at: new Date().toISOString() })
     .eq('id', guestId)
     .eq('tenant_id', tenantId)
     .select()
     .single();
   if (error) throw error;
   return mapGuestFromDb(data);
+}
+
+function splitGuestName(fullName) {
+  const parts = String(fullName || '').trim().split(/\s+/).filter(Boolean);
+  return { firstName: parts.shift() || '', lastName: parts.join(' ') };
+}
+
+async function linkBookingGuestProfile(bookingId, guestInput) {
+  const tenantId = getActiveTenantId();
+  if (!tenantId || !supabaseClient || !isUUID(bookingId)) throw new Error('Misafir profili için geçerli rezervasyon ve oturum gereklidir.');
+  const names = splitGuestName(guestInput.fullName);
+  const phoneResult = guestInput.phone ? normalizePhone(guestInput.phone, guestInput.countryCode || 'TR') : { valid: false, normalized: '' };
+  const emailResult = guestInput.email ? normalizeEmail(guestInput.email) : { valid: false, normalized: '' };
+  if (guestInput.phone && !phoneResult.valid) throw new Error('Telefon numarası geçerli değil. Türkiye için 05xx xxx xx xx biçimini kullanın.');
+  if (guestInput.email && !emailResult.valid) throw new Error('E-posta adresi geçerli değil.');
+
+  const { data, error } = await supabaseClient.rpc('upsert_booking_guest_atomic', {
+    p_tenant_id: tenantId,
+    p_booking_id: bookingId,
+    p_first_name: names.firstName,
+    p_last_name: names.lastName || null,
+    p_phone: phoneResult.normalized || null,
+    p_email: emailResult.normalized || null,
+    p_preferred_language: guestInput.language || 'tr',
+    p_country_code: guestInput.countryCode || 'TR',
+    p_allow_email: true,
+    p_allow_sms: true,
+    p_allow_whatsapp: true,
+    p_marketing_opt_in: guestInput.marketingOptIn === true
+  });
+  if (error) {
+    if (error.code === 'PGRST202' || String(error.message || '').includes('Could not find the function')) {
+      throw new Error('Misafir bağlantısı için phase27 Supabase göçü uygulanmalı.');
+    }
+    throw error;
+  }
+  const guest = mapGuestFromDb(data);
+  if (!appData.guests) appData.guests = [];
+  const guestIndex = appData.guests.findIndex(item => item.id === guest.id);
+  if (guestIndex >= 0) appData.guests[guestIndex] = guest;
+  else appData.guests.unshift(guest);
+  const booking = (appData.bookings || []).find(item => item.id === bookingId);
+  if (booking) {
+    booking.primaryGuestId = guest.id;
+    booking.guest = [guest.firstName, guest.lastName].filter(Boolean).join(' ');
+    booking.phone = guest.phone || booking.phone;
+  }
+  renderGuestsTab();
+  return guest;
 }
 
 async function loadMessageTemplates(targetTenantId) {
@@ -14225,43 +14334,179 @@ function renderOperationsTab() {
   `;
 }
 
+const guestDirectoryState = { query: '', segment: 'ALL', sort: 'RECENT', page: 1, pageSize: 20 };
+
+function getGuestCrmApi() {
+  if (typeof LexbnbGuestCrm !== 'undefined') return LexbnbGuestCrm;
+  if (typeof require === 'function') return require('./core/guest_crm_engine.js');
+  return null;
+}
+
+function getGuestCrmView() {
+  const api = getGuestCrmApi();
+  return api ? api.buildGuestCrmView({
+    guests: appData.guests || [],
+    bookings: appData.bookings || [],
+    messages: appData.scheduledMessages || [],
+    offers: appData.extensionOffers || [],
+    villas: appData.villas || {},
+    today: getTodayStr()
+  }) : { rows: [], metrics: {} };
+}
+
+function setGuestDirectoryQuery(value) { guestDirectoryState.query = value || ''; guestDirectoryState.page = 1; renderGuestsTab(); }
+function setGuestDirectorySegment(value) { guestDirectoryState.segment = value || 'ALL'; guestDirectoryState.page = 1; renderGuestsTab(); }
+function setGuestDirectorySort(value) { guestDirectoryState.sort = value || 'RECENT'; guestDirectoryState.page = 1; renderGuestsTab(); }
+function setGuestDirectoryPage(value) { guestDirectoryState.page = Math.max(1, Number(value) || 1); renderGuestsTab(); }
+
+function setGuestMetric(id, value) {
+  const element = document.getElementById(id);
+  if (element) element.innerText = value;
+}
+
 function renderGuestsTab() {
   if (typeof document === 'undefined') return;
   const tbody = document.getElementById('guestsTableBody');
   if (!tbody) return;
+  const api = getGuestCrmApi();
+  const view = getGuestCrmView();
+  const metrics = view.metrics || {};
+  const repeatRate = metrics.repeatRate == null ? '—' : '%' + Math.round(metrics.repeatRate * 100);
+  setGuestMetric('guestCountBadge', metrics.totalGuests ?? '—');
+  setGuestMetric('guestKpiTotal', metrics.totalGuests ?? '—');
+  setGuestMetric('guestKpiRepeat', metrics.repeatGuests ?? '—');
+  setGuestMetric('guestKpiRepeatRate', repeatRate + (metrics.repeatRate == null ? '' : ' tekrar oranı'));
+  setGuestMetric('guestKpiRepeatRevenue', metrics.repeatRevenue == null ? '—' : '₺' + Number(metrics.repeatRevenue).toLocaleString('tr-TR'));
+  setGuestMetric('guestKpiContactable', metrics.contactableGuests ?? '—');
+  setGuestMetric('guestKpiUnlinked', metrics.unlinkedBookingCount ?? '—');
 
-  const bookings = (typeof appData !== 'undefined' && appData.bookings) || [];
-  const activeBookings = bookings.filter(b => b.status !== 'CANCELLED');
-
-  const badge = document.getElementById('guestCountBadge');
-  if (badge) badge.innerText = activeBookings.length;
-
-  if (activeBookings.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 20px;">Kayıtlı misafir bulunmuyor.</td></tr>`;
-    return;
+  const notice = document.getElementById('guestDataNotice');
+  if (notice) {
+    const notes = [];
+    if (metrics.excludedAggregateBookingCount) notes.push(`${metrics.excludedAggregateBookingCount} toplu aktarım özeti kişi olmadığı için CRM dışında tutuldu.`);
+    if (metrics.unlinkedBookingCount) notes.push(`${metrics.unlinkedBookingCount} gerçek rezervasyon henüz bir misafir profiline bağlı değil; düzenleyip telefon veya e-posta ekleyerek bağlayabilirsiniz.`);
+    notice.innerText = notes.join(' ');
+    notice.style.display = notes.length ? 'block' : 'none';
   }
 
-  tbody.innerHTML = activeBookings.slice(0, 20).map(b => {
-    const vName = (appData.villas && appData.villas[b.villa]?.name) || b.villa;
-    const stage = b.checkOut < getTodayStr() ? 'POST_STAY' : (b.checkIn <= getTodayStr() ? 'IN_HOUSE' : 'CONFIRMED');
-    const stageBadge = stage === 'IN_HOUSE'
-      ? '<span class="badge badge-green">KONAKLAMADA</span>'
-      : (stage === 'POST_STAY' ? '<span class="badge badge-blue">ÇIKIŞ YAPTI</span>' : '<span class="badge badge-yellow">ONAYLANDI</span>');
+  const editAllowed = ['owner', 'admin', 'manager', 'staff'].includes(activeTenant?.role);
+  const newButton = document.getElementById('newGuestProfileBtn');
+  if (newButton) newButton.style.display = editAllowed ? '' : 'none';
 
-    return `
-      <tr>
-        <td><strong>${escapeHtml(b.guest || 'Belirtilmedi')}</strong></td>
-        <td>${escapeHtml(b.phone || 'Belirtilmedi')}</td>
-        <td>${escapeHtml(vName)} (${escapeHtml(b.checkIn || '—')} - ${escapeHtml(b.checkOut || '—')})</td>
-        <td>${stageBadge}</td>
-        <td><span class="badge badge-slate">Entegrasyon verisi yok</span></td>
-        <td><span class="badge badge-slate">Değerlendirilmedi</span></td>
-        <td style="text-align: right;">
-          <button class="btn btn-secondary btn-sm" onclick="openReservationModal('${b.id}')" style="font-size: 10px;">Detay</button>
-        </td>
-      </tr>
-    `;
-  }).join('');
+  const filtered = api ? api.filterGuestRows(view.rows, guestDirectoryState) : [];
+  const pageCount = Math.max(1, Math.ceil(filtered.length / guestDirectoryState.pageSize));
+  guestDirectoryState.page = Math.min(guestDirectoryState.page, pageCount);
+  const start = (guestDirectoryState.page - 1) * guestDirectoryState.pageSize;
+  const pageRows = filtered.slice(start, start + guestDirectoryState.pageSize);
+
+  if (pageRows.length === 0) {
+    const hasProfiles = (metrics.totalGuests || 0) > 0;
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted); padding:24px;">${hasProfiles ? 'Arama veya segmente uyan misafir yok.' : 'Henüz gerçek misafir profili yok. Yeni rezervasyonda telefon veya e-posta girildiğinde profil güvenle oluşur.'}</td></tr>`;
+  } else {
+    tbody.innerHTML = pageRows.map(row => {
+      const dateBooking = row.nextStay || row.lastStay;
+      const dateValue = dateBooking ? `${formatTrDate(dateBooking.checkIn)} – ${formatTrDate(dateBooking.checkOut)}` : '—';
+      const lifecycleClass = row.lifecycle.code === 'IN_HOUSE' ? 'badge-green' : (row.lifecycle.code === 'UPCOMING' ? 'badge-yellow' : 'badge-blue');
+      const segment = row.isRepeat ? '<span class="badge badge-purple">TEKRAR</span>' : '<span class="badge badge-slate">İLK KONAKLAMA</span>';
+      const contact = [row.phone, row.email].filter(Boolean).map(escapeHtml).join('<br>') || '—';
+      return `<tr>
+        <td><strong>${escapeHtml(row.name)}</strong><br><small>${escapeHtml(String(row.language || 'tr').toUpperCase())}</small></td>
+        <td>${contact}</td>
+        <td><strong>${row.stayCount}</strong></td>
+        <td>${row.nights}</td>
+        <td><strong>₺${Number(row.lifetimeRevenue).toLocaleString('tr-TR')}</strong></td>
+        <td>${escapeHtml(dateValue)}<br><span class="badge ${lifecycleClass}">${escapeHtml(row.lifecycle.label)}</span></td>
+        <td>${segment}</td>
+        <td style="text-align:right;"><button class="btn btn-secondary btn-sm" onclick="openGuestProfileModal(decodeURIComponent('${encodeURIComponent(String(row.id))}'))">Detay</button></td>
+      </tr>`;
+    }).join('');
+  }
+
+  const pagination = document.getElementById('guestDirectoryPagination');
+  if (pagination) pagination.innerHTML = `<button class="btn btn-secondary btn-sm" onclick="setGuestDirectoryPage(${guestDirectoryState.page - 1})" ${guestDirectoryState.page <= 1 ? 'disabled' : ''}>Önceki</button><span>${filtered.length} misafir · ${guestDirectoryState.page}/${pageCount}</span><button class="btn btn-secondary btn-sm" onclick="setGuestDirectoryPage(${guestDirectoryState.page + 1})" ${guestDirectoryState.page >= pageCount ? 'disabled' : ''}>Sonraki</button>`;
+}
+
+function closeGuestProfileModal() {
+  document.getElementById('guestProfileModal')?.classList.remove('active');
+}
+
+function openGuestProfileModal(guestId = null) {
+  const modal = document.getElementById('guestProfileModal');
+  const form = document.getElementById('guestProfileForm');
+  if (!modal || !form) return;
+  form.reset();
+  document.getElementById('guestCountryCode').value = 'TR';
+  const guest = guestId ? (appData.guests || []).find(item => item.id === guestId) : null;
+  document.getElementById('guestProfileId').value = guest?.id || '';
+  document.getElementById('guestProfileModalTitle').innerText = guest ? '👤 Misafir Detayı' : '➕ Yeni Misafir';
+  document.getElementById('guestFirstName').value = guest?.firstName || '';
+  document.getElementById('guestLastName').value = guest?.lastName || '';
+  document.getElementById('guestPhone').value = guest?.phone || '';
+  document.getElementById('guestEmail').value = guest?.email || '';
+  document.getElementById('guestLanguage').value = guest?.language || 'tr';
+  document.getElementById('guestCountryCode').value = guest?.countryCode || 'TR';
+  document.getElementById('guestAllowWhatsapp').checked = guest ? guest.allowWhatsapp !== false : true;
+  document.getElementById('guestAllowSms').checked = guest ? guest.allowSms !== false : true;
+  document.getElementById('guestAllowEmail').checked = guest ? guest.allowEmail !== false : true;
+  document.getElementById('guestMarketingOptIn').checked = guest?.marketingOptIn === true;
+
+  const insights = document.getElementById('guestProfileInsights');
+  const row = guest ? getGuestCrmView().rows.find(item => item.id === guest.id) : null;
+  if (insights && row) {
+    const history = row.bookings.length ? row.bookings.map(booking => {
+      const villaName = appData.villas?.[booking.villa]?.name || booking.villa || '—';
+      return `<div style="padding:7px 0; border-bottom:1px solid rgba(255,255,255,.06);">${escapeHtml(villaName)} · ${formatTrDate(booking.checkIn)} – ${formatTrDate(booking.checkOut)} · ₺${Number(booking.gross || 0).toLocaleString('tr-TR')} <button type="button" class="btn btn-secondary btn-sm" style="float:right;" onclick="closeGuestProfileModal(); openBookingModal(decodeURIComponent('${encodeURIComponent(String(booking.id))}'))">Rezervasyon</button></div>`;
+    }).join('') : '<div style="color:var(--text-muted);">Bu profile bağlı rezervasyon yok.</div>';
+    const offerStatus = row.latestOffer ? escapeHtml(row.latestOffer.status || '—') : '—';
+    insights.innerHTML = `<div class="kpi-cards-grid" style="grid-template-columns:repeat(4,minmax(0,1fr)); margin-bottom:12px;"><div class="kpi-card"><span class="kpi-label">KONAKLAMA</span><div class="kpi-value">${row.stayCount}</div></div><div class="kpi-card"><span class="kpi-label">GECE</span><div class="kpi-value">${row.nights}</div></div><div class="kpi-card"><span class="kpi-label">CİRO</span><div class="kpi-value">₺${Number(row.lifetimeRevenue).toLocaleString('tr-TR')}</div></div><div class="kpi-card"><span class="kpi-label">PLANLI MESAJ</span><div class="kpi-value">${row.scheduledCount}</div><div class="kpi-meta">Uzatma: ${offerStatus}</div></div></div><h4>Konaklama Geçmişi</h4>${history}`;
+    insights.style.display = 'block';
+  } else if (insights) {
+    insights.innerHTML = '';
+    insights.style.display = 'none';
+  }
+  modal.classList.add('active');
+}
+
+async function saveGuestProfile(event) {
+  event.preventDefault();
+  const submit = event.target.querySelector('button[type="submit"]');
+  if (submit) submit.disabled = true;
+  try {
+    const id = document.getElementById('guestProfileId').value;
+    const rawPhone = document.getElementById('guestPhone').value.trim();
+    const rawEmail = document.getElementById('guestEmail').value.trim();
+    const phone = rawPhone ? normalizePhone(rawPhone, document.getElementById('guestCountryCode').value || 'TR') : { valid: false, normalized: '' };
+    const email = rawEmail ? normalizeEmail(rawEmail) : { valid: false, normalized: '' };
+    if (rawPhone && !phone.valid) throw new Error('Telefon numarası geçerli değil.');
+    if (rawEmail && !email.valid) throw new Error('E-posta adresi geçerli değil.');
+    const input = {
+      firstName: document.getElementById('guestFirstName').value.trim(),
+      lastName: document.getElementById('guestLastName').value.trim(),
+      phone: phone.normalized || '', email: email.normalized || '',
+      language: document.getElementById('guestLanguage').value,
+      countryCode: document.getElementById('guestCountryCode').value.trim().toUpperCase() || 'TR',
+      allowWhatsapp: document.getElementById('guestAllowWhatsapp').checked,
+      allowSms: document.getElementById('guestAllowSms').checked,
+      allowEmail: document.getElementById('guestAllowEmail').checked,
+      marketingOptIn: document.getElementById('guestMarketingOptIn').checked
+    };
+    const duplicate = detectDuplicateCandidates(
+      { id: id || null, tenant_id: getActiveTenantId(), phone: input.phone, email: input.email },
+      (appData.guests || []).map(item => ({ id: item.id, tenant_id: item.tenantId, first_name: item.firstName, last_name: item.lastName, phone: item.phone, email: item.email }))
+    );
+    if (duplicate.hasWarning) throw new Error('Aynı telefon veya e-postaya sahip başka bir misafir profili var. Otomatik birleştirme yapılmadı; mevcut profili açın.');
+    const saved = id ? await updateGuest(id, input) : await createGuest(input);
+    if (!appData.guests) appData.guests = [];
+    const index = appData.guests.findIndex(item => item.id === saved.id);
+    if (index >= 0) appData.guests[index] = saved; else appData.guests.unshift(saved);
+    closeGuestProfileModal();
+    renderGuestsTab();
+    if (typeof alert === 'function') alert('✅ Misafir profili kaydedildi.');
+  } catch (error) {
+    if (typeof alert === 'function') alert('Misafir profili kaydedilemedi: ' + (error.message || 'Bilinmeyen hata'));
+  } finally {
+    if (submit) submit.disabled = false;
+  }
 }
 
 function renderPricingTab() {
@@ -14423,9 +14668,13 @@ if (typeof module !== 'undefined' && module.exports) {
     createMaintenanceTicket,
     resolveMaintenanceTicket,
     mapGuestFromDb,
+    mapGuestToDb,
     loadGuests,
     createGuest,
     updateGuest,
+    splitGuestName,
+    linkBookingGuestProfile,
+    getGuestCrmView,
     loadMessageTemplates,
     createMessageTemplate,
     updateMessageTemplate,

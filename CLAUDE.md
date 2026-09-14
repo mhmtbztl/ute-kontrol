@@ -331,6 +331,7 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 | Demo'yu Supabase'de gerçek tenant olarak yeniden kurma | yapılmadı |
 | Pazarlama ROAS'ı | kampanya gelir alanı kullanıcı girdisi; "ölçülmüş" gibi sunuluyor, etiketlenmeli |
 | RGVQI denetim düzeltmeleri | phase24 ve phase25, 14 Eylül 2026'da üretime uygulandı ve readiness denetimiyle doğrulandı; uygulama/worker dağıtımı ayrıca izlenmeli |
+| Misafir CRM kanonik profil bağlantısı | phase27 hazır, **üretime uygulanmadı** — kod push edilmeden önce Supabase SQL Editor'da ayrı onayla uygulanmalı |
 | Güvenli test kapısı | `npm test` yalnızca çevrimdışı suite'leri çalıştırır; canlı suite için ayrı test projesi ve açık onay gerekir |
 | Kullanıcı davet e-postası | phase24 outbox + `npm run invitations:worker`; üretimde worker secret'ları kurulmalı |
 
