@@ -236,29 +236,45 @@ phase19 (atomik rezervasyon silme), phase20 (ay kapanışı bütünlüğü),
 phase21 (veri sıfırlama), phase17 (pazarlama — 14 tablo + 20 fonksiyon,
 2026-09-13 doğrulandı).
 
-phase22 (Phase 17 fonksiyonlarından `anon` yetkisinin geri alınması) uygulandı.
+phase22 (`anon` yetkisinin geri alınması), phase23 (çapraz kiracı yazma açığı),
+phase24 (RGVQI denetim düzeltmeleri), phase25 (bulgu incelemesinde yetki sırası)
+ve phase26 (mülk koruması istisnaları) **14 Eylül 2026'da uygulandı.**
+**Bekleyen göç yok.**
 
-**Bekleyen — ACİL:** phase23 (`migration_phase23_marketing_tenant_guard.sql`).
-Çapraz kiracı yazma açığını kapatır (§7'ye bakın). Uygulanana kadar
-`marketing_tenant_isolation_tests.js` **kırmızı kalır ve kırmızı kalması
-doğrudur** — üretimde gerçekten yabancı kiracı yazabiliyor demektir.
+**Bir göçün uygulanıp uygulanmadığı, dosyaya bakarak anlaşılmaz.** Dosya repoda
+durur; veritabanı uygulanmamış olabilir. Doğrulamanın yolu üretime sormaktır:
 
-Göçün uygulanıp uygulanmadığını doğrulamanın en hızlı yolu şemayı okumak değil,
-**PostgREST'e anon anahtarıyla sormaktır**: fonksiyon gövdesindeki hatayı
-(`MARKETING_FINDING_NOT_FOUND`) görüyorsanız anon hâlâ çalıştırabiliyordur;
-`permission denied for function` görüyorsanız göç uygulanmıştır.
+- **Yetki göçleri** → anon anahtarıyla RPC çağırın.
+  `permission denied for function` = uygulanmış;
+  fonksiyonun kendi hata mesajı (ör. `MARKETING_FINDING_NOT_FOUND`) = uygulanmamış.
+- **Davranış göçleri** → ilgili canlı süiti koşun. `tenant_reset_tests` ve
+  `account_deletion_tests` phase26'yı, `marketing_tenant_isolation_tests`
+  phase23'ü böyle ölçer.
+- **Sütun/tablo göçleri** → `select=<sutun>&limit=0` ile sorun; `42703`
+  dönüyorsa uygulanmamıştır.
 
-### 4.3 Paralel çalışma (Codex / Antigravity)
-Bu repoda başka AI araçları da çalışıyor. **Dosya bazında bölüşün.**
+### 4.3 Paralel çalışma (Codex / Claude / Antigravity)
 
-- Pazarlama: `core/marketing_*.js`, `docs/`, `index.html`'deki `tab-marketing` → `codex/marketing` dalı, ayrı worktree
-- Geri kalan her şey → `master`
+Bu repoda birden fazla AI aracı **aynı anda** çalışıyor ve hepsi `app.js` (~530 KB)
+ile `index.html` (~265 KB) gibi dev ortak dosyalara dokunuyor.
 
-Tek ortak dosya `run_all_tests.js` (süit listesi). Çakışma orada olur, küçüktür.
+> **Ortak çalışma kurallarının tek kaynağı [`AGENTS.md`](AGENTS.md) dosyasıdır.**
+> Worktree düzeni, commit/push kuralları, göç değişmezliği, teslim protokolü ve
+> karşılıklı denetim orada tanımlıdır ve **bu repoda çalışan her araç için
+> bağlayıcıdır**. Kuralları buraya kopyalamayın: iki kopya kaçınılmaz olarak
+> ayrışır ve hangisinin geçerli olduğu belirsizleşir.
 
-**Uyarı:** Antigravity bir kez ben çalışırken commit atıp yarım düzenlememi kendi commit'ine
-kattı. Çok dosyalı bir değişikliğe başlamadan `git log --oneline -1` ve `git status` bakın,
-bitince tekrar bakın. `git status` siz commit atmadan temizlendiyse başkası araya girmiştir.
+Özet — ayrıntı ve gerekçeler `AGENTS.md` içinde:
+
+1. Her araç kendi worktree klasöründe çalışır; ana klasörde tek araç bulunur.
+2. `git add -A` / `git add .` yasak — kimse başkasının dosyasını commit etmez.
+3. Göç dosyaları değişmezdir; düzeltme yeni `phase<N+1>` göçü olarak eklenir.
+4. Teslimden önce `npm test`, `npm run verify:migrations` ve
+   `node stamp_assets.js --check` yeşil olmalı.
+5. `master` dalına aynı anda tek araç dokunur; diğeri haber vermeden merge/push yapmaz.
+
+Üretim şeması **hiçbir araç tarafından kendiliğinden değiştirilmez**: göçler
+Supabase panelinden elle ve **ayrı açık onayla** uygulanır (§4.2).
 
 ---
 
@@ -302,7 +318,11 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 | Veri sıfırlama | tamamlandı (phase21) — göç uygulandı |
 | Phase 17 pazarlama (Codex, PR #1) | birleştirildi; tablolar + RPC'ler üretimde |
 | Phase 17 `anon` yetkisi | tamamlandı (phase22 uygulandı) — ağı `marketing_anon_grant_tests` |
-| Çapraz kiracı yazma açığı | **phase23 göçü uygulanmayı bekliyor — ACİL** — ağı `marketing_tenant_isolation_tests` |
+| Çapraz kiracı yazma açığı | tamamlandı (phase23 uygulandı) — ağı `marketing_tenant_isolation_tests` |
+| Bulgu incelemesinde yetki sırası | tamamlandı (phase25 uygulandı) |
+| Mülk koruması sıfırlamayı kilitliyordu | tamamlandı (phase26 uygulandı) — ağı `tenant_reset_tests`, `account_deletion_tests` |
+| Rezervasyon ekranı: temizlik gelir/gider ayrımı, komisyon oranı, tek takvimli tarih | tamamlandı — ağı `booking_form_economics_tests` |
+| Ayrı Supabase test projesi | **yapılmadı** — canlı süitler (30 adet) varsayılan koşuda atlanıyor, kimse otomatik koşmuyor |
 | Fotoğraf AI worker'ı | `GEMINI_API_KEY` yok; Actions adımı güvenle atlanıyor — **harici bağımlılık** |
 | `get_executive_dashboard_snapshot` | tanımlı ama arayüzde **hiç çağrılmıyor**; içinde tahakkuk ve gece sayımı hataları var (§3.4) |
 | Excel içe/dışa aktarma | "Şirket Genel Raporu" içe aktarımı devre dışı bırakıldı, gerçek uygulama yok |
