@@ -42,6 +42,29 @@ function computeHash(content) {
   return 'hash_' + Math.abs(hash).toString(16);
 }
 
+/**
+ * Daha once yazilmis bir rezervasyonla ice aktarim satirini karsilastirmak
+ * icin kararlı parmak izi. Rezervasyon kodu dahil edilmez: kod bos
+ * birakildiginda createBooking tarafindan her denemede yeniden uretilir.
+ */
+function bookingFingerprint(row = {}) {
+  const propertyId = String(row.propertyId || row.property_id || row.villa || '').trim().toLowerCase();
+  const guest = String(row.guest || row.guest_name || '').trim().toLocaleLowerCase('tr-TR');
+  const checkIn = normalizeDate(row.checkIn || row.check_in) || '';
+  const checkOut = normalizeDate(row.checkOut || row.check_out) || '';
+  const amount = (value) => {
+    const normalized = normalizeAmount(value);
+    return normalized === null ? '' : String(Math.round(normalized * 100) / 100);
+  };
+  const gross = amount(row.gross !== undefined ? row.gross : (row.grossAmount !== undefined ? row.grossAmount : row.gross_amount));
+  const otaCommission = amount(row.otaCommission !== undefined ? row.otaCommission : (row.otaComm !== undefined ? row.otaComm : row.ota_commission));
+  const cleaningFee = amount(row.cleaningFee !== undefined ? row.cleaningFee : (row.cleanFee !== undefined ? row.cleanFee : row.cleaning_fee));
+  const pax = String(Number(row.pax) || 2);
+  const channel = String(row.channel || 'Direct').trim().toLocaleLowerCase('tr-TR');
+  const status = String(row.status || 'CONFIRMED').trim().toUpperCase();
+  return [propertyId, guest, checkIn, checkOut, gross, otaCommission, cleaningFee, pax, channel, status].join('|');
+}
+
 // -----------------------------------------------------------------------------
 // Normalizasyon
 // -----------------------------------------------------------------------------
@@ -278,9 +301,12 @@ function validateBookingRows(rawRows = [], columnMap = {}, context = {}) {
   const kapaliMi = typeof context.isStayPeriodClosed === 'function' ? context.isStayPeriodClosed : () => false;
 
   const validatedRows = [], errors = [];
-  let validCount = 0, invalidCount = 0, duplicateCount = 0;
+  let validCount = 0, invalidCount = 0, duplicateCount = 0, existingDuplicateCount = 0;
   let totalGross = 0, totalNights = 0;
   const gorulen = new Set();
+  const mevcutRezervasyonlar = new Set(
+    (context.existingBookings || []).map(bookingFingerprint)
+  );
 
   rawRows.forEach((raw, idx) => {
     const rowNum = idx + 2;
@@ -359,10 +385,32 @@ function validateBookingRows(rawRows = [], columnMap = {}, context = {}) {
     }
 
     // Dosya ICI mukerrer / ayni mulkte cakisma
-    const fp = `${mulk ? mulk.id : mulkHam}|${giris}|${cikis}|${misafir.toLowerCase()}`;
+    const aday = {
+      propertyId: mulk ? mulk.id : mulkHam,
+      guest: misafir,
+      checkIn: giris,
+      checkOut: cikis,
+      gross: brut,
+      otaCommission: komisyon,
+      cleaningFee: temizlik,
+      pax,
+      channel: kanal,
+      status: durum
+    };
+    const fp = bookingFingerprint(aday);
     let mukerrer = false;
     if (satirHata.length === 0) {
-      if (gorulen.has(fp)) { mukerrer = true; duplicateCount++; } else gorulen.add(fp);
+      if (gorulen.has(fp)) {
+        mukerrer = true;
+        duplicateCount++;
+      } else if (mevcutRezervasyonlar.has(fp)) {
+        mukerrer = true;
+        duplicateCount++;
+        existingDuplicateCount++;
+        gorulen.add(fp);
+      } else {
+        gorulen.add(fp);
+      }
     }
 
     if (satirHata.length === 0) {
@@ -385,7 +433,7 @@ function validateBookingRows(rawRows = [], columnMap = {}, context = {}) {
   // ama kullaniciya yazmadan once soylemek daha iyi)
   const cakisma = [];
   const mulkeGore = {};
-  validatedRows.filter(r => r.status !== 'CANCELLED').forEach(r => {
+  validatedRows.filter(r => r.status !== 'CANCELLED' && !r.isPotentialDuplicate).forEach(r => {
     (mulkeGore[r.propertyId] = mulkeGore[r.propertyId] || []).push(r);
   });
   Object.values(mulkeGore).forEach(list => {
@@ -400,11 +448,13 @@ function validateBookingRows(rawRows = [], columnMap = {}, context = {}) {
       }
     }
   });
+  const cakisanSatirlar = new Set(cakisma.map(c => c.rowNum));
+  validatedRows.forEach(r => { r.hasFileOverlap = cakisanSatirlar.has(r.rowNum); });
 
   return {
     mode: 'BOOKINGS',
     totalRows: rawRows.length,
-    validCount, invalidCount, duplicateCount,
+    validCount, invalidCount, duplicateCount, existingDuplicateCount,
     totalGross: Math.round(totalGross * 100) / 100,
     totalNights,
     validatedRows, errors,
@@ -456,6 +506,7 @@ function parseCSV(text) {
 
 const FinanceImportEngine = {
   computeHash,
+  bookingFingerprint,
   parseCSV,
   normalizeAmount,
   normalizeDate,

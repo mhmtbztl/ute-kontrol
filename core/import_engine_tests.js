@@ -151,13 +151,30 @@ function run() {
   check(ayniIki.duplicateCount === 1,
     '16. Birebir aynı satır mükerrer olarak işaretlenir', 'mükerrer = ' + ayniIki.duplicateCount);
 
+  const mevcutKayit = {
+    propertyId: 'p1', guest: 'Ali', checkIn: '2026-03-10', checkOut: '2026-03-14',
+    gross: 40000, otaComm: 0, cleanFee: 0, pax: 2, channel: 'Direct', status: 'CONFIRMED'
+  };
+  const yenidenYukleme = E.validateBookingRows([
+    { 'Villa': 'SEYİR', 'Misafir Adı': 'Ali', 'Giriş Tarihi': '2026-03-10',
+      'Çıkış Tarihi': '2026-03-14', 'Brüt Tutar (TL)': '40000' }
+  ], bMap, { properties: MULKLER, existingBookings: [mevcutKayit] });
+  check(yenidenYukleme.duplicateCount === 1 && yenidenYukleme.existingDuplicateCount === 1 &&
+        yenidenYukleme.validatedRows[0].isPotentialDuplicate === true,
+    '17. Yarım kalan aktarım yeniden yüklendiğinde mevcut birebir kayıt hata yerine mükerrer sayılır',
+    JSON.stringify(yenidenYukleme));
+
+  check(cakisan.validatedRows.filter(r => !r.isPotentialDuplicate && !r.hasFileOverlap).length === 1,
+    '18. Dosya içindeki gerçek tarih çakışması yazma kuyruğuna girmez',
+    JSON.stringify(cakisan.validatedRows));
+
   // --- 6. Kapali donem ------------------------------------------------------------
   console.log('\n--- 6. KAPALI DÖNEM ---');
   const kapali = E.validateBookingRows([
     { 'Villa': 'SEYİR', 'Misafir Adı': 'Ali', 'Giriş Tarihi': '2026-03-10', 'Çıkış Tarihi': '2026-03-14', 'Brüt Tutar (TL)': '40000' }
   ], bMap, { properties: MULKLER, isStayPeriodClosed: () => true });
   check(kapali.validCount === 0 && kapali.errors[0].errors.some(e => e.includes('kapatılmış')),
-    '17. Kapatılmış döneme denk gelen rezervasyon önizlemede engellenir',
+    '19. Kapatılmış döneme denk gelen rezervasyon önizlemede engellenir',
     JSON.stringify(kapali.errors[0] && kapali.errors[0].errors));
 
   // --- 7. Gider dogrulama -----------------------------------------------------
@@ -172,29 +189,29 @@ function run() {
   ], gMap, { properties: MULKLER });
 
   check(gider.validCount === 2 && gider.invalidCount === 3,
-    '18. Geçerli ve hatalı gider satırları ayrılır', JSON.stringify({ g: gider.validCount, h: gider.invalidCount }));
+    '20. Geçerli ve hatalı gider satırları ayrılır', JSON.stringify({ g: gider.validCount, h: gider.invalidCount }));
 
   check(Math.abs(gider.totalAmount - 110590) < 0.01,
-    '19. Geçerli satırların toplamı doğru hesaplanır (34.268 + 76.322)',
+    '21. Geçerli satırların toplamı doğru hesaplanır (34.268 + 76.322)',
     'toplam = ' + gider.totalAmount);
 
   check(gider.validatedRows[1].expenseType === 'CAPEX' && gider.validatedRows[1].propertyId === 'p2',
-    '20. CAPEX ve mülk eşlemesi doğru', JSON.stringify(gider.validatedRows[1]));
+    '22. CAPEX ve mülk eşlemesi doğru', JSON.stringify(gider.validatedRows[1]));
 
   check(gider.validatedRows[0].propertyId === null,
-    '21. Boş mülk "tüm portföy" olarak kabul edilir (hata değil)',
+    '23. Boş mülk "tüm portföy" olarak kabul edilir (hata değil)',
     'propertyId = ' + gider.validatedRows[0].propertyId);
 
   // --- 8. CSV ----------------------------------------------------------------
   console.log('\n--- 8. CSV ---');
   const csv = E.parseCSV('Tarih;Kategori;Tutar\n15.03.2026;BAKIM;"1.234,56"\n16.03.2026;FATURA;500');
   check(csv.headers.length === 3 && csv.rows.length === 2 && csv.rows[0]['Tutar'] === '1.234,56',
-    '22. Noktalı virgüllü CSV ve tırnaklı alanlar doğru ayrıştırılır', JSON.stringify(csv));
+    '24. Noktalı virgüllü CSV ve tırnaklı alanlar doğru ayrıştırılır', JSON.stringify(csv));
 
   // --- 9. Dosya parmak izi ------------------------------------------------------
   const h1 = E.computeHash('abc'), h2 = E.computeHash('abc'), h3 = E.computeHash('abd');
   check(h1 === h2 && h1 !== h3,
-    '23. Dosya parmak izi kararlı ve ayırt edici (mükerrer yükleme engeli)', `${h1} / ${h3}`);
+    '25. Dosya parmak izi kararlı ve ayırt edici (mükerrer yükleme engeli)', `${h1} / ${h3}`);
 
   console.log('\n=============================================================================');
   console.log(`TEST SUMMARY: ${passed} / ${passed + failed} TESTS PASSED (${failed} FAILED)`);

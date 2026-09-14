@@ -4976,6 +4976,7 @@ function parseWorkbookWithMode(wb, fileName, mode) {
   } else {
     const ctx = {
       properties: getImportProperties(),
+      existingBookings: (appData && appData.bookings) || [],
       isPeriodClosed: (d) => (typeof isPeriodClosed === 'function' ? isPeriodClosed(d) : false),
       isStayPeriodClosed: (a, b) => (typeof isStayPeriodClosed === 'function' ? isStayPeriodClosed(a, b) : false)
     };
@@ -5037,7 +5038,7 @@ function renderImportPreviewBox() {
     : { date: 'Tarih', category: 'Kategori', amount: 'Tutar' };
   const eksikSutun = Object.keys(zorunlu).filter(k => !pendingImportData.columnMap[k]).map(k => zorunlu[k]);
 
-  const yazilacak = r.validCount - (r.duplicateCount || 0);
+  const yazilacak = (r.validatedRows || []).filter(v => !v.isPotentialDuplicate && !v.hasFileOverlap).length;
 
   if (stats) {
     const p = [`${r.totalRows} satır okundu`];
@@ -5085,7 +5086,7 @@ function renderImportPreviewBox() {
     });
 
     // Sonra gecerli satirlardan ornek
-    (r.validatedRows || []).slice(0, Math.max(0, 15 - hatalar.length)).forEach(v => {
+    (r.validatedRows || []).filter(v => !v.hasFileOverlap).slice(0, Math.max(0, 15 - hatalar.length)).forEach(v => {
       const durum = v.isPotentialDuplicate ? '⊘ mükerrer, atlanacak' : '✓ eklenecek';
       const renk = v.isPotentialDuplicate ? 'rgba(245,158,11,0.10)' : '';
       if (rezMi) {
@@ -5145,7 +5146,7 @@ async function applyImportedData() {
 
   const r = pendingImportData.result;
   const rezMi = pendingImportData.mode === 'BOOKINGS';
-  const yazilacaklar = (r.validatedRows || []).filter(v => !v.isPotentialDuplicate);
+  const yazilacaklar = (r.validatedRows || []).filter(v => !v.isPotentialDuplicate && !v.hasFileOverlap);
   if (yazilacaklar.length === 0) {
     if (typeof showToast === 'function') showToast('İçe aktarılacak geçerli kayıt yok.', 'info');
     return;
