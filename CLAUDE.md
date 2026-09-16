@@ -357,7 +357,20 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
    Ayrıca e-posta onayı açıkken her `signUp` bir mail tetikler ve gönderim
    limiti doğrulamadan **önce** çalışıp asıl hatayı maskeler. Test projesinde
    onay bu yüzden kapalıdır.
-11. **SQL dosyalarında UTF-8 BOM var** (`schema.sql` + üç göç). Postgres'e
+12. **Bir kimlik bilgisine kaçan satır sonu, 20 süiti anlaşılmaz hatayla düşürür.**
+   CI'daki ilk canlı koşuda anon anahtarı GitHub secret'ına satır sonlarıyla
+   yapıştırılmıştı. `supabase-js` onu `apikey` başlığına koyuyor, fetch
+   `Headers.append: ... is an invalid header value` ile reddediyor, her giriş
+   düşüyor ve süitler `Cannot read properties of null` ile yarılıyor. Hiçbir
+   mesaj sorunun **anahtarda** olduğunu söylemiyordu; GitHub değeri
+   maskelediği için hata `"***" is an invalid header value` olarak görünüyor,
+   yani değeri okumak da mümkün değil. Üstüne, yarım kalan süitler temizlik
+   yapamadan çıkıp hesap sızdırıyor.
+
+   `core/test_env.js` artık kimlik bilgilerini kırpar ve içinde satır sonu
+   kalırsa **hangi değişkenin** bozuk olduğunu söyleyerek, tek bir hesap bile
+   yaratmadan durur. Ağı `core/test_gate_tests.js`.
+13. **SQL dosyalarında UTF-8 BOM var** (`schema.sql` + üç göç). Postgres'e
    olduğu gibi gönderilirse ilk ifade sözdizimi hatası verir. Dosyadan
    silinemez: manifest hash'leri BOM dahil metin üzerinden üretildi ve göçler
    değişmezdir. `bootstrap_test_project.js` çalıştırdığı metinden ayıklar,

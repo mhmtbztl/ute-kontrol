@@ -171,3 +171,16 @@ Canlı süitler **davranışı** ölçer ve bunu test projesinde yapar.
 
 Secret'lara **üretim anahtarlarını koymayın.** İş akışı hedefin üretim olmadığını
 ayrıca doğrular, ama ilk savunma doğru değeri girmektir.
+
+> **Anahtarı yapıştırırken satır sonu kaçırmayın.** Değer tek satır olmalı.
+> Anahtarın içine giren bir satır sonu, `supabase-js`'in `apikey` başlığını
+> geçersiz kılar ve **her** istek reddedilir. İlk CI koşusunda tam olarak bu
+> oldu. Kapı bunu artık yakalıyor ve hangi değişkenin bozuk olduğunu söylüyor:
+>
+> ```
+> LIVE_TEST_GUARD: SUPABASE_ANON_KEY icinde satir sonu ya da sekme var.
+> ```
+>
+> Bu mesajı görürseniz ilgili secret'ı silip **tek satır** olarak yeniden girin.
+> Sondaki fazladan boşluk/satır sonu kırpılır; **içeride** kalan bir satır sonu
+> anahtarın kendisini bozar ve kırpılamaz.
