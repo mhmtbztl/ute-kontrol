@@ -166,11 +166,21 @@ function sanitizeCredentials(env) {
     const trimmed = raw.trim();
     if (trimmed !== raw) env[key] = trimmed;
     if (/[\r\n\t]/.test(trimmed)) {
+      // Degerin KENDISI basilamaz (gizli, ayrica CI onu maskeler ve maskelenmis
+      // bir metin hicbir sey anlatmaz). Bunun yerine SEKLINI bas: kac parcaya
+      // bolunmus, parcalar kac karakter. "46 karakter tek parca beklenirken
+      // 12+34 geldi" demek, sorunu tek bakista anlasilir kilar.
+      const parts = trimmed.split(/[\r\n\t]+/);
       throw new Error(
         `LIVE_TEST_GUARD: ${key} icinde satir sonu ya da sekme var.\n` +
         '  Bu deger HTTP basligina giriyor; boyle bir karakter tum istekleri\n' +
-        '  "invalid header value" ile reddettirir. Degeri tek satir olarak girin\n' +
-        '  (CI kullaniyorsaniz secret\'i yeniden yapistirin).'
+        '  "invalid header value" ile reddettirir.\n' +
+        `  Deger ${parts.length} parcaya bolunmus, parca uzunluklari: ${parts.map(p => p.length).join(' + ')}` +
+        ` (toplam ${trimmed.length} karakter).\n` +
+        '  Muhtemel sebep: dar bir terminalden ya da satir kaydiran bir gorunumden\n' +
+        '  kopyalamak — kaydirma noktasi gercek bir satir sonuna donusur.\n' +
+        '  Degeri tek satir olarak girin; CI kullaniyorsaniz secret\'i silip\n' +
+        '  yeniden yapistirin.'
       );
     }
   }
