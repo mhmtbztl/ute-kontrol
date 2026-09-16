@@ -286,13 +286,19 @@ for (let i = 0; i < testFiles.length; i++) {
 
 // -----------------------------------------------------------------------------
 // SIZINTI DENETIMI
-// Suitler uretim Supabase projesine karsi calisiyor ve gercek kullanici aciyor.
-// Temizlik hatalari Supabase JS'te FIRLATMAZ, {error} doner; kontrol edilmezse
-// gorunmez kalir. 2026-09-11'de bu sekilde 525 artik hesap birikmisti.
-// Bu denetim, hangi suit sizdirirsa sizdirsin durumu gorunur kilar.
+// Suitler gercek auth kullanicisi acar. Temizlik hatalari Supabase JS'te
+// FIRLATMAZ, {error} doner; kontrol edilmezse gorunmez kalir — 2026-09-11'de bu
+// sekilde 525 artik hesap birikmisti. Bu denetim, hangi suit sizdirirsa
+// sizdirsin durumu gorunur kilar.
+//
+// Denetlenen proje, kapinin ONAYLADIGI hedeftir; yani ayri test projesi.
+// Uretim artik hedeflenemez (core/test_env.js kara listesi), dolayisiyla
+// mesajlar "uretim" demez: yanlis projeyi isaret eden bir uyari, insani
+// gereksiz yere uretimde temizlik aramaya gonderir.
 // -----------------------------------------------------------------------------
 const TEST_EMAIL_RE = /@(lexbnb-e2e\.test|lexbnb\.test|lexbnbtest\.com|lexbnb-test\.com)$/i;
 let leakedAccounts = null;
+let auditedHost = 'test';
 
 async function auditLeakedTestAccounts() {
   try {
@@ -300,6 +306,7 @@ async function auditLeakedTestAccounts() {
     // Suitlerin yazdigi projeyi denetler — kapinin onayladigi hedefin aynisi.
     const env = testEnv.loadTestEnv();
     if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return null;
+    auditedHost = new URL(env.SUPABASE_URL).hostname;
 
     const admin = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
       auth: { persistSession: false, autoRefreshToken: false }
@@ -337,7 +344,7 @@ if (!allowLiveTests) {
   console.log('⚠️  Sizinti denetimi calistirilamadi (.env veya servis anahtari okunamadi).');
 } else if (leakedAccounts.length > 0) {
   leakFailed = true;
-  console.log(`\n❌ SIZINTI: uretim projesinde ${leakedAccounts.length} temizlenmemis test hesabi var.`);
+  console.log(`\n❌ SIZINTI: ${auditedHost} projesinde ${leakedAccounts.length} temizlenmemis test hesabi var.`);
   console.log(`   Ornek: ${leakedAccounts.slice(0, 5).join(', ')}${leakedAccounts.length > 5 ? ' ...' : ''}`);
   console.log('   Temizlik: supabase/cleanup_test_accounts.sql');
   console.log('   Silme bloke oluyorsa migration_phase13 + migration_phase14 calistirilmamis olabilir.');

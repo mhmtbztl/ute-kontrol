@@ -136,12 +136,53 @@ function assertSafeLiveTarget(env) {
   return env;
 }
 
+// Baglanti icin kullanilan degerler. Bunlar HTTP basligina ya da URL'e girer;
+// icindeki bosluk/satir sonu sessizce degil, adiyla patlamalidir.
+const CREDENTIAL_KEYS = Object.freeze([
+  'SUPABASE_URL',
+  'TEST_SUPABASE_URL',
+  'SUPABASE_ANON_KEY',
+  'SUPABASE_PUBLISHABLE_KEY',
+  'SUPABASE_SERVICE_ROLE_KEY'
+]);
+
+/**
+ * Kimlik bilgilerini bastaki/sondaki bosluktan arindirir ve icinde satir sonu
+ * kalmadigini dogrular.
+ *
+ * Neden: 2026-09-16'da GitHub secret'ina anon anahtari yapistirilirken sonuna
+ * bir satir sonu kacti. supabase-js onu apikey basligina koydu ve fetch
+ * "Headers.append: ... is an invalid header value" ile reddetti. Sonuc: 20'ye
+ * yakin suit "Cannot read properties of null" ile dustu, hicbir mesaj sorunun
+ * ANAHTARDA oldugunu soylemedi ve yarim kalan suitler temizlik yapamadan
+ * cikip 4 hesap sizdirdi. GitHub loglarda secret'i maskeledigi icin hata
+ * `"***" is an invalid header value` olarak gorunuyordu — yani degeri gormek
+ * de mumkun degildi. Kapi artik hangi degiskenin bozuk oldugunu soyler.
+ */
+function sanitizeCredentials(env) {
+  for (const key of CREDENTIAL_KEYS) {
+    const raw = env[key];
+    if (typeof raw !== 'string') continue;
+    const trimmed = raw.trim();
+    if (trimmed !== raw) env[key] = trimmed;
+    if (/[\r\n\t]/.test(trimmed)) {
+      throw new Error(
+        `LIVE_TEST_GUARD: ${key} icinde satir sonu ya da sekme var.\n` +
+        '  Bu deger HTTP basligina giriyor; boyle bir karakter tum istekleri\n' +
+        '  "invalid header value" ile reddettirir. Degeri tek satir olarak girin\n' +
+        '  (CI kullaniyorsaniz secret\'i yeniden yapistirin).'
+      );
+    }
+  }
+  return env;
+}
+
 /**
  * Canli suitlerin cagirdigi tek fonksiyon.
  * Dosya degerleri okunur, process.env ustune yazar (CI icin), sonra kapi.
  */
 function loadTestEnv() {
-  const env = { ...parseEnvFile(envFilePath()), ...process.env };
+  const env = sanitizeCredentials({ ...parseEnvFile(envFilePath()), ...process.env });
   assertSafeLiveTarget(env);
   return env;
 }
@@ -157,6 +198,8 @@ function readEnvFileUnguarded(fileName) {
 
 module.exports = {
   loadTestEnv,
+  sanitizeCredentials,
+  CREDENTIAL_KEYS,
   assertSafeLiveTarget,
   readEnvFileUnguarded,
   destructiveTestsAllowed,

@@ -71,8 +71,12 @@ function runGate(envOverrides, envFileContent) {
   try {
     const out = execFileSync(
       process.execPath,
-      ['-e', "const e = require(process.argv[1]).loadTestEnv(); console.log('OK ' + e.SUPABASE_URL);"
-        , path.join(CORE, 'test_env.js')],
+      ['-e',
+        // Kapinin DONDURDUGU degerleri bas: yalnizca "hata verdi mi" bakmak,
+        // degeri temizleyen bir duzeltmeyi olcemez.
+        "const e = require(process.argv[1]).loadTestEnv();" +
+        "console.log('OK ' + JSON.stringify({ url: e.SUPABASE_URL, anon: e.SUPABASE_ANON_KEY || '' }));",
+        path.join(CORE, 'test_env.js')],
       { env: childEnv, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }
     );
     return { ok: true, output: out.trim() };
@@ -201,6 +205,38 @@ try {
   check(!unconfirmed.ok && /LEXBNB_CONFIRM_REMOTE_TEST_PROJECT/.test(unconfirmed.output),
     'Kapi, uzak bir projenin hostname onayini zorunlu tutuyor',
     unconfirmed.output.slice(0, 200));
+
+  // ---------------------------------------------------------------------------
+  // CI secret'ina kacan satir sonu. 2026-09-16'da tam olarak bu oldu: anon
+  // anahtarinin sonundaki '\n' apikey basligina girdi, fetch "invalid header
+  // value" dedi, 20'ye yakin suit "Cannot read properties of null" ile dustu ve
+  // yarim kalanlar temizlik yapamadan 4 hesap sizdirdi. Hicbir mesaj sorunun
+  // anahtarda oldugunu soylemiyordu — GitHub degeri maskeledigi icin gormek de
+  // mumkun degildi.
+  // ---------------------------------------------------------------------------
+  const trailingNewline = runGate(
+    {
+      LEXBNB_ALLOW_DESTRUCTIVE_TESTS: '1',
+      LEXBNB_CONFIRM_REMOTE_TEST_PROJECT: FAKE_TEST_HOST,
+      SUPABASE_ANON_KEY: 'anahtar-degeri\n'
+    },
+    `SUPABASE_URL=${FAKE_TEST_URL}\nTEST_SUPABASE_URL=${FAKE_TEST_URL}\n`);
+  const trimmedAnon = trailingNewline.ok
+    && JSON.parse(trailingNewline.output.replace(/^OK /, '')).anon === 'anahtar-degeri';
+  check(trimmedAnon,
+    'Kapi, anahtarin sonuna kacan satir sonunu KIRPARAK donduruyor',
+    trailingNewline.output.slice(0, 250));
+
+  const interiorNewline = runGate(
+    {
+      LEXBNB_ALLOW_DESTRUCTIVE_TESTS: '1',
+      LEXBNB_CONFIRM_REMOTE_TEST_PROJECT: FAKE_TEST_HOST,
+      SUPABASE_ANON_KEY: 'anahtarin\nortasinda-satir-sonu'
+    },
+    `SUPABASE_URL=${FAKE_TEST_URL}\nTEST_SUPABASE_URL=${FAKE_TEST_URL}\n`);
+  check(!interiorNewline.ok && /SUPABASE_ANON_KEY icinde satir sonu/.test(interiorNewline.output),
+    'Kapi, anahtarin ICINDE satir sonu varsa degiskeni adiyla soyleyerek duruyor',
+    interiorNewline.output.slice(0, 250));
 
   const accepted = runGate(
     { LEXBNB_ALLOW_DESTRUCTIVE_TESTS: '1', LEXBNB_CONFIRM_REMOTE_TEST_PROJECT: FAKE_TEST_HOST },
