@@ -12287,7 +12287,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
       const tenantId = targetId;
       // Independent datasets are loaded concurrently and every list is paged;
       // Supabase's per-response cap must never silently truncate a dashboard.
-      const [villas, bookings, expenses, cleanList, leads, closeList, targetList, maintenanceTickets, financialTransactions, guests, guestConsentEvents, scheduledMessages, extensionOffers] = await Promise.all([
+      const [villas, bookings, expenses, cleanList, leads, closeList, targetList, maintenanceTickets, financialTransactions, guests, guestConsentEvents, scheduledMessages, extensionOffers, userNotifications] = await Promise.all([
         loadProperties(tenantId),
         loadBookings(tenantId),
         loadExpenses(tenantId),
@@ -12300,7 +12300,11 @@ async function loadTenantAppData(tenantIdOrUserId) {
         fetchAllCloudRows(() => supabaseClient.from('guests').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false })),
         fetchAllCloudRows(() => supabaseClient.from('guest_consent_events').select('*').eq('tenant_id', tenantId).order('recorded_at', { ascending: false })),
         fetchAllCloudRows(() => supabaseClient.from('scheduled_messages').select('*').eq('tenant_id', tenantId).order('scheduled_at', { ascending: true })),
-        fetchAllCloudRows(() => supabaseClient.from('extension_offers').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false }))
+        fetchAllCloudRows(() => supabaseClient.from('extension_offers').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false })),
+        // Bildirim merkezi: `appData.userNotifications` HIC ATANMIYORDU.
+        // Zil ikonu, rozet ve cekmece yalnizca bu diziyi okuyor, yani
+        // bildirim merkezi musteride HER ZAMAN bos gorunuyordu.
+        fetchAllCloudRows(() => supabaseClient.from('user_notifications').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false }))
       ]);
       const propIdMap = {};
       Object.values(villas || {}).forEach(p => {
@@ -12345,6 +12349,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
         })),
         maintenanceTickets,
         financialTransactions: financialTransactions || [],
+        userNotifications: userNotifications || [],
         marketingCampaigns: [],
         influencerCollabs: [],
         loadState: { status: 'READY', stale: false, loadedAt: new Date().toISOString() },
@@ -13697,6 +13702,35 @@ async function acknowledgeUserNotification(notifId) {
   return data;
 }
 
+/**
+ * Bildirimleri OKUNDU olarak isaretler — Postgres'e.
+ *
+ * "Tumunu Okundu Say" dugmesi bir zamanlar yalnizca `appData` icindeki
+ * nesneleri degistirip `saveAppData()` cagiriyordu; saveAppData ise hicbir sey
+ * kaydetmiyor (yalnizca eski localStorage onbellegini siliyor). Yani rozet
+ * siniyor, kullanici "okundu" sanip sayfayi yeniliyor ve butun bildirimler
+ * geri geliyordu. 1. bolum: kaydedilmeyen seye "kaydedildi" denmez.
+ *
+ * ACKNOWLEDGED icin ayri bir RPC var (denetimli); READ icin tablo yazmasi
+ * yeterlidir ve RLS kiraci izolasyonunu zaten uyguluyor.
+ */
+async function markUserNotificationsRead(notifIds) {
+  const tenantId = getActiveTenantId();
+  const ids = (notifIds || []).filter(Boolean);
+  if (!ids.length) return { updated: 0 };
+  requireCloudForWrite('bildirimleri okundu isaretleme', tenantId);
+  if (!supabaseClient) return { updated: 0 };
+  const { data, error } = await supabaseClient
+    .from('user_notifications')
+    .update({ status: 'READ', read_at: new Date().toISOString() })
+    .in('id', ids)
+    .eq('tenant_id', tenantId)
+    .eq('status', 'UNREAD')
+    .select('id');
+  if (error) throw error;
+  return { updated: (data || []).length };
+}
+
 async function loadTenantOnboarding(targetTenantId) {
   const tenantId = targetTenantId || getActiveTenantId();
   if (!tenantId || !supabaseClient) return null;
@@ -14492,18 +14526,67 @@ function renderUserNotificationsDrawer() {
       </div>
       <div style="color: #CBD5E1; font-size: 11px;">${escapeHtml(n.message || '')}</div>
       <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 4px;">
-        <button class="btn btn-secondary btn-sm" onclick="acknowledgeUserNotification('${n.id}'); renderUserNotificationsDrawer();" style="font-size: 9px; padding: 1px 5px;">Okundu</button>
+        ${n.status === 'ACKNOWLEDGED' || n.status === 'RESOLVED' ? '' :
+          `<button class="btn btn-secondary btn-sm" onclick="confirmUserNotification('${n.id}')" style="font-size: 9px; padding: 1px 5px;">Onayla</button>`}
       </div>
     </div>
   `).join('');
 }
 
-function markAllNotificationsAsRead() {
-  if (typeof appData !== 'undefined' && appData.userNotifications) {
-    appData.userNotifications.forEach(n => { n.status = 'READ'; });
+/**
+ * Cekmecedeki "Onayla" dugmesi.
+ *
+ * Eskiden `onclick="acknowledgeUserNotification(id); renderUserNotificationsDrawer();"`
+ * yaziyordu. Uc ayri sorun vardi:
+ *   1. acknowledgeUserNotification async; BEKLENMIYORDU. Yeniden cizim, RPC
+ *      donmeden once yerel (degismemis) veriyle calisiyordu.
+ *   2. Yerel kayit hic guncellenmiyordu; sayfa yenilenene kadar bildirim
+ *      UNREAD gorunmeye devam ediyordu.
+ *   3. RPC hata firlatirsa (yetki, baglanti) yakalanmiyordu: yakalanmayan
+ *      promise reddi, kullaniciya HICBIR SEY soylemeden sessizce yutuluyordu.
+ */
+async function confirmUserNotification(notifId) {
+  try {
+    await acknowledgeUserNotification(notifId);
+    const notes = (typeof appData !== 'undefined' && appData.userNotifications) || [];
+    const n = notes.find(x => x.id === notifId);
+    if (n) {
+      n.status = 'ACKNOWLEDGED';
+      n.acknowledged_at = new Date().toISOString();
+    }
+    renderUserNotificationsBadge();
+    renderUserNotificationsDrawer();
+  } catch (err) {
+    console.error('Bildirim onaylanamadi:', err);
+    if (typeof showToast === 'function') {
+      showToast('Bildirim onaylanamadı: ' + (err && err.message ? err.message : 'bilinmeyen hata'), 'error');
+    }
   }
-  renderUserNotificationsBadge();
-  renderUserNotificationsDrawer();
+}
+
+/**
+ * "Tumunu Okundu Say".
+ *
+ * Eskiden yalnizca bellekteki nesneleri degistiriyordu. `saveAppData()` bile
+ * cagrilmiyordu — cagrilsa da bir sey degismezdi, cunku o fonksiyon hicbir sey
+ * kaydetmiyor. Rozet siniyor, kullanici "okundu" saniyor, sayfa yenilenince
+ * butun bildirimler geri geliyordu (1. bolum).
+ */
+async function markAllNotificationsAsRead() {
+  const notes = (typeof appData !== 'undefined' && appData.userNotifications) || [];
+  const okunmayan = notes.filter(n => n.status === 'UNREAD');
+  if (okunmayan.length === 0) return;
+  try {
+    await markUserNotificationsRead(okunmayan.map(n => n.id));
+    okunmayan.forEach(n => { n.status = 'READ'; n.read_at = new Date().toISOString(); });
+    renderUserNotificationsBadge();
+    renderUserNotificationsDrawer();
+  } catch (err) {
+    console.error('Bildirimler okundu isaretlenemedi:', err);
+    if (typeof showToast === 'function') {
+      showToast('Bildirimler okundu işaretlenemedi: ' + (err && err.message ? err.message : 'bilinmeyen hata'), 'error');
+    }
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -15069,6 +15152,13 @@ if (typeof module !== 'undefined' && module.exports) {
     openCommandPalette,
     closeCommandPalette,
     toggleNotificationDrawer,
+    // Bildirim merkezi: yukleme + okundu/onay yollari. Bu fonksiyonlarin
+    // hicbiri kalici degildi (bkz. markAllNotificationsAsRead aciklamasi).
+    markUserNotificationsRead,
+    markAllNotificationsAsRead,
+    confirmUserNotification,
+    renderUserNotificationsBadge,
+    renderUserNotificationsDrawer,
     startWithCleanPortfolio,
     // Tarayici render hatti. core/render_pipeline_tests.js bunlari sahte bir
     // DOM ile GERCEKTEN calistirir; setEl gibi tanimsiz referanslar ancak

@@ -248,9 +248,9 @@ ve kısmi veriyle daha kötü bir duruma yol açar. Bayrak işlem sonunda kapanm
 ```bash
 node stamp_assets.js     # varlıkları içerik hash'iyle damgala (ZORUNLU)
 npm run verify:migrations # göçlerin içerik bütünlüğü + bağımlılık sırası
-npm test                  # 98 çevrimdışı/güvenli süit
+npm test                  # 99 çevrimdışı/güvenli süit
 npm run test:bootstrap    # test projesine eksik göçleri uygula (--check salt okunur)
-npm run test:live         # 121 süit, yalnız ayrı test projesine karşı
+npm run test:live         # 123 süit, yalnız ayrı test projesine karşı
 ```
 `stamp_assets.js --check` güncel değilse hata verir — CI'ya konabilir.
 
@@ -287,7 +287,12 @@ izin geçmişi) **15 Eylül 2026'da uygulandı**; üretime sorularak doğruland�
 projesine `npm run test:bootstrap` ile uygulandı ve sıfırdan kurulan bir
 şemada temiz çalıştıkları görüldü.
 
-**Bekleyen göç yok.**
+**Bekleyen göç: phase29** (`migration_phase29_notification_authz_order.sql`).
+Test projesine `npm run test:bootstrap` ile uygulandı ve doğrulandı;
+**üretime henüz uygulanmadı** — Supabase panelinden elle çalıştırılmalı (§4.2).
+Ne yaptığı: `acknowledge_notification_atomic` ve `resolve_executive_alert_atomic`
+için yetkiyi satir kilidinden öne alır, varlık oracülünü kapatır ve `anon`
+yetkisini geri alır. Ağı `core/notification_authz_tests.js` (16 iddia).
 
 **Bir göçün uygulanıp uygulanmadığı, dosyaya bakarak anlaşılmaz.** Dosya repoda
 durur; veritabanı uygulanmamış olabilir. Doğrulamanın yolu üretime sormaktır:
@@ -449,7 +454,10 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 | Fotoğraf AI worker'ı | `GEMINI_API_KEY` yok; Actions adımı güvenle atlanıyor — **harici bağımlılık** |
 | `get_executive_dashboard_snapshot` | tahakkuk ve gece sayımı hataları phase24 ile düzeltildi; ağı artık `executive_snapshot_tests` (22 iddia, davranış). **Arayüz hâlâ çağırmıyor**: yönetici paneli aynı rakamları tarayıcıda hesaplıyor (§3.4.1 ile ters) |
 | Excel içe/dışa aktarma | "Şirket Genel Raporu" içe aktarımı devre dışı bırakıldı, gerçek uygulama yok |
-| Bildirim merkezi analizi | yapılmadı |
+| Bildirim merkezi analizi | **tamamlandı** (17 Eylül 2026) — merkez her iki uçtan da bağlı değildi; yükleme bağlandı, "okundu" artık Postgres'e yazıyor. RPC yetki sırası phase29 ile düzeltildi (üretime uygulanmalı) |
+| `saveAppData()` hiçbir şey kaydetmiyor | **yeni bulgu** (17 Eylül 2026) — gövdesi yalnızca eski localStorage anahtarlarını siliyor. 40 fonksiyon onu çağırıyor; **17’sinde hiçbir Postgres yazması yok**. Ayrıntı aşağıda |
+| Pazarlama kampanya defteri kalıcı değil | **yeni bulgu** — `marketing_campaigns` tablosu **yok**; `saveMarketingCampaign()` yalnızca bellekte tutup `saveAppData()` çağırıyor. Kullanıcı kampanyayı giriyor, tabloda görüyor, sayfa yenilenince kayıp. `influencerCollabs` de aynı |
+| `month: ‘2026-09’` sabiti | **yeni bulgu** — `toggleCleaningPaid()` oluşturduğu gider kaydının ayını sabit yazıyor. §3.6’daki "bugün sabit yazılmaz" hatasının ay boyutundaki hali; `demo_residue_tests` tarih taraması 10 karakterli `YYYY-MM-DD` arıyordu, 7 karakterli `YYYY-MM` gözden kaçtı. Altı yerde daha var (`prevKey = ‘2025-08’`, `isCurrentMonth: (m === ‘2026-09’)`) |
 | OTA ilan analizi (`runAiListingCritic`) | veri bağlantısı yok; artık skor uydurmuyor, durumu açıkça söylüyor |
 | Demo'yu Supabase'de gerçek tenant olarak yeniden kurma | yapılmadı |
 | Pazarlama ROAS’ı | **tamamlandı** (17 Eylül 2026) — reklam cirosu artık "girilen" olarak etiketleniyor; simülatör sabit çarpan yerine işletmenin kendi ölçülmüş ROAS'ını kullanıyor, ölçülmemiş kanal için tahmin üretmiyor |
@@ -457,6 +465,34 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 | Misafir CRM (phase27 + phase28) | göçler **üretimde uygulandı ve doğrulandı** (15 Eylül 2026, sütun sorgusuyla); test projesinde de kurulu |
 | Güvenli test kapısı | tamamlandı — canlı/çevrimdışı ayrımı artık `@supabase/supabase-js` require'ına bakıyor. Eski kaba dizgi taraması 8 çevrimdışı süiti (worker giriş noktaları) yanlışlıkla atlıyordu; güvenli koşu 85 → 94 süit |
 | Kullanıcı davet e-postası | phase24 outbox + `npm run invitations:worker`; üretimde worker secret'ları kurulmalı |
+
+### `saveAppData()` — kaydetmeyen kaydedici
+
+Adı kaydediyormuş gibi duruyor; gövdesi yalnızca `LEXBNB_DATA_*` ve
+`LEXBNB_V5_MASTER_DATA` anahtarlarını siliyor. Postgres tek kaynak olduğu için
+bu doğru bir temizlik — ama çağıran kodun yarısı onu **kalıcılık sanıyor.**
+
+Çağıran 40 fonksiyonun 23’ü yanında gerçek bir bulut yazması yapıyor
+(`createBooking`, `saveCleaningTask` → `cloudUpsertCleaningTask`, …) — onlarda
+`saveAppData()` yalnızca artık bir çağrı. Kalan **17’sinde hiçbir yazma yok**:
+
+```
+convertAiActionToTask   changeImportMode        saveAllSettings
+promptEditCleaningAmount promptEditTaskAmount   toggleCleaningPaid
+cycleHkStatus           toggleTaskPaid          payAllPendingCleaning
+saveWaAsLead            saveWaAsBooking         saveWhapiSettings
+syncLiveAirbnbData      saveMarketingCampaign   setOtaPricingStrategy
+saveOperatorNote        saveInfluencerCollab
+```
+
+Hepsi aynı sınıf değil ve **tek tek incelenmeli**: bazıları gerçekten yerel bir
+arayüz durumu (`changeImportMode`), bazıları ise müşterinin kaydettiğini
+sandığı iş kaydı (`toggleCleaningPaid` bir **gider kaydı** oluşturuyor,
+`saveWaAsBooking` bir **rezervasyon**). §3.3’teki `requireCloudForWrite`
+bunların hiçbirinde çağrılmıyor, yani yazma koruması da devreye girmiyor.
+
+Bildirim merkezi bu sınıfın ilk düzeltilen üyesidir; ağı
+`core/notification_wiring_tests.js`.
 
 ---
 
@@ -486,6 +522,29 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
   `SELECT ... FOR UPDATE` yapıp sonra yetkiye bakıyor: kimliği doğrulanmamış bir
   çağrı rastgele satırlara kilit alabiliyor ve hata mesajı ("bulunamadı" ile
   "yetkisiz" farklı) bir UUID'nin var olup olmadığını sızdırıyor.
+
+  **Bu kalıp phase25’ten sonra da iki yerde durmaya devam etti** ve 17 Eylül
+  2026’da bildirim merkezi incelemesinde bulundu: phase12’den gelen
+  `acknowledge_notification_atomic` ile `resolve_executive_alert_atomic`.
+  Üretimde ölçüldü — **`anon` ikisini de çalıştırabiliyordu** (phase22 yalnızca
+  pazarlama fonksiyonlarını kapatmıştı) ve varlık oracülü açıktı:
+
+  ```
+  var olmayan UUID -> 200 {"success": false, "error": "NOTIFICATION_NOT_FOUND"}
+  VAR OLAN UUID    -> UNAUTHORIZED: Tenant membership mismatch
+  ```
+
+  Yani giriş bile yapmamış biri, tarayıcıda duran anon anahtarıyla bir
+  bildirim kimliğinin var olup olmadığını öğrenebiliyordu. **Veri değişmedi**:
+  gövdedeki ikinci kat (`tenant_members` kontrolü) tuttu ve kayıt UNREAD kaldı —
+  iki katlı kuralın üçüncü kanıtı. Düzeltme phase29; ağı
+  `core/notification_authz_tests.js`, 16 iddianın 5’i eski gövdeye karşı kırılıyor.
+
+  Aynı göçte ikinci bir düzeltme var: `resolve_executive_alert_atomic`
+  "kim çözdü" izini `COALESCE(p_resolved_by, auth.uid())` ile yazıyordu, yani
+  **çağıran denetim izine başkasının kimliğini yazdırabiliyordu.** Sıra
+  `COALESCE(auth.uid(), p_resolved_by)` olarak çevrildi: oturum varken izi
+  oturum belirler.
 - **`NULL NOT IN (...)` bir koruma DEĞİLDİR.** Phase 17'nin yetki kontrolü şuydu:
 
   ```sql

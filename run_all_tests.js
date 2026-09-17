@@ -149,6 +149,12 @@ const allTestFiles = [
   // Yonetici anlik goruntu RPC: tahakkuk, gece sayimi, USALI siniflandirmasi
   'executive_snapshot_tests.js',
 
+  // Bildirim/uyari RPC yetki sirasi ve anon iptali (Phase 29)
+  'notification_authz_tests.js',
+
+  // Bildirim merkezi her iki uctan da bagli mi (yukleme + kalici okundu)
+  'notification_wiring_tests.js',
+
   // Demo artigi denetimi (uydurma villa/rakam/tarih kaynak taramasi)
   'demo_residue_tests.js',
 
