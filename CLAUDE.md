@@ -400,8 +400,8 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 | Bulgu incelemesinde yetki sırası | tamamlandı (phase25 uygulandı) |
 | Mülk koruması sıfırlamayı kilitliyordu | tamamlandı (phase26 uygulandı) — ağı `tenant_reset_tests`, `account_deletion_tests` |
 | Rezervasyon ekranı: temizlik gelir/gider ayrımı, komisyon oranı, tek takvimli tarih | tamamlandı — ağı `booking_form_economics_tests` |
-| Ayrı Supabase test projesi | **tamamlandı** (15 Eylül 2026) — proje `pdeiorpgxetksyogrmbi`, şema bootstrap ile kuruldu, tam koşu 119/119 yeşil. Geriye yalnızca CI'nin açılması kaldı (aşağıdaki satır) |
-| Canlı süitlerin CI'da otomatik koşması | `.github/workflows/live-tests.yml` hazır ama **uykuda**: `LIVE_TESTS_ENABLED` repo değişkeni `true` olana kadar atlanır. Secret'lar ve değişkenler eklenmeli — docs/TEST_PROJECT_SETUP.md son bölüm |
+| Ayrı Supabase test projesi | **tamamlandı** (15 Eylül 2026) — proje `pdeiorpgxetksyogrmbi`, şema bootstrap ile kuruldu, tam koşu yeşil |
+| Canlı süitlerin CI’da otomatik koşması | **tamamlandı** (16 Eylül 2026) — `.github/workflows/live-tests.yml` açık, her gece 03:00 UTC. İlk yeşil koşu 17 Eylül: 120/120 süit, 1123 iddia, sızıntı temiz |
 | Fotoğraf AI worker'ı | `GEMINI_API_KEY` yok; Actions adımı güvenle atlanıyor — **harici bağımlılık** |
 | `get_executive_dashboard_snapshot` | tanımlı ama arayüzde **hiç çağrılmıyor**; içinde tahakkuk ve gece sayımı hataları var (§3.4) |
 | Excel içe/dışa aktarma | "Şirket Genel Raporu" içe aktarımı devre dışı bırakıldı, gerçek uygulama yok |

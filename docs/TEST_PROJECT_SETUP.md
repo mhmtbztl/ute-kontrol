@@ -160,8 +160,12 @@ Canlı süitler **davranışı** ölçer ve bunu test projesinde yapar.
 
 ## CI
 
-`.github/workflows/live-tests.yml` hazır ama **uykuda**: yalnızca
-`LIVE_TESTS_ENABLED` repo değişkeni `true` olduğunda çalışır. Açmak için:
+`.github/workflows/live-tests.yml` **açık ve çalışıyor** (16 Eylül 2026).
+Her gece 03:00 UTC’te tek koşu yapar; elle tetiklemek için `workflow_dispatch`.
+İlk yeşil koşu 17 Eylül 2026: 120/120 süit, 1123 iddia, sızıntı denetimi temiz.
+
+Anahtar hâlâ `LIVE_TESTS_ENABLED` repo değişkenidir; `true` dışında bir değer
+iş akışını atlar. Sıfırdan kurulum ya da başka bir repoya taşıma için:
 
 1. Repo → Settings → Secrets and variables → Actions
 2. **Secrets**: `TEST_SUPABASE_URL`, `TEST_SUPABASE_ANON_KEY`,

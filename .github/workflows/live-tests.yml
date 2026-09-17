@@ -3,7 +3,8 @@ name: Live database regression
 # Veritabanina yazan 22 suit. Ayri bir Supabase TEST projesi gerektirir.
 # Kurulum: docs/TEST_PROJECT_SETUP.md
 #
-# Bu is akisi LIVE_TESTS_ENABLED repo degiskeni 'true' olana kadar UYKUDADIR.
+# Bu is akisi LIVE_TESTS_ENABLED repo degiskeni 'true' iken calisir; 16 Eylul
+# 2026'da acildi. Degisken bir sebeple geri alinirsa is akisi sessizce atlanir.
 # Sebep: secret'lar tanimli degilken her gece kirmizi bir kosu uretmek, gercek
 # bir kirilmayi da gorunmez kilar.
 
