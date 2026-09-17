@@ -214,9 +214,9 @@ ve kısmi veriyle daha kötü bir duruma yol açar. Bayrak işlem sonunda kapanm
 ```bash
 node stamp_assets.js     # varlıkları içerik hash'iyle damgala (ZORUNLU)
 npm run verify:migrations # göçlerin içerik bütünlüğü + bağımlılık sırası
-npm test                  # 97 çevrimdışı/güvenli süit
+npm test                  # 98 çevrimdışı/güvenli süit
 npm run test:bootstrap    # test projesine eksik göçleri uygula (--check salt okunur)
-npm run test:live         # 119 süit, yalnız ayrı test projesine karşı
+npm run test:live         # 121 süit, yalnız ayrı test projesine karşı
 ```
 `stamp_assets.js --check` güncel değilse hata verir — CI'ya konabilir.
 
@@ -328,6 +328,16 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
    sayılır. Temizlik: `supabase/cleanup_test_accounts.sql`.
 5. **Yeni bir test yazdığınızda, eski koda karşı çalıştırıp KIRILDIĞINI görün.**
    Kırılmıyorsa regresyon ağı değildir.
+
+   **Sunucu tarafı (SQL) bir ağ için de bu geçerli** ve yapılabilir: TEST
+   projesine `pg` ile bağlanın, `pg_get_functiondef('<imza>'::regprocedure)`
+   ile mevcut tanımı **kaydedin**, fonksiyonu eski (hatalı) gövdeyle
+   `CREATE OR REPLACE` edin, süiti koşun, sonra kaydettiğiniz metni aynen geri
+   yükleyip `pg_get_functiondef` çıktısını yeniden okuyarak **birebir aynı**
+   olduğunu doğrulayın. Geri yükleme `finally` içinde olmalı.
+   `executive_snapshot_tests` böyle ölçüldü: phase12 gövdesine karşı 22
+   iddianın 12’si kırıldı. Bu yalnızca TEST projesine dokunur; üretim şeması
+   elle ve ayrı onayla değişir (§4.2).
 6. **Tam koşuyu arka arkaya tekrarlamayın.** Her süit auth kullanıcısı yaratıyor;
    iki-üç ardışık tam koşudan sonra Supabase `Request rate limit reached` döner ve
    **10'a yakın süit sahte biçimde kırmızı olur**. Kod regresyonu sanmayın:
@@ -403,7 +413,7 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 | Ayrı Supabase test projesi | **tamamlandı** (15 Eylül 2026) — proje `pdeiorpgxetksyogrmbi`, şema bootstrap ile kuruldu, tam koşu yeşil |
 | Canlı süitlerin CI’da otomatik koşması | **tamamlandı** (16 Eylül 2026) — `.github/workflows/live-tests.yml` açık, her gece 03:00 UTC. İlk yeşil koşu 17 Eylül: 120/120 süit, 1123 iddia, sızıntı temiz |
 | Fotoğraf AI worker'ı | `GEMINI_API_KEY` yok; Actions adımı güvenle atlanıyor — **harici bağımlılık** |
-| `get_executive_dashboard_snapshot` | tanımlı ama arayüzde **hiç çağrılmıyor**; içinde tahakkuk ve gece sayımı hataları var (§3.4) |
+| `get_executive_dashboard_snapshot` | tahakkuk ve gece sayımı hataları phase24 ile düzeltildi; ağı artık `executive_snapshot_tests` (22 iddia, davranış). **Arayüz hâlâ çağırmıyor**: yönetici paneli aynı rakamları tarayıcıda hesaplıyor (§3.4.1 ile ters) |
 | Excel içe/dışa aktarma | "Şirket Genel Raporu" içe aktarımı devre dışı bırakıldı, gerçek uygulama yok |
 | Bildirim merkezi analizi | yapılmadı |
 | OTA ilan analizi (`runAiListingCritic`) | veri bağlantısı yok; artık skor uydurmuyor, durumu açıkça söylüyor |

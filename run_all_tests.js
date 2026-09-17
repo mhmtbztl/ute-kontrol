@@ -146,6 +146,9 @@ const allTestFiles = [
   // Ay kapanisi butunlugu (Phase 20)
   'month_close_integrity_tests.js',
 
+  // Yonetici anlik goruntu RPC: tahakkuk, gece sayimi, USALI siniflandirmasi
+  'executive_snapshot_tests.js',
+
   // Demo artigi denetimi (uydurma villa/rakam/tarih kaynak taramasi)
   'demo_residue_tests.js',
 
