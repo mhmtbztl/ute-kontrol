@@ -161,6 +161,69 @@ function run() {
     '8. Gerçek boşluk gecesi yoksa uydurulmuyor',
     'detectGapNights() hâlâ eksik kayıt yerine sahte kayıt üretiyor olabilir.');
 
+  // --- 8. Olculmemis metrige varsayilan atamak --------------------------------
+  // `context.metaRoas || 8.0` kalibi: veri yoksa metrik UYDURULUYOR demektir.
+  // "AI Analizini Yenile" dugmesi danismani argumansiz cagiriyordu; o yolda
+  // musteriye hic olculmemis 8.0x / 9.5x ROAS ve 28.000 TL komisyon yazildi.
+  // `|| 0` ve `?? 0` ihlal DEGILDIR: toplama biriktiricisinde 0 etkisiz
+  // elemandir, "sifir olctuk" demek degil "bu kayit toplama katkı vermiyor"
+  // demektir. Yasak olan SIFIR OLMAYAN varsayilandir — 8.0, 20000, 1500 gibi
+  // bir rakam, olculmemis bir seyi olculmus gibi gosterir.
+  const METRIK = 'Roas|ROAS|Cac|CAC|Occupancy|Adr|ADR|CommLoss|Revenue|Ciro|Price|Fiyat|Cost';
+  const varsayilanRe = new RegExp(
+    '(?:' + METRIK + ')\\s*(?:\\|\\||\\?\\?)\\s*(?:[1-9][0-9]*(?:\\.[0-9]+)?|0\\.[0-9]*[1-9])\\b', 'i');
+  const varsayilanIhlal = [];
+  kodSatirlari(APP).forEach(({ n, l }) => {
+    if (varsayilanRe.test(l)) varsayilanIhlal.push(`app.js:${n} — ${l.trim().slice(0, 100)}`);
+  });
+  check(varsayilanIhlal.length === 0,
+    '9. Ölçülmemiş bir metriğe sayısal varsayılan atanmıyor',
+    varsayilanIhlal.join('\n         ') +
+    '\n       `x.roas || 8.0` kalıbı, veri yokken müşteriye ölçülmüş gibi bir ' +
+    'rakam gösterir. Ölçülemeyen yerde null taşıyıp "—" yazın.');
+
+  // --- 9. Simulator ve danisman sabit carpan kullanmamali ---------------------
+  // Butce simulatoru "Gecmis ROAS'a gore hesaplanir" diyor ama bir zamanlar
+  // Google 9.5x / Meta 8.0x / retarget 10.5x sabitleriyle "Beklenen Ciro"
+  // uretiyordu: hic reklam vermemis hesapta bile rakam cikiyordu.
+  const simBas = APP.indexOf('function runMarketingBudgetSimulation');
+  const simGovde = simBas === -1 ? '' : APP.slice(simBas, APP.indexOf('\nfunction ', simBas + 10));
+  const carpanIhlal = [];
+  kodSatirlari(simGovde).forEach(({ l }) => {
+    const m = l.match(/Amt\s*\*\s*[0-9]+(?:\.[0-9]+)?/g) || [];
+    m.forEach(x => carpanIhlal.push(x.trim()));
+  });
+  check(carpanIhlal.length === 0,
+    '10. Bütçe simülatörü sabit ROAS çarpanı kullanmıyor',
+    'sabit çarpan: ' + carpanIhlal.join(', ') +
+    '\n       Çarpan işletmenin kendi ölçülmüş ROAS\'ı olmalı; ölçülmemiş kanal ' +
+    'için ciro tahmini üretilmemeli.');
+
+  // --- 10. Misafire giden metinde vaat edilmemis ozellik ----------------------
+  // Yetim gece hikaye metni her mulk icin "somine, isitmali jakuzi, izole
+  // mustakil bahce" yaziyordu ve fiyat olarak silinmis demo anahtarlarina
+  // bagli bir merdivenden gelen uydurma rakami gonderiyordu.
+  const MISAFIR_VAADI = ['ısıtmalı jakuzi', 'şömine keyfi', 'AKDENİZ VİLLA',
+                         'meşe şömine odunu', 'korunaklı bahçe', 'Akdeniz kıyısında'];
+  // Sozluk/egitim metinleri istisna: bunlar musteriye bir sey VAAT ETMEZ,
+  // bir muhasebe kaleminin ne demek oldugunu ornekle anlatir.
+  const VAAT_ISTISNA = [/actionRule:/, /warning:/, /example:/, /summary:/];
+  const vaatIhlal = [];
+  kodSatirlari(APP).forEach(({ n, l }) => {
+    if (VAAT_ISTISNA.some(re => re.test(l))) return;
+    MISAFIR_VAADI.forEach(v => { if (l.includes(v)) vaatIhlal.push(`app.js:${n} — ${v}`); });
+  });
+  check(vaatIhlal.length === 0,
+    '11. Misafire giden metin, mülkte olmayan özellik/konum vaat etmiyor',
+    vaatIhlal.join('\n         ') +
+    '\n       Bu metinler WhatsApp/hikaye ile GERÇEK misafire gidiyor.');
+
+  check(!/vKey\s*===\s*'[A-Z]+'\s*\?\s*[0-9]+/.test(APP),
+    '12. Gecelik fiyat villa anahtarına gömülü merdivenden gelmiyor',
+    'detectGapNights() fiyatı `vKey === \'AZURE\' ? 18000 : ...` gibi bir ' +
+    'merdivenden alıyor olabilir. Fiyat mülkün kendi basePrice\'ıdır; ' +
+    'girilmemişse uydurulmaz — ve bu rakam misafire gönderilen metne giriyor.');
+
   console.log('\n=============================================================================');
   console.log(`TEST SUMMARY: ${passed} / ${passed + failed} TESTS PASSED (${failed} FAILED)`);
   console.log('=============================================================================\n');

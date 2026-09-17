@@ -5606,13 +5606,19 @@ function renderGapNights() {
       const diffDays = Math.round((new Date(next.checkIn) - new Date(cur.checkOut)) / (1000 * 60 * 60 * 24));
 
       if (diffDays >= 1 && diffDays <= 4) {
-        const floorGuard = (vConf.floor || 4000) + (vConf.cleanCost || 1500) + (vConf.heatCost || 500);
-        const offer = Math.max(Math.round((vConf.base || 7000) * 0.75), floorGuard);
+        // Taban ve teklif YALNIZCA mulkun kendi girilmis rakamlarindan
+        // uretilir. Eskiden girilmemis her alan bir sabitle dolduruluyordu
+        // (taban 4.000, temizlik 1.500, isitma 500, baz 7.000): hic fiyat
+        // girmemis bir isletme, kendi rakami sanip uygulayacagi bir teklif
+        // goruyordu. Baz fiyat yoksa teklif hesaplanamaz (3.6).
+        const floorGuard = (Number(vConf.floor) || 0) + (Number(vConf.cleanCost) || 0) + (Number(vConf.heatCost) || 0);
+        const baseNightly = Number(vConf.base) || Number(vConf.basePrice) || 0;
+        const offer = baseNightly > 0 ? Math.max(Math.round(baseNightly * 0.75), floorGuard) : null;
         gaps.push({
           villaName: vConf.name,
           dates: `${formatShortDate(cur.checkOut)} → ${formatShortDate(next.checkIn)} (${diffDays} Gece Boş)`,
-          offer: '₺' + offer.toLocaleString('tr-TR') + ' / Gece',
-          floor: '₺' + floorGuard.toLocaleString('tr-TR') + ' Taban',
+          offer: offer === null ? 'Fiyat girilmemiş' : ('₺' + offer.toLocaleString('tr-TR') + ' / Gece'),
+          floor: floorGuard > 0 ? ('₺' + floorGuard.toLocaleString('tr-TR') + ' Taban') : 'Taban maliyeti girilmemiş',
           note: 'İki rezervasyon arası kör boşluk doldurma önerisi'
         });
       }
@@ -5624,13 +5630,19 @@ function renderGapNights() {
       const firstB = upcoming[0];
       const daysUntil = Math.round((new Date(firstB.checkIn) - new Date(todayStr)) / (1000 * 60 * 60 * 24));
       if (daysUntil >= 2 && daysUntil <= 5) {
-        const floorGuard = (vConf.floor || 4000) + (vConf.cleanCost || 1500) + (vConf.heatCost || 500);
-        const offer = Math.max(Math.round((vConf.base || 7000) * 0.75), floorGuard);
+        // Taban ve teklif YALNIZCA mulkun kendi girilmis rakamlarindan
+        // uretilir. Eskiden girilmemis her alan bir sabitle dolduruluyordu
+        // (taban 4.000, temizlik 1.500, isitma 500, baz 7.000): hic fiyat
+        // girmemis bir isletme, kendi rakami sanip uygulayacagi bir teklif
+        // goruyordu. Baz fiyat yoksa teklif hesaplanamaz (3.6).
+        const floorGuard = (Number(vConf.floor) || 0) + (Number(vConf.cleanCost) || 0) + (Number(vConf.heatCost) || 0);
+        const baseNightly = Number(vConf.base) || Number(vConf.basePrice) || 0;
+        const offer = baseNightly > 0 ? Math.max(Math.round(baseNightly * 0.75), floorGuard) : null;
         gaps.push({
           villaName: vConf.name,
           dates: `Hemen Giriş: ${formatShortDate(todayStr)} → ${formatShortDate(firstB.checkIn)} (${daysUntil} Gece)`,
-          offer: '₺' + offer.toLocaleString('tr-TR') + ' / Gece',
-          floor: '₺' + floorGuard.toLocaleString('tr-TR') + ' Taban',
+          offer: offer === null ? 'Fiyat girilmemiş' : ('₺' + offer.toLocaleString('tr-TR') + ' / Gece'),
+          floor: floorGuard > 0 ? ('₺' + floorGuard.toLocaleString('tr-TR') + ' Taban') : 'Taban maliyeti girilmemiş',
           note: 'İlk girişe kadar hızlı fırsat satışı'
         });
       }
@@ -7942,7 +7954,10 @@ function renderDailyOps() {
 // -------------------------------------------------------------
 function promptEditCleaningAmount(vKey) {
   const vConf = appData.villas[vKey];
-  const currentAmount = (appData.cleaningPayments && appData.cleaningPayments[vKey] && appData.cleaningPayments[vKey].amount) || vConf?.cleanCost || 1500;
+  // 1.500 TL VARSAYILMAZ: bu rakam temizlik BORC defterine yaziliyor ve
+  // "Ödendi" isaretlenince gider defterine geçiyor. Girilmemis bir maliyeti
+  // uydurmak, personele olan borç ile kar marjını aynı anda yanlıs yapar (3.4).
+  const currentAmount = Number(appData.cleaningPayments?.[vKey]?.amount) || Number(vConf?.cleanCost) || '';
   
   const input = prompt(`${vConf?.name || vKey} temizlik bedelini giriniz (TL):`, currentAmount);
   if (input === null) return; // cancelled
@@ -8014,7 +8029,8 @@ function toggleCleaningPaid(vKey) {
   if (!appData.cleaningTasks) appData.cleaningTasks = [];
   if (!appData.expenses) appData.expenses = [];
   const vConf = appData.villas[vKey];
-  const cleanCost = Number(appData.cleaningPayments[vKey]?.amount) || vConf?.cleanCost || 1500;
+  // Maliyet girilmemisse 0'dir (bilinmiyor); 1.500 uydurulmaz.
+  const cleanCost = Number(appData.cleaningPayments[vKey]?.amount) || Number(vConf?.cleanCost) || 0;
 
   const currentPaid = !!appData.cleaningPayments[vKey]?.paid;
   const newPaid = !currentPaid;
@@ -8372,7 +8388,10 @@ function openNewCleaningTaskModal() {
   
   const vKey = document.getElementById('hkVilla').value;
   const vConf = appData.villas[vKey];
-  document.getElementById('hkAmount').value = vConf?.cleanCost || 1500;
+  // Yeni borc girisinde tutar, mulkun girilmis temizlik maliyetidir; yoksa
+  // bos kalir. 1.500 TL on-doldurmak, kullanicinin hic girmedigi bir tutari
+  // borc defterine yazmasina yol aciyordu.
+  document.getElementById('hkAmount').value = Number(vConf?.cleanCost) || '';
   
   document.getElementById('hkDesc').value = '';
   document.getElementById('hkPaidStatus').value = 'PENDING';
@@ -9834,7 +9853,9 @@ function renderMarketingModule() {
     if (pKey === 'GOOGLE') platformStats[pKey].impressions += imp;
   });
 
-  const overallROAS = totalSpent > 0 ? (totalRev / totalSpent).toFixed(1) : '0.0';
+  // Harcama yoksa ROAS TANIMSIZDIR. "0.0x" bir olcum gibi gorunur ama
+  // olcum degildir; hesaplanamayan yerde "—" yazilir (3.6).
+  const overallROAS = totalSpent > 0 ? (totalRev / totalSpent).toFixed(1) : null;
   const overallCAC = totalBookings > 0 ? Math.round(totalSpent / totalBookings) : 0;
   const spendRatio = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : (totalSpent > 0 ? 100 : 0);
 
@@ -9845,6 +9866,10 @@ function renderMarketingModule() {
   let otaCount = 0;
   let directGross = 0;
   let directCount = 0;
+  // Komisyonu KAYITLI olan OTA rezervasyonlari ayri toplanir: isletmenin
+  // gercek komisyon orani yalnizca bunlardan olculebilir.
+  let otaGrossWithComm = 0;
+  let otaMissingCommCount = 0;
 
   (appData.bookings || []).forEach(b => {
     if (b.status === 'CANCELLED' || !isBookingInFilter(b)) return;
@@ -9856,7 +9881,10 @@ function renderMarketingModule() {
 
     if (ch === 'AIRBNB' || ch === 'BOOKING' || ch === 'EXPEDIA' || ch === 'OTA') {
       otaGross += gr;
-      otaCommLoss += cm > 0 ? cm : Math.round(gr * 0.15); // Fallback to 15% if 0
+      // Komisyon kayitli degilse %15 UYDURULMAZ (3.6). Kayitsiz rezervasyon
+      // toplama 0 ile girer ve ayrica sayilir; ekran eksik kaydi soyler.
+      otaCommLoss += cm;
+      if (cm > 0) otaGrossWithComm += gr; else otaMissingCommCount++;
       otaNet += nt;
       otaCount++;
     } else {
@@ -9867,8 +9895,11 @@ function renderMarketingModule() {
 
   const totalBookingGross = otaGross + directGross;
   const directSharePct = totalBookingGross > 0 ? Math.round((directGross / totalBookingGross) * 100) : 0;
-  const directSavedComm = Math.round(directGross * 0.15); // Saved by not paying 15% OTA
-  const otaLossRatio = otaGross > 0 ? ((otaCommLoss / otaGross) * 100).toFixed(1) : '0.0';
+  // Isletmenin KENDI olculmus komisyon orani. Hicbir OTA rezervasyonunda
+  // komisyon kayitli degilse oran bilinmiyordur; sabit %15 varsayilmaz.
+  const measuredCommRate = otaGrossWithComm > 0 ? (otaCommLoss / otaGrossWithComm) : null;
+  const directSavedComm = measuredCommRate === null ? null : Math.round(directGross * measuredCommRate);
+  const otaLossRatio = otaGrossWithComm > 0 ? ((otaCommLoss / otaGrossWithComm) * 100).toFixed(1) : null;
 
   // 3. Render Scorecard KPIs
   const elTotalSpend = document.getElementById('mktTotalSpend');
@@ -9881,10 +9912,29 @@ function renderMarketingModule() {
   if (elSpendProgress) elSpendProgress.innerText = `%${spendRatio} Harcandı`;
 
   const elOverallRoas = document.getElementById('mktOverallRoas');
-  if (elOverallRoas) elOverallRoas.innerText = `${overallROAS}x`;
+  if (elOverallRoas) elOverallRoas.innerText = overallROAS === null ? '—' : `${overallROAS}x`;
 
   const elRoasRevDetail = document.getElementById('mktRoasRevDetail');
-  if (elRoasRevDetail) elRoasRevDetail.innerText = `Reklam Cirosu: ₺${totalRev.toLocaleString('tr-TR')}`;
+  if (elRoasRevDetail) {
+    // Reklam cirosu kampanya kaydindaki KULLANICI GIRDISIDIR; reklam
+    // platformundan olculmez. Bunu yazmazsak rakam "olculmus" gibi durur.
+    elRoasRevDetail.innerText = totalSpent > 0
+      ? `Girilen reklam cirosu: ₺${totalRev.toLocaleString('tr-TR')}`
+      : 'Bu dönemde reklam harcaması kaydı yok';
+  }
+
+  const elRoasVerdict = document.getElementById('mktRoasVerdict');
+  if (elRoasVerdict) {
+    // Eskiden burada sabit "Mükemmel ✅" yaziyordu: 0.0x ROAS'ta bile.
+    if (overallROAS === null) {
+      elRoasVerdict.innerText = '—';
+      elRoasVerdict.style.color = 'var(--text-muted)';
+    } else {
+      const r = Number(overallROAS);
+      elRoasVerdict.innerText = r >= 5 ? 'Güçlü' : (r >= 2 ? 'Makul' : 'Zayıf');
+      elRoasVerdict.style.color = r >= 5 ? '#10B981' : (r >= 2 ? '#FBBF24' : '#F87171');
+    }
+  }
 
   const elOverallCac = document.getElementById('mktOverallCac');
   if (elOverallCac) elOverallCac.innerText = `₺${overallCAC.toLocaleString('tr-TR')}`;
@@ -9898,7 +9948,10 @@ function renderMarketingModule() {
   const isMarkup = (appData.otaPricingStrategy !== 'ABSORBED');
   const elSavedOtaComm = document.getElementById('mktSavedOtaComm');
   if (elSavedOtaComm) {
-    if (isMarkup) {
+    if (directSavedComm === null) {
+      // Komisyon orani hicbir OTA rezervasyonundan olculemiyor.
+      elSavedOtaComm.innerText = 'Komisyon oranı ölçülemiyor —';
+    } else if (isMarkup) {
       elSavedOtaComm.innerText = `Misafire İndirim: ₺${directSavedComm.toLocaleString('tr-TR')}`;
     } else {
       elSavedOtaComm.innerText = `Kurtarılan: ₺${directSavedComm.toLocaleString('tr-TR')}`;
@@ -9924,10 +9977,11 @@ function renderMarketingModule() {
 
   // 4. Render Platform Cards
   // Meta
-  const metaRoas = platformStats.META.spent > 0 ? (platformStats.META.rev / platformStats.META.spent).toFixed(1) : '0.0';
+  const metaRoas = platformStats.META.spent > 0 ? (platformStats.META.rev / platformStats.META.spent).toFixed(1) : null;
   const metaCpc = platformStats.META.clicks > 0 ? (platformStats.META.spent / platformStats.META.clicks).toFixed(2) : '0.00';
   const elMetaRoas = document.getElementById('metaRoasBadge');
-  if (elMetaRoas) elMetaRoas.innerText = `${metaRoas}x ROAS`;
+  // Harcama yoksa ROAS tanimsizdir; "0.0x" olcum gibi gorunur (3.6).
+  if (elMetaRoas) elMetaRoas.innerText = metaRoas === null ? 'ROAS ölçülmedi' : `${metaRoas}x ROAS`;
   const elMetaSpent = document.getElementById('metaTotalSpent');
   if (elMetaSpent) elMetaSpent.innerText = `₺${platformStats.META.spent.toLocaleString('tr-TR')}`;
   const elMetaClicks = document.getElementById('metaClicksCpc');
@@ -9940,10 +9994,10 @@ function renderMarketingModule() {
   if (elMetaBookings) elMetaBookings.innerText = `${platformStats.META.bookings} Rezervasyon`;
 
   // Google
-  const googleRoas = platformStats.GOOGLE.spent > 0 ? (platformStats.GOOGLE.rev / platformStats.GOOGLE.spent).toFixed(1) : '0.0';
+  const googleRoas = platformStats.GOOGLE.spent > 0 ? (platformStats.GOOGLE.rev / platformStats.GOOGLE.spent).toFixed(1) : null;
   const googleCpc = platformStats.GOOGLE.clicks > 0 ? (platformStats.GOOGLE.spent / platformStats.GOOGLE.clicks).toFixed(2) : '0.00';
   const elGoogleRoas = document.getElementById('googleRoasBadge');
-  if (elGoogleRoas) elGoogleRoas.innerText = `${googleRoas}x ROAS`;
+  if (elGoogleRoas) elGoogleRoas.innerText = googleRoas === null ? 'ROAS ölçülmedi' : `${googleRoas}x ROAS`;
   const elGoogleSpent = document.getElementById('googleTotalSpent');
   if (elGoogleSpent) elGoogleSpent.innerText = `₺${platformStats.GOOGLE.spent.toLocaleString('tr-TR')}`;
   const elGoogleClicks = document.getElementById('googleClicksCpc');
@@ -9962,11 +10016,16 @@ function renderMarketingModule() {
 
   const elOtaLoss = document.getElementById('otaCommissionLoss');
   if (elOtaLoss) {
+    // Komisyonu kayitli olmayan rezervasyon varsa toplam EKSIKTIR; bunu
+    // gizlemek yerine soyleriz (3.6).
+    const eksikNot = otaMissingCommCount > 0
+      ? ` · ${otaMissingCommCount} rezervasyonda komisyon kaydı yok`
+      : '';
     if (isMarkupModel) {
-      elOtaLoss.innerText = `+₺${otaCommLoss.toLocaleString('tr-TR')} (Misafir Ödedi)`;
+      elOtaLoss.innerText = `+₺${otaCommLoss.toLocaleString('tr-TR')} (Misafir Ödedi)${eksikNot}`;
       elOtaLoss.style.color = '#93C5FD';
     } else {
-      elOtaLoss.innerText = `-₺${otaCommLoss.toLocaleString('tr-TR')}`;
+      elOtaLoss.innerText = `-₺${otaCommLoss.toLocaleString('tr-TR')}${eksikNot}`;
       elOtaLoss.style.color = '#F87171';
     }
   }
@@ -9981,6 +10040,9 @@ function renderMarketingModule() {
     if (isMarkupModel) {
       elOtaLossRatio.innerText = 'İşletme Kaybı: ₺0 (%100 Korundu ✅)';
       elOtaLossRatio.style.color = '#34D399';
+    } else if (otaLossRatio === null) {
+      elOtaLossRatio.innerText = 'Komisyon kaydı yok — oran ölçülemiyor';
+      elOtaLossRatio.style.color = 'var(--text-muted)';
     } else {
       elOtaLossRatio.innerText = `%${otaLossRatio} Komisyon Kaybı`;
       elOtaLossRatio.style.color = '#FCA5A5';
@@ -9996,7 +10058,11 @@ function renderMarketingModule() {
   const elDirectBookings = document.getElementById('directBookingsCount');
   if (elDirectBookings) elDirectBookings.innerText = `${directCount} Rezervasyon`;
   const elDirectSaved = document.getElementById('directCommissionSaved');
-  if (elDirectSaved) elDirectSaved.innerText = `+₺${directSavedComm.toLocaleString('tr-TR')}`;
+  if (elDirectSaved) {
+    elDirectSaved.innerText = directSavedComm === null
+      ? '—'
+      : `+₺${directSavedComm.toLocaleString('tr-TR')}`;
+  }
 
   // 5. Render Table & AI Advisor
   renderMarketingCampaignsTable(campaigns);
@@ -10006,13 +10072,10 @@ function renderMarketingModule() {
   renderRetentionCrm();
   renderSeasonalEventRadar();
   renderInfluencerRoiLedger();
-  runAIMarketingAdvisor({
-    metaRoas: Number(metaRoas),
-    googleRoas: Number(googleRoas),
-    otaCommLoss,
-    directSharePct,
-    totalSpent
-  });
+  // Danisman gerekleri kendisi toplar (collectMarketingFacts). Eskiden buradan
+  // bir context gecilirdi ama "AI Analizini Yenile" dugmesi onu argumansiz
+  // cagiriyordu; o yolda her deger uydurma varsayilanlara dusuyordu.
+  runAIMarketingAdvisor();
 }
 
 function renderMarketingCampaignsTable(campaigns) {
@@ -10029,7 +10092,7 @@ function renderMarketingCampaignsTable(campaigns) {
     const sp = Number(c.spent) || 0;
     const bg = Number(c.budget) || sp;
     const rv = Number(c.revenue) || 0;
-    const roas = sp > 0 ? (rv / sp).toFixed(1) : '0.0';
+    const roas = sp > 0 ? (rv / sp).toFixed(1) : null;
     const cl = Number(c.clicks) || 0;
     const ld = Number(c.leads) || 0;
     const bk = Number(c.bookingsCount) || 0;
@@ -10068,7 +10131,7 @@ function renderMarketingCampaignsTable(campaigns) {
         <div style="font-size:10px; color:var(--text-muted);">${bk} Rezervasyon</div>
       </td>
       <td>
-        <span class="badge ${Number(roas) >= 5 ? 'badge-green' : 'badge-amber'}" style="font-weight:700;">${roas}x ROAS</span>
+        <span class="badge ${roas === null ? 'badge-purple' : (Number(roas) >= 5 ? 'badge-green' : 'badge-amber')}" style="font-weight:700;">${roas === null ? 'harcama yok' : roas + 'x ROAS'}</span>
       </td>
       <td>${statusBadge}</td>
       <td style="text-align: right; white-space: nowrap;">
@@ -10080,70 +10143,162 @@ function renderMarketingCampaignsTable(campaigns) {
   });
 }
 
-function runAIMarketingAdvisor(context = {}) {
+/**
+ * Pazarlama danismaninin dayandigi OLCULMUS gercekler.
+ *
+ * Olculemeyen her alan null doner. Cagiran taraf null'i "veri yok" olarak
+ * gosterir; varsayilan deger UYDURMAZ (3.6). Danisman bu tabloyu kendisi
+ * uretir, cunku "AI Analizini Yenile" dugmesi onu argumansiz cagiriyor:
+ * eskiden o yolda context bos geliyor ve `context.metaRoas || 8.0` devreye
+ * girip musteriye hic olculmemis bir 8.0x ROAS gosteriyordu.
+ */
+function collectMarketingFacts() {
+  const campaigns = (appData.marketingCampaigns || []).filter(isCampaignInFilter);
+  const platform = {
+    META: { spent: 0, rev: 0 },
+    GOOGLE: { spent: 0, rev: 0 }
+  };
+  let totalSpent = 0;
+  let totalRev = 0;
+
+  campaigns.forEach(c => {
+    const sp = Number(c.spent) || 0;
+    const rv = Number(c.revenue) || 0;
+    totalSpent += sp;
+    totalRev += rv;
+    const key = platform[c.platform] ? c.platform : null;
+    if (key) {
+      platform[key].spent += sp;
+      platform[key].rev += rv;
+    }
+  });
+
+  // ROAS yalnizca harcama varken tanimlidir. Harcama 0 ise oran yoktur.
+  const roas = s => (s.spent > 0 ? Number((s.rev / s.spent).toFixed(1)) : null);
+
+  let otaComm = 0;
+  let otaCommRecorded = 0;
+  let otaMissing = 0;
+  (appData.bookings || []).forEach(b => {
+    if (b.status === 'CANCELLED' || !isBookingInFilter(b)) return;
+    const ch = (b.channel || '').toUpperCase();
+    if (ch !== 'AIRBNB' && ch !== 'BOOKING' && ch !== 'EXPEDIA' && ch !== 'OTA') return;
+    const oran = getBookingFilterShare(b).ratio;
+    const cm = (Number(b.otaComm) || 0) * oran;
+    otaComm += cm;
+    if (cm > 0) otaCommRecorded++; else otaMissing++;
+  });
+
+  return {
+    campaignCount: campaigns.length,
+    totalSpent,
+    totalRev,
+    metaRoas: roas(platform.META),
+    googleRoas: roas(platform.GOOGLE),
+    otaCommLoss: otaCommRecorded > 0 ? otaComm : null,
+    otaMissingCommCount: otaMissing,
+    gapNights: (typeof detectGapNights === 'function' ? detectGapNights() : [])
+  };
+}
+
+function runAIMarketingAdvisor() {
   const container = document.getElementById('aiInsightsContainer');
   if (!container) return;
 
   const nowStr = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
   const timeEl = document.getElementById('aiLastAnalysisTime');
-  if (timeEl) timeEl.innerText = `Son Analiz: ${nowStr} (Canlı)`;
+  if (timeEl) timeEl.innerText = `Son Analiz: ${nowStr}`;
 
-  const metaRoas = context.metaRoas || 8.0;
-  const googleRoas = context.googleRoas || 9.5;
-  const otaLoss = context.otaCommLoss || 28000;
+  const f = collectMarketingFacts();
+  const metaRoas = f.metaRoas;
+  const googleRoas = f.googleRoas;
 
   let insights = [];
 
-  // Insight 1: ROAS Arbitrage (Google vs Meta)
-  if (googleRoas > metaRoas) {
+  // Insight 1: ROAS karsilastirmasi — YALNIZCA ikisi de olculmusse.
+  if (metaRoas !== null && googleRoas !== null) {
+    const onde = googleRoas > metaRoas ? 'Google Arama' : 'Meta';
+    const geride = googleRoas > metaRoas ? 'Meta' : 'Google Arama';
+    const ondeDeger = Math.max(googleRoas, metaRoas);
+    const gerideDeger = Math.min(googleRoas, metaRoas);
+    if (ondeDeger > gerideDeger) {
+      insights.push({
+        type: 'arbitrage',
+        icon: '💡',
+        title: `Bütçe Arbitrajı: ${onde} tarafı daha verimli`,
+        text: `<strong>${onde}</strong> kampanyalarınız <strong>${ondeDeger}x</strong> getiri üretirken <strong>${geride}</strong> tarafı <strong>${gerideDeger}x</strong> seviyesinde. Bütçenin bir kısmını ${onde} tarafına kaydırmak aynı harcamayla daha yüksek ciro getirebilir. <em>Kaydırmanın ne kadar ek ciro getireceği ölçülmeden bilinemez</em> — değişikliği yaptıktan sonra bu ekrandan takip edin.`
+      });
+    } else {
+      insights.push({
+        type: 'arbitrage',
+        icon: '⚖️',
+        title: 'İki platform da aynı getiride',
+        text: `Meta ve Google tarafı <strong>${metaRoas}x</strong> ile aynı seviyede. Bütçeyi bir tarafa kaydırmak için ölçülmüş bir gerekçe yok.`
+      });
+    }
+  } else if (metaRoas !== null || googleRoas !== null) {
+    const olculen = metaRoas !== null ? 'Meta' : 'Google Arama';
+    const olculmeyen = metaRoas !== null ? 'Google Arama' : 'Meta';
+    const deger = metaRoas !== null ? metaRoas : googleRoas;
     insights.push({
       type: 'arbitrage',
-      icon: '💡',
-      title: 'Bütçe Arbitrajı: Google Arama Reklamlarını Ölçekleyin',
-      text: `Google Arama kampanyalarınız <strong>${googleRoas}x ROAS</strong> üretirken Meta reklamları <strong>${metaRoas}x</strong> seviyesinde. Meta bütçenizin %25'ini 'Kaş Kiralık Villa' ve 'Özel Havuzlu Villa' arama kelimelerine kaydırarak aynı bütçeyle tahmini <strong>+32.000 TL ek ciro</strong> elde edebilirsiniz.`
-    });
-  } else {
-    insights.push({
-      type: 'arbitrage',
-      icon: '📱',
-      title: 'Bütçe Arbitrajı: Meta Instagram DM Kampanyalarını Ölçekleyin',
-      text: `Meta reklamlarınız <strong>${metaRoas}x ROAS</strong> ile yüksek verimlilikte çalışıyor. Özellikle hafta sonu kaçamağı hedefli Instagram Reels ve direkt WhatsApp reklamlarına ağırlık vererek dönüşüm maliyetini düşürebilirsiniz.`
+      icon: '📊',
+      title: `Yalnızca ${olculen} tarafı ölçülebiliyor`,
+      text: `<strong>${olculen}</strong> kampanyalarınızın getirisi <strong>${deger}x</strong>. <strong>${olculmeyen}</strong> tarafında harcama kaydı olmadığı için karşılaştırma yapılamıyor; iki tarafı kıyaslamak için ${olculmeyen} kampanyalarını da deftere girin.`
     });
   }
 
-  // Insight 2: OTA Stratejisi (Mark-up vs Standart)
+  // Insight 2: OTA stratejisi. Komisyon tutari kayitliysa yazilir.
   const isUserMarkup = (appData.otaPricingStrategy !== 'ABSORBED');
   if (isUserMarkup) {
     insights.push({
       type: 'commission',
       icon: '🏷️',
       title: 'Fiyatlandırma Stratejisi: Komisyon Misafire Yansıtılıyor (Mark-up)',
-      text: `Fiyatlarınız OTA komisyonu oranında artırılarak listelendiği için <strong>net kârınız %100 korunuyor (Sıfır kâr kaybı)</strong>. Bu stratejinin asıl avantajı direkt satışta ortaya çıkar: WhatsApp ve web sitenizde misafire <strong>'Komisyonsuz En İyi Fiyat Garantisi' (%15 indirim)</strong> sunarak OTA'da sizi görüp arayan misafirleri doğrudan kapatabilirsiniz.`
+      text: `Fiyatlarınız OTA komisyonu oranında artırılarak listelendiği için <strong>net kârınız korunuyor</strong>. Bu stratejinin asıl avantajı direkt satışta ortaya çıkar: WhatsApp ve web sitenizde misafire komisyon farkı kadar indirim sunarak OTA'da sizi görüp arayan misafirleri doğrudan kapatabilirsiniz.`
+    });
+  } else if (f.otaCommLoss !== null) {
+    const eksik = f.otaMissingCommCount > 0
+      ? ` Bu tutar eksik olabilir: <strong>${f.otaMissingCommCount}</strong> OTA rezervasyonunda komisyon kaydı yok.`
+      : '';
+    insights.push({
+      type: 'commission',
+      icon: '🛡️',
+      title: 'OTA Komisyon Sızıntısı: Direkte Çevirme Reçetesi',
+      text: `Bu dönem OTA platformlarına ödenen kayıtlı komisyon tutarı <strong>₺${Math.round(f.otaCommLoss).toLocaleString('tr-TR')}</strong>.${eksik} Bu bütçenin bir kısmı direkt kanala aktarılarak komisyon tasarrufu denenebilir.`
     });
   } else {
     insights.push({
       type: 'commission',
       icon: '🛡️',
-      title: 'OTA Komisyon Sızıntısı: Direkte Çevirme Reçetesi',
-      text: `Bu dönem OTA platformlarına ödenen komisyon tutarı <strong>₺${otaLoss.toLocaleString('tr-TR')}</strong>. Bu bütçenin bir kısmı ile Meta Click-to-WhatsApp reklamı verilerek komisyon tasarrufu sağlanabilir.`
+      title: 'OTA komisyonu ölçülemiyor',
+      text: 'Bu dönemdeki OTA rezervasyonlarının hiçbirinde komisyon tutarı kayıtlı değil, bu yüzden sızıntı hesaplanamıyor. Rezervasyon kayıtlarına OTA komisyonunu girdikçe bu kutu gerçek tutarı gösterir.'
     });
   }
 
-  // Insight 3: Gap-Filling / Boşluk Doldurma Uyarısı
-  insights.push({
-    type: 'gap',
-    icon: '⚡',
-    title: 'Son Dakika Boşluk Doldurma (Gap-Filling Reklamı)',
-    text: 'Önümüzdeki 14 günlük pencerede hafta içi boşlukları için İstanbul, Bursa ve Kocaeli lokasyonlu kullanıcılara yönelik <strong>₺1.500 bütçeli 48 saatlik Instagram Hikaye reklamı</strong> açılması önerilir. Mesaj başı maliyet ₺35 civarında gerçekleşecektir.'
-  });
+  // Insight 3: Bosluk gecesi — GERCEK bosluk varsa. Bir zamanlar burada
+  // sabit bir sehir listesi, "₺1.500 butce" ve "mesaj basi ₺35" yaziyordu;
+  // hicbiri olculmuyordu ve bos bir hesapta bile goruntuleniyordu.
+  if (f.gapNights.length > 0) {
+    const toplamGece = f.gapNights.reduce((a, g) => a + g.nights, 0);
+    const mulkSayisi = new Set(f.gapNights.map(g => g.villaKey)).size;
+    insights.push({
+      type: 'gap',
+      icon: '⚡',
+      title: 'Son Dakika Boşluk Doldurma (Gap-Filling)',
+      text: `Takviminizde <strong>${mulkSayisi}</strong> mülkte toplam <strong>${toplamGece}</strong> gecelik yetim boşluk var. Bu boşluklar için minimum konaklama süresini düşürmek ve hedefli bir hikaye reklamı açmak en hızlı dolum yoludur. Boşlukların listesi ve fırsat fiyatları aşağıdaki <em>Yetim Gece Radarı</em> kutusunda.`
+    });
+  }
 
-  // Insight 4: Sezonluk Erken Rezervasyon (Yılbaşı & Kış)
-  insights.push({
-    type: 'seasonal',
-    icon: '🎄',
-    title: '2026/2027 Kış & Yılbaşı Sezonu Erken Talep Penceresi',
-    text: 'Eylül ve Ekim ayları, Akdeniz villaları için yaz sezonu (Haziran-Temmuz-Ağustos) erken rezervasyonlarının toplandığı en yüksek karlı dönemdir. Google Performance Max ve şömine temalı video reklamlara şimdiden başlamak, kış dönemini yüksek ADR ile kapatmanızı sağlar.'
-  });
+  if (insights.length === 0 || (f.campaignCount === 0 && f.gapNights.length === 0)) {
+    // Ne kampanya ne bosluk var: olculecek bir sey yok, oneri de uydurulmaz.
+    insights = [{
+      type: 'gap',
+      icon: '📭',
+      title: 'Henüz analiz edilecek veri yok',
+      text: 'Bu dönemde kampanya kaydı ve takvimde yetim boşluk bulunmuyor. Reklam defterine kampanya girdikçe getiri (ROAS) karşılaştırması, rezervasyonlara OTA komisyonu girdikçe komisyon sızıntısı burada gerçek rakamlarla görünür.'
+    }];
+  }
 
   container.innerHTML = insights.map(i => `
     <div class="ai-insight-card ${i.type}">
@@ -10156,40 +10311,73 @@ function runAIMarketingAdvisor(context = {}) {
   `).join('');
 }
 
+/**
+ * Butce dagitim simulatoru.
+ *
+ * Kutunun etiketi "Gecmis ROAS ve kanal doluluk katsayilarina gore hesaplanir"
+ * diyor; bir zamanlar bu DOGRU DEGILDI. Beklenen ciro sabit carpanlarla
+ * uretiliyordu (Google 9,5x / Meta 8,0x / retarget 10,5x): musteri hangi
+ * butceyi girerse girsin, hic reklam vermemis bir hesapta bile "Beklenen
+ * Toplam Ciro" yaziyordu ve rakam isletmenin kendi verisiyle hic ilgili
+ * degildi. Artik carpan isletmenin KENDI olculmus ROAS'idir; olculmemis bir
+ * kanal icin ciro tahmini yazilmaz (3.6).
+ *
+ * "Yeniden hedefleme" ayri bir kanal olarak defterde tutulmuyor; kendi
+ * olculmus getirisi olmadigi icin ciro tahmini uretmez.
+ */
 function runMarketingBudgetSimulation() {
   const budgetInput = document.getElementById('simBudgetInput');
-  const budget = budgetInput ? (Number(budgetInput.value) || 20000) : 20000;
+  const budget = budgetInput ? (Number(budgetInput.value) || 0) : 0;
 
-  // Strategic Allocation: 45% Google, 40% Meta, 15% Retargeting
+  const f = collectMarketingFacts();
+
+  // Dagitim bir ONERIDIR (olcum degil): %45 Google, %40 Meta, %15 retarget.
   const googleAmt = Math.round(budget * 0.45);
   const metaAmt = Math.round(budget * 0.40);
   const retargetAmt = Math.round(budget * 0.15);
 
-  const googleRev = Math.round(googleAmt * 9.5);
-  const metaRev = Math.round(metaAmt * 8.0);
-  const retargetRev = Math.round(retargetAmt * 10.5);
-  const totalRev = googleRev + metaRev + retargetRev;
-  const blendedRoas = budget > 0 ? (totalRev / budget).toFixed(1) : '0.0';
+  const googleRev = f.googleRoas !== null ? Math.round(googleAmt * f.googleRoas) : null;
+  const metaRev = f.metaRoas !== null ? Math.round(metaAmt * f.metaRoas) : null;
+  const retargetRev = null;
 
-  const elGoogleAmt = document.getElementById('simGoogleAmt');
-  if (elGoogleAmt) elGoogleAmt.innerText = `₺${googleAmt.toLocaleString('tr-TR')}`;
-  const elGoogleRev = document.getElementById('simGoogleRev');
-  if (elGoogleRev) elGoogleRev.innerText = `₺${googleRev.toLocaleString('tr-TR')}`;
+  const olculenler = [googleRev, metaRev].filter(v => v !== null);
+  const olculenButce = (f.googleRoas !== null ? googleAmt : 0) + (f.metaRoas !== null ? metaAmt : 0);
+  const totalRev = olculenler.length > 0 ? olculenler.reduce((a, b) => a + b, 0) : null;
+  const blendedRoas = (totalRev !== null && olculenButce > 0)
+    ? (totalRev / olculenButce).toFixed(1)
+    : null;
 
-  const elMetaAmt = document.getElementById('simMetaAmt');
-  if (elMetaAmt) elMetaAmt.innerText = `₺${metaAmt.toLocaleString('tr-TR')}`;
-  const elMetaRev = document.getElementById('simMetaRev');
-  if (elMetaRev) elMetaRev.innerText = `₺${metaRev.toLocaleString('tr-TR')}`;
+  const tl = v => `₺${v.toLocaleString('tr-TR')}`;
+  const yaz = (id, deger) => {
+    const el = document.getElementById(id);
+    if (el) el.innerText = deger;
+  };
 
-  const elRetargetAmt = document.getElementById('simRetargetAmt');
-  if (elRetargetAmt) elRetargetAmt.innerText = `₺${retargetAmt.toLocaleString('tr-TR')}`;
-  const elRetargetRev = document.getElementById('simRetargetRev');
-  if (elRetargetRev) elRetargetRev.innerText = `₺${retargetRev.toLocaleString('tr-TR')}`;
+  yaz('simGoogleAmt', tl(googleAmt));
+  yaz('simGoogleRev', googleRev === null ? 'ölçülmedi' : tl(googleRev));
+  yaz('simMetaAmt', tl(metaAmt));
+  yaz('simMetaRev', metaRev === null ? 'ölçülmedi' : tl(metaRev));
+  yaz('simRetargetAmt', tl(retargetAmt));
+  yaz('simRetargetRev', retargetRev === null ? 'ölçülmedi' : tl(retargetRev));
 
-  const elTotalRev = document.getElementById('simTotalExpectedRev');
-  if (elTotalRev) elTotalRev.innerText = `₺${totalRev.toLocaleString('tr-TR')}`;
-  const elBlendedRoas = document.getElementById('simExpectedRoas');
-  if (elBlendedRoas) elBlendedRoas.innerText = `${blendedRoas}x ROAS`;
+  yaz('simTotalExpectedRev', totalRev === null ? '—' : tl(totalRev));
+  yaz('simExpectedRoas', blendedRoas === null
+    ? 'geçmiş ROAS yok'
+    : `${blendedRoas}x ROAS (kendi ölçümünüz)`);
+
+  // Neye dayandigini acikca yaz: hangi kanalin carpani olculdu, hangisi yok.
+  const not = document.getElementById('simBasisNote');
+  if (not) {
+    if (totalRev === null) {
+      not.innerText = 'Bu dönemde harcama kaydı olan kampanya yok; geçmiş getiri ölçülemediği için ciro tahmini üretilmedi.';
+    } else {
+      const parcalar = [];
+      if (f.googleRoas !== null) parcalar.push(`Google ${f.googleRoas}x`);
+      if (f.metaRoas !== null) parcalar.push(`Meta ${f.metaRoas}x`);
+      not.innerText = `Çarpanlar kendi kayıtlarınızdan: ${parcalar.join(', ')}. ` +
+        'Yeniden hedefleme ayrı ölçülmediği için tahmine katılmadı.';
+    }
+  }
 }
 
 // -------------------------------------------------------------
@@ -10593,9 +10781,16 @@ function detectGapNights() {
       const diffDays = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
 
       if (diffDays >= 1 && diffDays <= 4) {
-        const baseNightly = vKey === 'AZURE' ? 18000 : (vKey === 'BELLA' ? 14000 : 12000);
-        const regularTotal = baseNightly * diffDays;
-        const discountTotal = Math.round(regularTotal * 0.8);
+        // Gecelik fiyat MULKUN KENDI liste fiyatidir. Burada bir zamanlar
+        // silinmis demo anahtarlarina bagli bir merdiven vardi
+        // (AZURE 18.000, BELLA 14.000, digerleri 12.000): her gercek mulk
+        // icin 12.000 TL uyduruyordu ve bu rakam asagidaki "Durum" /
+        // "Hikaye" butonlariyla MISAFIRE GONDERILEN metne giriyordu.
+        // Liste fiyati girilmemisse fiyat bilinmiyordur; uydurulmaz (3.6).
+        const villa = (appData.villas || {})[vKey] || {};
+        const baseNightly = Number(villa.basePrice) || 0;
+        const regularTotal = baseNightly > 0 ? baseNightly * diffDays : null;
+        const discountTotal = regularTotal === null ? null : Math.round(regularTotal * 0.8);
         gaps.push({
           villaKey: vKey,
           villaName: vName,
@@ -10604,7 +10799,7 @@ function detectGapNights() {
           nights: diffDays,
           regularPrice: regularTotal,
           discountPrice: discountTotal,
-          discountPct: 20
+          discountPct: regularTotal === null ? null : 20
         });
       }
     }
@@ -10635,42 +10830,57 @@ function renderGapNightsRadar() {
   gaps.forEach(g => {
     const card = document.createElement('div');
     card.className = 'gap-night-card';
-    card.innerHTML = `
-      <div class="gap-card-header">
-        <span class="gap-villa-name">🏡 ${g.villaName}</span>
-        <span class="badge badge-amber">%${g.discountPct} Flaş İndirim</span>
-      </div>
-      <div class="gap-dates-tag">
-        <span>📅</span> ${g.checkIn} - ${g.checkOut} (${g.nights} Gece Boşluk)
-      </div>
-      <div class="gap-price-box">
-        <div>
+    // Fiyat bilinmiyorsa paylasim butonlari CIKMAZ: bu metinler misafire
+    // gidiyor, icinde "₺—" ya da uydurma bir rakam olamaz.
+    const fiyatBiliniyor = g.regularPrice !== null && g.discountPrice !== null;
+    const fiyatKutusu = fiyatBiliniyor
+      ? `<div>
           <div style="font-size:10px; color:var(--text-muted); text-decoration:line-through;">Liste: ₺${g.regularPrice.toLocaleString('tr-TR')}</div>
           <div style="font-size:15px; font-weight:800; color:#34D399;">₺${g.discountPrice.toLocaleString('tr-TR')}</div>
         </div>
-        <span class="badge badge-green" style="font-size:10px;">OTA Komisyonsuz</span>
-      </div>
-      <div style="font-size:11px; color:#CBD5E1; margin-bottom:10px;">
-        💡 <strong>STR Aksiyonu:</strong> Airbnb'de minimum konaklamayı ${g.nights} geceye düşürün ve aşağıdaki hikaye şablonunu paylaşın.
-      </div>
-      <div style="display:flex; gap:6px; flex-wrap:wrap;">
+        <span class="badge badge-green" style="font-size:10px;">OTA Komisyonsuz</span>`
+      : `<div style="font-size:11px; color:var(--text-muted);">
+          Bu mülkün liste fiyatı girilmemiş — fırsat fiyatı hesaplanamıyor.
+          <div style="margin-top:2px;">Mülk kartından gecelik fiyatı girin.</div>
+        </div>`;
+    const butonlar = fiyatBiliniyor
+      ? `<div style="display:flex; gap:6px; flex-wrap:wrap;">
         <button type="button" class="btn btn-secondary btn-sm" onclick="copyGapStoryText('${g.villaName}', '${g.checkIn} - ${g.checkOut}', ${g.nights}, '${g.discountPrice.toLocaleString('tr-TR')}', '${g.regularPrice.toLocaleString('tr-TR')}')" style="flex:1; border-color:#EF4444; color:#FCA5A5; font-size:11px; font-weight:700;">
           ⚡ Flaş Hikaye Kopyala
         </button>
         <button type="button" class="btn btn-primary btn-sm" onclick="shareGapWhatsApp('${g.villaName}', '${g.checkIn} - ${g.checkOut}', ${g.nights}, '${g.discountPrice.toLocaleString('tr-TR')}')" style="background:#10B981; border:none; font-size:11px; font-weight:700;">
           📲 Durum
         </button>
+      </div>`
+      : '';
+    card.innerHTML = `
+      <div class="gap-card-header">
+        <span class="gap-villa-name">🏡 ${g.villaName}</span>
+        ${fiyatBiliniyor ? `<span class="badge badge-amber">%${g.discountPct} Flaş İndirim</span>` : ''}
       </div>
+      <div class="gap-dates-tag">
+        <span>📅</span> ${g.checkIn} - ${g.checkOut} (${g.nights} Gece Boşluk)
+      </div>
+      <div class="gap-price-box">
+        ${fiyatKutusu}
+      </div>
+      <div style="font-size:11px; color:#CBD5E1; margin-bottom:10px;">
+        💡 <strong>STR Aksiyonu:</strong> Airbnb'de minimum konaklamayı ${g.nights} geceye düşürün ve aşağıdaki hikaye şablonunu paylaşın.
+      </div>
+      ${butonlar}
     `;
     container.appendChild(card);
   });
 }
 
 function copyGapStoryText(vName, dates, nights, discPrice, regPrice) {
+  // Bu metin MISAFIRE gidiyor. Bir zamanlar burada "karlar altinda sicacik
+  // somine keyfi, izole mustakil bahce ve isitmali jakuzi" yaziyordu: mulkte
+  // bunlar olmasa da, mevsim kis olmasa da her firsat mesajina giriyordu.
+  // Isletme adina olmayan bir ozellik vaat etmeyiz.
   const storyText = '🔥 SON DAKİKA KAÇAMAK FIRSATI! 🔥\n\n' +
     '🏡 ' + vName + '\n' +
     '📅 ' + dates + ' (' + nights + ' Gece)\n\n' +
-    '✨ Karlar altında sıcacık şömine keyfi, izole müstakil bahçe ve ısıtmalı jakuzi!\n' +
     '🏷️ Flaş Yetim Gece Fırsatı: ₺' + regPrice + ' yerine sadece ₺' + discPrice + '!\n\n' +
     '📲 İlk yazan rezerve eder! Detay ve rezervasyon için hemen DM veya WhatsApp\'tan yazın.';
 
@@ -10682,7 +10892,8 @@ function copyGapStoryText(vName, dates, nights, discPrice, regPrice) {
 }
 
 function shareGapWhatsApp(vName, dates, nights, discPrice) {
-  const text = '🔥 AKDENİZ VİLLA KAÇAMAĞI!\n' +
+  // Konum iddiasi yok: isletme Akdeniz'de olmayabilir (eskiden sabitti).
+  const text = '🔥 SON DAKİKA VİLLA KAÇAMAĞI!\n' +
     '🏡 ' + vName + '\n' +
     '📅 ' + dates + ' (' + nights + ' Gece)\n' +
     '🏷️ Flaş İndirimli Fiyat: ₺' + discPrice + '\n' +
@@ -10710,37 +10921,58 @@ function selectClosingScenario(scenarioKey) {
 }
 
 function updateClosingScriptPreview() {
-  const guestName = (document.getElementById('scriptGuestName')?.value || 'Ahmet Bey').trim();
+  // Bu metinler MISAFIRE gidiyor. Bir zamanlar her senaryo, isletmenin
+  // dogrulanmamis ozelliklerini ve vermedigi sozleri iceriyordu: "1.200 m²
+  // korunakli bahce", "disaridan gorunmeyen isitmali jakuzi", "sinirsiz mese
+  // somine odunu", "Akdeniz kiyisi", "1 cuval odun ve mangal paketi hediye",
+  // "%30 daha avantajli". Hicbiri musterinin verisinden gelmiyordu; mulkte
+  // jakuzi olmasa da, isletme Akdeniz'de olmasa da gonderiliyordu — ustelik
+  // bazilari isletmenin yerine getirmek zorunda kalacagi TAAHHUTTU.
+  // Artik yalnizca musterinin kendi girdigi bilgiler kullanilir.
+  const guestName = (document.getElementById('scriptGuestName')?.value || '').trim();
   const vSelect = document.getElementById('scriptVillaSelect');
   const vKey = vSelect ? vSelect.value : Object.keys(appData.villas || {})[0];
-  const vName = (appData.villas && appData.villas[vKey]?.name) ? appData.villas[vKey].name : (vKey || 'mülkünüz');
-  const dates = (document.getElementById('scriptDates')?.value || 'Bu Hafta Sonu / 2 Gece').trim();
-  const price = (document.getElementById('scriptPrice')?.value || '₺28.000').trim();
+  const villa = (appData.villas || {})[vKey] || {};
+  const vName = villa.name || vKey || 'mülkümüz';
+  const dates = (document.getElementById('scriptDates')?.value || '').trim();
+  const priceInput = (document.getElementById('scriptPrice')?.value || '').trim();
+  // Fiyat girilmemisse mulkun KENDI liste fiyati; o da yoksa fiyat cumlesi hic kurulmaz.
+  const price = priceInput || (Number(villa.basePrice) > 0
+    ? '₺' + Number(villa.basePrice).toLocaleString('tr-TR')
+    : '');
+
+  const hitap = guestName ? guestName + ' merhaba!' : 'Merhaba!';
+  const tarihIfadesi = dates || 'belirttiğiniz tarihler';
+  // Ozellik iddiasi yalnizca mulkun kendi "amenities" alanindan gelir.
+  const ozellikler = (villa.amenities || '').trim();
+  const ozellikCumlesi = ozellikler ? ' ' + vName + ' şu özellikleriyle öne çıkıyor: ' + ozellikler + '.' : '';
+  const fiyatCumlesi = price ? ' Bu tarihler için fiyatımız ' + price + '.' : '';
 
   let text = '';
   switch (activeClosingScenario) {
     case 'PAHALI':
-      text = guestName + ' merhaba! Haklısınız, tatil bütçesi planlaması çok önemli. Ancak ' + vName + '\'miz sıradan bir otel odası değil; tamamen size ve sevdiklerinize ait 1.200 m² korunaklı bahçesi, dışarıdan görünmeyen ısıtmalı jakuzisi, sınırsız meşe şömine odunu ve barbekü alanıyla tam bir mahremiyet ve dinlenme alanı sunuyor.\n\n' +
-        dates + ' için sevdiklerinizle unutulmaz bir kış deneyimi yaşamanız adına size liste fiyatımız (' + price + ') yerine özel bir jest yaparak fiyata hoş geldin meyve sepeti ve akşam için şömine kestanesi ikramı ekleyebilirim. Sizin için opsiyonlayayım mı?';
+      text = hitap + ' Bütçe planlamasının önemli olduğunu biliyoruz.' + ozellikCumlesi +
+        '\n\n' + tarihIfadesi + ' için size uygun bir çözüm bulmak isteriz.' + fiyatCumlesi +
+        ' Sizin için opsiyonlayayım mı?';
       break;
     case 'GHOSTING':
-      text = guestName + ' tekrar merhaba! ' + vName + ' için görüştüğümüz ' + dates + ' tarihlerine az önce başka bir misafirimizden kiralama talebi geldi.\n\n' +
-        'Sizinle daha önce iletişime geçtiğimiz için önceliği size vermek istedim. Rezervasyonunuzu kesinleştirmek isterseniz bu teklifi 2 saat boyunca adınıza opsiyonda tutabilirim. Ne dersiniz, organize edelim mi?';
+      text = hitap + ' ' + vName + ' için görüştüğümüz ' + tarihIfadesi + ' tarihlerine başka bir misafirimizden de talep geldi.\n\n' +
+        'Sizinle daha önce iletişime geçtiğimiz için önceliği size vermek istedim. Rezervasyonunuzu kesinleştirmek isterseniz bu teklifi adınıza opsiyonda tutabilirim. Ne dersiniz, organize edelim mi?';
       break;
     case 'DOLU':
-      text = guestName + ' merhaba! Ne yazık ki ilgilendiğiniz ' + vName + ' belirttiğiniz tarihlerde dolu.\n\n' +
-        'Ancak sizi Akdeniz kıyısında ağırlamayı çok isteriz! Hemen aynı bölgede yer alan, aynı derecede sıcak şöminesi, jakuzisi ve harika doğa manzarası olan alternatif villamiz o tarihlerde tam müsait. Üstelik bu tarihe özel ' + price + ' avantajlı fiyatla yardımcı olabilirim. Fotoğraflarını iletmemi ister misiniz?';
+      text = hitap + ' Ne yazık ki ilgilendiğiniz ' + vName + ' ' + tarihIfadesi + ' tarihlerinde dolu.\n\n' +
+        'Sizi ağırlamayı çok isteriz: portföyümüzdeki diğer mülklerin o tarihlerdeki müsaitliğini kontrol edip seçenekleri ve fotoğrafları iletebilirim. İster misiniz?';
       break;
     case 'SON_DAKIKA':
-      text = guestName + ' merhaba! Bugün için evimizin tüm hazırlıkları tamamlandı ve ' + vName + ' sıcacık hazır bekliyor.\n\n' +
-        'Fiyat politikamız gereği liste rakamını korumakla birlikte, son dakika kararınız için size 1 çuval meşe şömine odununu ve akşam barbekü mangal paketini tamamen ücretsiz olarak hediye edebilirim. Girişinizi hemen hazırlayalım mı?';
+      text = hitap + ' ' + vName + ' bugün için hazır ve müsait.' + ozellikCumlesi + fiyatCumlesi +
+        '\n\nGirişinizi hemen hazırlayalım mı?';
       break;
     case 'KARARSIZ':
-      text = guestName + ' merhaba! Eğer tarihleriniz esnekse, size hafta sonu yerine hafta içi konaklamayı öneririm.\n\n' +
-        'Dağın sessizliği ve doğanın huzuru çok daha keyifli oluyor hem de hafta sonuna kıyasla %30 daha avantajlı fiyatla (' + price + ') kapatabiliyoruz. Hafta içi müsaitliklerimizi ileteyim mi?';
+      text = hitap + ' Tarihleriniz esnekse hafta sonu yerine hafta içi konaklamayı önerebilirim: hem daha sakin oluyor hem de hafta içi fiyatlarımız genelde daha uygun.\n\n' +
+        'Hafta içi müsaitliklerimizi ve fiyatlarını ileteyim mi?';
       break;
     default:
-      text = guestName + ' merhaba! ' + vName + ' için ' + dates + ' konaklamanızı organize etmek için buradayız.';
+      text = hitap + ' ' + vName + ' için ' + tarihIfadesi + ' konaklamanızı organize etmek için buradayız.';
   }
 
   const previewEl = document.getElementById('scriptPreviewText');
@@ -12317,8 +12549,10 @@ function openPropertyModal(villaKey = null) {
     document.getElementById('propKey').readOnly = true;
     document.getElementById('propName').value = v.name || '';
     document.getElementById('propCapacity').value = v.capacity || '';
-    document.getElementById('propBasePrice').value = v.basePrice || v.adr || 20000;
-    document.getElementById('propCleanCost').value = v.cleanCost || 1500;
+    // Girilmemis fiyat 20.000 / 1.500 olarak DOLDURULMAZ: kullanici hic
+    // girmedigi bir rakami kaydediyordu ve o rakam mulkun fiyati oluyordu.
+    document.getElementById('propBasePrice').value = (Number(v.basePrice) || Number(v.adr) || '');
+    document.getElementById('propCleanCost').value = (Number(v.cleanCost) || '');
     document.getElementById('propAmenities').value = v.amenities || '';
     document.getElementById('propUrl').value = v.url || '';
     if (deleteBtn) {
@@ -12565,9 +12799,13 @@ async function executeMigrationToCloud() {
           tenant_id: tenantId,
           slug: vKey,
           name: v.name || vKey,
-          capacity: v.capacity || '6-8 Kişilik',
-          base_price: v.basePrice || v.adr || 20000,
-          clean_cost: v.cleanCost || 1500,
+          capacity: v.capacity || '',
+          // Ice aktarilan kaynakta fiyat yoksa VERITABANINA 20.000 / 1.500
+          // YAZILMAZ. Uydurma rakam kaydedilince gercek gibi davraniyor:
+          // bosluk gecesi firsat fiyati ve satis metinleri uzerinden
+          // MISAFIRE gidiyordu. 0 = "girilmedi"; isletme sonra girer.
+          base_price: Number(v.basePrice) || Number(v.adr) || 0,
+          clean_cost: Number(v.cleanCost) || 0,
           amenities: v.amenities || '',
           url: v.url || '',
           created_by: activeSaaSUser?.id
@@ -13785,7 +14023,13 @@ function renderExecutiveControlCenter() {
         urgencyDueTime: 20,
         confidence: 'HIGH',
         rationale: 'İki rezervasyon arasında kalan boşluk; %15 indirimle doldurulabilir.',
-        sourceMetrics: [`Tarih: ${gap.date}`, `Öneri: ₺${gap.suggestedPrice || 12500}`],
+        // Onerilen fiyat hesaplanmamissa satir hic yazilmaz; 12.500 TL
+        // uydurulmaz (3.6).
+        sourceMetrics: [`Tarih: ${gap.date}`].concat(
+          Number(gap.suggestedPrice) > 0
+            ? [`Öneri: ₺${Number(gap.suggestedPrice).toLocaleString('tr-TR')}`]
+            : ['Öneri fiyatı hesaplanamadı (mülkün liste fiyatı girilmemiş)']
+        ),
         deepLink: 'pricing',
         quickAction: 'APPLY_GAP_DISCOUNT'
       });
@@ -14646,7 +14890,7 @@ function renderPricingTab() {
               <div class="gap-dates-tag">📅 ${g.date} (1 Gece)</div>
               <div class="gap-price-box">
                 <span style="font-size: 11px; color: #94A3B8;">Önerilen Fiyat:</span>
-                <strong style="color: #34D399;">₺${Number(g.suggestedPrice || 12000).toLocaleString('tr-TR')}</strong>
+                <strong style="color: ${Number(g.suggestedPrice) > 0 ? '#34D399' : 'var(--text-muted)'};">${Number(g.suggestedPrice) > 0 ? '₺' + Number(g.suggestedPrice).toLocaleString('tr-TR') : '—'}</strong>
               </div>
             </div>
           `).join('')}
@@ -14832,6 +15076,16 @@ if (typeof module !== 'undefined' && module.exports) {
     renderAll,
     setEl,
     showToast,
+    // Pazarlama ekrani renderAll'in ICINDE DEGIL (sekme acilinca calisiyor),
+    // bu yuzden ayrica disa aktarilir. Bu fonksiyonlar musteriye rakam
+    // yaziyor; sahte DOM ile gercekten kosulup uydurma deger uretmedikleri
+    // olculur (core/render_pipeline_tests.js).
+    renderMarketingModule,
+    runAIMarketingAdvisor,
+    runMarketingBudgetSimulation,
+    renderGapNightsRadar,
+    updateClosingScriptPreview,
+    collectMarketingFacts,
     setActiveTenantForTests: (t) => { activeTenant = t; }
   };
 }

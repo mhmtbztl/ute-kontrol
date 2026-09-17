@@ -234,6 +234,74 @@ function run() {
     '11. Eşleşmeyen property kimliği veri kaybı olmadan korunur',
     JSON.stringify(eslesmeyen[0]));
 
+  // --- Pazarlama ekrani: renderAll'in DISINDA kalan render yolu ---------------
+  // Bu fonksiyonlar sekme acilinca calisiyor, renderAll icinden degil; yani
+  // render hatti testi onlari hic calistirmiyordu. Musteriye ROAS, komisyon,
+  // firsat fiyati yaziyorlar — uydurma deger uretip uretmediklerini ancak
+  // gercekten kosarak olcebiliriz.
+  function pazarlamaCalistir(etiket, veri) {
+    domKur();
+    app.setAppData(veri);
+    if (app.setActiveTenantForTests) {
+      app.setActiveTenantForTests({ id: veri.tenantId, name: veri.companyName, slug: 't', role: 'owner' });
+    }
+    app.setCurrentFilter({ period: '2026-09', villa: 'ALL', startDate: null, endDate: null });
+    try {
+      app.renderMarketingModule();
+      app.runAIMarketingAdvisor();
+      app.runMarketingBudgetSimulation();
+      app.renderGapNightsRadar();
+      app.updateClosingScriptPreview();
+      ok(etiket);
+      return true;
+    } catch (e) {
+      no(etiket, hataOzeti(e));
+      return false;
+    }
+  }
+
+  pazarlamaCalistir('13. Pazarlama ekranı boş işletmede hata vermeden çalışır', bosVeri());
+  pazarlamaCalistir('14. Pazarlama ekranı dolu veriyle hata vermeden çalışır', doluVeri());
+
+  // Bos isletmede EKRANDA uydurma rakam olmamali. Bu sayilar gercekten
+  // gosteriliyordu: ROAS 8.0x/9.5x, OTA komisyonu 28.000 TL, "+32.000 TL ek
+  // ciro", simulatorde sabit carpanla uretilmis "Beklenen Toplam Ciro".
+  try {
+    domKur();
+    const bos = bosVeri();
+    app.setAppData(bos);
+    if (app.setActiveTenantForTests) {
+      app.setActiveTenantForTests({ id: bos.tenantId, name: bos.companyName, slug: 't', role: 'owner' });
+    }
+    app.setCurrentFilter({ period: '2026-09', villa: 'ALL', startDate: null, endDate: null });
+    app.renderMarketingModule();
+    app.runAIMarketingAdvisor();
+    app.runMarketingBudgetSimulation();
+
+    const metin = ['aiInsightsContainer', 'mktOverallRoas', 'mktRoasRevDetail',
+                   'metaRoasBadge', 'googleRoasBadge', 'simTotalExpectedRev',
+                   'simExpectedRoas', 'simGoogleRev', 'simMetaRev']
+      .map(id => {
+        const el = global.document.getElementById(id);
+        return el ? (el.innerHTML || '') + ' ' + (el.innerText || '') : '';
+      }).join(' | ');
+
+    const YASAK = ['8.0x', '9.5x', '10.5', '28.000', '32.000', '12.000', '20.000'];
+    const bulunan = YASAK.filter(y => metin.includes(y));
+    check(bulunan.length === 0,
+      '15. Boş işletmede pazarlama ekranı uydurma rakam göstermiyor',
+      'ekranda çıkan uydurma değerler: ' + bulunan.join(', ') +
+      '\n       ekran metni: ' + metin.slice(0, 400));
+
+    // ROAS olculmemisken "0.0x" da yazilmamali: olcum gibi gorunur.
+    const roasEl = global.document.getElementById('mktOverallRoas');
+    check(roasEl && roasEl.innerText === '—',
+      '16. Reklam harcaması yokken ROAS "—" yazar, "0.0x" değil',
+      'mktOverallRoas = ' + (roasEl ? JSON.stringify(roasEl.innerText) : 'yok'));
+  } catch (e) {
+    no('15. Boş işletmede pazarlama ekranı uydurma rakam göstermiyor', hataOzeti(e));
+  }
+
   // showToast gercekten bir sey yaziyor mu?
   try {
     domKur();

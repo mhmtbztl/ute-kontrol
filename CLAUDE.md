@@ -181,6 +181,40 @@ Ağı `core/demo_residue_tests.js` tutuyor — kaynak taraması. Uydurma villa a
 sabit tarihler, ilk müşterinin rakamları, silinmiş `DEFAULT_*` referansları,
 kapsam dışı villa seçicileri ve "yoksa uydur" kalıbı için kırılır.
 
+**Sıfır olmayan varsayılan, uydurma veridir (2026-09-17 taraması).** `x.roas || 8.0`
+kalıbı masum görünür ama tam olarak ölçülmemiş bir şeyi ölçülmüş gibi gösterir.
+Pazarlama ekranı bu kalıpla doluydu ve **bomboş bir hesapta bile** rakam yazıyordu:
+
+- `runAIMarketingAdvisor` — "AI Analizini Yenile" düğmesi onu **argümansız**
+  çağırıyordu, yani her zaman `context = {}` yolundan geçiyordu: Meta 8,0x /
+  Google 9,5x ROAS, 28.000 TL OTA komisyonu, "tahmini **+32.000 TL ek ciro**",
+  sabit arama kelimeleri ve şehir listesi.
+- `runMarketingBudgetSimulation` — kutunun etiketi "Geçmiş ROAS'a göre
+  hesaplanır" diyordu; gerçekte sabit 9,5x / 8,0x / 10,5x çarpanlarıyla
+  "Beklenen Toplam Ciro" üretiyordu.
+- `detectGapNights` — gecelik fiyatı **silinmiş demo anahtarlarına** bağlı bir
+  merdivenden alıyordu (`vKey === 'AZURE' ? 18000 : ... : 12000`). Bu rakam
+  yalnızca ekranda kalmıyordu: "Durum" ve "Flaş Hikaye" düğmeleri onu
+  **misafire gönderilen metne** koyuyordu.
+- Satış kapanış asistanı — misafire "1.200 m² korunaklı bahçe, ısıtmalı
+  jakuzi, sınırsız meşe şömine odunu, Akdeniz kıyısı" yazıyordu ve "1 çuval
+  odun hediye", "%30 avantajlı" gibi **işletmenin yerine getirmek zorunda
+  kalacağı taahhütler** veriyordu. Hiçbiri mülkün verisinden gelmiyordu.
+- Mülk formu ve içe aktarım — `base_price: v.basePrice || 20000` ve
+  `clean_cost: ... || 1500` **Postgres'e yazıyordu**. Kullanıcının hiç
+  girmediği bir fiyat mülkün gerçek fiyatı oluyor, oradan fırsat fiyatına ve
+  misafire giden metne taşınıyordu.
+- Temizlik tutarı — `cleanCost || 1500` **borç defterine** yazılıyordu.
+
+`|| 0` ve `?? 0` yasak değildir: toplamada 0 etkisiz elemandır. Yasak olan
+**sıfır olmayan** varsayılandır. Ölçülemeyen değer `null` taşınır, ekranda "—"
+yazılır ve **neden** ölçülemediği söylenir.
+
+Pazarlama ekranı `renderAll()` içinde **değildir** (sekme açılınca çalışır);
+bu yüzden render hattı testi onu hiç koşmuyordu. `render_pipeline_tests` artık
+sahte DOM ile `renderMarketingModule` + danışman + simülatörü de koşuyor ve
+boş işletmede ekranda uydurma rakam çıkmadığını doğrudan ölçüyor.
+
 **"Bugün" sabit yazılmaz.** Tek kaynak `getTodayStr()`. Bir zamanlar 20 ayrı
 yerde `'2026-09-07'` sabitti ve yalnızca ekranı değil **kayıtları da** bozuyordu:
 temizlik ödemesi hangi gün işaretlenirse işaretlensin ödeme tarihi 2026-09-07
@@ -418,7 +452,7 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 | Bildirim merkezi analizi | yapılmadı |
 | OTA ilan analizi (`runAiListingCritic`) | veri bağlantısı yok; artık skor uydurmuyor, durumu açıkça söylüyor |
 | Demo'yu Supabase'de gerçek tenant olarak yeniden kurma | yapılmadı |
-| Pazarlama ROAS'ı | kampanya gelir alanı kullanıcı girdisi; "ölçülmüş" gibi sunuluyor, etiketlenmeli |
+| Pazarlama ROAS’ı | **tamamlandı** (17 Eylül 2026) — reklam cirosu artık "girilen" olarak etiketleniyor; simülatör sabit çarpan yerine işletmenin kendi ölçülmüş ROAS'ını kullanıyor, ölçülmemiş kanal için tahmin üretmiyor |
 | RGVQI denetim düzeltmeleri | phase24 ve phase25, 14 Eylül 2026'da üretime uygulandı ve readiness denetimiyle doğrulandı; uygulama/worker dağıtımı ayrıca izlenmeli |
 | Misafir CRM (phase27 + phase28) | göçler **üretimde uygulandı ve doğrulandı** (15 Eylül 2026, sütun sorgusuyla); test projesinde de kurulu |
 | Güvenli test kapısı | tamamlandı — canlı/çevrimdışı ayrımı artık `@supabase/supabase-js` require'ına bakıyor. Eski kaba dizgi taraması 8 çevrimdışı süiti (worker giriş noktaları) yanlışlıkla atlıyordu; güvenli koşu 85 → 94 süit |
