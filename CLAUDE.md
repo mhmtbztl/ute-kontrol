@@ -289,7 +289,7 @@ projesine `npm run test:bootstrap` ile uygulandı ve sıfırdan kurulan bir
 
 **phase29 (`migration_phase29_notification_authz_order.sql`) 20 Eylül 2026'da
 üretime uygulandı ve doğrulandı.** Test projesinde de kurulu
-(`npm run test:bootstrap:check`: 0 eksik, 40 uygulanmış).
+(`npm run test:bootstrap:check`: 0 eksik, 41 uygulanmış; phase30 dahil).
 Ne yaptığı: `acknowledge_notification_atomic` ve `resolve_executive_alert_atomic`
 için yetkiyi satır kilidinden öne alır, varlık oracülünü kapatır ve `anon`
 yetkisini geri alır. Ağı `core/notification_authz_tests.js` (16 iddia).
@@ -319,6 +319,15 @@ cascade ile), pencere mikrosaniye ve istemci `success` üzerinden yıkıcı bir
 iş yapmıyor. Düzeltmek yeni bir göç gerektirir; **bilerek ertelendi.**
 Düzeltilecekse `GET DIAGNOSTICS ... ROW_COUNT` ile 0 satır durumu
 `success: false`'a çevrilmeli.
+
+**phase30 (`migration_phase30_booking_channel_settings.sql`) 20 Eylül 2026'da
+üretime uygulandı ve doğrulandı.** `tenant_booking_channels` tablosu üretimde
+mevcut; anon tablo sorgusu eksik şema (`PGRST205`) yerine `401 permission
+denied for table` ve anon `save_tenant_booking_channel` çağrısı `401/42501
+permission denied for function` döndürdü. Böylece hem göçün varlığı hem de
+doğrudan/anon yazma kapısı, üretime kayıt bırakmadan doğrulandı. Test projesinde
+owner/manager, viewer, anon, çapraz tenant, özel kanal rezervasyonu ve pasif
+kanal geçmişi dahil canlı süit 26/26 geçti.
 
 **Bir göçün uygulanıp uygulanmadığı, dosyaya bakarak anlaşılmaz.** Dosya repoda
 durur; veritabanı uygulanmamış olabilir. Doğrulamanın yolu üretime sormaktır:

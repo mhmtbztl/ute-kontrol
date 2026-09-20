@@ -317,7 +317,7 @@ başarı bunu göstermez, çünkü üretim elle ve çalışan bir sırayla kurul
 | Göç | Sahip | Test projesi | Üretim | Ölçüm |
 |---|---|---|---|---|
 | **phase29** bildirim yetki sırası | Claude (tek) | ✅ uygulanmış | ✅ **uygulanmış ve doğrulanmış** | anon RPC → `42501 permission denied for function` |
-| **phase30** rezervasyon kanalı ayarları | Codex (çift) | ✅ uygulanmış | ❌ **henüz uygulanmamış** | `GET /rest/v1/tenant_booking_channels?select=id&limit=0` → HTTP 404, `PGRST205 Could not find the table` |
+| **phase30** rezervasyon kanalı ayarları | Codex (çift) | ✅ uygulanmış | ✅ **uygulanmış ve doğrulanmış** | anon tablo sorgusu → HTTP 401 `permission denied for table`; anon RPC → HTTP 401/`42501 permission denied for function` |
 
 Her iki ölçüm de 20 Eylül 2026'da, salt okunur olarak yapıldı; üretime kayıt
 bırakmadı.
