@@ -2268,9 +2268,6 @@
             <p class="sub-text">Gelen mesajların rezervasyona dönüşüm oranı, kayıp analizleri ve misafir talepleri.</p>
           </div>
           <div style="display: flex; gap: 8px;">
-            <button class="btn btn-secondary btn-sm" onclick="openWhatsAppModal('connect')" style="border-color: #25D366; color: #4ADE80;">
-              <span>🔗</span> Whapi / Canlı QR Bağla
-            </button>
             <button class="btn btn-secondary btn-sm" onclick="openWhatsAppModal('lead')" style="background: rgba(37,211,102,0.15); border-color: #25D366; color: #4ADE80;">
               <span>💬</span> Mesaj Ayrıştır
             </button>
@@ -3791,7 +3788,7 @@
           <span style="font-size: 26px;">💬</span>
           <div>
             <h3 style="color: #4ADE80; margin: 0;">WhatsApp Business Akıllı Entegrasyon Merkezi</h3>
-            <p style="font-size: 12px; color: var(--text-muted); margin: 2px 0 0 0;">WhatsApp mesajlarını çözün veya telefonunuzu Whapi.cloud QR ile canlı bağlayın.</p>
+            <p style="font-size: 12px; color: var(--text-muted); margin: 2px 0 0 0;">Misafirin WhatsApp mesajını yapıştırın; sistem tarih, kişi sayısı ve tutarı ayrıştırıp talebe veya rezervasyona çevirsin.</p>
           </div>
         </div>
         <button class="close-btn" onclick="closeWhatsAppModal()">&times;</button>
@@ -3801,9 +3798,6 @@
       <div style="display: flex; gap: 4px; padding: 12px 20px 0 20px; border-bottom: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.2);">
         <button type="button" class="btn btn-secondary btn-sm" id="waTabBtnParser" onclick="switchWaModalTab('parser')" style="font-weight: 700; border-bottom: 2px solid #25D366; border-radius: 6px 6px 0 0;">
           ⚡ Akıllı Mesaj Ayrıştırıcı
-        </button>
-        <button type="button" class="btn btn-secondary btn-sm" id="waTabBtnGateway" onclick="switchWaModalTab('gateway')" style="font-weight: 700; border-radius: 6px 6px 0 0; opacity: 0.8;">
-          🔗 Canlı QR / Whapi.cloud Bağlantısı
         </button>
       </div>
 
@@ -3871,73 +3865,6 @@
           </div>
         </div>
 
-        <!-- TAB 2: CANLI QR / WHAPI GATEWAY BAĞLANTISI -->
-        <div id="waPaneGateway" style="display: none;">
-          <div style="background: rgba(30,41,59,0.7); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 18px; margin-bottom: 16px;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px;">
-              <div>
-                <strong style="color: #34D399; font-size: 14px; display: flex; align-items: center; gap: 8px;">
-                  <span style="width: 10px; height: 10px; border-radius: 50%; background: #10B981; display: inline-block;"></span>
-                  Whapi.cloud Canlı Ağ Geçidi Durumu
-                </strong>
-                <p style="color: var(--text-muted); font-size: 12px; margin: 4px 0 0 0;">
-                  Telefonunuzdaki WhatsApp Business'ı QR kod okutarak doğrudan bu panele bağlayabilirsiniz.
-                </p>
-              </div>
-              <span id="whapiLiveStatusBadge" class="badge badge-emerald" style="padding: 4px 10px;">🟢 Hazır / Simülasyon Aktif</span>
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px;">
-              <div class="form-group">
-                <label style="font-size: 12px; font-weight: 600;">Whapi API Token / Anahtar</label>
-                <input type="password" id="whapiTokenInput" placeholder="Whapi.cloud Token yapıştırın (Opsiyonel)" style="width: 100%; padding: 9px 12px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 12px;" onchange="saveWhapiSettings()">
-              </div>
-              <div class="form-group">
-                <label style="font-size: 12px; font-weight: 600;">Otomatik Ayrıştırma Modu</label>
-                <select id="whapiAutoModeSelect" style="width: 100%; padding: 9px 12px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 12px;">
-                  <option value="LEAD_AUTO">Gelen Mesajı Doğrudan Lead Olarak Kaydet</option>
-                  <option value="NOTIFY_ONLY">Bana Bildirim Ver, Onaylarsam Rezervasyona Dönüştür</option>
-                </select>
-              </div>
-            </div>
-
-            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-              <button type="button" class="btn btn-secondary btn-sm" onclick="showLiveQrCodeModal()" style="border-color: #25D366; color: #4ADE80; font-weight: 700;">
-                📱 QR Kodu Göster & Telefonu Bağla
-              </button>
-            </div>
-          </div>
-
-          <!-- QR Code Display Box (Hidden by default, shown on click) -->
-          <div id="whapiQrBox" style="display: none; text-align: center; background: rgba(0,0,0,0.5); padding: 20px; border-radius: 10px; border: 1px solid rgba(37,211,102,0.4); margin-bottom: 16px;">
-            <div style="background: #FFFFFF; width: 180px; height: 180px; margin: 0 auto 12px auto; padding: 10px; border-radius: 8px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0,0,0,0.4);">
-              <!-- High quality QR SVG representation -->
-              <svg viewBox="0 0 100 100" width="160" height="160" fill="#0F172A">
-                <rect x="0" y="0" width="30" height="30" fill="#0F172A"/>
-                <rect x="5" y="5" width="20" height="20" fill="#FFFFFF"/>
-                <rect x="10" y="10" width="10" height="10" fill="#0F172A"/>
-                <rect x="70" y="0" width="30" height="30" fill="#0F172A"/>
-                <rect x="75" y="5" width="20" height="20" fill="#FFFFFF"/>
-                <rect x="80" y="10" width="10" height="10" fill="#0F172A"/>
-                <rect x="0" y="70" width="30" height="30" fill="#0F172A"/>
-                <rect x="5" y="75" width="20" height="20" fill="#FFFFFF"/>
-                <rect x="10" y="80" width="10" height="10" fill="#0F172A"/>
-                <rect x="40" y="10" width="10" height="20" fill="#0F172A"/>
-                <rect x="20" y="40" width="30" height="10" fill="#0F172A"/>
-                <rect x="60" y="40" width="20" height="20" fill="#0F172A"/>
-                <rect x="40" y="70" width="20" height="20" fill="#0F172A"/>
-                <rect x="70" y="70" width="20" height="10" fill="#0F172A"/>
-              </svg>
-            </div>
-            <strong style="color: #FFFFFF; font-size: 13px; display: block; margin-bottom: 4px;">WhatsApp Business > Bağlı Cihazlar > Cihaz Bağla</strong>
-            <p style="color: var(--text-muted); font-size: 11px; margin: 0;">Telefonunuzun kamerasını bu koda doğrulttuğunuzda bağlantı otomatik olarak canlıya geçer.</p>
-          </div>
-          <!-- Automation Guide Hint -->
-          <div style="background: rgba(37, 211, 102, 0.08); border: 1px solid rgba(37, 211, 102, 0.2); border-radius: 8px; padding: 12px; font-size: 12px; color: #D1FAE5; line-height: 1.5; margin-top: 14px;">
-            <strong>🤖 Sıfır Dokunuş / Otomatik Entegrasyon mu İstiyorsunuz?</strong>
-            <p style="margin: 4px 0 0 0; color: #A7F3D0;">WhatsApp Business Cloud API veya Make.com / Zapier webhook kurarak müşterilerinizin yazdığı mesajların buraya hiç kopyala-yapıştır yapmadan otomatik düşmesini sağlayabilirsiniz. Detaylı kurulum rehberi için kılavuza göz atın.</p>
-          </div>
-        </div>
       </div>
 
       <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
@@ -4411,7 +4338,7 @@
   <script src="core/executive_dashboard_service.js?v=8065c637"></script>
   <script src="core/executive_ai_advisor.js?v=4b235c67"></script>
   <script src="core/notification_center_service.js?v=710f8a91"></script>
-  <script src="app.js?v=5c50534b"></script>
+  <script src="app.js?v=edd255e9"></script>
   <script src="core/marketing_ui.js?v=2e506018"></script>
 </body>
 </html>

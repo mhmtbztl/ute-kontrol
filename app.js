@@ -9209,38 +9209,29 @@ async function saveWaAsBooking() {
 // WHATSAPP TALEP & DÖNÜŞÜM ANALİTİĞİ MOTORU
 // =============================================================
 function switchWaModalTab(tab) {
+  // Gecmiste iki sekme vardi; "Canli QR / Whapi" sekmesi sahte oldugu icin
+  // kaldirildi. Ayristirici tek panel olarak kaldi.
   const p1 = document.getElementById('waPaneParser');
-  const p2 = document.getElementById('waPaneGateway');
-  const b1 = document.getElementById('waTabBtnParser');
-  const b2 = document.getElementById('waTabBtnGateway');
-
-  if (tab === 'gateway') {
-    if (p1) p1.style.display = 'none';
-    if (p2) p2.style.display = 'block';
-    if (b1) { b1.style.borderBottom = 'none'; b1.style.opacity = '0.7'; }
-    if (b2) { b2.style.borderBottom = '2px solid #25D366'; b2.style.opacity = '1'; }
-  } else {
-    if (p1) p1.style.display = 'block';
-    if (p2) p2.style.display = 'none';
-    if (b1) { b1.style.borderBottom = '2px solid #25D366'; b1.style.opacity = '1'; }
-    if (b2) { b2.style.borderBottom = 'none'; b2.style.opacity = '0.7'; }
-  }
+  if (p1) p1.style.display = 'block';
 }
 
-function showLiveQrCodeModal() {
-  const box = document.getElementById('whapiQrBox');
-  if (box) {
-    box.style.display = (box.style.display === 'none') ? 'block' : 'none';
-  }
-}
+// `showLiveQrCodeModal()` KALDIRILDI: sahte QR kutusunu acip kapatiyordu.
 
-function saveWhapiSettings() {
-  const token = document.getElementById('whapiTokenInput')?.value.trim();
-  if (!appData.waConfig) appData.waConfig = {};
-  appData.waConfig.token = token;
-  saveAppData();
-  alert('Whapi.cloud ayarları kaydedildi!');
-}
+// `saveWhapiSettings()` KALDIRILDI.
+//
+// Whapi/WhatsApp "canli baglanti" ozelliginin TAMAMI sahteydi:
+//   • "QR Kodu Göster" bir div acip kapatiyordu; icindeki QR elle cizilmis
+//     bir SVG'ydi, okutulsa hicbir sey yapmazdi.
+//   • Token `appData.waConfig.token`'a yaziliyordu; oradan HICBIR YER
+//     okumuyordu ve `saveAppData()` de kaydetmiyordu. Musteri gercek bir
+//     API anahtarini girip cope atiyordu.
+//   • Durum rozeti sabit "🟢 Hazır / Simülasyon Aktif" yaziyordu.
+//   • Whapi.cloud'a tek bir istek gitmiyordu.
+//
+// Calisan ozellik korundu: misafirin mesajini yapistirip talebe veya
+// rezervasyona cevirme (parseWhatsAppMessage + saveWaAsLead /
+// saveWaAsBooking). Ticari bir uruns musteriye kurulu olmayan bir
+// entegrasyonu kurulmus gibi gosteremez (3.6).
 
 // `simulateIncomingWhatsAppTest()` KALDIRILDI.
 //

@@ -268,6 +268,18 @@ function run() {
     '`v.base * 1.3` kalıbı duruyor: kullanıcı hedef fiyatı hiç girmemişken ' +
     'ekranda bir rakam görür ve "Kaydet" onu gerçek fiyat yapar.');
 
+  // --- 14. Kurulu olmayan entegrasyonu kurulmus gibi gostermek ---------------
+  // Whapi/WhatsApp "canli baglanti" ozelliginin tamami mockup'ti: QR elle
+  // cizilmis bir SVG, token hicbir yere yazilmiyor ve hicbir yerden
+  // okunmuyor, rozet sabit "🟢 Hazır / Simülasyon Aktif" ve Whapi.cloud'a
+  // tek bir istek gitmiyordu. Musteri gercek API anahtarini girip cope
+  // atiyordu.
+  check(!/whapi/i.test(HTML_KOD) && !/saveWhapiSettings|showLiveQrCodeModal/.test(APP_KOD),
+    '17. Kurulu olmayan Whapi entegrasyonu kurulmuş gibi gösterilmiyor',
+    'Whapi token alanı, sahte QR kutusu veya "🟢 Hazır" rozeti hâlâ ' +
+    'arayüzde. Müşteriden gerçek bir API anahtarı isteyip hiçbir yere ' +
+    'yazmayan bir ekran, ticari bir üründe bulunamaz.');
+
   console.log('\n=============================================================================');
   console.log(`TEST SUMMARY: ${passed} / ${passed + failed} TESTS PASSED (${failed} FAILED)`);
   console.log('=============================================================================\n');
