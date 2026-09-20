@@ -2118,43 +2118,209 @@ async function cloudDeleteExpense(expId) {
   return await deleteExpense(expId, true);
 }
 
+/**
+ * Bir temizlik gorevini Postgres'e yazar.
+ *
+ * ID'nin iki hali vardir ve BIRBIRINE KARISTIRILAMAZ:
+ *   • Bulut yuklemesinden gelen gorevin `id`'si satirin UUID'sidir
+ *     (bkz. loadAppData -> cleaningTasks esleyicisi).
+ *   • Arayuzde yeni yaratilan gorevin `id`'si `TASK-CLN-...` gibi bir
+ *     yerel anahtardir; satirin `legacy_id`'si olur.
+ *
+ * Bir zamanlar her iki hal de `legacy_id`'ye yaziliyordu. Sonuc: kullanici
+ * "Ödendi" deyip sayfayi yeniledikten sonra AYNI goreve ikinci kez
+ * dokundugunda, artik elindeki UUID `legacy_id` olarak gonderiliyor,
+ * `tenant_id + legacy_id` benzersizligi tutmuyor ve Postgres MUKERRER bir
+ * gorev satiri aciyordu — temizlik borcu iki kez gorunuyordu.
+ */
 async function cloudUpsertCleaningTask(task) {
   const tenantId = getActiveTenantId();
-  if (!isCloudTenant(tenantId)) return;
-    requireCloudForWrite('Temizlik görevi', tenantId);
-  try {
-    const propId = await getPropertyIdBySlug(task.villa, tenantId);
-    if (!propId) return;
-    const legacyId = task.id || ('TASK-' + Date.now().toString());
-    const { error } = await supabaseClient.from('cleaning_tasks').upsert({
-      tenant_id: tenantId,
-      property_id: propId,
-      task_date: task.date || getTodayStr(),
-      cleaner_name: task.cleaner || 'Temizlik Ekibi',
-      amount: Number(task.amount) || 0,
-      description: task.notes || task.desc || '',
-      is_paid: !!task.paid,
-      legacy_id: legacyId,
-      created_by: activeSaaSUser?.id
-    }, { onConflict: 'tenant_id, legacy_id' });
-    if (error) console.warn('cloudUpsertCleaningTask notice:', error.message);
-  } catch (err) {
-    console.warn('cloudUpsertCleaningTask error:', err);
+  if (!isCloudTenant(tenantId)) return null;
+  requireCloudForWrite('Temizlik görevi', tenantId);
+  const propId = await getPropertyIdBySlug(task.villa, tenantId);
+  if (!propId) {
+    throw new Error('Temizlik görevi kaydedilemedi: "' + (task.villa || '—') + '" mülkü bulunamadı.');
   }
+  const satir = {
+    tenant_id: tenantId,
+    property_id: propId,
+    task_date: task.date || getTodayStr(),
+    cleaner_name: task.cleaner || 'Temizlik Ekibi',
+    amount: Number(task.amount) || 0,
+    description: task.notes || task.desc || '',
+    is_paid: !!task.paid,
+    created_by: activeSaaSUser?.id
+  };
+
+  let sorgu;
+  if (task.id && isUUID(task.id)) {
+    // Bilinen satir: birincil anahtardan guncelle.
+    satir.id = task.id;
+    if (task.legacyId) satir.legacy_id = task.legacyId;
+    sorgu = supabaseClient.from('cleaning_tasks').upsert(satir, { onConflict: 'id' });
+  } else {
+    satir.legacy_id = task.id || ('TASK-' + Date.now().toString());
+    sorgu = supabaseClient.from('cleaning_tasks').upsert(satir, { onConflict: 'tenant_id, legacy_id' });
+  }
+
+  const { data, error } = await sorgu.select('id, legacy_id').single();
+  if (error) {
+    throw new Error('Temizlik görevi kaydedilemedi: ' + (error.message || 'veritabanı hatası'));
+  }
+  return data;
 }
 
 async function cloudDeleteCleaningTask(taskId) {
   const tenantId = getActiveTenantId();
   if (!isCloudTenant(tenantId)) return;
-    requireCloudForWrite('Temizlik görevi silme', tenantId);
+  requireCloudForWrite('Temizlik görevi silme', tenantId);
+  const eslesme = isUUID(taskId)
+    ? { tenant_id: tenantId, id: taskId }
+    : { tenant_id: tenantId, legacy_id: taskId };
+  const { error } = await supabaseClient.from('cleaning_tasks').delete().match(eslesme);
+  if (error) {
+    throw new Error('Temizlik görevi silinemedi: ' + (error.message || 'veritabanı hatası'));
+  }
+}
+
+// -------------------------------------------------------------
+// TEMIZLIK GIDERI — borç defterinden gider defterine geçen kalem
+// -------------------------------------------------------------
+
+/**
+ * Bir temizlik gorevi "Ödendi" isaretlendiginde olusan gider kaydinin
+ * TEK kaynagi. Uc ayri yerde (toggleCleaningPaid, toggleTaskPaid,
+ * payAllPendingCleaning) elle kuruluyordu ve uclunun biri `month` alanini
+ * SABIT '2026-09' yaziyordu: odeme hangi ay yapilirsa yapilsin gider Eylul
+ * 2026'ya dusuyor, o ayin net kari ve dogru ayin net kari ayni anda
+ * yanlis cikiyordu. Ay artik her zaman odeme tarihinden turetilir (3.6).
+ */
+function cleaningExpenseKey(task) {
+  // Gorevin VERITABANI kimligi, yeniden yuklemeden sonra da ayni kalan tek
+  // anahtardir. Yerel `TASK-CLN-...` anahtari yuklemede UUID'ye donusur;
+  // gideri ona baglarsak her yenilemeden sonra eski gider satiri oksuz
+  // kalir ve "Borç" isaretlemek onu silemez.
+  return 'EXP-CLEAN-' + (task.dbId || task.id);
+}
+
+function buildCleaningExpenseRecord(task, villaAdi) {
+  const odemeTarihi = task.paidDate || getTodayStr();
+  const ad = villaAdi
+    || ((typeof appData !== 'undefined' && appData.villas && appData.villas[task.villa]?.name)
+        ? appData.villas[task.villa].name : task.villa);
+  const anahtar = cleaningExpenseKey(task);
+  return {
+    id: anahtar,
+    legacyId: anahtar,
+    date: odemeTarihi,
+    month: odemeTarihi.slice(0, 7),
+    villa: task.villa,
+    category: 'Temizlik',
+    type: 'OPEX',
+    amount: Number(task.amount) || 0,
+    description: `[${ad}] Temizlik Ücreti - ${task.cleaner || 'Temizlik personeli belirtilmedi'} (${task.guest || 'Çıkış Temizliği'})`,
+    cleanTaskId: task.id,
+    paid: true
+  };
+}
+
+/**
+ * Temizlik giderini `legacy_id` uzerinden idempotent yazar.
+ *
+ * `cloudUpsertExpense()` burada KULLANILAMAZ: UUID olmayan bir id gorunce
+ * `createExpense()`'a dusuyor, yani "Ödendi -> Borç -> Ödendi" her turunda
+ * yeni bir gider satiri aciyor.
+ *
+ * Tutar 0 ise satir YAZILMAZ: `chk_expense_positive_amount` onu zaten
+ * reddeder. Maliyet girilmemis demektir ve uydurulmaz (3.6) — cagiran
+ * tarafa bunu soyleyebilmesi icin sebep dondurulur.
+ */
+async function cloudUpsertCleaningExpense(exp) {
+  const tenantId = getActiveTenantId();
+  if (!isCloudTenant(tenantId)) return { yazildi: false, sebep: 'YEREL' };
+  requireCloudForWrite('Temizlik gideri', tenantId);
+  if (!(Number(exp.amount) > 0)) {
+    return { yazildi: false, sebep: 'TUTAR_YOK' };
+  }
+  const payload = mapExpenseToDb(exp, tenantId);
+  payload.legacy_id = exp.legacyId || exp.id;
+  delete payload.id; // legacy_id catismasi birincil anahtardan once gelir
+  const { data, error } = await supabaseClient
+    .from('expenses')
+    .upsert(payload, { onConflict: 'tenant_id, legacy_id' })
+    .select('id')
+    .single();
+  if (error) {
+    throw new Error('Temizlik gideri kaydedilemedi: ' + (error.message || 'veritabanı hatası'));
+  }
+  return { yazildi: true, id: data?.id };
+}
+
+async function cloudDeleteCleaningExpense(legacyId) {
+  const tenantId = getActiveTenantId();
+  if (!isCloudTenant(tenantId)) return;
+  requireCloudForWrite('Temizlik gideri silme', tenantId);
+  const { error } = await supabaseClient.from('expenses').delete().match({
+    tenant_id: tenantId,
+    legacy_id: legacyId
+  });
+  if (error) {
+    throw new Error('Temizlik gideri silinemedi: ' + (error.message || 'veritabanı hatası'));
+  }
+}
+
+/**
+ * Bir temizlik gorevinin defterdeki BUTUN izini kalici hale getirir:
+ * gorev satiri + (odendiyse) gider satiri, (borctaysa) gider satirinin
+ * kaldirilmasi. Sirali yapilir, cunku gider anahtari gorevin veritabani
+ * kimliginden turer.
+ *
+ * Bu fonksiyon HATA YUTMAZ. `saveAppData()` bir sey kaydetmiyor (6. bolum);
+ * cagiran taraf yazmanin gerceklestigini varsayamaz, bu yuzden basarisizlik
+ * cagirana firlatilir ve kullaniciya soylenir.
+ */
+async function persistCleaningLedgerEntry(task) {
+  const tenantId = getActiveTenantId();
+  if (!isCloudTenant(tenantId)) return { yazildi: false, sebep: 'YEREL' };
+
+  const satir = await cloudUpsertCleaningTask(task);
+  if (satir && satir.id) task.dbId = satir.id;
+
+  const anahtar = cleaningExpenseKey(task);
+  if (task.paid) {
+    const sonuc = await cloudUpsertCleaningExpense(buildCleaningExpenseRecord(task));
+    return { yazildi: true, gider: sonuc };
+  }
+  await cloudDeleteCleaningExpense(anahtar);
+  return { yazildi: true, gider: { yazildi: false, sebep: 'BORC' } };
+}
+
+/**
+ * Temizlik defteri yazmalarini arayuz tarafinda tek bicimde raporlar.
+ * Basarisizlikta kullaniciya "kaydedilmedi" denir — sessizce gecilmez (3.3).
+ */
+async function reportCleaningPersist(gorevler, basariMesaji) {
+  const liste = Array.isArray(gorevler) ? gorevler : [gorevler];
   try {
-    const { error } = await supabaseClient.from('cleaning_tasks').delete().match({
-      tenant_id: tenantId,
-      legacy_id: taskId
-    });
-    if (error) console.warn('cloudDeleteCleaningTask notice:', error.message);
+    const sonuclar = [];
+    for (const t of liste) sonuclar.push(await persistCleaningLedgerEntry(t));
+    const tutarsiz = sonuclar.filter(s => s.gider && s.gider.sebep === 'TUTAR_YOK').length;
+    let mesaj = basariMesaji;
+    if (tutarsiz > 0) {
+      mesaj += ` (${tutarsiz} görevde tutar girilmediği için gider defterine kalem açılmadı.)`;
+    }
+    if (typeof window !== 'undefined' && window.showToast) window.showToast(mesaj);
+    return true;
   } catch (err) {
-    console.warn('cloudDeleteCleaningTask error:', err);
+    const mesaj = '⚠️ ' + (err && err.message ? err.message : 'Kayıt veritabanına yazılamadı.');
+    if (typeof window !== 'undefined' && window.showToast) window.showToast(mesaj, 'error');
+    else console.error(mesaj);
+    // Bellekteki degisiklik ekranda duruyor ama veritabaninda yok. Ekrani
+    // gercege geri cek: yoksa kullanici "Ödendi" gorur, defterde yoktur.
+    if (typeof loadTenantAppData === 'function' && isCloudTenant(getActiveTenantId())) {
+      try { await loadTenantAppData(getActiveTenantId()); } catch (_) { /* yeniden yukleme de dustu */ }
+    }
+    return false;
   }
 }
 
@@ -7952,7 +8118,7 @@ function renderDailyOps() {
 // -------------------------------------------------------------
 // ✏️ TEMİZLİK TUTARINI DEĞİŞTİRME FONKSİYONLARI (Kullanıcı İsteği)
 // -------------------------------------------------------------
-function promptEditCleaningAmount(vKey) {
+async function promptEditCleaningAmount(vKey) {
   const vConf = appData.villas[vKey];
   // 1.500 TL VARSAYILMAZ: bu rakam temizlik BORC defterine yaziliyor ve
   // "Ödendi" isaretlenince gider defterine geçiyor. Girilmemis bir maliyeti
@@ -7972,29 +8138,49 @@ function promptEditCleaningAmount(vKey) {
   appData.cleaningPayments[vKey].amount = newAmount;
 
   // Also sync in cleaningTasks if a task exists for this villa
+  let etkilenen = null;
   if (appData.cleaningTasks) {
     const task = appData.cleaningTasks.find(t => t.villa === vKey);
     if (task) {
       task.amount = newAmount;
+      etkilenen = task;
       if (task.paid && appData.expenses) {
-        const exp = appData.expenses.find(e => e.cleanTaskId === task.id || e.id === 'EXP-CLEAN-' + task.id);
+        const exp = appData.expenses.find(e => e.cleanTaskId === task.id || e.id === cleaningExpenseKey(task));
         if (exp) exp.amount = newAmount;
       }
     }
   }
 
-
-
   saveAppData();
   renderDailyOps();
   renderHousekeepingTab();
+  renderExpensesTable();
 
   const msg = `✅ ${vConf?.name || vKey} temizlik bedeli ₺${newAmount.toLocaleString('tr-TR')} olarak güncellendi.`;
-  if (window.showToast) window.showToast(msg);
-  else console.log(msg);
+  if (etkilenen) {
+    // Tutar temizlik BORC defterinin kendisidir; yazilmazsa kaydedilmemistir.
+    await reportCleaningPersist(etkilenen, msg);
+    return;
+  }
+
+  // Gorev yoksa bu, mulkun VARSAYILAN temizlik maliyetidir. Dogal adresi
+  // `properties.clean_cost`; yeni sutun/tablo gerekmez. Yazilmazsa rakam
+  // yalnizca bellekte kalir ve yenilemede kaybolur.
+  if (vConf) vConf.cleanCost = newAmount;
+  if (isCloudTenant(getActiveTenantId()) && vConf) {
+    try {
+      await updateProperty(vKey, { ...vConf, cleanCost: newAmount });
+      if (window.showToast) window.showToast(msg);
+    } catch (err) {
+      const hata = '⚠️ Temizlik bedeli kaydedilemedi: ' + (err?.message || 'veritabanı hatası');
+      if (window.showToast) window.showToast(hata, 'error'); else console.error(hata);
+    }
+    return;
+  }
+  if (window.showToast) window.showToast(msg); else console.log(msg);
 }
 
-function promptEditTaskAmount(taskId) {
+async function promptEditTaskAmount(taskId) {
   if (!appData.cleaningTasks) return;
   const task = appData.cleaningTasks.find(t => t.id === taskId);
   if (!task) return;
@@ -8014,17 +8200,21 @@ function promptEditTaskAmount(taskId) {
     appData.cleaningPayments[task.villa].amount = newAmount;
   }
 
-
+  // Gorev odenmisse gider kalemi de bu tutari tasir; ikisi birlikte yazilir.
+  if (task.paid && appData.expenses) {
+    const exp = appData.expenses.find(e => e.cleanTaskId === task.id || e.id === cleaningExpenseKey(task));
+    if (exp) exp.amount = newAmount;
+  }
 
   saveAppData();
   renderHousekeepingTab();
   renderDailyOps();
   renderExpensesTable();
 
-  if (window.showToast) window.showToast(`✅ Temizlik tutarı ₺${newAmount.toLocaleString('tr-TR')} olarak güncellendi.`);
+  await reportCleaningPersist(task, `✅ Temizlik tutarı ₺${newAmount.toLocaleString('tr-TR')} olarak güncellendi.`);
 }
 
-function toggleCleaningPaid(vKey) {
+async function toggleCleaningPaid(vKey) {
   if (!appData.cleaningPayments) appData.cleaningPayments = {};
   if (!appData.cleaningTasks) appData.cleaningTasks = [];
   if (!appData.expenses) appData.expenses = [];
@@ -8063,31 +8253,15 @@ function toggleCleaningPaid(vKey) {
     task.paidDate = newPaid ? getTodayStr() : null;
   }
 
-  const expId = 'EXP-CLEAN-' + task.id;
+  if (!Number(task.amount)) task.amount = cleanCost;
+  const expId = cleaningExpenseKey(task);
   const vName = (appData.villas && appData.villas[vKey]?.name) ? appData.villas[vKey].name : vKey;
-  const desc = `[${vName}] Temizlik Ücreti - ${task.cleaner || 'Temizlik personeli belirtilmedi'} (${task.guest || 'Çıkış Temizliği'})`;
 
   if (newPaid) {
+    const kayit = buildCleaningExpenseRecord(task, vName);
     const existingIdx = appData.expenses.findIndex(e => e.id === expId || e.cleanTaskId === task.id);
-    if (existingIdx !== -1) {
-      appData.expenses[existingIdx].amount = Number(task.amount) || cleanCost;
-      appData.expenses[existingIdx].paid = true;
-      appData.expenses[existingIdx].description = desc;
-      appData.expenses[existingIdx].cleanTaskId = task.id;
-    } else {
-      appData.expenses.push({
-        id: expId,
-        date: getTodayStr(),
-        month: '2026-09',
-        villa: vKey,
-        category: 'Temizlik',
-        type: 'OPEX',
-        amount: Number(task.amount) || cleanCost,
-        description: desc,
-        cleanTaskId: task.id,
-        paid: true
-      });
-    }
+    if (existingIdx !== -1) appData.expenses[existingIdx] = { ...appData.expenses[existingIdx], ...kayit };
+    else appData.expenses.push(kayit);
   } else {
     appData.expenses = appData.expenses.filter(e => e.id !== expId && e.cleanTaskId !== task.id);
   }
@@ -8098,10 +8272,10 @@ function toggleCleaningPaid(vKey) {
   renderExpensesTable();
   renderFinanceModule();
 
-  const msg = newPaid 
+  const msg = newPaid
     ? `✅ [${vName}] temizlik bedeli (₺${cleanCost.toLocaleString('tr-TR')}) "ÖDENDİ" yapıldı ve Gider Defteri'ne işlendi.`
     : `⏳ [${vName}] temizlik bedeli (₺${cleanCost.toLocaleString('tr-TR')}) "ÖDENECEK (Borç)" yapıldı, Gider Defteri'nden çıkarıldı.`;
-  if (window.showToast) window.showToast(msg);
+  await reportCleaningPersist(task, msg);
 }
 
 function cycleHkStatus(vKey) {
@@ -8256,7 +8430,7 @@ function renderHousekeepingTab() {
   });
 }
 
-function toggleTaskPaid(taskId) {
+async function toggleTaskPaid(taskId) {
   if (!appData.cleaningTasks) return;
   const task = appData.cleaningTasks.find(t => t.id === taskId);
   if (!task) return;
@@ -8275,32 +8449,15 @@ function toggleTaskPaid(taskId) {
   }
 
   if (!appData.expenses) appData.expenses = [];
-  const expId = 'EXP-CLEAN-' + task.id;
+  const expId = cleaningExpenseKey(task);
   const vName = (appData.villas && appData.villas[task.villa]?.name) ? appData.villas[task.villa].name : task.villa;
-  const desc = `[${vName}] Temizlik Ücreti - ${task.cleaner || 'Temizlik personeli belirtilmedi'} (${task.guest || 'Çıkış Temizliği'})`;
 
   if (newPaid) {
     // Tuşa basılınca Gider Defteri'ne TAM 1 TANE gider kalemi girilir (Mükerrer kontrolü ile)
+    const kayit = buildCleaningExpenseRecord(task, vName);
     const existingIdx = appData.expenses.findIndex(e => e.id === expId || e.cleanTaskId === task.id);
-    if (existingIdx !== -1) {
-      appData.expenses[existingIdx].amount = Number(task.amount) || 0;
-      appData.expenses[existingIdx].paid = true;
-      appData.expenses[existingIdx].description = desc;
-      appData.expenses[existingIdx].cleanTaskId = task.id;
-    } else {
-      appData.expenses.push({
-        id: expId,
-        date: task.paidDate || getTodayStr(),
-        month: (task.paidDate || getTodayStr()).slice(0, 7),
-        villa: task.villa,
-        category: 'Temizlik',
-        type: 'OPEX',
-        amount: Number(task.amount) || 0,
-        description: desc,
-        cleanTaskId: task.id,
-        paid: true
-      });
-    }
+    if (existingIdx !== -1) appData.expenses[existingIdx] = { ...appData.expenses[existingIdx], ...kayit };
+    else appData.expenses.push(kayit);
   } else {
     // Ödendi iptal edilip tekrar borç yapıldığında gider kalemi geri alınır
     appData.expenses = appData.expenses.filter(e => e.id !== expId && e.cleanTaskId !== task.id);
@@ -8312,13 +8469,13 @@ function toggleTaskPaid(taskId) {
   renderExpensesTable();
   renderFinanceModule();
 
-  const msg = newPaid 
-    ? `✅ [${vName}] temizlik ücreti (₺${Number(task.amount).toLocaleString('tr-TR')}) "ÖDENDİ" yapıldı ve Gider Defteri'ne işlendi.` 
+  const msg = newPaid
+    ? `✅ [${vName}] temizlik ücreti (₺${Number(task.amount).toLocaleString('tr-TR')}) "ÖDENDİ" yapıldı ve Gider Defteri'ne işlendi.`
     : `⏳ [${vName}] temizlik ücreti (₺${Number(task.amount).toLocaleString('tr-TR')}) "ÖDENECEK (Borç)" durumuna alındı.`;
-  if (window.showToast) window.showToast(msg);
+  await reportCleaningPersist(task, msg);
 }
 
-function payAllPendingCleaning() {
+async function payAllPendingCleaning() {
   if (!appData.cleaningTasks) return;
   const pending = appData.cleaningTasks.filter(t => !t.paid);
   if (pending.length === 0) {
@@ -8342,30 +8499,13 @@ function payAllPendingCleaning() {
       appData.cleaningPayments[t.villa].amount = t.amount;
     }
 
-    const expId = 'EXP-CLEAN-' + t.id;
+    const expId = cleaningExpenseKey(t);
     const vName = (appData.villas && appData.villas[t.villa]?.name) ? appData.villas[t.villa].name : t.villa;
-    const desc = `[${vName}] Temizlik Ücreti - ${t.cleaner || 'Temizlik personeli belirtilmedi'} (${t.guest || 'Çıkış'})`;
+    const kayit = buildCleaningExpenseRecord(t, vName);
 
     const existingIdx = appData.expenses.findIndex(e => e.id === expId || e.cleanTaskId === t.id);
-    if (existingIdx !== -1) {
-      appData.expenses[existingIdx].amount = Number(t.amount) || 0;
-      appData.expenses[existingIdx].paid = true;
-      appData.expenses[existingIdx].description = desc;
-      appData.expenses[existingIdx].cleanTaskId = t.id;
-    } else {
-      appData.expenses.push({
-        id: expId,
-        date: todayStr,
-        month: todayStr.slice(0, 7),
-        villa: t.villa,
-        category: 'Temizlik',
-        type: 'OPEX',
-        amount: Number(t.amount) || 0,
-        description: desc,
-        cleanTaskId: t.id,
-        paid: true
-      });
-    }
+    if (existingIdx !== -1) appData.expenses[existingIdx] = { ...appData.expenses[existingIdx], ...kayit };
+    else appData.expenses.push(kayit);
   });
 
   saveAppData();
@@ -8374,7 +8514,10 @@ function payAllPendingCleaning() {
   renderExpensesTable();
   renderFinanceModule();
 
-  if (window.showToast) window.showToast(`✅ ${pending.length} temizlik borcu (₺${totalDebt.toLocaleString('tr-TR')}) başarıyla ödendi ve Gider Defteri'ne işlendi.`);
+  await reportCleaningPersist(
+    pending,
+    `✅ ${pending.length} temizlik borcu (₺${totalDebt.toLocaleString('tr-TR')}) başarıyla ödendi ve Gider Defteri'ne işlendi.`
+  );
 }
 
 function openNewCleaningTaskModal() {
@@ -12314,6 +12457,10 @@ async function loadTenantAppData(tenantIdOrUserId) {
 
       const cleaningTasks = (cleanList || []).map(c => ({
         id: c.id,
+        dbId: c.id,
+        // `legacy_id` tasinmazsa, yeniden yuklenmis bir gorev bir sonraki
+        // yazmada anahtarini kaybeder (bkz. cloudUpsertCleaningTask).
+        legacyId: c.legacy_id || null,
         bookingId: c.booking_id,
         villa: propIdMap[c.property_id] || '',
         date: c.task_date,
@@ -12322,6 +12469,20 @@ async function loadTenantAppData(tenantIdOrUserId) {
         desc: c.description || '',
         paid: c.is_paid
       }));
+
+      // `cleaningPayments` (kokpitteki villa bazli "ödendi/borç" durumu)
+      // HICBIR YERDE YUKLENMIYORDU: yenilemeden sonra her villa yeniden
+      // "borç" gorunuyordu. Ayri bir tabloda tutulmaz — ayni sayiyi iki
+      // yerde saklamak "hangisi dogru" sorusunu acar (3.4). Villanin en
+      // guncel temizlik gorevinden TURETILIR.
+      const cleaningPayments = {};
+      cleaningTasks.forEach(t => {
+        if (!t.villa) return;
+        const mevcut = cleaningPayments[t.villa];
+        if (!mevcut || (t.date || '') > (mevcut.date || '')) {
+          cleaningPayments[t.villa] = { paid: !!t.paid, amount: t.amount, date: t.date };
+        }
+      });
 
       appData = {
         tenantId,
@@ -12334,6 +12495,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
         extensionOffers: extensionOffers || [],
         expenses,
         cleaningTasks,
+        cleaningPayments,
         leads,
         closedPeriods: closeList || [],
         targets: targetList || [],
@@ -15048,6 +15210,13 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     isUUID,
     roundMoney,
+    cleaningExpenseKey,
+    buildCleaningExpenseRecord,
+    cloudUpsertCleaningTask,
+    cloudDeleteCleaningTask,
+    cloudUpsertCleaningExpense,
+    cloudDeleteCleaningExpense,
+    persistCleaningLedgerEntry,
     mapPropertyFromDb,
     mapPropertyToDb,
     loadProperties,

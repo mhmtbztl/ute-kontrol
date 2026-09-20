@@ -155,6 +155,9 @@ const allTestFiles = [
   // Bildirim merkezi her iki uctan da bagli mi (yukleme + kalici okundu)
   'notification_wiring_tests.js',
 
+  // Temizlik & gider defteri gercekten Postgres'e yaziliyor mu
+  'cleaning_ledger_persistence_tests.js',
+
   // Demo artigi denetimi (uydurma villa/rakam/tarih kaynak taramasi)
   'demo_residue_tests.js',
 
