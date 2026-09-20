@@ -125,6 +125,76 @@
   }
 
   /**
+   * Maps the authoritative database snapshot to the KPI shape consumed by
+   * the executive UI. Financial totals must not be recomputed from the
+   * browser's partial booking/expense cache.
+   */
+  function computeExecutiveTopKpisFromSnapshot(snapshot, options = {}) {
+    if (!snapshot || typeof snapshot !== 'object') {
+      throw new Error('EXECUTIVE_SNAPSHOT_REQUIRED');
+    }
+
+    const targets = options.targets || {};
+    const prior = options.priorSnapshot || null;
+    const revenue = roundMoney(snapshot.total_revenue);
+    const expenses = roundMoney(snapshot.total_expenses);
+    const netProfit = roundMoney(snapshot.net_profit);
+    const bookedNights = Math.max(0, Number(snapshot.booked_nights) || 0);
+    const availableNights = Math.max(0, Number(snapshot.available_nights) || 0);
+    const occupancy = snapshot.occupancy === null || snapshot.occupancy === undefined
+      ? null : roundMoney(snapshot.occupancy);
+    const hasRoomRevenue = snapshot.room_revenue !== null && snapshot.room_revenue !== undefined;
+    const roomRevenue = hasRoomRevenue ? roundMoney(snapshot.room_revenue) : null;
+
+    const targetRevenue = Number(targets.revenue_target || targets.revenueTarget || 0);
+    const targetProfit = Number(targets.profit_target || targets.profitTarget || 0);
+    const targetOccupancy = Number(targets.occupancy_target || targets.occupancyTarget || 0);
+
+    function variance(current, target) {
+      if (current === null || !target) return { varianceAmount: 0, variancePercent: 0, status: 'NEUTRAL' };
+      const diff = roundMoney(current - target);
+      return {
+        varianceAmount: diff,
+        variancePercent: Math.round((diff / target) * 100),
+        status: diff >= 0 ? 'ON_TARGET' : 'BELOW_TARGET'
+      };
+    }
+
+    const priorRevenue = prior ? roundMoney(prior.total_revenue) : null;
+    const priorNetProfit = prior ? roundMoney(prior.net_profit) : null;
+    const priorOccupancy = prior && prior.occupancy !== null && prior.occupancy !== undefined
+      ? roundMoney(prior.occupancy) : null;
+    const priorRoomRevenue = prior && prior.room_revenue !== null && prior.room_revenue !== undefined
+      ? roundMoney(prior.room_revenue) : null;
+    const priorBookedNights = prior ? Math.max(0, Number(prior.booked_nights) || 0) : 0;
+    const priorAvailableNights = prior ? Math.max(0, Number(prior.available_nights) || 0) : 0;
+
+    return {
+      source: 'SERVER_SNAPSHOT',
+      expenses,
+      bookedNights,
+      availableNights,
+      revenue: { current: revenue, target: targetRevenue, variance: variance(revenue, targetRevenue), prior: priorRevenue },
+      netProfit: { current: netProfit, target: targetProfit, variance: variance(netProfit, targetProfit), prior: priorNetProfit },
+      occupancy: { current: occupancy, target: targetOccupancy, variance: variance(occupancy, targetOccupancy), prior: priorOccupancy },
+      adr: {
+        current: hasRoomRevenue && bookedNights > 0 ? roundMoney(roomRevenue / bookedNights) : null,
+        prior: priorRoomRevenue !== null && priorBookedNights > 0 ? roundMoney(priorRoomRevenue / priorBookedNights) : null
+      },
+      revpar: {
+        current: hasRoomRevenue && availableNights > 0 ? roundMoney(roomRevenue / availableNights) : null,
+        prior: priorRoomRevenue !== null && priorAvailableNights > 0 ? roundMoney(priorRoomRevenue / priorAvailableNights) : null
+      },
+      forecast: {
+        monthEndRevenue: null,
+        confidence: null,
+        target: targetRevenue,
+        variance: variance(null, targetRevenue)
+      }
+    };
+  }
+
+  /**
    * Evaluates explainable portfolio health with distinct sub-domain statuses.
    */
   function evaluatePortfolioHealth(params) {
@@ -351,6 +421,7 @@
   return {
     roundMoney,
     computeExecutiveTopKpis,
+    computeExecutiveTopKpisFromSnapshot,
     evaluatePortfolioHealth,
     generatePropertyHealthCards,
     transitionAlertState,

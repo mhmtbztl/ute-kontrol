@@ -102,7 +102,7 @@ async function run() {
     const { error: b1e } = await owner.client.from('bookings').insert({
       tenant_id: TID, property_id: mulkler.a, booking_code: 'EXS-1', guest_name: 'Misafir 1',
       check_in: '2026-04-28', check_out: '2026-05-03',
-      gross_amount: 50000, discount: 5000, ota_commission: 7500
+      gross_amount: 50000, cleaning_fee: 5000, discount: 5000, ota_commission: 7500
     });
     if (b1e) throw new Error('rezervasyon 1: ' + b1e.message);
 
@@ -179,27 +179,31 @@ async function run() {
       '8. Net kar = ciro - gider (30.000 - 13.500)',
       'net_profit=' + nisan.net_profit);
 
+    check(para(nisan.room_revenue, 27000),
+      '9. Oda geliri temizlik gelirini dislar (24.000 + 3.000)',
+      'room_revenue=' + nisan.room_revenue);
+
     check(!para(nisan.total_revenue, 25500),
-      '9. Komisyon CIRODAN DUSULMEZ (ciro brut tabanli kalir)',
+      '10. Komisyon CIRODAN DUSULMEZ (ciro brut tabanli kalir)',
       'total_revenue=' + nisan.total_revenue + ' — 25.500 ise komisyon gelirden dusulmus');
 
     // -----------------------------------------------------------------------
     console.log('\n--- 3. IPTAL VE DOLULUK ---');
     check(para(mayis.total_revenue, 49000) && Number(mayis.booked_nights) === 33,
-      '10. Iptal edilmis rezervasyon ciroya da geceye de girmez',
+      '11. Iptal edilmis rezervasyon ciroya da geceye de girmez',
       'revenue=' + mayis.total_revenue + ' nights=' + mayis.booked_nights);
 
     // Nisan 30 gun x 2 mulk = 60 musait gece; 6 satilmis -> %10
     check(Number(nisan.available_nights) === 60,
-      '11. Musait gece ayin GERCEK gun sayisindan uretilir (30 x 2 = 60)',
+      '12. Musait gece ayin GERCEK gun sayisindan uretilir (30 x 2 = 60)',
       'available_nights=' + nisan.available_nights);
 
     check(para(nisan.occupancy, 10),
-      '12. Doluluk = 6 / 60 = %10',
+      '13. Doluluk = 6 / 60 = %10',
       'occupancy=' + nisan.occupancy);
 
     check(Number(mayis.available_nights) === 62 && para(mayis.occupancy, 53.23),
-      '13. Mayis 31 gunluk paydayi kullanir (33 / 62 = %53,23)',
+      '14. Mayis 31 gunluk paydayi kullanir (33 / 62 = %53,23)',
       'available=' + mayis.available_nights + ' occupancy=' + mayis.occupancy);
 
     // -----------------------------------------------------------------------
@@ -208,7 +212,7 @@ async function run() {
     if (oe) throw new Error('2025-12 anlik goruntu: ' + oe.message);
 
     check(once && once.occupancy === null && Number(once.available_nights) === 0,
-      '14. Mulk daha aktif degilken doluluk NULL doner, 0 ya da 100 uydurulmaz',
+      '15. Mulk daha aktif degilken doluluk NULL doner, 0 ya da 100 uydurulmaz',
       'occupancy=' + (once && once.occupancy) + ' available=' + (once && once.available_nights));
 
     // -----------------------------------------------------------------------
@@ -218,7 +222,7 @@ async function run() {
 
     check(para(sadeceA.total_revenue, 27000) && Number(sadeceA.booked_nights) === 3
           && Number(sadeceA.available_nights) === 30,
-      '15. Tek mulk suzuldugunde hem ciro hem payda o mulke daralir',
+      '16. Tek mulk suzuldugunde hem ciro hem payda o mulke daralir',
       'revenue=' + sadeceA.total_revenue + ' nights=' + sadeceA.booked_nights +
       ' available=' + sadeceA.available_nights);
 
@@ -233,21 +237,21 @@ async function run() {
 
     const { data: sizinti, error: ye } = await anlik(yabanci.client, TID, '2026-04');
     check(!!ye && !sizinti,
-      '16. Baska isletmenin sahibi bu isletmenin anlik goruntusunu ALAMAZ',
+      '17. Baska isletmenin sahibi bu isletmenin anlik goruntusunu ALAMAZ',
       ye ? ('beklenmedik veri dondu: ' + JSON.stringify(sizinti))
          : 'IZIN VERILDI — yabanci kiraci ciro ve kar rakamlarini okudu');
 
     // phase12'de kiraci uyelikten LIMIT 1 ile secitiliyordu: yabanci cagri
     // hata vermek yerine KENDI isletmesinin rakamini dondururdu.
     check(!sizinti || sizinti.tenant_id !== yt.tenant_id,
-      '17. Kiraci acik argumandan gelir, uyelikten LIMIT 1 ile secilmez',
+      '18. Kiraci acik argumandan gelir, uyelikten LIMIT 1 ile secilmez',
       'cagri yabanci kullanicinin KENDI isletmesine dustu: ' + JSON.stringify(sizinti));
 
     const { error: fe } = await anlik(owner.client, TID, '2026-13');
-    check(!!fe, '18. Gecersiz ay formati reddedilir (2026-13)', 'kabul edildi');
+    check(!!fe, '19. Gecersiz ay formati reddedilir (2026-13)', 'kabul edildi');
 
     const { error: fe2 } = await anlik(owner.client, TID, 'Nisan');
-    check(!!fe2, '19. Ay argumani serbest metin kabul etmez', 'kabul edildi');
+    check(!!fe2, '20. Ay argumani serbest metin kabul etmez', 'kabul edildi');
 
     const { data: ymulk, error: yme } = await yabanci.client.from('properties').insert({
       tenant_id: yt.tenant_id, name: 'Yabanci Villa',
@@ -257,13 +261,13 @@ async function run() {
 
     const { error: pe2 } = await anlik(owner.client, TID, '2026-04', ymulk.id);
     check(!!pe2,
-      '20. Baska isletmenin mulk id si filtre olarak kullanilamaz',
+      '21. Baska isletmenin mulk id si filtre olarak kullanilamaz',
       'kabul edildi — mulk id sinin varligi sizdirilabilir');
 
     const anon = newClient();
     const { error: anone } = await anlik(anon, TID, '2026-04');
     check(!!anone && /permission denied|UNAUTHORIZED/i.test(anone.message || ''),
-      '21. anon rolu fonksiyonu hic calistiramaz (7. bolum)',
+      '22. anon rolu fonksiyonu hic calistiramaz (7. bolum)',
       anone ? anone.message : 'anon cagirabildi');
 
   } catch (err) {
@@ -290,7 +294,7 @@ async function run() {
     const kalan = (after ? after.users : []).filter(u => createdUsers.includes(u.id));
     if (kalan.length) { hata = true; console.error(`[FAIL] ${kalan.length} test hesabi duruyor`); }
 
-    if (hata) failed++; else ok('22. Test verileri eksiksiz temizlendi');
+    if (hata) failed++; else ok('23. Test verileri eksiksiz temizlendi');
 
     console.log('\n=============================================================================');
     console.log(`TEST SUMMARY: ${passed} / ${passed + failed} TESTS PASSED (${failed} FAILED)`);

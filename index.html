@@ -405,6 +405,10 @@
         </div>
       </section>
 
+      <div id="execSnapshotStatus" role="status" aria-live="polite" style="margin: -8px 0 12px; color: #94A3B8; font-size: 11px;">
+        Sunucu anlık görüntüsü hazırlanıyor…
+      </div>
+
       <!-- 2. TOP EXECUTIVE KPI STRIP (6 CARDS) -->
       <section class="executive-kpi-grid">
         <!-- 1. Realized Revenue -->
@@ -476,7 +480,7 @@
         <div class="executive-kpi-card" id="execCardForecast">
           <div class="kpi-card-header">
             <span class="kpi-label">AY SONU TAHMİNİ</span>
-            <span class="badge badge-purple" style="font-size: 9px;">AI MODEL</span>
+            <span class="badge badge-purple" style="font-size: 9px;">TAHMİN</span>
           </div>
           <div class="kpi-val" id="execKpiForecast" style="color: #C084FC;">₺0</div>
           <div class="kpi-meta">
@@ -498,7 +502,7 @@
             </p>
           </div>
           <div style="display: flex; gap: 8px;">
-            <button class="btn btn-secondary btn-sm" onclick="renderExecutiveControlCenter()" style="font-size: 11px;">🔄 Yenile</button>
+            <button class="btn btn-secondary btn-sm" onclick="refreshExecutiveDashboardSnapshot(true)" style="font-size: 11px;">🔄 Yenile</button>
           </div>
         </div>
 
@@ -4360,10 +4364,10 @@
   <script src="core/pricing_booking_service.js?v=0eb93c05"></script>
   <script src="core/revenue_forecast_service.js?v=358b0879"></script>
   <script src="core/executive_priority_service.js?v=d113e0e8"></script>
-  <script src="core/executive_dashboard_service.js?v=8065c637"></script>
+  <script src="core/executive_dashboard_service.js?v=be794e79"></script>
   <script src="core/executive_ai_advisor.js?v=4b235c67"></script>
   <script src="core/notification_center_service.js?v=710f8a91"></script>
-  <script src="app.js?v=d01f3e57"></script>
+  <script src="app.js?v=6cb8eaec"></script>
   <script src="core/marketing_ui.js?v=2e506018"></script>
 </body>
 </html>

@@ -14335,6 +14335,156 @@ async function getExecutiveDashboardSnapshot(targetMonth, propertyId = null) {
   return data;
 }
 
+let executiveSnapshotState = {
+  key: null,
+  status: 'idle',
+  current: null,
+  prior: null,
+  error: null,
+  requestId: 0
+};
+
+function getExecutiveSnapshotContext() {
+  const tenantId = getActiveTenantId();
+  const period = currentFilter && currentFilter.period;
+  if (!isCloudTenant(tenantId) || !supabaseClient) return { supported: false, reason: 'Bulut oturumu gerekli.' };
+  if (!/^\d{4}-\d{2}$/.test(period || '')) {
+    return { supported: false, reason: 'Sunucu anlık görüntüsü aylık dönemlerde kullanılabilir.' };
+  }
+
+  let propertyId = null;
+  if (currentFilter.villa && currentFilter.villa !== 'ALL') {
+    const villa = appData && appData.villas ? appData.villas[currentFilter.villa] : null;
+    propertyId = (villa && (villa.id || villa.dbId || villa.property_id)) || currentFilter.villa;
+  }
+  return {
+    supported: true,
+    tenantId,
+    period,
+    priorPeriod: getPreviousPeriodKey(period),
+    propertyId,
+    key: [tenantId, period, propertyId || 'ALL'].join('|')
+  };
+}
+
+function setExecutiveSnapshotPlaceholder(message) {
+  ['execKpiRevenue', 'execKpiProfit', 'execKpiOccupancy', 'execKpiAdr', 'execKpiRevpar', 'execKpiForecast']
+    .forEach(id => setEl(id, '—'));
+  setEl('execRevVariance', '—');
+  setEl('execRevMoM', '—');
+  setEl('execProfitMargin', '—');
+  setEl('execProfitVariance', '—');
+  setEl('execOccVariance', '—');
+  setEl('execSoldNightsLabel', '—');
+  setEl('execForecastPacing', 'Tahmin hesaplanmadı');
+  setEl('execForecastConfidence', '—');
+  setEl('execSnapshotStatus', message);
+}
+
+function renderExecutiveSnapshotKpis() {
+  const context = getExecutiveSnapshotContext();
+  if (!context.supported) {
+    setExecutiveSnapshotPlaceholder(context.reason);
+    return false;
+  }
+
+  if (executiveSnapshotState.key !== context.key) {
+    setExecutiveSnapshotPlaceholder('Sunucu anlık görüntüsü yükleniyor…');
+    void refreshExecutiveDashboardSnapshot(false);
+    return true;
+  }
+  if (executiveSnapshotState.status === 'loading') {
+    setExecutiveSnapshotPlaceholder('Sunucu anlık görüntüsü yükleniyor…');
+    return true;
+  }
+  if (executiveSnapshotState.status === 'error') {
+    setExecutiveSnapshotPlaceholder('Sunucu anlık görüntüsü alınamadı; finansal KPI gösterilmiyor.');
+    return true;
+  }
+  if (executiveSnapshotState.status !== 'ready' || !executiveSnapshotState.current) {
+    setExecutiveSnapshotPlaceholder('Sunucu anlık görüntüsü hazır değil.');
+    return true;
+  }
+  if (typeof ExecutiveDashboardService === 'undefined' || !ExecutiveDashboardService.computeExecutiveTopKpisFromSnapshot) {
+    setExecutiveSnapshotPlaceholder('Sunucu anlık görüntüsü işlenemedi.');
+    return true;
+  }
+
+  const periodTarget = getTargetRecordForPeriod(context.period) || {};
+  const kpis = ExecutiveDashboardService.computeExecutiveTopKpisFromSnapshot(
+    executiveSnapshotState.current,
+    { targets: periodTarget, priorSnapshot: executiveSnapshotState.prior }
+  );
+  const money = value => value === null || value === undefined
+    ? '—' : `₺${Number(value).toLocaleString('tr-TR')}`;
+
+  setEl('execKpiRevenue', money(kpis.revenue.current));
+  setEl('execKpiProfit', money(kpis.netProfit.current));
+  setEl('execKpiOccupancy', kpis.occupancy.current === null ? '—' : `%${kpis.occupancy.current}`);
+  setEl('execKpiAdr', money(kpis.adr.current));
+  setEl('execKpiRevpar', money(kpis.revpar.current));
+  setEl('execKpiForecast', '—');
+  setEl('execRevMoM', kpis.revenue.prior === null ? 'geçen ay veri yok' : `${formatMoMDelta(kpis.revenue.current, kpis.revenue.prior)} Geçen Ay`);
+  setEl('execSoldNightsLabel', `${kpis.bookedNights} Gece`);
+  setEl('execProfitMargin', kpis.revenue.current > 0 ? `%${Math.round((kpis.netProfit.current / kpis.revenue.current) * 100)} Marj` : '—');
+  setEl('execForecastPacing', 'Tahmin hesaplanmadı');
+  setEl('execForecastConfidence', '—');
+
+  const revVariance = document.getElementById('execRevVariance');
+  if (revVariance) {
+    revVariance.className = kpis.revenue.variance.varianceAmount >= 0 ? 'badge badge-green' : 'badge badge-red';
+    revVariance.innerText = kpis.revenue.target > 0
+      ? `${kpis.revenue.variance.varianceAmount >= 0 ? '+' : ''}%${kpis.revenue.variance.variancePercent} Hedef`
+      : 'Hedef belirlenmemiş';
+  }
+  setEl('execProfitVariance', kpis.netProfit.target > 0
+    ? `${kpis.netProfit.variance.varianceAmount >= 0 ? '+' : ''}%${kpis.netProfit.variance.variancePercent} Hedef`
+    : 'Hedef belirlenmemiş');
+  const occVariance = document.getElementById('execOccVariance');
+  if (occVariance) {
+    occVariance.className = kpis.occupancy.variance.varianceAmount >= 0 ? 'badge badge-green' : 'badge badge-yellow';
+    occVariance.innerText = kpis.occupancy.target > 0 ? `Hedef: %${kpis.occupancy.target}` : 'Hedef belirlenmemiş';
+  }
+
+  const phase32Ready = executiveSnapshotState.current.room_revenue !== undefined;
+  setEl('execSnapshotStatus', phase32Ready
+    ? 'Sunucu anlık görüntüsü • finansal tek kaynak'
+    : 'Sunucu anlık görüntüsü • Phase 32 uygulanana kadar ADR/RevPAR gösterilmez');
+  return true;
+}
+
+async function refreshExecutiveDashboardSnapshot(force = false) {
+  const context = getExecutiveSnapshotContext();
+  if (!context.supported) {
+    executiveSnapshotState = { ...executiveSnapshotState, key: null, status: 'unsupported', current: null, prior: null, error: null };
+    if (typeof document !== 'undefined') renderExecutiveSnapshotKpis();
+    return null;
+  }
+  if (!force && executiveSnapshotState.key === context.key && ['loading', 'ready'].includes(executiveSnapshotState.status)) {
+    return executiveSnapshotState.current;
+  }
+
+  const requestId = executiveSnapshotState.requestId + 1;
+  executiveSnapshotState = { key: context.key, status: 'loading', current: null, prior: null, error: null, requestId };
+  if (typeof document !== 'undefined') setExecutiveSnapshotPlaceholder('Sunucu anlık görüntüsü yükleniyor…');
+  try {
+    const [current, prior] = await Promise.all([
+      getExecutiveDashboardSnapshot(context.period, context.propertyId),
+      context.priorPeriod ? getExecutiveDashboardSnapshot(context.priorPeriod, context.propertyId) : Promise.resolve(null)
+    ]);
+    if (executiveSnapshotState.requestId !== requestId || executiveSnapshotState.key !== context.key) return null;
+    executiveSnapshotState = { key: context.key, status: 'ready', current, prior, error: null, requestId };
+    if (typeof document !== 'undefined') renderExecutiveControlCenter();
+    return current;
+  } catch (error) {
+    if (executiveSnapshotState.requestId !== requestId) return null;
+    console.error('Executive snapshot load failed:', error);
+    executiveSnapshotState = { key: context.key, status: 'error', current: null, prior: null, error, requestId };
+    if (typeof document !== 'undefined') renderExecutiveControlCenter();
+    return null;
+  }
+}
+
 function setAppData(data) {
   if (typeof appData !== 'undefined') {
     Object.assign(appData, data);
@@ -14394,8 +14544,11 @@ function renderExecutiveControlCenter() {
     readinessStatus: villas[k].readinessStatus || 'UNKNOWN'
   }));
 
+  const snapshotOwnsTopKpis = isCloudTenant(getActiveTenantId()) && !!supabaseClient;
+  if (snapshotOwnsTopKpis) renderExecutiveSnapshotKpis();
+
   // 1. Top Executive KPIs
-  if (typeof ExecutiveDashboardService !== 'undefined' && ExecutiveDashboardService.computeExecutiveTopKpis) {
+  if (!snapshotOwnsTopKpis && typeof ExecutiveDashboardService !== 'undefined' && ExecutiveDashboardService.computeExecutiveTopKpis) {
     const curPeriod = (typeof currentFilter !== 'undefined' && currentFilter.period) || 'ALL';
     const periodTarget = getTargetRecordForPeriod(curPeriod) || {};
     const scopedBookings = bookings
@@ -15714,6 +15867,9 @@ if (typeof module !== 'undefined' && module.exports) {
     loadTenantOnboarding,
     saveTenantOnboarding,
     getExecutiveDashboardSnapshot,
+    getExecutiveSnapshotContext,
+    refreshExecutiveDashboardSnapshot,
+    renderExecutiveSnapshotKpis,
     renderExecutiveControlCenter,
     askExecutiveAdvisor,
     openCommandPalette,

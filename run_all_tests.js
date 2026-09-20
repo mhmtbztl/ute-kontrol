@@ -152,6 +152,9 @@ const allTestFiles = [
   // Yonetici anlik goruntu RPC: tahakkuk, gece sayimi, USALI siniflandirmasi
   'executive_snapshot_tests.js',
 
+  // Phase 32: yonetici UI finansal KPI'lari sunucu snapshot'ina bagli mi
+  'executive_snapshot_ui_tests.js',
+
   // Bildirim/uyari RPC yetki sirasi ve anon iptali (Phase 29)
   'notification_authz_tests.js',
 

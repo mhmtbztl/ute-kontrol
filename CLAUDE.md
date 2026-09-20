@@ -289,7 +289,7 @@ projesine `npm run test:bootstrap` ile uygulandı ve sıfırdan kurulan bir
 
 **phase29 (`migration_phase29_notification_authz_order.sql`) 20 Eylül 2026'da
 üretime uygulandı ve doğrulandı.** Test projesinde de kurulu
-(`npm run test:bootstrap:check`: 0 eksik, 41 uygulanmış; phase30 dahil).
+(`npm run test:bootstrap:check`: 0 eksik, 42 uygulanmış; phase32 dahil).
 Ne yaptığı: `acknowledge_notification_atomic` ve `resolve_executive_alert_atomic`
 için yetkiyi satır kilidinden öne alır, varlık oracülünü kapatır ve `anon`
 yetkisini geri alır. Ağı `core/notification_authz_tests.js` (16 iddia).
@@ -489,7 +489,7 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 | Ayrı Supabase test projesi | **tamamlandı** (15 Eylül 2026) — proje `pdeiorpgxetksyogrmbi`, şema bootstrap ile kuruldu, tam koşu yeşil |
 | Canlı süitlerin CI’da otomatik koşması | **tamamlandı** (16 Eylül 2026) — `.github/workflows/live-tests.yml` açık, her gece 03:00 UTC. İlk yeşil koşu 17 Eylül: 120/120 süit, 1123 iddia, sızıntı temiz |
 | Fotoğraf AI worker'ı | `GEMINI_API_KEY` yok; Actions adımı güvenle atlanıyor — **harici bağımlılık** |
-| `get_executive_dashboard_snapshot` | tahakkuk ve gece sayımı hataları phase24 ile düzeltildi; ağı artık `executive_snapshot_tests` (22 iddia, davranış). **Arayüz hâlâ çağırmıyor**: yönetici paneli aynı rakamları tarayıcıda hesaplıyor (§3.4.1 ile ters) |
+| `get_executive_dashboard_snapshot` | **phase32 ile arayüze bağlandı** (20 Eylül 2026) — aylık ciro, gider, net kâr, doluluk, ADR ve RevPAR artık sunucu snapshot'ından geliyor; önceki ay da RPC ile alınıyor. Test projesine uygulandı; `executive_snapshot_tests` 23/23 ve `executive_snapshot_ui_tests` 7/7. **Üretim göçü bekliyor** |
 | Excel içe/dışa aktarma | "Şirket Genel Raporu" içe aktarımı devre dışı bırakıldı, gerçek uygulama yok |
 | Bildirim merkezi analizi | **tamamlandı** (17 Eylül 2026) — merkez her iki uçtan da bağlı değildi; yükleme bağlandı, "okundu" artık Postgres'e yazıyor. RPC yetki sırası phase29 ile düzeltildi; göç 20 Eylül 2026'da **üretime uygulandı ve doğrulandı** |
 | `saveAppData()` hiçbir şey kaydetmiyor | gövdesi yalnızca eski localStorage anahtarlarını siliyor. 17 çağıranda hiçbir Postgres yazması yoktu; **8'i 20 Eylül 2026'da bağlandı**, 1'i meşru yerel durum, 2'si kaldırıldı, **6'sı açık** (tablo yok — phase31 gerekiyor). Ayrıntı aşağıda |
