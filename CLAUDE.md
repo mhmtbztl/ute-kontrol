@@ -329,6 +329,34 @@ doğrudan/anon yazma kapısı, üretime kayıt bırakmadan doğrulandı. Test pr
 owner/manager, viewer, anon, çapraz tenant, özel kanal rezervasyonu ve pasif
 kanal geçmişi dahil canlı süit 26/26 geçti.
 
+Bu satır aynı gün **iki kez** ölçüldü ve cevap değişti: önce
+`404 PGRST205 Could not find the table` (uygulanmamış), sonra
+`401 42501 permission denied` (uygulanmış). §4.2'nin "dosyaya bakarak
+anlaşılmaz, üretime sorulur" kuralının canlı örneği — aradaki fark saatlerle
+ölçülüyor ve belge tek başına asla güncel değildir.
+
+**phase31 (`migration_phase31_local_state_persistence.sql`) yazıldı, test
+projesine uygulandı, üretime HENÜZ UYGULANMADI.** `saveAppData()`'nın açık
+kalan son altı kalemini kapatır: `marketing_campaigns`, `influencer_collabs`,
+`tenant_settings`, `property_operator_notes`, `property_pricing_ladder`,
+`housekeeping_status_overrides`. Ayrıca `reset_tenant_data`'yı yeniden
+tanımlar — yeni defterler silme listesine girer, **kiracı ayarları bilerek
+girmez** (ayar defter değildir, §3.7).
+
+Fiyat merdiveni `properties`'e **sütun olarak eklenmedi, bilerek**: mülk
+CRUD'una yeni sütun sokmak, göç uygulanana kadar mülk kaydetmeyi tamamen
+kırar — `bookings`'te bir kez yaşandı (§3.4). Merdiven ayrı tabloda durur ve
+göç uygulanana kadar yalnızca merdiven kaydı çalışmaz; `saveAllSettings`
+bunu kullanıcıya açıkça söyler. Basamaklar **NULL olabilir**: girilmemiş bir
+basamak 0 değil, bilinmiyordur (§3.6); göç bunu `PHASE31_LADDER_STEP_NOT_NULLABLE`
+ile doğrular.
+
+Uygulama ve doğrulama adımları: `docs/PHASE31_DEPLOY_PACKAGE.md`.
+Ağı `core/phase31_persistence_tests.js` (64 iddia, çevrimdışı) ve
+`core/phase31_isolation_tests.js` (27 iddia, canlı — RLS çapraz kiracı,
+anon kapısı, sıfırlama). Eski gövdeye karşı ölçüldü: 64 iddianın **32'si**
+kırılıyor.
+
 **Bir göçün uygulanıp uygulanmadığı, dosyaya bakarak anlaşılmaz.** Dosya repoda
 durur; veritabanı uygulanmamış olabilir. Doğrulamanın yolu üretime sormaktır:
 
@@ -492,10 +520,10 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 | `get_executive_dashboard_snapshot` | **phase32 ile arayüze bağlandı** (20 Eylül 2026) — aylık ciro, gider, net kâr, doluluk, ADR ve RevPAR artık sunucu snapshot'ından geliyor; önceki ay da RPC ile alınıyor. Test projesine uygulandı; `executive_snapshot_tests` 23/23 ve `executive_snapshot_ui_tests` 7/7. **Üretim göçü bekliyor** |
 | Excel içe/dışa aktarma | "Şirket Genel Raporu" içe aktarımı devre dışı bırakıldı, gerçek uygulama yok |
 | Bildirim merkezi analizi | **tamamlandı** (17 Eylül 2026) — merkez her iki uçtan da bağlı değildi; yükleme bağlandı, "okundu" artık Postgres'e yazıyor. RPC yetki sırası phase29 ile düzeltildi; göç 20 Eylül 2026'da **üretime uygulandı ve doğrulandı** |
-| `saveAppData()` hiçbir şey kaydetmiyor | gövdesi yalnızca eski localStorage anahtarlarını siliyor. 17 çağıranda hiçbir Postgres yazması yoktu; **8'i 20 Eylül 2026'da bağlandı**, 1'i meşru yerel durum, 2'si kaldırıldı, **6'sı açık** (tablo yok — phase31 gerekiyor). Ayrıntı aşağıda |
+| `saveAppData()` hiçbir şey kaydetmiyor | gövdesi yalnızca eski localStorage anahtarlarını siliyor. 17 çağıranda hiçbir Postgres yazması yoktu; **8'i 20 Eylül 2026'da bağlandı**, 1'i meşru yerel durum, 2'si kaldırıldı, **6'sı 20 Eylül 2026'da phase31 ile kapandı**; liste artık boş. Göç üretime henüz uygulanmadı. Ayrıntı aşağıda |
 | Temizlik & gider defteri kalıcılığı | **tamamlandı** (20 Eylül 2026) — beş fonksiyon hiçbir şey yazmıyordu. Ayrıca `cloudUpsertCleaningTask` yeniden yüklemeden sonra **mükerrer görev satırı** açıyordu (UUID'yi `legacy_id` olarak gönderiyordu) ve `cleaningPayments` hiç yüklenmiyordu. Ağı `cleaning_ledger_persistence_tests` (27 iddia) |
 | WhatsApp → talep / rezervasyon | **tamamlandı** (20 Eylül 2026) — modal "✅ rezervasyon kesinleştirildi" deyip hiçbir şey yazmıyordu. `createBooking()` / `createLead()` yoluna bağlandı. Ağı `persistence_wiring_tests` |
-| Pazarlama kampanya defteri kalıcı değil | **açık** — `marketing_campaigns` tablosu **yok**; `saveMarketingCampaign()` yalnızca bellekte tutuyor. Kullanıcı kampanyayı giriyor, tabloda görüyor, sayfa yenilenince kayıp. `influencerCollabs` de aynı. **phase31 bekliyor** |
+| Pazarlama kampanya defteri kalıcı değil | **tamamlandı** (20 Eylül 2026, phase31) — `marketing_campaigns` ve `influencer_collabs` tabloları açıldı; kayıt, düzenleme ve silme Postgres’e bağlandı. **Göç üretime henüz uygulanmadı** — `docs/PHASE31_DEPLOY_PACKAGE.md` |
 | `month: ‘2026-09’` sabiti | **tamamlandı** (20 Eylül 2026) — altı nokta kaldırıldı. Tek kaynak `getCurrentMonthKey()`, o da `getTodayStr()`'den türer. Başlangıç dönemi de tarayıcının yerel saatini kullanıyordu; kayıtlar Europe/Istanbul gününe yazılıyor, ay sınırında kullanıcı az önce girdiği kaydı filtrede göremiyordu. Ağı `persistence_wiring_tests` (kaynak taraması) |
 | Ölü `appData.excelDb` dalları | **tamamlandı** (20 Eylül 2026) — alan yalnızca `null` atanıyordu, hiçbir yerde doldurulmuyordu. Ona bağlı **üç panel hiç çalışmıyordu**: yönetici panelinin 116 satırlık dalı, YoY karşılaştırması (her zaman "Veriler sıfırlandı" diyordu) ve gidişat radarı (ölü dalında ilk müşterinin rakamları duruyordu: skor "88", "Haziran (268k) ➔ Temmuz (467k)"). Üçü de artık gerçek kayıttan hesaplıyor; ortak taban `computeMonthActuals()` |
 | Fiyat merdiveni uydurma varsayılanları | **tamamlandı** (20 Eylül 2026) — `saveAllSettings()` boş bırakılan her alana `|| 3000`, `|| 4000`, `|| 12000`, `|| 800`, `|| 350` yazıyordu ve o rakam mülkün gerçek fiyatı oluyordu. Form da girilmemiş basamakları `v.base * 1.3` ile dolduruyordu. 17 Eylül §3.6 taraması bunu **kaçırmıştı** |
@@ -532,19 +560,27 @@ bu doğru bir temizlik — ama çağıran kodun yarısı onu **kalıcılık san�
 | ✅ bağlandı | `saveWaAsLead` | `createLead()` → `leads` |
 | ✅ bağlandı | `saveWaAsBooking` | `createBooking()` → `bookings` |
 | ✅ bağlandı | `convertAiActionToTask` | `createMaintenanceTicket()` |
-| ✅ bağlandı | `saveAllSettings` | `properties` (yalnız taban fiyat + temizlik maliyeti) |
 | 🗑 kaldırıldı | `saveWhapiSettings` | özelliğin tamamı mockup'tı |
 | 🗑 düzeltildi | `syncLiveAirbnbData` | senkronizasyon yoktu; durumu söylüyor |
 | ⚪ meşru yerel | `changeImportMode` | açık formun görünümü; iş kaydı değil |
-| ❌ **açık** | `cycleHkStatus` | temizlik durumu geçersiz kılma — **tablo yok** |
-| ❌ **açık** | `saveMarketingCampaign` | `marketing_campaigns` — **tablo yok** |
-| ❌ **açık** | `saveInfluencerCollab` | influencer defteri — **tablo yok** |
-| ❌ **açık** | `setOtaPricingStrategy` | kiracı ayarı — **tablo yok** |
-| ❌ **açık** | `saveOperatorNote` | mülk başına not — **tablo yok** |
-| ❌ **kısmen** | `saveAllSettings` | merdivenin floor/target/premium/peak + ısıtma maliyeti için **sütun yok**; kullanıcıya açıkça söyleniyor |
+| ✅ bağlandı (phase31) | `cycleHkStatus` | `housekeeping_status_overrides` |
+| ✅ bağlandı (phase31) | `saveMarketingCampaign` | `marketing_campaigns` |
+| ✅ bağlandı (phase31) | `saveInfluencerCollab` | `influencer_collabs` |
+| ✅ bağlandı (phase31) | `setOtaPricingStrategy` | `tenant_settings` (`ota_pricing_strategy`) |
+| ✅ bağlandı (phase31) | `saveOperatorNote` | `property_operator_notes` |
+| ✅ bağlandı (phase31) | `saveAllSettings` | `properties` + `property_pricing_ladder` (merdiven) |
 
-Açık kalan altısının hepsi **aynı sebepten** açık: yazılacak tablo yok.
-Hepsi tek bir **phase31** göçü ile kapanır (tek numara: AGENTS.md phase sahipliği).
+Altısı da **20 Eylül 2026’da phase31 ile kapandı** (tek numara: AGENTS.md
+phase sahipliği). Hepsi aynı sebepten açıktı — yazılacak tablo yok — ve tek
+bir göçle kapandı. Liste artık **boş**: `saveAppData()` çağıranlarının tamamı
+ya gerçek bir Postgres yazmasından geçiyor ya da meşru yerel durum.
+
+**Göç üretime henüz uygulanmadı.** O ana kadar kod canlıda duruyor ve bu altı
+akış `PGRST205` ile düşüyor. İstemci bunu yutmuyor: kullanıcıya "veritabanı
+göçü henüz uygulanmamış" diyor ve ekranı `loadTenantAppData()` ile gerçeğe
+geri çekiyor. Okuma tarafı `fetchTenantRowsTolerant()` ile `null` dönüp ekranı
+ayakta tutuyor — dağıtım sırası tuzağının (AGENTS.md) tasarlanmış karşılığı
+budur.
 
 `requireCloudForWrite` (§3.3) artık bağlananların hepsinde devrede; yazma
 düşerse kullanıcıya söylenir ve ekran `loadTenantAppData()` ile gerçeğe

@@ -322,6 +322,14 @@ başarı bunu göstermez, çünkü üretim elle ve çalışan bir sırayla kurul
 Her iki ölçüm de 20 Eylül 2026'da, salt okunur olarak yapıldı; üretime kayıt
 bırakmadı.
 
+**phase30 satırı aynı gün ikinci kez ölçüldü ve değişti.** İlk ölçümde
+`404 PGRST205 Could not find the table` geliyordu (uygulanmamış); phase31
+hazırlığı sırasında yapılan ikinci ölçümde `401 42501 permission denied`
+geldi. Tablo adının *bilinip* yetkinin reddedilmesi, tablonun artık var
+olduğunun kanıtıdır. Bu, §4.2'nin "bir göçün uygulanıp uygulanmadığı
+dosyaya bakarak anlaşılmaz, üretime sorulur" kuralının canlı örneğidir:
+aradaki fark saatlerle ölçülüyor ve belge tek başına asla güncel değildir.
+
 > **Kapsam uyarısı.** Bu belge **yalnızca phase29'u** anlatır. phase30 burada
 > sadece üretim durumunu netleştirmek için geçiyor; **uygulama talimatları bu
 > belgeye ait değildir.** phase30 Codex'in göçüdür ve kendi paketiyle,

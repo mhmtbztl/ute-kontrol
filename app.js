@@ -389,8 +389,21 @@ function getFallbackBookingChannels() {
   return DEFAULT_BOOKING_CHANNELS.map(channel => ({ ...channel, id: null, persisted: false }));
 }
 
+/**
+ * "Bu tablo/sutun henuz yok" hatasi mi?
+ *
+ * GitHub Pages push ile ANINDA yayina alir, gocler Supabase panelinden ELLE
+ * uygulanir (AGENTS.md). Yani yeni bir tabloya bagli istemci kodu her zaman
+ * gocten once canliya cikabilir. Bu esnada okuma tarafi sessizce bos donmeli
+ * (ekran calismaya devam eder), yazma tarafi ise kullaniciya ACIKCA soylemeli
+ * — "kaydedildi" deyip kaybetmek 3.3'un yasakladigi seydir.
+ */
+function isMissingSchemaError(error) {
+  return ['42P01', '42703', 'PGRST204', 'PGRST205'].includes(String(error?.code || ''));
+}
+
 function isMissingBookingChannelSchema(error) {
-  return ['42P01', 'PGRST204', 'PGRST205'].includes(String(error?.code || ''));
+  return isMissingSchemaError(error);
 }
 
 async function loadTenantBookingChannels(targetTenantId) {
@@ -7770,6 +7783,7 @@ async function saveAllSettings() {
   }
 
   const hatalar = [];
+  let merdivenKirik = false;
   for (const vKey of degisen) {
     const v = appData.villas[vKey];
     try {
@@ -7780,6 +7794,20 @@ async function saveAllSettings() {
       });
     } catch (err) {
       hatalar.push(`${v.name || vKey}: ${err?.message || 'veritabanı hatası'}`);
+      continue;
+    }
+    // Merdivenin geri kalani (taban/hedef/premium/zirve + isitma) ayri bir
+    // tabloda durur: `properties`'e sutun eklemek, goc uygulanana kadar mulk
+    // kaydetmeyi tamamen kirardi (AGENTS.md, dagitim sirasi tuzagi). Bu
+    // yuzden merdiven yazmasi ayri denenir ve tek basina duser.
+    try {
+      await cloudSavePricingLadder(vKey, {
+        floor: v.floor, target: v.target, premium: v.premium,
+        peak: v.peak, heatCost: v.heatCost
+      });
+    } catch (err) {
+      if (isMissingSchemaError(err)) merdivenKirik = true;
+      else hatalar.push(`${v.name || vKey} (fiyat merdiveni): ${err?.message || 'veritabanı hatası'}`);
     }
   }
 
@@ -7789,9 +7817,12 @@ async function saveAllSettings() {
   }
 
   alert(
-    'Gecelik taban fiyat ve temizlik maliyeti kaydedildi.\n\n' +
-    'Not: Taban/hedef/premium/zirve basamakları ve ısıtma maliyeti için ' +
-    'veritabanında henüz alan yok; bu değerler yalnızca bu oturumda geçerlidir.'
+    merdivenKirik
+      ? 'Gecelik taban fiyat ve temizlik maliyeti kaydedildi.\n\n' +
+        '⚠️ Fiyat merdiveni (taban/hedef/premium/zirve) ve ısıtma maliyeti ' +
+        'KAYDEDİLEMEDİ: veritabanı göçü (phase31) henüz uygulanmamış. ' +
+        'Bu değerler yalnızca bu oturumda geçerlidir.'
+      : 'Fiyat merdiveni, gecelik taban fiyat ve maliyetler kaydedildi.'
   );
 }
 
@@ -8688,7 +8719,7 @@ async function toggleCleaningPaid(vKey) {
   await reportCleaningPersist(task, msg);
 }
 
-function cycleHkStatus(vKey) {
+async function cycleHkStatus(vKey) {
   if (!appData.housekeepingOverrides) appData.housekeepingOverrides = {};
   const current = appData.housekeepingOverrides[vKey];
   const states = [null, 'CLEANING', 'READY', 'OCCUPIED'];
@@ -8698,9 +8729,13 @@ function cycleHkStatus(vKey) {
   else if (current === 'OCCUPIED') nextIdx = 0; // AUTO (null)
   else nextIdx = 1; // CLEANING
 
-  appData.housekeepingOverrides[vKey] = states[nextIdx];
+  const yeni = states[nextIdx];
+  appData.housekeepingOverrides[vKey] = yeni;
   saveAppData();
   renderDailyOps();
+  // AUTO (null) satirin silinmesidir: "otomatik" bir durum DEGIL, elle
+  // gecersiz kilmanin kaldirilmasidir.
+  await reportStatePersist(() => cloudSaveHousekeepingOverride(vKey, yeni));
 }
 
 // -------------------------------------------------------------
@@ -10952,7 +10987,7 @@ function closeMarketingModal() {
   if (modal) modal.classList.remove('active');
 }
 
-function saveMarketingCampaign(e) {
+async function saveMarketingCampaign(e) {
   e.preventDefault();
   if (!appData.marketingCampaigns) appData.marketingCampaigns = [];
 
@@ -10971,31 +11006,35 @@ function saveMarketingCampaign(e) {
   const status = document.getElementById('mktStatus').value;
   const notes = document.getElementById('mktNotes').value.trim();
 
-  if (id) {
-    const idx = appData.marketingCampaigns.findIndex(c => c.id === id);
-    if (idx !== -1) {
-      appData.marketingCampaigns[idx] = {
-        ...appData.marketingCampaigns[idx],
-        name, platform, villa, startDate, endDate, budget, spent,
-        clicks, leads, bookingsCount, revenue, status, notes
-      };
-    }
-  } else {
-    const newCamp = {
-      id: 'MKT-' + Date.now().toString().slice(-6),
-      name, platform, villa, startDate, endDate, budget, spent,
-      clicks, leads, bookingsCount, revenue, status, notes
-    };
-    appData.marketingCampaigns.unshift(newCamp);
-  }
+  // Kimlik artik Postgres'ten gelir. Eskiden `MKT-<zaman>` uretiliyordu ve
+  // kayit hicbir yere yazilmadigi icin sayfa yenilenince yok oluyordu.
+  const kampanya = {
+    id: id || null,
+    name, platform, villa, startDate, endDate, budget, spent,
+    clicks, leads, bookingsCount, revenue, status, notes
+  };
+
+  const yazildi = await reportStatePersist(async () => {
+    const satir = await cloudSaveMarketingCampaign(kampanya);
+    const kayit = mapMarketingCampaignFromDb(satir, buildPropertyIdSlugMap());
+    const idx = appData.marketingCampaigns.findIndex(c => c.id === kayit.id);
+    if (idx !== -1) appData.marketingCampaigns[idx] = kayit;
+    else appData.marketingCampaigns.unshift(kayit);
+  }, '✅ Reklam kampanyası kaydedildi.');
 
   saveAppData();
+  if (!yazildi) return;
   closeMarketingModal();
   renderMarketingModule();
 }
 
-function deleteMarketingCampaign(id) {
+async function deleteMarketingCampaign(id) {
   if (!confirm('Bu reklam kampanyası kaydını silmek istediğinizden emin misiniz?')) return;
+  const yazildi = await reportStatePersist(
+    () => cloudDeleteMarketingCampaign(id),
+    'Reklam kampanyası silindi.'
+  );
+  if (!yazildi) return;
   appData.marketingCampaigns = (appData.marketingCampaigns || []).filter(c => c.id !== id);
   saveAppData();
   renderMarketingModule();
@@ -11188,10 +11227,21 @@ function copyAiTitle(titleText) {
 }
 
 
-function setOtaPricingStrategy(strategyMode) {
+async function setOtaPricingStrategy(strategyMode) {
+  const oncekiDeger = appData.otaPricingStrategy;
   appData.otaPricingStrategy = strategyMode;
   saveAppData();
   renderMarketingModule();
+  const yazildi = await reportStatePersist(
+    () => cloudSaveTenantSetting('ota_pricing_strategy', strategyMode)
+  );
+  if (!yazildi) {
+    // Yazma dustu: secim ekranda "kaydedilmis" gibi kalmasin. Fiyat
+    // stratejisi misafire gosterilen fiyati degistiriyor; yanlis modda
+    // durmasi dogrudan para kaybidir.
+    appData.otaPricingStrategy = oncekiDeger;
+    renderMarketingModule();
+  }
 }
 
 
@@ -11199,7 +11249,7 @@ function setOtaPricingStrategy(strategyMode) {
 // 🤖 AIRBNB / OTA İLAN ELEŞTİRMENİ (AI STR CRITIC & ROAST ENGINE)
 // =============================================================
 
-function saveOperatorNote(villaKey) {
+async function saveOperatorNote(villaKey) {
   if (!appData.airbnbListings) {
     appData.airbnbListings = {};  // DEFAULT_AIRBNB_PROPERTIES demo temizliginde silindi (ReferenceError)
   }
@@ -11213,7 +11263,10 @@ function saveOperatorNote(villaKey) {
   appData.airbnbListings[villaKey].operatorNote = noteText;
   saveAppData();
   const mAd = (appData.villas && appData.villas[villaKey] && appData.villas[villaKey].name) || villaKey;
-  if (typeof showToast === 'function') showToast(mAd + ' için operatör notu kaydedildi.', 'success');
+  await reportStatePersist(
+    () => cloudSaveOperatorNote(villaKey, noteText),
+    mAd + ' için operatör notu kaydedildi.'
+  );
 }
 
 function setCriticUrlPreset(villaKey) {
@@ -11900,7 +11953,7 @@ function closeInfluencerModal() {
   if (modal) modal.classList.remove('active');
 }
 
-function saveInfluencerCollab(e) {
+async function saveInfluencerCollab(e) {
   e.preventDefault();
   if (!appData.influencerCollabs) appData.influencerCollabs = [];
 
@@ -11916,31 +11969,37 @@ function saveInfluencerCollab(e) {
   const status = document.getElementById('infStatus').value;
   const notes = document.getElementById('infNotes').value.trim();
 
-  if (id) {
-    const idx = appData.influencerCollabs.findIndex(c => c.id === id);
-    if (idx !== -1) {
-      appData.influencerCollabs[idx] = {
-        ...appData.influencerCollabs[idx],
-        handle, followers, villa, dates, cost, code, bookingsCount, revenue, status, notes
-      };
-    }
-  } else {
-    const newId = 'INF-' + Date.now().toString().slice(-4);
-    appData.influencerCollabs.push({
-      id: newId,
-      handle, followers, villa, dates, cost, code, bookingsCount, revenue, status, notes
-    });
-  }
+  const isbirligi = {
+    id: id || null,
+    handle, followers, villa, dates, cost, code, bookingsCount, revenue, status, notes
+  };
+
+  const yazildi = await reportStatePersist(async () => {
+    const satir = await cloudSaveInfluencerCollab(isbirligi);
+    const kayit = mapInfluencerCollabFromDb(satir, buildPropertyIdSlugMap());
+    const idx = appData.influencerCollabs.findIndex(c => c.id === kayit.id);
+    if (idx !== -1) appData.influencerCollabs[idx] = kayit;
+    else appData.influencerCollabs.push(kayit);
+  });
 
   saveAppData();
+  // Basarisizsa modal ACIK kalir: kullanici girdigi veriyi kaybetmesin.
+  // Eskiden her durumda "başarıyla kaydedildi" deniyordu ve kayit
+  // hicbir yere yazilmiyordu.
+  if (!yazildi) return;
   closeInfluencerModal();
   renderInfluencerRoiLedger();
   alert('✅ Influencer / Barter işbirliği başarıyla kaydedildi!');
 }
 
-function deleteInfluencerCollab(id) {
+async function deleteInfluencerCollab(id) {
   if (!confirm('Bu influencer işbirliği kaydını silmek istediğinize emin misiniz?')) return;
   if (!appData.influencerCollabs) return;
+  const yazildi = await reportStatePersist(
+    () => cloudDeleteInfluencerCollab(id),
+    'Influencer işbirliği silindi.'
+  );
+  if (!yazildi) return;
   appData.influencerCollabs = appData.influencerCollabs.filter(c => c.id !== id);
   saveAppData();
   renderInfluencerRoiLedger();
@@ -12803,6 +12862,252 @@ async function logoutSaaSUser() {
   showLockOverlay();
 }
 
+// =============================================================================
+// 💾 PHASE 31 — YEREL KALAN SON ALTI DEFTER
+//
+// `saveAppData()` hicbir sey kaydetmez; govdesi yalnizca eski localStorage
+// anahtarlarini siler (CLAUDE.md 6). Asagidaki alti akis "yazilacak tablo yok"
+// dendigi icin bellekte kaliyordu: kullanici kampanyayi giriyor, tabloda
+// goruyor, sayfayi yenileyince kaybediyordu. phase31 gocu tablolari actı;
+// burasi o tablolarin okuma/yazma katmanidir.
+//
+// Her yazma `requireCloudForWrite` (3.3) ile korunur ve dustugu anda ekran
+// `loadTenantAppData()` ile gercege geri cekilir — bellekteki degisiklik
+// ekranda "kaydedilmis" gibi kalmaz.
+// =============================================================================
+
+/**
+ * Goc uygulanmadan once de ekran calissin: tablo yoksa `null` doner.
+ * `null` = "sema hazir degil", `[]` = "hazir ama bos". Ikisi ayri seydir;
+ * ilkinde kullaniciya YAZARKEN sebebi soylenir.
+ */
+async function fetchTenantRowsTolerant(buildQuery) {
+  try {
+    return await fetchAllCloudRows(buildQuery);
+  } catch (err) {
+    if (isMissingSchemaError(err)) return null;
+    throw err;
+  }
+}
+
+const PHASE31_SEMA_YOK =
+  'Bu kayit icin veritabani tablosu henuz olusturulmamis (phase31 gocu ' +
+  'uygulanmadi). Degisiklik kaydedilmedi.';
+
+/** Yazma hatasini yuzeye cikarir ve ekrani gercege geri ceker. */
+async function reportStatePersist(yazici, basariMesaji) {
+  try {
+    await yazici();
+    if (basariMesaji && typeof window !== 'undefined' && window.showToast) {
+      window.showToast(basariMesaji);
+    }
+    return true;
+  } catch (err) {
+    const ham = err && err.message ? err.message : 'Kayit veritabanina yazilamadi.';
+    const mesaj = '⚠️ ' + (isMissingSchemaError(err) ? PHASE31_SEMA_YOK : ham);
+    if (typeof window !== 'undefined' && window.showToast) window.showToast(mesaj, 'error');
+    else console.error(mesaj);
+    if (typeof loadTenantAppData === 'function' && isCloudTenant(getActiveTenantId())) {
+      try { await loadTenantAppData(getActiveTenantId()); } catch (_) { /* yeniden yukleme de dustu */ }
+    }
+    return false;
+  }
+}
+
+/** property_id -> villa slug. Kayit sonrasi donen satiri esleme icin. */
+function buildPropertyIdSlugMap() {
+  const harita = {};
+  const villas = (typeof appData !== 'undefined' && appData) ? (appData.villas || {}) : {};
+  Object.values(villas).forEach(p => { if (p && p.id) harita[p.id] = p.slug; });
+  return harita;
+}
+
+/** `villa` slug'i -> property_id. 'ALL' portfoy genelidir, mulke baglanmaz. */
+async function resolveOptionalPropertyId(villaKey, tenantId) {
+  if (!villaKey || villaKey === 'ALL') return null;
+  return await getPropertyIdBySlug(villaKey, tenantId);
+}
+
+function mapMarketingCampaignFromDb(row, propIdMap = {}) {
+  return {
+    id: row.id,
+    name: row.name || '',
+    platform: row.platform || 'OTHER',
+    villa: row.property_id ? (propIdMap[row.property_id] || row.property_id) : 'ALL',
+    startDate: row.start_date || '',
+    endDate: row.end_date || '',
+    budget: Number(row.budget) || 0,
+    spent: Number(row.spent) || 0,
+    clicks: Number(row.clicks) || 0,
+    leads: Number(row.leads_count) || 0,
+    bookingsCount: Number(row.bookings_count) || 0,
+    revenue: Number(row.revenue) || 0,
+    status: row.status || 'ACTIVE',
+    notes: row.notes || ''
+  };
+}
+
+function mapInfluencerCollabFromDb(row, propIdMap = {}) {
+  return {
+    id: row.id,
+    handle: row.handle || '',
+    followers: row.followers || '',
+    villa: row.property_id ? (propIdMap[row.property_id] || row.property_id) : 'ALL',
+    dates: row.collab_dates || '',
+    cost: Number(row.cost) || 0,
+    code: row.discount_code || '',
+    bookingsCount: Number(row.bookings_count) || 0,
+    revenue: Number(row.revenue) || 0,
+    status: row.status || 'COMPLETED',
+    notes: row.notes || ''
+  };
+}
+
+async function cloudSaveMarketingCampaign(kampanya) {
+  const tenantId = getActiveTenantId();
+  requireCloudForWrite('Reklam kampanyasi', tenantId);
+  const satir = {
+    tenant_id: tenantId,
+    property_id: await resolveOptionalPropertyId(kampanya.villa, tenantId),
+    name: kampanya.name,
+    platform: kampanya.platform,
+    start_date: kampanya.startDate || null,
+    end_date: kampanya.endDate || null,
+    budget: Number(kampanya.budget) || 0,
+    spent: Number(kampanya.spent) || 0,
+    clicks: Number(kampanya.clicks) || 0,
+    leads_count: Number(kampanya.leads) || 0,
+    bookings_count: Number(kampanya.bookingsCount) || 0,
+    revenue: Number(kampanya.revenue) || 0,
+    status: kampanya.status || 'ACTIVE',
+    notes: kampanya.notes || ''
+  };
+  if (kampanya.id && isUUID(kampanya.id)) satir.id = kampanya.id;
+  else satir.created_by = activeSaaSUser?.id;
+
+  const { data, error } = await supabaseClient
+    .from('marketing_campaigns')
+    .upsert(satir, { onConflict: 'id' })
+    .select('*')
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function cloudDeleteMarketingCampaign(id) {
+  const tenantId = getActiveTenantId();
+  requireCloudForWrite('Reklam kampanyasi silme', tenantId);
+  const { error } = await supabaseClient
+    .from('marketing_campaigns').delete().match({ tenant_id: tenantId, id });
+  if (error) throw error;
+}
+
+async function cloudSaveInfluencerCollab(isbirligi) {
+  const tenantId = getActiveTenantId();
+  requireCloudForWrite('Influencer isbirligi', tenantId);
+  const satir = {
+    tenant_id: tenantId,
+    property_id: await resolveOptionalPropertyId(isbirligi.villa, tenantId),
+    handle: isbirligi.handle,
+    followers: isbirligi.followers || null,
+    collab_dates: isbirligi.dates || null,
+    cost: Number(isbirligi.cost) || 0,
+    discount_code: isbirligi.code || null,
+    bookings_count: Number(isbirligi.bookingsCount) || 0,
+    revenue: Number(isbirligi.revenue) || 0,
+    status: isbirligi.status || 'COMPLETED',
+    notes: isbirligi.notes || ''
+  };
+  if (isbirligi.id && isUUID(isbirligi.id)) satir.id = isbirligi.id;
+  else satir.created_by = activeSaaSUser?.id;
+
+  const { data, error } = await supabaseClient
+    .from('influencer_collabs')
+    .upsert(satir, { onConflict: 'id' })
+    .select('*')
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function cloudDeleteInfluencerCollab(id) {
+  const tenantId = getActiveTenantId();
+  requireCloudForWrite('Influencer isbirligi silme', tenantId);
+  const { error } = await supabaseClient
+    .from('influencer_collabs').delete().match({ tenant_id: tenantId, id });
+  if (error) throw error;
+}
+
+async function cloudSaveTenantSetting(anahtar, deger) {
+  const tenantId = getActiveTenantId();
+  requireCloudForWrite('Isletme ayari', tenantId);
+  const { error } = await supabaseClient.from('tenant_settings').upsert({
+    tenant_id: tenantId,
+    key: anahtar,
+    value: deger,
+    updated_by: activeSaaSUser?.id
+  }, { onConflict: 'tenant_id, key' });
+  if (error) throw error;
+}
+
+async function cloudSaveOperatorNote(villaKey, not) {
+  const tenantId = getActiveTenantId();
+  requireCloudForWrite('Operator notu', tenantId);
+  const propId = await getPropertyIdBySlug(villaKey, tenantId);
+  if (!propId) throw new Error('Operator notu kaydedilemedi: mulk bulunamadi.');
+  const { error } = await supabaseClient.from('property_operator_notes').upsert({
+    property_id: propId,
+    tenant_id: tenantId,
+    note: not || '',
+    updated_by: activeSaaSUser?.id
+  }, { onConflict: 'property_id' });
+  if (error) throw error;
+}
+
+/**
+ * Merdivenin girilmemis basamagi `null` gider — 0 DEGIL.
+ * `|| 3000` kalibi tam olarak burada uydurma veri uretiyordu (3.6).
+ */
+async function cloudSavePricingLadder(villaKey, merdiven) {
+  const tenantId = getActiveTenantId();
+  requireCloudForWrite('Fiyat merdiveni', tenantId);
+  const propId = await getPropertyIdBySlug(villaKey, tenantId);
+  if (!propId) throw new Error('Fiyat merdiveni kaydedilemedi: mulk bulunamadi.');
+  const sayi = (v) => (v === null || v === undefined || v === '' ? null : Number(v));
+  const { error } = await supabaseClient.from('property_pricing_ladder').upsert({
+    property_id: propId,
+    tenant_id: tenantId,
+    floor_price: sayi(merdiven.floor),
+    target_price: sayi(merdiven.target),
+    premium_price: sayi(merdiven.premium),
+    peak_price: sayi(merdiven.peak),
+    heating_cost: sayi(merdiven.heatCost),
+    updated_by: activeSaaSUser?.id
+  }, { onConflict: 'property_id' });
+  if (error) throw error;
+}
+
+/** `status === null` = AUTO: gecersiz kilma satiri SILINIR. */
+async function cloudSaveHousekeepingOverride(villaKey, status) {
+  const tenantId = getActiveTenantId();
+  requireCloudForWrite('Temizlik durumu', tenantId);
+  const propId = await getPropertyIdBySlug(villaKey, tenantId);
+  if (!propId) throw new Error('Temizlik durumu kaydedilemedi: mulk bulunamadi.');
+  if (!status) {
+    const { error } = await supabaseClient.from('housekeeping_status_overrides')
+      .delete().match({ tenant_id: tenantId, property_id: propId });
+    if (error) throw error;
+    return;
+  }
+  const { error } = await supabaseClient.from('housekeeping_status_overrides').upsert({
+    property_id: propId,
+    tenant_id: tenantId,
+    status,
+    updated_by: activeSaaSUser?.id
+  }, { onConflict: 'property_id' });
+  if (error) throw error;
+}
+
 // -------------------------------------------------------------
 // ☁️ VERİ YÜKLEME (SUPABASE = SOURCE OF TRUTH)
 // -------------------------------------------------------------
@@ -12815,7 +13120,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
       const tenantId = targetId;
       // Independent datasets are loaded concurrently and every list is paged;
       // Supabase's per-response cap must never silently truncate a dashboard.
-      const [villas, bookings, expenses, cleanList, leads, closeList, targetList, maintenanceTickets, financialTransactions, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications] = await Promise.all([
+      const [villas, bookings, expenses, cleanList, leads, closeList, targetList, maintenanceTickets, financialTransactions, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications, campaignRows, influencerRows, settingRows, operatorNoteRows, pricingLadderRows, hkOverrideRows] = await Promise.all([
         loadProperties(tenantId),
         loadBookings(tenantId),
         loadExpenses(tenantId),
@@ -12833,13 +13138,54 @@ async function loadTenantAppData(tenantIdOrUserId) {
         // Bildirim merkezi: `appData.userNotifications` HIC ATANMIYORDU.
         // Zil ikonu, rozet ve cekmece yalnizca bu diziyi okuyor, yani
         // bildirim merkezi musteride HER ZAMAN bos gorunuyordu.
-        fetchAllCloudRows(() => supabaseClient.from('user_notifications').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false }))
+        fetchAllCloudRows(() => supabaseClient.from('user_notifications').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false })),
+        // phase31 defterleri: goc uygulanmadan once `null` doner, ekran
+        // bos ama calisir durumda kalir (dagitim sirasi tuzagi).
+        fetchTenantRowsTolerant(() => supabaseClient.from('marketing_campaigns').select('*').eq('tenant_id', tenantId).order('start_date', { ascending: false, nullsFirst: false })),
+        fetchTenantRowsTolerant(() => supabaseClient.from('influencer_collabs').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false })),
+        fetchTenantRowsTolerant(() => supabaseClient.from('tenant_settings').select('*').eq('tenant_id', tenantId)),
+        fetchTenantRowsTolerant(() => supabaseClient.from('property_operator_notes').select('*').eq('tenant_id', tenantId)),
+        fetchTenantRowsTolerant(() => supabaseClient.from('property_pricing_ladder').select('*').eq('tenant_id', tenantId)),
+        fetchTenantRowsTolerant(() => supabaseClient.from('housekeeping_status_overrides').select('*').eq('tenant_id', tenantId))
       ]);
       const propIdMap = {};
       Object.values(villas || {}).forEach(p => {
         if (p.id) propIdMap[p.id] = p.slug;
       });
       const bookingsWithVillaSlugs = attachBookingVillaSlugs(bookings, villas);
+
+      // --- phase31: yerel kalan alti defter -------------------------------
+      // Fiyat merdiveni mulk nesnesine geri yazilir: ayar ekrani `v.floor`,
+      // `v.heatCost` ... okuyor. `properties`'e sutun eklenmedi, cunku mulk
+      // CRUD'una yeni sutun sokmak goc uygulanana kadar mulk kaydetmeyi
+      // tamamen kirar (AGENTS.md, dagitim sirasi tuzagi).
+      (pricingLadderRows || []).forEach(r => {
+        const slug = propIdMap[r.property_id];
+        const v = slug && villas ? villas[slug] : null;
+        if (!v) return;
+        // null = kullanici girmedi. 0'a cevirmek "bilinmiyor"u "sifir"
+        // yapardi; ekranda "—" yerine rakam cikardi (3.6).
+        if (r.floor_price !== null) v.floor = Number(r.floor_price);
+        if (r.target_price !== null) v.target = Number(r.target_price);
+        if (r.premium_price !== null) v.premium = Number(r.premium_price);
+        if (r.peak_price !== null) v.peak = Number(r.peak_price);
+        if (r.heating_cost !== null) v.heatCost = Number(r.heating_cost);
+      });
+
+      const housekeepingOverrides = {};
+      (hkOverrideRows || []).forEach(r => {
+        const slug = propIdMap[r.property_id];
+        if (slug) housekeepingOverrides[slug] = r.status;
+      });
+
+      const airbnbListings = {};
+      (operatorNoteRows || []).forEach(r => {
+        const slug = propIdMap[r.property_id];
+        if (slug) airbnbListings[slug] = { operatorNote: r.note || '' };
+      });
+
+      const ayarlar = {};
+      (settingRows || []).forEach(r => { ayarlar[r.key] = r.value; });
 
       const cleaningTasks = (cleanList || []).map(c => ({
         id: c.id,
@@ -12900,8 +13246,19 @@ async function loadTenantAppData(tenantIdOrUserId) {
         maintenanceTickets,
         financialTransactions: financialTransactions || [],
         userNotifications: userNotifications || [],
-        marketingCampaigns: [],
-        influencerCollabs: [],
+        marketingCampaigns: (campaignRows || []).map(r => mapMarketingCampaignFromDb(r, propIdMap)),
+        influencerCollabs: (influencerRows || []).map(r => mapInfluencerCollabFromDb(r, propIdMap)),
+        housekeepingOverrides,
+        airbnbListings,
+        // Ayar okunamiyorsa (goc yok) varsayilan 'MARKUP' kalir; bu bir
+        // uydurma veri degil, ozelligin tanimli baslangic modudur.
+        otaPricingStrategy: ayarlar.ota_pricing_strategy || 'MARKUP',
+        // Hangi defterlerin semasi hazir? Yazma tarafi buna bakmaz
+        // (hatayi Postgres soyler) ama ekranin "kayit yok" ile "tablo yok"
+        // ayrimini yapabilmesi icin tasinir.
+        phase31SchemaReady: campaignRows !== null && influencerRows !== null
+          && settingRows !== null && operatorNoteRows !== null
+          && pricingLadderRows !== null && hkOverrideRows !== null,
         loadState: { status: 'READY', stale: false, loadedAt: new Date().toISOString() },
         isCleanState: Object.keys(villas).length === 0
       };
@@ -12954,6 +13311,9 @@ function getBlankTenantData(userId) {
     financialTransactions: [],
     marketingCampaigns: [],
     influencerCollabs: [],
+    housekeepingOverrides: {},
+    airbnbListings: {},
+    phase31SchemaReady: false,
     otaPricingStrategy: 'MARKUP'
   };
 }
@@ -15817,8 +16177,24 @@ if (typeof module !== 'undefined' && module.exports) {
     getFallbackBookingChannels,
     mapBookingChannelFromDb,
     isMissingBookingChannelSchema,
+    isMissingSchemaError,
     loadTenantBookingChannels,
     saveTenantBookingChannel,
+    // phase31 — yerel kalan alti defter
+    fetchTenantRowsTolerant,
+    reportStatePersist,
+    buildPropertyIdSlugMap,
+    resolveOptionalPropertyId,
+    mapMarketingCampaignFromDb,
+    mapInfluencerCollabFromDb,
+    cloudSaveMarketingCampaign,
+    cloudDeleteMarketingCampaign,
+    cloudSaveInfluencerCollab,
+    cloudDeleteInfluencerCollab,
+    cloudSaveTenantSetting,
+    cloudSaveOperatorNote,
+    cloudSavePricingLadder,
+    cloudSaveHousekeepingOverride,
     syncBookingCleaningTasks,
     convertAiActionToTask,
     loadOperationalTasks,

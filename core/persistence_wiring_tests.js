@@ -56,8 +56,8 @@ function govde(kaynak, ad) {
 
 /** Bir govdenin gercek bir kalicilik yolundan gectigine dair isaretler. */
 const YAZMA_IZLERI = [
-  'cloudUpsert', 'cloudDelete', 'supabaseClient', 'requireCloudForWrite',
-  'persistCleaningLedgerEntry', 'reportCleaningPersist',
+  'cloudUpsert', 'cloudDelete', 'cloudSave', 'supabaseClient', 'requireCloudForWrite',
+  'persistCleaningLedgerEntry', 'reportCleaningPersist', 'reportStatePersist',
   'createBooking(', 'createLead(', 'createExpense(', 'updateExpense(',
   'createMaintenanceTicket(', 'updateProperty(', 'loadTenantAppData('
 ];
@@ -78,7 +78,14 @@ const KALICI = [
   'saveWaAsLead',
   'saveWaAsBooking',
   // AI finans onerisi -> bakim kaydi
-  'convertAiActionToTask'
+  'convertAiActionToTask',
+  // phase31 — yerel kalan son alti defter (ayrica phase31_persistence_tests)
+  'cycleHkStatus',
+  'saveMarketingCampaign',
+  'saveInfluencerCollab',
+  'setOtaPricingStrategy',
+  'saveOperatorNote',
+  'saveAllSettings'
 ];
 
 /**
