@@ -82,7 +82,7 @@ const KAPILAR = [
   'payAllPendingCleaning'
 ];
 
-function run() {
+async function run() {
   console.log('=============================================================================');
   console.log('LEXBNB TEMIZLIK & GIDER DEFTERI KALICILIK DENETIMI');
   console.log('=============================================================================\n');
@@ -202,7 +202,8 @@ function run() {
 
   // --- 9. Yukleme ucu --------------------------------------------------------
   check(
-    /legacyId:\s*c\.legacy_id/.test(APP),
+    /legacyId\s*=\s*task\.legacyId\s*\|\|\s*task\.legacy_id/.test(APP)
+      && /normalizeCleaningTask\(c, villas\)/.test(APP),
     '18. Yuklenen gorev legacy_id\'sini TASIYOR',
     'legacy_id tasinmiyor; yeniden yuklenen gorev bir sonraki yazmada ' +
     'anahtarini kaybeder.'
@@ -261,6 +262,109 @@ function run() {
       '23. Yeniden yuklenmis gorevin gider anahtari UUID\'den turer',
       `legacyId='${uuidKayit.legacyId}'`
     );
+
+    const villas = {
+      V1: { id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee', name: 'Deniz Evi' }
+    };
+    const dbId = '11111111-2222-4333-8444-555555555555';
+    const legacyId = 'TASK-CLN-REFRESH-1';
+    const yeniKayit = app.normalizeCleaningTask({
+      id: dbId,
+      dbId,
+      legacyId,
+      propertyId: villas.V1.id,
+      villa: 'V1',
+      date: '2026-09-23',
+      cleaner: 'Zeynep',
+      amount: 2500,
+      paid: false,
+      notes: 'Nevresim değişecek'
+    }, villas);
+    const dbdenYuklenen = app.normalizeCleaningTask({
+      id: dbId,
+      legacy_id: legacyId,
+      property_id: villas.V1.id,
+      task_date: '2026-09-23',
+      cleaner_name: 'Zeynep',
+      amount: '2500.00',
+      is_paid: false,
+      description: 'Nevresim değişecek'
+    }, villas);
+    check(
+      JSON.stringify(yeniKayit) === JSON.stringify(dbdenYuklenen),
+      '24. Yeni kayit ve DB yuklemesi AYNI normalize sozlesmesini uretiyor',
+      `yeni=${JSON.stringify(yeniKayit)}\n       db=${JSON.stringify(dbdenYuklenen)}`
+    );
+    check(
+      dbdenYuklenen.notes === 'Nevresim değişecek',
+      '25. Aciklama sayfa yenileme modelinde KORUNUYOR',
+      `notes=${JSON.stringify(dbdenYuklenen.notes)}`
+    );
+
+    let yazmayiTamamla;
+    const bildirimler = [];
+    const bekleyenYazma = app.persistCleaningTaskDraft({
+      id: legacyId,
+      villa: 'V1',
+      date: '2026-09-23',
+      cleaner: 'Zeynep',
+      amount: 2500,
+      paid: false,
+      notes: 'Nevresim değişecek'
+    }, {
+      write: () => new Promise(resolve => { yazmayiTamamla = resolve; }),
+      notify: (message, type) => bildirimler.push({ message, type }),
+      reload: async () => {}
+    });
+    await Promise.resolve();
+    check(
+      bildirimler.length === 0,
+      '26. Basari bildirimi upsert TAMAMLANMADAN gosterilmiyor',
+      `erken bildirimler=${JSON.stringify(bildirimler)}`
+    );
+    yazmayiTamamla({ id: dbId, legacy_id: legacyId, property_id: villas.V1.id });
+    const basarili = await bekleyenYazma;
+    check(
+      basarili.ok && basarili.task.id === dbId && basarili.task.dbId === dbId
+        && basarili.task.legacyId === legacyId && bildirimler.length === 1
+        && bildirimler[0].type === 'success',
+      '27. Basarili upsert DB UUID/legacy kimligini yerel kayda AKTARIYOR',
+      `sonuc=${JSON.stringify(basarili)} bildirimler=${JSON.stringify(bildirimler)}`
+    );
+
+    const hataBildirimleri = [];
+    let reloadSayisi = 0;
+    const basarisiz = await app.persistCleaningTaskDraft(yeniKayit, {
+      write: async () => { throw new Error('baglanti reddedildi'); },
+      notify: (message, type) => hataBildirimleri.push({ message, type }),
+      reload: async () => { reloadSayisi++; }
+    });
+    check(
+      !basarisiz.ok && reloadSayisi === 1
+        && hataBildirimleri.some(item => item.type === 'error')
+        && !hataBildirimleri.some(item => item.type === 'success'),
+      '28. Upsert reddedilirse basari yok, acik hata var ve ekran DB gercegine DONUYOR',
+      `sonuc=${JSON.stringify(basarisiz)} reload=${reloadSayisi} bildirimler=${JSON.stringify(hataBildirimleri)}`
+    );
+
+    app.setAppData({ villas, cleaningTasks: [
+      { id: dbId, dbId, legacyId, villa: 'V1' },
+      { id: legacyId, legacyId, villa: 'V1' }
+    ] });
+    app.upsertCleaningTaskInMemory(basarili.task, legacyId);
+    app.upsertCleaningTaskInMemory(basarili.task, legacyId);
+    check(
+      app.getAppData().cleaningTasks.length === 1,
+      '29. Ayni DB kimligi yerel listede MUKERRER temizlik satiri olusturmuyor',
+      `gorevler=${JSON.stringify(app.getAppData().cleaningTasks)}`
+    );
+
+    const saveGovdesi = govde(APP, 'saveCleaningTask') || '';
+    check(
+      /async function saveCleaningTask/.test(saveGovdesi) && saveGovdesi.includes('await persistCleaningTaskDraft'),
+      '30. saveCleaningTask async ve bulut yazisini BEKLIYOR',
+      saveGovdesi.slice(0, 300)
+    );
     delete global.appData;
   } else if (app) {
     no('20-23. buildCleaningExpenseRecord disa aktarilmis',
@@ -268,11 +372,15 @@ function run() {
   }
 }
 
-try {
-  run();
-} finally {
-  console.log('\n-----------------------------------------------------------------------------');
-  console.log(`TOPLAM: ${passed} gecti, ${failed} kaldi`);
-  console.log('-----------------------------------------------------------------------------');
-  if (failed > 0) process.exit(1);
-}
+(async () => {
+  try {
+    await run();
+  } catch (err) {
+    no('Test suitinin kendisi hata vermeden tamamlanir', err && err.stack ? err.stack : String(err));
+  } finally {
+    console.log('\n-----------------------------------------------------------------------------');
+    console.log(`TOPLAM: ${passed} gecti, ${failed} kaldi`);
+    console.log('-----------------------------------------------------------------------------');
+    if (failed > 0) process.exitCode = 1;
+  }
+})();

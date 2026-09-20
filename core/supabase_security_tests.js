@@ -307,7 +307,8 @@ runTest('Phase 3: Discrete Entity-Based Mutations in place of Monolithic Bulk Sy
   assert(appContent.includes('cloudDeleteExpense(id)'));
   assert(appContent.includes('cloudUpsertLead(leadRecord)'));
   assert(appContent.includes('cloudDeleteLead(id)'));
-  assert(appContent.includes('cloudUpsertCleaningTask(taskRecord)'));
+  assert(appContent.includes('result = await persistCleaningTaskDraft(taskRecord)'));
+  assert(appContent.includes('const satir = await cloudUpsertCleaningTask(task)'));
   assert(appContent.includes('cloudDeleteCleaningTask(taskId)'));
 });
 

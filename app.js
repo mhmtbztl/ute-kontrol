@@ -227,6 +227,52 @@ let propertyViewMode = 'table'; // 'table' or 'cards'
 // =============================================================
 // REZERVASYON TEMİZLİK GÖREVLERİ SENKRONİZASYONU
 // =============================================================
+function normalizeCleaningTask(source, villasOrPropertyMap) {
+  const task = source || {};
+  const propertyId = task.propertyId || task.property_id || null;
+  const rawId = task.id || task.legacyId || task.legacy_id || '';
+  const dbIdCandidate = task.dbId || task.db_id || rawId;
+  const dbId = isUUID(dbIdCandidate) ? dbIdCandidate : (isUUID(rawId) ? rawId : null);
+  const legacyId = task.legacyId || task.legacy_id || (!isUUID(rawId) ? rawId : null);
+  const context = villasOrPropertyMap || {};
+
+  let villa = task.villa || '';
+  if (!villa && propertyId) {
+    if (typeof context[propertyId] === 'string') {
+      villa = context[propertyId];
+    } else {
+      const match = Object.entries(context).find(([, property]) => property && property.id === propertyId);
+      if (match) villa = match[0];
+    }
+  }
+
+  const property = villa && context[villa] && typeof context[villa] === 'object'
+    ? context[villa]
+    : null;
+  const paid = Object.prototype.hasOwnProperty.call(task, 'paid')
+    ? !!task.paid
+    : !!task.is_paid;
+  const notes = task.notes ?? task.desc ?? task.description ?? '';
+
+  return {
+    id: dbId || rawId || legacyId || '',
+    dbId: dbId || null,
+    legacyId: legacyId || null,
+    bookingId: task.bookingId || task.booking_id || null,
+    propertyId,
+    villa,
+    propertyName: task.propertyName || property?.name || villa || 'Mülk belirtilmedi',
+    guest: task.guest || '',
+    date: task.date || task.task_date || '',
+    cleaner: task.cleaner ?? task.cleaner_name ?? '',
+    amount: Number(task.amount) || 0,
+    paid,
+    paidDate: task.paidDate || task.paid_date || null,
+    notes,
+    paymentLabel: paid ? 'Ödendi' : 'Ödenecek'
+  };
+}
+
 // KULLANICI TALEBİ: Gider Defteri'ne ASLA otomatik temizlik gideri EKLENMEZ!
 // Gider Defteri %100 kullanıcının manuel kontrolündedir. Kullanıcı bir gideri
 // sildiğinde o gider kalıcı olarak silinir, arka plandan tekrar oluşturulmaz.
@@ -283,7 +329,7 @@ function syncBookingCleaningTasks() {
 
     if (!existing) {
       // REZERVASYON EKRANINDA TEMİZLİK BORCU EKLENDİ (paid: false - Henüz ödenmedi)
-      appData.cleaningTasks.push({
+      appData.cleaningTasks.push(normalizeCleaningTask({
         id: taskId,
         bookingId: b.id,
         villa: b.villa,
@@ -294,7 +340,7 @@ function syncBookingCleaningTasks() {
         paid: false,
         paidDate: null,
         notes: `${b.guest} Çıkış Temizliği (${vName})`
-      });
+      }, appData.villas));
     } else {
       existing.date = b.checkOut;
       existing.guest = b.guest;
@@ -303,6 +349,8 @@ function syncBookingCleaningTasks() {
       if (!existing.notes) existing.notes = `${b.guest} Çıkış Temizliği (${vName})`;
     }
   });
+
+  appData.cleaningTasks = appData.cleaningTasks.map(task => normalizeCleaningTask(task, appData.villas));
 }
 
 function saveAppData() {
@@ -2298,9 +2346,12 @@ async function cloudUpsertCleaningTask(task) {
   };
 
   let sorgu;
-  if (task.id && isUUID(task.id)) {
+  const knownDbId = task.dbId && isUUID(task.dbId)
+    ? task.dbId
+    : (task.id && isUUID(task.id) ? task.id : null);
+  if ((task.id && isUUID(task.id)) || (knownDbId && isUUID(knownDbId))) {
     // Bilinen satir: birincil anahtardan guncelle.
-    satir.id = task.id;
+    satir.id = knownDbId;
     if (task.legacyId) satir.legacy_id = task.legacyId;
     sorgu = supabaseClient.from('cleaning_tasks').upsert(satir, { onConflict: 'id' });
   } else {
@@ -2308,7 +2359,9 @@ async function cloudUpsertCleaningTask(task) {
     sorgu = supabaseClient.from('cleaning_tasks').upsert(satir, { onConflict: 'tenant_id, legacy_id' });
   }
 
-  const { data, error } = await sorgu.select('id, legacy_id').single();
+  const { data, error } = await sorgu
+    .select('id, legacy_id, property_id, booking_id, task_date, cleaner_name, amount, description, is_paid')
+    .single();
   if (error) {
     throw new Error('Temizlik görevi kaydedilemedi: ' + (error.message || 'veritabanı hatası'));
   }
@@ -2429,15 +2482,22 @@ async function persistCleaningLedgerEntry(task) {
   if (!isCloudTenant(tenantId)) return { yazildi: false, sebep: 'YEREL' };
 
   const satir = await cloudUpsertCleaningTask(task);
-  if (satir && satir.id) task.dbId = satir.id;
+  if (satir && satir.id) {
+    Object.assign(task, normalizeCleaningTask({
+      ...task,
+      ...satir,
+      dbId: satir.id,
+      legacyId: satir.legacy_id || task.legacyId || (!isUUID(task.id) ? task.id : null)
+    }, (typeof appData !== 'undefined' && appData.villas) || {}));
+  }
 
   const anahtar = cleaningExpenseKey(task);
   if (task.paid) {
     const sonuc = await cloudUpsertCleaningExpense(buildCleaningExpenseRecord(task));
-    return { yazildi: true, gider: sonuc };
+    return { yazildi: true, satir, gider: sonuc };
   }
   await cloudDeleteCleaningExpense(anahtar);
-  return { yazildi: true, gider: { yazildi: false, sebep: 'BORC' } };
+  return { yazildi: true, satir, gider: { yazildi: false, sebep: 'BORC' } };
 }
 
 /**
@@ -2467,6 +2527,60 @@ async function reportCleaningPersist(gorevler, basariMesaji) {
     }
     return false;
   }
+}
+
+async function persistCleaningTaskDraft(taskRecord, options) {
+  const opts = options || {};
+  const write = opts.write || (async task => {
+    const sonuc = await persistCleaningLedgerEntry(task);
+    if (!sonuc?.yazildi || !sonuc?.satir?.id) {
+      throw new Error('Temizlik görevi etkin bir bulut bağlantısı olmadan kaydedilemez.');
+    }
+    return sonuc.satir;
+  });
+  const reload = opts.reload || (async () => {
+    if (typeof loadTenantAppData === 'function' && isCloudTenant(getActiveTenantId())) {
+      await loadTenantAppData(getActiveTenantId());
+    }
+  });
+  const notify = opts.notify || ((message, type) => {
+    if (typeof window !== 'undefined' && window.showToast) window.showToast(message, type);
+    else if (type === 'error') console.error(message);
+  });
+
+  try {
+    const dbRow = await write(taskRecord);
+    const savedTask = normalizeCleaningTask({
+      ...taskRecord,
+      ...(dbRow || {}),
+      dbId: dbRow?.id || taskRecord.dbId,
+      legacyId: dbRow?.legacy_id || taskRecord.legacyId
+        || (!isUUID(taskRecord.id) ? taskRecord.id : null)
+    }, (typeof appData !== 'undefined' && appData.villas) || {});
+    notify(opts.successMessage || '✅ Temizlik kaydı başarıyla kaydedildi.', 'success');
+    return { ok: true, task: savedTask, dbRow: dbRow || null };
+  } catch (err) {
+    notify('⚠️ ' + (err?.message || 'Temizlik kaydı veritabanına yazılamadı.'), 'error');
+    try { await reload(); } catch (_) { /* yeniden yukleme de dustu */ }
+    return { ok: false, error: err };
+  }
+}
+
+function upsertCleaningTaskInMemory(task, previousId) {
+  if (!appData.cleaningTasks) appData.cleaningTasks = [];
+  const identities = new Set([
+    previousId,
+    task.id,
+    task.dbId,
+    task.legacyId
+  ].filter(Boolean));
+  const matches = current => [current.id, current.dbId, current.legacyId]
+    .filter(Boolean)
+    .some(id => identities.has(id));
+  const index = appData.cleaningTasks.findIndex(matches);
+  const remaining = appData.cleaningTasks.filter(current => !matches(current));
+  remaining.splice(index === -1 ? 0 : Math.min(index, remaining.length), 0, task);
+  appData.cleaningTasks = remaining;
 }
 
 // =============================================================
@@ -8990,8 +9104,9 @@ function openNewCleaningTaskModal() {
 
 function openEditCleaningTaskModal(taskId) {
   if (!appData.cleaningTasks) return;
-  const task = appData.cleaningTasks.find(t => t.id === taskId);
-  if (!task) return;
+  const rawTask = appData.cleaningTasks.find(t => t.id === taskId || t.dbId === taskId || t.legacyId === taskId);
+  if (!rawTask) return;
+  const task = normalizeCleaningTask(rawTask, appData.villas || {});
 
   document.getElementById('cleaningTaskModalTitle').innerText = '✏️ Temizlik Kaydını Düzenle';
   document.getElementById('hkEditTaskId').value = task.id;
@@ -9011,7 +9126,7 @@ function closeCleaningTaskModal() {
   if (modal) modal.classList.remove('active');
 }
 
-function saveCleaningTask(e) {
+async function saveCleaningTask(e) {
   e.preventDefault();
   if (!appData.cleaningTasks) appData.cleaningTasks = [];
 
@@ -9029,19 +9144,18 @@ function saveCleaningTask(e) {
 
   let taskRecord = null;
   if (editId) {
-    const idx = appData.cleaningTasks.findIndex(t => t.id === editId);
-    if (idx !== -1) {
-      taskRecord = {
-        ...appData.cleaningTasks[idx],
+    const existing = appData.cleaningTasks.find(t => t.id === editId || t.dbId === editId || t.legacyId === editId);
+    if (existing) {
+      taskRecord = normalizeCleaningTask({
+        ...existing,
         villa, date, cleaner, amount, notes,
         paid,
-        paidDate: paid ? (appData.cleaningTasks[idx].paidDate || getTodayStr()) : null
-      };
-      appData.cleaningTasks[idx] = taskRecord;
+        paidDate: paid ? (existing.paidDate || getTodayStr()) : null
+      }, appData.villas || {});
     }
   } else {
-    const newId = 'TASK-CLN-' + Date.now().toString().slice(-5);
-    taskRecord = {
+    const newId = 'TASK-CLN-' + Date.now().toString() + '-' + Math.random().toString(36).slice(2, 8);
+    taskRecord = normalizeCleaningTask({
       id: newId,
       villa,
       guest: '',
@@ -9051,25 +9165,39 @@ function saveCleaningTask(e) {
       paid,
       paidDate: paid ? getTodayStr() : null,
       notes
-    };
-    appData.cleaningTasks.unshift(taskRecord);
+    }, appData.villas || {});
   }
 
-  // Update default amount for this villa
+  if (!taskRecord) {
+    if (window.showToast) window.showToast('⚠️ Düzenlenecek temizlik kaydı bulunamadı.', 'error');
+    return false;
+  }
+
+  const saveButton = document.getElementById('hkSaveBtn');
+  if (saveButton) saveButton.disabled = true;
+  let result;
+  try {
+    result = await persistCleaningTaskDraft(taskRecord);
+  } finally {
+    if (saveButton) saveButton.disabled = false;
+  }
+  if (!result.ok) return false;
+
+  taskRecord = result.task;
+  upsertCleaningTaskInMemory(taskRecord, editId);
+
+  // Update the villa-level summary only after Postgres accepted the task.
   if (!appData.cleaningPayments) appData.cleaningPayments = {};
-  if (!appData.cleaningPayments[villa]) appData.cleaningPayments[villa] = { paid: false };
-  appData.cleaningPayments[villa].amount = amount;
+  appData.cleaningPayments[villa] = { paid, amount, date };
 
   closeCleaningTaskModal();
   saveAppData();
-  if (taskRecord) {
-    cloudUpsertCleaningTask(taskRecord);
-  }
   renderHousekeepingTab();
   renderDailyOps();
   renderExpensesTable();
+  renderOperationsTab();
 
-  if (window.showToast) window.showToast('✅ Temizlik kaydı başarıyla kaydedildi.');
+  return true;
 }
 
 function deleteCleaningTask(taskId) {
@@ -13187,20 +13315,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
       const ayarlar = {};
       (settingRows || []).forEach(r => { ayarlar[r.key] = r.value; });
 
-      const cleaningTasks = (cleanList || []).map(c => ({
-        id: c.id,
-        dbId: c.id,
-        // `legacy_id` tasinmazsa, yeniden yuklenmis bir gorev bir sonraki
-        // yazmada anahtarini kaybeder (bkz. cloudUpsertCleaningTask).
-        legacyId: c.legacy_id || null,
-        bookingId: c.booking_id,
-        villa: propIdMap[c.property_id] || '',
-        date: c.task_date,
-        cleaner: c.cleaner_name,
-        amount: Number(c.amount) || 0,
-        desc: c.description || '',
-        paid: c.is_paid
-      }));
+      const cleaningTasks = (cleanList || []).map(c => normalizeCleaningTask(c, villas));
 
       // `cleaningPayments` (kokpitteki villa bazli "ödendi/borç" durumu)
       // HICBIR YERDE YUKLENMIYORDU: yenilemeden sonra her villa yeniden
@@ -13906,17 +14021,9 @@ function subscribeTenantRealtime(tenantId) {
           (props || []).forEach(p => { pMap[p.id] = p.slug; });
           const { data: cleanList } = await supabaseClient.from('cleaning_tasks').select('*').eq('tenant_id', tenantId);
           if (cleanList) {
-            appData.cleaningTasks = cleanList.map(c => ({
-              id: c.id,
-              bookingId: c.booking_id,
-              villa: pMap[c.property_id] || '',
-              date: c.task_date,
-              cleaner: c.cleaner_name,
-              amount: Number(c.amount) || 0,
-              desc: c.description || '',
-              paid: c.is_paid
-            }));
+            appData.cleaningTasks = cleanList.map(c => normalizeCleaningTask(c, appData.villas || pMap));
             renderDailyOps();
+            renderOperationsTab();
           }
         }
       })
@@ -15706,20 +15813,30 @@ function renderOperationsTab() {
   const container = document.getElementById('opsCombinedContainer');
   if (!container) return;
 
-  const tasks = (typeof appData !== 'undefined' && appData.cleaningTasks) || [];
+  const tasks = ((typeof appData !== 'undefined' && appData.cleaningTasks) || [])
+    .map(task => normalizeCleaningTask(task, appData.villas || {}));
+  const pendingTasks = tasks.filter(task => !task.paid);
   const tickets = (typeof appData !== 'undefined' && appData.maintenanceTickets) || [];
 
   const taskBadge = document.getElementById('opsTaskCountBadge');
-  if (taskBadge) taskBadge.innerText = tasks.filter(t => t.status !== 'DONE').length;
+  if (taskBadge) taskBadge.innerText = String(pendingTasks.length);
 
   container.innerHTML = `
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
       <div style="background: rgba(0,0,0,0.25); padding: 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06);">
-        <h4 style="margin: 0 0 10px 0; color: #FBBF24; font-size: 13px;">🧹 Bekleyen Temizlik Görevleri (${tasks.length})</h4>
-        ${tasks.length === 0 ? '<div style="color: var(--text-muted); font-size: 12px;">Bekleyen temizlik görevi yok.</div>' : tasks.slice(0, 5).map(t => `
-          <div style="padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 12px; display: flex; justify-content: space-between;">
-            <span>${escapeHtml(t.title || 'Turnover')} (${escapeHtml(t.propertyId || '')})</span>
-            <span class="badge badge-yellow" style="font-size: 10px;">${escapeHtml(t.status || 'PENDING')}</span>
+        <h4 style="margin: 0 0 10px 0; color: #FBBF24; font-size: 13px;">🧹 Bekleyen Temizlik Borçları (${pendingTasks.length})</h4>
+        ${pendingTasks.length === 0 ? '<div style="color: var(--text-muted); font-size: 12px;">Bekleyen temizlik borcu yok.</div>' : pendingTasks.map(t => `
+          <div data-cleaning-task-id="${escapeHtml(t.id)}" style="padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 12px; display: flex; justify-content: space-between; gap: 12px; align-items: flex-start;">
+            <div style="min-width: 0;">
+              <strong style="color: #F8FAFC;">${escapeHtml(t.propertyName)}</strong>
+              <div style="color: #CBD5E1; margin-top: 3px;">📅 ${escapeHtml(t.date ? formatTrDate(t.date) : 'Tarih belirtilmedi')} · 🧹 ${escapeHtml(t.cleaner || 'Personel belirtilmedi')}</div>
+              ${t.notes ? `<div style="color: var(--text-muted); margin-top: 3px;">${escapeHtml(t.notes)}</div>` : ''}
+            </div>
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 5px; white-space: nowrap;">
+              <strong style="color: #60A5FA;">₺${Number(t.amount).toLocaleString('tr-TR')}</strong>
+              <span class="badge badge-yellow" style="font-size: 10px;">${escapeHtml(t.paymentLabel)}</span>
+              <button class="btn btn-secondary btn-sm" style="font-size: 10px; padding: 3px 7px;" onclick="openEditCleaningTaskModal('${escapeHtml(t.id)}')">Ayrıntı / Düzenle</button>
+            </div>
           </div>
         `).join('')}
       </div>
@@ -16113,6 +16230,7 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     isUUID,
     roundMoney,
+    normalizeCleaningTask,
     cleaningExpenseKey,
     buildCleaningExpenseRecord,
     cloudUpsertCleaningTask,
@@ -16120,6 +16238,8 @@ if (typeof module !== 'undefined' && module.exports) {
     cloudUpsertCleaningExpense,
     cloudDeleteCleaningExpense,
     persistCleaningLedgerEntry,
+    persistCleaningTaskDraft,
+    upsertCleaningTaskInMemory,
     mapPropertyFromDb,
     mapPropertyToDb,
     loadProperties,
@@ -16263,6 +16383,7 @@ if (typeof module !== 'undefined' && module.exports) {
     // DOM ile GERCEKTEN calistirir; setEl gibi tanimsiz referanslar ancak
     // boyle yakalanir (statik tarama regex literalleri yuzunden guvenilmez).
     renderAll,
+    renderOperationsTab,
     setEl,
     showToast,
     // Pazarlama ekrani renderAll'in ICINDE DEGIL (sekme acilinca calisiyor),

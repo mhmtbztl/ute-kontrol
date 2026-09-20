@@ -234,6 +234,54 @@ function run() {
     '11. Eşleşmeyen property kimliği veri kaybı olmadan korunur',
     JSON.stringify(eslesmeyen[0]));
 
+  // --- Temizlik operasyon ozeti: gercek alan sozlesmesi ---------------------
+  try {
+    domKur();
+    const operasyonVeri = bosVeri();
+    operasyonVeri.villas = {
+      V1: { id: 'p1', slug: 'V1', name: 'Deniz Evi' },
+      V2: { id: 'p2', slug: 'V2', name: 'Bahçe Evi' }
+    };
+    operasyonVeri.cleaningTasks = [
+      { id: 'pending-1', villa: 'V1', date: '2026-09-23', cleaner: 'Zeynep', amount: 2500,
+        notes: 'Nevresim değişecek', paid: false },
+      { id: 'paid-1', villa: 'V2', date: '2026-09-24', cleaner: 'Ayşe', amount: 1800,
+        notes: 'ODENMIS-GOREV-GIZLI', paid: true }
+    ];
+    app.setAppData(operasyonVeri);
+    app.renderOperationsTab();
+    const operationsHtml = global.document.getElementById('opsCombinedContainer').innerHTML;
+    const operationsCount = global.document.getElementById('opsTaskCountBadge').innerText;
+    const rowCount = (operationsHtml.match(/data-cleaning-task-id=/g) || []).length;
+
+    check(
+      !operationsHtml.includes('Turnover ()') && !operationsHtml.includes('>PENDING<'),
+      '17. Operasyon ozeti "Turnover ()" ve ham "PENDING" URETMİYOR',
+      operationsHtml.slice(0, 700)
+    );
+    check(
+      operationsHtml.includes('Deniz Evi') && operationsHtml.includes('23.09.2026')
+        && operationsHtml.includes('Zeynep') && operationsHtml.includes('₺2.500')
+        && operationsHtml.includes('Nevresim değişecek') && operationsHtml.includes('Ödenecek'),
+      '18. Operasyon satiri mulk, tarih, personel, tutar, aciklama ve odeme durumunu GOSTERIYOR',
+      operationsHtml.slice(0, 1000)
+    );
+    check(
+      !operationsHtml.includes('ODENMIS-GOREV-GIZLI') && operationsCount === '1'
+        && operationsHtml.includes('Bekleyen Temizlik Borçları (1)') && rowCount === 1,
+      '19. Odenmis gorev bekleyen borcta YOK; baslik, sayac ve liste ayni filtreyi kullaniyor',
+      `badge=${operationsCount}, satir=${rowCount}, html=${operationsHtml.slice(0, 700)}`
+    );
+    check(
+      operationsHtml.includes("openEditCleaningTaskModal('pending-1')")
+        && operationsHtml.includes('Ayrıntı / Düzenle'),
+      '20. Operasyon satirindan ayrinti/duzenleme akisina ULASILABILIYOR',
+      operationsHtml.slice(0, 900)
+    );
+  } catch (e) {
+    no('17-20. Temizlik operasyon ozeti cevrimdisi render testi', hataOzeti(e));
+  }
+
   // --- Pazarlama ekrani: renderAll'in DISINDA kalan render yolu ---------------
   // Bu fonksiyonlar sekme acilinca calisiyor, renderAll icinden degil; yani
   // render hatti testi onlari hic calistirmiyordu. Musteriye ROAS, komisyon,
