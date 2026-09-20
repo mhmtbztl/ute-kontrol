@@ -361,6 +361,77 @@ async function fetchAllCloudRows(buildQuery, pageSize = CLOUD_PAGE_SIZE) {
   return rows;
 }
 
+const DEFAULT_BOOKING_CHANNELS = Object.freeze([
+  { code: 'WHATSAPP', displayName: 'WhatsApp', channelType: 'DIRECT', defaultCommissionRate: 0, isActive: true, isSystem: true },
+  { code: 'AIRBNB', displayName: 'Airbnb', channelType: 'OTA', defaultCommissionRate: 15, isActive: true, isSystem: true },
+  { code: 'BOOKING', displayName: 'Booking.com', channelType: 'OTA', defaultCommissionRate: 18, isActive: true, isSystem: true },
+  { code: 'INSTAGRAM', displayName: 'Instagram', channelType: 'DIRECT', defaultCommissionRate: 0, isActive: true, isSystem: true },
+  { code: 'WEBSITE', displayName: 'Website', channelType: 'DIRECT', defaultCommissionRate: 0, isActive: true, isSystem: true },
+  { code: 'REPEAT', displayName: 'Tekrar Misafir', channelType: 'DIRECT', defaultCommissionRate: 0, isActive: true, isSystem: true },
+  { code: 'PHONE', displayName: 'Telefon', channelType: 'DIRECT', defaultCommissionRate: 0, isActive: true, isSystem: true }
+]);
+
+function mapBookingChannelFromDb(row) {
+  return {
+    id: row.id || null,
+    tenantId: row.tenant_id || null,
+    code: String(row.code || '').toUpperCase(),
+    displayName: row.display_name || row.code || 'Kanal',
+    channelType: row.channel_type === 'OTA' ? 'OTA' : 'DIRECT',
+    defaultCommissionRate: Math.max(0, Math.min(100, Number(row.default_commission_rate) || 0)),
+    isActive: row.is_active !== false,
+    isSystem: row.is_system === true,
+    persisted: true
+  };
+}
+
+function getFallbackBookingChannels() {
+  return DEFAULT_BOOKING_CHANNELS.map(channel => ({ ...channel, id: null, persisted: false }));
+}
+
+function isMissingBookingChannelSchema(error) {
+  return ['42P01', 'PGRST204', 'PGRST205'].includes(String(error?.code || ''));
+}
+
+async function loadTenantBookingChannels(targetTenantId) {
+  const tenantId = targetTenantId || getActiveTenantId();
+  if (!tenantId || !supabaseClient) return { rows: getFallbackBookingChannels(), schemaReady: false };
+  try {
+    const rows = await fetchAllCloudRows(() => supabaseClient
+      .from('tenant_booking_channels')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('is_system', { ascending: false })
+      .order('display_name', { ascending: true }));
+    return { rows: rows.map(mapBookingChannelFromDb), schemaReady: true };
+  } catch (error) {
+    if (isMissingBookingChannelSchema(error)) {
+      return { rows: getFallbackBookingChannels(), schemaReady: false };
+    }
+    throw error;
+  }
+}
+
+async function saveTenantBookingChannel(input = {}) {
+  const tenantId = getActiveTenantId();
+  requireCloudForWrite('Kanal ayarı', tenantId);
+  const type = String(input.channelType || '').toUpperCase();
+  const rate = type === 'DIRECT' ? 0 : Number(input.defaultCommissionRate);
+  if (!input.displayName || !String(input.displayName).trim()) throw new Error('Kanal adı zorunludur.');
+  if (!['OTA', 'DIRECT'].includes(type)) throw new Error('Kanal türü geçersiz.');
+  if (!Number.isFinite(rate) || rate < 0 || rate > 100) throw new Error('Komisyon oranı 0 ile 100 arasında olmalıdır.');
+  const { data, error } = await supabaseClient.rpc('save_tenant_booking_channel', {
+    p_tenant_id: tenantId,
+    p_channel_id: input.id || null,
+    p_display_name: String(input.displayName).trim(),
+    p_channel_type: type,
+    p_default_commission_rate: rate,
+    p_is_active: input.isActive !== false
+  });
+  if (error) throw error;
+  return mapBookingChannelFromDb(data);
+}
+
 // -------------------------------------------------------------
 // BULUT YAZMA KORUMASI (Asama 2)
 // Demo kaldirildiktan sonra isCloudTenant() yalnizca baglanti kopuk oldugunda
@@ -6110,6 +6181,7 @@ function openBookingModal(editId = null) {
   if (editId) {
     const b = (appData.bookings || []).find(item => item.id === editId || item.code === editId || item.dbId === editId);
     if (!b) return;
+    refreshBookingChannelDropdown(b.channel);
     if (title) title.innerText = '✏️ Rezervasyonu Güncelle';
     if (editInput) editInput.value = b.id;
     const vEl = document.getElementById('resVilla');
@@ -6155,6 +6227,7 @@ function openBookingModal(editId = null) {
     if (editInput) editInput.value = '';
     const form = document.getElementById('bookingForm');
     if (form) form.reset();
+    refreshBookingChannelDropdown();
     const gidEl = document.getElementById('resGuestId');
     if (gidEl) gidEl.value = '';
     const cfEl = document.getElementById('resCleanFee');
@@ -6165,6 +6238,7 @@ function openBookingModal(editId = null) {
     if (rateEl) rateEl.value = '';
     // form.reset() gizli inputlari bosaltir ama takvim durumu JS'te tutulur.
     clearResDateRange();
+    handleBookingChannelChange();
     if (deleteBtn) deleteBtn.style.display = 'none';
   }
 
@@ -6184,14 +6258,59 @@ function handleBookingDeleteFromModal() {
   }
 }
 
-// Kanalin varsayilan OTA komisyon orani (%). Direkt kanallarda komisyon yoktur.
-const CHANNEL_COMMISSION_RATES = Object.freeze({
-  AIRBNB: 15,
-  BOOKING: 18
-});
+function getBookingChannelCatalog(channels) {
+  if (Array.isArray(channels) && channels.length) return channels;
+  if (typeof appData !== 'undefined' && Array.isArray(appData.bookingChannels) && appData.bookingChannels.length) {
+    return appData.bookingChannels;
+  }
+  return getFallbackBookingChannels();
+}
 
-function getChannelCommissionRate(channel) {
-  return CHANNEL_COMMISSION_RATES[channel] || 0;
+function getChannelCommissionRate(channel, channels) {
+  const code = String(channel || '').toUpperCase();
+  const match = getBookingChannelCatalog(channels).find(item => String(item.code || '').toUpperCase() === code);
+  return match ? Number(match.defaultCommissionRate) || 0 : 0;
+}
+
+function getBookingChannelLabel(channel) {
+  const rate = Number(channel.defaultCommissionRate) || 0;
+  return `${channel.displayName} (${channel.channelType === 'OTA' ? `OTA - %${rate.toLocaleString('tr-TR')}` : 'Direkt - %0'})`;
+}
+
+function sortBookingChannelsForSelection(channels) {
+  const systemOrder = new Map(DEFAULT_BOOKING_CHANNELS.map((channel, index) => [channel.code, index]));
+  return (channels || []).slice().sort((a, b) => {
+    const aRank = systemOrder.has(a.code) ? systemOrder.get(a.code) : Number.MAX_SAFE_INTEGER;
+    const bRank = systemOrder.has(b.code) ? systemOrder.get(b.code) : Number.MAX_SAFE_INTEGER;
+    if (aRank !== bRank) return aRank - bRank;
+    return String(a.displayName || a.code).localeCompare(String(b.displayName || b.code), 'tr');
+  });
+}
+
+function refreshBookingChannelDropdown(selectedCode = '') {
+  if (typeof document === 'undefined') return;
+  const select = document.getElementById('resChannel');
+  if (!select) return;
+  const selected = String(selectedCode || select.value || '').toUpperCase();
+  const channels = sortBookingChannelsForSelection(
+    getBookingChannelCatalog().filter(channel => channel.isActive || channel.code === selected)
+  );
+  if (selected && !channels.some(channel => channel.code === selected)) {
+    channels.push({ code: selected, displayName: selected, channelType: 'DIRECT', defaultCommissionRate: 0, isActive: false });
+  }
+  select.innerHTML = channels.map(channel =>
+    `<option value="${escapeHtml(channel.code)}">${escapeHtml(getBookingChannelLabel(channel))}${channel.isActive ? '' : ' — Pasif'}</option>`
+  ).join('');
+  if (selected && channels.some(channel => channel.code === selected)) select.value = selected;
+}
+
+function handleBookingChannelChange() {
+  const channel = document.getElementById('resChannel')?.value || '';
+  const rateEl = document.getElementById('resCommissionRate');
+  const commEl = document.getElementById('resCommission');
+  if (rateEl) rateEl.value = String(getChannelCommissionRate(channel));
+  if (commEl) commEl.value = '';
+  syncCommissionFromRate();
 }
 
 /**
@@ -6219,7 +6338,7 @@ function computeBookingEconomics(input) {
       && !isNaN(Number(input.commission))) {
     otaComm = Math.max(0, Number(input.commission));
   } else {
-    otaComm = Math.round(gross * getChannelCommissionRate(input.channel) / 100);
+    otaComm = Math.round(gross * getChannelCommissionRate(input.channel, input.channels) / 100);
   }
   otaComm = Math.min(otaComm, gross);
 
@@ -7436,8 +7555,133 @@ async function revokeMemberInvite(invitationId, email) {
   await renderTeamManagement();
 }
 
+function canManageBookingChannels() {
+  return ['owner', 'admin', 'manager'].includes(String(activeTenant?.role || '').toLowerCase());
+}
+
+function setBookingChannelMessage(message, type = 'info') {
+  if (typeof showToast === 'function') showToast(message, type);
+  else if (typeof alert === 'function') alert(message);
+}
+
+async function refreshBookingChannelSettings() {
+  const result = await loadTenantBookingChannels(getActiveTenantId());
+  appData.bookingChannels = result.rows;
+  appData.bookingChannelSchemaReady = result.schemaReady;
+  renderBookingChannelSettings();
+  refreshBookingChannelDropdown();
+}
+
+function toggleNewBookingChannelRate() {
+  const type = document.getElementById('newBookingChannelType')?.value || 'OTA';
+  const input = document.getElementById('newBookingChannelRate');
+  if (!input) return;
+  input.disabled = type === 'DIRECT';
+  if (type === 'DIRECT') input.value = '0';
+}
+
+function toggleBookingChannelRowRate(channelId) {
+  const type = document.getElementById(`bookingChannelType_${channelId}`)?.value || 'DIRECT';
+  const input = document.getElementById(`bookingChannelRate_${channelId}`);
+  if (!input) return;
+  input.disabled = type === 'DIRECT' || !canManageBookingChannels();
+  if (type === 'DIRECT') input.value = '0';
+}
+
+function renderBookingChannelSettings() {
+  const tbody = document.getElementById('bookingChannelSettingsBody');
+  const addForm = document.getElementById('bookingChannelAddForm');
+  const notice = document.getElementById('bookingChannelSchemaNotice');
+  if (!tbody) return;
+  const canEdit = canManageBookingChannels();
+  const schemaReady = appData.bookingChannelSchemaReady === true;
+  if (addForm) addForm.style.display = canEdit && schemaReady ? 'grid' : 'none';
+  if (notice) {
+    notice.style.display = schemaReady ? 'none' : 'block';
+    notice.innerText = 'Kanal ayarları göçü henüz uygulanmadı. Rezervasyon formu mevcut güvenli varsayılanlarla çalışmaya devam eder; kalıcı değişiklik yapılamaz.';
+  }
+  const channels = getBookingChannelCatalog().slice().sort((a, b) => {
+    if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
+    return String(a.displayName).localeCompare(String(b.displayName), 'tr');
+  });
+  tbody.innerHTML = channels.map(channel => {
+    const id = channel.id || `fallback_${channel.code}`;
+    const disabled = !canEdit || !schemaReady || !channel.id;
+    const typeDisabled = disabled || channel.isSystem;
+    return `<tr style="${channel.isActive ? '' : 'opacity:.6;'}">
+      <td><input class="tbl-input" id="bookingChannelName_${id}" maxlength="100" value="${escapeHtml(channel.displayName)}" ${disabled ? 'disabled' : ''}><br><small>${escapeHtml(channel.code)}${channel.isSystem ? ' · Sistem kanalı' : ' · Özel kanal'}</small></td>
+      <td><select class="tbl-input" id="bookingChannelType_${id}" onchange="toggleBookingChannelRowRate('${id}')" ${typeDisabled ? 'disabled' : ''}><option value="OTA" ${channel.channelType === 'OTA' ? 'selected' : ''}>OTA</option><option value="DIRECT" ${channel.channelType === 'DIRECT' ? 'selected' : ''}>Direkt</option></select></td>
+      <td><input class="tbl-input" id="bookingChannelRate_${id}" type="number" min="0" max="100" step="0.01" value="${Number(channel.defaultCommissionRate)}" ${(disabled || channel.channelType === 'DIRECT') ? 'disabled' : ''}></td>
+      <td><span class="badge ${channel.isActive ? 'badge-green' : 'badge-slate'}">${channel.isActive ? 'AKTİF' : 'PASİF'}</span></td>
+      <td style="text-align:right; white-space:nowrap;">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="saveBookingChannelRow(event, '${channel.id || ''}')" ${disabled ? 'disabled' : ''}>Kaydet</button>
+        <button type="button" class="btn ${channel.isActive ? 'btn-danger' : 'btn-secondary'} btn-sm" onclick="setBookingChannelActive('${channel.id || ''}', ${channel.isActive ? 'false' : 'true'})" ${disabled ? 'disabled' : ''}>${channel.isActive ? 'Kaldır' : 'Etkinleştir'}</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function saveBookingChannelRow(clickEvent, channelId) {
+  const channel = (appData.bookingChannels || []).find(item => item.id === channelId);
+  if (!channel) return;
+  const id = channel.id;
+  const button = clickEvent?.currentTarget || null;
+  if (button) button.disabled = true;
+  try {
+    await saveTenantBookingChannel({
+      id,
+      displayName: document.getElementById(`bookingChannelName_${id}`)?.value,
+      channelType: document.getElementById(`bookingChannelType_${id}`)?.value || channel.channelType,
+      defaultCommissionRate: document.getElementById(`bookingChannelRate_${id}`)?.value,
+      isActive: channel.isActive
+    });
+    await refreshBookingChannelSettings();
+    setBookingChannelMessage('Kanal ve komisyon ayarı kaydedildi.', 'success');
+  } catch (error) {
+    setBookingChannelMessage('Kanal ayarı kaydedilemedi: ' + (error.message || 'Bilinmeyen hata'), 'error');
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
+async function setBookingChannelActive(channelId, isActive) {
+  const channel = (appData.bookingChannels || []).find(item => item.id === channelId);
+  if (!channel) return;
+  if (!isActive && typeof confirm === 'function' && !confirm(`${channel.displayName} yeni rezervasyonlardan kaldırılacak. Eski rezervasyonlar korunur. Devam edilsin mi?`)) return;
+  try {
+    await saveTenantBookingChannel({ ...channel, isActive });
+    await refreshBookingChannelSettings();
+    setBookingChannelMessage(isActive ? 'Kanal yeniden etkinleştirildi.' : 'Kanal pasifleştirildi; geçmiş rezervasyonlar korundu.', 'success');
+  } catch (error) {
+    setBookingChannelMessage('Kanal durumu değiştirilemedi: ' + (error.message || 'Bilinmeyen hata'), 'error');
+  }
+}
+
+async function createBookingChannelFromSettings(formEvent) {
+  formEvent.preventDefault();
+  const submit = formEvent.currentTarget.querySelector('button[type="submit"]');
+  if (submit) submit.disabled = true;
+  try {
+    await saveTenantBookingChannel({
+      displayName: document.getElementById('newBookingChannelName')?.value,
+      channelType: document.getElementById('newBookingChannelType')?.value,
+      defaultCommissionRate: document.getElementById('newBookingChannelRate')?.value,
+      isActive: true
+    });
+    formEvent.currentTarget.reset();
+    toggleNewBookingChannelRate();
+    await refreshBookingChannelSettings();
+    setBookingChannelMessage('Yeni rezervasyon kanalı eklendi.', 'success');
+  } catch (error) {
+    setBookingChannelMessage('Kanal eklenemedi: ' + (error.message || 'Bilinmeyen hata'), 'error');
+  } finally {
+    if (submit) submit.disabled = false;
+  }
+}
+
 function renderSettingsTable() {
   renderSettingsGoalsTable();
+  renderBookingChannelSettings();
   const tbody = document.getElementById('settingsTableBody');
   if (!tbody) return;
   tbody.innerHTML = '';
@@ -12571,7 +12815,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
       const tenantId = targetId;
       // Independent datasets are loaded concurrently and every list is paged;
       // Supabase's per-response cap must never silently truncate a dashboard.
-      const [villas, bookings, expenses, cleanList, leads, closeList, targetList, maintenanceTickets, financialTransactions, guests, guestConsentEvents, scheduledMessages, extensionOffers, userNotifications] = await Promise.all([
+      const [villas, bookings, expenses, cleanList, leads, closeList, targetList, maintenanceTickets, financialTransactions, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications] = await Promise.all([
         loadProperties(tenantId),
         loadBookings(tenantId),
         loadExpenses(tenantId),
@@ -12583,6 +12827,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
         fetchAllCloudRows(() => supabaseClient.from('financial_transactions').select('*').eq('tenant_id', tenantId).order('occurred_on', { ascending: false })),
         fetchAllCloudRows(() => supabaseClient.from('guests').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false })),
         fetchAllCloudRows(() => supabaseClient.from('guest_consent_events').select('*').eq('tenant_id', tenantId).order('recorded_at', { ascending: false })),
+        loadTenantBookingChannels(tenantId),
         fetchAllCloudRows(() => supabaseClient.from('scheduled_messages').select('*').eq('tenant_id', tenantId).order('scheduled_at', { ascending: true })),
         fetchAllCloudRows(() => supabaseClient.from('extension_offers').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false })),
         // Bildirim merkezi: `appData.userNotifications` HIC ATANMIYORDU.
@@ -12632,6 +12877,8 @@ async function loadTenantAppData(tenantIdOrUserId) {
         bookings: bookingsWithVillaSlugs,
         guests: (guests || []).map(mapGuestFromDb),
         guestConsentEvents: guestConsentEvents || [],
+        bookingChannels: bookingChannelCatalog.rows,
+        bookingChannelSchemaReady: bookingChannelCatalog.schemaReady,
         scheduledMessages: scheduledMessages || [],
         extensionOffers: extensionOffers || [],
         expenses,
@@ -12693,6 +12940,8 @@ function getBlankTenantData(userId) {
     bookings: [],
     guests: [],
     guestConsentEvents: [],
+    bookingChannels: getFallbackBookingChannels(),
+    bookingChannelSchemaReady: false,
     scheduledMessages: [],
     extensionOffers: [],
     expenses: [],
@@ -15409,6 +15658,14 @@ if (typeof module !== 'undefined' && module.exports) {
     getBookingFilterShare,
     computeBookingEconomics,
     getChannelCommissionRate,
+    sortBookingChannelsForSelection,
+    canManageBookingChannels,
+    renderBookingChannelSettings,
+    getFallbackBookingChannels,
+    mapBookingChannelFromDb,
+    isMissingBookingChannelSchema,
+    loadTenantBookingChannels,
+    saveTenantBookingChannel,
     syncBookingCleaningTasks,
     convertAiActionToTask,
     loadOperationalTasks,

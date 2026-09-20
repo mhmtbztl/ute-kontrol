@@ -6,6 +6,9 @@ const allTestFiles = [
   // Prior 29 Regression Suites (Phases 1-10)
   'auth_lifecycle_tests.js',
   'booking_crud_tests.js',
+  'booking_channel_settings_tests.js',
+  'booking_channel_schema_tests.js',
+  'booking_channel_live_tests.js',
   'booking_operations_tests.js',
   'cleaning_workflow_tests.js',
   'extension_offer_tests.js',
