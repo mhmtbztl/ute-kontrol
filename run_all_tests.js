@@ -158,6 +158,9 @@ const allTestFiles = [
   // Temizlik & gider defteri gercekten Postgres'e yaziliyor mu
   'cleaning_ledger_persistence_tests.js',
 
+  // "Kaydettim" diyen her yer yaziyor mu + sabit YYYY-MM ay taramasi
+  'persistence_wiring_tests.js',
+
   // Demo artigi denetimi (uydurma villa/rakam/tarih kaynak taramasi)
   'demo_residue_tests.js',
 
