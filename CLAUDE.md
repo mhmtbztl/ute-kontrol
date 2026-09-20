@@ -248,9 +248,9 @@ ve kısmi veriyle daha kötü bir duruma yol açar. Bayrak işlem sonunda kapanm
 ```bash
 node stamp_assets.js     # varlıkları içerik hash'iyle damgala (ZORUNLU)
 npm run verify:migrations # göçlerin içerik bütünlüğü + bağımlılık sırası
-npm test                  # 99 çevrimdışı/güvenli süit
+npm test                  # 101 çevrimdışı/güvenli süit
 npm run test:bootstrap    # test projesine eksik göçleri uygula (--check salt okunur)
-npm run test:live         # 123 süit, yalnız ayrı test projesine karşı
+npm run test:live         # 125 süit, yalnız ayrı test projesine karşı
 ```
 `stamp_assets.js --check` güncel değilse hata verir — CI'ya konabilir.
 
@@ -293,6 +293,20 @@ Test projesine `npm run test:bootstrap` ile uygulandı ve doğrulandı;
 Ne yaptığı: `acknowledge_notification_atomic` ve `resolve_executive_alert_atomic`
 için yetkiyi satir kilidinden öne alır, varlık oracülünü kapatır ve `anon`
 yetkisini geri alır. Ağı `core/notification_authz_tests.js` (16 iddia).
+
+**20 Eylül 2026'da üretime yeniden soruldu; hâlâ uygulanmamış.** Anon
+anahtarıyla, var olmayan bir UUID ile:
+
+```
+acknowledge_notification_atomic -> 200 {"error": "NOTIFICATION_NOT_FOUND", "success": false}
+resolve_executive_alert_atomic  -> 200 {"error": "ALERT_NOT_FOUND",        "success": false}
+```
+
+Fonksiyonun kendi hata mesajı dönüyor, `permission denied` değil: yani
+giriş yapmamış biri hâlâ bu iki fonksiyonu çalıştırabiliyor ve bir
+kimliğin var olup olmadığını öğrenebiliyor. **Veri değişmiyor** (gövdedeki
+ikinci kat tutuyor), kırılan gizlilik. Göç Supabase panelinden elle
+çalıştırılana kadar bu açık üretimde durur.
 
 **Bir göçün uygulanıp uygulanmadığı, dosyaya bakarak anlaşılmaz.** Dosya repoda
 durur; veritabanı uygulanmamış olabilir. Doğrulamanın yolu üretime sormaktır:
@@ -455,9 +469,16 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 | `get_executive_dashboard_snapshot` | tahakkuk ve gece sayımı hataları phase24 ile düzeltildi; ağı artık `executive_snapshot_tests` (22 iddia, davranış). **Arayüz hâlâ çağırmıyor**: yönetici paneli aynı rakamları tarayıcıda hesaplıyor (§3.4.1 ile ters) |
 | Excel içe/dışa aktarma | "Şirket Genel Raporu" içe aktarımı devre dışı bırakıldı, gerçek uygulama yok |
 | Bildirim merkezi analizi | **tamamlandı** (17 Eylül 2026) — merkez her iki uçtan da bağlı değildi; yükleme bağlandı, "okundu" artık Postgres'e yazıyor. RPC yetki sırası phase29 ile düzeltildi (üretime uygulanmalı) |
-| `saveAppData()` hiçbir şey kaydetmiyor | **yeni bulgu** (17 Eylül 2026) — gövdesi yalnızca eski localStorage anahtarlarını siliyor. 40 fonksiyon onu çağırıyor; **17’sinde hiçbir Postgres yazması yok**. Ayrıntı aşağıda |
-| Pazarlama kampanya defteri kalıcı değil | **yeni bulgu** — `marketing_campaigns` tablosu **yok**; `saveMarketingCampaign()` yalnızca bellekte tutup `saveAppData()` çağırıyor. Kullanıcı kampanyayı giriyor, tabloda görüyor, sayfa yenilenince kayıp. `influencerCollabs` de aynı |
-| `month: ‘2026-09’` sabiti | **yeni bulgu** — `toggleCleaningPaid()` oluşturduğu gider kaydının ayını sabit yazıyor. §3.6’daki "bugün sabit yazılmaz" hatasının ay boyutundaki hali; `demo_residue_tests` tarih taraması 10 karakterli `YYYY-MM-DD` arıyordu, 7 karakterli `YYYY-MM` gözden kaçtı. Altı yerde daha var (`prevKey = ‘2025-08’`, `isCurrentMonth: (m === ‘2026-09’)`) |
+| `saveAppData()` hiçbir şey kaydetmiyor | gövdesi yalnızca eski localStorage anahtarlarını siliyor. 17 çağıranda hiçbir Postgres yazması yoktu; **8'i 20 Eylül 2026'da bağlandı**, 1'i meşru yerel durum, 2'si kaldırıldı, **6'sı açık** (tablo yok — phase30 gerekiyor). Ayrıntı aşağıda |
+| Temizlik & gider defteri kalıcılığı | **tamamlandı** (20 Eylül 2026) — beş fonksiyon hiçbir şey yazmıyordu. Ayrıca `cloudUpsertCleaningTask` yeniden yüklemeden sonra **mükerrer görev satırı** açıyordu (UUID'yi `legacy_id` olarak gönderiyordu) ve `cleaningPayments` hiç yüklenmiyordu. Ağı `cleaning_ledger_persistence_tests` (27 iddia) |
+| WhatsApp → talep / rezervasyon | **tamamlandı** (20 Eylül 2026) — modal "✅ rezervasyon kesinleştirildi" deyip hiçbir şey yazmıyordu. `createBooking()` / `createLead()` yoluna bağlandı. Ağı `persistence_wiring_tests` |
+| Pazarlama kampanya defteri kalıcı değil | **açık** — `marketing_campaigns` tablosu **yok**; `saveMarketingCampaign()` yalnızca bellekte tutuyor. Kullanıcı kampanyayı giriyor, tabloda görüyor, sayfa yenilenince kayıp. `influencerCollabs` de aynı. **phase30 bekliyor** |
+| `month: ‘2026-09’` sabiti | **tamamlandı** (20 Eylül 2026) — altı nokta kaldırıldı. Tek kaynak `getCurrentMonthKey()`, o da `getTodayStr()`'den türer. Başlangıç dönemi de tarayıcının yerel saatini kullanıyordu; kayıtlar Europe/Istanbul gününe yazılıyor, ay sınırında kullanıcı az önce girdiği kaydı filtrede göremiyordu. Ağı `persistence_wiring_tests` (kaynak taraması) |
+| Ölü `appData.excelDb` dalları | **tamamlandı** (20 Eylül 2026) — alan yalnızca `null` atanıyordu, hiçbir yerde doldurulmuyordu. Ona bağlı **üç panel hiç çalışmıyordu**: yönetici panelinin 116 satırlık dalı, YoY karşılaştırması (her zaman "Veriler sıfırlandı" diyordu) ve gidişat radarı (ölü dalında ilk müşterinin rakamları duruyordu: skor "88", "Haziran (268k) ➔ Temmuz (467k)"). Üçü de artık gerçek kayıttan hesaplıyor; ortak taban `computeMonthActuals()` |
+| Fiyat merdiveni uydurma varsayılanları | **tamamlandı** (20 Eylül 2026) — `saveAllSettings()` boş bırakılan her alana `|| 3000`, `|| 4000`, `|| 12000`, `|| 800`, `|| 350` yazıyordu ve o rakam mülkün gerçek fiyatı oluyordu. Form da girilmemiş basamakları `v.base * 1.3` ile dolduruyordu. 17 Eylül §3.6 taraması bunu **kaçırmıştı** |
+| Sahte talep üreten düğme | **kaldırıldı** (20 Eylül 2026) — "⚡ Gelen Canlı Mesajı Simüle Et" müşterinin **gerçek talep defterine** sahte kayıt yazıyordu (Cemil Öz / 55.000 TL, silinmiş AZURE/OLIVE/BELLA anahtarlarıyla) ve dönüşüm oranını bozuyordu |
+| Whapi "canlı bağlantı" | **kaldırıldı** (20 Eylül 2026) — özelliğin **tamamı mockup'tı**: QR elle çizilmiş bir SVG, token hiçbir yere yazılmıyor ve hiçbir yerden okunmuyordu, rozet sabit "🟢 Hazır", Whapi.cloud'a tek bir istek gitmiyordu. Müşteri gerçek API anahtarını girip çöpe atıyordu. Mesaj yapıştırıp ayrıştırma akışı korundu |
+| Sahte Airbnb senkronizasyonu | **düzeltildi** (20 Eylül 2026) — `syncLiveAirbnbData()` 600 ms bekleyip `lastSync`'e "Şimdi" yazıyor ve "✅ Canlı Skorlar Güncel!" diyordu; Airbnb'ye istek gitmiyordu. Artık durumu açıkça söylüyor |
 | OTA ilan analizi (`runAiListingCritic`) | veri bağlantısı yok; artık skor uydurmuyor, durumu açıkça söylüyor |
 | Demo'yu Supabase'de gerçek tenant olarak yeniden kurma | yapılmadı |
 | Pazarlama ROAS’ı | **tamamlandı** (17 Eylül 2026) — reklam cirosu artık "girilen" olarak etiketleniyor; simülatör sabit çarpan yerine işletmenin kendi ölçülmüş ROAS'ını kullanıyor, ölçülmemiş kanal için tahmin üretmiyor |
@@ -474,25 +495,44 @@ bu doğru bir temizlik — ama çağıran kodun yarısı onu **kalıcılık san�
 
 Çağıran 40 fonksiyonun 23’ü yanında gerçek bir bulut yazması yapıyor
 (`createBooking`, `saveCleaningTask` → `cloudUpsertCleaningTask`, …) — onlarda
-`saveAppData()` yalnızca artık bir çağrı. Kalan **17’sinde hiçbir yazma yok**:
+`saveAppData()` yalnızca artık bir çağrı. Kalan 17’sinde hiçbir yazma yoktu.
 
-```
-convertAiActionToTask   changeImportMode        saveAllSettings
-promptEditCleaningAmount promptEditTaskAmount   toggleCleaningPaid
-cycleHkStatus           toggleTaskPaid          payAllPendingCleaning
-saveWaAsLead            saveWaAsBooking         saveWhapiSettings
-syncLiveAirbnbData      saveMarketingCampaign   setOtaPricingStrategy
-saveOperatorNote        saveInfluencerCollab
-```
+**20 Eylül 2026 durumu — 8 bağlandı, 2 kaldırıldı, 1 meşru yerel, 6 açık:**
 
-Hepsi aynı sınıf değil ve **tek tek incelenmeli**: bazıları gerçekten yerel bir
-arayüz durumu (`changeImportMode`), bazıları ise müşterinin kaydettiğini
-sandığı iş kaydı (`toggleCleaningPaid` bir **gider kaydı** oluşturuyor,
-`saveWaAsBooking` bir **rezervasyon**). §3.3’teki `requireCloudForWrite`
-bunların hiçbirinde çağrılmıyor, yani yazma koruması da devreye girmiyor.
+| Durum | Fonksiyon | Nereye yazıyor |
+|---|---|---|
+| ✅ bağlandı | `promptEditCleaningAmount` | `cleaning_tasks` + `properties.clean_cost` |
+| ✅ bağlandı | `promptEditTaskAmount` | `cleaning_tasks` |
+| ✅ bağlandı | `toggleCleaningPaid` | `cleaning_tasks` + `expenses` |
+| ✅ bağlandı | `toggleTaskPaid` | `cleaning_tasks` + `expenses` |
+| ✅ bağlandı | `payAllPendingCleaning` | `cleaning_tasks` + `expenses` |
+| ✅ bağlandı | `saveWaAsLead` | `createLead()` → `leads` |
+| ✅ bağlandı | `saveWaAsBooking` | `createBooking()` → `bookings` |
+| ✅ bağlandı | `convertAiActionToTask` | `createMaintenanceTicket()` |
+| ✅ bağlandı | `saveAllSettings` | `properties` (yalnız taban fiyat + temizlik maliyeti) |
+| 🗑 kaldırıldı | `saveWhapiSettings` | özelliğin tamamı mockup'tı |
+| 🗑 düzeltildi | `syncLiveAirbnbData` | senkronizasyon yoktu; durumu söylüyor |
+| ⚪ meşru yerel | `changeImportMode` | açık formun görünümü; iş kaydı değil |
+| ❌ **açık** | `cycleHkStatus` | temizlik durumu geçersiz kılma — **tablo yok** |
+| ❌ **açık** | `saveMarketingCampaign` | `marketing_campaigns` — **tablo yok** |
+| ❌ **açık** | `saveInfluencerCollab` | influencer defteri — **tablo yok** |
+| ❌ **açık** | `setOtaPricingStrategy` | kiracı ayarı — **tablo yok** |
+| ❌ **açık** | `saveOperatorNote` | mülk başına not — **tablo yok** |
+| ❌ **kısmen** | `saveAllSettings` | merdivenin floor/target/premium/peak + ısıtma maliyeti için **sütun yok**; kullanıcıya açıkça söyleniyor |
+
+Açık kalan altısının hepsi **aynı sebepten** açık: yazılacak tablo yok.
+Hepsi tek bir **phase30** göçü ile kapanır.
+
+`requireCloudForWrite` (§3.3) artık bağlananların hepsinde devrede; yazma
+düşerse kullanıcıya söylenir ve ekran `loadTenantAppData()` ile gerçeğe
+geri çekilir — bellekteki değişiklik ekranda "kaydedilmiş" gibi kalmaz.
 
 Bildirim merkezi bu sınıfın ilk düzeltilen üyesidir; ağı
-`core/notification_wiring_tests.js`.
+`core/notification_wiring_tests.js`. Temizlik defteri için
+`core/cleaning_ledger_persistence_tests.js`, geri kalanı için
+`core/persistence_wiring_tests.js` — ikincisi ayrıca sabit `YYYY-MM` ay
+literallerini tarar ve **KALICI listesi yalnızca büyür**: bağlanan bir
+fonksiyon bir daha "yalnızca saveAppData()" hâline dönemez.
 
 ---
 
