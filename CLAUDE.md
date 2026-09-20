@@ -287,26 +287,38 @@ izin geçmişi) **15 Eylül 2026'da uygulandı**; üretime sorularak doğruland�
 projesine `npm run test:bootstrap` ile uygulandı ve sıfırdan kurulan bir
 şemada temiz çalıştıkları görüldü.
 
-**Bekleyen göç: phase29** (`migration_phase29_notification_authz_order.sql`).
-Test projesine `npm run test:bootstrap` ile uygulandı ve doğrulandı;
-**üretime henüz uygulanmadı** — Supabase panelinden elle çalıştırılmalı (§4.2).
+**phase29 (`migration_phase29_notification_authz_order.sql`) 20 Eylül 2026'da
+üretime uygulandı ve doğrulandı.** Test projesinde de kurulu
+(`npm run test:bootstrap:check`: 0 eksik, 40 uygulanmış).
 Ne yaptığı: `acknowledge_notification_atomic` ve `resolve_executive_alert_atomic`
-için yetkiyi satir kilidinden öne alır, varlık oracülünü kapatır ve `anon`
+için yetkiyi satır kilidinden öne alır, varlık oracülünü kapatır ve `anon`
 yetkisini geri alır. Ağı `core/notification_authz_tests.js` (16 iddia).
 
-**20 Eylül 2026'da üretime yeniden soruldu; hâlâ uygulanmamış.** Anon
-anahtarıyla, var olmayan bir UUID ile:
+Doğrulama, aynı gün iki kez §4.2 yöntemiyle yapıldı — **önce ve sonra**:
 
 ```
-acknowledge_notification_atomic -> 200 {"error": "NOTIFICATION_NOT_FOUND", "success": false}
-resolve_executive_alert_atomic  -> 200 {"error": "ALERT_NOT_FOUND",        "success": false}
+UYGULANMADAN ÖNCE (anon anahtarı, var olmayan UUID):
+  acknowledge_notification_atomic -> 200 {"error": "NOTIFICATION_NOT_FOUND", "success": false}
+  resolve_executive_alert_atomic  -> 200 {"error": "ALERT_NOT_FOUND",        "success": false}
+
+UYGULANDIKTAN SONRA:
+  acknowledge_notification_atomic -> 42501 permission denied for function
+  resolve_executive_alert_atomic  -> 42501 permission denied for function
 ```
 
-Fonksiyonun kendi hata mesajı dönüyor, `permission denied` değil: yani
-giriş yapmamış biri hâlâ bu iki fonksiyonu çalıştırabiliyor ve bir
-kimliğin var olup olmadığını öğrenebiliyor. **Veri değişmiyor** (gövdedeki
-ikinci kat tutuyor), kırılan gizlilik. Göç Supabase panelinden elle
-çalıştırılana kadar bu açık üretimde durur.
+Fonksiyonun kendi hata mesajı yerine `permission denied` dönmesi, göçün
+uygulandığının kanıtıdır. Bu ayrım §4.2'nin yetki göçü testidir ve
+salt okunurdur — üretime kayıt bırakmaz.
+
+**Bilinen ve kabul edilen yan etki:** phase29 `FOR UPDATE` satır kilidini
+tamamen kaldırdı (yetki kontrolünün kilitten önce gelmesi böyle
+sağlandı). Artık `SELECT` ile `UPDATE` arasında satır silinirse `UPDATE`
+0 satır etkiler ama fonksiyon yine `{"success": true}` döner. Bu satırlar
+tek tek silinmiyor (yalnızca kiracı sıfırlama ve hesap kapatma akışlarında,
+cascade ile), pencere mikrosaniye ve istemci `success` üzerinden yıkıcı bir
+iş yapmıyor. Düzeltmek yeni bir göç gerektirir; **bilerek ertelendi.**
+Düzeltilecekse `GET DIAGNOSTICS ... ROW_COUNT` ile 0 satır durumu
+`success: false`'a çevrilmeli.
 
 **Bir göçün uygulanıp uygulanmadığı, dosyaya bakarak anlaşılmaz.** Dosya repoda
 durur; veritabanı uygulanmamış olabilir. Doğrulamanın yolu üretime sormaktır:
@@ -468,7 +480,7 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 | Fotoğraf AI worker'ı | `GEMINI_API_KEY` yok; Actions adımı güvenle atlanıyor — **harici bağımlılık** |
 | `get_executive_dashboard_snapshot` | tahakkuk ve gece sayımı hataları phase24 ile düzeltildi; ağı artık `executive_snapshot_tests` (22 iddia, davranış). **Arayüz hâlâ çağırmıyor**: yönetici paneli aynı rakamları tarayıcıda hesaplıyor (§3.4.1 ile ters) |
 | Excel içe/dışa aktarma | "Şirket Genel Raporu" içe aktarımı devre dışı bırakıldı, gerçek uygulama yok |
-| Bildirim merkezi analizi | **tamamlandı** (17 Eylül 2026) — merkez her iki uçtan da bağlı değildi; yükleme bağlandı, "okundu" artık Postgres'e yazıyor. RPC yetki sırası phase29 ile düzeltildi (üretime uygulanmalı) |
+| Bildirim merkezi analizi | **tamamlandı** (17 Eylül 2026) — merkez her iki uçtan da bağlı değildi; yükleme bağlandı, "okundu" artık Postgres'e yazıyor. RPC yetki sırası phase29 ile düzeltildi; göç 20 Eylül 2026'da **üretime uygulandı ve doğrulandı** |
 | `saveAppData()` hiçbir şey kaydetmiyor | gövdesi yalnızca eski localStorage anahtarlarını siliyor. 17 çağıranda hiçbir Postgres yazması yoktu; **8'i 20 Eylül 2026'da bağlandı**, 1'i meşru yerel durum, 2'si kaldırıldı, **6'sı açık** (tablo yok — phase30 gerekiyor). Ayrıntı aşağıda |
 | Temizlik & gider defteri kalıcılığı | **tamamlandı** (20 Eylül 2026) — beş fonksiyon hiçbir şey yazmıyordu. Ayrıca `cloudUpsertCleaningTask` yeniden yüklemeden sonra **mükerrer görev satırı** açıyordu (UUID'yi `legacy_id` olarak gönderiyordu) ve `cleaningPayments` hiç yüklenmiyordu. Ağı `cleaning_ledger_persistence_tests` (27 iddia) |
 | WhatsApp → talep / rezervasyon | **tamamlandı** (20 Eylül 2026) — modal "✅ rezervasyon kesinleştirildi" deyip hiçbir şey yazmıyordu. `createBooking()` / `createLead()` yoluna bağlandı. Ağı `persistence_wiring_tests` |
