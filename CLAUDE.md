@@ -357,6 +357,14 @@ Ağı `core/phase31_persistence_tests.js` (64 iddia, çevrimdışı) ve
 anon kapısı, sıfırlama). Eski gövdeye karşı ölçüldü: 64 iddianın **32'si**
 kırılıyor.
 
+**phase32 (`migration_phase32_executive_snapshot_ui.sql`) 21 Eylül 2026'da
+üretime uygulandı ve doğrulandı.** Göçün transaction içindeki doğrulama bloğu
+`room_revenue` sözleşmesini, `authenticated` yetkisini ve kapalı `anon`
+yetkisini denetleyerek hatasız tamamlandı. Ardından üretime yapılan anon RPC
+çağrısı `401/42501 permission denied for function` döndürdü; fonksiyonun
+varlığı ve anon kapısı üretime kayıt bırakmadan ayrıca doğrulandı. Test
+projesinde `executive_snapshot_tests` 23/23 geçti.
+
 **Bir göçün uygulanıp uygulanmadığı, dosyaya bakarak anlaşılmaz.** Dosya repoda
 durur; veritabanı uygulanmamış olabilir. Doğrulamanın yolu üretime sormaktır:
 
@@ -517,7 +525,7 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 | Ayrı Supabase test projesi | **tamamlandı** (15 Eylül 2026) — proje `pdeiorpgxetksyogrmbi`, şema bootstrap ile kuruldu, tam koşu yeşil |
 | Canlı süitlerin CI’da otomatik koşması | **tamamlandı** (16 Eylül 2026) — `.github/workflows/live-tests.yml` açık, her gece 03:00 UTC. İlk yeşil koşu 17 Eylül: 120/120 süit, 1123 iddia, sızıntı temiz |
 | Fotoğraf AI worker'ı | `GEMINI_API_KEY` yok; Actions adımı güvenle atlanıyor — **harici bağımlılık** |
-| `get_executive_dashboard_snapshot` | **phase32 ile arayüze bağlandı** (20 Eylül 2026) — aylık ciro, gider, net kâr, doluluk, ADR ve RevPAR artık sunucu snapshot'ından geliyor; önceki ay da RPC ile alınıyor. Test projesine uygulandı; `executive_snapshot_tests` 23/23 ve `executive_snapshot_ui_tests` 7/7. **Üretim göçü bekliyor** |
+| `get_executive_dashboard_snapshot` | **phase32 ile arayüze bağlandı** (20 Eylül 2026) — aylık ciro, gider, net kâr, doluluk, ADR ve RevPAR artık sunucu snapshot'ından geliyor; önceki ay da RPC ile alınıyor. Test projesine uygulandı; `executive_snapshot_tests` 23/23 ve `executive_snapshot_ui_tests` 7/7. Göç 21 Eylül 2026'da **üretime uygulandı ve doğrulandı** |
 | Excel içe/dışa aktarma | "Şirket Genel Raporu" içe aktarımı devre dışı bırakıldı, gerçek uygulama yok |
 | Bildirim merkezi analizi | **tamamlandı** (17 Eylül 2026) — merkez her iki uçtan da bağlı değildi; yükleme bağlandı, "okundu" artık Postgres'e yazıyor. RPC yetki sırası phase29 ile düzeltildi; göç 20 Eylül 2026'da **üretime uygulandı ve doğrulandı** |
 | `saveAppData()` hiçbir şey kaydetmiyor | gövdesi yalnızca eski localStorage anahtarlarını siliyor. 17 çağıranda hiçbir Postgres yazması yoktu; **8'i 20 Eylül 2026'da bağlandı**, 1'i meşru yerel durum, 2'si kaldırıldı, **6'sı 20 Eylül 2026'da phase31 ile kapandı**; liste artık boş. Göç üretime henüz uygulanmadı. Ayrıntı aşağıda |
