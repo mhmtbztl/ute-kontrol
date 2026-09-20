@@ -7448,30 +7448,107 @@ function renderSettingsTable() {
     tr.innerHTML = `
       <td><strong>${v.name}</strong></td>
       <td>${v.capacity}</td>
-      <td><input type="number" class="tbl-input" id="set_floor_${vKey}" value="${v.floor}"></td>
-      <td><input type="number" class="tbl-input" id="set_base_${vKey}" value="${v.base}"></td>
-      <td><input type="number" class="tbl-input" id="set_target_${vKey}" value="${v.target || v.base * 1.3}"></td>
-      <td><input type="number" class="tbl-input" id="set_premium_${vKey}" value="${v.premium || v.base * 1.8}"></td>
-      <td><input type="number" class="tbl-input" id="set_peak_${vKey}" value="${v.peak || v.base * 2.5}"></td>
-      <td><input type="number" class="tbl-input" id="set_clean_${vKey}" value="${v.cleanCost}"></td>
-      <td><input type="number" class="tbl-input" id="set_heat_${vKey}" value="${v.heatCost}"></td>
+      <td><input type="number" class="tbl-input" id="set_floor_${vKey}" value="${fiyatAlani(v.floor)}"></td>
+      <td><input type="number" class="tbl-input" id="set_base_${vKey}" value="${fiyatAlani(v.base)}"></td>
+      <td><input type="number" class="tbl-input" id="set_target_${vKey}" value="${fiyatAlani(v.target)}"></td>
+      <td><input type="number" class="tbl-input" id="set_premium_${vKey}" value="${fiyatAlani(v.premium)}"></td>
+      <td><input type="number" class="tbl-input" id="set_peak_${vKey}" value="${fiyatAlani(v.peak)}"></td>
+      <td><input type="number" class="tbl-input" id="set_clean_${vKey}" value="${fiyatAlani(v.cleanCost)}"></td>
+      <td><input type="number" class="tbl-input" id="set_heat_${vKey}" value="${fiyatAlani(v.heatCost)}"></td>
     `;
     tbody.appendChild(tr);
   });
 }
 
-function saveAllSettings() {
+/**
+ * Girilmemis bir fiyat alani BOS gosterilir.
+ *
+ * Buradaki uc alan bir zamanlar `v.base * 1.3`, `* 1.8`, `* 2.5` ile
+ * DOLDURULUYORDU. Kullanici hedef/premium/zirve fiyatini hic girmemis olsa
+ * bile ekranda bir rakam goruyor, "Kaydet"e basinca o uydurma rakam
+ * mulkun gercek fiyati oluyordu — oradan firsat fiyatina ve misafire giden
+ * metne tasiniyordu (3.6).
+ */
+function fiyatAlani(deger) {
+  const n = Number(deger);
+  return Number.isFinite(n) && n > 0 ? n : '';
+}
+
+/**
+ * Villa fiyat basamaklarini ve maliyet parametrelerini kaydeder.
+ *
+ * Bir zamanlar iki ayri sekilde yaniltiyordu:
+ *
+ *   1. Bos birakilan her alana SIFIR OLMAYAN bir varsayilan yaziyordu
+ *      (`|| 3000`, `|| 4000`, `|| 12000`, `|| 800`, `|| 350`). Kullanicinin
+ *      hic girmedigi bir fiyat mulkun gercek fiyati oluyordu (3.6).
+ *   2. Yalnizca `saveAppData()` cagiriyordu, yani hicbir sey kaydetmiyordu;
+ *      "kaydedildi" diyen uyari ise gosteriliyordu.
+ *
+ * `base_price` ve `clean_cost` mulkun kendi satirina yazilir. Merdivenin
+ * diger basamaklari (floor/target/premium/peak) ve isitma maliyeti icin
+ * henuz sutun yok — phase30 gelene kadar bunlar KAYDEDILEMEZ ve kullaniciya
+ * bu acikca soylenir; "kaydedildi" denip kaybedilmez.
+ */
+async function saveAllSettings() {
+  const oku = (id) => {
+    const el = document.getElementById(id);
+    if (!el) return null;
+    const ham = String(el.value).trim();
+    if (ham === '') return null;          // girilmemis: 0 degil, BILINMIYOR
+    const n = Number(ham);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  };
+
+  const degisen = [];
   Object.keys(appData.villas).forEach(vKey => {
-    appData.villas[vKey].floor = Number(document.getElementById(`set_floor_${vKey}`).value) || 3000;
-    appData.villas[vKey].base = Number(document.getElementById(`set_base_${vKey}`).value) || 4000;
-    appData.villas[vKey].target = Number(document.getElementById(`set_target_${vKey}`).value) || 6000;
-    appData.villas[vKey].premium = Number(document.getElementById(`set_premium_${vKey}`).value) || 8000;
-    appData.villas[vKey].peak = Number(document.getElementById(`set_peak_${vKey}`).value) || 12000;
-    appData.villas[vKey].cleanCost = Number(document.getElementById(`set_clean_${vKey}`).value) || 800;
-    appData.villas[vKey].heatCost = Number(document.getElementById(`set_heat_${vKey}`).value) || 350;
+    const v = appData.villas[vKey];
+    const yeni = {
+      floor: oku(`set_floor_${vKey}`),
+      base: oku(`set_base_${vKey}`),
+      target: oku(`set_target_${vKey}`),
+      premium: oku(`set_premium_${vKey}`),
+      peak: oku(`set_peak_${vKey}`),
+      cleanCost: oku(`set_clean_${vKey}`),
+      heatCost: oku(`set_heat_${vKey}`)
+    };
+    // null = kullanici bos birakti; onceki degeri silmeyiz, uydurmayiz da.
+    Object.entries(yeni).forEach(([alan, deger]) => {
+      if (deger !== null) v[alan] = deger;
+    });
+    degisen.push(vKey);
   });
-  saveAppData();
-  alert('Tüm villa fiyat basamakları ve maliyet parametreleri kaydedildi!');
+
+  const tenantId = getActiveTenantId();
+  if (!isCloudTenant(tenantId)) {
+    alert('Bulut bağlantısı kurulamadı. Değişiklikler kaydedilmedi.');
+    return;
+  }
+
+  const hatalar = [];
+  for (const vKey of degisen) {
+    const v = appData.villas[vKey];
+    try {
+      await updateProperty(vKey, {
+        ...v,
+        basePrice: v.base !== undefined ? v.base : v.basePrice,
+        cleanCost: v.cleanCost
+      });
+    } catch (err) {
+      hatalar.push(`${v.name || vKey}: ${err?.message || 'veritabanı hatası'}`);
+    }
+  }
+
+  if (hatalar.length > 0) {
+    alert('⚠️ Bazı mülkler kaydedilemedi:\n' + hatalar.join('\n'));
+    return;
+  }
+
+  alert(
+    'Gecelik taban fiyat ve temizlik maliyeti kaydedildi.\n\n' +
+    'Not: Taban/hedef/premium/zirve basamakları ve ısıtma maliyeti için ' +
+    'veritabanında henüz alan yok; bu değerler yalnızca bu oturumda geçerlidir.'
+  );
 }
 
 // -------------------------------------------------------------
@@ -9165,39 +9242,17 @@ function saveWhapiSettings() {
   alert('Whapi.cloud ayarları kaydedildi!');
 }
 
-function simulateIncomingWhatsAppTest() {
-  const testGuests = [
-    { name: 'Cemil Öz', phone: '0533 999 8877', villa: 'AZURE', quote: 55000, notes: '25-28 Eylül jakuzili ev için WhatsApp mesajı attı' },
-    { name: 'Deniz Aksu', phone: '0542 777 6655', villa: 'OLIVE', quote: 42000, notes: 'Ekim ilk haftası 11 kişilik aile için fiyat sordu' },
-    { name: 'Alper Tunç', phone: '0530 222 3344', villa: 'BELLA', quote: 26000, notes: 'Hafta içi 2 gece için indirim talep etti' }
-  ];
-
-  const pick = testGuests[Math.floor(Math.random() * testGuests.length)];
-  const newLead = {
-    id: 'L-SIM-' + Date.now().toString().slice(-4),
-    guest: `${pick.name} (${pick.phone})`,
-    villa: pick.villa,
-    channel: 'WhatsApp',
-    quote: pick.quote,
-    status: 'FOLLOW_UP',
-    lostReason: '-',
-    notes: pick.notes
-  };
-
-  if (!appData.leads) appData.leads = [];
-  appData.leads.unshift(newLead);
-  saveAppData();
-
-  renderManageLeadsTable();
-  renderLeadAnalytics();
-
-  // Show live toast
-  const toast = document.createElement('div');
-  toast.style.cssText = 'position:fixed; top:24px; right:24px; background:#065F46; color:#D1FAE5; border:1px solid #10B981; padding:16px 22px; border-radius:12px; font-weight:700; font-size:13px; box-shadow:0 15px 35px rgba(0,0,0,0.6); z-index:99999; display:flex; align-items:center; gap:12px;';
-  toast.innerHTML = `<span style="font-size:24px;">💬</span> <div><strong>Yeni Canlı WhatsApp Mesajı Yakalandı!</strong><br><span style="font-size:12px; font-weight:normal; color:#A7F3D0;">${pick.name} (${pick.villa}) - ${pick.quote.toLocaleString('tr-TR')} TL talep oluşturuldu.</span></div>`;
-  document.body.appendChild(toast);
-  setTimeout(() => { toast.remove(); }, 4000);
-}
+// `simulateIncomingWhatsAppTest()` KALDIRILDI.
+//
+// "⚡ Gelen Canlı Mesajı Simüle Et" dugmesi, musterinin GERCEK talep
+// defterine sahte bir kayit yaziyordu: uc uydurma misafir (Cemil Öz /
+// 55.000 TL, Deniz Aksu / 42.000 TL, Alper Tunç / 26.000 TL) ve silinmis
+// demo villa anahtarlari (AZURE, OLIVE, BELLA). Kayit huniye giriyor,
+// donusum orani ve talep analitigi bozuluyordu. Ustelik bildirimde
+// "Yeni CANLI WhatsApp Mesaji Yakalandi" yaziyordu — canli degildi.
+//
+// Ticari bir urunde musterinin defterine test kaydi yazan bir dugme
+// bulunmaz (3.6).
 
 function renderLeadAnalytics() {
   const leads = appData.leads || [];
@@ -9981,34 +10036,35 @@ function renderAirbnbAuditRadar() {
   if (pReviewsEl) pReviewsEl.innerText = `${totalReviews} Değerlendirme (${portfolioLabel()})`;
 }
 
+/**
+ * Airbnb ilan verisi senkronizasyonu — BAGLANTI YOK, durum acikca soylenir.
+ *
+ * Bu fonksiyon SENKRONIZASYON YAPMIYORDU. Govdesi 600 ms bekliyor, sonra
+ * her ilanin `lastSync` alanina "Şimdi (14:32)" yaziyor ve dugmeyi
+ * "✅ Canlı Skorlar Güncel!" yapiyordu. Airbnb'ye hicbir istek gitmiyordu;
+ * zaten `appData.airbnbListings` bos bir nesne, yani donguye girecek tek
+ * bir ilan bile yoktu. Musteri puanlarinin guncellendigini saniyordu.
+ *
+ * Ayni sinifin daha once duzeltilen uyesi `runAiListingCritic`: o da her
+ * URL icin 79/100 uyduruyordu, artik durumu acikca soyluyor. Kural ayni —
+ * bir ozellik gercek veriyi olcemiyorsa bunu SOYLER, skor uydurmaz (3.6).
+ */
 function syncLiveAirbnbData() {
   const btn = document.getElementById('syncAirbnbBtn');
+  const mesaj = 'Airbnb ilan verisi bağlantısı kurulu değil.\n\n' +
+    'İlan puanı, yorum sayısı ve sıralama Airbnb tarafından herkese açık ' +
+    'bir arayüzle verilmiyor; bu rakamlar ölçülemediği için uydurulmuyor. ' +
+    'Bağlantı kurulduğunda bu ekran gerçek verilerle dolacak.';
+  if (typeof showToast === 'function') showToast(mesaj, 'info');
+  else alert(mesaj);
   if (btn) {
     btn.disabled = true;
-    btn.innerHTML = '⏳ Senkronize Ediliyor...';
-  }
-
-  setTimeout(() => {
-    // Save live synced data
-    if (!appData.airbnbListings) {
-      appData.airbnbListings = {};  // DEFAULT_AIRBNB_PROPERTIES demo temizliginde silindi (ReferenceError)
-    }
-    const nowStr = 'Şimdi (' + new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) + ')';
-    Object.keys(appData.airbnbListings).forEach(k => {
-      appData.airbnbListings[k].lastSync = nowStr;
-    });
-
-    saveAppData();
-    renderAirbnbAuditRadar();
-
-    if (btn) {
+    btn.innerHTML = '⛔ Bağlantı kurulu değil';
+    setTimeout(() => {
       btn.disabled = false;
-      btn.innerHTML = '✅ Canlı Skorlar Güncel!';
-      setTimeout(() => {
-        btn.innerHTML = '🔄 Airbnb\'den Senkronize Et';
-      }, 3000);
-    }
-  }, 600);
+      btn.innerHTML = '🔄 Airbnb\'den Senkronize Et';
+    }, 3000);
+  }
 }
 
 

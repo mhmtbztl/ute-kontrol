@@ -224,6 +224,50 @@ function run() {
     'merdivenden alıyor olabilir. Fiyat mülkün kendi basePrice\'ıdır; ' +
     'girilmemişse uydurulmaz — ve bu rakam misafire gönderilen metne giriyor.');
 
+  // --- 11. Musterinin defterine test kaydi yazan dugme ------------------------
+  // "⚡ Gelen Canlı Mesajı Simüle Et", musterinin GERCEK talep defterine uc
+  // uydurma misafirden birini yaziyordu (Cemil Öz / 55.000 TL, silinmis
+  // AZURE/OLIVE/BELLA anahtarlariyla). Kayit huniye giriyor, donusum orani
+  // ve talep analitigi bozuluyordu; bildirim de "CANLI mesaj yakalandi"
+  // diyordu — canli degildi.
+  // Yorumlar ayiklanir: hatanin NEDEN kaldirildigini anlatan aciklama
+  // ihlal sayilirsa, denetim kendi belgesini yok eder.
+  const APP_KOD = kodSatirlari(APP).map(({ l }) => l).join('\n');
+  const HTML_KOD = kodSatirlari(HTML).map(({ l }) => l).join('\n');
+  check(!/simulateIncomingWhatsAppTest\s*\(/.test(APP_KOD) && !/simulateIncomingWhatsAppTest/.test(HTML_KOD),
+    '13. Müşterinin defterine test kaydı yazan düğme yok',
+    'simulateIncomingWhatsAppTest hâlâ tanımlı veya arayüze bağlı. Ticari ' +
+    'bir üründe müşterinin iş defterine sahte kayıt yazan bir düğme bulunmaz.');
+
+  // --- 12. Yapmadigi isi yapmis gibi gosteren "senkronizasyon" ---------------
+  // syncLiveAirbnbData() 600 ms bekleyip her ilanin lastSync alanina
+  // "Şimdi (14:32)" yaziyor ve dugmeyi "✅ Canlı Skorlar Güncel!" yapiyordu.
+  // Airbnb'ye hicbir istek gitmiyordu.
+  const syncBas = APP.indexOf('function syncLiveAirbnbData');
+  const syncGovde = syncBas === -1 ? '' : APP.slice(syncBas, APP.indexOf('\nfunction ', syncBas + 10));
+  check(!/lastSync\s*=\s*nowStr/.test(syncGovde) && !/Canlı Skorlar Güncel/.test(syncGovde),
+    '14. Airbnb senkronizasyonu yapmadığı işi yapmış gibi göstermiyor',
+    'syncLiveAirbnbData() hâlâ sahte bir "senkronize edildi" durumu yazıyor. ' +
+    'Veri bağlantısı yoksa bu açıkça söylenir; runAiListingCritic aynı ' +
+    'sebeple düzeltilmişti.');
+
+  // --- 13. Fiyat merdiveninde uydurma varsayilan -----------------------------
+  // saveAllSettings() bos birakilan her alana sifir olmayan bir varsayilan
+  // yaziyordu (|| 3000, || 4000, || 12000, || 800, || 350) ve o rakam
+  // mulkun GERCEK fiyati oluyordu; oradan firsat fiyatina ve misafire giden
+  // metne tasiniyordu. Form da girilmemis basamaklari `v.base * 1.3` ile
+  // dolduruyordu.
+  const ayarBas = APP.indexOf('function saveAllSettings');
+  const ayarGovde = ayarBas === -1 ? '' : APP.slice(ayarBas, APP.indexOf('\nfunction ', ayarBas + 10));
+  check(!/\|\|\s*(3000|4000|6000|8000|12000|800|350)\b/.test(ayarGovde),
+    '15. Fiyat basamaklarına uydurma varsayılan yazılmıyor',
+    'saveAllSettings() boş bırakılan alana sıfır olmayan bir varsayılan ' +
+    'yazıyor. Girilmemiş fiyat mülkün gerçek fiyatı olur ve misafire gider.');
+  check(!/v\.base\s*\*\s*[0-9]/.test(APP_KOD),
+    '16. Ayar formu girilmemiş fiyat basamağını türetip doldurmuyor',
+    '`v.base * 1.3` kalıbı duruyor: kullanıcı hedef fiyatı hiç girmemişken ' +
+    'ekranda bir rakam görür ve "Kaydet" onu gerçek fiyat yapar.');
+
   console.log('\n=============================================================================');
   console.log(`TEST SUMMARY: ${passed} / ${passed + failed} TESTS PASSED (${failed} FAILED)`);
   console.log('=============================================================================\n');
