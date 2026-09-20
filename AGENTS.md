@@ -148,6 +148,10 @@ dalında kalır ve **haber vermeden `master`'a dokunmaz.**
 
 4. **Yeni göç eklediyseniz**
    - Dosya `supabase/migration_phase<N>_<konu>.sql` olarak eklenir.
+   - **Phase numarası sahipliği:** Codex yalnızca çift numaraları (`30`, `32`,
+     `34`, ...), Claude yalnızca tek numaraları (`29`, `31`, `33`, ...)
+     kullanır. Bir aracın sırası kullanılmayacak olsa bile diğer araç o
+     numarayı devralmaz; böylece paralel worktree'ler aynı phase adını seçmez.
    - Sonunda kendi doğrulama bloğu bulunur; başarısızsa `RAISE EXCEPTION`
      ile durur.
    - `supabase/migration_manifest.txt`'e dosya adı + sha256 kaydedilir.
