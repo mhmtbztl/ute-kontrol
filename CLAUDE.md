@@ -351,7 +351,9 @@ ile `index.html` (~265 KB) gibi dev ortak dosyalara dokunuyor.
 
 1. Her araç kendi worktree klasöründe çalışır; ana klasörde tek araç bulunur.
 2. `git add -A` / `git add .` yasak — kimse başkasının dosyasını commit etmez.
-3. Göç dosyaları değişmezdir; düzeltme yeni `phase<N+1>` göçü olarak eklenir.
+3. Göç dosyaları değişmezdir; düzeltme **yeni bir göç** olarak eklenir —
+   numarası `N+1` olmak zorunda değildir: phase numaraları araçlara ayrılmıştır
+   (**Codex çift, Claude tek**), her araç kendi sırasındaki ilk boş numarayı alır.
 4. Teslimden önce `npm test`, `npm run verify:migrations` ve
    `node stamp_assets.js --check` yeşil olmalı.
 5. `master` dalına aynı anda tek araç dokunur; diğeri haber vermeden merge/push yapmaz.
@@ -481,10 +483,10 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 | `get_executive_dashboard_snapshot` | tahakkuk ve gece sayımı hataları phase24 ile düzeltildi; ağı artık `executive_snapshot_tests` (22 iddia, davranış). **Arayüz hâlâ çağırmıyor**: yönetici paneli aynı rakamları tarayıcıda hesaplıyor (§3.4.1 ile ters) |
 | Excel içe/dışa aktarma | "Şirket Genel Raporu" içe aktarımı devre dışı bırakıldı, gerçek uygulama yok |
 | Bildirim merkezi analizi | **tamamlandı** (17 Eylül 2026) — merkez her iki uçtan da bağlı değildi; yükleme bağlandı, "okundu" artık Postgres'e yazıyor. RPC yetki sırası phase29 ile düzeltildi; göç 20 Eylül 2026'da **üretime uygulandı ve doğrulandı** |
-| `saveAppData()` hiçbir şey kaydetmiyor | gövdesi yalnızca eski localStorage anahtarlarını siliyor. 17 çağıranda hiçbir Postgres yazması yoktu; **8'i 20 Eylül 2026'da bağlandı**, 1'i meşru yerel durum, 2'si kaldırıldı, **6'sı açık** (tablo yok — phase30 gerekiyor). Ayrıntı aşağıda |
+| `saveAppData()` hiçbir şey kaydetmiyor | gövdesi yalnızca eski localStorage anahtarlarını siliyor. 17 çağıranda hiçbir Postgres yazması yoktu; **8'i 20 Eylül 2026'da bağlandı**, 1'i meşru yerel durum, 2'si kaldırıldı, **6'sı açık** (tablo yok — phase31 gerekiyor). Ayrıntı aşağıda |
 | Temizlik & gider defteri kalıcılığı | **tamamlandı** (20 Eylül 2026) — beş fonksiyon hiçbir şey yazmıyordu. Ayrıca `cloudUpsertCleaningTask` yeniden yüklemeden sonra **mükerrer görev satırı** açıyordu (UUID'yi `legacy_id` olarak gönderiyordu) ve `cleaningPayments` hiç yüklenmiyordu. Ağı `cleaning_ledger_persistence_tests` (27 iddia) |
 | WhatsApp → talep / rezervasyon | **tamamlandı** (20 Eylül 2026) — modal "✅ rezervasyon kesinleştirildi" deyip hiçbir şey yazmıyordu. `createBooking()` / `createLead()` yoluna bağlandı. Ağı `persistence_wiring_tests` |
-| Pazarlama kampanya defteri kalıcı değil | **açık** — `marketing_campaigns` tablosu **yok**; `saveMarketingCampaign()` yalnızca bellekte tutuyor. Kullanıcı kampanyayı giriyor, tabloda görüyor, sayfa yenilenince kayıp. `influencerCollabs` de aynı. **phase30 bekliyor** |
+| Pazarlama kampanya defteri kalıcı değil | **açık** — `marketing_campaigns` tablosu **yok**; `saveMarketingCampaign()` yalnızca bellekte tutuyor. Kullanıcı kampanyayı giriyor, tabloda görüyor, sayfa yenilenince kayıp. `influencerCollabs` de aynı. **phase31 bekliyor** |
 | `month: ‘2026-09’` sabiti | **tamamlandı** (20 Eylül 2026) — altı nokta kaldırıldı. Tek kaynak `getCurrentMonthKey()`, o da `getTodayStr()`'den türer. Başlangıç dönemi de tarayıcının yerel saatini kullanıyordu; kayıtlar Europe/Istanbul gününe yazılıyor, ay sınırında kullanıcı az önce girdiği kaydı filtrede göremiyordu. Ağı `persistence_wiring_tests` (kaynak taraması) |
 | Ölü `appData.excelDb` dalları | **tamamlandı** (20 Eylül 2026) — alan yalnızca `null` atanıyordu, hiçbir yerde doldurulmuyordu. Ona bağlı **üç panel hiç çalışmıyordu**: yönetici panelinin 116 satırlık dalı, YoY karşılaştırması (her zaman "Veriler sıfırlandı" diyordu) ve gidişat radarı (ölü dalında ilk müşterinin rakamları duruyordu: skor "88", "Haziran (268k) ➔ Temmuz (467k)"). Üçü de artık gerçek kayıttan hesaplıyor; ortak taban `computeMonthActuals()` |
 | Fiyat merdiveni uydurma varsayılanları | **tamamlandı** (20 Eylül 2026) — `saveAllSettings()` boş bırakılan her alana `|| 3000`, `|| 4000`, `|| 12000`, `|| 800`, `|| 350` yazıyordu ve o rakam mülkün gerçek fiyatı oluyordu. Form da girilmemiş basamakları `v.base * 1.3` ile dolduruyordu. 17 Eylül §3.6 taraması bunu **kaçırmıştı** |
@@ -533,7 +535,7 @@ bu doğru bir temizlik — ama çağıran kodun yarısı onu **kalıcılık san�
 | ❌ **kısmen** | `saveAllSettings` | merdivenin floor/target/premium/peak + ısıtma maliyeti için **sütun yok**; kullanıcıya açıkça söyleniyor |
 
 Açık kalan altısının hepsi **aynı sebepten** açık: yazılacak tablo yok.
-Hepsi tek bir **phase30** göçü ile kapanır.
+Hepsi tek bir **phase31** göçü ile kapanır (tek numara: AGENTS.md phase sahipliği).
 
 `requireCloudForWrite` (§3.3) artık bağlananların hepsinde devrede; yazma
 düşerse kullanıcıya söylenir ve ekran `loadTenantAppData()` ile gerçeğe
