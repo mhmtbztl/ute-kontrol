@@ -7,7 +7,12 @@
 | Ortam | Durum |
 |---|---|
 | Test projesi `pdeiorpgxetksyogrmbi` | ✅ **uygulandı** (`npm run test:bootstrap`), canlı süit 27/27 yeşil |
-| Üretim `kirpcqklyjlrhvdbgdrq` | ❌ **henüz uygulanmadı** — kullanıcının ayrı ve açık onayı gerekir (§4.2) |
+| Üretim `kirpcqklyjlrhvdbgdrq` | ✅ **21 Eylül 2026'da uygulandı ve doğrulandı** (§4.2 yöntemiyle, önce/sonra ölçümü — bkz. §4) |
+
+> **Bu belge artık iki amaca hizmet ediyor:** (a) uygulamanın doğru yapıldığını
+> kanıtlayan doğrulama seti, (b) yeni bir ortam (staging, felaket kurtarma) için
+> uygulama talimatı. Üretim şemasına bu belgeden **hiçbir yazma yapılmadı**;
+> göç Supabase panelinden elle ve ayrı açık onayla uygulandı.
 
 ---
 
@@ -128,9 +133,33 @@ properties.target_price          -> 400 42703
 properties.heating_cost          -> 400 42703
 ```
 
-**Uygulandıktan sonra beklenen:** altısı da `401 42501`.
-`42501` gelmesi hem tablonun var olduğunu hem de **`anon` yetkisinin geri
-alındığını** birlikte gösterir — §7'nin iki katlı kuralının birinci katı.
+**Uygulandıktan sonra ölçüldü (21 Eylül 2026) — altısı da `401 42501`:**
+
+```
+marketing_campaigns              -> 401 42501  permission denied for table marketing_campaigns
+influencer_collabs               -> 401 42501  permission denied for table influencer_collabs
+tenant_settings                  -> 401 42501  permission denied for table tenant_settings
+property_operator_notes          -> 401 42501  permission denied for table property_operator_notes
+property_pricing_ladder          -> 401 42501  permission denied for table property_pricing_ladder
+housekeeping_status_overrides    -> 401 42501  permission denied for table housekeeping_status_overrides
+```
+
+Bu tek ölçüm §7'nin **iki katını birden** kanıtlar:
+
+- **Tablo adının bilinmesi** → altı tablo da üretimde var (`PGRST205` yerine
+  `42501`; PostgREST tanımadığı tabloya şema önbelleği hatası verir).
+- **`42501` dönmesi** → `anon` yetkisi gerçekten geri alınmış. Yetki
+  bırakılmış olsaydı çağrı RLS'e kadar girer ve `200 []` dönerdi — veri
+  sızmazdı ama koruma **tek katlıya** düşmüş olurdu. Phase 17'de tam olarak
+  bu yaşanmıştı.
+
+**Göçün iç değişmezleri** (RLS politikaları, `updated_at` tetikleyicileri,
+merdiven basamaklarının NULL kalabilmesi, `reset_tenant_data`'nın yeni
+defterleri görmesi ve ayarları görmemesi) ayrıca sorulmadı — gerek yok:
+bunların hepsini göçün kendi doğrulama bloğu ölçüyor ve biri tutmazsa
+`RAISE EXCEPTION` ile durup `PHASE31_...` kodunu basıyor. Koşunun
+`PHASE31 OK` NOTICE'ı ile bitmesi, on bir kontrolün de geçtiği anlamına
+gelir.
 
 `id` **değil** `tenant_id` sorulur: dört tablonun birincil anahtarı
 `(tenant_id, key)` ya da `property_id`'dir; `id` sütunları yoktur ve

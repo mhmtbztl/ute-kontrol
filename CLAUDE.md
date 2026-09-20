@@ -335,8 +335,8 @@ Bu satır aynı gün **iki kez** ölçüldü ve cevap değişti: önce
 anlaşılmaz, üretime sorulur" kuralının canlı örneği — aradaki fark saatlerle
 ölçülüyor ve belge tek başına asla güncel değildir.
 
-**phase31 (`migration_phase31_local_state_persistence.sql`) yazıldı, test
-projesine uygulandı, üretime HENÜZ UYGULANMADI.** `saveAppData()`'nın açık
+**phase31 (`migration_phase31_local_state_persistence.sql`) 21 Eylül 2026'da
+üretime uygulandı ve doğrulandı.** Test projesinde de kurulu. `saveAppData()`'nın açık
 kalan son altı kalemini kapatır: `marketing_campaigns`, `influencer_collabs`,
 `tenant_settings`, `property_operator_notes`, `property_pricing_ladder`,
 `housekeeping_status_overrides`. Ayrıca `reset_tenant_data`'yı yeniden
@@ -350,6 +350,27 @@ göç uygulanana kadar yalnızca merdiven kaydı çalışmaz; `saveAllSettings`
 bunu kullanıcıya açıkça söyler. Basamaklar **NULL olabilir**: girilmemiş bir
 basamak 0 değil, bilinmiyordur (§3.6); göç bunu `PHASE31_LADDER_STEP_NOT_NULLABLE`
 ile doğrular.
+
+Doğrulama §4.2'nin tablo sorgusuyla, önce ve sonra yapıldı:
+
+```
+UYGULANMADAN ÖNCE (anon anahtarı, altı tablo):
+  ...?select=tenant_id&limit=0  -> 404 PGRST205 Could not find the table
+  properties.floor_price        -> 400 42703    column does not exist
+
+UYGULANDIKTAN SONRA:
+  ...?select=tenant_id&limit=0  -> 401 42501    permission denied for table
+```
+
+Tek ölçüm §7'nin **iki katını birden** kanıtlar: tablo adının bilinmesi
+tabloların var olduğunu, `42501` dönmesi `anon` yetkisinin geri alındığını
+gösterir. Yetki bırakılsaydı çağrı RLS'e kadar girip `200 []` dönerdi —
+veri sızmazdı ama koruma tek katlıya düşerdi (Phase 17'de yaşanan).
+
+Göçün iç değişmezleri (RLS, tetikleyiciler, merdivenin NULL kalabilmesi,
+sıfırlama listesi) ayrıca sorulmadı: hepsini göçün kendi doğrulama bloğu
+ölçüyor ve koşunun `PHASE31 OK` ile bitmesi on bir kontrolün de geçtiği
+anlamına geliyor.
 
 Uygulama ve doğrulama adımları: `docs/PHASE31_DEPLOY_PACKAGE.md`.
 Ağı `core/phase31_persistence_tests.js` (64 iddia, çevrimdışı) ve
@@ -528,10 +549,10 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 | `get_executive_dashboard_snapshot` | **phase32 ile arayüze bağlandı** (20 Eylül 2026) — aylık ciro, gider, net kâr, doluluk, ADR ve RevPAR artık sunucu snapshot'ından geliyor; önceki ay da RPC ile alınıyor. Test projesine uygulandı; `executive_snapshot_tests` 23/23 ve `executive_snapshot_ui_tests` 7/7. Göç 21 Eylül 2026'da **üretime uygulandı ve doğrulandı** |
 | Excel içe/dışa aktarma | "Şirket Genel Raporu" içe aktarımı devre dışı bırakıldı, gerçek uygulama yok |
 | Bildirim merkezi analizi | **tamamlandı** (17 Eylül 2026) — merkez her iki uçtan da bağlı değildi; yükleme bağlandı, "okundu" artık Postgres'e yazıyor. RPC yetki sırası phase29 ile düzeltildi; göç 20 Eylül 2026'da **üretime uygulandı ve doğrulandı** |
-| `saveAppData()` hiçbir şey kaydetmiyor | gövdesi yalnızca eski localStorage anahtarlarını siliyor. 17 çağıranda hiçbir Postgres yazması yoktu; **8'i 20 Eylül 2026'da bağlandı**, 1'i meşru yerel durum, 2'si kaldırıldı, **6'sı 20 Eylül 2026'da phase31 ile kapandı**; liste artık boş. Göç üretime henüz uygulanmadı. Ayrıntı aşağıda |
+| `saveAppData()` hiçbir şey kaydetmiyor | gövdesi yalnızca eski localStorage anahtarlarını siliyor. 17 çağıranda hiçbir Postgres yazması yoktu; **8'i 20 Eylül 2026'da bağlandı**, 1'i meşru yerel durum, 2'si kaldırıldı, **6'sı 20 Eylül 2026'da phase31 ile kapandı**; liste artık boş. Göç **21 Eylül 2026’da üretime uygulandı ve doğrulandı**. Ayrıntı aşağıda |
 | Temizlik & gider defteri kalıcılığı | **tamamlandı** (20 Eylül 2026) — beş fonksiyon hiçbir şey yazmıyordu. Ayrıca `cloudUpsertCleaningTask` yeniden yüklemeden sonra **mükerrer görev satırı** açıyordu (UUID'yi `legacy_id` olarak gönderiyordu) ve `cleaningPayments` hiç yüklenmiyordu. Ağı `cleaning_ledger_persistence_tests` (27 iddia) |
 | WhatsApp → talep / rezervasyon | **tamamlandı** (20 Eylül 2026) — modal "✅ rezervasyon kesinleştirildi" deyip hiçbir şey yazmıyordu. `createBooking()` / `createLead()` yoluna bağlandı. Ağı `persistence_wiring_tests` |
-| Pazarlama kampanya defteri kalıcı değil | **tamamlandı** (20 Eylül 2026, phase31) — `marketing_campaigns` ve `influencer_collabs` tabloları açıldı; kayıt, düzenleme ve silme Postgres’e bağlandı. **Göç üretime henüz uygulanmadı** — `docs/PHASE31_DEPLOY_PACKAGE.md` |
+| Pazarlama kampanya defteri kalıcı değil | **tamamlandı** (20 Eylül 2026, phase31) — `marketing_campaigns` ve `influencer_collabs` tabloları açıldı; kayıt, düzenleme ve silme Postgres’e bağlandı. Göç **21 Eylül 2026’da üretime uygulandı ve doğrulandı** — `docs/PHASE31_DEPLOY_PACKAGE.md` |
 | `month: ‘2026-09’` sabiti | **tamamlandı** (20 Eylül 2026) — altı nokta kaldırıldı. Tek kaynak `getCurrentMonthKey()`, o da `getTodayStr()`'den türer. Başlangıç dönemi de tarayıcının yerel saatini kullanıyordu; kayıtlar Europe/Istanbul gününe yazılıyor, ay sınırında kullanıcı az önce girdiği kaydı filtrede göremiyordu. Ağı `persistence_wiring_tests` (kaynak taraması) |
 | Ölü `appData.excelDb` dalları | **tamamlandı** (20 Eylül 2026) — alan yalnızca `null` atanıyordu, hiçbir yerde doldurulmuyordu. Ona bağlı **üç panel hiç çalışmıyordu**: yönetici panelinin 116 satırlık dalı, YoY karşılaştırması (her zaman "Veriler sıfırlandı" diyordu) ve gidişat radarı (ölü dalında ilk müşterinin rakamları duruyordu: skor "88", "Haziran (268k) ➔ Temmuz (467k)"). Üçü de artık gerçek kayıttan hesaplıyor; ortak taban `computeMonthActuals()` |
 | Fiyat merdiveni uydurma varsayılanları | **tamamlandı** (20 Eylül 2026) — `saveAllSettings()` boş bırakılan her alana `|| 3000`, `|| 4000`, `|| 12000`, `|| 800`, `|| 350` yazıyordu ve o rakam mülkün gerçek fiyatı oluyordu. Form da girilmemiş basamakları `v.base * 1.3` ile dolduruyordu. 17 Eylül §3.6 taraması bunu **kaçırmıştı** |
@@ -583,12 +604,16 @@ phase sahipliği). Hepsi aynı sebepten açıktı — yazılacak tablo yok — v
 bir göçle kapandı. Liste artık **boş**: `saveAppData()` çağıranlarının tamamı
 ya gerçek bir Postgres yazmasından geçiyor ya da meşru yerel durum.
 
-**Göç üretime henüz uygulanmadı.** O ana kadar kod canlıda duruyor ve bu altı
-akış `PGRST205` ile düşüyor. İstemci bunu yutmuyor: kullanıcıya "veritabanı
-göçü henüz uygulanmamış" diyor ve ekranı `loadTenantAppData()` ile gerçeğe
-geri çekiyor. Okuma tarafı `fetchTenantRowsTolerant()` ile `null` dönüp ekranı
-ayakta tutuyor — dağıtım sırası tuzağının (AGENTS.md) tasarlanmış karşılığı
-budur.
+**Göç 21 Eylül 2026’da üretime uygulandı ve doğrulandı** (§4.2 tablo
+sorgusu: altı tablo da `401 42501`, öncesinde `404 PGRST205`).
+
+Göçten ÖNCEKİ pencerede kod zaten canlıdaydı — GitHub Pages push ile anında
+yayına alır, göçler elle uygulanır — ve altı akış `PGRST205` ile düşüyordu.
+İstemci bunu yutmadı: kullanıcıya "veritabanı göçü henüz uygulanmamış" dedi
+ve ekranı `loadTenantAppData()` ile gerçeğe geri çekti. Okuma tarafı
+`fetchTenantRowsTolerant()` ile `null` dönüp ekranı ayakta tuttu. Dağıtım
+sırası tuzağının (AGENTS.md) tasarlanmış karşılığı budur ve yeni bir tabloya
+bağlanan her kod aynısını yapmalıdır.
 
 `requireCloudForWrite` (§3.3) artık bağlananların hepsinde devrede; yazma
 düşerse kullanıcıya söylenir ve ekran `loadTenantAppData()` ile gerçeğe
