@@ -182,6 +182,10 @@ const allTestFiles = [
   // Ice aktarma motoru (ayristirma, dogrulama, mukerrer, cakisma)
   'import_engine_tests.js',
 
+  // CSV / metin dosyasi yolu (phase33): kod sayfasi, ayirici, tirnakli satir
+  // sonu ve surukle-birak. Metin yolu yokken "72.500,50" -> 72.5005 oluyordu.
+  'csv_import_tests.js',
+
   // Canli test kapisi: suitler hangi projeye yaziyor (kara liste + siniflandirma)
   'test_gate_tests.js',
 

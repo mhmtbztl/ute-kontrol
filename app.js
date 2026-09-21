@@ -219,7 +219,6 @@ let currentFilter = (() => {
 })();
 
 let activeTrendRange = '6M';
-let pendingImportRows = null;
 let propertyViewMode = 'table'; // 'table' or 'cards'
 
 // Initialize and Load Data
@@ -5198,12 +5197,16 @@ async function saveMonthlyGoals(e) {
 // -------------------------------------------------------------
 function openImportModal() {
   document.getElementById('importModal').classList.add('active');
+  initImportDropzone();
 }
 
 function closeImportModal() {
   document.getElementById('importModal').classList.remove('active');
-  pendingImportRows = null;
-  document.getElementById('importPreviewBox').style.display = 'none';
+  // Modal kapaninca ayristirilmis dosya da birakilir. Eskiden yalnizca kutu
+  // gizleniyordu: `pendingImportData` ayakta kaliyor, kullanici modali
+  // yeniden acip tur seciciyi oynattiginda KAPATTIGI dosyanin onizlemesi
+  // geri geliyordu.
+  resetImportPreview();
 }
 
 // =============================================================
@@ -5301,8 +5304,53 @@ function downloadSampleTemplate(templateType) {
   }
 }
 
-function handleFileImport(e) {
-  const file = e.target.files[0];
+/**
+ * Secilen dosyayi turune gore okur (phase33).
+ *
+ * Eskiden HER dosya SheetJS'in bayt yoluna gidiyordu — `.csv` de dahil.
+ * Dosya secici `.csv/.tsv/.txt` kabul ettigi halde metin yolu yoktu ve bu
+ * sessizce PARA BOZUYORDU: `"72.500,50"` hucresi `raw: true` ile 72.5005
+ * sayisina donusuyor, 72.500,50 TL'lik rezervasyon 72,50 TL olarak
+ * yaziliyordu. Ustelik BOM'suz UTF-8 ve windows-1254 dosyalarda basliklar
+ * mojibake oluyordu ("Misafir Adı" -> "Misafir AdÄ±").
+ *
+ * Artik tur BAYT IMZASINDAN belirlenir (uzantidan degil: OTA disa
+ * aktarimlari uzantiyi duzenli olarak yanlis verir) ve metin dosyalari
+ * kod sayfasi cozulup `FinanceImportEngine.parseCSV` ile ayristirilir.
+ * Hucreler STRING kalir; sayi/tarih yorumunu `normalizeAmount` ve
+ * `normalizeDate` yapar.
+ */
+function buildImportSource(bytes, fileName) {
+  const E = getImportEngine();
+  if (!E) throw new Error('İçe aktarma motoru yüklenemedi. Sayfayı yenileyin.');
+
+  if (E.detectImportSourceKind(bytes) === 'TEXT') {
+    const cozulmus = E.parseCSV(E.decodeImportText(bytes));
+    return {
+      kind: 'CSV',
+      fileName,
+      sheetNames: ['CSV'],
+      headers: cozulmus.headers || [],
+      rows: cozulmus.rows || []
+    };
+  }
+
+  if (typeof XLSX === 'undefined') {
+    throw new Error('Excel motoru henüz yüklenmedi, lütfen sayfayı yenileyin.');
+  }
+  const wb = XLSX.read(bytes, { type: 'array', cellDates: true });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = ws ? XLSX.utils.sheet_to_json(ws, { defval: '', raw: true }) : [];
+  return {
+    kind: 'XLSX',
+    fileName,
+    sheetNames: (wb.SheetNames || []).slice(),
+    headers: rows.length ? Object.keys(rows[0]) : [],
+    rows
+  };
+}
+
+function readImportFile(file) {
   if (!file) return;
 
   const fileName = file.name;
@@ -5310,16 +5358,8 @@ function handleFileImport(e) {
 
   reader.onload = function(evt) {
     try {
-      let wb;
-      if (typeof XLSX !== 'undefined') {
-        const data = new Uint8Array(evt.target.result);
-        wb = XLSX.read(data, { type: 'array', cellDates: true });
-      } else {
-        alert('XLSX motoru bulunamadı, lütfen sayfayı yenileyin.');
-        return;
-      }
-
-      analyzeAndPreviewWorkbook(wb, fileName);
+      const kaynak = buildImportSource(new Uint8Array(evt.target.result), fileName);
+      analyzeAndPreviewSource(kaynak);
     } catch (err) {
       console.error('File parsing error:', err);
       alert('Dosya okunurken bir hata oluştu: ' + (err.message || 'Bilinmeyen format'));
@@ -5329,27 +5369,67 @@ function handleFileImport(e) {
   reader.readAsArrayBuffer(file);
 }
 
-function analyzeAndPreviewWorkbook(wb, fileName) {
-  const sheetNames = wb.SheetNames.map(s => s.trim().toUpperCase());
+function handleFileImport(e) {
+  readImportFile(e.target.files && e.target.files[0]);
+}
+
+/**
+ * Surukle-birak (phase33).
+ *
+ * Kutu bastan beri "Raporunuzu Buraya Sürükleyin" diyor ve kesik cizgili bir
+ * birakma alani gibi duruyordu, ama HICBIR surukleme olayi bagli degildi.
+ * Dosya birakildiginda tarayicinin varsayilani devreye giriyor ve sekme o
+ * dosyaya gidiyordu: kullanici uygulamadan cikiyor, yarim kalan formu
+ * kaybediyordu. Vaat edilen davranis buraya baglandi; kutunun DISINA
+ * birakilan dosya da artik sekmeyi goturmuyor.
+ */
+function initImportDropzone() {
+  const zone = document.getElementById('excelDropzone');
+  if (!zone || zone.dataset.dropReady === '1') return;
+  zone.dataset.dropReady = '1';
+
+  const dur = (ev) => { ev.preventDefault(); ev.stopPropagation(); };
+  ['dragenter', 'dragover'].forEach(t => zone.addEventListener(t, (ev) => {
+    dur(ev);
+    zone.classList.add('dropzone-active');
+  }));
+  ['dragleave', 'dragend'].forEach(t => zone.addEventListener(t, (ev) => {
+    dur(ev);
+    zone.classList.remove('dropzone-active');
+  }));
+  zone.addEventListener('drop', (ev) => {
+    dur(ev);
+    zone.classList.remove('dropzone-active');
+    const dt = ev.dataTransfer;
+    const dosya = dt && dt.files && dt.files[0];
+    if (dosya) readImportFile(dosya);
+  });
+
+  ['dragover', 'drop'].forEach(t => window.addEventListener(t, (ev) => {
+    if (!zone.contains(ev.target)) ev.preventDefault();
+  }));
+}
+
+function analyzeAndPreviewSource(kaynak) {
+  const sheetNames = (kaynak.sheetNames || []).map(s => String(s).trim().toUpperCase());
   let detectedType = 'GENERIC';
 
   if (sheetNames.includes('GENEL') || (sheetNames.includes('GDR') && sheetNames.includes('RPR')) || sheetNames.includes('HDF')) {
     detectedType = 'COMPANY_REPORT';
   } else {
-    // Check first sheet headers
-    const firstWs = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(firstWs, { header: 1 });
-    if (rows && rows.length > 0) {
-      for (let r = 0; r < Math.min(5, rows.length); r++) {
-        const rowStr = (rows[r] || []).join(' ').toLowerCase();
-        if (rowStr.includes('misafir') || rowStr.includes('guest') || rowStr.includes('check-in') || rowStr.includes('checkin') || rowStr.includes('giriş')) {
-          detectedType = 'BOOKINGS';
-          break;
-        }
-        if (rowStr.includes('gider') || rowStr.includes('harcama') || rowStr.includes('expense') || rowStr.includes('kategori') || rowStr.includes('açıklama')) {
-          detectedType = 'EXPENSES';
-          break;
-        }
+    // Basliklardan tur sez. Tek sayfali CSV'de sayfa adi bilgi tasimaz;
+    // karar yalnizca sutun adlarindan cikar.
+    const bakilacak = [(kaynak.headers || []).join(' ')]
+      .concat((kaynak.rows || []).slice(0, 4).map(r => Object.values(r).join(' ')));
+    for (const ham of bakilacak) {
+      const rowStr = String(ham).toLowerCase();
+      if (rowStr.includes('misafir') || rowStr.includes('guest') || rowStr.includes('check-in') || rowStr.includes('checkin') || rowStr.includes('giriş')) {
+        detectedType = 'BOOKINGS';
+        break;
+      }
+      if (rowStr.includes('gider') || rowStr.includes('harcama') || rowStr.includes('expense') || rowStr.includes('kategori') || rowStr.includes('açıklama')) {
+        detectedType = 'EXPENSES';
+        break;
       }
     }
   }
@@ -5358,12 +5438,12 @@ function analyzeAndPreviewWorkbook(wb, fileName) {
   const select = document.getElementById('importModeSelect');
   if (select) select.value = detectedType;
 
-  parseWorkbookWithMode(wb, fileName, detectedType);
+  parseSourceWithMode(kaynak, detectedType);
 }
 
 function changeImportMode(newMode) {
-  if (!pendingImportData || !pendingImportData.workbook) return;
-  parseWorkbookWithMode(pendingImportData.workbook, pendingImportData.fileName, newMode);
+  if (!pendingImportData || !pendingImportData.source) return;
+  parseSourceWithMode(pendingImportData.source, newMode);
 }
 
 // -----------------------------------------------------------------------------
@@ -5400,6 +5480,11 @@ function enSonVeriAyi(satirlar, rezMi) {
 function getImportEngine() {
   if (typeof FinanceImportEngine !== 'undefined') return FinanceImportEngine;
   if (typeof window !== 'undefined' && window.FinanceImportEngine) return window.FinanceImportEngine;
+  // Node yolu: motor olmadan `buildImportSource` hic kosturulamaz ve ice
+  // aktarma denetimi yalnizca kaynak taramasi olarak kalirdi (CLAUDE.md 5.5).
+  if (typeof require === 'function') {
+    try { return require('./core/finance_import_engine.js'); } catch (e) { /* tarayici */ }
+  }
   return null;
 }
 
@@ -5409,23 +5494,27 @@ function getImportProperties() {
     .map(([anahtar, v]) => ({ id: v.id, slug: anahtar, key: anahtar, name: v.name || anahtar }));
 }
 
-function parseWorkbookWithMode(wb, fileName, mode) {
+function parseSourceWithMode(kaynak, mode) {
   const E = getImportEngine();
   if (!E) { alert('İçe aktarma motoru yüklenemedi. Sayfayı yenileyin.'); return; }
 
   let finalMode = mode;
   if (finalMode === 'AUTO') {
-    const adlar = wb.SheetNames.map(s => s.trim().toUpperCase());
+    const adlar = (kaynak.sheetNames || []).map(s => String(s).trim().toUpperCase());
     finalMode = adlar.includes('GENEL') ? 'COMPANY_REPORT' : 'BOOKINGS';
   }
 
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  const rawRows = (finalMode === 'COMPANY_REPORT') ? [] : XLSX.utils.sheet_to_json(ws, { defval: '', raw: true });
-  const headers = rawRows.length ? Object.keys(rawRows[0]) : [];
+  const rawRows = (finalMode === 'COMPANY_REPORT') ? [] : (kaynak.rows || []);
+  // Basliklar kaynaktan gelir: basliksiz bir CSV'de `Object.keys(rawRows[0])`
+  // hic satir olmadiginda bos doner ve kullaniciya "hangi sutunlar bulundu"
+  // denemez; kaynak listesi tek satirlik dosyada da doludur.
+  const headers = (kaynak.headers && kaynak.headers.length)
+    ? kaynak.headers
+    : (rawRows.length ? Object.keys(rawRows[0]) : []);
 
   const parsedData = {
-    workbook: wb,
-    fileName: fileName,
+    source: kaynak,
+    fileName: kaynak.fileName,
     mode: finalMode,
     headers,
     columnMap: null,
@@ -5521,10 +5610,24 @@ function renderImportPreviewBox() {
     tbody.innerHTML = '';
 
     if (eksikSutun.length) {
+      // Metin dosyasinda TEK sutun bulunduysa sebep neredeyse her zaman
+      // sutunlarin adi degil, AYIRICININ bulunamamis olmasidir. "Zorunlu
+      // sutun eksik" demek kullaniciyi basliklarini duzeltmeye gonderir;
+      // oysa duzeltilecek sey dosyanin kaydedilme bicimidir.
+      const tekSutun = pendingImportData.source
+        && pendingImportData.source.kind === 'CSV'
+        && (pendingImportData.headers || []).length <= 1;
+      const ipucu = tekSutun
+        ? `<br><br><strong style="color:#FBBF24;">Bu bir CSV/metin dosyası ve tek sütun olarak okundu.</strong>
+           Sütun ayırıcısı bulunamadı — dosya büyük ihtimalle desteklenmeyen bir
+           ayırıcıyla kaydedilmiş. Kabul edilen ayırıcılar: noktalı virgül (;),
+           virgül (,), sekme ve dikey çizgi (|). Excel'de
+           <em>Farklı Kaydet → CSV UTF-8</em> ile yeniden kaydetmek genellikle yeterli.`
+        : '';
       tbody.innerHTML = `<tr><td colspan="${basliklar.length}" style="padding:14px; color:#FCA5A5; font-size:12px; line-height:1.6;">
         <strong>Dosya içe aktarılamaz:</strong> zorunlu sütun bulunamadı — ${escapeHtml(eksikSutun.join(', '))}.<br>
         Dosyanızın ilk satırı başlık satırı olmalı ve bu sütunları içermeli.
-        En kolayı yukarıdan örnek şablonu indirip kendi verinizi oraya yapıştırmak.<br><br>
+        En kolayı yukarıdan örnek şablonu indirip kendi verinizi oraya yapıştırmak.${ipucu}<br><br>
         <span style="color:#94A3B8;">Bulunan sütunlar: ${escapeHtml((pendingImportData.headers || []).join(', ') || '—')}</span>
       </td></tr>`;
       if (btn) { btn.disabled = true; btn.innerText = 'Zorunlu sütun eksik'; }
@@ -16278,6 +16381,8 @@ if (typeof module !== 'undefined' && module.exports) {
     getSupabaseClient,
     getActiveTenantId,
     setActiveTenant,
+    getImportEngine,
+    buildImportSource,
     loadMonthlyTargets,
     saveMonthlyTarget,
     loadMonthlyCloses,

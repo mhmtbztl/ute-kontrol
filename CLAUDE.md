@@ -547,7 +547,9 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 | Canlı süitlerin CI’da otomatik koşması | **tamamlandı** (16 Eylül 2026) — `.github/workflows/live-tests.yml` açık, her gece 03:00 UTC. İlk yeşil koşu 17 Eylül: 120/120 süit, 1123 iddia, sızıntı temiz |
 | Fotoğraf AI worker'ı | `GEMINI_API_KEY` yok; Actions adımı güvenle atlanıyor — **harici bağımlılık** |
 | `get_executive_dashboard_snapshot` | **phase32 ile arayüze bağlandı** (20 Eylül 2026) — aylık ciro, gider, net kâr, doluluk, ADR ve RevPAR artık sunucu snapshot'ından geliyor; önceki ay da RPC ile alınıyor. Test projesine uygulandı; `executive_snapshot_tests` 23/23 ve `executive_snapshot_ui_tests` 7/7. Göç 21 Eylül 2026'da **üretime uygulandı ve doğrulandı** |
-| Excel içe/dışa aktarma | "Şirket Genel Raporu" içe aktarımı devre dışı bırakıldı, gerçek uygulama yok |
+| Excel / CSV **içe** aktarma | **tamamlandı** (21 Eylül 2026, phase33 — göç gerektirmedi) — CSV/TSV yolu hiç yoktu ve sessizce **para bozuyordu**; ayrıntı aşağıda. Ağı `core/csv_import_tests.js` (52 iddia) |
+| Excel **dışa** aktarma | yok — yalnızca örnek şablon indirilebiliyor, kayıt dışa aktarımı hiç yazılmadı |
+| "Şirket Genel Raporu" içe aktarımı | **bilerek reddediliyor** — aylık toplamdan rezervasyon üretmek uydurma veri olurdu (§3.6). Ekran bunu açıkça söylüyor ve kullanıcıyı defter şablonlarına yönlendiriyor |
 | Bildirim merkezi analizi | **tamamlandı** (17 Eylül 2026) — merkez her iki uçtan da bağlı değildi; yükleme bağlandı, "okundu" artık Postgres'e yazıyor. RPC yetki sırası phase29 ile düzeltildi; göç 20 Eylül 2026'da **üretime uygulandı ve doğrulandı** |
 | `saveAppData()` hiçbir şey kaydetmiyor | gövdesi yalnızca eski localStorage anahtarlarını siliyor. 17 çağıranda hiçbir Postgres yazması yoktu; **8'i 20 Eylül 2026'da bağlandı**, 1'i meşru yerel durum, 2'si kaldırıldı, **6'sı 20 Eylül 2026'da phase31 ile kapandı**; liste artık boş. Göç **21 Eylül 2026’da üretime uygulandı ve doğrulandı**. Ayrıntı aşağıda |
 | Temizlik & gider defteri kalıcılığı | **tamamlandı** (20 Eylül 2026) — beş fonksiyon hiçbir şey yazmıyordu. Ayrıca `cloudUpsertCleaningTask` yeniden yüklemeden sonra **mükerrer görev satırı** açıyordu (UUID'yi `legacy_id` olarak gönderiyordu) ve `cleaningPayments` hiç yüklenmiyordu. Ağı `cleaning_ledger_persistence_tests` (34 iddia) |
@@ -626,6 +628,52 @@ Bildirim merkezi bu sınıfın ilk düzeltilen üyesidir; ağı
 `core/persistence_wiring_tests.js` — ikincisi ayrıca sabit `YYYY-MM` ay
 literallerini tarar ve **KALICI listesi yalnızca büyür**: bağlanan bir
 fonksiyon bir daha "yalnızca saveAppData()" hâline dönemez.
+
+### Excel / CSV içe aktarma — metin yolu (phase33)
+
+**phase33'ün SQL dosyası yoktur, aramayın.** İş tamamen istemci tarafındaydı;
+numara AGENTS.md sırasına göre (Claude tek) bu iş birimine verildi. Bir sonraki
+göç Claude'un ilk boş tek numarasını alır.
+
+Dosya seçici `.csv, .tsv, .txt` kabul ediyordu, kutu "CSV Raporunuzu Buraya
+Sürükleyin" diyordu — ama `app.js`'te **ne CSV yolu ne de sürükleme olayı
+vardı.** Her dosya SheetJS'in bayt yoluna (`XLSX.read(bytes)`) gidiyordu.
+21 Eylül 2026'da aynı örnek satırla ölçülen sonuçlar:
+
+```
+"72.500,50"        ->  72.5005      (raw:true sayıyı ABD biçimi sanıyor)
+UTF-8, BOM yok     ->  "Misafir AdÄ±",  "AyÅe Åahin"
+windows-1254       ->  "Misafir Ad1",  "Ay_e ^ahin"   (Türk Excel varsayılanı)
+sekme ayırıcı      ->  tüm satır TEK sütun
+tırnak içinde \n   ->  2 kayıt 3 kayda bölünüyor, tutar kayıyor
+dosya bırakma      ->  tarayıcı uygulamadan çıkıp dosyaya gidiyor
+```
+
+**İlki bu sınıfın en tehlikelisidir çünkü sessizdir.** 72.500,50 TL'lik bir
+rezervasyon 72,50 TL olarak yazılır; ekranda makul bir sayı durur, hiçbir yerde
+hata görünmez ve ciro bininci katına düşer. Diğerleri gürültülüdür (sütun
+eşleşmez) ama misafir adı eşleşirse bozuk metin Postgres'e gider.
+
+Çözüm sayıyı *düzeltmek* değil, **sayıyı hiç bozmamaktır**: metin dosyası metin
+olarak okunur ve hücreler **string kalır**; yorumu `normalizeAmount` /
+`normalizeDate` yapar — onlar `"1.234,56"` ile `"1,234.56"` ayrımını zaten doğru
+biliyor. Ayrıştırıcı asla `Number` üretmez.
+
+- **Tür bayt imzasından belirlenir, uzantıdan değil** (`PK` → xlsx, OLE2 → xls,
+  kalanı metin). OTA dışa aktarımları uzantıyı düzenli olarak yanlış verir.
+- **Kod sayfası sırayla denenir:** BOM'lar → `TextDecoder('utf-8', {fatal:true})`
+  sınavı → windows-1254. `fatal` şart: sessiz değiştirmeyle (U+FFFD) çözseydik
+  mojibake'yi "başarılı" sayardık.
+- Ayırıcı `;` `,` sekme `|`; sayım **tırnak dışında** yapılır.
+- Satır sonu yalnızca **tırnak dışında** kayıt bitirir.
+
+Şirket genel raporu hâlâ **bilerek** içe aktarılmıyor (§3.6) — ama başlıktaki
+"Şirket Raporlarını Otomatik Çözer" vaadi kaldırıldı; yapmadığımız şeyi
+söylemek de uydurma veriyle aynı sınıftır.
+
+Ağı `core/csv_import_tests.js` (52 iddia: motor, `app.js` kaynağı, gerçek
+`buildImportSource` koşusu ve arayüz vaatleri). Eski gövdeye karşı ölçüldü:
+**29 iddia kırılıyor.**
 
 ---
 

@@ -1699,6 +1699,17 @@ body {
   background: rgba(16, 185, 129, 0.05);
 }
 
+/* Dosya kutunun uzerine suruklendiginde: birakmanin bir sey yapacagini
+   gostermezsek kullanici tarayicinin varsayilanina guvenip kutunun disina
+   birakiyor. (phase33)
+   `!important` gerekli: #excelDropzone kendi border/background degerlerini
+   SATIR ICI style ile veriyor ve satir ici bildirim sinif secicisini yener. */
+.upload-dropzone.dropzone-active {
+  border-color: var(--accent-emerald) !important;
+  border-style: solid !important;
+  background: rgba(16, 185, 129, 0.12) !important;
+}
+
 .dropzone-icon {
   font-size: 36px;
   margin-bottom: 8px;

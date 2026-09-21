@@ -466,35 +466,160 @@ function validateBookingRows(rawRows = [], columnMap = {}, context = {}) {
 const validateImportRows = validateExpenseRows;
 
 // -----------------------------------------------------------------------------
-// CSV
+// CSV / TSV — METIN DOSYASI YOLU  (phase33)
 // -----------------------------------------------------------------------------
-function parseCSV(text) {
-  const lines = String(text || '').split(/\r?\n/).filter(l => l.trim().length > 0);
-  if (lines.length === 0) return { headers: [], rows: [] };
+//
+// BU YOL NEDEN VAR (2026-09-21 olcumu):
+//
+// Dosya secici `.csv, .tsv, .txt` kabul ediyordu ama app.js'te CSV yolu YOKTU:
+// her dosya SheetJS'in BAYT yoluna (`XLSX.read(bytes)`) gidiyordu. Olculen
+// sonuclar, ayni ornek satirla:
+//
+//   "72.500,50"  ->  72.5005      raw:true sayiyi ABD bicimi sanip parcaliyor
+//   UTF-8 (BOM yok)  ->  "Misafir AdÄ±", "AyÅe Åahin"
+//   windows-1254     ->  "Misafir Ad1", "Ay_e ^ahin"   (Turk Excel varsayilani)
+//
+// Ilki en tehlikelisi: 72.500,50 TL'lik bir rezervasyon 72,50 TL olarak
+// SESSIZCE yaziliyor. Ekranda makul bir sayi duruyor, ciro bininci katina
+// dusuyor ve hicbir yerde hata gorunmuyor. Digerleri gurultulu (sutun
+// eslesmiyor) ama misafir adi eslesirse bozuk metin Postgres'e gidiyor.
+//
+// Cozum sayiyi "duzeltmek" degil, sayiyi hic bozmamaktir: metin dosyasi metin
+// olarak okunur, hucreler STRING kalir ve yorumu `normalizeAmount` /
+// `normalizeDate` yapar — onlar "1.234,56" ile "1,234.56" ayrimini zaten
+// dogru biliyor. Bu yuzden bu ayristirici asla Number uretmez.
+//
+// Ayristiricinin kendisinde de iki eksik vardi ve ikisi de olculdu:
+//   * Sekme ayirici taninmiyordu -> tum satir TEK sutun olup "zorunlu sutun
+//     eksik" diyordu. Excel'in "Unicode Metin (.txt)" disa aktarimi tam olarak
+//     budur (UTF-16LE + sekme).
+//   * Satir bolme `split(/\r?\n/)` ile yapiliyordu, yani TIRNAK ICINDEKI satir
+//     sonu dosyayi kaydiriyordu: iki satirlik bir gider aciklamasi 2 kaydi 3
+//     kayda cevirip tutari bir sonraki satira ittiriyordu.
 
-  const ilk = lines[0];
-  const ayirici = (ilk.split(';').length > ilk.split(',').length) ? ';' : ',';
+/** Kabul edilen ayiricilar. Esitlik halinde bu sira karar verir. */
+const CSV_AYIRICILAR = [';', ',', '\t', '|'];
 
-  function satirAyir(line) {
-    const out = [];
-    let cur = '', tirnak = false;
-    for (let i = 0; i < line.length; i++) {
-      const c = line[i];
-      if (c === '"') {
-        if (tirnak && line[i + 1] === '"') { cur += '"'; i++; }
-        else tirnak = !tirnak;
-      } else if (c === ayirici && !tirnak) { out.push(cur.trim()); cur = ''; }
-      else cur += c;
-    }
-    out.push(cur.trim());
-    return out;
+/**
+ * Baytlardan kaynagin turunu belirler: 'XLSX' | 'XLS' | 'TEXT'.
+ *
+ * UZANTIYA DEGIL IMZAYA bakar. OTA disa aktarimlari uzantiyi duzenli olarak
+ * yanlis verir (Booking.com "xls" dosyasi HTML'dir, Airbnb "csv" dosyasini
+ * musteri Excel'de acip .xlsx diye kaydeder). Imza sormak ikisini de dogru
+ * yonlendirir.
+ */
+function detectImportSourceKind(bytes) {
+  const b = bytes || [];
+  if (b[0] === 0x50 && b[1] === 0x4B) return 'XLSX';                    // PK.. (zip)
+  if (b[0] === 0xD0 && b[1] === 0xCF && b[2] === 0x11 && b[3] === 0xE0) return 'XLS'; // OLE2
+  return 'TEXT';
+}
+
+/**
+ * Metin dosyasini dogru kod sayfasiyla cozer.
+ *
+ * Sira onemli: once BOM'lar (kesin bilgi), sonra "gecerli UTF-8 mu" sinavi,
+ * en son windows-1254. Sinav `fatal: true` ile yapilir — UTF-8 olmayan bir
+ * bayt dizisi cozulmek yerine hata firlatir, biz de 1254'e duseriz. Sessiz
+ * degistirme (U+FFFD) ile cozseydik mojibake'yi "basarili" sayardik.
+ *
+ * windows-1254 son caredir cunku Turkce Windows'ta Excel'in "CSV (virgulle
+ * ayrilmis)" disa aktarimi varsayilan olarak onu yazar ve musterinin en sik
+ * urettigi dosya odur.
+ */
+function decodeImportText(bytes) {
+  const b = (bytes && bytes.length !== undefined) ? bytes : new Uint8Array(0);
+  const coz = (etiket, dilim) => new TextDecoder(etiket).decode(dilim);
+  const kes = (n) => (b.subarray ? b.subarray(n) : b.slice(n));
+
+  if (b[0] === 0xEF && b[1] === 0xBB && b[2] === 0xBF) return coz('utf-8', kes(3));
+  if (b[0] === 0xFF && b[1] === 0xFE) return coz('utf-16le', kes(2));
+  if (b[0] === 0xFE && b[1] === 0xFF) return coz('utf-16be', kes(2));
+
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(b);
+  } catch (_) {
+    return coz('windows-1254', b);
   }
+}
 
-  const headers = satirAyir(lines[0]);
+/**
+ * Basliktaki ayiriciyi bulur. Sayim TIRNAK DISINDA yapilir: tirnak icindeki
+ * "Villa Bella Vista, Kalkan" gibi bir baslik virgul oyunu kazanmasin.
+ */
+function detectDelimiter(headerLine) {
+  const satir = String(headerLine || '');
+  let enIyi = ',', enCok = -1;
+  CSV_AYIRICILAR.forEach(ay => {
+    let n = 0, tirnak = false;
+    for (let i = 0; i < satir.length; i++) {
+      const c = satir[i];
+      if (c === '"') tirnak = !tirnak;
+      else if (c === ay && !tirnak) n++;
+    }
+    if (n > enCok) { enCok = n; enIyi = ay; }
+  });
+  return enCok > 0 ? enIyi : ',';
+}
+
+/**
+ * CSV/TSV metnini ayristirir. Donen her hucre STRING'tir — sayiya cevirmek
+ * cagiranin degil, `normalizeAmount`/`normalizeDate`'in isidir (yukaridaki
+ * gerekce).
+ *
+ * Metnin tamami tek geciste taranir; satir sonu yalnizca TIRNAK DISINDA
+ * kayit bitirir.
+ */
+function parseCSV(text) {
+  let metin = String(text === null || text === undefined ? '' : text);
+  if (metin.charCodeAt(0) === 0xFEFF) metin = metin.slice(1);   // BOM metne de kacabilir
+  if (!metin.trim()) return { headers: [], rows: [] };
+
+  const ilkSatirSonu = (() => {
+    let tirnak = false;
+    for (let i = 0; i < metin.length; i++) {
+      const c = metin[i];
+      if (c === '"') tirnak = !tirnak;
+      else if ((c === '\n' || c === '\r') && !tirnak) return i;
+    }
+    return metin.length;
+  })();
+  const ayirici = detectDelimiter(metin.slice(0, ilkSatirSonu));
+
+  const kayitlar = [];
+  let hucreler = [], cur = '', tirnak = false, hucreVar = false;
+  const hucreBitir = () => { hucreler.push(cur.trim()); cur = ''; };
+  const kayitBitir = () => {
+    hucreBitir();
+    // Tamamen bos satirlar atlanir; dosya sonundaki satir sonu kayit uretmez.
+    if (hucreVar && hucreler.some(h => h !== '')) kayitlar.push(hucreler);
+    hucreler = []; hucreVar = false;
+  };
+
+  for (let i = 0; i < metin.length; i++) {
+    const c = metin[i];
+    if (tirnak) {
+      if (c === '"') {
+        if (metin[i + 1] === '"') { cur += '"'; i++; }
+        else tirnak = false;
+      } else cur += c;
+      hucreVar = true;
+      continue;
+    }
+    if (c === '"') { tirnak = true; hucreVar = true; }
+    else if (c === ayirici) { hucreBitir(); hucreVar = true; }
+    else if (c === '\r') { if (metin[i + 1] === '\n') i++; kayitBitir(); }
+    else if (c === '\n') { kayitBitir(); }
+    else { cur += c; hucreVar = true; }
+  }
+  kayitBitir();
+
+  if (kayitlar.length === 0) return { headers: [], rows: [] };
+
+  const headers = kayitlar[0];
   const rows = [];
-  for (let i = 1; i < lines.length; i++) {
-    const vals = satirAyir(lines[i]);
-    if (vals.every(v => !v)) continue;
+  for (let i = 1; i < kayitlar.length; i++) {
+    const vals = kayitlar[i];
     const o = {};
     headers.forEach((h, idx) => { o[h] = vals[idx] !== undefined ? vals[idx] : ''; });
     rows.push(o);
@@ -508,6 +633,9 @@ const FinanceImportEngine = {
   computeHash,
   bookingFingerprint,
   parseCSV,
+  detectDelimiter,
+  detectImportSourceKind,
+  decodeImportText,
   normalizeAmount,
   normalizeDate,
   nightsBetween,

@@ -10,7 +10,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=c376f039">
+  <link rel="stylesheet" href="style.css?v=003f9b7e">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -3053,7 +3053,7 @@
           <span style="font-size: 24px;">📥</span>
           <div>
             <h3 style="margin: 0; font-size: 17px; font-weight: 800; color: #fff;">Excel / CSV Finans Raporu Yükle</h3>
-            <span style="font-size: 11px; color: var(--text-muted);">Tüm Excel (.xlsx, .xls), CSV ve Şirket Raporlarını Otomatik Çözer</span>
+            <span style="font-size: 11px; color: var(--text-muted);">Rezervasyon ve gider defterlerinizi Excel (.xlsx, .xls) veya CSV/TSV olarak yükleyin</span>
           </div>
         </div>
         <button class="close-btn" onclick="closeImportModal()">&times;</button>
@@ -3080,8 +3080,8 @@
         <div class="upload-dropzone" id="excelDropzone" onclick="document.getElementById('excelFileInput').click()" style="border: 2px dashed rgba(168, 85, 247, 0.5); background: rgba(168, 85, 247, 0.05); border-radius: 12px; padding: 24px 16px; text-align: center; cursor: pointer; transition: all 0.2s ease;">
           <span style="font-size: 42px; display: block; margin-bottom: 6px;">📊</span>
           <strong style="font-size: 14px; color: #F8FAFC; display: block;">Excel veya CSV Raporunuzu Buraya Sürükleyin</strong>
-          <span style="font-size: 12px; color: var(--text-muted); display: block; margin-top: 4px;">veya dosya seçmek için tıklayın (.xlsx, .xls, .csv, .tsv)</span>
-          <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv, .tsv, .txt, .json" style="display:none;" onchange="handleFileImport(event)">
+          <span style="font-size: 12px; color: var(--text-muted); display: block; margin-top: 4px;">veya dosya seçmek için tıklayın (.xlsx, .xls, .csv, .tsv, .txt)</span>
+          <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv, .tsv, .txt" style="display:none;" onchange="handleFileImport(event)">
         </div>
 
         <!-- Dosya Analiz ve Canlı Önizleme Kutusu -->
@@ -3805,7 +3805,7 @@
   </div>
 
   <script src="core/financial_metrics_service.js?v=58fa83fc"></script>
-  <script src="core/finance_import_engine.js?v=4a06f922"></script>
+  <script src="core/finance_import_engine.js?v=9cd861af"></script>
 
   <!-- ======================================================= -->
   <!-- MODAL: WHATSAPP BUSINESS AKILLI MESAJ AYRIŞTIRICI -->
@@ -4367,7 +4367,7 @@
   <script src="core/executive_dashboard_service.js?v=be794e79"></script>
   <script src="core/executive_ai_advisor.js?v=4b235c67"></script>
   <script src="core/notification_center_service.js?v=710f8a91"></script>
-  <script src="app.js?v=8a37a9de"></script>
+  <script src="app.js?v=2df12b1a"></script>
   <script src="core/marketing_ui.js?v=2e506018"></script>
 </body>
 </html>
