@@ -10,7 +10,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=003f9b7e">
+  <link rel="stylesheet" href="style.css?v=6694a630">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -548,26 +548,27 @@
         </div>
       </section>
 
-      <!-- 4. PORTFOLIO HEALTH MATRIX (MÜLK SAĞLIĞI ANALİZİ) -->
+      <!-- 4. MÜLK SATIŞ HAZIRLIĞI -->
       <section class="card" style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 20px; margin-bottom: 24px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
           <div>
             <h3 style="margin: 0; font-size: 15px; color: #F8FAFC; display: flex; align-items: center; gap: 8px;">
-              <span>🏡</span> PORTFÖY SAĞLIK MATRİSİ
+              <span>🏡</span> MÜLK SATIŞ HAZIRLIĞI
             </h3>
             <p style="margin: 3px 0 0 0; font-size: 11px; color: #94A3B8;">
-              Tüm mülklerin operasyonel hazırlık, arıza, doluluk ve fiyatlandırma sağlık durumu.
+              Satışa hazır, temizlik bekleyen ve arıza nedeniyle açık veya kapalı mülkler.
             </p>
           </div>
           <div style="display: flex; gap: 6px;">
-            <span class="badge badge-green" id="healthPillHealthy">—</span>
-            <span class="badge badge-yellow" id="healthPillWarning">—</span>
-            <span class="badge badge-red" id="healthPillCritical">—</span>
+            <span class="badge badge-green" id="healthPillReady">—</span>
+            <span class="badge badge-yellow" id="healthPillCleaning">—</span>
+            <span class="badge badge-blue" id="healthPillMinorIssue">—</span>
+            <span class="badge badge-red" id="healthPillBlocked">—</span>
           </div>
         </div>
 
         <div class="portfolio-health-grid" id="portfolioHealthCardsGrid">
-          <!-- Dinamik olarak Mülk Sağlık Kartları eklenecek -->
+          <!-- Dinamik olarak mülk satış hazırlığı kartları eklenecek -->
         </div>
       </section>
 
@@ -4349,6 +4350,7 @@
   <script src="core/operations_priority_engine.js?v=9e7b3fbe"></script>
   <script src="core/operations_sla_service.js?v=8bd4e804"></script>
   <script src="core/property_readiness_service.js?v=573c4f5f"></script>
+  <script src="core/property_sales_readiness.js?v=9d264e9f"></script>
   <script src="core/operations_engine.js?v=e946e4db"></script>
   <script src="core/recurring_tasks_service.js?v=c499718d"></script>
   <script src="core/today_operations_service.js?v=b03f0d0a"></script>
@@ -4367,7 +4369,7 @@
   <script src="core/executive_dashboard_service.js?v=be794e79"></script>
   <script src="core/executive_ai_advisor.js?v=4b235c67"></script>
   <script src="core/notification_center_service.js?v=710f8a91"></script>
-  <script src="app.js?v=2df12b1a"></script>
+  <script src="app.js?v=dab53f41"></script>
   <script src="core/marketing_ui.js?v=2e506018"></script>
 </body>
 </html>

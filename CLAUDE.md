@@ -351,6 +351,15 @@ bunu kullanıcıya açıkça söyler. Basamaklar **NULL olabilir**: girilmemiş 
 basamak 0 değil, bilinmiyordur (§3.6); göç bunu `PHASE31_LADDER_STEP_NOT_NULLABLE`
 ile doğrular.
 
+**phase36 (`migration_phase36_property_sales_readiness.sql`) henüz üretime
+uygulanmadı.** Phase31'in `housekeeping_status_overrides` tablosunu değiştirmeden,
+ileri yönlü bir kısıt genişletmesiyle dört satış hazırlığı durumunu ekler:
+`SALES_READY`, `NEEDS_CLEANING`, `BLOCKED_MAINTENANCE` ve
+`NON_BLOCKING_ISSUE`. Eski `READY/CLEANING/OCCUPIED` satırları istemcide
+normalize edilir. `paid` yalnız ödeme durumudur; satış hazırlığı hesabına
+katılmaz. Kod push edilmeden önce göç test projesine kurulmalı; üretim göçü
+ayrı ve açık onayla Supabase SQL Editor'den uygulanmalıdır.
+
 Doğrulama §4.2'nin tablo sorgusuyla, önce ve sonra yapıldı:
 
 ```
@@ -595,7 +604,7 @@ bu doğru bir temizlik — ama çağıran kodun yarısı onu **kalıcılık san�
 | 🗑 kaldırıldı | `saveWhapiSettings` | özelliğin tamamı mockup'tı |
 | 🗑 düzeltildi | `syncLiveAirbnbData` | senkronizasyon yoktu; durumu söylüyor |
 | ⚪ meşru yerel | `changeImportMode` | açık formun görünümü; iş kaydı değil |
-| ✅ bağlandı (phase31) | `cycleHkStatus` | `housekeeping_status_overrides` |
+| ✅ bağlandı (phase31, phase36 sözleşmesi) | `cycleHkStatus` / `setPropertySalesReadiness` | `housekeeping_status_overrides` |
 | ✅ bağlandı (phase31) | `saveMarketingCampaign` | `marketing_campaigns` |
 | ✅ bağlandı (phase31) | `saveInfluencerCollab` | `influencer_collabs` |
 | ✅ bağlandı (phase31) | `setOtaPricingStrategy` | `tenant_settings` (`ota_pricing_strategy`) |

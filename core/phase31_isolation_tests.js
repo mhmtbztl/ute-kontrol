@@ -64,9 +64,27 @@ async function makeOwner(label) {
   return { client, tenantId: t.tenant_id, propertyId: p.id, userId: data.user.id };
 }
 
+async function makeMember(tenantId, label, role) {
+  const email = `p36_${label}_${stamp}@lexbnb-e2e.test`;
+  const password = 'P36!' + stamp + 'Aa';
+  const { data, error } = await admin.auth.admin.createUser({ email, password, email_confirm: true });
+  if (error) throw new Error(`${label} kullanici: ${error.message}`);
+  users.push(data.user.id);
+  const { error: memberError } = await admin.from('tenant_members').insert({
+    tenant_id: tenantId, user_id: data.user.id, role
+  });
+  if (memberError) throw new Error(`${label} uyelik: ${memberError.message}`);
+  const client = newClient();
+  const { error: loginError } = await client.auth.signInWithPassword({ email, password });
+  if (loginError) throw new Error(`${label} giris: ${loginError.message}`);
+  return client;
+}
+
 async function run() {
   const A = await makeOwner('a');
   const B = await makeOwner('b');
+  const staff = await makeMember(A.tenantId, 'staff', 'staff');
+  const viewer = await makeMember(A.tenantId, 'viewer', 'viewer');
   const anon = newClient();
 
   // ---------------------------------------------------------------------
@@ -116,9 +134,21 @@ async function run() {
     'karisir ve ekranda "—" yerine uydurma bir rakam cikar (3.6).');
 
   const { error: he } = await A.client.from('housekeeping_status_overrides').upsert({
-    property_id: A.propertyId, tenant_id: A.tenantId, status: 'CLEANING'
+    property_id: A.propertyId, tenant_id: A.tenantId, status: 'SALES_READY'
   }, { onConflict: 'property_id' });
-  check(!he, '7. Sahip temizlik durumu gecersiz kilmasi yazabiliyor', he && he.message);
+  check(!he, '7. Sahip satis hazirligi durumu yazabiliyor', he && he.message);
+
+  const { error: staffError } = await staff.from('housekeeping_status_overrides').upsert({
+    property_id: A.propertyId, tenant_id: A.tenantId, status: 'NEEDS_CLEANING'
+  }, { onConflict: 'property_id' });
+  check(!staffError, '7a. Saha personeli satis hazirligi durumunu degistirebiliyor',
+    staffError && staffError.message);
+
+  const { error: viewerError } = await viewer.from('housekeeping_status_overrides').upsert({
+    property_id: A.propertyId, tenant_id: A.tenantId, status: 'SALES_READY'
+  }, { onConflict: 'property_id' });
+  check(!!viewerError, '7b. Viewer satis hazirligi durumunu degistiremiyor',
+    'RLS viewer yazmasini gecirdi.');
 
   // ---------------------------------------------------------------------
   // 2. CAPRAZ KIRACI — B, A'nin defterine yazamaz ve okuyamaz
@@ -144,9 +174,9 @@ async function run() {
     'degistirebilmesi dogrudan para kaybidir.');
 
   const { error: xh } = await B.client.from('housekeeping_status_overrides').upsert({
-    property_id: A.propertyId, tenant_id: A.tenantId, status: 'OCCUPIED'
+    property_id: A.propertyId, tenant_id: A.tenantId, status: 'BLOCKED_MAINTENANCE'
   }, { onConflict: 'property_id' });
-  check(!!xh, '11. Yabanci kiraci temizlik durumunu degistiremiyor', 'RLS gecirdi.');
+  check(!!xh, '11. Yabanci kiraci satis hazirligini degistiremiyor', 'RLS gecirdi.');
 
   for (const tablo of ['marketing_campaigns', 'influencer_collabs', 'tenant_settings',
     'property_operator_notes', 'property_pricing_ladder', 'housekeeping_status_overrides']) {

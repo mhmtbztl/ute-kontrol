@@ -58,6 +58,7 @@ function govde(kaynak, ad) {
 const YAZMA_IZLERI = [
   'cloudUpsert', 'cloudDelete', 'cloudSave', 'supabaseClient', 'requireCloudForWrite',
   'persistCleaningLedgerEntry', 'reportCleaningPersist', 'reportStatePersist',
+  'setPropertySalesReadiness(',
   'createBooking(', 'createLead(', 'createExpense(', 'updateExpense(',
   'createMaintenanceTicket(', 'updateProperty(', 'loadTenantAppData('
 ];
@@ -81,6 +82,7 @@ const KALICI = [
   'convertAiActionToTask',
   // phase31 — yerel kalan son alti defter (ayrica phase31_persistence_tests)
   'cycleHkStatus',
+  'setPropertySalesReadiness',
   'saveMarketingCampaign',
   'saveInfluencerCollab',
   'setOtaPricingStrategy',

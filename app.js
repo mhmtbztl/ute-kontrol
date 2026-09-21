@@ -3351,6 +3351,30 @@ function getFilterDateRange() {
   return null;
 }
 
+function getPropertySalesReadinessApi() {
+  if (typeof PropertySalesReadiness !== 'undefined') return PropertySalesReadiness;
+  if (typeof require === 'function') return require('./core/property_sales_readiness.js');
+  return null;
+}
+
+function canManagePropertyReadiness() {
+  const api = getPropertySalesReadinessApi();
+  return !!(api && api.canEdit(activeTenant?.role));
+}
+
+function getPropertySalesReadiness(villaKey) {
+  const api = getPropertySalesReadinessApi();
+  const villa = appData?.villas?.[villaKey];
+  if (!api || !villa) return null;
+  const cloudTickets = appData?.maintenanceTickets;
+  return api.buildPropertyReadiness({ ...villa, key: villaKey, slug: villa.slug || villaKey }, {
+    overrideStatus: appData?.housekeepingOverrides?.[villaKey],
+    maintenanceTickets: Array.isArray(cloudTickets) && cloudTickets.length > 0
+      ? cloudTickets
+      : (appData?.maintenance || [])
+  });
+}
+
 // -------------------------------------------------------------
 // AY ÜSTÜ AY (MoM) KARŞILAŞTIRMASI
 // Finans ekranindaki "geçen aya göre" rozetleri statik HTML'di ve kategori
@@ -3371,8 +3395,8 @@ function renderOperationsKpiStrip() {
   const tickets = appData.maintenance || [];
 
   const hazir = villaKeys.filter(k => {
-    const st = villas[k].readinessStatus;
-    return !st || st === 'READY';
+    const readiness = getPropertySalesReadiness(k);
+    return readiness && ['SALES_READY', 'NON_BLOCKING_ISSUE'].includes(readiness.status);
   }).length;
   setEl('opsReadyPropsVal', `${hazir} / ${villaKeys.length}`);
 
@@ -8615,37 +8639,30 @@ function renderDailyOps() {
     const vConf = appData.villas[vKey];
     if (!vConf) return;
 
-    const activeBooking = appData.bookings.find(b => b.villa === vKey && b.status !== 'CANCELLED' && b.checkIn <= todayStr && b.checkOut > todayStr);
-    const checkoutToday = appData.bookings.find(b => b.villa === vKey && b.status !== 'CANCELLED' && b.checkOut === todayStr);
-    const checkinToday = appData.bookings.find(b => b.villa === vKey && b.status !== 'CANCELLED' && b.checkIn === todayStr);
-    const hasP1Maint = appData.maintenance.some(m => m.villa === vKey && m.status === 'OPEN' && m.priority === 'P1');
-    const overrideStatus = appData.housekeepingOverrides[vKey];
-
-    let statusBadge = '🟢 Hazır';
-    let badgeClass = 'badge-emerald';
-
-    if (overrideStatus) {
-      if (overrideStatus === 'CLEANING') { statusBadge = '🟡 Temizlikte'; badgeClass = 'badge-amber'; }
-      else if (overrideStatus === 'OCCUPIED') { statusBadge = '🔵 Dolu'; badgeClass = 'badge-blue'; }
-    } else {
-      if (hasP1Maint) { statusBadge = '🔴 Bakımda'; badgeClass = 'badge-rose'; }
-      else if (checkoutToday) { statusBadge = '🟡 Çıkış/Temizlik'; badgeClass = 'badge-amber'; }
-      else if (checkinToday) { statusBadge = '🟡 Giriş/Kontrol'; badgeClass = 'badge-amber'; }
-      else if (activeBooking) { statusBadge = '🔵 Dolu'; badgeClass = 'badge-blue'; }
-    }
+    const readiness = getPropertySalesReadiness(vKey);
+    const meta = readiness?.meta || getPropertySalesReadinessApi()?.STATUS_META?.UNSET;
+    const statusBadge = meta ? `${meta.icon} ${meta.shortLabel}` : '⚪ Belirsiz';
+    const badgeClass = meta?.tone === 'green' ? 'badge-emerald'
+      : meta?.tone === 'yellow' ? 'badge-amber'
+        : meta?.tone === 'red' ? 'badge-rose'
+          : meta?.tone === 'blue' ? 'badge-blue' : '';
+    const canEditReadiness = canManagePropertyReadiness();
+    const actionAttrs = canEditReadiness
+      ? `onclick="cycleHkStatus('${vKey}')" title="Satış hazırlığı durumunu değiştirmek için tıklayın"`
+      : 'title="Bu durumu değiştirme yetkiniz yok"';
 
     villaCardsHtml += `
       <div style="display: inline-flex; align-items: center; gap: 4px; background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.07); padding: 3px 6px; border-radius: 6px; font-size: 11px; margin: 2px;">
         <span style="color: #FFFFFF; font-weight: 600;">${vConf.name.split(' ')[0]}:</span>
-        <span class="badge ${badgeClass}" style="font-size: 9px; padding: 1px 5px; cursor: pointer;" onclick="cycleHkStatus('${vKey}')" title="Fiziksel durumu değiştirmek için tıklayın">${statusBadge}</span>
+        <span class="badge ${badgeClass}" data-readiness-status="${readiness?.status || 'UNSET'}" style="font-size: 9px; padding: 1px 5px; cursor: ${canEditReadiness ? 'pointer' : 'default'};" ${actionAttrs}>${statusBadge}</span>
       </div>
     `;
   });
 
   villaBar.innerHTML = `
     <div style="font-size: 10px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
-      <span>🏡 Villa Fiziksel Durumları</span>
-      <span style="color: #93C5FD; font-size: 10px;">Durum Değiştir 🔄</span>
+      <span>🏡 Mülk Satış Hazırlığı</span>
+      <span style="color: #93C5FD; font-size: 10px;">${canManagePropertyReadiness() ? 'Durum Değiştir 🔄' : 'Salt Okunur'}</span>
     </div>
     <div style="display: flex; flex-wrap: wrap; gap: 2px;">
       ${villaCardsHtml}
@@ -8937,22 +8954,40 @@ async function toggleCleaningPaid(vKey) {
 }
 
 async function cycleHkStatus(vKey) {
-  if (!appData.housekeepingOverrides) appData.housekeepingOverrides = {};
-  const current = appData.housekeepingOverrides[vKey];
-  const states = [null, 'CLEANING', 'READY', 'OCCUPIED'];
-  let nextIdx = 0;
-  if (current === 'CLEANING') nextIdx = 2; // READY
-  else if (current === 'READY') nextIdx = 3; // OCCUPIED
-  else if (current === 'OCCUPIED') nextIdx = 0; // AUTO (null)
-  else nextIdx = 1; // CLEANING
+  const api = getPropertySalesReadinessApi();
+  if (!api) return false;
+  const current = api.normalizeStatus(appData?.housekeepingOverrides?.[vKey]);
+  const states = api.SELECTABLE_STATUSES;
+  const currentIndex = states.indexOf(current);
+  const next = states[(currentIndex + 1) % states.length];
+  return await setPropertySalesReadiness(vKey, next);
+}
 
-  const yeni = states[nextIdx];
-  appData.housekeepingOverrides[vKey] = yeni;
-  saveAppData();
+async function setPropertySalesReadiness(vKey, status) {
+  const api = getPropertySalesReadinessApi();
+  if (!api || !api.SELECTABLE_STATUSES.includes(status)) {
+    if (window.showToast) window.showToast('⚠️ Geçersiz mülk hazırlık durumu.', 'error');
+    return false;
+  }
+  if (!canManagePropertyReadiness()) {
+    if (window.showToast) window.showToast('⚠️ Bu durumu değiştirme yetkiniz yok.', 'error');
+    return false;
+  }
+
+  const villaName = appData?.villas?.[vKey]?.name || vKey;
+  const meta = api.STATUS_META[status];
+  const saved = await reportStatePersist(
+    () => cloudSaveHousekeepingOverride(vKey, status),
+    `✅ ${villaName}: ${meta.label}`
+  );
+  if (!saved) return false;
+
+  if (!appData.housekeepingOverrides) appData.housekeepingOverrides = {};
+  appData.housekeepingOverrides[vKey] = status;
+  renderExecutiveControlCenter();
   renderDailyOps();
-  // AUTO (null) satirin silinmesidir: "otomatik" bir durum DEGIL, elle
-  // gecersiz kilmanin kaldirilmasidir.
-  await reportStatePersist(() => cloudSaveHousekeepingOverride(vKey, yeni));
+  renderOperationsKpiStrip();
+  return true;
 }
 
 // -------------------------------------------------------------
@@ -13321,9 +13356,13 @@ async function cloudSavePricingLadder(villaKey, merdiven) {
 /** `status === null` = AUTO: gecersiz kilma satiri SILINIR. */
 async function cloudSaveHousekeepingOverride(villaKey, status) {
   const tenantId = getActiveTenantId();
-  requireCloudForWrite('Temizlik durumu', tenantId);
+  requireCloudForWrite('Mülk satış hazırlığı', tenantId);
+  const api = getPropertySalesReadinessApi();
+  if (status && (!api || !api.SELECTABLE_STATUSES.includes(status))) {
+    throw new Error('Geçersiz mülk hazırlık durumu.');
+  }
   const propId = await getPropertyIdBySlug(villaKey, tenantId);
-  if (!propId) throw new Error('Temizlik durumu kaydedilemedi: mulk bulunamadi.');
+  if (!propId) throw new Error('Mülk hazırlık durumu kaydedilemedi: mülk bulunamadı.');
   if (!status) {
     const { error } = await supabaseClient.from('housekeeping_status_overrides')
       .delete().match({ tenant_id: tenantId, property_id: propId });
@@ -13336,7 +13375,12 @@ async function cloudSaveHousekeepingOverride(villaKey, status) {
     status,
     updated_by: activeSaaSUser?.id
   }, { onConflict: 'property_id' });
-  if (error) throw error;
+  if (error) {
+    if (error.code === '23514' || String(error.message || '').includes('housekeeping_status_overrides_status_check')) {
+      throw new Error('Mülk satış hazırlığı için Phase 36 veritabanı güncellemesi henüz uygulanmadı. Değişiklik kaydedilmedi.');
+    }
+    throw error;
+  }
 }
 
 // -------------------------------------------------------------
@@ -15370,13 +15414,14 @@ function renderExecutiveControlCenter() {
     renderTodayCommandCenter(commandResult);
   }
 
-  // 4. Portfolio Health Matrix
-  if (typeof ExecutiveDashboardService !== 'undefined' && ExecutiveDashboardService.generatePropertyHealthCards) {
-    const healthCards = ExecutiveDashboardService.generatePropertyHealthCards(propertiesList, {
-      bookings,
-      cleaningTasks: tasks,
+  // 4. Property sales readiness. Payment status is deliberately not used:
+  // `paid` is a financial flag, not evidence that cleaning was completed.
+  const readinessApi = getPropertySalesReadinessApi();
+  if (readinessApi) {
+    const healthCards = propertiesList.map(property => readinessApi.buildPropertyReadiness(property, {
+      overrideStatus: appData?.housekeepingOverrides?.[property.key],
       maintenanceTickets: tickets
-    });
+    }));
     renderPortfolioHealth(healthCards);
   }
 }
@@ -15434,57 +15479,73 @@ function renderPortfolioHealth(healthCards) {
   const grid = document.getElementById('portfolioHealthCardsGrid');
   if (!grid) return;
 
-  let healthyCount = 0;
-  let warningCount = 0;
-  let criticalCount = 0;
+  const counts = {
+    SALES_READY: 0,
+    NEEDS_CLEANING: 0,
+    NON_BLOCKING_ISSUE: 0,
+    BLOCKED_MAINTENANCE: 0,
+    UNSET: 0
+  };
+  const readinessApi = getPropertySalesReadinessApi();
+  const canEdit = canManagePropertyReadiness();
 
   grid.innerHTML = healthCards.map(c => {
-    if (c.status === 'HEALTHY') healthyCount++;
-    else if (c.status === 'WARNING') warningCount++;
-    else if (c.status === 'CRITICAL') criticalCount++;
-
-    const statusBadge = c.status === 'HEALTHY'
-      ? '<span class="badge badge-green">🟢 HAZIR</span>'
-      : (c.status === 'WARNING'
-        ? '<span class="badge badge-yellow">🟡 TEMİZLİK / DİKKAT</span>'
-        : '<span class="badge badge-red">🔴 KRİTİK / ARIZA</span>');
+    counts[c.status] = (counts[c.status] || 0) + 1;
+    const meta = c.meta || readinessApi?.STATUS_META?.UNSET || {
+      icon: '⚪', label: 'Durum seçilmedi', tone: 'neutral'
+    };
+    const badgeClass = meta.tone === 'green' ? 'badge-green'
+      : meta.tone === 'yellow' ? 'badge-yellow'
+        : meta.tone === 'red' ? 'badge-red'
+          : meta.tone === 'blue' ? 'badge-blue' : '';
+    const cardStatus = c.status === 'SALES_READY' ? 'HEALTHY'
+      : c.status === 'BLOCKED_MAINTENANCE' ? 'CRITICAL'
+        : c.status === 'NON_BLOCKING_ISSUE' ? 'INFO' : 'WARNING';
+    const options = readinessApi.SELECTABLE_STATUSES.map(status => {
+      const optionMeta = readinessApi.STATUS_META[status];
+      const selected = c.manualStatus === status ? ' selected' : '';
+      return `<option value="${status}"${selected}>${optionMeta.icon} ${escapeHtml(optionMeta.label)}</option>`;
+    }).join('');
+    const editor = canEdit
+      ? `<label style="display:block; margin-top:9px; font-size:10px; color:#94A3B8;">
+           Durumu değiştir
+           <select class="property-readiness-select" data-property-readiness-key="${escapeHtml(c.propertyKey)}"
+             onchange="setPropertySalesReadiness(decodeURIComponent('${encodeURIComponent(String(c.propertyKey))}'), this.value)"
+             style="width:100%; margin-top:4px; padding:6px 8px; border-radius:6px; background:#0F172A; color:#E2E8F0; border:1px solid rgba(255,255,255,.16); font-size:11px;">
+             <option value="" disabled${c.manualStatus === 'UNSET' ? ' selected' : ''}>⚪ Durum seçin</option>
+             ${options}
+           </select>
+         </label>`
+      : '<div style="margin-top:9px; font-size:10px; color:#64748B;">Salt okunur · değiştirme yetkiniz yok</div>';
 
     return `
-      <div class="property-health-card status-${c.status}">
+      <div class="property-health-card status-${cardStatus}" data-readiness-status="${escapeHtml(c.status)}" data-property-key="${escapeHtml(c.propertyKey)}">
         <div style="display: flex; justify-content: space-between; align-items: flex-start;">
           <div>
             <strong style="font-size: 14px; color: #FFFFFF;">${escapeHtml(c.propertyName)}</strong>
-            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Kapasite: ${c.capacity == null ? 'Belirtilmedi' : `${escapeHtml(c.capacity)} Kişi`}</div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">${escapeHtml(c.reason)}</div>
           </div>
-          ${statusBadge}
+          <span class="badge ${badgeClass}" style="white-space:nowrap;">${meta.icon} ${escapeHtml(meta.label)}</span>
         </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px; margin: 4px 0;">
           <div style="background: rgba(0,0,0,0.25); padding: 6px 8px; border-radius: 6px;">
-            <span style="color: #94A3B8; display: block;">30G Doluluk:</span>
-            <strong style="color: #F8FAFC; font-size: 13px;">${c.occupancyRate == null ? '—' : `%${escapeHtml(c.occupancyRate)}`}</strong>
+            <span style="color: #94A3B8; display: block;">Satış Durumu:</span>
+            <strong style="color: #F8FAFC; font-size: 12px;">${c.status === 'BLOCKED_MAINTENANCE' ? 'Kapalı' : (c.status === 'UNSET' ? 'Belirsiz' : 'Açık')}</strong>
           </div>
           <div style="background: rgba(0,0,0,0.25); padding: 6px 8px; border-radius: 6px;">
             <span style="color: #94A3B8; display: block;">Açık İş / Arıza:</span>
-            <strong style="color: ${c.openIssuesCount > 0 ? '#F87171' : '#34D399'}; font-size: 13px;">${c.openIssuesCount || 0} Görev</strong>
+            <strong style="color: ${c.openIssueCount > 0 ? '#F87171' : '#34D399'}; font-size: 13px;">${c.openIssueCount || 0} Kayıt</strong>
           </div>
         </div>
-        <div style="font-size: 11px; color: #CBD5E1;">
-          <strong>Fiyat Durumu:</strong> ${escapeHtml(c.pricingHealth || 'Değerlendirilmedi')}
-        </div>
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06);">
-          <button class="btn btn-secondary btn-sm" onclick="switchTab('properties')" style="font-size: 10px; padding: 2px 6px;">Mülk Detayı</button>
-          <button class="btn btn-secondary btn-sm" onclick="switchTab('reservations')" style="font-size: 10px; padding: 2px 6px;">Takvim</button>
-        </div>
+        ${editor}
       </div>
     `;
   }).join('');
 
-  const hEl = document.getElementById('healthPillHealthy');
-  if (hEl) hEl.innerText = `🟢 Sağlıklı: ${healthyCount}`;
-  const wEl = document.getElementById('healthPillWarning');
-  if (wEl) wEl.innerText = `🟡 Dikkat: ${warningCount}`;
-  const cEl = document.getElementById('healthPillCritical');
-  if (cEl) cEl.innerText = `🔴 Kritik: ${criticalCount}`;
+  setEl('healthPillReady', `🟢 Hazır: ${counts.SALES_READY}`);
+  setEl('healthPillCleaning', `🟡 Temizlik: ${counts.NEEDS_CLEANING}`);
+  setEl('healthPillMinorIssue', `🔵 Küçük Arıza: ${counts.NON_BLOCKING_ISSUE}`);
+  setEl('healthPillBlocked', `🔴 Kapalı: ${counts.BLOCKED_MAINTENANCE}`);
 }
 
 // -----------------------------------------------------------------------------
@@ -16472,6 +16533,10 @@ if (typeof module !== 'undefined' && module.exports) {
     refreshExecutiveDashboardSnapshot,
     renderExecutiveSnapshotKpis,
     renderExecutiveControlCenter,
+    renderPortfolioHealth,
+    getPropertySalesReadiness,
+    canManagePropertyReadiness,
+    setPropertySalesReadiness,
     askExecutiveAdvisor,
     openCommandPalette,
     closeCommandPalette,

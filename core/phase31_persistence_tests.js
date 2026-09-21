@@ -215,11 +215,11 @@ async function davranisTestleri(app) {
   // --- 5. Temizlik durumu: AUTO = satirin SILINMESI ------------------------
   kayit.upserts.length = 0;
   kayit.deletes.length = 0;
-  await app.cloudSaveHousekeepingOverride('VILLA_A', 'CLEANING');
+  await app.cloudSaveHousekeepingOverride('VILLA_A', 'SALES_READY');
   const hk = kayit.upserts.find(u => u.tablo === 'housekeeping_status_overrides');
-  check(hk && hk.satir.status === 'CLEANING',
-    '14. Elle secilen temizlik durumu yaziliyor',
-    'cycleHkStatus hala yalnizca bellege yaziyor.');
+  check(hk && hk.satir.status === 'SALES_READY',
+    '14. Elle secilen satis hazirligi durumu yaziliyor',
+    'Ana sayfa durumu hala yalnizca bellege yaziliyor.');
 
   kayit.upserts.length = 0;
   await app.cloudSaveHousekeepingOverride('VILLA_A', null);
@@ -289,7 +289,7 @@ async function davranisTestleri(app) {
 function kaynakTestleri() {
   // Alti kapi. Hepsi async olmak ve gercek bir yazma yolundan gecmek zorunda.
   const KAPILAR = {
-    cycleHkStatus: 'cloudSaveHousekeepingOverride',
+    cycleHkStatus: 'setPropertySalesReadiness',
     saveMarketingCampaign: 'cloudSaveMarketingCampaign',
     saveInfluencerCollab: 'cloudSaveInfluencerCollab',
     setOtaPricingStrategy: 'cloudSaveTenantSetting',
@@ -313,6 +313,11 @@ function kaynakTestleri() {
       'Senkron govdede bulut yazmasi beklenemez; hata yakalanamaz ve ' +
       'yakalanmamis promise reddi olarak sessizce yutulur.');
   });
+
+  const hazirlik = govde(APP, 'setPropertySalesReadiness') || '';
+  check(hazirlik.includes('cloudSaveHousekeepingOverride'),
+    `${i++}. setPropertySalesReadiness -> cloudSaveHousekeepingOverride cagiriyor`,
+    'Ana sayfadaki yeni durum secici kalici Postgres yazma yoluna ulasmiyor.');
 
   // Silme de yazmadir: bellekten silip veritabaninda birakmak, yenilemede
   // silinen kaydin geri gelmesi demektir.

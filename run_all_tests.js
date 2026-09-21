@@ -170,6 +170,9 @@ const allTestFiles = [
   // Yerel kalan son alti defter Postgres'e tasindi mi (Phase 31)
   'phase31_persistence_tests.js',
 
+  // Phase 36: ana sayfa mulk satis hazirligi sozlesmesi ve rol kapisi
+  'property_sales_readiness_tests.js',
+
   // Phase 31 tablolarinin RLS'i ve anon kapisi (canli — test projesine kosar)
   'phase31_isolation_tests.js',
 

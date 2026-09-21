@@ -3940,6 +3940,10 @@ body {
   border-top: 3px solid #F59E0B;
 }
 
+.property-health-card.status-INFO {
+  border-top: 3px solid #3B82F6;
+}
+
 .property-health-card.status-CRITICAL {
   border-top: 3px solid #EF4444;
 }

@@ -282,6 +282,58 @@ function run() {
     no('17-20. Temizlik operasyon ozeti cevrimdisi render testi', hataOzeti(e));
   }
 
+  // --- Phase 36: anasayfa mulk satis hazirligi -----------------------------
+  try {
+    domKur();
+    const hazirlikVeri = bosVeri();
+    hazirlikVeri.villas = {
+      V1: { id: 'p1', slug: 'V1', name: 'Yeşil Ev' },
+      V2: { id: 'p2', slug: 'V2', name: 'Sarı Ev' },
+      V3: { id: 'p3', slug: 'V3', name: 'Mavi Ev' },
+      V4: { id: 'p4', slug: 'V4', name: 'Kırmızı Ev' }
+    };
+    hazirlikVeri.housekeepingOverrides = {
+      V1: 'SALES_READY', V2: 'NEEDS_CLEANING', V4: 'SALES_READY'
+    };
+    hazirlikVeri.maintenanceTickets = [
+      { id: 'minor', property_id: 'p3', status: 'OPEN', severity: 'MEDIUM', booking_impact: false },
+      { id: 'blocking', property_id: 'p4', status: 'IN_PROGRESS', severity: 'CRITICAL', booking_impact: true }
+    ];
+    app.setAppData(hazirlikVeri);
+    app.setActiveTenantForTests({ id: hazirlikVeri.tenantId, name: 'Test', role: 'owner' });
+    app.renderExecutiveControlCenter();
+
+    const grid = global.document.getElementById('portfolioHealthCardsGrid').innerHTML;
+    check(grid.includes('Yeşil Ev') && grid.includes('Satışa hazır')
+      && grid.includes('Sarı Ev') && grid.includes('Temizlik sonrası hazır')
+      && grid.includes('Mavi Ev') && grid.includes('Satışa açık · küçük arıza var')
+      && grid.includes('Kırmızı Ev') && grid.includes('Satışa kapalı · büyük arıza/tadilat'),
+    '21. Anasayfa dort mulk durumunu gercek adlari ve acik etiketleriyle gosteriyor',
+    grid.slice(0, 1800));
+    check(grid.includes('status-HEALTHY') && grid.includes('status-WARNING')
+      && grid.includes('status-INFO') && grid.includes('status-CRITICAL'),
+    '22. Hazirlik kartlari yesil, sari, mavi ve kirmizi gorsel siniflari tasiyor',
+    grid.slice(0, 1400));
+    check((grid.match(/class="property-readiness-select"/g) || []).length === 4,
+      '23. Yetkili kullanici her mulkun durumunu anasayfadan degistirebiliyor',
+      grid.slice(0, 1200));
+    check(global.document.getElementById('healthPillReady').innerText.includes('1')
+      && global.document.getElementById('healthPillCleaning').innerText.includes('1')
+      && global.document.getElementById('healthPillMinorIssue').innerText.includes('1')
+      && global.document.getElementById('healthPillBlocked').innerText.includes('1'),
+    '24. Dort anasayfa sayaci kartlarla ayni normalize sonucu kullaniyor');
+
+    app.setActiveTenantForTests({ id: hazirlikVeri.tenantId, name: 'Test', role: 'viewer' });
+    app.renderExecutiveControlCenter();
+    const viewerGrid = global.document.getElementById('portfolioHealthCardsGrid').innerHTML;
+    check(!viewerGrid.includes('property-readiness-select')
+      && viewerGrid.includes('değiştirme yetkiniz yok'),
+    '25. Yetkisiz kullanici durumu goruyor ama degistirme kontrolu gormuyor',
+    viewerGrid.slice(0, 1200));
+  } catch (e) {
+    no('21-25. Phase 36 anasayfa hazirlik render testi', hataOzeti(e));
+  }
+
   // --- Pazarlama ekrani: renderAll'in DISINDA kalan render yolu ---------------
   // Bu fonksiyonlar sekme acilinca calisiyor, renderAll icinden degil; yani
   // render hatti testi onlari hic calistirmiyordu. Musteriye ROAS, komisyon,
