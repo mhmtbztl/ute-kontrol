@@ -61,6 +61,24 @@ function run() {
   check(kar === 49000 - (3750 + 5000),
     '4. Net kâr = brüt ciro − (komisyon + kaydedilmiş gider)',
     `beklenen ${49000 - 8750}, donen ${kar}`);
+  check(kpis.opex.current === 8750 && kpis.capex.current === 0
+      && kpis.operatingProfit.current === 40250,
+    '4b. OPEX komisyonu içerir, CAPEX ve faaliyet kârı ayrı kalır',
+    JSON.stringify({ opex: kpis.opex.current, capex: kpis.capex.current, operatingProfit: kpis.operatingProfit.current }));
+
+  const yatirimli = Svc.computeExecutiveTopKpis({
+    bookings: [{ gross_amount: 49000, ota_commission: 3750, cleaning_fee: 900, nights: 7, status: 'CONFIRMED' }],
+    expenses: [{ amount: 5000, expense_type: 'OPEX' }, { amount: 10000, expense_type: 'CAPEX' }],
+    availableNights: 14
+  });
+  check(yatirimli.opex.current === 8750 && yatirimli.capex.current === 10000
+      && yatirimli.operatingProfit.current === 40250 && yatirimli.netProfit.current === 30250,
+    '4c. CAPEX faaliyet kârından sonra net nakit kârından düşer',
+    JSON.stringify(yatirimli));
+  check(yatirimli.occupancy.current === 50 && yatirimli.adr.current === 6871.43
+      && yatirimli.revpar.current === 3435.71,
+    '4d. Doluluk, ADR ve RevPAR gerçek gece ve oda geliriyle birlikte hesaplanır',
+    JSON.stringify({ occupancy: yatirimli.occupancy, adr: yatirimli.adr, revpar: yatirimli.revpar }));
 
   // Komisyon ve temizligin AYRI AYRI sayildigini dogrula
   const komisyonsuz = Svc.computeExecutiveTopKpis({

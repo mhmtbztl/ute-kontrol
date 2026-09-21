@@ -123,10 +123,13 @@ async function run() {
     });
     if (b3e) throw new Error('rezervasyon 3: ' + b3e.message);
 
-    const { error: ee } = await owner.client.from('expenses').insert({
-      tenant_id: TID, category: 'Bakim', amount: 9000,
+    const { error: ee } = await owner.client.from('expenses').insert([{
+      tenant_id: TID, category: 'Bakim', amount: 9000, expense_type: 'OPEX',
       expense_date: '2026-04-15', description: 'nisan bakim'
-    });
+    }, {
+      tenant_id: TID, category: 'Yatirim', amount: 6000, expense_type: 'CAPEX',
+      expense_date: '2026-04-16', description: 'nisan yatirim'
+    }]);
     if (ee) throw new Error('gider: ' + ee.message);
 
     // -----------------------------------------------------------------------
@@ -170,21 +173,27 @@ async function run() {
 
     // -----------------------------------------------------------------------
     console.log('\n--- 2. USALI SINIFLANDIRMASI (CLAUDE.md 3.4) ---');
-    check(para(nisan.total_expenses, 13500),
-      '7. OTA komisyonu gidere yazilir (9.000 elle + 4.500 komisyon payi)',
-      'total_expenses=' + nisan.total_expenses +
-      ' — 9.000 ise komisyon hic sayilmiyor');
+    check(para(nisan.manual_opex, 9000) && para(nisan.ota_commission, 4500)
+          && para(nisan.operating_expenses, 13500),
+      '7. OPEX elle gideri ve OTA komisyonunu ayri ve toplu verir',
+      'manual_opex=' + nisan.manual_opex + ' ota=' + nisan.ota_commission +
+      ' operating_expenses=' + nisan.operating_expenses);
 
-    check(para(nisan.net_profit, 16500),
-      '8. Net kar = ciro - gider (30.000 - 13.500)',
-      'net_profit=' + nisan.net_profit);
+    check(para(nisan.capex, 6000) && para(nisan.total_expenses, 19500),
+      '8. CAPEX OPEX disinda kalir, toplam gider ikisini de kapsar',
+      'total_expenses=' + nisan.total_expenses +
+      ' capex=' + nisan.capex);
+
+    check(para(nisan.operating_profit, 16500) && para(nisan.net_profit, 10500),
+      '9. Faaliyet kari CAPEX oncesi, net nakit kari CAPEX sonrasidir',
+      'operating_profit=' + nisan.operating_profit + ' net_profit=' + nisan.net_profit);
 
     check(para(nisan.room_revenue, 27000),
-      '9. Oda geliri temizlik gelirini dislar (24.000 + 3.000)',
+      '10. Oda geliri temizlik gelirini dislar (24.000 + 3.000)',
       'room_revenue=' + nisan.room_revenue);
 
     check(!para(nisan.total_revenue, 25500),
-      '10. Komisyon CIRODAN DUSULMEZ (ciro brut tabanli kalir)',
+      '11. Komisyon CIRODAN DUSULMEZ (ciro brut tabanli kalir)',
       'total_revenue=' + nisan.total_revenue + ' — 25.500 ise komisyon gelirden dusulmus');
 
     // -----------------------------------------------------------------------

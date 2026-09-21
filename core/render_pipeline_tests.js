@@ -109,6 +109,7 @@ function domKur() {
 
 domKur();
 
+global.ExecutiveDashboardService = require('./executive_dashboard_service.js');
 const app = require('../app.js');
 
 let passed = 0, failed = 0;
@@ -332,6 +333,45 @@ function run() {
     viewerGrid.slice(0, 1200));
   } catch (e) {
     no('21-25. Phase 36 anasayfa hazirlik render testi', hataOzeti(e));
+  }
+
+  // --- Phase 38: finansal KPI'lar ayni anasayfa sozlesmesinde ------------
+  try {
+    domKur();
+    const kpiVeri = bosVeri();
+    kpiVeri.villas = {
+      V1: { id: 'p1', slug: 'V1', name: 'KPI Evi', activatedOn: '2026-01-01', isActive: true }
+    };
+    kpiVeri.bookings = [{
+      id: 'kpi-b1', villa: 'V1', propertyId: 'p1', checkIn: '2026-09-01', checkOut: '2026-09-11',
+      nights: 10, gross: 100000, cleaningFee: 10000, otaCommission: 10000, discount: 0,
+      status: 'CONFIRMED'
+    }];
+    kpiVeri.expenses = [
+      { id: 'kpi-o', date: '2026-09-05', amount: 20000, type: 'OPEX', villa: 'ALL', category: 'Enerji' },
+      { id: 'kpi-c', date: '2026-09-06', amount: 15000, type: 'CAPEX', villa: 'ALL', category: 'Yatırım' }
+    ];
+    app.setAppData(kpiVeri);
+    app.setActiveTenantForTests(null);
+    app.setCurrentFilter({ period: '2026-09', villa: 'ALL', startDate: null, endDate: null });
+    app.renderExecutiveControlCenter();
+
+    const get = id => global.document.getElementById(id).innerText;
+    check(get('execKpiRevenue') === '₺100.000'
+      && get('execKpiOpex') === '₺30.000'
+      && get('execKpiCapex') === '₺15.000'
+      && get('execKpiOperatingProfit') === '₺70.000'
+      && get('execKpiProfit') === '₺55.000',
+    '26. Anasayfa ciro, OPEX, CAPEX, faaliyet kari ve net nakit karini birlikte gosteriyor',
+    JSON.stringify({ revenue: get('execKpiRevenue'), opex: get('execKpiOpex'), capex: get('execKpiCapex'),
+      operatingProfit: get('execKpiOperatingProfit'), netProfit: get('execKpiProfit') }));
+    check(get('execKpiOccupancy') === '%33.33' && get('execSoldNightsLabel') === '10 / 30 Gece'
+      && get('execKpiAdr') === '₺9.000' && get('execKpiRevpar') === '₺3.000',
+    '27. Doluluk, satilan/kullanilabilir gece, ADR ve RevPAR ayni filtreyle entegre',
+    JSON.stringify({ occupancy: get('execKpiOccupancy'), nights: get('execSoldNightsLabel'),
+      adr: get('execKpiAdr'), revpar: get('execKpiRevpar') }));
+  } catch (e) {
+    no('26-27. Phase 38 anasayfa KPI render testi', hataOzeti(e));
   }
 
   // --- Pazarlama ekrani: renderAll'in DISINDA kalan render yolu ---------------

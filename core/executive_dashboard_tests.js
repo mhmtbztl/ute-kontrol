@@ -30,7 +30,7 @@ function runExecutiveDashboardTests() {
   ];
   const sampleExpenses = [
     { id: 'e1', amount: 12000, type: 'OPEX' },
-    { id: 'e2', amount: 8000, type: 'OPEX' }
+    { id: 'e2', amount: 8000, type: 'CAPEX' }
   ];
   const targets = {
     revenue_target: 60000,
@@ -54,7 +54,11 @@ function runExecutiveDashboardTests() {
   assert.strictEqual(kpis.revenue.variance.varianceAmount, -10000);
   assert.strictEqual(kpis.revenue.variance.status, 'BELOW_TARGET');
 
-  // Net Profit: 50000 - 20000 = 30000. Target: 35000 -> variance: -5000 (-14%)
+  // OPEX and CAPEX remain distinct; both are deducted from net cash profit.
+  assert.strictEqual(kpis.opex.current, 12000);
+  assert.strictEqual(kpis.capex.current, 8000);
+  assert.strictEqual(kpis.operatingProfit.current, 38000);
+  assert.strictEqual(kpis.expenses, 20000);
   assert.strictEqual(kpis.netProfit.current, 30000);
   assert.strictEqual(kpis.netProfit.target, 35000);
 

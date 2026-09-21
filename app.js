@@ -3500,25 +3500,31 @@ function computePreviousPeriodCategoryTotals() {
 
 function computePreviousPeriodTotals() {
   const prev = getPreviousPeriodKey(currentFilter && currentFilter.period);
-  const out = { revenue: 0, expense: 0, nights: 0, netProfit: 0, hasData: false };
+  const out = { revenue: 0, roomRevenue: 0, opex: 0, capex: 0, nights: 0, operatingProfit: 0, netProfit: 0, hasData: false };
   if (!prev || !appData) return out;
 
   (appData.bookings || []).forEach(b => {
     const ci = b.checkin || b.checkIn;
     if (!inPeriodKey(ci, prev)) return;
     if (!matchesVillaFilter(b)) return;
-    out.revenue += Number(b.gross !== undefined ? b.gross : b.netRoomRevenue) || 0;
+    const gross = Number(b.gross ?? b.grossAmount ?? b.gross_amount ?? b.netRoomRevenue) || 0;
+    out.revenue += gross;
+    out.roomRevenue += gross - (Number(b.cleaningFee ?? b.cleaning_fee) || 0) - (Number(b.discount) || 0);
     out.nights += Number(b.nights) || 0;
-    out.expense += (Number(b.otaCommission) || 0) + (Number(b.cleaningFee) || 0);
+    out.opex += Number(b.otaCommission ?? b.otaComm ?? b.ota_commission) || 0;
     out.hasData = true;
   });
   (appData.expenses || []).forEach(e => {
     if (!inPeriodKey(e.date || e.expense_date, prev)) return;
     if (!matchesVillaFilter(e)) return;
-    out.expense += Number(e.amount) || 0;
+    const amount = Number(e.amount) || 0;
+    const expenseType = String(e.expenseType || e.expense_type || e.type || 'OPEX').toUpperCase();
+    if (expenseType === 'CAPEX') out.capex += amount;
+    else out.opex += amount;
     out.hasData = true;
   });
-  out.netProfit = out.revenue - out.expense;
+  out.operatingProfit = out.revenue - out.opex;
+  out.netProfit = out.operatingProfit - out.capex;
   return out;
 }
 
@@ -10373,6 +10379,17 @@ const KPI_EXPLANATION_GUIDES = {
     example: 'Örn: Ocak ayında yapılan 465.331 TL\'lik kış hazırlığı ve sauna yatırımı.',
     actionRule: 'Doğru bir CAPEX yatırımı (örn: ısıtmalı jakuzi), kendini 2-3 ayda gecelik fiyat artışıyla geri öder.'
   },
+  'OPERATING_PROFIT': {
+    title: 'Faaliyet Kârı',
+    icon: '📉',
+    category: 'OPERASYON VERİMLİLİĞİ',
+    badgeClass: 'badge-blue',
+    summary: 'Cirodan OPEX düşüldükten sonra, yatırım harcamaları düşülmeden önce kalan işletme sonucudur.',
+    warning: 'Faaliyet kârı CAPEX’i içermez; sahibin cebinde kalan nihai nakit için Net Nakit Kârı izleyin.',
+    formula: 'Faaliyet Kârı = Gerçekleşen Ciro − OPEX',
+    example: 'Örnek: 100.000 TL ciro ve 40.000 TL OPEX için faaliyet kârı 60.000 TL’dir.',
+    actionRule: 'Faaliyet marjı düşüyorsa önce komisyon, enerji, temizlik ve sarf giderlerini inceleyin.'
+  },
   'GAP_NIGHTS': {
     title: 'Boşluk Geceleri (Gap Nights & Yetim Geceler)',
     icon: '🧩',
@@ -14983,17 +15000,63 @@ function getExecutiveSnapshotContext() {
 }
 
 function setExecutiveSnapshotPlaceholder(message) {
-  ['execKpiRevenue', 'execKpiProfit', 'execKpiOccupancy', 'execKpiAdr', 'execKpiRevpar', 'execKpiForecast']
+  ['execKpiRevenue', 'execKpiOpex', 'execKpiCapex', 'execKpiOperatingProfit',
+    'execKpiProfit', 'execKpiOccupancy', 'execKpiAdr', 'execKpiRevpar']
     .forEach(id => setEl(id, '—'));
-  setEl('execRevVariance', '—');
-  setEl('execRevMoM', '—');
-  setEl('execProfitMargin', '—');
-  setEl('execProfitVariance', '—');
-  setEl('execOccVariance', '—');
-  setEl('execSoldNightsLabel', '—');
-  setEl('execForecastPacing', 'Tahmin hesaplanmadı');
-  setEl('execForecastConfidence', '—');
+  ['execRevVariance', 'execRevMoM', 'execOpexRatio', 'execOtaCost', 'execCapexRatio',
+    'execCapexTrend', 'execOperatingMargin', 'execOperatingTrend', 'execProfitMargin',
+    'execProfitVariance', 'execOccVariance', 'execSoldNightsLabel', 'execAdrTrend',
+    'execRevparTrend'].forEach(id => setEl(id, '—'));
   setEl('execSnapshotStatus', message);
+}
+
+function renderExecutiveKpiValues(kpis) {
+  const money = value => value === null || value === undefined || !Number.isFinite(Number(value))
+    ? '—' : `₺${Number(value).toLocaleString('tr-TR')}`;
+  const ratio = (value, revenue) => value === null || value === undefined || !(Number(revenue) > 0)
+    ? '—' : `%${Math.round((Number(value) / Number(revenue)) * 100)}`;
+  const trend = metric => !metric || metric.prior === null || metric.prior === undefined
+    ? 'geçen ay veri yok' : `${formatMoMDelta(metric.current, metric.prior)} Geçen Ay`;
+
+  setEl('execKpiRevenue', money(kpis.revenue.current));
+  setEl('execKpiOpex', money(kpis.opex.current));
+  setEl('execKpiCapex', money(kpis.capex.current));
+  setEl('execKpiOperatingProfit', money(kpis.operatingProfit.current));
+  setEl('execKpiProfit', money(kpis.netProfit.current));
+  setEl('execKpiOccupancy', kpis.occupancy.current === null ? '—' : `%${kpis.occupancy.current}`);
+  setEl('execKpiAdr', money(kpis.adr.current));
+  setEl('execKpiRevpar', money(kpis.revpar.current));
+
+  setEl('execRevMoM', trend(kpis.revenue));
+  setEl('execOpexRatio', kpis.opex.current === null ? '—' : `${ratio(kpis.opex.current, kpis.revenue.current)} Ciro`);
+  setEl('execOtaCost', kpis.opex.otaCommission === null || kpis.opex.otaCommission === undefined
+    ? 'OTA: —' : `OTA: ${money(kpis.opex.otaCommission)}`);
+  setEl('execCapexRatio', kpis.capex.current === null ? '—' : `${ratio(kpis.capex.current, kpis.revenue.current)} Ciro`);
+  setEl('execCapexTrend', trend(kpis.capex));
+  const operatingMargin = ratio(kpis.operatingProfit.current, kpis.revenue.current);
+  const netMargin = ratio(kpis.netProfit.current, kpis.revenue.current);
+  setEl('execOperatingMargin', operatingMargin === '—' ? '—' : `${operatingMargin} Marj`);
+  setEl('execOperatingTrend', trend(kpis.operatingProfit));
+  setEl('execProfitMargin', netMargin === '—' ? '—' : `${netMargin} Marj`);
+  setEl('execAdrTrend', trend(kpis.adr));
+  setEl('execRevparTrend', trend(kpis.revpar));
+  setEl('execSoldNightsLabel', `${kpis.bookedNights} / ${kpis.availableNights ?? '—'} Gece`);
+
+  const revVariance = document.getElementById('execRevVariance');
+  if (revVariance) {
+    revVariance.className = kpis.revenue.variance.varianceAmount >= 0 ? 'badge badge-green' : 'badge badge-red';
+    revVariance.innerText = kpis.revenue.target > 0
+      ? `${kpis.revenue.variance.varianceAmount >= 0 ? '+' : ''}%${kpis.revenue.variance.variancePercent} Hedef`
+      : 'Hedef belirlenmemiş';
+  }
+  setEl('execProfitVariance', kpis.netProfit.target > 0
+    ? `${kpis.netProfit.variance.varianceAmount >= 0 ? '+' : ''}%${kpis.netProfit.variance.variancePercent} Hedef`
+    : 'Hedef belirlenmemiş');
+  const occVariance = document.getElementById('execOccVariance');
+  if (occVariance) {
+    occVariance.className = kpis.occupancy.variance.varianceAmount >= 0 ? 'badge badge-green' : 'badge badge-yellow';
+    occVariance.innerText = kpis.occupancy.target > 0 ? `Hedef: %${kpis.occupancy.target}` : 'Hedef belirlenmemiş';
+  }
 }
 
 function renderExecutiveSnapshotKpis() {
@@ -15030,41 +15093,14 @@ function renderExecutiveSnapshotKpis() {
     executiveSnapshotState.current,
     { targets: periodTarget, priorSnapshot: executiveSnapshotState.prior }
   );
-  const money = value => value === null || value === undefined
-    ? '—' : `₺${Number(value).toLocaleString('tr-TR')}`;
-
-  setEl('execKpiRevenue', money(kpis.revenue.current));
-  setEl('execKpiProfit', money(kpis.netProfit.current));
-  setEl('execKpiOccupancy', kpis.occupancy.current === null ? '—' : `%${kpis.occupancy.current}`);
-  setEl('execKpiAdr', money(kpis.adr.current));
-  setEl('execKpiRevpar', money(kpis.revpar.current));
-  setEl('execKpiForecast', '—');
-  setEl('execRevMoM', kpis.revenue.prior === null ? 'geçen ay veri yok' : `${formatMoMDelta(kpis.revenue.current, kpis.revenue.prior)} Geçen Ay`);
-  setEl('execSoldNightsLabel', `${kpis.bookedNights} Gece`);
-  setEl('execProfitMargin', kpis.revenue.current > 0 ? `%${Math.round((kpis.netProfit.current / kpis.revenue.current) * 100)} Marj` : '—');
-  setEl('execForecastPacing', 'Tahmin hesaplanmadı');
-  setEl('execForecastConfidence', '—');
-
-  const revVariance = document.getElementById('execRevVariance');
-  if (revVariance) {
-    revVariance.className = kpis.revenue.variance.varianceAmount >= 0 ? 'badge badge-green' : 'badge badge-red';
-    revVariance.innerText = kpis.revenue.target > 0
-      ? `${kpis.revenue.variance.varianceAmount >= 0 ? '+' : ''}%${kpis.revenue.variance.variancePercent} Hedef`
-      : 'Hedef belirlenmemiş';
-  }
-  setEl('execProfitVariance', kpis.netProfit.target > 0
-    ? `${kpis.netProfit.variance.varianceAmount >= 0 ? '+' : ''}%${kpis.netProfit.variance.variancePercent} Hedef`
-    : 'Hedef belirlenmemiş');
-  const occVariance = document.getElementById('execOccVariance');
-  if (occVariance) {
-    occVariance.className = kpis.occupancy.variance.varianceAmount >= 0 ? 'badge badge-green' : 'badge badge-yellow';
-    occVariance.innerText = kpis.occupancy.target > 0 ? `Hedef: %${kpis.occupancy.target}` : 'Hedef belirlenmemiş';
-  }
+  renderExecutiveKpiValues(kpis);
 
   const phase32Ready = executiveSnapshotState.current.room_revenue !== undefined;
-  setEl('execSnapshotStatus', phase32Ready
-    ? 'Sunucu anlık görüntüsü • finansal tek kaynak'
-    : 'Sunucu anlık görüntüsü • Phase 32 uygulanana kadar ADR/RevPAR gösterilmez');
+  setEl('execSnapshotStatus', !phase32Ready
+    ? 'Sunucu anlık görüntüsü • Phase 32 uygulanana kadar ADR/RevPAR gösterilmez'
+    : kpis.hasExpenseBreakdown
+      ? 'Sunucu anlık görüntüsü • finansal tek kaynak'
+      : 'Sunucu anlık görüntüsü • Phase 38 uygulanana kadar OPEX/CAPEX ayrımı gösterilmez');
   return true;
 }
 
@@ -15197,67 +15233,18 @@ function renderExecutiveControlCenter() {
         const kapasite = Math.max(1, propertiesList.length * gunler);
         return {
           revenue: p.revenue,
+          opex: p.opex,
+          capex: p.capex,
+          operatingProfit: p.operatingProfit,
           netProfit: p.netProfit,
           occupancy: Number(((p.nights / kapasite) * 100).toFixed(2)),
-          adr: p.nights > 0 ? Math.round(p.revenue / p.nights) : 0,
-          revpar: Math.round(p.revenue / kapasite)
+          adr: p.nights > 0 ? Math.round(p.roomRevenue / p.nights) : 0,
+          revpar: Math.round(p.roomRevenue / kapasite)
         };
       })()
     });
-
-    // Sabit "↑ %0 Geçen Ay" / "0 Gece" / "Pacing: %100" etiketleri
-    setEl('execRevMoM', (kpis.revenue.prior === null || kpis.revenue.prior === undefined)
-      ? 'geçen ay veri yok'
-      : formatMoMDelta(kpis.revenue.current, kpis.revenue.prior) + ' Geçen Ay');
-
-    const satilanGece = scopedBookings
-      .filter(b => b.status !== 'CANCELLED')
-      .reduce((a, b) => a + (Number(b.nights) || 0), 0);
-    setEl('execSoldNightsLabel', satilanGece + ' Gece');
-
-    const hedefCiro = Number((periodTarget && (periodTarget.revenue_target || periodTarget.revenueTarget)) || 0);
-    setEl('execForecastPacing', hedefCiro > 0
-      ? 'Pacing: %' + Math.round((kpis.forecast.monthEndRevenue / hedefCiro) * 100)
-      : 'Hedef belirlenmemiş');
-
-    const revEl = document.getElementById('execKpiRevenue');
-    if (revEl) revEl.innerText = `₺${Number(kpis.revenue.current).toLocaleString('tr-TR')}`;
-    const revVar = document.getElementById('execRevVariance');
-    if (revVar) {
-      const v = kpis.revenue.variance;
-      revVar.className = v.varianceAmount >= 0 ? 'badge badge-green' : 'badge badge-red';
-      revVar.innerText = `${v.varianceAmount >= 0 ? '+' : ''}%${v.variancePercent} Hedef`;
-    }
-
-    const profitEl = document.getElementById('execKpiProfit');
-    if (profitEl) profitEl.innerText = `₺${Number(kpis.netProfit.current).toLocaleString('tr-TR')}`;
-    const profitMarginEl = document.getElementById('execProfitMargin');
-    if (profitMarginEl) {
-      const margin = kpis.revenue.current > 0 ? Math.round((kpis.netProfit.current / kpis.revenue.current) * 100) : 0;
-      profitMarginEl.innerText = `%${margin} Marj`;
-    }
-
-    const occEl = document.getElementById('execKpiOccupancy');
-    if (occEl) occEl.innerText = kpis.occupancy.current == null ? '—' : `%${kpis.occupancy.current}`;
-    const occVar = document.getElementById('execOccVariance');
-    if (occVar) {
-      const v = kpis.occupancy.variance;
-      occVar.className = v.varianceAmount >= 0 ? 'badge badge-green' : 'badge badge-yellow';
-      occVar.innerText = kpis.occupancy.target > 0 ? `Hedef: %${kpis.occupancy.target}` : 'Hedef belirlenmemiş';
-    }
-
-    const adrEl = document.getElementById('execKpiAdr');
-    if (adrEl) adrEl.innerText = kpis.adr.current == null ? '—' : `₺${Number(kpis.adr.current).toLocaleString('tr-TR')}`;
-
-    const revparEl = document.getElementById('execKpiRevpar');
-    if (revparEl) revparEl.innerText = kpis.revpar.current == null ? '—' : `₺${Number(kpis.revpar.current).toLocaleString('tr-TR')}`;
-
-    const forecastEl = document.getElementById('execKpiForecast');
-    if (forecastEl) {
-      forecastEl.innerText = kpis.forecast.monthEndRevenue == null
-        ? '—'
-        : `₺${Number(kpis.forecast.monthEndRevenue).toLocaleString('tr-TR')}`;
-    }
+    renderExecutiveKpiValues(kpis);
+    setEl('execSnapshotStatus', 'Yerel veri görünümü • OPEX/CAPEX ayrımı etkin');
   }
 
   // 2. Onboarding Progress

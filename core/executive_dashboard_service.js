@@ -52,14 +52,23 @@
       distributionCost += Number(b.ota_commission || b.otaCommission || 0);
     });
 
-    let currentExpenses = distributionCost;
+    let manualOpex = 0;
+    let capex = 0;
     expenses.forEach(e => {
-      currentExpenses += Number(e.amount || 0);
+      const amount = Number(e.amount || 0);
+      const expenseType = String(e.expense_type || e.expenseType || e.type || 'OPEX').toUpperCase();
+      if (expenseType === 'CAPEX') capex += amount;
+      else manualOpex += amount;
     });
 
     currentRevenue = roundMoney(currentRevenue);
-    currentExpenses = roundMoney(currentExpenses);
-    const netCashProfit = roundMoney(currentRevenue - currentExpenses);
+    distributionCost = roundMoney(distributionCost);
+    manualOpex = roundMoney(manualOpex);
+    const operatingExpenses = roundMoney(manualOpex + distributionCost);
+    capex = roundMoney(capex);
+    const currentExpenses = roundMoney(operatingExpenses + capex);
+    const operatingProfit = roundMoney(currentRevenue - operatingExpenses);
+    const netCashProfit = roundMoney(operatingProfit - capex);
 
     const calculatedCapacity = availableNights !== null && availableNights !== undefined && Number.isFinite(Number(availableNights))
       ? Number(availableNights) : Number(propertiesCount) * Number(daysInMonth);
@@ -89,11 +98,29 @@
     }
 
     return {
+      expenses: currentExpenses,
+      bookedNights,
+      availableNights: totalAvailableRoomNights,
+      otaCommission: distributionCost,
       revenue: {
         current: currentRevenue,
         target: targetRevenue,
         variance: calcVariance(currentRevenue, targetRevenue),
         prior: priorPeriodMetrics ? priorPeriodMetrics.revenue : null
+      },
+      opex: {
+        current: operatingExpenses,
+        manual: manualOpex,
+        otaCommission: distributionCost,
+        prior: priorPeriodMetrics ? priorPeriodMetrics.opex : null
+      },
+      capex: {
+        current: capex,
+        prior: priorPeriodMetrics ? priorPeriodMetrics.capex : null
+      },
+      operatingProfit: {
+        current: operatingProfit,
+        prior: priorPeriodMetrics ? priorPeriodMetrics.operatingProfit : null
       },
       netProfit: {
         current: netCashProfit,
@@ -139,6 +166,14 @@
     const revenue = roundMoney(snapshot.total_revenue);
     const expenses = roundMoney(snapshot.total_expenses);
     const netProfit = roundMoney(snapshot.net_profit);
+    const hasExpenseBreakdown = snapshot.operating_expenses !== null && snapshot.operating_expenses !== undefined
+      && snapshot.capex !== null && snapshot.capex !== undefined
+      && snapshot.operating_profit !== null && snapshot.operating_profit !== undefined;
+    const opex = hasExpenseBreakdown ? roundMoney(snapshot.operating_expenses) : null;
+    const capex = hasExpenseBreakdown ? roundMoney(snapshot.capex) : null;
+    const operatingProfit = hasExpenseBreakdown ? roundMoney(snapshot.operating_profit) : null;
+    const otaCommission = snapshot.ota_commission === null || snapshot.ota_commission === undefined
+      ? null : roundMoney(snapshot.ota_commission);
     const bookedNights = Math.max(0, Number(snapshot.booked_nights) || 0);
     const availableNights = Math.max(0, Number(snapshot.available_nights) || 0);
     const occupancy = snapshot.occupancy === null || snapshot.occupancy === undefined
@@ -162,6 +197,10 @@
 
     const priorRevenue = prior ? roundMoney(prior.total_revenue) : null;
     const priorNetProfit = prior ? roundMoney(prior.net_profit) : null;
+    const priorHasExpenseBreakdown = !!prior
+      && prior.operating_expenses !== null && prior.operating_expenses !== undefined
+      && prior.capex !== null && prior.capex !== undefined
+      && prior.operating_profit !== null && prior.operating_profit !== undefined;
     const priorOccupancy = prior && prior.occupancy !== null && prior.occupancy !== undefined
       ? roundMoney(prior.occupancy) : null;
     const priorRoomRevenue = prior && prior.room_revenue !== null && prior.room_revenue !== undefined
@@ -171,10 +210,23 @@
 
     return {
       source: 'SERVER_SNAPSHOT',
+      hasExpenseBreakdown,
       expenses,
       bookedNights,
       availableNights,
+      otaCommission,
       revenue: { current: revenue, target: targetRevenue, variance: variance(revenue, targetRevenue), prior: priorRevenue },
+      opex: {
+        current: opex,
+        manual: snapshot.manual_opex === null || snapshot.manual_opex === undefined ? null : roundMoney(snapshot.manual_opex),
+        otaCommission,
+        prior: priorHasExpenseBreakdown ? roundMoney(prior.operating_expenses) : null
+      },
+      capex: { current: capex, prior: priorHasExpenseBreakdown ? roundMoney(prior.capex) : null },
+      operatingProfit: {
+        current: operatingProfit,
+        prior: priorHasExpenseBreakdown ? roundMoney(prior.operating_profit) : null
+      },
       netProfit: { current: netProfit, target: targetProfit, variance: variance(netProfit, targetProfit), prior: priorNetProfit },
       occupancy: { current: occupancy, target: targetOccupancy, variance: variance(occupancy, targetOccupancy), prior: priorOccupancy },
       adr: {

@@ -10,7 +10,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=6694a630">
+  <link rel="stylesheet" href="style.css?v=9c7d8f8d">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -409,7 +409,7 @@
         Sunucu anlık görüntüsü hazırlanıyor…
       </div>
 
-      <!-- 2. TOP EXECUTIVE KPI STRIP (6 CARDS) -->
+      <!-- 2. TOP EXECUTIVE KPI STRIP (PHASE 38 — 8 CARDS) -->
       <section class="executive-kpi-grid">
         <!-- 1. Realized Revenue -->
         <div class="executive-kpi-card" id="execCardRevenue">
@@ -417,75 +417,101 @@
             <span class="kpi-label">GERÇEKLEŞEN CİRO</span>
             <button class="kpi-info-btn" onclick="showKpiExplanation('REVENUE')">ℹ️</button>
           </div>
-          <div class="kpi-val" id="execKpiRevenue">₺0</div>
+          <div class="kpi-val" id="execKpiRevenue">—</div>
           <div class="kpi-meta">
             <span class="badge badge-green" id="execRevVariance">—</span>
             <span id="execRevMoM" style="color: #94A3B8;">—</span>
           </div>
         </div>
 
-        <!-- 2. Net Cash Profit -->
-        <div class="executive-kpi-card highlight-profit" id="execCardProfit">
+        <!-- 2. Operating Expenses -->
+        <div class="executive-kpi-card" id="execCardOpex">
           <div class="kpi-card-header">
-            <span class="kpi-label">NET KÂR (CASH PROFIT)</span>
-            <button class="kpi-info-btn" onclick="showKpiExplanation('NET_PROFIT')">ℹ️</button>
+            <span class="kpi-label">OPEX (FAALİYET GİDERİ)</span>
+            <button class="kpi-info-btn" onclick="showKpiExplanation('OPEX')">ℹ️</button>
           </div>
-          <div class="kpi-val" id="execKpiProfit" style="color: #34D399;">₺0</div>
+          <div class="kpi-val" id="execKpiOpex" style="color: #FBBF24;">—</div>
           <div class="kpi-meta">
-            <span class="badge badge-green" id="execProfitMargin">%0 Marj</span>
-            <span id="execProfitVariance" style="color: #94A3B8;">Hedefle başa baş</span>
+            <span class="badge badge-yellow" id="execOpexRatio">—</span>
+            <span id="execOtaCost" style="color: #94A3B8;">—</span>
           </div>
         </div>
 
-        <!-- 3. Occupancy -->
+        <!-- 3. Capital Expenses -->
+        <div class="executive-kpi-card" id="execCardCapex">
+          <div class="kpi-card-header">
+            <span class="kpi-label">CAPEX (YATIRIM GİDERİ)</span>
+            <button class="kpi-info-btn" onclick="showKpiExplanation('CAPEX')">ℹ️</button>
+          </div>
+          <div class="kpi-val" id="execKpiCapex" style="color: #FB7185;">—</div>
+          <div class="kpi-meta">
+            <span class="badge badge-purple" id="execCapexRatio">—</span>
+            <span id="execCapexTrend" style="color: #94A3B8;">—</span>
+          </div>
+        </div>
+
+        <!-- 4. Operating Profit -->
+        <div class="executive-kpi-card" id="execCardOperatingProfit">
+          <div class="kpi-card-header">
+            <span class="kpi-label">FAALİYET KÂRI</span>
+            <button class="kpi-info-btn" onclick="showKpiExplanation('OPERATING_PROFIT')">ℹ️</button>
+          </div>
+          <div class="kpi-val" id="execKpiOperatingProfit">—</div>
+          <div class="kpi-meta">
+            <span class="badge badge-blue" id="execOperatingMargin">—</span>
+            <span id="execOperatingTrend" style="color: #94A3B8;">—</span>
+          </div>
+        </div>
+
+        <!-- 5. Net Cash Profit -->
+        <div class="executive-kpi-card highlight-profit" id="execCardProfit">
+          <div class="kpi-card-header">
+            <span class="kpi-label">NET NAKİT KÂRI</span>
+            <button class="kpi-info-btn" onclick="showKpiExplanation('NET_PROFIT')">ℹ️</button>
+          </div>
+          <div class="kpi-val" id="execKpiProfit" style="color: #34D399;">—</div>
+          <div class="kpi-meta">
+            <span class="badge badge-green" id="execProfitMargin">—</span>
+            <span id="execProfitVariance" style="color: #94A3B8;">—</span>
+          </div>
+        </div>
+
+        <!-- 6. Occupancy -->
         <div class="executive-kpi-card" id="execCardOccupancy">
           <div class="kpi-card-header">
             <span class="kpi-label">DOLULUK ORANI</span>
             <button class="kpi-info-btn" onclick="showKpiExplanation('OCCUPANCY')">ℹ️</button>
           </div>
-          <div class="kpi-val" id="execKpiOccupancy">0%</div>
+          <div class="kpi-val" id="execKpiOccupancy">—</div>
           <div class="kpi-meta">
             <span class="badge badge-blue" id="execOccVariance">—</span>
-            <span id="execSoldNightsLabel" style="color: #94A3B8;">0 Gece</span>
+            <span id="execSoldNightsLabel" style="color: #94A3B8;">—</span>
           </div>
         </div>
 
-        <!-- 4. ADR -->
+        <!-- 7. ADR -->
         <div class="executive-kpi-card" id="execCardAdr">
           <div class="kpi-card-header">
             <span class="kpi-label">ADR (ORT. GÜNLÜK FİYAT)</span>
             <button class="kpi-info-btn" onclick="showKpiExplanation('ADR')">ℹ️</button>
           </div>
-          <div class="kpi-val" id="execKpiAdr">₺0</div>
+          <div class="kpi-val" id="execKpiAdr">—</div>
           <div class="kpi-meta">
             <span style="color: #94A3B8;">Satılan Gece Başına</span>
-            <span id="execAdrTrend" style="color: #A78BFA;">Stabil</span>
+            <span id="execAdrTrend" style="color: #A78BFA;">—</span>
           </div>
         </div>
 
-        <!-- 5. RevPAR -->
+        <!-- 8. RevPAR -->
         <div class="executive-kpi-card" id="execCardRevpar">
           <div class="kpi-card-header">
             <span class="kpi-label">RevPAR (ODA BAŞI GELİR)</span>
             <button class="kpi-info-btn" onclick="showKpiExplanation('REVPAR')">ℹ️</button>
           </div>
-          <div class="kpi-val" id="execKpiRevpar">₺0</div>
+          <div class="kpi-val" id="execKpiRevpar">—</div>
           <div class="kpi-meta">
             <span style="color: #94A3B8;">Mevcut Kapasite Başına</span>
-            <span id="execRevparTrend" style="color: #A78BFA;">Verimli</span>
-          </div>
-        </div>
-
-        <!-- 6. Month-End Forecast -->
-        <div class="executive-kpi-card" id="execCardForecast">
-          <div class="kpi-card-header">
-            <span class="kpi-label">AY SONU TAHMİNİ</span>
-            <span class="badge badge-purple" style="font-size: 9px;">TAHMİN</span>
-          </div>
-          <div class="kpi-val" id="execKpiForecast" style="color: #C084FC;">₺0</div>
-          <div class="kpi-meta">
-            <span id="execForecastPacing" style="color: #E2E8F0;">—</span>
-            <span class="badge badge-green" id="execForecastConfidence" style="font-size: 9px;">Yüksek Güven</span>
+            <span id="execRevparTrend" style="color: #A78BFA;">—</span>
           </div>
         </div>
       </section>
@@ -4392,10 +4418,10 @@
   <script src="core/pricing_booking_service.js?v=0eb93c05"></script>
   <script src="core/revenue_forecast_service.js?v=358b0879"></script>
   <script src="core/executive_priority_service.js?v=d113e0e8"></script>
-  <script src="core/executive_dashboard_service.js?v=be794e79"></script>
+  <script src="core/executive_dashboard_service.js?v=baf5396e"></script>
   <script src="core/executive_ai_advisor.js?v=4b235c67"></script>
   <script src="core/notification_center_service.js?v=710f8a91"></script>
-  <script src="app.js?v=d888e72a"></script>
+  <script src="app.js?v=05a21744"></script>
   <script src="core/marketing_ui.js?v=2e506018"></script>
 </body>
 </html>
