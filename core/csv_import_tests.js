@@ -416,6 +416,162 @@ function arayuzTestleri() {
     'hic gorunmez.');
 }
 
+// =============================================================================
+// D) BASLIK ESLESMESI — Turkce buyuk "İ" tuzagi
+// =============================================================================
+function baslikTestleri(E) {
+  console.log('\n--- D) BASLIK ESLESMESI ---');
+
+  const alan = (h, mod, k) => E.autoDetectColumnMap([h], mod)[k];
+
+  check(alan('İşlem Tarihi', 'EXPENSES', 'date') === 'İşlem Tarihi',
+    'D1. Turkce buyuk İ ile baslayan baslik taniniyor ("İşlem Tarihi")',
+    'JavaScript\'te \'İ\'.toLowerCase() sonucu \'i\' DEGIL, \'i\' + U+0307 ' +
+    '(birlestirici ustnokta). Sozlukteki "işlem tarihi" ile asla eslesmiyor ' +
+    've banka ekstresi bicimindeki dosya "zorunlu sutun eksik" ile ' +
+    'reddediliyor. Donen: ' + JSON.stringify(alan('İşlem Tarihi', 'EXPENSES', 'date')));
+
+  check(alan('İsim', 'BOOKINGS', 'guest') === 'İsim',
+    'D2. "İsim" misafir adi olarak taniniyor', 'Ayni U+0307 tuzagi.');
+
+  check(alan('Misafir Sayısı', 'BOOKINGS', 'pax') === 'Misafir Sayısı',
+    'D3. "Misafir Sayısı" kisi sayisi olarak taniniyor',
+    'Sozlukte yalnizca noktasiz "misafir sayisi" vardi.');
+
+  // Duzeltme Ingilizce adlari bozmamali: `toLocaleLowerCase("tr")` kullanmak
+  // 'I' harfini 'ı'ya cevirir ve bu kez "Invoice"/"ID"/"ISIM" kirilir.
+  const ing = { Property: 'property', Guest: 'guest', 'Check-in': 'checkIn',
+    'Check-out': 'checkOut', Gross: 'gross' };
+  const bozulan = Object.keys(ing).filter(h => alan(h, 'BOOKINGS', ing[h]) !== h);
+  check(bozulan.length === 0,
+    'D4. Ingilizce basliklar duzeltmeden etkilenmiyor',
+    'Bozulan: ' + bozulan.join(', ') + '. Turkce yerel kucultme I -> ı ' +
+    'cevirdigi icin sozlukteki Ingilizce adlari kirar.');
+
+  check(alan('Isim', 'BOOKINGS', 'guest') === 'Isim' &&
+        alan('Islem Tarihi', 'EXPENSES', 'date') === 'Islem Tarihi',
+    'D5. Noktasiz yazimlar da calismaya devam ediyor', 'Eski davranis kayboldu.');
+}
+
+// =============================================================================
+// E) YAYINLANAN ORNEK SABLONLAR
+// =============================================================================
+function sablonTestleri(app, E) {
+  console.log('\n--- E) ORNEK SABLONLAR ---');
+
+  const KLASOR = path.join(KOK, 'sablonlar');
+  const dosyalar = ['lexbnb-rezervasyon-sablonu.csv', 'lexbnb-rezervasyon-sablonu.xlsx',
+    'lexbnb-gider-sablonu.csv', 'lexbnb-gider-sablonu.xlsx'];
+
+  const eksik = dosyalar.filter(d => !fs.existsSync(path.join(KLASOR, d)));
+  check(eksik.length === 0,
+    'E1. Dort ornek sablon depoda yayinlanmis durumda',
+    'Eksik: ' + eksik.join(', ') + '. Arayuzdeki indirme baglantilari 404 verir.');
+  if (eksik.length) return;
+
+  // CSV sablonlari Excel tarafindan da dogru acilmali.
+  ['lexbnb-rezervasyon-sablonu.csv', 'lexbnb-gider-sablonu.csv'].forEach((d, i) => {
+    const ham = fs.readFileSync(path.join(KLASOR, d));
+    check(ham[0] === 0xEF && ham[1] === 0xBB && ham[2] === 0xBF,
+      `E${2 + i}. ${d} UTF-8 BOM ile yaziliyor`,
+      'BOM\'suz bir UTF-8 CSV\'yi Turkce Windows\'ta Excel windows-1254 sanar ' +
+      've "Misafir Adı" -> "Misafir AdÄ±" olur. Kendi motorumuz ikisini de ' +
+      'cozer, musterinin Excel\'i cozmez.');
+    check(ham.toString('utf8').split(/\r?\n/)[0].includes(';'),
+      `E${4 + i}. ${d} noktali virgulle ayrilmis`,
+      'Turkce yerel ayarda Excel\'in liste ayiricisi ";" oldugu icin virgullu ' +
+      'bir CSV tek sutun olarak acilir.');
+  });
+
+  // En onemlisi: verdigimiz sablon KENDI ice aktaricimizdan geciyor mu?
+  const ctx = {
+    properties: [
+      { id: 'p1', slug: 'MULK_KODU_1', key: 'MULK_KODU_1', name: 'Villa A' },
+      { id: 'p2', slug: 'MULK_KODU_2', key: 'MULK_KODU_2', name: 'Villa B' }
+    ],
+    existingBookings: [], isPeriodClosed: () => false, isStayPeriodClosed: () => false
+  };
+
+  let XLSX = null;
+  try { XLSX = require(path.join(KOK, 'xlsx.full.min.js')); } catch (e) { /* yok */ }
+  if (XLSX) global.XLSX = XLSX;
+  try {
+    dosyalar.forEach((d, i) => {
+      const kaynak = app.buildImportSource(
+        new Uint8Array(fs.readFileSync(path.join(KLASOR, d))), d);
+      const mod = d.includes('rezervasyon') ? 'BOOKINGS' : 'EXPENSES';
+      const zor = (mod === 'BOOKINGS')
+        ? ['property', 'guest', 'checkIn', 'checkOut', 'gross']
+        : ['date', 'category', 'amount'];
+      const map = E.autoDetectColumnMap(kaynak.headers, mod);
+      const eksikSutun = zor.filter(k => !map[k]);
+      const r = (mod === 'BOOKINGS')
+        ? E.validateBookingRows(kaynak.rows, map, ctx)
+        : E.validateExpenseRows(kaynak.rows, map, ctx);
+
+      check(eksikSutun.length === 0 && r.validCount === kaynak.rows.length && r.invalidCount === 0,
+        `E${6 + i}. ${d} kendi ice aktaricimizdan hatasiz geciyor`,
+        'Eksik sutun: ' + (eksikSutun.join(', ') || '-') +
+        ' | gecerli=' + r.validCount + ' hatali=' + r.invalidCount +
+        (r.errors && r.errors.length ? ' | ' + r.errors[0].errors.join(' ') : '') +
+        '. Musteriye verdigimiz sablonun yuklenememesi en utanc verici hatadir.');
+    });
+
+    // Yer tutucu korumasi: sablon DEGISTIRILMEDEN yuklenirse hicbir sey yazilmamali.
+    const yabanci = {
+      properties: [{ id: 'p9', slug: 'CINAR', key: 'CINAR', name: 'Villa Çınar' }],
+      existingBookings: [], isPeriodClosed: () => false, isStayPeriodClosed: () => false
+    };
+    const rez = app.buildImportSource(
+      new Uint8Array(fs.readFileSync(path.join(KLASOR, 'lexbnb-rezervasyon-sablonu.csv'))), 'r.csv');
+    const rr = E.validateBookingRows(rez.rows,
+      E.autoDetectColumnMap(rez.headers, 'BOOKINGS'), yabanci);
+    check(rr.validCount === 0 && rr.invalidCount === rez.rows.length,
+      'E10. Yer tutucu mulk kodu degistirilmezse HICBIR satir yazilmiyor',
+      'Ornek satirlar gercek mulke eslesiyor: sablonu oldugu gibi yukleyen ' +
+      'musteri defterine ornek veri yazmis olur (3.6). gecerli=' + rr.validCount);
+  } finally {
+    if (XLSX) delete global.XLSX;
+  }
+
+  // Uretici ile depodaki dosyalar ayrismis mi?
+  const { execSync } = require('child_process');
+  let temiz = true, cikti = '';
+  try {
+    cikti = execSync('node scripts/build_sample_templates.js --check',
+      { cwd: KOK, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  } catch (e) {
+    temiz = false;
+    cikti = (e.stdout || '') + (e.stderr || '');
+  }
+  check(temiz,
+    'E11. Yayinlanan sablonlar ureticiyle ayrismamis',
+    'Elle duzenlenen bir sablon, eslesme sozlugu degisince sessizce ' +
+    'gecersizlesir. Cozum: node scripts/build_sample_templates.js\n' +
+    String(cikti).trim().slice(0, 400));
+
+  // Ice aktarilamayan bir bicimin sablonu sunulmamali.
+  check(!/downloadSampleTemplate\('COMPANY'\)/.test(HTML) && !/'COMPANY'/.test(govde(APP, 'downloadSampleTemplate') || ''),
+    'E12. Ice aktarilamayan "Sirket Genel Raporu" sablonu sunulmuyor',
+    'Sablon indirtip dosyayi "bu dosya ice aktarilamaz" duvarina gondermek, ' +
+    'yapmadigimiz seyi vaat etmenin bir baska bicimidir (3.6).');
+
+  // Arayuz baglantilari gercek dosyalara gitmeli.
+  const linkler = (HTML.match(/href="(sablonlar\/[^"]+)"/g) || [])
+    .map(m => m.replace(/^href="|"$/g, ''));
+  check(linkler.length === 4,
+    'E13. Modalda dort indirme baglantisi var',
+    'Bulunan: ' + JSON.stringify(linkler));
+  const kirik = linkler.filter(l => !fs.existsSync(path.join(KOK, l)));
+  check(kirik.length === 0,
+    'E14. Indirme baglantilarinin hepsi var olan dosyayi gosteriyor',
+    'Kirik: ' + kirik.join(', '));
+  check((HTML.match(/href="sablonlar\/[^"]+"\s+download/g) || []).length === linkler.length,
+    'E15. Baglantilar `download` ile indiriliyor',
+    '`download` olmadan tarayici CSV\'yi sekmede acar, kullanici dosyayi ' +
+    'alamaz ve uygulamadan cikar.');
+}
+
 function run() {
   console.log('=============================================================================');
   console.log('LEXBNB CSV / METIN ICE AKTARMA DENETIMI (phase33)');
@@ -428,6 +584,8 @@ function run() {
   kaynakTestleri(app);
   davranisTestleri(app);
   arayuzTestleri();
+  baslikTestleri(E);
+  sablonTestleri(app, E);
 }
 
 try {

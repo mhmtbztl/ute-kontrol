@@ -9,6 +9,8 @@
     "test:bootstrap": "node scripts/bootstrap_test_project.js",
     "test:bootstrap:check": "node scripts/bootstrap_test_project.js --check",
     "verify:migrations": "node scripts/verify_migration_chain.js",
+    "templates": "node scripts/build_sample_templates.js",
+    "templates:check": "node scripts/build_sample_templates.js --check",
     "production:readiness": "node scripts/check_production_readiness.js",
     "invitations:worker": "node scripts/run_invitation_worker.js",
     "marketing:photo-worker": "node scripts/run_photo_analysis_worker.js",

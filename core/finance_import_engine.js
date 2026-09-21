@@ -176,7 +176,7 @@ const BASLIKLAR = {
     channel:     ['kanal', 'channel', 'kaynak', 'platform'],
     otaCommission: ['ota komisyonu', 'ota komisyonu (tl)', 'komisyon', 'commission'],
     cleaningFee: ['temizlik', 'temizlik ucreti', 'temizlik ücreti', 'temizlik ücreti (tl)', 'cleaning', 'cleanfee'],
-    pax:         ['kisi', 'kişi', 'kisi sayisi', 'kişi sayısı', 'pax', 'misafir sayisi'],
+    pax:         ['kisi', 'kişi', 'kisi sayisi', 'kişi sayısı', 'pax', 'misafir sayisi', 'misafir sayısı'],
     status:      ['durum', 'status'],
     code:        ['kod', 'rezervasyon kodu', 'code', 'booking code', 'referans']
   }
@@ -188,7 +188,18 @@ function autoDetectColumnMap(headers = [], mode = 'EXPENSES') {
   const map = {};
   Object.keys(sozluk).forEach(k => { map[k] = null; });
 
-  const norm = h => String(h || '').toLowerCase().trim().replace(/\s+/g, ' ');
+  // Turkce buyuk "İ" tuzagi: JavaScript'te 'İ'.toLowerCase() sonucu 'i'
+  // DEGILDIR, 'i' + U+0307 (birlestirici ustnokta) olur. Yani "İşlem Tarihi"
+  // basligi 'i̇şlem tarihi' haline gelir ve sozlukteki 'işlem tarihi'
+  // ile ASLA eslesmez. Banka ekstrelerinin standart sutun adi tam olarak
+  // budur; dosya "zorunlu sutun eksik" diye reddediliyordu.
+  //
+  // `toLocaleLowerCase('tr')` dogru gorunur ama daha kotudur: 'I' harfini de
+  // 'ı'ya cevirir ve sozlukteki Ingilizce adlari ("Invoice", "ID", "ISIM")
+  // bu kez o bozar. Cozum yalnizca artik isareti atmak.
+  const norm = h => String(h || '').toLowerCase()
+    .replace(/̇/g, '')
+    .trim().replace(/\s+/g, ' ');
   headers.forEach(h => {
     const n = norm(h);
     if (!n) return;

@@ -5321,11 +5321,12 @@ function downloadSampleTemplate(templateType) {
     const ws = XLSX.utils.json_to_sheet(data);
     XLSX.utils.book_append_sheet(wb, ws, 'Giderler');
     XLSX.writeFile(wb, 'LexBnB_Ornek_Gider_Sablonu.xlsx');
-  } else if (templateType === 'COMPANY') {
-    const wsG = XLSX.utils.aoa_to_sheet([['Dönem', 'Ciro (TL)', 'OPEX (TL)', 'CAPEX (TL)', 'Satılan Gece']]);
-    XLSX.utils.book_append_sheet(wb, wsG, 'GENEL');
-    XLSX.writeFile(wb, 'LexBnB_Ornek_Sirket_Raporu.xlsx');
   }
+  // 'COMPANY' dali KALDIRILDI (21 Eylul 2026): sirket genel raporu bilerek
+  // ICE AKTARILMIYOR (aylik toplamdan rezervasyon uretmek uydurma veri
+  // olurdu, 3.6). Sablonu indirtmek kullaniciyi doldurup yuklemeye ve
+  // "bu dosya ice aktarilamaz" duvarina gondermekten baska bir sey
+  // yapmiyordu.
 }
 
 /**

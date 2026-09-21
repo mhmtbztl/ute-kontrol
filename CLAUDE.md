@@ -248,6 +248,7 @@ ve kısmi veriyle daha kötü bir duruma yol açar. Bayrak işlem sonunda kapanm
 ```bash
 node stamp_assets.js     # varlıkları içerik hash'iyle damgala (ZORUNLU)
 npm run verify:migrations # göçlerin içerik bütünlüğü + bağımlılık sırası
+npm run templates:check   # yayınlanan örnek şablonlar üreticiyle uyumlu mu
 npm test                  # 101 çevrimdışı/güvenli süit
 npm run test:bootstrap    # test projesine eksik göçleri uygula (--check salt okunur)
 npm run test:live         # 125 süit, yalnız ayrı test projesine karşı
@@ -679,9 +680,52 @@ biliyor. Ayrıştırıcı asla `Number` üretmez.
 - Ayırıcı `;` `,` sekme `|`; sayım **tırnak dışında** yapılır.
 - Satır sonu yalnızca **tırnak dışında** kayıt bitirir.
 
+**Türkçe büyük İ tuzağı.** `'İ'.toLowerCase()` sonucu `'i'` **değildir**,
+`'i' + U+0307` (birleştirici üstnokta) olur. Sütun eşleme sözlüğündeki
+`'işlem tarihi'` ile asla tutmuyordu; banka ekstrelerinin standart sütun adı
+tam olarak bu ve dosya "zorunlu sütun eksik" ile reddediliyordu. `İsim` ve
+`İndirim` de aynı sınıfta. Düzeltme `autoDetectColumnMap` içindeki
+normalleştirmede artık işareti atmaktır — **`toLocaleLowerCase('tr')`
+kullanmayın**: o `I` harfini `ı`ya çevirir ve bu kez sözlükteki İngilizce
+adları (`Invoice`, `ID`, `ISIM`) bozar.
+
 Şirket genel raporu hâlâ **bilerek** içe aktarılmıyor (§3.6) — ama başlıktaki
-"Şirket Raporlarını Otomatik Çözer" vaadi kaldırıldı; yapmadığımız şeyi
-söylemek de uydurma veriyle aynı sınıftır.
+"Şirket Raporlarını Otomatik Çözer" vaadi ve **"Şirket Genel Rapor Şablonu"
+indirme düğmesi** kaldırıldı. Şablon indirtip dosyayı "bu dosya içe
+aktarılamaz" duvarına göndermek, yapmadığımız şeyi vaat etmenin bir başka
+biçimiydi.
+
+### Yayınlanan örnek şablonlar
+
+`sablonlar/` klasörü GitHub Pages ile birlikte yayınlanır, yani **giriş
+gerektirmeden** indirilebilir ve link olarak paylaşılabilir:
+
+```
+https://lexbnb.space/sablonlar/lexbnb-rezervasyon-sablonu.csv   (ve .xlsx)
+https://lexbnb.space/sablonlar/lexbnb-gider-sablonu.csv         (ve .xlsx)
+```
+
+Bunlar uygulama içindeki `downloadSampleTemplate()`'in **yerine geçmez,
+yanına durur**: o, müşterinin kendi mülk kodlarıyla ve bugüne göre
+tarihlerle üretir ve daha kolaydır. Statik dosya bunu bilemez.
+
+- **Yer tutucu koruması:** örnek satırlarda `MULK_KODU_1` yazar. Uydurma bir
+  villa adı koymak (eskiden `AZURE`/`BELLA` vardı) müşteriyi tanımsız bir
+  mülke kayıt girmeye gönderiyordu. Açık yer tutucu bunu tersine çevirir:
+  şablon **değiştirilmeden** yüklenirse mülk eşleşmez ve her satır reddedilir
+  — yanlışlıkla örnek veri yazılması imkânsızdır. `csv_import_tests` E10 bunu
+  ölçer.
+- **CSV biçimi Excel yüzünden iki karar taşır:** UTF-8 **BOM ile** (BOM'suz
+  UTF-8'i Türkçe Windows'ta Excel windows-1254 sanar) ve ayırıcı **noktalı
+  virgül** (Türkçe yerel ayarda Excel'in liste ayırıcısı `;`, virgüllü CSV
+  tek sütun açılır). Kendi motorumuz zaten ikisini de çözüyor; çözemeyen
+  müşterinin Excel'i.
+- **Elle düzenlemeyin.** Dosyalar `npm run templates` ile üretilir;
+  `npm run templates:check` içerikle ayrışmayı yakalar. Başlıklar eşleme
+  sözlüğüne bağlı ve sözlük değişince elle yazılmış bir şablon **sessizce**
+  geçersizleşir — `core/marketing_ui.js` damgalarında tam olarak bu oldu
+  (§4.1). Ağı `csv_import_tests` E1–E15; **en önemlisi E6–E9: müşteriye
+  verdiğimiz şablon kendi içe aktarıcımızdan geçiyor mu.**
 
 Ağı `core/csv_import_tests.js` (52 iddia: motor, `app.js` kaynağı, gerçek
 `buildImportSource` koşusu ve arayüz vaatleri). Eski gövdeye karşı ölçüldü:

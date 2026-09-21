@@ -3063,17 +3063,43 @@
       <div class="import-modal-body" style="padding: 16px;">
         <!-- Hazır Şablon İndirme Alanı -->
         <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-          <span style="font-size: 11px; color: #CBD5E1; font-weight: 600;">📋 Hazır Excel Şablonlarını İndir:</span>
-          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-            <button type="button" class="btn btn-secondary btn-sm" onclick="downloadSampleTemplate('BOOKINGS')" style="font-size: 11px; padding: 4px 8px; border-color: #3B82F6; color: #93C5FD;">
-              📥 Rezervasyon Şablonu (.xlsx)
-            </button>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="downloadSampleTemplate('EXPENSES')" style="font-size: 11px; padding: 4px 8px; border-color: #EF4444; color: #FCA5A5;">
-              📥 Gider Şablonu (.xlsx)
-            </button>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="downloadSampleTemplate('COMPANY')" style="font-size: 11px; padding: 4px 8px; border-color: #10B981; color: #6EE7B7;">
-              📥 Şirket Genel Rapor Şablonu (.xlsx)
-            </button>
+          <div style="width: 100%;">
+            <span style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 6px;">
+              📋 Kendi mülk kodlarınızla hazır şablon:
+            </span>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="downloadSampleTemplate('BOOKINGS')" style="font-size: 11px; padding: 4px 8px; border-color: #3B82F6; color: #93C5FD;">
+                📥 Rezervasyon Şablonu (.xlsx)
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="downloadSampleTemplate('EXPENSES')" style="font-size: 11px; padding: 4px 8px; border-color: #EF4444; color: #FCA5A5;">
+                📥 Gider Şablonu (.xlsx)
+              </button>
+            </div>
+          </div>
+
+          <!-- Bos ornek sablonlar: giris yapmadan da indirilebilen statik
+               dosyalar. Muhasebecinize/ekibinize link olarak gonderebilmek
+               icin ayri duruyorlar; yukaridakiler sizin mulk kodlarinizi
+               tasidigi icin daha kolaydir. -->
+          <div style="width: 100%; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 8px; margin-top: 2px;">
+            <span style="font-size: 11px; color: #94A3B8; font-weight: 600; display: block; margin-bottom: 6px;">
+              🔗 Boş örnek şablon (paylaşılabilir — giriş gerektirmez):
+            </span>
+            <div style="display: flex; gap: 12px; flex-wrap: wrap; font-size: 11px;">
+              <span style="color: #64748B;">Rezervasyon:
+                <a href="sablonlar/lexbnb-rezervasyon-sablonu.xlsx" download style="color: #93C5FD; font-weight: 600;">Excel</a> ·
+                <a href="sablonlar/lexbnb-rezervasyon-sablonu.csv" download style="color: #93C5FD; font-weight: 600;">CSV</a>
+              </span>
+              <span style="color: #64748B;">Gider:
+                <a href="sablonlar/lexbnb-gider-sablonu.xlsx" download style="color: #FCA5A5; font-weight: 600;">Excel</a> ·
+                <a href="sablonlar/lexbnb-gider-sablonu.csv" download style="color: #FCA5A5; font-weight: 600;">CSV</a>
+              </span>
+            </div>
+            <span style="font-size: 10px; color: #64748B; display: block; margin-top: 5px; line-height: 1.5;">
+              Villa sütununda <strong>MULK_KODU_1</strong> yazan satırlar yalnızca örnektir;
+              kendi mülk kodunuzla değiştirmezseniz o satırlar kaydedilmez.
+              Excel dosyasının ikinci sayfasında doldurma talimatı var.
+            </span>
           </div>
         </div>
 
@@ -3806,7 +3832,7 @@
   </div>
 
   <script src="core/financial_metrics_service.js?v=58fa83fc"></script>
-  <script src="core/finance_import_engine.js?v=9cd861af"></script>
+  <script src="core/finance_import_engine.js?v=ba5fb81b"></script>
 
   <!-- ======================================================= -->
   <!-- MODAL: WHATSAPP BUSINESS AKILLI MESAJ AYRIŞTIRICI -->
@@ -4369,7 +4395,7 @@
   <script src="core/executive_dashboard_service.js?v=be794e79"></script>
   <script src="core/executive_ai_advisor.js?v=4b235c67"></script>
   <script src="core/notification_center_service.js?v=710f8a91"></script>
-  <script src="app.js?v=dab53f41"></script>
+  <script src="app.js?v=d888e72a"></script>
   <script src="core/marketing_ui.js?v=2e506018"></script>
 </body>
 </html>
