@@ -351,14 +351,17 @@ bunu kullanıcıya açıkça söyler. Basamaklar **NULL olabilir**: girilmemiş 
 basamak 0 değil, bilinmiyordur (§3.6); göç bunu `PHASE31_LADDER_STEP_NOT_NULLABLE`
 ile doğrular.
 
-**phase36 (`migration_phase36_property_sales_readiness.sql`) henüz üretime
-uygulanmadı.** Phase31'in `housekeeping_status_overrides` tablosunu değiştirmeden,
+**phase36 (`migration_phase36_property_sales_readiness.sql`) 21 Eylül 2026'da
+kullanıcı tarafından Supabase SQL Editor'de hatasız uygulandı.** Phase31'in
+`housekeeping_status_overrides` tablosunu değiştirmeden,
 ileri yönlü bir kısıt genişletmesiyle dört satış hazırlığı durumunu ekler:
 `SALES_READY`, `NEEDS_CLEANING`, `BLOCKED_MAINTENANCE` ve
 `NON_BLOCKING_ISSUE`. Eski `READY/CLEANING/OCCUPIED` satırları istemcide
 normalize edilir. `paid` yalnız ödeme durumudur; satış hazırlığı hesabına
-katılmaz. Kod push edilmeden önce göç test projesine kurulmalı; üretim göçü
-ayrı ve açık onayla Supabase SQL Editor'den uygulanmalıdır.
+katılmaz. Göç test projesinde bootstrap ve canlı RLS süitiyle doğrulandı.
+Üretimde `pg_constraint` için salt-okunur bir sorgu yolu bulunmadığından,
+kullanıcının SQL Editor başarı bildirimi dışında bağımsız katalog doğrulaması
+yapılmadı; üretime doğrulama amacıyla test kaydı yazılmadı.
 
 Doğrulama §4.2'nin tablo sorgusuyla, önce ve sonra yapıldı:
 
