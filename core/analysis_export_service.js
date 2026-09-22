@@ -243,6 +243,7 @@
       schemaVersion: ANALYSIS_SCHEMA_VERSION,
       generatedAt: input.generatedAt || new Date().toISOString(),
       currency: request.currency,
+      includedSections: request.sections,
       business: { name: input.business && input.business.name || null },
       period: { ...request.period, dateBasis: 'STAY_DATE' },
       comparisonPeriod,
@@ -315,9 +316,86 @@
     };
   }
 
+  function serializeAnalysisPackage(analysisPackage) {
+    if (!analysisPackage || analysisPackage.schemaVersion !== ANALYSIS_SCHEMA_VERSION) {
+      throw contractError('ANALYSIS_INVALID_PACKAGE', 'A valid analysis package is required.');
+    }
+    return JSON.stringify(analysisPackage);
+  }
+
+  function buildChatGptPrompt(analysisPackage) {
+    const json = serializeAnalysisPackage(analysisPackage);
+    const included = new Set(analysisPackage.includedSections || []);
+    const sections = [
+      'Sen uluslararası kısa dönem kiralama, vacation rental revenue management, OTA optimization, hospitality finance, performance marketing ve portfolio management alanlarında uzman kıdemli danışman olarak çalış.',
+      '',
+      'Aşağıda LexBnB sisteminden otomatik olarak çıkarılmış gerçek işletme verileri bulunmaktadır. Bu verileri yüzeysel yorumlama.',
+      '',
+      'Gerekli olduğu yerlerde güncel web araştırması yaparak bölgesel STR pazarını, sezon etkisini, turizm hareketlerini, Airbnb ve Booking rekabetini, benzer mülk fiyatlarını, benchmark ADR/Occupancy/RevPAR değerlerini, özel günleri, etkinlikleri ve ekonomik koşulları araştır.',
+      '',
+      'Database\'de bulunmayan piyasa veya rakip verilerini gerçekmiş gibi tahmin etme. Harici bilgileri kaynaklarıyla birlikte ve LexBnB iç verilerinden açıkça ayrı değerlendir.',
+      '',
+      '# İŞLETME',
+      JSON.stringify(analysisPackage.business),
+      '',
+      '# ANALİZ DÖNEMİ',
+      JSON.stringify(analysisPackage.period),
+      '',
+      '# PORTFÖY',
+      JSON.stringify(analysisPackage.portfolio)
+    ];
+
+    if (included.has('FINANCE') || included.has('EXPENSES') || included.has('INVESTMENTS')) {
+      sections.push('', '# FİNANSAL PERFORMANS', JSON.stringify(analysisPackage.financials));
+    }
+    if (included.has('BOOKING_KPIS')) {
+      sections.push('', '# REZERVASYON KPI\'LARI', JSON.stringify(analysisPackage.bookingKpis));
+    }
+    if (included.has('CHANNELS')) {
+      sections.push('', '# KANAL PERFORMANSI', JSON.stringify(analysisPackage.channels));
+    }
+    if (included.has('PROPERTIES')) {
+      sections.push('', '# MÜLK BAZLI PERFORMANS', JSON.stringify(analysisPackage.properties));
+    }
+    if (analysisPackage.comparisonPeriod) {
+      sections.push('', '# KARŞILAŞTIRMA DÖNEMİ', JSON.stringify({
+        period: analysisPackage.comparisonPeriod,
+        metrics: analysisPackage.comparison
+      }));
+    }
+    sections.push(
+      '', '# VERİ KALİTESİ', JSON.stringify(analysisPackage.dataQuality),
+      '', '# MAKİNE TARAFINDAN OKUNABİLİR JSON', '```json', json, '```',
+      '', 'Aşağıdaki çıktıları üret:',
+      '1. Yönetici özeti',
+      '2. Finansal analiz',
+      '3. Revenue management analizi',
+      '4. OTA analizi',
+      '5. Mülk bazlı analiz',
+      '6. Rakip analizi',
+      '7. Benchmark değerlendirmesi',
+      '8. Revenue leakage tespiti',
+      '9. Fırsatlar',
+      '10. Sonraki dönem için önceliklendirilmiş aksiyon planı'
+    );
+    return sections.join('\n');
+  }
+
+  function buildAnalysisExports(input) {
+    const analysisPackage = buildAnalysisPackage(input);
+    return {
+      package: analysisPackage,
+      json: serializeAnalysisPackage(analysisPackage),
+      prompt: buildChatGptPrompt(analysisPackage)
+    };
+  }
+
   return {
     ANALYSIS_SCHEMA_VERSION,
     validateAnalysisRequest,
-    buildAnalysisPackage
+    buildAnalysisPackage,
+    serializeAnalysisPackage,
+    buildChatGptPrompt,
+    buildAnalysisExports
   };
 }));

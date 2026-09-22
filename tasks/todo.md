@@ -29,7 +29,7 @@
   - Verify: Comparison and quality fixtures pass.
   - Dependencies: Tasks 4-5.
 
-- [ ] Task 7: Add JSON and ChatGPT prompt builders.
+- [x] Task 7: Add JSON and ChatGPT prompt builders.
   - Acceptance: Deterministic outputs contain no PII/internal IDs.
   - Verify: Sanitization, snapshot and preview-equality tests pass.
   - Dependencies: Task 6.

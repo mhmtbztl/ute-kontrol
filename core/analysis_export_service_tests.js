@@ -3,7 +3,10 @@ const assert = require('assert');
 const {
   ANALYSIS_SCHEMA_VERSION,
   validateAnalysisRequest,
-  buildAnalysisPackage
+  buildAnalysisPackage,
+  serializeAnalysisPackage,
+  buildChatGptPrompt,
+  buildAnalysisExports
 } = require('./analysis_export_service');
 
 let passed = 0;
@@ -242,6 +245,40 @@ test('comparison does not invent a percentage when the previous value is zero', 
     current: 2000, previous: 0, changeAmount: 2000,
     changePercent: null, comparisonAvailable: false
   });
+});
+
+test('JSON and ChatGPT prompt are deterministic views of the same sanitized package', () => {
+  const input = {
+    period: { start: '2026-09-01', end: '2026-09-02' },
+    comparison: { mode: 'NONE' },
+    propertyIds: ['P1'], sections: ['FINANCE', 'BOOKING_KPIS', 'CHANNELS', 'PROPERTIES'],
+    generatedAt: '2026-09-22T12:00:00.000Z', currency: 'TRY',
+    business: { name: 'Lex Villas', tenantId: 'TENANT-SECRET' },
+    properties: [{ id: 'P1', name: 'Seyir', activated_on: '2026-01-01' }],
+    bookings: [{
+      id: 'BOOKING-SECRET', property_id: 'P1', channel: 'Airbnb',
+      created_at: '2026-08-20T10:00:00Z', check_in: '2026-09-01', check_out: '2026-09-03',
+      gross_amount: 2000, cleaning_fee: 200, ota_commission: 100, pax: 2,
+      guest_name: 'Misafir Gizli', guest_phone: '+90000000000', notes: 'Özel not'
+    }],
+    expenses: [], maintenances: []
+  };
+
+  const exports = buildAnalysisExports(input);
+  assert.deepStrictEqual(JSON.parse(exports.json), exports.package);
+  assert.strictEqual(exports.json, serializeAnalysisPackage(exports.package));
+  assert.strictEqual(exports.prompt, buildChatGptPrompt(exports.package));
+  assert(exports.prompt.includes('# FİNANSAL PERFORMANS'));
+  assert(exports.prompt.includes('# REZERVASYON KPI\'LARI'));
+  assert(exports.prompt.includes('# MAKİNE TARAFINDAN OKUNABİLİR JSON'));
+  assert(exports.prompt.includes(exports.json));
+  assert(exports.prompt.includes('Database\'de bulunmayan piyasa veya rakip verilerini gerçekmiş gibi tahmin etme.'));
+
+  for (const secret of ['TENANT-SECRET', 'BOOKING-SECRET', 'Misafir Gizli', '+90000000000', 'Özel not']) {
+    assert(!exports.json.includes(secret));
+    assert(!exports.prompt.includes(secret));
+  }
+  assert.deepStrictEqual(buildAnalysisExports(input), exports);
 });
 
 console.log(`\nTEST SUMMARY: ${passed} / ${passed + failed} TESTS PASSED (${failed} FAILED)`);
