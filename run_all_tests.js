@@ -176,6 +176,13 @@ const allTestFiles = [
   // Phase 31 tablolarinin RLS'i ve anon kapisi (canli — test projesine kosar)
   'phase31_isolation_tests.js',
 
+  // Phase 35: ice aktarimi geri alma — bag, kaynak taramasi ve goc icerigi
+  'import_undo_tests.js',
+
+  // Phase 35 geri almanin GERCEK davranisi (canli — test projesine kosar):
+  // atlanan duzenlemeler, kapanmis donem reddi, capraz kiraci, anon kapisi
+  'import_undo_live_tests.js',
+
   // Demo artigi denetimi (uydurma villa/rakam/tarih kaynak taramasi)
   'demo_residue_tests.js',
 

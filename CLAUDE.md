@@ -563,6 +563,7 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 | Excel / CSV **içe** aktarma | **tamamlandı** (21 Eylül 2026, phase33 — göç gerektirmedi) — CSV/TSV yolu hiç yoktu ve sessizce **para bozuyordu**; ayrıntı aşağıda. Ağı `core/csv_import_tests.js` (52 iddia) |
 | Excel / CSV **dışa** aktarma | **tamamlandı** (22 Eylül 2026) — tek dışa aktarım `appData`'nın ham JSON dökümüydü: rapor değildi, dönem filtresini yok sayıyordu ve **geri yüklenemiyordu**. Yerine dönem defterleri geldi; sütunlar içe aktarma şablonuyla aynı, yani tur kapanıyor. Ağı `core/finance_export_tests.js` (42 iddia) |
 | "Şirket Genel Raporu" içe aktarımı | **bilerek reddediliyor** — aylık toplamdan rezervasyon üretmek uydurma veri olurdu (§3.6). Ekran bunu açıkça söylüyor ve kullanıcıyı defter şablonlarına yönlendiriyor |
+| İçe aktarımı **geri alma** | kod tamamlandı (22 Eylül 2026, phase35 + phase37) — yanlış dosya aktarıldığında dönüş yolu yoktu. **Göçler üretime henüz uygulanmadı** — `docs/PHASE35_DEPLOY_PACKAGE.md`. Ağı `core/import_undo_tests.js` (50 iddia) + `core/import_undo_live_tests.js` (23 iddia, canlı) |
 | Bildirim merkezi analizi | **tamamlandı** (17 Eylül 2026) — merkez her iki uçtan da bağlı değildi; yükleme bağlandı, "okundu" artık Postgres'e yazıyor. RPC yetki sırası phase29 ile düzeltildi; göç 20 Eylül 2026'da **üretime uygulandı ve doğrulandı** |
 | `saveAppData()` hiçbir şey kaydetmiyor | gövdesi yalnızca eski localStorage anahtarlarını siliyor. 17 çağıranda hiçbir Postgres yazması yoktu; **8'i 20 Eylül 2026'da bağlandı**, 1'i meşru yerel durum, 2'si kaldırıldı, **6'sı 20 Eylül 2026'da phase31 ile kapandı**; liste artık boş. Göç **21 Eylül 2026’da üretime uygulandı ve doğrulandı**. Ayrıntı aşağıda |
 | Temizlik & gider defteri kalıcılığı | **tamamlandı** (20 Eylül 2026) — beş fonksiyon hiçbir şey yazmıyordu. Ayrıca `cloudUpsertCleaningTask` yeniden yüklemeden sonra **mükerrer görev satırı** açıyordu (UUID'yi `legacy_id` olarak gönderiyordu) ve `cleaningPayments` hiç yüklenmiyordu. Ağı `cleaning_ledger_persistence_tests` (34 iddia) |
@@ -756,6 +757,47 @@ tırnaklanmaz — `-500` bir formül değil, negatif tutardır ve tırnaklamak
 Excel'de toplamayı bozardı. XLSX tarafı zaten güvenlidir: `aoa_to_sheet`
 metni `t: 's'` hücresi yapar, formül alanı üretmez. Ağı
 `finance_export_tests` E bölümü.
+
+### İçe aktarımı geri alma (phase35 + phase37)
+
+Biçim kontrolleri bozuk **biçimi** yakalar; **"yanlış dosyayı yükledim"
+hiçbir kapıya takılmaz** — dosya geçerlidir, veri yanlıştır. 300 kayıt
+defterin içindedir ve tek tek silmekten başka yol yoktu.
+
+`finance_import_batches` her aktarımı zaten kaydediyordu ama aktarım ile
+**yazdığı kayıtlar arasında bağ yoktu**. phase35 o bağı (`finance_import_batch_rows`)
+ve `undo_finance_import()` RPC'sini kurar.
+
+Üç karar:
+
+- **`bookings`/`expenses`'e sütun eklenmedi.** Aynı dağıtım sırası tuzağı
+  (§3.4). Bağ ayrı tabloda durur; göç uygulanana kadar yalnızca geri alma
+  çalışmaz, içe aktarmanın kendisi çalışır ve istemci bunu kullanıcıya söyler.
+- **Sonradan elle düzenlenen kayıt silinmez, atlanır.** O artık "aktarılan
+  veri" değil, kullanıcının emeğidir. Kaç kaydın atlandığı ayrı raporlanır.
+- **Kapanmış döneme düşen kayıt varsa işlem hiç başlamaz.** Yarısını silmek,
+  düzeltilmek istenen karışıklığın daha kötüsünü üretirdi.
+
+**phase37 — ve canlı süitin neden var olduğu.** phase35 "değişmiş kayıt"
+ölçütünü `updated_at <= created_at + INTERVAL '2 seconds'` yazdı. Pay
+**gereksizdi**: `set_updated_at` (phase24) yalnızca `BEFORE UPDATE` çalışır,
+oluşturma anında `updated_at`'e dokunmaz — ölçüldü, `INSERT`'te iki damga
+birebir aynı, `UPDATE` 82 ms ileri taşıyor. Ve pay **zararlıydı**: aktarımdan
+hemen sonra — yani en olağan durumda — yapılan düzenlemeyi "değişmemiş" sayıp
+kullanıcının emeğini sessizce siliyordu.
+
+Bunu **canlı süit yakaladı, kaynak taraması değil**: ilk koşuda 23 iddianın
+6'sı kırmızıydı. Kaynak taraması ölçütün dosyada ne yazdığını görür,
+veritabanında ne yaptığını göremez — §5.5'in sunucu tarafı için de geçerli
+olmasının sebebi budur.
+
+**phase35 düzeltilmedi, phase37 eklendi.** Bir veritabanına uygulanmış göç
+değişmezdir ve `bootstrap_test_project.js` bunu kapıda reddeder ("başka bir
+içerikle uygulanmış"). Kural yalnızca üretim için değil; test projesine
+uygulanmak da bağlayıcıdır.
+
+Uygulama ve doğrulama: `docs/PHASE35_DEPLOY_PACKAGE.md`. **İkisi bu sırayla
+uygulanmalıdır**; yalnız phase35 uygulanırsa kusur üretimde kalır.
 
 ### Yayınlanan örnek şablonlar
 

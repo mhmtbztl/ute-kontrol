@@ -5228,6 +5228,8 @@ async function saveMonthlyGoals(e) {
 function openImportModal() {
   document.getElementById('importModal').classList.add('active');
   initImportDropzone();
+  // Gecmis asenkron yuklenir; modalin acilmasini bekletmez.
+  refreshImportHistory().catch(e => console.warn('İçe aktarım geçmişi:', e));
 }
 
 function closeImportModal() {
@@ -5508,6 +5510,158 @@ function enSonVeriAyi(satirlar, rezMi) {
   return enSon;
 }
 
+// -----------------------------------------------------------------------------
+// ICE AKTARIMI GERI ALMA (phase35)
+// -----------------------------------------------------------------------------
+//
+// Ice aktarma tek seferde yuzlerce kayit yazabiliyor. Bicim kontrolleri
+// (zorunlu sutun, mulk eslesmesi, tarih cakismasi) bozuk BICIMI yakalar ama
+// "yanlis dosyayi yukledim" hicbir kapiya takilmaz: dosya gecerlidir, veri
+// yanlistir. O ana kadar tek cikis yolu 300 kaydi tek tek silmekti.
+//
+// `finance_import_batches` her aktarimi zaten kaydediyordu; eksik olan
+// aktarim ile YAZDIGI KAYITLAR arasindaki bagdi. phase35 o bagi kuruyor.
+//
+// DAGITIM SIRASI: goc uygulanmadan once bag tablosu yok. O durumda bag
+// kurulamaz ama ICE AKTARMANIN KENDISI CALISMAYA DEVAM EDER — bu yuzden
+// eksik sema hatasi yutulmaz, yalnizca "geri alinamaz" olarak raporlanir.
+
+async function cloudLinkImportBatchRows(tenantId, batchId, rezMi, kayitlar) {
+  if (!supabaseClient || !batchId || !kayitlar || kayitlar.length === 0) return false;
+
+  const satirlar = kayitlar.map(k => ({
+    tenant_id: tenantId,
+    batch_id: batchId,
+    booking_id: rezMi ? k.id : null,
+    expense_id: rezMi ? null : k.id,
+    source_row_num: k.rowNum
+  }));
+
+  // 500'lük parçalar: tek istekte binlerce satır PostgREST'i zorlar.
+  for (let i = 0; i < satirlar.length; i += 500) {
+    const { error } = await supabaseClient
+      .from('finance_import_batch_rows')
+      .insert(satirlar.slice(i, i + 500));
+    if (error) {
+      if (isMissingSchemaError(error)) return false;   // phase35 henüz uygulanmamış
+      throw error;
+    }
+  }
+  return true;
+}
+
+/** Son aktarimlar (geri alinabilir olanlar). Goc yoksa bos liste doner. */
+async function loadImportBatches(tenantId) {
+  if (!supabaseClient || !isUUID(tenantId)) return [];
+  const { data, error } = await supabaseClient
+    .from('finance_import_batches')
+    .select('id, filename, imported_at, row_count, imported_amount, finance_import_batch_rows(count)')
+    .eq('tenant_id', tenantId)
+    .order('imported_at', { ascending: false })
+    .limit(10);
+  if (error) {
+    if (isMissingSchemaError(error)) return [];
+    console.warn('İçe aktarım geçmişi okunamadı:', error.message);
+    return [];
+  }
+  return (data || []).map(p => ({
+    id: p.id,
+    filename: p.filename,
+    importedAt: p.imported_at,
+    rowCount: Number(p.row_count) || 0,
+    amount: Number(p.imported_amount) || 0,
+    // Bagli satir yoksa geri alma yapilamaz: aktarim goc uygulanmadan ONCE
+    // yapilmis demektir.
+    linkedCount: (p.finance_import_batch_rows && p.finance_import_batch_rows[0])
+      ? Number(p.finance_import_batch_rows[0].count) || 0 : 0
+  }));
+}
+
+async function undoImportBatch(batchId) {
+  const tenantId = getActiveTenantId();
+  try {
+    requireCloudForWrite('İçe aktarımı geri alma', tenantId);
+  } catch (e) {
+    if (typeof showToast === 'function') showToast(e.message, 'error');
+    return;
+  }
+
+  const parti = (appData.importBatches || []).find(p => p.id === batchId);
+  const adet = parti ? parti.linkedCount : 0;
+  const onay = typeof confirm === 'function' ? confirm(
+    `"${parti ? parti.filename : 'Bu dosya'}" aktarımıyla eklenen ${adet} kayıt SİLİNECEK.\n\n` +
+    'Aktarımdan sonra elle düzenlediğiniz kayıtlar silinmez, atlanır.\n' +
+    'Kapanmış bir döneme düşen kayıt varsa hiçbir şey silinmez.\n\n' +
+    'Devam edilsin mi?') : false;
+  if (!onay) return;
+
+  const { data, error } = await supabaseClient.rpc('undo_finance_import', {
+    p_tenant_id: tenantId,
+    p_batch_id: batchId,
+    p_confirm: 'AKTARIMI GERI AL'
+  });
+
+  if (error) {
+    const mesaj = String(error.message || '');
+    if (mesaj.indexOf('CLOSED_PERIOD_BLOCK') !== -1) {
+      alert('Geri alınamadı: bu aktarımın bir kısmı KAPATILMIŞ bir döneme ait.\n\n' +
+        'Yarım bir geri alma, düzeltmek istediğiniz karışıklığın daha kötüsünü ' +
+        'üretirdi; bu yüzden hiçbir kayıt silinmedi. Önce ilgili dönemi açın.');
+    } else if (mesaj.indexOf('Could not find the function') !== -1 || error.code === 'PGRST202') {
+      alert('Geri alma özelliği için veritabanı göçü (phase35) henüz uygulanmamış.');
+    } else {
+      alert('Geri alınamadı: ' + (error.message || 'bilinmeyen hata'));
+    }
+    return;
+  }
+
+  await loadTenantAppData(tenantId);
+  await refreshImportHistory();
+
+  const silinen = (data.deleted_bookings || 0) + (data.deleted_expenses || 0);
+  if (data.skipped_modified > 0) {
+    alert(`${silinen} kayıt silindi.\n\n${data.skipped_modified} kayıt SİLİNMEDİ: ` +
+      'aktarımdan sonra elle düzenlenmişler. Onlar artık aktarılan veri değil, ' +
+      'sizin düzenlemeniz; istiyorsanız tek tek silebilirsiniz.');
+  } else if (typeof showToast === 'function') {
+    showToast(`${silinen} kayıt geri alındı.`, 'success');
+  }
+}
+
+/** Modal acilinca ve geri almadan sonra gecmisi tazeler. */
+async function refreshImportHistory() {
+  const kutu = document.getElementById('importHistoryBox');
+  if (!kutu) return;
+  const tenantId = getActiveTenantId();
+  if (!isUUID(tenantId)) { kutu.style.display = 'none'; return; }
+
+  const partiler = await loadImportBatches(tenantId);
+  appData.importBatches = partiler;
+
+  if (partiler.length === 0) { kutu.style.display = 'none'; return; }
+  kutu.style.display = 'block';
+
+  const govde = document.getElementById('importHistoryList');
+  if (!govde) return;
+  const tl = n => Math.round(Number(n) || 0).toLocaleString('tr-TR');
+
+  govde.innerHTML = partiler.map(p => {
+    const tarih = p.importedAt ? new Date(p.importedAt).toLocaleString('tr-TR') : '—';
+    const geriAlinabilir = p.linkedCount > 0;
+    const dugme = geriAlinabilir
+      ? `<button type="button" class="btn btn-secondary btn-sm" style="font-size:10px; padding:3px 8px; border-color:#EF4444; color:#FCA5A5;"
+                 onclick="undoImportBatch('${escapeHtml(p.id)}')">↩︎ Geri Al (${p.linkedCount})</button>`
+      : `<span style="font-size:10px; color:#64748B;" title="Bu aktarım, geri alma özelliği eklenmeden önce yapıldı.">geri alınamaz</span>`;
+    return `<div style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:6px 8px; border-bottom:1px solid rgba(255,255,255,0.06);">
+      <div style="min-width:0;">
+        <div style="font-size:11px; color:#E2E8F0; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(p.filename)}</div>
+        <div style="font-size:10px; color:#64748B;">${escapeHtml(tarih)} · ${p.rowCount} kayıt · ${tl(p.amount)} TL</div>
+      </div>
+      ${dugme}
+    </div>`;
+  }).join('');
+}
+
 function getImportEngine() {
   if (typeof FinanceImportEngine !== 'undefined') return FinanceImportEngine;
   if (typeof window !== 'undefined' && window.FinanceImportEngine) return window.FinanceImportEngine;
@@ -5769,11 +5923,15 @@ async function applyImportedData() {
   if (btn) { btn.disabled = true; btn.innerText = 'Aktarılıyor… (0/' + yazilacaklar.length + ')'; }
 
   const basarili = [], basarisiz = [];
+  // Yazilan kayitlarin kimlikleri: aktarimi GERI ALABILMEK icin partiyle
+  // eslestirilecekler (phase35). Kimlik toplanmazsa "bu aktarim neyi yazdi"
+  // sorusunun cevabi hicbir yerde durmaz.
+  const yeniKayitlar = [];
   for (let i = 0; i < yazilacaklar.length; i++) {
     const v = yazilacaklar[i];
     try {
       if (rezMi) {
-        await createBooking({
+        const olusan = await createBooking({
           propertyId: v.propertyId,
           villa: v.propertyKey,
           guest: v.guest,
@@ -5787,8 +5945,9 @@ async function applyImportedData() {
           status: v.status,
           code: v.code || undefined
         });
+        if (olusan && olusan.id) yeniKayitlar.push({ rowNum: v.rowNum, id: olusan.id });
       } else {
-        await createExpense({
+        const olusan = await createExpense({
           date: v.date,
           category: v.category,
           amount: v.amount,
@@ -5797,6 +5956,7 @@ async function applyImportedData() {
           villa: v.propertyKey || 'ALL',
           type: v.expenseType
         });
+        if (olusan && olusan.id) yeniKayitlar.push({ rowNum: v.rowNum, id: olusan.id });
       }
       basarili.push(v.rowNum);
     } catch (err) {
@@ -5807,17 +5967,29 @@ async function applyImportedData() {
     }
   }
 
-  // Basarili bir aktarim kaydi birak (mukerrer engeli bunu okur).
+  // Basarili bir aktarim kaydi birak (mukerrer engeli bunu okur) ve yazilan
+  // kayitlari ona BAGLA — geri alma bu bagin ustunde durur (phase35).
+  let bagKuruldu = false;
   if (parmakIzi && supabaseClient && basarili.length > 0) {
     try {
-      await supabaseClient.from('finance_import_batches').insert({
-        tenant_id: tenantId,
-        file_hash: parmakIzi,
-        filename: String(pendingImportData.fileName || 'dosya').slice(0, 255),
-        row_count: basarili.length,
-        imported_amount: rezMi ? r.totalGross : r.totalAmount
-      });
-    } catch (e) { /* kayit tutulamazsa aktarim yine de gecerlidir */ }
+      const { data: parti, error: partiHata } = await supabaseClient
+        .from('finance_import_batches')
+        .insert({
+          tenant_id: tenantId,
+          file_hash: parmakIzi,
+          filename: String(pendingImportData.fileName || 'dosya').slice(0, 255),
+          row_count: basarili.length,
+          imported_amount: rezMi ? r.totalGross : r.totalAmount
+        })
+        .select('id')
+        .single();
+      if (partiHata) throw partiHata;
+      bagKuruldu = await cloudLinkImportBatchRows(tenantId, parti.id, rezMi, yeniKayitlar);
+    } catch (e) {
+      // Kayit tutulamazsa aktarimin KENDISI yine de gecerlidir; kullanici
+      // sadece tek tusla geri alamaz. Sessiz kalmiyoruz (asagida soyleniyor).
+      console.warn('İçe aktarım kaydı tutulamadı:', e && e.message ? e.message : e);
+    }
   }
 
   await loadTenantAppData(tenantId);
@@ -5846,6 +6018,12 @@ async function applyImportedData() {
   }
 
   if (basarisiz.length === 0) {
+    // Bag kurulamadiysa aktarim gecerlidir ama tek tusla geri alinamaz;
+    // bunu SESSIZ gecmek, olmayan bir guvenlik agi vaat etmek olurdu.
+    if (!bagKuruldu && typeof showToast === 'function') {
+      showToast('Kayıtlar aktarıldı, ancak bu aktarım tek tuşla geri alınamayacak ' +
+        '(veritabanı göçü henüz uygulanmamış).', 'info');
+    }
     closeImportModal();
     resetImportPreview();
     if (typeof showToast === 'function') {
@@ -16556,6 +16734,9 @@ if (typeof module !== 'undefined' && module.exports) {
     getExportEngine,
     collectExportRecords,
     exportLedger,
+    cloudLinkImportBatchRows,
+    loadImportBatches,
+    undoImportBatch,
     loadMonthlyTargets,
     saveMonthlyTarget,
     loadMonthlyCloses,
