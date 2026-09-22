@@ -19,7 +19,7 @@
   - Verify: Split-stay and null/zero tests pass.
   - Dependencies: Task 3.
 
-- [ ] Task 5: Add channel, cohort and property aggregation.
+- [x] Task 5: Add channel, cohort and property aggregation.
   - Acceptance: Existing MarketingEngine outputs are mapped without formula duplication.
   - Verify: Channel totals and property totals reconcile.
   - Dependencies: Task 4.

@@ -146,7 +146,11 @@ test('analysis package maps canonical range finance and STR metrics without expo
     adr: 900,
     revpar: 360,
     averageBookingValue: 2000,
-    dateBasis: 'STAY_DATE'
+    guestCount: 0,
+    alos: null,
+    leadTime: null,
+    cancellationRate: null,
+    dateBasis: 'STAY_DATE_WITH_BOOKING_CREATED_AT_COHORT'
   });
   const serialized = JSON.stringify(result);
   assert(!serialized.includes('booking-internal-id'));
@@ -160,6 +164,43 @@ test('selected properties must belong to the provided tenant-scoped property set
     propertyIds: ['foreign-property'], sections: ['FINANCE'],
     properties: [{ id: 'owned-property', name: 'Owned' }]
   }), 'ANALYSIS_UNKNOWN_PROPERTY');
+});
+
+test('channel, cohort and property sections reuse canonical engines and surface quality findings', () => {
+  const result = buildAnalysisPackage({
+    period: { start: '2026-09-01', end: '2026-09-09' },
+    propertyIds: ['P1', 'P2'],
+    sections: ['BOOKING_KPIS', 'CHANNELS', 'PROPERTIES'],
+    properties: [
+      { id: 'P1', name: 'Seyir', activated_on: '2026-09-01' },
+      { id: 'P2', name: 'Nefes', activated_on: '2026-09-01' }
+    ],
+    bookings: [
+      { id: 'B1', property_id: 'P1', channel: 'Airbnb', created_at: '2026-09-01T10:00:00Z', check_in: '2026-09-02', check_out: '2026-09-04', gross_amount: 20000, cleaning_fee: 2000, ota_commission: 3000, pax: 4 },
+      { id: 'B2', property_id: 'P2', channel: 'WhatsApp', created_at: '2026-09-03T10:00:00Z', check_in: '2026-09-03', check_out: '2026-09-06', gross_amount: 24000, pax: 6 },
+      { id: 'B3', property_id: 'P1', channel: 'Booking', created_at: '2026-09-04T10:00:00Z', check_in: '2026-09-10', check_out: '2026-09-12', gross_amount: 99999, status: 'CANCELLED' },
+      { id: 'B4', property_id: 'P1', channel: 'Mystery Channel', created_at: '2026-09-05T10:00:00Z', check_in: '2026-09-04', check_out: '2026-09-05', gross_amount: 5000, pax: 2 }
+    ],
+    expenses: [], maintenances: []
+  });
+
+  const airbnb = result.channels.find(row => row.channel === 'AIRBNB');
+  const direct = result.channels.find(row => row.channel === 'DIRECT');
+  const unknown = result.channels.find(row => row.channel === 'UNKNOWN');
+  assert.strictEqual(airbnb.roomRevenue, 18000);
+  assert.strictEqual(airbnb.otaCommission, 3000);
+  assert.strictEqual(direct.directSubchannels[0], 'WHATSAPP');
+  assert.strictEqual(unknown.roomRevenue, 5000);
+
+  assert.strictEqual(result.bookingKpis.cancellationRate, 25);
+  assert.strictEqual(result.bookingKpis.alos, 2);
+  assert.strictEqual(result.bookingKpis.leadTime, 0.5);
+  assert.strictEqual(result.bookingKpis.guestCount, 12);
+  assert.deepStrictEqual(result.properties.map(row => row.name), ['Seyir', 'Nefes']);
+  assert(result.properties.every(row => !('propertyId' in row)));
+  assert(result.dataQuality.items.some(item => item.code === 'UNKNOWN_CHANNEL'));
+  assert(result.dataQuality.items.some(item => item.code === 'INVALID_NEGATIVE_LEAD_TIME'));
+  assert.strictEqual(result.dataQuality.status, 'NEEDS_REVIEW');
 });
 
 console.log(`\nTEST SUMMARY: ${passed} / ${passed + failed} TESTS PASSED (${failed} FAILED)`);

@@ -5,11 +5,11 @@
 
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
-    module.exports = factory(require('./financial_metrics_service'));
+    module.exports = factory(require('./financial_metrics_service'), require('./marketing_engine'));
   } else {
-    root.AnalysisExportService = factory(root.FinancialMetricsService);
+    root.AnalysisExportService = factory(root.FinancialMetricsService, root.MarketingEngine);
   }
-}(typeof self !== 'undefined' ? self : this, function (FinancialMetricsService) {
+}(typeof self !== 'undefined' ? self : this, function (FinancialMetricsService, MarketingEngine) {
   'use strict';
 
   const ANALYSIS_SCHEMA_VERSION = '1.0';
@@ -87,7 +87,7 @@
       throw contractError('ANALYSIS_UNKNOWN_PROPERTY', 'Selected property is not available in the active tenant scope.');
     }
     const properties = (input.properties || [])
-      .filter(property => selected.has(property.id))
+      .filter(property => selected.has(property.id) || selected.has(property.slug))
       .map(property => ({ name: property.name || property.slug || 'Adsız mülk' }));
     if (!FinancialMetricsService || typeof FinancialMetricsService.computeFinancialMetricsForRange !== 'function') {
       throw contractError('ANALYSIS_FINANCE_SERVICE_UNAVAILABLE', 'Canonical financial metrics service is unavailable.');
@@ -105,6 +105,83 @@
     const operations = metrics.operations;
     const includeFinance = request.sections.some(section => ['FINANCE', 'EXPENSES', 'INVESTMENTS'].includes(section));
     const includeBookingKpis = request.sections.includes('BOOKING_KPIS');
+    const includeChannels = request.sections.includes('CHANNELS');
+    const includeProperties = request.sections.includes('PROPERTIES');
+    const scopedBookings = (input.bookings || []).filter(booking => {
+      const propertyId = booking.propertyId || booking.property_id || booking.villa;
+      return selected.has(propertyId);
+    });
+    const channelReport = (includeChannels || includeBookingKpis) && MarketingEngine
+      ? MarketingEngine.computeChannelEconomics({
+        bookings: scopedBookings,
+        periodStart: request.period.start,
+        periodEndExclusive: request.period.endExclusive,
+        baseCurrency: request.currency,
+        availableNights: operations.availableNights
+      }) : null;
+    const cohortReport = includeBookingKpis && MarketingEngine
+      ? MarketingEngine.computeBookingCohortMetrics({
+        bookings: scopedBookings,
+        cohortStart: request.period.start + 'T00:00:00Z',
+        cohortEndExclusive: request.period.endExclusive + 'T00:00:00Z'
+      }) : null;
+    const qualityItems = [];
+    if (channelReport && channelReport.dataQuality.unknownRawChannels.length > 0) {
+      qualityItems.push({
+        code: 'UNKNOWN_CHANNEL', severity: 'WARNING',
+        values: channelReport.dataQuality.unknownRawChannels
+      });
+    }
+    if (cohortReport && cohortReport.dataQuality.missingCreatedAtReservations > 0) {
+      qualityItems.push({
+        code: 'MISSING_BOOKING_CREATED_AT', severity: 'WARNING',
+        count: cohortReport.dataQuality.missingCreatedAtReservations
+      });
+    }
+    if (cohortReport && cohortReport.dataQuality.invalidLeadTimeReservations > 0) {
+      qualityItems.push({
+        code: 'INVALID_NEGATIVE_LEAD_TIME', severity: 'WARNING',
+        count: cohortReport.dataQuality.invalidLeadTimeReservations
+      });
+    }
+    const contributingGuestCount = scopedBookings.reduce((sum, booking) => {
+      if ((booking.status || 'CONFIRMED') === 'CANCELLED') return sum;
+      const nights = FinancialMetricsService.splitBookingStayNights({
+        ...booking,
+        checkIn: booking.checkIn || booking.check_in,
+        checkOut: booking.checkOut || booking.check_out
+      }).some(night => night.date >= request.period.start && night.date < request.period.endExclusive);
+      if (!nights) return sum;
+      const pax = Number(booking.pax);
+      return sum + (Number.isFinite(pax) && pax >= 0 ? pax : 0);
+    }, 0);
+    const propertyResults = includeProperties ? (input.properties || [])
+      .filter(property => selected.has(property.id) || selected.has(property.slug))
+      .map(property => {
+        const propertyKey = property.id || property.slug;
+        const propertyMetrics = FinancialMetricsService.computeFinancialMetricsForRange({
+          periodStart: request.period.start,
+          periodEndExclusive: request.period.endExclusive,
+          propertyIds: [propertyKey],
+          bookings: input.bookings || [], expenses: input.expenses || [],
+          properties: input.properties || [], maintenances: input.maintenances || []
+        });
+        return {
+          name: property.name || property.slug || 'Adsız mülk',
+          reservations: propertyMetrics.operations.reservationCount,
+          nights: propertyMetrics.operations.soldNights,
+          availableNights: propertyMetrics.operations.availableNights,
+          occupancy: propertyMetrics.operations.occupancy,
+          adr: propertyMetrics.operations.adr,
+          revpar: propertyMetrics.operations.revpar,
+          roomRevenue: propertyMetrics.operations.roomRevenue,
+          financialRevenue: propertyMetrics.financial.revenue,
+          expenses: propertyMetrics.financial.operatingExpenses,
+          investments: propertyMetrics.financial.capex,
+          operatingProfit: propertyMetrics.financial.operatingProfit,
+          netCashProfit: propertyMetrics.financial.netCashProfit
+        };
+      }) : [];
     const hasMeasuredData = operations.reservationCount > 0 ||
       finance.operatingExpenses > 0 || finance.capex > 0;
 
@@ -141,14 +218,32 @@
         revpar: operations.revpar,
         averageBookingValue: operations.reservationCount > 0
           ? FinancialMetricsService.roundMoney(finance.revenue / operations.reservationCount) : null,
-        dateBasis: 'STAY_DATE'
+        guestCount: contributingGuestCount,
+        alos: cohortReport ? cohortReport.totals.averageLengthOfStay : null,
+        leadTime: cohortReport ? cohortReport.totals.averageLeadTimeDays : null,
+        cancellationRate: cohortReport ? cohortReport.totals.cancellationRatePercent : null,
+        dateBasis: 'STAY_DATE_WITH_BOOKING_CREATED_AT_COHORT'
       } : {},
-      channels: [],
-      properties: [],
+      channels: includeChannels && channelReport ? channelReport.channels.map(channel => ({
+        channel: channel.channel,
+        reservations: channel.reservationCount,
+        nights: channel.bookedNights,
+        roomRevenue: channel.roomRevenueBeforeDistribution,
+        adr: channel.roomAdr,
+        otaCommission: channel.distributionCost,
+        netRevenue: channel.roomRevenueAfterDistribution,
+        revenueShare: channelReport.totals.roomRevenueBeforeDistribution !== 0
+          ? FinancialMetricsService.roundMoney(channel.roomRevenueBeforeDistribution / channelReport.totals.roomRevenueBeforeDistribution * 100)
+          : null,
+        directSubchannels: channel.directSubchannels
+      })) : [],
+      properties: propertyResults,
       comparison: {},
       dataQuality: {
-        status: hasMeasuredData ? 'OK' : 'INSUFFICIENT_DATA',
-        items: hasMeasuredData ? [] : [{ code: 'NO_MEASURED_ACTIVITY', severity: 'INFO' }]
+        status: qualityItems.length > 0 ? 'NEEDS_REVIEW' : (hasMeasuredData ? 'OK' : 'INSUFFICIENT_DATA'),
+        items: qualityItems.length > 0
+          ? qualityItems
+          : (hasMeasuredData ? [] : [{ code: 'NO_MEASURED_ACTIVITY', severity: 'INFO' }])
       }
     };
   }
