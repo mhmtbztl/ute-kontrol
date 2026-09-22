@@ -453,7 +453,8 @@ ile `index.html` (~265 KB) gibi dev ortak dosyalara dokunuyor.
 2. `git add -A` / `git add .` yasak — kimse başkasının dosyasını commit etmez.
 3. Göç dosyaları değişmezdir; düzeltme **yeni bir göç** olarak eklenir —
    numarası `N+1` olmak zorunda değildir: phase numaraları araçlara ayrılmıştır
-   (**Codex çift, Claude tek**), her araç kendi sırasındaki ilk boş numarayı alır.
+   (**Codex çift, Claude tek, Antigravity `100+`**), her araç kendi sırasındaki
+   ilk boş numarayı alır.
 4. Teslimden önce `npm test`, `npm run verify:migrations` ve
    `node stamp_assets.js --check` yeşil olmalı.
 5. `master` dalına aynı anda tek araç dokunur; diğeri haber vermeden merge/push yapmaz.

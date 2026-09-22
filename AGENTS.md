@@ -44,9 +44,16 @@ Mevcut yerleşim:
 
 | Klasör | Dal | Kim |
 |---|---|---|
-| `lexbnb` | `master` | Codex |
+| `lexbnb` | Codex’in o anki dalı | Codex (ana klasör) |
 | `lexbnb-claude` | `claude/calisma` | Claude |
-| `lexbnb-codex-marketing` | `codex/marketing` | (eski, pazarlama) |
+| `lexbnb-antigravity` | `antigravity/calisma` | Antigravity |
+| `lexbnb-codex-*` | bitmiş işlerin dalları | (arşiv) |
+
+**Ana klasör boş değil.** `lexbnb` klasöründe Codex’in `master`’a girmemiş
+işi ve takipsiz dosyaları (`RGVQI_AUDIT_REPORT.md`, `docs/audits/`) durur. Yeni
+bir aracı oraya açmak, 2026-09-14’te yaşanan "başkasının yarım düzenlemesini
+commit’leme" olayını birebir tekrarlar. Her yeni araç **kendi worktree’siyle**
+başlar; ana klasöre yalnızca orada zaten çalışan araç dokunur.
 
 İş bitince dal `master`'a birleştirilir. Çakışma çıkarsa git **söyler** ve
 görerek çözülür — sessiz kayıp olmaz. Asıl kazanç budur.
@@ -149,9 +156,13 @@ dalında kalır ve **haber vermeden `master`'a dokunmaz.**
 4. **Yeni göç eklediyseniz**
    - Dosya `supabase/migration_phase<N>_<konu>.sql` olarak eklenir.
    - **Phase numarası sahipliği:** Codex yalnızca çift numaraları (`30`, `32`,
-     `34`, ...), Claude yalnızca tek numaraları (`29`, `31`, `33`, ...)
+     `34`, ...), Claude yalnızca tek numaraları (`29`, `31`, `33`, ...),
+     Antigravity yalnızca **`100` ve sonrasını** (`100`, `101`, `102`, ...)
      kullanır. Bir aracın sırası kullanılmayacak olsa bile diğer araç o
-     numarayı devralmaz; böylece paralel worktree'ler aynı phase adını seçmez.
+     numarayı devralmaz; böylece paralel worktree’ler aynı phase adını seçmez.
+     Tek/çift ayrımı iki araç için tasarlanmıştı ve üçüncüde tükendi; dördüncü
+     bir araç gelirse ona da **ayrı bir blok** verilir (`200+`), tek/çift
+     bölünmez. Numara bloğu, aracın ilk göçünü yazmasından **önce** verilir.
    - Sonunda kendi doğrulama bloğu bulunur; başarısızsa `RAISE EXCEPTION`
      ile durur.
    - `supabase/migration_manifest.txt`'e dosya adı + sha256 kaydedilir.

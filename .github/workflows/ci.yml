@@ -21,5 +21,9 @@ jobs:
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Verify immutable migration chain
         run: npm run verify:migrations
+      - name: Verify asset cache-busting stamps
+        run: node stamp_assets.js --check
+      - name: Verify published sample templates
+        run: npm run templates:check
       - name: Run offline-safe regression suite
         run: npm test
