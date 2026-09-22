@@ -34,12 +34,12 @@
   - Verify: Sanitization, snapshot and preview-equality tests pass.
   - Dependencies: Task 6.
 
-- [ ] Task 8: Build the Analysis Center UI and clipboard flow.
+- [x] Task 8: Build the Analysis Center UI and clipboard flow.
   - Acceptance: Filters, summary, preview, copy and responsive states work.
   - Verify: UI tests plus real-browser validation pass.
   - Dependencies: Task 7.
 
-- [ ] Task 9: Complete security, quality and delivery review.
+- [x] Task 9: Complete security, quality and delivery review.
   - Acceptance: No high-severity finding remains and all repository gates pass.
   - Verify: `npm test`, `npm run verify:migrations`, `node stamp_assets.js --check`.
   - Dependencies: Task 8.

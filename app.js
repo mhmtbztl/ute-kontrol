@@ -3234,6 +3234,7 @@ function switchTab(tabId) {
   if (tabId === 'pricing') renderPricingTab();
   if (tabId === 'pricing') renderPricingKpiStrip();
   if (tabId === 'reports') renderReportsTab();
+  if (tabId === 'analysis') renderAnalysisCenter();
   if (tabId === 'settings') renderSettingsTable();
   if (tabId === 'settings') renderTeamManagement();
   if (tabId === 'settings') loadDeletionImpact();

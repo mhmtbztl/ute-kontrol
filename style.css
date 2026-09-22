@@ -4132,6 +4132,315 @@ body {
 .daterange-months { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
 @media (max-width: 640px) { .daterange-months { grid-template-columns: 1fr; } }
 
+/* Analysis Center */
+.analysis-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  background:
+    radial-gradient(circle at 12% 15%, rgba(16, 185, 129, 0.15), transparent 34%),
+    linear-gradient(135deg, rgba(17, 24, 39, 0.98), rgba(15, 23, 42, 0.98));
+  border-color: rgba(52, 211, 153, 0.25);
+}
+
+.analysis-hero h2 {
+  margin: 5px 0 7px;
+  color: var(--text-main);
+  font-size: 22px;
+}
+
+.analysis-hero p {
+  max-width: 720px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.analysis-eyebrow {
+  color: var(--accent-emerald);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.6px;
+}
+
+.analysis-privacy-note {
+  max-width: 320px;
+  padding: 12px 14px;
+  border: 1px solid rgba(52, 211, 153, 0.22);
+  border-radius: 10px;
+  background: rgba(16, 185, 129, 0.07);
+}
+
+.analysis-privacy-note strong,
+.analysis-privacy-note span {
+  display: block;
+}
+
+.analysis-privacy-note strong {
+  margin-bottom: 4px;
+  color: #6EE7B7;
+  font-size: 12px;
+}
+
+.analysis-privacy-note span {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.analysis-layout {
+  display: grid;
+  grid-template-columns: minmax(360px, 0.85fr) minmax(440px, 1.15fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.analysis-builder,
+.analysis-output {
+  min-width: 0;
+}
+
+.analysis-date-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.analysis-control-wide {
+  grid-column: 1 / -1;
+}
+
+.analysis-control label,
+.analysis-choice-group legend {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.25px;
+}
+
+.analysis-field {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  outline: none;
+  background: var(--bg-surface-elevated);
+  color: var(--text-main);
+  color-scheme: dark;
+  font: inherit;
+  font-size: 13px;
+}
+
+.analysis-field:focus {
+  border-color: var(--accent-emerald);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.14);
+}
+
+.analysis-choice-group {
+  margin: 18px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.analysis-check-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.analysis-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--text-main);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.analysis-check:hover {
+  border-color: rgba(52, 211, 153, 0.35);
+  background: rgba(16, 185, 129, 0.05);
+}
+
+.analysis-check input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-emerald);
+}
+
+.analysis-check-all {
+  margin-bottom: 8px;
+  border-style: dashed;
+}
+
+.analysis-generate-btn {
+  width: 100%;
+  justify-content: center;
+  min-height: 42px;
+  margin-top: 18px;
+}
+
+#analysisError {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.09);
+  color: #FCA5A5;
+  font-size: 12px;
+}
+
+#analysisStatus {
+  margin-top: 10px;
+  color: var(--text-dim);
+  font-size: 11px;
+  text-align: center;
+}
+
+.analysis-empty-state {
+  display: flex;
+  min-height: 430px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 36px;
+  border: 1px dashed var(--border-subtle);
+  border-radius: 10px;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.analysis-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.analysis-summary > div {
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: rgba(16, 185, 129, 0.045);
+  text-align: center;
+}
+
+.analysis-summary strong,
+.analysis-summary span {
+  display: block;
+}
+
+.analysis-summary strong {
+  color: #6EE7B7;
+  font-size: 17px;
+}
+
+.analysis-summary span {
+  margin-top: 2px;
+  color: var(--text-dim);
+  font-size: 10px;
+}
+
+.analysis-empty-state span {
+  margin-bottom: 10px;
+  color: var(--accent-emerald);
+  font-size: 34px;
+}
+
+.analysis-empty-state strong {
+  color: var(--text-main);
+  font-size: 14px;
+}
+
+.analysis-empty-state p {
+  margin-top: 6px;
+  font-size: 12px;
+}
+
+.analysis-prompt-preview {
+  display: block;
+  width: 100%;
+  min-height: 430px;
+  resize: vertical;
+  padding: 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  outline: none;
+  background: #0B0F19;
+  color: #D1FAE5;
+  font: 12px/1.55 Consolas, "Courier New", monospace;
+  white-space: pre-wrap;
+}
+
+.analysis-prompt-preview:focus {
+  border-color: var(--accent-emerald);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.14);
+}
+
+.analysis-output-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.analysis-prompt-preview[hidden],
+.analysis-output-actions[hidden],
+.analysis-empty-state[hidden],
+.analysis-summary[hidden],
+#analysisError[hidden] {
+  display: none !important;
+}
+
+@media (max-width: 800px) {
+  .analysis-hero {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .analysis-privacy-note {
+    max-width: none;
+  }
+
+  .analysis-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .analysis-empty-state,
+  .analysis-prompt-preview {
+    min-height: 320px;
+  }
+}
+
+@media (max-width: 520px) {
+  .analysis-date-grid,
+  .analysis-check-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .analysis-output-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .analysis-output-actions .btn {
+    justify-content: center;
+  }
+
+  .analysis-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .daterange-month-name {
   text-align: center;
   font-size: 12px;

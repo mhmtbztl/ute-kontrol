@@ -10,7 +10,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=9c7d8f8d">
+  <link rel="stylesheet" href="style.css?v=217e2a4d">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -387,6 +387,7 @@
     <button class="tab-btn" onclick="switchTab('finance')">💰 Finans</button>
     <button class="tab-btn" onclick="switchTab('marketing')">📈 Gelir & Dağıtım</button>
     <button class="tab-btn" onclick="switchTab('reports')">📊 Raporlar</button>
+    <button class="tab-btn" onclick="switchTab('analysis')">🧠 Analiz Merkezi</button>
     <button class="tab-btn" onclick="switchTab('settings')">⚙️ Ayarlar</button>
   </nav>
 
@@ -2832,6 +2833,105 @@
       </section>
     </div>
 
+    <!-- ======================================================= -->
+    <!-- TAB: ANALİZ MERKEZİ (CHATGPT EXPORT / PROMPT BUILDER)   -->
+    <!-- ======================================================= -->
+    <div id="tab-analysis" class="tab-content">
+      <section class="card analysis-hero" aria-labelledby="analysisTitle">
+        <div>
+          <span class="analysis-eyebrow">KARAR DESTEK PAKETİ</span>
+          <h2 id="analysisTitle">🧠 ChatGPT Analiz Merkezi</h2>
+          <p>Seçtiğiniz dönem ve mülkler için kişisel veri içermeyen finans, rezervasyon ve kanal özetini üretin.</p>
+        </div>
+        <div class="analysis-privacy-note">
+          <strong>Gizlilik sınırı</strong>
+          <span>Misafir adı, telefon, e-posta, notlar ve sistem kimlikleri dışa aktarılmaz.</span>
+        </div>
+      </section>
+
+      <div class="analysis-layout">
+        <section class="card analysis-builder" aria-labelledby="analysisBuilderTitle">
+          <div class="section-title-bar">
+            <div>
+              <h2 id="analysisBuilderTitle">Analiz kapsamı</h2>
+              <p class="sub-text">Dönemi, karşılaştırmayı, mülkleri ve veri bölümlerini seçin.</p>
+            </div>
+          </div>
+
+          <div class="analysis-date-grid">
+            <div class="analysis-control">
+              <label for="analysisStartDate">Başlangıç tarihi</label>
+              <input class="analysis-field" type="date" id="analysisStartDate">
+            </div>
+            <div class="analysis-control">
+              <label for="analysisEndDate">Bitiş tarihi</label>
+              <input class="analysis-field" type="date" id="analysisEndDate">
+            </div>
+            <div class="analysis-control analysis-control-wide">
+              <label for="analysisComparison">Karşılaştırma</label>
+              <select class="analysis-field" id="analysisComparison">
+                <option value="PRIOR_YEAR">Geçen yılın aynı dönemi</option>
+                <option value="PREVIOUS_PERIOD">Önceki eşit dönem</option>
+                <option value="NONE">Karşılaştırma yok</option>
+              </select>
+            </div>
+          </div>
+
+          <fieldset class="analysis-choice-group">
+            <legend>Mülkler</legend>
+            <label class="analysis-check analysis-check-all">
+              <input type="checkbox" id="analysisAllProperties" checked onchange="toggleAnalysisProperties(this.checked)">
+              <span>Tüm aktif portföy</span>
+            </label>
+            <div id="analysisPropertyList" class="analysis-check-grid"></div>
+          </fieldset>
+
+          <fieldset class="analysis-choice-group">
+            <legend>Analiz bölümleri</legend>
+            <div id="analysisSectionList" class="analysis-check-grid">
+              <label class="analysis-check"><input type="checkbox" name="analysisSection" value="FINANCE" checked><span>Finansal performans</span></label>
+              <label class="analysis-check"><input type="checkbox" name="analysisSection" value="BOOKING_KPIS" checked><span>Rezervasyon KPI'ları</span></label>
+              <label class="analysis-check"><input type="checkbox" name="analysisSection" value="CHANNELS" checked><span>Kanal performansı</span></label>
+              <label class="analysis-check"><input type="checkbox" name="analysisSection" value="PROPERTIES" checked><span>Mülk bazlı performans</span></label>
+              <label class="analysis-check"><input type="checkbox" name="analysisSection" value="EXPENSES" checked><span>Giderler</span></label>
+              <label class="analysis-check"><input type="checkbox" name="analysisSection" value="INVESTMENTS" checked><span>Yatırımlar</span></label>
+            </div>
+          </fieldset>
+
+          <div id="analysisError" role="alert" hidden></div>
+          <button type="button" class="btn btn-primary analysis-generate-btn" id="analysisGenerateBtn" onclick="generateAnalysisExport()">
+            🧠 Analiz Paketini Oluştur
+          </button>
+          <p id="analysisStatus" role="status" aria-live="polite">Henüz analiz paketi oluşturulmadı.</p>
+        </section>
+
+        <section class="card analysis-output" aria-labelledby="analysisOutputTitle">
+          <div class="section-title-bar">
+            <div>
+              <h2 id="analysisOutputTitle">ChatGPT prompt önizlemesi</h2>
+              <p class="sub-text" id="analysisOutputMeta">Seçimlerinizden üretilecek güvenli metin burada görünür.</p>
+            </div>
+          </div>
+          <div class="analysis-summary" id="analysisSummary" hidden aria-label="Analiz paketi özeti">
+            <div><strong id="analysisSummaryProperties">0</strong><span>Mülk</span></div>
+            <div><strong id="analysisSummaryReservations">0</strong><span>Rezervasyon</span></div>
+            <div><strong id="analysisSummaryNights">0</strong><span>Satılan gece</span></div>
+            <div><strong id="analysisSummaryMetrics">0</strong><span>Finansal metrik</span></div>
+          </div>
+          <div class="analysis-empty-state" id="analysisEmptyState">
+            <span aria-hidden="true">✦</span>
+            <strong>Analize hazır</strong>
+            <p>Sol taraftan kapsamı seçip paketi oluşturun.</p>
+          </div>
+          <textarea class="analysis-prompt-preview" id="analysisPromptPreview" readonly hidden aria-label="ChatGPT analiz prompt önizlemesi"></textarea>
+          <div class="analysis-output-actions" id="analysisOutputActions" hidden>
+            <button type="button" class="btn btn-primary" id="analysisCopyBtn" onclick="copyAnalysisPrompt()">📋 Promptu Kopyala</button>
+            <button type="button" class="btn btn-secondary" onclick="downloadAnalysisJson()">💾 JSON İndir</button>
+          </div>
+        </section>
+      </div>
+    </div>
+
   </main>
 
   <!-- ========================================== -->
@@ -3903,7 +4003,9 @@
     </div>
   </div>
 
-  <script src="core/financial_metrics_service.js?v=58fa83fc"></script>
+  <script src="core/financial_metrics_service.js?v=66c8bc6a"></script>
+  <script src="core/marketing_engine.js?v=2756f4ec"></script>
+  <script src="core/analysis_export_service.js?v=3bec6c79"></script>
   <script src="core/finance_import_engine.js?v=7d2e5cc4"></script>
   <script src="core/finance_export_engine.js?v=4ab4113f"></script>
 
@@ -4468,7 +4570,8 @@
   <script src="core/executive_dashboard_service.js?v=baf5396e"></script>
   <script src="core/executive_ai_advisor.js?v=4b235c67"></script>
   <script src="core/notification_center_service.js?v=710f8a91"></script>
-  <script src="app.js?v=e5f33a14"></script>
+  <script src="app.js?v=7f4fd78b"></script>
+  <script src="core/analysis_center_ui.js?v=3f391831"></script>
   <script src="core/marketing_ui.js?v=2e506018"></script>
 </body>
 </html>

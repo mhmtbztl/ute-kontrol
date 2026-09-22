@@ -18,6 +18,7 @@ const allTestFiles = [
   'finance_import_tests.js',
   'financial_metrics_tests.js',
   'analysis_export_service_tests.js',
+  'analysis_center_ui_tests.js',
   'guest_domain_tests.js',
   'guest_crm_tests.js',
   'guest_linking_schema_tests.js',
