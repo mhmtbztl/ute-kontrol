@@ -7,7 +7,7 @@
 | Ortam | Durum |
 |---|---|
 | Test projesi `pdeiorpgxetksyogrmbi` | ✅ **uygulandı**, canlı süit 19/19 yeşil |
-| Üretim `kirpcqklyjlrhvdbgdrq` | ⏳ **uygulanmadı** — §3 |
+| Üretim `kirpcqklyjlrhvdbgdrq` | ✅ **uygulandı ve doğrulandı** (23 Eylül 2026) — §4 |
 
 > phase29'dan **sonra** uygulanmalıdır. Tek transaction, idempotent.
 
@@ -143,6 +143,14 @@ phase39'un uygulandığının kanıtı **kendi doğrulama bloğudur**: blok
 `pg_get_functiondef` ile gövdeyi okuyup `ROW_COUNT` yoksa durur. Dosyanın
 hatasız tamamlanıp `PHASE 39 OK` yazması, ölçümün **veritabanının içinde,
 gerçek tanım üzerinde** yapıldığı anlamına gelir.
+
+**Üretim ölçümü (23 Eylül 2026):**
+
+```
+acknowledge_notification_atomic  -> 401 42501 permission denied for function
+resolve_executive_alert_atomic   -> 401 42501 permission denied for function
+schema_migrations (service_role, salt okunur) -> 39 phase39_notification_rowcount
+```
 
 ---
 

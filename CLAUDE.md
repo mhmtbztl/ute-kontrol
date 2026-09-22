@@ -342,6 +342,11 @@ döner, `UPDATE`'e hiç gelinmez. Dalın varlığını **göçün kendi doğrula
 eklerken phase29'un kazanımlarını **kaybetmediğidir** (`CREATE OR REPLACE`
 gövdeyi bütünüyle değiştirir).
 
+**phase39 23 Eylül 2026’da üretime uygulandı ve doğrulandı.** SQL Editor’de
+hatasız tamamlandı (doğrulama bloğu gövde üzerinde koştu). Dışarıdan salt
+okunur iki ölçüm: anon ile iki RPC `401 42501` (phase29 kapısı yerinde) ve
+`schema_migrations` satırı `39 phase39_notification_rowcount` mevcut.
+
 **phase30 (`migration_phase30_booking_channel_settings.sql`) 20 Eylül 2026'da
 üretime uygulandı ve doğrulandı.** `tenant_booking_channels` tablosu üretimde
 mevcut; anon tablo sorgusu eksik şema (`PGRST205`) yerine `401 permission
@@ -587,7 +592,7 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 | "Şirket Genel Raporu" içe aktarımı | **bilerek reddediliyor** — aylık toplamdan rezervasyon üretmek uydurma veri olurdu (§3.6). Ekran bunu açıkça söylüyor ve kullanıcıyı defter şablonlarına yönlendiriyor |
 | İçe aktarımı **geri alma** | **tamamlandı** (22 Eylül 2026, phase35 + phase37) — yanlış dosya aktarıldığında dönüş yolu yoktu. Göçler **22 Eylül 2026'da üretime uygulandı ve doğrulandı** — `docs/PHASE35_DEPLOY_PACKAGE.md`. Ağı `core/import_undo_tests.js` (50 iddia) + `core/import_undo_live_tests.js` (23 iddia, canlı) |
 | Bildirim merkezi analizi | **tamamlandı** (17 Eylül 2026) — merkez her iki uçtan da bağlı değildi; yükleme bağlandı, "okundu" artık Postgres'e yazıyor. RPC yetki sırası phase29 ile düzeltildi; göç 20 Eylül 2026'da **üretime uygulandı ve doğrulandı** |
-| phase29'un ertelenmiş `ROW_COUNT` yan etkisi | **tamamlandı** (22 Eylül 2026, phase39) — 0 satır etkilendiğinde artık `success: false`. Aynı turda `RESOLVE_ALERT` aksiyonunun **her zaman düşen** çağrısı da düzeltildi (`p_resolved_by`'a cümle gidiyordu, `22P02`). **Göç üretime henüz uygulanmadı** — `docs/PHASE39_DEPLOY_PACKAGE.md` |
+| phase29'un ertelenmiş `ROW_COUNT` yan etkisi | **tamamlandı** (22 Eylül 2026, phase39) — 0 satır etkilendiğinde artık `success: false`. Aynı turda `RESOLVE_ALERT` aksiyonunun **her zaman düşen** çağrısı da düzeltildi (`p_resolved_by`'a cümle gidiyordu, `22P02`). Göç **23 Eylül 2026’da üretime uygulandı ve doğrulandı** — `docs/PHASE39_DEPLOY_PACKAGE.md` |
 | `saveAppData()` hiçbir şey kaydetmiyor | gövdesi yalnızca eski localStorage anahtarlarını siliyor. 17 çağıranda hiçbir Postgres yazması yoktu; **8'i 20 Eylül 2026'da bağlandı**, 1'i meşru yerel durum, 2'si kaldırıldı, **6'sı 20 Eylül 2026'da phase31 ile kapandı**; liste artık boş. Göç **21 Eylül 2026’da üretime uygulandı ve doğrulandı**. Ayrıntı aşağıda |
 | Temizlik & gider defteri kalıcılığı | **tamamlandı** (20 Eylül 2026) — beş fonksiyon hiçbir şey yazmıyordu. Ayrıca `cloudUpsertCleaningTask` yeniden yüklemeden sonra **mükerrer görev satırı** açıyordu (UUID'yi `legacy_id` olarak gönderiyordu) ve `cleaningPayments` hiç yüklenmiyordu. Ağı `cleaning_ledger_persistence_tests` (34 iddia) |
 | Temizlik görevi → Operasyon Kontrol Merkezi sözleşmesi | **phase34 ile düzeltildi** (21 Eylül 2026) — yeni kayıt, Postgres yüklemesi, realtime ve operasyon özeti tek `normalizeCleaningTask` modelinden geçiyor; açıklama `notes` olarak korunuyor, kayıt DB yazısını bekliyor ve bekleyen borç listesi yalnızca `!paid` gösteriyor. `paid` yalnız ödeme durumudur. `cleaning_tasks` tablosunda operasyonel tamamlanma alanı olmadığı için “hazır mülk” hesabı temizlik ödemesinden türetilemez; gerçek bir tamamlanma modeli tasarlanana kadar bu kavramsal açık bilerek açık tutulur. Ağı `cleaning_ledger_persistence_tests` ve `render_pipeline_tests`. |
