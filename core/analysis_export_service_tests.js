@@ -203,5 +203,46 @@ test('channel, cohort and property sections reuse canonical engines and surface 
   assert.strictEqual(result.dataQuality.status, 'NEEDS_REVIEW');
 });
 
+test('previous-period comparison uses an equal-length range and guarded percentages', () => {
+  const result = buildAnalysisPackage({
+    period: { start: '2026-09-01', end: '2026-09-03' },
+    comparison: { mode: 'PREVIOUS_PERIOD' },
+    propertyIds: ['P1'], sections: ['FINANCE', 'BOOKING_KPIS'],
+    properties: [{ id: 'P1', name: 'Seyir', activated_on: '2026-01-01' }],
+    bookings: [
+      { id: 'CUR', property_id: 'P1', check_in: '2026-09-01', check_out: '2026-09-04', gross_amount: 3000 },
+      { id: 'PREV', property_id: 'P1', check_in: '2026-08-29', check_out: '2026-09-01', gross_amount: 1500 }
+    ],
+    expenses: [], maintenances: []
+  });
+
+  assert.deepStrictEqual(result.comparisonPeriod, {
+    mode: 'PREVIOUS_PERIOD', start: '2026-08-29', end: '2026-08-31',
+    endExclusive: '2026-09-01', dayCount: 3
+  });
+  assert.deepStrictEqual(result.comparison.financialRevenue, {
+    current: 3000, previous: 1500, changeAmount: 1500,
+    changePercent: 100, comparisonAvailable: true
+  });
+  assert.strictEqual(result.comparison.occupancy.current, 100);
+  assert.strictEqual(result.comparison.occupancy.previous, 100);
+});
+
+test('comparison does not invent a percentage when the previous value is zero', () => {
+  const result = buildAnalysisPackage({
+    period: { start: '2026-09-01', end: '2026-09-02' },
+    comparison: { mode: 'PREVIOUS_PERIOD' },
+    propertyIds: ['P1'], sections: ['FINANCE'],
+    properties: [{ id: 'P1', name: 'Seyir', activated_on: '2026-01-01' }],
+    bookings: [{ id: 'CUR', property_id: 'P1', check_in: '2026-09-01', check_out: '2026-09-03', gross_amount: 2000 }],
+    expenses: [], maintenances: []
+  });
+
+  assert.deepStrictEqual(result.comparison.financialRevenue, {
+    current: 2000, previous: 0, changeAmount: 2000,
+    changePercent: null, comparisonAvailable: false
+  });
+});
+
 console.log(`\nTEST SUMMARY: ${passed} / ${passed + failed} TESTS PASSED (${failed} FAILED)`);
 if (failed > 0) process.exit(1);

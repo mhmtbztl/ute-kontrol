@@ -24,7 +24,7 @@
   - Verify: Channel totals and property totals reconcile.
   - Dependencies: Task 4.
 
-- [ ] Task 6: Add comparison, reconciliation and data-quality validation.
+- [x] Task 6: Add comparison, reconciliation and data-quality validation.
   - Acceptance: Equal-length comparisons and reason-coded unavailable values work.
   - Verify: Comparison and quality fixtures pass.
   - Dependencies: Tasks 4-5.

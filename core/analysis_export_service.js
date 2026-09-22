@@ -37,6 +37,50 @@
     return date.toISOString().slice(0, 10);
   }
 
+  function addUtcDays(date, amount) {
+    const next = new Date(date.getTime());
+    next.setUTCDate(next.getUTCDate() + amount);
+    return next;
+  }
+
+  function deriveComparisonPeriod(period, mode) {
+    if (!mode || mode === 'NONE') return null;
+    const currentStart = parseIsoDate(period.start);
+    let start;
+    if (mode === 'PREVIOUS_PERIOD') {
+      start = addUtcDays(currentStart, -period.dayCount);
+    } else if (mode === 'PRIOR_YEAR') {
+      const targetYear = currentStart.getUTCFullYear() - 1;
+      const targetMonth = currentStart.getUTCMonth();
+      const lastDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+      start = new Date(Date.UTC(targetYear, targetMonth, Math.min(currentStart.getUTCDate(), lastDay)));
+    } else {
+      throw contractError('ANALYSIS_INVALID_COMPARISON', 'Unknown comparison mode.');
+    }
+    const endExclusive = addUtcDays(start, period.dayCount);
+    return {
+      mode,
+      start: formatIsoDate(start),
+      end: formatIsoDate(addUtcDays(endExclusive, -1)),
+      endExclusive: formatIsoDate(endExclusive),
+      dayCount: period.dayCount
+    };
+  }
+
+  function compareMetric(current, previous) {
+    if (current === null || current === undefined || previous === null || previous === undefined) {
+      return { current, previous, changeAmount: null, changePercent: null, comparisonAvailable: false };
+    }
+    const changeAmount = FinancialMetricsService.roundMoney(current - previous);
+    if (previous === 0 && current !== 0) {
+      return { current, previous, changeAmount, changePercent: null, comparisonAvailable: false };
+    }
+    const changePercent = previous === 0
+      ? 0
+      : FinancialMetricsService.roundMoney(changeAmount / Math.abs(previous) * 100);
+    return { current, previous, changeAmount, changePercent, comparisonAvailable: true };
+  }
+
   function validateAnalysisRequest(input) {
     const start = parseIsoDate(input && input.period && input.period.start);
     const end = parseIsoDate(input && input.period && input.period.end);
@@ -103,6 +147,16 @@
     });
     const finance = metrics.financial;
     const operations = metrics.operations;
+    const comparisonPeriod = deriveComparisonPeriod(request.period, request.comparison.mode);
+    const comparisonMetrics = comparisonPeriod
+      ? FinancialMetricsService.computeFinancialMetricsForRange({
+        periodStart: comparisonPeriod.start,
+        periodEndExclusive: comparisonPeriod.endExclusive,
+        propertyIds: request.propertyIds,
+        bookings: input.bookings || [], expenses: input.expenses || [],
+        properties: sourceProperties, maintenances: input.maintenances || []
+      })
+      : null;
     const includeFinance = request.sections.some(section => ['FINANCE', 'EXPENSES', 'INVESTMENTS'].includes(section));
     const includeBookingKpis = request.sections.includes('BOOKING_KPIS');
     const includeChannels = request.sections.includes('CHANNELS');
@@ -191,7 +245,7 @@
       currency: request.currency,
       business: { name: input.business && input.business.name || null },
       period: { ...request.period, dateBasis: 'STAY_DATE' },
-      comparisonPeriod: null,
+      comparisonPeriod,
       portfolio: { propertyCount: properties.length, properties },
       financials: includeFinance ? {
         financialRevenue: finance.revenue,
@@ -238,7 +292,20 @@
         directSubchannels: channel.directSubchannels
       })) : [],
       properties: propertyResults,
-      comparison: {},
+      comparison: comparisonMetrics ? {
+        financialRevenue: compareMetric(finance.revenue, comparisonMetrics.financial.revenue),
+        roomRevenue: compareMetric(operations.roomRevenue, comparisonMetrics.operations.roomRevenue),
+        operatingExpenses: compareMetric(finance.operatingExpenses, comparisonMetrics.financial.operatingExpenses),
+        investments: compareMetric(finance.capex, comparisonMetrics.financial.capex),
+        operatingProfit: compareMetric(finance.operatingProfit, comparisonMetrics.financial.operatingProfit),
+        netCashProfit: compareMetric(finance.netCashProfit, comparisonMetrics.financial.netCashProfit),
+        reservations: compareMetric(operations.reservationCount, comparisonMetrics.operations.reservationCount),
+        soldNights: compareMetric(operations.soldNights, comparisonMetrics.operations.soldNights),
+        availableNights: compareMetric(operations.availableNights, comparisonMetrics.operations.availableNights),
+        occupancy: compareMetric(operations.occupancy, comparisonMetrics.operations.occupancy),
+        adr: compareMetric(operations.adr, comparisonMetrics.operations.adr),
+        revpar: compareMetric(operations.revpar, comparisonMetrics.operations.revpar)
+      } : {},
       dataQuality: {
         status: qualityItems.length > 0 ? 'NEEDS_REVIEW' : (hasMeasuredData ? 'OK' : 'INSUFFICIENT_DATA'),
         items: qualityItems.length > 0
