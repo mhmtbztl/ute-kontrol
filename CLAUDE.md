@@ -610,7 +610,7 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 | RGVQI denetim düzeltmeleri | phase24 ve phase25, 14 Eylül 2026'da üretime uygulandı ve readiness denetimiyle doğrulandı; uygulama/worker dağıtımı ayrıca izlenmeli |
 | Misafir CRM (phase27 + phase28) | göçler **üretimde uygulandı ve doğrulandı** (15 Eylül 2026, sütun sorgusuyla); test projesinde de kurulu |
 | Güvenli test kapısı | tamamlandı — canlı/çevrimdışı ayrımı artık `@supabase/supabase-js` require'ına bakıyor. Eski kaba dizgi taraması 8 çevrimdışı süiti (worker giriş noktaları) yanlışlıkla atlıyordu; güvenli koşu 85 → 94 süit |
-| Kullanıcı davet e-postası | phase24 outbox + `npm run invitations:worker`; üretimde worker secret'ları kurulmalı |
+| Kullanıcı davet e-postası | **worker üretimde çalışıyor** (23 Eylül 2026 kontrolü: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `LEXBNB_PUBLIC_URL` secret'ları tanımlı, `Marketing workers` her koşuda adımı çalıştırıp `{"claimed":0}` dönüyor; kuyruk o gün boştu, yani uçtan uca henüz hiç sınanmadı). Aynı gün iki kusur düzeltildi: hesabı **zaten olan** adrese davet `already registered` ile 5 kez düşüp hiç gitmiyordu (artık giriş linki gidiyor), davet linkiyle gelen **şifresiz** hesaba şifre belirletilmiyordu (`#type=invite` artık şifre formunu açıyor). Ağı `core/invitation_worker_tests.js` (14 iddia). Açık: Supabase Invite/Magic Link şablonlarının Türkçeleştirilmesi; GitHub `*/15` zamanlaması pratikte saatlerce gecikiyor |
 
 ### `saveAppData()` — kaydetmeyen kaydedici
 

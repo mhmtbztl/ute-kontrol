@@ -12812,6 +12812,12 @@ function showNewPasswordForm() {
     if (el) el.style.display = 'none';
   });
   if (tabs) tabs.style.display = 'none';
+  const intro = document.getElementById('saasNewPassIntro');
+  if (intro) {
+    intro.innerText = getPasswordSetupRedirectType() === 'invite'
+      ? 'Ekibe davet edildiniz. Sonraki girişleriniz için bir şifre belirleyin.'
+      : 'Yeni şifrenizi belirleyin.';
+  }
   const form = document.getElementById('saasNewPassForm');
   if (form) form.style.display = 'block';
   setTimeout(() => document.getElementById('saasNewPass1')?.focus(), 80);
@@ -12897,10 +12903,21 @@ async function handleSaaSNewPassword(e) {
 }
 
 // Supabase recovery linkiyle donuldugunde token URL hash'inde gelir.
-function isPasswordRecoveryRedirect() {
+// Sifre belirletilmesi gereken iki link turu var:
+//   recovery -> sifremi unuttum
+//   invite   -> ekip daveti. Davet edilen hesabin SIFRESI YOKTUR; link oturumu
+//               acar ama giris yalnizca e-posta+sifre ile yapildigi icin
+//               (CLAUDE.md 3.1) sifre belirletilmezse kisi bir sonraki girisinde
+//               iceri giremezdi.
+function getPasswordSetupRedirectType() {
   const hash = (window.location.hash || '').replace(/^#/, '');
-  if (hash && new URLSearchParams(hash).get('type') === 'recovery') return true;
-  return new URLSearchParams(window.location.search).get('type') === 'recovery';
+  const type = (hash && new URLSearchParams(hash).get('type'))
+    || new URLSearchParams(window.location.search).get('type');
+  return type === 'recovery' || type === 'invite' ? type : null;
+}
+
+function isPasswordRecoveryRedirect() {
+  return getPasswordSetupRedirectType() !== null;
 }
 
 // RESTORE SESSION ON LOAD & AUTH STATE LISTENER

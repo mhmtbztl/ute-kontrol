@@ -163,6 +163,9 @@ const allTestFiles = [
   // Bildirim merkezi her iki uctan da bagli mi (yukleme + kalici okundu)
   'notification_wiring_tests.js',
 
+  // Ekip daveti: hesabi olan adrese de e-posta gidiyor mu, davetle gelene sifre belirletiliyor mu
+  'invitation_worker_tests.js',
+
   // Temizlik & gider defteri gercekten Postgres'e yaziliyor mu
   'cleaning_ledger_persistence_tests.js',
 
