@@ -371,6 +371,69 @@ function kaynakTestleri(app) {
     'Birakilmazsa her disa aktarim sekme kapanana kadar bellekte kalir.');
 }
 
+// =============================================================================
+// E) GUVENLIK — CSV formul enjeksiyonu
+// =============================================================================
+function guvenlikTestleri(app, X, I) {
+  console.log('\n--- E) GUVENLIK ---');
+
+  const tuzakli = [
+    { villa: 'CINAR', guest: '=HYPERLINK("http://kotu.site","Fatura")', checkIn: '2026-09-15',
+      checkOut: '2026-09-16', gross: 1000, otaCommission: 0, cleaningFee: 0,
+      channel: 'X', pax: 2, status: 'CONFIRMED' },
+    { villa: 'CINAR', guest: '+1+1', checkIn: '2026-09-17', checkOut: '2026-09-18',
+      gross: -500, otaCommission: 0, cleaningFee: 0, channel: 'X', pax: 2, status: 'CONFIRMED' },
+    { villa: 'CINAR', guest: '@SUM(1+1)', checkIn: '2026-09-19', checkOut: '2026-09-20',
+      gross: 1000, otaCommission: 0, cleaningFee: 0, channel: 'X', pax: 2, status: 'CONFIRMED' },
+    { villa: 'CINAR', guest: "'Ali", checkIn: '2026-09-21', checkOut: '2026-09-22',
+      gross: 1000, otaCommission: 0, cleaningFee: 0, channel: 'X', pax: 2, status: 'CONFIRMED' }
+  ];
+
+  const csv = X.toCSV(X.buildExport('BOOKINGS', tuzakli));
+  const satirlar = csv.split('\r\n');
+
+  const korumasiz = satirlar.slice(1, 5).filter(s => /;[=+@]/.test(s));
+  check(korumasiz.length === 0,
+    'E1. Formulle baslayan hucreler METIN olarak sabitleniyor',
+    'Excel `=`, `+`, `-`, `@` ile acilan bir CSV hucresini FORMUL sayar ve ' +
+    'dosyayi acanin makinesinde calistirir. Misafir adina ' +
+    '=HYPERLINK("http://kotu.site","Fatura") yazan biri, o defteri acan ' +
+    'muhasebeciye tiklanabilir bir tuzak gonderir. Dosyayi BIZ urettigimiz ' +
+    'icin sorumluluk bizdedir.\n       Korumasiz: ' + JSON.stringify(korumasiz));
+
+  check(/;-500;/.test(csv),
+    'E2. Negatif TUTAR tirnaklanmiyor (formul degil, sayidir)',
+    'Sayiyi metne sabitlemek Excel\'de toplama islemini bozar. CSV: ' + satirlar[2]);
+
+  // Tur bozulmamali: koruyucu geri okunurken soyulmali.
+  const k = app.buildImportSource(Uint8Array.from(Buffer.from(csv, 'utf8')), 'g.csv');
+  const farkli = k.rows.filter((r, i) => r['Misafir Adı'] !== tuzakli[i].guest);
+  check(farkli.length === 0,
+    'E3. Koruyucu geri okunurken soyuluyor — tur bozulmuyor',
+    'Soyulmazsa misafir adi her disa aktarim/geri yukleme turunda bir tirnak ' +
+    'daha kazanir. Farkli: ' + JSON.stringify(farkli.map(r => r['Misafir Adı'])));
+
+  check(I.formulKoruyucusunuSoy("'Ali") === "'Ali",
+    'E4. Formul karakteri olmayan tek tirnak KORUNUYOR',
+    'Kor bir soyma, tirnakla baslayan mesru bir degeri bozardi. Donen: ' +
+    JSON.stringify(I.formulKoruyucusunuSoy("'Ali")));
+
+  // XLSX yolu: hucre metin tipinde olmali, formul alani bulunmamali.
+  let XLSX = null;
+  try { XLSX = require(path.join(KOK, 'xlsx.full.min.js')); } catch (e) { /* yok */ }
+  if (!XLSX) {
+    no('E5. XLSX hucresi formula donusmuyor', 'xlsx.full.min.js yuklenemedi.');
+    return;
+  }
+  const d = X.buildExport('BOOKINGS', tuzakli);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(X.toAOA(d)), 'R');
+  const hucre = wb.Sheets['R']['B2'];
+  check(hucre && hucre.t === 's' && hucre.f === undefined,
+    'E5. XLSX hucresi formula donusmuyor',
+    'Hucre tipi=' + (hucre && hucre.t) + ' formul=' + (hucre && hucre.f));
+}
+
 function run() {
   console.log('=============================================================================');
   console.log('LEXBNB DEFTER DISA AKTARMA DENETIMI');
@@ -385,6 +448,7 @@ function run() {
   if (X) {
     motorTestleri(X, I);
     turTestleri(app, X, I);
+    guvenlikTestleri(app, X, I);
   } else {
     // Motor yoksa A ve B kosturulamaz — ama C ve D yalnizca ice aktarma
     // motoruna ve kaynaga bakar, onlar yine kossun. Yoksa denetim "neyin

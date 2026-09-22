@@ -70,11 +70,30 @@ function disaSayi(v) {
   return isFinite(n) ? Math.round(n * 100) / 100 : null;
 }
 
+/**
+ * Excel bir CSV hucresini `=`, `+`, `-` veya `@` ile aciliyorsa FORMUL sayar
+ * ve dosyayi acan kisinin makinesinde CALISTIRIR. Yani bir misafir adina
+ * `=HYPERLINK("http://kotu.site","Fatura")` yazilirsa, o defteri Excel'de
+ * acan muhasebeci tiklanabilir bir tuzak gorur; eski Excel'lerde DDE ile
+ * daha kotusu mumkundur.
+ *
+ * Bu "CSV formul enjeksiyonu"dur ve dosyayi BIZ urettigimiz icin sorumlulugu
+ * bizdedir: veri kendi veritabanimizdan cikip musterinin Excel'ine giriyor.
+ *
+ * Savunma, Excel'in kendi kuralidir: basa tek tirnak koymak hucreyi METIN'e
+ * sabitler ve Excel o tirnagi hucre degerine DAHIL ETMEZ. Tur bozulmasin
+ * diye `parseCSV` ayni koruyucuyu geri okurken soyuyor.
+ */
+const FORMUL_BASLANGICI = /^[=+\-@\t\r]/;
+
 /** CSV hucresi: sayilar TURK ondaligi, binlik ayrac yok. */
 function csvHucre(v, ayirici) {
   if (v === null || v === undefined) return '';
+  // Sayilar tirnaklanmaz: `-500` bir formul degil, negatif tutardir ve
+  // hucre zaten sayi olarak yazilir.
   if (typeof v === 'number') return String(v).replace('.', ',');
-  const s = String(v);
+  let s = String(v);
+  if (FORMUL_BASLANGICI.test(s)) s = "'" + s;
   const kacismaGerek = s.indexOf('"') !== -1 || s.indexOf('\n') !== -1 ||
     s.indexOf('\r') !== -1 || s.indexOf(ayirici) !== -1;
   return kacismaGerek ? '"' + s.replace(/"/g, '""') + '"' : s;

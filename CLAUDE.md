@@ -739,6 +739,24 @@ Ağın omurgası **B bölümüdür**: dışa aktar → geri oku → her alan bir
 mı. Noktalı virgül, tırnak ve Türkçe büyük İ içeren bir misafir adı, kuruşlu
 tutar, iptal durumu ve portföy geneli gider (`ALL`) aynı turda ölçülür.
 
+**CSV formül enjeksiyonu — dışa aktarmanın kendi güvenlik borcu.**
+Excel, `=`, `+`, `-` veya `@` ile açılan bir CSV hücresini **formül sayar ve
+dosyayı açanın makinesinde çalıştırır.** Misafir adına
+`=HYPERLINK("http://kotu.site","Fatura")` yazan biri, o defteri Excel'de açan
+muhasebeciye tıklanabilir bir tuzak göndermiş olur; eski Excel'lerde DDE ile
+daha kötüsü mümkündür. Dosyayı **biz** ürettiğimiz için sorumluluk bizdedir —
+veri kendi veritabanımızdan çıkıp müşterinin Excel'ine giriyor.
+
+Savunma Excel'in kendi kuralıdır: başa tek tırnak koymak hücreyi metne
+sabitler ve Excel o tırnağı hücre değerine **dahil etmez**. Tur bozulmasın
+diye `parseCSV` aynı koruyucuyu geri okurken soyar
+(`formulKoruyucusunuSoy`). Soyma **kör değildir**: yalnızca tırnaktan sonra
+formül karakteri geliyorsa soyar, yani `'Ali` olduğu gibi kalır. Sayılar
+tırnaklanmaz — `-500` bir formül değil, negatif tutardır ve tırnaklamak
+Excel'de toplamayı bozardı. XLSX tarafı zaten güvenlidir: `aoa_to_sheet`
+metni `t: 's'` hücresi yapar, formül alanı üretmez. Ağı
+`finance_export_tests` E bölümü.
+
 ### Yayınlanan örnek şablonlar
 
 `sablonlar/` klasörü GitHub Pages ile birlikte yayınlanır, yani **giriş

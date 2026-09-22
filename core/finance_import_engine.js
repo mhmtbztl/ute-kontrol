@@ -535,6 +535,25 @@ const validateImportRows = validateExpenseRows;
 const CSV_AYIRICILAR = [';', ',', '\t', '|'];
 
 /**
+ * Excel'in "bu hucre METIN" koruyucusunu soyar.
+ *
+ * `=`, `+`, `-`, `@` ile baslayan bir CSV hucresini Excel FORMUL sayar ve
+ * dosyayi acanin makinesinde calistirir. Hem Excel hem bizim disa
+ * aktarimimiz (`finance_export_engine.js`) bunu basa tek tirnak koyarak
+ * engeller; Excel o tirnagi hucre degerine dahil etmez.
+ *
+ * Biz de etmeyelim — yoksa "disa aktar -> geri yukle" turunda misafir adi
+ * her seferinde bir tirnak daha kazanirdi.
+ *
+ * SOYULAN YALNIZCA formul karakterinden ONCE gelen tirnaktir: `'Ali` oldugu
+ * gibi kalir, `'=HYPERLINK(...)` ise `=HYPERLINK(...)` olur.
+ */
+function formulKoruyucusunuSoy(deger) {
+  const s = String(deger === null || deger === undefined ? '' : deger);
+  return /^'[=+\-@\t\r]/.test(s) ? s.slice(1) : s;
+}
+
+/**
  * Baytlardan kaynagin turunu belirler: 'XLSX' | 'XLS' | 'TEXT'.
  *
  * UZANTIYA DEGIL IMZAYA bakar. OTA disa aktarimlari uzantiyi duzenli olarak
@@ -650,12 +669,14 @@ function parseCSV(text) {
 
   if (kayitlar.length === 0) return { headers: [], rows: [] };
 
-  const headers = kayitlar[0];
+  const headers = kayitlar[0].map(formulKoruyucusunuSoy);
   const rows = [];
   for (let i = 1; i < kayitlar.length; i++) {
     const vals = kayitlar[i];
     const o = {};
-    headers.forEach((h, idx) => { o[h] = vals[idx] !== undefined ? vals[idx] : ''; });
+    headers.forEach((h, idx) => {
+      o[h] = vals[idx] !== undefined ? formulKoruyucusunuSoy(vals[idx]) : '';
+    });
     rows.push(o);
   }
   return { headers, rows };
@@ -667,6 +688,7 @@ const FinanceImportEngine = {
   computeHash,
   bookingFingerprint,
   parseCSV,
+  formulKoruyucusunuSoy,
   detectDelimiter,
   detectImportSourceKind,
   decodeImportText,
