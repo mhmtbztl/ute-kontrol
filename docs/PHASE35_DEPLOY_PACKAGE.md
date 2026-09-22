@@ -10,7 +10,7 @@
 | Ortam | Durum |
 |---|---|
 | Test projesi `pdeiorpgxetksyogrmbi` | ✅ **uygulandı**, canlı süit 23/23 yeşil |
-| Üretim `kirpcqklyjlrhvdbgdrq` | ⏳ **uygulanmadı** — aşağıdaki adımlar |
+| Üretim `kirpcqklyjlrhvdbgdrq` | ✅ **22 Eylül 2026'da uygulandı ve doğrulandı** — bkz. §5 |
 
 > **İkisi birlikte uygulanmalıdır.** phase37, phase35'in bir kusurunu düzeltir;
 > yalnız phase35 uygulanırsa geri alma, aktarımdan hemen sonra yapılan
@@ -143,21 +143,33 @@ const url=env.SUPABASE_URL, key=env.SUPABASE_ANON_KEY||env.SUPABASE_PUBLISHABLE_
 "
 ```
 
-**Beklenen (uygulandıktan sonra):**
+**Uygulandıktan sonra ölçüldü (22 Eylül 2026):**
 
 ```
-finance_import_batch_rows -> 401 42501
-undo_finance_import        -> 401 42501 permission denied for function
+finance_import_batch_rows      -> 401 42501  permission denied for table
+undo_finance_import            -> 401 42501  permission denied for function
+bookings.import_batch_id       -> 400 42703  column does not exist
+bookings.batch_id              -> 400 42703  column does not exist
 ```
 
-`CONFIRMATION_REQUIRED` gibi **fonksiyonun kendi hata mesajı** dönerse anon
-gövdeye kadar girmiş demektir — o zaman `anon` yetkisi geri alınmamıştır ve
-koruma tek katlıya düşmüştür (CLAUDE.md §7, Phase 17'de yaşanan).
+İlk iki satır §7'nin **iki katını birden** kanıtlar: adın bilinmesi nesnenin
+var olduğunu, `42501` dönmesi `anon` yetkisinin gerçekten geri alındığını
+gösterir. `CONFIRMATION_REQUIRED` gibi **fonksiyonun kendi hata mesajı**
+dönseydi anon gövdeye kadar girmiş olurdu — koruma tek katlıya düşerdi
+(CLAUDE.md §7, Phase 17'de yaşanan).
 
-**phase37'nin ayrı doğrulaması:** anon çağrısı ikisinde de aynı cevabı verir,
-yani bu sorgu phase35 ile phase37'yi **ayırt etmez.** phase37'nin uygulandığı
-kendi `RAISE NOTICE`'ı ve doğrulama bloğuyla anlaşılır; şüphedeyseniz dosyayı
-yeniden çalıştırın (idempotenttir).
+Son iki satır **§2.1'deki tasarım kararının tuttuğunu** gösterir: `bookings`
+tablosuna hiçbir sütun eklenmedi, yani rezervasyon kaydetme akışına
+dokunulmadı.
+
+**phase37 bu sorguyla DOĞRULANAMAZ.** Anon çağrısı phase35 ile phase37
+arasında aynı cevabı verir; ikisini ayırt etmez. phase37'nin uygulandığının
+kanıtı **kendi doğrulama bloğudur**: blok `pg_proc.prosrc`'u okuyup zaman
+payı hâlâ duruyorsa `PHASE37_TOLERANCE_STILL_PRESENT` ile `RAISE EXCEPTION`
+yapar. Yani dosyanın **hatasız** tamamlanıp `PHASE 37 OK` yazması, ölçümü
+veritabanının içinde yapılmış bir doğrulamadır ve dışarıdan atılacak her
+sorgudan güçlüdür. Şüphe varsa dosyayı yeniden çalıştırmak yeterlidir
+(idempotenttir).
 
 ---
 

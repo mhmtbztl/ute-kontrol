@@ -563,7 +563,7 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 | Excel / CSV **içe** aktarma | **tamamlandı** (21 Eylül 2026, phase33 — göç gerektirmedi) — CSV/TSV yolu hiç yoktu ve sessizce **para bozuyordu**; ayrıntı aşağıda. Ağı `core/csv_import_tests.js` (52 iddia) |
 | Excel / CSV **dışa** aktarma | **tamamlandı** (22 Eylül 2026) — tek dışa aktarım `appData`'nın ham JSON dökümüydü: rapor değildi, dönem filtresini yok sayıyordu ve **geri yüklenemiyordu**. Yerine dönem defterleri geldi; sütunlar içe aktarma şablonuyla aynı, yani tur kapanıyor. Ağı `core/finance_export_tests.js` (42 iddia) |
 | "Şirket Genel Raporu" içe aktarımı | **bilerek reddediliyor** — aylık toplamdan rezervasyon üretmek uydurma veri olurdu (§3.6). Ekran bunu açıkça söylüyor ve kullanıcıyı defter şablonlarına yönlendiriyor |
-| İçe aktarımı **geri alma** | kod tamamlandı (22 Eylül 2026, phase35 + phase37) — yanlış dosya aktarıldığında dönüş yolu yoktu. **Göçler üretime henüz uygulanmadı** — `docs/PHASE35_DEPLOY_PACKAGE.md`. Ağı `core/import_undo_tests.js` (50 iddia) + `core/import_undo_live_tests.js` (23 iddia, canlı) |
+| İçe aktarımı **geri alma** | **tamamlandı** (22 Eylül 2026, phase35 + phase37) — yanlış dosya aktarıldığında dönüş yolu yoktu. Göçler **22 Eylül 2026'da üretime uygulandı ve doğrulandı** — `docs/PHASE35_DEPLOY_PACKAGE.md`. Ağı `core/import_undo_tests.js` (50 iddia) + `core/import_undo_live_tests.js` (23 iddia, canlı) |
 | Bildirim merkezi analizi | **tamamlandı** (17 Eylül 2026) — merkez her iki uçtan da bağlı değildi; yükleme bağlandı, "okundu" artık Postgres'e yazıyor. RPC yetki sırası phase29 ile düzeltildi; göç 20 Eylül 2026'da **üretime uygulandı ve doğrulandı** |
 | `saveAppData()` hiçbir şey kaydetmiyor | gövdesi yalnızca eski localStorage anahtarlarını siliyor. 17 çağıranda hiçbir Postgres yazması yoktu; **8'i 20 Eylül 2026'da bağlandı**, 1'i meşru yerel durum, 2'si kaldırıldı, **6'sı 20 Eylül 2026'da phase31 ile kapandı**; liste artık boş. Göç **21 Eylül 2026’da üretime uygulandı ve doğrulandı**. Ayrıntı aşağıda |
 | Temizlik & gider defteri kalıcılığı | **tamamlandı** (20 Eylül 2026) — beş fonksiyon hiçbir şey yazmıyordu. Ayrıca `cloudUpsertCleaningTask` yeniden yüklemeden sonra **mükerrer görev satırı** açıyordu (UUID'yi `legacy_id` olarak gönderiyordu) ve `cleaningPayments` hiç yüklenmiyordu. Ağı `cleaning_ledger_persistence_tests` (34 iddia) |
@@ -796,8 +796,29 @@ değişmezdir ve `bootstrap_test_project.js` bunu kapıda reddeder ("başka bir
 içerikle uygulanmış"). Kural yalnızca üretim için değil; test projesine
 uygulanmak da bağlayıcıdır.
 
-Uygulama ve doğrulama: `docs/PHASE35_DEPLOY_PACKAGE.md`. **İkisi bu sırayla
-uygulanmalıdır**; yalnız phase35 uygulanırsa kusur üretimde kalır.
+**İkisi de 22 Eylül 2026'da üretime uygulandı ve doğrulandı** (bu sırayla;
+yalnız phase35 uygulansaydı kusur üretimde kalırdı). §4.2 yöntemiyle ölçüldü:
+
+```
+finance_import_batch_rows      -> 401 42501  permission denied for table
+undo_finance_import            -> 401 42501  permission denied for function
+bookings.import_batch_id       -> 400 42703  column does not exist
+bookings.batch_id              -> 400 42703  column does not exist
+```
+
+Son iki satır boşuna değil: tasarım kararının tuttuğunu, yani `bookings`
+tablosuna hiçbir sütun eklenmediğini ve rezervasyon kaydetme akışına
+dokunulmadığını gösterir.
+
+**Bu sorgu phase37'yi ayırt etmez** — anon çağrısı phase35 ile phase37'de
+aynı cevabı verir. phase37'nin kanıtı kendi doğrulama bloğudur: blok
+`pg_proc.prosrc`'u okur ve zaman payı hâlâ duruyorsa
+`PHASE37_TOLERANCE_STILL_PRESENT` ile durur. Dosyanın hatasız tamamlanması,
+ölçümün **veritabanının içinde** yapıldığı anlamına gelir ve dışarıdan
+atılacak her sorgudan güçlüdür. Bir göçün uygulandığını "aynı görünen"
+bir cevaba dayanarak ilan etmek, §4.2'nin kaçınmaya çalıştığı hatadır.
+
+Uygulama ve doğrulama adımları: `docs/PHASE35_DEPLOY_PACKAGE.md`.
 
 ### Yayınlanan örnek şablonlar
 
