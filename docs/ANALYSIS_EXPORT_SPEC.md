@@ -1,0 +1,196 @@
+# LexBnB ChatGPT Analysis Export Specification
+
+Status: approved for incremental implementation on 2026-09-22.
+
+## Objective
+
+Build a tenant-safe Analysis Center that packages real LexBnB operating data
+for analysis in ChatGPT. LexBnB calculates and validates internal metrics; it
+does not call an LLM, invent market data, or export guest PII.
+
+## Capability Map
+
+| Module | Responsibility | Depends on |
+|---|---|---|
+| `analysis-contract` | Period, scope, metric, null and error contracts | — |
+| `analysis-aggregation` | Finance, booking, property and comparison metrics | contract |
+| `analysis-channels` | Channel economics and booking cohort metrics | contract |
+| `analysis-quality` | Missing, invalid and unavailable data findings | aggregation, channels |
+| `analysis-export` | JSON document and ChatGPT prompt | quality |
+| `analysis-center-ui` | Filters, preview, copy and user feedback | export |
+| `analysis-security` | Tenant isolation, PII exclusion and export allowlist | all modules |
+
+Build order: contract -> aggregation/channels -> quality -> export -> UI -> security review.
+
+## Existing Sources of Truth
+
+- `core/financial_metrics_service.js`: accrual allocation, room/financial
+  revenue, OPEX, CAPEX, profit, occupancy, ADR, RevPAR and availability.
+- `core/marketing_engine.js`: canonical channel identity, channel economics,
+  booking-created cohort cancellation rate, ALOS and lead time.
+- `get_executive_dashboard_snapshot`: monthly server-side reconciliation and
+  tenant-authorized executive KPIs.
+- `CLAUDE.md` section 3.4: binding USALI and revenue classification rules.
+
+The feature must extend or orchestrate these sources. It must not add another
+independent implementation of the same formulas.
+
+## Input Contract
+
+```text
+period.start                 YYYY-MM-DD, inclusive
+period.end                   YYYY-MM-DD, inclusive
+comparison.mode              NONE | PREVIOUS_PERIOD | PRIOR_YEAR
+propertyIds                  one or more active-tenant property UUIDs
+sections                     FINANCE | BOOKING_KPIS | CHANNELS |
+                             PROPERTIES | EXPENSES | INVESTMENTS
+currency                     TRY for the initial version
+```
+
+Internally all ranges use `[start, endExclusive)`.
+
+## Date Bases
+
+- Revenue, sold nights and channel economics: `STAY_DATE`.
+- Expenses and investments: `EXPENSE_DATE`.
+- Cancellation rate, lead time and ALOS: `BOOKING_CREATED_AT` cohort.
+- Previous-period comparison uses the immediately preceding equal-length range.
+- Prior-year comparison uses the same calendar dates one year earlier.
+- Every exported metric group declares its date basis.
+
+## Financial Rules
+
+```text
+Financial Revenue = sum(gross_amount - discount), accrued per stay night
+Room Revenue      = sum(gross_amount - cleaning_fee - discount), accrued per stay night
+Other Revenue     = Financial Revenue - Room Revenue
+OPEX              = recorded OPEX + accrued OTA commission
+Operating Profit  = Financial Revenue - OPEX
+Net Cash Profit   = Operating Profit - CAPEX
+ADR               = Room Revenue / Sold Nights
+Occupancy         = Sold Nights / Available Nights
+RevPAR            = Room Revenue / Available Nights
+```
+
+Guest cleaning fees never enter ADR or RevPAR. OTA commission is an expense,
+not a revenue deduction. Investments are `expenses.expense_type = CAPEX`.
+
+## Availability
+
+Available nights are derived from property activation/deactivation windows and
+explicit `maintenance_tickets.blocks_availability` ranges. No owner-block
+source currently exists; owner blocks must not be inferred or fabricated.
+
+## Null and Zero
+
+- `0`: the source is present and the measured value is zero.
+- `null`: the value cannot be computed from available data.
+- Every unavailable value has a machine-readable data-quality reason.
+- `value || defaultValue` must not convert missing data into a number.
+
+## Output Contract
+
+```json
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "ISO-8601",
+  "currency": "TRY",
+  "period": {},
+  "comparisonPeriod": {},
+  "portfolio": {},
+  "financials": {},
+  "bookingKpis": {},
+  "channels": [],
+  "properties": [],
+  "comparison": {},
+  "dataQuality": { "status": "OK", "items": [] }
+}
+```
+
+The exported contract is additive. Existing fields are not repurposed or
+silently changed after release; incompatible revisions require a new
+`schemaVersion`.
+
+## Prompt Contract
+
+The prompt contains:
+
+1. the fixed senior STR advisor role;
+2. period, portfolio and metric sections selected by the user;
+3. explicit internal-data versus external-research boundaries;
+4. a compact JSON block containing the same package;
+5. requests for executive, finance, revenue management, OTA, property,
+   competitor, benchmark, leakage, opportunity and action-plan analysis.
+
+The prompt builder is a pure deterministic function. Preview and clipboard
+must use exactly the same returned string.
+
+## Data Quality
+
+Required findings include:
+
+- missing or invalid booking dates;
+- missing booking creation timestamps;
+- invalid negative lead time;
+- unknown channel aliases;
+- unavailable inventory denominator;
+- unmapped expense categories;
+- mixed currencies;
+- portfolio expenses not allocated to a property;
+- metrics unavailable because their source does not exist.
+
+## Security Boundaries
+
+- Active tenant must be a real UUID and the signed-in user must be a member.
+- Source reads retain RLS and explicit `tenant_id` filtering.
+- Export uses an allowlist; raw database rows are never serialized.
+- Never export internal IDs, guest names, phones, emails, notes, auth data,
+  tokens, API keys or service-role credentials.
+- Clipboard writes occur only after a user action and report permission errors.
+- Any future RPC must revoke `anon`, grant only required roles, validate
+  `auth.uid()` and tenant membership before reading records.
+
+## Error Contract
+
+Boundary validation throws stable machine-readable codes:
+
+- `ANALYSIS_INVALID_PERIOD`
+- `ANALYSIS_EMPTY_PROPERTY_SCOPE`
+- `ANALYSIS_EMPTY_SECTIONS`
+- `ANALYSIS_UNKNOWN_PROPERTY`
+- `ANALYSIS_MIXED_CURRENCY`
+- `ANALYSIS_CLIPBOARD_DENIED` (UI boundary)
+
+## Acceptance Criteria
+
+- All formulas above are regression-tested, including split-month stays.
+- Cancelled bookings do not enter stay-performance revenue or sold nights.
+- Custom ranges and selected property subsets are supported.
+- Property results reconcile to portfolio results with unallocated expenses
+  shown separately.
+- Real zero and unavailable values remain distinct through JSON and prompt.
+- No PII, secrets or internal IDs appear in either output.
+- Unknown channels and missing data remain visible as quality findings.
+- Preview equals clipboard content byte-for-byte.
+- Empty, loading, success and failure UI states are accessible and responsive.
+- Full repository tests, migration verification and asset-stamp verification pass.
+
+## Out of Scope
+
+- Calling ChatGPT or another LLM from LexBnB.
+- Producing competitor, benchmark or market facts inside LexBnB.
+- Guest-level exports.
+- A new investments table.
+- Inventing owner-block dates or marketing attribution.
+
+## Commands and Delivery Gates
+
+```text
+Focused tests: node core/analysis_export_service_tests.js
+Full tests:    npm test
+Migrations:    npm run verify:migrations
+Assets:        node stamp_assets.js --check
+```
+
+Database schema changes and production migrations require a separate explicit
+approval. The initial implementation is designed without a migration.
