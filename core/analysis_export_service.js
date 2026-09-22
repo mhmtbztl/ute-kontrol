@@ -5,11 +5,11 @@
 
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
-    module.exports = factory();
+    module.exports = factory(require('./financial_metrics_service'));
   } else {
-    root.AnalysisExportService = factory();
+    root.AnalysisExportService = factory(root.FinancialMetricsService);
   }
-}(typeof self !== 'undefined' ? self : this, function () {
+}(typeof self !== 'undefined' ? self : this, function (FinancialMetricsService) {
   'use strict';
 
   const ANALYSIS_SCHEMA_VERSION = '1.0';
@@ -77,9 +77,36 @@
   function buildAnalysisPackage(input) {
     const request = validateAnalysisRequest(input || {});
     const selected = new Set(request.propertyIds);
+    const sourceProperties = input.properties || [];
+    const knownPropertyIds = new Set();
+    sourceProperties.forEach(property => {
+      if (property.id) knownPropertyIds.add(property.id);
+      if (property.slug) knownPropertyIds.add(property.slug);
+    });
+    if (request.propertyIds.some(propertyId => !knownPropertyIds.has(propertyId))) {
+      throw contractError('ANALYSIS_UNKNOWN_PROPERTY', 'Selected property is not available in the active tenant scope.');
+    }
     const properties = (input.properties || [])
       .filter(property => selected.has(property.id))
       .map(property => ({ name: property.name || property.slug || 'Adsız mülk' }));
+    if (!FinancialMetricsService || typeof FinancialMetricsService.computeFinancialMetricsForRange !== 'function') {
+      throw contractError('ANALYSIS_FINANCE_SERVICE_UNAVAILABLE', 'Canonical financial metrics service is unavailable.');
+    }
+    const metrics = FinancialMetricsService.computeFinancialMetricsForRange({
+      periodStart: request.period.start,
+      periodEndExclusive: request.period.endExclusive,
+      propertyIds: request.propertyIds,
+      bookings: input.bookings || [],
+      expenses: input.expenses || [],
+      properties: sourceProperties,
+      maintenances: input.maintenances || []
+    });
+    const finance = metrics.financial;
+    const operations = metrics.operations;
+    const includeFinance = request.sections.some(section => ['FINANCE', 'EXPENSES', 'INVESTMENTS'].includes(section));
+    const includeBookingKpis = request.sections.includes('BOOKING_KPIS');
+    const hasMeasuredData = operations.reservationCount > 0 ||
+      finance.operatingExpenses > 0 || finance.capex > 0;
 
     return {
       schemaVersion: ANALYSIS_SCHEMA_VERSION,
@@ -89,14 +116,39 @@
       period: { ...request.period, dateBasis: 'STAY_DATE' },
       comparisonPeriod: null,
       portfolio: { propertyCount: properties.length, properties },
-      financials: {},
-      bookingKpis: {},
+      financials: includeFinance ? {
+        financialRevenue: finance.revenue,
+        roomRevenue: operations.roomRevenue,
+        otherRevenue: FinancialMetricsService.roundMoney(finance.revenue - operations.roomRevenue),
+        operatingExpenses: finance.operatingExpenses,
+        totalExpenses: FinancialMetricsService.roundMoney(finance.operatingExpenses + finance.capex),
+        otaCommission: operations.bookedOtaCommission,
+        investments: finance.capex,
+        operatingProfit: finance.operatingProfit,
+        netCashProfit: finance.netCashProfit,
+        operatingMargin: finance.operatingMargin,
+        netMargin: finance.netCashMargin,
+        expenseCategories: finance.categoryBreakdown,
+        unallocatedPortfolioExpenses: finance.unallocatedPortfolioExpenses,
+        dateBasis: 'STAY_DATE_AND_EXPENSE_DATE'
+      } : {},
+      bookingKpis: includeBookingKpis ? {
+        reservationCount: operations.reservationCount,
+        soldNights: operations.soldNights,
+        availableNights: operations.availableNights,
+        occupancy: operations.occupancy,
+        adr: operations.adr,
+        revpar: operations.revpar,
+        averageBookingValue: operations.reservationCount > 0
+          ? FinancialMetricsService.roundMoney(finance.revenue / operations.reservationCount) : null,
+        dateBasis: 'STAY_DATE'
+      } : {},
       channels: [],
       properties: [],
       comparison: {},
       dataQuality: {
-        status: 'INSUFFICIENT_DATA',
-        items: [{ code: 'ANALYSIS_AGGREGATION_PENDING', severity: 'INFO' }]
+        status: hasMeasuredData ? 'OK' : 'INSUFFICIENT_DATA',
+        items: hasMeasuredData ? [] : [{ code: 'NO_MEASURED_ACTIVITY', severity: 'INFO' }]
       }
     };
   }

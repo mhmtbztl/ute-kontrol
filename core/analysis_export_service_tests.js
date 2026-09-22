@@ -88,7 +88,9 @@ test('minimal package is versioned, deterministic and contains only allowlisted 
   assert.strictEqual(first.generatedAt, input.generatedAt);
   assert.strictEqual(first.currency, 'TRY');
   assert.deepStrictEqual(first.portfolio.properties, [{ name: 'Seyir' }]);
-  assert.deepStrictEqual(first.financials, {});
+  assert.strictEqual(first.financials.financialRevenue, 0);
+  assert.strictEqual(first.financials.operatingExpenses, 0);
+  assert.strictEqual(first.financials.netMargin, null);
   assert.strictEqual(first.comparisonPeriod, null);
   assert.strictEqual(first.dataQuality.status, 'INSUFFICIENT_DATA');
 
@@ -96,6 +98,68 @@ test('minimal package is versioned, deterministic and contains only allowlisted 
   assert(!serialized.includes('tenant-secret-id'));
   assert(!serialized.includes('prop-a'));
   assert(!serialized.includes('guest_name'));
+});
+
+test('analysis package maps canonical range finance and STR metrics without exposing source rows', () => {
+  const result = buildAnalysisPackage({
+    period: { start: '2026-09-01', end: '2026-09-05' },
+    comparison: { mode: 'NONE' },
+    propertyIds: ['prop-a'],
+    sections: ['FINANCE', 'BOOKING_KPIS', 'EXPENSES', 'INVESTMENTS'],
+    currency: 'TRY',
+    generatedAt: '2026-09-22T12:00:00.000Z',
+    properties: [{ id: 'prop-a', name: 'Seyir', activated_on: '2026-09-01' }],
+    bookings: [{
+      id: 'booking-internal-id', property_id: 'prop-a',
+      check_in: '2026-08-31', check_out: '2026-09-03',
+      gross_amount: 3000, cleaning_fee: 300, ota_commission: 300,
+      guest_name: 'Export edilmemeli', guest_phone: '+900000000'
+    }],
+    expenses: [
+      { id: 'expense-1', property_id: 'prop-a', expense_date: '2026-09-02', amount: 500, expense_type: 'OPEX', category: 'Bakım' },
+      { id: 'expense-2', property_id: 'prop-a', expense_date: '2026-09-04', amount: 1000, expense_type: 'CAPEX', category: 'Yatırım' }
+    ],
+    maintenances: []
+  });
+
+  assert.deepStrictEqual(result.financials, {
+    financialRevenue: 2000,
+    roomRevenue: 1800,
+    otherRevenue: 200,
+    operatingExpenses: 700,
+    totalExpenses: 1700,
+    otaCommission: 200,
+    investments: 1000,
+    operatingProfit: 1300,
+    netCashProfit: 300,
+    operatingMargin: 65,
+    netMargin: 15,
+    expenseCategories: { 'Bakım': 500, 'Yatırım': 1000 },
+    unallocatedPortfolioExpenses: 0,
+    dateBasis: 'STAY_DATE_AND_EXPENSE_DATE'
+  });
+  assert.deepStrictEqual(result.bookingKpis, {
+    reservationCount: 1,
+    soldNights: 2,
+    availableNights: 5,
+    occupancy: 40,
+    adr: 900,
+    revpar: 360,
+    averageBookingValue: 2000,
+    dateBasis: 'STAY_DATE'
+  });
+  const serialized = JSON.stringify(result);
+  assert(!serialized.includes('booking-internal-id'));
+  assert(!serialized.includes('Export edilmemeli'));
+  assert(!serialized.includes('+900000000'));
+});
+
+test('selected properties must belong to the provided tenant-scoped property set', () => {
+  expectCode(() => buildAnalysisPackage({
+    period: { start: '2026-09-01', end: '2026-09-30' },
+    propertyIds: ['foreign-property'], sections: ['FINANCE'],
+    properties: [{ id: 'owned-property', name: 'Owned' }]
+  }), 'ANALYSIS_UNKNOWN_PROPERTY');
 });
 
 console.log(`\nTEST SUMMARY: ${passed} / ${passed + failed} TESTS PASSED (${failed} FAILED)`);

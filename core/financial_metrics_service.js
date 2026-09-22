@@ -146,6 +146,142 @@ function calculateAvailableNights(properties = [], year, month, maintenances = [
   return totalAvailable;
 }
 
+function calculateAvailableNightsForRange(properties = [], periodStart, periodEndExclusive, maintenances = []) {
+  const rangeStart = parseDate(periodStart);
+  const rangeEnd = parseDate(periodEndExclusive);
+  if (!periodStart || !periodEndExclusive || rangeEnd <= rangeStart) return 0;
+
+  let totalAvailable = 0;
+  properties.forEach(property => {
+    const propertyKey = property.id || property.slug;
+    const activationValue = property.activated_on || property.activationDate || property.created_at || property.createdAt;
+    const deactivationValue = property.deactivated_on || property.deactivationDate || property.archived_at || property.archivedAt;
+    const activeStart = activationValue ? parseDate(activationValue) : rangeStart;
+    const deactivation = deactivationValue ? parseDate(deactivationValue) : null;
+    const activeEndExclusive = deactivation
+      ? new Date(deactivation.getFullYear(), deactivation.getMonth(), deactivation.getDate() + 1)
+      : rangeEnd;
+    const effectiveStart = new Date(Math.max(rangeStart.getTime(), activeStart.getTime()));
+    const effectiveEnd = new Date(Math.min(rangeEnd.getTime(), activeEndExclusive.getTime()));
+    if (effectiveEnd <= effectiveStart) return;
+
+    const blockedDates = new Set();
+    maintenances.forEach(maintenance => {
+      const maintenanceProperty = maintenance.property_id || maintenance.propertyId || maintenance.villa;
+      if (maintenanceProperty !== propertyKey && maintenanceProperty !== property.id && maintenanceProperty !== property.slug) return;
+      if (maintenance.blocks_availability !== true && maintenance.blocksAvailability !== true) return;
+      const downtimeStartValue = maintenance.downtime_start || maintenance.downtimeStart;
+      const downtimeEndValue = maintenance.downtime_end || maintenance.downtimeEnd;
+      if (!downtimeStartValue || !downtimeEndValue) return;
+      const downtimeStart = parseDate(downtimeStartValue);
+      const downtimeEndInclusive = parseDate(downtimeEndValue);
+      const blockedStart = new Date(Math.max(effectiveStart.getTime(), downtimeStart.getTime()));
+      const blockedEnd = new Date(Math.min(effectiveEnd.getTime(), downtimeEndInclusive.getTime() + 86400000));
+      for (const day = new Date(blockedStart); day < blockedEnd; day.setDate(day.getDate() + 1)) {
+        blockedDates.add(formatDate(day));
+      }
+    });
+
+    const activeDays = Math.round((effectiveEnd.getTime() - effectiveStart.getTime()) / 86400000);
+    totalAvailable += Math.max(0, activeDays - blockedDates.size);
+  });
+  return totalAvailable;
+}
+
+function computeFinancialMetricsForRange({
+  periodStart,
+  periodEndExclusive,
+  propertyIds = [],
+  bookings = [],
+  expenses = [],
+  properties = [],
+  maintenances = []
+}) {
+  const selectedIds = new Set(propertyIds);
+  const relevantProperties = properties.filter(property => selectedIds.has(property.id) || selectedIds.has(property.slug));
+  const isFullPortfolio = properties.length > 0 && properties.every(property => selectedIds.has(property.id) || selectedIds.has(property.slug));
+  const availableNights = calculateAvailableNightsForRange(relevantProperties, periodStart, periodEndExclusive, maintenances);
+  const contributingBookings = new Set();
+  let soldNights = 0;
+  let financialRevenue = 0;
+  let roomRevenue = 0;
+  let cleaningRevenue = 0;
+  let otaCommission = 0;
+
+  bookings.forEach(booking => {
+    if ((booking.status || 'CONFIRMED') === 'CANCELLED') return;
+    const propertyId = booking.propertyId || booking.property_id || booking.villa;
+    if (!selectedIds.has(propertyId)) return;
+    const normalizedBooking = {
+      ...booking,
+      checkIn: booking.checkIn || booking.check_in,
+      checkOut: booking.checkOut || booking.check_out,
+      propertyId
+    };
+    const nights = splitBookingStayNights(normalizedBooking)
+      .filter(night => night.date >= periodStart && night.date < periodEndExclusive);
+    if (nights.length === 0) return;
+    contributingBookings.add(booking.id || booking.booking_code || booking.bookingCode);
+    nights.forEach(night => {
+      soldNights += 1;
+      financialRevenue += Number(night.financialRevenue);
+      roomRevenue += Number(night.roomRevenue);
+      cleaningRevenue += Number(night.cleaningRevenue);
+      otaCommission += Number(night.otaCommission);
+    });
+  });
+
+  let manualOpex = 0;
+  let capex = 0;
+  let unallocatedPortfolioExpenses = 0;
+  const categoryBreakdown = {};
+  expenses.forEach(expense => {
+    const date = expense.expense_date || expense.date;
+    if (!date || date < periodStart || date >= periodEndExclusive) return;
+    const propertyId = expense.property_id || expense.propertyId || expense.villa;
+    const isUnallocated = !propertyId || propertyId === 'ALL';
+    if (!isUnallocated && !selectedIds.has(propertyId)) return;
+    if (isUnallocated && !isFullPortfolio) return;
+    const amount = Number(expense.amount ?? 0);
+    const category = String(expense.category || 'Diğer').trim() || 'Diğer';
+    categoryBreakdown[category] = roundMoney((categoryBreakdown[category] || 0) + amount);
+    if (isUnallocated) unallocatedPortfolioExpenses += amount;
+    if (String(expense.expense_type || expense.type || 'OPEX').toUpperCase() === 'CAPEX') capex += amount;
+    else manualOpex += amount;
+  });
+
+  const revenue = roundMoney(financialRevenue);
+  const opex = roundMoney(manualOpex + otaCommission);
+  const operatingProfit = roundMoney(revenue - opex);
+  const netCashProfit = roundMoney(operatingProfit - capex);
+  return {
+    period: { start: periodStart, endExclusive: periodEndExclusive },
+    scope: { propertyIds: Array.from(selectedIds), isFullPortfolio },
+    financial: {
+      revenue,
+      operatingExpenses: opex,
+      capex: roundMoney(capex),
+      operatingProfit,
+      netCashProfit,
+      operatingMargin: revenue !== 0 ? roundMoney(operatingProfit / revenue * 100) : null,
+      netCashMargin: revenue !== 0 ? roundMoney(netCashProfit / revenue * 100) : null,
+      unallocatedPortfolioExpenses: roundMoney(unallocatedPortfolioExpenses),
+      categoryBreakdown
+    },
+    operations: {
+      reservationCount: contributingBookings.size,
+      roomRevenue: roundMoney(roomRevenue),
+      cleaningRevenue: roundMoney(cleaningRevenue),
+      soldNights,
+      availableNights,
+      occupancy: availableNights > 0 ? roundMoney(soldNights / availableNights * 100) : null,
+      adr: soldNights > 0 ? roundMoney(roomRevenue / soldNights) : null,
+      revpar: availableNights > 0 ? roundMoney(roomRevenue / availableNights) : null,
+      bookedOtaCommission: roundMoney(otaCommission)
+    }
+  };
+}
+
 /**
  * Core Canonical Metrics Computation
  * Single canonical contract serving dashboard, scorecard, bridge, trends, and AI payload.
@@ -640,7 +776,9 @@ const FinancialMetricsService = {
   getDaysInMonth,
   splitBookingStayNights,
   calculateAvailableNights,
+  calculateAvailableNightsForRange,
   computeFinancialMetrics,
+  computeFinancialMetricsForRange,
   computeComparativeMetrics,
   computeTrendTimeline,
   detectAnomaliesAndInsights,

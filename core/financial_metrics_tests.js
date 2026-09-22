@@ -7,7 +7,8 @@ const {
   roundMoney,
   splitBookingStayNights,
   calculateAvailableNights,
-  computeFinancialMetrics
+  computeFinancialMetrics,
+  computeFinancialMetricsForRange
 } = require('./financial_metrics_service');
 
 console.log('=============================================================================');
@@ -426,6 +427,69 @@ runTest('11. Missing Target State: When no target exists, hasTarget is false and
   assert.strictEqual(metrics.targets.revenueTarget, null);
   assert.strictEqual(metrics.targets.revenueTargetAchievement, null);
   assert.strictEqual(metrics.targets.revenueTargetDiff, null);
+});
+
+runTest('12. Custom range keeps accrual, inventory, OPEX and CAPEX definitions canonical', () => {
+  const metrics = computeFinancialMetricsForRange({
+    periodStart: '2026-09-01',
+    periodEndExclusive: '2026-09-06',
+    propertyIds: ['P1', 'P2'],
+    properties: [
+      { id: 'P1', activated_on: '2026-09-01' },
+      { id: 'P2', activated_on: '2026-09-03' }
+    ],
+    bookings: [
+      { id: 'B1', property_id: 'P1', check_in: '2026-08-31', check_out: '2026-09-03', gross_amount: 3000, cleaning_fee: 300, ota_commission: 300 },
+      { id: 'B2', property_id: 'P2', check_in: '2026-09-03', check_out: '2026-09-05', gross_amount: 2400, cleaning_fee: 400, ota_commission: 240 },
+      { id: 'BX', property_id: 'P1', check_in: '2026-09-04', check_out: '2026-09-05', gross_amount: 9999, status: 'CANCELLED' }
+    ],
+    expenses: [
+      { property_id: 'P1', expense_date: '2026-09-02', amount: 500, expense_type: 'OPEX', category: 'Bakım' },
+      { property_id: 'P2', expense_date: '2026-09-04', amount: 1000, expense_type: 'CAPEX', category: 'Yatırım' },
+      { property_id: 'P1', expense_date: '2026-08-30', amount: 8000, expense_type: 'OPEX', category: 'Dışarıda' }
+    ],
+    maintenances: [
+      { property_id: 'P1', blocks_availability: true, downtime_start: '2026-09-02', downtime_end: '2026-09-03' }
+    ]
+  });
+
+  assert.strictEqual(metrics.financial.revenue, 4400);
+  assert.strictEqual(metrics.operations.roomRevenue, 3800);
+  assert.strictEqual(metrics.operations.cleaningRevenue, 600);
+  assert.strictEqual(metrics.financial.operatingExpenses, 940);
+  assert.strictEqual(metrics.financial.capex, 1000);
+  assert.strictEqual(metrics.financial.operatingProfit, 3460);
+  assert.strictEqual(metrics.financial.netCashProfit, 2460);
+  assert.strictEqual(metrics.operations.reservationCount, 2);
+  assert.strictEqual(metrics.operations.soldNights, 4);
+  assert.strictEqual(metrics.operations.availableNights, 6);
+  assert.strictEqual(metrics.operations.occupancy, 66.67);
+  assert.strictEqual(metrics.operations.adr, 950);
+  assert.strictEqual(metrics.operations.revpar, 633.33);
+});
+
+runTest('13. Custom range property scope excludes other properties and preserves unavailable ratios as null', () => {
+  const scoped = computeFinancialMetricsForRange({
+    periodStart: '2026-09-01', periodEndExclusive: '2026-09-06',
+    propertyIds: ['P1'],
+    properties: [{ id: 'P1', activated_on: '2026-09-01' }, { id: 'P2', activated_on: '2026-09-01' }],
+    bookings: [
+      { id: 'B1', property_id: 'P1', check_in: '2026-09-01', check_out: '2026-09-03', gross_amount: 2000 },
+      { id: 'B2', property_id: 'P2', check_in: '2026-09-01', check_out: '2026-09-04', gross_amount: 9000 }
+    ]
+  });
+  assert.strictEqual(scoped.financial.revenue, 2000);
+  assert.strictEqual(scoped.operations.soldNights, 2);
+  assert.strictEqual(scoped.operations.availableNights, 5);
+
+  const empty = computeFinancialMetricsForRange({
+    periodStart: '2026-09-01', periodEndExclusive: '2026-09-06',
+    propertyIds: ['MISSING'], properties: [], bookings: []
+  });
+  assert.strictEqual(empty.operations.availableNights, 0);
+  assert.strictEqual(empty.operations.occupancy, null);
+  assert.strictEqual(empty.operations.adr, null);
+  assert.strictEqual(empty.operations.revpar, null);
 });
 
 console.log(`\n=============================================================================`);

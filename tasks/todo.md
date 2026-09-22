@@ -14,7 +14,7 @@
   - Verify: Focused tests pass; financial and marketing tests remain green.
   - Dependencies: Task 2.
 
-- [ ] Task 4: Add range-based finance, booking and availability metrics.
+- [x] Task 4: Add range-based finance, booking and availability metrics.
   - Acceptance: Accrual, room revenue, OPEX/CAPEX and core STR KPIs match fixtures.
   - Verify: Split-stay and null/zero tests pass.
   - Dependencies: Task 3.
