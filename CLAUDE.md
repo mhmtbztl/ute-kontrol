@@ -561,7 +561,7 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 | Fotoğraf AI worker'ı | `GEMINI_API_KEY` yok; Actions adımı güvenle atlanıyor — **harici bağımlılık** |
 | `get_executive_dashboard_snapshot` | **phase32 ile arayüze bağlandı** (20 Eylül 2026) — aylık ciro, gider, net kâr, doluluk, ADR ve RevPAR artık sunucu snapshot'ından geliyor; önceki ay da RPC ile alınıyor. Test projesine uygulandı; `executive_snapshot_tests` 23/23 ve `executive_snapshot_ui_tests` 7/7. Göç 21 Eylül 2026'da **üretime uygulandı ve doğrulandı** |
 | Excel / CSV **içe** aktarma | **tamamlandı** (21 Eylül 2026, phase33 — göç gerektirmedi) — CSV/TSV yolu hiç yoktu ve sessizce **para bozuyordu**; ayrıntı aşağıda. Ağı `core/csv_import_tests.js` (52 iddia) |
-| Excel **dışa** aktarma | yok — yalnızca örnek şablon indirilebiliyor, kayıt dışa aktarımı hiç yazılmadı |
+| Excel / CSV **dışa** aktarma | **tamamlandı** (22 Eylül 2026) — tek dışa aktarım `appData`'nın ham JSON dökümüydü: rapor değildi, dönem filtresini yok sayıyordu ve **geri yüklenemiyordu**. Yerine dönem defterleri geldi; sütunlar içe aktarma şablonuyla aynı, yani tur kapanıyor. Ağı `core/finance_export_tests.js` (42 iddia) |
 | "Şirket Genel Raporu" içe aktarımı | **bilerek reddediliyor** — aylık toplamdan rezervasyon üretmek uydurma veri olurdu (§3.6). Ekran bunu açıkça söylüyor ve kullanıcıyı defter şablonlarına yönlendiriyor |
 | Bildirim merkezi analizi | **tamamlandı** (17 Eylül 2026) — merkez her iki uçtan da bağlı değildi; yükleme bağlandı, "okundu" artık Postgres'e yazıyor. RPC yetki sırası phase29 ile düzeltildi; göç 20 Eylül 2026'da **üretime uygulandı ve doğrulandı** |
 | `saveAppData()` hiçbir şey kaydetmiyor | gövdesi yalnızca eski localStorage anahtarlarını siliyor. 17 çağıranda hiçbir Postgres yazması yoktu; **8'i 20 Eylül 2026'da bağlandı**, 1'i meşru yerel durum, 2'si kaldırıldı, **6'sı 20 Eylül 2026'da phase31 ile kapandı**; liste artık boş. Göç **21 Eylül 2026’da üretime uygulandı ve doğrulandı**. Ayrıntı aşağıda |
@@ -694,6 +694,50 @@ adları (`Invoice`, `ID`, `ISIM`) bozar.
 indirme düğmesi** kaldırıldı. Şablon indirtip dosyayı "bu dosya içe
 aktarılamaz" duvarına göndermek, yapmadığımız şeyi vaat etmenin bir başka
 biçimiydi.
+
+### Defter dışa aktarma — turu kapatmak
+
+Uygulamada tek bir dışa aktarım vardı: `exportDataJSON()`. İki düğme onu
+çağırıyordu — raporlar bölümünde "💾 Raporu İndir (JSON)", üst menüde "Veri
+Tabanı Yedeği İndir". Yaptığı şey `appData`'nın **tamamını** ham JSON olarak
+dökmekti; misafir adları, telefonları, rıza kayıtları ve planlanmış mesajlar
+dahil. Üç ayrı sorun:
+
+- **Rapor değildi.** Düğme "Rapor" diyordu, dosya ham veri yığınıydı.
+- **Dönem filtresini yok sayıyordu.** Ekranda Eylül seçiliyken dosya her ayı
+  içeriyordu.
+- **Yedek de değildi.** JSON'u geri okuyan hiçbir kod yok — yani geri
+  yüklenemeyen bir "yedek"ti. Etiketi dürüst olan ikinci düğme bile aslında
+  olmayan bir güvenlik ağı vaat ediyordu.
+
+Yerine gelenin tek kuralı var: **dışa aktarılan dosya geri yüklenebilmeli.**
+Sütunlar `FinanceImportEngine.SABLON_SUTUNLARI`'ndan gelir ve **üç yer** bu
+tek sabite bağlıdır: örnek şablon üreticisi, dışa aktarma motoru ve
+`autoDetectColumnMap`. Üçü ayrı yazılsaydı "dışa aktar → Excel'de toplu
+düzelt → geri yükle" döngüsü sessizce kırılırdı; `finance_export_tests` C
+bölümü her üç tarafı da bu sabite karşı ölçer.
+
+**Sayı biçimi iki hedefe göre ayrışır:** XLSX'e sayı **sayı** olarak yazılır
+(Excel yerel ayara göre gösterir, SheetJS geri okurken yine sayı verir);
+CSV'ye **Türk ondalığıyla, binlik ayraç olmadan** yazılır (`72500,5`).
+Binlik ayraç phase33'te ölçüldüğü gibi SheetJS bayt yolunda `72.5005`'e
+dönüşüyordu, nokta ondalık ise Excel-TR'de yanlış okunuyor.
+
+**Rezervasyon defterde TAM haliyle durur, aya düşen payıyla değil.** Tahakkuk
+payı (§3.4) bir *raporlama* kuralıdır; defter satırı ise bütün bir
+rezervasyondur. Payı yazsaydık dosya geri yüklendiğinde rezervasyon parçalanır
+ve tutar kalıcı olarak bozulurdu. Sonuç: ay sınırını kesen bir kayıt dosyada
+tam tutarıyla görünür, ekrandaki aylık ciro ise gecelere bölünmüş payı
+gösterir — **arayüz bunu açıkça söyler.**
+
+Temizlik sütunu `cleaning_fee`'dir (misafirden alınan **gelir**). Temizlik
+**maliyeti** bilerek yoktur: o `bookings`'te değil, temizlik borç defterinde
+durur (§3.4). Maliyeti bu sütuna koymak iki kalemi tek sayıya indirger ve
+14 Eylül'de ayıklanan hatayı geri getirirdi.
+
+Ağın omurgası **B bölümüdür**: dışa aktar → geri oku → her alan birebir aynı
+mı. Noktalı virgül, tırnak ve Türkçe büyük İ içeren bir misafir adı, kuruşlu
+tutar, iptal durumu ve portföy geneli gider (`ALL`) aynı turda ölçülür.
 
 ### Yayınlanan örnek şablonlar
 

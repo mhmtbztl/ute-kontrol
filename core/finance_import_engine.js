@@ -182,6 +182,29 @@ const BASLIKLAR = {
   }
 };
 
+/**
+ * SABLON SUTUNLARI — tek kaynak.
+ *
+ * Uc yer bu listeye bagli ve UCU DE ayni olmak zorunda:
+ *   1. `scripts/build_sample_templates.js`  — indirilen ornek sablon
+ *   2. `core/finance_export_engine.js`      — disa aktarilan defter
+ *   3. `autoDetectColumnMap`                — geri yuklerken eslesme
+ *
+ * Ayrisirlarsa "disa aktar -> Excel'de duzelt -> geri yukle" dongusu
+ * sessizce kirilir: kullanici kendi disa aktardigi dosyayi geri
+ * yukleyemez. Listeyi burada tutmak bu ihtimali ortadan kaldirir;
+ * `csv_import_tests` her uc tarafi da bu sabite karsi olcer.
+ *
+ * Basliklar `BASLIKLAR` sozlugunde TANINAN adlardan secilmistir ve Turkce
+ * buyuk "İ" ile baslayan baslik BILEREK yoktur (U+0307 tuzagi, bkz. norm).
+ */
+const SABLON_SUTUNLARI = {
+  BOOKINGS: ['Villa', 'Misafir Adı', 'Giriş Tarihi', 'Çıkış Tarihi',
+    'Brüt Tutar (TL)', 'Kanal', 'OTA Komisyonu (TL)', 'Temizlik Ücreti (TL)',
+    'Kişi Sayısı', 'Durum'],
+  EXPENSES: ['Tarih', 'Kategori', 'Tutar (TL)', 'Açıklama', 'Tür', 'Villa']
+};
+
 /** Basliklardan sutun eslemesi cikarir. Eslesmeyen alan null kalir. */
 function autoDetectColumnMap(headers = [], mode = 'EXPENSES') {
   const sozluk = BASLIKLAR[mode] || BASLIKLAR.EXPENSES;
@@ -655,7 +678,8 @@ const FinanceImportEngine = {
   validateExpenseRows,
   validateBookingRows,
   validateImportRows,
-  BASLIKLAR
+  BASLIKLAR,
+  SABLON_SUTUNLARI
 };
 
 if (typeof module !== 'undefined' && module.exports) module.exports = FinanceImportEngine;

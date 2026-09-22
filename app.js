@@ -8469,14 +8469,135 @@ function resetToCleanState() {
   openResetModal();
 }
 
-function exportDataJSON() {
-  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData, null, 2));
-  const downloadAnchor = document.createElement('a');
-  downloadAnchor.setAttribute("href", dataStr);
-  downloadAnchor.setAttribute("download", `LEXBNB_Finans_Yedek_${getTodayStr()}.json`);
-  document.body.appendChild(downloadAnchor);
-  downloadAnchor.click();
-  downloadAnchor.remove();
+// -------------------------------------------------------------
+// DEFTER DISA AKTARMA
+// -------------------------------------------------------------
+//
+// Burada bir zamanlar `exportDataJSON()` vardi: "💾 Raporu İndir (JSON)"
+// dugmesi `appData`'nin TAMAMINI ham JSON olarak dokuyordu — misafir
+// adlari, telefonlari, riza kayitlari ve planlanmis mesajlar dahil. Ne
+// rapordu (ham veri yigiydi), ne donem filtresini taniyordu (ekranda Eylul
+// secilyken dosya her ayi iceriyordu), ne de kimsenin isine yariyordu
+// (bir isletmeci ya da muhasebeci JSON acmaz).
+//
+// Yerine gecen sey tek bir kurala bagli: **disa aktarilan dosya geri
+// yuklenebilmeli.** Sutunlar `SABLON_SUTUNLARI`'ndan gelir; ornek sablonla
+// ve ice aktarma eslemesiyle ayni listedir.
+//
+// Suzme burada yapilir, motorda degil: hangi kayitlarin disa aktarilacagi
+// ekranin sorusudur, bicimlendirme motorun.
+
+/** Dısa aktarma menusunu acar/kapatir. Disariya tiklayinca da kapanir. */
+function toggleExportMenu(olay) {
+  if (olay) olay.stopPropagation();
+  const menu = document.getElementById('ledgerExportMenu');
+  if (!menu) return;
+  const acik = menu.style.display !== 'none';
+  menu.style.display = acik ? 'none' : 'block';
+
+  if (!acik && !menu.dataset.disKapatmaHazir) {
+    menu.dataset.disKapatmaHazir = '1';
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#ledgerExportMenu') && !e.target.closest('[onclick*="toggleExportMenu"]')) {
+        menu.style.display = 'none';
+      }
+    });
+  }
+}
+
+function getExportEngine() {
+  if (typeof FinanceExportEngine !== 'undefined') return FinanceExportEngine;
+  if (typeof window !== 'undefined' && window.FinanceExportEngine) return window.FinanceExportEngine;
+  if (typeof require === 'function') {
+    try { return require('./core/finance_export_engine.js'); } catch (e) { /* tarayici */ }
+  }
+  return null;
+}
+
+/**
+ * Disa aktarilacak kayitlar — EKRANDA GORUNEN defterin aynisi.
+ *
+ * Rezervasyon TAM haliyle yazilir, aya dusen payiyla DEGIL. Tahakkuk payi
+ * (3.4) bir RAPORLAMA kuralidir; defter satiri ise butun bir rezervasyondur.
+ * Payi yazsaydik dosya geri yuklendiginde rezervasyon parcalanir ve tutar
+ * kalici olarak bozulurdu. Bunun sonucu, ay sinirini kesen bir kaydin
+ * dosyada TAM tutariyla gorunmesidir; kullaniciya da oyle soylenir.
+ */
+function collectExportRecords(mod) {
+  if (mod === 'BOOKINGS') {
+    return (appData.bookings || []).filter(b => isBookingInFilter(b));
+  }
+  return (appData.expenses || []).filter(e => isExpenseInFilter(e));
+}
+
+/** Tarayiciya dosya indirtir. */
+function triggerFileDownload(icerik, ad, mimeTur) {
+  const blob = new Blob([icerik], { type: mimeTur });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = ad;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  // Object URL birakilmazsa sekme kapanana kadar bellekte kalir.
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+/**
+ * @param {'BOOKINGS'|'EXPENSES'} mod
+ * @param {'xlsx'|'csv'} bicim
+ */
+function exportLedger(mod, bicim) {
+  const E = getExportEngine();
+  if (!E) {
+    if (typeof showToast === 'function') showToast('Dışa aktarma motoru yüklenemedi. Sayfayı yenileyin.', 'error');
+    return;
+  }
+
+  const kayitlar = collectExportRecords(mod);
+  const defterAdi = (mod === 'BOOKINGS') ? 'rezervasyon' : 'gider';
+  if (kayitlar.length === 0) {
+    // Bos dosya indirtmek "disa aktarim calismadi" izlenimi verir; sebebi
+    // soylemek daha dogru.
+    if (typeof showToast === 'function') {
+      showToast(`${getPeriodDisplayName(currentFilter.period)} döneminde dışa aktarılacak ${defterAdi} kaydı yok.`, 'info');
+    }
+    return;
+  }
+
+  let disaAktarim;
+  try {
+    disaAktarim = E.buildExport(mod, kayitlar);
+  } catch (err) {
+    console.error('Export build failed:', err);
+    if (typeof showToast === 'function') showToast(err.message || 'Dışa aktarma hazırlanamadı.', 'error');
+    return;
+  }
+
+  const donem = (currentFilter.villa && currentFilter.villa !== 'ALL')
+    ? currentFilter.period + '_' + currentFilter.villa
+    : currentFilter.period;
+
+  if (bicim === 'csv') {
+    triggerFileDownload(E.toCSV(disaAktarim), E.dosyaAdi(mod, donem, 'csv'),
+      'text/csv;charset=utf-8');
+  } else {
+    if (typeof XLSX === 'undefined') {
+      if (typeof showToast === 'function') showToast('Excel motoru henüz yüklenmedi, birkaç saniye sonra tekrar deneyin.', 'error');
+      return;
+    }
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(E.toAOA(disaAktarim)),
+      mod === 'BOOKINGS' ? 'Rezervasyonlar' : 'Giderler');
+    const bayt = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+    triggerFileDownload(bayt, E.dosyaAdi(mod, donem, 'xlsx'),
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  }
+
+  if (typeof showToast === 'function') {
+    showToast(`${kayitlar.length} ${defterAdi} kaydı dışa aktarıldı (${getPeriodDisplayName(currentFilter.period)}).`, 'success');
+  }
 }
 
 // Initialize on DOM Ready
@@ -16432,6 +16553,9 @@ if (typeof module !== 'undefined' && module.exports) {
     setActiveTenant,
     getImportEngine,
     buildImportSource,
+    getExportEngine,
+    collectExportRecords,
+    exportLedger,
     loadMonthlyTargets,
     saveMonthlyTarget,
     loadMonthlyCloses,

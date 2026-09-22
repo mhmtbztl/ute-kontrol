@@ -45,6 +45,11 @@ const KOK = path.join(__dirname, '..');
 const HEDEF = path.join(KOK, 'sablonlar');
 const XLSX = require(path.join(KOK, 'xlsx.full.min.js'));
 
+// Basliklar BURADA TANIMLANMAZ. Ornek sablon, disa aktarilan defter ve ice
+// aktarma eslemesi ayni listeye bagli; uc yerde ayri ayri yazilirsa
+// "disa aktar -> duzelt -> geri yukle" dongusu sessizce kirilir.
+const { SABLON_SUTUNLARI } = require(path.join(KOK, 'core', 'finance_import_engine.js'));
+
 const BOM = '﻿';
 const CRLF = '\r\n';
 const AYIRICI = ';';
@@ -61,9 +66,7 @@ const SABLONLAR = {
   rezervasyon: {
     dosya: 'lexbnb-rezervasyon-sablonu',
     sayfa: 'Rezervasyonlar',
-    basliklar: ['Villa', 'Misafir Adı', 'Giriş Tarihi', 'Çıkış Tarihi',
-      'Brüt Tutar (TL)', 'Kanal', 'OTA Komisyonu (TL)', 'Temizlik Ücreti (TL)',
-      'Kişi Sayısı', 'Durum'],
+    basliklar: SABLON_SUTUNLARI.BOOKINGS,
     satirlar: [
       ['MULK_KODU_1', 'Örnek Misafir 1', '2026-07-15', '2026-07-19',
         '72500', 'WHATSAPP', '0', '1500', '8', 'CONFIRMED'],
@@ -94,7 +97,7 @@ const SABLONLAR = {
   gider: {
     dosya: 'lexbnb-gider-sablonu',
     sayfa: 'Giderler',
-    basliklar: ['Tarih', 'Kategori', 'Tutar (TL)', 'Açıklama', 'Tür', 'Villa'],
+    basliklar: SABLON_SUTUNLARI.EXPENSES,
     satirlar: [
       ['2026-07-03', 'Şömine & Yakacak', '18000', 'Örnek: yakacak alımı', 'OPEX', 'ALL'],
       ['2026-07-08', 'Bakım & Onarım', '6500', 'Örnek: kombi bakımı', 'OPEX', 'MULK_KODU_1'],

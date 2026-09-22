@@ -287,11 +287,23 @@
               <small>Finansal verileri sisteme aktarın</small>
             </div>
           </button>
-          <button type="button" class="dropdown-item" onclick="exportDataJSON(); closeAllHeaderDropdowns();">
-            <span class="dropdown-icon">💾</span>
+          <!-- Burada "Veri Tabanı Yedeği İndir — Tüm kayıtları JSON olarak
+               indirin" vardı. Etiketi dürüsttü ama YEDEK DEGILDI: JSON'u
+               geri okuyan hicbir kod yok, yani geri yuklenemeyen bir
+               dosyaydi. Yerine gelen defterler ice aktarma sablonuyla ayni
+               sutunlari tasir ve GERCEKTEN geri yuklenebilir. -->
+          <button type="button" class="dropdown-item" onclick="exportLedger('BOOKINGS','xlsx'); closeAllHeaderDropdowns();">
+            <span class="dropdown-icon">📗</span>
             <div>
-              <strong>Veri Tabanı Yedeği İndir</strong>
-              <small>Tüm kayıtları JSON olarak indirin</small>
+              <strong>Rezervasyon Defterini İndir</strong>
+              <small>Seçili dönem, Excel — düzenleyip geri yükleyebilirsiniz</small>
+            </div>
+          </button>
+          <button type="button" class="dropdown-item" onclick="exportLedger('EXPENSES','xlsx'); closeAllHeaderDropdowns();">
+            <span class="dropdown-icon">📕</span>
+            <div>
+              <strong>Gider Defterini İndir</strong>
+              <small>Seçili dönem, Excel — düzenleyip geri yükleyebilirsiniz</small>
             </div>
           </button>
           <button type="button" class="dropdown-item" onclick="openHelpModal(); closeAllHeaderDropdowns();">
@@ -2789,7 +2801,27 @@
             <p class="sub-text">Kanal dağılımı (Airbnb, Booking.com, Doğrudan Satış), komisyon analizleri ve kârlılık köprüsü.</p>
           </div>
           <div style="display: flex; gap: 8px;">
-            <button class="btn btn-secondary btn-sm" onclick="exportDataJSON()">💾 Raporu İndir (JSON)</button>
+            <!-- Defter disa aktarma: sutunlar ice aktarma sablonuyla ayni,
+                 yani indirilen dosya duzeltilip geri yuklenebilir. Burada
+                 bir zamanlar "Raporu Indir (JSON)" vardi; appData'nin
+                 tamamini ham dokuyor, donem filtresini yok sayiyordu. -->
+            <div class="dropdown" style="position: relative;">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="toggleExportMenu(event)">⬇️ Defteri Dışa Aktar</button>
+              <div id="ledgerExportMenu" class="dropdown-menu" style="display: none; position: absolute; right: 0; top: calc(100% + 6px); z-index: 60; min-width: 250px; background: #111C2E; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 6px; box-shadow: 0 12px 32px rgba(0,0,0,0.45);">
+                <div style="font-size: 10px; color: #64748B; padding: 6px 10px 4px; line-height: 1.5;">
+                  Seçili dönem ve mülk filtresine göre. Sütunlar içe aktarma
+                  şablonuyla aynıdır: düzenleyip geri yükleyebilirsiniz.
+                </div>
+                <button type="button" class="dropdown-item" onclick="exportLedger('BOOKINGS','xlsx'); toggleExportMenu(event);">📗 Rezervasyon Defteri (.xlsx)</button>
+                <button type="button" class="dropdown-item" onclick="exportLedger('BOOKINGS','csv'); toggleExportMenu(event);">📄 Rezervasyon Defteri (.csv)</button>
+                <button type="button" class="dropdown-item" onclick="exportLedger('EXPENSES','xlsx'); toggleExportMenu(event);">📕 Gider Defteri (.xlsx)</button>
+                <button type="button" class="dropdown-item" onclick="exportLedger('EXPENSES','csv'); toggleExportMenu(event);">📄 Gider Defteri (.csv)</button>
+                <div style="font-size: 10px; color: #64748B; padding: 6px 10px 4px; border-top: 1px solid rgba(255,255,255,0.08); margin-top: 4px; line-height: 1.5;">
+                  Ay sınırını kesen bir rezervasyon dosyada <strong>tam tutarıyla</strong>
+                  görünür; ekrandaki aylık ciro ise gecelere bölünmüş payı gösterir.
+                </div>
+              </div>
+            </div>
             <button class="btn btn-secondary btn-sm" onclick="switchTab('channels')">🌐 OTA Radarına Git</button>
             <button class="btn btn-secondary btn-sm" onclick="switchTab('marketing')">📢 Pazarlama Modülüne Git</button>
           </div>
@@ -3858,7 +3890,8 @@
   </div>
 
   <script src="core/financial_metrics_service.js?v=58fa83fc"></script>
-  <script src="core/finance_import_engine.js?v=ba5fb81b"></script>
+  <script src="core/finance_import_engine.js?v=9947b7a4"></script>
+  <script src="core/finance_export_engine.js?v=93e2df87"></script>
 
   <!-- ======================================================= -->
   <!-- MODAL: WHATSAPP BUSINESS AKILLI MESAJ AYRIŞTIRICI -->
@@ -4421,7 +4454,7 @@
   <script src="core/executive_dashboard_service.js?v=baf5396e"></script>
   <script src="core/executive_ai_advisor.js?v=4b235c67"></script>
   <script src="core/notification_center_service.js?v=710f8a91"></script>
-  <script src="app.js?v=05a21744"></script>
+  <script src="app.js?v=666f5c54"></script>
   <script src="core/marketing_ui.js?v=2e506018"></script>
 </body>
 </html>

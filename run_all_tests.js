@@ -189,6 +189,10 @@ const allTestFiles = [
   // sonu ve surukle-birak. Metin yolu yokken "72.500,50" -> 72.5005 oluyordu.
   'csv_import_tests.js',
 
+  // Defter disa aktarma: indirilen dosya GERI YUKLENEBILIYOR mu. Eskiden
+  // tek disa aktarim appData'nin ham JSON dokumuydu ve geri okunamiyordu.
+  'finance_export_tests.js',
+
   // Canli test kapisi: suitler hangi projeye yaziyor (kara liste + siniflandirma)
   'test_gate_tests.js',
 
