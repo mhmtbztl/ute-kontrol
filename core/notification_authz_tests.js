@@ -195,6 +195,63 @@ async function run() {
       '\n       beklenen (owner)=' + owner.id +
       '\n       cagirida gonderilen (yabanci)=' + yabanci.id);
 
+    // -----------------------------------------------------------------------
+    console.log('\n--- 6. 0 SATIR ETKILENDIGINDE YALAN SOYLENMEZ (phase39) ---');
+    //
+    // phase29 yetkiyi kilitten one almak icin `FOR UPDATE`i TAMAMEN kaldirdi.
+    // Artik SELECT ile UPDATE arasinda kilit yok: satir o aralikta silinirse
+    // UPDATE 0 satir etkiler ve phase39 oncesinde fonksiyon YINE
+    // `success: true` donuyordu — yapmadigi isi yaptim demesi.
+    //
+    // O YARIS PENCERESI ISTEMCIDEN SAHNELENEMEZ. Satir cagridan ONCE
+    // silinmisse yetki kapisi (NOT FOUND) devreye girer ve 42501 doner;
+    // UPDATE'e hic gelinmez. 0 satir dalina ancak iki eszamanli islemle
+    // ulasilir ve `.env`'de dogrudan Postgres baglanti dizesi yok (4.2),
+    // yani istemciden iki islemi ayni anda yurutemiyoruz.
+    //
+    // Bu yuzden 0 satir dalinin VARLIGI gocun KENDI dogrulama blogunda
+    // olculuyor: blok `pg_get_functiondef` ile govdeyi okuyup `ROW_COUNT` ve
+    // `NOTIFICATION_GONE`/`ALERT_GONE` yoksa `RAISE EXCEPTION` yapiyor. Yani
+    // olcum veritabaninin icinde, gercek tanim uzerinde yapiliyor.
+    // Burada olculebilen sey, phase39'un bu dali eklerken phase29'un
+    // kazanimlarini KAYBETMEDIGIDIR.
+    const { data: gecici, error: ge } = await admin.from('user_notifications').insert({
+      tenant_id: TID, event_key: `notif:${TID}:OPS:phase39:GONE`, domain: 'OPS',
+      severity: 'INFO', title: 'Silinecek bildirim', message: 'phase39', status: 'UNREAD'
+    }).select().single();
+    if (ge) throw new Error('gecici bildirim: ' + ge.message);
+    const geciciId = gecici.id;
+    await admin.from('user_notifications').delete().eq('id', geciciId);
+
+    const { data: g1, error: g1e } = await admin.rpc('acknowledge_notification_atomic', {
+      p_notification_id: geciciId
+    });
+    check(g1e && String(g1e.message || '').indexOf('UNAUTHORIZED_NOTIFICATION_ACK') !== -1,
+      '17. Silinmis bildirim "bulunamadi" degil YETKISIZ doner (oracul kapali)',
+      'donen: ' + (g1e ? g1e.message : JSON.stringify(g1)) +
+      ' — phase39 CREATE OR REPLACE ile govdeyi yeniden yazdi; bu iddia ' +
+      'phase29 kazaniminin kaybolmadigini olcer.');
+
+    // Satir DURUYORSA yol success:true kalmali. 0 satir dali, var olan bir
+    // satiri guncelleyen cagriyi bozmamalidir.
+    const { data: g2, error: g2e } = await owner.client.rpc('resolve_executive_alert_atomic', {
+      p_alert_id: alert2.id, p_resolved_by: null
+    });
+    check(!g2e && g2 && g2.success === true,
+      '18. Zaten cozulmus uyariyi tekrar cozmek success:true kalir (satir var)',
+      g2e ? g2e.message : JSON.stringify(g2));
+
+    // p_resolved_by tipi UUID'dir. Istemci buraya bir CUMLE gonderiyordu ve
+    // cagri her zaman 22P02 ile dusuyordu; `await`/`catch` olmadigi icin
+    // kullaniciya "✅ Bildirim kapatıldı" deniyordu.
+    const { error: cumleHata } = await owner.client.rpc('resolve_executive_alert_atomic', {
+      p_alert_id: alert2.id, p_resolved_by: 'İncelendi ve çözüldü.'
+    });
+    check(cumleHata && String(cumleHata.code || '') === '22P02',
+      '19. p_resolved_by UUID bekler; cumle gonderilirse cagri DUSER',
+      'donen: ' + JSON.stringify(cumleHata) +
+      ' — istemci bunu yutup "kapatildi" diyorsa uyari acik kalir.');
+
   } catch (err) {
     no('Suit beklenmedik hata ile durdu', err && err.message ? err.message : String(err));
   } finally {

@@ -16170,7 +16170,23 @@ function renderUserNotificationsDrawer() {
  */
 async function confirmUserNotification(notifId) {
   try {
-    await acknowledgeUserNotification(notifId);
+    const sonuc = await acknowledgeUserNotification(notifId);
+
+    // phase39: RPC artik 0 satir etkiledigini SOYLUYOR. Bunu okumazsak
+    // ekranda "onaylandi" yazar, kayit ise (silinmis oldugu icin) yoktur —
+    // yani istemci, sunucunun duzelttigi yalani kendi tekrarlar.
+    if (sonuc && sonuc.success === false) {
+      const notes = (typeof appData !== 'undefined' && appData.userNotifications) || [];
+      const i = notes.findIndex(x => x.id === notifId);
+      if (i >= 0) notes.splice(i, 1);
+      renderUserNotificationsBadge();
+      renderUserNotificationsDrawer();
+      if (typeof showToast === 'function') {
+        showToast('Bu bildirim artık mevcut değil; listeden kaldırıldı.', 'info');
+      }
+      return;
+    }
+
     const notes = (typeof appData !== 'undefined' && appData.userNotifications) || [];
     const n = notes.find(x => x.id === notifId);
     if (n) {
@@ -16660,10 +16676,37 @@ function handleQuickActionTrigger(actionType, entityId) {
     }
     alert('✅ Arıza iş emri çözüldü olarak güncellendi.');
   } else if (actionType === 'RESOLVE_ALERT') {
+    // Bu cagri BIR ZAMANLAR HER ZAMAN DUSUYORDU ve kimse gormuyordu:
+    //   resolveExecutiveAlert(entityId, 'İncelendi ve çözüldü.');
+    // Ikinci arguman `p_resolved_by`dir ve tipi UUID'dir; oraya bir CUMLE
+    // gidiyordu. Test projesinde olculdu:
+    //   22P02 invalid input syntax for type uuid: "İncelendi ve çözüldü."
+    // Cagri `await` edilmedigi ve `catch`lenmedigi icin reddedilen promise
+    // sessizce yutuluyor, hemen altindaki alert ise KOSULSUZ
+    // "✅ Bildirim kapatıldı." diyordu. Uyari acik kaliyordu.
+    //
+    // "Kim cozdu" izini zaten sunucu belirler (COALESCE(auth.uid(), ...)),
+    // yani istemcinin buraya bir sey gondermesine gerek yok.
     if (typeof resolveExecutiveAlert === 'function') {
-      resolveExecutiveAlert(entityId, 'İncelendi ve çözüldü.');
+      resolveExecutiveAlert(entityId)
+        .then(sonuc => {
+          if (sonuc && sonuc.success === false) {
+            // phase39: 0 satir etkilendi — uyari artik yok.
+            if (typeof showToast === 'function') {
+              showToast('Bu uyarı artık mevcut değil.', 'info');
+            }
+            return;
+          }
+          if (typeof showToast === 'function') showToast('Bildirim kapatıldı.', 'success');
+          if (typeof renderAll === 'function') renderAll();
+        })
+        .catch(err => {
+          console.error('Uyarı çözülemedi:', err);
+          if (typeof showToast === 'function') {
+            showToast('Uyarı kapatılamadı: ' + (err && err.message ? err.message : 'bilinmeyen hata'), 'error');
+          }
+        });
     }
-    alert('✅ Bildirim kapatıldı.');
   } else if (actionType === 'APPLY_GAP_DISCOUNT') {
     openAiActionConfirmModal({
       type: 'GAP_DISCOUNT',

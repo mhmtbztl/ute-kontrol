@@ -311,15 +311,36 @@ Fonksiyonun kendi hata mesajı yerine `permission denied` dönmesi, göçün
 uygulandığının kanıtıdır. Bu ayrım §4.2'nin yetki göçü testidir ve
 salt okunurdur — üretime kayıt bırakmaz.
 
-**Bilinen ve kabul edilen yan etki:** phase29 `FOR UPDATE` satır kilidini
-tamamen kaldırdı (yetki kontrolünün kilitten önce gelmesi böyle
-sağlandı). Artık `SELECT` ile `UPDATE` arasında satır silinirse `UPDATE`
-0 satır etkiler ama fonksiyon yine `{"success": true}` döner. Bu satırlar
-tek tek silinmiyor (yalnızca kiracı sıfırlama ve hesap kapatma akışlarında,
-cascade ile), pencere mikrosaniye ve istemci `success` üzerinden yıkıcı bir
-iş yapmıyor. Düzeltmek yeni bir göç gerektirir; **bilerek ertelendi.**
-Düzeltilecekse `GET DIAGNOSTICS ... ROW_COUNT` ile 0 satır durumu
-`success: false`'a çevrilmeli.
+**Ertelenmiş yan etki — phase39 ile kapatıldı (22 Eylül 2026).** phase29
+`FOR UPDATE` satır kilidini tamamen kaldırdı (yetki kontrolünün kilitten önce
+gelmesi böyle sağlandı). `SELECT` ile `UPDATE` arasında satır silinirse
+`UPDATE` 0 satır etkiliyor ama fonksiyon yine `{"success": true}` dönüyordu.
+
+Pratik risk küçüktü ve **ertelenmesi doğruydu**: bu satırlar tek tek
+silinmiyor (yalnızca kiracı sıfırlama ve hesap kapatma akışlarında, cascade
+ile), pencere mikrosaniye ve istemci `success` üzerinden yıkıcı bir iş
+yapmıyor. **Kalması doğru değildi**: yanlış olan, fonksiyonun *yapmadığı* bir
+işi yaptım demesidir — "kaydettim" deyip kaydetmeyen `saveAppData()` ile aynı
+aile (§1, §6).
+
+phase39 `GET DIAGNOSTICS ... ROW_COUNT` ile 0 satır durumunu `success: false`
++ `NOTIFICATION_GONE` / `ALERT_GONE`'a çevirir. `RAISE` değil `success: false`
+seçildi: çağıran zaten bu sözleşmeyi okuyor ve 0 satır bir **hata değil,
+sonuçtur** — kayıt artık yoktur. Yetki ihlalleri `42501` istisnası olmaya
+devam eder.
+
+**`FOR UPDATE` geri getirilmedi.** Kilit yetki kontrolünden önce alınamaz
+(phase29'un düzelttiği açık buydu) ve kilidi yetkiden *sonra* almak pencereyi
+kapatmaz, yalnızca daraltır. 0 satırı dürüst raporlamak hem daha basit hem
+daha doğru.
+
+**0 satır dalı istemciden sahnelenemez**, bu yüzden canlı süitte test
+edilmiyor: satır çağrıdan önce silinmişse yetki kapısı devreye girip `42501`
+döner, `UPDATE`'e hiç gelinmez. Dalın varlığını **göçün kendi doğrulama bloğu**
+ölçüyor — `pg_get_functiondef` ile gövdeyi okuyup `ROW_COUNT` yoksa
+`RAISE EXCEPTION` yapıyor. Canlı süitin ölçtüğü şey, phase39'un bu dalı
+eklerken phase29'un kazanımlarını **kaybetmediğidir** (`CREATE OR REPLACE`
+gövdeyi bütünüyle değiştirir).
 
 **phase30 (`migration_phase30_booking_channel_settings.sql`) 20 Eylül 2026'da
 üretime uygulandı ve doğrulandı.** `tenant_booking_channels` tablosu üretimde
@@ -565,6 +586,7 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 | "Şirket Genel Raporu" içe aktarımı | **bilerek reddediliyor** — aylık toplamdan rezervasyon üretmek uydurma veri olurdu (§3.6). Ekran bunu açıkça söylüyor ve kullanıcıyı defter şablonlarına yönlendiriyor |
 | İçe aktarımı **geri alma** | **tamamlandı** (22 Eylül 2026, phase35 + phase37) — yanlış dosya aktarıldığında dönüş yolu yoktu. Göçler **22 Eylül 2026'da üretime uygulandı ve doğrulandı** — `docs/PHASE35_DEPLOY_PACKAGE.md`. Ağı `core/import_undo_tests.js` (50 iddia) + `core/import_undo_live_tests.js` (23 iddia, canlı) |
 | Bildirim merkezi analizi | **tamamlandı** (17 Eylül 2026) — merkez her iki uçtan da bağlı değildi; yükleme bağlandı, "okundu" artık Postgres'e yazıyor. RPC yetki sırası phase29 ile düzeltildi; göç 20 Eylül 2026'da **üretime uygulandı ve doğrulandı** |
+| phase29'un ertelenmiş `ROW_COUNT` yan etkisi | **tamamlandı** (22 Eylül 2026, phase39) — 0 satır etkilendiğinde artık `success: false`. Aynı turda `RESOLVE_ALERT` aksiyonunun **her zaman düşen** çağrısı da düzeltildi (`p_resolved_by`'a cümle gidiyordu, `22P02`). **Göç üretime henüz uygulanmadı** — `docs/PHASE39_DEPLOY_PACKAGE.md` |
 | `saveAppData()` hiçbir şey kaydetmiyor | gövdesi yalnızca eski localStorage anahtarlarını siliyor. 17 çağıranda hiçbir Postgres yazması yoktu; **8'i 20 Eylül 2026'da bağlandı**, 1'i meşru yerel durum, 2'si kaldırıldı, **6'sı 20 Eylül 2026'da phase31 ile kapandı**; liste artık boş. Göç **21 Eylül 2026’da üretime uygulandı ve doğrulandı**. Ayrıntı aşağıda |
 | Temizlik & gider defteri kalıcılığı | **tamamlandı** (20 Eylül 2026) — beş fonksiyon hiçbir şey yazmıyordu. Ayrıca `cloudUpsertCleaningTask` yeniden yüklemeden sonra **mükerrer görev satırı** açıyordu (UUID'yi `legacy_id` olarak gönderiyordu) ve `cleaningPayments` hiç yüklenmiyordu. Ağı `cleaning_ledger_persistence_tests` (34 iddia) |
 | Temizlik görevi → Operasyon Kontrol Merkezi sözleşmesi | **phase34 ile düzeltildi** (21 Eylül 2026) — yeni kayıt, Postgres yüklemesi, realtime ve operasyon özeti tek `normalizeCleaningTask` modelinden geçiyor; açıklama `notes` olarak korunuyor, kayıt DB yazısını bekliyor ve bekleyen borç listesi yalnızca `!paid` gösteriyor. `paid` yalnız ödeme durumudur. `cleaning_tasks` tablosunda operasyonel tamamlanma alanı olmadığı için “hazır mülk” hesabı temizlik ödemesinden türetilemez; gerçek bir tamamlanma modeli tasarlanana kadar bu kavramsal açık bilerek açık tutulur. Ağı `cleaning_ledger_persistence_tests` ve `render_pipeline_tests`. |

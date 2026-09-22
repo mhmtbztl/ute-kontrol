@@ -114,6 +114,42 @@ function run() {
     'saveAppData() hiçbir şey kaydetmez; kalıcılık sanılan yer burasıysa ' +
     'kayıt sessizce kaybolur.');
 
+  // --- 5. Sunucunun "olmadi" demesi OKUNUYOR mu (phase39) --------------------
+  //
+  // phase39 ile iki RPC artik 0 satir etkiledigini `success: false` ile
+  // soyluyor. Istemci bunu okumazsa ekranda "onaylandi" yazar, kayit ise
+  // yoktur — yani istemci, sunucunun duzelttigi yalani kendi tekrarlar.
+  check(/sonuc\s*&&\s*sonuc\.success === false/.test(confGovde),
+    '11. Onay yolu sunucunun `success: false` cevabini OKUYOR',
+    'Donen deger kontrol edilmiyor: silinmis bir bildirim ekranda ' +
+    '"onaylandi" gorunur.');
+
+  // --- 6. Uyari cozme cagrisi (phase39) --------------------------------------
+  //
+  // Bu cagri BIR ZAMANLAR HER ZAMAN DUSUYORDU: `p_resolved_by` tipi UUID'dir
+  // ve oraya bir CUMLE gidiyordu. Test projesinde olculdu:
+  //   22P02 invalid input syntax for type uuid: "İncelendi ve çözüldü."
+  // Cagri `await` edilmedigi ve `catch`lenmedigi icin reddedilen promise
+  // sessizce yutuluyor, hemen altindaki `alert` ise KOSULSUZ
+  // "✅ Bildirim kapatıldı." diyordu. Uyari acik kaliyordu.
+  const ham = kodu(APP);
+  check(!/resolveExecutiveAlert\(\s*entityId\s*,\s*'[^']*[a-zçğıöşü][^']*'\s*\)/i.test(ham),
+    '12. resolveExecutiveAlert ikinci argumanina CUMLE gonderilmiyor',
+    'p_resolved_by UUID bekler; cumle gidince cagri 22P02 ile duser.');
+
+  const alertBas = ham.indexOf("actionType === 'RESOLVE_ALERT'");
+  const alertGovde = alertBas === -1 ? '' : ham.slice(alertBas, alertBas + 1400);
+  check(alertBas !== -1 && /\.catch\(|catch\s*\(/.test(alertGovde),
+    '13. Uyari cozme cagrisinin hatasi yakalaniyor',
+    'Yakalanmazsa reddedilen promise sessizce yutulur.');
+  check(!/alert\('✅ Bildirim kapatıldı\.'\)/.test(alertGovde),
+    '14. "Bildirim kapatildi" KOSULSUZ soylenmiyor',
+    'Cagri dusse de kullaniciya basarili denirdi — bu depoda kabul edilmeyen ' +
+    'kalip tam olarak budur (1. bolum).');
+  check(/success === false/.test(alertGovde),
+    '15. Uyari cozmede de `success: false` okunuyor (phase39)',
+    'Sunucu "uyari artik yok" diyor, istemci "kapatildi" diyor.');
+
   console.log('\n=============================================================================');
   console.log(`TEST SUMMARY: ${passed} / ${passed + failed} TESTS PASSED (${failed} FAILED)`);
   console.log('=============================================================================\n');
