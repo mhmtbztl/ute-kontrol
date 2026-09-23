@@ -222,7 +222,11 @@ const allTestFiles = [
   // phase41: rol ve kiraci yetkileri. Canli suit gercek rollerle olcer;
   // kural suiti sonraki goclerin tenant_id tetikleyicisini unutmasini engeller.
   'phase41_authz_live_tests.js',
-  'phase41_rules_tests.js'
+  'phase41_rules_tests.js',
+
+  // phase43: ay kapanisi, sifirlama, hesap kapatma, sahipsiz fotograf temizligi
+  'phase43_period_reset_live_tests.js',
+  'storage_orphan_cleanup_tests.js'
 ];
 
 const testEnv = require('./core/test_env.js');

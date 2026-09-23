@@ -159,7 +159,11 @@ Kapanış anlık görüntüsü **sunucuda** hesaplanır (`compute_month_close_sn
 İstemcininki de saklanır ve karşılaştırılır (`client_matches_server`,
 `revenue_delta`). Bir muhasebe kapanışının rakamını tarayıcıya hesaplatmayın.
 
-Henüz **başlamamış** bir ay kapatılamaz.
+Ay **bitmeden** kapatılamaz (phase43, `PERIOD_NOT_ENDED`; "bugün" Europe/Istanbul).
+phase20 yalnızca henüz başlamamış ayı reddediyordu; içinde bulunulan ay
+kapatılabiliyor ve ayın kalan günlerine kayıt girilemez hâle geliyordu.
+Kapalı dönemde temizlik görevleri de korunur (tarih/tutar/mülk); ödeme
+durumu değişebilir, çünkü ödeme kapanıştan sonra yapılır.
 
 ### 3.5 Arayüzde sabit değer yasağı
 `index.html`'de **sayı içeren hiçbir id** sabit bir değerle duramaz. Ya JS yazar ve
@@ -444,6 +448,15 @@ owner/admin/manager, her `tenant_id` tablosunda değişmezlik tetikleyicisi,
 Üretim doğrulaması (§4.2, salt okunur): anon ile `guests`, `profiles`,
 `scheduled_messages`, `extension_offers` sorguları `200 []` yerine `401 42501`
 döndü; `schema_migrations` defterinde `41 phase41_role_authz_hardening` var.
+
+**phase43 (`migration_phase43_period_reset_integrity.sql`) 23 Eylül 2026'da
+test projesine uygulandı; üretimde BEKLİYOR.** L-08…L-11: ay bitmeden kapanış
+yok, sıfırlama izi, `financial_transactions` sıfırlamayı kilitlemiyor, kapalı
+dönemde temizlik ve rezervasyonun raporlanan alanları, hesap kapatmada
+silinen kullanıcı kimliğinin boşalması. L-12 (sahipsiz fotoğraf) göçte değil,
+gece worker'ı: `npm run storage:orphan-cleanup`. Canlı süit
+`phase43_period_reset_live_tests` 25/25 (göçten önce 16 kırmızı).
+Paket: `docs/PHASE43_DEPLOY_PACKAGE.md`.
 
 **Bir göçün uygulanıp uygulanmadığı, dosyaya bakarak anlaşılmaz.** Dosya repoda
 durur; veritabanı uygulanmamış olabilir. Doğrulamanın yolu üretime sormaktır:
@@ -991,6 +1004,15 @@ Ağı `core/csv_import_tests.js` (52 iddia: motor, `app.js` kaynağı, gerçek
 - **Koruma tetikleyicileri cascade'i engellememeli.** Beş tetikleyici (son sahip, kapanmış dönem ×2,
   gönderilmiş mesaj, kabul edilmiş teklif) üst kayıt silinirken devreye girip hesap silmeyi
   kilitliyordu. `fn_tenant_is_being_deleted()` ile istisna tanımlı — yeni koruma eklerken aynısını yapın.
+- **`auth.users`'a bağlanan FK `ON DELETE SET NULL` (ya da CASCADE) olur ve
+  o sütunu koruyan tetikleyici boşalmaya izin verir.** `guard_created_by`
+  UPDATE'te değeri geri yazıyordu: SET NULL etkisiz kalıyor, satır silinmiş
+  kullanıcıyı göstermeye devam ediyordu (FK kontrolü değişmemiş sütunu
+  atlar, yani hata bile vermez — döküm geri yüklenirken FK doğrulaması
+  kırılır). Kapanış kaydı koruması ise aynı SET NULL'u reddedip hesap
+  kapatmayı kilitliyordu. phase43 ikisini de "kullanıcı gerçekten yoksa
+  boşalabilir" kuralına bağladı; doğrulama bloğu NO ACTION/RESTRICT FK
+  kalırsa durur.
 - **Yeni tablo açan her göç üç şey yapar** (phase41'den beri, makineyle zorlanır):
   `tenant_id` sütunu varsa `trg_tenant_id_immutable` tetikleyicisini kurar,
   `anon` yetkisini geri alır ve göç kendini `schema_migrations`'a yazar.

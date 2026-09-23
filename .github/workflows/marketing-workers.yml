@@ -64,3 +64,5 @@ jobs:
         run: npm run marketing:economics-worker
       - name: Refresh seasonal cover reviews
         run: npm run marketing:seasonal-worker
+      - name: Remove photos whose tenant or property no longer exists
+        run: npm run storage:orphan-cleanup
