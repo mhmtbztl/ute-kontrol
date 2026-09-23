@@ -14039,6 +14039,7 @@ function openPropertyModal(villaKey = null) {
 
   form.reset();
   document.getElementById('propEditKey').value = '';
+  if (typeof resetPropertyAnalysisContextForm === 'function') resetPropertyAnalysisContextForm();
 
   let deleteBtn = document.getElementById('propDeleteBtn');
   if (!deleteBtn) {
@@ -14069,6 +14070,7 @@ function openPropertyModal(villaKey = null) {
     document.getElementById('propCleanCost').value = (Number(v.cleanCost) || '');
     document.getElementById('propAmenities').value = v.amenities || '';
     document.getElementById('propUrl').value = v.url || '';
+    if (typeof loadPropertyAnalysisContextForm === 'function') loadPropertyAnalysisContextForm(v.id);
     if (deleteBtn) {
       deleteBtn.style.display = 'inline-block';
     }
@@ -14133,17 +14135,31 @@ async function saveProperty(e) {
       url
     };
 
+    let savedProperty;
     if (editKey) {
-      await updateProperty(editKey, propData);
+      savedProperty = await updateProperty(editKey, propData);
     } else {
       propData.slug = rawKey || name.toUpperCase().replace(/[^A-Z0-9_]/g, '_');
-      await createProperty(propData);
+      savedProperty = await createProperty(propData);
+    }
+
+    let contextWarning = '';
+    if (typeof savePropertyAnalysisContextDraft === 'function' && savedProperty?.id) {
+      try {
+        await savePropertyAnalysisContextDraft(savedProperty.id);
+      } catch (contextError) {
+        const migrationMissing = typeof PropertyAnalysisContextService !== 'undefined'
+          && PropertyAnalysisContextService.isMissingSchemaError(contextError);
+        contextWarning = migrationMissing
+          ? '\n\n⚠️ Mülk kaydedildi; konum/sosyal profil için Phase 40 göçü henüz uygulanmamış.'
+          : '\n\n⚠️ Mülk kaydedildi; konum/sosyal profil kaydedilemedi: ' + (contextError.message || 'Bilinmeyen hata');
+      }
     }
 
     closePropertyModal();
     updateAllVillaDropdowns();
     renderAll();
-    alert('✅ ' + name + ' başarıyla mülk portföyünüze kaydedildi!');
+    alert('✅ ' + name + ' başarıyla mülk portföyünüze kaydedildi!' + contextWarning);
   } catch (err) {
     console.error('saveProperty error:', err);
     alert('Mülk kaydedilemedi: ' + (err.message || 'Lütfen bilgileri kontrol edip tekrar deneyin.'));

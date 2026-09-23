@@ -93,6 +93,16 @@ function mockClient(rowsByTable = {}, errorsByTable = {}) {
     assert.strictEqual(result.placements.length, 1);
   });
 
+  await runTest('Listing reads include safe analysis link fields but not raw metadata', async () => {
+    const client = mockClient();
+    await MarketingDataService.loadMarketingWorkspaceData(client, { tenantId: TENANT, propertyId: PROPERTY });
+    const call = client.calls.find(item => item.table === 'property_channel_listings');
+    assert.match(call.selected, /external_url/);
+    assert.match(call.selected, /display_name/);
+    assert.doesNotMatch(call.selected, /metadata/);
+    assert.doesNotMatch(call.selected, /external_listing_id/);
+  });
+
   await runTest('Benchmark history is read-only and property scoped', async () => {
     const client = mockClient({ property_marketing_benchmarks: [{ id: 'benchmark' }] });
     const result = await MarketingDataService.loadMarketingWorkspaceData(client, { tenantId: TENANT, propertyId: PROPERTY });

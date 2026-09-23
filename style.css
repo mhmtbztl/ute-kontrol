@@ -4189,6 +4189,70 @@ body {
   line-height: 1.45;
 }
 
+.property-analysis-context {
+  margin: 0 0 16px;
+  padding: 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.property-analysis-context legend {
+  padding: 0 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.property-analysis-context__help,
+.property-analysis-context__actions span {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.property-analysis-context__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.property-analysis-context label {
+  color: #cbd5e1;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.property-analysis-context input,
+.property-analysis-context select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  background: var(--bg-input);
+  color: #fff;
+}
+
+.property-analysis-context input:focus,
+.property-analysis-context select:focus {
+  border-color: var(--accent-primary);
+  outline: 2px solid color-mix(in srgb, var(--accent-primary) 35%, transparent);
+  outline-offset: 1px;
+}
+
+.property-analysis-context__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.property-analysis-context__actions span[data-tone="error"] { color: #fca5a5; }
+.property-analysis-context__actions span[data-tone="warning"] { color: #fde68a; }
+.property-analysis-context__actions span[data-tone="success"] { color: #86efac; }
+
 .analysis-layout {
   display: grid;
   grid-template-columns: minmax(360px, 0.85fr) minmax(440px, 1.15fr);
@@ -4536,3 +4600,8 @@ body {
   color: var(--accent-emerald);
 }
 .preview-item.preview-total strong { font-size: 15px; }
+
+@media (max-width: 640px) {
+  .property-analysis-context__grid { grid-template-columns: 1fr; }
+  .property-analysis-context__actions { align-items: stretch; flex-direction: column; }
+}

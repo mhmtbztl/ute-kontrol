@@ -12,11 +12,13 @@
     const channelCode = String(input.channelCode || '').trim().toUpperCase();
     const externalListingId = String(input.externalListingId || '').trim();
     const externalUrl = optionalText(input.externalUrl);
+    const displayName = optionalText(input.displayName);
     const payoutCurrency = String(input.payoutCurrency || 'TRY').trim().toUpperCase();
     if (!UUID_RE.test(String(input.tenantId || ''))) throw new Error('VALID_TENANT_ID_REQUIRED');
     if (!UUID_RE.test(String(input.propertyId || ''))) throw new Error('VALID_PROPERTY_ID_REQUIRED');
     if (!CHANNELS.includes(channelCode)) throw new Error('INVALID_CHANNEL_CODE');
     if (!externalListingId || externalListingId.length > 200) throw new Error('CHANNEL_LISTING_REFERENCE_REQUIRED');
+    if (channelCode === 'OTHER_OTA' && !displayName) throw new Error('CUSTOM_OTA_NAME_REQUIRED');
     if (!/^[A-Z]{3}$/.test(payoutCurrency)) throw new Error('INVALID_PAYOUT_CURRENCY');
     if (externalUrl) {
       let url;
@@ -25,7 +27,7 @@
     }
     return {
       tenantId: input.tenantId, propertyId: input.propertyId, channelCode, externalListingId,
-      displayName: optionalText(input.displayName), externalUrl, payoutCurrency
+      displayName, externalUrl, payoutCurrency
     };
   }
 

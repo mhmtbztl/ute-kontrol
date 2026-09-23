@@ -10,7 +10,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=217e2a4d">
+  <link rel="stylesheet" href="style.css?v=5537b4b9">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -4005,7 +4005,8 @@
 
   <script src="core/financial_metrics_service.js?v=66c8bc6a"></script>
   <script src="core/marketing_engine.js?v=2756f4ec"></script>
-  <script src="core/analysis_export_service.js?v=3bec6c79"></script>
+  <script src="core/analysis_export_service.js?v=d05579d8"></script>
+  <script src="core/property_analysis_context_service.js?v=8d679adb"></script>
   <script src="core/finance_import_engine.js?v=7d2e5cc4"></script>
   <script src="core/finance_export_engine.js?v=4ab4113f"></script>
 
@@ -4326,7 +4327,7 @@
   <!-- MODAL: DİNAMİK VİLLA / MÜLK EKLE & DÜZENLE -->
   <!-- ========================================== -->
   <div class="modal-backdrop" id="propertyModal">
-    <div class="modal-card" style="max-width: 540px;">
+    <div class="modal-card" style="max-width: 760px;">
       <div class="modal-header">
         <h3 id="propertyModalTitle">🏡 Yeni Villa / Mülk Ekle</h3>
         <button class="close-btn" onclick="closePropertyModal()">&times;</button>
@@ -4365,6 +4366,28 @@
           <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Airbnb / OTA İlan Linki (Opsiyonel):</label>
           <input type="url" id="propUrl" placeholder="https://www.airbnb.com.tr/rooms/..." style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff;">
         </div>
+        <fieldset class="property-analysis-context">
+          <legend>Pazar konumu ve dijital profiller</legend>
+          <p class="property-analysis-context__help">Bu alanlar finansal hesaplamaları değiştirmez; ChatGPT’nin doğru bölgeyi, rakipleri, özel günleri ve ilan sayfalarını araştırmasına bağlam sağlar.</p>
+          <div class="property-analysis-context__grid">
+            <div class="form-group"><label for="propAnalysisCountry">Ülke</label><select id="propAnalysisCountry"><option value="">Ülke seçin</option></select></div>
+            <div class="form-group"><label for="propAnalysisAdminArea">Eyalet / il / bölge</label><input type="text" id="propAnalysisAdminArea" maxlength="120" placeholder="Örn. Antalya"></div>
+            <div class="form-group"><label for="propAnalysisCity">Şehir</label><input type="text" id="propAnalysisCity" maxlength="120" placeholder="Örn. Kaş"></div>
+            <div class="form-group"><label for="propAnalysisDistrictRegion">İlçe / turizm bölgesi</label><input type="text" id="propAnalysisDistrictRegion" maxlength="160" placeholder="Örn. Kalkan"></div>
+          </div>
+          <div class="property-analysis-context__grid property-analysis-context__links">
+            <div class="form-group"><label for="propSocialWebsite">Web sitesi</label><input type="url" inputmode="url" id="propSocialWebsite" placeholder="https://..."></div>
+            <div class="form-group"><label for="propSocialInstagram">Instagram</label><input type="url" inputmode="url" id="propSocialInstagram" placeholder="https://instagram.com/..."></div>
+            <div class="form-group"><label for="propSocialFacebook">Facebook</label><input type="url" inputmode="url" id="propSocialFacebook" placeholder="https://facebook.com/..."></div>
+            <div class="form-group"><label for="propSocialTikTok">TikTok</label><input type="url" inputmode="url" id="propSocialTikTok" placeholder="https://tiktok.com/@..."></div>
+            <div class="form-group"><label for="propSocialYouTube">YouTube</label><input type="url" inputmode="url" id="propSocialYouTube" placeholder="https://youtube.com/@..."></div>
+            <div class="form-group"><label for="propSocialGoogleBusiness">Google İşletme / Maps</label><input type="url" inputmode="url" id="propSocialGoogleBusiness" placeholder="https://maps.google.com/..."></div>
+          </div>
+          <div class="property-analysis-context__actions">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="openPropertyOtaManager()">OTA bağlantılarını yönet</button>
+            <span id="propAnalysisContextStatus" role="status" aria-live="polite">Konum ve sosyal profiller ChatGPT pazar analizine güvenli bağlantı olarak eklenir.</span>
+          </div>
+        </fieldset>
         <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
           <button type="button" id="propDeleteBtn" class="btn btn-danger" style="display: none; background: #EF4444; border: none; font-size: 12px; padding: 8px 14px; border-radius: 6px; color: #fff; cursor: pointer;" onclick="handlePropertyDeleteFromModal()">🗑️ Mülkü Sil</button>
           <div style="display: flex; gap: 10px; margin-left: auto;">
@@ -4570,8 +4593,9 @@
   <script src="core/executive_dashboard_service.js?v=baf5396e"></script>
   <script src="core/executive_ai_advisor.js?v=4b235c67"></script>
   <script src="core/notification_center_service.js?v=710f8a91"></script>
-  <script src="app.js?v=48bdef19"></script>
-  <script src="core/analysis_center_ui.js?v=3f391831"></script>
-  <script src="core/marketing_ui.js?v=2e506018"></script>
+  <script src="app.js?v=06ce9393"></script>
+  <script src="core/property_analysis_context_ui.js?v=efba10f2"></script>
+  <script src="core/analysis_center_ui.js?v=7991bd67"></script>
+  <script src="core/marketing_ui.js?v=1360fb04"></script>
 </body>
 </html>

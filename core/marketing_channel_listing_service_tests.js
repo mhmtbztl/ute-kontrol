@@ -14,6 +14,11 @@ const base = { tenantId: '11111111-1111-4111-8111-111111111111', propertyId: '22
     assert.throws(() => Service.validateInput({ ...base, channelCode: 'INSTAGRAM' }), /INVALID_CHANNEL_CODE/);
     assert.throws(() => Service.validateInput({ ...base, externalListingId: ' ' }), /REFERENCE_REQUIRED/);
   });
+  await runTest('Manual OTAs require a human-readable platform name such as ETS Tur', () => {
+    assert.throws(() => Service.validateInput({ ...base, channelCode: 'OTHER_OTA', displayName: ' ' }), /CUSTOM_OTA_NAME_REQUIRED/);
+    const valid = Service.validateInput({ ...base, channelCode: 'OTHER_OTA', displayName: ' ETS Tur ', externalUrl: 'https://www.etstur.com/villa' });
+    assert.strictEqual(valid.displayName, 'ETS Tur');
+  });
   await runTest('Only HTTPS listing URLs pass validation', () => {
     assert.throws(() => Service.validateInput({ ...base, externalUrl: 'http://example.com/listing' }), /HTTPS_CHANNEL_URL_REQUIRED/);
     assert.strictEqual(Service.validateInput({ ...base, externalUrl: 'https://example.com/listing' }).externalUrl, 'https://example.com/listing');

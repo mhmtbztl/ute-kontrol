@@ -25,7 +25,7 @@
     const valid = assertScope(scope);
     const max = { ...DEFAULT_LIMITS, ...limits };
     return {
-      listings: request('property_channel_listings', 'id,property_id,channel_code,display_name,status', 'created_at', 100, valid.propertyId),
+      listings: request('property_channel_listings', 'id,property_id,channel_code,display_name,external_url,status', 'created_at', 100, valid.propertyId),
       findings: request('marketing_findings', '*', 'last_seen_at', max.findings, valid.propertyId),
       media: request('property_media', 'id,property_id,media_status,room_category,content_sha256,width_px,height_px,created_at', 'created_at', max.media, valid.propertyId),
       placements: request('channel_media_placements', 'id,property_id,channel_listing_id,media_id,display_order,is_cover,is_active,updated_at', 'updated_at', max.placements, valid.propertyId),

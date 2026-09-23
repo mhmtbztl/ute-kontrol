@@ -25,6 +25,7 @@
     view: 'economics',
     snapshotFormOpen: false,
     listingFormOpen: false,
+    listingPropertyId: null,
     mediaFormOpen: false,
     experimentFormOpen: false,
     benchmarkFormOpen: false,
@@ -53,10 +54,10 @@
     ['MarketingPriorityService', 'core/marketing_priority_service.js?v=f6e216ff'],
     ['MarketingBenchmarkService', 'core/marketing_benchmark_service.js?v=05187d46'],
     ['MarketingCoverChangeService', 'core/marketing_cover_change_service.js?v=81211a39'],
-    ['MarketingDataService', 'core/marketing_data_service.js?v=a048dab9'],
+    ['MarketingDataService', 'core/marketing_data_service.js?v=0c6b8c4f'],
     ['MarketingReviewService', 'core/marketing_review_service.js?v=9207dee5'],
     ['MarketingSnapshotService', 'core/marketing_snapshot_service.js?v=184ad517'],
-    ['MarketingChannelListingService', 'core/marketing_channel_listing_service.js?v=0e34cbca'],
+    ['MarketingChannelListingService', 'core/marketing_channel_listing_service.js?v=f3dbce3f'],
     ['MarketingMediaUploadService', 'core/marketing_media_upload_service.js?v=37cc2d13'],
     ['MarketingPhotoAnalysisService', 'core/marketing_photo_analysis_service.js?v=639eaf5b'],
     ['MarketingExperimentService', 'core/marketing_experiment_service.js?v=4a2ffb14'],
@@ -330,12 +331,12 @@
   function renderListingForm(model) {
     const properties = model.properties.filter(item => item.id);
     if (!properties.length) return emptyState('Mülk kaydı bulunamadı', 'Kanal ilanı eklemek için önce bulut hesabında bir mülk oluşturulmalıdır.');
-    const selectedId = model.selectedProperty === 'ALL' ? null
-      : (properties.find(item => item.slug === model.selectedProperty) || {}).id;
+    const selectedId = state.listingPropertyId || (model.selectedProperty === 'ALL' ? null
+      : (properties.find(item => item.slug === model.selectedProperty) || {}).id);
     const propertyOptions = properties.map(item => `<option value="${escapeHtml(item.id)}"${item.id === selectedId ? ' selected' : ''}>${escapeHtml(item.name)}</option>`).join('');
     const channelOptions = [
       ['AIRBNB', 'Airbnb'], ['BOOKING_COM', 'Booking.com'], ['VRBO', 'Vrbo'],
-      ['EXPEDIA', 'Expedia'], ['DIRECT', 'Direkt'], ['OTHER_OTA', 'Diğer OTA']
+      ['EXPEDIA', 'Expedia'], ['DIRECT', 'Direkt'], ['OTHER_OTA', 'Diğer OTA (ETS Tur vb.)']
     ].map(([value, label]) => `<option value="${value}">${label}</option>`).join('');
     return `<form data-marketing-listing-form class="card" style="padding:16px;margin-bottom:14px">
       <h3 style="margin:0 0 12px">Kanal ilanı tanımla</h3>
@@ -343,11 +344,11 @@
         <label style="display:grid;gap:5px;font-size:12px">Mülk<select class="form-control" name="propertyId" required>${propertyOptions}</select></label>
         <label style="display:grid;gap:5px;font-size:12px">Kanal<select class="form-control" name="channelCode" required>${channelOptions}</select></label>
         <label style="display:grid;gap:5px;font-size:12px">İlan ID / sabit referans<input class="form-control" name="externalListingId" maxlength="200" required placeholder="Örn. Airbnb ilan ID"></label>
-        <label style="display:grid;gap:5px;font-size:12px">Görünen ad<input class="form-control" name="displayName" maxlength="200" placeholder="Örn. Villa Azure Airbnb"></label>
-        <label style="display:grid;gap:5px;font-size:12px">İlan URL’si<input class="form-control" type="url" name="externalUrl" placeholder="https://..."></label>
+        <label style="display:grid;gap:5px;font-size:12px">Platform / ilan adı<input class="form-control" name="displayName" maxlength="200" placeholder="Örn. ETS Tur · Villa Azure"></label>
+        <label style="display:grid;gap:5px;font-size:12px">İlan URL’si<input class="form-control" type="url" name="externalUrl" placeholder="https://..." inputmode="url"></label>
         <label style="display:grid;gap:5px;font-size:12px">Ödeme para birimi<input class="form-control" name="payoutCurrency" value="TRY" minlength="3" maxlength="3" required></label>
       </div>
-      <div class="sub-text" style="margin-top:10px">Sabit referans aynı kanal içinde tekrar gönderilirse mevcut kayıt güncellenir; başka mülke taşınmaz.</div>
+      <div class="sub-text" style="margin-top:10px">ETS Tur gibi listede olmayan bir kanal için “Diğer OTA” seçin ve platform adını yazın. URL eklerseniz ChatGPT analiz paketine güvenli bağlantı olarak alınır. Sabit referans aynı kanal içinde tekrar gönderilirse mevcut kayıt güncellenir; başka mülke taşınmaz.</div>
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button type="button" class="btn btn-secondary btn-sm" data-marketing-cancel-listing>Vazgeç</button><button type="submit" class="btn btn-primary btn-sm">Kanal ilanını kaydet</button></div>
     </form>`;
   }
@@ -846,6 +847,13 @@
     });
     // switchTab() in app.js invokes this global hook. Replacing it prevents the
     // hidden legacy demo from rendering while preserving the existing router.
+    window.openMarketingListingManager = function openMarketingListingManager(propertyId) {
+      state.view = 'funnel';
+      state.listingFormOpen = true;
+      state.listingPropertyId = propertyId || null;
+      if (typeof switchTab === 'function') switchTab('marketing');
+      else render();
+    };
     window.renderMarketingModule = function renderMarketingWorkspace() {
       return ensureBrowserDependencies().then(() => {
         render();
