@@ -10,7 +10,7 @@
 | Ortam | Durum |
 |---|---|
 | Test projesi `pdeiorpgxetksyogrmbi` | ✅ **uygulandı**, `phase43_period_reset_live_tests` 25/25 yeşil; göçten önce 16'sı kırmızıydı |
-| Üretim `kirpcqklyjlrhvdbgdrq` | ⬜ **bekliyor** — kullanıcı SQL Editor'den uygular, sonra `GÖÇ UYGULANDI` |
+| Üretim `kirpcqklyjlrhvdbgdrq` | ✅ **uygulandı ve doğrulandı** (23 Eylül 2026) — `schema_migrations` 43 mevcut |
 
 > phase41'den **sonra** uygulanmalıdır. Tek transaction, idempotent
 > (test projesinde `BEGIN … ROLLBACK` içinde art arda iki kez koşuldu).

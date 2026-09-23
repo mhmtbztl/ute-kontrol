@@ -450,7 +450,8 @@ owner/admin/manager, her `tenant_id` tablosunda değişmezlik tetikleyicisi,
 döndü; `schema_migrations` defterinde `41 phase41_role_authz_hardening` var.
 
 **phase43 (`migration_phase43_period_reset_integrity.sql`) 23 Eylül 2026'da
-test projesine uygulandı; üretimde BEKLİYOR.** L-08…L-11: ay bitmeden kapanış
+test projesine ve üretime uygulandı; üretimde doğrulandı
+(`schema_migrations` 43 mevcut).** L-08…L-11: ay bitmeden kapanış
 yok, sıfırlama izi, `financial_transactions` sıfırlamayı kilitlemiyor, kapalı
 dönemde temizlik ve rezervasyonun raporlanan alanları, hesap kapatmada
 silinen kullanıcı kimliğinin boşalması. L-12 (sahipsiz fotoğraf) göçte değil,
