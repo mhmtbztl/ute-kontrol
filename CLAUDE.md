@@ -434,14 +434,16 @@ varlığı ve anon kapısı üretime kayıt bırakmadan ayrıca doğrulandı. Te
 projesinde `executive_snapshot_tests` 23/23 geçti.
 
 **phase41 (`migration_phase41_role_authz_hardening.sql`) 23 Eylül 2026'da
-test projesine uygulandı; üretimde BEKLİYOR.** Rol ve kiracı yetkilerini
+test projesine ve üretime uygulandı, üretimde doğrulandı.** Rol ve kiracı yetkilerini
 sıkılaştırır: worker RPC'leri yalnız service_role, mesajlaşma/uyarı/bildirim
 tablolarında rol bazlı yazma, kişisel bildirim, rezervasyon silme
 owner/admin/manager, her `tenant_id` tablosunda değişmezlik tetikleyicisi,
 `anon` tablo yetkisi yok, üyeliği olan hesaba ikinci işletme yok,
 `schema_migrations` RLS. Canlı süit `phase41_authz_live_tests` 38/38 (göçten
 önce 29 kırmızı). Uygulama ve doğrulama: `docs/PHASE41_DEPLOY_PACKAGE.md`.
-**Üretime uygulanmadan `master`'a push edilmez** — repo herkese açık.
+Üretim doğrulaması (§4.2, salt okunur): anon ile `guests`, `profiles`,
+`scheduled_messages`, `extension_offers` sorguları `200 []` yerine `401 42501`
+döndü; `schema_migrations` defterinde `41 phase41_role_authz_hardening` var.
 
 **Bir göçün uygulanıp uygulanmadığı, dosyaya bakarak anlaşılmaz.** Dosya repoda
 durur; veritabanı uygulanmamış olabilir. Doğrulamanın yolu üretime sormaktır:

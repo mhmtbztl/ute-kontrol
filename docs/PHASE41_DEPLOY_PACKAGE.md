@@ -11,7 +11,7 @@
 | Ortam | Durum |
 |---|---|
 | Test projesi `pdeiorpgxetksyogrmbi` | ✅ **uygulandı** (`npm run test:bootstrap`), `phase41_authz_live_tests` 38/38 yeşil; göçten önce 29'u kırmızıydı |
-| Üretim `kirpcqklyjlrhvdbgdrq` | ⬜ **bekliyor** — kullanıcı SQL Editor'den uygular, sonra `GÖÇ UYGULANDI` |
+| Üretim `kirpcqklyjlrhvdbgdrq` | ✅ **uygulandı ve doğrulandı** (23 Eylül 2026) — anon ile `guests`/`profiles`/`scheduled_messages`/`extension_offers`/`bookings` → `401 42501`; `schema_migrations` 41 mevcut |
 
 > phase39'dan **sonra** uygulanmalıdır. Tek transaction, idempotent
 > (test projesinde `BEGIN … ROLLBACK` içinde art arda iki kez koşuldu).
