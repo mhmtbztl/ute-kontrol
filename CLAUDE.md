@@ -922,6 +922,11 @@ Ağı `core/csv_import_tests.js` (52 iddia: motor, `app.js` kaynağı, gerçek
 
 ## 7. Güvenlik notları
 
+- **Yerel sunucu (`server.js`) yalnızca `127.0.0.1`'e bağlanır ve izin listesindeki
+  dosyaları verir** (`index.html`, `app.js`, `style.css`, `core/*.js` — testler ve
+  `test_env.js` hariç —, `sablonlar/`). Eskiden klasörün tamamını ağa açıyordu;
+  `.env` de dahildi. Tarayıcıya yeni bir dosya eklerseniz izin listesine de
+  ekleyin; ağı `core/local_server_tests.js`.
 - `.env` **asla** commit edilmez (`.gitignore`'da). İçinde `service_role` anahtarı var — tam yetkili.
   Tarayıcı koduna hiç girmedi, git geçmişine hiç girmedi.
 - **Supabase, `public` şemasındaki yeni fonksiyonlara varsayılan olarak `anon` rolüne EXECUTE verir.**

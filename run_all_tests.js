@@ -226,7 +226,10 @@ const allTestFiles = [
 
   // phase43: ay kapanisi, sifirlama, hesap kapatma, sahipsiz fotograf temizligi
   'phase43_period_reset_live_tests.js',
-  'storage_orphan_cleanup_tests.js'
+  'storage_orphan_cleanup_tests.js',
+
+  // Yerel sunucu yalnizca 127.0.0.1 ve izin listesi (.env / .git / supabase verilmez)
+  'local_server_tests.js'
 ];
 
 const testEnv = require('./core/test_env.js');
