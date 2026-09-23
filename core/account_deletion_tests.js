@@ -114,10 +114,17 @@ async function run() {
       .insert({ tenant_id: sharedTenant, name: 'Kalacak Villa', slug: 'KAL_VILLA', base_price: 5000 });
 
     // C) victim'e bekleyen bir davet birak
-    const { data: t3 } = await partner.client.rpc('create_tenant_and_owner', {
-      p_company_name: 'Ucuncu Isletme', p_full_name: 'Del partner'
-    });
+    // Ucuncu isletme service_role ile kurulur: phase41'den beri
+    // create_tenant_and_owner uyeligi olan kullaniciya ikinci isletme acmaz.
+    const { data: t3row, error: e3 } = await admin.from('tenants')
+      .insert({ name: 'Ucuncu Isletme', slug: `ucuncu-${stamp}`, created_by: partner.id })
+      .select('id').single();
+    if (e3) throw new Error('ucuncu tenant: ' + e3.message);
+    const t3 = { tenant_id: t3row.id };
     createdTenantIds.push(t3.tenant_id);
+    const { error: e3m } = await admin.from('tenant_members')
+      .insert({ tenant_id: t3.tenant_id, user_id: partner.id, role: 'owner' });
+    if (e3m) throw new Error('ucuncu tenant sahibi: ' + e3m.message);
     await partner.client.rpc('create_tenant_invitation', {
       p_tenant_id: t3.tenant_id, p_email: victim.email, p_role: 'viewer'
     });

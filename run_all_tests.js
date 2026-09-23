@@ -217,7 +217,12 @@ const allTestFiles = [
   // Tarayici render hatti — sahte DOM ile renderAll GERCEKTEN calisir.
   // setEl gibi tanimsiz referanslari yalnizca bu suit yakalar.
   'render_pipeline_tests.js',
-  'audit_remediation_tests.js'
+  'audit_remediation_tests.js',
+
+  // phase41: rol ve kiraci yetkileri. Canli suit gercek rollerle olcer;
+  // kural suiti sonraki goclerin tenant_id tetikleyicisini unutmasini engeller.
+  'phase41_authz_live_tests.js',
+  'phase41_rules_tests.js'
 ];
 
 const testEnv = require('./core/test_env.js');

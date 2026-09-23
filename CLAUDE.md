@@ -433,6 +433,16 @@ yetkisini denetleyerek hatasız tamamlandı. Ardından üretime yapılan anon RP
 varlığı ve anon kapısı üretime kayıt bırakmadan ayrıca doğrulandı. Test
 projesinde `executive_snapshot_tests` 23/23 geçti.
 
+**phase41 (`migration_phase41_role_authz_hardening.sql`) 23 Eylül 2026'da
+test projesine uygulandı; üretimde BEKLİYOR.** Rol ve kiracı yetkilerini
+sıkılaştırır: worker RPC'leri yalnız service_role, mesajlaşma/uyarı/bildirim
+tablolarında rol bazlı yazma, kişisel bildirim, rezervasyon silme
+owner/admin/manager, her `tenant_id` tablosunda değişmezlik tetikleyicisi,
+`anon` tablo yetkisi yok, üyeliği olan hesaba ikinci işletme yok,
+`schema_migrations` RLS. Canlı süit `phase41_authz_live_tests` 38/38 (göçten
+önce 29 kırmızı). Uygulama ve doğrulama: `docs/PHASE41_DEPLOY_PACKAGE.md`.
+**Üretime uygulanmadan `master`'a push edilmez** — repo herkese açık.
+
 **Bir göçün uygulanıp uygulanmadığı, dosyaya bakarak anlaşılmaz.** Dosya repoda
 durur; veritabanı uygulanmamış olabilir. Doğrulamanın yolu üretime sormaktır:
 
@@ -979,3 +989,17 @@ Ağı `core/csv_import_tests.js` (52 iddia: motor, `app.js` kaynağı, gerçek
 - **Koruma tetikleyicileri cascade'i engellememeli.** Beş tetikleyici (son sahip, kapanmış dönem ×2,
   gönderilmiş mesaj, kabul edilmiş teklif) üst kayıt silinirken devreye girip hesap silmeyi
   kilitliyordu. `fn_tenant_is_being_deleted()` ile istisna tanımlı — yeni koruma eklerken aynısını yapın.
+- **Yeni tablo açan her göç üç şey yapar** (phase41'den beri, makineyle zorlanır):
+  `tenant_id` sütunu varsa `trg_tenant_id_immutable` tetikleyicisini kurar,
+  `anon` yetkisini geri alır ve göç kendini `schema_migrations`'a yazar.
+  phase24 tetikleyiciyi yalnızca o an var olan tablolara döngüyle kurmuştu;
+  sonra açılan on iki tablo (phase30/31/35/40 …) bu korumadan yoksun kaldı.
+  Kural bir belgede durdukça aynısı tekrar olur: `core/phase41_rules_tests.js`
+  phase41'den sonra manifest'e giren her göçü tarar ve eksikte kırılır.
+- **Yazma politikası rol ister, `FOR ALL` üyelik politikası yazılmaz.** phase10
+  ve phase12 tablolarında rol ayırmayan üyelik politikası vardı; rol modeli o
+  tablolarda fiilen işlemiyordu. Okuma
+  `is_tenant_member`, yazma `COALESCE(get_tenant_role(..), '') IN (...)`.
+  Aynı kural RPC'ye de uygulanır: tablo yolu kapanıp aynı işi yapan RPC açık
+  kalırsa kural delinmiş olur (phase41 bildirim/uyarı RPC'lerini bu yüzden
+  yeniden tanımladı).
