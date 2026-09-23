@@ -171,9 +171,9 @@ runTest('Phase 7: Destructive Actions Protection & Last Owner Guardrail', () => 
 });
 
 // -----------------------------------------------------------------------------
-// TEST 5: DB-LEVEL MIGRATION IDEMPOTENCY & CONSTRAINTS
+// TEST 5: HISTORICAL MIGRATION CONSTRAINTS REMAIN INTACT
 // -----------------------------------------------------------------------------
-runTest('Phase 5: DB-Level Migration Idempotency & Unique Constraints', () => {
+runTest('Phase 5: Historical Migration Constraints Remain Intact', () => {
   // Verify tenant_migrations table
   assert(schemaContent.includes('CREATE TABLE IF NOT EXISTS public.tenant_migrations'));
   assert(schemaContent.includes('UNIQUE (tenant_id, entity_type, source_record_id)'));
@@ -184,12 +184,10 @@ runTest('Phase 5: DB-Level Migration Idempotency & Unique Constraints', () => {
   // Verify cleaning_tasks unique constraint on (tenant_id, legacy_id)
   assert(schemaContent.includes('CONSTRAINT uq_tenant_cleaning_legacy UNIQUE (tenant_id, legacy_id)'));
 
-  // Verify executeMigrationToCloud implementation records into tenant_migrations and uses legacy_id
-  assert(appContent.includes("entity_type: 'property'"));
-  assert(appContent.includes("entity_type: 'booking'"));
-  assert(appContent.includes("entity_type: 'expense'"));
-  assert(appContent.includes("entity_type: 'cleaning'"));
-  assert(appContent.includes("onConflict: 'tenant_id, legacy_id'"));
+  // The retired browser-side importer must not be reintroduced. The database
+  // constraints stay because applied migrations are immutable.
+  assert(!appContent.includes('executeMigrationToCloud'));
+  assert(!appContent.includes("source: 'localstorage'"));
 
   // Simulate Migration Store
   const db = {
