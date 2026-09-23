@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co; img-src 'self' data: https:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'; upgrade-insecure-requests">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co; img-src 'self' data: https:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src https://challenges.cloudflare.com; upgrade-insecure-requests">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <title>Lexbnb — Kısa Dönem Kiralama & Executive Kontrol Merkezi</title>
   <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=5537b4b9">
+  <link rel="stylesheet" href="style.css?v=685f0689">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -52,6 +52,7 @@
           <input type="password" id="saasLoginPass" placeholder="Şifreniz" required autocomplete="current-password" style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 13px;">
         </div>
 
+        <div id="captchaLogin" class="auth-captcha"></div>
         <button type="submit" id="saasLoginSubmitBtn" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 800; font-size: 14px; background: linear-gradient(135deg, #8B5CF6, #6D28D9); border: none; border-radius: 8px;">
           🔓 Hesabıma Giriş Yap
         </button>
@@ -85,9 +86,10 @@
         </div>
         <div class="form-group" style="margin-bottom: 14px;">
           <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Şifre Belirleyin:</label>
-          <input type="password" id="saasRegPass" placeholder="En az 6 karakter" required minlength="6" style="width: 100%; padding: 9px 12px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 13px;">
+          <input type="password" id="saasRegPass" placeholder="En az 10 karakter" required minlength="10" style="width: 100%; padding: 9px 12px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 13px;">
         </div>
 
+        <div id="captchaRegister" class="auth-captcha"></div>
         <button type="submit" id="saasRegSubmitBtn" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 800; font-size: 14px; background: linear-gradient(135deg, #10B981, #059669); border: none; border-radius: 8px;">
           ✨ Hesabımı Oluştur ve Başla
         </button>
@@ -102,6 +104,7 @@
           <label style="font-size: 12px; color: var(--text-muted);">E-posta Adresi:</label>
           <input type="text" inputmode="email" id="saasForgotEmail" placeholder="ornek@isletmeniz.com" required autocomplete="email" style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 13px;">
         </div>
+        <div id="captchaForgot" class="auth-captcha"></div>
         <button type="submit" id="saasForgotSubmitBtn" class="btn btn-primary" style="width: 100%;">
           📧 Sıfırlama Bağlantısı Gönder
         </button>
@@ -117,11 +120,11 @@
         </p>
         <div class="form-group" style="margin-bottom: 10px;">
           <label style="font-size: 12px; color: var(--text-muted);">Yeni Şifre:</label>
-          <input type="password" id="saasNewPass1" placeholder="En az 6 karakter" required minlength="6" autocomplete="new-password" style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 13px;">
+          <input type="password" id="saasNewPass1" placeholder="En az 10 karakter" required minlength="10" autocomplete="new-password" style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 13px;">
         </div>
         <div class="form-group" style="margin-bottom: 12px;">
           <label style="font-size: 12px; color: var(--text-muted);">Yeni Şifre (Tekrar):</label>
-          <input type="password" id="saasNewPass2" placeholder="Şifrenizi tekrar girin" required minlength="6" autocomplete="new-password" style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 13px;">
+          <input type="password" id="saasNewPass2" placeholder="Şifrenizi tekrar girin" required minlength="10" autocomplete="new-password" style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 13px;">
         </div>
         <button type="submit" id="saasNewPassSubmitBtn" class="btn btn-primary" style="width: 100%;">
           🔒 Şifremi Güncelle
@@ -4593,7 +4596,8 @@
   <script src="core/executive_dashboard_service.js?v=baf5396e"></script>
   <script src="core/executive_ai_advisor.js?v=4b235c67"></script>
   <script src="core/notification_center_service.js?v=710f8a91"></script>
-  <script src="app.js?v=68c19e34"></script>
+  <script src="core/captcha_gate.js?v=3ad4a776"></script>
+  <script src="app.js?v=b0ed58d9"></script>
   <script src="core/property_analysis_context_ui.js?v=efba10f2"></script>
   <script src="core/analysis_center_ui.js?v=7991bd67"></script>
   <script src="core/marketing_ui.js?v=1360fb04"></script>

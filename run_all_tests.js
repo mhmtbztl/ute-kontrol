@@ -5,6 +5,7 @@ const fs = require('fs');
 const allTestFiles = [
   // Prior 29 Regression Suites (Phases 1-10)
   'auth_lifecycle_tests.js',
+  'captcha_gate_tests.js',
   'booking_crud_tests.js',
   'booking_channel_settings_tests.js',
   'booking_channel_schema_tests.js',

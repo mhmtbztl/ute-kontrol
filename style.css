@@ -2663,6 +2663,14 @@ body {
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
 }
 
+/* Cloudflare Turnstile kutucugu: cizilene kadar yer kaplamaz. */
+.auth-captcha {
+  margin: 0 0 12px;
+}
+.auth-captcha:empty {
+  margin: 0;
+}
+
 .auth-error-msg {
   color: #FCA5A5;
   background: rgba(239, 68, 68, 0.12);

@@ -41,6 +41,14 @@ Firmalara satılacak — kişisel araç veya demo değil. Bu, kalite çıtasın�
   e-posta onayı **kapalıdır**; ikisi de zorunlu, gerekçeleri
   `docs/TEST_PROJECT_SETUP.md` içinde.
 
+- **CAPTCHA:** Cloudflare Turnstile. Site anahtarı `core/captcha_gate.js`
+  içinde (herkese açık). **Gizli anahtar yalnız Supabase panelindedir** —
+  repoya, `.env`'e, sohbete girmez. Giriş, kayıt ve şifre sıfırlama
+  `captchaToken` gönderir; Turnstile yüklenemezse istemci formu **kilitlemez**,
+  istek belirteçsiz gider ve hakem sunucudur. Panelde CAPTCHA **en son**
+  açılır: istemci belirteç göndermeden açılırsa site herkese kilitlenir.
+  **Test projesinde kapalı kalır** (`registration_flow_tests` `signUp` kullanır).
+  Ağı `core/captcha_gate_tests.js`.
 Supabase panelinde bulması zor ayarlar (menüde arama, doğrudan gidin):
 ```
 SMTP            .../project/kirpcqklyjlrhvdbgdrq/auth/smtp

@@ -72,6 +72,10 @@ installInnerHtmlSecurityBoundary();
 // NOT: Sabit kodlu master PIN'ler ve '?key=' ile paylasilan gizli erisim linki
 // kaldirildi. Kimlik dogrulamanin tek kaynagi Supabase Auth'tur.
 
+// Supabase Auth panelindeki "Minimum password length" ile ayni olmali (uretim: 10).
+// Istemci daha dusuk sorarsa 6-9 karakterlik sifre on kontrolden gecip sunucuda reddedilir.
+const AUTH_MIN_PASSWORD_LENGTH = 10;
+
 function getFriendlyAuthErrorMessage(err) {
   if (!err) return 'Bir hata oluştu. Lütfen tekrar deneyin.';
   const msg = typeof err === 'string' ? err : (err.message || '');
@@ -84,8 +88,12 @@ function getFriendlyAuthErrorMessage(err) {
   if (msg.includes('User already registered') || msg.includes('already registered')) {
     return 'Bu e-posta adresi ile kayıtlı bir hesap zaten var. Lütfen giriş yapın.';
   }
-  if (msg.includes('Password should be at least 6 characters') || msg.includes('at least 6 characters')) {
-    return 'Şifreniz en az 6 karakter olmalıdır.';
+  const minLen = msg.match(/at least (\d+) characters/);
+  if (minLen) {
+    return `Şifreniz en az ${minLen[1]} karakter olmalıdır.`;
+  }
+  if (/captcha/i.test(msg)) {
+    return 'Güvenlik doğrulaması tamamlanamadı. Formun altındaki doğrulama kutusunun onaylanmasını bekleyip tekrar deneyin. Reklam engelleyici kullanıyorsanız challenges.cloudflare.com adresine izin verin.';
   }
   if (msg.includes('rate limit') || msg.includes('Too many requests') || msg.includes('over_email_send_rate_limit')) {
     return 'Çok fazla deneme yapıldı. Lütfen biraz bekleyip tekrar deneyin.';
@@ -97,6 +105,23 @@ function getFriendlyAuthErrorMessage(err) {
     return 'İşletme kurulumu tamamlanamadı. Lütfen tekrar deneyin.';
   }
   return msg || 'İşlem sırasında bir hata oluştu.';
+}
+
+// Turnstile belirteci (core/captcha_gate.js). Modul ya da kutucuk yoksa null
+// doner ve istek belirtecsiz gider: hakem Supabase'dir, istemci formu kilitlemez.
+async function getAuthCaptchaToken(formId) {
+  if (typeof window === 'undefined' || !window.LexbnbCaptcha) return null;
+  try {
+    return await window.LexbnbCaptcha.getToken(formId);
+  } catch (e) {
+    return null;
+  }
+}
+
+// Belirtec tek kullanimliktir; her gonderimden sonra kutucuk yenilenir.
+function consumeAuthCaptcha(formId) {
+  if (typeof window === 'undefined' || !window.LexbnbCaptcha) return;
+  window.LexbnbCaptcha.consume(formId);
 }
 
 async function checkAuthStatus() {
@@ -12771,7 +12796,9 @@ async function handleSaaSForgotPassword(e) {
 
   try {
     const redirectTo = window.location.origin + window.location.pathname;
-    const { error } = await supabaseClient.auth.resetPasswordForEmail(email, { redirectTo });
+    const captchaToken = await getAuthCaptchaToken('saasForgotForm');
+    const { error } = await supabaseClient.auth.resetPasswordForEmail(email, captchaToken ? { redirectTo, captchaToken } : { redirectTo });
+    consumeAuthCaptcha('saasForgotForm');
 
     // Hesabin var olup olmadigini ASLA sizdirma: her iki durumda ayni mesaj.
     if (error && !/rate limit|Too many requests/i.test(error.message || '')) {
@@ -12837,10 +12864,10 @@ async function handleSaaSNewPassword(e) {
     err.style.color = '';
   }
 
-  if (p1.length < 6) {
+  if (p1.length < AUTH_MIN_PASSWORD_LENGTH) {
     if (err) {
       err.style.display = 'block';
-      err.innerText = '⚠️ Şifreniz en az 6 karakter olmalıdır.';
+      err.innerText = `⚠️ Şifreniz en az ${AUTH_MIN_PASSWORD_LENGTH} karakter olmalıdır.`;
     }
     return;
   }
@@ -13203,10 +13230,13 @@ async function handleSaaSLogin(e) {
   }
 
   try {
+    const captchaToken = await getAuthCaptchaToken('saasLoginForm');
     const { data: authData, error: authErr } = await supabaseClient.auth.signInWithPassword({
       email: userInput,
-      password: passInput
+      password: passInput,
+      ...(captchaToken ? { options: { captchaToken } } : {})
     });
+    consumeAuthCaptcha('saasLoginForm');
 
     if (authErr) {
       if (err) {
@@ -13277,10 +13307,10 @@ async function handleSaaSRegister(e) {
     return;
   }
 
-  if (pass.length < 6) {
+  if (pass.length < AUTH_MIN_PASSWORD_LENGTH) {
     if (err) {
       err.style.display = 'block';
-      err.innerText = '⚠️ Şifreniz en az 6 karakter olmalıdır.';
+      err.innerText = `⚠️ Şifreniz en az ${AUTH_MIN_PASSWORD_LENGTH} karakter olmalıdır.`;
     }
     return;
   }
@@ -13301,11 +13331,13 @@ async function handleSaaSRegister(e) {
 
   try {
     // Adım 1: Supabase Auth kullanıcısı oluştur
+    const captchaToken = await getAuthCaptchaToken('saasRegisterForm');
     const { data: authData, error: authError } = await supabaseClient.auth.signUp({
       email,
       password: pass,
-      options: { data: { full_name: manager, company_name: company } }
+      options: { data: { full_name: manager, company_name: company }, ...(captchaToken ? { captchaToken } : {}) }
     });
+    consumeAuthCaptcha('saasRegisterForm');
 
     if (authError) {
       if (err) {
