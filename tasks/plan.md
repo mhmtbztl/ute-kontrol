@@ -3,8 +3,9 @@
 ## Overview
 
 Deliver the Analysis Center in small, independently verified slices while
-reusing LexBnB's canonical financial and marketing engines. No migration is
-planned for the initial version.
+reusing LexBnB's canonical financial and marketing engines. The approved
+market-context extension is delivered through additive Phase 40 without
+coupling the existing property CRUD payload to the new schema.
 
 ## Architecture Decisions
 
@@ -15,6 +16,12 @@ planned for the initial version.
   existing RLS-protected, paged application loader.
 - JSON and prompt are derived from the same allowlisted analysis package.
 - Missing data is represented by `null` plus a data-quality finding.
+- Existing `property_channel_listings` remains the single OTA source of truth;
+  manual platforms use `OTHER_OTA` plus a required display name.
+- Property market context lives in a separate one-row-per-property table so an
+  unapplied migration cannot break ordinary property saves.
+- Competitor discovery and special-date research happen in ChatGPT after copy;
+  LexBnB exports only the research brief and allowlisted source links.
 
 ## Dependency Graph
 
@@ -90,6 +97,48 @@ analysis contract
 - Existing finance/marketing tests at each checkpoint.
 - `npm test`, `npm run verify:migrations`, `node stamp_assets.js --check` before delivery.
 - Browser DOM, console, network, clipboard and responsive checks after UI integration.
+
+## Phase 6: Market Context Contract (Migration Phase 40)
+
+- Task 15: Extend the spec and add failing export/context/schema tests.
+- Task 16: Add `property_analysis_context`, role-aware RLS and a restricted
+  authenticated save RPC in `migration_phase40_property_analysis_context.sql`.
+- Task 17: Add the client context service with ISO country labels, HTTPS-only
+  social profiles and schema-tolerant reads.
+
+### Checkpoint: Context Foundation
+
+- Migration verification and focused context tests pass.
+- Existing property saves remain independent of Phase 40.
+
+## Phase 8: Research Export and UI
+
+- Task 18: Add accessible villa location/social fields and explicit Phase 40
+  loading, success and unavailable states.
+- Task 19: Make custom OTA entry explicit (`ETS Tur` and similar) and expose
+  safe OTA URLs to the analysis adapter.
+- Task 20: Export deduplicated markets, property links, the ten-competitor
+  comparison brief and selected-period special-date research brief.
+
+### Checkpoint: Market Research Flow
+
+- One generated prompt contains safe location, OTA and social context.
+- Ten competitors are requested per unique market, not per duplicate villa.
+- Strengths, weaknesses and special dates require cited current evidence.
+
+## Phase 10: Security and Browser Verification
+
+- Task 21: Review RLS, grants, RPC authority, URL validation, prompt injection,
+  cross-tenant behavior and PII/ID allowlists.
+- Task 22: Verify keyboard, responsive, modal, save, export and clipboard flows
+  in a real browser with a clean console.
+
+## Phase 12: Delivery Gates
+
+- Task 23: Run focused, full, migration and asset-stamp gates.
+- Task 24: Bootstrap Phase 40 into the dedicated test project and run the
+  relevant live isolation suite; do not touch production without separate
+  explicit migration approval.
 
 ## Open Questions Resolved for Initial Version
 

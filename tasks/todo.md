@@ -43,3 +43,46 @@
   - Acceptance: No high-severity finding remains and all repository gates pass.
   - Verify: `npm test`, `npm run verify:migrations`, `node stamp_assets.js --check`.
   - Dependencies: Task 8.
+
+- [x] Task 10: Specify the market-context extension and Phase 40 boundaries.
+  - Acceptance: Location, social links, custom OTA, competitor comparison and
+    special-date contracts are documented.
+  - Verify: Spec and plan preserve the completed initial-version history.
+
+- [x] Task 11: Add failing Phase 40 and context-service tests.
+  - Acceptance: Tenant/property validation, roles, grants, HTTPS links and
+    schema-unavailable behavior are covered.
+  - Verify: New focused tests fail before implementation.
+  - Dependencies: Task 10.
+
+- [x] Task 12: Implement Phase 40 and the property analysis-context service.
+  - Acceptance: One tenant-safe row per property; explicit authenticated-only
+    save contract; no change to property CRUD schema.
+  - Verify: Migration chain and focused service/schema tests pass.
+  - Dependencies: Task 11.
+
+- [x] Task 13: Build the villa location and social-profile UI.
+  - Acceptance: Country, state/province, city, district/region and six public
+    profile links have accessible loading/error/success states.
+  - Verify: UI contract tests and real-browser keyboard/responsive checks pass.
+  - Dependencies: Task 12.
+
+- [x] Task 14: Make custom OTA entry explicit and export safe OTA links.
+  - Acceptance: `OTHER_OTA` requires a name such as ETS Tur; analysis receives
+    only channel, display name and HTTPS URL.
+  - Verify: Marketing service/data/UI tests cover manual OTA behavior.
+  - Dependencies: Task 12.
+
+- [x] Task 15: Extend the ChatGPT export research brief.
+  - Acceptance: Markets are deduplicated; each market requests ten sourced
+    competitors, strengths/weaknesses and selected-period special dates.
+  - Verify: Export snapshots contain no internal property/listing IDs, raw
+    references, metadata, PII or non-HTTPS URLs.
+  - Dependencies: Tasks 13-14.
+
+- [x] Task 16: Complete security, browser and delivery verification.
+  - Acceptance: No required review finding remains; Phase 40 is bootstrapped
+    and isolated in the dedicated test project.
+  - Verify: focused tests, `npm test`, `npm run verify:migrations`,
+    `node stamp_assets.js --check`, bootstrap and relevant live tests pass.
+  - Dependencies: Task 15.

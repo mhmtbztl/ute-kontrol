@@ -6,6 +6,7 @@ const root = path.join(__dirname, '..');
 const indexHtml = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const appJs = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
 const analysisUiJs = fs.readFileSync(path.join(root, 'core', 'analysis_center_ui.js'), 'utf8');
+const contextUiJs = fs.readFileSync(path.join(root, 'core', 'property_analysis_context_ui.js'), 'utf8');
 const styleCss = fs.readFileSync(path.join(root, 'style.css'), 'utf8');
 
 let passed = 0;
@@ -45,17 +46,34 @@ test('canonical browser dependencies load before app.js', () => {
   const marketingIndex = indexHtml.indexOf('core/marketing_engine.js');
   const exportIndex = indexHtml.indexOf('core/analysis_export_service.js');
   const appIndex = indexHtml.indexOf('app.js');
+  const contextServiceIndex = indexHtml.indexOf('core/property_analysis_context_service.js');
+  const contextUiIndex = indexHtml.indexOf('core/property_analysis_context_ui.js');
   const uiIndex = indexHtml.indexOf('core/analysis_center_ui.js');
   assert(financeIndex >= 0);
   assert(marketingIndex > financeIndex);
   assert(exportIndex > marketingIndex);
+  assert(contextServiceIndex > exportIndex);
   assert(appIndex > exportIndex);
+  assert(contextUiIndex > appIndex);
   assert(uiIndex > appIndex);
 });
 
-test('UI exposes generation, copy and JSON download actions', () => {
+test('property modal exposes labelled structured location and social profile fields', () => {
+  for (const id of [
+    'propAnalysisCountry', 'propAnalysisAdminArea', 'propAnalysisCity',
+    'propAnalysisDistrictRegion', 'propSocialWebsite', 'propSocialInstagram',
+    'propSocialFacebook', 'propSocialTikTok', 'propSocialYouTube',
+    'propSocialGoogleBusiness', 'propAnalysisContextStatus'
+  ]) assert(indexHtml.includes(`id="${id}"`), `missing #${id}`);
+  assert(indexHtml.includes('id="propAnalysisContextStatus" role="status" aria-live="polite"'));
+  assert(contextUiJs.includes('function loadPropertyAnalysisContextForm'));
+  assert(contextUiJs.includes('function savePropertyAnalysisContextDraft'));
+});
+
+test('UI exposes asynchronous context-aware generation, copy and JSON download actions', () => {
   assert(analysisUiJs.includes('function renderAnalysisCenter()'));
-  assert(analysisUiJs.includes('function generateAnalysisExport()'));
+  assert(analysisUiJs.includes('async function generateAnalysisExport()'));
+  assert(analysisUiJs.includes('PropertyAnalysisContextService.loadAnalysisContext'));
   assert(analysisUiJs.includes('async function copyAnalysisPrompt()'));
   assert(analysisUiJs.includes('function downloadAnalysisJson()'));
   assert(appJs.includes("if (tabId === 'analysis') renderAnalysisCenter();"));

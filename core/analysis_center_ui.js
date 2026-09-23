@@ -130,10 +130,14 @@ function renderAnalysisOutput(exports) {
   }
 }
 
-function generateAnalysisExport() {
+async function generateAnalysisExport() {
   setAnalysisError('');
   const button = document.getElementById('analysisGenerateBtn');
-  if (button) button.disabled = true;
+  const originalButtonText = button?.textContent;
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Bağlam yükleniyor…';
+  }
 
   try {
     if (typeof AnalysisExportService === 'undefined' || typeof AnalysisExportService.buildAnalysisExports !== 'function') {
@@ -149,6 +153,22 @@ function generateAnalysisExport() {
       .map(input => input.value);
     const sections = Array.from(document.querySelectorAll('input[name="analysisSection"]:checked'))
       .map(input => input.value);
+    const baseProperties = getAnalysisProperties();
+    let properties = baseProperties;
+    let analysisContextWarnings = [];
+    if (typeof PropertyAnalysisContextService !== 'undefined') {
+      try {
+        const contextBundle = await PropertyAnalysisContextService.loadAnalysisContext(supabaseClient, {
+          tenantId: getActiveTenantId(), propertyIds
+        });
+        properties = PropertyAnalysisContextService.attachAnalysisContext(baseProperties, contextBundle);
+        analysisContextWarnings = contextBundle.warnings;
+      } catch (_) {
+        analysisContextWarnings = ['ANALYSIS_CONTEXT_READ_FAILED', 'ANALYSIS_OTA_LINKS_UNAVAILABLE'];
+      }
+    } else {
+      analysisContextWarnings = ['ANALYSIS_CONTEXT_READ_FAILED'];
+    }
     latestAnalysisExports = AnalysisExportService.buildAnalysisExports({
       period: {
         start: document.getElementById('analysisStartDate')?.value,
@@ -159,7 +179,8 @@ function generateAnalysisExport() {
       sections,
       currency: 'TRY',
       business: { name: activeTenant?.name || appData.companyName || null },
-      properties: getAnalysisProperties(),
+      properties,
+      analysisContextWarnings,
       bookings: appData.bookings || [],
       expenses: appData.expenses || [],
       maintenances: appData.maintenance || []
@@ -179,7 +200,10 @@ function generateAnalysisExport() {
     setAnalysisError(knownMessages[error.code] || error.message || 'Analiz paketi oluşturulamadı.');
     setAnalysisStatus('Paket oluşturulamadı. Seçimleri kontrol edin.');
   } finally {
-    if (button) button.disabled = false;
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalButtonText;
+    }
   }
 }
 
