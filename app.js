@@ -9875,32 +9875,36 @@ const MONTH_MAP_TR = {
   'kasim': '11', 'aralık': '12', 'aralik': '12'
 };
 
-function parseWhatsAppMessage() {
-  const text = (document.getElementById('waRawInput')?.value || '').trim();
-  if (!text) return;
+function parseWhatsAppMessageText(text, villas = {}, todayStr = getTodayStr()) {
+  const normalizedText = String(text || '').trim();
+  const emptyResult = {
+    guest: null,
+    phone: null,
+    villa: null,
+    amount: null,
+    pax: null,
+    checkIn: null,
+    checkOut: null
+  };
+  if (!normalizedText) return emptyResult;
 
+  text = normalizedText;
   const lower = text.toLowerCase();
 
-  // 1. Mulk tespiti — MUSTERININ KENDI mulk adlarina gore.
-  // Burada bes uydurma villanin ('bella', 'olive', 'azure'...) adi sabit
-  // araniyordu; gercek mulkler hicbir zaman eslesmiyor, mesaj her zaman
-  // VILLA_AZURE'a atanıyordu.
-  const mulkler = Object.entries(appData.villas || {});
-  let detectedVilla = mulkler.length ? mulkler[0][0] : '';
+  // Mulk yalnizca mesajda gercekten geciyorsa secilir. Ilk mulku varsaymak,
+  // eksik bilgiyi gercek veri gibi kaydediyordu.
+  const mulkler = Object.entries(villas || {});
+  let detectedVilla = null;
   for (const [anahtar, v] of mulkler) {
     const ad = ((v && v.name) || '').toLowerCase();
-    // Ad icindeki en ayirt edici kelime (3 harften uzun ilk kelime)
-    const kelime = ad.split(/\s+/).find(w => w.length > 3);
-    if ((ad && lower.includes(ad)) ||
-        (kelime && lower.includes(kelime)) ||
-        lower.includes(String(anahtar).toLowerCase())) {
+    const anahtarMetni = String(anahtar).toLowerCase();
+    if ((ad && lower.includes(ad)) || (anahtarMetni && lower.includes(anahtarMetni))) {
       detectedVilla = anahtar;
       break;
     }
   }
 
-  // 2. Detect Guest Name
-  let detectedGuest = '';
+  let detectedGuest = null;
   const prefixMatch = text.match(/(?:misafir|isim|ad\s*soyad|ad|konuk)\s*[:=-]\s*([A-Za-zÇĞİÖŞÜçğıöşü\s]{3,30})/i);
   if (prefixMatch) {
     detectedGuest = prefixMatch[1].trim();
@@ -9914,7 +9918,7 @@ function parseWhatsAppMessage() {
       // adlari + kanal ve selamlama sozcukleri. Burada bes uydurma villa adi
       // sabit yaziliydi; gercek mulk adlari ise listede olmadigi icin misafir
       // adi olarak algilanabiliyordu.
-      const mulkAdlari = Object.values((typeof appData !== 'undefined' && appData.villas) || {})
+      const mulkAdlari = Object.values(villas || {})
         .map(v => v && v.name).filter(Boolean);
       const yasakli = mulkAdlari.concat(['WhatsApp', 'Airbnb', 'Booking', 'Selamlar', 'Merhaba', 'İyi Günler']);
       if (wordsMatch && !yasakli.includes(wordsMatch[1])) {
@@ -9923,77 +9927,118 @@ function parseWhatsAppMessage() {
     }
   }
 
-  // 3. Detect Phone Number
-  let detectedPhone = '';
+  let detectedPhone = null;
   const phoneMatch = text.match(/(?:\+?90\s*|\b0)?\s*(5\d{2})[\s\.-]*(\d{3})[\s\.-]*(\d{2})[\s\.-]*(\d{2})\b/);
   if (phoneMatch) {
     detectedPhone = `0${phoneMatch[1]} ${phoneMatch[2]} ${phoneMatch[3]} ${phoneMatch[4]}`;
   }
 
-  // 4. Detect Price / Amount
-  let detectedAmount = 0;
-  const kMatch = text.match(/(\d+)\s*(?:bin|k)\b/i);
+  // Ucret icin para birimi veya fiyat/butce baglami aranir. Boylece telefon
+  // numaralari ve tarihler ucret olarak yorumlanmaz.
+  let detectedAmount = null;
+  const kMatch = text.match(/(\d+(?:[.,]\d+)?)\s*(?:bin|k)\b/i);
   if (kMatch) {
-    detectedAmount = Number(kMatch[1]) * 1000;
+    detectedAmount = Number(kMatch[1].replace(',', '.')) * 1000;
   } else {
-    const priceMatch = text.match(/(\d{1,3}(?:\.\d{3})+|\d{4,7})\s*(?:tl|₺|euro|usd|lira)?/i);
+    const currencyMatch = text.match(/(\d{1,3}(?:\.\d{3})+|\d{1,7}(?:[.,]\d{1,2})?)\s*(?:tl|₺|euro|usd|lira)/i);
+    const contextMatch = text.match(/(?:bütçe(?:miz)?|butce(?:miz)?|fiyat|tutar|teklif)\D{0,20}(\d{1,3}(?:\.\d{3})+|\d{1,7}(?:[.,]\d{1,2})?)/i);
+    const priceMatch = currencyMatch || contextMatch;
     if (priceMatch) {
-      detectedAmount = Number(priceMatch[1].replace(/\./g, '')) || 0;
+      const rawAmount = priceMatch[1];
+      const decimalSeparator = rawAmount.includes(',') && !/^\d{1,3}(?:\.\d{3})+$/.test(rawAmount);
+      detectedAmount = Number(decimalSeparator
+        ? rawAmount.replace(/\./g, '').replace(',', '.')
+        : rawAmount.replace(/\./g, ''));
+      if (!Number.isFinite(detectedAmount)) detectedAmount = null;
     }
   }
 
-  // 5. Detect Pax (Kişi Sayısı)
-  let detectedPax = 6;
+  let detectedPax = null;
   const paxMatch = text.match(/(\d{1,2})\s*(?:kişi|kisi|pax|yetişkin|yetiskin|konuk)/i);
   if (paxMatch) {
     detectedPax = Number(paxMatch[1]);
   }
 
-  // 6. Detect Dates
-  let checkIn = '';
-  let checkOut = '';
-  const currentYear = 2026;
+  let checkIn = null;
+  let checkOut = null;
+  const todayMatch = String(todayStr || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const currentYear = todayMatch ? Number(todayMatch[1]) : new Date().getFullYear();
+  const normalizedToday = todayMatch ? todayMatch[0] : `${currentYear}-01-01`;
+
+  function validIsoDate(year, month, day) {
+    const iso = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const candidate = new Date(`${iso}T00:00:00Z`);
+    return candidate.getUTCFullYear() === Number(year) &&
+      candidate.getUTCMonth() + 1 === Number(month) &&
+      candidate.getUTCDate() === Number(day) ? iso : null;
+  }
+
+  function inferFutureRange(startMonth, startDay, endMonth, endDay) {
+    let startYear = currentYear;
+    let start = validIsoDate(startYear, startMonth, startDay);
+    if (start && start < normalizedToday) {
+      startYear += 1;
+      start = validIsoDate(startYear, startMonth, startDay);
+    }
+    const crossesYear = Number(endMonth) < Number(startMonth) ||
+      (Number(endMonth) === Number(startMonth) && Number(endDay) < Number(startDay));
+    const end = validIsoDate(startYear + (crossesYear ? 1 : 0), endMonth, endDay);
+    return { start, end };
+  }
 
   const sameMonthMatch = text.match(/(\d{1,2})\s*[-–/]\s*(\d{1,2})\s+([a-zA-ZçğıöşüÇĞİÖŞÜ]+)/i);
   const diffMonthMatch = text.match(/(\d{1,2})\s+([a-zA-ZçğıöşüÇĞİÖŞÜ]+)\s*[-–/]\s*(\d{1,2})\s+([a-zA-ZçğıöşüÇĞİÖŞÜ]+)/i);
-  const isoMatch = text.match(/(\d{1,2})[\.\/](d{1,2})[\.\/](d{4})\s*[-–]\s*(\d{1,2})[\.\/](d{1,2})[\.\/](d{4})/);
+  const isoMatch = text.match(/(\d{1,2})[.\/](\d{1,2})[.\/](\d{4})\s*[-–]\s*(\d{1,2})[.\/](\d{1,2})[.\/](\d{4})/);
 
   if (isoMatch) {
-    checkIn = `${isoMatch[3]}-${isoMatch[2].padStart(2, '0')}-${isoMatch[1].padStart(2, '0')}`;
-    checkOut = `${isoMatch[6]}-${isoMatch[5].padStart(2, '0')}-${isoMatch[4].padStart(2, '0')}`;
+    checkIn = validIsoDate(isoMatch[3], isoMatch[2], isoMatch[1]);
+    checkOut = validIsoDate(isoMatch[6], isoMatch[5], isoMatch[4]);
   } else if (diffMonthMatch) {
-    const d1 = diffMonthMatch[1].padStart(2, '0');
     const m1Name = diffMonthMatch[2].toLowerCase();
-    const d2 = diffMonthMatch[3].padStart(2, '0');
     const m2Name = diffMonthMatch[4].toLowerCase();
     const m1 = MONTH_MAP_TR[m1Name];
     const m2 = MONTH_MAP_TR[m2Name];
 
     if (m1 && m2) {
-      const y1 = currentYear;
-      const y2 = (m1 === '12' && m2 === '01') ? (currentYear + 1) : currentYear;
-      checkIn = `${y1}-${m1}-${d1}`;
-      checkOut = `${y2}-${m2}-${d2}`;
+      const range = inferFutureRange(m1, diffMonthMatch[1], m2, diffMonthMatch[3]);
+      checkIn = range.start;
+      checkOut = range.end;
     }
   } else if (sameMonthMatch) {
-    const d1 = sameMonthMatch[1].padStart(2, '0');
-    const d2 = sameMonthMatch[2].padStart(2, '0');
     const mName = sameMonthMatch[3].toLowerCase();
     const m = MONTH_MAP_TR[mName];
     if (m) {
-      checkIn = `${currentYear}-${m}-${d1}`;
-      checkOut = `${currentYear}-${m}-${d2}`;
+      const range = inferFutureRange(m, sameMonthMatch[1], m, sameMonthMatch[2]);
+      checkIn = range.start;
+      checkOut = range.end;
     }
   }
 
+  return {
+    guest: detectedGuest,
+    phone: detectedPhone,
+    villa: detectedVilla,
+    amount: detectedAmount,
+    pax: detectedPax,
+    checkIn,
+    checkOut
+  };
+}
+
+function parseWhatsAppMessage() {
+  const text = (document.getElementById('waRawInput')?.value || '').trim();
+  if (!text) return;
+
+  const parsed = parseWhatsAppMessageText(text, appData.villas || {});
+
   // Populate preview form
-  if (detectedGuest) document.getElementById('waParsedGuest').value = detectedGuest;
-  if (detectedPhone) document.getElementById('waParsedPhone').value = detectedPhone;
-  document.getElementById('waParsedVilla').value = detectedVilla;
-  if (detectedAmount > 0) document.getElementById('waParsedAmount').value = detectedAmount;
-  if (checkIn) document.getElementById('waParsedCheckIn').value = checkIn;
-  if (checkOut) document.getElementById('waParsedCheckOut').value = checkOut;
-  if (detectedPax) document.getElementById('waParsedPax').value = detectedPax;
+  document.getElementById('waParsedGuest').value = parsed.guest || '';
+  document.getElementById('waParsedPhone').value = parsed.phone || '';
+  document.getElementById('waParsedVilla').value = parsed.villa || '';
+  document.getElementById('waParsedAmount').value = parsed.amount ?? '';
+  document.getElementById('waParsedCheckIn').value = parsed.checkIn || '';
+  document.getElementById('waParsedCheckOut').value = parsed.checkOut || '';
+  document.getElementById('waParsedPax').value = parsed.pax ?? '';
   
   const notes = `WhatsApp mesajından aktarıldı: ${text.slice(0, 60)}...`;
   document.getElementById('waParsedNotes').value = notes;
@@ -10044,8 +10089,19 @@ async function saveWaAsBooking() {
   const gross = Number(document.getElementById('waParsedAmount').value) || 0;
   const checkIn = document.getElementById('waParsedCheckIn').value;
   const checkOut = document.getElementById('waParsedCheckOut').value;
-  const pax = Number(document.getElementById('waParsedPax').value) || 6;
+  const paxText = document.getElementById('waParsedPax').value;
+  const pax = Number(paxText);
   const phone = document.getElementById('waParsedPhone').value.trim();
+
+  if (!villa) {
+    alert('Lütfen rezervasyon için villayı seçiniz!');
+    return;
+  }
+
+  if (!paxText || !Number.isFinite(pax) || pax <= 0) {
+    alert('Lütfen rezervasyon için kişi sayısını giriniz!');
+    return;
+  }
 
   if (!checkIn || !checkOut) {
     alert('Lütfen rezervasyon için giriş ve çıkış tarihlerini seçiniz!');
@@ -14033,6 +14089,13 @@ function updateAllVillaDropdowns() {
       el.appendChild(optAll);
     }
 
+    if (selectId === 'waParsedVilla') {
+      const optUnknown = document.createElement('option');
+      optUnknown.value = '';
+      optUnknown.innerText = 'Mesajdan algılanmadı — seçin';
+      el.appendChild(optUnknown);
+    }
+
     if (villaKeys.length === 0) {
       const bos = document.createElement('option');
       bos.value = '';
@@ -16789,6 +16852,7 @@ function handleQuickActionTrigger(actionType, entityId) {
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
+    parseWhatsAppMessageText,
     isUUID,
     roundMoney,
     normalizeCleaningTask,

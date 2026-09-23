@@ -177,6 +177,7 @@ const allTestFiles = [
 
   // "Kaydettim" diyen her yer yaziyor mu + sabit YYYY-MM ay taramasi
   'persistence_wiring_tests.js',
+  'whatsapp_parser_tests.js',
 
   // Yerel kalan son alti defter Postgres'e tasindi mi (Phase 31)
   'phase31_persistence_tests.js',
