@@ -817,6 +817,18 @@ async function deleteProperty(propIdOrSlug) {
   }
 
   const vName = existing ? existing.name : propIdOrSlug;
+  const tenantId = getActiveTenantId();
+  const isCloud = isCloudTenant(tenantId);
+  const propId = [existing?.id, propIdOrSlug].find(id => isUUID(id)) || null;
+
+  // Fail closed: a tenant-only UPDATE would archive every property. An exact
+  // property id or a slug resolved from the current tenant state is required.
+  if (!propId && !targetSlug) {
+    throw new Error('Arşivlenecek mülk bulunamadı; geçerli mülk kimliği gereklidir.');
+  }
+  if (!isCloud && !existing) {
+    throw new Error('Arşivlenecek mülk bulunamadı.');
+  }
 
   if (typeof confirm === 'function') {
     if (!confirm(vName + ' kaydını arşivlemek istediğinize emin misiniz? Geçmiş finans ve rezervasyon kayıtları korunacaktır.')) {
@@ -824,12 +836,9 @@ async function deleteProperty(propIdOrSlug) {
     }
   }
 
-  const tenantId = getActiveTenantId();
-  const propId = existing?.id || (isUUID(propIdOrSlug) ? propIdOrSlug : null);
-
   // Physical deletion is intentionally unavailable. Archiving preserves every
   // historical booking, expense and closed-period report.
-  if (isCloudTenant(tenantId)) {
+  if (isCloud) {
     const archivedAt = new Date().toISOString();
     let deleteQuery = supabaseClient.from('properties').update({
       is_active: false,
@@ -837,19 +846,20 @@ async function deleteProperty(propIdOrSlug) {
       archived_at: archivedAt,
       updated_at: archivedAt
     }).eq('tenant_id', tenantId);
-    if (propId) {
-      deleteQuery = deleteQuery.eq('id', propId);
-    } else if (targetSlug) {
-      deleteQuery = deleteQuery.eq('slug', targetSlug);
-    }
+    deleteQuery = propId
+      ? deleteQuery.eq('id', propId)
+      : deleteQuery.eq('slug', targetSlug);
 
-    const { error } = await deleteQuery;
+    const { data, error } = await deleteQuery.select('id, slug').maybeSingle();
     if (error) {
       console.error('archiveProperty DB error:', error);
       const msg = 'Mülk arşivlenemedi: ' + (error.message || 'Veritabanı hatası');
-      if (typeof alert === 'function') alert(msg);
       throw new Error(msg);
     }
+    if (!data) {
+      throw new Error('Arşivlenecek mülk bulunamadı; hiçbir kayıt değiştirilmedi.');
+    }
+    if (!targetSlug && data.slug) targetSlug = data.slug;
   }
 
   // 2. Update local state ONLY on DB success
@@ -879,6 +889,15 @@ async function deleteProperty(propIdOrSlug) {
   }
 
   return true;
+}
+
+async function deletePropertyUI(propIdOrSlug) {
+  try {
+    return await deleteProperty(propIdOrSlug);
+  } catch (error) {
+    if (typeof alert === 'function') alert(error?.message || 'Mülk arşivlenemedi.');
+    return false;
+  }
 }
 
 // Backwards compatibility wrappers
@@ -14187,11 +14206,12 @@ function closePropertyModal() {
   if (modal) modal.classList.remove('active');
 }
 
-function handlePropertyDeleteFromModal() {
+async function handlePropertyDeleteFromModal() {
   const editKey = document.getElementById('propEditKey')?.value;
   if (editKey) {
-    deleteProperty(editKey);
+    return await deletePropertyUI(editKey);
   }
+  return false;
 }
 
 async function saveProperty(e) {

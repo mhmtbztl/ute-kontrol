@@ -179,6 +179,7 @@ const allTestFiles = [
   'persistence_wiring_tests.js',
   'whatsapp_parser_tests.js',
   'action_truthfulness_tests.js',
+  'property_archive_tests.js',
 
   // Yerel kalan son alti defter Postgres'e tasindi mi (Phase 31)
   'phase31_persistence_tests.js',
