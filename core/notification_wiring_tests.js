@@ -139,7 +139,9 @@ function run() {
 
   const alertBas = ham.indexOf("actionType === 'RESOLVE_ALERT'");
   const alertGovde = alertBas === -1 ? '' : ham.slice(alertBas, alertBas + 1400);
-  check(alertBas !== -1 && /\.catch\(|catch\s*\(/.test(alertGovde),
+  const tetikleyiciBas = ham.indexOf('async function handleQuickActionTrigger');
+  const tetikleyiciGovde = tetikleyiciBas === -1 ? '' : ham.slice(tetikleyiciBas, tetikleyiciBas + 3200);
+  check(alertBas !== -1 && /await resolveAlert\(entityId\)/.test(alertGovde) && /catch\s*\(/.test(tetikleyiciGovde),
     '13. Uyari cozme cagrisinin hatasi yakalaniyor',
     'Yakalanmazsa reddedilen promise sessizce yutulur.');
   check(!/alert\('✅ Bildirim kapatıldı\.'\)/.test(alertGovde),

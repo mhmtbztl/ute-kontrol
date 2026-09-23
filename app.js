@@ -1467,8 +1467,12 @@ async function deleteBooking(bookingId) {
     existing = appData.bookings.find(b => b.id === bookingId || b.code === bookingId || b.dbId === bookingId);
   }
 
-  const propBookingId = existing?.id || (isUUID(bookingId) ? bookingId : null);
+  const propBookingId = [existing?.id, existing?.dbId, bookingId].find(id => isUUID(id)) || null;
   const guestName = existing?.guest || 'bu';
+
+  if (isCloud && !propBookingId) {
+    throw new Error('Rezervasyonun geçerli bulut kimliği (UUID) bulunamadı; silme işlemi yapılmadı.');
+  }
 
   if (existing && isStayPeriodClosed(existing.checkIn, existing.checkOut)) {
     throw new Error('Bu rezervasyonun konakladığı dönem kapatılmıştır. Silinemez. Önce dönemi yeniden açın.');
@@ -1498,7 +1502,6 @@ async function deleteBooking(bookingId) {
       }
     } catch (err) {
       const msg = 'Rezervasyon silinemedi: ' + (err.message || 'Veritabanı hatası');
-      if (typeof alert === 'function') alert(msg);
       throw new Error(msg);
     }
   }
@@ -1527,6 +1530,15 @@ async function deleteBooking(bookingId) {
   }
 
   return true;
+}
+
+async function deleteBookingUI(bookingId) {
+  try {
+    return await deleteBooking(bookingId);
+  } catch (error) {
+    if (typeof alert === 'function') alert(error?.message || 'Rezervasyon silinemedi.');
+    return false;
+  }
 }
 
 // Backwards compatibility wrappers
@@ -4660,21 +4672,10 @@ function renderAIFinancialAnalyst(revenue, targetRev, targetPct, opex, capex, ne
   }
 }
 
-function createTaskFromAI(title, priority, notes) {
-  const newId = 'M' + (appData.maintenance.length + 1);
-  appData.maintenance.push({
-    id: newId,
-    villa: currentFilter.villa === 'ALL' ? 'AZURE' : currentFilter.villa,
-    priority: priority,
-    title: title,
-    assignee: 'İşletme Müdürü',
-    downtime: 0,
-    cost: 0,
-    status: 'OPEN',
-    notes: notes
-  });
-  saveAppData();
-  alert(`✅ Görev Başarıyla Oluşturuldu!\n\n"${title}" görevi Lexbnb Bakım & Operasyon sistemine eklendi.`);
+async function createTaskFromAI(title, priority, notes) {
+  const propertyId = currentFilter.villa === 'ALL' ? null : currentFilter.villa;
+  const canonicalPriority = priority === 'P1' || priority === 'HIGH' ? 'HIGH' : 'MEDIUM';
+  return await convertAiActionToTask(title, propertyId, canonicalPriority, notes);
 }
 
 // -------------------------------------------------------------
@@ -6630,7 +6631,7 @@ function renderManageBookingsTable() {
       <td>${statusBadge}</td>
       <td style="text-align: right; white-space: nowrap;">
         <button class="btn btn-secondary btn-sm" onclick="editBooking(decodeURIComponent('${encodeURIComponent(String(b.id))}'))" title="Düzenle">✏️</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteBooking(decodeURIComponent('${encodeURIComponent(String(b.id))}'))" title="Sil">🗑️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteBookingUI(decodeURIComponent('${encodeURIComponent(String(b.id))}'))" title="Sil">🗑️</button>
       </td>
     `;
     tbody.appendChild(tr);
@@ -6731,11 +6732,12 @@ function closeBookingModal() {
   if (modal) modal.classList.remove('active');
 }
 
-function handleBookingDeleteFromModal() {
+async function handleBookingDeleteFromModal() {
   const editId = document.getElementById('resEditId')?.value;
   if (editId) {
-    deleteBooking(editId);
+    return await deleteBookingUI(editId);
   }
+  return false;
 }
 
 function getBookingChannelCatalog(channels) {
@@ -8343,28 +8345,31 @@ function renderManageLeadsTable() {
 
 async function convertLeadAction(leadId) {
   const l = (appData.leads || []).find(item => item.id === leadId || item.dbId === leadId);
-  if (!l) return alert('Talep bulunamadı.');
-
-  if (l.status === 'WON' || l.convertedBookingId) {
-    return alert('Bu talep zaten bir rezervasyona dönüştürülmüş.');
+  if (!l) {
+    alert('Talep bulunamadı.');
+    return false;
   }
 
-  // If checkIn/checkOut missing, prompt user
+  if (l.status === 'WON' || l.convertedBookingId) {
+    alert('Bu talep zaten bir rezervasyona dönüştürülmüş.');
+    return false;
+  }
+
   let checkIn = l.checkIn;
   let checkOut = l.checkOut;
   if (!checkIn || !checkOut) {
     checkIn = prompt(`"${l.guest}" için Giriş Tarihini giriniz (YYYY-AA-GG):`, getTodayStr());
-    if (!checkIn) return;
+    if (!checkIn) return false;
     checkOut = prompt(`"${l.guest}" için Çıkış Tarihini giriniz (YYYY-AA-GG):`, checkIn);
-    if (!checkOut) return;
+    if (!checkOut) return false;
   }
 
   if (!confirm(`"${l.guest}" talebi ₺${Number(l.quote).toLocaleString('tr-TR')} bedelle kesin rezervasyona dönüştürülecek. Onaylıyor musunuz?`)) {
-    return;
+    return false;
   }
 
   try {
-    const res = await convertLeadToBooking(l.id, {
+    await convertLeadToBooking(l.id, {
       checkIn,
       checkOut,
       grossAmount: Number(l.quote) || 0,
@@ -8375,8 +8380,10 @@ async function convertLeadAction(leadId) {
     else alert('🎉 Talep başarıyla rezervasyona dönüştürüldü ve takvime eklendi!');
     renderManageLeadsTable();
     renderLeadAnalytics();
+    return true;
   } catch (err) {
     alert('Dönüştürme Hatası: ' + err.message);
+    return false;
   }
 }
 
@@ -15131,13 +15138,13 @@ async function saveManualPricingOverride(params) {
   const tenantId = getActiveTenantId();
   if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
   const { data, error } = await supabaseClient.rpc('save_manual_pricing_override_atomic', {
+    p_tenant_id: tenantId,
     p_property_id: params.propertyId,
     p_start_date: params.startDate,
     p_end_date: params.endDate,
-    p_rate: params.rate,
+    p_rate_override: params.rate,
     p_reason: params.reason || 'Manual override',
-    p_min_stay: params.minStay || null,
-    p_is_closed: params.isClosed || false,
+    p_min_stay_override: params.minStay || null,
     p_bypass_guardrail: params.bypassGuardrail || false
   });
   if (error) throw error;
@@ -15717,7 +15724,7 @@ function renderExecutiveControlCenter() {
         candidates.push({
           id: t.id,
           domain: 'OPERATIONS',
-          propertyId: t.propertyId || t.property_id || 'BELLA',
+          propertyId: t.propertyId || t.property_id || null,
           title: t.title || 'Turnover Temizlik Görevi',
           severity: isCritical ? 'CRITICAL' : 'MEDIUM',
           guestImpact: isCritical ? 'HIGH' : 'MEDIUM',
@@ -15728,7 +15735,7 @@ function renderExecutiveControlCenter() {
           rationale: 'Misafir check-in öncesi turnover temizliği ve hazır bulunuşluk zorunluluğu.',
           sourceMetrics: [`Giriş: 14:00`, `Kategori: Temizlik`],
           deepLink: 'housekeeping',
-          quickAction: 'COMPLETE_TASK'
+          quickAction: null
         });
       }
     });
@@ -15739,7 +15746,7 @@ function renderExecutiveControlCenter() {
         candidates.push({
           id: tk.id,
           domain: 'OPERATIONS',
-          propertyId: tk.propertyId || tk.property_id || 'AZURE',
+          propertyId: tk.propertyId || tk.property_id || null,
           title: `P1 Arıza: ${tk.title || 'Klima / Jakuzi Arızası'}`,
           severity: tk.severity || 'CRITICAL',
           guestImpact: 'HIGH',
@@ -15873,7 +15880,9 @@ function renderTodayCommandCenter(actionsResult) {
           ${metricsText ? `<div class="action-source-metrics">📊 ${metricsText}</div>` : ''}
           <div class="action-card-footer">
             <button type="button" class="btn btn-secondary btn-sm" onclick="openTabFromDeepLink('${act.deepLink || 'executive'}', '${act.id}')" style="font-size: 11px; padding: 3px 8px;">İncele ›</button>
-            <button type="button" class="btn btn-primary btn-sm" onclick="handleQuickActionTrigger('${act.quickAction}', '${act.id}')" style="font-size: 11px; padding: 3px 8px;">Uygula</button>
+            ${act.quickAction
+              ? `<button type="button" class="btn btn-primary btn-sm" onclick="handleQuickActionTrigger('${act.quickAction}', '${act.id}')" style="font-size: 11px; padding: 3px 8px;">Uygula</button>`
+              : ''}
           </div>
         </div>
       `;
@@ -16034,7 +16043,7 @@ function handleAiAdvisorSubmit(e) {
     }
 
     let actionBtnHtml = '';
-    if (recommendationAction) {
+    if (recommendationAction && isCanonicalAiActionReady(recommendationAction)) {
       actionBtnHtml = `
         <div style="margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: flex-end;">
           <button type="button" class="btn btn-primary btn-sm" onclick="openAiActionConfirmModal(${JSON.stringify(recommendationAction).replace(/"/g, '&quot;')})" style="background: #10B981; font-weight: 700;">
@@ -16090,19 +16099,49 @@ function closeAiActionConfirmModal() {
   pendingAiAction = null;
 }
 
-function executeAiActionConfirmed() {
-  if (!pendingAiAction) return closeAiActionConfirmModal();
+function isCanonicalAiActionReady(action) {
+  return !!(action && action.type === 'GAP_DISCOUNT' && isUUID(action.propertyId) &&
+    /^\d{4}-\d{2}-\d{2}$/.test(String(action.date || '')) && Number(action.rate) > 0);
+}
 
-  // Route to canonical service
-  if (pendingAiAction.type === 'GAP_DISCOUNT' || pendingAiAction.domain === 'PRICING') {
-    if (typeof PricingBookingService !== 'undefined' && PricingBookingService.applyGapDiscount) {
-      PricingBookingService.applyGapDiscount(pendingAiAction.propertyId, pendingAiAction.date, 15);
-    }
+async function executeCanonicalAiAction(action, services = {}) {
+  if (!isCanonicalAiActionReady(action)) {
+    throw new Error('Öneriyi uygulamak için mülk, tarih ve doğrulanmış fiyat bilgisi eksik.');
   }
 
-  closeAiActionConfirmModal();
-  renderAll();
-  alert('✅ Öneri başarıyla onaylandı ve kanonik servis üzerinden uygulandı.');
+  const persistOverride = services.saveManualPricingOverride || saveManualPricingOverride;
+  return await persistOverride({
+    propertyId: action.propertyId,
+    startDate: action.date,
+    endDate: action.date,
+    rate: Number(action.rate),
+    reason: 'Komuta Merkezi: boş gece fiyatı'
+  });
+}
+
+async function executeAiActionConfirmed() {
+  if (!pendingAiAction) {
+    closeAiActionConfirmModal();
+    return false;
+  }
+
+  const btn = document.getElementById('aiActionConfirmExecuteBtn');
+  if (btn) btn.disabled = true;
+  try {
+    await executeCanonicalAiAction(pendingAiAction);
+    closeAiActionConfirmModal();
+    if (typeof renderAll === 'function') renderAll();
+    if (typeof showToast === 'function') showToast('Önerilen fiyat takvime kaydedildi.', 'success');
+    return true;
+  } catch (error) {
+    console.error('AI önerisi uygulanamadı:', error);
+    if (typeof showToast === 'function') {
+      showToast('Öneri uygulanamadı: ' + (error?.message || 'veritabanı hatası'), 'error');
+    }
+    return false;
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -16794,60 +16833,85 @@ function openTabFromDeepLink(tabId, entityId) {
   switchTab(tabId);
 }
 
-function handleQuickActionTrigger(actionType, entityId) {
+async function runCommandCenterAction(actionType, entityId, options = {}) {
   if (actionType === 'COMPLETE_TASK') {
-    if (typeof updateOperationalTask === 'function') {
-      updateOperationalTask(entityId, { status: 'DONE' });
+    const updateTask = options.updateOperationalTask || updateOperationalTask;
+    return await updateTask(entityId, { status: 'DONE' });
+  }
+  if (actionType === 'RESOLVE_TICKET') {
+    const actualCost = Number(options.actualCost);
+    if (!Number.isFinite(actualCost) || actualCost < 0) {
+      throw new Error('Gerçekleşen maliyet sıfır veya pozitif bir sayı olmalıdır.');
     }
-    alert('✅ Operasyonel görev tamamlandı olarak işaretlendi.');
-  } else if (actionType === 'RESOLVE_TICKET') {
-    if (typeof resolveMaintenanceTicket === 'function') {
-      resolveMaintenanceTicket(entityId, 'Sorun giderildi ve test edildi.');
+    const resolveTicket = options.resolveMaintenanceTicket || resolveMaintenanceTicket;
+    return await resolveTicket(entityId, actualCost, 'Tadilat', 'Komuta Merkezi üzerinden çözüldü.');
+  }
+  if (actionType === 'RESOLVE_ALERT') {
+    const resolveAlert = options.resolveExecutiveAlert || resolveExecutiveAlert;
+    const result = await resolveAlert(entityId);
+    if (result && result.success === false) throw new Error('Bu uyarı artık mevcut değil.');
+    return result;
+  }
+  if (actionType === 'CONVERT_LEAD') {
+    const convertLead = options.convertLeadAction || convertLeadAction;
+    const result = await convertLead(entityId);
+    if (result !== true) throw new Error('Talep rezervasyona dönüştürülmedi.');
+    return result;
+  }
+  throw new Error('Bu aksiyon için çalışan bir uygulama yolu bulunmuyor.');
+}
+
+async function handleQuickActionTrigger(actionType, entityId) {
+  if (actionType === 'APPLY_GAP_DISCOUNT') {
+    const gap = ((typeof appData !== 'undefined' && appData.gapNights) || [])
+      .find(item => `gap-${item.date}-${item.villa}` === entityId);
+    const propertyId = gap && ((appData.villas?.[gap.villa]?.id) || (isUUID(gap.villa) ? gap.villa : null));
+    const rate = Number(gap?.suggestedPrice);
+    if (!gap || !propertyId || !Number.isFinite(rate) || rate <= 0) {
+      if (typeof showToast === 'function') {
+        showToast('İndirim uygulanmadı: doğrulanmış mülk veya fiyat bilgisi eksik.', 'error');
+      }
+      openTabFromDeepLink('pricing', entityId);
+      return false;
     }
-    alert('✅ Arıza iş emri çözüldü olarak güncellendi.');
-  } else if (actionType === 'RESOLVE_ALERT') {
-    // Bu cagri BIR ZAMANLAR HER ZAMAN DUSUYORDU ve kimse gormuyordu:
-    //   resolveExecutiveAlert(entityId, 'İncelendi ve çözüldü.');
-    // Ikinci arguman `p_resolved_by`dir ve tipi UUID'dir; oraya bir CUMLE
-    // gidiyordu. Test projesinde olculdu:
-    //   22P02 invalid input syntax for type uuid: "İncelendi ve çözüldü."
-    // Cagri `await` edilmedigi ve `catch`lenmedigi icin reddedilen promise
-    // sessizce yutuluyor, hemen altindaki alert ise KOSULSUZ
-    // "✅ Bildirim kapatıldı." diyordu. Uyari acik kaliyordu.
-    //
-    // "Kim cozdu" izini zaten sunucu belirler (COALESCE(auth.uid(), ...)),
-    // yani istemcinin buraya bir sey gondermesine gerek yok.
-    if (typeof resolveExecutiveAlert === 'function') {
-      resolveExecutiveAlert(entityId)
-        .then(sonuc => {
-          if (sonuc && sonuc.success === false) {
-            // phase39: 0 satir etkilendi — uyari artik yok.
-            if (typeof showToast === 'function') {
-              showToast('Bu uyarı artık mevcut değil.', 'info');
-            }
-            return;
-          }
-          if (typeof showToast === 'function') showToast('Bildirim kapatıldı.', 'success');
-          if (typeof renderAll === 'function') renderAll();
-        })
-        .catch(err => {
-          console.error('Uyarı çözülemedi:', err);
-          if (typeof showToast === 'function') {
-            showToast('Uyarı kapatılamadı: ' + (err && err.message ? err.message : 'bilinmeyen hata'), 'error');
-          }
-        });
-    }
-  } else if (actionType === 'APPLY_GAP_DISCOUNT') {
     openAiActionConfirmModal({
       type: 'GAP_DISCOUNT',
-      description: 'Boş gece için %15 dinamik indirim uygulanacak.',
-      sourceMetrics: ['Doluluk: %68', 'Boşluk: 1 Gece']
+      propertyId,
+      date: gap.date,
+      rate,
+      description: `${gap.date} tarihi için ₺${rate.toLocaleString('tr-TR')} fiyatı takvime kaydedilecek.`,
+      sourceMetrics: [`Tarih: ${gap.date}`, `Önerilen fiyat: ₺${rate.toLocaleString('tr-TR')}`]
     });
-    return;
-  } else {
-    alert('✅ Aksiyon başarıyla tetiklendi.');
+    return true;
   }
-  renderAll();
+
+  let actualCost;
+  if (actionType === 'RESOLVE_TICKET') {
+    const entered = prompt('Arıza için gerçekleşen maliyeti giriniz (₺):', '0');
+    if (entered === null) return false;
+    actualCost = Number(String(entered).replace(',', '.'));
+  }
+
+  try {
+    await runCommandCenterAction(actionType, entityId, { actualCost });
+    if (typeof renderAll === 'function') renderAll();
+    const messages = {
+      COMPLETE_TASK: 'Operasyonel görev tamamlandı.',
+      RESOLVE_TICKET: 'Arıza iş emri çözüldü.',
+      RESOLVE_ALERT: 'Bildirim kapatıldı.',
+      CONVERT_LEAD: 'Talep rezervasyona dönüştürüldü.'
+    };
+    if (actionType !== 'CONVERT_LEAD' && typeof showToast === 'function') {
+      showToast(messages[actionType] || 'Aksiyon tamamlandı.', 'success');
+    }
+    return true;
+  } catch (error) {
+    console.error('Komuta merkezi aksiyonu uygulanamadı:', error);
+    if (typeof showToast === 'function') {
+      showToast('Aksiyon uygulanamadı: ' + (error?.message || 'veritabanı hatası'), 'error');
+    }
+    return false;
+  }
 }
 
 if (typeof module !== 'undefined' && module.exports) {
@@ -17005,6 +17069,8 @@ if (typeof module !== 'undefined' && module.exports) {
     renderExecutiveSnapshotKpis,
     renderExecutiveControlCenter,
     renderPortfolioHealth,
+    runCommandCenterAction,
+    executeCanonicalAiAction,
     getPropertySalesReadiness,
     canManagePropertyReadiness,
     setPropertySalesReadiness,
