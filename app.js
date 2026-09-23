@@ -3296,20 +3296,14 @@ function isBookingInFilter(b) {
   const bIn = b.checkIn || '';
   const bOut = b.checkOut || b.checkIn || '';
 
-  if (currentFilter.period === 'CUSTOM' || (currentFilter.startDate && currentFilter.endDate && (currentFilter.period === '2026-YEAR' || currentFilter.period === '2025-YEAR'))) {
-    const s = currentFilter.startDate || '2025-07-01';
-    const e = currentFilter.endDate || '2099-12-31';
-    return (bIn <= e && bOut >= s);
-  }
-
-  // Konaklama araligi bu ayla kesisiyor mu?
+  // Konaklama araligi secili ay/yil/ozel aralikla kesisiyor mu?
   // Onceki hal yalnizca GIRIS ve CIKIS ayina bakiyordu. 04-28 -> 06-02
   // rezervasyonu Mayis filtresinde hic gorunmuyordu; oysa Mayis'in 31
   // gecesinin tamami bu rezervasyona ait.
   // Geceler [checkIn, checkOut-1] araligidir; checkOut cikis gunu, gece degil.
-  const ayBas = currentFilter.period + '-01';
-  const ayBit = currentFilter.period + '-31';
-  return (bIn <= ayBit && bOut > ayBas);
+  const range = getFilterDateRange();
+  if (!range || !bIn) return false;
+  return bIn <= range.end && bOut > range.start;
 }
 
 /**
@@ -3369,9 +3363,15 @@ function getFilterDateRange() {
     return dates.length ? { start: dates[0].slice(0, 10), end: dates[dates.length - 1].slice(0, 10) } : null;
   }
 
-  if (currentFilter.period === 'CUSTOM' ||
-      (currentFilter.startDate && currentFilter.endDate &&
-       /^\d{4}-YEAR$/.test(currentFilter.period))) {
+  const yearMatch = /^(\d{4})-YEAR$/.exec(currentFilter.period);
+  if (yearMatch) {
+    return {
+      start: yearMatch[1] + '-01-01',
+      end: yearMatch[1] + '-12-31'
+    };
+  }
+
+  if (currentFilter.period === 'CUSTOM') {
     if (!currentFilter.startDate || !currentFilter.endDate) return null;
     return {
       start: currentFilter.startDate,
@@ -3390,6 +3390,13 @@ function getFilterDateRange() {
   }
 
   return null;
+}
+
+function isDateInFilter(date) {
+  if (currentFilter.period === 'ALL') return true;
+  if (!date) return true;
+  const range = getFilterDateRange();
+  return !!range && date >= range.start && date <= range.end;
 }
 
 function getPropertySalesReadinessApi() {
@@ -3594,14 +3601,7 @@ function isExpenseInFilter(exp) {
   const expMonth = exp.monthKey || exp.month || (exp.date ? exp.date.substring(0, 7) : '');
   const expDate = exp.date || (expMonth ? expMonth + '-15' : '');
 
-  if (currentFilter.period === 'CUSTOM' || (currentFilter.startDate && currentFilter.endDate && (currentFilter.period === '2026-YEAR' || currentFilter.period === '2025-YEAR'))) {
-    const s = currentFilter.startDate || '2025-07-01';
-    const e = currentFilter.endDate || '2099-12-31';
-    if (expDate) return (expDate >= s && expDate <= e);
-    return true;
-  }
-
-  return expMonth === currentFilter.period;
+  return isDateInFilter(expDate);
 }
 
 
@@ -9363,12 +9363,7 @@ function renderHousekeepingTab() {
     filtered = filtered.filter(t => {
       const taskDate = t.date || t.paidDate || '';
       if (!taskDate) return true;
-      if (currentFilter.period === 'CUSTOM' || (currentFilter.startDate && currentFilter.endDate && (currentFilter.period === '2026-YEAR' || currentFilter.period === '2025-YEAR'))) {
-        const s = currentFilter.startDate || '2025-07-01';
-        const e = currentFilter.endDate || '2099-12-31';
-        return taskDate >= s && taskDate <= e;
-      }
-      return taskDate.slice(0, 7) === currentFilter.period;
+      return isDateInFilter(taskDate);
     });
   }
 
@@ -9396,12 +9391,7 @@ function renderHousekeepingTab() {
     if (currentFilter.period === 'ALL') return true;
     const taskDate = t.date || t.paidDate || '';
     if (!taskDate) return true;
-    if (currentFilter.period === 'CUSTOM' || (currentFilter.startDate && currentFilter.endDate && (currentFilter.period === '2026-YEAR' || currentFilter.period === '2025-YEAR'))) {
-      const s = currentFilter.startDate || '2025-07-01';
-      const e = currentFilter.endDate || '2099-12-31';
-      return taskDate >= s && taskDate <= e;
-    }
-    return taskDate.slice(0, 7) === currentFilter.period;
+    return isDateInFilter(taskDate);
   });
 
   const pendingList = allInScope.filter(t => !t.paid);
@@ -10975,19 +10965,9 @@ function isCampaignInFilter(camp) {
   const s = camp.startDate || '';
   const e = camp.endDate || s || '';
 
-  if (currentFilter.period === 'CUSTOM' || currentFilter.startDate) {
-    const fStart = currentFilter.startDate || '2025-07-01';
-    const fEnd = currentFilter.endDate || '2099-12-31';
-    if (s && e) return (s <= fEnd && e >= fStart);
-    return true;
-  }
-
-  if (currentFilter.period === '2026-YEAR') return s.startsWith('2026-') || e.startsWith('2026-');
-  if (currentFilter.period === '2025-YEAR') return s.startsWith('2025-') || e.startsWith('2025-');
-
-  const sMonth = s ? s.slice(0, 7) : '';
-  const eMonth = e ? e.slice(0, 7) : '';
-  return sMonth === currentFilter.period || eMonth === currentFilter.period;
+  const range = getFilterDateRange();
+  if (!range || !s || !e) return true;
+  return s <= range.end && e >= range.start;
 }
 
 function renderMarketingModule() {
@@ -16878,6 +16858,9 @@ if (typeof module !== 'undefined' && module.exports) {
     setCurrentFilter,
     isBookingInFilter,
     getFilterDateRange,
+    isDateInFilter,
+    isExpenseInFilter,
+    isCampaignInFilter,
     getBookingFilterShare,
     computeBookingEconomics,
     getChannelCommissionRate,
