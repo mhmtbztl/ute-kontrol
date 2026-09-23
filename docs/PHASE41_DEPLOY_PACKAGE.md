@@ -1,5 +1,9 @@
 # phase41 — uygulama ve doğrulama paketi
 
+> **SQL Editor'e YAPIŞTIRILACAK DOSYA:**
+> `C:\Users\pc\Desktop\lexbnb-claude\supabase\migration_phase41_role_authz_hardening.sql`
+> Bu belge (`.md`) açıklamadır — SQL Editor'e yapıştırılmaz.
+
 **Göç dosyası:** `supabase/migration_phase41_role_authz_hardening.sql`
 **Sahibi:** Claude (tek numara — `AGENTS.md`, phase numarası sahipliği)
 **Durum (23 Eylül 2026):**
