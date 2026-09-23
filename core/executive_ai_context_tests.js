@@ -108,8 +108,8 @@ function runExecutiveAiContextTests() {
   // TEST 5: Contextual "Ask Lexbnb" Query Answering
   console.log('\n--- TEST 5: Ask Lexbnb Contextual QA ---');
   const qaProfit = answerExecutiveQuery('Bu ay neden kârım ve cirom hedefin gerisinde kaldı?', context);
-  assert.ok(qaProfit.answer.includes('75000 TL'));
-  assert.ok(qaProfit.sourceMetrics.some(m => m.includes('75000 TL')));
+  assert.ok(qaProfit.answer.includes('75.000 TL'));
+  assert.ok(qaProfit.sourceMetrics.some(m => m.includes('75.000 TL')));
   assert.strictEqual(qaProfit.requiresConfirmationForActions, true);
   recordPass('5. "Ask Lexbnb" contextual QA answers accurately citing verified sourceMetrics with confirmation requirement');
 
@@ -117,6 +117,38 @@ function runExecutiveAiContextTests() {
   assert.ok(qaGaps.answer.includes('1 adet boşluk'));
   assert.ok(qaGaps.sourceMetrics.some(m => m.includes('gapNightsCount: 1')));
   recordPass('6. "Ask Lexbnb" correctly identifies gap nights and pricing opportunities from context');
+
+  // TEST 6: Unknown values stay unknown instead of becoming reassuring data.
+  console.log('\n--- TEST 6: Unknown Metric Honesty ---');
+  const unknownContext = buildSanitizedExecutiveContext({
+    tenant: { name: 'Gercek Isletme' },
+    kpis: { revenue: { current: 12500, target: null } },
+    leads: [
+      { status: 'WON' },
+      { status: 'NEW' }
+    ]
+  });
+  const qaUnknownTarget = answerExecutiveQuery('Ciro hedefim nasil?', unknownContext);
+  const qaUnknownHealth = answerExecutiveQuery('Genel durum nedir?', unknownContext);
+
+  assert.strictEqual(unknownContext.portfolio.companyName, 'Gercek Isletme');
+  assert.strictEqual(unknownContext.portfolio.overallHealth, null);
+  assert.strictEqual(unknownContext.sales.openLeadsCount, 1);
+  assert.ok(qaUnknownTarget.answer.includes('12.500 TL'));
+  assert.match(qaUnknownTarget.answer, /hedefi tanımlanmadı/i);
+  assert.ok(!qaUnknownTarget.answer.includes('%100'));
+  assert.ok(qaUnknownHealth.answer.includes('ölçülemedi'));
+  assert.ok(!qaUnknownHealth.answer.includes('HEALTHY'));
+  assert.ok(!answerExecutiveQuery('Hangi kararı almalıyım?', unknownContext).answer.includes('net nakit kârı'));
+  recordPass('7. Missing targets, health and tenant fields are reported without invented defaults');
+
+  const rangedGapContext = buildSanitizedExecutiveContext({
+    gapNights: [{ checkIn: '2026-09-20', checkOut: '2026-09-22' }]
+  });
+  const rangedGapAnswer = answerExecutiveQuery('Boşluk var mı?', rangedGapContext);
+  assert.ok(rangedGapAnswer.answer.includes('2026-09-20 → 2026-09-22'));
+  assert.ok(!rangedGapAnswer.answer.includes('undefined'));
+  recordPass('8. Real gap-night ranges are shown without relying on a missing date field');
 
   console.log(`\n=============================================================================`);
   console.log(`TEST SUMMARY: ${passedTests} / ${totalTests} TESTS PASSED (0 FAILED)`);

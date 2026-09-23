@@ -15924,6 +15924,7 @@ function handleAiAdvisorSubmit(e) {
   if (responseContent) responseContent.innerHTML = `<div style="color: #A78BFA; font-size: 13px;">🤖 Analiz ediliyor... Lütfen bekleyin.</div>`;
 
   setTimeout(() => {
+    try {
     let answerText = '';
     let recommendationAction = null;
     let sourceMetrics = [];
@@ -15949,7 +15950,7 @@ function handleAiAdvisorSubmit(e) {
       const manualCost = expenses.filter(isExpenseInFilter).reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
       const availableNights = getAvailableNightsForMonth(period);
       const sanitizedContext = ExecutiveAIAdvisor.buildSanitizedExecutiveContext({
-        tenant: activeTenant || { company_name: 'LexBnB Portföyü' },
+        tenant: activeTenant || {},
         kpis: {
           revenue: { current: revenue, target: Number(target.revenue_target || target.revenueTarget || 0) },
           netProfit: { current: revenue - otaCost - manualCost, target: Number(target.net_profit_target || target.profit_target || target.profitTarget || 0) },
@@ -15958,14 +15959,14 @@ function handleAiAdvisorSubmit(e) {
           revpar: { current: availableNights > 0 ? roomRevenue / availableNights : null }
         },
         properties: Object.keys(villas).map(k => ({ id: k, name: villas[k]?.name || k })),
-        gapNights: (appData && appData.gapNights) || [],
-        tasks: (appData && appData.cleaningTasks) || [],
+        gapNights: typeof detectGapNights === 'function' ? detectGapNights() : [],
+        tasks: (appData && appData.operationalTasks) || [],
         tickets: (appData && appData.maintenanceTickets) || [],
         leads: (appData && appData.leads) || [],
         targets: target
       });
 
-      const response = ExecutiveAIAdvisor.answerExecutiveQuery(sanitizedContext, query);
+      const response = ExecutiveAIAdvisor.answerExecutiveQuery(query, sanitizedContext);
       answerText = response.answer;
       sourceMetrics = response.sourceMetrics || [];
       recommendationAction = response.recommendedAction;
@@ -15994,6 +15995,11 @@ function handleAiAdvisorSubmit(e) {
         </div>
         ${actionBtnHtml}
       `;
+    }
+    } catch (_error) {
+      if (responseContent) {
+        responseContent.innerHTML = '<div role="alert" style="color:#FCA5A5; font-size:13px;">Danışman yanıtı oluşturulamadı. Lütfen tekrar deneyin.</div>';
+      }
     }
   }, 350);
 }

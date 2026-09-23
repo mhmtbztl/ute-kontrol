@@ -59,6 +59,7 @@ const allTestFiles = [
   'executive_dashboard_tests.js',
   'executive_priority_tests.js',
   'executive_ai_context_tests.js',
+  'executive_ai_ui_tests.js',
   'notification_center_tests.js',
   'final_security_audit_tests.js',
   'end_to_end_product_tests.js',

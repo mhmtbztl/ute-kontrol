@@ -23,6 +23,25 @@
       .replace(/\b\d{4,8}\b/g, '[PIN_MASKED]');
   }
 
+  function metricValue(metric, key) {
+    if (!metric || !Object.prototype.hasOwnProperty.call(metric, key)) return null;
+    const raw = metric[key];
+    if (raw === null || raw === undefined || raw === '') return null;
+    const value = Number(raw);
+    return Number.isFinite(value) ? value : null;
+  }
+
+  function formatCurrency(value) {
+    if (!Number.isFinite(value)) return '—';
+    return `${value.toLocaleString('tr-TR', { maximumFractionDigits: 2 })} TL`;
+  }
+
+  function hasKeyword(query, stems) {
+    const suffixes = ['', 'm', 'ım', 'im', 'um', 'üm'];
+    const words = query.toLocaleLowerCase('tr-TR').split(/[^\p{L}]+/u).filter(Boolean);
+    return words.some(word => stems.some(stem => suffixes.some(suffix => word === stem + suffix)));
+  }
+
   /**
    * Builds sanitized executive context for AI Advisor.
    * Strips all sensitive credentials, door codes, and unnecessary personal PII.
@@ -45,9 +64,9 @@
     const sanitizedProperties = properties.map(p => ({
       id: p.id || p.dbId,
       name: p.name,
-      basePrice: p.base_price || p.basePrice || 0,
-      minPrice: p.min_price || p.minPrice || 0,
-      maxPrice: p.max_price || p.maxPrice || 0
+      basePrice: p.base_price ?? p.basePrice ?? null,
+      minPrice: p.min_price ?? p.minPrice ?? null,
+      maxPrice: p.max_price ?? p.maxPrice ?? null
     }));
 
     const sanitizedAlerts = alerts.map(a => ({
@@ -71,38 +90,41 @@
 
     return {
       portfolio: {
-        companyName: tenant.company_name || 'LexBnB İşletmesi',
+        companyName: tenant.name || tenant.company_name || null,
         propertiesCount: properties.length,
-        overallHealth: health.overallStatus || 'HEALTHY',
+        overallHealth: health.overallStatus || null,
         domainsHealth: health.domains || {}
       },
       financial: {
-        revenue: kpis.revenue ? kpis.revenue.current : 0,
-        targetRevenue: kpis.revenue ? kpis.revenue.target : 0,
-        netProfit: kpis.netProfit ? kpis.netProfit.current : 0,
-        targetProfit: kpis.netProfit ? kpis.netProfit.target : 0,
-        occupancy: kpis.occupancy ? kpis.occupancy.current : 0,
-        adr: kpis.adr ? kpis.adr.current : 0,
-        revpar: kpis.revpar ? kpis.revpar.current : 0,
-        forecastedRevenue: (kpis.forecast && kpis.forecast.monthEndRevenue) || 0
+        revenue: metricValue(kpis.revenue, 'current'),
+        targetRevenue: metricValue(kpis.revenue, 'target'),
+        netProfit: metricValue(kpis.netProfit, 'current'),
+        targetProfit: metricValue(kpis.netProfit, 'target'),
+        occupancy: metricValue(kpis.occupancy, 'current'),
+        adr: metricValue(kpis.adr, 'current'),
+        revpar: metricValue(kpis.revpar, 'current'),
+        forecastedRevenue: metricValue(kpis.forecast, 'monthEndRevenue')
       },
       operations: {
-        openTasksCount: tasks.filter(t => t.status !== 'DONE').length,
-        criticalTasksCount: tasks.filter(t => t.priority === 'CRITICAL' && t.status !== 'DONE').length,
-        openMaintenanceTickets: sanitizedTickets.filter(t => t.status !== 'RESOLVED').length
+        openTasksCount: tasks.filter(t => t.status && !['DONE', 'COMPLETED', 'CANCELLED'].includes(t.status)).length,
+        criticalTasksCount: tasks.filter(t => t.priority === 'CRITICAL' && t.status && !['DONE', 'COMPLETED', 'CANCELLED'].includes(t.status)).length,
+        openMaintenanceTickets: sanitizedTickets.filter(t => t.status && !['RESOLVED', 'CANCELLED'].includes(t.status)).length
       },
       pricing: {
         gapNightsCount: gapNights.length,
-        gapDates: gapNights.map(g => g.date)
+        gapDates: gapNights.map(g => g.date || [g.checkIn, g.checkOut].filter(Boolean).join(' → ')).filter(Boolean)
       },
       sales: {
-        openLeadsCount: leads.filter(l => l.stage !== 'WON' && l.stage !== 'LOST').length
+        openLeadsCount: leads.filter(l => {
+          const status = l.status || l.stage;
+          return status && status !== 'WON' && status !== 'LOST';
+        }).length
       },
       properties: sanitizedProperties,
       alerts: sanitizedAlerts,
       targets: {
-        revenueTarget: targets.revenue_target || 0,
-        profitTarget: targets.profit_target || 0
+        revenueTarget: targets.revenue_target ?? null,
+        profitTarget: targets.profit_target ?? null
       }
     };
   }
@@ -234,18 +256,32 @@
     let answer = '';
     const sourceMetrics = [];
 
-    if (q.includes('kâr') || q.includes('kar') || q.includes('düştü') || q.includes('ciro')) {
-      answer = `Bu ay toplam ciro ${fin.revenue} TL, net nakit kârı ise ${fin.netProfit} TL olarak gerçekleşmiştir. Hedeflenen ciro ${fin.targetRevenue} TL olup, gerçekleşme oranı %${fin.targetRevenue > 0 ? Math.round((fin.revenue / fin.targetRevenue) * 100) : 100}'dir.`;
-      sourceMetrics.push(`revenue: ${fin.revenue} TL`, `netProfit: ${fin.netProfit} TL`, `targetRevenue: ${fin.targetRevenue} TL`);
-    } else if (q.includes('sorun') || q.includes('kritik') || q.includes('bakım')) {
+    if (hasKeyword(q, ['kâr', 'kar', 'ciro']) || q.includes('düştü')) {
+      const revenueText = formatCurrency(fin.revenue);
+      const profitText = formatCurrency(fin.netProfit);
+      if (fin.targetRevenue > 0 && Number.isFinite(fin.revenue)) {
+        const targetText = formatCurrency(fin.targetRevenue);
+        answer = `Bu ay toplam ciro ${revenueText}, net nakit kârı ise ${profitText} olarak gerçekleşmiştir. Hedeflenen ciro ${targetText} olup, gerçekleşme oranı %${Math.round((fin.revenue / fin.targetRevenue) * 100)}'dir.`;
+        sourceMetrics.push(`revenue: ${revenueText}`, `netProfit: ${profitText}`, `targetRevenue: ${targetText}`);
+      } else {
+        answer = `Bu ay toplam ciro ${revenueText}, net nakit kârı ise ${profitText} olarak gerçekleşmiştir. Ciro hedefi tanımlanmadı; gerçekleşme oranı hesaplanamadı.`;
+        sourceMetrics.push(`revenue: ${revenueText}`, `netProfit: ${profitText}`, 'targetRevenue: — (hedef tanımlanmadı)');
+      }
+    } else if (hasKeyword(q, ['sorun', 'kritik', 'bakım'])) {
       answer = `Mevcut durumda ${ops.openMaintenanceTickets} açık bakım bileti ve ${ops.criticalTasksCount} kritik operasyonel görev bulunmaktadır.`;
       sourceMetrics.push(`criticalTasks: ${ops.criticalTasksCount}`, `openMaintenanceTickets: ${ops.openMaintenanceTickets}`);
-    } else if (q.includes('fiyat') || q.includes('boşluk') || q.includes('fırsat')) {
+    } else if (hasKeyword(q, ['fiyat', 'boşluk', 'fırsat'])) {
       answer = `Takvimde ${pricing.gapNightsCount} adet boşluk gece bulunmaktadır (${pricing.gapDates.join(', ') || 'Yok'}). Bu geceler için minimum konaklama süresini esneterek gelir artırılabilir.`;
       sourceMetrics.push(`gapNightsCount: ${pricing.gapNightsCount}`);
     } else {
-      answer = `Portföyünüzde ${context.portfolio.propertiesCount} mülk aktif durumdadır. Genel sağlık durumu: ${context.portfolio.overallHealth}.`;
-      sourceMetrics.push(`propertiesCount: ${context.portfolio.propertiesCount}`, `overallHealth: ${context.portfolio.overallHealth}`);
+      const healthText = context.portfolio.overallHealth
+        ? `Genel sağlık durumu: ${context.portfolio.overallHealth}.`
+        : 'Genel sağlık durumu ölçülemedi (sağlık verisi bulunmuyor).';
+      answer = `Portföyünüzde ${context.portfolio.propertiesCount} mülk bulunmaktadır. ${healthText}`;
+      sourceMetrics.push(
+        `propertiesCount: ${context.portfolio.propertiesCount}`,
+        context.portfolio.overallHealth ? `overallHealth: ${context.portfolio.overallHealth}` : 'overallHealth: — (veri yok)'
+      );
     }
 
     return {
