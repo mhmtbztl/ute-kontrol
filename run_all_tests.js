@@ -19,6 +19,8 @@ const allTestFiles = [
   'financial_metrics_tests.js',
   'analysis_export_service_tests.js',
   'analysis_center_ui_tests.js',
+  'property_analysis_context_service_tests.js',
+  'phase40_property_analysis_context_tests.js',
   'guest_domain_tests.js',
   'guest_crm_tests.js',
   'guest_linking_schema_tests.js',
@@ -180,6 +182,9 @@ const allTestFiles = [
 
   // Phase 31 tablolarinin RLS'i ve anon kapisi (canli — test projesine kosar)
   'phase31_isolation_tests.js',
+
+  // Phase 40 pazar baglami RLS'i, anon kapisi ve capraz kiraci korumasi
+  'property_analysis_context_isolation_tests.js',
 
   // Phase 35: ice aktarimi geri alma — bag, kaynak taramasi ve goc icerigi
   'import_undo_tests.js',
