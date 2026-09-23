@@ -27,6 +27,7 @@ const allTestFiles = [
   'guest_linking_schema_tests.js',
   'guest_profile_context_schema_tests.js',
   'guest_ui_integration_tests.js',
+  'lead_edit_preservation_tests.js',
   'lead_crud_tests.js',
   'maintenance_tests.js',
   'message_automation_tests.js',

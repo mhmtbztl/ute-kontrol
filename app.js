@@ -2726,6 +2726,20 @@ function mapLeadToDb(lead, targetTenantId) {
   return payload;
 }
 
+function buildLeadEditPayload(editId, changes) {
+  const definedChanges = Object.fromEntries(
+    Object.entries(changes || {}).filter(([, value]) => value !== undefined)
+  );
+  if (!editId) return definedChanges;
+
+  const existingLead = (appData.leads || []).find(
+    lead => lead.id === editId || lead.dbId === editId
+  );
+  if (!existingLead) return definedChanges;
+
+  return { ...existingLead, ...definedChanges };
+}
+
 function validateLeadInput(leadInput, targetTenantId) {
   if (!leadInput) throw new Error('Lead bilgisi boş olamaz.');
   const tenantId = targetTenantId || getActiveTenantId();
@@ -2875,12 +2889,13 @@ async function updateLead(leadId, patch) {
   if (!leadId) throw new Error('Güncellenecek lead kimliği gereklidir.');
   const tenantId = getActiveTenantId();
   const isCloud = !!(isCloudTenant(tenantId));
+  const completePatch = buildLeadEditPayload(leadId, patch);
 
   if (!isCloud) {
     if (typeof appData !== 'undefined' && appData.leads) {
       const idx = appData.leads.findIndex(l => l.id === leadId || l.dbId === leadId);
       if (idx !== -1) {
-        appData.leads[idx] = { ...appData.leads[idx], ...patch };
+        appData.leads[idx] = { ...appData.leads[idx], ...completePatch };
         if (typeof saveAppData === 'function') saveAppData();
         if (typeof renderAll === 'function') renderAll();
         return appData.leads[idx];
@@ -2895,12 +2910,12 @@ async function updateLead(leadId, patch) {
 
   // Pre-validate patch if relevant fields exist
   validateLeadInput({
-    guestName: patch.guestName || patch.guest || 'Misafir',
-    phone: patch.phone || '',
-    ...patch
+    guestName: completePatch.guestName || completePatch.guest || 'Misafir',
+    phone: completePatch.phone || '',
+    ...completePatch
   }, tenantId);
 
-  const payload = mapLeadToDb({ ...patch, id: leadId }, tenantId);
+  const payload = mapLeadToDb({ ...completePatch, id: leadId }, tenantId);
   delete payload.tenant_id; // Never mutate tenant_id
 
   const { data, error } = await supabaseClient
@@ -8403,7 +8418,7 @@ async function saveLead(e) {
   const lostReason = document.getElementById('leadLostReason').value;
   const notes = document.getElementById('leadNotes').value.trim();
 
-  const payload = {
+  const payload = buildLeadEditPayload(editId, {
     guest,
     guestName: guest,
     villa,
@@ -8412,7 +8427,7 @@ async function saveLead(e) {
     status,
     lostReason,
     notes
-  };
+  });
 
   try {
     if (editId) {
@@ -16832,6 +16847,7 @@ if (typeof module !== 'undefined' && module.exports) {
     ALLOWED_LEAD_SOURCES,
     mapLeadFromDb,
     mapLeadToDb,
+    buildLeadEditPayload,
     validateLeadInput,
     loadLeads,
     createLead,
