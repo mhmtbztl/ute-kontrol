@@ -1899,7 +1899,7 @@
               <span class="badge badge-pink">Yüksek Sezon Alarmı</span>
             </div>
             <p class="sub-text" style="margin: 4px 0 0 0;">
-              Villaların en yüksek cirolu özel dönemleri için geri sayım, 5 villanın anlık doluluk durumu ve erken rezervasyon stratejileri.
+              Mülklerinizin en yüksek cirolu özel dönemleri için geri sayım, portföyün anlık doluluk durumu ve erken rezervasyon stratejileri.
             </p>
           </div>
         </div>
@@ -2115,7 +2115,7 @@
         <div class="section-title-bar">
           <div>
             <h2>📅 VİLLA DOLULUK VE REZERVASYON TAKVİMİ (TAPE CHART)</h2>
-            <p class="sub-text">5 villanın gün gün doluluk durumu. Boş günlere tıklayarak doğrudan rezervasyon girebilirsiniz.</p>
+            <p class="sub-text">Portföyünüzdeki gerçek mülklerin gün gün doluluk durumu. Boş günlere tıklayarak doğrudan rezervasyon girebilirsiniz.</p>
           </div>
           <div style="display: flex; gap: 12px; align-items: center; font-size: 11px;">
             <span style="display: inline-flex; align-items: center; gap: 4px;"><span style="width: 10px; height: 10px; border-radius: 2px; background: #E11D48;"></span> Airbnb</span>
@@ -2171,7 +2171,7 @@
               <option value="ALL" selected>Tüm Durumlar</option>
               <option value="CONFIRMED">Onaylandı</option>
               <option value="CHECKED_IN">İçeride (Konaklıyor)</option>
-              <option value="COMPLETED">Tamamlandı</option>
+              <option value="CHECKED_OUT">Tamamlandı</option>
               <option value="CANCELLED">İptal</option>
             </select>
           </div>
@@ -3505,13 +3505,13 @@
             <select id="resStatus">
               <option value="CONFIRMED">Onaylandı</option>
               <option value="CHECKED_IN">İçeride (Konaklıyor)</option>
-              <option value="COMPLETED">Tamamlandı</option>
+              <option value="CHECKED_OUT">Tamamlandı</option>
               <option value="CANCELLED">İptal Edildi</option>
             </select>
           </div>
           <div class="form-group">
             <label>Kişi Sayısı</label>
-            <input type="number" id="resPax" value="6">
+            <input type="number" id="resPax" min="1" step="1" required placeholder="Kişi sayısını girin">
           </div>
         </div>
 
@@ -4569,7 +4569,7 @@
   <script src="core/executive_ai_advisor.js?v=502075f7"></script>
   <script src="core/notification_center_service.js?v=710f8a91"></script>
   <script src="core/captcha_gate.js?v=3ad4a776"></script>
-  <script src="app.js?v=86a44444"></script>
+  <script src="app.js?v=ae46a186"></script>
   <script src="core/property_analysis_context_ui.js?v=efba10f2"></script>
   <script src="core/analysis_center_ui.js?v=7991bd67"></script>
   <script src="core/marketing_ui.js?v=1360fb04"></script>

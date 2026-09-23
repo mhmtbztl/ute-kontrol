@@ -546,7 +546,7 @@ function mapPropertyFromDb(row) {
     tenantId: row.tenant_id,
     slug: row.slug,
     name: row.name,
-    capacity: row.capacity || '6-8 Kişilik',
+    capacity: row.capacity || '',
     basePrice: basePrice,
     adr: basePrice,
     cleanCost: cleanCost,
@@ -570,7 +570,7 @@ function mapPropertyToDb(property, tenantId) {
     tenant_id: activeTId,
     slug: (property.slug || property.name || 'VILLA').trim().toUpperCase().replace(/[^A-Z0-9_]/g, '_'),
     name: (property.name || property.slug || '').trim(),
-    capacity: property.capacity || '6-8 Kişilik',
+    capacity: property.capacity || '',
     base_price: basePrice,
     clean_cost: cleanCost,
     amenities: property.amenities || '',
@@ -628,7 +628,7 @@ async function createProperty(propInput) {
       id: 'local_' + Date.now(),
       slug,
       name,
-      capacity: propInput.capacity || '6-8 Kişilik',
+      capacity: propInput.capacity || '',
       basePrice: Number(propInput.basePrice || propInput.adr) || 0,
       adr: Number(propInput.basePrice || propInput.adr) || 0,
       cleanCost: Number(propInput.cleanCost) || 0,
@@ -763,7 +763,7 @@ async function updateProperty(propIdOrSlug, propInput) {
 
   const dbPayload = {
     name: name,
-    capacity: propInput.capacity !== undefined ? propInput.capacity : (existing?.capacity || '6-8 Kişilik'),
+    capacity: propInput.capacity !== undefined ? propInput.capacity : (existing?.capacity || ''),
     base_price: basePrice,
     clean_cost: cleanCost,
     amenities: propInput.amenities !== undefined ? propInput.amenities : (existing?.amenities || ''),
@@ -936,6 +936,16 @@ async function getPropertyIdBySlug(slug, tenantId) {
 // -------------------------------------------------------------
 const ALLOWED_BOOKING_STATUSES = ['CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT', 'CANCELLED'];
 
+function normalizePositiveInteger(value) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function normalizeBookingStatus(value) {
+  const status = String(value || '').trim().toUpperCase();
+  return ALLOWED_BOOKING_STATUSES.includes(status) ? status : null;
+}
+
 function generateSafeBookingCode(checkInDate) {
   const prefix = checkInDate ? checkInDate.replace(/[^0-9]/g, '').slice(2, 6) : getTodayStr().slice(2, 7).replace('-', '');
   const rand = Math.floor(1000 + Math.random() * 9000);
@@ -975,7 +985,7 @@ function mapBookingFromDb(row, propertyMap = {}) {
     }
   }
 
-  const status = ALLOWED_BOOKING_STATUSES.includes(row.status) ? row.status : 'CONFIRMED';
+  const status = normalizeBookingStatus(row.status);
 
   return {
     id: row.id, // Primary Supabase UUID
@@ -991,7 +1001,7 @@ function mapBookingFromDb(row, propertyMap = {}) {
     channel: row.channel || 'Direct',
     checkIn: row.check_in,
     checkOut: row.check_out,
-    pax: Number(row.pax) || 2,
+    pax: normalizePositiveInteger(row.pax),
     gross: gross,
     grossAmount: gross,
     otaComm: otaComm,
@@ -1005,7 +1015,7 @@ function mapBookingFromDb(row, propertyMap = {}) {
     net: net,
     netRoomRev: net,
     netRoomRevenue: net,
-    nights: Math.max(1, nights),
+    nights: nights,
     status: status,
     notes: row.notes || '',
     createdBy: row.created_by,
@@ -1050,7 +1060,8 @@ function mapBookingToDb(booking, tenantId) {
   const discount = Number(booking.discount) || 0;
   const net = Number(booking.net !== undefined ? booking.net : (booking.netRoomRev || booking.netRoomRevenue)) || Math.max(0, gross - otaComm - cleanFee - discount);
 
-  const status = ALLOWED_BOOKING_STATUSES.includes(booking.status) ? booking.status : 'CONFIRMED';
+  const status = normalizeBookingStatus(booking.status);
+  const pax = normalizePositiveInteger(booking.pax);
   const checkIn = booking.checkIn || booking.check_in;
   const checkOut = booking.checkOut || booking.check_out;
 
@@ -1063,7 +1074,7 @@ function mapBookingToDb(booking, tenantId) {
     channel: booking.channel || 'Direct',
     check_in: checkIn,
     check_out: checkOut,
-    pax: Number(booking.pax) || 2,
+    pax: pax,
     gross_amount: gross,
     ota_commission: otaComm,
     cleaning_fee: cleanFee,
@@ -1154,6 +1165,15 @@ async function createBooking(bookingInput) {
     throw new Error('Misafir adı boş bırakılamaz.');
   }
 
+  const pax = normalizePositiveInteger(bookingInput.pax);
+  if (pax === null) {
+    throw new Error('Kişi sayısı pozitif bir tam sayı olmalıdır.');
+  }
+  const status = normalizeBookingStatus(bookingInput.status);
+  if (!status) {
+    throw new Error('Geçerli bir rezervasyon durumu seçilmelidir.');
+  }
+
   const gross = Number(bookingInput.gross !== undefined ? bookingInput.gross : bookingInput.grossAmount) || 0;
   if (gross < 0) {
     throw new Error('Toplam tutar negatif olamaz.');
@@ -1198,7 +1218,7 @@ async function createBooking(bookingInput) {
       channel: bookingInput.channel || 'Direct',
       checkIn,
       checkOut,
-      pax: Number(bookingInput.pax) || 2,
+      pax,
       gross,
       otaComm: Number(bookingInput.otaComm) || 0,
       cleanFee: Number(bookingInput.cleanFee) || 0,
@@ -1206,7 +1226,7 @@ async function createBooking(bookingInput) {
       discount: Number(bookingInput.discount) || 0,
       net: Number(bookingInput.net) || gross,
       nights: calculateNightsBetween(checkIn, checkOut),
-      status: bookingInput.status || 'CONFIRMED',
+      status,
       notes: bookingInput.notes || ''
     };
     if (typeof appData !== 'undefined') {
@@ -1220,7 +1240,7 @@ async function createBooking(bookingInput) {
   }
 
   // 3. Awaited DB write with collision retry (max 3 attempts)
-  const payload = mapBookingToDb(bookingInput, tenantId);
+  const payload = mapBookingToDb({ ...bookingInput, pax, status }, tenantId);
   delete payload.id; // Let DB generate gen_random_uuid()
 
   let attempts = 0;
@@ -2679,7 +2699,7 @@ function mapLeadFromDb(row) {
     date: row.lead_date || '',
     checkIn: row.requested_check_in || '',
     checkOut: row.requested_check_out || '',
-    pax: Number(row.pax) || 2,
+    pax: normalizePositiveInteger(row.pax),
     quote: Number(row.quote_amount) || 0,
     quoteAmount: Number(row.quote_amount) || 0,
     status: status,
@@ -2743,7 +2763,7 @@ function mapLeadToDb(lead, targetTenantId) {
     lead_date: lead.date || lead.lead_date || getTodayStr(),
     requested_check_in: checkIn,
     requested_check_out: checkOut,
-    pax: Number(lead.pax) > 0 ? Number(lead.pax) : 2,
+    pax: normalizePositiveInteger(lead.pax),
     quote_amount: Number(lead.quote ?? lead.quoteAmount ?? 0) >= 0 ? Number(lead.quote ?? lead.quoteAmount ?? 0) : 0,
     status: status,
     lost_reason: (status === 'LOST' ? (lead.lostReason || lead.lost_reason || 'Diğer') : null),
@@ -2873,7 +2893,7 @@ async function createLead(leadInput) {
       date: leadInput.date || getTodayStr(),
       checkIn: leadInput.checkIn || '',
       checkOut: leadInput.checkOut || '',
-      pax: Number(leadInput.pax) || 2,
+      pax: normalizePositiveInteger(leadInput.pax),
       quote: Number(leadInput.quote) || 0,
       quoteAmount: Number(leadInput.quote) || 0,
       status: (leadInput.status || 'NEW').toUpperCase(),
@@ -3069,7 +3089,7 @@ async function convertLeadToBooking(leadId, options = {}) {
         checkIn: options.checkIn || l.checkIn,
         checkOut: options.checkOut || l.checkOut,
         gross: Number(options.grossAmount ?? l.quote ?? 0),
-        pax: Number(options.pax ?? l.pax ?? 2),
+        pax: normalizePositiveInteger(options.pax ?? l.pax),
         channel: (options.channel || l.channel || 'Direct').toUpperCase(),
         status: 'CONFIRMED'
       };
@@ -4099,20 +4119,14 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
   const cardsContainer = document.getElementById('propCardsContainer');
   if (!tableBody && !cardsContainer) return;
 
-  const vMeta = {
-    'BELLA': { icon: '🏔️', spec: '6+2 Kişi • Şömine & Barbekü', color: '#3B82F6' },
-    'AZURE': { icon: '💎', spec: '9 Kişi • Jakuzi & Sauna Lüks', color: '#10B981' },
-    'PALM': { icon: '🌲', spec: '12 Kişi • Geniş Aile & Şömine', color: '#8B5CF6' },
-    'OLIVE': { icon: '🌄', spec: '11 Kişi • Dağ & Doğa Manzaralı', color: '#06B6D4' },
-    'SUNSET': { icon: '🌿', spec: '7 Kişi • Butik Villa', color: '#F59E0B' }
-  };
-
-  const vKeys = ['BELLA', 'OLIVE', 'AZURE', 'SUNSET', 'PALM'];
+  const vKeys = Object.keys(appData.villas || {}).filter(k => propStats && propStats[k]);
   
   // Sort villas by revenue descending so #1 is clearly visible
   const sortedVillas = vKeys.map(k => {
     const s = propStats[k] || { revenue: 0, nights: 0, adr: 0, occupancy: 0, revpar: 0, share: 0 };
-    return { key: k, conf: (appData.villas && appData.villas[k]) || {}, stats: s, meta: vMeta[k] || {} };
+    const conf = (appData.villas && appData.villas[k]) || {};
+    const spec = [conf.capacity, conf.amenities].filter(Boolean).join(' • ') || 'Özellik belirtilmedi';
+    return { key: k, conf, stats: s, meta: { icon: '🏡', spec } };
   }).sort((a, b) => b.stats.revenue - a.stats.revenue);
 
   // 1. Render Executive Ranking Matrix Table
@@ -4123,17 +4137,12 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
       const rank = idx + 1;
       const rankClass = rank === 1 ? 'rank-1' : (rank === 2 ? 'rank-2' : (rank === 3 ? 'rank-3' : ''));
       const ciroShare = totalRevenue > 0 ? (s.revenue / totalRevenue) * 100 : 0;
-      const estimatedCost = Math.round(s.revenue * 0.45);
-      const estimatedProfit = Math.max(0, s.revenue - estimatedCost);
-      const profitMargin = s.revenue > 0 ? ((estimatedProfit / s.revenue) * 100).toFixed(1) : 0;
       const occVal = Number(s.occupancy || ((s.nights / getPeriodDayCount()) * 100).toFixed(1));
       const adrVal = Math.round(s.adr || (s.nights > 0 ? s.revenue / s.nights : 0));
 
       // Determine Strategic Diagnosis
       let diagBadge = '<span class="badge badge-emerald">🟢 Dengeli</span>';
       if (rank === 1 && s.revenue > 0) diagBadge = '<span class="badge badge-emerald">👑 Ciro Şampiyonu</span>';
-      else if (item.key === 'AZURE' && adrVal > 8000) diagBadge = '<span class="badge badge-purple">💎 Yüksek Marj & Lüks</span>';
-      else if (item.key === 'SUNSET' && occVal > 85 && adrVal < 3500) diagBadge = '<span class="badge badge-amber">⚠️ Düşük Fiyat Kaçağı</span>';
       else if (occVal < 40 && s.revenue > 0) diagBadge = '<span class="badge badge-rose">📉 Boşluk Riski</span>';
 
       const tr = document.createElement('tr');
@@ -4170,8 +4179,8 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
         <td><strong>${adrVal.toLocaleString('tr-TR')} TL</strong></td>
         <td>₺${Math.round(s.revpar || 0).toLocaleString('tr-TR')}</td>
         <td>
-          <strong class="text-emerald">₺${Math.round(estimatedProfit).toLocaleString('tr-TR')}</strong>
-          <span style="display:block; font-size:10px; color:var(--text-muted);">%${profitMargin} Marj</span>
+          <strong class="text-emerald" title="Mülk bazında gider dağılımı bulunmadığı için hesaplanamadı">—</strong>
+          <span style="display:block; font-size:10px; color:var(--text-muted);">Gider dağılımı gerekli</span>
         </td>
         <td style="text-align: right; white-space: nowrap;">
           <button class="btn btn-secondary btn-sm" onclick="filterByVilla('${item.key}')">🔍 Odaklan</button>
@@ -4188,8 +4197,6 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
       const s = item.stats;
       const rank = idx + 1;
       const ciroShare = totalRevenue > 0 ? (s.revenue / totalRevenue) * 100 : 0;
-      const estimatedCost = Math.round(s.revenue * 0.45);
-      const estimatedProfit = Math.max(0, s.revenue - estimatedCost);
       const occVal = Number(s.occupancy || ((s.nights / getPeriodDayCount()) * 100).toFixed(1));
       const adrVal = Math.round(s.adr || (s.nights > 0 ? s.revenue / s.nights : 0));
 
@@ -4238,11 +4245,11 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
           </div>
           <div class="subm-box">
             <span class="s-lbl">TAHMİNİ NET KÂR</span>
-            <span class="s-val text-emerald">₺${Math.round(estimatedProfit).toLocaleString('tr-TR')}</span>
+            <span class="s-val text-emerald" title="Mülk bazında gider dağılımı bulunmadığı için hesaplanamadı">—</span>
           </div>
           <div class="subm-box">
             <span class="s-lbl">KÂR MARJI</span>
-            <span class="s-val">%${s.revenue > 0 ? ((estimatedProfit / s.revenue) * 100).toFixed(1) : 0}</span>
+            <span class="s-val" title="Mülk bazında gider dağılımı bulunmadığı için hesaplanamadı">—</span>
           </div>
         </div>
 
@@ -4275,7 +4282,7 @@ function renderPropertyComparisonChart(propStats) {
     const s = propStats[vKey] || { revenue: 0, nights: 0, adr: 0, occupancy: 0, revpar: 0 };
     let val = 0;
     if (metric === 'ciro') val = s.revenue;
-    if (metric === 'netKar') val = Math.round(s.revenue * 0.4);
+    if (metric === 'netKar') val = null;
     if (metric === 'adr') val = s.adr || (s.nights > 0 ? Math.round(s.revenue / s.nights) : 0);
     if (metric === 'revpar') val = s.revpar || Math.round(s.revenue / getPeriodDayCount());
     if (metric === 'doluluk') val = Number(s.occupancy || ((s.nights / getPeriodDayCount()) * 100).toFixed(1));
@@ -4283,10 +4290,10 @@ function renderPropertyComparisonChart(propStats) {
     values.push({ key: vKey, name: ((appData.villas && appData.villas[vKey] && appData.villas[vKey].name) || vKey), val });
   });
 
-  const maxVal = Math.max(1, ...values.map(v => v.val));
+  const maxVal = Math.max(1, ...values.map(v => Number(v.val) || 0));
 
   values.forEach(item => {
-    const barPct = (item.val / maxVal) * 100;
+    const barPct = item.val === null ? 0 : (item.val / maxVal) * 100;
     const row = document.createElement('div');
     row.className = 'comp-bar-row';
     row.innerHTML = `
@@ -4294,7 +4301,7 @@ function renderPropertyComparisonChart(propStats) {
       <div class="comp-bar-track">
         <div class="comp-bar-fill" style="width: ${barPct}%;"></div>
       </div>
-      <div class="comp-bar-value"><strong>${typeof item.val === 'number' ? item.val.toLocaleString('tr-TR') : item.val}</strong></div>
+      <div class="comp-bar-value"><strong title="${item.val === null ? 'Mülk bazında gider dağılımı bulunmadığı için hesaplanamadı' : ''}">${item.val === null ? '—' : item.val.toLocaleString('tr-TR')}</strong></div>
     `;
     container.appendChild(row);
   });
@@ -5341,7 +5348,7 @@ function downloadSampleTemplate(templateType) {
         'OTA Komisyonu (TL)': 0,
         'Temizlik Ücreti (TL)': 1500,
         'Kişi Sayısı': 8,
-        'Durum': 'COMPLETED'
+        'Durum': 'CHECKED_OUT'
       },
       {
         'Villa': m2,
@@ -5354,7 +5361,7 @@ function downloadSampleTemplate(templateType) {
         'OTA Komisyonu (TL)': 8400,
         'Temizlik Ücreti (TL)': 1200,
         'Kişi Sayısı': 6,
-        'Durum': 'COMPLETED'
+        'Durum': 'CHECKED_OUT'
       }
     ];
     const ws = XLSX.utils.json_to_sheet(data);
@@ -6265,7 +6272,12 @@ function renderTodayRadar() {
   const actions = [];
 
   appData.maintenance.filter(m => m.status === 'OPEN' && m.priority === 'P1').forEach(m => {
-    actions.push({ type: 'p1', badge: '[P1 ACİL]', title: `${appData.villas[m.villa]?.name || m.villa}: ${m.title}`, meta: `Downtime: ${m.downtime || 1} Gece`, action: 'Çöz' });
+    const downtime = Number(m.downtime);
+    const hasDowntime = m.downtime !== null && m.downtime !== undefined && m.downtime !== '';
+    const downtimeText = hasDowntime && Number.isFinite(downtime) && downtime >= 0
+      ? `${downtime} Gece`
+      : '— (kesinti süresi girilmemiş)';
+    actions.push({ type: 'p1', badge: '[P1 ACİL]', title: `${appData.villas[m.villa]?.name || m.villa}: ${m.title}`, meta: `Downtime: ${downtimeText}`, action: 'Çöz' });
   });
 
   appData.leads.filter(l => l.status === 'FOLLOW_UP').forEach(l => {
@@ -6622,10 +6634,11 @@ function renderManageBookingsTable() {
     const vName = appData.villas[b.villa]?.name || b.villa;
     const nightly = b.nights > 0 ? Math.round((b.net || b.gross) / b.nights) : 0;
 
-    let statusBadge = '<span class="badge badge-green">Onaylandı</span>';
+    let statusBadge = '<span class="badge badge-slate" title="Kaynak kayıtta geçerli durum yok">—</span>';
+    if (b.status === 'CONFIRMED') statusBadge = '<span class="badge badge-green">Onaylandı</span>';
     if (b.status === 'CANCELLED') statusBadge = '<span class="badge badge-rose">İptal</span>';
     if (b.status === 'CHECKED_IN') statusBadge = '<span class="badge badge-blue">İçeride</span>';
-    if (b.status === 'COMPLETED') statusBadge = '<span class="badge badge-slate">Tamamlandı</span>';
+    if (b.status === 'CHECKED_OUT') statusBadge = '<span class="badge badge-slate">Tamamlandı</span>';
 
     // Highlight New Year / future special dates
     const isNewYear = String(b.checkIn || '').slice(5, 10) === '12-31';
@@ -6718,9 +6731,9 @@ function openBookingModal(editId = null) {
     // tutar temizlik ucretiyle ayni sayiydi, o yuzden oradan doldurulur.
     if (ccEl) ccEl.value = (b.cleanCost === undefined || b.cleanCost === null) ? (b.cleanFee || 0) : b.cleanCost;
     const stEl = document.getElementById('resStatus');
-    if (stEl) stEl.value = b.status || 'CONFIRMED';
+    if (stEl) stEl.value = normalizeBookingStatus(b.status) || '';
     const pxEl = document.getElementById('resPax');
-    if (pxEl) pxEl.value = b.pax || 6;
+    if (pxEl) pxEl.value = normalizePositiveInteger(b.pax) ?? '';
     if (deleteBtn) deleteBtn.style.display = 'inline-block';
   } else {
     if (title) title.innerText = '➕ Yeni Rezervasyon Girişi';
@@ -7101,7 +7114,11 @@ async function saveBooking(e) {
     const checkOut = document.getElementById('resCheckOut').value;
     const channel = document.getElementById('resChannel').value;
     const status = document.getElementById('resStatus').value;
-    const pax = Number(document.getElementById('resPax').value) || 2;
+    const pax = normalizePositiveInteger(document.getElementById('resPax').value);
+
+    if (pax === null) {
+      throw new Error('Kişi sayısı pozitif bir tam sayı olmalıdır.');
+    }
 
     // Tarihler artik gizli input; tarayici "required" dogrulamasi gizli
     // alanlara uygulanmaz, bu yuzden burada acikca kontrol edilir.
@@ -8383,6 +8400,17 @@ async function convertLeadAction(leadId) {
     if (!checkOut) return false;
   }
 
+  let pax = normalizePositiveInteger(l.pax);
+  if (pax === null) {
+    const enteredPax = prompt(`"${l.guest}" için kişi sayısını giriniz:`, '');
+    if (enteredPax === null) return false;
+    pax = normalizePositiveInteger(enteredPax);
+    if (pax === null) {
+      alert('Kişi sayısı pozitif bir tam sayı olmalıdır.');
+      return false;
+    }
+  }
+
   if (!confirm(`"${l.guest}" talebi ₺${Number(l.quote).toLocaleString('tr-TR')} bedelle kesin rezervasyona dönüştürülecek. Onaylıyor musunuz?`)) {
     return false;
   }
@@ -8392,6 +8420,7 @@ async function convertLeadAction(leadId) {
       checkIn,
       checkOut,
       grossAmount: Number(l.quote) || 0,
+      pax,
       villa: l.villa,
       propertyId: l.propertyId
     });
@@ -8924,7 +8953,7 @@ function renderDailyOps() {
         <div style="flex: 1;">
           <div class="ops-guest-name" style="font-weight: 700; color: #FFFFFF; font-size: 13px;">${b.guest}</div>
           <div class="ops-guest-meta" style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
-            ${vName} • ${b.channel} • ${b.nights} Gece • ${b.pax || 2} Kişi
+            ${vName} • ${b.channel} • ${b.nights || '—'} Gece • ${b.pax || '—'} Kişi
           </div>
           <div style="font-size: 11px; color: #34D399; margin-top: 2px;">Net Gelir: ₺${Number(b.net || 0).toLocaleString('tr-TR')}</div>
         </div>
@@ -9776,14 +9805,25 @@ function renderTapeChart() {
   populateTapeChartMonthSelect();
 
   const [yStr, mStr] = tapeChartMonth.split('-');
-  const year = Number(yStr) || 2026;
-  const month = Number(mStr) || 9;
+  const year = Number(yStr);
+  const month = Number(mStr);
+  if (!/^\d{4}-\d{2}$/.test(tapeChartMonth)
+      || !Number.isInteger(year) || !Number.isInteger(month)
+      || month < 1 || month > 12) {
+    container.innerHTML = '<div class="empty-state">Takvim gösterilemedi: geçerli bir ay seçilmedi.</div>';
+    return;
+  }
+
+  const vKeys = (typeof appData !== 'undefined' && appData.villas)
+    ? Object.keys(appData.villas)
+    : [];
+  if (vKeys.length === 0) {
+    container.innerHTML = '<div class="empty-state">Henüz gerçek mülk kaydı yok; doluluk takvimi oluşturulamadı.</div>';
+    return;
+  }
   
   // Exact days in month (30 for Sep, 31 for Dec, 28/29 for Feb)
   const daysInMonth = new Date(year, month, 0).getDate();
-  const vKeys = (typeof appData !== 'undefined' && appData.villas && Object.keys(appData.villas).length > 0)
-    ? Object.keys(appData.villas)
-    : ['BELLA', 'OLIVE', 'AZURE', 'SUNSET', 'PALM'];
   
   const dayNamesShort = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
   const todayStr = getTodayStr();
@@ -10136,7 +10176,11 @@ async function saveWaAsBooking() {
 
   const d1 = new Date(checkIn);
   const d2 = new Date(checkOut);
-  const nights = Math.max(1, Math.round((d2 - d1) / (1000 * 60 * 60 * 24)));
+  const nights = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
+  if (!Number.isInteger(nights) || nights <= 0) {
+    alert('Çıkış tarihi giriş tarihinden sonra olmalıdır.');
+    return;
+  }
 
   try {
     await createBooking({
@@ -10949,9 +10993,15 @@ function renderAirbnbAuditRadar() {
   Object.keys(listings).forEach(vKey => {
     const item = listings[vKey];
     const rCount = Number(item.reviews) || 0;
-    const rScore = Number(item.rating) || 5.0;
-    totalWeightedScore += (rScore * rCount);
-    totalReviews += rCount;
+    const parsedScore = Number(item.rating);
+    const hasRating = item.rating !== null && item.rating !== undefined && item.rating !== '';
+    const rScore = hasRating && Number.isFinite(parsedScore) && parsedScore >= 0 && parsedScore <= 5
+      ? parsedScore
+      : null;
+    if (rScore !== null && rCount > 0) {
+      totalWeightedScore += (rScore * rCount);
+      totalReviews += rCount;
+    }
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -10965,8 +11015,8 @@ function renderAirbnbAuditRadar() {
         </div>
       </td>
       <td style="white-space: nowrap;">
-        <span class="badge ${rScore >= 4.9 ? 'badge-amber' : 'badge-blue'}" style="font-size: 13px; font-weight: 800; padding: 4px 8px;">
-          ${rScore.toFixed(2)} ★
+        <span class="badge ${rScore !== null && rScore >= 4.9 ? 'badge-amber' : 'badge-blue'}" style="font-size: 13px; font-weight: 800; padding: 4px 8px;" title="${rScore === null ? 'Airbnb puanı ölçülemedi' : 'Airbnb puanı'}">
+          ${rScore === null ? '—' : rScore.toFixed(2) + ' ★'}
         </span>
       </td>
       <td style="font-weight: 700; white-space: nowrap; color: #93C5FD;">
@@ -10994,9 +11044,13 @@ function renderAirbnbAuditRadar() {
   });
 
   // Update Top Portfolio Card
-  const portfolioAvg = totalReviews > 0 ? (totalWeightedScore / totalReviews) : 4.97;
+  const portfolioAvg = totalReviews > 0 ? (totalWeightedScore / totalReviews) : null;
   const pScoreEl = document.getElementById('airbnbPortfolioScore');
-  if (pScoreEl) pScoreEl.innerHTML = `${portfolioAvg.toFixed(2)} <span class="sub-val" style="color: #FDE68A;">★ / 5.0</span>`;
+  if (pScoreEl) {
+    pScoreEl.innerHTML = portfolioAvg === null
+      ? '<span title="Puanı hesaplamak için doğrulanmış ilan puanı ve yorum sayısı gerekli">—</span>'
+      : `${portfolioAvg.toFixed(2)} <span class="sub-val" style="color: #FDE68A;">★ / 5.0</span>`;
+  }
 
   const pReviewsEl = document.getElementById('airbnbTotalReviews');
   if (pReviewsEl) pReviewsEl.innerText = `${totalReviews} Değerlendirme (${portfolioLabel()})`;
@@ -14321,10 +14375,19 @@ async function handleOnboardingSubmit(e) {
 
     let slug = document.getElementById('onboardPropKey')?.value.trim().toUpperCase() || 'VILLA_1';
     slug = slug.replace(/[^A-Z0-9_]/g, '_');
-    const capacity = document.getElementById('onboardPropCapacity')?.value.trim() || '6-8 Kişilik';
-    const basePrice = Number(document.getElementById('onboardPropBasePrice')?.value) || 20000;
-    const cleanCost = Number(document.getElementById('onboardPropCleanCost')?.value) || 1500;
+    const capacity = document.getElementById('onboardPropCapacity')?.value.trim() || '';
+    const basePrice = Number(document.getElementById('onboardPropBasePrice')?.value);
+    const cleanCost = Number(document.getElementById('onboardPropCleanCost')?.value || 0);
     const amenities = document.getElementById('onboardPropAmenities')?.value.trim() || '';
+
+    if (!Number.isFinite(basePrice) || basePrice < 0) {
+      alert('Lütfen sıfır veya daha büyük geçerli bir gecelik fiyat giriniz.');
+      return;
+    }
+    if (!Number.isFinite(cleanCost) || cleanCost < 0) {
+      alert('Lütfen sıfır veya daha büyük geçerli bir temizlik maliyeti giriniz.');
+      return;
+    }
 
     await createProperty({
       slug,
@@ -15547,8 +15610,8 @@ function renderExecutiveControlCenter() {
           id: tk.id,
           domain: 'OPERATIONS',
           propertyId: tk.propertyId || tk.property_id || null,
-          title: `P1 Arıza: ${tk.title || 'Klima / Jakuzi Arızası'}`,
-          severity: tk.severity || 'CRITICAL',
+          title: `${tk.severity === 'CRITICAL' ? 'P1 ' : ''}Arıza: ${tk.title || 'Başlık girilmemiş'}`,
+          severity: tk.severity || null,
           guestImpact: 'HIGH',
           urgencyDueTime: 25,
           revenueImpact: 'HIGH',
@@ -15665,14 +15728,17 @@ function renderTodayCommandCenter(actionsResult) {
     }
 
     listEl.innerHTML = actions.map(act => {
-      const score = act.actionScore || 85;
-      const scoreClass = score >= 70 ? '' : (score >= 40 ? 'score-med' : 'score-green');
+      const rawScore = act.priorityScore ?? act.actionScore;
+      const parsedScore = Number(rawScore);
+      const hasScore = rawScore !== null && rawScore !== '' && Number.isFinite(parsedScore);
+      const score = hasScore ? parsedScore : null;
+      const scoreClass = !hasScore ? 'score-med' : (score >= 70 ? '' : (score >= 40 ? 'score-med' : 'score-green'));
       const metricsText = (act.sourceMetrics || []).join(' • ');
 
       return `
         <div class="command-action-card ${typeClass}">
           <div class="action-card-top">
-            <span class="action-score-pill ${scoreClass}">Puan: ${score}/100</span>
+            <span class="action-score-pill ${scoreClass}" title="${hasScore ? 'Hesaplanan öncelik puanı' : 'Öncelik puanı hesaplanamadı'}">Puan: ${hasScore ? score + '/100' : '—'}</span>
             <span style="font-size: 10px; color: #94A3B8; font-weight: 600;">${act.propertyId || ''}</span>
           </div>
           <div class="action-card-title">${act.title}</div>
@@ -16891,6 +16957,7 @@ if (typeof module !== 'undefined' && module.exports) {
     // boyle yakalanir (statik tarama regex literalleri yuzunden guvenilmez).
     renderAll,
     renderOperationsTab,
+    renderTapeChart,
     setEl,
     showToast,
     // Pazarlama ekrani renderAll'in ICINDE DEGIL (sekme acilinca calisiyor),

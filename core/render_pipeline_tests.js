@@ -442,6 +442,41 @@ function run() {
     no('15. Boş işletmede pazarlama ekranı uydurma rakam göstermiyor', hataOzeti(e));
   }
 
+  // L-67: Takvim boş işletmede sahte villa üretmemeli; dolu işletmede de
+  // yalnızca müşterinin kendi, birbirinden farklı anahtarlarını çizmelidir.
+  try {
+    check(typeof app.renderTapeChart === 'function',
+      '28. Doluluk takvimi gerçek render testi için dışa aktarılmış',
+      'renderTapeChart export edilmemiş; boş ve çok mülklü senaryo doğrulanamıyor');
+
+    if (typeof app.renderTapeChart === 'function') {
+      domKur();
+      app.setAppData(bosVeri());
+      app.renderTapeChart();
+      const bosTakvim = global.document.getElementById('tapeChartContainer').innerHTML;
+      check(/Henüz gerçek mülk/.test(bosTakvim)
+        && !/BELLA|OLIVE|AZURE|SUNSET|PALM/.test(bosTakvim),
+      '29. Boş işletme takvimi nedenini gösteriyor, sahte mülk göstermiyor',
+      bosTakvim.slice(0, 500));
+
+      domKur();
+      const ikiMulk = bosVeri();
+      ikiMulk.villas = {
+        KAYIK_EVI: { id: 'property-a', slug: 'KAYIK_EVI', name: 'Kayık Evi' },
+        ORMAN_KULUBESI: { id: 'property-b', slug: 'ORMAN_KULUBESI', name: 'Orman Kulübesi' }
+      };
+      app.setAppData(ikiMulk);
+      app.renderTapeChart();
+      const ikiMulkTakvimi = global.document.getElementById('tapeChartContainer').innerHTML;
+      check(ikiMulkTakvimi.includes('Kayık Evi') && ikiMulkTakvimi.includes('Orman Kulübesi')
+        && !/BELLA|OLIVE|AZURE|SUNSET|PALM/.test(ikiMulkTakvimi),
+      '30. Takvim iki farklı gerçek mülk anahtarını birbirine karıştırmadan çiziyor',
+      ikiMulkTakvimi.slice(0, 800));
+    }
+  } catch (e) {
+    no('28-30. L-67 takvim render senaryoları', hataOzeti(e));
+  }
+
   // showToast gercekten bir sey yaziyor mu?
   try {
     domKur();

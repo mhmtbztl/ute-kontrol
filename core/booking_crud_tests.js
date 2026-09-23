@@ -247,7 +247,9 @@ async function runPhase5BookingCrudTests() {
       guest: 'Attacker Guest',
       checkIn: '2026-10-20',
       checkOut: '2026-10-25',
-      gross: 50000
+      gross: 50000,
+      pax: 2,
+      status: 'CONFIRMED'
     };
     const safePayload = mapBookingToDb(forgedInput, tenantAId);
     assert(safePayload.tenant_id === tenantAId, '5. Mapper strictly enforced activeTenantId (' + tenantAId + ') and ignored forged tenantId');
@@ -266,7 +268,9 @@ async function runPhase5BookingCrudTests() {
         guest: 'Injected Guest',
         checkIn: '2026-11-01',
         checkOut: '2026-11-05',
-        gross: 40000
+        gross: 40000,
+        pax: 2,
+        status: 'CONFIRMED'
       });
     } catch (e) {
       if (e.message && e.message.includes('ait değildir')) {
@@ -593,7 +597,9 @@ async function runPhase5BookingCrudTests() {
         guest: 'Guest For Pending Clean',
         checkIn: '2026-12-10',
         checkOut: '2026-12-15',
-        gross: 60000
+        gross: 60000,
+        pax: 2,
+        status: 'CONFIRMED'
       }, tenantAId)
     ).select().single();
 
@@ -622,7 +628,7 @@ async function runPhase5BookingCrudTests() {
     // Create booking with fixed code
     const fixedCode = 'COLLISION-TEST-CODE';
     await clientA.from('bookings').insert(
-      mapBookingToDb({ propertyId: propAId, bookingCode: fixedCode, guest: 'Fixed', checkIn: '2026-07-01', checkOut: '2026-07-05', gross: 20000 }, tenantAId)
+      mapBookingToDb({ propertyId: propAId, bookingCode: fixedCode, guest: 'Fixed', checkIn: '2026-07-01', checkOut: '2026-07-05', gross: 20000, pax: 2, status: 'CONFIRMED' }, tenantAId)
     );
 
     // Attempt second insert with same code -> retry with safe code
@@ -633,7 +639,7 @@ async function runPhase5BookingCrudTests() {
     while (attemptsCount < 3) {
       attemptsCount++;
       const { data: rData, error: rErr } = await clientA.from('bookings').insert(
-        mapBookingToDb({ propertyId: propAId, bookingCode: codeToUse, guest: 'Retry Guest', checkIn: '2026-07-10', checkOut: '2026-07-15', gross: 25000 }, tenantAId)
+        mapBookingToDb({ propertyId: propAId, bookingCode: codeToUse, guest: 'Retry Guest', checkIn: '2026-07-10', checkOut: '2026-07-15', gross: 25000, pax: 2, status: 'CONFIRMED' }, tenantAId)
       ).select().single();
 
       if (!rErr && rData) {
@@ -662,6 +668,7 @@ async function runPhase5BookingCrudTests() {
       checkIn: '2026-12-01',
       checkOut: '2026-12-05',
       gross: 40000,
+      pax: 2,
       status: 'CONFIRMED'
     };
     const { data: bBase1, error: errBase1 } = await clientA.from('bookings').insert(mapBookingToDb(baseInput1, tenantAId)).select().single();
@@ -677,6 +684,7 @@ async function runPhase5BookingCrudTests() {
         checkIn: '2026-12-03',
         checkOut: '2026-12-07',
         gross: 40000,
+        pax: 2,
         status: 'CONFIRMED'
       };
       const { error: errDirectOverlap } = await clientA.from('bookings').insert(mapBookingToDb(overlapInput, tenantAId));
@@ -701,6 +709,7 @@ async function runPhase5BookingCrudTests() {
       checkIn: '2026-12-05', // Exact same day as Booking 1 checkout!
       checkOut: '2026-12-10',
       gross: 50000,
+      pax: 2,
       status: 'CONFIRMED'
     };
     const { data: bSameDay, error: errSameDay } = await clientA.from('bookings').insert(mapBookingToDb(sameDayInput, tenantAId)).select().single();
@@ -716,6 +725,7 @@ async function runPhase5BookingCrudTests() {
       checkIn: '2026-12-15',
       checkOut: '2026-12-20',
       gross: 40000,
+      pax: 2,
       status: 'CANCELLED'
     };
     const { data: bCanc, error: errCanc } = await clientA.from('bookings').insert(mapBookingToDb(cancelledInput, tenantAId)).select().single();
@@ -729,6 +739,7 @@ async function runPhase5BookingCrudTests() {
       checkIn: '2026-12-15',
       checkOut: '2026-12-20',
       gross: 45000,
+      pax: 2,
       status: 'CONFIRMED'
     };
     const { data: bOnCanc, error: errOnCanc } = await clientA.from('bookings').insert(mapBookingToDb(activeOnCancelledInput, tenantAId)).select().single();
@@ -754,6 +765,7 @@ async function runPhase5BookingCrudTests() {
       checkIn: '2026-12-01',
       checkOut: '2026-12-05',
       gross: 40000,
+      pax: 2,
       status: 'CONFIRMED'
     };
     const { data: bDiffProp, error: errDiffProp } = await clientA.from('bookings').insert(mapBookingToDb(diffPropInput, tenantAId)).select().single();
@@ -769,6 +781,7 @@ async function runPhase5BookingCrudTests() {
       checkIn: '2026-12-01',
       checkOut: '2026-12-05',
       gross: 40000,
+      pax: 2,
       status: 'CONFIRMED'
     };
     const { data: bDiffTenant, error: errDiffTenant } = await clientB.from('bookings').insert(mapBookingToDb(diffTenantInput, tenantBId)).select().single();
@@ -804,6 +817,7 @@ async function runPhase5BookingCrudTests() {
       checkIn: concSlotDate1,
       checkOut: concSlotDate2,
       gross: 50000,
+      pax: 2,
       status: 'CONFIRMED'
     };
     const concPayload2 = {
@@ -814,6 +828,7 @@ async function runPhase5BookingCrudTests() {
       checkIn: concSlotDate1,
       checkOut: concSlotDate2,
       gross: 50000,
+      pax: 2,
       status: 'CONFIRMED'
     };
 
@@ -839,9 +854,9 @@ async function runPhase5BookingCrudTests() {
     const concSlotDate3 = '2027-02-01';
     const concSlotDate4 = '2027-02-06';
 
-    const racerA = { tenantId: tenantAId, propertyId: propAId, bookingCode: 'BK-TRI-001', guest: 'Tri Racer 1', checkIn: concSlotDate3, checkOut: concSlotDate4, gross: 60000, status: 'CONFIRMED' };
-    const racerB = { tenantId: tenantAId, propertyId: propAId, bookingCode: 'BK-TRI-002', guest: 'Tri Racer 2', checkIn: concSlotDate3, checkOut: concSlotDate4, gross: 60000, status: 'CONFIRMED' };
-    const racerC = { tenantId: tenantAId, propertyId: propAId, bookingCode: 'BK-TRI-003', guest: 'Tri Racer 3', checkIn: concSlotDate3, checkOut: concSlotDate4, gross: 60000, status: 'CONFIRMED' };
+    const racerA = { tenantId: tenantAId, propertyId: propAId, bookingCode: 'BK-TRI-001', guest: 'Tri Racer 1', checkIn: concSlotDate3, checkOut: concSlotDate4, gross: 60000, pax: 2, status: 'CONFIRMED' };
+    const racerB = { tenantId: tenantAId, propertyId: propAId, bookingCode: 'BK-TRI-002', guest: 'Tri Racer 2', checkIn: concSlotDate3, checkOut: concSlotDate4, gross: 60000, pax: 2, status: 'CONFIRMED' };
+    const racerC = { tenantId: tenantAId, propertyId: propAId, bookingCode: 'BK-TRI-003', guest: 'Tri Racer 3', checkIn: concSlotDate3, checkOut: concSlotDate4, gross: 60000, pax: 2, status: 'CONFIRMED' };
 
     const results3 = await Promise.allSettled([
       clientA.from('bookings').insert(mapBookingToDb(racerA, tenantAId)).select().single(),
@@ -865,8 +880,8 @@ async function runPhase5BookingCrudTests() {
     console.log('\n--- TEST 45: Concurrent update does not corrupt availability ---');
     const targetSlotDate1 = '2027-03-10';
     const targetSlotDate2 = '2027-03-15';
-    const { data: bX } = await clientA.from('bookings').insert(mapBookingToDb({ tenantId: tenantAId, propertyId: propAId, bookingCode: 'BK-UPDX-001', guest: 'Upd X', checkIn: '2027-04-01', checkOut: '2027-04-05', gross: 40000, status: 'CONFIRMED' }, tenantAId)).select().single();
-    const { data: bY } = await clientA.from('bookings').insert(mapBookingToDb({ tenantId: tenantAId, propertyId: propAId, bookingCode: 'BK-UPDY-001', guest: 'Upd Y', checkIn: '2027-05-01', checkOut: '2027-05-05', gross: 40000, status: 'CONFIRMED' }, tenantAId)).select().single();
+    const { data: bX } = await clientA.from('bookings').insert(mapBookingToDb({ tenantId: tenantAId, propertyId: propAId, bookingCode: 'BK-UPDX-001', guest: 'Upd X', checkIn: '2027-04-01', checkOut: '2027-04-05', gross: 40000, pax: 2, status: 'CONFIRMED' }, tenantAId)).select().single();
+    const { data: bY } = await clientA.from('bookings').insert(mapBookingToDb({ tenantId: tenantAId, propertyId: propAId, bookingCode: 'BK-UPDY-001', guest: 'Upd Y', checkIn: '2027-05-01', checkOut: '2027-05-05', gross: 40000, pax: 2, status: 'CONFIRMED' }, tenantAId)).select().single();
 
     const resultsUpd = await Promise.allSettled([
       clientA.from('bookings').update({ check_in: targetSlotDate1, check_out: targetSlotDate2 }).eq('id', bX.id).select().single(),
@@ -904,6 +919,7 @@ async function runPhase5BookingCrudTests() {
         checkIn: '2027-06-03', // Overlap with 2027-06-01 to 2027-06-05!
         checkOut: '2027-06-07',
         gross: 50000,
+        pax: 2,
         status: 'CONFIRMED'
       });
     } catch (e) {

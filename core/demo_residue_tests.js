@@ -280,6 +280,40 @@ function run() {
     'arayüzde. Müşteriden gerçek bir API anahtarı isteyip hiçbir yere ' +
     'yazmayan bir ekran, ticari bir üründe bulunamaz.');
 
+  // --- 15. Eksik alanlari gercek veriymis gibi dolduran varsayilanlar -------
+  const UYDURMA_VARSAYILANLAR = [
+    [/\|\|\s*'6-8 Kişilik'/, 'kapasite 6-8 kişi'],
+    [/\|\|\s*20000\b/, 'gecelik fiyat 20.000'],
+    [/\|\|\s*1500\b/, 'temizlik maliyeti 1.500'],
+    [/Number\([^\n]*\.pax\)\s*\|\|\s*2\b/, 'kişi sayısı 2'],
+    [/\.pax\s*\|\|\s*6\b/, 'kişi sayısı 6'],
+    [/ALLOWED_BOOKING_STATUSES\.includes\([^\n]+\)\s*\?[^\n]+:\s*'CONFIRMED'/, 'bilinmeyen durum CONFIRMED'],
+    [/\.status\s*\|\|\s*'CONFIRMED'/, 'eksik durum CONFIRMED'],
+    [/Math\.max\(1,\s*nights\)/, 'geçersiz konaklama 1 gece'],
+    [/Number\(item\.rating\)\s*\|\|\s*5\.0/, 'eksik puan 5.0'],
+    [/\.actionScore\s*\|\|\s*85\b/, 'eksik aksiyon skoru 85'],
+    [/Number\(yStr\)\s*\|\|\s*2026\b/, 'takvim yılı 2026'],
+    [/Number\(mStr\)\s*\|\|\s*9\b/, 'takvim ayı 9'],
+    [/\.downtime\s*\|\|\s*1\b/, 'eksik kesinti 1 gece'],
+    [/\.severity\s*\|\|\s*'CRITICAL'/, 'eksik arıza önceliği CRITICAL']
+  ];
+  const uydurmaVarsayilanlar = UYDURMA_VARSAYILANLAR
+    .filter(([re]) => re.test(APP_KOD))
+    .map(([, ad]) => ad);
+  check(uydurmaVarsayilanlar.length === 0,
+    '18. Eksik ticari alanlar sıfır olmayan veya kritik varsayılanla doldurulmuyor',
+    'bulunan varsayılanlar: ' + uydurmaVarsayilanlar.join(', ') +
+    '\n       Ölçülemeyen değer null/boş kalmalı ve ekranda “—” ile nedeni görünmelidir.');
+
+  check(!/:\s*\['BELLA',\s*'OLIVE',\s*'AZURE',\s*'SUNSET',\s*'PALM'\]/.test(APP_KOD),
+    '19. Boş portföy takvimi uydurma mülk anahtarları üretmiyor',
+    'Takvim boş işletmede BELLA/OLIVE/AZURE/SUNSET/PALM satırları oluşturuyor.');
+
+  check(!/\.revenue\s*\*\s*(?:0\.4|0\.45)\b/.test(APP_KOD),
+    '20. Mülk kârı, gider dağılımı yokken sabit yüzdeyle tahmin edilmiyor',
+    'Mülk cirosunun %40/%45’i gider veya kâr kabul ediliyor. Gider dağılımı ' +
+    'yokken kâr ve marj “—” olmalıdır.');
+
   console.log('\n=============================================================================');
   console.log(`TEST SUMMARY: ${passed} / ${passed + failed} TESTS PASSED (${failed} FAILED)`);
   console.log('=============================================================================\n');
