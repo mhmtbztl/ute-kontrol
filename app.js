@@ -399,6 +399,7 @@ function syncBookingCleaningTasks() {
 }
 
 function saveAppData() {
+  invalidateExecutiveSnapshotCache();
   if (typeof localStorage === 'undefined') return;
   const uId = (activeSaaSUser && activeSaaSUser.id) ? activeSaaSUser.id : 'usr_ute_master';
   try {
@@ -1857,6 +1858,7 @@ async function saveMonthlyTarget(targetInput) {
     throw new Error('Hedef kaydedilemedi: ' + (error.message || 'Veritabanı hatası'));
   }
   await loadMonthlyTargets();
+  invalidateExecutiveSnapshotCache();
   if (typeof renderAll === 'function') renderAll();
   return data;
 }
@@ -3062,6 +3064,23 @@ async function deleteLead(leadId, options = {}) {
   return true;
 }
 
+function buildLeadConversionOptions(lead = {}, overrides = {}) {
+  const value = (overrideKey, ...leadKeys) => {
+    if (overrides[overrideKey] !== undefined && overrides[overrideKey] !== null) return overrides[overrideKey];
+    for (const key of leadKeys) {
+      if (lead[key] !== undefined && lead[key] !== null) return lead[key];
+    }
+    return null;
+  };
+  return {
+    grossAmount: value('grossAmount', 'quote', 'quoteAmount', 'quote_amount'),
+    channel: value('channel', 'channel', 'source'),
+    otaCommission: value('otaCommission', 'otaCommission', 'otaComm', 'ota_commission'),
+    cleaningFee: value('cleaningFee', 'cleaningFee', 'cleanFee', 'cleaning_fee'),
+    discount: value('discount', 'discount')
+  };
+}
+
 async function convertLeadToBooking(leadId, options = {}) {
   if (!leadId) throw new Error('Dönüştürülecek lead kimliği gereklidir.');
   const tenantId = getActiveTenantId();
@@ -3112,6 +3131,9 @@ async function convertLeadToBooking(leadId, options = {}) {
         gross: Number(options.grossAmount ?? l.quote ?? 0),
         pax: normalizePositiveInteger(options.pax ?? l.pax),
         channel: (options.channel || l.channel || 'Direct').toUpperCase(),
+        otaComm: Number(options.otaCommission ?? l.otaCommission ?? l.otaComm ?? 0),
+        cleaningFee: Number(options.cleaningFee ?? l.cleaningFee ?? l.cleanFee ?? 0),
+        discount: Number(options.discount ?? l.discount ?? 0),
         status: 'CONFIRMED'
       };
       if (!appData.bookings) appData.bookings = [];
@@ -3147,9 +3169,9 @@ async function convertLeadToBooking(leadId, options = {}) {
       p_check_out: options.checkOut || null,
       p_pax: options.pax ? Number(options.pax) : null,
       p_gross_amount: options.grossAmount ? Number(options.grossAmount) : null,
-      p_ota_commission: options.otaCommission ? Number(options.otaCommission) : 0,
-      p_cleaning_fee: options.cleaningFee ? Number(options.cleaningFee) : 0,
-      p_discount: options.discount ? Number(options.discount) : 0,
+      p_ota_commission: options.otaCommission == null ? null : Number(options.otaCommission),
+      p_cleaning_fee: options.cleaningFee == null ? null : Number(options.cleaningFee),
+      p_discount: options.discount == null ? null : Number(options.discount),
       p_notes: options.notes || null
     });
 
@@ -3759,10 +3781,18 @@ function formatShortDate(dateStr) {
 // =============================================================
 // 🔄 MOBİL ÖNBELLEK (CACHE) & ÇEREZ TEMİZLEME MOTORU
 // =============================================================
-const CURRENT_APP_BUILD_VERSION = '5.5.2-20260907';
+function getCurrentAppBuildVersion(doc = typeof document !== 'undefined' ? document : null) {
+  const script = doc?.currentScript || Array.from(doc?.scripts || [])
+    .find(item => /(?:^|\/)app\.js(?:\?|$)/.test(item.getAttribute?.('src') || ''));
+  const src = script?.getAttribute?.('src') || '';
+  const version = src.match(/[?&]v=([^&]+)/)?.[1];
+  return version ? `asset-${version}` : 'development';
+}
+
+const CURRENT_APP_BUILD_VERSION = getCurrentAppBuildVersion();
 
 async function forceHardRefresh() {
-  const confirmed = confirm('Tarayıcı ve mobildeki eski önbellek (cache) ve çerez kalıntıları temizlenip en güncel canlı sürüm yüklensin mi?\n\n(Not: Yetkili PIN şifreniz korunacaktır.)');
+  const confirmed = confirm('Tarayıcı ve mobildeki eski önbellek (cache) ve çerez kalıntıları temizlenip en güncel canlı sürüm yüklensin mi?\n\n(Not: Oturum bilgileriniz korunacaktır.)');
   if (!confirmed) return;
 
   if (window.showToast) {
@@ -5421,19 +5451,23 @@ async function saveMonthlyGoals(e) {
   const revpar = capacity > 0 ? Math.round(revenue / capacity) : 0;
   const [year, month] = period.split('-').map(Number);
 
-  await saveMonthlyTarget({ year, month, revenueTarget: revenue, netProfitTarget: netProfit,
-    maxExpenseTarget: maxExpense, occupancyTarget: occupancy, adrTarget: adr,
-    revparTarget: revpar, marginTarget: margin });
-  closeGoalsModal();
-  renderFinanceModule();
-  renderSettingsGoalsTable();
+  try {
+    await saveMonthlyTarget({ year, month, revenueTarget: revenue, netProfitTarget: netProfit,
+      maxExpenseTarget: maxExpense, occupancyTarget: occupancy, adrTarget: adr,
+      revparTarget: revpar, marginTarget: margin });
+    closeGoalsModal();
+    renderFinanceModule();
+    renderSettingsGoalsTable();
 
-  // Show friendly notification toast
-  const toast = document.createElement('div');
-  toast.style.cssText = 'position:fixed; bottom:24px; right:24px; background:#10B981; color:#fff; padding:14px 20px; border-radius:10px; font-weight:700; font-size:14px; box-shadow:0 10px 25px rgba(0,0,0,0.5); z-index:99999; display:flex; align-items:center; gap:8px;';
-  toast.innerHTML = `<span>✓</span> <strong>${period}</strong> hedefi ${revenue.toLocaleString('tr-TR')} TL olarak güncellendi!`;
-  document.body.appendChild(toast);
-  setTimeout(() => { toast.remove(); }, 3500);
+    // Show friendly notification toast
+    const toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed; bottom:24px; right:24px; background:#10B981; color:#fff; padding:14px 20px; border-radius:10px; font-weight:700; font-size:14px; box-shadow:0 10px 25px rgba(0,0,0,0.5); z-index:99999; display:flex; align-items:center; gap:8px;';
+    toast.innerHTML = `<span>✓</span> <strong>${period}</strong> hedefi ${revenue.toLocaleString('tr-TR')} TL olarak güncellendi!`;
+    document.body.appendChild(toast);
+    setTimeout(() => { toast.remove(); }, 3500);
+  } catch (err) {
+    alert('Hedef kaydedilemedi: ' + getFriendlyAuthErrorMessage(err));
+  }
 }
 
 // -------------------------------------------------------------
@@ -8648,10 +8682,10 @@ async function convertLeadAction(leadId) {
     await convertLeadToBooking(l.id, {
       checkIn,
       checkOut,
-      grossAmount: Number(l.quote) || 0,
       pax,
       villa: l.villa,
-      propertyId: l.propertyId
+      propertyId: l.propertyId,
+      ...buildLeadConversionOptions(l, { grossAmount: Number(l.quote) || 0 })
     });
     if (window.showToast) window.showToast('🎉 Talep başarıyla rezervasyona dönüştürüldü ve takvime eklendi!');
     else alert('🎉 Talep başarıyla rezervasyona dönüştürüldü ve takvime eklendi!');
@@ -8870,23 +8904,23 @@ async function saveMaint(e) {
     alert('Takvimi kapatan bakım için geçerli başlangıç ve bitiş tarihleri zorunludur.');
     return;
   }
-  const tenantId = getActiveTenantId();
-  requireCloudForWrite('Bakım kaydı', tenantId);
-  const propertyId = appData.villas[villa]?.id;
-  const existingTicket = editId ? appData.maintenance.find(item => item.id === editId) : null;
-  const payload = {
-    property_id: propertyId,
-    category: 'MAINTENANCE',
-    severity: getMaintenanceSeverityForSave(priority, existingTicket),
-    title: title.trim(),
-    description: assignee ? `Sorumlu: ${assignee}` : null,
-    status,
-    estimated_cost: cost,
-    blocks_availability: blocksAvailability,
-    downtime_start: blocksAvailability ? downtimeStart : null,
-    downtime_end: blocksAvailability ? downtimeEnd : null
-  };
   try {
+    const tenantId = getActiveTenantId();
+    requireCloudForWrite('Bakım kaydı', tenantId);
+    const propertyId = appData.villas[villa]?.id;
+    const existingTicket = editId ? appData.maintenance.find(item => item.id === editId) : null;
+    const payload = {
+      property_id: propertyId,
+      category: 'MAINTENANCE',
+      severity: getMaintenanceSeverityForSave(priority, existingTicket),
+      title: title.trim(),
+      description: assignee ? `Sorumlu: ${assignee}` : null,
+      status,
+      estimated_cost: cost,
+      blocks_availability: blocksAvailability,
+      downtime_start: blocksAvailability ? downtimeStart : null,
+      downtime_end: blocksAvailability ? downtimeEnd : null
+    };
     if (editId) {
       const { error } = await supabaseClient.from('maintenance_tickets').update(payload)
         .eq('tenant_id', tenantId).eq('id', editId);
@@ -13971,6 +14005,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
         isCleanState: Object.keys(villas).length === 0
       };
 
+      invalidateExecutiveSnapshotCache();
       updateAllVillaDropdowns();
       renderAll();
       return;
@@ -13988,6 +14023,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
 
   // Demo / yerel boş state
   appData = getBlankTenantData(targetId);
+  invalidateExecutiveSnapshotCache();
   updateAllVillaDropdowns();
   renderAll();
 }
@@ -14453,6 +14489,7 @@ function applyTenantRealtimePayload(table, payload) {
 
 function renderTenantRealtimeChange(table) {
   if (typeof document === 'undefined') return;
+  invalidateExecutiveSnapshotCache();
   if (table === 'properties') updateAllVillaDropdowns();
   if (table === 'bookings' && typeof syncBookingCleaningTasks === 'function') syncBookingCleaningTasks();
   renderAll();
@@ -14614,9 +14651,9 @@ function mapGuestFromDb(g) {
     email: g.email || '',
     language: g.preferred_language || 'tr',
     countryCode: g.country_code || 'TR',
-    allowEmail: g.allow_email !== false,
-    allowSms: g.allow_sms !== false,
-    allowWhatsapp: g.allow_whatsapp !== false,
+    allowEmail: g.allow_email === true,
+    allowSms: g.allow_sms === true,
+    allowWhatsapp: g.allow_whatsapp === true,
     marketingOptIn: g.marketing_opt_in === true,
     preferences: g.preferences || '',
     internalNotes: g.internal_notes || '',
@@ -14634,9 +14671,9 @@ function mapGuestToDb(guestInput = {}) {
     email: String(guestInput.email || '').trim().toLowerCase() || null,
     preferred_language: guestInput.language || guestInput.preferred_language || 'tr',
     country_code: guestInput.countryCode || guestInput.country_code || 'TR',
-    allow_email: guestInput.allowEmail !== false && guestInput.allow_email !== false,
-    allow_sms: guestInput.allowSms !== false && guestInput.allow_sms !== false,
-    allow_whatsapp: guestInput.allowWhatsapp !== false && guestInput.allow_whatsapp !== false,
+    allow_email: guestInput.allowEmail === true || guestInput.allow_email === true,
+    allow_sms: guestInput.allowSms === true || guestInput.allow_sms === true,
+    allow_whatsapp: guestInput.allowWhatsapp === true || guestInput.allow_whatsapp === true,
     marketing_opt_in: guestInput.marketingOptIn === true || guestInput.marketing_opt_in === true,
     preferences: String(guestInput.preferences || '').trim() || null,
     internal_notes: String(guestInput.internalNotes || guestInput.internal_notes || '').trim() || null,
@@ -14714,9 +14751,9 @@ async function linkBookingGuestProfile(bookingId, guestInput) {
     p_email: emailResult.normalized || null,
     p_preferred_language: guestInput.language || 'tr',
     p_country_code: guestInput.countryCode || 'TR',
-    p_allow_email: true,
-    p_allow_sms: true,
-    p_allow_whatsapp: true,
+    p_allow_email: guestInput.allowEmail === true,
+    p_allow_sms: guestInput.allowSms === true,
+    p_allow_whatsapp: guestInput.allowWhatsapp === true,
     p_marketing_opt_in: guestInput.marketingOptIn === true
   });
   if (error) {
@@ -15269,8 +15306,27 @@ let executiveSnapshotState = {
   current: null,
   prior: null,
   error: null,
+  retryAt: 0,
   requestId: 0
 };
+
+function shouldRefreshExecutiveSnapshot(state, contextKey, now = Date.now()) {
+  if (!state || state.key !== contextKey) return true;
+  return state.status === 'error' && Number(state.retryAt || 0) <= now;
+}
+
+function invalidateExecutiveSnapshotCache() {
+  executiveSnapshotState = {
+    ...executiveSnapshotState,
+    key: null,
+    status: 'idle',
+    current: null,
+    prior: null,
+    error: null,
+    retryAt: 0,
+    requestId: Number(executiveSnapshotState?.requestId || 0) + 1
+  };
+}
 
 function getExecutiveSnapshotContext() {
   const tenantId = getActiveTenantId();
@@ -15362,7 +15418,7 @@ function renderExecutiveSnapshotKpis() {
     return false;
   }
 
-  if (executiveSnapshotState.key !== context.key) {
+  if (shouldRefreshExecutiveSnapshot(executiveSnapshotState, context.key)) {
     setExecutiveSnapshotPlaceholder('Sunucu anlık görüntüsü yükleniyor…');
     void refreshExecutiveDashboardSnapshot(false);
     return true;
@@ -15403,7 +15459,7 @@ function renderExecutiveSnapshotKpis() {
 async function refreshExecutiveDashboardSnapshot(force = false) {
   const context = getExecutiveSnapshotContext();
   if (!context.supported) {
-    executiveSnapshotState = { ...executiveSnapshotState, key: null, status: 'unsupported', current: null, prior: null, error: null };
+    executiveSnapshotState = { ...executiveSnapshotState, key: null, status: 'unsupported', current: null, prior: null, error: null, retryAt: 0 };
     if (typeof document !== 'undefined') renderExecutiveSnapshotKpis();
     return null;
   }
@@ -15412,7 +15468,7 @@ async function refreshExecutiveDashboardSnapshot(force = false) {
   }
 
   const requestId = executiveSnapshotState.requestId + 1;
-  executiveSnapshotState = { key: context.key, status: 'loading', current: null, prior: null, error: null, requestId };
+  executiveSnapshotState = { key: context.key, status: 'loading', current: null, prior: null, error: null, retryAt: 0, requestId };
   if (typeof document !== 'undefined') setExecutiveSnapshotPlaceholder('Sunucu anlık görüntüsü yükleniyor…');
   try {
     const [current, prior] = await Promise.all([
@@ -15420,30 +15476,30 @@ async function refreshExecutiveDashboardSnapshot(force = false) {
       context.priorPeriod ? getExecutiveDashboardSnapshot(context.priorPeriod, context.propertyId) : Promise.resolve(null)
     ]);
     if (executiveSnapshotState.requestId !== requestId || executiveSnapshotState.key !== context.key) return null;
-    executiveSnapshotState = { key: context.key, status: 'ready', current, prior, error: null, requestId };
+    executiveSnapshotState = { key: context.key, status: 'ready', current, prior, error: null, retryAt: 0, requestId };
     if (typeof document !== 'undefined') renderExecutiveControlCenter();
     return current;
   } catch (error) {
     if (executiveSnapshotState.requestId !== requestId) return null;
     console.error('Executive snapshot load failed:', error);
-    executiveSnapshotState = { key: context.key, status: 'error', current: null, prior: null, error, requestId };
+    executiveSnapshotState = { key: context.key, status: 'error', current: null, prior: null, error, retryAt: Date.now() + 5000, requestId };
     if (typeof document !== 'undefined') renderExecutiveControlCenter();
     return null;
   }
 }
 
-function setAppData(data) {
+const setAppData = function (data) {
   if (typeof appData !== 'undefined') {
     Object.assign(appData, data);
   } else if (typeof global !== 'undefined') {
     if (!global.appData) global.appData = {};
     Object.assign(global.appData, data);
   }
-}
+};
 
-function getAppData() {
+const getAppData = function () {
   return (typeof appData !== 'undefined') ? appData : (typeof global !== 'undefined' ? global.appData : null);
-}
+};
 
 // Donem filtresini disaridan ayarlamak icin. Testler gelir dagitiminin
 // (getBookingFilterShare) donem sinirlarinda dogru davrandigini boyle olcer.
@@ -15452,13 +15508,13 @@ function setCurrentFilter(filter) {
   return currentFilter;
 }
 
-function setSupabaseClient(client) {
+const setSupabaseClient = function (client) {
   supabaseClient = client;
-}
+};
 
-function getSupabaseClient() {
+const getSupabaseClient = function () {
   return supabaseClient;
-}
+};
 
 // =============================================================================
 // LEXBNB PHASE 12 — EXECUTIVE CONTROL CENTER & UI IMPLEMENTATION
@@ -16539,9 +16595,9 @@ function openGuestProfileModal(guestId = null) {
   document.getElementById('guestEmail').value = guest?.email || '';
   document.getElementById('guestLanguage').value = guest?.language || 'tr';
   document.getElementById('guestCountryCode').value = guest?.countryCode || 'TR';
-  document.getElementById('guestAllowWhatsapp').checked = guest ? guest.allowWhatsapp !== false : true;
-  document.getElementById('guestAllowSms').checked = guest ? guest.allowSms !== false : true;
-  document.getElementById('guestAllowEmail').checked = guest ? guest.allowEmail !== false : true;
+  document.getElementById('guestAllowWhatsapp').checked = guest?.allowWhatsapp === true;
+  document.getElementById('guestAllowSms').checked = guest?.allowSms === true;
+  document.getElementById('guestAllowEmail').checked = guest?.allowEmail === true;
   document.getElementById('guestMarketingOptIn').checked = guest?.marketingOptIn === true;
   document.getElementById('guestPreferences').value = guest?.preferences || '';
   document.getElementById('guestInternalNotes').value = guest?.internalNotes || '';
@@ -16871,6 +16927,7 @@ if (typeof module !== 'undefined' && module.exports) {
     createLead,
     updateLead,
     deleteLead,
+    buildLeadConversionOptions,
     convertLeadToBooking,
     setAppData,
     getAppData,
@@ -16985,6 +17042,8 @@ if (typeof module !== 'undefined' && module.exports) {
     saveTenantOnboarding,
     getExecutiveDashboardSnapshot,
     getExecutiveSnapshotContext,
+    invalidateExecutiveSnapshotCache,
+    shouldRefreshExecutiveSnapshot,
     refreshExecutiveDashboardSnapshot,
     renderExecutiveSnapshotKpis,
     renderExecutiveControlCenter,
