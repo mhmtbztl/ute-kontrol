@@ -411,7 +411,7 @@
             <strong style="color: #F8FAFC; font-size: 14px;">İşletme Kurulum Durumu: <span id="onboardProgressPct" style="color: #A78BFA;">—</span></strong>
           </div>
           <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; margin-bottom: 8px;">
-            <div id="onboardProgressBar" style="width: 100%; height: 100%; background: linear-gradient(90deg, #8B5CF6, #10B981); border-radius: 3px;"></div>
+            <div id="onboardProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #8B5CF6, #10B981); border-radius: 3px;"></div>
           </div>
           <div id="onboardStepsList" style="display: flex; gap: 12px; flex-wrap: wrap; font-size: 11px; color: #CBD5E1;">
             <!-- JS ile doldurulur: renderExecutiveControlCenter -->
@@ -559,7 +559,7 @@
               <span class="command-col-badge badge-red" id="criticalActionsCountBadge">—</span>
             </div>
             <div id="todayCriticalActionsList">
-              <div class="empty-action-state">✅ Kritik müdahale gerektiren açık alert bulunmuyor.</div>
+              <div class="empty-action-state">Kayıtlı açık kritik uyarı yok; dış sistem durumu doğrulanmadı.</div>
             </div>
           </div>
 
@@ -572,7 +572,7 @@
               <span class="command-col-badge badge-yellow" id="operationsActionsCountBadge">—</span>
             </div>
             <div id="todayOperationsActionsList">
-              <div class="empty-action-state">✅ Bugün bekleyen acil turnover veya arıza görevi yok.</div>
+              <div class="empty-action-state">Kayıtlı bekleyen turnover veya arıza görevi yok.</div>
             </div>
           </div>
 
@@ -585,7 +585,7 @@
               <span class="command-col-badge badge-green" id="revenueActionsCountBadge">—</span>
             </div>
             <div id="todayRevenueActionsList">
-              <div class="empty-action-state">✅ Fiyatlandırma ve doluluk optimize; açık fırsat yok.</div>
+              <div class="empty-action-state">Hesaplanmış gelir fırsatı yok; fiyatlandırmanın optimize olduğu sonucuna varılamaz.</div>
             </div>
           </div>
         </div>
@@ -921,7 +921,7 @@
       <section class="card property-finance-section">
         <div class="section-title-bar">
           <div>
-            <h2>🏡 MÜLK BAZLI FİNANSAL PERFORMANS (5 VİLLA)</h2>
+            <h2>🏡 MÜLK BAZLI FİNANSAL PERFORMANS</h2>
             <p class="sub-text">Ciro üretimi, doluluk oranları, gecelik fiyat savunması ve net kâr katkısı</p>
           </div>
           <div class="prop-header-actions">
@@ -1041,7 +1041,7 @@
           <div style="background: rgba(139, 92, 246, 0.08); border: 1px solid rgba(139, 92, 246, 0.25); border-radius: 10px; padding: 12px 14px;">
             <div style="font-size: 11px; color: #DDD6FE; font-weight: 700; text-transform: uppercase;">💵 En Kârlı Ay (Net Kâr)</div>
             <div style="font-size: 17px; font-weight: 800; color: #A78BFA; margin: 4px 0;" id="kpiPeakProfit">—</div>
-            <div style="font-size: 11px; color: var(--text-muted);">%60,8 operasyonel marj rekoru</div>
+            <div style="font-size: 11px; color: var(--text-muted);">Seçili dönem kayıtlarından hesaplanır</div>
           </div>
         </div>
 
@@ -1189,9 +1189,9 @@
             <span class="trajectory-icon">🔮</span>
             <div>
               <h2>ŞİRKET GİDİŞAT RADARI & OTOMATİK PROJEKSİYON MOTORU</h2>
-              <span class="sub-text">Son 14 ayın resmi şirket trendi, momentum analizi ve kış sezonu gelir tahminleri</span>
+              <span class="sub-text">Kayıtlı dönemlerden hesaplanan şirket trendi ve momentum analizi</span>
             </div>
-            <span class="badge badge-emerald" id="trajectoryStatusBadge">CANLI GİDİŞAT: GÜÇLÜ POZİTİF</span>
+            <span class="badge badge-slate" id="trajectoryStatusBadge">SKOR HESAPLANIYOR</span>
           </div>
           <button class="btn btn-secondary btn-sm" onclick="exportTrajectoryReport()">📄 Gidişat Raporu Al</button>
         </div>
@@ -1206,8 +1206,8 @@
             </div>
             <div class="score-info">
               <strong>ŞİRKET SAĞLIK SKORU</strong>
-              <span class="text-emerald" id="trajectoryHealthStatus">🟢 Büyüme & Kâr İvmesinde</span>
-              <p id="trajectoryHealthDesc">Yaz sezonu güçlü toparlanma sağladı, kış öncesi nakit pozisyonu sağlam.</p>
+              <span class="text-slate" id="trajectoryHealthStatus">—</span>
+              <p id="trajectoryHealthDesc">Aylık kayıtlar değerlendirilmeden sonuç gösterilmez.</p>
             </div>
           </div>
 
@@ -1230,40 +1230,14 @@
           </div>
         </div>
 
-        <!-- 2. Gelecek Sezon Tahminleri (Projeksiyon Paneli) -->
+        <!-- 2. Gelecek Sezon Tahminleri (yalnız gerçek model sonucu) -->
         <div class="forecast-panel">
           <div class="forecast-header">
-            <h3>📅 YAKLAŞAN DÖNEM & 2026/2027 KIŞ SEZONU GELİR PROJEKSİYONU</h3>
-            <span class="sub-text">Tarihsel talep dağılımı ve doluluk trendi baz alınarak otomatik modellenmiştir</span>
+            <h3>📅 GELİR PROJEKSİYONU</h3>
+            <span class="sub-text">Projeksiyon göstermek için doğrulanmış bir tahmin modeli ve yeterli tarihsel kayıt gerekir.</span>
           </div>
-          <div class="forecast-grid">
-            <div class="forecast-box">
-              <span class="f-period">EYLÜL 2026 (GEÇİŞ DÖNEMİ)</span>
-              <strong class="f-val">150.000 – 185.000 TL</strong>
-              <span class="f-meta">Tahmini Doluluk: %35 | ADR: ~8.500 TL</span>
-              <p class="f-note">Okul açılışı sebebiyle hafta içi yavaşlar, hafta sonu şömineli talep öne çıkar.</p>
-            </div>
-
-            <div class="forecast-box">
-              <span class="f-period">EKİM - KASIM 2026 (GÜZ SEZONU)</span>
-              <strong class="f-val">450.000 – 520.000 TL</strong>
-              <span class="f-meta">2 Ay Toplamı | Tahmini 45 Gece</span>
-              <p class="f-note">Doğa ve şömine tatili dönemi. Kış erken rezervasyonlarının toplanacağı pencere.</p>
-            </div>
-
-            <div class="forecast-box highlight-winter">
-              <span class="f-period">❄️ 2026/2027 KIŞ SEZONU (ARA - OCA - ŞUB)</span>
-              <strong class="f-val text-emerald">2.250.000 – 2.650.000 TL</strong>
-              <span class="f-meta">Geçen Kış (1.92M TL) Baz Alındığında +%25 Büyüme</span>
-              <p class="f-note">Ocak 2026'da 843k TL yapılmıştı. Doğru fiyatlandırma ile Ocak 2027 hedefi: <strong>1.100.000 TL</strong>.</p>
-            </div>
-
-            <div class="forecast-box highlight-yearend">
-              <span class="f-period">🏆 2026 YIL SONU TOPLAM CİRO TAHMİNİ</span>
-              <strong class="f-val text-emerald">~6.200.000 – 6.450.000 TL</strong>
-              <span class="f-meta">İlk 8 Ay: 3.58M TL | Kalan 4 Ay: ~2.7M TL</span>
-              <p class="f-note">Şirket tarihinin en yüksek yıllık ciro rekoruna doğru ilerleniyor.</p>
-            </div>
+          <div class="forecast-grid" id="trajectoryForecastGrid">
+            <div class="forecast-box"><strong class="f-val">—</strong><p class="f-note">Bağlı ve doğrulanmış tahmin modeli bulunmuyor; gelir projeksiyonu üretilmedi.</p></div>
           </div>
         </div>
 
@@ -1302,7 +1276,7 @@
                 <strong id="simDirectLabel">—</strong>
               </div>
               <input type="range" id="simDirectSlider" min="20" max="90" step="5" value="60" oninput="runWhatIfSimulation()">
-              <span class="slider-hint">OTA komisyonunu (%15-18) sıfırlayan direkt satış</span>
+              <span class="slider-hint">Kayıtlı kanal komisyonunu azaltabilen doğrudan satış payı</span>
             </div>
           </div>
 
@@ -1441,7 +1415,7 @@
 
       <section class="card">
         <div class="section-title-bar">
-          <h2>🏆 5 VİLLA PERFORMANS SCORECARD</h2>
+          <h2>🏆 MÜLK PERFORMANS KARTI</h2>
         </div>
         <div class="table-responsive">
           <table class="data-table">
@@ -1615,10 +1589,10 @@
             <span class="mkt-platform-title">🏨 OTA Algoritma & Sıralama (Airbnb/Booking)</span>
             <span class="badge badge-amber" id="otaRankSummaryBadge">—</span>
           </div>
-          <div class="mkt-stats-row"><span class="mkt-stats-label">Arama Sıralaması:</span><span class="mkt-stats-val" style="color: #FBBF24;" id="otaAvgRankVal">Sayfa 1 / Ort. #4</span></div>
+          <div class="mkt-stats-row"><span class="mkt-stats-label">Arama Sıralaması:</span><span class="mkt-stats-val" style="color: #FBBF24;" id="otaAvgRankVal">—</span></div>
           <div class="mkt-stats-row"><span class="mkt-stats-label">Kapak Görseli Tıklama (CTR):</span><span class="mkt-stats-val" style="color: #34D399;" id="otaAvgCoverCtr">—</span></div>
           <div class="mkt-stats-row"><span class="mkt-stats-label">Başlık & Açıklama SEO:</span><span class="mkt-stats-val" id="otaAvgListingScore">—</span></div>
-          <div class="mkt-stats-row"><span class="mkt-stats-label">Süper Ev Sahibi & Gözde:</span><span class="mkt-stats-val" style="color: #34D399;">5/5 Villa Rozetli 🏆</span></div>
+          <div class="mkt-stats-row"><span class="mkt-stats-label">Süper Ev Sahibi & Gözde:</span><span class="mkt-stats-val" style="color: var(--text-muted);">— Airbnb bağlantısı yok</span></div>
           <div class="mkt-stats-row"><span class="mkt-stats-label">OTA Rezervasyon / Ciro:</span><span class="mkt-stats-val" id="otaBookingsCiroDetail">—</span></div>
         </div>
 
@@ -1977,9 +1951,9 @@
           </div>
 
           <div class="mkt-sim-bars" id="simBarsContainer">
-            <div class="mkt-sim-bar google" id="simBarGoogle" style="width: 45%;">Google %45</div>
-            <div class="mkt-sim-bar meta" id="simBarMeta" style="width: 40%;">Meta %40</div>
-            <div class="mkt-sim-bar retargeting" id="simBarRetarget" style="width: 15%;">Retarget %15</div>
+            <div class="mkt-sim-bar google" id="simBarGoogle" style="width: 33.33%;">Google</div>
+            <div class="mkt-sim-bar meta" id="simBarMeta" style="width: 33.33%;">Meta</div>
+            <div class="mkt-sim-bar retargeting" id="simBarRetarget" style="width: 33.34%;">Retarget</div>
           </div>
 
           <div style="display: flex; justify-content: space-between; font-size: 12px; flex-wrap: wrap; gap: 10px; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px;" id="simResultsDetail">
@@ -2030,28 +2004,28 @@
           <div style="position: absolute; top: -10px; right: -10px; width: 60px; height: 60px; background: rgba(245, 158, 11, 0.08); border-radius: 50%;"></div>
           <div class="channel-card-top">
             <span class="channel-title">🏡 Airbnb Portföyü</span>
-            <span class="badge badge-amber" id="airbnbSuperhostBadge">🏆 Süper Ev Sahibi</span>
+            <span class="badge badge-secondary" id="airbnbSuperhostBadge">Bağlantı yok</span>
           </div>
           <div class="kpi-value" id="airbnbPortfolioScore" style="color: #FBBF24;">—<span class="sub-val" style="color: #FDE68A;">★ / 5.0</span></div>
           <div class="kpi-meta">
             <span id="airbnbTotalReviews">—</span>
-            <span style="color: #34D399; font-weight: 700;">💎 Misafirlerin Gözdesi</span>
+            <span style="color: var(--text-muted);">Rozet durumu ölçülemedi</span>
           </div>
         </div>
         <div class="kpi-card channel-card booking">
-          <div class="channel-card-top"><span class="channel-title">🏨 Booking.com</span><span class="badge badge-blue">Premier Partner</span></div>
-          <div class="kpi-value">9.3 <span class="sub-val">/ 10</span></div>
-          <div class="kpi-meta"><span>Fevkalade</span><span style="color:var(--accent-emerald);">İptal: %12</span></div>
+          <div class="channel-card-top"><span class="channel-title">🏨 Booking.com</span><span class="badge badge-blue">Bağlantı yok</span></div>
+          <div class="kpi-value">—</div>
+          <div class="kpi-meta"><span>Puan ve iptal oranı ölçülemedi</span></div>
         </div>
         <div class="kpi-card channel-card direct">
-          <div class="channel-card-top"><span class="channel-title">💬 WhatsApp & Direkt</span><span class="badge badge-green">%0 Komisyon</span></div>
-          <div class="kpi-value" id="otaSavedCommission">₺0</div>
-          <div class="kpi-meta"><span>Kurtarılan Komisyon</span><span style="color:var(--accent-emerald);">Cepte Kalan ✅</span></div>
+          <div class="channel-card-top"><span class="channel-title">💬 Doğrudan Kanallar</span><span class="badge badge-green">Kayıtlı satışlar</span></div>
+          <div class="kpi-value" id="otaSavedCommission">—</div>
+          <div class="kpi-meta"><span>Doğrudan kanal cirosu</span><span style="color:var(--text-muted);">Varsayımsal tasarruf hesaplanmaz</span></div>
         </div>
         <div class="kpi-card channel-card google">
-          <div class="channel-card-top"><span class="channel-title">📍 Google Haritalar</span><span class="badge badge-blue">Yerel Güç</span></div>
-          <div class="kpi-value">4.9 <span class="sub-val">★</span></div>
-          <div class="kpi-meta"><span>124 Yorum</span><span style="color:var(--accent-emerald);">1.800 Arama</span></div>
+          <div class="channel-card-top"><span class="channel-title">📍 Google Haritalar</span><span class="badge badge-blue">Bağlantı yok</span></div>
+          <div class="kpi-value">—</div>
+          <div class="kpi-meta"><span>Puan, yorum ve arama verisi ölçülemedi</span></div>
         </div>
       </div>
 
@@ -2060,7 +2034,7 @@
         <div class="table-responsive">
           <table class="data-table">
             <thead>
-              <tr><th>KANAL</th><th>TÜR</th><th>REZERVASYON</th><th>BRÜT (₺)</th><th>KOMİSYON (₺)</th><th>KOMİSYON %</th><th>NET ODA (₺)</th><th>KÂRLILIK</th></tr>
+              <tr><th>KANAL</th><th>TÜR</th><th>REZERVASYON</th><th>BRÜT (₺)</th><th>KOMİSYON (₺)</th><th>KOMİSYON %</th><th>NET ODA (₺)</th><th>NET / BRÜT</th></tr>
             </thead>
             <tbody id="channelProfitabilityTableBody"></tbody>
           </table>
@@ -2072,8 +2046,8 @@
           <div>
             <div class="title-with-badge">
               <span style="font-size: 20px;">⭐</span>
-              <h2>5 VİLLA CANLI AIRBNB İTİBAR & İLAN AUDIT RADARI</h2>
-              <span class="badge badge-amber">4.97 Portföy Puanı</span>
+              <h2>AIRBNB İTİBAR & İLAN DENETİMİ</h2>
+              <span class="badge badge-amber">Puan bağlantısı yok</span>
             </div>
             <p class="sub-text">Mülklerinizin Airbnb ilan puanları, yorum adetleri ve misafir memnuniyet karnesi. Bu veriler Airbnb tarafından açık bir arayüzle verilmediği için şu an bağlı değil.</p>
           </div>
@@ -2765,8 +2739,8 @@
         <div class="kpi-cards-grid five-cols" style="margin-bottom: 20px;">
           <div class="kpi-card">
             <span class="kpi-label">YILLIK HEDEF CİRO</span>
-            <div class="kpi-value" style="color: #60A5FA;">₺4.800.000</div>
-            <div class="kpi-meta">2026 Bütçesi</div>
+            <div class="kpi-value" id="pricingAnnualTargetVal" style="color: #60A5FA;">—</div>
+            <div class="kpi-meta" id="pricingAnnualTargetMeta">Yıllık hedef kaydı yok</div>
           </div>
           <div class="kpi-card">
             <span class="kpi-label">ORTALAMA ADR</span>
@@ -2780,13 +2754,13 @@
           </div>
           <div class="kpi-card">
             <span class="kpi-label">KORUMA LİMİTLERİ</span>
-            <div class="kpi-value" style="color: #A78BFA;">AKTİF</div>
-            <div class="kpi-meta">Min/Max Guardrail açık</div>
+            <div class="kpi-value" id="pricingGuardrailVal" style="color: #A78BFA;">—</div>
+            <div class="kpi-meta" id="pricingGuardrailMeta">Fiyat profili kaydı yok</div>
           </div>
           <div class="kpi-card">
             <span class="kpi-label">UZATMA DÖNÜŞÜMÜ</span>
-            <div class="kpi-value" style="color: #FBBF24;">%45</div>
-            <div class="kpi-meta">Misafir erken check-in/out</div>
+            <div class="kpi-value" id="pricingExtensionConversionVal" style="color: #FBBF24;">—</div>
+            <div class="kpi-meta" id="pricingExtensionConversionMeta">Uzatma teklifi kaydı yok</div>
           </div>
         </div>
         <div id="pricingManagerContainer">
@@ -3467,8 +3441,8 @@
             <label>Rezervasyon Kanalı</label>
             <select id="resChannel" required onchange="handleBookingChannelChange()">
               <option value="WHATSAPP">WhatsApp (Direkt - %0)</option>
-              <option value="AIRBNB">Airbnb (OTA - %15)</option>
-              <option value="BOOKING">Booking.com (OTA - %18)</option>
+              <option value="AIRBNB">Airbnb (OTA)</option>
+              <option value="BOOKING">Booking.com (OTA)</option>
               <option value="INSTAGRAM">Instagram (Direkt - %0)</option>
               <option value="WEBSITE">Website (Direkt - %0)</option>
               <option value="REPEAT">Tekrar Misafir (%0)</option>
@@ -3702,7 +3676,6 @@
         <button class="help-tab-btn" id="helpTabBtn-routine" onclick="switchHelpTab('routine')">🕒 Günlük Rutin (10 Saniye)</button>
         <button class="help-tab-btn" id="helpTabBtn-pricing" onclick="switchHelpTab('pricing')">💰 Fiyatlama & Taktikler</button>
         <button class="help-tab-btn" id="helpTabBtn-ops" onclick="switchHelpTab('ops')">🛎️ Operasyon & Temizlik</button>
-        <button class="help-tab-btn" id="helpTabBtn-saas" onclick="switchHelpTab('saas')" style="color: #FBBF24; font-weight: 700;">🚀 SaaS Olarak Kiralama</button>
         <button class="help-tab-btn" id="helpTabBtn-data" onclick="switchHelpTab('data')">🔄 Veri & Sıfırlama</button>
       </div>
 
@@ -3811,7 +3784,7 @@
                 <strong style="color:#4ADE80; font-size:14px;">🌐 OTA Komisyonu vs Doğrudan Satış</strong>
                 <span class="badge badge-green" style="font-size:10px;">Kâr Katlama</span>
               </div>
-              <p style="font-size:12px; color:#E2E8F0; margin:6px 0;"><strong>Basitçe:</strong> Airbnb ve Booking sizden %15-20 komisyon keser. WhatsApp veya direkt satışta komisyon %0'dır.</p>
+              <p style="font-size:12px; color:#E2E8F0; margin:6px 0;"><strong>Basitçe:</strong> OTA ve doğrudan kanalların komisyonu, işletmenizin kanal ayarlarında kayıtlı oranlardan izlenir.</p>
               <p style="font-size:11px; color:#BBF7D0; margin:0;">💡 <strong>Taktik:</strong> OTA'yı misafiri bulmak için kullanın, bir sonraki gelişinde kartvizitinizle doğrudan sizden rezerve etmesini sağlayın.</p>
             </div>
           </div>
@@ -3837,7 +3810,7 @@
             <div class="step-body">
               <h4>Gün İçi (Satış & İletişim) — WhatsApp Mesaj Ayrıştırıcı</h4>
               <p>WhatsApp'tan gelen mesajları tek tek elle girmek yerine, üst menüden <strong>"💬 WhatsApp Ayrıştırıcı"</strong>yı açın. Mesajı yapıştırın, misafir adı, telefon ve tarih 2 saniyede çözülüp takvime eklensin.</p>
-              <span class="step-tip">💡 İpucu: Direkt WhatsApp satışında komisyon sıfırlandığı için kâr marjınız %15 artar.</span>
+              <span class="step-tip">💡 İpucu: Kanal maliyetini karşılaştırırken yalnız kayıtlı komisyon tutarlarını kullanın; varsayımsal tasarruf yazmayın.</span>
             </div>
           </div>
 
@@ -3892,49 +3865,7 @@
           </ul>
         </div>
 
-        <!-- TAB 5: SAAS OLARAK KİRALAMA REHBERİ -->
-        <div id="helpTab-saas" class="help-tab-pane" style="display: none;">
-          <div style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(139, 92, 246, 0.15)); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 12px; padding: 18px; margin-bottom: 16px;">
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-              <span style="font-size: 24px;">🚀</span>
-              <h3 style="margin: 0; color: #FBBF24; font-size: 17px;">Bu Yazılımı Diğer İşletmelere Kiralama (SaaS Modeli)</h3>
-            </div>
-            <p style="margin: 0; font-size: 13px; color: #E2E8F0; line-height: 1.5;">
-              Bu kontrol panelini sadece kendi tesisiniz için değil, <strong>Sapanca, Fethiye, Kaş, Rize ve Bodrum'daki binlerce bungalov ve villa sahibine aylık abonelikle satabilirsiniz.</strong>
-            </p>
-          </div>
-
-          <h4 style="color: #FFFFFF; font-size: 14px; margin-bottom: 8px;">💼 Önerilen SaaS Abonelik Paketleri:</h4>
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin-bottom: 18px;">
-            <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 14px;">
-              <div style="font-size: 12px; color: var(--text-muted); font-weight: 700;">BAŞLANGIÇ PAKETİ</div>
-              <div style="font-size: 20px; font-weight: 800; color: #60A5FA; margin: 4px 0;">990 TL <small style="font-size: 12px; color: var(--text-muted);">/ ay</small></div>
-              <div style="font-size: 11px; color: #94A3B8;">• 1 - 3 Villa / Bungalov<br>• WhatsApp Mesaj Çözücü<br>• Temel Finans & Takvim</div>
-            </div>
-
-            <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 10px; padding: 14px; position: relative;">
-              <span class="badge badge-amber" style="position: absolute; top: 8px; right: 8px; font-size: 9px;">EN POPÜLER</span>
-              <div style="font-size: 12px; color: #FDE68A; font-weight: 700;">PRO İŞLETME</div>
-              <div style="font-size: 20px; font-weight: 800; color: #FBBF24; margin: 4px 0;">1.990 TL <small style="font-size: 12px; color: var(--text-muted);">/ ay</small></div>
-              <div style="font-size: 11px; color: #E2E8F0;">• 4 - 10 Villa (Portföy Paketi)<br>• Tam Finansal Şelale & KPI<br>• Canlı WhatsApp Gateway</div>
-            </div>
-
-            <div style="background: rgba(139, 92, 246, 0.08); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 10px; padding: 14px;">
-              <div style="font-size: 12px; color: #DDD6FE; font-weight: 700;">KURUMSAL / ZİNCİR</div>
-              <div style="font-size: 20px; font-weight: 800; color: #A78BFA; margin: 4px 0;">3.490 TL <small style="font-size: 12px; color: var(--text-muted);">/ ay</small></div>
-              <div style="font-size: 11px; color: #94A3B8;">• 10+ Villa / Otel Odası<br>• Çoklu Kullanıcı Rolleri<br>• Özel Alan Adı & Logo</div>
-            </div>
-          </div>
-
-          <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 10px; padding: 14px;">
-            <strong style="color: #34D399; font-size: 13px;">💰 Aylık Pasif Gelir Potansiyeli (MRR):</strong>
-            <p style="font-size: 12px; color: var(--text-secondary); margin: 6px 0 0 0;">
-              Sadece Sapanca ve Fethiye bölgesindeki <strong>50 bungalov işletmesi</strong> abone olduğunda, işletme başı ortalama 1.500 TL'den <strong>aylık 75.000 TL net düzenli yazılım geliri</strong> elde edersiniz.
-            </p>
-          </div>
-        </div>
-
-        <!-- TAB 6: VERİ VE SIFIRLAMA -->
+        <!-- TAB 5: VERİ VE SIFIRLAMA -->
         <div id="helpTab-data" class="help-tab-pane" style="display: none;">
           <h4 style="color: #FFFFFF; margin-top: 0;">🔄 Veri Tabanı ve Sıfırlama Mekanizması</h4>
           <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px;">
@@ -4569,7 +4500,7 @@
   <script src="core/executive_ai_advisor.js?v=502075f7"></script>
   <script src="core/notification_center_service.js?v=710f8a91"></script>
   <script src="core/captcha_gate.js?v=3ad4a776"></script>
-  <script src="app.js?v=ae46a186"></script>
+  <script src="app.js?v=48d4d279"></script>
   <script src="core/property_analysis_context_ui.js?v=efba10f2"></script>
   <script src="core/analysis_center_ui.js?v=7991bd67"></script>
   <script src="core/marketing_ui.js?v=1360fb04"></script>

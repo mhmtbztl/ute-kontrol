@@ -477,6 +477,76 @@ function run() {
     no('28-30. L-67 takvim render senaryoları', hataOzeti(e));
   }
 
+  // L-68: Raporlar ilk musterinin sabit rakamlarini gostermemeli. Bos hesapta
+  // neden belirtilmeli; iki farkli anahtar kullanan iki kiracinin raporu da
+  // yalnizca kendi kayitlarindan uretilmelidir.
+  try {
+    check(typeof app.renderReportsTab === 'function',
+      '31. Raporlar gerçek render testi için dışa aktarılmış',
+      'renderReportsTab export edilmemiş');
+    if (typeof app.renderReportsTab === 'function') {
+      domKur();
+      app.setAppData(bosVeri());
+      app.setCurrentFilter({ period: '2026-09', villa: 'ALL', startDate: null, endDate: null });
+      app.renderReportsTab();
+      const bosRapor = global.document.getElementById('reportsContentContainer').innerHTML;
+      check(/rezervasyon kaydı yok|hesaplanamadı/i.test(bosRapor)
+        && !/483[.]965|251[.]661|142[.]793/.test(bosRapor),
+      '32. Boş işletme raporu açıklamalı boş durum gösteriyor', bosRapor.slice(0, 900));
+
+      const kiraciA = bosVeri();
+      kiraciA.villas = { KIYI_01: { id: 'pa', slug: 'KIYI_01', name: 'Kıyı Evi' } };
+      kiraciA.bookings = [{ id: 'ba', villa: 'KIYI_01', propertyId: 'pa', checkIn: '2026-09-01',
+        checkOut: '2026-09-03', nights: 2, gross: 11000, otaCommission: 1100,
+        channel: 'AIRBNB', status: 'CONFIRMED', pax: 2 }];
+      domKur(); app.setAppData(kiraciA); app.setCurrentFilter({ period: '2026-09', villa: 'ALL', startDate: null, endDate: null });
+      app.renderReportsTab();
+      const raporA = global.document.getElementById('reportsContentContainer').innerHTML;
+
+      const kiraciB = bosVeri();
+      kiraciB.villas = { DAG_99: { id: 'pb', slug: 'DAG_99', name: 'Dağ Evi' } };
+      kiraciB.bookings = [{ id: 'bb', villa: 'DAG_99', propertyId: 'pb', checkIn: '2026-09-05',
+        checkOut: '2026-09-08', nights: 3, gross: 27000, otaCommission: 0,
+        channel: 'WHATSAPP', status: 'CONFIRMED', pax: 4 }];
+      domKur(); app.setAppData(kiraciB); app.setCurrentFilter({ period: '2026-09', villa: 'ALL', startDate: null, endDate: null });
+      app.renderReportsTab();
+      const raporB = global.document.getElementById('reportsContentContainer').innerHTML;
+      check(/11[.]000/.test(raporA) && !/27[.]000|DAG_99/.test(raporA)
+        && /27[.]000/.test(raporB) && !/11[.]000|KIYI_01/.test(raporB),
+      '33. İki kiracının rapor rakamları birbirine sızmıyor',
+      'A: ' + raporA.slice(0, 500) + '\n       B: ' + raporB.slice(0, 500));
+    }
+
+    check(typeof app.renderCoverAbTestLab === 'function',
+      '34. A/B laboratuvarı gerçek mülk anahtarıyla test edilebilir',
+      'renderCoverAbTestLab export edilmemiş');
+    check(typeof app.renderPricingTab === 'function',
+      '35. Fiyatlandırma boş durumu gerçek render testi için dışa aktarılmış',
+      'renderPricingTab export edilmemiş');
+    if (typeof app.renderPricingTab === 'function') {
+      domKur(); app.setAppData(bosVeri()); app.renderPricingTab();
+      const bosFiyat = global.document.getElementById('pricingManagerContainer').innerHTML;
+      check(/hesaplanamadı|mülk kaydı yok/i.test(bosFiyat) && !/Kritik boş gece penceresi bulunmuyor/.test(bosFiyat),
+        '36. Boş işletmede fiyatlandırma başarı iddiası değil veri eksikliği gösteriyor', bosFiyat.slice(0, 700));
+    }
+    check(typeof app.renderGapNights === 'function' && typeof app.renderOtaRadar === 'function',
+      '37. Kanal ve boş gece yüzeyleri gerçek render testi için dışa aktarılmış',
+      'renderGapNights/renderOtaRadar export edilmemiş');
+    if (typeof app.renderGapNights === 'function' && typeof app.renderOtaRadar === 'function') {
+      domKur(); app.setAppData(bosVeri());
+      app.renderGapNights(); app.renderOtaRadar();
+      const gapText = global.document.getElementById('gapNightGrid').innerHTML;
+      const channelText = global.document.getElementById('channelProfitabilityTableBody').innerHTML;
+      const directValue = global.document.getElementById('otaSavedCommission').innerText;
+      check(/hesaplanamadı/i.test(gapText) && !/Optimum|dengeli dağıldı/i.test(gapText)
+        && /rezervasyon kaydı yok/i.test(channelText) && directValue === '—',
+      '38. Boş işletmede kanal ve takvim başarı/tasarruf uydurmuyor',
+      `gap=${gapText.slice(0, 350)} channel=${channelText.slice(0, 350)} direct=${directValue}`);
+    }
+  } catch (e) {
+    no('31-38. L-68 görünür rapor render senaryoları', hataOzeti(e));
+  }
+
   // showToast gercekten bir sey yaziyor mu?
   try {
     domKur();

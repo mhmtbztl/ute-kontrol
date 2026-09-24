@@ -29,13 +29,7 @@ const HTML = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 const APP = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
 
 // Sabit kalmasi MESRU olan id'ler. Her biri gerekcesiyle birlikte.
-const ALLOWLIST = {
-  // Pazarlama ekrani ayri bir dalda gelistiriliyor; oradaki degerler o dalla
-  // birlikte ele alinacak.
-  otaAvgRankVal: 'pazarlama dali (codex/marketing)',
-  simBarMeta: 'pazarlama dali (codex/marketing)',
-  simBarRetarget: 'pazarlama dali (codex/marketing)'
-};
+const ALLOWLIST = {};
 
 let passed = 0, failed = 0;
 const ok = n => { passed++; console.log(`[PASS] ${n}`); };
@@ -108,6 +102,48 @@ function run() {
   const olu = Object.keys(ALLOWLIST).filter(id => !HTML.includes('id="' + id + '"'));
   if (olu.length === 0) ok('3. İstisna listesinde ölü kayıt yok');
   else no('3. İstisna listesinde ölü kayıt yok', 'artik HTML\'de olmayan: ' + olu.join(', '));
+
+  // L-68: Onceki tarama yalnizca `id` tasiyan elemanlari goruyordu. Boylece
+  // `<div class="kpi-value">9.3</div>` veya id'siz "%60,8 marj rekoru"
+  // metinleri denetimden tamamen kaciyordu. Script/style/yorumlari attiktan
+  // sonra gorunur HTML'nin TAMAMINI tara. Bu liste urun verisi gibi gorunen,
+  // fakat herhangi bir kayda dayanmayan eski demo iddialarini temsil eder.
+  const gorunurHtml = HTML
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;|&#160;/gi, ' ')
+    .replace(/\s+/g, ' ');
+  const idlessDemoPatterns = [
+    ['kanal puanı', /\b9[,.]3\s*\/\s*10\b/],
+    ['kanal iptal oranı', /İptal:\s*%12\b/i],
+    ['Google puanı', /\b4[,.]9\s*★/],
+    ['Google yorum/arama sayısı', /\b124\s+Yorum\b|\b1[.]800\s+Arama\b/i],
+    ['Airbnb portföy puanı', /\b4[,.]97\s+Portföy Puanı\b/i],
+    ['yıllık hedef ciro', /₺\s*4[.]800[.]000\b/],
+    ['uzatma dönüşümü', /UZATMA DÖNÜŞÜMÜ\s*%45\b/i],
+    ['uydurma marj rekoru', /%60[,.]8\s+operasyonel marj rekoru/i],
+    ['ürün dışı SaaS iş planı', /SaaS Olarak Kiralama|Aylık Pasif Gelir Potansiyeli/i],
+    ['sabit OTA komisyon etiketi', /OTA\s*-\s*%1[58]\b/i]
+  ];
+  const idlessBulunan = idlessDemoPatterns.filter(([, desen]) => desen.test(gorunurHtml));
+  if (idlessBulunan.length === 0) {
+    ok('4. Kimliksiz görünür metinlerde demo rakamı veya iş planı yok');
+  } else {
+    no('4. Kimliksiz görünür metinlerde demo rakamı veya iş planı yok',
+      idlessBulunan.map(([ad]) => ad).join(', ') +
+      '\n       Bu denetim id taşımayan görünür metinleri de kapsar.');
+  }
+
+  const channelTruthful = /if\s*\(tabId\s*===\s*['"]channels['"]\)\s*renderOtaRadar\(\)/.test(APP)
+    && !/savedComm\s*\+=|gross\)\s*\|\|\s*0\)\s*\*\s*0[.]15/.test(APP);
+  if (channelTruthful) {
+    ok('5. Kanal ekranı açılışta render ediliyor ve varsayımsal %15 tasarruf üretmiyor');
+  } else {
+    no('5. Kanal ekranı açılışta render ediliyor ve varsayımsal %15 tasarruf üretmiyor',
+      'channels sekmesi renderOtaRadar yoluna bağlı olmalı; doğrudan cirodan sabit oranlı tasarruf türetilmemeli.');
+  }
 
   // Bilgi amacli
   if (izinli.length) {

@@ -3333,6 +3333,7 @@ function switchTab(tabId) {
   if (tabId === 'expenses') renderExpensesTable();
   if (tabId === 'housekeeping') renderHousekeepingTab();
   if (tabId === 'marketing') renderMarketingModule();
+  if (tabId === 'channels') renderOtaRadar();
 }
 
 function isBookingInFilter(b) {
@@ -3540,7 +3541,37 @@ function renderPricingKpiStrip() {
       gapSayisi = Array.isArray(g) ? g.length : (g && g.gapNights ? g.gapNights.length : 0);
     }
   } catch (e) { gapSayisi = 0; }
-  setEl('pricingGapCountVal', `${gapSayisi} Gece`);
+  const fiyatVerisiVar = Object.keys(appData.villas || {}).length > 0 && bookings.length > 0;
+  setEl('pricingGapCountVal', fiyatVerisiVar ? `${gapSayisi} Gece` : '—');
+
+  // Yillik hedef, guardrail ve uzatma donusumu ancak kayit varsa gosterilir.
+  // Ilk musteriye ait butce ve oranlar tum hesaplara sabit yazilmiyordu.
+  const hedefler = Array.isArray(appData.targets) ? appData.targets : Object.values(appData.targets || {});
+  const yillik = hedefler.find(t => {
+    const tur = String(t.type || t.metric || t.target_type || '').toUpperCase();
+    return tur.includes('REVENUE') && (tur.includes('YEAR') || t.year);
+  });
+  const hedefTutar = Number(yillik && (yillik.amount ?? yillik.target ?? yillik.value));
+  setEl('pricingAnnualTargetVal', hedefTutar > 0 ? `₺${Math.round(hedefTutar).toLocaleString('tr-TR')}` : '—');
+  setEl('pricingAnnualTargetMeta', hedefTutar > 0
+    ? `${yillik.year || 'Seçili yıl'} hedef kaydı`
+    : 'Yıllık hedef kaydı yok; tutar hesaplanamadı');
+
+  const profiller = Array.isArray(appData.pricingProfiles) ? appData.pricingProfiles : [];
+  const korumali = profiller.filter(p => Number(p.min_price ?? p.minPrice) > 0 && Number(p.max_price ?? p.maxPrice) > 0);
+  setEl('pricingGuardrailVal', profiller.length ? `${korumali.length} / ${profiller.length}` : '—');
+  setEl('pricingGuardrailMeta', profiller.length
+    ? 'Alt ve üst fiyat sınırı kayıtlı profil'
+    : 'Fiyat profili kaydı yok; koruma durumu hesaplanamadı');
+
+  const teklifler = Array.isArray(appData.extensionOffers) ? appData.extensionOffers : [];
+  const sonuclanan = teklifler.filter(t => ['ACCEPTED', 'REJECTED', 'DECLINED'].includes(String(t.status || '').toUpperCase()));
+  const kabul = sonuclanan.filter(t => String(t.status || '').toUpperCase() === 'ACCEPTED').length;
+  setEl('pricingExtensionConversionVal', sonuclanan.length
+    ? `%${Math.round((kabul / sonuclanan.length) * 100)}` : '—');
+  setEl('pricingExtensionConversionMeta', sonuclanan.length
+    ? `${kabul} kabul / ${sonuclanan.length} sonuçlanan teklif`
+    : 'Sonuçlanmış uzatma teklifi yok; oran hesaplanamadı');
 }
 
 // -------------------------------------------------------------
@@ -4586,7 +4617,6 @@ function renderAIFinancialAnalyst(revenue, targetRev, targetPct, opex, capex, ne
   const paylar = donemBk.map(b => ({ b, p: getBookingFilterShare(b) }));
   const donemGece = paylar.reduce((a, x) => a + x.p.nights, 0);
   const komisyon = paylar.reduce((a, x) => a + (Number(x.b.otaCommission) || 0) * x.p.ratio, 0);
-  const temizlik = paylar.reduce((a, x) => a + (Number(x.b.cleaningFee) || 0) * x.p.ratio, 0);
 
   // Mulk bazinda: en iyi ve en zayif gecelik fiyat
   const mulkStat = Object.keys(propStats || {})
@@ -4641,9 +4671,6 @@ function renderAIFinancialAnalyst(revenue, targetRev, targetPct, opex, capex, ne
     if (komisyon > 0) {
       const oran = revenue > 0 ? ((komisyon / revenue) * 100).toFixed(1) : null;
       satirlar.push(`<p>• <strong>OTA Komisyonu:</strong> ${tl(komisyon)} TL${oran ? ` (cironun %${oran}'i)` : ''}. Doğrudan satışa kayan her rezervasyon bu kalemi düşürür.</p>`);
-    }
-    if (temizlik > 0) {
-      satirlar.push(`<p>• <strong>Temizlik Maliyeti:</strong> ${tl(temizlik)} TL. USALI gereği gelirden düşülmez, gider tarafında raporlanır.</p>`);
     }
     if (capex > 0) {
       satirlar.push(`<p>• <strong>Yatırım (CAPEX):</strong> ${tl(capex)} TL. Bu tutar işletme kârını değil nakit akışını etkiler.</p>`);
@@ -4951,8 +4978,10 @@ function exportTrajectoryReport() {
   // --- Tum zamanlar toplami (tahakkuk gerekmez; butun kayitlar dahil) -------
   const toplamCiro = bookings.reduce((a, b) => a + (Number(b.gross) || 0), 0);
   const toplamGece = bookings.reduce((a, b) => a + (Number(b.nights) || 0), 0);
+  // cleaningFee misafirden alinan GELIRDIR; gider degildir. Personel
+  // temizlik maliyeti odendiginde zaten expenses defterine OPEX olarak girer.
   const dagitimMaliyeti = bookings.reduce(
-    (a, b) => a + (Number(b.otaCommission) || 0) + (Number(b.cleaningFee) || 0), 0);
+    (a, b) => a + (Number(b.otaCommission) || 0), 0);
   const elleGider = expenses.filter(e => e.type !== 'CAPEX').reduce((a, e) => a + (Number(e.amount) || 0), 0);
   const capex = expenses.filter(e => e.type === 'CAPEX').reduce((a, e) => a + (Number(e.amount) || 0), 0);
   const opex = elleGider + dagitimMaliyeti;
@@ -4997,7 +5026,7 @@ ${ilk ? `Kapsanan dönem: ${ilk} – ${sonT}` : 'Kapsanan dönem: —'}
 2. GİDER VE KÂR (USALI)
 -----------------------------------------------------
 • Elle girilen gider:              ${tl(elleGider)} TL
-• Rezervasyondan otomatik gider:   ${tl(dagitimMaliyeti)} TL (OTA komisyonu + temizlik)
+• Kayıtlı OTA komisyonu:           ${tl(dagitimMaliyeti)} TL
 • Toplam işletme gideri (OPEX):    ${tl(opex)} TL
 • Yatırım (CAPEX):                 ${tl(capex)} TL
 • NET KÂR:                         ${tl(netKar)} TL
@@ -6415,6 +6444,8 @@ function renderGapNights() {
   container.innerHTML = '';
   const gaps = [];
   const todayStr = getTodayStr();
+  const hasCalendarSource = Object.keys(appData.villas || {}).length > 0
+    && (appData.bookings || []).some(b => b.status !== 'CANCELLED');
 
   // Check gaps between consecutive bookings for each villa
   Object.keys(appData.villas).forEach(vKey => {
@@ -6476,7 +6507,10 @@ function renderGapNights() {
   });
 
   if (gaps.length === 0) {
-    // If no 1-4 night gaps found, display positive optimized status card
+    if (!hasCalendarSource) {
+      container.innerHTML = '<div style="grid-column:1 / -1; padding:14px 18px; color:var(--text-muted);">Mülk ve rezervasyon kaydı olmadan takvim boşlukları hesaplanamadı.</div>';
+      return;
+    }
     container.innerHTML = `
       <div style="grid-column: 1 / -1; padding: 14px 18px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 8px; display: flex; align-items: center; gap: 12px;">
         <span style="font-size: 24px;">💎</span>
@@ -6515,31 +6549,36 @@ function renderOtaRadar() {
   if (!tbody) return;
   tbody.innerHTML = '';
 
-  const channelData = {
-    'AIRBNB': { name: 'Airbnb', type: 'OTA', count: 0, gross: 0, comm: 0, net: 0 },
-    'BOOKING': { name: 'Booking.com', type: 'OTA', count: 0, gross: 0, comm: 0, net: 0 },
-    'WHATSAPP': { name: 'WhatsApp', type: 'Direkt', count: 0, gross: 0, comm: 0, net: 0 },
-    'INSTAGRAM': { name: 'Instagram', type: 'Direkt', count: 0, gross: 0, comm: 0, net: 0 }
-  };
+  const channelData = {};
+  const directChannels = new Set(['WHATSAPP', 'INSTAGRAM', 'WEBSITE', 'REPEAT', 'PHONE', 'DIRECT']);
 
-  let savedComm = 0;
+  let directGross = 0;
   appData.bookings.forEach(b => {
     if (b.status === 'CANCELLED' || !isBookingInFilter(b)) return;
     const ch = b.channel ? b.channel.toUpperCase() : 'OTHER';
     const oran = getBookingFilterShare(b).ratio;
-    if (channelData[ch]) {
-      channelData[ch].count += 1;
-      channelData[ch].gross += (Number(b.gross) || 0) * oran;
-      channelData[ch].comm += (Number(b.otaComm) || 0) * oran;
-      channelData[ch].net += (Number(b.net) || 0) * oran;
-    }
-    if (['WHATSAPP', 'INSTAGRAM', 'WEBSITE'].includes(ch)) {
-      savedComm += (Number(b.gross) || 0) * 0.15;
-    }
+    const isDirect = directChannels.has(ch);
+    if (!channelData[ch]) channelData[ch] = {
+      name: ch === 'BOOKING' ? 'Booking.com' : ch,
+      type: isDirect ? 'Direkt' : 'OTA', count: 0, gross: 0, comm: 0, net: 0
+    };
+    const gross = (Number(b.gross) || 0) * oran;
+    channelData[ch].count += 1;
+    channelData[ch].gross += gross;
+    channelData[ch].comm += (Number(b.otaComm ?? b.otaCommission) || 0) * oran;
+    channelData[ch].net += (Number(b.net) || 0) * oran;
+    if (isDirect) directGross += gross;
   });
 
   const otaSavedEl = document.getElementById('otaSavedCommission');
-  if (otaSavedEl) otaSavedEl.innerText = `${Math.round(savedComm).toLocaleString('tr-TR')} TL`;
+  if (otaSavedEl) otaSavedEl.innerText = Object.keys(channelData).length
+    ? `${Math.round(directGross).toLocaleString('tr-TR')} TL`
+    : '—';
+
+  if (Object.keys(channelData).length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--text-muted);">Seçili dönemde kanal raporu oluşturacak rezervasyon kaydı yok.</td></tr>';
+    return;
+  }
 
   Object.keys(channelData).forEach(k => {
     const c = channelData[k];
@@ -8911,6 +8950,8 @@ function renderDailyOps() {
   if (!appData.housekeepingOverrides) appData.housekeepingOverrides = {};
 
   const todayStr = getTodayStr(); // Canonical system date
+  const checkInTime = appData.guestSettings?.check_in_time || appData.guestSettings?.checkInTime || null;
+  const checkOutTime = appData.guestSettings?.check_out_time || appData.guestSettings?.checkOutTime || null;
 
   // 1. Check-ins for Today
   const checkins = appData.bookings.filter(b => b.status !== 'CANCELLED' && b.checkIn === todayStr);
@@ -8958,7 +8999,7 @@ function renderDailyOps() {
           <div style="font-size: 11px; color: #34D399; margin-top: 2px;">Net Gelir: ₺${Number(b.net || 0).toLocaleString('tr-TR')}</div>
         </div>
         <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
-          <span class="badge badge-green" style="font-weight: 700;">🟢 14:00 Giriş</span>
+          <span class="badge badge-green" style="font-weight: 700;">🟢 ${checkInTime ? escapeHtml(checkInTime) + ' Giriş' : 'Giriş saati kayıtlı değil'}</span>
           <button class="btn btn-secondary btn-sm" style="font-size: 10px; padding: 2px 6px;" onclick="openReservationModal('${b.id}')">Detay</button>
         </div>
       `;
@@ -9012,7 +9053,7 @@ function renderDailyOps() {
           <div style="font-size: 11px; color: #FBBF24; margin-top: 2px;">🧹 Temizlik Planına Alındı</div>
         </div>
         <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
-          <span class="badge badge-blue" style="font-weight: 700;">🔵 11:00 Çıkış</span>
+          <span class="badge badge-blue" style="font-weight: 700;">🔵 ${checkOutTime ? escapeHtml(checkOutTime) + ' Çıkış' : 'Çıkış saati kayıtlı değil'}</span>
           <button class="btn btn-secondary btn-sm" style="font-size: 10px; padding: 2px 6px;" onclick="openReservationModal('${b.id}')">Detay</button>
         </div>
       `;
@@ -10321,9 +10362,10 @@ function renderLeadAnalytics() {
   }
 
   // Villa Demand Share Breakdown
-  const villaCounts = { AZURE: 0, OLIVE: 0, BELLA: 0, SUNSET: 0, PALM: 0 };
+  const villaCounts = Object.fromEntries(Object.keys(appData.villas || {}).map(k => [k, 0]));
   leads.forEach(l => {
-    if (villaCounts[l.villa] !== undefined) villaCounts[l.villa]++;
+    const key = l.villa || l.propertyId;
+    if (Object.prototype.hasOwnProperty.call(villaCounts, key)) villaCounts[key]++;
   });
 
   const villaBox = document.getElementById('waVillaDemandList');
@@ -10365,7 +10407,7 @@ function renderLeadAnalytics() {
   if (insightsBox) {
     insightsBox.innerHTML = `
       <div style="margin-bottom: 8px;">
-        • <strong>Dönüşüm Verimliliği:</strong> Gelen her 3 WhatsApp talebinden <strong>1 tanesi rezervasyona dönüştü</strong> (%${convRate}). Bu kanaldan komisyonsuz <strong>${wonRevenue.toLocaleString('tr-TR')} TL</strong> saf nakit kazanıldı.
+        • <strong>Dönüşüm Verimliliği:</strong> ${totalLeads > 0 ? `${totalLeads} talebin ${wonLeads.length} tanesi rezervasyona dönüştü (%${convRate}). Kayıtlı teklif toplamı <strong>${wonRevenue.toLocaleString('tr-TR')} TL</strong>.` : 'Henüz talep kaydı yok; dönüşüm oranı hesaplanamadı.'}
       </div>
       <div style="margin-bottom: 8px;">
         • <strong>Kaçan Satış Aksiyonu:</strong> Kaybedilen taleplerin en büyük sebebi <em>"Tarih Dolu"</em> ve <em>"Fiyat Yüksek"</em>. İstenen tarih doluysa misafire hemen yakın boş gap gecelerini alternatif olarak sunun.
@@ -10733,7 +10775,7 @@ const KPI_EXPLANATION_GUIDES = {
     summary: 'İlgili ayda villalarınızda misafirlerin konaklaması karşılığında kasaya giren brüt toplam paradır.',
     warning: '⚠️ Unutmayın: Ciro kâr demek değildir! Elektrik, personel, komisyon, kömür gibi tüm giderler bu paranın içinden düşecektir.',
     formula: 'Satılan Gece Sayısı × Ortalama Gecelik Fiyat (ADR)',
-    example: 'Örn: Ağustos ayında 79 gece satıldı ve toplam 483.965 TL brüt ciro elde edildi.',
+    example: 'Seçili dönemin brüt rezervasyon tutarları toplanır.',
     actionRule: 'Ciro hacminizi gösterir ama asıl odaklanmanız gereken rakam cebinizde kalan Net Kâr\'dır.'
   },
   'TARGET': {
@@ -10742,9 +10784,9 @@ const KPI_EXPLANATION_GUIDES = {
     category: 'STRATEJİ & HEDEF',
     badgeClass: 'badge-amber',
     summary: 'O ay için ulaşmayı planladığınız gelir eşiğidir. İşletmenizin rotasını ve başarı çıtasını belirler.',
-    warning: '💡 Sezona göre hedef koyun: Kış zirvesinde 1.000.000 TL hedef koyarken, ara sezon Eylül için 120.000 TL gerçekçi bir hedeftir.',
+    warning: '💡 Hedefi kendi kapasiteniz, geçmiş kayıtlarınız ve sezonsal talebinizle belirleyin.',
     formula: 'Tahmini Satılabilir Gece × Hedeflenen ADR',
-    example: 'Örn: Hedef 300.000 TL iken gerçekleşen 483.965 TL ise hedefin %161,3\'ü tamamlanmış demektir.',
+    example: 'Kayıtlı hedef ile aynı dönemin gerçekleşen cirosu karşılaştırılır.',
     actionRule: 'Hedefe ayın ortasında ulaştıysanız hemen kalan günlerin fiyatını artırın (yield management). Geride kaldıysanız gap gecelerine indirim uygulayın.'
   },
   'NET_PROFIT': {
@@ -10753,9 +10795,9 @@ const KPI_EXPLANATION_GUIDES = {
     category: 'KASADA KALAN SERBEST NAKİT',
     badgeClass: 'badge-green',
     summary: 'Cirodan tüm operasyonel harcamalar (Opex) ve mülk yatırımları (Capex) düşüldükten sonra işletme sahibinin cebinde kalan net nakittir.',
-    warning: '🌟 En önemli rakam budur: 1 milyon TL ciro yapıp 950 bin TL harcarsanız kârınız sadece 50 bindir. 500 bin ciro ile 350 bin kâr edebilirsiniz!',
+    warning: '🌟 Yüksek ciro tek başına yüksek kâr anlamına gelmez; kayıtlı gider ve yatırımları birlikte değerlendirin.',
     formula: 'Net Kâr = Fiili Ciro - (OPEX + CAPEX)',
-    example: 'Örn: Temmuz 2025\'te 320.000 TL cirodan 125.000 TL gider düşülmüş ve 195.000 TL rekor net kâr kalmıştır.',
+    example: 'Seçili dönemin cirosundan kayıtlı OPEX ve CAPEX düşülür.',
     actionRule: 'Net marjınızın (Net Kâr / Ciro) %30\'un altına düşmemesine dikkat edin.'
   },
   'TOTAL_EXPENSE': {
@@ -10766,7 +10808,7 @@ const KPI_EXPLANATION_GUIDES = {
     summary: 'İşletmenin dönmesi ve villaların kalitesini koruması için harcanan her kuruşun toplamıdır.',
     warning: 'Giderler ikiye ayrılır: 1) Yaşamsal rutin giderler (OPEX), 2) Mülkün değerini kalıcı artıran yatırımlar (CAPEX).',
     formula: 'Toplam Gider = Operasyonel Giderler + Yatırımlar',
-    example: 'Örn: Temizlik, fatura, komisyon (337.306 TL) + su arıtma yatırımı (3.866 TL) = 341.172 TL.',
+    example: 'Seçili dönemdeki OPEX ve CAPEX kayıtları ayrı toplanıp birlikte gösterilir.',
     actionRule: 'Giderlerin ciroya oranı %70\'i aşıyorsa harcama kalemlerini (özellikle komisyon ve sarfiyatları) denetleyin.'
   },
   'SOLD_NIGHTS': {
@@ -10775,9 +10817,9 @@ const KPI_EXPLANATION_GUIDES = {
     category: 'KAPASİTE & HACİM',
     badgeClass: 'badge-blue',
     summary: 'O ay boyunca villalarınızda misafirlerin fiilen konakladığı toplam gece sayısıdır.',
-    warning: '5 villanız varsa ve ay 30 gün çekiyorsa, satabileceğiniz maksimum gece sayısı 5 × 30 = 150 gecedir.',
+    warning: 'Kapasite, seçili dönemin gerçek gün sayısı ile aktif mülk sayısından hesaplanır.',
     formula: 'Tüm villaların ay içindeki rezerve gece toplamı.',
-    example: 'Örn: Ağustos ayında toplam 79 gece satılmış, geriye 71 satılabilir boş gece kalmıştır.',
+    example: 'Seçili döneme düşen rezervasyon geceleri çakışmalar giderilerek toplanır.',
     actionRule: 'Yüksek sezonda satılan geceyi 70\'in üzerine çıkarmak doluluk başarısıdır.'
   },
   'ADR': {
@@ -10788,7 +10830,7 @@ const KPI_EXPLANATION_GUIDES = {
     summary: 'Villalarınızı bir geceliğine ortalama kaça sattığınızı gösteren fiyattır. (Average Daily Rate).',
     warning: '🌟 Başlangıç Seviyesi Altın Kural: Tüm evleriniz doluyorsa ama ADR çok düşükse, evlerinizi ucuza satıyorsunuz demektir! Fiyatı hemen artırın.',
     formula: 'ADR = Toplam Oda Cirosu ÷ Satılan Gece Sayısı',
-    example: 'Örnek: 10.000 TL oda geliri ve 2 satılan gece için ADR 5.000 TL/gecedir.',
+    example: 'Seçili dönemin oda geliri, aynı dönemde satılan geceye bölünür.',
     actionRule: 'Hafta sonu yüksek ADR, hafta içi doluluk odaklı dengeli ADR uygulayın.'
   },
   'REVPAR': {
@@ -10797,9 +10839,9 @@ const KPI_EXPLANATION_GUIDES = {
     category: 'OTELCİLİĞİN ALTIN KARNESİ',
     badgeClass: 'badge-purple',
     summary: 'Villanız boş ya da dolu fark etmeksizin, takvimdeki her gün için size kaç TL kazandırdığını gösteren en dürüst başarı karnesidir.',
-    warning: 'Neden ADR\'den daha önemlidir? Bir villayı geceliği 20.000 TL\'ye satıp ayda sadece 1 gün doldurursanız batarsınız. RevPAR hem doluluğu hem fiyatı aynı anda ölçer!',
+    warning: 'RevPAR, fiyat ile kullanılabilir kapasitenin ne kadarının satıldığını aynı ölçüde birleştirir.',
     formula: 'RevPAR = Oda Geliri ÷ Kullanılabilir Gece VEYA RevPAR = ADR × Doluluk %',
-    example: 'Örnek: 10.000 TL oda geliri ve 20 kullanılabilir gece için RevPAR 500 TL’dir.',
+    example: 'Seçili dönemin oda geliri, kullanılabilir mülk-gece kapasitesine bölünür.',
     actionRule: 'RevPAR\'ı artırmanın yolu: Doluluk %70\'i aştığında fiyatı yükseltmektir.'
   },
   'OCCUPANCY': {
@@ -10808,9 +10850,9 @@ const KPI_EXPLANATION_GUIDES = {
     category: 'KAPASİTE VERİMLİLİĞİ',
     badgeClass: 'badge-blue',
     summary: 'Villalarınızın ayın yüzde kaçında misafirle dolu olduğunu gösterir.',
-    warning: '30 günün kaçında evlerde ışık yanıyordu? %70 ve üzeri harika performanstır. %40 altı ise fiyat indirimi veya tanıtım alarmıdır.',
+    warning: 'Doluluk tek başına yorumlanmaz; ADR, RevPAR ve kârlılıkla birlikte değerlendirilir.',
     formula: '(Satılan Gece Sayısı ÷ Kullanılabilir Gece Sayısı) × 100',
-    example: 'Örnek: 20 kullanılabilir gecenin 10’u satıldıysa doluluk %50’dir.',
+    example: 'Satılan mülk-gece sayısı, seçili dönemin kullanılabilir mülk-gece kapasitesine bölünür.',
     actionRule: '%100 doluluk her zaman iyi değildir! %100 doluluk genellikle \'fiyatı çok ucuz tuttunuz\' anlamına gelir.'
   },
   'OPEX': {
@@ -10821,7 +10863,7 @@ const KPI_EXPLANATION_GUIDES = {
     summary: 'Tesisin günlük olarak çalışmaya devam etmesi için yapılan düzenli, tekrarlayan harcamalardır.',
     warning: 'Gerçek temizlik maliyeti, elektrik/su/internet faturası, sarfiyat ve OTA komisyonları OPEX’tir. Misafirden alınan temizlik bedeli gelir bileşenidir.',
     formula: 'Tüm operasyonel cari fatura ve sarfiyat toplamı.',
-    example: 'Örn: Ağustos ayında elektrik, temizlik ve bakım giderleri toplamı 337.306 TL.',
+    example: 'Seçili dönemde OPEX olarak sınıflandırılmış gider kayıtları toplanır.',
     actionRule: 'OPEX\'i kısmak zordur ama toplu alım (örneğin odunu yazdan almak) maliyeti %30 düşürür.'
   },
   'CAPEX': {
@@ -10832,7 +10874,7 @@ const KPI_EXPLANATION_GUIDES = {
     summary: 'Villanın değerini ve kalitesini kalıcı olarak artıran büyük, tek seferlik demirbaş yatırımlarıdır.',
     warning: 'Bahçeye jakuzi yaptırmak, sauna eklemek, klima taktırmak CAPEX\'tir. Bu bir masraf değil, villanın gecelik fiyatını artıracak yatırımdır.',
     formula: 'Demirbaş ve kalıcı renovasyon harcamaları toplamı.',
-    example: 'Örn: Ocak ayında yapılan 465.331 TL\'lik kış hazırlığı ve sauna yatırımı.',
+    example: 'Seçili dönemde CAPEX olarak sınıflandırılmış yatırım kayıtları toplanır.',
     actionRule: 'Doğru bir CAPEX yatırımı (örn: ısıtmalı jakuzi), kendini 2-3 ayda gecelik fiyat artışıyla geri öder.'
   },
   'OPERATING_PROFIT': {
@@ -10843,7 +10885,7 @@ const KPI_EXPLANATION_GUIDES = {
     summary: 'Cirodan OPEX düşüldükten sonra, yatırım harcamaları düşülmeden önce kalan işletme sonucudur.',
     warning: 'Faaliyet kârı CAPEX’i içermez; sahibin cebinde kalan nihai nakit için Net Nakit Kârı izleyin.',
     formula: 'Faaliyet Kârı = Gerçekleşen Ciro − OPEX',
-    example: 'Örnek: 100.000 TL ciro ve 40.000 TL OPEX için faaliyet kârı 60.000 TL’dir.',
+    example: 'Seçili dönemin gerçekleşen cirosundan aynı dönemin OPEX toplamı düşülür.',
     actionRule: 'Faaliyet marjı düşüyorsa önce komisyon, enerji, temizlik ve sarf giderlerini inceleyin.'
   },
   'GAP_NIGHTS': {
@@ -10854,7 +10896,7 @@ const KPI_EXPLANATION_GUIDES = {
     summary: 'İki rezervasyon arasında sıkışıp kalan 1 veya 2 günlük boş günlerdir.',
     warning: 'O gün boş kalırsa size maliyeti 0 TL değil, kayıp bir cirodur! O günü fırsat paketiyle satmak saf kârdır.',
     formula: 'İki rezervasyon arasındaki satılmamış 1-2 günlük boşluklar.',
-    example: 'Örn: Sistemde 3 adet gap gecesi tespit edildi. %25 indirimle Instagram\'da satılıp 15.000 TL kurtarıldı.',
+    example: 'Sistem, ardışık rezervasyonlar arasındaki kısa boşlukları gerçek takvimden bulur.',
     actionRule: 'Gap gecesini boş bırakmaktansa normal fiyatın %30 altına \'Son Dakika Fırsatı\' ile satın.'
   },
   'OTA_COMMISSION': {
@@ -10862,10 +10904,10 @@ const KPI_EXPLANATION_GUIDES = {
     icon: '🌐',
     category: 'KOMİSYON TASARRUFU',
     badgeClass: 'badge-green',
-    summary: 'Airbnb, Booking.com vb. platformların sizden kestiği %15 - %20 arası aracılık ücretidir.',
-    warning: '100.000 TL\'lik satışı Airbnb\'den yaparsanız cebinize 85.000 TL kalır. Doğrudan WhatsApp\'tan yaparsanız 100.000 TL\'nin tamamı sizindir!',
-    formula: 'OTA Satış Tutarı × Komisyon Oranı (%15)',
-    example: 'Örn: Doğrudan WhatsApp\'tan kapatılan 280.000 TL\'lik satış sayesinde 42.000 TL komisyon cepte kalmıştır.',
+    summary: 'OTA platformlarının rezervasyon başına kestiği, kanal ayarınızda veya rezervasyonda kayıtlı aracılık ücretidir.',
+    warning: 'Komisyon oranı kanal ve sözleşmeye göre değişir; kayıt yoksa oran veya tasarruf varsayılmaz.',
+    formula: 'Kayıtlı OTA Satış Tutarı × Kayıtlı Komisyon Oranı',
+    example: 'Kayıtlı OTA komisyonları ile doğrudan kanal satışları ayrı raporlanır.',
     actionRule: 'OTA\'ları vitrin olarak kullanın; gelen misafire kartınızı vererek bir sonraki gelişinde doğrudan sizden rezerve etmesini sağlayın.'
   }
 };
@@ -11871,26 +11913,26 @@ function renderOtaRankingAndCoverRadar() {
   });
 
   // Update Summary Badges
-  const firstPagePct = count > 0 ? Math.round((firstPageCount / count) * 100) : 80;
-  const avgCtr = count > 0 ? (totalCtrSum / count).toFixed(1) : '4.8';
-  const avgScore = count > 0 ? Math.round(totalScoreSum / count) : 92;
+  const firstPagePct = count > 0 ? Math.round((firstPageCount / count) * 100) : null;
+  const avgCtr = count > 0 ? (totalCtrSum / count).toFixed(1) : null;
+  const avgScore = count > 0 ? Math.round(totalScoreSum / count) : null;
 
   const elFpBadge = document.getElementById('otaFirstPageBadge');
-  if (elFpBadge) elFpBadge.innerText = `%${firstPagePct} İlk Sayfada (${firstPageCount}/${count} Villa)`;
+  if (elFpBadge) elFpBadge.innerText = firstPagePct === null ? '— İlan verisi yok' : `%${firstPagePct} İlk Sayfada (${firstPageCount}/${count} mülk)`;
 
   const elRankSummary = document.getElementById('otaRankSummaryBadge');
-  if (elRankSummary) elRankSummary.innerText = `1. Sayfada: %${firstPagePct}`;
+  if (elRankSummary) elRankSummary.innerText = firstPagePct === null ? '1. sayfa oranı hesaplanamadı' : `1. Sayfada: %${firstPagePct}`;
 
   const elAvgCoverCtr = document.getElementById('otaAvgCoverCtr');
-  if (elAvgCoverCtr) elAvgCoverCtr.innerText = `%${avgCtr} (Sektör: %3.2)`;
+  if (elAvgCoverCtr) elAvgCoverCtr.innerText = avgCtr === null ? '— CTR verisi yok' : `%${avgCtr}`;
 
   const elAvgScore = document.getElementById('otaAvgListingScore');
-  if (elAvgScore) elAvgScore.innerText = `${avgScore} / 100`;
+  if (elAvgScore) elAvgScore.innerText = avgScore === null ? '—' : `${avgScore} / 100`;
 
-  renderCoverAbTestLab('AZURE');
+  renderCoverAbTestLab();
 }
 
-function renderCoverAbTestLab(villaKey = 'AZURE') {
+function renderCoverAbTestLab(villaKey = null) {
   const container = document.getElementById('abTestComparisonContainer');
   if (!container) return;
 
@@ -11898,11 +11940,15 @@ function renderCoverAbTestLab(villaKey = 'AZURE') {
     ? appData.airbnbListings
     : {};
 
-  const item = listings[villaKey];
-  if (!item) return;
+  const selectedKey = villaKey && listings[villaKey] ? villaKey : Object.keys(listings)[0];
+  const item = selectedKey ? listings[selectedKey] : null;
+  if (!item) {
+    container.innerHTML = '<div style="color:var(--text-muted);">A/B karşılaştırması için ölçülmüş ilan verisi yok.</div>';
+    return;
+  }
 
-  const currentCtr = (Number(item.coverCtr) || 4.2).toFixed(1);
-  const potentialCtr = (Number(currentCtr) * 1.35).toFixed(1);
+  const parsedCtr = Number(item.coverCtr);
+  const currentCtr = Number.isFinite(parsedCtr) && parsedCtr >= 0 ? parsedCtr : null;
 
   container.innerHTML = `
     <div class="ab-test-card-grid">
@@ -11922,7 +11968,7 @@ function renderCoverAbTestLab(villaKey = 'AZURE') {
         </div>
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: rgba(255,255,255,0.04); border-radius: 8px;">
           <span style="font-size: 12px; color: var(--text-muted);">Ölçülen Tıklama (CTR):</span>
-          <strong style="color: #93C5FD; font-size: 14px;">%${currentCtr}</strong>
+          <strong style="color: #93C5FD; font-size: 14px;">${currentCtr === null ? '— (CTR ölçülmedi)' : '%' + currentCtr.toFixed(1)}</strong>
         </div>
       </div>
 
@@ -11930,7 +11976,7 @@ function renderCoverAbTestLab(villaKey = 'AZURE') {
       <div class="ab-box ai-optimized">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
           <span class="badge badge-green">Versiyon B (AI Optimize Edilmiş Öneri ⭐)</span>
-          <span style="font-weight: 800; color: #34D399; font-size: 12px;">Hedef: Sayfa 1 / #1-3</span>
+          <span style="font-weight: 800; color: #34D399; font-size: 12px;">Öneri; sonuç henüz ölçülmedi</span>
         </div>
         <div style="margin-bottom: 8px;">
           <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Önerilen Yeni Kapak Konsepti:</div>
@@ -11947,7 +11993,7 @@ function renderCoverAbTestLab(villaKey = 'AZURE') {
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: rgba(16, 185, 129, 0.1); border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.2);">
           <div>
             <span style="font-size: 12px; color: #DDD6FE;">Beklenen Tıklama (CTR):</span>
-            <strong style="color: #34D399; font-size: 14px; margin-left: 6px;">%${potentialCtr}</strong>
+            <strong style="color: #34D399; font-size: 14px; margin-left: 6px;">— (A/B testi çalıştırılmadı)</strong>
           </div>
           <button type="button" class="btn btn-secondary btn-sm" onclick="copyAiTitle('${item.aiOptimizedTitle || item.title}')" style="border-color: #34D399; color: #34D399; font-size: 11px; font-weight: 700;">
             📋 Başlığı Kopyala
@@ -12439,17 +12485,19 @@ function renderTrajectoryInsights() {
   const paylar = bk.map(b => ({ b, p: getBookingFilterShare(b) }));
   const ciro = paylar.reduce((a, x) => a + (Number(x.b.gross) || 0) * x.p.ratio, 0);
   const komisyon = paylar.reduce((a, x) => a + (Number(x.b.otaCommission) || 0) * x.p.ratio, 0);
-  const temizlik = paylar.reduce((a, x) => a + (Number(x.b.cleaningFee) || 0) * x.p.ratio, 0);
+  const temizlikMaliyeti = (appData.expenses || [])
+    .filter(e => isExpenseInFilter(e) && /temizlik/i.test(String(e.category || '')))
+    .reduce((a, e) => a + (Number(e.amount) || 0), 0);
   const donem = getPeriodDisplayName(currentFilter.period);
 
   if (tehlike) {
-    if (komisyon + temizlik <= 0) {
+    if (komisyon + temizlikMaliyeti <= 0) {
       tehlike.textContent = bk.length
         ? 'Bu dönemde OTA komisyonu veya temizlik maliyeti kaydedilmemiş.'
         : 'Bu dönemde rezervasyon kaydı yok.';
     } else {
-      const oran = ciro > 0 ? ((komisyon + temizlik) / ciro) * 100 : null;
-      tehlike.innerHTML = `<strong>Komisyon & Temizlik Sızıntısı:</strong> ${donem} döneminde komisyon ${tl(komisyon)} TL, temizlik ${tl(temizlik)} TL — toplam <strong>${tl(komisyon + temizlik)} TL</strong>${oran !== null ? ` (cironun %${oran.toFixed(1)}'i)` : ''}. Doğrudan rezervasyon payını artırmak bu kalemi doğrudan düşürür.`;
+      const oran = ciro > 0 ? ((komisyon + temizlikMaliyeti) / ciro) * 100 : null;
+      tehlike.innerHTML = `<strong>Kayıtlı Komisyon ve Temizlik Maliyeti:</strong> ${donem} döneminde komisyon ${tl(komisyon)} TL, gider defterindeki temizlik maliyeti ${tl(temizlikMaliyeti)} TL — toplam <strong>${tl(komisyon + temizlikMaliyeti)} TL</strong>${oran !== null ? ` (cironun %${oran.toFixed(1)}'i)` : ''}.`;
     }
   }
 
@@ -14093,7 +14141,7 @@ function updateSaaSUi() {
   if (menuEmail) menuEmail.innerText = (user.fullName || user.managerName ? (user.fullName || user.managerName) + ' • ' : '') + user.email;
 
   const menuPlan = document.getElementById('menuPlanBadge');
-  if (menuPlan) menuPlan.innerText = (user.plan || 'Pro Plan') + ' 🚀';
+  if (menuPlan) menuPlan.innerText = user.plan ? user.plan + ' 🚀' : 'Plan bilgisi yok';
 }
 
 // Portfoydeki mulk sayisi. Uygulama 5 villalik demo portfoye gore yazilmisti
@@ -15596,7 +15644,9 @@ function renderExecutiveControlCenter() {
           isCheckInToday: true,
           confidence: 'HIGH',
           rationale: 'Misafir check-in öncesi turnover temizliği ve hazır bulunuşluk zorunluluğu.',
-          sourceMetrics: [`Giriş: 14:00`, `Kategori: Temizlik`],
+          sourceMetrics: [t.due_at || t.dueAt
+            ? `Son zaman: ${t.due_at || t.dueAt}`
+            : 'Görev zamanı kayıtlı değil', 'Kategori: Temizlik'],
           deepLink: 'housekeeping',
           quickAction: null
         });
@@ -15656,7 +15706,7 @@ function renderExecutiveControlCenter() {
         guestImpact: 'LOW',
         urgencyDueTime: 20,
         confidence: 'HIGH',
-        rationale: 'İki rezervasyon arasında kalan boşluk; %15 indirimle doldurulabilir.',
+        rationale: 'İki rezervasyon arasında kalan boşluk; yalnız kayıtlı fiyat kuralı varsa teklif üretilebilir.',
         // Onerilen fiyat hesaplanmamissa satir hic yazilmaz; 12.500 TL
         // uydurulmaz (3.6).
         sourceMetrics: [`Tarih: ${gap.date}`].concat(
@@ -15755,9 +15805,9 @@ function renderTodayCommandCenter(actionsResult) {
     }).join('');
   }
 
-  renderActionCards(critList, critBadge, actionsResult.critical || [], 'critical', '✅ Kritik müdahale gerektiren açık alert bulunmuyor.');
-  renderActionCards(opsList, opsBadge, actionsResult.operations || [], 'operations', '✅ Bugün bekleyen acil turnover veya arıza görevi yok.');
-  renderActionCards(revList, revBadge, actionsResult.revenueOpportunities || [], 'revenue', '✅ Fiyatlandırma ve doluluk optimize; açık fırsat yok.');
+  renderActionCards(critList, critBadge, actionsResult.critical || [], 'critical', 'Kayıtlı açık kritik uyarı yok; dış sistem durumu doğrulanmadı.');
+  renderActionCards(opsList, opsBadge, actionsResult.operations || [], 'operations', 'Kayıtlı bekleyen turnover veya arıza görevi yok.');
+  renderActionCards(revList, revBadge, actionsResult.revenueOpportunities || [], 'revenue', 'Hesaplanmış gelir fırsatı yok; fiyatlandırmanın optimize olduğu sonucuna varılamaz.');
 }
 
 function renderPortfolioHealth(healthCards) {
@@ -16640,6 +16690,8 @@ function renderPricingTab() {
   if (!container) return;
 
   const gaps = (typeof appData !== 'undefined' && appData.gapNights) || [];
+  const hasPricingSource = Object.keys((typeof appData !== 'undefined' && appData.villas) || {}).length > 0
+    && ((typeof appData !== 'undefined' && appData.bookings) || []).length > 0;
   const gapBadge = document.getElementById('pricingGapBadge');
   if (gapBadge) gapBadge.innerText = gaps.length;
 
@@ -16649,7 +16701,9 @@ function renderPricingTab() {
       <p style="font-size: 12px; color: #CBD5E1; margin: 0 0 14px 0;">
         Dinamik fiyatlandırma motoru, boş kalan günleri tespit ederek gelir kaybını önler ve min/max koruma sınırları dahilinde kalır.
       </p>
-      ${gaps.length === 0 ? '<div style="color: #34D399; font-size: 12px;">✅ Kritik boş gece penceresi bulunmuyor.</div>' : `
+      ${!hasPricingSource
+        ? '<div style="color: var(--text-muted); font-size: 12px;">Mülk ve rezervasyon kaydı olmadan boş gece durumu hesaplanamadı.</div>'
+        : gaps.length === 0 ? '<div style="color: #34D399; font-size: 12px;">✅ Kayıtlı takvimde kritik boş gece penceresi bulunmuyor.</div>' : `
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px;">
           ${gaps.map(g => `
             <div class="gap-night-card">
@@ -16672,23 +16726,58 @@ function renderReportsTab() {
   const container = document.getElementById('reportsContentContainer');
   if (!container) return;
 
+  const bookings = (appData.bookings || []).filter(b => b.status !== 'CANCELLED' && isBookingInFilter(b));
+  const expenses = (appData.expenses || []).filter(isExpenseInFilter);
+  const tl = n => Math.round(Number(n) || 0).toLocaleString('tr-TR');
+  const kanal = new Map();
+  let brut = 0;
+  let komisyon = 0;
+  bookings.forEach(b => {
+    const pay = getBookingFilterShare(b);
+    const tutar = (Number(b.gross) || 0) * pay.ratio;
+    const kesinti = (Number(b.otaCommission ?? b.otaComm) || 0) * pay.ratio;
+    const ad = String(b.channel || 'KANAL BELİRTİLMEDİ').trim() || 'KANAL BELİRTİLMEDİ';
+    const satir = kanal.get(ad) || { tutar: 0, adet: 0 };
+    satir.tutar += tutar;
+    satir.adet += 1;
+    kanal.set(ad, satir);
+    brut += tutar;
+    komisyon += kesinti;
+  });
+  const opex = expenses.filter(e => String(e.type || 'OPEX').toUpperCase() !== 'CAPEX')
+    .reduce((a, e) => a + (Number(e.amount) || 0), 0);
+  const capex = expenses.filter(e => String(e.type || '').toUpperCase() === 'CAPEX')
+    .reduce((a, e) => a + (Number(e.amount) || 0), 0);
+  const netNakit = brut - komisyon - opex - capex;
+  const marj = brut > 0 ? (netNakit / brut) * 100 : null;
+  const kanalSatirlari = Array.from(kanal.entries())
+    .sort((a, b) => b[1].tutar - a[1].tutar)
+    .map(([ad, v]) => {
+      const pay = brut > 0 ? (v.tutar / brut) * 100 : 0;
+      return `• <strong>${escapeHtml(ad)}:</strong> %${pay.toFixed(1)} pay (₺${tl(v.tutar)}, ${v.adet} rezervasyon)`;
+    }).join('<br>');
+
+  if (!bookings.length && !expenses.length) {
+    container.innerHTML = '<div class="empty-state" style="padding:24px; color:var(--text-muted);">Seçili dönem ve mülk için rezervasyon veya gider kaydı yok; kanal dağılımı ve kârlılık hesaplanamadı.</div>';
+    return;
+  }
+
   container.innerHTML = `
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
       <div style="background: rgba(0,0,0,0.25); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06);">
         <h4 style="margin: 0 0 10px 0; color: #60A5FA; font-size: 13px;">🌐 Kanal Satış Dağılımı</h4>
         <div style="font-size: 12px; color: #CBD5E1; line-height: 1.6;">
-          • <strong>Airbnb:</strong> %52 pay (₺251.661)<br>
-          • <strong>Doğrudan Satış (Direct):</strong> %33 pay (₺159.708)<br>
-          • <strong>Booking.com:</strong> %15 pay (₺72.594)
+          ${kanalSatirlari || 'Kanalı belirlenmiş rezervasyon kaydı yok.'}
         </div>
       </div>
       <div style="background: rgba(0,0,0,0.25); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06);">
         <h4 style="margin: 0 0 10px 0; color: #34D399; font-size: 13px;">📈 Kârlılık Köprüsü & Komisyon Analizi</h4>
         <div style="font-size: 12px; color: #CBD5E1; line-height: 1.6;">
-          • <strong>Brüt Satış:</strong> ₺483.965<br>
-          • <strong>Kanal Komisyonları:</strong> ₺48.396<br>
-          • <strong>Operasyon & Temizlik:</strong> ₺36.500<br>
-          • <strong>Net Nakit Kâr:</strong> ₺142.793 (%29,5 Marj)
+          • <strong>Brüt Satış:</strong> ₺${tl(brut)}<br>
+          • <strong>Kayıtlı Kanal Komisyonları:</strong> ₺${tl(komisyon)}<br>
+          • <strong>Kayıtlı OPEX:</strong> ₺${tl(opex)}<br>
+          • <strong>Kayıtlı CAPEX:</strong> ₺${tl(capex)}<br>
+          • <strong>Net Nakit:</strong> ₺${tl(netNakit)}${marj === null ? ' (marj hesaplanamadı: ciro yok)' : ` (%${marj.toFixed(1)} marj)`}
         </div>
       </div>
     </div>
@@ -16958,6 +17047,13 @@ if (typeof module !== 'undefined' && module.exports) {
     renderAll,
     renderOperationsTab,
     renderTapeChart,
+    renderReportsTab,
+    renderPricingTab,
+    renderPricingKpiStrip,
+    renderAirbnbAuditRadar,
+    renderCoverAbTestLab,
+    renderGapNights,
+    renderOtaRadar,
     setEl,
     showToast,
     // Pazarlama ekrani renderAll'in ICINDE DEGIL (sekme acilinca calisiyor),
