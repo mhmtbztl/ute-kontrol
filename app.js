@@ -16406,7 +16406,7 @@ function renderPricingTab() {
     <div style="background: rgba(0,0,0,0.25); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08);">
       <h4 style="margin: 0 0 12px 0; color: #A78BFA; font-size: 14px;">🎯 Fiyatlandırma ve Boş Gece Durumu</h4>
       <p style="font-size: 12px; color: #CBD5E1; margin: 0 0 14px 0;">
-        Dinamik fiyatlandırma motoru, boş kalan günleri tespit ederek gelir kaybını önler ve min/max koruma sınırları dahilinde kalır.
+        Kayıtlı rezervasyon takviminizdeki tek gecelik boşlukları gösterir. Fiyat değişikliği yalnızca sizin onayınızla yapılır.
       </p>
       ${!hasPricingSource
         ? '<div style="color: var(--text-muted); font-size: 12px;">Mülk ve rezervasyon kaydı olmadan boş gece durumu hesaplanamadı.</div>'
