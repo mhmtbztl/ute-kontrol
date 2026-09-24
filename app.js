@@ -8733,6 +8733,52 @@ async function deleteLeadUI(id) {
   }
 }
 
+function getMaintenancePriorityFromSeverity(severity) {
+  if (severity === 'CRITICAL') return 'P1';
+  if (severity === 'HIGH' || severity === 'MEDIUM') return 'P2';
+  return 'P3';
+}
+
+function getMaintenanceAssigneeFromDb(ticket) {
+  const description = String(ticket?.description || '');
+  const match = description.match(/^Sorumlu:\s*(.+)$/i);
+  return match ? match[1].trim() : String(ticket?.assigned_to || '');
+}
+
+function getMaintenanceStatusPresentation(status) {
+  const presentations = {
+    OPEN: { label: 'Açık', badgeClass: 'badge-rose', archived: false },
+    IN_PROGRESS: { label: 'Devam Ediyor', badgeClass: 'badge-amber', archived: false },
+    WAITING_PARTS: { label: 'Parça Bekliyor', badgeClass: 'badge-amber', archived: false },
+    RESOLVED: { label: 'Tamamlandı', badgeClass: 'badge-green', archived: false },
+    COMPLETED: { label: 'Tamamlandı', badgeClass: 'badge-green', archived: false },
+    CANCELLED: { label: 'Arşivlendi', badgeClass: 'badge-secondary', archived: true }
+  };
+  return presentations[status] || { label: 'Bilinmiyor', badgeClass: 'badge-secondary', archived: false };
+}
+
+function getMaintenanceSeverityForSave(priority, existingTicket = null) {
+  if (existingTicket && existingTicket.priority === priority &&
+      ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].includes(existingTicket.severity)) {
+    return existingTicket.severity;
+  }
+  return priority === 'P1' ? 'CRITICAL' : (priority === 'P2' ? 'HIGH' : 'LOW');
+}
+
+function mapMaintenanceTicketFromDb(ticket, propertyIdMap = {}) {
+  return {
+    ...ticket,
+    villa: propertyIdMap[ticket.property_id] || ticket.property_id,
+    priority: getMaintenancePriorityFromSeverity(ticket.severity),
+    assignee: getMaintenanceAssigneeFromDb(ticket),
+    cost: Number(ticket.actual_cost || ticket.estimated_cost || 0),
+    downtime: ticket.blocks_availability && ticket.downtime_start && ticket.downtime_end
+      ? Math.floor((Date.parse(ticket.downtime_end + 'T00:00:00Z') - Date.parse(ticket.downtime_start + 'T00:00:00Z')) / 86400000) + 1 : 0,
+    statusRaw: ticket.status,
+    status: ticket.status === 'RESOLVED' ? 'COMPLETED' : ticket.status
+  };
+}
+
 function renderManageMaintTable() {
   const tbody = document.getElementById('manageMaintTableBody');
   if (!tbody) return;
@@ -8743,6 +8789,7 @@ function renderManageMaintTable() {
     if (m.priority === 'P2') priBadge = '<span class="badge badge-amber">P2 Önemli</span>';
     if (m.priority === 'P3') priBadge = '<span class="badge badge-blue">P3 Rutin</span>';
 
+    const statusPresentation = getMaintenanceStatusPresentation(m.statusRaw || m.status);
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${priBadge}</td>
@@ -8751,10 +8798,10 @@ function renderManageMaintTable() {
       <td>${escapeHtml(m.assignee || 'Atanmadı')}</td>
       <td>₺${Number(m.cost).toLocaleString('tr-TR')}</td>
       <td>${m.downtime || 0} Gece</td>
-      <td>${m.status === 'COMPLETED' ? '<span class="badge badge-green">Tamamlandı</span>' : '<span class="badge badge-rose">Açık</span>'}</td>
+      <td><span class="badge ${statusPresentation.badgeClass}">${statusPresentation.label}</span></td>
       <td style="text-align: right; white-space: nowrap;">
-        <button class="btn btn-secondary btn-sm" onclick="editMaint(decodeURIComponent('${encodeURIComponent(String(m.id))}'))">✏️</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteMaint(decodeURIComponent('${encodeURIComponent(String(m.id))}'))">Arşivle</button>
+        ${statusPresentation.archived ? '' : `<button class="btn btn-secondary btn-sm" onclick="editMaint(decodeURIComponent('${encodeURIComponent(String(m.id))}'))">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteMaint(decodeURIComponent('${encodeURIComponent(String(m.id))}'))">Arşivle</button>`}
       </td>
     `;
     tbody.appendChild(tr);
@@ -8779,7 +8826,7 @@ function openMaintModal(editId = null) {
     document.getElementById('maintDowntimeStart').value = m.downtime_start || m.downtimeStart || '';
     document.getElementById('maintDowntimeEnd').value = m.downtime_end || m.downtimeEnd || '';
     document.getElementById('maintCost').value = m.cost || 0;
-    document.getElementById('maintStatus').value = m.status;
+    document.getElementById('maintStatus').value = m.statusRaw || (m.status === 'COMPLETED' ? 'RESOLVED' : m.status);
   } else {
     title.innerText = '🛠️ Yeni Arıza / Bakım İşi';
     editInput.value = '';
@@ -8810,10 +8857,11 @@ async function saveMaint(e) {
   const tenantId = getActiveTenantId();
   requireCloudForWrite('Bakım kaydı', tenantId);
   const propertyId = appData.villas[villa]?.id;
+  const existingTicket = editId ? appData.maintenance.find(item => item.id === editId) : null;
   const payload = {
     property_id: propertyId,
     category: 'MAINTENANCE',
-    severity: priority === 'P1' ? 'CRITICAL' : (priority === 'P2' ? 'HIGH' : 'LOW'),
+    severity: getMaintenanceSeverityForSave(priority, existingTicket),
     title: title.trim(),
     description: assignee ? `Sorumlu: ${assignee}` : null,
     status,
@@ -13885,16 +13933,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
         leads,
         closedPeriods: closeList || [],
         targets: targetList || [],
-        maintenance: maintenanceTickets.map(t => ({
-          ...t,
-          villa: propIdMap[t.property_id] || t.property_id,
-          priority: t.severity === 'CRITICAL' ? 'P1' : (t.severity === 'HIGH' ? 'P2' : 'P3'),
-          assignee: t.assigned_to || '',
-          cost: Number(t.actual_cost || t.estimated_cost || 0),
-          downtime: t.blocks_availability && t.downtime_start && t.downtime_end
-            ? Math.floor((Date.parse(t.downtime_end + 'T00:00:00Z') - Date.parse(t.downtime_start + 'T00:00:00Z')) / 86400000) + 1 : 0,
-          status: t.status === 'RESOLVED' ? 'COMPLETED' : t.status
-        })),
+        maintenance: maintenanceTickets.map(t => mapMaintenanceTicketFromDb(t, propIdMap)),
         maintenanceTickets,
         operationalTasks: operationalTasks || [],
         financialTransactions: financialTransactions || [],
@@ -16772,6 +16811,9 @@ if (typeof module !== 'undefined' && module.exports) {
     paginateRows,
     getActiveRenderPlan,
     insertImportedRowsInBatches,
+    mapMaintenanceTicketFromDb,
+    getMaintenanceStatusPresentation,
+    getMaintenanceSeverityForSave,
     getExportEngine,
     collectExportRecords,
     exportLedger,
