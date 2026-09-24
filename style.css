@@ -482,6 +482,17 @@ body {
   overflow-x: auto;
 }
 
+.table-pagination {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding-top: 10px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
 .data-table {
   width: 100%;
   border-collapse: collapse;

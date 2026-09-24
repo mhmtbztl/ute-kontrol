@@ -174,10 +174,11 @@ function kaynakTestleri(app) {
     'B1. Ice aktarma yazdigi kayitlarin kimliklerini TOPLUYOR',
     'Kimlik toplanmazsa "bu aktarim neyi yazdi" sorusunun cevabi yok ve ' +
     'geri alma kurulamaz.');
-  check(/const olusan = await createBooking/.test(uygula) &&
-        /const olusan = await createExpense/.test(uygula),
-    'B2. Her iki defterde de olusan kayit yakalaniyor',
-    'createBooking/createExpense donusu kullanilmiyor.');
+  check(/batchResult\.rows\.forEach/.test(uygula) &&
+        /sourceRowById\.get\(row\.id\)/.test(uygula) &&
+        /yeniKayitlar\.push\(\{ rowNum, id: row\.id \}\)/.test(uygula),
+    'B2. Her iki defterde de toplu yazilan kayit kimligi kaynak satirina baglaniyor',
+    'Toplu insert donusundeki UUID kaynak satir numarasiyla eslestirilmiyor.');
   check(uygula.includes('cloudLinkImportBatchRows'),
     'B3. Toplanan kimlikler partiye baglaniyor', 'Bag hic kurulmuyor.');
   check(uygula.includes(".select('id')") && uygula.includes('bagKuruldu'),

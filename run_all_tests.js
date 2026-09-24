@@ -246,6 +246,7 @@ const allTestFiles = [
   // Tarayici kutuphaneleri depoya gomulu ve ozetle sabit (SheetJS, Supabase SDK)
   'vendor_pin_tests.js',
   'dead_browser_module_tests.js',
+  'performance_regression_tests.js',
 
   // GitHub Actions eylemleri tam commit SHA'sina sabit
   'workflow_pin_tests.js',

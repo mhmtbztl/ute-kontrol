@@ -3351,7 +3351,27 @@ function switchTab(tabId) {
   if (tabId === 'settings') renderTeamManagement();
   if (tabId === 'settings') loadDeletionImpact();
   if (tabId === 'finance') renderFinanceModule();
+  if (tabId === 'dashboard') {
+    renderKPIsAndDashboard();
+    renderGapNights();
+    renderTodayRadar();
+    renderOtaRadar();
+    runWhatIfSimulation();
+    renderTrajectoryRadar();
+    renderTrajectoryInsights();
+    renderCriticPresets();
+    renderDailyOps();
+  }
+  if (tabId === 'reservations') {
+    renderManageBookingsTable();
+    renderTapeChart();
+  }
   if (tabId === 'expenses') renderExpensesTable();
+  if (tabId === 'leads') {
+    renderManageLeadsTable();
+    renderLeadAnalytics();
+  }
+  if (tabId === 'maintenance') renderManageMaintTable();
   if (tabId === 'housekeeping') renderHousekeepingTab();
   if (tabId === 'marketing') renderMarketingModule();
   if (tabId === 'channels') renderOtaRadar();
@@ -3777,32 +3797,89 @@ async function forceHardRefresh() {
   }
 }
 
-// Master Render All Components
+const LARGE_TABLE_PAGE_SIZE = 100;
+const largeTablePageState = { bookings: 1, expenses: 1 };
+
+function paginateRows(rows, requestedPage = 1, pageSize = LARGE_TABLE_PAGE_SIZE) {
+  const source = Array.isArray(rows) ? rows : [];
+  const safeSize = Math.max(1, Math.floor(Number(pageSize) || LARGE_TABLE_PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(source.length / safeSize));
+  const page = Math.min(totalPages, Math.max(1, Math.floor(Number(requestedPage) || 1)));
+  const start = (page - 1) * safeSize;
+  return { rows: source.slice(start, start + safeSize), page, pageSize: safeSize, totalPages, totalRows: source.length };
+}
+
+function renderTablePagination(containerId, tableKey, pageInfo, renderFunctionName) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  largeTablePageState[tableKey] = pageInfo.page;
+  if (pageInfo.totalRows <= pageInfo.pageSize) {
+    container.innerHTML = '';
+    return;
+  }
+  container.innerHTML = `
+    <button type="button" class="btn btn-secondary btn-sm" ${pageInfo.page <= 1 ? 'disabled' : ''}
+            onclick="setLargeTablePage('${tableKey}', ${pageInfo.page - 1}, '${renderFunctionName}')">← Önceki</button>
+    <span>${pageInfo.totalRows.toLocaleString('tr-TR')} kayıt · ${pageInfo.page}/${pageInfo.totalPages}. sayfa</span>
+    <button type="button" class="btn btn-secondary btn-sm" ${pageInfo.page >= pageInfo.totalPages ? 'disabled' : ''}
+            onclick="setLargeTablePage('${tableKey}', ${pageInfo.page + 1}, '${renderFunctionName}')">Sonraki →</button>`;
+}
+
+function setLargeTablePage(tableKey, page, renderFunctionName) {
+  largeTablePageState[tableKey] = Math.max(1, Number(page) || 1);
+  const renderers = { renderManageBookingsTable, renderExpensesTable };
+  if (renderers[renderFunctionName]) renderers[renderFunctionName]();
+}
+
+const ACTIVE_RENDER_PLANS = {
+  'tab-executive': ['renderExecutiveControlCenter'],
+  'tab-finance': ['renderFinanceModule'],
+  'tab-dashboard': ['renderKPIsAndDashboard', 'renderGapNights', 'renderTodayRadar', 'renderOtaRadar', 'runWhatIfSimulation', 'renderTrajectoryRadar', 'renderTrajectoryInsights', 'renderCriticPresets', 'renderDailyOps'],
+  'tab-reservations': ['renderManageBookingsTable', 'renderTapeChart'],
+  'tab-expenses': ['renderExpensesTable'],
+  'tab-leads': ['renderManageLeadsTable', 'renderLeadAnalytics'],
+  'tab-maintenance': ['renderManageMaintTable'],
+  'tab-housekeeping': ['renderHousekeepingTab']
+};
+
+function getActiveRenderPlan(activeTabId) {
+  return (ACTIVE_RENDER_PLANS[activeTabId] || []).slice();
+}
+
+// Master render updates only the visible surface. Previously every mutation
+// rebuilt every hidden table and dashboard, so one booking rendered 20+ views.
 function renderAll() {
   if (typeof document === 'undefined') return;
   refreshPortfolioCountLabels();
   refreshPeriodSelectors();
   updateStepperLabels();
   renderMonthCloseCard();
-  renderExecutiveControlCenter();
   renderUserNotificationsBadge();
-  renderFinanceModule();
-  renderKPIsAndDashboard();
-  renderManageBookingsTable();
-  renderExpensesTable();
-  renderManageLeadsTable();
-  renderLeadAnalytics();
-  renderManageMaintTable();
-  renderGapNights();
-  renderTodayRadar();
-  renderOtaRadar();
-  runWhatIfSimulation();
-  renderTrajectoryRadar();
-  renderTrajectoryInsights();
-  renderCriticPresets();
-  renderDailyOps();
-  renderTapeChart();
-  renderHousekeepingTab();
+
+  const activeTabId = document.querySelector('.tab-content.active')?.id || '';
+  const activePlan = getActiveRenderPlan(activeTabId);
+  const renderers = {
+    renderExecutiveControlCenter,
+    renderFinanceModule,
+    renderKPIsAndDashboard,
+    renderManageBookingsTable,
+    renderExpensesTable,
+    renderManageLeadsTable,
+    renderLeadAnalytics,
+    renderManageMaintTable,
+    renderGapNights,
+    renderTodayRadar,
+    renderOtaRadar,
+    runWhatIfSimulation,
+    renderTrajectoryRadar,
+    renderTrajectoryInsights,
+    renderCriticPresets,
+    renderDailyOps,
+    renderTapeChart,
+    renderHousekeepingTab
+  };
+  const fallbackPlan = Object.keys(renderers);
+  (activePlan.length ? activePlan : fallbackPlan).forEach(name => renderers[name]());
 
   // Badges
   // Badges (Seçili Dönem Filtresine Göre Dinamik Sayım)
@@ -5090,9 +5167,12 @@ function renderExpensesTable() {
 
   if (filtered.length === 0) {
     tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 25px; color: var(--color-slate-400);">Kayıtlı gider bulunmamaktadır. "+ Gider / Yatırım" butonu ile yeni kayıt ekleyebilirsiniz.</td></tr>';
+    renderTablePagination('expensesPagination', 'expenses', paginateRows([], 1), 'renderExpensesTable');
     return;
   }
-  filtered.forEach(exp => {
+  const pageInfo = paginateRows(filtered, largeTablePageState.expenses);
+  renderTablePagination('expensesPagination', 'expenses', pageInfo, 'renderExpensesTable');
+  pageInfo.rows.forEach(exp => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${formatTrDate(exp.date)}</td>
@@ -5668,6 +5748,36 @@ async function cloudLinkImportBatchRows(tenantId, batchId, rezMi, kayitlar) {
   return true;
 }
 
+async function insertImportedRowsInBatches(client, tableName, payloadRows, batchSize = 100) {
+  const rows = [];
+  const failures = [];
+  const safeBatchSize = Math.max(1, Math.floor(Number(batchSize) || 100));
+  for (let i = 0; i < payloadRows.length; i += safeBatchSize) {
+    const batch = payloadRows.slice(i, i + safeBatchSize);
+    const { data, error } = await client.from(tableName).insert(batch).select();
+    if (error) {
+      batch.forEach(row => failures.push({ row, error }));
+      continue;
+    }
+    const inserted = Array.isArray(data) ? data : [];
+    const insertedIds = new Set(inserted.map(row => row && row.id).filter(Boolean));
+    rows.push(...inserted);
+    batch.filter(row => !insertedIds.has(row.id)).forEach(row => failures.push({
+      row,
+      error: new Error('Sunucu toplu yazmadaki satırı geri döndürmedi.')
+    }));
+  }
+  return { rows, failures };
+}
+
+function createImportRowId() {
+  const randomUUID = globalThis.crypto && globalThis.crypto.randomUUID;
+  if (typeof randomUUID !== 'function') {
+    throw new Error('Güvenli kayıt kimliği üretilemedi; içe aktarma başlatılmadı.');
+  }
+  return randomUUID.call(globalThis.crypto);
+}
+
 /** Son aktarimlar (geri alinabilir olanlar). Goc yoksa bos liste doner. */
 async function loadImportBatches(tenantId) {
   if (!supabaseClient || !isUUID(tenantId)) return [];
@@ -6045,11 +6155,15 @@ async function applyImportedData() {
   // eslestirilecekler (phase35). Kimlik toplanmazsa "bu aktarim neyi yazdi"
   // sorusunun cevabi hicbir yerde durmaz.
   const yeniKayitlar = [];
-  for (let i = 0; i < yazilacaklar.length; i++) {
-    const v = yazilacaklar[i];
+  const prepared = [];
+  const sourceRowById = new Map();
+  for (const v of yazilacaklar) {
     try {
+      const id = createImportRowId();
+      let payload;
       if (rezMi) {
-        const olusan = await createBooking({
+        payload = mapBookingToDb({
+          id,
           propertyId: v.propertyId,
           villa: v.propertyKey,
           guest: v.guest,
@@ -6062,10 +6176,10 @@ async function applyImportedData() {
           pax: v.pax || undefined,
           status: v.status,
           code: v.code || undefined
-        });
-        if (olusan && olusan.id) yeniKayitlar.push({ rowNum: v.rowNum, id: olusan.id });
+        }, tenantId);
       } else {
-        const olusan = await createExpense({
+        payload = mapExpenseToDb({
+          id,
           date: v.date,
           category: v.category,
           amount: v.amount,
@@ -6073,16 +6187,36 @@ async function applyImportedData() {
           propertyId: v.propertyId || undefined,
           villa: v.propertyKey || 'ALL',
           type: v.expenseType
-        });
-        if (olusan && olusan.id) yeniKayitlar.push({ rowNum: v.rowNum, id: olusan.id });
+        }, tenantId);
       }
-      basarili.push(v.rowNum);
+      prepared.push(payload);
+      sourceRowById.set(id, v.rowNum);
     } catch (err) {
       basarisiz.push({ rowNum: v.rowNum, mesaj: (err && err.message) ? err.message : String(err) });
     }
-    if (btn && (i % 5 === 0 || i === yazilacaklar.length - 1)) {
-      btn.innerText = `Aktarılıyor… (${i + 1}/${yazilacaklar.length})`;
-    }
+  }
+
+  if (prepared.length > 0) {
+    const batchResult = await insertImportedRowsInBatches(
+      supabaseClient,
+      rezMi ? 'bookings' : 'expenses',
+      prepared,
+      100
+    );
+    batchResult.rows.forEach(row => {
+      const rowNum = sourceRowById.get(row.id);
+      if (rowNum !== undefined) {
+        basarili.push(rowNum);
+        yeniKayitlar.push({ rowNum, id: row.id });
+      }
+    });
+    batchResult.failures.forEach(failure => {
+      basarisiz.push({
+        rowNum: sourceRowById.get(failure.row.id),
+        mesaj: failure.error && failure.error.message ? failure.error.message : String(failure.error)
+      });
+    });
+    if (btn) btn.innerText = `Aktarılıyor… (${basarili.length + basarisiz.length}/${yazilacaklar.length})`;
   }
 
   // Basarili bir aktarim kaydi birak (mukerrer engeli bunu okur) ve yazilan
@@ -6703,10 +6837,13 @@ function renderManageBookingsTable() {
 
   if (filtered.length === 0) {
     tbody.innerHTML = '<tr><td colspan="13" style="text-align:center; padding: 30px; color: var(--color-slate-400);">Kriterlere uygun rezervasyon bulunamadı. "+ Yeni Rezervasyon Ekle" butonu ile ekleyebilirsiniz.</td></tr>';
+    renderTablePagination('bookingsPagination', 'bookings', paginateRows([], 1), 'renderManageBookingsTable');
     return;
   }
 
-  filtered.forEach(b => {
+  const pageInfo = paginateRows(filtered, largeTablePageState.bookings);
+  renderTablePagination('bookingsPagination', 'bookings', pageInfo, 'renderManageBookingsTable');
+  pageInfo.rows.forEach(b => {
     const vName = appData.villas[b.villa]?.name || b.villa;
     const nightly = b.nights > 0 ? Math.round((b.net || b.gross) / b.nights) : 0;
 
@@ -16632,6 +16769,9 @@ if (typeof module !== 'undefined' && module.exports) {
     setActiveTenant,
     getImportEngine,
     buildImportSource,
+    paginateRows,
+    getActiveRenderPlan,
+    insertImportedRowsInBatches,
     getExportEngine,
     collectExportRecords,
     exportLedger,
