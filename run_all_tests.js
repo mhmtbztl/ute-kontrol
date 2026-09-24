@@ -250,7 +250,12 @@ const allTestFiles = [
   'workflow_pin_tests.js',
 
   // Clickjacking: yabanci cercevede belge gizlenir (Pages baslik veremiyor)
-  'frame_guard_tests.js'
+  'frame_guard_tests.js',
+
+  // Yedek ve geri yukleme (L-42): eksiksizlik, yalniz okuma, kurallar ve canli tur
+  'backup_engine_tests.js',
+  'restore_engine_tests.js',
+  'backup_restore_live_tests.js'
 ];
 
 const testEnv = require('./core/test_env.js');

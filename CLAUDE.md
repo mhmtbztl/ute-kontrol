@@ -278,6 +278,11 @@ Yeni bir çalışma anı yükleyici eklerseniz dosyayı `stamp_assets.js` içind
 `index.html` kendi başına 10 dakika önbelleklenir (GitHub Pages `max-age=600`, başlık
 değiştiremiyoruz). Deploy sonrası eski sürüm görürseniz `Ctrl+Shift+R`.
 
+**Yedek (L-42, K-01):** `npm run backup` — haftalık, Pro plana geçene kadar.
+Hedef deponun DIŞINDA (`Masaüstülexbnb-yedekler`); geri yükleme `npm run restore`.
+Yedek geri yüklenebilir olduğu için yedektir: canlı tur (`backup_restore_live_tests`)
+işletmeyi siler ve yedekten birebir geri getirir. Ayrıntı: `docs/BACKUP_RESTORE.md`.
+
 ### 4.2 Göç (migration) uygulama
 DDL, PostgREST üzerinden çalıştırılamaz ve `.env`'de doğrudan Postgres bağlantı dizesi yok.
 **Göçler Supabase Dashboard → SQL Editor'den elle çalıştırılır.** Her göç dosyasının

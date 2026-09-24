@@ -14,6 +14,8 @@
     "production:readiness": "node scripts/check_production_readiness.js",
     "invitations:worker": "node scripts/run_invitation_worker.js",
     "storage:orphan-cleanup": "node scripts/run_storage_orphan_cleanup.js",
+    "backup": "node scripts/run_backup.js",
+    "restore": "node scripts/run_restore.js",
     "marketing:photo-worker": "node scripts/run_photo_analysis_worker.js",
     "marketing:experiment-worker": "node scripts/run_marketing_experiment_worker.js",
     "marketing:seasonal-worker": "node scripts/run_seasonal_marketing_worker.js",
