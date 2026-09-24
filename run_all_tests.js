@@ -232,7 +232,10 @@ const allTestFiles = [
   'local_server_tests.js',
 
   // Tarayici kutuphaneleri depoya gomulu ve ozetle sabit (SheetJS, Supabase SDK)
-  'vendor_pin_tests.js'
+  'vendor_pin_tests.js',
+
+  // GitHub Actions eylemleri tam commit SHA'sina sabit
+  'workflow_pin_tests.js'
 ];
 
 const testEnv = require('./core/test_env.js');
