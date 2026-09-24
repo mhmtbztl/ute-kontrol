@@ -5082,7 +5082,7 @@ function renderExpensesTable() {
       <td><strong>${Number(exp.amount).toLocaleString('tr-TR')} TL</strong></td>
       <td style="text-align: right; white-space: nowrap;">
         <button class="btn btn-secondary btn-sm" onclick="editExpense(decodeURIComponent('${encodeURIComponent(String(exp.id))}'))">✏️</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteExpense(decodeURIComponent('${encodeURIComponent(String(exp.id))}'))">🗑️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteExpenseUI(decodeURIComponent('${encodeURIComponent(String(exp.id))}'))">🗑️</button>
       </td>
     `;
     tbody.appendChild(tr);
@@ -6306,15 +6306,15 @@ function renderTodayRadar() {
     const downtimeText = hasDowntime && Number.isFinite(downtime) && downtime >= 0
       ? `${downtime} Gece`
       : '— (kesinti süresi girilmemiş)';
-    actions.push({ type: 'p1', badge: '[P1 ACİL]', title: `${appData.villas[m.villa]?.name || m.villa}: ${m.title}`, meta: `Downtime: ${downtimeText}`, action: 'Çöz' });
+    actions.push({ type: 'p1', id: m.id, badge: '[P1 ACİL]', title: `${appData.villas[m.villa]?.name || m.villa}: ${m.title}`, meta: `Downtime: ${downtimeText}`, action: 'Arızalara Git' });
   });
 
   appData.leads.filter(l => l.status === 'FOLLOW_UP').forEach(l => {
-    actions.push({ type: 'lead', badge: '[SICAK LEAD]', title: `${l.guest} (${appData.villas[l.villa]?.name || l.villa}): ₺${Number(l.quote).toLocaleString('tr-TR')}`, meta: `Kanal: ${l.channel}`, action: 'Follow-up' });
+    actions.push({ type: 'lead', id: l.id, badge: '[SICAK LEAD]', title: `${l.guest} (${appData.villas[l.villa]?.name || l.villa}): ₺${Number(l.quote).toLocaleString('tr-TR')}`, meta: `Kanal: ${l.channel}`, action: 'Taleplere Git' });
   });
 
   if (actions.length === 0) {
-    actions.push({ type: 'ops', badge: '[GÜVENLİ]', title: 'Tüm villalar operasyonel açıdan sakin ve hazır durumda.', meta: 'Açık P1 arıza bulunmuyor.', action: 'Rutin' });
+    actions.push({ type: 'ops', id: '', badge: '[GÜVENLİ]', title: 'Tüm villalar operasyonel açıdan sakin ve hazır durumda.', meta: 'Açık P1 arıza bulunmuyor.', action: 'Operasyona Git' });
   }
 
   const badge = document.getElementById('radarBadge');
@@ -6326,10 +6326,26 @@ function renderTodayRadar() {
     row.innerHTML = `
       <div class="radar-badge-col"><span class="radar-pill pill-${act.type}">${act.badge}</span></div>
       <div class="radar-main-col"><strong>${act.title}</strong><span>${act.meta}</span></div>
-      <div class="radar-action-col"><button class="btn btn-secondary btn-sm" onclick="alert('${act.title}')">${act.action}</button></div>
+      <div class="radar-action-col"><button type="button" class="btn btn-secondary btn-sm" data-radar-action="${act.type}" data-radar-id="${act.id || ''}">${act.action}</button></div>
     `;
+    const actionButton = row.querySelector('[data-radar-action]');
+    if (actionButton) {
+      actionButton.addEventListener('click', () => handleTodayRadarAction(act.type, act.id));
+    }
     container.appendChild(row);
   });
+}
+
+function handleTodayRadarAction(type) {
+  if (type === 'p1') {
+    switchTab('maintenance');
+    return;
+  }
+  if (type === 'lead') {
+    switchTab('leads');
+    return;
+  }
+  switchTab('operations');
 }
 
 function renderFunnelStats() {
@@ -9000,7 +9016,7 @@ function renderDailyOps() {
         </div>
         <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
           <span class="badge badge-green" style="font-weight: 700;">🟢 ${checkInTime ? escapeHtml(checkInTime) + ' Giriş' : 'Giriş saati kayıtlı değil'}</span>
-          <button class="btn btn-secondary btn-sm" style="font-size: 10px; padding: 2px 6px;" onclick="openReservationModal('${b.id}')">Detay</button>
+          <button class="btn btn-secondary btn-sm" style="font-size: 10px; padding: 2px 6px;" onclick="openBookingModal('${b.id}')">Detay</button>
         </div>
       `;
       inList.appendChild(div);
@@ -9054,7 +9070,7 @@ function renderDailyOps() {
         </div>
         <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
           <span class="badge badge-blue" style="font-weight: 700;">🔵 ${checkOutTime ? escapeHtml(checkOutTime) + ' Çıkış' : 'Çıkış saati kayıtlı değil'}</span>
-          <button class="btn btn-secondary btn-sm" style="font-size: 10px; padding: 2px 6px;" onclick="openReservationModal('${b.id}')">Detay</button>
+          <button class="btn btn-secondary btn-sm" style="font-size: 10px; padding: 2px 6px;" onclick="openBookingModal('${b.id}')">Detay</button>
         </div>
       `;
       outList.appendChild(div);
@@ -13939,7 +13955,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
       const tenantId = targetId;
       // Independent datasets are loaded concurrently and every list is paged;
       // Supabase's per-response cap must never silently truncate a dashboard.
-      const [villas, bookings, expenses, cleanList, leads, closeList, targetList, maintenanceTickets, financialTransactions, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications, campaignRows, influencerRows, settingRows, operatorNoteRows, pricingLadderRows, hkOverrideRows] = await Promise.all([
+      const [villas, bookings, expenses, cleanList, leads, closeList, targetList, maintenanceTickets, operationalTasks, financialTransactions, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications, campaignRows, influencerRows, settingRows, operatorNoteRows, pricingLadderRows, hkOverrideRows] = await Promise.all([
         loadProperties(tenantId),
         loadBookings(tenantId),
         loadExpenses(tenantId),
@@ -13948,6 +13964,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
         fetchAllCloudRows(() => supabaseClient.from('monthly_financial_closes').select('*').eq('tenant_id', tenantId).order('year', { ascending: false }).order('month', { ascending: false })),
         fetchAllCloudRows(() => supabaseClient.from('monthly_targets').select('*').eq('tenant_id', tenantId).order('year', { ascending: false }).order('month', { ascending: false })),
         fetchAllCloudRows(() => supabaseClient.from('maintenance_tickets').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false })),
+        fetchAllCloudRows(() => supabaseClient.from('operational_tasks').select('*').eq('tenant_id', tenantId).order('due_at', { ascending: true })),
         fetchAllCloudRows(() => supabaseClient.from('financial_transactions').select('*').eq('tenant_id', tenantId).order('occurred_on', { ascending: false })),
         fetchAllCloudRows(() => supabaseClient.from('guests').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false })),
         fetchAllCloudRows(() => supabaseClient.from('guest_consent_events').select('*').eq('tenant_id', tenantId).order('recorded_at', { ascending: false })),
@@ -14050,6 +14067,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
           status: t.status === 'RESOLVED' ? 'COMPLETED' : t.status
         })),
         maintenanceTickets,
+        operationalTasks: operationalTasks || [],
         financialTransactions: financialTransactions || [],
         userNotifications: userNotifications || [],
         marketingCampaigns: (campaignRows || []).map(r => mapMarketingCampaignFromDb(r, propIdMap)),
@@ -14114,6 +14132,7 @@ function getBlankTenantData(userId) {
     targets: [],
     maintenance: [],
     maintenanceTickets: [],
+    operationalTasks: [],
     financialTransactions: [],
     marketingCampaigns: [],
     influencerCollabs: [],
@@ -15720,18 +15739,18 @@ function renderExecutiveControlCenter() {
     }
 
     // High value leads
-    const hotLeads = leads.filter(l => l.stage === 'PROPOSAL' || l.stage === 'QUALIFIED');
+    const hotLeads = leads.filter(l => l.status === 'FOLLOW_UP' || l.status === 'QUOTE_SENT');
     if (hotLeads.length > 0) {
       const l = hotLeads[0];
       candidates.push({
         id: l.id,
         domain: 'LEADS',
-        propertyId: l.propertyId,
-        title: `Sıcak Müşteri Teklifi: ${l.guestName || l.contactName} (₺${Number(l.estimatedValue || 0).toLocaleString('tr-TR')})`,
+        propertyId: l.villa,
+        title: `Sıcak Müşteri Teklifi: ${l.guest || 'Ad belirtilmedi'} (₺${Number(l.quote || 0).toLocaleString('tr-TR')})`,
         revenueImpact: 'HIGH',
         confidence: 'HIGH',
         rationale: 'Rezervasyona dönüşme olasılığı yüksek müşteri teklifi bekliyor.',
-        sourceMetrics: [`Aşama: ${l.stage}`, `Değer: ₺${l.estimatedValue}`],
+        sourceMetrics: [`Durum: ${l.status}`, `Değer: ₺${Number(l.quote || 0).toLocaleString('tr-TR')}`],
         deepLink: 'leads',
         quickAction: 'CONVERT_LEAD'
       });
@@ -16142,7 +16161,7 @@ function handleCommandPaletteSearch(query) {
             title: `Rezervasyon: ${b.guest} (${b.checkIn} - ${b.checkOut})`,
             action: () => {
               closeCommandPalette();
-              openReservationModal(b.id);
+              openBookingModal(b.id);
             }
           });
         }
