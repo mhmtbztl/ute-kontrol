@@ -927,6 +927,13 @@ Ağı `core/csv_import_tests.js` (52 iddia: motor, `app.js` kaynağı, gerçek
   `test_env.js` hariç —, `sablonlar/`). Eskiden klasörün tamamını ağa açıyordu;
   `.env` de dahildi. Tarayıcıya yeni bir dosya eklerseniz izin listesine de
   ekleyin; ağı `core/local_server_tests.js`.
+- **`npm audit`: 2 orta (exceljs → uuid 8.3.2, GHSA-w5hq-g745-h8pq) — erişilemez,
+  bilerek kabul edildi (24 Eylül 2026).** Açık yalnızca `uuid` v3/v5/v6'ya
+  `buf` parametresi verildiğinde tetiklenir; `exceljs` `uuidv4()`'ü parametresiz
+  çağırıyor. Üstelik `exceljs`'i kullanan tek dosya (`core/excel_generator.js`)
+  hiçbir yerden çağrılmıyor ve tarayıcıya yüklenmiyor. `npm audit fix --force`
+  önerisi exceljs'i 3.4.0'a **düşürür** — yapmayın. Kalıcı çözüm, ölü
+  `excel_generator.js` ile `exceljs` bağımlılığını birlikte kaldırmaktır.
 - `.env` **asla** commit edilmez (`.gitignore`'da). İçinde `service_role` anahtarı var — tam yetkili.
   Tarayıcı koduna hiç girmedi, git geçmişine hiç girmedi.
 - **Supabase, `public` şemasındaki yeni fonksiyonlara varsayılan olarak `anon` rolüne EXECUTE verir.**
