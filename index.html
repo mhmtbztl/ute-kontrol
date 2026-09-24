@@ -11,7 +11,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=685f0689">
+  <link rel="stylesheet" href="style.css?v=4a4caa56">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="supabase.umd.js?v=3810661a"></script>
@@ -22,11 +22,11 @@
   <!-- ======================================================= -->
   <!-- SAAS AUTHENTICATION & MULTI-TENANT GATEWAY             -->
   <!-- ======================================================= -->
-  <div id="securityLockOverlay" class="security-lock-overlay" style="display: none;">
+  <div id="securityLockOverlay" class="security-lock-overlay" role="dialog" aria-modal="true" aria-labelledby="authGatewayTitle" style="display: none;">
     <div class="security-lock-card" style="max-width: 480px; width: 92%; padding: 28px 24px;">
       <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 6px;">
         <span style="font-size: 28px;">🌲</span>
-        <h2 style="margin: 0; font-size: 22px; font-weight: 900; letter-spacing: 0.5px; color: #fff;">LEXBNB <span style="font-size: 13px; color: #A855F7; border: 1px solid rgba(168, 85, 247, 0.4); padding: 2px 6px; border-radius: 4px; vertical-align: middle;">SaaS</span></h2>
+        <h2 id="authGatewayTitle" style="margin: 0; font-size: 22px; font-weight: 900; letter-spacing: 0.5px; color: #fff;">LEXBNB <span style="font-size: 13px; color: #A855F7; border: 1px solid rgba(168, 85, 247, 0.4); padding: 2px 6px; border-radius: 4px; vertical-align: middle;">SaaS</span></h2>
       </div>
       <span class="lock-sub-brand" style="display: block; margin-bottom: 14px; font-size: 12px; color: #CBD5E1;">
         Kısa Dönem Kiralama, Villa & Bungalov Operasyon Merkezi
@@ -2820,53 +2820,28 @@
   <!-- ========================================== -->
   <!-- MODAL: REZERVASYON EKLE / DÜZENLE -->
   <!-- ========================================== -->
-  <div class="modal-backdrop" id="bookingModal">
+  <div class="modal-backdrop" id="bookingModal" role="dialog" aria-modal="true" aria-labelledby="bookingModalTitle">
     <div class="modal-card">
       <div class="modal-header">
         <h3 id="bookingModalTitle">➕ Rezervasyon Girişi</h3>
-        <button class="close-btn" onclick="closeBookingModal()">&times;</button>
+        <button type="button" class="close-btn" aria-label="Rezervasyon penceresini kapat" onclick="closeBookingModal()">&times;</button>
       </div>
       <form id="bookingForm" onsubmit="saveBooking(event)">
         <input type="hidden" id="resEditId">
         <input type="hidden" id="resGuestId">
-        <div class="form-grid">
+        <div class="booking-essential-grid">
           <div class="form-group">
-            <label>Villa Seçin</label>
+            <label for="resVilla">Villa Seçin</label>
             <select id="resVilla" required onchange="calculateLivePreview()">
               <!-- updateAllVillaDropdowns() musterinin mulkleriyle doldurur -->
             </select>
           </div>
           <div class="form-group">
-            <label>Misafir Adı</label>
-            <input type="text" id="resGuest" placeholder="Örn: Ahmet Yılmaz" required>
-          </div>
-          <div class="form-group">
-            <label>Misafir Telefonu</label>
-            <input type="tel" id="resGuestPhone" placeholder="Örn: 0532 123 45 67" autocomplete="tel">
-            <small class="field-note">Tekrar eden misafiri güvenilir biçimde tanımak için telefon veya e-posta girin.</small>
-          </div>
-          <div class="form-group">
-            <label>Misafir E-postası</label>
-            <input type="email" id="resGuestEmail" placeholder="ornek@email.com" autocomplete="email">
-          </div>
-          <div class="form-group">
-            <label>İletişim Dili</label>
-            <select id="resGuestLanguage">
-              <option value="tr">Türkçe</option>
-              <option value="en">English</option>
-              <option value="de">Deutsch</option>
-              <option value="ru">Русский</option>
-              <option value="ar">العربية</option>
-            </select>
-          </div>
-          <div class="form-group" style="justify-content: flex-end;">
-            <label style="display:flex; gap:8px; align-items:flex-start; cursor:pointer;">
-              <input type="checkbox" id="resGuestMarketingOptIn" style="width:auto; margin-top:2px;">
-              <span>Kampanya iletişimi izni alındı<small class="field-note" style="display:block;">İşlemsel konaklama mesajlarından ayrıdır; yalnız açık onay varsa işaretleyin.</small></span>
-            </label>
+            <label for="resGuest">Misafir Adı</label>
+            <input type="text" id="resGuest" placeholder="Örn: Ahmet Yılmaz" required autocomplete="name">
           </div>
           <div class="form-group daterange-group">
-            <label>Konaklama Tarihleri</label>
+            <label for="resDateRangeBtn">Konaklama Tarihleri</label>
             <button type="button" id="resDateRangeBtn" class="daterange-trigger" onclick="toggleResDatePicker()" aria-haspopup="dialog" aria-expanded="false">
               <span class="daterange-leg">
                 <span class="daterange-cap">Giriş</span>
@@ -2895,7 +2870,16 @@
             <input type="hidden" id="resCheckOut">
           </div>
           <div class="form-group">
-            <label>Rezervasyon Kanalı</label>
+            <label for="resGross">Brüt Tutar (₺)</label>
+            <input type="number" inputmode="decimal" id="resGross" placeholder="Örn: 40000" required oninput="syncCommissionFromRate()">
+            <small class="field-note">Misafirin ödediği toplam. Temizlik ücreti bu tutara dâhildir.</small>
+          </div>
+          <div class="form-group">
+            <label for="resPax">Kişi Sayısı</label>
+            <input type="number" inputmode="numeric" id="resPax" min="1" step="1" required placeholder="Kişi sayısını girin">
+          </div>
+          <div class="form-group">
+            <label for="resChannel">Rezervasyon Kanalı</label>
             <select id="resChannel" required onchange="handleBookingChannelChange()">
               <option value="WHATSAPP">WhatsApp (Direkt - %0)</option>
               <option value="AIRBNB">Airbnb (OTA)</option>
@@ -2906,46 +2890,67 @@
               <option value="PHONE">Telefon (%0)</option>
             </select>
           </div>
-          <div class="form-group">
-            <label>Brüt Tutar (₺)</label>
-            <input type="number" id="resGross" placeholder="Örn: 40000" required oninput="syncCommissionFromRate()">
-            <small class="field-note">Misafirin ödediği toplam. Temizlik ücreti bu tutara dâhildir.</small>
-          </div>
-          <div class="form-group">
-            <label>OTA Komisyon Oranı (%)</label>
-            <input type="number" id="resCommissionRate" step="0.01" min="0" max="100" placeholder="Kanala göre otomatik" oninput="syncCommissionFromRate()">
-            <small class="field-note">Boş bırakırsanız kanalın varsayılan oranı uygulanır.</small>
-          </div>
-          <div class="form-group">
-            <label>OTA Komisyonu (₺)</label>
-            <input type="number" id="resCommission" placeholder="Otomatik veya Manuel" oninput="syncRateFromCommission()">
-            <small class="field-note">Oran ve tutar birbirini günceller; hangisini yazarsanız diğeri hesaplanır.</small>
-          </div>
-          <div class="form-group">
-            <label>Temizlik Ücreti — Misafirden Alınan (₺)</label>
-            <input type="number" id="resCleanFee" placeholder="Örn: 1500" value="0" oninput="calculateLivePreview()">
-            <small class="field-note note-revenue">▲ <strong>Gelir kalemi.</strong> Brüt tutarın içindedir; oda gelirinden ayrı raporlanır.</small>
-          </div>
-          <div class="form-group">
-            <label>Temizlik Maliyeti — Personele Ödenen (₺)</label>
-            <input type="number" id="resCleanCost" placeholder="Örn: 1200" value="0" oninput="calculateLivePreview()">
-            <small class="field-note note-expense">▼ <strong>Gider kalemi.</strong> "Temizlik &amp; Borç" defterine borç olarak yazılır; siz "Ödendi" yapana kadar kasadan çıkış görünmez.</small>
-          </div>
-          <div class="form-group">
-            <label>Rezervasyon Durumu</label>
-            <select id="resStatus">
-              <option value="CONFIRMED">Onaylandı</option>
-              <option value="CHECKED_IN">İçeride (Konaklıyor)</option>
-              <option value="CHECKED_OUT">Tamamlandı</option>
-              <option value="CANCELLED">İptal Edildi</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Kişi Sayısı</label>
-            <input type="number" id="resPax" min="1" step="1" required placeholder="Kişi sayısını girin">
-          </div>
         </div>
 
+        <details class="booking-optional-details">
+          <summary>İsteğe bağlı ayrıntılar</summary>
+          <div class="booking-optional-grid">
+            <div class="form-group">
+              <label for="resGuestPhone">Misafir Telefonu</label>
+              <input type="tel" inputmode="tel" id="resGuestPhone" placeholder="Örn: 0532 123 45 67" autocomplete="tel">
+              <small class="field-note">Tekrar eden misafiri güvenilir biçimde tanımak için telefon veya e-posta girin.</small>
+            </div>
+            <div class="form-group">
+              <label for="resGuestEmail">Misafir E-postası</label>
+              <input type="email" inputmode="email" id="resGuestEmail" placeholder="ornek@email.com" autocomplete="email">
+            </div>
+            <div class="form-group">
+              <label for="resGuestLanguage">İletişim Dili</label>
+              <select id="resGuestLanguage">
+                <option value="tr">Türkçe</option>
+                <option value="en">English</option>
+                <option value="de">Deutsch</option>
+                <option value="ru">Русский</option>
+                <option value="ar">العربية</option>
+              </select>
+            </div>
+            <div class="form-group" style="justify-content: flex-end;">
+              <label for="resGuestMarketingOptIn" style="display:flex; gap:8px; align-items:flex-start; cursor:pointer;">
+                <input type="checkbox" id="resGuestMarketingOptIn" style="width:auto; margin-top:2px;">
+                <span>Kampanya iletişimi izni alındı<small class="field-note" style="display:block;">İşlemsel konaklama mesajlarından ayrıdır; yalnız açık onay varsa işaretleyin.</small></span>
+              </label>
+            </div>
+            <div class="form-group">
+              <label for="resCommissionRate">OTA Komisyon Oranı (%)</label>
+              <input type="number" inputmode="decimal" id="resCommissionRate" step="0.01" min="0" max="100" placeholder="Kanala göre otomatik" oninput="syncCommissionFromRate()">
+              <small class="field-note">Boş bırakırsanız kanalın varsayılan oranı uygulanır.</small>
+            </div>
+            <div class="form-group">
+              <label for="resCommission">OTA Komisyonu (₺)</label>
+              <input type="number" inputmode="decimal" id="resCommission" placeholder="Otomatik veya Manuel" oninput="syncRateFromCommission()">
+              <small class="field-note">Oran ve tutar birbirini günceller; hangisini yazarsanız diğeri hesaplanır.</small>
+            </div>
+            <div class="form-group">
+              <label for="resCleanFee">Temizlik Ücreti — Misafirden Alınan (₺)</label>
+              <input type="number" inputmode="decimal" id="resCleanFee" placeholder="Örn: 1500" value="0" oninput="calculateLivePreview()">
+              <small class="field-note note-revenue">▲ <strong>Gelir kalemi.</strong> Brüt tutarın içindedir; oda gelirinden ayrı raporlanır.</small>
+            </div>
+            <div class="form-group">
+              <label for="resCleanCost">Temizlik Maliyeti — Personele Ödenen (₺)</label>
+              <input type="number" inputmode="decimal" id="resCleanCost" placeholder="Örn: 1200" value="0" oninput="calculateLivePreview()">
+              <small class="field-note note-expense">▼ <strong>Gider kalemi.</strong> "Temizlik &amp; Borç" defterine borç olarak yazılır; siz "Ödendi" yapana kadar kasadan çıkış görünmez.</small>
+            </div>
+            <div class="form-group">
+              <label for="resStatus">Rezervasyon Durumu</label>
+              <select id="resStatus">
+                <option value="CONFIRMED">Onaylandı</option>
+                <option value="CHECKED_IN">İçeride (Konaklıyor)</option>
+                <option value="CHECKED_OUT">Tamamlandı</option>
+                <option value="CANCELLED">İptal Edildi</option>
+              </select>
+            </div>
+          </div>
+        </details>
         <div class="live-calculation-box">
           <div class="preview-item"><span>Gece Sayısı:</span><strong id="prevNights">—</strong></div>
 
@@ -3957,7 +3962,7 @@
   <script src="core/executive_ai_advisor.js?v=502075f7"></script>
   <script src="core/notification_center_service.js?v=710f8a91"></script>
   <script src="core/captcha_gate.js?v=3ad4a776"></script>
-  <script src="app.js?v=09aa0e7e"></script>
+  <script src="app.js?v=09743697"></script>
   <script src="core/property_analysis_context_ui.js?v=efba10f2"></script>
   <script src="core/analysis_center_ui.js?v=7991bd67"></script>
   <script src="core/marketing_ui.js?v=1360fb04"></script>

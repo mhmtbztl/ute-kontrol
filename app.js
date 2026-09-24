@@ -152,6 +152,7 @@ async function checkAuthStatus() {
 function showLockOverlay() {
   const overlay = document.getElementById('securityLockOverlay');
   if (overlay) {
+    setApplicationInert(true);
     overlay.style.display = 'flex';
     setTimeout(() => {
       const emailInput = document.getElementById('saasLoginUser');
@@ -163,6 +164,26 @@ function showLockOverlay() {
 function hideLockOverlay() {
   const overlay = document.getElementById('securityLockOverlay');
   if (overlay) overlay.style.display = 'none';
+  setApplicationInert(false);
+}
+
+function setApplicationInert(locked) {
+  if (typeof document === 'undefined' || !document.body) return;
+  const overlay = document.getElementById('securityLockOverlay');
+  Array.from(document.body.children).forEach(element => {
+    if (element !== overlay && 'inert' in element) element.inert = !!locked;
+  });
+  if (overlay && 'inert' in overlay) overlay.inert = false;
+}
+
+function wireAccessibleFormLabels() {
+  if (typeof document === 'undefined') return;
+  document.querySelectorAll('.form-group').forEach(group => {
+    const label = group.querySelector('label');
+    const control = group.querySelector('input:not([type="hidden"]), select, textarea, button');
+    if (!label || !control || !control.id || label.contains(control)) return;
+    if (!label.htmlFor) label.htmlFor = control.id;
+  });
 }
 
 // LEXBNB KONTROL MERKEZİ - EXECUTIVE STR CONTROL & REVENUE MANAGEMENT ENGINE
@@ -8932,6 +8953,7 @@ function exportLedger(mod, bicim) {
 // Initialize on DOM Ready
 if (typeof document !== 'undefined') {
   document.addEventListener('DOMContentLoaded', async () => {
+    wireAccessibleFormLabels();
     const isAuth = await checkAuthStatus();
     if (!isAuth) {
       if (typeof getBlankTenantData === 'function') {

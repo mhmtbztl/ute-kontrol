@@ -29,6 +29,11 @@
   padding: 0;
 }
 
+html, body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 body {
   font-family: var(--font-sans);
   background-color: var(--bg-main);
@@ -3053,13 +3058,16 @@ body {
 @media (max-width: 768px) {
   .header-actions {
     display: flex !important;
+    flex-wrap: wrap !important;
     gap: 8px !important;
     width: 100% !important;
   }
 
+  .header-actions > .btn,
   .header-dropdown-wrap {
-    flex: 1 1 50% !important;
-    width: 50% !important;
+    flex: 1 1 calc(50% - 4px) !important;
+    width: auto !important;
+    min-width: 0 !important;
   }
 
   .header-dropdown-wrap .btn {
@@ -4002,6 +4010,7 @@ body {
 
 .ai-chat-input {
   flex: 1;
+  min-width: 0;
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 8px;
@@ -4061,6 +4070,40 @@ body {
    =========================================================================== */
 
 .daterange-group { grid-column: 1 / -1; position: relative; }
+
+.booking-essential-grid,
+.booking-optional-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.booking-optional-details {
+  margin-top: 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.booking-optional-details summary {
+  min-height: 44px;
+  padding: 11px 12px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.booking-optional-grid {
+  padding: 0 12px 12px;
+}
+
+#bookingModal input,
+#bookingModal select,
+#bookingModal button,
+#bookingModal summary {
+  min-height: 44px;
+}
 
 .daterange-trigger {
   width: 100%;
@@ -4139,6 +4182,46 @@ body {
 
 .daterange-months { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
 @media (max-width: 640px) { .daterange-months { grid-template-columns: 1fr; } }
+
+@media (max-width: 640px) {
+  #bookingModal {
+    align-items: stretch;
+  }
+
+  #bookingModal .modal-card {
+    width: 100% !important;
+    max-width: none !important;
+    height: 100dvh;
+    max-height: 100dvh !important;
+    margin: 0 !important;
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+    padding: 14px !important;
+  }
+
+  .booking-essential-grid,
+  .booking-optional-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .daterange-trigger {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .daterange-leg {
+    flex: 1 1 110px;
+    min-width: 0;
+  }
+
+  .daterange-nights {
+    width: 100%;
+    margin-left: 0;
+    text-align: center;
+  }
+}
 
 /* Analysis Center */
 .analysis-hero {
