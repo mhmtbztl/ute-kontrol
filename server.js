@@ -27,7 +27,7 @@ const MIME_TYPES = {
   '.ico': 'image/x-icon'
 };
 
-const ROOT_FILES = new Set(['index.html', 'style.css', 'app.js', 'xlsx.full.min.js', 'robots.txt', 'favicon.ico']);
+const ROOT_FILES = new Set(['index.html', 'style.css', 'app.js', 'xlsx.full.min.js', 'supabase.umd.js', 'robots.txt', 'favicon.ico']);
 
 /** Istenen yolun izin listesinde olup olmadigi. Goreli, '/' ayracli yol alir. */
 function isAllowed(rel) {

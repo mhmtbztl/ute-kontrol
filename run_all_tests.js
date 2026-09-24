@@ -229,7 +229,10 @@ const allTestFiles = [
   'storage_orphan_cleanup_tests.js',
 
   // Yerel sunucu yalnizca 127.0.0.1 ve izin listesi (.env / .git / supabase verilmez)
-  'local_server_tests.js'
+  'local_server_tests.js',
+
+  // Tarayici kutuphaneleri depoya gomulu ve ozetle sabit (SheetJS, Supabase SDK)
+  'vendor_pin_tests.js'
 ];
 
 const testEnv = require('./core/test_env.js');

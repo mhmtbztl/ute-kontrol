@@ -1,0 +1,4 @@
+# Gomulu tarayici kutuphaneleri: ozetleri core/vendor_pin_tests.js icinde sabit.
+# Satir sonu donusumu ozeti degistirir; bayt bayt korunur.
+xlsx.full.min.js -text
+supabase.umd.js -text
