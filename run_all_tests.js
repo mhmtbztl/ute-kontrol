@@ -255,7 +255,10 @@ const allTestFiles = [
   // Yedek ve geri yukleme (L-42): eksiksizlik, yalniz okuma, kurallar ve canli tur
   'backup_engine_tests.js',
   'restore_engine_tests.js',
-  'backup_restore_live_tests.js'
+  'backup_restore_live_tests.js',
+
+  // Ice aktarma: tarih sirasi dosyadan (GG/AA - AA/GG), TL ekli tutar, yabanci para reddi
+  'import_parsing_tests.js'
 ];
 
 const testEnv = require('./core/test_env.js');

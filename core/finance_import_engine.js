@@ -81,8 +81,13 @@ function normalizeAmount(v) {
 
   let s = String(v).trim();
   if (!s) return null;
+  // Yabanci para birimi TL SAYILMAZ: "$100" eskiden sembolu silinip 100 TL
+  // yaziliyordu (uydurma tutar, §3.6). Okunamadi -> satir reddedilir.
+  if (/[$€£]|(^|[^A-Za-z])(USD|EUR|GBP)([^A-Za-z]|$)/i.test(s)) return null;
+  // TL ailesi kabul edilir: "1.500 TL", "TRY 1500", "₺1.500".
+  s = s.replace(/₺/g, '').replace(/(^|[^A-Za-z])(TRY|TRL|TL)(?=[^A-Za-z]|$)/gi, '$1').trim();
   const eksi = /^\(.*\)$/.test(s) || s.startsWith('-');
-  s = s.replace(/[₺$€\s()]/g, '').replace(/^-/, '');
+  s = s.replace(/[\s()]/g, '').replace(/^-/, '');
   if (!s) return null;
   if (!/^[\d.,]+$/.test(s)) return null;
 
@@ -111,9 +116,10 @@ function normalizeAmount(v) {
 /**
  * Tarihi 'YYYY-MM-DD' formatina cevirir.
  * Date nesnesi, Excel seri numarasi, YYYY-MM-DD, DD.MM.YYYY, DD/MM/YYYY kabul eder.
+ * order === 'MDY' ise AA/GG/YYYY okunur; dosyanin sirasini detectDateOrder verir.
  * Cozulemezse null.
  */
-function normalizeDate(v) {
+function normalizeDate(v, order) {
   if (v === null || v === undefined || v === '') return null;
 
   const bicim = (y, a, g) => {
@@ -142,9 +148,67 @@ function normalizeDate(v) {
   let m = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
   if (m) return bicim(m[1], m[2], m[3]);
   m = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
-  if (m) return bicim(m[3], m[2], m[1]);   // gun.ay.yil (TR)
+  if (m) {
+    // Sira dosyadan belirlenir (detectDateOrder). Varsayilan gun.ay.yil (TR).
+    return order === 'MDY' ? bicim(m[3], m[1], m[2]) : bicim(m[3], m[2], m[1]);
+  }
   return null;
 }
+
+const GUN_AY_DESENI = /^(\d{1,2})([-/.])(\d{1,2})\2(\d{4})/;
+
+/**
+ * Tek hucrenin sira kaniti: 'DMY' | 'MDY' | 'AMBIGUOUS' | null (sayisal
+ * gun/ay/yil degil). Ilk sayi 12'den buyukse gundur; ikinci sayi 12'den
+ * buyukse gundur; nokta ayirici Turk bicimidir (ABD bicimi noktayi kullanmaz).
+ */
+function dateCellEvidence(v) {
+  if (typeof v !== 'string') return null;
+  const m = v.trim().match(GUN_AY_DESENI);
+  if (!m) return null;
+  const a = Number(m[1]), b = Number(m[3]);
+  if (a > 12 && b <= 12) return 'DMY';
+  if (b > 12 && a <= 12) return 'MDY';
+  if (m[2] === '.') return 'DMY';
+  return 'AMBIGUOUS';
+}
+
+/**
+ * Dosyanin tarih sirasi, TUM tarih hucrelerine bakilarak.
+ * Donen: { order: 'DMY' | 'MDY' | 'MIXED', assumed: bool }
+ *   - yalniz GG/AA kaniti ya da hic kanit yok -> DMY (kanit yoksa assumed)
+ *   - yalniz AA/GG kaniti                    -> MDY
+ *   - ikisi birden                           -> MIXED: belirsiz hucreler reddedilir
+ * Eskiden her hucre tek basina GG/AA sayiliyordu: ABD bicimli dosyada gunu
+ * 12'den kucuk tarihler sessizce yanlis aya yaziliyordu.
+ */
+function detectDateOrder(values = []) {
+  let dmy = false, mdy = false;
+  for (const v of values) {
+    const e = dateCellEvidence(v);
+    if (e === 'DMY') dmy = true;
+    else if (e === 'MDY') mdy = true;
+  }
+  if (dmy && mdy) return { order: 'MIXED', assumed: false };
+  if (mdy) return { order: 'MDY', assumed: false };
+  return { order: 'DMY', assumed: !dmy };
+}
+
+/** Dosya sirasina gore tek hucre. MIXED'de belirsiz hucre { error } doner. */
+function parseDateCell(v, fileOrder) {
+  if (fileOrder !== 'MIXED') return { value: normalizeDate(v, fileOrder) };
+  const e = dateCellEvidence(v);
+  if (e === 'AMBIGUOUS') return { value: null, ambiguous: true };
+  return { value: normalizeDate(v, e === 'MDY' ? 'MDY' : 'DMY') };
+}
+
+function fileDateOrder(rawRows, columns) {
+  const values = [];
+  for (const r of rawRows) for (const c of columns) if (c !== undefined) values.push(r[c]);
+  return detectDateOrder(values);
+}
+
+const BELIRSIZ_TARIH = 'Tarih biçimi belirsiz: dosyada hem GG/AA hem AA/GG yazılmış tarihler var';
 
 /** Iki tarih arasindaki gece sayisi. */
 function nightsBetween(checkIn, checkOut) {
@@ -263,12 +327,16 @@ function validateExpenseRows(rawRows = [], columnMap = {}, context = {}) {
   let validCount = 0, invalidCount = 0, duplicateCount = 0, totalAmount = 0;
   const gorulen = new Set();
 
+  const tarihSirasi = fileDateOrder(rawRows, [columnMap.date]);
+
   rawRows.forEach((raw, idx) => {
     const rowNum = idx + 2;               // 1. satir baslik
     const satirHata = [];
 
-    const tarih = normalizeDate(raw[columnMap.date]);
+    const tarihHucre = parseDateCell(raw[columnMap.date], tarihSirasi.order);
+    const tarih = tarihHucre.value;
     if (raw[columnMap.date] === undefined || raw[columnMap.date] === '') satirHata.push('Tarih boş.');
+    else if (tarihHucre.ambiguous) satirHata.push(`${BELIRSIZ_TARIH}: "${raw[columnMap.date]}"`);
     else if (!tarih) satirHata.push(`Tarih anlaşılamadı: "${raw[columnMap.date]}"`);
 
     const kategori = String(raw[columnMap.category] || '').trim();
@@ -318,6 +386,7 @@ function validateExpenseRows(rawRows = [], columnMap = {}, context = {}) {
 
   return {
     mode: 'EXPENSES',
+    dateOrder: tarihSirasi.order, dateOrderAssumed: tarihSirasi.assumed,
     totalRows: rawRows.length,
     validCount, invalidCount, duplicateCount,
     totalAmount: Math.round(totalAmount * 100) / 100,
@@ -341,6 +410,7 @@ function validateBookingRows(rawRows = [], columnMap = {}, context = {}) {
   const mevcutRezervasyonlar = new Set(
     (context.existingBookings || []).map(bookingFingerprint)
   );
+  const tarihSirasi = fileDateOrder(rawRows, [columnMap.checkIn, columnMap.checkOut]);
 
   rawRows.forEach((raw, idx) => {
     const rowNum = idx + 2;
@@ -363,11 +433,15 @@ function validateBookingRows(rawRows = [], columnMap = {}, context = {}) {
     if (!misafir) satirHata.push('Misafir adı boş.');
 
     // --- Tarihler: ZORUNLU (eskiden bugun yaziliyordu) ---
-    const giris = normalizeDate(raw[columnMap.checkIn]);
-    const cikis = normalizeDate(raw[columnMap.checkOut]);
+    const girisHucre = parseDateCell(raw[columnMap.checkIn], tarihSirasi.order);
+    const cikisHucre = parseDateCell(raw[columnMap.checkOut], tarihSirasi.order);
+    const giris = girisHucre.value;
+    const cikis = cikisHucre.value;
     if (raw[columnMap.checkIn] === undefined || raw[columnMap.checkIn] === '') satirHata.push('Giriş tarihi boş.');
+    else if (girisHucre.ambiguous) satirHata.push(`${BELIRSIZ_TARIH} (giriş): "${raw[columnMap.checkIn]}"`);
     else if (!giris) satirHata.push(`Giriş tarihi anlaşılamadı: "${raw[columnMap.checkIn]}"`);
     if (raw[columnMap.checkOut] === undefined || raw[columnMap.checkOut] === '') satirHata.push('Çıkış tarihi boş.');
+    else if (cikisHucre.ambiguous) satirHata.push(`${BELIRSIZ_TARIH} (çıkış): "${raw[columnMap.checkOut]}"`);
     else if (!cikis) satirHata.push(`Çıkış tarihi anlaşılamadı: "${raw[columnMap.checkOut]}"`);
 
     let gece = null;
@@ -487,6 +561,7 @@ function validateBookingRows(rawRows = [], columnMap = {}, context = {}) {
 
   return {
     mode: 'BOOKINGS',
+    dateOrder: tarihSirasi.order, dateOrderAssumed: tarihSirasi.assumed,
     totalRows: rawRows.length,
     validCount, invalidCount, duplicateCount, existingDuplicateCount,
     totalGross: Math.round(totalGross * 100) / 100,
@@ -694,6 +769,7 @@ const FinanceImportEngine = {
   decodeImportText,
   normalizeAmount,
   normalizeDate,
+  detectDateOrder,
   nightsBetween,
   autoDetectColumnMap,
   buildPropertyIndex,
