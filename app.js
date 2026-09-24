@@ -12588,22 +12588,6 @@ function initSupabaseClient() {
 }
 initSupabaseClient();
 
-// Yerel demo hesabinin tanimi. Buradaki tek amac demo kum havuzuna bir isim ve
-// isletme adi vermektir.
-//
-// NOT: Bu kayitta eskiden bir `password: 'lexbnb'` alani ve bunlari
-// localStorage'a yazan bir saveSaaSUsers() vardi. Yerel sifre karsilastirmasi
-// kaldirildiginda alan okunmaz hale geldi ama kalmaya devam etti: her ziyaretcinin
-// tarayicisinda duz metin bir sifre. Kimlik dogrulama artik yalnizca Supabase
-// Auth'tur; alan da, yazici da kaldirildi.
-// Uygulamada yerel kullanici kaydi YOKTUR. Burada 'usr_ute_master' /
-// 'demo@lexbnb.com' adinda bir demo hesabi duruyordu; getBlankTenantData()
-// isletme adini oradan okumaya calisiyordu. Kimlik ve isletme bilgisi yalnizca
-// Supabase'den gelir.
-function getSaaSUsers() {
-  return [];
-}
-
 // Eski surumlerin tarayiciya yazdigi duz metin sifreli kaydi temizle.
 (function purgeLegacyUserRegistry() {
   try {
@@ -13118,12 +13102,6 @@ async function handleSaaSLogin(e) {
     err.style.color = '';
   }
 
-  const uLow = userInput.toLowerCase();
-  const pLow = passInput.toLowerCase();
-
-  // Yerel demo bypass'i kaldirildi. Girisin tek yolu Supabase Auth'tur;
-  // demo hesabi da gercek bir bulut hesabi olacak.
-
   // 2. Giriş yalnızca e-posta ile yapılır (Supabase Auth source-of-truth)
   if (!userInput.includes('@')) {
     if (err) {
@@ -13163,7 +13141,7 @@ async function handleSaaSLogin(e) {
           err.style.background = 'rgba(245, 158, 11, 0.15)';
           err.style.border = '1px solid #F59E0B';
           err.style.color = '#FDE68A';
-          err.innerHTML = '📬 <strong>E-posta Doğrulaması Gerekiyor:</strong><br><span style="font-size:12px;">Lütfen gelen kutunuzdaki aktivasyon linkine tıklayın veya demo hesabıyla giriş yapın.</span>';
+          err.innerHTML = '📬 <strong>E-posta Doğrulaması Gerekiyor:</strong><br><span style="font-size:12px;">Lütfen gelen kutunuzdaki aktivasyon bağlantısına tıklayıp ardından yeniden giriş yapın.</span>';
         } else {
           err.innerText = '⚠️ ' + getFriendlyAuthErrorMessage(authErr);
         }
@@ -13346,39 +13324,6 @@ async function handleSaaSRegister(e) {
       submitBtn.innerText = '✨ Hesabımı Oluştur ve Başla';
     }
   }
-}
-
-function startWithCleanPortfolio() {
-  if (typeof confirm === 'function' && !confirm('Eski örnek verileri temizleyip sıfırdan kendi mülk ve rezervasyonlarınızı eklemek istiyor musunuz?')) {
-    return;
-  }
-  localStorage.removeItem('LEXBNB_CUSTOM_DATA');
-  appData = getBlankTenantData('usr_demo_master');
-  appData.isCleanState = true;
-  if (window.currentFilter) window.currentFilter.villa = 'ALL';
-  updateAllVillaDropdowns();
-  renderAll();
-  if (typeof alert === 'function') {
-    alert('✅ Örnek veriler temizlendi! Şimdi "+ Yeni Villa / Mülk Ekle" butonuyla kendi mülklerinizi girebilirsiniz.');
-  }
-}
-
-function authenticateSaaSUser(user, remember = false) {
-  activeSaaSUser = user;
-  sessionStorage.setItem('LEXBNB_ACTIVE_USER_ID', user.id);
-  sessionStorage.setItem('LEXBNB_ACTIVE_USER', JSON.stringify(user));
-  if (!activeTenant) {
-    activeTenant = { id: user.id, name: user.companyName || 'İşletmem', slug: 'tenant', role: 'owner' };
-  }
-  sessionStorage.setItem('LEXBNB_ACTIVE_TENANT', JSON.stringify(activeTenant));
-
-  if (remember) {
-    localStorage.setItem('LEXBNB_REMEMBER_USER_ID', user.id);
-  }
-
-  hideLockOverlay();
-  loadTenantAppData(user.id);
-  updateSaaSUi();
 }
 
 async function logoutSaaSUser() {
@@ -13834,14 +13779,10 @@ async function loadTenantAppData(tenantIdOrUserId) {
 }
 
 function getBlankTenantData(userId) {
-  const users = getSaaSUsers();
-  const u = users.find(item => item.id === userId) || {};
-  const cName = u.companyName || 'Özel Mülk Portföyü';
-
   return {
     tenantId: userId,
-    companyName: cName,
-    managerName: u.managerName || 'Yönetici',
+    companyName: 'Özel Mülk Portföyü',
+    managerName: 'Yönetici',
     villas: {},
     bookings: [],
     guests: [],
@@ -16784,7 +16725,6 @@ if (typeof module !== 'undefined' && module.exports) {
     confirmUserNotification,
     renderUserNotificationsBadge,
     renderUserNotificationsDrawer,
-    startWithCleanPortfolio,
     // Tarayici render hatti. core/render_pipeline_tests.js bunlari sahte bir
     // DOM ile GERCEKTEN calistirir; setEl gibi tanimsiz referanslar ancak
     // boyle yakalanir (statik tarama regex literalleri yuzunden guvenilmez).
