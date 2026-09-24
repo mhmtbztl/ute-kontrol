@@ -1,8 +1,8 @@
 // LEXBNB PHASE 17 — SCHEDULED, IDEMPOTENT FUNNEL FINDINGS
 (function (root, factory) {
-  if (typeof module === 'object' && module.exports) module.exports = factory(require('./marketing_funnel_service'), require('./marketing_finding_orchestrator'));
-  else root.MarketingFunnelWorkerService = factory(root.MarketingFunnelService, root.MarketingFindingOrchestrator);
-}(typeof self !== 'undefined' ? self : this, function (FunnelService, Orchestrator) {
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./marketing_funnel_service'), require('./marketing_finding_orchestrator'), require('./business_date'));
+  else root.MarketingFunnelWorkerService = factory(root.MarketingFunnelService, root.MarketingFindingOrchestrator, root.LexbnbBusinessDate);
+}(typeof self !== 'undefined' ? self : this, function (FunnelService, Orchestrator, BusinessDate) {
   'use strict';
   const DAY = 86400000;
   const field = (o, c, s) => o && (o[c] !== undefined ? o[c] : o[s]);
@@ -17,7 +17,7 @@
   }
   async function runFunnelFindings(repository, options = {}) {
     ['loadActiveListings', 'loadLatestSnapshot', 'loadBenchmark', 'persistFinding'].forEach(name => { if (!repository || typeof repository[name] !== 'function') throw new Error(`REPOSITORY_${name.toUpperCase()}_REQUIRED`); });
-    const asOfDate = options.asOfDate || new Date().toISOString().slice(0, 10);
+    const asOfDate = options.asOfDate || BusinessDate.getBusinessDate();
     const listings = await repository.loadActiveListings(options.tenantId || null, options.limit || 200);
     const summary = { status: 'COMPLETED', examined: 0, persisted: 0, skipped: [], errors: [] };
     for (const listing of listings) {

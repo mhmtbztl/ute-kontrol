@@ -3,6 +3,10 @@
 // Deterministic and idempotent periodic task generation (HVAC, Jacuzzi, Chimney, Inspections).
 // =============================================================================
 
+const RecurringBusinessDate = typeof module === 'object' && module.exports
+  ? require('./business_date')
+  : globalThis.LexbnbBusinessDate;
+
 /**
  * Checks whether a recurring rule matches a specific calendar date.
  * @param {Object} rule
@@ -12,9 +16,9 @@
 function isRuleDueOnDate(rule, targetDate) {
   if (!rule.is_active) return false;
 
-  const dayOfWeek = targetDate.getDay(); // 0 = Sunday, 1 = Monday...
-  const dayOfMonth = targetDate.getDate(); // 1 - 31
-  const month = targetDate.getMonth() + 1; // 1 - 12
+  const dayOfWeek = targetDate.getUTCDay(); // 0 = Sunday, 1 = Monday...
+  const dayOfMonth = targetDate.getUTCDate(); // 1 - 31
+  const month = targetDate.getUTCMonth() + 1; // 1 - 12
 
   switch (rule.frequency) {
     case 'DAILY':
@@ -48,7 +52,8 @@ function isRuleDueOnDate(rule, targetDate) {
  */
 function generateRecurringInstances(rules = [], targetDate = new Date(), existingTasks = []) {
   const dateObj = new Date(targetDate);
-  const dateStr = dateObj.toISOString().split('T')[0];
+  const dateStr = RecurringBusinessDate.getBusinessDate(dateObj);
+  const businessDateObj = new Date(`${dateStr}T12:00:00Z`);
   const newInstances = [];
 
   const existingSourceIds = new Set(
@@ -64,7 +69,7 @@ function generateRecurringInstances(rules = [], targetDate = new Date(), existin
       continue;
     }
 
-    if (isRuleDueOnDate(rule, dateObj)) {
+    if (isRuleDueOnDate(rule, businessDateObj)) {
       const dueTime = `${dateStr}T12:00:00Z`;
       const newTask = {
         tenant_id: rule.tenant_id,

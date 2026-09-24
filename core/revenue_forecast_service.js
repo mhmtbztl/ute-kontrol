@@ -7,11 +7,11 @@
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
     const PricingEngine = require('./pricing_engine');
-    module.exports = factory(PricingEngine);
+    module.exports = factory(PricingEngine, require('./business_date'));
   } else {
-    root.RevenueForecastService = factory(root.PricingEngine);
+    root.RevenueForecastService = factory(root.PricingEngine, root.LexbnbBusinessDate);
   }
-}(typeof self !== 'undefined' ? self : this, function (PricingEngine) {
+}(typeof self !== 'undefined' ? self : this, function (PricingEngine, BusinessDate) {
   'use strict';
 
   function roundMoney(val) {
@@ -50,7 +50,7 @@
       startDate = null,         // "YYYY-MM-DD"
       endDate = null,           // "YYYY-MM-DD"
       lookbackDays = 7,
-      asOfDate = new Date().toISOString().split('T')[0]
+      asOfDate = BusinessDate.getBusinessDate()
     } = params;
 
     const asOf = parseDate(asOfDate);
@@ -308,7 +308,7 @@
       bookings = [],
       dailyRates = [],
       gapNights = [],
-      asOfDate = new Date().toISOString().split('T')[0]
+      asOfDate = BusinessDate.getBusinessDate()
     } = params;
 
     const insights = [];

@@ -4,10 +4,13 @@
 // =============================================================================
 
 (function (root, factory) {
-  const api = factory();
+  const businessDate = typeof module === 'object' && module.exports
+    ? require('./business_date')
+    : root.LexbnbBusinessDate;
+  const api = factory(businessDate);
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.LexbnbGuestCrm = api;
-})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (BusinessDate) {
   const DIRECT_CHANNELS = new Set(['DIRECT', 'WHATSAPP', 'INSTAGRAM', 'WEBSITE', 'REPEAT', 'PHONE']);
 
   function isBulkSummaryBooking(booking) {
@@ -75,7 +78,7 @@
     const bookings = Array.isArray(input.bookings) ? input.bookings : [];
     const messages = Array.isArray(input.messages) ? input.messages : [];
     const offers = Array.isArray(input.offers) ? input.offers : [];
-    const today = String(input.today || new Date().toISOString().slice(0, 10));
+    const today = String(input.today || BusinessDate.getBusinessDate());
     const bookingsByGuest = new Map();
 
     bookings.filter(isActiveBooking).forEach(booking => {

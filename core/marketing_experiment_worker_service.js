@@ -1,8 +1,8 @@
 // LEXBNB PHASE 17 — PROVIDER-FREE OBSERVATIONAL EXPERIMENT WORKER
 (function (root, factory) {
-  if (typeof module === 'object' && module.exports) module.exports = factory(require('./marketing_impact_service'));
-  else root.MarketingExperimentWorkerService = factory(root.MarketingImpactService);
-}(typeof self !== 'undefined' ? self : this, function (ImpactService) {
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./marketing_impact_service'), require('./business_date'));
+  else root.MarketingExperimentWorkerService = factory(root.MarketingImpactService, root.LexbnbBusinessDate);
+}(typeof self !== 'undefined' ? self : this, function (ImpactService, BusinessDate) {
   'use strict';
 
   function field(source, camel, snake) {
@@ -47,7 +47,7 @@
         startDate: field(experiment, 'afterStartDate', 'after_start_date'),
         endDateExclusive: field(experiment, 'afterEndExclusive', 'after_end_exclusive')
       });
-      const asOfDate = String(options.asOfDate || new Date().toISOString().slice(0, 10));
+      const asOfDate = String(options.asOfDate || BusinessDate.getBusinessDate());
       const result = ImpactService.evaluateListingChange({
         changeDate: field(experiment, 'changeDate', 'change_date'),
         asOfDate,

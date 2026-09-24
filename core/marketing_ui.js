@@ -9,6 +9,7 @@
       MarketingEngine: require('./marketing_engine'),
       MarketingFunnelService: require('./marketing_funnel_service'),
       MarketingPriorityService: require('./marketing_priority_service'),
+      LexbnbBusinessDate: require('./business_date'),
       MarketingBenchmarkService: require('./marketing_benchmark_service'),
       MarketingCoverChangeService: require('./marketing_cover_change_service'),
       MarketingHealthResultsService: require('./marketing_health_results_service')
@@ -47,6 +48,7 @@
   });
 
   const BROWSER_DEPENDENCIES = Object.freeze([
+    ['LexbnbBusinessDate', 'core/business_date.js?v=a1518391'],
     ['MarketingEngine', 'core/marketing_engine.js?v=2756f4ec'],
     ['MarketingFunnelService', 'core/marketing_funnel_service.js?v=a5ecbdaa'],
     ['MarketingPriorityService', 'core/marketing_priority_service.js?v=f6e216ff'],
@@ -253,7 +255,7 @@
   function renderBenchmarkPanel(model) {
     const selected = model.selectedProperty === 'ALL' ? null : model.properties.find(item => item.slug === model.selectedProperty);
     const propertyId = selected && selected.id;
-    const current = selectCurrentBenchmark(model.benchmarks, propertyId, new Date().toISOString().slice(0, 10));
+    const current = selectCurrentBenchmark(model.benchmarks, propertyId, services.LexbnbBusinessDate.getBusinessDate());
     const button = `<button type="button" class="btn btn-secondary btn-sm" data-marketing-open-benchmark${propertyId ? '' : ' disabled'}>＋ Referans ekle</button>`;
     const form = state.benchmarkFormOpen ? renderBenchmarkForm(model) : '';
     if (!current) return `<div class="card" style="padding:14px;margin-bottom:12px"><div style="display:flex;justify-content:space-between;gap:12px;align-items:center"><div><strong>Pazarlama referansı yok</strong><div class="sub-text">Karşılaştırma bulguları, kaynağı ve geçerlilik tarihi belirtilmiş bir referans olmadan üretilmez.</div></div>${button}</div>${form}</div>`;
@@ -282,7 +284,7 @@
     return `<form data-marketing-benchmark-form style="margin-top:14px;border-top:1px solid rgba(148,163,184,.2);padding-top:14px"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px">
       <label style="display:grid;gap:5px;font-size:12px">Kaynak türü<select class="form-control" name="sourceKind" required><option value="PORTFOLIO_HISTORY">Portföy geçmişi</option><option value="MARKET_PROVIDER">Pazar veri sağlayıcısı</option><option value="MANUAL_RESEARCH">Manuel araştırma</option></select></label>
       <label style="display:grid;gap:5px;font-size:12px">Kaynak kaydı<input class="form-control" name="sourceRecordId" maxlength="300" placeholder="Rapor/dosya/sorgu referansı"></label>
-      <label style="display:grid;gap:5px;font-size:12px">Geçerlilik başlangıcı<input class="form-control" type="date" name="effectiveFrom" value="${new Date().toISOString().slice(0, 10)}" required></label>
+      <label style="display:grid;gap:5px;font-size:12px">Geçerlilik başlangıcı<input class="form-control" type="date" name="effectiveFrom" value="${services.LexbnbBusinessDate.getBusinessDate()}" required></label>
       <label style="display:grid;gap:5px;font-size:12px">Geçerlilik bitişi (hariç)<input class="form-control" type="date" name="effectiveToExclusive"></label>
       ${numeric('searchToViewCtrPercent', 'Arama → görüntüleme CTR (%)', '100')}${numeric('viewToBookingConversionPercent', 'Görüntüleme → rezervasyon (%)', '100')}
       ${numeric('normalizedImpressionsPerListingDay', 'Gösterim / ilan-gün')}${numeric('recommendedActiveMediaCount', 'Önerilen aktif medya', '', '1')}

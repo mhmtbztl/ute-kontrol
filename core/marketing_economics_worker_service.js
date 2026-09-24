@@ -1,8 +1,8 @@
 // LEXBNB PHASE 17 — SCHEDULED CHANNEL ECONOMICS FINDINGS
 (function (root, factory) {
-  if (typeof module === 'object' && module.exports) module.exports = factory(require('./marketing_engine'), require('./marketing_economics_finding_service'));
-  else root.MarketingEconomicsWorkerService = factory(root.MarketingEngine, root.MarketingEconomicsFindingService);
-}(typeof self !== 'undefined' ? self : this, function (Engine, FindingService) {
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./marketing_engine'), require('./marketing_economics_finding_service'), require('./business_date'));
+  else root.MarketingEconomicsWorkerService = factory(root.MarketingEngine, root.MarketingEconomicsFindingService, root.LexbnbBusinessDate);
+}(typeof self !== 'undefined' ? self : this, function (Engine, FindingService, BusinessDate) {
   'use strict';
   const DAY = 86400000;
   const field = (object, camel, snake) => object && (object[camel] !== undefined ? object[camel] : object[snake]);
@@ -10,7 +10,7 @@
     ['loadPropertyScopes', 'loadBenchmark', 'loadBookings', 'persistFinding'].forEach(name => {
       if (!repository || typeof repository[name] !== 'function') throw new Error(`REPOSITORY_${name.toUpperCase()}_REQUIRED`);
     });
-    const asOfDate = options.asOfDate || new Date().toISOString().slice(0, 10);
+    const asOfDate = options.asOfDate || BusinessDate.getBusinessDate();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(asOfDate) || !Number.isFinite(Date.parse(`${asOfDate}T00:00:00Z`))) throw new Error('VALID_AS_OF_DATE_REQUIRED');
     const periodDays = Number.isInteger(options.periodDays) && options.periodDays > 0 ? options.periodDays : 90;
     const periodStart = new Date(Date.parse(`${asOfDate}T00:00:00Z`) - periodDays * DAY).toISOString().slice(0, 10);

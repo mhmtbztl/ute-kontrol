@@ -17,6 +17,9 @@
 if (typeof require !== 'undefined') {
   var { evaluateTaskSla } = require('./operations_sla_service.js');
   var { computeTaskPriority } = require('./operations_priority_engine.js');
+  var BusinessDateService = require('./business_date.js');
+} else {
+  var BusinessDateService = globalThis.LexbnbBusinessDate;
 }
 
 
@@ -27,14 +30,8 @@ if (typeof require !== 'undefined') {
  * @param {string} [timeZone]
  * @returns {string}
  */
-function getTenantLocalDateStr(date = new Date(), timeZone = 'Europe/Istanbul') {
-  const d = new Date(date);
-  try {
-    const formatter = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' });
-    return formatter.format(d);
-  } catch (e) {
-    return d.toISOString().split('T')[0];
-  }
+function getTenantLocalDateStr(date = new Date(), timeZone = BusinessDateService.DEFAULT_BUSINESS_TIME_ZONE) {
+  return BusinessDateService.getBusinessDate(date, timeZone);
 }
 
 /**
@@ -48,7 +45,7 @@ function getTenantLocalDateStr(date = new Date(), timeZone = 'Europe/Istanbul') 
  * @param {string} [params.timeZone]
  * @returns {Object} Dashboard view payload
  */
-function buildTodayOperationsDashboard({ tasks = [], tickets = [], bookings = [], properties = [], referenceDate = new Date(), timeZone = 'Europe/Istanbul' }) {
+function buildTodayOperationsDashboard({ tasks = [], tickets = [], bookings = [], properties = [], referenceDate = new Date(), timeZone = BusinessDateService.DEFAULT_BUSINESS_TIME_ZONE }) {
   const todayStr = getTenantLocalDateStr(referenceDate, timeZone);
   const refDateObj = new Date(referenceDate);
 

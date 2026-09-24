@@ -1,9 +1,9 @@
 // LEXBNB PHASE 17 — IDEMPOTENT SEASONAL FINDING SCHEDULER
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
-    module.exports = factory(require('./seasonal_marketing_service'), require('./marketing_photo_results_service'));
-  } else root.SeasonalMarketingWorkerService = factory(root.SeasonalMarketingService, root.MarketingPhotoResultsService);
-}(typeof self !== 'undefined' ? self : this, function (SeasonalService, PhotoResultsService) {
+    module.exports = factory(require('./seasonal_marketing_service'), require('./marketing_photo_results_service'), require('./business_date'));
+  } else root.SeasonalMarketingWorkerService = factory(root.SeasonalMarketingService, root.MarketingPhotoResultsService, root.LexbnbBusinessDate);
+}(typeof self !== 'undefined' ? self : this, function (SeasonalService, PhotoResultsService, BusinessDate) {
   'use strict';
 
   function field(source, camel, snake) {
@@ -32,7 +32,7 @@
     ['loadLatestAnalysisRuns', 'loadActiveMedia', 'loadActiveListings', 'persistFinding'].forEach(name => {
       if (!repository || typeof repository[name] !== 'function') throw new Error(`REPOSITORY_${name.toUpperCase()}_REQUIRED`);
     });
-    const asOfDate = String(options.asOfDate || new Date().toISOString().slice(0, 10));
+    const asOfDate = String(options.asOfDate || BusinessDate.getBusinessDate());
     SeasonalService.seasonForDate(asOfDate);
     const runs = await repository.loadLatestAnalysisRuns(options.tenantId || null, options.limit || 100);
     const newestByProperty = new Map();
