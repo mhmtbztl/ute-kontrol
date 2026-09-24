@@ -248,6 +248,7 @@ const allTestFiles = [
   'dead_browser_module_tests.js',
   'performance_regression_tests.js',
   'maintenance_ui_tests.js',
+  'realtime_scope_tests.js',
 
   // GitHub Actions eylemleri tam commit SHA'sina sabit
   'workflow_pin_tests.js',

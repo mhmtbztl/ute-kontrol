@@ -3833,13 +3833,19 @@ function setLargeTablePage(tableKey, page, renderFunctionName) {
 
 const ACTIVE_RENDER_PLANS = {
   'tab-executive': ['renderExecutiveControlCenter'],
+  'tab-properties': ['renderPropertiesTab'],
+  'tab-operations': ['renderOperationsTab', 'renderOperationsKpiStrip'],
+  'tab-guests': ['renderGuestsTab'],
+  'tab-pricing': ['renderPricingTab', 'renderPricingKpiStrip'],
   'tab-finance': ['renderFinanceModule'],
   'tab-dashboard': ['renderKPIsAndDashboard', 'renderGapNights', 'renderTodayRadar', 'renderOtaRadar', 'runWhatIfSimulation', 'renderTrajectoryRadar', 'renderTrajectoryInsights', 'renderCriticPresets', 'renderDailyOps'],
   'tab-reservations': ['renderManageBookingsTable', 'renderTapeChart'],
   'tab-expenses': ['renderExpensesTable'],
   'tab-leads': ['renderManageLeadsTable', 'renderLeadAnalytics'],
   'tab-maintenance': ['renderManageMaintTable'],
-  'tab-housekeeping': ['renderHousekeepingTab']
+  'tab-housekeeping': ['renderHousekeepingTab'],
+  'tab-reports': ['renderReportsTab'],
+  'tab-settings': ['renderSettingsTable', 'renderTeamManagement']
 };
 
 function getActiveRenderPlan(activeTabId) {
@@ -3860,6 +3866,12 @@ function renderAll() {
   const activePlan = getActiveRenderPlan(activeTabId);
   const renderers = {
     renderExecutiveControlCenter,
+    renderPropertiesTab,
+    renderOperationsTab,
+    renderOperationsKpiStrip,
+    renderGuestsTab,
+    renderPricingTab,
+    renderPricingKpiStrip,
     renderFinanceModule,
     renderKPIsAndDashboard,
     renderManageBookingsTable,
@@ -3876,10 +3888,14 @@ function renderAll() {
     renderCriticPresets,
     renderDailyOps,
     renderTapeChart,
-    renderHousekeepingTab
+    renderHousekeepingTab,
+    renderReportsTab,
+    renderSettingsTable,
+    renderTeamManagement
   };
   const fallbackPlan = Object.keys(renderers);
-  (activePlan.length ? activePlan : fallbackPlan).forEach(name => renderers[name]());
+  const plan = activePlan.length ? activePlan : (activeTabId ? [] : fallbackPlan);
+  plan.forEach(name => renderers[name]());
 
   // Badges
   // Badges (Seçili Dönem Filtresine Göre Dinamik Sayım)
@@ -14350,15 +14366,108 @@ async function handleOnboardingSubmit(e) {
 // -------------------------------------------------------------
 let activeRealtimeChannel = null;
 
+const TENANT_REALTIME_TABLES = [
+  'properties',
+  'bookings',
+  'expenses',
+  'cleaning_tasks',
+  'leads',
+  'monthly_financial_closes',
+  'monthly_targets',
+  'maintenance_tickets',
+  'operational_tasks',
+  'financial_transactions',
+  'guests',
+  'user_notifications'
+];
+
+function getTenantRealtimeTables() {
+  return TENANT_REALTIME_TABLES.slice();
+}
+
+function applyRealtimeArrayEvent(items, payload, mapper) {
+  const collection = Array.isArray(items) ? items : [];
+  const eventType = payload?.eventType;
+  const row = eventType === 'DELETE' ? payload?.old : payload?.new;
+  if (!row?.id) return { changed: false, items: collection };
+  if (eventType === 'DELETE') {
+    const next = collection.filter(item => item?.id !== row.id && item?.dbId !== row.id);
+    return { changed: next.length !== collection.length, items: next };
+  }
+  if (eventType !== 'INSERT' && eventType !== 'UPDATE') return { changed: false, items: collection };
+  const mapped = mapper(row);
+  if (!mapped) return { changed: false, items: collection };
+  const index = collection.findIndex(item => item?.id === row.id || item?.dbId === row.id);
+  if (index === -1) return { changed: true, items: [mapped, ...collection] };
+  const next = collection.slice();
+  next[index] = mapped;
+  return { changed: true, items: next };
+}
+
+function applyTenantRealtimePayload(table, payload) {
+  if (!TENANT_REALTIME_TABLES.includes(table)) return false;
+  if (table === 'properties') {
+    const row = payload?.eventType === 'DELETE' ? payload?.old : payload?.new;
+    if (!row?.id) return false;
+    const villas = { ...(appData.villas || {}) };
+    const existingKey = Object.keys(villas).find(key => villas[key]?.id === row.id);
+    if (existingKey) delete villas[existingKey];
+    if (payload.eventType !== 'DELETE') {
+      const mapped = mapPropertyFromDb(row);
+      if (!mapped?.slug) return false;
+      villas[mapped.slug] = mapped;
+    }
+    appData.villas = villas;
+    return true;
+  }
+
+  const propertyIdMap = {};
+  Object.entries(appData.villas || {}).forEach(([slug, property]) => {
+    if (property?.id) propertyIdMap[property.id] = slug;
+  });
+  let relatedStateChanged = false;
+  if (table === 'maintenance_tickets') {
+    const rawTickets = applyRealtimeArrayEvent(appData.maintenanceTickets, payload, row => row);
+    if (rawTickets.changed) appData.maintenanceTickets = rawTickets.items;
+    relatedStateChanged = rawTickets.changed;
+  }
+  const configs = {
+    bookings: ['bookings', row => mapBookingFromDb(row, propertyIdMap)],
+    expenses: ['expenses', mapExpenseFromDb],
+    cleaning_tasks: ['cleaningTasks', row => normalizeCleaningTask(row, appData.villas || propertyIdMap)],
+    leads: ['leads', mapLeadFromDb],
+    monthly_financial_closes: ['closedPeriods', row => row],
+    monthly_targets: ['targets', row => row],
+    maintenance_tickets: ['maintenance', row => mapMaintenanceTicketFromDb(row, propertyIdMap)],
+    operational_tasks: ['operationalTasks', row => row],
+    financial_transactions: ['financialTransactions', row => row],
+    guests: ['guests', row => row],
+    user_notifications: ['userNotifications', row => row]
+  };
+  const [stateKey, mapper] = configs[table] || [];
+  if (!stateKey) return false;
+  const result = applyRealtimeArrayEvent(appData[stateKey], payload, mapper);
+  if (result.changed) appData[stateKey] = result.items;
+  return result.changed || relatedStateChanged;
+}
+
+function renderTenantRealtimeChange(table) {
+  if (typeof document === 'undefined') return;
+  if (table === 'properties') updateAllVillaDropdowns();
+  if (table === 'bookings' && typeof syncBookingCleaningTasks === 'function') syncBookingCleaningTasks();
+  renderAll();
+}
+
 function unsubscribeTenantRealtime() {
-  if (activeRealtimeChannel && supabaseClient) {
+  const channel = activeRealtimeChannel;
+  activeRealtimeChannel = null;
+  if (channel && supabaseClient) {
     try {
-      supabaseClient.removeChannel(activeRealtimeChannel);
+      supabaseClient.removeChannel(channel);
       console.log('⚡ Realtime: Önceki kanal aboneliği sonlandırıldı ve soket temizlendi.');
     } catch (e) {
       console.warn('Realtime teardown notice:', e);
     }
-    activeRealtimeChannel = null;
   }
 }
 
@@ -14366,57 +14475,20 @@ function subscribeTenantRealtime(tenantId) {
   unsubscribeTenantRealtime();
   if (!isCloudTenant(tenantId)) return;
   try {
-    activeRealtimeChannel = supabaseClient
-      .channel(`tenant-${tenantId}-ops`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings', filter: `tenant_id=eq.${tenantId}` }, async (payload) => {
-        if (!activeTenant || activeTenant.id !== tenantId) return;
-        const eventType = payload.eventType; // 'INSERT', 'UPDATE', 'DELETE'
-        console.log(`⚡ Realtime: Rezervasyonlar olayı [${eventType}]`);
-        if (eventType === 'INSERT' && payload.new) {
-          const newBooking = mapBookingFromDb(payload.new);
-          if (newBooking) {
-            const exists = (appData.bookings || []).some(b => b.id === newBooking.id);
-            if (!exists) {
-              appData.bookings.push(newBooking);
-              if (typeof syncBookingCleaningTasks === 'function') syncBookingCleaningTasks();
-              renderAll();
-            }
-          }
-        } else if (eventType === 'UPDATE' && payload.new) {
-          const updated = mapBookingFromDb(payload.new);
-          if (updated) {
-            const idx = (appData.bookings || []).findIndex(b => b.id === updated.id);
-            if (idx !== -1) {
-              appData.bookings[idx] = updated;
-            } else {
-              appData.bookings.push(updated);
-            }
-            if (typeof syncBookingCleaningTasks === 'function') syncBookingCleaningTasks();
-            renderAll();
-          }
-        } else if (eventType === 'DELETE' && payload.old) {
-          const delId = payload.old.id;
-          if (delId) {
-            appData.bookings = (appData.bookings || []).filter(b => b.id !== delId);
-            renderAll();
-          }
+    let channel = supabaseClient.channel(`tenant-${tenantId}-ops`);
+    TENANT_REALTIME_TABLES.forEach(table => {
+      channel = channel.on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table, filter: `tenant_id=eq.${tenantId}` },
+        payload => {
+          if (!activeTenant || activeTenant.id !== tenantId) return;
+          const eventRow = payload?.eventType === 'DELETE' ? payload?.old : payload?.new;
+          if (eventRow?.tenant_id && eventRow.tenant_id !== tenantId) return;
+          if (applyTenantRealtimePayload(table, payload)) renderTenantRealtimeChange(table);
         }
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cleaning_tasks', filter: `tenant_id=eq.${tenantId}` }, async () => {
-        console.log('⚡ Realtime: Temizlik görevleri güncellendi');
-        if (activeTenant && activeTenant.id === tenantId) {
-          const { data: props } = await supabaseClient.from('properties').select('id, slug').eq('tenant_id', tenantId);
-          const pMap = {};
-          (props || []).forEach(p => { pMap[p.id] = p.slug; });
-          const { data: cleanList } = await supabaseClient.from('cleaning_tasks').select('*').eq('tenant_id', tenantId);
-          if (cleanList) {
-            appData.cleaningTasks = cleanList.map(c => normalizeCleaningTask(c, appData.villas || pMap));
-            renderDailyOps();
-            renderOperationsTab();
-          }
-        }
-      })
-      .subscribe();
+      );
+    });
+    activeRealtimeChannel = channel.subscribe();
   } catch (e) {
     console.warn('Realtime subscription error:', e);
   }
@@ -16814,6 +16886,10 @@ if (typeof module !== 'undefined' && module.exports) {
     mapMaintenanceTicketFromDb,
     getMaintenanceStatusPresentation,
     getMaintenanceSeverityForSave,
+    getTenantRealtimeTables,
+    applyTenantRealtimePayload,
+    subscribeTenantRealtime,
+    unsubscribeTenantRealtime,
     getExportEngine,
     collectExportRecords,
     exportLedger,
