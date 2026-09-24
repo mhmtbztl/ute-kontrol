@@ -235,7 +235,10 @@ const allTestFiles = [
   'vendor_pin_tests.js',
 
   // GitHub Actions eylemleri tam commit SHA'sina sabit
-  'workflow_pin_tests.js'
+  'workflow_pin_tests.js',
+
+  // Clickjacking: yabanci cercevede belge gizlenir (Pages baslik veremiyor)
+  'frame_guard_tests.js'
 ];
 
 const testEnv = require('./core/test_env.js');
