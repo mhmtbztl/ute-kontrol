@@ -83,6 +83,10 @@ async function loadPropertyAnalysisContextForm(propertyId) {
       tenantId: getActiveTenantId(), propertyIds: [propertyId]
     });
     if (propertyAnalysisContextPropertyId !== propertyId) return;
+    if (propertyAnalysisContextDirty) {
+      setPropertyAnalysisContextStatus('Yazdığınız değerler korunuyor; kayıtlı bağlam bu forma uygulanmadı.', 'warning');
+      return;
+    }
     setPropertyAnalysisFieldValues(bundle.contexts[0] || {});
     propertyAnalysisContextDirty = false;
     setPropertyAnalysisContextStatus(bundle.contextAvailable
@@ -94,7 +98,7 @@ async function loadPropertyAnalysisContextForm(propertyId) {
       setPropertyAnalysisContextStatus('Konum ve sosyal profiller yüklenemedi. Normal mülk kaydı etkilenmez.', 'error');
     }
   } finally {
-    propertyAnalysisContextLoading = false;
+    if (propertyAnalysisContextPropertyId === propertyId) propertyAnalysisContextLoading = false;
   }
 }
 
@@ -113,7 +117,7 @@ function getPropertyAnalysisContextDraft() {
 
 async function savePropertyAnalysisContextDraft(propertyId) {
   if (!propertyAnalysisContextDirty) return { skipped: true };
-  if (propertyAnalysisContextLoading) throw new Error('ANALYSIS_CONTEXT_LOADING');
+  if (propertyAnalysisContextLoading) throw new Error('Konum ve sosyal profiller hâlâ yükleniyor. Lütfen kısa bir süre sonra yeniden deneyin.');
   const result = await PropertyAnalysisContextService.savePropertyAnalysisContext(supabaseClient, {
     tenantId: getActiveTenantId(), propertyId, ...getPropertyAnalysisContextDraft()
   });

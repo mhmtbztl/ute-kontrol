@@ -183,6 +183,7 @@ const allTestFiles = [
   'legacy_marketing_removal_tests.js',
   'demo_surface_removal_tests.js',
   'mobile_reservation_ui_tests.js',
+  'marketing_cleanup_tests.js',
   'property_archive_tests.js',
   'legacy_migration_removal_tests.js',
 

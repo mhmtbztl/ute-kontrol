@@ -21,8 +21,6 @@ jobs:
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      AI_DATA_PROCESSING_APPROVED: ${{ secrets.AI_DATA_PROCESSING_APPROVED }}
       LEXBNB_PUBLIC_URL: ${{ secrets.LEXBNB_PUBLIC_URL }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -31,9 +29,6 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
-      - name: Process one photo analysis job
-        if: env.GEMINI_API_KEY != '' && env.AI_DATA_PROCESSING_APPROVED == '1'
-        run: npm run marketing:photo-worker
       - name: Deliver pending tenant invitations
         if: env.LEXBNB_PUBLIC_URL != ''
         run: npm run invitations:worker

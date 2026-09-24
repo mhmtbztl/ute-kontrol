@@ -129,7 +129,7 @@ runTest('Insufficient health evidence remains scoreless in the UI', () => {
 runTest('Missing funnel and gallery inputs render explicit empty states', () => {
   const model = MarketingUI.buildWorkspaceModel({ filter: { period: 'ALL', villa: 'ALL' }, bookings: [] });
   assert.match(MarketingUI.renderWorkspaceHtml(model, 'funnel'), /Huni verisi henüz yok/);
-  assert.match(MarketingUI.renderWorkspaceHtml(model, 'gallery'), /Galeri analizi henüz yok/);
+  assert.match(MarketingUI.renderWorkspaceHtml(model, 'gallery'), /Galeri henüz boş/);
   assert.doesNotMatch(MarketingUI.renderWorkspaceHtml(model, 'gallery'), /70/);
 });
 
@@ -204,7 +204,7 @@ runTest('Private media form scopes the property and constrains accepted image ty
   assert.doesNotMatch(html, /image\/svg/);
 });
 
-runTest('Gallery enables analysis only for a selected property with active media', () => {
+runTest('Gallery keeps media management without exposing the retired photo AI action', () => {
   const propertyId = '22222222-2222-4222-8222-222222222222';
   const model = MarketingUI.buildWorkspaceModel({
     filter: { period: 'ALL', villa: 'AZURE' }, bookings: [],
@@ -212,11 +212,11 @@ runTest('Gallery enables analysis only for a selected property with active media
     media: [{ id: 'M1', property_id: propertyId, media_status: 'ACTIVE' }]
   });
   const html = MarketingUI.renderWorkspaceHtml(model, 'gallery');
-  assert.match(html, /data-marketing-request-analysis>AI ile analiz et/);
-  assert.doesNotMatch(html, /data-marketing-request-analysis disabled/);
+  assert.match(html, /data-marketing-open-media/);
+  assert.doesNotMatch(html, /data-marketing-request-analysis|AI ile analiz et/);
 });
 
-runTest('Gallery reports an active analysis without presenting invented results', () => {
+runTest('Gallery does not expose legacy analysis queue state', () => {
   const propertyId = '22222222-2222-4222-8222-222222222222';
   const model = MarketingUI.buildWorkspaceModel({
     filter: { period: 'ALL', villa: 'AZURE' }, bookings: [],
@@ -225,12 +225,11 @@ runTest('Gallery reports an active analysis without presenting invented results'
     analysisRuns: [{ property_id: propertyId, status: 'PROCESSING', requested_at: '2026-09-12T10:00:00Z' }]
   });
   const html = MarketingUI.renderWorkspaceHtml(model, 'gallery');
-  assert.match(html, /data-marketing-request-analysis disabled>Analiz sürüyor/);
-  assert.match(html, /İşleniyor/);
-  assert.doesNotMatch(html, /Galeri puanı/);
+  assert.doesNotMatch(html, /Analiz sürüyor|İşleniyor|Son analiz talepleri/);
+  assert.match(html, /Medya kaydı/);
 });
 
-runTest('Gallery renders only schema-validated analysis results for the current media set', () => {
+runTest('Gallery hides persisted legacy photo AI results while retaining media records', () => {
   const propertyId = '22222222-2222-4222-8222-222222222222';
   const runId = '33333333-3333-4333-8333-333333333333';
   const mediaId = '44444444-4444-4444-8444-444444444444';
@@ -251,10 +250,8 @@ runTest('Gallery renders only schema-validated analysis results for the current 
     }]
   });
   const html = MarketingUI.renderWorkspaceHtml(model, 'gallery');
-  assert.match(html, /Galeri sağlık skoru/);
-  assert.match(html, /84\/100/);
-  assert.match(html, /&lt;iyi aday&gt;/);
-  assert.match(html, /Kanal bazlı mevcut kapak belirtilmedi/);
+  assert.match(html, /Medya kaydı/);
+  assert.doesNotMatch(html, /Galeri sağlık skoru|84\/100|&lt;iyi aday&gt;|Kanal bazlı mevcut kapak/);
 });
 
 runTest('Cover-change form uses the recorded cover and creates fixed observational windows atomically', () => {
@@ -309,7 +306,7 @@ runTest('Marketing bootstrap and lazy dependencies carry current content hashes'
     .update(fs.readFileSync(file, 'utf8').replace(/\r\n?/g, '\n'), 'utf8')
     .digest('hex').slice(0, 8);
   assert.match(index, new RegExp(`core/marketing_ui\\.js\\?v=${hash(path.join(__dirname, 'marketing_ui.js'))}`));
-  ['marketing_engine.js', 'marketing_funnel_service.js', 'marketing_priority_service.js', 'marketing_benchmark_service.js', 'marketing_cover_change_service.js', 'marketing_data_service.js', 'marketing_review_service.js', 'marketing_snapshot_service.js', 'marketing_channel_listing_service.js', 'marketing_media_upload_service.js', 'marketing_photo_analysis_service.js', 'marketing_experiment_service.js', 'marketing_photo_results_service.js', 'marketing_health_results_service.js'].forEach(file => {
+  ['marketing_engine.js', 'marketing_funnel_service.js', 'marketing_priority_service.js', 'marketing_benchmark_service.js', 'marketing_cover_change_service.js', 'marketing_data_service.js', 'marketing_review_service.js', 'marketing_snapshot_service.js', 'marketing_channel_listing_service.js', 'marketing_media_upload_service.js', 'marketing_experiment_service.js', 'marketing_health_results_service.js'].forEach(file => {
     assert.match(uiSource, new RegExp(`${file.replace('.', '\\.') }\\?v=${hash(path.join(__dirname, file))}`));
   });
 });

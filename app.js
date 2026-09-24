@@ -14076,7 +14076,7 @@ async function saveProperty(e) {
           && PropertyAnalysisContextService.isMissingSchemaError(contextError);
         contextWarning = migrationMissing
           ? '\n\n⚠️ Mülk kaydedildi; konum/sosyal profil için Phase 40 göçü henüz uygulanmamış.'
-          : '\n\n⚠️ Mülk kaydedildi; konum/sosyal profil kaydedilemedi: ' + (contextError.message || 'Bilinmeyen hata');
+          : '\n\n⚠️ Mülk kaydedildi; konum/sosyal profil kaydedilemedi. Lütfen yeniden deneyin.';
       }
     }
 
