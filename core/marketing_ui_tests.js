@@ -297,7 +297,7 @@ runTest('Index integrates one independent marketing entry without app.js edits',
   const index = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   assert.strictEqual((index.match(/id="tab-marketing"/g) || []).length, 1);
   assert.strictEqual((index.match(/src="core\/marketing_ui\.js(?:\?v=[a-f0-9]{8})?"/g) || []).length, 1);
-  assert.match(index, /id="tab-marketing-legacy"[^>]*hidden[^>]*aria-hidden="true"/);
+  assert.doesNotMatch(index, /id="tab-marketing-legacy"/);
   assert.match(index, /onclick="switchTab\('marketing'\)"[^>]*>📈 Gelir & Dağıtım/);
 });
 
