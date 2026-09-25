@@ -13,6 +13,230 @@ Bu dosya, bu repoda çalışan **her AI aracı için bağlayıcı tek kaynaktır
 
 ---
 
+# SKILL ROUTING — MINIMUM CONTEXT POLICY
+
+Bu repoda uzmanlık skill'leri mevcuttur. Skill'ler araç kutusudur;
+her görevde çalıştırılması gereken zorunlu bir pipeline değildir.
+
+AGENTS.md ve CLAUDE.md her zaman bağlayıcıdır.
+Bu iki dosya skill routing dışında tutulur ve önceliklidir.
+
+## 1. Ana kural
+
+Her görevde bütün skill'leri yükleme veya okuma.
+
+Önce `using-agent-skills` yönlendirme mantığını kullanarak görevi
+sınıflandır ve gereken EN KÜÇÜK skill setini belirle.
+
+Varsayılan hedef:
+- 0–3 uzmanlık skill'i.
+
+3'ten fazla skill yalnızca görev gerçekten birden fazla uzmanlık alanına
+yayılıyorsa kullanılabilir.
+
+Skill sayısını doldurmak hedef değildir.
+
+Basit bir görev hiçbir uzmanlık skill'i gerektirmiyorsa doğrudan çalış.
+
+## 2. Skill discovery
+
+Hangi skill'lerin mevcut olduğunu anlamak için bütün SKILL.md dosyalarını
+topluca okuma.
+
+Önce aşağıdaki index'i kullan.
+
+Bir skill seçildikten sonra yalnızca o skill'in SKILL.md dosyasını oku.
+
+### ROUTING INDEX
+
+Belirsiz gereksinim:
+- interview-me
+
+Fikir / ürün konsepti:
+- idea-refine
+
+Yeni ve kapsamlı özellik:
+- spec-driven-development
+
+Sert performans / güvenlik / kalite kısıtları:
+- constraint-driven-development
+
+Büyük işi görevlere bölme:
+- planning-and-task-breakdown
+
+Bağlam / AGENTS / kaynak seçimi problemi:
+- context-engineering
+
+Güncel teknik bilgi veya resmi doküman gerekli:
+- source-driven-development
+
+Riskli varsayımları sorgulama:
+- doubt-driven-development
+
+Çok dosyalı implementasyon:
+- incremental-implementation
+
+Davranış değişikliği / bug fix:
+- test-driven-development
+
+Frontend / UI:
+- frontend-ui-engineering
+
+API / interface:
+- api-and-interface-design
+
+Gerçek tarayıcı doğrulaması:
+- browser-testing-with-devtools
+
+Bug / hata / başarısız test:
+- debugging-and-error-recovery
+
+Ölçülmüş performans problemi:
+- performance-optimization
+
+Auth / RLS / secret / kullanıcı girdisi / veri erişimi:
+- security-and-hardening
+
+Kod veya commit denetimi:
+- code-review-and-quality
+
+Davranışı değiştirmeden sadeleştirme:
+- code-simplification
+
+ADR / geliştirici dokümantasyonu:
+- documentation-and-adrs
+
+Migration / schema / eski API kaldırma:
+- deprecation-and-migration
+
+Branch / worktree / commit / rebase / push:
+- git-workflow-and-versioning
+
+CI/CD / GitHub Actions:
+- ci-cd-and-automation
+
+Log / metric / tracing / alarm:
+- observability-and-instrumentation
+
+Release / production launch:
+- shipping-and-launch
+
+## 3. Skill seçme prensibi
+
+Skill'i "faydalı olabilir" diye seçme.
+
+Yalnızca skill olmadan görevin:
+- doğruluğu,
+- güvenliği,
+- uygulanabilirliği veya
+- doğrulanabilirliği
+
+anlamlı şekilde düşecekse seç.
+
+Örnek:
+
+"ADR hesabındaki bug'ı düzelt"
+→ debugging-and-error-recovery
+→ test-driven-development
+
+"Yeni rezervasyon API'si ekle"
+→ api-and-interface-design
+→ test-driven-development
+→ incremental-implementation (yalnızca değişiklik çok dosyalıysa)
+
+"Supabase RLS'yi denetle"
+→ security-and-hardening
+→ code-review-and-quality
+
+"Butonun mobil görünümünü düzelt"
+→ frontend-ui-engineering
+→ browser-testing-with-devtools (gerçek tarayıcı doğrulaması gerekiyorsa)
+
+"Son 3 commit'i denetle"
+→ code-review-and-quality
+
+Basit metin, isim veya lokal küçük değişiklik:
+→ skill gerekmeyebilir.
+
+## 4. Dikey dilim
+
+Büyük görevlerde bütün sistemi aynı anda ele alma.
+
+Mümkün olan en küçük çalışan dikey dilimi seç:
+
+gereksinim
+→ gerekli kod
+→ gerekli test
+→ doğrulama
+
+Bu dilim tamamlanmadan sonraki dilime geçme.
+
+Görev gerektirmedikçe:
+- tüm repository'yi tarama,
+- bütün testleri analiz etme,
+- ilgisiz modülleri açma,
+- bütün skill'leri okuma.
+
+AGENTS.md veya CLAUDE.md teslim sırasında tam test paketini zorunlu
+tutuyorsa bu kural testlerin çalıştırılmasını engellemez.
+
+## 5. Spec ve plan kapısı
+
+Her iş için spec oluşturma.
+
+Spec yalnızca:
+- yeni büyük özellik,
+- belirsiz kapsam,
+- mimari değişiklik,
+- birden fazla sistemi etkileyen değişiklik
+
+durumlarında kullanılmalı.
+
+Küçük bug fix, küçük UI düzeltmesi veya açıkça tanımlanmış lokal değişiklik
+için yeniden spec ve kapsamlı plan üretme.
+
+Aynı şekilde planning-and-task-breakdown yalnızca iş gerçekten parçalanmaya
+ihtiyaç duyuyorsa kullanılmalı.
+
+## 6. Git ve shipping skill'leri
+
+git-workflow-and-versioning ve shipping-and-launch her kod değişikliğinde
+otomatik olarak yüklenmez.
+
+AGENTS.md'deki Git, worktree, commit, migration ve push kuralları skill
+yüklenmese bile HER ZAMAN geçerlidir.
+
+Git skill'i yalnızca Git işleminin kendisi karmaşık veya görevin konusuysa
+yüklenir.
+
+Shipping skill'i yalnızca gerçek release / production çıkışı söz konusuysa
+yüklenir.
+
+## 7. Başlangıç
+
+Kodlamaya başlamadan önce uzun plan yazma.
+
+Gerekirse yalnızca:
+
+Task: <tek cümle>
+Skills: <seçilen skill'ler veya none>
+Scope: <çalışılacak küçük alan>
+
+Sonra işe başla.
+
+## 8. Kullanıcının açık skill çağrısı
+
+Kullanıcı bir skill'i açıkça çağırırsa:
+@test-driven-development
+@security-and-hardening
+
+gibi, o skill kullanılmalıdır.
+
+Ancak açıkça çağrılmamış diğer skill'leri otomatik olarak zincire ekleme.
+Yalnızca gerçekten gerekli olanları ekle.
+
+---
+
 ## Neden bu dosya var
 
 Bu repoda birden fazla AI aracı **aynı anda** çalışıyor ve hepsi `app.js`
