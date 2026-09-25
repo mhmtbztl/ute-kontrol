@@ -235,6 +235,9 @@ const allTestFiles = [
   // kural suiti sonraki goclerin tenant_id tetikleyicisini unutmasini engeller.
   'phase41_authz_live_tests.js',
   'phase41_rules_tests.js',
+  'phase42_lead_contract_tests.js',
+  'phase44_pricing_deploy_tests.js',
+  'production_readiness_tests.js',
 
   // phase43: ay kapanisi, sifirlama, hesap kapatma, sahipsiz fotograf temizligi
   'phase43_period_reset_live_tests.js',

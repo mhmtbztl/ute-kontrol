@@ -1,0 +1,11 @@
+'use strict';
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+const sql = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'migration_phase42_lead_identity_contract.sql'), 'utf8').replace(/^\uFEFF/, '');
+assert.match(sql, /ALTER\s+COLUMN\s+guest_name\s+DROP\s+NOT\s+NULL/i);
+assert.match(sql, /COALESCE\(guest_name,\s*''\)[\s\S]*OR[\s\S]*COALESCE\(guest_phone,\s*''\)/i);
+assert.match(sql, /PHASE42_[A-Z_]+/);
+assert.match(sql, /schema_migrations\s*\(version,\s*name\)[\s\S]*VALUES\s*\(42,/i);
+console.log('[PASS] phase42 guest_name alanını nullable yapar ve ad/telefon kuralını korur');
+console.log('TEST SUMMARY: 1 / 1 TESTS PASSED (0 FAILED)');

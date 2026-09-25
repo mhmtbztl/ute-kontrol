@@ -49,3 +49,24 @@ jobs:
         # test:live kapiyi kendisi dogrular: hedef uretimse veya beyan
         # edilmemisse kosmadan durur.
         run: npm run test:live
+
+  schema-drift:
+    if: vars.SCHEMA_DRIFT_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      LEXBNB_CONFIRM_REMOTE_TEST_PROJECT: ${{ vars.TEST_SUPABASE_HOST }}
+      LEXBNB_CONFIRM_PRODUCTION_PROJECT: ${{ vars.PRODUCTION_SUPABASE_HOST }}
+      TEST_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
+      TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.TEST_SUPABASE_SERVICE_ROLE_KEY }}
+      PRODUCTION_SUPABASE_URL: ${{ secrets.PRODUCTION_SUPABASE_URL }}
+      PRODUCTION_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.PRODUCTION_SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Compare canonical, test and production OpenAPI contracts
+        run: npm run schema:drift
