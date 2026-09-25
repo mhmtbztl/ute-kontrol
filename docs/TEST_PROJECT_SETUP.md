@@ -1,6 +1,6 @@
 # Ayrı Supabase test projesi kurulumu
 
-Bu belge, veritabanına yazan **22 canlı süiti** üretimden ayrı bir Supabase
+Bu belge, veritabanına yazan **31 canlı süiti** üretimden ayrı bir Supabase
 projesine karşı koşulabilir hâle getirir.
 
 ## Neden
@@ -61,7 +61,7 @@ Test projesinin panelinde (`.../project/<ref>/auth/...`):
   İkinci sebep: Supabase yeni projelerde `signUp()` adresinin alan adını
   **teslim edilebilirlik** açısından doğrular. `@lexbnb.test` ve
   `@lexbnb-test.com` MX kaydı olmadığı için reddedilir. `admin.createUser()`
-  bu doğrulamayı atladığından diğer 21 süit etkilenmez — yalnızca gerçek kayıt
+  bu doğrulamayı atladığından diğer canlı süitler etkilenmez — yalnızca gerçek kayıt
   akışını ölçen süit takılır.
 
 ## 3. Anahtarlar ve bağlantı dizesi
@@ -96,7 +96,7 @@ yerine iki kez beyan edilir.
 
 ## 5. Şemayı kur
 
-`schema.sql` + manifestteki 35 göç, manifest sırasıyla uygulanır:
+`schema.sql` + manifestteki **52 göç**, manifest sırasıyla uygulanır:
 
 ```bash
 npm run test:bootstrap:check   # ne uygulanacak, hiçbir şey yazmaz
@@ -163,6 +163,9 @@ Canlı süitler **davranışı** ölçer ve bunu test projesinde yapar.
 `.github/workflows/live-tests.yml` **açık ve çalışıyor** (16 Eylül 2026).
 Her gece 03:00 UTC’te tek koşu yapar; elle tetiklemek için `workflow_dispatch`.
 İlk yeşil koşu 17 Eylül 2026: 120/120 süit, 1123 iddia, sızıntı denetimi temiz.
+Güncel güvenli koşu 25 Eylül 2026: 145 çevrimdışı süit ve 1422 iddia; 31 canlı süit varsayılan
+koşuda atlanır. Güncel sayılar her zaman koşucu özetinden alınır, bu tarihsel
+satırlar sabit bir kalite vaadi değildir.
 
 Anahtar hâlâ `LIVE_TESTS_ENABLED` repo değişkenidir; `true` dışında bir değer
 iş akışını atlar. Sıfırdan kurulum ya da başka bir repoya taşıma için:
@@ -172,6 +175,14 @@ iş akışını atlar. Sıfırdan kurulum ya da başka bir repoya taşıma için
    `TEST_SUPABASE_SERVICE_ROLE_KEY`
 3. **Variables**: `LIVE_TESTS_ENABLED = true`,
    `TEST_SUPABASE_HOST = <test-ref>.supabase.co`
+
+### İsteğe bağlı üretim drift işi
+
+`schema-drift` işi yalnız `SCHEMA_DRIFT_ENABLED = true` olduğunda çalışır.
+Test ve üretim hostları ayrıca `TEST_SUPABASE_HOST` ve
+`PRODUCTION_SUPABASE_HOST` ile açıkça onaylanır; iki projenin URL ve
+service-role anahtarları ayrı secret'lardır. Secret eksikse betik başarı
+üretmez, non-zero çıkar. İşin atlanması şema eşitliği kanıtı değildir.
 
 Secret'lara **üretim anahtarlarını koymayın.** İş akışı hedefin üretim olmadığını
 ayrıca doğrular, ama ilk savunma doğru değeri girmektir.

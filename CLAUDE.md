@@ -35,7 +35,7 @@ Firmalara satılacak — kişisel araç veya demo değil. Bu, kalite çıtasın�
 - **E-posta:** Resend ücretsiz katman, `lexbnb.space` doğrulanmış. Supabase'e custom SMTP olarak bağlı
   (`smtp.resend.com:465`, kullanıcı adı birebir `resend`, gönderen `noreply@lexbnb.space`).
 - **Supabase proje ref (ÜRETİM):** `kirpcqklyjlrhvdbgdrq`
-- **Supabase proje ref (TEST):** `pdeiorpgxetksyogrmbi` — veritabanına yazan 22 süit
+- **Supabase proje ref (TEST):** `pdeiorpgxetksyogrmbi` — veritabanına yazan 31 süit
   yalnızca buraya koşar. Üretim `core/test_env.js` içinde **kara listededir**: onay
   değişkeni doldurulsa bile hedeflenemez. Test projesinde custom SMTP **yoktur** ve
   e-posta onayı **kapalıdır**; ikisi de zorunlu, gerekçeleri
@@ -277,9 +277,9 @@ ve kısmi veriyle daha kötü bir duruma yol açar. Bayrak işlem sonunda kapanm
 node stamp_assets.js     # varlıkları içerik hash'iyle damgala (ZORUNLU)
 npm run verify:migrations # göçlerin içerik bütünlüğü + bağımlılık sırası
 npm run templates:check   # yayınlanan örnek şablonlar üreticiyle uyumlu mu
-npm test                  # 101 çevrimdışı/güvenli süit
+npm test                  # 145 çevrimdışı/güvenli süit, 1422 iddia (25 Eylül 2026)
 npm run test:bootstrap    # test projesine eksik göçleri uygula (--check salt okunur)
-npm run test:live         # 125 süit, yalnız ayrı test projesine karşı
+npm run test:live         # 176 süit (145 güvenli + 31 canlı), yalnız ayrı test projesine karşı
 ```
 `stamp_assets.js --check` güncel değilse hata verir — CI'ya konabilir.
 
@@ -480,6 +480,23 @@ gece worker'ı: `npm run storage:orphan-cleanup`. Canlı süit
 `phase43_period_reset_live_tests` 25/25 (göçten önce 16 kırmızı).
 Paket: `docs/PHASE43_DEPLOY_PACKAGE.md`.
 
+**phase38 ve phase40 durum notu (25 Eylül 2026):** ikisi de repo manifestinde
+ve test projesinde kurulu. Phase40'ın `property_analysis_contexts` tablosu
+üretim OpenAPI'sinde görüldü; üretimde uygulandığı salt okunur olarak
+doğrulandı. Phase38 mevcut `get_executive_dashboard_snapshot` imzasını yeniden
+tanımlar ve `schema_migrations` defterine yazmaz; dış OpenAPI imzası phase32 ile
+aynı olduğundan üretimdeki phase38 gövdesi bağımsız olarak ayırt edilemedi.
+Bu yüzden phase38 üretim durumu **doğrulanmamış** olarak kalır; varmış gibi
+raporlanmaz.
+
+**phase42 (`migration_phase42_lead_identity_contract.sql`) ve phase44
+(`migration_phase44_pricing_late_deploy_hardening.sql`) 25 Eylül 2026'da test
+projesine bootstrap edildi.** Phase42 `leads.guest_name` alanını nullable yapar
+ve "ad veya telefon" CHECK kuralını korur. Phase44, üretime geç uygulanacak
+phase11 tablolarını phase41'in anon/tenant değişmezliği/yazma rolü sözleşmesine
+taşır. İkisi de üretimde henüz uygulanmadı; Phase11 ile birlikte readiness
+kapısı bu yüzden kırmızıdır. Paket: `docs/PHASE11_DEPLOY_PACKAGE.md`.
+
 **Bir göçün uygulanıp uygulanmadığı, dosyaya bakarak anlaşılmaz.** Dosya repoda
 durur; veritabanı uygulanmamış olabilir. Doğrulamanın yolu üretime sormaktır:
 
@@ -664,7 +681,7 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 | Pazarlama ROAS’ı | **tamamlandı** (17 Eylül 2026) — reklam cirosu artık "girilen" olarak etiketleniyor; simülatör sabit çarpan yerine işletmenin kendi ölçülmüş ROAS'ını kullanıyor, ölçülmemiş kanal için tahmin üretmiyor |
 | RGVQI denetim düzeltmeleri | phase24 ve phase25, 14 Eylül 2026'da üretime uygulandı ve readiness denetimiyle doğrulandı; uygulama/worker dağıtımı ayrıca izlenmeli |
 | Misafir CRM (phase27 + phase28) | göçler **üretimde uygulandı ve doğrulandı** (15 Eylül 2026, sütun sorgusuyla); test projesinde de kurulu |
-| Güvenli test kapısı | tamamlandı — canlı/çevrimdışı ayrımı artık `@supabase/supabase-js` require'ına bakıyor. Eski kaba dizgi taraması 8 çevrimdışı süiti (worker giriş noktaları) yanlışlıkla atlıyordu; güvenli koşu 85 → 94 süit |
+| Güvenli test kapısı | tamamlandı — canlı/çevrimdışı ayrımı artık `@supabase/supabase-js` require'ına bakıyor. Eski kaba dizgi taraması 8 çevrimdışı süiti (worker giriş noktaları) yanlışlıkla atlıyordu; güncel güvenli koşu 145 süit (25 Eylül 2026) |
 | Kullanıcı davet e-postası | **worker üretimde çalışıyor** (23 Eylül 2026 kontrolü: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `LEXBNB_PUBLIC_URL` secret'ları tanımlı, `Marketing workers` her koşuda adımı çalıştırıp `{"claimed":0}` dönüyor; kuyruk o gün boştu, yani uçtan uca henüz hiç sınanmadı). Aynı gün iki kusur düzeltildi: hesabı **zaten olan** adrese davet `already registered` ile 5 kez düşüp hiç gitmiyordu (artık giriş linki gidiyor), davet linkiyle gelen **şifresiz** hesaba şifre belirletilmiyordu (`#type=invite` artık şifre formunu açıyor). Ağı `core/invitation_worker_tests.js` (14 iddia). Açık: Supabase Invite/Magic Link şablonlarının Türkçeleştirilmesi; GitHub `*/15` zamanlaması pratikte saatlerce gecikiyor |
 
 ### `saveAppData()` — kaydetmeyen kaydedici

@@ -1,49 +1,82 @@
 # Lexbnb üretim runbook'u
 
-Bu belge Phase 24 denetim düzeltmelerinin güvenli dağıtım, gözlem ve geri kazanım prosedürüdür. Üretim şeması için tek geçerli kurulum sırası `supabase/schema.sql` ve ardından `supabase/migration_manifest.txt` içindeki göçlerin dosya sırasıdır. Bir göç dosyası yayımlandıktan sonra değiştirilmez; yeni düzeltme yeni bir göç olarak eklenir.
+Üretim şemasının kanonik sırası `supabase/schema.sql` ve ardından `supabase/migration_manifest.txt` içindeki 52 değişmez migration'dır. Üretime migration yalnız Supabase SQL Editor'den, kullanıcı tarafından ve ayrı açık onayla uygulanır.
+
+## Gerçek altyapı durumu — 25 Eylül 2026
+
+- Ayrı Supabase test projesi var; bootstrap ve canlı regresyon burada çalışır.
+- Üretim için otomatik staging ortamı yoktur.
+- Supabase Free planda yönetilen PITR yoktur. `npm run backup` haftalık manuel geri yüklenebilir yedektir; ilk gerçek müşteriden önce Pro plana geçiş kararı vardır.
+- Harici alarm/Sentry kurulmamıştır. Aşağıdaki kontroller operasyon kontrol listesidir, otomatik alarm değildir.
+- `schema_migrations` üretimde yalnız 24, 25, 29, 39, 41 ve 43'ü kaydediyor; eski phase'ler için tek başına kanıt değildir.
+- Phase40'ın `property_analysis_contexts` sözleşmesi üretim OpenAPI'sinde görüldü. Phase38 aynı RPC imzasını yeniden tanımladığı ve deftere yazmadığı için üretimdeki durumu dışarıdan bağımsız olarak ayırt edilemedi; test projesinde kuruludur.
+- Phase11, Phase42 ve Phase44 üretimde bekliyor. `npm run production:readiness` bu nedenle kırmızıdır.
+- Üretime özgü `rls_auto_enable` RPC'si Supabase'in RLS otomasyon yardımcısıdır;
+  uygulama sözleşmesi değildir ve exact-name allowlist'tedir. Kaynağı
+  anlaşılmadan silinmez. Teste özgü `lexbnb_bootstrap_log` da yalnız bootstrap
+  defteri olarak allowlist'tedir; başka beklenmeyen nesneler hata kalır.
 
 ## Dağıtım öncesi kapılar
 
-1. `npm ci --ignore-scripts --no-audit --no-fund`
-2. `npm run verify:migrations`
-3. `npm test` — ağ ve canlı veritabanı kullanmayan regresyon paketi
-4. Ayrı bir Supabase test projesinde `TEST_SUPABASE_URL`, `SUPABASE_URL`, servis anahtarı ve `LEXBNB_ALLOW_DESTRUCTIVE_TESTS=1` ile `npm run test:live`. Üretim proje URL'si kullanılamaz.
-5. Staging yedeği ve geri dönüş noktası doğrulanır; Phase 24 staging'e uygulanır; RLS, tenant değiştirme, mülk arşivleme, ay kapama ve davet teslimatı duman testleri yapılır.
+```bash
+npm ci --ignore-scripts --no-audit --no-fund
+npm test
+npm run verify:migrations
+npm run templates:check
+node stamp_assets.js --check
+```
 
-## Üretim dağıtım sırası
+Migration değişikliği varsa:
 
-1. Supabase otomatik yedek/PITR durumunu ve son başarılı yedeği doğrula.
-2. `migration_phase24_audit_remediation.sql` ve ardından `migration_phase25_marketing_review_authz_order.sql` dosyasını ayrı, tekil işlemler olarak uygula.
-3. `schema_migrations` tablosunda `24` ve `25` kayıtlarını ve beklenen nesneleri doğrula.
-4. Uygulama kodunu yayımla. Şema, koddan önce gelmelidir; yeni uygulama `financial_transactions` tablosunu okur.
-5. Worker secret'larını ayarla: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `LEXBNB_PUBLIC_URL`. Fotoğraf analizi için ayrıca `GEMINI_API_KEY` ve açık onay olarak `AI_DATA_PROCESSING_APPROVED=1` gerekir.
-6. Worker iş akışını elle bir kez çalıştır; davet outbox'ının `SENT`, AI kuyruğunun `SUCCEEDED/IDLE` durumuna geçtiğini doğrula.
+```powershell
+$env:LEXBNB_ALLOW_DESTRUCTIVE_TESTS = '1'
+$env:LEXBNB_CONFIRM_REMOTE_TEST_PROJECT = 'pdeiorpgxetksyogrmbi.supabase.co'
+npm run test:bootstrap
+npm run test:live
+```
 
-## Doğrulama sorguları
+Canlı test üretimi hedefleyemez. Phase11/42 özel kanıtları `npm run test:phase11-late` ve `npm run test:phase42-live` komutlarıdır.
+
+## Üretim dağıtımı
+
+1. `npm run backup` ile repo dışına yedek alıp manifest hatası olmadığını doğrulayın.
+2. İlgili deploy paketindeki ön kontrol sorgularını çalıştırın.
+3. Migration dosyalarını paketteki sırayla SQL Editor'de çalıştırın. Uygulanmış dosyayı düzenlemeyin.
+4. `notify pgrst, 'reload schema';` ile OpenAPI önbelleğini yenileyin.
+5. Salt okunur readiness kapısını çalıştırın:
+
+```powershell
+$env:LEXBNB_CONFIRM_PRODUCTION_PROJECT = 'kirpcqklyjlrhvdbgdrq.supabase.co'
+npm run production:readiness
+```
+
+6. Uygulama commitini master'a yalnız `AGENTS.md` içindeki `PUSH` kapısıyla gönderin.
+7. Pages build commitini `docs/RELEASE_PROCESS.md` komutuyla doğrulayın.
+
+Phase11 için tek kaynak: `docs/PHASE11_DEPLOY_PACKAGE.md`.
+
+## Operasyon kontrolleri
+
+Bunlar bugün otomatik alarm değildir; dağıtım sırasında elle kontrol edilir:
 
 ```sql
-select version, applied_at from public.schema_migrations order by version desc limit 5;
 select status, count(*) from public.invitation_delivery_outbox group by status;
 select count(*) from public.financial_transactions;
 select count(*) from public.properties where archived_at is not null and is_active;
 ```
 
-Arşivlenmiş bir mülk için son sorgu sıfır olmalıdır. İki test tenant'ı ile diğer tenant'ın UUID'sine SELECT/INSERT/UPDATE ve `tenant_id` değiştirme denemeleri `42501` ile reddedilmelidir. `log_audit_event` authenticated/anon çağrısı reddedilmelidir.
-
-## Gözlem ve alarmlar
-
-- 5 dakika içinde 5'ten fazla `42501`, göç hatası veya ay-kapatma mutabakat farkı: yüksek öncelikli alarm.
-- `invitation_delivery_outbox` içinde 15 dakikadan eski `PENDING/PROCESSING` ya da 5 denemeye ulaşmış `FAILED`: operasyon alarmı.
-- Fotoğraf analizinde art arda 3 worker hatası veya 30 dakikadan eski iş: operasyon alarmı.
-- Uygulama `loadState.stale=true` raporluyorsa veri boşaltılmaz; Supabase erişimi ve RLS logları incelenir.
-- Secret'lar loglanmaz; service-role anahtarı yalnızca CI/worker secret store'da tutulur ve en az 90 günde bir döndürülür.
+- Eski `PENDING/PROCESSING` davetler ve son denemeye ulaşmış `FAILED` kayıtlar incelenir.
+- `loadState.stale=true` görülürse veri boşaltılmaz; Supabase erişimi ve RLS hataları incelenir.
+- Secret'lar loglanmaz. Anahtar döndürme K-02 kapsamında son güvenlik adımını bekliyor; otomatik 90 gün rotasyonu kurulmuş değildir.
 
 ## Geri alma ve olay yönetimi
 
-Uygulama kodu önceki sürüme geri alınabilir. Veritabanında yayımlanmış göç geriye doğru silinmez; veri kaybı riskini önlemek için ileri yönlü düzeltme göçü hazırlanır. Kritik tenant sızıntısında yazma trafiği durdurulur, servis anahtarı döndürülür, audit kayıtları korunur ve etkilenen tenant/zaman aralığı belirlenir.
+Uygulama kodu `git revert` ile yeni commit üzerinden geri alınır; force push yapılmaz. Son başarılı Pages commitini belirleme ve doğrulama adımları `docs/RELEASE_PROCESS.md` içindedir.
 
-Hedefler: RPO en fazla 15 dakika, RTO en fazla 60 dakika. Üç ayda bir staging'e yedek geri yükleme tatbikatı yapılır; başlangıç/bitiş, veri sayımları ve sapmalar kaydedilir. Gerçek veri kaybında PITR ile ayrı projeye dönülür, tenant ve finans toplamları doğrulanmadan DNS/istemci geçişi yapılmaz.
+Uygulanmış migration silinmez veya geriye düzenlenmez. Kusur yeni çift phase migration ile ileri yönlü düzeltilir. Veri kaybı/tenant sızıntısında yazma akışı durdurulur, ilgili anahtar döndürülür, audit kayıtları korunur ve etkilenen tenant/zaman aralığı belirlenir.
+
+RPO 15 dakika, RTO 60 dakika ve üç aylık staging geri yükleme tatbikatı bugün mevcut kabiliyet değil, gelecekteki Pro/staging hedefidir. Mevcut geri kazanım kanıtı `docs/BACKUP_RESTORE.md` içindeki manuel backup/restore turudur.
 
 ## Saklama ve mahremiyet
 
-Misafir PII'si tarayıcı kalıcı depolamasına yazılmaz. Hesap silme/KVKK akışı uygulama kayıtlarını siler; yedeklerdeki veriler yedek saklama süresi sonunda kaybolur. Finans ve audit kayıtları yasal saklama politikasına göre tutulur. AI işleme yalnızca belgelenmiş amaç, yetki ve `AI_DATA_PROCESSING_APPROVED=1` ile açılır; sağlayıcıya yalnızca gerekli görsel ve en az metadata gönderilir. Sağlayıcı saklama/eğitim ayarları sözleşme öncesi doğrulanır ve onay geri çekildiğinde worker secret'ı kaldırılır.
+Misafir PII'si tarayıcı kalıcı depolamasına yazılmaz. Hesap silme/KVKK akışı uygulama kayıtlarını siler; yedek saklama ve silme politikası yasal metinlerle birlikte henüz kesinleştirilmelidir. Harici AI işleme yalnız belgelenmiş amaç, açık onay ve gerekli en az veriyle açılır.

@@ -142,7 +142,9 @@ select pg_get_functiondef('public.acknowledge_notification_atomic(uuid)'::regpro
 select pg_get_functiondef('public.resolve_executive_alert_atomic(uuid,uuid)'::regprocedure);
 ```
 
-Ayrıca Supabase panelinden otomatik yedek / PITR durumunu doğrulayın.
+Supabase Free planda yönetilen PITR yoktur. Uygulama öncesinde
+`npm run backup` ile geri yüklenebilir manuel yedek alın; Pro plana geçildiyse
+paneldeki PITR durumunu ayrıca doğrulayın.
 
 ---
 
@@ -361,7 +363,7 @@ her iki RPC için `42501 permission denied for function`.
 
 **Uygulama (yalnızca yeni ortam için; üretimde 20 Eylül'de tamamlandı):**
 
-- [ ] Supabase yedek / PITR noktası doğrulandı
+- [ ] Free planda `npm run backup` tamamlandı; Pro plandaysa PITR noktası doğrulandı
 - [ ] §3.1 — phase12 uygulanmış, imzalar `(uuid)` ve `(uuid,uuid)`
 - [ ] §3.2 — `anon_calistirabiliyor` veya `oracle_acik` **true** (göç gerçekten gerekli)
 - [ ] §3.3 — mevcut iki gövde `pg_get_functiondef` ile dosyaya kaydedildi
