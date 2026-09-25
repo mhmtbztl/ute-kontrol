@@ -79,25 +79,35 @@ Kara listeye geri dönmeyin.
 Node'da (testler) muaf; orada yerel yol doğrulama mantığının test yüzeyidir.
 
 ### 3.4 Finansal hesaplama — USALI
+K-04 sözleşmesi (kullanıcı kararı 23–25 Eylül 2026; phase45):
 ```
-CİRO   = Σ rezervasyon.brütTutar              (iptaller hariç, temizlik ücreti dahil)
-       ├─ oda geliri      = brüt − temizlik ücreti
-       └─ temizlik geliri = misafirden alınan temizlik ücreti
-OPEX   = elle girilen giderler
-       + Σ OTA komisyonu          ← rezervasyondan otomatik
-       + Σ temizlik MALİYETİ      ← rezervasyondan otomatik (personele ödenen)
-NET KÂR = CİRO − OPEX − CAPEX
+Brüt Oda Geliri = brüt − misafirden alınan temizlik ücreti
+Net Oda Geliri  = Brüt Oda Geliri − indirim          ← "konaklama cirosu"
+Temizlik Geliri = misafirden alınan temizlik ücreti  ← ayrı gelir kalemi
+Toplam Gelir    = Net Oda Geliri + Temizlik Geliri   (= brüt − indirim; iptaller hariç)
+OPEX            = elle girilen giderler
+                + Σ OTA komisyonu         ← rezervasyondan, gecelere tahakkuk
+                + Σ ödeme komisyonu       ← booking_payment_commissions, gecelere tahakkuk
+                + Σ YAPILMIŞ temizliklerin maliyeti ← cleaning_tasks (status = DONE), yapıldığı günün ayı
+NET KÂR         = Toplam Gelir − OPEX − CAPEX
+ADR    = Net Oda Geliri / satılan gece
+RevPAR = Net Oda Geliri / satılabilir gece
 ```
-Komisyon **gelirden düşülmez, gider yazılır.** Yönetici paneli ve Finans ekranı
-aynı tabanı kullanmalı — bir zamanlar biri brüt, diğeri net kullanıyordu ve aynı ay için
-farklı net kâr raporluyorlardı.
+Komisyonlar **gelirden düşülmez, gider yazılır.** İndirim yalnız oda gelirinden
+düşer ve gecelere tahakkukla dağılır. **Tek kaynak:** istemcide
+`core/ledger_contract.js` (`computeFilterLedger` / `computeMonthLedger`),
+sunucuda `compute_month_close_snapshot` ve `get_executive_dashboard_snapshot`
+— ikisi aynı formül ve aynı rakamlarla ölçülür (`ledger_contract_tests` ↔
+`phase45_cleaning_cost_live_tests`). Bir ekran kendi toplamını yapmaz: bir
+zamanlar Finans, kokpit, KPI tablosu ve önceki dönem rozetleri dört ayrı
+formülle aynı ay için farklı net kâr raporluyordu.
 
 **Temizlik iki ayrı kalemdir; asla tek sayıya indirgenmez (2026-09-14 kararı).**
 
 | | Alan | Nerede durur | Ne |
 |---|---|---|---|
 | Gelir | `cleaning_fee` | `bookings.cleaning_fee` | Misafirden alınan temizlik ücreti. **Brüt tutarın içindedir**, ayrı gelir kalemi olarak raporlanır. |
-| Gider | `cleanCost` | `cleaning_tasks.amount` | Personele ödenen temizlik maliyeti. Temizlik & Borç defterine borç yazılır; "Ödendi" işaretlenince gider defterine geçer. |
+| Gider | `cleanCost` | `cleaning_tasks.amount` | Personele ödenen temizlik maliyeti. Rezervasyon kaydı görevi **planlı** açar; temizlik **"yapıldı"** işaretlenince gider olur (yapıldığı günün ayı) ve ödenene kadar personele borçtur. "Ödendi" **yalnız ödemedir**, gider defterine satır yazmaz. Yapılmayan temizlik (gelmeyen misafir, iptal) ne gider ne borçtur. |
 
 Maliyet için `bookings`'e **yeni sütun açılmadı, bilerek.** Denendi ve kırdı:
 göçler Supabase panelinden elle uygulanıyor ama GitHub Pages push ile anında
@@ -114,10 +124,16 @@ personele ödenecek tutarı (gider) oluyordu. Misafirden 1.500 TL alıp personel
 1.200 TL ödeyen işletmede aradaki 300 TL yok sayılıyordu: kâr marjı ve temizlik
 borcu aynı anda yanlıştı. Ağı `core/booking_form_economics_tests.js` tutuyor.
 
-Rezervasyonun bağlı bir temizlik görevi **yoksa** kayıt bu ayrımdan öncedir; doğru
-maliyet bilinmiyordur ve **uydurulmaz** (§3.6). İstemci o durumda eski davranışa
-düşer (maliyet = ücret); işletme rezervasyonu düzenleyip gerçek maliyeti girdikçe
-veri düzelir.
+Rezervasyonun bağlı bir temizlik görevi **yoksa** maliyet bilinmiyordur ve
+**uydurulmaz** (§3.6). Eskiden istemci burada "maliyet = ücret" varsayıyor ve
+görevi yalnız bellekte uyduruyordu (L-27); ödenince `booking_id`'siz yazılan
+görev yeniden yüklemede eşleşmiyor, aynı temizlik yeniden borç doğuyordu (L-28).
+Artık görev rezervasyon **kaydedilirken** veritabanına `booking_id` ile yazılır
+(`syncBookingCleaningTaskToCloud`). Ağı `core/ledger_integrity_tests.js`.
+
+Eski istemcinin "Ödendi" anında yazdığı `EXP-CLEAN-<görev>` gider satırları
+silinmez (kapanmış aylarda durabilirler); defter formülü satırı olan görevi
+ikinci kez saymaz.
 
 Doluluk/RevPAR paydası: `getPeriodDayCount()` — **ayın gerçek gün sayısı**.
 Bir zamanlar bir ekranda 30, diğerinde 31, bir başkasında 90 kullanılıyordu.
