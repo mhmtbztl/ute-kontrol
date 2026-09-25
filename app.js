@@ -6250,6 +6250,14 @@ function renderImportPreviewBox() {
     if (r.invalidCount) p.push(`${r.invalidCount} hatalı`);
     if (r.overlaps && r.overlaps.length) p.push(`${r.overlaps.length} tarih çakışması`);
     p.push(rezMi ? `toplam ${tl(r.totalGross)} TL / ${r.totalNights} gece` : `toplam ${tl(r.totalAmount)} TL`);
+    // Tarih sirasi dosyadan belirlenir (d7414be). Belirlenemediyse GG/AA
+    // varsayilir ve bu KULLANICIYA SOYLENIR (L-40): 03/04/2026 bir dosyada
+    // 3 Nisan, digerinde 4 Mart'tir ve yanlis ay tum aylik raporlari kaydirir.
+    if (r.dateOrderAssumed) {
+      p.push('⚠️ Tarihler GÜN/AY sırasıyla okundu (dosyada ayırt edici tarih yok) — önizlemede birkaç satırı kontrol edin');
+    } else if (r.dateOrder === 'MDY') {
+      p.push('ℹ️ Tarihler dosyadan AY/GÜN (ABD) sırasıyla tespit edildi');
+    }
     stats.innerText = p.join(' · ');
   }
 
@@ -6347,6 +6355,27 @@ function resetImportPreview() {
  * donem korumasi, rol ve tenant dogrulamasi bu yollarda zaten var. Kismi
  * basari normaldir; her satirin sonucu ayri raporlanir.
  */
+/**
+ * Ice aktarimin icerik parmak izi: dogrulanmis satirlarin kanonik metninin
+ * SHA-256'si. Dosya adi ve satir sirasi disinda her sey dahildir.
+ */
+async function computeImportContentFingerprint(mode, result, tenantId) {
+  const alanlar = r => {
+    const { raw, rowNum, isPotentialDuplicate, hasFileOverlap, ...kalan } = r || {};
+    return JSON.stringify(Object.keys(kalan).sort().map(k => [k, kalan[k]]));
+  };
+  const satirlar = ((result && result.validatedRows) || []).map(alanlar).sort();
+  const hatali = ((result && result.errors) || []).map(e => JSON.stringify(e.raw || {})).sort();
+  const metin = [String(mode), String(tenantId), satirlar.join('\n'), hatali.join('\n')].join('|');
+  const sub = typeof globalThis !== 'undefined' && globalThis.crypto && globalThis.crypto.subtle;
+  if (sub && typeof TextEncoder !== 'undefined') {
+    const ozet = await sub.digest('SHA-256', new TextEncoder().encode(metin));
+    return Array.from(new Uint8Array(ozet)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+  const E = getImportEngine();
+  return E ? E.computeHash(metin) : null;
+}
+
 async function applyImportedData() {
   if (!pendingImportData || !pendingImportData.result) {
     if (typeof showToast === 'function') showToast('Önce bir dosya seçin.', 'info');
@@ -6369,11 +6398,11 @@ async function applyImportedData() {
     return;
   }
 
-  // Dosya parmak izi: ayni dosya iki kez yuklenmesin.
-  const E = getImportEngine();
-  const parmakIzi = E ? E.computeHash(
-    pendingImportData.fileName + '|' + r.totalRows + '|' +
-    (rezMi ? r.totalGross : r.totalAmount) + '|' + tenantId) : null;
+  // Dosya parmak izi: ayni dosya iki kez yuklenmesin. ICERIKTEN uretilir
+  // (L-41): eskiden "ad | satir | toplam" idi; yeniden adlandirilan ayni dosya
+  // uyarisiz ikinci kez yaziliyor, ayni ad/satir/toplamli FARKLI dosya ise
+  // "daha once aktarilmis" saniliyordu.
+  const parmakIzi = await computeImportContentFingerprint(pendingImportData.mode, r, tenantId);
 
   if (parmakIzi && supabaseClient) {
     const { data: onceki } = await supabaseClient.from('finance_import_batches')
@@ -17225,6 +17254,7 @@ if (typeof module !== 'undefined' && module.exports) {
     findLegacyCleaningExpense,
     syncBookingCleaningTaskToCloud,
     refreshAfterPersistedWrite,
+    computeImportContentFingerprint,
     saveBookingPaymentCommission,
     deleteCleaningTask,
     parseCleaningAmountInput,

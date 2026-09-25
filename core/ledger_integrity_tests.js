@@ -432,6 +432,29 @@ const yazmalar = (istemci, tablo) =>
     konsolHatalari.length = 0;
   });
 
+  await test('L-41 Mükerrer dosya parmak izi İÇERİKTEN: ad değişse de aynı, içerik değişince farklı', async () => {
+    const sonuc = satirlar => ({ totalRows: satirlar.length, validatedRows: satirlar, errors: [] });
+    const s1 = [{ rowNum: 2, guest: 'Ada', gross: 1000, checkIn: '2031-01-01', raw: { a: 1 } },
+      { rowNum: 3, guest: 'Can', gross: 2000, checkIn: '2031-01-05', raw: { a: 2 } }];
+    const s1Ters = [{ ...s1[1], rowNum: 2 }, { ...s1[0], rowNum: 3 }];
+    const s2 = [{ ...s1[0] }, { ...s1[1], gross: 1000 + 1000.01 }];
+    const a = await App.computeImportContentFingerprint('BOOKINGS', sonuc(s1), TENANT);
+    const b = await App.computeImportContentFingerprint('BOOKINGS', sonuc(s1Ters), TENANT);
+    const c = await App.computeImportContentFingerprint('BOOKINGS', sonuc(s2), TENANT);
+    const d = await App.computeImportContentFingerprint('BOOKINGS', sonuc(s1), '99999999-9999-4999-8999-999999999999');
+    assert.ok(a && a.length === 64, 'SHA-256 beklenir');
+    assert.strictEqual(a, b, 'satır sırası/ad farkı aynı dosyayı farklı saymamalı');
+    assert.notStrictEqual(a, c, 'farklı içerik farklı parmak izi');
+    assert.notStrictEqual(a, d, 'işletme parmak izine dahil');
+    const kaynak = require('fs').readFileSync(require('path').join(__dirname, '..', 'app.js'), 'utf8');
+    assert.ok(!/pendingImportData\.fileName \+ '\|' \+ r\.totalRows/.test(kaynak), 'dosya adına bağlı eski parmak izi duruyor');
+  });
+
+  await test('L-40 Tarih sırası varsayıldığında önizleme bunu kullanıcıya söyler', async () => {
+    const kaynak = require('fs').readFileSync(require('path').join(__dirname, '..', 'app.js'), 'utf8');
+    assert.match(kaynak, /if \(r\.dateOrderAssumed\) \{\s*p\.push\('⚠️ Tarihler GÜN\/AY/);
+  });
+
   await test('L-31 Görev uyduran villa düzeyi fonksiyonlar yok', async () => {
     assert.strictEqual(App.toggleCleaningPaid, undefined);
     assert.strictEqual(App.promptEditCleaningAmount, undefined);
