@@ -238,6 +238,8 @@ const allTestFiles = [
 
   // phase43: ay kapanisi, sifirlama, hesap kapatma, sahipsiz fotograf temizligi
   'phase43_period_reset_live_tests.js',
+  // K-04: temizlik maliyeti 'yapildi' aninda, odeme komisyonu gider (phase45)
+  'phase45_cleaning_cost_live_tests.js',
   'storage_orphan_cleanup_tests.js',
 
   // Yerel sunucu yalnizca 127.0.0.1 ve izin listesi (.env / .git / supabase verilmez)

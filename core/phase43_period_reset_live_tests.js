@@ -92,7 +92,10 @@ async function run() {
     const pA = await mulk(A, s, 'a');
     const bkA = await rez(A, pA.id, 'P43A-' + s, prevDay(10), prevDay(13));
     const taskA = must(await admin.from('cleaning_tasks').insert({ tenant_id: A, property_id: pA.id, booking_id: bkA.id,
-      task_date: prevDay(13), cleaner_name: 'Ayse', amount: 1200, is_paid: false }).select().single(), 'temizlik');
+      task_date: prevDay(13), cleaner_name: 'Ayse', amount: 1200, is_paid: false,
+      // phase45: odeme yalniz YAPILMIS temizlige yapilir. Kapanistan once yapilmis
+      // bir temizligin odemesi kapanistan sonra serbesttir (2g).
+      status: 'DONE' }).select().single(), 'temizlik');
 
     // -----------------------------------------------------------------------
     console.log('--- 1. L-08: DEVAM EDEN AY ---');

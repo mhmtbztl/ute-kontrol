@@ -1,6 +1,6 @@
 # Tasarım — Temizlik maliyeti ve ciro sözleşmesi (K-04 · L-27 + L-32)
 
-**Durum:** tasarım (24 Eylül 2026). Kod yok. `app.js` Codex Dalga 1'den
+**Durum:** kararlar verildi (25 Eylül 2026); sunucu kısmı phase45. `app.js` Codex Dalga 1'den
 sonra açılınca uygulanır. Sunucu kısmı **phase45** (Claude'un sıradaki tek
 numarası).
 
@@ -147,16 +147,16 @@ Mevcut ağlar yeni sözleşmeyi ölçecek şekilde güncellenir:
 
 ---
 
-## 6. Kullanıcıya sorular
+## 6. Kullanıcı kararları (25 Eylül 2026)
 
-1. **Ödeme komisyonu** (kredi kartı / POS / sanal POS kesintisi) için
-   bugün hiçbir alan yok. Öneri: şimdilik **"Ödeme Komisyonu" gider
-   kategorisi** (elle gider, OPEX'e zaten girer); rezervasyon başına
-   otomatik hesap gerekiyorsa ayrı bir tabloyla sonra. Uydurma oran
-   yazılmaz.
-2. **Geçmiş tarihli, ödenmemiş görevler** göçte `PLANNED` kalır ve
-   arayüzde "yapıldı mı?" diye sorulur. Toplu "hepsi yapıldı" düğmesi
-   istenir mi?
-3. Temizlik **yapıldığı gün** ile **planlanan gün** farklıysa gider hangi
-   aya yazılır: öneri **yapıldığı gün** (`task_date` "yapıldı" anında
-   güncellenir).
+1. **Ödeme komisyonu rezervasyon başına girilir** (gider kategorisi değil).
+   Ayrı tablo `booking_payment_commissions` — `bookings`'e sütun eklenmez
+   (§3.4). OTA komisyonu gibi gecelere tahakkukla dağılır, ciroyu azaltmaz.
+   Uydurma oran yazılmaz: girilmemişse 0'dır.
+2. **Geçmiş tarihli planlı görevler için toplu "seçilenlerin hepsi yapıldı"
+   düğmesi olur**, tek tek işaretlemenin yanında.
+3. **Gider, temizliğin yapıldığı günün ayına yazılır.** "Yapıldı" denirken
+   tarih sorulur (varsayılan planlanan gün) ve `task_date` o güne çekilir.
+
+Sunucu kısmı: `supabase/migration_phase45_cleaning_cost_contract.sql`,
+paket `docs/PHASE45_DEPLOY_PACKAGE.md`.
