@@ -119,7 +119,12 @@ function rezervasyonSatiri(b) {
     // ayiklanan hatayi geri getirirdi.
     disaSayi(kayit.cleaningFee !== undefined ? kayit.cleaningFee : kayit.cleanFee),
     disaSayi(kayit.pax),
-    String(kayit.status || '')
+    String(kayit.status || ''),
+    // L-39: indirim, telefon ve not da tura girer; yoksa geri yuklenen
+    // rezervasyonun cirosu indirim kadar artiyordu.
+    disaSayi(kayit.discount || 0),
+    String(kayit.phone || kayit.guestPhone || ''),
+    String(kayit.notes || '')
   ];
 }
 

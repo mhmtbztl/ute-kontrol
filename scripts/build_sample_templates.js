@@ -69,9 +69,9 @@ const SABLONLAR = {
     basliklar: SABLON_SUTUNLARI.BOOKINGS,
     satirlar: [
       ['MULK_KODU_1', 'Örnek Misafir 1', '2026-07-15', '2026-07-19',
-        '72500', 'WHATSAPP', '0', '1500', '8', 'CONFIRMED'],
+        '72500', 'WHATSAPP', '0', '1500', '8', 'CONFIRMED', '2500', '', 'Örnek not'],
       ['MULK_KODU_2', 'Örnek Misafir 2', '2026-07-20', '2026-07-24',
-        '56000', 'AIRBNB', '8400', '1200', '6', 'CONFIRMED']
+        '56000', 'AIRBNB', '8400', '1200', '6', 'CONFIRMED', '0', '', '']
     ],
     aciklama: [
       'LEXBNB — REZERVASYON DEFTERİ ŞABLONU',
@@ -89,6 +89,8 @@ const SABLONLAR = {
       '5) Gece sayısı tarihlerden hesaplanır, ayrı sütun gerekmez.',
       '6) Başlık satırı DOSYANIN İLK SATIRI olmalıdır; üstüne rapor başlığı eklemeyin.',
       '7) Sütun sırası önemsizdir, fazladan sütunlar yok sayılır.',
+      '8) "Oda İndirimi" yalnız oda gelirinden düşer; temizlik ücretini etkilemez.',
+      '   "Telefon" ve "Not" isteğe bağlıdır.',
       '',
       'Durum değerleri: CONFIRMED, CHECKED_IN, CHECKED_OUT, CANCELLED'
     ]

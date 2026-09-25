@@ -73,7 +73,9 @@ const check = (c, n, d) => c ? ok(n) : no(n, d);
 const REZERVASYONLAR = [
   { villa: 'CINAR', guest: 'Ayşe Şahin', checkIn: '2026-09-15', checkOut: '2026-09-19',
     gross: 72500.5, otaCommission: 0, cleaningFee: 1500, channel: 'WHATSAPP',
-    pax: 8, status: 'CONFIRMED' },
+    pax: 8, status: 'CONFIRMED',
+    // L-39: indirim, telefon ve not da turdan birebir donmeli.
+    discount: 2500.5, phone: '+90 532 000 00 00', notes: 'Geç giriş; "bebek yatağı"' },
   { villa: 'ZEYTIN', guest: 'Ömer Çelik', checkIn: '2026-09-20', checkOut: '2026-09-22',
     gross: 18500, otaCommission: 2775, cleaningFee: 1200, channel: 'AIRBNB',
     pax: 4, status: 'CHECKED_OUT' },
@@ -193,7 +195,8 @@ function turTestleri(app, X, I) {
     v.propertyKey === o.villa && v.guest === o.guest &&
     v.checkIn === o.checkIn && v.checkOut === o.checkOut &&
     v.gross === o.gross && v.otaCommission === o.otaCommission &&
-    v.cleaningFee === o.cleaningFee && v.pax === o.pax && v.status === o.status;
+    v.cleaningFee === o.cleaningFee && v.pax === o.pax && v.status === o.status &&
+    (v.discount || 0) === (o.discount || 0) && (v.phone || '') === (o.phone || '') && (v.notes || '') === (o.notes || '');
 
   // --- CSV turu ---
   const csv = X.toCSV(X.buildExport('BOOKINGS', REZERVASYONLAR));

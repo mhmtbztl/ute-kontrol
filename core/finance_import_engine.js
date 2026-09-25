@@ -242,7 +242,12 @@ const BASLIKLAR = {
     cleaningFee: ['temizlik', 'temizlik ucreti', 'temizlik ücreti', 'temizlik ücreti (tl)', 'cleaning', 'cleanfee'],
     pax:         ['kisi', 'kişi', 'kisi sayisi', 'kişi sayısı', 'pax', 'misafir sayisi', 'misafir sayısı'],
     status:      ['durum', 'status'],
-    code:        ['kod', 'rezervasyon kodu', 'code', 'booking code', 'referans']
+    code:        ['kod', 'rezervasyon kodu', 'code', 'booking code', 'referans'],
+    // Tur kapanisi (L-39): disa aktarilan indirim, telefon ve not geri
+    // yuklendiginde kaybolmamali.
+    discount:    ['indirim', 'indirim (tl)', 'oda indirimi', 'oda indirimi (tl)', 'discount'],
+    phone:       ['telefon', 'tel', 'phone', 'telefon no', 'gsm', 'misafir telefonu'],
+    notes:       ['not', 'notlar', 'notes', 'aciklama', 'açıklama']
   }
 };
 
@@ -265,7 +270,7 @@ const BASLIKLAR = {
 const SABLON_SUTUNLARI = {
   BOOKINGS: ['Villa', 'Misafir Adı', 'Giriş Tarihi', 'Çıkış Tarihi',
     'Brüt Tutar (TL)', 'Kanal', 'OTA Komisyonu (TL)', 'Temizlik Ücreti (TL)',
-    'Kişi Sayısı', 'Durum'],
+    'Kişi Sayısı', 'Durum', 'Oda İndirimi (TL)', 'Telefon', 'Not'],
   EXPENSES: ['Tarih', 'Kategori', 'Tutar (TL)', 'Açıklama', 'Tür', 'Villa']
 };
 
@@ -470,6 +475,17 @@ function validateBookingRows(rawRows = [], columnMap = {}, context = {}) {
       satirHata.push(`Komisyon + temizlik (${komisyon + temizlik}) brüt tutarı (${brut}) aşıyor.`);
     }
 
+    // Indirim yalniz oda gelirinden duser (K-04); temizlik ucretini asamaz.
+    const indirimHam = columnMap.discount ? raw[columnMap.discount] : undefined;
+    const indirim = (indirimHam === undefined || indirimHam === '') ? 0 : normalizeAmount(indirimHam);
+    if (indirim === null) satirHata.push(`İndirim anlaşılamadı: "${indirimHam}"`);
+    else if (indirim < 0) satirHata.push('İndirim negatif olamaz.');
+    else if (brut !== null && temizlik !== null && indirim > brut - temizlik) {
+      satirHata.push(`İndirim (${indirim}) oda gelirini (${brut - temizlik}) aşıyor.`);
+    }
+    const telefon = columnMap.phone ? String(raw[columnMap.phone] || '').trim() : '';
+    const not = columnMap.notes ? String(raw[columnMap.notes] || '').trim() : '';
+
     const paxHam = raw[columnMap.pax];
     let pax = null;
     if (paxHam !== undefined && paxHam !== '') {
@@ -528,6 +544,7 @@ function validateBookingRows(rawRows = [], columnMap = {}, context = {}) {
         propertyId: mulk.id, propertyKey: mulk.slug || mulk.key || null, propertyName: mulk.name || mulkHam,
         guest: misafir, checkIn: giris, checkOut: cikis, nights: gece,
         gross: brut, otaCommission: komisyon, cleaningFee: temizlik,
+        discount: indirim || 0, phone: telefon, notes: not,
         channel: kanal, pax, status: durum, code: kod || null,
         isPotentialDuplicate: mukerrer, raw
       });

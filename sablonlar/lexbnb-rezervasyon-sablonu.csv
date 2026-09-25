@@ -1,3 +1,3 @@
-﻿Villa;Misafir Adı;Giriş Tarihi;Çıkış Tarihi;Brüt Tutar (TL);Kanal;OTA Komisyonu (TL);Temizlik Ücreti (TL);Kişi Sayısı;Durum
-MULK_KODU_1;Örnek Misafir 1;2026-07-15;2026-07-19;72500;WHATSAPP;0;1500;8;CONFIRMED
-MULK_KODU_2;Örnek Misafir 2;2026-07-20;2026-07-24;56000;AIRBNB;8400;1200;6;CONFIRMED
+﻿Villa;Misafir Adı;Giriş Tarihi;Çıkış Tarihi;Brüt Tutar (TL);Kanal;OTA Komisyonu (TL);Temizlik Ücreti (TL);Kişi Sayısı;Durum;Oda İndirimi (TL);Telefon;Not
+MULK_KODU_1;Örnek Misafir 1;2026-07-15;2026-07-19;72500;WHATSAPP;0;1500;8;CONFIRMED;2500;;Örnek not
+MULK_KODU_2;Örnek Misafir 2;2026-07-20;2026-07-24;56000;AIRBNB;8400;1200;6;CONFIRMED;0;;
