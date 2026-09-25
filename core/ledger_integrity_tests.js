@@ -455,6 +455,75 @@ const yazmalar = (istemci, tablo) =>
     assert.match(kaynak, /if \(r\.dateOrderAssumed\) \{\s*p\.push\('⚠️ Tarihler GÜN\/AY/);
   });
 
+  // --- L-37: kalan hesap tutarsizliklari -----------------------------------
+  const L37 = () => ({
+    bookingChannels: [{ code: 'KENDI_SITEM', channelType: 'DIRECT' }, { code: 'AIRBNB', channelType: 'OTA' }],
+    bookings: [
+      { id: 'o1', villa: 'A', propertyId: PROP_A, channel: 'AIRBNB', checkIn: '2031-05-01', checkOut: '2031-05-03',
+        gross: 20000, cleanFee: 2000, discount: 0, otaComm: 2000, status: 'CONFIRMED' },
+      { id: 'd1', villa: 'A', propertyId: PROP_A, channel: 'KENDI_SITEM', checkIn: '2031-05-10', checkOut: '2031-05-12',
+        gross: 10000, cleanFee: 0, discount: 0, otaComm: 0, status: 'CONFIRMED' }
+    ]
+  });
+  const kaynak37 = require('fs').readFileSync(require('path').join(__dirname, '..', 'app.js'), 'utf8');
+
+  await test('L-37 Fiyatlandırma şeridi ADR\'yi tek tanımdan gösterir (net oda geliri / gece)', async () => {
+    ortamKur(L37(), kaydedenIstemci());
+    formKur({});
+    App.setCurrentFilter({ period: '2031-05', villa: 'ALL' });
+    App.renderPricingKpiStrip();
+    // (18.000 + 10.000) / 4 gece = 7.000 — brüt/gece olsaydı 7.500
+    assert.match(global.document.getElementById('pricingAdrVal').innerText, /7\.000/);
+  });
+
+  await test('L-37 İşletmenin tanımladığı özel doğrudan kanal DOĞRUDAN sayılır', async () => {
+    const kanallar = L37().bookingChannels;
+    assert.strictEqual(App.isDirectBookingChannel('KENDI_SITEM', kanallar), true);
+    assert.strictEqual(App.isDirectBookingChannel('AIRBNB', kanallar), false);
+    assert.strictEqual(App.isDirectBookingChannel('WHATSAPP', []), true);
+    assert.strictEqual((kaynak37.match(/'WHATSAPP', 'INSTAGRAM', 'WEBSITE'/g) || []).length, 1,
+      'sabit doğrudan kanal listesi yardımcı dışında da duruyor');
+  });
+
+  await test('L-37 What-if simülatörü sabit %16 / 600 TL uydurmaz; ölçülen oranı kullanır', async () => {
+    assert.ok(!/\* 0\.16\b/.test(kaynak37) && !/nightsDiff \* 600/.test(kaynak37), 'sabit varsayım duruyor');
+    ortamKur(L37(), kaydedenIstemci());
+    formKur({ simAdrSlider: '0', simOccSlider: '0', simDirectSlider: '50' });
+    App.setCurrentFilter({ period: '2031-05', villa: 'ALL' });
+    App.runWhatIfSimulation();
+    // OTA geliri 20.000, komisyon 2.000 -> olculen oran %10
+    assert.match(global.document.getElementById('simResCommDelta').innerText, /%10\.0/);
+  });
+
+  await test('L-37 Aylık KPI tablosu mülk filtresine uyar', async () => {
+    const PROP_B = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+    const v = L37();
+    v.villas = { A: { id: PROP_A, slug: 'A' }, B: { id: PROP_B, slug: 'B' } };
+    v.bookings.push({ id: 'b9', villa: 'B', propertyId: PROP_B, checkIn: '2031-05-20', checkOut: '2031-05-21', gross: 5000, status: 'CONFIRMED' });
+    ortamKur(v, kaydedenIstemci());
+    yakin(App.computeMonthActuals('2031-05', 'A').ciro, 30000, 'A');
+    yakin(App.computeMonthActuals('2031-05').ciro, 35000, 'portföy');
+    assert.match(kaynak37, /computeMonthActuals\(m, secili\)/);
+  });
+
+  await test('L-37 Boş bırakılan hedef 0 değil null yazılır', async () => {
+    const ist = kaydedenIstemci();
+    ortamKur({ targets: [] }, ist);
+    await App.saveMonthlyTarget({ year: 2031, month: 5, revenueTarget: 100000, netProfitTarget: null, adrTarget: null });
+    const w = yazmalar(ist, 'monthly_targets')[0];
+    assert.ok(w, 'hedef yazılmadı');
+    assert.strictEqual(w.yuk.revenue_target, 100000);
+    assert.strictEqual(w.yuk.net_profit_target, null);
+    assert.strictEqual(w.yuk.adr_target, null);
+    konsolHatalari.length = 0;
+  });
+
+  await test('L-37 Rezervasyon listesi dönem filtresi gece kesişimi; taban fiyat alanları doğru okunur', async () => {
+    assert.match(kaynak37, /b\.checkIn <= aralik\.end && b\.checkOut > aralik\.start/);
+    assert.match(kaynak37, /fiyatAlani\(v\.base !== undefined \? v\.base : v\.basePrice\)/);
+    assert.match(kaynak37, /const t = v\.floor \?\? v\.floorPrice/);
+  });
+
   await test('L-31 Görev uyduran villa düzeyi fonksiyonlar yok', async () => {
     assert.strictEqual(App.toggleCleaningPaid, undefined);
     assert.strictEqual(App.promptEditCleaningAmount, undefined);

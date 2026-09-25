@@ -1943,6 +1943,13 @@ async function loadMonthlyTargets(year, month) {
   return (currentAppData && Array.isArray(currentAppData.targets)) ? currentAppData.targets : [];
 }
 
+function hedefDegeri(a, b) {
+  const v = a !== undefined ? a : b;
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 async function saveMonthlyTarget(targetInput) {
   const tenantId = getActiveTenantId();
   if (!targetInput || !targetInput.year || !targetInput.month) {
@@ -1954,13 +1961,14 @@ async function saveMonthlyTarget(targetInput) {
     property_id: targetInput.propertyId || targetInput.property_id || null,
     year: Number(targetInput.year),
     month: Number(targetInput.month),
-    revenue_target: targetInput.revenueTarget !== undefined ? Number(targetInput.revenueTarget) : Number(targetInput.revenue_target || 0),
-    net_profit_target: targetInput.netProfitTarget !== undefined ? Number(targetInput.netProfitTarget) : Number(targetInput.net_profit_target || 0),
-    margin_target: targetInput.marginTarget !== undefined ? Number(targetInput.marginTarget) : Number(targetInput.margin_target || 0),
-    occupancy_target: targetInput.occupancyTarget !== undefined ? Number(targetInput.occupancyTarget) : Number(targetInput.occupancy_target || 0),
-    adr_target: targetInput.adrTarget !== undefined ? Number(targetInput.adrTarget) : Number(targetInput.adr_target || 0),
-    revpar_target: targetInput.revparTarget !== undefined ? Number(targetInput.revparTarget) : Number(targetInput.revpar_target || 0),
-    max_expense_target: targetInput.maxExpenseTarget !== undefined ? Number(targetInput.maxExpenseTarget) : Number(targetInput.max_expense_target || 0),
+    // Girilmemis hedef null kalir (sutunlar bos olabilir); 0'a cevrilmez.
+    revenue_target: hedefDegeri(targetInput.revenueTarget, targetInput.revenue_target),
+    net_profit_target: hedefDegeri(targetInput.netProfitTarget, targetInput.net_profit_target),
+    margin_target: hedefDegeri(targetInput.marginTarget, targetInput.margin_target),
+    occupancy_target: hedefDegeri(targetInput.occupancyTarget, targetInput.occupancy_target),
+    adr_target: hedefDegeri(targetInput.adrTarget, targetInput.adr_target),
+    revpar_target: hedefDegeri(targetInput.revparTarget, targetInput.revpar_target),
+    max_expense_target: hedefDegeri(targetInput.maxExpenseTarget, targetInput.max_expense_target),
     updated_at: new Date().toISOString()
   };
 
@@ -3744,10 +3752,11 @@ function renderOperationsKpiStrip() {
 function renderPricingKpiStrip() {
   if (typeof document === 'undefined' || !appData) return;
   const bookings = (appData.bookings || []).filter(b => b.status !== 'CANCELLED' && isBookingInFilter(b));
-  // Aylari kesen rezervasyonun yalnizca bu doneme dusen gecesi ve payi sayilir.
-  const geceler = bookings.reduce((a, b) => a + getBookingFilterShare(b).nights, 0);
-  const ciro = bookings.reduce((a, b) => a + (Number(b.gross) || 0) * getBookingFilterShare(b).ratio, 0);
-  setEl('pricingAdrVal', geceler > 0 ? `₺${Math.round(ciro / geceler).toLocaleString('tr-TR')}` : '—');
+  // ADR tek tanimdan: net oda geliri / satilan gece (K-04, L-37). Burada
+  // eskiden brut / gece hesaplaniyordu; temizlik ucreti ve indirim ADR'yi
+  // ayni ay icin Finans ekranindan farkli gosteriyordu.
+  const defter = computeFilterLedger();
+  setEl('pricingAdrVal', defter.adr === null ? '—' : `₺${Math.round(defter.adr).toLocaleString('tr-TR')}`);
 
   let gapSayisi = 0;
   try {
@@ -4847,7 +4856,7 @@ function renderYoYComparison(actualRevenue, actualOpex, actualNetProfit, actualN
     return;
   }
 
-  const gecen = computeMonthActuals(prevKey);
+  const gecen = computeMonthActuals(prevKey, currentFilter ? currentFilter.villa : 'ALL');
   const prevRevenue = gecen.ciro;
   const prevNights = gecen.nights;
   const prevNetProfit = gecen.netProfit;
@@ -5052,63 +5061,89 @@ function runWhatIfSimulation() {
   const occDelta = Number(document.getElementById('simOccSlider')?.value) || 0;
   const directPct = Number(document.getElementById('simDirectSlider')?.value) || 60;
 
-  // setEl artik genel kapsamda tanimli. Burada yerel bir const olarak
-  // duruyordu ve fonksiyonun BASINDA kullanildigi icin TDZ hatasi veriyordu:
-  //   ReferenceError: Cannot access 'setEl' before initialization
-
   setEl('simAdrLabel', `${adrDelta >= 0 ? '+' : ''}%${adrDelta}`);
   setEl('simOccLabel', `${occDelta >= 0 ? '+' : ''}%${occDelta}`);
   setEl('simDirectLabel', `%${directPct}`);
 
-  const scopedBookings = (appData.bookings || []).filter(b => b.status !== 'CANCELLED' && isBookingInFilter(b));
-  const baseRevenue = scopedBookings.reduce((sum, b) => sum + Math.max(0, Number(b.gross || 0) - Number(b.discount || 0)), 0);
-  const baseNights = scopedBookings.reduce((sum, b) => sum + Number(b.nights || 0), 0);
-  const baseRoomRevenue = scopedBookings.reduce((sum, b) => sum + Math.max(0, Number(b.gross || 0) - Number(b.cleaningFee || b.cleanFee || 0) - Number(b.discount || 0)), 0);
-  const baseAdr = baseNights > 0 ? baseRoomRevenue / baseNights : 0;
-  const scopedExpenses = (appData.expenses || []).filter(isExpenseInFilter);
-  const baseOpex = scopedExpenses.filter(e => (e.type || e.expense_type || 'OPEX') !== 'CAPEX').reduce((sum, e) => sum + Number(e.amount || 0), 0);
-  const baseComm = scopedBookings.reduce((sum, b) => sum + Number(b.otaCommission || b.otaComm || 0), 0);
-  const baseCapex = scopedExpenses.filter(e => (e.type || e.expense_type) === 'CAPEX').reduce((sum, e) => sum + Number(e.amount || 0), 0);
-  const baseProfit = baseRevenue - baseOpex - baseComm - baseCapex;
+  // Taban: secili donemin DEFTERI (K-04 formulu, tahakkuklu). Eskiden
+  // rezervasyonlarin TAMAMI donem disi geceleriyle birlikte sayiliyordu.
+  const d = computeFilterLedger();
+  const baseRevenue = d.totalRevenue;
+  const baseNights = d.soldNights;
+  const baseAdr = d.adr || 0;
+  const baseProfit = d.netProfit;
 
-  if (baseRevenue === 0) {
-    setEl('simResRevenue', '0 TL');
-    setEl('simResRevDelta', 'Veri bekleniyor');
-    setEl('simResCommission', '0 TL');
-    setEl('simResCommDelta', 'OTA komisyonu yok');
-    setEl('simResProfit', '0 TL');
+  if (baseRevenue <= 0 || baseNights <= 0) {
+    setEl('simResRevenue', '—');
+    setEl('simResRevDelta', 'Bu dönemde satılmış gece yok; simülasyon yapılamaz');
+    setEl('simResCommission', '—');
+    setEl('simResCommDelta', 'Veri yok');
+    setEl('simResProfit', '—');
     setEl('simResProfitDelta', 'Kayıt bekleniyor');
     return;
   }
 
+  // Oranlar ISLETMENIN KENDI kayitlarindan olculur (L-37, 3.6). Eskiden
+  // sabit %16 OTA komisyonu ve gece basi 600 TL marjinal maliyet
+  // varsayiliyordu; olculmemis bir sayi olculmus gibi sonuc uretiyordu.
+  const kanallar = (typeof appData !== 'undefined' && appData.bookingChannels) || [];
+  const direktMi = b => isDirectBookingChannel(b.channel, kanallar);
+  const otaGeliri = (appData.bookings || [])
+    .filter(b => b.status !== 'CANCELLED' && isBookingInFilter(b) && !direktMi(b))
+    .reduce((t, b) => t + ((Number(b.gross) || 0) - (Number(b.discount) || 0)) * getBookingFilterShare(b).ratio, 0);
+  const otaOrani = otaGeliri > 0 ? d.otaCommission / otaGeliri : null;
+  const geceMaliyeti = d.cleaningCost > 0 ? d.cleaningCost / baseNights : null;
+  // Temizlik geliri gece basina (ucret brutun icinde; oda disi gelir).
+  const geceTemizlikGeliri = d.cleaningRevenue / baseNights;
+
   const newAdr = baseAdr * (1 + (adrDelta / 100));
   const newNights = Math.max(1, Math.round(baseNights * (1 + (occDelta / 100))));
-  const newRevenue = Math.round(newAdr * newNights);
+  const newRoomRevenue = newAdr * newNights;
+  const newRevenue = Math.round(newRoomRevenue + geceTemizlikGeliri * newNights);
   const revDiff = newRevenue - baseRevenue;
   const revDiffPct = (revDiff / baseRevenue) * 100;
 
-  // Direct bookings have 0 commission; OTA channel portion has ~16% commission
   const otaShare = Math.max(0, (100 - directPct) / 100);
-  const newComm = Math.round(newRevenue * otaShare * 0.16);
-  const commSaved = Math.max(0, baseComm - newComm);
+  const newComm = otaOrani === null ? d.otaCommission : Math.round(newRevenue * otaShare * otaOrani);
+  const commSaved = d.otaCommission - newComm;
 
-  // Marginal cleaning & linen cost for extra nights (~600 TL/night)
-  const nightsDiff = newNights - baseNights;
-  const marginalCost = nightsDiff * 600;
-
-  const newOpex = Math.round(baseOpex - baseComm + newComm + marginalCost);
-  const newProfit = Math.round(newRevenue - newOpex - baseCapex);
+  const marginalCost = geceMaliyeti === null ? 0 : (newNights - baseNights) * geceMaliyeti;
+  const newOpex = Math.round(d.totalOpex - d.otaCommission + newComm + marginalCost);
+  const newProfit = Math.round(newRevenue - newOpex - d.capex);
   const profitDiff = newProfit - baseProfit;
   const newMargin = newRevenue > 0 ? (newProfit / newRevenue) * 100 : 0;
 
   setEl('simResRevenue', `${newRevenue.toLocaleString('tr-TR')} TL`);
   setEl('simResRevDelta', `${revDiff >= 0 ? '+' : ''}${Math.round(revDiff).toLocaleString('tr-TR')} TL (%${revDiffPct.toFixed(1)})`);
 
-  setEl('simResCommission', `${commSaved.toLocaleString('tr-TR')} TL`);
-  setEl('simResCommDelta', `Doğrudan Tasarruf (OTA Komisyonu: ${newComm.toLocaleString('tr-TR')} TL)`);
+  if (otaOrani === null) {
+    setEl('simResCommission', '—');
+    setEl('simResCommDelta', 'Bu dönemde OTA rezervasyonu yok; komisyon oranı ölçülemedi');
+  } else {
+    setEl('simResCommission', `${Math.round(commSaved).toLocaleString('tr-TR')} TL`);
+    setEl('simResCommDelta', `Ölçülen OTA oranı %${(otaOrani * 100).toFixed(1)} · yeni komisyon ${newComm.toLocaleString('tr-TR')} TL`);
+  }
 
   setEl('simResProfit', `${newProfit.toLocaleString('tr-TR')} TL`);
-  setEl('simResProfitDelta', `${profitDiff >= 0 ? '+' : ''}${Math.round(profitDiff).toLocaleString('tr-TR')} TL Fazla Kâr (%${newMargin.toFixed(1)} Marj)`);
+  setEl('simResProfitDelta', `${profitDiff >= 0 ? '+' : ''}${Math.round(profitDiff).toLocaleString('tr-TR')} TL (%${newMargin.toFixed(1)} Marj)`
+    + (geceMaliyeti === null ? ' · ek gece maliyeti ölçülemedi (yapılmış temizlik yok)' : ''));
+}
+
+/**
+ * Kanal dogrudan mi? Isletmenin kanal ayarlari (phase30, tenant_booking_channels
+ * channel_type = DIRECT) once gelir; kayit yoksa bilinen dogrudan kanallar.
+ * Eskiden iki yerde iki farkli sabit liste vardi ve isletmenin kendi
+ * tanimladigi ozel dogrudan kanallar hep OTA sayiliyordu (L-37).
+ */
+function isDirectBookingChannel(channel, channels) {
+  const ad = String(channel || '').toUpperCase().trim();
+  if (!ad) return false;
+  const kayit = (channels || []).find(c => String(c.code || c.name || c.channel || '').toUpperCase().trim() === ad);
+  if (kayit) {
+    const tur = String(kayit.channelType || kayit.channel_type || '').toUpperCase();
+    if (tur) return tur === 'DIRECT';
+  }
+  return ['WHATSAPP', 'INSTAGRAM', 'WEBSITE', 'REPEAT', 'PHONE', 'DIRECT', 'DIREKT'].includes(ad);
 }
 
 // -------------------------------------------------------------
@@ -5536,7 +5571,14 @@ function loadSelectedPeriodGoal() {
   const rev = saved ? (saved.revenue ?? saved.revenue_target ?? '') : '';
   const netProfit = saved ? (saved.netProfit ?? saved.net_profit_target ?? '') : '';
   const maxExpense = saved ? (saved.maxExpense ?? saved.max_expense_target ?? '') : '';
-  const nights = saved ? (saved.nights ?? saved.sold_nights_target ?? '') : '';
+  // Gece hedefinin kendi sutunu yok; doluluk hedefi olarak saklanir. Form
+  // yeniden acildiginda kayitli dolulukla o ayin kapasitesinden geri
+  // turetilir (L-37) — eskiden hep bos aciliyordu.
+  const kayitliGece = saved ? (saved.nights ?? saved.sold_nights_target ?? null) : null;
+  const kapasiteGoal = getAvailableNightsForMonth(period);
+  const doluluk = saved ? Number(saved.occupancy ?? saved.occupancy_target) : NaN;
+  const nights = kayitliGece !== null && kayitliGece !== undefined ? kayitliGece
+    : (saved && Number.isFinite(doluluk) && doluluk > 0 && kapasiteGoal > 0 ? Math.round(doluluk / 100 * kapasiteGoal) : '');
   const adr = saved ? (saved.adr ?? saved.adr_target ?? '') : '';
 
   const revEl = document.getElementById('goalRevenue');
@@ -5609,14 +5651,22 @@ async function saveMonthlyGoals(e) {
     alert('Aylık ciro hedefini girin. Sistem hedef uydurmaz.');
     return;
   }
-  const netProfit = Number(document.getElementById('goalNetProfit').value) || 0;
-  const maxExpense = Number(document.getElementById('goalMaxExpense').value) || 0;
-  const nights = Number(document.getElementById('goalOccupancyNights').value) || 0;
-  const adr = Number(document.getElementById('goalADR').value) || 0;
+  // Bos birakilan hedef 0 DEGIL, "hedef yok"tur (3.6): 0 yazmak ekranda
+  // "0 TL net kar hedefi" gibi anlamsiz bir hedef uretiyordu (L-37).
+  const oku = id => {
+    const v = String((document.getElementById(id) || {}).value ?? '').trim();
+    if (v === '') return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+  const netProfit = oku('goalNetProfit');
+  const maxExpense = oku('goalMaxExpense');
+  const nights = oku('goalOccupancyNights');
+  const adr = oku('goalADR');
   const capacity = getAvailableNightsForMonth(period);
-  const occupancy = capacity > 0 ? Number(((nights / capacity) * 100).toFixed(1)) : 0;
-  const margin = revenue > 0 ? Number(((netProfit / revenue) * 100).toFixed(1)) : 0;
-  const revpar = capacity > 0 ? Math.round(revenue / capacity) : 0;
+  const occupancy = nights !== null && capacity > 0 ? Math.min(100, Number(((nights / capacity) * 100).toFixed(1))) : null;
+  const margin = netProfit !== null && revenue > 0 ? Number(((netProfit / revenue) * 100).toFixed(1)) : null;
+  const revpar = capacity > 0 ? Math.round(revenue / capacity) : null;
   const [year, month] = period.split('-').map(Number);
 
   try {
@@ -6608,7 +6658,7 @@ function renderKPIsAndDashboard() {
       villaStats[b.villa].grossRevenue += bGross;
     }
 
-    if (['WHATSAPP', 'INSTAGRAM', 'WEBSITE', 'REPEAT', 'PHONE'].includes(b.channel)) {
+    if (isDirectBookingChannel(b.channel, appData.bookingChannels)) {
       directRevenue += bNet;
       if (villaStats[b.villa]) villaStats[b.villa].directRevenue += bNet;
     }
@@ -6837,7 +6887,7 @@ function renderChannelDistribution() {
     channelTotals[ch].count += 1;
     channelTotals[ch].net += net;
 
-    if (['WHATSAPP', 'INSTAGRAM', 'WEBSITE', 'REPEAT', 'PHONE', 'DIRECT'].includes(ch)) {
+    if (isDirectBookingChannel(ch, appData.bookingChannels)) {
       directNet += net;
     }
   });
@@ -6867,7 +6917,7 @@ function renderChannelDistribution() {
   container.innerHTML = '';
   sortedChannels.forEach(ch => {
     const chName = channelNames[ch.name] || ch.name;
-    const isDirect = ['WHATSAPP', 'INSTAGRAM', 'WEBSITE', 'PHONE', 'DIRECT', 'REPEAT'].includes(ch.name);
+    const isDirect = isDirectBookingChannel(ch.name, appData.bookingChannels);
     const pct = totalNet > 0 ? (ch.net / totalNet) * 100 : 0;
 
     const div = document.createElement('div');
@@ -6997,14 +7047,14 @@ function renderOtaRadar() {
   tbody.innerHTML = '';
 
   const channelData = {};
-  const directChannels = new Set(['WHATSAPP', 'INSTAGRAM', 'WEBSITE', 'REPEAT', 'PHONE', 'DIRECT']);
+
 
   let directGross = 0;
   appData.bookings.forEach(b => {
     if (b.status === 'CANCELLED' || !isBookingInFilter(b)) return;
     const ch = b.channel ? b.channel.toUpperCase() : 'OTHER';
     const oran = getBookingFilterShare(b).ratio;
-    const isDirect = directChannels.has(ch);
+    const isDirect = isDirectBookingChannel(ch, appData.bookingChannels);
     if (!channelData[ch]) channelData[ch] = {
       name: ch === 'BOOKING' ? 'Booking.com' : ch,
       type: isDirect ? 'Direkt' : 'OTA', count: 0, gross: 0, comm: 0, net: 0
@@ -7078,9 +7128,16 @@ function renderManageBookingsTable() {
     if (periodFilter === 'UPCOMING') {
       if (b.checkOut < todayStr) return false;
     } else if (periodFilter !== 'ALL') {
-      const bInMonth = b.checkIn.slice(0, 7);
-      const bOutMonth = b.checkOut.slice(0, 7);
-      if (bInMonth !== periodFilter && bOutMonth !== periodFilter) return false;
+      // Konaklamanin GECELERINDEN biri donemde mi (3.4)? Eskiden yalniz giris
+      // ve cikis ayina bakiliyordu; 28 Nisan -> 2 Haziran konaklamasi Mayis
+      // listesinde hic gorunmuyordu (L-37).
+      const yil = /^(\d{4})-YEAR$/.exec(periodFilter);
+      const aralik = yil ? { start: `${yil[1]}-01-01`, end: `${yil[1]}-12-31` } : getLedgerContract().monthRange(periodFilter);
+      if (aralik) {
+        if (!(b.checkIn <= aralik.end && b.checkOut > aralik.start)) return false;
+      } else if (b.checkIn.slice(0, 7) !== periodFilter && b.checkOut.slice(0, 7) !== periodFilter) {
+        return false;
+      }
     }
 
     // Search
@@ -7710,12 +7767,17 @@ function renderSettingsGoalsTable() {
   getGoalMonths().forEach(m => {
     const period = m.id;
     const saved = getTargetRecordForPeriod(period);
-    const rev = saved ? Number(saved.revenue ?? saved.revenue_target) : null;
-    const netProfit = saved ? Number(saved.netProfit ?? saved.net_profit_target) : null;
-    const maxExpense = saved ? Number(saved.maxExpense ?? saved.max_expense_target) : null;
-    const nights = saved ? Number(saved.nights ?? saved.sold_nights_target) : null;
-    const occ = saved ? Number(saved.occupancy ?? saved.occupancy_target) : null;
-    const adr = saved ? Number(saved.adr ?? saved.adr_target) : null;
+    // null (girilmemis) hedef NaN olur ve "—" yazilir; Number(null) = 0 degil.
+    const sayi = v => (v === null || v === undefined || v === '') ? NaN : Number(v);
+    const rev = saved ? sayi(saved.revenue ?? saved.revenue_target) : null;
+    const netProfit = saved ? sayi(saved.netProfit ?? saved.net_profit_target) : null;
+    const maxExpense = saved ? sayi(saved.maxExpense ?? saved.max_expense_target) : null;
+    const occ = saved ? sayi(saved.occupancy ?? saved.occupancy_target) : null;
+    const kap = getAvailableNightsForMonth(period);
+    const nights = saved ? (Number.isFinite(sayi(saved.nights ?? saved.sold_nights_target))
+      ? sayi(saved.nights ?? saved.sold_nights_target)
+      : (Number.isFinite(occ) && kap > 0 ? Math.round(occ / 100 * kap) : NaN)) : null;
+    const adr = saved ? sayi(saved.adr ?? saved.adr_target) : null;
 
     const isCurrent = (currentFilter.period === period);
     const tr = document.createElement('tr');
@@ -8728,7 +8790,7 @@ function renderSettingsTable() {
       <td><strong>${v.name}</strong></td>
       <td>${v.capacity}</td>
       <td><input type="number" class="tbl-input" id="set_floor_${vKey}" value="${fiyatAlani(v.floor)}"></td>
-      <td><input type="number" class="tbl-input" id="set_base_${vKey}" value="${fiyatAlani(v.base)}"></td>
+      <td><input type="number" class="tbl-input" id="set_base_${vKey}" value="${fiyatAlani(v.base !== undefined ? v.base : v.basePrice)}"></td>
       <td><input type="number" class="tbl-input" id="set_target_${vKey}" value="${fiyatAlani(v.target)}"></td>
       <td><input type="number" class="tbl-input" id="set_premium_${vKey}" value="${fiyatAlani(v.premium)}"></td>
       <td><input type="number" class="tbl-input" id="set_peak_${vKey}" value="${fiyatAlani(v.peak)}"></td>
@@ -10409,7 +10471,7 @@ function renderTapeChart() {
         let chClass = 'tape-other';
         if (booking.channel === 'AIRBNB') chClass = 'tape-airbnb';
         else if (booking.channel === 'BOOKING') chClass = 'tape-booking';
-        else if (['WHATSAPP', 'INSTAGRAM', 'WEBSITE', 'DIRECT'].includes(booking.channel)) chClass = 'tape-direct';
+        else if (isDirectBookingChannel(booking.channel, appData.bookingChannels)) chClass = 'tape-direct';
 
         const isCheckInDay = (booking.checkIn === dateStr);
         const isCheckOutDay = (booking.checkOut === dateStr);
@@ -10994,8 +11056,10 @@ function filterByPeriod(period) {
  * cagrilar kalmisti. Tek kaynaga cikarildi: YoY karsilastirmasi da ayni
  * tabani kullanir, yoksa iki ekran ayni ay icin farkli ciro raporlar.
  */
-function computeMonthActuals(monthKey) {
-  const l = computeMonthLedger(monthKey, 'ALL');
+function computeMonthActuals(monthKey, villa) {
+  // Mulk filtresi (L-37): KPI izleyici ve YoY eskiden secili mulku yok sayip
+  // hep portfoyu gosteriyordu.
+  const l = computeMonthLedger(monthKey, villa || 'ALL');
   if (!l) return { ciro: 0, roomRevenue: 0, opex: 0, capex: 0, nights: 0, netProfit: 0 };
   return {
     ciro: l.totalRevenue,
@@ -11015,16 +11079,17 @@ function getMonthlyKpiDataset() {
   months.forEach(m => {
     const [metricYear, metricMonth] = m.split('-').map(Number);
     const targetFilter = { period: m };
-    const target = getConfiguredRevenueTarget(targetFilter, appData.targets, 'ALL') || 0;
+    const secili = (typeof currentFilter !== 'undefined' && currentFilter && currentFilter.villa) || 'ALL';
+    const target = getConfiguredRevenueTarget(targetFilter, appData.targets, secili) || 0;
     const monthName = getPeriodDisplayName(m);
 
-    const { ciro, roomRevenue, opex, capex, nights, netProfit } = computeMonthActuals(m);
+    const { ciro, roomRevenue, opex, capex, nights, netProfit } = computeMonthActuals(m, secili);
     // ADR ve RevPAR NET ODA GELIRINDEN (K-04). Toplam ciro temizlik ucretini
     // de icerir; ona bolmek gecelik fiyati sisirirdi.
     const adr = nights > 0 ? Math.round(roomRevenue / nights) : 0;
     const margin = ciro > 0 ? Number(((netProfit / ciro) * 100).toFixed(1)) : 0;
     const available = typeof FinancialMetricsService !== 'undefined'
-      ? FinancialMetricsService.calculateAvailableNights(Object.values(appData.villas || {}), metricYear, metricMonth, appData.maintenance || [])
+      ? FinancialMetricsService.calculateAvailableNights(secili === 'ALL' ? Object.values(appData.villas || {}) : [appData.villas[secili]].filter(Boolean), metricYear, metricMonth, appData.maintenance || [])
       : null;
     const occupancy = available > 0 ? Number(((nights / available) * 100).toFixed(1)) : null;
     const revpar = available > 0 ? Math.round(roomRevenue / available) : null;
@@ -12714,7 +12779,9 @@ function renderTrajectoryInsights() {
   paylar.forEach(({ b, p }) => {
     const k = b.villa || b.propertyId || '—';
     if (!mulk[k]) mulk[k] = { ciro: 0, gece: 0 };
-    mulk[k].ciro += (Number(b.gross) || 0) * p.ratio;
+    // Gecelik fiyat NET ODA GELIRINDEN (K-04 ADR tanimi); brut temizlik
+    // ucretini ve indirimi icerirdi.
+    mulk[k].ciro += ((Number(b.gross) || 0) - (Number(b.cleanFee ?? b.cleaningFee) || 0) - (Number(b.discount) || 0)) * p.ratio;
     mulk[k].gece += p.nights;
   });
   const liste = Object.entries(mulk)
@@ -16716,7 +16783,7 @@ function renderPropertiesTab() {
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px; margin: 6px 0;">
           <div style="background: rgba(0,0,0,0.25); padding: 6px 8px; border-radius: 6px;">
             <span style="color: #94A3B8; display: block;">Taban Fiyat:</span>
-            <strong style="color: #F8FAFC; font-size: 12px;">${Number.isFinite(Number(v.floorPrice)) ? '₺' + Number(v.floorPrice).toLocaleString('tr-TR') : '—'}</strong>
+            <strong style="color: #F8FAFC; font-size: 12px;">${(() => { const t = v.floor ?? v.floorPrice; return t !== null && t !== undefined && t !== '' && Number.isFinite(Number(t)) ? '₺' + Number(t).toLocaleString('tr-TR') : '—'; })()}</strong>
           </div>
           <div style="background: rgba(0,0,0,0.25); padding: 6px 8px; border-radius: 6px;">
             <span style="color: #94A3B8; display: block;">Baz Fiyat:</span>
@@ -17254,6 +17321,8 @@ if (typeof module !== 'undefined' && module.exports) {
     findLegacyCleaningExpense,
     syncBookingCleaningTaskToCloud,
     refreshAfterPersistedWrite,
+    runWhatIfSimulation,
+    isDirectBookingChannel,
     computeImportContentFingerprint,
     saveBookingPaymentCommission,
     deleteCleaningTask,
