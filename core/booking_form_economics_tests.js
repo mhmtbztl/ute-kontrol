@@ -134,7 +134,8 @@ runTest('Negative inputs are clamped instead of silently inverting the math', ()
 // veritabanina yazilir (syncBookingCleaningTaskToCloud); bellekte uydurulmaz.
 const GOREV_YAZ = (() => {
   const i = APP.indexOf('async function syncBookingCleaningTaskToCloud(');
-  const f = APP.slice(i);
+  // Satir sonu normalize: Windows checkout'u CRLF verir (CLAUDE.md kabuk tuzaklari).
+  const f = APP.slice(i).replace(/\r\n/g, '\n');
   return i < 0 ? '' : f.slice(0, f.indexOf('\n}\n') + 2);
 })();
 
