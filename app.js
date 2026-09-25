@@ -3611,7 +3611,7 @@ function computeMonthLedger(monthKey, villa) {
     cleaningTasks: appData.cleaningTasks || [],
     bookingInScope: b => v === 'ALL' || b.villa === v || (!!propId && b.propertyId === propId),
     bookingShare: b => L.nightShareInRange(b, r.start, r.end),
-    expenseInScope: e => (v === 'ALL' || e.villa === v || e.villa === 'ALL')
+    expenseInScope: e => (v === 'ALL' || e.villa === v)
       && tarihIcinde(e.date || e.expense_date || (e.month ? e.month + '-15' : '')),
     taskInScope: t => taskMatchesVilla(t, v) && tarihIcinde(t.date)
   });
@@ -3824,7 +3824,7 @@ function inPeriodKey(dateStr, periodKey) {
 
 function matchesVillaFilter(record) {
   if (!currentFilter || currentFilter.villa === 'ALL') return true;
-  return record.villa === currentFilter.villa || record.villa === 'ALL';
+  return record.villa === currentFilter.villa;
 }
 
 function computePreviousPeriodCategoryTotals() {
@@ -3882,7 +3882,12 @@ function formatMoMLabel(current, previous) {
 }
 
 function isExpenseInFilter(exp) {
-  if (currentFilter.villa !== 'ALL' && exp.villa !== 'ALL' && exp.villa !== currentFilter.villa) return false;
+  // Mulk gorunumu yalniz O MULKUN giderini sayar (L-36). Portfoy geneli
+  // (mulksuz) gider eskiden HER mulke ayri ayri dusuyordu: iki mulkun
+  // karlari toplami portfoy karindan kucuk cikiyordu ve sunucu snapshot'i
+  // ayni mulk/ay icin baska rakam veriyordu. Portfoy geneli gider mulk
+  // gorunumunde ayrica "dahil degil" diye gosterilir.
+  if (currentFilter.villa !== 'ALL' && exp.villa !== currentFilter.villa) return false;
   if (currentFilter.period === 'ALL') return true;
 
   const expMonth = exp.monthKey || exp.month || (exp.date ? exp.date.substring(0, 7) : '');
@@ -4185,12 +4190,24 @@ function renderFinanceModule() {
 
 
     const daysInPeriod = getPeriodDayCount();
+    // Payda: mulkun o aydaki GERCEK kapasitesi (aktivasyon/pasiflestirme ve
+    // bakim kesintisi dusulmus), sunucu snapshot'iyla ayni (L-36). Ay disi
+    // donemlerde gun sayisi.
+    const ayMi = /^d{4}-d{2}$/.test(currentFilter.period || '');
+    const kapasite = vKey => {
+      if (ayMi && typeof FinancialMetricsService !== 'undefined' && appData.villas[vKey]) {
+        const [y, m] = currentFilter.period.split('-').map(Number);
+        return FinancialMetricsService.calculateAvailableNights([appData.villas[vKey]], y, m, appData.maintenance || []);
+      }
+      return daysInPeriod;
+    };
     Object.keys(propStats).forEach(vKey => {
       const s = propStats[vKey];
+      const payda = kapasite(vKey);
       s.adr = s.nights > 0 ? Math.round((s.roomRevenue || 0) / s.nights) : 0;
       s.share = totalRevenue > 0 ? Number(((s.revenue / totalRevenue) * 100).toFixed(1)) : 0;
-      s.occupancy = Number(((s.nights / daysInPeriod) * 100).toFixed(1));
-      s.revpar = Math.round((s.roomRevenue || 0) / daysInPeriod);
+      s.occupancy = payda > 0 ? Number(((s.nights / payda) * 100).toFixed(1)) : 0;
+      s.revpar = payda > 0 ? Math.round((s.roomRevenue || 0) / payda) : 0;
     });
 
     // Mulk filtresi defterin kendisinde (isBookingInFilter); toplamlar
@@ -4224,9 +4241,16 @@ function renderFinanceModule() {
   if (ledger.otaCommission > 0) otomatikParcalar.push(`${Math.round(ledger.otaCommission).toLocaleString('tr-TR')} TL OTA komisyonu`);
   if (ledger.paymentCommission > 0) otomatikParcalar.push(`${Math.round(ledger.paymentCommission).toLocaleString('tr-TR')} TL ödeme komisyonu`);
   if (ledger.cleaningCost > 0) otomatikParcalar.push(`${Math.round(ledger.cleaningCost).toLocaleString('tr-TR')} TL yapılmış temizlik maliyeti`);
-  setEl('finAutoDerivedCost', otomatikParcalar.length
+  let ortakNot = '';
+  if (currentFilter.villa !== 'ALL') {
+    const ortak = (appData.expenses || [])
+      .filter(e => e.villa === 'ALL' && (currentFilter.period === 'ALL' || isDateInFilter(e.date || (e.month ? e.month + '-15' : ''))))
+      .reduce((t, e) => t + (Number(e.amount) || 0), 0);
+    if (ortak > 0) ortakNot = ` Portföy geneli ${Math.round(ortak).toLocaleString('tr-TR')} TL gider bu mülk görünümüne dahil değildir.`;
+  }
+  setEl('finAutoDerivedCost', (otomatikParcalar.length
     ? `Bunun ${otomatikParcalar.join(', ')} kayıtlardan otomatik gelir. Aynı tutarları Gider Defteri'ne tekrar girmeyin.`
-    : '');
+    : '') + ortakNot);
 
   // Hierarchy calculations
   const operatingProfit = totalRevenue - totalOpex;

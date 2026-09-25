@@ -389,6 +389,30 @@ const yazmalar = (istemci, tablo) =>
     } finally { global.document.getElementById = asil; konsolHatalari.length = 0; }
   });
 
+  await test('L-36 Portföy geneli gider mülk görünümlerine TEKRAR TEKRAR düşmez', async () => {
+    const PROP_B = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+    ortamKur({
+      villas: { A: { id: PROP_A, slug: 'A', name: 'A' }, B: { id: PROP_B, slug: 'B', name: 'B' } },
+      bookings: [
+        { id: 'a1', villa: 'A', propertyId: PROP_A, checkIn: '2031-03-01', checkOut: '2031-03-03', gross: 14000, status: 'CONFIRMED' },
+        { id: 'b1', villa: 'B', propertyId: PROP_B, checkIn: '2031-03-05', checkOut: '2031-03-07', gross: 19000, status: 'CONFIRMED' }
+      ],
+      expenses: [
+        { id: 'x1', villa: 'ALL', date: '2031-03-10', month: '2031-03', type: 'OPEX', amount: 1000 },
+        { id: 'x2', villa: 'A', date: '2031-03-10', month: '2031-03', type: 'OPEX', amount: 500 }
+      ]
+    }, kaydedenIstemci());
+    const kar = villa => { App.setCurrentFilter({ period: '2031-03', villa }); return App.computeFilterLedger().netProfit; };
+    const portfoy = kar('ALL'), a = kar('A'), b = kar('B');
+    yakin(portfoy, 33000 - 1500, 'portföy');
+    yakin(a, 14000 - 500, 'A yalnız kendi gideri');
+    yakin(b, 19000, 'B ortak gideri taşımaz');
+    yakin(a + b - 1000, portfoy, 'mülkler + ortak gider = portföy');
+    const aylik = App.computeMonthLedger('2031-03', 'A');
+    yakin(aylik.netProfit, a, 'ay defteri mülk filtresinde aynı');
+    App.setCurrentFilter({ period: '2031-03', villa: 'ALL' });
+  });
+
   await test('L-31 Görev uyduran villa düzeyi fonksiyonlar yok', async () => {
     assert.strictEqual(App.toggleCleaningPaid, undefined);
     assert.strictEqual(App.promptEditCleaningAmount, undefined);
