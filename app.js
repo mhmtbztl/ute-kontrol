@@ -1870,8 +1870,11 @@ async function loadExpenses(targetTenantId) {
     }
     return mapped;
   } catch (err) {
-    console.error('loadExpenses unexpected error:', err);
-    return (typeof appData !== 'undefined' && appData.expenses) ? appData.expenses : [];
+    // Hata YUTULMAZ (L-38). Eskiden onceki isletmenin/oturumun eski gider
+    // listesi donuyor ve yukleme durumu yine READY yaziliyordu: kullanici
+    // "yuklenemedi" yerine yanlis veriyi dogru saniyordu.
+    console.error('loadExpenses error:', err);
+    throw err;
   }
 }
 
@@ -14225,6 +14228,12 @@ async function loadTenantAppData(tenantIdOrUserId) {
         if (p.id) propIdMap[p.id] = p.slug;
       });
       const bookingsWithVillaSlugs = attachBookingVillaSlugs(bookings, villas);
+      // Gider ve talepler mulklerle PARALEL yuklenir; esleyici mulk kisa adini
+      // o anki (bos olabilen) listeden cozer ve kisa ad yerine UUID kalir. Mulk
+      // filtresinde o mulkun giderleri kayboluyor, mulk kari sisiyordu (L-38).
+      // Rezervasyonlardaki gibi yukleme BITTIKTEN sonra yeniden baglanir.
+      const expensesWithSlugs = attachBookingVillaSlugs(expenses, villas);
+      const leadsWithSlugs = attachBookingVillaSlugs(leads, villas);
       const odemeKomisyonu = {};
       (paymentCommissionRows || []).forEach(r => { odemeKomisyonu[r.booking_id] = Number(r.amount) || 0; });
       bookingsWithVillaSlugs.forEach(b => {
@@ -14291,10 +14300,10 @@ async function loadTenantAppData(tenantIdOrUserId) {
         bookingChannelSchemaReady: bookingChannelCatalog.schemaReady,
         scheduledMessages: scheduledMessages || [],
         extensionOffers: extensionOffers || [],
-        expenses,
+        expenses: expensesWithSlugs,
         cleaningTasks,
         cleaningPayments,
-        leads,
+        leads: leadsWithSlugs,
         closedPeriods: closeList || [],
         targets: targetList || [],
         maintenance: maintenanceTickets.map(t => mapMaintenanceTicketFromDb(t, propIdMap)),

@@ -413,6 +413,25 @@ const yazmalar = (istemci, tablo) =>
     App.setCurrentFilter({ period: '2031-03', villa: 'ALL' });
   });
 
+  await test('L-38 Mülkler yüklenmeden eşlenen gider, yükleme bitince mülküne bağlanır', async () => {
+    App.setAppData({ villas: {} });
+    const erken = App.mapExpenseFromDb({ id: 'e1', tenant_id: TENANT, property_id: PROP_A, expense_date: '2031-03-10',
+      category: 'Bakım', expense_type: 'OPEX', amount: 500 });
+    assert.notStrictEqual(erken.villa, 'A', 'ön koşul: yarışta kısa ad çözülemiyor');
+    const [bagli] = App.attachBookingVillaSlugs([erken], { A: { id: PROP_A, slug: 'A' } });
+    assert.strictEqual(bagli.villa, 'A');
+    const kaynak = require('fs').readFileSync(require('path').join(__dirname, '..', 'app.js'), 'utf8');
+    assert.match(kaynak, /expenses: expensesWithSlugs/);
+    assert.match(kaynak, /leads: leadsWithSlugs/);
+  });
+
+  await test('L-38 loadExpenses hatayı YUTMAZ (eski listeyi "yüklendi" diye döndürmez)', async () => {
+    const ist = kaydedenIstemci({ hata: k => (k.tablo === 'expenses' ? { message: 'bağlantı koptu' } : null) });
+    ortamKur({ expenses: [{ id: 'eski', villa: 'A', amount: 1 }] }, ist);
+    await assert.rejects(App.loadExpenses(TENANT));
+    konsolHatalari.length = 0;
+  });
+
   await test('L-31 Görev uyduran villa düzeyi fonksiyonlar yok', async () => {
     assert.strictEqual(App.toggleCleaningPaid, undefined);
     assert.strictEqual(App.promptEditCleaningAmount, undefined);
