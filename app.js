@@ -76,6 +76,21 @@ installInnerHtmlSecurityBoundary();
 // Istemci daha dusuk sorarsa 6-9 karakterlik sifre on kontrolden gecip sunucuda reddedilir.
 const AUTH_MIN_PASSWORD_LENGTH = 10;
 
+// Kullaniciya giden hata metni (L-22, core/user_facing_errors.js).
+function getUserFacingErrors() {
+  if (typeof UserFacingErrors !== 'undefined') return UserFacingErrors;
+  if (typeof window !== 'undefined' && window.UserFacingErrors) return window.UserFacingErrors;
+  if (typeof require === 'function') {
+    try { return require('./core/user_facing_errors.js'); } catch (e) { /* tarayici */ }
+  }
+  return null;
+}
+
+function kullaniciMesaji(metin) {
+  const U = getUserFacingErrors();
+  return U ? U.sanitizeUserMessage(metin) : metin;
+}
+
 function getFriendlyAuthErrorMessage(err) {
   if (!err) return 'Bir hata oluştu. Lütfen tekrar deneyin.';
   const msg = typeof err === 'string' ? err : (err.message || '');
@@ -104,7 +119,17 @@ function getFriendlyAuthErrorMessage(err) {
   if (msg.includes('tenant') || msg.includes('create_tenant_and_owner')) {
     return 'İşletme kurulumu tamamlanamadı. Lütfen tekrar deneyin.';
   }
-  return msg || 'İşlem sırasında bir hata oluştu.';
+  // Taninmayan sunucu mesaji ham gosterilmez (L-22): ayrinti konsola, ekrana
+  // anlasilir cumle ve basvuru kodu.
+  if (!msg) return 'İşlem sırasında bir hata oluştu.';
+  const U = getUserFacingErrors();
+  if (U && U.isTechnical(msg)) return U.sanitizeUserMessage(msg);
+  if (/^[\x00-\x7F]*$/.test(msg)) {
+    // Supabase Auth'un Ingilizce ve taninmayan mesaji: ayrinti konsola.
+    console.error('[Lexbnb giris hatasi]', msg);
+    return 'İşlem tamamlanamadı. Lütfen bilgilerinizi kontrol edip tekrar deneyin.';
+  }
+  return msg;
 }
 
 // Turnstile belirteci (core/captcha_gate.js). Modul ya da kutucuk yoksa null
@@ -2014,6 +2039,9 @@ async function closeMonthlyPeriod(year, month) {
   });
 
   if (error) {
+    if (/PERIOD_NOT_ENDED/.test(String(error.message || ''))) {
+      throw new Error('Dönem kapatılamadı: ay henüz bitmedi. Ayın son gününden sonra kapatabilirsiniz.');
+    }
     throw new Error('Dönem kapatılamadı: ' + (error.message || 'Veritabanı hatası'));
   }
   await loadMonthlyCloses();
@@ -5676,12 +5704,27 @@ function downloadSampleTemplate(templateType) {
  * Hucreler STRING kalir; sayi/tarih yorumunu `normalizeAmount` ve
  * `normalizeDate` yapar.
  */
+// Ice aktarma sinirlari (L-16). Kotu niyetli ya da bozuk bir dosya tarayiciyi
+// kilitleyebilir (SheetJS CVE-2023-30533 / CVE-2024-22363 sinifi: asiri
+// buyuk ya da ic ice yapilar). Gercek bir isletmenin defteri bu sinirlarin
+// cok altinda kalir; asan dosya OKUNMADAN reddedilir.
+const IMPORT_MAX_BYTES = 10 * 1024 * 1024;   // 10 MB
+const IMPORT_MAX_ROWS = 10000;
+
+function importSinirHatasi(satir) {
+  return new Error(`Dosya çok büyük: ${satir.toLocaleString('tr-TR')} satır var, en fazla ${IMPORT_MAX_ROWS.toLocaleString('tr-TR')} satır içe aktarılabilir. Dosyayı dönemlere bölün.`);
+}
+
 function buildImportSource(bytes, fileName) {
   const E = getImportEngine();
   if (!E) throw new Error('İçe aktarma motoru yüklenemedi. Sayfayı yenileyin.');
+  if (bytes && bytes.length > IMPORT_MAX_BYTES) {
+    throw new Error(`Dosya çok büyük (${(bytes.length / 1048576).toFixed(1)} MB). En fazla ${IMPORT_MAX_BYTES / 1048576} MB içe aktarılabilir.`);
+  }
 
   if (E.detectImportSourceKind(bytes) === 'TEXT') {
     const cozulmus = E.parseCSV(E.decodeImportText(bytes));
+    if ((cozulmus.rows || []).length > IMPORT_MAX_ROWS) throw importSinirHatasi(cozulmus.rows.length);
     return {
       kind: 'CSV',
       fileName,
@@ -5694,9 +5737,12 @@ function buildImportSource(bytes, fileName) {
   if (typeof XLSX === 'undefined') {
     throw new Error('Excel motoru henüz yüklenmedi, lütfen sayfayı yenileyin.');
   }
-  const wb = XLSX.read(bytes, { type: 'array', cellDates: true });
+  // Yalniz ilk sayfa ve siniri bir satir asacak kadar okunur: SheetJS'in
+  // butun dosyayi bellege acmasina izin verilmez.
+  const wb = XLSX.read(bytes, { type: 'array', cellDates: true, sheets: 0, sheetRows: IMPORT_MAX_ROWS + 2 });
   const ws = wb.Sheets[wb.SheetNames[0]];
   const rows = ws ? XLSX.utils.sheet_to_json(ws, { defval: '', raw: true }) : [];
+  if (rows.length > IMPORT_MAX_ROWS) throw importSinirHatasi(rows.length);
   return {
     kind: 'XLSX',
     fileName,
@@ -5708,6 +5754,10 @@ function buildImportSource(bytes, fileName) {
 
 function readImportFile(file) {
   if (!file) return;
+  if (file.size > IMPORT_MAX_BYTES) {
+    alert(`Dosya çok büyük (${(file.size / 1048576).toFixed(1)} MB). En fazla ${IMPORT_MAX_BYTES / 1048576} MB içe aktarılabilir.`);
+    return;
+  }
 
   const fileName = file.name;
   const reader = new FileReader();
@@ -7656,7 +7706,8 @@ function showToast(mesaj, tur = 'info') {
     'border-left:3px solid ' + renk + ';border-radius:8px;padding:11px 14px;font-size:13px;line-height:1.45;' +
     'box-shadow:0 8px 24px rgba(0,0,0,0.45);opacity:0;transform:translateY(6px);' +
     'transition:opacity .18s ease,transform .18s ease;word-break:break-word;';
-  el.textContent = String(mesaj == null ? '' : mesaj);
+  // Ham sunucu mesaji kullaniciya gitmez (L-22).
+  el.textContent = String(mesaj == null ? '' : kullaniciMesaji(mesaj));
   kap.appendChild(el);
   requestAnimationFrame(() => { el.style.opacity = '1'; el.style.transform = 'translateY(0)'; });
 
@@ -8005,13 +8056,20 @@ function renderMonthCloseCard() {
 
   const yetkili = canManageMonthClose();
   const gelecek = periodStartsInFuture(p);
+  // Icinde bulunulan ay bitmeden kapatilamaz (phase43, PERIOD_NOT_ENDED;
+  // "bugun" Europe/Istanbul). Dugme bunu sunucuya sormadan soyler (L-08).
+  const suruyor = !gelecek && p === getTodayStr().slice(0, 7);
 
   if (kapatBtn) {
     kapatBtn.hidden = kapali;
-    kapatBtn.disabled = !yetkili || gelecek;
+    kapatBtn.disabled = !yetkili || gelecek || suruyor;
     kapatBtn.title = !yetkili
       ? 'Dönem kapatmak için yönetici yetkisi gerekir.'
-      : (gelecek ? 'Henüz başlamamış bir dönem kapatılamaz.' : '');
+      : (gelecek ? 'Henüz başlamamış bir dönem kapatılamaz.'
+        : (suruyor ? 'İçinde bulunulan ay bitmeden kapatılamaz; ayın son gününden sonra kapatabilirsiniz.' : ''));
+  }
+  if (detay && !kapali && !kayit && suruyor) {
+    detay.textContent = `${ayAdi} devam ediyor. Ay bittikten sonra (ayın son gününden sonra) kapatarak rakamları mühürleyebilirsiniz.`;
   }
   if (acBtn) {
     acBtn.hidden = !kapali;
@@ -8150,8 +8208,10 @@ function formatPeriodLabel(p) {
 /** Donem henuz baslamadi mi? Sunucu da bunu reddeder. */
 function periodStartsInFuture(p) {
   if (!/^\d{4}-\d{2}$/.test(p || '')) return false;
-  const bugun = new Date();
-  const buAy = bugun.getFullYear() * 12 + bugun.getMonth();
+  // "Bugun" tek kaynaktan (Europe/Istanbul); tarayicinin yerel saati ay
+  // sinirinda sunucunun PERIOD_NOT_ENDED kararindan ayrisirdi.
+  const bugun = getTodayStr();
+  const buAy = parseInt(bugun.slice(0, 4), 10) * 12 + (parseInt(bugun.slice(5, 7), 10) - 1);
   const hedef = parseInt(p.slice(0, 4), 10) * 12 + (parseInt(p.slice(5, 7), 10) - 1);
   return hedef > buAy;
 }
@@ -12878,6 +12938,110 @@ function setActiveTenant(tenantObj) {
   }
 }
 
+// -------------------------------------------------------------
+// "BU CIHAZDA BENI HATIRLA" (L-21)
+// -------------------------------------------------------------
+// Kutu bir zamanlar hicbir sey yapmiyordu: istemci her durumda oturumu
+// localStorage'a yaziyor, kutunun yazdigi anahtar hic okunmuyordu. Ortak bir
+// bilgisayarda kutuyu bos birakip tarayiciyi kapatan kullanicinin oturumu
+// (finans ve misafir verisi) bir sonraki kisiye acik kaliyordu.
+//
+// Supabase oturumu artik tercihe gore yazilir: isaretliyse localStorage'a ve
+// en fazla 30 gun; isaretsizse sessionStorage'a (tarayici kapaninca biter).
+// Tercih girisin HEMEN ONCESINDE yazilir; tercih yoksa (davet / sifre
+// sifirlama baglantisi) oturum sekmeyle sinirli kalir.
+const REMEMBER_PREF_KEY = 'LEXBNB_REMEMBER_DEVICE';
+const REMEMBER_UNTIL_KEY = 'LEXBNB_REMEMBER_UNTIL';
+const REMEMBER_DAYS = 30;
+
+function guvenliDepo(ad) {
+  try {
+    const kok = typeof globalThis !== 'undefined' ? globalThis : (typeof window !== 'undefined' ? window : null);
+    const d = kok ? kok[ad] : null;
+    return d && typeof d.getItem === 'function' ? d : null;
+  } catch (_) { return null; }
+}
+
+function setRememberDevicePreference(remember, now) {
+  const kalici = guvenliDepo('localStorage');
+  if (!kalici) return;
+  try {
+    kalici.setItem(REMEMBER_PREF_KEY, remember ? '1' : '0');
+    if (remember) kalici.setItem(REMEMBER_UNTIL_KEY, String((now || Date.now()) + REMEMBER_DAYS * 86400000));
+    else kalici.removeItem(REMEMBER_UNTIL_KEY);
+  } catch (_) { /* gizli pencere vb. */ }
+}
+
+function createAuthSessionStorage(nowFn) {
+  const simdi = nowFn || (() => Date.now());
+  const kalici = () => guvenliDepo('localStorage');
+  const oturumluk = () => guvenliDepo('sessionStorage');
+  const hatirla = () => {
+    const d = kalici();
+    try { return !!d && d.getItem(REMEMBER_PREF_KEY) === '1'; } catch (_) { return false; }
+  };
+  const suresiDoldu = () => {
+    const d = kalici();
+    try { return Number(d && d.getItem(REMEMBER_UNTIL_KEY)) < simdi(); } catch (_) { return true; }
+  };
+  const sil = key => {
+    [kalici(), oturumluk()].forEach(d => { try { if (d) d.removeItem(key); } catch (_) { /* yoksay */ } });
+  };
+  return {
+    getItem(key) {
+      if (hatirla()) {
+        if (suresiDoldu()) { sil(key); return null; }
+        const d = kalici();
+        try { return d ? d.getItem(key) : null; } catch (_) { return null; }
+      }
+      // Hatirlanmayan oturum yalniz sekmede durur. Eski surumun localStorage'a
+      // yazdigi oturum burada okunmaz ve temizlenir.
+      const d = oturumluk();
+      try { const k = kalici(); if (k) k.removeItem(key); } catch (_) { /* yoksay */ }
+      try { return d ? d.getItem(key) : null; } catch (_) { return null; }
+    },
+    setItem(key, value) {
+      const hedef = hatirla() ? kalici() : oturumluk();
+      const diger = hatirla() ? oturumluk() : kalici();
+      try { if (diger) diger.removeItem(key); } catch (_) { /* yoksay */ }
+      try { if (hedef) hedef.setItem(key, value); } catch (_) { /* yoksay */ }
+    },
+    removeItem(key) { sil(key); }
+  };
+}
+
+/**
+ * Tarayicida bir kez kurulur:
+ *   - window.alert kanali ham sunucu mesajini ayiklar (L-22). Uygulamadaki
+ *     yuzlerce "alert('... : ' + err.message)" noktasi tek tek degil, kanalin
+ *     kendisinde duzeltilir; uygulamanin Turkce metni degismez.
+ *   - Yakalanmamis hata ve reddedilmis promise kullaniciya gorunur (L-24).
+ *     Eskiden sessizce konsolda kaliyordu: "Lexbnb'e Sor" her soruda
+ *     cokuyordu (L-60) ve kimse gormuyordu. Harici servis yok (K-07).
+ */
+function installUserFacingErrorChannels() {
+  if (typeof window === 'undefined' || window.__lexbnbErrorChannels) return;
+  if (typeof window.addEventListener !== 'function') return; // tarayici disi (test) ortam
+  window.__lexbnbErrorChannels = true;
+  const U = getUserFacingErrors();
+  if (!U) return;
+  if (typeof window.alert === 'function') {
+    const asilAlert = window.alert.bind(window);
+    window.alert = m => asilAlert(U.sanitizeUserMessage(m));
+  }
+  const kapi = U.createGlobalErrorGate(() => Date.now(), window.location ? window.location.origin : '');
+  const bildir = (olay, ayrinti) => {
+    console.error('[Lexbnb yakalanmamis hata]', ayrinti);
+    if (!kapi(olay)) return;
+    if (typeof showToast === 'function') {
+      showToast('⚠️ Beklenmeyen bir hata oluştu; son işleminiz tamamlanmamış olabilir. Sayfayı yenileyip tekrar deneyin.', 'error');
+    }
+  };
+  window.addEventListener('error', olay => bildir(olay, olay.error || olay.message));
+  window.addEventListener('unhandledrejection', olay => bildir(olay, olay.reason));
+}
+installUserFacingErrorChannels();
+
 function initSupabaseClient() {
   if (typeof window !== 'undefined' && window.supabase && typeof window.supabase.createClient === 'function') {
     try {
@@ -12886,7 +13050,8 @@ function initSupabaseClient() {
           auth: {
             persistSession: true,
             autoRefreshToken: true,
-            storageKey: 'LEXBNB_SUPA_AUTH'
+            storageKey: 'LEXBNB_SUPA_AUTH',
+            storage: createAuthSessionStorage()
           }
         });
         console.log('⚡ LexBnB Cloud Engine: Supabase client aktif.');
@@ -13211,6 +13376,19 @@ async function handleAuthenticatedSession(u) {
     .eq('user_id', u.id)
     .order('created_at', { ascending: true });
 
+  // Uyelik OKUNAMADIYSA (ag, RLS, zaman asimi) kullanicinin isletmesi yok
+  // DEGILDIR. Eskiden hata okunmuyor, bos liste "henuz isletme yok" sayiliyor
+  // ve asagidaki kurtarma yolu kullaniciya IKINCI bir isletme aciyordu (L-06).
+  if (memErr) {
+    console.error('Uyelik okunamadi:', memErr);
+    const hataKutusu = document.getElementById('authErrorMessage');
+    if (hataKutusu) {
+      hataKutusu.style.display = 'block';
+      hataKutusu.innerText = '⚠️ İşletme bilgileriniz şu an okunamadı. Bağlantınızı kontrol edip yeniden giriş yapın.';
+    }
+    return false;
+  }
+
   userMemberships = members || [];
 
   if (userMemberships.length > 0) {
@@ -13436,6 +13614,9 @@ async function handleSaaSLogin(e) {
   }
 
   try {
+    // Oturum yazilmadan ONCE: depo bagdastiricisi hangi depoya yazacagini
+    // bu tercihten okur (L-21).
+    setRememberDevicePreference(!!remember);
     const captchaToken = await getAuthCaptchaToken('saasLoginForm');
     const { data: authData, error: authErr } = await supabaseClient.auth.signInWithPassword({
       email: userInput,
@@ -13460,11 +13641,6 @@ async function handleSaaSLogin(e) {
     }
 
     if (authData && authData.user) {
-      if (remember) {
-        localStorage.setItem('LEXBNB_REMEMBER_USER_ID', authData.user.id);
-      } else {
-        localStorage.removeItem('LEXBNB_REMEMBER_USER_ID');
-      }
       const ok = await handleAuthenticatedSession(authData.user);
       if (!ok && err) {
         err.style.display = 'block';
@@ -13657,6 +13833,8 @@ async function logoutSaaSUser() {
   localStorage.removeItem('LEXBNB_REMEMBER_USER_ID');
   localStorage.removeItem('LEXBNB_REMEMBER_AUTH');
   localStorage.removeItem('LEXBNB_LAST_TENANT');
+  localStorage.removeItem(REMEMBER_PREF_KEY);
+  localStorage.removeItem(REMEMBER_UNTIL_KEY);
 
   // Business state'i sıfırla (Önceki kullanıcının verisi ekranda ve bellekte kalmasın)
   appData = getBlankTenantData('guest');
@@ -17174,6 +17352,11 @@ if (typeof module !== 'undefined' && module.exports) {
     renderGapNightsRadar,
     updateClosingScriptPreview,
     collectMarketingFacts,
+    createAuthSessionStorage,
+    renderMonthCloseCard,
+    getFriendlyAuthErrorMessage,
+    handleAuthenticatedSession,
+    setRememberDevicePreference,
     setActiveTenantForTests: (t) => { activeTenant = t; }
   };
 }

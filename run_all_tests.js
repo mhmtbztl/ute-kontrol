@@ -257,6 +257,9 @@ const allTestFiles = [
   // Para defteri: gider/temizlik yazmalari davranis olcumuyle (Dalga 3)
   'ledger_contract_tests.js',
   'ledger_integrity_tests.js',
+  // Dalga 2 istemci: uyelik hatasi, ay kapanisi dugmesi, ice aktarma siniri,
+  // beni hatirla, ham sunucu hatasi, yakalanmamis hata
+  'wave2_client_tests.js',
 
   // GitHub Actions eylemleri tam commit SHA'sina sabit
   'workflow_pin_tests.js',
