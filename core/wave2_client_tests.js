@@ -182,6 +182,15 @@ function eleman() {
     assert.match(APP, /window\.alert = m => asilAlert\(U\.sanitizeUserMessage\(m\)\)/);
   });
 
+  // --- L-20 -------------------------------------------------------------------
+  await test('L-20 Supabase hedefi kullanıcı deposundan ya da sayfa globalinden okunmaz', async () => {
+    const kod = APP.split(/\r?\n/).filter(l => !l.trim().startsWith('//')).join('\n');
+    assert.ok(!/getItem\('LEXBNB_SUPABASE_URL'\)/.test(kod), 'localStorage adresi okunuyor');
+    assert.ok(!/window\.LEXBNB_SUPABASE_URL/.test(kod), 'sayfa globali adresi değiştirebiliyor');
+    assert.match(kod, /const SUPABASE_URL = DEFAULT_SUPABASE_URL;/);
+    assert.match(kod, /removeItem\('LEXBNB_SUPABASE_URL'\)/, 'eski kalıcı değer temizlenmeli');
+  });
+
   // --- L-24 -------------------------------------------------------------------
   await test('L-24 Yakalanmamış hata kapısı: eklenti ve ResizeObserver elenir, tekrar seyreltilir', async () => {
     let t = 0;

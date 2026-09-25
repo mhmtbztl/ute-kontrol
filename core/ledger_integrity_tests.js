@@ -51,7 +51,7 @@ function kaydedenIstemci(secenek = {}) {
   const kayitlar = [];
   const client = {
     kayitlar,
-    rpc: async (ad, args) => { kayitlar.push({ tablo: null, islem: 'rpc', ad, args }); return { data: null, error: null }; },
+    rpc: async (ad, args) => { kayitlar.push({ tablo: null, islem: 'rpc', ad, args }); return secenek.rpc ? secenek.rpc(ad, args) : { data: null, error: null }; },
     from(tablo) {
       const k = { tablo, islem: 'select', yuk: null, filtre: [] };
       const sonuc = () => {
@@ -357,6 +357,36 @@ const yazmalar = (istemci, tablo) =>
     const uyari = await App.syncBookingCleaningTaskToCloud(rez, 1800);
     assert.strictEqual(gorevYazmalari(ist).length, 0, 'yapılmış görev yazıldı');
     assert.match(uyari, /yapıldı olarak işaretli/);
+  });
+
+  // --- L-33 / L-34 / L-35: rezervasyon kaydi --------------------------------
+  const REZ_GIRDI = { villa: 'A', guest: 'Ada', checkIn: '2031-02-10', checkOut: '2031-02-12', pax: 2, gross: 10000, status: 'CONFIRMED' };
+
+  await test('L-33 Düzenleme net_room_revenue\'yu yükleyiciyle AYNI tanımla yazar (indirim düşülür)', async () => {
+    const y = App.mapBookingToDb({ gross: 40000, otaComm: 6000, cleanFee: 1500, discount: 2000, net: 32500, villa: 'A' }, TENANT);
+    assert.strictEqual(y.net_room_revenue, 30500);
+  });
+
+  await test('L-34 RPC reddi doğrudan insert\'e DÜŞMEZ; RPC\'nin sebebi kullanıcıya gider', async () => {
+    const ist = kaydedenIstemci({ rpc: () => ({ data: null, error: { code: '42501', message: 'FORBIDDEN_ROLE: yetki yok' } }) });
+    ortamKur({}, ist);
+    formKur({});
+    await assert.rejects(App.createBooking({ ...REZ_GIRDI }), /FORBIDDEN_ROLE/);
+    konsolHatalari.length = 0;
+    assert.strictEqual(yazmalar(ist, 'bookings').length, 0, 'ikinci yol (insert) çalıştı');
+  });
+
+  await test('L-35 Kayıt yazıldıktan sonraki ekran hatası kaydı "başarısız" göstermez', async () => {
+    const ist = kaydedenIstemci({ rpc: (ad, a) => ({ data: { id: REZ, tenant_id: TENANT, property_id: PROP_A, guest_name: 'Ada',
+      check_in: a.p_check_in, check_out: a.p_check_out, gross_amount: 10000, pax: 2, status: 'CONFIRMED', booking_code: 'X' }, error: null }) });
+    ortamKur({}, ist);
+    formKur({});
+    const asil = global.document.getElementById;
+    global.document.getElementById = () => { throw new Error('ekran bozuk'); };
+    try {
+      const b = await App.createBooking({ ...REZ_GIRDI });
+      assert.strictEqual(b.id, REZ);
+    } finally { global.document.getElementById = asil; konsolHatalari.length = 0; }
   });
 
   await test('L-31 Görev uyduran villa düzeyi fonksiyonlar yok', async () => {

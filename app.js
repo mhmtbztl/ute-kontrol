@@ -1175,7 +1175,13 @@ function mapBookingToDb(booking, tenantId) {
   const cleanFee = Number(booking.cleanFee !== undefined ? booking.cleanFee : booking.cleaningFee) || 0;
   const cleanCost = Math.max(0, Number(booking.cleanCost) || 0);
   const discount = Number(booking.discount) || 0;
-  const net = Number(booking.net !== undefined ? booking.net : (booking.netRoomRev || booking.netRoomRevenue)) || Math.max(0, gross - otaComm - cleanFee - discount);
+  // Tek tanim, yukleyiciyle (mapBookingFromDb) ayni: brut - OTA - temizlik
+  // ucreti - indirim. Eskiden formun gonderdigi `net` (indirimsiz) bunu
+  // eziyordu; hicbir alani degismeyen bir duzenleme saklanan degeri
+  // sessizce degistiriyordu (L-33). Brut yoksa (eski ice aktarim) verilen
+  // net korunur.
+  const verilenNet = Number(booking.net !== undefined ? booking.net : (booking.netRoomRev || booking.netRoomRevenue)) || 0;
+  const net = gross > 0 ? Math.max(0, gross - otaComm - cleanFee - discount) : verilenNet;
 
   const status = normalizeBookingStatus(booking.status);
   const pax = normalizePositiveInteger(booking.pax);
@@ -1388,17 +1394,28 @@ async function createBooking(bookingInput) {
       });
       if (!rpcRes.error && rpcRes.data) {
         data = rpcRes.data;
-      } else if (rpcRes.error && (rpcRes.error.code === '23P01' || rpcRes.error.message?.includes('OVERBOOKING_CONFLICT') || rpcRes.error.message?.includes('çakışıyor'))) {
-        error = rpcRes.error;
+      } else if (rpcRes.error) {
+        // RPC BILINCLI olarak reddettiyse (yetki, kapali donem, dogrulama)
+        // onun mesaji kullaniciya gider. Eskiden HER hatada ayni satir
+        // dogrudan insert ile yeniden deneniyordu: ikinci bir yurutme yolu ve
+        // kullaniciya RPC'nin gercek sebebi yerine ikinci yolun hatasi (L-34).
+        // Yalniz fonksiyon HENUZ YOKSA (goc uygulanmamissa) yedege dusulur;
+        // updateBooking ile ayni kural.
+        const fonksiyonYok = rpcRes.error.code === 'PGRST202'
+          || (rpcRes.error.message || '').includes('Could not find the function');
+        if (!fonksiyonYok) {
+          error = rpcRes.error;
+        } else {
+          const insRes = await supabaseClient.from('bookings').insert(payload).select().single();
+          data = insRes.data;
+          error = insRes.error;
+        }
       } else {
-        const insRes = await supabaseClient.from('bookings').insert(payload).select().single();
-        data = insRes.data;
-        error = insRes.error;
+        error = new Error('Rezervasyon kaydedilemedi: sunucudan boş yanıt döndü.');
       }
     } catch (e) {
-      const insRes = await supabaseClient.from('bookings').insert(payload).select().single();
-      data = insRes.data;
-      error = insRes.error;
+      // Beklenmedik istisna (ag vb.): zayif yola dusulmez, hata bildirilir.
+      error = e;
     }
 
     if (!error && data) {
@@ -1439,9 +1456,10 @@ async function createBooking(bookingInput) {
     if (!exists) {
       appData.bookings.push(createdBooking);
     }
-    if (typeof syncBookingCleaningTasks === 'function') syncBookingCleaningTasks();
-    if (typeof saveAppData === 'function') saveAppData();
-    if (typeof renderAll === 'function') renderAll();
+    // Kayit VERITABANINA YAZILDI. Bundan sonraki ekran hatasi kaydi basarisiz
+    // gostermemeli: eskiden renderAll firlatirsa kullanici "kaydedilemedi"
+    // goruyor, tekrar deneyince cakisma hatasi aliyordu (L-35).
+    refreshAfterPersistedWrite();
   }
 
   return createdBooking;
@@ -1599,6 +1617,9 @@ async function updateBooking(bookingId, bookingInput) {
 
   // Update local state ONLY on DB success
   const updatedBooking = mapBookingFromDb(data);
+  // Odeme komisyonu ayri tabloda durur (phase45); bookings satirindan
+  // gelmez, bellekteki deger korunur.
+  if (existing && existing.paymentCommission !== undefined) updatedBooking.paymentCommission = existing.paymentCommission;
   if (typeof appData !== 'undefined' && appData.bookings) {
     const idx = appData.bookings.findIndex(b => b.id === updatedBooking.id);
     if (idx !== -1) {
@@ -1606,12 +1627,29 @@ async function updateBooking(bookingId, bookingInput) {
     } else {
       appData.bookings.push(updatedBooking);
     }
-    if (typeof syncBookingCleaningTasks === 'function') syncBookingCleaningTasks();
-    if (typeof saveAppData === 'function') saveAppData();
-    if (typeof renderAll === 'function') renderAll();
+    refreshAfterPersistedWrite();
   }
 
   return updatedBooking;
+}
+
+/**
+ * Veritabani yazmasi BASARILI olduktan sonra bellek esitlemesi ve ekran.
+ * Buradaki bir hata kaydi geri almaz ve cagirana firlatilmaz: kullanici
+ * "kaydedilemedi" gorup tekrar denerse ayni kaydi ikinci kez yazmaya
+ * calisir (L-35). Hata konsola ve yakalanmamis hata kanalina gider.
+ */
+function refreshAfterPersistedWrite() {
+  try {
+    if (typeof syncBookingCleaningTasks === 'function') syncBookingCleaningTasks();
+    if (typeof saveAppData === 'function') saveAppData();
+    if (typeof renderAll === 'function') renderAll();
+  } catch (err) {
+    console.error('Kayit yazildi; ekran yenilenirken hata:', err);
+    if (typeof window !== 'undefined' && window.showToast) {
+      window.showToast('Kayıt kaydedildi, ancak ekran yenilenemedi. Sayfayı yenileyin.', 'error');
+    }
+  }
 }
 
 async function deleteBooking(bookingId) {
@@ -12912,8 +12950,21 @@ async function deleteInfluencerCollab(id) {
 const DEFAULT_SUPABASE_URL = 'https://kirpcqklyjlrhvdbgdrq.supabase.co';
 const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtpcnBjcWtseWpscmh2ZGJnZHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5OTcxMjksImV4cCI6MjEwNDU3MzEyOX0.qjZJYGo9mLL3kPYpjkGuAfToxu8Xud1kILCTuVl24O0';
 
-const SUPABASE_URL = (typeof window !== 'undefined' && window.LEXBNB_SUPABASE_URL) || (typeof localStorage !== 'undefined' && localStorage.getItem('LEXBNB_SUPABASE_URL')) || DEFAULT_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = (typeof window !== 'undefined' && window.LEXBNB_SUPABASE_PUBLISHABLE_KEY) || (typeof localStorage !== 'undefined' && localStorage.getItem('LEXBNB_SUPABASE_PUBLISHABLE_KEY')) || DEFAULT_SUPABASE_KEY;
+// Hedef proje YALNIZ koddan gelir (L-20). Eskiden localStorage'daki
+// LEXBNB_SUPABASE_URL okunuyordu: bir kez yazilan deger (ortak bilgisayar,
+// eklenti, HTML enjeksiyonu) uygulamayi baska bir Supabase'e yonlendiriyor ve
+// giris formu e-posta ile sifreyi oraya gonderiyordu. Eski anahtarlar
+// acilista silinir.
+const SUPABASE_URL = DEFAULT_SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY = DEFAULT_SUPABASE_KEY;
+(function purgeLegacySupabaseOverrides() {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('LEXBNB_SUPABASE_URL');
+      localStorage.removeItem('LEXBNB_SUPABASE_PUBLISHABLE_KEY');
+    }
+  } catch (e) { /* gizli pencere vb. */ }
+})();
 
 let supabaseClient = null;
 let activeSaaSUser = null; // { id, email, fullName }
@@ -17137,6 +17188,7 @@ if (typeof module !== 'undefined' && module.exports) {
     cleaningExpenseKey,
     findLegacyCleaningExpense,
     syncBookingCleaningTaskToCloud,
+    refreshAfterPersistedWrite,
     saveBookingPaymentCommission,
     deleteCleaningTask,
     parseCleaningAmountInput,
