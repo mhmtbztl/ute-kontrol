@@ -130,31 +130,48 @@ runTest('Negative inputs are clamped instead of silently inverting the math', ()
 // 3. BORC DEFTERI MALIYETTEN TURETILIR
 // ---------------------------------------------------------------------------
 
+// K-04 (25 Eylul 2026): rezervasyonun temizlik gorevi rezervasyon KAYDEDILIRKEN
+// veritabanina yazilir (syncBookingCleaningTaskToCloud); bellekte uydurulmaz.
+const GOREV_YAZ = (() => {
+  const i = APP.indexOf('async function syncBookingCleaningTaskToCloud(');
+  const f = APP.slice(i);
+  return i < 0 ? '' : f.slice(0, f.indexOf('\n}\n') + 2);
+})();
+
 runTest('Cleaning debt ledger is driven by the cost, not the guest fee', () => {
-  const fn = APP.slice(APP.indexOf('function syncBookingCleaningTasks'));
-  const body = fn.slice(0, fn.indexOf('\nfunction '));
-  assert.ok(body.includes('amount: cleanCost'),
+  assert.ok(GOREV_YAZ.includes('amount: maliyet || 0'),
     'yeni temizlik gorevi personele odenecek MALIYETLE acilmali');
-  assert.ok(body.includes('existing.amount = cleanCost'),
+  assert.ok(GOREV_YAZ.includes('mevcut.amount = maliyet'),
     'mevcut gorev guncellenirken de maliyet kullanilmali');
-  assert.ok(!/amount:\s*cleanFee/.test(body) && !/existing\.amount\s*=\s*cleanFee/.test(body),
+  assert.ok(!/cleanFee/.test(GOREV_YAZ),
     'misafirden alinan ucret borc defterine yazilmamali');
+  assert.ok(/await syncBookingCleaningTaskToCloud\(savedBooking, cleanCost\)/.test(APP),
+    'rezervasyon formu kayittan sonra gorevi veritabanina yazmali (L-27)');
 });
 
 runTest('Cleaning cost is reloaded from the debt ledger, not duplicated on bookings', () => {
   const fn = APP.slice(APP.indexOf('function syncBookingCleaningTasks'));
   const body = fn.slice(0, fn.indexOf('\nfunction '));
-  assert.ok(/linkedTask/.test(body) && /b\.cleanCost = linkedTask/.test(body),
+  assert.ok(/findBookingCleaningTask\(b\)/.test(body) && /b\.cleanCost = bagli/.test(body),
     'buluttan yuklenen rezervasyonda maliyet mevcut temizlik gorevinden okunmali');
   assert.ok(!APP.includes('cleaning_cost'),
     'ayni sayi bookings tablosunda ikinci kez tutulmamali');
 });
 
-runTest('Bookings created before the split keep their existing debt', () => {
+// Eskiden gorevi olmayan rezervasyonda maliyet = ucret varsayiliyordu ("eski
+// davranis"). K-04 bunu kaldirdi: bilinmeyen maliyet uydurulmaz (3.6), ve
+// bellekte uydurulan gorev hic veritabanina yazilmadigi icin korunacak
+// "mevcut borc" zaten yoktu.
+runTest('Unknown cleaning cost is never copied from the guest fee', () => {
   const fn = APP.slice(APP.indexOf('function syncBookingCleaningTasks'));
   const body = fn.slice(0, fn.indexOf('\nfunction '));
-  assert.ok(/b\.cleanCost === undefined/.test(body) && /b\.cleanFee/.test(body),
-    'gorev de yoksa eski davranisa geri dusmeli — mevcut borclar silinmemeli');
+  assert.ok(!/b\.cleanFee/.test(body) && !/cleanFee/.test(body),
+    'gorevi olmayan rezervasyonda maliyet ucretten KOPYALANMAMALI');
+  assert.ok(!/cleaningTasks\.push\(/.test(body),
+    'syncBookingCleaningTasks bellekte gorev uydurmamali');
+  const form = APP.slice(APP.indexOf("const ccEl = document.getElementById('resCleanCost');"));
+  assert.ok(!/ccEl\.value = [^;]*cleanFee/.test(form.slice(0, 400)),
+    'duzenleme formu maliyeti ucretten doldurmamali');
 });
 
 runTest('Cleaner name is not invented', () => {
@@ -203,7 +220,7 @@ runTest('Range picker refuses an end date before the start date', () => {
 });
 
 runTest('Hidden date inputs are validated in code, not by the browser', () => {
-  const fn = APP.slice(APP.indexOf('async function saveBooking'));
+  const fn = APP.slice(APP.indexOf('async function saveBooking('));
   const body = fn.slice(0, fn.indexOf('\nasync function ') > 0 ? fn.indexOf('\nasync function ') : 4000);
   assert.ok(/!checkIn \|\| !checkOut/.test(body),
     'gizli inputlara tarayici "required" uygulamaz; kod kontrol etmeli');

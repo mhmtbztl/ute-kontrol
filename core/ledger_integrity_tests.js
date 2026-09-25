@@ -215,6 +215,155 @@ const yazmalar = (istemci, tablo) =>
     yakin(f.adr, (30000 - 1500 - 3000) / 3, 'ADR = net oda geliri / gece');
   });
 
+  // --- Temizlik defteri (K-04 durum modeli, L-27 … L-31) ------------------------
+  const TASK_DB = '22222222-2222-4222-8222-000000000001';
+  const TASK_DB2 = '22222222-2222-4222-8222-000000000002';
+  const REZ = '33333333-3333-4333-8333-000000000001';
+  const gorev = (ek) => ({ id: TASK_DB, dbId: TASK_DB, villa: 'A', propertyId: PROP_A, date: '2026-09-10',
+    cleaner: 'Ayşe', amount: 1200, paid: false, status: 'DONE', ...ek });
+  const gorevYazmalari = ist => yazmalar(ist, 'cleaning_tasks').filter(k => k.islem === 'upsert');
+  const soruKur = (cevaplar) => {
+    const kuyruk = cevaplar.slice();
+    global.prompt = () => (kuyruk.length ? kuyruk.shift() : null);
+    global.confirm = () => true;
+  };
+
+  await test('L-29 "1.500" bin beş yüz olarak DOĞRU göreve yazılır (1,5 TL değil, ilk görev değil)', async () => {
+    const ist = kaydedenIstemci();
+    ortamKur({ cleaningTasks: [gorev({ id: TASK_DB2, dbId: TASK_DB2, amount: 900 }), gorev()] }, ist);
+    formKur({}); soruKur(['1.500']);
+    await App.promptEditTaskAmount(TASK_DB);
+    const w = gorevYazmalari(ist);
+    assert.strictEqual(w.length, 1, `${w.length} görev yazması`);
+    assert.strictEqual(w[0].yuk.id, TASK_DB, 'yanlış görev güncellendi');
+    assert.strictEqual(w[0].yuk.amount, 1500, `tutar ${w[0].yuk.amount}`);
+  });
+
+  await test('K-04 "Ödendi" yalnız görevi yazar; gider defterine satır YAZMAZ', async () => {
+    const ist = kaydedenIstemci();
+    ortamKur({ cleaningTasks: [gorev()] }, ist);
+    formKur({}); soruKur([]);
+    await App.toggleTaskPaid(TASK_DB);
+    const w = gorevYazmalari(ist);
+    assert.strictEqual(w.length, 1);
+    assert.strictEqual(w[0].yuk.is_paid, true);
+    assert.strictEqual(w[0].yuk.status, 'DONE');
+    assert.strictEqual(yazmalar(ist, 'expenses').length, 0, 'gider tablosuna yazma gitti');
+  });
+
+  await test('K-04 Planlı görev ödenirken önce "yapıldı" olur ve yapıldığı güne taşınır', async () => {
+    const ist = kaydedenIstemci();
+    ortamKur({ cleaningTasks: [gorev({ status: 'PLANNED', date: '2026-09-10' })] }, ist);
+    formKur({}); soruKur(['2026-09-12']);
+    await App.toggleTaskPaid(TASK_DB);
+    const y = gorevYazmalari(ist)[0].yuk;
+    assert.strictEqual(y.status, 'DONE');
+    assert.strictEqual(y.task_date, '2026-09-12', 'gider yapıldığı günün ayına yazılmalı');
+    assert.strictEqual(y.is_paid, true);
+  });
+
+  await test('K-04 "Tüm borcu öde" yalnız YAPILMIŞ temizlikleri öder; planlıya dokunmaz', async () => {
+    const ist = kaydedenIstemci();
+    ortamKur({ cleaningTasks: [gorev(), gorev({ id: TASK_DB2, dbId: TASK_DB2, status: 'PLANNED' })] }, ist);
+    formKur({}); soruKur([]);
+    await App.payAllPendingCleaning();
+    const w = gorevYazmalari(ist);
+    assert.strictEqual(w.length, 1, `${w.length} görev yazıldı`);
+    assert.strictEqual(w[0].yuk.id, TASK_DB);
+    assert.strictEqual(yazmalar(ist, 'expenses').length, 0);
+  });
+
+  await test('K-04 Eski EXP-CLEAN satırı olan görev "borç"a alınırsa eski satır silinir', async () => {
+    const ist = kaydedenIstemci();
+    ortamKur({
+      cleaningTasks: [gorev({ paid: true })],
+      expenses: [{ id: 'e-eski', legacyId: 'EXP-CLEAN-' + TASK_DB, villa: 'A', date: '2026-09-15', category: 'Temizlik', type: 'OPEX', amount: 1200 }]
+    }, ist);
+    formKur({}); soruKur([]);
+    await App.toggleTaskPaid(TASK_DB);
+    const sil = yazmalar(ist, 'expenses').filter(k => k.islem === 'delete');
+    assert.strictEqual(sil.length, 1, 'eski gider satırı silinmeli');
+    assert.ok(sil[0].filtre.some(([k, v]) => k === 'legacy_id' && v === 'EXP-CLEAN-' + TASK_DB));
+  });
+
+  await test('L-30 Temizlik silme veritabanını BEKLER; hata olursa kayıt ekrandan kalkmaz', async () => {
+    const ist = kaydedenIstemci({ hata: k => (k.tablo === 'cleaning_tasks' && k.islem === 'delete') ? { message: 'CLOSED_PERIOD_VIOLATION' } : null });
+    ortamKur({ cleaningTasks: [gorev()] }, ist);
+    formKur({}); soruKur([]);
+    const mesajlar = [];
+    global.window.showToast = (m, tur) => mesajlar.push({ m, tur });
+    const sonuc = await App.deleteCleaningTask(TASK_DB);
+    konsolHatalari.length = 0; // beklenen hata mesaji
+    assert.strictEqual(sonuc, false, 'başarısız silme false dönmeli');
+    assert.ok(!mesajlar.some(x => /silindi/.test(x.m)), '"silindi" dendi: ' + JSON.stringify(mesajlar));
+    assert.ok(mesajlar.some(x => x.tur === 'error' && /CLOSED_PERIOD/.test(x.m)), 'hata kullanıcıya gösterilmeli');
+  });
+
+  await test('L-30 Başarılı silme görev satırını ve eski gider satırını veritabanından siler', async () => {
+    const ist = kaydedenIstemci();
+    ortamKur({
+      cleaningTasks: [gorev({ paid: true })],
+      expenses: [{ id: 'e-eski', legacyId: 'EXP-CLEAN-' + TASK_DB, villa: 'A', date: '2026-09-15', category: 'Temizlik', type: 'OPEX', amount: 1200 }]
+    }, ist);
+    formKur({}); soruKur([]);
+    assert.strictEqual(await App.deleteCleaningTask(TASK_DB), true);
+    assert.strictEqual(yazmalar(ist, 'cleaning_tasks').filter(k => k.islem === 'delete').length, 1);
+    assert.strictEqual(yazmalar(ist, 'expenses').filter(k => k.islem === 'delete').length, 1);
+    assert.strictEqual(App.getAppData().cleaningTasks.length, 0);
+    assert.strictEqual(App.getAppData().expenses.length, 0);
+  });
+
+  await test('L-27/L-28 Rezervasyon kaydı görevi booking_id ve MALİYETLE, planlı olarak yazar', async () => {
+    const ist = kaydedenIstemci();
+    const rez = { id: REZ, villa: 'A', guest: 'Ada', checkIn: '2026-09-20', checkOut: '2026-09-23', cleanFee: 1500, status: 'CONFIRMED' };
+    ortamKur({ bookings: [rez] }, ist);
+    formKur({});
+    const uyari = await App.syncBookingCleaningTaskToCloud(rez, 1200);
+    assert.strictEqual(uyari, '');
+    const w = gorevYazmalari(ist);
+    assert.strictEqual(w.length, 1);
+    assert.strictEqual(w[0].yuk.booking_id, REZ, 'booking_id yazılmalı (L-28)');
+    assert.strictEqual(w[0].yuk.amount, 1200, 'maliyet ücretten değil girilen maliyetten (L-27)');
+    assert.strictEqual(w[0].yuk.status, 'PLANNED', 'rezervasyon kaydı gider yazmaz (K-04)');
+    assert.strictEqual(w[0].yuk.task_date, '2026-09-23');
+    assert.strictEqual(yazmalar(ist, 'expenses').length, 0);
+  });
+
+  await test('L-27 Maliyeti girilmemiş rezervasyonda ücret maliyet diye KOPYALANMAZ, görev uydurulmaz', async () => {
+    const ist = kaydedenIstemci();
+    const rez = { id: REZ, villa: 'A', guest: 'Ada', checkIn: '2026-09-20', checkOut: '2026-09-23', cleanFee: 1500, status: 'CONFIRMED' };
+    ortamKur({ bookings: [rez] }, ist);
+    App.syncBookingCleaningTasks();
+    assert.strictEqual(App.getAppData().cleaningTasks.length, 0, 'bellekte görev uyduruldu');
+    assert.strictEqual(App.getAppData().bookings[0].cleanCost, null, 'maliyet bilinmiyor olmalı, ücret değil');
+    await App.syncBookingCleaningTaskToCloud(rez, null);
+    assert.strictEqual(gorevYazmalari(ist)[0].yuk.amount, 0, 'tutar boş (0 = girilmedi), ücret değil');
+  });
+
+  await test('K-04 İptal edilen rezervasyonun planlı temizliği "yapılmadı" olur (ne gider ne borç)', async () => {
+    const ist = kaydedenIstemci();
+    const rez = { id: REZ, villa: 'A', guest: 'Ada', checkIn: '2026-09-20', checkOut: '2026-09-23', status: 'CANCELLED' };
+    ortamKur({ bookings: [rez], cleaningTasks: [gorev({ bookingId: REZ, status: 'PLANNED' })] }, ist);
+    await App.syncBookingCleaningTaskToCloud(rez, 1200);
+    const w = gorevYazmalari(ist);
+    assert.strictEqual(w.length, 1);
+    assert.strictEqual(w[0].yuk.status, 'SKIPPED');
+  });
+
+  await test('K-04 Yapılmış temizlik rezervasyon düzenlemesiyle DEĞİŞMEZ; kullanıcıya söylenir', async () => {
+    const ist = kaydedenIstemci();
+    const rez = { id: REZ, villa: 'A', guest: 'Ada', checkIn: '2026-09-20', checkOut: '2026-09-25', status: 'CONFIRMED' };
+    ortamKur({ bookings: [rez], cleaningTasks: [gorev({ bookingId: REZ, status: 'DONE', amount: 1200 })] }, ist);
+    const uyari = await App.syncBookingCleaningTaskToCloud(rez, 1800);
+    assert.strictEqual(gorevYazmalari(ist).length, 0, 'yapılmış görev yazıldı');
+    assert.match(uyari, /yapıldı olarak işaretli/);
+  });
+
+  await test('L-31 Görev uyduran villa düzeyi fonksiyonlar yok', async () => {
+    assert.strictEqual(App.toggleCleaningPaid, undefined);
+    assert.strictEqual(App.promptEditCleaningAmount, undefined);
+  });
+
   console.log(`\n${passed} geçti, ${failed} başarısız`);
   if (failed > 0) process.exit(1);
 })();

@@ -22,6 +22,12 @@
  *     tarafinda hic kurulmuyordu; yenilemeden sonra her villa "borç"
  *     gorunuyordu.
  *
+ * 25 Eylul 2026 (K-04, phase45): temizlik gideri "yapildi" aninda dogar ve
+ * temizlik defterinden okunur; "Odendi" artik gider defterine SATIR YAZMAZ.
+ * Asagidaki "gider kaydi" iddialari bu sozlesmeye gore yeniden yazildi.
+ * Hic cagirani olmayan ve gorev uyduran toggleCleaningPaid /
+ * promptEditCleaningAmount kaldirildi (L-31).
+ *
  * Bu denetim kaynak taramasi + saf mantik olcumudur; dis sisteme baglanmaz.
  */
 
@@ -75,11 +81,13 @@ const check = (c, n, d) => c ? ok(n) : no(n, d);
 // Defterin bes kapisi. Hepsi ayni yoldan (persistCleaningLedgerEntry)
 // gecmek zorunda: ayri ayri yazan bes kopya kacinilmaz olarak ayrisir.
 const KAPILAR = [
-  'promptEditCleaningAmount',
   'promptEditTaskAmount',
-  'toggleCleaningPaid',
+  'markCleaningDone',
   'toggleTaskPaid',
-  'payAllPendingCleaning'
+  'payAllPendingCleaning',
+  'markCleaningSkipped',
+  'markCleaningPlanned',
+  'markSelectedCleaningDone'
 ];
 
 async function run() {
@@ -111,20 +119,19 @@ async function run() {
     );
   });
 
-  // --- 3. Sabit ay yasagi ----------------------------------------------------
-  const tcp = govde(APP, 'toggleCleaningPaid') || '';
+  // --- 3. Uydurma gorev ve "odendi = gider satiri" yok (K-04, L-31) ---------
   check(
-    !/month:\s*['"]\d{4}-\d{2}['"]/.test(tcp),
-    '7. toggleCleaningPaid gider ayini SABIT yazmiyor',
-    "month: '2026-09' sabiti duruyor. Odeme hangi ay yapilirsa yapilsin " +
-    'gider Eylul 2026\'ya duser; iki ayin net kari ayni anda yanlis olur.'
+    !/function toggleCleaningPaid\s*\(/.test(APP) && !/function promptEditCleaningAmount\s*\(/.test(APP)
+      && !/Rutin Temizlik`/.test(APP),
+    '7. Gorev UYDURAN villa duzeyi odeme/tutar fonksiyonlari kaldirildi',
+    'toggleCleaningPaid gorev yoksa bugun tarihli "Rutin Temizlik" uydurup gider yaziyordu (L-31).'
   );
-
-  const ay = govde(APP, 'buildCleaningExpenseRecord') || '';
+  const kalici = govde(APP, 'persistCleaningLedgerEntry') || '';
   check(
-    ay.includes('slice(0, 7)') && !/['"]\d{4}-\d{2}['"]/.test(ay),
-    '8. Gider ayi odeme tarihinden TURETILIYOR',
-    'buildCleaningExpenseRecord ayi tarihten uretmiyor.'
+    kalici.length > 0 && !/expenses['"]\)\s*\.upsert/.test(APP) && !/function buildCleaningExpenseRecord/.test(APP)
+      && !/function cloudUpsertCleaningExpense/.test(APP),
+    '8. "Odendi" gider defterine SATIR YAZMIYOR (gider yapildiginda dogar)',
+    'Odeme hala gider satiri uretiyor: gider odeme ayina dusuyor, odenmemis ama yapilmis temizlik gider sayilmiyor.'
   );
 
   // --- 4. Gider kaydinin tek kaynagi ----------------------------------------
@@ -136,7 +143,7 @@ async function run() {
     elleKurulan.length === 0,
     '9. Temizlik gideri nesnesi kapilarda ELLE kurulmuyor',
     'Su fonksiyonlar kaydi hala kendisi kuruyor: ' + elleKurulan.join(', ') +
-    '. Uc kopyanin biri sabit ay yaziyordu; tek kaynak buildCleaningExpenseRecord.'
+    '. Temizlik gideri defter formulunden gelir (core/ledger_contract.js).'
   );
 
   // --- 5. Mukerrer gorev satiri hatasi --------------------------------------
@@ -170,16 +177,14 @@ async function run() {
   );
 
   // --- 7. Sifir tutar: uydurma yok, sessiz basarisizlik da yok --------------
-  const gider = govde(APP, 'cloudUpsertCleaningExpense') || '';
+  const rapor2 = govde(APP, 'reportCleaningPersist') || '';
   check(
-    gider.includes('TUTAR_YOK'),
-    '14. Tutar girilmemisse gider satiri YAZILMIYOR ve sebebi donuyor',
-    'expenses tablosunda chk_expense_positive_amount var: 0 tutarli satir ' +
-    'reddedilir. Sebep dondurulmezse hata sessizce yutulur veya uydurma bir ' +
-    'varsayilan yazilir (3.6).'
+    rapor2.includes('maliyet bilinmiyor'),
+    '14. Tutari girilmemis YAPILMIS temizlik kullaniciya soyleniyor',
+    'Maliyet girilmemisse 0 uydurulmaz; kullanici bilmeli ki gider eksik (3.6).'
   );
   check(
-    !/\|\|\s*1500/.test(gider) && !/\|\|\s*1500/.test(tcp),
+    !/cleanCost\s*\|\|\s*1500/.test(APP) && !/amount\)\s*\|\|\s*1500/.test(APP),
     '15. Temizlik maliyetinde sifir olmayan VARSAYILAN yok',
     '`|| 1500` kalibi geri gelmis: girilmemis bir maliyet uydurulup borc ' +
     'defterine yaziliyor (3.6).'
@@ -224,45 +229,10 @@ async function run() {
     no('20. app.js Node icinde yuklenebiliyor', String(err && err.message));
   }
 
-  if (app && typeof app.buildCleaningExpenseRecord === 'function') {
-    global.appData = { villas: { AZURE: { name: 'Test Villa' } } };
-    const kayit = app.buildCleaningExpenseRecord({
-      id: 'TASK-CLN-AZURE-1',
-      villa: 'AZURE',
-      amount: 1200,
-      paid: true,
-      paidDate: '2027-03-04',
-      cleaner: 'Ayse'
-    });
-    check(
-      kayit.month === '2027-03',
-      '20. Mart 2027\'de odenen temizlik Mart 2027\'ye yaziliyor',
-      `Beklenen '2027-03', gelen '${kayit.month}'. Sabit ay hatasi geri gelmis.`
-    );
-    check(
-      kayit.date === '2027-03-04' && kayit.amount === 1200,
-      '21. Gider kaydi tarih ve tutari odeme gununden aliyor',
-      `date='${kayit.date}', amount=${kayit.amount}`
-    );
-    check(
-      kayit.legacyId === 'EXP-CLEAN-TASK-CLN-AZURE-1',
-      '22. Yerel anahtarli gorevin gider anahtari yerel anahtardan turer',
-      `legacyId='${kayit.legacyId}'`
-    );
-    const uuidKayit = app.buildCleaningExpenseRecord({
-      id: '11111111-2222-3333-4444-555555555555',
-      dbId: '11111111-2222-3333-4444-555555555555',
-      villa: 'AZURE',
-      amount: 900,
-      paid: true,
-      paidDate: '2027-03-04'
-    });
-    check(
-      uuidKayit.legacyId === 'EXP-CLEAN-11111111-2222-3333-4444-555555555555',
-      '23. Yeniden yuklenmis gorevin gider anahtari UUID\'den turer',
-      `legacyId='${uuidKayit.legacyId}'`
-    );
-
+  if (app && typeof app.normalizeCleaningTask === 'function') {
+    // 20-23 (eski): odeme gunune gider satiri kuran buildCleaningExpenseRecord.
+    // K-04 ile kaldirildi; gider davranisi ledger_integrity_tests ve
+    // phase45_cleaning_cost_live_tests ile olculur.
     const villas = {
       V1: { id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee', name: 'Deniz Evi' }
     };
@@ -367,7 +337,7 @@ async function run() {
     );
     delete global.appData;
   } else if (app) {
-    no('20-23. buildCleaningExpenseRecord disa aktarilmis',
+    no('24. normalizeCleaningTask disa aktarilmis',
       'Fonksiyon module.exports icinde yok; davranis olculemiyor.');
   }
 }

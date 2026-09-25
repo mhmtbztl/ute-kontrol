@@ -69,12 +69,18 @@ const YAZMA_IZLERI = [
  * donemez — donerse bu denetim kirmizi olur.
  */
 const KALICI = [
-  // Temizlik & gider defteri (ayrica cleaning_ledger_persistence_tests)
-  'promptEditCleaningAmount',
+  // Temizlik & gider defteri (ayrica cleaning_ledger_persistence_tests).
+  // promptEditCleaningAmount ve toggleCleaningPaid 25 Eylul 2026'da SILINDI:
+  // hicbir yerden cagrilmiyorlardi ve gorev uyduruyorlardi (L-31). Yerlerine
+  // K-04 durum modelinin kapilari girdi; liste yine yalniz buyur.
   'promptEditTaskAmount',
-  'toggleCleaningPaid',
   'toggleTaskPaid',
   'payAllPendingCleaning',
+  'markCleaningDone',
+  'markCleaningSkipped',
+  'markCleaningPlanned',
+  'markSelectedCleaningDone',
+  'deleteCleaningTask',
   // WhatsApp -> Lead / Rezervasyon
   'saveWaAsLead',
   'saveWaAsBooking',

@@ -1703,16 +1703,20 @@
         <div class="section-title-bar">
           <div>
             <h2>🧹 TEMİZLİK & OPERASYON BORÇ DEFTERİ</h2>
-            <p class="sub-text">Rezervasyonlardan gelen temizlikler, hangi evde hangi tarihte temizlik yapıldığı ve personel ödemeleri.</p>
+            <p class="sub-text">Rezervasyonlardan gelen temizlikler. Maliyet temizlik <strong>yapıldı</strong> işaretlendiği günün ayına gider yazılır; ödeme ayrı bir adımdır. Yapılmayan temizlik (gelmeyen misafir) ne gider ne borç olur.</p>
           </div>
           <div class="table-actions" style="display: flex; gap: 8px; flex-wrap: wrap;">
             <select id="hkStatusFilter" class="form-control" style="width: auto; font-size: 12px; padding: 6px 10px; background: rgba(0,0,0,0.4); color: #fff; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px;" onchange="renderHousekeepingTab()">
               <option value="ALL">Tüm Durumlar (Tümü)</option>
-              <option value="PENDING">⏳ Sadece Bekleyen Borçlar</option>
-              <option value="PAID">✅ Sadece Ödenenler</option>
+              <option value="UNCONFIRMED">❓ Yapıldı mı? (geçmiş tarihli planlı)</option>
+              <option value="PLANNED">🗓️ Planlananlar</option>
+              <option value="DEBT">⏳ Borç (yapıldı, ödenmedi)</option>
+              <option value="PAID">✅ Ödenenler</option>
+              <option value="SKIPPED">✖ Yapılmayanlar</option>
             </select>
             <input type="text" id="hkSearchInput" placeholder="🔍 Ev, misafir, personel ara..." oninput="renderHousekeepingTab()" style="width: 220px; font-size: 12px; padding: 6px 12px; background: rgba(0,0,0,0.4); color: #fff; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px;">
-            <button class="btn btn-warning btn-sm" onclick="payAllPendingCleaning()" style="font-size: 12px; font-weight: 700; background: #F59E0B; color: #000;">💳 Tümünü Öde</button>
+            <button class="btn btn-secondary btn-sm" onclick="markSelectedCleaningDone()" style="font-size: 12px; font-weight: 700;" title="Listede işaretlediğiniz planlı temizlikleri planlandıkları gün yapılmış sayar">✔ Seçilenler Yapıldı</button>
+            <button class="btn btn-warning btn-sm" onclick="payAllPendingCleaning()" style="font-size: 12px; font-weight: 700; background: #F59E0B; color: #000;">💳 Tüm Borcu Öde</button>
             <button class="btn btn-primary btn-sm" onclick="openNewCleaningTaskModal()" style="font-size: 12px; font-weight: 700;">+ Yeni Temizlik Ekle</button>
           </div>
         </div>
@@ -1724,9 +1728,9 @@
                 <th>VİLLA (EV)</th>
                 <th>MİSAFİR / GÖREV</th>
                 <th>PERSONEL / EKİP</th>
-                <th>BEDEL (TL)</th>
+                <th>MALİYET (TL)</th>
                 <th>DURUM</th>
-                <th>ÖDEME TARİHİ</th>
+                <th>ÖDEME</th>
                 <th style="text-align: right;">İŞLEM</th>
               </tr>
             </thead>
@@ -2933,14 +2937,19 @@
               <small class="field-note">Oran ve tutar birbirini günceller; hangisini yazarsanız diğeri hesaplanır.</small>
             </div>
             <div class="form-group">
+              <label for="resPaymentCommission">Ödeme Komisyonu — POS / Sanal POS (₺)</label>
+              <input type="number" inputmode="decimal" id="resPaymentCommission" min="0" step="0.01" placeholder="Yoksa boş bırakın" oninput="calculateLivePreview()">
+              <small class="field-note note-expense">▼ <strong>Gider kalemi.</strong> Ciroyu azaltmaz; konaklama gecelerine dağıtılarak gider yazılır.</small>
+            </div>
+            <div class="form-group">
               <label for="resCleanFee">Temizlik Ücreti — Misafirden Alınan (₺)</label>
               <input type="number" inputmode="decimal" id="resCleanFee" placeholder="Örn: 1500" value="0" oninput="calculateLivePreview()">
               <small class="field-note note-revenue">▲ <strong>Gelir kalemi.</strong> Brüt tutarın içindedir; oda gelirinden ayrı raporlanır.</small>
             </div>
             <div class="form-group">
               <label for="resCleanCost">Temizlik Maliyeti — Personele Ödenen (₺)</label>
-              <input type="number" inputmode="decimal" id="resCleanCost" placeholder="Örn: 1200" value="0" oninput="calculateLivePreview()">
-              <small class="field-note note-expense">▼ <strong>Gider kalemi.</strong> "Temizlik &amp; Borç" defterine borç olarak yazılır; siz "Ödendi" yapana kadar kasadan çıkış görünmez.</small>
+              <input type="number" inputmode="decimal" id="resCleanCost" placeholder="Örn: 1200 — bilinmiyorsa boş" oninput="calculateLivePreview()">
+              <small class="field-note note-expense">▼ <strong>Gider kalemi.</strong> Temizlik defterine planlı görev olarak yazılır; temizlik <strong>yapıldı</strong> işaretlenince gider olur. Misafir gelmezse gider oluşmaz.</small>
             </div>
             <div class="form-group">
               <label for="resStatus">Rezervasyon Durumu</label>
@@ -2963,7 +2972,8 @@
 
           <div class="preview-section">Kesintiler</div>
           <div class="preview-item"><span>OTA Komisyonu <em id="prevCommissionRate">—</em>:</span><strong id="prevCommission" class="text-negative">—</strong></div>
-          <div class="preview-item highlight"><span>Komisyon Sonrası Net (bize geçen):</span><strong id="prevNetAfterCommission">—</strong></div>
+          <div class="preview-item"><span>Ödeme Komisyonu:</span><strong id="prevPaymentCommission" class="text-negative">—</strong></div>
+          <div class="preview-item highlight"><span>Komisyonlar Sonrası Net (bize geçen):</span><strong id="prevNetAfterCommission">—</strong></div>
 
           <div class="preview-section">Gider</div>
           <div class="preview-item"><span>Temizlik Maliyeti:</span><strong id="prevCleanCost" class="text-negative">—</strong></div>
@@ -3836,10 +3846,12 @@
             <input type="text" id="hkDesc" placeholder="Örn: Hakan Demir çıkışı sonrası rutin temizlik ve nevresim">
           </div>
           <div class="form-group full-width">
-            <label>Ödeme Durumu</label>
+            <label for="hkPaidStatus">Durum</label>
             <select id="hkPaidStatus" required>
-              <option value="PENDING">⏳ Ödenecek (Personele Borç)</option>
-              <option value="PAID">✅ Ödendi (Kapatıldı & Gider Tablosuna Ekle)</option>
+              <option value="PLANNED">🗓️ Planlandı (henüz yapılmadı)</option>
+              <option value="PENDING">⏳ Yapıldı — ödenecek (personele borç)</option>
+              <option value="PAID">✅ Yapıldı — ödendi</option>
+              <option value="SKIPPED">✖ Yapılmadı (gider ve borç yok)</option>
             </select>
           </div>
         </div>
@@ -3954,7 +3966,7 @@
   <script src="core/executive_dashboard_service.js?v=ca6c3133"></script>
   <script src="core/executive_ai_advisor.js?v=502075f7"></script>
   <script src="core/captcha_gate.js?v=3ad4a776"></script>
-  <script src="app.js?v=8fa4e8a4"></script>
+  <script src="app.js?v=061c66cd"></script>
   <script src="core/property_analysis_context_ui.js?v=56a57dc8"></script>
   <script src="core/analysis_center_ui.js?v=7991bd67"></script>
   <script src="core/marketing_ui.js?v=ec8aca52"></script>

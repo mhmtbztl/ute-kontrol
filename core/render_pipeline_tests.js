@@ -245,7 +245,10 @@ function run() {
     };
     operasyonVeri.cleaningTasks = [
       { id: 'pending-1', villa: 'V1', date: '2026-09-23', cleaner: 'Zeynep', amount: 2500,
-        notes: 'Nevresim değişecek', paid: false },
+        notes: 'Nevresim değişecek', paid: false, status: 'DONE' },
+      // K-04: planli (henuz yapilmamis) temizlik personele borc DEGILDIR.
+      { id: 'planned-1', villa: 'V1', date: '2026-09-25', cleaner: 'Zeynep', amount: 900,
+        notes: 'PLANLI-GOREV-BORC-DEGIL', paid: false, status: 'PLANNED' },
       { id: 'paid-1', villa: 'V2', date: '2026-09-24', cleaner: 'Ayşe', amount: 1800,
         notes: 'ODENMIS-GOREV-GIZLI', paid: true }
     ];
@@ -268,7 +271,7 @@ function run() {
       operationsHtml.slice(0, 1000)
     );
     check(
-      !operationsHtml.includes('ODENMIS-GOREV-GIZLI') && operationsCount === '1'
+      !operationsHtml.includes('ODENMIS-GOREV-GIZLI') && !operationsHtml.includes('PLANLI-GOREV-BORC-DEGIL') && operationsCount === '1'
         && operationsHtml.includes('Bekleyen Temizlik Borçları (1)') && rowCount === 1,
       '19. Odenmis gorev bekleyen borcta YOK; baslik, sayac ve liste ayni filtreyi kullaniyor',
       `badge=${operationsCount}, satir=${rowCount}, html=${operationsHtml.slice(0, 700)}`
