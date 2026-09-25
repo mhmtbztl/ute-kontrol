@@ -114,19 +114,22 @@ function run() {
 
   // --- Kaynak denetimi: app.js finans modulu ---------------------------------
   const APP = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
-  const i = APP.indexOf('let manualBookingRev = 0;');
-  const blok = i === -1 ? '' : APP.slice(i, i + 1600);
+  const i = APP.indexOf('function renderFinanceModule(');
+  const blok = i === -1 ? '' : APP.slice(i, i + 6000);
 
-  // Brut once, net yedek. (Tutar ayrica doneme dusen gece oraniyla carpilir;
-  // bkz. getBookingFilterShare — orani buraya sokmak cironun brut olmasini
-  // degistirmez.)
-  check(/Number\(b\.gross !== undefined \? b\.gross : b\.net\)/.test(blok),
+  // K-04'ten beri finans toplamlari tek formulden gelir
+  // (core/ledger_contract.js). Ciro brutten, komisyon gider tarafinda:
+  // bunu formulun kendisi olcer (ledger_contract_tests); burada olculen,
+  // Finans ekraninin o formulu KULLANDIGI ve kendi toplamini yapmadigidir.
+  const L = require('./ledger_contract.js');
+  const tek = L.computePeriodLedger({ bookings: [{ gross: 10000, cleanFee: 1000, otaComm: 1500 }], bookingShare: () => ({ ratio: 1, nights: 2 }) });
+  check(/computeFilterLedger\(\)/.test(blok) && /totalRevenue = ledger\.totalRevenue/.test(blok) && tek.totalRevenue === 10000,
     '7. Finans modülü brüt ciro kullanır',
-    'hala b.net (brut - komisyon - temizlik) kullaniliyor olabilir');
+    'renderFinanceModule toplam geliri defter sozlesmesinden okumuyor ya da sozlesme brutu dusuruyor');
 
-  check(/bookingDistributionCost \+=/.test(blok) && /totalOpex \+= bookingDistributionCost/.test(APP),
+  check(/totalOpex = ledger\.totalOpex/.test(blok) && tek.totalOpex === 1500 && tek.totalRevenue === 10000,
     '8. Finans modülü dağıtım maliyetini gidere ekler',
-    'bookingDistributionCost gider toplamina eklenmiyor');
+    'OTA komisyonu gider toplamina eklenmiyor ya da cirodan dusuluyor');
 
   console.log('\n=============================================================================');
   console.log(`TEST SUMMARY: ${passed} / ${passed + failed} TESTS PASSED (${failed} FAILED)`);

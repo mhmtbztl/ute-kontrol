@@ -174,6 +174,47 @@ const yazmalar = (istemci, tablo) =>
     assert.strictEqual(w.length, 1, `expenses tablosuna ${w.length} silme gitti`);
   });
 
+  // --- L-32 / L-37: ekranlar ayni formulden okur ------------------------------
+  // Ekim 2031: 3 gecelik rezervasyon (2 gece Ekim, 1 gece Kasim), 30.000 brut,
+  // 1.500 temizlik ucreti, 3.000 indirim, 2.400 OTA; Ekim'de yapilmis 1.000 TL
+  // temizlik; 500 TL elle gider.
+  const EKIM = () => ({
+    bookings: [{ id: 'b1', villa: 'A', propertyId: PROP_A, checkIn: '2031-10-30', checkOut: '2031-11-02',
+      gross: 30000, cleanFee: 1500, discount: 3000, otaComm: 2400, status: 'CONFIRMED' }],
+    cleaningTasks: [{ id: 't1', villa: 'A', propertyId: PROP_A, date: '2031-10-31', amount: 1000, status: 'DONE', paid: false }],
+    expenses: [{ id: 'e1', villa: 'A', date: '2031-10-05', month: '2031-10', category: 'Bakım', type: 'OPEX', amount: 500 }]
+  });
+  const yakin = (a, b, m) => assert.ok(Math.abs(Number(a) - Number(b)) < 0.011, `${m}: ${a} != ${b}`);
+
+  await test('L-32 Aylık KPI tablosu yapılmış temizliği OPEX\'e katar ve tahakkuk uygular', async () => {
+    ortamKur(EKIM(), kaydedenIstemci());
+    const m = App.computeMonthActuals('2031-10');
+    yakin(m.ciro, (30000 - 3000) * 2 / 3, 'Ekim toplam gelir (2/3 gece)');
+    yakin(m.opex, 2400 * 2 / 3 + 1000 + 500, 'Ekim OPEX = OTA payı + yapılmış temizlik + elle');
+    yakin(m.roomRevenue, (30000 - 1500 - 3000) * 2 / 3, 'Ekim net oda geliri');
+  });
+
+  await test('L-37 Önceki dönem karşılaştırması aynı formülden gelir (tahakkuk + gider alanı)', async () => {
+    ortamKur(EKIM(), kaydedenIstemci());
+    App.setCurrentFilter({ period: '2031-11', villa: 'ALL' });
+    const p = App.computePreviousPeriodTotals();
+    const ekim = App.computeMonthLedger('2031-10');
+    yakin(p.revenue, ekim.totalRevenue, 'önceki ay geliri = Ekim defteri');
+    yakin(p.expense, ekim.totalOpex + ekim.capex, 'önceki ay gideri tanımlı ve defterle aynı');
+    yakin(p.netProfit, ekim.netProfit, 'önceki ay net kâr');
+  });
+
+  await test('L-32 Seçili dönem defteri = ay defteri (Finans ekranı ile KPI tablosu aynı rakam)', async () => {
+    ortamKur(EKIM(), kaydedenIstemci());
+    App.setCurrentFilter({ period: '2031-10', villa: 'ALL' });
+    const f = App.computeFilterLedger();
+    const m = App.computeMonthLedger('2031-10');
+    for (const k of ['totalRevenue', 'netRoomRevenue', 'totalOpex', 'netProfit', 'cleaningCost', 'soldNights']) {
+      yakin(f[k], m[k], k);
+    }
+    yakin(f.adr, (30000 - 1500 - 3000) / 3, 'ADR = net oda geliri / gece');
+  });
+
   console.log(`\n${passed} geçti, ${failed} başarısız`);
   if (failed > 0) process.exit(1);
 })();

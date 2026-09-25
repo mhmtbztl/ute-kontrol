@@ -3468,6 +3468,62 @@ function getBookingFilterShare(b) {
 /**
  * Secili filtrenin tarih araligi (dahil-dahil). Donem 'ALL' ise null.
  */
+// -------------------------------------------------------------
+// DONEM DEFTERI — tek formul (K-04, core/ledger_contract.js)
+// -------------------------------------------------------------
+// Finans ekrani, kokpit, aylik KPI tablosu ve onceki donem karsilastirmasi
+// toplamlarini BURADAN okur. Sunucudaki kapanis ve yonetici snapshot'lari
+// (phase45) ayni formulu kullanir; ekranlar ayri ayri toplam yaptiginda ayni
+// ay icin farkli net kar raporluyorlardi (CLAUDE.md 3.4).
+function getLedgerContract() {
+  if (typeof LedgerContract !== 'undefined') return LedgerContract;
+  if (typeof window !== 'undefined' && window.LedgerContract) return window.LedgerContract;
+  if (typeof require === 'function') {
+    try { return require('./core/ledger_contract.js'); } catch (e) { /* tarayici */ }
+  }
+  throw new Error('Defter sozlesmesi (core/ledger_contract.js) yuklenmedi.');
+}
+
+function taskMatchesVilla(t, villa) {
+  if (!villa || villa === 'ALL') return true;
+  const propId = appData?.villas?.[villa]?.id;
+  return t.villa === villa || (!!propId && t.propertyId === propId);
+}
+
+/** Arayuzde secili donem ve mulk icin defter. */
+function computeFilterLedger() {
+  const villa = currentFilter ? currentFilter.villa : 'ALL';
+  return getLedgerContract().computePeriodLedger({
+    bookings: appData.bookings || [],
+    expenses: appData.expenses || [],
+    cleaningTasks: appData.cleaningTasks || [],
+    bookingInScope: isBookingInFilter,
+    bookingShare: getBookingFilterShare,
+    expenseInScope: isExpenseInFilter,
+    taskInScope: t => taskMatchesVilla(t, villa) && isDateInFilter(t.date)
+  });
+}
+
+/** Belirli bir takvim ayi (YYYY-MM) icin defter; mulk filtresi istege bagli. */
+function computeMonthLedger(monthKey, villa) {
+  const L = getLedgerContract();
+  const r = L.monthRange(monthKey);
+  if (!r) return null;
+  const v = villa || 'ALL';
+  const propId = v !== 'ALL' ? appData?.villas?.[v]?.id : null;
+  const tarihIcinde = d => typeof d === 'string' && d.slice(0, 10) >= r.start && d.slice(0, 10) <= r.end;
+  return L.computePeriodLedger({
+    bookings: appData.bookings || [],
+    expenses: appData.expenses || [],
+    cleaningTasks: appData.cleaningTasks || [],
+    bookingInScope: b => v === 'ALL' || b.villa === v || (!!propId && b.propertyId === propId),
+    bookingShare: b => L.nightShareInRange(b, r.start, r.end),
+    expenseInScope: e => (v === 'ALL' || e.villa === v || e.villa === 'ALL')
+      && tarihIcinde(e.date || e.expense_date || (e.month ? e.month + '-15' : '')),
+    taskInScope: t => taskMatchesVilla(t, v) && tarihIcinde(t.date)
+  });
+}
+
 function getFilterDateRange() {
   if (typeof currentFilter === 'undefined' || !currentFilter) return null;
   if (!currentFilter.period || currentFilter.period === 'ALL') {
@@ -3692,32 +3748,25 @@ function computePreviousPeriodCategoryTotals() {
 }
 
 function computePreviousPeriodTotals() {
+  // Onceki ay da SECILI donemle ayni formulden (K-04) ve ayni tahakkukla
+  // gelir. Bir zamanlar rezervasyonu yalniz GIRIS ayina tam tutariyla
+  // yaziyordu ve temizlik ucretini ciroya katip indirimi dusmuyordu; MoM
+  // rozetleri elma ile armudu karsilastiriyordu (L-37). `expense` alani da
+  // yoktu: "gider" rozeti her zaman "—" gosteriyordu.
+  const out = { revenue: 0, roomRevenue: 0, opex: 0, capex: 0, expense: 0, nights: 0, operatingProfit: 0, netProfit: 0, hasData: false };
   const prev = getPreviousPeriodKey(currentFilter && currentFilter.period);
-  const out = { revenue: 0, roomRevenue: 0, opex: 0, capex: 0, nights: 0, operatingProfit: 0, netProfit: 0, hasData: false };
   if (!prev || !appData) return out;
-
-  (appData.bookings || []).forEach(b => {
-    const ci = b.checkin || b.checkIn;
-    if (!inPeriodKey(ci, prev)) return;
-    if (!matchesVillaFilter(b)) return;
-    const gross = Number(b.gross ?? b.grossAmount ?? b.gross_amount ?? b.netRoomRevenue) || 0;
-    out.revenue += gross;
-    out.roomRevenue += gross - (Number(b.cleaningFee ?? b.cleaning_fee) || 0) - (Number(b.discount) || 0);
-    out.nights += Number(b.nights) || 0;
-    out.opex += Number(b.otaCommission ?? b.otaComm ?? b.ota_commission) || 0;
-    out.hasData = true;
-  });
-  (appData.expenses || []).forEach(e => {
-    if (!inPeriodKey(e.date || e.expense_date, prev)) return;
-    if (!matchesVillaFilter(e)) return;
-    const amount = Number(e.amount) || 0;
-    const expenseType = String(e.expenseType || e.expense_type || e.type || 'OPEX').toUpperCase();
-    if (expenseType === 'CAPEX') out.capex += amount;
-    else out.opex += amount;
-    out.hasData = true;
-  });
-  out.operatingProfit = out.revenue - out.opex;
-  out.netProfit = out.operatingProfit - out.capex;
+  const l = computeMonthLedger(prev, currentFilter ? currentFilter.villa : 'ALL');
+  if (!l) return out;
+  out.revenue = l.totalRevenue;
+  out.roomRevenue = l.netRoomRevenue;
+  out.opex = l.totalOpex;
+  out.capex = l.capex;
+  out.expense = l.totalOpex + l.capex;
+  out.nights = l.soldNights;
+  out.operatingProfit = l.operatingProfit;
+  out.netProfit = l.netProfit;
+  out.hasData = l.bookingCount > 0 || l.manualOpex > 0 || l.capex > 0 || l.cleaningCost > 0;
   return out;
 }
 
@@ -4011,25 +4060,21 @@ function renderFinanceModule() {
   if (targetRev === null) targetRev = getConfiguredRevenueTarget(currentFilter, appData.targets, currentFilter.villa);
 
   // Include user-entered bookings (in clean state, ALL revenue comes from here!)
-  let manualBookingRev = 0;
-  let manualBookingNights = 0;
-  // Canonical contract: recognized revenue = gross - discount. Guest cleaning
-  // charge remains revenue; OTA commission is distribution OPEX; actual cleaner
-  // payout is an expense/cleaning-task amount and is never inferred from the fee.
-  let bookingDistributionCost = 0;
+  // Donemin toplamlari tek formulden (K-04, core/ledger_contract.js). Asagidaki
+  // dongu yalniz MULK kirilimi icindir; toplamlar ondan turetilmez.
+  const ledger = computeFilterLedger();
   appData.bookings.forEach(b => {
     if (b.status === 'CANCELLED' || !isBookingInFilter(b)) return;
     // USALI tahakkuk: aylari kesen rezervasyonun yalnizca bu doneme dusen payi.
     const pay = getBookingFilterShare(b);
     if (pay.nights === 0 && pay.ratio === 0) return;
-    const bNet = Math.max(0, (Number(b.gross !== undefined ? b.gross : b.net) || 0) - (Number(b.discount) || 0)) * pay.ratio;
+    const bNet = ((Number(b.gross !== undefined ? b.gross : b.net) || 0) - (Number(b.discount) || 0)) * pay.ratio;
+    const bRoom = ((Number(b.gross !== undefined ? b.gross : b.net) || 0) - (Number(b.cleanFee ?? b.cleaningFee) || 0) - (Number(b.discount) || 0)) * pay.ratio;
     const bNights = pay.nights;
-    bookingDistributionCost += (Number(b.otaCommission) || Number(b.otaComm) || 0) * pay.ratio;
-    manualBookingRev += bNet;
-    manualBookingNights += bNights;
 
     if (propStats[b.villa]) {
       propStats[b.villa].revenue += bNet;
+      propStats[b.villa].roomRevenue = (propStats[b.villa].roomRevenue || 0) + bRoom;
       propStats[b.villa].nights += bNights;
     }
   });
@@ -4040,26 +4085,23 @@ function renderFinanceModule() {
   // null atanir ve baska hicbir yerde doldurulmaz, yani kontrol her zaman
   // false donuyordu — dal oluydu (3.6).
   {
-    totalRevenue = manualBookingRev;
-    totalSoldNights = manualBookingNights;
-    avgRevPerNight = totalSoldNights > 0 ? Math.round(totalRevenue / totalSoldNights) : 0;
+    totalRevenue = ledger.totalRevenue;
+    totalSoldNights = ledger.soldNights;
+    // ADR = Net Oda Geliri / satilan gece (K-04). Satilan gece yoksa bilinmiyor.
+    avgRevPerNight = ledger.adr === null ? null : Math.round(ledger.adr);
 
 
     const daysInPeriod = getPeriodDayCount();
     Object.keys(propStats).forEach(vKey => {
       const s = propStats[vKey];
-      s.adr = s.nights > 0 ? Math.round(s.revenue / s.nights) : 0;
+      s.adr = s.nights > 0 ? Math.round((s.roomRevenue || 0) / s.nights) : 0;
       s.share = totalRevenue > 0 ? Number(((s.revenue / totalRevenue) * 100).toFixed(1)) : 0;
       s.occupancy = Number(((s.nights / daysInPeriod) * 100).toFixed(1));
-      s.revpar = Math.round(s.revenue / daysInPeriod);
+      s.revpar = Math.round((s.roomRevenue || 0) / daysInPeriod);
     });
 
-    if (currentFilter.villa !== 'ALL' && propStats[currentFilter.villa]) {
-      const vData = propStats[currentFilter.villa];
-      totalRevenue = vData.revenue;
-      totalSoldNights = vData.nights;
-      avgRevPerNight = vData.adr;
-    }
+    // Mulk filtresi defterin kendisinde (isBookingInFilter); toplamlar
+    // burada mulk kiriliminden yeniden yazilmaz.
   }
 
   // Categorical expenses
@@ -4071,19 +4113,26 @@ function renderFinanceModule() {
     // "Temizlik" ile eslesmiyor, gider grafiginde her sey "Diger"e dusuyordu.
     const kat = eslesenGiderKategorisi(exp.category);
     categoryTotals[kat] = (categoryTotals[kat] || 0) + amt;
-    if (exp.type === 'CAPEX') totalCapex += amt;
-    else totalOpex += amt;
   });
 
-  // Only OTA commission is derived from a booking. Cleaning fee is guest income;
-  // cleaner payout belongs in the expense ledger.
-  totalOpex += bookingDistributionCost;
+  // Rezervasyondan ve temizlik defterinden OTOMATIK gelen giderler de
+  // kategorilere dusulur; yoksa halka grafiginin dilimleri toplam gideri
+  // tutmaz.
+  const otomatikKomisyon = ledger.otaCommission + ledger.paymentCommission;
+  categoryTotals['Kredi Kartı / Komisyon'] = (categoryTotals['Kredi Kartı / Komisyon'] || 0) + otomatikKomisyon;
+  categoryTotals['Temizlik'] = (categoryTotals['Temizlik'] || 0) + ledger.cleaningCost;
+  totalOpex = ledger.totalOpex;
+  totalCapex = ledger.capex;
 
-  // Bu tutarlar rezervasyonlardan OTOMATIK gelir. Kullanici ayni maliyeti bir de
-  // Gider Defteri'ne elle girerse iki kez dusulur; bunu gizlemek yerine ekranda
-  // acikca gosteriyoruz ki mukerrer giris yapilmasin.
-  setEl('finAutoDerivedCost', bookingDistributionCost > 0
-    ? `Bunun ${Math.round(bookingDistributionCost).toLocaleString('tr-TR')} TL'si rezervasyonlardan otomatik OTA komisyonudur. Aynı komisyonu Gider Defteri'ne tekrar girmeyin.`
+  // Bu tutarlar rezervasyonlardan ve temizlik defterinden OTOMATIK gelir.
+  // Kullanici ayni maliyeti bir de Gider Defteri'ne elle girerse iki kez
+  // dusulur; bunu gizlemek yerine ekranda acikca gosteriyoruz.
+  const otomatikParcalar = [];
+  if (ledger.otaCommission > 0) otomatikParcalar.push(`${Math.round(ledger.otaCommission).toLocaleString('tr-TR')} TL OTA komisyonu`);
+  if (ledger.paymentCommission > 0) otomatikParcalar.push(`${Math.round(ledger.paymentCommission).toLocaleString('tr-TR')} TL ödeme komisyonu`);
+  if (ledger.cleaningCost > 0) otomatikParcalar.push(`${Math.round(ledger.cleaningCost).toLocaleString('tr-TR')} TL yapılmış temizlik maliyeti`);
+  setEl('finAutoDerivedCost', otomatikParcalar.length
+    ? `Bunun ${otomatikParcalar.join(', ')} kayıtlardan otomatik gelir. Aynı tutarları Gider Defteri'ne tekrar girmeyin.`
     : '');
 
   // Hierarchy calculations
@@ -4116,7 +4165,7 @@ function renderFinanceModule() {
   setEl('finExpenseRatio', `Cironun %${expenseRatio.toFixed(1)}'i`);
 
   setEl('finSoldNights', `${totalSoldNights} gece`);
-  setEl('finAvgRevPerNight', `${avgRevPerNight.toLocaleString('tr-TR')} TL / satılan gece`);
+  setEl('finAvgRevPerNight', avgRevPerNight === null ? 'ADR: — (satılan gece yok)' : `ADR ${avgRevPerNight.toLocaleString('tr-TR')} TL (net oda geliri / satılan gece)`);
 
   // Target Analysis Box
   setEl('tgtBoxTarget', hasTarget ? `${Math.round(targetRev).toLocaleString('tr-TR')} TL` : '—');
@@ -6401,14 +6450,18 @@ function renderKPIsAndDashboard() {
     const daysInPeriod = getPeriodDayCount();
     if (daysInPeriod !== null) availableNights = daysInPeriod * targetVillas.length;
   }
+  // Toplamlar Finans ekraniyla AYNI formulden (K-04); yukaridaki dongu
+  // yalniz mulk kirilimi icindir.
+  const ledger = computeFilterLedger();
+  totalNet = ledger.totalRevenue;
+  totalRoomRevenue = ledger.netRoomRevenue;
+  totalPaidNights = ledger.soldNights;
   const occupancyRate = availableNights > 0 ? (totalPaidNights / availableNights) * 100 : null;
-  const adr = totalPaidNights > 0 ? (totalRoomRevenue / totalPaidNights) : null;
+  const adr = ledger.adr;
   const revpar = availableNights > 0 ? totalRoomRevenue / availableNights : null;
-  const scopedOpex = (appData.expenses || []).filter(e => isExpenseInFilter(e) && (e.type || e.expense_type || 'OPEX') !== 'CAPEX')
-    .reduce((sum, e) => sum + Number(e.amount || 0), 0);
-  const scopedOta = (appData.bookings || []).filter(b => b.status !== 'CANCELLED' && isBookingInFilter(b))
-    .reduce((sum, b) => sum + Number(b.otaCommission || b.otaComm || 0) * getBookingFilterShare(b).ratio, 0);
-  const nrevpar = availableNights > 0 ? (totalNet - scopedOpex - scopedOta) / availableNights : null;
+  // NRevPAR = (Toplam Gelir - OPEX) / kullanilabilir gece. OPEX yapilmis
+  // temizligi ve odeme komisyonunu da icerir.
+  const nrevpar = availableNights > 0 ? ledger.operatingProfit / availableNights : null;
 
   // Populate Kokpit Top KPI Cards (Net Gelir, Doluluk, ADR, RevPAR)
   const elNetRev = document.getElementById('kpiNetRevenue');
@@ -10768,34 +10821,16 @@ function filterByPeriod(period) {
  * tabani kullanir, yoksa iki ekran ayni ay icin farkli ciro raporlar.
  */
 function computeMonthActuals(monthKey) {
-  let ciro = 0, opex = 0, capex = 0, nights = 0;
-
-  (appData.bookings || []).forEach(b => {
-    if (b.status === 'CANCELLED') return;
-    const totalNights = Math.max(0, Math.round((Date.parse(b.checkOut + 'T00:00:00Z') - Date.parse(b.checkIn + 'T00:00:00Z')) / 86400000));
-    if (!totalNights) return;
-    const start = new Date(b.checkIn + 'T00:00:00Z');
-    let monthNights = 0;
-    for (let i = 0; i < totalNights; i++) {
-      const d = new Date(start.getTime() + i * 86400000);
-      if (`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}` === monthKey) monthNights++;
-    }
-    if (!monthNights) return;
-    const ratio = monthNights / totalNights;
-    ciro += Math.max(0, Number(b.gross || 0) - Number(b.discount || 0)) * ratio;
-    opex += Number(b.otaCommission || b.otaComm || 0) * ratio;
-    nights += monthNights;
-  });
-
-  (appData.expenses || []).forEach(exp => {
-    const expM = exp.monthKey || exp.month || (exp.date ? exp.date.substring(0, 7) : '');
-    if (expM !== monthKey) return;
-    const amt = Number(exp.amount) || 0;
-    if (exp.type === 'CAPEX') capex += amt;
-    else opex += amt;
-  });
-
-  return { ciro, opex, capex, nights, netProfit: ciro - opex - capex };
+  const l = computeMonthLedger(monthKey, 'ALL');
+  if (!l) return { ciro: 0, roomRevenue: 0, opex: 0, capex: 0, nights: 0, netProfit: 0 };
+  return {
+    ciro: l.totalRevenue,
+    roomRevenue: l.netRoomRevenue,
+    opex: l.totalOpex,
+    capex: l.capex,
+    nights: l.soldNights,
+    netProfit: l.netProfit
+  };
 }
 
 function getMonthlyKpiDataset() {
@@ -10809,14 +10844,16 @@ function getMonthlyKpiDataset() {
     const target = getConfiguredRevenueTarget(targetFilter, appData.targets, 'ALL') || 0;
     const monthName = getPeriodDisplayName(m);
 
-    const { ciro, opex, capex, nights, netProfit } = computeMonthActuals(m);
-    const adr = nights > 0 ? Math.round(ciro / nights) : 0;
+    const { ciro, roomRevenue, opex, capex, nights, netProfit } = computeMonthActuals(m);
+    // ADR ve RevPAR NET ODA GELIRINDEN (K-04). Toplam ciro temizlik ucretini
+    // de icerir; ona bolmek gecelik fiyati sisirirdi.
+    const adr = nights > 0 ? Math.round(roomRevenue / nights) : 0;
     const margin = ciro > 0 ? Number(((netProfit / ciro) * 100).toFixed(1)) : 0;
     const available = typeof FinancialMetricsService !== 'undefined'
       ? FinancialMetricsService.calculateAvailableNights(Object.values(appData.villas || {}), metricYear, metricMonth, appData.maintenance || [])
       : null;
     const occupancy = available > 0 ? Number(((nights / available) * 100).toFixed(1)) : null;
-    const revpar = available > 0 ? Math.round(ciro / available) : null;
+    const revpar = available > 0 ? Math.round(roomRevenue / available) : null;
 
     const totalExp = opex + capex;
     const targetPct = target > 0 ? Number(((ciro / target) * 100).toFixed(1)) : null;
@@ -11040,14 +11077,14 @@ function renderMonthlyKpiTracker() {
 // =============================================================
 const KPI_EXPLANATION_GUIDES = {
   'REVENUE': {
-    title: 'Gerçekleşen Ciro (Brüt Konaklama Geliri)',
+    title: 'Toplam Gelir (Net Oda Geliri + Temizlik Geliri)',
     icon: '💰',
     category: 'TEMEL FİNANS',
     badgeClass: 'badge-blue',
-    summary: 'İlgili ayda villalarınızda misafirlerin konaklaması karşılığında kasaya giren brüt toplam paradır.',
-    warning: '⚠️ Unutmayın: Ciro kâr demek değildir! Elektrik, personel, komisyon, kömür gibi tüm giderler bu paranın içinden düşecektir.',
-    formula: 'Satılan Gece Sayısı × Ortalama Gecelik Fiyat (ADR)',
-    example: 'Seçili dönemin brüt rezervasyon tutarları toplanır.',
+    summary: 'Seçili döneme düşen konaklama gecelerinin geliridir: indirimler düşülmüş oda geliri ile misafirden alınan temizlik ücretinin toplamı.',
+    warning: '⚠️ OTA komisyonu ve ödeme komisyonu geliri azaltmaz; gider olarak ayrıca düşülür. Ciro kâr demek değildir.',
+    formula: 'Net Oda Geliri = Brüt − Temizlik Ücreti − İndirim · Toplam Gelir = Net Oda Geliri + Temizlik Ücreti',
+    example: 'Ay sınırını aşan rezervasyonun yalnız bu döneme düşen gecelerinin payı sayılır.',
     actionRule: 'Ciro hacminizi gösterir ama asıl odaklanmanız gereken rakam cebinizde kalan Net Kâr\'dır.'
   },
   'TARGET': {
@@ -11068,8 +11105,8 @@ const KPI_EXPLANATION_GUIDES = {
     badgeClass: 'badge-green',
     summary: 'Cirodan tüm operasyonel harcamalar (Opex) ve mülk yatırımları (Capex) düşüldükten sonra işletme sahibinin cebinde kalan net nakittir.',
     warning: '🌟 Yüksek ciro tek başına yüksek kâr anlamına gelmez; kayıtlı gider ve yatırımları birlikte değerlendirin.',
-    formula: 'Net Kâr = Fiili Ciro - (OPEX + CAPEX)',
-    example: 'Seçili dönemin cirosundan kayıtlı OPEX ve CAPEX düşülür.',
+    formula: 'Net Kâr = Toplam Gelir − OPEX − CAPEX · OPEX = elle giderler + OTA komisyonu + ödeme komisyonu + yapılmış temizlik maliyeti',
+    example: 'Temizlik maliyeti temizlik "yapıldı" işaretlendiği günün ayına yazılır; ödeme ayrı bir durumdur.',
     actionRule: 'Net marjınızın (Net Kâr / Ciro) %30\'un altına düşmemesine dikkat edin.'
   },
   'TOTAL_EXPENSE': {
@@ -11101,7 +11138,7 @@ const KPI_EXPLANATION_GUIDES = {
     badgeClass: 'badge-amber',
     summary: 'Villalarınızı bir geceliğine ortalama kaça sattığınızı gösteren fiyattır. (Average Daily Rate).',
     warning: '🌟 Başlangıç Seviyesi Altın Kural: Tüm evleriniz doluyorsa ama ADR çok düşükse, evlerinizi ucuza satıyorsunuz demektir! Fiyatı hemen artırın.',
-    formula: 'ADR = Toplam Oda Cirosu ÷ Satılan Gece Sayısı',
+    formula: 'ADR = Net Oda Geliri ÷ Satılan Gece Sayısı',
     example: 'Seçili dönemin oda geliri, aynı dönemde satılan geceye bölünür.',
     actionRule: 'Hafta sonu yüksek ADR, hafta içi doluluk odaklı dengeli ADR uygulayın.'
   },
@@ -11112,7 +11149,7 @@ const KPI_EXPLANATION_GUIDES = {
     badgeClass: 'badge-purple',
     summary: 'Villanız boş ya da dolu fark etmeksizin, takvimdeki her gün için size kaç TL kazandırdığını gösteren en dürüst başarı karnesidir.',
     warning: 'RevPAR, fiyat ile kullanılabilir kapasitenin ne kadarının satıldığını aynı ölçüde birleştirir.',
-    formula: 'RevPAR = Oda Geliri ÷ Kullanılabilir Gece VEYA RevPAR = ADR × Doluluk %',
+    formula: 'RevPAR = Net Oda Geliri ÷ Kullanılabilir Gece (= ADR × Doluluk %)',
     example: 'Seçili dönemin oda geliri, kullanılabilir mülk-gece kapasitesine bölünür.',
     actionRule: 'RevPAR\'ı artırmanın yolu: Doluluk %70\'i aştığında fiyatı yükseltmektir.'
   },
@@ -15380,8 +15417,14 @@ function renderExecutiveKpiValues(kpis) {
 
   setEl('execRevMoM', trend(kpis.revenue));
   setEl('execOpexRatio', kpis.opex.current === null ? '—' : `${ratio(kpis.opex.current, kpis.revenue.current)} Ciro`);
-  setEl('execOtaCost', kpis.opex.otaCommission === null || kpis.opex.otaCommission === undefined
-    ? 'OTA: —' : `OTA: ${money(kpis.opex.otaCommission)}`);
+  // OPEX'in otomatik kalemleri. Sunucu bir kalemi vermiyorsa (phase45
+  // oncesi) o kalem "—" yazilir, 0 degil.
+  const kalem = (ad, v) => `${ad}: ${v === null || v === undefined ? '—' : money(v)}`;
+  setEl('execOtaCost', [
+    kalem('OTA', kpis.opex.otaCommission),
+    kalem('Ödeme kom.', kpis.opex.paymentCommission),
+    kalem('Temizlik', kpis.opex.cleaningCost)
+  ].join(' · '));
   setEl('execCapexRatio', kpis.capex.current === null ? '—' : `${ratio(kpis.capex.current, kpis.revenue.current)} Ciro`);
   setEl('execCapexTrend', trend(kpis.capex));
   const operatingMargin = ratio(kpis.operatingProfit.current, kpis.revenue.current);
@@ -15563,6 +15606,7 @@ function renderExecutiveControlCenter() {
           cleaning_fee: Number(b.cleaningFee ?? b.cleaning_fee ?? 0) * share.ratio,
           discount: Number(b.discount || 0) * share.ratio,
           ota_commission: Number(b.otaCommission ?? b.otaComm ?? b.ota_commission ?? 0) * share.ratio,
+          payment_commission: Number(b.paymentCommission ?? b.payment_commission ?? 0) * share.ratio,
           nights: share.nights
         };
       });
@@ -15572,6 +15616,7 @@ function renderExecutiveControlCenter() {
       bookings: scopedBookings,
       expenses: expenses.filter(e => typeof isExpenseInFilter === 'function' ? isExpenseInFilter(e) : true),
       targets: periodTarget,
+      cleaningCost: computeFilterLedger().cleaningCost,
       propertiesCount: propertiesList.filter(p => villas[p.key]?.isActive !== false && !villas[p.key]?.archivedAt).length,
       daysInMonth: getPeriodDayCount(),
       availableNights: exactAvailableNights,
@@ -16962,6 +17007,10 @@ if (typeof module !== 'undefined' && module.exports) {
     isPeriodClosed,
     isStayPeriodClosed,
     setCurrentFilter,
+    computeFilterLedger,
+    computeMonthLedger,
+    computeMonthActuals,
+    computePreviousPeriodTotals,
     isBookingInFilter,
     getFilterDateRange,
     isDateInFilter,

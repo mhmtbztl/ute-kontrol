@@ -255,6 +255,7 @@ const allTestFiles = [
   'business_date_tests.js',
 
   // Para defteri: gider/temizlik yazmalari davranis olcumuyle (Dalga 3)
+  'ledger_contract_tests.js',
   'ledger_integrity_tests.js',
 
   // GitHub Actions eylemleri tam commit SHA'sina sabit

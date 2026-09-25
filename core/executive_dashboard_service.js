@@ -29,7 +29,10 @@
       propertiesCount = 0,
       daysInMonth = 0,
       availableNights = null,
-      priorPeriodMetrics = null
+      priorPeriodMetrics = null,
+      // Yapilmis temizliklerin maliyeti (K-04). Rezervasyondan turetilmez:
+      // temizlik defterinden gelir, cagiran hesaplar.
+      cleaningCost = 0
     } = params;
 
     let currentRevenue = 0;
@@ -47,9 +50,11 @@
     // the guest remains revenue; only an actual cleaner payment in expenses is
     // a cost.
     let distributionCost = 0;
+    let paymentCommission = 0;
     bookings.forEach(b => {
       if (b.status === 'CANCELLED') return;
       distributionCost += Number(b.ota_commission || b.otaCommission || 0);
+      paymentCommission += Number(b.payment_commission || b.paymentCommission || 0);
     });
 
     let manualOpex = 0;
@@ -64,7 +69,9 @@
     currentRevenue = roundMoney(currentRevenue);
     distributionCost = roundMoney(distributionCost);
     manualOpex = roundMoney(manualOpex);
-    const operatingExpenses = roundMoney(manualOpex + distributionCost);
+    paymentCommission = roundMoney(paymentCommission);
+    const cleaning = roundMoney(cleaningCost);
+    const operatingExpenses = roundMoney(manualOpex + distributionCost + paymentCommission + cleaning);
     capex = roundMoney(capex);
     const currentExpenses = roundMoney(operatingExpenses + capex);
     const operatingProfit = roundMoney(currentRevenue - operatingExpenses);
@@ -112,6 +119,8 @@
         current: operatingExpenses,
         manual: manualOpex,
         otaCommission: distributionCost,
+        paymentCommission,
+        cleaningCost: cleaning,
         prior: priorPeriodMetrics ? priorPeriodMetrics.opex : null
       },
       capex: {
@@ -220,6 +229,9 @@
         current: opex,
         manual: snapshot.manual_opex === null || snapshot.manual_opex === undefined ? null : roundMoney(snapshot.manual_opex),
         otaCommission,
+        // phase45 oncesi sunucu bu alanlari vermez: bilinmiyor, 0 degil.
+        paymentCommission: snapshot.payment_commission === null || snapshot.payment_commission === undefined ? null : roundMoney(snapshot.payment_commission),
+        cleaningCost: snapshot.cleaning_cost === null || snapshot.cleaning_cost === undefined ? null : roundMoney(snapshot.cleaning_cost),
         prior: priorHasExpenseBreakdown ? roundMoney(prior.operating_expenses) : null
       },
       capex: { current: capex, prior: priorHasExpenseBreakdown ? roundMoney(prior.capex) : null },
