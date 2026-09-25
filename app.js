@@ -5286,8 +5286,9 @@ async function saveExpense(e) {
       await createExpense(expRecord);
       if (typeof window !== 'undefined' && window.showToast) window.showToast('✅ Gider başarıyla kaydedildi.');
     }
-    // Backward compatibility call for discrete entity-based mutation test
-    if (typeof cloudUpsertExpense === 'function') cloudUpsertExpense(expRecord);
+    // createExpense/updateExpense yazmanin KENDISIDIR. Burada eskiden bir de
+    // ayni kayitla cloudUpsertExpense cagriliyordu: yeni gider iki satir,
+    // duzenleme iki guncelleme oluyordu (L-26). Tek yazma, tek kayit.
     closeExpenseModal();
   } catch (err) {
     console.error('saveExpense error:', err);
@@ -5305,8 +5306,6 @@ async function deleteExpenseUI(id) {
   }
   try {
     await deleteExpense(id, true);
-    // Backward compatibility call for discrete entity-based mutation test
-    if (typeof cloudDeleteExpense === 'function') cloudDeleteExpense(id);
     return true;
   } catch (err) {
     console.error('deleteExpense error:', err);
@@ -16917,6 +16916,8 @@ if (typeof module !== 'undefined' && module.exports) {
     createExpense,
     updateExpense,
     deleteExpense,
+    saveExpense,
+    deleteExpenseUI,
     ALLOWED_LEAD_STAGES,
     ALLOWED_LEAD_SOURCES,
     mapLeadFromDb,

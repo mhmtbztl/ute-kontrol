@@ -301,8 +301,11 @@ runTest('Phase 3: Discrete Entity-Based Mutations in place of Monolithic Bulk Sy
   // Verify UI save handlers wire to these entity mutations
   assert(appContent.includes('cloudUpsertBooking(bookingRecord)'));
   assert(appContent.includes('cloudDeleteBooking(id)'));
-  assert(appContent.includes('cloudUpsertExpense(expRecord)'));
-  assert(appContent.includes('cloudDeleteExpense(id)'));
+  // Gider formu createExpense/updateExpense/deleteExpense ile TEK kez yazar;
+  // ustune ikinci bir cloudUpsertExpense/cloudDeleteExpense cagrisi her
+  // gideri iki satir yapiyordu (L-26). Davranis olcumu: ledger_integrity_tests.
+  assert(!appContent.includes('cloudUpsertExpense(expRecord)'), 'saveExpense gideri ikinci kez yazmamali');
+  assert(!appContent.includes('cloudDeleteExpense(id)'), 'deleteExpenseUI gideri ikinci kez silmemeli');
   assert(appContent.includes('cloudUpsertLead(leadRecord)'));
   assert(appContent.includes('cloudDeleteLead(id)'));
   assert(appContent.includes('result = await persistCleaningTaskDraft(taskRecord)'));

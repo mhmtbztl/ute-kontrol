@@ -252,6 +252,9 @@ const allTestFiles = [
   'remaining_correctness_tests.js',
   'business_date_tests.js',
 
+  // Para defteri: gider/temizlik yazmalari davranis olcumuyle (Dalga 3)
+  'ledger_integrity_tests.js',
+
   // GitHub Actions eylemleri tam commit SHA'sina sabit
   'workflow_pin_tests.js',
 
