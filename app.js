@@ -19,11 +19,20 @@ function installInnerHtmlSecurityBoundary() {
   // Only the application's existing action verbs may appear in legacy inline
   // handlers. Property access (window.*, document.*, event.*), assignments and
   // arbitrary expressions remain forbidden.
-  const allowedHandlerName = /^(?:acknowledge|apply|ask|auto|calculate|change|clean|close|convert|copy|cycle|delete|download|edit|execute|export|filter|handle|load|logout|mark|open|parse|pay|prompt|render|reset|run|save|select|send|set|share|show|simulate|start|step|submit|switch|sync|toggle|update)[A-Za-z0-9_$]*$/;
+  const allowedHandlerName = /^(?:acknowledge|apply|ask|auto|calculate|change|clean|close|confirm|convert|copy|cycle|delete|download|edit|execute|export|filter|handle|load|logout|mark|open|parse|pay|prompt|render|reset|run|save|select|send|set|share|show|simulate|start|step|submit|switch|sync|toggle|undo|update)[A-Za-z0-9_$]*$/;
+
+  // Yalniz KULLANICI ETKILESIMIYLE tetiklenen olaylar (L-15). onerror, onload,
+  // onmouseover, onfocus, onanimationstart ... kullanici hicbir sey yapmadan
+  // calisir; enjekte edilmis bir <img onerror> ekran cizilir cizilmez
+  // uygulamanin fonksiyonunu kurbanin oturumuyla calistiriyordu.
+  const allowedHandlerAttrs = new Set(['onclick', 'ondblclick', 'onchange', 'oninput', 'onsubmit',
+    'onkeydown', 'onkeyup', 'onkeypress']);
 
   function handlerIsTrusted(source) {
+    // Tek cagri (sondaki ';' hosgorulur). Zincir kabul edilmez: uygulamanin
+    // kendi sablonlari tek cagri kullanir; zincir ancak enjeksiyonla olusur.
     const chunks = String(source || '').split(';').map(s => s.trim()).filter(Boolean);
-    return chunks.length > 0 && chunks.every(chunk => {
+    return chunks.length === 1 && chunks.every(chunk => {
       const match = chunk.match(/^([A-Za-z_$][\w$]*)\((.*)\)$/s);
       if (!match || !allowedHandlerName.test(match[1])) return false;
       const args = match[2];
@@ -43,7 +52,9 @@ function installInnerHtmlSecurityBoundary() {
       Array.from(node.attributes || []).forEach(attr => {
         const name = attr.name.toLowerCase();
         const val = String(attr.value || '').trim();
-        if (name.startsWith('on') && !handlerIsTrusted(val)) node.removeAttribute(attr.name);
+        if (name.startsWith('on') && (!allowedHandlerAttrs.has(name) || !handlerIsTrusted(val))) {
+          node.removeAttribute(attr.name);
+        }
         if (['href', 'src', 'xlink:href', 'formaction'].includes(name) &&
             /^(?:javascript|vbscript|data):/i.test(val)) node.removeAttribute(attr.name);
         if (name === 'srcdoc' || (name === 'style' && /(?:url\s*\(|expression\s*\(|@import)/i.test(val))) {
@@ -4385,7 +4396,7 @@ function renderExpenseDonutAndTable(categoryTotals, totalExpense, totalRevenue, 
     path.setAttribute('fill', cat.color);
     path.setAttribute('stroke', '#111827');
     path.setAttribute('stroke-width', '2');
-    path.innerHTML = `<title>${cat.name}: ${amt.toLocaleString('tr-TR')} TL (%${((amt/totalExpense)*100).toFixed(1)})</title>`;
+    path.innerHTML = `<title>${escapeHtml(cat.name)}: ${amt.toLocaleString('tr-TR')} TL (%${((amt/totalExpense)*100).toFixed(1)})</title>`;
     svg.appendChild(path);
 
     startAngle = endAngle;
@@ -4418,18 +4429,19 @@ function renderExpenseDonutAndTable(categoryTotals, totalExpense, totalRevenue, 
     tr.className = 'clickable-row';
     tr.onclick = () => filterExpensesByCategory(cat.name);
     tr.innerHTML = `
-      <td><span class="cat-dot" style="background:${cat.color};"></span> <strong>${cat.name}</strong></td>
+      <td><span class="cat-dot" style="background:${cat.color};"></span> <strong>${escapeHtml(cat.name)}</strong></td>
       <td><strong>${Math.round(amt).toLocaleString('tr-TR')} TL</strong></td>
       <td>%${shareExpense.toFixed(1)}</td>
       <td>%${shareRev.toFixed(1)}</td>
       <td><span class="${deltaStr.includes('↑') ? 'text-rose' : 'text-emerald'}">${deltaStr}</span></td>
-      <td style="text-align: right;"><button class="btn-text" onclick="event.stopPropagation(); filterExpensesByCategory('${cat.name}')">Detay ›</button></td>
+      <td style="text-align: right;"><button class="btn-text" onclick="filterExpensesByCategory(decodeURIComponent('${encodeURIComponent(cat.name)}'), event)">Detay ›</button></td>
     `;
     tbody.appendChild(tr);
   });
 }
 
-function filterExpensesByCategory(catName) {
+function filterExpensesByCategory(catName, clickEvent) {
+  if (clickEvent && typeof clickEvent.stopPropagation === 'function') clickEvent.stopPropagation();
   switchTab('expenses');
   document.getElementById('expSearchInput').value = catName;
   renderExpensesTable();
@@ -4505,7 +4517,7 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
             <span class="rank-badge ${rankClass}">#${rank}</span>
             <div class="villa-icon-avatar">${item.meta.icon || '🏡'}</div>
             <div class="villa-text-meta">
-              <h4>${item.conf.name}</h4>
+              <h4>${escapeHtml(item.conf.name)}</h4>
               <span>${item.meta.spec}</span>
             </div>
           </div>
@@ -4562,7 +4574,7 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
           <div style="display:flex; align-items:center; gap:10px;">
             <div class="villa-icon-avatar">${item.meta.icon || '🏡'}</div>
             <div>
-              <h3 style="margin:0; font-size:15px; font-weight:700;">${item.conf.name}</h3>
+              <h3 style="margin:0; font-size:15px; font-weight:700;">${escapeHtml(item.conf.name)}</h3>
               <span style="font-size:11px; color:var(--text-muted);">${item.meta.spec}</span>
             </div>
           </div>
@@ -4650,7 +4662,7 @@ function renderPropertyComparisonChart(propStats) {
     const row = document.createElement('div');
     row.className = 'comp-bar-row';
     row.innerHTML = `
-      <div class="comp-bar-label"><strong>${item.name}</strong></div>
+      <div class="comp-bar-label"><strong>${escapeHtml(item.name)}</strong></div>
       <div class="comp-bar-track">
         <div class="comp-bar-fill" style="width: ${barPct}%;"></div>
       </div>
@@ -6168,7 +6180,7 @@ async function refreshImportHistory() {
     const geriAlinabilir = p.linkedCount > 0;
     const dugme = geriAlinabilir
       ? `<button type="button" class="btn btn-secondary btn-sm" style="font-size:10px; padding:3px 8px; border-color:#EF4444; color:#FCA5A5;"
-                 onclick="undoImportBatch('${escapeHtml(p.id)}')">↩︎ Geri Al (${p.linkedCount})</button>`
+                 onclick="undoImportBatch(decodeURIComponent('${encodeURIComponent(String(p.id))}'))">↩︎ Geri Al (${p.linkedCount})</button>`
       : `<span style="font-size:10px; color:#64748B;" title="Bu aktarım, geri alma özelliği eklenmeden önce yapıldı.">geri alınamaz</span>`;
     return `<div style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:6px 8px; border-bottom:1px solid rgba(255,255,255,0.06);">
       <div style="min-width:0;">
@@ -6806,7 +6818,7 @@ function renderTodayRadar() {
     row.className = 'radar-row';
     row.innerHTML = `
       <div class="radar-badge-col"><span class="radar-pill pill-${act.type}">${act.badge}</span></div>
-      <div class="radar-main-col"><strong>${act.title}</strong><span>${act.meta}</span></div>
+      <div class="radar-main-col"><strong>${escapeHtml(act.title)}</strong><span>${act.meta}</span></div>
       <div class="radar-action-col"><button type="button" class="btn btn-secondary btn-sm" data-radar-action="${act.type}" data-radar-id="${act.id || ''}">${act.action}</button></div>
     `;
     const actionButton = row.querySelector('[data-radar-action]');
@@ -6924,7 +6936,7 @@ function renderChannelDistribution() {
     div.className = 'channel-progress-item';
     div.innerHTML = `
       <div class="channel-meta">
-        <span><strong>${chName}</strong> (${ch.count} Rez.)</span>
+        <span><strong>${escapeHtml(chName)}</strong> (${ch.count} Rez.)</span>
         <span>₺${Math.round(ch.net).toLocaleString('tr-TR')} • %${pct.toFixed(1)}</span>
       </div>
       <div class="progress-bar-bg">
@@ -7027,9 +7039,9 @@ function renderGapNights() {
     card.className = 'gap-card';
     card.innerHTML = `
       <div class="gap-info">
-        <strong style="color: #FFFFFF; font-size: 13px;">${g.villaName}</strong>
+        <strong style="color: #FFFFFF; font-size: 13px;">${escapeHtml(g.villaName)}</strong>
         <span style="color: #60A5FA; font-size: 12px; font-weight: 600; margin-top: 2px;">${g.dates}</span>
-        <span style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">${g.note}</span>
+        <span style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">${escapeHtml(g.note)}</span>
       </div>
       <div class="gap-pricing">
         <div class="offer-price" style="color: #34D399; font-size: 15px; font-weight: 800;">${g.offer}</div>
@@ -7083,7 +7095,7 @@ function renderOtaRadar() {
     const netMargin = c.gross > 0 ? (c.net / c.gross) * 100 : 0;
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td><strong>${c.name}</strong></td>
+      <td><strong>${escapeHtml(c.name)}</strong></td>
       <td><span class="badge ${c.type === 'Direkt' ? 'badge-green' : 'badge-blue'}">${c.type}</span></td>
       <td>${c.count}</td>
       <td>₺${Math.round(c.gross).toLocaleString('tr-TR')}</td>
@@ -7787,7 +7799,7 @@ function renderSettingsGoalsTable() {
 
     tr.innerHTML = `
       <td>
-        <strong>${m.name}</strong>
+        <strong>${escapeHtml(m.name)}</strong>
         ${isCurrent ? ' <span class="badge badge-blue" style="font-size:10px; margin-left:4px;">Seçili Dönem</span>' : ''}
       </td>
       <td>
@@ -8711,8 +8723,8 @@ function renderBookingChannelSettings() {
       <td><input class="tbl-input" id="bookingChannelRate_${id}" type="number" min="0" max="100" step="0.01" value="${Number(channel.defaultCommissionRate)}" ${(disabled || channel.channelType === 'DIRECT') ? 'disabled' : ''}></td>
       <td><span class="badge ${channel.isActive ? 'badge-green' : 'badge-slate'}">${channel.isActive ? 'AKTİF' : 'PASİF'}</span></td>
       <td style="text-align:right; white-space:nowrap;">
-        <button type="button" class="btn btn-secondary btn-sm" onclick="saveBookingChannelRow(event, '${channel.id || ''}')" ${disabled ? 'disabled' : ''}>Kaydet</button>
-        <button type="button" class="btn ${channel.isActive ? 'btn-danger' : 'btn-secondary'} btn-sm" onclick="setBookingChannelActive('${channel.id || ''}', ${channel.isActive ? 'false' : 'true'})" ${disabled ? 'disabled' : ''}>${channel.isActive ? 'Kaldır' : 'Etkinleştir'}</button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="saveBookingChannelRow(event, decodeURIComponent('${encodeURIComponent(channel.id || '')}'))" ${disabled ? 'disabled' : ''}>Kaydet</button>
+        <button type="button" class="btn ${channel.isActive ? 'btn-danger' : 'btn-secondary'} btn-sm" onclick="setBookingChannelActive(decodeURIComponent('${encodeURIComponent(channel.id || '')}'), ${channel.isActive ? 'false' : 'true'})" ${disabled ? 'disabled' : ''}>${channel.isActive ? 'Kaldır' : 'Etkinleştir'}</button>
       </td>
     </tr>`;
   }).join('');
@@ -8787,7 +8799,7 @@ function renderSettingsTable() {
     const v = appData.villas[vKey];
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td><strong>${v.name}</strong></td>
+      <td><strong>${escapeHtml(v.name)}</strong></td>
       <td>${v.capacity}</td>
       <td><input type="number" class="tbl-input" id="set_floor_${vKey}" value="${fiyatAlani(v.floor)}"></td>
       <td><input type="number" class="tbl-input" id="set_base_${vKey}" value="${fiyatAlani(v.base !== undefined ? v.base : v.basePrice)}"></td>
@@ -8928,7 +8940,7 @@ function renderManageLeadsTable() {
   });
 
   leads.forEach(l => {
-    let statusBadge = `<span class="badge badge-amber">${l.status || l.stage}</span>`;
+    let statusBadge = `<span class="badge badge-amber">${escapeHtml(l.status || l.stage)}</span>`;
     if (l.status === 'WON' || l.stage === 'WON') statusBadge = `<span class="badge badge-green">Kazanıldı</span>`;
     if (l.status === 'LOST' || l.stage === 'LOST') statusBadge = `<span class="badge badge-rose">Kaybedildi</span>`;
 
@@ -8941,13 +8953,13 @@ function renderManageLeadsTable() {
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td><strong>${l.guest}</strong></td>
-      <td>${appData.villas[l.villa]?.name || l.villa}</td>
-      <td>${l.channel}</td>
+      <td><strong>${escapeHtml(l.guest)}</strong></td>
+      <td>${escapeHtml(appData.villas[l.villa]?.name || l.villa)}</td>
+      <td>${escapeHtml(l.channel)}</td>
       <td>₺${Number(l.quote).toLocaleString('tr-TR')}</td>
       <td>${statusBadge}</td>
-      <td>${l.lostReason || '-'}</td>
-      <td>${l.notes || '-'}</td>
+      <td>${escapeHtml(l.lostReason || '-')}</td>
+      <td>${escapeHtml(l.notes || '-')}</td>
       <td style="text-align: right; white-space: nowrap; display: flex; gap: 6px; justify-content: flex-end; align-items: center;">
         ${convertAction}
         <button class="btn btn-secondary btn-sm" onclick="editLead('${l.id}')" title="Düzenle">✏️</button>
@@ -9164,7 +9176,7 @@ function renderManageMaintTable() {
       <td>${escapeHtml(m.assignee || 'Atanmadı')}</td>
       <td>₺${Number(m.cost).toLocaleString('tr-TR')}</td>
       <td>${m.downtime || 0} Gece</td>
-      <td><span class="badge ${statusPresentation.badgeClass}">${statusPresentation.label}</span></td>
+      <td><span class="badge ${statusPresentation.badgeClass}">${escapeHtml(statusPresentation.label)}</span></td>
       <td style="text-align: right; white-space: nowrap;">
         ${statusPresentation.archived ? '' : `<button class="btn btn-secondary btn-sm" onclick="editMaint(decodeURIComponent('${encodeURIComponent(String(m.id))}'))">✏️</button>
         <button class="btn btn-danger btn-sm" onclick="deleteMaint(decodeURIComponent('${encodeURIComponent(String(m.id))}'))">Arşivle</button>`}
@@ -9305,7 +9317,7 @@ function renderResetImpact() {
 
   kutu.innerHTML = satirlar.length
     ? '<strong>Silinecek kayıtlar:</strong><br>' +
-      satirlar.map(([ad, n]) => `• ${ad}: <strong>${n}</strong>`).join('<br>') +
+      satirlar.map(([ad, n]) => `• ${escapeHtml(ad)}: <strong>${n}</strong>`).join('<br>') +
       '<br><span style="color:#94A3B8;">Ekip üyeleriniz ve işletme hesabınız korunur.</span>'
     : 'Sıfırlanacak kayıt bulunmuyor; işletmeniz zaten boş.';
 }
@@ -9559,8 +9571,8 @@ function renderDailyOps() {
           <div style="font-size: 11px; color: #60A5FA; font-weight: 600; margin-bottom: 4px;">📅 Yaklaşan İlk Girişler:</div>
           ${upcoming.map(u => `
             <div style="font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between; padding: 2px 0;">
-              <span><strong>${formatShortDate(u.checkIn)}</strong> - ${u.guest}</span>
-              <span style="color: #93C5FD;">${appData.villas[u.villa]?.name || u.villa}</span>
+              <span><strong>${formatShortDate(u.checkIn)}</strong> - ${escapeHtml(u.guest)}</span>
+              <span style="color: #93C5FD;">${escapeHtml(appData.villas[u.villa]?.name || u.villa)}</span>
             </div>
           `).join('')}
         </div>
@@ -9581,9 +9593,9 @@ function renderDailyOps() {
       div.className = 'ops-entry-card';
       div.innerHTML = `
         <div style="flex: 1;">
-          <div class="ops-guest-name" style="font-weight: 700; color: #FFFFFF; font-size: 13px;">${b.guest}</div>
+          <div class="ops-guest-name" style="font-weight: 700; color: #FFFFFF; font-size: 13px;">${escapeHtml(b.guest)}</div>
           <div class="ops-guest-meta" style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
-            ${vName} • ${b.channel} • ${b.nights || '—'} Gece • ${b.pax || '—'} Kişi
+            ${escapeHtml(vName)} • ${escapeHtml(b.channel)} • ${b.nights || '—'} Gece • ${b.pax || '—'} Kişi
           </div>
           <div style="font-size: 11px; color: #34D399; margin-top: 2px;">Net Gelir: ₺${Number(b.net || 0).toLocaleString('tr-TR')}</div>
         </div>
@@ -9613,8 +9625,8 @@ function renderDailyOps() {
           <div style="font-size: 11px; color: #93C5FD; font-weight: 600; margin-bottom: 4px;">📅 Yaklaşan İlk Çıkışlar:</div>
           ${upcomingOut.map(u => `
             <div style="font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between; padding: 2px 0;">
-              <span><strong>${formatShortDate(u.checkOut)}</strong> - ${u.guest}</span>
-              <span style="color: #93C5FD;">${appData.villas[u.villa]?.name || u.villa}</span>
+              <span><strong>${formatShortDate(u.checkOut)}</strong> - ${escapeHtml(u.guest)}</span>
+              <span style="color: #93C5FD;">${escapeHtml(appData.villas[u.villa]?.name || u.villa)}</span>
             </div>
           `).join('')}
         </div>
@@ -9635,9 +9647,9 @@ function renderDailyOps() {
       div.className = 'ops-entry-card';
       div.innerHTML = `
         <div style="flex: 1;">
-          <div class="ops-guest-name" style="font-weight: 700; color: #FFFFFF; font-size: 13px;">${b.guest}</div>
+          <div class="ops-guest-name" style="font-weight: 700; color: #FFFFFF; font-size: 13px;">${escapeHtml(b.guest)}</div>
           <div class="ops-guest-meta" style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
-            ${vName} • ${b.channel} • Çıkış Günü
+            ${escapeHtml(vName)} • ${escapeHtml(b.channel)} • Çıkış Günü
           </div>
           <div style="font-size: 11px; color: #FBBF24; margin-top: 2px;">🧹 Temizlik Planına Alındı</div>
         </div>
@@ -9685,8 +9697,8 @@ function renderDailyOps() {
 
     villaCardsHtml += `
       <div style="display: inline-flex; align-items: center; gap: 4px; background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.07); padding: 3px 6px; border-radius: 6px; font-size: 11px; margin: 2px;">
-        <span style="color: #FFFFFF; font-weight: 600;">${vConf.name.split(' ')[0]}:</span>
-        <span class="badge ${badgeClass}" data-readiness-status="${readiness?.status || 'UNSET'}" style="font-size: 9px; padding: 1px 5px; cursor: ${canEditReadiness ? 'pointer' : 'default'};" ${actionAttrs}>${statusBadge}</span>
+        <span style="color: #FFFFFF; font-weight: 600;">${escapeHtml(vConf.name.split(' ')[0])}:</span>
+        <span class="badge ${badgeClass}" data-readiness-status="${escapeHtml(readiness?.status || 'UNSET')}" style="font-size: 9px; padding: 1px 5px; cursor: ${canEditReadiness ? 'pointer' : 'default'};" ${actionAttrs}>${statusBadge}</span>
       </div>
     `;
   });
@@ -10451,7 +10463,7 @@ function renderTapeChart() {
     const vConf = appData.villas?.[vKey] || {};
     const vName = vConf.name || vKey;
     const vPropId = vConf.id;
-    tableHtml += `<tr><td class="tape-villa-td"><strong>${vName}</strong></td>`;
+    tableHtml += `<tr><td class="tape-villa-td"><strong>${escapeHtml(vName)}</strong></td>`;
 
     const vBookings = (appData.bookings || []).filter(b => 
       (b.villa === vKey || (vPropId && b.propertyId === vPropId)) && b.status !== 'CANCELLED'
@@ -10476,9 +10488,9 @@ function renderTapeChart() {
         const isCheckInDay = (booking.checkIn === dateStr);
         const isCheckOutDay = (booking.checkOut === dateStr);
 
-        tableHtml += `<td class="tape-cell ${isToday ? 'today-cell' : ''}" title="${booking.guest} (${booking.channel}) | ${booking.checkIn} - ${booking.checkOut} | Toplam: ${booking.gross} TL (Tıklayarak düzenleyin)" onclick="editBooking('${booking.id}')" style="cursor: pointer;">
+        tableHtml += `<td class="tape-cell ${isToday ? 'today-cell' : ''}" title="${escapeHtml(booking.guest)} (${escapeHtml(booking.channel)}) | ${booking.checkIn} - ${booking.checkOut} | Toplam: ${booking.gross} TL (Tıklayarak düzenleyin)" onclick="editBooking('${booking.id}')" style="cursor: pointer;">
           <div class="tape-booked ${chClass}" style="${isCheckInDay ? 'border-left: 3px solid #FCD34D;' : ''}">
-            ${booking.guest.split(' ')[0]}
+            ${escapeHtml(booking.guest.split(' ')[0])}
           </div>
         </td>`;
       } else {
@@ -10911,7 +10923,7 @@ function renderLeadAnalytics() {
       lossBox.innerHTML += `
         <div>
           <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px;">
-            <span>${r.label}</span>
+            <span>${escapeHtml(r.label)}</span>
             <strong style="color:${r.color};">${cnt} Kişi (%${pct})</strong>
           </div>
           <div style="height:6px; background:rgba(255,255,255,0.06); border-radius:3px; overflow:hidden;">
@@ -10952,7 +10964,7 @@ function renderLeadAnalytics() {
       villaBox.innerHTML += `
         <div>
           <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px;">
-            <span>${v.name}</span>
+            <span>${escapeHtml(v.name)}</span>
             <strong>${cnt} Talep (%${pct})</strong>
           </div>
           <div style="height:6px; background:rgba(255,255,255,0.06); border-radius:3px; overflow:hidden;">
@@ -10980,12 +10992,12 @@ function renderLeadAnalytics() {
           .filter(([, n]) => n > 0)
           .sort((a, b) => b[1] - a[1]);
         if (!siralı.length) return '';
-        const ad = k => escapeHtml((appData.villas && appData.villas[k] && appData.villas[k].name) || k);
+        const guvenliAd = k => escapeHtml((appData.villas && appData.villas[k] && appData.villas[k].name) || k);
         const top = siralı[0];
         const pay = totalLeads > 0 ? Math.round((top[1] / totalLeads) * 100) : 0;
         const zayif = siralı.length > 1 ? siralı[siralı.length - 1] : null;
         return `<div>
-        • <strong>Talep Yoğunluğu:</strong> Taleplerin %${pay}'i <strong>${ad(top[0])}</strong> için geliyor (${top[1]} talep). Bu mülkte taban fiyatı savunun${zayif ? `; en az talep gören <strong>${ad(zayif[0])}</strong> için hafta içi paket teklifi deneyin` : ''}.
+        • <strong>Talep Yoğunluğu:</strong> Taleplerin %${pay}'i <strong>${guvenliAd(top[0])}</strong> için geliyor (${top[1]} talep). Bu mülkte taban fiyatı savunun${zayif ? `; en az talep gören <strong>${guvenliAd(zayif[0])}</strong> için hafta içi paket teklifi deneyin` : ''}.
       </div>`;
       })()}
     `;
@@ -11596,12 +11608,12 @@ function renderAirbnbAuditRadar() {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td style="font-weight: 700; white-space: nowrap;">
-        <strong>${item.name}</strong>
+        <strong>${escapeHtml(item.name)}</strong>
       </td>
       <td style="font-size: 12px; color: #E2E8F0;">
-        <span style="font-weight: 600;">${item.title}</span>
+        <span style="font-weight: 600;">${escapeHtml(item.title)}</span>
         <div style="font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); margin-top: 2px;">
-          airbnb.com.tr/h/${item.slug}
+          airbnb.com.tr/h/${escapeHtml(item.slug)}
         </div>
       </td>
       <td style="white-space: nowrap;">
@@ -11730,11 +11742,11 @@ function renderMarketingCampaignsTable(campaigns) {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>
-        <strong style="color:#F8FAFC;">${c.name}</strong>
-        <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">${c.notes || c.channelType || ''}</div>
+        <strong style="color:#F8FAFC;">${escapeHtml(c.name)}</strong>
+        <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">${escapeHtml(c.notes || c.channelType || '')}</div>
       </td>
       <td>${pBadge}</td>
-      <td><span class="badge badge-blue" style="font-size:11px;">${vName}</span></td>
+      <td><span class="badge badge-blue" style="font-size:11px;">${escapeHtml(vName)}</span></td>
       <td style="font-size:12px; color:var(--text-muted);">${dateStr || '-'}</td>
       <td>
         <strong style="color:#F87171;">₺${sp.toLocaleString('tr-TR')}</strong>
@@ -11922,9 +11934,9 @@ function runAIMarketingAdvisor() {
     <div class="ai-insight-card ${i.type}">
       <div class="ai-insight-title">
         <span>${i.icon}</span>
-        <span>${i.title}</span>
+        <span>${escapeHtml(i.title)}</span>
       </div>
-      <div class="ai-insight-text">${i.text}</div>
+      <div class="ai-insight-text">${escapeHtml(i.text)}</div>
     </div>
   `).join('');
 }
@@ -12130,10 +12142,10 @@ function renderOtaRankingAndCoverRadar() {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>
-        <strong style="color: #F8FAFC; font-size: 13px;">${item.name}</strong>
-        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">${item.title}</div>
+        <strong style="color: #F8FAFC; font-size: 13px;">${escapeHtml(item.name)}</strong>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">${escapeHtml(item.title)}</div>
         <div style="margin-top: 4px;">
-          <a href="${item.url}" target="_blank" rel="noopener noreferrer" style="font-size: 10px; color: #60A5FA; text-decoration: none;">🔗 airbnb.com.tr/h/${item.slug} ↗</a>
+          <a href="${item.url}" target="_blank" rel="noopener noreferrer" style="font-size: 10px; color: #60A5FA; text-decoration: none;">🔗 airbnb.com.tr/h/${escapeHtml(item.slug)} ↗</a>
         </div>
       </td>
       <td>
@@ -12237,7 +12249,7 @@ function renderCoverAbTestLab(villaKey = null) {
         </div>
         <div style="margin-bottom: 12px;">
           <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Mevcut Başlık:</div>
-          <div style="font-size: 12px; color: #CBD5E1; font-weight: 600; margin-top: 2px;">"${item.title}"</div>
+          <div style="font-size: 12px; color: #CBD5E1; font-weight: 600; margin-top: 2px;">"${escapeHtml(item.title)}"</div>
         </div>
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: rgba(255,255,255,0.04); border-radius: 8px;">
           <span style="font-size: 12px; color: var(--text-muted);">Ölçülen Tıklama (CTR):</span>
@@ -12260,7 +12272,7 @@ function renderCoverAbTestLab(villaKey = null) {
         <div style="margin-bottom: 12px;">
           <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">AI Tarafından Üretilen SEO Başlığı:</div>
           <div style="font-size: 12px; color: #F8FAFC; font-weight: 700; margin-top: 2px; background: rgba(0,0,0,0.4); padding: 6px 10px; border-radius: 6px; border: 1px dashed rgba(52, 211, 153, 0.4);">
-            "${item.aiOptimizedTitle || item.title}"
+            "${escapeHtml(item.aiOptimizedTitle || item.title)}"
           </div>
         </div>
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: rgba(16, 185, 129, 0.1); border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.2);">
@@ -12268,7 +12280,7 @@ function renderCoverAbTestLab(villaKey = null) {
             <span style="font-size: 12px; color: #DDD6FE;">Beklenen Tıklama (CTR):</span>
             <strong style="color: #34D399; font-size: 14px; margin-left: 6px;">— (A/B testi çalıştırılmadı)</strong>
           </div>
-          <button type="button" class="btn btn-secondary btn-sm" onclick="copyAiTitle('${item.aiOptimizedTitle || item.title}')" style="border-color: #34D399; color: #34D399; font-size: 11px; font-weight: 700;">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="copyAiTitle(decodeURIComponent('${encodeURIComponent(item.aiOptimizedTitle || item.title)}'))" style="border-color: #34D399; color: #34D399; font-size: 11px; font-weight: 700;">
             📋 Başlığı Kopyala
           </button>
         </div>
@@ -12485,17 +12497,17 @@ function renderGapNightsRadar() {
         </div>`;
     const butonlar = fiyatBiliniyor
       ? `<div style="display:flex; gap:6px; flex-wrap:wrap;">
-        <button type="button" class="btn btn-secondary btn-sm" onclick="copyGapStoryText('${g.villaName}', '${g.checkIn} - ${g.checkOut}', ${g.nights}, '${g.discountPrice.toLocaleString('tr-TR')}', '${g.regularPrice.toLocaleString('tr-TR')}')" style="flex:1; border-color:#EF4444; color:#FCA5A5; font-size:11px; font-weight:700;">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="copyGapStoryText(decodeURIComponent('${encodeURIComponent(g.villaName)}'), decodeURIComponent('${encodeURIComponent(g.checkIn + ' - ' + g.checkOut)}'), ${Number(g.nights) || 0}, decodeURIComponent('${encodeURIComponent(g.discountPrice.toLocaleString('tr-TR'))}'), decodeURIComponent('${encodeURIComponent(g.regularPrice.toLocaleString('tr-TR'))}'))" style="flex:1; border-color:#EF4444; color:#FCA5A5; font-size:11px; font-weight:700;">
           ⚡ Flaş Hikaye Kopyala
         </button>
-        <button type="button" class="btn btn-primary btn-sm" onclick="shareGapWhatsApp('${g.villaName}', '${g.checkIn} - ${g.checkOut}', ${g.nights}, '${g.discountPrice.toLocaleString('tr-TR')}')" style="background:#10B981; border:none; font-size:11px; font-weight:700;">
+        <button type="button" class="btn btn-primary btn-sm" onclick="shareGapWhatsApp(decodeURIComponent('${encodeURIComponent(g.villaName)}'), decodeURIComponent('${encodeURIComponent(g.checkIn + ' - ' + g.checkOut)}'), ${Number(g.nights) || 0}, decodeURIComponent('${encodeURIComponent(g.discountPrice.toLocaleString('tr-TR'))}'))" style="background:#10B981; border:none; font-size:11px; font-weight:700;">
           📲 Durum
         </button>
       </div>`
       : '';
     card.innerHTML = `
       <div class="gap-card-header">
-        <span class="gap-villa-name">🏡 ${g.villaName}</span>
+        <span class="gap-villa-name">🏡 ${escapeHtml(g.villaName)}</span>
         ${fiyatBiliniyor ? `<span class="badge badge-amber">%${g.discountPct} Flaş İndirim</span>` : ''}
       </div>
       <div class="gap-dates-tag">
@@ -13370,7 +13382,7 @@ async function handleSaaSForgotPassword(e) {
         err.style.border = '1px solid #3B82F6';
         err.style.color = '#93C5FD';
         err.innerHTML = `📬 <strong>Sıfırlama Bağlantısı Gönderildi</strong><br>
-        <span style="font-size:12px;">Bu adrese ait bir hesap varsa, <strong>${email}</strong> adresine şifre yenileme bağlantısı gönderildi. Gelen kutunuzu ve spam klasörünü kontrol edin.</span>`;
+        <span style="font-size:12px;">Bu adrese ait bir hesap varsa, <strong>${escapeHtml(email)}</strong> adresine şifre yenileme bağlantısı gönderildi. Gelen kutunuzu ve spam klasörünü kontrol edin.</span>`;
       }
     }
   } catch (ex) {
@@ -13930,7 +13942,7 @@ async function handleSaaSRegister(e) {
         err.style.border = '1px solid #3B82F6';
         err.style.color = '#93C5FD';
         err.innerHTML = `📬 <strong>Aktivasyon E-postası Gönderildi!</strong><br>
-        <span style="font-size:12px;">Lütfen <strong>${email}</strong> adresine gönderilen onay linkine tıklayın. Doğrulama sonrası kaldığınız yerden devam edebilirsiniz.</span>`;
+        <span style="font-size:12px;">Lütfen <strong>${escapeHtml(email)}</strong> adresine gönderilen onay linkine tıklayın. Doğrulama sonrası kaldığınız yerden devam edebilirsiniz.</span>`;
       }
       return;
     }
@@ -16232,7 +16244,7 @@ function renderTodayCommandCenter(actionsResult) {
             <span class="action-score-pill ${scoreClass}" title="${hasScore ? 'Hesaplanan öncelik puanı' : 'Öncelik puanı hesaplanamadı'}">Puan: ${hasScore ? score + '/100' : '—'}</span>
             <span style="font-size: 10px; color: #94A3B8; font-weight: 600;">${act.propertyId || ''}</span>
           </div>
-          <div class="action-card-title">${act.title}</div>
+          <div class="action-card-title">${escapeHtml(act.title)}</div>
           <div class="action-card-rationale">${act.rationale || ''}</div>
           ${metricsText ? `<div class="action-source-metrics">📊 ${metricsText}</div>` : ''}
           <div class="action-card-footer">
@@ -16281,7 +16293,7 @@ function renderPortfolioHealth(healthCards) {
     const options = readinessApi.SELECTABLE_STATUSES.map(status => {
       const optionMeta = readinessApi.STATUS_META[status];
       const selected = c.manualStatus === status ? ' selected' : '';
-      return `<option value="${status}"${selected}>${optionMeta.icon} ${escapeHtml(optionMeta.label)}</option>`;
+      return `<option value="${escapeHtml(status)}"${selected}>${optionMeta.icon} ${escapeHtml(optionMeta.label)}</option>`;
     }).join('');
     const editor = canEdit
       ? `<label style="display:block; margin-top:9px; font-size:10px; color:#94A3B8;">
@@ -16403,7 +16415,7 @@ function handleAiAdvisorSubmit(e) {
     if (recommendationAction && isCanonicalAiActionReady(recommendationAction)) {
       actionBtnHtml = `
         <div style="margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: flex-end;">
-          <button type="button" class="btn btn-primary btn-sm" onclick="openAiActionConfirmModal(${JSON.stringify(recommendationAction).replace(/"/g, '&quot;')})" style="background: #10B981; font-weight: 700;">
+          <button type="button" class="btn btn-primary btn-sm" onclick="openAiActionConfirmModal(decodeURIComponent('${encodeURIComponent(JSON.stringify(recommendationAction))}'))" style="background: #10B981; font-weight: 700;">
             ⚡ Bu Öneriyi Uygula
           </button>
         </div>
@@ -16429,6 +16441,11 @@ function handleAiAdvisorSubmit(e) {
 }
 
 function openAiActionConfirmModal(action) {
+  // Isleyiciden JSON metni olarak gelir (L-15: nesne satir ici isleyiciye
+  // yazilamaz); dogrudan nesne de kabul edilir.
+  if (typeof action === 'string') {
+    try { action = JSON.parse(action); } catch (_) { return; }
+  }
   pendingAiAction = action;
   const modal = document.getElementById('aiActionConfirmModal');
   const body = document.getElementById('aiActionConfirmBody');
@@ -16438,7 +16455,7 @@ function openAiActionConfirmModal(action) {
   if (body) {
     body.innerHTML = `
       <strong>Öneri Türü:</strong> ${action.type || 'FİYAT_GÜNCELLEME'}<br>
-      <strong>Açıklama:</strong> ${action.description || 'Önerilen stratejik değişiklik kanonik motor aracılığıyla uygulanacaktır.'}
+      <strong>Açıklama:</strong> ${escapeHtml(action.description || 'Önerilen stratejik değişiklik kanonik motor aracılığıyla uygulanacaktır.')}
     `;
   }
   if (metrics) {
@@ -16676,7 +16693,7 @@ function renderUserNotificationsDrawer() {
       <div style="color: #CBD5E1; font-size: 11px;">${escapeHtml(n.message || '')}</div>
       <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 4px;">
         ${n.status === 'ACKNOWLEDGED' || n.status === 'RESOLVED' ? '' :
-          `<button class="btn btn-secondary btn-sm" onclick="confirmUserNotification('${n.id}')" style="font-size: 9px; padding: 1px 5px;">Onayla</button>`}
+          `<button class="btn btn-secondary btn-sm" onclick="confirmUserNotification(decodeURIComponent('${encodeURIComponent(String(n.id))}'))" style="font-size: 9px; padding: 1px 5px;">Onayla</button>`}
       </div>
     </div>
   `).join('');
@@ -16868,7 +16885,13 @@ function getGuestCrmView() {
 }
 
 function setGuestDirectoryQuery(value) { guestDirectoryState.query = value || ''; guestDirectoryState.page = 1; renderGuestsTab(); }
-function setGuestDirectorySegment(value) { guestDirectoryState.segment = value || 'ALL'; guestDirectoryState.page = 1; renderGuestsTab(); }
+// syncSelect: satir ici isleyici tek cagri olmali (L-15); secici esitlemesi
+// eskiden isleyicide ikinci ifadeydi ve temizleyici butun isleyiciyi siliyordu.
+function setGuestDirectorySegment(value, syncSelect) {
+  guestDirectoryState.segment = value || 'ALL'; guestDirectoryState.page = 1;
+  if (syncSelect) { const el = document.getElementById('guestDirectorySegment'); if (el) el.value = guestDirectoryState.segment; }
+  renderGuestsTab();
+}
 function setGuestDirectoryProperty(value) { guestDirectoryState.propertyId = value || ''; guestDirectoryState.page = 1; renderGuestsTab(); }
 function setGuestDirectorySort(value) { guestDirectoryState.sort = value || 'RECENT'; guestDirectoryState.page = 1; renderGuestsTab(); }
 function setGuestDirectorySortDirection(value) { guestDirectoryState.direction = value === 'ASC' ? 'ASC' : 'DESC'; guestDirectoryState.page = 1; renderGuestsTab(); }
@@ -16931,7 +16954,7 @@ function renderGuestsTab() {
   if (opportunityNotice) {
     const count = Number(metrics.rebookingOpportunityCount || 0);
     opportunityNotice.innerHTML = count
-      ? `<strong>🎯 ${count} yeniden rezervasyon fırsatı:</strong> Konaklaması tamamlanmış, gelecekte rezervasyonu olmayan ve kampanya iletişimine açık onay vermiş misafir. <button type="button" class="btn btn-secondary btn-sm" style="margin-left:8px;" onclick="setGuestDirectorySegment('REBOOKING'); document.getElementById('guestDirectorySegment').value='REBOOKING';">Fırsatları göster</button>`
+      ? `<strong>🎯 ${count} yeniden rezervasyon fırsatı:</strong> Konaklaması tamamlanmış, gelecekte rezervasyonu olmayan ve kampanya iletişimine açık onay vermiş misafir. <button type="button" class="btn btn-secondary btn-sm" style="margin-left:8px;" onclick="setGuestDirectorySegment('REBOOKING', true)">Fırsatları göster</button>`
       : '';
     opportunityNotice.style.display = count ? 'block' : 'none';
   }
@@ -17007,6 +17030,12 @@ function renderGuestsTab() {
   if (pagination) pagination.innerHTML = `<button class="btn btn-secondary btn-sm" onclick="setGuestDirectoryPage(${guestDirectoryState.page - 1})" ${guestDirectoryState.page <= 1 ? 'disabled' : ''}>Önceki</button><span>${filtered.length} misafir · ${guestDirectoryState.page}/${pageCount}</span><button class="btn btn-secondary btn-sm" onclick="setGuestDirectoryPage(${guestDirectoryState.page + 1})" ${guestDirectoryState.page >= pageCount ? 'disabled' : ''}>Sonraki</button>`;
 }
 
+/** Misafir profilinden rezervasyona gec (tek cagri, L-15). */
+function openBookingFromGuestProfile(bookingId) {
+  closeGuestProfileModal();
+  openBookingModal(bookingId);
+}
+
 function closeGuestProfileModal() {
   document.getElementById('guestProfileModal')?.classList.remove('active');
 }
@@ -17041,7 +17070,7 @@ function openGuestProfileModal(guestId = null) {
   if (insights && row) {
     const history = row.bookings.length ? row.bookings.map(booking => {
       const villaName = appData.villas?.[booking.villa]?.name || booking.villa || '—';
-      return `<div style="padding:7px 0; border-bottom:1px solid rgba(255,255,255,.06);">${escapeHtml(villaName)} · ${formatTrDate(booking.checkIn)} – ${formatTrDate(booking.checkOut)} · ₺${Number(booking.gross || 0).toLocaleString('tr-TR')} <button type="button" class="btn btn-secondary btn-sm" style="float:right;" onclick="closeGuestProfileModal(); openBookingModal(decodeURIComponent('${encodeURIComponent(String(booking.id))}'))">Rezervasyon</button></div>`;
+      return `<div style="padding:7px 0; border-bottom:1px solid rgba(255,255,255,.06);">${escapeHtml(villaName)} · ${formatTrDate(booking.checkIn)} – ${formatTrDate(booking.checkOut)} · ₺${Number(booking.gross || 0).toLocaleString('tr-TR')} <button type="button" class="btn btn-secondary btn-sm" style="float:right;" onclick="openBookingFromGuestProfile(decodeURIComponent('${encodeURIComponent(String(booking.id))}'))">Rezervasyon</button></div>`;
     }).join('') : '<div style="color:var(--text-muted);">Bu profile bağlı rezervasyon yok.</div>';
     const offerStatus = row.latestOffer ? escapeHtml(row.latestOffer.status || '—') : '—';
     const directShare = row.directShare == null ? '—' : '%' + Math.round(row.directShare * 100);
@@ -17149,7 +17178,7 @@ function renderPricingTab() {
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px;">
           ${gaps.map(g => `
             <div class="gap-night-card">
-              <div class="gap-villa-name">${(appData.villas && appData.villas[g.villa]?.name) || g.villa}</div>
+              <div class="gap-villa-name">${escapeHtml((appData.villas && appData.villas[g.villa]?.name) || g.villa)}</div>
               <div class="gap-dates-tag">📅 ${g.date} (1 Gece)</div>
               <div class="gap-price-box">
                 <span style="font-size: 11px; color: #94A3B8;">Önerilen Fiyat:</span>

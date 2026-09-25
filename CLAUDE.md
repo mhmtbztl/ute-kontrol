@@ -955,6 +955,19 @@ Ağı `core/csv_import_tests.js` (52 iddia: motor, `app.js` kaynağı, gerçek
   hiçbir yerden çağrılmıyor ve tarayıcıya yüklenmiyor. `npm audit fix --force`
   önerisi exceljs'i 3.4.0'a **düşürür** — yapmayın. Kalıcı çözüm, ölü
   `excel_generator.js` ile `exceljs` bağımlılığını birlikte kaldırmaktır.
+- **HTML'e giren her kullanıcı/misafir verisi kaçışlanır (L-15).** Metin ve
+  öznitelik için `escapeHtml(...)`; satır içi işleyicideki JS dizesi için
+  `decodeURIComponent('${encodeURIComponent(x)}')` — orada `escapeHtml`
+  **yetmez** (öznitelik çözülünce tırnak geri gelir). HTML döndüren yardımcının
+  adı `...Html` ile biter ve kendi kaçışından sorumludur. Ağı
+  `core/html_injection_tests.js`: `app.js` ve tüm `core/` modüllerini
+  `core/html_injection_scan.js` ile tarar. Global `innerHTML` temizleyicisi
+  ikinci kattır: yalnız etkileşim olaylarına (`onclick`, `onchange` …) ve tek,
+  izinli fiille başlayan, düz argümanlı çağrıya izin verir; yeni bir düğme
+  işleyicisi bu kurala uymazsa **sessizce silinir** (`undoImportBatch` ve
+  `confirmUserNotification` düğmeleri bu yüzden çalışmıyordu). Hedef: satır
+  içi işleyicileri olay dinleyicisine taşıyıp CSP'den `unsafe-inline`'ı
+  kaldırmak — henüz yapılmadı.
 - `.env` **asla** commit edilmez (`.gitignore`'da). İçinde `service_role` anahtarı var — tam yetkili.
   Tarayıcı koduna hiç girmedi, git geçmişine hiç girmedi.
 - **Supabase, `public` şemasındaki yeni fonksiyonlara varsayılan olarak `anon` rolüne EXECUTE verir.**

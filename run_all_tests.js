@@ -260,6 +260,8 @@ const allTestFiles = [
   // Dalga 2 istemci: uyelik hatasi, ay kapanisi dugmesi, ice aktarma siniri,
   // beni hatirla, ham sunucu hatasi, yakalanmamis hata
   'wave2_client_tests.js',
+  // HTML enjeksiyonu (L-15): kacissiz veri taramasi + temizleyici sozlesmesi
+  'html_injection_tests.js',
 
   // GitHub Actions eylemleri tam commit SHA'sina sabit
   'workflow_pin_tests.js',

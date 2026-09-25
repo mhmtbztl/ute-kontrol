@@ -280,7 +280,7 @@
   function renderBenchmarkForm(model) {
     const selected = model.properties.find(item => item.slug === model.selectedProperty);
     if (!selected || !selected.id) return '';
-    const numeric = (name, label, max = '', step = '0.001') => `<label style="display:grid;gap:5px;font-size:12px">${label}<input class="form-control" type="number" min="0"${max ? ` max="${max}"` : ''} step="${step}" name="${name}" placeholder="Boş bırakılabilir"></label>`;
+    const numeric = (name, label, max = '', step = '0.001') => `<label style="display:grid;gap:5px;font-size:12px">${escapeHtml(label)}<input class="form-control" type="number" min="0"${max ? ` max="${max}"` : ''} step="${step}" name="${escapeHtml(name)}" placeholder="Boş bırakılabilir"></label>`;
     return `<form data-marketing-benchmark-form style="margin-top:14px;border-top:1px solid rgba(148,163,184,.2);padding-top:14px"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px">
       <label style="display:grid;gap:5px;font-size:12px">Kaynak türü<select class="form-control" name="sourceKind" required><option value="PORTFOLIO_HISTORY">Portföy geçmişi</option><option value="MARKET_PROVIDER">Pazar veri sağlayıcısı</option><option value="MANUAL_RESEARCH">Manuel araştırma</option></select></label>
       <label style="display:grid;gap:5px;font-size:12px">Kaynak kaydı<input class="form-control" name="sourceRecordId" maxlength="300" placeholder="Rapor/dosya/sorgu referansı"></label>
@@ -335,7 +335,7 @@
     const channelOptions = [
       ['AIRBNB', 'Airbnb'], ['BOOKING_COM', 'Booking.com'], ['VRBO', 'Vrbo'],
       ['EXPEDIA', 'Expedia'], ['DIRECT', 'Direkt'], ['OTHER_OTA', 'Diğer OTA (ETS Tur vb.)']
-    ].map(([value, label]) => `<option value="${value}">${label}</option>`).join('');
+    ].map(([value, label]) => `<option value="${value}">${escapeHtml(label)}</option>`).join('');
     return `<form data-marketing-listing-form class="card" style="padding:16px;margin-bottom:14px">
       <h3 style="margin:0 0 12px">Kanal ilanı tanımla</h3>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px">
@@ -356,7 +356,7 @@
     const start = model.period.start || '';
     const end = model.period.endExclusive || '';
     const options = model.listings.map(item => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.display_name || item.displayName || item.channel_code || item.channelCode || item.id)}</option>`).join('');
-    const field = (name, label) => `<label style="display:grid;gap:5px;font-size:12px">${label}<input class="form-control" type="number" min="0" step="1" name="${name}" placeholder="Bilinmiyorsa boş bırakın"></label>`;
+    const field = (name, label) => `<label style="display:grid;gap:5px;font-size:12px">${escapeHtml(label)}<input class="form-control" type="number" min="0" step="1" name="${escapeHtml(name)}" placeholder="Bilinmiyorsa boş bırakın"></label>`;
     return `<form data-marketing-snapshot-form class="card" style="padding:16px;margin-bottom:14px">
       <h3 style="margin:0 0 12px">Manuel huni snapshot’ı</h3>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
@@ -386,7 +386,7 @@
     const status = String(item.status || 'OPEN').toUpperCase();
     if (!id || !['OPEN', 'ACKNOWLEDGED'].includes(status)) return '';
     const actionKind = String(item.actionKind || item.action_kind || '').toUpperCase();
-    const button = (action, label, className = 'btn-secondary') => `<button type="button" class="btn btn-sm ${className}" data-marketing-action="${action}" data-finding-id="${escapeHtml(id)}">${label}</button>`;
+    const button = (action, label, className = 'btn-secondary') => `<button type="button" class="btn btn-sm ${className}" data-marketing-action="${action}" data-finding-id="${escapeHtml(id)}">${escapeHtml(label)}</button>`;
     const actions = [];
     if (status === 'OPEN') actions.push(button('ACKNOWLEDGE', 'İncelendi'));
     if (['RESHOOT', 'ON_SITE_CONTENT'].includes(actionKind) && !item.acceptedForTask && !item.accepted_for_task) {
@@ -427,7 +427,7 @@
       ['BATHROOM', 'Banyo'], ['KITCHEN', 'Mutfak'], ['DINING', 'Yemek alanı'],
       ['POOL', 'Havuz'], ['SPA', 'Spa / jakuzi'], ['VIEW_TERRACE', 'Manzara / teras'],
       ['AMENITY', 'Olanak'], ['OTHER', 'Diğer']
-    ].map(([value, label]) => `<option value="${value}">${label}</option>`).join('');
+    ].map(([value, label]) => `<option value="${value}">${escapeHtml(label)}</option>`).join('');
     return `<form data-marketing-media-form class="card" style="padding:16px;margin-bottom:14px">
       <h3 style="margin:0 0 12px">Özel galeriye fotoğraf yükle</h3>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px">
