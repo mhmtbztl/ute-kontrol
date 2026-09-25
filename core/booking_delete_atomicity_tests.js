@@ -118,6 +118,17 @@ async function run() {
       '2. Ödenmiş temizlik görevi korunur, bağlantısı boşalır',
       JSON.stringify(odenmis));
 
+    // K-04 (phase47): yapilmis ama odenmemis temizlik gerceklesmis bir gider
+    // ve personele borctur; rezervasyon silinince kaybolmamali.
+    const r1d = await rezervasyonEkle(owner.client, A.tenantId, A.propertyId, 'D-2D', '06', false);
+    const { error: de } = await admin.from('cleaning_tasks').update({ status: 'DONE' }).eq('id', r1d.task.id);
+    if (de) throw new Error('durum: ' + de.message);
+    await owner.client.rpc('delete_booking_atomic', { p_booking_id: r1d.booking.id, p_tenant_id: A.tenantId });
+    const { data: yapilmis } = await admin.from('cleaning_tasks').select('id,booking_id,status').eq('id', r1d.task.id);
+    check((yapilmis || []).length === 1 && yapilmis[0].booking_id === null,
+      '2b. Yapılmış (ödenmemiş) temizlik görevi korunur: gider ve borç silinmez',
+      JSON.stringify(yapilmis));
+
     // --- 3 & 4: kapanmis donem + atomiklik -----------------------------------
     console.log('\n--- 2. KAPANMIŞ DÖNEM & ATOMİKLİK ---');
     const r2 = await rezervasyonEkle(owner.client, A.tenantId, A.propertyId, 'D-3', '05', false);

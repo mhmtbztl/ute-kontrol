@@ -1,7 +1,9 @@
-# phase45 — uygulama ve doğrulama paketi
+# phase45 + phase47 — uygulama ve doğrulama paketi
 
 > **SQL Editor'e YAPIŞTIRILACAK DOSYA:**
 > `C:\Users\pc\Desktop\lexbnb-claude\supabase\migration_phase45_cleaning_cost_contract.sql`
+> ardından **ayrı bir çalıştırmayla**
+> `C:UserspcDesktoplexbnb-claudesupabasemigration_phase47_booking_delete_keeps_done_cleaning.sql`
 > Bu belge (`.md`) açıklamadır — SQL Editor'e yapıştırılmaz.
 
 **Sahibi:** Claude (tek numara — `AGENTS.md`)
@@ -47,8 +49,19 @@ bu sözleşmeyi kullanır.
 ## 2. Uygulama
 
 1. https://supabase.com/dashboard/project/kirpcqklyjlrhvdbgdrq/sql/new
-2. Editörü boşaltın, **yukarıdaki `.sql` dosyasının** tamamını yapıştırın, **Run**.
+2. Editörü boşaltın, **phase45 `.sql` dosyasının** tamamını yapıştırın, **Run**.
 3. Son bildirim: `PHASE 45 OK — temizlik maliyeti ve odeme komisyonu sozlesmesi yerinde.`
+4. Editörü boşaltın, **phase47 `.sql` dosyasının** tamamını yapıştırın, **Run**.
+5. Son bildirim: `PHASE 47 OK — rezervasyon silme yapilmis temizligi koruyor.`
+
+### phase47 ne yapar
+
+`delete_booking_atomic` rezervasyonla birlikte ödenmemiş **her** temizlik
+görevini siliyordu. phase45'ten beri yapılmış ama ödenmemiş temizlik
+gerçekleşmiş bir gider ve personele borçtur; artık yalnız **yapılmamış**
+(planlı / yapılmadı) ve ödenmemiş görevler silinir. Yetki kapısı phase41 ile
+aynı. Ağı `booking_delete_atomicity_tests` 2b (göçten önce kırmızıydı);
+`phase41_authz_live_tests` 38/38.
 
 Hata alırsanız hiçbir şey uygulanmamıştır (tek transaction); hata kodunu iletin.
 
