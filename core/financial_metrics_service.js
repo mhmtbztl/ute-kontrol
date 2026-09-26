@@ -131,12 +131,10 @@ function calculateAvailableNights(properties = [], year, month, maintenances = [
             blockedDates.add(formatDate(cur));
             cur.setDate(cur.getDate() + 1);
           }
-        } else if (m.priority === 'P1' && (m.status === 'OPEN' || m.downtime > 0)) {
-          // Legacy records had only a day count. Keep compatibility, but no
-          // implicit one-day deduction when no duration was recorded.
-          const legacyDays = Math.max(0, Number(m.downtime || 0));
-          for (let i = 0; i < legacyDays; i++) blockedDates.add(`legacy-${i}`);
         }
+        // Tarihsiz eski kayit (yalniz gun sayisi) DUSULMEZ: hangi aya ait
+        // oldugunu bilmiyoruz ve sunucu da dusmuyor. Eskiden her ay
+        // dusuluyordu; istemci ile sunucunun kapasitesi ayrisiyordu.
       }
     });
 

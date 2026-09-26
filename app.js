@@ -701,6 +701,9 @@ function mapPropertyToDb(property, tenantId) {
     amenities: property.amenities || '',
     url: property.url || ''
   };
+  // Faaliyete baslama tarihi (doluluk kapasitesinin baslangici). Girilmediyse
+  // gonderilmez; sunucu varsayilani (kayit gunu) gecerli olur.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(property.activationDate || '')) payload.activated_on = property.activationDate;
   if (property.id) {
     payload.id = property.id;
   }
@@ -893,6 +896,9 @@ async function updateProperty(propIdOrSlug, propInput) {
     clean_cost: cleanCost,
     amenities: propInput.amenities !== undefined ? propInput.amenities : (existing?.amenities || ''),
     url: propInput.url !== undefined ? propInput.url : (existing?.url || ''),
+    // Sunucu (phase49) ilk rezervasyondan sonraya ve kapanmis aya dokunan
+    // degisikligi reddeder; hata mesaji kullaniciya oldugu gibi gider.
+    ...(/^\d{4}-\d{2}-\d{2}$/.test(propInput.activationDate || '') ? { activated_on: propInput.activationDate } : {}),
     updated_at: new Date().toISOString()
   };
 
@@ -4213,7 +4219,10 @@ function renderFinanceModule() {
     // Payda: mulkun o aydaki GERCEK kapasitesi (aktivasyon/pasiflestirme ve
     // bakim kesintisi dusulmus), sunucu snapshot'iyla ayni (L-36). Ay disi
     // donemlerde gun sayisi.
-    const ayMi = /^d{4}-d{2}$/.test(currentFilter.period || '');
+    // Buradaki regex bir kez ters bolulerini kaybetmisti (\d yerine d): hic
+    // eslesmiyor, payda her zaman ayin gun sayisina dusuyordu
+    // (capacity_consistency_tests B).
+    const ayMi = /^\d{4}-\d{2}$/.test(currentFilter.period || '');
     const kapasite = vKey => {
       if (ayMi && typeof FinancialMetricsService !== 'undefined' && appData.villas[vKey]) {
         const [y, m] = currentFilter.period.split('-').map(Number);
@@ -4226,8 +4235,11 @@ function renderFinanceModule() {
       const payda = kapasite(vKey);
       s.adr = s.nights > 0 ? Math.round((s.roomRevenue || 0) / s.nights) : 0;
       s.share = totalRevenue > 0 ? Number(((s.revenue / totalRevenue) * 100).toFixed(1)) : 0;
-      s.occupancy = payda > 0 ? Number(((s.nights / payda) * 100).toFixed(1)) : 0;
-      s.revpar = payda > 0 ? Math.round((s.roomRevenue || 0) / payda) : 0;
+      // Kapasite yoksa (mulk o donemde faaliyette degil) doluluk OLCULEMEZ:
+      // null tasinir, ekranda "—". 0 yazmak "hic satilmadi" demek olurdu.
+      s.availableNights = payda;
+      s.occupancy = payda > 0 ? Number(((s.nights / payda) * 100).toFixed(1)) : null;
+      s.revpar = payda > 0 ? Math.round((s.roomRevenue || 0) / payda) : null;
     });
 
     // Mulk filtresi defterin kendisinde (isBookingInFilter); toplamlar
@@ -4499,13 +4511,15 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
       const rank = idx + 1;
       const rankClass = rank === 1 ? 'rank-1' : (rank === 2 ? 'rank-2' : (rank === 3 ? 'rank-3' : ''));
       const ciroShare = totalRevenue > 0 ? (s.revenue / totalRevenue) * 100 : 0;
-      const occVal = Number(s.occupancy || ((s.nights / getPeriodDayCount()) * 100).toFixed(1));
+      const occVal = s.occupancy === null || s.occupancy === undefined ? null : Number(s.occupancy);
+      const occText = occVal === null ? '—' : `%${occVal}`;
+      const revparText = s.revpar === null || s.revpar === undefined ? '—' : `₺${Math.round(s.revpar).toLocaleString('tr-TR')}`;
       const adrVal = Math.round(s.adr || (s.nights > 0 ? s.revenue / s.nights : 0));
 
       // Determine Strategic Diagnosis
       let diagBadge = '<span class="badge badge-emerald">🟢 Dengeli</span>';
       if (rank === 1 && s.revenue > 0) diagBadge = '<span class="badge badge-emerald">👑 Ciro Şampiyonu</span>';
-      else if (occVal < 40 && s.revenue > 0) diagBadge = '<span class="badge badge-rose">📉 Boşluk Riski</span>';
+      else if (occVal !== null && occVal < 40 && s.revenue > 0) diagBadge = '<span class="badge badge-rose">📉 Boşluk Riski</span>';
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
@@ -4533,13 +4547,13 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
           <strong style="color:var(--text-primary);">${s.nights} Gece</strong>
           <div class="table-bar-wrapper" style="margin-top:4px;">
             <div class="table-bar-track">
-              <div class="table-bar-fill ${occVal >= 75 ? 'bar-emerald' : (occVal >= 45 ? 'bar-blue' : 'bar-amber')}" style="width: ${Math.min(100, Math.max(0, occVal))}%;"></div>
+              <div class="table-bar-fill ${occVal >= 75 ? 'bar-emerald' : (occVal >= 45 ? 'bar-blue' : 'bar-amber')}" style="width: ${Math.min(100, Math.max(0, occVal || 0))}%;"></div>
             </div>
-            <span style="font-size:10px; color:var(--text-muted);">Doluluk: %${occVal}</span>
+            <span style="font-size:10px; color:var(--text-muted);" title="${occVal === null ? 'Mülk bu dönemde faaliyette görünmüyor (faaliyete başlama tarihi)' : ''}">Doluluk: ${occText}</span>
           </div>
         </td>
         <td><strong>${adrVal.toLocaleString('tr-TR')} TL</strong></td>
-        <td>₺${Math.round(s.revpar || 0).toLocaleString('tr-TR')}</td>
+        <td>${revparText}</td>
         <td>
           <strong class="text-emerald" title="Mülk bazında gider dağılımı bulunmadığı için hesaplanamadı">—</strong>
           <span style="display:block; font-size:10px; color:var(--text-muted);">Gider dağılımı gerekli</span>
@@ -4559,7 +4573,9 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
       const s = item.stats;
       const rank = idx + 1;
       const ciroShare = totalRevenue > 0 ? (s.revenue / totalRevenue) * 100 : 0;
-      const occVal = Number(s.occupancy || ((s.nights / getPeriodDayCount()) * 100).toFixed(1));
+      const occVal = s.occupancy === null || s.occupancy === undefined ? null : Number(s.occupancy);
+      const occText = occVal === null ? '—' : `%${occVal}`;
+      const revparText = s.revpar === null || s.revpar === undefined ? '—' : `₺${Math.round(s.revpar).toLocaleString('tr-TR')}`;
       const adrVal = Math.round(s.adr || (s.nights > 0 ? s.revenue / s.nights : 0));
 
       const card = document.createElement('div');
@@ -4589,10 +4605,10 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
         <div style="display:flex; flex-direction:column; gap:4px;">
           <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-muted);">
             <span>Doluluk Oranı (${s.nights} Gece)</span>
-            <strong style="color:#FFFFFF;">%${occVal}</strong>
+            <strong style="color:#FFFFFF;">${occText}</strong>
           </div>
           <div class="table-bar-track" style="height:8px;">
-            <div class="table-bar-fill ${occVal >= 75 ? 'bar-emerald' : (occVal >= 45 ? 'bar-blue' : 'bar-amber')}" style="width: ${Math.min(100, Math.max(0, occVal))}%;"></div>
+            <div class="table-bar-fill ${occVal >= 75 ? 'bar-emerald' : (occVal >= 45 ? 'bar-blue' : 'bar-amber')}" style="width: ${Math.min(100, Math.max(0, occVal || 0))}%;"></div>
           </div>
         </div>
 
@@ -4603,7 +4619,7 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
           </div>
           <div class="subm-box">
             <span class="s-lbl">RevPAR (VERİM)</span>
-            <span class="s-val">₺${Math.round(s.revpar || 0).toLocaleString('tr-TR')}</span>
+            <span class="s-val">${revparText}</span>
           </div>
           <div class="subm-box">
             <span class="s-lbl">TAHMİNİ NET KÂR</span>
@@ -4646,8 +4662,9 @@ function renderPropertyComparisonChart(propStats) {
     if (metric === 'ciro') val = s.revenue;
     if (metric === 'netKar') val = null;
     if (metric === 'adr') val = s.adr || (s.nights > 0 ? Math.round(s.revenue / s.nights) : 0);
-    if (metric === 'revpar') val = s.revpar || Math.round(s.revenue / getPeriodDayCount());
-    if (metric === 'doluluk') val = Number(s.occupancy || ((s.nights / getPeriodDayCount()) * 100).toFixed(1));
+    // Kapasite yoksa olculemez (null -> "—"); ayin gun sayisina dusulmez.
+    if (metric === 'revpar') val = s.revpar === undefined ? null : s.revpar;
+    if (metric === 'doluluk') val = s.occupancy === undefined ? null : s.occupancy;
     if (metric === 'satilanGece') val = s.nights;
     values.push({ key: vKey, name: ((appData.villas && appData.villas[vKey] && appData.villas[vKey].name) || vKey), val });
   });
@@ -4663,7 +4680,7 @@ function renderPropertyComparisonChart(propStats) {
       <div class="comp-bar-track">
         <div class="comp-bar-fill" style="width: ${barPct}%;"></div>
       </div>
-      <div class="comp-bar-value"><strong title="${item.val === null ? 'Mülk bazında gider dağılımı bulunmadığı için hesaplanamadı' : ''}">${item.val === null ? '—' : item.val.toLocaleString('tr-TR')}</strong></div>
+      <div class="comp-bar-value"><strong title="${item.val === null ? (metric === 'netKar' ? 'Mülk bazında gider dağılımı bulunmadığı için hesaplanamadı' : 'Kapasite yok: mülk bu dönemde faaliyette görünmüyor (faaliyete başlama tarihi)') : ''}">${item.val === null ? '—' : item.val.toLocaleString('tr-TR')}</strong></div>
     `;
     container.appendChild(row);
   });
@@ -4691,7 +4708,9 @@ function renderPropertyComparisonChart(propStats) {
     } else {
       const adrOf = v => Number(v.s.adr) || (v.s.nights > 0 ? v.s.revenue / v.s.nights : 0);
       const ortAdr = aktif.reduce((a, v) => a + adrOf(v), 0) / aktif.length;
-      const ortDoluluk = aktif.reduce((a, v) => a + (Number(v.s.occupancy) || 0), 0) / aktif.length;
+      // Yalniz dolulugu olculebilen mulkler ortalamaya girer.
+      const olculen = aktif.filter(v => v.s.occupancy !== null && v.s.occupancy !== undefined);
+      const ortDoluluk = olculen.length ? olculen.reduce((a, v) => a + Number(v.s.occupancy), 0) / olculen.length : null;
       const tl = n => Math.round(n).toLocaleString('tr-TR');
 
       const enIyi = aktif.slice().sort((a, b) => adrOf(b) - adrOf(a))[0];
@@ -4701,8 +4720,8 @@ function renderPropertyComparisonChart(propStats) {
       });
 
       // Talep var ama fiyat dusuk: doluluk ortalamanin ustunde, ADR altinda.
-      aktif
-        .filter(v => (Number(v.s.occupancy) || 0) > ortDoluluk && adrOf(v) < ortAdr)
+      olculen
+        .filter(v => ortDoluluk !== null && Number(v.s.occupancy) > ortDoluluk && adrOf(v) < ortAdr)
         .slice(0, 2)
         .forEach(v => anomalies.push({
           type: 'warning',
@@ -8293,10 +8312,15 @@ function refreshPeriodSelectors() {
     ? `${formatPeriodLabel(aylar[0])} – Günümüz`
     : 'Tüm Zamanlar';
 
-  function kur(id, ustSecenekler) {
+  // tercih: secicinin gostermesi gereken deger (uygulamanin gercek filtresi).
+  // Onceki DOM degerine guvenilmez: index.html'deki yedek listenin ilk
+  // secenegi "Tum Zamanlar"dir ve tarayici onu kendiliginden secer; filtre
+  // ise icinde bulunulan ayla baslar. Secici "Tum Zamanlar" yazip ekranlar
+  // tek ayi hesapliyordu.
+  function kur(id, ustSecenekler, tercih) {
     const el = document.getElementById(id);
     if (!el) return;
-    const onceki = el.value;
+    const onceki = tercih || el.value;
     const parcalar = [ustSecenekler];
     yillar.forEach(g => {
       parcalar.push(`<optgroup label="${g.yil}">` +
@@ -8317,7 +8341,8 @@ function refreshPeriodSelectors() {
     `<option value="ALL">Tüm Zamanlar (${ilkEtiket})</option>` +
     yilSecenekleri +
     '<option value="CUSTOM">Özel Tarih Aralığı Seç…</option>' +
-    '</optgroup>');
+    '</optgroup>',
+    currentFilter && currentFilter.period);
 
   kur('rezPeriodFilter',
     '<optgroup label="GENEL">' +
@@ -14663,6 +14688,8 @@ function openPropertyModal(villaKey = null) {
     document.getElementById('propCleanCost').value = (Number(v.cleanCost) || '');
     document.getElementById('propAmenities').value = v.amenities || '';
     document.getElementById('propUrl').value = v.url || '';
+    const activationInput = document.getElementById('propActivatedOn');
+    if (activationInput) activationInput.value = v.activationDate || '';
     if (typeof loadPropertyAnalysisContextForm === 'function') loadPropertyAnalysisContextForm(v.id);
     if (deleteBtn) {
       deleteBtn.style.display = 'inline-block';
@@ -14713,6 +14740,8 @@ async function saveProperty(e) {
     const cleanCost = Number(document.getElementById('propCleanCost').value) || 0;
     const amenities = document.getElementById('propAmenities').value.trim();
     const url = document.getElementById('propUrl').value.trim();
+    const activationInput = document.getElementById('propActivatedOn');
+    const activationDate = activationInput ? document.getElementById('propActivatedOn').value : '';
 
     if (!name) {
       alert('Lütfen geçerli bir mülk adı giriniz.');
@@ -14726,7 +14755,8 @@ async function saveProperty(e) {
       adr: basePrice,
       cleanCost,
       amenities,
-      url
+      url,
+      activationDate
     };
 
     let savedProperty;
@@ -15804,6 +15834,20 @@ function setExecutiveSnapshotPlaceholder(message) {
   setEl('execSnapshotStatus', message);
 }
 
+// "satilan / kapasite Gece". Kapasite 0 ya da bilinmiyorsa kesir yazilmaz
+// ("79 / 0 Gece" yaziyordu): satilan gece ve olculememe nedeni yazilir.
+function formatSoldNightsLabel(soldNights, availableNights) {
+  const satilan = Number(soldNights) || 0;
+  const kapasite = Number(availableNights);
+  if (availableNights === null || availableNights === undefined || !Number.isFinite(kapasite)) {
+    return `${satilan} Gece satıldı · kapasite bilinmiyor`;
+  }
+  if (kapasite <= 0) {
+    return `${satilan} Gece satıldı · kapasite yok (mülklerin faaliyete başlama tarihine bakın)`;
+  }
+  return `${satilan} / ${kapasite} Gece`;
+}
+
 function renderExecutiveKpiValues(kpis) {
   const money = value => value === null || value === undefined || !Number.isFinite(Number(value))
     ? '—' : `₺${Number(value).toLocaleString('tr-TR')}`;
@@ -15840,7 +15884,7 @@ function renderExecutiveKpiValues(kpis) {
   setEl('execProfitMargin', netMargin === '—' ? '—' : `${netMargin} Marj`);
   setEl('execAdrTrend', trend(kpis.adr));
   setEl('execRevparTrend', trend(kpis.revpar));
-  setEl('execSoldNightsLabel', `${kpis.bookedNights} / ${kpis.availableNights ?? '—'} Gece`);
+  setEl('execSoldNightsLabel', formatSoldNightsLabel(kpis.bookedNights, kpis.availableNights));
 
   const revVariance = document.getElementById('execRevVariance');
   if (revVariance) {
@@ -17445,6 +17489,9 @@ if (typeof module !== 'undefined' && module.exports) {
     isPeriodClosed,
     isStayPeriodClosed,
     setCurrentFilter,
+    refreshPeriodSelectors,
+    renderFinanceModule,
+    formatSoldNightsLabel,
     computeFilterLedger,
     computeMonthLedger,
     computeMonthActuals,

@@ -360,19 +360,26 @@ runTest('8. Cancelled Bookings Exclusion: Cancelled bookings do not contribute t
 // -------------------------------------------------------------
 runTest('9. Available Nights: Mid-month activation (Aug 15) and P1 maintenance downtime', () => {
   // Property opened on Aug 15: 17 days in August (15 to 31)
-  // P1 maintenance with 2 days downtime
+  // Maintenance closing Aug 20-21 (2 dated days)
   // Available nights should be 17 - 2 = 15 nights (NOT 31 nights)
+  // Sunucu (get_executive_dashboard_snapshot) yalniz TARIHLI ve
+  // blocks_availability = TRUE kesintiyi duser; istemci ayni kurali izler.
 
   const properties = [
     { id: 'PROP-MID', slug: 'VILLA_MID', is_active: true, activationDate: '2026-08-15' }
   ];
 
   const maintenances = [
-    { villa: 'PROP-MID', priority: 'P1', status: 'OPEN', downtime: 2 }
+    { villa: 'PROP-MID', priority: 'P1', status: 'OPEN', blocks_availability: true,
+      downtime_start: '2026-08-20', downtime_end: '2026-08-21' }
   ];
 
   const avail = calculateAvailableNights(properties, 2026, 8, maintenances);
   assert.strictEqual(avail, 15, 'Available nights must be exactly 15 nights (17 active days - 2 downtime)');
+
+  // Tarihsiz eski kayit hangi aya ait oldugunu soylemez; her ay dusulmez.
+  const eski = calculateAvailableNights(properties, 2026, 8, [{ villa: 'PROP-MID', priority: 'P1', status: 'OPEN', downtime: 2 }]);
+  assert.strictEqual(eski, 17, 'Undated legacy downtime must not reduce capacity (server parity)');
 });
 
 // -------------------------------------------------------------

@@ -266,6 +266,8 @@ const allTestFiles = [
   // HTML enjeksiyonu (L-15): kacissiz veri taramasi + temizleyici sozlesmesi
   'html_injection_tests.js',
   'action_dispatch_tests.js',
+  'capacity_consistency_tests.js',
+  'phase49_activation_live_tests.js',
 
   // GitHub Actions eylemleri tam commit SHA'sina sabit
   'workflow_pin_tests.js',

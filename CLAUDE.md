@@ -138,6 +138,25 @@ ikinci kez saymaz.
 Doluluk/RevPAR paydası: `getPeriodDayCount()` — **ayın gerçek gün sayısı**.
 Bir zamanlar bir ekranda 30, diğerinde 31, bir başkasında 90 kullanılıyordu.
 
+Ay bazında mülk kapasitesi ise **faaliyete başlama tarihinden** sayılır ve
+tarihli, `blocks_availability` bakım kesintisi düşülür — sunucuda
+`get_executive_dashboard_snapshot`, istemcide
+`FinancialMetricsService.calculateAvailableNights`, **aynı kural**. Tarihsiz
+eski "P1 + gün sayısı" kaydı düşülmez (sunucu düşmüyordu; istemci her ay
+düşüyordu). Kapasite 0 ise doluluk/RevPAR `null` → "—" ve neden yazılır;
+ayın gün sayısına **düşülmez** (uydurma, §3.6).
+
+**Faaliyete başlama tarihi ilk rezervasyondan sonra olamaz (phase49).**
+`activated_on` varsayılanı `CURRENT_DATE` ve mülk formu onu yazmıyordu:
+mülkünü bugün ekleyip geçmişini içe aktaran işletmede geçmiş ayların
+kapasitesi 0'dı. 26.09.2026'da gerçek hesapta ölçüldü — ana sayfa Eylül'de
+"2 / 85 Gece" (doğrusu 150), Ağustos'ta "79 / 0 Gece" gösteriyordu. Aynı ay
+için Finans'taki mülk tablosu %29 diyordu, çünkü paydayı seçen ay regex'i
+ters bölülerini kaybetmişti (§5 kabuk tuzağı) ve L-36'nın kapasite düzeltmesi
+**ilk günden beri hiç çalışmamıştı** — onu ölçen test yoktu. Ağı
+`core/capacity_consistency_tests.js` (davranış: tablo gerçekten çizilir) ve
+`core/phase49_activation_live_tests.js`.
+
 **Gelirin aya yazılması — tahakkuk (accrual):**
 Gelir **gecelere eşit bölünür**, her ay yalnızca kendi gecelerinin payını alır.
 Ay sınırını kesen bir rezervasyonda bu şart:
@@ -496,6 +515,17 @@ ve "ad veya telefon" CHECK kuralını korur. Phase44, üretime geç uygulanacak
 phase11 tablolarını phase41'in anon/tenant değişmezliği/yazma rolü sözleşmesine
 taşır. İkisi de üretimde henüz uygulanmadı; Phase11 ile birlikte readiness
 kapısı bu yüzden kırmızıdır. Paket: `docs/PHASE11_DEPLOY_PACKAGE.md`.
+
+**phase49 (`migration_phase49_property_activation_floor.sql`) 26 Eylül 2026'da
+test projesine uygulandı; üretim kullanıcı onayı bekliyor.** Mülkün faaliyete
+başlama tarihi (`activated_on`) ilk iptal edilmemiş rezervasyondan sonra
+olamaz: mevcut veri geri çekilir, daha eski rezervasyon tarihi kendiliğinden
+çeker, sonraya alma ve kapanmış aya dokunan değişiklik reddedilir (§3.4).
+Canlı süit `phase49_activation_live_tests` 12/12 (göçten önce 9 kırmızı);
+`BEGIN…ROLLBACK` içinde iki kez koşuldu, idempotent. Dışarıdan ayırt
+edilemez (yeni tablo/RPC yok): kanıt SQL Editor'deki `PHASE 49 OK`
+bildirimi ve oturumlu hesapta geçmiş ayın `available_nights` değerinin 0
+olmaktan çıkması. Paket: `docs/PHASE49_DEPLOY_PACKAGE.md`.
 
 **Bir göçün uygulanıp uygulanmadığı, dosyaya bakarak anlaşılmaz.** Dosya repoda
 durur; veritabanı uygulanmamış olabilir. Doğrulamanın yolu üretime sormaktır:
