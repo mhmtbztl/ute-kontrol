@@ -7,6 +7,7 @@ const {
   compareContract,
   compareSchemas
 } = require('../scripts/schema_contract.js');
+const { isAnonProbeDenied, securityLedgerErrors } = require('../scripts/check_production_readiness.js');
 
 let passed = 0;
 function test(name, fn) {
@@ -69,6 +70,15 @@ test('tam uyumlu şema yeşildir', () => {
   assert.deepStrictEqual(compareContract(inspectOpenApi(fixture())).errors, []);
 });
 
+test('readiness yalniz salt okunur yetki kanitlarini kabul eder', () => {
+  assert.strictEqual(isAnonProbeDenied('rpc', 404, ''), false);
+  assert.strictEqual(isAnonProbeDenied('table', 404, ''), false);
+  assert.strictEqual(isAnonProbeDenied('rpc', 403, '{"code":"42501","message":"permission denied"}'), true);
+  assert.strictEqual(isAnonProbeDenied('rpc', 200, '{}'), false);
+  assert.deepStrictEqual(securityLedgerErrors([42, 44]), []);
+  assert(securityLedgerErrors([42]).some(error => error.includes('phase44')));
+});
+
 test('test ve üretim drift karşılaştırması nullability, sütun ve RPC farkını bulur', () => {
   const production = fixture();
   production.definitions.leads.required.push('guest_name');
@@ -80,4 +90,4 @@ test('test ve üretim drift karşılaştırması nullability, sütun ve RPC fark
   assert(drift.some(x => x.includes('save_manual_pricing_override_atomic')));
 });
 
-console.log(`TEST SUMMARY: ${passed} / 7 TESTS PASSED (${process.exitCode ? 1 : 0} FAILED)`);
+console.log(`TEST SUMMARY: ${passed} / 8 TESTS PASSED (${process.exitCode ? 1 : 0} FAILED)`);

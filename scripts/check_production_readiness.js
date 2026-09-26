@@ -56,6 +56,16 @@ function anonExposureErrors(inspection) {
   return errors;
 }
 
+function isAnonProbeDenied(_kind, status, body) {
+  return [401, 403].includes(status) && /42501|permission denied/i.test(body);
+}
+
+function securityLedgerErrors(versions) {
+  return versions.includes(44)
+    ? []
+    : ['eksik guvenlik gocu: phase44 RPC ve fiyatlandirma yetki dogrulamasi kayitli degil'];
+}
+
 async function probeAnonPrivileges(url, key) {
   const headers = { apikey: key, 'Content-Type': 'application/json' };
   if (String(key).startsWith('eyJ')) headers.Authorization = `Bearer ${key}`;
@@ -63,12 +73,7 @@ async function probeAnonPrivileges(url, key) {
   for (const table of PROTECTED_TABLES) {
     const response = await fetch(`${url.replace(/\/$/, '')}/rest/v1/${table}?select=id&limit=0`, { headers });
     const body = await response.text();
-    probes.push({ object: `table:${table}`, denied: [401, 403].includes(response.status) && /42501|permission denied/i.test(body), status: response.status });
-  }
-  for (const rpc of PROTECTED_RPCS) {
-    const response = await fetch(`${url.replace(/\/$/, '')}/rest/v1/rpc/${rpc}`, { method: 'POST', headers, body: '{}' });
-    const body = await response.text();
-    probes.push({ object: `rpc:${rpc}`, denied: [401, 403].includes(response.status) && /42501|permission denied/i.test(body), status: response.status });
+    probes.push({ object: `table:${table}`, denied: isAnonProbeDenied('table', response.status, body), status: response.status });
   }
   return probes;
 }
@@ -104,6 +109,7 @@ async function main() {
   };
   const errors = [
     ...contract.errors,
+    ...securityLedgerErrors(ledgerVersions),
     ...anonProbes.filter(probe => objectExists(probe.object) && !probe.denied)
       .map(probe => `anon yetki kapısı doğrulanamadı: ${probe.object} HTTP ${probe.status}`)
   ];
@@ -121,4 +127,4 @@ if (require.main === module) main().catch(error => {
   process.exitCode = 1;
 });
 
-module.exports = { assertProductionTarget, fetchOpenApi, anonExposureErrors, probeAnonPrivileges, fetchMigrationLedger, main };
+module.exports = { assertProductionTarget, fetchOpenApi, anonExposureErrors, isAnonProbeDenied, securityLedgerErrors, probeAnonPrivileges, fetchMigrationLedger, main };

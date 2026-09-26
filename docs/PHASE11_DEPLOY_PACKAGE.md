@@ -81,7 +81,7 @@ Kapı sıfır çıkış vermeden dağıtım tamamlanmış sayılmaz.
 
 ## Yetki doğrulaması
 
-Anon anahtarıyla her yedi tabloya `select=id&limit=0` ve iki RPC'ye boş gövde çağrısı `401/403` ile `42501 permission denied` dönmelidir. Authenticated owner/admin/manager/staff testleri üretimde kayıt yaratılarak yapılmaz; aynı davranış ayrılmış test projesindeki fiyatlandırma canlı süitlerinde ölçülür.
+Anon anahtarıyla her yedi tabloya `select=id&limit=0` çağrısı `401/403` ile `42501 permission denied` dönmelidir. Üretimde veri yazabilecek RPC'lere doğrulama amacıyla `POST` gönderilmez. RPC varlığı ve imzası service-role OpenAPI sözleşmesinden; anon yetkisinin kapalı olduğu ise transaction içindeki Phase44 doğrulaması başarıyla tamamlandıktan sonra yazılan `schema_migrations.version = 44` kaydından doğrulanır. Authenticated owner/admin/manager/staff davranışı üretimde kayıt yaratılarak ölçülmez; ayrılmış test projesindeki fiyatlandırma canlı süitlerinde ölçülür.
 
 ## Hata ve ileri yönlü kurtarma
 
