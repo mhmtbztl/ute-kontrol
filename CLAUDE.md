@@ -973,18 +973,29 @@ Ağı `core/csv_import_tests.js` (52 iddia: motor, `app.js` kaynağı, gerçek
   önerisi exceljs'i 3.4.0'a **düşürür** — yapmayın. Kalıcı çözüm, ölü
   `excel_generator.js` ile `exceljs` bağımlılığını birlikte kaldırmaktır.
 - **HTML'e giren her kullanıcı/misafir verisi kaçışlanır (L-15).** Metin ve
-  öznitelik için `escapeHtml(...)`; satır içi işleyicideki JS dizesi için
-  `decodeURIComponent('${encodeURIComponent(x)}')` — orada `escapeHtml`
-  **yetmez** (öznitelik çözülünce tırnak geri gelir). HTML döndüren yardımcının
-  adı `...Html` ile biter ve kendi kaçışından sorumludur. Ağı
-  `core/html_injection_tests.js`: `app.js` ve tüm `core/` modüllerini
-  `core/html_injection_scan.js` ile tarar. Global `innerHTML` temizleyicisi
-  ikinci kattır: yalnız etkileşim olaylarına (`onclick`, `onchange` …) ve tek,
-  izinli fiille başlayan, düz argümanlı çağrıya izin verir; yeni bir düğme
-  işleyicisi bu kurala uymazsa **sessizce silinir** (`undoImportBatch` ve
-  `confirmUserNotification` düğmeleri bu yüzden çalışmıyordu). Hedef: satır
-  içi işleyicileri olay dinleyicisine taşıyıp CSP'den `unsafe-inline`'ı
-  kaldırmak — henüz yapılmadı.
+  öznitelik için `escapeHtml(...)`; işleyicideki JS dizesi için
+  `decodeURIComponent('${encodeActionArg(x)}')` — orada `escapeHtml`
+  **yetmez** (öznitelik çözülünce tırnak geri gelir), `encodeURIComponent` de
+  yetmez (tek tırnağı ve parantezi kodlamaz: `O'Brien` dizeyi kırıyordu). HTML
+  döndüren yardımcının adı `...Html` ile biter ve kendi kaçışından sorumludur.
+  Ağı `core/html_injection_tests.js`: `app.js` ve tüm `core/` modüllerini
+  `core/html_injection_scan.js` ile tarar.
+- **Satır içi işleyici yoktur; CSP `script-src` `'unsafe-inline'` içermez
+  (L-15 adım 3, 26 Eylül 2026).** Düğme `onclick="f(...)"` değil
+  `data-onclick="f(...)"` taşır (`data-onchange`, `data-oninput`,
+  `data-onsubmit`, `data-onkeydown` aynı). Gövde **çalıştırılmaz,
+  ayrıştırılır** — `core/action_dispatch.js` (app.js'ten **önce** yüklenir):
+  yalnız `ad(arg, …)` çağrısı, `;` zinciri, `return false`,
+  `event.stopPropagation()`; argüman olarak dize/sayı/mantıksal, `this`,
+  `this.value`, `this.checked`, `event`, `decodeURIComponent('…')`. Ad,
+  modüldeki **`EYLEMLER` izin listesinde** olmalı. **Yeni düğme eklerken
+  fonksiyonu oraya ekleyin**; `action_dispatch_tests` eksik, tanımsız ve
+  artık kullanılmayan adı yakalar. `this`, `event.currentTarget`,
+  `stopPropagation` ve `return false` satır içi işleyicidekiyle aynı çalışır.
+  Global `innerHTML` temizleyicisi artık **her** `on*` özniteliğini siler.
+  Tarayıcıda ölçüldü: eklenen satır içi `onclick` CSP ile reddediliyor
+  (`script-src-attr`), 184 eylemin hepsi fonksiyona çözülüyor. `style-src`
+  hâlâ `'unsafe-inline'` (satır içi `style=` yüzlerce yerde) — ayrı iş.
 - `.env` **asla** commit edilmez (`.gitignore`'da). İçinde `service_role` anahtarı var — tam yetkili.
   Tarayıcı koduna hiç girmedi, git geçmişine hiç girmedi.
 - **Supabase, `public` şemasındaki yeni fonksiyonlara varsayılan olarak `anon` rolüne EXECUTE verir.**

@@ -265,6 +265,7 @@ const allTestFiles = [
   'wave2_client_tests.js',
   // HTML enjeksiyonu (L-15): kacissiz veri taramasi + temizleyici sozlesmesi
   'html_injection_tests.js',
+  'action_dispatch_tests.js',
 
   // GitHub Actions eylemleri tam commit SHA'sina sabit
   'workflow_pin_tests.js',

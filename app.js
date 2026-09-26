@@ -16,31 +16,11 @@ function installInnerHtmlSecurityBoundary() {
     'SCRIPT', 'IFRAME', 'OBJECT', 'EMBED', 'BASE', 'META', 'LINK', 'FORM',
     'MATH', 'SVG', 'TEMPLATE'
   ]);
-  // Only the application's existing action verbs may appear in legacy inline
-  // handlers. Property access (window.*, document.*, event.*), assignments and
-  // arbitrary expressions remain forbidden.
-  const allowedHandlerName = /^(?:acknowledge|apply|ask|auto|calculate|change|clean|close|confirm|convert|copy|cycle|delete|download|edit|execute|export|filter|handle|load|logout|mark|open|parse|pay|prompt|render|reset|run|save|select|send|set|share|show|simulate|start|step|submit|switch|sync|toggle|undo|update)[A-Za-z0-9_$]*$/;
-
-  // Yalniz KULLANICI ETKILESIMIYLE tetiklenen olaylar (L-15). onerror, onload,
-  // onmouseover, onfocus, onanimationstart ... kullanici hicbir sey yapmadan
-  // calisir; enjekte edilmis bir <img onerror> ekran cizilir cizilmez
-  // uygulamanin fonksiyonunu kurbanin oturumuyla calistiriyordu.
-  const allowedHandlerAttrs = new Set(['onclick', 'ondblclick', 'onchange', 'oninput', 'onsubmit',
-    'onkeydown', 'onkeyup', 'onkeypress']);
-
-  function handlerIsTrusted(source) {
-    // Tek cagri (sondaki ';' hosgorulur). Zincir kabul edilmez: uygulamanin
-    // kendi sablonlari tek cagri kullanir; zincir ancak enjeksiyonla olusur.
-    const chunks = String(source || '').split(';').map(s => s.trim()).filter(Boolean);
-    return chunks.length === 1 && chunks.every(chunk => {
-      const match = chunk.match(/^([A-Za-z_$][\w$]*)\((.*)\)$/s);
-      if (!match || !allowedHandlerName.test(match[1])) return false;
-      const args = match[2];
-      const withoutCodec = args.replace(/(?:encode|decode)URIComponent\(\s*(['"])[A-Za-z0-9_.%~\-]*\1\s*\)/g, "''");
-      return !/[`(){};=<>\n\r]/.test(withoutCodec);
-    });
-  }
-
+  // L-15 adim 3: uygulama satir ici isleyici kullanmaz; dugmeler data-on*
+  // ozniteligi ve core/action_dispatch.js yetkilendiricisiyle calisir (govde
+  // ayristirilir, izinli eylem listesi disinda hicbir sey cagrilamaz). Bu
+  // yuzden HER on* ozniteligi silinir. CSP de satir ici betigi reddeder;
+  // bu ikinci kattir (ornegin CSP'yi desteklemeyen bir gomulu goruntuleyici).
   function sanitizeHtml(value) {
     const template = document.createElement('template');
     descriptor.set.call(template, String(value == null ? '' : value));
@@ -52,8 +32,9 @@ function installInnerHtmlSecurityBoundary() {
       Array.from(node.attributes || []).forEach(attr => {
         const name = attr.name.toLowerCase();
         const val = String(attr.value || '').trim();
-        if (name.startsWith('on') && (!allowedHandlerAttrs.has(name) || !handlerIsTrusted(val))) {
+        if (name.startsWith('on')) {
           node.removeAttribute(attr.name);
+          return;
         }
         if (['href', 'src', 'xlink:href', 'formaction'].includes(name) &&
             /^(?:javascript|vbscript|data):/i.test(val)) node.removeAttribute(attr.name);
@@ -75,6 +56,22 @@ function installInnerHtmlSecurityBoundary() {
 }
 
 installInnerHtmlSecurityBoundary();
+
+// data-on* isleyicisine giren dize (L-15 adim 3, core/action_dispatch.js).
+// encodeURIComponent tek tirnagi kodlamaz; sablonlar bunu kullanir.
+function getLexbnbActions() {
+  if (typeof window !== 'undefined' && window.LexbnbActions) return window.LexbnbActions;
+  if (typeof require === 'function') {
+    try { return require('./core/action_dispatch.js'); } catch (e) { /* tarayici */ }
+  }
+  return null;
+}
+
+function encodeActionArg(deger) {
+  const A = getLexbnbActions();
+  if (!A) throw new Error('core/action_dispatch.js yuklenmedi');
+  return A.encodeActionArg(deger);
+}
 
 
 // =============================================================
@@ -3469,7 +3466,7 @@ function switchTab(tabId) {
   document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 
-  const activeBtn = document.querySelector(`.tab-btn[onclick*="${tabId}"]`);
+  const activeBtn = document.querySelector(`.tab-btn[data-onclick*="${tabId}"]`);
   if (activeBtn) activeBtn.classList.add('active');
 
   const content = document.getElementById(`tab-${tabId}`);
@@ -4019,10 +4016,10 @@ function renderTablePagination(containerId, tableKey, pageInfo, renderFunctionNa
   }
   container.innerHTML = `
     <button type="button" class="btn btn-secondary btn-sm" ${pageInfo.page <= 1 ? 'disabled' : ''}
-            onclick="setLargeTablePage('${tableKey}', ${pageInfo.page - 1}, '${renderFunctionName}')">← Önceki</button>
+            data-onclick="setLargeTablePage(decodeURIComponent('${encodeActionArg(tableKey)}'), ${pageInfo.page - 1}, decodeURIComponent('${encodeActionArg(renderFunctionName)}'))">← Önceki</button>
     <span>${pageInfo.totalRows.toLocaleString('tr-TR')} kayıt · ${pageInfo.page}/${pageInfo.totalPages}. sayfa</span>
     <button type="button" class="btn btn-secondary btn-sm" ${pageInfo.page >= pageInfo.totalPages ? 'disabled' : ''}
-            onclick="setLargeTablePage('${tableKey}', ${pageInfo.page + 1}, '${renderFunctionName}')">Sonraki →</button>`;
+            data-onclick="setLargeTablePage(decodeURIComponent('${encodeActionArg(tableKey)}'), ${pageInfo.page + 1}, decodeURIComponent('${encodeActionArg(renderFunctionName)}'))">Sonraki →</button>`;
 }
 
 function setLargeTablePage(tableKey, page, renderFunctionName) {
@@ -4434,7 +4431,7 @@ function renderExpenseDonutAndTable(categoryTotals, totalExpense, totalRevenue, 
       <td>%${shareExpense.toFixed(1)}</td>
       <td>%${shareRev.toFixed(1)}</td>
       <td><span class="${deltaStr.includes('↑') ? 'text-rose' : 'text-emerald'}">${deltaStr}</span></td>
-      <td style="text-align: right;"><button class="btn-text" onclick="filterExpensesByCategory(decodeURIComponent('${encodeURIComponent(cat.name)}'), event)">Detay ›</button></td>
+      <td style="text-align: right;"><button class="btn-text" data-onclick="filterExpensesByCategory(decodeURIComponent('${encodeActionArg(cat.name)}'), event)">Detay ›</button></td>
     `;
     tbody.appendChild(tr);
   });
@@ -4548,7 +4545,7 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
           <span style="display:block; font-size:10px; color:var(--text-muted);">Gider dağılımı gerekli</span>
         </td>
         <td style="text-align: right; white-space: nowrap;">
-          <button class="btn btn-secondary btn-sm" onclick="filterByVilla('${item.key}')">🔍 Odaklan</button>
+          <button class="btn btn-secondary btn-sm" data-onclick="filterByVilla(decodeURIComponent('${encodeActionArg(item.key)}'))">🔍 Odaklan</button>
         </td>
       `;
       tableBody.appendChild(tr);
@@ -5444,8 +5441,8 @@ function renderExpensesTable() {
       <td>${escapeHtml(exp.description || exp.desc || "-")}</td>
       <td><strong>${Number(exp.amount).toLocaleString('tr-TR')} TL</strong></td>
       <td style="text-align: right; white-space: nowrap;">
-        <button class="btn btn-secondary btn-sm" onclick="editExpense(decodeURIComponent('${encodeURIComponent(String(exp.id))}'))">✏️</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteExpenseUI(decodeURIComponent('${encodeURIComponent(String(exp.id))}'))">🗑️</button>
+        <button class="btn btn-secondary btn-sm" data-onclick="editExpense(decodeURIComponent('${encodeActionArg(String(exp.id))}'))">✏️</button>
+        <button class="btn btn-danger btn-sm" data-onclick="deleteExpenseUI(decodeURIComponent('${encodeActionArg(String(exp.id))}'))">🗑️</button>
       </td>
     `;
     tbody.appendChild(tr);
@@ -6180,7 +6177,7 @@ async function refreshImportHistory() {
     const geriAlinabilir = p.linkedCount > 0;
     const dugme = geriAlinabilir
       ? `<button type="button" class="btn btn-secondary btn-sm" style="font-size:10px; padding:3px 8px; border-color:#EF4444; color:#FCA5A5;"
-                 onclick="undoImportBatch(decodeURIComponent('${encodeURIComponent(String(p.id))}'))">↩︎ Geri Al (${p.linkedCount})</button>`
+                 data-onclick="undoImportBatch(decodeURIComponent('${encodeActionArg(String(p.id))}'))">↩︎ Geri Al (${p.linkedCount})</button>`
       : `<span style="font-size:10px; color:#64748B;" title="Bu aktarım, geri alma özelliği eklenmeden önce yapıldı.">geri alınamaz</span>`;
     return `<div style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:6px 8px; border-bottom:1px solid rgba(255,255,255,0.06);">
       <div style="min-width:0;">
@@ -6741,7 +6738,7 @@ function renderKPIsAndDashboard() {
         <tr>
           <td colspan="10" style="text-align: center; padding: 32px; color: var(--text-muted, #94A3B8);">
             <div style="font-size: 14px; margin-bottom: 8px;">Henüz kayıtlı bir mülkünüz bulunmuyor.</div>
-            <button type="button" class="btn btn-primary btn-sm" onclick="openPropertyModal()" style="font-size: 12px; padding: 6px 14px;">İlk mülkünü ekle</button>
+            <button type="button" class="btn btn-primary btn-sm" data-onclick="openPropertyModal()" style="font-size: 12px; padding: 6px 14px;">İlk mülkünü ekle</button>
           </td>
         </tr>
       `;
@@ -6769,7 +6766,7 @@ function renderKPIsAndDashboard() {
         <td>
           <div style="display: flex; align-items: center; gap: 6px;">
             <strong>${escapeHtml(vConf.name || 'Adsız mülk')}</strong>
-            <button type="button" class="btn btn-sm btn-subtle" onclick="openPropertyModal(decodeURIComponent('${encodeURIComponent(String(vKey))}'))" title="Mülkü Düzenle" style="padding: 2px 6px; font-size: 11px; cursor: pointer; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: #cbd5e1;">✏️</button>
+            <button type="button" class="btn btn-sm btn-subtle" data-onclick="openPropertyModal(decodeURIComponent('${encodeActionArg(String(vKey))}'))" title="Mülkü Düzenle" style="padding: 2px 6px; font-size: 11px; cursor: pointer; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: #cbd5e1;">✏️</button>
           </div>
         </td>
         <td>${escapeHtml(vConf.capacity || 'Belirtilmedi')}</td>
@@ -7220,8 +7217,8 @@ function renderManageBookingsTable() {
       <td>${nightly.toLocaleString('tr-TR')} ₺</td>
       <td>${statusBadge}</td>
       <td style="text-align: right; white-space: nowrap;">
-        <button class="btn btn-secondary btn-sm" onclick="editBooking(decodeURIComponent('${encodeURIComponent(String(b.id))}'))" title="Düzenle">✏️</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteBookingUI(decodeURIComponent('${encodeURIComponent(String(b.id))}'))" title="Sil">🗑️</button>
+        <button class="btn btn-secondary btn-sm" data-onclick="editBooking(decodeURIComponent('${encodeActionArg(String(b.id))}'))" title="Düzenle">✏️</button>
+        <button class="btn btn-danger btn-sm" data-onclick="deleteBookingUI(decodeURIComponent('${encodeActionArg(String(b.id))}'))" title="Sil">🗑️</button>
       </td>
     `;
     tbody.appendChild(tr);
@@ -7818,7 +7815,7 @@ function renderSettingsGoalsTable() {
         ${Number.isFinite(maxExpense) ? maxExpense.toLocaleString('tr-TR') + ' TL' : '—'}
       </td>
       <td style="text-align: right;">
-        <button class="btn btn-secondary btn-sm" onclick="openGoalsModal('${period}')" style="padding: 4px 10px; font-size: 11px;">
+        <button class="btn btn-secondary btn-sm" data-onclick="openGoalsModal(decodeURIComponent('${encodeActionArg(period)}'))" style="padding: 4px 10px; font-size: 11px;">
           ✏️ Düzenle
         </button>
       </td>
@@ -8719,12 +8716,12 @@ function renderBookingChannelSettings() {
     const typeDisabled = disabled || channel.isSystem;
     return `<tr style="${channel.isActive ? '' : 'opacity:.6;'}">
       <td><input class="tbl-input" id="bookingChannelName_${id}" maxlength="100" value="${escapeHtml(channel.displayName)}" ${disabled ? 'disabled' : ''}><br><small>${escapeHtml(channel.code)}${channel.isSystem ? ' · Sistem kanalı' : ' · Özel kanal'}</small></td>
-      <td><select class="tbl-input" id="bookingChannelType_${id}" onchange="toggleBookingChannelRowRate('${id}')" ${typeDisabled ? 'disabled' : ''}><option value="OTA" ${channel.channelType === 'OTA' ? 'selected' : ''}>OTA</option><option value="DIRECT" ${channel.channelType === 'DIRECT' ? 'selected' : ''}>Direkt</option></select></td>
+      <td><select class="tbl-input" id="bookingChannelType_${id}" data-onchange="toggleBookingChannelRowRate(decodeURIComponent('${encodeActionArg(id)}'))" ${typeDisabled ? 'disabled' : ''}><option value="OTA" ${channel.channelType === 'OTA' ? 'selected' : ''}>OTA</option><option value="DIRECT" ${channel.channelType === 'DIRECT' ? 'selected' : ''}>Direkt</option></select></td>
       <td><input class="tbl-input" id="bookingChannelRate_${id}" type="number" min="0" max="100" step="0.01" value="${Number(channel.defaultCommissionRate)}" ${(disabled || channel.channelType === 'DIRECT') ? 'disabled' : ''}></td>
       <td><span class="badge ${channel.isActive ? 'badge-green' : 'badge-slate'}">${channel.isActive ? 'AKTİF' : 'PASİF'}</span></td>
       <td style="text-align:right; white-space:nowrap;">
-        <button type="button" class="btn btn-secondary btn-sm" onclick="saveBookingChannelRow(event, decodeURIComponent('${encodeURIComponent(channel.id || '')}'))" ${disabled ? 'disabled' : ''}>Kaydet</button>
-        <button type="button" class="btn ${channel.isActive ? 'btn-danger' : 'btn-secondary'} btn-sm" onclick="setBookingChannelActive(decodeURIComponent('${encodeURIComponent(channel.id || '')}'), ${channel.isActive ? 'false' : 'true'})" ${disabled ? 'disabled' : ''}>${channel.isActive ? 'Kaldır' : 'Etkinleştir'}</button>
+        <button type="button" class="btn btn-secondary btn-sm" data-onclick="saveBookingChannelRow(event, decodeURIComponent('${encodeActionArg(channel.id || '')}'))" ${disabled ? 'disabled' : ''}>Kaydet</button>
+        <button type="button" class="btn ${channel.isActive ? 'btn-danger' : 'btn-secondary'} btn-sm" data-onclick="setBookingChannelActive(decodeURIComponent('${encodeActionArg(channel.id || '')}'), ${channel.isActive ? 'false' : 'true'})" ${disabled ? 'disabled' : ''}>${channel.isActive ? 'Kaldır' : 'Etkinleştir'}</button>
       </td>
     </tr>`;
   }).join('');
@@ -8948,7 +8945,7 @@ function renderManageLeadsTable() {
     if (l.status === 'WON' || l.stage === 'WON' || l.convertedBookingId) {
       convertAction = `<span class="badge badge-green" style="font-size: 11px;" title="Dönüşen Rezervasyon">✅ Rezervasyona Dönüştü</span>`;
     } else {
-      convertAction = `<button class="btn btn-primary btn-sm" onclick="convertLeadAction('${l.id}')" title="Kesin Rezervasyona Dönüştür">📅 Rezervasyona Dönüştür</button>`;
+      convertAction = `<button class="btn btn-primary btn-sm" data-onclick="convertLeadAction(decodeURIComponent('${encodeActionArg(l.id)}'))" title="Kesin Rezervasyona Dönüştür">📅 Rezervasyona Dönüştür</button>`;
     }
 
     const tr = document.createElement('tr');
@@ -8962,8 +8959,8 @@ function renderManageLeadsTable() {
       <td>${escapeHtml(l.notes || '-')}</td>
       <td style="text-align: right; white-space: nowrap; display: flex; gap: 6px; justify-content: flex-end; align-items: center;">
         ${convertAction}
-        <button class="btn btn-secondary btn-sm" onclick="editLead('${l.id}')" title="Düzenle">✏️</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteLeadUI('${l.id}')" title="Sil">🗑️</button>
+        <button class="btn btn-secondary btn-sm" data-onclick="editLead(decodeURIComponent('${encodeActionArg(l.id)}'))" title="Düzenle">✏️</button>
+        <button class="btn btn-danger btn-sm" data-onclick="deleteLeadUI(decodeURIComponent('${encodeActionArg(l.id)}'))" title="Sil">🗑️</button>
       </td>
     `;
     tbody.appendChild(tr);
@@ -9178,8 +9175,8 @@ function renderManageMaintTable() {
       <td>${m.downtime || 0} Gece</td>
       <td><span class="badge ${statusPresentation.badgeClass}">${escapeHtml(statusPresentation.label)}</span></td>
       <td style="text-align: right; white-space: nowrap;">
-        ${statusPresentation.archived ? '' : `<button class="btn btn-secondary btn-sm" onclick="editMaint(decodeURIComponent('${encodeURIComponent(String(m.id))}'))">✏️</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteMaint(decodeURIComponent('${encodeURIComponent(String(m.id))}'))">Arşivle</button>`}
+        ${statusPresentation.archived ? '' : `<button class="btn btn-secondary btn-sm" data-onclick="editMaint(decodeURIComponent('${encodeActionArg(String(m.id))}'))">✏️</button>
+        <button class="btn btn-danger btn-sm" data-onclick="deleteMaint(decodeURIComponent('${encodeActionArg(String(m.id))}'))">Arşivle</button>`}
       </td>
     `;
     tbody.appendChild(tr);
@@ -9411,7 +9408,7 @@ function toggleExportMenu(olay) {
   if (!acik && !menu.dataset.disKapatmaHazir) {
     menu.dataset.disKapatmaHazir = '1';
     document.addEventListener('click', (e) => {
-      if (!e.target.closest('#ledgerExportMenu') && !e.target.closest('[onclick*="toggleExportMenu"]')) {
+      if (!e.target.closest('#ledgerExportMenu') && !e.target.closest('[data-onclick*="toggleExportMenu"]')) {
         menu.style.display = 'none';
       }
     });
@@ -9601,7 +9598,7 @@ function renderDailyOps() {
         </div>
         <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
           <span class="badge badge-green" style="font-weight: 700;">🟢 ${checkInTime ? escapeHtml(checkInTime) + ' Giriş' : 'Giriş saati kayıtlı değil'}</span>
-          <button class="btn btn-secondary btn-sm" style="font-size: 10px; padding: 2px 6px;" onclick="openBookingModal('${b.id}')">Detay</button>
+          <button class="btn btn-secondary btn-sm" style="font-size: 10px; padding: 2px 6px;" data-onclick="openBookingModal(decodeURIComponent('${encodeActionArg(b.id)}'))">Detay</button>
         </div>
       `;
       inList.appendChild(div);
@@ -9655,7 +9652,7 @@ function renderDailyOps() {
         </div>
         <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
           <span class="badge badge-blue" style="font-weight: 700;">🔵 ${checkOutTime ? escapeHtml(checkOutTime) + ' Çıkış' : 'Çıkış saati kayıtlı değil'}</span>
-          <button class="btn btn-secondary btn-sm" style="font-size: 10px; padding: 2px 6px;" onclick="openBookingModal('${b.id}')">Detay</button>
+          <button class="btn btn-secondary btn-sm" style="font-size: 10px; padding: 2px 6px;" data-onclick="openBookingModal(decodeURIComponent('${encodeActionArg(b.id)}'))">Detay</button>
         </div>
       `;
       outList.appendChild(div);
@@ -9692,7 +9689,7 @@ function renderDailyOps() {
           : meta?.tone === 'blue' ? 'badge-blue' : '';
     const canEditReadiness = canManagePropertyReadiness();
     const actionAttrs = canEditReadiness
-      ? `onclick="cycleHkStatus('${vKey}')" title="Satış hazırlığı durumunu değiştirmek için tıklayın"`
+      ? `data-onclick="cycleHkStatus(decodeURIComponent('${encodeActionArg(vKey)}'))" title="Satış hazırlığı durumunu değiştirmek için tıklayın"`
       : 'title="Bu durumu değiştirme yetkiniz yok"';
 
     villaCardsHtml += `
@@ -9802,13 +9799,13 @@ function renderDailyOps() {
           <span style="color: var(--text-muted); display: flex; align-items: center; gap: 4px;">
             🧹 Bedel: 
             <b style="color: #60A5FA; cursor: pointer; text-decoration: underline dashed; font-size: 12px;" 
-               onclick="promptEditTaskAmount('${task.id}')" 
+               data-onclick="promptEditTaskAmount(decodeURIComponent('${encodeActionArg(task.id)}'))" 
                title="Maliyeti değiştirmek için tıklayın">
               ₺${amt.toLocaleString('tr-TR')} ✏️
             </b>
           </span>
           <button class="${isPaid ? 'btn-clean-paid' : 'btn-clean-pending'}" 
-                  onclick="toggleTaskPaid('${task.id}')" 
+                  data-onclick="toggleTaskPaid(decodeURIComponent('${encodeActionArg(task.id)}'))" 
                   title="${isPaid ? 'Ödenmedi (Borç) olarak işaretle' : 'Ödendi olarak işaretle ve Gider Defterine işle'}">
             ${isPaid ? '✅ ₺' + amt.toLocaleString('tr-TR') + ' Ödendi' : '⏳ ₺' + amt.toLocaleString('tr-TR') + ' Ödenecek'}
           </button>
@@ -10069,7 +10066,7 @@ function renderHousekeepingTab() {
     return;
   }
 
-  const kod = v => encodeURIComponent(String(v));
+  const kod = encodeActionArg; // checkbox degeri de ayni kodla
   filtered.sort((a, b) => (b.date || '').localeCompare(a.date || '')).forEach(task => {
     const vName = appData.villas[task.villa]?.name || task.villa;
     const isPaid = !!task.paid;
@@ -10080,19 +10077,19 @@ function renderHousekeepingTab() {
     let durum;
     if (task.status === 'DONE') {
       durum = `<span class="badge badge-emerald">✔ Yapıldı</span>`
-        + (isPaid ? '' : ` <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:10px;" onclick="markCleaningPlanned(decodeURIComponent('${id}'))" title="Yanlışlıkla işaretlendiyse geri al">↩︎</button>`);
+        + (isPaid ? '' : ` <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:10px;" data-onclick="markCleaningPlanned(decodeURIComponent('${encodeActionArg(task.id)}'))" title="Yanlışlıkla işaretlendiyse geri al">↩︎</button>`);
     } else if (task.status === 'SKIPPED') {
-      durum = `<span class="badge">Yapılmadı</span> <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:10px;" onclick="markCleaningPlanned(decodeURIComponent('${id}'))" title="Geri al">↩︎</button>`;
+      durum = `<span class="badge">Yapılmadı</span> <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:10px;" data-onclick="markCleaningPlanned(decodeURIComponent('${encodeActionArg(task.id)}'))" title="Geri al">↩︎</button>`;
     } else {
       durum = `<span class="badge ${gecmisPlanli ? 'badge-amber' : 'badge-blue'}">${gecmisPlanli ? 'Yapıldı mı?' : 'Planlandı'}</span>
-        <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:10px; margin-left:4px;" onclick="markCleaningDone(decodeURIComponent('${id}'))">✔ Yapıldı</button>
-        <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:10px;" onclick="markCleaningSkipped(decodeURIComponent('${id}'))">✖ Yapılmadı</button>`;
+        <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:10px; margin-left:4px;" data-onclick="markCleaningDone(decodeURIComponent('${encodeActionArg(task.id)}'))">✔ Yapıldı</button>
+        <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:10px;" data-onclick="markCleaningSkipped(decodeURIComponent('${encodeActionArg(task.id)}'))">✖ Yapılmadı</button>`;
     }
 
     let odeme;
     if (task.status === 'DONE') {
       odeme = `<button class="${isPaid ? 'btn-clean-paid' : 'btn-clean-pending'}"
-                onclick="toggleTaskPaid(decodeURIComponent('${id}'))"
+                data-onclick="toggleTaskPaid(decodeURIComponent('${encodeActionArg(task.id)}'))"
                 title="${isPaid ? 'Ödenmedi olarak değiştir' : 'Ödendi olarak işaretle'}">
           ${isPaid ? '✅ ÖDENDİ' : '⏳ ÖDENECEK'}
         </button>
@@ -10114,7 +10111,7 @@ function renderHousekeepingTab() {
       </td>
       <td>
         <b style="color: #60A5FA; cursor: pointer; text-decoration: underline dashed; font-size: 13px;"
-           onclick="promptEditTaskAmount(decodeURIComponent('${id}'))"
+           data-onclick="promptEditTaskAmount(decodeURIComponent('${encodeActionArg(task.id)}'))"
            title="Tıklayarak maliyeti değiştirin">
           ${amount > 0 ? '₺' + amount.toLocaleString('tr-TR') : 'Tutar girilmedi'} ✏️
         </b>
@@ -10122,8 +10119,8 @@ function renderHousekeepingTab() {
       <td>${durum}</td>
       <td>${odeme}</td>
       <td style="text-align: right;">
-        <button class="btn btn-secondary btn-sm" onclick="openEditCleaningTaskModal(decodeURIComponent('${id}'))" style="padding: 3px 7px; font-size: 11px;" title="Detaylı Düzenle">✏️</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteCleaningTask(decodeURIComponent('${id}'))" style="padding: 3px 7px; font-size: 11px; margin-left: 4px;" title="Sil">🗑️</button>
+        <button class="btn btn-secondary btn-sm" data-onclick="openEditCleaningTaskModal(decodeURIComponent('${encodeActionArg(task.id)}'))" style="padding: 3px 7px; font-size: 11px;" title="Detaylı Düzenle">✏️</button>
+        <button class="btn btn-danger btn-sm" data-onclick="deleteCleaningTask(decodeURIComponent('${encodeActionArg(task.id)}'))" style="padding: 3px 7px; font-size: 11px; margin-left: 4px;" title="Sil">🗑️</button>
       </td>
     `;
     tbody.appendChild(tr);
@@ -10488,13 +10485,13 @@ function renderTapeChart() {
         const isCheckInDay = (booking.checkIn === dateStr);
         const isCheckOutDay = (booking.checkOut === dateStr);
 
-        tableHtml += `<td class="tape-cell ${isToday ? 'today-cell' : ''}" title="${escapeHtml(booking.guest)} (${escapeHtml(booking.channel)}) | ${booking.checkIn} - ${booking.checkOut} | Toplam: ${booking.gross} TL (Tıklayarak düzenleyin)" onclick="editBooking('${booking.id}')" style="cursor: pointer;">
+        tableHtml += `<td class="tape-cell ${isToday ? 'today-cell' : ''}" title="${escapeHtml(booking.guest)} (${escapeHtml(booking.channel)}) | ${booking.checkIn} - ${booking.checkOut} | Toplam: ${booking.gross} TL (Tıklayarak düzenleyin)" data-onclick="editBooking(decodeURIComponent('${encodeActionArg(booking.id)}'))" style="cursor: pointer;">
           <div class="tape-booked ${chClass}" style="${isCheckInDay ? 'border-left: 3px solid #FCD34D;' : ''}">
             ${escapeHtml(booking.guest.split(' ')[0])}
           </div>
         </td>`;
       } else {
-        tableHtml += `<td class="tape-cell ${isToday ? 'today-cell' : ''}" title="${formatTrDate(dateStr)} - Müsait (Rezervasyon eklemek için tıklayın)" onclick="openBookingForDate('${vKey}', '${dateStr}')" style="cursor: pointer; ${isToday ? 'background: rgba(245, 158, 11, 0.05);' : ''}"></td>`;
+        tableHtml += `<td class="tape-cell ${isToday ? 'today-cell' : ''}" title="${formatTrDate(dateStr)} - Müsait (Rezervasyon eklemek için tıklayın)" data-onclick="openBookingForDate(decodeURIComponent('${encodeActionArg(vKey)}'), decodeURIComponent('${encodeActionArg(dateStr)}'))" style="cursor: pointer; ${isToday ? 'background: rgba(245, 158, 11, 0.05);' : ''}"></td>`;
       }
     }
     tableHtml += '</tr>';
@@ -11021,6 +11018,17 @@ function closeAllHeaderDropdowns() {
   document.querySelectorAll('.header-dropdown-menu').forEach(m => m.classList.remove('show'));
 }
 
+// Satir ici ifade olarak yazilamayan iki dugme (L-15: data-on* govdesi yalniz
+// izinli fonksiyon cagirir, ozellik erisimi yapamaz).
+function reloadPage() {
+  window.location.reload();
+}
+
+function openExcelFilePicker() {
+  const input = document.getElementById('excelFileInput');
+  if (input) input.click();
+}
+
 if (typeof document !== 'undefined') {
   document.addEventListener('click', function(e) {
     if (!e.target.closest('.header-dropdown-wrap')) {
@@ -11310,7 +11318,7 @@ function renderMonthlyKpiTracker() {
         <td style="font-weight: 600; color: #DDD6FE; white-space: nowrap;">${d.revpar > 0 ? (Math.round(d.revpar).toLocaleString('tr-TR') + ' ₺') : '-'}</td>
         <td style="color: #F87171; font-weight: 600; white-space: nowrap;">${Math.round(d.totalExp).toLocaleString('tr-TR')} ₺</td>
         <td style="text-align: right; white-space: nowrap;">
-          <button type="button" class="btn btn-secondary btn-sm" onclick="filterByPeriod('${d.key}')" style="padding: 4px 8px; font-size: 11px;">
+          <button type="button" class="btn btn-secondary btn-sm" data-onclick="filterByPeriod(decodeURIComponent('${encodeActionArg(d.key)}'))" style="padding: 4px 8px; font-size: 11px;">
             🔍 ${isSelected ? 'Seçili' : 'Aya Git'}
           </button>
         </td>
@@ -11765,8 +11773,8 @@ function renderMarketingCampaignsTable(campaigns) {
       </td>
       <td>${statusBadge}</td>
       <td style="text-align: right; white-space: nowrap;">
-        <button class="btn btn-secondary btn-sm" onclick="openMarketingModal('${c.id}')" style="padding:4px 8px; font-size:11px; margin-right:4px;">✏️ Düzenle</button>
-        <button class="btn btn-secondary btn-sm text-danger" onclick="deleteMarketingCampaign('${c.id}')" style="padding:4px 8px; font-size:11px;">🗑️</button>
+        <button class="btn btn-secondary btn-sm" data-onclick="openMarketingModal(decodeURIComponent('${encodeActionArg(c.id)}'))" style="padding:4px 8px; font-size:11px; margin-right:4px;">✏️ Düzenle</button>
+        <button class="btn btn-secondary btn-sm text-danger" data-onclick="deleteMarketingCampaign(decodeURIComponent('${encodeActionArg(c.id)}'))" style="padding:4px 8px; font-size:11px;">🗑️</button>
       </td>
     `;
     tbody.appendChild(tr);
@@ -12184,12 +12192,12 @@ function renderOtaRankingAndCoverRadar() {
       </td>
       <td style="min-width: 190px;">
         <textarea id="opNote_${vKey}" class="operator-note-box" rows="2" placeholder="Stratejik notunuzu buraya yazın...">${opNote}</textarea>
-        <button type="button" class="btn btn-secondary btn-sm" onclick="saveOperatorNote('${vKey}')" style="margin-top: 4px; padding: 2px 8px; font-size: 10px; border-color: #A855F7; color: #DDD6FE;">
+        <button type="button" class="btn btn-secondary btn-sm" data-onclick="saveOperatorNote(decodeURIComponent('${encodeActionArg(vKey)}'))" style="margin-top: 4px; padding: 2px 8px; font-size: 10px; border-color: #A855F7; color: #DDD6FE;">
           💾 Notu Kaydet
         </button>
       </td>
       <td style="text-align: right; white-space: nowrap;">
-        <button type="button" class="btn btn-secondary btn-sm" onclick="setCriticUrlPreset('${vKey}')" style="border-color: #EF4444; color: #FCA5A5; font-size: 11px; font-weight: 700;">
+        <button type="button" class="btn btn-secondary btn-sm" data-onclick="setCriticUrlPreset(decodeURIComponent('${encodeActionArg(vKey)}'))" style="border-color: #EF4444; color: #FCA5A5; font-size: 11px; font-weight: 700;">
           🔥 Eleştir
         </button>
       </td>
@@ -12280,7 +12288,7 @@ function renderCoverAbTestLab(villaKey = null) {
             <span style="font-size: 12px; color: #DDD6FE;">Beklenen Tıklama (CTR):</span>
             <strong style="color: #34D399; font-size: 14px; margin-left: 6px;">— (A/B testi çalıştırılmadı)</strong>
           </div>
-          <button type="button" class="btn btn-secondary btn-sm" onclick="copyAiTitle(decodeURIComponent('${encodeURIComponent(item.aiOptimizedTitle || item.title)}'))" style="border-color: #34D399; color: #34D399; font-size: 11px; font-weight: 700;">
+          <button type="button" class="btn btn-secondary btn-sm" data-onclick="copyAiTitle(decodeURIComponent('${encodeActionArg(item.aiOptimizedTitle || item.title)}'))" style="border-color: #34D399; color: #34D399; font-size: 11px; font-weight: 700;">
             📋 Başlığı Kopyala
           </button>
         </div>
@@ -12497,10 +12505,10 @@ function renderGapNightsRadar() {
         </div>`;
     const butonlar = fiyatBiliniyor
       ? `<div style="display:flex; gap:6px; flex-wrap:wrap;">
-        <button type="button" class="btn btn-secondary btn-sm" onclick="copyGapStoryText(decodeURIComponent('${encodeURIComponent(g.villaName)}'), decodeURIComponent('${encodeURIComponent(g.checkIn + ' - ' + g.checkOut)}'), ${Number(g.nights) || 0}, decodeURIComponent('${encodeURIComponent(g.discountPrice.toLocaleString('tr-TR'))}'), decodeURIComponent('${encodeURIComponent(g.regularPrice.toLocaleString('tr-TR'))}'))" style="flex:1; border-color:#EF4444; color:#FCA5A5; font-size:11px; font-weight:700;">
+        <button type="button" class="btn btn-secondary btn-sm" data-onclick="copyGapStoryText(decodeURIComponent('${encodeActionArg(g.villaName)}'), decodeURIComponent('${encodeActionArg(g.checkIn + ' - ' + g.checkOut)}'), ${Number(g.nights) || 0}, decodeURIComponent('${encodeActionArg(g.discountPrice.toLocaleString('tr-TR'))}'), decodeURIComponent('${encodeActionArg(g.regularPrice.toLocaleString('tr-TR'))}'))" style="flex:1; border-color:#EF4444; color:#FCA5A5; font-size:11px; font-weight:700;">
           ⚡ Flaş Hikaye Kopyala
         </button>
-        <button type="button" class="btn btn-primary btn-sm" onclick="shareGapWhatsApp(decodeURIComponent('${encodeURIComponent(g.villaName)}'), decodeURIComponent('${encodeURIComponent(g.checkIn + ' - ' + g.checkOut)}'), ${Number(g.nights) || 0}, decodeURIComponent('${encodeURIComponent(g.discountPrice.toLocaleString('tr-TR'))}'))" style="background:#10B981; border:none; font-size:11px; font-weight:700;">
+        <button type="button" class="btn btn-primary btn-sm" data-onclick="shareGapWhatsApp(decodeURIComponent('${encodeActionArg(g.villaName)}'), decodeURIComponent('${encodeActionArg(g.checkIn + ' - ' + g.checkOut)}'), ${Number(g.nights) || 0}, decodeURIComponent('${encodeActionArg(g.discountPrice.toLocaleString('tr-TR'))}'))" style="background:#10B981; border:none; font-size:11px; font-weight:700;">
           📲 Durum
         </button>
       </div>`
@@ -12719,7 +12727,7 @@ function renderRetentionCrm() {
       <td style="font-size:12px; color:var(--text-muted);">${g.lastStay || '-'}</td>
       <td>${badge}</td>
       <td style="text-align: right;">
-        <button type="button" class="btn btn-secondary btn-sm" onclick="sendGuestLoyaltyMessage(decodeURIComponent('${encodeURIComponent(g.guest)}'), decodeURIComponent('${encodeURIComponent(String(g.villa || ''))}'), '')" style="border-color:#10B981; color:#34D399; font-size:11px; font-weight:700;">
+        <button type="button" class="btn btn-secondary btn-sm" data-onclick="sendGuestLoyaltyMessage(decodeURIComponent('${encodeActionArg(g.guest)}'), decodeURIComponent('${encodeActionArg(String(g.villa || ''))}'), '')" style="border-color:#10B981; color:#34D399; font-size:11px; font-weight:700;">
           💬 VIP Davet
         </button>
       </td>
@@ -12983,8 +12991,8 @@ function renderInfluencerRoiLedger() {
       </td>
       <td><span class="badge badge-green">${escapeHtml(c.status === 'COMPLETED' ? 'Tamamlandı' : (c.status || 'Belirtilmedi'))}</span></td>
       <td style="text-align: right; white-space: nowrap;">
-        <button type="button" class="btn btn-secondary btn-sm" onclick="openInfluencerModal(decodeURIComponent('${encodeURIComponent(String(c.id))}'))" style="padding:4px 8px; font-size:11px; margin-right:4px;">✏️ Düzenle</button>
-        <button type="button" class="btn btn-secondary btn-sm text-danger" onclick="deleteInfluencerCollab(decodeURIComponent('${encodeURIComponent(String(c.id))}'))" style="padding:4px 8px; font-size:11px;">🗑️</button>
+        <button type="button" class="btn btn-secondary btn-sm" data-onclick="openInfluencerModal(decodeURIComponent('${encodeActionArg(String(c.id))}'))" style="padding:4px 8px; font-size:11px; margin-right:4px;">✏️ Düzenle</button>
+        <button type="button" class="btn btn-secondary btn-sm text-danger" data-onclick="deleteInfluencerCollab(decodeURIComponent('${encodeActionArg(String(c.id))}'))" style="padding:4px 8px; font-size:11px;">🗑️</button>
       </td>
     `;
     tbody.appendChild(tr);
@@ -16248,9 +16256,9 @@ function renderTodayCommandCenter(actionsResult) {
           <div class="action-card-rationale">${act.rationale || ''}</div>
           ${metricsText ? `<div class="action-source-metrics">📊 ${metricsText}</div>` : ''}
           <div class="action-card-footer">
-            <button type="button" class="btn btn-secondary btn-sm" onclick="openTabFromDeepLink('${act.deepLink || 'executive'}', '${act.id}')" style="font-size: 11px; padding: 3px 8px;">İncele ›</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-onclick="openTabFromDeepLink(decodeURIComponent('${encodeActionArg(act.deepLink || 'executive')}'), decodeURIComponent('${encodeActionArg(act.id)}'))" style="font-size: 11px; padding: 3px 8px;">İncele ›</button>
             ${act.quickAction
-              ? `<button type="button" class="btn btn-primary btn-sm" onclick="handleQuickActionTrigger('${act.quickAction}', '${act.id}')" style="font-size: 11px; padding: 3px 8px;">Uygula</button>`
+              ? `<button type="button" class="btn btn-primary btn-sm" data-onclick="handleQuickActionTrigger(decodeURIComponent('${encodeActionArg(act.quickAction)}'), decodeURIComponent('${encodeActionArg(act.id)}'))" style="font-size: 11px; padding: 3px 8px;">Uygula</button>`
               : ''}
           </div>
         </div>
@@ -16299,7 +16307,7 @@ function renderPortfolioHealth(healthCards) {
       ? `<label style="display:block; margin-top:9px; font-size:10px; color:#94A3B8;">
            Durumu değiştir
            <select class="property-readiness-select" data-property-readiness-key="${escapeHtml(c.propertyKey)}"
-             onchange="setPropertySalesReadiness(decodeURIComponent('${encodeURIComponent(String(c.propertyKey))}'), this.value)"
+             data-onchange="setPropertySalesReadiness(decodeURIComponent('${encodeActionArg(String(c.propertyKey))}'), this.value)"
              style="width:100%; margin-top:4px; padding:6px 8px; border-radius:6px; background:#0F172A; color:#E2E8F0; border:1px solid rgba(255,255,255,.16); font-size:11px;">
              <option value="" disabled${c.manualStatus === 'UNSET' ? ' selected' : ''}>⚪ Durum seçin</option>
              ${options}
@@ -16415,7 +16423,7 @@ function handleAiAdvisorSubmit(e) {
     if (recommendationAction && isCanonicalAiActionReady(recommendationAction)) {
       actionBtnHtml = `
         <div style="margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: flex-end;">
-          <button type="button" class="btn btn-primary btn-sm" onclick="openAiActionConfirmModal(decodeURIComponent('${encodeURIComponent(JSON.stringify(recommendationAction))}'))" style="background: #10B981; font-weight: 700;">
+          <button type="button" class="btn btn-primary btn-sm" data-onclick="openAiActionConfirmModal(decodeURIComponent('${encodeActionArg(JSON.stringify(recommendationAction))}'))" style="background: #10B981; font-weight: 700;">
             ⚡ Bu Öneriyi Uygula
           </button>
         </div>
@@ -16693,7 +16701,7 @@ function renderUserNotificationsDrawer() {
       <div style="color: #CBD5E1; font-size: 11px;">${escapeHtml(n.message || '')}</div>
       <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 4px;">
         ${n.status === 'ACKNOWLEDGED' || n.status === 'RESOLVED' ? '' :
-          `<button class="btn btn-secondary btn-sm" onclick="confirmUserNotification(decodeURIComponent('${encodeURIComponent(String(n.id))}'))" style="font-size: 9px; padding: 1px 5px;">Onayla</button>`}
+          `<button class="btn btn-secondary btn-sm" data-onclick="confirmUserNotification(decodeURIComponent('${encodeActionArg(String(n.id))}'))" style="font-size: 9px; padding: 1px 5px;">Onayla</button>`}
       </div>
     </div>
   `).join('');
@@ -16702,7 +16710,7 @@ function renderUserNotificationsDrawer() {
 /**
  * Cekmecedeki "Onayla" dugmesi.
  *
- * Eskiden `onclick="acknowledgeUserNotification(id); renderUserNotificationsDrawer();"`
+ * Eskiden dugmenin isleyicisi `acknowledgeUserNotification(id); renderUserNotificationsDrawer();`
  * yaziyordu. Uc ayri sorun vardi:
  *   1. acknowledgeUserNotification async; BEKLENMIYORDU. Yeniden cizim, RPC
  *      donmeden once yerel (degismemis) veriyle calisiyordu.
@@ -16811,7 +16819,7 @@ function renderPropertiesTab() {
           <strong>Olanaklar:</strong> ${escapeHtml(v.amenities || 'Belirtilmedi')}
         </div>
         <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px;">
-          <button class="btn btn-secondary btn-sm" onclick="openPropertyModal('${k}')" style="font-size: 10px;">Düzenle</button>
+          <button class="btn btn-secondary btn-sm" data-onclick="openPropertyModal(decodeURIComponent('${encodeActionArg(k)}'))" style="font-size: 10px;">Düzenle</button>
         </div>
       </div>
     `;
@@ -16846,7 +16854,7 @@ function renderOperationsTab() {
             <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 5px; white-space: nowrap;">
               <strong style="color: #60A5FA;">₺${Number(t.amount).toLocaleString('tr-TR')}</strong>
               <span class="badge badge-yellow" style="font-size: 10px;">${escapeHtml(t.paymentLabel)}</span>
-              <button class="btn btn-secondary btn-sm" style="font-size: 10px; padding: 3px 7px;" onclick="openEditCleaningTaskModal('${escapeHtml(t.id)}')">Ayrıntı / Düzenle</button>
+              <button class="btn btn-secondary btn-sm" style="font-size: 10px; padding: 3px 7px;" data-onclick="openEditCleaningTaskModal(decodeURIComponent('${encodeActionArg(t.id)}'))">Ayrıntı / Düzenle</button>
             </div>
           </div>
         `).join('')}
@@ -16954,7 +16962,7 @@ function renderGuestsTab() {
   if (opportunityNotice) {
     const count = Number(metrics.rebookingOpportunityCount || 0);
     opportunityNotice.innerHTML = count
-      ? `<strong>🎯 ${count} yeniden rezervasyon fırsatı:</strong> Konaklaması tamamlanmış, gelecekte rezervasyonu olmayan ve kampanya iletişimine açık onay vermiş misafir. <button type="button" class="btn btn-secondary btn-sm" style="margin-left:8px;" onclick="setGuestDirectorySegment('REBOOKING', true)">Fırsatları göster</button>`
+      ? `<strong>🎯 ${count} yeniden rezervasyon fırsatı:</strong> Konaklaması tamamlanmış, gelecekte rezervasyonu olmayan ve kampanya iletişimine açık onay vermiş misafir. <button type="button" class="btn btn-secondary btn-sm" style="margin-left:8px;" data-onclick="setGuestDirectorySegment('REBOOKING', true)">Fırsatları göster</button>`
       : '';
     opportunityNotice.style.display = count ? 'block' : 'none';
   }
@@ -17021,13 +17029,13 @@ function renderGuestsTab() {
         <td>${escapeHtml(dateValue)}${villaName ? `<br><small>${escapeHtml(villaName)}</small>` : ''}</td>
         <td><span>${escapeHtml(directShare)}</span><br>${consent}</td>
         <td><span class="badge ${lifecycleClass}">${escapeHtml(row.lifecycle.label)}</span><br>${segment}${opportunity}</td>
-        <td style="text-align:right;"><button class="btn btn-secondary btn-sm" onclick="openGuestProfileModal(decodeURIComponent('${encodeURIComponent(String(row.id))}'))">Detay</button></td>
+        <td style="text-align:right;"><button class="btn btn-secondary btn-sm" data-onclick="openGuestProfileModal(decodeURIComponent('${encodeActionArg(String(row.id))}'))">Detay</button></td>
       </tr>`;
     }).join('');
   }
 
   const pagination = document.getElementById('guestDirectoryPagination');
-  if (pagination) pagination.innerHTML = `<button class="btn btn-secondary btn-sm" onclick="setGuestDirectoryPage(${guestDirectoryState.page - 1})" ${guestDirectoryState.page <= 1 ? 'disabled' : ''}>Önceki</button><span>${filtered.length} misafir · ${guestDirectoryState.page}/${pageCount}</span><button class="btn btn-secondary btn-sm" onclick="setGuestDirectoryPage(${guestDirectoryState.page + 1})" ${guestDirectoryState.page >= pageCount ? 'disabled' : ''}>Sonraki</button>`;
+  if (pagination) pagination.innerHTML = `<button class="btn btn-secondary btn-sm" data-onclick="setGuestDirectoryPage(${guestDirectoryState.page - 1})" ${guestDirectoryState.page <= 1 ? 'disabled' : ''}>Önceki</button><span>${filtered.length} misafir · ${guestDirectoryState.page}/${pageCount}</span><button class="btn btn-secondary btn-sm" data-onclick="setGuestDirectoryPage(${guestDirectoryState.page + 1})" ${guestDirectoryState.page >= pageCount ? 'disabled' : ''}>Sonraki</button>`;
 }
 
 /** Misafir profilinden rezervasyona gec (tek cagri, L-15). */
@@ -17070,7 +17078,7 @@ function openGuestProfileModal(guestId = null) {
   if (insights && row) {
     const history = row.bookings.length ? row.bookings.map(booking => {
       const villaName = appData.villas?.[booking.villa]?.name || booking.villa || '—';
-      return `<div style="padding:7px 0; border-bottom:1px solid rgba(255,255,255,.06);">${escapeHtml(villaName)} · ${formatTrDate(booking.checkIn)} – ${formatTrDate(booking.checkOut)} · ₺${Number(booking.gross || 0).toLocaleString('tr-TR')} <button type="button" class="btn btn-secondary btn-sm" style="float:right;" onclick="openBookingFromGuestProfile(decodeURIComponent('${encodeURIComponent(String(booking.id))}'))">Rezervasyon</button></div>`;
+      return `<div style="padding:7px 0; border-bottom:1px solid rgba(255,255,255,.06);">${escapeHtml(villaName)} · ${formatTrDate(booking.checkIn)} – ${formatTrDate(booking.checkOut)} · ₺${Number(booking.gross || 0).toLocaleString('tr-TR')} <button type="button" class="btn btn-secondary btn-sm" style="float:right;" data-onclick="openBookingFromGuestProfile(decodeURIComponent('${encodeActionArg(String(booking.id))}'))">Rezervasyon</button></div>`;
     }).join('') : '<div style="color:var(--text-muted);">Bu profile bağlı rezervasyon yok.</div>';
     const offerStatus = row.latestOffer ? escapeHtml(row.latestOffer.status || '—') : '—';
     const directShare = row.directShare == null ? '—' : '%' + Math.round(row.directShare * 100);
@@ -17083,7 +17091,7 @@ function openGuestProfileModal(guestId = null) {
     insights.style.display = 'block';
     if (rebookingAction) {
       rebookingAction.innerHTML = row.rebookingEligible
-        ? `<strong>🎯 Yeniden rezervasyon fırsatı</strong><br><span style="font-size:12px; color:var(--text-muted);">Son çıkışın üzerinden ${row.daysSinceLastStay ?? '—'} gün geçti; gelecekte rezervasyon yok ve kampanya izni mevcut.</span><button type="button" class="btn btn-primary btn-sm" style="float:right; margin-top:-8px;" onclick="openGuestRebookingWhatsApp(decodeURIComponent('${encodeURIComponent(String(row.id))}'))">WhatsApp'ta davet hazırla</button>`
+        ? `<strong>🎯 Yeniden rezervasyon fırsatı</strong><br><span style="font-size:12px; color:var(--text-muted);">Son çıkışın üzerinden ${row.daysSinceLastStay ?? '—'} gün geçti; gelecekte rezervasyon yok ve kampanya izni mevcut.</span><button type="button" class="btn btn-primary btn-sm" style="float:right; margin-top:-8px;" data-onclick="openGuestRebookingWhatsApp(decodeURIComponent('${encodeActionArg(String(row.id))}'))">WhatsApp'ta davet hazırla</button>`
         : '';
       rebookingAction.style.display = row.rebookingEligible ? 'block' : 'none';
     }

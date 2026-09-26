@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co; img-src 'self' data: https:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src https://challenges.cloudflare.com; upgrade-insecure-requests">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co; img-src 'self' data: https:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src https://challenges.cloudflare.com; upgrade-insecure-requests">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <script src="core/frame_guard.js?v=365335d2"></script>
   <title>Lexbnb — Kısa Dönem Kiralama & Executive Kontrol Merkezi</title>
@@ -34,16 +34,16 @@
 
       <!-- SaaS Auth Tabs -->
       <div class="saas-auth-tabs" style="display: flex; background: rgba(0,0,0,0.4); padding: 4px; border-radius: 8px; margin-bottom: 18px; border: 1px solid rgba(255,255,255,0.1);">
-        <button type="button" id="tabBtnLogin" class="saas-tab-btn active" onclick="switchAuthTab('login')" style="flex: 1; padding: 8px; border: none; background: #8B5CF6; color: #fff; font-weight: 700; border-radius: 6px; cursor: pointer; font-size: 13px;">
+        <button type="button" id="tabBtnLogin" class="saas-tab-btn active" data-onclick="switchAuthTab('login')" style="flex: 1; padding: 8px; border: none; background: #8B5CF6; color: #fff; font-weight: 700; border-radius: 6px; cursor: pointer; font-size: 13px;">
           🔑 Giriş Yap
         </button>
-        <button type="button" id="tabBtnRegister" class="saas-tab-btn" onclick="switchAuthTab('register')" style="flex: 1; padding: 8px; border: none; background: transparent; color: #94A3B8; font-weight: 600; border-radius: 6px; cursor: pointer; font-size: 13px;">
+        <button type="button" id="tabBtnRegister" class="saas-tab-btn" data-onclick="switchAuthTab('register')" style="flex: 1; padding: 8px; border: none; background: transparent; color: #94A3B8; font-weight: 600; border-radius: 6px; cursor: pointer; font-size: 13px;">
           ✨ Yeni Hesap Aç
         </button>
       </div>
 
       <!-- FORM 1: Giriş Yap -->
-      <form id="saasLoginForm" onsubmit="handleSaaSLogin(event)" style="display: block;">
+      <form id="saasLoginForm" data-onsubmit="handleSaaSLogin(event)" style="display: block;">
         <div class="form-group" style="margin-bottom: 12px; text-align: left;">
           <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">E-posta Adresi:</label>
           <input type="text" inputmode="email" id="saasLoginUser" placeholder="ornek@isletmeniz.com" required autocomplete="email" style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 13px;">
@@ -60,7 +60,7 @@
 
 
         <div style="text-align: center; margin-top: 10px;">
-          <a href="#" onclick="showForgotPasswordForm(); return false;" style="color: #94A3B8; font-size: 12px; text-decoration: underline;">Şifremi unuttum</a>
+          <a href="#" data-onclick="showForgotPasswordForm(); return false;" style="color: #94A3B8; font-size: 12px; text-decoration: underline;">Şifremi unuttum</a>
         </div>
 
         <div class="remember-row" style="margin-top: 12px;">
@@ -72,7 +72,7 @@
       </form>
 
       <!-- FORM 2: Yeni Hesap Aç (Register) -->
-      <form id="saasRegisterForm" onsubmit="handleSaaSRegister(event)" style="display: none; text-align: left;">
+      <form id="saasRegisterForm" data-onsubmit="handleSaaSRegister(event)" style="display: none; text-align: left;">
         <div class="form-group" style="margin-bottom: 10px;">
           <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">İşletme / Marka Adı:</label>
           <input type="text" id="saasRegCompany" placeholder="Örn: Bodrum Luxury Villas, Sapanca Doğa Evleri" required style="width: 100%; padding: 9px 12px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 13px;">
@@ -97,7 +97,7 @@
       </form>
 
       <!-- FORM 3: Şifremi Unuttum -->
-      <form id="saasForgotForm" onsubmit="handleSaaSForgotPassword(event)" style="display: none; text-align: left;">
+      <form id="saasForgotForm" data-onsubmit="handleSaaSForgotPassword(event)" style="display: none; text-align: left;">
         <p style="font-size: 12px; color: #94A3B8; margin: 0 0 12px; text-align: center;">
           Hesabınızın e-posta adresini girin, şifre yenileme bağlantısını gönderelim.
         </p>
@@ -110,12 +110,12 @@
           📧 Sıfırlama Bağlantısı Gönder
         </button>
         <div style="text-align: center; margin-top: 10px;">
-          <a href="#" onclick="switchAuthTab('login'); return false;" style="color: #94A3B8; font-size: 12px; text-decoration: underline;">← Girişe dön</a>
+          <a href="#" data-onclick="switchAuthTab('login'); return false;" style="color: #94A3B8; font-size: 12px; text-decoration: underline;">← Girişe dön</a>
         </div>
       </form>
 
       <!-- FORM 4: Yeni Şifre Belirle (recovery linkiyle gelindiğinde) -->
-      <form id="saasNewPassForm" onsubmit="handleSaaSNewPassword(event)" style="display: none; text-align: left;">
+      <form id="saasNewPassForm" data-onsubmit="handleSaaSNewPassword(event)" style="display: none; text-align: left;">
         <p id="saasNewPassIntro" style="font-size: 12px; color: #94A3B8; margin: 0 0 12px; text-align: center;">
           Yeni şifrenizi belirleyin.
         </p>
@@ -154,7 +154,7 @@
     <div class="header-filters">
             <div class="filter-group">
         <label style="display: flex; align-items: center; gap: 4px;"><span>📅</span> DÖNEM / TARİH:</label>
-        <select id="globalPeriodFilter" onchange="handleFilterChange()">
+        <select id="globalPeriodFilter" data-onchange="handleFilterChange()">
           <!-- Bu liste refreshPeriodSelectors() tarafindan musterinin kendi
                veri araligindan yeniden kurulur. Asagisi yalnizca yedektir. -->
           <optgroup label="GENEL & TARİH ARALIKLARI">
@@ -166,13 +166,13 @@
 
       <!-- Özel Tarih Aralığı Seçim Kutusu (Sadece 'Özel Tarih Aralığı' seçilince görünür) -->
       <div id="customDateRangeWrap" style="display: none; align-items: center; gap: 6px; background: rgba(0,0,0,0.3); padding: 4px 8px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15);">
-        <input type="date" id="customFilterStart" onchange="handleFilterChange()" title="Başlangıç Tarihi" style="padding: 6px 8px; background: rgba(30,41,59,0.9); border: 1px solid rgba(255,255,255,0.25); border-radius: 6px; color: #fff; font-size: 12px; font-weight: 600;">
+        <input type="date" id="customFilterStart" data-onchange="handleFilterChange()" title="Başlangıç Tarihi" style="padding: 6px 8px; background: rgba(30,41,59,0.9); border: 1px solid rgba(255,255,255,0.25); border-radius: 6px; color: #fff; font-size: 12px; font-weight: 600;">
         <span style="color: #94A3B8; font-weight: 700; font-size: 13px;">–</span>
-        <input type="date" id="customFilterEnd" value="2026-09-30" onchange="handleFilterChange()" title="Bitiş Tarihi" style="padding: 6px 8px; background: rgba(30,41,59,0.9); border: 1px solid rgba(255,255,255,0.25); border-radius: 6px; color: #fff; font-size: 12px; font-weight: 600;">
+        <input type="date" id="customFilterEnd" value="2026-09-30" data-onchange="handleFilterChange()" title="Bitiş Tarihi" style="padding: 6px 8px; background: rgba(30,41,59,0.9); border: 1px solid rgba(255,255,255,0.25); border-radius: 6px; color: #fff; font-size: 12px; font-weight: 600;">
       </div>
       <div class="filter-group">
         <label>PORTFÖY:</label>
-        <select id="globalVillaFilter" onchange="handleFilterChange()">
+        <select id="globalVillaFilter" data-onchange="handleFilterChange()">
               <option value="ALL">Tüm Villalar / Portföy</option>
             </select>
       </div>
@@ -180,7 +180,7 @@
 
         <div class="header-actions">
       <!-- Komuta Paleti Butonu (Ctrl+K) -->
-      <button type="button" class="btn btn-secondary header-palette-btn" onclick="openCommandPalette()" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.18); color: #E2E8F0; font-weight: 600; display: flex; align-items: center; gap: 6px;" title="Komuta Paleti (Kısayol: Ctrl+K)">
+      <button type="button" class="btn btn-secondary header-palette-btn" data-onclick="openCommandPalette()" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.18); color: #E2E8F0; font-weight: 600; display: flex; align-items: center; gap: 6px;" title="Komuta Paleti (Kısayol: Ctrl+K)">
         <span>🔍</span>
         <span class="palette-btn-text">Ara / Komut</span>
         <kbd style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; padding: 1px 5px; font-size: 10px; font-family: monospace;">Ctrl+K</kbd>
@@ -188,14 +188,14 @@
 
       <!-- Bildirim Merkezi (Notification Bell & Drawer) -->
       <div class="header-dropdown-wrap">
-        <button type="button" class="btn btn-secondary header-bell-btn" onclick="toggleNotificationDrawer()" id="notificationBellBtn" style="position: relative; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.18); color: #E2E8F0; font-weight: 700; padding: 8px 12px;" title="Bildirim Merkezi">
+        <button type="button" class="btn btn-secondary header-bell-btn" data-onclick="toggleNotificationDrawer()" id="notificationBellBtn" style="position: relative; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.18); color: #E2E8F0; font-weight: 700; padding: 8px 12px;" title="Bildirim Merkezi">
           <span>🔔</span>
           <span id="notificationBellBadge" class="badge badge-red" style="position: absolute; top: -5px; right: -5px; padding: 2px 6px; font-size: 10px; border-radius: 10px; display: none; background: #EF4444; color: #fff;">0</span>
         </button>
         <div class="header-dropdown-menu notification-drawer-menu" id="notificationDrawer" style="display: none; width: 360px; right: 0; max-height: 480px; overflow-y: auto; padding: 0; background: #0F172A; border: 1px solid rgba(139, 92, 246, 0.3); box-shadow: 0 15px 35px rgba(0,0,0,0.7); z-index: 1000;">
           <div style="padding: 12px 16px; background: rgba(30, 41, 59, 0.95); border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center;">
             <strong style="color: #F8FAFC; font-size: 13px;">🔔 Bildirim Merkezi</strong>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="markAllNotificationsAsRead()" style="font-size: 10px; padding: 2px 6px;">Tümünü Okundu Say</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-onclick="markAllNotificationsAsRead()" style="font-size: 10px; padding: 2px 6px;">Tümünü Okundu Say</button>
           </div>
           <div id="notificationList" style="padding: 8px;">
             <div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px;">Yeni bildirim bulunmuyor.</div>
@@ -204,63 +204,63 @@
       </div>
 
       <!-- Başlangıç Rehberi Butonu -->
-      <button type="button" class="btn btn-secondary header-cache-btn" onclick="window.location.reload()" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.15); color: #E2E8F0; font-weight: 600; display: flex; align-items: center; gap: 5px;" title="Sayfayı yeniden yükler (Verilerinizi ASLA silmez)">
+      <button type="button" class="btn btn-secondary header-cache-btn" data-onclick="reloadPage()" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.15); color: #E2E8F0; font-weight: 600; display: flex; align-items: center; gap: 5px;" title="Sayfayı yeniden yükler (Verilerinizi ASLA silmez)">
         <span>🔄</span>
         <span class="cache-btn-text">Sayfayı Yenile</span>
       </button>
-      <button type="button" class="btn btn-secondary header-guide-btn" onclick="openHelpModal('terms')" style="background: rgba(139, 92, 246, 0.18); border: 1px solid rgba(139, 92, 246, 0.4); color: #DDD6FE; font-weight: 700; display: flex; align-items: center; gap: 6px;" title="Başlangıç Seviyesi Terimler Sözlüğü & Kılavuz">
+      <button type="button" class="btn btn-secondary header-guide-btn" data-onclick="openHelpModal('terms')" style="background: rgba(139, 92, 246, 0.18); border: 1px solid rgba(139, 92, 246, 0.4); color: #DDD6FE; font-weight: 700; display: flex; align-items: center; gap: 6px;" title="Başlangıç Seviyesi Terimler Sözlüğü & Kılavuz">
         <span>🎓</span>
         <span class="guide-btn-text">Başlangıç Rehberi</span>
       </button>
       <!-- Dropdown 1: Hızlı Ekle -->
       <div class="header-dropdown-wrap">
-        <button type="button" class="btn btn-primary" onclick="toggleHeaderDropdown('quickAddMenu')" id="quickAddBtn" style="font-weight: 700;">
+        <button type="button" class="btn btn-primary" data-onclick="toggleHeaderDropdown('quickAddMenu')" id="quickAddBtn" style="font-weight: 700;">
           <span>➕</span> Hızlı Ekle <span style="font-size: 10px; margin-left: 2px;">▼</span>
         </button>
         <div class="header-dropdown-menu" id="quickAddMenu">
-          <button type="button" class="dropdown-item" onclick="openBookingModal(); closeAllHeaderDropdowns();">
+          <button type="button" class="dropdown-item" data-onclick="openBookingModal(); closeAllHeaderDropdowns();">
             <span class="dropdown-icon">📅</span>
             <div>
               <strong>Yeni Rezervasyon Girişi</strong>
               <small>Giriş, çıkış, misafir ve fiyat kaydı</small>
             </div>
           </button>
-          <button type="button" class="dropdown-item" onclick="openNewCleaningTaskModal(); closeAllHeaderDropdowns();">
+          <button type="button" class="dropdown-item" data-onclick="openNewCleaningTaskModal(); closeAllHeaderDropdowns();">
             <span class="dropdown-icon">🧹</span>
             <div>
               <strong>Temizlik & Borç Kaydı Ekle</strong>
               <small>Personel temizlik hakedişi ve ödeme takibi</small>
             </div>
           </button>
-          <button type="button" class="dropdown-item" onclick="openExpenseModal(); closeAllHeaderDropdowns();">
+          <button type="button" class="dropdown-item" data-onclick="openExpenseModal(); closeAllHeaderDropdowns();">
             <span class="dropdown-icon">💸</span>
             <div>
               <strong>Gider / Yatırım Ekle</strong>
               <small>Opex veya Capex harcaması kaydedin</small>
             </div>
           </button>
-          <button type="button" class="dropdown-item highlight-green" onclick="openWhatsAppModal('parser'); closeAllHeaderDropdowns();">
+          <button type="button" class="dropdown-item highlight-green" data-onclick="openWhatsAppModal('parser'); closeAllHeaderDropdowns();">
             <span class="dropdown-icon">💬</span>
             <div>
               <strong>WhatsApp'tan Mesaj Ayrıştır</strong>
               <small>Mesajı yapıştırın, 2 saniyede çözülsün</small>
             </div>
           </button>
-          <button type="button" class="dropdown-item" onclick="openGoalsModal(); closeAllHeaderDropdowns();">
+          <button type="button" class="dropdown-item" data-onclick="openGoalsModal(); closeAllHeaderDropdowns();">
             <span class="dropdown-icon">🎯</span>
             <div>
               <strong>Aylık Hedef Belirle</strong>
               <small>Ciro, net kâr ve doluluk hedefleri</small>
             </div>
           </button>
-          <button type="button" class="dropdown-item" onclick="openLeadModal(); closeAllHeaderDropdowns();">
+          <button type="button" class="dropdown-item" data-onclick="openLeadModal(); closeAllHeaderDropdowns();">
             <span class="dropdown-icon">🎯</span>
             <div>
               <strong>Yeni Lead / Müşteri Talebi</strong>
               <small>Fiyat soran misafir teklifi</small>
             </div>
           </button>
-          <button type="button" class="dropdown-item" onclick="openMaintModal(); closeAllHeaderDropdowns();">
+          <button type="button" class="dropdown-item" data-onclick="openMaintModal(); closeAllHeaderDropdowns();">
             <span class="dropdown-icon">🛠️</span>
             <div>
               <strong>Arıza / Bakım İşi Bildir</strong>
@@ -272,11 +272,11 @@
 
       <!-- Dropdown 2: Araçlar & Yönetim -->
       <div class="header-dropdown-wrap">
-        <button type="button" class="btn btn-secondary" onclick="toggleHeaderDropdown('toolsMenu')" id="toolsBtn" style="font-weight: 700;">
+        <button type="button" class="btn btn-secondary" data-onclick="toggleHeaderDropdown('toolsMenu')" id="toolsBtn" style="font-weight: 700;">
           <span>⚙️</span> Araçlar <span style="font-size: 10px; margin-left: 2px;">▼</span>
         </button>
         <div class="header-dropdown-menu" id="toolsMenu">
-          <button type="button" class="dropdown-item" onclick="switchTab('housekeeping'); closeAllHeaderDropdowns();" style="background: rgba(245, 158, 11, 0.12); border-bottom: 1px solid rgba(255,255,255,0.08);">
+          <button type="button" class="dropdown-item" data-onclick="switchTab('housekeeping'); closeAllHeaderDropdowns();" style="background: rgba(245, 158, 11, 0.12); border-bottom: 1px solid rgba(255,255,255,0.08);">
             <span class="dropdown-icon">🧹</span>
             <div>
               <strong style="color: #FCD34D;">Temizlik & Borç Defteri</strong>
@@ -284,7 +284,7 @@
             </div>
           </button>
           
-          <button type="button" class="dropdown-item" onclick="openImportModal(); closeAllHeaderDropdowns();">
+          <button type="button" class="dropdown-item" data-onclick="openImportModal(); closeAllHeaderDropdowns();">
             <span class="dropdown-icon">📥</span>
             <div>
               <strong>Excel / CSV Rapor Yükle</strong>
@@ -296,21 +296,21 @@
                geri okuyan hicbir kod yok, yani geri yuklenemeyen bir
                dosyaydi. Yerine gelen defterler ice aktarma sablonuyla ayni
                sutunlari tasir ve GERCEKTEN geri yuklenebilir. -->
-          <button type="button" class="dropdown-item" onclick="exportLedger('BOOKINGS','xlsx'); closeAllHeaderDropdowns();">
+          <button type="button" class="dropdown-item" data-onclick="exportLedger('BOOKINGS','xlsx'); closeAllHeaderDropdowns();">
             <span class="dropdown-icon">📗</span>
             <div>
               <strong>Rezervasyon Defterini İndir</strong>
               <small>Seçili dönem, Excel — düzenleyip geri yükleyebilirsiniz</small>
             </div>
           </button>
-          <button type="button" class="dropdown-item" onclick="exportLedger('EXPENSES','xlsx'); closeAllHeaderDropdowns();">
+          <button type="button" class="dropdown-item" data-onclick="exportLedger('EXPENSES','xlsx'); closeAllHeaderDropdowns();">
             <span class="dropdown-icon">📕</span>
             <div>
               <strong>Gider Defterini İndir</strong>
               <small>Seçili dönem, Excel — düzenleyip geri yükleyebilirsiniz</small>
             </div>
           </button>
-          <button type="button" class="dropdown-item" onclick="openHelpModal(); closeAllHeaderDropdowns();">
+          <button type="button" class="dropdown-item" data-onclick="openHelpModal(); closeAllHeaderDropdowns();">
             <span class="dropdown-icon">❓</span>
             <div>
               <strong>Nasıl Kullanılır?</strong>
@@ -322,7 +322,7 @@
 
       <!-- Dropdown 3: SaaS Kullanıcı Hesabı & Profil -->
       <div class="header-dropdown-wrap">
-        <button type="button" class="btn btn-secondary" onclick="toggleHeaderDropdown('userProfileMenu')" id="userProfileBtn" style="border-color: #8B5CF6; color: #DDD6FE; font-weight: 700;">
+        <button type="button" class="btn btn-secondary" data-onclick="toggleHeaderDropdown('userProfileMenu')" id="userProfileBtn" style="border-color: #8B5CF6; color: #DDD6FE; font-weight: 700;">
           <span id="headerUserAvatar">👤</span> <span id="headerCompanyName">LexBnB Portföyü</span> <span style="font-size: 10px; margin-left: 2px;">▼</span>
         </button>
         <div class="header-dropdown-menu" id="userProfileMenu" style="min-width: 220px;">
@@ -333,17 +333,17 @@
           </div>
           <div id="tenantSwitcherContainer" style="display: none; padding: 8px 14px; border-bottom: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.25);">
             <label style="font-size: 10px; color: #A78BFA; text-transform: uppercase; font-weight: 700; display: block; margin-bottom: 4px;">Aktif İşletme:</label>
-            <select id="tenantSelectDropdown" onchange="switchActiveTenant(this.value); closeAllHeaderDropdowns();" style="width: 100%; padding: 6px 8px; font-size: 12px; border-radius: 6px; background: #1E1B4B; color: #EDE9FE; border: 1px solid #6366F1; outline: none; cursor: pointer;">
+            <select id="tenantSelectDropdown" data-onchange="switchActiveTenant(this.value); closeAllHeaderDropdowns();" style="width: 100%; padding: 6px 8px; font-size: 12px; border-radius: 6px; background: #1E1B4B; color: #EDE9FE; border: 1px solid #6366F1; outline: none; cursor: pointer;">
             </select>
           </div>
-          <button type="button" class="dropdown-item" onclick="openPropertyModal(); closeAllHeaderDropdowns();">
+          <button type="button" class="dropdown-item" data-onclick="openPropertyModal(); closeAllHeaderDropdowns();">
             <span class="dropdown-icon">🏡</span>
             <div>
               <strong>Yeni Villa / Mülk Ekle</strong>
               <small>Portföyünüze yeni ev ekleyin</small>
             </div>
           </button>
-          <button type="button" class="dropdown-item" onclick="openImportModal(); closeAllHeaderDropdowns();">
+          <button type="button" class="dropdown-item" data-onclick="openImportModal(); closeAllHeaderDropdowns();">
             <span class="dropdown-icon">📥</span>
             <div>
               <strong>Excel'den Rapor Yükle</strong>
@@ -351,7 +351,7 @@
             </div>
           </button>
           <div class="dropdown-divider"></div>
-          <button type="button" class="dropdown-item text-danger" onclick="logoutSaaSUser(); closeAllHeaderDropdowns();">
+          <button type="button" class="dropdown-item text-danger" data-onclick="logoutSaaSUser(); closeAllHeaderDropdowns();">
             <span class="dropdown-icon">🚪</span>
             <div>
               <strong style="color: #F87171;">Oturumu Kapat</strong>
@@ -366,18 +366,18 @@
 
   <!-- Navigation Tabs: Canonical Sections -->
   <nav class="nav-tabs">
-    <button class="tab-btn active" onclick="switchTab('executive')">🎯 Kontrol Merkezi</button>
-    <button class="tab-btn" onclick="switchTab('reservations')">📅 Rezervasyonlar (<span id="rezCountBadge">0</span>)</button>
-    <button class="tab-btn" onclick="switchTab('properties')">🏡 Mülkler (<span id="propCountBadge">0</span>)</button>
-    <button class="tab-btn" onclick="switchTab('operations')">🧹 Operasyon (<span id="opsTaskCountBadge">0</span>)</button>
-    <button class="tab-btn" onclick="switchTab('guests')">👥 Misafirler (<span id="guestCountBadge">—</span>)</button>
-    <button class="tab-btn" onclick="switchTab('leads')">🎯 Satış / CRM (<span id="leadCountBadge">0</span>)</button>
-    <button class="tab-btn" onclick="switchTab('pricing')">🏷️ Fiyatlandırma</button>
-    <button class="tab-btn" onclick="switchTab('finance')">💰 Finans</button>
-    <button class="tab-btn" onclick="switchTab('marketing')">📈 Gelir & Dağıtım</button>
-    <button class="tab-btn" onclick="switchTab('reports')">📊 Raporlar</button>
-    <button class="tab-btn" onclick="switchTab('analysis')">🧠 Analiz Merkezi</button>
-    <button class="tab-btn" onclick="switchTab('settings')">⚙️ Ayarlar</button>
+    <button class="tab-btn active" data-onclick="switchTab('executive')">🎯 Kontrol Merkezi</button>
+    <button class="tab-btn" data-onclick="switchTab('reservations')">📅 Rezervasyonlar (<span id="rezCountBadge">0</span>)</button>
+    <button class="tab-btn" data-onclick="switchTab('properties')">🏡 Mülkler (<span id="propCountBadge">0</span>)</button>
+    <button class="tab-btn" data-onclick="switchTab('operations')">🧹 Operasyon (<span id="opsTaskCountBadge">0</span>)</button>
+    <button class="tab-btn" data-onclick="switchTab('guests')">👥 Misafirler (<span id="guestCountBadge">—</span>)</button>
+    <button class="tab-btn" data-onclick="switchTab('leads')">🎯 Satış / CRM (<span id="leadCountBadge">0</span>)</button>
+    <button class="tab-btn" data-onclick="switchTab('pricing')">🏷️ Fiyatlandırma</button>
+    <button class="tab-btn" data-onclick="switchTab('finance')">💰 Finans</button>
+    <button class="tab-btn" data-onclick="switchTab('marketing')">📈 Gelir & Dağıtım</button>
+    <button class="tab-btn" data-onclick="switchTab('reports')">📊 Raporlar</button>
+    <button class="tab-btn" data-onclick="switchTab('analysis')">🧠 Analiz Merkezi</button>
+    <button class="tab-btn" data-onclick="switchTab('settings')">⚙️ Ayarlar</button>
   </nav>
 
   <!-- Main Container -->
@@ -403,7 +403,7 @@
           </div>
         </div>
         <div>
-          <button class="btn btn-secondary btn-sm" onclick="openGoalsModal()" style="font-size: 11px;">⚙️ Hedefleri Düzenle</button>
+          <button class="btn btn-secondary btn-sm" data-onclick="openGoalsModal()" style="font-size: 11px;">⚙️ Hedefleri Düzenle</button>
         </div>
       </section>
 
@@ -417,7 +417,7 @@
         <div class="executive-kpi-card" id="execCardRevenue">
           <div class="kpi-card-header">
             <span class="kpi-label">TOPLAM GELİR (NET ODA + TEMİZLİK)</span>
-            <button class="kpi-info-btn" onclick="showKpiExplanation('REVENUE')">ℹ️</button>
+            <button class="kpi-info-btn" data-onclick="showKpiExplanation('REVENUE')">ℹ️</button>
           </div>
           <div class="kpi-val" id="execKpiRevenue">—</div>
           <div class="kpi-meta">
@@ -430,7 +430,7 @@
         <div class="executive-kpi-card" id="execCardOpex">
           <div class="kpi-card-header">
             <span class="kpi-label">OPEX (FAALİYET GİDERİ)</span>
-            <button class="kpi-info-btn" onclick="showKpiExplanation('OPEX')">ℹ️</button>
+            <button class="kpi-info-btn" data-onclick="showKpiExplanation('OPEX')">ℹ️</button>
           </div>
           <div class="kpi-val" id="execKpiOpex" style="color: #FBBF24;">—</div>
           <div class="kpi-meta">
@@ -443,7 +443,7 @@
         <div class="executive-kpi-card" id="execCardCapex">
           <div class="kpi-card-header">
             <span class="kpi-label">CAPEX (YATIRIM GİDERİ)</span>
-            <button class="kpi-info-btn" onclick="showKpiExplanation('CAPEX')">ℹ️</button>
+            <button class="kpi-info-btn" data-onclick="showKpiExplanation('CAPEX')">ℹ️</button>
           </div>
           <div class="kpi-val" id="execKpiCapex" style="color: #FB7185;">—</div>
           <div class="kpi-meta">
@@ -456,7 +456,7 @@
         <div class="executive-kpi-card" id="execCardOperatingProfit">
           <div class="kpi-card-header">
             <span class="kpi-label">FAALİYET KÂRI</span>
-            <button class="kpi-info-btn" onclick="showKpiExplanation('OPERATING_PROFIT')">ℹ️</button>
+            <button class="kpi-info-btn" data-onclick="showKpiExplanation('OPERATING_PROFIT')">ℹ️</button>
           </div>
           <div class="kpi-val" id="execKpiOperatingProfit">—</div>
           <div class="kpi-meta">
@@ -469,7 +469,7 @@
         <div class="executive-kpi-card highlight-profit" id="execCardProfit">
           <div class="kpi-card-header">
             <span class="kpi-label">NET NAKİT KÂRI</span>
-            <button class="kpi-info-btn" onclick="showKpiExplanation('NET_PROFIT')">ℹ️</button>
+            <button class="kpi-info-btn" data-onclick="showKpiExplanation('NET_PROFIT')">ℹ️</button>
           </div>
           <div class="kpi-val" id="execKpiProfit" style="color: #34D399;">—</div>
           <div class="kpi-meta">
@@ -482,7 +482,7 @@
         <div class="executive-kpi-card" id="execCardOccupancy">
           <div class="kpi-card-header">
             <span class="kpi-label">DOLULUK ORANI</span>
-            <button class="kpi-info-btn" onclick="showKpiExplanation('OCCUPANCY')">ℹ️</button>
+            <button class="kpi-info-btn" data-onclick="showKpiExplanation('OCCUPANCY')">ℹ️</button>
           </div>
           <div class="kpi-val" id="execKpiOccupancy">—</div>
           <div class="kpi-meta">
@@ -495,7 +495,7 @@
         <div class="executive-kpi-card" id="execCardAdr">
           <div class="kpi-card-header">
             <span class="kpi-label">ADR (ORT. GÜNLÜK FİYAT)</span>
-            <button class="kpi-info-btn" onclick="showKpiExplanation('ADR')">ℹ️</button>
+            <button class="kpi-info-btn" data-onclick="showKpiExplanation('ADR')">ℹ️</button>
           </div>
           <div class="kpi-val" id="execKpiAdr">—</div>
           <div class="kpi-meta">
@@ -508,7 +508,7 @@
         <div class="executive-kpi-card" id="execCardRevpar">
           <div class="kpi-card-header">
             <span class="kpi-label">RevPAR (ODA BAŞI GELİR)</span>
-            <button class="kpi-info-btn" onclick="showKpiExplanation('REVPAR')">ℹ️</button>
+            <button class="kpi-info-btn" data-onclick="showKpiExplanation('REVPAR')">ℹ️</button>
           </div>
           <div class="kpi-val" id="execKpiRevpar">—</div>
           <div class="kpi-meta">
@@ -530,7 +530,7 @@
             </p>
           </div>
           <div style="display: flex; gap: 8px;">
-            <button class="btn btn-secondary btn-sm" onclick="refreshExecutiveDashboardSnapshot(true)" style="font-size: 11px;">🔄 Yenile</button>
+            <button class="btn btn-secondary btn-sm" data-onclick="refreshExecutiveDashboardSnapshot(true)" style="font-size: 11px;">🔄 Yenile</button>
           </div>
         </div>
 
@@ -615,13 +615,13 @@
         </div>
 
         <div class="ai-suggestion-chips">
-          <button type="button" class="ai-chip-btn" onclick="askExecutiveAdvisor('Bu ay net kârımı nasıl %15 artırırım?')">💡 Bu ay net kârımı nasıl %15 artırırım?</button>
-          <button type="button" class="ai-chip-btn" onclick="askExecutiveAdvisor('Ekim ayında doluluğu nasıl artırabilirim?')">📅 Ekim ayında doluluğu nasıl artırabilirim?</button>
-          <button type="button" class="ai-chip-btn" onclick="askExecutiveAdvisor('Hangi mülkümde fiyat optimizasyonu gerekiyor?')">🏡 Hangi mülkümde fiyat optimizasyonu gerekiyor?</button>
-          <button type="button" class="ai-chip-btn" onclick="askExecutiveAdvisor('Operasyonel arıza ve temizlik darboğazları nelerdir?')">🛠️ Operasyonel darboğazlar nelerdir?</button>
+          <button type="button" class="ai-chip-btn" data-onclick="askExecutiveAdvisor('Bu ay net kârımı nasıl %15 artırırım?')">💡 Bu ay net kârımı nasıl %15 artırırım?</button>
+          <button type="button" class="ai-chip-btn" data-onclick="askExecutiveAdvisor('Ekim ayında doluluğu nasıl artırabilirim?')">📅 Ekim ayında doluluğu nasıl artırabilirim?</button>
+          <button type="button" class="ai-chip-btn" data-onclick="askExecutiveAdvisor('Hangi mülkümde fiyat optimizasyonu gerekiyor?')">🏡 Hangi mülkümde fiyat optimizasyonu gerekiyor?</button>
+          <button type="button" class="ai-chip-btn" data-onclick="askExecutiveAdvisor('Operasyonel arıza ve temizlik darboğazları nelerdir?')">🛠️ Operasyonel darboğazlar nelerdir?</button>
         </div>
 
-        <form onsubmit="handleAiAdvisorSubmit(event)" class="ai-chat-input-row">
+        <form data-onsubmit="handleAiAdvisorSubmit(event)" class="ai-chat-input-row">
           <input type="text" id="aiAdvisorPromptInput" class="ai-chat-input" placeholder="İşletmeniz, portföyünüz veya fiyat stratejiniz hakkında bir soru yazın...">
           <button type="submit" class="btn btn-primary" style="background: linear-gradient(135deg, #8B5CF6, #6D28D9); border: none; font-weight: 700; padding: 10px 20px;">
             <span>✨</span> Sor
@@ -643,13 +643,13 @@
       <!-- 1. MONTH STEPPER & PORTFOLIO BANNER -->
       <section class="card finance-top-bar">
         <div class="month-stepper">
-          <button class="stepper-arrow-btn" onclick="stepMonth(-1)" title="Önceki Ay">‹</button>
+          <button class="stepper-arrow-btn" data-onclick="stepMonth(-1)" title="Önceki Ay">‹</button>
           <div class="month-stepper-display">
             <span class="stepper-sub-prev" id="stepperPrevLabel">—</span>
             <strong class="stepper-current" id="stepperCurrentLabel">—</strong>
             <span class="stepper-sub-next" id="stepperNextLabel">—</span>
           </div>
-          <button class="stepper-arrow-btn" onclick="stepMonth(1)" title="Sonraki Ay">›</button>
+          <button class="stepper-arrow-btn" data-onclick="stepMonth(1)" title="Sonraki Ay">›</button>
         </div>
 
         <div class="finance-top-meta">
@@ -657,8 +657,8 @@
             <span>Portföy:</span>
             <strong id="finTopPropertyLabel">Tüm Villalar / Portföy</strong>
           </div>
-          <button class="btn btn-secondary btn-sm" onclick="openGoalsModal()">⚙️ Hedefleri Düzenle</button>
-          <button class="btn btn-secondary btn-sm" onclick="openExpenseModal()">+ Gider Girişi</button>
+          <button class="btn btn-secondary btn-sm" data-onclick="openGoalsModal()">⚙️ Hedefleri Düzenle</button>
+          <button class="btn btn-secondary btn-sm" data-onclick="openExpenseModal()">+ Gider Girişi</button>
         </div>
       </section>
 
@@ -673,8 +673,8 @@
             <p class="sub-text" id="monthCloseDetail" style="margin:4px 0 0; font-size:11px;">—</p>
           </div>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <button type="button" class="btn btn-secondary btn-sm" id="monthCloseBtn" onclick="openMonthCloseModal()">🔒 Bu Ayı Kapat</button>
-            <button type="button" class="btn btn-secondary btn-sm" id="monthReopenBtn" onclick="openMonthReopenModal()" hidden>🔓 Dönemi Yeniden Aç</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="monthCloseBtn" data-onclick="openMonthCloseModal()">🔒 Bu Ayı Kapat</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="monthReopenBtn" data-onclick="openMonthReopenModal()" hidden>🔓 Dönemi Yeniden Aç</button>
           </div>
         </div>
         <div id="monthCloseHistory" class="sub-text" style="font-size:10px; margin-top:8px; color:#94A3B8;"></div>
@@ -686,7 +686,7 @@
         <div class="kpi-card fin-kpi-card">
           <div class="kpi-card-header">
             <span class="kpi-label">GERÇEKLEŞEN CİRO</span>
-            <button class="kpi-info-btn" onclick="showKpiExplanation('REVENUE')">ℹ️</button>
+            <button class="kpi-info-btn" data-onclick="showKpiExplanation('REVENUE')">ℹ️</button>
           </div>
           <div class="kpi-value" id="finActualRevenue">—</div>
           <div class="kpi-meta">
@@ -696,12 +696,12 @@
         </div>
 
         <!-- Hedef Ciro (Doğrudan Tıklanabilir & Düzenlenebilir) -->
-        <div class="kpi-card fin-kpi-card" onclick="openGoalsModal()" style="cursor: pointer;" title="Hedefi değiştirmek için tıklayın">
+        <div class="kpi-card fin-kpi-card" data-onclick="openGoalsModal()" style="cursor: pointer;" title="Hedefi değiştirmek için tıklayın">
           <div class="kpi-card-header">
             <span class="kpi-label">HEDEF CİRO</span>
             <div style="display: flex; gap: 4px;">
-              <button class="kpi-info-btn" onclick="event.stopPropagation(); openGoalsModal()" title="Hedefi Hızlı Değiştir">✏️</button>
-              <button class="kpi-info-btn" onclick="event.stopPropagation(); showKpiExplanation('TARGET')">ℹ️</button>
+              <button class="kpi-info-btn" data-onclick="event.stopPropagation(); openGoalsModal()" title="Hedefi Hızlı Değiştir">✏️</button>
+              <button class="kpi-info-btn" data-onclick="event.stopPropagation(); showKpiExplanation('TARGET')">ℹ️</button>
             </div>
           </div>
           <div class="kpi-value" id="finTargetRevenue">—</div>
@@ -715,7 +715,7 @@
         <div class="kpi-card fin-kpi-card highlight-profit">
           <div class="kpi-card-header">
             <span class="kpi-label">NET KÂR (CASH PROFIT)</span>
-            <button class="kpi-info-btn" onclick="showKpiExplanation('NET_PROFIT')">ℹ️</button>
+            <button class="kpi-info-btn" data-onclick="showKpiExplanation('NET_PROFIT')">ℹ️</button>
           </div>
           <div class="kpi-value" id="finNetProfit">—</div>
           <div class="kpi-meta">
@@ -728,7 +728,7 @@
         <div class="kpi-card fin-kpi-card">
           <div class="kpi-card-header">
             <span class="kpi-label">TOPLAM GİDER (OPEX+CAPEX)</span>
-            <button class="kpi-info-btn" onclick="showKpiExplanation('TOTAL_EXPENSE')">ℹ️</button>
+            <button class="kpi-info-btn" data-onclick="showKpiExplanation('TOTAL_EXPENSE')">ℹ️</button>
           </div>
           <div class="kpi-value" id="finTotalExpense">—</div>
           <div class="kpi-meta">
@@ -742,7 +742,7 @@
         <div class="kpi-card fin-kpi-card">
           <div class="kpi-card-header">
             <span class="kpi-label">SATILAN GECE</span>
-            <button class="kpi-info-btn" onclick="showKpiExplanation('SOLD_NIGHTS')">ℹ️</button>
+            <button class="kpi-info-btn" data-onclick="showKpiExplanation('SOLD_NIGHTS')">ℹ️</button>
           </div>
           <div class="kpi-value" id="finSoldNights">—</div>
           <div class="kpi-meta">
@@ -761,7 +761,7 @@
           </div>
           <div style="display: flex; align-items: center; gap: 10px;">
             <span class="badge badge-emerald" id="finTargetStatusBadge">—</span>
-            <button class="btn btn-primary btn-sm" onclick="openGoalsModal()">🎯 Hedefi Değiştir</button>
+            <button class="btn btn-primary btn-sm" data-onclick="openGoalsModal()">🎯 Hedefi Değiştir</button>
           </div>
         </div>
 
@@ -860,7 +860,7 @@
             <h2>📊 GİDER ANALİZİ (KATEGORİ BAZLI DAĞILIM)</h2>
             <p class="sub-text">Gider kalemlerinin toplam bütçe ve ciro içindeki payları ile geçen aya göre değişimleri</p>
           </div>
-          <button class="btn btn-primary btn-sm" onclick="openExpenseModal()">+ Yeni Gider / Harcama Ekle</button>
+          <button class="btn btn-primary btn-sm" data-onclick="openExpenseModal()">+ Yeni Gider / Harcama Ekle</button>
         </div>
 
         <div class="expense-breakdown-grid">
@@ -911,10 +911,10 @@
           </div>
           <div class="prop-header-actions">
             <div class="view-toggle-group">
-              <button class="view-toggle-btn active" id="propViewTableBtn" onclick="setPropViewMode('table')">
+              <button class="view-toggle-btn active" id="propViewTableBtn" data-onclick="setPropViewMode('table')">
                 📋 Yönetici Sıralama Tablosu
               </button>
-              <button class="view-toggle-btn" id="propViewCardsBtn" onclick="setPropViewMode('cards')">
+              <button class="view-toggle-btn" id="propViewCardsBtn" data-onclick="setPropViewMode('cards')">
                 🎴 Kart Görünümü
               </button>
             </div>
@@ -957,7 +957,7 @@
           </div>
           <div class="metric-selector-wrapper">
             <label>Karşılaştırma Metriği:</label>
-            <select id="compMetricSelect" onchange="renderPropertyComparisonChart()">
+            <select id="compMetricSelect" data-onchange="renderPropertyComparisonChart()">
               <option value="ciro" selected>Ciro (TL)</option>
               <option value="netKar">Tahmini Net Kâr (TL)</option>
               <option value="adr">ADR (Ortalama Günlük Fiyat)</option>
@@ -995,11 +995,11 @@
 
           <!-- Metric Selector for Visual Chart -->
           <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-            <button type="button" class="btn btn-secondary btn-sm" id="kpiTrackBtn-ciro" onclick="setKpiTrackerMetric('ciro')" style="background: rgba(59,130,246,0.2); border-color: #3B82F6; color: #93C5FD; font-weight: 700;">💰 Ciro</button>
-            <button type="button" class="btn btn-secondary btn-sm" id="kpiTrackBtn-netProfit" onclick="setKpiTrackerMetric('netProfit')">💵 Net Kâr</button>
-            <button type="button" class="btn btn-secondary btn-sm" id="kpiTrackBtn-adr" onclick="setKpiTrackerMetric('adr')">🏷️ ADR</button>
-            <button type="button" class="btn btn-secondary btn-sm" id="kpiTrackBtn-occupancy" onclick="setKpiTrackerMetric('occupancy')">🌙 Doluluk %</button>
-            <button type="button" class="btn btn-secondary btn-sm" id="kpiTrackBtn-opex" onclick="setKpiTrackerMetric('opex')">💸 Giderler</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="kpiTrackBtn-ciro" data-onclick="setKpiTrackerMetric('ciro')" style="background: rgba(59,130,246,0.2); border-color: #3B82F6; color: #93C5FD; font-weight: 700;">💰 Ciro</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="kpiTrackBtn-netProfit" data-onclick="setKpiTrackerMetric('netProfit')">💵 Net Kâr</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="kpiTrackBtn-adr" data-onclick="setKpiTrackerMetric('adr')">🏷️ ADR</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="kpiTrackBtn-occupancy" data-onclick="setKpiTrackerMetric('occupancy')">🌙 Doluluk %</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="kpiTrackBtn-opex" data-onclick="setKpiTrackerMetric('opex')">💸 Giderler</button>
           </div>
         </div>
 
@@ -1077,10 +1077,10 @@
               <span class="sub-text">Ciro, Gider ve Net Kâr Evrimi</span>
             </div>
             <div class="trend-range-selector">
-              <button class="trend-btn active" onclick="setTrendRange('3M')">3 Ay</button>
-              <button class="trend-btn" onclick="setTrendRange('6M')">6 Ay</button>
-              <button class="trend-btn" onclick="setTrendRange('12M')">12 Ay</button>
-              <button class="trend-btn" onclick="setTrendRange('YTD')">YTD</button>
+              <button class="trend-btn active" data-onclick="setTrendRange('3M')">3 Ay</button>
+              <button class="trend-btn" data-onclick="setTrendRange('6M')">6 Ay</button>
+              <button class="trend-btn" data-onclick="setTrendRange('12M')">12 Ay</button>
+              <button class="trend-btn" data-onclick="setTrendRange('YTD')">YTD</button>
             </div>
           </div>
           <div class="trend-chart-container" id="trendChartContainer">
@@ -1178,7 +1178,7 @@
             </div>
             <span class="badge badge-slate" id="trajectoryStatusBadge">SKOR HESAPLANIYOR</span>
           </div>
-          <button class="btn btn-secondary btn-sm" onclick="exportTrajectoryReport()">📄 Gidişat Raporu Al</button>
+          <button class="btn btn-secondary btn-sm" data-onclick="exportTrajectoryReport()">📄 Gidişat Raporu Al</button>
         </div>
 
 
@@ -1233,7 +1233,7 @@
               <h3>🎛️ CANLI "NE OLURSA NE OLUR?" GELİR & KÂR SİMÜLATÖRÜ</h3>
               <p class="sub-text">Fiyat, doluluk veya komisyon oranlarını değiştirin, aylık kasaya girecek net nakdi anında görün</p>
             </div>
-            <button class="btn btn-secondary btn-sm" onclick="resetSimulator()">Sıfırla</button>
+            <button class="btn btn-secondary btn-sm" data-onclick="resetSimulator()">Sıfırla</button>
           </div>
 
           <div class="sim-controls-grid">
@@ -1242,7 +1242,7 @@
                 <span>ADR (Gecelik Fiyat) Değişimi:</span>
                 <strong id="simAdrLabel">—</strong>
               </div>
-              <input type="range" id="simAdrSlider" min="-20" max="40" step="5" value="15" oninput="runWhatIfSimulation()">
+              <input type="range" id="simAdrSlider" min="-20" max="40" step="5" value="15" data-oninput="runWhatIfSimulation()">
               <span class="slider-hint">Taban ve tavan fiyatların yukarı çekilmesi</span>
             </div>
 
@@ -1251,7 +1251,7 @@
                 <span>Doluluk Oranı Değişimi:</span>
                 <strong id="simOccLabel">—</strong>
               </div>
-              <input type="range" id="simOccSlider" min="-15" max="25" step="5" value="5" oninput="runWhatIfSimulation()">
+              <input type="range" id="simOccSlider" min="-15" max="25" step="5" value="5" data-oninput="runWhatIfSimulation()">
               <span class="slider-hint">Boş günlerin ve gap gecelerinin kapatılması</span>
             </div>
 
@@ -1260,7 +1260,7 @@
                 <span>Direkt Rezervasyon Payı (WhatsApp/Instagram):</span>
                 <strong id="simDirectLabel">—</strong>
               </div>
-              <input type="range" id="simDirectSlider" min="20" max="90" step="5" value="60" oninput="runWhatIfSimulation()">
+              <input type="range" id="simDirectSlider" min="20" max="90" step="5" value="60" data-oninput="runWhatIfSimulation()">
               <span class="slider-hint">Kayıtlı kanal komisyonunu azaltabilen doğrudan satış payı</span>
             </div>
           </div>
@@ -1321,7 +1321,7 @@
             <h2>⚡ BUGÜN NE YAPMALIYIM? (GÜNLÜK AKSIYON RADARI)</h2>
             <span class="badge badge-amber" id="radarBadge">0 Aksiyon</span>
           </div>
-          <button class="btn-text" onclick="renderAll()">🔄 Yenile</button>
+          <button class="btn-text" data-onclick="renderAll()">🔄 Yenile</button>
         </div>
         <div class="radar-grid" id="todayRadarList"></div>
       </section>
@@ -1333,7 +1333,7 @@
             <h2>🛎️ GÜNLÜK OPERASYON & TEMİZLİK KONTROL MERKEZİ</h2>
             <p class="sub-text" id="dailyOpsSubtitle">Bugün (07.09.2026 Pazartesi) giriş-çıkış yapacak misafirler ve villaların temizlik / ödeme durumu</p>
           </div>
-          <button class="btn btn-primary btn-sm" onclick="openBookingModal()">+ Hızlı Rezervasyon</button>
+          <button class="btn btn-primary btn-sm" data-onclick="openBookingModal()">+ Hızlı Rezervasyon</button>
         </div>
 
         <div class="daily-ops-grid">
@@ -1367,7 +1367,7 @@
                 <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Bekleyen Temizlik Borcu</div>
                 <div style="font-size: 15px; font-weight: 800; color: #FBBF24; margin-top: 2px;" id="kokpitCleanDebtSummary">₺0</div>
               </div>
-              <button class="btn btn-warning btn-sm" onclick="switchTab('housekeeping')" style="font-size: 11px; font-weight: 700; padding: 6px 12px; background: #F59E0B; color: #000; border: none; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 5px; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);" title="Tüm Temizlik ve Personel Borç Defterini Aç">
+              <button class="btn btn-warning btn-sm" data-onclick="switchTab('housekeeping')" style="font-size: 11px; font-weight: 700; padding: 6px 12px; background: #F59E0B; color: #000; border: none; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 5px; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);" title="Tüm Temizlik ve Personel Borç Defterini Aç">
                 <span>🧹</span> <strong>Temizlik Defterini Aç ›</strong>
               </button>
             </div>
@@ -1377,22 +1377,22 @@
 
       <section class="kpi-cards-grid">
         <div class="kpi-card">
-          <div class="kpi-card-header"><span class="kpi-label">NET ODA GELİRİ</span><button class="kpi-info-btn" onclick="showKpiExplanation('REVENUE')">ℹ️</button></div>
+          <div class="kpi-card-header"><span class="kpi-label">NET ODA GELİRİ</span><button class="kpi-info-btn" data-onclick="showKpiExplanation('REVENUE')">ℹ️</button></div>
           <div class="kpi-value" id="kpiNetRevenue">₺0</div>
           <div class="kpi-meta"><span class="kpi-trend positive" id="kpiTargetPct">%0 Hedef</span><span id="kpiGrossRevenue">—</span></div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-card-header"><span class="kpi-label">DOLULUK ORANI</span><button class="kpi-info-btn" onclick="showKpiExplanation('OCCUPANCY')">ℹ️</button></div>
+          <div class="kpi-card-header"><span class="kpi-label">DOLULUK ORANI</span><button class="kpi-info-btn" data-onclick="showKpiExplanation('OCCUPANCY')">ℹ️</button></div>
           <div class="kpi-value" id="kpiOccupancy">%0.0</div>
           <div class="kpi-meta"><span class="kpi-trend positive" id="kpiNightsDetail">0 Gece</span><span id="kpiAvailableDetail">0 Gece</span></div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-card-header"><span class="kpi-label">ADR</span><button class="kpi-info-btn" onclick="showKpiExplanation('ADR')">ℹ️</button></div>
+          <div class="kpi-card-header"><span class="kpi-label">ADR</span><button class="kpi-info-btn" data-onclick="showKpiExplanation('ADR')">ℹ️</button></div>
           <div class="kpi-value" id="kpiADR">₺0</div>
           <div class="kpi-meta"><span class="kpi-trend positive">Net / Gece</span><span>Komisyon Hariç</span></div>
         </div>
         <div class="kpi-card">
-          <div class="kpi-card-header"><span class="kpi-label">RevPAR</span><button class="kpi-info-btn" onclick="showKpiExplanation('REVPAR')">ℹ️</button></div>
+          <div class="kpi-card-header"><span class="kpi-label">RevPAR</span><button class="kpi-info-btn" data-onclick="showKpiExplanation('REVPAR')">ℹ️</button></div>
           <div class="kpi-value" id="kpiRevPAR">₺0</div>
           <div class="kpi-meta"><span class="kpi-trend positive">Kapasite</span><span id="kpiNRevPAR">—</span></div>
         </div>
@@ -1509,7 +1509,7 @@
             <p class="sub-text">Mülklerinizin Airbnb ilan puanları, yorum adetleri ve misafir memnuniyet karnesi. Bu veriler Airbnb tarafından açık bir arayüzle verilmediği için şu an bağlı değil.</p>
           </div>
           <div style="display: flex; gap: 8px; align-items: center;">
-            <button type="button" class="btn btn-secondary btn-sm" onclick="syncLiveAirbnbData()" id="syncAirbnbBtn" style="border-color: #F59E0B; color: #FDE68A; font-weight: 700;">
+            <button type="button" class="btn btn-secondary btn-sm" data-onclick="syncLiveAirbnbData()" id="syncAirbnbBtn" style="border-color: #F59E0B; color: #FDE68A; font-weight: 700;">
               🔄 Airbnb'den Senkronize Et
             </button>
           </div>
@@ -1558,11 +1558,11 @@
         <!-- Takvim Gezinme ve Hızlı Atlama Araç Çubuğu -->
         <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); padding: 12px 16px; border-radius: 8px; margin-top: 10px; margin-bottom: 12px; flex-wrap: wrap; gap: 10px; border: 1px solid rgba(255,255,255,0.08);">
           <div style="display: flex; align-items: center; gap: 8px;">
-            <button type="button" class="btn btn-secondary btn-sm" onclick="stepTapeChartMonth(-1)" title="Önceki Ay">‹ Önceki Ay</button>
-            <select id="tapeChartMonthSelect" onchange="setTapeChartMonth(this.value)" style="padding: 7px 14px; background: #1E293B; border: 1px solid rgba(255,255,255,0.25); border-radius: 6px; color: #fff; font-weight: 700; font-size: 13px; cursor: pointer;">
+            <button type="button" class="btn btn-secondary btn-sm" data-onclick="stepTapeChartMonth(-1)" title="Önceki Ay">‹ Önceki Ay</button>
+            <select id="tapeChartMonthSelect" data-onchange="setTapeChartMonth(this.value)" style="padding: 7px 14px; background: #1E293B; border: 1px solid rgba(255,255,255,0.25); border-radius: 6px; color: #fff; font-weight: 700; font-size: 13px; cursor: pointer;">
               <!-- Populated dynamically via JS -->
             </select>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="stepTapeChartMonth(1)" title="Sonraki Ay">Sonraki Ay ›</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-onclick="stepTapeChartMonth(1)" title="Sonraki Ay">Sonraki Ay ›</button>
           </div>
           
         </div>
@@ -1576,29 +1576,29 @@
             <h2>📋 TÜM REZERVASYONLAR LİSTESİ</h2>
             <p class="sub-text">Geçmiş, güncel ve yılbaşı dahil tüm gelecek rezervasyonlar. Düzenleyin, silin veya filtreleyin.</p>
           </div>
-          <button class="btn btn-secondary" onclick="openWhatsAppModal('reservation')" style="border-color: #25D366; color: #4ADE80; margin-right: 8px;"><span style="font-size: 14px;">💬</span> WhatsApp'tan Rezervasyona Aktar</button>
-          <button class="btn btn-primary" onclick="openBookingModal()">+ Yeni Rezervasyon Ekle</button>
+          <button class="btn btn-secondary" data-onclick="openWhatsAppModal('reservation')" style="border-color: #25D366; color: #4ADE80; margin-right: 8px;"><span style="font-size: 14px;">💬</span> WhatsApp'tan Rezervasyona Aktar</button>
+          <button class="btn btn-primary" data-onclick="openBookingModal()">+ Yeni Rezervasyon Ekle</button>
         </div>
 
         <!-- Rezervasyon Tablosu Filtreleme ve Arama Çubuğu -->
         <div style="display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; background: rgba(0,0,0,0.25); padding: 12px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
           <div style="flex: 1; min-width: 200px;">
-            <input type="text" id="rezSearchInput" placeholder="🔍 Misafir adı veya villa ara..." oninput="renderManageBookingsTable()" style="width: 100%; padding: 8px 12px; background: rgba(30,41,59,0.8); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff;">
+            <input type="text" id="rezSearchInput" placeholder="🔍 Misafir adı veya villa ara..." data-oninput="renderManageBookingsTable()" style="width: 100%; padding: 8px 12px; background: rgba(30,41,59,0.8); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff;">
           </div>
           <div>
-            <select id="rezPeriodFilter" onchange="renderManageBookingsTable()" style="padding: 8px 12px; background: rgba(30,41,59,0.9); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px;">
+            <select id="rezPeriodFilter" data-onchange="renderManageBookingsTable()" style="padding: 8px 12px; background: rgba(30,41,59,0.9); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px;">
               <!-- refreshPeriodSelectors() yeniden kurar; yedek liste. -->
               <option value="ALL" selected>Tüm Rezervasyonlar</option>
               <option value="UPCOMING">Gelecek & Aktif Rezervasyonlar</option>
             </select>
           </div>
           <div>
-            <select id="rezVillaFilter" onchange="renderManageBookingsTable()" style="padding: 8px 12px; background: rgba(30,41,59,0.9); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px;">
+            <select id="rezVillaFilter" data-onchange="renderManageBookingsTable()" style="padding: 8px 12px; background: rgba(30,41,59,0.9); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px;">
               <option value="ALL">Tüm Villalar / Portföy</option>
             </select>
           </div>
           <div>
-            <select id="rezStatusFilter" onchange="renderManageBookingsTable()" style="padding: 8px 12px; background: rgba(30,41,59,0.9); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px;">
+            <select id="rezStatusFilter" data-onchange="renderManageBookingsTable()" style="padding: 8px 12px; background: rgba(30,41,59,0.9); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px;">
               <option value="ALL" selected>Tüm Durumlar</option>
               <option value="CONFIRMED">Onaylandı</option>
               <option value="CHECKED_IN">İçeride (Konaklıyor)</option>
@@ -1645,8 +1645,8 @@
         <div class="section-title-bar">
           <div><h2>💸 GİDER VE YATIRIM DEFTERİ</h2><p class="sub-text">Tüm operasyonel (Opex) ve yatırım (Capex) harcamaları.</p></div>
           <div class="table-actions">
-            <input type="text" id="expSearchInput" placeholder="🔍 Açıklama veya Kategori ara..." oninput="renderExpensesTable()">
-            <button class="btn btn-primary" onclick="openExpenseModal()">+ Yeni Gider Ekle</button>
+            <input type="text" id="expSearchInput" placeholder="🔍 Açıklama veya Kategori ara..." data-oninput="renderExpensesTable()">
+            <button class="btn btn-primary" data-onclick="openExpenseModal()">+ Yeni Gider Ekle</button>
           </div>
         </div>
         <div class="table-responsive">
@@ -1706,7 +1706,7 @@
             <p class="sub-text">Rezervasyonlardan gelen temizlikler. Maliyet temizlik <strong>yapıldı</strong> işaretlendiği günün ayına gider yazılır; ödeme ayrı bir adımdır. Yapılmayan temizlik (gelmeyen misafir) ne gider ne borç olur.</p>
           </div>
           <div class="table-actions" style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <select id="hkStatusFilter" class="form-control" style="width: auto; font-size: 12px; padding: 6px 10px; background: rgba(0,0,0,0.4); color: #fff; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px;" onchange="renderHousekeepingTab()">
+            <select id="hkStatusFilter" class="form-control" style="width: auto; font-size: 12px; padding: 6px 10px; background: rgba(0,0,0,0.4); color: #fff; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px;" data-onchange="renderHousekeepingTab()">
               <option value="ALL">Tüm Durumlar (Tümü)</option>
               <option value="UNCONFIRMED">❓ Yapıldı mı? (geçmiş tarihli planlı)</option>
               <option value="PLANNED">🗓️ Planlananlar</option>
@@ -1714,10 +1714,10 @@
               <option value="PAID">✅ Ödenenler</option>
               <option value="SKIPPED">✖ Yapılmayanlar</option>
             </select>
-            <input type="text" id="hkSearchInput" placeholder="🔍 Ev, misafir, personel ara..." oninput="renderHousekeepingTab()" style="width: 220px; font-size: 12px; padding: 6px 12px; background: rgba(0,0,0,0.4); color: #fff; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px;">
-            <button class="btn btn-secondary btn-sm" onclick="markSelectedCleaningDone()" style="font-size: 12px; font-weight: 700;" title="Listede işaretlediğiniz planlı temizlikleri planlandıkları gün yapılmış sayar">✔ Seçilenler Yapıldı</button>
-            <button class="btn btn-warning btn-sm" onclick="payAllPendingCleaning()" style="font-size: 12px; font-weight: 700; background: #F59E0B; color: #000;">💳 Tüm Borcu Öde</button>
-            <button class="btn btn-primary btn-sm" onclick="openNewCleaningTaskModal()" style="font-size: 12px; font-weight: 700;">+ Yeni Temizlik Ekle</button>
+            <input type="text" id="hkSearchInput" placeholder="🔍 Ev, misafir, personel ara..." data-oninput="renderHousekeepingTab()" style="width: 220px; font-size: 12px; padding: 6px 12px; background: rgba(0,0,0,0.4); color: #fff; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px;">
+            <button class="btn btn-secondary btn-sm" data-onclick="markSelectedCleaningDone()" style="font-size: 12px; font-weight: 700;" title="Listede işaretlediğiniz planlı temizlikleri planlandıkları gün yapılmış sayar">✔ Seçilenler Yapıldı</button>
+            <button class="btn btn-warning btn-sm" data-onclick="payAllPendingCleaning()" style="font-size: 12px; font-weight: 700; background: #F59E0B; color: #000;">💳 Tüm Borcu Öde</button>
+            <button class="btn btn-primary btn-sm" data-onclick="openNewCleaningTaskModal()" style="font-size: 12px; font-weight: 700;">+ Yeni Temizlik Ekle</button>
           </div>
         </div>
         <div class="table-responsive">
@@ -1753,10 +1753,10 @@
             <p class="sub-text">Gelen mesajların rezervasyona dönüşüm oranı, kayıp analizleri ve misafir talepleri.</p>
           </div>
           <div style="display: flex; gap: 8px;">
-            <button class="btn btn-secondary btn-sm" onclick="openWhatsAppModal('lead')" style="background: rgba(37,211,102,0.15); border-color: #25D366; color: #4ADE80;">
+            <button class="btn btn-secondary btn-sm" data-onclick="openWhatsAppModal('lead')" style="background: rgba(37,211,102,0.15); border-color: #25D366; color: #4ADE80;">
               <span>💬</span> Mesaj Ayrıştır
             </button>
-            <button class="btn btn-primary btn-sm" onclick="openLeadModal()">+ Manuel Lead</button>
+            <button class="btn btn-primary btn-sm" data-onclick="openLeadModal()">+ Manuel Lead</button>
           </div>
         </div>
 
@@ -1826,7 +1826,7 @@
         <div class="section-title-bar">
           <div><h2>📋 GELEN TALEP VE LEAD LİSTESİ</h2><p class="sub-text">WhatsApp, Instagram ve telefon teklifleri. Durumu güncelleyin veya rezervasyona dönüştürün.</p></div>
           <div style="display: flex; gap: 8px;">
-            <input type="text" id="leadSearchInput" placeholder="🔍 Misafir veya Villa ara..." oninput="renderManageLeadsTable()" style="padding: 6px 12px; background: rgba(30,41,59,0.8); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px;">
+            <input type="text" id="leadSearchInput" placeholder="🔍 Misafir veya Villa ara..." data-oninput="renderManageLeadsTable()" style="padding: 6px 12px; background: rgba(30,41,59,0.8); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px;">
           </div>
         </div>
         <div class="table-responsive">
@@ -1856,7 +1856,7 @@
       <section class="card">
         <div class="section-title-bar">
           <div><h2>🛠️ BAKIM, ONARIM VE ARIZA DEFTERİ</h2><p class="sub-text">P1, P2 ve P3 arıza kayıtları.</p></div>
-          <button class="btn btn-primary" onclick="openMaintModal()">+ Yeni Arıza Ekle</button>
+          <button class="btn btn-primary" data-onclick="openMaintModal()">+ Yeni Arıza Ekle</button>
         </div>
         <div class="table-responsive">
           <table class="data-table">
@@ -1878,7 +1878,7 @@
             <h2>👥 EKİP VE ROL YÖNETİMİ</h2>
             <p class="sub-text">İşletmenize kullanıcı davet edin ve her birinin yetki seviyesini belirleyin.</p>
           </div>
-          <button class="btn btn-primary btn-sm" id="inviteMemberBtn" onclick="openInviteMemberModal()">+ Ekibe Üye Davet Et</button>
+          <button class="btn btn-primary btn-sm" id="inviteMemberBtn" data-onclick="openInviteMemberModal()">+ Ekibe Üye Davet Et</button>
         </div>
 
         <div id="teamRoleLegend" style="display: flex; flex-wrap: wrap; gap: 8px; padding: 0 4px 14px;">
@@ -1940,9 +1940,9 @@
         </div>
         <div id="bookingChannelSchemaNotice" style="display:none; margin-bottom:12px; padding:10px 12px; border-radius:8px; background:rgba(245,158,11,.08); border:1px solid rgba(245,158,11,.25); color:#FDE68A; font-size:12px;"></div>
         <p class="sub-text" style="margin-bottom:14px;">“Kaldır” kanalı yalnızca yeni rezervasyon seçiminden çıkarır; geçmiş kayıtlar ve finansal raporlar değişmez. Rezervasyon içindeki oran veya tutar gerektiğinde kayıt bazında ayrıca değiştirilebilir.</p>
-        <form id="bookingChannelAddForm" onsubmit="createBookingChannelFromSettings(event)" style="display:grid; grid-template-columns:minmax(180px,2fr) minmax(130px,1fr) minmax(150px,1fr) auto; gap:10px; align-items:end; margin-bottom:16px;">
+        <form id="bookingChannelAddForm" data-onsubmit="createBookingChannelFromSettings(event)" style="display:grid; grid-template-columns:minmax(180px,2fr) minmax(130px,1fr) minmax(150px,1fr) auto; gap:10px; align-items:end; margin-bottom:16px;">
           <div class="form-group"><label for="newBookingChannelName">Yeni kanal adı</label><input id="newBookingChannelName" type="text" maxlength="100" required placeholder="Örn: TatilVillam"></div>
-          <div class="form-group"><label for="newBookingChannelType">Kanal türü</label><select id="newBookingChannelType" onchange="toggleNewBookingChannelRate()"><option value="OTA">OTA</option><option value="DIRECT">Direkt</option></select></div>
+          <div class="form-group"><label for="newBookingChannelType">Kanal türü</label><select id="newBookingChannelType" data-onchange="toggleNewBookingChannelRate()"><option value="OTA">OTA</option><option value="DIRECT">Direkt</option></select></div>
           <div class="form-group"><label for="newBookingChannelRate">Varsayılan komisyon (%)</label><input id="newBookingChannelRate" type="number" min="0" max="100" step="0.01" value="0" required></div>
           <button type="submit" class="btn btn-primary">+ Kanal Ekle</button>
         </form>
@@ -1962,7 +1962,7 @@
             <h2>🎯 AYLIK CİRO VE KÂR HEDEFLERİ LİSTESİ</h2>
             <p class="sub-text">Yılın tüm ayları için belirlenen bütçe hedefleri. İstediğiniz ayın hedefini tek tıkla değiştirebilirsiniz.</p>
           </div>
-          <button class="btn btn-primary btn-sm" onclick="openGoalsModal()">+ Hedef Belirle / Düzenle</button>
+          <button class="btn btn-primary btn-sm" data-onclick="openGoalsModal()">+ Hedef Belirle / Düzenle</button>
         </div>
         <div class="table-responsive">
           <table class="data-table">
@@ -1987,7 +1987,7 @@
       <section class="card">
         <div class="section-title-bar">
           <div><h2>⚙️ VİLLA FİYAT BASAMAKLARI VE MALİYETLER</h2><p class="sub-text">Taban, baz, hedef, premium ve peak fiyatlar.</p></div>
-          <button class="btn btn-primary" onclick="saveAllSettings()">💾 Ayarları Kaydet</button>
+          <button class="btn btn-primary" data-onclick="saveAllSettings()">💾 Ayarları Kaydet</button>
         </div>
         <div class="table-responsive">
           <table class="data-table">
@@ -2011,7 +2011,7 @@
             dahil bütün kayıtlar kalıcı olarak silinir. Kapatılmış dönemler de dahildir.
             Deneme verisi yükleyip temizlemek için bunu kullanın.
           </p>
-          <button type="button" class="btn btn-secondary" onclick="openResetModal()">
+          <button type="button" class="btn btn-secondary" data-onclick="openResetModal()">
             🗑️ Veri Sıfırlama Menüsünü Aç
           </button>
         </div>
@@ -2029,7 +2029,7 @@
           <div id="deletionImpactBox" class="sub-text" style="font-size: 12px; margin-bottom: 14px;">
             Etki bilgisi yükleniyor…
           </div>
-          <button class="btn btn-danger" id="openDeleteAccountBtn" onclick="openDeleteAccountModal()">
+          <button class="btn btn-danger" id="openDeleteAccountBtn" data-onclick="openDeleteAccountModal()">
             Hesabımı Kalıcı Olarak Kapat
           </button>
         </div>
@@ -2046,7 +2046,7 @@
             <h2>🏡 PORTFÖY & MÜLK YÖNETİMİ</h2>
             <p class="sub-text">Sistemdeki tüm villalar, operasyonel hazırlık durumları, baz fiyatlar ve koruma sınırları.</p>
           </div>
-          <button class="btn btn-primary btn-sm" onclick="openPropertyModal()">+ Yeni Villa / Mülk Ekle</button>
+          <button class="btn btn-primary btn-sm" data-onclick="openPropertyModal()">+ Yeni Villa / Mülk Ekle</button>
         </div>
         <div class="portfolio-health-grid" id="propertiesManagementGrid">
           <!-- JS dinamik dolduracak -->
@@ -2065,10 +2065,10 @@
             <p class="sub-text">Günlük turnover temizlikleri, personel hakedişleri, borç takibi ve P1 acil bakım işleri.</p>
           </div>
           <div style="display: flex; gap: 8px;">
-            <button class="btn btn-secondary btn-sm" onclick="switchTab('housekeeping')">🧹 Temizlik Defteri Detayı</button>
-            <button class="btn btn-secondary btn-sm" onclick="switchTab('maintenance')">🛠️ Arıza / Bakım Detayı</button>
-            <button class="btn btn-primary btn-sm" onclick="openNewCleaningTaskModal()">+ Temizlik Görevi Ekle</button>
-            <button class="btn btn-primary btn-sm" onclick="openMaintModal()">+ Arıza Bildir</button>
+            <button class="btn btn-secondary btn-sm" data-onclick="switchTab('housekeeping')">🧹 Temizlik Defteri Detayı</button>
+            <button class="btn btn-secondary btn-sm" data-onclick="switchTab('maintenance')">🛠️ Arıza / Bakım Detayı</button>
+            <button class="btn btn-primary btn-sm" data-onclick="openNewCleaningTaskModal()">+ Temizlik Görevi Ekle</button>
+            <button class="btn btn-primary btn-sm" data-onclick="openMaintModal()">+ Arıza Bildir</button>
           </div>
         </div>
         <div class="kpi-cards-grid five-cols" style="margin-bottom: 20px;">
@@ -2115,8 +2115,8 @@
             <p class="sub-text">Kanonik misafir profilleri, tekrar konaklama değeri ve izinli doğrudan satış takibi.</p>
           </div>
           <div style="display: flex; gap: 8px;">
-            <button class="btn btn-secondary btn-sm" onclick="openWhatsAppModal('parser')">💬 WhatsApp Ayrıştır</button>
-            <button class="btn btn-primary btn-sm" id="newGuestProfileBtn" onclick="openGuestProfileModal()">+ Yeni Misafir</button>
+            <button class="btn btn-secondary btn-sm" data-onclick="openWhatsAppModal('parser')">💬 WhatsApp Ayrıştır</button>
+            <button class="btn btn-primary btn-sm" id="newGuestProfileBtn" data-onclick="openGuestProfileModal()">+ Yeni Misafir</button>
           </div>
         </div>
         <div class="kpi-cards-grid" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); margin-bottom: 16px;">
@@ -2130,11 +2130,11 @@
         <div id="guestOpportunityNotice" style="display:none; margin-bottom:12px; padding:12px; border-radius:10px; background:rgba(16,185,129,.08); border:1px solid rgba(16,185,129,.25); color:#D1FAE5; font-size:12px;"></div>
         <div id="guestDataNotice" style="display:none; margin-bottom:12px; padding:10px 12px; border-radius:8px; background:rgba(245,158,11,.08); border:1px solid rgba(245,158,11,.25); color:#FDE68A; font-size:12px;"></div>
         <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
-          <input id="guestDirectorySearch" type="search" placeholder="İsim, telefon veya e-posta ara" oninput="setGuestDirectoryQuery(this.value)" style="min-width:240px; flex:1;">
-          <label style="display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-muted);">Başlangıç <input id="guestDirectoryDateStart" type="date" onchange="setGuestDirectoryDateRange()" aria-label="Konaklama başlangıç tarihi"></label>
-          <label style="display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-muted);">Bitiş <input id="guestDirectoryDateEnd" type="date" onchange="setGuestDirectoryDateRange()" aria-label="Konaklama bitiş tarihi"></label>
-          <button type="button" class="btn btn-secondary btn-sm" onclick="resetGuestDirectoryDateRange()">Tüm Tarihler</button>
-          <select id="guestDirectorySegment" onchange="setGuestDirectorySegment(this.value)" style="min-width:160px;">
+          <input id="guestDirectorySearch" type="search" placeholder="İsim, telefon veya e-posta ara" data-oninput="setGuestDirectoryQuery(this.value)" style="min-width:240px; flex:1;">
+          <label style="display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-muted);">Başlangıç <input id="guestDirectoryDateStart" type="date" data-onchange="setGuestDirectoryDateRange()" aria-label="Konaklama başlangıç tarihi"></label>
+          <label style="display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-muted);">Bitiş <input id="guestDirectoryDateEnd" type="date" data-onchange="setGuestDirectoryDateRange()" aria-label="Konaklama bitiş tarihi"></label>
+          <button type="button" class="btn btn-secondary btn-sm" data-onclick="resetGuestDirectoryDateRange()">Tüm Tarihler</button>
+          <select id="guestDirectorySegment" data-onchange="setGuestDirectorySegment(this.value)" style="min-width:160px;">
             <option value="ALL">Tüm misafirler</option>
             <option value="REPEAT">Tekrar edenler</option>
             <option value="UPCOMING">Yaklaşanlar</option>
@@ -2145,17 +2145,17 @@
             <option value="CONTACTABLE">İletişim bilgisi olanlar</option>
             <option value="NO_CONTACT">İletişim bilgisi eksik</option>
           </select>
-          <select id="guestDirectoryProperty" onchange="setGuestDirectoryProperty(this.value)" style="min-width:170px;" aria-label="Konaklanan mülk">
+          <select id="guestDirectoryProperty" data-onchange="setGuestDirectoryProperty(this.value)" style="min-width:170px;" aria-label="Konaklanan mülk">
             <option value="">Tüm mülkler</option>
           </select>
-          <select id="guestDirectorySort" onchange="setGuestDirectorySort(this.value)" style="min-width:160px;">
+          <select id="guestDirectorySort" data-onchange="setGuestDirectorySort(this.value)" style="min-width:160px;">
             <option value="RECENT">Konaklama tarihi</option>
             <option value="STAYS">Konaklama sayısı</option>
             <option value="NIGHTS">Toplam gece</option>
             <option value="VALUE">Yaşam boyu ciro</option>
             <option value="NAME">İsme göre</option>
           </select>
-          <select id="guestDirectorySortDirection" onchange="setGuestDirectorySortDirection(this.value)" style="min-width:140px;" aria-label="Sıralama yönü">
+          <select id="guestDirectorySortDirection" data-onchange="setGuestDirectorySortDirection(this.value)" style="min-width:140px;" aria-label="Sıralama yönü">
             <option value="DESC">Çoktan aza</option>
             <option value="ASC">Azdan çoğa</option>
           </select>
@@ -2196,7 +2196,7 @@
             <p class="sub-text">Deterministik gelir motoru, boş gece (gap night) tespiti, sezonsal katsayılar ve fiyat guardrail koruması.</p>
           </div>
           <div style="display: flex; gap: 8px;">
-            <button class="btn btn-secondary btn-sm" onclick="openGoalsModal()">🎯 Hedefleri Yönet</button>
+            <button class="btn btn-secondary btn-sm" data-onclick="openGoalsModal()">🎯 Hedefleri Yönet</button>
           </div>
         </div>
         <div class="kpi-cards-grid five-cols" style="margin-bottom: 20px;">
@@ -2248,24 +2248,24 @@
                  bir zamanlar "Raporu Indir (JSON)" vardi; appData'nin
                  tamamini ham dokuyor, donem filtresini yok sayiyordu. -->
             <div class="dropdown" style="position: relative;">
-              <button type="button" class="btn btn-secondary btn-sm" onclick="toggleExportMenu(event)">⬇️ Defteri Dışa Aktar</button>
+              <button type="button" class="btn btn-secondary btn-sm" data-onclick="toggleExportMenu(event)">⬇️ Defteri Dışa Aktar</button>
               <div id="ledgerExportMenu" class="dropdown-menu" style="display: none; position: absolute; right: 0; top: calc(100% + 6px); z-index: 60; min-width: 250px; background: #111C2E; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 6px; box-shadow: 0 12px 32px rgba(0,0,0,0.45);">
                 <div style="font-size: 10px; color: #64748B; padding: 6px 10px 4px; line-height: 1.5;">
                   Seçili dönem ve mülk filtresine göre. Sütunlar içe aktarma
                   şablonuyla aynıdır: düzenleyip geri yükleyebilirsiniz.
                 </div>
-                <button type="button" class="dropdown-item" onclick="exportLedger('BOOKINGS','xlsx'); toggleExportMenu(event);">📗 Rezervasyon Defteri (.xlsx)</button>
-                <button type="button" class="dropdown-item" onclick="exportLedger('BOOKINGS','csv'); toggleExportMenu(event);">📄 Rezervasyon Defteri (.csv)</button>
-                <button type="button" class="dropdown-item" onclick="exportLedger('EXPENSES','xlsx'); toggleExportMenu(event);">📕 Gider Defteri (.xlsx)</button>
-                <button type="button" class="dropdown-item" onclick="exportLedger('EXPENSES','csv'); toggleExportMenu(event);">📄 Gider Defteri (.csv)</button>
+                <button type="button" class="dropdown-item" data-onclick="exportLedger('BOOKINGS','xlsx'); toggleExportMenu(event);">📗 Rezervasyon Defteri (.xlsx)</button>
+                <button type="button" class="dropdown-item" data-onclick="exportLedger('BOOKINGS','csv'); toggleExportMenu(event);">📄 Rezervasyon Defteri (.csv)</button>
+                <button type="button" class="dropdown-item" data-onclick="exportLedger('EXPENSES','xlsx'); toggleExportMenu(event);">📕 Gider Defteri (.xlsx)</button>
+                <button type="button" class="dropdown-item" data-onclick="exportLedger('EXPENSES','csv'); toggleExportMenu(event);">📄 Gider Defteri (.csv)</button>
                 <div style="font-size: 10px; color: #64748B; padding: 6px 10px 4px; border-top: 1px solid rgba(255,255,255,0.08); margin-top: 4px; line-height: 1.5;">
                   Ay sınırını kesen bir rezervasyon dosyada <strong>tam tutarıyla</strong>
                   görünür; ekrandaki aylık ciro ise gecelere bölünmüş payı gösterir.
                 </div>
               </div>
             </div>
-            <button class="btn btn-secondary btn-sm" onclick="switchTab('channels')">🌐 OTA Radarına Git</button>
-            <button class="btn btn-secondary btn-sm" onclick="switchTab('marketing')">📢 Pazarlama Modülüne Git</button>
+            <button class="btn btn-secondary btn-sm" data-onclick="switchTab('channels')">🌐 OTA Radarına Git</button>
+            <button class="btn btn-secondary btn-sm" data-onclick="switchTab('marketing')">📢 Pazarlama Modülüne Git</button>
           </div>
         </div>
         <div id="reportsContentContainer">
@@ -2321,7 +2321,7 @@
           <fieldset class="analysis-choice-group">
             <legend>Mülkler</legend>
             <label class="analysis-check analysis-check-all">
-              <input type="checkbox" id="analysisAllProperties" checked onchange="toggleAnalysisProperties(this.checked)">
+              <input type="checkbox" id="analysisAllProperties" checked data-onchange="toggleAnalysisProperties(this.checked)">
               <span>Tüm aktif portföy</span>
             </label>
             <div id="analysisPropertyList" class="analysis-check-grid"></div>
@@ -2340,7 +2340,7 @@
           </fieldset>
 
           <div id="analysisError" role="alert" hidden></div>
-          <button type="button" class="btn btn-primary analysis-generate-btn" id="analysisGenerateBtn" onclick="generateAnalysisExport()">
+          <button type="button" class="btn btn-primary analysis-generate-btn" id="analysisGenerateBtn" data-onclick="generateAnalysisExport()">
             🧠 Analiz Paketini Oluştur
           </button>
           <p id="analysisStatus" role="status" aria-live="polite">Henüz analiz paketi oluşturulmadı.</p>
@@ -2366,8 +2366,8 @@
           </div>
           <textarea class="analysis-prompt-preview" id="analysisPromptPreview" readonly hidden aria-label="ChatGPT analiz prompt önizlemesi"></textarea>
           <div class="analysis-output-actions" id="analysisOutputActions" hidden>
-            <button type="button" class="btn btn-primary" id="analysisCopyBtn" onclick="copyAnalysisPrompt()">📋 Promptu Kopyala</button>
-            <button type="button" class="btn btn-secondary" onclick="downloadAnalysisJson()">💾 JSON İndir</button>
+            <button type="button" class="btn btn-primary" id="analysisCopyBtn" data-onclick="copyAnalysisPrompt()">📋 Promptu Kopyala</button>
+            <button type="button" class="btn btn-secondary" data-onclick="downloadAnalysisJson()">💾 JSON İndir</button>
           </div>
         </section>
       </div>
@@ -2382,9 +2382,9 @@
     <div class="modal-card">
       <div class="modal-header">
         <h3 id="expenseModalTitle">💸 Yeni Gider / Yatırım Girişi</h3>
-        <button class="close-btn" onclick="closeExpenseModal()">&times;</button>
+        <button class="close-btn" data-onclick="closeExpenseModal()">&times;</button>
       </div>
-      <form id="expenseForm" onsubmit="saveExpense(event)">
+      <form id="expenseForm" data-onsubmit="saveExpense(event)">
         <input type="hidden" id="expEditId">
         <div class="form-grid">
           <div class="form-group">
@@ -2433,7 +2433,7 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" onclick="closeExpenseModal()">Vazgeç</button>
+          <button type="button" class="btn btn-secondary" data-onclick="closeExpenseModal()">Vazgeç</button>
           <button type="submit" class="btn btn-primary">Kaydet</button>
         </div>
       </form>
@@ -2450,9 +2450,9 @@
     <div class="modal-card" style="max-width: 560px;">
       <div class="modal-header">
         <h3>🔒 Dönemi Kapat</h3>
-        <button class="close-btn" onclick="closeMonthCloseModal()">&times;</button>
+        <button class="close-btn" data-onclick="closeMonthCloseModal()">&times;</button>
       </div>
-      <form id="monthCloseForm" onsubmit="submitMonthClose(event)">
+      <form id="monthCloseForm" data-onsubmit="submitMonthClose(event)">
         <div style="padding: 20px;">
           <p class="sub-text" style="margin-top:0; font-size:12px;">
             Kapatılan dönemde rezervasyon ve gider kayıtları <strong>değiştirilemez, eklenemez, silinemez</strong>.
@@ -2467,7 +2467,7 @@
           <div id="monthCloseError" class="auth-error-msg" style="display:none; margin-top:12px;"></div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" onclick="closeMonthCloseModal()">Vazgeç</button>
+          <button type="button" class="btn btn-secondary" data-onclick="closeMonthCloseModal()">Vazgeç</button>
           <button type="submit" class="btn btn-primary" id="monthCloseSubmitBtn">Dönemi Kapat</button>
         </div>
       </form>
@@ -2481,9 +2481,9 @@
     <div class="modal-card" style="max-width: 560px; border: 1px solid rgba(245, 158, 11, 0.45);">
       <div class="modal-header" style="background: linear-gradient(135deg, rgba(245,158,11,0.18), rgba(120,53,15,0.1));">
         <h3 style="color:#FCD34D;">🔓 Dönemi Yeniden Aç</h3>
-        <button class="close-btn" onclick="closeMonthReopenModal()">&times;</button>
+        <button class="close-btn" data-onclick="closeMonthReopenModal()">&times;</button>
       </div>
-      <form id="monthReopenForm" onsubmit="submitMonthReopen(event)">
+      <form id="monthReopenForm" data-onsubmit="submitMonthReopen(event)">
         <div style="padding: 20px;">
           <div style="background: rgba(245,158,11,0.12); border:1px dashed rgba(245,158,11,0.4); border-radius:6px; padding:10px 12px; font-size:11px; color:#FDE68A; margin-bottom:16px;">
             Mühürlenmiş bir dönemi açmak <strong>denetim kaydına işlenir</strong>. Kapanış anlık görüntüsü silinmez;
@@ -2493,14 +2493,14 @@
 
           <div class="form-group">
             <label style="font-weight:700; color:#FFFFFF; font-size:13px;">Gerekçe <span style="color:#FCA5A5;">*</span></label>
-            <textarea id="monthReopenReason" rows="3" placeholder="Örn: Nisan elektrik faturası geç geldi, gider kaydı eksik kalmıştı." oninput="updateMonthReopenButton()" style="width:100%; padding:10px 12px; background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.15); border-radius:8px; color:#fff; font-size:13px; margin-top:6px; resize:vertical;"></textarea>
+            <textarea id="monthReopenReason" rows="3" placeholder="Örn: Nisan elektrik faturası geç geldi, gider kaydı eksik kalmıştı." data-oninput="updateMonthReopenButton()" style="width:100%; padding:10px 12px; background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.15); border-radius:8px; color:#fff; font-size:13px; margin-top:6px; resize:vertical;"></textarea>
             <p class="sub-text" style="font-size:10px; margin:6px 0 0;">En az 10 karakter. <span id="monthReopenCharCount">0</span> karakter yazıldı.</p>
           </div>
 
           <div id="monthReopenError" class="auth-error-msg" style="display:none; margin-top:12px;"></div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" onclick="closeMonthReopenModal()">Vazgeç</button>
+          <button type="button" class="btn btn-secondary" data-onclick="closeMonthReopenModal()">Vazgeç</button>
           <button type="submit" class="btn btn-danger" id="monthReopenSubmitBtn" disabled>Dönemi Yeniden Aç</button>
         </div>
       </form>
@@ -2514,9 +2514,9 @@
     <div class="modal-card" style="max-width: 560px; border: 1px solid rgba(239, 68, 68, 0.45);">
       <div class="modal-header" style="background: linear-gradient(135deg, rgba(239, 68, 68, 0.18), rgba(153, 27, 27, 0.1));">
         <h3 style="color: #FCA5A5;">⚠️ Hesabınızı Kalıcı Olarak Kapatın</h3>
-        <button class="close-btn" onclick="closeDeleteAccountModal()">&times;</button>
+        <button class="close-btn" data-onclick="closeDeleteAccountModal()">&times;</button>
       </div>
-      <form id="deleteAccountForm" onsubmit="submitAccountDeletion(event)">
+      <form id="deleteAccountForm" data-onsubmit="submitAccountDeletion(event)">
         <div style="padding: 20px;">
           <div id="deleteAccountImpact" style="font-size: 12px; color: #E2E8F0; margin-bottom: 16px;">
             Yükleniyor…
@@ -2529,13 +2529,13 @@
 
           <div class="form-group">
             <label style="font-weight: 700; color: #FFFFFF; font-size: 13px;">Onaylamak için <code style="background: rgba(0,0,0,0.4); padding: 1px 6px; border-radius: 3px; color: #FDE68A;">HESABIMI SIL</code> yazın</label>
-            <input type="text" id="deleteAccountConfirm" autocomplete="off" placeholder="HESABIMI SIL" oninput="updateDeleteAccountButton()" style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 13px; margin-top: 6px;">
+            <input type="text" id="deleteAccountConfirm" autocomplete="off" placeholder="HESABIMI SIL" data-oninput="updateDeleteAccountButton()" style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 13px; margin-top: 6px;">
           </div>
 
           <div id="deleteAccountError" class="auth-error-msg" style="display: none; margin-top: 12px;"></div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" onclick="closeDeleteAccountModal()">Vazgeç</button>
+          <button type="button" class="btn btn-secondary" data-onclick="closeDeleteAccountModal()">Vazgeç</button>
           <button type="submit" class="btn btn-danger" id="deleteAccountSubmitBtn" disabled>Hesabımı Kalıcı Olarak Sil</button>
         </div>
       </form>
@@ -2549,9 +2549,9 @@
     <div class="modal-card" style="max-width: 520px;">
       <div class="modal-header">
         <h3>👥 Ekibe Üye Davet Et</h3>
-        <button class="close-btn" onclick="closeInviteMemberModal()">&times;</button>
+        <button class="close-btn" data-onclick="closeInviteMemberModal()">&times;</button>
       </div>
-      <form id="inviteMemberForm" onsubmit="submitMemberInvite(event)">
+      <form id="inviteMemberForm" data-onsubmit="submitMemberInvite(event)">
         <div style="padding: 20px;">
           <div class="form-group" style="margin-bottom: 16px;">
             <label style="font-weight: 700; color: #FFFFFF; font-size: 13px;">E-posta Adresi</label>
@@ -2560,7 +2560,7 @@
 
           <div class="form-group" style="margin-bottom: 16px;">
             <label style="font-weight: 700; color: #FFFFFF; font-size: 13px;">Yetki Seviyesi</label>
-            <select id="inviteMemberRole" onchange="updateInviteRoleHint()" style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 13px; font-weight: 600; margin-top: 4px;">
+            <select id="inviteMemberRole" data-onchange="updateInviteRoleHint()" style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 13px; font-weight: 600; margin-top: 4px;">
               <option value="admin">Yönetici (admin)</option>
               <option value="manager" selected>Operasyon (manager)</option>
               <option value="staff">Personel (staff)</option>
@@ -2576,7 +2576,7 @@
           <div id="inviteMemberError" class="auth-error-msg" style="display: none; margin-top: 12px;"></div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" onclick="closeInviteMemberModal()">Vazgeç</button>
+          <button type="button" class="btn btn-secondary" data-onclick="closeInviteMemberModal()">Vazgeç</button>
           <button type="submit" class="btn btn-primary" id="inviteMemberSubmitBtn">✉️ Daveti Gönder</button>
         </div>
       </form>
@@ -2587,13 +2587,13 @@
     <div class="modal-card" style="max-width: 540px;">
       <div class="modal-header">
         <h3>🎯 Finansal Hedef Belirleme & Düzenleme</h3>
-        <button class="close-btn" onclick="closeGoalsModal()">&times;</button>
+        <button class="close-btn" data-onclick="closeGoalsModal()">&times;</button>
       </div>
-      <form id="goalsForm" onsubmit="saveMonthlyGoals(event)">
+      <form id="goalsForm" data-onsubmit="saveMonthlyGoals(event)">
         <div style="padding: 20px;">
           <div class="form-group" style="margin-bottom: 16px;">
             <label style="font-weight: 700; color: #FFFFFF; font-size: 13px;">Hangi Dönem İçin Hedef Belirliyorsunuz?</label>
-            <select id="goalPeriodSelect" onchange="loadSelectedPeriodGoal()" style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 13px; font-weight: 600; margin-top: 4px;">
+            <select id="goalPeriodSelect" data-onchange="loadSelectedPeriodGoal()" style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 13px; font-weight: 600; margin-top: 4px;">
               <!-- Populated dynamically with all months -->
             </select>
           </div>
@@ -2603,14 +2603,14 @@
               <label style="font-weight: 700; color: #FFFFFF; font-size: 13px;">🎯 Aylık Hedef Ciro (TL)</label>
               <span id="goalRevenueHint" style="font-size: 11px; color: #93C5FD;"></span>
             </div>
-            <input type="number" id="goalRevenue" step="5000" required oninput="autoCalculateGoalSubmetrics()" style="font-size: 16px; font-weight: 700; padding: 12px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff;">
+            <input type="number" id="goalRevenue" step="5000" required data-oninput="autoCalculateGoalSubmetrics()" style="font-size: 16px; font-weight: 700; padding: 12px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff;">
             
           </div>
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
             <div class="form-group">
               <label style="font-size: 12px; font-weight: 600;">🌙 Hedef Gece Sayısı</label>
-              <input type="number" id="goalOccupancyNights" placeholder="Örn: 75" oninput="autoCalculateGoalAdr()" style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
+              <input type="number" id="goalOccupancyNights" placeholder="Örn: 75" data-oninput="autoCalculateGoalAdr()" style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
               <span style="font-size: 10px; color: var(--text-muted); margin-top: 3px; display: block;">Tahmini doluluk: <strong id="goalCalcOccLabel" style="color:#60A5FA;">—</strong></span>
             </div>
             <div class="form-group">
@@ -2635,7 +2635,7 @@
         </div>
 
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" onclick="closeGoalsModal()">Vazgeç</button>
+          <button type="button" class="btn btn-secondary" data-onclick="closeGoalsModal()">Vazgeç</button>
           <button type="submit" class="btn btn-primary" style="padding: 10px 24px;">💾 Hedefleri Kaydet</button>
         </div>
       </form>
@@ -2656,7 +2656,7 @@
             <span style="font-size: 11px; color: var(--text-muted);">Rezervasyon ve gider defterlerinizi Excel (.xlsx, .xls) veya CSV/TSV olarak yükleyin</span>
           </div>
         </div>
-        <button class="close-btn" onclick="closeImportModal()">&times;</button>
+        <button class="close-btn" data-onclick="closeImportModal()">&times;</button>
       </div>
 
       <div class="import-modal-body" style="padding: 16px;">
@@ -2667,10 +2667,10 @@
               📋 Kendi mülk kodlarınızla hazır şablon:
             </span>
             <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-              <button type="button" class="btn btn-secondary btn-sm" onclick="downloadSampleTemplate('BOOKINGS')" style="font-size: 11px; padding: 4px 8px; border-color: #3B82F6; color: #93C5FD;">
+              <button type="button" class="btn btn-secondary btn-sm" data-onclick="downloadSampleTemplate('BOOKINGS')" style="font-size: 11px; padding: 4px 8px; border-color: #3B82F6; color: #93C5FD;">
                 📥 Rezervasyon Şablonu (.xlsx)
               </button>
-              <button type="button" class="btn btn-secondary btn-sm" onclick="downloadSampleTemplate('EXPENSES')" style="font-size: 11px; padding: 4px 8px; border-color: #EF4444; color: #FCA5A5;">
+              <button type="button" class="btn btn-secondary btn-sm" data-onclick="downloadSampleTemplate('EXPENSES')" style="font-size: 11px; padding: 4px 8px; border-color: #EF4444; color: #FCA5A5;">
                 📥 Gider Şablonu (.xlsx)
               </button>
             </div>
@@ -2703,11 +2703,11 @@
         </div>
 
         <!-- Yükleme Sürükle Bırak Alanı -->
-        <div class="upload-dropzone" id="excelDropzone" onclick="document.getElementById('excelFileInput').click()" style="border: 2px dashed rgba(168, 85, 247, 0.5); background: rgba(168, 85, 247, 0.05); border-radius: 12px; padding: 24px 16px; text-align: center; cursor: pointer; transition: all 0.2s ease;">
+        <div class="upload-dropzone" id="excelDropzone" data-onclick="openExcelFilePicker()" style="border: 2px dashed rgba(168, 85, 247, 0.5); background: rgba(168, 85, 247, 0.05); border-radius: 12px; padding: 24px 16px; text-align: center; cursor: pointer; transition: all 0.2s ease;">
           <span style="font-size: 42px; display: block; margin-bottom: 6px;">📊</span>
           <strong style="font-size: 14px; color: #F8FAFC; display: block;">Excel veya CSV Raporunuzu Buraya Sürükleyin</strong>
           <span style="font-size: 12px; color: var(--text-muted); display: block; margin-top: 4px;">veya dosya seçmek için tıklayın (.xlsx, .xls, .csv, .tsv, .txt)</span>
-          <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv, .tsv, .txt" style="display:none;" onchange="handleFileImport(event)">
+          <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv, .tsv, .txt" style="display:none;" data-onchange="handleFileImport(event)">
         </div>
 
         <!-- Dosya Analiz ve Canlı Önizleme Kutusu -->
@@ -2724,7 +2724,7 @@
             <!-- İçe Aktarma Modu Seçici -->
             <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px;">
               <label style="font-size: 12px; color: #CBD5E1; font-weight: 600;">Veri Türü:</label>
-              <select id="importModeSelect" onchange="changeImportMode(this.value)" style="padding: 6px 10px; background: #1E293B; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; font-size: 12px; font-weight: 700;">
+              <select id="importModeSelect" data-onchange="changeImportMode(this.value)" style="padding: 6px 10px; background: #1E293B; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; font-size: 12px; font-weight: 700;">
                 <option value="AUTO">🤖 Otomatik Algıla</option>
                 <option value="COMPANY_REPORT">🏆 Şirket Genel Raporu (GENEL / GDR / RPR / HDF)</option>
                 <option value="BOOKINGS">📋 Rezervasyon Defteri (Ciro & Geceleme)</option>
@@ -2750,8 +2750,8 @@
 
             <!-- Onay Butonu -->
             <div style="margin-top: 14px; display: flex; justify-content: flex-end; gap: 8px;">
-              <button type="button" class="btn btn-secondary btn-sm" onclick="resetImportPreview()">İptal</button>
-              <button type="button" class="btn btn-primary" id="importConfirmBtn" onclick="applyImportedData()" style="background: linear-gradient(135deg, #10B981, #059669); border: none; font-weight: 700; padding: 8px 16px;">
+              <button type="button" class="btn btn-secondary btn-sm" data-onclick="resetImportPreview()">İptal</button>
+              <button type="button" class="btn btn-primary" id="importConfirmBtn" data-onclick="applyImportedData()" style="background: linear-gradient(135deg, #10B981, #059669); border: none; font-weight: 700; padding: 8px 16px;">
                 Verileri Sisteme Aktar
               </button>
             </div>
@@ -2775,7 +2775,7 @@
 
       <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
         <span style="font-size: 11px; color: var(--text-muted);">💡 Excel başlıklarınız farklı olsa dahi sistem akıllı eşleştirme yapar.</span>
-        <button type="button" class="btn btn-secondary" onclick="closeImportModal()">Kapat</button>
+        <button type="button" class="btn btn-secondary" data-onclick="closeImportModal()">Kapat</button>
       </div>
     </div>
   </div>
@@ -2787,9 +2787,9 @@
     <div class="modal-card" style="max-width:760px;">
       <div class="modal-header">
         <h3 id="guestProfileModalTitle">👤 Misafir Profili</h3>
-        <button class="close-btn" onclick="closeGuestProfileModal()" aria-label="Kapat">&times;</button>
+        <button class="close-btn" data-onclick="closeGuestProfileModal()" aria-label="Kapat">&times;</button>
       </div>
-      <form id="guestProfileForm" onsubmit="saveGuestProfile(event)">
+      <form id="guestProfileForm" data-onsubmit="saveGuestProfile(event)">
         <input type="hidden" id="guestProfileId">
         <div class="form-grid">
           <div class="form-group"><label>Ad</label><input id="guestFirstName" type="text" required autocomplete="given-name"></div>
@@ -2816,7 +2816,7 @@
         <div id="guestProfileInsights" style="display:none; margin-top:14px; padding-top:14px; border-top:1px solid rgba(255,255,255,.08);"></div>
         <div id="guestRebookingAction" style="display:none; margin-top:14px; padding:12px; border-radius:10px; background:rgba(16,185,129,.08); border:1px solid rgba(16,185,129,.25);"></div>
         <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:10px;">
-          <button type="button" class="btn btn-secondary" onclick="closeGuestProfileModal()">Vazgeç</button>
+          <button type="button" class="btn btn-secondary" data-onclick="closeGuestProfileModal()">Vazgeç</button>
           <button type="submit" class="btn btn-primary">Misafiri Kaydet</button>
         </div>
       </form>
@@ -2830,15 +2830,15 @@
     <div class="modal-card">
       <div class="modal-header">
         <h3 id="bookingModalTitle">➕ Rezervasyon Girişi</h3>
-        <button type="button" class="close-btn" aria-label="Rezervasyon penceresini kapat" onclick="closeBookingModal()">&times;</button>
+        <button type="button" class="close-btn" aria-label="Rezervasyon penceresini kapat" data-onclick="closeBookingModal()">&times;</button>
       </div>
-      <form id="bookingForm" onsubmit="saveBooking(event)">
+      <form id="bookingForm" data-onsubmit="saveBooking(event)">
         <input type="hidden" id="resEditId">
         <input type="hidden" id="resGuestId">
         <div class="booking-essential-grid">
           <div class="form-group">
             <label for="resVilla">Villa Seçin</label>
-            <select id="resVilla" required onchange="calculateLivePreview()">
+            <select id="resVilla" required data-onchange="calculateLivePreview()">
               <!-- updateAllVillaDropdowns() musterinin mulkleriyle doldurur -->
             </select>
           </div>
@@ -2848,7 +2848,7 @@
           </div>
           <div class="form-group daterange-group">
             <label for="resDateRangeBtn">Konaklama Tarihleri</label>
-            <button type="button" id="resDateRangeBtn" class="daterange-trigger" onclick="toggleResDatePicker()" aria-haspopup="dialog" aria-expanded="false">
+            <button type="button" id="resDateRangeBtn" class="daterange-trigger" data-onclick="toggleResDatePicker()" aria-haspopup="dialog" aria-expanded="false">
               <span class="daterange-leg">
                 <span class="daterange-cap">Giriş</span>
                 <strong id="resDateInLabel">—</strong>
@@ -2862,14 +2862,14 @@
             </button>
             <div id="resDatePicker" class="daterange-panel" role="dialog" aria-label="Konaklama tarihleri" hidden>
               <div class="daterange-head">
-                <button type="button" class="daterange-nav" onclick="shiftResCalendar(-1)" aria-label="Önceki ay">‹</button>
+                <button type="button" class="daterange-nav" data-onclick="shiftResCalendar(-1)" aria-label="Önceki ay">‹</button>
                 <div class="daterange-title" id="resCalTitle">—</div>
-                <button type="button" class="daterange-nav" onclick="shiftResCalendar(1)" aria-label="Sonraki ay">›</button>
+                <button type="button" class="daterange-nav" data-onclick="shiftResCalendar(1)" aria-label="Sonraki ay">›</button>
               </div>
               <div class="daterange-months" id="resCalMonths"></div>
               <div class="daterange-foot">
                 <span id="resDateHint">Giriş tarihini seçin</span>
-                <button type="button" class="daterange-clear" onclick="clearResDateRange()">Temizle</button>
+                <button type="button" class="daterange-clear" data-onclick="clearResDateRange()">Temizle</button>
               </div>
             </div>
             <input type="hidden" id="resCheckIn">
@@ -2877,7 +2877,7 @@
           </div>
           <div class="form-group">
             <label for="resGross">Brüt Tutar (₺)</label>
-            <input type="number" inputmode="decimal" id="resGross" placeholder="Örn: 40000" required oninput="syncCommissionFromRate()">
+            <input type="number" inputmode="decimal" id="resGross" placeholder="Örn: 40000" required data-oninput="syncCommissionFromRate()">
             <small class="field-note">Misafirin ödediği toplam. Temizlik ücreti bu tutara dâhildir.</small>
           </div>
           <div class="form-group">
@@ -2886,7 +2886,7 @@
           </div>
           <div class="form-group">
             <label for="resChannel">Rezervasyon Kanalı</label>
-            <select id="resChannel" required onchange="handleBookingChannelChange()">
+            <select id="resChannel" required data-onchange="handleBookingChannelChange()">
               <option value="WHATSAPP">WhatsApp (Direkt - %0)</option>
               <option value="AIRBNB">Airbnb (OTA)</option>
               <option value="BOOKING">Booking.com (OTA)</option>
@@ -2928,27 +2928,27 @@
             </div>
             <div class="form-group">
               <label for="resCommissionRate">OTA Komisyon Oranı (%)</label>
-              <input type="number" inputmode="decimal" id="resCommissionRate" step="0.01" min="0" max="100" placeholder="Kanala göre otomatik" oninput="syncCommissionFromRate()">
+              <input type="number" inputmode="decimal" id="resCommissionRate" step="0.01" min="0" max="100" placeholder="Kanala göre otomatik" data-oninput="syncCommissionFromRate()">
               <small class="field-note">Boş bırakırsanız kanalın varsayılan oranı uygulanır.</small>
             </div>
             <div class="form-group">
               <label for="resCommission">OTA Komisyonu (₺)</label>
-              <input type="number" inputmode="decimal" id="resCommission" placeholder="Otomatik veya Manuel" oninput="syncRateFromCommission()">
+              <input type="number" inputmode="decimal" id="resCommission" placeholder="Otomatik veya Manuel" data-oninput="syncRateFromCommission()">
               <small class="field-note">Oran ve tutar birbirini günceller; hangisini yazarsanız diğeri hesaplanır.</small>
             </div>
             <div class="form-group">
               <label for="resPaymentCommission">Ödeme Komisyonu — POS / Sanal POS (₺)</label>
-              <input type="number" inputmode="decimal" id="resPaymentCommission" min="0" step="0.01" placeholder="Yoksa boş bırakın" oninput="calculateLivePreview()">
+              <input type="number" inputmode="decimal" id="resPaymentCommission" min="0" step="0.01" placeholder="Yoksa boş bırakın" data-oninput="calculateLivePreview()">
               <small class="field-note note-expense">▼ <strong>Gider kalemi.</strong> Ciroyu azaltmaz; konaklama gecelerine dağıtılarak gider yazılır.</small>
             </div>
             <div class="form-group">
               <label for="resCleanFee">Temizlik Ücreti — Misafirden Alınan (₺)</label>
-              <input type="number" inputmode="decimal" id="resCleanFee" placeholder="Örn: 1500" value="0" oninput="calculateLivePreview()">
+              <input type="number" inputmode="decimal" id="resCleanFee" placeholder="Örn: 1500" value="0" data-oninput="calculateLivePreview()">
               <small class="field-note note-revenue">▲ <strong>Gelir kalemi.</strong> Brüt tutarın içindedir; oda gelirinden ayrı raporlanır.</small>
             </div>
             <div class="form-group">
               <label for="resCleanCost">Temizlik Maliyeti — Personele Ödenen (₺)</label>
-              <input type="number" inputmode="decimal" id="resCleanCost" placeholder="Örn: 1200 — bilinmiyorsa boş" oninput="calculateLivePreview()">
+              <input type="number" inputmode="decimal" id="resCleanCost" placeholder="Örn: 1200 — bilinmiyorsa boş" data-oninput="calculateLivePreview()">
               <small class="field-note note-expense">▼ <strong>Gider kalemi.</strong> Temizlik defterine planlı görev olarak yazılır; temizlik <strong>yapıldı</strong> işaretlenince gider olur. Misafir gelmezse gider oluşmaz.</small>
             </div>
             <div class="form-group">
@@ -2984,9 +2984,9 @@
         </div>
 
         <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
-          <button type="button" id="resDeleteBtn" class="btn btn-danger" style="display: none; background: #EF4444; border: none; font-size: 12px; padding: 8px 14px; border-radius: 6px; color: #fff; cursor: pointer;" onclick="handleBookingDeleteFromModal()">🗑️ Rezervasyonu Sil</button>
+          <button type="button" id="resDeleteBtn" class="btn btn-danger" style="display: none; background: #EF4444; border: none; font-size: 12px; padding: 8px 14px; border-radius: 6px; color: #fff; cursor: pointer;" data-onclick="handleBookingDeleteFromModal()">🗑️ Rezervasyonu Sil</button>
           <div style="display: flex; gap: 10px; margin-left: auto;">
-            <button type="button" class="btn btn-secondary" onclick="closeBookingModal()">Vazgeç</button>
+            <button type="button" class="btn btn-secondary" data-onclick="closeBookingModal()">Vazgeç</button>
             <button type="submit" class="btn btn-primary" id="saveBookingBtn">Kaydet</button>
           </div>
         </div>
@@ -3001,9 +3001,9 @@
     <div class="modal-card">
       <div class="modal-header">
         <h3 id="leadModalTitle">🎯 Lead / Talep Girişi</h3>
-        <button class="close-btn" onclick="closeLeadModal()">&times;</button>
+        <button class="close-btn" data-onclick="closeLeadModal()">&times;</button>
       </div>
-      <form id="leadForm" onsubmit="saveLead(event)">
+      <form id="leadForm" data-onsubmit="saveLead(event)">
         <input type="hidden" id="leadEditId">
         <div class="form-grid">
           <div class="form-group">
@@ -3055,7 +3055,7 @@
           <input type="text" id="leadNotes" placeholder="Örn: Akşam dönüş yapacak">
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" onclick="closeLeadModal()">Vazgeç</button>
+          <button type="button" class="btn btn-secondary" data-onclick="closeLeadModal()">Vazgeç</button>
           <button type="submit" class="btn btn-primary">Kaydet</button>
         </div>
       </form>
@@ -3069,9 +3069,9 @@
     <div class="modal-card">
       <div class="modal-header">
         <h3 id="maintModalTitle">🛠️ Arıza / Bakım İşi</h3>
-        <button class="close-btn" onclick="closeMaintModal()">&times;</button>
+        <button class="close-btn" data-onclick="closeMaintModal()">&times;</button>
       </div>
-      <form id="maintForm" onsubmit="saveMaint(event)">
+      <form id="maintForm" data-onsubmit="saveMaint(event)">
         <input type="hidden" id="maintEditId">
         <div class="form-grid">
           <div class="form-group">
@@ -3122,7 +3122,7 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" onclick="closeMaintModal()">Vazgeç</button>
+          <button type="button" class="btn btn-secondary" data-onclick="closeMaintModal()">Vazgeç</button>
           <button type="submit" class="btn btn-primary">Kaydet</button>
         </div>
       </form>
@@ -3144,15 +3144,15 @@
             <span style="font-size: 11px; color: #C4B5FD;">Sıfırdan zirveye terimler, gelir taktikleri ve SaaS kiralama modeli</span>
           </div>
         </div>
-        <button class="close-btn" onclick="closeHelpModal()">&times;</button>
+        <button class="close-btn" data-onclick="closeHelpModal()">&times;</button>
       </div>
 
       <div class="help-tabs-nav" style="display: flex; overflow-x: auto; gap: 6px; padding: 10px 16px; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.08);">
-        <button class="help-tab-btn active" id="helpTabBtn-terms" onclick="switchHelpTab('terms')">📖 Terimler Sözlüğü (A-Z)</button>
-        <button class="help-tab-btn" id="helpTabBtn-routine" onclick="switchHelpTab('routine')">🕒 Günlük Rutin (10 Saniye)</button>
-        <button class="help-tab-btn" id="helpTabBtn-pricing" onclick="switchHelpTab('pricing')">💰 Fiyatlama & Taktikler</button>
-        <button class="help-tab-btn" id="helpTabBtn-ops" onclick="switchHelpTab('ops')">🛎️ Operasyon & Temizlik</button>
-        <button class="help-tab-btn" id="helpTabBtn-data" onclick="switchHelpTab('data')">🔄 Veri & Sıfırlama</button>
+        <button class="help-tab-btn active" id="helpTabBtn-terms" data-onclick="switchHelpTab('terms')">📖 Terimler Sözlüğü (A-Z)</button>
+        <button class="help-tab-btn" id="helpTabBtn-routine" data-onclick="switchHelpTab('routine')">🕒 Günlük Rutin (10 Saniye)</button>
+        <button class="help-tab-btn" id="helpTabBtn-pricing" data-onclick="switchHelpTab('pricing')">💰 Fiyatlama & Taktikler</button>
+        <button class="help-tab-btn" id="helpTabBtn-ops" data-onclick="switchHelpTab('ops')">🛎️ Operasyon & Temizlik</button>
+        <button class="help-tab-btn" id="helpTabBtn-data" data-onclick="switchHelpTab('data')">🔄 Veri & Sıfırlama</button>
       </div>
 
       <div style="padding: 20px; overflow-y: auto; flex: 1;">
@@ -3164,7 +3164,7 @@
               <p style="margin: 2px 0 0 0; font-size: 12px; color: var(--text-muted);">Aşağıdaki arama kutusuna merak ettiğiniz kelimeyi yazarak anında bulun.</p>
             </div>
             <div style="flex: 1; max-width: 280px; min-width: 180px;">
-              <input type="text" id="helpGlossarySearch" placeholder="🔍 Terim ara (örn: ADR, Kâr, RevPAR)..." oninput="filterHelpGlossary()" style="width: 100%; padding: 8px 12px; border-radius: 8px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-size: 12px;">
+              <input type="text" id="helpGlossarySearch" placeholder="🔍 Terim ara (örn: ADR, Kâr, RevPAR)..." data-oninput="filterHelpGlossary()" style="width: 100%; padding: 8px 12px; border-radius: 8px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); color: #fff; font-size: 12px;">
             </div>
           </div>
 
@@ -3352,7 +3352,7 @@
               • Onaylamak için <code>VERILERI SIFIRLA</code> yazmanız gerekir; işlemi yalnızca işletme sahibi yapabilir.<br>
               • Aynı ekrana <strong>Ayarlar → Veri Sıfırlama</strong> bölümünden de ulaşabilirsiniz.
             </p>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="closeHelpModal(); openResetModal();">
+            <button type="button" class="btn btn-secondary btn-sm" data-onclick="closeHelpModal(); openResetModal();">
               🗑️ Sıfırlama Menüsünü Aç
             </button>
           </div>
@@ -3361,7 +3361,7 @@
 
       <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
         <span style="font-size: 11px; color: var(--text-muted);">💡 İpucu: Paneldeki herhangi bir ℹ️ butonuna tıklayarak da ilgili metriğin detayını görebilirsiniz.</span>
-        <button type="button" class="btn btn-primary" onclick="closeHelpModal()">Anladım, Kapat</button>
+        <button type="button" class="btn btn-primary" data-onclick="closeHelpModal()">Anladım, Kapat</button>
       </div>
     </div>
   </div>
@@ -3370,7 +3370,7 @@
     <div class="modal-card" style="max-width: 580px;">
       <div class="modal-header">
         <h3>🗑️ Veri Sıfırlama ve Yönetim</h3>
-        <button class="close-btn" onclick="closeResetModal()">&times;</button>
+        <button class="close-btn" data-onclick="closeResetModal()">&times;</button>
       </div>
       <div style="padding: 20px;">
         <p style="color: var(--color-slate-300); font-size: 0.95rem; margin-bottom: 20px;">
@@ -3396,12 +3396,12 @@
               Onaylamak için <code style="background: rgba(0,0,0,0.4); padding: 1px 6px; border-radius: 3px; color: #FDE68A;">VERILERI SIFIRLA</code> yazın
             </label>
             <input type="text" id="resetConfirmInput" autocomplete="off" placeholder="VERILERI SIFIRLA"
-                   oninput="updateResetButton()"
+                   data-oninput="updateResetButton()"
                    style="width: 100%; padding: 9px 12px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 13px; margin: 6px 0 12px;">
 
             <div id="resetError" class="auth-error-msg" style="display: none; margin-bottom: 12px;"></div>
 
-            <button class="btn btn-danger" id="resetSubmitBtn" onclick="cleanResetAll()" style="width: 100%;" disabled>
+            <button class="btn btn-danger" id="resetSubmitBtn" data-onclick="cleanResetAll()" style="width: 100%;" disabled>
               🗑️ Tüm Verileri Kalıcı Olarak Sıfırla
             </button>
           </div>
@@ -3409,7 +3409,7 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" onclick="closeResetModal()">Vazgeç / Kapat</button>
+        <button type="button" class="btn btn-secondary" data-onclick="closeResetModal()">Vazgeç / Kapat</button>
       </div>
     </div>
   </div>
@@ -3434,12 +3434,12 @@
             <p style="font-size: 12px; color: var(--text-muted); margin: 2px 0 0 0;">Misafirin WhatsApp mesajını yapıştırın; sistem tarih, kişi sayısı ve tutarı ayrıştırıp talebe veya rezervasyona çevirsin.</p>
           </div>
         </div>
-        <button class="close-btn" onclick="closeWhatsAppModal()">&times;</button>
+        <button class="close-btn" data-onclick="closeWhatsAppModal()">&times;</button>
       </div>
 
       <!-- Tab Buttons Inside Modal -->
       <div style="display: flex; gap: 4px; padding: 12px 20px 0 20px; border-bottom: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.2);">
-        <button type="button" class="btn btn-secondary btn-sm" id="waTabBtnParser" onclick="switchWaModalTab('parser')" style="font-weight: 700; border-bottom: 2px solid #25D366; border-radius: 6px 6px 0 0;">
+        <button type="button" class="btn btn-secondary btn-sm" id="waTabBtnParser" data-onclick="switchWaModalTab('parser')" style="font-weight: 700; border-bottom: 2px solid #25D366; border-radius: 6px 6px 0 0;">
           ⚡ Akıllı Mesaj Ayrıştırıcı
         </button>
       </div>
@@ -3450,14 +3450,14 @@
           <div class="form-group" style="margin-bottom: 14px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
               <label style="font-weight: 700; color: #FFFFFF; font-size: 13px;">WhatsApp Mesaj Metnini Buraya Yapıştırın:</label>
-              <button type="button" class="btn btn-secondary btn-sm" onclick="loadSampleWhatsAppMsg()" style="font-size: 11px; padding: 3px 8px;">📋 Örnek Mesaj Doldur</button>
+              <button type="button" class="btn btn-secondary btn-sm" data-onclick="loadSampleWhatsAppMsg()" style="font-size: 11px; padding: 3px 8px;">📋 Örnek Mesaj Doldur</button>
             </div>
-            <textarea id="waRawInput" rows="3" placeholder="Örnek: 'Ahmet Yılmaz: 18-23 Eylül arası 5 gece için 85.000 TL konuştuk, 8 kişiyiz onaylıyoruz. Tel: +90 532 555 1234'" style="width: 100%; padding: 12px; background: rgba(0,0,0,0.4); border: 1px solid rgba(37, 211, 102, 0.3); border-radius: 8px; color: #fff; font-size: 13px; font-family: monospace;" oninput="parseWhatsAppMessage()"></textarea>
+            <textarea id="waRawInput" rows="3" placeholder="Örnek: 'Ahmet Yılmaz: 18-23 Eylül arası 5 gece için 85.000 TL konuştuk, 8 kişiyiz onaylıyoruz. Tel: +90 532 555 1234'" style="width: 100%; padding: 12px; background: rgba(0,0,0,0.4); border: 1px solid rgba(37, 211, 102, 0.3); border-radius: 8px; color: #fff; font-size: 13px; font-family: monospace;" data-oninput="parseWhatsAppMessage()"></textarea>
             <span style="font-size: 11px; color: var(--text-muted); margin-top: 4px; display: block;">💡 İpucu: Misafirin yazdığı mesajı olduğu gibi yapıştırın; yapay zeka isim, villa, tarih ve tutarı saniyesinde ayıklar.</span>
           </div>
 
           <div style="text-align: right; margin-bottom: 14px;">
-            <button type="button" class="btn btn-secondary" onclick="parseWhatsAppMessage()" style="padding: 5px 14px; font-size: 12px;">⚡ Yeniden Ayrıştır / Çözümle</button>
+            <button type="button" class="btn btn-secondary" data-onclick="parseWhatsAppMessage()" style="padding: 5px 14px; font-size: 12px;">⚡ Yeniden Ayrıştır / Çözümle</button>
           </div>
 
           <!-- Parsed Preview Form -->
@@ -3511,12 +3511,12 @@
       </div>
 
       <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
-        <button type="button" class="btn btn-secondary" onclick="closeWhatsAppModal()">Kapat</button>
+        <button type="button" class="btn btn-secondary" data-onclick="closeWhatsAppModal()">Kapat</button>
         <div style="display: flex; gap: 10px;">
-          <button type="button" class="btn btn-secondary" onclick="saveWaAsLead()" style="border-color: #F59E0B; color: #FBBF24; font-weight: 700;">
+          <button type="button" class="btn btn-secondary" data-onclick="saveWaAsLead()" style="border-color: #F59E0B; color: #FBBF24; font-weight: 700;">
             🎯 Sıcak Lead Olarak Kaydet
           </button>
-          <button type="button" class="btn btn-primary" onclick="saveWaAsBooking()" style="background: #059669; border-color: #10B981; font-weight: 700;">
+          <button type="button" class="btn btn-primary" data-onclick="saveWaAsBooking()" style="background: #059669; border-color: #10B981; font-weight: 700;">
             📅 Kesin Rezervasyona Dönüştür
           </button>
         </div>
@@ -3539,7 +3539,7 @@
             <span id="kpiExplCategory" class="badge badge-blue" style="font-size: 10px; margin-top: 4px; display: inline-block;">FİNANS & GELİR YÖNETİMİ</span>
           </div>
         </div>
-        <button class="close-btn" onclick="closeKpiExplanationModal()">&times;</button>
+        <button class="close-btn" data-onclick="closeKpiExplanationModal()">&times;</button>
       </div>
 
       <div style="padding: 22px; max-height: 65vh; overflow-y: auto;" id="kpiExplBody">
@@ -3547,10 +3547,10 @@
       </div>
 
       <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; background: rgba(15, 23, 42, 0.5);">
-        <button type="button" class="btn btn-secondary btn-sm" onclick="closeKpiExplanationModal(); openHelpModal('terms');">
+        <button type="button" class="btn btn-secondary btn-sm" data-onclick="closeKpiExplanationModal(); openHelpModal('terms');">
           🎓 Tüm Sözlüğü Aç
         </button>
-        <button type="button" class="btn btn-primary btn-sm" onclick="closeKpiExplanationModal()">
+        <button type="button" class="btn btn-primary btn-sm" data-onclick="closeKpiExplanationModal()">
           Anladım, Kapat
         </button>
       </div>
@@ -3566,9 +3566,9 @@
           <span style="font-size: 20px;">📢</span>
           <h3 id="mktModalTitle" style="margin: 0;">Yeni Reklam Kampanyası Ekle</h3>
         </div>
-        <button class="close-btn" onclick="closeMarketingModal()">&times;</button>
+        <button class="close-btn" data-onclick="closeMarketingModal()">&times;</button>
       </div>
-      <form id="mktCampaignForm" onsubmit="saveMarketingCampaign(event)">
+      <form id="mktCampaignForm" data-onsubmit="saveMarketingCampaign(event)">
         <input type="hidden" id="mktCampaignId">
         <div style="padding: 20px;">
           <div class="form-group" style="margin-bottom: 14px;">
@@ -3653,7 +3653,7 @@
           </div>
 
           <div style="display: flex; justify-content: flex-end; gap: 10px;">
-            <button type="button" class="btn btn-secondary" onclick="closeMarketingModal()">İptal</button>
+            <button type="button" class="btn btn-secondary" data-onclick="closeMarketingModal()">İptal</button>
             <button type="submit" class="btn btn-primary" style="font-weight: 700;">Kaydet</button>
           </div>
         </div>
@@ -3667,9 +3667,9 @@
     <div class="modal-card modal-content" style="max-width: 520px;">
       <div class="modal-header">
         <h3 id="influencerModalTitle">Yeni Influencer / Barter İşbirliği Ekle</h3>
-        <button type="button" class="close-btn btn-close" onclick="closeInfluencerModal()">&times;</button>
+        <button type="button" class="close-btn btn-close" data-onclick="closeInfluencerModal()">&times;</button>
       </div>
-      <form id="influencerForm" onsubmit="saveInfluencerCollab(event)">
+      <form id="influencerForm" data-onsubmit="saveInfluencerCollab(event)">
         <input type="hidden" id="infCollabId">
         <div class="form-group">
           <label>Influencer / Hesap Adı (@):</label>
@@ -3726,7 +3726,7 @@
           <input type="text" id="infNotes" placeholder="2 Reels + 5 Hikaye paylaşıldı" style="width:100%; padding:8px; background:var(--bg-input); border:1px solid rgba(255,255,255,0.2); border-radius:6px; color:#fff;">
         </div>
         <div class="modal-footer" style="margin-top:16px; display:flex; justify-content:flex-end; gap:8px;">
-          <button type="button" class="btn btn-secondary" onclick="closeInfluencerModal()">İptal</button>
+          <button type="button" class="btn btn-secondary" data-onclick="closeInfluencerModal()">İptal</button>
           <button type="submit" class="btn btn-primary">Kaydet</button>
         </div>
       </form>
@@ -3741,9 +3741,9 @@
     <div class="modal-card" style="max-width: 760px;">
       <div class="modal-header">
         <h3 id="propertyModalTitle">🏡 Yeni Villa / Mülk Ekle</h3>
-        <button class="close-btn" onclick="closePropertyModal()">&times;</button>
+        <button class="close-btn" data-onclick="closePropertyModal()">&times;</button>
       </div>
-      <form id="propertyForm" onsubmit="saveProperty(event)">
+      <form id="propertyForm" data-onsubmit="saveProperty(event)">
         <input type="hidden" id="propEditKey">
         <div class="form-group" style="margin-bottom: 12px;">
           <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Villa / Mülk Adı:</label>
@@ -3795,14 +3795,14 @@
             <div class="form-group"><label for="propSocialGoogleBusiness">Google İşletme / Maps</label><input type="url" inputmode="url" id="propSocialGoogleBusiness" placeholder="https://maps.google.com/..."></div>
           </div>
           <div class="property-analysis-context__actions">
-            <button type="button" class="btn btn-secondary btn-sm" onclick="openPropertyOtaManager()">OTA bağlantılarını yönet</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-onclick="openPropertyOtaManager()">OTA bağlantılarını yönet</button>
             <span id="propAnalysisContextStatus" role="status" aria-live="polite">Konum ve sosyal profiller ChatGPT pazar analizine güvenli bağlantı olarak eklenir.</span>
           </div>
         </fieldset>
         <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
-          <button type="button" id="propDeleteBtn" class="btn btn-danger" style="display: none; background: #EF4444; border: none; font-size: 12px; padding: 8px 14px; border-radius: 6px; color: #fff; cursor: pointer;" onclick="handlePropertyDeleteFromModal()">🗑️ Mülkü Sil</button>
+          <button type="button" id="propDeleteBtn" class="btn btn-danger" style="display: none; background: #EF4444; border: none; font-size: 12px; padding: 8px 14px; border-radius: 6px; color: #fff; cursor: pointer;" data-onclick="handlePropertyDeleteFromModal()">🗑️ Mülkü Sil</button>
           <div style="display: flex; gap: 10px; margin-left: auto;">
-            <button type="button" class="btn btn-secondary" onclick="closePropertyModal()">İptal</button>
+            <button type="button" class="btn btn-secondary" data-onclick="closePropertyModal()">İptal</button>
             <button type="submit" id="propSubmitBtn" class="btn btn-primary" style="background: linear-gradient(135deg, #8B5CF6, #6D28D9); border: none; font-weight: 700;">
               💾 Mülkü Kaydet
             </button>
@@ -3818,9 +3818,9 @@
     <div class="modal-card" style="max-width: 500px;">
       <div class="modal-header">
         <h3 id="cleaningTaskModalTitle">🧹 Temizlik & Personel Hakediş Kaydı</h3>
-        <button class="close-btn" onclick="closeCleaningTaskModal()">&times;</button>
+        <button class="close-btn" data-onclick="closeCleaningTaskModal()">&times;</button>
       </div>
-      <form id="cleaningTaskForm" onsubmit="saveCleaningTask(event)">
+      <form id="cleaningTaskForm" data-onsubmit="saveCleaningTask(event)">
         <input type="hidden" id="hkEditTaskId">
         <div class="form-grid">
           <div class="form-group">
@@ -3856,9 +3856,9 @@
           </div>
         </div>
         <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px;">
-          <button type="button" class="btn btn-danger btn-sm" id="hkDeleteBtn" onclick="deleteCleaningTaskFromModal()" style="display: none;">🗑️ Sil</button>
+          <button type="button" class="btn btn-danger btn-sm" id="hkDeleteBtn" data-onclick="deleteCleaningTaskFromModal()" style="display: none;">🗑️ Sil</button>
           <div style="display: flex; gap: 8px; margin-left: auto;">
-            <button type="button" class="btn btn-secondary" onclick="closeCleaningTaskModal()">Vazgeç</button>
+            <button type="button" class="btn btn-secondary" data-onclick="closeCleaningTaskModal()">Vazgeç</button>
             <button type="submit" class="btn btn-primary" id="hkSaveBtn">Kaydet</button>
           </div>
         </div>
@@ -3876,9 +3876,9 @@
           <h3 id="onboardingModalTitle" style="margin: 0; color: #F8FAFC;">🎉 Hoş Geldiniz! İlk Mülkünüzü Tanımlayın</h3>
           <p style="margin: 4px 0 0 0; font-size: 12px; color: #CBD5E1;">İşletmeniz başarıyla oluşturuldu. Portföyünüzdeki ilk villayı veya daireyi ekleyin.</p>
         </div>
-        <button type="button" class="close-btn" onclick="closeOnboardingModal()" aria-label="Kapat" title="Şimdilik atla">&times;</button>
+        <button type="button" class="close-btn" data-onclick="closeOnboardingModal()" aria-label="Kapat" title="Şimdilik atla">&times;</button>
       </div>
-      <form id="onboardingForm" onsubmit="handleOnboardingSubmit(event)">
+      <form id="onboardingForm" data-onsubmit="handleOnboardingSubmit(event)">
         <div class="form-group" style="margin-bottom: 12px;">
           <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Villa / Mülk Adı:</label>
           <input type="text" id="onboardPropName" placeholder="Örn: Sunset Luxury Villa, Doğa Villa 1" required style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff;">
@@ -3908,7 +3908,7 @@
           <input type="text" id="onboardPropAmenities" placeholder="Örn: Özel Havuz, Jakuzi, Şömine, Barbekü" style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff;">
         </div>
         <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
-          <button type="button" class="btn btn-secondary" onclick="closeOnboardingModal()">Şimdilik Atla</button>
+          <button type="button" class="btn btn-secondary" data-onclick="closeOnboardingModal()">Şimdilik Atla</button>
           <button type="submit" class="btn btn-primary" style="background: linear-gradient(135deg, #10B981, #059669); border: none; font-weight: 700; padding: 10px 20px;">
             🚀 Kaydet ve Kokpite Başla
           </button>
@@ -3924,7 +3924,7 @@
     <div class="modal-card command-palette-card" style="max-width: 600px; padding: 0; border: 1px solid rgba(139, 92, 246, 0.4); box-shadow: 0 25px 60px rgba(0,0,0,0.85); overflow: hidden; background: #0F172A;">
       <div style="padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; gap: 10px; background: #1E293B;">
         <span style="font-size: 18px;">🔍</span>
-        <input type="text" id="commandPaletteInput" placeholder="Mülk, misafir, rezervasyon ara veya komut yaz... (ESC ile kapat)" oninput="handleCommandPaletteSearch(this.value)" onkeydown="handleCommandPaletteKeydown(event)" style="flex: 1; background: transparent; border: none; outline: none; color: #fff; font-size: 14px; font-weight: 500;">
+        <input type="text" id="commandPaletteInput" placeholder="Mülk, misafir, rezervasyon ara veya komut yaz... (ESC ile kapat)" data-oninput="handleCommandPaletteSearch(this.value)" data-onkeydown="handleCommandPaletteKeydown(event)" style="flex: 1; background: transparent; border: none; outline: none; color: #fff; font-size: 14px; font-weight: 500;">
         <kbd style="font-size: 11px; background: rgba(0,0,0,0.4); padding: 2px 6px; border-radius: 4px; color: #94A3B8;">ESC</kbd>
       </div>
       <div id="commandPaletteResults" style="max-height: 380px; overflow-y: auto; padding: 8px;">
@@ -3940,7 +3940,7 @@
     <div class="modal-card" style="max-width: 480px; border: 1px solid rgba(16, 185, 129, 0.4);">
       <div class="modal-header" style="background: rgba(16, 185, 129, 0.1);">
         <h3 style="color: #34D399; margin: 0; font-size: 15px;">🤖 AI Önerisini Uygula</h3>
-        <button class="close-btn" onclick="closeAiActionConfirmModal()">&times;</button>
+        <button class="close-btn" data-onclick="closeAiActionConfirmModal()">&times;</button>
       </div>
       <div style="padding: 16px 20px;">
         <div id="aiActionConfirmBody" style="font-size: 13px; color: #E2E8F0; line-height: 1.5; margin-bottom: 16px;">
@@ -3948,7 +3948,7 @@
         <div style="background: rgba(0,0,0,0.3); border-left: 3px solid #10B981; padding: 8px 12px; font-size: 11px; color: #94A3B8; margin-bottom: 16px;" id="aiActionConfirmMetrics">
         </div>
         <div style="display: flex; justify-content: flex-end; gap: 8px;">
-          <button type="button" class="btn btn-secondary" onclick="closeAiActionConfirmModal()">İptal</button>
+          <button type="button" class="btn btn-secondary" data-onclick="closeAiActionConfirmModal()">İptal</button>
           <button type="button" class="btn btn-primary" id="aiActionConfirmExecuteBtn" style="background: #10B981; font-weight: 700;">Onayla ve Uygula</button>
         </div>
       </div>
@@ -3967,7 +3967,8 @@
   <script src="core/executive_dashboard_service.js?v=ca6c3133"></script>
   <script src="core/executive_ai_advisor.js?v=502075f7"></script>
   <script src="core/captcha_gate.js?v=3ad4a776"></script>
-  <script src="app.js?v=85cf35e2"></script>
+  <script src="core/action_dispatch.js?v=2cb14054"></script>
+  <script src="app.js?v=31746250"></script>
   <script src="core/property_analysis_context_ui.js?v=56a57dc8"></script>
   <script src="core/analysis_center_ui.js?v=7991bd67"></script>
   <script src="core/marketing_ui.js?v=0bb620e0"></script>

@@ -32,38 +32,29 @@ check(bulgular.length === 0, `1. ${dosyalar.length} dosyada kaçışsız kullan�
 
 // Tarayicinin kendisi gercekten yakaliyor mu (bos tarama her zaman gecer):
 const ornek = S.scan('el.innerHTML = `<td>${b.guest}</td><td>${escapeHtml(b.guest)}</td>' +
-  '<button onclick="fn(\'${escapeHtml(l.notes)}\')">x</button>`;');
-check(ornek.length === 2 && ornek.some(x => x.isleyicide),
-  '1b. Tarayıcı kaçışsız metni ve işleyicide escapeHtml kullanımını yakalıyor', JSON.stringify(ornek));
+  '<button data-onclick="fn(decodeURIComponent(\'${escapeHtml(l.notes)}\'))">x</button>' +
+  '<button data-onclick="fn(decodeURIComponent(\'${encodeURIComponent(l.notes)}\'))">x</button>' +
+  '<button data-onclick="fn(decodeURIComponent(\'${encodeActionArg(l.notes)}\'))">x</button>`;');
+check(ornek.length === 3 && ornek.filter(x => x.isleyicide).length === 2,
+  '1b. Tarayıcı kaçışsız metni, data-on* içinde escapeHtml ve encodeURIComponent (tek tırnağı kodlamaz) kullanımını yakalıyor',
+  JSON.stringify(ornek));
 
-// --- 2. Uygulamanin kendi isleyicileri temizleyiciden geciyor mu -------------
-const izinliFiil = (APP.match(/const allowedHandlerName = (\/.*\/);/) || [])[1];
-const fiilRe = izinliFiil ? eval(izinliFiil) : null; // kaynaktaki regex'in kendisi
-const olaylar = new Set(['onclick', 'ondblclick', 'onchange', 'oninput', 'onsubmit', 'onkeydown', 'onkeyup', 'onkeypress']);
-const sorunlu = [];
+// --- 2. Satir ici isleyici yok (L-15 adim 3) ---------------------------------
+// Isleyicilerin tamami data-on* + core/action_dispatch.js'e tasindi; ayrintili
+// ag action_dispatch_tests. Burada yalniz sablonlarin kurala uydugu olculur.
+const satirIci = [];
 dosyalar.forEach(f => {
   const k = fs.readFileSync(path.join(KOK, f), 'utf8');
-  const re = /\s(on[a-z]+)="([^"]*)"/g;
+  const re = /(?:^|[\s"'`<])(on[a-z]+)\s*=\s*["'\\]/gm;
   let m;
-  while ((m = re.exec(k))) {
-    // Yalniz JS sablonlari (innerHTML ile gelen); index.html burada yok.
-    const olay = m[1].toLowerCase();
-    const govde = m[2].replace(/\$\{[^}]*\}/g, 'X').trim().replace(/;$/, '');
-    const cagri = govde.match(/^([A-Za-z_$][\w$]*)\((.*)\)$/s);
-    const argumanlar = cagri ? cagri[2].replace(/(?:encode|decode)URIComponent\(\s*(['"])[^'"]*\1\s*\)/g, "''") : '';
-    if (!olaylar.has(olay) || !cagri || !fiilRe || !fiilRe.test(cagri[1]) || govde.includes(';') || /[`(){};=<>]/.test(argumanlar)) {
-      sorunlu.push(`${f}: ${m[0].trim().slice(0, 100)}`);
-    }
-  }
+  while ((m = re.exec(k))) satirIci.push(`${f}:${k.slice(0, m.index).split('\n').length} ${m[1]}`);
 });
-check(sorunlu.length === 0, '2. Şablonlardaki her satır içi işleyici sıkılaştırılmış temizleyiciden geçer',
-  sorunlu.slice(0, 15).join('\n       '));
+check(satirIci.length === 0, '2. Şablonlarda satır içi on* işleyicisi yok', satirIci.slice(0, 15).join('\n       '));
 
 // --- 3. Temizleyici sozlesmesi -----------------------------------------------
-check(/const allowedHandlerAttrs = new Set\(\['onclick'/.test(APP) && /!allowedHandlerAttrs\.has\(name\)/.test(APP),
-  '3a. Yalnız etkileşim olayları; onerror/onload/onmouseover her koşulda silinir', 'allowedHandlerAttrs yok');
-check(/return chunks\.length === 1 && chunks\.every/.test(APP),
-  '3b. İşleyici tek çağrı; ";" ile zincir kabul edilmez', 'zincir hâlâ kabul ediliyor');
+check(/if \(name\.startsWith\('on'\)\) \{\s*node\.removeAttribute\(attr\.name\);/.test(APP)
+  && !/allowedHandlerName|handlerIsTrusted/.test(APP),
+  '3. Temizleyici her on* özniteliğini koşulsuz siler (izinli fiil istisnası kalmadı)', 'on* hâlâ koşullu');
 
 console.log(`\nTEST SUMMARY: ${passed} / ${passed + failed} TESTS PASSED (${failed} FAILED)`);
 if (failed > 0) process.exit(1);

@@ -277,7 +277,7 @@ function run() {
       `badge=${operationsCount}, satir=${rowCount}, html=${operationsHtml.slice(0, 700)}`
     );
     check(
-      operationsHtml.includes("openEditCleaningTaskModal('pending-1')")
+      operationsHtml.includes("openEditCleaningTaskModal(decodeURIComponent('pending-1'))")
         && operationsHtml.includes('Ayrıntı / Düzenle'),
       '20. Operasyon satirindan ayrinti/duzenleme akisina ULASILABILIYOR',
       operationsHtml.slice(0, 900)

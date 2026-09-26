@@ -7,8 +7,10 @@
  * Kural: HTML sablonuna giren ve asagidaki veri alanlarindan birine dokunan
  * her `${...}` ifadesi su sarmalayicilardan biriyle baslamalidir:
  *   escapeHtml(...)          — metin ve oznitelik degeri
- *   encodeURIComponent(...)  — satir ici isleyicideki JS dizesi (decodeURIComponent ile okunur)
- *   kod(...)                 — ayni (yerel kisaltma)
+ *   encodeActionArg(...)     — data-on* isleyicisindeki dize (decodeURIComponent ile
+ *                              okunur); orada encodeURIComponent YETMEZ, tek tirnagi
+ *                              kodlamaz (L-15 adim 3)
+ *   encodeURIComponent(...), kod(...) — isleyici disindaki deger parcalari
  * Ic ice sablonlar (ternary icindeki `<span>...`) ayrica taranir.
  *
  * Sayi ve tarih bicimleyicileri (toLocaleString, formatTrDate, Math.round,
@@ -34,7 +36,7 @@ const VERI_ALANLARI = [
 
 // Adi Html ile biten ya da guvenli ile baslayan yardimcilar kendi
 // kacislarindan sorumludur (or. roleBadgeHtml, guvenliAd).
-const GUVENLI_BASLANGIC = /^(?:escapeHtml|encodeURIComponent|kod|escapeAttr|[A-Za-z_$][\w$]*Html|guvenli[A-Z][\w$]*)\s*\(/;
+const GUVENLI_BASLANGIC = /^(?:escapeHtml|encodeURIComponent|encodeActionArg|kod|escapeAttr|[A-Za-z_$][\w$]*Html|guvenli[A-Z][\w$]*)\s*\(/;
 const SAYISAL = /(?:toLocaleString|toFixed|formatTrDate|formatShortDate|formatPeriodLabel|getPeriodDisplayName|Math\.(?:round|abs|max|min|floor|ceil)|Number\s*\(|parseInt|parseFloat|\.length\b|money\s*\(|tl\s*\(|formatMoney|formatCurrency)/;
 
 const alanRegex = new RegExp('(?:\\.|\\b)(' + VERI_ALANLARI.join('|') + ')\\b');
@@ -121,9 +123,10 @@ function scan(kaynak) {
       const ifade = p.deger.trim();
       if (!ifade) return;
       // Satir ici isleyici icindeki JS dizesi: escapeHtml YETMEZ (oznitelik
-      // cozulunce &#39; yine tirnak olur); encodeURIComponent sart.
-      const isleyicide = /\son[a-z]+\s*=\s*"[^"]*$/i.test(onceki);
-      if (isleyicide ? /^(?:encodeURIComponent|kod)\s*\(/.test(ifade) : GUVENLI_BASLANGIC.test(ifade)) return;
+      // cozulunce &#39; yine tirnak olur); encodeURIComponent de yetmez (tek
+      // tirnagi ve parantezi kodlamaz). Tek kabul: encodeActionArg (L-15 adim 3).
+      const isleyicide = /(?:\s|data-)on[a-z]+\s*=\s*"[^"]*$/i.test(onceki);
+      if (isleyicide ? /^encodeActionArg\s*\(/.test(ifade) : GUVENLI_BASLANGIC.test(ifade)) return;
       // Ic sablon iceren ifade (ternary ile HTML parcasi): ic sablon ayrica taranir;
       // ifadenin geri kalaninda (ic sablonlar cikarilmis) veri var mi bak.
       // Geri cagirim / IIFE ile ic sablon ureten ifade: ciktiyi ic sablonlar
@@ -133,8 +136,8 @@ function scan(kaynak) {
       const disi = ifade.replace(/`(?:\\.|[^`\\])*`/g, "''")
         // Zaten kacislanmis alt ifadeler (ternary dallarinda) guvenlidir.
         // Isleyici baglaminda escapeHtml guvenli DEGILDIR (yukariya bkz.).
-        .replace(isleyicide ? /(?:encodeURIComponent|kod)\s*\([^()]*\)/g
-          : /(?:escapeHtml|encodeURIComponent|kod)\s*\([^()]*\)/g, "''");
+        .replace(isleyicide ? /encodeActionArg\s*\([^()]*\)/g
+          : /(?:escapeHtml|encodeURIComponent|encodeActionArg|kod)\s*\([^()]*\)/g, "''");
       if (!alanRegex.test(disi)) return;
       if (SAYISAL.test(disi) && !/\?|\|\|/.test(disi)) return;
       // Kosul/secim ifadesi: yalniz kosulda kullanilan alan cikti degildir.
