@@ -3772,10 +3772,14 @@ function renderOperationsKpiStrip() {
   const bugunkuTurnover = tasks.filter(t => (t.date || '').slice(0, 10) === bugun).length;
   setEl('opsTurnoverVal', `${bugunkuTurnover} Görev`);
 
+  // DB'deki RESOLVED bellekte COMPLETED'e cevrilir (mapMaintenanceTicketFromDb);
+  // iptal CANCELLED'dir. Ikisi de kapali. Eskiden yalniz DONE/CLOSED/TAMAMLANDI
+  // kapali sayiliyordu: cozulen ariza kartta acik kaliyordu.
+  const KAPALI_ARIZA = ['DONE', 'CLOSED', 'TAMAMLANDI', 'RESOLVED', 'COMPLETED', 'CANCELLED'];
   const acikP1 = tickets.filter(t => {
-    const durum = String(t.status || '').toUpperCase();
+    const durum = String(t.statusRaw || t.status || '').toUpperCase();
     const oncelik = String(t.priority || t.oncelik || '').toUpperCase();
-    return durum !== 'DONE' && durum !== 'CLOSED' && durum !== 'TAMAMLANDI'
+    return !KAPALI_ARIZA.includes(durum)
       && (oncelik === 'P1' || oncelik === 'KRITIK' || oncelik === 'CRITICAL');
   }).length;
   setEl('opsOpenMaintVal', `${acikP1} İş`);
@@ -9307,6 +9311,8 @@ async function saveMaint(e) {
       title: title.trim(),
       description: assignee ? `Sorumlu: ${assignee}` : null,
       status,
+      // Cozulme zamani: ilk kez cozuldugunde yazilir, yeniden acilirsa bosalir.
+      resolved_at: status === 'RESOLVED' ? (existingTicket?.resolved_at || new Date().toISOString()) : null,
       estimated_cost: cost,
       blocks_availability: blocksAvailability,
       downtime_start: blocksAvailability ? downtimeStart : null,

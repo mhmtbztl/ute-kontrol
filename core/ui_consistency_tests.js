@@ -233,6 +233,23 @@ try {
       hata ? hata.message : `sonuc=${sonuc} convertedBookingId=${l.convertedBookingId} converted_booking_id=${l.converted_booking_id}`);
   })();
 
+  // --- I. Acik ariza sayisi -----------------------------------------------------
+  // Arizayi "Cozuldu" yapmak karttaki "Acik Arizalar (P1)" sayisini dusurmuyordu:
+  // DB'deki RESOLVED bellekte COMPLETED'e cevriliyor, kart ise yalniz
+  // DONE/CLOSED/TAMAMLANDI'yi kapali sayiyordu. Iptal (CANCELLED) de acikti.
+  app.setAppData(veri({ cleaningTasks: [], maintenance: [
+    { id: 'm1', villa: 'V1', priority: 'P1', status: 'OPEN', statusRaw: 'OPEN' },
+    { id: 'm2', villa: 'V1', priority: 'P1', status: 'COMPLETED', statusRaw: 'RESOLVED' },
+    { id: 'm3', villa: 'V1', priority: 'P1', status: 'CANCELLED', statusRaw: 'CANCELLED' },
+    { id: 'm4', villa: 'V1', priority: 'P2', status: 'OPEN', statusRaw: 'OPEN' },
+    { id: 'm5', villa: 'V1', priority: 'P1', status: 'IN_PROGRESS', statusRaw: 'IN_PROGRESS' }
+  ] }));
+  app.renderOperationsKpiStrip();
+  check(g('opsOpenMaintVal').innerText === '2 İş',
+    'I1. Çözülen ve iptal edilen P1 arıza "açık" sayılmaz (açık + işlemde = 2)', `kart=${g('opsOpenMaintVal').innerText}`);
+  const bakim = govde('saveMaint') || '';
+  check(/resolved_at:/.test(bakim), 'I2. Arıza çözülünce çözülme zamanı (resolved_at) yazılır', 'saveMaint resolved_at yazmıyor');
+
   // --- D. Kanal tablosu hizasi ------------------------------------------------
   check(/class="mkt-channel-table"/.test(MKT) && /\.mkt-channel-table th,\s*\.mkt-channel-table td\s*\{[^}]*text-align/.test(CSS),
     'D1. Kanal ekonomisi tablosunda başlık ve değer aynı hizada', 'mkt-channel-table kuralı yok');
