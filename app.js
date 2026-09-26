@@ -1733,6 +1733,18 @@ async function deleteBooking(bookingId) {
       appData.bookings = appData.bookings.filter(b => b.id !== propBookingId && b.id !== bookingId && b.code !== bookingId);
     }
 
+    // Veritabani talebin bagini ON DELETE SET NULL ile bosaltir; bellek de
+    // ayni olmali. Yoksa talep duzenlenirken silinmis kimlik gonderiliyor ve
+    // sunucu yaniltici "baska isletmeye ait" hatasi veriyordu.
+    if (appData.leads) {
+      appData.leads = appData.leads.map(l => {
+        const bag = l.convertedBookingId || l.converted_booking_id;
+        return bag && (bag === propBookingId || bag === bookingId)
+          ? { ...l, convertedBookingId: null, converted_booking_id: null }
+          : l;
+      });
+    }
+
     if (typeof saveAppData === 'function') saveAppData();
     if (typeof renderAll === 'function') renderAll();
     if (typeof closeBookingModal === 'function') closeBookingModal();
@@ -3311,6 +3323,10 @@ async function convertLeadToBooking(leadId, options = {}) {
         if (!appData.bookings) appData.bookings = [];
         const existsB = appData.bookings.some(b => b.id === createdBooking.id);
         if (!existsB) appData.bookings.unshift(createdBooking);
+        // Kesin rezervasyonun cikis temizligi planlanir (formla ayni). Maliyet
+        // talepte yok: bilinmiyor, uydurulmaz; gorev planli ve tutarsiz acilir.
+        const temizlikNotu = await syncBookingCleaningTaskToCloud(createdBooking, null);
+        if (temizlikNotu) data.cleaningNote = temizlikNotu.trim();
 
         if (appData.leads) {
           const lIdx = appData.leads.findIndex(l => l.id === leadId);
@@ -10843,8 +10859,9 @@ async function saveWaAsBooking() {
     return;
   }
 
+  let temizlikNotu = '';
   try {
-    await createBooking({
+    const yeni = await createBooking({
       villa: villa,
       guest: guest,
       phone: phone,
@@ -10860,6 +10877,8 @@ async function saveWaAsBooking() {
       pax: pax,
       status: 'CONFIRMED'
     });
+    // Cikis temizligi formla ayni sekilde planlanir; maliyet bilinmiyor.
+    temizlikNotu = await syncBookingCleaningTaskToCloud(yeni, null);
   } catch (err) {
     alert('⚠️ Rezervasyon kaydedilemedi: ' + (err?.message || 'veritabanı hatası'));
     return;
@@ -10870,7 +10889,7 @@ async function saveWaAsBooking() {
   renderManageBookingsTable();
   renderTapeChart();
 
-  alert(`✅ Tebrikler! "${guest}" için ${nights} gecelik WhatsApp rezervasyonu kesinleştirildi ve takvime işlendi!`);
+  alert(`✅ Tebrikler! "${guest}" için ${nights} gecelik WhatsApp rezervasyonu kesinleştirildi ve takvime işlendi!${temizlikNotu || ''}`);
 }
 
 

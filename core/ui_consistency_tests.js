@@ -192,6 +192,47 @@ try {
   check(eksik.length === 0, `F1. Ana sayfa rakamını etkileyen ${yazicilar.length} yazıcı, başarılı yazmadan sonra anlık görüntü önbelleğini temizler`,
     'temizlemeyenler: ' + eksik.join(', '));
 
+  // --- G. Her kesin rezervasyon yolu cikis temizligini planlar ---------------
+  // Gorev yalniz rezervasyon formunda (saveBooking) aciliyordu. Talebi
+  // rezervasyona donusturme ve WhatsApp'tan aktarma ayni kesin rezervasyonu
+  // gorevsiz birakiyordu: operasyon cikis temizligini hic gormuyordu (26.09,
+  // tarayicida). Ice aktarma BILEREK disarida: gecmis konaklamalar icin
+  // "yapildi mi?" gorevi acmak uydurma is yuku olur.
+  const cagiranlar = ['saveBooking', 'convertLeadToBooking', 'saveWaAsBooking'];
+  const gorevsiz = cagiranlar.filter(ad => { const g = govde(ad); return !g || !g.includes('syncBookingCleaningTaskToCloud('); });
+  check(gorevsiz.length === 0, 'G1. Form, talep dönüştürme ve WhatsApp aktarımı çıkış temizliğini planlar', 'planlamayanlar: ' + gorevsiz.join(', '));
+  const ice = govde('cloudUpsertBooking') || '';
+  check(!ice.includes('syncBookingCleaningTaskToCloud('), 'G2. İçe aktarma geçmiş konaklamalar için temizlik görevi açmaz', 'cloudUpsertBooking görev açıyor');
+
+  // --- H. Rezervasyon silinince talebin bagi bellekte de bosalir ---------------
+  // Veritabani leads.converted_booking_id'yi ON DELETE SET NULL ile bosaltir.
+  // Istemci bellekteki talepte silinmis kimligi tutuyordu: sayfa yenilenene
+  // kadar talep duzenlenemiyor, sunucu yaniltici "CROSS_TENANT_BOOKING_VIOLATION
+  // ... aktif isletmeye ait degildir" donuyordu (26.09, tarayicida).
+  await (async () => {
+    const TID = '11111111-2222-4333-8444-555555555555';
+    const BID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+    app.setSupabaseClient({
+      rpc: async (ad) => ({ data: ad === 'delete_booking_atomic' ? { deleted: true } : [], error: null }),
+      from: () => { const p = new Proxy(function () {}, { get: (_, k) => k === 'then' ? (res) => Promise.resolve({ data: [], error: null }).then(res) : () => p }); return p; },
+      channel: () => ({ on() { return this; }, subscribe() { return this; } }), removeChannel() {}
+    });
+    app.setActiveTenant({ id: TID, name: 'Test', role: 'owner' });
+    app.setAppData(veri({
+      tenantId: TID, cleaningTasks: [],
+      bookings: [{ id: BID, villa: 'V1', propertyId: 'p1', code: 'R-9', guest: 'X', checkIn: '2026-11-05', checkOut: '2026-11-08',
+        nights: 3, gross: 25000, net: 25000, otaCommission: 0, cleaningFee: 0, channel: 'WHATSAPP', status: 'CONFIRMED', pax: 2 }],
+      leads: [{ id: 'lead-1', dbId: 'lead-1', guest: 'X', status: 'WON', convertedBookingId: BID, converted_booking_id: BID }]
+    }));
+    let hata = null, sonuc = null;
+    const eskiOnay = global.confirm; global.confirm = () => true;
+    try { sonuc = await app.deleteBooking(BID); } catch (e) { hata = e; } finally { global.confirm = eskiOnay; }
+    const l = (app.getAppData().leads || [])[0] || {};
+    check(!hata && sonuc === true && l.convertedBookingId === null && l.converted_booking_id === null,
+      'H1. Rezervasyon silinince bellekteki talebin rezervasyon bağı da boşalır (veritabanıyla aynı)',
+      hata ? hata.message : `sonuc=${sonuc} convertedBookingId=${l.convertedBookingId} converted_booking_id=${l.converted_booking_id}`);
+  })();
+
   // --- D. Kanal tablosu hizasi ------------------------------------------------
   check(/class="mkt-channel-table"/.test(MKT) && /\.mkt-channel-table th,\s*\.mkt-channel-table td\s*\{[^}]*text-align/.test(CSS),
     'D1. Kanal ekonomisi tablosunda başlık ve değer aynı hizada', 'mkt-channel-table kuralı yok');
