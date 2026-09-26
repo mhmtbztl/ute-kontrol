@@ -419,6 +419,7 @@ async function saveBookingPaymentCommission(booking, amount) {
     booking.paymentCommission = tutar;
     const bellek = (appData.bookings || []).find(b => b.id === booking.id);
     if (bellek) bellek.paymentCommission = tutar;
+    invalidateExecutiveSnapshotCache(); // ana sayfa bayat kalmasin (ui_consistency_tests F)
     return '';
   } catch (err) {
     return '\n\nRezervasyon kaydedildi; ancak ödeme komisyonu yazılamadı: ' + (err?.message || 'veritabanı hatası');
@@ -2367,6 +2368,7 @@ async function createExpense(expenseInput) {
     if (typeof renderFinance === 'function') renderFinance();
   }
 
+  invalidateExecutiveSnapshotCache(); // ana sayfa bayat kalmasin (ui_consistency_tests F)
   return mapped;
 }
 
@@ -2495,6 +2497,7 @@ async function updateExpense(expenseId, expenseInput) {
     if (typeof renderFinance === 'function') renderFinance();
   }
 
+  invalidateExecutiveSnapshotCache(); // ana sayfa bayat kalmasin (ui_consistency_tests F)
   return mapped;
 }
 
@@ -2548,6 +2551,7 @@ async function deleteExpense(expenseId, skipConfirm = false) {
     if (typeof window !== 'undefined' && window.showToast) window.showToast('🗑️ Harcama başarıyla silindi.');
   }
 
+  invalidateExecutiveSnapshotCache(); // ana sayfa bayat kalmasin (ui_consistency_tests F)
   return true;
 }
 
@@ -2629,6 +2633,7 @@ async function cloudUpsertCleaningTask(task) {
     }
     throw new Error('Temizlik görevi kaydedilemedi: ' + (error.message || 'veritabanı hatası'));
   }
+  invalidateExecutiveSnapshotCache(); // ana sayfa bayat kalmasin (ui_consistency_tests F)
   return data;
 }
 
@@ -2643,6 +2648,7 @@ async function cloudDeleteCleaningTask(taskId) {
   if (error) {
     throw new Error('Temizlik görevi silinemedi: ' + (error.message || 'veritabanı hatası'));
   }
+  invalidateExecutiveSnapshotCache(); // ana sayfa bayat kalmasin (ui_consistency_tests F)
 }
 
 // -------------------------------------------------------------
@@ -2681,6 +2687,7 @@ async function cloudDeleteCleaningExpense(legacyId) {
   if (error) {
     throw new Error('Temizlik gideri silinemedi: ' + (error.message || 'veritabanı hatası'));
   }
+  invalidateExecutiveSnapshotCache(); // ana sayfa bayat kalmasin (ui_consistency_tests F)
 }
 
 /**
@@ -3724,6 +3731,14 @@ function getPropertySalesReadiness(villaKey) {
 // "%100") ve hicbir render fonksiyonu onlara dokunmuyordu; her musteri ayni
 // uydurma rakamlari goruyordu. Artik gercek veriden turetilir.
 // -------------------------------------------------------------
+// Personele borc: temizlik YAPILMIS ve odenmemis (K-04, CLAUDE.md 3.4).
+// Planli ya da "yapilmadi" gorev ne gider ne borctur. Operasyon karti bir
+// zamanlar yalniz !paid'e bakip planli gorevi de borc sayiyordu; hemen
+// altindaki liste ise "borc yok" diyordu.
+function isCleaningDebt(task) {
+  return !!task && task.status === 'DONE' && !task.paid;
+}
+
 function renderOperationsKpiStrip() {
   if (typeof document === 'undefined' || !appData) return;
   const villas = appData.villas || {};
@@ -3749,7 +3764,7 @@ function renderOperationsKpiStrip() {
   }).length;
   setEl('opsOpenMaintVal', `${acikP1} İş`);
 
-  const borc = tasks.filter(t => !t.paid).reduce((a, t) => a + (Number(t.amount) || 0), 0);
+  const borc = tasks.filter(isCleaningDebt).reduce((a, t) => a + (Number(t.amount) || 0), 0);
   setEl('opsDebtVal', `₺${Math.round(borc).toLocaleString('tr-TR')}`);
 
   // SLA: tamamlanmis gorevlerin zamaninda bitenlerin orani. Hic tamamlanmis
@@ -4325,8 +4340,18 @@ function renderFinanceModule() {
   setEl('finTargetStatusBadge', hasTarget ? `%${targetPct.toFixed(1)} Hedef Başarısı` : 'Hedef belirlenmedi');
   setEl('targetBarRatioText', hasTarget ? `${Math.round(totalRevenue).toLocaleString('tr-TR')} TL / ${Math.round(targetRev).toLocaleString('tr-TR')} TL (%${targetPct.toFixed(1)})` : `${Math.round(totalRevenue).toLocaleString('tr-TR')} TL / —`);
 
+  // Olcek gerceklesen ile hedefin buyugu: dolgu gerceklesen, isaret hedef.
+  // Hedef asildiginda dolgu tam, isaret geride kalir — asim gorunur. Isaret
+  // eskiden HTML'de sabit %62'deydi ve hic guncellenmiyordu.
   const fillEl = document.getElementById('targetBarFill');
-  if (fillEl) fillEl.style.width = hasTarget ? `${Math.min(100, Math.max(0, targetPct))}%` : '0%';
+  const markerEl = document.getElementById('targetBarMarker');
+  const olcek = hasTarget ? Math.max(targetRev, totalRevenue) : 0;
+  const yuzde = v => `${Math.round(Math.min(100, Math.max(0, (v / olcek) * 100)))}%`;
+  if (fillEl) fillEl.style.width = hasTarget && olcek > 0 ? yuzde(totalRevenue) : '0%';
+  if (markerEl) {
+    markerEl.hidden = !(hasTarget && olcek > 0);
+    markerEl.style.left = markerEl.hidden ? '' : yuzde(targetRev);
+  }
 
   // Profit Waterfall Bridge
   setEl('brCiro', `${Math.round(totalRevenue).toLocaleString('tr-TR')} TL`);
@@ -9841,7 +9866,7 @@ function renderDailyOps() {
   }
 
   // Update badge in column header
-  const pendingCount = (appData.cleaningTasks || []).filter(t => !t.paid).length;
+  const pendingCount = (appData.cleaningTasks || []).filter(isCleaningDebt).length;
   if (hkBadge) {
     hkBadge.innerText = `${pendingCount} Ödenecek (${allTasks.length} Görev)`;
     hkBadge.className = pendingCount > 0 ? 'badge badge-amber' : 'badge badge-emerald';
@@ -14472,6 +14497,11 @@ async function loadTenantAppData(tenantIdOrUserId) {
         isCleanState: Object.keys(villas).length === 0
       };
 
+      // Rezervasyonun temizlik MALIYETI bagli gorevden okunur (3.4). Bu cagri
+      // eskiden yalniz kaydetme yolundaydi: sayfa ilk acildiginda her
+      // rezervasyonun maliyeti bilinmiyor gorunuyor, duzenleme formu bos
+      // geliyordu.
+      syncBookingCleaningTasks();
       invalidateExecutiveSnapshotCache();
       updateAllVillaDropdowns();
       renderAll();
@@ -17491,6 +17521,9 @@ if (typeof module !== 'undefined' && module.exports) {
     setCurrentFilter,
     refreshPeriodSelectors,
     renderFinanceModule,
+    renderOperationsKpiStrip,
+    renderDailyOps,
+    loadTenantAppData,
     formatSoldNightsLabel,
     computeFilterLedger,
     computeMonthLedger,

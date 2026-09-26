@@ -135,6 +135,20 @@ Eski istemcinin "Ödendi" anında yazdığı `EXP-CLEAN-<görev>` gider satırla
 silinmez (kapanmış aylarda durabilirler); defter formülü satırı olan görevi
 ikinci kez saymaz.
 
+**Personel borcu tek tanımdır: `isCleaningDebt(t)` = yapılmış ve ödenmemiş.**
+Operasyon kartı ve temizlik rozeti bir zamanlar yalnız `!paid`'e bakıyordu:
+26.09.2026'da gerçek hesapta kart "₺2.500 borç", hemen altındaki liste
+"borç yok" diyordu (görev planlıydı). Ağı `core/ui_consistency_tests.js`.
+
+**Ana sayfa sunucu anlık görüntüsünü önbellekte tutar; deftere yazan her
+fonksiyon başarılı yazmadan sonra `invalidateExecutiveSnapshotCache()` çağırır.**
+Kural düğmede değil **tabloya yazan fonksiyondadır** (`createExpense`,
+`cloudUpsertCleaningTask`, …): temizlik "yapıldı" ve gider kaydı önbelleği
+temizlemiyordu; sunucu doğru hesaplarken ana sayfa sayfa yenilenene kadar
+eski kârı gösteriyordu. Rezervasyon yolları tam yeniden yükleme yaptığı için
+etkilenmiyordu. Deftere yazan yeni bir fonksiyon eklerseniz
+`ui_consistency_tests` F listesine ekleyin.
+
 Doluluk/RevPAR paydası: `getPeriodDayCount()` — **ayın gerçek gün sayısı**.
 Bir zamanlar bir ekranda 30, diğerinde 31, bir başkasında 90 kullanılıyordu.
 

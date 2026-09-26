@@ -267,6 +267,7 @@ const allTestFiles = [
   'html_injection_tests.js',
   'action_dispatch_tests.js',
   'capacity_consistency_tests.js',
+  'ui_consistency_tests.js',
   'phase49_activation_live_tests.js',
 
   // GitHub Actions eylemleri tam commit SHA'sina sabit

@@ -4707,3 +4707,13 @@ body {
   .property-analysis-context__grid { grid-template-columns: 1fr; }
   .property-analysis-context__actions { align-items: stretch; flex-direction: column; }
 }
+
+/* hidden ozniteligi HER ZAMAN gizler. .btn { display: inline-flex } gibi
+ * kurallar onu eziyordu: "Donemi Yeniden Ac" dugmesi acik donemde gorunuyordu. */
+[hidden] { display: none !important; }
+
+/* Kanal ekonomisi tablosu: baslik ve deger ayni hizada (metin solda, sayilar sagda). */
+.mkt-channel-table th,
+.mkt-channel-table td { text-align: right; padding: 8px 12px; }
+.mkt-channel-table th:first-child,
+.mkt-channel-table td:first-child { text-align: left; }

@@ -245,7 +245,7 @@
       ${kpi('Direkt rezervasyon', number(report.mix.directReservationSharePercent, '%'), 'Rezervasyon adedi payı')}
     </div>
     <div class="card" style="padding:0;overflow:auto">
-      <table style="width:100%;border-collapse:collapse;min-width:780px"><thead><tr>
+      <table class="mkt-channel-table" style="width:100%;border-collapse:collapse;min-width:780px"><thead><tr>
         <th>Kanal</th><th>Rez.</th><th>Gece</th><th>Oda geliri</th><th>Komisyon</th><th>Net oda geliri</th><th>Net ADR</th>
       </tr></thead><tbody>${rows || '<tr><td colspan="7" style="padding:24px;text-align:center">Bu dönemde rezervasyon yok.</td></tr>'}</tbody></table>
     </div>
