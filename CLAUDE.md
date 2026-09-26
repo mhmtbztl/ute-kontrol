@@ -517,7 +517,7 @@ taşır. İkisi de üretimde henüz uygulanmadı; Phase11 ile birlikte readiness
 kapısı bu yüzden kırmızıdır. Paket: `docs/PHASE11_DEPLOY_PACKAGE.md`.
 
 **phase49 (`migration_phase49_property_activation_floor.sql`) 26 Eylül 2026'da
-test projesine uygulandı; üretim kullanıcı onayı bekliyor.** Mülkün faaliyete
+test projesine ve üretime uygulandı; üretimde doğrulandı.** Mülkün faaliyete
 başlama tarihi (`activated_on`) ilk iptal edilmemiş rezervasyondan sonra
 olamaz: mevcut veri geri çekilir, daha eski rezervasyon tarihi kendiliğinden
 çeker, sonraya alma ve kapanmış aya dokunan değişiklik reddedilir (§3.4).
@@ -525,7 +525,7 @@ Canlı süit `phase49_activation_live_tests` 12/12 (göçten önce 9 kırmızı)
 `BEGIN…ROLLBACK` içinde iki kez koşuldu, idempotent. Dışarıdan ayırt
 edilemez (yeni tablo/RPC yok): kanıt SQL Editor'deki `PHASE 49 OK`
 bildirimi ve oturumlu hesapta geçmiş ayın `available_nights` değerinin 0
-olmaktan çıkması. Paket: `docs/PHASE49_DEPLOY_PACKAGE.md`.
+olmaktan çıkması. SQL Editor bildirimi göstermedi (yalnız "Success. No rows returned"; blok hata verseydi işlem dururdu). Üretimde oturumlu, salt okunur ölçüm: Ekim 2025 kapasitesi 0 → 124, Ağustos 2026 0 → 155 (doluluk %50,97), Eylül 85 → 150. Paket: `docs/PHASE49_DEPLOY_PACKAGE.md`.
 
 **Bir göçün uygulanıp uygulanmadığı, dosyaya bakarak anlaşılmaz.** Dosya repoda
 durur; veritabanı uygulanmamış olabilir. Doğrulamanın yolu üretime sormaktır:
