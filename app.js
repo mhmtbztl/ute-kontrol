@@ -1910,6 +1910,29 @@ async function loadExpenses(targetTenantId) {
 // PHASE 8: FINANCIAL INTELLIGENCE & MONTHLY TARGETS / CLOSES
 // =============================================================
 
+// Kar olculebilir mi (L-101, K-04 eki, kullanici 27.09). Ciro var ama donemde
+// HIC gider yoksa (elle gider, komisyon, temizlik maliyeti, CAPEX toplami 0)
+// "gider yok" ile "gider henuz girilmedi" ayirt edilemez. Eskiden bu aylar
+// "%100 marj" ve net kar = ciro gosteriyordu; musteri bunu gercek kar sanar.
+// Kapatilmis ay istisnadir: kapanis, kullanicinin defteri onaylamasidir.
+// Tek ay degil bir aralik secildiyse kapanis istisnasi uygulanmaz.
+const OLCULEMEYEN_KAR_NOTU = 'Gider kaydı yok; kâr ölçülemedi';
+function isProfitUnmeasured(revenue, opex, capex, periodKey) {
+  const ciro = Number(revenue) || 0;
+  const gider = (Number(opex) || 0) + (Number(capex) || 0);
+  if (!(ciro > 0) || gider !== 0) return false;
+  const ay = String(periodKey || '');
+  if (/^\d{4}-\d{2}$/.test(ay) && isPeriodClosed(ay)) return false;
+  return true;
+}
+
+// Kar koprusunde dusulen kalem. Tutar yoksa "-0 TL" yazilmaz (L-104).
+function formatDeductionTl(value) {
+  const n = Math.round(Number(value) || 0);
+  if (n === 0) return '0 TL';
+  return `${n > 0 ? '−' : '+'}${Math.abs(n).toLocaleString('tr-TR')} TL`;
+}
+
 function isPeriodClosed(dateOrYearMonth) {
   if (!dateOrYearMonth) return false;
   const ym = String(dateOrYearMonth).substring(0, 7);
@@ -3514,7 +3537,12 @@ function switchTab(tabId) {
   if (tabId === 'settings') renderSettingsTable();
   if (tabId === 'settings') renderTeamManagement();
   if (tabId === 'settings') loadDeletionImpact();
-  if (tabId === 'finance') renderFinanceModule();
+  if (tabId === 'finance') {
+    renderFinanceModule();
+    renderTrajectoryRadar();
+    renderTrajectoryInsights();
+    runWhatIfSimulation();
+  }
   if (tabId === 'dashboard') {
     renderKPIsAndDashboard();
     renderGapNights();
@@ -3756,6 +3784,46 @@ function isCleaningDebt(task) {
   return !!task && task.status === 'DONE' && !task.paid;
 }
 
+// Toplu aktarim ozeti (L-103): aylik toplamdan girilmis "TOPLU AKTARIM — Ocak
+// 2026" satiri. TOPLAM metriklere (ciro, gece, ADR, doluluk) dogru girer;
+// KAYIT ve GUN basi metriklere girmez: rezervasyon adedi, takvimde hangi gun
+// dolu, bos gece tespiti. Aksi halde tum ay ayin 1'inden itibaren dolu gorunur
+// ve gercek olmayan bosluklar/rezervasyonlar uretilir. Tanim tek yerde:
+// guest_crm_engine (CRM onu zaten boyle disarida tutuyordu).
+function isBulkSummaryBooking(booking) {
+  const api = typeof getGuestCrmApi === 'function' ? getGuestCrmApi() : null;
+  if (api && typeof api.isBulkSummaryBooking === 'function') return api.isBulkSummaryBooking(booking);
+  return /^TOPLU\s+AKTARIM(?:\s*[—–-]|\s|$)/i.test(String((booking && (booking.guest || booking.guest_name)) || '').trim());
+}
+
+// Kanal kodunun musteriye gorunen adi (L-105). Liste ham kodu ("Direct",
+// "WHATSAPP") yaziyordu; Raporlar ayni kanali "WHATSAPP", Gelir & Dağıtım
+// "Direkt" diye aniyordu. Ad isletmenin kanal katalogundan, yoksa sistem
+// kanallarindan gelir; katalogda olmayan kod oldugu gibi kalir.
+function getChannelDisplayName(code) {
+  const k = String(code || '').trim();
+  if (!k) return 'Kanal belirtilmedi';
+  const katalog = (typeof appData !== 'undefined' && appData && appData.bookingChannels && appData.bookingChannels.length)
+    ? appData.bookingChannels : DEFAULT_BOOKING_CHANNELS;
+  const ust = k.toUpperCase();
+  const bul = (liste) => (liste || []).find(c => String(c.code || '').toUpperCase() === ust);
+  const kayit = bul(katalog) || bul(DEFAULT_BOOKING_CHANNELS);
+  if (kayit && kayit.displayName) return kayit.displayName;
+  if (ust === 'DIRECT' || ust === 'DIREKT') return 'Doğrudan';
+  return k;
+}
+
+// Acik ariza tek tanimdir (L-95, L-98). DB'deki RESOLVED bellekte
+// COMPLETED'e cevrilir (mapMaintenanceTicketFromDb); iptal CANCELLED'dir.
+// Ana sayfa bir zamanlar ham satirda yalniz `!== 'RESOLVED'` bakiyordu:
+// iptal arizayi "Durum: Açık" diye kritik eylem olarak gosteriyordu.
+const KAPALI_ARIZA_DURUMLARI = ['DONE', 'CLOSED', 'TAMAMLANDI', 'RESOLVED', 'COMPLETED', 'CANCELLED'];
+function isMaintenanceTicketOpen(ticket) {
+  if (!ticket) return false;
+  const durum = String(ticket.statusRaw || ticket.status || '').toUpperCase();
+  return !KAPALI_ARIZA_DURUMLARI.includes(durum);
+}
+
 function renderOperationsKpiStrip() {
   if (typeof document === 'undefined' || !appData) return;
   const villas = appData.villas || {};
@@ -3773,14 +3841,11 @@ function renderOperationsKpiStrip() {
   const bugunkuTurnover = tasks.filter(t => (t.date || '').slice(0, 10) === bugun).length;
   setEl('opsTurnoverVal', `${bugunkuTurnover} Görev`);
 
-  // DB'deki RESOLVED bellekte COMPLETED'e cevrilir (mapMaintenanceTicketFromDb);
-  // iptal CANCELLED'dir. Ikisi de kapali. Eskiden yalniz DONE/CLOSED/TAMAMLANDI
-  // kapali sayiliyordu: cozulen ariza kartta acik kaliyordu.
-  const KAPALI_ARIZA = ['DONE', 'CLOSED', 'TAMAMLANDI', 'RESOLVED', 'COMPLETED', 'CANCELLED'];
+  // Eskiden yalniz DONE/CLOSED/TAMAMLANDI kapali sayiliyordu: cozulen ariza
+  // kartta acik kaliyordu. Tek tanim isMaintenanceTicketOpen.
   const acikP1 = tickets.filter(t => {
-    const durum = String(t.statusRaw || t.status || '').toUpperCase();
     const oncelik = String(t.priority || t.oncelik || '').toUpperCase();
-    return !KAPALI_ARIZA.includes(durum)
+    return isMaintenanceTicketOpen(t)
       && (oncelik === 'P1' || oncelik === 'KRITIK' || oncelik === 'CRITICAL');
   }).length;
   setEl('opsOpenMaintVal', `${acikP1} İş`);
@@ -3811,7 +3876,7 @@ function renderPricingKpiStrip() {
   let gapSayisi = 0;
   try {
     if (typeof GapNightService !== 'undefined' && GapNightService.detectGapNights) {
-      const g = GapNightService.detectGapNights({ bookings, properties: Object.values(appData.villas || {}) });
+      const g = GapNightService.detectGapNights({ bookings: bookings.filter(b => !isBulkSummaryBooking(b)), properties: Object.values(appData.villas || {}) });
       gapSayisi = Array.isArray(g) ? g.length : (g && g.gapNights ? g.gapNights.length : 0);
     }
   } catch (e) { gapSayisi = 0; }
@@ -4076,7 +4141,9 @@ const ACTIVE_RENDER_PLANS = {
   'tab-operations': ['renderOperationsTab', 'renderOperationsKpiStrip'],
   'tab-guests': ['renderGuestsTab'],
   'tab-pricing': ['renderPricingTab', 'renderPricingKpiStrip'],
-  'tab-finance': ['renderFinanceModule'],
+  // Gidisat radari, icgoruler ve simulator tab-finance ICINDEDIR (L-100);
+  // eskiden yalniz gizli tab-dashboard planindaydi ve Finans'ta hic cizilmiyordu.
+  'tab-finance': ['renderFinanceModule', 'renderTrajectoryRadar', 'renderTrajectoryInsights', 'runWhatIfSimulation'],
   'tab-dashboard': ['renderKPIsAndDashboard', 'renderGapNights', 'renderTodayRadar', 'renderOtaRadar', 'runWhatIfSimulation', 'renderTrajectoryRadar', 'renderTrajectoryInsights', 'renderCriticPresets', 'renderDailyOps'],
   'tab-reservations': ['renderManageBookingsTable', 'renderTapeChart'],
   'tab-expenses': ['renderExpensesTable'],
@@ -4136,12 +4203,23 @@ function renderAll() {
   const plan = activePlan.length ? activePlan : (activeTabId ? [] : fallbackPlan);
   plan.forEach(name => renderers[name]());
 
+  renderDataSyncStamp();
+
   // Badges
   // Badges (Seçili Dönem Filtresine Göre Dinamik Sayım)
   const rBadge = document.getElementById('rezCountBadge');
   if (rBadge) {
-    const activeBookings = (appData.bookings || []).filter(b => isBookingInFilter(b));
+    // Secili donemdeki iptal edilmemis GERCEK rezervasyonlar. Liste ise dönem
+    // filtresini ayrica secer; ikisinin farkli sayi gostermesinin sebebi
+    // sekmede yaziyor (L-105). Toplu aktarim ozeti rezervasyon degildir (L-103).
+    const activeBookings = (appData.bookings || [])
+      .filter(b => b.status !== 'CANCELLED' && isBookingInFilter(b) && !isBulkSummaryBooking(b));
     rBadge.innerText = activeBookings.length;
+    const donemAdi = getPeriodDisplayName(currentFilter && currentFilter.period) || 'seçili dönem';
+    const aciklama = `${donemAdi}: iptal edilmemiş ${activeBookings.length} rezervasyon (üstteki dönem filtresine göre)`;
+    if (typeof rBadge.setAttribute === 'function') rBadge.setAttribute('title', aciklama);
+    const dugme = rBadge.parentNode;
+    if (dugme && typeof dugme.setAttribute === 'function') dugme.setAttribute('title', aciklama);
   }
   const eBadge = document.getElementById('expenseCountBadge');
   if (eBadge) {
@@ -4326,6 +4404,8 @@ function renderFinanceModule() {
   const totalExpense = totalOpex + totalCapex;
   const netMargin = totalRevenue > 0 ? (netCashProfit / totalRevenue) * 100 : 0;
   const expenseRatio = totalRevenue > 0 ? (totalExpense / totalRevenue) * 100 : 0;
+  // L-101: donemde hic gider yoksa kar/marj olculmus gibi yazilmaz.
+  const karOlculemez = isProfitUnmeasured(totalRevenue, totalOpex, totalCapex, currentFilter && currentFilter.period);
 
   // Monthly Target Comparison
   const hasTarget = Number.isFinite(Number(targetRev)) && Number(targetRev) > 0;
@@ -4343,11 +4423,11 @@ function renderFinanceModule() {
   setEl('finTargetRevenue', hasTarget ? `${Math.round(targetRev).toLocaleString('tr-TR')} TL` : '—');
   setEl('finTargetDiff', hasTarget ? `${targetDiff >= 0 ? '+' : ''}${Math.round(targetDiff).toLocaleString('tr-TR')} TL fark` : '—');
 
-  setEl('finNetProfit', `${Math.round(netCashProfit).toLocaleString('tr-TR')} TL`);
-  setEl('finNetMarginLabel', `%${netMargin.toFixed(1)} net kâr marjı`);
+  setEl('finNetProfit', karOlculemez ? '—' : `${Math.round(netCashProfit).toLocaleString('tr-TR')} TL`);
+  setEl('finNetMarginLabel', karOlculemez ? OLCULEMEYEN_KAR_NOTU : `%${netMargin.toFixed(1)} net kâr marjı`);
 
   setEl('finTotalExpense', `${Math.round(totalExpense).toLocaleString('tr-TR')} TL`);
-  setEl('finExpenseRatio', `Cironun %${expenseRatio.toFixed(1)}'i`);
+  setEl('finExpenseRatio', karOlculemez ? 'Bu dönem için gider kaydı yok' : `Cironun %${expenseRatio.toFixed(1)}'i`);
 
   setEl('finSoldNights', `${totalSoldNights} gece`);
   setEl('finAvgRevPerNight', avgRevPerNight === null ? 'ADR: — (satılan gece yok)' : `ADR ${avgRevPerNight.toLocaleString('tr-TR')} TL (net oda geliri / satılan gece)`);
@@ -4376,21 +4456,21 @@ function renderFinanceModule() {
 
   // Profit Waterfall Bridge
   setEl('brCiro', `${Math.round(totalRevenue).toLocaleString('tr-TR')} TL`);
-  setEl('brOpex', `-${Math.round(totalOpex).toLocaleString('tr-TR')} TL`);
-  setEl('brOpProfit', `${Math.round(operatingProfit).toLocaleString('tr-TR')} TL`);
-  setEl('brCapex', `-${Math.round(totalCapex).toLocaleString('tr-TR')} TL`);
-  setEl('brNetProfit', `${Math.round(netCashProfit).toLocaleString('tr-TR')} TL`);
-  setEl('brNetMargin', `%${netMargin.toFixed(1)} Net Kâr Marjı`);
+  setEl('brOpex', formatDeductionTl(totalOpex));
+  setEl('brOpProfit', karOlculemez ? '—' : `${Math.round(operatingProfit).toLocaleString('tr-TR')} TL`);
+  setEl('brCapex', formatDeductionTl(totalCapex));
+  setEl('brNetProfit', karOlculemez ? '—' : `${Math.round(netCashProfit).toLocaleString('tr-TR')} TL`);
+  setEl('brNetMargin', karOlculemez ? OLCULEMEYEN_KAR_NOTU : `%${netMargin.toFixed(1)} Net Kâr Marjı`);
 
   // Operasyonel kar marji index.html'de "%30,3" olarak KODA GOMULUYDU ve hicbir
   // zaman guncellenmiyordu; hemen altindaki net marj dogru hesaplanirken bu
   // sabit kaliyordu, yani iki satir birbirini yalanliyordu.
   const opMargin = totalRevenue > 0 ? (operatingProfit / totalRevenue) * 100 : 0;
-  setEl('brOpMargin', `Marj: %${opMargin.toFixed(1)} (Yatırımlar Öncesi)`);
+  setEl('brOpMargin', karOlculemez ? OLCULEMEYEN_KAR_NOTU : `Marj: %${opMargin.toFixed(1)} (Yatırımlar Öncesi)`);
 
   // "geçen aya göre" rozetleri de statik HTML'di.
   const prevTotals = computePreviousPeriodTotals();
-  setEl('finNetProfitMoM', formatMoMLabel(netCashProfit, prevTotals.netProfit));
+  setEl('finNetProfitMoM', karOlculemez ? '—' : formatMoMLabel(netCashProfit, prevTotals.netProfit));
   setEl('finExpenseMoM', formatMoMLabel(totalExpense, prevTotals.expense));
   setEl('finRevMoM', formatMoMLabel(totalRevenue, prevTotals.revenue));
   setEl('finNightsMoM', formatMoMLabel(totalSoldNights, prevTotals.nights));
@@ -4414,7 +4494,7 @@ function renderFinanceModule() {
   renderYoYComparison(totalRevenue, totalOpex, netCashProfit, totalSoldNights);
 
   // Render AI Financial Analyst
-  renderAIFinancialAnalyst(totalRevenue, targetRev, targetPct, totalOpex, totalCapex, netCashProfit, netMargin, propStats);
+  renderAIFinancialAnalyst(totalRevenue, targetRev, targetPct, totalOpex, totalCapex, netCashProfit, netMargin, propStats, karOlculemez);
 }
 
 // -------------------------------------------------------------
@@ -4563,8 +4643,12 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
       const adrVal = Math.round(s.adr || (s.nights > 0 ? s.revenue / s.nights : 0));
 
       // Determine Strategic Diagnosis
+      // Satisi olmayan mulk "Dengeli" degildir; olculecek bir dagilim yok (L-102).
+      // Eskiden varsayilan etiket buydu: donemde tek gece satmayan dort mulk
+      // "Dengeli" gorunurken hemen alttaki kutu "hic satilmayan mulk" diyordu.
       let diagBadge = '<span class="badge badge-emerald">🟢 Dengeli</span>';
-      if (rank === 1 && s.revenue > 0) diagBadge = '<span class="badge badge-emerald">👑 Ciro Şampiyonu</span>';
+      if (!(s.revenue > 0) && !(s.nights > 0)) diagBadge = '<span class="badge badge-slate">⚪ Bu dönem satış yok</span>';
+      else if (rank === 1 && s.revenue > 0) diagBadge = '<span class="badge badge-emerald">👑 Ciro Şampiyonu</span>';
       else if (occVal !== null && occVal < 40 && s.revenue > 0) diagBadge = '<span class="badge badge-rose">📉 Boşluk Riski</span>';
 
       const tr = document.createElement('tr');
@@ -4825,7 +4909,9 @@ function renderMonthlyTrendChart() {
   if (activeTrendRange === 'YTD') selectedTrendData = allTrendData.filter(d => d.key.startsWith(String(new Date().getFullYear())));
   const displayData = selectedTrendData.map(d => ({
     key: d.key, month: d.monthName, ciro: d.ciro, opex: d.opex,
-    profit: Math.max(0, d.netProfit)
+    // L-101: gider kaydi olmayan ayin net kar cubugu cizilmez (ciro ile ayni boyda yesil cubuk).
+    profit: d.profitUnmeasured ? 0 : Math.max(0, d.netProfit),
+    profitUnmeasured: d.profitUnmeasured
   }));
 
   const maxVal = Math.max(100000, ...displayData.map(d => Math.max(d.ciro, d.opex)));
@@ -4872,7 +4958,10 @@ function renderMonthlyTrendChart() {
     rProfit.setAttribute('height', hProfit);
     rProfit.setAttribute('fill', '#10B981');
     rProfit.setAttribute('rx', '3');
-    rProfit.innerHTML = `<title>${d.key} Net Kâr: ${d.profit.toLocaleString('tr-TR')} TL</title>`;
+    if (d.profitUnmeasured) rProfit.setAttribute('opacity', '0.25');
+    rProfit.innerHTML = d.profitUnmeasured
+      ? `<title>${d.key} Net Kâr: — (${OLCULEMEYEN_KAR_NOTU})</title>`
+      : `<title>${d.key} Net Kâr: ${d.profit.toLocaleString('tr-TR')} TL</title>`;
     svg.appendChild(rProfit);
 
     // Label
@@ -4985,7 +5074,7 @@ function renderYoYComparison(actualRevenue, actualOpex, actualNetProfit, actualN
 // -------------------------------------------------------------
 // LEXBNB AI FİNANS ANALİSTİ (GERÇEK VERİ KORELASYON MOTORU)
 // -------------------------------------------------------------
-function renderAIFinancialAnalyst(revenue, targetRev, targetPct, opex, capex, netProfit, netMargin, propStats) {
+function renderAIFinancialAnalyst(revenue, targetRev, targetPct, opex, capex, netProfit, netMargin, propStats, karOlculemez = false) {
   const goodBox = document.getElementById('aiGoodContent');
   const badBox = document.getElementById('aiBadContent');
   const whyBox = document.getElementById('aiWhyContent');
@@ -5038,7 +5127,7 @@ function renderAIFinancialAnalyst(revenue, targetRev, targetPct, opex, capex, ne
       const en = mulkStat[0];
       satirlar.push(`<p>• <strong>En Güçlü Mülk:</strong> ${escapeHtml(en.ad)} — ${tl(en.adr)} TL/gece ile dönemin en yüksek gecelik fiyatı (${en.s.nights} gece, ${tl(en.s.revenue)} TL).</p>`);
     }
-    if (netProfit > 0) {
+    if (netProfit > 0 && !karOlculemez) {
       satirlar.push(`<p>• <strong>Net Kâr:</strong> ${tl(netProfit)} TL${netMargin ? ` (marj %${Number(netMargin).toFixed(1)})` : ''}.</p>`);
     }
     goodBox.innerHTML = satirlar.join('') || '<p>• Bu dönem için öne çıkarılacak bir sonuç yok.</p>';
@@ -5046,7 +5135,10 @@ function renderAIFinancialAnalyst(revenue, targetRev, targetPct, opex, capex, ne
 
   if (badBox) {
     const satirlar = [];
-    if (revenue > 0) {
+    if (karOlculemez) {
+      // L-101: gider hic girilmemisken "%0 gider" iyi haber gibi okunur.
+      satirlar.push('<p>• <strong>Gider kaydı yok:</strong> Bu dönem için hiç gider girilmemiş; kâr ve marj ölçülemiyor. Giderleri girin ya da ayı kapatarak defteri onaylayın.</p>');
+    } else if (revenue > 0) {
       satirlar.push(`<p>• <strong>Gider / Ciro Oranı:</strong> Toplam giderler cironun <strong>%${(((opex + capex) / revenue) * 100).toFixed(1)}</strong>'i seviyesinde.</p>`);
     }
     if (mulkStat.length > 1) {
@@ -5146,6 +5238,7 @@ function runWhatIfSimulation() {
   const baseNights = d.soldNights;
   const baseAdr = d.adr || 0;
   const baseProfit = d.netProfit;
+  const karOlculemez = isProfitUnmeasured(d.totalRevenue, d.totalOpex, d.capex, currentFilter && currentFilter.period);
 
   if (baseRevenue <= 0 || baseNights <= 0) {
     setEl('simResRevenue', '—');
@@ -5198,8 +5291,13 @@ function runWhatIfSimulation() {
     setEl('simResCommDelta', `Ölçülen OTA oranı %${(otaOrani * 100).toFixed(1)} · yeni komisyon ${newComm.toLocaleString('tr-TR')} TL`);
   }
 
+  if (karOlculemez) {
+    setEl('simResProfit', '—');
+    setEl('simResProfitDelta', `${OLCULEMEYEN_KAR_NOTU}; kâr senaryosu hesaplanmadı`);
+    return;
+  }
   setEl('simResProfit', `${newProfit.toLocaleString('tr-TR')} TL`);
-  setEl('simResProfitDelta', `${profitDiff >= 0 ? '+' : ''}${Math.round(profitDiff).toLocaleString('tr-TR')} TL (%${newMargin.toFixed(1)} Marj)`
+  setEl('simResProfitDelta',`${profitDiff >= 0 ? '+' : ''}${Math.round(profitDiff).toLocaleString('tr-TR')} TL (%${newMargin.toFixed(1)} Marj)`
     + (geceMaliyeti === null ? ' · ek gece maliyeti ölçülemedi (yapılmış temizlik yok)' : ''));
 }
 
@@ -5302,7 +5400,8 @@ function renderTrajectoryRadar() {
   }
 
   // --- Marj araligi ---------------------------------------------------------
-  const marjlar = dolu.filter(v => v.ciro > 0).map(v => (v.netProfit / v.ciro) * 100);
+  const olculebilir = dolu.filter(v => v.ciro > 0 && !isProfitUnmeasured(v.ciro, v.opex, v.capex, v.ay));
+  const marjlar = olculebilir.map(v => (v.netProfit / v.ciro) * 100);
   if (marjlar.length > 0) {
     const enAz = Math.min(...marjlar), enCok = Math.max(...marjlar);
     if (marVal) {
@@ -5314,6 +5413,8 @@ function renderTrajectoryRadar() {
     if (marDesc) {
       marDesc.innerText = `Son ${marjlar.length} ayın net kâr marjı (ciro − OPEX − CAPEX).`;
     }
+  } else if (dolu.some(v => v.ciro > 0)) {
+    bosVal(marVal, marDesc, 'Son üç ayda gider kaydı yok; marj ölçülemedi.');
   } else {
     bosVal(marVal, marDesc, 'Ciro kaydı olmadan marj hesaplanamaz.');
   }
@@ -7239,7 +7340,10 @@ function renderManageBookingsTable() {
 
   const summaryPill = document.getElementById('rezTableSummaryPill');
   if (summaryPill) {
-    summaryPill.innerHTML = `📊 Gösterilen: <strong>${filtered.length} Rezervasyon</strong> | 🌙 ${totalNights} Gece | 💰 Net: ${totalNet.toLocaleString('tr-TR')} TL`;
+    // Toplu aktarim ozeti rezervasyon sayilmaz (L-103); gece ve tutara dahildir.
+    const ozetSayisi = filtered.filter(isBulkSummaryBooking).length;
+    const rezSayisi = filtered.length - ozetSayisi;
+    summaryPill.innerHTML = `📊 Gösterilen: <strong>${rezSayisi} Rezervasyon</strong>${ozetSayisi ? ` + ${ozetSayisi} toplu aktarım özeti` : ''} | 🌙 ${totalNights} Gece | 💰 Net: ${totalNet.toLocaleString('tr-TR')} TL`;
   }
 
   if (filtered.length === 0) {
@@ -7270,8 +7374,8 @@ function renderManageBookingsTable() {
 
     tr.innerHTML = `
       <td><strong>${escapeHtml(vName)}</strong> ${isNewYear ? ' <span class="badge badge-amber" style="font-size:10px;">🎄 Yılbaşı</span>' : ''}</td>
-      <td>${escapeHtml(b.guest || 'Belirtilmedi')}</td>
-      <td><span class="badge ${b.channel === 'AIRBNB' ? 'badge-rose' : (b.channel === 'BOOKING' ? 'badge-blue' : 'badge-emerald')}">${escapeHtml(b.channel || 'Belirtilmedi')}</span></td>
+      <td>${escapeHtml(b.guest || 'Belirtilmedi')}${isBulkSummaryBooking(b) ? ' <span class="badge badge-slate" style="font-size:10px;" title="Aylık toplamdan girilmiş kayıt; gerçek bir konaklama değildir. Ciro ve gece toplamlarına girer, rezervasyon sayısına girmez.">Aylık özet</span>' : ''}</td>
+      <td><span class="badge ${b.channel === 'AIRBNB' ? 'badge-rose' : (b.channel === 'BOOKING' ? 'badge-blue' : 'badge-emerald')}">${escapeHtml(getChannelDisplayName(b.channel))}</span></td>
       <td>${formatTrDate(b.checkIn)}</td>
       <td>${formatTrDate(b.checkOut)}</td>
       <td><strong>${b.nights}</strong></td>
@@ -10529,15 +10633,20 @@ function renderTapeChart() {
   tableHtml += '</tr></thead><tbody>';
 
   // Find bookings for each villa
+  const takvimOzetleri = [];
   vKeys.forEach(vKey => {
     const vConf = appData.villas?.[vKey] || {};
     const vName = vConf.name || vKey;
     const vPropId = vConf.id;
     tableHtml += `<tr><td class="tape-villa-td"><strong>${escapeHtml(vName)}</strong></td>`;
 
-    const vBookings = (appData.bookings || []).filter(b => 
+    const tumu = (appData.bookings || []).filter(b =>
       (b.villa === vKey || (vPropId && b.propertyId === vPropId)) && b.status !== 'CANCELLED'
     );
+    const vBookings = tumu.filter(b => !isBulkSummaryBooking(b));
+    tumu.filter(isBulkSummaryBooking).forEach(b => {
+      if (String(b.checkIn || '') < `${tapeChartMonth}-32` && String(b.checkOut || '') > `${tapeChartMonth}-01`) takvimOzetleri.push(vName);
+    });
 
     for (let d = 1; d <= daysInMonth; d++) {
       const dStr = (d < 10 ? '0' : '') + d;
@@ -10571,6 +10680,10 @@ function renderTapeChart() {
   });
 
   tableHtml += '</tbody></table>';
+  if (takvimOzetleri.length) {
+    const adlar = [...new Set(takvimOzetleri)].map(escapeHtml).join(', ');
+    tableHtml += `<div class="tape-chart-note" style="font-size:11px; color:var(--text-muted); margin-top:8px;">ℹ️ Bu ayda ${takvimOzetleri.length} toplu aktarım özeti var (${adlar}). Özetler aylık toplamdır; hangi günlerde konaklandığı bilinmediği için takvimde gösterilmez. Ciro ve gece toplamlarına dahildir.</div>`;
+  }
   container.innerHTML = tableHtml;
 }
 
@@ -10940,6 +11053,45 @@ function switchWaModalTab(tab) {
 // Ticari bir urunde musterinin defterine test kaydi yazan bir dugme
 // bulunmaz (3.6).
 
+// Kayip nedeni ozeti (L-99). Tavsiye cumlesi sabitti: sifir talepte bile
+// "en büyük sebep Tarih Dolu ve Fiyat Yüksek" diyordu (CLAUDE.md 3.6).
+// Kural: kayip yoksa neden ilan edilmez; esitlikte tek kazanan ilan edilmez;
+// nedeni kaydedilmemis (Diğer) kayip "neden" sayilmaz, kayit eksigi sayilir.
+const KAYIP_NEDENI_ONERILERI = {
+  'Tarih Dolu': 'İstenen tarih doluysa misafire yakın boş geceleri alternatif olarak sunun.',
+  'Fiyat Yüksek': 'Teklif fiyatını ve toplam ücret kalemlerini (temizlik, indirim) gözden geçirin.',
+  'Cevap Vermedi': 'Teklif gönderildikten sonra takip mesajı planlayın.',
+  'Başka Yer Seçti': 'Kaybedilen tekliflerde misafire neyi karşılaştırdığını sorun.'
+};
+function summarizeLeadLossReasons(lostLeads) {
+  const counts = { 'Fiyat Yüksek': 0, 'Tarih Dolu': 0, 'Cevap Vermedi': 0, 'Başka Yer Seçti': 0, 'Diğer': 0 };
+  let secilmemis = 0;
+  (lostLeads || []).forEach(l => {
+    const reason = l && l.lostReason;
+    if (!reason) secilmemis++;
+    if (reason && counts[reason] !== undefined) counts[reason]++;
+    else counts['Diğer']++;
+  });
+  const toplam = (lostLeads || []).length;
+  if (toplam === 0) {
+    return { counts, total: 0, topReasons: [], adviceHtml: 'Henüz kaybedilmiş talep yok; kayıp nedeni analizi yapılamaz.' };
+  }
+  const bilinen = Object.keys(KAYIP_NEDENI_ONERILERI).filter(k => counts[k] > 0);
+  if (bilinen.length === 0) {
+    return { counts, total: toplam, topReasons: [],
+      adviceHtml: `${toplam} kayıp talebin nedeni "Diğer" ya da boş; baskın bir neden belirlenemez. Talebi "Kaybedildi" yaparken nedenini seçin.` };
+  }
+  const enCok = Math.max(...bilinen.map(k => counts[k]));
+  const top = bilinen.filter(k => counts[k] === enCok);
+  const adlar = top.map(k => `<em>"${escapeHtml(k)}"</em>`).join(' ve ');
+  const oneri = top.map(k => KAYIP_NEDENI_ONERILERI[k]).join(' ');
+  const bas = top.length === 1
+    ? `${toplam} kayıp talebin en sık nedeni ${adlar} (${enCok} talep).`
+    : `${toplam} kayıp talepte ${adlar} eşit sıklıkta (${enCok}'er talep); tek bir baskın neden yok.`;
+  const eksik = secilmemis > 0 ? ` ${secilmemis} talepte neden seçilmemiş.` : '';
+  return { counts, total: toplam, topReasons: top, adviceHtml: `${bas} ${oneri}${eksik}` };
+}
+
 function renderLeadAnalytics() {
   const leads = appData.leads || [];
   const totalLeads = leads.length;
@@ -10965,19 +11117,9 @@ function renderLeadAnalytics() {
   if (kLost) kLost.innerText = `${lostRevenue.toLocaleString('tr-TR')} ₺`;
   if (kLostSub) kLostSub.innerText = `${lostLeads.length} kaçan talep | ${activeLeads.length} sıcak takip`;
 
-  // Loss Reasons Breakdown
-  const lossReasonsCount = {
-    'Fiyat Yüksek': 0,
-    'Tarih Dolu': 0,
-    'Cevap Vermedi': 0,
-    'Diğer': 0
-  };
-
-  lostLeads.forEach(l => {
-    const reason = l.lostReason || 'Diğer';
-    if (lossReasonsCount[reason] !== undefined) lossReasonsCount[reason]++;
-    else lossReasonsCount['Diğer']++;
-  });
+  // Loss Reasons Breakdown — tek kaynak summarizeLeadLossReasons (L-99).
+  const kayipOzeti = summarizeLeadLossReasons(lostLeads);
+  const lossReasonsCount = kayipOzeti.counts;
 
   const lossBox = document.getElementById('waLossReasonsList');
   if (lossBox) {
@@ -10987,6 +11129,7 @@ function renderLeadAnalytics() {
       { key: 'Fiyat Yüksek', color: '#EF4444', label: 'Bütçe / Fiyat Yüksek Geldi' },
       { key: 'Tarih Dolu', color: '#F59E0B', label: 'İstenen Tarih Doluydu' },
       { key: 'Cevap Vermedi', color: '#64748B', label: 'Geri Dönüş Yapmadı' },
+      { key: 'Başka Yer Seçti', color: '#0EA5E9', label: 'Başka Yer Seçti' },
       { key: 'Diğer', color: '#8B5CF6', label: 'Diğer Nedenler' }
     ];
 
@@ -11056,7 +11199,7 @@ function renderLeadAnalytics() {
         • <strong>Dönüşüm Verimliliği:</strong> ${totalLeads > 0 ? `${totalLeads} talebin ${wonLeads.length} tanesi rezervasyona dönüştü (%${convRate}). Kayıtlı teklif toplamı <strong>${wonRevenue.toLocaleString('tr-TR')} TL</strong>.` : 'Henüz talep kaydı yok; dönüşüm oranı hesaplanamadı.'}
       </div>
       <div style="margin-bottom: 8px;">
-        • <strong>Kaçan Satış Aksiyonu:</strong> Kaybedilen taleplerin en büyük sebebi <em>"Tarih Dolu"</em> ve <em>"Fiyat Yüksek"</em>. İstenen tarih doluysa misafire hemen yakın boş gap gecelerini alternatif olarak sunun.
+        • <strong>Kaçan Satış Aksiyonu:</strong> ${kayipOzeti.adviceHtml}
       </div>
       ${(() => {
         // Bu cumle sabitti: "Taleplerin %60'indan fazlasi Villa Azure Bay ve
@@ -11096,8 +11239,47 @@ function closeAllHeaderDropdowns() {
 
 // Satir ici ifade olarak yazilamayan iki dugme (L-15: data-on* govdesi yalniz
 // izinli fonksiyon cagirir, ozellik erisimi yapamaz).
-function reloadPage() {
-  window.location.reload();
+// "Sayfayı Yenile" dugmesi tum sayfayi yeniden yukluyordu ve verinin ne
+// zaman okundugunu soylemiyordu (L-106). Artik yalniz veriyi sunucudan yeniden
+// okur ve son esitleme zamanini gosterir. Hicbir kaydi degistirmez.
+let dataSyncInFlight = false;
+async function resyncTenantData() {
+  const tid = typeof getActiveTenantId === 'function' ? getActiveTenantId() : null;
+  if (!tid || !(typeof isCloudTenant === 'function' && isCloudTenant(tid))) {
+    if (typeof window !== 'undefined' && window.location) window.location.reload();
+    return;
+  }
+  if (dataSyncInFlight) return;
+  dataSyncInFlight = true;
+  const btn = typeof document !== 'undefined' ? document.getElementById('dataSyncBtn') : null;
+  if (btn) btn.disabled = true;
+  setEl('dataSyncBtnText', 'Eşitleniyor…');
+  try {
+    await loadTenantAppData(tid);
+  } finally {
+    dataSyncInFlight = false;
+    if (btn) btn.disabled = false;
+    renderDataSyncStamp();
+  }
+}
+
+function renderDataSyncStamp() {
+  if (typeof document === 'undefined') return;
+  const btn = document.getElementById('dataSyncBtn');
+  const durum = (typeof appData !== 'undefined' && appData && appData.loadState) || null;
+  if (durum && durum.status === 'ERROR') {
+    setEl('dataSyncBtnText', 'Eşitlenemedi — tekrar dene');
+    if (btn) btn.title = 'Son eşitleme başarısız; ekranda son doğrulanmış veri duruyor. Tekrar denemek için tıklayın.';
+    return;
+  }
+  const zaman = durum && durum.loadedAt ? new Date(durum.loadedAt) : null;
+  if (!zaman || Number.isNaN(zaman.getTime())) {
+    setEl('dataSyncBtnText', 'Verileri eşitle');
+    return;
+  }
+  const saat = zaman.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Istanbul' });
+  setEl('dataSyncBtnText', `Eşitlendi ${saat}`);
+  if (btn) btn.title = `Veriler en son ${saat}'de sunucudan okundu. Yeniden okumak için tıklayın; hiçbir kaydı değiştirmez.`;
 }
 
 function openExcelFilePicker() {
@@ -11184,6 +11366,8 @@ function getMonthlyKpiDataset() {
     // de icerir; ona bolmek gecelik fiyati sisirirdi.
     const adr = nights > 0 ? Math.round(roomRevenue / nights) : 0;
     const margin = ciro > 0 ? Number(((netProfit / ciro) * 100).toFixed(1)) : 0;
+    // L-101: hic gider yoksa o ayin kari/marji olculmemistir.
+    const profitUnmeasured = isProfitUnmeasured(ciro, opex, capex, m);
     const available = typeof FinancialMetricsService !== 'undefined'
       ? FinancialMetricsService.calculateAvailableNights(secili === 'ALL' ? Object.values(appData.villas || {}) : [appData.villas[secili]].filter(Boolean), metricYear, metricMonth, appData.maintenance || [])
       : null;
@@ -11206,6 +11390,7 @@ function getMonthlyKpiDataset() {
       occupancy,
       revpar,
       margin,
+      profitUnmeasured,
       target,
       targetPct,
       isCurrentMonth: (m === getCurrentMonthKey()),
@@ -11224,12 +11409,12 @@ function renderMonthlyKpiTracker() {
   const dataset = getMonthlyKpiDataset();
 
   // 1. Update Historical Peak Cards
-  let maxRevItem = dataset[0], maxAdrItem = dataset[0], maxNightsItem = dataset[0], maxProfitItem = dataset[0];
+  let maxRevItem = dataset[0], maxAdrItem = dataset[0], maxNightsItem = dataset[0], maxProfitItem = null;
   dataset.forEach(d => {
     if (d.ciro > maxRevItem.ciro) maxRevItem = d;
     if (d.adr > maxAdrItem.adr) maxAdrItem = d;
     if (d.nights > maxNightsItem.nights) maxNightsItem = d;
-    if (d.netProfit > maxProfitItem.netProfit) maxProfitItem = d;
+    if (!d.profitUnmeasured && d.ciro > 0 && (!maxProfitItem || d.netProfit > maxProfitItem.netProfit)) maxProfitItem = d;
   });
 
   const pRev = document.getElementById('kpiPeakRev');
@@ -11242,6 +11427,7 @@ function renderMonthlyKpiTracker() {
   if (pNights && maxNightsItem) pNights.innerText = `${maxNightsItem.monthName.split(' ')[0]} ${maxNightsItem.key.split('-')[0]} (${maxNightsItem.nights} Gece)`;
 
   const pProfit = document.getElementById('kpiPeakProfit');
+  if (pProfit && !maxProfitItem) pProfit.innerText = '— (gider kaydı olan ay yok)';
   if (pProfit && maxProfitItem) pProfit.innerText = `${maxProfitItem.monthName.split(' ')[0]} ${maxProfitItem.key.split('-')[0]} (${Math.round(maxProfitItem.netProfit).toLocaleString('tr-TR')} TL)`;
 
   // 2. Metric Buttons State & Chart Title
@@ -11302,7 +11488,7 @@ function renderMonthlyKpiTracker() {
     dataset.forEach(d => {
       let val = 0;
       if (activeKpiTrackerMetric === 'ciro') val = d.ciro;
-      else if (activeKpiTrackerMetric === 'netProfit') val = Math.max(0, d.netProfit);
+      else if (activeKpiTrackerMetric === 'netProfit') val = d.profitUnmeasured ? 0 : Math.max(0, d.netProfit);
       else if (activeKpiTrackerMetric === 'adr') val = d.adr;
       else if (activeKpiTrackerMetric === 'occupancy') val = d.occupancy;
       else if (activeKpiTrackerMetric === 'opex') val = d.totalExp;
@@ -11312,10 +11498,11 @@ function renderMonthlyKpiTracker() {
     dataset.forEach(d => {
       let val = 0;
       if (activeKpiTrackerMetric === 'ciro') val = d.ciro;
-      else if (activeKpiTrackerMetric === 'netProfit') val = d.netProfit;
+      else if (activeKpiTrackerMetric === 'netProfit') val = d.profitUnmeasured ? 0 : d.netProfit;
       else if (activeKpiTrackerMetric === 'adr') val = d.adr;
       else if (activeKpiTrackerMetric === 'occupancy') val = d.occupancy;
       else if (activeKpiTrackerMetric === 'opex') val = d.totalExp;
+      const olculmedi = activeKpiTrackerMetric === 'netProfit' && d.profitUnmeasured;
 
       const pctOfMax = maxVal > 0 ? Math.max(6, Math.min(100, Math.round((Math.max(0, val) / maxVal) * 100))) : 6;
       const barHeightPx = Math.round((pctOfMax / 100) * 95);
@@ -11336,7 +11523,7 @@ function renderMonthlyKpiTracker() {
 
       barEl.innerHTML = `
         <div style="font-size: 10px; font-weight: 700; color: ${isCurrentFilter ? '#FFFFFF' : '#94A3B8'}; margin-bottom: 4px; white-space: nowrap; text-align: center;">
-          ${activeKpiTrackerMetric === 'occupancy' ? ('%' + Number(val).toFixed(0)) : (val >= 1000 ? Math.round(val / 1000) + 'k' : Math.round(val))}
+          ${olculmedi ? '—' : (activeKpiTrackerMetric === 'occupancy' ? ('%' + Number(val).toFixed(0)) : (val >= 1000 ? Math.round(val / 1000) + 'k' : Math.round(val)))}
         </div>
         <div class="kpi-bar-fill" style="width: 100%; height: ${barHeightPx}px; background: ${barColor}; opacity: ${isCurrentFilter ? '1' : '0.8'}; border-radius: 4px 4px 1px 1px; ${borderStyle}"></div>
         <div style="font-size: 10px; color: ${isCurrentFilter ? '#60A5FA' : 'var(--text-muted)'}; font-weight: ${isCurrentFilter ? '800' : '500'}; margin-top: 6px; white-space: nowrap;">
@@ -11386,8 +11573,11 @@ function renderMonthlyKpiTracker() {
         <td style="font-weight: 800; color: #60A5FA; white-space: nowrap;">${Math.round(d.ciro).toLocaleString('tr-TR')} ₺</td>
         <td style="color: var(--text-muted); white-space: nowrap;">${d.target > 0 ? (Math.round(d.target).toLocaleString('tr-TR') + ' ₺') : '-'}</td>
         <td style="white-space: nowrap;">${targetBadge}</td>
-        <td style="font-weight: 800; color: ${profitColor}; white-space: nowrap;">${Math.round(d.netProfit).toLocaleString('tr-TR')} ₺</td>
-        <td style="white-space: nowrap;"><span class="badge ${marginBadge}">%${d.margin}</span></td>
+        ${d.profitUnmeasured
+          ? `<td style="color: var(--text-muted); white-space: nowrap;" title="${OLCULEMEYEN_KAR_NOTU}">—</td>
+        <td style="white-space: nowrap;"><span class="badge badge-slate" title="${OLCULEMEYEN_KAR_NOTU}">Gider yok</span></td>`
+          : `<td style="font-weight: 800; color: ${profitColor}; white-space: nowrap;">${Math.round(d.netProfit).toLocaleString('tr-TR')} ₺</td>
+        <td style="white-space: nowrap;"><span class="badge ${marginBadge}">%${d.margin}</span></td>`}
         <td style="font-weight: 700; white-space: nowrap;">${d.nights} Gece</td>
         <td style="font-weight: 700; white-space: nowrap;">${d.occupancy === null ? '—' : '%' + d.occupancy}</td>
         <td style="font-weight: 700; color: #FBBF24; white-space: nowrap;">${d.adr > 0 ? (Math.round(d.adr).toLocaleString('tr-TR') + ' ₺') : '-'}</td>
@@ -12506,7 +12696,7 @@ function detectGapNights() {
   villas.forEach(vKey => {
     const vName = (appData.villas && appData.villas[vKey]?.name) ? appData.villas[vKey].name : vKey;
     const vBookings = (appData.bookings || [])
-      .filter(b => b.villa === vKey && b.status !== 'CANCELLED')
+      .filter(b => b.villa === vKey && b.status !== 'CANCELLED' && !isBulkSummaryBooking(b))
       .sort((a, b) => new Date(a.checkIn) - new Date(b.checkIn));
 
     for (let i = 0; i < vBookings.length - 1; i++) {
@@ -15915,8 +16105,11 @@ function renderExecutiveKpiValues(kpis) {
   setEl('execKpiRevenue', money(kpis.revenue.current));
   setEl('execKpiOpex', money(kpis.opex.current));
   setEl('execKpiCapex', money(kpis.capex.current));
-  setEl('execKpiOperatingProfit', money(kpis.operatingProfit.current));
-  setEl('execKpiProfit', money(kpis.netProfit.current));
+  // L-101: gider hic yoksa kar ve marj olculmus gibi gosterilmez.
+  const karOlculemez = isProfitUnmeasured(kpis.revenue.current, kpis.opex.current, kpis.capex.current,
+    currentFilter && currentFilter.period);
+  setEl('execKpiOperatingProfit', karOlculemez ? '—' : money(kpis.operatingProfit.current));
+  setEl('execKpiProfit', karOlculemez ? '—' : money(kpis.netProfit.current));
   setEl('execKpiOccupancy', kpis.occupancy.current === null ? '—' : `%${kpis.occupancy.current}`);
   setEl('execKpiAdr', money(kpis.adr.current));
   setEl('execKpiRevpar', money(kpis.revpar.current));
@@ -15935,9 +16128,9 @@ function renderExecutiveKpiValues(kpis) {
   setEl('execCapexTrend', trend(kpis.capex));
   const operatingMargin = ratio(kpis.operatingProfit.current, kpis.revenue.current);
   const netMargin = ratio(kpis.netProfit.current, kpis.revenue.current);
-  setEl('execOperatingMargin', operatingMargin === '—' ? '—' : `${operatingMargin} Marj`);
-  setEl('execOperatingTrend', trend(kpis.operatingProfit));
-  setEl('execProfitMargin', netMargin === '—' ? '—' : `${netMargin} Marj`);
+  setEl('execOperatingMargin', karOlculemez ? OLCULEMEYEN_KAR_NOTU : (operatingMargin === '—' ? '—' : `${operatingMargin} Marj`));
+  setEl('execOperatingTrend', karOlculemez ? '—' : trend(kpis.operatingProfit));
+  setEl('execProfitMargin', karOlculemez ? OLCULEMEYEN_KAR_NOTU : (netMargin === '—' ? '—' : `${netMargin} Marj`));
   setEl('execAdrTrend', trend(kpis.adr));
   setEl('execRevparTrend', trend(kpis.revpar));
   setEl('execSoldNightsLabel', formatSoldNightsLabel(kpis.bookedNights, kpis.availableNights));
@@ -16188,51 +16381,71 @@ function renderExecutiveControlCenter() {
   // 3. Today Command Center (3+2+1 Priority Scoring)
   if (typeof ExecutivePriorityService !== 'undefined' && ExecutivePriorityService.selectTodayCommandCenterActions) {
     const candidates = [];
+    // Kartta mulkun ADI yazar; ham UUID musteriye anlamsizdir (L-104).
+    const mulkAdi = (ref) => {
+      if (!ref) return null;
+      const p = propertiesList.find(x => x.id === ref || x.key === ref);
+      return p ? p.name : null;
+    };
 
     // Cleaning / Turnover tasks
+    // Temizlik: yalniz BUGUN planli gorev (L-98). Operasyon karti "Bugünkü
+    // turnover"u ayni kuralla sayar. Eskiden DONE olmayan her gorev -
+    // gecmis, gelecek, "yapilmadi" - tarihine bakilmadan `isCheckInToday:
+    // true` damgasiyla "bugun" diye sunuluyordu; iki ekran celisiyordu.
+    const bugunStr = getTodayStr();
     tasks.forEach(t => {
-      if (t.status !== 'DONE') {
-        const isCritical = t.priority === 'CRITICAL' || t.isSlaBreached;
-        candidates.push({
-          id: t.id,
-          domain: 'OPERATIONS',
-          propertyId: t.propertyId || t.property_id || null,
-          title: t.title || 'Turnover Temizlik Görevi',
-          severity: isCritical ? 'CRITICAL' : 'MEDIUM',
-          guestImpact: isCritical ? 'HIGH' : 'MEDIUM',
-          urgencyDueTime: isCritical ? 30 : 18,
-          isSlaBreached: !!t.isSlaBreached,
-          isCheckInToday: true,
-          confidence: 'HIGH',
-          rationale: 'Misafir check-in öncesi turnover temizliği ve hazır bulunuşluk zorunluluğu.',
-          sourceMetrics: [t.due_at || t.dueAt
-            ? `Son zaman: ${t.due_at || t.dueAt}`
-            : 'Görev zamanı kayıtlı değil', 'Kategori: Temizlik'],
-          deepLink: 'housekeeping',
-          quickAction: null
-        });
-      }
+      if (t.status !== 'PLANNED') return;
+      if (String(t.date || '').slice(0, 10) !== bugunStr) return;
+      const isCritical = t.priority === 'CRITICAL' || t.isSlaBreached;
+      const ad = mulkAdi(t.villa || t.propertyId || t.property_id);
+      candidates.push({
+        id: t.id,
+        domain: 'OPERATIONS',
+        propertyId: t.villa || t.propertyId || t.property_id || null,
+        propertyName: ad,
+        title: ad ? `Bugünkü temizlik: ${ad}` : 'Bugünkü temizlik',
+        severity: isCritical ? 'CRITICAL' : 'MEDIUM',
+        guestImpact: isCritical ? 'HIGH' : 'MEDIUM',
+        urgencyDueTime: isCritical ? 30 : 18,
+        isSlaBreached: !!t.isSlaBreached,
+        isCheckInToday: true,
+        confidence: 'HIGH',
+        rationale: 'Bugün planlı temizlik henüz "yapıldı" işaretlenmedi.',
+        sourceMetrics: [`Tarih: ${formatTrDate(bugunStr)}`, 'Kategori: Temizlik'],
+        deepLink: 'housekeeping',
+        quickAction: null
+      });
     });
 
     // Maintenance tickets
+    // Arizalar: yalniz ACIK olanlar ve kartta GERCEK oncelik/durum (L-98).
+    // Eskiden her karta sabit "Öncelik: P1 • Durum: Açık" ve "kritik teknik
+    // donanım arızası" yaziliyordu; iptal edilmis ariza bile.
     tickets.forEach(tk => {
-      if (tk.status !== 'RESOLVED') {
-        candidates.push({
-          id: tk.id,
-          domain: 'OPERATIONS',
-          propertyId: tk.propertyId || tk.property_id || null,
-          title: `${tk.severity === 'CRITICAL' ? 'P1 ' : ''}Arıza: ${tk.title || 'Başlık girilmemiş'}`,
-          severity: tk.severity || null,
-          guestImpact: 'HIGH',
-          urgencyDueTime: 25,
-          revenueImpact: 'HIGH',
-          confidence: 'HIGH',
-          rationale: 'Misafir konforunu doğrudan etkileyen kritik teknik donanım arızası.',
-          sourceMetrics: [`Öncelik: P1`, `Durum: Açık`],
-          deepLink: 'maintenance',
-          quickAction: 'RESOLVE_TICKET'
-        });
-      }
+      if (!isMaintenanceTicketOpen(tk)) return;
+      const oncelik = getMaintenancePriorityFromSeverity(tk.severity);
+      const kritik = oncelik === 'P1';
+      const durum = getMaintenanceStatusPresentation(tk.statusRaw || tk.status).label;
+      const ad = mulkAdi(tk.villa || tk.propertyId || tk.property_id);
+      candidates.push({
+        id: tk.id,
+        domain: 'OPERATIONS',
+        propertyId: tk.propertyId || tk.property_id || null,
+        propertyName: ad,
+        title: `${kritik ? 'P1 ' : ''}Arıza: ${tk.title || 'Başlık girilmemiş'}`,
+        severity: tk.severity || null,
+        guestImpact: kritik ? 'HIGH' : 'MEDIUM',
+        urgencyDueTime: kritik ? 25 : 12,
+        revenueImpact: tk.blocks_availability ? 'HIGH' : 'MEDIUM',
+        confidence: 'HIGH',
+        rationale: tk.blocks_availability
+          ? 'Açık arıza mülkü satışa kapatıyor.'
+          : (kritik ? 'Kritik öncelikli açık arıza.' : 'Açık arıza kaydı.'),
+        sourceMetrics: [`Öncelik: ${oncelik}`, `Durum: ${durum}`],
+        deepLink: 'maintenance',
+        quickAction: 'RESOLVE_TICKET'
+      });
     });
 
     // Executive alerts
@@ -16345,12 +16558,16 @@ function renderTodayCommandCenter(actionsResult) {
       const score = hasScore ? parsedScore : null;
       const scoreClass = !hasScore ? 'score-med' : (score >= 70 ? '' : (score >= 40 ? 'score-med' : 'score-green'));
       const metricsText = (act.sourceMetrics || []).join(' • ');
+      // Ham kimlik (UUID) musteriye gosterilmez; ad bulunamazsa bos kalir (L-104).
+      const mulkEtiketi = act.propertyName
+        || (typeof appData !== 'undefined' && appData.villas && appData.villas[act.propertyId]?.name)
+        || '';
 
       return `
         <div class="command-action-card ${typeClass}">
           <div class="action-card-top">
             <span class="action-score-pill ${scoreClass}" title="${hasScore ? 'Hesaplanan öncelik puanı' : 'Öncelik puanı hesaplanamadı'}">Puan: ${hasScore ? score + '/100' : '—'}</span>
-            <span style="font-size: 10px; color: #94A3B8; font-weight: 600;">${act.propertyId || ''}</span>
+            <span style="font-size: 10px; color: #94A3B8; font-weight: 600;">${escapeHtml(mulkEtiketi)}</span>
           </div>
           <div class="action-card-title">${escapeHtml(act.title)}</div>
           <div class="action-card-rationale">${act.rationale || ''}</div>
@@ -17308,32 +17525,36 @@ function renderReportsTab() {
   const bookings = (appData.bookings || []).filter(b => b.status !== 'CANCELLED' && isBookingInFilter(b));
   const expenses = (appData.expenses || []).filter(isExpenseInFilter);
   const tl = n => Math.round(Number(n) || 0).toLocaleString('tr-TR');
+  // Kanal satirinda musterinin gordugu AD yazar, ham kod degil (L-105).
+  const kanalAdi = getChannelDisplayName;
   const kanal = new Map();
   let brut = 0;
-  let komisyon = 0;
   bookings.forEach(b => {
     const pay = getBookingFilterShare(b);
     const tutar = (Number(b.gross) || 0) * pay.ratio;
-    const kesinti = (Number(b.otaCommission ?? b.otaComm) || 0) * pay.ratio;
-    const ad = String(b.channel || 'KANAL BELİRTİLMEDİ').trim() || 'KANAL BELİRTİLMEDİ';
-    const satir = kanal.get(ad) || { tutar: 0, adet: 0 };
+    const ad = kanalAdi(b.channel);
+    const satir = kanal.get(ad) || { tutar: 0, adet: 0, ozet: 0 };
     satir.tutar += tutar;
-    satir.adet += 1;
+    if (isBulkSummaryBooking(b)) satir.ozet += 1; else satir.adet += 1;
     kanal.set(ad, satir);
     brut += tutar;
-    komisyon += kesinti;
   });
-  const opex = expenses.filter(e => String(e.type || 'OPEX').toUpperCase() !== 'CAPEX')
-    .reduce((a, e) => a + (Number(e.amount) || 0), 0);
-  const capex = expenses.filter(e => String(e.type || '').toUpperCase() === 'CAPEX')
-    .reduce((a, e) => a + (Number(e.amount) || 0), 0);
-  const netNakit = brut - komisyon - opex - capex;
-  const marj = brut > 0 ? (netNakit / brut) * 100 : null;
+  // Karlilik TEK defter formulunden (CLAUDE.md 3.4, K-04). Bu ekran eskiden
+  // kendi toplamini yapiyordu: indirimi dusmuyor, temizlik maliyetini ve
+  // odeme komisyonunu hic gormuyordu; ayni ay icin Finans'tan farkli net kar.
+  const defter = computeFilterLedger();
+  const karOlculemez = isProfitUnmeasured(defter.totalRevenue, defter.totalOpex, defter.capex,
+    currentFilter && currentFilter.period);
+  const marj = defter.totalRevenue > 0 ? (defter.netProfit / defter.totalRevenue) * 100 : null;
+  const netSatiri = karOlculemez
+    ? `— (${OLCULEMEYEN_KAR_NOTU})`
+    : `₺${tl(defter.netProfit)}${marj === null ? ' (marj hesaplanamadı: ciro yok)' : ` (%${marj.toFixed(1)} marj)`}`;
   const kanalSatirlari = Array.from(kanal.entries())
     .sort((a, b) => b[1].tutar - a[1].tutar)
     .map(([ad, v]) => {
       const pay = brut > 0 ? (v.tutar / brut) * 100 : 0;
-      return `• <strong>${escapeHtml(ad)}:</strong> %${pay.toFixed(1)} pay (₺${tl(v.tutar)}, ${v.adet} rezervasyon)`;
+      const ozetNotu = v.ozet ? `, ${v.ozet} toplu aktarım özeti` : '';
+      return `• <strong>${escapeHtml(ad)}:</strong> %${pay.toFixed(1)} pay (₺${tl(v.tutar)}, ${v.adet} rezervasyon${ozetNotu})`;
     }).join('<br>');
 
   if (!bookings.length && !expenses.length) {
@@ -17352,11 +17573,12 @@ function renderReportsTab() {
       <div style="background: rgba(0,0,0,0.25); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06);">
         <h4 style="margin: 0 0 10px 0; color: #34D399; font-size: 13px;">📈 Kârlılık Köprüsü & Komisyon Analizi</h4>
         <div style="font-size: 12px; color: #CBD5E1; line-height: 1.6;">
-          • <strong>Brüt Satış:</strong> ₺${tl(brut)}<br>
-          • <strong>Kayıtlı Kanal Komisyonları:</strong> ₺${tl(komisyon)}<br>
-          • <strong>Kayıtlı OPEX:</strong> ₺${tl(opex)}<br>
-          • <strong>Kayıtlı CAPEX:</strong> ₺${tl(capex)}<br>
-          • <strong>Net Nakit:</strong> ₺${tl(netNakit)}${marj === null ? ' (marj hesaplanamadı: ciro yok)' : ` (%${marj.toFixed(1)} marj)`}
+          • <strong>Toplam Gelir:</strong> ₺${tl(defter.totalRevenue)} (net oda geliri + temizlik geliri)<br>
+          • <strong>Kanal ve ödeme komisyonları:</strong> ₺${tl(defter.otaCommission + defter.paymentCommission)}<br>
+          • <strong>Temizlik maliyeti (yapılan):</strong> ₺${tl(defter.cleaningCost)}<br>
+          • <strong>Elle girilen OPEX:</strong> ₺${tl(defter.manualOpex)}<br>
+          • <strong>CAPEX:</strong> ₺${tl(defter.capex)}<br>
+          • <strong>Net Kâr:</strong> ${netSatiri}
         </div>
       </div>
     </div>
@@ -17642,6 +17864,17 @@ if (typeof module !== 'undefined' && module.exports) {
     renderExecutiveSnapshotKpis,
     renderExecutiveControlCenter,
     renderPortfolioHealth,
+    // 27.09 guven turu (L-98..L-106)
+    isMaintenanceTicketOpen,
+    summarizeLeadLossReasons,
+    renderLeadAnalytics,
+    isProfitUnmeasured,
+    formatDeductionTl,
+    isBulkSummaryBooking,
+    getChannelDisplayName,
+    renderManageBookingsTable,
+    renderTrajectoryRadar,
+    resyncTenantData,
     runCommandCenterAction,
     executeCanonicalAiAction,
     getPropertySalesReadiness,

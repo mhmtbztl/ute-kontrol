@@ -145,7 +145,7 @@
     <div class="brand-area">
       <div class="brand-logo">🌲 LEXBNB</div>
       <div class="brand-meta">
-        <h1>KONTROL MERKEZİ V5</h1>
+        <h1>KONTROL MERKEZİ</h1>
         <p id="brandSubTitle">Kısa Dönem Kiralama & Finansal Performans Portalı</p>
       </div>
     </div>
@@ -204,9 +204,9 @@
       </div>
 
       <!-- Başlangıç Rehberi Butonu -->
-      <button type="button" class="btn btn-secondary header-cache-btn" data-onclick="reloadPage()" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.15); color: #E2E8F0; font-weight: 600; display: flex; align-items: center; gap: 5px;" title="Sayfayı yeniden yükler (Verilerinizi ASLA silmez)">
+      <button type="button" id="dataSyncBtn" class="btn btn-secondary header-cache-btn" data-onclick="resyncTenantData()" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.15); color: #E2E8F0; font-weight: 600; display: flex; align-items: center; gap: 5px;" title="Verileri sunucudan yeniden okur; hiçbir kaydı değiştirmez">
         <span>🔄</span>
-        <span class="cache-btn-text">Sayfayı Yenile</span>
+        <span class="cache-btn-text" id="dataSyncBtnText">Verileri eşitle</span>
       </button>
       <button type="button" class="btn btn-secondary header-guide-btn" data-onclick="openHelpModal('terms')" style="background: rgba(139, 92, 246, 0.18); border: 1px solid rgba(139, 92, 246, 0.4); color: #DDD6FE; font-weight: 700; display: flex; align-items: center; gap: 6px;" title="Başlangıç Seviyesi Terimler Sözlüğü & Kılavuz">
         <span>🎓</span>
@@ -1008,25 +1008,25 @@
           <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 10px; padding: 12px 14px;">
             <div style="font-size: 11px; color: #A7F3D0; font-weight: 700; text-transform: uppercase;">🏆 Ciro Şampiyonu Ay</div>
             <div style="font-size: 17px; font-weight: 800; color: #34D399; margin: 4px 0;" id="kpiPeakRev">—</div>
-            <div style="font-size: 11px; color: var(--text-muted);">Kış zirvesi ve yüksek talep</div>
+            <div style="font-size: 11px; color: var(--text-muted);">Kayıtlı aylar içinde en yüksek ciro</div>
           </div>
 
           <div style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 10px; padding: 12px 14px;">
             <div style="font-size: 11px; color: #93C5FD; font-weight: 700; text-transform: uppercase;">💎 En Yüksek ADR (Gecelik)</div>
             <div style="font-size: 17px; font-weight: 800; color: #60A5FA; margin: 4px 0;" id="kpiPeakAdr">—</div>
-            <div style="font-size: 11px; color: var(--text-muted);">Sömestr tatilinde premium fiyatlama</div>
+            <div style="font-size: 11px; color: var(--text-muted);">Net oda geliri / satılan gece</div>
           </div>
 
           <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 10px; padding: 12px 14px;">
             <div style="font-size: 11px; color: #FDE68A; font-weight: 700; text-transform: uppercase;">📈 En Çok Gece Satılan Ay</div>
             <div style="font-size: 17px; font-weight: 800; color: #FBBF24; margin: 4px 0;" id="kpiPeakNights">—</div>
-            <div style="font-size: 11px; color: var(--text-muted);">Yaz sezonu hacim lideri</div>
+            <div style="font-size: 11px; color: var(--text-muted);">Kayıtlı aylar içinde en çok satılan gece</div>
           </div>
 
           <div style="background: rgba(139, 92, 246, 0.08); border: 1px solid rgba(139, 92, 246, 0.25); border-radius: 10px; padding: 12px 14px;">
             <div style="font-size: 11px; color: #DDD6FE; font-weight: 700; text-transform: uppercase;">💵 En Kârlı Ay (Net Kâr)</div>
             <div style="font-size: 17px; font-weight: 800; color: #A78BFA; margin: 4px 0;" id="kpiPeakProfit">—</div>
-            <div style="font-size: 11px; color: var(--text-muted);">Seçili dönem kayıtlarından hesaplanır</div>
+            <div style="font-size: 11px; color: var(--text-muted);">Kârı ölçülebilen aylar arasından</div>
           </div>
         </div>
 
@@ -1176,7 +1176,7 @@
               <h2>ŞİRKET GİDİŞAT RADARI & OTOMATİK PROJEKSİYON MOTORU</h2>
               <span class="sub-text">Kayıtlı dönemlerden hesaplanan şirket trendi ve momentum analizi</span>
             </div>
-            <span class="badge badge-slate" id="trajectoryStatusBadge">SKOR HESAPLANIYOR</span>
+            <span class="badge badge-slate" id="trajectoryStatusBadge">—</span>
           </div>
           <button class="btn btn-secondary btn-sm" data-onclick="exportTrajectoryReport()">📄 Gidişat Raporu Al</button>
         </div>
@@ -1210,7 +1210,7 @@
 
           <div class="barometer-card">
             <span class="b-lbl">FİYAT SAVUNMASI (ADR TRENDİ)</span>
-            <strong class="b-val text-amber" id="trajectoryAdrVal">⚠️ Sezonsal Uçurum</strong>
+            <strong class="b-val text-slate" id="trajectoryAdrVal">—</strong>
             <span class="b-desc" id="trajectoryAdrDesc">—</span>
           </div>
         </div>
@@ -1765,7 +1765,7 @@
           <div class="kpi-card" style="border-left: 4px solid #25D366;">
             <div class="kpi-title">💬 TOPLAM WHATSAPP TALEBİ</div>
             <div class="kpi-value" id="waKpiTotalLeads">0</div>
-            <div class="kpi-sub" id="waKpiTotalLeadsSub">Bu dönem gelen mesajlar</div>
+            <div class="kpi-sub" id="waKpiTotalLeadsSub">Kayıtlı tüm talepler (dönem filtresi uygulanmaz)</div>
           </div>
           <div class="kpi-card" style="border-left: 4px solid #3B82F6;">
             <div class="kpi-title">🎯 DÖNÜŞÜM ORANI (CONVERSION)</div>
@@ -3973,10 +3973,10 @@
   <script src="core/executive_dashboard_service.js?v=ca6c3133"></script>
   <script src="core/executive_ai_advisor.js?v=502075f7"></script>
   <script src="core/captcha_gate.js?v=3ad4a776"></script>
-  <script src="core/action_dispatch.js?v=2cb14054"></script>
-  <script src="app.js?v=18e58693"></script>
+  <script src="core/action_dispatch.js?v=bcb9635d"></script>
+  <script src="app.js?v=1c554057"></script>
   <script src="core/property_analysis_context_ui.js?v=56a57dc8"></script>
   <script src="core/analysis_center_ui.js?v=7991bd67"></script>
-  <script src="core/marketing_ui.js?v=ab8906ba"></script>
+  <script src="core/marketing_ui.js?v=e349e32e"></script>
 </body>
 </html>

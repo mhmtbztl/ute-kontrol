@@ -21,7 +21,7 @@ function runTest(name, fn) {
 
 runTest('Monthly filter uses an exclusive first day of next month', () => {
   assert.deepStrictEqual(MarketingUI.periodFromFilter({ period: '2026-12' }), {
-    start: '2026-12-01', endExclusive: '2027-01-01', label: '2026-12'
+    start: '2026-12-01', endExclusive: '2027-01-01', label: 'Aralık 2026'
   });
 });
 

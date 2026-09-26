@@ -140,6 +140,25 @@ Operasyon kartı ve temizlik rozeti bir zamanlar yalnız `!paid`'e bakıyordu:
 26.09.2026'da gerçek hesapta kart "₺2.500 borç", hemen altındaki liste
 "borç yok" diyordu (görev planlıydı). Ağı `core/ui_consistency_tests.js`.
 
+**Açık arıza da tek tanımdır: `isMaintenanceTicketOpen(t)`** (RESOLVED/COMPLETED/
+CANCELLED kapalı). Ana sayfa öncelik motoru ham satırda yalnız `!== 'RESOLVED'`
+bakıyor ve her karta sabit "Öncelik: P1 / Durum: Açık" yazıyordu; iptal arıza
+kritik eylem görünüyordu (L-98). Ana sayfa temizliği yalnız **bugün planlı**
+görevden gösterir — Operasyon'un "Bugünkü turnover" kuralı.
+
+**Kâr ölçülebilir mi: `isProfitUnmeasured` (K-04 eki, kullanıcı 27.09.2026, L-101).**
+Dönemde ciro var ama **hiç gider yoksa** (elle gider + komisyon + temizlik
+maliyeti + CAPEX = 0) net kâr ve marj "—" / "Gider kaydı yok; kâr ölçülemedi"
+yazılır; "%100 marj" gösterilmez. "Gider yok" ile "gider henüz girilmedi" ayırt
+edilemez. **Kapatılmış ay istisnadır**: kapanış defterin onayıdır, 0 gider
+gerçek 0'dır. Ana sayfa, Finans, kâr köprüsü, aylık KPI tablosu, radar,
+simülatör ve Raporlar aynı yardımcıyı kullanır.
+
+**Toplu aktarım özeti (`isBulkSummaryBooking`, "TOPLU AKTARIM — Ocak 2026") toplam
+metriklere girer, kayıt ve gün başı metriklere girmez (L-103).** Ciro, gece,
+ADR, doluluk doğrudur; rezervasyon adedi, takvimdeki gün, boş gece tespiti
+özeti gerçek konaklama saymaz. Tanım tek yerde: `guest_crm_engine`.
+
 **Ana sayfa sunucu anlık görüntüsünü önbellekte tutar; deftere yazan her
 fonksiyon başarılı yazmadan sonra `invalidateExecutiveSnapshotCache()` çağırır.**
 Kural düğmede değil **tabloya yazan fonksiyondadır** (`createExpense`,
@@ -222,6 +241,15 @@ içindeki ALLOWLIST'e eklenir.
 Bu kural tesadüfi değil: bu oturumda bulunan hataların çoğu tam bu kalıptı —
 `pricingAdrVal "₺16.500"`, `opsReadyPropsVal "5 / 5"`, `dummyMoMDeltas`,
 `finActualRevenue "483.965 TL"`. Toplam 100'den fazla nokta.
+
+**Rakamsız hüküm de sabit değerdir (L-100, 27.09.2026).** Finans'taki gidişat
+radarında `"⚠️ Sezonsal Uçurum"` ve `"SKOR HESAPLANIYOR"` sabit yazıyordu;
+radarın render fonksiyonu yalnız gizli `dashboard` sekmesinin planındaydı ve
+Finans'ta **hiç çalışmıyordu**. Rakam içermediği için bu denetim görmedi.
+Kural 6: JS'in yazdığı bir alan sonuç iddia eden kelimeyle (`uçurum`, `kritik`,
+`şampiyon`, `dengeli`…) başlayamaz; eşleşme `toLocaleLowerCase('tr')` ile
+yapılır. Bir blok hangi sekmenin içindeyse render fonksiyonu **o sekmenin**
+`ACTIVE_RENDER_PLANS` satırında olmalıdır.
 
 ### 3.6 Demo yok / uydurma veri yok
 Demo portföyü ve paralel yerel yolu **tamamen kaldırıldı** (2026-09-13).

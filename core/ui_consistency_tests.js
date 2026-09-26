@@ -265,6 +265,200 @@ try {
   // --- D. Kanal tablosu hizasi ------------------------------------------------
   check(/class="mkt-channel-table"/.test(MKT) && /\.mkt-channel-table th,\s*\.mkt-channel-table td\s*\{[^}]*text-align/.test(CSS),
     'D1. Kanal ekonomisi tablosunda başlık ve değer aynı hizada', 'mkt-channel-table kuralı yok');
+
+  // =========================================================================
+  // 27.09 guven turu — 26.09'da kullanicinin gercek hesabinda tarayicida
+  // gorulen celiskiler (HATALAR.md L-98..L-106).
+  // =========================================================================
+  const bugun = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const gunKaydir = (n) => { const d = new Date(bugun + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+  const buAy = bugun.slice(0, 7);
+  const PROP_UUID = '7c1e2d3f-4a5b-4c6d-8e7f-901234567890';
+  const ayFiltresi = () => {
+    const [y, m] = buAy.split('-').map(Number);
+    const son = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    app.setCurrentFilter({ period: buAy, villa: 'ALL', startDate: `${buAy}-01`, endDate: `${buAy}-${String(son).padStart(2, '0')}` });
+  };
+  global.ExecutivePriorityService = require('./executive_priority_service.js');
+  const komutaHtml = () => ['todayCriticalActionsList', 'todayOperationsActionsList', 'todayRevenueActionsList']
+    .map(id => g(id).innerHTML).join('\n');
+
+  // --- K. Ana sayfa oncelik motoru (L-98) ------------------------------------
+  // Canlida: iptal edilmis "DEMO Claude arıza" ana sayfada "Durum: Açık" +
+  // "Uygula"; Operasyon "0 turnover" derken ana sayfa turnover gorevi.
+  app.setAppData(veri({
+    villas: { V1: { id: PROP_UUID, slug: 'V1', name: 'Deniz Evi', basePrice: 10000, cleanCost: 0, activationDate: '2025-01-01' } },
+    maintenanceTickets: [
+      { id: 'mt-iptal', property_id: PROP_UUID, title: 'Iptal edilen ariza', severity: 'CRITICAL', status: 'CANCELLED' },
+      { id: 'mt-cozuldu', property_id: PROP_UUID, title: 'Cozulen ariza', severity: 'CRITICAL', status: 'RESOLVED' },
+      { id: 'mt-dusuk', property_id: PROP_UUID, title: 'Musluk damlatiyor', severity: 'LOW', status: 'OPEN' }
+    ],
+    cleaningTasks: [
+      { id: 'ct-dun', villa: 'V1', date: gunKaydir(-1), amount: 500, paid: false, status: 'PLANNED' },
+      { id: 'ct-yarin', villa: 'V1', date: gunKaydir(1), amount: 500, paid: false, status: 'PLANNED' },
+      { id: 'ct-yapilmadi', villa: 'V1', date: bugun, amount: 500, paid: false, status: 'SKIPPED' }
+    ]
+  }));
+  ayFiltresi();
+  // K1 yalniz kapali arizalarla ayri olculur: ayni mulkteki kartlar
+  // birlestirildigi icin acik bir arizanin yaninda kapali olan gizlenebilir.
+  const acikOlanlar = app.getAppData().maintenanceTickets;
+  app.getAppData().maintenanceTickets = acikOlanlar.filter(t => t.status !== 'OPEN');
+  app.getAppData().cleaningTasks = [];
+  hata = null;
+  try { app.renderExecutiveControlCenter(); } catch (e) { hata = e; }
+  let html = komutaHtml();
+  check(!hata && !/Arıza:/.test(html),
+    'K1. İptal edilen ve çözülen arıza ana sayfada kritik eylem olarak görünmez',
+    hata ? hata.stack.split('\n').slice(0, 3).join(' | ') : html.slice(0, 300));
+  app.setAppData(veri({
+    villas: { V1: { id: PROP_UUID, slug: 'V1', name: 'Deniz Evi', basePrice: 10000, cleanCost: 0, activationDate: '2025-01-01' } },
+    maintenanceTickets: acikOlanlar,
+    cleaningTasks: [
+      { id: 'ct-dun', villa: 'V1', date: gunKaydir(-1), amount: 500, paid: false, status: 'PLANNED' },
+      { id: 'ct-yarin', villa: 'V1', date: gunKaydir(1), amount: 500, paid: false, status: 'PLANNED' },
+      { id: 'ct-yapilmadi', villa: 'V1', date: bugun, amount: 500, paid: false, status: 'SKIPPED' }
+    ]
+  }));
+  app.renderExecutiveControlCenter();
+  html = komutaHtml();
+  check(/Musluk damlatiyor/.test(html) && /Öncelik: P3/.test(html) && !/Öncelik: P1/.test(html),
+    'K2. Açık arıza kartı GERÇEK önceliği yazar (düşük önem → P3; sabit "P1" yok)', html.slice(0, 300));
+  check(!/Turnover Temizlik Görevi|Bugünkü temizlik/.test(html),
+    'K3. Dünkü/yarınki planlı ve "yapılmadı" temizlik ana sayfada "bugün" diye sunulmaz', html.slice(0, 300));
+  check(!html.includes(PROP_UUID) && /Deniz Evi/.test(html),
+    'K4. Kartta mülkün ham kimliği (UUID) değil adı yazar (L-104)', 'UUID kartta görünüyor');
+  app.renderOperationsKpiStrip();
+  check(g('opsTurnoverVal').innerText === '1 Görev' ,
+    'K5. Operasyon kartı bugünkü görevi sayar (yapılmadı dahil) — referans', `kart=${g('opsTurnoverVal').innerText}`);
+  const appData0 = app.getAppData();
+  appData0.cleaningTasks.push({ id: 'ct-bugun', villa: 'V1', date: bugun, amount: 500, paid: false, status: 'PLANNED' });
+  app.renderExecutiveControlCenter();
+  html = komutaHtml();
+  check((html.match(/Bugünkü temizlik/g) || []).length === 1,
+    'K6. Bugün planlı temizlik ana sayfada tek kart olarak görünür', html.slice(0, 300));
+
+  // --- L. CRM kayip nedeni tavsiyesi (L-99) -----------------------------------
+  const kayip = (reason) => ({ status: 'LOST', lostReason: reason });
+  let oz = app.summarizeLeadLossReasons([]);
+  check(oz.topReasons.length === 0 && !/Tarih Dolu|Fiyat Yüksek/.test(oz.adviceHtml),
+    'L1. Kayıp talep yokken kayıp nedeni ilan edilmez', oz.adviceHtml);
+  oz = app.summarizeLeadLossReasons([kayip('Cevap Vermedi'), kayip('Cevap Vermedi')]);
+  check(oz.topReasons.join() === 'Cevap Vermedi' && !/Tarih Dolu|Fiyat Yüksek/.test(oz.adviceHtml),
+    'L2. Veride yalnız "Cevap Vermedi" varsa tavsiye onu söyler; "Tarih Dolu/Fiyat Yüksek" demez', oz.adviceHtml);
+  oz = app.summarizeLeadLossReasons([kayip('Tarih Dolu'), kayip('Fiyat Yüksek')]);
+  check(oz.topReasons.length === 2 && /eşit/.test(oz.adviceHtml) && /tek bir baskın neden yok/.test(oz.adviceHtml),
+    'L3. Eşitlikte tek kazanan ilan edilmez', oz.adviceHtml);
+  oz = app.summarizeLeadLossReasons([kayip(null), kayip('Diğer')]);
+  check(oz.topReasons.length === 0 && /1 talepte neden seçilmemiş|belirlenemez/.test(oz.adviceHtml),
+    'L4. Nedeni seçilmemiş kayıp "neden" sayılmaz', oz.adviceHtml);
+  oz = app.summarizeLeadLossReasons([kayip('Başka Yer Seçti')]);
+  check(oz.counts['Başka Yer Seçti'] === 1 && oz.counts['Diğer'] === 0,
+    'L5. "Başka Yer Seçti" kendi satırında sayılır ("Diğer"e düşmez)', JSON.stringify(oz.counts));
+  app.setAppData(veri({ leads: [], cleaningTasks: [] }));
+  app.renderLeadAnalytics();
+  check(!/Tarih Dolu|Fiyat Yüksek/.test(g('waActionableInsights').innerHTML),
+    'L6. Boş işletmede CRM ekranı sabit kayıp nedeni yazmaz (canlıda görülen)', g('waActionableInsights').innerHTML.slice(0, 200));
+
+  // --- M. Finans'taki gidisat radari ve simulator cizilir (L-100) --------------
+  const finPlan = app.getActiveRenderPlan('tab-finance');
+  check(['renderTrajectoryRadar', 'renderTrajectoryInsights', 'runWhatIfSimulation'].every(f => finPlan.includes(f)),
+    'M1. Finans sekmesi açılınca gidişat radarı, içgörüler ve simülatör çizilir', 'plan=' + finPlan.join(','));
+  check(/if \(tabId === 'finance'\) \{[^}]*renderTrajectoryRadar\(\);[^}]*runWhatIfSimulation\(\);/.test(APP2),
+    'M2. switchTab(\'finance\') da aynı üç fonksiyonu çağırır', 'switchTab finance dalı eksik');
+  app.setAppData(veri({ cleaningTasks: [] }));
+  ayFiltresi();
+  g('trajectoryAdrVal').innerText = 'SABIT';
+  g('trajectoryStatusBadge').innerText = 'SABIT';
+  app.renderTrajectoryRadar();
+  check(g('trajectoryStatusBadge').innerText !== 'SABIT' && g('trajectoryAdrVal').innerText !== 'SABIT',
+    'M3. Radar kendi alanlarını gerçekten yazar (HTML\'deki başlangıç metni kalmaz)',
+    `rozet=${g('trajectoryStatusBadge').innerText} adr=${g('trajectoryAdrVal').innerText}`);
+
+  // --- N. Gider kaydi olmayan ayda kar "olculemedi" (L-101) --------------------
+  check(app.isProfitUnmeasured(12000, 0, 0, '2099-01') === true
+    && app.isProfitUnmeasured(12000, 500, 0, '2099-01') === false
+    && app.isProfitUnmeasured(0, 0, 0, '2099-01') === false,
+    'N1. Ciro var + hiç gider yok → kâr ölçülemedi; gider varsa ya da ciro yoksa değil', 'kural yanlış');
+  const rezB = (id, gross, extra) => Object.assign({ id, villa: 'V1', propertyId: 'p1', code: id, guest: 'Ali Veli',
+    checkIn: `${buAy}-03`, checkOut: `${buAy}-05`, nights: 2, gross, net: gross, otaCommission: 0, cleaningFee: 0,
+    channel: 'WHATSAPP', status: 'CONFIRMED', pax: 2 }, extra || {});
+  app.setAppData(veri({ bookings: [rezB('r1', 12000)], cleaningTasks: [] }));
+  ayFiltresi();
+  app.renderFinanceModule();
+  check(g('finNetProfit').innerText === '—' && /ölçülemedi/.test(g('finNetMarginLabel').innerText)
+    && g('brNetProfit').innerText === '—' && !/%100/.test(g('brNetMargin').innerText),
+    'N2. Gider kaydı olmayan açık ayda Finans "%100 marj" göstermez; "ölçülemedi" der',
+    `net=${g('finNetProfit').innerText} marj=${g('finNetMarginLabel').innerText} kopru=${g('brNetMargin').innerText}`);
+  check(g('brOpex').innerText === '0 TL' && g('brCapex').innerText === '0 TL',
+    'N3. Kâr köprüsünde düşülecek tutar yoksa "-0 TL" yazılmaz (L-104)', `opex=${g('brOpex').innerText}`);
+  const [ky, km] = buAy.split('-').map(Number);
+  app.setAppData(veri({ bookings: [rezB('r1', 12000)], cleaningTasks: [], closedPeriods: [{ year: ky, month: km, status: 'CLOSED' }] }));
+  ayFiltresi();
+  app.renderFinanceModule();
+  check(g('finNetProfit').innerText === '12.000 TL',
+    'N4. Kapatılmış ay defteri onaylı sayar: 0 gider gerçek 0\'dır, kâr gösterilir', `net=${g('finNetProfit').innerText}`);
+  app.setAppData(veri({ bookings: [rezB('r1', 12000)], cleaningTasks: [],
+    expenses: [{ id: 'e1', villa: 'V1', date: `${buAy}-04`, amount: 2000, category: 'Bakım', type: 'OPEX' }] }));
+  ayFiltresi();
+  app.renderFinanceModule();
+  check(g('finNetProfit').innerText === '10.000 TL' && /%83[.,]3/.test(g('finNetMarginLabel').innerText),
+    'N5. Gider varsa kâr ve marj normal hesaplanır', `net=${g('finNetProfit').innerText} marj=${g('finNetMarginLabel').innerText}`);
+
+  // --- O. Satisi olmayan mulk "Dengeli" degil (L-102) -------------------------
+  app.setAppData(veri({
+    villas: {
+      V1: { id: 'p1', slug: 'V1', name: 'Deniz Evi', basePrice: 10000, cleanCost: 0, activationDate: '2025-01-01' },
+      V2: { id: 'p2', slug: 'V2', name: 'Orman Evi', basePrice: 10000, cleanCost: 0, activationDate: '2025-01-01' }
+    },
+    bookings: [rezB('r1', 12000)], cleaningTasks: []
+  }));
+  ayFiltresi();
+  g('propExecTableBody').children = [];
+  app.renderFinanceModule();
+  const satirlar = g('propExecTableBody').children.map(tr => tr.innerHTML);
+  const orman = satirlar.find(h => /Orman Evi/.test(h)) || '';
+  check(orman && !/Dengeli/.test(orman) && /satış yok/.test(orman),
+    'O1. Dönemde satışı olmayan mülk "Dengeli" değil "Bu dönem satış yok" etiketi alır', orman.slice(0, 200) || 'satır yok');
+
+  // --- P. Toplu aktarim ozeti kayit basi metriklere girmez (L-103) ------------
+  const ozet = rezB('toplu', 90000, { guest: 'TOPLU AKTARIM — Ocak 2026', checkIn: `${buAy}-01`, checkOut: `${buAy}-10`, nights: 9, channel: 'DIRECT' });
+  check(app.isBulkSummaryBooking(ozet) && !app.isBulkSummaryBooking(rezB('r1', 1)),
+    'P1. Toplu aktarım özeti tek tanımdan tanınır (CRM ile aynı)', 'tanım tutmuyor');
+  app.setAppData(veri({ bookings: [rezB('r1', 12000), ozet], cleaningTasks: [],
+    expenses: [{ id: 'e1', villa: 'V1', date: `${buAy}-04`, amount: 2000, category: 'Bakım', type: 'OPEX' }] }));
+  ayFiltresi();
+  ['rezSearchInput', 'rezPeriodFilter', 'rezVillaFilter', 'rezStatusFilter'].forEach(id => { g(id).value = id === 'rezSearchInput' ? '' : 'ALL'; });
+  app.renderManageBookingsTable();
+  check(/<strong>1 Rezervasyon<\/strong> \+ 1 toplu aktarım özeti/.test(g('rezTableSummaryPill').innerHTML),
+    'P2. Rezervasyon listesi özeti rezervasyon saymaz, ayrı yazar', g('rezTableSummaryPill').innerHTML);
+  app.renderAll();
+  check(g('rezCountBadge').innerText === 1 || g('rezCountBadge').innerText === '1',
+    'P3. Sekme sayacı özeti rezervasyon saymaz', `sayac=${g('rezCountBadge').innerText}`);
+  app.renderTapeChart();
+  const takvim = g('tapeChartContainer').innerHTML;
+  check(!/TOPLU/.test(takvim) && /1 toplu aktarım özeti/.test(takvim),
+    'P4. Takvim özeti günlere yaymaz; altında not olarak söyler', takvim.slice(-300));
+  app.renderReportsTab();
+  const rapor = g('reportsContentContainer').innerHTML;
+  check(/WhatsApp/.test(rapor) && !/WHATSAPP/.test(rapor) && /1 toplu aktarım özeti/.test(rapor),
+    'P5. Raporlar kanalı görünen adıyla yazar ve özeti rezervasyon saymaz (L-105)', rapor.slice(0, 400));
+  check(/Net Kâr:<\/strong> ₺100\.000/.test(rapor),
+    'P6. Raporlar net kârı Finans ile aynı defter formülünden yazar', (rapor.match(/Net Kâr:[^<]*<\/strong>[^<]*/) || [''])[0]);
+
+  // --- Q. Etiketler (L-104, L-105) -----------------------------------------
+  check(app.formatDeductionTl(0) === '0 TL' && app.formatDeductionTl(-0) === '0 TL' && app.formatDeductionTl(1500) === '−1.500 TL',
+    'Q1. Düşülen tutar biçimi: 0 → "0 TL", 1500 → "−1.500 TL"', app.formatDeductionTl(0));
+  check(app.getChannelDisplayName('WHATSAPP') === 'WhatsApp' && app.getChannelDisplayName('Direct') === 'Doğrudan'
+    && app.getChannelDisplayName('') === 'Kanal belirtilmedi',
+    'Q2. Kanal kodu müşteriye görünen adla yazılır', app.getChannelDisplayName('Direct'));
+  check(!/KONTROL MERKEZİ V5/.test(INDEX2), 'Q3. Başlıkta müşteriye sürüm numarası ("V5") gösterilmez', 'V5 hâlâ başlıkta');
+
+  // --- R. Veri esitleme dugmesi (L-106) --------------------------------------
+  check(/data-onclick="resyncTenantData\(\)"/.test(INDEX2) && !/Sayfayı Yenile/.test(INDEX2),
+    'R1. Üst çubuktaki düğme sayfayı değil veriyi yeniden okur ve adı bunu söyler', 'düğme hâlâ reloadPage');
+  check(/Eşitlendi \$\{saat\}/.test(APP2) && /renderDataSyncStamp\(\);\n\n  \/\/ Badges/.test(APP2),
+    'R2. Son eşitleme zamanı her çizimde düğmede görünür', 'renderDataSyncStamp renderAll\'da yok');
 } finally {
   console.log(`\nTEST SUMMARY: ${passed} / ${passed + failed} TESTS PASSED (${failed} FAILED)`);
   if (failed > 0) process.exit(1);

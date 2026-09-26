@@ -29,7 +29,11 @@ const HTML = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 const APP = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
 
 // Sabit kalmasi MESRU olan id'ler. Her biri gerekcesiyle birlikte.
-const ALLOWLIST = {};
+const ALLOWLIST = {
+  // Gizli (display:none) hata kutusu; yalniz giris hatasinda gorunur ve
+  // mesaji JS yazar. Bir olcum ya da hukum degil, hata sablonudur.
+  authErrorMessage: 'gizli giriş hata şablonu'
+};
 
 let passed = 0, failed = 0;
 const ok = n => { passed++; console.log(`[PASS] ${n}`); };
@@ -125,7 +129,10 @@ function run() {
     ['uzatma dönüşümü', /UZATMA DÖNÜŞÜMÜ\s*%45\b/i],
     ['uydurma marj rekoru', /%60[,.]8\s+operasyonel marj rekoru/i],
     ['ürün dışı SaaS iş planı', /SaaS Olarak Kiralama|Aylık Pasif Gelir Potansiyeli/i],
-    ['sabit OTA komisyon etiketi', /OTA\s*-\s*%1[58]\b/i]
+    ['sabit OTA komisyon etiketi', /OTA\s*-\s*%1[58]\b/i],
+    // L-100: zirve kartlarinin alt yazisi sabit NEDEN iddiasiydi; hangi ay
+    // zirve olursa olsun "Kış zirvesi" / "Sömestr" / "Yaz sezonu" diyordu.
+    ['sabit sezon gerekçesi', /Kış zirvesi ve yüksek talep|Sömestr tatilinde premium fiyatlama|Yaz sezonu hacim lideri/i]
   ];
   const idlessBulunan = idlessDemoPatterns.filter(([, desen]) => desen.test(gorunurHtml));
   if (idlessBulunan.length === 0) {
@@ -143,6 +150,28 @@ function run() {
   } else {
     no('5. Kanal ekranı açılışta render ediliyor ve varsayımsal %15 tasarruf üretmiyor',
       'channels sekmesi renderOtaRadar yoluna bağlı olmalı; doğrudan cirodan sabit oranlı tasarruf türetilmemeli.');
+  }
+
+  // L-100: Kural 1-2 yalniz SAYI iceren metne bakiyordu. Finans'taki gidisat
+  // radarinda "⚠️ Sezonsal Uçurum" sabit yaziyordu; render fonksiyonu o
+  // sekmede hic calismadigi icin musteri bu HUKMU gercek bir tespit sandi.
+  // Rakam yoktu, denetim gormedi. JS'in yazdigi bir alan sonuc iddia eden bir
+  // kelimeyle baslayamaz. Kucuk harfe TR kurali ile indirilir: 'UÇURUM' ve
+  // 'KRİTİK' ancak boyle eslesir (bkz. CLAUDE.md, Turkce buyuk I tuzagi).
+  const HUKUM = /uçurum|pozitif|negatif|şampiyon|dengeli|baskı|kritik|risk|güçlü|zayıf|mükemmel|rekor|lider|zirve|premium|sağlıklı|⚠️/;
+  const hukumler = [];
+  for (const m of HTML.matchAll(/<(span|strong|div|td|h[1-6]|p|b|small|em)\b[^>]*\sid="([^"]+)"[^>]*>([^<]{1,90})</g)) {
+    const id = m[2];
+    const metin = m[3].trim();
+    if (!metin || !jsWritesId(id) || ALLOWLIST[id]) continue;
+    if (HUKUM.test(metin.toLocaleLowerCase('tr'))) hukumler.push({ id, metin: metin.slice(0, 55) });
+  }
+  if (hukumler.length === 0) {
+    ok('6. JS ile yazılan hiçbir alan sabit bir hükümle ("Uçurum", "Kritik", "Şampiyon"...) başlamıyor');
+  } else {
+    no('6. JS ile yazılan hiçbir alan sabit bir hükümle ("Uçurum", "Kritik", "Şampiyon"...) başlamıyor',
+      hukumler.length + ' alan hesaplanmamış bir hüküm taşıyor:\n' + dok(hukumler) +
+      '\n       Render o sekmede calismazsa musteri bunu gercek tespit sanir. "—" ile baslatin.');
   }
 
   // Bilgi amacli

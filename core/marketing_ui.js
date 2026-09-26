@@ -44,7 +44,8 @@
 
   const CHANNEL_LABELS = Object.freeze({
     AIRBNB: 'Airbnb', BOOKING_COM: 'Booking.com', VRBO: 'Vrbo', EXPEDIA: 'Expedia',
-    DIRECT: 'Direkt', OTHER_OTA: 'Diğer OTA', UNKNOWN: 'Bilinmeyen'
+    // Kanal GRUBU: WhatsApp, telefon, web vb. burada tek satirda toplanir (L-105).
+    DIRECT: 'Doğrudan (tüm direkt kanallar)', OTHER_OTA: 'Diğer OTA', UNKNOWN: 'Bilinmeyen'
   });
 
   const BROWSER_DEPENDENCIES = Object.freeze([
@@ -121,7 +122,10 @@
       const year = Number(monthMatch[1]);
       const month = Number(monthMatch[2]);
       const next = new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 10);
-      return { start: `${period}-01`, endExclusive: next, label: period };
+      // Musteriye ham anahtar ('2026-09') degil ay adi gosterilir (L-104).
+      const AYLAR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+      const label = month >= 1 && month <= 12 ? `${AYLAR[month - 1]} ${year}` : period;
+      return { start: `${period}-01`, endExclusive: next, label };
     }
     return { start: null, endExclusive: null, label: period };
   }
@@ -242,11 +246,11 @@
       ${kpi('Dağıtım maliyeti', money(totals.distributionCost, report.currency), 'Yalnızca kaydedilmiş komisyon')}
       ${kpi('Net oda geliri', money(totals.roomRevenueAfterDistribution, report.currency), 'Komisyon sonrası')}
       ${kpi('Net ADR', money(totals.netRoomAdr, report.currency), `${number(totals.bookedNights)} satılmış gece`)}
-      ${kpi('Direkt rezervasyon', number(report.mix.directReservationSharePercent, '%'), 'Rezervasyon adedi payı')}
+      ${kpi('Doğrudan rezervasyon', number(report.mix.directReservationSharePercent, '%'), 'Rezervasyon adedi payı')}
     </div>
     <div class="card" style="padding:0;overflow:auto">
       <table class="mkt-channel-table" style="width:100%;border-collapse:collapse;min-width:780px"><thead><tr>
-        <th>Kanal</th><th>Rez.</th><th>Gece</th><th>Oda geliri</th><th>Komisyon</th><th>Net oda geliri</th><th>Net ADR</th>
+        <th>Kanal grubu</th><th>Rez.</th><th>Gece</th><th>Oda geliri</th><th>Komisyon</th><th>Net oda geliri</th><th>Net ADR</th>
       </tr></thead><tbody>${rows || '<tr><td colspan="7" style="padding:24px;text-align:center">Bu dönemde rezervasyon yok.</td></tr>'}</tbody></table>
     </div>
     <div class="card" style="padding:14px;margin-top:12px"><strong>Veri notları</strong><ul style="margin:8px 0 0;padding-left:20px">${warnings.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul></div>`;
@@ -334,7 +338,7 @@
     const propertyOptions = properties.map(item => `<option value="${escapeHtml(item.id)}"${item.id === selectedId ? ' selected' : ''}>${escapeHtml(item.name)}</option>`).join('');
     const channelOptions = [
       ['AIRBNB', 'Airbnb'], ['BOOKING_COM', 'Booking.com'], ['VRBO', 'Vrbo'],
-      ['EXPEDIA', 'Expedia'], ['DIRECT', 'Direkt'], ['OTHER_OTA', 'Diğer OTA (ETS Tur vb.)']
+      ['EXPEDIA', 'Expedia'], ['DIRECT', 'Doğrudan'], ['OTHER_OTA', 'Diğer OTA (ETS Tur vb.)']
     ].map(([value, label]) => `<option value="${value}">${escapeHtml(label)}</option>`).join('');
     return `<form data-marketing-listing-form class="card" style="padding:16px;margin-bottom:14px">
       <h3 style="margin:0 0 12px">Kanal ilanı tanımla</h3>
