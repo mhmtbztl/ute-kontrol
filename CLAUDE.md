@@ -540,6 +540,16 @@ Canlı süit `phase49_activation_live_tests` 12/12 (göçten önce 9 kırmızı)
 edilemez (yeni tablo/RPC yok): kanıt SQL Editor'deki `PHASE 49 OK`
 bildirimi ve oturumlu hesapta geçmiş ayın `available_nights` değerinin 0
 olmaktan çıkması. SQL Editor bildirimi göstermedi (yalnız "Success. No rows returned"; blok hata verseydi işlem dururdu). Üretimde oturumlu, salt okunur ölçüm: Ekim 2025 kapasitesi 0 → 124, Ağustos 2026 0 → 155 (doluluk %50,97), Eylül 85 → 150. Paket: `docs/PHASE49_DEPLOY_PACKAGE.md`.
+**phase51 (`migration_phase51_booking_delete_reopens_lead.sql`) 26 Eylül 2026'da
+test projesine uygulandı; üretim kullanıcı onayı bekliyor.** Talepten doğan
+bir rezervasyon silinince talep aynı işlemde WON'dan QUOTE_SENT'e (açık satış)
+döner; eskiden WON kalıyor, olmayan satış dönüşüm oranında sayılıyor ve talep
+silinemiyordu (L-94). Geriye dönük düzeltme **yok**, bilerek: bağı olmayan WON
+talep elle işaretlenmiş gerçek bir satış olabilir. Gövde phase47 ile aynı,
+yalnız talep adımı eklendi. Canlı süit `phase51_lead_revert_live_tests` 6/6
+(göçten önce 1 kırmızı); `BEGIN…ROLLBACK` içinde iki kez koşuldu. Dışarıdan
+ayırt edilemez (imza aynı): kanıt `PHASE 51 OK` ya da `schema_migrations` 51.
+Paket: `docs/PHASE51_DEPLOY_PACKAGE.md`.
 
 **Bir göçün uygulanıp uygulanmadığı, dosyaya bakarak anlaşılmaz.** Dosya repoda
 durur; veritabanı uygulanmamış olabilir. Doğrulamanın yolu üretime sormaktır:

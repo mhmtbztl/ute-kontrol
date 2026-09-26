@@ -1733,15 +1733,16 @@ async function deleteBooking(bookingId) {
       appData.bookings = appData.bookings.filter(b => b.id !== propBookingId && b.id !== bookingId && b.code !== bookingId);
     }
 
-    // Veritabani talebin bagini ON DELETE SET NULL ile bosaltir; bellek de
-    // ayni olmali. Yoksa talep duzenlenirken silinmis kimlik gonderiliyor ve
-    // sunucu yaniltici "baska isletmeye ait" hatasi veriyordu.
+    // Sunucu (phase51) bu rezervasyondan dogan WON talebi QUOTE_SENT'e dondurur
+    // ve bagi bosaltir; bellek de ayni olmali. Yoksa talep duzenlenirken
+    // silinmis kimlik gonderiliyor, sunucu yaniltici "baska isletmeye ait"
+    // hatasi veriyordu; kazanilmis satis da ekranda kaliyordu.
     if (appData.leads) {
       appData.leads = appData.leads.map(l => {
         const bag = l.convertedBookingId || l.converted_booking_id;
-        return bag && (bag === propBookingId || bag === bookingId)
-          ? { ...l, convertedBookingId: null, converted_booking_id: null }
-          : l;
+        if (!bag || (bag !== propBookingId && bag !== bookingId)) return l;
+        const acik = l.status === 'WON' ? { status: 'QUOTE_SENT', stage: 'QUOTE_SENT' } : {};
+        return { ...l, ...acik, convertedBookingId: null, converted_booking_id: null };
       });
     }
 

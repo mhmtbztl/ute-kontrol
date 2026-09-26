@@ -1860,7 +1860,7 @@
         </div>
         <div class="table-responsive">
           <table class="data-table">
-            <thead><tr><th>ÖNCELİK</th><th>VİLLA</th><th>YAPILACAK İŞ / SORUN</th><th>SORUMLU</th><th>MALİYET (₺)</th><th>DOWNTIME (GECE)</th><th>DURUM</th><th style="text-align: right;">İŞLEM</th></tr></thead>
+            <thead><tr><th>ÖNCELİK</th><th>VİLLA</th><th>YAPILACAK İŞ / SORUN</th><th>SORUMLU</th><th>TAHMİNİ MALİYET (₺)</th><th>DOWNTIME (GECE)</th><th>DURUM</th><th style="text-align: right;">İŞLEM</th></tr></thead>
             <tbody id="manageMaintTableBody"></tbody>
           </table>
         </div>
@@ -3108,8 +3108,9 @@
             <input type="date" id="maintDowntimeEnd">
           </div>
           <div class="form-group">
-            <label>Maliyet (₺)</label>
+            <label>Tahmini Maliyet (₺)</label>
             <input type="number" id="maintCost" value="0">
+            <span style="display:block; font-size:10px; color: var(--text-muted); margin-top: 4px;">Planlama içindir; gider defterine yazılmaz. Ödenen tutarı Finans → Gider Girişi'nden girin.</span>
           </div>
           <div class="form-group">
             <label>Durum</label>
@@ -3973,7 +3974,7 @@
   <script src="core/executive_ai_advisor.js?v=502075f7"></script>
   <script src="core/captcha_gate.js?v=3ad4a776"></script>
   <script src="core/action_dispatch.js?v=2cb14054"></script>
-  <script src="app.js?v=b2ce00cc"></script>
+  <script src="app.js?v=18e58693"></script>
   <script src="core/property_analysis_context_ui.js?v=56a57dc8"></script>
   <script src="core/analysis_center_ui.js?v=7991bd67"></script>
   <script src="core/marketing_ui.js?v=ab8906ba"></script>

@@ -269,6 +269,7 @@ const allTestFiles = [
   'capacity_consistency_tests.js',
   'ui_consistency_tests.js',
   'phase49_activation_live_tests.js',
+  'phase51_lead_revert_live_tests.js',
 
   // GitHub Actions eylemleri tam commit SHA'sina sabit
   'workflow_pin_tests.js',

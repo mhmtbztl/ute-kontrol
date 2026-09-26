@@ -228,9 +228,9 @@ try {
     const eskiOnay = global.confirm; global.confirm = () => true;
     try { sonuc = await app.deleteBooking(BID); } catch (e) { hata = e; } finally { global.confirm = eskiOnay; }
     const l = (app.getAppData().leads || [])[0] || {};
-    check(!hata && sonuc === true && l.convertedBookingId === null && l.converted_booking_id === null,
-      'H1. Rezervasyon silinince bellekteki talebin rezervasyon bağı da boşalır (veritabanıyla aynı)',
-      hata ? hata.message : `sonuc=${sonuc} convertedBookingId=${l.convertedBookingId} converted_booking_id=${l.converted_booking_id}`);
+    check(!hata && sonuc === true && l.convertedBookingId === null && l.converted_booking_id === null && l.status === 'QUOTE_SENT',
+      'H1. Rezervasyon silinince bellekteki talep de veritabanıyla aynı: bağ boş, durum QUOTE_SENT (phase51)',
+      hata ? hata.message : `sonuc=${sonuc} status=${l.status} convertedBookingId=${l.convertedBookingId} converted_booking_id=${l.converted_booking_id}`);
   })();
 
   // --- I. Acik ariza sayisi -----------------------------------------------------
@@ -249,6 +249,18 @@ try {
     'I1. Çözülen ve iptal edilen P1 arıza "açık" sayılmaz (açık + işlemde = 2)', `kart=${g('opsOpenMaintVal').innerText}`);
   const bakim = govde('saveMaint') || '';
   check(/resolved_at:/.test(bakim), 'I2. Arıza çözülünce çözülme zamanı (resolved_at) yazılır', 'saveMaint resolved_at yazmıyor');
+
+  // --- J. Ariza maliyeti etiketi ------------------------------------------------
+  // Formda "Maliyet (₺)" yaziyordu; deger estimated_cost olarak saklaniyor ve
+  // hicbir zaman gider defterine yazilmiyordu (L-97). Kullanici tamir bedelini
+  // girip Finans'ta hic goremiyordu. Karar: otomatik gider ACILMAZ (ayni para
+  // gider olarak da girilirse iki kez sayilirdi); alan durustce etiketlenir.
+  const INDEX2 = fs.readFileSync(path.join(KOK, 'index.html'), 'utf8');
+  const formEtiket = (INDEX2.match(/<label[^>]*>([^<]*)<\/label>\s*<input[^>]*id="maintCost"/) || [])[1] || '';
+  check(/Tahmini/i.test(formEtiket) && /gider defterine yazılmaz/i.test(INDEX2),
+    'J1. Arıza maliyeti "Tahmini" diye etiketli ve gider olmadığı formda söyleniyor', `etiket="${formEtiket}"`);
+  check(/<th>TAHMİNİ MALİYET \(₺\)<\/th>/.test(INDEX2) && !/<th>MALİYET \(₺\)<\/th>/.test(INDEX2),
+    'J2. Arıza tablosu başlığı da "Tahmini maliyet"', 'tablo başlığı hâlâ MALİYET');
 
   // --- D. Kanal tablosu hizasi ------------------------------------------------
   check(/class="mkt-channel-table"/.test(MKT) && /\.mkt-channel-table th,\s*\.mkt-channel-table td\s*\{[^}]*text-align/.test(CSS),
