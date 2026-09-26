@@ -541,7 +541,7 @@ edilemez (yeni tablo/RPC yok): kanıt SQL Editor'deki `PHASE 49 OK`
 bildirimi ve oturumlu hesapta geçmiş ayın `available_nights` değerinin 0
 olmaktan çıkması. SQL Editor bildirimi göstermedi (yalnız "Success. No rows returned"; blok hata verseydi işlem dururdu). Üretimde oturumlu, salt okunur ölçüm: Ekim 2025 kapasitesi 0 → 124, Ağustos 2026 0 → 155 (doluluk %50,97), Eylül 85 → 150. Paket: `docs/PHASE49_DEPLOY_PACKAGE.md`.
 **phase51 (`migration_phase51_booking_delete_reopens_lead.sql`) 26 Eylül 2026'da
-test projesine uygulandı; üretim kullanıcı onayı bekliyor.** Talepten doğan
+test projesine uygulandı; üretime 26 Eylül 2026'da kullanıcı uyguladı (SQL Editor "Success"). Bağımsız ölçüm yapılamadı: imza aynı, dışarıdan ayırt edilemez; oturumlu hesapta `schema_migrations` 51 ile doğrulanacak.** Talepten doğan
 bir rezervasyon silinince talep aynı işlemde WON'dan QUOTE_SENT'e (açık satış)
 döner; eskiden WON kalıyor, olmayan satış dönüşüm oranında sayılıyor ve talep
 silinemiyordu (L-94). Geriye dönük düzeltme **yok**, bilerek: bağı olmayan WON
