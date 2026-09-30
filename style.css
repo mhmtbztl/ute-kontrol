@@ -3178,12 +3178,51 @@ body {
 }
 
 @media (max-width: 768px) {
-  .header-guide-btn .guide-btn-text {
+  .header-guide-btn .guide-btn-text,
+  .header-chatgpt-btn .chatgpt-btn-text {
     display: none;
   }
-  .header-guide-btn {
+  .header-guide-btn,
+  .header-chatgpt-btn {
     padding: 8px 10px !important;
   }
+}
+
+/* Tek menu kalemi altindaki iki gorunum (Misafirler ve Satis: Talepler | Misafirler) */
+.subpage-switch {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 16px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.subpage-switch-btn {
+  background: transparent;
+  border: 0;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.subpage-switch-btn:hover {
+  color: #F8FAFC;
+  background: rgba(255, 255, 255, 0.05);
+}
+.subpage-switch-btn.active {
+  color: #F8FAFC;
+  background: rgba(139, 92, 246, 0.25);
+}
+.subpage-switch-btn:focus-visible {
+  outline: 2px solid #8B5CF6;
+  outline-offset: 2px;
 }
 
 /* Housekeeping & Cleaning Payment Controls */

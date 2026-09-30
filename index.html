@@ -11,7 +11,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=1bb9987a">
+  <link rel="stylesheet" href="style.css?v=bc859c8d">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="supabase.umd.js?v=3810661a"></script>
@@ -212,6 +212,12 @@
         <span>🎓</span>
         <span class="guide-btn-text">Başlangıç Rehberi</span>
       </button>
+      <!-- Tek ChatGPT kapisi (ENVANTER Analiz Merkezi, 30.09.2026). Simdilik
+           Analiz Merkezi sayfasini acar; A5'te sayfaya gore kapsamli pencere olur. -->
+      <button type="button" id="askChatGptBtn" class="btn btn-secondary header-chatgpt-btn" data-onclick="switchTab('analysis')" style="background: rgba(16, 185, 129, 0.14); border: 1px solid rgba(16, 185, 129, 0.4); color: #A7F3D0; font-weight: 700; display: flex; align-items: center; gap: 6px;" title="Verilerinizden ChatGPT için hazır, kişisel veri içermeyen bir analiz komutu üretir">
+        <span>🧠</span>
+        <span class="chatgpt-btn-text">ChatGPT'ye sor</span>
+      </button>
       <!-- Dropdown 1: Hızlı Ekle -->
       <div class="header-dropdown-wrap">
         <button type="button" class="btn btn-primary" data-onclick="toggleHeaderDropdown('quickAddMenu')" id="quickAddBtn" style="font-weight: 700;">
@@ -276,14 +282,6 @@
           <span>⚙️</span> Araçlar <span style="font-size: 10px; margin-left: 2px;">▼</span>
         </button>
         <div class="header-dropdown-menu" id="toolsMenu">
-          <button type="button" class="dropdown-item" data-onclick="switchTab('housekeeping'); closeAllHeaderDropdowns();" style="background: rgba(245, 158, 11, 0.12); border-bottom: 1px solid rgba(255,255,255,0.08);">
-            <span class="dropdown-icon">🧹</span>
-            <div>
-              <strong style="color: #FCD34D;">Temizlik & Borç Defteri</strong>
-              <small>Tüm temizlik işleri, hakedişler ve personel borçları</small>
-            </div>
-          </button>
-          
           <button type="button" class="dropdown-item" data-onclick="openImportModal(); closeAllHeaderDropdowns();">
             <span class="dropdown-icon">📥</span>
             <div>
@@ -343,13 +341,6 @@
               <small>Portföyünüze yeni ev ekleyin</small>
             </div>
           </button>
-          <button type="button" class="dropdown-item" data-onclick="openImportModal(); closeAllHeaderDropdowns();">
-            <span class="dropdown-icon">📥</span>
-            <div>
-              <strong>Excel'den Rapor Yükle</strong>
-              <small>Kendi verilerinizi aktarın</small>
-            </div>
-          </button>
           <div class="dropdown-divider"></div>
           <button type="button" class="dropdown-item text-danger" data-onclick="logoutSaaSUser(); closeAllHeaderDropdowns();">
             <span class="dropdown-icon">🚪</span>
@@ -366,17 +357,18 @@
 
   <!-- Navigation Tabs: Canonical Sections -->
   <nav class="nav-tabs">
-    <button class="tab-btn active" data-onclick="switchTab('executive')">🎯 Kontrol Merkezi</button>
+    <!-- Menu 9 kalem (ENVANTER, 30.09.2026). Raporlar sekmesi kalkti: disa
+         aktarim Finans basliginda, kanal dagilimi Kanallar ve Pazarlama'da.
+         Analiz Merkezi ust cubuktaki "ChatGPT'ye sor" dugmesiyle acilir.
+         Misafirler ile Satis tek menu kalemi; sayfa icinde Talepler | Misafirler. -->
+    <button class="tab-btn active" data-onclick="switchTab('executive')">📍 Bugün</button>
     <button class="tab-btn" data-onclick="switchTab('reservations')">📅 Rezervasyonlar (<span id="rezCountBadge">0</span>)</button>
     <button class="tab-btn" data-onclick="switchTab('properties')">🏡 Mülkler (<span id="propCountBadge">0</span>)</button>
     <button class="tab-btn" data-onclick="switchTab('operations')">🧹 Operasyon (<span id="opsTaskCountBadge">0</span>)</button>
-    <button class="tab-btn" data-onclick="switchTab('guests')">👥 Misafirler (<span id="guestCountBadge">—</span>)</button>
-    <button class="tab-btn" data-onclick="switchTab('leads')">🎯 Satış / CRM (<span id="leadCountBadge">0</span>)</button>
+    <button class="tab-btn" data-onclick="switchTab('leads')">🤝 Misafirler ve Satış (<span id="leadCountBadge">0</span>)</button>
     <button class="tab-btn" data-onclick="switchTab('pricing')">🏷️ Fiyatlandırma</button>
     <button class="tab-btn" data-onclick="switchTab('finance')">💰 Finans</button>
-    <button class="tab-btn" data-onclick="switchTab('marketing')">📈 Gelir & Dağıtım</button>
-    <button class="tab-btn" data-onclick="switchTab('reports')">📊 Raporlar</button>
-    <button class="tab-btn" data-onclick="switchTab('analysis')">🧠 Analiz Merkezi</button>
+    <button class="tab-btn" data-onclick="switchTab('marketing')">📈 Kanallar ve Pazarlama</button>
     <button class="tab-btn" data-onclick="switchTab('settings')">⚙️ Ayarlar</button>
   </nav>
 
@@ -656,6 +648,28 @@
           <div class="meta-pill">
             <span>Portföy:</span>
             <strong id="finTopPropertyLabel">Tüm Villalar / Portföy</strong>
+          </div>
+          <!-- (Raporlar sekmesinden tasindi, 30.09.2026 — A5'te "Rapor al" olur.)
+               Defter disa aktarma: sutunlar ice aktarma sablonuyla ayni,
+               yani indirilen dosya duzeltilip geri yuklenebilir. Burada
+               bir zamanlar "Raporu Indir (JSON)" vardi; appData'nin
+               tamamini ham dokuyor, donem filtresini yok sayiyordu. -->
+          <div class="dropdown" style="position: relative;">
+            <button type="button" class="btn btn-secondary btn-sm" data-onclick="toggleExportMenu(event)">⬇️ Defteri Dışa Aktar</button>
+            <div id="ledgerExportMenu" class="dropdown-menu" style="display: none; position: absolute; right: 0; top: calc(100% + 6px); z-index: 60; min-width: 250px; background: #111C2E; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 6px; box-shadow: 0 12px 32px rgba(0,0,0,0.45);">
+              <div style="font-size: 10px; color: #64748B; padding: 6px 10px 4px; line-height: 1.5;">
+                Seçili dönem ve mülk filtresine göre. Sütunlar içe aktarma
+                şablonuyla aynıdır: düzenleyip geri yükleyebilirsiniz.
+              </div>
+              <button type="button" class="dropdown-item" data-onclick="exportLedger('BOOKINGS','xlsx'); toggleExportMenu(event);">📗 Rezervasyon Defteri (.xlsx)</button>
+              <button type="button" class="dropdown-item" data-onclick="exportLedger('BOOKINGS','csv'); toggleExportMenu(event);">📄 Rezervasyon Defteri (.csv)</button>
+              <button type="button" class="dropdown-item" data-onclick="exportLedger('EXPENSES','xlsx'); toggleExportMenu(event);">📕 Gider Defteri (.xlsx)</button>
+              <button type="button" class="dropdown-item" data-onclick="exportLedger('EXPENSES','csv'); toggleExportMenu(event);">📄 Gider Defteri (.csv)</button>
+              <div style="font-size: 10px; color: #64748B; padding: 6px 10px 4px; border-top: 1px solid rgba(255,255,255,0.08); margin-top: 4px; line-height: 1.5;">
+                Ay sınırını kesen bir rezervasyon dosyada <strong>tam tutarıyla</strong>
+                görünür; ekrandaki aylık ciro ise gecelere bölünmüş payı gösterir.
+              </div>
+            </div>
           </div>
           <button class="btn btn-secondary btn-sm" data-onclick="openGoalsModal()">⚙️ Hedefleri Düzenle</button>
           <button class="btn btn-secondary btn-sm" data-onclick="openExpenseModal()">+ Gider Girişi</button>
@@ -1744,6 +1758,11 @@
     <!-- TAB: LEAD CRM & WHATSAPP SATIŞ RADARI -->
     <!-- ========================================== -->
     <div id="tab-leads" class="tab-content">
+      <!-- Misafirler ve Satis tek menu kalemi (ENVANTER 27.09): iki alt gorunum. -->
+      <div class="subpage-switch" role="tablist" aria-label="Misafirler ve Satış">
+        <button type="button" role="tab" class="subpage-switch-btn active" aria-selected="true" data-onclick="switchTab('leads')">🎯 Talepler</button>
+        <button type="button" role="tab" class="subpage-switch-btn" aria-selected="false" data-onclick="switchTab('guests')">👥 Misafirler</button>
+      </div>
 
       <!-- 1. WHATSAPP & SATIŞ TALEP ANALİZİ (EXECUTIVE RADAR) -->
       <section class="card" style="margin-bottom: 24px;">
@@ -2108,6 +2127,11 @@
     <!-- TAB: MİSAFİRLER (LIFECYCLE & İLETİŞİM)                  -->
     <!-- ======================================================= -->
     <div id="tab-guests" class="tab-content">
+      <!-- Misafirler ve Satis tek menu kalemi (ENVANTER 27.09): iki alt gorunum. -->
+      <div class="subpage-switch" role="tablist" aria-label="Misafirler ve Satış">
+        <button type="button" role="tab" class="subpage-switch-btn" aria-selected="false" data-onclick="switchTab('leads')">🎯 Talepler</button>
+        <button type="button" role="tab" class="subpage-switch-btn active" aria-selected="true" data-onclick="switchTab('guests')">👥 Misafirler (<span id="guestCountBadge">—</span>)</button>
+      </div>
       <section class="card" style="margin-bottom: 24px;">
         <div class="section-title-bar">
           <div>
@@ -2243,27 +2267,6 @@
             <p class="sub-text">Kanal dağılımı (Airbnb, Booking.com, Doğrudan Satış), komisyon analizleri ve kârlılık köprüsü.</p>
           </div>
           <div style="display: flex; gap: 8px;">
-            <!-- Defter disa aktarma: sutunlar ice aktarma sablonuyla ayni,
-                 yani indirilen dosya duzeltilip geri yuklenebilir. Burada
-                 bir zamanlar "Raporu Indir (JSON)" vardi; appData'nin
-                 tamamini ham dokuyor, donem filtresini yok sayiyordu. -->
-            <div class="dropdown" style="position: relative;">
-              <button type="button" class="btn btn-secondary btn-sm" data-onclick="toggleExportMenu(event)">⬇️ Defteri Dışa Aktar</button>
-              <div id="ledgerExportMenu" class="dropdown-menu" style="display: none; position: absolute; right: 0; top: calc(100% + 6px); z-index: 60; min-width: 250px; background: #111C2E; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 6px; box-shadow: 0 12px 32px rgba(0,0,0,0.45);">
-                <div style="font-size: 10px; color: #64748B; padding: 6px 10px 4px; line-height: 1.5;">
-                  Seçili dönem ve mülk filtresine göre. Sütunlar içe aktarma
-                  şablonuyla aynıdır: düzenleyip geri yükleyebilirsiniz.
-                </div>
-                <button type="button" class="dropdown-item" data-onclick="exportLedger('BOOKINGS','xlsx'); toggleExportMenu(event);">📗 Rezervasyon Defteri (.xlsx)</button>
-                <button type="button" class="dropdown-item" data-onclick="exportLedger('BOOKINGS','csv'); toggleExportMenu(event);">📄 Rezervasyon Defteri (.csv)</button>
-                <button type="button" class="dropdown-item" data-onclick="exportLedger('EXPENSES','xlsx'); toggleExportMenu(event);">📕 Gider Defteri (.xlsx)</button>
-                <button type="button" class="dropdown-item" data-onclick="exportLedger('EXPENSES','csv'); toggleExportMenu(event);">📄 Gider Defteri (.csv)</button>
-                <div style="font-size: 10px; color: #64748B; padding: 6px 10px 4px; border-top: 1px solid rgba(255,255,255,0.08); margin-top: 4px; line-height: 1.5;">
-                  Ay sınırını kesen bir rezervasyon dosyada <strong>tam tutarıyla</strong>
-                  görünür; ekrandaki aylık ciro ise gecelere bölünmüş payı gösterir.
-                </div>
-              </div>
-            </div>
             <button class="btn btn-secondary btn-sm" data-onclick="switchTab('channels')">🌐 OTA Radarına Git</button>
             <button class="btn btn-secondary btn-sm" data-onclick="switchTab('marketing')">📢 Pazarlama Modülüne Git</button>
           </div>
@@ -3974,7 +3977,7 @@
   <script src="core/executive_ai_advisor.js?v=502075f7"></script>
   <script src="core/captcha_gate.js?v=3ad4a776"></script>
   <script src="core/action_dispatch.js?v=bcb9635d"></script>
-  <script src="app.js?v=1c554057"></script>
+  <script src="app.js?v=5b1dabad"></script>
   <script src="core/property_analysis_context_ui.js?v=56a57dc8"></script>
   <script src="core/analysis_center_ui.js?v=7991bd67"></script>
   <script src="core/marketing_ui.js?v=e349e32e"></script>

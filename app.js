@@ -3515,11 +3515,27 @@ function updateStepperLabels() {
   if (vEl) vEl.innerText = vLabel;
 }
 
+// Menude kendi kalemi olmayan sayfa, ait oldugu menu kalemini secili gosterir
+// (menu 9 kalem, ENVANTER 30.09.2026). Eslemesiz sayfada menude secim kalmaz.
+const TAB_MENU_PARENT = {
+  guests: 'leads',
+  channels: 'marketing',
+  reports: 'finance',
+  expenses: 'finance',
+  housekeeping: 'operations',
+  maintenance: 'operations'
+};
+
+function getMenuTabFor(tabId) {
+  return TAB_MENU_PARENT[tabId] || tabId;
+}
+
 function switchTab(tabId) {
   document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 
-  const activeBtn = document.querySelector(`.tab-btn[data-onclick*="${tabId}"]`);
+  const menuTab = getMenuTabFor(tabId);
+  const activeBtn = document.querySelector(`.tab-btn[data-onclick="switchTab('${menuTab}')"]`);
   if (activeBtn) activeBtn.classList.add('active');
 
   const content = document.getElementById(`tab-${tabId}`);
@@ -17672,6 +17688,9 @@ async function handleQuickActionTrigger(actionType, entityId) {
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
+    getMenuTabFor,
+    TAB_MENU_PARENT,
+    switchTab,
     parseWhatsAppMessageText,
     isUUID,
     roundMoney,

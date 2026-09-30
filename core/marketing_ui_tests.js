@@ -295,7 +295,8 @@ runTest('Index integrates one independent marketing entry without app.js edits',
   assert.strictEqual((index.match(/id="tab-marketing"/g) || []).length, 1);
   assert.strictEqual((index.match(/src="core\/marketing_ui\.js(?:\?v=[a-f0-9]{8})?"/g) || []).length, 1);
   assert.doesNotMatch(index, /id="tab-marketing-legacy"/);
-  assert.match(index, /onclick="switchTab\('marketing'\)"[^>]*>📈 Gelir & Dağıtım/);
+  // Menu etiketi kullanici karariyla degisti (ENVANTER 30.09.2026).
+  assert.match(index, /onclick="switchTab\('marketing'\)"[^>]*>📈 Kanallar ve Pazarlama/);
 });
 
 runTest('Marketing bootstrap and lazy dependencies carry current content hashes', () => {
