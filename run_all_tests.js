@@ -282,6 +282,13 @@ const allTestFiles = [
   'restore_engine_tests.js',
   'backup_restore_live_tests.js',
 
+  // A1 saf motorlar: rapor/ChatGPT, fiyat onerisi, ozel gun ve hedef ciro
+  'chatgpt_prompt_engine_tests.js',
+  'report_engine_tests.js',
+  'suggested_price_engine_tests.js',
+  'tr_special_days_tests.js',
+  'target_revenue_calculator_tests.js',
+
   // Ice aktarma: tarih sirasi dosyadan (GG/AA - AA/GG), TL ekli tutar, yabanci para reddi
   'import_parsing_tests.js'
 ];
