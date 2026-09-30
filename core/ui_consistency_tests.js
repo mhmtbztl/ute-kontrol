@@ -360,20 +360,18 @@ try {
   check(!/Tarih Dolu|Fiyat Yüksek/.test(g('waActionableInsights').innerHTML),
     'L6. Boş işletmede CRM ekranı sabit kayıp nedeni yazmaz (canlıda görülen)', g('waActionableInsights').innerHTML.slice(0, 200));
 
-  // --- M. Finans'taki gidisat radari ve simulator cizilir (L-100) --------------
+  // --- M. Gidisat radari, projeksiyon ve simulator KALDIRILDI (A1-G1) ------------
+  // L-100: radar Finans'ta hic cizilmiyordu, sabit hukum yaziyordu. Kullanici
+  // karari (ENVANTER Finans 28.09.2026): radar ana ekrandan cikar, projeksiyon
+  // ve simulator kalkar. Ag artik geri gelmediklerini olcer.
   const finPlan = app.getActiveRenderPlan('tab-finance');
-  check(['renderTrajectoryRadar', 'renderTrajectoryInsights', 'runWhatIfSimulation'].every(f => finPlan.includes(f)),
-    'M1. Finans sekmesi açılınca gidişat radarı, içgörüler ve simülatör çizilir', 'plan=' + finPlan.join(','));
-  check(/if \(tabId === 'finance'\) \{[^}]*renderTrajectoryRadar\(\);[^}]*runWhatIfSimulation\(\);/.test(APP2),
-    'M2. switchTab(\'finance\') da aynı üç fonksiyonu çağırır', 'switchTab finance dalı eksik');
-  app.setAppData(veri({ cleaningTasks: [] }));
-  ayFiltresi();
-  g('trajectoryAdrVal').innerText = 'SABIT';
-  g('trajectoryStatusBadge').innerText = 'SABIT';
-  app.renderTrajectoryRadar();
-  check(g('trajectoryStatusBadge').innerText !== 'SABIT' && g('trajectoryAdrVal').innerText !== 'SABIT',
-    'M3. Radar kendi alanlarını gerçekten yazar (HTML\'deki başlangıç metni kalmaz)',
-    `rozet=${g('trajectoryStatusBadge').innerText} adr=${g('trajectoryAdrVal').innerText}`);
+  check(JSON.stringify(finPlan) === JSON.stringify(['renderFinanceModule']),
+    'M1. Finans sekmesi yalnız kendi modülünü çizer; radar/simülatör planında yok', 'plan=' + finPlan.join(','));
+  check(!/function (renderTrajectoryRadar|renderTrajectoryInsights|runWhatIfSimulation)\(/.test(APP2)
+    && !/id="(trajectoryStatusBadge|simAdrSlider|trajDangerText)"/.test(INDEX2),
+    'M2. Gidişat radarı, içgörüler ve simülatör kaynakta ve sayfada yok', 'kalıntı var');
+  check(!/id="tab-dashboard"/.test(INDEX2) && !/'tab-dashboard'/.test(APP2),
+    'M3. Hiçbir yoldan açılmayan ölü "Kokpit" sekmesi silindi', 'tab-dashboard kalıntısı');
 
   // --- N. Gider kaydi olmayan ayda kar "olculemedi" (L-101) --------------------
   check(app.isProfitUnmeasured(12000, 0, 0, '2099-01') === true

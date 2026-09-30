@@ -18,17 +18,16 @@ check(
   'Rezervasyon detay eylemleri tanimsiz openReservationModal fonksiyonunu cagirmamali'
 );
 
-const radarStart = appSource.indexOf('function renderTodayRadar()');
-const radarEnd = appSource.indexOf('\nfunction renderFunnelStats()', radarStart);
-const radarSource = appSource.slice(radarStart, radarEnd);
-check(radarStart >= 0 && radarEnd > radarStart, 'Bugunun radari kaynakta bulunmali');
+// "Bugunun radari" yalniz hicbir yoldan acilamayan tab-dashboard'daydi; sekme
+// ve radar A1-G1'de silindi. Bugun ekrani kendi eylemlerini
+// renderExecutiveControlCenter icinde baglar.
 check(
-  !radarSource.includes('onclick="alert('),
-  'Radar dugmeleri temizleyicinin sildigi alert isleyicisine baglanmamali'
+  !appSource.includes('function renderTodayRadar()') && !appSource.includes('handleTodayRadarAction('),
+  'Olu sekmenin radari ve eylem isleyicisi kaynakta kalmamali'
 );
 check(
-  radarSource.includes('data-radar-action') && radarSource.includes("addEventListener('click'"),
-  'Radar eylemleri veri ozelligi ve guvenli olay dinleyicisiyle baglanmali'
+  !appSource.includes('onclick="alert('),
+  'Hicbir dugme temizleyicinin sildigi alert isleyicisine baglanmamali'
 );
 
 check(

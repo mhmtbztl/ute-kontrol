@@ -11,7 +11,6 @@ const { reconcileBookingMessages } = require('./guest_messaging_engine.js');
 const { computeTaskPriority } = require('./operations_priority_engine.js');
 const ExecutiveDashboardService = require('./executive_dashboard_service.js');
 const { selectTodayCommandCenterActions } = require('./executive_priority_service.js');
-const { buildSanitizedExecutiveContext, generateExecutiveRecommendations } = require('./executive_ai_advisor.js');
 
 console.log('=============================================================================');
 console.log('🚀 LEXBNB PHASE 12 — END-TO-END PRODUCT LIFECYCLE TEST SUITE');
@@ -168,22 +167,8 @@ function runEndToEndProductTests() {
   assert.ok(todayCmd.totalSelected >= 1);
   recordPass('7. Executive Control Center top KPIs and Today Command Center synthesized realized numbers');
 
-  // STEP 8: AI Advisor Context & Structured Recommendation Generation
-  console.log('\n--- STEP 8: AI Advisor Synthesis ---');
-  const aiContext = buildSanitizedExecutiveContext({
-    tenant: { company_name: 'LexBnB E2E' },
-    properties: [property],
-    kpis: topKpis,
-    tasks: [checkinTask],
-    tickets: [],
-    alerts: [],
-    gapNights: []
-  });
-
-  const aiRecs = generateExecutiveRecommendations(aiContext);
-  assert.ok(aiRecs.summary);
-  assert.ok(Array.isArray(aiRecs.wins));
-  recordPass('8. AI STR Advisor produced structured recommendations from sanitized end-to-end context');
+  // STEP 8 (kaldirildi, A1-G1): "AI Strateji Danismani" kullanici karariyla
+  // silindi; anahtar kelime eslestirmesiydi, gercek yapay zeka degildi.
 
   console.log(`\n=============================================================================`);
   console.log(`TEST SUMMARY: ${passedTests} / ${totalTests} TESTS PASSED (0 FAILED)`);

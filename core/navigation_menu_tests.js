@@ -84,9 +84,9 @@ try {
       .filter(t => !['dashboard', 'analysis'].includes(t));
     const sahipsiz = sayfalar.filter(t => !menudekiler.has(esle(t)));
     check(sahipsiz.length === 0, 'D2. Menüde kalemi olmayan her sayfa bir menü kalemine bağlı', sahipsiz.join(', '));
-    check(esle('guests') === 'leads' && esle('housekeeping') === 'operations' && esle('channels') === 'marketing',
-      'D3. Misafirler → Misafirler ve Satış, temizlik defteri → Operasyon, kanal radarı → Kanallar',
-      `${esle('guests')} ${esle('housekeeping')} ${esle('channels')}`);
+    check(esle('guests') === 'leads' && esle('housekeeping') === 'operations' && esle('maintenance') === 'operations',
+      'D3. Misafirler → Misafirler ve Satış, temizlik ve arıza defteri → Operasyon',
+      `${esle('guests')} ${esle('housekeeping')} ${esle('maintenance')}`);
     check(esle('finance') === 'finance', 'D4. Menüdeki sayfa kendini gösterir', esle('finance'));
   }
   check(/\.tab-btn\[data-onclick="switchTab\('\$\{menuTab\}'\)"\]/.test(APP),

@@ -20,8 +20,12 @@ function check(condition, label, detail = '') {
 
 function getFunctionSource(name, nextName) {
   const start = source.indexOf(`function ${name}`);
-  const end = source.indexOf(`function ${nextName}`, start + 1);
-  return start >= 0 ? source.slice(start, end >= 0 ? end : source.length) : '';
+  // nextName verilmezse bir sonraki ust duzey fonksiyona kadar: komsu fonksiyon
+  // silindiginde (A1-G1 sokumu) sinir kaybolmaz.
+  const end = nextName
+    ? source.indexOf(`function ${nextName}`, start + 1)
+    : source.slice(start + 1).search(/\n(async )?function /) + start + 1;
+  return start >= 0 ? source.slice(start, end > start ? end : source.length) : '';
 }
 
 async function run() {
@@ -74,7 +78,7 @@ async function run() {
     check(result.rows.length === 300 && result.failures.length === 0, 'Toplu yazma başarılı satırların tamamını döndürüyor');
   }
 
-  const importSource = getFunctionSource('applyImportedData', 'renderKPIsAndDashboard');
+  const importSource = getFunctionSource('applyImportedData');
   check(!/await\s+createBooking\s*\(/.test(importSource) && !/await\s+createExpense\s*\(/.test(importSource),
     'İçe aktarma satır başına createBooking/createExpense çağırmıyor');
   check(/insertImportedRowsInBatches\s*\(/.test(importSource), 'İçe aktarma toplu yazma yardımcısını kullanıyor');

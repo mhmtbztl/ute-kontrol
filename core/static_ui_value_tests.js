@@ -143,13 +143,16 @@ function run() {
       '\n       Bu denetim id taşımayan görünür metinleri de kapsar.');
   }
 
-  const channelTruthful = /if\s*\(tabId\s*===\s*['"]channels['"]\)\s*renderOtaRadar\(\)/.test(APP)
+  // Gizli "Kanal radari" sekmesi A1-G1'de kalkti (ENVANTER Kanallar ve
+  // Pazarlama); kanal ekonomisi Kanallar ve Pazarlama sayfasinda. Varsayimsal
+  // tasarruf yasagi kaynakta kalir.
+  const channelTruthful = !/id="tab-channels"/.test(HTML) && !/function renderOtaRadar\(/.test(APP)
     && !/savedComm\s*\+=|gross\)\s*\|\|\s*0\)\s*\*\s*0[.]15/.test(APP);
   if (channelTruthful) {
-    ok('5. Kanal ekranı açılışta render ediliyor ve varsayımsal %15 tasarruf üretmiyor');
+    ok('5. Ölü kanal radarı kalktı ve hiçbir yerde varsayımsal %15 tasarruf üretilmiyor');
   } else {
-    no('5. Kanal ekranı açılışta render ediliyor ve varsayımsal %15 tasarruf üretmiyor',
-      'channels sekmesi renderOtaRadar yoluna bağlı olmalı; doğrudan cirodan sabit oranlı tasarruf türetilmemeli.');
+    no('5. Ölü kanal radarı kalktı ve hiçbir yerde varsayımsal %15 tasarruf üretilmiyor',
+      'tab-channels / renderOtaRadar kalıntısı ya da cirodan sabit oranlı tasarruf var.');
   }
 
   // L-100: Kural 1-2 yalniz SAYI iceren metne bakiyordu. Finans'taki gidisat

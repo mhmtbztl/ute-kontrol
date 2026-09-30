@@ -32,7 +32,10 @@ const deadBrowserModules = [
   'message_delivery_service',
   'pricing_engine',
   'revenue_forecast_service',
-  'notification_center_service'
+  'notification_center_service',
+  // Kullanici karari (ENVANTER 27.09.2026): anahtar kelime eslestirmesi olan
+  // "AI Strateji Danismani" kaldirildi (A1-G1). Geri gelirse bu satir kirilir.
+  'executive_ai_advisor'
 ];
 
 for (const moduleName of deadBrowserModules) {
@@ -54,7 +57,6 @@ const requiredBrowserModules = [
   'gap_night_service',
   'executive_priority_service',
   'executive_dashboard_service',
-  'executive_ai_advisor',
   'captcha_gate',
   'property_analysis_context_ui',
   'analysis_center_ui',

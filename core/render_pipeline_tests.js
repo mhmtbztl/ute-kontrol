@@ -464,20 +464,13 @@ function run() {
       check(/hesaplanamadı|mülk kaydı yok/i.test(bosFiyat) && !/Kritik boş gece penceresi bulunmuyor/.test(bosFiyat),
         '36. Boş işletmede fiyatlandırma başarı iddiası değil veri eksikliği gösteriyor', bosFiyat.slice(0, 700));
     }
-    check(typeof app.renderGapNights === 'function' && typeof app.renderOtaRadar === 'function',
-      '37. Kanal ve boş gece yüzeyleri gerçek render testi için dışa aktarılmış',
-      'renderGapNights/renderOtaRadar export edilmemiş');
-    if (typeof app.renderGapNights === 'function' && typeof app.renderOtaRadar === 'function') {
-      domKur(); app.setAppData(bosVeri());
-      app.renderGapNights(); app.renderOtaRadar();
-      const gapText = global.document.getElementById('gapNightGrid').innerHTML;
-      const channelText = global.document.getElementById('channelProfitabilityTableBody').innerHTML;
-      const directValue = global.document.getElementById('otaSavedCommission').innerText;
-      check(/hesaplanamadı/i.test(gapText) && !/Optimum|dengeli dağıldı/i.test(gapText)
-        && /rezervasyon kaydı yok/i.test(channelText) && directValue === '—',
-      '38. Boş işletmede kanal ve takvim başarı/tasarruf uydurmuyor',
-      `gap=${gapText.slice(0, 350)} channel=${channelText.slice(0, 350)} direct=${directValue}`);
-    }
+    // Bos gece izgarasi yalniz olu tab-dashboard'daydi (A1-G1'de silindi); bos
+    // geceler Bugun ekraninin "gelir firsatlari" sutununda gosterilir.
+    // Gizli kanal radari da A1-G1'de kalkti; kanal ekonomisinin bos isletme
+    // davranisini marketing_ui testleri olcer.
+    check(typeof app.renderGapNights === 'undefined' && typeof app.renderOtaRadar === 'undefined',
+      '37. Ölü boş gece ızgarası ve gizli kanal radarı kaldırıldı',
+      `renderGapNights=${typeof app.renderGapNights} renderOtaRadar=${typeof app.renderOtaRadar}`);
   } catch (e) {
     no('31-38. L-68 görünür rapor render senaryoları', hataOzeti(e));
   }

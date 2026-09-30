@@ -8,7 +8,6 @@ const assert = require('assert');
 const ExecutiveDashboardService = require('./executive_dashboard_service.js');
 const { collapseDuplicateActions, selectTodayCommandCenterActions } = require('./executive_priority_service.js');
 const { buildNotificationEventKey, processCandidateNotification } = require('./notification_center_service.js');
-const { buildSanitizedExecutiveContext } = require('./executive_ai_advisor.js');
 
 console.log('=============================================================================');
 console.log('🛡️  LEXBNB PHASE 12 — MULTI-TENANT CONCURRENT ISOLATION E2E SUITE');
@@ -129,27 +128,9 @@ function runMultiTenantE2eTests() {
   assert.strictEqual(notifPool.length, 2);
   recordPass('3. Identical event types across different tenants generate collision-free deterministic notifications');
 
-  // 4. AI Advisor Context Multi-Tenant Leakage Check
-  console.log('\n--- TEST 4: AI Advisor Context Isolation ---');
-  const contextA = buildSanitizedExecutiveContext({
-    tenant: { company_name: tenantA.name },
-    properties: propertiesA,
-    kpis: kpisA
-  });
-  const contextB = buildSanitizedExecutiveContext({
-    tenant: { company_name: tenantB.name },
-    properties: propertiesB,
-    kpis: kpisB
-  });
-
-  const jsonA = JSON.stringify(contextA);
-  const jsonB = JSON.stringify(contextB);
-
-  assert.strictEqual(jsonA.includes('Villa Toros'), false, 'Tenant A context must not contain Tenant B property');
-  assert.strictEqual(jsonB.includes('Villa Ege'), false, 'Tenant B context must not contain Tenant A property');
-  assert.strictEqual(jsonA.includes('18000'), false, 'Tenant A context must not contain Tenant B revenue');
-  assert.strictEqual(jsonB.includes('50000'), false, 'Tenant B context must not contain Tenant A revenue');
-  recordPass('4. AI Advisor sanitized context guarantees 0% cross-tenant data leakage');
+  // 4. (kaldirildi, A1-G1) "AI Strateji Danismani" baglam izolasyonu: danisman
+  // kullanici karariyla silindi. ChatGPT paketinin kiraci izolasyonunu
+  // chatgpt_prompt_engine testleri olcer (SOZLESMELER.md §1).
 
   console.log(`\n=============================================================================`);
   console.log(`TEST SUMMARY: ${passedTests} / ${totalTests} TESTS PASSED (0 FAILED)`);

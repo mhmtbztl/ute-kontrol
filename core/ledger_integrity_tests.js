@@ -485,14 +485,13 @@ const yazmalar = (istemci, tablo) =>
       'sabit doğrudan kanal listesi yardımcı dışında da duruyor');
   });
 
-  await test('L-37 What-if simülatörü sabit %16 / 600 TL uydurmaz; ölçülen oranı kullanır', async () => {
+  // L-37'nin simulator kismi: "Ne olursa ne olur" simulatoru kullanici karariyla
+  // kaldirildi (ENVANTER Finans 28.09.2026, A1-G1); karsiligi Fiyatlandirma'daki
+  // hedef ciro hesaplayicisi. Sabit varsayim yasagi kaynakta kalir.
+  await test('L-37 What-if simülatörü kaldırıldı; sabit %16 / 600 TL varsayımı kaynakta yok', async () => {
     assert.ok(!/\* 0\.16\b/.test(kaynak37) && !/nightsDiff \* 600/.test(kaynak37), 'sabit varsayım duruyor');
-    ortamKur(L37(), kaydedenIstemci());
-    formKur({ simAdrSlider: '0', simOccSlider: '0', simDirectSlider: '50' });
-    App.setCurrentFilter({ period: '2031-05', villa: 'ALL' });
-    App.runWhatIfSimulation();
-    // OTA geliri 20.000, komisyon 2.000 -> olculen oran %10
-    assert.match(global.document.getElementById('simResCommDelta').innerText, /%10\.0/);
+    assert.strictEqual(typeof App.runWhatIfSimulation, 'undefined', 'simülatör hâlâ dışa aktarılıyor');
+    assert.ok(!/function runWhatIfSimulation\(/.test(kaynak37), 'simülatör fonksiyonu hâlâ kaynakta');
   });
 
   await test('L-37 Aylık KPI tablosu mülk filtresine uyar', async () => {
