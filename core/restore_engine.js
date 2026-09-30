@@ -36,7 +36,8 @@
   //   tenants          -> tenant_booking_channels (seed_booking_channels_for_new_tenant)
   //   guests           -> guest_consent_events    (audit_guest_marketing_consent)
   //   tenant_invitations -> invitation_delivery_outbox (enqueue_invitation_delivery)
-  const SIDE_EFFECTS = ['tenant_booking_channels', 'guest_consent_events', 'invitation_delivery_outbox'];
+  //   tenants          -> lead_source_catalog     (seed_lead_source_catalog_for_new_tenant, phase59)
+  const SIDE_EFFECTS = ['tenant_booking_channels', 'guest_consent_events', 'invitation_delivery_outbox', 'lead_source_catalog'];
   // Olusturma zamaninin sutunu (varsayilan created_at).
   const CREATED_COL = { guest_consent_events: 'recorded_at' };
   const BATCH = 500;
