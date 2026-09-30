@@ -11,7 +11,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=82089305">
+  <link rel="stylesheet" href="style.css?v=5d30fbfb">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="supabase.umd.js?v=3810661a"></script>
@@ -374,6 +374,9 @@
 
   <!-- Main Container -->
   <main class="container">
+    <!-- Sayfa eylem yuvasi (A1-G2): "Rapor al" ve sayfaya ozel "ChatGPT'ye sor"
+         A5'te buraya kaydolur. Kayitli eylem yoksa gizli; olu dugme cizilmez. -->
+    <div id="pageActionBar" class="page-action-bar" role="toolbar" aria-label="Sayfa eylemleri" hidden></div>
 
     <!-- ======================================================= -->
     <!-- TAB: EXECUTIVE CONTROL CENTER (KONTROL MERKEZİ)         -->
@@ -1786,8 +1789,8 @@
         <div id="guestDataNotice" style="display:none; margin-bottom:12px; padding:10px 12px; border-radius:8px; background:rgba(245,158,11,.08); border:1px solid rgba(245,158,11,.25); color:#FDE68A; font-size:12px;"></div>
         <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
           <input id="guestDirectorySearch" type="search" placeholder="İsim, telefon veya e-posta ara" data-oninput="setGuestDirectoryQuery(this.value)" style="min-width:240px; flex:1;">
-          <label style="display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-muted);">Başlangıç <input id="guestDirectoryDateStart" type="date" data-onchange="setGuestDirectoryDateRange()" aria-label="Konaklama başlangıç tarihi"></label>
-          <label style="display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-muted);">Bitiş <input id="guestDirectoryDateEnd" type="date" data-onchange="setGuestDirectoryDateRange()" aria-label="Konaklama bitiş tarihi"></label>
+          <!-- Tek takvimde aralik (ENVANTER 27.09): ortak secici core/date_range_picker.js -->
+          <div id="guestDirectoryDateRange" class="daterange-filter" aria-label="Konaklama tarih aralığı"></div>
           <button type="button" class="btn btn-secondary btn-sm" data-onclick="resetGuestDirectoryDateRange()">Tüm Tarihler</button>
           <select id="guestDirectorySegment" data-onchange="setGuestDirectorySegment(this.value)" style="min-width:160px;">
             <option value="ALL">Tüm misafirler</option>
@@ -3604,8 +3607,10 @@
   <script src="core/executive_priority_service.js?v=d113e0e8"></script>
   <script src="core/executive_dashboard_service.js?v=7d6b9308"></script>
   <script src="core/captcha_gate.js?v=3ad4a776"></script>
-  <script src="core/action_dispatch.js?v=e29837f0"></script>
-  <script src="app.js?v=1bd03b85"></script>
+  <script src="core/date_range_picker.js?v=3c8f5fd9"></script>
+  <script src="core/side_panel.js?v=d763b464"></script>
+  <script src="core/action_dispatch.js?v=e1e57f2d"></script>
+  <script src="app.js?v=fe20e5f7"></script>
   <script src="core/property_analysis_context_ui.js?v=56a57dc8"></script>
   <script src="core/analysis_center_ui.js?v=beb16d7c"></script>
   <script src="core/marketing_ui.js?v=e349e32e"></script>

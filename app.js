@@ -3529,6 +3529,39 @@ function getMenuTabFor(tabId) {
   return TAB_MENU_PARENT[tabId] || tabId;
 }
 
+// Sayfa eylem yuvasi (A1-G2). Her menu sayfasi "Rapor al" ve sayfaya ozel
+// "ChatGPT'ye sor" gibi eylemlerini buraya kaydeder (A5). HTML'e kod metni
+// girmez: dugme yalniz runPageAction('<id>') cagirir, is kayittaki FONKSIYONDUR
+// (satir ici kod yasagi, CLAUDE.md 7 L-15). Kayitli eylemi olmayan sayfada
+// cubuk gizlenir; olu dugme cizilmez.
+const PAGE_ACTIONS = {};
+
+function registerPageAction(tabId, action) {
+  if (!tabId || !action || !action.id || typeof action.run !== 'function') return;
+  const liste = PAGE_ACTIONS[tabId] || (PAGE_ACTIONS[tabId] = []);
+  const i = liste.findIndex(a => a.id === action.id);
+  if (i >= 0) liste[i] = action; else liste.push(action);
+}
+
+function runPageAction(id) {
+  const aktif = typeof document !== 'undefined' && document.querySelector
+    ? (document.querySelector('.tab-content.active') || {}).id || '' : '';
+  const sekme = getMenuTabFor(String(aktif).replace(/^tab-/, ''));
+  const eylem = (PAGE_ACTIONS[sekme] || []).find(a => a.id === id);
+  if (!eylem) return false;
+  eylem.run();
+  return true;
+}
+
+function renderPageActionBar(tabId) {
+  if (typeof document === 'undefined') return;
+  const bar = document.getElementById('pageActionBar');
+  if (!bar) return;
+  const eylemler = PAGE_ACTIONS[getMenuTabFor(tabId)] || [];
+  bar.hidden = eylemler.length === 0;
+  bar.innerHTML = eylemler.map(e => `<button type="button" class="btn btn-secondary btn-sm" data-onclick="runPageAction(decodeURIComponent('${encodeActionArg(e.id)}'))"${e.title ? ` title="${escapeHtml(e.title)}"` : ''}>${escapeHtml(e.label)}</button>`).join('');
+}
+
 function switchTab(tabId) {
   document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -3536,6 +3569,7 @@ function switchTab(tabId) {
   const menuTab = getMenuTabFor(tabId);
   const activeBtn = document.querySelector(`.tab-btn[data-onclick="switchTab('${menuTab}')"]`);
   if (activeBtn) activeBtn.classList.add('active');
+  renderPageActionBar(tabId);
 
   const content = document.getElementById(`tab-${tabId}`);
   if (content) content.classList.add('active');
@@ -6840,7 +6874,6 @@ function calculateLivePreview() {
    =========================================================================== */
 const RES_CAL_MONTHS_TR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
   'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
-const RES_CAL_DOW_TR = ['Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct', 'Pa'];
 
 let resCalAnchor = null;   // gorunen ilk ayin 1'i
 let resRangeStart = null;  // 'YYYY-MM-DD'
@@ -6894,19 +6927,23 @@ function clearResDateRange() {
   renderResCalendar();
 }
 
-function pickResDate(key) {
-  if (!resRangeStart || (resRangeStart && resRangeEnd)) {
-    // Yeni bir aralik baslat
-    resRangeStart = key;
-    resRangeEnd = null;
-  } else if (key <= resRangeStart) {
-    // Girisden onceki (veya ayni) gun secildiyse yeni giris say — cikis
-    // girisden once olamaz, bu yuzden sessizce gecersiz aralik uretmeyiz.
-    resRangeStart = key;
-    resRangeEnd = null;
-  } else {
-    resRangeEnd = key;
+// Secim kurali ve ay izgarasi ortak secicide durur (core/date_range_picker.js,
+// A1-G2): rezervasyon formu ile filtreler ayni kurali kullanir.
+function getDateRangePicker() {
+  if (typeof DateRangePicker !== 'undefined') return DateRangePicker;
+  if (typeof window !== 'undefined' && window.DateRangePicker) return window.DateRangePicker;
+  if (typeof require === 'function') {
+    try { return require('./core/date_range_picker.js'); } catch (e) { /* tarayici */ }
   }
+  throw new Error('Tarih secici (core/date_range_picker.js) yuklenmedi.');
+}
+
+function pickResDate(key) {
+  // Konaklama kipi: cikis giristen once ya da ayni gun olamaz; oyle bir gun
+  // secilirse yeni giris sayilir — gecersiz aralik sessizce uretilmez.
+  const next = getDateRangePicker().pick({ start: resRangeStart, end: resRangeEnd }, key, 'stay');
+  resRangeStart = next.start;
+  resRangeEnd = next.end;
   syncResDateInputs();
   renderResCalendar();
   if (resRangeStart && resRangeEnd) toggleResDatePicker(false);
@@ -6945,30 +6982,8 @@ function setResDateRange(checkIn, checkOut) {
 }
 
 function renderResCalendarMonth(anchor) {
-  const year = anchor.getFullYear();
-  const month = anchor.getMonth();
-  const today = getTodayStr();
-  const first = new Date(year, month, 1);
-  // Pazartesi=0 olacak sekilde kaydir (JS'te Pazar=0).
-  const lead = (first.getDay() + 6) % 7;
-  const dayCount = new Date(year, month + 1, 0).getDate();
-
-  let cells = '';
-  RES_CAL_DOW_TR.forEach(d => { cells += `<div class="daterange-dow">${d}</div>`; });
-  for (let i = 0; i < lead; i++) cells += '<span class="daterange-day is-empty"></span>';
-
-  for (let day = 1; day <= dayCount; day++) {
-    const key = resDateKey(year, month, day);
-    const classes = ['daterange-day'];
-    if (key === today) classes.push('is-today');
-    if (resRangeStart && key === resRangeStart) classes.push('is-start');
-    if (resRangeEnd && key === resRangeEnd) classes.push('is-end');
-    if (resRangeStart && resRangeEnd && key > resRangeStart && key < resRangeEnd) classes.push('in-range');
-    cells += `<button type="button" class="${classes.join(' ')}" data-res-date="${key}">${day}</button>`;
-  }
-
-  return `<div><div class="daterange-month-name">${RES_CAL_MONTHS_TR[month]} ${year}</div>`
-    + `<div class="daterange-grid">${cells}</div></div>`;
+  const drp = getDateRangePicker();
+  return drp.monthHtml(drp.buildMonth(anchor, { start: resRangeStart, end: resRangeEnd }, getTodayStr()), 'data-res-date');
 }
 
 function renderResCalendar() {
@@ -15936,26 +15951,35 @@ function setGuestDirectorySegment(value, syncSelect) {
 function setGuestDirectoryProperty(value) { guestDirectoryState.propertyId = value || ''; guestDirectoryState.page = 1; renderGuestsTab(); }
 function setGuestDirectorySort(value) { guestDirectoryState.sort = value || 'RECENT'; guestDirectoryState.page = 1; renderGuestsTab(); }
 function setGuestDirectorySortDirection(value) { guestDirectoryState.direction = value === 'ASC' ? 'ASC' : 'DESC'; guestDirectoryState.page = 1; renderGuestsTab(); }
-function setGuestDirectoryDateRange() {
-  const startInput = document.getElementById('guestDirectoryDateStart');
-  const endInput = document.getElementById('guestDirectoryDateEnd');
-  const start = startInput?.value || '';
-  const end = endInput?.value || '';
-  if (endInput) endInput.setCustomValidity(start && end && end < start ? 'Bitiş tarihi başlangıç tarihinden önce olamaz.' : '');
-  if (start && end && end < start) {
-    endInput?.reportValidity();
-    return;
-  }
-  guestDirectoryState.dateStart = start;
-  guestDirectoryState.dateEnd = end;
+// Tarih filtresi tek takvimli ortak secicidir ('range' kipi: tek gun de
+// secilebilir). Eskiden iki ayri <input type="date"> vardi ve bitis
+// baslangictan once girilebiliyordu.
+let guestDirectoryDatePicker = null;
+function ensureGuestDirectoryDatePicker() {
+  if (guestDirectoryDatePicker || typeof document === 'undefined') return guestDirectoryDatePicker;
+  const kok = document.getElementById('guestDirectoryDateRange');
+  if (!kok || typeof kok.addEventListener !== 'function') return null;
+  guestDirectoryDatePicker = getDateRangePicker().mount(kok, {
+    mode: 'range',
+    today: getTodayStr(),
+    start: guestDirectoryState.dateStart,
+    end: guestDirectoryState.dateEnd,
+    ariaLabel: 'Konaklama tarih aralığı',
+    onChange: aralik => setGuestDirectoryDateRange(aralik.start, aralik.end)
+  });
+  return guestDirectoryDatePicker;
+}
+function setGuestDirectoryDateRange(start, end) {
+  const bas = start || '';
+  const bit = end || '';
+  if (bas && bit && bit < bas) return;
+  guestDirectoryState.dateStart = bas;
+  guestDirectoryState.dateEnd = bit;
   guestDirectoryState.page = 1;
   renderGuestsTab();
 }
 function resetGuestDirectoryDateRange() {
-  const startInput = document.getElementById('guestDirectoryDateStart');
-  const endInput = document.getElementById('guestDirectoryDateEnd');
-  if (startInput) startInput.value = '';
-  if (endInput) { endInput.value = ''; endInput.setCustomValidity(''); }
+  if (guestDirectoryDatePicker) guestDirectoryDatePicker.clear();
   guestDirectoryState.dateStart = '';
   guestDirectoryState.dateEnd = '';
   guestDirectoryState.page = 1;
@@ -15978,6 +16002,7 @@ function renderGuestsTab() {
   if (typeof document === 'undefined') return;
   const tbody = document.getElementById('guestsTableBody');
   if (!tbody) return;
+  ensureGuestDirectoryDatePicker();
   const api = getGuestCrmApi();
   const view = getGuestCrmView();
   const metrics = view.metrics || {};
@@ -16390,6 +16415,14 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     getMenuTabFor,
     TAB_MENU_PARENT,
+    registerPageAction,
+    renderPageActionBar,
+    runPageAction,
+    PAGE_ACTIONS,
+    getDateRangePicker,
+    ensureGuestDirectoryDatePicker,
+    setGuestDirectoryDateRange,
+    resetGuestDirectoryDateRange,
     switchTab,
     parseWhatsAppMessageText,
     isUUID,

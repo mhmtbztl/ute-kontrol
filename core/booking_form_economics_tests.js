@@ -214,10 +214,19 @@ runTest('Check-in and check-out are chosen in one range calendar', () => {
 });
 
 runTest('Range picker refuses an end date before the start date', () => {
+  // Kural ortak secicide (core/date_range_picker.js, A1-G2); form 'stay'
+  // kipiyle ona baglanir. Kaynak dizesi yerine davranis olculur.
+  const DRP = require('./date_range_picker.js');
+  const bas = { start: '2026-10-10', end: null };
+  assert.deepStrictEqual(DRP.pick(bas, '2026-10-08', 'stay'), { start: '2026-10-08', end: null },
+    'girisden onceki gun secilince gecersiz aralik uretilmemeli');
+  assert.deepStrictEqual(DRP.pick(bas, '2026-10-10', 'stay'), { start: '2026-10-10', end: null },
+    'konaklamada ayni gun cikis olamaz (0 gece)');
+  assert.deepStrictEqual(DRP.pick(bas, '2026-10-12', 'stay'), { start: '2026-10-10', end: '2026-10-12' });
   const fn = APP.slice(APP.indexOf('function pickResDate'));
   const body = fn.slice(0, fn.indexOf('\nfunction '));
-  assert.ok(body.includes('key <= resRangeStart'),
-    'girisden onceki gun secilince gecersiz aralik uretilmemeli');
+  assert.ok(/getDateRangePicker\(\)\.pick\([^)]*'stay'\)/.test(body),
+    'rezervasyon formu ortak secicinin konaklama kipini kullanmali');
 });
 
 runTest('Hidden date inputs are validated in code, not by the browser', () => {

@@ -37,8 +37,9 @@ console.log('[PASS] Misafirler screen renders canonical profiles with working de
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 assert(html.includes('id="guestDirectorySearch"'));
 assert(html.includes('id="guestDirectorySegment"'));
-assert(html.includes('id="guestDirectoryDateStart"'));
-assert(html.includes('id="guestDirectoryDateEnd"'));
+// Tarih filtresi tek takvimli ortak secici (A1-G2); iki ayri tarih kutusu yok.
+assert(html.includes('id="guestDirectoryDateRange"'));
+assert(!html.includes('id="guestDirectoryDateStart"') && !html.includes('type="date" data-onchange="setGuestDirectoryDateRange'));
 assert(html.includes('id="guestDirectorySortDirection"'));
 assert(html.includes('id="guestDirectoryProperty"'));
 assert(html.includes('value="REBOOKING"'));

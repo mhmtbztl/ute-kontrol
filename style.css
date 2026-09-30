@@ -4762,3 +4762,126 @@ body {
 .mkt-channel-table td { text-align: right; padding: 8px 12px; }
 .mkt-channel-table th:first-child,
 .mkt-channel-table td:first-child { text-align: left; }
+
+/* =========================================================================
+   A1-G2 ORTAK BILESENLER (30.09.2026)
+   ========================================================================= */
+
+/* Tarih araligi secici filtre cubugunda (core/date_range_picker.js). Form
+   icinde .daterange-group tum satiri kaplar; filtrede kendi genisligindedir. */
+.daterange-filter.daterange-group {
+  grid-column: auto;
+  flex: 0 1 360px;
+  min-width: 260px;
+}
+.daterange-filter .daterange-trigger { padding: 6px 12px; }
+.daterange-filter .daterange-leg { min-width: 88px; }
+.daterange-filter .daterange-panel {
+  right: auto;
+  width: min(640px, calc(100vw - 32px));
+}
+@media (max-width: 640px) {
+  .daterange-filter.daterange-group { flex: 1 1 100%; min-width: 0; }
+  /* Telefonda takvim tetikleyicinin yerinden bagimsiz, ekrana sabit ve ortada. */
+  .daterange-filter .daterange-panel {
+    position: fixed;
+    left: 16px !important;
+    right: 16px;
+    top: 50%;
+    width: auto;
+    max-height: 80vh;
+    overflow-y: auto;
+    transform: translateY(-50%);
+    z-index: 950;
+  }
+}
+
+/* Detay paneli (core/side_panel.js): masaustunde sagdan kayar, mobilde tam
+   ekran sayfa (ENVANTER Mulkler 27.09.2026). */
+body.side-panel-open { overflow: hidden; }
+.side-panel-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  background: rgba(2, 6, 23, 0.6);
+  animation: sidePanelFade 0.18s ease-out;
+}
+.side-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 901;
+  width: min(560px, 100vw);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border-subtle);
+  box-shadow: -18px 0 48px rgba(0, 0, 0, 0.45);
+  animation: sidePanelSlide 0.22s ease-out;
+}
+.side-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.side-panel-title { margin: 0; font-size: 17px; color: #F8FAFC; }
+.side-panel-subtitle { margin: 4px 0 0; font-size: 12px; color: var(--text-muted); }
+.side-panel-close {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: #E2E8F0;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.side-panel-close:hover { background: rgba(255, 255, 255, 0.1); }
+.side-panel-close:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.side-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 20px;
+  -webkit-overflow-scrolling: touch;
+}
+.side-panel-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border-subtle);
+}
+@media (max-width: 768px) {
+  .side-panel {
+    width: 100vw;
+    border-left: 0;
+    box-shadow: none;
+    animation: sidePanelRise 0.22s ease-out;
+  }
+  .side-panel-header { padding: 14px 16px 12px; }
+  .side-panel-body { padding: 14px 16px; }
+  .side-panel-footer { padding: 10px 16px; }
+}
+@keyframes sidePanelFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sidePanelSlide { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes sidePanelRise { from { transform: translateY(16px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .side-panel, .side-panel-backdrop { animation: none; }
+}
+
+/* Sayfa eylem yuvasi: "Rapor al" ve sayfaya ozel "ChatGPT'ye sor" (A5).
+   Kayitli eylemi olmayan sayfada yuva gorunmez; olu dugme cizilmez. */
+.page-action-bar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 0 0 12px;
+}
+.page-action-bar[hidden] { display: none; }
