@@ -3851,15 +3851,9 @@ function renderOperationsKpiStrip() {
   const borc = tasks.filter(isCleaningDebt).reduce((a, t) => a + (Number(t.amount) || 0), 0);
   setEl('opsDebtVal', `₺${Math.round(borc).toLocaleString('tr-TR')}`);
 
-  // SLA: tamamlanmis gorevlerin zamaninda bitenlerin orani. Hic tamamlanmis
-  // gorev yoksa YUZDE UYDURMA - "—" goster.
-  const tamamlanan = tasks.filter(t => t.completed || t.status === 'DONE');
-  if (tamamlanan.length === 0) {
-    setEl('opsSlaVal', '—');
-  } else {
-    const zamaninda = tamamlanan.filter(t => !t.slaBreached && !t.isLate).length;
-    setEl('opsSlaVal', `%${Math.round((zamaninda / tamamlanan.length) * 100)}`);
-  }
+  // SLA gostergesi kalkti (ENVANTER Operasyon 27.09.2026): tamamlanma zamani
+  // kaydedilmiyordu; gecikme alani hic yazilmadigi icin tamamlanmis gorev
+  // oldugu an gosterge her zaman %100'du.
 }
 
 function renderPricingKpiStrip() {
@@ -6535,15 +6529,10 @@ function renderManageBookingsTable() {
     if (b.status === 'CHECKED_OUT') statusBadge = '<span class="badge badge-slate">Tamamlandı</span>';
 
     // Highlight New Year / future special dates
-    const isNewYear = String(b.checkIn || '').slice(5, 10) === '12-31';
-
     const tr = document.createElement('tr');
-    if (isNewYear) {
-      tr.style.background = 'rgba(217, 119, 6, 0.08)';
-    }
 
     tr.innerHTML = `
-      <td><strong>${escapeHtml(vName)}</strong> ${isNewYear ? ' <span class="badge badge-amber" style="font-size:10px;">🎄 Yılbaşı</span>' : ''}</td>
+      <td><strong>${escapeHtml(vName)}</strong></td>
       <td>${escapeHtml(b.guest || 'Belirtilmedi')}${isBulkSummaryBooking(b) ? ' <span class="badge badge-slate" style="font-size:10px;" title="Aylık toplamdan girilmiş kayıt; gerçek bir konaklama değildir. Ciro ve gece toplamlarına girer, rezervasyon sayısına girmez.">Aylık özet</span>' : ''}</td>
       <td><span class="badge ${b.channel === 'AIRBNB' ? 'badge-rose' : (b.channel === 'BOOKING' ? 'badge-blue' : 'badge-emerald')}">${escapeHtml(getChannelDisplayName(b.channel))}</span></td>
       <td>${formatTrDate(b.checkIn)}</td>

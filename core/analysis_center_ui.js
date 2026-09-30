@@ -231,20 +231,5 @@ async function copyAnalysisPrompt() {
   }
 }
 
-function downloadAnalysisJson() {
-  if (!latestAnalysisExports) {
-    setAnalysisError('Önce bir analiz paketi oluşturun.');
-    return;
-  }
-  const blob = new Blob([latestAnalysisExports.json], { type: 'application/json;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = `lexbnb-analiz-${latestAnalysisExports.package.period.start}-${latestAnalysisExports.package.period.end}.json`;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
-  setAnalysisStatus('Güvenli JSON analiz özeti indirildi.');
-  if (typeof showToast === 'function') showToast('Güvenli JSON analiz özeti indirildi.', 'success');
-}
+// "JSON Indir" kalkti (ENVANTER Analiz Merkezi 30.09.2026): ChatGPT'ye metin
+// yapistiriliyor; ham JSON cogu kullanici icin anlamsiz bir dugmeydi.

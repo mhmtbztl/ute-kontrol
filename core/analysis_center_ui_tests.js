@@ -75,7 +75,9 @@ test('UI exposes asynchronous context-aware generation, copy and JSON download a
   assert(analysisUiJs.includes('async function generateAnalysisExport()'));
   assert(analysisUiJs.includes('PropertyAnalysisContextService.loadAnalysisContext'));
   assert(analysisUiJs.includes('async function copyAnalysisPrompt()'));
-  assert(analysisUiJs.includes('function downloadAnalysisJson()'));
+  // "JSON Indir" kullanici karariyla kalkti (A1-G1); geri gelmemeli.
+  assert(!analysisUiJs.includes('function downloadAnalysisJson()'));
+  assert(!indexHtml.includes('downloadAnalysisJson('));
   assert(appJs.includes("if (tabId === 'analysis') renderAnalysisCenter();"));
   assert(analysisUiJs.includes('isUUID(getActiveTenantId())'));
   assert(analysisUiJs.includes('navigator.clipboard.writeText(latestAnalysisExports.prompt)'));

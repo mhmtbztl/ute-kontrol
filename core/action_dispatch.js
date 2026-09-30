@@ -50,7 +50,7 @@
     'copyGapStoryText', 'createBookingChannelFromSettings', 'cycleHkStatus', 'deleteBookingUI',
     'deleteCleaningTask', 'deleteCleaningTaskFromModal', 'deleteExpenseUI',
     'deleteInfluencerCollab', 'deleteLeadUI', 'deleteMaint', 'deleteMarketingCampaign',
-    'downloadAnalysisJson', 'downloadSampleTemplate', 'editBooking', 'editExpense', 'editLead',
+    'downloadSampleTemplate', 'editBooking', 'editExpense', 'editLead',
     'editMaint', 'exportLedger', 'filterByPeriod', 'filterByVilla',
     'filterExpensesByCategory', 'filterHelpGlossary', 'generateAnalysisExport',
     'handleBookingChannelChange', 'handleBookingDeleteFromModal',

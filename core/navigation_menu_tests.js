@@ -60,6 +60,11 @@ try {
   check(!/switchTab\('housekeeping'\)/.test(araclar), 'B5. Araçlar menüsünde temizlik defteri kısayolu yok (Operasyon\'da)',
     'Araçlar hâlâ housekeeping açıyor');
 
+  // Kullanici karari (ENVANTER Mulkler 27.09): fotograf yukleme/galeri olmayacak;
+  // fotograf analizi ilan linkleri uzerinden ChatGPT ile yapilir.
+  check(!/data-marketing-view="gallery"/.test(INDEX) && !/galeri kararları/.test(INDEX),
+    'B6. Kanallar ve Pazarlama\'da fotoğraf galerisi görünümü yok', 'galeri düğmesi/vaadi duruyor');
+
   // --- C. Talepler | Misafirler -----------------------------------------------
   const sekme = id => {
     const b = INDEX.indexOf(`id="tab-${id}"`);
@@ -72,6 +77,14 @@ try {
   });
   check((INDEX.match(/id="guestCountBadge"/g) || []).length === 1, 'C3. Misafir sayacı tek ve sayfada duruyor',
     `${(INDEX.match(/id="guestCountBadge"/g) || []).length} adet`);
+
+  // --- E. Kucuk sokumler (ENVANTER kararlari) --------------------------------
+  check(!/id="opsSlaVal"/.test(INDEX) && !/slaBreached/.test(APP),
+    'E1. SLA göstergesi yok (tamamlanma zamanı kaydedilmiyordu; hep %100 çıkıyordu)', 'SLA kalıntısı');
+  check(!/🎄 Yılbaşı<\/span>/.test(APP),
+    'E2. Rezervasyon satırında sabit "Yılbaşı" vurgusu yok', 'Yılbaşı rozeti duruyor');
+  check(!/downloadAnalysisJson\(/.test(INDEX),
+    'E3. Analiz Merkezi\'nde "JSON İndir" düğmesi yok', 'JSON İndir duruyor');
 
   // --- D. Menu secimi --------------------------------------------------------
   let app = null;
