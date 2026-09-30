@@ -277,6 +277,8 @@ const allTestFiles = [
   'phase51_lead_revert_live_tests.js',
   'phase53_staff_boundary_live_tests.js',
   'phase53_staff_boundary_tests.js',
+  'phase55_operations_execution_live_tests.js',
+  'phase55_operations_execution_tests.js',
 
   // GitHub Actions eylemleri tam commit SHA'sina sabit
   'workflow_pin_tests.js',

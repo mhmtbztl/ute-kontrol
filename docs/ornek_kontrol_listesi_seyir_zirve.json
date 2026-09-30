@@ -1,0 +1,846 @@
+{
+  "_aciklama": [
+    "ORNEK — veri degil. Kullanicinin Seyir ve Zirve temizlik listesi PDF'lerinden (lexbnb-dosyalar) phase55 bicimine aktarim.",
+    "Her kayit property_checklist_templates satiridir: property null = genel (tum evler), dolu = o eve ozel (mulk adi ile eslenir).",
+    "Temizlik atanirken (assign_cleaning_task) genel + eve ozel bolumler sirasiyla birlestirilir ve icra satirina dondurulur.",
+    "Her maddede iki isaret: Z = temizlikci, M = denetleyen yonetici. Malzeme: OK (Var) / LOW (Az var) / OUT (Yok).",
+    "Mutfak iki evde ayni oldugu icin genel sablonda; salon (Seyir sobali, Zirve sobasiz) eve ozel. Dogus, Nefes, Sirin listeleri A3-G2 ice aktariminda ayni yontemle.",
+    "Ice aktarma A3-G2'de; uretime bu dosyadan veri YAZILMAZ."
+  ],
+  "task_type": "CLEANING",
+  "templates": [
+    {
+      "template_name": "Genel temizlik listesi (tüm evler)",
+      "property": null,
+      "items": {
+        "sections": [
+          {
+            "title": "Mutfak",
+            "items": [
+              {
+                "text": "Buzdolabı boşaltıldı mı?"
+              },
+              {
+                "text": "Tüm çöpler atıldı mı?"
+              },
+              {
+                "text": "Buzdolabı pis ise silindi mi?"
+              },
+              {
+                "text": "Bulaşıklar yıkandı mı?"
+              },
+              {
+                "text": "Bulaşıkların temiz olup olmadığı kontrol edildi mi? Tortulu kaldıysa bir daha yıkandı mı?"
+              },
+              {
+                "text": "Bulaşık makinesinin tuz oranı ayda bir kontrol edildi mi?"
+              },
+              {
+                "text": "Lavabo - tezgah temizlendi mi?"
+              },
+              {
+                "text": "Fırın içi temizlendi mi?"
+              },
+              {
+                "text": "Ocak - davlumbaz - buzdolabı parmak izleri silindi mi?"
+              },
+              {
+                "text": "Bulaşık bezi - bulaşık süngeri değiştirildi mi? Çok temizse gerek yok"
+              },
+              {
+                "text": "Bulaşık kapsülü – bulaşık deterjanı – çamaşır suyu kontrol edildi mi?"
+              },
+              {
+                "text": "Havluluk açılıp kontrol edildi mi? Yenisi eklendi mi?"
+              },
+              {
+                "text": "Çöp poşetleri kontrol edildi mi?"
+              },
+              {
+                "text": "Eksik malzemeler hemen eklendi mi?"
+              },
+              {
+                "text": "Mutfak süpürüldü ve silindi mi?"
+              },
+              {
+                "text": "Lambaların tozu alındı mı?"
+              },
+              {
+                "text": "Dolap içleri kontrol edildi mi? Pis ise temizlendi mi, bozulan malzeme atıldı mı?"
+              },
+              {
+                "text": "Bozuk cihaz varsa bildirildi mi?"
+              },
+              {
+                "text": "Makinede bulaşık kaldı mı?"
+              }
+            ]
+          }
+        ],
+        "supplies": [
+          {
+            "area": "Mutfak",
+            "item": "Bulaşık deterjanı"
+          },
+          {
+            "area": "Mutfak",
+            "item": "Bulaşık kapsülü"
+          },
+          {
+            "area": "Mutfak",
+            "item": "Çamaşır suyu"
+          },
+          {
+            "area": "Mutfak",
+            "item": "Bulaşık süngeri"
+          },
+          {
+            "area": "Mutfak",
+            "item": "Mutfak bezi"
+          },
+          {
+            "area": "Mutfak",
+            "item": "Kâğıt havlu"
+          },
+          {
+            "area": "Mutfak",
+            "item": "Orta boy çöp poşeti (en az 3)"
+          },
+          {
+            "area": "Mutfak",
+            "item": "Küçük boy çöp poşeti (en az 3)"
+          },
+          {
+            "area": "Mutfak",
+            "item": "Çay"
+          },
+          {
+            "area": "Mutfak",
+            "item": "Türk kahvesi"
+          },
+          {
+            "area": "Mutfak",
+            "item": "Granül kahve"
+          },
+          {
+            "area": "Mutfak",
+            "item": "Kekik"
+          },
+          {
+            "area": "Mutfak",
+            "item": "Nane"
+          },
+          {
+            "area": "Mutfak",
+            "item": "Karabiber"
+          },
+          {
+            "area": "Mutfak",
+            "item": "Tuz"
+          },
+          {
+            "area": "Mutfak",
+            "item": "Pul biber"
+          },
+          {
+            "area": "Mutfak",
+            "item": "Küp şeker"
+          },
+          {
+            "area": "Mutfak",
+            "item": "Bitkisel çay"
+          },
+          {
+            "area": "Mutfak",
+            "item": "Sıvı yağ"
+          },
+          {
+            "area": "Mutfak",
+            "item": "Zeytinyağı"
+          },
+          {
+            "area": "Mutfak",
+            "item": "Makarna"
+          },
+          {
+            "area": "Mutfak",
+            "item": "Bulaşık teli"
+          },
+          {
+            "area": "Salon",
+            "item": "Kozalak kovası dolu"
+          },
+          {
+            "area": "Salon",
+            "item": "Yarıdan fazla jel"
+          },
+          {
+            "area": "Salon",
+            "item": "Çalışan çakmak"
+          }
+        ]
+      }
+    },
+    {
+      "template_name": "Seyir — eve özel",
+      "property": "Seyir",
+      "items": {
+        "sections": [
+          {
+            "title": "Yatak odaları",
+            "items": [
+              {
+                "text": "Nevresimler söküldü mü?"
+              },
+              {
+                "text": "Yatak alezleri süpürüldü mü?"
+              },
+              {
+                "text": "Nevresimler yıkandı mı?"
+              },
+              {
+                "text": "Lekesi geçmeyen nevresimler detaylı yıkama için ayrıldı mı veya atıldı mı?"
+              },
+              {
+                "text": "Nevresim – yastık – yorgan kıl, tüy kontrolü detaylıca yapıldı mı?"
+              },
+              {
+                "text": "Yedek nevresim – yastık – yorganın temizliği (dolap içi kontrol edildi mi?) — gözden kaçabilir",
+                "important": true
+              },
+              {
+                "text": "Havlular yıkandı mı?"
+              },
+              {
+                "text": "Havlular kurudu ve yataklara konuldu mu – ya da yedekler konuldu mu?"
+              },
+              {
+                "text": "Kurutmada / askıda havlu kaldı mı? Kaldıysa ev hazır değildir",
+                "important": true
+              },
+              {
+                "text": "Çekmece ve dolapların içi kontrol edildi mi?"
+              },
+              {
+                "text": "1 çift 4 tek kişilik yatak nevresim ve havlular hazır mı?"
+              },
+              {
+                "text": "3 çarşaf – 3 yorgan – 3 yastık – 3 büyük – 3 küçük havlu temiz ve hazır mı?"
+              },
+              {
+                "text": "Çöpler atıldı mı?"
+              },
+              {
+                "text": "Yerler süpürüldü ve silindi mi?"
+              },
+              {
+                "text": "Tozlar alındı mı?"
+              },
+              {
+                "text": "Çift kişilik yatak odası tamamlandı"
+              },
+              {
+                "text": "4 tek kişilik yatak odası tamamlandı"
+              },
+              {
+                "text": "Camlar kapandı mı?"
+              },
+              {
+                "text": "Örümcek ağları ve karıncalar kontrol edildi mi?"
+              },
+              {
+                "text": "Cam kenarlarında sinek, böcek var mı kontrol edildi mi?"
+              }
+            ]
+          },
+          {
+            "title": "Banyolar ve lavabolar (üst, alt, bahçe)",
+            "items": [
+              {
+                "text": "(Üst banyo) Önce duştaki ve banyodaki tüm çöpler, kişisel eşyalar atıldı mı?",
+                "important": true
+              },
+              {
+                "text": "(Üst banyo) Duş başlıkları, camları, bataryalar yıkanıp parlatıldı mı? Kireç kalmamalı"
+              },
+              {
+                "text": "(Üst banyo) Duş giderindeki saç, kıl temizlendi mi?"
+              },
+              {
+                "text": "(Üst banyo) Lavabo yıkandı mı? Kireç kalmamalı"
+              },
+              {
+                "text": "(Üst banyo) Klozet alt ve üst kısımları çamaşır suyu ile yıkandı mı?"
+              },
+              {
+                "text": "(Üst banyo) Tuvalet kağıdı dolu görünse bile anahtarla açılıp kontrol edildi mi?",
+                "important": true
+              },
+              {
+                "text": "(Üst banyo) Kağıt havluluk açılıp kontrol edildi mi?"
+              },
+              {
+                "text": "(Üst banyo) Sabunluk açılıp kontrol edildi mi?"
+              },
+              {
+                "text": "(Üst banyo) Duştaki şampuan dolduruldu mu?"
+              },
+              {
+                "text": "(Üst banyo) Duştaki vücut jeli dolduruldu mu?"
+              },
+              {
+                "text": "(Üst banyo) Ayna ve dolabın tozları ve izleri silindi mi?"
+              },
+              {
+                "text": "(Alt banyo) Çöpler atıldı mı?"
+              },
+              {
+                "text": "(Alt banyo) Klozet detaylıca çamaşır suyu ile yıkandı mı?"
+              },
+              {
+                "text": "(Alt banyo) Lavabo ve ayna temizlendi mi?"
+              },
+              {
+                "text": "(Alt banyo) Sabunluk kontrol edildi mi?"
+              },
+              {
+                "text": "(Alt banyo) Tuvalet kağıdı açılıp kontrol edildi mi?"
+              },
+              {
+                "text": "(Alt banyo) Havlu kağıtlık açılıp kontrol edildi mi?"
+              },
+              {
+                "text": "Alt – üst banyo süpürüldü ve silindi mi?"
+              },
+              {
+                "text": "(Bahçe) Lavabolar ve aynalar temizlendi mi?"
+              },
+              {
+                "text": "(Bahçe) Klozet ve alaturka temizlendi mi?"
+              },
+              {
+                "text": "(Bahçe) Kağıt havluluk, sabunluk, tuvalet kağıtlığı kontrol edildi mi?"
+              },
+              {
+                "text": "Paspaslar pis ise yıkandı ve serildi mi?"
+              }
+            ]
+          },
+          {
+            "title": "Salon",
+            "items": [
+              {
+                "text": "Camlar temiz mi?"
+              },
+              {
+                "text": "Koltukların arasında bir şey kaldıysa temizlendi mi?"
+              },
+              {
+                "text": "Örümcek ağları ve karıncalar kontrol edildi mi?"
+              },
+              {
+                "text": "Koltuklar süpürüldü mü?"
+              },
+              {
+                "text": "TV ekranı - klimalar - sehpalar - masaların tozu alındı mı?"
+              },
+              {
+                "text": "Salon, yemek masası ve şömine çevresi süpürüldü ve silindi mi?"
+              },
+              {
+                "text": "Kozalak kovası dolu mu?"
+              },
+              {
+                "text": "Odun sepetinde yarılmış odun ve normal odun var mı?"
+              },
+              {
+                "text": "Jel var mı? Yarıdan fazla olmalı",
+                "important": true
+              },
+              {
+                "text": "Çakmak var mı ve çalışıyor mu?"
+              },
+              {
+                "text": "Şömine külleri temizlendi mi?"
+              },
+              {
+                "text": "Soba külleri temizlendi mi?"
+              },
+              {
+                "text": "Soba hazırlandı mı?"
+              },
+              {
+                "text": "Şömine hazırlandı mı?"
+              },
+              {
+                "text": "Camlar kapatıldı mı?"
+              },
+              {
+                "text": "Lambaların tozu alındı mı?"
+              },
+              {
+                "text": "Patlak ampul varsa bildirildi mi?"
+              },
+              {
+                "text": "Cam kenarlarında sinek, böcek var mı kontrol edildi mi?"
+              }
+            ]
+          },
+          {
+            "title": "Bahçe çardağı – kış bahçesi",
+            "items": [
+              {
+                "text": "Çardaktaki halı ve minderler süpürüldü mü?"
+              },
+              {
+                "text": "Bahçe lambaları kapatıldı mı?"
+              },
+              {
+                "text": "Bahçedeki çöpler atıldı mı?"
+              },
+              {
+                "text": "Kış bahçesindeki masalar ve sandalyeler temizlendi mi? Cam varsa altlı üstlü"
+              },
+              {
+                "text": "Kış bahçesindeki koltuk süpürüldü mü?"
+              },
+              {
+                "text": "Hemen misafir gelmeyecekse perde indirildi mi?"
+              },
+              {
+                "text": "Kış bahçesi mangal içi temizlendi mi?"
+              },
+              {
+                "text": "Kış bahçesi mangal kömürü kontrol edildi mi? En az 1-2 kg olmalı"
+              },
+              {
+                "text": "Kış bahçesi camları içeriden ve dışarıdan temiz mi?"
+              }
+            ]
+          }
+        ],
+        "supplies": [
+          {
+            "area": "Üst banyo",
+            "item": "Tuvalet kağıdı"
+          },
+          {
+            "area": "Üst banyo",
+            "item": "Kağıt havlu"
+          },
+          {
+            "area": "Üst banyo",
+            "item": "Köpük sabun"
+          },
+          {
+            "area": "Üst banyo",
+            "item": "Şampuan"
+          },
+          {
+            "area": "Üst banyo",
+            "item": "Vücut jeli"
+          },
+          {
+            "area": "Üst banyo",
+            "item": "Toz deterjan"
+          },
+          {
+            "area": "Alt banyo",
+            "item": "Tuvalet kağıdı"
+          },
+          {
+            "area": "Alt banyo",
+            "item": "Kağıt havlu"
+          },
+          {
+            "area": "Alt banyo",
+            "item": "Köpük sabun"
+          },
+          {
+            "area": "Salon",
+            "item": "Odun sepeti yarılmış odun"
+          },
+          {
+            "area": "Salon",
+            "item": "Odun sepeti normal odun"
+          },
+          {
+            "area": "Kış bahçesi",
+            "item": "En az 2 kg kömür"
+          },
+          {
+            "area": "Bahçe",
+            "item": "Sabun – tuvalet kağıdı – kağıt havlu"
+          },
+          {
+            "area": "Bahçe",
+            "item": "Jeneratör mazot"
+          }
+        ]
+      }
+    },
+    {
+      "template_name": "Zirve — eve özel",
+      "property": "Zirve",
+      "items": {
+        "sections": [
+          {
+            "title": "Yatak odaları (ODA 1 ebeveyn banyolu · ODA 2 çift kişilik · ODA 3 tek kişilik)",
+            "items": [
+              {
+                "text": "Nevresimler söküldü mü?",
+                "subChecks": [
+                  "ODA 1",
+                  "ODA 2",
+                  "ODA 3"
+                ]
+              },
+              {
+                "text": "Yatak alezleri süpürüldü mü?",
+                "subChecks": [
+                  "ODA 1",
+                  "ODA 2",
+                  "ODA 3"
+                ]
+              },
+              {
+                "text": "Nevresimler yıkandı mı?",
+                "subChecks": [
+                  "ODA 1",
+                  "ODA 2",
+                  "ODA 3"
+                ]
+              },
+              {
+                "text": "Lekesi geçmeyen nevresimler detaylı yıkama için ayrıldı mı veya atıldı mı?",
+                "subChecks": [
+                  "ODA 1",
+                  "ODA 2",
+                  "ODA 3"
+                ]
+              },
+              {
+                "text": "Nevresim – yastık – yorgan kıl, tüy kontrolü detaylıca yapıldı mı?",
+                "subChecks": [
+                  "ODA 1",
+                  "ODA 2",
+                  "ODA 3"
+                ]
+              },
+              {
+                "text": "Yedek nevresim – yastık – yorganın temizliği (dolap içi kontrol edildi mi?) — gözden kaçabilir",
+                "important": true
+              },
+              {
+                "text": "Havlular yıkandı mı?",
+                "subChecks": [
+                  "ODA 1",
+                  "ODA 2",
+                  "ODA 3"
+                ]
+              },
+              {
+                "text": "Havlular kurudu ve yataklara konuldu mu – ya da yedekler konuldu mu?",
+                "subChecks": [
+                  "ODA 1",
+                  "ODA 2",
+                  "ODA 3"
+                ]
+              },
+              {
+                "text": "Kurutmada / askıda havlu kaldı mı? Kaldıysa ev hazır değildir",
+                "important": true
+              },
+              {
+                "text": "Çekmece ve dolapların içi kontrol edildi mi?"
+              },
+              {
+                "text": "2 çift 3 tek kişilik yatak nevresim ve havlular hazır mı?"
+              },
+              {
+                "text": "2 çarşaf – 2 yorgan – 2 yastık – 2 büyük – 2 küçük havlu (yedekler) temiz ve hazır mı?"
+              },
+              {
+                "text": "Çöpler atıldı mı?"
+              },
+              {
+                "text": "Yerler süpürüldü ve silindi mi?"
+              },
+              {
+                "text": "Tozlar alındı mı?"
+              },
+              {
+                "text": "ODA 1 tamamlandı"
+              },
+              {
+                "text": "ODA 2 tamamlandı"
+              },
+              {
+                "text": "ODA 3 tamamlandı"
+              },
+              {
+                "text": "Camlar kapandı mı?"
+              },
+              {
+                "text": "Örümcek ağları ve karıncalar kontrol edildi mi?"
+              },
+              {
+                "text": "Cam önleri sinek, örümcek kontrol edildi mi?"
+              }
+            ]
+          },
+          {
+            "title": "Ebeveyn banyo – büyük banyo – sauna ve jakuzi",
+            "items": [
+              {
+                "text": "(Küçük banyo) Önce duştaki ve banyodaki tüm çöpler, kişisel eşyalar atıldı mı?",
+                "important": true
+              },
+              {
+                "text": "(Küçük banyo) Duş başlıkları, camları, bataryalar yıkanıp parlatıldı mı? Kireç kalmamalı"
+              },
+              {
+                "text": "(Küçük banyo) Duş giderindeki saç, kıl temizlendi mi?"
+              },
+              {
+                "text": "(Büyük banyo) Önce duştaki ve banyodaki tüm çöpler, kişisel eşyalar atıldı mı?",
+                "important": true
+              },
+              {
+                "text": "(Büyük banyo) Duş başlıkları, camları, bataryalar yıkanıp parlatıldı mı? Kireç kalmamalı"
+              },
+              {
+                "text": "(Büyük banyo) Duş giderindeki saç, kıl temizlendi mi?"
+              },
+              {
+                "text": "(Küçük banyo) Lavabo yıkandı mı? Kireç kalmamalı"
+              },
+              {
+                "text": "(Küçük banyo) Klozet çamaşır suyu ile yıkandı mı?"
+              },
+              {
+                "text": "(Küçük banyo) Tuvalet kağıdı dolu görünse bile anahtarla açılıp kontrol edildi mi?",
+                "important": true
+              },
+              {
+                "text": "(Küçük banyo) Kağıt havluluk açılıp kontrol edildi mi?"
+              },
+              {
+                "text": "(Küçük banyo) Sabunluk açılıp kontrol edildi mi?"
+              },
+              {
+                "text": "(Küçük banyo) Şampuan dolduruldu mu?"
+              },
+              {
+                "text": "(Küçük banyo) Vücut jeli dolduruldu mu?"
+              },
+              {
+                "text": "(Küçük banyo) Ayna ve dolabın tozları ve izleri silindi mi?"
+              },
+              {
+                "text": "(Büyük banyo) Klozet detaylıca çamaşır suyu ile yıkandı mı?"
+              },
+              {
+                "text": "(Büyük banyo) Lavabo ve ayna temizlendi mi?"
+              },
+              {
+                "text": "(Büyük banyo) Sabunluk kontrol edildi mi?"
+              },
+              {
+                "text": "(Büyük banyo) Tuvalet kağıdı açılıp kontrol edildi mi?"
+              },
+              {
+                "text": "(Büyük banyo) Havlu kağıtlık açılıp kontrol edildi mi?"
+              },
+              {
+                "text": "(Büyük banyo) Dolap içleri kontrol edildi mi?"
+              },
+              {
+                "text": "Banyolar süpürüldü ve silindi mi?"
+              },
+              {
+                "text": "(Büyük banyo) Toz çamaşır deterjanı var mı? Yoksa eklendi mi?"
+              },
+              {
+                "text": "(İki banyo) Paspaslar pis ise yıkandı ve serildi mi?"
+              },
+              {
+                "text": "Jakuzi detaylıca yıkandı ve temizlendi mi?"
+              },
+              {
+                "text": "Jakuzi şampuanı dolduruldu mu?"
+              },
+              {
+                "text": "Jakuzi duş jeli dolduruldu mu?"
+              },
+              {
+                "text": "Jakuzi ve sauna yerleri süpürüldü mü, ölü böcek ve sinekler temizlendi mi?"
+              },
+              {
+                "text": "Sauna kovasına mentol eklendi mi?"
+              }
+            ]
+          },
+          {
+            "title": "Salon",
+            "items": [
+              {
+                "text": "Camlar temiz mi?"
+              },
+              {
+                "text": "Koltukların arasında bir şey kaldıysa temizlendi mi?"
+              },
+              {
+                "text": "Örümcek ağları ve karıncalar kontrol edildi mi?"
+              },
+              {
+                "text": "Koltuklar süpürüldü mü?"
+              },
+              {
+                "text": "TV ekranları - sehpalar - masaların tozu alındı mı?"
+              },
+              {
+                "text": "Salon, yemek masası ve şömine çevresi süpürüldü ve silindi mi?"
+              },
+              {
+                "text": "Kozalak kovası dolu mu?"
+              },
+              {
+                "text": "Odun sepetinde yarılmış odun ve normal odun var mı?"
+              },
+              {
+                "text": "Jel var mı? Yarıdan fazla olmalı",
+                "important": true
+              },
+              {
+                "text": "Çakmak var mı ve çalışıyor mu?"
+              },
+              {
+                "text": "Şömine külleri temizlendi mi?"
+              },
+              {
+                "text": "Şömine bacasının tozu alındı mı?"
+              },
+              {
+                "text": "Lambaların tozu alındı mı?"
+              },
+              {
+                "text": "Şömine hazırlandı mı?"
+              },
+              {
+                "text": "Camlar kapatıldı mı?"
+              },
+              {
+                "text": "Yerler süpürüldü ve silindi mi?"
+              },
+              {
+                "text": "Patlak ampul varsa bildirildi mi?"
+              }
+            ]
+          },
+          {
+            "title": "Kış bahçesi – çardak – ateş çukuru",
+            "items": [
+              {
+                "text": "Kış bahçesi yerleri süpürüldü ve silindi mi?"
+              },
+              {
+                "text": "Ayakkabılık temizlendi mi? Arada bir hortumla yıkanmalı"
+              },
+              {
+                "text": "Kış bahçesindeki masalar ve sandalyeler temizlendi mi?"
+              },
+              {
+                "text": "Kış bahçesindeki koltuk süpürüldü mü?"
+              },
+              {
+                "text": "Kış bahçesi camları içeriden ve dışarıdan temiz mi?"
+              },
+              {
+                "text": "Çardak çöpleri atıldı mı?"
+              },
+              {
+                "text": "Çardak mangalı, lavabosu, semaveri, dolabı temizlendi mi?"
+              },
+              {
+                "text": "Çardak koltukları ve masası temizlendi mi?"
+              },
+              {
+                "text": "Bahçedeki bank ve bahçe geneli temiz mi?"
+              },
+              {
+                "text": "Ateş çukuru temiz mi, çöpler atıldı mı?"
+              }
+            ]
+          }
+        ],
+        "supplies": [
+          {
+            "area": "Küçük banyo",
+            "item": "Tuvalet kağıdı"
+          },
+          {
+            "area": "Küçük banyo",
+            "item": "Kağıt havlu"
+          },
+          {
+            "area": "Küçük banyo",
+            "item": "Köpük sabun"
+          },
+          {
+            "area": "Küçük banyo",
+            "item": "Şampuan"
+          },
+          {
+            "area": "Küçük banyo",
+            "item": "Duş jeli"
+          },
+          {
+            "area": "Büyük banyo",
+            "item": "Toz deterjan"
+          },
+          {
+            "area": "Büyük banyo",
+            "item": "Tuvalet kağıdı"
+          },
+          {
+            "area": "Büyük banyo",
+            "item": "Kağıt havlu"
+          },
+          {
+            "area": "Büyük banyo",
+            "item": "Köpük sabun"
+          },
+          {
+            "area": "Büyük banyo",
+            "item": "Şampuan"
+          },
+          {
+            "area": "Büyük banyo",
+            "item": "Duş jeli"
+          },
+          {
+            "area": "Çardak",
+            "item": "En az 2 kg kömür"
+          },
+          {
+            "area": "Çardak",
+            "item": "Sabunluk"
+          },
+          {
+            "area": "Çardak",
+            "item": "Kağıt havlu"
+          },
+          {
+            "area": "Jakuzi",
+            "item": "Duş jeli"
+          },
+          {
+            "area": "Jakuzi",
+            "item": "Şampuan"
+          }
+        ]
+      }
+    }
+  ]
+}
