@@ -208,8 +208,11 @@ async function run() {
     r = await vw.client.from('executive_alerts').select('id').eq('id', alert.id);
     check(!r.error && (r.data || []).length === 1, '3f. viewer uyarilari OKUMAYA devam eder', hataMetni(r.error) || '0 satir');
 
+    // phase53 (L-107): staff saha personelidir; misafir mesajlari satis/yonetim
+    // isidir. Bu iddia phase41'de "DEVAM EDER" idi; kullanici karari 30.09.2026.
     r = await st.client.from('scheduled_messages').update({ status: 'CANCELLED', cancelled_at: new Date().toISOString() }).eq('id', msg2.id).select('id');
-    check(!r.error && (r.data || []).length === 1, '3g. staff zamanlanmis mesaji iptal etmeye DEVAM EDER', hataMetni(r.error) || '0 satir');
+    check((await row('scheduled_messages', msg2.id, 'status')).status !== 'CANCELLED',
+      '3g. staff zamanlanmis mesaji iptal EDEMEZ (phase53)', `${hataMetni(r.error)} ${(r.data || []).length} satir`);
     r = await st.client.from('executive_alerts').update({ status: 'ACKNOWLEDGED' }).eq('id', alert.id).select('id');
     check((await row('executive_alerts', alert.id, 'status')).status === 'OPEN',
       '3h. staff yonetici uyarisini DEGISTIREMEZ', `${hataMetni(r.error)} ${(r.data || []).length} satir`);

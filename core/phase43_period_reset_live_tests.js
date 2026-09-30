@@ -87,7 +87,7 @@ async function run() {
     const S = await makeTenant(sh, 'P43 S ' + s);
     const T = await makeTenant(solo, 'P43 T ' + s);
     must(await admin.from('tenant_members').insert({ tenant_id: S, user_id: mgr.id, role: 'manager' }), 'ortak uye');
-    must(await admin.from('tenant_members').insert({ tenant_id: S, user_id: stf.id, role: 'staff' }), 'ortak personel');
+    must(await admin.from('tenant_members').insert({ tenant_id: S, user_id: stf.id, role: 'sales' }), 'ortak satis uyesi'); // phase53: rezervasyon giren uye sales
 
     const pA = await mulk(A, s, 'a');
     const bkA = await rez(A, pA.id, 'P43A-' + s, prevDay(10), prevDay(13));

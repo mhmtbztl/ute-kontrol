@@ -87,7 +87,7 @@ async function run() {
     clients.push(own, stf, own2);
     const A = await makeTenant(own, 'P49 A ' + s);
     const B = await makeTenant(own2, 'P49 B ' + s);
-    must(await admin.from('tenant_members').insert({ tenant_id: A, user_id: stf.id, role: 'staff' }), 'personel');
+    must(await admin.from('tenant_members').insert({ tenant_id: A, user_id: stf.id, role: 'sales' }), 'satis uyesi'); // phase53: rezervasyon giren uye sales (staff saha personeli)
 
     // -----------------------------------------------------------------------
     console.log('--- 1-2. REZERVASYON TARIHI GERI CEKER ---');
