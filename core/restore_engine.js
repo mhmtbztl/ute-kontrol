@@ -25,7 +25,7 @@
 }(typeof self !== 'undefined' ? self : this, function () {
   // Yazilamaz ya da yedekten yuklenmemesi gerekenler. Yeni bir VIEW
   // eklenirse buraya da eklenir; restore_engine_tests goclerle karsilastirir.
-  const VIEWS = ['channel_performance_rates'];
+  const VIEWS = ['channel_performance_rates', 'booking_payment_balances'];
   const INFRA = ['schema_migrations', 'lexbnb_bootstrap_log'];
   const LAST = ['monthly_financial_closes'];
   // Baska bir tabloya satir eklenince TETIKLEYICININ kendiliginden satir
