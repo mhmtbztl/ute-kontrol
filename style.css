@@ -1027,6 +1027,12 @@ body {
   font-weight: 600;
 }
 
+/* Kosullu kopru adimlari (temizlik geliri): sarmalayici duzende yok sayilir,
+   adimlar kardes gibi dizilir. JS gizlerken inline display:none verir. */
+.bridge-optional-group {
+  display: contents;
+}
+
 .profit-bridge-steps {
   display: flex;
   align-items: stretch;

@@ -4255,6 +4255,11 @@ function getConfiguredRevenueTarget(filter, targets, villaKey = 'ALL') {
 }
 
 function renderFinanceModule() {
+  // "Ciro" = net konaklama geliri (kullanici karari 28.09.2026, ENVANTER
+  // Finans 1): temizlik ucreti haric, indirim dusulmus. Hedef, MoM ve mulk
+  // payi bunu kullanir. Kar ve marj TOPLAM GELIR uzerinden kalir: temizlik
+  // maliyeti OPEX'te durdugu icin temizlik geliri karin icinde kalmali.
+  let ciro = 0;
   let totalRevenue = 0;
   let totalOpex = 0;
   let totalCapex = 0;
@@ -4294,7 +4299,9 @@ function renderFinanceModule() {
     const bNights = pay.nights;
 
     if (propStats[b.villa]) {
-      propStats[b.villa].revenue += bNet;
+      // Mulk "cirosu" da net konaklama geliri; toplam gelir ayrica tutulur.
+      propStats[b.villa].revenue += bRoom;
+      propStats[b.villa].totalIncome = (propStats[b.villa].totalIncome || 0) + bNet;
       propStats[b.villa].roomRevenue = (propStats[b.villa].roomRevenue || 0) + bRoom;
       propStats[b.villa].nights += bNights;
     }
@@ -4306,6 +4313,7 @@ function renderFinanceModule() {
   // null atanir ve baska hicbir yerde doldurulmaz, yani kontrol her zaman
   // false donuyordu — dal oluydu (3.6).
   {
+    ciro = ledger.netRoomRevenue;
     totalRevenue = ledger.totalRevenue;
     totalSoldNights = ledger.soldNights;
     // ADR = Net Oda Geliri / satilan gece (K-04). Satilan gece yoksa bilinmiyor.
@@ -4331,7 +4339,7 @@ function renderFinanceModule() {
       const s = propStats[vKey];
       const payda = kapasite(vKey);
       s.adr = s.nights > 0 ? Math.round((s.roomRevenue || 0) / s.nights) : 0;
-      s.share = totalRevenue > 0 ? Number(((s.revenue / totalRevenue) * 100).toFixed(1)) : 0;
+      s.share = ciro > 0 ? Number(((s.revenue / ciro) * 100).toFixed(1)) : 0;
       // Kapasite yoksa (mulk o donemde faaliyette degil) doluluk OLCULEMEZ:
       // null tasinir, ekranda "—". 0 yazmak "hic satilmadi" demek olurdu.
       s.availableNights = payda;
@@ -4392,8 +4400,8 @@ function renderFinanceModule() {
 
   // Monthly Target Comparison
   const hasTarget = Number.isFinite(Number(targetRev)) && Number(targetRev) > 0;
-  const targetDiff = hasTarget ? totalRevenue - Number(targetRev) : null;
-  const targetPct = hasTarget ? (totalRevenue / Number(targetRev)) * 100 : null;
+  const targetDiff = hasTarget ? ciro - Number(targetRev) : null;
+  const targetPct = hasTarget ? (ciro / Number(targetRev)) * 100 : null;
   const forecastEndMonth = null; // A forecast is shown only when a real forecast model supplies one.
 
   // Update Top 5 KPI Cards
@@ -4401,7 +4409,7 @@ function renderFinanceModule() {
   // duruyordu ve fonksiyonun BASINDA kullanildigi icin TDZ hatasi veriyordu:
   //   ReferenceError: Cannot access 'setEl' before initialization
 
-  setEl('finActualRevenue', `${Math.round(totalRevenue).toLocaleString('tr-TR')} TL`);
+  setEl('finActualRevenue', `${Math.round(ciro).toLocaleString('tr-TR')} TL`);
   setEl('finRevTargetDelta', hasTarget ? `Hedefin %${Math.round(Math.abs(targetPct - 100))} ${targetDiff >= 0 ? 'üzerinde' : 'altında'}` : 'Hedef belirlenmedi');
   setEl('finTargetRevenue', hasTarget ? `${Math.round(targetRev).toLocaleString('tr-TR')} TL` : '—');
   setEl('finTargetDiff', hasTarget ? `${targetDiff >= 0 ? '+' : ''}${Math.round(targetDiff).toLocaleString('tr-TR')} TL fark` : '—');
@@ -4410,35 +4418,42 @@ function renderFinanceModule() {
   setEl('finNetMarginLabel', karOlculemez ? OLCULEMEYEN_KAR_NOTU : `%${netMargin.toFixed(1)} net kâr marjı`);
 
   setEl('finTotalExpense', `${Math.round(totalExpense).toLocaleString('tr-TR')} TL`);
-  setEl('finExpenseRatio', karOlculemez ? 'Bu dönem için gider kaydı yok' : `Cironun %${expenseRatio.toFixed(1)}'i`);
+  setEl('finExpenseRatio', karOlculemez ? 'Bu dönem için gider kaydı yok' : `Toplam gelirin %${expenseRatio.toFixed(1)}'i`);
 
   setEl('finSoldNights', `${totalSoldNights} gece`);
   setEl('finAvgRevPerNight', avgRevPerNight === null ? 'ADR: — (satılan gece yok)' : `ADR ${avgRevPerNight.toLocaleString('tr-TR')} TL (net oda geliri / satılan gece)`);
 
   // Target Analysis Box
   setEl('tgtBoxTarget', hasTarget ? `${Math.round(targetRev).toLocaleString('tr-TR')} TL` : '—');
-  setEl('tgtBoxActual', `${Math.round(totalRevenue).toLocaleString('tr-TR')} TL`);
+  setEl('tgtBoxActual', `${Math.round(ciro).toLocaleString('tr-TR')} TL`);
   setEl('tgtBoxDiff', hasTarget ? `${targetDiff >= 0 ? '+' : ''}${Math.round(targetDiff).toLocaleString('tr-TR')} TL` : '—');
   setEl('tgtBoxPct', hasTarget ? `%${targetPct.toFixed(1)}` : '—');
   setEl('tgtBoxForecast', forecastEndMonth === null ? '—' : `${forecastEndMonth.toLocaleString('tr-TR')} TL`);
   setEl('finTargetStatusBadge', hasTarget ? `%${targetPct.toFixed(1)} Hedef Başarısı` : 'Hedef belirlenmedi');
-  setEl('targetBarRatioText', hasTarget ? `${Math.round(totalRevenue).toLocaleString('tr-TR')} TL / ${Math.round(targetRev).toLocaleString('tr-TR')} TL (%${targetPct.toFixed(1)})` : `${Math.round(totalRevenue).toLocaleString('tr-TR')} TL / —`);
+  setEl('targetBarRatioText', hasTarget ? `${Math.round(ciro).toLocaleString('tr-TR')} TL / ${Math.round(targetRev).toLocaleString('tr-TR')} TL (%${targetPct.toFixed(1)})` : `${Math.round(ciro).toLocaleString('tr-TR')} TL / —`);
 
   // Olcek gerceklesen ile hedefin buyugu: dolgu gerceklesen, isaret hedef.
   // Hedef asildiginda dolgu tam, isaret geride kalir — asim gorunur. Isaret
   // eskiden HTML'de sabit %62'deydi ve hic guncellenmiyordu.
   const fillEl = document.getElementById('targetBarFill');
   const markerEl = document.getElementById('targetBarMarker');
-  const olcek = hasTarget ? Math.max(targetRev, totalRevenue) : 0;
+  const olcek = hasTarget ? Math.max(targetRev, ciro) : 0;
   const yuzde = v => `${Math.round(Math.min(100, Math.max(0, (v / olcek) * 100)))}%`;
-  if (fillEl) fillEl.style.width = hasTarget && olcek > 0 ? yuzde(totalRevenue) : '0%';
+  if (fillEl) fillEl.style.width = hasTarget && olcek > 0 ? yuzde(ciro) : '0%';
   if (markerEl) {
     markerEl.hidden = !(hasTarget && olcek > 0);
     markerEl.style.left = markerEl.hidden ? '' : yuzde(targetRev);
   }
 
   // Profit Waterfall Bridge
-  setEl('brCiro', `${Math.round(totalRevenue).toLocaleString('tr-TR')} TL`);
+  // Kar koprusu: Konaklama cirosu (+ Temizlik geliri = Toplam gelir) → giderler.
+  // Cogu isletme ayri temizlik ucreti almaz: 0 ise iki adim hic gorunmez.
+  setEl('brCiro', `${Math.round(ciro).toLocaleString('tr-TR')} TL`);
+  const temizlikGeliri = ledger.cleaningRevenue;
+  const temizlikAdimi = document.getElementById('brCleaningGroup');
+  if (temizlikAdimi) temizlikAdimi.style.display = temizlikGeliri > 0 ? '' : 'none';
+  setEl('brCleaningRevenue', temizlikGeliri > 0 ? `+${Math.round(temizlikGeliri).toLocaleString('tr-TR')} TL` : '—');
+  setEl('brTotalIncome', `${Math.round(totalRevenue).toLocaleString('tr-TR')} TL`);
   setEl('brOpex', formatDeductionTl(totalOpex));
   setEl('brOpProfit', karOlculemez ? '—' : `${Math.round(operatingProfit).toLocaleString('tr-TR')} TL`);
   setEl('brCapex', formatDeductionTl(totalCapex));
@@ -4455,14 +4470,14 @@ function renderFinanceModule() {
   const prevTotals = computePreviousPeriodTotals();
   setEl('finNetProfitMoM', karOlculemez ? '—' : formatMoMLabel(netCashProfit, prevTotals.netProfit));
   setEl('finExpenseMoM', formatMoMLabel(totalExpense, prevTotals.expense));
-  setEl('finRevMoM', formatMoMLabel(totalRevenue, prevTotals.revenue));
+  setEl('finRevMoM', formatMoMLabel(ciro, prevTotals.roomRevenue));
   setEl('finNightsMoM', formatMoMLabel(totalSoldNights, prevTotals.nights));
 
   // Render Expense Donut Chart & Category Table
   renderExpenseDonutAndTable(categoryTotals, totalExpense, totalRevenue, totalOpex, totalCapex);
 
   // Render Property Finance Scorecards
-  renderPropertyFinanceCards(propStats, totalRevenue);
+  renderPropertyFinanceCards(propStats, ciro);
 
   // Render Property Comparison Chart
   renderPropertyComparisonChart(propStats);
@@ -4474,10 +4489,10 @@ function renderFinanceModule() {
   renderMonthlyTrendChart();
 
   // Render YoY Comparison
-  renderYoYComparison(totalRevenue, totalOpex, netCashProfit, totalSoldNights);
+  renderYoYComparison(ciro, totalOpex, netCashProfit, totalSoldNights);
 
   // Render AI Financial Analyst
-  renderAIFinancialAnalyst(totalRevenue, targetRev, targetPct, totalOpex, totalCapex, netCashProfit, netMargin, propStats, karOlculemez);
+  renderAIFinancialAnalyst(ciro, targetRev, targetPct, totalOpex, totalCapex, netCashProfit, netMargin, propStats, karOlculemez);
 }
 
 // -------------------------------------------------------------
@@ -10497,9 +10512,12 @@ function computeMonthActuals(monthKey, villa) {
   // Mulk filtresi (L-37): KPI izleyici ve YoY eskiden secili mulku yok sayip
   // hep portfoyu gosteriyordu.
   const l = computeMonthLedger(monthKey, villa || 'ALL');
-  if (!l) return { ciro: 0, roomRevenue: 0, opex: 0, capex: 0, nights: 0, netProfit: 0 };
+  if (!l) return { ciro: 0, totalIncome: 0, roomRevenue: 0, opex: 0, capex: 0, nights: 0, netProfit: 0 };
   return {
-    ciro: l.totalRevenue,
+    // "Ciro" = net konaklama geliri (ENVANTER Finans 1, 28.09.2026). Kar ve
+    // marj toplam gelir uzerinden: totalIncome.
+    ciro: l.netRoomRevenue,
+    totalIncome: l.totalRevenue,
     roomRevenue: l.netRoomRevenue,
     opex: l.totalOpex,
     capex: l.capex,
@@ -10520,13 +10538,13 @@ function getMonthlyKpiDataset() {
     const target = getConfiguredRevenueTarget(targetFilter, appData.targets, secili) || 0;
     const monthName = getPeriodDisplayName(m);
 
-    const { ciro, roomRevenue, opex, capex, nights, netProfit } = computeMonthActuals(m, secili);
-    // ADR ve RevPAR NET ODA GELIRINDEN (K-04). Toplam ciro temizlik ucretini
-    // de icerir; ona bolmek gecelik fiyati sisirirdi.
+    const { ciro, totalIncome, roomRevenue, opex, capex, nights, netProfit } = computeMonthActuals(m, secili);
+    // ADR ve RevPAR NET ODA GELIRINDEN (K-04). Marj, kar gibi TOPLAM GELIR
+    // uzerinden (temizlik geliri karin icinde kalir).
     const adr = nights > 0 ? Math.round(roomRevenue / nights) : 0;
-    const margin = ciro > 0 ? Number(((netProfit / ciro) * 100).toFixed(1)) : 0;
+    const margin = totalIncome > 0 ? Number(((netProfit / totalIncome) * 100).toFixed(1)) : 0;
     // L-101: hic gider yoksa o ayin kari/marji olculmemistir.
-    const profitUnmeasured = isProfitUnmeasured(ciro, opex, capex, m);
+    const profitUnmeasured = isProfitUnmeasured(totalIncome, opex, capex, m);
     const available = typeof FinancialMetricsService !== 'undefined'
       ? FinancialMetricsService.calculateAvailableNights(secili === 'ALL' ? Object.values(appData.villas || {}) : [appData.villas[secili]].filter(Boolean), metricYear, metricMonth, appData.maintenance || [])
       : null;
@@ -10761,13 +10779,13 @@ function renderMonthlyKpiTracker() {
 // =============================================================
 const KPI_EXPLANATION_GUIDES = {
   'REVENUE': {
-    title: 'Toplam Gelir (Net Oda Geliri + Temizlik Geliri)',
+    title: 'Ciro (Net Konaklama Geliri)',
     icon: '💰',
     category: 'TEMEL FİNANS',
     badgeClass: 'badge-blue',
-    summary: 'Seçili döneme düşen konaklama gecelerinin geliridir: indirimler düşülmüş oda geliri ile misafirden alınan temizlik ücretinin toplamı.',
-    warning: '⚠️ OTA komisyonu ve ödeme komisyonu geliri azaltmaz; gider olarak ayrıca düşülür. Ciro kâr demek değildir.',
-    formula: 'Net Oda Geliri = Brüt − Temizlik Ücreti − İndirim · Toplam Gelir = Net Oda Geliri + Temizlik Ücreti',
+    summary: 'Seçili döneme düşen konaklama gecelerinin geliridir: misafirden alınan temizlik ücreti hariç, indirimler düşülmüş oda geliri. Hedef, ADR ve RevPAR aynı rakamı kullanır.',
+    warning: '⚠️ Misafirden ayrıca temizlik ücreti alıyorsanız o tutar ciroya girmez; "Temizlik geliri" olarak ayrı yazılır ve kârın içinde kalır. OTA ve ödeme komisyonu ciroyu azaltmaz; gider olarak düşülür. Ciro kâr demek değildir.',
+    formula: 'Ciro = Brüt − Temizlik Ücreti − İndirim · Toplam Gelir = Ciro + Temizlik Geliri (kâr bunun üzerinden hesaplanır)',
     example: 'Ay sınırını aşan rezervasyonun yalnız bu döneme düşen gecelerinin payı sayılır.',
     actionRule: 'Ciro hacminizi gösterir ama asıl odaklanmanız gereken rakam cebinizde kalan Net Kâr\'dır.'
   },
@@ -14900,11 +14918,14 @@ function renderExecutiveKpiValues(kpis) {
   const trend = metric => !metric || metric.prior === null || metric.prior === undefined
     ? 'geçen ay veri yok' : `${formatMoMDelta(metric.current, metric.prior)} Geçen Ay`;
 
+  // Ciro = net konaklama geliri; kar, marj ve gider oranlari TOPLAM GELIR
+  // uzerinden (temizlik geliri karin icinde kalir — Finans ile ayni kural).
+  const gelir = kpis.totalIncome ? kpis.totalIncome.current : kpis.revenue.current;
   setEl('execKpiRevenue', money(kpis.revenue.current));
   setEl('execKpiOpex', money(kpis.opex.current));
   setEl('execKpiCapex', money(kpis.capex.current));
   // L-101: gider hic yoksa kar ve marj olculmus gibi gosterilmez.
-  const karOlculemez = isProfitUnmeasured(kpis.revenue.current, kpis.opex.current, kpis.capex.current,
+  const karOlculemez = isProfitUnmeasured(gelir, kpis.opex.current, kpis.capex.current,
     currentFilter && currentFilter.period);
   setEl('execKpiOperatingProfit', karOlculemez ? '—' : money(kpis.operatingProfit.current));
   setEl('execKpiProfit', karOlculemez ? '—' : money(kpis.netProfit.current));
@@ -14913,7 +14934,7 @@ function renderExecutiveKpiValues(kpis) {
   setEl('execKpiRevpar', money(kpis.revpar.current));
 
   setEl('execRevMoM', trend(kpis.revenue));
-  setEl('execOpexRatio', kpis.opex.current === null ? '—' : `${ratio(kpis.opex.current, kpis.revenue.current)} Ciro`);
+  setEl('execOpexRatio', kpis.opex.current === null ? '—' : `${ratio(kpis.opex.current, gelir)} Toplam gelir`);
   // OPEX'in otomatik kalemleri. Sunucu bir kalemi vermiyorsa (phase45
   // oncesi) o kalem "—" yazilir, 0 degil.
   const kalem = (ad, v) => `${ad}: ${v === null || v === undefined ? '—' : money(v)}`;
@@ -14922,10 +14943,10 @@ function renderExecutiveKpiValues(kpis) {
     kalem('Ödeme kom.', kpis.opex.paymentCommission),
     kalem('Temizlik', kpis.opex.cleaningCost)
   ].join(' · '));
-  setEl('execCapexRatio', kpis.capex.current === null ? '—' : `${ratio(kpis.capex.current, kpis.revenue.current)} Ciro`);
+  setEl('execCapexRatio', kpis.capex.current === null ? '—' : `${ratio(kpis.capex.current, gelir)} Toplam gelir`);
   setEl('execCapexTrend', trend(kpis.capex));
-  const operatingMargin = ratio(kpis.operatingProfit.current, kpis.revenue.current);
-  const netMargin = ratio(kpis.netProfit.current, kpis.revenue.current);
+  const operatingMargin = ratio(kpis.operatingProfit.current, gelir);
+  const netMargin = ratio(kpis.netProfit.current, gelir);
   setEl('execOperatingMargin', karOlculemez ? OLCULEMEYEN_KAR_NOTU : (operatingMargin === '—' ? '—' : `${operatingMargin} Marj`));
   setEl('execOperatingTrend', karOlculemez ? '—' : trend(kpis.operatingProfit));
   setEl('execProfitMargin', karOlculemez ? OLCULEMEYEN_KAR_NOTU : (netMargin === '—' ? '—' : `${netMargin} Marj`));

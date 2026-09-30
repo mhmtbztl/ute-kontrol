@@ -189,7 +189,9 @@ const yazmalar = (istemci, tablo) =>
   await test('L-32 Aylık KPI tablosu yapılmış temizliği OPEX\'e katar ve tahakkuk uygular', async () => {
     ortamKur(EKIM(), kaydedenIstemci());
     const m = App.computeMonthActuals('2031-10');
-    yakin(m.ciro, (30000 - 3000) * 2 / 3, 'Ekim toplam gelir (2/3 gece)');
+    // Ciro = net konaklama geliri; toplam gelir ayri (ENVANTER Finans 1, A1-G3).
+    yakin(m.totalIncome, (30000 - 3000) * 2 / 3, 'Ekim toplam gelir (2/3 gece)');
+    yakin(m.ciro, (30000 - 1500 - 3000) * 2 / 3, 'Ekim cirosu = net konaklama geliri (2/3 gece)');
     yakin(m.opex, 2400 * 2 / 3 + 1000 + 500, 'Ekim OPEX = OTA payı + yapılmış temizlik + elle');
     yakin(m.roomRevenue, (30000 - 1500 - 3000) * 2 / 3, 'Ekim net oda geliri');
   });
@@ -500,8 +502,11 @@ const yazmalar = (istemci, tablo) =>
     v.villas = { A: { id: PROP_A, slug: 'A' }, B: { id: PROP_B, slug: 'B' } };
     v.bookings.push({ id: 'b9', villa: 'B', propertyId: PROP_B, checkIn: '2031-05-20', checkOut: '2031-05-21', gross: 5000, status: 'CONFIRMED' });
     ortamKur(v, kaydedenIstemci());
-    yakin(App.computeMonthActuals('2031-05', 'A').ciro, 30000, 'A');
-    yakin(App.computeMonthActuals('2031-05').ciro, 35000, 'portföy');
+    yakin(App.computeMonthActuals('2031-05', 'A').totalIncome, 30000, 'A toplam gelir');
+    yakin(App.computeMonthActuals('2031-05').totalIncome, 35000, 'portföy toplam gelir');
+    // Ciro temizlik ucretini (A'da 2.000) icermez.
+    yakin(App.computeMonthActuals('2031-05', 'A').ciro, 28000, 'A ciro');
+    yakin(App.computeMonthActuals('2031-05').ciro, 33000, 'portföy ciro');
     assert.match(kaynak37, /computeMonthActuals\(m, secili\)/);
   });
 

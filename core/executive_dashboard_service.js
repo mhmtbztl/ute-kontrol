@@ -172,7 +172,11 @@
 
     const targets = options.targets || {};
     const prior = options.priorSnapshot || null;
-    const revenue = roundMoney(snapshot.total_revenue);
+    // "Ciro" = net konaklama geliri (room_revenue; ENVANTER Finans 1,
+    // 28.09.2026). Toplam gelir (temizlik geliri dahil) kar hesabinin tabani
+    // olarak ayrica tasinir. room_revenue yoksa (phase32 oncesi sunucu) ciro
+    // bilinmiyor: null, toplam gelirle doldurulmaz.
+    const totalIncome = roundMoney(snapshot.total_revenue);
     const expenses = roundMoney(snapshot.total_expenses);
     const netProfit = roundMoney(snapshot.net_profit);
     const hasExpenseBreakdown = snapshot.operating_expenses !== null && snapshot.operating_expenses !== undefined
@@ -189,6 +193,9 @@
       ? null : roundMoney(snapshot.occupancy);
     const hasRoomRevenue = snapshot.room_revenue !== null && snapshot.room_revenue !== undefined;
     const roomRevenue = hasRoomRevenue ? roundMoney(snapshot.room_revenue) : null;
+    const revenue = roomRevenue;
+    const cleaningRevenue = snapshot.cleaning_revenue === null || snapshot.cleaning_revenue === undefined
+      ? null : roundMoney(snapshot.cleaning_revenue);
 
     const targetRevenue = Number(targets.revenue_target || targets.revenueTarget || 0);
     const targetProfit = Number(targets.profit_target || targets.profitTarget || 0);
@@ -204,7 +211,7 @@
       };
     }
 
-    const priorRevenue = prior ? roundMoney(prior.total_revenue) : null;
+    const priorTotalIncome = prior ? roundMoney(prior.total_revenue) : null;
     const priorNetProfit = prior ? roundMoney(prior.net_profit) : null;
     const priorHasExpenseBreakdown = !!prior
       && prior.operating_expenses !== null && prior.operating_expenses !== undefined
@@ -214,6 +221,7 @@
       ? roundMoney(prior.occupancy) : null;
     const priorRoomRevenue = prior && prior.room_revenue !== null && prior.room_revenue !== undefined
       ? roundMoney(prior.room_revenue) : null;
+    const priorRevenue = priorRoomRevenue;
     const priorBookedNights = prior ? Math.max(0, Number(prior.booked_nights) || 0) : 0;
     const priorAvailableNights = prior ? Math.max(0, Number(prior.available_nights) || 0) : 0;
 
@@ -225,6 +233,7 @@
       availableNights,
       otaCommission,
       revenue: { current: revenue, target: targetRevenue, variance: variance(revenue, targetRevenue), prior: priorRevenue },
+      totalIncome: { current: totalIncome, cleaningRevenue, prior: priorTotalIncome },
       opex: {
         current: opex,
         manual: snapshot.manual_opex === null || snapshot.manual_opex === undefined ? null : roundMoney(snapshot.manual_opex),

@@ -47,7 +47,9 @@ test('Sunucu snapshot finansal KPI sekline kayipsiz donusur', () => {
   });
 
   assert.strictEqual(result.source, 'SERVER_SNAPSHOT');
-  assert.strictEqual(result.revenue.current, 50000);
+  // Ciro = net konaklama geliri (room_revenue); toplam gelir ayri (ENVANTER Finans 1).
+  assert.strictEqual(result.revenue.current, 42000);
+  assert.strictEqual(result.totalIncome.current, 50000);
   assert.strictEqual(result.expenses, 15000);
   assert.strictEqual(result.opex.current, 12000);
   assert.strictEqual(result.opex.manual, 8000);
@@ -57,7 +59,9 @@ test('Sunucu snapshot finansal KPI sekline kayipsiz donusur', () => {
   assert.strictEqual(result.netProfit.current, 35000);
   assert.strictEqual(result.adr.current, 4200);
   assert.strictEqual(result.revpar.current, 1050);
-  assert.strictEqual(result.revenue.prior, 40000);
+  assert.strictEqual(result.revenue.prior, 36000);
+  assert.strictEqual(result.totalIncome.prior, 40000);
+  assert.strictEqual(result.revenue.variance.varianceAmount, 42000 - 60000);
   assert.strictEqual(result.adr.prior, 4000);
   assert.strictEqual(result.forecast.monthEndRevenue, null);
 });
@@ -73,6 +77,9 @@ test('Eski semada room_revenue yoksa ADR ve RevPAR uydurulmaz', () => {
   });
   assert.strictEqual(result.adr.current, null);
   assert.strictEqual(result.revpar.current, null);
+  // Ciro bilinmiyor: toplam gelirle DOLDURULMAZ (3.6).
+  assert.strictEqual(result.revenue.current, null);
+  assert.strictEqual(result.totalIncome.current, 50000);
   assert.strictEqual(result.hasExpenseBreakdown, false);
   assert.strictEqual(result.opex.current, null);
   assert.strictEqual(result.capex.current, null);
@@ -158,7 +165,11 @@ async function runAsyncTests() {
   App.renderExecutiveSnapshotKpis();
   assert.deepStrictEqual(calls.map(call => call.args.p_target_month), ['2026-04', '2026-03']);
   assert.ok(calls.every(call => call.name === 'get_executive_dashboard_snapshot'));
-  assert.strictEqual(elements.execKpiRevenue.innerText, '₺50.000');
+  // Kart ciroyu (net konaklama geliri) gosterir; kar ve marj toplam gelir
+  // (50.000) uzerinden: 35.000 / 50.000 = %70 (ENVANTER Finans 1).
+  assert.strictEqual(elements.execKpiRevenue.innerText, '₺42.000');
+  assert.strictEqual(elements.execProfitMargin.innerText, '%70 Marj');
+  assert.strictEqual(elements.execOpexRatio.innerText, '%24 Toplam gelir');
   assert.strictEqual(elements.execKpiOpex.innerText, '₺12.000');
   assert.strictEqual(elements.execKpiCapex.innerText, '₺3.000');
   assert.strictEqual(elements.execKpiOperatingProfit.innerText, '₺38.000');

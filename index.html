@@ -11,7 +11,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=bc859c8d">
+  <link rel="stylesheet" href="style.css?v=82089305">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="supabase.umd.js?v=3810661a"></script>
@@ -408,7 +408,7 @@
         <!-- 1. Realized Revenue -->
         <div class="executive-kpi-card" id="execCardRevenue">
           <div class="kpi-card-header">
-            <span class="kpi-label">TOPLAM GELİR (NET ODA + TEMİZLİK)</span>
+            <span class="kpi-label">CİRO (NET KONAKLAMA GELİRİ)</span>
             <button class="kpi-info-btn" data-onclick="showKpiExplanation('REVENUE')">ℹ️</button>
           </div>
           <div class="kpi-val" id="execKpiRevenue">—</div>
@@ -666,7 +666,7 @@
         <!-- Gerçekleşen Ciro -->
         <div class="kpi-card fin-kpi-card">
           <div class="kpi-card-header">
-            <span class="kpi-label">GERÇEKLEŞEN CİRO</span>
+            <span class="kpi-label">CİRO (NET KONAKLAMA GELİRİ)</span>
             <button class="kpi-info-btn" data-onclick="showKpiExplanation('REVENUE')">ℹ️</button>
           </div>
           <div class="kpi-value" id="finActualRevenue">—</div>
@@ -795,9 +795,25 @@
         <div class="profit-bridge-steps" id="profitBridgeContainer">
           <!-- Step 1: Ciro -->
           <div class="bridge-step ciro">
-            <span class="step-label">Ciro</span>
+            <span class="step-label">Konaklama Cirosu</span>
             <strong class="step-val" id="brCiro">—</strong>
-            <span class="step-sub">Brüt Oda & Hizmet Geliri</span>
+            <span class="step-sub">Net oda geliri (indirim düşülmüş, temizlik hariç)</span>
+          </div>
+          <!-- Misafirden ayri temizlik ucreti alinmiyorsa (cogu isletme) bu iki
+               adim hic gorunmez; JS temizlik geliri > 0 ise acar. -->
+          <div id="brCleaningGroup" class="bridge-optional-group" style="display: none;">
+            <div class="bridge-arrow">+</div>
+            <div class="bridge-step ciro">
+              <span class="step-label">Temizlik Geliri</span>
+              <strong class="step-val" id="brCleaningRevenue">—</strong>
+              <span class="step-sub">Misafirden alınan temizlik ücreti</span>
+            </div>
+            <div class="bridge-arrow">=</div>
+            <div class="bridge-step ciro">
+              <span class="step-label">Toplam Gelir</span>
+              <strong class="step-val" id="brTotalIncome">—</strong>
+              <span class="step-sub">Kâr bu tutar üzerinden hesaplanır</span>
+            </div>
           </div>
           <div class="bridge-arrow">↓</div>
 
@@ -3586,10 +3602,10 @@
   <script src="core/gap_night_service.js?v=6cdf4142"></script>
   <script src="core/pricing_booking_service.js?v=0eb93c05"></script>
   <script src="core/executive_priority_service.js?v=d113e0e8"></script>
-  <script src="core/executive_dashboard_service.js?v=ca6c3133"></script>
+  <script src="core/executive_dashboard_service.js?v=7d6b9308"></script>
   <script src="core/captcha_gate.js?v=3ad4a776"></script>
   <script src="core/action_dispatch.js?v=e29837f0"></script>
-  <script src="app.js?v=11e04408"></script>
+  <script src="app.js?v=1bd03b85"></script>
   <script src="core/property_analysis_context_ui.js?v=56a57dc8"></script>
   <script src="core/analysis_center_ui.js?v=beb16d7c"></script>
   <script src="core/marketing_ui.js?v=e349e32e"></script>

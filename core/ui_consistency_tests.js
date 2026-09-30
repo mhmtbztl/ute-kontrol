@@ -457,6 +457,36 @@ try {
     'R1. Üst çubuktaki düğme sayfayı değil veriyi yeniden okur ve adı bunu söyler', 'düğme hâlâ reloadPage');
   check(/Eşitlendi \$\{saat\}/.test(APP2) && /renderDataSyncStamp\(\);\n\n  \/\/ Badges/.test(APP2),
     'R2. Son eşitleme zamanı her çizimde düğmede görünür', 'renderDataSyncStamp renderAll\'da yok');
+
+  // --- S. Ciro = net konaklama geliri (ENVANTER Finans 1, A1-G3) --------------
+  // Temizlik ucreti ciroya girmez; ayri gelir kalemi olarak karin icinde kalir.
+  // Hedef, MoM ve mulk payi ciroyu; kar, marj ve gider orani toplam geliri kullanir.
+  app.setAppData(veri({ bookings: [rezB('r1', 11500, { cleaningFee: 1500 })], cleaningTasks: [],
+    targets: { [buAy]: { revenue_target: 10000 } },
+    expenses: [{ id: 'e1', villa: 'V1', date: `${buAy}-04`, amount: 1000, category: 'Bakım', type: 'OPEX' }] }));
+  ayFiltresi();
+  app.renderFinanceModule();
+  check(g('finActualRevenue').innerText === '10.000 TL' && g('brCiro').innerText === '10.000 TL',
+    'S1. Ciro kartı ve köprünün ilk adımı temizlik ücreti hariç net konaklama geliri',
+    `kart=${g('finActualRevenue').innerText} kopru=${g('brCiro').innerText}`);
+  check(g('brCleaningGroup').style.display === '' && g('brCleaningRevenue').innerText === '+1.500 TL'
+    && g('brTotalIncome').innerText === '11.500 TL',
+    'S2. Temizlik geliri varsa köprüde ayrı adım: + temizlik geliri = toplam gelir',
+    `grup=${g('brCleaningGroup').style.display} temizlik=${g('brCleaningRevenue').innerText} toplam=${g('brTotalIncome').innerText}`);
+  check(g('finNetProfit').innerText === '10.500 TL' && /%91[.,]3/.test(g('finNetMarginLabel').innerText),
+    'S3. Kâr ve marj toplam gelirden: 11.500 − 1.000 = 10.500, marj %91,3 (temizlik geliri kârda kalır)',
+    `net=${g('finNetProfit').innerText} marj=${g('finNetMarginLabel').innerText}`);
+  check(g('tgtBoxPct').innerText === '%100.0',
+    'S4. Hedef ciroyla karşılaştırılır (10.000 / 10.000), toplam gelirle değil (%115)', g('tgtBoxPct').innerText);
+  app.setAppData(veri({ bookings: [rezB('r1', 12000)], cleaningTasks: [] }));
+  ayFiltresi();
+  app.renderFinanceModule();
+  check(g('brCleaningGroup').style.display === 'none' && g('finActualRevenue').innerText === '12.000 TL',
+    'S5. Temizlik ücreti alınmıyorsa köprüde temizlik adımları hiç görünmez', `grup=${g('brCleaningGroup').style.display}`);
+  check(/<span class="kpi-label">CİRO \(NET KONAKLAMA GELİRİ\)<\/span>[\s\S]{0,200}id="finActualRevenue"/.test(INDEX2)
+    && /<span class="kpi-label">CİRO \(NET KONAKLAMA GELİRİ\)<\/span>[\s\S]{0,200}id="execKpiRevenue"/.test(INDEX2)
+    && !/TOPLAM GELİR \(NET ODA \+ TEMİZLİK\)/.test(INDEX2),
+    'S6. Finans ve Bugün kartlarının etiketi aynı: "Ciro (net konaklama geliri)"', 'etiket eski ya da farklı');
 } finally {
   console.log(`\nTEST SUMMARY: ${passed} / ${passed + failed} TESTS PASSED (${failed} FAILED)`);
   if (failed > 0) process.exit(1);

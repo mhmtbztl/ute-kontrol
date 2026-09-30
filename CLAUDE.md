@@ -82,9 +82,9 @@ Node'da (testler) muaf; orada yerel yol doğrulama mantığının test yüzeyidi
 K-04 sözleşmesi (kullanıcı kararı 23–25 Eylül 2026; phase45):
 ```
 Brüt Oda Geliri = brüt − misafirden alınan temizlik ücreti
-Net Oda Geliri  = Brüt Oda Geliri − indirim          ← "konaklama cirosu"
+Net Oda Geliri  = Brüt Oda Geliri − indirim          ← "CİRO" (net konaklama geliri)
 Temizlik Geliri = misafirden alınan temizlik ücreti  ← ayrı gelir kalemi
-Toplam Gelir    = Net Oda Geliri + Temizlik Geliri   (= brüt − indirim; iptaller hariç)
+Toplam Gelir    = Net Oda Geliri + Temizlik Geliri   (= brüt − indirim; iptaller hariç) ← kârın tabanı
 OPEX            = elle girilen giderler
                 + Σ OTA komisyonu         ← rezervasyondan, gecelere tahakkuk
                 + Σ ödeme komisyonu       ← booking_payment_commissions, gecelere tahakkuk
@@ -101,6 +101,21 @@ sunucuda `compute_month_close_snapshot` ve `get_executive_dashboard_snapshot`
 `phase45_cleaning_cost_live_tests`). Bir ekran kendi toplamını yapmaz: bir
 zamanlar Finans, kokpit, KPI tablosu ve önceki dönem rozetleri dört ayrı
 formülle aynı ay için farklı net kâr raporluyordu.
+
+**"Ciro" = Net Oda Geliri (net konaklama geliri) — kullanıcı kararı 28.09.2026,
+A1-G3.** Gerekçe (kullanıcı): "çoğu firma ek temizlik ücreti almıyor; karışıklığa
+sebep olabilir." Ekranda "ciro" yazan her yer (Finans ve Bugün kartı, hedef,
+geçen aya göre rozeti, mülk payı, aylık KPI tablosu, hedef ciro hesaplayıcısı)
+`netRoomRevenue` / sunucuda `room_revenue` gösterir. **Kâr formülü değişmedi:**
+kâr, marj ve gider oranı Toplam Gelir üzerinden kalır, çünkü temizlik maliyeti
+OPEX'te durur; ücreti gelirden çıkarıp maliyeti bırakmak kârı olduğundan düşük
+gösterirdi. Kâr köprüsü: Konaklama cirosu (+ Temizlik geliri = Toplam gelir) →
+OPEX → CAPEX → Net kâr; temizlik geliri 0 ise o iki adım **görünmez**. Sunucu
+iki alanı zaten döndürüyordu; **göç gerekmedi.** Bu karardan önce girilen aylık
+hedefler toplam gelire göre girilmişti ve artık ciroyla karşılaştırılır.
+`computeMonthActuals` ikisini ayrı taşır (`ciro`, `totalIncome`). Ağı
+`ui_consistency_tests` S1–S6, `executive_snapshot_ui_tests`,
+`ledger_integrity_tests` L-32/L-37.
 
 **Temizlik iki ayrı kalemdir; asla tek sayıya indirgenmez (2026-09-14 kararı).**
 
