@@ -35,14 +35,14 @@ function fixture() {
 
 test('eksik tabloyu reddeder', () => {
   const spec = fixture();
-  delete spec.definitions.pricing_profiles;
-  assert(compareContract(inspectOpenApi(spec)).errors.some(e => e.includes('pricing_profiles')));
+  delete spec.definitions.leads;
+  assert(compareContract(inspectOpenApi(spec)).errors.some(e => e.includes('leads')));
 });
 
 test('eksik sütunu reddeder', () => {
   const spec = fixture();
-  delete spec.definitions.bookings.properties.quote_snapshot;
-  assert(compareContract(inspectOpenApi(spec)).errors.some(e => e.includes('bookings.quote_snapshot')));
+  delete spec.definitions.leads.properties.guest_phone;
+  assert(compareContract(inspectOpenApi(spec)).errors.some(e => e.includes('leads.guest_phone')));
 });
 
 test('yanlış nullability durumunu reddeder', () => {
@@ -53,8 +53,8 @@ test('yanlış nullability durumunu reddeder', () => {
 
 test('eksik RPC ve imzasını reddeder', () => {
   const spec = fixture();
-  delete spec.paths['/rpc/accept_booking_quote_atomic'];
-  assert(compareContract(inspectOpenApi(spec)).errors.some(e => e.includes('accept_booking_quote_atomic')));
+  delete spec.paths['/rpc/convert_lead_to_booking_atomic'];
+  assert(compareContract(inspectOpenApi(spec)).errors.some(e => e.includes('convert_lead_to_booking_atomic')));
 });
 
 test('beklenmeyen nesneyi reddeder, gerekçeli allowlisti kabul eder', () => {
@@ -75,19 +75,19 @@ test('readiness yalniz salt okunur yetki kanitlarini kabul eder', () => {
   assert.strictEqual(isAnonProbeDenied('table', 404, ''), false);
   assert.strictEqual(isAnonProbeDenied('rpc', 403, '{"code":"42501","message":"permission denied"}'), true);
   assert.strictEqual(isAnonProbeDenied('rpc', 200, '{}'), false);
-  assert.deepStrictEqual(securityLedgerErrors([42, 44]), []);
-  assert(securityLedgerErrors([42]).some(error => error.includes('phase44')));
+  assert.deepStrictEqual(securityLedgerErrors([42]), []);
+  assert(securityLedgerErrors([44]).some(error => error.includes('phase42')));
 });
 
 test('test ve üretim drift karşılaştırması nullability, sütun ve RPC farkını bulur', () => {
   const production = fixture();
   production.definitions.leads.required.push('guest_name');
-  delete production.definitions.bookings.properties.quote_snapshot;
-  delete production.paths['/rpc/save_manual_pricing_override_atomic'];
+  delete production.definitions.leads.properties.guest_phone;
+  delete production.paths['/rpc/convert_lead_to_booking_atomic'];
   const drift = compareSchemas(inspectOpenApi(fixture()), inspectOpenApi(production));
   assert(drift.some(x => x.includes('leads.guest_name')));
-  assert(drift.some(x => x.includes('bookings.quote_snapshot')));
-  assert(drift.some(x => x.includes('save_manual_pricing_override_atomic')));
+  assert(drift.some(x => x.includes('leads.guest_phone')));
+  assert(drift.some(x => x.includes('convert_lead_to_booking_atomic')));
 });
 
 console.log(`TEST SUMMARY: ${passed} / 8 TESTS PASSED (${process.exitCode ? 1 : 0} FAILED)`);

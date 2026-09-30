@@ -271,6 +271,8 @@ const allTestFiles = [
   'shared_components_tests.js',
   'a1_engine_audit_tests.js',
   'a2_finance_ui_tests.js',
+  'a2_reservations_ui_tests.js',
+  'a2_marketing_ui_tests.js',
   'phase49_activation_live_tests.js',
   'phase51_lead_revert_live_tests.js',
 

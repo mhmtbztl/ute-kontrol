@@ -4894,6 +4894,16 @@ body.side-panel-open { overflow: hidden; }
   border-radius: 12px;
   background: var(--bg-card);
 }
+.tape-property-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 7px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.12);
+}
+.tape-chart-table tbody tr:nth-child(even) .tape-cell,
+.tape-chart-table tbody tr:nth-child(even) .tape-villa-td { background: rgba(255,255,255,0.035); }
 .finance-disclosure > summary {
   display: flex;
   align-items: center;
@@ -4928,4 +4938,33 @@ body.side-panel-open { overflow: hidden; }
   .finance-disclosure > .card,
   .finance-disclosure > .grid-2col { margin: 10px; }
   .period-summary-grid { grid-template-columns: 1fr; }
+}
+
+.reservation-range-group { position: relative; }
+.reservation-range-panel { min-width: 330px; right: 0; left: auto; z-index: 30; }
+.reservation-list-row { cursor: pointer; }
+.reservation-list-row:hover { background: rgba(59,130,246,0.08); }
+.reservation-markers { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+.reservation-marker { font-size: 9px; font-weight: 800; border-radius: 999px; padding: 2px 6px; }
+.marker-checkin { color: #93C5FD; background: rgba(59,130,246,0.16); }
+.marker-checkout { color: #FDE68A; background: rgba(245,158,11,0.16); }
+.marker-cleaning { color: #FCA5A5; background: rgba(239,68,68,0.16); }
+.booking-detail-grid { display: grid; gap: 2px; }
+.booking-detail-row { display: flex; justify-content: space-between; gap: 18px; padding: 11px 0; border-bottom: 1px solid var(--border-subtle); }
+.booking-detail-row span { color: var(--text-muted); }
+.booking-detail-row strong { text-align: right; }
+
+@media (max-width: 768px) {
+  .reservation-range-group { width: 100%; }
+  .reservation-range-group > button { width: 100%; justify-content: center; }
+  .reservation-range-panel { position: fixed; inset: 68px 10px auto; min-width: 0; }
+  .reservation-list-table thead { display: none; }
+  .reservation-list-table,
+  .reservation-list-table tbody,
+  .reservation-list-table tr,
+  .reservation-list-table td { display: block; width: 100%; }
+  .reservation-list-table tr { margin-bottom: 12px; padding: 10px 12px; border: 1px solid var(--border-subtle); border-radius: 10px; background: var(--bg-surface-elevated); }
+  .reservation-list-table td { display: flex; justify-content: space-between; gap: 16px; padding: 7px 0; border: 0; text-align: right; }
+  .reservation-list-table td::before { content: attr(data-label); color: var(--text-muted); font-size: 11px; font-weight: 700; text-align: left; }
+  .reservation-list-table td:first-child { align-items: flex-start; }
 }

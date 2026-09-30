@@ -1,5 +1,7 @@
 # Phase 11 üretim dağıtım paketi
 
+> Durum (2026-10-01): Phase11 ve Phase44 kullanıcı kararıyla güncel production-readiness kapsamından çıkarılmıştır. Bu belge yalnız ertelenen fiyatlandırma şemasının ileride ayrıca uygulanması için korunur; A2/Phase42 dağıtımının önkoşulu değildir.
+
 Bu paket fiyatlandırma sözleşmesini üretime güvenli ve ileri yönlü olarak kurar. Araç üretim şemasına yazmaz; SQL yalnız Supabase Dashboard → SQL Editor'de kullanıcı tarafından çalıştırılır.
 
 ## Beklenen sözleşme
@@ -77,7 +79,7 @@ $env:LEXBNB_CONFIRM_PRODUCTION_PROJECT = 'kirpcqklyjlrhvdbgdrq.supabase.co'
 npm run production:readiness
 ```
 
-Kapı sıfır çıkış vermeden dağıtım tamamlanmış sayılmaz.
+Bu komut güncel readiness kapsamını (Phase42 dahil) doğrular; Phase11/44'ün uygulanmış olduğunu doğrulamaz. Phase11/44 ileride uygulanırsa bu belgedeki özel salt-okunur kontroller ayrıca yürütülür.
 
 ## Yetki doğrulaması
 

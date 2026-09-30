@@ -6,11 +6,8 @@ const { inspectOpenApi, compareContract } = require('./schema_contract.js');
 
 const PRODUCTION_REF = 'kirpcqklyjlrhvdbgdrq';
 const TEST_REF = 'pdeiorpgxetksyogrmbi';
-const PROTECTED_TABLES = [
-  'pricing_profiles', 'pricing_rules', 'pricing_events', 'pricing_overrides',
-  'daily_rates', 'rate_change_logs', 'booking_quotes'
-];
-const PROTECTED_RPCS = ['save_manual_pricing_override_atomic', 'accept_booking_quote_atomic'];
+const PROTECTED_TABLES = ['leads'];
+const PROTECTED_RPCS = [];
 
 function readEnvironment() {
   const values = {};
@@ -61,9 +58,9 @@ function isAnonProbeDenied(_kind, status, body) {
 }
 
 function securityLedgerErrors(versions) {
-  return versions.includes(44)
+  return versions.includes(42)
     ? []
-    : ['eksik guvenlik gocu: phase44 RPC ve fiyatlandirma yetki dogrulamasi kayitli degil'];
+    : ['eksik sözleşme göçü: phase42 leads.guest_name nullability ve ad/telefon kuralı kayıtlı değil'];
 }
 
 async function probeAnonPrivileges(url, key) {

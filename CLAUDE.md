@@ -568,10 +568,10 @@ raporlanmaz.
 **phase42 (`migration_phase42_lead_identity_contract.sql`) ve phase44
 (`migration_phase44_pricing_late_deploy_hardening.sql`) 25 Eylül 2026'da test
 projesine bootstrap edildi.** Phase42 `leads.guest_name` alanını nullable yapar
-ve "ad veya telefon" CHECK kuralını korur. Phase44, üretime geç uygulanacak
-phase11 tablolarını phase41'in anon/tenant değişmezliği/yazma rolü sözleşmesine
-taşır. İkisi de üretimde henüz uygulanmadı; Phase11 ile birlikte readiness
-kapısı bu yüzden kırmızıdır. Paket: `docs/PHASE11_DEPLOY_PACKAGE.md`.
+ve "ad veya telefon" CHECK kuralını korur; üretimde henüz uygulanmadı. Üretim
+paketi: `docs/PHASE42_DEPLOY_PACKAGE.md`. Phase11/phase44, 30 Eylül 2026 ürün
+kararıyla production readiness kapsamı dışındadır; migration dosyaları ve
+manifest kayıtları tarihsel bütünlük için korunur, üretime uygulanmış sayılmaz.
 
 **phase49 (`migration_phase49_property_activation_floor.sql`) 26 Eylül 2026'da
 test projesine ve üretime uygulandı; üretimde doğrulandı.** Mülkün faaliyete

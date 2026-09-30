@@ -111,6 +111,7 @@ domKur();
 
 global.ExecutiveDashboardService = require('./executive_dashboard_service.js');
 const app = require('../app.js');
+const MarketingUI = require('./marketing_ui.js');
 
 let passed = 0, failed = 0;
 const ok = n => { passed++; console.log(`[PASS] ${n}`); };
@@ -412,43 +413,34 @@ function run() {
     no('28-30. L-67 takvim render senaryoları', hataOzeti(e));
   }
 
-  // L-68: Raporlar ilk musterinin sabit rakamlarini gostermemeli. Bos hesapta
-  // neden belirtilmeli; iki farkli anahtar kullanan iki kiracinin raporu da
-  // yalnizca kendi kayitlarindan uretilmelidir.
+  // L-68: Eski Raporlar guvenceleri Kanal Ekonomisi'ne tasindi. Bos hesapta
+  // neden belirtilir; iki kiracinin kanal rakamlari birbirine sizmaz.
   try {
-    check(typeof app.renderReportsTab === 'function',
-      '31. Raporlar gerçek render testi için dışa aktarılmış',
-      'renderReportsTab export edilmemiş');
-    if (typeof app.renderReportsTab === 'function') {
-      domKur();
-      app.setAppData(bosVeri());
-      app.setCurrentFilter({ period: '2026-09', villa: 'ALL', startDate: null, endDate: null });
-      app.renderReportsTab();
-      const bosRapor = global.document.getElementById('reportsContentContainer').innerHTML;
-      check(/rezervasyon kaydı yok|hesaplanamadı/i.test(bosRapor)
+    check(typeof MarketingUI.renderWorkspaceHtml === 'function',
+      '31. Kanal ekonomisi gerçek render testi için dışa aktarılmış',
+      'renderWorkspaceHtml export edilmemiş');
+    if (typeof MarketingUI.renderWorkspaceHtml === 'function') {
+      const bosRapor = MarketingUI.renderWorkspaceHtml(MarketingUI.buildWorkspaceModel({ filter: { period: '2026-09', villa: 'ALL' }, bookings: [] }), 'economics');
+      check(/rezervasyon yok|hesaplanamadı/i.test(bosRapor)
         && !/483[.]965|251[.]661|142[.]793/.test(bosRapor),
-      '32. Boş işletme raporu açıklamalı boş durum gösteriyor', bosRapor.slice(0, 900));
+      '32. Boş işletme kanal ekonomisi açıklamalı boş durum gösteriyor', bosRapor.slice(0, 900));
 
       const kiraciA = bosVeri();
       kiraciA.villas = { KIYI_01: { id: 'pa', slug: 'KIYI_01', name: 'Kıyı Evi' } };
       kiraciA.bookings = [{ id: 'ba', villa: 'KIYI_01', propertyId: 'pa', checkIn: '2026-09-01',
         checkOut: '2026-09-03', nights: 2, gross: 11000, otaCommission: 1100,
         channel: 'AIRBNB', status: 'CONFIRMED', pax: 2 }];
-      domKur(); app.setAppData(kiraciA); app.setCurrentFilter({ period: '2026-09', villa: 'ALL', startDate: null, endDate: null });
-      app.renderReportsTab();
-      const raporA = global.document.getElementById('reportsContentContainer').innerHTML;
+      const raporA = MarketingUI.renderWorkspaceHtml(MarketingUI.buildWorkspaceModel({ filter: { period: '2026-09', villa: 'ALL' }, bookings: kiraciA.bookings, villas: kiraciA.villas }), 'economics');
 
       const kiraciB = bosVeri();
       kiraciB.villas = { DAG_99: { id: 'pb', slug: 'DAG_99', name: 'Dağ Evi' } };
       kiraciB.bookings = [{ id: 'bb', villa: 'DAG_99', propertyId: 'pb', checkIn: '2026-09-05',
         checkOut: '2026-09-08', nights: 3, gross: 27000, otaCommission: 0,
         channel: 'WHATSAPP', status: 'CONFIRMED', pax: 4 }];
-      domKur(); app.setAppData(kiraciB); app.setCurrentFilter({ period: '2026-09', villa: 'ALL', startDate: null, endDate: null });
-      app.renderReportsTab();
-      const raporB = global.document.getElementById('reportsContentContainer').innerHTML;
+      const raporB = MarketingUI.renderWorkspaceHtml(MarketingUI.buildWorkspaceModel({ filter: { period: '2026-09', villa: 'ALL' }, bookings: kiraciB.bookings, villas: kiraciB.villas }), 'economics');
       check(/11[.]000/.test(raporA) && !/27[.]000|DAG_99/.test(raporA)
         && /27[.]000/.test(raporB) && !/11[.]000|KIYI_01/.test(raporB),
-      '33. İki kiracının rapor rakamları birbirine sızmıyor',
+      '33. İki kiracının kanal ekonomisi rakamları birbirine sızmıyor',
       'A: ' + raporA.slice(0, 500) + '\n       B: ' + raporB.slice(0, 500));
     }
 

@@ -27,6 +27,11 @@ check(
   'Olculmeyen OTA puanlarini gosteren eski siralama tablosu kaldirilmali'
 );
 check(
+  !indexSource.includes('id="marketingCampaignModal"')
+    && !indexSource.includes('id="influencerModal"'),
+  'A4 oncesinde olu kampanya ve influencer defteri modallari DOM icinde tutulmamali'
+);
+check(
   !/function\s+renderMarketingModule\s*\(/.test(appSource),
   'Eski pazarlama sekmesinin app.js render girisi kaldirilmali'
 );

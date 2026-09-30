@@ -25,7 +25,6 @@
     snapshotFormOpen: false,
     listingFormOpen: false,
     listingPropertyId: null,
-    mediaFormOpen: false,
     experimentFormOpen: false,
     benchmarkFormOpen: false,
     listings: [],
@@ -47,6 +46,10 @@
     // Kanal GRUBU: WhatsApp, telefon, web vb. burada tek satirda toplanir (L-105).
     DIRECT: 'Doğrudan (tüm direkt kanallar)', OTHER_OTA: 'Diğer OTA', UNKNOWN: 'Bilinmeyen'
   });
+  const DIRECT_CHANNEL_LABELS = Object.freeze({
+    WHATSAPP: 'WhatsApp', INSTAGRAM: 'Instagram', WEBSITE: 'Web sitesi', WEB: 'Web sitesi',
+    PHONE: 'Telefon', TELEPHONE: 'Telefon', TELEFON: 'Telefon', DIRECT: 'Doğrudan', REPEAT: 'Tekrar misafir', REPEAT_GUEST: 'Tekrar misafir'
+  });
 
   const BROWSER_DEPENDENCIES = Object.freeze([
     ['LexbnbBusinessDate', 'core/business_date.js?v=a1518391'],
@@ -59,7 +62,6 @@
     ['MarketingReviewService', 'core/marketing_review_service.js?v=9207dee5'],
     ['MarketingSnapshotService', 'core/marketing_snapshot_service.js?v=184ad517'],
     ['MarketingChannelListingService', 'core/marketing_channel_listing_service.js?v=f3dbce3f'],
-    ['MarketingMediaUploadService', 'core/marketing_media_upload_service.js?v=37cc2d13'],
     ['MarketingExperimentService', 'core/marketing_experiment_service.js?v=4a2ffb14'],
     ['MarketingHealthResultsService', 'core/marketing_health_results_service.js?v=662edeea']
   ]);
@@ -154,6 +156,18 @@
       periodEndExclusive: period.endExclusive,
       baseCurrency: input.baseCurrency || 'TRY'
     });
+    // Aylik toplu aktarim satiri gelir/gece tasir ama gercek bir rezervasyon
+    // degildir. Kanal ekonomisi tutari korur, adet ve pay hesaplarinda saymaz.
+    const bulkSummaries = bookings.filter(item => /^TOPLU AKTARIM\s*[—-]/i.test(String(item.guest || item.guest_name || '')));
+    bulkSummaries.forEach(item => {
+      const channel = engine.normalizeChannel(item.channel).canonicalChannel;
+      const row = economics.channels.find(entry => entry.channel === channel);
+      if (row) row.reservationCount = Math.max(0, row.reservationCount - 1);
+      economics.totals.reservationCount = Math.max(0, economics.totals.reservationCount - 1);
+    });
+    const direct = economics.channels.find(row => row.channel === 'DIRECT');
+    economics.mix.directReservationSharePercent = economics.totals.reservationCount > 0
+      ? Number((((direct && direct.reservationCount) || 0) / economics.totals.reservationCount * 100).toFixed(2)) : null;
     return {
       period,
       selectedProperty,
@@ -161,6 +175,8 @@
         slug, id: property && property.id, name: property && property.name || slug
       })),
       economics,
+      bulkSummaryCount: bulkSummaries.length,
+      financeSummary: input.financeSummary || null,
       listings: Array.isArray(input.listings) ? input.listings.filter(item => String(item.status || 'ACTIVE').toUpperCase() !== 'ARCHIVED') : [],
       snapshots: Array.isArray(input.snapshots) ? input.snapshots : [],
       findings: Array.isArray(input.findings) ? input.findings : [],
@@ -227,30 +243,38 @@
   function renderEconomics(model) {
     const report = model.economics;
     const totals = report.totals;
-    const rows = report.channels.map(row => `<tr>
-      <td><strong>${escapeHtml(CHANNEL_LABELS[row.channel] || row.channel)}</strong>${row.channel === 'UNKNOWN' ? '<div class="sub-text">Eşleme gerekli</div>' : ''}</td>
+    const rows = report.channels.map(row => {
+      const share = totals.roomRevenueBeforeDistribution > 0
+        ? (row.roomRevenueBeforeDistribution / totals.roomRevenueBeforeDistribution) * 100 : null;
+      return `<tr>
+      <td><strong>${escapeHtml(CHANNEL_LABELS[row.channel] || row.channel)}</strong>${row.rawChannels && row.rawChannels.length && row.channel === 'DIRECT' ? `<div class="sub-text">${escapeHtml(row.rawChannels.map(raw => DIRECT_CHANNEL_LABELS[String(raw).trim().toUpperCase()] || 'Doğrudan').join(', '))}</div>` : ''}${row.channel === 'UNKNOWN' ? '<div class="sub-text">Eşleme gerekli</div>' : ''}</td>
       <td>${number(row.reservationCount)}</td><td>${number(row.bookedNights)}</td>
       <td>${money(row.roomRevenueBeforeDistribution, report.currency)}</td>
       <td>${money(row.distributionCost, report.currency)}</td>
       <td>${money(row.roomRevenueAfterDistribution, report.currency)}</td>
-      <td>${money(row.netRoomAdr, report.currency)}</td>
-    </tr>`).join('');
+      <td>${number(share, '%')}</td>
+    </tr>`;
+    }).join('');
     const unknown = report.dataQuality.unknownRawChannels;
     const warnings = [];
     if (unknown.length) warnings.push(`Eşlenmemiş kanal: ${unknown.join(', ')}`);
     if (report.dataQuality.assumedCurrencyReservationCount) warnings.push(`${report.dataQuality.assumedCurrencyReservationCount} rezervasyonda para birimi TRY varsayıldı.`);
     warnings.push('Kanal bazlı müsait gece verilmediği için RevPAR gösterilmiyor.');
 
-    return `${renderMarketingHealth(model)}${renderBenchmarkPanel(model)}<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+    const profitCard = model.financeSummary && Number.isFinite(Number(model.financeSummary.netProfit))
+      ? kpi('Net kâr', money(model.financeSummary.netProfit, report.currency), 'Finans defteriyle aynı hesap') : '';
+    const bulkNote = model.bulkSummaryCount ? `<div class="card" style="padding:12px;margin-bottom:12px">${number(model.bulkSummaryCount)} toplu aktarım özeti gelir ve geceye dahil, rezervasyon adedine dahil değildir.</div>` : '';
+    return `${renderMarketingHealth(model)}${renderBenchmarkPanel(model)}${bulkNote}<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
       ${kpi('Oda geliri', money(totals.roomRevenueBeforeDistribution, report.currency), 'Temizlik hariç, komisyon öncesi')}
       ${kpi('Dağıtım maliyeti', money(totals.distributionCost, report.currency), 'Yalnızca kaydedilmiş komisyon')}
       ${kpi('Net oda geliri', money(totals.roomRevenueAfterDistribution, report.currency), 'Komisyon sonrası')}
       ${kpi('Net ADR', money(totals.netRoomAdr, report.currency), `${number(totals.bookedNights)} satılmış gece`)}
       ${kpi('Doğrudan rezervasyon', number(report.mix.directReservationSharePercent, '%'), 'Rezervasyon adedi payı')}
+      ${profitCard}
     </div>
     <div class="card" style="padding:0;overflow:auto">
       <table class="mkt-channel-table" style="width:100%;border-collapse:collapse;min-width:780px"><thead><tr>
-        <th>Kanal grubu</th><th>Rez.</th><th>Gece</th><th>Oda geliri</th><th>Komisyon</th><th>Net oda geliri</th><th>Net ADR</th>
+        <th>Kanal</th><th>Rezervasyon</th><th>Gece</th><th>Konaklama cirosu</th><th>Komisyon</th><th>Size kalan net</th><th>Pay</th>
       </tr></thead><tbody>${rows || '<tr><td colspan="7" style="padding:24px;text-align:center">Bu dönemde rezervasyon yok.</td></tr>'}</tbody></table>
     </div>
     <div class="card" style="padding:14px;margin-top:12px"><strong>Veri notları</strong><ul style="margin:8px 0 0;padding-left:20px">${warnings.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul></div>`;
@@ -299,27 +323,39 @@
   }
 
   function renderFunnel(model) {
-    const toolbar = `<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-bottom:12px"><button type="button" class="btn btn-secondary btn-sm" data-marketing-open-listing>＋ Kanal ilanı ekle</button><button type="button" class="btn btn-primary btn-sm" data-marketing-open-snapshot>＋ Manuel snapshot ekle</button></div>`;
+    const selected = model.selectedProperty === 'ALL' ? null : model.properties.find(item => item.slug === model.selectedProperty);
+    const selectedId = selected && selected.id;
+    const scopedListings = model.listings.filter(item => !selectedId || (item.propertyId || item.property_id) === selectedId);
+    const activeMedia = model.media.filter(item => (!selectedId || (item.propertyId || item.property_id) === selectedId)
+      && String(item.mediaStatus || item.media_status || '').toUpperCase() === 'ACTIVE');
+    const experimentDisabled = !selectedId || !scopedListings.length || activeMedia.length < 2;
+    const toolbar = `<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-bottom:12px"><button type="button" class="btn btn-secondary btn-sm" data-marketing-open-listing>＋ Kanal ilanı ekle</button><button type="button" class="btn btn-secondary btn-sm" data-marketing-open-experiment${experimentDisabled ? ' disabled' : ''}>Değişikliği ölç</button><button type="button" class="btn btn-primary btn-sm" data-marketing-open-snapshot>＋ Manuel snapshot ekle</button></div>`;
     const listingForm = state.listingFormOpen ? renderListingForm(model) : '';
     const form = state.snapshotFormOpen ? renderSnapshotForm(model) : '';
+    const experimentForm = state.experimentFormOpen ? renderExperimentForm(model) : '';
+    const experimentResults = renderExperiments(model.experiments, selectedId);
     if (!model.snapshots.length) {
-      return `${toolbar}${listingForm}${form}${emptyState('Huni verisi henüz yok', 'Airbnb/OTA panelinden manuel veya API tabanlı bir görünürlük snapshot’ı gelmeden oran üretilmez.')}`;
+      const channel = String((model.listings[0] || {}).channelCode || (model.listings[0] || {}).channel_code || '').toUpperCase();
+      const platformNote = channel === 'BOOKING_COM'
+        ? 'Booking.com Extranet’te kaydı bulunan aşamalar gösterilir; boş alanlar ölçülmedi sayılır.'
+        : 'Airbnb için ilk sayfa görünme → ilan görüntüleme → rezervasyon aşamaları kullanılır; boş alanlar ölçülmedi sayılır.';
+      return `${toolbar}${listingForm}${form}${experimentForm}${emptyState('Huni verisi henüz yok', platformNote)}${experimentResults}`;
     }
     const funnel = services.MarketingFunnelService;
     const latest = selectLatestSnapshot(model.snapshots);
     const derived = funnel && funnel.deriveFunnelMetrics ? funnel.deriveFunnelMetrics(latest) : null;
     if (!derived || !derived.validation.valid) {
-      return `${toolbar}${listingForm}${form}${emptyState('Huni snapshot’ı doğrulanamadı', 'Sayaç sıralamasını ve negatif/eksik değerleri kontrol edin.')}`;
+      return `${toolbar}${listingForm}${form}${experimentForm}${emptyState('Huni snapshot’ı doğrulanamadı', 'Sayaç sıralamasını ve negatif/eksik değerleri kontrol edin.')}${experimentResults}`;
     }
     const c = derived.validation.counters;
     const r = derived.rates;
     const findings = rankFindings(model.findings);
-    return `${toolbar}${listingForm}${form}<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+    return `${toolbar}${listingForm}${form}${experimentForm}<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
       ${kpi('Gösterim', number(c.impressions), `Kapsama: ${number(derived.validation.coveragePercent, '%')}`)}
       ${kpi('İlan görüntüleme', number(c.listingViews), `Arama → görüntüleme: ${number(r.searchToViewCtrPercent, '%')}`)}
       ${kpi('Rezervasyon denemesi', number(c.bookingAttempts), `Görüntüleme → deneme: ${number(r.viewToAttemptConversionPercent, '%')}`)}
       ${kpi('Platform rezervasyonu', number(c.platformReportedBookings), `Görüntüleme → rezervasyon: ${number(r.viewToBookingConversionPercent, '%')}`)}
-    </div>${renderFindings(findings)}`;
+    </div>${renderFindings(findings)}${experimentResults}`;
   }
 
   function selectLatestSnapshot(snapshots = []) {
@@ -401,49 +437,6 @@
     return `<div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:10px">${actions.join('')}</div>`;
   }
 
-  function renderGallery(model) {
-    const selected = model.selectedProperty === 'ALL' ? null : model.properties.find(item => item.slug === model.selectedProperty);
-    const selectedId = selected && selected.id;
-    const activeMedia = model.media.filter(item => (!selectedId || (item.propertyId || item.property_id) === selectedId)
-      && String(item.mediaStatus || item.media_status || '').toUpperCase() === 'ACTIVE');
-    const scopedListings = model.listings.filter(item => !selectedId || (item.propertyId || item.property_id) === selectedId);
-    const experimentDisabled = !selectedId || !scopedListings.length || activeMedia.length < 2;
-    const toolbar = `<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-bottom:12px"><button type="button" class="btn btn-secondary btn-sm" data-marketing-open-experiment${experimentDisabled ? ' disabled' : ''}>Kapağı değiştir ve ölç</button><button type="button" class="btn btn-primary btn-sm" data-marketing-open-media>＋ Fotoğraf yükle</button></div>`;
-    const form = state.mediaFormOpen ? renderMediaUploadForm(model) : '';
-    const experimentForm = state.experimentFormOpen ? renderExperimentForm(model) : '';
-    if (!model.media.length && !model.experiments.length) {
-      return `${toolbar}${form}${experimentForm}${emptyState('Galeri henüz boş', 'Fotoğraf yüklediğinizde kanal kapaklarını kaydedip değişikliklerin etkisini ölçebilirsiniz.')}`;
-    }
-    return `${toolbar}${form}${experimentForm}<div style="display:flex;gap:10px;flex-wrap:wrap">
-      ${kpi('Medya kaydı', number(model.media.length), 'Yetkili özel medya')}
-      ${kpi('Gözlemsel deney', number(model.experiments.length), 'A/B testi olarak sunulmaz')}
-    </div>${renderExperiments(model.experiments, selectedId)}`;
-  }
-
-  function renderMediaUploadForm(model) {
-    const properties = model.properties.filter(item => item.id);
-    if (!properties.length) return emptyState('Mülk kaydı bulunamadı', 'Fotoğraf yüklemek için önce bulut hesabında bir mülk oluşturulmalıdır.');
-    const selectedId = model.selectedProperty === 'ALL' ? null
-      : (properties.find(item => item.slug === model.selectedProperty) || {}).id;
-    const propertyOptions = properties.map(item => `<option value="${escapeHtml(item.id)}"${item.id === selectedId ? ' selected' : ''}>${escapeHtml(item.name)}</option>`).join('');
-    const categories = [
-      ['EXTERIOR', 'Dış mekân'], ['LIVING_ROOM', 'Salon'], ['BEDROOM', 'Yatak odası'],
-      ['BATHROOM', 'Banyo'], ['KITCHEN', 'Mutfak'], ['DINING', 'Yemek alanı'],
-      ['POOL', 'Havuz'], ['SPA', 'Spa / jakuzi'], ['VIEW_TERRACE', 'Manzara / teras'],
-      ['AMENITY', 'Olanak'], ['OTHER', 'Diğer']
-    ].map(([value, label]) => `<option value="${value}">${escapeHtml(label)}</option>`).join('');
-    return `<form data-marketing-media-form class="card" style="padding:16px;margin-bottom:14px">
-      <h3 style="margin:0 0 12px">Özel galeriye fotoğraf yükle</h3>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px">
-        <label style="display:grid;gap:5px;font-size:12px">Mülk<select class="form-control" name="propertyId" required>${propertyOptions}</select></label>
-        <label style="display:grid;gap:5px;font-size:12px">Alan kategorisi<select class="form-control" name="roomCategory" required>${categories}</select></label>
-        <label style="display:grid;gap:5px;font-size:12px">Fotoğraf<input class="form-control" type="file" name="mediaFile" accept="image/jpeg,image/png,image/webp,image/heic" required></label>
-      </div>
-      <div class="sub-text" style="margin-top:10px">JPEG, PNG, WebP veya HEIC · en fazla 25 MiB · dosya özel bucket’ta tutulur.</div>
-      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button type="button" class="btn btn-secondary btn-sm" data-marketing-cancel-media>Vazgeç</button><button type="submit" class="btn btn-primary btn-sm">Fotoğrafı yükle</button></div>
-    </form>`;
-  }
-
   function renderExperimentForm(model) {
     const selected = model.selectedProperty === 'ALL' ? null : model.properties.find(item => item.slug === model.selectedProperty);
     const propertyId = selected && selected.id;
@@ -472,20 +465,24 @@
     return `<div class="card" style="padding:14px;margin-top:12px"><strong>Gözlemsel değişiklik ölçümleri</strong><div style="display:grid;gap:8px;margin-top:10px">${scoped.map(item => {
       const status = String(item.status || '').toUpperCase();
       const verdict = String(item.verdict || '').toUpperCase();
-      return `<div style="display:flex;justify-content:space-between;gap:12px"><span>${escapeHtml(item.change_date || item.changeDate || 'Tarih yok')} · ${escapeHtml(item.primary_metric || item.primaryMetric || '')}</span><strong>${escapeHtml(verdictLabels[verdict] || statusLabels[status] || status || 'Bilinmiyor')}</strong></div>`;
-    }).join('')}</div><div class="sub-text" style="margin-top:8px">Sonuçlar nedensellik kanıtı olarak sunulmaz.</div></div>`;
+      const insufficient = verdict === 'INSUFFICIENT_DATA' ? ' · Karar için yetersiz' : '';
+      const confounders = item.confounders || item.confounding_factors || [];
+      const confounded = (Array.isArray(confounders) && confounders.length) || verdict === 'CONFOUNDED'
+        ? '<div class="sub-text">⚠ Aynı dönemde fiyat veya sezon etkisi olabilir.</div>' : '';
+      return `<div style="display:flex;justify-content:space-between;gap:12px"><span>${escapeHtml(item.change_date || item.changeDate || 'Tarih yok')} · ${escapeHtml(item.primary_metric || item.primaryMetric || '')}</span><strong>${escapeHtml((verdictLabels[verdict] || statusLabels[status] || status || 'Bilinmiyor') + insufficient)}</strong></div>${confounded}`;
+    }).join('')}</div><div class="sub-text" style="margin-top:8px">Bu gerçek A/B değil; yalnız olası etkiyi gösteren gözlemsel önce/sonra ölçümüdür. Sonuç nedensellik kanıtı olarak sunulmaz.</div></div>`;
   }
 
   function renderWorkspaceHtml(model, view) {
     if (view === 'funnel') return renderFunnel(model);
-    if (view === 'gallery') return renderGallery(model);
     return renderEconomics(model);
   }
 
   function browserInput() {
     const data = typeof appData !== 'undefined' ? appData : {};
     const filter = typeof currentFilter !== 'undefined' ? currentFilter : {};
-    return { ...state, bookings: data.bookings || [], villas: data.villas || {}, filter, baseCurrency: 'TRY' };
+    const financeSummary = typeof computeFilterLedger === 'function' ? computeFilterLedger() : null;
+    return { ...state, bookings: data.bookings || [], villas: data.villas || {}, filter, baseCurrency: 'TRY', financeSummary };
   }
 
   function cloudScope() {
@@ -658,29 +655,6 @@
     }
   }
 
-  async function handleMediaSubmit(form) {
-    const client = typeof supabaseClient !== 'undefined' ? supabaseClient : null;
-    const scope = cloudScope();
-    if (!client || !scope || !services.MarketingMediaUploadService) throw new Error('MEDIA_UPLOAD_UNAVAILABLE');
-    const values = Object.fromEntries(new FormData(form).entries());
-    const submit = form.querySelector('[type="submit"]');
-    if (submit) submit.disabled = true;
-    try {
-      const result = await services.MarketingMediaUploadService.uploadPropertyMedia(client, {
-        tenantId: scope.tenantId, propertyId: values.propertyId,
-        roomCategory: values.roomCategory, file: values.mediaFile
-      });
-      state.mediaFormOpen = false;
-      state.remoteStatus = 'LOADING';
-      render();
-      await hydrateCloudData();
-      render();
-      return result;
-    } finally {
-      if (submit) submit.disabled = false;
-    }
-  }
-
   async function handleExperimentSubmit(form) {
     const client = typeof supabaseClient !== 'undefined' ? supabaseClient : null;
     const scope = cloudScope();
@@ -715,8 +689,6 @@
       const cancel = event.target.closest('[data-marketing-cancel-snapshot]');
       const openListing = event.target.closest('[data-marketing-open-listing]');
       const cancelListing = event.target.closest('[data-marketing-cancel-listing]');
-      const openMedia = event.target.closest('[data-marketing-open-media]');
-      const cancelMedia = event.target.closest('[data-marketing-cancel-media]');
       const openExperiment = event.target.closest('[data-marketing-open-experiment]');
       const cancelExperiment = event.target.closest('[data-marketing-cancel-experiment]');
       const openBenchmark = event.target.closest('[data-marketing-open-benchmark]');
@@ -725,9 +697,7 @@
       if (cancel) { state.snapshotFormOpen = false; render(); return; }
       if (openListing) { state.listingFormOpen = true; state.snapshotFormOpen = false; render(); return; }
       if (cancelListing) { state.listingFormOpen = false; render(); return; }
-      if (openMedia) { state.mediaFormOpen = true; state.experimentFormOpen = false; render(); return; }
-      if (cancelMedia) { state.mediaFormOpen = false; render(); return; }
-      if (openExperiment) { state.experimentFormOpen = true; state.mediaFormOpen = false; render(); return; }
+      if (openExperiment) { state.experimentFormOpen = true; render(); return; }
       if (cancelExperiment) { state.experimentFormOpen = false; render(); return; }
       if (openBenchmark) { state.benchmarkFormOpen = true; render(); return; }
       if (cancelBenchmark) { state.benchmarkFormOpen = false; render(); return; }
@@ -754,15 +724,6 @@
         handleExperimentSubmit(experimentForm).catch(() => {
           const status = document.getElementById('marketingWorkspaceStatus');
           if (status) status.textContent = 'Değişiklik ölçümü başlatılamadı. Lütfen yeniden deneyin.';
-        });
-        return;
-      }
-      const mediaForm = event.target.closest('[data-marketing-media-form]');
-      if (mediaForm) {
-        event.preventDefault();
-        handleMediaSubmit(mediaForm).catch(() => {
-          const status = document.getElementById('marketingWorkspaceStatus');
-          if (status) status.textContent = 'Fotoğraf yüklenemedi. Dosyayı kontrol edip yeniden deneyin.';
         });
         return;
       }
@@ -807,5 +768,5 @@
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') initializeBrowser();
 
-  return { periodFromFilter, scopeBookings, buildWorkspaceModel, selectLatestSnapshot, selectCurrentBenchmark, renderWorkspaceHtml, renderMarketingHealth, renderBenchmarkPanel, renderBenchmarkForm, renderFindingActions, renderListingForm, renderSnapshotForm, renderMediaUploadForm, renderExperimentForm, renderExperiments, escapeHtml, setData, render };
+  return { periodFromFilter, scopeBookings, buildWorkspaceModel, selectLatestSnapshot, selectCurrentBenchmark, renderWorkspaceHtml, renderMarketingHealth, renderBenchmarkPanel, renderBenchmarkForm, renderFindingActions, renderListingForm, renderSnapshotForm, renderExperimentForm, renderExperiments, escapeHtml, setData, render };
 }));

@@ -126,11 +126,10 @@ runTest('Insufficient health evidence remains scoreless in the UI', () => {
   assert.doesNotMatch(html, />70</);
 });
 
-runTest('Missing funnel and gallery inputs render explicit empty states', () => {
+runTest('Missing funnel input renders an explicit unmeasured state', () => {
   const model = MarketingUI.buildWorkspaceModel({ filter: { period: 'ALL', villa: 'ALL' }, bookings: [] });
   assert.match(MarketingUI.renderWorkspaceHtml(model, 'funnel'), /Huni verisi henüz yok/);
-  assert.match(MarketingUI.renderWorkspaceHtml(model, 'gallery'), /Galeri henüz boş/);
-  assert.doesNotMatch(MarketingUI.renderWorkspaceHtml(model, 'gallery'), /70/);
+  assert.match(MarketingUI.renderWorkspaceHtml(model, 'funnel'), /ölçülmedi/);
 });
 
 runTest('Injected markup is escaped in finding output', () => {
@@ -192,68 +191,6 @@ runTest('Channel listing form preserves property scope and constrained channel v
   assert.match(html, /&lt;Eski&gt;/);
 });
 
-runTest('Private media form scopes the property and constrains accepted image types', () => {
-  const model = MarketingUI.buildWorkspaceModel({
-    filter: { period: 'ALL', villa: 'AZURE' }, bookings: [],
-    villas: { AZURE: { id: 'P1', name: 'Villa Azure' } }
-  });
-  const html = MarketingUI.renderMediaUploadForm(model);
-  assert.match(html, /value="P1" selected/);
-  assert.match(html, /accept="image\/jpeg,image\/png,image\/webp,image\/heic"/);
-  assert.match(html, /en fazla 25 MiB/);
-  assert.doesNotMatch(html, /image\/svg/);
-});
-
-runTest('Gallery keeps media management without exposing the retired photo AI action', () => {
-  const propertyId = '22222222-2222-4222-8222-222222222222';
-  const model = MarketingUI.buildWorkspaceModel({
-    filter: { period: 'ALL', villa: 'AZURE' }, bookings: [],
-    villas: { AZURE: { id: propertyId, name: 'Villa Azure' } },
-    media: [{ id: 'M1', property_id: propertyId, media_status: 'ACTIVE' }]
-  });
-  const html = MarketingUI.renderWorkspaceHtml(model, 'gallery');
-  assert.match(html, /data-marketing-open-media/);
-  assert.doesNotMatch(html, /data-marketing-request-analysis|AI ile analiz et/);
-});
-
-runTest('Gallery does not expose legacy analysis queue state', () => {
-  const propertyId = '22222222-2222-4222-8222-222222222222';
-  const model = MarketingUI.buildWorkspaceModel({
-    filter: { period: 'ALL', villa: 'AZURE' }, bookings: [],
-    villas: { AZURE: { id: propertyId, name: 'Villa Azure' } },
-    media: [{ id: 'M1', property_id: propertyId, media_status: 'ACTIVE' }],
-    analysisRuns: [{ property_id: propertyId, status: 'PROCESSING', requested_at: '2026-09-12T10:00:00Z' }]
-  });
-  const html = MarketingUI.renderWorkspaceHtml(model, 'gallery');
-  assert.doesNotMatch(html, /Analiz sürüyor|İşleniyor|Son analiz talepleri/);
-  assert.match(html, /Medya kaydı/);
-});
-
-runTest('Gallery hides persisted legacy photo AI results while retaining media records', () => {
-  const propertyId = '22222222-2222-4222-8222-222222222222';
-  const runId = '33333333-3333-4333-8333-333333333333';
-  const mediaId = '44444444-4444-4444-8444-444444444444';
-  const model = MarketingUI.buildWorkspaceModel({
-    filter: { period: 'ALL', villa: 'AZURE' }, bookings: [],
-    villas: { AZURE: { id: propertyId, name: 'Villa Azure' } },
-    media: [{ id: mediaId, property_id: propertyId, media_status: 'ACTIVE' }],
-    analysisRuns: [{
-      id: runId, property_id: propertyId, status: 'SUCCEEDED', completed_at: '2026-09-13T10:00:00Z',
-      result_schema_validated_at: '2026-09-13T10:00:00Z',
-      result_payload: {
-        schemaVersion: 'photo-analysis-v1', runId, propertyId, overallGalleryScore: 84, confidence: 0.88,
-        coverAnalysis: { currentCoverMediaId: null, currentCoverScore: null, bestCoverCandidates: [{ mediaId, score: 91, reason: '<iyi aday>' }] },
-        photoEvaluations: [{ mediaId, roomCategory: 'POOL', technicalScore: 80, commercialScore: 72, improvementType: 'EDITABLE', actionableRecommendations: ['Pozlamayı düzelt'] }],
-        missingCoverage: [], recommendedStoryOrder: [{ suggestedIndex: 1, mediaId, roleInStory: 'HERO' }],
-        trustAssessment: { fabricationSuggested: false, uncertainClaims: [] }
-      }
-    }]
-  });
-  const html = MarketingUI.renderWorkspaceHtml(model, 'gallery');
-  assert.match(html, /Medya kaydı/);
-  assert.doesNotMatch(html, /Galeri sağlık skoru|84\/100|&lt;iyi aday&gt;|Kanal bazlı mevcut kapak/);
-});
-
 runTest('Cover-change form uses the recorded cover and creates fixed observational windows atomically', () => {
   const propertyId = '22222222-2222-4222-8222-222222222222';
   const model = MarketingUI.buildWorkspaceModel({
@@ -307,7 +244,7 @@ runTest('Marketing bootstrap and lazy dependencies carry current content hashes'
     .update(fs.readFileSync(file, 'utf8').replace(/\r\n?/g, '\n'), 'utf8')
     .digest('hex').slice(0, 8);
   assert.match(index, new RegExp(`core/marketing_ui\\.js\\?v=${hash(path.join(__dirname, 'marketing_ui.js'))}`));
-  ['marketing_engine.js', 'marketing_funnel_service.js', 'marketing_priority_service.js', 'marketing_benchmark_service.js', 'marketing_cover_change_service.js', 'marketing_data_service.js', 'marketing_review_service.js', 'marketing_snapshot_service.js', 'marketing_channel_listing_service.js', 'marketing_media_upload_service.js', 'marketing_experiment_service.js', 'marketing_health_results_service.js'].forEach(file => {
+  ['marketing_engine.js', 'marketing_funnel_service.js', 'marketing_priority_service.js', 'marketing_benchmark_service.js', 'marketing_cover_change_service.js', 'marketing_data_service.js', 'marketing_review_service.js', 'marketing_snapshot_service.js', 'marketing_channel_listing_service.js', 'marketing_experiment_service.js', 'marketing_health_results_service.js'].forEach(file => {
     assert.match(uiSource, new RegExp(`${file.replace('.', '\\.') }\\?v=${hash(path.join(__dirname, file))}`));
   });
 });

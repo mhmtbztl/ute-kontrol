@@ -57,6 +57,7 @@ global.FinancialMetricsService = require('./financial_metrics_service.js');
 global.ExecutiveDashboardService = require('./executive_dashboard_service.js');
 
 const app = require('../app.js');
+const MarketingUI = require('./marketing_ui.js');
 const INDEX = fs.readFileSync(path.join(KOK, 'index.html'), 'utf8');
 const CSS = fs.readFileSync(path.join(KOK, 'style.css'), 'utf8');
 const MKT = fs.readFileSync(path.join(KOK, 'core', 'marketing_ui.js'), 'utf8');
@@ -426,7 +427,7 @@ try {
   app.setAppData(veri({ bookings: [rezB('r1', 12000), ozet], cleaningTasks: [],
     expenses: [{ id: 'e1', villa: 'V1', date: `${buAy}-04`, amount: 2000, category: 'Bakım', type: 'OPEX' }] }));
   ayFiltresi();
-  ['rezSearchInput', 'rezPeriodFilter', 'rezVillaFilter', 'rezStatusFilter'].forEach(id => { g(id).value = id === 'rezSearchInput' ? '' : 'ALL'; });
+  ['rezSearchInput', 'rezVillaFilter', 'rezStatusFilter'].forEach(id => { g(id).value = id === 'rezSearchInput' ? '' : 'ALL'; });
   app.renderManageBookingsTable();
   check(/<strong>1 Rezervasyon<\/strong> \+ 1 toplu aktarım özeti/.test(g('rezTableSummaryPill').innerHTML),
     'P2. Rezervasyon listesi özeti rezervasyon saymaz, ayrı yazar', g('rezTableSummaryPill').innerHTML);
@@ -437,12 +438,15 @@ try {
   const takvim = g('tapeChartContainer').innerHTML;
   check(!/TOPLU/.test(takvim) && /1 toplu aktarım özeti/.test(takvim),
     'P4. Takvim özeti günlere yaymaz; altında not olarak söyler', takvim.slice(-300));
-  app.renderReportsTab();
-  const rapor = g('reportsContentContainer').innerHTML;
-  check(/WhatsApp/.test(rapor) && !/WHATSAPP/.test(rapor) && /1 toplu aktarım özeti/.test(rapor),
-    'P5. Raporlar kanalı görünen adıyla yazar ve özeti rezervasyon saymaz (L-105)', rapor.slice(0, 400));
-  check(/Net Kâr:<\/strong> ₺100\.000/.test(rapor),
-    'P6. Raporlar net kârı Finans ile aynı defter formülünden yazar', (rapor.match(/Net Kâr:[^<]*<\/strong>[^<]*/) || [''])[0]);
+  const raporModel = MarketingUI.buildWorkspaceModel({
+    filter: { period: buAy, villa: 'ALL' }, bookings: app.getAppData().bookings,
+    villas: app.getAppData().villas, financeSummary: app.computeFilterLedger()
+  });
+  const rapor = MarketingUI.renderWorkspaceHtml(raporModel, 'economics');
+  check(/WhatsApp/.test(rapor) && /1 toplu aktarım özeti/.test(rapor) && />1<\/td>/.test(rapor),
+    'P5. Kanal ekonomisi görünen kanal adını yazar ve özeti rezervasyon saymaz (L-105)', rapor.slice(0, 800));
+  check(/Net kâr/.test(rapor) && /₺100\.000/.test(rapor),
+    'P6. Kanal ekonomisi net kârı Finans ile aynı defter formülünden yazar', rapor.slice(0, 800));
 
   // --- Q. Etiketler (L-104, L-105) -----------------------------------------
   check(app.formatDeductionTl(0) === '0 TL' && app.formatDeductionTl(-0) === '0 TL' && app.formatDeductionTl(1500) === '−1.500 TL',

@@ -50,4 +50,4 @@ gh api repos/mhmtbztl/ute-kontrol/pages/builds/latest \
 
 ## Önerilen ilk tag
 
-Mevcut kanonik sürüm `1.0.0`; önerilen tag `v1.0.0`dır. Hedef, Dalga 2 commitleri master'a girdikten ve üretim Phase11/42/44 readiness kapısı yeşil olduktan sonraki doğrulanmış master commitidir. Hedef hash bugün henüz oluşmadığı için uydurulmaz. Açık kullanıcı onayı olmadan tag oluşturulmaz veya remote'a gönderilmez.
+Mevcut kanonik sürüm `1.0.0`; önerilen tag `v1.0.0`dır. Hedef, Dalga 2 commitleri master'a girdikten ve güncel üretim readiness kapısı yeşil olduktan sonraki doğrulanmış master commitidir. A2 kapsamında bu kapının şema hedefi Phase42'dir; Phase11/44 fiyatlandırma sözleşmesi kullanıcı kararıyla readiness kapsamı dışındadır. Hedef hash bugün henüz oluşmadığı için uydurulmaz. Açık kullanıcı onayı olmadan tag oluşturulmaz veya remote'a gönderilmez.

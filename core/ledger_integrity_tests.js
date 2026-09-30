@@ -523,7 +523,15 @@ const yazmalar = (istemci, tablo) =>
   });
 
   await test('L-37 Rezervasyon listesi dönem filtresi gece kesişimi; taban fiyat alanları doğru okunur', async () => {
-    assert.match(kaynak37, /b\.checkIn <= aralik\.end && b\.checkOut > aralik\.start/);
+    const visible = App.buildReservationListView({
+      today: '2031-05-15', rangeStart: '2031-05-01', rangeEnd: '2031-05-31',
+      bookings: [
+        { id: 'overlap', checkIn: '2031-04-30', checkOut: '2031-05-02', status: 'CONFIRMED' },
+        { id: 'checkout-boundary', checkIn: '2031-04-29', checkOut: '2031-05-01', status: 'CONFIRMED' },
+        { id: 'after-range', checkIn: '2031-06-01', checkOut: '2031-06-02', status: 'CONFIRMED' }
+      ]
+    });
+    assert.deepStrictEqual(visible.map(item => item.booking.id), ['overlap']);
     assert.match(kaynak37, /fiyatAlani\(v\.base !== undefined \? v\.base : v\.basePrice\)/);
     assert.match(kaynak37, /const t = v\.floor \?\? v\.floorPrice/);
   });

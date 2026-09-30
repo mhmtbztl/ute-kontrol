@@ -3543,6 +3543,13 @@ function registerPageAction(tabId, action) {
   if (i >= 0) liste[i] = action; else liste.push(action);
 }
 
+registerPageAction('marketing', {
+  id: 'funnel-test-question',
+  label: "ChatGPT'ye sor",
+  title: 'FUNNEL_TEST_QUESTION · Değişiklik işe yaradı mı?',
+  run: () => switchTab('analysis')
+});
+
 function runPageAction(id) {
   const aktif = typeof document !== 'undefined' && document.querySelector
     ? (document.querySelector('.tab-content.active') || {}).id || '' : '';
@@ -3581,7 +3588,6 @@ function switchTab(tabId) {
   if (tabId === 'guests') renderGuestsTab();
   if (tabId === 'pricing') renderPricingTab();
   if (tabId === 'pricing') renderPricingKpiStrip();
-  if (tabId === 'reports') renderReportsTab();
   if (tabId === 'analysis') renderAnalysisCenter();
   if (tabId === 'settings') renderSettingsTable();
   if (tabId === 'settings') renderTeamManagement();
@@ -4235,7 +4241,6 @@ const ACTIVE_RENDER_PLANS = {
   'tab-leads': ['renderManageLeadsTable', 'renderLeadAnalytics'],
   'tab-maintenance': ['renderManageMaintTable'],
   'tab-housekeeping': ['renderHousekeepingTab'],
-  'tab-reports': ['renderReportsTab'],
   'tab-settings': ['renderSettingsTable', 'renderTeamManagement']
 };
 
@@ -4272,7 +4277,6 @@ function renderAll() {
     renderDailyOps,
     renderTapeChart,
     renderHousekeepingTab,
-    renderReportsTab,
     renderSettingsTable,
     renderTeamManagement
   };
@@ -6573,13 +6577,141 @@ async function applyImportedData() {
 // -------------------------------------------------------------
 // MANAGE BOOKINGS TABLE (CRUD + SEARCH)
 // -------------------------------------------------------------
+function reservationMonthRange(monthKey) {
+  const [year, month] = String(monthKey || '').split('-').map(Number);
+  const lastDay = new Date(year, month, 0).getDate();
+  return { start: `${year}-${String(month).padStart(2, '0')}-01`, end: `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}` };
+}
+
+let reservationListRange = reservationMonthRange(getTodayStr().slice(0, 7));
+let reservationRangeAnchor = new Date(`${reservationListRange.start}T12:00:00`);
+
+function syncReservationRangeUi() {
+  const label = document.getElementById('reservationRangeLabel');
+  if (label) label.textContent = `${formatTrDate(reservationListRange.start)} – ${formatTrDate(reservationListRange.end)}`;
+}
+
+function renderReservationRangeCalendar() {
+  const container = document.getElementById('reservationRangeCalendar');
+  if (!container) return;
+  const picker = getDateRangePicker();
+  container.innerHTML = picker.monthHtml(picker.buildMonth(reservationRangeAnchor, reservationListRange, getTodayStr()), 'data-reservation-filter-date');
+  const title = document.getElementById('reservationRangeTitle');
+  if (title) title.textContent = new Intl.DateTimeFormat('tr-TR', { month: 'long', year: 'numeric' }).format(reservationRangeAnchor);
+  syncReservationRangeUi();
+}
+
+function toggleReservationRangePicker(forceOpen) {
+  const panel = document.getElementById('reservationRangePicker');
+  const trigger = document.getElementById('reservationRangeTrigger');
+  if (!panel) return false;
+  const open = typeof forceOpen === 'boolean' ? forceOpen : panel.hidden;
+  panel.hidden = !open;
+  if (trigger) trigger.setAttribute('aria-expanded', String(open));
+  if (open) renderReservationRangeCalendar();
+  return open;
+}
+
+function shiftReservationRangeCalendar(delta) {
+  reservationRangeAnchor = new Date(reservationRangeAnchor.getFullYear(), reservationRangeAnchor.getMonth() + Number(delta || 0), 1, 12);
+  renderReservationRangeCalendar();
+}
+
+function pickReservationRangeDate(dateKey) {
+  reservationListRange = getDateRangePicker().pick(reservationListRange, dateKey, 'range');
+  if (reservationListRange.start && reservationListRange.end) toggleReservationRangePicker(false);
+  renderReservationRangeCalendar();
+  largeTablePageState.bookings = 1;
+  renderManageBookingsTable();
+}
+
+function resetReservationRange() {
+  reservationListRange = reservationMonthRange(getTodayStr().slice(0, 7));
+  reservationRangeAnchor = new Date(`${reservationListRange.start}T12:00:00`);
+  renderReservationRangeCalendar();
+  renderManageBookingsTable();
+}
+
+function buildReservationListView(options = {}) {
+  const bookings = Array.isArray(options.bookings) ? options.bookings : [];
+  const cleaningTasks = Array.isArray(options.cleaningTasks) ? options.cleaningTasks : [];
+  const today = options.today || getTodayStr();
+  const rangeStart = options.rangeStart || `${today.slice(0, 7)}-01`;
+  const rangeEnd = options.rangeEnd || reservationMonthRange(today.slice(0, 7)).end;
+  const byBooking = new Map();
+  cleaningTasks.forEach(task => {
+    const id = task.bookingId || task.booking_id;
+    if (id && !byBooking.has(String(id))) byBooking.set(String(id), task);
+  });
+  const rank = booking => {
+    if (booking.checkIn <= today && booking.checkOut > today && booking.status !== 'CANCELLED') return 0;
+    if (booking.checkIn >= today) return 1;
+    return 2;
+  };
+  return bookings
+    .filter(booking => booking.checkIn <= rangeEnd && booking.checkOut > rangeStart)
+    .map(booking => {
+      const task = byBooking.get(String(booking.id)) || null;
+      return {
+        booking,
+        cleaningTask: task,
+        markers: {
+          todayCheckIn: booking.checkIn === today,
+          todayCheckOut: booking.checkOut === today,
+          cleaningPending: !!task && task.status === 'PLANNED' && (task.date || task.task_date || booking.checkOut) <= today
+        }
+      };
+    })
+    .sort((a, b) => {
+      const priority = rank(a.booking) - rank(b.booking);
+      if (priority) return priority;
+      if (rank(a.booking) === 1) return a.booking.checkIn.localeCompare(b.booking.checkIn);
+      return b.booking.checkIn.localeCompare(a.booking.checkIn);
+    });
+}
+
+function reservationStatusBadge(status) {
+  if (status === 'CONFIRMED') return '<span class="badge badge-green">Onaylandı</span>';
+  if (status === 'CANCELLED') return '<span class="badge badge-rose">İptal</span>';
+  if (status === 'CHECKED_IN') return '<span class="badge badge-blue">İçeride</span>';
+  if (status === 'CHECKED_OUT') return '<span class="badge badge-slate">Tamamlandı</span>';
+  return '<span class="badge badge-slate" title="Kaynak kayıtta geçerli durum yok">—</span>';
+}
+
+function openBookingDetailsPanel(bookingId) {
+  const booking = (appData.bookings || []).find(item => String(item.id) === String(bookingId));
+  if (!booking || typeof SidePanel === 'undefined') return false;
+  const villaName = appData.villas?.[booking.villa]?.name || booking.villa || '—';
+  const cleaning = findBookingCleaningTask(booking);
+  const lead = (appData.leads || []).find(item => String(item.convertedBookingId || item.converted_booking_id || '') === String(booking.id));
+  const cleaningStatus = cleaning
+    ? ({ PLANNED: 'Planlandı', DONE: 'Yapıldı', SKIPPED: 'Yapılmadı' }[cleaning.status] || cleaning.status || '—')
+    : 'Görev yok';
+  const detailHtml = (label, value) => `<div class="booking-detail-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value == null || value === '' ? '—' : String(value))}</strong></div>`;
+  const bodyHtml = `<div class="booking-detail-grid">
+    ${detailHtml('Mülk', villaName)}
+    ${detailHtml('Misafir', booking.guest || 'Belirtilmedi')}
+    ${detailHtml('Kanal', getChannelDisplayName(booking.channel))}
+    ${detailHtml('Konaklama', `${formatTrDate(booking.checkIn)} – ${formatTrDate(booking.checkOut)} · ${booking.nights || calculateNightsBetween(booking.checkIn, booking.checkOut)} gece`)}
+    ${detailHtml('Brüt tutar', `${Number(booking.gross || 0).toLocaleString('tr-TR')} ₺`)}
+    ${detailHtml('OTA komisyonu', `${Number(booking.otaComm || 0).toLocaleString('tr-TR')} ₺`)}
+    ${detailHtml('Temizlik ücreti', `${Number(booking.cleanFee || 0).toLocaleString('tr-TR')} ₺`)}
+    ${detailHtml('Net oda geliri', `${Number(booking.net || 0).toLocaleString('tr-TR')} ₺`)}
+    ${detailHtml('Temizlik görevi', cleaningStatus)}
+    ${detailHtml('Kaynak talep', lead ? (lead.guest || lead.guestName || lead.channel || 'Bağlı talep') : 'Bağlı talep yok')}
+  </div>`;
+  const footerHtml = `<button type="button" class="btn btn-danger" data-onclick="deleteBookingUI(decodeURIComponent('${encodeActionArg(String(booking.id))}'))">Sil</button>
+    <button type="button" class="btn btn-primary" data-onclick="editBooking(decodeURIComponent('${encodeActionArg(String(booking.id))}'))">Düzenle</button>`;
+  SidePanel.open({ title: booking.guest || 'Rezervasyon detayı', subtitle: `${formatTrDate(booking.checkIn)} – ${formatTrDate(booking.checkOut)}`, bodyHtml, footerHtml, ariaLabel: 'Rezervasyon detayı' });
+  return true;
+}
+
 function renderManageBookingsTable() {
   const tbody = document.getElementById('manageBookingsTableBody');
   if (!tbody) return;
   tbody.innerHTML = '';
 
   const search = (document.getElementById('rezSearchInput')?.value || '').toLowerCase();
-  const periodFilter = document.getElementById('rezPeriodFilter')?.value || 'ALL';
   const villaFilter = document.getElementById('rezVillaFilter')?.value || 'ALL';
   const statusFilter = document.getElementById('rezStatusFilter')?.value || 'ALL';
 
@@ -6589,29 +6721,16 @@ function renderManageBookingsTable() {
   let totalNet = 0;
   let totalNights = 0;
 
-  // Filter bookings
-  const filtered = appData.bookings.filter(b => {
+  const visibleRows = buildReservationListView({
+    bookings: appData.bookings || [], cleaningTasks: appData.cleaningTasks || [], today: todayStr,
+    rangeStart: reservationListRange.start, rangeEnd: reservationListRange.end
+  });
+  const filteredRows = visibleRows.filter(({ booking: b }) => {
     // Villa Filter
     if (villaFilter !== 'ALL' && b.villa !== villaFilter) return false;
     
     // Status Filter
     if (statusFilter !== 'ALL' && b.status !== statusFilter) return false;
-
-    // Period Filter
-    if (periodFilter === 'UPCOMING') {
-      if (b.checkOut < todayStr) return false;
-    } else if (periodFilter !== 'ALL') {
-      // Konaklamanin GECELERINDEN biri donemde mi (3.4)? Eskiden yalniz giris
-      // ve cikis ayina bakiliyordu; 28 Nisan -> 2 Haziran konaklamasi Mayis
-      // listesinde hic gorunmuyordu (L-37).
-      const yil = /^(\d{4})-YEAR$/.exec(periodFilter);
-      const aralik = yil ? { start: `${yil[1]}-01-01`, end: `${yil[1]}-12-31` } : getLedgerContract().monthRange(periodFilter);
-      if (aralik) {
-        if (!(b.checkIn <= aralik.end && b.checkOut > aralik.start)) return false;
-      } else if (b.checkIn.slice(0, 7) !== periodFilter && b.checkOut.slice(0, 7) !== periodFilter) {
-        return false;
-      }
-    }
 
     // Search
     if (search) {
@@ -6624,11 +6743,8 @@ function renderManageBookingsTable() {
     return true;
   });
 
-  // Sort: Upcoming and current first, then by checkIn ascending
-  filtered.sort((a, b) => a.checkIn.localeCompare(b.checkIn));
-
   // Update Summary Pill
-  filtered.forEach(b => {
+  filteredRows.forEach(({ booking: b }) => {
     if (b.status !== 'CANCELLED') {
       totalGross += Number(b.gross) || 0;
       totalNet += Number(b.net) || 0;
@@ -6639,49 +6755,40 @@ function renderManageBookingsTable() {
   const summaryPill = document.getElementById('rezTableSummaryPill');
   if (summaryPill) {
     // Toplu aktarim ozeti rezervasyon sayilmaz (L-103); gece ve tutara dahildir.
-    const ozetSayisi = filtered.filter(isBulkSummaryBooking).length;
-    const rezSayisi = filtered.length - ozetSayisi;
+    const ozetSayisi = filteredRows.filter(row => isBulkSummaryBooking(row.booking)).length;
+    const rezSayisi = filteredRows.length - ozetSayisi;
     summaryPill.innerHTML = `📊 Gösterilen: <strong>${rezSayisi} Rezervasyon</strong>${ozetSayisi ? ` + ${ozetSayisi} toplu aktarım özeti` : ''} | 🌙 ${totalNights} Gece | 💰 Net: ${totalNet.toLocaleString('tr-TR')} TL`;
   }
 
-  if (filtered.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="13" style="text-align:center; padding: 30px; color: var(--color-slate-400);">Kriterlere uygun rezervasyon bulunamadı. "+ Yeni Rezervasyon Ekle" butonu ile ekleyebilirsiniz.</td></tr>';
+  if (filteredRows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 30px; color: var(--color-slate-400);">Seçili dönemde rezervasyon bulunamadı.</td></tr>';
     renderTablePagination('bookingsPagination', 'bookings', paginateRows([], 1), 'renderManageBookingsTable');
     return;
   }
 
-  const pageInfo = paginateRows(filtered, largeTablePageState.bookings);
+  const pageInfo = paginateRows(filteredRows, largeTablePageState.bookings);
   renderTablePagination('bookingsPagination', 'bookings', pageInfo, 'renderManageBookingsTable');
-  pageInfo.rows.forEach(b => {
+  pageInfo.rows.forEach(({ booking: b, markers }) => {
     const vName = appData.villas[b.villa]?.name || b.villa;
-    const nightly = b.nights > 0 ? Math.round((b.net || b.gross) / b.nights) : 0;
-
-    let statusBadge = '<span class="badge badge-slate" title="Kaynak kayıtta geçerli durum yok">—</span>';
-    if (b.status === 'CONFIRMED') statusBadge = '<span class="badge badge-green">Onaylandı</span>';
-    if (b.status === 'CANCELLED') statusBadge = '<span class="badge badge-rose">İptal</span>';
-    if (b.status === 'CHECKED_IN') statusBadge = '<span class="badge badge-blue">İçeride</span>';
-    if (b.status === 'CHECKED_OUT') statusBadge = '<span class="badge badge-slate">Tamamlandı</span>';
+    const statusBadge = reservationStatusBadge(b.status);
+    const markerHtml = [
+      markers.todayCheckIn ? '<span class="reservation-marker marker-checkin">Bugün giriş</span>' : '',
+      markers.todayCheckOut ? '<span class="reservation-marker marker-checkout">Bugün çıkış</span>' : '',
+      markers.cleaningPending ? '<span class="reservation-marker marker-cleaning">Temizlik bekliyor</span>' : ''
+    ].filter(Boolean).join(' ');
 
     // Highlight New Year / future special dates
     const tr = document.createElement('tr');
 
+    tr.className = 'reservation-list-row';
+    tr.setAttribute('data-onclick', `openBookingDetailsPanel(decodeURIComponent('${encodeActionArg(String(b.id))}'))`);
     tr.innerHTML = `
-      <td><strong>${escapeHtml(vName)}</strong></td>
-      <td>${escapeHtml(b.guest || 'Belirtilmedi')}${isBulkSummaryBooking(b) ? ' <span class="badge badge-slate" style="font-size:10px;" title="Aylık toplamdan girilmiş kayıt; gerçek bir konaklama değildir. Ciro ve gece toplamlarına girer, rezervasyon sayısına girmez.">Aylık özet</span>' : ''}</td>
-      <td><span class="badge ${b.channel === 'AIRBNB' ? 'badge-rose' : (b.channel === 'BOOKING' ? 'badge-blue' : 'badge-emerald')}">${escapeHtml(getChannelDisplayName(b.channel))}</span></td>
-      <td>${formatTrDate(b.checkIn)}</td>
-      <td>${formatTrDate(b.checkOut)}</td>
-      <td><strong>${b.nights}</strong></td>
-      <td>${Number(b.gross).toLocaleString('tr-TR')} ₺</td>
-      <td>${Number(b.otaComm || 0).toLocaleString('tr-TR')} ₺</td>
-      <td>${Number(b.cleanFee || 0).toLocaleString('tr-TR')} ₺</td>
-      <td style="color: #34D399; font-weight: 700;">${Number(b.net).toLocaleString('tr-TR')} ₺</td>
-      <td>${nightly.toLocaleString('tr-TR')} ₺</td>
-      <td>${statusBadge}</td>
-      <td style="text-align: right; white-space: nowrap;">
-        <button class="btn btn-secondary btn-sm" data-onclick="editBooking(decodeURIComponent('${encodeActionArg(String(b.id))}'))" title="Düzenle">✏️</button>
-        <button class="btn btn-danger btn-sm" data-onclick="deleteBookingUI(decodeURIComponent('${encodeActionArg(String(b.id))}'))" title="Sil">🗑️</button>
-      </td>
+      <td data-label="Mülk" data-onclick="openBookingDetailsPanel(decodeURIComponent('${encodeActionArg(String(b.id))}'))"><strong>${escapeHtml(vName)}</strong>${markerHtml ? `<div class="reservation-markers">${markerHtml}</div>` : ''}</td>
+      <td data-label="Misafir">${escapeHtml(b.guest || 'Belirtilmedi')}${isBulkSummaryBooking(b) ? ' <span class="badge badge-slate" style="font-size:10px;">Aylık özet</span>' : ''}</td>
+      <td data-label="Kanal"><span class="badge ${b.channel === 'AIRBNB' ? 'badge-rose' : (b.channel === 'BOOKING' ? 'badge-blue' : 'badge-emerald')}">${escapeHtml(getChannelDisplayName(b.channel))}</span></td>
+      <td data-label="Tarihler">${formatTrDate(b.checkIn)} – ${formatTrDate(b.checkOut)}</td>
+      <td data-label="Brüt"><strong>${Number(b.gross || 0).toLocaleString('tr-TR')} ₺</strong></td>
+      <td data-label="Durum">${statusBadge}</td>
     `;
     tbody.appendChild(tr);
   });
@@ -7088,6 +7195,8 @@ function renderResCalendar() {
 if (typeof document !== 'undefined' && document.addEventListener) {
   // Gun butonlari her render'da yeniden uretildigi icin olay delegasyonu.
   document.addEventListener('click', event => {
+    const filterDay = event.target.closest && event.target.closest('[data-reservation-filter-date]');
+    if (filterDay) { pickReservationRangeDate(filterDay.dataset.reservationFilterDate); return; }
     const dayBtn = event.target.closest && event.target.closest('[data-res-date]');
     if (dayBtn) { pickResDate(dayBtn.dataset.resDate); return; }
     const panel = document.getElementById('resDatePicker');
@@ -9828,6 +9937,16 @@ function deleteCleaningTaskFromModal() {
 // 📅 30 GÜNLÜK GÖRSEL DOLULUK ÇİZELGESİ (TAPE CHART)
 // -------------------------------------------------------------
 let tapeChartMonth = getTodayStr().slice(0, 7);
+let tapeChartView = 'MONTH';
+let tapeChartAnchor = getTodayStr();
+
+function setTapeChartView(view) {
+  if (!['WEEK_1', 'WEEK_2', 'MONTH'].includes(view)) return false;
+  tapeChartView = view;
+  if (view !== 'MONTH') tapeChartAnchor = getTodayStr();
+  renderTapeChart();
+  return true;
+}
 
 function populateTapeChartMonthSelect() {
   const select = document.getElementById('tapeChartMonthSelect');
@@ -9848,12 +9967,22 @@ function populateTapeChartMonthSelect() {
 
 function setTapeChartMonth(month) {
   tapeChartMonth = month;
+  tapeChartAnchor = month === getTodayStr().slice(0, 7) ? getTodayStr() : `${month}-01`;
   const select = document.getElementById('tapeChartMonthSelect');
   if (select) select.value = month;
   renderTapeChart();
 }
 
 function stepTapeChartMonth(delta) {
+  if (tapeChartView !== 'MONTH') {
+    const stepDays = tapeChartView === 'WEEK_2' ? 14 : 7;
+    const anchor = new Date(`${tapeChartAnchor}T12:00:00`);
+    anchor.setDate(anchor.getDate() + Number(delta || 0) * stepDays);
+    tapeChartAnchor = `${anchor.getFullYear()}-${String(anchor.getMonth() + 1).padStart(2, '0')}-${String(anchor.getDate()).padStart(2, '0')}`;
+    tapeChartMonth = tapeChartAnchor.slice(0, 7);
+    renderTapeChart();
+    return;
+  }
   let idx = ALL_FINANCIAL_MONTHS.indexOf(tapeChartMonth);
   if (idx === -1) idx = ALL_FINANCIAL_MONTHS.indexOf(getTodayStr().slice(0, 7));
   let newIdx = idx + delta;
@@ -9886,17 +10015,28 @@ function renderTapeChart() {
     return;
   }
   
-  // Exact days in month (30 for Sep, 31 for Dec, 28/29 for Feb)
+  // Ay ya da bugunden baslayan 1/2 haftalik tarih ekseni.
   const daysInMonth = new Date(year, month, 0).getDate();
-  
+  const calendarDates = [];
+  if (tapeChartView === 'MONTH') {
+    for (let day = 1; day <= daysInMonth; day++) calendarDates.push(`${tapeChartMonth}-${String(day).padStart(2, '0')}`);
+  } else {
+    const count = tapeChartView === 'WEEK_2' ? 14 : 7;
+    const start = new Date(`${tapeChartAnchor}T12:00:00`);
+    for (let offset = 0; offset < count; offset++) {
+      const date = new Date(start);
+      date.setDate(start.getDate() + offset);
+      calendarDates.push(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`);
+    }
+  }
+
   const dayNamesShort = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
   const todayStr = getTodayStr();
 
-  let tableHtml = '<table class="tape-chart-table"><thead><tr><th class="tape-villa-th">VİLLA \\ GÜNLER</th>';
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dStr = (d < 10 ? '0' : '') + d;
-    const curDateStr = `${tapeChartMonth}-${dStr}`;
-    const dateObj = new Date(year, month - 1, d);
+  let tableHtml = '<table class="tape-chart-table"><thead><tr><th class="tape-villa-th">MÜLK \\ GÜNLER</th>';
+  calendarDates.forEach(curDateStr => {
+    const dateObj = new Date(`${curDateStr}T12:00:00`);
+    const d = dateObj.getDate();
     const dayOfWeek = dateObj.getDay();
     const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
     const isToday = (curDateStr === todayStr);
@@ -9905,28 +10045,27 @@ function renderTapeChart() {
       ${d}<br>
       <span style="font-size:9px; font-weight:normal; opacity:0.8;">${dayNamesShort[dayOfWeek]}</span>
     </th>`;
-  }
+  });
   tableHtml += '</tr></thead><tbody>';
 
   // Find bookings for each villa
   const takvimOzetleri = [];
-  vKeys.forEach(vKey => {
+  vKeys.forEach((vKey, villaIndex) => {
     const vConf = appData.villas?.[vKey] || {};
     const vName = vConf.name || vKey;
     const vPropId = vConf.id;
-    tableHtml += `<tr><td class="tape-villa-td"><strong>${escapeHtml(vName)}</strong></td>`;
+    const propertyColor = ['#38BDF8', '#A78BFA', '#34D399', '#FBBF24', '#FB7185'][villaIndex % 5];
+    tableHtml += `<tr><td class="tape-villa-td"><span class="tape-property-dot" style="background:${propertyColor}"></span><strong>${escapeHtml(vName)}</strong></td>`;
 
     const tumu = (appData.bookings || []).filter(b =>
       (b.villa === vKey || (vPropId && b.propertyId === vPropId)) && b.status !== 'CANCELLED'
     );
     const vBookings = tumu.filter(b => !isBulkSummaryBooking(b));
     tumu.filter(isBulkSummaryBooking).forEach(b => {
-      if (String(b.checkIn || '') < `${tapeChartMonth}-32` && String(b.checkOut || '') > `${tapeChartMonth}-01`) takvimOzetleri.push(vName);
+      if (String(b.checkIn || '') <= calendarDates[calendarDates.length - 1] && String(b.checkOut || '') > calendarDates[0]) takvimOzetleri.push(vName);
     });
 
-    for (let d = 1; d <= daysInMonth; d++) {
-      const dStr = (d < 10 ? '0' : '') + d;
-      const dateStr = `${tapeChartMonth}-${dStr}`;
+    calendarDates.forEach(dateStr => {
       const isToday = (dateStr === todayStr);
 
       // Check if booked
@@ -9951,7 +10090,7 @@ function renderTapeChart() {
       } else {
         tableHtml += `<td class="tape-cell ${isToday ? 'today-cell' : ''}" title="${formatTrDate(dateStr)} - Müsait (Rezervasyon eklemek için tıklayın)" data-onclick="openBookingForDate(decodeURIComponent('${encodeActionArg(vKey)}'), decodeURIComponent('${encodeActionArg(dateStr)}'))" style="cursor: pointer; ${isToday ? 'background: rgba(245, 158, 11, 0.05);' : ''}"></td>`;
       }
-    }
+    });
     tableHtml += '</tr>';
   });
 
@@ -16352,74 +16491,6 @@ function renderPricingTab() {
   `;
 }
 
-function renderReportsTab() {
-  if (typeof document === 'undefined') return;
-  const container = document.getElementById('reportsContentContainer');
-  if (!container) return;
-
-  const bookings = (appData.bookings || []).filter(b => b.status !== 'CANCELLED' && isBookingInFilter(b));
-  const expenses = (appData.expenses || []).filter(isExpenseInFilter);
-  const tl = n => Math.round(Number(n) || 0).toLocaleString('tr-TR');
-  // Kanal satirinda musterinin gordugu AD yazar, ham kod degil (L-105).
-  const kanalAdi = getChannelDisplayName;
-  const kanal = new Map();
-  let brut = 0;
-  bookings.forEach(b => {
-    const pay = getBookingFilterShare(b);
-    const tutar = (Number(b.gross) || 0) * pay.ratio;
-    const ad = kanalAdi(b.channel);
-    const satir = kanal.get(ad) || { tutar: 0, adet: 0, ozet: 0 };
-    satir.tutar += tutar;
-    if (isBulkSummaryBooking(b)) satir.ozet += 1; else satir.adet += 1;
-    kanal.set(ad, satir);
-    brut += tutar;
-  });
-  // Karlilik TEK defter formulunden (CLAUDE.md 3.4, K-04). Bu ekran eskiden
-  // kendi toplamini yapiyordu: indirimi dusmuyor, temizlik maliyetini ve
-  // odeme komisyonunu hic gormuyordu; ayni ay icin Finans'tan farkli net kar.
-  const defter = computeFilterLedger();
-  const karOlculemez = isProfitUnmeasured(defter.totalRevenue, defter.totalOpex, defter.capex,
-    currentFilter && currentFilter.period);
-  const marj = defter.totalRevenue > 0 ? (defter.netProfit / defter.totalRevenue) * 100 : null;
-  const netSatiri = karOlculemez
-    ? `— (${OLCULEMEYEN_KAR_NOTU})`
-    : `₺${tl(defter.netProfit)}${marj === null ? ' (marj hesaplanamadı: ciro yok)' : ` (%${marj.toFixed(1)} marj)`}`;
-  const kanalSatirlari = Array.from(kanal.entries())
-    .sort((a, b) => b[1].tutar - a[1].tutar)
-    .map(([ad, v]) => {
-      const pay = brut > 0 ? (v.tutar / brut) * 100 : 0;
-      const ozetNotu = v.ozet ? `, ${v.ozet} toplu aktarım özeti` : '';
-      return `• <strong>${escapeHtml(ad)}:</strong> %${pay.toFixed(1)} pay (₺${tl(v.tutar)}, ${v.adet} rezervasyon${ozetNotu})`;
-    }).join('<br>');
-
-  if (!bookings.length && !expenses.length) {
-    container.innerHTML = '<div class="empty-state" style="padding:24px; color:var(--text-muted);">Seçili dönem ve mülk için rezervasyon veya gider kaydı yok; kanal dağılımı ve kârlılık hesaplanamadı.</div>';
-    return;
-  }
-
-  container.innerHTML = `
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-      <div style="background: rgba(0,0,0,0.25); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06);">
-        <h4 style="margin: 0 0 10px 0; color: #60A5FA; font-size: 13px;">🌐 Kanal Satış Dağılımı</h4>
-        <div style="font-size: 12px; color: #CBD5E1; line-height: 1.6;">
-          ${kanalSatirlari || 'Kanalı belirlenmiş rezervasyon kaydı yok.'}
-        </div>
-      </div>
-      <div style="background: rgba(0,0,0,0.25); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06);">
-        <h4 style="margin: 0 0 10px 0; color: #34D399; font-size: 13px;">📈 Kârlılık Köprüsü & Komisyon Analizi</h4>
-        <div style="font-size: 12px; color: #CBD5E1; line-height: 1.6;">
-          • <strong>Toplam Gelir:</strong> ₺${tl(defter.totalRevenue)} (net oda geliri + temizlik geliri)<br>
-          • <strong>Kanal ve ödeme komisyonları:</strong> ₺${tl(defter.otaCommission + defter.paymentCommission)}<br>
-          • <strong>Temizlik maliyeti (yapılan):</strong> ₺${tl(defter.cleaningCost)}<br>
-          • <strong>Elle girilen OPEX:</strong> ₺${tl(defter.manualOpex)}<br>
-          • <strong>CAPEX:</strong> ₺${tl(defter.capex)}<br>
-          • <strong>Net Kâr:</strong> ${netSatiri}
-        </div>
-      </div>
-    </div>
-  `;
-}
-
 function openTabFromDeepLink(tabId, entityId) {
   switchTab(tabId);
 }
@@ -16617,6 +16688,12 @@ if (typeof module !== 'undefined' && module.exports) {
     renderFinanceModule,
     openCopyPreviousExpensesPanel,
     confirmCopyPreviousExpenses,
+    buildReservationListView,
+    openBookingDetailsPanel,
+    toggleReservationRangePicker,
+    shiftReservationRangeCalendar,
+    resetReservationRange,
+    setTapeChartView,
     renderOperationsKpiStrip,
     renderDailyOps,
     loadTenantAppData,
@@ -16743,7 +16820,6 @@ if (typeof module !== 'undefined' && module.exports) {
     renderAll,
     renderOperationsTab,
     renderTapeChart,
-    renderReportsTab,
     renderPricingTab,
     renderPricingKpiStrip,
     renderCoverAbTestLab,

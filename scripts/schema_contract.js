@@ -5,6 +5,11 @@ const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 const SUPABASE = path.join(ROOT, 'supabase');
+const OUT_OF_SCOPE_TABLES = new Set([
+  'pricing_profiles', 'pricing_rules', 'pricing_events', 'pricing_overrides',
+  'daily_rates', 'rate_change_logs', 'booking_quotes'
+]);
+const OUT_OF_SCOPE_RPCS = new Set(['save_manual_pricing_override_atomic', 'accept_booking_quote_atomic']);
 
 function canonicalFiles() {
   const manifest = fs.readFileSync(path.join(SUPABASE, 'migration_manifest.txt'), 'utf8')
@@ -30,40 +35,25 @@ function discoveredObjects() {
 }
 
 const discovered = discoveredObjects();
-const tableContracts = Object.fromEntries(discovered.tables.map(name => [name, { columns: {} }]));
+const tableContracts = Object.fromEntries(discovered.tables.filter(name => !OUT_OF_SCOPE_TABLES.has(name)).map(name => [name, { columns: {} }]));
 
 Object.assign(tableContracts, {
   tenants: { columns: { id: { nullable: false } } },
   tenant_members: { columns: { tenant_id: { nullable: false }, user_id: { nullable: false }, role: { nullable: false } } },
   properties: { columns: { id: { nullable: false }, tenant_id: { nullable: false }, is_active: { nullable: false } } },
   bookings: { columns: {
-    id: { nullable: false }, tenant_id: { nullable: false }, property_id: { nullable: false },
-    quote_snapshot: { nullable: true }, pricing_source: { nullable: true }
+    id: { nullable: false }, tenant_id: { nullable: false }, property_id: { nullable: false }
   } },
   leads: { columns: {
     id: { nullable: false }, tenant_id: { nullable: false }, guest_name: { nullable: true }, guest_phone: { nullable: true }
   } },
   financial_transactions: { columns: { id: { nullable: false }, tenant_id: { nullable: false } } },
-  invitation_delivery_outbox: { columns: { id: { nullable: false }, tenant_id: { nullable: false } } },
-  pricing_profiles: { columns: { id: { nullable: false }, tenant_id: { nullable: false }, property_id: { nullable: false } } },
-  pricing_rules: { columns: { id: { nullable: false }, tenant_id: { nullable: false }, name: { nullable: false } } },
-  pricing_events: { columns: { id: { nullable: false }, tenant_id: { nullable: false }, name: { nullable: false } } },
-  pricing_overrides: { columns: { id: { nullable: false }, tenant_id: { nullable: false }, reason: { nullable: false } } },
-  daily_rates: { columns: { id: { nullable: false }, tenant_id: { nullable: false }, rate_date: { nullable: false } } },
-  rate_change_logs: { columns: { id: { nullable: false }, tenant_id: { nullable: false }, rate_date: { nullable: false } } },
-  booking_quotes: { columns: { id: { nullable: false }, tenant_id: { nullable: false }, quoted_total: { nullable: false } } }
+  invitation_delivery_outbox: { columns: { id: { nullable: false }, tenant_id: { nullable: false } } }
 });
 
 const CONTRACT = {
   tables: tableContracts,
   rpcs: {
-    save_manual_pricing_override_atomic: {
-      args: ['p_tenant_id', 'p_property_id', 'p_start_date', 'p_end_date', 'p_rate_override', 'p_reason', 'p_bypass_guardrail', 'p_min_stay_override'],
-      requiredArgs: ['p_tenant_id', 'p_property_id', 'p_start_date', 'p_end_date', 'p_rate_override', 'p_reason']
-    },
-    accept_booking_quote_atomic: {
-      args: ['p_tenant_id', 'p_quote_id'], requiredArgs: ['p_tenant_id', 'p_quote_id']
-    },
     convert_lead_to_booking_atomic: {
       args: ['p_lead_id', 'p_tenant_id', 'p_property_id', 'p_booking_code', 'p_check_in', 'p_check_out', 'p_pax', 'p_gross_amount', 'p_ota_commission', 'p_cleaning_fee', 'p_discount', 'p_notes'],
       requiredArgs: ['p_lead_id', 'p_tenant_id']
@@ -71,8 +61,14 @@ const CONTRACT = {
   },
   allowedRpcs: new Set(discovered.rpcs),
   allowlist: {
-    rpcs: new Map([['rls_auto_enable', 'Supabase production event-trigger helper; not part of the application contract']]),
-    tables: new Map([['lexbnb_bootstrap_log', 'test bootstrap ledger; intentionally exists only in the dedicated test project']])
+    rpcs: new Map([
+      ['rls_auto_enable', 'Supabase production event-trigger helper; not part of the application contract'],
+      ...[...OUT_OF_SCOPE_RPCS].map(name => [name, 'Phase11/44 pricing scope excluded by product decision on 30.09.2026'])
+    ]),
+    tables: new Map([
+      ['lexbnb_bootstrap_log', 'test bootstrap ledger; intentionally exists only in the dedicated test project'],
+      ...[...OUT_OF_SCOPE_TABLES].map(name => [name, 'Phase11/44 pricing scope excluded by product decision on 30.09.2026'])
+    ])
   }
 };
 

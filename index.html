@@ -11,7 +11,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=5d30fbfb">
+  <link rel="stylesheet" href="style.css?v=6d1e0bf7">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="supabase.umd.js?v=3810661a"></script>
@@ -1068,15 +1068,15 @@
     <div id="tab-marketing" class="tab-content">
       <div class="section-title-bar" style="align-items: flex-start; gap: 16px; flex-wrap: wrap;">
         <div>
-          <h2 style="margin: 0;">📈 GELİR, DAĞITIM & İLAN ZEKÂSI</h2>
-          <p class="sub-text" style="margin: 5px 0 0;">Kanal ekonomisi ve ölçülebilir dönüşüm hunisi.</p>
+          <h2 style="margin: 0;">📈 KANALLAR VE PAZARLAMA</h2>
+          <p class="sub-text" style="margin: 5px 0 0;">Kanal ekonomisi ile ölçülebilir huni değişiklikleri.</p>
         </div>
         <span id="marketingDataQualityBadge" class="badge badge-secondary">Veri kontrol ediliyor</span>
       </div>
 
       <div role="tablist" aria-label="Pazarlama çalışma alanları" style="display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0;">
-        <button type="button" class="btn btn-primary btn-sm" data-marketing-view="economics">🌐 Kanal Ekonomisi</button>
-        <button type="button" class="btn btn-secondary btn-sm" data-marketing-view="funnel">🔻 Huni & Bulgular</button>
+        <button type="button" class="btn btn-primary btn-sm" data-marketing-view="economics">Kanallar</button>
+        <button type="button" class="btn btn-secondary btn-sm" data-marketing-view="funnel">Huniler ve Testler</button>
       </div>
 
       <div id="marketingWorkspaceStatus" class="card" style="padding: 14px; margin-bottom: 14px;">Pazarlama motoru hazırlanıyor…</div>
@@ -1087,11 +1087,11 @@
     <!-- TAB: REZERVASYONLAR (FULL CRUD) -->
     <!-- ========================================== -->
     <div id="tab-reservations" class="tab-content">
-      <!-- 30 GÜNLÜK GÖRSEL DOLULUK ÇİZELGESİ (TAPE CHART) -->
+      <!-- DOLULUK VE REZERVASYON TAKVİMİ -->
       <section class="card tape-chart-card">
         <div class="section-title-bar">
           <div>
-            <h2>📅 VİLLA DOLULUK VE REZERVASYON TAKVİMİ (TAPE CHART)</h2>
+            <h2>📅 DOLULUK VE REZERVASYON TAKVİMİ</h2>
             <p class="sub-text">Portföyünüzdeki gerçek mülklerin gün gün doluluk durumu. Boş günlere tıklayarak doğrudan rezervasyon girebilirsiniz.</p>
           </div>
           <div style="display: flex; gap: 12px; align-items: center; font-size: 11px;">
@@ -1103,12 +1103,17 @@
 
         <!-- Takvim Gezinme ve Hızlı Atlama Araç Çubuğu -->
         <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); padding: 12px 16px; border-radius: 8px; margin-top: 10px; margin-bottom: 12px; flex-wrap: wrap; gap: 10px; border: 1px solid rgba(255,255,255,0.08);">
-          <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap:wrap;">
             <button type="button" class="btn btn-secondary btn-sm" data-onclick="stepTapeChartMonth(-1)" title="Önceki Ay">‹ Önceki Ay</button>
             <select id="tapeChartMonthSelect" data-onchange="setTapeChartMonth(this.value)" style="padding: 7px 14px; background: #1E293B; border: 1px solid rgba(255,255,255,0.25); border-radius: 6px; color: #fff; font-weight: 700; font-size: 13px; cursor: pointer;">
               <!-- Populated dynamically via JS -->
             </select>
             <button type="button" class="btn btn-secondary btn-sm" data-onclick="stepTapeChartMonth(1)" title="Sonraki Ay">Sonraki Ay ›</button>
+            <div class="calendar-view-switch" aria-label="Takvim görünümü">
+              <button type="button" class="btn btn-secondary btn-sm" data-onclick="setTapeChartView('WEEK_1')">1 hafta</button>
+              <button type="button" class="btn btn-secondary btn-sm" data-onclick="setTapeChartView('WEEK_2')">2 hafta</button>
+              <button type="button" class="btn btn-secondary btn-sm" data-onclick="setTapeChartView('MONTH')">Ay</button>
+            </div>
           </div>
           
         </div>
@@ -1119,10 +1124,9 @@
       <section class="card">
         <div class="section-title-bar">
           <div>
-            <h2>📋 TÜM REZERVASYONLAR LİSTESİ</h2>
-            <p class="sub-text">Geçmiş, güncel ve yılbaşı dahil tüm gelecek rezervasyonlar. Düzenleyin, silin veya filtreleyin.</p>
+            <h2>📋 REZERVASYONLAR</h2>
+            <p class="sub-text">Seçili dönemin rezervasyonları; operasyon önceliğine göre sıralanır.</p>
           </div>
-          <button class="btn btn-secondary" data-onclick="openWhatsAppModal('reservation')" style="border-color: #25D366; color: #4ADE80; margin-right: 8px;"><span style="font-size: 14px;">💬</span> WhatsApp'tan Rezervasyona Aktar</button>
           <button class="btn btn-primary" data-onclick="openBookingModal()">+ Yeni Rezervasyon Ekle</button>
         </div>
 
@@ -1131,12 +1135,19 @@
           <div style="flex: 1; min-width: 200px;">
             <input type="text" id="rezSearchInput" placeholder="🔍 Misafir adı veya villa ara..." data-oninput="renderManageBookingsTable()" style="width: 100%; padding: 8px 12px; background: rgba(30,41,59,0.8); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff;">
           </div>
-          <div>
-            <select id="rezPeriodFilter" data-onchange="renderManageBookingsTable()" style="padding: 8px 12px; background: rgba(30,41,59,0.9); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px;">
-              <!-- refreshPeriodSelectors() yeniden kurar; yedek liste. -->
-              <option value="ALL" selected>Tüm Rezervasyonlar</option>
-              <option value="UPCOMING">Gelecek & Aktif Rezervasyonlar</option>
-            </select>
+          <div class="reservation-range-group">
+            <button type="button" id="reservationRangeTrigger" class="btn btn-secondary" data-onclick="toggleReservationRangePicker()" aria-expanded="false">
+              <span id="reservationRangeLabel">—</span>
+            </button>
+            <div id="reservationRangePicker" class="daterange-panel reservation-range-panel" role="dialog" aria-label="Rezervasyon liste dönemi" hidden>
+              <div class="daterange-head">
+                <button type="button" class="daterange-nav" data-onclick="shiftReservationRangeCalendar(-1)" aria-label="Önceki ay">‹</button>
+                <div class="daterange-title" id="reservationRangeTitle">—</div>
+                <button type="button" class="daterange-nav" data-onclick="shiftReservationRangeCalendar(1)" aria-label="Sonraki ay">›</button>
+              </div>
+              <div id="reservationRangeCalendar"></div>
+              <div class="daterange-foot"><span>Başlangıç ve bitiş tarihini seçin</span><button type="button" class="daterange-clear" data-onclick="resetReservationRange()">Bu ay</button></div>
+            </div>
           </div>
           <div>
             <select id="rezVillaFilter" data-onchange="renderManageBookingsTable()" style="padding: 8px 12px; background: rgba(30,41,59,0.9); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px;">
@@ -1158,22 +1169,15 @@
         </div>
 
         <div class="table-responsive">
-          <table class="data-table">
+          <table class="data-table reservation-list-table">
             <thead>
               <tr>
                 <th>VİLLA</th>
                 <th>MİSAFİR</th>
                 <th>KANAL</th>
-                <th>GİRİŞ</th>
-                <th>ÇIKIŞ</th>
-                <th>GECE</th>
+                <th>TARİHLER</th>
                 <th>BRÜT (₺)</th>
-                <th>KOMİSYON (₺)</th>
-                <th>TEMİZLİK (₺)</th>
-                <th>NET ODA (₺)</th>
-                <th>GECELİK (₺)</th>
                 <th>DURUM</th>
-                <th style="text-align: right;">İŞLEM</th>
               </tr>
             </thead>
             <tbody id="manageBookingsTableBody"></tbody>
@@ -1779,26 +1783,6 @@
         </div>
         <div id="pricingManagerContainer">
           <!-- Dinamik fiyatlandırma detayları ve gap night kartları -->
-        </div>
-      </section>
-    </div>
-
-    <!-- ======================================================= -->
-    <!-- TAB: RAPORLAR (OTA & KANAL RADARI, PERFORMANS)           -->
-    <!-- ======================================================= -->
-    <div id="tab-reports" class="tab-content">
-      <section class="card" style="margin-bottom: 24px;">
-        <div class="section-title-bar">
-          <div>
-            <h2>📊 PORTFÖY PERFORMANSI & KANAL RAPORLARI</h2>
-            <p class="sub-text">Kanal dağılımı (Airbnb, Booking.com, Doğrudan Satış), komisyon analizleri ve kârlılık köprüsü.</p>
-          </div>
-          <div style="display: flex; gap: 8px;">
-            <button class="btn btn-secondary btn-sm" data-onclick="switchTab('marketing')">📢 Pazarlama Modülüne Git</button>
-          </div>
-        </div>
-        <div id="reportsContentContainer">
-          <!-- Rapor içerikleri JS ile doldurulacak -->
         </div>
       </section>
     </div>
@@ -3087,180 +3071,6 @@
   </div>
 
 
-  <!-- MODAL: YENİ REKLAM KAMPANYASI / HARCAMASI EKLE -->
-  <div id="marketingCampaignModal" class="modal-backdrop modal-overlay">
-    <div class="modal-card modal-content" style="max-width: 600px;">
-      <div class="modal-header">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <span style="font-size: 20px;">📢</span>
-          <h3 id="mktModalTitle" style="margin: 0;">Yeni Reklam Kampanyası Ekle</h3>
-        </div>
-        <button class="close-btn" data-onclick="closeMarketingModal()">&times;</button>
-      </div>
-      <form id="mktCampaignForm" data-onsubmit="saveMarketingCampaign(event)">
-        <input type="hidden" id="mktCampaignId">
-        <div style="padding: 20px;">
-          <div class="form-group" style="margin-bottom: 14px;">
-            <label style="font-weight: 700; color: #fff; font-size: 13px;">Kampanya Adı *</label>
-            <input type="text" id="mktName" required placeholder="Örn: Instagram Reels - Kış Kaçamağı" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 13px;">
-          </div>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
-            <div class="form-group">
-              <label style="font-size: 12px; font-weight: 600;">Reklam Platformu *</label>
-              <select id="mktPlatform" required style="width: 100%; padding: 10px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
-                <option value="META">Meta Ads (Instagram / FB)</option>
-                <option value="GOOGLE">Google Ads (Arama / PMax)</option>
-                <option value="TIKTOK">TikTok Ads</option>
-                <option value="OTHER">Diğer Sponsorlu Tanıtım</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label style="font-size: 12px; font-weight: 600;">İlgili Villa / Portföy</label>
-              <select id="mktVilla" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
-              <option value="ALL">Tüm Villalar / Portföy</option>
-            </select>
-            </div>
-          </div>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
-            <div class="form-group">
-              <label style="font-size: 12px; font-weight: 600;">Başlangıç Tarihi</label>
-              <input type="date" id="mktStartDate" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
-            </div>
-            <div class="form-group">
-              <label style="font-size: 12px; font-weight: 600;">Bitiş Tarihi</label>
-              <input type="date" id="mktEndDate" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
-            </div>
-          </div>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
-            <div class="form-group">
-              <label style="font-size: 12px; font-weight: 600;">Planlanan Bütçe (TL)</label>
-              <input type="number" id="mktBudget" placeholder="Örn: 5000" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
-            </div>
-            <div class="form-group">
-              <label style="font-size: 12px; font-weight: 600; color: #FCA5A5;">Fiili Harcanan Tutar (TL) *</label>
-              <input type="number" id="mktSpent" required placeholder="Örn: 4200" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-weight: 700;">
-            </div>
-          </div>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
-            <div class="form-group">
-              <label style="font-size: 12px; font-weight: 600;">Tıklama Sayısı (Clicks)</label>
-              <input type="number" id="mktClicks" placeholder="Örn: 450" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
-            </div>
-            <div class="form-group">
-              <label style="font-size: 12px; font-weight: 600;">Gelen Lead / WhatsApp Mesajı</label>
-              <input type="number" id="mktLeads" placeholder="Örn: 24" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
-            </div>
-          </div>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
-            <div class="form-group">
-              <label style="font-size: 12px; font-weight: 600; color: #93C5FD;">Kazanılan Rezervasyon Adedi</label>
-              <input type="number" id="mktBookingsCount" placeholder="Örn: 2" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
-            </div>
-            <div class="form-group">
-              <label style="font-size: 12px; font-weight: 600; color: #34D399;">Üretilen Ciro (TL)</label>
-              <input type="number" id="mktRevenue" placeholder="Örn: 48000" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-weight: 700;">
-            </div>
-          </div>
-
-          <div class="form-group" style="margin-bottom: 14px;">
-            <label style="font-size: 12px; font-weight: 600;">Kampanya Durumu</label>
-            <select id="mktStatus" style="width: 100%; padding: 10px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
-              <option value="ACTIVE">Aktif (Yayında)</option>
-              <option value="COMPLETED">Tamamlandı</option>
-              <option value="PAUSED">Duraklatıldı</option>
-            </select>
-          </div>
-
-          <div class="form-group" style="margin-bottom: 20px;">
-            <label style="font-size: 12px; font-weight: 600;">Notlar & Hedef Kitle Detayları</label>
-            <textarea id="mktNotes" rows="2" placeholder="Hedefleme, kreatif detayları veya özel indirim kodu..." style="width: 100%; padding: 10px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 12px;"></textarea>
-          </div>
-
-          <div style="display: flex; justify-content: flex-end; gap: 10px;">
-            <button type="button" class="btn btn-secondary" data-onclick="closeMarketingModal()">İptal</button>
-            <button type="submit" class="btn btn-primary" style="font-weight: 700;">Kaydet</button>
-          </div>
-        </div>
-      </form>
-    </div>
-  </div>
-
-
-  <!-- Modal: Influencer & Barter İşbirliği Ekle / Düzenle -->
-  <div id="influencerModal" class="modal-backdrop modal-overlay">
-    <div class="modal-card modal-content" style="max-width: 520px;">
-      <div class="modal-header">
-        <h3 id="influencerModalTitle">Yeni Influencer / Barter İşbirliği Ekle</h3>
-        <button type="button" class="close-btn btn-close" data-onclick="closeInfluencerModal()">&times;</button>
-      </div>
-      <form id="influencerForm" data-onsubmit="saveInfluencerCollab(event)">
-        <input type="hidden" id="infCollabId">
-        <div class="form-group">
-          <label>Influencer / Hesap Adı (@):</label>
-          <input type="text" id="infHandle" required placeholder="@gezgincift" style="width:100%; padding:8px; background:var(--bg-input); border:1px solid rgba(255,255,255,0.2); border-radius:6px; color:#fff;">
-        </div>
-        <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px;">
-          <div class="form-group">
-            <label>Takipçi Sayısı:</label>
-            <input type="text" id="infFollowers" placeholder="250K" style="width:100%; padding:8px; background:var(--bg-input); border:1px solid rgba(255,255,255,0.2); border-radius:6px; color:#fff;">
-          </div>
-          <div class="form-group">
-            <label>Tahsis Edilen Villa:</label>
-            <select id="infVilla" style="width:100%; padding:8px; background:var(--bg-input); border:1px solid rgba(255,255,255,0.2); border-radius:6px; color:#fff;">
-              <!-- updateAllVillaDropdowns() musterinin mulkleriyle doldurur -->
-            </select>
-          </div>
-        </div>
-        <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px;">
-          <div class="form-group">
-            <label>Konaklama Tarihi:</label>
-            <input type="text" id="infDates" placeholder="12 - 14 Ekim" style="width:100%; padding:8px; background:var(--bg-input); border:1px solid rgba(255,255,255,0.2); border-radius:6px; color:#fff;">
-          </div>
-          <div class="form-group">
-            <label>İşletme Maliyeti (₺):</label>
-            <input type="number" id="infCost" placeholder="3000" style="width:100%; padding:8px; background:var(--bg-input); border:1px solid rgba(255,255,255,0.2); border-radius:6px; color:#fff;">
-          </div>
-        </div>
-        <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px;">
-          <div class="form-group">
-            <label>Özel İndirim Kuponu:</label>
-            <input type="text" id="infCode" placeholder="GEZGIN10" style="width:100%; padding:8px; background:var(--bg-input); border:1px solid rgba(255,255,255,0.2); border-radius:6px; color:#fff;">
-          </div>
-          <div class="form-group">
-            <label>Kazanılan Rezervasyon:</label>
-            <input type="number" id="infBookingsCount" placeholder="3" style="width:100%; padding:8px; background:var(--bg-input); border:1px solid rgba(255,255,255,0.2); border-radius:6px; color:#fff;">
-          </div>
-        </div>
-        <div class="form-row" style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px;">
-          <div class="form-group">
-            <label>Üretilen Brüt Ciro (₺):</label>
-            <input type="number" id="infRevenue" placeholder="84000" style="width:100%; padding:8px; background:var(--bg-input); border:1px solid rgba(255,255,255,0.2); border-radius:6px; color:#fff;">
-          </div>
-          <div class="form-group">
-            <label>Durum:</label>
-            <select id="infStatus" style="width:100%; padding:8px; background:var(--bg-input); border:1px solid rgba(255,255,255,0.2); border-radius:6px; color:#fff;">
-              <option value="PLANLANAN">Planlandı</option>
-              <option value="COMPLETED" selected>Tamamlandı</option>
-              <option value="IPTAL">İptal Edildi</option>
-            </select>
-          </div>
-        </div>
-        <div class="form-group" style="margin-top:10px;">
-          <label>Notlar & Paylaşım Detayları:</label>
-          <input type="text" id="infNotes" placeholder="2 Reels + 5 Hikaye paylaşıldı" style="width:100%; padding:8px; background:var(--bg-input); border:1px solid rgba(255,255,255,0.2); border-radius:6px; color:#fff;">
-        </div>
-        <div class="modal-footer" style="margin-top:16px; display:flex; justify-content:flex-end; gap:8px;">
-          <button type="button" class="btn btn-secondary" data-onclick="closeInfluencerModal()">İptal</button>
-          <button type="submit" class="btn btn-primary">Kaydet</button>
-        </div>
-      </form>
-    </div>
-  </div>
 
 
   <!-- ========================================== -->
@@ -3494,7 +3304,7 @@
   <script src="core/user_facing_errors.js?v=e4eb0ae5"></script>
   <script src="core/ledger_contract.js?v=bc9fd6f2"></script>
   <script src="core/business_date.js?v=a1518391"></script>
-  <script src="core/guest_crm_engine.js?v=2caa7b7c"></script>
+  <script src="core/guest_crm_engine.js?v=eb788dbf"></script>
   <script src="core/gap_night_service.js?v=6cdf4142"></script>
   <script src="core/pricing_booking_service.js?v=0eb93c05"></script>
   <script src="core/executive_priority_service.js?v=d113e0e8"></script>
@@ -3502,10 +3312,10 @@
   <script src="core/captcha_gate.js?v=3ad4a776"></script>
   <script src="core/date_range_picker.js?v=41dc564c"></script>
   <script src="core/side_panel.js?v=d763b464"></script>
-  <script src="core/action_dispatch.js?v=e1e57f2d"></script>
-  <script src="app.js?v=3c937700"></script>
+  <script src="core/action_dispatch.js?v=599466d8"></script>
+  <script src="app.js?v=7c07fae8"></script>
   <script src="core/property_analysis_context_ui.js?v=56a57dc8"></script>
   <script src="core/analysis_center_ui.js?v=beb16d7c"></script>
-  <script src="core/marketing_ui.js?v=e349e32e"></script>
+  <script src="core/marketing_ui.js?v=771c6289"></script>
 </body>
 </html>
