@@ -269,6 +269,7 @@ const allTestFiles = [
   'navigation_menu_tests.js',
   'a1_claude_remaining_audit_tests.js',
   'shared_components_tests.js',
+  'a1_engine_audit_tests.js',
   'phase49_activation_live_tests.js',
   'phase51_lead_revert_live_tests.js',
 
