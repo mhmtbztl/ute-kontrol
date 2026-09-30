@@ -1,4 +1,7 @@
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
 const { isBulkSummaryBooking, buildGuestCrmView, filterGuestRows } = require('./guest_crm_engine.js');
 
 let passed = 0;
@@ -80,5 +83,27 @@ assert.deepStrictEqual(filterGuestRows(view.rows, { dateStart: '2026-09-01', dat
 assert.strictEqual(filterGuestRows(view.rows, { sort: 'VALUE', direction: 'ASC' })[0].id, 'g3');
 assert.strictEqual(filterGuestRows(view.rows, { sort: 'NIGHTS', direction: 'DESC' })[0].id, 'g1');
 ok('Tarih aralığı ve artan/azalan yön seçimi doğru uygulanır');
+
+const guestCrmSource = fs.readFileSync(path.join(__dirname, 'guest_crm_engine.js'), 'utf8');
+const isolatedModule = { exports: {} };
+vm.runInNewContext(guestCrmSource, {
+  module: isolatedModule,
+  exports: isolatedModule.exports,
+  require(request) {
+    if (request === './business_date') return { getBusinessDate: () => '2026-09-14' };
+    if (request === './ledger_contract') return null;
+    throw new Error(`Beklenmeyen require: ${request}`);
+  },
+  globalThis: {}
+}, { filename: 'guest_crm_engine_without_ledger.js' });
+assert.throws(
+  () => isolatedModule.exports.buildGuestCrmView({
+    guests: [{ id: 'g1', firstName: 'Ayşe' }],
+    bookings: [{ primaryGuestId: 'g1', gross: 10000, status: 'CONFIRMED' }],
+    today: '2026-09-14'
+  }),
+  error => error && error.code === 'LEDGER_CONTRACT_REQUIRED'
+);
+ok('Defter sözleşmesi yoksa yaşam boyu ciro sessizce sıfır olmaz');
 
 console.log(`TEST SUMMARY: ${passed} / ${passed} TESTS PASSED (0 FAILED)`);

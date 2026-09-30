@@ -37,6 +37,30 @@ test('boş bağlam rakam uydurmaz, null ve sıfırı ayırır', () => {
   assert(zero.prompt.includes('Baz fiyat: 0'));
 });
 
+test('tamamı ölçülmemiş iç içe fiyat alanları komuta yazılmaz', () => {
+  const r = Engine.buildPrompt({
+    kind: 'PRICE_RULE_QUESTION',
+    context: {
+      rules: { weekendPct: null, specialDayPct: null, lastMinutePct: null, gapNightPct: null },
+      next30: { soldNights: null, sellableNights: null },
+      history: {
+        weekendOccupancy: { value: null }, weekdayOccupancy: { value: null },
+        weekendAdr: { value: null }, weekdayAdr: { value: null },
+        sampleNights: {}
+      }
+    },
+    today: '2026-09-30'
+  });
+  assert(!r.prompt.includes('Kurallar:'));
+  assert(!r.prompt.includes('Sonraki 30 gün:'));
+  assert(!r.prompt.includes('Geçmiş ipucu:'));
+  assert(!r.prompt.includes('null'));
+  assert(!r.prompt.includes('{}'));
+  assert(r.omitted.some(x => x.field === 'rules'));
+  assert(r.omitted.some(x => x.field === 'next30'));
+  assert(r.omitted.some(x => x.field === 'history'));
+});
+
 test('reklam ekran görüntüsü komutu tek V2 biçimini taşır', () => {
   const r = Engine.buildPrompt({ kind: 'ADS_SCREENSHOT_READ', context: { platform: 'META' }, today: '2026-09-30' });
   assert(r.prompt.includes('LEXBNB_REKLAM_V2'));

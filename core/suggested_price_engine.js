@@ -21,7 +21,7 @@
   }
   function sameProperty(record, property) {
     const wanted = property && property.id, got = record && (record.propertyId || record.property_id || record.villaId || record.villa_id);
-    return !wanted || !got || String(wanted) === String(got);
+    return !wanted || (!!got && String(wanted) === String(got));
   }
   function bookedOn(record, date) {
     const start = record && (record.checkIn || record.check_in), end = record && (record.checkOut || record.check_out);
@@ -118,10 +118,18 @@
     const o = input || {}, ledger = o.ledgerToDate;
     const actual = ledger && !missing(ledger.netRoomRevenue) ? Number(ledger.netRoomRevenue) : null;
     if (!o.historyHint) return { actual, planned: null, expected: null, reason: { code: 'HISTORY_MISSING', text: 'Geçmiş doluluk ipucu yok' } };
-    const occupancyValues = [o.historyHint.weekendOccupancy, o.historyHint.weekdayOccupancy].map(x => x && x.value).filter(Number.isFinite);
-    if (!occupancyValues.length) return { actual, planned: null, expected: null, reason: { code: 'HISTORY_MISSING', text: 'Geçmiş doluluk ölçülemedi' } };
-    const occupancy = occupancyValues.reduce((s, x) => s + x, 0) / occupancyValues.length;
-    const planned = (o.suggestions || []).filter(x => x.status === 'OPEN' && Number.isFinite(x.price)).reduce((s, x) => s + x.price * occupancy, 0);
+    const weekendOccupancy = o.historyHint.weekendOccupancy && o.historyHint.weekendOccupancy.value;
+    const weekdayOccupancy = o.historyHint.weekdayOccupancy && o.historyHint.weekdayOccupancy.value;
+    if (!Number.isFinite(weekendOccupancy) && !Number.isFinite(weekdayOccupancy)) {
+      return { actual, planned: null, expected: null, reason: { code: 'HISTORY_MISSING', text: 'Geçmiş doluluk ölçülemedi' } };
+    }
+    const monthPrefix = /^\d{4}-\d{2}$/.test(o.monthKey || '') ? `${o.monthKey}-` : null;
+    const planned = (o.suggestions || [])
+      .filter(x => x.status === 'OPEN' && Number.isFinite(x.price) && (!monthPrefix || String(x.date || '').startsWith(monthPrefix)) && (!o.today || x.date >= o.today))
+      .reduce((sum, row) => {
+        const occupancy = [5, 6].includes(dayOfWeek(row.date)) ? weekendOccupancy : weekdayOccupancy;
+        return Number.isFinite(occupancy) ? sum + row.price * occupancy : sum;
+      }, 0);
     return { actual, planned, expected: actual === null ? null : actual + planned };
   }
   return { suggest, historyHint, forecastMonth };

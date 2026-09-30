@@ -39,5 +39,36 @@ test('geçmiş/öngörü boş veride ölçülmemiş kalır', () => {
   assert.strictEqual(f.reason.code, 'HISTORY_MISSING');
 });
 
+test('kimliksiz rezervasyon başka mülkü dolu göstermez', () => {
+  const r = E.suggest({
+    property: { id: 'p-zirve', basePrice: 10000 },
+    today: '2026-10-05',
+    days: 4,
+    bookings: [{ villa: 'SEYIR', checkIn: '2026-10-06', checkOut: '2026-10-08' }]
+  });
+  assert.strictEqual(r.days.find(x => x.date === '2026-10-06').status, 'OPEN');
+  assert.strictEqual(r.days.find(x => x.date === '2026-10-07').status, 'OPEN');
+});
+
+test('ay sonu tahmini yalnız seçili ayın kalan günlerini gece türü doluluğuyla tartar', () => {
+  const suggestions = Array.from({ length: 30 }, (_, index) => {
+    const date = new Date(Date.parse('2026-10-20T00:00:00Z') + index * 86400000).toISOString().slice(0, 10);
+    return { date, status: 'OPEN', price: 10000 };
+  });
+  const r = E.forecastMonth({
+    monthKey: '2026-10',
+    today: '2026-10-20',
+    ledgerToDate: { netRoomRevenue: 50000 },
+    suggestions,
+    historyHint: {
+      weekendOccupancy: { value: 0.9 },
+      weekdayOccupancy: { value: 0.3 }
+    }
+  });
+  assert.strictEqual(r.actual, 50000);
+  assert.strictEqual(r.planned, 60000);
+  assert.strictEqual(r.expected, 110000);
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed) process.exit(1);

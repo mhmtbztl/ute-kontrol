@@ -8,10 +8,16 @@ const appSource = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 
 let passed = 0;
+let failed = 0;
 function test(name, fn) {
-  fn();
-  passed += 1;
-  console.log(`[PASS] ${name}`);
+  try {
+    fn();
+    passed += 1;
+    console.log(`[PASS] ${name}`);
+  } catch (error) {
+    failed += 1;
+    console.error(`[FAIL] ${name}\n       ${error.stack || error.message}`);
+  }
 }
 
 test('A1-G1 menusu dokuz kararli kalemi dogru sirada tasir', () => {
@@ -63,4 +69,9 @@ test('Finans sozlugu ciroyu brut gelir veya kar tabani diye tanimlamaz', () => {
   assert.match(html, /Ciro \(Net Konaklama Geliri\)/);
 });
 
-console.log(`TEST SUMMARY: ${passed} / ${passed} TESTS PASSED (0 FAILED)`);
+try {
+  // Özet, başarısız bir blok sonraki blokları durdurmasa da her zaman yazılır.
+} finally {
+  console.log(`TEST SUMMARY: ${passed} PASSED, ${failed} FAILED`);
+  if (failed) process.exitCode = 1;
+}

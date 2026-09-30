@@ -35,5 +35,17 @@ test('ChatGPT bağlamı misafir alanlarını içermez ve rapor Exceli rapor olar
   assert(r.excel.sheets[0].rows[0].notice.includes('içe aktarılamaz'));
 });
 
+test('rapor Excel satırları CSV kaçışı değil ham hücre değeri taşır', () => {
+  const r = R.buildReport({
+    page: 'SALES',
+    period: { start: '2026-09-01', end: '2026-09-30' },
+    data: { leads: [{ guest: 'Ayşe; Fatma', note: '=HYPERLINK("https://example.invalid")' }] },
+    business: {},
+    today: '2026-09-30'
+  });
+  assert.strictEqual(r.excel.sheets[0].rows[1].guest, 'Ayşe; Fatma');
+  assert.strictEqual(r.excel.sheets[0].rows[1].note, '=HYPERLINK("https://example.invalid")');
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed) process.exit(1);

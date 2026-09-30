@@ -38,9 +38,12 @@
   }
 
   function bookingRevenue(booking) {
-    const amounts = LedgerContract && typeof LedgerContract.bookingAmounts === 'function'
-      ? LedgerContract.bookingAmounts(booking || {})
-      : { gross: 0, cleanFee: 0, discount: 0 };
+    if (!LedgerContract || typeof LedgerContract.bookingAmounts !== 'function') {
+      const error = new Error('Yaşam boyu ciro için defter sözleşmesi yüklenemedi');
+      error.code = 'LEDGER_CONTRACT_REQUIRED';
+      throw error;
+    }
+    const amounts = LedgerContract.bookingAmounts(booking || {});
     return amounts.gross - amounts.cleanFee - amounts.discount;
   }
 

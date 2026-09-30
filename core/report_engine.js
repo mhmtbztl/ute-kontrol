@@ -6,13 +6,12 @@
   const PAGES = ['FINANCE','PROPERTY','BOOKINGS','OPERATIONS','SALES','CHANNELS_MARKETING'];
   const PAGE_NAMES = { FINANCE: 'Finans', PROPERTY: 'Mülk', BOOKINGS: 'Rezervasyonlar', OPERATIONS: 'Operasyon', SALES: 'Misafirler ve Satış', CHANNELS_MARKETING: 'Kanallar ve Pazarlama' };
   const absent = value => value === undefined || value === null || value === '';
-  const safeCell = value => typeof value === 'string' ? FinanceExportEngine.csvHucre(value, ';').replace(/^'/, "'") : value;
   function metricItems(ledger, profitUnmeasured) {
     const fields = [['netRoomRevenue','Net konaklama geliri','money'],['cleaningRevenue','Temizlik geliri','money'],['totalRevenue','Toplam gelir','money'],['totalOpex','Toplam OPEX','money'],['netProfit','Net kâr','money'],['soldNights','Satılan gece','int'],['adr','ADR','money']];
     return fields.map(([id, label, type]) => ({ id, label, type, value: id === 'netProfit' && profitUnmeasured ? null : ledger && !absent(ledger[id]) ? ledger[id] : null }));
   }
   function reportSheet(page, rows, columns) {
-    return { name: PAGE_NAMES[page].slice(0, 31), columns, rows: [{ notice: 'Bu dosya içe aktarılamaz, rapordur.' }].concat((rows || []).map(row => Object.fromEntries(Object.entries(row).map(([k, v]) => [k, safeCell(v)])))) };
+    return { name: PAGE_NAMES[page].slice(0, 31), columns, rows: [{ notice: 'Bu dosya içe aktarılamaz, rapordur.' }].concat((rows || []).map(row => ({ ...row }))) };
   }
   function buildReport(input) {
     const o = input || {}, page = String(o.page || ''), data = o.data || {}, period = o.period || {}, business = o.business || {};
