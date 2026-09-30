@@ -693,6 +693,16 @@
             <span class="kpi-trend positive" id="finTargetDiff">—</span>
             <span style="color: #60A5FA; font-weight: 600;">✏️ Hedefi Değiştir ›</span>
           </div>
+          <div class="target-progress-wrapper compact-target-progress">
+            <div class="target-progress-header">
+              <span id="finTargetStatusBadge" class="badge badge-emerald">—</span>
+              <span id="targetBarRatioText">—</span>
+            </div>
+            <div class="progress-bar-bg target-bar-large">
+              <div class="progress-bar-fill target-bar-fill" id="targetBarFill" style="width: 0%;"></div>
+              <div class="target-threshold-marker" id="targetBarMarker" title="Hedef Noktası (%100)" hidden></div>
+            </div>
+          </div>
         </div>
 
         <!-- Net Kâr (Ciro - Opex - Capex) -->
@@ -732,51 +742,6 @@
           <div class="kpi-meta">
             <span class="kpi-trend positive" id="finAvgRevPerNight">—</span>
             <span id="finNightsMoM">—</span>
-          </div>
-        </div>
-      </section>
-
-      <!-- 3. CİRO HEDEFİ ANALİZİ (HEDEF VS GERÇEKLEŞEN) -->
-      <section class="card target-analysis-card">
-        <div class="section-title-bar">
-          <div>
-            <h2>🎯 CİRO HEDEFİ ANALİZİ (HEDEF VS GERÇEKLEŞEN)</h2>
-            <span class="sub-text">Ay içi ilerleme ve hedef sapması</span>
-          </div>
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <span class="badge badge-emerald" id="finTargetStatusBadge">—</span>
-            <button class="btn btn-primary btn-sm" data-onclick="openGoalsModal()">🎯 Hedefi Değiştir</button>
-          </div>
-        </div>
-
-        <div class="target-comparison-grid">
-          <div class="target-stat-box">
-            <span class="lbl">Hedef Ciro</span>
-            <strong class="val" id="tgtBoxTarget">—</strong>
-          </div>
-          <div class="target-stat-box">
-            <span class="lbl">Gerçekleşen Ciro</span>
-            <strong class="val positive" id="tgtBoxActual">—</strong>
-          </div>
-          <div class="target-stat-box">
-            <span class="lbl">Hedef Farkı</span>
-            <strong class="val positive" id="tgtBoxDiff">—</strong>
-          </div>
-          <div class="target-stat-box">
-            <span class="lbl">Gerçekleşme Oranı</span>
-            <strong class="val positive" id="tgtBoxPct">—</strong>
-          </div>
-        </div>
-
-        <!-- Modern Progress Bar -->
-        <div class="target-progress-wrapper">
-          <div class="target-progress-header">
-            <span>İlerleme Çubuğu</span>
-            <span id="targetBarRatioText">—</span>
-          </div>
-          <div class="progress-bar-bg target-bar-large">
-            <div class="progress-bar-fill target-bar-fill" id="targetBarFill" style="width: 100%;"></div>
-            <div class="target-threshold-marker" id="targetBarMarker" title="Hedef Noktası (%100)" hidden></div>
           </div>
         </div>
       </section>
@@ -850,13 +815,17 @@
       </section>
 
       <!-- 5. GİDER ANALİZİ (DONUT CHART & 10 KATEGORİ DETAYI) -->
-      <section class="card expense-analysis-card">
+      <details class="card expense-analysis-card finance-disclosure" id="financeExpensesDisclosure">
+        <summary><strong>Giderler</strong><span>Yalnız tutarı olan kategoriler</span></summary>
         <div class="section-title-bar">
           <div>
             <h2>📊 GİDER ANALİZİ (KATEGORİ BAZLI DAĞILIM)</h2>
             <p class="sub-text">Gider kalemlerinin toplam bütçe ve ciro içindeki payları ile geçen aya göre değişimleri</p>
           </div>
-          <button class="btn btn-primary btn-sm" data-onclick="openExpenseModal()">+ Yeni Gider / Harcama Ekle</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-secondary btn-sm" data-onclick="openCopyPreviousExpensesPanel()">Geçen ayın giderlerini kopyala</button>
+            <button class="btn btn-primary btn-sm" data-onclick="openExpenseModal()">+ Yeni Gider / Harcama Ekle</button>
+          </div>
         </div>
 
         <div class="expense-breakdown-grid">
@@ -896,7 +865,7 @@
             </table>
           </div>
         </div>
-      </section>
+      </details>
 
       <!-- 6. MÜLK BAZLI FİNANSAL PERFORMANS (YÖNETİCİ SIRALAMA TABLOSU & PREMİUM KARTLAR) -->
       <section class="card property-finance-section">
@@ -944,41 +913,12 @@
         </div>
       </section>
 
-      <!-- 7. MÜLK KARŞILAŞTIRMA & ANOMALİ TESPİTİ -->
-      <section class="card comparison-anomaly-section">
-        <div class="section-title-bar">
-          <div>
-            <h2>⚖️ MÜLK KARŞILAŞTIRMA VE STRATEJİK ANOMALİ TESPİTİ</h2>
-            <p class="sub-text">Fiyatlandırma veya doluluk açısından portföy ortalamasından sapan villalar</p>
-          </div>
-          <div class="metric-selector-wrapper">
-            <label>Karşılaştırma Metriği:</label>
-            <select id="compMetricSelect" data-onchange="renderPropertyComparisonChart()">
-              <option value="ciro" selected>Ciro (TL)</option>
-              <option value="netKar">Tahmini Net Kâr (TL)</option>
-              <option value="adr">ADR (Ortalama Günlük Fiyat)</option>
-              <option value="revpar">RevPAR (Kapasite Geliri)</option>
-              <option value="doluluk">Doluluk Oranı (%)</option>
-              <option value="satilanGece">Satılan Gece</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- Comparison Bar Chart -->
-        <div class="comparison-bars-container" id="comparisonBarsContainer">
-          <!-- Injected via JS -->
-        </div>
-
-        <!-- Anomaly Detection Badges -->
-        <div class="anomalies-list" id="anomaliesListContainer">
-          <!-- Injected via JS: örn: Yüksek Doluluk + Düşük ADR -->
-        </div>
-      </section>
-
             <!-- ======================================================= -->
       <!-- AYLARA GÖRE KPI TAKİP VE GELİŞİM MATRİSİ (14+ AY)      -->
       <!-- ======================================================= -->
-      <section class="card monthly-kpi-tracker-card" style="margin-top: 24px;">
+      <details class="finance-disclosure" id="financeMonthlyDisclosure">
+        <summary><strong>Aylık gelişim</strong><span>KPI tablosu, trend ve geçen yıl karşılaştırması</span></summary>
+      <section class="card monthly-kpi-tracker-card">
         <div class="section-title-bar">
           <div>
             <div class="title-with-badge">
@@ -1044,6 +984,7 @@
               <tr>
                 <th>DÖNEM / AY</th>
                 <th>CİRO (TL)</th>
+                <th>GEÇEN YIL CİROSU</th>
                 <th>HEDEF CİRO</th>
                 <th>HEDEF BAŞARISI</th>
                 <th>NET KÂR (TL)</th>
@@ -1104,63 +1045,19 @@
           </div>
         </section>
       </div>
+      </details>
 
-      <!-- 9. LEXBNB AI FİNANS ANALİSTİ (4 BÖLÜM & AKSİYONA DÖNÜŞTÜR) -->
+      <!-- 9. KURAL BAZLI DÖNEM ÖZETİ -->
       <section class="card ai-analyst-card">
         <div class="section-title-bar">
           <div class="title-with-badge">
-            <span class="ai-sparkle-icon">✨</span>
-            <h2>LEXBNB AI FİNANS ANALİSTİ</h2>
-            <span class="badge badge-purple">Veri Tabanlı Zeka Motoru</span>
+            <span class="ai-sparkle-icon">📌</span>
+            <h2>DÖNEM ÖZETİ</h2>
+            <span class="badge badge-purple">Kural bazlı</span>
           </div>
-          <span class="sub-text">Rakam uydurmaz, gerçek operasyonel korelasyonları raporlar</span>
+          <span class="sub-text">Defterde ölçülen rakamlardan en fazla dört kısa içgörü</span>
         </div>
-
-        <div class="ai-analyst-grid">
-          <!-- Bölüm 1: Ne İyi Gitti? -->
-          <div class="ai-section-box good">
-            <div class="ai-sec-header">
-              <span class="sec-icon">🟢</span>
-              <h3>1. Ne İyi Gitti?</h3>
-            </div>
-            <div class="ai-sec-content" id="aiGoodContent">
-              <!-- Injected via JS -->
-            </div>
-          </div>
-
-          <!-- Bölüm 2: Ne Kötü Gitti? -->
-          <div class="ai-section-box bad">
-            <div class="ai-sec-header">
-              <span class="sec-icon">🔴</span>
-              <h3>2. Ne Kötü Gitti?</h3>
-            </div>
-            <div class="ai-sec-content" id="aiBadContent">
-              <!-- Injected via JS -->
-            </div>
-          </div>
-
-          <!-- Bölüm 3: Neden? -->
-          <div class="ai-section-box why">
-            <div class="ai-sec-header">
-              <span class="sec-icon">🔍</span>
-              <h3>3. Neden? (Kök Neden Korelasyonu)</h3>
-            </div>
-            <div class="ai-sec-content" id="aiWhyContent">
-              <!-- Injected via JS -->
-            </div>
-          </div>
-
-          <!-- Bölüm 4: Gelecek Ay Ne Yapmalıyım? (Aksiyona Dönüştür) -->
-          <div class="ai-section-box action">
-            <div class="ai-sec-header">
-              <span class="sec-icon">⚡</span>
-              <h3>4. Gelecek Ay Ne Yapmalıyım?</h3>
-            </div>
-            <div class="ai-sec-content" id="aiActionContent">
-              <!-- Injected via JS with "Görev Oluştur" buttons -->
-            </div>
-          </div>
-        </div>
+        <div class="period-summary-grid" id="periodSummaryContent">—</div>
       </section>
 
     </div>

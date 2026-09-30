@@ -4885,3 +4885,47 @@ body.side-panel-open { overflow: hidden; }
   margin: 0 0 12px;
 }
 .page-action-bar[hidden] { display: none; }
+
+/* Finans ana gorunumu yalniz karar verdiren ozetlerle baslar; ayrintilar
+   klavye ve mobil erisimini koruyan yerel details bloklarinda acilir. */
+.finance-disclosure {
+  margin-bottom: 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--bg-card);
+}
+.finance-disclosure > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 15px 18px;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+.finance-disclosure > summary span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.finance-disclosure[open] > summary { border-bottom: 1px solid var(--border-subtle); }
+.finance-disclosure > .card,
+.finance-disclosure > .grid-2col { margin: 16px; }
+.compact-target-progress { margin-top: 10px; }
+.copy-expense-list { display: grid; gap: 8px; }
+.copy-expense-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+}
+.period-summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.period-summary-item { padding: 12px; border-radius: 8px; background: var(--bg-elevated); }
+@media (max-width: 768px) {
+  .finance-disclosure > summary { align-items: flex-start; flex-direction: column; }
+  .finance-disclosure > .card,
+  .finance-disclosure > .grid-2col { margin: 10px; }
+  .period-summary-grid { grid-template-columns: 1fr; }
+}

@@ -3971,6 +3971,66 @@ function getPreviousPeriodKey(periodKey) {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
+function buildPreviousMonthExpenseCopies({ targetMonth, selectedIds, expenses }) {
+  if (!/^\d{4}-\d{2}$/.test(targetMonth || '')) return [];
+  const sourceMonth = getPreviousPeriodKey(targetMonth);
+  const wanted = new Set((selectedIds || []).map(String));
+  const [year, month] = targetMonth.split('-').map(Number);
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return (expenses || [])
+    .filter(expense => wanted.has(String(expense.id || expense.dbId || '')) && inPeriodKey(expense.date || expense.expense_date, sourceMonth))
+    .map(expense => {
+      const sourceDay = Number(String(expense.date || expense.expense_date).slice(8, 10)) || 1;
+      const day = String(Math.min(sourceDay, lastDay)).padStart(2, '0');
+      const description = String(expense.description || expense.desc || '').trim();
+      return {
+        date: `${targetMonth}-${day}`,
+        category: expense.category,
+        type: expense.type === 'CAPEX' || expense.expense_type === 'CAPEX' ? 'CAPEX' : 'OPEX',
+        amount: Number(expense.amount),
+        villa: expense.villa || 'ALL',
+        propertyId: expense.propertyId || expense.property_id || null,
+        description: `${description ? description + ' · ' : ''}Kaynak dönem: ${sourceMonth}`
+      };
+    });
+}
+
+function openCopyPreviousExpensesPanel() {
+  const targetMonth = currentFilter && currentFilter.period;
+  const sourceMonth = getPreviousPeriodKey(targetMonth);
+  if (!sourceMonth) {
+    showToast('Gider kopyalamak için Finans ekranında tek bir ay seçin.', 'warning');
+    return false;
+  }
+  const rows = (appData.expenses || []).filter(expense => inPeriodKey(expense.date || expense.expense_date, sourceMonth));
+  const bodyHtml = rows.length
+    ? `<div class="copy-expense-list">${rows.map(expense => {
+        const id = String(expense.id || expense.dbId || '');
+        return `<label class="copy-expense-row"><input type="checkbox" data-copy-expense value="${escapeHtml(id)}" checked><span><strong>${escapeHtml(expense.category || 'Gider')}</strong><small>${escapeHtml(expense.description || expense.desc || 'Açıklama yok')} · ${Math.round(Number(expense.amount) || 0).toLocaleString('tr-TR')} TL</small></span></label>`;
+      }).join('')}</div><p class="sub-text">Kopyalar ${escapeHtml(targetMonth)} dönemine yeni gider satırı olarak yazılır; kaynak ay açıklamada korunur.</p>`
+    : `<p class="sub-text">${escapeHtml(sourceMonth)} döneminde kopyalanabilecek gider bulunamadı.</p>`;
+  const footerHtml = rows.length
+    ? '<button type="button" class="btn btn-primary" data-onclick="confirmCopyPreviousExpenses()">Seçilenleri önizle ve kopyala</button>'
+    : '';
+  if (typeof SidePanel === 'undefined') throw new Error('SidePanel yüklenemedi');
+  SidePanel.open({ title: 'Geçen ayın giderlerini kopyala', subtitle: `${sourceMonth} → ${targetMonth}`, bodyHtml, footerHtml, ariaLabel: 'Gider kopyalama paneli' });
+  return true;
+}
+
+async function confirmCopyPreviousExpenses() {
+  const selectedIds = Array.from(document.querySelectorAll('[data-copy-expense]:checked')).map(input => input.value);
+  const copies = buildPreviousMonthExpenseCopies({ targetMonth: currentFilter.period, selectedIds, expenses: appData.expenses || [] });
+  if (!copies.length) {
+    showToast('Kopyalanacak en az bir gider seçin.', 'warning');
+    return false;
+  }
+  if (!confirm(`${copies.length} gider ${currentFilter.period} dönemine yeni kayıt olarak yazılsın mı?`)) return false;
+  for (const copy of copies) await createExpense(copy);
+  if (typeof SidePanel !== 'undefined') SidePanel.close();
+  showToast(`${copies.length} gider kopyalandı.`, 'success');
+  return true;
+}
+
 function inPeriodKey(dateStr, periodKey) {
   return typeof dateStr === 'string' && periodKey && dateStr.slice(0, 7) === periodKey;
 }
@@ -4586,6 +4646,7 @@ function renderExpenseDonutAndTable(categoryTotals, totalExpense, totalRevenue, 
 
   EXPENSE_CATEGORIES.forEach(cat => {
     const amt = categoryTotals[cat.name] || 0;
+    if (amt <= 0) return;
     const shareExpense = totalExpense > 0 ? (amt / totalExpense) * 100 : 0;
     const shareRev = totalRevenue > 0 ? (amt / totalRevenue) * 100 : 0;
     const deltaStr = formatMoMDelta(amt, prevCategoryTotals[cat.name] || 0);
@@ -5111,6 +5172,25 @@ function computeFinanceInsightRatios({ totalIncome, opex, capex }) {
 }
 
 function renderAIFinancialAnalyst(revenue, totalIncome, targetRev, targetPct, opex, capex, netProfit, netMargin, propStats, karOlculemez = false) {
+  const summary = document.getElementById('periodSummaryContent');
+  if (summary) {
+    const tl = value => Math.round(Number(value) || 0).toLocaleString('tr-TR');
+    const insights = [];
+    if (targetRev > 0) insights.push({ title: 'Hedef ilerlemesi', text: `${tl(targetRev)} TL hedefin %${Number(targetPct || 0).toFixed(1)}'i gerçekleşti.` });
+    else if (revenue > 0) insights.push({ title: 'Konaklama cirosu', text: `${tl(revenue)} TL; bu dönem için hedef girilmemiş.` });
+    if (karOlculemez) insights.push({ title: 'Kâr ölçülemiyor', text: 'Gider kaydı yok. Giderleri girin veya ayı kapatarak sıfır gideri onaylayın.' });
+    else insights.push({ title: 'Net kâr', text: `${tl(netProfit)} TL${Number.isFinite(Number(netMargin)) ? ` · marj %${Number(netMargin).toFixed(1)}` : ''}.` });
+    const expenses = (appData.expenses || []).filter(expense => isExpenseInFilter(expense));
+    const totals = {};
+    expenses.forEach(expense => { totals[expense.category || 'Diğer'] = (totals[expense.category || 'Diğer'] || 0) + (Number(expense.amount) || 0); });
+    const topExpense = Object.entries(totals).sort((a, b) => b[1] - a[1])[0];
+    if (topExpense) insights.push({ title: 'En büyük gider', text: `${topExpense[0]} · ${tl(topExpense[1])} TL.` });
+    const strongest = Object.values(propStats || {}).filter(item => Number(item.revenue) > 0).sort((a, b) => b.revenue - a.revenue)[0];
+    if (strongest) insights.push({ title: 'En güçlü mülk', text: `${strongest.name} · ${tl(strongest.revenue)} TL ciro.` });
+    if (!insights.length) insights.push({ title: 'Henüz ölçüm yok', text: 'Rezervasyon ve gider kaydı geldikçe dönem özeti oluşur.' });
+    summary.innerHTML = insights.slice(0, 4).map(item => `<article class="period-summary-item"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.text)}</p></article>`).join('');
+    return;
+  }
   const goodBox = document.getElementById('aiGoodContent');
   const badBox = document.getElementById('aiBadContent');
   const whyBox = document.getElementById('aiWhyContent');
@@ -10575,11 +10655,14 @@ function getMonthlyKpiDataset() {
 
     const totalExp = opex + capex;
     const targetPct = target > 0 ? Number(((ciro / target) * 100).toFixed(1)) : null;
+    const previousYearKey = `${metricYear - 1}-${String(metricMonth).padStart(2, '0')}`;
+    const previousYearCiro = computeMonthActuals(previousYearKey, secili).ciro;
 
     dataset.push({
       key: m,
       monthName,
       ciro,
+      previousYearCiro,
       opex,
       capex,
       totalExp,
@@ -10597,7 +10680,8 @@ function getMonthlyKpiDataset() {
     });
   });
 
-  return dataset;
+  const currentMonthKey = getCurrentMonthKey();
+  return dataset.filter(d => d.key <= currentMonthKey || d.ciro !== 0 || d.totalExp !== 0 || d.nights !== 0 || d.target > 0);
 }
 
 function renderMonthlyKpiTracker() {
@@ -10770,6 +10854,7 @@ function renderMonthlyKpiTracker() {
       tr.innerHTML = `
         <td style="font-weight: 700; white-space: nowrap;">${periodLabel}</td>
         <td style="font-weight: 800; color: #60A5FA; white-space: nowrap;">${Math.round(d.ciro).toLocaleString('tr-TR')} ₺</td>
+        <td style="font-weight: 700; color: var(--text-secondary); white-space: nowrap;">${d.previousYearCiro > 0 ? Math.round(d.previousYearCiro).toLocaleString('tr-TR') + ' ₺' : '—'}</td>
         <td style="color: var(--text-muted); white-space: nowrap;">${d.target > 0 ? (Math.round(d.target).toLocaleString('tr-TR') + ' ₺') : '-'}</td>
         <td style="white-space: nowrap;">${targetBadge}</td>
         ${d.profitUnmeasured
@@ -16479,6 +16564,7 @@ if (typeof module !== 'undefined' && module.exports) {
     mapExpenseToDb,
     loadExpenses,
     createExpense,
+    buildPreviousMonthExpenseCopies,
     updateExpense,
     deleteExpense,
     saveExpense,
@@ -16529,6 +16615,8 @@ if (typeof module !== 'undefined' && module.exports) {
     setCurrentFilter,
     refreshPeriodSelectors,
     renderFinanceModule,
+    openCopyPreviousExpensesPanel,
+    confirmCopyPreviousExpenses,
     renderOperationsKpiStrip,
     renderDailyOps,
     loadTenantAppData,
