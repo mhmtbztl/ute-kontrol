@@ -37,13 +37,18 @@
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
   function dateKey(year, monthIndex, day) { return `${year}-${pad(monthIndex + 1)}-${pad(day)}`; }
-  function isKey(value) { return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value); }
+  function keyParts(value) {
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+    const [year, month, day] = value.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day
+      ? { year, month, day, date } : null;
+  }
+  function isKey(value) { return !!keyParts(value); }
 
   function parseKey(key) {
-    if (!isKey(key)) return null;
-    const [y, m, d] = key.split('-').map(Number);
-    const date = new Date(y, m - 1, d);
-    return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d ? date : null;
+    const parts = keyParts(key);
+    return parts ? parts.date : null;
   }
 
   function formatHuman(key) {
@@ -67,14 +72,23 @@
   function pick(state, key, mode) {
     const s = state || {};
     const kip = mode === 'range' ? 'range' : 'stay';
-    if (!isKey(key)) return { start: s.start || null, end: s.end || null };
+    if (!isKey(key)) return normalizeState(s.start, s.end, kip);
     if (!s.start || (s.start && s.end)) return { start: key, end: null };
     if (kip === 'stay' ? key <= s.start : key < s.start) return { start: key, end: null };
     return { start: s.start, end: key };
   }
 
-  function isComplete(state) {
-    return !!(state && state.start && state.end);
+  function normalizeState(start, end, mode) {
+    const normalizedStart = isKey(start) ? start : null;
+    const normalizedEnd = isKey(end) ? end : null;
+    if (!normalizedStart || !normalizedEnd) return { start: normalizedStart, end: null };
+    const valid = mode === 'range' ? normalizedEnd >= normalizedStart : normalizedEnd > normalizedStart;
+    return valid ? { start: normalizedStart, end: normalizedEnd } : { start: normalizedStart, end: null };
+  }
+
+  function isComplete(state, mode) {
+    const normalized = normalizeState(state && state.start, state && state.end, mode === 'range' ? 'range' : 'stay');
+    return !!normalized.end;
   }
 
   function anchorFrom(key, today) {
@@ -131,6 +145,14 @@
     return `${nightsBetween(s.start, s.end)} gece seçildi`;
   }
 
+  // `paint()` gün düğmelerini aynı tıklama içinde yeniden kurar. Belge
+  // dinleyicisi çalıştığında event.target artık DOM'dan ayrılmış olabilir;
+  // sabit composedPath yolu tıklamanın yine bu kökten geldiğini kanıtlar.
+  function eventCameFromRoot(event, rootEl) {
+    const path = event && typeof event.composedPath === 'function' ? event.composedPath() : [];
+    return path.includes(rootEl) || !!(event && event.target && rootEl && rootEl.contains(event.target));
+  }
+
   // ---------------------------------------------------------------------------
   // Tarayici baglayicisi
   // ---------------------------------------------------------------------------
@@ -149,7 +171,7 @@
     const mode = o.mode === 'range' ? 'range' : 'stay';
     const today = o.today;
     const labels = { start: mode === 'range' ? 'Başlangıç' : 'Giriş', end: mode === 'range' ? 'Bitiş' : 'Çıkış', ...(o.labels || {}) };
-    let state = { start: isKey(o.start) ? o.start : null, end: isKey(o.end) ? o.end : null };
+    let state = normalizeState(o.start, o.end, mode);
     let anchor = anchorFrom(state.start, today);
 
     rootEl.classList.add('daterange-group');
@@ -188,7 +210,7 @@
       q('[data-drp-start]').textContent = state.start ? formatHuman(state.start) : '—';
       q('[data-drp-end]').textContent = state.end ? formatHuman(state.end) : '—';
       const badge = q('[data-drp-badge]');
-      if (mode === 'range') badge.textContent = isComplete(state) ? `${nightsBetween(state.start, state.end) + 1} gün` : '—';
+      if (mode === 'range') badge.textContent = isComplete(state, mode) ? `${nightsBetween(state.start, state.end) + 1} gün` : '—';
       else { const n = nightsBetween(state.start, state.end); badge.textContent = n > 0 ? `${n} gece` : '—'; }
       q('[data-drp-hint]').textContent = summaryText(state, mode);
       if (!panel.hidden) {
@@ -229,12 +251,12 @@
       if (day) {
         state = pick(state, day.getAttribute('data-drp-date'), mode);
         paint();
-        if (isComplete(state)) { setOpen(false); emit(); }
+        if (isComplete(state, mode)) { setOpen(false); emit(); }
       }
     }
     function onDocClick(event) {
       if (panel.hidden) return;
-      if (event.target && event.target.closest && !rootEl.contains(event.target)) setOpen(false);
+      if (!eventCameFromRoot(event, rootEl)) setOpen(false);
     }
     function onKey(event) { if (event.key === 'Escape' && !panel.hidden) { setOpen(false); trigger.focus(); } }
 
@@ -245,7 +267,7 @@
 
     return {
       get: () => ({ start: state.start, end: state.end }),
-      set: (start, end) => { state = { start: isKey(start) ? start : null, end: isKey(end) ? end : null }; anchor = anchorFrom(state.start, today); paint(); },
+      set: (start, end) => { state = normalizeState(start, end, mode); anchor = anchorFrom(state.start, today); paint(); },
       clear: () => { state = { start: null, end: null }; paint(); },
       open: () => setOpen(true),
       close: () => setOpen(false),
@@ -261,7 +283,7 @@
   return {
     MONTHS_TR, DOW_TR,
     dateKey, parseKey, isKey, formatHuman, nightsBetween,
-    pick, isComplete, anchorFrom, shiftAnchor, buildMonth, monthHtml, summaryText,
+    pick, isComplete, anchorFrom, shiftAnchor, buildMonth, monthHtml, summaryText, eventCameFromRoot,
     mount
   };
 }));

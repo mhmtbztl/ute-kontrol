@@ -68,6 +68,11 @@ try {
       'A5. Tam aralıktan sonra tıklama yeni aralık başlatır', '');
     check(DRP.parseKey('2026-02-30') === null && DRP.parseKey('2026-2-3') === null && DRP.nightsBetween('x', '2026-01-01') === 0,
       'A6. Geçersiz tarih ve biçim reddedilir, gece sayısı 0', '');
+    check(JSON.stringify(DRP.pick({ start: null, end: null }, '2026-02-30', 'range')) === JSON.stringify({ start: null, end: null })
+      && !DRP.isComplete({ start: '2026-10-10', end: '2026-10-01' }, 'range')
+      && !DRP.isComplete({ start: '2026-10-10', end: '2026-10-10' }, 'stay')
+      && DRP.isComplete({ start: '2026-10-10', end: '2026-10-10' }, 'range'),
+      'A6b. Ortak API geçersiz takvim gününü ve ters/sıfır gecelik aralığı tamamlanmış saymaz', '');
     const ekim = DRP.buildMonth(new Date(2026, 9, 1), { start: '2026-10-10', end: '2026-10-13' }, '2026-10-01');
     const sinif = k => ekim.days.find(d => d.key === k).classes.join(' ');
     check(ekim.lead === 3 && ekim.days.length === 31 && ekim.title === 'Ekim 2026',
@@ -79,6 +84,11 @@ try {
       && DRP.summaryText({ start: '2026-10-10', end: '2026-10-13' }, 'stay') === '3 gece seçildi'
       && DRP.formatHuman('2026-10-10') === '10 Ekim 2026',
       'A9. Özet metni kipe göre: filtrede gün, konaklamada gece', '');
+    const root = { contains: () => false };
+    const detachedDay = {};
+    check(typeof DRP.eventCameFromRoot === 'function'
+      && DRP.eventCameFromRoot({ target: detachedDay, composedPath: () => [detachedDay, root] }, root),
+      'A9b. Gün düğmesi yeniden çizilip DOM’dan ayrılsa da aynı tıklama dış tıklama sayılmaz', 'takvim ilk günde kapanır');
     // Sablonu kuramayan ortamda (HTML ayristirmayan sahte DOM) mount sayfayi
     // dusurmez: null doner, olay baglamaz (render_pipeline bu yolla calisir).
     const kok = { innerHTML: 'x', classList: { add() {} }, querySelector: () => null, addEventListener() { throw new Error('baglanmamali'); } };
