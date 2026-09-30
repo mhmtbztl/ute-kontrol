@@ -70,7 +70,7 @@ test('property modal exposes labelled structured location and social profile fie
   assert(contextUiJs.includes('function savePropertyAnalysisContextDraft'));
 });
 
-test('UI exposes asynchronous context-aware generation, copy and JSON download actions', () => {
+test('UI exposes asynchronous context-aware generation and copy; JSON download stays removed', () => {
   assert(analysisUiJs.includes('function renderAnalysisCenter()'));
   assert(analysisUiJs.includes('async function generateAnalysisExport()'));
   assert(analysisUiJs.includes('PropertyAnalysisContextService.loadAnalysisContext'));

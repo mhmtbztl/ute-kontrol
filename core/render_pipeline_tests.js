@@ -360,12 +360,12 @@ function run() {
     app.renderExecutiveControlCenter();
 
     const get = id => global.document.getElementById(id).innerText;
-    check(get('execKpiRevenue') === '₺100.000'
+    check(get('execKpiRevenue') === '₺90.000'
       && get('execKpiOpex') === '₺30.000'
       && get('execKpiCapex') === '₺15.000'
       && get('execKpiOperatingProfit') === '₺70.000'
       && get('execKpiProfit') === '₺55.000',
-    '26. Anasayfa ciro, OPEX, CAPEX, faaliyet kari ve net nakit karini birlikte gosteriyor',
+    '26. Anasayfa net konaklama cirosunu; kârda toplam geliri, OPEX ve CAPEX ile birlikte kullanıyor',
     JSON.stringify({ revenue: get('execKpiRevenue'), opex: get('execKpiOpex'), capex: get('execKpiCapex'),
       operatingProfit: get('execKpiOperatingProfit'), netProfit: get('execKpiProfit') }));
     check(get('execKpiOccupancy') === '%33.33' && get('execSoldNightsLabel') === '10 / 30 Gece'

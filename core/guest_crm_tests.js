@@ -11,8 +11,8 @@ const guests = [
   { id: 'g4', firstName: 'Ece', phone: '+905322222222', allowWhatsapp: true, marketingOptIn: true }
 ];
 const bookings = [
-  { id: 'b1', primaryGuestId: 'g1', propertyId: 'p1', guest: 'Ayşe Yılmaz', checkIn: '2026-01-01', checkOut: '2026-01-04', nights: 3, gross: 30000, channel: 'AIRBNB', status: 'CHECKED_OUT' },
-  { id: 'b2', primaryGuestId: 'g1', propertyId: 'p2', guest: 'Ayşe Yılmaz', checkIn: '2026-10-01', checkOut: '2026-10-05', nights: 4, gross: 50000, channel: 'WHATSAPP', status: 'CONFIRMED' },
+  { id: 'b1', primaryGuestId: 'g1', propertyId: 'p1', guest: 'Ayşe Yılmaz', checkIn: '2026-01-01', checkOut: '2026-01-04', nights: 3, gross: 30000, cleaningFee: 3000, discount: 1000, channel: 'AIRBNB', status: 'CHECKED_OUT' },
+  { id: 'b2', primaryGuestId: 'g1', propertyId: 'p2', guest: 'Ayşe Yılmaz', checkIn: '2026-10-01', checkOut: '2026-10-05', nights: 4, gross: 50000, cleaningFee: 5000, discount: 2000, channel: 'WHATSAPP', status: 'CONFIRMED' },
   { id: 'b3', primaryGuestId: 'g2', propertyId: 'p2', guest: 'Can', checkIn: '2026-09-10', checkOut: '2026-09-16', nights: 6, gross: 60000, channel: 'BOOKING', status: 'CHECKED_IN' },
   { id: 'b4', guest: 'Bağlantısız Kayıt', checkIn: '2026-08-01', checkOut: '2026-08-02', gross: 10000, status: 'CONFIRMED' },
   { id: 'b5', guest: 'TOPLU AKTARIM — Temmuz 2025', checkIn: '2025-07-01', checkOut: '2025-07-05', gross: 53050, status: 'CONFIRMED' },
@@ -34,7 +34,7 @@ const view = buildGuestCrmView({
 assert.strictEqual(view.metrics.totalGuests, 4);
 assert.strictEqual(view.metrics.repeatGuests, 1);
 assert.strictEqual(view.metrics.repeatRate, 1 / 4);
-assert.strictEqual(view.metrics.repeatRevenue, 80000);
+assert.strictEqual(view.metrics.repeatRevenue, 69000);
 assert.strictEqual(view.metrics.contactableGuests, 3);
 assert.strictEqual(view.metrics.marketingEligibleGuests, 2);
 assert.strictEqual(view.metrics.rebookingOpportunityCount, 1);
@@ -45,6 +45,7 @@ ok('KPI değerleri yalnız kanonik profiller ve bağlı rezervasyonlardan hesapl
 const ayse = view.rows.find(row => row.id === 'g1');
 assert.strictEqual(ayse.stayCount, 2);
 assert.strictEqual(ayse.nights, 7);
+assert.strictEqual(ayse.lifetimeRevenue, 69000);
 assert.strictEqual(ayse.isRepeat, true);
 assert.strictEqual(ayse.directShare, 0.5);
 assert.strictEqual(ayse.lifecycle.code, 'UPCOMING');

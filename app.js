@@ -4436,7 +4436,6 @@ function renderFinanceModule() {
   const hasTarget = Number.isFinite(Number(targetRev)) && Number(targetRev) > 0;
   const targetDiff = hasTarget ? ciro - Number(targetRev) : null;
   const targetPct = hasTarget ? (ciro / Number(targetRev)) * 100 : null;
-  const forecastEndMonth = null; // A forecast is shown only when a real forecast model supplies one.
 
   // Update Top 5 KPI Cards
   // setEl artik genel kapsamda tanimli. Burada yerel bir const olarak
@@ -4462,7 +4461,6 @@ function renderFinanceModule() {
   setEl('tgtBoxActual', `${Math.round(ciro).toLocaleString('tr-TR')} TL`);
   setEl('tgtBoxDiff', hasTarget ? `${targetDiff >= 0 ? '+' : ''}${Math.round(targetDiff).toLocaleString('tr-TR')} TL` : '—');
   setEl('tgtBoxPct', hasTarget ? `%${targetPct.toFixed(1)}` : '—');
-  setEl('tgtBoxForecast', forecastEndMonth === null ? '—' : `${forecastEndMonth.toLocaleString('tr-TR')} TL`);
   setEl('finTargetStatusBadge', hasTarget ? `%${targetPct.toFixed(1)} Hedef Başarısı` : 'Hedef belirlenmedi');
   setEl('targetBarRatioText', hasTarget ? `${Math.round(ciro).toLocaleString('tr-TR')} TL / ${Math.round(targetRev).toLocaleString('tr-TR')} TL (%${targetPct.toFixed(1)})` : `${Math.round(ciro).toLocaleString('tr-TR')} TL / —`);
 
@@ -4526,7 +4524,7 @@ function renderFinanceModule() {
   renderYoYComparison(ciro, totalOpex, netCashProfit, totalSoldNights);
 
   // Render AI Financial Analyst
-  renderAIFinancialAnalyst(ciro, targetRev, targetPct, totalOpex, totalCapex, netCashProfit, netMargin, propStats, karOlculemez);
+  renderAIFinancialAnalyst(ciro, totalRevenue, targetRev, targetPct, totalOpex, totalCapex, netCashProfit, netMargin, propStats, karOlculemez);
 }
 
 // -------------------------------------------------------------
@@ -5106,13 +5104,19 @@ function renderYoYComparison(actualRevenue, actualOpex, actualNetProfit, actualN
 // -------------------------------------------------------------
 // LEXBNB AI FİNANS ANALİSTİ (GERÇEK VERİ KORELASYON MOTORU)
 // -------------------------------------------------------------
-function renderAIFinancialAnalyst(revenue, targetRev, targetPct, opex, capex, netProfit, netMargin, propStats, karOlculemez = false) {
+function computeFinanceInsightRatios({ totalIncome, opex, capex }) {
+  const income = Number(totalIncome);
+  const expense = Number(opex) + Number(capex);
+  return { expenseRatio: income > 0 ? Number(((expense / income) * 100).toFixed(1)) : null };
+}
+
+function renderAIFinancialAnalyst(revenue, totalIncome, targetRev, targetPct, opex, capex, netProfit, netMargin, propStats, karOlculemez = false) {
   const goodBox = document.getElementById('aiGoodContent');
   const badBox = document.getElementById('aiBadContent');
   const whyBox = document.getElementById('aiWhyContent');
   const actionBox = document.getElementById('aiActionContent');
 
-  if (revenue === 0) {
+  if (totalIncome === 0) {
     if (goodBox) goodBox.innerHTML = '<p>• <strong>Temiz Başlangıç:</strong> Sistem verileri sıfırlandı. Yeni rezervasyonlar girildikçe finansal analizler burada anlık oluşturulacaktır.</p>';
     if (badBox) badBox.innerHTML = '<p>• <strong>Kaçak Yok:</strong> Şu anda kayıtlı maliyet kaçağı veya düşük fiyat anomalisi bulunmuyor.</p>';
     if (whyBox) whyBox.innerHTML = '<p>• <strong>Korelasyon:</strong> Rezervasyon ve harcama girişi yapıldıkça maliyet korelasyonları tespit edilecektir.</p>';
@@ -5170,8 +5174,9 @@ function renderAIFinancialAnalyst(revenue, targetRev, targetPct, opex, capex, ne
     if (karOlculemez) {
       // L-101: gider hic girilmemisken "%0 gider" iyi haber gibi okunur.
       satirlar.push('<p>• <strong>Gider kaydı yok:</strong> Bu dönem için hiç gider girilmemiş; kâr ve marj ölçülemiyor. Giderleri girin ya da ayı kapatarak defteri onaylayın.</p>');
-    } else if (revenue > 0) {
-      satirlar.push(`<p>• <strong>Gider / Ciro Oranı:</strong> Toplam giderler cironun <strong>%${(((opex + capex) / revenue) * 100).toFixed(1)}</strong>'i seviyesinde.</p>`);
+    } else if (totalIncome > 0) {
+      const { expenseRatio } = computeFinanceInsightRatios({ totalIncome, opex, capex });
+      satirlar.push(`<p>• <strong>Gider / Toplam Gelir Oranı:</strong> Toplam giderler toplam gelirin <strong>%${expenseRatio.toFixed(1)}</strong>'i seviyesinde.</p>`);
     }
     if (mulkStat.length > 1) {
       const ortAdr = mulkStat.reduce((a, v) => a + v.adr, 0) / mulkStat.length;
@@ -7761,7 +7766,9 @@ function openMonthCloseModal() {
   if (ozet) {
     const bkl = (appData.bookings || []).filter(b => b.status !== 'CANCELLED' && isBookingInFilter(b));
     const geceler = bkl.reduce((a, b) => a + getBookingFilterShare(b).nights, 0);
-    const ciro = bkl.reduce((a, b) => a + (Number(b.gross) || 0) * getBookingFilterShare(b).ratio, 0);
+    // A1-G3: ciro net konaklama geliridir. Brüt tutarı burada yeniden
+    // toplamamak için Finans ekranıyla aynı kanonik dönem defterini kullan.
+    const ciro = computeFilterLedger().netRoomRevenue;
     const gid = (appData.expenses || []).filter(e => isExpenseInFilter(e));
     const gidTop = gid.reduce((a, e) => a + (Number(e.amount) || 0), 0);
     ozet.innerHTML = `
@@ -10820,11 +10827,11 @@ const KPI_EXPLANATION_GUIDES = {
     icon: '💵',
     category: 'KASADA KALAN SERBEST NAKİT',
     badgeClass: 'badge-green',
-    summary: 'Cirodan tüm operasyonel harcamalar (Opex) ve mülk yatırımları (Capex) düşüldükten sonra işletme sahibinin cebinde kalan net nakittir.',
+    summary: 'Toplam gelirden tüm operasyonel harcamalar (Opex) ve mülk yatırımları (Capex) düşüldükten sonra işletme sahibinin cebinde kalan net nakittir.',
     warning: '🌟 Yüksek ciro tek başına yüksek kâr anlamına gelmez; kayıtlı gider ve yatırımları birlikte değerlendirin.',
     formula: 'Net Kâr = Toplam Gelir − OPEX − CAPEX · OPEX = elle giderler + OTA komisyonu + ödeme komisyonu + yapılmış temizlik maliyeti',
     example: 'Temizlik maliyeti temizlik "yapıldı" işaretlendiği günün ayına yazılır; ödeme ayrı bir durumdur.',
-    actionRule: 'Net marjınızın (Net Kâr / Ciro) %30\'un altına düşmemesine dikkat edin.'
+    actionRule: 'Net marjınızın (Net Kâr / Toplam Gelir) %30\'un altına düşmemesine dikkat edin.'
   },
   'TOTAL_EXPENSE': {
     title: 'Toplam Giderler (OPEX + CAPEX)',
@@ -10908,9 +10915,9 @@ const KPI_EXPLANATION_GUIDES = {
     icon: '📉',
     category: 'OPERASYON VERİMLİLİĞİ',
     badgeClass: 'badge-blue',
-    summary: 'Cirodan OPEX düşüldükten sonra, yatırım harcamaları düşülmeden önce kalan işletme sonucudur.',
+    summary: 'Toplam gelirden OPEX düşüldükten sonra, yatırım harcamaları düşülmeden önce kalan işletme sonucudur.',
     warning: 'Faaliyet kârı CAPEX’i içermez; sahibin cebinde kalan nihai nakit için Net Nakit Kârı izleyin.',
-    formula: 'Faaliyet Kârı = Gerçekleşen Ciro − OPEX',
+    formula: 'Faaliyet Kârı = Toplam Gelir − OPEX',
     example: 'Seçili dönemin gerçekleşen cirosundan aynı dönemin OPEX toplamı düşülür.',
     actionRule: 'Faaliyet marjı düşüyorsa önce komisyon, enerji, temizlik ve sarf giderlerini inceleyin.'
   },
@@ -15161,7 +15168,9 @@ function renderExecutiveControlCenter() {
         const gunler = getPeriodDayCount(getPreviousPeriodKey(currentFilter && currentFilter.period));
         const kapasite = Math.max(1, propertiesList.length * gunler);
         return {
-          revenue: p.revenue,
+          revenue: p.roomRevenue,
+          roomRevenue: p.roomRevenue,
+          totalIncome: p.revenue,
           opex: p.opex,
           capex: p.capex,
           operatingProfit: p.operatingProfit,
@@ -16663,6 +16672,8 @@ if (typeof module !== 'undefined' && module.exports) {
     collectMarketingFacts,
     createAuthSessionStorage,
     renderMonthCloseCard,
+    openMonthCloseModal,
+    computeFinanceInsightRatios,
     getFriendlyAuthErrorMessage,
     handleAuthenticatedSession,
     setRememberDevicePreference,

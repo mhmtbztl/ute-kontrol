@@ -35,12 +35,17 @@
       cleaningCost = 0
     } = params;
 
-    let currentRevenue = 0;
+    let totalIncome = 0;
+    let roomRevenue = 0;
     let bookedNights = 0;
 
     bookings.forEach(b => {
       if (b.status !== 'CANCELLED') {
-        currentRevenue += Number(b.gross_amount || b.grossAmount || 0) - Number(b.discount || 0);
+        const gross = Number(b.gross_amount || b.grossAmount || 0);
+        const cleaningRevenue = Number(b.cleaning_fee || b.cleaningFee || 0);
+        const discount = Number(b.discount || 0);
+        totalIncome += gross - discount;
+        roomRevenue += gross - cleaningRevenue - discount;
         const nights = b.nights || 1;
         bookedNights += nights;
       }
@@ -66,7 +71,8 @@
       else manualOpex += amount;
     });
 
-    currentRevenue = roundMoney(currentRevenue);
+    totalIncome = roundMoney(totalIncome);
+    roomRevenue = roundMoney(roomRevenue);
     distributionCost = roundMoney(distributionCost);
     manualOpex = roundMoney(manualOpex);
     paymentCommission = roundMoney(paymentCommission);
@@ -74,15 +80,13 @@
     const operatingExpenses = roundMoney(manualOpex + distributionCost + paymentCommission + cleaning);
     capex = roundMoney(capex);
     const currentExpenses = roundMoney(operatingExpenses + capex);
-    const operatingProfit = roundMoney(currentRevenue - operatingExpenses);
+    const operatingProfit = roundMoney(totalIncome - operatingExpenses);
     const netCashProfit = roundMoney(operatingProfit - capex);
 
     const calculatedCapacity = availableNights !== null && availableNights !== undefined && Number.isFinite(Number(availableNights))
       ? Number(availableNights) : Number(propertiesCount) * Number(daysInMonth);
     const totalAvailableRoomNights = calculatedCapacity > 0 ? calculatedCapacity : null;
     const occupancyRate = totalAvailableRoomNights ? roundMoney((bookedNights / totalAvailableRoomNights) * 100) : null;
-    const roomRevenue = bookings.reduce((sum, b) => b.status === 'CANCELLED' ? sum : sum +
-      Number(b.gross_amount || b.grossAmount || 0) - Number(b.cleaning_fee || b.cleaningFee || 0) - Number(b.discount || 0), 0);
     const adr = bookedNights > 0 ? roundMoney(roomRevenue / bookedNights) : null;
     const revpar = totalAvailableRoomNights ? roundMoney(roomRevenue / totalAvailableRoomNights) : null;
     const forecastedTotalRevenue = Number.isFinite(Number(forecast.forecastedTotalRevenue))
@@ -110,10 +114,15 @@
       availableNights: totalAvailableRoomNights,
       otaCommission: distributionCost,
       revenue: {
-        current: currentRevenue,
+        current: roomRevenue,
         target: targetRevenue,
-        variance: calcVariance(currentRevenue, targetRevenue),
-        prior: priorPeriodMetrics ? priorPeriodMetrics.revenue : null
+        variance: calcVariance(roomRevenue, targetRevenue),
+        prior: priorPeriodMetrics ? (priorPeriodMetrics.roomRevenue ?? priorPeriodMetrics.revenue) : null
+      },
+      totalIncome: {
+        current: totalIncome,
+        cleaningRevenue: roundMoney(totalIncome - roomRevenue),
+        prior: priorPeriodMetrics ? (priorPeriodMetrics.totalIncome ?? priorPeriodMetrics.revenue) : null
       },
       opex: {
         current: operatingExpenses,

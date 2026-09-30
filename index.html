@@ -741,7 +741,7 @@
         <div class="section-title-bar">
           <div>
             <h2>🎯 CİRO HEDEFİ ANALİZİ (HEDEF VS GERÇEKLEŞEN)</h2>
-            <span class="sub-text">Ay içi ilerleme, hedef sapması ve dönem sonu tahmini</span>
+            <span class="sub-text">Ay içi ilerleme ve hedef sapması</span>
           </div>
           <div style="display: flex; align-items: center; gap: 10px;">
             <span class="badge badge-emerald" id="finTargetStatusBadge">—</span>
@@ -765,10 +765,6 @@
           <div class="target-stat-box">
             <span class="lbl">Gerçekleşme Oranı</span>
             <strong class="val positive" id="tgtBoxPct">—</strong>
-          </div>
-          <div class="target-stat-box">
-            <span class="lbl">Ay Sonu Tahmini Ciro</span>
-            <strong class="val" id="tgtBoxForecast">—</strong>
           </div>
         </div>
 
@@ -2834,12 +2830,12 @@
             <!-- Fiili Ciro -->
             <div class="glossary-card-item" data-keywords="ciro brüt gelir konaklama para giriş">
               <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                <strong style="color:#60A5FA; font-size:14px;">💰 Fiili Ciro (Brüt Gelir)</strong>
+                <strong style="color:#60A5FA; font-size:14px;">💰 Ciro (Net Konaklama Geliri)</strong>
                 <span class="badge badge-blue" style="font-size:10px;">Hacim</span>
               </div>
-              <p style="font-size:12px; color:#E2E8F0; margin:6px 0;"><strong>Basitçe:</strong> Misafirlerin konaklaması karşılığında kasaya giren brüt toplam para.</p>
+              <p style="font-size:12px; color:#E2E8F0; margin:6px 0;"><strong>Basitçe:</strong> Brüt tutardan temizlik ücreti ve indirimler çıkarıldıktan sonra konaklamadan kalan gelir.</p>
               <div style="font-size:11px; background:rgba(0,0,0,0.25); padding:6px 8px; border-radius:6px; color:#94A3B8; margin-bottom:6px;">
-                📐 <code>Satılan Gece × ADR</code>
+                📐 <code>Brüt Tutar − Temizlik Ücreti − İndirim</code>
               </div>
               <p style="font-size:11px; color:#93C5FD; margin:0;">⚠️ <strong>Dikkat:</strong> Ciro kâr demek değildir! Elektrik, personel ve komisyonlar bu paranın içinden düşecektir.</p>
             </div>
@@ -2850,9 +2846,9 @@
                 <strong style="color:#34D399; font-size:14px;">💵 Net Nakit Kâr (Cash Profit)</strong>
                 <span class="badge badge-green" style="font-size:10px;">Cepte Kalan</span>
               </div>
-              <p style="font-size:12px; color:#E2E8F0; margin:6px 0;"><strong>Basitçe:</strong> Cirodan tüm giderler ve yatırımlar çıktıktan sonra cebinizde kalan net nakit para.</p>
+              <p style="font-size:12px; color:#E2E8F0; margin:6px 0;"><strong>Basitçe:</strong> Toplam gelirden tüm giderler ve yatırımlar çıktıktan sonra cebinizde kalan net nakit para.</p>
               <div style="font-size:11px; background:rgba(0,0,0,0.25); padding:6px 8px; border-radius:6px; color:#94A3B8; margin-bottom:6px;">
-                📐 <code>Ciro - (OPEX + CAPEX)</code>
+                📐 <code>Toplam Gelir − (OPEX + CAPEX)</code>
               </div>
               <p style="font-size:11px; color:#A7F3D0; margin:0;">💡 <strong>Hedef:</strong> Net kâr marjınızın en az %30-40 bandında kalmasını sağlayın.</p>
             </div>
@@ -3601,16 +3597,16 @@
   <script src="core/user_facing_errors.js?v=e4eb0ae5"></script>
   <script src="core/ledger_contract.js?v=bc9fd6f2"></script>
   <script src="core/business_date.js?v=a1518391"></script>
-  <script src="core/guest_crm_engine.js?v=3f0f93bd"></script>
+  <script src="core/guest_crm_engine.js?v=2caa7b7c"></script>
   <script src="core/gap_night_service.js?v=6cdf4142"></script>
   <script src="core/pricing_booking_service.js?v=0eb93c05"></script>
   <script src="core/executive_priority_service.js?v=d113e0e8"></script>
-  <script src="core/executive_dashboard_service.js?v=7d6b9308"></script>
+  <script src="core/executive_dashboard_service.js?v=8405671c"></script>
   <script src="core/captcha_gate.js?v=3ad4a776"></script>
   <script src="core/date_range_picker.js?v=41dc564c"></script>
   <script src="core/side_panel.js?v=d763b464"></script>
   <script src="core/action_dispatch.js?v=e1e57f2d"></script>
-  <script src="app.js?v=fe20e5f7"></script>
+  <script src="app.js?v=3c937700"></script>
   <script src="core/property_analysis_context_ui.js?v=56a57dc8"></script>
   <script src="core/analysis_center_ui.js?v=beb16d7c"></script>
   <script src="core/marketing_ui.js?v=e349e32e"></script>

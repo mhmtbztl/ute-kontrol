@@ -2,7 +2,7 @@
  * LEXBNB USALI GELİR/GİDER SINIFLANDIRMA TEST SUITE
  *
  * USALI (Uniform System of Accounts for the Lodging Industry):
- *   - Ciro, misafirin odedigi BRUT tutardir.
+ *   - Ciro, net konaklama geliridir (brüt - temizlik geliri - indirim).
  *   - OTA komisyonu bir DAGITIM GIDERIDIR, gelirden dusulmez.
  *   - Misafirden alinan temizlik ucreti gelirdir; yalnız kaydedilmiş temizlikçi ödemesi giderdir.
  *
@@ -16,13 +16,13 @@
  * Ikisi de USALI'ye aykiriydi. Bu suit dogru sinifllandirmayi kilitler.
  *
  * Kapsam:
- *  1. Ciro brut tutardir (komisyon/temizlik dusulmez)
+ *  1. Ciro net konaklama geliridir; temizlik geliri toplam gelirde ayrıdır
  *  2. OTA komisyonu gider tarafinda sayilir
  *  3. Misafir temizlik ücreti gider sayılmaz
- *  4. Net kar = brut ciro - (komisyon + kaydedilmiş giderler)
+ *  4. Net kar = toplam gelir - (komisyon + kaydedilmiş giderler)
  *  5. Iptal edilen rezervasyonun komisyonu gider sayilmaz
  *  6. ADR oda geliri uzerinden hesaplanir
- *  7. app.js finans modulu de brut ciro kullanir (kaynak denetimi)
+ *  7. app.js finans modulu ciro ve toplam geliri ayri kullanir (kaynak denetimi)
  *  8. app.js finans modulu dagitim maliyetini gidere ekler (kaynak denetimi)
  */
 
@@ -54,12 +54,14 @@ function run() {
   const kar = kpis.netProfit.current;
   const adr = kpis.adr.current;
 
-  check(ciro === 49000, '1. Ciro brüt tutardır (49.000)', `donen: ${ciro}`);
+  check(ciro === 48100 && kpis.totalIncome.current === 49000,
+    '1. Ciro net konaklama geliridir (48.100); toplam gelir 49.000 ayrı taşınır',
+    JSON.stringify({ ciro, totalIncome: kpis.totalIncome }));
 
   // Beklenen gider: 3750 + 5000 = 8750 -> net kar 40.250. Misafirden tahsil
-  // edilen 900 TL temizlik bedeli ayrıca maliyet değildir.
+  // edilen 900 TL temizlik geliri toplam gelirdedir; ayrıca maliyet değildir.
   check(kar === 49000 - (3750 + 5000),
-    '4. Net kâr = brüt ciro − (komisyon + kaydedilmiş gider)',
+    '4. Net kâr = toplam gelir − (komisyon + kaydedilmiş gider)',
     `beklenen ${49000 - 8750}, donen ${kar}`);
   check(kpis.opex.current === 8750 && kpis.capex.current === 0
       && kpis.operatingProfit.current === 40250,
@@ -118,14 +120,16 @@ function run() {
   const blok = i === -1 ? '' : APP.slice(i, i + 6000);
 
   // K-04'ten beri finans toplamlari tek formulden gelir
-  // (core/ledger_contract.js). Ciro brutten, komisyon gider tarafinda:
+  // (core/ledger_contract.js). Ciro net konaklama, komisyon gider tarafinda:
   // bunu formulun kendisi olcer (ledger_contract_tests); burada olculen,
   // Finans ekraninin o formulu KULLANDIGI ve kendi toplamini yapmadigidir.
   const L = require('./ledger_contract.js');
   const tek = L.computePeriodLedger({ bookings: [{ gross: 10000, cleanFee: 1000, otaComm: 1500 }], bookingShare: () => ({ ratio: 1, nights: 2 }) });
-  check(/computeFilterLedger\(\)/.test(blok) && /totalRevenue = ledger\.totalRevenue/.test(blok) && tek.totalRevenue === 10000,
-    '7. Finans modülü brüt ciro kullanır',
-    'renderFinanceModule toplam geliri defter sozlesmesinden okumuyor ya da sozlesme brutu dusuruyor');
+  check(/computeFilterLedger\(\)/.test(blok) && /ciro = ledger\.netRoomRevenue/.test(blok)
+      && /totalRevenue = ledger\.totalRevenue/.test(blok)
+      && tek.netRoomRevenue === 9000 && tek.totalRevenue === 10000,
+    '7. Finans modülü ciro ve toplam geliri kanonik defterden ayrı okur',
+    'renderFinanceModule net konaklama cirosu ile toplam geliri ayirmiyor');
 
   check(/totalOpex = ledger\.totalOpex/.test(blok) && tek.totalOpex === 1500 && tek.totalRevenue === 10000,
     '8. Finans modülü dağıtım maliyetini gidere ekler',

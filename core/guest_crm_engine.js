@@ -7,10 +7,13 @@
   const businessDate = typeof module === 'object' && module.exports
     ? require('./business_date')
     : root.LexbnbBusinessDate;
-  const api = factory(businessDate);
+  const ledgerContract = typeof module === 'object' && module.exports
+    ? require('./ledger_contract')
+    : root.LedgerContract;
+  const api = factory(businessDate, ledgerContract);
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.LexbnbGuestCrm = api;
-})(typeof globalThis !== 'undefined' ? globalThis : this, function (BusinessDate) {
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (BusinessDate, LedgerContract) {
   const DIRECT_CHANNELS = new Set(['DIRECT', 'WHATSAPP', 'INSTAGRAM', 'WEBSITE', 'REPEAT', 'PHONE']);
 
   function isBulkSummaryBooking(booking) {
@@ -34,9 +37,11 @@
     return Number.isFinite(start) && Number.isFinite(end) ? Math.max(0, Math.round((end - start) / 86400000)) : 0;
   }
 
-  function bookingGross(booking) {
-    const value = Number(booking?.gross ?? booking?.grossAmount ?? booking?.gross_amount);
-    return Number.isFinite(value) ? value : 0;
+  function bookingRevenue(booking) {
+    const amounts = LedgerContract && typeof LedgerContract.bookingAmounts === 'function'
+      ? LedgerContract.bookingAmounts(booking || {})
+      : { gross: 0, cleanFee: 0, discount: 0 };
+    return amounts.gross - amounts.cleanFee - amounts.discount;
   }
 
   function bookingPropertyId(booking) {
@@ -142,7 +147,7 @@
         stayCount,
         isRepeat: stayCount >= 2,
         nights: stays.reduce((sum, booking) => sum + bookingNights(booking), 0),
-        lifetimeRevenue: stays.reduce((sum, booking) => sum + bookingGross(booking), 0),
+        lifetimeRevenue: stays.reduce((sum, booking) => sum + bookingRevenue(booking), 0),
         directCount,
         directShare: stays.length ? directCount / stays.length : null,
         rebookingEligible,

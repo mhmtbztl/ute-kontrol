@@ -24,8 +24,8 @@ function runExecutiveDashboardTests() {
   // TEST 1: Top KPIs Computation with Variance & Prior Comparison
   console.log('\n--- TEST 1: Top KPIs & Variances ---');
   const sampleBookings = [
-    { id: 'b1', gross_amount: 30000, nights: 10, status: 'CONFIRMED' },
-    { id: 'b2', gross_amount: 20000, nights: 5, status: 'CONFIRMED' },
+    { id: 'b1', gross_amount: 30000, cleaning_fee: 3000, nights: 10, status: 'CONFIRMED' },
+    { id: 'b2', gross_amount: 20000, cleaning_fee: 2000, nights: 5, status: 'CONFIRMED' },
     { id: 'b3', gross_amount: 15000, nights: 4, status: 'CANCELLED' } // should be ignored
   ];
   const sampleExpenses = [
@@ -48,10 +48,11 @@ function runExecutiveDashboardTests() {
     daysInMonth: 30
   });
 
-  // Revenue: 30000 + 20000 = 50000. Target: 60000 -> variance: -10000 (-17%)
-  assert.strictEqual(kpis.revenue.current, 50000);
+  // Ciro temizlik geliri haric net konaklama geliridir; toplam gelir karin tabanidir.
+  assert.strictEqual(kpis.revenue.current, 45000);
+  assert.strictEqual(kpis.totalIncome.current, 50000);
   assert.strictEqual(kpis.revenue.target, 60000);
-  assert.strictEqual(kpis.revenue.variance.varianceAmount, -10000);
+  assert.strictEqual(kpis.revenue.variance.varianceAmount, -15000);
   assert.strictEqual(kpis.revenue.variance.status, 'BELOW_TARGET');
 
   // OPEX and CAPEX remain distinct; both are deducted from net cash profit.
@@ -65,8 +66,8 @@ function runExecutiveDashboardTests() {
   // Occupancy: 15 nights / 30 room nights = 50.0%
   assert.strictEqual(kpis.occupancy.current, 50);
 
-  // ADR: 50000 / 15 nights = 3333.33 TL
-  assert.strictEqual(kpis.adr.current, 3333.33);
+  // ADR: 45000 / 15 nights = 3000 TL
+  assert.strictEqual(kpis.adr.current, 3000);
 
   // Month-end Forecast: 62000 (exceeds 60000 target by +2000)
   assert.strictEqual(kpis.forecast.monthEndRevenue, 62000);
