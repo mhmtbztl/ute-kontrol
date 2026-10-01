@@ -16042,6 +16042,111 @@ async function payCleanerDebt(cleanerName) {
   return ok;
 }
 
+async function assignMaintenanceTechnician(ticketId, personId) {
+  const api = getOperationsApi();
+  const technicians = api ? api.eligibleTechnicians(appData?.operationalPeople || []) : [];
+  if (!technicians.some(person => person.id === personId)) {
+    if (typeof showToast === 'function') showToast('⚠️ Aktif bir usta seçin.', 'error');
+    return false;
+  }
+  const { error } = await supabaseClient.from('maintenance_assignments').upsert({
+    maintenance_ticket_id: ticketId,
+    tenant_id: getActiveTenantId(),
+    person_id: personId
+  }, { onConflict: 'maintenance_ticket_id' });
+  if (error) {
+    if (typeof showToast === 'function') showToast('⚠️ Usta atanamadı: ' + (error.message || 'Veritabanı hatası'), 'error');
+    return false;
+  }
+  await loadTenantAppData(getActiveTenantId());
+  if (typeof showToast === 'function') showToast('✅ Usta atandı.');
+  return true;
+}
+
+function assignMaintenanceFromSelect(ticketId) {
+  const select = document.getElementById(`opsTechnician-${ticketId}`);
+  return assignMaintenanceTechnician(ticketId, select?.value || '');
+}
+
+async function resolveMaintenanceFromOperations(ticketId) {
+  const ticket = (appData?.maintenanceTickets || []).find(item => item.id === ticketId);
+  if (!ticket) return false;
+  const entered = prompt('Gerçekleşen maliyet (TL; yoksa 0):', String(ticket.actual_cost || ticket.estimated_cost || 0));
+  if (entered === null) return false;
+  const actualCost = Number(String(entered).replace(',', '.'));
+  if (!Number.isFinite(actualCost) || actualCost < 0) {
+    alert('Geçerli ve negatif olmayan bir tutar girin.');
+    return false;
+  }
+  const createExpense = actualCost > 0 && confirm('Gider olarak kaydedilsin mi?');
+  try {
+    if (createExpense) {
+      await resolveMaintenanceTicket(ticketId, actualCost, 'Bakım & Onarım', `Bakım gideri: ${ticket.title || 'Arıza'}`);
+      invalidateExecutiveSnapshotCache();
+    } else {
+      const { error } = await supabaseClient.from('maintenance_tickets').update({
+        status: 'RESOLVED',
+        actual_cost: actualCost,
+        resolved_at: new Date().toISOString()
+      }).eq('tenant_id', getActiveTenantId()).eq('id', ticketId);
+      if (error) throw error;
+    }
+    await loadTenantAppData(getActiveTenantId());
+    if (typeof showToast === 'function') showToast(createExpense ? '✅ Arıza çözüldü ve gider kaydedildi.' : '✅ Arıza çözüldü; gider kaydı oluşturulmadı.');
+    return true;
+  } catch (error) {
+    if (typeof showToast === 'function') showToast('⚠️ Arıza çözülemedi: ' + getFriendlyAuthErrorMessage(error), 'error');
+    return false;
+  }
+}
+
+async function createGeneralOperationalTask(templateId = null) {
+  const template = templateId ? (appData?.taskTemplates || []).find(item => item.id === templateId) : null;
+  const title = template?.title || prompt('Genel görev başlığı:', '');
+  if (!String(title || '').trim()) return false;
+  try {
+    await createOperationalTask({
+      property_id: null,
+      task_type: template?.task_type || 'GENERAL',
+      title: String(title).trim(),
+      description: template?.description || null,
+      status: 'TODO',
+      priority: template?.priority || 'MEDIUM',
+      checklist: template?.default_checklist || {},
+      source: 'MANUAL'
+    });
+    await loadTenantAppData(getActiveTenantId());
+    if (typeof showToast === 'function') showToast('✅ Genel görev oluşturuldu.');
+    return true;
+  } catch (error) {
+    if (typeof showToast === 'function') showToast('⚠️ Görev oluşturulamadı: ' + getFriendlyAuthErrorMessage(error), 'error');
+    return false;
+  }
+}
+
+function createTaskFromTemplate(templateId) {
+  return createGeneralOperationalTask(templateId);
+}
+
+async function assignOperationalTask(taskId, userId) {
+  const allowed = (appData?.operationalPeople || []).some(person => person.user_id === userId && person.is_active !== false);
+  if (!allowed) return false;
+  try {
+    await updateOperationalTask(taskId, { assigned_to: userId });
+    await loadTenantAppData(getActiveTenantId());
+    if (typeof showToast === 'function') showToast('✅ Görev ekip üyesine atandı.');
+    return true;
+  } catch (error) {
+    if (typeof showToast === 'function') showToast('⚠️ Görev atanamadı: ' + getFriendlyAuthErrorMessage(error), 'error');
+    return false;
+  }
+}
+
+function assignOperationalTaskFromSelect(taskId) {
+  const select = document.getElementById(`opsTaskPerson-${taskId}`);
+  return assignOperationalTask(taskId, select?.value || '');
+}
+
 function renderOperationsCleaningView(tasks) {
   const api = getOperationsApi();
   if (!api) return '<div class="empty-state">Operasyon motoru yüklenemedi.</div>';
@@ -16104,12 +16209,21 @@ function renderOperationsTab() {
   if (operationsViewState === 'cleaning') {
     container.innerHTML = renderOperationsCleaningView(tasks);
   } else if (operationsViewState === 'maintenance') {
-    const open = tickets.filter(isMaintenanceTicketOpen).sort((a, b) => Number(!!b.booking_impact) - Number(!!a.booking_impact));
-    container.innerHTML = open.length ? open.map(ticket => `<article class="ops-row"><div class="ops-row-main"><strong>${escapeHtml(ticket.title || '—')}</strong><span>${escapeHtml(ticket.description || 'Açıklama yok')}</span></div><span class="badge ${ticket.booking_impact ? 'badge-red' : ''}">${ticket.booking_impact ? 'Satışa kapatır' : escapeHtml(ticket.status || 'OPEN')}</span></article>`).join('') : '<div class="empty-state">Açık arıza veya bakım kaydı yok.</div>';
+    const api = getOperationsApi();
+    const open = api.sortMaintenanceTickets(tickets.filter(isMaintenanceTicketOpen));
+    const technicians = api.eligibleTechnicians(appData?.operationalPeople || []);
+    const assignments = new Map((appData?.maintenanceAssignments || []).map(item => [item.maintenance_ticket_id, item]));
+    container.innerHTML = open.length ? open.map(ticket => {
+      const assignment = assignments.get(ticket.id);
+      const assigned = technicians.find(person => person.id === assignment?.person_id);
+      const options = technicians.map(person => `<option value="${escapeHtml(person.id)}"${person.id === assignment?.person_id ? ' selected' : ''}>${escapeHtml(person.full_name)}${person.specialty ? ` · ${escapeHtml(person.specialty)}` : ''}</option>`).join('');
+      return `<article class="ops-row"><div class="ops-row-main"><strong>${escapeHtml(ticket.title || '—')}</strong><span>${escapeHtml(ticket.description || 'Açıklama yok')}</span>${assigned ? `<span>Usta: ${escapeHtml(assigned.full_name)}${assigned.phone ? ` · <a href="tel:${escapeHtml(assigned.phone)}">Ara</a>` : ''}</span>` : ''}</div><span class="badge ${ticket.booking_impact ? 'badge-red' : ''}">${ticket.booking_impact ? 'Satışa kapatır' : escapeHtml(getMaintenanceStatusPresentation(ticket.status).label)}</span><div class="ops-row-actions"><select id="opsTechnician-${escapeHtml(ticket.id)}" aria-label="Usta seç"><option value="">Usta seç…</option>${options}</select><button class="btn btn-secondary btn-sm" data-onclick="assignMaintenanceFromSelect(decodeURIComponent('${encodeActionArg(ticket.id)}'))">Usta ata</button><button class="btn btn-secondary btn-sm" data-onclick="editMaint(decodeURIComponent('${encodeActionArg(ticket.id)}'))">Durumu güncelle</button><button class="btn btn-primary btn-sm" data-onclick="resolveMaintenanceFromOperations(decodeURIComponent('${encodeActionArg(ticket.id)}'))">Çözüldü</button></div></article>`;
+    }).join('') : '<div class="empty-state">Açık arıza veya bakım kaydı yok.</div>';
   } else {
     const operational = appData?.operationalTasks || [];
     const templates = appData?.taskTemplates || [];
-    container.innerHTML = `<div class="ops-cleaning-layout"><section class="ops-group"><h3>Aktif görevler <span class="badge">${operational.length}</span></h3>${operational.length ? operational.map(task => `<article class="ops-row"><div class="ops-row-main"><strong>${escapeHtml(task.title || '—')}</strong><span>${task.property_id ? 'Mülke bağlı' : 'Genel görev'} · ${escapeHtml(task.status || 'TODO')}</span></div></article>`).join('') : '<div class="empty-state">Aktif görev yok.</div>'}</section><aside class="ops-debt-panel"><h3>Hazır görev kütüphanesi</h3>${templates.length ? templates.map(template => `<div class="ops-debt-row"><strong>${escapeHtml(template.title)}</strong><span>${escapeHtml(template.task_type || 'GENERAL')}</span></div>`).join('') : '<div class="empty-state">Henüz görev şablonu yok.</div>'}</aside></div>`;
+    const assignees = (appData?.operationalPeople || []).filter(person => person.user_id && person.is_active !== false);
+    container.innerHTML = `<div class="ops-cleaning-layout"><section class="ops-group"><div class="section-title-bar"><h3>Aktif görevler <span class="badge">${operational.length}</span></h3><button class="btn btn-primary btn-sm" data-onclick="createGeneralOperationalTask()">+ Genel görev</button></div>${operational.length ? operational.map(task => { const options = assignees.map(person => `<option value="${escapeHtml(person.user_id)}"${person.user_id === task.assigned_to ? ' selected' : ''}>${escapeHtml(person.full_name)}</option>`).join(''); return `<article class="ops-row"><div class="ops-row-main"><strong>${escapeHtml(task.title || '—')}</strong><span>${task.property_id ? 'Mülke bağlı' : 'Genel görev'} · ${escapeHtml(task.status || 'TODO')}</span></div><div class="ops-row-actions"><select id="opsTaskPerson-${escapeHtml(task.id)}" aria-label="Görevli seç"><option value="">Ekip üyesi seç…</option>${options}</select><button class="btn btn-secondary btn-sm" data-onclick="assignOperationalTaskFromSelect(decodeURIComponent('${encodeActionArg(task.id)}'))">Ata</button></div></article>`; }).join('') : '<div class="empty-state">Aktif görev yok.</div>'}</section><aside class="ops-debt-panel"><h3>Hazır görev kütüphanesi</h3>${templates.length ? templates.map(template => `<div class="ops-debt-row"><div><strong>${escapeHtml(template.title)}</strong><span>${escapeHtml(template.task_type || 'GENERAL')}</span></div><button class="btn btn-secondary btn-sm" data-onclick="createTaskFromTemplate(decodeURIComponent('${encodeActionArg(template.id)}'))">Görev oluştur</button></div>`).join('') : '<div class="empty-state">Henüz görev şablonu yok.</div>'}</aside></div>`;
   }
 }
 
@@ -16791,6 +16905,10 @@ if (typeof module !== 'undefined' && module.exports) {
     assignCleaningTask,
     inspectCleaningExecution,
     payCleanerDebt,
+    assignMaintenanceTechnician,
+    resolveMaintenanceFromOperations,
+    createGeneralOperationalTask,
+    assignOperationalTask,
     renderTapeChart,
     renderPricingTab,
     renderPricingKpiStrip,

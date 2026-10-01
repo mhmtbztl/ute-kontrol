@@ -38,14 +38,14 @@
   // fonksiyonu buraya ekleyin; html_injection_tests listede olmayan, tanimsiz
   // ya da artik kullanilmayan adi yakalar.
   const EYLEMLER = new Set([
-    'applyImportedData', 'assignCleaningTaskFromSelect', 'autoCalculateGoalAdr',
+    'applyImportedData', 'assignCleaningTaskFromSelect', 'assignMaintenanceFromSelect', 'assignOperationalTaskFromSelect', 'autoCalculateGoalAdr',
     'autoCalculateGoalSubmetrics', 'calculateLivePreview', 'changeImportMode', 'cleanResetAll',
     'clearResDateRange', 'closeAiActionConfirmModal', 'closeAllHeaderDropdowns',
     'closeBookingModal', 'closeCleaningTaskModal', 'closeDeleteAccountModal', 'closeExpenseModal',
     'closeGoalsModal', 'closeGuestProfileModal', 'closeHelpModal', 'closeImportModal',
     'closeInviteMemberModal', 'closeKpiExplanationModal', 'closeLeadModal',
     'closeMaintModal', 'closeMonthCloseModal', 'closeMonthReopenModal',
-    'closeOnboardingModal', 'closePropertyModal', 'closeResetModal', 'closeWhatsAppModal',
+    'closeOnboardingModal', 'closePropertyModal', 'closeResetModal', 'closeWhatsAppModal', 'createGeneralOperationalTask', 'createTaskFromTemplate',
     'confirmCopyPreviousExpenses', 'confirmUserNotification', 'convertLeadAction', 'copyAiTitle', 'copyAnalysisPrompt',
     'copyGapStoryText', 'createBookingChannelFromSettings', 'cycleHkStatus', 'deleteBookingUI',
     'deleteCleaningTask', 'deleteCleaningTaskFromModal', 'deleteExpenseUI',
@@ -70,7 +70,7 @@
     'openTabFromDeepLink', 'openWhatsAppModal', 'parseWhatsAppMessage', 'payAllPendingCleaning', 'payCleanerDebt',
     'promptEditTaskAmount', 'refreshExecutiveDashboardSnapshot', 'renderExpensesTable', 'renderHousekeepingTab', 'renderManageBookingsTable',
     'renderManageLeadsTable', 'resetGuestDirectoryDateRange',
-    'resetImportPreview', 'resyncTenantData', 'runPageAction', 'saveAllSettings',
+    'resetImportPreview', 'resyncTenantData', 'resolveMaintenanceFromOperations', 'runPageAction', 'saveAllSettings',
     'saveBooking', 'saveBookingChannelRow', 'saveCleaningTask', 'saveExpense', 'saveGuestProfile',
     'saveLead', 'saveMaint', 'saveMonthlyGoals',
     'saveProperty', 'saveWaAsBooking', 'saveWaAsLead',

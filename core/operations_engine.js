@@ -334,6 +334,17 @@ function canAssignCleaner(people = [], personId) {
   return eligibleCleaners(people).some(person => person.id === personId);
 }
 
+function eligibleTechnicians(people = []) {
+  return people.filter(person => person && person.kind === 'TECHNICIAN' && person.is_active !== false);
+}
+
+function sortMaintenanceTickets(tickets = []) {
+  const severity = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
+  return tickets.slice().sort((a, b) => Number(!!b.booking_impact) - Number(!!a.booking_impact)
+    || (severity[String(b.severity || '').toUpperCase()] || 0) - (severity[String(a.severity || '').toUpperCase()] || 0)
+    || String(b.created_at || '').localeCompare(String(a.created_at || '')));
+}
+
 function addDays(isoDate, count) {
   const date = new Date(`${isoDate}T12:00:00Z`);
   date.setUTCDate(date.getUTCDate() + count);
@@ -388,6 +399,8 @@ if (typeof module !== 'undefined' && module.exports) {
     isCleaningDebt,
     eligibleCleaners,
     canAssignCleaner,
+    eligibleTechnicians,
+    sortMaintenanceTickets,
     groupCleaningTasks,
     cleanerDebtSummary,
     attachExecutions
@@ -404,6 +417,8 @@ if (typeof window !== 'undefined') {
     isCleaningDebt,
     eligibleCleaners,
     canAssignCleaner,
+    eligibleTechnicians,
+    sortMaintenanceTickets,
     groupCleaningTasks,
     cleanerDebtSummary,
     attachExecutions

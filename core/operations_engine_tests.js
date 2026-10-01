@@ -48,6 +48,16 @@ try {
     && !OperationsEngine.isCleaningDebt({ status: 'DONE', paid: true }),
     'C2. Temizlik borcu tek tanim: DONE ve odenmemis', 'borc tanimi yanlis');
 
+  const technicians = OperationsEngine.eligibleTechnicians(people);
+  check(technicians.length === 1 && technicians[0].id === 't1',
+    'C3. Usta atamasinda yalniz aktif teknisyenler listelenir', JSON.stringify(technicians));
+  const orderedTickets = OperationsEngine.sortMaintenanceTickets([
+    { id: 'normal', booking_impact: false, severity: 'CRITICAL' },
+    { id: 'blocking', booking_impact: true, severity: 'LOW' }
+  ]);
+  check(orderedTickets.map(ticket => ticket.id).join() === 'blocking,normal',
+    'C4. Satisa kapatan ariza once gelir', orderedTickets.map(ticket => ticket.id).join());
+
   const app = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8').replace(/\r\n?/g, '\n');
   const assignBody = (app.match(/async function assignCleaningTask[\s\S]*?\n}\n/) || [''])[0];
   check(/canAssignCleaner/.test(assignBody) && /assign_cleaning_task/.test(assignBody),
@@ -55,6 +65,15 @@ try {
   const inspectBody = (app.match(/async function inspectCleaningExecution[\s\S]*?\n}\n/) || [''])[0];
   check(/inspect_cleaning/.test(inspectBody) && /invalidateExecutiveSnapshotCache\(\)/.test(inspectBody),
     'D2. M denetimi defter onbellegini temizler', inspectBody.slice(0, 500));
+  const assignMaintenance = (app.match(/async function assignMaintenanceTechnician[\s\S]*?\n}\n/) || [''])[0];
+  check(/maintenance_assignments/.test(assignMaintenance) && /upsert/.test(assignMaintenance),
+    'D3. Ariza ustasi maintenance_assignments defterine yazilir', assignMaintenance.slice(0, 500));
+  const resolveMaintenance = (app.match(/async function resolveMaintenanceFromOperations[\s\S]*?\n}\n/) || [''])[0];
+  check(/Gider olarak kaydedilsin mi/.test(resolveMaintenance) && /resolveMaintenanceTicket/.test(resolveMaintenance),
+    'D4. Ariza cozulurken gider kaydi kullaniciya sorulur', resolveMaintenance.slice(0, 700));
+  const createGeneral = (app.match(/async function createGeneralOperationalTask[\s\S]*?\n}\n/) || [''])[0];
+  check(/property_id:\s*null/.test(createGeneral) && /createOperationalTask/.test(createGeneral),
+    'D5. Genel gorev mulksuz kaydedilir', createGeneral.slice(0, 500));
 } catch (error) {
   failed++;
   console.error(`[FAIL] Beklenmeyen hata\n       ${error && error.stack}`);
