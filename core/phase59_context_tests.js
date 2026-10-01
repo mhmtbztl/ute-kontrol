@@ -91,17 +91,18 @@ function run() {
 
   console.log('\n--- D. SIFIRLAMA ---');
   const reset = (bodies.reset_tenant_data || {});
-  check(reset.from === 'migration_phase59_property_lead_guest_context.sql' && /'lead_interest_daily'/.test(reset.body)
-    && /'property_owners'/.test(reset.body) && !/'lead_source_catalog'/.test(reset.body),
-    'D1. Son sifirlama tanimi iki defteri siler, kaynak katalogunu (ayar) korur', `${reset.from}`);
-  const p43 = lastBodies(['schema.sql', ...files.slice(0, idx('migration_phase59_property_lead_guest_context.sql'))]).reset_tenant_data || {};
+  check(reset.from === 'migration_phase78_pricing_research_expense_templates.sql' && /'lead_interest_daily'/.test(reset.body)
+    && /'property_owners'/.test(reset.body) && /'competitor_price_research'/.test(reset.body)
+    && !/'lead_source_catalog'/.test(reset.body),
+    'D1. Son sifirlama phase59 defterlerini ve phase78 verisini siler, kaynak katalogunu korur', `${reset.from}`);
+  const resetBefore78 = lastBodies(['schema.sql', ...files.slice(0, idx('migration_phase78_pricing_research_expense_templates.sql'))]).reset_tenant_data || {};
   const lines = b => b.split('\n').map(l => l.trim()).filter(Boolean);
-  const eklenen = lines(reset.body || '').filter(l => !lines(p43.body || '').includes(l));
-  const silinen = lines(p43.body || '').filter(l => !lines(reset.body || '').includes(l));
-  check(p43.from === 'migration_phase43_period_reset_integrity.sql'
-    && eklenen.every(l => /lead_interest_daily|property_owners|^-- phase59/.test(l))
-    && silinen.every(l => /'property_operator_notes',$/.test(l)),
-    'D2. Govde phase43 ile ayni; yalniz iki tablo eklendi', `eklenen ${JSON.stringify(eklenen)} silinen ${JSON.stringify(silinen)}`);
+  const eklenen = lines(reset.body || '').filter(l => !lines(resetBefore78.body || '').includes(l));
+  const silinen = lines(resetBefore78.body || '').filter(l => !lines(reset.body || '').includes(l));
+  check(resetBefore78.from === 'migration_phase59_property_lead_guest_context.sql'
+    && eklenen.every(l => /phase78|expense_template_occurrences|competitor_price_research|expense_templates|property_pricing_rule_settings/.test(l))
+    && silinen.length === 0,
+    'D2. Govde phase59 ile ayni; yalniz phase78 tablolari eklendi', `eklenen ${JSON.stringify(eklenen)} silinen ${JSON.stringify(silinen)}`);
 
   console.log('\n=============================================================================');
   console.log(`TEST SUMMARY: ${passed} / ${passed + failed} TESTS PASSED (${failed} FAILED)`);
