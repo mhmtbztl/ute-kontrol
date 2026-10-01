@@ -1879,6 +1879,14 @@
             <div class="kpi-meta" id="pricingExtensionConversionMeta">Uzatma teklifi kaydı yok</div>
           </div>
         </div>
+        <div class="pricing-controls" aria-label="Fiyatlandırma kapsamı">
+          <div class="form-group"><label for="pricingPropertySelect">Mülk</label><select id="pricingPropertySelect" data-onchange="setPricingProperty(this.value)"></select></div>
+          <div class="form-group"><label for="pricingTargetInput">Hedef ciro (₺)</label><input id="pricingTargetInput" type="number" min="0" step="1000" placeholder="—"></div>
+          <div class="form-group"><label for="pricingExpectedOccupancy">Beklenen doluluk (%)</label><input id="pricingExpectedOccupancy" type="number" min="1" max="100" step="1" placeholder="—"></div>
+          <div class="form-group"><label for="pricingFocusSelect">Odak</label><select id="pricingFocusSelect"><option value="BALANCED">Dengeli</option><option value="OCCUPANCY">Doluluk</option><option value="REVENUE">Gelir</option></select></div>
+          <button type="button" class="btn btn-primary" data-onclick="recalculatePricingTarget()">Hesapla</button>
+        </div>
+        <div id="pricingTargetResult" aria-live="polite"></div>
         <div id="pricingManagerContainer">
           <!-- Dinamik fiyatlandırma detayları ve gap night kartları -->
         </div>
@@ -3403,6 +3411,9 @@
   <script src="core/guest_contact_utils.js?v=84fd6474"></script>
   <script src="core/user_facing_errors.js?v=e4eb0ae5"></script>
   <script src="core/ledger_contract.js?v=bc9fd6f2"></script>
+  <script src="core/suggested_price_engine.js"></script>
+  <script src="core/target_revenue_calculator.js"></script>
+  <script src="core/tr_special_days.js"></script>
   <script src="core/business_date.js?v=a1518391"></script>
   <script src="core/guest_crm_engine.js?v=eb788dbf"></script>
   <script src="core/gap_night_service.js?v=6cdf4142"></script>

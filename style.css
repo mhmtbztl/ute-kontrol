@@ -5045,14 +5045,35 @@ body.side-panel-open { overflow: hidden; }
 .lead-followup-row span { display: block; margin-top: 4px; color: var(--text-muted); font-size: 11px; }
 .lead-card-meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .lead-followup-list { display: grid; gap: 8px; margin-bottom: 16px; }
+.pricing-controls { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) auto; gap: 12px; align-items: end; margin-bottom: 14px; }
+.pricing-controls .form-group { margin: 0; }
+.pricing-controls label { display: block; margin-bottom: 6px; color: var(--text-secondary); font-size: 12px; font-weight: 700; }
+.pricing-controls input,
+.pricing-controls select { width: 100%; min-height: 40px; }
+.pricing-days { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+.pricing-day { display: grid; gap: 5px; padding: 12px; border: 1px solid var(--border-subtle); border-radius: 9px; background: var(--bg-elevated); }
+.pricing-day span,
+.pricing-day small { color: var(--text-muted); }
+.pricing-day b { color: #34D399; font-size: 16px; }
+.pricing-warnings { display: grid; gap: 5px; margin-bottom: 12px; padding: 10px; border: 1px solid rgba(245,158,11,.35); border-radius: 8px; color: #FDE68A; }
+.pricing-target-empty,
+.pricing-target-summary { margin-bottom: 14px; padding: 12px; border: 1px solid var(--border-subtle); border-radius: 9px; background: var(--bg-elevated); }
+.pricing-target-summary { display: flex; flex-wrap: wrap; gap: 18px; }
+.pricing-target-table { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-bottom: 16px; }
+.pricing-target-table > div { display: grid; gap: 4px; padding: 10px; border: 1px solid var(--border-subtle); border-radius: 8px; }
+.pricing-target-table > .is-highlighted { border-color: #34D399; background: rgba(16,185,129,.1); }
 @media (max-width: 900px) {
   .lead-quick-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pricing-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pricing-target-table { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 520px) {
   .lead-quick-form { grid-template-columns: 1fr; }
   .lead-quick-note { grid-column: auto; }
   .lead-quick-form .btn { width: 100%; }
   .lead-followup-head { align-items: flex-start; flex-direction: column; }
+  .pricing-controls,
+  .pricing-target-table { grid-template-columns: 1fr; }
 }
 
 .reservation-range-group { position: relative; }

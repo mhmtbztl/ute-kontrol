@@ -13937,6 +13937,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
         // Ayar okunamiyorsa (goc yok) varsayilan 'MARKUP' kalir; bu bir
         // uydurma veri degil, ozelligin tanimli baslangic modudur.
         otaPricingStrategy: ayarlar.ota_pricing_strategy || 'MARKUP',
+        tenantSettings: ayarlar,
         // Hangi defterlerin semasi hazir? Yazma tarafi buna bakmaz
         // (hatayi Postgres soyler) ama ekranin "kayit yok" ile "tablo yok"
         // ayrimini yapabilmesi icin tasinir.
@@ -14011,7 +14012,8 @@ function getBlankTenantData(userId) {
     housekeepingOverrides: {},
     airbnbListings: {},
     phase31SchemaReady: false,
-    otaPricingStrategy: 'MARKUP'
+    otaPricingStrategy: 'MARKUP',
+    tenantSettings: {}
   };
 }
 
@@ -17027,41 +17029,117 @@ async function saveGuestProfile(event) {
   }
 }
 
+function getSuggestedPriceEngine() {
+  if (typeof SuggestedPriceEngine !== 'undefined') return SuggestedPriceEngine;
+  if (typeof require === 'function') return require('./core/suggested_price_engine.js');
+  return null;
+}
+
+function getTargetRevenueCalculator() {
+  if (typeof TargetRevenueCalculator !== 'undefined') return TargetRevenueCalculator;
+  if (typeof require === 'function') return require('./core/target_revenue_calculator.js');
+  return null;
+}
+
+function getTrSpecialDays() {
+  if (typeof TrSpecialDays !== 'undefined') return TrSpecialDays;
+  if (typeof require === 'function') return require('./core/tr_special_days.js');
+  return null;
+}
+
+function buildPricingWorkspace(input = {}) {
+  const priceEngine = getSuggestedPriceEngine();
+  const targetEngine = getTargetRevenueCalculator();
+  const suggestions = priceEngine.suggest({
+    property: input.property || {}, rules: input.rules || {}, bookings: input.bookings || [], blocks: input.blocks || [],
+    specialDays: input.specialDays || [], occupancyTarget: input.occupancyTarget, today: input.today, days: 30
+  });
+  const specialDates = new Set((input.specialDays || []).map(day => day.date));
+  const groups = { weekday: [], weekend: [], special: [] };
+  suggestions.days.filter(day => day.status === 'OPEN').forEach(day => {
+    const dow = new Date(`${day.date}T00:00:00Z`).getUTCDay();
+    const type = specialDates.has(day.date) ? 'special' : ([5, 6].includes(dow) ? 'weekend' : 'weekday');
+    groups[type].push(day.price);
+  });
+  const average = values => {
+    const measured = values.filter(Number.isFinite);
+    return measured.length ? measured.reduce((sum, value) => sum + value, 0) / measured.length : null;
+  };
+  const openNights = Object.fromEntries(Object.entries(groups).map(([key, values]) => [key, values.length]));
+  const prices = Object.fromEntries(Object.entries(groups).map(([key, values]) => [key, average(values)]));
+  const target = targetEngine.calculate({
+    target: input.target,
+    soldToDate: { nights: input.soldNights ?? null, netRoomRevenue: input.soldRevenue },
+    openNights,
+    prices,
+    expectedOccupancy: input.expectedOccupancy,
+    focus: input.focus || 'BALANCED',
+    history: input.history || null
+  });
+  return { suggestions, target, openNights, prices };
+}
+
+let pricingSelectedPropertyId = '';
+let pricingTargetDraft = null;
+let pricingExpectedOccupancyDraft = null;
+let pricingFocusDraft = 'BALANCED';
+
+function setPricingProperty(propertyId) {
+  pricingSelectedPropertyId = propertyId || '';
+  pricingTargetDraft = null;
+  renderPricingTab();
+}
+
+function recalculatePricingTarget() {
+  const targetValue = document.getElementById('pricingTargetInput')?.value;
+  const occupancyValue = document.getElementById('pricingExpectedOccupancy')?.value;
+  pricingTargetDraft = targetValue === '' ? null : Number(targetValue);
+  pricingExpectedOccupancyDraft = occupancyValue === '' ? null : Number(occupancyValue) / 100;
+  pricingFocusDraft = document.getElementById('pricingFocusSelect')?.value || 'BALANCED';
+  renderPricingTab();
+}
+
 function renderPricingTab() {
   if (typeof document === 'undefined') return;
   const container = document.getElementById('pricingManagerContainer');
   if (!container) return;
-
-  const gaps = (typeof appData !== 'undefined' && appData.gapNights) || [];
-  const hasPricingSource = Object.keys((typeof appData !== 'undefined' && appData.villas) || {}).length > 0
-    && ((typeof appData !== 'undefined' && appData.bookings) || []).length > 0;
-  const gapBadge = document.getElementById('pricingGapBadge');
-  if (gapBadge) gapBadge.innerText = gaps.length;
-
-  container.innerHTML = `
-    <div style="background: rgba(0,0,0,0.25); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08);">
-      <h4 style="margin: 0 0 12px 0; color: #A78BFA; font-size: 14px;">🎯 Fiyatlandırma ve Boş Gece Durumu</h4>
-      <p style="font-size: 12px; color: #CBD5E1; margin: 0 0 14px 0;">
-        Kayıtlı rezervasyon takviminizdeki tek gecelik boşlukları gösterir. Fiyat değişikliği yalnızca sizin onayınızla yapılır.
-      </p>
-      ${!hasPricingSource
-        ? '<div style="color: var(--text-muted); font-size: 12px;">Mülk ve rezervasyon kaydı olmadan boş gece durumu hesaplanamadı.</div>'
-        : gaps.length === 0 ? '<div style="color: #34D399; font-size: 12px;">✅ Kayıtlı takvimde kritik boş gece penceresi bulunmuyor.</div>' : `
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px;">
-          ${gaps.map(g => `
-            <div class="gap-night-card">
-              <div class="gap-villa-name">${escapeHtml((appData.villas && appData.villas[g.villa]?.name) || g.villa)}</div>
-              <div class="gap-dates-tag">📅 ${g.date} (1 Gece)</div>
-              <div class="gap-price-box">
-                <span style="font-size: 11px; color: #94A3B8;">Önerilen Fiyat:</span>
-                <strong style="color: ${Number(g.suggestedPrice) > 0 ? '#34D399' : 'var(--text-muted)'};">${Number(g.suggestedPrice) > 0 ? '₺' + Number(g.suggestedPrice).toLocaleString('tr-TR') : '—'}</strong>
-              </div>
-            </div>
-          `).join('')}
-        </div>
-      `}
-    </div>
-  `;
+  const properties = Object.values(appData.villas || {}).filter(property => property && property.isActive !== false && !property.archivedAt);
+  const property = properties.find(item => item.id === pricingSelectedPropertyId) || properties[0] || null;
+  if (property && !pricingSelectedPropertyId) pricingSelectedPropertyId = property.id;
+  const select = document.getElementById('pricingPropertySelect');
+  if (select) select.innerHTML = properties.length ? properties.map(item => `<option value="${escapeHtml(item.id)}"${item.id === pricingSelectedPropertyId ? ' selected' : ''}>${escapeHtml(item.name || item.slug || 'Adlandırılmamış mülk')}</option>`).join('') : '<option value="">Mülk yok</option>';
+  if (!property) {
+    container.innerHTML = '<div class="empty-state">Fiyat önerisi hesaplanamadı: mülk kaydı yok.</div>';
+    document.getElementById('pricingTargetResult').innerHTML = '';
+    return;
+  }
+  const today = getTodayStr();
+  const end = new Date(Date.parse(`${today}T00:00:00Z`) + 29 * 86400000).toISOString().slice(0, 10);
+  const specialDays = getTrSpecialDays().forRange(today, end);
+  const slug = Object.entries(appData.villas || {}).find(([, value]) => value === property)?.[0] || property.slug;
+  const bookings = (appData.bookings || []).filter(booking => booking.propertyId === property.id || booking.villa === slug);
+  const targetRecord = getConfiguredRevenueTarget(currentFilter, appData.targets || [], slug || 'ALL');
+  const targetValue = pricingTargetDraft === null ? targetRecord : pricingTargetDraft;
+  const ledger = computeMonthLedger(today.slice(0, 7), slug || 'ALL');
+  const result = buildPricingWorkspace({
+    property: { id: property.id, basePrice: property.basePrice ?? property.base ?? null, floorPrice: property.floor ?? null },
+    bookings, blocks: (appData.maintenanceTickets || []).filter(ticket => ticket.property_id === property.id && ticket.blocks_availability).map(ticket => ({ propertyId: property.id, start: ticket.downtime_start, end: ticket.downtime_end })),
+    rules: appData.tenantSettings?.pricing_rules || {}, specialDays,
+    occupancyTarget: null, today, target: targetValue, soldRevenue: ledger?.netRoomRevenue ?? null,
+    expectedOccupancy: pricingExpectedOccupancyDraft, focus: pricingFocusDraft
+  });
+  const targetInput = document.getElementById('pricingTargetInput');
+  if (targetInput) targetInput.value = targetValue ?? '';
+  const occupancyInput = document.getElementById('pricingExpectedOccupancy');
+  if (occupancyInput) occupancyInput.value = pricingExpectedOccupancyDraft == null ? '' : Math.round(pricingExpectedOccupancyDraft * 100);
+  const focusInput = document.getElementById('pricingFocusSelect');
+  if (focusInput) focusInput.value = pricingFocusDraft;
+  const warningHtml = result.suggestions.warnings.length ? `<div class="pricing-warnings">${result.suggestions.warnings.map(item => `<span>${escapeHtml(item.text)}</span>`).join('')}</div>` : '';
+  container.innerHTML = `${warningHtml}<div class="pricing-days">${result.suggestions.days.map(day => `<div class="pricing-day"><strong>${escapeHtml(formatTrDate(day.date))}</strong><span>${escapeHtml(day.status === 'OPEN' ? 'Açık' : day.status === 'BOOKED' ? 'Dolu' : 'Kapalı')}</span><b>${day.price == null ? '—' : `₺${Number(day.price).toLocaleString('tr-TR')}`}</b><small>${day.reasons.length ? escapeHtml(day.reasons.map(reason => `${reason.text} ${reason.pct > 0 ? '+' : ''}${reason.pct}%`).join(' · ')) : 'Kural uygulanmadı'}</small></div>`).join('')}</div>`;
+  const targetBox = document.getElementById('pricingTargetResult');
+  if (targetBox) targetBox.innerHTML = targetValue == null
+    ? '<div class="pricing-target-empty">Hedef ciro girildiğinde gereken fiyat–doluluk seçenekleri burada görünür.</div>'
+    : `<div class="pricing-target-summary"><strong>${escapeHtml(result.target.reason?.text || (result.target.status === 'OK' ? 'Hedef hesaplandı' : result.target.status))}</strong><span>Kalan hedef: ${result.target.remaining == null ? '—' : `₺${Number(result.target.remaining).toLocaleString('tr-TR')}`}</span><span>Gereken doluluk: ${result.target.requiredOccupancy == null ? '—' : `%${(result.target.requiredOccupancy * 100).toFixed(1)}`}</span></div>${result.target.table.length ? `<div class="pricing-target-table">${result.target.table.map((row, index) => `<div class="${index === result.target.highlightedRow ? 'is-highlighted' : ''}"><span>₺${Number(row.avgPrice).toLocaleString('tr-TR')}</span><strong>${row.feasible ? `%${(row.requiredOccupancy * 100).toFixed(1)} doluluk` : 'Bu fiyatla mümkün değil'}</strong></div>`).join('')}</div>` : ''}`;
 }
 
 function openTabFromDeepLink(tabId, entityId) {
@@ -17367,6 +17445,7 @@ if (typeof module !== 'undefined' && module.exports) {
     canReadLedgerRole,
     canReadSalesRole,
     canWriteSalesRole,
+    buildPricingWorkspace,
     applyRoleNavigationVisibility,
     invalidateExecutiveSnapshotCache,
     shouldRefreshExecutiveSnapshot,
