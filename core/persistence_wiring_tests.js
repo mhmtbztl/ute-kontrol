@@ -86,11 +86,9 @@ const KALICI = [
   'saveWaAsBooking',
   // AI finans onerisi -> bakim kaydi
   'convertAiActionToTask',
-  // phase31 — yerel kalan son alti defter (ayrica phase31_persistence_tests)
+  // phase31 — arayüzü hâlâ canlı olan defterler (ayrıca phase31_persistence_tests)
   'cycleHkStatus',
   'setPropertySalesReadiness',
-  'saveMarketingCampaign',
-  'saveInfluencerCollab',
   'setOtaPricingStrategy',
   'saveOperatorNote',
   'saveAllSettings'

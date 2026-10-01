@@ -45,6 +45,25 @@ test('Önceki ay gider kopyaları seçili aya taşınır ve kaynak ayı notta ko
   }]);
 });
 
+test('Önceki ay gider kopyası hedef ayda aynı kaynak satırı zaten varsa mükerrer üretmez', () => {
+  const expenses = [
+    { id: 'e1', date: '2026-02-28', category: 'Kira', type: 'OPEX', amount: 12500, villa: 'ALL', description: 'Ofis' },
+    { id: 'copy1', date: '2026-03-28', category: 'Kira', type: 'OPEX', amount: 12500, villa: 'ALL', description: 'Ofis · Kaynak dönem: 2026-02' }
+  ];
+  assert.deepStrictEqual(App.buildPreviousMonthExpenseCopies({ targetMonth: '2026-03', selectedIds: ['e1'], expenses }), []);
+});
+
+test('Gider kopyalama tek atomik çoklu yazı kullanır', () => {
+  assert.match(source, /async function createExpensesBatch/);
+  assert.match(source, /\.from\(['"]expenses['"]\)[\s\S]{0,500}\.insert\(payloads\)/);
+  assert.doesNotMatch(source.match(/async function confirmCopyPreviousExpenses[\s\S]*?\n}/)?.[0] || '', /for\s*\([^)]*copies[^)]*\)[\s\S]*createExpense/);
+});
+
+test('Dönem özeti otomatik komisyon ve temizliği içeren ortak kategori toplamından en büyük gideri seçer', () => {
+  assert.strictEqual(typeof App.getTopExpenseCategory, 'function');
+  assert.deepStrictEqual(App.getTopExpenseCategory({ Elektrik: 950, Temizlik: 3000, 'Kredi Kartı / Komisyon': 4500 }), ['Kredi Kartı / Komisyon', 4500]);
+});
+
 test('Aylık gelişim gelecek boş ayları gizler ve geçen yıl cirosunu tek sütunda taşır', () => {
   assert.match(source, /previousYearCiro/);
   assert.match(source, /d\.key <= currentMonthKey/);

@@ -4,6 +4,14 @@
 // =============================================================================
 
 let latestAnalysisExports = null;
+let analysisFocusQuestion = '';
+
+function setAnalysisFocusQuestion(question) {
+  analysisFocusQuestion = String(question || '').trim();
+  setAnalysisStatus(analysisFocusQuestion
+    ? `Seçili soru: ${analysisFocusQuestion}`
+    : 'Henüz analiz paketi oluşturulmadı.');
+}
 
 function getAnalysisProperties() {
   return Object.entries((appData && appData.villas) || {})
@@ -186,6 +194,9 @@ async function generateAnalysisExport() {
       maintenances: appData.maintenance || []
     });
 
+    if (analysisFocusQuestion) {
+      latestAnalysisExports.prompt += `\n\nSoru: ${analysisFocusQuestion}`;
+    }
     renderAnalysisOutput(latestAnalysisExports);
     setAnalysisStatus('Analiz paketi hazır. Promptu kopyalayabilir veya güvenli JSON özetini indirebilirsiniz.');
   } catch (error) {

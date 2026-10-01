@@ -2408,6 +2408,78 @@ async function createExpense(expenseInput) {
   return mapped;
 }
 
+async function createExpensesBatch(expenseInputs) {
+  const inputs = Array.isArray(expenseInputs) ? expenseInputs : [];
+  if (!inputs.length) throw new Error('Kopyalanacak gider bulunamadı.');
+  const tenantId = getActiveTenantId();
+  const isCloud = !!isCloudTenant(tenantId);
+  requireCloudForWrite('Gider', tenantId);
+  const currentAppData = (typeof appData !== 'undefined') ? appData : null;
+  const validPropertyIds = new Set(Object.values(currentAppData?.villas || {}).map(property => property.id).filter(Boolean));
+
+  const normalized = inputs.map((expenseInput, index) => {
+    const amount = roundMoney(expenseInput.amount);
+    const date = String(expenseInput.date || expenseInput.expense_date || '').slice(0, 10);
+    const category = String(expenseInput.category || '').trim();
+    if (!Number.isFinite(amount) || amount <= 0) throw new Error(`${index + 1}. giderin tutarı geçersiz.`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error(`${index + 1}. giderin tarihi geçersiz.`);
+    if (isPeriodClosed(date)) throw new Error(`Bu dönem (${date.slice(0, 7)}) kapatılmıştır. Giderler kopyalanamaz.`);
+    if (!category) throw new Error(`${index + 1}. giderin kategorisi eksik.`);
+    let propertyId = expenseInput.propertyId || expenseInput.property_id || null;
+    if (!propertyId && expenseInput.villa && expenseInput.villa !== 'ALL') {
+      propertyId = isUUID(expenseInput.villa)
+        ? expenseInput.villa
+        : currentAppData?.villas?.[expenseInput.villa]?.id || null;
+    }
+    if (propertyId && validPropertyIds.size && !validPropertyIds.has(propertyId)) {
+      throw new Error(`${index + 1}. giderin mülkü aktif işletmeye ait değil.`);
+    }
+    return {
+      ...expenseInput,
+      amount,
+      date,
+      category,
+      type: expenseInput.type === 'CAPEX' || expenseInput.expense_type === 'CAPEX' ? 'CAPEX' : 'OPEX',
+      propertyId
+    };
+  });
+
+  let created;
+  if (!isCloud) {
+    const stamp = Date.now();
+    created = normalized.map((expense, index) => ({
+      ...expense,
+      id: `local_exp_${stamp}_${index}`,
+      dbId: `local_exp_${stamp}_${index}`,
+      tenantId: tenantId || 'usr_ute_master',
+      month: expense.date.slice(0, 7),
+      villa: expense.villa || 'ALL',
+      description: String(expense.description || expense.desc || '').trim()
+    }));
+  } else {
+    const payloads = normalized.map(expense => {
+      const payload = mapExpenseToDb(expense, tenantId);
+      delete payload.id;
+      if (!expense.legacyId && !expense.legacy_id) delete payload.legacy_id;
+      return payload;
+    });
+    const { data, error } = await supabaseClient.from('expenses').insert(payloads).select();
+    if (error || !Array.isArray(data) || data.length !== payloads.length) {
+      throw new Error('Giderler kopyalanamadı; hiçbir kayıt eklenmedi: ' + (error?.message || 'Veritabanı hatası'));
+    }
+    created = data.map(mapExpenseFromDb);
+  }
+
+  if (currentAppData) {
+    if (!Array.isArray(currentAppData.expenses)) currentAppData.expenses = [];
+    currentAppData.expenses.push(...created);
+    if (typeof saveAppData === 'function') saveAppData();
+    if (typeof renderAll === 'function') renderAll();
+  }
+  invalidateExecutiveSnapshotCache();
+  return created;
+}
+
 async function updateExpense(expenseId, expenseInput) {
   if (!expenseId) throw new Error('Güncellenecek gider ID belirtilmedi.');
   if (!expenseInput) throw new Error('Gider güncelleme bilgisi girilmedi.');
@@ -3546,9 +3618,17 @@ function registerPageAction(tabId, action) {
 registerPageAction('marketing', {
   id: 'funnel-test-question',
   label: "ChatGPT'ye sor",
-  title: 'FUNNEL_TEST_QUESTION · Değişiklik işe yaradı mı?',
-  run: () => switchTab('analysis')
+  title: 'Huni değişikliğinin etkisini ChatGPT ile değerlendir',
+  kind: 'FUNNEL_TEST_QUESTION',
+  run: () => openFunnelTestQuestion()
 });
+
+function openFunnelTestQuestion() {
+  if (typeof setAnalysisFocusQuestion === 'function') {
+    setAnalysisFocusQuestion('Değişiklik işe yaradı mı, sırada ne var?');
+  }
+  switchTab('analysis');
+}
 
 function runPageAction(id) {
   const aktif = typeof document !== 'undefined' && document.querySelector
@@ -3983,6 +4063,9 @@ function buildPreviousMonthExpenseCopies({ targetMonth, selectedIds, expenses })
   const wanted = new Set((selectedIds || []).map(String));
   const [year, month] = targetMonth.split('-').map(Number);
   const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const existingKeys = new Set((expenses || [])
+    .filter(expense => inPeriodKey(expense.date || expense.expense_date, targetMonth))
+    .map(expenseCopyKey));
   return (expenses || [])
     .filter(expense => wanted.has(String(expense.id || expense.dbId || '')) && inPeriodKey(expense.date || expense.expense_date, sourceMonth))
     .map(expense => {
@@ -3998,7 +4081,18 @@ function buildPreviousMonthExpenseCopies({ targetMonth, selectedIds, expenses })
         propertyId: expense.propertyId || expense.property_id || null,
         description: `${description ? description + ' · ' : ''}Kaynak dönem: ${sourceMonth}`
       };
-    });
+    })
+    .filter(copy => !existingKeys.has(expenseCopyKey(copy)));
+}
+
+function expenseCopyKey(expense) {
+  const type = expense.type === 'CAPEX' || expense.expense_type === 'CAPEX' ? 'CAPEX' : 'OPEX';
+  const property = expense.propertyId || expense.property_id || expense.villa || 'ALL';
+  return [
+    String(expense.date || expense.expense_date || '').slice(0, 10),
+    String(expense.category || '').trim(), type, Number(expense.amount) || 0,
+    property, String(expense.description || expense.desc || '').trim()
+  ].join('|');
 }
 
 function openCopyPreviousExpensesPanel() {
@@ -4031,10 +4125,15 @@ async function confirmCopyPreviousExpenses() {
     return false;
   }
   if (!confirm(`${copies.length} gider ${currentFilter.period} dönemine yeni kayıt olarak yazılsın mı?`)) return false;
-  for (const copy of copies) await createExpense(copy);
-  if (typeof SidePanel !== 'undefined') SidePanel.close();
-  showToast(`${copies.length} gider kopyalandı.`, 'success');
-  return true;
+  try {
+    await createExpensesBatch(copies);
+    if (typeof SidePanel !== 'undefined') SidePanel.close();
+    showToast(`${copies.length} gider kopyalandı.`, 'success');
+    return true;
+  } catch (error) {
+    showToast(error?.message || 'Giderler kopyalanamadı; hiçbir kayıt eklenmedi.', 'error');
+    return false;
+  }
 }
 
 function inPeriodKey(dateStr, periodKey) {
@@ -4588,7 +4687,7 @@ function renderFinanceModule() {
   renderYoYComparison(ciro, totalOpex, netCashProfit, totalSoldNights);
 
   // Render AI Financial Analyst
-  renderAIFinancialAnalyst(ciro, totalRevenue, targetRev, targetPct, totalOpex, totalCapex, netCashProfit, netMargin, propStats, karOlculemez);
+  renderAIFinancialAnalyst(ciro, totalRevenue, targetRev, targetPct, totalOpex, totalCapex, netCashProfit, netMargin, propStats, karOlculemez, categoryTotals);
 }
 
 // -------------------------------------------------------------
@@ -5175,7 +5274,13 @@ function computeFinanceInsightRatios({ totalIncome, opex, capex }) {
   return { expenseRatio: income > 0 ? Number(((expense / income) * 100).toFixed(1)) : null };
 }
 
-function renderAIFinancialAnalyst(revenue, totalIncome, targetRev, targetPct, opex, capex, netProfit, netMargin, propStats, karOlculemez = false) {
+function getTopExpenseCategory(categoryTotals) {
+  return Object.entries(categoryTotals || {})
+    .filter(([, amount]) => Number(amount) > 0)
+    .sort((left, right) => Number(right[1]) - Number(left[1]))[0] || null;
+}
+
+function renderAIFinancialAnalyst(revenue, totalIncome, targetRev, targetPct, opex, capex, netProfit, netMargin, propStats, karOlculemez = false, categoryTotals = {}) {
   const summary = document.getElementById('periodSummaryContent');
   if (summary) {
     const tl = value => Math.round(Number(value) || 0).toLocaleString('tr-TR');
@@ -5184,10 +5289,7 @@ function renderAIFinancialAnalyst(revenue, totalIncome, targetRev, targetPct, op
     else if (revenue > 0) insights.push({ title: 'Konaklama cirosu', text: `${tl(revenue)} TL; bu dönem için hedef girilmemiş.` });
     if (karOlculemez) insights.push({ title: 'Kâr ölçülemiyor', text: 'Gider kaydı yok. Giderleri girin veya ayı kapatarak sıfır gideri onaylayın.' });
     else insights.push({ title: 'Net kâr', text: `${tl(netProfit)} TL${Number.isFinite(Number(netMargin)) ? ` · marj %${Number(netMargin).toFixed(1)}` : ''}.` });
-    const expenses = (appData.expenses || []).filter(expense => isExpenseInFilter(expense));
-    const totals = {};
-    expenses.forEach(expense => { totals[expense.category || 'Diğer'] = (totals[expense.category || 'Diğer'] || 0) + (Number(expense.amount) || 0); });
-    const topExpense = Object.entries(totals).sort((a, b) => b[1] - a[1])[0];
+    const topExpense = getTopExpenseCategory(categoryTotals);
     if (topExpense) insights.push({ title: 'En büyük gider', text: `${topExpense[0]} · ${tl(topExpense[1])} TL.` });
     const strongest = Object.values(propStats || {}).filter(item => Number(item.revenue) > 0).sort((a, b) => b.revenue - a.revenue)[0];
     if (strongest) insights.push({ title: 'En güçlü mülk', text: `${strongest.name} · ${tl(strongest.revenue)} TL ciro.` });
@@ -6670,6 +6772,17 @@ function buildReservationListView(options = {}) {
     });
 }
 
+function computeReservationListSummary({ rows, rangeStart, rangeEnd }) {
+  const bookings = (rows || []).map(row => row.booking || row);
+  const ledger = getLedgerContract().computePeriodLedger({
+    bookings,
+    bookingInScope: booking => String(booking.status || '').toUpperCase() !== 'CANCELLED',
+    bookingShare: booking => getLedgerContract().nightShareInRange(booking, rangeStart, rangeEnd),
+    expenses: [], cleaningTasks: []
+  });
+  return { soldNights: ledger.soldNights, netRoomRevenue: ledger.netRoomRevenue };
+}
+
 function reservationStatusBadge(status) {
   if (status === 'CONFIRMED') return '<span class="badge badge-green">Onaylandı</span>';
   if (status === 'CANCELLED') return '<span class="badge badge-rose">İptal</span>';
@@ -6717,9 +6830,7 @@ function renderManageBookingsTable() {
 
   const todayStr = getTodayStr();
 
-  let totalGross = 0;
-  let totalNet = 0;
-  let totalNights = 0;
+  syncReservationRangeUi();
 
   const visibleRows = buildReservationListView({
     bookings: appData.bookings || [], cleaningTasks: appData.cleaningTasks || [], today: todayStr,
@@ -6744,12 +6855,10 @@ function renderManageBookingsTable() {
   });
 
   // Update Summary Pill
-  filteredRows.forEach(({ booking: b }) => {
-    if (b.status !== 'CANCELLED') {
-      totalGross += Number(b.gross) || 0;
-      totalNet += Number(b.net) || 0;
-      totalNights += Number(b.nights) || 0;
-    }
+  const listSummary = computeReservationListSummary({
+    rows: filteredRows,
+    rangeStart: reservationListRange.start,
+    rangeEnd: reservationListRange.end
   });
 
   const summaryPill = document.getElementById('rezTableSummaryPill');
@@ -6757,7 +6866,7 @@ function renderManageBookingsTable() {
     // Toplu aktarim ozeti rezervasyon sayilmaz (L-103); gece ve tutara dahildir.
     const ozetSayisi = filteredRows.filter(row => isBulkSummaryBooking(row.booking)).length;
     const rezSayisi = filteredRows.length - ozetSayisi;
-    summaryPill.innerHTML = `📊 Gösterilen: <strong>${rezSayisi} Rezervasyon</strong>${ozetSayisi ? ` + ${ozetSayisi} toplu aktarım özeti` : ''} | 🌙 ${totalNights} Gece | 💰 Net: ${totalNet.toLocaleString('tr-TR')} TL`;
+    summaryPill.innerHTML = `📊 Gösterilen: <strong>${rezSayisi} Rezervasyon</strong>${ozetSayisi ? ` + ${ozetSayisi} toplu aktarım özeti` : ''} | 🌙 ${listSummary.soldNights} Gece | 💰 Net oda geliri: ${Math.round(listSummary.netRoomRevenue).toLocaleString('tr-TR')} TL`;
   }
 
   if (filteredRows.length === 0) {
@@ -11296,71 +11405,6 @@ function isCampaignInFilter(camp) {
   return s <= range.end && e >= range.start;
 }
 
-function renderMarketingCampaignsTable(campaigns) {
-  const tbody = document.getElementById('marketingCampaignsTableBody');
-  if (!tbody) return;
-  tbody.innerHTML = '';
-
-  if (!campaigns || campaigns.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:20px; color:var(--text-muted);">Bu dönemde kayıtlı reklam kampanyası bulunmuyor.</td></tr>';
-    return;
-  }
-
-  campaigns.forEach(c => {
-    const sp = Number(c.spent) || 0;
-    const bg = Number(c.budget) || sp;
-    const rv = Number(c.revenue) || 0;
-    const roas = sp > 0 ? (rv / sp).toFixed(1) : null;
-    const cl = Number(c.clicks) || 0;
-    const ld = Number(c.leads) || 0;
-    const bk = Number(c.bookingsCount) || 0;
-
-    let pBadge = '<span class="badge badge-blue">Google Ads</span>';
-    if (c.platform === 'META') pBadge = '<span class="badge badge-purple">Meta Ads</span>';
-    if (c.platform === 'TIKTOK') pBadge = '<span class="badge badge-pink">TikTok Ads</span>';
-    if (c.platform === 'OTHER') pBadge = '<span class="badge badge-secondary">Diğer</span>';
-
-    let statusBadge = '<span class="badge badge-green">Aktif</span>';
-    if (c.status === 'COMPLETED') statusBadge = '<span class="badge badge-secondary">Tamamlandı</span>';
-    if (c.status === 'PAUSED') statusBadge = '<span class="badge badge-amber">Duraklatıldı</span>';
-
-    const vName = c.villa === 'ALL' ? 'Tüm Portföy' : (appData.villas[c.villa]?.name || c.villa);
-    const dateStr = (c.startDate || '') + (c.endDate ? ' - ' + c.endDate : '');
-
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>
-        <strong style="color:#F8FAFC;">${escapeHtml(c.name)}</strong>
-        <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">${escapeHtml(c.notes || c.channelType || '')}</div>
-      </td>
-      <td>${pBadge}</td>
-      <td><span class="badge badge-blue" style="font-size:11px;">${escapeHtml(vName)}</span></td>
-      <td style="font-size:12px; color:var(--text-muted);">${dateStr || '-'}</td>
-      <td>
-        <strong style="color:#F87171;">₺${sp.toLocaleString('tr-TR')}</strong>
-        <div style="font-size:10px; color:var(--text-muted);">Bütçe: ₺${bg.toLocaleString('tr-TR')}</div>
-      </td>
-      <td>
-        <span style="font-weight:600; color:#E2E8F0;">${cl.toLocaleString('tr-TR')} Tık</span>
-        <div style="font-size:10px; color:#A855F7;">${ld} Lead / Mesaj</div>
-      </td>
-      <td>
-        <strong style="color:#34D399;">₺${rv.toLocaleString('tr-TR')}</strong>
-        <div style="font-size:10px; color:var(--text-muted);">${bk} Rezervasyon</div>
-      </td>
-      <td>
-        <span class="badge ${roas === null ? 'badge-purple' : (Number(roas) >= 5 ? 'badge-green' : 'badge-amber')}" style="font-weight:700;">${roas === null ? 'harcama yok' : roas + 'x ROAS'}</span>
-      </td>
-      <td>${statusBadge}</td>
-      <td style="text-align: right; white-space: nowrap;">
-        <button class="btn btn-secondary btn-sm" data-onclick="openMarketingModal(decodeURIComponent('${encodeActionArg(c.id)}'))" style="padding:4px 8px; font-size:11px; margin-right:4px;">✏️ Düzenle</button>
-        <button class="btn btn-secondary btn-sm text-danger" data-onclick="deleteMarketingCampaign(decodeURIComponent('${encodeActionArg(c.id)}'))" style="padding:4px 8px; font-size:11px;">🗑️</button>
-      </td>
-    `;
-    tbody.appendChild(tr);
-  });
-}
-
 /**
  * Pazarlama danismaninin dayandigi OLCULMUS gercekler.
  *
@@ -11597,104 +11641,6 @@ function runMarketingBudgetSimulation() {
     }
   }
 }
-
-// -------------------------------------------------------------
-// MARKETING MODAL & CRUD
-// -------------------------------------------------------------
-function openMarketingModal(id = null) {
-  const modal = document.getElementById('marketingCampaignModal');
-  const form = document.getElementById('mktCampaignForm');
-  const title = document.getElementById('mktModalTitle');
-  if (!modal || !form) return;
-
-  form.reset();
-  document.getElementById('mktCampaignId').value = '';
-
-  if (id) {
-    const c = (appData.marketingCampaigns || []).find(item => item.id === id);
-    if (c) {
-      if (title) title.innerText = 'Reklam Kampanyasını Düzenle';
-      document.getElementById('mktCampaignId').value = c.id;
-      document.getElementById('mktName').value = c.name || '';
-      document.getElementById('mktPlatform').value = c.platform || 'META';
-      document.getElementById('mktVilla').value = c.villa || 'ALL';
-      document.getElementById('mktStartDate').value = c.startDate || '';
-      document.getElementById('mktEndDate').value = c.endDate || '';
-      document.getElementById('mktBudget').value = c.budget || '';
-      document.getElementById('mktSpent').value = c.spent || '';
-      document.getElementById('mktClicks').value = c.clicks || '';
-      document.getElementById('mktLeads').value = c.leads || '';
-      document.getElementById('mktBookingsCount').value = c.bookingsCount || '';
-      document.getElementById('mktRevenue').value = c.revenue || '';
-      document.getElementById('mktStatus').value = c.status || 'ACTIVE';
-      document.getElementById('mktNotes').value = c.notes || '';
-    }
-  } else {
-    if (title) title.innerText = 'Yeni Reklam Kampanyası Ekle';
-    document.getElementById('mktStartDate').value = getTodayStr();
-  }
-
-  modal.classList.add('active');
-}
-
-function closeMarketingModal() {
-  const modal = document.getElementById('marketingCampaignModal');
-  if (modal) modal.classList.remove('active');
-}
-
-async function saveMarketingCampaign(e) {
-  e.preventDefault();
-  if (!appData.marketingCampaigns) appData.marketingCampaigns = [];
-
-  const id = document.getElementById('mktCampaignId').value;
-  const name = document.getElementById('mktName').value.trim();
-  const platform = document.getElementById('mktPlatform').value;
-  const villa = document.getElementById('mktVilla').value;
-  const startDate = document.getElementById('mktStartDate').value;
-  const endDate = document.getElementById('mktEndDate').value;
-  const budget = Number(document.getElementById('mktBudget').value) || 0;
-  const spent = Number(document.getElementById('mktSpent').value) || 0;
-  const clicks = Number(document.getElementById('mktClicks').value) || 0;
-  const leads = Number(document.getElementById('mktLeads').value) || 0;
-  const bookingsCount = Number(document.getElementById('mktBookingsCount').value) || 0;
-  const revenue = Number(document.getElementById('mktRevenue').value) || 0;
-  const status = document.getElementById('mktStatus').value;
-  const notes = document.getElementById('mktNotes').value.trim();
-
-  // Kimlik artik Postgres'ten gelir. Eskiden `MKT-<zaman>` uretiliyordu ve
-  // kayit hicbir yere yazilmadigi icin sayfa yenilenince yok oluyordu.
-  const kampanya = {
-    id: id || null,
-    name, platform, villa, startDate, endDate, budget, spent,
-    clicks, leads, bookingsCount, revenue, status, notes
-  };
-
-  const yazildi = await reportStatePersist(async () => {
-    const satir = await cloudSaveMarketingCampaign(kampanya);
-    const kayit = mapMarketingCampaignFromDb(satir, buildPropertyIdSlugMap());
-    const idx = appData.marketingCampaigns.findIndex(c => c.id === kayit.id);
-    if (idx !== -1) appData.marketingCampaigns[idx] = kayit;
-    else appData.marketingCampaigns.unshift(kayit);
-  }, '✅ Reklam kampanyası kaydedildi.');
-
-  saveAppData();
-  if (!yazildi) return;
-  closeMarketingModal();
-  renderMarketingModule();
-}
-
-async function deleteMarketingCampaign(id) {
-  if (!confirm('Bu reklam kampanyası kaydını silmek istediğinizden emin misiniz?')) return;
-  const yazildi = await reportStatePersist(
-    () => cloudDeleteMarketingCampaign(id),
-    'Reklam kampanyası silindi.'
-  );
-  if (!yazildi) return;
-  appData.marketingCampaigns = (appData.marketingCampaigns || []).filter(c => c.id !== id);
-  saveAppData();
-  renderMarketingModule();
-}
-
 
 // =============================================================
 // 🌟 OTA İLK SAYFA SIRALAMA, KAPAK GÖRSELİ & A/B TEST RADARI
@@ -12272,148 +12218,6 @@ function renderSeasonalEventRadar() {
     `;
     container.appendChild(card);
   });
-}
-
-// -------------------------------------------------------------
-// 5. 📸 INFLUENCER & BARTER İŞBİRLİĞİ ROI TAKİPÇİSİ
-// -------------------------------------------------------------
-function renderInfluencerRoiLedger() {
-  const tbody = document.getElementById('influencerCollabsTableBody');
-  if (!tbody) return;
-  tbody.innerHTML = '';
-
-  if (!appData.influencerCollabs) {
-    // DEFAULT_INFLUENCER_COLLABS demo temizliginde silindi.
-    appData.influencerCollabs = [];
-  }
-
-  if (appData.influencerCollabs.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:16px; color:var(--text-muted);">Kayıtlı influencer veya barter anlaşması bulunmuyor.</td></tr>';
-    return;
-  }
-
-  appData.influencerCollabs.forEach(c => {
-    const cost = Number(c.cost) || 0;
-    const rev = Number(c.revenue) || 0;
-    const roiCalc = cost > 0 ? (rev / cost).toFixed(1) + 'x' : '-';
-    const vName = (appData.villas && appData.villas[c.villa]?.name) ? appData.villas[c.villa].name : c.villa;
-
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>
-        <strong style="color:#FDE68A;">${escapeHtml(c.handle || 'Belirtilmedi')}</strong>
-        <div style="font-size:11px; color:var(--text-muted);">${escapeHtml(c.followers || '-')} Takipçi</div>
-      </td>
-      <td>
-        <span class="badge badge-secondary">${escapeHtml(vName || 'Belirtilmedi')}</span>
-        <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">${escapeHtml(c.dates || '-')}</div>
-      </td>
-      <td style="color:#F87171; font-weight:700;">₺${cost.toLocaleString('tr-TR')}</td>
-      <td><span class="badge badge-purple" style="font-size:11px; font-weight:800;">${escapeHtml(c.code || '-')}</span></td>
-      <td>
-        <strong style="color:#34D399;">₺${rev.toLocaleString('tr-TR')}</strong>
-        <div style="font-size:10px; color:var(--text-muted);">${c.bookingsCount || 0} Rezervasyon</div>
-      </td>
-      <td>
-        <span class="badge ${Number(roiCalc) >= 5 ? 'badge-green' : 'badge-amber'}" style="font-weight:800; font-size:12px;">${roiCalc} ROI 🚀</span>
-      </td>
-      <td><span class="badge badge-green">${escapeHtml(c.status === 'COMPLETED' ? 'Tamamlandı' : (c.status || 'Belirtilmedi'))}</span></td>
-      <td style="text-align: right; white-space: nowrap;">
-        <button type="button" class="btn btn-secondary btn-sm" data-onclick="openInfluencerModal(decodeURIComponent('${encodeActionArg(String(c.id))}'))" style="padding:4px 8px; font-size:11px; margin-right:4px;">✏️ Düzenle</button>
-        <button type="button" class="btn btn-secondary btn-sm text-danger" data-onclick="deleteInfluencerCollab(decodeURIComponent('${encodeActionArg(String(c.id))}'))" style="padding:4px 8px; font-size:11px;">🗑️</button>
-      </td>
-    `;
-    tbody.appendChild(tr);
-  });
-}
-
-function openInfluencerModal(id = null) {
-  const modal = document.getElementById('influencerModal');
-  const form = document.getElementById('influencerForm');
-  const title = document.getElementById('influencerModalTitle');
-  if (!modal || !form) return;
-
-  form.reset();
-  document.getElementById('infCollabId').value = '';
-
-  if (id) {
-    const item = (appData.influencerCollabs || []).find(c => c.id === id);
-    if (item) {
-      if (title) title.innerText = 'Influencer / Barter Düzenle';
-      document.getElementById('infCollabId').value = item.id;
-      document.getElementById('infHandle').value = item.handle || '';
-      document.getElementById('infFollowers').value = item.followers || '';
-      document.getElementById('infVilla').value = item.villa || Object.keys(appData.villas || {})[0] || '';
-      document.getElementById('infDates').value = item.dates || '';
-      document.getElementById('infCost').value = item.cost || '';
-      document.getElementById('infCode').value = item.code || '';
-      document.getElementById('infBookingsCount').value = item.bookingsCount || '';
-      document.getElementById('infRevenue').value = item.revenue || '';
-      document.getElementById('infStatus').value = item.status || 'COMPLETED';
-      document.getElementById('infNotes').value = item.notes || '';
-    }
-  } else {
-    if (title) title.innerText = 'Yeni Influencer / Barter İşbirliği Ekle';
-  }
-
-  modal.classList.add('active');
-}
-
-function closeInfluencerModal() {
-  const modal = document.getElementById('influencerModal');
-  if (modal) modal.classList.remove('active');
-}
-
-async function saveInfluencerCollab(e) {
-  e.preventDefault();
-  if (!appData.influencerCollabs) appData.influencerCollabs = [];
-
-  const id = document.getElementById('infCollabId').value;
-  const handle = document.getElementById('infHandle').value.trim();
-  const followers = document.getElementById('infFollowers').value.trim();
-  const villa = document.getElementById('infVilla').value;
-  const dates = document.getElementById('infDates').value.trim();
-  const cost = Number(document.getElementById('infCost').value) || 0;
-  const code = document.getElementById('infCode').value.trim().toUpperCase();
-  const bookingsCount = Number(document.getElementById('infBookingsCount').value) || 0;
-  const revenue = Number(document.getElementById('infRevenue').value) || 0;
-  const status = document.getElementById('infStatus').value;
-  const notes = document.getElementById('infNotes').value.trim();
-
-  const isbirligi = {
-    id: id || null,
-    handle, followers, villa, dates, cost, code, bookingsCount, revenue, status, notes
-  };
-
-  const yazildi = await reportStatePersist(async () => {
-    const satir = await cloudSaveInfluencerCollab(isbirligi);
-    const kayit = mapInfluencerCollabFromDb(satir, buildPropertyIdSlugMap());
-    const idx = appData.influencerCollabs.findIndex(c => c.id === kayit.id);
-    if (idx !== -1) appData.influencerCollabs[idx] = kayit;
-    else appData.influencerCollabs.push(kayit);
-  });
-
-  saveAppData();
-  // Basarisizsa modal ACIK kalir: kullanici girdigi veriyi kaybetmesin.
-  // Eskiden her durumda "başarıyla kaydedildi" deniyordu ve kayit
-  // hicbir yere yazilmiyordu.
-  if (!yazildi) return;
-  closeInfluencerModal();
-  renderInfluencerRoiLedger();
-  alert('✅ Influencer / Barter işbirliği başarıyla kaydedildi!');
-}
-
-async function deleteInfluencerCollab(id) {
-  if (!confirm('Bu influencer işbirliği kaydını silmek istediğinize emin misiniz?')) return;
-  if (!appData.influencerCollabs) return;
-  const yazildi = await reportStatePersist(
-    () => cloudDeleteInfluencerCollab(id),
-    'Influencer işbirliği silindi.'
-  );
-  if (!yazildi) return;
-  appData.influencerCollabs = appData.influencerCollabs.filter(c => c.id !== id);
-  saveAppData();
-  renderInfluencerRoiLedger();
 }
 
 // =============================================================================
@@ -16635,7 +16439,9 @@ if (typeof module !== 'undefined' && module.exports) {
     mapExpenseToDb,
     loadExpenses,
     createExpense,
+    createExpensesBatch,
     buildPreviousMonthExpenseCopies,
+    getTopExpenseCategory,
     updateExpense,
     deleteExpense,
     saveExpense,
@@ -16689,6 +16495,7 @@ if (typeof module !== 'undefined' && module.exports) {
     openCopyPreviousExpensesPanel,
     confirmCopyPreviousExpenses,
     buildReservationListView,
+    computeReservationListSummary,
     openBookingDetailsPanel,
     toggleReservationRangePicker,
     shiftReservationRangeCalendar,

@@ -445,6 +445,8 @@ try {
   const rapor = MarketingUI.renderWorkspaceHtml(raporModel, 'economics');
   check(/WhatsApp/.test(rapor) && /1 toplu aktarım özeti/.test(rapor) && />1<\/td>/.test(rapor),
     'P5. Kanal ekonomisi görünen kanal adını yazar ve özeti rezervasyon saymaz (L-105)', rapor.slice(0, 800));
+  check(!/WHATSAPP/.test(rapor),
+    'P5b. Kanal ekonomisi müşteriye ham kanal kodu göstermez', rapor.slice(0, 800));
   check(/Net kâr/.test(rapor) && /₺100\.000/.test(rapor),
     'P6. Kanal ekonomisi net kârı Finans ile aynı defter formülünden yazar', rapor.slice(0, 800));
 

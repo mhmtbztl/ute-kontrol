@@ -40,6 +40,10 @@ check(
   'Eski pazarlama render girisi Node disari aktariminda kalmamali'
 );
 check(
+  !/function\s+(renderMarketingCampaignsTable|openMarketingModal|saveMarketingCampaign|deleteMarketingCampaign|renderInfluencerRoiLedger|openInfluencerModal|saveInfluencerCollab|deleteInfluencerCollab)\s*\(/.test(appSource),
+  'DOM yuzeyi silinen kampanya ve influencer defterlerinin olu UI fonksiyonlari kalmamali'
+);
+check(
   indexSource.includes('id="tab-marketing"')
     && indexSource.includes('id="marketingWorkspaceContent"')
     && /src="core\/marketing_ui\.js\?v=[a-f0-9]{8}"/.test(indexSource),

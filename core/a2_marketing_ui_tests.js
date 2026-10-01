@@ -26,6 +26,8 @@ test('Kanal ekonomisi karar sütunlarını ve net payı gösterir', () => {
   assert.match(output, /Size kalan net/);
   assert.match(output, /Pay/);
   assert.doesNotMatch(output, /Brüt toplam/);
+  assert.match(output, /Size kalan net \(komisyon sonrası\)/);
+  assert.doesNotMatch(output, />Net oda geliri</);
 });
 
 test('Huni eksik sayaçları sıfır diye uydurmaz ve kanalın kendi aşamalarını açıklar', () => {
@@ -54,6 +56,8 @@ test('Galeri ve eski Raporlar yüzeyi geri gelmeyecek şekilde kaldırılır', (
 
 test('Huni sayfası FUNNEL_TEST_QUESTION eylemini sayfa çubuğuna kaydeder', () => {
   assert.match(appSource, /registerPageAction\(['"]marketing['"][\s\S]{0,500}FUNNEL_TEST_QUESTION/);
+  assert.match(appSource, /function openFunnelTestQuestion\(\)/);
+  assert.doesNotMatch(appSource, /title:\s*['"]FUNNEL_TEST_QUESTION/);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

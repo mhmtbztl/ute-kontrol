@@ -29,6 +29,18 @@ test('Rezervasyon listesi varsayılan ay aralığını ve operasyon önceliğini
   assert.strictEqual(rows[2].markers.cleaningPending, true);
 });
 
+test('Rezervasyon listesi özeti tarih aralığını kesen konaklamayı tahakkukla paylaştırır', () => {
+  assert.strictEqual(typeof App.computeReservationListSummary, 'function');
+  const summary = App.computeReservationListSummary({
+    rows: [
+      { booking: { id: 'cross', checkIn: '2026-08-30', checkOut: '2026-09-02', gross: 45000, cleaningFee: 3000, discount: 0, status: 'CONFIRMED' } },
+      { booking: { id: 'inside', checkIn: '2026-09-10', checkOut: '2026-09-13', gross: 24000, cleaningFee: 3000, discount: 0, status: 'CONFIRMED' } }
+    ],
+    rangeStart: '2026-09-01', rangeEnd: '2026-09-30'
+  });
+  assert.deepStrictEqual(summary, { soldNights: 4, netRoomRevenue: 35000 });
+});
+
 test('Liste yalnız altı karar bilgisi taşır ve ayrıntı ortak SidePanel ile açılır', () => {
   assert.match(html, /class="[^"]*reservation-list-table[^"]*"/);
   assert.doesNotMatch(html, /WhatsApp'tan Rezervasyona Aktar/);
@@ -41,6 +53,7 @@ test('Liste filtresi ortak DateRangePicker range kipini kullanır', () => {
   assert.match(html, /id="reservationRangePicker"/);
   assert.match(source, /pick\([^\n]+['"]range['"]\)/);
   assert.doesNotMatch(html, /id="rezPeriodFilter"/);
+  assert.doesNotMatch(html, /id="reservationRangeLabel">—</);
 });
 
 test('Takvim ay, bir hafta ve iki hafta görünümlerine sahiptir', () => {

@@ -287,11 +287,9 @@ async function davranisTestleri(app) {
 }
 
 function kaynakTestleri() {
-  // Alti kapi. Hepsi async olmak ve gercek bir yazma yolundan gecmek zorunda.
+  // Arayüzü canlı kalan kapılar async olmak ve gerçek bir yazma yolundan geçmek zorunda.
   const KAPILAR = {
     cycleHkStatus: 'setPropertySalesReadiness',
-    saveMarketingCampaign: 'cloudSaveMarketingCampaign',
-    saveInfluencerCollab: 'cloudSaveInfluencerCollab',
     setOtaPricingStrategy: 'cloudSaveTenantSetting',
     saveOperatorNote: 'cloudSaveOperatorNote',
     saveAllSettings: 'cloudSavePricingLadder'
@@ -318,16 +316,6 @@ function kaynakTestleri() {
   check(hazirlik.includes('cloudSaveHousekeepingOverride'),
     `${i++}. setPropertySalesReadiness -> cloudSaveHousekeepingOverride cagiriyor`,
     'Ana sayfadaki yeni durum secici kalici Postgres yazma yoluna ulasmiyor.');
-
-  // Silme de yazmadir: bellekten silip veritabaninda birakmak, yenilemede
-  // silinen kaydin geri gelmesi demektir.
-  [['deleteMarketingCampaign', 'cloudDeleteMarketingCampaign'],
-   ['deleteInfluencerCollab', 'cloudDeleteInfluencerCollab']].forEach(([ad, yazici]) => {
-    const g = govde(APP, ad) || '';
-    check(g.includes(yazici),
-      `${i++}. ${ad} veritabanindan da siliyor`,
-      'Kayit yalnizca bellekten siliniyor; sayfa yenilenince geri gelir.');
-  });
 
   // Yerel kimlik uretimi kalmamali: kimlik artik Postgres'ten gelir.
   check(!/'MKT-'\s*\+\s*Date\.now\(\)/.test(APP),

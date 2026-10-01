@@ -267,7 +267,7 @@
     return `${renderMarketingHealth(model)}${renderBenchmarkPanel(model)}${bulkNote}<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
       ${kpi('Oda geliri', money(totals.roomRevenueBeforeDistribution, report.currency), 'Temizlik hariç, komisyon öncesi')}
       ${kpi('Dağıtım maliyeti', money(totals.distributionCost, report.currency), 'Yalnızca kaydedilmiş komisyon')}
-      ${kpi('Net oda geliri', money(totals.roomRevenueAfterDistribution, report.currency), 'Komisyon sonrası')}
+      ${kpi('Size kalan net (komisyon sonrası)', money(totals.roomRevenueAfterDistribution, report.currency), 'Konaklama cirosu eksi dağıtım maliyeti')}
       ${kpi('Net ADR', money(totals.netRoomAdr, report.currency), `${number(totals.bookedNights)} satılmış gece`)}
       ${kpi('Doğrudan rezervasyon', number(report.mix.directReservationSharePercent, '%'), 'Rezervasyon adedi payı')}
       ${profitCard}

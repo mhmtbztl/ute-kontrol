@@ -566,12 +566,15 @@ Bu yüzden phase38 üretim durumu **doğrulanmamış** olarak kalır; varmış g
 raporlanmaz.
 
 **phase42 (`migration_phase42_lead_identity_contract.sql`) ve phase44
-(`migration_phase44_pricing_late_deploy_hardening.sql`) 25 Eylül 2026'da test
-projesine bootstrap edildi.** Phase42 `leads.guest_name` alanını nullable yapar
-ve "ad veya telefon" CHECK kuralını korur; üretimde henüz uygulanmadı. Üretim
-paketi: `docs/PHASE42_DEPLOY_PACKAGE.md`. Phase11/phase44, 30 Eylül 2026 ürün
-kararıyla production readiness kapsamı dışındadır; migration dosyaları ve
-manifest kayıtları tarihsel bütünlük için korunur, üretime uygulanmış sayılmaz.
+(`migration_phase44_pricing_late_deploy_hardening.sql`) test projesine ve
+üretime uygulandı; üretimde `schema_migrations` defterindeki 42/44 kayıtlarıyla
+doğrulandı.** Phase42 `leads.guest_name` alanını nullable yapar ve "ad veya
+telefon" CHECK kuralını korur. Phase11 fiyat tabloları ve iki fiyat yazma RPC'si
+de üretimde vardır; phase44 bunların geç dağıtım sertleştirmesidir. Sade fiyat
+motoru bu yüzeyleri ana akışta kullanmasa da istemci uyumluluğu ve güvenlik
+kapısı nedeniyle production readiness, yedi fiyat tablosunun ve iki RPC'nin
+anon erişime kapalı kaldığını denetlemeye devam eder. Tarihsel uygulama paketi:
+`docs/PHASE42_DEPLOY_PACKAGE.md`.
 
 **phase49 (`migration_phase49_property_activation_floor.sql`) 26 Eylül 2026'da
 test projesine ve üretime uygulandı; üretimde doğrulandı.** Mülkün faaliyete
