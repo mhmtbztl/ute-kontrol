@@ -114,6 +114,18 @@ async function test(name, fn) {
     assert.match(app, /function renderLeadQuickCapture\(/);
     assert.match(app, /async function submitQuickLead\(/);
     assert.match(actions, /'submitQuickLead'/);
+    assert.match(html, /id="leadInterestToday"/);
+    assert.match(html, /data-onclick="addLeadSource\(\)"/);
+    assert.match(html, /id="leadAssignedTo"/);
+    assert.match(html, /id="leadNextFollowUp"/);
+    assert.match(html, /id="leadMessageTemplate"/);
+    assert.match(html, /id="guestBirthDate"/);
+    assert.match(html, /id="guestPrivateClassificationSection"/);
+    assert.match(app, /SalesWorkflowService\.saveWorkflow/);
+    assert.match(app, /status === 'QUOTE_SENT' && !nextFollowUpAt/);
+    assert.match(app, /canManageTenantRole\(activeTenant\?\.role\)/);
+    assert.match(app, /Talep bilgileri kaydedildi; ancak atama\/takip bilgisi kaydedilemedi/);
+    assert.match(app, /Kara\/beyaz liste bilgisi kaydedilemedi/);
   });
 
   await test('talep çalışma alanı kaynak, takip ve atamayı tek görünümde birleştirir', () => {

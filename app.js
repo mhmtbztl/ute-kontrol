@@ -8827,9 +8827,11 @@ function getLeadSalesView() {
 
 function renderLeadCard(row) {
   const villaName = appData.villas?.[row.villa]?.name || (row.villa === 'ALL' ? 'Mülk belirtilmedi' : row.villa || 'Mülk belirtilmedi');
+  const assignee = (appData.salesMembers || []).find(member => member.user_id === row.assignedTo);
+  const assigneeLabel = assignee?.full_name || assignee?.email || (row.assignedTo ? 'Ekip üyesi' : 'Atanmamış');
   return `<article class="lead-card">
     <div><strong>${escapeHtml(row.guest || 'Ad girilmedi')}</strong><span>${escapeHtml(row.sourceLabel)} · ${escapeHtml(villaName)}</span></div>
-    <div class="lead-card-meta"><span>${row.nextFollowUpAt ? `Takip: ${escapeHtml(formatTrDate(String(row.nextFollowUpAt).slice(0, 10)))}` : 'Takip tarihi yok'}</span><button type="button" class="btn btn-secondary btn-sm" data-onclick="editLead(decodeURIComponent('${encodeActionArg(row.id)}'))">Aç</button></div>
+    <div class="lead-card-meta"><span>${escapeHtml(assigneeLabel)} · ${row.nextFollowUpAt ? `Takip: ${escapeHtml(formatTrDate(String(row.nextFollowUpAt).slice(0, 10)))}` : 'Takip tarihi yok'}</span><button type="button" class="btn btn-secondary btn-sm" data-onclick="editLead(decodeURIComponent('${encodeActionArg(row.id)}'))">Aç</button></div>
   </article>`;
 }
 
@@ -8874,6 +8876,12 @@ function renderLeadQuickCapture() {
   if (!form || !sourceSelect || !propertySelect) return;
 
   const canWrite = canWriteSalesRole(activeTenant?.role);
+  const interestToday = (appData.leadInterests || []).filter(row => row.day === getTodayStr())
+    .reduce((sum, row) => sum + (Number(row.count) || 0), 0);
+  const interestElement = document.getElementById('leadInterestToday');
+  if (interestElement) interestElement.textContent = String(interestToday);
+  const addSourceButton = document.getElementById('leadAddSourceBtn');
+  if (addSourceButton) addSourceButton.hidden = !canManageTenantRole(activeTenant?.role);
   const sources = Array.isArray(appData.leadSources) ? appData.leadSources : [];
   const sortedSources = sources.slice().sort((a, b) => {
     if (a.id === lastLeadSourceId) return -1;
@@ -8899,6 +8907,54 @@ function renderLeadQuickCapture() {
   else if (!sources.length) setLeadQuickMessage('Kaynak kataloğu yüklenemedi. Kayıt yapılmadı; yönetici kaynak ayarını kontrol etmeli.', 'error');
 }
 
+async function refreshLeadSalesContext() {
+  const context = await loadLeadSalesContext(getActiveTenantId());
+  appData.leadSources = context.sources;
+  appData.leadAcquisitions = context.acquisitions;
+  appData.leadWorkflows = context.workflows;
+  appData.leadInterests = context.interests;
+  renderLeadQuickCapture();
+  renderLeadSalesWorkspace();
+  return context;
+}
+
+async function addLeadSource() {
+  if (!canManageTenantRole(activeTenant?.role)) return false;
+  const label = prompt('Yeni talep kaynağının adı:', '');
+  if (!String(label || '').trim()) return false;
+  try {
+    const source = await SalesWorkflowService.createSource(supabaseClient, { tenantId: getActiveTenantId(), label });
+    lastLeadSourceId = source.id;
+    await refreshLeadSalesContext();
+    if (window.showToast) window.showToast('✅ Talep kaynağı eklendi.');
+    return true;
+  } catch (error) {
+    if (window.showToast) window.showToast('Kaynak eklenemedi: ' + kullaniciMesaji(error?.message), 'error');
+    return false;
+  }
+}
+
+async function bumpLeadInterestFromQuick(delta) {
+  if (!canWriteSalesRole(activeTenant?.role)) return false;
+  const sourceId = document.getElementById('leadQuickSource')?.value || '';
+  const channel = document.getElementById('leadQuickChannel')?.value || '';
+  if (!sourceId || !channel) {
+    setLeadQuickMessage('İlgi sayacı için kaynak ve iletişim kanalı seçin.', 'error');
+    return false;
+  }
+  try {
+    const result = await SalesWorkflowService.bumpInterest(supabaseClient, {
+      tenantId: getActiveTenantId(), day: getTodayStr(), sourceId, channel, delta
+    });
+    await refreshLeadSalesContext();
+    setLeadQuickMessage(`Bugünkü yalnız fiyat sorusu sayacı: ${Number(result?.count ?? 0)}`, 'success');
+    return true;
+  } catch (error) {
+    setLeadQuickMessage(kullaniciMesaji(error?.message || 'İlgi sayacı güncellenemedi.'), 'error');
+    return false;
+  }
+}
+
 async function submitQuickLead(event) {
   event.preventDefault();
   const form = event.currentTarget;
@@ -8920,6 +8976,7 @@ async function submitQuickLead(event) {
     });
     lastLeadSourceId = sourceId;
     await loadLeads(getActiveTenantId());
+    await refreshLeadSalesContext();
     const parts = [result.created ? 'Yeni talep kaydedildi.' : 'Bilgiler mevcut açık talebe eklendi.'];
     if (result.returning) parts.push(`Tekrar gelen misafir${Number(result.previous_leads) > 0 ? ` · ${Number(result.previous_leads)} önceki talep` : ''}.`);
     if (result.classification === 'BLACK') parts.push('Yönetici uyarısı: Bu misafir kara listede.');
@@ -9041,6 +9098,17 @@ function openLeadModal(editId = null) {
   const modal = document.getElementById('leadModal');
   const title = document.getElementById('leadModalTitle');
   const editInput = document.getElementById('leadEditId');
+  const assignee = document.getElementById('leadAssignedTo');
+
+  if (assignee) {
+    assignee.innerHTML = '<option value="">Atanmamış</option>';
+    (appData.salesMembers || []).filter(member => ['owner', 'admin', 'manager', 'sales'].includes(member.role)).forEach(member => {
+      const option = document.createElement('option');
+      option.value = member.user_id;
+      option.textContent = member.full_name || member.email || member.user_id;
+      assignee.appendChild(option);
+    });
+  }
 
   if (editId) {
     const l = appData.leads.find(item => item.id === editId || item.dbId === editId);
@@ -9054,12 +9122,58 @@ function openLeadModal(editId = null) {
     document.getElementById('leadStatus').value = l.status;
     document.getElementById('leadLostReason').value = l.lostReason || '-';
     document.getElementById('leadNotes').value = l.notes || '';
+    const workflow = (appData.leadWorkflows || []).find(row => row.lead_id === l.id);
+    if (assignee) assignee.value = workflow?.assigned_to || '';
+    const followUp = document.getElementById('leadNextFollowUp');
+    if (followUp) followUp.value = workflow?.next_follow_up_at ? String(workflow.next_follow_up_at).slice(0, 16) : '';
+    const templateSelect = document.getElementById('leadMessageTemplate');
+    const templateRow = document.getElementById('leadMessageTemplateRow');
+    const lifecycle = l.status === 'QUOTE_SENT' ? 'LEAD_QUOTE_FOLLOW_UP' : 'LEAD_REENGAGEMENT';
+    const templates = (appData.messageTemplates || []).filter(template => template.channel === 'WHATSAPP'
+      && [lifecycle, 'MANUAL'].includes(template.lifecycle_stage));
+    if (templateSelect) templateSelect.innerHTML = '<option value="">Şablon seçin</option>' + templates.map(template => `<option value="${escapeHtml(template.id)}">${escapeHtml(template.name)}</option>`).join('');
+    if (templateRow) templateRow.style.display = templates.length && l.phone ? 'grid' : 'none';
   } else {
     title.innerText = '🎯 Yeni Lead / Fırsat Girişi';
     editInput.value = '';
     document.getElementById('leadForm').reset();
+    if (assignee) assignee.value = activeSaaSUser?.id || '';
+    const templateRow = document.getElementById('leadMessageTemplateRow');
+    if (templateRow) templateRow.style.display = 'none';
   }
   modal.classList.add('active');
+}
+
+function renderLeadTemplateBody(template, lead) {
+  const villaName = appData.villas?.[lead.villa]?.name || lead.villa || '';
+  return String(template?.body || '')
+    .replace(/\{\{?guest_name\}?\}/gi, lead.guest || 'Misafir')
+    .replace(/\{\{?property_name\}?\}/gi, villaName)
+    .replace(/\{\{?quote\}?\}/gi, Number(lead.quote || 0).toLocaleString('tr-TR'));
+}
+
+function openLeadWhatsApp() {
+  const leadId = document.getElementById('leadEditId')?.value;
+  const templateId = document.getElementById('leadMessageTemplate')?.value;
+  const lead = (appData.leads || []).find(item => item.id === leadId);
+  const template = (appData.messageTemplates || []).find(item => item.id === templateId);
+  if (!lead || !template) return false;
+  const digits = String(lead.phone || '').replace(/\D/g, '');
+  const guest = (appData.guests || []).find(item => String(item.phone || '').replace(/\D/g, '') === digits);
+  const link = SalesWorkflowService.buildWhatsAppLink({
+    phone: lead.phone, body: renderLeadTemplateBody(template, lead),
+    messageType: template.message_type || 'TRANSACTIONAL',
+    allowWhatsapp: template.message_type !== 'MARKETING' || guest?.allowWhatsapp === true,
+    marketingOptIn: guest?.marketingOptIn === true
+  });
+  if (!link.allowed) {
+    alert(link.reason === 'MARKETING_CONSENT_REQUIRED'
+      ? 'Pazarlama mesajı için misafirin açık kampanya izni gerekir.'
+      : 'WhatsApp mesajı için telefon ve iletişim izni gerekir.');
+    return false;
+  }
+  window.open(link.url, '_blank', 'noopener,noreferrer');
+  return true;
 }
 
 function closeLeadModal() { document.getElementById('leadModal').classList.remove('active'); }
@@ -9074,6 +9188,20 @@ async function saveLead(e) {
   const status = document.getElementById('leadStatus').value;
   const lostReason = document.getElementById('leadLostReason').value;
   const notes = document.getElementById('leadNotes').value.trim();
+  const assignedTo = document.getElementById('leadAssignedTo')?.value || null;
+  let nextFollowUpAt = document.getElementById('leadNextFollowUp')?.value || null;
+  if (status === 'QUOTE_SENT' && !nextFollowUpAt) {
+    const date = new Date(`${getTodayStr()}T10:00:00`);
+    date.setDate(date.getDate() + 2);
+    nextFollowUpAt = date.toISOString();
+  } else if (nextFollowUpAt) {
+    const date = new Date(nextFollowUpAt);
+    if (Number.isNaN(date.getTime())) {
+      alert('Hata: Geçerli bir takip tarihi seçin.');
+      return;
+    }
+    nextFollowUpAt = date.toISOString();
+  }
 
   const payload = buildLeadEditPayload(editId, {
     guest,
@@ -9089,10 +9217,20 @@ async function saveLead(e) {
   try {
     if (editId) {
       await updateLead(editId, payload);
+      try {
+        await SalesWorkflowService.saveWorkflow(supabaseClient, {
+          tenantId: getActiveTenantId(), leadId: editId, assignedTo, nextFollowUpAt
+        });
+        await refreshLeadSalesContext();
+      } catch (workflowError) {
+        renderManageLeadsTable();
+        renderLeadAnalytics();
+        alert('Talep bilgileri kaydedildi; ancak atama/takip bilgisi kaydedilemedi: ' + workflowError.message);
+        return;
+      }
       if (window.showToast) window.showToast('✅ Talep başarıyla güncellendi.');
     } else {
-      await createLead(payload);
-      if (window.showToast) window.showToast('🎯 Yeni talep başarıyla oluşturuldu.');
+      throw new Error('Yeni talepler telefon ve kaynak zorunlu hızlı kayıt alanından oluşturulur.');
     }
     closeLeadModal();
     renderManageLeadsTable();
@@ -13793,9 +13931,13 @@ async function loadTenantAppData(tenantIdOrUserId) {
       const tenantId = targetId;
       const mayReadLedger = canReadLedgerRole(activeTenant?.role);
       const mayManageAds = canManageTenantRole(activeTenant?.role);
+      const mayReadSales = canReadSalesRole(activeTenant?.role);
+      const salesMembersPromise = mayReadSales
+        ? supabaseClient.rpc('get_tenant_members', { p_tenant_id: tenantId }).then(result => result.error ? [] : (result.data || []))
+        : Promise.resolve([]);
       // Independent datasets are loaded concurrently and every list is paged;
       // Supabase's per-response cap must never silently truncate a dashboard.
-      const [villas, bookings, expenses, cleanList, leads, leadSalesContext, closeList, targetList, maintenanceTickets, operationalTasks, financialTransactions, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications, campaignRows, influencerRows, settingRows, operatorNoteRows, pricingLadderRows, hkOverrideRows, paymentCommissionRows, operationalPeopleRows, cleaningExecutionRows, maintenanceAssignmentRows, taskTemplateRows, checklistTemplateRows, bookingPayments, bookingPaymentBalances, adMetricPeriods, propertyContextRows, propertyOwnerRows, propertyOwnerLinkRows] = await Promise.all([
+      const [villas, bookings, expenses, cleanList, leads, leadSalesContext, closeList, targetList, maintenanceTickets, operationalTasks, financialTransactions, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications, campaignRows, influencerRows, settingRows, operatorNoteRows, pricingLadderRows, hkOverrideRows, paymentCommissionRows, operationalPeopleRows, cleaningExecutionRows, maintenanceAssignmentRows, taskTemplateRows, checklistTemplateRows, bookingPayments, bookingPaymentBalances, adMetricPeriods, propertyContextRows, propertyOwnerRows, propertyOwnerLinkRows, messageTemplateRows, guestClassificationRows, salesMembers] = await Promise.all([
         loadProperties(tenantId),
         loadBookings(tenantId),
         mayReadLedger ? loadExpenses(tenantId) : Promise.resolve([]),
@@ -13837,7 +13979,10 @@ async function loadTenantAppData(tenantIdOrUserId) {
         mayManageAds ? fetchTenantRowsTolerant(() => supabaseClient.from('ad_metric_periods').select('*').eq('tenant_id', tenantId).order('period_start', { ascending: false })) : Promise.resolve([]),
         fetchTenantRowsTolerant(() => supabaseClient.from('property_analysis_context').select('*').eq('tenant_id', tenantId)),
         mayReadLedger ? fetchTenantRowsTolerant(() => supabaseClient.from('property_owners').select('*').eq('tenant_id', tenantId).order('full_name')) : Promise.resolve([]),
-        mayReadLedger ? fetchTenantRowsTolerant(() => supabaseClient.from('property_owner_links').select('*').eq('tenant_id', tenantId)) : Promise.resolve([])
+        mayReadLedger ? fetchTenantRowsTolerant(() => supabaseClient.from('property_owner_links').select('*').eq('tenant_id', tenantId)) : Promise.resolve([]),
+        mayReadSales ? fetchTenantRowsTolerant(() => supabaseClient.from('message_templates').select('*').eq('tenant_id', tenantId).eq('is_active', true).order('created_at', { ascending: false })) : Promise.resolve([]),
+        mayManageAds ? fetchTenantRowsTolerant(() => supabaseClient.from('guest_private_classifications').select('*').eq('tenant_id', tenantId)) : Promise.resolve([]),
+        salesMembersPromise
       ]);
       const propIdMap = {};
       Object.values(villas || {}).forEach(p => {
@@ -13943,6 +14088,9 @@ async function loadTenantAppData(tenantIdOrUserId) {
         propertyAnalysisContexts: propertyContextRows || [],
         propertyOwners: propertyOwnerRows || [],
         propertyOwnerLinks: propertyOwnerLinkRows || [],
+        messageTemplates: messageTemplateRows || [],
+        guestPrivateClassifications: guestClassificationRows || [],
+        salesMembers: salesMembers || [],
         influencerCollabs: (influencerRows || []).map(r => mapInfluencerCollabFromDb(r, propIdMap)),
         housekeepingOverrides,
         airbnbListings,
@@ -14024,6 +14172,9 @@ function getBlankTenantData(userId) {
     propertyAnalysisContexts: [],
     propertyOwners: [],
     propertyOwnerLinks: [],
+    messageTemplates: [],
+    guestPrivateClassifications: [],
+    salesMembers: [],
     influencerCollabs: [],
     housekeepingOverrides: {},
     airbnbListings: {},
@@ -14680,6 +14831,7 @@ function mapGuestFromDb(g) {
     allowSms: g.allow_sms === true,
     allowWhatsapp: g.allow_whatsapp === true,
     marketingOptIn: g.marketing_opt_in === true,
+    birthDate: g.birth_date || '',
     preferences: g.preferences || '',
     internalNotes: g.internal_notes || '',
     tags: Array.isArray(g.tags) ? g.tags : [],
@@ -14700,6 +14852,8 @@ function mapGuestToDb(guestInput = {}) {
     allow_sms: guestInput.allowSms === true || guestInput.allow_sms === true,
     allow_whatsapp: guestInput.allowWhatsapp === true || guestInput.allow_whatsapp === true,
     marketing_opt_in: guestInput.marketingOptIn === true || guestInput.marketing_opt_in === true,
+    birth_date: /^\d{4}-\d{2}-\d{2}$/.test(guestInput.birthDate || guestInput.birth_date || '')
+      ? (guestInput.birthDate || guestInput.birth_date) : null,
     preferences: String(guestInput.preferences || '').trim() || null,
     internal_notes: String(guestInput.internalNotes || guestInput.internal_notes || '').trim() || null,
     tags: Array.from(new Set((Array.isArray(guestInput.tags) ? guestInput.tags : [])
@@ -17067,6 +17221,7 @@ function openGuestProfileModal(guestId = null) {
   document.getElementById('guestEmail').value = guest?.email || '';
   document.getElementById('guestLanguage').value = guest?.language || 'tr';
   document.getElementById('guestCountryCode').value = guest?.countryCode || 'TR';
+  document.getElementById('guestBirthDate').value = guest?.birthDate || '';
   document.getElementById('guestAllowWhatsapp').checked = guest?.allowWhatsapp === true;
   document.getElementById('guestAllowSms').checked = guest?.allowSms === true;
   document.getElementById('guestAllowEmail').checked = guest?.allowEmail === true;
@@ -17074,6 +17229,14 @@ function openGuestProfileModal(guestId = null) {
   document.getElementById('guestPreferences').value = guest?.preferences || '';
   document.getElementById('guestInternalNotes').value = guest?.internalNotes || '';
   document.getElementById('guestTags').value = (guest?.tags || []).join(', ');
+  const privateSection = document.getElementById('guestPrivateClassificationSection');
+  const canManagePrivate = canManageTenantRole(activeTenant?.role);
+  if (privateSection) privateSection.style.display = canManagePrivate ? '' : 'none';
+  const classification = guest && canManagePrivate
+    ? (appData.guestPrivateClassifications || []).find(item => item.guest_id === guest.id) : null;
+  document.getElementById('guestPrivateListType').value = classification?.list_type || '';
+  document.getElementById('guestPrivateReason').value = classification?.reason || '';
+  document.getElementById('guestPrivateIncidentOn').value = classification?.incident_on || '';
 
   const rebookingAction = document.getElementById('guestRebookingAction');
 
@@ -17144,6 +17307,7 @@ async function saveGuestProfile(event) {
       allowSms: document.getElementById('guestAllowSms').checked,
       allowEmail: document.getElementById('guestAllowEmail').checked,
       marketingOptIn: document.getElementById('guestMarketingOptIn').checked,
+      birthDate: document.getElementById('guestBirthDate').value,
       preferences: document.getElementById('guestPreferences').value.trim(),
       internalNotes: document.getElementById('guestInternalNotes').value.trim(),
       tags: document.getElementById('guestTags').value.split(',').map(tag => tag.trim()).filter(Boolean)
@@ -17153,13 +17317,36 @@ async function saveGuestProfile(event) {
       (appData.guests || []).map(item => ({ id: item.id, tenant_id: item.tenantId, first_name: item.firstName, last_name: item.lastName, phone: item.phone, email: item.email }))
     );
     if (duplicate.hasWarning) throw new Error('Aynı telefon veya e-postaya sahip başka bir misafir profili var. Otomatik birleştirme yapılmadı; mevcut profili açın.');
+    const canManagePrivate = canManageTenantRole(activeTenant?.role);
+    const listType = canManagePrivate ? document.getElementById('guestPrivateListType').value : '';
+    const privateReason = canManagePrivate ? document.getElementById('guestPrivateReason').value.trim() : '';
+    if (listType && (privateReason.length < 3 || privateReason.length > 500)) {
+      throw new Error('Kara/beyaz liste için 3–500 karakter arasında olgusal gerekçe yazın.');
+    }
     const saved = id ? await updateGuest(id, input) : await createGuest(input);
     if (!appData.guests) appData.guests = [];
     const index = appData.guests.findIndex(item => item.id === saved.id);
     if (index >= 0) appData.guests[index] = saved; else appData.guests.unshift(saved);
+    let classificationWarning = '';
+    if (canManagePrivate) {
+      const hadClassification = (appData.guestPrivateClassifications || []).some(item => item.guest_id === saved.id);
+      if (listType || hadClassification) {
+        try {
+          const classification = await SalesWorkflowService.saveClassification(supabaseClient, {
+            tenantId: getActiveTenantId(), guestId: saved.id, listType,
+            reason: privateReason,
+            incidentOn: document.getElementById('guestPrivateIncidentOn').value || null
+          });
+          appData.guestPrivateClassifications = (appData.guestPrivateClassifications || []).filter(item => item.guest_id !== saved.id);
+          if (classification) appData.guestPrivateClassifications.push(classification);
+        } catch (classificationError) {
+          classificationWarning = '\n\n⚠️ Kara/beyaz liste bilgisi kaydedilemedi: ' + (classificationError.message || 'Bilinmeyen hata');
+        }
+      }
+    }
     closeGuestProfileModal();
     renderGuestsTab();
-    if (typeof alert === 'function') alert('✅ Misafir profili kaydedildi.');
+    if (typeof alert === 'function') alert('✅ Misafir profili kaydedildi.' + classificationWarning);
   } catch (error) {
     if (typeof alert === 'function') alert('Misafir profili kaydedilemedi: ' + (error.message || 'Bilinmeyen hata'));
   } finally {

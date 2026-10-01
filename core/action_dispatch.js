@@ -38,7 +38,7 @@
   // fonksiyonu buraya ekleyin; html_injection_tests listede olmayan, tanimsiz
   // ya da artik kullanilmayan adi yakalar.
   const EYLEMLER = new Set([
-    'applyImportedData', 'assignCleaningTaskFromSelect', 'assignMaintenanceFromSelect', 'assignOperationalTaskFromSelect', 'autoCalculateGoalAdr',
+    'addLeadSource', 'applyImportedData', 'assignCleaningTaskFromSelect', 'assignMaintenanceFromSelect', 'assignOperationalTaskFromSelect', 'autoCalculateGoalAdr',
     'autoCalculateGoalSubmetrics', 'calculateLivePreview', 'changeImportMode', 'cleanResetAll',
     'clearResDateRange', 'closeAiActionConfirmModal', 'closeAllHeaderDropdowns',
     'closeBookingModal', 'closeCleaningTaskModal', 'closeDeleteAccountModal', 'closeExpenseModal',
@@ -65,14 +65,14 @@
     'openEditCleaningTaskModal', 'openExcelFilePicker', 'openExpenseModal', 'openGoalsModal',
     'openGuestProfileModal', 'openGuestRebookingWhatsApp', 'openHelpModal', 'openImportModal',
     'openInviteMemberModal', 'openLeadModal', 'openMaintModal',
-    'openMonthCloseModal', 'openMonthReopenModal', 'inspectCleaningExecution',
+    'openMonthCloseModal', 'openMonthReopenModal', 'openLeadWhatsApp', 'inspectCleaningExecution',
     'openNewCleaningTaskModal', 'openCopyPreviousExpensesPanel', 'openPropertyModal', 'openPropertyOtaManager', 'openResetModal',
     'openTabFromDeepLink', 'openWhatsAppModal', 'parseWhatsAppMessage', 'payAllPendingCleaning', 'payCleanerDebt',
     'promptEditTaskAmount', 'refreshExecutiveDashboardSnapshot', 'renderExpensesTable', 'renderHousekeepingTab', 'renderManageBookingsTable',
     'renderManageLeadsTable', 'recalculatePricingTarget', 'resetGuestDirectoryDateRange',
     'resetImportPreview', 'resyncTenantData', 'resolveMaintenanceFromOperations', 'runPageAction', 'saveAllSettings',
     'saveBooking', 'saveBookingChannelRow', 'saveBookingPayment', 'saveCleaningTask', 'saveExpense', 'saveGuestProfile',
-    'saveLead', 'saveMaint', 'saveMonthlyGoals', 'saveStaffCleaningProgress', 'signStaffCleaningDone',
+    'saveLead', 'saveMaint', 'saveMonthlyGoals', 'saveStaffCleaningProgress', 'signStaffCleaningDone', 'bumpLeadInterestFromQuick',
     'saveProperty', 'saveWaAsBooking', 'saveWaAsLead',
     'sendGuestLoyaltyMessage', 'setBookingChannelActive', 'setLeadFollowUpScope', 'setLeadViewMode',
     'setGuestDirectoryPage', 'setGuestDirectoryProperty',

@@ -11,7 +11,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=1dec49cd">
+  <link rel="stylesheet" href="style.css?v=8cce6736">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="supabase.umd.js?v=3810661a"></script>
@@ -1327,6 +1327,12 @@
             <h2 id="leadQuickTitle">Hızlı talep kaydı</h2>
             <p class="sub-text">Telefon ve “nereden geldi” bilgisiyle yaklaşık 10 saniyede kaydedin. Aynı telefonun açık talebi varsa yeni kayıt açılmaz.</p>
           </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button type="button" id="leadAddSourceBtn" class="btn btn-secondary btn-sm" data-onclick="addLeadSource()">+ Kaynak ekle</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-onclick="bumpLeadInterestFromQuick(1)">+1 yalnız fiyat sorusu</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-onclick="bumpLeadInterestFromQuick(-1)">Geri al</button>
+            <span class="badge">Bugün yalnız fiyat: <strong id="leadInterestToday">0</strong></span>
+          </div>
         </div>
         <form id="leadQuickCaptureForm" data-onsubmit="submitQuickLead(event)" class="lead-quick-form">
           <div class="form-group">
@@ -1406,7 +1412,6 @@
             <button class="btn btn-secondary btn-sm" data-onclick="openWhatsAppModal('lead')" style="background: rgba(37,211,102,0.15); border-color: #25D366; color: #4ADE80;">
               <span>💬</span> Mesaj Ayrıştır
             </button>
-            <button class="btn btn-primary btn-sm" data-onclick="openLeadModal()">+ Manuel Lead</button>
           </div>
         </div>
 
@@ -2406,7 +2411,7 @@
   <!-- MODAL: MİSAFİR PROFİLİ -->
   <!-- ========================================== -->
   <div class="modal-backdrop" id="guestProfileModal">
-    <div class="modal-card" style="max-width:760px;">
+    <div class="modal-card guest-side-panel" style="max-width:760px;">
       <div class="modal-header">
         <h3 id="guestProfileModalTitle">👤 Misafir Profili</h3>
         <button class="close-btn" data-onclick="closeGuestProfileModal()" aria-label="Kapat">&times;</button>
@@ -2423,6 +2428,7 @@
             <select id="guestLanguage"><option value="tr">Türkçe</option><option value="en">English</option><option value="de">Deutsch</option><option value="ru">Русский</option><option value="ar">العربية</option></select>
           </div>
           <div class="form-group"><label>Ülke Kodu</label><input id="guestCountryCode" type="text" value="TR" maxlength="10"></div>
+          <div class="form-group"><label for="guestBirthDate">Doğum tarihi</label><input id="guestBirthDate" type="date" min="1900-01-01"></div>
         </div>
         <div style="display:flex; gap:16px; flex-wrap:wrap; margin:12px 0; font-size:12px;">
           <label><input id="guestAllowWhatsapp" type="checkbox"> WhatsApp işlemsel iletişim</label>
@@ -2435,6 +2441,15 @@
           <div class="form-group"><label for="guestPreferences">Tercihler</label><textarea id="guestPreferences" maxlength="2000" rows="3" placeholder="Yastık, beslenme, giriş saati gibi hizmet tercihleri"></textarea></div>
           <div class="form-group" style="grid-column:1/-1;"><label for="guestInternalNotes">Ekip içi not</label><textarea id="guestInternalNotes" maxlength="5000" rows="3" placeholder="Yalnız işletme ekibinin göreceği operasyonel not"></textarea></div>
         </div>
+        <fieldset id="guestPrivateClassificationSection" class="property-analysis-context" style="display:none">
+          <legend>Yönetime özel sınıflandırma</legend>
+          <p class="property-analysis-context__help">Yalnız olgusal, doğrulanabilir olay yazın. Sağlık, etnik köken veya kanaat gibi özel nitelikli veri girmeyin.</p>
+          <div class="form-grid">
+            <div class="form-group"><label for="guestPrivateListType">Liste</label><select id="guestPrivateListType"><option value="">Sınıflandırma yok</option><option value="WHITE">Beyaz liste</option><option value="BLACK">Kara liste</option></select></div>
+            <div class="form-group"><label for="guestPrivateIncidentOn">Olay tarihi</label><input id="guestPrivateIncidentOn" type="date"></div>
+            <div class="form-group" style="grid-column:1/-1"><label for="guestPrivateReason">Olgusal gerekçe</label><textarea id="guestPrivateReason" minlength="3" maxlength="500" rows="3"></textarea></div>
+          </div>
+        </fieldset>
         <div id="guestProfileInsights" style="display:none; margin-top:14px; padding-top:14px; border-top:1px solid rgba(255,255,255,.08);"></div>
         <div id="guestRebookingAction" style="display:none; margin-top:14px; padding:12px; border-radius:10px; background:rgba(16,185,129,.08); border:1px solid rgba(16,185,129,.25);"></div>
         <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:10px;">
@@ -2662,6 +2677,14 @@
             </select>
           </div>
           <div class="form-group">
+            <label for="leadAssignedTo">Atanan kişi</label>
+            <select id="leadAssignedTo"><option value="">Atanmamış</option></select>
+          </div>
+          <div class="form-group">
+            <label for="leadNextFollowUp">Sonraki takip</label>
+            <input type="datetime-local" id="leadNextFollowUp">
+          </div>
+          <div class="form-group">
             <label>Kayıp Nedeni</label>
             <select id="leadLostReason">
               <option value="-">-</option>
@@ -2675,6 +2698,10 @@
         <div class="form-group" style="margin-top: 14px;">
           <label>Notlar</label>
           <input type="text" id="leadNotes" placeholder="Örn: Akşam dönüş yapacak">
+        </div>
+        <div id="leadMessageTemplateRow" class="form-row" style="display:none;grid-template-columns:1fr auto;gap:10px;margin-top:12px;align-items:end">
+          <div class="form-group"><label for="leadMessageTemplate">Önerilen mesaj</label><select id="leadMessageTemplate"><option value="">Şablon seçin</option></select></div>
+          <button type="button" class="btn btn-secondary" data-onclick="openLeadWhatsApp()">WhatsApp'ta aç</button>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-onclick="closeLeadModal()">Vazgeç</button>
@@ -3432,6 +3459,7 @@
   <script src="core/ledger_contract.js?v=bc9fd6f2"></script>
   <script src="core/property_profile_engine.js?v=923521c1"></script>
   <script src="core/property_owner_service.js?v=5c741a12"></script>
+  <script src="core/sales_workflow_service.js?v=46af3b73"></script>
   <script src="core/suggested_price_engine.js?v=6c3ac01e"></script>
   <script src="core/target_revenue_calculator.js?v=fe49dcc0"></script>
   <script src="core/tr_special_days.js?v=0227d5dd"></script>
@@ -3449,8 +3477,8 @@
   <script src="core/captcha_gate.js?v=3ad4a776"></script>
   <script src="core/date_range_picker.js?v=41dc564c"></script>
   <script src="core/side_panel.js?v=d763b464"></script>
-  <script src="core/action_dispatch.js?v=368b1603"></script>
-  <script src="app.js?v=61ec3d77"></script>
+  <script src="core/action_dispatch.js?v=a2b1a12a"></script>
+  <script src="app.js?v=9fef7848"></script>
   <script src="core/property_analysis_context_ui.js?v=9f24e43b"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=d9398578"></script>
