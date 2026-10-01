@@ -70,5 +70,26 @@ test('ay sonu tahmini yalnız seçili ayın kalan günlerini gece türü dolulu�
   assert.strictEqual(r.expected, 110000);
 });
 
+test('ay sonu tahmini gereken gece turunun dolulugu olculmediyse eksik toplam uretmez', () => {
+  const r = E.forecastMonth({
+    monthKey: '2026-10',
+    today: '2026-10-01',
+    ledgerToDate: { netRoomRevenue: 5000 },
+    suggestions: [
+      { date: '2026-10-02', status: 'OPEN', price: 1000 }, // Cuma: hafta sonu
+      { date: '2026-10-05', status: 'OPEN', price: 1000 }  // Pazartesi: hafta ici
+    ],
+    historyHint: {
+      weekendOccupancy: { value: null, reason: { code: 'SAMPLE_TOO_SMALL' } },
+      weekdayOccupancy: { value: 0.5 }
+    }
+  });
+  assert.strictEqual(r.actual, 5000);
+  assert.strictEqual(r.planned, null);
+  assert.strictEqual(r.expected, null);
+  assert.strictEqual(r.reason.code, 'HISTORY_INCOMPLETE');
+  assert.deepStrictEqual(r.reason.missingNightTypes, ['weekend']);
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed) process.exit(1);

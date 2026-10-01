@@ -7,7 +7,14 @@ const {
   compareContract,
   compareSchemas
 } = require('../scripts/schema_contract.js');
-const { isAnonProbeDenied, securityLedgerErrors } = require('../scripts/check_production_readiness.js');
+const {
+  PROTECTED_TABLES,
+  PROTECTED_RPCS,
+  anonExposureErrors,
+  buildAnonProbeRequests,
+  isAnonProbeDenied,
+  securityLedgerErrors
+} = require('../scripts/check_production_readiness.js');
 
 let passed = 0;
 function test(name, fn) {
@@ -79,6 +86,32 @@ test('readiness yalniz salt okunur yetki kanitlarini kabul eder', () => {
   assert(securityLedgerErrors([44]).some(error => error.includes('phase42')));
 });
 
+test('fiyat tablolari ve aktif fiyat RPCleri varlik sozlesmesinden bagimsiz anon kapisinda kalir', () => {
+  const pricingTables = [
+    'pricing_profiles', 'pricing_rules', 'pricing_events', 'pricing_overrides',
+    'daily_rates', 'rate_change_logs', 'booking_quotes'
+  ];
+  const pricingRpcs = ['accept_booking_quote_atomic', 'save_manual_pricing_override_atomic'];
+  for (const name of pricingTables) assert(PROTECTED_TABLES.includes(name), `anon tablo kapisinda yok: ${name}`);
+  for (const name of pricingRpcs) assert(Object.hasOwn(PROTECTED_RPCS, name), `anon RPC kapisinda yok: ${name}`);
+
+  const inspection = {
+    tables: Object.fromEntries(pricingTables.map(name => [name, { columns: {} }])),
+    rpcs: Object.fromEntries(pricingRpcs.map(name => [name, { args: [] }]))
+  };
+  const exposure = anonExposureErrors(inspection);
+  for (const name of [...pricingTables, ...pricingRpcs]) {
+    assert(exposure.some(error => error.includes(name)), `anon acik nesne raporlanmadi: ${name}`);
+  }
+
+  const probes = buildAnonProbeRequests('https://example.supabase.co');
+  for (const name of pricingTables) assert(probes.some(p => p.object === `table:${name}` && p.method === 'GET'));
+  for (const name of pricingRpcs) {
+    const probe = probes.find(p => p.object === `rpc:${name}`);
+    assert(probe && probe.method === 'POST' && probe.body, `guvenli RPC probe yok: ${name}`);
+  }
+});
+
 test('test ve üretim drift karşılaştırması nullability, sütun ve RPC farkını bulur', () => {
   const production = fixture();
   production.definitions.leads.required.push('guest_name');
@@ -90,4 +123,4 @@ test('test ve üretim drift karşılaştırması nullability, sütun ve RPC fark
   assert(drift.some(x => x.includes('convert_lead_to_booking_atomic')));
 });
 
-console.log(`TEST SUMMARY: ${passed} / 8 TESTS PASSED (${process.exitCode ? 1 : 0} FAILED)`);
+console.log(`TEST SUMMARY: ${passed} / 9 TESTS PASSED (${process.exitCode ? 1 : 0} FAILED)`);

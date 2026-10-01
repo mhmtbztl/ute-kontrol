@@ -6,8 +6,34 @@ const { inspectOpenApi, compareContract } = require('./schema_contract.js');
 
 const PRODUCTION_REF = 'kirpcqklyjlrhvdbgdrq';
 const TEST_REF = 'pdeiorpgxetksyogrmbi';
-const PROTECTED_TABLES = ['leads'];
-const PROTECTED_RPCS = [];
+// Varlik sozlesmesi ile guvenlik sozlesmesi ayni sey degildir. Phase11 fiyat
+// nesneleri urun karariyla canonical schema karsilastirmasinda opsiyonel
+// kalabilir; uretimde VAR olduklari surece anon erisime kapali olmalari yine
+// zorunludur.
+const PROTECTED_TABLES = [
+  'leads',
+  'pricing_profiles', 'pricing_rules', 'pricing_events', 'pricing_overrides',
+  'daily_rates', 'rate_change_logs', 'booking_quotes'
+];
+const PROTECTED_RPCS = Object.freeze({
+  // Iki RPC de govde icinde auth.uid() kontrolunu kayit aramadan once yapar.
+  // Bu gecersiz ama tip-dogru girdiler, EXECUTE yanlislikla aciksa bile yazma
+  // yapmadan UNAUTHENTICATED ile durur; dogru durumda PostgREST 42501 doner.
+  accept_booking_quote_atomic: {
+    p_tenant_id: '00000000-0000-0000-0000-000000000000',
+    p_quote_id: '00000000-0000-0000-0000-000000000000'
+  },
+  save_manual_pricing_override_atomic: {
+    p_tenant_id: '00000000-0000-0000-0000-000000000000',
+    p_property_id: '00000000-0000-0000-0000-000000000000',
+    p_start_date: '2000-01-01',
+    p_end_date: '2000-01-01',
+    p_rate_override: 0,
+    p_reason: 'readiness-anon-probe',
+    p_bypass_guardrail: false,
+    p_min_stay_override: null
+  }
+});
 
 function readEnvironment() {
   const values = {};
@@ -49,7 +75,7 @@ async function fetchOpenApi(url, key) {
 function anonExposureErrors(inspection) {
   const errors = [];
   for (const table of PROTECTED_TABLES) if (inspection.tables[table]) errors.push(`anon tablo yetkisi açık: ${table}`);
-  for (const rpc of PROTECTED_RPCS) if (inspection.rpcs[rpc]) errors.push(`anon RPC yetkisi açık: ${rpc}`);
+  for (const rpc of Object.keys(PROTECTED_RPCS)) if (inspection.rpcs[rpc]) errors.push(`anon RPC yetkisi açık: ${rpc}`);
   return errors;
 }
 
@@ -63,14 +89,39 @@ function securityLedgerErrors(versions) {
     : ['eksik sözleşme göçü: phase42 leads.guest_name nullability ve ad/telefon kuralı kayıtlı değil'];
 }
 
+function buildAnonProbeRequests(url) {
+  const base = url.replace(/\/$/, '');
+  return [
+    ...PROTECTED_TABLES.map(table => ({
+      object: `table:${table}`,
+      method: 'GET',
+      url: `${base}/rest/v1/${table}?select=id&limit=0`
+    })),
+    ...Object.entries(PROTECTED_RPCS).map(([rpc, body]) => ({
+      object: `rpc:${rpc}`,
+      method: 'POST',
+      url: `${base}/rest/v1/rpc/${rpc}`,
+      body: JSON.stringify(body)
+    }))
+  ];
+}
+
 async function probeAnonPrivileges(url, key) {
   const headers = { apikey: key, 'Content-Type': 'application/json' };
   if (String(key).startsWith('eyJ')) headers.Authorization = `Bearer ${key}`;
   const probes = [];
-  for (const table of PROTECTED_TABLES) {
-    const response = await fetch(`${url.replace(/\/$/, '')}/rest/v1/${table}?select=id&limit=0`, { headers });
+  for (const request of buildAnonProbeRequests(url)) {
+    const response = await fetch(request.url, {
+      method: request.method,
+      headers,
+      ...(request.body ? { body: request.body } : {})
+    });
     const body = await response.text();
-    probes.push({ object: `table:${table}`, denied: isAnonProbeDenied('table', response.status, body), status: response.status });
+    probes.push({
+      object: request.object,
+      denied: isAnonProbeDenied(request.object.split(':')[0], response.status, body),
+      status: response.status
+    });
   }
   return probes;
 }
@@ -124,4 +175,16 @@ if (require.main === module) main().catch(error => {
   process.exitCode = 1;
 });
 
-module.exports = { assertProductionTarget, fetchOpenApi, anonExposureErrors, isAnonProbeDenied, securityLedgerErrors, probeAnonPrivileges, fetchMigrationLedger, main };
+module.exports = {
+  PROTECTED_TABLES,
+  PROTECTED_RPCS,
+  assertProductionTarget,
+  fetchOpenApi,
+  anonExposureErrors,
+  buildAnonProbeRequests,
+  isAnonProbeDenied,
+  securityLedgerErrors,
+  probeAnonPrivileges,
+  fetchMigrationLedger,
+  main
+};

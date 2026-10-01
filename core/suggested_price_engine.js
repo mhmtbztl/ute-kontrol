@@ -124,12 +124,27 @@
       return { actual, planned: null, expected: null, reason: { code: 'HISTORY_MISSING', text: 'Geçmiş doluluk ölçülemedi' } };
     }
     const monthPrefix = /^\d{4}-\d{2}$/.test(o.monthKey || '') ? `${o.monthKey}-` : null;
-    const planned = (o.suggestions || [])
-      .filter(x => x.status === 'OPEN' && Number.isFinite(x.price) && (!monthPrefix || String(x.date || '').startsWith(monthPrefix)) && (!o.today || x.date >= o.today))
-      .reduce((sum, row) => {
-        const occupancy = [5, 6].includes(dayOfWeek(row.date)) ? weekendOccupancy : weekdayOccupancy;
-        return Number.isFinite(occupancy) ? sum + row.price * occupancy : sum;
-      }, 0);
+    const eligible = (o.suggestions || [])
+      .filter(x => x.status === 'OPEN' && Number.isFinite(x.price) && (!monthPrefix || String(x.date || '').startsWith(monthPrefix)) && (!o.today || x.date >= o.today));
+    const requiredNightTypes = new Set(eligible.map(row => [5, 6].includes(dayOfWeek(row.date)) ? 'weekend' : 'weekday'));
+    const missingNightTypes = ['weekend', 'weekday'].filter(type => requiredNightTypes.has(type)
+      && !Number.isFinite(type === 'weekend' ? weekendOccupancy : weekdayOccupancy));
+    if (missingNightTypes.length) {
+      return {
+        actual,
+        planned: null,
+        expected: null,
+        reason: {
+          code: 'HISTORY_INCOMPLETE',
+          text: 'Kalan gecelerin tum turleri icin gecmis doluluk olculemedi',
+          missingNightTypes
+        }
+      };
+    }
+    const planned = eligible.reduce((sum, row) => {
+      const occupancy = [5, 6].includes(dayOfWeek(row.date)) ? weekendOccupancy : weekdayOccupancy;
+      return sum + row.price * occupancy;
+    }, 0);
     return { actual, planned, expected: actual === null ? null : actual + planned };
   }
   return { suggest, historyHint, forecastMonth };
