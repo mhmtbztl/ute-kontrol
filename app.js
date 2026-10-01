@@ -7495,9 +7495,26 @@ const TEAM_ROLES = {
   owner:   { label: 'Sahip',     badge: 'badge-purple',  hint: 'Tam yetki. Ekip ve rolleri yönetir, işletmeyi silebilir.' },
   admin:   { label: 'Yönetici',  badge: 'badge-blue',    hint: 'Davet gönderebilir, tüm verileri yönetir. Rol değiştiremez.' },
   manager: { label: 'Operasyon', badge: 'badge-emerald', hint: 'Rezervasyon, fiyatlama ve operasyonu yönetir.' },
-  staff:   { label: 'Personel',  badge: 'badge-amber',   hint: 'Günlük operasyon görevlerini görür ve günceller.' },
+  sales:   { label: 'Satış',      badge: 'badge-cyan',    hint: 'Rezervasyon, talep ve misafir kaydı yapar; finansı ve giderleri görmez, rezervasyon silemez.' },
+  staff:   { label: 'Personel',  badge: 'badge-amber',   hint: 'Saha personeli (temizlik/usta): yalnız kendisine atanan işi görür.' },
   viewer:  { label: 'İzleyici',  badge: 'badge-rose',    hint: 'Yalnızca görüntüler, hiçbir veriyi değiştiremez.' }
 };
+
+function canManageTenantRole(role = activeTenant?.role) {
+  return ['owner', 'admin', 'manager'].includes(role);
+}
+
+function canReadLedgerRole(role = activeTenant?.role) {
+  return ['owner', 'admin', 'manager', 'viewer'].includes(role);
+}
+
+function canReadSalesRole(role = activeTenant?.role) {
+  return ['owner', 'admin', 'manager', 'sales', 'viewer'].includes(role);
+}
+
+function canWriteSalesRole(role = activeTenant?.role) {
+  return ['owner', 'admin', 'manager', 'sales'].includes(role);
+}
 
 function roleBadgeHtml(role) {
   const r = TEAM_ROLES[role] || { label: role, badge: 'badge-rose' };
@@ -12810,7 +12827,7 @@ async function handleAuthenticatedSession(u) {
 
     // Mülk sayısı 0 ise Onboarding modalını aç
     const propCount = Object.keys(appData.villas || {}).length;
-    if (propCount === 0) {
+    if (propCount === 0 && canManageTenantRole(activeTenant?.role)) {
       openOnboardingModal(activeTenant.name);
     }
   }
@@ -13643,7 +13660,8 @@ function updateSaaSUi() {
   if (!user) return;
 
   const tName = activeTenant?.name || user.companyName || 'LexBnB SaaS';
-  const roleText = activeTenant?.role ? ` (${activeTenant.role.toUpperCase()})` : '';
+  const roleMeta = TEAM_ROLES[activeTenant?.role];
+  const roleText = roleMeta ? ` (${roleMeta.label})` : (activeTenant?.role ? ` (${activeTenant.role})` : '');
 
   const headerComp = document.getElementById('headerCompanyName');
   if (headerComp) headerComp.innerText = tName + roleText;
@@ -13656,6 +13674,18 @@ function updateSaaSUi() {
 
   const menuPlan = document.getElementById('menuPlanBadge');
   if (menuPlan) menuPlan.innerText = user.plan ? user.plan + ' 🚀' : 'Plan bilgisi yok';
+
+  applyRoleNavigationVisibility();
+}
+
+function applyRoleNavigationVisibility() {
+  if (typeof document === 'undefined') return;
+  const role = activeTenant?.role || 'viewer';
+  const hiddenTabs = new Set(['sales', 'staff'].includes(role) ? ['finance', 'marketing'] : []);
+  document.querySelectorAll('.nav-tabs .tab-btn').forEach(button => {
+    const match = String(button.getAttribute('data-onclick') || '').match(/^switchTab\('([^']+)'\)$/);
+    button.hidden = !!(match && hiddenTabs.has(match[1]));
+  });
 }
 
 // Portfoydeki mulk sayisi. Uygulama 5 villalik demo portfoye gore yazilmisti
@@ -14915,6 +14945,9 @@ function invalidateExecutiveSnapshotCache() {
 function getExecutiveSnapshotContext() {
   const tenantId = getActiveTenantId();
   const period = currentFilter && currentFilter.period;
+  if (!canReadLedgerRole(activeTenant?.role)) {
+    return { supported: false, reason: 'Bu rolde finans özeti gösterilmez.' };
+  }
   if (!isCloudTenant(tenantId) || !supabaseClient) return { supported: false, reason: 'Bulut oturumu gerekli.' };
   if (!/^\d{4}-\d{2}$/.test(period || '')) {
     return { supported: false, reason: 'Sunucu anlık görüntüsü aylık dönemlerde kullanılabilir.' };
@@ -16071,7 +16104,7 @@ function renderGuestsTab() {
     notice.style.display = notes.length ? 'block' : 'none';
   }
 
-  const editAllowed = ['owner', 'admin', 'manager', 'staff'].includes(activeTenant?.role);
+  const editAllowed = ['owner', 'admin', 'manager', 'sales'].includes(activeTenant?.role);
   const newButton = document.getElementById('newGuestProfileBtn');
   if (newButton) newButton.style.display = editAllowed ? '' : 'none';
 
@@ -16590,6 +16623,11 @@ if (typeof module !== 'undefined' && module.exports) {
     saveTenantOnboarding,
     getExecutiveDashboardSnapshot,
     getExecutiveSnapshotContext,
+    canManageTenantRole,
+    canReadLedgerRole,
+    canReadSalesRole,
+    canWriteSalesRole,
+    applyRoleNavigationVisibility,
     invalidateExecutiveSnapshotCache,
     shouldRefreshExecutiveSnapshot,
     refreshExecutiveDashboardSnapshot,

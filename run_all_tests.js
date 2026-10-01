@@ -266,6 +266,7 @@ const allTestFiles = [
   'action_dispatch_tests.js',
   'capacity_consistency_tests.js',
   'ui_consistency_tests.js',
+  'a3_role_ui_tests.js',
   'navigation_menu_tests.js',
   'a1_claude_remaining_audit_tests.js',
   'shared_components_tests.js',
