@@ -5536,7 +5536,14 @@ function openExpenseModal(editId = null) {
     document.getElementById('expDate').value = getTodayStr();
   }
 
+  updateExpenseCategoryWarning(document.getElementById('expCategory')?.value || '');
+
   modal.classList.add('active');
+}
+
+function updateExpenseCategoryWarning(category) {
+  const warning = document.getElementById('expenseAdCategoryWarning');
+  if (warning) warning.hidden = String(category || '') !== 'Reklam';
 }
 
 function closeExpenseModal() {
@@ -6882,7 +6889,12 @@ function openBookingDetailsPanel(bookingId) {
   const payments = (appData.bookingPayments || []).filter(item => String(item.booking_id) === String(booking.id));
   const balance = (appData.bookingPaymentBalances || []).find(item => String(item.booking_id) === String(booking.id));
   const money = value => value == null ? '—' : `${Number(value).toLocaleString('tr-TR')} ₺`;
-  const paymentRows = payments.length ? payments.map(payment => `<div class="booking-payment-row"><div><strong>${escapeHtml(paymentEngine?.kindLabel(payment.kind) || payment.kind || '—')}</strong><span>${escapeHtml(formatTrDate(payment.paid_on))} · ${escapeHtml(paymentEngine?.methodLabel(payment.method) || payment.method || '—')}</span>${payment.note ? `<span>${escapeHtml(payment.note)}</span>` : ''}</div><strong>${money(payment.amount)}</strong>${canManageTenantRole(activeTenant?.role) ? `<button class="btn btn-danger btn-sm" data-onclick="deleteBookingPayment(decodeURIComponent('${encodeActionArg(payment.id)}'), decodeURIComponent('${encodeActionArg(String(booking.id))}'))">Sil</button>` : ''}</div>`).join('') : '<div class="empty-state">Henüz ödeme kaydı yok.</div>';
+  const paymentRows = payments.length ? payments.map(payment => {
+    const deleteButton = canManageTenantRole(activeTenant?.role)
+      ? `<button class="btn btn-danger btn-sm" data-onclick="deleteBookingPayment(decodeURIComponent('${encodeActionArg(payment.id)}'), decodeURIComponent('${encodeActionArg(String(booking.id))}'))">Sil</button>`
+      : '';
+    return `<div class="booking-payment-row"><div><strong>${escapeHtml(paymentEngine?.kindLabel(payment.kind) || payment.kind || '—')}</strong><span>${escapeHtml(formatTrDate(payment.paid_on))} · ${escapeHtml(paymentEngine?.methodLabel(payment.method) || payment.method || '—')}</span>${payment.note ? `<span>${escapeHtml(payment.note)}</span>` : ''}</div><strong>${money(payment.amount)}</strong>${deleteButton}</div>`;
+  }).join('') : '<div class="empty-state">Henüz ödeme kaydı yok.</div>';
   const paymentForm = canWriteSalesRole(activeTenant?.role) ? `<div class="booking-payment-form"><input id="bookingPaymentAmount" type="number" min="0.01" step="0.01" placeholder="Tutar"><input id="bookingPaymentDate" type="date" value="${escapeHtml(getTodayStr())}"><select id="bookingPaymentKind"><option value="DEPOSIT">Kapora</option><option value="INTERIM">Ara ödeme</option><option value="BALANCE">Kalan</option></select><select id="bookingPaymentMethod"><option value="">Yöntem —</option><option value="CASH">Nakit</option><option value="BANK_TRANSFER">Havale/EFT</option><option value="CARD">Kart</option><option value="OTA">OTA</option><option value="OTHER">Diğer</option></select><input id="bookingPaymentNote" maxlength="1000" placeholder="Not —"><button class="btn btn-primary" data-onclick="saveBookingPayment(decodeURIComponent('${encodeActionArg(String(booking.id))}'))">Ödeme ekle</button></div>` : '';
   const paymentHtml = `<section class="booking-payments"><h3>Ödeme takibi</h3><div class="booking-payment-summary"><div><span>Tahsil edilecek</span><strong>${money(balance?.amount_due)}</strong></div><div><span>Toplam tahsilat</span><strong>${money(balance?.paid_total)}</strong></div><div><span>Kalan</span><strong>${money(balance?.remaining)}</strong></div></div>${paymentRows}${paymentForm}<p class="sub-text">Ödeme nakit hareketidir; rezervasyon cirosunu değiştirmez.</p></section>`;
   const detailHtml = (label, value) => `<div class="booking-detail-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value == null || value === '' ? '—' : String(value))}</strong></div>`;
@@ -16471,7 +16483,9 @@ function renderOperationsTab() {
       const assignment = assignments.get(ticket.id);
       const assigned = technicians.find(person => person.id === assignment?.person_id);
       const options = technicians.map(person => `<option value="${escapeHtml(person.id)}"${person.id === assignment?.person_id ? ' selected' : ''}>${escapeHtml(person.full_name)}${person.specialty ? ` · ${escapeHtml(person.specialty)}` : ''}</option>`).join('');
-      return `<article class="ops-row"><div class="ops-row-main"><strong>${escapeHtml(ticket.title || '—')}</strong><span>${escapeHtml(ticket.description || 'Açıklama yok')}</span>${assigned ? `<span>Usta: ${escapeHtml(assigned.full_name)}${assigned.phone ? ` · <a href="tel:${escapeHtml(assigned.phone)}">Ara</a>` : ''}</span>` : ''}</div><span class="badge ${ticket.booking_impact ? 'badge-red' : ''}">${ticket.booking_impact ? 'Satışa kapatır' : escapeHtml(getMaintenanceStatusPresentation(ticket.status).label)}</span><div class="ops-row-actions"><select id="opsTechnician-${escapeHtml(ticket.id)}" aria-label="Usta seç"><option value="">Usta seç…</option>${options}</select><button class="btn btn-secondary btn-sm" data-onclick="assignMaintenanceFromSelect(decodeURIComponent('${encodeActionArg(ticket.id)}'))">Usta ata</button><button class="btn btn-secondary btn-sm" data-onclick="editMaint(decodeURIComponent('${encodeActionArg(ticket.id)}'))">Durumu güncelle</button><button class="btn btn-primary btn-sm" data-onclick="resolveMaintenanceFromOperations(decodeURIComponent('${encodeActionArg(ticket.id)}'))">Çözüldü</button></div></article>`;
+      const impactClass = ticket.booking_impact ? 'badge-red' : '';
+      const statusLabel = ticket.booking_impact ? 'Satışa kapatır' : getMaintenanceStatusPresentation(ticket.status).label;
+      return `<article class="ops-row"><div class="ops-row-main"><strong>${escapeHtml(ticket.title || '—')}</strong><span>${escapeHtml(ticket.description || 'Açıklama yok')}</span>${assigned ? `<span>Usta: ${escapeHtml(assigned.full_name)}${assigned.phone ? ` · <a href="tel:${escapeHtml(assigned.phone)}">Ara</a>` : ''}</span>` : ''}</div><span class="badge ${impactClass}">${escapeHtml(statusLabel)}</span><div class="ops-row-actions"><select id="opsTechnician-${escapeHtml(ticket.id)}" aria-label="Usta seç"><option value="">Usta seç…</option>${options}</select><button class="btn btn-secondary btn-sm" data-onclick="assignMaintenanceFromSelect(decodeURIComponent('${encodeActionArg(ticket.id)}'))">Usta ata</button><button class="btn btn-secondary btn-sm" data-onclick="editMaint(decodeURIComponent('${encodeActionArg(ticket.id)}'))">Durumu güncelle</button><button class="btn btn-primary btn-sm" data-onclick="resolveMaintenanceFromOperations(decodeURIComponent('${encodeActionArg(ticket.id)}'))">Çözüldü</button></div></article>`;
     }).join('') : '<div class="empty-state">Açık arıza veya bakım kaydı yok.</div>';
   } else {
     const operational = appData?.operationalTasks || [];

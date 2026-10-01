@@ -5,7 +5,7 @@
     "Temizlik atanirken (assign_cleaning_task) genel + eve ozel bolumler sirasiyla birlestirilir ve icra satirina dondurulur.",
     "Her maddede iki isaret: Z = temizlikci, M = denetleyen yonetici. Malzeme: OK (Var) / LOW (Az var) / OUT (Yok).",
     "Mutfak iki evde ayni oldugu icin genel sablonda; salon (Seyir sobali, Zirve sobasiz) eve ozel. Dogus, Nefes, Sirin listeleri A3-G2 ice aktariminda ayni yontemle.",
-    "Ice aktarma A3-G2'de; uretime bu dosyadan veri YAZILMAZ."
+    "Ice aktarma A3-G2'de kullanicinin acik onayiyla yapilir; uretime bu dosyadan kendiliginden veri YAZILMAZ."
   ],
   "task_type": "CLEANING",
   "templates": [

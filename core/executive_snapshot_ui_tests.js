@@ -134,7 +134,7 @@ async function runAsyncTests() {
       return elements[id];
     }
   };
-  App.setActiveTenant({ id: '11111111-1111-4111-8111-111111111111' });
+  App.setActiveTenant({ id: '11111111-1111-4111-8111-111111111111', role: 'owner' });
   App.setCurrentFilter({ period: '2026-04', villa: 'ALL' });
   App.setAppData({ targets: { '2026-04': { revenue_target: 60000 } }, villas: {} });
   App.setSupabaseClient({

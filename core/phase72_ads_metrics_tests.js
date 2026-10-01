@@ -1,0 +1,18 @@
+const fs = require('fs');
+const path = require('path');
+const ROOT = path.join(__dirname, '..');
+const FILE = path.join(ROOT, 'supabase', 'migration_phase72_ads_metric_periods.sql');
+const sql = fs.existsSync(FILE) ? fs.readFileSync(FILE, 'utf8').replace(/\r\n?/g, '\n') : '';
+let p = 0, f = 0;
+const check = (ok, name, detail) => ok ? (p++, console.log(`[PASS] ${name}`)) : (f++, console.error(`[FAIL] ${name}\n       ${detail}`));
+check(/CREATE TABLE public\.ad_metric_periods/.test(sql), 'A1. Donem metrik tablosu var', 'tablo yok');
+check(/period_end - period_start BETWEEN 0 AND 30/.test(sql), 'A2. Donem en fazla 31 gun', 'sure kisiti yok');
+check(/ADS_PERIOD_OVERLAP/.test(sql) && /daterange/.test(sql), 'A3. Kampanya donemleri cakisma korumali', 'overlap korumasi yok');
+check(/result_type[\s\S]*MESSAGE[\s\S]*CALL[\s\S]*OTHER/.test(sql), 'A4. Sonuc turu sozlesmesi var', 'result type eksik');
+check(!/\broas\b|bookings_count|\brevenue\b/i.test(sql), 'A5. Kampanya bazinda atif alani yok', 'ROAS/rezervasyon/ciro alani bulundu');
+check(/FUNCTION public\.save_ad_metric_period/.test(sql) && /category[\s\S]*Reklam/.test(sql) && /ADS_PERIOD:/.test(sql), 'B1. Tek RPC Reklam giderini bagli yazar', 'RPC/gider bagi yok');
+check(/v_segment_days[\s\S]*v_total_days[\s\S]*v_segment_spend/.test(sql), 'B2. Ay payi gun sayisina gore dagitilir', 'gun dagitimi yok');
+check(/can_manage_tenant/.test(sql) && /REVOKE ALL ON TABLE public\.ad_metric_periods FROM[^;]*authenticated/.test(sql), 'C1. Dogrudan yazma kapali, yonetim RPC kapisi var', 'yetki kapisi eksik');
+check(/PHASE72_[A-Z_]+/.test(sql) && /VALUES \(72, 'phase72_ads_metric_periods'\)/.test(sql), 'D1. Dogrulama ve phase kaydi var', 'verify yok');
+console.log(`\nTEST SUMMARY: ${p} / ${p + f} TESTS PASSED (${f} FAILED)`);
+if (f) process.exit(1);

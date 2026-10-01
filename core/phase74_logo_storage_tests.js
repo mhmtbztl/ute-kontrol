@@ -1,0 +1,15 @@
+const fs = require('fs');
+const path = require('path');
+const FILE = path.join(__dirname, '..', 'supabase', 'migration_phase74_tenant_logo_storage.sql');
+const sql = fs.existsSync(FILE) ? fs.readFileSync(FILE, 'utf8').replace(/\r\n?/g, '\n') : '';
+let p = 0, f = 0;
+const check = (ok, name, detail) => ok ? (p++, console.log(`[PASS] ${name}`)) : (f++, console.error(`[FAIL] ${name}\n       ${detail}`));
+check(/tenant-assets/.test(sql) && /public[^,)]*false/i.test(sql), 'A1. Logo bucket ozeldir', 'private bucket yok');
+check(/storage\.foldername\(storage\.objects\.name\)/.test(sql), 'A2. Logo yolu hedef nesne adi ile kiraciya ayrilir', 'nitelikli name yok');
+check(/logo/.test(sql) && /can_manage_tenant|get_tenant_role/.test(sql), 'A3. Yazma yonetim rolune ve logo klasorune kapili', 'policy eksik');
+check(/image\/png/.test(sql) && /image\/svg\+xml/.test(sql) && /2097152/.test(sql), 'A4. Logo turu ve 2 MB siniri var', 'dosya siniri eksik');
+check(!/marketing_storage_tenant_id\(\s*name\s*\)/.test(sql), 'B1. L-118 niteliksiz name yeniden yazilmadi', 'niteliksiz name var');
+check(/marketing_storage_tenant_id\(storage\.objects\.name\)/.test(sql), 'B2. property-media politikalari nesne adini niteler', 'L-118 duzeltilmedi');
+check(/PHASE74_[A-Z_]+/.test(sql) && /VALUES \(74, 'phase74_tenant_logo_storage'\)/.test(sql), 'C1. Dogrulama ve phase kaydi var', 'verify yok');
+console.log(`\nTEST SUMMARY: ${p} / ${p + f} TESTS PASSED (${f} FAILED)`);
+if (f) process.exit(1);

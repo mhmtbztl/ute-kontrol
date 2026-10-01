@@ -78,6 +78,23 @@ Kara listeye geri dönmeyin.
 `requireCloudForWrite(islem, tenantId)` — bağlantı yoksa yazma **durur**, sessizce localStorage'a yazılmaz.
 Node'da (testler) muaf; orada yerel yol doğrulama mantığının test yüzeyidir.
 
+### 3.3.1 Rol sınırları — tek sözleşme
+
+Rol yetkileri ekran adlarından veya yerel rol dizilerinden türetilmez. Sunucuda
+`can_manage_tenant`, `can_read_ledger`, `can_read_sales`, `can_write_sales`;
+istemcide bunların aynı adlı `...Role` karşılıkları tek kaynaktır.
+
+| Rol | Yönetim | Finans defteri | Satış verisi | Satış yazma |
+|---|---:|---:|---:|---:|
+| `owner` / `admin` / `manager` | evet | evet | evet | evet |
+| `sales` | hayır | hayır | evet | evet |
+| `staff` | hayır | hayır | hayır | hayır |
+| `viewer` | hayır | evet | evet | hayır |
+
+Yeni politika veya arayüz kapısı için bağımsız `['owner', ...]` dizisi
+yazmayın. `sales` ve `staff` finans RPC'lerini çağırmaz; `staff` yalnız dar
+alan-işi RPC'leriyle kendi görevini görür ve ilerletir.
+
 ### 3.4 Finansal hesaplama — USALI
 K-04 sözleşmesi (kullanıcı kararı 23–25 Eylül 2026; phase45):
 ```
@@ -122,7 +139,7 @@ hedefler toplam gelire göre girilmişti ve artık ciroyla karşılaştırılır
 | | Alan | Nerede durur | Ne |
 |---|---|---|---|
 | Gelir | `cleaning_fee` | `bookings.cleaning_fee` | Misafirden alınan temizlik ücreti. **Brüt tutarın içindedir**, ayrı gelir kalemi olarak raporlanır. |
-| Gider | `cleanCost` | `cleaning_tasks.amount` | Personele ödenen temizlik maliyeti. Rezervasyon kaydı görevi **planlı** açar; temizlik **"yapıldı"** işaretlenince gider olur (yapıldığı günün ayı) ve ödenene kadar personele borçtur. "Ödendi" **yalnız ödemedir**, gider defterine satır yazmaz. Yapılmayan temizlik (gelmeyen misafir, iptal) ne gider ne borçtur. |
+| Gider | `cleanCost` | `cleaning_tasks.amount` | Personele ödenen temizlik maliyeti. Rezervasyon kaydı görevi **planlı** açar; gider ve personel borcu ancak yönetici M kontrolünde işi onaylayınca doğar. Tahakkuk ayı `task_date` ayıdır; kontrolün tıklandığı gün değildir. "Ödendi" **yalnız ödemedir**, gider defterine satır yazmaz. Yapılmayan veya M kontrolü bekleyen temizlik ne gider ne borçtur. |
 
 Maliyet için `bookings`'e **yeni sütun açılmadı, bilerek.** Denendi ve kırdı:
 göçler Supabase panelinden elle uygulanıyor ama GitHub Pages push ile anında
@@ -150,7 +167,10 @@ Eski istemcinin "Ödendi" anında yazdığı `EXP-CLEAN-<görev>` gider satırla
 silinmez (kapanmış aylarda durabilirler); defter formülü satırı olan görevi
 ikinci kez saymaz.
 
-**Personel borcu tek tanımdır: `isCleaningDebt(t)` = yapılmış ve ödenmemiş.**
+**Personel borcu tek tanımdır: `isCleaningDebt(t)` = yönetici M kontrolüyle
+onaylanmış ve ödenmemiş.** Temizlikçinin Z imzası işi tamamladığını bildirir,
+tek başına gider/borç doğurmaz. M kontrolü bekleyen iş bulunan ay kapanamaz;
+kontrol sonradan verilse bile tahakkuk `task_date` ayına gider.
 Operasyon kartı ve temizlik rozeti bir zamanlar yalnız `!paid`'e bakıyordu:
 26.09.2026'da gerçek hesapta kart "₺2.500 borç", hemen altındaki liste
 "borç yok" diyordu (görev planlıydı). Ağı `core/ui_consistency_tests.js`.
@@ -374,6 +394,11 @@ değiştiremiyoruz). Deploy sonrası eski sürüm görürseniz `Ctrl+Shift+R`.
 Hedef deponun DIŞINDA (`Masaüstülexbnb-yedekler`); geri yükleme `npm run restore`.
 Yedek geri yüklenebilir olduğu için yedektir: canlı tur (`backup_restore_live_tests`)
 işletmeyi siler ve yedekten birebir geri getirir. Ayrıntı: `docs/BACKUP_RESTORE.md`.
+
+Yeni bir tetikleyici başka tabloya satır yazıyorsa hedef tabloyu
+`core/restore_engine.js` içindeki `SIDE_EFFECTS` listesine ve geri yükleme ağına
+ekleyin; yoksa restore temiz bir tur olmaz. Silme kilitleri de yedek/restore
+ve bakımın kullandığı `service_role` için açıkça muaf olmalıdır.
 
 ### 4.2 Göç (migration) uygulama
 DDL, PostgREST üzerinden çalıştırılamaz ve `.env`'de doğrudan Postgres bağlantı dizesi yok.
@@ -709,9 +734,13 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
    `@lexbnb.test` ve `@lexbnb-test.com` MX kaydı olmadığı için reddedilir.
    `admin.createUser` bu doğrulamayı atlar — bu yüzden 21 süit etkilenmez,
    yalnızca gerçek kayıt akışını ölçen `registration_flow_tests` takılır.
-   Ayrıca e-posta onayı açıkken her `signUp` bir mail tetikler ve gönderim
-   limiti doğrulamadan **önce** çalışıp asıl hatayı maskeler. Test projesinde
-   onay bu yüzden kapalıdır.
+    Ayrıca e-posta onayı açıkken her `signUp` bir mail tetikler ve gönderim
+    limiti doğrulamadan **önce** çalışıp asıl hatayı maskeler. Test projesinde
+    onay bu yüzden kapalıdır.
+11. **PL/pgSQL'de `AND` kısa devre garantisi bir güvenlik veya doğruluk kapısı
+    değildir.** Sağ tarafın çalışmayacağı varsayımıyla yetki kontrolü, cast,
+    bölme ya da yan etkili çağrı yazmayın. Koşulları ardışık `IF` bloklarına
+    ayırın; her tehlikeli ifade kendi önkoşulundan sonra çalışsın.
 12. **Bir kimlik bilgisine kaçan satır sonu, 20 süiti anlaşılmaz hatayla düşürür.**
    CI'daki ilk canlı koşuda anon anahtarı GitHub secret'ına satır sonlarıyla
    yapıştırılmıştı. `supabase-js` onu `apikey` başlığına koyuyor, fetch
@@ -727,9 +756,14 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
    yaratmadan durur. Ağı `core/test_gate_tests.js`.
 13. **SQL dosyalarında UTF-8 BOM var** (`schema.sql` + üç göç). Postgres'e
    olduğu gibi gönderilirse ilk ifade sözdizimi hatası verir. Dosyadan
-   silinemez: manifest hash'leri BOM dahil metin üzerinden üretildi ve göçler
-   değişmezdir. `bootstrap_test_project.js` çalıştırdığı metinden ayıklar,
-   hash'ten ayıklamaz.
+    silinemez: manifest hash'leri BOM dahil metin üzerinden üretildi ve göçler
+    değişmezdir. `bootstrap_test_project.js` çalıştırdığı metinden ayıklar,
+    hash'ten ayıklamaz.
+14. **`BEGIN; ... ROLLBACK;` tek başına tetikleyici dry-run'ı değildir.**
+    İşlem içinde ilgili `INSERT`/`UPDATE`/`DELETE` gerçekten çalışmadıysa
+    tetikleyici gövdesi hiç yürütülmez. Dry-run kanıtı, yan etkiyi doğuran DML'i
+    çalıştırıp beklenen satır/hata sonucunu işlem içinde doğrulamalı, sonra
+    `ROLLBACK` etmelidir.
 
 ### Kabuk tuzakları (Windows / Git Bash)
 - Heredoc (`<<'SCRIPT'`) bir kaçış seviyesi yiyor: `'\\b'` dosyada `'\b'` (backspace) oluyor
@@ -770,6 +804,11 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 | Temizlik görevi → Operasyon Kontrol Merkezi sözleşmesi | **phase34 ile düzeltildi** (21 Eylül 2026) — yeni kayıt, Postgres yüklemesi, realtime ve operasyon özeti tek `normalizeCleaningTask` modelinden geçiyor; açıklama `notes` olarak korunuyor, kayıt DB yazısını bekliyor ve bekleyen borç listesi yalnızca `!paid` gösteriyor. `paid` yalnız ödeme durumudur. `cleaning_tasks` tablosunda operasyonel tamamlanma alanı olmadığı için “hazır mülk” hesabı temizlik ödemesinden türetilemez; gerçek bir tamamlanma modeli tasarlanana kadar bu kavramsal açık bilerek açık tutulur. Ağı `cleaning_ledger_persistence_tests` ve `render_pipeline_tests`. |
 | WhatsApp → talep / rezervasyon | **tamamlandı** (20 Eylül 2026) — modal "✅ rezervasyon kesinleştirildi" deyip hiçbir şey yazmıyordu. `createBooking()` / `createLead()` yoluna bağlandı. Ağı `persistence_wiring_tests` |
 | Pazarlama kampanya defteri kalıcı değil | **tamamlandı** (20 Eylül 2026, phase31) — `marketing_campaigns` ve `influencer_collabs` tabloları açıldı; kayıt, düzenleme ve silme Postgres’e bağlandı. Göç **21 Eylül 2026’da üretime uygulandı ve doğrulandı** — `docs/PHASE31_DEPLOY_PACKAGE.md` |
+| A3 operasyon / personel / ödeme temeli | **tamamlandı** (phase53, 55, 57, 59, 63, 65, 67, 68) — rol sınırları, iki imzalı temizlik, dar personel RPC'si, ödeme defteri ve operasyon akışları; üretim uygulama durumu dağıtım paketlerinden doğrulanır |
+| A3 iş günü varsayılanları | **kod hazır, üretim bekliyor** (phase70) — `properties.activated_on`, `expenses.expense_date`, `leads.lead_date` Europe/Istanbul iş gününü kullanır |
+| A3 reklam dönemleri | **kod hazır, üretim bekliyor** (phase72) — en fazla 31 günlük örtüşmeyen metrik dönemleri ve aylara bölünen reklam gideri |
+| A3 işletme logosu Storage/RLS | **kod hazır, üretim bekliyor** (phase74) — özel bucket, kiracı/logo yolu ve yalnız yönetim yazması; ayarlar arayüzü A5 kapsamındadır |
+| A3 reklam tenant değişmezliği | **kod hazır, üretim bekliyor** (phase76) — phase72 sonrası tam regresyonun yakaladığı eksik `tenant_id` tetikleyicisi, uygulanmış göç değiştirilmeden yeni göçle tamamlandı |
 | `month: ‘2026-09’` sabiti | **tamamlandı** (20 Eylül 2026) — altı nokta kaldırıldı. Tek kaynak `getCurrentMonthKey()`, o da `getTodayStr()`'den türer. Başlangıç dönemi de tarayıcının yerel saatini kullanıyordu; kayıtlar Europe/Istanbul gününe yazılıyor, ay sınırında kullanıcı az önce girdiği kaydı filtrede göremiyordu. Ağı `persistence_wiring_tests` (kaynak taraması) |
 | Ölü `appData.excelDb` dalları | **tamamlandı** (20 Eylül 2026) — alan yalnızca `null` atanıyordu, hiçbir yerde doldurulmuyordu. Ona bağlı **üç panel hiç çalışmıyordu**: yönetici panelinin 116 satırlık dalı, YoY karşılaştırması (her zaman "Veriler sıfırlandı" diyordu) ve gidişat radarı (ölü dalında ilk müşterinin rakamları duruyordu: skor "88", "Haziran (268k) ➔ Temmuz (467k)"). Üçü de artık gerçek kayıttan hesaplıyor; ortak taban `computeMonthActuals()` |
 | Fiyat merdiveni uydurma varsayılanları | **tamamlandı** (20 Eylül 2026) — `saveAllSettings()` boş bırakılan her alana `|| 3000`, `|| 4000`, `|| 12000`, `|| 800`, `|| 350` yazıyordu ve o rakam mülkün gerçek fiyatı oluyordu. Form da girilmemiş basamakları `v.base * 1.3` ile dolduruyordu. 17 Eylül §3.6 taraması bunu **kaçırmıştı** |

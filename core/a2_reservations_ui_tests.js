@@ -41,12 +41,14 @@ test('Rezervasyon listesi özeti tarih aralığını kesen konaklamayı tahakkuk
   assert.deepStrictEqual(summary, { soldNights: 4, netRoomRevenue: 35000 });
 });
 
-test('Liste yalnız altı karar bilgisi taşır ve ayrıntı ortak SidePanel ile açılır', () => {
+test('Liste karar bilgilerini korur; A3 ödeme takibi ortak SidePanel ayrıntısında açılır', () => {
   assert.match(html, /class="[^"]*reservation-list-table[^"]*"/);
   assert.doesNotMatch(html, /WhatsApp'tan Rezervasyona Aktar/);
   assert.match(source, /function openBookingDetailsPanel/);
   assert.match(source, /SidePanel\.open/);
-  assert.doesNotMatch(source.match(/function openBookingDetailsPanel[\s\S]*?\n}/)?.[0] || '', /Ödeme/);
+  const panelSource = source.match(/function openBookingDetailsPanel[\s\S]*?\n}/)?.[0] || '';
+  assert.match(panelSource, /Ödeme takibi/);
+  assert.match(panelSource, /booking_payment_balances|bookingPaymentBalances/);
 });
 
 test('Liste filtresi ortak DateRangePicker range kipini kullanır', () => {

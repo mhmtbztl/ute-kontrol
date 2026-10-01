@@ -87,7 +87,7 @@
     'toggleBookingChannelRowRate', 'toggleExportMenu', 'toggleHeaderDropdown', 'toggleReservationRangePicker',
     'toggleNewBookingChannelRate', 'toggleNotificationDrawer', 'toggleResDatePicker',
     'toggleTaskPaid', 'undoImportBatch', 'updateDeleteAccountButton', 'updateInviteRoleHint',
-    'updateMonthReopenButton', 'updateResetButton', 'shiftReservationRangeCalendar', 'resetReservationRange'
+    'updateExpenseCategoryWarning', 'updateMonthReopenButton', 'updateResetButton', 'shiftReservationRangeCalendar', 'resetReservationRange'
   ]);
 
   // encodeURIComponent tek tirnagi ve parantezleri KODLAMAZ: "O'Brien" ile

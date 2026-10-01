@@ -75,6 +75,24 @@ function forwardRuleViolations(file, sql) {
   return out;
 }
 
+/**
+ * Uygulanmis bir goc degistirilemez. Ileri kural daha sonra eksigi yakalarsa
+ * yeni bir remedial phase kabul edilir; ancak yalniz tetikleyici eksigini ve
+ * yalniz ayni tabloyu acikca onaran daha sonraki SQL'i kapatabilir.
+ */
+function unresolvedForwardRuleViolations(entries) {
+  return entries.flatMap((entry, index) => forwardRuleViolations(entry.file, entry.sql).filter(violation => {
+    const match = violation.match(/tenant_id tablosu aciyor \(([^)]+)\) ama trg_tenant_id_immutable/);
+    if (!match) return true;
+    const tables = match[1].split(',').map(value => value.trim().replace(/^public\./i, ''));
+    const later = entries.slice(index + 1).map(item => stripComments(item.sql)).join('\n');
+    return !tables.every(table => new RegExp(
+      `CREATE\\s+TRIGGER\\s+trg_tenant_id_immutable[\\s\\S]*?BEFORE\\s+UPDATE\\s+OF\\s+tenant_id\\s+ON\\s+public\\.${table.replace(/[^a-z0-9_]/gi, '')}\\b`,
+      'i'
+    ).test(later));
+  }));
+}
+
 function run() {
   console.log('=============================================================================');
   console.log('LEXBNB PHASE 41 — GOC KURALLARI (CEVRIMDISI)');
@@ -141,7 +159,7 @@ function run() {
     JSON.stringify(forwardRuleViolations('yorum.sql', yorumdaKalan)));
 
   const sonraki = files.slice(i41 + 1);
-  const ihlal = sonraki.flatMap(f => forwardRuleViolations(f, read(f)));
+  const ihlal = unresolvedForwardRuleViolations(sonraki.map(file => ({ file, sql: read(file) })));
   check(ihlal.length === 0, `B4. phase41 sonrasi ${sonraki.length} goc kurala uyuyor`, ihlal.join('\n       '));
 
   finish();
@@ -154,6 +172,6 @@ function finish() {
   if (failed > 0) process.exit(1);
 }
 
-module.exports = { tenantTablesCreated, forwardRuleViolations };
+module.exports = { tenantTablesCreated, forwardRuleViolations, unresolvedForwardRuleViolations };
 
 if (require.main === module) run();

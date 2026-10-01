@@ -1,0 +1,10 @@
+const fs = require('fs');
+const path = require('path');
+const sql = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'migration_phase76_ads_tenant_guard.sql'), 'utf8');
+let passed = 0, failed = 0;
+const check = (ok, name, detail) => ok ? (passed++, console.log(`[PASS] ${name}`)) : (failed++, console.error(`[FAIL] ${name}\n       ${detail}`));
+check(/BEFORE UPDATE OF tenant_id ON public\.ad_metric_periods[\s\S]*guard_tenant_id_immutable/.test(sql), 'A1. Reklam donemi tenant_id degismez', 'tetikleyici yok');
+check(/PHASE76_TENANT_ID_TRIGGER_MISSING/.test(sql), 'A2. Dogrulama blogu tetikleyiciyi kanitlar', 'verify yok');
+check(/VALUES \(76, 'phase76_ads_tenant_guard'\)/.test(sql), 'A3. Phase defter kaydi var', 'schema_migrations kaydi yok');
+console.log(`\nTEST SUMMARY: ${passed} / ${passed + failed} TESTS PASSED (${failed} FAILED)`);
+if (failed) process.exit(1);

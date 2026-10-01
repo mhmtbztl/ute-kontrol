@@ -4,6 +4,7 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const APP = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8').replace(/\r\n?/g, '\n');
 const INDEX = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8').replace(/\r\n?/g, '\n');
+const STYLE = fs.readFileSync(path.join(ROOT, 'style.css'), 'utf8').replace(/\r\n?/g, '\n');
 let passed = 0, failed = 0;
 const check = (condition, name, detail) => condition
   ? (passed++, console.log(`[PASS] ${name}`))
@@ -35,6 +36,8 @@ try {
   const managerFlags = body('renderCleaningExecutionFlags');
   check(/supplies_result/.test(managerFlags) && /LOW/.test(managerFlags) && /OUT/.test(managerFlags) && /note/.test(managerFlags),
     'B6. Yonetici denetiminde az/yok malzeme ve personel notu gorunur', managerFlags);
+  check(/@media\s*\(max-width:\s*768px\)[\s\S]*?#headerCompanyName\s*\{[^}]*overflow:\s*hidden[^}]*text-overflow:\s*ellipsis[^}]*max-width:\s*100%/m.test(STYLE),
+    'C1. Uzun rol adi telefon genisliginde yatay tasma yapmaz', 'Mobil headerCompanyName kisaltma kurali yok');
 } catch (error) {
   failed++;
   console.error(`[FAIL] Beklenmeyen hata\n       ${error && error.stack}`);
