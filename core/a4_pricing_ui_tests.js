@@ -49,9 +49,15 @@ test('tarayıcı fiyat motorlarını app.js öncesinde yükler ve hedef kontroll
   assert(html.indexOf('core/suggested_price_engine.js') > 0 && html.indexOf('core/suggested_price_engine.js') < appIndex);
   assert(html.indexOf('core/target_revenue_calculator.js') > 0 && html.indexOf('core/target_revenue_calculator.js') < appIndex);
   assert(html.indexOf('core/tr_special_days.js') > 0 && html.indexOf('core/tr_special_days.js') < appIndex);
+  assert(html.indexOf('core/pricing_research_service.js') > 0 && html.indexOf('core/pricing_research_service.js') < appIndex);
   assert.match(html, /id="pricingPropertySelect"/);
   assert.match(html, /id="pricingTargetInput"/);
   assert.match(html, /id="pricingTargetResult"/);
+  assert.match(html, /id="pricingRuleKey"/);
+  assert.match(html, /id="pricingResearchUrl"/);
+  assert.match(html, /id="pricingChatGptQuestion"/);
+  assert.match(html, /id="pricingPhase78Status"/);
+  assert.match(fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8'), /Göç bekleniyor: phase78 ve phase80/);
 });
 
 console.log('✅ A4 Fiyatlandırma UI testleri tamamlandı.');

@@ -13937,7 +13937,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
         : Promise.resolve([]);
       // Independent datasets are loaded concurrently and every list is paged;
       // Supabase's per-response cap must never silently truncate a dashboard.
-      const [villas, bookings, expenses, cleanList, leads, leadSalesContext, closeList, targetList, maintenanceTickets, operationalTasks, financialTransactions, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications, campaignRows, influencerRows, settingRows, operatorNoteRows, pricingLadderRows, hkOverrideRows, paymentCommissionRows, operationalPeopleRows, cleaningExecutionRows, maintenanceAssignmentRows, taskTemplateRows, checklistTemplateRows, bookingPayments, bookingPaymentBalances, adMetricPeriods, propertyContextRows, propertyOwnerRows, propertyOwnerLinkRows, messageTemplateRows, guestClassificationRows, salesMembers] = await Promise.all([
+      const [villas, bookings, expenses, cleanList, leads, leadSalesContext, closeList, targetList, maintenanceTickets, operationalTasks, financialTransactions, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications, campaignRows, influencerRows, settingRows, operatorNoteRows, pricingLadderRows, hkOverrideRows, paymentCommissionRows, operationalPeopleRows, cleaningExecutionRows, maintenanceAssignmentRows, taskTemplateRows, checklistTemplateRows, bookingPayments, bookingPaymentBalances, adMetricPeriods, propertyContextRows, propertyOwnerRows, propertyOwnerLinkRows, messageTemplateRows, guestClassificationRows, salesMembers, propertyPricingRuleRows, competitorResearchRows] = await Promise.all([
         loadProperties(tenantId),
         loadBookings(tenantId),
         mayReadLedger ? loadExpenses(tenantId) : Promise.resolve([]),
@@ -13982,7 +13982,9 @@ async function loadTenantAppData(tenantIdOrUserId) {
         mayReadLedger ? fetchTenantRowsTolerant(() => supabaseClient.from('property_owner_links').select('*').eq('tenant_id', tenantId)) : Promise.resolve([]),
         mayReadSales ? fetchTenantRowsTolerant(() => supabaseClient.from('message_templates').select('*').eq('tenant_id', tenantId).eq('is_active', true).order('created_at', { ascending: false })) : Promise.resolve([]),
         mayManageAds ? fetchTenantRowsTolerant(() => supabaseClient.from('guest_private_classifications').select('*').eq('tenant_id', tenantId)) : Promise.resolve([]),
-        salesMembersPromise
+        salesMembersPromise,
+        mayReadSales ? fetchTenantRowsTolerant(() => supabaseClient.from('property_pricing_rule_settings').select('*').eq('tenant_id', tenantId)) : Promise.resolve([]),
+        mayReadSales ? fetchTenantRowsTolerant(() => supabaseClient.from('competitor_price_research').select('*').eq('tenant_id', tenantId).order('researched_on', { ascending: false }).order('created_at', { ascending: false })) : Promise.resolve([])
       ]);
       const propIdMap = {};
       Object.values(villas || {}).forEach(p => {
@@ -14091,6 +14093,9 @@ async function loadTenantAppData(tenantIdOrUserId) {
         messageTemplates: messageTemplateRows || [],
         guestPrivateClassifications: guestClassificationRows || [],
         salesMembers: salesMembers || [],
+        propertyPricingRules: propertyPricingRuleRows || [],
+        competitorPriceResearch: competitorResearchRows || [],
+        phase78SchemaReady: propertyPricingRuleRows !== null && competitorResearchRows !== null,
         influencerCollabs: (influencerRows || []).map(r => mapInfluencerCollabFromDb(r, propIdMap)),
         housekeepingOverrides,
         airbnbListings,
@@ -14175,6 +14180,9 @@ function getBlankTenantData(userId) {
     messageTemplates: [],
     guestPrivateClassifications: [],
     salesMembers: [],
+    propertyPricingRules: [],
+    competitorPriceResearch: [],
+    phase78SchemaReady: false,
     influencerCollabs: [],
     housekeepingOverrides: {},
     airbnbListings: {},
@@ -17372,9 +17380,19 @@ function getTrSpecialDays() {
   return null;
 }
 
+function getPricingResearchService() {
+  if (typeof PricingResearchService !== 'undefined') return PricingResearchService;
+  if (typeof require === 'function') return require('./core/pricing_research_service.js');
+  return null;
+}
+
 function buildPricingWorkspace(input = {}) {
   const priceEngine = getSuggestedPriceEngine();
   const targetEngine = getTargetRevenueCalculator();
+  const history = input.history || priceEngine.historyHint({
+    property: input.property || {}, monthKey: input.monthKey,
+    sellableDates: input.historySellableDates || [], bookings: input.bookings || []
+  });
   const suggestions = priceEngine.suggest({
     property: input.property || {}, rules: input.rules || {}, bookings: input.bookings || [], blocks: input.blocks || [],
     specialDays: input.specialDays || [], occupancyTarget: input.occupancyTarget, today: input.today, days: 30
@@ -17399,9 +17417,9 @@ function buildPricingWorkspace(input = {}) {
     prices,
     expectedOccupancy: input.expectedOccupancy,
     focus: input.focus || 'BALANCED',
-    history: input.history || null
+    history
   });
-  return { suggestions, target, openNights, prices };
+  return { suggestions, target, openNights, prices, history };
 }
 
 let pricingSelectedPropertyId = '';
@@ -17422,6 +17440,98 @@ function recalculatePricingTarget() {
   pricingExpectedOccupancyDraft = occupancyValue === '' ? null : Number(occupancyValue) / 100;
   pricingFocusDraft = document.getElementById('pricingFocusSelect')?.value || 'BALANCED';
   renderPricingTab();
+}
+
+function pricingRuleParameters(ruleKey, rawValue) {
+  if (rawValue === '' || rawValue === null || rawValue === undefined) return {};
+  const value = Number(rawValue);
+  if (!Number.isFinite(value) || value < 0) throw new Error('Kural parametresi sıfır veya pozitif olmalıdır.');
+  if (ruleKey === 'lastMinute') return { withinDays: value };
+  if (ruleKey === 'gapNight') return { maxGap: value };
+  return {};
+}
+
+function loadPricingRuleDraft() {
+  const ruleKey = document.getElementById('pricingRuleKey')?.value || 'weekend';
+  const row = (appData.propertyPricingRules || []).find(item => item.property_id === pricingSelectedPropertyId && item.rule_key === ruleKey);
+  const pct = document.getElementById('pricingRulePct');
+  const enabled = document.getElementById('pricingRuleEnabled');
+  const parameter = document.getElementById('pricingRuleParameter');
+  const label = document.getElementById('pricingRuleParameterLabel');
+  if (pct) pct.value = row ? Number(row.pct) : '';
+  if (enabled) enabled.checked = row ? row.enabled === true : true;
+  if (parameter) {
+    parameter.disabled = !['lastMinute', 'gapNight'].includes(ruleKey);
+    parameter.value = ruleKey === 'lastMinute' ? (row?.parameters?.withinDays ?? '')
+      : ruleKey === 'gapNight' ? (row?.parameters?.maxGap ?? '') : '';
+  }
+  if (label) label.textContent = ruleKey === 'lastMinute' ? 'Kaç gün kala' : ruleKey === 'gapNight' ? 'En çok boş gece' : 'Ek parametre yok';
+}
+
+async function savePricingRuleSettings() {
+  if (!canManageTenantRole(activeTenant?.role)) return false;
+  if (!appData.phase78SchemaReady) {
+    alert('Ev bazlı fiyat kuralı kaydedilemedi: phase78 ve phase80 üretim göçleri bekleniyor.');
+    return false;
+  }
+  const ruleKey = document.getElementById('pricingRuleKey')?.value || '';
+  try {
+    const saved = await getPricingResearchService().saveRule(supabaseClient, {
+      tenantId: getActiveTenantId(), propertyId: pricingSelectedPropertyId, ruleKey,
+      enabled: document.getElementById('pricingRuleEnabled')?.checked === true,
+      pct: document.getElementById('pricingRulePct')?.value,
+      parameters: pricingRuleParameters(ruleKey, document.getElementById('pricingRuleParameter')?.value)
+    });
+    appData.propertyPricingRules = (appData.propertyPricingRules || []).filter(item => !(item.property_id === saved.property_id && item.rule_key === saved.rule_key));
+    appData.propertyPricingRules.push(saved);
+    renderPricingTab();
+    if (window.showToast) window.showToast('Ev bazlı fiyat kuralı kaydedildi.', 'success');
+    return true;
+  } catch (error) {
+    alert('Fiyat kuralı kaydedilemedi: ' + (error.message || 'Bilinmeyen hata'));
+    return false;
+  }
+}
+
+async function saveCompetitorResearch() {
+  if (!canManageTenantRole(activeTenant?.role)) return false;
+  if (!appData.phase78SchemaReady) {
+    alert('Rakip araştırması kaydedilemedi: phase78 ve phase80 üretim göçleri bekleniyor.');
+    return false;
+  }
+  try {
+    const saved = await getPricingResearchService().saveResearch(supabaseClient, {
+      tenantId: getActiveTenantId(), propertyId: pricingSelectedPropertyId,
+      researchedOn: document.getElementById('pricingResearchDate')?.value,
+      sourceKind: document.getElementById('pricingResearchSource')?.value,
+      sourceUrl: document.getElementById('pricingResearchUrl')?.value,
+      values: {
+        WEEKDAY: document.getElementById('pricingResearchWeekday')?.value,
+        WEEKEND: document.getElementById('pricingResearchWeekend')?.value,
+        SPECIAL: document.getElementById('pricingResearchSpecial')?.value
+      },
+      rawNote: document.getElementById('pricingResearchNote')?.value
+    });
+    appData.competitorPriceResearch = [saved, ...(appData.competitorPriceResearch || [])];
+    ['pricingResearchUrl', 'pricingResearchWeekday', 'pricingResearchWeekend', 'pricingResearchSpecial', 'pricingResearchNote'].forEach(id => {
+      const element = document.getElementById(id); if (element) element.value = '';
+    });
+    renderPricingTab();
+    if (window.showToast) window.showToast('Kaynaklı rakip araştırması kaydedildi.', 'success');
+    return true;
+  } catch (error) {
+    alert('Rakip araştırması kaydedilemedi: ' + (error.message || 'Bilinmeyen hata'));
+    return false;
+  }
+}
+
+function askPricingChatGpt() {
+  const question = document.getElementById('pricingChatGptQuestion')?.value || 'Önerilen fiyatları ve doluluk hedefini değerlendir.';
+  const property = Object.values(appData.villas || {}).find(item => item.id === pricingSelectedPropertyId);
+  if (typeof setAnalysisFocusQuestion === 'function') setAnalysisFocusQuestion(`${property?.name || 'Seçili mülk'}: ${question}`);
+  switchTab('analysis');
+  document.querySelectorAll('input[name="analysisProperty"]').forEach(input => { input.checked = input.value === pricingSelectedPropertyId; });
+  if (typeof syncAnalysisAllProperties === 'function') syncAnalysisAllProperties();
 }
 
 function renderPricingTab() {
@@ -17446,10 +17556,15 @@ function renderPricingTab() {
   const targetRecord = getConfiguredRevenueTarget(currentFilter, appData.targets || [], slug || 'ALL');
   const targetValue = pricingTargetDraft === null ? targetRecord : pricingTargetDraft;
   const ledger = computeMonthLedger(today.slice(0, 7), slug || 'ALL');
+  const previousYear = Number(today.slice(0, 4)) - 1;
+  const month = Number(today.slice(5, 7));
+  const previousMonthDays = new Date(Date.UTC(previousYear, month, 0)).getUTCDate();
+  const historySellableDates = Array.from({ length: previousMonthDays }, (_, index) => `${previousYear}-${String(month).padStart(2, '0')}-${String(index + 1).padStart(2, '0')}`);
+  const rules = getPricingResearchService().mergeRules(appData.tenantSettings?.pricing_rules || {}, appData.propertyPricingRules || [], property.id);
   const result = buildPricingWorkspace({
     property: { id: property.id, basePrice: property.basePrice ?? property.base ?? null, floorPrice: property.floor ?? null },
     bookings, blocks: (appData.maintenanceTickets || []).filter(ticket => ticket.property_id === property.id && ticket.blocks_availability).map(ticket => ({ propertyId: property.id, start: ticket.downtime_start, end: ticket.downtime_end })),
-    rules: appData.tenantSettings?.pricing_rules || {}, specialDays,
+    rules, specialDays, monthKey: today.slice(0, 7), historySellableDates,
     occupancyTarget: null, today, target: targetValue, soldRevenue: ledger?.netRoomRevenue ?? null,
     expectedOccupancy: pricingExpectedOccupancyDraft, focus: pricingFocusDraft
   });
@@ -17460,11 +17575,28 @@ function renderPricingTab() {
   const focusInput = document.getElementById('pricingFocusSelect');
   if (focusInput) focusInput.value = pricingFocusDraft;
   const warningHtml = result.suggestions.warnings.length ? `<div class="pricing-warnings">${result.suggestions.warnings.map(item => `<span>${escapeHtml(item.text)}</span>`).join('')}</div>` : '';
-  container.innerHTML = `${warningHtml}<div class="pricing-days">${result.suggestions.days.map(day => `<div class="pricing-day"><strong>${escapeHtml(formatTrDate(day.date))}</strong><span>${escapeHtml(day.status === 'OPEN' ? 'Açık' : day.status === 'BOOKED' ? 'Dolu' : 'Kapalı')}</span><b>${day.price == null ? '—' : `₺${Number(day.price).toLocaleString('tr-TR')}`}</b><small>${day.reasons.length ? escapeHtml(day.reasons.map(reason => `${reason.text} ${reason.pct > 0 ? '+' : ''}${reason.pct}%`).join(' · ')) : 'Kural uygulanmadı'}</small></div>`).join('')}</div>`;
+  const historyHtml = result.history
+    ? `<div class="pricing-history-hint"><strong>Geçen yıl ipucu</strong><span>Hafta içi ADR: ${result.history.weekdayAdr?.value == null ? '— (en az 8 gece)' : `₺${Math.round(result.history.weekdayAdr.value).toLocaleString('tr-TR')}`} · Hafta sonu ADR: ${result.history.weekendAdr?.value == null ? '— (en az 8 gece)' : `₺${Math.round(result.history.weekendAdr.value).toLocaleString('tr-TR')}`}</span></div>`
+    : '<div class="pricing-history-hint"><strong>Geçmiş ipucu yok</strong><span>Geçen yılın aynı ayında yeterli satılmış gece bulunamadı.</span></div>';
+  container.innerHTML = `${warningHtml}${historyHtml}<div class="pricing-days">${result.suggestions.days.map(day => `<div class="pricing-day"><strong>${escapeHtml(formatTrDate(day.date))}</strong><span>${escapeHtml(day.status === 'OPEN' ? 'Açık' : day.status === 'BOOKED' ? 'Dolu' : 'Kapalı')}</span><b>${day.price == null ? '—' : `₺${Number(day.price).toLocaleString('tr-TR')}`}</b><small>${day.reasons.length ? escapeHtml(day.reasons.map(reason => `${reason.text} ${reason.pct > 0 ? '+' : ''}${reason.pct}%`).join(' · ')) : 'Kural uygulanmadı'}</small></div>`).join('')}</div>`;
   const targetBox = document.getElementById('pricingTargetResult');
   if (targetBox) targetBox.innerHTML = targetValue == null
     ? '<div class="pricing-target-empty">Hedef ciro girildiğinde gereken fiyat–doluluk seçenekleri burada görünür.</div>'
     : `<div class="pricing-target-summary"><strong>${escapeHtml(result.target.reason?.text || (result.target.status === 'OK' ? 'Hedef hesaplandı' : result.target.status))}</strong><span>Kalan hedef: ${result.target.remaining == null ? '—' : `₺${Number(result.target.remaining).toLocaleString('tr-TR')}`}</span><span>Gereken doluluk: ${result.target.requiredOccupancy == null ? '—' : `%${(result.target.requiredOccupancy * 100).toFixed(1)}`}</span></div>${result.target.table.length ? `<div class="pricing-target-table">${result.target.table.map((row, index) => `<div class="${index === result.target.highlightedRow ? 'is-highlighted' : ''}"><span>₺${Number(row.avgPrice).toLocaleString('tr-TR')}</span><strong>${row.feasible ? `%${(row.requiredOccupancy * 100).toFixed(1)} doluluk` : 'Bu fiyatla mümkün değil'}</strong></div>`).join('')}</div>` : ''}`;
+  const schemaStatus = document.getElementById('pricingPhase78Status');
+  if (schemaStatus) schemaStatus.textContent = appData.phase78SchemaReady
+    ? 'Ev kuralları ve rakip araştırması veritabanına bağlı.'
+    : 'Göç bekleniyor: phase78 ve phase80 uygulanana kadar bu iki kayıt alanı salt okunur.';
+  const managePanels = document.getElementById('pricingManagePanels');
+  if (managePanels) managePanels.style.display = canManageTenantRole(activeTenant?.role) ? '' : 'none';
+  const researchList = document.getElementById('pricingResearchList');
+  if (researchList) {
+    const rows = (appData.competitorPriceResearch || []).filter(row => row.property_id === property.id);
+    researchList.innerHTML = rows.length ? rows.map(row => `<article><strong>${escapeHtml(formatTrDate(row.researched_on))} · ${escapeHtml(row.source_kind)}</strong><a href="${escapeHtml(row.source_url)}" target="_blank" rel="noopener noreferrer">Kaynağı aç</a><span>${escapeHtml((row.prices || []).map(point => `${point.type}: ₺${Number(point.amount).toLocaleString('tr-TR')}`).join(' · '))}</span><small>${escapeHtml(row.raw_note || 'Not yok')}</small></article>`).join('') : '<div class="empty-state">Bu mülk için kaynaklı rakip araştırması yok.</div>';
+  }
+  const researchDate = document.getElementById('pricingResearchDate');
+  if (researchDate && !researchDate.value) researchDate.value = today;
+  loadPricingRuleDraft();
 }
 
 function openTabFromDeepLink(tabId, entityId) {

@@ -38,7 +38,7 @@
   // fonksiyonu buraya ekleyin; html_injection_tests listede olmayan, tanimsiz
   // ya da artik kullanilmayan adi yakalar.
   const EYLEMLER = new Set([
-    'addLeadSource', 'applyImportedData', 'assignCleaningTaskFromSelect', 'assignMaintenanceFromSelect', 'assignOperationalTaskFromSelect', 'autoCalculateGoalAdr',
+    'addLeadSource', 'applyImportedData', 'askPricingChatGpt', 'assignCleaningTaskFromSelect', 'assignMaintenanceFromSelect', 'assignOperationalTaskFromSelect', 'autoCalculateGoalAdr',
     'autoCalculateGoalSubmetrics', 'calculateLivePreview', 'changeImportMode', 'cleanResetAll',
     'clearResDateRange', 'closeAiActionConfirmModal', 'closeAllHeaderDropdowns',
     'closeBookingModal', 'closeCleaningTaskModal', 'closeDeleteAccountModal', 'closeExpenseModal',
@@ -57,7 +57,7 @@
     'handleCommandPaletteKeydown', 'handleCommandPaletteSearch', 'handleFileImport',
     'handleFilterChange', 'handleOnboardingSubmit', 'handlePropertyDeleteFromModal',
     'handleQuickActionTrigger', 'handleSaaSForgotPassword', 'handleSaaSLogin',
-    'handleSaaSNewPassword', 'handleSaaSRegister', 'loadSampleWhatsAppMsg', 'loadStaffFieldWork',
+    'handleSaaSNewPassword', 'handleSaaSRegister', 'loadPricingRuleDraft', 'loadSampleWhatsAppMsg', 'loadStaffFieldWork',
     'loadSelectedPeriodGoal', 'logoutSaaSUser', 'markAllNotificationsAsRead', 'markCleaningDone',
     'markCleaningPlanned', 'markCleaningSkipped', 'markSelectedCleaningDone',
     'openBookingDetailsPanel', 'openBookingForDate', 'openBookingFromGuestProfile',
@@ -71,8 +71,8 @@
     'promptEditTaskAmount', 'refreshExecutiveDashboardSnapshot', 'renderExpensesTable', 'renderHousekeepingTab', 'renderManageBookingsTable',
     'renderManageLeadsTable', 'recalculatePricingTarget', 'resetGuestDirectoryDateRange',
     'resetImportPreview', 'resyncTenantData', 'resolveMaintenanceFromOperations', 'runPageAction', 'saveAllSettings',
-    'saveBooking', 'saveBookingChannelRow', 'saveBookingPayment', 'saveCleaningTask', 'saveExpense', 'saveGuestProfile',
-    'saveLead', 'saveMaint', 'saveMonthlyGoals', 'saveStaffCleaningProgress', 'signStaffCleaningDone', 'bumpLeadInterestFromQuick',
+    'saveBooking', 'saveBookingChannelRow', 'saveBookingPayment', 'saveCleaningTask', 'saveCompetitorResearch', 'saveExpense', 'saveGuestProfile',
+    'saveLead', 'saveMaint', 'saveMonthlyGoals', 'savePricingRuleSettings', 'saveStaffCleaningProgress', 'signStaffCleaningDone', 'bumpLeadInterestFromQuick',
     'saveProperty', 'saveWaAsBooking', 'saveWaAsLead',
     'sendGuestLoyaltyMessage', 'setBookingChannelActive', 'setLeadFollowUpScope', 'setLeadViewMode',
     'setGuestDirectoryPage', 'setGuestDirectoryProperty',

@@ -282,6 +282,7 @@ const allTestFiles = [
   'property_profile_engine_tests.js',
   'property_owner_service_tests.js',
   'a4_properties_ui_tests.js',
+  'pricing_research_service_tests.js',
   'sales_workflow_service_tests.js',
   'phase72_ads_metrics_tests.js',
   'phase72_ads_metrics_live_tests.js',
