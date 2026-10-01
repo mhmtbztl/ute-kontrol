@@ -1320,6 +1320,61 @@
         <button type="button" role="tab" class="subpage-switch-btn" aria-selected="false" data-onclick="switchTab('guests')">👥 Misafirler</button>
       </div>
 
+      <section class="card lead-quick-card" aria-labelledby="leadQuickTitle">
+        <div class="section-title-bar">
+          <div>
+            <h2 id="leadQuickTitle">Hızlı talep kaydı</h2>
+            <p class="sub-text">Telefon ve “nereden geldi” bilgisiyle yaklaşık 10 saniyede kaydedin. Aynı telefonun açık talebi varsa yeni kayıt açılmaz.</p>
+          </div>
+        </div>
+        <form id="leadQuickCaptureForm" data-onsubmit="submitQuickLead(event)" class="lead-quick-form">
+          <div class="form-group">
+            <label for="leadQuickPhone">Telefon *</label>
+            <input id="leadQuickPhone" required type="tel" inputmode="tel" autocomplete="tel" placeholder="05xx xxx xx xx">
+          </div>
+          <div class="form-group">
+            <label for="leadQuickSource">Nereden geldi? *</label>
+            <select id="leadQuickSource" required><option value="">Kaynaklar yükleniyor…</option></select>
+          </div>
+          <div class="form-group">
+            <label for="leadQuickChannel">İletişim kanalı *</label>
+            <select id="leadQuickChannel" required>
+              <option value="Telefon">Telefon</option>
+              <option value="WhatsApp">WhatsApp</option>
+              <option value="Instagram">Instagram</option>
+              <option value="E-posta">E-posta</option>
+              <option value="Diğer">Diğer</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="leadQuickGuestName">Ad soyad</label>
+            <input id="leadQuickGuestName" type="text" maxlength="200" autocomplete="name" placeholder="İsteğe bağlı">
+          </div>
+          <div class="form-group">
+            <label for="leadQuickProperty">İlgilendiği mülk</label>
+            <select id="leadQuickProperty"><option value="">Henüz belli değil</option></select>
+          </div>
+          <div class="form-group">
+            <label for="leadQuickPax">Kişi</label>
+            <input id="leadQuickPax" type="number" min="1" step="1" inputmode="numeric" placeholder="—">
+          </div>
+          <div class="form-group">
+            <label for="leadQuickCheckIn">Giriş</label>
+            <input id="leadQuickCheckIn" type="date">
+          </div>
+          <div class="form-group">
+            <label for="leadQuickCheckOut">Çıkış</label>
+            <input id="leadQuickCheckOut" type="date">
+          </div>
+          <div class="form-group lead-quick-note">
+            <label for="leadQuickNote">Kısa not</label>
+            <input id="leadQuickNote" type="text" maxlength="1000" placeholder="Örn. akşam aranacak">
+          </div>
+          <button id="leadQuickSubmit" type="submit" class="btn btn-primary">Talebi kaydet</button>
+        </form>
+        <p id="leadQuickMessage" class="lead-quick-message" role="status" aria-live="polite"></p>
+      </section>
+
       <!-- 1. WHATSAPP & SATIŞ TALEP ANALİZİ (EXECUTIVE RADAR) -->
       <section class="card" style="margin-bottom: 24px;">
         <div class="section-title-bar">

@@ -29,6 +29,7 @@ const allTestFiles = [
   'guest_ui_integration_tests.js',
   'lead_edit_preservation_tests.js',
   'lead_crud_tests.js',
+  'a4_sales_ui_tests.js',
   'maintenance_tests.js',
   'message_automation_tests.js',
   'message_delivery_tests.js',

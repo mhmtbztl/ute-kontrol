@@ -2956,7 +2956,9 @@ function mapLeadFromDb(row) {
     tenantId: row.tenant_id,
     propertyId: row.property_id || null,
     villa: villaSlug,
-    guest: guestPhone ? `${guestName} (${guestPhone})` : (guestName || 'Misafir Talebi'),
+    guest: guestPhone
+      ? `${guestName || 'Ad girilmedi'} (${guestPhone})`
+      : (guestName || 'Ad girilmedi'),
     guestName: guestName,
     phone: guestPhone,
     email: guestEmail,
@@ -2999,17 +3001,15 @@ function mapLeadToDb(lead, targetTenantId) {
   // Parse guestName and guestPhone
   let gName = (lead.guestName || lead.guest_name || '').trim();
   let gPhone = (lead.phone || lead.guestPhone || lead.guest_phone || '').trim();
-  if (!gName && lead.guest) {
+  const hasExplicitGuestName = Object.prototype.hasOwnProperty.call(lead, 'guestName')
+    || Object.prototype.hasOwnProperty.call(lead, 'guest_name');
+  if (!gName && !hasExplicitGuestName && lead.guest) {
     const m = String(lead.guest).match(/^(.*?)(?:\s*\((.*?)\))?$/);
     if (m) {
       gName = (m[1] || '').trim();
       if (!gPhone && m[2]) gPhone = m[2].trim();
     }
   }
-  if (!gName && !gPhone) {
-    gName = 'Misafir Talebi';
-  }
-
   // Normalize status/stage
   const rawStatus = (lead.status || lead.stage || 'NEW').toUpperCase();
   const status = ALLOWED_LEAD_STAGES.includes(rawStatus) ? rawStatus : 'NEW';
@@ -3022,7 +3022,7 @@ function mapLeadToDb(lead, targetTenantId) {
     tenant_id: tenantId,
     property_id: propertyId,
     converted_booking_id: lead.convertedBookingId || lead.converted_booking_id || null,
-    guest_name: gName,
+    guest_name: gName || null,
     guest_phone: gPhone,
     guest_email: (lead.email || lead.guestEmail || lead.guest_email || '').trim() || null,
     channel: lead.channel || lead.source || 'WhatsApp',
@@ -3135,6 +3135,20 @@ async function loadLeads(targetTenantId) {
   return mapped;
 }
 
+async function loadLeadSalesContext(targetTenantId) {
+  const tenantId = targetTenantId || getActiveTenantId();
+  if (!isCloudTenant(tenantId) || !canReadSalesRole(activeTenant?.role)) {
+    return { sources: [], acquisitions: [], workflows: [], interests: [] };
+  }
+  const [sources, acquisitions, workflows, interests] = await Promise.all([
+    fetchAllCloudRows(() => supabaseClient.from('lead_source_catalog').select('*').eq('tenant_id', tenantId).eq('is_active', true).order('sort_order').order('label')),
+    fetchAllCloudRows(() => supabaseClient.from('lead_acquisition').select('*').eq('tenant_id', tenantId)),
+    fetchAllCloudRows(() => supabaseClient.from('lead_workflow').select('*').eq('tenant_id', tenantId)),
+    fetchAllCloudRows(() => supabaseClient.from('lead_interest_daily').select('*').eq('tenant_id', tenantId).order('day', { ascending: false }))
+  ]);
+  return { sources, acquisitions, workflows, interests };
+}
+
 async function createLead(leadInput) {
   const tenantId = getActiveTenantId();
   validateLeadInput(leadInput, tenantId);
@@ -3150,8 +3164,8 @@ async function createLead(leadInput) {
       tenantId: tenantId || 'usr_ute_master',
       propertyId: leadInput.propertyId || null,
       villa: leadInput.villa || 'ALL',
-      guest: leadInput.guest || leadInput.guestName || 'Misafir Talebi',
-      guestName: leadInput.guestName || leadInput.guest || 'Misafir Talebi',
+      guest: leadInput.guest || leadInput.guestName || 'Ad girilmedi',
+      guestName: leadInput.guestName || leadInput.guest || '',
       phone: leadInput.phone || '',
       email: leadInput.email || '',
       channel: leadInput.channel || 'WhatsApp',
@@ -3200,6 +3214,53 @@ async function createLead(leadInput) {
     if (typeof renderAll === 'function') renderAll();
   }
   return created;
+}
+
+/**
+ * A4 hizli kayit yolu. Talep, kaynak ve takip yan tablolarini ayri ayri
+ * yazmaz; phase59'un atomik RPC'si ayni telefonu eszamanli kayitlarda da tek
+ * acik talepte birlestirir.
+ */
+async function quickCaptureLead(input, options = {}) {
+  const data = input || {};
+  const tenantId = options.tenantId || getActiveTenantId();
+  const client = options.client || supabaseClient;
+  const phone = String(data.phone || '').trim();
+  const sourceId = String(data.sourceId || '').trim();
+  const channel = String(data.channel || '').trim();
+
+  if (!phone) throw new Error('Hızlı kayıt için telefon numarası zorunludur.');
+  if (!sourceId) throw new Error('“Nereden geldi” kaynağı zorunludur.');
+  if (!channel) throw new Error('İletişim kanalı zorunludur.');
+  if (!client || typeof client.rpc !== 'function') throw new Error('Bulut bağlantısı kurulamadı. Talep kaydedilmedi.');
+  if (!options.tenantId) requireCloudForWrite('Hızlı talep kaydı', tenantId);
+
+  const nullableText = value => {
+    const normalized = String(value == null ? '' : value).trim();
+    return normalized || null;
+  };
+  const nullablePositiveInteger = value => {
+    if (value === '' || value === null || value === undefined) return null;
+    const normalized = normalizePositiveInteger(value);
+    if (normalized === null) throw new Error('Kişi sayısı pozitif bir tam sayı olmalıdır.');
+    return normalized;
+  };
+
+  const { data: result, error } = await client.rpc('quick_capture_lead', {
+    p_tenant_id: tenantId,
+    p_phone: phone,
+    p_source_id: sourceId,
+    p_channel: channel,
+    p_check_in: nullableText(data.checkIn),
+    p_check_out: nullableText(data.checkOut),
+    p_pax: nullablePositiveInteger(data.pax),
+    p_property_id: nullableText(data.propertyId),
+    p_guest_name: nullableText(data.guestName),
+    p_note: nullableText(data.note)
+  });
+  if (error) throw error;
+  if (!result || result.success !== true) throw new Error('Talep kaydı tamamlanamadı.');
+  return result;
 }
 
 async function updateLead(leadId, patch) {
@@ -3690,6 +3751,7 @@ function switchTab(tabId) {
   }
   if (tabId === 'expenses') renderExpensesTable();
   if (tabId === 'leads') {
+    renderLeadQuickCapture();
     renderManageLeadsTable();
     renderLeadAnalytics();
   }
@@ -4350,7 +4412,7 @@ const ACTIVE_RENDER_PLANS = {
   'tab-finance': ['renderFinanceModule'],
   'tab-reservations': ['renderManageBookingsTable', 'renderTapeChart'],
   'tab-expenses': ['renderExpensesTable'],
-  'tab-leads': ['renderManageLeadsTable', 'renderLeadAnalytics'],
+  'tab-leads': ['renderLeadQuickCapture', 'renderManageLeadsTable', 'renderLeadAnalytics'],
   'tab-maintenance': ['renderManageMaintTable'],
   'tab-housekeeping': ['renderHousekeepingTab'],
   'tab-settings': ['renderSettingsTable', 'renderTeamManagement']
@@ -4383,6 +4445,7 @@ function renderAll() {
     renderFinanceModule,
     renderManageBookingsTable,
     renderExpensesTable,
+    renderLeadQuickCapture,
     renderManageLeadsTable,
     renderLeadAnalytics,
     renderManageMaintTable,
@@ -8711,6 +8774,85 @@ async function saveAllSettings() {
 // -------------------------------------------------------------
 // LEADS & MAINTENANCE CRUD
 // -------------------------------------------------------------
+let lastLeadSourceId = '';
+
+function setLeadQuickMessage(message, type = '') {
+  const element = document.getElementById('leadQuickMessage');
+  if (!element) return;
+  element.textContent = message || '';
+  element.className = `lead-quick-message${type ? ` is-${type}` : ''}`;
+}
+
+function renderLeadQuickCapture() {
+  if (typeof document === 'undefined') return;
+  const form = document.getElementById('leadQuickCaptureForm');
+  const sourceSelect = document.getElementById('leadQuickSource');
+  const propertySelect = document.getElementById('leadQuickProperty');
+  if (!form || !sourceSelect || !propertySelect) return;
+
+  const canWrite = canWriteSalesRole(activeTenant?.role);
+  const sources = Array.isArray(appData.leadSources) ? appData.leadSources : [];
+  const sortedSources = sources.slice().sort((a, b) => {
+    if (a.id === lastLeadSourceId) return -1;
+    if (b.id === lastLeadSourceId) return 1;
+    return (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0)
+      || String(a.label || '').localeCompare(String(b.label || ''), 'tr');
+  });
+  const selectedSource = sortedSources.some(source => source.id === sourceSelect.value)
+    ? sourceSelect.value
+    : (lastLeadSourceId || sortedSources.find(source => source.code === 'UNKNOWN')?.id || sortedSources[0]?.id || '');
+  sourceSelect.innerHTML = sortedSources.length
+    ? sortedSources.map(source => `<option value="${escapeHtml(source.id)}"${source.id === selectedSource ? ' selected' : ''}>${escapeHtml(source.label || 'Adlandırılmamış kaynak')}</option>`).join('')
+    : '<option value="">Kaynak bulunamadı — yöneticinizden kaynak eklemesini isteyin</option>';
+
+  const selectedProperty = propertySelect.value;
+  const properties = Object.values(appData.villas || {}).filter(property => property && property.isActive !== false && !property.archivedAt);
+  propertySelect.innerHTML = '<option value="">Henüz belli değil</option>' + properties
+    .map(property => `<option value="${escapeHtml(property.id || '')}"${property.id === selectedProperty ? ' selected' : ''}>${escapeHtml(property.name || property.slug || 'Adlandırılmamış mülk')}</option>`)
+    .join('');
+
+  Array.from(form.elements || []).forEach(control => { control.disabled = !canWrite || (control.id === 'leadQuickSource' && sources.length === 0); });
+  if (!canWrite) setLeadQuickMessage('Bu rol satış verisini görüntüleyebilir; talep kaydedemez.', 'info');
+  else if (!sources.length) setLeadQuickMessage('Kaynak kataloğu yüklenemedi. Kayıt yapılmadı; yönetici kaynak ayarını kontrol etmeli.', 'error');
+}
+
+async function submitQuickLead(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const submit = document.getElementById('leadQuickSubmit');
+  const sourceId = document.getElementById('leadQuickSource')?.value || '';
+  if (submit) submit.disabled = true;
+  setLeadQuickMessage('Talep kaydediliyor…', 'info');
+  try {
+    const result = await quickCaptureLead({
+      phone: document.getElementById('leadQuickPhone')?.value,
+      sourceId,
+      channel: document.getElementById('leadQuickChannel')?.value,
+      guestName: document.getElementById('leadQuickGuestName')?.value,
+      propertyId: document.getElementById('leadQuickProperty')?.value,
+      pax: document.getElementById('leadQuickPax')?.value,
+      checkIn: document.getElementById('leadQuickCheckIn')?.value,
+      checkOut: document.getElementById('leadQuickCheckOut')?.value,
+      note: document.getElementById('leadQuickNote')?.value
+    });
+    lastLeadSourceId = sourceId;
+    await loadLeads(getActiveTenantId());
+    const parts = [result.created ? 'Yeni talep kaydedildi.' : 'Bilgiler mevcut açık talebe eklendi.'];
+    if (result.returning) parts.push(`Tekrar gelen misafir${Number(result.previous_leads) > 0 ? ` · ${Number(result.previous_leads)} önceki talep` : ''}.`);
+    if (result.classification === 'BLACK') parts.push('Yönetici uyarısı: Bu misafir kara listede.');
+    if (result.classification === 'WHITE') parts.push('Yönetici notu: Bu misafir beyaz listede.');
+    form.reset();
+    renderLeadQuickCapture();
+    renderManageLeadsTable();
+    renderLeadAnalytics();
+    setLeadQuickMessage(parts.join(' '), result.classification === 'BLACK' ? 'warning' : 'success');
+  } catch (error) {
+    setLeadQuickMessage(kullaniciMesaji(error?.message || 'Talep kaydedilemedi.'), 'error');
+  } finally {
+    if (submit && canWriteSalesRole(activeTenant?.role) && (appData.leadSources || []).length) submit.disabled = false;
+  }
+}
+
 function renderManageLeadsTable() {
   const tbody = document.getElementById('manageLeadsTableBody');
   if (!tbody) return;
@@ -13569,12 +13711,13 @@ async function loadTenantAppData(tenantIdOrUserId) {
       const mayReadLedger = canReadLedgerRole(activeTenant?.role);
       // Independent datasets are loaded concurrently and every list is paged;
       // Supabase's per-response cap must never silently truncate a dashboard.
-      const [villas, bookings, expenses, cleanList, leads, closeList, targetList, maintenanceTickets, operationalTasks, financialTransactions, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications, campaignRows, influencerRows, settingRows, operatorNoteRows, pricingLadderRows, hkOverrideRows, paymentCommissionRows, operationalPeopleRows, cleaningExecutionRows, maintenanceAssignmentRows, taskTemplateRows, checklistTemplateRows, bookingPayments, bookingPaymentBalances] = await Promise.all([
+      const [villas, bookings, expenses, cleanList, leads, leadSalesContext, closeList, targetList, maintenanceTickets, operationalTasks, financialTransactions, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications, campaignRows, influencerRows, settingRows, operatorNoteRows, pricingLadderRows, hkOverrideRows, paymentCommissionRows, operationalPeopleRows, cleaningExecutionRows, maintenanceAssignmentRows, taskTemplateRows, checklistTemplateRows, bookingPayments, bookingPaymentBalances] = await Promise.all([
         loadProperties(tenantId),
         loadBookings(tenantId),
         mayReadLedger ? loadExpenses(tenantId) : Promise.resolve([]),
         fetchAllCloudRows(() => supabaseClient.from('cleaning_tasks').select('*').eq('tenant_id', tenantId).order('task_date', { ascending: false })),
         loadLeads(tenantId),
+        loadLeadSalesContext(tenantId),
         mayReadLedger ? fetchAllCloudRows(() => supabaseClient.from('monthly_financial_closes').select('*').eq('tenant_id', tenantId).order('year', { ascending: false }).order('month', { ascending: false })) : Promise.resolve([]),
         mayReadLedger ? fetchAllCloudRows(() => supabaseClient.from('monthly_targets').select('*').eq('tenant_id', tenantId).order('year', { ascending: false }).order('month', { ascending: false })) : Promise.resolve([]),
         fetchAllCloudRows(() => supabaseClient.from('maintenance_tickets').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false })),
@@ -13689,6 +13832,10 @@ async function loadTenantAppData(tenantIdOrUserId) {
         cleaningTasks,
         cleaningPayments,
         leads: leadsWithSlugs,
+        leadSources: leadSalesContext.sources,
+        leadAcquisitions: leadSalesContext.acquisitions,
+        leadWorkflows: leadSalesContext.workflows,
+        leadInterests: leadSalesContext.interests,
         closedPeriods: closeList || [],
         targets: targetList || [],
         maintenance: maintenanceTickets.map(t => mapMaintenanceTicketFromDb(t, propIdMap)),
@@ -13764,6 +13911,10 @@ function getBlankTenantData(userId) {
     expenses: [],
     cleaningTasks: [],
     leads: [],
+    leadSources: [],
+    leadAcquisitions: [],
+    leadWorkflows: [],
+    leadInterests: [],
     closedPeriods: [],
     targets: [],
     maintenance: [],
@@ -16992,6 +17143,7 @@ if (typeof module !== 'undefined' && module.exports) {
     validateLeadInput,
     loadLeads,
     createLead,
+    quickCaptureLead,
     updateLead,
     deleteLead,
     buildLeadConversionOptions,

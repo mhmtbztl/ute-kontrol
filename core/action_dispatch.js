@@ -81,7 +81,7 @@
     'setOperationsView', 'setPropViewMode', 'setPropertySalesReadiness', 'setStaffChecklistMark', 'setStaffSupplyStatus', 'setTapeChartMonth', 'setTapeChartView', 'setTrendRange',
     'shareGapWhatsApp', 'shiftResCalendar', 'showForgotPasswordForm', 'showKpiExplanation',
     'stepMonth', 'stepTapeChartMonth', 'submitAccountDeletion', 'submitMemberInvite',
-    'submitMonthClose', 'submitMonthReopen', 'switchActiveTenant', 'switchAuthTab',
+    'submitMonthClose', 'submitMonthReopen', 'submitQuickLead', 'switchActiveTenant', 'switchAuthTab',
     'switchHelpTab', 'switchTab', 'switchWaModalTab', 'syncCommissionFromRate',
      'syncRateFromCommission', 'toggleAnalysisProperties',
     'toggleBookingChannelRowRate', 'toggleExportMenu', 'toggleHeaderDropdown', 'toggleReservationRangePicker',
