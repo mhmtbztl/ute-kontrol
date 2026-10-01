@@ -4799,6 +4799,15 @@ body {
 .today-todo-list { display: grid; gap: 8px; }
 .today-todo-item { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 9px 11px; border-radius: 8px; background: rgba(255,255,255,.035); }
 .today-month-summary { padding: 10px 14px; margin-bottom: 24px; color: #94a3b8; font-size: 12px; text-align: center; border-top: 1px solid rgba(255,255,255,.08); }
+.booking-payments { margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.1); }
+.booking-payments h3 { margin: 0 0 10px; font-size: 14px; }
+.booking-payment-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+.booking-payment-summary > div { display: grid; gap: 3px; padding: 9px; background: rgba(255,255,255,.04); border-radius: 8px; }
+.booking-payment-summary span, .booking-payment-row span { color: #94a3b8; font-size: 11px; }
+.booking-payment-row { display: grid; grid-template-columns: minmax(0,1fr) auto auto; align-items: center; gap: 9px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.07); }
+.booking-payment-row > div { display: grid; gap: 2px; }
+.booking-payment-form { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; margin-top: 12px; }
+.booking-payment-form button { grid-column: 1 / -1; }
 @media (max-width: 720px) {
   .ops-cleaning-layout { grid-template-columns: 1fr; }
   .ops-row { grid-template-columns: 1fr; }
@@ -4806,6 +4815,8 @@ body {
   .ops-row-actions select { width: 100%; min-width: 0; }
   .staff-access { grid-template-columns: 1fr; }
   .staff-field-page { padding: 0; }
+  .booking-payment-summary, .booking-payment-form { grid-template-columns: 1fr; }
+  .booking-payment-row { grid-template-columns: minmax(0,1fr) auto; }
 }
 
 /* Kanal ekonomisi tablosu: baslik ve deger ayni hizada (metin solda, sayilar sagda). */

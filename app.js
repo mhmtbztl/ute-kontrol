@@ -498,6 +498,9 @@ async function syncBookingCleaningTaskToCloud(booking, cleanCost) {
     upsertCleaningTaskInMemory(gorev);
     return '';
   } catch (err) {
+    if (activeTenant?.role === 'sales' || String(err?.code || '') === '42501') {
+      return '\n\nRezervasyon kaydedildi. Temizlik görevi yönetici tarafından planlanacak.';
+    }
     return '\n\nRezervasyon kaydedildi; ancak temizlik görevi yazılamadı: ' + (err?.message || 'veritabanı hatası');
   }
 }
@@ -1759,7 +1762,11 @@ async function deleteBookingUI(bookingId) {
   try {
     return await deleteBooking(bookingId);
   } catch (error) {
-    if (typeof alert === 'function') alert(error?.message || 'Rezervasyon silinemedi.');
+    const raw = String(error?.message || '');
+    const message = raw.includes('BOOKING_HAS_PAYMENTS')
+      ? 'Ödemesi bulunan rezervasyon silinemez. Önce ödeme kayıtlarını silin veya rezervasyonu iptal edin.'
+      : (raw || 'Rezervasyon silinemedi.');
+    if (typeof alert === 'function') alert(message);
     return false;
   }
 }
@@ -6797,6 +6804,71 @@ function reservationStatusBadge(status) {
   return '<span class="badge badge-slate" title="Kaynak kayıtta geçerli durum yok">—</span>';
 }
 
+function getBookingPaymentEngine() {
+  if (typeof BookingPaymentEngine !== 'undefined') return BookingPaymentEngine;
+  if (typeof require === 'function') {
+    try { return require('./core/booking_payment_engine.js'); } catch (_) { /* browser */ }
+  }
+  return null;
+}
+
+async function refreshBookingPaymentData(bookingId) {
+  const tenantId = getActiveTenantId();
+  const [paymentsResult, balanceResult] = await Promise.all([
+    supabaseClient.from('booking_payments').select('*').eq('tenant_id', tenantId).eq('booking_id', bookingId).order('paid_on', { ascending: false }),
+    supabaseClient.from('booking_payment_balances').select('*').eq('tenant_id', tenantId).eq('booking_id', bookingId).single()
+  ]);
+  if (paymentsResult.error) throw paymentsResult.error;
+  if (balanceResult.error) throw balanceResult.error;
+  appData.bookingPayments = (appData.bookingPayments || []).filter(item => String(item.booking_id) !== String(bookingId)).concat(paymentsResult.data || []);
+  appData.bookingPaymentBalances = (appData.bookingPaymentBalances || []).filter(item => String(item.booking_id) !== String(bookingId)).concat(balanceResult.data ? [balanceResult.data] : []);
+}
+
+async function saveBookingPayment(bookingId) {
+  if (!canWriteSalesRole(activeTenant?.role)) return false;
+  const amount = Number(document.getElementById('bookingPaymentAmount')?.value);
+  const paidOn = document.getElementById('bookingPaymentDate')?.value || '';
+  const kind = document.getElementById('bookingPaymentKind')?.value || '';
+  const method = document.getElementById('bookingPaymentMethod')?.value || null;
+  const note = (document.getElementById('bookingPaymentNote')?.value || '').trim() || null;
+  if (!(amount > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(paidOn) || !['DEPOSIT', 'INTERIM', 'BALANCE'].includes(kind)) {
+    if (typeof showToast === 'function') showToast('⚠️ Tutar, tarih ve ödeme türünü kontrol edin.', 'error');
+    return false;
+  }
+  try {
+    requireCloudForWrite('Rezervasyon ödemesi', getActiveTenantId());
+    const { error } = await supabaseClient.from('booking_payments').insert({
+      tenant_id: getActiveTenantId(), booking_id: bookingId, paid_on: paidOn,
+      amount, kind, method, note
+    });
+    if (error) throw error;
+    await refreshBookingPaymentData(bookingId);
+    openBookingDetailsPanel(bookingId);
+    renderManageBookingsTable();
+    if (typeof showToast === 'function') showToast('✅ Ödeme kaydedildi. Ciro değişmedi.', 'success');
+    return true;
+  } catch (error) {
+    if (typeof showToast === 'function') showToast('⚠️ Ödeme kaydedilemedi: ' + getFriendlyAuthErrorMessage(error), 'error');
+    return false;
+  }
+}
+
+async function deleteBookingPayment(paymentId, bookingId) {
+  if (!canManageTenantRole(activeTenant?.role)) return false;
+  if (typeof confirm === 'function' && !confirm('Bu ödeme kaydı silinsin mi?')) return false;
+  try {
+    const { error } = await supabaseClient.from('booking_payments').delete().eq('id', paymentId);
+    if (error) throw error;
+    await refreshBookingPaymentData(bookingId);
+    openBookingDetailsPanel(bookingId);
+    renderManageBookingsTable();
+    return true;
+  } catch (error) {
+    if (typeof showToast === 'function') showToast('⚠️ Ödeme silinemedi: ' + getFriendlyAuthErrorMessage(error), 'error');
+    return false;
+  }
+}
+
 function openBookingDetailsPanel(bookingId) {
   const booking = (appData.bookings || []).find(item => String(item.id) === String(bookingId));
   if (!booking || typeof SidePanel === 'undefined') return false;
@@ -6806,6 +6878,13 @@ function openBookingDetailsPanel(bookingId) {
   const cleaningStatus = cleaning
     ? ({ PLANNED: 'Planlandı', DONE: 'Yapıldı', SKIPPED: 'Yapılmadı' }[cleaning.status] || cleaning.status || '—')
     : 'Görev yok';
+  const paymentEngine = getBookingPaymentEngine();
+  const payments = (appData.bookingPayments || []).filter(item => String(item.booking_id) === String(booking.id));
+  const balance = (appData.bookingPaymentBalances || []).find(item => String(item.booking_id) === String(booking.id));
+  const money = value => value == null ? '—' : `${Number(value).toLocaleString('tr-TR')} ₺`;
+  const paymentRows = payments.length ? payments.map(payment => `<div class="booking-payment-row"><div><strong>${escapeHtml(paymentEngine?.kindLabel(payment.kind) || payment.kind || '—')}</strong><span>${escapeHtml(formatTrDate(payment.paid_on))} · ${escapeHtml(paymentEngine?.methodLabel(payment.method) || payment.method || '—')}</span>${payment.note ? `<span>${escapeHtml(payment.note)}</span>` : ''}</div><strong>${money(payment.amount)}</strong>${canManageTenantRole(activeTenant?.role) ? `<button class="btn btn-danger btn-sm" data-onclick="deleteBookingPayment(decodeURIComponent('${encodeActionArg(payment.id)}'), decodeURIComponent('${encodeActionArg(String(booking.id))}'))">Sil</button>` : ''}</div>`).join('') : '<div class="empty-state">Henüz ödeme kaydı yok.</div>';
+  const paymentForm = canWriteSalesRole(activeTenant?.role) ? `<div class="booking-payment-form"><input id="bookingPaymentAmount" type="number" min="0.01" step="0.01" placeholder="Tutar"><input id="bookingPaymentDate" type="date" value="${escapeHtml(getTodayStr())}"><select id="bookingPaymentKind"><option value="DEPOSIT">Kapora</option><option value="INTERIM">Ara ödeme</option><option value="BALANCE">Kalan</option></select><select id="bookingPaymentMethod"><option value="">Yöntem —</option><option value="CASH">Nakit</option><option value="BANK_TRANSFER">Havale/EFT</option><option value="CARD">Kart</option><option value="OTA">OTA</option><option value="OTHER">Diğer</option></select><input id="bookingPaymentNote" maxlength="1000" placeholder="Not —"><button class="btn btn-primary" data-onclick="saveBookingPayment(decodeURIComponent('${encodeActionArg(String(booking.id))}'))">Ödeme ekle</button></div>` : '';
+  const paymentHtml = `<section class="booking-payments"><h3>Ödeme takibi</h3><div class="booking-payment-summary"><div><span>Tahsil edilecek</span><strong>${money(balance?.amount_due)}</strong></div><div><span>Toplam tahsilat</span><strong>${money(balance?.paid_total)}</strong></div><div><span>Kalan</span><strong>${money(balance?.remaining)}</strong></div></div>${paymentRows}${paymentForm}<p class="sub-text">Ödeme nakit hareketidir; rezervasyon cirosunu değiştirmez.</p></section>`;
   const detailHtml = (label, value) => `<div class="booking-detail-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value == null || value === '' ? '—' : String(value))}</strong></div>`;
   const bodyHtml = `<div class="booking-detail-grid">
     ${detailHtml('Mülk', villaName)}
@@ -6818,8 +6897,9 @@ function openBookingDetailsPanel(bookingId) {
     ${detailHtml('Net oda geliri', `${Number(booking.net || 0).toLocaleString('tr-TR')} ₺`)}
     ${detailHtml('Temizlik görevi', cleaningStatus)}
     ${detailHtml('Kaynak talep', lead ? (lead.guest || lead.guestName || lead.channel || 'Bağlı talep') : 'Bağlı talep yok')}
-  </div>`;
-  const footerHtml = `<button type="button" class="btn btn-danger" data-onclick="deleteBookingUI(decodeURIComponent('${encodeActionArg(String(booking.id))}'))">Sil</button>
+  </div>${paymentHtml}`;
+  const canDeleteBooking = canManageTenantRole(activeTenant?.role);
+  const footerHtml = `${canDeleteBooking ? `<button type="button" class="btn btn-danger" data-onclick="deleteBookingUI(decodeURIComponent('${encodeActionArg(String(booking.id))}'))">Sil</button>` : ''}
     <button type="button" class="btn btn-primary" data-onclick="editBooking(decodeURIComponent('${encodeActionArg(String(booking.id))}'))">Düzenle</button>`;
   SidePanel.open({ title: booking.guest || 'Rezervasyon detayı', subtitle: `${formatTrDate(booking.checkIn)} – ${formatTrDate(booking.checkOut)}`, bodyHtml, footerHtml, ariaLabel: 'Rezervasyon detayı' });
   return true;
@@ -6842,6 +6922,11 @@ function renderManageBookingsTable() {
     bookings: appData.bookings || [], cleaningTasks: appData.cleaningTasks || [], today: todayStr,
     rangeStart: reservationListRange.start, rangeEnd: reservationListRange.end
   });
+  const paymentEngine = getBookingPaymentEngine();
+  const collectionTotal = paymentEngine
+    ? paymentEngine.totalCollections(appData.bookingPayments || [], reservationListRange.start, reservationListRange.end)
+    : null;
+  setEl('rezCollectionsMetric', `Toplam tahsilat: ${collectionTotal == null ? '—' : `₺${Number(collectionTotal).toLocaleString('tr-TR')}`}`);
   const filteredRows = visibleRows.filter(({ booking: b }) => {
     // Villa Filter
     if (villaFilter !== 'ALL' && b.villa !== villaFilter) return false;
@@ -13472,7 +13557,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
       const mayReadLedger = canReadLedgerRole(activeTenant?.role);
       // Independent datasets are loaded concurrently and every list is paged;
       // Supabase's per-response cap must never silently truncate a dashboard.
-      const [villas, bookings, expenses, cleanList, leads, closeList, targetList, maintenanceTickets, operationalTasks, financialTransactions, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications, campaignRows, influencerRows, settingRows, operatorNoteRows, pricingLadderRows, hkOverrideRows, paymentCommissionRows, operationalPeopleRows, cleaningExecutionRows, maintenanceAssignmentRows, taskTemplateRows, checklistTemplateRows] = await Promise.all([
+      const [villas, bookings, expenses, cleanList, leads, closeList, targetList, maintenanceTickets, operationalTasks, financialTransactions, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications, campaignRows, influencerRows, settingRows, operatorNoteRows, pricingLadderRows, hkOverrideRows, paymentCommissionRows, operationalPeopleRows, cleaningExecutionRows, maintenanceAssignmentRows, taskTemplateRows, checklistTemplateRows, bookingPayments, bookingPaymentBalances] = await Promise.all([
         loadProperties(tenantId),
         loadBookings(tenantId),
         mayReadLedger ? loadExpenses(tenantId) : Promise.resolve([]),
@@ -13507,7 +13592,9 @@ async function loadTenantAppData(tenantIdOrUserId) {
         fetchTenantRowsTolerant(() => supabaseClient.from('cleaning_task_executions').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false })),
         fetchTenantRowsTolerant(() => supabaseClient.from('maintenance_assignments').select('*').eq('tenant_id', tenantId)),
         fetchTenantRowsTolerant(() => supabaseClient.from('task_templates').select('*').eq('tenant_id', tenantId).eq('is_active', true).order('title')),
-        fetchTenantRowsTolerant(() => supabaseClient.from('property_checklist_templates').select('*').eq('tenant_id', tenantId).eq('is_active', true).order('updated_at', { ascending: false }))
+        fetchTenantRowsTolerant(() => supabaseClient.from('property_checklist_templates').select('*').eq('tenant_id', tenantId).eq('is_active', true).order('updated_at', { ascending: false })),
+        fetchTenantRowsTolerant(() => supabaseClient.from('booking_payments').select('*').eq('tenant_id', tenantId).order('paid_on', { ascending: false })),
+        fetchTenantRowsTolerant(() => supabaseClient.from('booking_payment_balances').select('*').eq('tenant_id', tenantId))
       ]);
       const propIdMap = {};
       Object.values(villas || {}).forEach(p => {
@@ -13600,6 +13687,8 @@ async function loadTenantAppData(tenantIdOrUserId) {
         maintenanceAssignments: maintenanceAssignmentRows || [],
         taskTemplates: taskTemplateRows || [],
         checklistTemplates: checklistTemplateRows || [],
+        bookingPayments: bookingPayments || [],
+        bookingPaymentBalances: bookingPaymentBalances || [],
         financialTransactions: financialTransactions || [],
         userNotifications: userNotifications || [],
         marketingCampaigns: (campaignRows || []).map(r => mapMarketingCampaignFromDb(r, propIdMap)),
@@ -16932,6 +17021,8 @@ if (typeof module !== 'undefined' && module.exports) {
     buildReservationListView,
     computeReservationListSummary,
     openBookingDetailsPanel,
+    saveBookingPayment,
+    deleteBookingPayment,
     toggleReservationRangePicker,
     shiftReservationRangeCalendar,
     resetReservationRange,
