@@ -133,6 +133,8 @@ async function runPricingSecurityTests() {
 
   let userAId, userBId, tenantAId, tenantBId, propAId, propBId;
   let clientA, clientB;
+  let testError = null;
+  const cleanupErrors = [];
 
   // Supabase JS FIRLATMAZ, { error } dondurur (CLAUDE.md 5.1). Hata
   // okunmadiginda bir sonraki satir "null.id" ile patliyor ve ASIL sebep
@@ -254,20 +256,27 @@ async function runPricingSecurityTests() {
     assert.ok(logs.length > 0, 'Audit log must record rate change');
     recordPass('10. Atomic override saves cleanly and records audit entry in rate_change_logs');
 
+  } catch (err) {
+    // Temizlik hatasi asil test hatasini maskelemesin; ikisini ayri raporla.
+    testError = err;
   } finally {
-    // Cleanup
-    if (userAId) await adminClient.auth.admin.deleteUser(userAId).catch(() => {});
-    if (userBId) await adminClient.auth.admin.deleteUser(userBId).catch(() => {});
-    // Supabase JS FIRLATMAZ, { error } dondurur (CLAUDE.md 5.1) — PostgREST
-    // sorgu nesnesinde .catch() tanimli DEGIL. Buradaki .catch(() => {}) her
-    // temizlikte TypeError atiyor ve finally'den once olusan ASIL hatayi
-    // tamamen gizliyordu; suit bu yuzden sebebi gorunmez bir sekilde kirmiziydi.
+    // Once isletmeleri sil: sahip kullaniciyi once silmek owner korumasina
+    // takilir ve pricing_sec_a_* hesabini her kosuda test projesinde birakir.
     for (const [label, id] of [['A', tenantAId], ['B', tenantBId]]) {
       if (!id) continue;
       const { error } = await adminClient.from('tenants').delete().eq('id', id);
-      if (error) console.error(`[CLEANUP] Tenant ${label} silinemedi: ${error.message}`);
+      if (error) cleanupErrors.push(`Tenant ${label} silinemedi: ${error.message}`);
+    }
+    // Supabase JS hatayi firlatmaz; { error } mutlaka okunur (CLAUDE.md 5.1).
+    for (const [label, id] of [['A', userAId], ['B', userBId]]) {
+      if (!id) continue;
+      const { error } = await adminClient.auth.admin.deleteUser(id);
+      if (error) cleanupErrors.push(`Kullanici ${label} silinemedi: ${error.message}`);
     }
   }
+
+  if (testError) throw testError;
+  if (cleanupErrors.length) throw new Error(`CLEANUP_FAILED: ${cleanupErrors.join(' | ')}`);
 
   console.log(`\n=============================================================================`);
   console.log(`TEST SUMMARY: ${passedTests} / ${totalTests} TESTS PASSED (0 FAILED)`);

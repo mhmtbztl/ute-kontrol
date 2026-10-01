@@ -127,6 +127,11 @@ async function run() {
       return Number(bul(x, 'cleaning_cost') || 0);
     };
     const costBefore = await snap();
+    r = await own.client.rpc('save_cleaning_progress', { p_execution_id: execId,
+      p_checklist_result: { 's0.i0': { z: true } }, p_supplies_result: {}, p_note: 'yonetici Z denemesi' });
+    check(yetkiHatasi(r.error), 'C0a. Yonetici, baskasina atanmis temizlikte Z ilerlemesi yazamaz', hataMetni(r.error) || 'YAZDI');
+    r = await own.client.rpc('sign_cleaning_done', { p_execution_id: execId });
+    check(yetkiHatasi(r.error), 'C0b. Yonetici, baskasina atanmis temizlikte Z imzasi atamaz', hataMetni(r.error) || 'IMZALADI');
     r = await stf.client.rpc('save_cleaning_progress', { p_execution_id: execId,
       p_checklist_result: { 's0.i0': { z: true, m: true }, 's1.i0.0': { z: true } }, p_supplies_result: { '0': 'LOW', '1': 'OUT' }, p_note: 'Cay azaldi' });
     const ex1 = must(await admin.from('cleaning_task_executions').select('*').eq('id', execId).single(), 'icra');

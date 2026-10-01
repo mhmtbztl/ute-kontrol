@@ -60,7 +60,9 @@ function run() {
   const i53 = files.indexOf('migration_phase53_staff_data_boundary.sql');
   const i55 = files.indexOf('migration_phase55_operations_people_execution.sql');
   const i63 = files.indexOf('migration_phase63_task_status_audit_action.sql');
+  const i68 = files.indexOf('migration_phase68_cleaner_signature_boundary.sql');
   check(i53 >= 0 && i55 > i53 && i63 === i55 + 1, '0. Manifest: 53 -> 55 -> 63 (duzeltme hemen arkasinda)', `${i53} ${i55} ${i63}`);
+  check(i68 > i63, '0b. Phase68 Z imzasi yetki duzeltmesi phase55/63 sonrasinda', `${i63} ${i68}`);
   const p55 = read('migration_phase55_operations_people_execution.sql');
 
   console.log('\n--- A. Z / M VE GIDER ---');
@@ -74,6 +76,7 @@ function run() {
     && /e\.status = 'CLEANED'/.test(p55), 'A4. Denetim bekleyen temizlik varken ay kapanmaz', 'tetikleyici yok');
   check(/UPDATE public\.cleaning_tasks/.test(inspect) && !/SET status = 'DONE'[\s\S]*SET status = 'DONE'/.test(inspect),
     'A5. Gideri doguran tek yazma noktasi M onayi', 'birden fazla DONE yazmasi');
+  check(/NOT v_actor\.is_assignee/.test(sign), 'A6. Z imzasi yalniz atanan temizlikciye ait', 'is_assignee kapisi yok');
 
   console.log('\n--- B. PERSONELE GIDEN VERI ---');
   const field = lastDefinition('get_my_field_work').body || '';
@@ -86,6 +89,7 @@ function run() {
     'B4. Kapi kodu yardimcisi dogrudan cagrilamaz', 'authenticated revoke yok');
   const save = lastDefinition('save_cleaning_progress').body || '';
   check(/'m', COALESCE\(v_exec\.checklist_result -> v_key -> 'm'/.test(save), 'B5. Temizlikci M isaretini degistiremez (korunur)', 'M korunmuyor');
+  check(/NOT v_actor\.is_assignee/.test(save), 'B6. Z ilerlemesini yalniz atanan temizlikci yazar', 'is_assignee kapisi yok');
 
   console.log('\n--- C. DENETIM IZI EYLEMLERI ---');
   const schema = read('schema.sql');
