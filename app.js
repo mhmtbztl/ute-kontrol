@@ -3752,6 +3752,7 @@ function switchTab(tabId) {
   if (tabId === 'expenses') renderExpensesTable();
   if (tabId === 'leads') {
     renderLeadQuickCapture();
+    renderLeadSalesWorkspace();
     renderManageLeadsTable();
     renderLeadAnalytics();
   }
@@ -4412,7 +4413,7 @@ const ACTIVE_RENDER_PLANS = {
   'tab-finance': ['renderFinanceModule'],
   'tab-reservations': ['renderManageBookingsTable', 'renderTapeChart'],
   'tab-expenses': ['renderExpensesTable'],
-  'tab-leads': ['renderLeadQuickCapture', 'renderManageLeadsTable', 'renderLeadAnalytics'],
+  'tab-leads': ['renderLeadQuickCapture', 'renderLeadSalesWorkspace', 'renderManageLeadsTable', 'renderLeadAnalytics'],
   'tab-maintenance': ['renderManageMaintTable'],
   'tab-housekeeping': ['renderHousekeepingTab'],
   'tab-settings': ['renderSettingsTable', 'renderTeamManagement']
@@ -4446,6 +4447,7 @@ function renderAll() {
     renderManageBookingsTable,
     renderExpensesTable,
     renderLeadQuickCapture,
+    renderLeadSalesWorkspace,
     renderManageLeadsTable,
     renderLeadAnalytics,
     renderManageMaintTable,
@@ -8775,6 +8777,84 @@ async function saveAllSettings() {
 // LEADS & MAINTENANCE CRUD
 // -------------------------------------------------------------
 let lastLeadSourceId = '';
+let leadViewMode = 'KANBAN';
+let leadFollowUpScope = 'MINE';
+
+function buildLeadSalesView({ leads = [], sources = [], acquisitions = [], workflows = [], today = '', currentUserId = '' } = {}) {
+  const sourceById = new Map(sources.map(source => [source.id, source]));
+  const acquisitionByLead = new Map(acquisitions.map(row => [row.lead_id, row]));
+  const workflowByLead = new Map(workflows.map(row => [row.lead_id, row]));
+  const columns = Object.fromEntries(ALLOWED_LEAD_STAGES.map(stage => [stage, []]));
+  const rows = leads.map(lead => {
+    const acquisition = acquisitionByLead.get(lead.id) || null;
+    const workflow = workflowByLead.get(lead.id) || null;
+    const source = acquisition ? sourceById.get(acquisition.source_id) : null;
+    return {
+      ...lead,
+      sourceId: acquisition?.source_id || null,
+      sourceLabel: source?.label || '—',
+      assignedTo: workflow?.assigned_to || null,
+      nextFollowUpAt: workflow?.next_follow_up_at || null
+    };
+  }).sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+  rows.forEach(row => (columns[row.status] || columns.NEW).push(row));
+  const followUpsToday = rows
+    .filter(row => String(row.nextFollowUpAt || '').slice(0, 10) === today)
+    .sort((a, b) => String(a.nextFollowUpAt).localeCompare(String(b.nextFollowUpAt)));
+  return { rows, columns, followUpsToday, myFollowUpsToday: followUpsToday.filter(row => row.assignedTo === currentUserId) };
+}
+
+function setLeadViewMode(mode) {
+  leadViewMode = mode === 'LIST' ? 'LIST' : 'KANBAN';
+  renderLeadSalesWorkspace();
+}
+
+function setLeadFollowUpScope(scope) {
+  leadFollowUpScope = scope === 'ALL' ? 'ALL' : 'MINE';
+  renderLeadSalesWorkspace();
+}
+
+function getLeadSalesView() {
+  return buildLeadSalesView({
+    leads: appData.leads || [],
+    sources: appData.leadSources || [],
+    acquisitions: appData.leadAcquisitions || [],
+    workflows: appData.leadWorkflows || [],
+    today: getTodayStr(),
+    currentUserId: activeSaaSUser?.id || ''
+  });
+}
+
+function renderLeadCard(row) {
+  const villaName = appData.villas?.[row.villa]?.name || (row.villa === 'ALL' ? 'Mülk belirtilmedi' : row.villa || 'Mülk belirtilmedi');
+  return `<article class="lead-card">
+    <div><strong>${escapeHtml(row.guest || 'Ad girilmedi')}</strong><span>${escapeHtml(row.sourceLabel)} · ${escapeHtml(villaName)}</span></div>
+    <div class="lead-card-meta"><span>${row.nextFollowUpAt ? `Takip: ${escapeHtml(formatTrDate(String(row.nextFollowUpAt).slice(0, 10)))}` : 'Takip tarihi yok'}</span><button type="button" class="btn btn-secondary btn-sm" data-onclick="editLead(decodeURIComponent('${encodeActionArg(row.id)}'))">Aç</button></div>
+  </article>`;
+}
+
+function renderLeadSalesWorkspace() {
+  if (typeof document === 'undefined') return;
+  const kanban = document.getElementById('leadKanbanContainer');
+  const listSection = document.getElementById('leadLegacyListSection');
+  const followUpList = document.getElementById('leadFollowUpList');
+  if (!kanban || !listSection || !followUpList) return;
+  const view = getLeadSalesView();
+  const stages = [['NEW', 'Yeni'], ['CONTACTED', 'Görüşüldü'], ['QUOTE_SENT', 'Teklif'], ['FOLLOW_UP', 'Takip'], ['WON', 'Kazanıldı'], ['LOST', 'Kaybedildi']];
+  kanban.hidden = leadViewMode !== 'KANBAN';
+  listSection.hidden = leadViewMode !== 'LIST';
+  document.getElementById('leadViewKanban')?.classList.toggle('active', leadViewMode === 'KANBAN');
+  document.getElementById('leadViewList')?.classList.toggle('active', leadViewMode === 'LIST');
+  kanban.innerHTML = stages.map(([code, label]) => `<section class="lead-column"><h3>${escapeHtml(label)} <span class="badge">${view.columns[code].length}</span></h3><div>${view.columns[code].length ? view.columns[code].map(renderLeadCard).join('') : '<p class="empty-state">Talep yok.</p>'}</div></section>`).join('');
+
+  const followUps = leadFollowUpScope === 'ALL' ? view.followUpsToday : view.myFollowUpsToday;
+  document.getElementById('leadFollowUpCount').textContent = String(followUps.length);
+  document.getElementById('leadFollowUpMine')?.classList.toggle('active', leadFollowUpScope === 'MINE');
+  document.getElementById('leadFollowUpAll')?.classList.toggle('active', leadFollowUpScope === 'ALL');
+  followUpList.innerHTML = followUps.length
+    ? followUps.map(row => `<div class="lead-followup-row"><div><strong>${escapeHtml(row.guest || 'Ad girilmedi')}</strong><span>${escapeHtml(row.sourceLabel)} · ${escapeHtml(String(row.nextFollowUpAt || '').slice(11, 16) || 'Saat belirtilmedi')}</span></div><button type="button" class="btn btn-secondary btn-sm" data-onclick="editLead(decodeURIComponent('${encodeActionArg(row.id)}'))">Talebi aç</button></div>`).join('')
+    : '<p class="empty-state">Bu kapsamda bugün aranacak talep yok.</p>';
+}
 
 function setLeadQuickMessage(message, type = '') {
   const element = document.getElementById('leadQuickMessage');
@@ -17139,6 +17219,7 @@ if (typeof module !== 'undefined' && module.exports) {
     ALLOWED_LEAD_SOURCES,
     mapLeadFromDb,
     mapLeadToDb,
+    buildLeadSalesView,
     buildLeadEditPayload,
     validateLeadInput,
     loadLeads,

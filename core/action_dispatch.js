@@ -74,7 +74,7 @@
     'saveBooking', 'saveBookingChannelRow', 'saveBookingPayment', 'saveCleaningTask', 'saveExpense', 'saveGuestProfile',
     'saveLead', 'saveMaint', 'saveMonthlyGoals', 'saveStaffCleaningProgress', 'signStaffCleaningDone',
     'saveProperty', 'saveWaAsBooking', 'saveWaAsLead',
-    'sendGuestLoyaltyMessage', 'setBookingChannelActive', 
+    'sendGuestLoyaltyMessage', 'setBookingChannelActive', 'setLeadFollowUpScope', 'setLeadViewMode',
     'setGuestDirectoryPage', 'setGuestDirectoryProperty',
     'setGuestDirectoryQuery', 'setGuestDirectorySegment', 'setGuestDirectorySort',
     'setGuestDirectorySortDirection', 'setKpiTrackerMetric', 'setLargeTablePage',

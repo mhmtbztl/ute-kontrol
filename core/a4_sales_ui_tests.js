@@ -116,6 +116,28 @@ async function test(name, fn) {
     assert.match(actions, /'submitQuickLead'/);
   });
 
+  await test('talep çalışma alanı kaynak, takip ve atamayı tek görünümde birleştirir', () => {
+    const view = App.buildLeadSalesView({
+      leads: [
+        { id: 'lead-1', guest: 'Ayşe', status: 'QUOTE_SENT', createdAt: '2026-10-01T08:00:00Z' },
+        { id: 'lead-2', guest: 'Mehmet', status: 'NEW', createdAt: '2026-10-01T09:00:00Z' }
+      ],
+      sources: [{ id: 'src-1', label: 'Instagram reklamı' }],
+      acquisitions: [{ lead_id: 'lead-1', source_id: 'src-1' }],
+      workflows: [
+        { lead_id: 'lead-1', assigned_to: 'user-1', next_follow_up_at: '2026-10-01T12:00:00+03:00' },
+        { lead_id: 'lead-2', assigned_to: 'user-2', next_follow_up_at: '2026-10-02T12:00:00+03:00' }
+      ],
+      today: '2026-10-01',
+      currentUserId: 'user-1'
+    });
+
+    assert.strictEqual(view.rows.find(row => row.id === 'lead-1').sourceLabel, 'Instagram reklamı');
+    assert.strictEqual(view.columns.QUOTE_SENT.length, 1);
+    assert.deepStrictEqual(view.followUpsToday.map(row => row.id), ['lead-1']);
+    assert.deepStrictEqual(view.myFollowUpsToday.map(row => row.id), ['lead-1']);
+  });
+
   console.log('✅ A4 Misafirler ve Satış UI testleri tamamlandı.');
 })().catch(error => {
   console.error(error);

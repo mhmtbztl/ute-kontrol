@@ -1375,6 +1375,25 @@
         <p id="leadQuickMessage" class="lead-quick-message" role="status" aria-live="polite"></p>
       </section>
 
+      <section class="card lead-workspace" aria-labelledby="leadWorkspaceTitle">
+        <div class="section-title-bar">
+          <div><h2 id="leadWorkspaceTitle">Satış hunisi</h2><p class="sub-text">Talepleri aşamaya göre izleyin; bugünkü aramaları kaçırmayın.</p></div>
+          <div class="lead-view-switch" role="group" aria-label="Talep görünümü">
+            <button id="leadViewKanban" type="button" class="btn btn-secondary btn-sm" data-onclick="setLeadViewMode('KANBAN')">Kanban</button>
+            <button id="leadViewList" type="button" class="btn btn-secondary btn-sm" data-onclick="setLeadViewMode('LIST')">Liste</button>
+          </div>
+        </div>
+        <div class="lead-followup-head">
+          <h3>Bugün aranacaklar <span id="leadFollowUpCount" class="badge">0</span></h3>
+          <div role="group" aria-label="Takip kapsamı">
+            <button id="leadFollowUpMine" type="button" class="btn btn-secondary btn-sm" data-onclick="setLeadFollowUpScope('MINE')">Benim</button>
+            <button id="leadFollowUpAll" type="button" class="btn btn-secondary btn-sm" data-onclick="setLeadFollowUpScope('ALL')">Tümü</button>
+          </div>
+        </div>
+        <div id="leadFollowUpList" class="lead-followup-list"></div>
+        <div id="leadKanbanContainer" class="lead-kanban" aria-live="polite"></div>
+      </section>
+
       <!-- 1. WHATSAPP & SATIŞ TALEP ANALİZİ (EXECUTIVE RADAR) -->
       <section class="card" style="margin-bottom: 24px;">
         <div class="section-title-bar">
@@ -1452,7 +1471,7 @@
       </section>
 
       <!-- 2. LEAD LİSTESİ VE GELEN TALEPLER TABLOSU -->
-      <section class="card">
+      <section id="leadLegacyListSection" class="card">
         <div class="section-title-bar">
           <div><h2>📋 GELEN TALEP VE LEAD LİSTESİ</h2><p class="sub-text">WhatsApp, Instagram ve telefon teklifleri. Durumu güncelleyin veya rezervasyona dönüştürün.</p></div>
           <div style="display: flex; gap: 8px;">
