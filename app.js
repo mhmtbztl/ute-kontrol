@@ -3668,6 +3668,7 @@ function switchTab(tabId) {
   if (tabId === 'properties') renderPropertiesTab();
   if (tabId === 'operations') renderOperationsTab();
   if (tabId === 'operations') renderOperationsKpiStrip();
+  if (tabId === 'staff-field') renderStaffFieldWork();
   if (tabId === 'guests') renderGuestsTab();
   if (tabId === 'pricing') renderPricingTab();
   if (tabId === 'pricing') renderPricingKpiStrip();
@@ -4334,6 +4335,7 @@ const ACTIVE_RENDER_PLANS = {
   'tab-executive': ['renderExecutiveControlCenter'],
   'tab-properties': ['renderPropertiesTab'],
   'tab-operations': ['renderOperationsTab', 'renderOperationsKpiStrip'],
+  'tab-staff-field': ['renderStaffFieldWork'],
   'tab-guests': ['renderGuestsTab'],
   'tab-pricing': ['renderPricingTab', 'renderPricingKpiStrip'],
   // Gidisat radari, gelir projeksiyonu ve simulator kullanici karariyla kalkti
@@ -12826,8 +12828,14 @@ async function handleAuthenticatedSession(u) {
   renderTenantSelector();
 
   if (activeTenantId) {
-    await loadTenantAppData(activeTenantId);
-    subscribeTenantRealtime(activeTenantId);
+    if (activeTenant?.role === 'staff') {
+      appData = getBlankTenantData(activeTenantId);
+      await loadStaffFieldWork();
+      switchTab('staff-field');
+    } else {
+      await loadTenantAppData(activeTenantId);
+      subscribeTenantRealtime(activeTenantId);
+    }
 
     // Mülk sayısı 0 ise Onboarding modalını aç
     const propCount = Object.keys(appData.villas || {}).length;
@@ -13700,6 +13708,8 @@ function updateSaaSUi() {
 function applyRoleNavigationVisibility() {
   if (typeof document === 'undefined') return;
   const role = activeTenant?.role || 'viewer';
+  const nav = document.querySelector('.nav-tabs');
+  if (nav) nav.hidden = role === 'staff';
   const hiddenTabs = new Set(['sales', 'staff'].includes(role) ? ['finance', 'marketing'] : []);
   document.querySelectorAll('.nav-tabs .tab-btn').forEach(button => {
     const match = String(button.getAttribute('data-onclick') || '').match(/^switchTab\('([^']+)'\)$/);
@@ -15969,6 +15979,94 @@ function getOperationsApi() {
   return null;
 }
 
+let staffFieldWork = { cleanings: [], tasks: [], tickets: [] };
+
+async function loadStaffFieldWork() {
+  const tenantId = getActiveTenantId();
+  const today = getTodayStr();
+  if (!tenantId || !supabaseClient) return staffFieldWork;
+  const { data, error } = await supabaseClient.rpc('get_my_field_work', {
+    p_tenant_id: tenantId,
+    p_from: today,
+    p_to: today
+  });
+  if (error) {
+    staffFieldWork = { cleanings: [], tasks: [], tickets: [], error: getFriendlyAuthErrorMessage(error) };
+  } else {
+    staffFieldWork = {
+      cleanings: Array.isArray(data?.cleanings) ? data.cleanings : [],
+      tasks: Array.isArray(data?.tasks) ? data.tasks : [],
+      tickets: Array.isArray(data?.tickets) ? data.tickets : []
+    };
+  }
+  renderStaffFieldWork();
+  return staffFieldWork;
+}
+
+function setStaffChecklistMark(executionId, key, checked) {
+  const row = staffFieldWork.cleanings.find(item => item.execution_id === executionId);
+  if (!row) return false;
+  row.checklist_result = { ...(row.checklist_result || {}), [key]: { ...((row.checklist_result || {})[key] || {}), z: !!checked } };
+  return true;
+}
+
+function setStaffSupplyStatus(executionId, key, value) {
+  if (!['OK', 'LOW', 'OUT'].includes(value)) return false;
+  const row = staffFieldWork.cleanings.find(item => item.execution_id === executionId);
+  if (!row) return false;
+  row.supplies_result = { ...(row.supplies_result || {}), [key]: value };
+  return true;
+}
+
+async function saveStaffCleaningProgress(executionId) {
+  const row = staffFieldWork.cleanings.find(item => item.execution_id === executionId);
+  if (!row) return false;
+  const note = document.getElementById(`staffNote-${executionId}`)?.value || '';
+  const { error } = await supabaseClient.rpc('save_cleaning_progress', {
+    p_execution_id: executionId,
+    p_checklist_result: row.checklist_result || {},
+    p_supplies_result: row.supplies_result || {},
+    p_note: note || null
+  });
+  if (error) {
+    if (typeof showToast === 'function') showToast('⚠️ İlerleme kaydedilemedi: ' + getFriendlyAuthErrorMessage(error), 'error');
+    return false;
+  }
+  if (typeof showToast === 'function') showToast('✅ Kontrol listesi kaydedildi.');
+  return true;
+}
+
+async function signStaffCleaningDone(executionId) {
+  if (!confirm('Temizliği tamamladığınızı imzalıyor musunuz? Yönetici denetiminden sonra kapanır.')) return false;
+  if (!await saveStaffCleaningProgress(executionId)) return false;
+  const { error } = await supabaseClient.rpc('sign_cleaning_done', { p_execution_id: executionId });
+  if (error) {
+    if (typeof showToast === 'function') showToast('⚠️ Temizlik imzalanamadı: ' + getFriendlyAuthErrorMessage(error), 'error');
+    return false;
+  }
+  await loadStaffFieldWork();
+  if (typeof showToast === 'function') showToast('✅ Z imzanız kaydedildi; yönetici denetimi bekleniyor.');
+  return true;
+}
+
+function renderStaffFieldWork() {
+  if (typeof document === 'undefined') return;
+  const container = document.getElementById('staffFieldWorkContainer');
+  if (!container) return;
+  if (staffFieldWork.error) {
+    container.innerHTML = `<div class="empty-state">${escapeHtml(staffFieldWork.error)}</div>`;
+    return;
+  }
+  const rows = staffFieldWork.cleanings || [];
+  container.innerHTML = rows.length ? rows.map(row => {
+    const access = row.access || {};
+    const locked = ['CLEANED', 'INSPECTED'].includes(row.status);
+    const sections = (row.checklist?.sections || []).map((section, sectionIndex) => `<fieldset class="staff-check-section"><legend>${escapeHtml(section.title || 'Kontrol')}</legend>${(section.items || []).map((item, itemIndex) => { const key = `s${sectionIndex}.i${itemIndex}`; const checked = row.checklist_result?.[key]?.z === true; return `<label><input type="checkbox" ${checked ? 'checked' : ''} ${locked ? 'disabled' : ''} data-onchange="setStaffChecklistMark(decodeURIComponent('${encodeActionArg(row.execution_id)}'), decodeURIComponent('${encodeActionArg(key)}'), this.checked)"> ${escapeHtml(item.text || '—')}</label>`; }).join('')}</fieldset>`).join('');
+    const supplies = (row.checklist?.supplies || []).map((item, index) => { const current = row.supplies_result?.[String(index)] || ''; return `<label class="staff-supply"><span>${escapeHtml(item.item || '—')}</span><select ${locked ? 'disabled' : ''} data-onchange="setStaffSupplyStatus(decodeURIComponent('${encodeActionArg(row.execution_id)}'), '${index}', this.value)"><option value="">Seçin…</option><option value="OK"${current === 'OK' ? ' selected' : ''}>Var</option><option value="LOW"${current === 'LOW' ? ' selected' : ''}>Az var</option><option value="OUT"${current === 'OUT' ? ' selected' : ''}>Yok</option></select></label>`; }).join('');
+    return `<article class="staff-field-card"><header><div><h2>${escapeHtml(row.property?.name || '—')}</h2><span>${escapeHtml(row.task_date || '—')} · Sonraki giriş: ${escapeHtml(row.next_check_in || '—')}</span></div><span class="badge">${locked ? 'Denetim bekliyor' : 'Bugün'}</span></header><div class="staff-access"><div><strong>Adres</strong><span>${escapeHtml(access.address || '—')}</span></div><div><strong>Kapı kodu</strong><span>${escapeHtml(access.door_code || '—')}</span></div><div><strong>Wi-Fi</strong><span>${escapeHtml(access.wifi_name || '—')}</span></div><div><strong>Saatler</strong><span>${escapeHtml(access.check_out_time || '—')} → ${escapeHtml(access.check_in_time || '—')}</span></div></div>${sections || '<div class="empty-state">Kontrol listesi tanımlanmamış.</div>'}<div class="staff-supplies"><h3>Malzemeler</h3>${supplies || '<div class="empty-state">Malzeme listesi yok.</div>'}</div><label class="staff-note">Not<textarea id="staffNote-${escapeHtml(row.execution_id)}" ${locked ? 'disabled' : ''}>${escapeHtml(row.note || '')}</textarea></label>${locked ? '<p class="sub-text">Z imzanız kayıtlı; yönetici denetimi bekleniyor.</p>' : `<div class="staff-field-actions"><button class="btn btn-secondary" data-onclick="saveStaffCleaningProgress(decodeURIComponent('${encodeActionArg(row.execution_id)}'))">Kaydet</button><button class="btn btn-primary" data-onclick="signStaffCleaningDone(decodeURIComponent('${encodeActionArg(row.execution_id)}'))">Yaptım (Z)</button></div>`}</article>`;
+  }).join('') : '<div class="empty-state">Bugün size atanmış temizlik yok.</div>';
+}
+
 let operationsViewState = 'cleaning';
 
 function setOperationsView(view) {
@@ -16147,6 +16245,21 @@ function assignOperationalTaskFromSelect(taskId) {
   return assignOperationalTask(taskId, select?.value || '');
 }
 
+function renderCleaningExecutionFlags(execution) {
+  if (!execution) return '';
+  const snapshot = Array.isArray(execution.supplies_snapshot) ? execution.supplies_snapshot : [];
+  const results = execution.supplies_result || {};
+  const flagged = Object.entries(results)
+    .filter(([, value]) => value === 'LOW' || value === 'OUT')
+    .map(([key, value]) => {
+      const supply = snapshot[Number(key)] || {};
+      const label = supply.item || supply.text || `Malzeme ${Number(key) + 1}`;
+      return `${label}: ${value === 'OUT' ? 'Yok' : 'Az var'}`;
+    });
+  if (!flagged.length && !execution.note) return '';
+  return `<div class="ops-execution-flags">${flagged.length ? `<span><strong>Malzeme:</strong> ${escapeHtml(flagged.join(' · '))}</span>` : ''}${execution.note ? `<span><strong>Personel notu:</strong> ${escapeHtml(execution.note)}</span>` : ''}</div>`;
+}
+
 function renderOperationsCleaningView(tasks) {
   const api = getOperationsApi();
   if (!api) return '<div class="empty-state">Operasyon motoru yüklenemedi.</div>';
@@ -16165,7 +16278,7 @@ function renderOperationsCleaningView(tasks) {
         const options = eligible.map(person => `<option value="${escapeHtml(person.id)}"${execution?.person_id === person.id ? ' selected' : ''}>${escapeHtml(person.full_name)}</option>`).join('');
         const status = waiting ? 'Denetim bekliyor' : task.status === 'DONE' ? (task.paid ? 'Ödendi' : 'Borç') : task.status === 'SKIPPED' ? 'Yapılmadı' : execution ? 'Atandı' : 'Planlı';
         return `<article class="ops-row" data-cleaning-task-id="${escapeHtml(task.id)}">
-          <div class="ops-row-main"><strong>${escapeHtml(property)}</strong><span>${escapeHtml(task.date || '—')} · ${escapeHtml(task.cleaner || 'Personel belirtilmedi')}</span></div>
+          <div class="ops-row-main"><strong>${escapeHtml(property)}</strong><span>${escapeHtml(task.date || '—')} · ${escapeHtml(task.cleaner || 'Personel belirtilmedi')}</span>${waiting ? renderCleaningExecutionFlags(execution) : ''}</div>
           <span class="badge ${waiting ? 'badge-blue' : (isCleaningDebt(task) ? 'badge-amber' : '')}">${escapeHtml(status)}</span>
           <div class="ops-row-actions">
             ${waiting ? `<button class="btn btn-primary btn-sm" data-onclick="inspectCleaningExecution(decodeURIComponent('${encodeActionArg(execution.id)}'), true)">M Onayla</button><button class="btn btn-secondary btn-sm" data-onclick="inspectCleaningExecution(decodeURIComponent('${encodeActionArg(execution.id)}'), false)">Yeniden aç</button>` : task.status !== 'DONE' && task.status !== 'SKIPPED' ? `
@@ -16901,6 +17014,10 @@ if (typeof module !== 'undefined' && module.exports) {
     // boyle yakalanir (statik tarama regex literalleri yuzunden guvenilmez).
     renderAll,
     renderOperationsTab,
+    loadStaffFieldWork,
+    renderStaffFieldWork,
+    saveStaffCleaningProgress,
+    signStaffCleaningDone,
     setOperationsView,
     assignCleaningTask,
     inspectCleaningExecution,

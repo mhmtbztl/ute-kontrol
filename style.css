@@ -4773,11 +4773,31 @@ body {
 .ops-debt-detail { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 3px; padding: 8px; border-radius: 7px; background: rgba(255,255,255,.04); }
 .ops-debt-detail button { margin-top: 4px; }
 .empty-state { color: var(--text-muted); font-size: 12px; padding: 12px 0; }
+.staff-field-page { max-width: 900px; margin: 0 auto; }
+.staff-field-card { background: rgba(15,23,42,.88); border: 1px solid rgba(255,255,255,.1); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+.staff-field-card > header { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 14px; }
+.staff-field-card h2 { margin: 0 0 4px; font-size: 18px; }
+.staff-field-card header span { color: var(--text-muted); font-size: 12px; }
+.staff-access { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin-bottom: 14px; }
+.staff-access > div { display: flex; flex-direction: column; gap: 3px; padding: 10px; border-radius: 8px; background: rgba(255,255,255,.04); }
+.staff-access span { color: #CBD5E1; font-size: 12px; overflow-wrap: anywhere; }
+.staff-check-section { border: 1px solid rgba(255,255,255,.09); border-radius: 8px; padding: 10px 12px; margin: 0 0 10px; }
+.staff-check-section legend { padding: 0 5px; color: #F8FAFC; font-weight: 700; }
+.staff-check-section label { display: block; padding: 6px 0; color: #E2E8F0; }
+.staff-supplies h3 { font-size: 14px; margin: 14px 0 8px; }
+.staff-supply { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 6px 0; }
+.staff-supply select { min-width: 120px; padding: 7px; background: var(--bg-input); color: #fff; border: 1px solid rgba(255,255,255,.15); border-radius: 6px; }
+.staff-note { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; color: #E2E8F0; font-weight: 600; }
+.staff-note textarea { min-height: 80px; resize: vertical; padding: 10px; background: var(--bg-input); color: #fff; border: 1px solid rgba(255,255,255,.15); border-radius: 7px; }
+.staff-field-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.ops-execution-flags { display: grid; gap: 4px; margin-top: 8px; color: #fbbf24; font-size: 12px; }
 @media (max-width: 720px) {
   .ops-cleaning-layout { grid-template-columns: 1fr; }
   .ops-row { grid-template-columns: 1fr; }
   .ops-row > .badge { justify-self: start; }
   .ops-row-actions select { width: 100%; min-width: 0; }
+  .staff-access { grid-template-columns: 1fr; }
+  .staff-field-page { padding: 0; }
 }
 
 /* Kanal ekonomisi tablosu: baslik ve deger ayni hizada (metin solda, sayilar sagda). */
