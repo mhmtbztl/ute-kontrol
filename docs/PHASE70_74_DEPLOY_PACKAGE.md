@@ -1,5 +1,9 @@
 # Phase 70–76 dağıtım paketi
 
+**Üretim durumu:** 1 Ekim 2026'da phase70, phase72, phase74 ve phase76
+uygulandı. `npm run production:readiness` ile üretim defterinde dört sürümün
+varlığı, kanonik şema ve anonim erişim kapıları doğrulandı.
+
 Bu paket A3 için dört yeni, değişmez göçü kapsar. **Üretime araç tarafından
 uygulanmaz.** Kullanıcı açıkça onayladıktan sonra Supabase Dashboard → SQL
 Editor üzerinden aşağıdaki sırayla çalıştırılır:
