@@ -94,6 +94,33 @@
     };
   }
 
+  function validateLocationInput(input = {}) {
+    const tenantId = String(input.tenantId || '');
+    const propertyId = String(input.propertyId || '');
+    if (!UUID_RE.test(tenantId)) throw new Error('VALID_TENANT_ID_REQUIRED');
+    if (!UUID_RE.test(propertyId)) throw new Error('VALID_PROPERTY_ID_REQUIRED');
+    const locality = optionalText(input.locality, 120, 'PROPERTY_LOCALITY_TOO_LONG');
+    const latitude = input.latitude === '' || input.latitude == null ? null : Number(input.latitude);
+    const longitude = input.longitude === '' || input.longitude == null ? null : Number(input.longitude);
+    const radius = input.researchRadiusKm === '' || input.researchRadiusKm == null ? null : Number(input.researchRadiusKm);
+    if ((latitude === null) !== (longitude === null)) throw new Error('COORDINATE_PAIR_REQUIRED');
+    if (latitude !== null && (!Number.isFinite(latitude) || latitude < -90 || latitude > 90)) throw new Error('INVALID_LATITUDE');
+    if (longitude !== null && (!Number.isFinite(longitude) || longitude < -180 || longitude > 180)) throw new Error('INVALID_LONGITUDE');
+    if (radius !== null && (!Number.isFinite(radius) || radius < 0.5 || radius > 200)) throw new Error('INVALID_RESEARCH_RADIUS');
+    return { tenantId, propertyId, locality, latitude, longitude, researchRadiusKm: radius };
+  }
+
+  async function savePropertyLocation(client, input = {}) {
+    if (!client || typeof client.rpc !== 'function') throw new Error('SUPABASE_CLIENT_REQUIRED');
+    const valid = validateLocationInput(input);
+    const { data, error } = await client.rpc('save_property_location', {
+      p_tenant_id: valid.tenantId, p_property_id: valid.propertyId, p_locality: valid.locality,
+      p_latitude: valid.latitude, p_longitude: valid.longitude, p_research_radius_km: valid.researchRadiusKm
+    });
+    if (error) throw error;
+    return data;
+  }
+
   async function savePropertyAnalysisContext(client, input = {}) {
     if (!client || typeof client.rpc !== 'function') throw new Error('SUPABASE_CLIENT_REQUIRED');
     const valid = validateContextInput(input);
@@ -136,7 +163,7 @@
     if (!client || typeof client.from !== 'function') throw new Error('SUPABASE_CLIENT_REQUIRED');
     const valid = validateScope(scope);
     const contextPromise = execute(client.from('property_analysis_context')
-      .select('property_id,country_code,admin_area,city,district_region,social_links')
+      .select('property_id,country_code,admin_area,city,district_region,locality,latitude,longitude,research_radius_km,social_links')
       .eq('tenant_id', valid.tenantId)
       .in('property_id', valid.propertyIds));
     const listingPromise = execute(client.from('property_channel_listings')
@@ -194,7 +221,11 @@
             countryName: countryName(countryCode),
             adminArea: optionalText(row.admin_area || row.adminArea, 120, 'PROPERTY_ANALYSIS_LOCATION_TOO_LONG'),
             city: optionalText(row.city, 120, 'PROPERTY_ANALYSIS_LOCATION_TOO_LONG'),
-            districtRegion: optionalText(row.district_region || row.districtRegion, 160, 'PROPERTY_ANALYSIS_LOCATION_TOO_LONG')
+            districtRegion: optionalText(row.district_region || row.districtRegion, 160, 'PROPERTY_ANALYSIS_LOCATION_TOO_LONG'),
+            locality: optionalText(row.locality, 120, 'PROPERTY_LOCALITY_TOO_LONG'),
+            latitude: row.latitude == null ? null : Number(row.latitude),
+            longitude: row.longitude == null ? null : Number(row.longitude),
+            researchRadiusKm: row.research_radius_km == null ? null : Number(row.research_radius_km)
           },
           socialLinks,
           otaLinks
@@ -205,8 +236,8 @@
 
   return {
     UUID_RE, SOCIAL_LINK_KEYS, ISO_COUNTRY_CODES,
-    sanitizeHttpsUrl, sanitizeSocialLinks, countryName, validateContextInput,
-    savePropertyAnalysisContext, isMissingSchemaError, loadAnalysisContext,
+    sanitizeHttpsUrl, sanitizeSocialLinks, countryName, validateContextInput, validateLocationInput,
+    savePropertyAnalysisContext, savePropertyLocation, isMissingSchemaError, loadAnalysisContext,
     attachAnalysisContext
   };
 }));

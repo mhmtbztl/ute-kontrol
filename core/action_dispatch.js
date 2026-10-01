@@ -78,7 +78,7 @@
     'setGuestDirectoryPage', 'setGuestDirectoryProperty',
     'setGuestDirectoryQuery', 'setGuestDirectorySegment', 'setGuestDirectorySort',
     'setGuestDirectorySortDirection', 'setKpiTrackerMetric', 'setLargeTablePage',
-    'setOperationsView', 'setPricingProperty', 'setPropViewMode', 'setPropertySalesReadiness', 'setStaffChecklistMark', 'setStaffSupplyStatus', 'setTapeChartMonth', 'setTapeChartView', 'setTrendRange',
+    'setOperationsView', 'setPricingProperty', 'setPropViewMode', 'setPropertyProfile', 'setPropertyProfileTab', 'setPropertySalesReadiness', 'setStaffChecklistMark', 'setStaffSupplyStatus', 'setTapeChartMonth', 'setTapeChartView', 'setTrendRange',
     'shareGapWhatsApp', 'shiftResCalendar', 'showForgotPasswordForm', 'showKpiExplanation',
     'stepMonth', 'stepTapeChartMonth', 'submitAccountDeletion', 'submitMemberInvite',
     'submitMonthClose', 'submitMonthReopen', 'submitQuickLead', 'switchActiveTenant', 'switchAuthTab',

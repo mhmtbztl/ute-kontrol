@@ -105,7 +105,7 @@ function mockClient(dataByTable = {}, errorsByTable = {}) {
     await Service.loadAnalysisContext(client, { tenantId: TENANT, propertyIds: [P1, P2] });
     const contextCall = client.calls.find(item => item.table === 'property_analysis_context');
     const listingCall = client.calls.find(item => item.table === 'property_channel_listings');
-    assert.strictEqual(contextCall.columns, 'property_id,country_code,admin_area,city,district_region,social_links');
+    assert.strictEqual(contextCall.columns, 'property_id,country_code,admin_area,city,district_region,locality,latitude,longitude,research_radius_km,social_links');
     assert.strictEqual(listingCall.columns, 'property_id,channel_code,display_name,external_url,status');
     for (const call of [contextCall, listingCall]) {
       assert(call.filters.some(filter => filter.column === 'tenant_id' && filter.value === TENANT));

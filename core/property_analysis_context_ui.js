@@ -9,7 +9,8 @@ let propertyAnalysisContextPropertyId = null;
 
 const PROPERTY_ANALYSIS_FIELDS = Object.freeze({
   countryCode: 'propAnalysisCountry', adminArea: 'propAnalysisAdminArea',
-  city: 'propAnalysisCity', districtRegion: 'propAnalysisDistrictRegion'
+  city: 'propAnalysisCity', districtRegion: 'propAnalysisDistrictRegion', locality: 'propAnalysisLocality',
+  latitude: 'propAnalysisLatitude', longitude: 'propAnalysisLongitude', researchRadiusKm: 'propAnalysisRadius'
 });
 const PROPERTY_SOCIAL_FIELDS = Object.freeze({
   website: 'propSocialWebsite', instagram: 'propSocialInstagram',
@@ -43,7 +44,9 @@ function setPropertyAnalysisFieldValues(row = {}) {
     countryCode: row.country_code || row.countryCode || '',
     adminArea: row.admin_area || row.adminArea || '',
     city: row.city || '',
-    districtRegion: row.district_region || row.districtRegion || ''
+    districtRegion: row.district_region || row.districtRegion || '',
+    locality: row.locality || '', latitude: row.latitude ?? '', longitude: row.longitude ?? '',
+    researchRadiusKm: row.research_radius_km ?? row.researchRadiusKm ?? ''
   };
   const socialLinks = row.social_links || row.socialLinks || {};
   Object.entries(PROPERTY_ANALYSIS_FIELDS).forEach(([key, id]) => {
@@ -111,6 +114,10 @@ function getPropertyAnalysisContextDraft() {
     adminArea: value(PROPERTY_ANALYSIS_FIELDS.adminArea),
     city: value(PROPERTY_ANALYSIS_FIELDS.city),
     districtRegion: value(PROPERTY_ANALYSIS_FIELDS.districtRegion),
+    locality: value(PROPERTY_ANALYSIS_FIELDS.locality),
+    latitude: value(PROPERTY_ANALYSIS_FIELDS.latitude),
+    longitude: value(PROPERTY_ANALYSIS_FIELDS.longitude),
+    researchRadiusKm: value(PROPERTY_ANALYSIS_FIELDS.researchRadiusKm),
     socialLinks
   };
 }
@@ -118,8 +125,12 @@ function getPropertyAnalysisContextDraft() {
 async function savePropertyAnalysisContextDraft(propertyId) {
   if (!propertyAnalysisContextDirty) return { skipped: true };
   if (propertyAnalysisContextLoading) throw new Error('Konum ve sosyal profiller hâlâ yükleniyor. Lütfen kısa bir süre sonra yeniden deneyin.');
+  const draft = getPropertyAnalysisContextDraft();
   const result = await PropertyAnalysisContextService.savePropertyAnalysisContext(supabaseClient, {
-    tenantId: getActiveTenantId(), propertyId, ...getPropertyAnalysisContextDraft()
+    tenantId: getActiveTenantId(), propertyId, ...draft
+  });
+  await PropertyAnalysisContextService.savePropertyLocation(supabaseClient, {
+    tenantId: getActiveTenantId(), propertyId, ...draft
   });
   propertyAnalysisContextDirty = false;
   propertyAnalysisContextPropertyId = propertyId;
@@ -146,6 +157,22 @@ function initializePropertyAnalysisContextUi() {
     element.addEventListener('input', () => { propertyAnalysisContextDirty = true; });
     element.addEventListener('change', () => { propertyAnalysisContextDirty = true; });
   });
+  const mapLink = document.getElementById('propMapCoordinatesLink');
+  if (mapLink && !mapLink.dataset.coordinateParserBound) {
+    mapLink.dataset.coordinateParserBound = 'true';
+    mapLink.addEventListener('change', () => {
+      const parsed = typeof PropertyProfileEngine !== 'undefined'
+        ? PropertyProfileEngine.parseMapCoordinates(mapLink.value) : null;
+      if (!parsed) {
+        setPropertyAnalysisContextStatus('Bağlantıda koordinat bulunamadı. Enlem ve boylamı elle girebilirsiniz.', 'warning');
+        return;
+      }
+      document.getElementById(PROPERTY_ANALYSIS_FIELDS.latitude).value = parsed.latitude;
+      document.getElementById(PROPERTY_ANALYSIS_FIELDS.longitude).value = parsed.longitude;
+      propertyAnalysisContextDirty = true;
+      setPropertyAnalysisContextStatus('Koordinatlar bağlantıdan okundu; kaydetmeyi unutmayın.', 'success');
+    });
+  }
 }
 
 if (typeof document !== 'undefined') {

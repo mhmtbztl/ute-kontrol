@@ -11,7 +11,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=32bac10f">
+  <link rel="stylesheet" href="style.css?v=1dec49cd">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="supabase.umd.js?v=3810661a"></script>
@@ -1697,11 +1697,12 @@
             <h2>🏡 PORTFÖY & MÜLK YÖNETİMİ</h2>
             <p class="sub-text">Sistemdeki tüm villalar, operasyonel hazırlık durumları, baz fiyatlar ve koruma sınırları.</p>
           </div>
-          <button class="btn btn-primary btn-sm" data-onclick="openPropertyModal()">+ Yeni Villa / Mülk Ekle</button>
+          <button class="btn btn-primary btn-sm" id="newPropertyBtn" data-onclick="openPropertyModal()">+ Yeni Villa / Mülk Ekle</button>
         </div>
         <div class="portfolio-health-grid" id="propertiesManagementGrid">
           <!-- JS dinamik dolduracak -->
         </div>
+        <div id="propertyProfileWorkspace" style="margin-top:18px"></div>
       </section>
     </div>
 
@@ -3039,7 +3040,7 @@
   <script src="core/financial_metrics_service.js?v=4953570e"></script>
   <script src="core/marketing_engine.js?v=2756f4ec"></script>
   <script src="core/analysis_export_service.js?v=d05579d8"></script>
-  <script src="core/property_analysis_context_service.js?v=8d679adb"></script>
+  <script src="core/property_analysis_context_service.js?v=c0cc1027"></script>
   <script src="core/finance_import_engine.js?v=dddef08c"></script>
   <script src="core/finance_export_engine.js?v=ea797d31"></script>
 
@@ -3204,7 +3205,7 @@
           </div>
           <div class="form-group">
             <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Kapasite (Kişi):</label>
-            <input type="text" id="propCapacity" placeholder="Örn: 8 Kişilik (4+2)" style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff;">
+            <input type="text" id="propCapacity" placeholder="Örn: 8 Kişilik (4+2)" required style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff;">
           </div>
         </div>
         <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
@@ -3219,7 +3220,7 @@
         </div>
         <div class="form-group" style="margin-bottom: 12px;">
           <label for="propActivatedOn" style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Faaliyete Başlama Tarihi:</label>
-          <input type="date" id="propActivatedOn" style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff;">
+          <input type="date" id="propActivatedOn" required style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff;">
           <span style="display:block; font-size:10px; color: var(--text-muted); margin-top: 4px;">Doluluk ve RevPAR kapasitesi bu tarihten itibaren sayılır. Boş bırakılırsa kayıt günü kullanılır; daha eski bir rezervasyon girilirse tarih kendiliğinden geri çekilir.</span>
         </div>
         <div class="form-group" style="margin-bottom: 12px;">
@@ -3238,6 +3239,13 @@
             <div class="form-group"><label for="propAnalysisAdminArea">Eyalet / il / bölge</label><input type="text" id="propAnalysisAdminArea" maxlength="120" placeholder="Örn. Antalya"></div>
             <div class="form-group"><label for="propAnalysisCity">Şehir</label><input type="text" id="propAnalysisCity" maxlength="120" placeholder="Örn. Kaş"></div>
             <div class="form-group"><label for="propAnalysisDistrictRegion">İlçe / turizm bölgesi</label><input type="text" id="propAnalysisDistrictRegion" maxlength="160" placeholder="Örn. Kalkan"></div>
+            <div class="form-group"><label for="propAnalysisLocality">Köy / mahalle</label><input type="text" id="propAnalysisLocality" maxlength="120" placeholder="Örn. Kirazlı Köyü"></div>
+            <div class="form-group"><label for="propAnalysisRadius">Araştırma yarıçapı (km)</label><input type="number" id="propAnalysisRadius" min="0.5" max="200" step="0.5" placeholder="10"></div>
+          </div>
+          <div class="property-analysis-context__grid">
+            <div class="form-group"><label for="propMapCoordinatesLink">Maps / Google İşletme bağlantısı</label><input type="url" inputmode="url" id="propMapCoordinatesLink" placeholder="https://www.google.com/maps/.../@40.12,29.01,15z"></div>
+            <div class="form-group"><label for="propAnalysisLatitude">Enlem</label><input type="number" id="propAnalysisLatitude" min="-90" max="90" step="0.000001" placeholder="40.123456"></div>
+            <div class="form-group"><label for="propAnalysisLongitude">Boylam</label><input type="number" id="propAnalysisLongitude" min="-180" max="180" step="0.000001" placeholder="29.012345"></div>
           </div>
           <div class="property-analysis-context__grid property-analysis-context__links">
             <div class="form-group"><label for="propSocialWebsite">Web sitesi</label><input type="url" inputmode="url" id="propSocialWebsite" placeholder="https://..."></div>
@@ -3252,8 +3260,18 @@
             <span id="propAnalysisContextStatus" role="status" aria-live="polite">Konum ve sosyal profiller ChatGPT pazar analizine güvenli bağlantı olarak eklenir.</span>
           </div>
         </fieldset>
+        <fieldset class="property-analysis-context">
+          <legend>Mülk sahibi</legend>
+          <p class="property-analysis-context__help">Yalnız iletişim kaydıdır; gelir paylaşımı veya finansal hak tanımlamaz.</p>
+          <div class="property-analysis-context__grid">
+            <div class="form-group"><label for="propOwnerId">Kayıtlı sahip</label><select id="propOwnerId"><option value="">Yeni sahip / belirtilmedi</option></select></div>
+            <div class="form-group"><label for="propOwnerName">Yeni sahip adı</label><input type="text" id="propOwnerName" maxlength="150" placeholder="Ad soyad"></div>
+            <div class="form-group"><label for="propOwnerPhone">Telefon</label><input type="tel" id="propOwnerPhone" maxlength="40"></div>
+            <div class="form-group"><label for="propOwnerEmail">E-posta</label><input type="email" id="propOwnerEmail"></div>
+          </div>
+        </fieldset>
         <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
-          <button type="button" id="propDeleteBtn" class="btn btn-danger" style="display: none; background: #EF4444; border: none; font-size: 12px; padding: 8px 14px; border-radius: 6px; color: #fff; cursor: pointer;" data-onclick="handlePropertyDeleteFromModal()">🗑️ Mülkü Sil</button>
+          <button type="button" id="propDeleteBtn" class="btn btn-danger" style="display: none; background: #EF4444; border: none; font-size: 12px; padding: 8px 14px; border-radius: 6px; color: #fff; cursor: pointer;" data-onclick="handlePropertyDeleteFromModal()">📦 Satıştan Çek / Arşivle</button>
           <div style="display: flex; gap: 10px; margin-left: auto;">
             <button type="button" class="btn btn-secondary" data-onclick="closePropertyModal()">İptal</button>
             <button type="submit" id="propSubmitBtn" class="btn btn-primary" style="background: linear-gradient(135deg, #8B5CF6, #6D28D9); border: none; font-weight: 700;">
@@ -3412,6 +3430,8 @@
   <script src="core/guest_contact_utils.js?v=84fd6474"></script>
   <script src="core/user_facing_errors.js?v=e4eb0ae5"></script>
   <script src="core/ledger_contract.js?v=bc9fd6f2"></script>
+  <script src="core/property_profile_engine.js?v=923521c1"></script>
+  <script src="core/property_owner_service.js?v=5c741a12"></script>
   <script src="core/suggested_price_engine.js?v=6c3ac01e"></script>
   <script src="core/target_revenue_calculator.js?v=fe49dcc0"></script>
   <script src="core/tr_special_days.js?v=0227d5dd"></script>
@@ -3429,9 +3449,9 @@
   <script src="core/captcha_gate.js?v=3ad4a776"></script>
   <script src="core/date_range_picker.js?v=41dc564c"></script>
   <script src="core/side_panel.js?v=d763b464"></script>
-  <script src="core/action_dispatch.js?v=782cb946"></script>
-  <script src="app.js?v=ed6c3abd"></script>
-  <script src="core/property_analysis_context_ui.js?v=56a57dc8"></script>
+  <script src="core/action_dispatch.js?v=368b1603"></script>
+  <script src="app.js?v=61ec3d77"></script>
+  <script src="core/property_analysis_context_ui.js?v=9f24e43b"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=d9398578"></script>
 </body>
