@@ -317,13 +317,80 @@ function reconcileAllTenantBookings(allBookings = [], propertyTemplates = [], ex
   };
 }
 
+// A3 operasyon ekrani gorunum kurallari. Bunlar veri yazmaz; ayni kuralin
+// kart, liste ve RPC kapisinda farkli yorumlanmasini engeller.
+function isCleaningDebt(task) {
+  return !!task && String(task.status || '').toUpperCase() === 'DONE' && !(task.paid ?? task.is_paid);
+}
+
+function eligibleCleaners(people = []) {
+  return people.filter(person => person
+    && person.kind === 'CLEANER'
+    && person.is_active !== false
+    && !!person.user_id);
+}
+
+function canAssignCleaner(people = [], personId) {
+  return eligibleCleaners(people).some(person => person.id === personId);
+}
+
+function addDays(isoDate, count) {
+  const date = new Date(`${isoDate}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + count);
+  return date.toISOString().slice(0, 10);
+}
+
+function groupCleaningTasks(tasks = [], today) {
+  const tomorrow = addDays(today, 1);
+  const weekEnd = addDays(today, 6);
+  const result = { today: [], tomorrow: [], week: [] };
+  tasks.forEach(task => {
+    const date = String(task?.date || task?.task_date || '').slice(0, 10);
+    if (date === today) result.today.push(task);
+    else if (date === tomorrow) result.tomorrow.push(task);
+    else if (date > tomorrow && date <= weekEnd) result.week.push(task);
+  });
+  return result;
+}
+
+function cleanerDebtSummary(tasks = []) {
+  const grouped = new Map();
+  tasks.filter(isCleaningDebt).forEach(task => {
+    const cleaner = String(task.cleaner || task.cleaner_name || 'Personel belirtilmedi').trim() || 'Personel belirtilmedi';
+    const current = grouped.get(cleaner) || { cleaner, amount: 0, count: 0, taskIds: [] };
+    current.amount += Number(task.amount) || 0;
+    current.count += 1;
+    current.taskIds.push(task.id || task.dbId);
+    grouped.set(cleaner, current);
+  });
+  return [...grouped.values()].sort((a, b) => b.amount - a.amount || a.cleaner.localeCompare(b.cleaner, 'tr'));
+}
+
+function attachExecutions(tasks = [], executions = []) {
+  const byTask = new Map(executions.map(execution => [execution.cleaning_task_id, execution]));
+  return tasks.map(task => {
+    const execution = byTask.get(task.dbId || task.id) || null;
+    let workflowState = 'DIRECT';
+    if (execution?.status === 'CLEANED') workflowState = 'AWAITING_INSPECTION';
+    else if (execution?.status === 'INSPECTED') workflowState = 'INSPECTED';
+    else if (execution) workflowState = execution.status;
+    return { ...task, execution, workflowState };
+  });
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     DEFAULT_CLEANING_CHECKLIST,
     DEFAULT_CHECKIN_PREP_CHECKLIST,
     resolveChecklistSnapshot,
     reconcileBookingOperations,
-    reconcileAllTenantBookings
+    reconcileAllTenantBookings,
+    isCleaningDebt,
+    eligibleCleaners,
+    canAssignCleaner,
+    groupCleaningTasks,
+    cleanerDebtSummary,
+    attachExecutions
   };
 }
 
@@ -333,4 +400,12 @@ if (typeof window !== 'undefined') {
   window.resolveChecklistSnapshot = resolveChecklistSnapshot;
   window.reconcileBookingOperations = reconcileBookingOperations;
   window.reconcileAllTenantBookings = reconcileAllTenantBookings;
+  window.OperationsEngine = {
+    isCleaningDebt,
+    eligibleCleaners,
+    canAssignCleaner,
+    groupCleaningTasks,
+    cleanerDebtSummary,
+    attachExecutions
+  };
 }

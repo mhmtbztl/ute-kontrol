@@ -11,7 +11,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=6d1e0bf7">
+  <link rel="stylesheet" href="style.css?v=fe5bcd3c">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="supabase.umd.js?v=3810661a"></script>
@@ -1617,15 +1617,18 @@
       <section class="card" style="margin-bottom: 20px;">
         <div class="section-title-bar">
           <div>
-            <h2>🧹 OPERASYON KONTROL MERKEZİ</h2>
-            <p class="sub-text">Günlük turnover temizlikleri, personel hakedişleri, borç takibi ve P1 acil bakım işleri.</p>
+            <h2>🧹 OPERASYON</h2>
+            <p class="sub-text">Temizlik, arıza ve ekip görevlerini tek yerden yönetin.</p>
           </div>
           <div style="display: flex; gap: 8px;">
-            <button class="btn btn-secondary btn-sm" data-onclick="switchTab('housekeeping')">🧹 Temizlik Defteri Detayı</button>
-            <button class="btn btn-secondary btn-sm" data-onclick="switchTab('maintenance')">🛠️ Arıza / Bakım Detayı</button>
             <button class="btn btn-primary btn-sm" data-onclick="openNewCleaningTaskModal()">+ Temizlik Görevi Ekle</button>
             <button class="btn btn-primary btn-sm" data-onclick="openMaintModal()">+ Arıza Bildir</button>
           </div>
+        </div>
+        <div class="subpage-switch operations-switch" role="tablist" aria-label="Operasyon görünümü">
+          <button type="button" class="active" data-operations-view="cleaning" data-onclick="setOperationsView('cleaning')" role="tab">🧹 Temizlik</button>
+          <button type="button" data-operations-view="maintenance" data-onclick="setOperationsView('maintenance')" role="tab">🛠️ Arıza &amp; Bakım</button>
+          <button type="button" data-operations-view="tasks" data-onclick="setOperationsView('tasks')" role="tab">✅ Görevler</button>
         </div>
         <div class="kpi-cards-grid five-cols" style="margin-bottom: 20px;">
           <div class="kpi-card">
@@ -3311,11 +3314,12 @@
   <script src="core/pricing_booking_service.js?v=0eb93c05"></script>
   <script src="core/executive_priority_service.js?v=d113e0e8"></script>
   <script src="core/executive_dashboard_service.js?v=8405671c"></script>
+  <script src="core/operations_engine.js?v=176dfd28"></script>
   <script src="core/captcha_gate.js?v=3ad4a776"></script>
   <script src="core/date_range_picker.js?v=41dc564c"></script>
   <script src="core/side_panel.js?v=d763b464"></script>
-  <script src="core/action_dispatch.js?v=b3d8bf40"></script>
-  <script src="app.js?v=79fbfd17"></script>
+  <script src="core/action_dispatch.js?v=54660ed6"></script>
+  <script src="app.js?v=470b322f"></script>
   <script src="core/property_analysis_context_ui.js?v=56a57dc8"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=32235514"></script>

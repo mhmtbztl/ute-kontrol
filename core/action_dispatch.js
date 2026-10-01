@@ -38,7 +38,7 @@
   // fonksiyonu buraya ekleyin; html_injection_tests listede olmayan, tanimsiz
   // ya da artik kullanilmayan adi yakalar.
   const EYLEMLER = new Set([
-    'applyImportedData', 'autoCalculateGoalAdr',
+    'applyImportedData', 'assignCleaningTaskFromSelect', 'autoCalculateGoalAdr',
     'autoCalculateGoalSubmetrics', 'calculateLivePreview', 'changeImportMode', 'cleanResetAll',
     'clearResDateRange', 'closeAiActionConfirmModal', 'closeAllHeaderDropdowns',
     'closeBookingModal', 'closeCleaningTaskModal', 'closeDeleteAccountModal', 'closeExpenseModal',
@@ -65,9 +65,9 @@
     'openEditCleaningTaskModal', 'openExcelFilePicker', 'openExpenseModal', 'openGoalsModal',
     'openGuestProfileModal', 'openGuestRebookingWhatsApp', 'openHelpModal', 'openImportModal',
     'openInviteMemberModal', 'openLeadModal', 'openMaintModal',
-    'openMonthCloseModal', 'openMonthReopenModal',
+    'openMonthCloseModal', 'openMonthReopenModal', 'inspectCleaningExecution',
     'openNewCleaningTaskModal', 'openCopyPreviousExpensesPanel', 'openPropertyModal', 'openPropertyOtaManager', 'openResetModal',
-    'openTabFromDeepLink', 'openWhatsAppModal', 'parseWhatsAppMessage', 'payAllPendingCleaning',
+    'openTabFromDeepLink', 'openWhatsAppModal', 'parseWhatsAppMessage', 'payAllPendingCleaning', 'payCleanerDebt',
     'promptEditTaskAmount', 'refreshExecutiveDashboardSnapshot', 'renderExpensesTable', 'renderHousekeepingTab', 'renderManageBookingsTable',
     'renderManageLeadsTable', 'resetGuestDirectoryDateRange',
     'resetImportPreview', 'resyncTenantData', 'runPageAction', 'saveAllSettings',
@@ -78,7 +78,7 @@
     'setGuestDirectoryPage', 'setGuestDirectoryProperty',
     'setGuestDirectoryQuery', 'setGuestDirectorySegment', 'setGuestDirectorySort',
     'setGuestDirectorySortDirection', 'setKpiTrackerMetric', 'setLargeTablePage',
-    'setPropViewMode', 'setPropertySalesReadiness', 'setTapeChartMonth', 'setTapeChartView', 'setTrendRange',
+    'setOperationsView', 'setPropViewMode', 'setPropertySalesReadiness', 'setTapeChartMonth', 'setTapeChartView', 'setTrendRange',
     'shareGapWhatsApp', 'shiftResCalendar', 'showForgotPasswordForm', 'showKpiExplanation',
     'stepMonth', 'stepTapeChartMonth', 'submitAccountDeletion', 'submitMemberInvite',
     'submitMonthClose', 'submitMonthReopen', 'switchActiveTenant', 'switchAuthTab',

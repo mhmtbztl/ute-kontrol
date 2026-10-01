@@ -2142,6 +2142,9 @@ async function closeMonthlyPeriod(year, month) {
     if (/PERIOD_NOT_ENDED/.test(String(error.message || ''))) {
       throw new Error('Dönem kapatılamadı: ay henüz bitmedi. Ayın son gününden sonra kapatabilirsiniz.');
     }
+    if (/CLEANING_AWAITING_INSPECTION/.test(String(error.message || ''))) {
+      throw new Error('Dönem kapatılamadı: bu ayda yönetici denetimi bekleyen temizlikler var. Operasyon › Temizlik ekranından denetimleri tamamlayın.');
+    }
     throw new Error('Dönem kapatılamadı: ' + (error.message || 'Veritabanı hatası'));
   }
   await loadMonthlyCloses();
@@ -3899,7 +3902,8 @@ function getPropertySalesReadiness(villaKey) {
 // zamanlar yalniz !paid'e bakip planli gorevi de borc sayiyordu; hemen
 // altindaki liste ise "borc yok" diyordu.
 function isCleaningDebt(task) {
-  return !!task && task.status === 'DONE' && !task.paid;
+  const api = getOperationsApi();
+  return api ? api.isCleaningDebt(task) : (!!task && task.status === 'DONE' && !task.paid);
 }
 
 // Toplu aktarim ozeti (L-103): aylik toplamdan girilmis "TOPLU AKTARIM — Ocak
@@ -13459,7 +13463,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
       const tenantId = targetId;
       // Independent datasets are loaded concurrently and every list is paged;
       // Supabase's per-response cap must never silently truncate a dashboard.
-      const [villas, bookings, expenses, cleanList, leads, closeList, targetList, maintenanceTickets, operationalTasks, financialTransactions, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications, campaignRows, influencerRows, settingRows, operatorNoteRows, pricingLadderRows, hkOverrideRows, paymentCommissionRows] = await Promise.all([
+      const [villas, bookings, expenses, cleanList, leads, closeList, targetList, maintenanceTickets, operationalTasks, financialTransactions, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications, campaignRows, influencerRows, settingRows, operatorNoteRows, pricingLadderRows, hkOverrideRows, paymentCommissionRows, operationalPeopleRows, cleaningExecutionRows, maintenanceAssignmentRows, taskTemplateRows, checklistTemplateRows] = await Promise.all([
         loadProperties(tenantId),
         loadBookings(tenantId),
         loadExpenses(tenantId),
@@ -13489,7 +13493,12 @@ async function loadTenantAppData(tenantIdOrUserId) {
         fetchTenantRowsTolerant(() => supabaseClient.from('housekeeping_status_overrides').select('*').eq('tenant_id', tenantId)),
         // phase45: rezervasyon basina odeme komisyonu. Goc yoksa null doner;
         // komisyon 0 degil BILINMIYOR kalir ama ekran calisir.
-        fetchTenantRowsTolerant(() => supabaseClient.from('booking_payment_commissions').select('booking_id, amount').eq('tenant_id', tenantId))
+        fetchTenantRowsTolerant(() => supabaseClient.from('booking_payment_commissions').select('booking_id, amount').eq('tenant_id', tenantId)),
+        fetchTenantRowsTolerant(() => supabaseClient.from('operational_people').select('*').eq('tenant_id', tenantId).order('full_name')),
+        fetchTenantRowsTolerant(() => supabaseClient.from('cleaning_task_executions').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false })),
+        fetchTenantRowsTolerant(() => supabaseClient.from('maintenance_assignments').select('*').eq('tenant_id', tenantId)),
+        fetchTenantRowsTolerant(() => supabaseClient.from('task_templates').select('*').eq('tenant_id', tenantId).eq('is_active', true).order('title')),
+        fetchTenantRowsTolerant(() => supabaseClient.from('property_checklist_templates').select('*').eq('tenant_id', tenantId).eq('is_active', true).order('updated_at', { ascending: false }))
       ]);
       const propIdMap = {};
       Object.values(villas || {}).forEach(p => {
@@ -13577,6 +13586,11 @@ async function loadTenantAppData(tenantIdOrUserId) {
         maintenance: maintenanceTickets.map(t => mapMaintenanceTicketFromDb(t, propIdMap)),
         maintenanceTickets,
         operationalTasks: operationalTasks || [],
+        operationalPeople: operationalPeopleRows || [],
+        cleaningExecutions: cleaningExecutionRows || [],
+        maintenanceAssignments: maintenanceAssignmentRows || [],
+        taskTemplates: taskTemplateRows || [],
+        checklistTemplates: checklistTemplateRows || [],
         financialTransactions: financialTransactions || [],
         userNotifications: userNotifications || [],
         marketingCampaigns: (campaignRows || []).map(r => mapMarketingCampaignFromDb(r, propIdMap)),
@@ -13645,6 +13659,11 @@ function getBlankTenantData(userId) {
     maintenance: [],
     maintenanceTickets: [],
     operationalTasks: [],
+    operationalPeople: [],
+    cleaningExecutions: [],
+    maintenanceAssignments: [],
+    taskTemplates: [],
+    checklistTemplates: [],
     financialTransactions: [],
     marketingCampaigns: [],
     influencerCollabs: [],
@@ -15944,6 +15963,127 @@ function renderPropertiesTab() {
   }).join('');
 }
 
+function getOperationsApi() {
+  if (typeof OperationsEngine !== 'undefined') return OperationsEngine;
+  if (typeof require === 'function') return require('./core/operations_engine.js');
+  return null;
+}
+
+let operationsViewState = 'cleaning';
+
+function setOperationsView(view) {
+  if (!['cleaning', 'maintenance', 'tasks'].includes(view)) return false;
+  operationsViewState = view;
+  renderOperationsTab();
+  return true;
+}
+
+async function assignCleaningTask(taskId, personId) {
+  const api = getOperationsApi();
+  const people = appData?.operationalPeople || [];
+  if (!api || !api.canAssignCleaner(people, personId)) {
+    if (typeof showToast === 'function') showToast('Bu kişinin giriş hesabı yok; iki imzalı akışa atanamaz. Yönetici doğrudan yapıldı yolunu kullanabilir.', 'error');
+    return false;
+  }
+  const task = findCleaningTask(taskId);
+  const dbId = task && (task.dbId || task.id);
+  if (!dbId || !isCloudTenant(getActiveTenantId())) return false;
+  const { error } = await supabaseClient.rpc('assign_cleaning_task', {
+    p_cleaning_task_id: dbId,
+    p_person_id: personId,
+    p_template_id: null
+  });
+  if (error) {
+    if (typeof showToast === 'function') showToast('⚠️ Temizlik atanamadı: ' + (error.message || 'Veritabanı hatası'), 'error');
+    return false;
+  }
+  await loadTenantAppData(getActiveTenantId());
+  if (typeof showToast === 'function') showToast('✅ Temizlik, giriş hesabı olan personele atandı.');
+  return true;
+}
+
+async function assignCleaningTaskFromSelect(taskId) {
+  const select = document.getElementById(`opsCleaner-${taskId}`);
+  return assignCleaningTask(taskId, select?.value || '');
+}
+
+async function inspectCleaningExecution(executionId, approve) {
+  const note = approve ? null : prompt('Yeniden açma notu (temizlikçi neyi düzeltmeli?):', '');
+  if (!approve && note === null) return false;
+  if (!confirm(approve
+    ? 'Temizlik denetlendi ve onaylandı olarak işaretlensin mi? Gider bu onayla doğar.'
+    : 'Eksik maddeler temizlikçiye yeniden açılsın mı?')) return false;
+  const { error } = await supabaseClient.rpc('inspect_cleaning', {
+    p_execution_id: executionId,
+    p_approve: !!approve,
+    p_m_marks: {},
+    p_inspector_note: note || null
+  });
+  if (error) {
+    if (typeof showToast === 'function') showToast('⚠️ Denetim kaydedilemedi: ' + (error.message || 'Veritabanı hatası'), 'error');
+    return false;
+  }
+  invalidateExecutiveSnapshotCache();
+  await loadTenantAppData(getActiveTenantId());
+  if (typeof showToast === 'function') showToast(approve ? '✅ Denetim onaylandı; temizlik gideri oluştu.' : '↩️ Temizlik yeniden açıldı.');
+  return true;
+}
+
+async function payCleanerDebt(cleanerName) {
+  const pending = (appData?.cleaningTasks || []).filter(task => isCleaningDebt(task)
+    && String(task.cleaner || task.cleaner_name || 'Personel belirtilmedi') === cleanerName);
+  if (!pending.length) return false;
+  const total = pending.reduce((sum, task) => sum + (Number(task.amount) || 0), 0);
+  if (!confirm(`${cleanerName}: ${pending.length} temizlik, ₺${total.toLocaleString('tr-TR')} ödendi olarak kapatılsın mı?`)) return false;
+  const paidDate = getTodayStr();
+  pending.forEach(task => { task.paid = true; task.paidDate = paidDate; });
+  const ok = await reportCleaningPersist(pending, `✅ ${cleanerName} için ₺${total.toLocaleString('tr-TR')} temizlik borcu kapandı.`);
+  if (ok) renderOperationsTab();
+  return ok;
+}
+
+function renderOperationsCleaningView(tasks) {
+  const api = getOperationsApi();
+  if (!api) return '<div class="empty-state">Operasyon motoru yüklenemedi.</div>';
+  const people = appData?.operationalPeople || [];
+  const eligible = api.eligibleCleaners(people);
+  const withExecutions = api.attachExecutions(tasks, appData?.cleaningExecutions || []);
+  const grouped = api.groupCleaningTasks(withExecutions, getTodayStr());
+  const debt = api.cleanerDebtSummary(tasks);
+  const groupHtml = (label, rows) => `
+    <section class="ops-group">
+      <h3>${escapeHtml(label)} <span class="badge">${rows.length}</span></h3>
+      ${rows.length ? rows.map(task => {
+        const execution = task.execution;
+        const waiting = task.workflowState === 'AWAITING_INSPECTION';
+        const property = task.propertyName || appData?.villas?.[task.villa]?.name || task.villa || '—';
+        const options = eligible.map(person => `<option value="${escapeHtml(person.id)}"${execution?.person_id === person.id ? ' selected' : ''}>${escapeHtml(person.full_name)}</option>`).join('');
+        const status = waiting ? 'Denetim bekliyor' : task.status === 'DONE' ? (task.paid ? 'Ödendi' : 'Borç') : task.status === 'SKIPPED' ? 'Yapılmadı' : execution ? 'Atandı' : 'Planlı';
+        return `<article class="ops-row" data-cleaning-task-id="${escapeHtml(task.id)}">
+          <div class="ops-row-main"><strong>${escapeHtml(property)}</strong><span>${escapeHtml(task.date || '—')} · ${escapeHtml(task.cleaner || 'Personel belirtilmedi')}</span></div>
+          <span class="badge ${waiting ? 'badge-blue' : (isCleaningDebt(task) ? 'badge-amber' : '')}">${escapeHtml(status)}</span>
+          <div class="ops-row-actions">
+            ${waiting ? `<button class="btn btn-primary btn-sm" data-onclick="inspectCleaningExecution(decodeURIComponent('${encodeActionArg(execution.id)}'), true)">M Onayla</button><button class="btn btn-secondary btn-sm" data-onclick="inspectCleaningExecution(decodeURIComponent('${encodeActionArg(execution.id)}'), false)">Yeniden aç</button>` : task.status !== 'DONE' && task.status !== 'SKIPPED' ? `
+              <select id="opsCleaner-${escapeHtml(task.id)}" aria-label="Temizlikçi seç"><option value="">Giriş hesabı olan temizlikçi…</option>${options}</select>
+              <button class="btn btn-secondary btn-sm" data-onclick="assignCleaningTaskFromSelect(decodeURIComponent('${encodeActionArg(task.id)}'))">Ata</button>
+              <button class="btn btn-secondary btn-sm" data-onclick="markCleaningDone(decodeURIComponent('${encodeActionArg(task.id)}'))">Yönetici yaptı</button>` : ''}
+          </div>
+        </article>`;
+      }).join('') : '<div class="empty-state">Bu aralıkta temizlik yok.</div>'}
+    </section>`;
+  return `
+    <div class="ops-cleaning-layout">
+      <div>${groupHtml('Bugün', grouped.today)}${groupHtml('Yarın', grouped.tomorrow)}${groupHtml('Bu hafta', grouped.week)}</div>
+      <aside class="ops-debt-panel"><h3>Bekleyen Temizlik Borçları (${debt.reduce((sum, item) => sum + item.count, 0)})</h3>
+        ${debt.length ? debt.map(item => `<div class="ops-debt-row"><div><strong>${escapeHtml(item.cleaner)}</strong><span>${item.count} temizlik</span></div><strong>₺${item.amount.toLocaleString('tr-TR')}</strong>${item.taskIds.map(id => {
+          const task = tasks.find(candidate => (candidate.id || candidate.dbId) === id);
+          if (!task) return '';
+          return `<div data-cleaning-task-id="${escapeHtml(task.id || task.dbId)}" class="ops-debt-detail"><strong>${escapeHtml(task.propertyName || appData?.villas?.[task.villa]?.name || task.villa || '—')}</strong><span>${escapeHtml(task.date ? formatTrDate(task.date) : '—')} · ${escapeHtml(task.cleaner || item.cleaner)} · ₺${Number(task.amount || 0).toLocaleString('tr-TR')} Ödenecek</span>${task.notes ? `<span>${escapeHtml(task.notes)}</span>` : ''}<button class="btn btn-secondary btn-sm" data-onclick="openEditCleaningTaskModal(decodeURIComponent('${encodeActionArg(task.id || task.dbId)}'))">Ayrıntı / Düzenle</button></div>`;
+        }).join('')}<button class="btn btn-secondary btn-sm" data-onclick="payCleanerDebt(decodeURIComponent('${encodeActionArg(item.cleaner)}'))">Toplu öde</button></div>`).join('') : '<div class="empty-state">Temizlik borcu yok.</div>'}
+      </aside>
+    </div>`;
+}
+
 function renderOperationsTab() {
   if (typeof document === 'undefined') return;
   const container = document.getElementById('opsCombinedContainer');
@@ -15958,36 +16098,19 @@ function renderOperationsTab() {
   const taskBadge = document.getElementById('opsTaskCountBadge');
   if (taskBadge) taskBadge.innerText = String(pendingTasks.length);
 
-  container.innerHTML = `
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-      <div style="background: rgba(0,0,0,0.25); padding: 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06);">
-        <h4 style="margin: 0 0 10px 0; color: #FBBF24; font-size: 13px;">🧹 Bekleyen Temizlik Borçları (${pendingTasks.length})</h4>
-        ${pendingTasks.length === 0 ? '<div style="color: var(--text-muted); font-size: 12px;">Bekleyen temizlik borcu yok.</div>' : pendingTasks.map(t => `
-          <div data-cleaning-task-id="${escapeHtml(t.id)}" style="padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 12px; display: flex; justify-content: space-between; gap: 12px; align-items: flex-start;">
-            <div style="min-width: 0;">
-              <strong style="color: #F8FAFC;">${escapeHtml(t.propertyName)}</strong>
-              <div style="color: #CBD5E1; margin-top: 3px;">📅 ${escapeHtml(t.date ? formatTrDate(t.date) : 'Tarih belirtilmedi')} · 🧹 ${escapeHtml(t.cleaner || 'Personel belirtilmedi')}</div>
-              ${t.notes ? `<div style="color: var(--text-muted); margin-top: 3px;">${escapeHtml(t.notes)}</div>` : ''}
-            </div>
-            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 5px; white-space: nowrap;">
-              <strong style="color: #60A5FA;">₺${Number(t.amount).toLocaleString('tr-TR')}</strong>
-              <span class="badge badge-yellow" style="font-size: 10px;">${escapeHtml(t.paymentLabel)}</span>
-              <button class="btn btn-secondary btn-sm" style="font-size: 10px; padding: 3px 7px;" data-onclick="openEditCleaningTaskModal(decodeURIComponent('${encodeActionArg(t.id)}'))">Ayrıntı / Düzenle</button>
-            </div>
-          </div>
-        `).join('')}
-      </div>
-      <div style="background: rgba(0,0,0,0.25); padding: 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06);">
-        <h4 style="margin: 0 0 10px 0; color: #F87171; font-size: 13px;">🛠️ Arıza ve Bakım İşleri (${tickets.length})</h4>
-        ${tickets.length === 0 ? '<div style="color: var(--text-muted); font-size: 12px;">Açık arıza kaydı bulunmuyor.</div>' : tickets.slice(0, 5).map(tk => `
-          <div style="padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 12px; display: flex; justify-content: space-between;">
-            <span>${escapeHtml(tk.title || 'Belirtilmedi')}</span>
-            <span class="badge badge-red" style="font-size: 10px;">${escapeHtml(tk.status || 'OPEN')}</span>
-          </div>
-        `).join('')}
-      </div>
-    </div>
-  `;
+  document.querySelectorAll('[data-operations-view]').forEach(button => {
+    button.classList.toggle('active', button.dataset.operationsView === operationsViewState);
+  });
+  if (operationsViewState === 'cleaning') {
+    container.innerHTML = renderOperationsCleaningView(tasks);
+  } else if (operationsViewState === 'maintenance') {
+    const open = tickets.filter(isMaintenanceTicketOpen).sort((a, b) => Number(!!b.booking_impact) - Number(!!a.booking_impact));
+    container.innerHTML = open.length ? open.map(ticket => `<article class="ops-row"><div class="ops-row-main"><strong>${escapeHtml(ticket.title || '—')}</strong><span>${escapeHtml(ticket.description || 'Açıklama yok')}</span></div><span class="badge ${ticket.booking_impact ? 'badge-red' : ''}">${ticket.booking_impact ? 'Satışa kapatır' : escapeHtml(ticket.status || 'OPEN')}</span></article>`).join('') : '<div class="empty-state">Açık arıza veya bakım kaydı yok.</div>';
+  } else {
+    const operational = appData?.operationalTasks || [];
+    const templates = appData?.taskTemplates || [];
+    container.innerHTML = `<div class="ops-cleaning-layout"><section class="ops-group"><h3>Aktif görevler <span class="badge">${operational.length}</span></h3>${operational.length ? operational.map(task => `<article class="ops-row"><div class="ops-row-main"><strong>${escapeHtml(task.title || '—')}</strong><span>${task.property_id ? 'Mülke bağlı' : 'Genel görev'} · ${escapeHtml(task.status || 'TODO')}</span></div></article>`).join('') : '<div class="empty-state">Aktif görev yok.</div>'}</section><aside class="ops-debt-panel"><h3>Hazır görev kütüphanesi</h3>${templates.length ? templates.map(template => `<div class="ops-debt-row"><strong>${escapeHtml(template.title)}</strong><span>${escapeHtml(template.task_type || 'GENERAL')}</span></div>`).join('') : '<div class="empty-state">Henüz görev şablonu yok.</div>'}</aside></div>`;
+  }
 }
 
 const guestDirectoryState = { query: '', segment: 'ALL', propertyId: '', sort: 'RECENT', direction: 'DESC', dateStart: '', dateEnd: '', page: 1, pageSize: 20 };
@@ -16664,6 +16787,10 @@ if (typeof module !== 'undefined' && module.exports) {
     // boyle yakalanir (statik tarama regex literalleri yuzunden guvenilmez).
     renderAll,
     renderOperationsTab,
+    setOperationsView,
+    assignCleaningTask,
+    inspectCleaningExecution,
+    payCleanerDebt,
     renderTapeChart,
     renderPricingTab,
     renderPricingKpiStrip,
