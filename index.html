@@ -390,6 +390,11 @@
     <!-- ======================================================= -->
     <div id="tab-executive" class="tab-content active">
 
+      <section id="todayDateStrip" class="today-date-strip" aria-label="Bugün özeti">
+        <div><strong id="todayDateLabel">—</strong><span id="todayRoleLabel">—</span></div>
+        <span id="todayShiftSummary">—</span>
+      </section>
+
       <!-- 1. TENANT ONBOARDING PROGRESS BANNER -->
       <section class="card onboarding-banner" id="execOnboardingBanner" style="background: linear-gradient(135deg, rgba(30, 27, 75, 0.6), rgba(15, 23, 42, 0.8)); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 12px; padding: 16px 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
         <div style="flex: 1; min-width: 260px;">
@@ -414,7 +419,7 @@
       </div>
 
       <!-- 2. TOP EXECUTIVE KPI STRIP (PHASE 38 — 8 CARDS) -->
-      <section class="executive-kpi-grid">
+      <section class="executive-kpi-grid" hidden aria-hidden="true">
         <!-- 1. Realized Revenue -->
         <div class="executive-kpi-card" id="execCardRevenue">
           <div class="kpi-card-header">
@@ -601,6 +606,13 @@
           <!-- Dinamik olarak mülk satış hazırlığı kartları eklenecek -->
         </div>
       </section>
+
+      <section class="card today-todo-card">
+        <div class="section-title-bar"><div><h3>Yapılacaklar</h3><p class="sub-text">Bugüne ait açık operasyon ve satış işleri.</p></div></div>
+        <div id="todayTodoList"></div>
+      </section>
+
+      <section id="todayMonthSummary" class="today-month-summary" aria-label="Bu ay özeti">—</section>
 
     </div>
 

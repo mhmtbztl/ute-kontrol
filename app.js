@@ -13469,19 +13469,20 @@ async function loadTenantAppData(tenantIdOrUserId) {
   if (isCloudTenant(targetId)) {
     try {
       const tenantId = targetId;
+      const mayReadLedger = canReadLedgerRole(activeTenant?.role);
       // Independent datasets are loaded concurrently and every list is paged;
       // Supabase's per-response cap must never silently truncate a dashboard.
       const [villas, bookings, expenses, cleanList, leads, closeList, targetList, maintenanceTickets, operationalTasks, financialTransactions, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications, campaignRows, influencerRows, settingRows, operatorNoteRows, pricingLadderRows, hkOverrideRows, paymentCommissionRows, operationalPeopleRows, cleaningExecutionRows, maintenanceAssignmentRows, taskTemplateRows, checklistTemplateRows] = await Promise.all([
         loadProperties(tenantId),
         loadBookings(tenantId),
-        loadExpenses(tenantId),
+        mayReadLedger ? loadExpenses(tenantId) : Promise.resolve([]),
         fetchAllCloudRows(() => supabaseClient.from('cleaning_tasks').select('*').eq('tenant_id', tenantId).order('task_date', { ascending: false })),
         loadLeads(tenantId),
-        fetchAllCloudRows(() => supabaseClient.from('monthly_financial_closes').select('*').eq('tenant_id', tenantId).order('year', { ascending: false }).order('month', { ascending: false })),
-        fetchAllCloudRows(() => supabaseClient.from('monthly_targets').select('*').eq('tenant_id', tenantId).order('year', { ascending: false }).order('month', { ascending: false })),
+        mayReadLedger ? fetchAllCloudRows(() => supabaseClient.from('monthly_financial_closes').select('*').eq('tenant_id', tenantId).order('year', { ascending: false }).order('month', { ascending: false })) : Promise.resolve([]),
+        mayReadLedger ? fetchAllCloudRows(() => supabaseClient.from('monthly_targets').select('*').eq('tenant_id', tenantId).order('year', { ascending: false }).order('month', { ascending: false })) : Promise.resolve([]),
         fetchAllCloudRows(() => supabaseClient.from('maintenance_tickets').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false })),
         fetchAllCloudRows(() => supabaseClient.from('operational_tasks').select('*').eq('tenant_id', tenantId).order('due_at', { ascending: true })),
-        fetchAllCloudRows(() => supabaseClient.from('financial_transactions').select('*').eq('tenant_id', tenantId).order('occurred_on', { ascending: false })),
+        mayReadLedger ? fetchAllCloudRows(() => supabaseClient.from('financial_transactions').select('*').eq('tenant_id', tenantId).order('occurred_on', { ascending: false })) : Promise.resolve([]),
         fetchAllCloudRows(() => supabaseClient.from('guests').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false })),
         fetchAllCloudRows(() => supabaseClient.from('guest_consent_events').select('*').eq('tenant_id', tenantId).order('recorded_at', { ascending: false })),
         loadTenantBookingChannels(tenantId),
@@ -13501,7 +13502,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
         fetchTenantRowsTolerant(() => supabaseClient.from('housekeeping_status_overrides').select('*').eq('tenant_id', tenantId)),
         // phase45: rezervasyon basina odeme komisyonu. Goc yoksa null doner;
         // komisyon 0 degil BILINMIYOR kalir ama ekran calisir.
-        fetchTenantRowsTolerant(() => supabaseClient.from('booking_payment_commissions').select('booking_id, amount').eq('tenant_id', tenantId)),
+        mayReadLedger ? fetchTenantRowsTolerant(() => supabaseClient.from('booking_payment_commissions').select('booking_id, amount').eq('tenant_id', tenantId)) : Promise.resolve([]),
         fetchTenantRowsTolerant(() => supabaseClient.from('operational_people').select('*').eq('tenant_id', tenantId).order('full_name')),
         fetchTenantRowsTolerant(() => supabaseClient.from('cleaning_task_executions').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false })),
         fetchTenantRowsTolerant(() => supabaseClient.from('maintenance_assignments').select('*').eq('tenant_id', tenantId)),
@@ -15194,6 +15195,53 @@ const getSupabaseClient = function () {
 
 let pendingAiAction = null;
 
+function renderTodayDateStrip(bookings, tasks) {
+  const today = getTodayStr();
+  const role = TEAM_ROLES[activeTenant?.role]?.label || activeTenant?.role || '—';
+  const arrivals = bookings.filter(item => item.status !== 'CANCELLED' && item.checkIn === today).length;
+  const departures = bookings.filter(item => item.status !== 'CANCELLED' && item.checkOut === today).length;
+  const cleanings = tasks.filter(item => item.status === 'PLANNED' && String(item.date || '').slice(0, 10) === today).length;
+  setEl('todayDateLabel', new Intl.DateTimeFormat('tr-TR', { dateStyle: 'full', timeZone: 'Europe/Istanbul' }).format(new Date(`${today}T12:00:00+03:00`)));
+  setEl('todayRoleLabel', `${role} görünümü`);
+  setEl('todayShiftSummary', `${arrivals} giriş · ${departures} çıkış · ${cleanings} temizlik`);
+}
+
+function renderTodayTodoList(tasks, tickets, leads) {
+  const container = document.getElementById('todayTodoList');
+  if (!container) return;
+  const today = getTodayStr();
+  const items = [];
+  tasks.filter(item => item.status === 'PLANNED' && String(item.date || '').slice(0, 10) <= today)
+    .forEach(item => items.push({ label: `Temizlik · ${item.propertyName || appData?.villas?.[item.villa]?.name || '—'}`, tab: 'operations' }));
+  tickets.filter(isMaintenanceTicketOpen)
+    .forEach(item => items.push({ label: `Arıza · ${item.title || 'Başlık girilmemiş'}`, tab: 'operations' }));
+  if (canReadSalesRole(activeTenant?.role)) {
+    leads.filter(item => item.status === 'FOLLOW_UP' || item.status === 'QUOTE_SENT')
+      .forEach(item => items.push({ label: `Satış takibi · ${item.guest || 'Ad belirtilmedi'}`, tab: 'leads' }));
+  }
+  container.className = 'today-todo-list';
+  container.innerHTML = items.length ? items.slice(0, 8).map(item => `<div class="today-todo-item"><span>${escapeHtml(item.label)}</span><button class="btn btn-secondary btn-sm" data-onclick="switchTab(decodeURIComponent('${encodeActionArg(item.tab)}'))">Aç</button></div>`).join('') : '<div class="empty-state">Bugüne ait açık iş yok.</div>';
+}
+
+function renderTodayMonthSummary(bookings) {
+  const element = document.getElementById('todayMonthSummary');
+  if (!element) return;
+  const month = getTodayStr().slice(0, 7);
+  const monthly = bookings.filter(item => item.status !== 'CANCELLED' && String(item.checkIn || '').startsWith(month));
+  if (!canReadLedgerRole(activeTenant?.role)) {
+    element.textContent = `Bu ay · ${monthly.length} rezervasyon · finans özeti bu rolde gösterilmez`;
+    return;
+  }
+  const snapshot = executiveSnapshotState?.current;
+  if (!snapshot) {
+    element.textContent = `Bu ay · ${monthly.length} rezervasyon · finans özeti hazırlanıyor`;
+    return;
+  }
+  const revenue = snapshot.room_revenue ?? snapshot.revenue ?? null;
+  const occupancy = snapshot.occupancy_rate ?? snapshot.occupancy ?? null;
+  element.textContent = `Bu ay · ${monthly.length} rezervasyon · Ciro ${revenue == null ? '—' : `₺${Number(revenue).toLocaleString('tr-TR')}`} · Doluluk ${occupancy == null ? '—' : `%${Number(occupancy).toLocaleString('tr-TR')}`}`;
+}
+
 function renderExecutiveControlCenter() {
   if (typeof document === 'undefined') return;
   const execTab = document.getElementById('tab-executive');
@@ -15219,11 +15267,18 @@ function renderExecutiveControlCenter() {
     readinessStatus: villas[k].readinessStatus || 'UNKNOWN'
   }));
 
-  const snapshotOwnsTopKpis = isCloudTenant(getActiveTenantId()) && !!supabaseClient;
+  renderTodayDateStrip(bookings, tasks);
+  renderTodayTodoList(tasks, tickets, leads);
+  renderTodayMonthSummary(bookings);
+
+  // activeTenant bulunmayan yerel/test gorunumunde eski cevrimdisi hesap
+  // calisir; gercek oturumda rol kapisi zorunludur.
+  const mayReadLedger = !activeTenant || canReadLedgerRole(activeTenant?.role);
+  const snapshotOwnsTopKpis = mayReadLedger && isCloudTenant(getActiveTenantId()) && !!supabaseClient;
   if (snapshotOwnsTopKpis) renderExecutiveSnapshotKpis();
 
   // 1. Top Executive KPIs
-  if (!snapshotOwnsTopKpis && typeof ExecutiveDashboardService !== 'undefined' && ExecutiveDashboardService.computeExecutiveTopKpis) {
+  if (mayReadLedger && !snapshotOwnsTopKpis && typeof ExecutiveDashboardService !== 'undefined' && ExecutiveDashboardService.computeExecutiveTopKpis) {
     const curPeriod = (typeof currentFilter !== 'undefined' && currentFilter.period) || 'ALL';
     const periodTarget = getTargetRecordForPeriod(curPeriod) || {};
     const scopedBookings = bookings
@@ -15402,13 +15457,15 @@ function renderExecutiveControlCenter() {
     });
 
     // Gap nights (Revenue opportunity)
-    if (typeof appData !== 'undefined' && appData.gapNights && appData.gapNights.length > 0) {
-      const gap = appData.gapNights[0];
+    const gapNights = typeof detectGapNights === 'function' ? detectGapNights() : [];
+    if (gapNights.length > 0) {
+      const gap = gapNights[0];
       candidates.push({
-        id: `gap-${gap.date}-${gap.villa}`,
+        id: `gap-${gap.checkIn}-${gap.villaKey}`,
         domain: 'REVENUE',
-        propertyId: gap.villa,
-        title: `Boş Gece (Gap Night): ${gap.date} - ${appData.villas[gap.villa]?.name || gap.villa}`,
+        propertyId: gap.villaKey,
+        propertyName: gap.villaName,
+        title: `Boş Gece: ${gap.checkIn} - ${gap.villaName}`,
         revenueImpact: 'HIGH',
         guestImpact: 'LOW',
         urgencyDueTime: 20,
@@ -15416,9 +15473,9 @@ function renderExecutiveControlCenter() {
         rationale: 'İki rezervasyon arasında kalan boşluk; yalnız kayıtlı fiyat kuralı varsa teklif üretilebilir.',
         // Onerilen fiyat hesaplanmamissa satir hic yazilmaz; 12.500 TL
         // uydurulmaz (3.6).
-        sourceMetrics: [`Tarih: ${gap.date}`].concat(
-          Number(gap.suggestedPrice) > 0
-            ? [`Öneri: ₺${Number(gap.suggestedPrice).toLocaleString('tr-TR')}`]
+        sourceMetrics: [`Tarih: ${gap.checkIn}–${gap.checkOut}`].concat(
+          Number(gap.discountPrice) > 0
+            ? [`Öneri: ₺${Number(gap.discountPrice).toLocaleString('tr-TR')}`]
             : ['Öneri fiyatı hesaplanamadı (mülkün liste fiyatı girilmemiş)']
         ),
         deepLink: 'pricing',
@@ -15485,11 +15542,6 @@ function renderTodayCommandCenter(actionsResult) {
     }
 
     listEl.innerHTML = actions.map(act => {
-      const rawScore = act.priorityScore ?? act.actionScore;
-      const parsedScore = Number(rawScore);
-      const hasScore = rawScore !== null && rawScore !== '' && Number.isFinite(parsedScore);
-      const score = hasScore ? parsedScore : null;
-      const scoreClass = !hasScore ? 'score-med' : (score >= 70 ? '' : (score >= 40 ? 'score-med' : 'score-green'));
       const metricsText = (act.sourceMetrics || []).join(' • ');
       // Ham kimlik (UUID) musteriye gosterilmez; ad bulunamazsa bos kalir (L-104).
       const mulkEtiketi = act.propertyName
@@ -15499,7 +15551,7 @@ function renderTodayCommandCenter(actionsResult) {
       return `
         <div class="command-action-card ${typeClass}">
           <div class="action-card-top">
-            <span class="action-score-pill ${scoreClass}" title="${hasScore ? 'Hesaplanan öncelik puanı' : 'Öncelik puanı hesaplanamadı'}">Puan: ${hasScore ? score + '/100' : '—'}</span>
+            <span class="badge">${escapeHtml(act.domain === 'REVENUE' ? 'Gelir fırsatı' : act.domain === 'OPERATIONS' ? 'Operasyon' : 'Kritik')}</span>
             <span style="font-size: 10px; color: #94A3B8; font-weight: 600;">${escapeHtml(mulkEtiketi)}</span>
           </div>
           <div class="action-card-title">${escapeHtml(act.title)}</div>

@@ -269,6 +269,7 @@ const allTestFiles = [
   'a3_role_ui_tests.js',
   'operations_engine_tests.js',
   'staff_field_ui_tests.js',
+  'today_screen_ui_tests.js',
   'navigation_menu_tests.js',
   'a1_claude_remaining_audit_tests.js',
   'shared_components_tests.js',
