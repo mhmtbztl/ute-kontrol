@@ -12,7 +12,10 @@
       LexbnbBusinessDate: require('./business_date'),
       MarketingBenchmarkService: require('./marketing_benchmark_service'),
       MarketingCoverChangeService: require('./marketing_cover_change_service'),
-      MarketingHealthResultsService: require('./marketing_health_results_service')
+      MarketingHealthResultsService: require('./marketing_health_results_service'),
+      AdsMetricsEngine: require('./ads_metrics_engine'),
+      AdsImportParser: require('./ads_import_parser'),
+      AdsPeriodService: require('./ads_period_service')
     });
   } else {
     root.LexBnBMarketingUI = factory(root);
@@ -36,6 +39,7 @@
     analysisRuns: [],
     experiments: [],
     healthSnapshots: [],
+    adsImportPreview: null,
     remoteScopeKey: null,
     remoteStatus: 'LOCAL',
     remoteErrors: []
@@ -63,7 +67,10 @@
     ['MarketingSnapshotService', 'core/marketing_snapshot_service.js?v=184ad517'],
     ['MarketingChannelListingService', 'core/marketing_channel_listing_service.js?v=f3dbce3f'],
     ['MarketingExperimentService', 'core/marketing_experiment_service.js?v=4a2ffb14'],
-    ['MarketingHealthResultsService', 'core/marketing_health_results_service.js?v=662edeea']
+    ['MarketingHealthResultsService', 'core/marketing_health_results_service.js?v=662edeea'],
+    ['AdsMetricsEngine', 'core/ads_metrics_engine.js?v=d8dd5962'],
+    ['AdsImportParser', 'core/ads_import_parser.js?v=35136382'],
+    ['AdsPeriodService', 'core/ads_period_service.js?v=f7e904a2']
   ]);
   let dependencyPromise = null;
 
@@ -186,6 +193,7 @@
       analysisRuns: Array.isArray(input.analysisRuns) ? input.analysisRuns : [],
       experiments: Array.isArray(input.experiments) ? input.experiments : [],
       healthSnapshots: Array.isArray(input.healthSnapshots) ? input.healthSnapshots : [],
+      ads: buildAdsModel(input),
       remoteStatus: input.remoteStatus || 'LOCAL',
       remoteErrors: Array.isArray(input.remoteErrors) ? input.remoteErrors : []
     };
@@ -473,8 +481,126 @@
     }).join('')}</div><div class="sub-text" style="margin-top:8px">Bu gerçek A/B değil; yalnız olası etkiyi gösteren gözlemsel önce/sonra ölçümüdür. Sonuç nedensellik kanıtı olarak sunulmaz.</div></div>`;
   }
 
+  function buildAdsModel(input = {}) {
+    const engine = services.AdsMetricsEngine;
+    if (!engine || typeof engine.campaignMetrics !== 'function') throw new Error('ADS_METRICS_ENGINE_UNAVAILABLE');
+    const periods = (input.adMetricPeriods || []).map(row => ({
+      campaignId: row.campaignId || row.campaign_id,
+      platform: row.platform,
+      resultType: row.resultType || row.result_type,
+      periodStart: row.periodStart || row.period_start,
+      periodEnd: row.periodEnd || row.period_end,
+      spend: row.spend == null ? null : Number(row.spend),
+      impressions: row.impressions == null ? null : Number(row.impressions),
+      clicks: row.clicks == null ? null : Number(row.clicks),
+      messages: row.messages == null ? null : Number(row.messages),
+      calls: row.calls == null ? null : Number(row.calls)
+    }));
+    const campaigns = Array.isArray(input.marketingCampaigns) ? input.marketingCampaigns : [];
+    const campaignNames = new Map(campaigns.map(item => [String(item.id), item.name || 'Adsız kampanya']));
+    const metrics = engine.campaignMetrics(periods, { targets: input.targets || {}, minResults: 10 })
+      .map(row => ({ ...row, campaignName: campaignNames.get(String(row.campaignId)) || 'Bilinmeyen kampanya' }));
+
+    const sourceCodes = new Map((input.leadSources || []).map(item => [String(item.id), item.code]));
+    const leadsBySource = {};
+    (input.leadAcquisitions || []).forEach(item => {
+      const code = sourceCodes.get(String(item.sourceId || item.source_id));
+      if (code) leadsBySource[code] = (leadsBySource[code] || 0) + 1;
+    });
+    const sums = periods.reduce((out, row) => {
+      if (row.spend != null) out.spend[row.platform] = (out.spend[row.platform] || 0) + row.spend;
+      if (row.messages != null) out.messages[row.platform] = (out.messages[row.platform] || 0) + row.messages;
+      return out;
+    }, { spend: {}, messages: {} });
+    const totalSpend = periods.some(row => row.spend != null)
+      ? periods.reduce((sum, row) => sum + (row.spend || 0), 0) : null;
+    return {
+      metrics,
+      campaigns: campaigns.filter(item => ['META', 'GOOGLE'].includes(String(item.platform || '').toUpperCase())),
+      channelLeadCost: engine.channelLeadCost({ spendByPlatform: sums.spend, leadsBySource, messagesByPlatform: sums.messages }),
+      adShare: engine.adShare({ adSpend: totalSpend, netRoomRevenue: input.financeSummary && input.financeSummary.netRoomRevenue }),
+      totalSpend,
+      canManage: input.canManageAds !== false
+    };
+  }
+
+  function buildAdsImportPreview(text, mode, campaigns) {
+    const parser = services.AdsImportParser;
+    if (!parser) throw new Error('ADS_IMPORT_PARSER_UNAVAILABLE');
+    const parsed = mode === 'CSV_META' ? parser.parseCsv(text, 'META') : parser.parsePasted(text);
+    const rows = parser.matchCampaigns(parsed.rows, campaigns || []);
+    const unmatched = rows.filter(row => !row.campaignId).map((row, index) => ({
+      line: index + 1, code: 'CAMPAIGN_NOT_MATCHED', text: `${row.campaignName || 'Adsız kampanya'} kayıtlı kampanyalarla eşleşmedi.`
+    }));
+    return { rows, errors: [...parsed.errors, ...unmatched], warnings: parsed.warnings || [], mode };
+  }
+
+  function renderAdsImportPreview(preview) {
+    if (!preview) return '';
+    const errors = preview.errors.length
+      ? `<div class="card" style="padding:12px;border-left:4px solid #ef4444;margin-top:10px"><strong>İçe aktarma durduruldu</strong><ul>${preview.errors.map(item => `<li>${escapeHtml(item.text)}</li>`).join('')}</ul></div>` : '';
+    const rows = preview.rows.length ? `<div class="card" style="padding:12px;overflow:auto;margin-top:10px"><table class="data-table"><thead><tr><th>Kampanya</th><th>Dönem</th><th>Tür</th><th>Harcama</th><th>Sonuç</th><th>Eşleşme</th></tr></thead><tbody>${preview.rows.map(row => `<tr><td>${escapeHtml(row.campaignName)}</td><td>${escapeHtml(row.periodStart)} – ${escapeHtml(row.periodEnd)}</td><td>${escapeHtml(row.resultType)}</td><td>${money(row.spend)}</td><td>${number(row.resultType === 'MESSAGE' ? row.messages : row.calls)}</td><td>${row.campaignId ? 'Hazır' : 'Eşleşmedi'}</td></tr>`).join('')}</tbody></table>${preview.errors.length ? '' : '<form data-ads-import-confirm style="display:flex;justify-content:flex-end;margin-top:10px"><button type="submit" class="btn btn-primary btn-sm">Önizlemeyi onayla ve kaydet</button></form>'}</div>` : '';
+    return `${errors}${rows}`;
+  }
+
+  function renderAds(model) {
+    const statusLabels = { VERIMLI: 'Verimli', PAHALI: 'Pahalı', IZLE: 'İzle' };
+    const metricCards = model.metrics.length ? model.metrics.map(row => `
+      <article class="card" style="padding:14px">
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:start;flex-wrap:wrap">
+          <div><strong>${escapeHtml(row.campaignName)}</strong><div class="sub-text">${escapeHtml(row.platform)} · ${row.resultType === 'MESSAGE' ? 'Mesaj' : row.resultType === 'CALL' ? 'Arama' : 'Diğer sonuç'}</div></div>
+          <span class="badge ${row.status === 'VERIMLI' ? 'badge-emerald' : row.status === 'PAHALI' ? 'badge-red' : 'badge-amber'}">${escapeHtml(statusLabels[row.status] || 'Hedef gerekli')}</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:10px;margin-top:12px">
+          <div><span class="sub-text">Harcama</span><strong style="display:block">${money(row.spend)}</strong></div>
+          <div><span class="sub-text">CTR</span><strong style="display:block">${number(row.ctr, '%')}</strong></div>
+          <div><span class="sub-text">Tıklama maliyeti</span><strong style="display:block">${money(row.cpc)}</strong></div>
+          <div><span class="sub-text">Mesaj maliyeti</span><strong style="display:block">${money(row.costPerMessage)}</strong></div>
+          <div><span class="sub-text">Arama maliyeti</span><strong style="display:block">${money(row.costPerCall)}</strong></div>
+        </div>
+        <div class="sub-text" style="margin-top:8px">${escapeHtml(row.statusReason && row.statusReason.text || 'Durum için hedef ve yeterli örnek gerekli.')}</div>
+      </article>`).join('') : emptyState('Henüz reklam dönemi yok', 'İlk gerçek reklam dönemi kaydedildiğinde kampanya maliyetleri burada görünür.');
+    const channelRows = model.channelLeadCost.map(row => `<tr><td>${escapeHtml(row.platform)}</td><td>${money(row.spend)}</td><td>${number(row.leads)}</td><td>${money(row.costPerLead)}</td><td>${number(row.messageToLeadRatio)}</td></tr>`).join('');
+    const campaignOptions = model.campaigns.map(item => `<option value="${escapeHtml(item.id)}" data-platform="${escapeHtml(item.platform)}">${escapeHtml(item.name)} · ${escapeHtml(item.platform)}</option>`).join('');
+    const form = model.canManage ? (campaignOptions ? `
+      <form data-ads-manual-form class="card" style="padding:16px;margin-bottom:14px">
+        <h3 style="margin:0 0 6px">Reklam dönemi ekle</h3>
+        <p class="sub-text" style="margin:0 0 12px">Kaydetme işlemi reklam giderini Finans'a aynı işlem içinde bağlar.</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;align-items:end">
+          <label style="display:grid;gap:5px;font-size:12px">Kampanya<select class="form-control" name="campaignId" required>${campaignOptions}</select></label>
+          <label style="display:grid;gap:5px;font-size:12px">Platform<select class="form-control" name="platform" required><option value="META">Meta</option><option value="GOOGLE">Google</option></select></label>
+          <label style="display:grid;gap:5px;font-size:12px">Başlangıç<input class="form-control" type="date" name="periodStart" required></label>
+          <label style="display:grid;gap:5px;font-size:12px">Bitiş<input class="form-control" type="date" name="periodEnd" required></label>
+          <label style="display:grid;gap:5px;font-size:12px">Sonuç türü<select class="form-control" name="resultType" required><option value="MESSAGE">Mesaj</option><option value="CALL">Arama</option><option value="OTHER">Diğer</option></select></label>
+          <label style="display:grid;gap:5px;font-size:12px">Harcama<input class="form-control" type="number" name="spend" min="0" step="0.01"></label>
+          <label style="display:grid;gap:5px;font-size:12px">Gösterim<input class="form-control" type="number" name="impressions" min="0" step="1"></label>
+          <label style="display:grid;gap:5px;font-size:12px">Tıklama<input class="form-control" type="number" name="clicks" min="0" step="1"></label>
+          <label style="display:grid;gap:5px;font-size:12px">Mesaj<input class="form-control" type="number" name="messages" min="0" step="1"></label>
+          <label style="display:grid;gap:5px;font-size:12px">Arama<input class="form-control" type="number" name="calls" min="0" step="1"></label>
+          <button class="btn btn-primary btn-sm" type="submit">Dönemi kaydet</button>
+        </div>
+      </form>
+      <form data-ads-import-form class="card" style="padding:16px;margin-bottom:14px">
+        <h3 style="margin:0 0 6px">Ekran görüntüsü veya CSV içe aktar</h3>
+        <p class="sub-text" style="margin:0 0 10px">Varsayılan akış: reklam ekran görüntüsünü ChatGPT'ye okutun, çıktıyı aşağıdaki kesin biçimde yapıştırın. Kaydetmeden önce tüm satırlar gösterilir.</p>
+        <code style="display:block;white-space:pre-wrap;margin-bottom:10px">LEXBNB_REKLAM_V2\nplatform;kampanya;baslangic;bitis;sonuc_turu;harcama;gosterim;tiklama;mesaj;arama</code>
+        <div style="display:grid;grid-template-columns:minmax(160px,220px) 1fr;gap:10px;align-items:start">
+          <label style="display:grid;gap:5px;font-size:12px">Biçim<select class="form-control" name="mode"><option value="CHATGPT">ChatGPT çıktısı</option><option value="CSV_META">Meta CSV</option></select></label>
+          <label style="display:grid;gap:5px;font-size:12px">Dosya (isteğe bağlı)<input class="form-control" type="file" accept=".csv,.txt" data-ads-import-file></label>
+        </div>
+        <label style="display:grid;gap:5px;font-size:12px;margin-top:10px">Veri<textarea class="form-control" name="payload" rows="7" required></textarea></label>
+        <div style="display:flex;justify-content:flex-end;margin-top:10px"><button type="submit" class="btn btn-secondary btn-sm">Önizle</button></div>
+      </form>
+      ${renderAdsImportPreview(state.adsImportPreview)}` : emptyState('Önce kampanya oluşturun', 'Meta veya Google kampanyası olmadan reklam dönemi kaydedilemez.')) : '';
+    return `${form}
+      <div class="card" style="padding:14px;margin-bottom:14px;border-left:4px solid #f59e0b"><strong>Atıf sınırı</strong><div class="sub-text">Talep kaynağı kanal düzeyinde ölçülür; hangi reklamın rezervasyon getirdiği ölçülemez. Kampanya ROAS'ı gösterilmez.</div></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:14px">${metricCards}</div>
+      <div class="card" style="padding:14px;overflow:auto"><h3 style="margin:0 0 10px">Kanal → talep maliyeti</h3><table class="data-table"><thead><tr><th>Kanal</th><th>Harcama</th><th>Talep</th><th>Talep maliyeti</th><th>Mesaj→talep</th></tr></thead><tbody>${channelRows}</tbody></table><div class="sub-text" style="margin-top:10px">Toplam reklam harcaması ${money(model.totalSpend)} · net konaklama cirosundaki pay ${number(model.adShare.pct, '%')}</div></div>`;
+  }
+
   function renderWorkspaceHtml(model, view) {
     if (view === 'funnel') return renderFunnel(model);
+    if (view === 'ads') return renderAds(model.ads || buildAdsModel(model));
     return renderEconomics(model);
   }
 
@@ -482,7 +608,14 @@
     const data = typeof appData !== 'undefined' ? appData : {};
     const filter = typeof currentFilter !== 'undefined' ? currentFilter : {};
     const financeSummary = typeof computeFilterLedger === 'function' ? computeFilterLedger() : null;
-    return { ...state, bookings: data.bookings || [], villas: data.villas || {}, filter, baseCurrency: 'TRY', financeSummary };
+    const settings = data.tenantSettings || {};
+    return {
+      ...state, bookings: data.bookings || [], villas: data.villas || {}, filter, baseCurrency: 'TRY', financeSummary,
+      adMetricPeriods: data.adMetricPeriods || [], marketingCampaigns: data.marketingCampaigns || [],
+      leadSources: data.leadSources || [], leadAcquisitions: data.leadAcquisitions || [],
+      targets: { costPerMessage: settings.ads_cost_per_message_target, costPerCall: settings.ads_cost_per_call_target },
+      canManageAds: typeof canManageTenantRole !== 'function' || canManageTenantRole(typeof activeTenant !== 'undefined' && activeTenant && activeTenant.role)
+    };
   }
 
   function cloudScope() {
@@ -677,6 +810,52 @@
     }
   }
 
+  async function handleAdsPeriodSubmit(form) {
+    const client = typeof supabaseClient !== 'undefined' ? supabaseClient : null;
+    const scope = cloudScope();
+    if (!client || !scope || !services.AdsPeriodService) throw new Error('ADS_PERIOD_UNAVAILABLE');
+    const values = Object.fromEntries(new FormData(form).entries());
+    const submit = form.querySelector('[type="submit"]');
+    if (submit) submit.disabled = true;
+    try {
+      const result = await services.AdsPeriodService.savePeriod(client, {
+        ...values, tenantId: scope.tenantId, source: 'MANUAL'
+      });
+      if (typeof loadTenantAppData === 'function') await loadTenantAppData(scope.tenantId);
+      render();
+      return result;
+    } finally {
+      if (submit) submit.disabled = false;
+    }
+  }
+
+  function handleAdsImportPreview(form) {
+    const values = Object.fromEntries(new FormData(form).entries());
+    const data = typeof appData !== 'undefined' ? appData : {};
+    state.adsImportPreview = buildAdsImportPreview(values.payload, values.mode, data.marketingCampaigns || []);
+    render();
+    return state.adsImportPreview;
+  }
+
+  async function handleAdsImportConfirm(form) {
+    const client = typeof supabaseClient !== 'undefined' ? supabaseClient : null;
+    const scope = cloudScope();
+    const preview = state.adsImportPreview;
+    if (!client || !scope || !services.AdsPeriodService || !preview || preview.errors.length) throw new Error('ADS_IMPORT_NOT_READY');
+    const submit = form.querySelector('[type="submit"]');
+    if (submit) submit.disabled = true;
+    try {
+      for (const row of preview.rows) {
+        await services.AdsPeriodService.savePeriod(client, { ...row, tenantId: scope.tenantId });
+      }
+      state.adsImportPreview = null;
+      if (typeof loadTenantAppData === 'function') await loadTenantAppData(scope.tenantId);
+      render();
+    } finally {
+      if (submit) submit.disabled = false;
+    }
+  }
+
   function initializeBrowser() {
     if (typeof document === 'undefined') return;
     document.querySelectorAll('[data-marketing-view]').forEach(button => button.addEventListener('click', () => {
@@ -709,6 +888,33 @@
       });
     });
     if (content) content.addEventListener('submit', event => {
+      const adsConfirm = event.target.closest('[data-ads-import-confirm]');
+      if (adsConfirm) {
+        event.preventDefault();
+        handleAdsImportConfirm(adsConfirm).catch(() => {
+          const status = document.getElementById('marketingWorkspaceStatus');
+          if (status) status.textContent = 'Reklam satırları kaydedilemedi. Çakışan dönemleri ve yetkiyi kontrol edin.';
+        });
+        return;
+      }
+      const adsImport = event.target.closest('[data-ads-import-form]');
+      if (adsImport) {
+        event.preventDefault();
+        try { handleAdsImportPreview(adsImport); } catch (_) {
+          const status = document.getElementById('marketingWorkspaceStatus');
+          if (status) status.textContent = 'Reklam verisi okunamadı. Seçilen biçimi ve başlığı kontrol edin.';
+        }
+        return;
+      }
+      const adsForm = event.target.closest('[data-ads-manual-form]');
+      if (adsForm) {
+        event.preventDefault();
+        handleAdsPeriodSubmit(adsForm).catch(() => {
+          const status = document.getElementById('marketingWorkspaceStatus');
+          if (status) status.textContent = 'Reklam dönemi kaydedilemedi. Yetkiyi, kampanyayı ve tarih aralığını kontrol edin.';
+        });
+        return;
+      }
       const benchmarkForm = event.target.closest('[data-marketing-benchmark-form]');
       if (benchmarkForm) {
         event.preventDefault();
@@ -744,6 +950,17 @@
         if (status) status.textContent = 'Snapshot kaydedilemedi. Alanları kontrol edip yeniden deneyin.';
       });
     });
+    if (content) content.addEventListener('change', event => {
+      const input = event.target.closest('[data-ads-import-file]');
+      const file = input && input.files && input.files[0];
+      const form = input && input.closest('[data-ads-import-form]');
+      const textarea = form && form.querySelector('[name="payload"]');
+      if (!file || !textarea || typeof file.text !== 'function') return;
+      file.text().then(text => { textarea.value = text; }).catch(() => {
+        const status = document.getElementById('marketingWorkspaceStatus');
+        if (status) status.textContent = 'Seçilen reklam dosyası okunamadı.';
+      });
+    });
     // switchTab() in app.js invokes this global hook. Replacing it prevents the
     // hidden legacy demo from rendering while preserving the existing router.
     window.openMarketingListingManager = function openMarketingListingManager(propertyId) {
@@ -768,5 +985,5 @@
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') initializeBrowser();
 
-  return { periodFromFilter, scopeBookings, buildWorkspaceModel, selectLatestSnapshot, selectCurrentBenchmark, renderWorkspaceHtml, renderMarketingHealth, renderBenchmarkPanel, renderBenchmarkForm, renderFindingActions, renderListingForm, renderSnapshotForm, renderExperimentForm, renderExperiments, escapeHtml, setData, render };
+  return { periodFromFilter, scopeBookings, buildWorkspaceModel, buildAdsModel, buildAdsImportPreview, selectLatestSnapshot, selectCurrentBenchmark, renderWorkspaceHtml, renderAds, renderAdsImportPreview, renderMarketingHealth, renderBenchmarkPanel, renderBenchmarkForm, renderFindingActions, renderListingForm, renderSnapshotForm, renderExperimentForm, renderExperiments, escapeHtml, setData, render };
 }));

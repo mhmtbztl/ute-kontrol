@@ -277,6 +277,8 @@ const allTestFiles = [
   'phase70_business_date_defaults_tests.js',
   'phase70_business_date_defaults_live_tests.js',
   'ads_metrics_tests.js',
+  'ads_period_service_tests.js',
+  'a4_ads_ui_tests.js',
   'phase72_ads_metrics_tests.js',
   'phase72_ads_metrics_live_tests.js',
   'phase74_logo_storage_tests.js',

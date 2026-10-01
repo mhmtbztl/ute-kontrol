@@ -8845,7 +8845,10 @@ function renderLeadSalesWorkspace() {
   listSection.hidden = leadViewMode !== 'LIST';
   document.getElementById('leadViewKanban')?.classList.toggle('active', leadViewMode === 'KANBAN');
   document.getElementById('leadViewList')?.classList.toggle('active', leadViewMode === 'LIST');
-  kanban.innerHTML = stages.map(([code, label]) => `<section class="lead-column"><h3>${escapeHtml(label)} <span class="badge">${view.columns[code].length}</span></h3><div>${view.columns[code].length ? view.columns[code].map(renderLeadCard).join('') : '<p class="empty-state">Talep yok.</p>'}</div></section>`).join('');
+  kanban.innerHTML = stages.map(([code, label]) => {
+    const rows = view.columns[code];
+    return `<section class="lead-column"><h3>${escapeHtml(label)} <span class="badge">${escapeHtml(rows.length)}</span></h3><div>${rows.length ? rows.map(renderLeadCard).join('') : '<p class="empty-state">Talep yok.</p>'}</div></section>`;
+  }).join('');
 
   const followUps = leadFollowUpScope === 'ALL' ? view.followUpsToday : view.myFollowUpsToday;
   document.getElementById('leadFollowUpCount').textContent = String(followUps.length);
@@ -13789,9 +13792,10 @@ async function loadTenantAppData(tenantIdOrUserId) {
     try {
       const tenantId = targetId;
       const mayReadLedger = canReadLedgerRole(activeTenant?.role);
+      const mayManageAds = canManageTenantRole(activeTenant?.role);
       // Independent datasets are loaded concurrently and every list is paged;
       // Supabase's per-response cap must never silently truncate a dashboard.
-      const [villas, bookings, expenses, cleanList, leads, leadSalesContext, closeList, targetList, maintenanceTickets, operationalTasks, financialTransactions, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications, campaignRows, influencerRows, settingRows, operatorNoteRows, pricingLadderRows, hkOverrideRows, paymentCommissionRows, operationalPeopleRows, cleaningExecutionRows, maintenanceAssignmentRows, taskTemplateRows, checklistTemplateRows, bookingPayments, bookingPaymentBalances] = await Promise.all([
+      const [villas, bookings, expenses, cleanList, leads, leadSalesContext, closeList, targetList, maintenanceTickets, operationalTasks, financialTransactions, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications, campaignRows, influencerRows, settingRows, operatorNoteRows, pricingLadderRows, hkOverrideRows, paymentCommissionRows, operationalPeopleRows, cleaningExecutionRows, maintenanceAssignmentRows, taskTemplateRows, checklistTemplateRows, bookingPayments, bookingPaymentBalances, adMetricPeriods] = await Promise.all([
         loadProperties(tenantId),
         loadBookings(tenantId),
         mayReadLedger ? loadExpenses(tenantId) : Promise.resolve([]),
@@ -13829,7 +13833,8 @@ async function loadTenantAppData(tenantIdOrUserId) {
         fetchTenantRowsTolerant(() => supabaseClient.from('task_templates').select('*').eq('tenant_id', tenantId).eq('is_active', true).order('title')),
         fetchTenantRowsTolerant(() => supabaseClient.from('property_checklist_templates').select('*').eq('tenant_id', tenantId).eq('is_active', true).order('updated_at', { ascending: false })),
         fetchTenantRowsTolerant(() => supabaseClient.from('booking_payments').select('*').eq('tenant_id', tenantId).order('paid_on', { ascending: false })),
-        fetchTenantRowsTolerant(() => supabaseClient.from('booking_payment_balances').select('*').eq('tenant_id', tenantId))
+        fetchTenantRowsTolerant(() => supabaseClient.from('booking_payment_balances').select('*').eq('tenant_id', tenantId)),
+        mayManageAds ? fetchTenantRowsTolerant(() => supabaseClient.from('ad_metric_periods').select('*').eq('tenant_id', tenantId).order('period_start', { ascending: false })) : Promise.resolve([])
       ]);
       const propIdMap = {};
       Object.values(villas || {}).forEach(p => {
@@ -13931,6 +13936,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
         financialTransactions: financialTransactions || [],
         userNotifications: userNotifications || [],
         marketingCampaigns: (campaignRows || []).map(r => mapMarketingCampaignFromDb(r, propIdMap)),
+        adMetricPeriods: adMetricPeriods || [],
         influencerCollabs: (influencerRows || []).map(r => mapInfluencerCollabFromDb(r, propIdMap)),
         housekeepingOverrides,
         airbnbListings,
@@ -14008,6 +14014,7 @@ function getBlankTenantData(userId) {
     checklistTemplates: [],
     financialTransactions: [],
     marketingCampaigns: [],
+    adMetricPeriods: [],
     influencerCollabs: [],
     housekeepingOverrides: {},
     airbnbListings: {},
