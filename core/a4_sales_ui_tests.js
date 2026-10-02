@@ -128,6 +128,36 @@ async function test(name, fn) {
     assert.match(app, /Kara\/beyaz liste bilgisi kaydedilemedi/);
   });
 
+  await test('izleyici misafir profilini salt okunur görür; satış rolü düzenler ama özel listeyi yönetemez', () => {
+    const makeForm = () => {
+      const controls = [
+        { id: 'guestFirstName', type: 'text', disabled: false },
+        { id: 'guestBirthDate', type: 'date', disabled: false },
+        { id: 'guestPrivateListType', type: 'select-one', disabled: false },
+        { id: 'guestProfileId', type: 'hidden', disabled: false }
+      ];
+      const submit = { hidden: false, disabled: false };
+      return { elements: controls, querySelector: selector => selector === 'button[type="submit"]' ? submit : null, controls, submit };
+    };
+
+    const viewer = makeForm();
+    assert.deepStrictEqual(App.applyGuestProfileAccess(viewer, 'viewer'), { canEdit: false, canManagePrivate: false });
+    assert.strictEqual(viewer.controls.find(control => control.id === 'guestFirstName').disabled, true);
+    assert.strictEqual(viewer.controls.find(control => control.id === 'guestBirthDate').disabled, true);
+    assert.strictEqual(viewer.controls.find(control => control.id === 'guestProfileId').disabled, false);
+    assert.strictEqual(viewer.submit.hidden, true);
+
+    const sales = makeForm();
+    assert.deepStrictEqual(App.applyGuestProfileAccess(sales, 'sales'), { canEdit: true, canManagePrivate: false });
+    assert.strictEqual(sales.controls.find(control => control.id === 'guestFirstName').disabled, false);
+    assert.strictEqual(sales.controls.find(control => control.id === 'guestPrivateListType').disabled, true);
+    assert.strictEqual(sales.submit.hidden, false);
+
+    const owner = makeForm();
+    assert.deepStrictEqual(App.applyGuestProfileAccess(owner, 'owner'), { canEdit: true, canManagePrivate: true });
+    assert.ok(owner.controls.every(control => control.disabled === false));
+  });
+
   await test('talep çalışma alanı kaynak, takip ve atamayı tek görünümde birleştirir', () => {
     const view = App.buildLeadSalesView({
       leads: [

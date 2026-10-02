@@ -17214,6 +17214,22 @@ function closeGuestProfileModal() {
   document.getElementById('guestProfileModal')?.classList.remove('active');
 }
 
+function applyGuestProfileAccess(form, role = activeTenant?.role) {
+  const canEdit = canWriteSalesRole(role);
+  const canManagePrivate = canManageTenantRole(role);
+  const privateIds = new Set(['guestPrivateListType', 'guestPrivateReason', 'guestPrivateIncidentOn']);
+  Array.from(form?.elements || []).forEach(control => {
+    if (!control || control.type === 'hidden') return;
+    control.disabled = privateIds.has(control.id) ? !canManagePrivate : !canEdit;
+  });
+  const submit = form?.querySelector?.('button[type="submit"]');
+  if (submit) {
+    submit.hidden = !canEdit;
+    submit.disabled = !canEdit;
+  }
+  return { canEdit, canManagePrivate };
+}
+
 function openGuestProfileModal(guestId = null) {
   const modal = document.getElementById('guestProfileModal');
   const form = document.getElementById('guestProfileForm');
@@ -17237,8 +17253,9 @@ function openGuestProfileModal(guestId = null) {
   document.getElementById('guestPreferences').value = guest?.preferences || '';
   document.getElementById('guestInternalNotes').value = guest?.internalNotes || '';
   document.getElementById('guestTags').value = (guest?.tags || []).join(', ');
+  const access = applyGuestProfileAccess(form);
   const privateSection = document.getElementById('guestPrivateClassificationSection');
-  const canManagePrivate = canManageTenantRole(activeTenant?.role);
+  const canManagePrivate = access.canManagePrivate;
   if (privateSection) privateSection.style.display = canManagePrivate ? '' : 'none';
   const classification = guest && canManagePrivate
     ? (appData.guestPrivateClassifications || []).find(item => item.guest_id === guest.id) : null;
@@ -17295,6 +17312,7 @@ function openGuestRebookingWhatsApp(guestId) {
 
 async function saveGuestProfile(event) {
   event.preventDefault();
+  if (!canWriteSalesRole(activeTenant?.role)) return false;
   const submit = event.target.querySelector('button[type="submit"]');
   if (submit) submit.disabled = true;
   try {
@@ -17902,6 +17920,7 @@ if (typeof module !== 'undefined' && module.exports) {
     canReadLedgerRole,
     canReadSalesRole,
     canWriteSalesRole,
+    applyGuestProfileAccess,
     buildPricingWorkspace,
     applyRoleNavigationVisibility,
     invalidateExecutiveSnapshotCache,

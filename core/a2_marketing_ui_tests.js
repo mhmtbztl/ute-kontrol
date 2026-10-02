@@ -10,10 +10,10 @@ const marketingSource = fs.readFileSync(path.join(__dirname, 'marketing_ui.js'),
 let passed = 0, failed = 0;
 function test(name, fn) { try { fn(); passed++; console.log(`[PASS] ${name}`); } catch (e) { failed++; console.error(`[FAIL] ${name}\n       ${e.stack || e.message}`); } }
 
-test('Kanallar ve Pazarlama yalnız iki canlı alt sekme gösterir', () => {
+test('Kanallar ve Pazarlama A4 reklam çalışma alanıyla üç canlı alt sekme gösterir', () => {
   assert.match(html, /data-marketing-view="economics"[^>]*>[^<]*Kanallar/);
   assert.match(html, /data-marketing-view="funnel"[^>]*>[^<]*Huniler ve Testler/);
-  assert.doesNotMatch(html, />\s*Reklamlar\s*</);
+  assert.match(html, /data-marketing-view="ads"[^>]*>[^<]*Reklamlar/);
 });
 
 test('Kanal ekonomisi karar sütunlarını ve net payı gösterir', () => {
