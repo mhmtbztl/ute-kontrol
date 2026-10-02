@@ -46,8 +46,8 @@ try {
     'A6. Raporlar, Analiz Merkezi ve ayrı Misafirler menüde yok', nav.match(/switchTab\('(reports|analysis|guests)'\)/g));
 
   // --- B. Tasinan yuzeyler ---------------------------------------------------
-  check(/id="askChatGptBtn"[^>]*data-onclick="switchTab\('analysis'\)"/.test(INDEX),
-    'B1. Üst çubukta "ChatGPT\'ye sor" düğmesi Analiz Merkezi\'ni açar', 'askChatGptBtn yok');
+  check(/id="askChatGptBtn"[^>]*data-onclick="openChatGptQuestionModal\(\)"/.test(INDEX),
+    'B1. Üst çubukta "ChatGPT\'ye sor" düğmesi ortak soru penceresini açar', 'askChatGptBtn ortak pencereye bağlı değil');
   const finansBas = INDEX.indexOf('id="tab-finance"');
   const finansSon = INDEX.indexOf('class="tab-content', finansBas + 20);
   const finans = finansBas >= 0 ? INDEX.slice(finansBas, finansSon > 0 ? finansSon : undefined) : '';

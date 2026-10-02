@@ -142,7 +142,7 @@ try {
     check(typeof app.renderPageActionBar === 'function' && typeof app.registerPageAction === 'function',
       'C1. Eylem yuvası dışa aktarılmış', 'yok');
     if (typeof app.renderPageActionBar === 'function') {
-      app.renderPageActionBar('finance');
+      app.renderPageActionBar('pricing');
       check(cubuk.hidden === true && cubuk.innerHTML === '', 'C2. Kayıtlı eylemi olmayan sayfada çubuk gizli, düğme yok', cubuk.innerHTML);
       let calisti = 0;
       app.registerPageAction('leads', { id: 'rapor', label: 'Rapor <al>', run: () => { calisti++; } });

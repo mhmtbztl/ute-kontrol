@@ -64,13 +64,16 @@ body {
 }
 
 .brand-logo {
-  font-size: 20px;
-  font-weight: 800;
-  background: linear-gradient(135deg, #10B981, #059669);
-  color: white;
-  padding: 6px 12px;
-  border-radius: 8px;
-  letter-spacing: -0.5px;
+  display: flex;
+  align-items: center;
+  min-width: 118px;
+}
+
+.brand-logo img {
+  width: 118px;
+  height: 34px;
+  object-fit: contain;
+  object-position: left center;
 }
 
 .brand-meta h1 {
@@ -4415,6 +4418,110 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px;
+}
+
+.auth-brand-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.auth-brand-title img {
+  width: 184px;
+  height: 54px;
+  object-fit: contain;
+}
+
+.auth-brand-badge {
+  padding: 3px 7px;
+  border: 1px solid rgba(242, 85, 90, 0.5);
+  border-radius: 4px;
+  color: #ff8a85;
+  font-size: 12px;
+  vertical-align: middle;
+}
+.report-modal-card { max-width: 960px; max-height: 92vh; overflow: auto; }
+.report-preview { padding: 18px 20px; display: grid; gap: 16px; }
+.report-business { display: flex; align-items: center; gap: 12px; }
+.report-business img { width: 52px; height: 52px; object-fit: contain; border-radius: 10px; }
+.report-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.report-kpi { padding: 12px; border: 1px solid var(--border-color); border-radius: 10px; }
+.report-kpi span { display: block; color: var(--text-muted); font-size: 11px; }
+.report-kpi strong { display: block; margin-top: 5px; }
+.report-table-wrap { overflow-x: auto; }
+.report-modal-actions { flex-wrap: wrap; }
+.chatgpt-question-card { max-width: 760px; max-height: 92vh; overflow: auto; }
+.chatgpt-question-body { padding: 18px 20px; display: grid; gap: 10px; }
+.chatgpt-question-body .analysis-privacy-note { margin-bottom: 4px; }
+.chatgpt-question-body textarea { min-height: 260px; }
+.quick-booking-card { max-width: 520px; }
+.quick-booking-fields { display: grid; gap: 12px; padding: 18px 20px 6px; }
+.quick-booking-fields label { display: grid; gap: 5px; color: var(--text-secondary); font-size: 12px; font-weight: 700; }
+.quick-booking-fields input,
+.quick-booking-fields select { width: 100%; min-height: 44px; }
+.quick-booking-dates { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.quick-booking-card > form > .sub-text { margin: 8px 20px; }
+.mobile-quick-booking { display: none; }
+
+@media (max-width: 520px) {
+  .mobile-quick-booking {
+    display: block;
+    position: fixed;
+    right: 14px;
+    bottom: calc(14px + env(safe-area-inset-bottom));
+    z-index: 850;
+    min-height: 48px;
+    border-radius: 999px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, .42);
+  }
+  .quick-booking-card { width: 100vw; max-width: none; min-height: 100dvh; border-radius: 0; }
+  .quick-booking-dates { grid-template-columns: 1fr; }
+  .lead-kanban { grid-template-columns: 1fr; overflow-x: visible; }
+  .lead-column { min-width: 0; }
+  .report-modal-card,
+  .chatgpt-question-card { width: 100vw; max-width: none; min-height: 100dvh; border-radius: 0; }
+  .container,
+  .tab-content,
+  .card { min-width: 0; max-width: 100%; }
+}
+
+.settings-business-form {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.settings-logo-preview-wrap {
+  width: 140px;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px dashed rgba(148, 163, 184, 0.45);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.settings-logo-preview-wrap img { width: 100%; height: 100%; object-fit: contain; }
+.settings-logo-placeholder { color: #94A3B8; font-size: 12px; letter-spacing: 0.14em; }
+.settings-business-fields { display: grid; gap: 12px; max-width: 620px; }
+.settings-template-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.settings-template-pane { padding: 14px; border: 1px solid rgba(148, 163, 184, 0.18); border-radius: 10px; }
+.settings-template-pane h3 { margin: 0 0 12px; font-size: 14px; }
+.settings-inline-form { display: grid; gap: 8px; margin-bottom: 12px; }
+.settings-inline-form textarea { min-height: 82px; resize: vertical; }
+.settings-template-list { display: grid; gap: 8px; }
+.settings-template-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 0; border-top: 1px solid rgba(148, 163, 184, 0.12); }
+.settings-template-row span { min-width: 0; overflow-wrap: anywhere; }
+.settings-source-form { display: flex; gap: 10px; align-items: end; margin-bottom: 14px; }
+.settings-source-form .form-group { flex: 1; margin: 0; }
+
+@media (max-width: 760px) {
+  .settings-business-form, .settings-template-grid { grid-template-columns: 1fr; }
+  .settings-logo-preview-wrap { width: 112px; }
+  .settings-source-form { align-items: stretch; flex-direction: column; }
 }
 .property-profile-grid > div {
   display: grid;

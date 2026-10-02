@@ -1,6 +1,6 @@
 # Phase 78 + 80 — P61 fiyat araştırması ve gider şablonu
 
-Durum: Kod ve test projesi doğrulandı. Üretime uygulanmadı.
+Durum: Kod ve test projesi doğrulandı. Phase78 ve phase80, 2 Ekim 2026'da üretime uygulandı; `production:readiness` ile `schema_migrations` kayıtları ve anon erişim sınırı üretime sorularak doğrulandı.
 
 Bu paket iki değişmez göçten oluşur ve üretimde **bu sırayla, aynı bakım turunda** uygulanır:
 

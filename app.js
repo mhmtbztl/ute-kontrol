@@ -1771,6 +1771,41 @@ async function deleteBookingUI(bookingId) {
   }
 }
 
+function isBrowserQualityFixture() {
+  if (typeof window === 'undefined' || !window.location) return false;
+  return ['localhost', '127.0.0.1'].includes(window.location.hostname)
+    && new URLSearchParams(window.location.search).get('ci-browser') === '1';
+}
+
+function installBrowserQualityFixture(role = 'owner') {
+  if (!isBrowserQualityFixture()) throw new Error('Tarayıcı kalite fixture yalnız yerel sunucuda çalışır.');
+  const allowedRole = ['owner', 'sales', 'staff', 'viewer'].includes(role) ? role : 'viewer';
+  activeSaaSUser = { id: `browser-${allowedRole}`, email: `${allowedRole}@browser.test`, fullName: `Tarayıcı ${allowedRole}` };
+  activeTenant = { id: '00000000-0000-4000-8000-000000000001', name: 'Tarayıcı Test İşletmesi', role: allowedRole };
+  appData = getBlankTenantData(allowedRole);
+  const fixtureToday = getTodayStr();
+  const fixtureDate = offset => new Date(Date.parse(`${fixtureToday}T00:00:00Z`) + offset * 86400000).toISOString().slice(0, 10);
+  appData.villas = { test: { id: '00000000-0000-4000-8000-000000000010', name: 'Test Villası', slug: 'test', isActive: true, basePrice: 5000, floor: 3500, capacity: 4 } };
+  appData.bookings = [{ id: 'browser-booking', villa: 'test', propertyId: appData.villas.test.id, guest: 'Tarayıcı Misafiri', checkIn: fixtureDate(1), checkOut: fixtureDate(4), gross: 15000, cleanFee: 1000, otaComm: 0, discount: 0, pax: 2, channel: 'WHATSAPP', status: 'CONFIRMED' }];
+  appData.expenses = [{ id: 'browser-expense', villa: 'test', date: fixtureDate(2), amount: 1200, category: 'Bakım', type: 'OPEX', description: 'Tarayıcı fixture' }];
+  appData.cleaningTasks = [{ id: 'browser-cleaning', villa: 'test', propertyId: appData.villas.test.id, propertyName: 'Test Villası', date: fixtureDate(4), status: 'PLANNED', amount: 900, paid: false, assigned_to: `browser-${allowedRole}` }];
+  appData.operationalTasks = [{ id: 'browser-task', title: 'Giriş kontrolü', status: 'TODO', assigned_to: `browser-${allowedRole}`, property_id: appData.villas.test.id }];
+  appData.maintenanceTickets = [{ id: 'browser-maintenance', title: 'Musluk kontrolü', description: 'Fixture kaydı', status: 'OPEN', property_id: appData.villas.test.id }];
+  appData.leads = [{ id: 'browser-lead', guest: 'Tarayıcı Talebi', villa: 'test', status: 'NEW', createdAt: fixtureToday }];
+  appData.bookingPayments = [{ id: 'browser-payment', booking_id: 'browser-booking', paid_on: fixtureToday, amount: 3000, kind: 'DEPOSIT', method: 'BANK_TRANSFER' }];
+  appData.leadSources = [{ id: 'browser-source', code: 'UNKNOWN', label: 'Bilinmiyor', is_active: true, sort_order: 0 }];
+  appData.tenantSettings = {};
+  currentFilter.period = getCurrentMonthKey();
+  currentFilter.villa = 'ALL';
+  hideLockOverlay();
+  updateAllVillaDropdowns();
+  updateSaaSUi();
+  renderAll();
+  switchTab(allowedRole === 'staff' ? 'staff-field' : 'executive');
+  document.body.dataset.browserQualityReady = 'true';
+  return true;
+}
+
 // Backwards compatibility wrappers
 async function cloudUpsertBooking(bookingRecord) {
   if (bookingRecord && bookingRecord.id && isUUID(bookingRecord.id)) {
@@ -3694,11 +3729,289 @@ registerPageAction('marketing', {
   run: () => openFunnelTestQuestion()
 });
 
-function openFunnelTestQuestion() {
-  if (typeof setAnalysisFocusQuestion === 'function') {
-    setAnalysisFocusQuestion('Değişiklik işe yaradı mı, sırada ne var?');
+[
+  ['finance', 'FINANCE'], ['properties', 'PROPERTY'], ['reservations', 'BOOKINGS'],
+  ['operations', 'OPERATIONS'], ['leads', 'SALES'], ['marketing', 'CHANNELS_MARKETING']
+].forEach(([tabId, page]) => registerPageAction(tabId, {
+  id: 'page-report',
+  label: '📄 Rapor al',
+  title: 'Ekrandaki dönem ve filtrelerle rapor oluştur',
+  run: () => openPageReport(page)
+}));
+
+const CHATGPT_PAGE_CONFIG = Object.freeze({
+  executive: { page: 'FINANCE', scope: 'Bugün', questions: ['Bugünün önceliklerini ve risklerini sırala.', 'Bu dönem finansal açıdan en önemli üç karar nedir?'] },
+  reservations: { page: 'BOOKINGS', scope: 'Rezervasyonlar', questions: ['Rezervasyon görünümündeki eğilimleri yorumla.', 'Tahsilat ve doluluk açısından hangi noktaları izlemeliyim?'] },
+  properties: { page: 'PROPERTY', scope: 'Mülk profili', questions: ['Bu mülkün performansını yorumla.', 'Bu mülk için uygulanabilir üç iyileştirme öner.'] },
+  operations: { page: 'OPERATIONS', scope: 'Operasyon', questions: ['Operasyon yükünü ve bekleyen işleri değerlendir.', 'Önce çözülmesi gereken operasyon riskleri neler?'] },
+  leads: { page: 'SALES', scope: 'Misafirler ve Satış', questions: ['Satış hunisini yorumla.', 'Dönüşümü artırmak için sıradaki üç adım nedir?'] },
+  pricing: { kind: 'PRICE_RULE_QUESTION', scope: 'Fiyatlandırma', questions: ['Hafta sonu fiyat kuralını değerlendir.', 'Son dakika ve boş gece indirimlerini değerlendir.'] },
+  finance: { page: 'FINANCE', scope: 'Finans', questions: ['Bu finans raporunu yorumla.', 'Kârlılığı etkileyen ölçülmüş kalemleri önceliklendir.'] },
+  marketing: { page: 'CHANNELS_MARKETING', scope: 'Kanallar ve Pazarlama', questions: ['Kanal ekonomisini yorumla.', 'Değişiklik işe yaradı mı, sırada ne var?'] },
+  settings: { scope: 'Ayarlar', questions: ['İşletme kurulumunda eksik olabilecek noktaları kontrol listesi olarak yaz.'] }
+});
+let currentChatGptRequest = null;
+
+['finance', 'properties', 'reservations', 'operations', 'leads', 'marketing'].forEach(tabId => registerPageAction(tabId, {
+  id: 'page-chatgpt', label: "🧠 ChatGPT'ye sor", title: 'Bu sayfanın güvenli özetiyle soru sor',
+  run: () => openChatGptQuestionModal({ tabId })
+}));
+
+function activePageTabId() {
+  const active = document.querySelector('.tab-content.active');
+  return getMenuTabFor(String(active?.id || 'tab-executive').replace(/^tab-/, ''));
+}
+
+function pricingChatGptContext() {
+  const property = Object.values(appData.villas || {}).find(item => item.id === pricingSelectedPropertyId) || null;
+  if (!property) return {};
+  const rules = getPricingResearchService().mergeRules(appData.tenantSettings?.pricing_rules || {}, appData.propertyPricingRules || [], property.id);
+  const latest = (appData.competitorPriceResearch || []).find(item => item.property_id === property.id) || null;
+  return {
+    property: { name: property.name, locationText: property.locationText || property.location_text, capacity: property.capacity, amenities: property.amenities || [] },
+    basePrice: property.basePrice ?? property.base ?? null,
+    floorPrice: property.floor ?? property.floorPrice ?? null,
+    rules: { weekendPct: rules.weekend?.pct, specialDayPct: rules.specialDay?.pct, lastMinutePct: rules.lastMinute?.pct, gapNightPct: rules.gapNight?.pct },
+    next30: null, history: null,
+    competitorMedian: latest ? { weekday: latest.values?.WEEKDAY, fri: latest.values?.WEEKEND, sat: latest.values?.WEEKEND, researchedOn: latest.researched_on } : null,
+    questionId: 'WEEKEND'
+  };
+}
+
+function defaultChatGptRequest(tabId) {
+  const config = CHATGPT_PAGE_CONFIG[tabId] || CHATGPT_PAGE_CONFIG.executive;
+  if (config.kind === 'PRICE_RULE_QUESTION') return { kind: config.kind, scope: config.scope, questions: config.questions, context: pricingChatGptContext() };
+  if (config.page && canExportReportPage(config.page)) {
+    const report = buildCurrentPageReport(config.page);
+    return { kind: 'PAGE_REPORT', scope: config.scope, questions: config.questions, context: { report: report.chatGptContext } };
   }
+  return { kind: 'PAGE_REPORT', scope: config.scope, questions: config.questions, context: { report: { title: config.scope, subtitle: 'Bu rolün görebildiği sayfa', summary: {} } } };
+}
+
+function openChatGptQuestionModal(options = {}) {
+  try {
+    const tabId = options.tabId || activePageTabId();
+    currentChatGptRequest = options.kind
+      ? { kind: options.kind, scope: options.scope || CHATGPT_PAGE_CONFIG[tabId]?.scope || 'Sayfa', questions: options.questions || [options.selectedQuestion || 'Bu veriyi yorumla.'], context: options.context || {} }
+      : defaultChatGptRequest(tabId);
+    const select = document.getElementById('chatGptReadyQuestion');
+    if (select) {
+      select.innerHTML = currentChatGptRequest.questions.map((question, index) => `<option value="${index}">${escapeHtml(question)}</option>`).join('');
+      const selectedIndex = currentChatGptRequest.questions.indexOf(options.selectedQuestion);
+      select.value = String(selectedIndex >= 0 ? selectedIndex : 0);
+    }
+    setEl('chatGptQuestionScope', `${currentChatGptRequest.scope} · yalnız izinli, ölçülmüş alanlar`);
+    buildChatGptQuestionPrompt();
+    const modal = document.getElementById('chatGptQuestionModal');
+    if (modal) modal.style.display = 'flex';
+    return true;
+  } catch (error) {
+    showToast(error?.message || 'ChatGPT komutu hazırlanamadı.', 'error');
+    return false;
+  }
+}
+
+function buildChatGptQuestionPrompt() {
+  if (!currentChatGptRequest) return false;
+  const index = Number(document.getElementById('chatGptReadyQuestion')?.value || 0);
+  const question = currentChatGptRequest.questions[index] || currentChatGptRequest.questions[0];
+  const result = ChatGptPromptEngine.buildPrompt({ kind: currentChatGptRequest.kind, today: getTodayStr(), question, context: currentChatGptRequest.context });
+  const output = document.getElementById('chatGptQuestionPrompt');
+  if (output) output.value = result.prompt;
+  setEl('chatGptQuestionMeta', `${result.charCount} karakter · ${result.omitted.length} bulunmayan alan yazılmadı`);
+  currentChatGptRequest.result = result;
+  return true;
+}
+
+function closeChatGptQuestionModal() {
+  const modal = document.getElementById('chatGptQuestionModal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function copyChatGptQuestionPrompt() {
+  const prompt = document.getElementById('chatGptQuestionPrompt')?.value || '';
+  if (!prompt) return false;
+  await navigator.clipboard.writeText(prompt);
+  showToast('ChatGPT komutu kopyalandı.', 'success');
+  return true;
+}
+
+function openChatGptQuestionForReport(report) {
+  return openChatGptQuestionModal({ kind: 'PAGE_REPORT', scope: report.title, questions: ['Bu raporu yorumla.', 'Ölçülmüş verilere dayanarak öncelikli üç aksiyon öner.'], context: { report: report.chatGptContext } });
+}
+
+const REPORT_PAGE_ACCESS = Object.freeze({
+  owner: ['FINANCE', 'PROPERTY', 'BOOKINGS', 'OPERATIONS', 'SALES', 'CHANNELS_MARKETING'],
+  admin: ['FINANCE', 'PROPERTY', 'BOOKINGS', 'OPERATIONS', 'SALES', 'CHANNELS_MARKETING'],
+  manager: ['FINANCE', 'PROPERTY', 'BOOKINGS', 'OPERATIONS', 'SALES', 'CHANNELS_MARKETING'],
+  viewer: ['FINANCE', 'PROPERTY', 'BOOKINGS', 'OPERATIONS', 'SALES', 'CHANNELS_MARKETING'],
+  sales: ['BOOKINGS', 'SALES'],
+  staff: ['OPERATIONS']
+});
+let currentPageReport = null;
+
+function canExportReportPage(page, role = activeTenant?.role) {
+  return (REPORT_PAGE_ACCESS[role] || []).includes(page);
+}
+
+function reportPeriod() {
+  return getFilterDateRange() || { start: null, end: null };
+}
+
+function reportFilterLabel() {
+  return currentFilter?.villa === 'ALL'
+    ? `Tüm mülkler (${portfolioLabel()})`
+    : (appData.villas?.[currentFilter.villa]?.name || currentFilter?.villa || 'Tüm mülkler');
+}
+
+function reportBusiness() {
+  return { name: activeTenant?.name || activeSaaSUser?.companyName || null, logoUrl: appData.businessLogoUrl || 'assets/brand/lexbnb-logo.svg' };
+}
+
+function buildCurrentPageReport(page) {
+  const base = { page, period: reportPeriod(), filters: { label: reportFilterLabel() }, business: reportBusiness(), today: getTodayStr() };
+  if (page === 'FINANCE') {
+    const ledger = computeFilterLedger();
+    return ReportEngine.buildReport({ ...base, data: {
+      ledger, summary: { ...ledger },
+      isProfitUnmeasured: isProfitUnmeasured(ledger.totalRevenue, ledger.totalOpex, ledger.capex, currentFilter?.period),
+      bookings: (appData.bookings || []).filter(isBookingInFilter),
+      expenses: (appData.expenses || []).filter(isExpenseInFilter)
+    } });
+  }
+  if (page === 'PROPERTY') {
+    const key = selectedPropertyProfileKey || currentFilter?.villa;
+    const property = key && key !== 'ALL' ? appData.villas?.[key] : null;
+    if (!property) throw new Error('Rapor için bir mülk seçin.');
+    const ledger = PropertyProfileEngine.buildPropertyReport({ property, bookings: appData.bookings || [], expenses: appData.expenses || [], cleaningTasks: appData.cleaningTasks || [] });
+    return ReportEngine.buildReport({ ...base, filters: { label: property.name || key }, data: { property, ledger, summary: { ...ledger }, bookings: appData.bookings || [], maintenance: appData.maintenanceTickets || [] } });
+  }
+  if (page === 'BOOKINGS') {
+    const filteredRows = getFilteredReservationListRows();
+    const summary = computeReservationListSummary({ rows: filteredRows, rangeStart: reservationListRange.start, rangeEnd: reservationListRange.end });
+    const paymentEngine = getBookingPaymentEngine();
+    summary.collections = paymentEngine ? paymentEngine.totalCollections(appData.bookingPayments || [], reservationListRange.start, reservationListRange.end) : null;
+    return ReportEngine.buildReport({ ...base, period: { start: reservationListRange.start, end: reservationListRange.end }, data: { summary, rows: filteredRows.map(item => item.booking), bookings: filteredRows.map(item => item.booking), payments: appData.bookingPayments || [] } });
+  }
+  if (page === 'OPERATIONS') {
+    const staffOnly = activeTenant?.role === 'staff';
+    const mine = row => !staffOnly || [row.assigned_to, row.assignedTo, row.user_id, row.cleaner_user_id].includes(activeSaaSUser?.id);
+    const cleaningTasks = (appData.cleaningTasks || []).filter(mine);
+    const operationalTasks = (appData.operationalTasks || []).filter(mine);
+    const maintenance = (appData.maintenanceTickets || []).filter(mine);
+    const rows = cleaningTasks.map(row => ({ kind: 'Temizlik', title: row.propertyName || row.villa || '—', status: row.status || '—', date: row.date || null, amount: row.amount ?? null }))
+      .concat(operationalTasks.map(row => ({ kind: 'Görev', title: row.title || '—', status: row.status || '—', date: row.due_date || null, amount: null })))
+      .concat(maintenance.map(row => ({ kind: 'Arıza', title: row.title || '—', status: row.status || '—', date: row.reported_at || null, amount: row.cost ?? null })));
+    const pendingDebt = cleaningTasks.filter(row => String(row.status).toUpperCase() === 'DONE' && !(row.paid || row.is_paid)).reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
+    return ReportEngine.buildReport({ ...base, data: { summary: { recordCount: rows.length, pendingCleaningDebt: pendingDebt }, rows, cleaningTasks, staff: appData.operationalPeople || [], maintenance } });
+  }
+  if (page === 'SALES') {
+    const view = getLeadSalesView();
+    const funnel = Object.fromEntries(Object.entries(view.columns).map(([stage, rows]) => [stage, rows.length]));
+    const rows = view.rows.map(row => ({ source: row.sourceLabel, status: row.status, property: appData.villas?.[row.villa]?.name || row.villa || null, createdAt: row.createdAt || null }));
+    return ReportEngine.buildReport({ ...base, data: { summary: { ...funnel, total: view.rows.length }, rows, leads: rows, funnel } });
+  }
+  const model = LexBnBMarketingUI.getCurrentModel();
+  return ReportEngine.buildReport({ ...base, data: { summary: { ...model.economics.totals }, rows: model.economics.channels, channelEconomics: model.economics.channels, adsWeekly: model.ads?.rows || [] } });
+}
+
+function formatReportValue(value, type) {
+  if (value === null || value === undefined || value === '') return '—';
+  if (type === 'money') return `${Number(value).toLocaleString('tr-TR', { maximumFractionDigits: 2 })} ₺`;
+  if (type === 'pct') return `${Number(value).toLocaleString('tr-TR', { maximumFractionDigits: 2 })}%`;
+  return typeof value === 'number' ? value.toLocaleString('tr-TR', { maximumFractionDigits: 2 }) : String(value);
+}
+
+function reportPreviewHtml(report) {
+  const logo = /^(https:|blob:|data:image\/)/i.test(report.business?.logoUrl || '') ? report.business.logoUrl : '';
+  const business = `<div class="report-business">${logo ? `<img src="${escapeHtml(logo)}" alt="">` : ''}<div><strong>${escapeHtml(report.business?.name || 'İşletme')}</strong><span class="sub-text">${escapeHtml(report.subtitle)}</span></div></div>`;
+  const sections = report.sections.map(section => {
+    if (section.kind === 'kpis') return `<section><h4>${escapeHtml(section.title)}</h4><div class="report-kpis">${(section.items || []).map(item => `<div class="report-kpi"><span>${escapeHtml(item.label)}</span><strong>${escapeHtml(formatReportValue(item.value, item.type))}</strong></div>`).join('')}</div></section>`;
+    const columns = section.columns || [];
+    return `<section><h4>${escapeHtml(section.title)}</h4><div class="report-table-wrap"><table class="data-table"><thead><tr>${columns.map(column => `<th>${escapeHtml(column.label)}</th>`).join('')}</tr></thead><tbody>${(section.rows || []).length ? section.rows.map(row => `<tr>${columns.map(column => `<td>${escapeHtml(formatReportValue(row?.[column.key], column.type))}</td>`).join('')}</tr>`).join('') : `<tr><td colspan="${Math.max(1, columns.length)}">Kayıt yok.</td></tr>`}</tbody></table></div></section>`;
+  }).join('');
+  const unmeasured = report.unmeasured.length ? `<div class="sub-text">Hesaplanamayanlar: ${escapeHtml(report.unmeasured.map(item => item.reason).join(' · '))}</div>` : '';
+  return business + sections + unmeasured;
+}
+
+function openPageReport(page) {
+  if (!canExportReportPage(page)) {
+    showToast('Bu rol bu sayfanın raporunu alamaz.', 'error');
+    return false;
+  }
+  try {
+    currentPageReport = buildCurrentPageReport(page);
+    setEl('pageReportTitle', currentPageReport.title);
+    setEl('pageReportSubtitle', currentPageReport.subtitle);
+    const preview = document.getElementById('pageReportPreview');
+    if (preview) preview.innerHTML = reportPreviewHtml(currentPageReport);
+    const modal = document.getElementById('pageReportModal');
+    if (modal) modal.style.display = 'flex';
+    return true;
+  } catch (error) {
+    showToast(error?.message || 'Rapor oluşturulamadı.', 'error');
+    return false;
+  }
+}
+
+function closePageReportModal() {
+  const modal = document.getElementById('pageReportModal');
+  if (modal) modal.style.display = 'none';
+}
+
+function reportFileName(extension) {
+  const base = String(currentPageReport?.title || 'Rapor').replace(/[^0-9A-Za-zÇĞİÖŞÜçğıöşü_-]+/g, '_');
+  return `Lexbnb_${base}_${getTodayStr()}.${extension}`;
+}
+
+function downloadCurrentReportCsv() {
+  if (!currentPageReport) return false;
+  triggerFileDownload(ReportEngine.toCSV(currentPageReport), reportFileName('csv'), 'text/csv;charset=utf-8');
+  return true;
+}
+
+function downloadCurrentReportXlsx() {
+  if (!currentPageReport || typeof XLSX === 'undefined') return false;
+  const workbook = XLSX.utils.book_new();
+  currentPageReport.excel.sheets.forEach(sheet => {
+    const columns = sheet.columns || [];
+    const headers = columns.map(column => typeof column === 'string' ? column : column.label);
+    const keys = columns.map(column => typeof column === 'string' ? null : column.key);
+    const body = (sheet.rows || []).map(row => Array.isArray(row) ? row : (row?.notice ? [row.notice] : keys.map(key => row?.[key] ?? '')));
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([headers].concat(body)), String(sheet.name || 'Rapor').slice(0, 31));
+  });
+  XLSX.writeFile(workbook, reportFileName('xlsx'));
+  return true;
+}
+
+function printCurrentReport() {
+  if (!currentPageReport) return false;
+  const popup = window.open('', '_blank', 'noopener,noreferrer');
+  if (!popup) { showToast('Yazdırma penceresi engellendi.', 'error'); return false; }
+  popup.document.write(`<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>${escapeHtml(currentPageReport.title)}</title><style>body{font:14px Arial;color:#111;padding:24px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:7px;text-align:left}.report-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.report-kpi{border:1px solid #ccc;padding:10px}.sub-text{color:#555}img{max-width:64px;max-height:64px}</style></head><body><h1>${escapeHtml(currentPageReport.title)}</h1>${reportPreviewHtml(currentPageReport)}</body></html>`);
+  popup.document.close();
+  popup.focus();
+  popup.print();
+  return true;
+}
+
+function askChatGptFromCurrentReport() {
+  if (!currentPageReport) return false;
+  closePageReportModal();
+  if (typeof openChatGptQuestionForReport === 'function') return openChatGptQuestionForReport(currentPageReport);
   switchTab('analysis');
+  return true;
+}
+
+function openFunnelTestQuestion() {
+  const model = typeof LexBnBMarketingUI !== 'undefined' && LexBnBMarketingUI.getCurrentModel ? LexBnBMarketingUI.getCurrentModel() : null;
+  const experiment = model?.experiments?.[0] || {};
+  return openChatGptQuestionModal({
+    tabId: 'marketing', kind: 'FUNNEL_TEST_QUESTION', scope: 'Kanallar ve Pazarlama',
+    selectedQuestion: 'Değişiklik işe yaradı mı, sırada ne var?',
+    questions: ['Değişiklik işe yaradı mı, sırada ne var?'],
+    context: { testName: experiment.name || experiment.title, changedOn: experiment.started_on || experiment.startedAt, beforeRate: experiment.before_rate, afterRate: experiment.after_rate, sampleBefore: experiment.sample_before, sampleAfter: experiment.sample_after }
+  });
 }
 
 function runPageAction(id) {
@@ -3721,6 +4034,10 @@ function renderPageActionBar(tabId) {
 }
 
 function switchTab(tabId) {
+  if (tabId === 'settings' && !canManageTenantRole(activeTenant?.role)) {
+    if (typeof showToast === 'function') showToast('Ayarlar yalnızca işletme yönetim rollerine açıktır.', 'error');
+    return false;
+  }
   document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 
@@ -3741,7 +4058,7 @@ function switchTab(tabId) {
   if (tabId === 'pricing') renderPricingTab();
   if (tabId === 'pricing') renderPricingKpiStrip();
   if (tabId === 'analysis') renderAnalysisCenter();
-  if (tabId === 'settings') renderSettingsTable();
+  if (tabId === 'settings') renderSettingsWorkspace();
   if (tabId === 'settings') renderTeamManagement();
   if (tabId === 'settings') loadDeletionImpact();
   if (tabId === 'finance') renderFinanceModule();
@@ -4416,7 +4733,7 @@ const ACTIVE_RENDER_PLANS = {
   'tab-leads': ['renderLeadQuickCapture', 'renderLeadSalesWorkspace', 'renderManageLeadsTable', 'renderLeadAnalytics'],
   'tab-maintenance': ['renderManageMaintTable'],
   'tab-housekeeping': ['renderHousekeepingTab'],
-  'tab-settings': ['renderSettingsTable', 'renderTeamManagement']
+  'tab-settings': ['renderSettingsWorkspace', 'renderTeamManagement']
 };
 
 function getActiveRenderPlan(activeTabId) {
@@ -4440,6 +4757,7 @@ function renderAll() {
     renderPropertiesTab,
     renderOperationsTab,
     renderOperationsKpiStrip,
+    renderStaffFieldWork,
     renderGuestsTab,
     renderPricingTab,
     renderPricingKpiStrip,
@@ -4454,7 +4772,7 @@ function renderAll() {
     renderDailyOps,
     renderTapeChart,
     renderHousekeepingTab,
-    renderSettingsTable,
+    renderSettingsWorkspace,
     renderTeamManagement
   };
   const fallbackPlan = Object.keys(renderers);
@@ -6982,29 +7300,16 @@ function openBookingDetailsPanel(bookingId) {
   return true;
 }
 
-function renderManageBookingsTable() {
-  const tbody = document.getElementById('manageBookingsTableBody');
-  if (!tbody) return;
-  tbody.innerHTML = '';
-
+function getFilteredReservationListRows() {
   const search = (document.getElementById('rezSearchInput')?.value || '').toLowerCase();
   const villaFilter = document.getElementById('rezVillaFilter')?.value || 'ALL';
   const statusFilter = document.getElementById('rezStatusFilter')?.value || 'ALL';
-
   const todayStr = getTodayStr();
-
-  syncReservationRangeUi();
-
   const visibleRows = buildReservationListView({
     bookings: appData.bookings || [], cleaningTasks: appData.cleaningTasks || [], today: todayStr,
     rangeStart: reservationListRange.start, rangeEnd: reservationListRange.end
   });
-  const paymentEngine = getBookingPaymentEngine();
-  const collectionTotal = paymentEngine
-    ? paymentEngine.totalCollections(appData.bookingPayments || [], reservationListRange.start, reservationListRange.end)
-    : null;
-  setEl('rezCollectionsMetric', `Toplam tahsilat: ${collectionTotal == null ? '—' : `₺${Number(collectionTotal).toLocaleString('tr-TR')}`}`);
-  const filteredRows = visibleRows.filter(({ booking: b }) => {
+  return visibleRows.filter(({ booking: b }) => {
     // Villa Filter
     if (villaFilter !== 'ALL' && b.villa !== villaFilter) return false;
     
@@ -7022,7 +7327,19 @@ function renderManageBookingsTable() {
     return true;
   });
 
-  // Update Summary Pill
+}
+
+function renderManageBookingsTable() {
+  const tbody = document.getElementById('manageBookingsTableBody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  syncReservationRangeUi();
+  const paymentEngine = getBookingPaymentEngine();
+  const collectionTotal = paymentEngine
+    ? paymentEngine.totalCollections(appData.bookingPayments || [], reservationListRange.start, reservationListRange.end)
+    : null;
+  setEl('rezCollectionsMetric', `Toplam tahsilat: ${collectionTotal == null ? '—' : `₺${Number(collectionTotal).toLocaleString('tr-TR')}`}`);
+  const filteredRows = getFilteredReservationListRows();
   const listSummary = computeReservationListSummary({
     rows: filteredRows,
     rangeStart: reservationListRange.start,
@@ -7069,6 +7386,56 @@ function renderManageBookingsTable() {
     `;
     tbody.appendChild(tr);
   });
+}
+
+function openQuickBookingModal() {
+  if (!canWriteSalesRole(activeTenant?.role)) {
+    showToast('Bu rol rezervasyon ekleyemez.', 'error');
+    return false;
+  }
+  const select = document.getElementById('quickBookingVilla');
+  const properties = Object.entries(appData.villas || {}).filter(([, property]) => property && property.isActive !== false && !property.archivedAt);
+  if (select) select.innerHTML = properties.map(([key, property]) => `<option value="${escapeHtml(key)}">${escapeHtml(property.name || key)}</option>`).join('');
+  const form = document.getElementById('quickBookingForm');
+  if (form) form.reset();
+  const modal = document.getElementById('quickBookingModal');
+  if (modal) modal.style.display = 'flex';
+  document.getElementById('quickBookingGuest')?.focus();
+  return true;
+}
+
+function closeQuickBookingModal() {
+  const modal = document.getElementById('quickBookingModal');
+  if (modal) modal.style.display = 'none';
+}
+
+function saveQuickBooking(event) {
+  event.preventDefault();
+  if (!canWriteSalesRole(activeTenant?.role)) return false;
+  const checkIn = document.getElementById('quickBookingCheckIn')?.value || '';
+  const checkOut = document.getElementById('quickBookingCheckOut')?.value || '';
+  if (!checkIn || !checkOut || calculateNightsBetween(checkIn, checkOut) <= 0) {
+    showToast('Çıkış tarihi giriş tarihinden sonra olmalıdır.', 'error');
+    return false;
+  }
+  const values = {
+    villa: document.getElementById('quickBookingVilla')?.value || '',
+    guest: document.getElementById('quickBookingGuest')?.value.trim() || '',
+    gross: document.getElementById('quickBookingGross')?.value || '',
+    pax: document.getElementById('quickBookingPax')?.value || '',
+    channel: document.getElementById('quickBookingChannel')?.value || 'WHATSAPP'
+  };
+  closeQuickBookingModal();
+  openBookingModal();
+  document.getElementById('resVilla').value = values.villa;
+  document.getElementById('resGuest').value = values.guest;
+  document.getElementById('resGross').value = values.gross;
+  document.getElementById('resPax').value = values.pax;
+  document.getElementById('resChannel').value = values.channel;
+  setResDateRange(checkIn, checkOut);
+  handleBookingChannelChange();
+  document.getElementById('bookingForm')?.requestSubmit();
+  return true;
 }
 
 function openBookingModal(editId = null) {
@@ -7662,9 +8029,9 @@ function renderSettingsGoalsTable() {
 const TEAM_ROLES = {
   owner:   { label: 'Sahip',     badge: 'badge-purple',  hint: 'Tam yetki. Ekip ve rolleri yönetir, işletmeyi silebilir.' },
   admin:   { label: 'Yönetici',  badge: 'badge-blue',    hint: 'Davet gönderebilir, tüm verileri yönetir. Rol değiştiremez.' },
-  manager: { label: 'Operasyon', badge: 'badge-emerald', hint: 'Rezervasyon, fiyatlama ve operasyonu yönetir.' },
+  manager: { label: 'Müdür',     badge: 'badge-emerald', hint: 'İşletme ayarlarını, rezervasyonları, fiyatlamayı ve operasyonu yönetir.' },
   sales:   { label: 'Satış',      badge: 'badge-cyan',    hint: 'Rezervasyon, talep ve misafir kaydı yapar; finansı ve giderleri görmez, rezervasyon silemez.' },
-  staff:   { label: 'Personel',  badge: 'badge-amber',   hint: 'Saha personeli (temizlik/usta): yalnız kendisine atanan işi görür.' },
+  staff:   { label: 'Saha personeli', badge: 'badge-amber', hint: 'Saha personeli (temizlik/usta): yalnız kendisine atanan işi görür ve ilerletir.' },
   viewer:  { label: 'İzleyici',  badge: 'badge-rose',    hint: 'Yalnızca görüntüler, hiçbir veriyi değiştiremez.' }
 };
 
@@ -8637,6 +9004,346 @@ async function createBookingChannelFromSettings(formEvent) {
   } finally {
     if (submit) submit.disabled = false;
   }
+}
+
+function getBusinessProfileSetting() {
+  const raw = appData?.tenantSettings?.business_profile;
+  if (!raw) return {};
+  if (typeof raw === 'object') return raw;
+  try { return JSON.parse(raw); } catch (_) { return {}; }
+}
+
+function setBusinessSettingsMessage(message, type = 'info') {
+  const element = document.getElementById('businessSettingsMessage');
+  if (!element) return;
+  element.textContent = message || '';
+  element.style.color = type === 'error' ? '#FCA5A5' : (type === 'success' ? '#6EE7B7' : '#CBD5E1');
+}
+
+function applyBusinessLogoUrl(url) {
+  const logoUrl = String(url || '');
+  appData.businessLogoUrl = logoUrl || null;
+  const preview = document.getElementById('businessLogoPreview');
+  if (preview) {
+    preview.src = logoUrl;
+    preview.hidden = !logoUrl;
+  }
+  const headerLogo = document.getElementById('headerBusinessLogo');
+  if (headerLogo) {
+    headerLogo.src = logoUrl || 'assets/brand/lexbnb-logo.svg';
+    headerLogo.alt = logoUrl ? `${activeTenant?.name || 'İşletme'} logosu` : 'Lexbnb';
+    headerLogo.hidden = false;
+  }
+  const placeholder = document.getElementById('businessLogoPlaceholder');
+  if (placeholder) placeholder.hidden = !!logoUrl;
+}
+
+async function refreshBusinessLogoUrl() {
+  const path = getBusinessProfileSetting().logoPath;
+  if (!path || !supabaseClient?.storage) {
+    applyBusinessLogoUrl('');
+    return null;
+  }
+  const { data, error } = await supabaseClient.storage.from('tenant-assets').createSignedUrl(path, 3600);
+  if (error || !data?.signedUrl) {
+    applyBusinessLogoUrl('');
+    setBusinessSettingsMessage('Logo okunamadı. Dosyayı yeniden yükleyebilirsiniz.', 'error');
+    return null;
+  }
+  applyBusinessLogoUrl(data.signedUrl);
+  return data.signedUrl;
+}
+
+function renderBusinessSettings() {
+  const input = document.getElementById('businessNameInput');
+  if (input) input.value = activeTenant?.name || appData?.companyName || '';
+  const submit = document.querySelector('#businessSettingsForm button[type="submit"]');
+  if (submit) submit.disabled = !['owner', 'admin'].includes(activeTenant?.role);
+  refreshBusinessLogoUrl();
+}
+
+async function saveBusinessSettings(event) {
+  event?.preventDefault?.();
+  if (!canManageTenantRole(activeTenant?.role)) return false;
+  const name = String(document.getElementById('businessNameInput')?.value || '').trim();
+  if (!name) {
+    setBusinessSettingsMessage('İşletme adı boş bırakılamaz.', 'error');
+    return false;
+  }
+  if (!['owner', 'admin'].includes(activeTenant?.role)) {
+    setBusinessSettingsMessage('İşletme adını yalnız sahip veya yönetici değiştirebilir.', 'error');
+    return false;
+  }
+  setBusinessSettingsMessage('Kaydediliyor…');
+  const { data, error } = await supabaseClient.from('tenants').update({ name })
+    .eq('id', getActiveTenantId()).select('id,name,slug').single();
+  if (error) {
+    setBusinessSettingsMessage('İşletme adı kaydedilemedi: ' + kullaniciMesaji(error.message), 'error');
+    return false;
+  }
+  activeTenant = { ...activeTenant, name: data.name, slug: data.slug || activeTenant?.slug };
+  appData.companyName = data.name;
+  updateSaaSUi();
+  setBusinessSettingsMessage('İşletme bilgileri kaydedildi.', 'success');
+  return true;
+}
+
+async function uploadBusinessLogo(fileInput) {
+  if (!canManageTenantRole(activeTenant?.role)) return false;
+  const file = fileInput?.files?.[0];
+  if (!file) return false;
+  const allowed = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
+  if (!allowed.includes(file.type) || file.size > 2 * 1024 * 1024) {
+    setBusinessSettingsMessage('Logo PNG, JPG, WebP veya SVG olmalı ve 2 MB’ı geçmemeli.', 'error');
+    fileInput.value = '';
+    return false;
+  }
+  const tenantId = getActiveTenantId();
+  requireCloudForWrite('İşletme logosu', tenantId);
+  const extension = ({ 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/svg+xml': 'svg' })[file.type];
+  const path = `${tenantId}/logo/business.${extension}`;
+  setBusinessSettingsMessage('Logo yükleniyor…');
+  const { error: uploadError } = await supabaseClient.storage.from('tenant-assets')
+    .upload(path, file, { upsert: true, contentType: file.type, cacheControl: '3600' });
+  if (uploadError) {
+    setBusinessSettingsMessage('Logo yüklenemedi: ' + kullaniciMesaji(uploadError.message), 'error');
+    return false;
+  }
+  const profile = { ...getBusinessProfileSetting(), logoPath: path };
+  const { error: settingError } = await supabaseClient.from('tenant_settings').upsert({
+    tenant_id: tenantId, key: 'business_profile', value: profile
+  }, { onConflict: 'tenant_id,key' });
+  if (settingError) {
+    setBusinessSettingsMessage('Logo yüklendi ancak işletme profiline bağlanamadı.', 'error');
+    return false;
+  }
+  appData.tenantSettings.business_profile = profile;
+  await refreshBusinessLogoUrl();
+  setBusinessSettingsMessage('Logo kaydedildi; üst çubuk ve raporlar bu logoyu kullanacak.', 'success');
+  return true;
+}
+
+async function renderSettingsWorkspace() {
+  const denied = document.getElementById('settingsAccessDenied');
+  const allowed = canManageTenantRole(activeTenant?.role);
+  if (denied) denied.hidden = allowed;
+  document.querySelectorAll('#tab-settings [data-settings-section]').forEach(section => { section.hidden = !allowed; });
+  if (!allowed) return false;
+  renderBusinessSettings();
+  renderBookingChannelSettings();
+  renderSettingsTemplates();
+  renderSettingsLeadSources();
+  await loadSettingsCatalogs();
+  renderSettingsTemplates();
+  renderSettingsLeadSources();
+  return true;
+}
+
+async function loadSettingsCatalogs() {
+  const tenantId = getActiveTenantId();
+  if (!isCloudTenant(tenantId) || !canManageTenantRole(activeTenant?.role)) return false;
+  const [messages, tasks, checklists, sources] = await Promise.all([
+    fetchTenantRowsTolerant(() => supabaseClient.from('message_templates').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false })),
+    fetchTenantRowsTolerant(() => supabaseClient.from('task_templates').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false })),
+    fetchTenantRowsTolerant(() => supabaseClient.from('property_checklist_templates').select('*').eq('tenant_id', tenantId).order('updated_at', { ascending: false })),
+    fetchTenantRowsTolerant(() => supabaseClient.from('lead_source_catalog').select('*').eq('tenant_id', tenantId).order('sort_order').order('label'))
+  ]);
+  appData.settingsMessageTemplates = messages || [];
+  appData.settingsTaskTemplates = tasks || [];
+  appData.settingsChecklistTemplates = checklists || [];
+  appData.settingsLeadSources = sources || [];
+  return true;
+}
+
+function settingsTemplateRowHtml(kind, item, title, meta) {
+  return `<div class="settings-template-row"><span><strong>${escapeHtml(title || 'Adsız şablon')}</strong><small class="sub-text">${escapeHtml(meta || '')}</small></span><span><button type="button" class="btn btn-secondary btn-sm" data-onclick="editSettingsTemplate(decodeURIComponent('${encodeActionArg(kind)}'), decodeURIComponent('${encodeActionArg(item.id)}'))">Düzenle</button> <button type="button" class="btn btn-secondary btn-sm" data-onclick="archiveSettingsTemplate(decodeURIComponent('${encodeActionArg(kind)}'), decodeURIComponent('${encodeActionArg(item.id)}'))">Kapat</button></span></div>`;
+}
+
+function renderSettingsTemplates() {
+  const messages = appData?.settingsMessageTemplates || appData?.messageTemplates || [];
+  const tasks = appData?.settingsTaskTemplates || appData?.taskTemplates || [];
+  const checklists = appData?.settingsChecklistTemplates || appData?.checklistTemplates || [];
+  const messageList = document.getElementById('settingsMessageTemplatesList');
+  const taskList = document.getElementById('settingsTaskTemplatesList');
+  const checklistList = document.getElementById('settingsChecklistTemplatesList');
+  if (messageList) messageList.innerHTML = messages.length
+    ? messages.map(item => settingsTemplateRowHtml('message', item, item.name, `${item.channel || 'WHATSAPP'} · ${item.lifecycle_stage || 'MANUAL'}${item.is_active === false ? ' · Kapalı' : ''}`)).join('')
+    : '<div class="empty-state">Mesaj şablonu yok.</div>';
+  if (taskList) taskList.innerHTML = tasks.length
+    ? tasks.map(item => settingsTemplateRowHtml('task', item, item.title, `${item.task_type || 'GENERAL'} · ${item.priority || 'MEDIUM'}${item.is_active === false ? ' · Kapalı' : ''}`)).join('')
+    : '<div class="empty-state">Görev şablonu yok.</div>';
+  if (checklistList) checklistList.innerHTML = checklists.length
+    ? checklists.map(item => settingsTemplateRowHtml('checklist', item, item.template_name, `${item.property_id ? 'Mülke özel' : 'Genel'}${item.is_active === false ? ' · Kapalı' : ''}`)).join('')
+    : '<div class="empty-state">Kontrol listesi şablonu yok.</div>';
+}
+
+async function createSettingsMessageTemplate(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  try {
+    await createMessageTemplate({
+      name: String(form.elements.name.value || '').trim(), body: String(form.elements.body.value || '').trim(),
+      channel: 'WHATSAPP', lifecycle_stage: 'MANUAL', message_type: 'TRANSACTIONAL', language: 'tr', is_active: true
+    });
+    form.reset();
+    await loadSettingsCatalogs();
+    renderSettingsTemplates();
+    showToast('Mesaj şablonu kaydedildi.', 'success');
+    return true;
+  } catch (error) {
+    showToast('Mesaj şablonu kaydedilemedi: ' + kullaniciMesaji(error.message), 'error');
+    return false;
+  }
+}
+
+async function createSettingsTaskTemplate(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const payload = {
+    tenant_id: getActiveTenantId(), title: String(form.elements.title.value || '').trim(),
+    task_type: form.elements.task_type.value || 'GENERAL', priority: 'MEDIUM', is_active: true
+  };
+  const { error } = await supabaseClient.from('task_templates').insert(payload);
+  if (error) {
+    showToast('Görev şablonu kaydedilemedi: ' + kullaniciMesaji(error.message), 'error');
+    return false;
+  }
+  form.reset();
+  await loadSettingsCatalogs();
+  renderSettingsTemplates();
+  showToast('Görev şablonu kaydedildi.', 'success');
+  return true;
+}
+
+async function createSettingsChecklistTemplate(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const lines = String(form.elements.items.value || '').split(/\r?\n/).map(value => value.trim()).filter(Boolean);
+  if (!lines.length) {
+    showToast('Kontrol listesine en az bir madde yazın.', 'error');
+    return false;
+  }
+  const payload = {
+    tenant_id: getActiveTenantId(), property_id: null, task_type: 'CLEANING',
+    template_name: String(form.elements.template_name.value || '').trim(),
+    items: { sections: [{ title: 'Genel', items: lines.map(text => ({ text, important: false, subChecks: [] })) }], supplies: [] },
+    is_active: true
+  };
+  const { error } = await supabaseClient.from('property_checklist_templates').insert(payload);
+  if (error) {
+    showToast('Kontrol listesi kaydedilemedi: ' + kullaniciMesaji(error.message), 'error');
+    return false;
+  }
+  form.reset();
+  await loadSettingsCatalogs();
+  renderSettingsTemplates();
+  showToast('Kontrol listesi kaydedildi.', 'success');
+  return true;
+}
+
+function getSettingsTemplate(kind, id) {
+  const lists = {
+    message: appData?.settingsMessageTemplates || [], task: appData?.settingsTaskTemplates || [],
+    checklist: appData?.settingsChecklistTemplates || []
+  };
+  return (lists[kind] || []).find(item => item.id === id) || null;
+}
+
+async function editSettingsTemplate(kind, id) {
+  const item = getSettingsTemplate(kind, id);
+  if (!item) return false;
+  const table = kind === 'message' ? 'message_templates' : kind === 'task' ? 'task_templates' : 'property_checklist_templates';
+  const nameField = kind === 'message' ? 'name' : kind === 'task' ? 'title' : 'template_name';
+  const nextName = prompt('Şablon adı:', item[nameField] || '');
+  if (!String(nextName || '').trim()) return false;
+  const patch = { [nameField]: String(nextName).trim() };
+  if (kind === 'message') {
+    const body = prompt('Mesaj metni:', item.body || '');
+    if (!String(body || '').trim()) return false;
+    patch.body = String(body).trim();
+  }
+  const { error } = await supabaseClient.from(table).update(patch).eq('tenant_id', getActiveTenantId()).eq('id', id);
+  if (error) {
+    showToast('Şablon güncellenemedi: ' + kullaniciMesaji(error.message), 'error');
+    return false;
+  }
+  await loadSettingsCatalogs();
+  renderSettingsTemplates();
+  showToast('Şablon güncellendi.', 'success');
+  return true;
+}
+
+async function archiveSettingsTemplate(kind, id) {
+  const item = getSettingsTemplate(kind, id);
+  if (!item || !confirm('Bu şablon yeni seçimlerden kaldırılsın mı? Geçmiş kayıtlar korunur.')) return false;
+  const table = kind === 'message' ? 'message_templates' : kind === 'task' ? 'task_templates' : 'property_checklist_templates';
+  const { error } = await supabaseClient.from(table).update({ is_active: false }).eq('tenant_id', getActiveTenantId()).eq('id', id);
+  if (error) {
+    showToast('Şablon kapatılamadı: ' + kullaniciMesaji(error.message), 'error');
+    return false;
+  }
+  await loadSettingsCatalogs();
+  renderSettingsTemplates();
+  return true;
+}
+
+function renderSettingsLeadSources() {
+  const body = document.getElementById('settingsLeadSourcesBody');
+  if (!body) return;
+  const sources = appData?.settingsLeadSources || appData?.leadSources || [];
+  body.innerHTML = sources.length ? sources.map(source => {
+    const locked = source.code === 'UNKNOWN';
+    const active = source.is_active !== false;
+    const action = locked
+      ? '<span class="sub-text">Sistem kaynağı · silinemez ve kapatılamaz</span>'
+      : `<button type="button" class="btn btn-secondary btn-sm" data-onclick="toggleSettingsLeadSource(decodeURIComponent('${encodeActionArg(source.id)}'), ${active ? 'false' : 'true'})">${active ? 'Kapat' : 'Etkinleştir'}</button>`;
+    return `<tr><td><strong>${escapeHtml(source.label || 'Adlandırılmamış kaynak')}</strong></td><td>${locked ? 'Sistem' : 'Özel'}</td><td>${active ? 'Etkin' : 'Kapalı'}</td><td style="text-align:right">${action}</td></tr>`;
+  }).join('') : '<tr><td colspan="4" class="empty-state">Talep kaynağı bulunamadı.</td></tr>';
+}
+
+async function createSettingsLeadSource(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const label = String(form.elements.label.value || '').trim();
+  if (!label) return false;
+  try {
+    await SalesWorkflowService.createSource(supabaseClient, { tenantId: getActiveTenantId(), label });
+    form.reset();
+    await loadSettingsCatalogs();
+    await refreshLeadSalesContext();
+    renderSettingsLeadSources();
+    showToast('Talep kaynağı eklendi.', 'success');
+    return true;
+  } catch (error) {
+    showToast('Kaynak eklenemedi: ' + kullaniciMesaji(error.message), 'error');
+    return false;
+  }
+}
+
+async function toggleSettingsLeadSource(id, isActive) {
+  const source = (appData?.settingsLeadSources || []).find(item => item.id === id);
+  if (!source || source.code === 'UNKNOWN') {
+    showToast('Bilinmiyor sistem kaynağı silinemez ve kapatılamaz.', 'error');
+    return false;
+  }
+  const { error } = await supabaseClient.from('lead_source_catalog').update({ is_active: isActive === true })
+    .eq('tenant_id', getActiveTenantId()).eq('id', id);
+  if (error) {
+    showToast('Kaynak durumu değiştirilemedi: ' + kullaniciMesaji(error.message), 'error');
+    return false;
+  }
+  await loadSettingsCatalogs();
+  await refreshLeadSalesContext();
+  renderSettingsLeadSources();
+  return true;
+}
+
+function openSettingsSection(sectionName) {
+  if (!canManageTenantRole(activeTenant?.role)) return false;
+  switchTab('settings');
+  const target = document.querySelector(`#tab-settings [data-settings-section="${String(sectionName).replace(/[^a-z-]/g, '')}"]`);
+  target?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  return !!target;
 }
 
 function renderSettingsTable() {
@@ -9668,6 +10375,10 @@ function exportLedger(mod, bicim) {
 if (typeof document !== 'undefined') {
   document.addEventListener('DOMContentLoaded', async () => {
     wireAccessibleFormLabels();
+    if (isBrowserQualityFixture()) {
+      installBrowserQualityFixture(new URLSearchParams(window.location.search).get('role') || 'owner');
+      return;
+    }
     const isAuth = await checkAuthStatus();
     if (!isAuth) {
       if (typeof getBlankTenantData === 'function') {
@@ -14113,6 +14824,8 @@ async function loadTenantAppData(tenantIdOrUserId) {
         isCleanState: Object.keys(villas).length === 0
       };
 
+      refreshBusinessLogoUrl();
+
       // Rezervasyonun temizlik MALIYETI bagli gorevden okunur (3.4). Bu cagri
       // eskiden yalniz kaydetme yolundaydi: sayfa ilk acildiginda her
       // rezervasyonun maliyeti bilinmiyor gorunuyor, duzenleme formu bos
@@ -14213,6 +14926,7 @@ function updateSaaSUi() {
   if (menuPlan) menuPlan.innerText = user.plan ? user.plan + ' 🚀' : 'Plan bilgisi yok';
 
   applyRoleNavigationVisibility();
+  if (activeTenant?.role === 'staff') switchTab('staff-field');
 }
 
 function applyRoleNavigationVisibility() {
@@ -14220,11 +14934,17 @@ function applyRoleNavigationVisibility() {
   const role = activeTenant?.role || 'viewer';
   const nav = document.querySelector('.nav-tabs');
   if (nav) nav.hidden = role === 'staff';
-  const hiddenTabs = new Set(['sales', 'staff'].includes(role) ? ['finance', 'marketing'] : []);
+  const hiddenTabs = new Set(['sales', 'staff'].includes(role) ? ['finance', 'marketing', 'settings'] : []);
+  if (!canManageTenantRole(role)) hiddenTabs.add('settings');
   document.querySelectorAll('.nav-tabs .tab-btn').forEach(button => {
     const match = String(button.getAttribute('data-onclick') || '').match(/^switchTab\('([^']+)'\)$/);
     button.hidden = !!(match && hiddenTabs.has(match[1]));
   });
+  document.querySelectorAll('[data-management-only]').forEach(element => {
+    element.hidden = !canManageTenantRole(role);
+  });
+  const quickBooking = document.getElementById('mobileQuickBookingBtn');
+  if (quickBooking) quickBooking.hidden = !canWriteSalesRole(role);
 }
 
 // Portfoydeki mulk sayisi. Uygulama 5 villalik demo portfoye gore yazilmisti
@@ -14260,6 +14980,7 @@ function updateAllVillaDropdowns() {
 
   const dropdownIds = [
     'globalVillaFilter',
+    'quickBookingVilla',
     'resVilla',
     'expVilla',
     'leadVilla',
@@ -15673,6 +16394,10 @@ function renderExecutiveSnapshotKpis() {
 }
 
 async function refreshExecutiveDashboardSnapshot(force = false) {
+  if (isBrowserQualityFixture()) {
+    executiveSnapshotState = { ...executiveSnapshotState, key: null, status: 'unsupported', current: null, prior: null, error: null, retryAt: 0 };
+    return null;
+  }
   const context = getExecutiveSnapshotContext();
   if (!context.supported) {
     executiveSnapshotState = { ...executiveSnapshotState, key: null, status: 'unsupported', current: null, prior: null, error: null, retryAt: 0 };
@@ -17024,7 +17749,10 @@ function renderOperationsTab() {
     const operational = appData?.operationalTasks || [];
     const templates = appData?.taskTemplates || [];
     const assignees = (appData?.operationalPeople || []).filter(person => person.user_id && person.is_active !== false);
-    container.innerHTML = `<div class="ops-cleaning-layout"><section class="ops-group"><div class="section-title-bar"><h3>Aktif görevler <span class="badge">${operational.length}</span></h3><button class="btn btn-primary btn-sm" data-onclick="createGeneralOperationalTask()">+ Genel görev</button></div>${operational.length ? operational.map(task => { const options = assignees.map(person => `<option value="${escapeHtml(person.user_id)}"${person.user_id === task.assigned_to ? ' selected' : ''}>${escapeHtml(person.full_name)}</option>`).join(''); return `<article class="ops-row"><div class="ops-row-main"><strong>${escapeHtml(task.title || '—')}</strong><span>${task.property_id ? 'Mülke bağlı' : 'Genel görev'} · ${escapeHtml(task.status || 'TODO')}</span></div><div class="ops-row-actions"><select id="opsTaskPerson-${escapeHtml(task.id)}" aria-label="Görevli seç"><option value="">Ekip üyesi seç…</option>${options}</select><button class="btn btn-secondary btn-sm" data-onclick="assignOperationalTaskFromSelect(decodeURIComponent('${encodeActionArg(task.id)}'))">Ata</button></div></article>`; }).join('') : '<div class="empty-state">Aktif görev yok.</div>'}</section><aside class="ops-debt-panel"><h3>Hazır görev kütüphanesi</h3>${templates.length ? templates.map(template => `<div class="ops-debt-row"><div><strong>${escapeHtml(template.title)}</strong><span>${escapeHtml(template.task_type || 'GENERAL')}</span></div><button class="btn btn-secondary btn-sm" data-onclick="createTaskFromTemplate(decodeURIComponent('${encodeActionArg(template.id)}'))">Görev oluştur</button></div>`).join('') : '<div class="empty-state">Henüz görev şablonu yok.</div>'}</aside></div>`;
+    const editTemplatesLink = canManageTenantRole(activeTenant?.role)
+      ? `<button class="btn btn-secondary btn-sm" data-onclick="openSettingsSection(decodeURIComponent('${encodeActionArg('templates')}'))">Şablonu düzenle →</button>`
+      : '';
+    container.innerHTML = `<div class="ops-cleaning-layout"><section class="ops-group"><div class="section-title-bar"><h3>Aktif görevler <span class="badge">${operational.length}</span></h3><button class="btn btn-primary btn-sm" data-onclick="createGeneralOperationalTask()">+ Genel görev</button></div>${operational.length ? operational.map(task => { const options = assignees.map(person => `<option value="${escapeHtml(person.user_id)}"${person.user_id === task.assigned_to ? ' selected' : ''}>${escapeHtml(person.full_name)}</option>`).join(''); return `<article class="ops-row"><div class="ops-row-main"><strong>${escapeHtml(task.title || '—')}</strong><span>${task.property_id ? 'Mülke bağlı' : 'Genel görev'} · ${escapeHtml(task.status || 'TODO')}</span></div><div class="ops-row-actions"><select id="opsTaskPerson-${escapeHtml(task.id)}" aria-label="Görevli seç"><option value="">Ekip üyesi seç…</option>${options}</select><button class="btn btn-secondary btn-sm" data-onclick="assignOperationalTaskFromSelect(decodeURIComponent('${encodeActionArg(task.id)}'))">Ata</button></div></article>`; }).join('') : '<div class="empty-state">Aktif görev yok.</div>'}</section><aside class="ops-debt-panel"><h3>Hazır görev kütüphanesi</h3>${editTemplatesLink}${templates.length ? templates.map(template => `<div class="ops-debt-row"><div><strong>${escapeHtml(template.title)}</strong><span>${escapeHtml(template.task_type || 'GENERAL')}</span></div><button class="btn btn-secondary btn-sm" data-onclick="createTaskFromTemplate(decodeURIComponent('${encodeActionArg(template.id)}'))">Görev oluştur</button></div>`).join('') : '<div class="empty-state">Henüz görev şablonu yok.</div>'}</aside></div>`;
   }
 }
 
@@ -17545,11 +18273,7 @@ async function saveCompetitorResearch() {
 
 function askPricingChatGpt() {
   const question = document.getElementById('pricingChatGptQuestion')?.value || 'Önerilen fiyatları ve doluluk hedefini değerlendir.';
-  const property = Object.values(appData.villas || {}).find(item => item.id === pricingSelectedPropertyId);
-  if (typeof setAnalysisFocusQuestion === 'function') setAnalysisFocusQuestion(`${property?.name || 'Seçili mülk'}: ${question}`);
-  switchTab('analysis');
-  document.querySelectorAll('input[name="analysisProperty"]').forEach(input => { input.checked = input.value === pricingSelectedPropertyId; });
-  if (typeof syncAnalysisAllProperties === 'function') syncAnalysisAllProperties();
+  return openChatGptQuestionModal({ kind: 'PRICE_RULE_QUESTION', scope: 'Fiyatlandırma', questions: [question], selectedQuestion: question, context: pricingChatGptContext() });
 }
 
 function renderPricingTab() {

@@ -13,6 +13,21 @@
   function reportSheet(page, rows, columns) {
     return { name: PAGE_NAMES[page].slice(0, 31), columns, rows: [{ notice: 'Bu dosya içe aktarılamaz, rapordur.' }].concat((rows || []).map(row => ({ ...row }))) };
   }
+  function summaryItems(summary) {
+    return Object.entries(summary || {}).map(([id, value]) => ({
+      id,
+      label: id,
+      type: typeof value === 'number' ? 'number' : 'text',
+      value: absent(value) ? null : value
+    }));
+  }
+  function inferColumns(rows) {
+    const keys = rows.reduce((all, row) => {
+      Object.keys(row || {}).forEach(key => all.add(key));
+      return all;
+    }, new Set());
+    return Array.from(keys).map(key => ({ key, label: key, type: 'text' }));
+  }
   function buildReport(input) {
     const o = input || {}, page = String(o.page || ''), data = o.data || {}, period = o.period || {}, business = o.business || {};
     if (!PAGES.includes(page)) { const error = new Error('Bilinmeyen rapor sayfası'); error.code = 'REPORT_PAGE_UNKNOWN'; throw error; }
@@ -29,8 +44,10 @@
         BOOKINGS: ['bookings', 'Rezervasyonlar'], OPERATIONS: ['cleaningTasks', 'Operasyon kayıtları'],
         SALES: ['leads', 'Satış hunisi'], CHANNELS_MARKETING: ['channelEconomics', 'Kanal ekonomisi']
       }[page];
-      const rows = Array.isArray(data[mapping[0]]) ? data[mapping[0]] : [];
-      sections.push({ id: mapping[0], title: mapping[1], kind: 'table', columns: [], rows });
+      const rows = Array.isArray(data.rows) ? data.rows : (Array.isArray(data[mapping[0]]) ? data[mapping[0]] : []);
+      const items = summaryItems(data.summary || {});
+      if (items.length) sections.push({ id: 'summary', title: 'Ekran özeti', kind: 'kpis', items });
+      sections.push({ id: mapping[0], title: mapping[1], kind: 'table', columns: inferColumns(rows), rows });
       if (!rows.length) unmeasured.push({ id: mapping[0], reason: 'Kayıt yok' });
     }
     let excel;
@@ -41,14 +58,31 @@
       const exported = FinanceExportEngine.buildExport('BOOKINGS', data.bookings || []);
       excel = { roundTrip: true, sheets: [{ name: 'Rezervasyonlar', columns: exported.headers, rows: exported.rows }] };
     } else {
-      const first = sections[0], rows = first.rows || (first.items || []).map(x => ({ metric: x.label, value: x.value }));
-      excel = { roundTrip: false, sheets: [reportSheet(page, rows, first.columns || [{ key: 'metric', label: 'Metrik', type: 'text' }, { key: 'value', label: 'Değer', type: 'text' }])] };
+      const table = sections.find(section => section.kind === 'table');
+      const first = table || sections[0], rows = first.rows || (first.items || []).map(x => ({ metric: x.label, value: x.value }));
+      excel = { roundTrip: false, sheets: [reportSheet(page, rows, first.columns && first.columns.length ? first.columns : [{ key: 'metric', label: 'Metrik', type: 'text' }, { key: 'value', label: 'Değer', type: 'text' }])] };
     }
     const filterLabel = o.filters && o.filters.label ? o.filters.label : 'Tüm mülkler';
     const title = `${PAGE_NAMES[page]} raporu`;
     const subtitle = `${period.start || '—'} – ${period.end || '—'} · ${filterLabel}`;
-    const summary = page === 'SALES' ? { funnel: data.funnel || null } : page === 'FINANCE' || page === 'PROPERTY' ? Object.fromEntries((sections[0].items || []).map(x => [x.id, x.value])) : { recordCount: (sections[0].rows || []).length };
+    const summary = data.summary || (page === 'SALES' ? { funnel: data.funnel || null } : page === 'FINANCE' || page === 'PROPERTY' ? Object.fromEntries((sections[0].items || []).map(x => [x.id, x.value])) : { recordCount: ((sections.find(section => section.kind === 'table') || {}).rows || []).length });
     return { title, subtitle, business: { name: business.name || null, logoUrl: business.logoUrl || null }, sections, unmeasured, excel, chatGptContext: { title, subtitle, summary } };
   }
-  return { buildReport };
+  function toCSV(report) {
+    const rows = [];
+    (report.sections || []).forEach(section => {
+      rows.push([section.title || 'Rapor']);
+      if (section.kind === 'kpis') {
+        rows.push(['Metrik', 'Değer']);
+        (section.items || []).forEach(item => rows.push([item.label, item.value]));
+      } else if (section.kind === 'table') {
+        const columns = section.columns && section.columns.length ? section.columns : inferColumns(section.rows || []);
+        rows.push(columns.map(column => column.label));
+        (section.rows || []).forEach(row => rows.push(columns.map(column => row && row[column.key])));
+      }
+      rows.push([]);
+    });
+    return '\ufeff' + rows.map(row => row.map(value => FinanceExportEngine.csvHucre(value, ';')).join(';')).join('\r\n') + '\r\n';
+  }
+  return { buildReport, toCSV, PAGES: PAGES.slice() };
 }));

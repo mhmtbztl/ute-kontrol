@@ -27,3 +27,5 @@ jobs:
         run: npm run templates:check
       - name: Run offline-safe regression suite
         run: npm test
+      - name: Run browser quality gate (console, overflow, core flows)
+        run: npm run test:browser

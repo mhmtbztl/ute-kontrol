@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 180" role="img" aria-labelledby="title desc">
+  <title id="title">Lexbnb</title>
+  <desc id="desc">Mercan ve lacivert Lexbnb logosu</desc>
+  <g transform="translate(0 0)">
+    <path fill="#F2555A" fill-rule="evenodd" d="M18 67 75 33a10 10 0 0 1 15 9v79a10 10 0 0 1-5 9l-67 39V67Zm22 12v48l25-15V64L40 79Z"/>
+    <path fill="#FF7A73" d="m96 28 62 36a10 10 0 0 1 5 9v48a10 10 0 0 1-15 9l-52-30V28Z"/>
+    <path fill="#17324D" d="m79 118 69 40-58 20a12 12 0 0 1-10-1l-61-35 60-24Z"/>
+  </g>
+  <text x="190" y="127" font-family="'Plus Jakarta Sans','Segoe UI',Arial,sans-serif" font-size="100" font-weight="800" letter-spacing="-6">
+    <tspan fill="#F2555A">Lex</tspan><tspan fill="#17324D">bnb</tspan>
+  </text>
+</svg>

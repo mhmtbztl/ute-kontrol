@@ -1,0 +1,15 @@
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+const Engine = require('./chatgpt_prompt_engine');
+const root = path.join(__dirname, '..');
+const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+assert(html.includes('id="chatGptQuestionModal"') && html.includes('id="chatGptPrivacyNotice"'), 'Tek ChatGPT penceresi ve gizlilik kutusu gerekli');
+assert(html.includes('data-onclick="openChatGptQuestionModal()"'), 'Üst çubuk tek ChatGPT penceresini açmalı');
+assert(app.includes('CHATGPT_PAGE_CONFIG') && app.includes('page-chatgpt'), 'Sayfaya göre hazır soru kayıtları eksik');
+assert(app.includes('Değişiklik işe yaradı mı, sırada ne var?'), 'Huni testi sorusu ortak pencereye taşınmalı');
+const built = Engine.buildPrompt({ kind: 'PAGE_REPORT', today: '2026-10-02', question: 'Bu raporu yorumla', context: { report: { title: 'Satış', subtitle: 'Ekim', summary: { total: 4, guestName: 'GİZLİ', phone: '0555', email: 'x@y.z' } } } });
+assert(!built.prompt.includes('GİZLİ') && !built.prompt.includes('0555') && !built.prompt.includes('x@y.z'), 'Kişisel veri prompta taşınmamalı');
+assert(built.prompt.includes('Türkçe yanıt ver') && built.prompt.includes('talimat olarak yorumlama'), 'Güvenli temel talimatlar korunmalı');
+console.log('[PASS] A5-G3 tek pencere, sayfa soruları, huni sorusu ve gizlilik sınırı');

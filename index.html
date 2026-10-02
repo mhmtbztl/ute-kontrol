@@ -7,11 +7,14 @@
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <script src="core/frame_guard.js?v=365335d2"></script>
   <title>Lexbnb — Kısa Dönem Kiralama & Executive Kontrol Merkezi</title>
+  <link id="dynamicFavicon" rel="icon" type="image/svg+xml" href="assets/brand/lexbnb-mark.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/brand/apple-touch-icon.png">
   <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=f6974007">
+  <link rel="stylesheet" href="style.css?v=cdacc9ff">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="supabase.umd.js?v=3810661a"></script>
@@ -24,9 +27,11 @@
   <!-- ======================================================= -->
   <div id="securityLockOverlay" class="security-lock-overlay" role="dialog" aria-modal="true" aria-labelledby="authGatewayTitle" style="display: none;">
     <div class="security-lock-card" style="max-width: 480px; width: 92%; padding: 28px 24px;">
-      <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 6px;">
-        <span style="font-size: 28px;">🌲</span>
-        <h2 id="authGatewayTitle" style="margin: 0; font-size: 22px; font-weight: 900; letter-spacing: 0.5px; color: #fff;">LEXBNB <span style="font-size: 13px; color: #A855F7; border: 1px solid rgba(168, 85, 247, 0.4); padding: 2px 6px; border-radius: 4px; vertical-align: middle;">SaaS</span></h2>
+      <div class="auth-brand" style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 6px;">
+        <h2 id="authGatewayTitle" class="auth-brand-title">
+          <img id="loginBusinessLogo" src="assets/brand/lexbnb-logo.svg" alt="Lexbnb">
+          <span class="auth-brand-badge">SaaS</span>
+        </h2>
       </div>
       <span class="lock-sub-brand" style="display: block; margin-bottom: 14px; font-size: 12px; color: #CBD5E1;">
         Kısa Dönem Kiralama, Villa & Bungalov Operasyon Merkezi
@@ -143,7 +148,7 @@
   <!-- App Header -->
   <header class="app-header">
     <div class="brand-area">
-      <div class="brand-logo">🌲 LEXBNB</div>
+      <div class="brand-logo"><img id="headerBusinessLogo" src="assets/brand/lexbnb-logo.svg" alt="Lexbnb"></div>
       <div class="brand-meta">
         <h1>KONTROL MERKEZİ</h1>
         <p id="brandSubTitle">Kısa Dönem Kiralama & Finansal Performans Portalı</p>
@@ -212,9 +217,8 @@
         <span>🎓</span>
         <span class="guide-btn-text">Başlangıç Rehberi</span>
       </button>
-      <!-- Tek ChatGPT kapisi (ENVANTER Analiz Merkezi, 30.09.2026). Simdilik
-           Analiz Merkezi sayfasini acar; A5'te sayfaya gore kapsamli pencere olur. -->
-      <button type="button" id="askChatGptBtn" class="btn btn-secondary header-chatgpt-btn" data-onclick="switchTab('analysis')" style="background: rgba(16, 185, 129, 0.14); border: 1px solid rgba(16, 185, 129, 0.4); color: #A7F3D0; font-weight: 700; display: flex; align-items: center; gap: 6px;" title="Verilerinizden ChatGPT için hazır, kişisel veri içermeyen bir analiz komutu üretir">
+      <!-- Tek ChatGPT kapısı: açılan sayfanın güvenli bağlamını ve hazır sorularını kullanır. -->
+      <button type="button" id="askChatGptBtn" class="btn btn-secondary header-chatgpt-btn" data-onclick="openChatGptQuestionModal()" style="background: rgba(16, 185, 129, 0.14); border: 1px solid rgba(16, 185, 129, 0.4); color: #A7F3D0; font-weight: 700; display: flex; align-items: center; gap: 6px;" title="Verilerinizden ChatGPT için hazır, kişisel veri içermeyen bir analiz komutu üretir">
         <span>🧠</span>
         <span class="chatgpt-btn-text">ChatGPT'ye sor</span>
       </button>
@@ -1526,8 +1530,38 @@
     <!-- TAB: AYARLAR & HEDEFLER -->
     <!-- ========================================== -->
     <div id="tab-settings" class="tab-content">
+      <div id="settingsAccessDenied" class="empty-state" hidden>Bu sayfa yalnızca işletme yönetim rollerine açıktır.</div>
+
+      <section class="card settings-section" data-settings-section="business" style="margin-bottom: 24px;">
+        <div class="section-title-bar">
+          <div>
+            <h2>🏢 İŞLETME</h2>
+            <p class="sub-text">İşletme adını ve raporlarda kullanılacak logoyu yönetin.</p>
+          </div>
+        </div>
+        <form id="businessSettingsForm" data-onsubmit="saveBusinessSettings(event)" class="settings-business-form">
+          <div class="settings-logo-preview-wrap">
+            <img id="businessLogoPreview" alt="İşletme logosu önizlemesi" hidden>
+            <div id="businessLogoPlaceholder" class="settings-logo-placeholder" aria-hidden="true">LOGO</div>
+          </div>
+          <div class="settings-business-fields">
+            <div class="form-group">
+              <label for="businessNameInput">İşletme adı</label>
+              <input id="businessNameInput" type="text" maxlength="160" required autocomplete="organization">
+            </div>
+            <div class="form-group">
+              <label for="businessLogoInput">İşletme logosu</label>
+              <input id="businessLogoInput" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" data-onchange="uploadBusinessLogo(this)">
+              <small class="sub-text">PNG, JPG, WebP veya SVG · en fazla 2 MB.</small>
+            </div>
+            <div id="businessSettingsMessage" class="sub-text" role="status" aria-live="polite"></div>
+            <button type="submit" class="btn btn-primary">İşletme Bilgilerini Kaydet</button>
+          </div>
+        </form>
+      </section>
+
       <!-- EKİP VE ROL YÖNETİMİ -->
-      <section class="card" style="margin-bottom: 24px;">
+      <section class="card settings-section" data-settings-section="team" style="margin-bottom: 24px;">
         <div class="section-title-bar">
           <div>
             <h2>👥 EKİP VE ROL YÖNETİMİ</h2>
@@ -1539,10 +1573,10 @@
         <div id="teamRoleLegend" style="display: flex; flex-wrap: wrap; gap: 8px; padding: 0 4px 14px;">
           <span class="badge badge-purple">Sahip</span><span class="sub-text" style="font-size: 11px;">tam yetki, ekip ve rol yönetimi</span>
           <span class="badge badge-blue" style="margin-left: 10px;">Yönetici</span><span class="sub-text" style="font-size: 11px;">davet gönderebilir, veri yönetir</span>
-          <span class="badge badge-emerald" style="margin-left: 10px;">Operasyon</span><span class="sub-text" style="font-size: 11px;">rezervasyon ve operasyon</span>
-          <span class="badge badge-cyan" style="margin-left: 10px;">Satış</span><span class="sub-text" style="font-size: 11px;">rezervasyon, talep ve misafir</span>
-          <span class="badge badge-amber" style="margin-left: 10px;">Personel</span><span class="sub-text" style="font-size: 11px;">günlük görevler</span>
-          <span class="badge badge-rose" style="margin-left: 10px;">İzleyici</span><span class="sub-text" style="font-size: 11px;">yalnızca görüntüleme</span>
+          <span class="badge badge-emerald" style="margin-left: 10px;">Müdür</span><span class="sub-text" style="font-size: 11px;">işletme, rezervasyon ve operasyon yönetimi</span>
+          <span class="badge badge-cyan" style="margin-left: 10px;">Satış</span><span class="sub-text" style="font-size: 11px;">talep, misafir ve rezervasyon; finans yok</span>
+          <span class="badge badge-amber" style="margin-left: 10px;">Saha personeli</span><span class="sub-text" style="font-size: 11px;">yalnız atanan saha işleri</span>
+          <span class="badge badge-rose" style="margin-left: 10px;">İzleyici</span><span class="sub-text" style="font-size: 11px;">finans ve satış görüntüleme; yazma yok</span>
         </div>
 
         <div class="table-responsive">
@@ -1587,7 +1621,7 @@
       </section>
 
       <!-- REZERVASYON KANALLARI VE OTA KOMISYONLARI -->
-      <section class="card" id="bookingChannelSettingsCard" style="margin-bottom: 24px;">
+      <section class="card settings-section" data-settings-section="channels" id="bookingChannelSettingsCard" style="margin-bottom: 24px;">
         <div class="section-title-bar">
           <div>
             <h2>🌐 REZERVASYON KANALLARI VE OTA KOMİSYONLARI</h2>
@@ -1608,51 +1642,64 @@
             <tbody id="bookingChannelSettingsBody"></tbody>
           </table>
         </div>
-        <p class="sub-text" style="margin:12px 0 0;">Mülk bazlı Airbnb/Booking ilan bağlantıları ve performans verileri ayrı olarak <strong>Gelir &amp; Dağıtım</strong> ekranından yönetilir.</p>
+        <p class="sub-text" style="margin:12px 0 0;">Mülk bazlı Airbnb/Booking ilan bağlantıları ve performans verileri <strong>Kanallar ve Pazarlama</strong> ekranından yönetilir.</p>
       </section>
 
-      <!-- AYLIK CİRO VE BÜTÇE HEDEFLERİ YÖNETİMİ -->
-      <section class="card" style="margin-bottom: 24px;">
+      <section class="card settings-section" data-settings-section="templates" id="settingsTemplatesCard" style="margin-bottom: 24px;">
         <div class="section-title-bar">
           <div>
-            <h2>🎯 AYLIK CİRO VE KÂR HEDEFLERİ LİSTESİ</h2>
-            <p class="sub-text">Yılın tüm ayları için belirlenen bütçe hedefleri. İstediğiniz ayın hedefini tek tıkla değiştirebilirsiniz.</p>
+            <h2>🧩 ŞABLONLAR</h2>
+            <p class="sub-text">Mesaj, görev ve kontrol listesi şablonlarının tek yönetim yeri.</p>
           </div>
-          <button class="btn btn-primary btn-sm" data-onclick="openGoalsModal()">+ Hedef Belirle / Düzenle</button>
         </div>
-        <div class="table-responsive">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>DÖNEM / AY</th>
-                <th>HEDEF CİRO</th>
-                <th>HEDEF NET KÂR</th>
-                <th>HEDEF DOLULUK</th>
-                <th>HEDEF ADR</th>
-                <th>TAVAN GİDER</th>
-                <th style="text-align: right;">İŞLEM</th>
-              </tr>
-            </thead>
-            <tbody id="settingsGoalsTableBody">
-              <!-- Injected via JS -->
-            </tbody>
-          </table>
+        <div class="settings-template-grid">
+          <section class="settings-template-pane">
+            <h3>Mesaj şablonları</h3>
+            <form data-onsubmit="createSettingsMessageTemplate(event)" class="settings-inline-form">
+              <input name="name" maxlength="150" required placeholder="Şablon adı">
+              <textarea name="body" maxlength="4000" required placeholder="WhatsApp mesajı"></textarea>
+              <button type="submit" class="btn btn-secondary btn-sm">+ Mesaj şablonu</button>
+            </form>
+            <div id="settingsMessageTemplatesList" class="settings-template-list"></div>
+          </section>
+          <section class="settings-template-pane">
+            <h3>Görev şablonları</h3>
+            <form data-onsubmit="createSettingsTaskTemplate(event)" class="settings-inline-form">
+              <input name="title" maxlength="200" required placeholder="Görev başlığı">
+              <select name="task_type"><option value="GENERAL">Genel</option><option value="CLEANING">Temizlik</option><option value="INSPECTION">Kontrol</option><option value="MAINTENANCE">Bakım</option></select>
+              <button type="submit" class="btn btn-secondary btn-sm">+ Görev şablonu</button>
+            </form>
+            <div id="settingsTaskTemplatesList" class="settings-template-list"></div>
+          </section>
+          <section class="settings-template-pane">
+            <h3>Kontrol listeleri</h3>
+            <form data-onsubmit="createSettingsChecklistTemplate(event)" class="settings-inline-form">
+              <input name="template_name" maxlength="150" required placeholder="Liste adı">
+              <textarea name="items" maxlength="4000" required placeholder="Her satıra bir kontrol maddesi"></textarea>
+              <button type="submit" class="btn btn-secondary btn-sm">+ Kontrol listesi</button>
+            </form>
+            <div id="settingsChecklistTemplatesList" class="settings-template-list"></div>
+          </section>
         </div>
       </section>
 
-      <section class="card">
+      <section class="card settings-section" data-settings-section="lead-sources" id="settingsLeadSourcesCard" style="margin-bottom:24px;">
         <div class="section-title-bar">
-          <div><h2>⚙️ VİLLA FİYAT BASAMAKLARI VE MALİYETLER</h2><p class="sub-text">Taban, baz, hedef, premium ve peak fiyatlar.</p></div>
-          <button class="btn btn-primary" data-onclick="saveAllSettings()">💾 Ayarları Kaydet</button>
+          <div><h2>🧭 TALEP KAYNAKLARI</h2><p class="sub-text">“Nereden geldi?” seçeneklerini yönetin. Bilinmiyor sistem kaynağı silinemez ve kapatılamaz.</p></div>
         </div>
+        <form data-onsubmit="createSettingsLeadSource(event)" class="settings-source-form">
+          <div class="form-group"><label for="settingsLeadSourceName">Yeni kaynak</label><input id="settingsLeadSourceName" name="label" maxlength="100" required placeholder="Örn: TikTok"></div>
+          <button type="submit" class="btn btn-primary btn-sm">+ Kaynak Ekle</button>
+        </form>
         <div class="table-responsive">
           <table class="data-table">
-            <thead><tr><th>VİLLA</th><th>KAPASİTE</th><th>TABAN (FLOOR ₺)</th><th>BAZ (BASE ₺)</th><th>TARGET (₺)</th><th>PREMIUM (₺)</th><th>PEAK (₺)</th><th>TEMİZLİK (₺)</th><th>ISITMA (₺)</th></tr></thead>
-            <tbody id="settingsTableBody"></tbody>
+            <thead><tr><th>KAYNAK</th><th>TÜR</th><th>DURUM</th><th style="text-align:right;">İŞLEM</th></tr></thead>
+            <tbody id="settingsLeadSourcesBody"></tbody>
           </table>
         </div>
       </section>
 
+      <div class="settings-section" data-settings-section="danger">
       <!-- VERİ SIFIRLAMA -->
       <section class="card" id="dataResetCard" style="margin-top: 24px; border: 1px solid rgba(245, 158, 11, 0.35);">
         <div class="section-title-bar">
@@ -1690,6 +1737,7 @@
           </button>
         </div>
       </section>
+      </div>
     </div>
 
     <!-- ======================================================= -->
@@ -2039,6 +2087,8 @@
     </div>
 
   </main>
+
+  <button type="button" id="mobileQuickBookingBtn" class="btn btn-primary mobile-quick-booking" data-onclick="openQuickBookingModal()" hidden>＋ Hızlı rezervasyon</button>
 
   <!-- ========================================== -->
   <!-- MODAL: YENİ GİDER / YATIRIM EKLE -->
@@ -2741,6 +2791,7 @@
         </div>
         <div id="leadMessageTemplateRow" class="form-row" style="display:none;grid-template-columns:1fr auto;gap:10px;margin-top:12px;align-items:end">
           <div class="form-group"><label for="leadMessageTemplate">Önerilen mesaj</label><select id="leadMessageTemplate"><option value="">Şablon seçin</option></select></div>
+          <button type="button" class="btn btn-secondary btn-sm" data-management-only data-onclick="openSettingsSection('templates')">Şablonu düzenle →</button>
           <button type="button" class="btn btn-secondary" data-onclick="openLeadWhatsApp()">WhatsApp'ta aç</button>
         </div>
         <div class="modal-footer">
@@ -3107,6 +3158,7 @@
   <script src="core/financial_metrics_service.js?v=4953570e"></script>
   <script src="core/marketing_engine.js?v=2756f4ec"></script>
   <script src="core/analysis_export_service.js?v=d05579d8"></script>
+  <script src="core/chatgpt_prompt_engine.js?v=5e7232ae"></script>
   <script src="core/property_analysis_context_service.js?v=c0cc1027"></script>
   <script src="core/finance_import_engine.js?v=dddef08c"></script>
   <script src="core/finance_export_engine.js?v=ea797d31"></script>
@@ -3493,10 +3545,63 @@
     </div>
   </div>
 
+  <div class="modal-backdrop" id="pageReportModal" style="display:none;">
+    <div class="modal-card report-modal-card" role="dialog" aria-modal="true" aria-labelledby="pageReportTitle">
+      <div class="modal-header">
+        <div><h3 id="pageReportTitle">Rapor</h3><p id="pageReportSubtitle" class="sub-text">—</p></div>
+        <button type="button" class="close-btn" data-onclick="closePageReportModal()" aria-label="Raporu kapat">&times;</button>
+      </div>
+      <div id="pageReportPreview" class="report-preview"></div>
+      <div class="modal-footer report-modal-actions">
+        <button type="button" class="btn btn-secondary" data-onclick="downloadCurrentReportCsv()">CSV</button>
+        <button type="button" class="btn btn-secondary" data-onclick="downloadCurrentReportXlsx()">Excel</button>
+        <button type="button" class="btn btn-secondary" data-onclick="printCurrentReport()">Yazdır / PDF</button>
+        <button type="button" class="btn btn-primary" data-onclick="askChatGptFromCurrentReport()">🧠 ChatGPT'ye sor</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="quickBookingModal" style="display:none;">
+    <div class="modal-card quick-booking-card" role="dialog" aria-modal="true" aria-labelledby="quickBookingTitle">
+      <div class="modal-header"><h3 id="quickBookingTitle">Hızlı rezervasyon</h3><button type="button" class="close-btn" data-onclick="closeQuickBookingModal()" aria-label="Kapat">&times;</button></div>
+      <form id="quickBookingForm" data-onsubmit="saveQuickBooking(event)">
+        <div class="quick-booking-fields">
+          <label>Mülk<select id="quickBookingVilla" required></select></label>
+          <label>Misafir adı<input id="quickBookingGuest" required autocomplete="name"></label>
+          <div class="quick-booking-dates"><label>Giriş<input id="quickBookingCheckIn" type="date" required></label><label>Çıkış<input id="quickBookingCheckOut" type="date" required></label></div>
+          <label>Brüt tutar (₺)<input id="quickBookingGross" type="number" inputmode="decimal" min="0" step="0.01" required></label>
+          <label>Kişi sayısı<input id="quickBookingPax" type="number" inputmode="numeric" min="1" step="1" required></label>
+          <label>Kanal<select id="quickBookingChannel" required><option value="WHATSAPP">WhatsApp</option><option value="AIRBNB">Airbnb</option><option value="BOOKING">Booking.com</option><option value="INSTAGRAM">Instagram</option><option value="WEBSITE">Web sitesi</option><option value="REPEAT">Tekrar misafir</option><option value="PHONE">Telefon</option></select></label>
+        </div>
+        <p class="sub-text">Temel bilgilerle doğrudan kaydeder. Komisyon ve temizlik ayrıntıları daha sonra rezervasyon detayından eklenebilir.</p>
+        <div class="modal-footer"><button type="button" class="btn btn-secondary" data-onclick="closeQuickBookingModal()">Vazgeç</button><button type="submit" class="btn btn-primary">Rezervasyonu kaydet</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="chatGptQuestionModal" style="display:none;">
+    <div class="modal-card chatgpt-question-card" role="dialog" aria-modal="true" aria-labelledby="chatGptQuestionTitle">
+      <div class="modal-header">
+        <div><h3 id="chatGptQuestionTitle">🧠 ChatGPT'ye sor</h3><p id="chatGptQuestionScope" class="sub-text">—</p></div>
+        <button type="button" class="close-btn" data-onclick="closeChatGptQuestionModal()" aria-label="ChatGPT penceresini kapat">&times;</button>
+      </div>
+      <div class="chatgpt-question-body">
+        <div id="chatGptPrivacyNotice" class="analysis-privacy-note"><strong>Gizlilik sınırı</strong><span>Misafir adı, telefon, e-posta, notlar ve sistem kimlikleri bu metne eklenmez. Olmayan veri satırı yazılmaz.</span></div>
+        <label for="chatGptReadyQuestion">Hazır soru</label>
+        <select id="chatGptReadyQuestion" class="form-control" data-onchange="buildChatGptQuestionPrompt()"></select>
+        <label for="chatGptQuestionPrompt">Kopyalanacak güvenli komut</label>
+        <textarea id="chatGptQuestionPrompt" class="analysis-prompt-preview" rows="14" readonly></textarea>
+        <p id="chatGptQuestionMeta" class="sub-text">—</p>
+      </div>
+      <div class="modal-footer"><button type="button" class="btn btn-secondary" data-onclick="closeChatGptQuestionModal()">Kapat</button><button type="button" class="btn btn-primary" data-onclick="copyChatGptQuestionPrompt()">📋 Promptu kopyala</button></div>
+    </div>
+  </div>
+
   <script src="core/property_sales_readiness.js?v=9d264e9f"></script>
   <script src="core/guest_contact_utils.js?v=84fd6474"></script>
   <script src="core/user_facing_errors.js?v=e4eb0ae5"></script>
   <script src="core/ledger_contract.js?v=bc9fd6f2"></script>
+  <script src="core/report_engine.js?v=7699570c"></script>
   <script src="core/property_profile_engine.js?v=923521c1"></script>
   <script src="core/property_owner_service.js?v=5c741a12"></script>
   <script src="core/sales_workflow_service.js?v=46af3b73"></script>
@@ -3518,10 +3623,10 @@
   <script src="core/captcha_gate.js?v=3ad4a776"></script>
   <script src="core/date_range_picker.js?v=41dc564c"></script>
   <script src="core/side_panel.js?v=d763b464"></script>
-  <script src="core/action_dispatch.js?v=9542d593"></script>
-  <script src="app.js?v=22bbe806"></script>
+  <script src="core/action_dispatch.js?v=104bd082"></script>
+  <script src="app.js?v=4b3a2aaa"></script>
   <script src="core/property_analysis_context_ui.js?v=9f24e43b"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
-  <script src="core/marketing_ui.js?v=d9398578"></script>
+  <script src="core/marketing_ui.js?v=64e11751"></script>
 </body>
 </html>

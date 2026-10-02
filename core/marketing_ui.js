@@ -985,5 +985,5 @@
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') initializeBrowser();
 
-  return { periodFromFilter, scopeBookings, buildWorkspaceModel, buildAdsModel, buildAdsImportPreview, selectLatestSnapshot, selectCurrentBenchmark, renderWorkspaceHtml, renderAds, renderAdsImportPreview, renderMarketingHealth, renderBenchmarkPanel, renderBenchmarkForm, renderFindingActions, renderListingForm, renderSnapshotForm, renderExperimentForm, renderExperiments, escapeHtml, setData, render };
+  return { periodFromFilter, scopeBookings, buildWorkspaceModel, getCurrentModel: () => buildWorkspaceModel(browserInput()), buildAdsModel, buildAdsImportPreview, selectLatestSnapshot, selectCurrentBenchmark, renderWorkspaceHtml, renderAds, renderAdsImportPreview, renderMarketingHealth, renderBenchmarkPanel, renderBenchmarkForm, renderFindingActions, renderListingForm, renderSnapshotForm, renderExperimentForm, renderExperiments, escapeHtml, setData, render };
 }));

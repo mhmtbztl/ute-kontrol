@@ -24,7 +24,7 @@ function test(name, fn) {
 }
 
 test('analysis center is reachable from the primary navigation', () => {
-  assert(indexHtml.includes("switchTab('analysis')"));
+  assert(indexHtml.includes('openChatGptQuestionModal()'));
   assert(indexHtml.includes('id="tab-analysis"'));
   assert(indexHtml.includes('Analiz Merkezi'));
 });

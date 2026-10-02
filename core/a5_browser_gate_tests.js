@@ -1,0 +1,17 @@
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+const root = path.join(__dirname, '..');
+const script = fs.readFileSync(path.join(root, 'scripts', 'browser_quality_gate.js'), 'utf8');
+const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+const workflow = fs.readFileSync(path.join(root, '.github', 'workflows', 'ci.yml'), 'utf8');
+const pkg = require('../package.json');
+assert.strictEqual(pkg.scripts['test:browser'], 'node scripts/browser_quality_gate.js');
+assert(workflow.includes('npm run test:browser'), 'CI tarayıcı kapısını çalıştırmalı');
+assert(script.includes("['executive', 'reservations', 'properties', 'operations', 'leads', 'pricing', 'finance', 'marketing']"), 'Sekiz sayfalı mobil tur eksik');
+for (const role of ['owner', 'sales', 'staff', 'viewer']) assert(script.includes(`'${role}'`), `${role} tarayıcı turunda yok`);
+assert(script.includes("page.on('pageerror'") && script.includes("message.type() === 'error'"), 'Konsol ve çalışma zamanı hataları kapıyı kırmalı');
+assert(script.includes('document.documentElement.scrollWidth'), 'Yatay taşma ölçümü eksik');
+assert(app.includes("['localhost', '127.0.0.1'].includes(window.location.hostname)") && app.includes("get('ci-browser') === '1'"), 'Fixture yalnız yerel sunucuda ve açık bayrakla çalışmalı');
+assert(/async function refreshExecutiveDashboardSnapshot[\s\S]*?if \(isBrowserQualityFixture\(\)\)/.test(app), 'Yerel tarayıcı fixture dış ağa anlık görüntü isteği atmamalı');
+console.log('[PASS] A5-G6/G7 sekiz akış, dört rol ve CI tarayıcı kalite kapısı sözleşmesi');

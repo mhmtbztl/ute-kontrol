@@ -49,14 +49,17 @@ async function run() {
       '/core/..%5c.env', '/core\\..\\.env', '/.env%00.js',
       '/supabase/schema.sql', '/supabase/migration_manifest.txt', '/scripts/bootstrap_test_project.js',
       '/core/test_env.js', '/core/test_gate_tests.js', '/package.json', '/CLAUDE.md', '/server.js',
-      '/apps_script/Code.gs', '/docs/PHASE41_DEPLOY_PACKAGE.md', '/node_modules/pg/package.json'
+      '/apps_script/Code.gs', '/docs/PHASE41_DEPLOY_PACKAGE.md', '/node_modules/pg/package.json',
+      '/assets/logo-options/lexbnb-option-3-coral-navy.png', '/assets/brand/../logo-options/lexbnb-option-1.png'
     ];
     for (const p of yasak) {
       const r = await get(base, p);
       check(r.status === 404 || r.status === 400, `1. ${p} verilmez`, `durum ${r.status}, ${r.len} bayt`);
     }
     const izinli = ['/', '/index.html', '/app.js', '/style.css', '/xlsx.full.min.js', '/core/captcha_gate.js',
-      '/core/marketing_ui.js', '/sablonlar/lexbnb-rezervasyon-sablonu.csv', '/index.html?v=abc'];
+      '/core/marketing_ui.js', '/sablonlar/lexbnb-rezervasyon-sablonu.csv', '/index.html?v=abc',
+      '/assets/brand/lexbnb-logo.svg', '/assets/brand/lexbnb-mark.svg', '/assets/brand/favicon-32.png',
+      '/assets/brand/apple-touch-icon.png'];
     for (const p of izinli) {
       const r = await get(base, p);
       check(r.status === 200 && r.len > 0, `2. ${p} uygulama icin verilir`, `durum ${r.status}`);

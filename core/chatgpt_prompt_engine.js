@@ -93,7 +93,9 @@
       add(lines, included, omitted, 'title', 'Rapor', scalar(report.title));
       add(lines, included, omitted, 'subtitle', 'Kapsam', scalar(report.subtitle));
       add(lines, included, omitted, 'summary', 'Özet', report.summary && pickScalars(report.summary, [
-        'netRoomRevenue','cleaningRevenue','totalRevenue','totalOpex','netProfit','soldNights','adr','recordCount'
+        'netRoomRevenue','cleaningRevenue','totalRevenue','totalOpex','netProfit','soldNights','adr','recordCount',
+        'bookingCount','collections','pendingCleaningDebt','total','NEW','CONTACTED','QUOTE_SENT','FOLLOW_UP','WON','LOST',
+        'roomRevenueBeforeDistribution','distributionCost','netRoomRevenueAfterDistribution','bookedNights','reservationCount'
       ]));
     }
     const prompt = lines.join('\n');
