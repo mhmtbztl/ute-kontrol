@@ -7,7 +7,15 @@ const root = path.join(__dirname, '..');
 const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 
-const pages = ['FINANCE', 'PROPERTY', 'BOOKINGS', 'OPERATIONS', 'SALES', 'CHANNELS_MARKETING'];
+// Finans/Mülk özeti KPI kalemlerinden türer (L-142: ham defter, ölçülemeyen
+// kârı ChatGPT'ye taşıyordu); diğer sayfalar ekran özetini aynen taşır.
+const pages = ['BOOKINGS', 'OPERATIONS', 'SALES', 'CHANNELS_MARKETING'];
+for (const page of ['FINANCE', 'PROPERTY']) {
+  const ledger = { netRoomRevenue: 1234.5, totalOpex: 0, netProfit: 0, soldNights: 0 };
+  const report = ReportEngine.buildReport({ page, period: {}, data: { ledger, isProfitUnmeasured: false } });
+  assert.strictEqual(report.chatGptContext.summary.netRoomRevenue, ledger.netRoomRevenue, `${page}: ekran toplamı değişti`);
+  assert.strictEqual(report.chatGptContext.summary.soldNights, 0, `${page}: ölçülmüş sıfır kayboldu`);
+}
 for (const page of pages) {
   const summary = { screenTotal: page.length * 137.25, zeroIsMeasured: 0 };
   const report = ReportEngine.buildReport({

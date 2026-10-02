@@ -4444,7 +4444,8 @@ body {
 .report-modal-card { max-width: 960px; max-height: 92vh; overflow: auto; }
 .report-preview { padding: 18px 20px; display: grid; gap: 16px; }
 .report-business { display: flex; align-items: center; gap: 12px; }
-.report-business img { width: 52px; height: 52px; object-fit: contain; border-radius: 10px; }
+.report-business img { width: auto; max-width: 140px; height: 40px; object-fit: contain; border-radius: 6px; }
+.report-business .sub-text { display: block; }
 .report-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
 .report-kpi { padding: 12px; border: 1px solid var(--border-color); border-radius: 10px; }
 .report-kpi span { display: block; color: var(--text-muted); font-size: 11px; }
@@ -5257,4 +5258,30 @@ body.side-panel-open { overflow: hidden; }
   .reservation-list-table td { display: flex; justify-content: space-between; gap: 16px; padding: 7px 0; border: 0; text-align: right; }
   .reservation-list-table td::before { content: attr(data-label); color: var(--text-muted); font-size: 11px; font-weight: 700; text-align: left; }
   .reservation-list-table td:first-child { align-items: flex-start; }
+}
+
+/* L-147b/c (A5 denetimi): telefonda ust cubuk 390x844 ekranin ~%40ini
+   kapliyordu ve yuzen hizli rezervasyon dugmesi acik pencerelerin
+   dugmelerini (rapor: Yazdir / PDF, ChatGPT) ortuyordu. Ikon dugmeler tek
+   satirda kare, metinli dugmeler ikinci satirda; pencere acikken yuzen
+   dugme gizlenir. */
+@media (max-width: 520px) {
+  .brand-meta p { display: none; }
+  .header-actions { gap: 6px !important; }
+  .header-actions .palette-btn-text,
+  .header-actions .header-palette-btn kbd,
+  .header-actions .cache-btn-text { display: none !important; }
+  .header-actions > .btn.header-palette-btn,
+  .header-actions > .btn.header-cache-btn,
+  .header-actions > .btn.header-guide-btn,
+  .header-actions > .btn.header-chatgpt-btn,
+  .header-actions > .header-dropdown-wrap:has(#notificationBellBtn) {
+    flex: 1 1 44px !important;
+    min-height: 40px;
+  }
+  .header-actions > .header-dropdown-wrap:has(#quickAddBtn),
+  .header-actions > .header-dropdown-wrap:has(#toolsBtn) { flex: 1 1 calc(33% - 6px) !important; }
+  .header-actions .btn { padding: 8px 6px !important; }
+  body:has(.modal-backdrop[style*="flex"]) .mobile-quick-booking,
+  body.side-panel-open .mobile-quick-booking { display: none !important; }
 }

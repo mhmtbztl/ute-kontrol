@@ -3872,8 +3872,10 @@ function buildCurrentPageReport(page) {
   const base = { page, period: reportPeriod(), filters: { label: reportFilterLabel() }, business: reportBusiness(), today: getTodayStr() };
   if (page === 'FINANCE') {
     const ledger = computeFilterLedger();
+    // Ozet motorun KPI kalemlerinden turer; ham defter (summary) verilmez,
+    // olculemeyen kar ChatGPT'ye "ciro kadar kar" olarak gidiyordu (L-142).
     return ReportEngine.buildReport({ ...base, data: {
-      ledger, summary: { ...ledger },
+      ledger,
       isProfitUnmeasured: isProfitUnmeasured(ledger.totalRevenue, ledger.totalOpex, ledger.capex, currentFilter?.period),
       bookings: (appData.bookings || []).filter(isBookingInFilter),
       expenses: (appData.expenses || []).filter(isExpenseInFilter)
@@ -3884,35 +3886,81 @@ function buildCurrentPageReport(page) {
     const property = key && key !== 'ALL' ? appData.villas?.[key] : null;
     if (!property) throw new Error('Rapor için bir mülk seçin.');
     const ledger = PropertyProfileEngine.buildPropertyReport({ property, bookings: appData.bookings || [], expenses: appData.expenses || [], cleaningTasks: appData.cleaningTasks || [] });
-    return ReportEngine.buildReport({ ...base, filters: { label: property.name || key }, data: { property, ledger, summary: { ...ledger }, bookings: appData.bookings || [], maintenance: appData.maintenanceTickets || [] } });
+    // Mulk raporu profil "Gecmis" ile ayni kapsamdadir: tum zamanlar. Baslik
+    // filtre donemini yazmaz (L-146c). Tum zamanlarda kapanis istisnasi yok.
+    return ReportEngine.buildReport({ ...base, period: { label: 'Tüm zamanlar' }, filters: { label: property.name || key }, data: {
+      property, ledger,
+      isProfitUnmeasured: isProfitUnmeasured(ledger.totalRevenue, ledger.totalOpex, ledger.capex, null)
+    } });
   }
   if (page === 'BOOKINGS') {
     const filteredRows = getFilteredReservationListRows();
     const summary = computeReservationListSummary({ rows: filteredRows, rangeStart: reservationListRange.start, rangeEnd: reservationListRange.end });
     const paymentEngine = getBookingPaymentEngine();
     summary.collections = paymentEngine ? paymentEngine.totalCollections(appData.bookingPayments || [], reservationListRange.start, reservationListRange.end) : null;
-    return ReportEngine.buildReport({ ...base, period: { start: reservationListRange.start, end: reservationListRange.end }, data: { summary, rows: filteredRows.map(item => item.booking), bookings: filteredRows.map(item => item.booking), payments: appData.bookingPayments || [] } });
+    // Tablo ekrandaki liste satirlaridir; ham rezervasyon nesnesi dokulmez (L-146a).
+    const rows = filteredRows.map(({ booking: b }) => ({
+      guest: b.guest || null, property: appData.villas?.[b.villa]?.name || b.villa || null,
+      checkIn: b.checkIn || null, checkOut: b.checkOut || null,
+      nights: b.checkIn && b.checkOut ? calculateNightsBetween(b.checkIn, b.checkOut) : null,
+      channel: b.channel || null, status: b.status || null,
+      gross: Number.isFinite(Number(b.gross)) ? Number(b.gross) : null,
+      discount: Number.isFinite(Number(b.discount)) ? Number(b.discount) : null
+    }));
+    const columns = [
+      { key: 'guest', label: 'Misafir', type: 'text' }, { key: 'property', label: 'Mülk', type: 'text' },
+      { key: 'checkIn', label: 'Giriş', type: 'text' }, { key: 'checkOut', label: 'Çıkış', type: 'text' },
+      { key: 'nights', label: 'Gece', type: 'int' }, { key: 'channel', label: 'Kanal', type: 'text' },
+      { key: 'status', label: 'Durum', type: 'text' }, { key: 'gross', label: 'Brüt tutar', type: 'money' },
+      { key: 'discount', label: 'İndirim', type: 'money' }
+    ];
+    return ReportEngine.buildReport({ ...base, period: { start: reservationListRange.start, end: reservationListRange.end }, data: { summary, rows, columns, bookings: filteredRows.map(item => item.booking) } });
   }
   if (page === 'OPERATIONS') {
     const staffOnly = activeTenant?.role === 'staff';
     const mine = row => !staffOnly || [row.assigned_to, row.assignedTo, row.user_id, row.cleaner_user_id].includes(activeSaaSUser?.id);
-    const cleaningTasks = (appData.cleaningTasks || []).filter(mine);
-    const operationalTasks = (appData.operationalTasks || []).filter(mine);
-    const maintenance = (appData.maintenanceTickets || []).filter(mine);
-    const rows = cleaningTasks.map(row => ({ kind: 'Temizlik', title: row.propertyName || row.villa || '—', status: row.status || '—', date: row.date || null, amount: row.amount ?? null }))
-      .concat(operationalTasks.map(row => ({ kind: 'Görev', title: row.title || '—', status: row.status || '—', date: row.due_date || null, amount: null })))
-      .concat(maintenance.map(row => ({ kind: 'Arıza', title: row.title || '—', status: row.status || '—', date: row.reported_at || null, amount: row.cost ?? null })));
-    const pendingDebt = cleaningTasks.filter(row => String(row.status).toUpperCase() === 'DONE' && !(row.paid || row.is_paid)).reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
-    return ReportEngine.buildReport({ ...base, data: { summary: { recordCount: rows.length, pendingCleaningDebt: pendingDebt }, rows, cleaningTasks, staff: appData.operationalPeople || [], maintenance } });
+    // Rapor ekrandaki donem ve mulk filtresine uyar (L-146b): tarihli kayit
+    // donem icindeyse, tarihsiz kayit yalniz hala aciksa girer.
+    const villaKey = currentFilter?.villa || 'ALL';
+    const villaId = villaKey !== 'ALL' ? appData.villas?.[villaKey]?.id : null;
+    const inVilla = row => villaKey === 'ALL' || row.villa === villaKey || (villaId && [row.property_id, row.propertyId].includes(villaId));
+    const inScope = (date, open) => (date ? isDateInFilter(String(date).slice(0, 10)) : open);
+    const closedTask = status => ['DONE', 'CANCELLED', 'COMPLETED', 'SKIPPED'].includes(String(status || '').toUpperCase());
+    const cleaningTasks = (appData.cleaningTasks || []).filter(mine).filter(inVilla);
+    const operationalTasks = (appData.operationalTasks || []).filter(mine).filter(inVilla);
+    const maintenance = (appData.maintenanceTickets || []).filter(mine).filter(inVilla);
+    const rows = cleaningTasks.filter(row => inScope(row.date, !closedTask(row.status)))
+      .map(row => ({ kind: 'Temizlik', title: row.propertyName || row.villa || '—', status: row.status || '—', date: row.date || null, amount: row.amount ?? null }))
+      .concat(operationalTasks.filter(row => inScope(row.due_date, !closedTask(row.status)))
+        .map(row => ({ kind: 'Görev', title: row.title || '—', status: row.status || '—', date: row.due_date || null, amount: null })))
+      .concat(maintenance.filter(row => inScope(row.reported_at, isMaintenanceTicketOpen(row)))
+        .map(row => ({ kind: 'Arıza', title: row.title || '—', status: row.status || '—', date: row.reported_at ? String(row.reported_at).slice(0, 10) : null, amount: row.cost ?? null })));
+    // Borc bir bakiyedir, donem akisi degil: tek tanim isCleaningDebt, tum donemler.
+    const pendingDebt = cleaningTasks.filter(isCleaningDebt).reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
+    const columns = [
+      { key: 'kind', label: 'Tür', type: 'text' }, { key: 'title', label: 'Kayıt', type: 'text' },
+      { key: 'status', label: 'Durum', type: 'text' }, { key: 'date', label: 'Tarih', type: 'text' },
+      { key: 'amount', label: 'Tutar', type: 'money' }
+    ];
+    return ReportEngine.buildReport({ ...base, data: { summary: { recordCount: rows.length, pendingCleaningDebt: pendingDebt }, rows, columns } });
   }
   if (page === 'SALES') {
     const view = getLeadSalesView();
     const funnel = Object.fromEntries(Object.entries(view.columns).map(([stage, rows]) => [stage, rows.length]));
     const rows = view.rows.map(row => ({ source: row.sourceLabel, status: row.status, property: appData.villas?.[row.villa]?.name || row.villa || null, createdAt: row.createdAt || null }));
-    return ReportEngine.buildReport({ ...base, data: { summary: { ...funnel, total: view.rows.length }, rows, leads: rows, funnel } });
+    const columns = [
+      { key: 'source', label: 'Kaynak', type: 'text' }, { key: 'status', label: 'Aşama', type: 'text' },
+      { key: 'property', label: 'Mülk', type: 'text' }, { key: 'createdAt', label: 'Talep tarihi', type: 'text' }
+    ];
+    return ReportEngine.buildReport({ ...base, data: { summary: { ...funnel, total: view.rows.length }, rows, columns } });
   }
   const model = LexBnBMarketingUI.getCurrentModel();
-  return ReportEngine.buildReport({ ...base, data: { summary: { ...model.economics.totals }, rows: model.economics.channels, channelEconomics: model.economics.channels, adsWeekly: model.ads?.rows || [] } });
+  // Yalniz etiketli ekonomi alanlari; ic tanilama alanlari (rawChannels vb.) rapora girmez (L-146a).
+  const economyKeys = ['reservationCount', 'bookedNights', 'roomRevenueBeforeDistribution', 'cleaningRevenue', 'distributionCost', 'roomRevenueAfterDistribution', 'roomAdr', 'netRoomAdr', 'roomRevPar', 'netRoomRevPar'];
+  const totals = model.economics.totals || {};
+  const summary = Object.fromEntries(economyKeys.map(key => [key, totals[key] ?? null]));
+  const columns = [{ key: 'channel', label: 'Kanal', type: 'text' }].concat(economyKeys.map(key => ({ key, label: ReportEngine.LABELS[key][0], type: ReportEngine.LABELS[key][1] })));
+  return ReportEngine.buildReport({ ...base, data: { summary, rows: model.economics.channels || [], columns } });
 }
 
 function formatReportValue(value, type) {
@@ -3922,8 +3970,18 @@ function formatReportValue(value, type) {
   return typeof value === 'number' ? value.toLocaleString('tr-TR', { maximumFractionDigits: 2 }) : String(value);
 }
 
-function reportPreviewHtml(report) {
-  const logo = /^(https:|blob:|data:image\/)/i.test(report.business?.logoUrl || '') ? report.business.logoUrl : '';
+function reportLogoSrc(url, surface = 'screen') {
+  const raw = String(url || '');
+  if (/^(https:|blob:|data:image\/)/i.test(raw)) return raw;
+  if (/^assets\/brand\/[a-z0-9-]+\.svg$/.test(raw)) {
+    const file = surface === 'screen' && raw === 'assets/brand/lexbnb-logo.svg' ? 'assets/brand/lexbnb-logo-dark.svg' : raw;
+    return typeof window !== 'undefined' && window.location ? new URL(file, window.location.href).href : file;
+  }
+  return '';
+}
+
+function reportPreviewHtml(report, surface = 'screen') {
+  const logo = reportLogoSrc(report.business?.logoUrl, surface);
   const business = `<div class="report-business">${logo ? `<img src="${escapeHtml(logo)}" alt="">` : ''}<div><strong>${escapeHtml(report.business?.name || 'İşletme')}</strong><span class="sub-text">${escapeHtml(report.subtitle)}</span></div></div>`;
   const sections = report.sections.map(section => {
     if (section.kind === 'kpis') return `<section><h4>${escapeHtml(section.title)}</h4><div class="report-kpis">${(section.items || []).map(item => `<div class="report-kpi"><span>${escapeHtml(item.label)}</span><strong>${escapeHtml(formatReportValue(item.value, item.type))}</strong></div>`).join('')}</div></section>`;
@@ -3986,12 +4044,23 @@ function downloadCurrentReportXlsx() {
 
 function printCurrentReport() {
   if (!currentPageReport) return false;
-  const popup = window.open('', '_blank', 'noopener,noreferrer');
-  if (!popup) { showToast('Yazdırma penceresi engellendi.', 'error'); return false; }
-  popup.document.write(`<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>${escapeHtml(currentPageReport.title)}</title><style>body{font:14px Arial;color:#111;padding:24px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:7px;text-align:left}.report-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.report-kpi{border:1px solid #ccc;padding:10px}.sub-text{color:#555}img{max-width:64px;max-height:64px}</style></head><body><h1>${escapeHtml(currentPageReport.title)}</h1>${reportPreviewHtml(currentPageReport)}</body></html>`);
+  // 'noopener' ozelligiyle window.open standart geregi her zaman null doner;
+  // dugme bu yuzden hic calismiyordu (L-143). Pencere ozelliksiz acilir,
+  // yazildiktan sonra opener baglantisi elle kesilir.
+  const popup = window.open('', '_blank');
+  if (!popup) { showToast('Yazdırma penceresi engellendi. Tarayıcıda açılır pencerelere izin verin.', 'error'); return false; }
+  popup.document.write(`<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>${escapeHtml(currentPageReport.title)}</title><style>body{font:14px Arial;color:#111;padding:24px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:7px;text-align:left}.report-business{display:flex;gap:12px;align-items:center;margin-bottom:16px}.report-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.report-kpi{border:1px solid #ccc;padding:10px;display:flex;flex-direction:column}.sub-text{color:#555;display:block}img{max-width:180px;max-height:64px}</style></head><body><h1>${escapeHtml(currentPageReport.title)}</h1>${reportPreviewHtml(currentPageReport, 'print')}</body></html>`);
   popup.document.close();
+  popup.opener = null;
   popup.focus();
-  popup.print();
+  // Logo yuklenmeden yazdirilirsa PDF logosuz cikar.
+  const logo = popup.document.images[0];
+  if (logo && !logo.complete) {
+    logo.addEventListener('load', () => popup.print(), { once: true });
+    logo.addEventListener('error', () => popup.print(), { once: true });
+  } else {
+    popup.print();
+  }
   return true;
 }
 
@@ -7396,6 +7465,14 @@ function openQuickBookingModal() {
   const select = document.getElementById('quickBookingVilla');
   const properties = Object.entries(appData.villas || {}).filter(([, property]) => property && property.isActive !== false && !property.archivedAt);
   if (select) select.innerHTML = properties.map(([key, property]) => `<option value="${escapeHtml(key)}">${escapeHtml(property.name || key)}</option>`).join('');
+  // Kanal listesi tam formla ayni katalogdan gelir: isletmenin ozel kanallari
+  // dahil, pasif kanallar haric. Sabit liste pasif kanal sectirip kaydi tam
+  // forma dusuruyor, ozel kanallari hic gostermiyordu (L-147a).
+  const channelSelect = document.getElementById('quickBookingChannel');
+  if (channelSelect) {
+    const channels = sortBookingChannelsForSelection(getBookingChannelCatalog().filter(channel => channel.isActive));
+    channelSelect.innerHTML = channels.map(channel => `<option value="${escapeHtml(channel.code)}">${escapeHtml(channel.displayName || channel.code)}</option>`).join('');
+  }
   const form = document.getElementById('quickBookingForm');
   if (form) form.reset();
   const modal = document.getElementById('quickBookingModal');
@@ -7423,10 +7500,11 @@ function saveQuickBooking(event) {
     guest: document.getElementById('quickBookingGuest')?.value.trim() || '',
     gross: document.getElementById('quickBookingGross')?.value || '',
     pax: document.getElementById('quickBookingPax')?.value || '',
-    channel: document.getElementById('quickBookingChannel')?.value || 'WHATSAPP'
+    channel: document.getElementById('quickBookingChannel')?.value || ''
   };
   closeQuickBookingModal();
   openBookingModal();
+  refreshBookingChannelDropdown(values.channel);
   document.getElementById('resVilla').value = values.villa;
   document.getElementById('resGuest').value = values.guest;
   document.getElementById('resGross').value = values.gross;
@@ -9030,7 +9108,7 @@ function applyBusinessLogoUrl(url) {
   }
   const headerLogo = document.getElementById('headerBusinessLogo');
   if (headerLogo) {
-    headerLogo.src = logoUrl || 'assets/brand/lexbnb-logo.svg';
+    headerLogo.src = logoUrl || 'assets/brand/lexbnb-logo-dark.svg';
     headerLogo.alt = logoUrl ? `${activeTenant?.name || 'İşletme'} logosu` : 'Lexbnb';
     headerLogo.hidden = false;
   }
@@ -9038,11 +9116,24 @@ function applyBusinessLogoUrl(url) {
   if (placeholder) placeholder.hidden = !!logoUrl;
 }
 
-async function refreshBusinessLogoUrl() {
+// Imzali URL 1 saat gecerlidir. Eskiden sayfa acik kalinca ust cubuk logosu
+// bir saat sonra kiriliyordu ve her render yeni bir URL istiyordu (L-148a/d):
+// ayni yol icin URL 50 dakika yeniden kullanilir, sure dolmadan tazelenir.
+const BUSINESS_LOGO_URL_TTL_MS = 50 * 60 * 1000;
+let businessLogoUrlCache = { path: null, url: null, at: 0, timer: null };
+
+async function refreshBusinessLogoUrl(force = false) {
   const path = getBusinessProfileSetting().logoPath;
   if (!path || !supabaseClient?.storage) {
+    if (businessLogoUrlCache.timer) clearTimeout(businessLogoUrlCache.timer);
+    businessLogoUrlCache = { path: null, url: null, at: 0, timer: null };
     applyBusinessLogoUrl('');
     return null;
+  }
+  const fresh = businessLogoUrlCache.path === path && businessLogoUrlCache.url && Date.now() - businessLogoUrlCache.at < BUSINESS_LOGO_URL_TTL_MS;
+  if (fresh && !force) {
+    applyBusinessLogoUrl(businessLogoUrlCache.url);
+    return businessLogoUrlCache.url;
   }
   const { data, error } = await supabaseClient.storage.from('tenant-assets').createSignedUrl(path, 3600);
   if (error || !data?.signedUrl) {
@@ -9050,6 +9141,9 @@ async function refreshBusinessLogoUrl() {
     setBusinessSettingsMessage('Logo okunamadı. Dosyayı yeniden yükleyebilirsiniz.', 'error');
     return null;
   }
+  if (businessLogoUrlCache.timer) clearTimeout(businessLogoUrlCache.timer);
+  const timer = typeof setTimeout === 'function' ? setTimeout(() => { refreshBusinessLogoUrl(true); }, BUSINESS_LOGO_URL_TTL_MS) : null;
+  businessLogoUrlCache = { path, url: data.signedUrl, at: Date.now(), timer };
   applyBusinessLogoUrl(data.signedUrl);
   return data.signedUrl;
 }
@@ -9118,7 +9212,7 @@ async function uploadBusinessLogo(fileInput) {
     return false;
   }
   appData.tenantSettings.business_profile = profile;
-  await refreshBusinessLogoUrl();
+  await refreshBusinessLogoUrl(true);
   setBusinessSettingsMessage('Logo kaydedildi; üst çubuk ve raporlar bu logoyu kullanacak.', 'success');
   return true;
 }
@@ -9133,10 +9227,56 @@ async function renderSettingsWorkspace() {
   renderBookingChannelSettings();
   renderSettingsTemplates();
   renderSettingsLeadSources();
+  // renderAll her cagrida 4 katalog istiyordu (L-148d). Yazmalar ve sekme
+  // acilisi kendi yuklemesini yapar; burada 60 sn onbellek yeter.
+  const tenantId = getActiveTenantId();
+  if (settingsCatalogsLoadedFor.tenantId === tenantId && Date.now() - settingsCatalogsLoadedFor.at < 60000) return true;
   await loadSettingsCatalogs();
   renderSettingsTemplates();
   renderSettingsLeadSources();
   return true;
+}
+
+let settingsCatalogsLoadedFor = { tenantId: null, at: 0 };
+
+// Guncelleme RLS ile 0 satira duserse Supabase hata dondurmez; "guncellendi"
+// demeden once satirin gercekten degistigi okunur (L-148c, CLAUDE.md 5.1).
+async function updateSettingsRow(table, id, patch) {
+  const { data, error } = await supabaseClient.from(table).update(patch)
+    .eq('tenant_id', getActiveTenantId()).eq('id', id).select('id');
+  if (error) return error.message;
+  if (!Array.isArray(data) || data.length !== 1) return 'Kayıt güncellenemedi (yetki yok ya da kayıt artık yok).';
+  return null;
+}
+
+// Kontrol listesi metin bicimi: "# Bolum" satiri yeni bolum acar, "!" ile
+// baslayan madde onemlidir, " > a; b" maddenin alt isaretleridir. Ayni bicim
+// olusturma ve duzenlemede kullanilir; eskiden yalniz ad duzenlenebiliyordu ve
+// onemli / alt isaret (A2-G2 modeli) hic girilemiyordu (L-148b).
+function checklistItemsToText(items) {
+  const sections = Array.isArray(items?.sections) ? items.sections : [];
+  return sections.map(section => [`# ${section.title || 'Genel'}`].concat((section.items || []).map(item => {
+    const sub = Array.isArray(item.subChecks) && item.subChecks.length ? ` > ${item.subChecks.join('; ')}` : '';
+    return `${item.important ? '!' : ''}${item.text}${sub}`;
+  })).join('\n')).join('\n');
+}
+
+function checklistTextToItems(text, supplies = []) {
+  const sections = [];
+  let current = null;
+  String(text || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean).forEach(line => {
+    if (line.startsWith('#')) {
+      current = { title: line.replace(/^#+\s*/, '').trim() || 'Genel', items: [] };
+      sections.push(current);
+      return;
+    }
+    if (!current) { current = { title: 'Genel', items: [] }; sections.push(current); }
+    const important = line.startsWith('!');
+    const [main, subs] = line.replace(/^!\s*/, '').split(/\s+>\s+/);
+    const subChecks = String(subs || '').split(';').map(value => value.trim()).filter(Boolean);
+    if (main.trim()) current.items.push({ text: main.trim(), important, subChecks });
+  });
+  return { sections: sections.filter(section => section.items.length), supplies: Array.isArray(supplies) ? supplies : [] };
 }
 
 async function loadSettingsCatalogs() {
@@ -9152,6 +9292,7 @@ async function loadSettingsCatalogs() {
   appData.settingsTaskTemplates = tasks || [];
   appData.settingsChecklistTemplates = checklists || [];
   appData.settingsLeadSources = sources || [];
+  settingsCatalogsLoadedFor = { tenantId, at: Date.now() };
   return true;
 }
 
@@ -9218,15 +9359,15 @@ async function createSettingsTaskTemplate(event) {
 async function createSettingsChecklistTemplate(event) {
   event.preventDefault();
   const form = event.currentTarget;
-  const lines = String(form.elements.items.value || '').split(/\r?\n/).map(value => value.trim()).filter(Boolean);
-  if (!lines.length) {
+  const parsedItems = checklistTextToItems(form.elements.items.value);
+  if (!parsedItems.sections.length) {
     showToast('Kontrol listesine en az bir madde yazın.', 'error');
     return false;
   }
   const payload = {
     tenant_id: getActiveTenantId(), property_id: null, task_type: 'CLEANING',
     template_name: String(form.elements.template_name.value || '').trim(),
-    items: { sections: [{ title: 'Genel', items: lines.map(text => ({ text, important: false, subChecks: [] })) }], supplies: [] },
+    items: parsedItems,
     is_active: true
   };
   const { error } = await supabaseClient.from('property_checklist_templates').insert(payload);
@@ -9262,9 +9403,16 @@ async function editSettingsTemplate(kind, id) {
     if (!String(body || '').trim()) return false;
     patch.body = String(body).trim();
   }
-  const { error } = await supabaseClient.from(table).update(patch).eq('tenant_id', getActiveTenantId()).eq('id', id);
-  if (error) {
-    showToast('Şablon güncellenemedi: ' + kullaniciMesaji(error.message), 'error');
+  if (kind === 'checklist') {
+    const text = prompt('Maddeler (her satıra bir madde; "# Bölüm" yeni bölüm, "!" önemli, " > a; b" alt işaretler):', checklistItemsToText(item.items));
+    if (text === null) return false;
+    const items = checklistTextToItems(text, item.items?.supplies);
+    if (!items.sections.length) { showToast('Kontrol listesine en az bir madde yazın.', 'error'); return false; }
+    patch.items = items;
+  }
+  const failure = await updateSettingsRow(table, id, patch);
+  if (failure) {
+    showToast('Şablon güncellenemedi: ' + kullaniciMesaji(failure), 'error');
     return false;
   }
   await loadSettingsCatalogs();
@@ -9277,9 +9425,9 @@ async function archiveSettingsTemplate(kind, id) {
   const item = getSettingsTemplate(kind, id);
   if (!item || !confirm('Bu şablon yeni seçimlerden kaldırılsın mı? Geçmiş kayıtlar korunur.')) return false;
   const table = kind === 'message' ? 'message_templates' : kind === 'task' ? 'task_templates' : 'property_checklist_templates';
-  const { error } = await supabaseClient.from(table).update({ is_active: false }).eq('tenant_id', getActiveTenantId()).eq('id', id);
-  if (error) {
-    showToast('Şablon kapatılamadı: ' + kullaniciMesaji(error.message), 'error');
+  const failure = await updateSettingsRow(table, id, { is_active: false });
+  if (failure) {
+    showToast('Şablon kapatılamadı: ' + kullaniciMesaji(failure), 'error');
     return false;
   }
   await loadSettingsCatalogs();
@@ -9326,10 +9474,9 @@ async function toggleSettingsLeadSource(id, isActive) {
     showToast('Bilinmiyor sistem kaynağı silinemez ve kapatılamaz.', 'error');
     return false;
   }
-  const { error } = await supabaseClient.from('lead_source_catalog').update({ is_active: isActive === true })
-    .eq('tenant_id', getActiveTenantId()).eq('id', id);
-  if (error) {
-    showToast('Kaynak durumu değiştirilemedi: ' + kullaniciMesaji(error.message), 'error');
+  const failure = await updateSettingsRow('lead_source_catalog', id, { is_active: isActive === true });
+  if (failure) {
+    showToast('Kaynak durumu değiştirilemedi: ' + kullaniciMesaji(failure), 'error');
     return false;
   }
   await loadSettingsCatalogs();
@@ -17281,6 +17428,60 @@ function propertyProfileBodyHtml(value) {
   return String(value || '');
 }
 
+// Fiyat basamaklari (taban/hedef/premium/zirve + isitma maliyeti). A5'te
+// Ayarlar'daki tablo kaldirilinca basamaklar hicbir yerden girilemiyordu
+// (L-144). Bos alan "bilinmiyor"dur ve null yazilir; 0 ya da uydurma
+// varsayilan degil (CLAUDE.md 3.6, phase31 PHASE31_LADDER_STEP_NOT_NULLABLE).
+const PROPERTY_LADDER_FIELDS = [
+  ['floor', 'Taban fiyat (₺/gece)'], ['target', 'Hedef fiyat (₺/gece)'], ['premium', 'Premium fiyat (₺/gece)'],
+  ['peak', 'Yoğun dönem fiyatı (₺/gece)'], ['heatCost', 'Isıtma maliyeti (₺/gece)']
+];
+
+function propertyPricingLadderFormHtml(villaKey, property) {
+  if (!canManageTenantRole(activeTenant?.role)) return '';
+  const field = ([key, label]) => {
+    const raw = key === 'floor' ? (property.floor ?? property.floorPrice) : property[key];
+    const value = raw === null || raw === undefined || raw === '' || !Number.isFinite(Number(raw)) ? '' : String(Number(raw));
+    return `<div class="form-group"><label for="ladder_${key}">${escapeHtml(label)}</label><input id="ladder_${key}" name="${key}" type="number" min="0" step="1" inputmode="numeric" value="${escapeHtml(value)}" placeholder="Girilmedi"></div>`;
+  };
+  // <form> degil: global innerHTML temizleyicisi FORM ogesini siler (L-15).
+  return `<div class="property-ladder-form"><h4>Fiyat basamaklarını düzenle</h4><div class="property-profile-grid">${PROPERTY_LADDER_FIELDS.map(field).join('')}</div><p class="sub-text">Boş bırakılan basamak "girilmedi" olarak kalır; tahmin edilmez.</p><button type="button" class="btn btn-primary btn-sm" data-onclick="savePropertyPricingLadder(decodeURIComponent('${encodeActionArg(villaKey)}'))">Basamakları kaydet</button></div>`;
+}
+
+async function savePropertyPricingLadder(villaKey) {
+  if (!canManageTenantRole(activeTenant?.role)) return false;
+  const property = appData?.villas?.[villaKey];
+  if (!property) return false;
+  const values = {};
+  for (const [key, label] of PROPERTY_LADDER_FIELDS) {
+    const raw = String(document.getElementById(`ladder_${key}`)?.value ?? '').trim();
+    if (raw === '') { values[key] = null; continue; }
+    const number = Number(raw);
+    if (!Number.isFinite(number) || number < 0) {
+      showToast(`${label}: geçerli, negatif olmayan bir tutar girin.`, 'error');
+      return false;
+    }
+    values[key] = number;
+  }
+  const order = ['floor', 'target', 'premium', 'peak'].map(key => values[key]).filter(value => value !== null);
+  if (order.some((value, index) => index > 0 && value < order[index - 1])) {
+    showToast('Basamaklar küçükten büyüğe olmalı: taban ≤ hedef ≤ premium ≤ yoğun dönem.', 'error');
+    return false;
+  }
+  try {
+    await cloudSavePricingLadder(villaKey, values);
+  } catch (error) {
+    showToast('Fiyat basamakları kaydedilemedi: ' + kullaniciMesaji(error?.message || ''), 'error');
+    return false;
+  }
+  Object.assign(property, values);
+  property.floorPrice = values.floor;
+  renderPropertiesTab();
+  if (typeof renderPricingTab === 'function') renderPricingTab();
+  showToast('Fiyat basamakları kaydedildi.', 'success');
+  return true;
+}
+
 function renderPropertyProfile(villaKey) {
   const property = appData?.villas?.[villaKey];
   if (!property || typeof PropertyProfileEngine === 'undefined') return '';
@@ -17302,7 +17503,7 @@ function renderPropertyProfile(villaKey) {
       <div><span class="sub-text">Mülk sahibi</span><strong>${escapeHtml(owner?.full_name || 'Belirtilmedi')}</strong><small>${escapeHtml(owner?.phone || owner?.email || '')}</small></div>
     </div>`;
   } else if (selectedPropertyProfileTab === 'PRICES') {
-    body = `<div class="property-profile-grid"><div><span class="sub-text">Baz fiyat</span><strong>${propertyMoney(property.basePrice)}</strong></div><div><span class="sub-text">Taban fiyat</span><strong>${propertyMoney(property.floor ?? property.floorPrice)}</strong></div><div><span class="sub-text">Hedef fiyat</span><strong>${propertyMoney(property.target)}</strong></div><div><span class="sub-text">Premium fiyat</span><strong>${propertyMoney(property.premium)}</strong></div><div><span class="sub-text">Yoğun dönem</span><strong>${propertyMoney(property.peak)}</strong></div></div><p class="sub-text">Baz fiyat normal satış referansıdır; taban fiyat alt koruma sınırıdır.</p>`;
+    body = `<div class="property-profile-grid"><div><span class="sub-text">Baz fiyat</span><strong>${propertyMoney(property.basePrice)}</strong></div><div><span class="sub-text">Taban fiyat</span><strong>${propertyMoney(property.floor ?? property.floorPrice)}</strong></div><div><span class="sub-text">Hedef fiyat</span><strong>${propertyMoney(property.target)}</strong></div><div><span class="sub-text">Premium fiyat</span><strong>${propertyMoney(property.premium)}</strong></div><div><span class="sub-text">Yoğun dönem</span><strong>${propertyMoney(property.peak)}</strong></div></div><p class="sub-text">Baz fiyat normal satış referansıdır; taban fiyat alt koruma sınırıdır.</p>${propertyPricingLadderFormHtml(villaKey, property)}`;
   } else if (selectedPropertyProfileTab === 'CHANNELS') {
     const links = { ...(context.social_links || {}) };
     if (property.url) links.ota = property.url;

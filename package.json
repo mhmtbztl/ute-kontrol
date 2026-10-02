@@ -8,6 +8,7 @@
     "test:live": "node scripts/run_live_tests.js",
     "test:browser": "node scripts/browser_quality_gate.js",
     "test:browser:live": "node scripts/a5_live_browser_tour.js",
+    "test:e2e:live": "node scripts/a5_e2e_flow_tour.js",
     "test:bootstrap": "node scripts/bootstrap_test_project.js",
     "test:bootstrap:check": "node scripts/bootstrap_test_project.js --check",
     "test:phase11-late": "node scripts/test_phase11_late_apply.js",

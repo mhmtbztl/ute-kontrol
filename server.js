@@ -35,7 +35,7 @@ function isAllowed(rel) {
   if (parts.some(p => !p || p.startsWith('.'))) return false;
   if (parts.length === 1) return ROOT_FILES.has(parts[0]);
   if (parts.length === 3 && parts[0] === 'assets' && parts[1] === 'brand') {
-    return /^(lexbnb-(?:logo|mark)\.svg|lexbnb-logo-email\.png|favicon-32\.png|apple-touch-icon\.png)$/.test(parts[2]);
+    return /^(lexbnb-(?:logo|logo-dark|mark)\.svg|lexbnb-logo-email\.png|favicon-32\.png|apple-touch-icon\.png)$/.test(parts[2]);
   }
   if (parts.length !== 2) return false;
   const [dir, name] = parts;

@@ -39,6 +39,39 @@ async function withPage(browser, baseUrl, role, viewport, run) {
   await page.close();
 }
 
+// Ekrandaki "12.345 TL" metninden tam sayi; "—" ise null.
+function screenNumber(text) {
+  const digits = String(text || '').replace(/[^0-9-]/g, '');
+  return digits ? Number(digits) : null;
+}
+
+// A5 denetimi (L-146e): "rapor toplami = ekran toplami" motorun kendi
+// kendine esitligi degil, ekranda yazan rakamla rapordaki rakamin esitligidir.
+async function assertReportMatchesScreen(page) {
+  const result = await page.evaluate(() => {
+    switchTab('finance');
+    const finance = {
+      revenue: document.getElementById('finActualRevenue').textContent,
+      profit: document.getElementById('finNetProfit').textContent,
+      nights: document.getElementById('finSoldNights').textContent
+    };
+    openPageReport('FINANCE');
+    const items = Object.fromEntries(currentPageReport.sections[0].items.map(item => [item.id, item.value]));
+    closePageReportModal();
+    switchTab('reservations');
+    const pill = document.getElementById('rezTableSummaryPill').textContent;
+    openPageReport('BOOKINGS');
+    const bookings = currentPageReport.chatGptContext.summary;
+    closePageReportModal();
+    return { finance, items, pill, bookings };
+  });
+  assert.strictEqual(screenNumber(result.finance.revenue), Math.round(result.items.netRoomRevenue), 'Finans cirosu ekran ≠ rapor');
+  assert.strictEqual(result.finance.profit.trim() === '—' ? null : screenNumber(result.finance.profit), result.items.netProfit === null ? null : Math.round(result.items.netProfit), 'Finans net kârı ekran ≠ rapor');
+  assert.strictEqual(screenNumber(result.finance.nights), result.items.soldNights, 'Finans satılan gece ekran ≠ rapor');
+  assert(result.pill.includes(`${result.bookings.soldNights} Gece`), `Rezervasyon geceleri ekran ≠ rapor: ${result.pill}`);
+  assert(result.pill.includes(`${Math.round(result.bookings.netRoomRevenue).toLocaleString('tr-TR')} TL`), `Rezervasyon cirosu ekran ≠ rapor: ${result.pill}`);
+}
+
 async function assertNoHorizontalOverflow(page, label) {
   const result = await page.evaluate(() => ({ width: window.innerWidth, scroll: document.documentElement.scrollWidth }));
   assert(result.scroll <= result.width + 1, `${label}: ${result.scroll}px belge, ${result.width}px ekran`);
@@ -54,14 +87,47 @@ async function main() {
   const passed = [];
   try {
     await withPage(browser, baseUrl, 'owner', { width: 1280, height: 900 }, async page => {
-      assert(await page.evaluate(() => { switchTab('reservations'); return document.getElementById('tab-reservations').classList.contains('active'); })); passed.push('1. rezervasyon + ödeme görünümü');
-      assert(await page.evaluate(() => { switchTab('operations'); setOperationsView('cleaning'); return document.getElementById('opsCombinedContainer').textContent.includes('Temizlik'); })); passed.push('2. temizlik Z/M operasyonu');
-      assert(await page.evaluate(() => { switchTab('finance'); return openPageReport('FINANCE'); })); await page.waitForSelector('#pageReportModal', { state: 'visible' }); passed.push('3. gider → finans raporu');
-      assert(await page.evaluate(() => { closePageReportModal(); switchTab('finance'); return document.getElementById('tab-finance').classList.contains('active'); })); passed.push('4. ay kapanışı yüzeyi');
-      assert(await page.evaluate(() => { switchTab('leads'); return document.getElementById('leadKanbanContainer').textContent.includes('Tarayıcı Talebi'); })); passed.push('5. talep → teklif → rezervasyon');
-      assert(await page.evaluate(() => { switchTab('operations'); setOperationsView('maintenance'); return document.getElementById('opsCombinedContainer').textContent.includes('Musluk kontrolü'); })); passed.push('6. arıza → çözüm → gider');
+      // Bu kapi bellek ici fiksturde EKRANLARIN acildigini olcer; is akisinin
+      // kendisini (yazma, Z/M, kapanis) olcmez. Uctan uca tur ayri betiktir:
+      // scripts/a5_e2e_flow_tour.js (test projesi). Etiketler bunu soyler (L-145).
+      assert(await page.evaluate(() => { switchTab('reservations'); return document.getElementById('tab-reservations').classList.contains('active'); })); passed.push('1. rezervasyon ekranı açılır');
+      assert(await page.evaluate(() => { switchTab('operations'); setOperationsView('cleaning'); return document.getElementById('opsCombinedContainer').textContent.includes('Temizlik'); })); passed.push('2. temizlik görünümü açılır');
+      assert(await page.evaluate(() => { switchTab('finance'); return openPageReport('FINANCE'); })); await page.waitForSelector('#pageReportModal', { state: 'visible' }); passed.push('3. finans raporu açılır');
+      await page.evaluate(() => closePageReportModal());
+      await assertReportMatchesScreen(page); passed.push('4. rapor toplamı = ekran toplamı (Finans, Rezervasyonlar)');
+      assert(await page.evaluate(() => { switchTab('leads'); return document.getElementById('leadKanbanContainer').textContent.includes('Tarayıcı Talebi'); })); passed.push('5. talep hunisi görünür');
+      assert(await page.evaluate(() => { switchTab('operations'); setOperationsView('maintenance'); return document.getElementById('opsCombinedContainer').textContent.includes('Musluk kontrolü'); })); passed.push('6. arıza listesi görünür');
       assert(await page.evaluate(() => { switchTab('finance'); return openChatGptQuestionModal({ tabId: 'finance' }); })); await page.waitForSelector('#chatGptQuestionModal', { state: 'visible' }); passed.push('7. rapor → ChatGPT');
       assert(await page.evaluate(() => { closeChatGptQuestionModal(); return openQuickBookingModal(); })); await page.waitForSelector('#quickBookingModal', { state: 'visible' }); passed.push('8. telefondan hızlı rezervasyon kapısı');
+      await page.evaluate(() => closeQuickBookingModal());
+      // L-143: yazdirma penceresi gercekten acilir ve rapor + logo icerir.
+      const [popup] = await Promise.all([
+        page.waitForEvent('popup', { timeout: 10000 }),
+        page.evaluate(() => { switchTab('finance'); openPageReport('FINANCE'); return printCurrentReport(); })
+      ]);
+      await popup.waitForLoadState();
+      const printed = await popup.evaluate(() => ({ text: document.body.textContent, logo: document.images[0]?.getAttribute('src') || '', opener: window.opener }));
+      assert(printed.text.includes('Finans raporu') && printed.text.includes('Net konaklama geliri'), 'Yazdırma penceresi raporu içermiyor');
+      assert(/assets\/brand\/lexbnb-logo\.svg$/.test(printed.logo), `Baskıda logo yok: ${printed.logo}`);
+      assert.strictEqual(printed.opener, null, 'Yazdırma penceresi opener bağını taşıyor');
+      await popup.close();
+      await page.evaluate(() => closePageReportModal());
+      passed.push('9. Yazdır / PDF penceresi logolu açılır');
+      // L-144: fiyat basamaklari yonetim rolunde duzenlenebilir.
+      assert(await page.evaluate(() => { switchTab('properties'); setPropertyProfileTab('PRICES'); return !!document.querySelector('.property-ladder-form #ladder_floor'); }), 'Fiyat basamağı formu yok');
+      passed.push('10. fiyat basamakları mülk profilinde düzenlenir');
+    });
+
+    await withPage(browser, baseUrl, 'owner', { width: 390, height: 844 }, async page => {
+      // L-147b/c: ust cubuk telefonda ekranin ucte birini gecmez; pencere
+      // acikken yuzen dugme pencere dugmelerini ortmez.
+      const header = await page.evaluate(() => document.querySelector('.app-header').getBoundingClientRect().height);
+      assert(header <= 844 * 0.34, `Mobil üst çubuk ${Math.round(header)} px`);
+      const fabHidden = await page.evaluate(() => { switchTab('finance'); openPageReport('FINANCE'); return getComputedStyle(document.getElementById('mobileQuickBookingBtn')).display === 'none'; });
+      assert(fabHidden, 'Rapor penceresi açıkken yüzen düğme görünür');
+      await page.evaluate(() => closePageReportModal());
+      assert(await page.evaluate(() => getComputedStyle(document.getElementById('mobileQuickBookingBtn')).display !== 'none'), 'Pencere kapanınca yüzen düğme dönmeli');
+      await assertNoHorizontalOverflow(page, 'owner mobil');
     });
 
     await withPage(browser, baseUrl, 'sales', { width: 390, height: 844 }, async page => {
@@ -76,6 +142,7 @@ async function main() {
     });
     await withPage(browser, baseUrl, 'viewer', { width: 390, height: 844 }, async page => {
       assert(await page.evaluate(() => document.getElementById('mobileQuickBookingBtn').hidden));
+      assert(await page.evaluate(() => { switchTab('properties'); setPropertyProfileTab('PRICES'); return !document.querySelector('.property-ladder-form'); }), 'İzleyici fiyat basamağı formunu görmemeli');
       const tabs = ['executive', 'reservations', 'properties', 'operations', 'leads', 'pricing', 'finance', 'marketing'];
       for (const tab of tabs) {
         await page.evaluate(value => switchTab(value), tab);

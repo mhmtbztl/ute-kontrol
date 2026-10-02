@@ -72,7 +72,7 @@
     'promptEditTaskAmount', 'refreshExecutiveDashboardSnapshot', 'renderExpensesTable', 'renderHousekeepingTab', 'renderManageBookingsTable',
     'renderManageLeadsTable', 'recalculatePricingTarget', 'resetGuestDirectoryDateRange',
     'resetImportPreview', 'resyncTenantData', 'resolveMaintenanceFromOperations', 'runPageAction',
-    'saveBooking', 'saveBookingChannelRow', 'saveBookingPayment', 'saveBusinessSettings', 'saveCleaningTask', 'saveCompetitorResearch', 'saveExpense', 'saveGuestProfile', 'saveQuickBooking',
+    'saveBooking', 'saveBookingChannelRow', 'saveBookingPayment', 'saveBusinessSettings', 'savePropertyPricingLadder', 'saveCleaningTask', 'saveCompetitorResearch', 'saveExpense', 'saveGuestProfile', 'saveQuickBooking',
     'saveLead', 'saveMaint', 'saveMonthlyGoals', 'savePricingRuleSettings', 'saveStaffCleaningProgress', 'signStaffCleaningDone', 'bumpLeadInterestFromQuick',
     'saveProperty', 'saveWaAsBooking', 'saveWaAsLead',
     'sendGuestLoyaltyMessage', 'setBookingChannelActive', 'setLeadFollowUpScope', 'setLeadViewMode',

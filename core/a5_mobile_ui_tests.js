@@ -15,7 +15,7 @@ assert(app.includes('function saveQuickBooking') && app.includes("canWriteSalesR
 assert(css.includes('.mobile-quick-booking') && css.includes('overflow-x: visible'), '390 px mobil eylem ve kart stili eksik');
 assert(css.includes('.side-panel') && css.includes('width: 100vw'), 'SidePanel mobilde tam ekran olmalı');
 assert(html.includes('id="dynamicFavicon"') && html.includes('id="loginBusinessLogo"'), 'Logo favicon ve giriş yüzeyine bağlanmalı');
-assert(html.includes('assets/brand/lexbnb-mark.svg') && html.includes('assets/brand/lexbnb-logo.svg'), 'Onaylanan Lexbnb marka varlıkları site, favicon ve giriş ekranına bağlanmalı');
+assert(html.includes('assets/brand/lexbnb-mark.svg') && html.includes('assets/brand/lexbnb-logo-dark.svg'), 'Onaylanan Lexbnb marka varlıkları site, favicon ve giriş ekranına bağlanmalı');
 assert(fs.existsSync(brandLogoPath) && fs.existsSync(brandMarkPath), 'SVG logo ve marka işareti seti eksik');
 assert(fs.existsSync(favicon32Path) && fs.existsSync(appleTouchPath), 'PNG favicon seti eksik');
 assert(html.includes('assets/brand/favicon-32.png') && html.includes('assets/brand/apple-touch-icon.png'), 'PNG favicon seti belgeye bağlanmalı');
