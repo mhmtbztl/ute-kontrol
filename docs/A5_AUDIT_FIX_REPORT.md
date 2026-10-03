@@ -33,12 +33,12 @@ Dal: `codex/a5`
 - `migration_phase86_expense_template_authz.sql`: phase84 RPC'sinin tenant yetkisini kayıt kilidinden önce doğrulayan güvenlik düzeltmesi.
 - `migration_phase88_ads_update_trigger_cleanup.sql`: phase82'nin UPDATE sırasında aynı gün satırlarını iki kez senkronlayan yinelenen tetikleyicisini kaldırır.
 
-Phase82, phase84, phase86 ve phase88 ayrı Supabase test projesine uygulandı. Hiçbiri üretime uygulanmadı. Üretimde phase82 öncesi `preflight_phase82_ads_overlap.sql` sıfır satır dönmeli; phase84 ve phase86 aynı bakım adımında, ardından phase88 uygulanmalıdır.
+Phase82, phase84, phase86 ve phase88 ayrı Supabase test projesine ve kullanıcı tarafından üretime uygulandı. Üretimde `schema_migrations` defterindeki 82/84/86/88 kayıtları, kanonik şema ve anonim erişim kapıları `production:readiness` ile salt okunur olarak doğrulandı.
 
 ## Doğrulama
 
-- Çevrimdışı: 197/197 süit, 1893/1893 iddia.
+- Claude A5 commit'i `4065899` üstüne rebase sonrası çevrimdışı: 198/198 süit, 1909/1909 iddia.
 - Canlı test projesi: phase88 öncesi tam paket 240/240 süit ve 2726/2726 iddia; phase88 sonrası etkilenen phase82 canlı süiti 7/7 geçti. Son tam tekrar Auth hız sınırına kadar 222 süit yeşildi; ürün iddiasına ulaşmadan girişte sınırlanan beş süit daha sonra tek tek yeniden çalıştırıldı: phase53 47/47, phase55 37/37, phase57 25/25, phase59 43/43 ve yedek/geri yükleme 11/11 geçti. Temizlik ve sızıntı denetimleri de temiz kaldı.
-- Tarayıcı: 8 akış, 4 rol, 390 px ve konsol kapısı geçti.
+- Tarayıcı: 8 akış, 4 rol, 390 px ve konsol kapısı geçti; birleşik kodun test projesine yazan gerçek E2E turu 9/9 geçti.
 - Göç zinciri: `schema.sql` + 74 göç, hash ve bağımlılık sırası geçti.
 - Varlık damgaları güncel.
