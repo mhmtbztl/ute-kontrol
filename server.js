@@ -43,6 +43,7 @@ function isAllowed(rel) {
     return /^[a-z0-9_]+\.js$/.test(name) && !/_tests\.js$/.test(name) && name !== 'test_env.js';
   }
   if (dir === 'sablonlar') return /^[a-z0-9-]+\.(csv|xlsx)$/.test(name);
+  if (dir === 'yasal') return /^[a-z0-9-]+\.html$/.test(name);
   return false;
 }
 

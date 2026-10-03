@@ -2696,6 +2696,27 @@ body {
   margin: 0;
 }
 
+/* Kayit formunda yasal onay (L-82). */
+.auth-legal-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 14px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #CBD5E1;
+  cursor: pointer;
+}
+.auth-legal-consent input {
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  flex: 0 0 auto;
+}
+.auth-legal-consent a {
+  color: #C4B5FD;
+}
+
 .auth-error-msg {
   color: #FCA5A5;
   background: rgba(239, 68, 68, 0.12);

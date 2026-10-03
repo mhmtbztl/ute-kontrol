@@ -59,7 +59,7 @@ async function run() {
     const izinli = ['/', '/index.html', '/app.js', '/style.css', '/xlsx.full.min.js', '/core/captcha_gate.js',
       '/core/marketing_ui.js', '/sablonlar/lexbnb-rezervasyon-sablonu.csv', '/index.html?v=abc',
       '/assets/brand/lexbnb-logo.svg', '/assets/brand/lexbnb-logo-dark.svg', '/assets/brand/lexbnb-mark.svg', '/assets/brand/favicon-32.png',
-      '/assets/brand/apple-touch-icon.png'];
+      '/assets/brand/apple-touch-icon.png', '/yasal/kvkk.html'];
     for (const p of izinli) {
       const r = await get(base, p);
       check(r.status === 200 && r.len > 0, `2. ${p} uygulama icin verilir`, `durum ${r.status}`);
