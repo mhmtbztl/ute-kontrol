@@ -19,6 +19,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Dependency audit (high and critical block the merge)
+        run: npm audit --audit-level=high
       - name: Verify immutable migration chain
         run: npm run verify:migrations
       - name: Verify asset cache-busting stamps

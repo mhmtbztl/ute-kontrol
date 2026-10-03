@@ -36,7 +36,6 @@
   "type": "commonjs",
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",
-    "exceljs": "^4.4.0",
     "pg": "^8.23.0"
   },
   "devDependencies": {
