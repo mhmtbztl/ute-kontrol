@@ -1103,9 +1103,17 @@ Ağı `core/csv_import_tests.js` (52 iddia: motor, `app.js` kaynağı, gerçek
 
 - **Yerel sunucu (`server.js`) yalnızca `127.0.0.1`'e bağlanır ve izin listesindeki
   dosyaları verir** (`index.html`, `app.js`, `style.css`, `core/*.js` — testler ve
-  `test_env.js` hariç —, `sablonlar/`). Eskiden klasörün tamamını ağa açıyordu;
+  `test_env.js` hariç —, `sablonlar/`, `yasal/`). Eskiden klasörün tamamını ağa açıyordu;
   `.env` de dahildi. Tarayıcıya yeni bir dosya eklerseniz izin listesine de
   ekleyin; ağı `core/local_server_tests.js`.
+- **lexbnb.space de yalnız aynı izin listesini yayınlar (L-19, A6).** Pages
+  eskiden deponun kökünü yayınlıyordu: bu dosya, `schema.sql`, göçler ve
+  testler herkese açıktı. Artık `.github/workflows/pages.yml`,
+  `scripts/build_pages.js` ile git'in izlediği dosyalardan `isAllowed` +
+  `CNAME` süzgecini geçenleri yayınlar. İzin listesine eklenmeyen dosya
+  **canlıda 404 verir**; ağı `core/pages_build_tests.js` (index.html'in,
+  `marketing_ui` çalışma anı tablosunun ve `app.js`'in andığı her dosyanın
+  yayında olduğunu ölçer).
 - **`npm audit`: 2 orta (exceljs → uuid 8.3.2, GHSA-w5hq-g745-h8pq) — erişilemez,
   bilerek kabul edildi (24 Eylül 2026).** Açık yalnızca `uuid` v3/v5/v6'ya
   `buf` parametresi verildiğinde tetiklenir; `exceljs` `uuidv4()`'ü parametresiz
