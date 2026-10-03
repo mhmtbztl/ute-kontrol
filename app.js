@@ -83,6 +83,9 @@ function encodeActionArg(deger) {
 // Supabase Auth panelindeki "Minimum password length" ile ayni olmali (uretim: 10).
 // Istemci daha dusuk sorarsa 6-9 karakterlik sifre on kontrolden gecip sunucuda reddedilir.
 const AUTH_MIN_PASSWORD_LENGTH = 10;
+// Kayitta onaylanan yasal metin surumu (L-82). Metinler henuz iskelet;
+// kullanicidan gelen son metin yayimlaninca surum degisir.
+const LEGAL_TEXT_VERSION = 'iskelet-2026-10-03';
 
 // Kullaniciya giden hata metni (L-22, core/user_facing_errors.js).
 function getUserFacingErrors() {
@@ -14566,6 +14569,16 @@ async function handleSaaSRegister(e) {
     return;
   }
 
+  // Yasal onay (L-82): kutu formda `required` ama tarayici dogrulamasi
+  // atlanabilir; hesap onay olmadan acilmaz.
+  if (!document.getElementById('saasRegLegalConsent')?.checked) {
+    if (err) {
+      err.style.display = 'block';
+      err.innerText = '⚠️ Devam etmek için Kullanım Şartları\'nı kabul etmeniz gerekir.';
+    }
+    return;
+  }
+
   if (!supabaseClient) {
     if (err) {
       err.style.display = 'block';
@@ -14586,7 +14599,15 @@ async function handleSaaSRegister(e) {
     const { data: authData, error: authError } = await supabaseClient.auth.signUp({
       email,
       password: pass,
-      options: { data: { full_name: manager, company_name: company }, ...(captchaToken ? { captchaToken } : {}) }
+      options: {
+        data: {
+          full_name: manager,
+          company_name: company,
+          legal_consent_at: new Date().toISOString(),
+          legal_text_version: LEGAL_TEXT_VERSION
+        },
+        ...(captchaToken ? { captchaToken } : {})
+      }
     });
     consumeAuthCaptcha('saasRegisterForm');
 

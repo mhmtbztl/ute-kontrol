@@ -310,7 +310,7 @@ const allTestFiles = [
   'a5_chatgpt_ui_tests.js',
   'a5_mobile_ui_tests.js',
   'a5_browser_gate_tests.js',
-  'a5_audit_fix_tests.js', 'help_guide_tests.js',
+  'a5_audit_fix_tests.js', 'help_guide_tests.js', 'legal_consent_tests.js',
   'phase49_activation_live_tests.js',
   'phase51_lead_revert_live_tests.js',
   'phase53_staff_boundary_live_tests.js',
