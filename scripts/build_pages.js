@@ -27,7 +27,24 @@ function listPublishFiles(files = trackedFiles()) {
   return files.filter(rel => PAGES_ONLY.has(rel) || isAllowed(rel)).sort();
 }
 
+// Cikti klasoru silinip yeniden kurulur; yanlis bir argumanin baska bir
+// klasoru silmemesi icin hedef kilitlidir (Codex H3-01): adi `_site` olmali,
+// depo koku / ev klasoru / disk koku olamaz ve icinde proje dosyasi bulunamaz.
+function assertSafeOutDir(outDir) {
+  const target = path.resolve(outDir);
+  const forbidden = [ROOT, path.parse(target).root, require('os').homedir()].map(p => path.resolve(p).toLowerCase());
+  if (path.basename(target) !== '_site') throw new Error(`Pages cikti klasorunun adi _site olmali: ${target}`);
+  if (forbidden.includes(target.toLowerCase())) throw new Error(`Pages cikti klasoru korunan bir yol: ${target}`);
+  if (fs.existsSync(target)) {
+    if (!fs.statSync(target).isDirectory()) throw new Error(`Pages cikti yolu bir klasor degil: ${target}`);
+    const guard = ['.git', 'package.json', '.env'].find(name => fs.existsSync(path.join(target, name)));
+    if (guard) throw new Error(`Pages cikti klasorunde ${guard} var; silinmedi: ${target}`);
+  }
+  return target;
+}
+
 function buildPages(outDir = path.join(ROOT, '_site')) {
+  outDir = assertSafeOutDir(outDir);
   fs.rmSync(outDir, { recursive: true, force: true });
   const files = listPublishFiles();
   for (const rel of files) {
@@ -44,4 +61,4 @@ if (require.main === module) {
   console.log(`Pages: ${files.length} dosya -> ${path.relative(ROOT, outDir) || outDir}`);
 }
 
-module.exports = { listPublishFiles, buildPages, trackedFiles };
+module.exports = { listPublishFiles, buildPages, trackedFiles, assertSafeOutDir };

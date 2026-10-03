@@ -5,11 +5,12 @@ const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 const SUPABASE = path.join(ROOT, 'supabase');
-const OUT_OF_SCOPE_TABLES = new Set([
-  'pricing_profiles', 'pricing_rules', 'pricing_events', 'pricing_overrides',
-  'daily_rates', 'rate_change_logs', 'booking_quotes'
-]);
-const OUT_OF_SCOPE_RPCS = new Set(['save_manual_pricing_override_atomic', 'accept_booking_quote_atomic']);
+// Phase11/44 fiyat tablolari 30.09'da 'kapsam disi' diye bu sozlesmeden
+// cikarilmisti; ama Bugun ekranindaki bos gece indirimi
+// save_manual_pricing_override_atomic ile yaziyor. Codex H3-03 (03.10):
+// uretimde ve testte bulunan her nesne karsilastirilir, istisna yok.
+const OUT_OF_SCOPE_TABLES = new Set();
+const OUT_OF_SCOPE_RPCS = new Set();
 
 function canonicalFiles() {
   const manifest = fs.readFileSync(path.join(SUPABASE, 'migration_manifest.txt'), 'utf8')
@@ -57,6 +58,11 @@ const CONTRACT = {
     convert_lead_to_booking_atomic: {
       args: ['p_lead_id', 'p_tenant_id', 'p_property_id', 'p_booking_code', 'p_check_in', 'p_check_out', 'p_pax', 'p_gross_amount', 'p_ota_commission', 'p_cleaning_fee', 'p_discount', 'p_notes'],
       requiredArgs: ['p_lead_id', 'p_tenant_id']
+    },
+    // Bugun ekranindaki bos gece indirimi (executeCanonicalAiAction) bunu cagirir.
+    save_manual_pricing_override_atomic: {
+      args: ['p_tenant_id', 'p_property_id', 'p_start_date', 'p_end_date', 'p_rate_override', 'p_reason', 'p_bypass_guardrail', 'p_min_stay_override'],
+      requiredArgs: ['p_tenant_id', 'p_property_id', 'p_start_date', 'p_end_date', 'p_rate_override', 'p_reason']
     }
   },
   allowedRpcs: new Set(discovered.rpcs),

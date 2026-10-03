@@ -365,7 +365,7 @@ const yazmalar = (istemci, tablo) =>
   const REZ_GIRDI = { villa: 'A', guest: 'Ada', checkIn: '2031-02-10', checkOut: '2031-02-12', pax: 2, gross: 10000, status: 'CONFIRMED' };
 
   await test('L-33 Düzenleme net_room_revenue\'yu yükleyiciyle AYNI tanımla yazar (indirim düşülür)', async () => {
-    const y = App.mapBookingToDb({ gross: 40000, otaComm: 6000, cleanFee: 1500, discount: 2000, net: 32500, villa: 'A' }, TENANT);
+    const y = App.mapBookingToDb({ guest: 'Ada', gross: 40000, otaComm: 6000, cleanFee: 1500, discount: 2000, net: 32500, villa: 'A' }, TENANT);
     assert.strictEqual(y.net_room_revenue, 30500);
   });
 

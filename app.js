@@ -1211,11 +1211,15 @@ function mapBookingToDb(booking, tenantId) {
   const checkIn = booking.checkIn || booking.check_in;
   const checkOut = booking.checkOut || booking.check_out;
 
+  // Misafir adi uydurulmaz (Codex H3-05): eskiden bos ad "Misafir" yaziliyordu.
+  const guestName = String(booking.guest || booking.guest_name || '').trim();
+  if (!guestName) throw new Error('Misafir adı zorunludur.');
+
   const payload = {
     tenant_id: activeTId,
     property_id: propId,
     booking_code: (booking.bookingCode || booking.code || generateSafeBookingCode(checkIn)).trim(),
-    guest_name: (booking.guest || booking.guest_name || 'Misafir').trim(),
+    guest_name: guestName,
     guest_phone: booking.phone || booking.guest_phone || '',
     channel: booking.channel || 'Direct',
     check_in: checkIn,
@@ -1505,6 +1509,11 @@ async function updateBooking(bookingId, bookingInput) {
   const propBookingId = existing?.id || (isUUID(bookingId) ? bookingId : null);
   if (!propBookingId && isCloud) {
     throw new Error('Güncellenecek rezervasyonun kimliği bulunamadı.');
+  }
+  // Kayit bellekte yoksa kismi guncelleme eksik alanlari varsayilanla (0 TL,
+  // bos ad) ezerdi (Codex H3-05). Once guncel kayit yuklenmeli.
+  if (!existing && isCloud) {
+    throw new Error('Rezervasyon bu ekranda yüklü değil; verileri eşitleyip tekrar deneyin.');
   }
 
   // Validation
@@ -14546,8 +14555,10 @@ async function handleSaaSLogin(e) {
 // =============================================================================
 async function handleSaaSRegister(e) {
   e.preventDefault();
-  const company = document.getElementById('saasRegCompany')?.value.trim() || 'Özel Tatil Evleri';
-  const manager = document.getElementById('saasRegManager')?.value.trim() || 'İşletme Yöneticisi';
+  // Ad uydurulmaz (CLAUDE.md §3.6; Codex H3-04). Sunucuda phase89 ayni kurali
+  // tablo kisitiyla tutar.
+  const company = document.getElementById('saasRegCompany')?.value.trim() || '';
+  const manager = document.getElementById('saasRegManager')?.value.trim() || '';
   const email = document.getElementById('saasRegEmail')?.value.trim().toLowerCase() || '';
   const pass = document.getElementById('saasRegPass')?.value.trim() || '';
   const err = document.getElementById('authErrorMessage');
@@ -14560,7 +14571,7 @@ async function handleSaaSRegister(e) {
     err.style.color = '';
   }
 
-  if (!email || !pass) {
+  if (!company || !manager || !email || !pass) {
     if (err) {
       err.style.display = 'block';
       err.innerText = '⚠️ Lütfen tüm alanları doldurun.';
@@ -16143,183 +16154,6 @@ async function cancelScheduledMessage(messageId) {
   return data;
 }
 
-async function loadPricingProfiles(targetTenantId) {
-  const tenantId = targetTenantId || getActiveTenantId();
-  if (!tenantId || !supabaseClient) return [];
-  const { data, error } = await supabaseClient
-    .from('pricing_profiles')
-    .select('*')
-    .eq('tenant_id', tenantId);
-  if (error) {
-    console.error('Error loading pricing profiles:', error);
-    return [];
-  }
-  return data || [];
-}
-
-async function savePricingProfile(profileData) {
-  const tenantId = getActiveTenantId();
-  if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
-  const payload = { ...profileData, tenant_id: tenantId, updated_at: new Date().toISOString() };
-  let res;
-  if (payload.id) {
-    res = await supabaseClient
-      .from('pricing_profiles')
-      .update(payload)
-      .eq('id', payload.id)
-      .eq('tenant_id', tenantId)
-      .select()
-      .single();
-  } else {
-    res = await supabaseClient
-      .from('pricing_profiles')
-      .insert(payload)
-      .select()
-      .single();
-  }
-  if (res.error) throw res.error;
-  return res.data;
-}
-
-async function loadPricingRules(targetTenantId, options = {}) {
-  const tenantId = targetTenantId || getActiveTenantId();
-  if (!tenantId || !supabaseClient) return [];
-  let query = supabaseClient
-    .from('pricing_rules')
-    .select('*')
-    .eq('tenant_id', tenantId);
-  if (options.propertyId) {
-    query = query.or(`property_id.eq.${options.propertyId},property_id.is.null`);
-  }
-  if (options.isActive !== undefined) {
-    query = query.eq('is_active', options.isActive);
-  }
-  const { data, error } = await query.order('priority', { ascending: false });
-  if (error) {
-    console.error('Error loading pricing rules:', error);
-    return [];
-  }
-  return data || [];
-}
-
-async function createPricingRule(ruleData) {
-  const tenantId = getActiveTenantId();
-  if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
-  const payload = { ...ruleData, tenant_id: tenantId };
-  const { data, error } = await supabaseClient
-    .from('pricing_rules')
-    .insert(payload)
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
-}
-
-async function updatePricingRule(ruleId, patch) {
-  const tenantId = getActiveTenantId();
-  if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
-  const { data, error } = await supabaseClient
-    .from('pricing_rules')
-    .update({ ...patch, updated_at: new Date().toISOString() })
-    .eq('id', ruleId)
-    .eq('tenant_id', tenantId)
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
-}
-
-async function deletePricingRule(ruleId) {
-  const tenantId = getActiveTenantId();
-  if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
-  const { data, error } = await supabaseClient
-    .from('pricing_rules')
-    .delete()
-    .eq('id', ruleId)
-    .eq('tenant_id', tenantId)
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
-}
-
-async function loadPricingEvents(targetTenantId, options = {}) {
-  const tenantId = targetTenantId || getActiveTenantId();
-  if (!tenantId || !supabaseClient) return [];
-  let query = supabaseClient
-    .from('pricing_events')
-    .select('*')
-    .eq('tenant_id', tenantId);
-  if (options.propertyId) {
-    query = query.or(`property_id.eq.${options.propertyId},property_id.is.null`);
-  }
-  const { data, error } = await query.order('start_date', { ascending: true });
-  if (error) {
-    console.error('Error loading pricing events:', error);
-    return [];
-  }
-  return data || [];
-}
-
-async function createPricingEvent(eventData) {
-  const tenantId = getActiveTenantId();
-  if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
-  const payload = { ...eventData, tenant_id: tenantId };
-  const { data, error } = await supabaseClient
-    .from('pricing_events')
-    .insert(payload)
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
-}
-
-async function updatePricingEvent(eventId, patch) {
-  const tenantId = getActiveTenantId();
-  if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
-  const { data, error } = await supabaseClient
-    .from('pricing_events')
-    .update({ ...patch, updated_at: new Date().toISOString() })
-    .eq('id', eventId)
-    .eq('tenant_id', tenantId)
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
-}
-
-async function deletePricingEvent(eventId) {
-  const tenantId = getActiveTenantId();
-  if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
-  const { data, error } = await supabaseClient
-    .from('pricing_events')
-    .delete()
-    .eq('id', eventId)
-    .eq('tenant_id', tenantId)
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
-}
-
-async function loadDailyRates(propertyId, startDate, endDate) {
-  const tenantId = getActiveTenantId();
-  if (!tenantId || !supabaseClient) return [];
-  let query = supabaseClient
-    .from('daily_rates')
-    .select('*')
-    .eq('property_id', propertyId)
-    .eq('tenant_id', tenantId);
-  if (startDate) query = query.gte('date', startDate);
-  if (endDate) query = query.lte('date', endDate);
-  const { data, error } = await query.order('date', { ascending: true });
-  if (error) {
-    console.error('Error loading daily rates:', error);
-    return [];
-  }
-  return data || [];
-}
-
 async function saveManualPricingOverride(params) {
   const tenantId = getActiveTenantId();
   if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
@@ -16332,48 +16166,6 @@ async function saveManualPricingOverride(params) {
     p_reason: params.reason || 'Manual override',
     p_min_stay_override: params.minStay || null,
     p_bypass_guardrail: params.bypassGuardrail || false
-  });
-  if (error) throw error;
-  return data;
-}
-
-async function loadBookingQuotes(targetTenantId, options = {}) {
-  const tenantId = targetTenantId || getActiveTenantId();
-  if (!tenantId || !supabaseClient) return [];
-  let query = supabaseClient
-    .from('booking_quotes')
-    .select('*')
-    .eq('tenant_id', tenantId);
-  if (options.propertyId) query = query.eq('property_id', options.propertyId);
-  if (options.leadId) query = query.eq('lead_id', options.leadId);
-  if (options.status) query = query.eq('status', options.status);
-  const { data, error } = await query.order('created_at', { ascending: false });
-  if (error) {
-    console.error('Error loading booking quotes:', error);
-    return [];
-  }
-  return data || [];
-}
-
-async function createBookingQuote(quoteData) {
-  const tenantId = getActiveTenantId();
-  if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
-  const payload = { ...quoteData, tenant_id: tenantId };
-  const { data, error } = await supabaseClient
-    .from('booking_quotes')
-    .insert(payload)
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
-}
-
-async function acceptBookingQuote(quoteId, bookingId) {
-  const tenantId = getActiveTenantId();
-  if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
-  const { data, error } = await supabaseClient.rpc('accept_booking_quote_atomic', {
-    p_quote_id: quoteId,
-    p_booking_id: bookingId || null
   });
   if (error) throw error;
   return data;
@@ -19151,21 +18943,7 @@ if (typeof module !== 'undefined' && module.exports) {
     updateMessageTemplate,
     loadScheduledMessages,
     cancelScheduledMessage,
-    loadPricingProfiles,
-    savePricingProfile,
-    loadPricingRules,
-    createPricingRule,
-    updatePricingRule,
-    deletePricingRule,
-    loadPricingEvents,
-    createPricingEvent,
-    updatePricingEvent,
-    deletePricingEvent,
-    loadDailyRates,
     saveManualPricingOverride,
-    loadBookingQuotes,
-    createBookingQuote,
-    acceptBookingQuote,
     mapFriendlyErrorMessage,
     loadExecutiveAlerts,
     createExecutiveAlert,
