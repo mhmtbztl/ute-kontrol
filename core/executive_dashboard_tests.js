@@ -177,32 +177,28 @@ function runExecutiveDashboardTests() {
   const partialOnboarding = ExecutiveDashboardService.computeTenantOnboardingProgress({
     tenantId: 't1',
     propertiesCount: 1,
-    hasPricingProfile: true,
-    hasGuestSettings: true,
-    hasCleaningChecklist: true
-    // 5 out of 10 steps completed = 50%
+    teamMemberCount: 1, // yalniz sahibin kendisi: ekip adimi tamamlanmaz
+    checklistTemplateCount: 2
+    // 3 / 7 adim = %43
   });
-  assert.strictEqual(partialOnboarding.totalSteps, 10);
-  assert.strictEqual(partialOnboarding.completedCount, 5);
-  assert.strictEqual(partialOnboarding.progressPercent, 50);
+  assert.strictEqual(partialOnboarding.totalSteps, 7);
+  assert.strictEqual(partialOnboarding.completedCount, 3);
+  assert.strictEqual(partialOnboarding.progressPercent, 43);
   assert.strictEqual(partialOnboarding.isFullyOnboarded, false);
 
   const fullOnboarding = ExecutiveDashboardService.computeTenantOnboardingProgress({
     tenantId: 't1',
     propertiesCount: 2,
-    hasPricingProfile: true,
-    hasGuestSettings: true,
-    hasCleaningChecklist: true,
-    hasTeamMembers: true,
-    hasMessageTemplates: true,
+    teamMemberCount: 2,
+    checklistTemplateCount: 1,
     hasMonthlyTargets: true,
     bookingsCount: 3,
-    hasFinanceTransactions: true
+    expensesCount: 1
   });
-  assert.strictEqual(fullOnboarding.completedCount, 10);
+  assert.strictEqual(fullOnboarding.completedCount, 7);
   assert.strictEqual(fullOnboarding.progressPercent, 100);
   assert.strictEqual(fullOnboarding.isFullyOnboarded, true);
-  recordPass('7. Tenant onboarding progress accurately tracks 10 canonical setup milestones');
+  recordPass('7. Tenant onboarding progress tracks 7 measurable setup milestones');
 
   console.log(`\n=============================================================================`);
   console.log(`TEST SUMMARY: ${passedTests} / ${totalTests} TESTS PASSED (0 FAILED)`);

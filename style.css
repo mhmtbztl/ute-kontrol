@@ -5283,5 +5283,10 @@ body.side-panel-open { overflow: hidden; }
   .header-actions > .header-dropdown-wrap:has(#toolsBtn) { flex: 1 1 calc(33% - 6px) !important; }
   .header-actions .btn { padding: 8px 6px !important; }
   body:has(.modal-backdrop[style*="flex"]) .mobile-quick-booking,
+  body:has(.modal-backdrop.active) .mobile-quick-booking,
   body.side-panel-open .mobile-quick-booking { display: none !important; }
 }
+
+/* Ana sayfa kurulum seridi: eksik adim ilgili ekrani acar (A6). */
+.onboard-step-btn { background: none; border: 0; padding: 0; color: #CBD5E1; opacity: 0.75; font: inherit; font-size: 11px; cursor: pointer; text-align: left; }
+.onboard-step-btn:hover, .onboard-step-btn:focus-visible { opacity: 1; color: #DDD6FE; text-decoration: underline; }

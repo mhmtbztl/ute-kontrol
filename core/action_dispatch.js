@@ -64,7 +64,7 @@
     'openBookingDetailsPanel', 'openBookingForDate', 'openBookingFromGuestProfile',
     'openBookingModal', 'openCommandPalette', 'openDeleteAccountModal',
     'openEditCleaningTaskModal', 'openExcelFilePicker', 'openExpenseModal', 'openGoalsModal',
-    'openGuestProfileModal', 'openGuestRebookingWhatsApp', 'openHelpModal', 'openImportModal',
+    'openGuestProfileModal', 'openGuestRebookingWhatsApp', 'openHelpModal', 'openImportModal', 'openOnboardingStep',
     'openInviteMemberModal', 'openLeadModal', 'openMaintModal', 'openChatGptQuestionModal', 'openQuickBookingModal',
     'openMonthCloseModal', 'openMonthReopenModal', 'openLeadWhatsApp', 'inspectCleaningExecution',
     'openNewCleaningTaskModal', 'openCopyPreviousExpensesPanel', 'openPropertyModal', 'openPropertyOtaManager', 'openResetModal',

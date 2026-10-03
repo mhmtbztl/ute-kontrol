@@ -472,20 +472,20 @@
   }
 
   /**
-   * Calculates 10-step onboarding progress for new tenants.
+   * Yeni isletmenin kurulum adimlari. Her adim olculebilir bir kayda baglidir
+   * ve `action` ile kullaniciyi o kaydin girildigi ekrana goturur. Eskiden
+   * "Fiyatlandirma Profili" hic doldurulmayan bir alana bakiyordu ve serit
+   * %100'e ulasamiyordu (A6, 03.10.2026).
    */
   function computeTenantOnboardingProgress(tenantData = {}) {
     const steps = [
-      { id: 'create_tenant', title: 'İşletme Hesabı Oluşturuldu', completed: Boolean(tenantData.tenantId) },
-      { id: 'add_property', title: 'İlk Mülk Eklendi', completed: (tenantData.propertiesCount || 0) > 0 },
-      { id: 'pricing_profile', title: 'Fiyatlandırma Profili Tanımlandı', completed: Boolean(tenantData.hasPricingProfile) },
-      { id: 'guest_settings', title: 'Misafir İletişim Ayarları Yapıldı', completed: Boolean(tenantData.hasGuestSettings) },
-      { id: 'cleaning_checklist', title: 'Temizlik Kontrol Listesi Hazırlandı', completed: Boolean(tenantData.hasCleaningChecklist) },
-      { id: 'team_member', title: 'Ekip Üyesi Davet Edildi', completed: Boolean(tenantData.hasTeamMembers) },
-      { id: 'message_templates', title: 'Mesaj Şablonları Aktifleştirildi', completed: Boolean(tenantData.hasMessageTemplates) },
-      { id: 'monthly_targets', title: 'Aylık Ciro Hedefi Belirlendi', completed: Boolean(tenantData.hasMonthlyTargets) },
-      { id: 'first_booking', title: 'İlk Rezervasyon Kaydedildi', completed: (tenantData.bookingsCount || 0) > 0 },
-      { id: 'finance_setup', title: 'Finansal Başlangıç Yapıldı', completed: Boolean(tenantData.hasFinanceTransactions) }
+      { id: 'create_tenant', title: 'İşletme hesabı', action: 'settings', completed: Boolean(tenantData.tenantId) },
+      { id: 'add_property', title: 'İlk mülk', action: 'properties', completed: (tenantData.propertiesCount || 0) > 0 },
+      { id: 'team_member', title: 'Ekip üyesi', action: 'team', completed: (tenantData.teamMemberCount || 0) > 1 },
+      { id: 'cleaning_checklist', title: 'Temizlik kontrol listesi', action: 'templates', completed: (tenantData.checklistTemplateCount || 0) > 0 },
+      { id: 'monthly_targets', title: 'Aylık ciro hedefi', action: 'goals', completed: Boolean(tenantData.hasMonthlyTargets) },
+      { id: 'first_booking', title: 'İlk rezervasyon', action: 'booking', completed: (tenantData.bookingsCount || 0) > 0 },
+      { id: 'finance_setup', title: 'İlk gider', action: 'finance', completed: (tenantData.expensesCount || 0) > 0 }
     ];
 
     const completedCount = steps.filter(s => s.completed).length;

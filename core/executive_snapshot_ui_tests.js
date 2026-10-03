@@ -96,7 +96,7 @@ test('Eksik snapshot acik hata verir', () => {
 test('Arayuz mevcut ve onceki ayi RPC uzerinden yukler', () => {
   assert.match(app, /Promise\.all\([\s\S]*getExecutiveDashboardSnapshot\(context\.period, context\.propertyId\)[\s\S]*getExecutiveDashboardSnapshot\(context\.priorPeriod, context\.propertyId\)/);
   assert.match(app, /snapshotOwnsTopKpis[\s\S]*!snapshotOwnsTopKpis[\s\S]*computeExecutiveTopKpis/);
-  assert.match(app, /finansal KPI gösterilmiyor/);
+  assert.match(app, /finansal göstergeler gösterilmiyor/);
 });
 
 test('Yenile dugmesi gercek snapshot yenilemesini zorlar', () => {
@@ -178,7 +178,7 @@ async function runAsyncTests() {
   assert.strictEqual(elements.execSoldNightsLabel.innerText, '10 / 40 Gece');
   assert.strictEqual(elements.execKpiAdr.innerText, '₺4.200');
   assert.strictEqual(elements.execKpiRevpar.innerText, '₺1.050');
-  assert.match(elements.execSnapshotStatus.innerText, /finansal tek kaynak/);
+  assert.match(elements.execSnapshotStatus.innerText, /sunucudaki kayıtlarınızdan hesaplandı$/);
   passed++;
   console.log('[PASS] Gercek istemci akisi mevcut ve onceki snapshot ile DOM KPI degerlerini gunceller');
 

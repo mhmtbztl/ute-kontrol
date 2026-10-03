@@ -128,6 +128,22 @@ async function main() {
       await page.evaluate(() => closePageReportModal());
       assert(await page.evaluate(() => getComputedStyle(document.getElementById('mobileQuickBookingBtn')).display !== 'none'), 'Pencere kapanınca yüzen düğme dönmeli');
       await assertNoHorizontalOverflow(page, 'owner mobil');
+      // A6: Baslangic Rehberi ust menuden acilir, her sekmesi kendi bolmesini
+      // gosterir ve telefonda pencere ekrandan tasmaz.
+      await page.evaluate(() => document.querySelector('.header-guide-btn').click());
+      await page.waitForSelector('#helpModal.active', { state: 'visible' });
+      assert(await page.evaluate(() => getComputedStyle(document.getElementById('mobileQuickBookingBtn')).display === 'none'), 'Rehber açıkken yüzen düğme görünür');
+      const guide = await page.evaluate(() => [...document.querySelectorAll('#helpModal .help-tab-btn')].map(btn => {
+        btn.click();
+        const key = btn.id.replace('helpTabBtn-', '');
+        const pane = document.getElementById('helpTab-' + key);
+        const card = document.querySelector('#helpModal .modal-card').getBoundingClientRect();
+        return { key, shown: !!pane && pane.style.display !== 'none' && pane.textContent.trim().length > 40, fits: card.right <= window.innerWidth + 1 };
+      }));
+      assert(guide.length >= 5 && guide.every(tab => tab.shown && tab.fits), `Rehber sekmeleri: ${JSON.stringify(guide)}`);
+      await page.evaluate(() => closeHelpModal());
+      await assertNoHorizontalOverflow(page, 'owner rehber');
+      passed.push('11. Başlangıç Rehberi telefonda açılır, her sekme dolu');
     });
 
     await withPage(browser, baseUrl, 'sales', { width: 390, height: 844 }, async page => {
