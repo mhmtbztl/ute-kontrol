@@ -6,3 +6,6 @@ npm-debug.log
 
 
 supabase/.temp/
+
+# Pages yayin klasoru (scripts/build_pages.js uretir)
+_site/
