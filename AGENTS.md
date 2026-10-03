@@ -337,6 +337,8 @@ dalında kalır ve **haber vermeden `master`'a dokunmaz.**
   almaz.
 - Push etmeden önce `git fetch origin` + `git log --oneline origin/master..HEAD`
   ile yalnızca kendi commit'lerinizin gideceğini doğrulayın.
+- `master` korumalıdır: değişiklik yalnız PR ile ve CI yeşilken girer
+  (ayrıntı: Komut sözlüğü → `PUSH`).
 - `master` sizin dalınızın atası değilse **force push yapmayın**; rebase edin,
   çakışmayı görerek çözün, testleri yeniden koşun.
 
@@ -435,14 +437,25 @@ Kullanıcı bu kelimeleri tek başına yazabilir; **her araç aynı şeyi anlar.
 Push izni ayrıca istenir. Kendiliğinden `master`'a dokunma.
 
 ### `PUSH`
-Şimdi `master`'a gönder. Önce:
+Şimdi `master`'a gönder. **`master` korumalıdır (L-149, 03.10.2026):
+doğrudan push reddedilir; değişiklik PR ile girer ve `safe-regression`
+CI işi (npm test + tarayıcı kapısı) yeşil olmadan birleşmez.** Kural
+yöneticiye de uygulanır — araçların hepsi kullanıcının hesabıyla push eder.
+Önce:
 ```bash
 git fetch origin
 git log --oneline origin/master..HEAD    # yalnızca senin commit'lerin olmalı
 ```
 Yabancı commit görüyorsan **dur ve sor.** `master` dalının atası değilse
-rebase et, çakışmayı görerek çöz, testleri yeniden koş, sonra push et.
-**Force push yok.**
+rebase et, çakışmayı görerek çöz, testleri yeniden koş. Sonra:
+```bash
+git push -u origin <kendi-dalın>
+gh pr create --base master --fill
+gh pr merge --merge --auto      # CI yeşil olunca kendiliğinden birleşir
+```
+Dal `master`'ın gerisindeyse ("güncel olmalı" kuralı) önce rebase edip
+dalı yeniden gönder. Onaylayan inceleme gerekmez. **Force push yok;
+korumayı devre dışı bırakmak yok.** GitHub Pages birleşmeyle yayınlar.
 
 ### `REBASE`
 Diğer araç `master`'a push etti. `git fetch origin` + `git rebase origin/master`,

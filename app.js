@@ -12862,10 +12862,24 @@ function closeKpiExplanationModal() {
   if (modal) modal.classList.remove('active');
 }
 
-function openHelpModal(targetTab = 'terms') {
+function openHelpModal(targetTab = 'setup') {
   const modal = document.getElementById('helpModal');
   if (modal) modal.classList.add('active');
   if (targetTab) switchHelpTab(targetTab);
+}
+
+// Ana sayfa kurulum seridindeki eksik adim, kaydin girildigi ekrani acar.
+function openOnboardingStep(action) {
+  const settingsSection = { settings: 'business', team: 'team', templates: 'templates' }[action];
+  if (settingsSection) {
+    switchTab('settings');
+    document.querySelector(`[data-settings-section="${settingsSection}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+  if (action === 'properties') return switchTab('properties');
+  if (action === 'goals') return openGoalsModal();
+  if (action === 'booking') return openBookingModal();
+  if (action === 'finance') return openExpenseModal();
 }
 
 function closeHelpModal() {
@@ -16577,7 +16591,7 @@ function getExecutiveSnapshotContext() {
   }
   if (!isCloudTenant(tenantId) || !supabaseClient) return { supported: false, reason: 'Bulut oturumu gerekli.' };
   if (!/^\d{4}-\d{2}$/.test(period || '')) {
-    return { supported: false, reason: 'Sunucu anlık görüntüsü aylık dönemlerde kullanılabilir.' };
+    return { supported: false, reason: 'Güncel rakamlar yalnız aylık dönemde gösterilebilir.' };
   }
 
   let propertyId = null;
@@ -16689,24 +16703,24 @@ function renderExecutiveSnapshotKpis() {
   }
 
   if (shouldRefreshExecutiveSnapshot(executiveSnapshotState, context.key)) {
-    setExecutiveSnapshotPlaceholder('Sunucu anlık görüntüsü yükleniyor…');
+    setExecutiveSnapshotPlaceholder('Güncel rakamlar yükleniyor…');
     void refreshExecutiveDashboardSnapshot(false);
     return true;
   }
   if (executiveSnapshotState.status === 'loading') {
-    setExecutiveSnapshotPlaceholder('Sunucu anlık görüntüsü yükleniyor…');
+    setExecutiveSnapshotPlaceholder('Güncel rakamlar yükleniyor…');
     return true;
   }
   if (executiveSnapshotState.status === 'error') {
-    setExecutiveSnapshotPlaceholder('Sunucu anlık görüntüsü alınamadı; finansal KPI gösterilmiyor.');
+    setExecutiveSnapshotPlaceholder('Güncel rakamlar alınamadı; finansal göstergeler gösterilmiyor.');
     return true;
   }
   if (executiveSnapshotState.status !== 'ready' || !executiveSnapshotState.current) {
-    setExecutiveSnapshotPlaceholder('Sunucu anlık görüntüsü hazır değil.');
+    setExecutiveSnapshotPlaceholder('Güncel rakamlar hazır değil.');
     return true;
   }
   if (typeof ExecutiveDashboardService === 'undefined' || !ExecutiveDashboardService.computeExecutiveTopKpisFromSnapshot) {
-    setExecutiveSnapshotPlaceholder('Sunucu anlık görüntüsü işlenemedi.');
+    setExecutiveSnapshotPlaceholder('Güncel rakamlar işlenemedi.');
     return true;
   }
 
@@ -16719,10 +16733,10 @@ function renderExecutiveSnapshotKpis() {
 
   const phase32Ready = executiveSnapshotState.current.room_revenue !== undefined;
   setEl('execSnapshotStatus', !phase32Ready
-    ? 'Sunucu anlık görüntüsü • Phase 32 uygulanana kadar ADR/RevPAR gösterilmez'
+    ? 'Rakamlar sunucudaki kayıtlarınızdan hesaplandı • ADR ve RevPAR şu an hesaplanamıyor'
     : kpis.hasExpenseBreakdown
-      ? 'Sunucu anlık görüntüsü • finansal tek kaynak'
-      : 'Sunucu anlık görüntüsü • Phase 38 uygulanana kadar OPEX/CAPEX ayrımı gösterilmez');
+      ? 'Rakamlar sunucudaki kayıtlarınızdan hesaplandı'
+      : 'Rakamlar sunucudaki kayıtlarınızdan hesaplandı • OPEX/CAPEX ayrımı şu an gösterilemiyor');
   return true;
 }
 
@@ -16743,7 +16757,7 @@ async function refreshExecutiveDashboardSnapshot(force = false) {
 
   const requestId = executiveSnapshotState.requestId + 1;
   executiveSnapshotState = { key: context.key, status: 'loading', current: null, prior: null, error: null, retryAt: 0, requestId };
-  if (typeof document !== 'undefined') setExecutiveSnapshotPlaceholder('Sunucu anlık görüntüsü yükleniyor…');
+  if (typeof document !== 'undefined') setExecutiveSnapshotPlaceholder('Güncel rakamlar yükleniyor…');
   try {
     const [current, prior] = await Promise.all([
       getExecutiveDashboardSnapshot(context.period, context.propertyId),
@@ -16934,7 +16948,7 @@ function renderExecutiveControlCenter() {
       })()
     });
     renderExecutiveKpiValues(kpis);
-    setEl('execSnapshotStatus', 'Yerel veri görünümü • OPEX/CAPEX ayrımı etkin');
+    setEl('execSnapshotStatus', 'Rakamlar bu cihazdaki son yüklemeden hesaplandı');
   }
 
   // 2. Onboarding Progress
@@ -16943,29 +16957,32 @@ function renderExecutiveControlCenter() {
     // properties/monthly_targets/... gonderiyordu, yani hicbir adim
     // okunamiyordu ve donen alan `percentage` diye okunuyordu - oysa servis
     // `progressPercent` donduruyor. Sonuc: yeni musteri "%undefined" goruyordu.
+    // Ekip adimi isletmenin uye sayisina bakar (get_tenant_members). Eskiden
+    // kullanicinin KAC ISLETMEYE uye oldugunu sayiyordu.
     const onboarding = ExecutiveDashboardService.computeTenantOnboardingProgress({
       tenantId: getActiveTenantId(),
       propertiesCount: propertiesList.length,
-      bookingsCount: bookings.length,
+      teamMemberCount: Array.isArray(appData?.salesMembers) ? appData.salesMembers.length : 0,
+      checklistTemplateCount: Array.isArray(appData?.checklistTemplates) ? appData.checklistTemplates.length : 0,
       hasMonthlyTargets: Object.keys(targets || {}).length > 0,
-      hasFinanceTransactions: expenses.length > 0,
-      hasCleaningChecklist: tasks.length > 0,
-      hasPricingProfile: !!(appData && appData.pricingProfiles && appData.pricingProfiles.length),
-      hasGuestSettings: !!(appData && appData.guests && appData.guests.length),
-      hasMessageTemplates: !!(appData && appData.messageTemplates && appData.messageTemplates.length),
-      hasTeamMembers: (typeof userMemberships !== 'undefined' && userMemberships.length > 1)
-        || !!(appData && appData.teamMemberCount > 1)
+      bookingsCount: bookings.length,
+      expensesCount: expenses.length
     });
     const pctEl = document.getElementById('onboardProgressPct');
     if (pctEl) pctEl.innerText = `%${onboarding.progressPercent}`;
 
+    // Serit yalniz kurulumu yapabilecek role ve kurulum bitene kadar gorunur.
+    const bannerEl = document.getElementById('execOnboardingBanner');
+    if (bannerEl) bannerEl.hidden = onboarding.isFullyOnboarded || !canManageTenantRole(activeTenant?.role);
+
     // Adim listesi statik HTML'di ve BES MADDESI DE ✅ isaretliydi; sifir
     // mulklu bir hesapta bile "her sey tamam" diyordu. Artik gercek durumu
-    // yansitir.
+    // yansitir; eksik adim kullaniciyi kaydin girildigi ekrana goturur.
     const stepsEl = document.getElementById('onboardStepsList');
     if (stepsEl && Array.isArray(onboarding.steps)) {
-      stepsEl.innerHTML = onboarding.steps.map(s =>
-        `<span style="opacity:${s.completed ? 1 : 0.5};">${s.completed ? '✅' : '⬜'} ${escapeHtml(s.title)}</span>`
+      stepsEl.innerHTML = onboarding.steps.map(s => s.completed
+        ? `<span>✅ ${escapeHtml(s.title)}</span>`
+        : `<button type="button" class="onboard-step-btn" data-onclick="openOnboardingStep(decodeURIComponent('${encodeActionArg(s.action)}'))">⬜ ${escapeHtml(s.title)} →</button>`
       ).join('');
     }
 
@@ -17175,9 +17192,9 @@ function renderTodayCommandCenter(actionsResult) {
     }).join('');
   }
 
-  renderActionCards(critList, critBadge, actionsResult.critical || [], 'critical', 'Kayıtlı açık kritik uyarı yok; dış sistem durumu doğrulanmadı.');
+  renderActionCards(critList, critBadge, actionsResult.critical || [], 'critical', 'Açık kritik uyarı yok.');
   renderActionCards(opsList, opsBadge, actionsResult.operations || [], 'operations', 'Kayıtlı bekleyen turnover veya arıza görevi yok.');
-  renderActionCards(revList, revBadge, actionsResult.revenueOpportunities || [], 'revenue', 'Hesaplanmış gelir fırsatı yok; fiyatlandırmanın optimize olduğu sonucuna varılamaz.');
+  renderActionCards(revList, revBadge, actionsResult.revenueOpportunities || [], 'revenue', 'Kayıtlarınızda şu an önerilecek bir gelir fırsatı yok.');
 }
 
 function renderPortfolioHealth(healthCards) {
