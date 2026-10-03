@@ -1216,6 +1216,26 @@
     <!-- TAB: GİDER DEFTERİ (FULL CRUD) -->
     <!-- ========================================== -->
     <div id="tab-expenses" class="tab-content">
+      <section class="card" id="expenseTemplatesCard">
+        <div class="section-title-bar">
+          <div><h2>🔁 GİDER ŞABLONLARI</h2><p class="sub-text">Sabit gideri bir kez tanımlayın; seçili aya tek kayıt olarak işleyin.</p></div>
+        </div>
+        <form id="expenseTemplateForm" data-management-only data-onsubmit="saveExpenseTemplate(event)" class="form-grid" style="margin-bottom:16px;">
+          <div class="form-group"><label>Şablon adı</label><input id="expenseTemplateName" maxlength="150" required placeholder="Aylık internet"></div>
+          <div class="form-group"><label>Kategori</label><select id="expenseTemplateCategory" required>
+            <option value="Maaş">Maaş</option><option value="Temizlik">Temizlik</option><option value="Bakım">Bakım</option>
+            <option value="Akaryakıt">Akaryakıt</option><option value="Fatura" selected>Fatura</option><option value="Muhasebe">Muhasebe</option>
+            <option value="Kredi Kartı / Komisyon">Kredi Kartı / Komisyon</option><option value="Danışmanlık">Danışmanlık</option><option value="Diğer">Diğer</option>
+          </select></div>
+          <div class="form-group"><label>Tür</label><select id="expenseTemplateType"><option value="OPEX">Opex</option><option value="CAPEX">Capex</option></select></div>
+          <div class="form-group"><label>Mülk / kapsam</label><select id="expenseTemplateProperty"><option value="ALL">Tüm Portföy</option></select></div>
+          <div class="form-group"><label>Tutar (TL)</label><input id="expenseTemplateAmount" type="number" min="0.01" step="0.01" required></div>
+          <div class="form-group"><label>Açıklama</label><input id="expenseTemplateDescription" maxlength="2000"></div>
+          <div class="form-group" style="justify-content:flex-end;"><button class="btn btn-primary" type="submit">Şablon oluştur</button></div>
+        </form>
+        <div id="expenseTemplatesStatus" class="sub-text" hidden></div>
+        <div class="table-responsive"><table class="data-table"><thead><tr><th>ŞABLON</th><th>KATEGORİ</th><th>KAPSAM</th><th>TUTAR</th><th>DURUM / İŞLEM</th></tr></thead><tbody id="expenseTemplatesTableBody"></tbody></table></div>
+      </section>
       <section class="card">
         <div class="section-title-bar">
           <div><h2>💸 GİDER VE YATIRIM DEFTERİ</h2><p class="sub-text">Tüm operasyonel (Opex) ve yatırım (Capex) harcamaları.</p></div>
@@ -1350,11 +1370,11 @@
           <div class="form-group">
             <label for="leadQuickChannel">İletişim kanalı *</label>
             <select id="leadQuickChannel" required>
-              <option value="Telefon">Telefon</option>
+              <option value="Phone">Telefon</option>
               <option value="WhatsApp">WhatsApp</option>
               <option value="Instagram">Instagram</option>
-              <option value="E-posta">E-posta</option>
-              <option value="Diğer">Diğer</option>
+              <option value="Email">E-posta</option>
+              <option value="Other">Diğer</option>
             </select>
           </div>
           <div class="form-group">
@@ -2751,6 +2771,8 @@
               <option value="Phone">Telefon</option>
               <option value="Airbnb">Airbnb</option>
               <option value="Booking">Booking.com</option>
+              <option value="Email">E-posta</option>
+              <option value="Other">Diğer</option>
             </select>
           </div>
           <div class="form-group">
@@ -3246,6 +3268,10 @@
                 <label style="font-size: 11px; color: var(--text-muted);">Notlar</label>
                 <input type="text" id="waParsedNotes" placeholder="Örn: WhatsApp teklifi" style="width: 100%; padding: 8px 10px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px;">
               </div>
+              <div class="form-group">
+                <label for="waParsedSource" style="font-size: 11px; color: var(--text-muted);">Nereden geldi? *</label>
+                <select id="waParsedSource" required style="width: 100%; padding: 8px 10px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px;"><option value="">Kaynak seçin…</option></select>
+              </div>
             </div>
           </div>
         </div>
@@ -3615,18 +3641,18 @@
   <script src="core/pricing_booking_service.js?v=0eb93c05"></script>
   <script src="core/executive_priority_service.js?v=d113e0e8"></script>
   <script src="core/executive_dashboard_service.js?v=8405671c"></script>
-  <script src="core/operations_engine.js?v=ed7ccab3"></script>
+  <script src="core/operations_engine.js?v=039b8d32"></script>
   <script src="core/booking_payment_engine.js?v=91111565"></script>
   <script src="core/ads_metrics_engine.js?v=d8dd5962"></script>
-  <script src="core/ads_period_service.js?v=f7e904a2"></script>
+  <script src="core/ads_period_service.js?v=3f125702"></script>
   <script src="core/ads_import_parser.js?v=35136382"></script>
   <script src="core/captcha_gate.js?v=3ad4a776"></script>
   <script src="core/date_range_picker.js?v=41dc564c"></script>
   <script src="core/side_panel.js?v=d763b464"></script>
-  <script src="core/action_dispatch.js?v=93ff07af"></script>
-  <script src="app.js?v=ec868b2b"></script>
+  <script src="core/action_dispatch.js?v=25c6359d"></script>
+  <script src="app.js?v=8fd145b2"></script>
   <script src="core/property_analysis_context_ui.js?v=9f24e43b"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
-  <script src="core/marketing_ui.js?v=64e11751"></script>
+  <script src="core/marketing_ui.js?v=ec113951"></script>
 </body>
 </html>

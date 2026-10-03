@@ -3,10 +3,12 @@ const fs = require('fs');
 const path = require('path');
 
 const App = require('../app.js');
+let passed = 0;
 
 async function test(name, fn) {
   try {
     await fn();
+    passed++;
     console.log(`  ✅ ${name}`);
   } catch (error) {
     console.error(`  ❌ ${name}`);
@@ -90,7 +92,7 @@ async function test(name, fn) {
       p_tenant_id: '22222222-2222-4222-8222-222222222222',
       p_phone: '0532 123 45 67',
       p_source_id: '33333333-3333-4333-8333-333333333333',
-      p_channel: 'Telefon',
+      p_channel: 'Phone',
       p_check_in: null,
       p_check_out: null,
       p_pax: null,
@@ -99,6 +101,33 @@ async function test(name, fn) {
       p_note: 'Akşam aranacak'
     });
     assert.strictEqual(result.created, true);
+  });
+
+  await test('telefon kanalı hızlı kayıt, düzenleme ve raporlarda tek sözleşmeye çevrilir', () => {
+    assert.strictEqual(App.normalizeLeadChannel('Telefon'), 'Phone');
+    assert.strictEqual(App.normalizeLeadChannel('PHONE'), 'Phone');
+    assert.strictEqual(App.normalizeLeadChannel(' phone '), 'Phone');
+
+    const mapped = App.mapLeadFromDb({
+      id: '11111111-1111-4111-8111-111111111111',
+      tenant_id: '22222222-2222-4222-8222-222222222222',
+      guest_phone: '05321234567',
+      channel: 'Telefon',
+      status: 'NEW'
+    });
+    assert.strictEqual(mapped.channel, 'Phone');
+    assert.strictEqual(App.mapLeadToDb(mapped, mapped.tenantId).channel, 'Phone');
+
+    const view = App.buildLeadSalesView({
+      leads: [
+        { id: 'lead-tr', channel: 'Telefon', status: 'NEW' },
+        { id: 'lead-en', channel: 'Phone', status: 'NEW' }
+      ]
+    });
+    assert.deepStrictEqual(view.rows.map(row => row.channel), ['Phone', 'Phone']);
+
+    const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    assert.match(html, /id="leadQuickChannel"[\s\S]*?<option value="Phone">Telefon<\/option>/);
   });
 
   await test('satış ekranı erişilebilir hızlı kayıt formunu ve zorunlu kaynak alanını bağlar', () => {
@@ -110,6 +139,7 @@ async function test(name, fn) {
     assert.match(html, /<form[^>]+id="leadQuickCaptureForm"[^>]+data-onsubmit="submitQuickLead\(event\)"/);
     assert.match(html, /id="leadQuickPhone"[^>]+required/);
     assert.match(html, /id="leadQuickSource"[^>]+required/);
+    assert.match(app, /'<option value="">Kaynak seçin…<\/option>'/);
     assert.match(html, /id="leadQuickMessage"[^>]+role="status"/);
     assert.match(app, /function renderLeadQuickCapture\(/);
     assert.match(app, /async function submitQuickLead\(/);
@@ -126,6 +156,16 @@ async function test(name, fn) {
     assert.match(app, /canManageTenantRole\(activeTenant\?\.role\)/);
     assert.match(app, /Talep bilgileri kaydedildi; ancak atama\/takip bilgisi kaydedilemedi/);
     assert.match(app, /Kara\/beyaz liste bilgisi kaydedilemedi/);
+  });
+
+  await test('WhatsApp talebi de kaynak seçimiyle atomik hızlı kayıt yolundan geçer', () => {
+    const root = path.join(__dirname, '..');
+    const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+    const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+    const body = app.match(/async function saveWaAsLead\(\)[\s\S]*?\n}/)?.[0] || '';
+    assert.match(html, /id="waParsedSource"[^>]+required/);
+    assert.match(body, /quickCaptureLead/);
+    assert.doesNotMatch(body, /createLead|WhatsApp Misafiri/);
   });
 
   await test('izleyici misafir profilini salt okunur görür; satış rolü düzenler ama özel listeyi yönetemez', () => {
@@ -180,7 +220,35 @@ async function test(name, fn) {
     assert.deepStrictEqual(view.myFollowUpsToday.map(row => row.id), ['lead-1']);
   });
 
-  console.log('✅ A4 Misafirler ve Satış UI testleri tamamlandı.');
+  await test('takip saati İstanbul yerel saatinde kaymadan açılır ve kaydedilir', () => {
+    assert.strictEqual(App.toIstanbulDateTimeLocal('2026-10-01T07:00:00.000Z'), '2026-10-01T10:00');
+    assert.strictEqual(App.fromIstanbulDateTimeLocal('2026-10-01T10:00'), '2026-10-01T07:00:00.000Z');
+    assert.strictEqual(
+      App.toIstanbulDateTimeLocal(App.fromIstanbulDateTimeLocal(App.toIstanbulDateTimeLocal('2026-10-01T07:00:00.000Z'))),
+      '2026-10-01T10:00'
+    );
+  });
+
+  await test('bugün aranacaklar gecikmiş açık takipleri de içerir ve İstanbul gününü kullanır', () => {
+    const view = App.buildLeadSalesView({
+      leads: [
+        { id: 'late', status: 'FOLLOW_UP' },
+        { id: 'midnight', status: 'QUOTE_SENT' },
+        { id: 'closed', status: 'WON' },
+        { id: 'future', status: 'NEW' }
+      ],
+      workflows: [
+        { lead_id: 'late', next_follow_up_at: '2026-09-30T09:00:00Z' },
+        { lead_id: 'midnight', next_follow_up_at: '2026-09-30T22:00:00Z' },
+        { lead_id: 'closed', next_follow_up_at: '2026-09-29T09:00:00Z' },
+        { lead_id: 'future', next_follow_up_at: '2026-10-01T22:00:00Z' }
+      ],
+      today: '2026-10-01'
+    });
+    assert.deepStrictEqual(view.followUpsToday.map(row => row.id).sort(), ['late', 'midnight']);
+  });
+
+  console.log(`TEST SUMMARY: ${passed} / ${passed} TESTS PASSED (0 FAILED)`);
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

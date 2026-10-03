@@ -17,4 +17,15 @@ assert(contextService.includes("client.rpc('save_property_location'"));
 assert(app.includes('PropertyProfileEngine.buildPropertyReport'));
 assert(html.includes('Satıştan Çek / Arşivle'));
 assert(!html.includes('>🗑️ Mülkü Sil<'));
+
+const App = require('../app.js');
+const salesHistory = App.buildPropertyHistoryView({ netRoomRevenue: 10000, totalOpex: 0, capex: 0, netProfit: 10000 }, 'sales');
+assert.strictEqual(salesHistory.showLedger, false);
+assert.strictEqual(salesHistory.netProfit, null);
+const unmeasured = App.buildPropertyHistoryView({ netRoomRevenue: 10000, totalRevenue: 10000, totalOpex: 0, capex: 0, netProfit: 10000 }, 'manager');
+assert.strictEqual(unmeasured.showLedger, true);
+assert.strictEqual(unmeasured.netProfit, null);
+assert.match(unmeasured.reason, /ölçülemedi/i);
+const measured = App.buildPropertyHistoryView({ netRoomRevenue: 10000, totalRevenue: 10000, totalOpex: 2000, capex: 0, netProfit: 8000 }, 'viewer');
+assert.strictEqual(measured.netProfit, 8000);
 console.log('[PASS] Mülkler sekmeli profil, zorunlu alan, konum, sahip, arşiv ve tek-defter raporunu bağlar');

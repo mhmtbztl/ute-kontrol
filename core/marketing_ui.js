@@ -70,7 +70,7 @@
     ['MarketingHealthResultsService', 'core/marketing_health_results_service.js?v=662edeea'],
     ['AdsMetricsEngine', 'core/ads_metrics_engine.js?v=d8dd5962'],
     ['AdsImportParser', 'core/ads_import_parser.js?v=35136382'],
-    ['AdsPeriodService', 'core/ads_period_service.js?v=f7e904a2']
+    ['AdsPeriodService', 'core/ads_period_service.js?v=3f125702']
   ]);
   let dependencyPromise = null;
 
@@ -484,7 +484,9 @@
   function buildAdsModel(input = {}) {
     const engine = services.AdsMetricsEngine;
     if (!engine || typeof engine.campaignMetrics !== 'function') throw new Error('ADS_METRICS_ENGINE_UNAVAILABLE');
-    const periods = (input.adMetricPeriods || []).map(row => ({
+    const selectedPeriod = periodFromFilter(input.filter || {});
+    const allPeriods = (input.adMetricPeriods || []).map(row => ({
+      id: row.id,
       campaignId: row.campaignId || row.campaign_id,
       platform: row.platform,
       resultType: row.resultType || row.result_type,
@@ -496,6 +498,28 @@
       messages: row.messages == null ? null : Number(row.messages),
       calls: row.calls == null ? null : Number(row.calls)
     }));
+    const measuredFields = ['spend', 'impressions', 'clicks', 'messages', 'calls'];
+    const clipPeriods = (rangeStart, rangeEndExclusive) => allPeriods.map(row => {
+      const inclusiveEnd = rangeEndExclusive ? addUtcDays(rangeEndExclusive, -1) : null;
+      if (!rangeStart || !inclusiveEnd) return row;
+      const overlapStart = row.periodStart > rangeStart ? row.periodStart : rangeStart;
+      const overlapEnd = row.periodEnd < inclusiveEnd ? row.periodEnd : inclusiveEnd;
+      if (!row.periodStart || !row.periodEnd || overlapEnd < overlapStart) return null;
+      const totalDays = Math.floor((Date.parse(row.periodEnd + 'T00:00:00Z') - Date.parse(row.periodStart + 'T00:00:00Z')) / 86400000) + 1;
+      const overlapDays = Math.floor((Date.parse(overlapEnd + 'T00:00:00Z') - Date.parse(overlapStart + 'T00:00:00Z')) / 86400000) + 1;
+      if (!(totalDays > 0) || !(overlapDays > 0)) return null;
+      const ratio = overlapDays / totalDays;
+      return Object.fromEntries(Object.entries(row).map(([key, value]) => [
+        key,
+        measuredFields.includes(key) && value !== null ? Math.round(value * ratio * 100) / 100 : value
+      ]));
+    }).filter(Boolean);
+    const periods = clipPeriods(selectedPeriod.start, selectedPeriod.endExclusive);
+    let priorPeriods = [];
+    if (selectedPeriod.start && selectedPeriod.endExclusive) {
+      const durationDays = Math.round((Date.parse(selectedPeriod.endExclusive + 'T00:00:00Z') - Date.parse(selectedPeriod.start + 'T00:00:00Z')) / 86400000);
+      priorPeriods = clipPeriods(addUtcDays(selectedPeriod.start, -durationDays), selectedPeriod.start);
+    }
     const campaigns = Array.isArray(input.marketingCampaigns) ? input.marketingCampaigns : [];
     const campaignNames = new Map(campaigns.map(item => [String(item.id), item.name || 'Adsız kampanya']));
     const metrics = engine.campaignMetrics(periods, { targets: input.targets || {}, minResults: 10 })
@@ -503,7 +527,10 @@
 
     const sourceCodes = new Map((input.leadSources || []).map(item => [String(item.id), item.code]));
     const leadsBySource = {};
-    (input.leadAcquisitions || []).forEach(item => {
+    (input.leadAcquisitions || []).filter(item => {
+      const date = String(item.leadDate || item.lead_date || item.createdAt || item.created_at || '').slice(0, 10);
+      return !selectedPeriod.start || (date && date >= selectedPeriod.start && date < selectedPeriod.endExclusive);
+    }).forEach(item => {
       const code = sourceCodes.get(String(item.sourceId || item.source_id));
       if (code) leadsBySource[code] = (leadsBySource[code] || 0) + 1;
     });
@@ -514,12 +541,21 @@
     }, { spend: {}, messages: {} });
     const totalSpend = periods.some(row => row.spend != null)
       ? periods.reduce((sum, row) => sum + (row.spend || 0), 0) : null;
+    const priorSpend = priorPeriods.some(row => row.spend != null)
+      ? priorPeriods.reduce((sum, row) => sum + (row.spend || 0), 0) : null;
+    const spendTrendPct = totalSpend !== null && priorSpend > 0
+      ? Math.round(((totalSpend - priorSpend) / priorSpend) * 1000) / 10 : null;
     return {
       metrics,
       campaigns: campaigns.filter(item => ['META', 'GOOGLE'].includes(String(item.platform || '').toUpperCase())),
+      allCampaigns: campaigns,
+      periods,
+      targets: input.targets || {},
       channelLeadCost: engine.channelLeadCost({ spendByPlatform: sums.spend, leadsBySource, messagesByPlatform: sums.messages }),
       adShare: engine.adShare({ adSpend: totalSpend, netRoomRevenue: input.financeSummary && input.financeSummary.netRoomRevenue }),
       totalSpend,
+      priorSpend,
+      spendTrendPct,
       canManage: input.canManageAds !== false
     };
   }
@@ -562,6 +598,29 @@
       </article>`).join('') : emptyState('Henüz reklam dönemi yok', 'İlk gerçek reklam dönemi kaydedildiğinde kampanya maliyetleri burada görünür.');
     const channelRows = model.channelLeadCost.map(row => `<tr><td>${escapeHtml(row.platform)}</td><td>${money(row.spend)}</td><td>${number(row.leads)}</td><td>${money(row.costPerLead)}</td><td>${number(row.messageToLeadRatio)}</td></tr>`).join('');
     const campaignOptions = model.campaigns.map(item => `<option value="${escapeHtml(item.id)}" data-platform="${escapeHtml(item.platform)}">${escapeHtml(item.name)} · ${escapeHtml(item.platform)}</option>`).join('');
+    const campaignAdmin = model.canManage ? `
+      <form data-ads-campaign-form class="card" style="padding:16px;margin-bottom:14px">
+        <h3 style="margin:0 0 6px">Kampanya oluştur</h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;align-items:end">
+          <label style="display:grid;gap:5px;font-size:12px">Ad<input class="form-control" name="name" required maxlength="160"></label>
+          <label style="display:grid;gap:5px;font-size:12px">Platform<select class="form-control" name="platform" required><option value="META">Meta</option><option value="GOOGLE">Google</option><option value="TIKTOK">TikTok</option><option value="OTHER">Diğer / Influencer</option></select></label>
+          <label style="display:grid;gap:5px;font-size:12px">Başlangıç<input class="form-control" type="date" name="startDate"></label>
+          <label style="display:grid;gap:5px;font-size:12px">Bitiş<input class="form-control" type="date" name="endDate"></label>
+          <label style="display:grid;gap:5px;font-size:12px">Bütçe<input class="form-control" type="number" name="budget" min="0" step="0.01"></label>
+          <button class="btn btn-primary btn-sm" type="submit">Kampanyayı kaydet</button>
+        </div>
+      </form>
+      <form data-ads-target-form class="card" style="padding:16px;margin-bottom:14px">
+        <h3 style="margin:0 0 6px">Verimlilik hedefleri</h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;align-items:end">
+          <label style="display:grid;gap:5px;font-size:12px">Hedef mesaj maliyeti<input class="form-control" type="number" name="costPerMessage" min="0.01" step="0.01" required value="${escapeHtml(model.targets.costPerMessage ?? '')}"></label>
+          <label style="display:grid;gap:5px;font-size:12px">Hedef arama maliyeti<input class="form-control" type="number" name="costPerCall" min="0.01" step="0.01" required value="${escapeHtml(model.targets.costPerCall ?? '')}"></label>
+          <button class="btn btn-primary btn-sm" type="submit">Hedefleri kaydet</button>
+        </div>
+      </form>
+      <div class="card" style="padding:14px;margin-bottom:14px"><h3 style="margin:0 0 10px">Kayıtlı kampanyalar</h3>${model.allCampaigns.length ? model.allCampaigns.map(item => `<div class="lead-followup-row"><div><strong>${escapeHtml(item.name || 'Adsız kampanya')}</strong><span>${escapeHtml(item.platform || 'OTHER')} · ${escapeHtml(item.startDate || item.start_date || 'Başlangıç yok')} → ${escapeHtml(item.endDate || item.end_date || 'Bitiş yok')}</span></div><button type="button" class="btn btn-danger btn-sm" data-ads-delete-campaign="${escapeHtml(item.id)}">Sil</button></div>`).join('') : '<p class="empty-state">Henüz kampanya yok.</p>'}</div>`
+      : '';
+    const periodList = `<div class="card" style="padding:14px;margin-bottom:14px"><h3 style="margin:0 0 10px">Kayıtlı reklam dönemleri</h3>${model.periods.length ? model.periods.map(row => `<div class="lead-followup-row"><div><strong>${escapeHtml((model.allCampaigns.find(item => String(item.id) === String(row.campaignId)) || {}).name || 'Bilinmeyen kampanya')}</strong><span>${escapeHtml(row.periodStart)} → ${escapeHtml(row.periodEnd)} · ${money(row.spend)}</span></div>${model.canManage ? `<button type="button" class="btn btn-danger btn-sm" data-ads-delete-period="${escapeHtml(row.id)}">Sil</button>` : ''}</div>`).join('') : '<p class="empty-state">Henüz reklam dönemi yok.</p>'}</div>`;
     const form = model.canManage ? (campaignOptions ? `
       <form data-ads-manual-form class="card" style="padding:16px;margin-bottom:14px">
         <h3 style="margin:0 0 6px">Reklam dönemi ekle</h3>
@@ -592,7 +651,11 @@
         <div style="display:flex;justify-content:flex-end;margin-top:10px"><button type="submit" class="btn btn-secondary btn-sm">Önizle</button></div>
       </form>
       ${renderAdsImportPreview(state.adsImportPreview)}` : emptyState('Önce kampanya oluşturun', 'Meta veya Google kampanyası olmadan reklam dönemi kaydedilemez.')) : '';
-    return `${form}
+    const spendTrend = model.spendTrendPct === null || model.spendTrendPct === undefined
+      ? 'Önceki eş dönem karşılaştırması için veri yok'
+      : `Önceki eş döneme göre ${model.spendTrendPct > 0 ? '+' : ''}${number(model.spendTrendPct, '%')} (${money(model.priorSpend)} → ${money(model.totalSpend)})`;
+    return `${campaignAdmin}${form}${periodList}
+      <div class="card" style="padding:14px;margin-bottom:14px"><strong>Seçili dönem reklam toplamı: ${money(model.totalSpend)}</strong><div class="sub-text">${escapeHtml(spendTrend)}</div></div>
       <div class="card" style="padding:14px;margin-bottom:14px;border-left:4px solid #f59e0b"><strong>Atıf sınırı</strong><div class="sub-text">Talep kaynağı kanal düzeyinde ölçülür; hangi reklamın rezervasyon getirdiği ölçülemez. Kampanya ROAS'ı gösterilmez.</div></div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:14px">${metricCards}</div>
       <div class="card" style="padding:14px;overflow:auto"><h3 style="margin:0 0 10px">Kanal → talep maliyeti</h3><table class="data-table"><thead><tr><th>Kanal</th><th>Harcama</th><th>Talep</th><th>Talep maliyeti</th><th>Mesaj→talep</th></tr></thead><tbody>${channelRows}</tbody></table><div class="sub-text" style="margin-top:10px">Toplam reklam harcaması ${money(model.totalSpend)} · net konaklama cirosundaki pay ${number(model.adShare.pct, '%')}</div></div>`;
@@ -829,6 +892,61 @@
     }
   }
 
+  async function handleAdsCampaignSubmit(form) {
+    const scope = cloudScope();
+    if (!scope || typeof cloudSaveMarketingCampaign !== 'function') throw new Error('ADS_CAMPAIGN_UNAVAILABLE');
+    const values = Object.fromEntries(new FormData(form).entries());
+    const submit = form.querySelector('[type="submit"]');
+    if (submit) submit.disabled = true;
+    try {
+      const saved = await cloudSaveMarketingCampaign({
+        name: values.name, platform: values.platform, villa: 'ALL',
+        startDate: values.startDate || null, endDate: values.endDate || null,
+        budget: values.budget || 0, status: 'ACTIVE'
+      });
+      if (typeof loadTenantAppData === 'function') await loadTenantAppData(scope.tenantId);
+      render();
+      return saved;
+    } finally { if (submit) submit.disabled = false; }
+  }
+
+  async function handleAdsTargetSubmit(form) {
+    const client = typeof supabaseClient !== 'undefined' ? supabaseClient : null;
+    const scope = cloudScope();
+    if (!client || !scope) throw new Error('ADS_TARGET_UNAVAILABLE');
+    const values = Object.fromEntries(new FormData(form).entries());
+    const rows = [
+      { tenant_id: scope.tenantId, key: 'ads_cost_per_message_target', value: Number(values.costPerMessage) },
+      { tenant_id: scope.tenantId, key: 'ads_cost_per_call_target', value: Number(values.costPerCall) }
+    ];
+    if (rows.some(row => !(row.value > 0))) throw new Error('ADS_TARGET_INVALID');
+    const { error } = await client.from('tenant_settings').upsert(rows, { onConflict: 'tenant_id,key' });
+    if (error) throw error;
+    if (typeof loadTenantAppData === 'function') await loadTenantAppData(scope.tenantId);
+    render();
+  }
+
+  async function deleteAdsPeriod(periodId) {
+    const client = typeof supabaseClient !== 'undefined' ? supabaseClient : null;
+    const scope = cloudScope();
+    if (!client || !scope || !services.AdsPeriodService || !periodId) throw new Error('ADS_PERIOD_UNAVAILABLE');
+    if (typeof window !== 'undefined' && !window.confirm('Bu reklam dönemi ve bağlı Finans gideri silinsin mi?')) return false;
+    await services.AdsPeriodService.deletePeriod(client, periodId);
+    if (typeof loadTenantAppData === 'function') await loadTenantAppData(scope.tenantId);
+    render();
+    return true;
+  }
+
+  async function deleteAdsCampaign(campaignId) {
+    const scope = cloudScope();
+    if (!scope || typeof cloudDeleteMarketingCampaign !== 'function' || !campaignId) throw new Error('ADS_CAMPAIGN_UNAVAILABLE');
+    if (typeof window !== 'undefined' && !window.confirm('Kampanya ve bağlı reklam dönemleri silinsin mi?')) return false;
+    await cloudDeleteMarketingCampaign(campaignId);
+    if (typeof loadTenantAppData === 'function') await loadTenantAppData(scope.tenantId);
+    render();
+    return true;
+  }
+
   function handleAdsImportPreview(form) {
     const values = Object.fromEntries(new FormData(form).entries());
     const data = typeof appData !== 'undefined' ? appData : {};
@@ -845,9 +963,9 @@
     const submit = form.querySelector('[type="submit"]');
     if (submit) submit.disabled = true;
     try {
-      for (const row of preview.rows) {
-        await services.AdsPeriodService.savePeriod(client, { ...row, tenantId: scope.tenantId });
-      }
+      await services.AdsPeriodService.savePeriodsAtomic(client, scope.tenantId, preview.rows.map(row => ({
+        ...row, source: preview.mode === 'CSV_META' ? 'CSV' : 'SCREENSHOT_CHATGPT'
+      })));
       state.adsImportPreview = null;
       if (typeof loadTenantAppData === 'function') await loadTenantAppData(scope.tenantId);
       render();
@@ -880,6 +998,22 @@
       if (cancelExperiment) { state.experimentFormOpen = false; render(); return; }
       if (openBenchmark) { state.benchmarkFormOpen = true; render(); return; }
       if (cancelBenchmark) { state.benchmarkFormOpen = false; render(); return; }
+      const deletePeriodButton = event.target.closest('[data-ads-delete-period]');
+      if (deletePeriodButton) {
+        deleteAdsPeriod(deletePeriodButton.dataset.adsDeletePeriod).catch(() => {
+          const status = document.getElementById('marketingWorkspaceStatus');
+          if (status) status.textContent = 'Reklam dönemi silinemedi. Yetkiyi ve kapanmış ayları kontrol edin.';
+        });
+        return;
+      }
+      const deleteCampaignButton = event.target.closest('[data-ads-delete-campaign]');
+      if (deleteCampaignButton) {
+        deleteAdsCampaign(deleteCampaignButton.dataset.adsDeleteCampaign).catch(() => {
+          const status = document.getElementById('marketingWorkspaceStatus');
+          if (status) status.textContent = 'Kampanya silinemedi. Bağlı dönemleri ve yetkiyi kontrol edin.';
+        });
+        return;
+      }
       const actionButton = event.target.closest('[data-marketing-action][data-finding-id]');
       if (!actionButton) return;
       handleFindingAction(actionButton).catch(() => {
@@ -888,6 +1022,24 @@
       });
     });
     if (content) content.addEventListener('submit', event => {
+      const campaignForm = event.target.closest('[data-ads-campaign-form]');
+      if (campaignForm) {
+        event.preventDefault();
+        handleAdsCampaignSubmit(campaignForm).catch(() => {
+          const status = document.getElementById('marketingWorkspaceStatus');
+          if (status) status.textContent = 'Kampanya kaydedilemedi. Alanları ve yetkiyi kontrol edin.';
+        });
+        return;
+      }
+      const targetForm = event.target.closest('[data-ads-target-form]');
+      if (targetForm) {
+        event.preventDefault();
+        handleAdsTargetSubmit(targetForm).catch(() => {
+          const status = document.getElementById('marketingWorkspaceStatus');
+          if (status) status.textContent = 'Reklam hedefleri kaydedilemedi. Pozitif tutar girin.';
+        });
+        return;
+      }
       const adsConfirm = event.target.closest('[data-ads-import-confirm]');
       if (adsConfirm) {
         event.preventDefault();

@@ -65,7 +65,9 @@ test('7. Yeni view veya tetikleyici yan-etki tablosu olmadigi belgelenir', () =>
   assert.doesNotMatch(migration, /CREATE\s+(?:OR REPLACE\s+)?VIEW/i);
   assert.match(migration, /yeni VIEW ve baska tabloya yazan tetikleyici yoktur/i);
   assert.match(restore, /const VIEWS = \['channel_performance_rates', 'booking_payment_balances'\]/);
-  assert.match(restore, /const SIDE_EFFECTS = \['tenant_booking_channels', 'guest_consent_events', 'invitation_delivery_outbox', 'lead_source_catalog'\]/);
+  for (const table of ['tenant_booking_channels', 'guest_consent_events', 'invitation_delivery_outbox', 'lead_source_catalog', 'ad_metric_period_days']) {
+    assert.match(restore, new RegExp(`SIDE_EFFECTS[^;]+${table}`));
+  }
 });
 
 test('8. Arastirma tarihi UTC degil Istanbul is gunu ile sinirlanir', () => {

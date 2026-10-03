@@ -272,9 +272,9 @@ function run() {
       operationsHtml.slice(0, 1000)
     );
     check(
-      !operationsHtml.includes('ODENMIS-GOREV-GIZLI') && !operationsHtml.includes('PLANLI-GOREV-BORC-DEGIL') && operationsCount === '1'
-        && operationsHtml.includes('Bekleyen Temizlik Borçları (1)') && rowCount === 1,
-      '19. Odenmis gorev bekleyen borcta YOK; baslik, sayac ve liste ayni filtreyi kullaniyor',
+      !operationsHtml.includes('ODENMIS-GOREV-GIZLI') && operationsHtml.includes('data-cleaning-task-id="planned-1"') && operationsCount === '1'
+        && operationsHtml.includes('Bekleyen Temizlik Borçları (1)') && rowCount === 2,
+      '19. Odenmis gorev gizli, geciken planli gorev gorunur; borc listesi yalniz yapilmis ve odenmemis kaydi sayiyor',
       `badge=${operationsCount}, satir=${rowCount}, html=${operationsHtml.slice(0, 700)}`
     );
     check(

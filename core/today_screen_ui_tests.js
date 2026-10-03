@@ -23,6 +23,9 @@ try {
     'B2. Bos gece eylemi fiyatlandirma ile ayni kaynaktan gelir', 'detectGapNights tek kaynak degil');
   check(/renderTodayDateStrip/.test(render) && /renderTodayTodoList/.test(render) && /renderTodayMonthSummary/.test(render),
     'B3. Yeni Bugün bolumleri ana render planina bagli', 'yeni bolum renderlari eksik');
+  const monthSummary = between('function renderTodayMonthSummary', 'function renderExecutiveControlCenter');
+  check(/computeMonthActuals\(month/.test(monthSummary) && !/executiveSnapshotState/.test(monthSummary),
+    'B4. Bu ay satiri secili filtre snapshotindan degil gercek takvim ayindan beslenir', monthSummary);
 
   const cards = between('function renderTodayCommandCenter', 'function renderPortfolioHealth');
   check(!/Puan:/.test(cards) && !/action-score-pill/.test(cards),

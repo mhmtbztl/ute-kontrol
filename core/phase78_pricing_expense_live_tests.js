@@ -89,6 +89,29 @@ async function run() {
     r = await owner.client.from('expense_template_occurrences').insert({ tenant_id: tenantB, template_id: template.data.id, generated_expense_id: generatedExpense.id, period_month: '2026-11-01' });
     check(denied(r.error), '11. Gider kopya bagi kiracilar arasinda kurulamiyor', errText(r.error) || 'BAGLANDI');
 
+    r = await owner.client.rpc('generate_expense_from_template', { p_tenant_id: tenantA, p_template_id: template.data.id, p_period_month: '2026-11-01' });
+    const generatedByRpc = r.data;
+    const generatedCheck = generatedByRpc
+      ? await owner.client.from('expense_template_occurrences').select('generated_expense_id').eq('template_id', template.data.id).eq('period_month', '2026-11-01').single()
+      : { data: null, error: r.error };
+    check(!r.error && generatedCheck.data?.generated_expense_id === generatedByRpc,
+      '11b. Sablon aylik gideri ve iz kaydini atomik uretir', errText(r.error || generatedCheck.error));
+    const duplicate = await owner.client.rpc('generate_expense_from_template', { p_tenant_id: tenantA, p_template_id: template.data.id, p_period_month: '2026-11-01' });
+    check(!!duplicate.error && /SABLON_DONEMI_ZATEN_ISLENDI|duplicate/i.test(errText(duplicate.error)),
+      '11c. Ayni sablon ayni aya ikinci kez islenemez', errText(duplicate.error) || 'IKINCI KEZ YAZDI');
+
+    for (const [actor, label] of [[sales, 'sales'], [viewer, 'viewer'], [outsider, 'yabanci']]) {
+      const deniedExisting = await actor.client.rpc('generate_expense_from_template', {
+        p_tenant_id: tenantA, p_template_id: template.data.id, p_period_month: '2026-12-01'
+      });
+      const deniedMissing = await actor.client.rpc('generate_expense_from_template', {
+        p_tenant_id: tenantA, p_template_id: '00000000-0000-4000-8000-000000000086', p_period_month: '2026-12-01'
+      });
+      check(denied(deniedExisting.error) && denied(deniedMissing.error)
+        && errText(deniedExisting.error) === errText(deniedMissing.error),
+      `11d. ${label} sablon UUID varligini ayirt edemez`, `${errText(deniedExisting.error)} | ${errText(deniedMissing.error)}`);
+    }
+
     r = await owner.client.rpc('reset_tenant_data', { p_tenant_id: tenantA, p_confirm: 'VERILERI SIFIRLA' });
     const count = async table => {
       const result = await admin.from(table).select('*', { count: 'exact', head: true }).eq('tenant_id', tenantA);

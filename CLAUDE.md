@@ -373,9 +373,9 @@ ve kısmi veriyle daha kötü bir duruma yol açar. Bayrak işlem sonunda kapanm
 node stamp_assets.js     # varlıkları içerik hash'iyle damgala (ZORUNLU)
 npm run verify:migrations # göçlerin içerik bütünlüğü + bağımlılık sırası
 npm run templates:check   # yayınlanan örnek şablonlar üreticiyle uyumlu mu
-npm test                  # 145 çevrimdışı/güvenli süit, 1422 iddia (25 Eylül 2026)
+npm test                  # 197 çevrimdışı/güvenli süit, 1893 iddia (3 Ekim 2026)
 npm run test:bootstrap    # test projesine eksik göçleri uygula (--check salt okunur)
-npm run test:live         # 176 süit (145 güvenli + 31 canlı), yalnız ayrı test projesine karşı
+npm run test:live         # 241 süit (197 güvenli + 44 canlı), 2727 iddia; yalnız ayrı test projesine karşı
 ```
 `stamp_assets.js --check` güncel değilse hata verir — CI'ya konabilir.
 
@@ -810,6 +810,7 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 | A3 işletme logosu Storage/RLS | **üretimde uygulandı ve doğrulandı** (1 Ekim 2026, phase74) — özel bucket, kiracı/logo yolu ve yalnız yönetim yazması; ayarlar arayüzü A5 kapsamındadır |
 | A3 reklam tenant değişmezliği | **üretimde uygulandı ve doğrulandı** (1 Ekim 2026, phase76) — phase72 sonrası tam regresyonun yakaladığı eksik `tenant_id` tetikleyicisi, uygulanmış göç değiştirilmeden yeni göçle tamamlandı |
 | A4 fiyat araştırması ve gider şablonları | **üretimde uygulandı ve doğrulandı** (2 Ekim 2026, phase78 + phase80) — kullanıcı uygulama onayı verdi; `production:readiness` üretim `schema_migrations` kayıtlarını ve anon sınırını doğruladı. Phase80, İstanbul iş günü düzeltmesidir |
+| A3/A4 ekran denetimi düzeltmeleri | **kod ve test projesi tamamlandı** (3 Ekim 2026) — L-109, L-130…L-141 ve denetim takipleri L-150…L-156 düzeltildi; reklam içe aktarımı phase82 ile atomik, gider şablonundan aya işleme phase84 ile atomik, phase86 ile yetki-kilidi sırası güvenli, phase88 ile reklam UPDATE tetikleyicisi tek oldu. Phase82/84/86/88 test projesine bootstrap edildi; phase88 öncesi tam canlı koşu 240/240, phase88 sonrası ilgili canlı süit 7/7 yeşil. Son tam tekrar Auth hız sınırında kesilen beş süitin tamamı ayrı ayrı yeniden çalıştırılıp geçti. **Üretime uygulanmadı; ayrı açık onay gerekir. Phase82 öncesi çakışma ön kontrolü zorunludur; phase84 ve phase86 birlikte, ardından phase88 uygulanır.** |
 | `month: ‘2026-09’` sabiti | **tamamlandı** (20 Eylül 2026) — altı nokta kaldırıldı. Tek kaynak `getCurrentMonthKey()`, o da `getTodayStr()`'den türer. Başlangıç dönemi de tarayıcının yerel saatini kullanıyordu; kayıtlar Europe/Istanbul gününe yazılıyor, ay sınırında kullanıcı az önce girdiği kaydı filtrede göremiyordu. Ağı `persistence_wiring_tests` (kaynak taraması) |
 | Ölü `appData.excelDb` dalları | **tamamlandı** (20 Eylül 2026) — alan yalnızca `null` atanıyordu, hiçbir yerde doldurulmuyordu. Ona bağlı **üç panel hiç çalışmıyordu**: yönetici panelinin 116 satırlık dalı, YoY karşılaştırması (her zaman "Veriler sıfırlandı" diyordu) ve gidişat radarı (ölü dalında ilk müşterinin rakamları duruyordu: skor "88", "Haziran (268k) ➔ Temmuz (467k)"). Üçü de artık gerçek kayıttan hesaplıyor; ortak taban `computeMonthActuals()` |
 | Fiyat merdiveni uydurma varsayılanları | **tamamlandı** (20 Eylül 2026) — `saveAllSettings()` boş bırakılan her alana `|| 3000`, `|| 4000`, `|| 12000`, `|| 800`, `|| 350` yazıyordu ve o rakam mülkün gerçek fiyatı oluyordu. Form da girilmemiş basamakları `v.base * 1.3` ile dolduruyordu. 17 Eylül §3.6 taraması bunu **kaçırmıştı** |
@@ -843,7 +844,7 @@ bu doğru bir temizlik — ama çağıran kodun yarısı onu **kalıcılık san�
 | ✅ bağlandı | `toggleCleaningPaid` | `cleaning_tasks` + `expenses` |
 | ✅ bağlandı | `toggleTaskPaid` | `cleaning_tasks` + `expenses` |
 | ✅ bağlandı | `payAllPendingCleaning` | `cleaning_tasks` + `expenses` |
-| ✅ bağlandı | `saveWaAsLead` | `createLead()` → `leads` |
+| ✅ bağlandı | `saveWaAsLead` | `quickCaptureLead()` → atomik talep/kaynak defteri RPC'si |
 | ✅ bağlandı | `saveWaAsBooking` | `createBooking()` → `bookings` |
 | ✅ bağlandı | `convertAiActionToTask` | `createMaintenanceTicket()` |
 | 🗑 kaldırıldı | `saveWhapiSettings` | özelliğin tamamı mockup'tı |

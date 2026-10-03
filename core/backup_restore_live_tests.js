@@ -147,6 +147,9 @@ async function isletmeGoruntusu(spec, tid, uyeler) {
     }
     if (hata) failed++; else ok('10. Test verileri temizlendi');
     console.log(`\nTEST SUMMARY: ${passed} / ${passed + failed} TESTS PASSED (${failed} FAILED)`);
-    if (failed > 0) process.exit(1);
+    // Supabase/undici bazı Node sürümlerinde boşta keep-alive soketi bırakır.
+    // Temizlik ve özet tamamlandığı için bağımsız canlı test sürecini açıkça
+    // bitir; aksi halde üst koşucu 300 saniye sonra başarılı süiti öldürür.
+    setImmediate(() => process.exit(failed > 0 ? 1 : 0));
   }
 })();

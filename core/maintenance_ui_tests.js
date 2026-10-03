@@ -52,5 +52,12 @@ test('Kullanıcı önceliği açıkça değiştirirse yeni önem seviyesi uygula
   }), 'LOW');
 });
 
+test('Arıza çözme akışı başarılı yazımdan sonra ilgisiz mülk kaydı çalıştırmaz', () => {
+  assert.strictEqual(typeof app.resolveMaintenanceFromOperations, 'function');
+  const source = app.resolveMaintenanceFromOperations.toString();
+  assert.doesNotMatch(source, /savedProperty|PropertyOwnerService|contextWarning/);
+  assert.match(source, /await loadTenantAppData\(getActiveTenantId\(\)\)/);
+});
+
 console.log(`\n${passed} geçti, ${failed} başarısız`);
 if (failed > 0) process.exit(1);

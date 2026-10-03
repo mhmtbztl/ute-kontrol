@@ -99,6 +99,17 @@ async function test(name, fn) {
     });
   });
 
+  await test('Today gap action resolves the same detected gap and its per-night price', async () => {
+    const action = App.resolveGapDiscountAction('gap-2027-01-20-villa-key', [{
+      villaKey: 'villa-key', checkIn: '2027-01-20', checkOut: '2027-01-23', nights: 3,
+      discountPrice: 13500
+    }], { 'villa-key': { id: '11111111-1111-4111-8111-111111111111' } });
+    assert.deepStrictEqual(action, {
+      type: 'GAP_DISCOUNT', propertyId: '11111111-1111-4111-8111-111111111111',
+      startDate: '2027-01-20', endDate: '2027-01-22', rate: 4500
+    });
+  });
+
   await test('Manual pricing override uses the deployed RPC contract', async () => {
     const tenantId = '33333333-3333-4333-8333-333333333333';
     let rpcCall = null;

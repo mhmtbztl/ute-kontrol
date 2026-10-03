@@ -1,6 +1,6 @@
 # Ayrı Supabase test projesi kurulumu
 
-Bu belge, veritabanına yazan **31 canlı süiti** üretimden ayrı bir Supabase
+Bu belge, veritabanına yazan **43 canlı süiti** üretimden ayrı bir Supabase
 projesine karşı koşulabilir hâle getirir.
 
 ## Neden
@@ -163,7 +163,7 @@ Canlı süitler **davranışı** ölçer ve bunu test projesinde yapar.
 `.github/workflows/live-tests.yml` **açık ve çalışıyor** (16 Eylül 2026).
 Her gece 03:00 UTC’te tek koşu yapar; elle tetiklemek için `workflow_dispatch`.
 İlk yeşil koşu 17 Eylül 2026: 120/120 süit, 1123 iddia, sızıntı denetimi temiz.
-Güncel güvenli koşu 25 Eylül 2026: 145 çevrimdışı süit ve 1422 iddia; 31 canlı süit varsayılan
+Güncel güvenli koşu 3 Ekim 2026: 197 çevrimdışı süit ve 1893 iddia; 44 canlı süit varsayılan
 koşuda atlanır. Güncel sayılar her zaman koşucu özetinden alınır, bu tarihsel
 satırlar sabit bir kalite vaadi değildir.
 

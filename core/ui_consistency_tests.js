@@ -188,7 +188,8 @@ try {
     return APP2.slice(bas, son > 0 ? son : bas + 4000);
   };
   const yazicilar = ['createExpense', 'updateExpense', 'deleteExpense', 'cloudUpsertCleaningTask',
-    'cloudDeleteCleaningTask', 'cloudDeleteCleaningExpense', 'saveBookingPaymentCommission', 'inspectCleaningExecution'];
+    'cloudDeleteCleaningTask', 'cloudDeleteCleaningExpense', 'saveBookingPaymentCommission', 'inspectCleaningExecution',
+    'generateExpenseFromTemplate'];
   const eksik = yazicilar.filter(ad => { const g = govde(ad); return !g || !g.includes('invalidateExecutiveSnapshotCache()'); });
   check(eksik.length === 0, `F1. Ana sayfa rakamını etkileyen ${yazicilar.length} yazıcı, başarılı yazmadan sonra anlık görüntü önbelleğini temizler`,
     'temizlemeyenler: ' + eksik.join(', '));

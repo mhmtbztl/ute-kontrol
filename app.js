@@ -273,6 +273,8 @@ let appData = {
   targets: {},
   bookings: [],
   expenses: [],
+  expenseTemplates: [],
+  expenseTemplateOccurrences: [],
   leads: [],
   maintenance: []
 };
@@ -2967,6 +2969,26 @@ const ALLOWED_LEAD_STAGES = ['NEW', 'CONTACTED', 'QUOTE_SENT', 'FOLLOW_UP', 'WON
 const ALLOWED_LEAD_SOURCES = ['WHATSAPP', 'INSTAGRAM', 'META', 'AIRBNB', 'BOOKING', 'DIRECT', 'PHONE', 'OTHER'];
 const ALLOWED_LOST_REASONS = ['Fiyat Yüksek', 'Tarih Dolu', 'Cevap Vermedi', 'Başka Yer Seçti', 'Diğer'];
 
+function normalizeLeadChannel(value) {
+  const channel = String(value || '').trim();
+  if (!channel) return 'WhatsApp';
+  const key = channel.toLocaleLowerCase('tr-TR').replace(/[.\s_-]+/g, '');
+  const aliases = {
+    whatsapp: 'WhatsApp',
+    instagram: 'Instagram',
+    telefon: 'Phone',
+    phone: 'Phone',
+    airbnb: 'Airbnb',
+    booking: 'Booking',
+    bookingcom: 'Booking',
+    eposta: 'Email',
+    email: 'Email',
+    other: 'Other',
+    diger: 'Other'
+  };
+  return aliases[key] || channel;
+}
+
 function mapLeadFromDb(row) {
   if (!row) return null;
   const currentAppData = (typeof appData !== 'undefined') ? appData : (typeof global !== 'undefined' ? global.appData : null);
@@ -2997,8 +3019,8 @@ function mapLeadFromDb(row) {
     guestName: guestName,
     phone: guestPhone,
     email: guestEmail,
-    channel: row.channel || 'WhatsApp',
-    source: (row.channel || 'WHATSAPP').toUpperCase(),
+    channel: normalizeLeadChannel(row.channel),
+    source: normalizeLeadChannel(row.channel).toUpperCase(),
     date: row.lead_date || '',
     checkIn: row.requested_check_in || '',
     checkOut: row.requested_check_out || '',
@@ -3060,7 +3082,7 @@ function mapLeadToDb(lead, targetTenantId) {
     guest_name: gName || null,
     guest_phone: gPhone,
     guest_email: (lead.email || lead.guestEmail || lead.guest_email || '').trim() || null,
-    channel: lead.channel || lead.source || 'WhatsApp',
+    channel: normalizeLeadChannel(lead.channel || lead.source),
     lead_date: lead.date || lead.lead_date || getTodayStr(),
     requested_check_in: checkIn,
     requested_check_out: checkOut,
@@ -3203,8 +3225,8 @@ async function createLead(leadInput) {
       guestName: leadInput.guestName || leadInput.guest || '',
       phone: leadInput.phone || '',
       email: leadInput.email || '',
-      channel: leadInput.channel || 'WhatsApp',
-      source: (leadInput.channel || 'WHATSAPP').toUpperCase(),
+      channel: normalizeLeadChannel(leadInput.channel),
+      source: normalizeLeadChannel(leadInput.channel).toUpperCase(),
       date: leadInput.date || getTodayStr(),
       checkIn: leadInput.checkIn || '',
       checkOut: leadInput.checkOut || '',
@@ -3262,11 +3284,12 @@ async function quickCaptureLead(input, options = {}) {
   const client = options.client || supabaseClient;
   const phone = String(data.phone || '').trim();
   const sourceId = String(data.sourceId || '').trim();
-  const channel = String(data.channel || '').trim();
+  const rawChannel = String(data.channel || '').trim();
 
   if (!phone) throw new Error('Hızlı kayıt için telefon numarası zorunludur.');
   if (!sourceId) throw new Error('“Nereden geldi” kaynağı zorunludur.');
-  if (!channel) throw new Error('İletişim kanalı zorunludur.');
+  if (!rawChannel) throw new Error('İletişim kanalı zorunludur.');
+  const channel = normalizeLeadChannel(rawChannel);
   if (!client || typeof client.rpc !== 'function') throw new Error('Bulut bağlantısı kurulamadı. Talep kaydedilmedi.');
   if (!options.tenantId) requireCloudForWrite('Hızlı talep kaydı', tenantId);
 
@@ -4798,7 +4821,7 @@ const ACTIVE_RENDER_PLANS = {
   // (ENVANTER Finans 28.09.2026); olu tab-dashboard da silindi (A1-G1).
   'tab-finance': ['renderFinanceModule'],
   'tab-reservations': ['renderManageBookingsTable', 'renderTapeChart'],
-  'tab-expenses': ['renderExpensesTable'],
+  'tab-expenses': ['renderExpenseTemplates', 'renderExpensesTable'],
   'tab-leads': ['renderLeadQuickCapture', 'renderLeadSalesWorkspace', 'renderManageLeadsTable', 'renderLeadAnalytics'],
   'tab-maintenance': ['renderManageMaintTable'],
   'tab-housekeeping': ['renderHousekeepingTab'],
@@ -4833,6 +4856,7 @@ function renderAll() {
     renderFinanceModule,
     renderManageBookingsTable,
     renderExpensesTable,
+    renderExpenseTemplates,
     renderLeadQuickCapture,
     renderLeadSalesWorkspace,
     renderManageLeadsTable,
@@ -5927,6 +5951,10 @@ function isDirectBookingChannel(channel, channels) {
 // -------------------------------------------------------------
 // GİDER DEFTERİ (EXPENSES CRUD)
 // -------------------------------------------------------------
+function isAdsPeriodExpense(expense) {
+  return String(expense?.legacyId || expense?.legacy_id || '').startsWith('ADS_PERIOD:');
+}
+
 function renderExpensesTable() {
   const tbody = document.getElementById('expensesTableBody');
   if (!tbody) return;
@@ -5949,6 +5977,7 @@ function renderExpensesTable() {
   renderTablePagination('expensesPagination', 'expenses', pageInfo, 'renderExpensesTable');
   pageInfo.rows.forEach(exp => {
     const tr = document.createElement('tr');
+    const adsManaged = isAdsPeriodExpense(exp);
     tr.innerHTML = `
       <td>${formatTrDate(exp.date)}</td>
       <td><span class="badge ${exp.type === 'CAPEX' ? 'badge-amber' : 'badge-blue'}">${exp.type === 'CAPEX' ? 'Yatırım (Capex)' : 'Operasyonel (Opex)'}</span></td>
@@ -5957,12 +5986,124 @@ function renderExpensesTable() {
       <td>${escapeHtml(exp.description || exp.desc || "-")}</td>
       <td><strong>${Number(exp.amount).toLocaleString('tr-TR')} TL</strong></td>
       <td style="text-align: right; white-space: nowrap;">
-        <button class="btn btn-secondary btn-sm" data-onclick="editExpense(decodeURIComponent('${encodeActionArg(String(exp.id))}'))">✏️</button>
-        <button class="btn btn-danger btn-sm" data-onclick="deleteExpenseUI(decodeURIComponent('${encodeActionArg(String(exp.id))}'))">🗑️</button>
+        ${adsManaged ? '<span class="badge badge-blue">Reklamlar’dan yönetin</span>' : `<button class="btn btn-secondary btn-sm" data-onclick="editExpense(decodeURIComponent('${encodeActionArg(String(exp.id))}'))">✏️</button>
+        <button class="btn btn-danger btn-sm" data-onclick="deleteExpenseUI(decodeURIComponent('${encodeActionArg(String(exp.id))}'))">🗑️</button>`}
       </td>
     `;
     tbody.appendChild(tr);
   });
+}
+
+function renderExpenseTemplates() {
+  const tbody = document.getElementById('expenseTemplatesTableBody');
+  if (!tbody) return;
+  const status = document.getElementById('expenseTemplatesStatus');
+  const select = document.getElementById('expenseTemplateProperty');
+  if (select) {
+    const selected = select.value || 'ALL';
+    select.innerHTML = '<option value="ALL">Tüm Portföy</option>' + Object.values(appData.villas || {})
+      .map(property => `<option value="${escapeHtml(property.id)}">${escapeHtml(property.name || property.slug)}</option>`).join('');
+    select.value = [...select.options].some(option => option.value === selected) ? selected : 'ALL';
+  }
+  if (appData.phase78SchemaReady === false) {
+    if (status) { status.hidden = false; status.textContent = 'Göç bekleniyor: phase78 gider şablonları henüz kullanılamıyor.'; }
+    tbody.innerHTML = '<tr><td colspan="5">Gider şablonu şeması hazır değil.</td></tr>';
+    return;
+  }
+  if (status) status.hidden = true;
+  const month = /^\d{4}-\d{2}$/.test(String(currentFilter?.period || '')) ? currentFilter.period : getTodayStr().slice(0, 7);
+  const occurred = new Set((appData.expenseTemplateOccurrences || [])
+    .filter(row => String(row.period_month || '').slice(0, 7) === month)
+    .map(row => row.template_id));
+  const rows = (appData.expenseTemplates || []).filter(row => row.is_active !== false);
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;">Kayıtlı gider şablonu yok.</td></tr>';
+    return;
+  }
+  const canManage = canManageTenantRole(activeTenant?.role);
+  tbody.innerHTML = rows.map(row => {
+    const property = Object.values(appData.villas || {}).find(item => item.id === row.property_id);
+    const done = occurred.has(row.id);
+    const actions = canManage
+      ? `${done ? `<span class="badge badge-green">${escapeHtml(month)} işlendi</span>` : `<button class="btn btn-primary btn-sm" data-onclick="generateExpenseFromTemplate(decodeURIComponent('${encodeActionArg(row.id)}'))">${escapeHtml(month)} ayına işle</button>`}
+         <button class="btn btn-danger btn-sm" data-onclick="deleteExpenseTemplate(decodeURIComponent('${encodeActionArg(row.id)}'))">Sil</button>`
+      : (done ? `<span class="badge badge-green">${escapeHtml(month)} işlendi</span>` : 'Henüz işlenmedi');
+    return `<tr><td><strong>${escapeHtml(row.name)}</strong><br><small>${escapeHtml(row.description || '')}</small></td><td>${escapeHtml(row.category)} · ${escapeHtml(row.expense_type)}</td><td>${escapeHtml(property?.name || 'Tüm Portföy')}</td><td>${Number(row.amount).toLocaleString('tr-TR')} TL</td><td>${actions}</td></tr>`;
+  }).join('');
+}
+
+async function saveExpenseTemplate(event) {
+  event?.preventDefault?.();
+  if (!canManageTenantRole(activeTenant?.role)) return false;
+  try {
+    const tenantId = getActiveTenantId();
+    const propertyValue = document.getElementById('expenseTemplateProperty')?.value || 'ALL';
+    const payload = {
+      tenant_id: tenantId,
+      property_id: propertyValue === 'ALL' ? null : propertyValue,
+      name: (document.getElementById('expenseTemplateName')?.value || '').trim(),
+      category: document.getElementById('expenseTemplateCategory')?.value || 'Diğer',
+      expense_type: document.getElementById('expenseTemplateType')?.value === 'CAPEX' ? 'CAPEX' : 'OPEX',
+      amount: Number(document.getElementById('expenseTemplateAmount')?.value),
+      description: (document.getElementById('expenseTemplateDescription')?.value || '').trim() || null
+    };
+    if (!payload.name || !(payload.amount > 0)) throw new Error('Şablon adı ve pozitif tutar zorunludur.');
+    const { data, error } = await supabaseClient.from('expense_templates').insert(payload).select().single();
+    if (error) throw error;
+    appData.expenseTemplates = [...(appData.expenseTemplates || []), data];
+    document.getElementById('expenseTemplateForm')?.reset();
+    renderExpenseTemplates();
+    if (typeof showToast === 'function') showToast('Gider şablonu oluşturuldu.', 'success');
+    return data;
+  } catch (error) {
+    if (typeof showToast === 'function') showToast('Gider şablonu oluşturulamadı: ' + getFriendlyAuthErrorMessage(error), 'error');
+    return false;
+  }
+}
+
+async function generateExpenseFromTemplate(templateId) {
+  if (!canManageTenantRole(activeTenant?.role)) return false;
+  const month = /^\d{4}-\d{2}$/.test(String(currentFilter?.period || '')) ? currentFilter.period : getTodayStr().slice(0, 7);
+  try {
+    if (isPeriodClosed(month + '-01')) throw new Error(`Bu dönem (${month}) kapatılmıştır.`);
+    const tenantId = getActiveTenantId();
+    const { data, error } = await supabaseClient.rpc('generate_expense_from_template', {
+      p_tenant_id: tenantId,
+      p_template_id: templateId,
+      p_period_month: month + '-01'
+    });
+    if (error) {
+      if (error.code === '23505' || /already|duplicate|SABLON_DONEMI_ZATEN_ISLENDI/i.test(error.message || '')) throw new Error(`${month} dönemi bu şablondan zaten işlendi.`);
+      throw error;
+    }
+    invalidateExecutiveSnapshotCache();
+    await loadExpenses(tenantId);
+    appData.expenseTemplateOccurrences = await fetchTenantRowsTolerant(() => supabaseClient.from('expense_template_occurrences').select('*').eq('tenant_id', tenantId));
+    renderExpenseTemplates();
+    if (typeof showToast === 'function') showToast(`${month} gideri oluşturuldu.`, 'success');
+    return data;
+  } catch (error) {
+    if (typeof showToast === 'function') showToast('Gider oluşturulamadı: ' + getFriendlyAuthErrorMessage(error), 'error');
+    return false;
+  }
+}
+
+async function deleteExpenseTemplate(templateId) {
+  if (!canManageTenantRole(activeTenant?.role)) return false;
+  if (typeof confirm === 'function' && !confirm('Bu gider şablonunu silmek istiyor musunuz? Daha önce üretilen giderler korunur.')) return false;
+  try {
+    const { data, error } = await supabaseClient.from('expense_templates').delete()
+      .eq('tenant_id', getActiveTenantId()).eq('id', templateId).select('id').maybeSingle();
+    if (error) throw error;
+    if (!data) throw new Error('Şablon bulunamadı veya silme yetkiniz yok.');
+    appData.expenseTemplates = (appData.expenseTemplates || []).filter(row => row.id !== templateId);
+    renderExpenseTemplates();
+    if (typeof showToast === 'function') showToast('Gider şablonu silindi.', 'success');
+    return true;
+  } catch (error) {
+    if (typeof showToast === 'function') showToast('Gider şablonu silinemedi: ' + getFriendlyAuthErrorMessage(error), 'error');
+    return false;
+  }
 }
 
 function openExpenseModal(editId = null) {
@@ -6033,10 +6174,21 @@ async function saveExpense(e) {
 }
 
 function editExpense(id) {
+  const expense = (appData.expenses || []).find(item => item.id === id);
+  if (isAdsPeriodExpense(expense)) {
+    if (typeof showToast === 'function') showToast('Bu gider Reklamlar ekranındaki dönemden yönetilir.', 'error');
+    return false;
+  }
   openExpenseModal(id);
+  return true;
 }
 
 async function deleteExpenseUI(id) {
+  const expense = (appData.expenses || []).find(item => item.id === id);
+  if (isAdsPeriodExpense(expense)) {
+    if (typeof showToast === 'function') showToast('Bu gider Reklamlar ekranındaki dönemden yönetilir.', 'error');
+    return false;
+  }
   if (typeof confirm === 'function' && !confirm('Bu harcamayı silmek istediğinizden emin misiniz?')) {
     return false;
   }
@@ -9634,6 +9786,23 @@ let lastLeadSourceId = '';
 let leadViewMode = 'KANBAN';
 let leadFollowUpScope = 'MINE';
 
+function toIstanbulDateTimeLocal(value) {
+  const timestamp = Date.parse(String(value || ''));
+  if (!Number.isFinite(timestamp)) return '';
+  return new Date(timestamp + 3 * 60 * 60 * 1000).toISOString().slice(0, 16);
+}
+
+function fromIstanbulDateTimeLocal(value) {
+  const local = String(value || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(local)) return null;
+  const date = new Date(`${local}:00+03:00`);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function istanbulDateKey(value) {
+  return toIstanbulDateTimeLocal(value).slice(0, 10);
+}
+
 function buildLeadSalesView({ leads = [], sources = [], acquisitions = [], workflows = [], today = '', currentUserId = '' } = {}) {
   const sourceById = new Map(sources.map(source => [source.id, source]));
   const acquisitionByLead = new Map(acquisitions.map(row => [row.lead_id, row]));
@@ -9645,6 +9814,7 @@ function buildLeadSalesView({ leads = [], sources = [], acquisitions = [], workf
     const source = acquisition ? sourceById.get(acquisition.source_id) : null;
     return {
       ...lead,
+      channel: normalizeLeadChannel(lead.channel),
       sourceId: acquisition?.source_id || null,
       sourceLabel: source?.label || '—',
       assignedTo: workflow?.assigned_to || null,
@@ -9653,7 +9823,9 @@ function buildLeadSalesView({ leads = [], sources = [], acquisitions = [], workf
   }).sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
   rows.forEach(row => (columns[row.status] || columns.NEW).push(row));
   const followUpsToday = rows
-    .filter(row => String(row.nextFollowUpAt || '').slice(0, 10) === today)
+    .filter(row => row.nextFollowUpAt
+      && istanbulDateKey(row.nextFollowUpAt) <= today
+      && !['WON', 'LOST'].includes(String(row.status || '').toUpperCase()))
     .sort((a, b) => String(a.nextFollowUpAt).localeCompare(String(b.nextFollowUpAt)));
   return { rows, columns, followUpsToday, myFollowUpsToday: followUpsToday.filter(row => row.assignedTo === currentUserId) };
 }
@@ -9711,7 +9883,7 @@ function renderLeadSalesWorkspace() {
   document.getElementById('leadFollowUpMine')?.classList.toggle('active', leadFollowUpScope === 'MINE');
   document.getElementById('leadFollowUpAll')?.classList.toggle('active', leadFollowUpScope === 'ALL');
   followUpList.innerHTML = followUps.length
-    ? followUps.map(row => `<div class="lead-followup-row"><div><strong>${escapeHtml(row.guest || 'Ad girilmedi')}</strong><span>${escapeHtml(row.sourceLabel)} · ${escapeHtml(String(row.nextFollowUpAt || '').slice(11, 16) || 'Saat belirtilmedi')}</span></div><button type="button" class="btn btn-secondary btn-sm" data-onclick="editLead(decodeURIComponent('${encodeActionArg(row.id)}'))">Talebi aç</button></div>`).join('')
+    ? followUps.map(row => `<div class="lead-followup-row"><div><strong>${escapeHtml(row.guest || 'Ad girilmedi')}</strong><span>${escapeHtml(row.sourceLabel)} · ${escapeHtml(toIstanbulDateTimeLocal(row.nextFollowUpAt).slice(11, 16) || 'Saat belirtilmedi')}</span></div><button type="button" class="btn btn-secondary btn-sm" data-onclick="editLead(decodeURIComponent('${encodeActionArg(row.id)}'))">Talebi aç</button></div>`).join('')
     : '<p class="empty-state">Bu kapsamda bugün aranacak talep yok.</p>';
 }
 
@@ -9745,10 +9917,15 @@ function renderLeadQuickCapture() {
   });
   const selectedSource = sortedSources.some(source => source.id === sourceSelect.value)
     ? sourceSelect.value
-    : (lastLeadSourceId || sortedSources.find(source => source.code === 'UNKNOWN')?.id || sortedSources[0]?.id || '');
+    : '';
   sourceSelect.innerHTML = sortedSources.length
-    ? sortedSources.map(source => `<option value="${escapeHtml(source.id)}"${source.id === selectedSource ? ' selected' : ''}>${escapeHtml(source.label || 'Adlandırılmamış kaynak')}</option>`).join('')
+    ? '<option value="">Kaynak seçin…</option>' + sortedSources.map(source => `<option value="${escapeHtml(source.id)}"${source.id === selectedSource ? ' selected' : ''}>${escapeHtml(source.label || 'Adlandırılmamış kaynak')}</option>`).join('')
     : '<option value="">Kaynak bulunamadı — yöneticinizden kaynak eklemesini isteyin</option>';
+  const waSource = document.getElementById('waParsedSource');
+  if (waSource) {
+    const currentWaSource = sortedSources.some(source => source.id === waSource.value) ? waSource.value : '';
+    waSource.innerHTML = '<option value="">Kaynak seçin…</option>' + sortedSources.map(source => `<option value="${escapeHtml(source.id)}"${source.id === currentWaSource ? ' selected' : ''}>${escapeHtml(source.label || 'Adlandırılmamış kaynak')}</option>`).join('');
+  }
 
   const selectedProperty = propertySelect.value;
   const properties = Object.values(appData.villas || {}).filter(property => property && property.isActive !== false && !property.archivedAt);
@@ -9791,11 +9968,12 @@ async function addLeadSource() {
 async function bumpLeadInterestFromQuick(delta) {
   if (!canWriteSalesRole(activeTenant?.role)) return false;
   const sourceId = document.getElementById('leadQuickSource')?.value || '';
-  const channel = document.getElementById('leadQuickChannel')?.value || '';
-  if (!sourceId || !channel) {
+  const rawChannel = document.getElementById('leadQuickChannel')?.value || '';
+  if (!sourceId || !rawChannel) {
     setLeadQuickMessage('İlgi sayacı için kaynak ve iletişim kanalı seçin.', 'error');
     return false;
   }
+  const channel = normalizeLeadChannel(rawChannel);
   try {
     const result = await SalesWorkflowService.bumpInterest(supabaseClient, {
       tenantId: getActiveTenantId(), day: getTodayStr(), sourceId, channel, delta
@@ -9971,7 +10149,7 @@ function openLeadModal(editId = null) {
     editInput.value = l.id;
     document.getElementById('leadGuest').value = l.guestName || l.guest;
     document.getElementById('leadVilla').value = l.villa;
-    document.getElementById('leadChannel').value = l.channel;
+    document.getElementById('leadChannel').value = normalizeLeadChannel(l.channel);
     document.getElementById('leadQuote').value = l.quote;
     document.getElementById('leadStatus').value = l.status;
     document.getElementById('leadLostReason').value = l.lostReason || '-';
@@ -9979,7 +10157,7 @@ function openLeadModal(editId = null) {
     const workflow = (appData.leadWorkflows || []).find(row => row.lead_id === l.id);
     if (assignee) assignee.value = workflow?.assigned_to || '';
     const followUp = document.getElementById('leadNextFollowUp');
-    if (followUp) followUp.value = workflow?.next_follow_up_at ? String(workflow.next_follow_up_at).slice(0, 16) : '';
+    if (followUp) followUp.value = workflow?.next_follow_up_at ? toIstanbulDateTimeLocal(workflow.next_follow_up_at) : '';
     const templateSelect = document.getElementById('leadMessageTemplate');
     const templateRow = document.getElementById('leadMessageTemplateRow');
     const lifecycle = l.status === 'QUOTE_SENT' ? 'LEAD_QUOTE_FOLLOW_UP' : 'LEAD_REENGAGEMENT';
@@ -10037,7 +10215,7 @@ async function saveLead(e) {
   const editId = document.getElementById('leadEditId').value;
   const guest = document.getElementById('leadGuest').value.trim();
   const villa = document.getElementById('leadVilla').value;
-  const channel = document.getElementById('leadChannel').value;
+  const channel = normalizeLeadChannel(document.getElementById('leadChannel').value);
   const quote = Number(document.getElementById('leadQuote').value) || 0;
   const status = document.getElementById('leadStatus').value;
   const lostReason = document.getElementById('leadLostReason').value;
@@ -10045,16 +10223,16 @@ async function saveLead(e) {
   const assignedTo = document.getElementById('leadAssignedTo')?.value || null;
   let nextFollowUpAt = document.getElementById('leadNextFollowUp')?.value || null;
   if (status === 'QUOTE_SENT' && !nextFollowUpAt) {
-    const date = new Date(`${getTodayStr()}T10:00:00`);
-    date.setDate(date.getDate() + 2);
+    const date = new Date(`${getTodayStr()}T10:00:00+03:00`);
+    date.setUTCDate(date.getUTCDate() + 2);
     nextFollowUpAt = date.toISOString();
   } else if (nextFollowUpAt) {
-    const date = new Date(nextFollowUpAt);
-    if (Number.isNaN(date.getTime())) {
+    const normalized = fromIstanbulDateTimeLocal(nextFollowUpAt);
+    if (!normalized) {
       alert('Hata: Geçerli bir takip tarihi seçin.');
       return;
     }
-    nextFollowUpAt = date.toISOString();
+    nextFollowUpAt = normalized;
   }
 
   const payload = buildLeadEditPayload(editId, {
@@ -11782,23 +11960,24 @@ function parseWhatsAppMessage() {
  * appData guncellemesi oradadir.
  */
 async function saveWaAsLead() {
-  const guest = document.getElementById('waParsedGuest').value.trim() || 'WhatsApp Misafiri';
+  const guest = document.getElementById('waParsedGuest').value.trim();
   const villa = document.getElementById('waParsedVilla').value;
   const quote = Number(document.getElementById('waParsedAmount').value) || 0;
   const phone = document.getElementById('waParsedPhone').value.trim();
+  const sourceId = document.getElementById('waParsedSource')?.value || '';
   const notes = document.getElementById('waParsedNotes').value.trim();
 
   try {
-    await createLead({
-      guest: guest,
+    await quickCaptureLead({
       guestName: guest,
-      phone: phone,
-      villa: villa,
+      phone,
+      sourceId,
+      propertyId: appData.villas?.[villa]?.id || null,
       channel: 'WhatsApp',
-      quote: quote,
-      status: 'FOLLOW_UP',
-      notes: notes || 'WhatsApp Business talebi'
+      note: [notes, quote > 0 ? `Teklif: ₺${quote.toLocaleString('tr-TR')}` : ''].filter(Boolean).join(' · ')
     });
+    await loadLeads(getActiveTenantId());
+    await refreshLeadSalesContext();
   } catch (err) {
     alert('⚠️ Talep kaydedilemedi: ' + (err?.message || 'veritabanı hatası'));
     return;
@@ -11808,7 +11987,7 @@ async function saveWaAsLead() {
   switchTab('leads');
   renderManageLeadsTable();
 
-  alert(`✅ WhatsApp talebi "${guest}" başarıyla Lead & Satış listesine kaydedildi!`);
+  alert(`✅ WhatsApp talebi${guest ? ` "${guest}"` : ''} başarıyla Talep & Satış listesine kaydedildi!`);
 }
 
 async function saveWaAsBooking() {
@@ -14795,7 +14974,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
         : Promise.resolve([]);
       // Independent datasets are loaded concurrently and every list is paged;
       // Supabase's per-response cap must never silently truncate a dashboard.
-      const [villas, bookings, expenses, cleanList, leads, leadSalesContext, closeList, targetList, maintenanceTickets, operationalTasks, financialTransactions, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications, campaignRows, influencerRows, settingRows, operatorNoteRows, pricingLadderRows, hkOverrideRows, paymentCommissionRows, operationalPeopleRows, cleaningExecutionRows, maintenanceAssignmentRows, taskTemplateRows, checklistTemplateRows, bookingPayments, bookingPaymentBalances, adMetricPeriods, propertyContextRows, propertyOwnerRows, propertyOwnerLinkRows, messageTemplateRows, guestClassificationRows, salesMembers, propertyPricingRuleRows, competitorResearchRows] = await Promise.all([
+      const [villas, bookings, expenses, cleanList, leads, leadSalesContext, closeList, targetList, maintenanceTickets, operationalTasks, financialTransactions, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications, campaignRows, influencerRows, settingRows, operatorNoteRows, pricingLadderRows, hkOverrideRows, paymentCommissionRows, operationalPeopleRows, cleaningExecutionRows, maintenanceAssignmentRows, taskTemplateRows, checklistTemplateRows, bookingPayments, bookingPaymentBalances, adMetricPeriods, propertyContextRows, propertyOwnerRows, propertyOwnerLinkRows, messageTemplateRows, guestClassificationRows, salesMembers, propertyPricingRuleRows, competitorResearchRows, expenseTemplateRows, expenseTemplateOccurrenceRows] = await Promise.all([
         loadProperties(tenantId),
         loadBookings(tenantId),
         mayReadLedger ? loadExpenses(tenantId) : Promise.resolve([]),
@@ -14842,7 +15021,9 @@ async function loadTenantAppData(tenantIdOrUserId) {
         mayManageAds ? fetchTenantRowsTolerant(() => supabaseClient.from('guest_private_classifications').select('*').eq('tenant_id', tenantId)) : Promise.resolve([]),
         salesMembersPromise,
         mayReadSales ? fetchTenantRowsTolerant(() => supabaseClient.from('property_pricing_rule_settings').select('*').eq('tenant_id', tenantId)) : Promise.resolve([]),
-        mayReadSales ? fetchTenantRowsTolerant(() => supabaseClient.from('competitor_price_research').select('*').eq('tenant_id', tenantId).order('researched_on', { ascending: false }).order('created_at', { ascending: false })) : Promise.resolve([])
+        mayReadSales ? fetchTenantRowsTolerant(() => supabaseClient.from('competitor_price_research').select('*').eq('tenant_id', tenantId).order('researched_on', { ascending: false }).order('created_at', { ascending: false })) : Promise.resolve([]),
+        mayReadLedger ? fetchTenantRowsTolerant(() => supabaseClient.from('expense_templates').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false })) : Promise.resolve([]),
+        mayReadLedger ? fetchTenantRowsTolerant(() => supabaseClient.from('expense_template_occurrences').select('*').eq('tenant_id', tenantId).order('period_month', { ascending: false })) : Promise.resolve([])
       ]);
       const propIdMap = {};
       Object.values(villas || {}).forEach(p => {
@@ -14953,7 +15134,10 @@ async function loadTenantAppData(tenantIdOrUserId) {
         salesMembers: salesMembers || [],
         propertyPricingRules: propertyPricingRuleRows || [],
         competitorPriceResearch: competitorResearchRows || [],
-        phase78SchemaReady: propertyPricingRuleRows !== null && competitorResearchRows !== null,
+        expenseTemplates: expenseTemplateRows || [],
+        expenseTemplateOccurrences: expenseTemplateOccurrenceRows || [],
+        phase78SchemaReady: propertyPricingRuleRows !== null && competitorResearchRows !== null
+          && expenseTemplateRows !== null && expenseTemplateOccurrenceRows !== null,
         influencerCollabs: (influencerRows || []).map(r => mapInfluencerCollabFromDb(r, propIdMap)),
         housekeepingOverrides,
         airbnbListings,
@@ -15015,6 +15199,8 @@ function getBlankTenantData(userId) {
     scheduledMessages: [],
     extensionOffers: [],
     expenses: [],
+    expenseTemplates: [],
+    expenseTemplateOccurrences: [],
     cleaningTasks: [],
     leads: [],
     leadSources: [],
@@ -16642,18 +16828,24 @@ function renderTodayMonthSummary(bookings) {
   const element = document.getElementById('todayMonthSummary');
   if (!element) return;
   const month = getTodayStr().slice(0, 7);
-  const monthly = bookings.filter(item => item.status !== 'CANCELLED' && String(item.checkIn || '').startsWith(month));
+  const villa = currentFilter?.villa || 'ALL';
+  const propertyId = villa === 'ALL' ? null : appData?.villas?.[villa]?.id;
+  const monthEnd = getLedgerContract().monthRange(month)?.end;
+  const monthly = bookings.filter(item => item.status !== 'CANCELLED' && !isBulkSummaryBooking(item)
+    && (villa === 'ALL' || item.villa === villa || (propertyId && item.propertyId === propertyId))
+    && String(item.checkIn || '') <= monthEnd && String(item.checkOut || '') > `${month}-01`);
   if (!canReadLedgerRole(activeTenant?.role)) {
     element.textContent = `Bu ay · ${monthly.length} rezervasyon · finans özeti bu rolde gösterilmez`;
     return;
   }
-  const snapshot = executiveSnapshotState?.current;
-  if (!snapshot) {
-    element.textContent = `Bu ay · ${monthly.length} rezervasyon · finans özeti hazırlanıyor`;
-    return;
-  }
-  const revenue = snapshot.room_revenue ?? snapshot.revenue ?? null;
-  const occupancy = snapshot.occupancy_rate ?? snapshot.occupancy ?? null;
+  const actuals = computeMonthActuals(month, villa);
+  const revenue = actuals.ciro;
+  const [year, monthNumber] = month.split('-').map(Number);
+  const properties = villa === 'ALL' ? Object.values(appData?.villas || {}) : [appData?.villas?.[villa]].filter(Boolean);
+  const available = typeof FinancialMetricsService !== 'undefined'
+    ? FinancialMetricsService.calculateAvailableNights(properties, year, monthNumber, appData?.maintenance || [])
+    : null;
+  const occupancy = available > 0 ? Number(((actuals.nights / available) * 100).toFixed(1)) : null;
   element.textContent = `Bu ay · ${monthly.length} rezervasyon · Ciro ${revenue == null ? '—' : `₺${Number(revenue).toLocaleString('tr-TR')}`} · Doluluk ${occupancy == null ? '—' : `%${Number(occupancy).toLocaleString('tr-TR')}`}`;
 }
 
@@ -17097,8 +17289,11 @@ function closeAiActionConfirmModal() {
 }
 
 function isCanonicalAiActionReady(action) {
+  const startDate = action?.startDate || action?.date;
+  const endDate = action?.endDate || action?.date;
   return !!(action && action.type === 'GAP_DISCOUNT' && isUUID(action.propertyId) &&
-    /^\d{4}-\d{2}-\d{2}$/.test(String(action.date || '')) && Number(action.rate) > 0);
+    /^\d{4}-\d{2}-\d{2}$/.test(String(startDate || '')) &&
+    /^\d{4}-\d{2}-\d{2}$/.test(String(endDate || '')) && endDate >= startDate && Number(action.rate) > 0);
 }
 
 async function executeCanonicalAiAction(action, services = {}) {
@@ -17107,13 +17302,31 @@ async function executeCanonicalAiAction(action, services = {}) {
   }
 
   const persistOverride = services.saveManualPricingOverride || saveManualPricingOverride;
+  const startDate = action.startDate || action.date;
+  const endDate = action.endDate || action.date;
   return await persistOverride({
     propertyId: action.propertyId,
-    startDate: action.date,
-    endDate: action.date,
+    startDate,
+    endDate,
     rate: Number(action.rate),
     reason: 'Komuta Merkezi: boş gece fiyatı'
   });
+}
+
+function resolveGapDiscountAction(entityId, gaps = [], villas = {}) {
+  const gap = gaps.find(item => `gap-${item.checkIn}-${item.villaKey}` === entityId);
+  const propertyId = gap && (villas?.[gap.villaKey]?.id || (isUUID(gap.villaKey) ? gap.villaKey : null));
+  const nights = Number(gap?.nights);
+  const total = Number(gap?.discountPrice);
+  if (!gap || !isUUID(propertyId) || !Number.isFinite(nights) || nights <= 0 || !Number.isFinite(total) || total <= 0) return null;
+  const finalNight = new Date(`${gap.checkOut}T00:00:00Z`);
+  finalNight.setUTCDate(finalNight.getUTCDate() - 1);
+  return {
+    type: 'GAP_DISCOUNT', propertyId,
+    startDate: gap.checkIn,
+    endDate: finalNight.toISOString().slice(0, 10),
+    rate: Math.round((total / nights) * 100) / 100
+  };
 }
 
 async function executeAiActionConfirmed() {
@@ -17482,6 +17695,24 @@ async function savePropertyPricingLadder(villaKey) {
   return true;
 }
 
+function buildPropertyHistoryView(report = {}, role = activeTenant?.role) {
+  const showLedger = canReadLedgerRole(role);
+  const profitUnmeasured = showLedger && isProfitUnmeasured(
+    report.totalRevenue,
+    report.totalOpex,
+    report.capex,
+    null
+  );
+  return {
+    showLedger,
+    totalOpex: showLedger ? report.totalOpex : null,
+    netProfit: showLedger && !profitUnmeasured ? report.netProfit : null,
+    reason: !showLedger
+      ? 'Bu rol gider ve kâr verisini görüntüleyemez.'
+      : profitUnmeasured ? OLCULEMEYEN_KAR_NOTU : null
+  };
+}
+
 function renderPropertyProfile(villaKey) {
   const property = appData?.villas?.[villaKey];
   if (!property || typeof PropertyProfileEngine === 'undefined') return '';
@@ -17515,7 +17746,11 @@ function renderPropertyProfile(villaKey) {
     body = rendered ? `<div style="display:flex;gap:8px;flex-wrap:wrap">${rendered}</div>` : '<p class="empty-state">Kanal veya sosyal profil bağlantısı girilmemiş.</p>';
   } else {
     const history = (appData.bookings || []).filter(row => row.propertyId === property.id || row.villa === villaKey).sort((a, b) => String(b.checkIn || '').localeCompare(String(a.checkIn || ''))).slice(0, 8);
-    body = `<div class="property-profile-grid"><div><span class="sub-text">Net konaklama cirosu</span><strong>${propertyMoney(report.netRoomRevenue)}</strong></div><div><span class="sub-text">Toplam OPEX</span><strong>${propertyMoney(report.totalOpex)}</strong></div><div><span class="sub-text">Net kâr</span><strong>${propertyMoney(report.netProfit)}</strong></div><div><span class="sub-text">Satılan gece</span><strong>${escapeHtml(report.soldNights)}</strong></div><div><span class="sub-text">ADR</span><strong>${propertyMoney(report.adr)}</strong></div></div><div style="margin-top:12px">${history.length ? history.map(row => `<div class="lead-followup-row"><strong>${escapeHtml(row.guest || 'Misafir')}</strong><span>${escapeHtml(row.checkIn || '—')} → ${escapeHtml(row.checkOut || '—')}</span></div>`).join('') : '<p class="empty-state">Henüz konaklama geçmişi yok.</p>'}</div><p class="sub-text">Rapor LedgerContract tek defterinden, tüm zamanlar ve yalnız bu mülk kapsamında üretilir.</p>`;
+    const financial = buildPropertyHistoryView(report);
+    const ledgerHtml = financial.showLedger
+      ? `<div><span class="sub-text">Toplam OPEX</span><strong>${propertyMoney(financial.totalOpex)}</strong></div><div><span class="sub-text">Net kâr</span><strong>${propertyMoney(financial.netProfit)}</strong>${financial.reason ? `<small>${escapeHtml(financial.reason)}</small>` : ''}</div>`
+      : '';
+    body = `<div class="property-profile-grid"><div><span class="sub-text">Net konaklama cirosu</span><strong>${propertyMoney(report.netRoomRevenue)}</strong></div>${ledgerHtml}<div><span class="sub-text">Satılan gece</span><strong>${escapeHtml(report.soldNights)}</strong></div><div><span class="sub-text">ADR</span><strong>${propertyMoney(report.adr)}</strong></div></div>${financial.showLedger ? '' : `<p class="sub-text">${escapeHtml(financial.reason)}</p>`}<div style="margin-top:12px">${history.length ? history.map(row => `<div class="lead-followup-row"><strong>${escapeHtml(row.guest || 'Misafir')}</strong><span>${escapeHtml(row.checkIn || '—')} → ${escapeHtml(row.checkOut || '—')}</span></div>`).join('') : '<p class="empty-state">Henüz konaklama geçmişi yok.</p>'}</div><p class="sub-text">Rapor LedgerContract tek defterinden, tüm zamanlar ve yalnız bu mülk kapsamında üretilir.</p>`;
   }
   const editButton = canManageTenantRole(activeTenant?.role) ? `<button class="btn btn-secondary btn-sm" data-onclick="openPropertyModal(decodeURIComponent('${encodeActionArg(villaKey)}'))">Düzenle</button>` : '';
   return `<section class="card property-profile-card"><div class="section-title-bar"><div><h2>${escapeHtml(property.name)}</h2><p class="sub-text">Sekmeli mülk profili</p></div>${editButton}</div><div class="subpage-switch" role="tablist" aria-label="Mülk profili">${tabButtons}</div><div style="margin-top:14px">${propertyProfileBodyHtml(body)}</div></section>`;
@@ -17579,14 +17814,23 @@ function getOperationsApi() {
 
 let staffFieldWork = { cleanings: [], tasks: [], tickets: [] };
 
+function getStaffFieldWorkRange(today, lookbackDays = 60) {
+  const to = String(today || '').slice(0, 10);
+  const date = new Date(`${to}T12:00:00Z`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(to) || Number.isNaN(date.getTime())) return { from: to, to };
+  date.setUTCDate(date.getUTCDate() - Math.min(60, Math.max(0, Number(lookbackDays) || 0)));
+  return { from: date.toISOString().slice(0, 10), to };
+}
+
 async function loadStaffFieldWork() {
   const tenantId = getActiveTenantId();
   const today = getTodayStr();
+  const range = getStaffFieldWorkRange(today);
   if (!tenantId || !supabaseClient) return staffFieldWork;
   const { data, error } = await supabaseClient.rpc('get_my_field_work', {
     p_tenant_id: tenantId,
-    p_from: today,
-    p_to: today
+    p_from: range.from,
+    p_to: range.to
   });
   if (error) {
     staffFieldWork = { cleanings: [], tasks: [], tickets: [], error: getFriendlyAuthErrorMessage(error) };
@@ -17647,6 +17891,19 @@ async function signStaffCleaningDone(executionId) {
   return true;
 }
 
+async function setMyOperationalTaskStatus(taskId, status) {
+  if (!['IN_PROGRESS', 'DONE'].includes(status)) return false;
+  const { error } = await supabaseClient.rpc('set_my_task_status', {
+    p_task_id: taskId, p_status: status, p_note: null
+  });
+  if (error) {
+    if (typeof showToast === 'function') showToast('⚠️ Görev güncellenemedi: ' + getFriendlyAuthErrorMessage(error), 'error');
+    return false;
+  }
+  await loadStaffFieldWork();
+  return true;
+}
+
 function renderStaffFieldWork() {
   if (typeof document === 'undefined') return;
   const container = document.getElementById('staffFieldWorkContainer');
@@ -17659,10 +17916,16 @@ function renderStaffFieldWork() {
   container.innerHTML = rows.length ? rows.map(row => {
     const access = row.access || {};
     const locked = ['CLEANED', 'INSPECTED'].includes(row.status);
-    const sections = (row.checklist?.sections || []).map((section, sectionIndex) => `<fieldset class="staff-check-section"><legend>${escapeHtml(section.title || 'Kontrol')}</legend>${(section.items || []).map((item, itemIndex) => { const key = `s${sectionIndex}.i${itemIndex}`; const checked = row.checklist_result?.[key]?.z === true; return `<label><input type="checkbox" ${checked ? 'checked' : ''} ${locked ? 'disabled' : ''} data-onchange="setStaffChecklistMark(decodeURIComponent('${encodeActionArg(row.execution_id)}'), decodeURIComponent('${encodeActionArg(key)}'), this.checked)"> ${escapeHtml(item.text || '—')}</label>`; }).join('')}</fieldset>`).join('');
+    const statusLabel = row.status === 'INSPECTED' ? 'Onaylandı' : (row.status === 'CLEANED' ? 'Denetim bekliyor' : 'Açık');
+    const sections = (row.checklist?.sections || []).map((section, sectionIndex) => `<fieldset class="staff-check-section"><legend>${escapeHtml(section.title || 'Kontrol')}</legend>${(section.items || []).map((item, itemIndex) => { const key = `s${sectionIndex}.i${itemIndex}`; const checked = row.checklist_result?.[key]?.z === true; const subChecks = (item.subChecks || []).map((subCheck, subIndex) => { const subKey = `${key}.sub${subIndex}`; const subChecked = row.checklist_result?.[subKey]?.z === true; return `<label style="margin-left:22px"><input type="checkbox" ${subChecked ? 'checked' : ''} ${locked ? 'disabled' : ''} data-onchange="setStaffChecklistMark(decodeURIComponent('${encodeActionArg(row.execution_id)}'), decodeURIComponent('${encodeActionArg(subKey)}'), this.checked)"> ${escapeHtml(subCheck)}</label>`; }).join(''); return `<label><input type="checkbox" ${checked ? 'checked' : ''} ${locked ? 'disabled' : ''} data-onchange="setStaffChecklistMark(decodeURIComponent('${encodeActionArg(row.execution_id)}'), decodeURIComponent('${encodeActionArg(key)}'), this.checked)"> ${item.important ? '<strong>Önemli · </strong>' : ''}${escapeHtml(item.text || '—')}</label>${subChecks}`; }).join('')}</fieldset>`).join('');
     const supplies = (row.checklist?.supplies || []).map((item, index) => { const current = row.supplies_result?.[String(index)] || ''; return `<label class="staff-supply"><span>${escapeHtml(item.item || '—')}</span><select ${locked ? 'disabled' : ''} data-onchange="setStaffSupplyStatus(decodeURIComponent('${encodeActionArg(row.execution_id)}'), '${index}', this.value)"><option value="">Seçin…</option><option value="OK"${current === 'OK' ? ' selected' : ''}>Var</option><option value="LOW"${current === 'LOW' ? ' selected' : ''}>Az var</option><option value="OUT"${current === 'OUT' ? ' selected' : ''}>Yok</option></select></label>`; }).join('');
-    return `<article class="staff-field-card"><header><div><h2>${escapeHtml(row.property?.name || '—')}</h2><span>${escapeHtml(row.task_date || '—')} · Sonraki giriş: ${escapeHtml(row.next_check_in || '—')}</span></div><span class="badge">${locked ? 'Denetim bekliyor' : 'Bugün'}</span></header><div class="staff-access"><div><strong>Adres</strong><span>${escapeHtml(access.address || '—')}</span></div><div><strong>Kapı kodu</strong><span>${escapeHtml(access.door_code || '—')}</span></div><div><strong>Wi-Fi</strong><span>${escapeHtml(access.wifi_name || '—')}</span></div><div><strong>Saatler</strong><span>${escapeHtml(access.check_out_time || '—')} → ${escapeHtml(access.check_in_time || '—')}</span></div></div>${sections || '<div class="empty-state">Kontrol listesi tanımlanmamış.</div>'}<div class="staff-supplies"><h3>Malzemeler</h3>${supplies || '<div class="empty-state">Malzeme listesi yok.</div>'}</div><label class="staff-note">Not<textarea id="staffNote-${escapeHtml(row.execution_id)}" ${locked ? 'disabled' : ''}>${escapeHtml(row.note || '')}</textarea></label>${locked ? '<p class="sub-text">Z imzanız kayıtlı; yönetici denetimi bekleniyor.</p>' : `<div class="staff-field-actions"><button class="btn btn-secondary" data-onclick="saveStaffCleaningProgress(decodeURIComponent('${encodeActionArg(row.execution_id)}'))">Kaydet</button><button class="btn btn-primary" data-onclick="signStaffCleaningDone(decodeURIComponent('${encodeActionArg(row.execution_id)}'))">Yaptım (Z)</button></div>`}</article>`;
-  }).join('') : '<div class="empty-state">Bugün size atanmış temizlik yok.</div>';
+    const lockedMessage = row.status === 'INSPECTED' ? 'Yönetici denetimi tamamlandı.' : 'Z imzanız kayıtlı; yönetici denetimi bekleniyor.';
+    return `<article class="staff-field-card"><header><div><h2>${escapeHtml(row.property?.name || '—')}</h2><span>${escapeHtml(row.task_date || '—')} · Sonraki giriş: ${escapeHtml(row.next_check_in || '—')}</span></div><span class="badge">${statusLabel}</span></header><div class="staff-access"><div><strong>Adres</strong><span>${escapeHtml(access.address || '—')}</span></div><div><strong>Kapı kodu</strong><span>${escapeHtml(access.door_code || '—')}</span></div><div><strong>Wi-Fi</strong><span>${escapeHtml(access.wifi_name || '—')}</span></div><div><strong>Saatler</strong><span>${escapeHtml(access.check_out_time || '—')} → ${escapeHtml(access.check_in_time || '—')}</span></div></div>${sections || '<div class="empty-state">Kontrol listesi tanımlanmamış.</div>'}<div class="staff-supplies"><h3>Malzemeler</h3>${supplies || '<div class="empty-state">Malzeme listesi yok.</div>'}</div><label class="staff-note">Not<textarea id="staffNote-${escapeHtml(row.execution_id)}" ${locked ? 'disabled' : ''}>${escapeHtml(row.note || '')}</textarea></label>${locked ? `<p class="sub-text">${lockedMessage}</p>` : `<div class="staff-field-actions"><button class="btn btn-secondary" data-onclick="saveStaffCleaningProgress(decodeURIComponent('${encodeActionArg(row.execution_id)}'))">Kaydet</button><button class="btn btn-primary" data-onclick="signStaffCleaningDone(decodeURIComponent('${encodeActionArg(row.execution_id)}'))">Yaptım (Z)</button></div>`}</article>`;
+  }).join('') : '<div class="empty-state">Açık veya yeniden açılmış temizlik göreviniz yok.</div>';
+  const tasks = staffFieldWork.tasks || [];
+  if (tasks.length) {
+    container.innerHTML += `<section class="ops-group"><h2>Genel görevler</h2>${tasks.map(task => `<article class="ops-row"><div class="ops-row-main"><strong>${escapeHtml(task.title || 'Görev')}</strong><span>${escapeHtml(task.description || '')}</span></div><span class="badge">${escapeHtml(task.status || 'TODO')}</span><div class="ops-row-actions">${task.status === 'TODO' ? `<button class="btn btn-secondary btn-sm" data-onclick="setMyOperationalTaskStatus(decodeURIComponent('${encodeActionArg(task.id)}'), 'IN_PROGRESS')">Başla</button>` : ''}<button class="btn btn-primary btn-sm" data-onclick="setMyOperationalTaskStatus(decodeURIComponent('${encodeActionArg(task.id)}'), 'DONE')">Tamamla</button></div></article>`).join('')}</section>`;
+  }
 }
 
 let operationsViewState = 'cleaning';
@@ -17704,6 +17967,7 @@ async function assignCleaningTaskFromSelect(taskId) {
 }
 
 async function inspectCleaningExecution(executionId, approve) {
+  const execution = (appData?.cleaningExecutions || []).find(item => item.id === executionId);
   const note = approve ? null : prompt('Yeniden açma notu (temizlikçi neyi düzeltmeli?):', '');
   if (!approve && note === null) return false;
   if (!confirm(approve
@@ -17712,7 +17976,7 @@ async function inspectCleaningExecution(executionId, approve) {
   const { error } = await supabaseClient.rpc('inspect_cleaning', {
     p_execution_id: executionId,
     p_approve: !!approve,
-    p_m_marks: {},
+    p_m_marks: execution?.manager_marks || {},
     p_inspector_note: note || null
   });
   if (error) {
@@ -17726,8 +17990,9 @@ async function inspectCleaningExecution(executionId, approve) {
 }
 
 async function payCleanerDebt(cleanerName) {
+  cleanerName = String(cleanerName || '').trim();
   const pending = (appData?.cleaningTasks || []).filter(task => isCleaningDebt(task)
-    && String(task.cleaner || task.cleaner_name || 'Personel belirtilmedi') === cleanerName);
+    && String(task.cleaner || task.cleaner_name || 'Personel belirtilmedi').trim() === cleanerName);
   if (!pending.length) return false;
   const total = pending.reduce((sum, task) => sum + (Number(task.amount) || 0), 0);
   if (!confirm(`${cleanerName}: ${pending.length} temizlik, ₺${total.toLocaleString('tr-TR')} ödendi olarak kapatılsın mı?`)) return false;
@@ -17788,19 +18053,6 @@ async function resolveMaintenanceFromOperations(ticketId) {
       if (error) throw error;
     }
 
-    if (typeof PropertyOwnerService !== 'undefined' && savedProperty?.id && canManageTenantRole(activeTenant?.role)) {
-      try {
-        await PropertyOwnerService.saveOwnerAndLink(supabaseClient, {
-          tenantId: getActiveTenantId(), propertyId: savedProperty.id,
-          ownerId: document.getElementById('propOwnerId')?.value || null,
-          fullName: document.getElementById('propOwnerName')?.value || '',
-          phone: document.getElementById('propOwnerPhone')?.value || '',
-          email: document.getElementById('propOwnerEmail')?.value || ''
-        });
-      } catch (_) {
-        contextWarning += '\n\n⚠️ Mülk kaydedildi; mülk sahibi bağlantısı kaydedilemedi.';
-      }
-    }
     await loadTenantAppData(getActiveTenantId());
     if (typeof showToast === 'function') showToast(createExpense ? '✅ Arıza çözüldü ve gider kaydedildi.' : '✅ Arıza çözüldü; gider kaydı oluşturulmadı.');
     return true;
@@ -17857,6 +18109,14 @@ function assignOperationalTaskFromSelect(taskId) {
   return assignOperationalTask(taskId, select?.value || '');
 }
 
+async function setOperationalTaskStatus(taskId, status) {
+  if (!['DONE', 'CANCELLED'].includes(status)) return false;
+  await updateOperationalTask(taskId, { status });
+  await loadTenantAppData(getActiveTenantId());
+  if (typeof showToast === 'function') showToast(status === 'DONE' ? '✅ Görev tamamlandı.' : 'Görev iptal edildi.');
+  return true;
+}
+
 function renderCleaningExecutionFlags(execution) {
   if (!execution) return '';
   const snapshot = Array.isArray(execution.supplies_snapshot) ? execution.supplies_snapshot : [];
@@ -17870,6 +18130,19 @@ function renderCleaningExecutionFlags(execution) {
     });
   if (!flagged.length && !execution.note) return '';
   return `<div class="ops-execution-flags">${flagged.length ? `<span><strong>Malzeme:</strong> ${escapeHtml(flagged.join(' · '))}</span>` : ''}${execution.note ? `<span><strong>Personel notu:</strong> ${escapeHtml(execution.note)}</span>` : ''}</div>`;
+}
+
+function setManagerChecklistMark(executionId, key, checked) {
+  const execution = (appData?.cleaningExecutions || []).find(item => item.id === executionId);
+  if (!execution) return false;
+  execution.manager_marks = { ...(execution.manager_marks || {}), [key]: !!checked };
+  return true;
+}
+
+function renderManagerChecklist(execution) {
+  const sections = execution?.checklist_snapshot?.sections || [];
+  if (!sections.length) return '';
+  return `<div class="ops-manager-checklist">${sections.map((section, sectionIndex) => `<fieldset><legend>${escapeHtml(section.title || 'Kontrol')}</legend>${(section.items || []).map((item, itemIndex) => { const key = `s${sectionIndex}.i${itemIndex}`; const checked = execution.manager_marks?.[key] ?? execution.checklist_result?.[key]?.m; return `<label><input type="checkbox" ${checked === true ? 'checked' : ''} data-onchange="setManagerChecklistMark(decodeURIComponent('${encodeActionArg(execution.id)}'), decodeURIComponent('${encodeActionArg(key)}'), this.checked)"> ${item.important ? '<strong>Önemli · </strong>' : ''}${escapeHtml(item.text || '—')}</label>`; }).join('')}</fieldset>`).join('')}</div>`;
 }
 
 function renderOperationsCleaningView(tasks) {
@@ -17890,20 +18163,21 @@ function renderOperationsCleaningView(tasks) {
         const options = eligible.map(person => `<option value="${escapeHtml(person.id)}"${execution?.person_id === person.id ? ' selected' : ''}>${escapeHtml(person.full_name)}</option>`).join('');
         const status = waiting ? 'Denetim bekliyor' : task.status === 'DONE' ? (task.paid ? 'Ödendi' : 'Borç') : task.status === 'SKIPPED' ? 'Yapılmadı' : execution ? 'Atandı' : 'Planlı';
         return `<article class="ops-row" data-cleaning-task-id="${escapeHtml(task.id)}">
-          <div class="ops-row-main"><strong>${escapeHtml(property)}</strong><span>${escapeHtml(task.date || '—')} · ${escapeHtml(task.cleaner || 'Personel belirtilmedi')}</span>${waiting ? renderCleaningExecutionFlags(execution) : ''}</div>
+          <div class="ops-row-main"><strong>${escapeHtml(property)}</strong><span>${escapeHtml(task.date || '—')} · ${escapeHtml(task.cleaner || 'Personel belirtilmedi')}</span>${waiting ? renderCleaningExecutionFlags(execution) + renderManagerChecklist(execution) : ''}</div>
           <span class="badge ${waiting ? 'badge-blue' : (isCleaningDebt(task) ? 'badge-amber' : '')}">${escapeHtml(status)}</span>
           <div class="ops-row-actions">
             ${waiting ? `<button class="btn btn-primary btn-sm" data-onclick="inspectCleaningExecution(decodeURIComponent('${encodeActionArg(execution.id)}'), true)">M Onayla</button><button class="btn btn-secondary btn-sm" data-onclick="inspectCleaningExecution(decodeURIComponent('${encodeActionArg(execution.id)}'), false)">Yeniden aç</button>` : task.status !== 'DONE' && task.status !== 'SKIPPED' ? `
               <select id="opsCleaner-${escapeHtml(task.id)}" aria-label="Temizlikçi seç"><option value="">Giriş hesabı olan temizlikçi…</option>${options}</select>
               <button class="btn btn-secondary btn-sm" data-onclick="assignCleaningTaskFromSelect(decodeURIComponent('${encodeActionArg(task.id)}'))">Ata</button>
-              <button class="btn btn-secondary btn-sm" data-onclick="markCleaningDone(decodeURIComponent('${encodeActionArg(task.id)}'))">Yönetici yaptı</button>` : ''}
+              ${!execution ? `<button class="btn btn-secondary btn-sm" data-onclick="markCleaningDone(decodeURIComponent('${encodeActionArg(task.id)}'))">Yönetici yaptı</button>` : ''}
+              <button class="btn btn-secondary btn-sm" data-onclick="markCleaningSkipped(decodeURIComponent('${encodeActionArg(task.id)}'))">Yapılmadı</button>` : ''}
           </div>
         </article>`;
       }).join('') : '<div class="empty-state">Bu aralıkta temizlik yok.</div>'}
     </section>`;
   return `
     <div class="ops-cleaning-layout">
-      <div>${groupHtml('Bugün', grouped.today)}${groupHtml('Yarın', grouped.tomorrow)}${groupHtml('Bu hafta', grouped.week)}</div>
+      <div>${groupHtml('Geciken / denetim bekleyen', grouped.overdue)}${groupHtml('Bugün', grouped.today)}${groupHtml('Yarın', grouped.tomorrow)}${groupHtml('Bu hafta', grouped.week)}</div>
       <aside class="ops-debt-panel"><h3>Bekleyen Temizlik Borçları (${debt.reduce((sum, item) => sum + item.count, 0)})</h3>
         ${debt.length ? debt.map(item => `<div class="ops-debt-row"><div><strong>${escapeHtml(item.cleaner)}</strong><span>${item.count} temizlik</span></div><strong>₺${item.amount.toLocaleString('tr-TR')}</strong>${item.taskIds.map(id => {
           const task = tasks.find(candidate => (candidate.id || candidate.dbId) === id);
@@ -17947,13 +18221,13 @@ function renderOperationsTab() {
       return `<article class="ops-row"><div class="ops-row-main"><strong>${escapeHtml(ticket.title || '—')}</strong><span>${escapeHtml(ticket.description || 'Açıklama yok')}</span>${assigned ? `<span>Usta: ${escapeHtml(assigned.full_name)}${assigned.phone ? ` · <a href="tel:${escapeHtml(assigned.phone)}">Ara</a>` : ''}</span>` : ''}</div><span class="badge ${impactClass}">${escapeHtml(statusLabel)}</span><div class="ops-row-actions"><select id="opsTechnician-${escapeHtml(ticket.id)}" aria-label="Usta seç"><option value="">Usta seç…</option>${options}</select><button class="btn btn-secondary btn-sm" data-onclick="assignMaintenanceFromSelect(decodeURIComponent('${encodeActionArg(ticket.id)}'))">Usta ata</button><button class="btn btn-secondary btn-sm" data-onclick="editMaint(decodeURIComponent('${encodeActionArg(ticket.id)}'))">Durumu güncelle</button><button class="btn btn-primary btn-sm" data-onclick="resolveMaintenanceFromOperations(decodeURIComponent('${encodeActionArg(ticket.id)}'))">Çözüldü</button></div></article>`;
     }).join('') : '<div class="empty-state">Açık arıza veya bakım kaydı yok.</div>';
   } else {
-    const operational = appData?.operationalTasks || [];
+    const operational = (appData?.operationalTasks || []).filter(task => !['DONE', 'CANCELLED'].includes(String(task.status || '').toUpperCase()));
     const templates = appData?.taskTemplates || [];
     const assignees = (appData?.operationalPeople || []).filter(person => person.user_id && person.is_active !== false);
     const editTemplatesLink = canManageTenantRole(activeTenant?.role)
       ? `<button class="btn btn-secondary btn-sm" data-onclick="openSettingsSection(decodeURIComponent('${encodeActionArg('templates')}'))">Şablonu düzenle →</button>`
       : '';
-    container.innerHTML = `<div class="ops-cleaning-layout"><section class="ops-group"><div class="section-title-bar"><h3>Aktif görevler <span class="badge">${operational.length}</span></h3><button class="btn btn-primary btn-sm" data-onclick="createGeneralOperationalTask()">+ Genel görev</button></div>${operational.length ? operational.map(task => { const options = assignees.map(person => `<option value="${escapeHtml(person.user_id)}"${person.user_id === task.assigned_to ? ' selected' : ''}>${escapeHtml(person.full_name)}</option>`).join(''); return `<article class="ops-row"><div class="ops-row-main"><strong>${escapeHtml(task.title || '—')}</strong><span>${task.property_id ? 'Mülke bağlı' : 'Genel görev'} · ${escapeHtml(task.status || 'TODO')}</span></div><div class="ops-row-actions"><select id="opsTaskPerson-${escapeHtml(task.id)}" aria-label="Görevli seç"><option value="">Ekip üyesi seç…</option>${options}</select><button class="btn btn-secondary btn-sm" data-onclick="assignOperationalTaskFromSelect(decodeURIComponent('${encodeActionArg(task.id)}'))">Ata</button></div></article>`; }).join('') : '<div class="empty-state">Aktif görev yok.</div>'}</section><aside class="ops-debt-panel"><h3>Hazır görev kütüphanesi</h3>${editTemplatesLink}${templates.length ? templates.map(template => `<div class="ops-debt-row"><div><strong>${escapeHtml(template.title)}</strong><span>${escapeHtml(template.task_type || 'GENERAL')}</span></div><button class="btn btn-secondary btn-sm" data-onclick="createTaskFromTemplate(decodeURIComponent('${encodeActionArg(template.id)}'))">Görev oluştur</button></div>`).join('') : '<div class="empty-state">Henüz görev şablonu yok.</div>'}</aside></div>`;
+    container.innerHTML = `<div class="ops-cleaning-layout"><section class="ops-group"><div class="section-title-bar"><h3>Aktif görevler <span class="badge">${operational.length}</span></h3><button class="btn btn-primary btn-sm" data-onclick="createGeneralOperationalTask()">+ Genel görev</button></div>${operational.length ? operational.map(task => { const options = assignees.map(person => `<option value="${escapeHtml(person.user_id)}"${person.user_id === task.assigned_to ? ' selected' : ''}>${escapeHtml(person.full_name)}</option>`).join(''); return `<article class="ops-row"><div class="ops-row-main"><strong>${escapeHtml(task.title || '—')}</strong><span>${task.property_id ? 'Mülke bağlı' : 'Genel görev'} · ${escapeHtml(task.status || 'TODO')}</span></div><div class="ops-row-actions"><select id="opsTaskPerson-${escapeHtml(task.id)}" aria-label="Görevli seç"><option value="">Ekip üyesi seç…</option>${options}</select><button class="btn btn-secondary btn-sm" data-onclick="assignOperationalTaskFromSelect(decodeURIComponent('${encodeActionArg(task.id)}'))">Ata</button><button class="btn btn-primary btn-sm" data-onclick="setOperationalTaskStatus(decodeURIComponent('${encodeActionArg(task.id)}'), 'DONE')">Tamamla</button><button class="btn btn-secondary btn-sm" data-onclick="setOperationalTaskStatus(decodeURIComponent('${encodeActionArg(task.id)}'), 'CANCELLED')">İptal</button></div></article>`; }).join('') : '<div class="empty-state">Aktif görev yok.</div>'}</section><aside class="ops-debt-panel"><h3>Hazır görev kütüphanesi</h3>${editTemplatesLink}${templates.length ? templates.map(template => `<div class="ops-debt-row"><div><strong>${escapeHtml(template.title)}</strong><span>${escapeHtml(template.task_type || 'GENERAL')}</span></div><button class="btn btn-secondary btn-sm" data-onclick="createTaskFromTemplate(decodeURIComponent('${encodeActionArg(template.id)}'))">Görev oluştur</button></div>`).join('') : '<div class="empty-state">Henüz görev şablonu yok.</div>'}</aside></div>`;
   }
 }
 
@@ -18340,10 +18614,11 @@ function buildPricingWorkspace(input = {}) {
     property: input.property || {}, monthKey: input.monthKey,
     sellableDates: input.historySellableDates || [], bookings: input.bookings || []
   });
-  const suggestions = priceEngine.suggest({
+  let suggestions = priceEngine.suggest({
     property: input.property || {}, rules: input.rules || {}, bookings: input.bookings || [], blocks: input.blocks || [],
-    specialDays: input.specialDays || [], occupancyTarget: input.occupancyTarget, today: input.today, days: 30
+    specialDays: input.specialDays || [], occupancyTarget: input.occupancyTarget, today: input.today, days: input.days || 30
   });
+  if (input.days === 0) suggestions = { ...suggestions, days: [] };
   const specialDates = new Set((input.specialDays || []).map(day => day.date));
   const groups = { weekday: [], weekend: [], special: [] };
   suggestions.days.filter(day => day.status === 'OPEN').forEach(day => {
@@ -18367,6 +18642,19 @@ function buildPricingWorkspace(input = {}) {
     history
   });
   return { suggestions, target, openNights, prices, history };
+}
+
+function resolvePricingTargetPeriod(filter = {}, today = getTodayStr()) {
+  const requested = String(filter.period || '');
+  const monthKey = /^\d{4}-\d{2}$/.test(requested) ? requested : String(today).slice(0, 7);
+  const [year, month] = monthKey.split('-').map(Number);
+  const start = `${monthKey}-01`;
+  const end = `${monthKey}-${String(new Date(Date.UTC(year, month, 0)).getUTCDate()).padStart(2, '0')}`;
+  const remainingStart = today < start ? start : today > end ? null : today;
+  const remainingDays = remainingStart
+    ? Math.floor((Date.parse(end + 'T00:00:00Z') - Date.parse(remainingStart + 'T00:00:00Z')) / 86400000) + 1
+    : 0;
+  return { monthKey, start, end, remainingStart, remainingDays };
 }
 
 let pricingSelectedPropertyId = '';
@@ -18492,23 +18780,25 @@ function renderPricingTab() {
     return;
   }
   const today = getTodayStr();
-  const end = new Date(Date.parse(`${today}T00:00:00Z`) + 29 * 86400000).toISOString().slice(0, 10);
-  const specialDays = getTrSpecialDays().forRange(today, end);
+  const targetPeriod = resolvePricingTargetPeriod(currentFilter, today);
+  const pricingStart = targetPeriod.remainingStart || targetPeriod.end;
+  const specialDays = getTrSpecialDays().forRange(pricingStart, targetPeriod.end);
   const slug = Object.entries(appData.villas || {}).find(([, value]) => value === property)?.[0] || property.slug;
   const bookings = (appData.bookings || []).filter(booking => booking.propertyId === property.id || booking.villa === slug);
-  const targetRecord = getConfiguredRevenueTarget(currentFilter, appData.targets || [], slug || 'ALL');
+  const targetRecord = getConfiguredRevenueTarget({ ...currentFilter, period: targetPeriod.monthKey }, appData.targets || [], slug || 'ALL');
   const targetValue = pricingTargetDraft === null ? targetRecord : pricingTargetDraft;
-  const ledger = computeMonthLedger(today.slice(0, 7), slug || 'ALL');
-  const previousYear = Number(today.slice(0, 4)) - 1;
-  const month = Number(today.slice(5, 7));
+  const ledger = computeMonthLedger(targetPeriod.monthKey, slug || 'ALL');
+  const previousYear = Number(targetPeriod.monthKey.slice(0, 4)) - 1;
+  const month = Number(targetPeriod.monthKey.slice(5, 7));
   const previousMonthDays = new Date(Date.UTC(previousYear, month, 0)).getUTCDate();
   const historySellableDates = Array.from({ length: previousMonthDays }, (_, index) => `${previousYear}-${String(month).padStart(2, '0')}-${String(index + 1).padStart(2, '0')}`);
   const rules = getPricingResearchService().mergeRules(appData.tenantSettings?.pricing_rules || {}, appData.propertyPricingRules || [], property.id);
   const result = buildPricingWorkspace({
     property: { id: property.id, basePrice: property.basePrice ?? property.base ?? null, floorPrice: property.floor ?? null },
     bookings, blocks: (appData.maintenanceTickets || []).filter(ticket => ticket.property_id === property.id && ticket.blocks_availability).map(ticket => ({ propertyId: property.id, start: ticket.downtime_start, end: ticket.downtime_end })),
-    rules, specialDays, monthKey: today.slice(0, 7), historySellableDates,
-    occupancyTarget: null, today, target: targetValue, soldRevenue: ledger?.netRoomRevenue ?? null,
+    rules, specialDays, monthKey: targetPeriod.monthKey, historySellableDates,
+    occupancyTarget: null, today: pricingStart, days: targetPeriod.remainingDays,
+    target: targetValue, soldRevenue: ledger?.netRoomRevenue ?? null,
     expectedOccupancy: pricingExpectedOccupancyDraft, focus: pricingFocusDraft
   });
   const targetInput = document.getElementById('pricingTargetInput');
@@ -18576,11 +18866,8 @@ async function runCommandCenterAction(actionType, entityId, options = {}) {
 
 async function handleQuickActionTrigger(actionType, entityId) {
   if (actionType === 'APPLY_GAP_DISCOUNT') {
-    const gap = ((typeof appData !== 'undefined' && appData.gapNights) || [])
-      .find(item => `gap-${item.date}-${item.villa}` === entityId);
-    const propertyId = gap && ((appData.villas?.[gap.villa]?.id) || (isUUID(gap.villa) ? gap.villa : null));
-    const rate = Number(gap?.suggestedPrice);
-    if (!gap || !propertyId || !Number.isFinite(rate) || rate <= 0) {
+    const action = resolveGapDiscountAction(entityId, detectGapNights(), appData?.villas || {});
+    if (!action) {
       if (typeof showToast === 'function') {
         showToast('İndirim uygulanmadı: doğrulanmış mülk veya fiyat bilgisi eksik.', 'error');
       }
@@ -18588,12 +18875,9 @@ async function handleQuickActionTrigger(actionType, entityId) {
       return false;
     }
     openAiActionConfirmModal({
-      type: 'GAP_DISCOUNT',
-      propertyId,
-      date: gap.date,
-      rate,
-      description: `${gap.date} tarihi için ₺${rate.toLocaleString('tr-TR')} fiyatı takvime kaydedilecek.`,
-      sourceMetrics: [`Tarih: ${gap.date}`, `Önerilen fiyat: ₺${rate.toLocaleString('tr-TR')}`]
+      ...action,
+      description: `${action.startDate}–${action.endDate} aralığı için gecelik ₺${action.rate.toLocaleString('tr-TR')} fiyat takvime kaydedilecek.`,
+      sourceMetrics: [`Tarih: ${action.startDate}–${action.endDate}`, `Gecelik fiyat: ₺${action.rate.toLocaleString('tr-TR')}`]
     });
     return true;
   }
@@ -18684,6 +18968,11 @@ if (typeof module !== 'undefined' && module.exports) {
     deleteBooking,
     mapExpenseFromDb,
     mapExpenseToDb,
+    isAdsPeriodExpense,
+    renderExpenseTemplates,
+    saveExpenseTemplate,
+    generateExpenseFromTemplate,
+    deleteExpenseTemplate,
     loadExpenses,
     createExpense,
     createExpensesBatch,
@@ -18695,9 +18984,12 @@ if (typeof module !== 'undefined' && module.exports) {
     deleteExpenseUI,
     ALLOWED_LEAD_STAGES,
     ALLOWED_LEAD_SOURCES,
+    normalizeLeadChannel,
     mapLeadFromDb,
     mapLeadToDb,
     buildLeadSalesView,
+    toIstanbulDateTimeLocal,
+    fromIstanbulDateTimeLocal,
     buildLeadEditPayload,
     validateLeadInput,
     loadLeads,
@@ -18847,6 +19139,8 @@ if (typeof module !== 'undefined' && module.exports) {
     canWriteSalesRole,
     applyGuestProfileAccess,
     buildPricingWorkspace,
+    resolvePricingTargetPeriod,
+    buildPropertyHistoryView,
     applyRoleNavigationVisibility,
     invalidateExecutiveSnapshotCache,
     shouldRefreshExecutiveSnapshot,
@@ -18866,6 +19160,7 @@ if (typeof module !== 'undefined' && module.exports) {
     resyncTenantData,
     runCommandCenterAction,
     executeCanonicalAiAction,
+    resolveGapDiscountAction,
     getPropertySalesReadiness,
     canManagePropertyReadiness,
     setPropertySalesReadiness,
@@ -18894,6 +19189,7 @@ if (typeof module !== 'undefined' && module.exports) {
     payCleanerDebt,
     assignMaintenanceTechnician,
     resolveMaintenanceFromOperations,
+    getStaffFieldWorkRange,
     createGeneralOperationalTask,
     assignOperationalTask,
     renderTapeChart,

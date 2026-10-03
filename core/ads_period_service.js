@@ -40,5 +40,21 @@
     return data;
   }
 
-  return { loadPeriods, savePeriod, deletePeriod };
+  async function savePeriodsAtomic(client, tenantId, rows = []) {
+    if (!client || !tenantId || !Array.isArray(rows) || !rows.length) throw new Error('İçe aktarılacak reklam dönemleri zorunludur.');
+    const payload = rows.map(input => ({
+      id: nullable(input.id), campaign_id: input.campaignId, platform: input.platform,
+      period_start: input.periodStart, period_end: input.periodEnd, result_type: input.resultType,
+      result_metric: nullable(input.resultMetric), spend: numeric(input.spend),
+      impressions: numeric(input.impressions), reach: numeric(input.reach), clicks: numeric(input.clicks),
+      messages: numeric(input.messages), calls: numeric(input.calls), source: input.source || 'CSV'
+    }));
+    const { data, error } = await client.rpc('save_ad_metric_period_batch', {
+      p_tenant_id: tenantId, p_rows: payload
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  return { loadPeriods, savePeriod, savePeriodsAtomic, deletePeriod };
 });

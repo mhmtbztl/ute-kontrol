@@ -2,9 +2,10 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const App = require('../app.js');
+let passed = 0;
 
 function test(name, fn) {
-  try { fn(); console.log(`  ✅ ${name}`); }
+  try { fn(); passed++; console.log(`  ✅ ${name}`); }
   catch (error) { console.error(`  ❌ ${name}`); throw error; }
 }
 
@@ -43,6 +44,24 @@ test('baz fiyat bilinmiyorsa öneri ve hedef hesabı rakam uydurmaz', () => {
   assert.strictEqual(result.target.reason.code, 'PRICES_MISSING');
 });
 
+test('hedef ciro tek seçili ayın kalan gecelerini ve aynı ay defterini kullanır', () => {
+  const period = App.resolvePricingTargetPeriod({ period: '2026-10' }, '2026-10-20');
+  assert.deepStrictEqual(period, {
+    monthKey: '2026-10', start: '2026-10-01', end: '2026-10-31',
+    remainingStart: '2026-10-20', remainingDays: 12
+  });
+  const result = App.buildPricingWorkspace({
+    property: { id: 'p1', basePrice: 1000, floorPrice: 800 },
+    bookings: [], blocks: [], rules: {}, specialDays: [],
+    monthKey: period.monthKey, today: period.remainingStart, days: period.remainingDays,
+    target: 20000, soldRevenue: 5000
+  });
+  assert.strictEqual(result.suggestions.days[0].date, '2026-10-20');
+  assert.strictEqual(result.suggestions.days.at(-1).date, '2026-10-31');
+  assert.strictEqual(result.target.remaining, 15000);
+  assert.strictEqual(result.target.openNightsTotal, 12);
+});
+
 test('tarayıcı fiyat motorlarını app.js öncesinde yükler ve hedef kontrollerini sunar', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   const appIndex = html.indexOf('<script src="app.js');
@@ -60,4 +79,4 @@ test('tarayıcı fiyat motorlarını app.js öncesinde yükler ve hedef kontroll
   assert.match(fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8'), /Göç bekleniyor: phase78 ve phase80/);
 });
 
-console.log('✅ A4 Fiyatlandırma UI testleri tamamlandı.');
+console.log(`TEST SUMMARY: ${passed} / ${passed} TESTS PASSED (0 FAILED)`);

@@ -24,5 +24,13 @@ function query(rows) {
   assert.strictEqual(saveCall.args.p_spend, 700);
   await Service.deletePeriod(client, 'period-1');
   assert(calls.some(call => call.name === 'delete_ad_metric_period' && call.args.p_id === 'period-1'));
+  await Service.savePeriodsAtomic(client, 'tenant-1', [{
+    campaignId: 'campaign-1', platform: 'META', periodStart: '2026-10-01',
+    periodEnd: '2026-10-07', resultType: 'MESSAGE', spend: 700, messages: 14, source: 'CSV'
+  }]);
+  const batchCall = calls.find(call => call.name === 'save_ad_metric_period_batch');
+  assert(batchCall);
+  assert.strictEqual(batchCall.args.p_tenant_id, 'tenant-1');
+  assert.strictEqual(batchCall.args.p_rows[0].campaign_id, 'campaign-1');
   console.log('[PASS] Reklam dönem servisi hazır phase72 RPC sözleşmesine bağlanır');
 })().catch(error => { console.error(error); process.exitCode = 1; });

@@ -59,7 +59,7 @@ const YAZMA_IZLERI = [
   'cloudUpsert', 'cloudDelete', 'cloudSave', 'supabaseClient', 'requireCloudForWrite',
   'persistCleaningLedgerEntry', 'reportCleaningPersist', 'reportStatePersist',
   'setPropertySalesReadiness(',
-  'createBooking(', 'createLead(', 'createExpense(', 'updateExpense(',
+  'createBooking(', 'createLead(', 'quickCaptureLead(', 'createExpense(', 'updateExpense(',
   'createMaintenanceTicket(', 'updateProperty(', 'loadTenantAppData('
 ];
 
@@ -192,8 +192,8 @@ function run() {
   // --- 6. WhatsApp kaydedicileri gercek CRUD yolundan geciyor --------------
   const waLead = govde(APP, 'saveWaAsLead') || '';
   check(
-    waLead.includes('createLead(') && waLead.includes('catch'),
-    '14. saveWaAsLead createLead() cagiriyor ve hatayi kullaniciya soyluyor',
+    waLead.includes('quickCaptureLead(') && waLead.includes('catch'),
+    '14. saveWaAsLead atomik quickCaptureLead() cagiriyor ve hatayi kullaniciya soyluyor',
     'Talep dogrudan appData.leads\'e itiliyor; dogrulama ve bulut yazmasi ' +
     'atlaniyor.'
   );

@@ -354,13 +354,20 @@ function addDays(isoDate, count) {
 function groupCleaningTasks(tasks = [], today) {
   const tomorrow = addDays(today, 1);
   const weekEnd = addDays(today, 6);
-  const result = { today: [], tomorrow: [], week: [] };
+  const result = { overdue: [], today: [], tomorrow: [], week: [] };
   tasks.forEach(task => {
     const date = String(task?.date || task?.task_date || '').slice(0, 10);
-    if (date === today) result.today.push(task);
+    const status = String(task?.status || '').toUpperCase();
+    const isOpen = task?.paid !== true && task?.is_paid !== true && (!['DONE', 'SKIPPED', 'CANCELLED'].includes(status)
+      || task?.workflowState === 'AWAITING_INSPECTION');
+    const completedToday = date === today && status === 'DONE';
+    if (!isOpen && !completedToday) return;
+    if (date && date < today && isOpen) result.overdue.push(task);
+    else if (date === today) result.today.push(task);
     else if (date === tomorrow) result.tomorrow.push(task);
     else if (date > tomorrow && date <= weekEnd) result.week.push(task);
   });
+  result.overdue.sort((a, b) => String(a?.date || a?.task_date || '').localeCompare(String(b?.date || b?.task_date || '')));
   return result;
 }
 

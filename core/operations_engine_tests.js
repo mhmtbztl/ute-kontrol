@@ -23,14 +23,18 @@ try {
     'A2. RPC oncesi kapisi hesapsiz temizlikciyi reddeder', 'uygunluk yanlis');
 
   const tasks = [
+    { id: 'late', date: '2026-09-30', status: 'PLANNED', paid: false, amount: 600, cleaner: 'Ayse' },
+    { id: 'inspect', date: '2026-09-29', status: 'PLANNED', workflowState: 'AWAITING_INSPECTION', paid: false, amount: 900, cleaner: 'Ayse' },
     { id: 'a', date: '2026-10-01', status: 'PLANNED', paid: false, amount: 500, cleaner: 'Ayse' },
+    { id: 'done-today', date: '2026-10-01', status: 'DONE', paid: true, amount: 600, cleaner: 'Ayse' },
     { id: 'b', date: '2026-10-02', status: 'DONE', paid: false, amount: 800, cleaner: 'Ayse' },
     { id: 'c', date: '2026-10-03', status: 'DONE', paid: true, amount: 700, cleaner: 'Fatma' }
   ];
   const groups = OperationsEngine.groupCleaningTasks(tasks, '2026-10-01');
-  check(groups.today.map(t => t.id).join() === 'a' && groups.tomorrow.map(t => t.id).join() === 'b'
-    && groups.week.map(t => t.id).join() === 'c',
-    'B1. Temizlik bugun / yarin / bu hafta tekil gruplara ayrilir', JSON.stringify(groups));
+  check(groups.today.map(t => t.id).join() === 'a,done-today' && groups.tomorrow.length === 0
+    && groups.week.length === 0
+    && groups.overdue.map(t => t.id).join() === 'inspect,late',
+    'B1. Acik temizlikler gruplara ayrilir; bugun tamamlanan gorunur, eski bitenler aktif listede kalmaz', JSON.stringify(groups));
   const debt = OperationsEngine.cleanerDebtSummary(tasks);
   check(debt.length === 1 && debt[0].cleaner === 'Ayse' && debt[0].amount === 800 && debt[0].count === 1,
     'B2. Kisi borcu yalniz DONE + odenmemis kayitlardan', JSON.stringify(debt));
