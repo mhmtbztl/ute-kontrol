@@ -11994,7 +11994,9 @@ async function saveWaAsLead() {
 }
 
 async function saveWaAsBooking() {
-  const guest = document.getElementById('waParsedGuest').value.trim() || 'WhatsApp Misafiri';
+  // Ad yoksa uydurulmaz (CLAUDE.md §3.6): rezervasyon gercek bir misafire
+  // aittir. Adi bilinmeyen mesaj talep olarak kaydedilebilir.
+  const guest = document.getElementById('waParsedGuest').value.trim();
   const villa = document.getElementById('waParsedVilla').value;
   const gross = Number(document.getElementById('waParsedAmount').value) || 0;
   const checkIn = document.getElementById('waParsedCheckIn').value;
@@ -12002,6 +12004,11 @@ async function saveWaAsBooking() {
   const paxText = document.getElementById('waParsedPax').value;
   const pax = Number(paxText);
   const phone = document.getElementById('waParsedPhone').value.trim();
+
+  if (!guest) {
+    alert('Lütfen rezervasyon için misafir adını giriniz! Ad bilinmiyorsa mesajı talep olarak kaydedin.');
+    return;
+  }
 
   if (!villa) {
     alert('Lütfen rezervasyon için villayı seçiniz!');

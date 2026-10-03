@@ -1114,13 +1114,15 @@ Ağı `core/csv_import_tests.js` (52 iddia: motor, `app.js` kaynağı, gerçek
   **canlıda 404 verir**; ağı `core/pages_build_tests.js` (index.html'in,
   `marketing_ui` çalışma anı tablosunun ve `app.js`'in andığı her dosyanın
   yayında olduğunu ölçer).
-- **`npm audit`: 2 orta (exceljs → uuid 8.3.2, GHSA-w5hq-g745-h8pq) — erişilemez,
-  bilerek kabul edildi (24 Eylül 2026).** Açık yalnızca `uuid` v3/v5/v6'ya
-  `buf` parametresi verildiğinde tetiklenir; `exceljs` `uuidv4()`'ü parametresiz
-  çağırıyor. Üstelik `exceljs`'i kullanan tek dosya (`core/excel_generator.js`)
-  hiçbir yerden çağrılmıyor ve tarayıcıya yüklenmiyor. `npm audit fix --force`
-  önerisi exceljs'i 3.4.0'a **düşürür** — yapmayın. Kalıcı çözüm, ölü
-  `excel_generator.js` ile `exceljs` bağımlılığını birlikte kaldırmaktır.
+- **`npm audit`: 0 açık; CI yüksek ve kritik açıkta birleşmeyi durdurur
+  (`npm audit --audit-level=high`, 03.10.2026).** Eskiden 2 orta (uuid) "erişilemez"
+  diye kabul edilmişti; sonra aynı zincire yüksek önemli bir açık eklendi
+  (brace-expansion, GHSA-qhr7-859c-m2p7) ve CI audit'i kapalı kurduğu için
+  kimse görmedi (Codex MVP denetimi). Üçü de yalnız `exceljs`'ten geliyordu ve
+  onu kullanan tek dosya (`core/excel_generator.js`) hiçbir yerden
+  çağrılmıyordu; ikisi birlikte kaldırıldı. Ders: "erişilemez" diye kabul
+  edilen açık kendiliğinden kapanmaz, zincir büyür. `npm audit fix --force`
+  kullanmayın; bağımlılığı kaldırın ya da sürümü bilerek yükseltin.
 - **HTML'e giren her kullanıcı/misafir verisi kaçışlanır (L-15).** Metin ve
   öznitelik için `escapeHtml(...)`; işleyicideki JS dizesi için
   `decodeURIComponent('${encodeActionArg(x)}')` — orada `escapeHtml`
