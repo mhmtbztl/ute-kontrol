@@ -28,11 +28,11 @@
 //      yapilmalidir — korumalar ancak oyle devrede kalir.
 // =============================================================================
 
-const crypto = (typeof require !== 'undefined' && typeof window === 'undefined') ? require('crypto') : null;
+const nodeCrypto = (typeof require !== 'undefined' && typeof window === 'undefined') ? require('crypto') : null;
 
 /** Dosya parmak izi — ayni dosyanin iki kez yuklenmesini engellemek icin. */
 function computeHash(content) {
-  if (crypto) return crypto.createHash('sha256').update(content).digest('hex');
+  if (nodeCrypto) return nodeCrypto.createHash('sha256').update(content).digest('hex');
   let hash = 0;
   const str = String(content);
   for (let i = 0; i < str.length; i++) {
