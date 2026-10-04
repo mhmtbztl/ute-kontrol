@@ -21,6 +21,18 @@
 
   --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
+
+  /* Uygulama yalniz koyu temadir: tarayicinin kendi cizdigi acilir listeler,
+     takvim, kaydirma cubugu ve isaret kutulari da koyu cizilir (M1). */
+  color-scheme: dark;
+}
+
+/* Secim kutusunun acik yazisini miras alan secenekler acik zeminde
+   gorunmuyordu (mulk formunda ulke listesi). Tum secim kutulari icin. */
+select option,
+select optgroup {
+  background-color: var(--bg-surface-elevated);
+  color: var(--text-main);
 }
 
 * {

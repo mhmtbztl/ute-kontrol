@@ -52,7 +52,9 @@ dosyalar.forEach(f => {
 check(satirIci.length === 0, '2. Şablonlarda satır içi on* işleyicisi yok', satirIci.slice(0, 15).join('\n       '));
 
 // --- 3. Temizleyici sozlesmesi -----------------------------------------------
-check(/if \(name\.startsWith\('on'\)\) \{\s*node\.removeAttribute\(attr\.name\);/.test(APP)
+// `|| ...` ekleri yalniz silinen oznitelikleri genisletir (M2: form gezinme
+// oznitelikleri); on* yine kosulsuz silinir.
+check(/if \(name\.startsWith\('on'\)(?: \|\|[^{]*)?\) \{\s*node\.removeAttribute\(attr\.name\);/.test(APP)
   && !/allowedHandlerName|handlerIsTrusted/.test(APP),
   '3. Temizleyici her on* özniteliğini koşulsuz siler (izinli fiil istisnası kalmadı)', 'on* hâlâ koşullu');
 
