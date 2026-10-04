@@ -160,18 +160,30 @@ function initializePropertyAnalysisContextUi() {
   const mapLink = document.getElementById('propMapCoordinatesLink');
   if (mapLink && !mapLink.dataset.coordinateParserBound) {
     mapLink.dataset.coordinateParserBound = 'true';
-    mapLink.addEventListener('change', () => {
+    // Yapistirir yapistirmaz okunur (input); alandan cikinca (change) da.
+    // Okunamayan bicimde NEDEN ve ne yapilacagi soylenir (M3).
+    const readLocation = final => {
       const parsed = typeof PropertyProfileEngine !== 'undefined'
-        ? PropertyProfileEngine.parseMapCoordinates(mapLink.value) : null;
-      if (!parsed) {
-        setPropertyAnalysisContextStatus('Bağlantıda koordinat bulunamadı. Enlem ve boylamı elle girebilirsiniz.', 'warning');
+        ? PropertyProfileEngine.readLocationInput(mapLink.value) : { error: 'NOT_FOUND' };
+      if (parsed.error) {
+        if (parsed.error === 'EMPTY' || !final) return;
+        const messages = {
+          SHORT_LINK: 'Kısa paylaşım bağlantısı (maps.app.goo.gl) tarayıcıdan açılamıyor. Bağlantıyı açın ve adres çubuğundaki uzun bağlantıyı yapıştırın; ya da haritada eve basılı tutup çıkan koordinatı kopyalayın.',
+          SHORT_PLUS_CODE: 'Kısa Plus Code (örn. "6J2V+F6 Kaş") yer adına göre tamamlanır ve burada çözülemiyor. Haritada koda dokunup tam kodu (örn. "8G8F6J2V+F6") ya da koordinatı kopyalayın.',
+          NOT_FOUND: 'Konum okunamadı. Haritada eve basılı tutun (bilgisayarda sağ tıklayın) ve çıkan "36.2012, 29.6431" biçimindeki koordinatı yapıştırın; ya da enlem ve boylamı elle girin.'
+        };
+        setPropertyAnalysisContextStatus(messages[parsed.error] || messages.NOT_FOUND, 'warning');
         return;
       }
       document.getElementById(PROPERTY_ANALYSIS_FIELDS.latitude).value = parsed.latitude;
       document.getElementById(PROPERTY_ANALYSIS_FIELDS.longitude).value = parsed.longitude;
       propertyAnalysisContextDirty = true;
-      setPropertyAnalysisContextStatus('Koordinatlar bağlantıdan okundu; kaydetmeyi unutmayın.', 'success');
-    });
+      setPropertyAnalysisContextStatus(parsed.source === 'PLUS_CODE'
+        ? 'Plus Code çözüldü, enlem ve boylam dolduruldu; kaydetmeyi unutmayın.'
+        : 'Koordinatlar okundu, enlem ve boylam dolduruldu; kaydetmeyi unutmayın.', 'success');
+    };
+    mapLink.addEventListener('input', () => readLocation(false));
+    mapLink.addEventListener('change', () => readLocation(true));
   }
 }
 
