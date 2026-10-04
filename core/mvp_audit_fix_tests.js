@@ -36,6 +36,15 @@ try {
   check(/^sb_publishable_/.test(siteKey), 'M8. Site publishable anahtari kullanir (eski JWT degil)', siteKey.slice(0, 12));
   check(!/eyJhbGciOi/.test(app), 'M9. app.js icinde eski JWT anahtari kalmadi');
 
+  // L-18: Cloudflare Web Analytics cerezsiz sayaci sayfaya kendisi ekler;
+  // CSP izin vermezse betik engellenir ve konsolda hata kalir. Izin yalniz
+  // bu iki adrese verilir, genel bir joker acilmaz.
+  const csp = (read('index.html').match(/http-equiv="Content-Security-Policy" content="([^"]+)"/) || [])[1] || '';
+  const directive = name => (csp.match(new RegExp(name + '([^;]*)')) || [])[1] || '';
+  check(/https:\/\/static\.cloudflareinsights\.com/.test(directive('script-src')), 'M10. CSP script-src Cloudflare Web Analytics betigine izin verir', directive('script-src'));
+  check(/https:\/\/cloudflareinsights\.com/.test(directive('connect-src')), 'M11. CSP connect-src Cloudflare Web Analytics raporuna izin verir', directive('connect-src'));
+  check(!/\*\.cloudflareinsights|https:\s|https:;/.test(directive('script-src') + ';'), 'M12. script-src joker icermez', directive('script-src'));
+
   // Yeni kayit Supabase'de kapaliyken (L-157) kullanici nedenini gorur.
   const App = require('../app.js');
   for (const raw of ['Signups not allowed for this instance', 'signup_disabled']) {
