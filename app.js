@@ -11573,6 +11573,8 @@ async function deleteCleaningTask(taskId) {
   }
 
   renderHousekeepingTab();
+  // Silme Operasyon ekranindan yapiliyor; satir orada da hemen kalkmali.
+  renderOperationsTab();
   renderDailyOps();
   renderExpensesTable();
   renderFinanceModule();
@@ -18019,18 +18021,21 @@ function renderOperationsCleaningView(tasks) {
         const execution = task.execution;
         const waiting = task.workflowState === 'AWAITING_INSPECTION';
         const property = task.propertyName || appData?.villas?.[task.villa]?.name || task.villa || '—';
-        const options = eligible.map(person => `<option value="${escapeHtml(person.id)}"${execution?.person_id === person.id ? ' selected' : ''}>${escapeHtml(person.full_name)}</option>`).join('');
+        const optionsHtml = eligible.map(person => `<option value="${escapeHtml(person.id)}"${execution?.person_id === person.id ? ' selected' : ''}>${escapeHtml(person.full_name)}</option>`).join('');
+        // Atama yalniz giris hesabi olan temizlikci varsa gosterilir.
+        const assignHtml = eligible.length ? `<select id="opsCleaner-${escapeHtml(task.id)}" aria-label="Temizlikçi seç" title="Yalnız uygulamaya giriş hesabı olan temizlikçiler listelenir"><option value="">Temizlikçi seç…</option>${optionsHtml}</select>
+              <button class="btn btn-secondary btn-sm" data-onclick="assignCleaningTaskFromSelect(decodeURIComponent('${encodeActionArg(task.id)}'))">Ata</button>` : '';
         const status = waiting ? 'Denetim bekliyor' : task.status === 'DONE' ? (task.paid ? 'Ödendi' : 'Borç') : task.status === 'SKIPPED' ? 'Yapılmadı' : execution ? 'Atandı' : 'Planlı';
         return `<article class="ops-row" data-cleaning-task-id="${escapeHtml(task.id)}">
           <div class="ops-row-main"><strong>${escapeHtml(property)}</strong><span>${escapeHtml(task.date || '—')} · ${escapeHtml(task.cleaner || 'Personel belirtilmedi')}</span>${waiting ? renderCleaningExecutionFlags(execution) + renderManagerChecklist(execution) : ''}</div>
           <span class="badge ${waiting ? 'badge-blue' : (isCleaningDebt(task) ? 'badge-amber' : '')}">${escapeHtml(status)}</span>
           <div class="ops-row-actions">
             ${waiting ? `<button class="btn btn-primary btn-sm" data-onclick="inspectCleaningExecution(decodeURIComponent('${encodeActionArg(execution.id)}'), true)">M Onayla</button><button class="btn btn-secondary btn-sm" data-onclick="inspectCleaningExecution(decodeURIComponent('${encodeActionArg(execution.id)}'), false)">Yeniden aç</button>` : task.status !== 'DONE' && task.status !== 'SKIPPED' ? `
-              <select id="opsCleaner-${escapeHtml(task.id)}" aria-label="Temizlikçi seç"><option value="">Giriş hesabı olan temizlikçi…</option>${options}</select>
-              <button class="btn btn-secondary btn-sm" data-onclick="assignCleaningTaskFromSelect(decodeURIComponent('${encodeActionArg(task.id)}'))">Ata</button>
-              ${!execution ? `<button class="btn btn-secondary btn-sm" data-onclick="markCleaningDone(decodeURIComponent('${encodeActionArg(task.id)}'))">Yönetici yaptı</button>` : ''}
-              <button class="btn btn-secondary btn-sm" data-onclick="markCleaningSkipped(decodeURIComponent('${encodeActionArg(task.id)}'))">Yapılmadı</button>` : ''}
-            <button class="btn btn-secondary btn-sm" data-onclick="openEditCleaningTaskModal(decodeURIComponent('${encodeActionArg(task.id || task.dbId)}'))">Ayrıntı / Düzenle</button>
+              ${assignHtml}
+              ${!execution ? `<button class="btn btn-primary btn-sm" data-onclick="markCleaningDone(decodeURIComponent('${encodeActionArg(task.id)}'))">✔ Kontrol ettim, yapıldı</button>` : ''}
+              <button class="btn btn-secondary btn-sm" data-onclick="markCleaningSkipped(decodeURIComponent('${encodeActionArg(task.id)}'))">✖ Yapılmadı</button>` : ''}
+            <button class="btn btn-secondary btn-sm" title="Ayrıntı / Düzenle" data-onclick="openEditCleaningTaskModal(decodeURIComponent('${encodeActionArg(task.id || task.dbId)}'))">✏️ Düzenle</button>
+            <button class="btn btn-danger btn-sm" title="Temizliği ve ona bağlı gideri sil" data-onclick="deleteCleaningTask(decodeURIComponent('${encodeActionArg(task.id || task.dbId)}'))">🗑️ Sil</button>
           </div>
         </article>`;
       }).join('') : '<div class="empty-state">Bu aralıkta temizlik yok.</div>'}
