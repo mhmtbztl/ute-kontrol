@@ -30,6 +30,12 @@ try {
   const body = start >= 0 ? app.slice(start, app.indexOf('createBooking(', start)) : '';
   check(/if \(!guest\) \{[\s\S]*?return;/.test(body), 'M6. WhatsApp rezervasyonu ad olmadan createBooking\'e gitmez');
 
+  // K-02: site yeni tip publishable anahtari kullanir; eski JWT anahtarlar
+  // ancak bu gecisten sonra panelden kapatilabilir.
+  const siteKey = (app.match(/const DEFAULT_SUPABASE_KEY = '([^']+)'/) || [])[1] || '';
+  check(/^sb_publishable_/.test(siteKey), 'M8. Site publishable anahtari kullanir (eski JWT degil)', siteKey.slice(0, 12));
+  check(!/eyJhbGciOi/.test(app), 'M9. app.js icinde eski JWT anahtari kalmadi');
+
   // Yeni kayit Supabase'de kapaliyken (L-157) kullanici nedenini gorur.
   const App = require('../app.js');
   for (const raw of ['Signups not allowed for this instance', 'signup_disabled']) {

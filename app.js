@@ -13783,7 +13783,7 @@ function renderSeasonalEventRadar() {
 
 // Merkezi LexBnB Supabase Projesi (Kullanıcıdan asla API key istenmez)
 const DEFAULT_SUPABASE_URL = 'https://kirpcqklyjlrhvdbgdrq.supabase.co';
-const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtpcnBjcWtseWpscmh2ZGJnZHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5OTcxMjksImV4cCI6MjEwNDU3MzEyOX0.qjZJYGo9mLL3kPYpjkGuAfToxu8Xud1kILCTuVl24O0';
+const DEFAULT_SUPABASE_KEY = 'sb_publishable_-WlHkiRp-DZPLhCV-4-xNg_P-xFXry-';
 
 // Hedef proje YALNIZ koddan gelir (L-20). Eskiden localStorage'daki
 // LEXBNB_SUPABASE_URL okunuyordu: bir kez yazilan deger (ortak bilgisayar,
