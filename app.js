@@ -13,9 +13,16 @@ function installInnerHtmlSecurityBoundary() {
   if (!descriptor || !descriptor.set || Element.prototype.__lexbnbHtmlGuard) return;
 
   const forbiddenTags = new Set([
-    'SCRIPT', 'IFRAME', 'OBJECT', 'EMBED', 'BASE', 'META', 'LINK', 'FORM',
+    'SCRIPT', 'IFRAME', 'OBJECT', 'EMBED', 'BASE', 'META', 'LINK',
     'MATH', 'SVG', 'TEMPLATE'
   ]);
+  // FORM izinlidir (M2, 04.10: pazarlamanin sekiz formu bu yuzden hic
+  // acilmiyordu) ama hicbir yere gonderemez: gezinme oznitelikleri silinir,
+  // gonderimi isleyici preventDefault ile kendisi yapar. CSP form-action
+  // 'self' ikinci kattir.
+  // (target yalniz FORM'da silinir; baglantilardaki target="_blank" kalir.)
+  const formNavigationAttrs = new Set(['action', 'method', 'target', 'enctype']);
+  const submitterNavigationAttrs = new Set(['formaction', 'formmethod', 'formtarget', 'formenctype']);
   // L-15 adim 3: uygulama satir ici isleyici kullanmaz; dugmeler data-on*
   // ozniteligi ve core/action_dispatch.js yetkilendiricisiyle calisir (govde
   // ayristirilir, izinli eylem listesi disinda hicbir sey cagrilamaz). Bu
@@ -32,7 +39,8 @@ function installInnerHtmlSecurityBoundary() {
       Array.from(node.attributes || []).forEach(attr => {
         const name = attr.name.toLowerCase();
         const val = String(attr.value || '').trim();
-        if (name.startsWith('on')) {
+        if (name.startsWith('on') || submitterNavigationAttrs.has(name)
+            || (node.tagName === 'FORM' && formNavigationAttrs.has(name))) {
           node.removeAttribute(attr.name);
           return;
         }

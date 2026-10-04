@@ -116,6 +116,26 @@ async function main() {
       // L-144: fiyat basamaklari yonetim rolunde duzenlenebilir.
       assert(await page.evaluate(() => { switchTab('properties'); setPropertyProfileTab('PRICES'); return !!document.querySelector('.property-ladder-form #ladder_floor'); }), 'Fiyat basamağı formu yok');
       passed.push('10. fiyat basamakları mülk profilinde düzenlenir');
+      // M2 (kullanici, 04.10): global innerHTML temizleyicisi FORM ogesini
+      // siliyordu; pazarlamanin sekiz formu (kanal ilani, snapshot, deney,
+      // referans, dort reklam formu) hic acilmiyordu. Fikstur bulut okumalari
+      // bos dondurulur ki konsol kapisi ag hatasi gormesin.
+      await page.route('**/rest/v1/**', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+      await page.evaluate(() => { switchTab('marketing'); document.querySelector('[data-marketing-view="funnel"]').click(); });
+      await page.waitForSelector('[data-marketing-open-listing]');
+      await page.click('[data-marketing-open-listing]');
+      await page.waitForSelector('[data-marketing-listing-form] [name="externalUrl"]', { timeout: 5000 });
+      await page.evaluate(() => document.querySelector('[data-marketing-view="ads"]').click());
+      await page.waitForSelector('[data-ads-manual-form], [data-ads-campaign-form]', { timeout: 5000 });
+      // Form izinlidir ama hicbir yere gonderemez: gezinme oznitelikleri silinir.
+      const stripped = await page.evaluate(() => {
+        const box = document.createElement('div');
+        box.innerHTML = '<form action="https://kotu.example" method="post" target="_blank"><button formaction="https://kotu.example">x</button></form>';
+        const form = box.querySelector('form');
+        return !!form && ['action', 'method', 'target'].every(a => !form.hasAttribute(a)) && !box.querySelector('button').hasAttribute('formaction');
+      });
+      assert(stripped, 'innerHTML formu gezinme öznitelikleriyle bırakıyor');
+      passed.push('12. pazarlama formları açılır (kanal ilanı, reklam); form dışarı gönderemez');
     });
 
     await withPage(browser, baseUrl, 'owner', { width: 390, height: 844 }, async page => {
