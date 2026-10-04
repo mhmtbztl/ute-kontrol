@@ -54,6 +54,15 @@ try {
   const golgeleyen = sayfaBetikleri.filter(f => golge.test(read(f))).map(f => f + ': ' + read(f).match(golge)[1]);
   check(sayfaBetikleri.length > 10 && golgeleyen.length === 0, 'M13. Sayfa betikleri tarayicinin yerlesik adlarini ust duzeyde golgelemez', golgeleyen.join(', '));
 
+  // M1 (kullanici, 04.10): uygulama yalniz koyu temadir. Tarayici acilir
+  // listeyi (option) acik temayla ciziyordu ve secim kutusunun acik renkli
+  // yazisini miras alan secenekler beyaz zemin uzerinde gorunmuyordu (mulk
+  // formunda ulke listesi). Kural tek bir kutuya degil tum sayfaya konur.
+  const css = read('style.css');
+  check(/:root\s*\{[^}]*color-scheme:\s*dark/.test(css), 'M14. Sayfa koyu renk semasini tarayiciya bildirir (:root color-scheme: dark)');
+  const optKural = css.match(/^select option[^{]*\{([^}]*)\}/m);
+  check(!!optKural && /background(?:-color)?:/.test(optKural[1]) && /color:/.test(optKural[1]), 'M15. Tum secim kutularinin secenekleri koyu zemin ve acik yazi alir', optKural ? optKural[0].trim() : 'kural yok');
+
   // Yeni kayit Supabase'de kapaliyken (L-157) kullanici nedenini gorur.
   const App = require('../app.js');
   for (const raw of ['Signups not allowed for this instance', 'signup_disabled']) {
