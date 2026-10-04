@@ -257,7 +257,9 @@ function run() {
     app.renderOperationsTab();
     const operationsHtml = global.document.getElementById('opsCombinedContainer').innerHTML;
     const operationsCount = global.document.getElementById('opsTaskCountBadge').innerText;
-    const rowCount = (operationsHtml.match(/data-cleaning-task-id=/g) || []).length;
+    // Gecmis bolumu (odenmis/yapilmis isler) bilerek ayri; 19 aktif listeleri olcer.
+    const aktifHtml = operationsHtml.replace(/<section class="ops-group" id="opsCleaningHistory">[\s\S]*?<\/section>/, '');
+    const rowCount = (aktifHtml.match(/data-cleaning-task-id=/g) || []).length;
 
     check(
       !operationsHtml.includes('Turnover ()') && !operationsHtml.includes('>PENDING<'),
@@ -282,6 +284,25 @@ function run() {
         && operationsHtml.includes('Ayrıntı / Düzenle'),
       '20. Operasyon satirindan ayrinti/duzenleme akisina ULASILABILIYOR',
       operationsHtml.slice(0, 900)
+    );
+    // Yapilmis/odenmis gecmis temizlik eskiden hicbir erisilebilir ekranda
+    // yoktu: silinemiyor, duzeltilemiyordu (kullanici, 04.10.2026).
+    const eskiFiltre = Object.assign({}, app.setCurrentFilter({}));
+    app.setCurrentFilter({ period: 'ALL', villa: 'ALL' });
+    app.renderOperationsTab();
+    const gecmisHtml = global.document.getElementById('opsCombinedContainer').innerHTML;
+    const gecmisBolum = gecmisHtml.slice(gecmisHtml.indexOf('id="opsCleaningHistory"'));
+    app.setCurrentFilter(eskiFiltre);
+    check(
+      gecmisHtml.includes('id="opsCleaningHistory"')
+        && gecmisBolum.includes("openEditCleaningTaskModal(decodeURIComponent('paid-1'))")
+        && gecmisBolum.includes("openEditCleaningTaskModal(decodeURIComponent('pending-1'))"),
+      '20b. Odenmis ve yapilmis gecmis temizlik "Gecmis" bolumunde duzenlenip silinebilir',
+      gecmisBolum.slice(0, 600)
+    );
+    check(
+      /if \(catName === 'Temizlik'\) \{[\s\S]{0,200}switchTab\('operations'\)/.test(require('fs').readFileSync(require('path').join(__dirname, '..', 'app.js'), 'utf8')),
+      '20c. Finans gider kategorisi "Temizlik" Detay, gider defterine degil temizlik gecmisine gider'
     );
   } catch (e) {
     no('17-20. Temizlik operasyon ozeti cevrimdisi render testi', hataOzeti(e));

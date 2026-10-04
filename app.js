@@ -5276,9 +5276,19 @@ function renderExpenseDonutAndTable(categoryTotals, totalExpense, totalRevenue, 
 
 function filterExpensesByCategory(catName, clickEvent) {
   if (clickEvent && typeof clickEvent.stopPropagation === 'function') clickEvent.stopPropagation();
+  // Temizlik maliyeti gider defterinde durmaz; yapilmis temizlik gorevlerinden
+  // gelir (K-04). Eskiden bu satir gider defterine gidiyordu: orada silinecek
+  // satir yoktu ve ekranin ustunde sablon formu duruyordu.
+  if (catName === 'Temizlik') {
+    switchTab('operations');
+    setOperationsView('cleaning');
+    document.getElementById('opsCleaningHistory')?.scrollIntoView({ block: 'start' });
+    return;
+  }
   switchTab('expenses');
   document.getElementById('expSearchInput').value = catName;
   renderExpensesTable();
+  document.getElementById('expensesTableBody')?.closest('section, .card')?.scrollIntoView({ block: 'start' });
 }
 
 // -------------------------------------------------------------
@@ -17994,8 +18004,16 @@ function renderOperationsCleaningView(tasks) {
   const withExecutions = api.attachExecutions(tasks, appData?.cleaningExecutions || []);
   const grouped = api.groupCleaningTasks(withExecutions, getTodayStr());
   const debt = api.cleanerDebtSummary(tasks);
-  const groupHtml = (label, rows) => `
-    <section class="ops-group">
+  // Gecmis: yukaridaki gruplara girmeyen, bugune kadarki temizlikler (secili
+  // mulk ve donem). Eskiden yapilmis/odenmis bir temizlik hicbir erisilebilir
+  // ekranda gorunmuyordu; silmek ya da duzeltmek mumkun degildi.
+  const listed = new Set([...grouped.overdue, ...grouped.today, ...grouped.tomorrow, ...grouped.week].map(task => task.id));
+  const history = withExecutions
+    .filter(task => !listed.has(task.id) && (task.date || '') <= getTodayStr())
+    .filter(task => taskMatchesVilla(task, currentFilter.villa) && (currentFilter.period === 'ALL' || isDateInFilter(task.date || '')))
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const groupHtml = (label, rows, id) => `
+    <section class="ops-group"${id ? ` id="${id}"` : ''}>
       <h3>${escapeHtml(label)} <span class="badge">${rows.length}</span></h3>
       ${rows.length ? rows.map(task => {
         const execution = task.execution;
@@ -18012,13 +18030,14 @@ function renderOperationsCleaningView(tasks) {
               <button class="btn btn-secondary btn-sm" data-onclick="assignCleaningTaskFromSelect(decodeURIComponent('${encodeActionArg(task.id)}'))">Ata</button>
               ${!execution ? `<button class="btn btn-secondary btn-sm" data-onclick="markCleaningDone(decodeURIComponent('${encodeActionArg(task.id)}'))">Yönetici yaptı</button>` : ''}
               <button class="btn btn-secondary btn-sm" data-onclick="markCleaningSkipped(decodeURIComponent('${encodeActionArg(task.id)}'))">Yapılmadı</button>` : ''}
+            <button class="btn btn-secondary btn-sm" data-onclick="openEditCleaningTaskModal(decodeURIComponent('${encodeActionArg(task.id || task.dbId)}'))">Ayrıntı / Düzenle</button>
           </div>
         </article>`;
       }).join('') : '<div class="empty-state">Bu aralıkta temizlik yok.</div>'}
     </section>`;
   return `
     <div class="ops-cleaning-layout">
-      <div>${groupHtml('Geciken / denetim bekleyen', grouped.overdue)}${groupHtml('Bugün', grouped.today)}${groupHtml('Yarın', grouped.tomorrow)}${groupHtml('Bu hafta', grouped.week)}</div>
+      <div>${groupHtml('Geciken / denetim bekleyen', grouped.overdue)}${groupHtml('Bugün', grouped.today)}${groupHtml('Yarın', grouped.tomorrow)}${groupHtml('Bu hafta', grouped.week)}${groupHtml('Geçmiş temizlikler (seçili dönem)', history, 'opsCleaningHistory')}</div>
       <aside class="ops-debt-panel"><h3>Bekleyen Temizlik Borçları (${debt.reduce((sum, item) => sum + item.count, 0)})</h3>
         ${debt.length ? debt.map(item => `<div class="ops-debt-row"><div><strong>${escapeHtml(item.cleaner)}</strong><span>${item.count} temizlik</span></div><strong>₺${item.amount.toLocaleString('tr-TR')}</strong>${item.taskIds.map(id => {
           const task = tasks.find(candidate => (candidate.id || candidate.dbId) === id);
