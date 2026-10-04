@@ -136,6 +136,22 @@ async function main() {
       });
       assert(stripped, 'innerHTML formu gezinme öznitelikleriyle bırakıyor');
       passed.push('12. pazarlama formları açılır (kanal ilanı, reklam); form dışarı gönderemez');
+      // M3: mulk formunda konum alanina yapistirilan Plus Code / koordinat
+      // enlem ve boylami kendiliginden doldurur.
+      await page.evaluate(() => openPropertyModal());
+      const filled = await page.evaluate(() => {
+        const input = document.getElementById('propMapCoordinatesLink');
+        const out = [];
+        for (const value of ['8G8F6J2V+F6', '36.2012, 29.6431']) {
+          input.value = value;
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          out.push([document.getElementById('propAnalysisLatitude').value, document.getElementById('propAnalysisLongitude').value]);
+        }
+        closePropertyModal();
+        return out;
+      });
+      assert(filled.every(([lat, lng]) => Math.abs(Number(lat) - 36.2012) < 0.001 && Math.abs(Number(lng) - 29.6431) < 0.001), `Konum doldurmadı: ${JSON.stringify(filled)}`);
+      passed.push('13. mülk konumu Plus Code ya da koordinattan dolar');
     });
 
     await withPage(browser, baseUrl, 'owner', { width: 390, height: 844 }, async page => {
