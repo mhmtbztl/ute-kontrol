@@ -114,6 +114,10 @@ function getFriendlyAuthErrorMessage(err) {
   if (msg.includes('User already registered') || msg.includes('already registered')) {
     return 'Bu e-posta adresi ile kayıtlı bir hesap zaten var. Lütfen giriş yapın.';
   }
+  // Supabase panelinde yeni kayit kapaliyken (yasal metinler hazir olana kadar).
+  if (/signups? not allowed|signup_disabled/i.test(msg)) {
+    return 'Yeni hesap açılışı şu an geçici olarak kapalı. Bir işletmeden davet aldıysanız e-postanızdaki bağlantıyı kullanın.';
+  }
   const minLen = msg.match(/at least (\d+) characters/);
   if (minLen) {
     return `Şifreniz en az ${minLen[1]} karakter olmalıdır.`;
