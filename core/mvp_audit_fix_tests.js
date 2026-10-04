@@ -63,6 +63,11 @@ try {
   const optKural = css.match(/^select option[^{]*\{([^}]*)\}/m);
   check(!!optKural && /background(?:-color)?:/.test(optKural[1]) && /color:/.test(optKural[1]), 'M15. Tum secim kutularinin secenekleri koyu zemin ve acik yazi alir', optKural ? optKural[0].trim() : 'kural yok');
 
+  // Pazarlama sayfa cubugunda iki eylem ayni "ChatGPT'ye sor" etiketini
+  // tasiyordu (kullanici ekran goruntusu, 04.10); huni testi kendi adini alir.
+  const funnelLabel = (app.match(/id: 'funnel-test-question',\s*label: "([^"]+)"/) || [])[1] || '';
+  check(!!funnelLabel && !/^(?:🧠 )?ChatGPT'ye sor$/.test(funnelLabel), 'M16. Huni testi eylemi genel ChatGPT dugmesinden ayirt edilir', funnelLabel);
+
   // Yeni kayit Supabase'de kapaliyken (L-157) kullanici nedenini gorur.
   const App = require('../app.js');
   for (const raw of ['Signups not allowed for this instance', 'signup_disabled']) {

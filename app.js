@@ -3770,7 +3770,7 @@ function registerPageAction(tabId, action) {
 
 registerPageAction('marketing', {
   id: 'funnel-test-question',
-  label: "ChatGPT'ye sor",
+  label: "🧪 Testi ChatGPT'ye sor",
   title: 'Huni değişikliğinin etkisini ChatGPT ile değerlendir',
   kind: 'FUNNEL_TEST_QUESTION',
   run: () => openFunnelTestQuestion()
