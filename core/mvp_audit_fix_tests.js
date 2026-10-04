@@ -45,6 +45,15 @@ try {
   check(/https:\/\/cloudflareinsights\.com/.test(directive('connect-src')), 'M11. CSP connect-src Cloudflare Web Analytics raporuna izin verir', directive('connect-src'));
   check(!/\*\.cloudflareinsights|https:\s|https:;/.test(directive('script-src') + ';'), 'M12. script-src joker icermez', directive('script-src'));
 
+  // Klasik <script> dosyasinda ust duzey `const crypto` tum sayfa icin
+  // tarayicinin crypto nesnesini golgeler: finance_import_engine.js onu null
+  // yapiyordu ve Cloudflare'in betigi crypto.randomUUID'de dusuyordu.
+  const tarayiciAdlari = 'crypto|location|navigator|fetch|performance|history|document|window|self|name|status|origin|top|parent|screen|localStorage|sessionStorage|caches|indexedDB';
+  const golge = new RegExp('^(?:const|let|var|function|class)\\s+(' + tarayiciAdlari + ')\\b', 'm');
+  const sayfaBetikleri = [...new Set((read('index.html').match(/src="core\/[^"?]+/g) || []).map(s => s.slice(5)))].concat('app.js');
+  const golgeleyen = sayfaBetikleri.filter(f => golge.test(read(f))).map(f => f + ': ' + read(f).match(golge)[1]);
+  check(sayfaBetikleri.length > 10 && golgeleyen.length === 0, 'M13. Sayfa betikleri tarayicinin yerlesik adlarini ust duzeyde golgelemez', golgeleyen.join(', '));
+
   // Yeni kayit Supabase'de kapaliyken (L-157) kullanici nedenini gorur.
   const App = require('../app.js');
   for (const raw of ['Signups not allowed for this instance', 'signup_disabled']) {
