@@ -29,6 +29,13 @@ try {
   const start = app.indexOf('async function saveWaAsBooking');
   const body = start >= 0 ? app.slice(start, app.indexOf('createBooking(', start)) : '';
   check(/if \(!guest\) \{[\s\S]*?return;/.test(body), 'M6. WhatsApp rezervasyonu ad olmadan createBooking\'e gitmez');
+
+  // Yeni kayit Supabase'de kapaliyken (L-157) kullanici nedenini gorur.
+  const App = require('../app.js');
+  for (const raw of ['Signups not allowed for this instance', 'signup_disabled']) {
+    const text = App.getFriendlyAuthErrorMessage({ message: raw });
+    check(/geçici olarak kapalı/.test(text), `M7. "${raw}" anlaşılır mesaja çevrilir`, text);
+  }
 } catch (error) {
   failed++;
   console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));
