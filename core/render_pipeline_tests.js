@@ -304,6 +304,16 @@ function run() {
       /if \(catName === 'Temizlik'\) \{[\s\S]{0,200}switchTab\('operations'\)/.test(require('fs').readFileSync(require('path').join(__dirname, '..', 'app.js'), 'utf8')),
       '20c. Finans gider kategorisi "Temizlik" Detay, gider defterine degil temizlik gecmisine gider'
     );
+    // Kullanici 04.10: "Yonetici yapti" belirsizdi, silmek pencere acmayi gerektiriyordu.
+    check(
+      operationsHtml.includes("deleteCleaningTask(decodeURIComponent('planned-1'))")
+        && !operationsHtml.includes('Yönetici yaptı') && operationsHtml.includes('Kontrol ettim, yapıldı'),
+      '20d. Temizlik satirinda tek tikla Sil var; "Yonetici yapti" yerine anlasilir onay',
+      operationsHtml.slice(0, 900)
+    );
+    const appKaynak = require('fs').readFileSync(require('path').join(__dirname, '..', 'app.js'), 'utf8');
+    const silGovde = appKaynak.slice(appKaynak.indexOf('async function deleteCleaningTask'), appKaynak.indexOf('function deleteCleaningTaskFromModal'));
+    check(/renderOperationsTab\(\)/.test(silGovde), '20e. Silinen temizlik Operasyon ekranindan hemen kalkar');
   } catch (e) {
     no('17-20. Temizlik operasyon ozeti cevrimdisi render testi', hataOzeti(e));
   }
