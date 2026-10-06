@@ -169,7 +169,7 @@ function initializePropertyAnalysisContextUi() {
         if (parsed.error === 'EMPTY' || !final) return;
         const messages = {
           SHORT_LINK: 'Kısa paylaşım bağlantısı (maps.app.goo.gl) tarayıcıdan açılamıyor. Bağlantıyı açın ve adres çubuğundaki uzun bağlantıyı yapıştırın; ya da haritada eve basılı tutup çıkan koordinatı kopyalayın.',
-          SHORT_PLUS_CODE: 'Kısa Plus Code (örn. "6J2V+F6 Kaş") yer adına göre tamamlanır ve burada çözülemiyor. Haritada koda dokunup tam kodu (örn. "8G8F6J2V+F6") ya da koordinatı kopyalayın.',
+          SHORT_PLUS_CODE: 'Kısa Plus Code (örn. "6J2V+F6 Kaş") burada çözülemiyor. İki kolay yol: 1) plus.codes/map sitesine bu kodu yazın, çıkan uzun kodu (örn. "8G8F6J2V+F6") kopyalayıp yapıştırın. 2) Google Haritalar’da eve basılı tutun ve çıkan koordinatı yapıştırın.',
           NOT_FOUND: 'Konum okunamadı. Haritada eve basılı tutun (bilgisayarda sağ tıklayın) ve çıkan "36.2012, 29.6431" biçimindeki koordinatı yapıştırın; ya da enlem ve boylamı elle girin.'
         };
         setPropertyAnalysisContextStatus(messages[parsed.error] || messages.NOT_FOUND, 'warning');
