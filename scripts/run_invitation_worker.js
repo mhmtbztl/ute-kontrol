@@ -1,4 +1,15 @@
 const { createClient } = require('@supabase/supabase-js');
+const path = require('path');
+const { pathToFileURL } = require('url');
+
+let sharedDeliveryPromise = null;
+function sharedDelivery() {
+  if (!sharedDeliveryPromise) {
+    const sharedPath = path.join(__dirname, '..', 'supabase', 'functions', '_shared', 'invitation_delivery.mjs');
+    sharedDeliveryPromise = import(pathToFileURL(sharedPath).href);
+  }
+  return sharedDeliveryPromise;
+}
 
 function required(name) {
   const value = String(process.env[name] || '').trim();
@@ -21,18 +32,8 @@ function isAlreadyRegistered(error) {
 // guncellemek cagiranin isidir; boylece bu fonksiyon sahte istemciyle
 // cevrimdisi olculebilir (core/invitation_worker_tests.js).
 async function deliverInvitation(client, job, redirectTo) {
-  const invited = await client.auth.admin.inviteUserByEmail(job.email, { redirectTo });
-  if (!invited.error) return { ok: true, channel: 'invite' };
-  if (!isAlreadyRegistered(invited.error)) return { ok: false, error: invited.error };
-
-  // Mevcut hesap: sifresi zaten var, yeni hesap acilmaz. Giris linki gider;
-  // link ile gelindiginde handleAuthenticatedSession bekleyen daveti kabul eder.
-  const linked = await client.auth.signInWithOtp({
-    email: job.email,
-    options: { shouldCreateUser: false, emailRedirectTo: redirectTo }
-  });
-  if (!linked.error) return { ok: true, channel: 'magiclink' };
-  return { ok: false, error: linked.error };
+  const shared = await sharedDelivery();
+  return shared.deliverInvitation(client, job, redirectTo);
 }
 
 async function main() {

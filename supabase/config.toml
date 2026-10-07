@@ -1,0 +1,2 @@
+[functions.send-tenant-invitation]
+verify_jwt = true
