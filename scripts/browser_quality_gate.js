@@ -152,6 +152,35 @@ async function main() {
       });
       assert(filled.every(([lat, lng]) => Math.abs(Number(lat) - 36.2012) < 0.001 && Math.abs(Number(lng) - 29.6431) < 0.001), `Konum doldurmadı: ${JSON.stringify(filled)}`);
       passed.push('13. mülk konumu Plus Code ya da koordinattan dolar');
+      // M4 (kullanici, 06.10): davet e-postasi yalniz GitHub'in gecikebilen
+      // zamanlayicisina birakilmamali. Tarayici yetkili Edge Function'i hemen
+      // cagirir; servis rolu ya da baska bir gizli anahtar istemciye verilmez.
+      const invitationCalls = [];
+      await page.route('**/functions/v1/**', async route => {
+        assert(route.request().url().endsWith('/functions/v1/send-tenant-invitation'), `Beklenmeyen function cagrisi: ${route.request().url()}`);
+        invitationCalls.push(route.request().postDataJSON());
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            invitation: { invitation_id: '00000000-0000-4000-8000-000000000099' },
+            delivery: 'sent'
+          })
+        });
+      });
+      await page.evaluate(async () => {
+        switchTab('settings');
+        openInviteMemberModal();
+        document.getElementById('inviteMemberEmail').value = 'm4-yonetici@browser.test';
+        document.getElementById('inviteMemberRole').value = 'admin';
+        await submitMemberInvite({ preventDefault() {} });
+      });
+      assert.deepStrictEqual(invitationCalls, [{
+        tenantId: '00000000-0000-4000-8000-000000000001',
+        email: 'm4-yonetici@browser.test',
+        role: 'admin'
+      }], `Davet Edge Function'a aninda gitmedi: ${JSON.stringify(invitationCalls)}`);
+      passed.push('14. ekip daveti e-posta sunucu fonksiyonuna anında gider');
     });
 
     await withPage(browser, baseUrl, 'owner', { width: 390, height: 844 }, async page => {

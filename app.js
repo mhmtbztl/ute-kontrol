@@ -9083,14 +9083,33 @@ async function submitMemberInvite(e) {
   if (btn) { btn.disabled = true; btn.innerText = '⏳ Gönderiliyor...'; }
 
   try {
-    const { error } = await supabaseClient.rpc('create_tenant_invitation', {
-      p_tenant_id: tenantId, p_email: email, p_role: role
+    let delivery = 'queued';
+    const { data, error } = await supabaseClient.functions.invoke('send-tenant-invitation', {
+      body: { tenantId, email, role }
     });
-    if (error) { showInviteError(error.message); return; }
+    if (error) {
+      // GitHub Pages kodu Edge Function'dan once yayina cikabilir. Yalnizca
+      // gercek 404'te eski kuyruk yoluna don; 401/403/500 hatalarinda ikinci
+      // bir davet olusturup olasi cift e-posta uretme.
+      const status = Number(error.context && error.context.status);
+      if (status !== 404) {
+        showInviteError('Davet gönderilemedi. Lütfen tekrar deneyin.');
+        return;
+      }
+      const fallback = await supabaseClient.rpc('create_tenant_invitation', {
+        p_tenant_id: tenantId, p_email: email, p_role: role
+      });
+      if (fallback.error) { showInviteError(fallback.error.message); return; }
+    } else {
+      delivery = data && data.delivery === 'sent' ? 'sent' : 'queued';
+    }
 
     closeInviteMemberModal();
     await renderTeamManagement();
-    alert(`✉️ Davet oluşturuldu ve e-posta teslim kuyruğuna alındı.\n\n${email} bu adresle kayıt olup giriş yaptığında ekibinize otomatik katılacak.\nDavet 14 gün geçerlidir.`);
+    const deliveryText = delivery === 'sent'
+      ? 'Davet e-postası gönderildi.'
+      : 'Davet oluşturuldu; e-posta teslim kuyruğuna alındı.';
+    alert(`✉️ ${deliveryText}\n\n${email} bu adresle kayıt olup giriş yaptığında ekibinize otomatik katılacak.\nDavet 14 gün geçerlidir.`);
   } catch (ex) {
     showInviteError(ex && ex.message ? ex.message : 'Davet gönderilemedi.');
   } finally {

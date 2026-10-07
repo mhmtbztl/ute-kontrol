@@ -171,6 +171,9 @@ const allTestFiles = [
 
   // Ekip daveti: hesabi olan adrese de e-posta gidiyor mu, davetle gelene sifre belirletiliyor mu
   'invitation_worker_tests.js',
+  // M4: tarayicidan Edge Function'a anlik teslim + phase90 tekrar davet davranisi
+  'invitation_edge_function_tests.js',
+  'phase90_invitation_delivery_live_tests.js',
 
   // Temizlik & gider defteri gercekten Postgres'e yaziliyor mu
   'cleaning_ledger_persistence_tests.js',
