@@ -14,7 +14,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=d886fb2d">
+  <link rel="stylesheet" href="style.css?v=86e714fc">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="supabase.umd.js?v=3810661a"></script>
@@ -1390,6 +1390,10 @@
           <div class="form-group">
             <label for="leadQuickProperty">İlgilendiği mülk</label>
             <select id="leadQuickProperty"><option value="">Henüz belli değil</option></select>
+          </div>
+          <div class="form-group lead-extra-properties-group">
+            <label>Başka baktığı mülkler</label>
+            <div id="leadQuickExtraProperties" class="lead-extra-properties"></div>
           </div>
           <div class="form-group">
             <label for="leadQuickPax">Kişi</label>
@@ -2796,6 +2800,10 @@
             </select>
           </div>
           <div class="form-group">
+            <label>Başka ilgilendiği mülkler</label>
+            <div id="leadExtraProperties" class="lead-extra-properties"></div>
+          </div>
+          <div class="form-group">
             <label>Kanal</label>
             <select id="leadChannel" required>
               <option value="WhatsApp">WhatsApp</option>
@@ -3708,7 +3716,7 @@
   <script src="core/date_range_picker.js?v=41dc564c"></script>
   <script src="core/side_panel.js?v=d763b464"></script>
   <script src="core/action_dispatch.js?v=c171f23d"></script>
-  <script src="app.js?v=01a0d130"></script>
+  <script src="app.js?v=256c27bd"></script>
   <script src="core/property_analysis_context_ui.js?v=0a5def2d"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=6fdf284a"></script>

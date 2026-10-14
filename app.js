@@ -3257,6 +3257,59 @@ function validateLeadInput(leadInput, targetTenantId) {
   return true;
 }
 
+// Talep birden fazla mulkle ilgilenebilir (L-186, kullanici M16, phase91).
+// leads.property_id asil mulktur; ek mulkler lead_interest_properties'te durur.
+// Tablo yoksa (goc uygulanmadi) rows null gelir: talepler ek mulksuz yuklenir.
+function attachLeadInterestProperties(leads, rows) {
+  const byLead = new Map();
+  (rows || []).forEach(row => {
+    if (!byLead.has(row.lead_id)) byLead.set(row.lead_id, []);
+    byLead.get(row.lead_id).push(row.property_id);
+  });
+  if (typeof appData !== 'undefined' && appData) appData.leadInterestTableReady = Array.isArray(rows);
+  return (leads || []).map(lead => ({ ...lead, extraPropertyIds: byLead.get(lead.id) || [] }));
+}
+
+// Ek mulk secicisi: asil mulk disindaki mulkler onay kutusu olarak.
+function renderLeadExtraPropertyPicker(containerId, selectedPropertyIds = [], primaryVillaKey = '') {
+  const box = typeof document !== 'undefined' ? document.getElementById(containerId) : null;
+  if (!box) return;
+  const selected = new Set(selectedPropertyIds || []);
+  const villas = appData?.villas || {};
+  const items = Object.keys(villas).filter(key => key !== primaryVillaKey && villas[key]?.id).map(key =>
+    `<label class="lead-extra-property"><input type="checkbox" value="${escapeHtml(villas[key].id)}"${selected.has(villas[key].id) ? ' checked' : ''}> ${escapeHtml(villas[key].name || key)}</label>`);
+  box.innerHTML = items.length ? items.join('') : '<span class="sub-text">Başka mülk yok.</span>';
+}
+
+function readLeadExtraPropertyPicker(containerId) {
+  const box = typeof document !== 'undefined' ? document.getElementById(containerId) : null;
+  if (!box || typeof box.querySelectorAll !== 'function') return [];
+  return Array.from(box.querySelectorAll('input[type="checkbox"]:checked')).map(input => input.value).filter(isUUID);
+}
+
+// Ek mulkleri yazar: once silinir, sonra secilenler eklenir. Talep kaydi
+// bundan bagimsizdir; yazilamazsa talep kayitli kalir ve uyari doner.
+async function syncLeadInterestProperties(leadId, propertyIds, primaryPropertyId) {
+  const tenantId = getActiveTenantId();
+  if (!isUUID(leadId) || !isCloudTenant(tenantId)) return '';
+  const wanted = Array.from(new Set((propertyIds || []).filter(id => isUUID(id) && id !== primaryPropertyId)));
+  const current = ((appData?.leads || []).find(lead => lead.id === leadId)?.extraPropertyIds) || [];
+  if (!wanted.length && !current.length) return '';
+  const sorun = error => isMissingSchemaError(error)
+    ? ' Ek mülkler kaydedilmedi: veritabanı güncellemesi (phase91) henüz uygulanmadı.'
+    : ' Ek mülkler kaydedilemedi: ' + kullaniciMesaji(error?.message || 'veritabanı hatası');
+  const del = await supabaseClient.from('lead_interest_properties').delete().eq('tenant_id', tenantId).eq('lead_id', leadId);
+  if (del.error) return sorun(del.error);
+  if (wanted.length) {
+    const ins = await supabaseClient.from('lead_interest_properties')
+      .insert(wanted.map(propertyId => ({ tenant_id: tenantId, lead_id: leadId, property_id: propertyId })));
+    if (ins.error) return sorun(ins.error);
+  }
+  const lead = (appData?.leads || []).find(item => item.id === leadId);
+  if (lead) lead.extraPropertyIds = wanted;
+  return '';
+}
+
 async function loadLeads(targetTenantId) {
   const tenantId = targetTenantId || getActiveTenantId();
   if (!isCloudTenant(tenantId)) {
@@ -3267,7 +3320,10 @@ async function loadLeads(targetTenantId) {
     .from('leads').select('*').eq('tenant_id', tenantId)
     .order('created_at', { ascending: false }));
 
-  const mapped = (data || []).map(mapLeadFromDb);
+  const interestRows = canReadSalesRole(activeTenant?.role)
+    ? await fetchTenantRowsTolerant(() => supabaseClient.from('lead_interest_properties').select('lead_id, property_id').eq('tenant_id', tenantId))
+    : [];
+  const mapped = attachLeadInterestProperties((data || []).map(mapLeadFromDb), interestRows);
   if (typeof appData !== 'undefined') {
     appData.leads = mapped;
     if (typeof saveAppData === 'function') saveAppData();
@@ -10280,6 +10336,8 @@ function renderLeadQuickCapture() {
     .map(property => `<option value="${escapeHtml(property.id || '')}"${property.id === selectedProperty ? ' selected' : ''}>${escapeHtml(property.name || property.slug || 'Adlandırılmamış mülk')}</option>`)
     .join('');
 
+  renderLeadExtraPropertyPicker('leadQuickExtraProperties', readLeadExtraPropertyPicker('leadQuickExtraProperties'));
+
   Array.from(form.elements || []).forEach(control => { control.disabled = !canWrite || (control.id === 'leadQuickSource' && sources.length === 0); });
   if (!canWrite) setLeadQuickMessage('Bu rol satış verisini görüntüleyebilir; talep kaydedemez.', 'info');
   else if (!sources.length) setLeadQuickMessage('Kaynak kataloğu yüklenemedi. Kayıt yapılmadı; yönetici kaynak ayarını kontrol etmeli.', 'error');
@@ -10354,13 +10412,17 @@ async function submitQuickLead(event) {
       note: document.getElementById('leadQuickNote')?.value
     });
     lastLeadSourceId = sourceId;
+    const extraWarning = await syncLeadInterestProperties(result?.lead_id,
+      readLeadExtraPropertyPicker('leadQuickExtraProperties'), document.getElementById('leadQuickProperty')?.value || null);
     await loadLeads(getActiveTenantId());
     await refreshLeadSalesContext();
     const parts = [result.created ? 'Yeni talep kaydedildi.' : 'Bilgiler mevcut açık talebe eklendi.'];
     if (result.returning) parts.push(`Tekrar gelen misafir${Number(result.previous_leads) > 0 ? ` · ${Number(result.previous_leads)} önceki talep` : ''}.`);
     if (result.classification === 'BLACK') parts.push('Yönetici uyarısı: Bu misafir kara listede.');
     if (result.classification === 'WHITE') parts.push('Yönetici notu: Bu misafir beyaz listede.');
+    if (extraWarning) parts.push(extraWarning.trim());
     form.reset();
+    renderLeadExtraPropertyPicker('leadQuickExtraProperties', []);
     renderLeadQuickCapture();
     renderManageLeadsTable();
     renderLeadAnalytics();
@@ -10401,7 +10463,7 @@ function renderManageLeadsTable() {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><strong>${escapeHtml(l.guest)}</strong>${l.checkIn && l.checkOut ? `<span style="display:block; font-size:11px; color:var(--text-muted);">${escapeHtml(formatTrDate(l.checkIn))} → ${escapeHtml(formatTrDate(l.checkOut))}</span>` : ''}</td>
-      <td>${escapeHtml(appData.villas[l.villa]?.name || l.villa)}</td>
+      <td>${escapeHtml(appData.villas[l.villa]?.name || l.villa)}${(l.extraPropertyIds || []).length ? `<span style="display:block; font-size:11px; color:var(--text-muted);">+ ${escapeHtml((l.extraPropertyIds || []).map(id => Object.values(appData.villas || {}).find(v => v.id === id)?.name).filter(Boolean).join(', '))}</span>` : ''}</td>
       <td>${escapeHtml(l.channel)}</td>
       <td>₺${Number(l.quote).toLocaleString('tr-TR')}</td>
       <td>${statusBadge}</td>
@@ -10508,6 +10570,7 @@ function openLeadModal(editId = null) {
     editInput.value = l.id;
     document.getElementById('leadGuest').value = l.guestName || l.guest;
     document.getElementById('leadVilla').value = l.villa;
+    renderLeadExtraPropertyPicker('leadExtraProperties', l.extraPropertyIds || [], l.villa);
     document.getElementById('leadChannel').value = normalizeLeadChannel(l.channel);
     document.getElementById('leadQuote').value = l.quote;
     // Ilgilenilen tarihler duzenlemede de gorunur ve degisir (L-186).
@@ -10619,6 +10682,9 @@ async function saveLead(e) {
   try {
     if (editId) {
       await updateLead(editId, payload);
+      const extraWarning = await syncLeadInterestProperties(editId,
+        readLeadExtraPropertyPicker('leadExtraProperties'), appData.villas?.[villa]?.id || null);
+      if (extraWarning) alert('Talep kaydedildi.' + extraWarning);
       try {
         await SalesWorkflowService.saveWorkflow(supabaseClient, {
           tenantId: getActiveTenantId(), leadId: editId, assignedTo, nextFollowUpAt
@@ -15537,7 +15603,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
         : Promise.resolve([]);
       // Independent datasets are loaded concurrently and every list is paged;
       // Supabase's per-response cap must never silently truncate a dashboard.
-      const [villas, bookings, expenses, cleanList, leads, leadSalesContext, closeList, targetList, maintenanceTickets, operationalTasks, financialTransactions, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications, campaignRows, influencerRows, settingRows, operatorNoteRows, pricingLadderRows, hkOverrideRows, paymentCommissionRows, operationalPeopleRows, cleaningExecutionRows, maintenanceAssignmentRows, taskTemplateRows, checklistTemplateRows, bookingPayments, bookingPaymentBalances, adMetricPeriods, propertyContextRows, propertyOwnerRows, propertyOwnerLinkRows, messageTemplateRows, guestClassificationRows, salesMembers, propertyPricingRuleRows, competitorResearchRows, expenseTemplateRows, expenseTemplateOccurrenceRows] = await Promise.all([
+      const [villas, bookings, expenses, cleanList, leads, leadSalesContext, closeList, targetList, maintenanceTickets, operationalTasks, financialTransactions, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications, campaignRows, influencerRows, settingRows, operatorNoteRows, pricingLadderRows, hkOverrideRows, paymentCommissionRows, operationalPeopleRows, cleaningExecutionRows, maintenanceAssignmentRows, taskTemplateRows, checklistTemplateRows, bookingPayments, bookingPaymentBalances, adMetricPeriods, propertyContextRows, propertyOwnerRows, propertyOwnerLinkRows, messageTemplateRows, guestClassificationRows, salesMembers, propertyPricingRuleRows, competitorResearchRows, expenseTemplateRows, expenseTemplateOccurrenceRows, leadInterestRows] = await Promise.all([
         loadProperties(tenantId),
         loadBookings(tenantId),
         mayReadLedger ? loadExpenses(tenantId) : Promise.resolve([]),
@@ -15586,7 +15652,9 @@ async function loadTenantAppData(tenantIdOrUserId) {
         mayReadSales ? fetchTenantRowsTolerant(() => supabaseClient.from('property_pricing_rule_settings').select('*').eq('tenant_id', tenantId)) : Promise.resolve([]),
         mayReadSales ? fetchTenantRowsTolerant(() => supabaseClient.from('competitor_price_research').select('*').eq('tenant_id', tenantId).order('researched_on', { ascending: false }).order('created_at', { ascending: false })) : Promise.resolve([]),
         mayReadLedger ? fetchTenantRowsTolerant(() => supabaseClient.from('expense_templates').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false })) : Promise.resolve([]),
-        mayReadLedger ? fetchTenantRowsTolerant(() => supabaseClient.from('expense_template_occurrences').select('*').eq('tenant_id', tenantId).order('period_month', { ascending: false })) : Promise.resolve([])
+        mayReadLedger ? fetchTenantRowsTolerant(() => supabaseClient.from('expense_template_occurrences').select('*').eq('tenant_id', tenantId).order('period_month', { ascending: false })) : Promise.resolve([]),
+        // phase91 uygulanmadan once tablo yoktur: null doner, ekran ayakta kalir.
+        mayReadSales ? fetchTenantRowsTolerant(() => supabaseClient.from('lead_interest_properties').select('lead_id, property_id').eq('tenant_id', tenantId)) : Promise.resolve([])
       ]);
       const propIdMap = {};
       Object.values(villas || {}).forEach(p => {
@@ -15598,7 +15666,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
       // filtresinde o mulkun giderleri kayboluyor, mulk kari sisiyordu (L-38).
       // Rezervasyonlardaki gibi yukleme BITTIKTEN sonra yeniden baglanir.
       const expensesWithSlugs = attachBookingVillaSlugs(expenses, villas);
-      const leadsWithSlugs = attachBookingVillaSlugs(leads, villas);
+      const leadsWithSlugs = attachLeadInterestProperties(attachBookingVillaSlugs(leads, villas), leadInterestRows);
       const odemeKomisyonu = {};
       (paymentCommissionRows || []).forEach(r => { odemeKomisyonu[r.booking_id] = Number(r.amount) || 0; });
       bookingsWithVillaSlugs.forEach(b => {
@@ -19767,6 +19835,9 @@ if (typeof module !== 'undefined' && module.exports) {
     renderOperationsPeopleView,
     renderTodayCommandCenter,
     readEmailTokenHashLink,
+    attachLeadInterestProperties,
+    renderLeadExtraPropertyPicker,
+    syncLeadInterestProperties,
     recordBookingDeposit,
     syncGoalProfitFromMargin,
     syncGoalMarginFromProfit,
