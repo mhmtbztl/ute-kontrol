@@ -181,6 +181,38 @@ async function main() {
         role: 'admin'
       }], `Davet Edge Function'a aninda gitmedi: ${JSON.stringify(invitationCalls)}`);
       passed.push('14. ekip daveti e-posta sunucu fonksiyonuna anında gider');
+      // Gorev 9 (14.10): M6 — Hizli Ekle "Yeni talep" hata vermeden hizli
+      // kayit formuna gider; M7 — saha ekibine kisi eklenir ve tabloya yazilir.
+      const dialogs = [];
+      const onDialog = dialog => { dialogs.push(dialog.message()); dialog.dismiss().catch(() => {}); };
+      page.on('dialog', onDialog);
+      await page.click('#quickAddBtn');
+      await page.click('#quickAddMenu [data-onclick^="openQuickLeadCapture"]');
+      const leadState = await page.evaluate(() => ({
+        tab: document.getElementById('tab-leads').classList.contains('active'),
+        focus: document.activeElement && document.activeElement.id,
+        modal: document.getElementById('leadModal')?.classList.contains('active') || false
+      }));
+      assert(leadState.tab && leadState.focus === 'leadQuickPhone' && !leadState.modal && !dialogs.length,
+        `Yeni talep hizli forma gitmedi: ${JSON.stringify({ leadState, dialogs })}`);
+      const personWrites = [];
+      await page.route('**/rest/v1/operational_people**', async route => {
+        if (route.request().method() === 'POST') personWrites.push(route.request().postDataJSON());
+        await route.fulfill({ status: route.request().method() === 'POST' ? 201 : 200, contentType: 'application/json', body: '[]' });
+      });
+      await page.evaluate(() => { switchTab('operations'); document.querySelector('[data-operations-view="people"]').click(); });
+      await page.waitForSelector('#opsPersonName', { state: 'visible', timeout: 5000 });
+      await page.selectOption('#opsPersonKind', 'TECHNICIAN');
+      await page.fill('#opsPersonName', 'Tarayici Usta');
+      await page.fill('#opsPersonSpecialty', 'elektrik');
+      await page.click('[data-onclick="saveOperationalPerson()"]');
+
+      await page.waitForTimeout(300);
+      page.off('dialog', onDialog);
+      const written = Array.isArray(personWrites[0]) ? personWrites[0][0] : personWrites[0];
+      assert(written && written.full_name === 'Tarayici Usta' && written.kind === 'TECHNICIAN' && written.tenant_id === '00000000-0000-4000-8000-000000000001' && !dialogs.length,
+        `Saha ekibi kaydi yazilmadi: ${JSON.stringify({ personWrites, dialogs })}`);
+      passed.push('15. yeni talep hızlı forma gider; saha ekibine usta eklenir');
     });
 
     await withPage(browser, baseUrl, 'owner', { width: 390, height: 844 }, async page => {

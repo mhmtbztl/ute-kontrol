@@ -2109,15 +2109,30 @@ async function saveMonthlyTarget(targetInput) {
     return payload;
   }
 
-  let query;
-  if (!payload.property_id) {
-    query = supabaseClient.from('monthly_targets')
-      .upsert(payload, { onConflict: 'tenant_id, year, month' });
-  } else {
-    query = supabaseClient.from('monthly_targets')
-      .upsert(payload, { onConflict: 'tenant_id, property_id, year, month' });
+  // Tekillik iki KISMİ benzersiz indeksle tutulur (property_id NULL / NOT NULL).
+  // PostgREST upsert'ü WHERE yüklemi veremediği için ON CONFLICT indeksi
+  // çıkaramaz ve 42P10 ile düşer (L-174): hedef kaydı hiç çalışmıyordu.
+  // Önce satır aranır, sonra güncellenir ya da eklenir.
+  const findExisting = async () => {
+    let q = supabaseClient.from('monthly_targets').select('id')
+      .eq('tenant_id', tenantId).eq('year', payload.year).eq('month', payload.month);
+    q = payload.property_id ? q.eq('property_id', payload.property_id) : q.is('property_id', null);
+    const { data: rows, error: findError } = await q.limit(1);
+    if (findError) throw new Error('Hedef kaydedilemedi: ' + (findError.message || 'Veritabanı hatası'));
+    return rows && rows[0] ? rows[0].id : null;
+  };
+  const updateById = id => supabaseClient.from('monthly_targets')
+    .update(payload).eq('id', id).eq('tenant_id', tenantId).select().single();
+
+  const existingId = await findExisting();
+  let { data, error } = existingId
+    ? await updateById(existingId)
+    : await supabaseClient.from('monthly_targets').insert(payload).select().single();
+  if (error && error.code === '23505') {
+    // Aynı anda başka bir oturum aynı dönemi ekledi: onun satırını güncelle.
+    const racedId = await findExisting();
+    if (racedId) ({ data, error } = await updateById(racedId));
   }
-  const { data, error } = await query.select().single();
   if (error) {
     throw new Error('Hedef kaydedilemedi: ' + (error.message || 'Veritabanı hatası'));
   }
@@ -8483,10 +8498,17 @@ async function renderTeamManagement() {
     }
 
     const canRemove = canManageRoles && !m.is_self && !isLastOwner;
-    const actionCell = canRemove
+    // Personel hesabı saha ekibine bağlanmadan temizliğe atanamaz (L-176).
+    const inFieldTeam = (appData?.operationalPeople || []).some(person => person.user_id === m.user_id);
+    const fieldCell = m.role === 'staff' && canManageTenantRole(myRole)
+      ? (inFieldTeam
+        ? '<span class="sub-text" style="font-size:11px;">Saha ekibinde</span> '
+        : `<button class="btn btn-secondary btn-sm" data-action="field" data-user="${escapeHtml(m.user_id)}">👷 Saha ekibine ekle</button> `)
+      : '';
+    const actionCell = fieldCell + (canRemove
       ? `<button class="btn btn-secondary btn-sm" data-action="remove"
            data-user="${escapeHtml(m.user_id)}" data-email="${escapeHtml(m.email)}">Çıkar</button>`
-      : '<span class="sub-text" style="font-size:11px;">—</span>';
+      : (fieldCell ? '' : '<span class="sub-text" style="font-size:11px;">—</span>'));
 
     return `<tr>
       <td><strong>${escapeHtml(m.full_name)}</strong>${m.is_self ? ' <span class="sub-text" style="font-size:10px;">(siz)</span>' : ''}</td>
@@ -8546,6 +8568,8 @@ function bindTeamTableEvents() {
     memberBody.addEventListener('click', (ev) => {
       const el = ev.target.closest('[data-action="remove"]');
       if (el) removeTeamMember(el.dataset.user, el.dataset.email);
+      const field = ev.target.closest('[data-action="field"]');
+      if (field) addMemberToFieldTeam(field.dataset.user);
     });
   }
 
@@ -10207,7 +10231,19 @@ async function convertLeadAction(leadId) {
   }
 }
 
+// Yeni talep tek yerden açılır: telefon ve kaynak zorunlu hızlı kayıt formu
+// (L-175). Hızlı Ekle menüsü eskiden düzenleme modalına gidiyordu; modal yeni
+// kaydı bilerek reddettiği için kullanıcı her seferinde hata görüyordu.
+function openQuickLeadCapture() {
+  if (switchTab('leads') === false) return;
+  const card = document.querySelector('.lead-quick-card');
+  if (card && typeof card.scrollIntoView === 'function') card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const phone = document.getElementById('leadQuickPhone');
+  if (phone && typeof phone.focus === 'function') phone.focus({ preventScroll: true });
+}
+
 function openLeadModal(editId = null) {
+  if (!editId) { openQuickLeadCapture(); return; }
   const modal = document.getElementById('leadModal');
   const title = document.getElementById('leadModalTitle');
   const editInput = document.getElementById('leadEditId');
@@ -11469,7 +11505,18 @@ async function payAllPendingCleaning() {
 }
 
 
+// Temizlik formunda saha ekibindeki etkin temizlikçiler listeden seçilir (L-176).
+// Alan serbest metin kalır: hesabı olmayan dış ekip de borç defterine yazılabilir.
+function fillCleanerNameOptions() {
+  const list = typeof document !== 'undefined' ? document.getElementById('hkCleanerOptions') : null;
+  if (!list) return;
+  list.innerHTML = (appData?.operationalPeople || [])
+    .filter(person => person.kind === 'CLEANER' && person.is_active !== false)
+    .map(person => `<option value="${escapeHtml(person.full_name || '')}"></option>`).join('');
+}
+
 function openNewCleaningTaskModal() {
+  fillCleanerNameOptions();
   document.getElementById('cleaningTaskModalTitle').innerText = '🧹 Yeni Temizlik / Borç Girişi';
   document.getElementById('hkEditTaskId').value = '';
   document.getElementById('hkVilla').value = currentFilter.villa !== 'ALL'
@@ -11493,6 +11540,7 @@ function openNewCleaningTaskModal() {
 }
 
 function openEditCleaningTaskModal(taskId) {
+  fillCleanerNameOptions();
   if (!appData.cleaningTasks) return;
   const rawTask = appData.cleaningTasks.find(t => t.id === taskId || t.dbId === taskId || t.legacyId === taskId);
   if (!rawTask) return;
@@ -17841,9 +17889,183 @@ function renderStaffFieldWork() {
 let operationsViewState = 'cleaning';
 
 function setOperationsView(view) {
-  if (!['cleaning', 'maintenance', 'tasks'].includes(view)) return false;
+  if (!['cleaning', 'maintenance', 'tasks', 'people'].includes(view)) return false;
   operationsViewState = view;
   renderOperationsTab();
+  return true;
+}
+
+// -----------------------------------------------------------------------------
+// Saha ekibi (L-176, kullanıcı M7): temizlikçi ve usta kayıtları.
+// operational_people (phase55) vardı ama hiçbir ekran ona yazmıyordu; temizlik
+// ataması ve usta listesi bu yüzden her hesapta boştu. Yazma RLS ile yönetim
+// rollerine açık (can_manage_tenant), göç gerekmedi. Silme yok: geçmiş temizlik
+// ve arıza kayıtları kişiye bağlı; kişi pasifleştirilir.
+// -----------------------------------------------------------------------------
+const OPERATIONAL_PERSON_KINDS = { CLEANER: 'Temizlikçi', TECHNICIAN: 'Usta' };
+let operationalPersonEditId = null;
+
+function fieldTeamHintHtml(kind) {
+  const isCleaner = kind === 'CLEANER';
+  const messageHtml = isCleaner
+    ? 'Atanabilecek temizlikçi yok. Temizlikçiyi <strong>Saha ekibi</strong> bölümünden ekleyip Personel rolündeki giriş hesabına bağlayın; o zaman görev atanır ve kontrol listesini telefonundan imzalar.'
+    : 'Kayıtlı usta yok. Ustayı <strong>Saha ekibi</strong> bölümünden ekleyin; giriş hesabı gerekmez.';
+  return `<div class="ops-field-team-hint sub-text" style="margin-bottom:12px">${messageHtml} <button class="btn btn-secondary btn-sm" data-onclick="setOperationsView('people')">👷 Saha ekibi</button></div>`;
+}
+
+function linkableFieldMembers(currentUserId) {
+  const linked = new Set((appData?.operationalPeople || [])
+    .filter(person => person.user_id && person.user_id !== currentUserId)
+    .map(person => person.user_id));
+  return (appData?.salesMembers || []).filter(member => member.role === 'staff' && !linked.has(member.user_id));
+}
+
+function renderOperationsPeopleView() {
+  const canManage = canManageTenantRole(activeTenant?.role);
+  const people = (appData?.operationalPeople || []).slice()
+    .sort((a, b) => Number(b.is_active !== false) - Number(a.is_active !== false) || String(a.full_name || '').localeCompare(String(b.full_name || ''), 'tr'));
+  const members = new Map((appData?.salesMembers || []).map(member => [member.user_id, member]));
+  const editing = operationalPersonEditId ? people.find(person => person.id === operationalPersonEditId) : null;
+  const kindOptions = Object.keys(OPERATIONAL_PERSON_KINDS).map(kind => `<option value="${kind}"${(editing?.kind || 'CLEANER') === kind ? ' selected' : ''}>${OPERATIONAL_PERSON_KINDS[kind]}</option>`).join('');
+  const accountOptions = linkableFieldMembers(editing?.user_id).map(member => `<option value="${escapeHtml(member.user_id)}"${editing?.user_id === member.user_id ? ' selected' : ''}>${escapeHtml(member.full_name || member.email || '—')}${member.email ? ` · ${escapeHtml(member.email)}` : ''}</option>`).join('');
+  const form = canManage ? `
+    <section class="ops-group" id="opsPersonFormCard">
+      <h3>${editing ? 'Kişiyi düzenle' : 'Saha ekibine kişi ekle'}</h3>
+      <p class="sub-text">
+        <strong>Temizlikçi:</strong> göreve atanması ve kontrol listesini telefonundan imzalaması (Z) için önce
+        Ayarlar → Ekip ve Rol Yönetimi'nden <strong>Personel</strong> rolüyle davet edin, sonra burada hesabına bağlayın.
+        Hesabı olmayan temizlikçinin işini siz "Kontrol ettim, yapıldı" ile kapatırsınız.
+        <strong>Usta:</strong> hesap gerekmez; arızaya atanır ve telefonundan aranır.
+      </p>
+      <div class="form-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;align-items:end">
+        <div class="form-group"><label for="opsPersonKind">Görev</label><select id="opsPersonKind">${kindOptions}</select></div>
+        <div class="form-group"><label for="opsPersonName">Ad soyad *</label><input id="opsPersonName" type="text" maxlength="120" value="${escapeHtml(editing?.full_name || '')}" placeholder="Örn. Ayşe Yılmaz"></div>
+        <div class="form-group"><label for="opsPersonPhone">Telefon</label><input id="opsPersonPhone" type="tel" maxlength="40" value="${escapeHtml(editing?.phone || '')}" placeholder="05xx xxx xx xx"></div>
+        <div class="form-group"><label for="opsPersonSpecialty">Uzmanlık</label><input id="opsPersonSpecialty" type="text" maxlength="120" value="${escapeHtml(editing?.specialty || '')}" placeholder="Örn. elektrik, tesisat"></div>
+        <div class="form-group"><label for="opsPersonAccount">Giriş hesabı</label><select id="opsPersonAccount"><option value="">Hesap yok</option>${accountOptions}</select></div>
+        <div class="form-group"><label for="opsPersonNotes">Not</label><input id="opsPersonNotes" type="text" maxlength="1000" value="${escapeHtml(editing?.notes || '')}"></div>
+      </div>
+      ${accountOptions ? '' : '<p class="sub-text" style="margin-top:6px">Bağlanacak Personel rolünde hesap yok. Davet ettiğiniz kişi daveti kabul edince burada görünür.</p>'}
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn btn-primary btn-sm" data-onclick="saveOperationalPerson()">${editing ? 'Değişiklikleri kaydet' : '+ Ekle'}</button>
+        ${editing ? '<button class="btn btn-secondary btn-sm" data-onclick="cancelOperationalPersonEdit()">Vazgeç</button>' : ''}
+      </div>
+    </section>` : '';
+  const rows = people.map(person => {
+    const active = person.is_active !== false;
+    const member = person.user_id ? members.get(person.user_id) : null;
+    const account = person.user_id ? `Hesap: ${escapeHtml(member?.full_name || member?.email || 'bağlı')}` : 'Hesap yok';
+    const ready = person.kind === 'CLEANER'
+      ? (person.user_id ? 'Temizlik atanabilir' : 'Atanamaz — hesap bağlanmalı')
+      : 'Arızaya atanabilir';
+    const actions = canManage ? `<div class="ops-row-actions">
+        <button class="btn btn-secondary btn-sm" data-onclick="editOperationalPerson(decodeURIComponent('${encodeActionArg(person.id)}'))">✏️ Düzenle</button>
+        <button class="btn btn-secondary btn-sm" data-onclick="toggleOperationalPersonActive(decodeURIComponent('${encodeActionArg(person.id)}'))">${active ? 'Pasifleştir' : 'Yeniden etkinleştir'}</button>
+      </div>` : '';
+    return `<article class="ops-row" data-operational-person-id="${escapeHtml(person.id)}"${active ? '' : ' style="opacity:.55"'}>
+      <div class="ops-row-main"><strong>${escapeHtml(person.full_name || '—')}</strong>
+        <span>${OPERATIONAL_PERSON_KINDS[person.kind] || '—'}${person.specialty ? ` · ${escapeHtml(person.specialty)}` : ''}${person.phone ? ` · <a href="tel:${escapeHtml(person.phone)}">${escapeHtml(person.phone)}</a>` : ''}</span>
+        <span>${account} · ${active ? ready : 'Pasif'}</span></div>
+      <span class="badge">${OPERATIONAL_PERSON_KINDS[person.kind] || '—'}</span>
+      ${actions}
+    </article>`;
+  }).join('');
+  return `${form}<section class="ops-group"><h3>Saha ekibi <span class="badge">${people.length}</span></h3>${rows || '<div class="empty-state">Henüz temizlikçi veya usta eklenmedi.</div>'}</section>`;
+}
+
+function readOperationalPersonForm() {
+  const value = id => String(document.getElementById(id)?.value || '').trim();
+  const kind = value('opsPersonKind');
+  return {
+    kind: OPERATIONAL_PERSON_KINDS[kind] ? kind : 'CLEANER',
+    full_name: value('opsPersonName'),
+    phone: value('opsPersonPhone') || null,
+    specialty: value('opsPersonSpecialty') || null,
+    notes: value('opsPersonNotes') || null,
+    user_id: value('opsPersonAccount') || null
+  };
+}
+
+async function saveOperationalPerson() {
+  const tenantId = getActiveTenantId();
+  const row = readOperationalPersonForm();
+  if (!row.full_name) {
+    alert('Ad soyad zorunludur.');
+    return false;
+  }
+  if (row.phone && row.phone.length < 3) {
+    alert('Telefon en az 3 karakter olmalı.');
+    return false;
+  }
+  try {
+    requireCloudForWrite('Saha ekibi', tenantId);
+    const query = operationalPersonEditId
+      ? supabaseClient.from('operational_people').update(row).eq('id', operationalPersonEditId).eq('tenant_id', tenantId)
+      : supabaseClient.from('operational_people').insert({ ...row, tenant_id: tenantId });
+    const { error } = await query;
+    if (error) {
+      throw new Error(error.code === '23505' ? 'Bu giriş hesabı zaten saha ekibinde başka bir kişiye bağlı.' : (error.message || 'Veritabanı hatası'));
+    }
+  } catch (err) {
+    alert('Saha ekibi kaydedilemedi: ' + err.message);
+    return false;
+  }
+  const wasEdit = !!operationalPersonEditId;
+  operationalPersonEditId = null;
+  await loadTenantAppData(tenantId);
+  operationsViewState = 'people';
+  renderOperationsTab();
+  if (typeof showToast === 'function') showToast(wasEdit ? '✅ Kişi güncellendi.' : '✅ Saha ekibine eklendi.');
+  return true;
+}
+
+function editOperationalPerson(personId) {
+  if (!(appData?.operationalPeople || []).some(person => person.id === personId)) return false;
+  operationalPersonEditId = personId;
+  setOperationsView('people');
+  document.getElementById('opsPersonFormCard')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  return true;
+}
+
+function cancelOperationalPersonEdit() {
+  operationalPersonEditId = null;
+  setOperationsView('people');
+}
+
+async function toggleOperationalPersonActive(personId) {
+  const tenantId = getActiveTenantId();
+  const person = (appData?.operationalPeople || []).find(item => item.id === personId);
+  if (!person) return false;
+  const nextActive = person.is_active === false;
+  if (!nextActive && !confirm(`${person.full_name} pasifleştirilsin mi? Geçmiş kayıtları korunur, yeni işe atanamaz.`)) return false;
+  try {
+    requireCloudForWrite('Saha ekibi', tenantId);
+    const { error } = await supabaseClient.from('operational_people')
+      .update({ is_active: nextActive }).eq('id', personId).eq('tenant_id', tenantId);
+    if (error) throw new Error(error.message || 'Veritabanı hatası');
+  } catch (err) {
+    alert('Saha ekibi kaydedilemedi: ' + err.message);
+    return false;
+  }
+  await loadTenantAppData(tenantId);
+  operationsViewState = 'people';
+  renderOperationsTab();
+  return true;
+}
+
+// Ekip listesindeki "Saha ekibine ekle": Personel hesabını temizlikçi olarak
+// forma hazırlar; kayıt yine kullanıcının onayıyla (Ekle) yazılır.
+function addMemberToFieldTeam(userId) {
+  const member = (appData?.salesMembers || []).find(item => item.user_id === userId);
+  if (!member) return false;
+  operationalPersonEditId = null;
+  if (switchTab('operations') === false) return false;
+  setOperationsView('people');
+  const set = (id, value) => { const el = document.getElementById(id); if (el) el.value = value; };
+  set('opsPersonKind', 'CLEANER');
+  set('opsPersonName', member.full_name || '');
+  set('opsPersonAccount', member.user_id);
+  document.getElementById('opsPersonFormCard')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
   return true;
 }
 
@@ -18098,6 +18320,7 @@ function renderOperationsCleaningView(tasks) {
       }).join('') : '<div class="empty-state">Bu aralıkta temizlik yok.</div>'}
     </section>`;
   return `
+    ${eligible.length ? '' : fieldTeamHintHtml('CLEANER')}
     <div class="ops-cleaning-layout">
       <div>${groupHtml('Geciken / denetim bekleyen', grouped.overdue)}${groupHtml('Bugün', grouped.today)}${groupHtml('Yarın', grouped.tomorrow)}${groupHtml('Bu hafta', grouped.week)}${groupHtml('Geçmiş temizlikler (seçili dönem)', history, 'opsCleaningHistory')}</div>
       <aside class="ops-debt-panel"><h3>Bekleyen Temizlik Borçları (${debt.reduce((sum, item) => sum + item.count, 0)})</h3>
@@ -18129,6 +18352,8 @@ function renderOperationsTab() {
   });
   if (operationsViewState === 'cleaning') {
     container.innerHTML = renderOperationsCleaningView(tasks);
+  } else if (operationsViewState === 'people') {
+    container.innerHTML = renderOperationsPeopleView();
   } else if (operationsViewState === 'maintenance') {
     const api = getOperationsApi();
     const open = api.sortMaintenanceTickets(tickets.filter(isMaintenanceTicketOpen));
@@ -18142,6 +18367,7 @@ function renderOperationsTab() {
       const statusLabel = ticket.booking_impact ? 'Satışa kapatır' : getMaintenanceStatusPresentation(ticket.status).label;
       return `<article class="ops-row"><div class="ops-row-main"><strong>${escapeHtml(ticket.title || '—')}</strong><span>${escapeHtml(ticket.description || 'Açıklama yok')}</span>${assigned ? `<span>Usta: ${escapeHtml(assigned.full_name)}${assigned.phone ? ` · <a href="tel:${escapeHtml(assigned.phone)}">Ara</a>` : ''}</span>` : ''}</div><span class="badge ${impactClass}">${escapeHtml(statusLabel)}</span><div class="ops-row-actions"><select id="opsTechnician-${escapeHtml(ticket.id)}" aria-label="Usta seç"><option value="">Usta seç…</option>${options}</select><button class="btn btn-secondary btn-sm" data-onclick="assignMaintenanceFromSelect(decodeURIComponent('${encodeActionArg(ticket.id)}'))">Usta ata</button><button class="btn btn-secondary btn-sm" data-onclick="editMaint(decodeURIComponent('${encodeActionArg(ticket.id)}'))">Durumu güncelle</button><button class="btn btn-primary btn-sm" data-onclick="resolveMaintenanceFromOperations(decodeURIComponent('${encodeActionArg(ticket.id)}'))">Çözüldü</button></div></article>`;
     }).join('') : '<div class="empty-state">Açık arıza veya bakım kaydı yok.</div>';
+    if (open.length && !technicians.length) container.innerHTML = fieldTeamHintHtml('TECHNICIAN') + container.innerHTML;
   } else {
     const operational = (appData?.operationalTasks || []).filter(task => !['DONE', 'CANCELLED'].includes(String(task.status || '').toUpperCase()));
     const templates = appData?.taskTemplates || [];
@@ -19096,6 +19322,12 @@ if (typeof module !== 'undefined' && module.exports) {
     signStaffCleaningDone,
     setOperationsView,
     assignCleaningTask,
+    renderOperationsPeopleView,
+    renderOperationsCleaningView,
+    saveOperationalPerson,
+    toggleOperationalPersonActive,
+    addMemberToFieldTeam,
+    fillCleanerNameOptions,
     inspectCleaningExecution,
     payCleanerDebt,
     assignMaintenanceTechnician,
