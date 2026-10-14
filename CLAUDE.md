@@ -622,6 +622,15 @@ yalnız talep adımı eklendi. Canlı süit `phase51_lead_revert_live_tests` 6/6
 ayırt edilemez (imza aynı): kanıt `PHASE 51 OK` ya da `schema_migrations` 51.
 Paket: `docs/PHASE51_DEPLOY_PACKAGE.md`.
 
+**phase91 (`migration_phase91_lead_interest_properties.sql`) 14 Ekim 2026'da
+test projesine uygulandı; üretimde HENÜZ UYGULANMADI.** Talebin ek ilgilendiği
+mülkler (kullanıcı M16): `lead_interest_properties` bağ tablosu, okuma
+`can_read_sales`, yazma `can_write_sales`, talep ve mülk aynı kiracıda.
+`leads`'e sütun eklenmedi (§3.4 dağıtım sırası tuzağı); göç öncesinde
+istemci tabloyu `fetchTenantRowsTolerant` ile okur, yazmada "phase91
+uygulanmadı" der. Canlı süit `phase91_lead_interest_live_tests` 13/13.
+Paket: `docs/PHASE91_DEPLOY_PACKAGE.md`.
+
 **Bir göçün uygulanıp uygulanmadığı, dosyaya bakarak anlaşılmaz.** Dosya repoda
 durur; veritabanı uygulanmamış olabilir. Doğrulamanın yolu üretime sormaktır:
 

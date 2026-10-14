@@ -317,6 +317,7 @@ const allTestFiles = [
   'a5_audit_fix_tests.js', 'help_guide_tests.js', 'legal_consent_tests.js', 'pages_build_tests.js', 'mvp_audit_fix_tests.js', 'g9_feedback_tests.js', 'h3_audit_fix_tests.js',
   'phase49_activation_live_tests.js',
   'phase51_lead_revert_live_tests.js',
+  'phase91_lead_interest_live_tests.js',
   'phase53_staff_boundary_live_tests.js',
   'phase53_staff_boundary_tests.js',
   'phase55_operations_execution_live_tests.js',

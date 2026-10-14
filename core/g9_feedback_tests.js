@@ -467,6 +467,43 @@ async function asama4Davranisi() {
   check(!/indirim oranını siz belirlersiniz/.test(html), 'L-190b Rehber olmayan bir ozelligi vaat etmez');
 }
 
+async function cokluMulkTalepDavranisi() {
+  sahteDom({});
+  const App = require('../app.js');
+  const PA = 'aaaaaaaa-0000-4000-8000-00000000000a', PB = 'aaaaaaaa-0000-4000-8000-00000000000b', PC = 'aaaaaaaa-0000-4000-8000-00000000000c';
+  const LEAD = 'cccccccc-0000-4000-8000-000000000001';
+  App.setActiveTenant({ id: TENANT, role: 'owner' });
+  App.setAppData({ villas: { A: { id: PA, slug: 'A', name: 'TEST A' }, B: { id: PB, slug: 'B', name: 'TEST B' }, C: { id: PC, slug: 'C', name: 'TEST C' } },
+    leads: [{ id: LEAD, villa: 'A', extraPropertyIds: [PC] }], bookings: [], expenses: [], cleaningTasks: [] });
+
+  const bagli = App.attachLeadInterestProperties([{ id: LEAD }, { id: 'x' }], [{ lead_id: LEAD, property_id: PB }, { lead_id: LEAD, property_id: PC }]);
+  check(bagli[0].extraPropertyIds.length === 2 && bagli[1].extraPropertyIds.length === 0, 'L-186c Ek mulkler talebe baglanir');
+  check(App.attachLeadInterestProperties([{ id: LEAD }], null)[0].extraPropertyIds.length === 0, 'L-186d Tablo yokken (goc oncesi) talepler ek mulksuz yuklenir');
+
+  App.renderLeadExtraPropertyPicker('leadExtraProperties', [PC], 'A');
+  const secici = global.document.getElementById('leadExtraProperties').innerHTML;
+  check(!secici.includes(PA) && secici.includes(PB) && new RegExp(PC + '" checked').test(secici), 'L-186e Secici asil mulku disarida birakir, kayitli ek mulku isaretli gosterir', secici);
+
+  let ist = kaydedenIstemci();
+  App.setSupabaseClient(ist);
+  const uyari = await App.syncLeadInterestProperties(LEAD, [PA, PB, PB, 'gecersiz'], PA);
+  const sil = ist.yazmalar.find(k => k.tablo === 'lead_interest_properties' && k.islem === 'delete');
+  const ekle = ist.yazmalar.find(k => k.tablo === 'lead_interest_properties' && k.islem === 'insert');
+  check(uyari === '' && sil && ekle && ekle.yuk.length === 1 && ekle.yuk[0].property_id === PB && ekle.yuk[0].tenant_id === TENANT,
+    'L-186f Esitleme eskiyi siler, asil mulk ve tekrar disinda secileni yazar', JSON.stringify(ekle && ekle.yuk));
+
+  ist = kaydedenIstemci();
+  const eksikSema = { code: 'PGRST205', message: "Could not find the table 'public.lead_interest_properties' in the schema cache" };
+  const hataliIstemci = { ...ist, from: tablo => { const q = ist.from(tablo); const orig = q.then; q.then = (res, rej) => Promise.resolve({ data: null, error: eksikSema }).then(res, rej); return q; } };
+  App.setSupabaseClient(hataliIstemci);
+  const gocYok = await App.syncLeadInterestProperties(LEAD, [PB], PA);
+  check(/phase91/.test(gocYok), 'L-186g Goc uygulanmamissa talep kaydi bozulmaz, kullaniciya soylenir', gocYok);
+
+  const html = read('index.html');
+  check(/id="leadQuickExtraProperties"/.test(html) && /id="leadExtraProperties"/.test(html), 'L-186h Hizli kayit ve duzenleme formunda ek mulk secimi var');
+  check(read('supabase/migration_manifest.txt').includes('migration_phase91_lead_interest_properties.sql'), 'L-186i phase91 manifestte');
+}
+
 async function main() {
 try {
   const html = read('index.html');
@@ -496,6 +533,7 @@ try {
   await mesajAyristiriciDavranisi();
   await temizlikHazirlikDavranisi();
   await asama4Davranisi();
+  await cokluMulkTalepDavranisi();
 } catch (error) {
   failed++;
   console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));
