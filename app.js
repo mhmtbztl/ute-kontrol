@@ -17825,88 +17825,89 @@ function closeCommandPalette() {
 
 function handleCommandPaletteKeydown(e) {
   if (e.key === 'Escape') closeCommandPalette();
+  if (e.key === 'Enter') {
+    const first = document.querySelector('#commandPaletteResults [data-palette-index]');
+    if (first) { e.preventDefault(); first.click(); }
+  }
+}
+
+// Ara / Komut (L-191, kullanici M21). Dizin ve eslesme core/command_search.js'te
+// (Node'da test edilir); burada yalniz hedef tarifi calistirilir. Eski govde
+// ilk 30 rezervasyonu tariyordu; misafir, talep, ekran ve kanal hic yoktu.
+function runCommandPaletteTarget(target) {
+  if (!target) return;
+  closeCommandPalette();
+  if (target.kind === 'tab') {
+    if (target.tab === 'operations' && target.opsView) operationsViewState = target.opsView;
+    switchTab(target.tab);
+  } else if (target.kind === 'settings') {
+    openSettingsSection(target.section);
+  } else if (target.kind === 'villa') {
+    currentFilter.villa = target.key;
+    const select = document.getElementById('globalVillaFilter');
+    if (select) select.value = target.key;
+    handleFilterChange();
+    switchTab('properties');
+  } else if (target.kind === 'booking') {
+    openBookingModal(target.id);
+  } else if (target.kind === 'guest') {
+    switchTab('guests');
+    openGuestProfileModal(target.id);
+  } else if (target.kind === 'lead') {
+    switchTab('leads');
+    openLeadModal(target.id);
+  } else if (target.kind === 'command') {
+    const komutlar = {
+      newBooking: () => openBookingModal(),
+      newLead: () => openQuickLeadCapture(),
+      newCleaning: () => openNewCleaningTaskModal(),
+      newMaintenance: () => openMaintModal(),
+      newExpense: () => openExpenseModal(),
+      goals: () => openGoalsModal(),
+      whatsapp: () => openWhatsAppModal('parser')
+    };
+    if (komutlar[target.name]) komutlar[target.name]();
+  }
+}
+
+function getCommandPaletteEntries() {
+  const data = (typeof appData !== 'undefined' && appData) ? appData : {};
+  return CommandSearch.buildEntries({
+    role: activeTenant?.role || '',
+    villas: data.villas,
+    bookings: data.bookings,
+    guests: data.guests,
+    leads: data.leads,
+    channels: typeof getBookingChannelCatalog === 'function' ? getBookingChannelCatalog() : []
+  });
 }
 
 function handleCommandPaletteSearch(query) {
   const container = document.getElementById('commandPaletteResults');
   if (!container) return;
+  const groups = CommandSearch.search(getCommandPaletteEntries(), query);
 
-  const q = (query || '').toLowerCase().trim();
-  const defaultActions = [
-    { icon: '📅', title: 'Yeni Rezervasyon Girişi', action: () => { closeCommandPalette(); openBookingModal(); } },
-    { icon: '🧹', title: 'Temizlik Görevi Ekle', action: () => { closeCommandPalette(); openNewCleaningTaskModal(); } },
-    { icon: '🛠️', title: 'Arıza / Bakım Bildir', action: () => { closeCommandPalette(); openMaintModal(); } },
-    { icon: '💸', title: 'Yeni Gider / Harcama Ekle', action: () => { closeCommandPalette(); openExpenseModal(); } },
-    { icon: '🎯', title: 'Aylık Hedef Belirle', action: () => { closeCommandPalette(); openGoalsModal(); } },
-    { icon: '💬', title: 'WhatsApp Mesaj Ayrıştır', action: () => { closeCommandPalette(); openWhatsAppModal('parser'); } },
-    { icon: '💰', title: 'Finansal Performans Portalı', action: () => { closeCommandPalette(); switchTab('finance'); } }
-  ];
-
-  let items = [];
-
-  if (!q) {
-    items = defaultActions;
-  } else {
-    // Search actions
-    defaultActions.forEach(act => {
-      if (act.title.toLowerCase().includes(q)) items.push(act);
-    });
-
-    // Search properties
-    if (typeof appData !== 'undefined' && appData.villas) {
-      Object.keys(appData.villas).forEach(k => {
-        const v = appData.villas[k];
-        if (v.name.toLowerCase().includes(q) || k.toLowerCase().includes(q)) {
-          items.push({
-            icon: '🏡',
-            title: `Mülk: ${v.name}${v.capacity ? ` (${v.capacity})` : ''}`,
-            action: () => {
-              closeCommandPalette();
-              currentFilter.villa = k;
-              const select = document.getElementById('globalVillaFilter');
-              if (select) select.value = k;
-              handleFilterChange();
-              switchTab('properties');
-            }
-          });
-        }
-      });
-    }
-
-    // Search bookings
-    if (typeof appData !== 'undefined' && appData.bookings) {
-      appData.bookings.slice(0, 30).forEach(b => {
-        if ((b.guest && b.guest.toLowerCase().includes(q)) || (b.code && b.code.toLowerCase().includes(q))) {
-          items.push({
-            icon: '👤',
-            title: `Rezervasyon: ${b.guest} (${b.checkIn} - ${b.checkOut})`,
-            action: () => {
-              closeCommandPalette();
-              openBookingModal(b.id);
-            }
-          });
-        }
-      });
-    }
-  }
-
-  if (items.length === 0) {
-    container.innerHTML = `<div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px;">"${escapeHtml(query)}" ile eşleşen komut veya kayıt bulunamadı.</div>`;
+  if (!groups.length) {
+    container.innerHTML = `<div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px;">"${escapeHtml(query)}" ile eşleşen ekran, kayıt veya komut bulunamadı. Misafir adı, telefon, rezervasyon kodu, mülk ya da ekran adı (ör. "temizlik", "airbnb") yazabilirsiniz.</div>`;
     return;
   }
 
-  container.innerHTML = items.map((it, idx) => `
+  const items = [];
+  container.innerHTML = groups.map(group => {
+    const rows = group.items.map(it => {
+      const idx = items.push(it) - 1;
+      return `
     <div class="palette-item" data-palette-index="${idx}" role="button" tabindex="0">
       <span style="font-size: 16px;">${escapeHtml(it.icon)}</span>
-      <span style="flex: 1; font-weight: 600;">${escapeHtml(it.title)}</span>
+      <span style="flex: 1; min-width: 0;"><span style="font-weight: 600;">${escapeHtml(it.title)}</span>${it.subtitle ? `<span style="display: block; font-size: 11px; color: #94A3B8;">${escapeHtml(it.subtitle)}</span>` : ''}</span>
       <span style="font-size: 11px; color: #94A3B8;">Git ›</span>
-    </div>
-  `).join('');
+    </div>`;
+    }).join('');
+    const more = group.more ? `<div style="font-size: 11px; color: #94A3B8; padding: 2px 12px 6px;">+${group.more} sonuç daha — aramayı daraltın</div>` : '';
+    return `<div class="palette-group-title" style="font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #94A3B8; padding: 8px 12px 4px;">${escapeHtml(group.group)}</div>${rows}${more}`;
+  }).join('');
   container.querySelectorAll('[data-palette-index]').forEach(element => {
-    const activate = () => {
-      const selected = items[Number(element.dataset.paletteIndex)];
-      if (selected && typeof selected.action === 'function') selected.action();
-    };
+    const activate = () => runCommandPaletteTarget(items[Number(element.dataset.paletteIndex)]?.target);
     element.addEventListener('click', activate);
     element.addEventListener('keydown', event => {
       if (event.key === 'Enter' || event.key === ' ') {
@@ -17916,6 +17917,7 @@ function handleCommandPaletteSearch(query) {
     });
   });
 }
+
 
 // Global shortcut listener for Ctrl+K
 if (typeof document !== 'undefined') {

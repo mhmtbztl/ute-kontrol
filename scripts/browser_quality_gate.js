@@ -213,6 +213,22 @@ async function main() {
       assert(written && written.full_name === 'Tarayici Usta' && written.kind === 'TECHNICIAN' && written.tenant_id === '00000000-0000-4000-8000-000000000001' && !dialogs.length,
         `Saha ekibi kaydi yazilmadi: ${JSON.stringify({ personWrites, dialogs })}`);
       passed.push('15. yeni talep hızlı forma gider; saha ekibine usta eklenir');
+      // L-191 (M21): Ara / Komut ekrana ve alt gorunume goturur, kanal kelimesini tanir.
+      await page.evaluate(() => openCommandPalette());
+      await page.fill('#commandPaletteInput', 'arıza');
+      await page.press('#commandPaletteInput', 'Enter');
+      const paletteState = await page.evaluate(() => ({
+        tab: document.getElementById('tab-operations').classList.contains('active'),
+        view: operationsViewState,
+        closed: getComputedStyle(document.getElementById('commandPaletteModal')).display === 'none'
+      }));
+      assert(paletteState.tab && paletteState.view === 'maintenance' && paletteState.closed, `Arama arizaya gitmedi: ${JSON.stringify(paletteState)}`);
+      await page.evaluate(() => openCommandPalette());
+      await page.fill('#commandPaletteInput', 'airbnb');
+      const airbnbText = await page.textContent('#commandPaletteResults');
+      assert(/Kanallar ve Pazarlama/.test(airbnbText), `"airbnb" kanal ekranini bulmadi: ${airbnbText}`);
+      await page.evaluate(() => closeCommandPalette());
+      passed.push('16. Ara / Komut ekrana ve alt görünüme götürür; "airbnb" kanal ekranını bulur');
     });
 
     await withPage(browser, baseUrl, 'owner', { width: 390, height: 844 }, async page => {

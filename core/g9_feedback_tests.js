@@ -12,6 +12,7 @@
 // L-181 (M11): Mulk raporunda mulk ve tarih araligi secilemiyordu.
 // L-182 (M12): Mesaj ayristirici tarih, ad ve kaporayi okumuyordu; kapora odeme defterine yazilir.
 // L-183 (M13): Temizlik planlaninca mulk kendiliginden "temizlik bekliyor", yapilinca hazir.
+// L-191 (M21): Ara / Komut ilk 30 rezervasyonu tariyordu; misafir, talep, ekran, kanal yoktu.
 // L-184..L-190 (M14-M20): kapora, kar marji hedefi, talep tarihi, mulk net kari, reklam tablosu/metrik/gunluk butce, sablon ekrani, bosluk gecesi.
 const fs = require('fs');
 const path = require('path');
@@ -504,6 +505,52 @@ async function cokluMulkTalepDavranisi() {
   check(read('supabase/migration_manifest.txt').includes('migration_phase91_lead_interest_properties.sql'), 'L-186i phase91 manifestte');
 }
 
+// L-191 (M21) — Ara / Komut: misafir, talep, butun rezervasyonlar, ekran, kanal.
+async function aramaDavranisi() {
+  const CS = require('./command_search.js');
+  const villas = { 'villa-a': { id: 'p-a', name: 'Villa Zeytin', capacity: 6 } };
+  const bookings = Array.from({ length: 40 }, (_, i) => ({ id: 'b' + i, guest: 'Misafir ' + i, villa: 'villa-a', checkIn: '2026-07-01', checkOut: '2026-07-03', channel: 'Direct' }));
+  bookings.push({ id: 'b-son', guest: 'İlter Kaya', villa: 'villa-a', checkIn: '2026-10-16', checkOut: '2026-10-18', channel: 'Airbnb', phone: '0532 111 22 33' });
+  const veri = {
+    role: 'owner', villas, bookings,
+    guests: [{ id: 'g1', firstName: 'Onur', lastName: 'Bey', phone: '+90 555 000 11 22' }],
+    leads: [{ id: 'l1', guestName: 'Şule Işık', phone: '05441234567', propertyId: 'p-a' }],
+    channels: [{ code: 'AIRBNB', displayName: 'Airbnb', channelType: 'OTA', defaultCommissionRate: 15, isActive: true }]
+  };
+  const ara = (q, v = veri) => CS.search(CS.buildEntries(v), q);
+  const grup = (sonuc, ad) => (sonuc.find(g => g.group === ad) || { items: [], more: 0 });
+
+  check(grup(ara('onur'), 'Misafirler').items.some(k => k.target.id === 'g1'), 'L-191a Misafir defterindeki kisi adiyla bulunur ("onur")');
+  check(grup(ara('sule'), 'Talepler').items.some(k => k.target.id === 'l1') && grup(ara('ŞULE IŞIK'), 'Talepler').items.length === 1,
+    'L-191b Talep bulunur; Turkce harfler katlanir (Şule/sule, IŞIK)');
+  check(grup(ara('ilter'), 'Rezervasyonlar').items.some(k => k.target.id === 'b-son'),
+    'L-191c 41. rezervasyon da aranir (eski slice(0, 30) siniri yok)');
+  const airbnb = ara('airbnb');
+  check(grup(airbnb, 'Ekranlar').items.some(k => k.target.tab === 'marketing') && grup(airbnb, 'Kanallar').items.length === 1,
+    'L-191d "airbnb" kanal ekranini ve kanal kaydini bulur');
+  check(grup(ara('ota'), 'Ekranlar').items.some(k => k.target.tab === 'marketing'), 'L-191e "ota" kanal ekranina goturur');
+  check(grup(ara('temizlik'), 'Ekranlar').items.some(k => k.target.opsView === 'cleaning'), 'L-191f Ekran adi alt gorunume goturur (Operasyon › Temizlik)');
+  check(grup(ara('5550001122'), 'Misafirler').items.length === 1 && grup(ara('0532 111'), 'Rezervasyonlar').items.length === 1,
+    'L-191g Telefon numarasi bosluklu ya da bosluksuz bulunur');
+  const cok = grup(ara('misafir'), 'Rezervasyonlar');
+  check(cok.items.length === 5 && cok.more === 35, 'L-191h Grup basina 5 sonuc, kalan sayi soylenir (gizlice kesilmez)', JSON.stringify({ n: cok.items.length, more: cok.more }));
+  check(grup(ara('yeni talep'), 'Komutlar').items.some(k => k.target.name === 'newLead'), 'L-191i "yeni talep" hizli kayit komutunu bulur');
+
+  const staff = ara('onur', { ...veri, role: 'staff' });
+  check(staff.length === 0 && ara('saha', { ...veri, role: 'staff' }).length === 1, 'L-191j staff misafir/rezervasyon goremez, yalniz saha ekranini bulur');
+  const viewer = ara('ayar', { ...veri, role: 'viewer' });
+  check(!viewer.some(g => g.group === 'Ekranlar' && g.items.some(k => k.target.kind === 'settings'))
+    && grup(ara('onur', { ...veri, role: 'viewer' }), 'Misafirler').items.length === 1
+    && grup(ara('yeni rezervasyon', { ...veri, role: 'viewer' }), 'Komutlar').items.length === 0,
+    'L-191k viewer ayarlari ve yazma komutlarini gormez, satis verisini okur (3.3.1)');
+  check(grup(ara('finans', { ...veri, role: 'sales' }), 'Ekranlar').items.length === 0, 'L-191l sales finans ekranini bulmaz');
+
+  const app = read('app.js');
+  const govde = functionBody(app, 'function handleCommandPaletteSearch(');
+  check(/CommandSearch\.search\(/.test(govde) && !/slice\(0,\s*30\)/.test(govde), 'L-191m Palet tek dizini kullanir');
+  check(/command_search\.js\?v=/.test(read('index.html')), 'L-191n Modul sayfaya yuklenir');
+}
+
 async function main() {
 try {
   const html = read('index.html');
@@ -534,6 +581,7 @@ try {
   await temizlikHazirlikDavranisi();
   await asama4Davranisi();
   await cokluMulkTalepDavranisi();
+  await aramaDavranisi();
 } catch (error) {
   failed++;
   console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));
