@@ -71,6 +71,7 @@ function kaydedenIstemci(secenek = {}) {
         select() { return q; },
         eq(c, v) { k.filtre.push([c, v]); return q; },
         in(c, v) { k.filtre.push([c, v]); return q; },
+        is(c, v) { k.filtre.push([c, v]); return q; },
         match(m) { Object.entries(m).forEach(e => k.filtre.push(e)); return q; },
         order() { return q; },
         limit() { return q; },
@@ -519,6 +520,30 @@ const yazmalar = (istemci, tablo) =>
     assert.strictEqual(w.yuk.revenue_target, 100000);
     assert.strictEqual(w.yuk.net_profit_target, null);
     assert.strictEqual(w.yuk.adr_target, null);
+    konsolHatalari.length = 0;
+  });
+
+  await test('L-174 Hedef kaydı kısmi indekse upsert göndermez; yeni hedef eklenir, mevcut hedef güncellenir', async () => {
+    // Gercek veritabani: monthly_targets tekilligi iki KISMI indeksle tutulur ve
+    // PostgREST upsert'u ON CONFLICT ile indeksi cikaramaz (42P10, test projesinde olculdu).
+    const kismiIndeks = k => (k.tablo === 'monthly_targets' && k.islem === 'upsert')
+      ? { code: '42P10', message: 'there is no unique or exclusion constraint matching the ON CONFLICT specification' } : null;
+    const aramalar = [];
+    let ist = kaydedenIstemci({ hata: kismiIndeks, okuma: k => { if (k.tablo === 'monthly_targets') aramalar.push(k.filtre.slice()); return []; } });
+    ortamKur({ targets: [] }, ist);
+    await App.saveMonthlyTarget({ year: 2031, month: 6, revenueTarget: 300000 });
+    const ekle = yazmalar(ist, 'monthly_targets').find(k => k.islem === 'insert');
+    assert.ok(ekle, 'yeni hedef eklenmedi');
+    assert.strictEqual(ekle.yuk.revenue_target, 300000);
+    assert.ok(aramalar.length && aramalar[0].some(([c, v]) => c === 'property_id' && v === null), 'portföy hedefi property_id IS NULL ile aranmadı');
+    const MEVCUT = '22222222-2222-4222-8222-222222222222';
+    ist = kaydedenIstemci({ hata: kismiIndeks, okuma: k => k.tablo === 'monthly_targets' ? [{ id: MEVCUT }] : [] });
+    ortamKur({ targets: [] }, ist);
+    await App.saveMonthlyTarget({ year: 2031, month: 6, propertyId: PROP_A, revenueTarget: 120000 });
+    const guncelle = yazmalar(ist, 'monthly_targets').find(k => k.islem === 'update');
+    assert.ok(guncelle, 'mevcut hedef güncellenmedi');
+    assert.ok(guncelle.filtre.some(([c, v]) => c === 'id' && v === MEVCUT), 'güncelleme mevcut satıra gitmedi');
+    assert.ok(!yazmalar(ist, 'monthly_targets').some(k => k.islem === 'insert'), 'mevcut hedef varken ikinci satır eklendi');
     konsolHatalari.length = 0;
   });
 

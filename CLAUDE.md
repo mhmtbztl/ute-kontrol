@@ -764,6 +764,15 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
     tetikleyici gövdesi hiç yürütülmez. Dry-run kanıtı, yan etkiyi doğuran DML'i
     çalıştırıp beklenen satır/hata sonucunu işlem içinde doğrulamalı, sonra
     `ROLLBACK` etmelidir.
+15. **PostgREST `upsert(..., { onConflict })` KISMİ benzersiz indeksi
+    bulamaz.** `ON CONFLICT (sütunlar)` kısmi indeksi ancak WHERE yüklemiyle
+    çıkarır; PostgREST yüklem gönderemez ve her çağrı `42P10` ile düşer.
+    `monthly_targets` (portföy `property_id IS NULL` / mülk `IS NOT NULL`)
+    bu yüzden **hiç kaydedilemiyordu** (L-174, kullanıcı Görev 9'da buldu).
+    Canlı süit düz `insert` kullandığı için görmedi: istemcinin gerçekten
+    gönderdiği çağrıyı ölçmeyen test ağ değildir (madde 5). Kısmi indeksli
+    tabloda önce satırı arayın, sonra `update`/`insert`; ağı
+    `ledger_integrity_tests` L-174.
 
 ### Kabuk tuzakları (Windows / Git Bash)
 - Heredoc (`<<'SCRIPT'`) bir kaçış seviyesi yiyor: `'\\b'` dosyada `'\b'` (backspace) oluyor

@@ -269,11 +269,11 @@
               <small>Ciro, net kâr ve doluluk hedefleri</small>
             </div>
           </button>
-          <button type="button" class="dropdown-item" data-onclick="openLeadModal(); closeAllHeaderDropdowns();">
+          <button type="button" class="dropdown-item" data-onclick="openQuickLeadCapture(); closeAllHeaderDropdowns();">
             <span class="dropdown-icon">🎯</span>
             <div>
               <strong>Yeni Lead / Müşteri Talebi</strong>
-              <small>Fiyat soran misafir teklifi</small>
+              <small>Telefon ve kaynakla hızlı talep kaydı</small>
             </div>
           </button>
           <button type="button" class="dropdown-item" data-onclick="openMaintModal(); closeAllHeaderDropdowns();">
@@ -1804,6 +1804,7 @@
           <button type="button" class="active" data-operations-view="cleaning" data-onclick="setOperationsView('cleaning')" role="tab">🧹 Temizlik</button>
           <button type="button" data-operations-view="maintenance" data-onclick="setOperationsView('maintenance')" role="tab">🛠️ Arıza &amp; Bakım</button>
           <button type="button" data-operations-view="tasks" data-onclick="setOperationsView('tasks')" role="tab">✅ Görevler</button>
+          <button type="button" data-operations-view="people" data-onclick="setOperationsView('people')" role="tab">👷 Saha ekibi</button>
         </div>
         <div class="kpi-cards-grid five-cols" style="margin-bottom: 20px;">
           <div class="kpi-card">
@@ -2788,7 +2789,7 @@
           <div class="form-group">
             <label>Durum</label>
             <select id="leadStatus">
-              <option value="FOLLOW_UP">Follow-up Bekliyor (Sıcak)</option>
+              <option value="FOLLOW_UP">Takip bekliyor (sıcak)</option>
               <option value="QUOTE_SENT">Teklif Verildi</option>
               <option value="WON">Rezervasyona Dönüştü</option>
               <option value="LOST">Kaybedildi</option>
@@ -2958,7 +2959,7 @@
             <div class="step-body">
               <h4>Ekip ve roller</h4>
               <p><strong>⚙️ Ayarlar → Ekip ve Rol Yönetimi</strong> bölümünden ekip arkadaşlarınızı e-postayla davet edin. Roller: <strong>Yönetici</strong> her şeyi görür; <strong>Satış</strong> talepleri ve rezervasyonları yönetir, finansı görmez; <strong>Saha personeli</strong> yalnızca kendisine atanan işleri görür; <strong>İzleyici</strong> okur ama değiştiremez.</p>
-              <span class="step-tip">💡 Temizlik personelinin iki imzalı akışa girmesi için davet edilip hesap açması gerekir. Hesabı olmayan personelin işini yönetici doğrudan "yapıldı" olarak işaretler.</span>
+              <span class="step-tip">💡 Temizlikçi ve ustalar <strong>🧹 Operasyon → 👷 Saha ekibi</strong> bölümünden eklenir. Temizlikçiye görev atamak için: (1) onu <strong>Personel</strong> rolüyle davet edin, (2) daveti kabul edince ekip listesinde <strong>Saha ekibine ekle</strong>'ye basın, (3) Operasyon → Temizlik'te görevin yanındaki <strong>Temizlikçi seç → Ata</strong> ile işi verin. Temizlikçi kontrol listesini telefonundan işaretleyip imzalar (Z), siz denetleyip onaylarsınız (M). Hesabı olmayan personelin işini doğrudan "Kontrol ettim, yapıldı" ile kapatırsınız. Ustanın hesabı gerekmez; arızada <strong>Usta seç → Usta ata</strong> ile atanır.</span>
             </div>
           </div>
           <div class="help-step-item">
@@ -3462,7 +3463,8 @@
           </div>
           <div class="form-group">
             <label>Temizlik Personeli / Ekip</label>
-            <input type="text" id="hkCleaner" placeholder="Temizlik personelinin adı" required>
+            <input type="text" id="hkCleaner" list="hkCleanerOptions" placeholder="Listeden seçin ya da adı yazın" required>
+            <datalist id="hkCleanerOptions"></datalist>
           </div>
           <div class="form-group">
             <label>Temizlik Ücreti (TL)</label>
@@ -3660,8 +3662,8 @@
   <script src="core/captcha_gate.js?v=3ad4a776"></script>
   <script src="core/date_range_picker.js?v=41dc564c"></script>
   <script src="core/side_panel.js?v=d763b464"></script>
-  <script src="core/action_dispatch.js?v=c1740842"></script>
-  <script src="app.js?v=3edeb2b0"></script>
+  <script src="core/action_dispatch.js?v=a9ce5373"></script>
+  <script src="app.js?v=0d7a6cf1"></script>
   <script src="core/property_analysis_context_ui.js?v=0a5def2d"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=ec113951"></script>
