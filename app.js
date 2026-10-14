@@ -3674,8 +3674,12 @@ function handleFilterChange() {
     const eInput = document.getElementById('customFilterEnd');
     // Varsayilan ozel aralik: icinde bulunulan ay. '2026-08-01' / '2026-09-30'
     // sabit yaziliydi.
+    // Bitis kutusunda da '2026-09-30' sabiti duruyordu; bos kutu artik
+    // kullanilan varsayilani gosterir.
     currentFilter.startDate = (sInput && sInput.value) ? sInput.value : getTodayStr().slice(0, 7) + '-01';
     currentFilter.endDate = (eInput && eInput.value) ? eInput.value : getTodayStr();
+    if (sInput && !sInput.value) sInput.value = currentFilter.startDate;
+    if (eInput && !eInput.value) eInput.value = currentFilter.endDate;
   } else {
     if (customWrap) customWrap.style.display = 'none';
     // Yil secenekleri artik musterinin veri araligindan uretiliyor; yalnizca
@@ -4149,6 +4153,29 @@ function renderPageActionBar(tabId) {
   bar.innerHTML = eylemler.map(e => `<button type="button" class="btn btn-secondary btn-sm" data-onclick="runPageAction(decodeURIComponent('${encodeActionArg(e.id)}'))"${e.title ? ` title="${escapeHtml(e.title)}"` : ''}>${escapeHtml(e.label)}</button>`).join('');
 }
 
+// Ustteki DONEM / PORTFOY filtresi yalniz onu okuyan sayfada gorunur ve orada
+// neyi etkiledigini yazar. Eskiden her sayfada duruyordu; Bugun'de donemi
+// degistirmek hicbir sey degistirmiyordu (KPI seridi gizli, "Bu ay" satiri
+// takvim ayini kullanir), Rezervasyonlar listesi kendi filtresine bakiyordu.
+// Filtreyi okuyan yeni bir sayfa eklerseniz buraya da ekleyin.
+const GLOBAL_FILTER_SCOPE = {
+  finance: 'Bu sayfadaki tüm rakamlar, tablolar ve dışa aktarım bu döneme ve mülke göre hesaplanır.',
+  expenses: 'Gider listesi ve şablondan işlenecek ay bu döneme ve mülke göre.',
+  pricing: 'Hedef ayı ve üstteki ADR / boş gece kartları bu döneme göre. Fiyat önerisinin mülkü aşağıdaki seçiciden.',
+  operations: 'Geçmiş temizlik listesi bu döneme ve mülke göre. Bugünün işleri filtreden bağımsız.',
+  housekeeping: 'Temizlik görevleri ve borç özeti bu döneme ve mülke göre.',
+  marketing: 'Kampanyalar ve kanal dağılımı bu döneme ve mülke göre.'
+};
+
+function applyGlobalFilterScope(tabId) {
+  if (typeof document === 'undefined') return;
+  const bar = document.getElementById('globalFilterBar');
+  if (!bar) return;
+  const scope = GLOBAL_FILTER_SCOPE[tabId] || '';
+  bar.hidden = !scope;
+  setEl('globalFilterScopeHint', scope);
+}
+
 function switchTab(tabId) {
   if (tabId === 'settings' && !canManageTenantRole(activeTenant?.role)) {
     if (typeof showToast === 'function') showToast('Ayarlar yalnızca işletme yönetim rollerine açıktır.', 'error');
@@ -4161,6 +4188,7 @@ function switchTab(tabId) {
   const activeBtn = document.querySelector(`.tab-btn[data-onclick="switchTab('${menuTab}')"]`);
   if (activeBtn) activeBtn.classList.add('active');
   renderPageActionBar(tabId);
+  applyGlobalFilterScope(tabId);
 
   const content = document.getElementById(`tab-${tabId}`);
   if (content) content.classList.add('active');
@@ -4867,6 +4895,7 @@ function renderAll() {
   renderUserNotificationsBadge();
 
   const activeTabId = document.querySelector('.tab-content.active')?.id || '';
+  if (activeTabId) applyGlobalFilterScope(activeTabId.replace(/^tab-/, ''));
   const activePlan = getActiveRenderPlan(activeTabId);
   const renderers = {
     renderExecutiveControlCenter,
@@ -4899,17 +4928,16 @@ function renderAll() {
   renderDataSyncStamp();
 
   // Badges
-  // Badges (Seçili Dönem Filtresine Göre Dinamik Sayım)
   const rBadge = document.getElementById('rezCountBadge');
   if (rBadge) {
-    // Secili donemdeki iptal edilmemis GERCEK rezervasyonlar. Liste ise dönem
-    // filtresini ayrica secer; ikisinin farkli sayi gostermesinin sebebi
-    // sekmede yaziyor (L-105). Toplu aktarim ozeti rezervasyon degildir (L-103).
+    // Iptal edilmemis GERCEK rezervasyonlarin tamami. Eskiden ustteki donem
+    // filtresine gore sayiyordu; ama Rezervasyonlar sayfasinda o filtre yok
+    // (liste kendi filtresine bakar), menudeki sayi gorunmeyen bir secime
+    // bagli kaliyordu. Toplu aktarim ozeti rezervasyon degildir (L-103).
     const activeBookings = (appData.bookings || [])
-      .filter(b => b.status !== 'CANCELLED' && isBookingInFilter(b) && !isBulkSummaryBooking(b));
+      .filter(b => b.status !== 'CANCELLED' && !isBulkSummaryBooking(b));
     rBadge.innerText = activeBookings.length;
-    const donemAdi = getPeriodDisplayName(currentFilter && currentFilter.period) || 'seçili dönem';
-    const aciklama = `${donemAdi}: iptal edilmemiş ${activeBookings.length} rezervasyon (üstteki dönem filtresine göre)`;
+    const aciklama = `İptal edilmemiş ${activeBookings.length} rezervasyon (tüm dönemler)`;
     if (typeof rBadge.setAttribute === 'function') rBadge.setAttribute('title', aciklama);
     const dugme = rBadge.parentNode;
     if (dugme && typeof dugme.setAttribute === 'function') dugme.setAttribute('title', aciklama);
@@ -16705,7 +16733,9 @@ function renderTodayMonthSummary(bookings) {
   const element = document.getElementById('todayMonthSummary');
   if (!element) return;
   const month = getTodayStr().slice(0, 7);
-  const villa = currentFilter?.villa || 'ALL';
+  // Bugun'de ustteki filtre gorunmez (GLOBAL_FILTER_SCOPE); baska sayfada
+  // secilen mulk burada gorunmeden satiri daraltmasin: her zaman portfoy.
+  const villa = 'ALL';
   const propertyId = villa === 'ALL' ? null : appData?.villas?.[villa]?.id;
   const monthEnd = getLedgerContract().monthRange(month)?.end;
   const monthly = bookings.filter(item => item.status !== 'CANCELLED' && !isBulkSummaryBooking(item)
@@ -18816,6 +18846,9 @@ if (typeof module !== 'undefined' && module.exports) {
     setGuestDirectoryDateRange,
     resetGuestDirectoryDateRange,
     switchTab,
+    applyGlobalFilterScope,
+    GLOBAL_FILTER_SCOPE,
+    renderTodayMonthSummary,
     parseWhatsAppMessageText,
     isUUID,
     roundMoney,

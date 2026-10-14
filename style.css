@@ -109,6 +109,26 @@ body {
   border: 1px solid var(--border-subtle);
 }
 
+.header-filters {
+  flex-wrap: wrap;
+}
+
+.header-filters[hidden] {
+  display: none;
+}
+
+/* Filtrenin bu sayfada neyi etkiledigi (applyGlobalFilterScope). */
+.filter-scope-hint {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.filter-scope-hint:empty {
+  display: none;
+}
+
 .filter-group {
   display: flex;
   align-items: center;

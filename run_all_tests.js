@@ -276,6 +276,7 @@ const allTestFiles = [
   'staff_field_ui_tests.js',
   'checklist_template_docs_tests.js',
   'today_screen_ui_tests.js',
+  'global_filter_scope_tests.js',
   'booking_payment_ui_tests.js',
   'phase70_business_date_defaults_tests.js',
   'phase70_business_date_defaults_live_tests.js',
