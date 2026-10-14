@@ -10336,6 +10336,14 @@ function setLeadQuickMessage(message, type = '') {
   element.className = `lead-quick-message${type ? ` is-${type}` : ''}`;
 }
 
+// Talep yazamayan role ne oldugunu ve ne yapacagini soyler (3.3.1: viewer
+// satis verisini okur, yazamaz; staff okuyamaz).
+function leadQuickRoleMessage(role) {
+  if (!role) return 'Yetkiniz yükleniyor…';
+  if (role === 'viewer') return 'İzleyici rolündesiniz: talepleri ve satış verisini görebilirsiniz ama yeni talep kaydedemez, değiştiremezsiniz. Talep girmeniz gerekiyorsa işletme yöneticisinden rolünüzü "Satış" ya da "Yönetici" yapmasını isteyin.';
+  return 'Rolünüz talep kaydetmeye yetkili değil. Talep girmeniz gerekiyorsa işletme yöneticisinden rolünüzü "Satış" ya da "Yönetici" yapmasını isteyin.';
+}
+
 function renderLeadQuickCapture() {
   if (typeof document === 'undefined') return;
   const form = document.getElementById('leadQuickCaptureForm');
@@ -10378,8 +10386,14 @@ function renderLeadQuickCapture() {
   renderLeadExtraPropertyPicker('leadQuickExtraProperties', readLeadExtraPropertyPicker('leadQuickExtraProperties'));
 
   Array.from(form.elements || []).forEach(control => { control.disabled = !canWrite || (control.id === 'leadQuickSource' && sources.length === 0); });
-  if (!canWrite) setLeadQuickMessage('Bu rol satış verisini görüntüleyebilir; talep kaydedemez.', 'info');
-  else if (!sources.length) setLeadQuickMessage('Kaynak kataloğu yüklenemedi. Kayıt yapılmadı; yönetici kaynak ayarını kontrol etmeli.', 'error');
+  // Rol yuklenmeden cizilen ekranda bu mesaj kaliyordu: rol sonradan 'owner'
+  // gelince form acildigi halde "talep kaydedemez" yazmaya devam ediyordu.
+  const roleMessage = leadQuickRoleMessage(activeTenant?.role);
+  const messageElement = document.getElementById('leadQuickMessage');
+  if (!canWrite) setLeadQuickMessage(roleMessage, 'info');
+  else if (messageElement && messageElement.dataset.roleMessage === 'true') setLeadQuickMessage('');
+  if (messageElement) messageElement.dataset.roleMessage = canWrite ? 'false' : 'true';
+  if (canWrite && !sources.length) setLeadQuickMessage('Kaynak kataloğu yüklenemedi. Kayıt yapılmadı; yönetici kaynak ayarını kontrol etmeli.', 'error');
 }
 
 async function refreshLeadSalesContext() {
@@ -19985,6 +19999,7 @@ if (typeof module !== 'undefined' && module.exports) {
     setOperationsView,
     assignCleaningTask,
     renderOperationsPeopleView,
+    renderLeadQuickCapture,
     renderTodayCommandCenter,
     readEmailTokenHashLink,
     attachLeadInterestProperties,
