@@ -106,7 +106,7 @@ runTest('Net after commission is exposed and excludes the cleaning payout', () =
   });
   assert.strictEqual(e.netAfterCommission, 34000, 'komisyon sonrasi bize gecen tutar');
   assert.strictEqual(e.netToUs, 32800, 'temizlik odendikten sonra kalan');
-  assert.strictEqual(e.netRoomRevenue, 32500, 'ADR tabani: oda geliri - komisyon');
+  assert.strictEqual(e.netRoomRevenue, 38500, 'ADR tabani: oda geliri; komisyon giderdir');
 });
 
 runTest('Commission can never exceed the gross amount', () => {
