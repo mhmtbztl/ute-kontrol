@@ -14,6 +14,7 @@
 // L-183 (M13): Temizlik planlaninca mulk kendiliginden "temizlik bekliyor", yapilinca hazir.
 // L-191 (M21): Ara / Komut ilk 30 rezervasyonu tariyordu; misafir, talep, ekran, kanal yoktu.
 // L-192 (M22): Bildirim merkezine satir ureten kod yoktu; olaylar gercek veriden turetilir (phase93).
+// L-199 (M29): Talep formunda rol yuklenmeden yazilan "kaydedemez" mesaji rol gelince kalmiyordu.
 // L-193 (M23): Defterdeki "Temizlik" sutunu maliyet saniliyordu; misafirden alinan gelir oldugu yazilir.
 // L-184..L-190 (M14-M20): kapora, kar marji hedefi, talep tarihi, mulk net kari, reklam tablosu/metrik/gunluk butce, sablon ekrani, bosluk gecesi.
 const fs = require('fs');
@@ -642,6 +643,29 @@ async function bildirimDavranisi() {
   check(/notification_feed\.js\?v=/.test(read('index.html')), 'L-192p Modul sayfaya yuklenir');
 }
 
+// L-199 (M29) — Talep formundaki rol mesaji: anlasilir ve rol gelince kalkar.
+async function talepRolMesajiDavranisi() {
+  sahteDom({});
+  const App = require('../app.js');
+  App.setSupabaseClient(kaydedenIstemci());
+  App.setAppData({ villas: {}, bookings: [], leads: [], leadSources: [{ id: 's1', label: 'WhatsApp', is_active: true }] });
+  const mesaj = () => document.getElementById('leadQuickMessage').textContent;
+  App.setActiveTenant({ id: TENANT, role: undefined });
+  App.renderLeadQuickCapture();
+  const once = mesaj();
+  App.setActiveTenant({ id: TENANT, role: 'owner' });
+  App.renderLeadQuickCapture();
+  check(once === 'Yetkiniz yükleniyor…' && mesaj() === '', 'L-199a Rol sonradan sahip gelince "kaydedemez" mesaji kalkar', JSON.stringify({ once, sonra: mesaj() }));
+  App.setActiveTenant({ id: TENANT, role: 'viewer' });
+  App.renderLeadQuickCapture();
+  check(/İzleyici rolündesiniz/.test(mesaj()) && /Satış/.test(mesaj()), 'L-199b Izleyiciye neden kaydedemedigi ve ne yapacagi soylenir', mesaj());
+  App.setActiveTenant({ id: TENANT, role: 'sales' });
+  document.getElementById('leadQuickMessage').textContent = 'Yeni talep kaydedildi.';
+  document.getElementById('leadQuickMessage').dataset.roleMessage = 'false';
+  App.renderLeadQuickCapture();
+  check(mesaj() === 'Yeni talep kaydedildi.', 'L-199c Yazabilen rolde basari mesaji silinmez');
+}
+
 async function main() {
 try {
   const html = read('index.html');
@@ -675,6 +699,7 @@ try {
   await aramaDavranisi();
   await temizlikSutunuDavranisi();
   await bildirimDavranisi();
+  await talepRolMesajiDavranisi();
 } catch (error) {
   failed++;
   console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));
