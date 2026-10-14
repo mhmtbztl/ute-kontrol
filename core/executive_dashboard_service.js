@@ -41,8 +41,9 @@
 
     bookings.forEach(b => {
       if (b.status !== 'CANCELLED') {
-        const gross = Number(b.gross_amount || b.grossAmount || 0);
-        const cleaningRevenue = Number(b.cleaning_fee || b.cleaningFee || 0);
+        const finance = (b.financialDetails || b.financial_details || {}).result || {};
+        const gross = Number(b.gross_amount || b.grossAmount || 0) - Number(finance.taxTotal || 0);
+        const cleaningRevenue = Number(b.cleaning_fee || b.cleaningFee || 0) - Number(finance.cleaningTax || 0);
         const discount = Number(b.discount || 0);
         totalIncome += gross - discount;
         roomRevenue += gross - cleaningRevenue - discount;

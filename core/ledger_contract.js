@@ -43,9 +43,10 @@
 
   /** Rezervasyonun para alanlari; eski ve yeni alan adlarini birlikte okur. */
   function bookingAmounts(b) {
+    const finance = (b.financialDetails || b.financial_details || {}).result || {};
     return {
-      gross: sayi(ilk(b.gross, b.grossAmount, b.gross_amount)),
-      cleanFee: sayi(ilk(b.cleanFee, b.cleaningFee, b.cleaning_fee)),
+      gross: sayi(ilk(b.gross, b.grossAmount, b.gross_amount)) - sayi(finance.taxTotal),
+      cleanFee: sayi(ilk(b.cleanFee, b.cleaningFee, b.cleaning_fee)) - sayi(finance.cleaningTax),
       discount: sayi(b.discount),
       ota: sayi(ilk(b.otaCommission, b.otaComm, b.ota_commission)),
       payment: sayi(ilk(b.paymentCommission, b.payment_commission))
