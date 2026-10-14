@@ -631,7 +631,7 @@ istemci tabloyu `fetchTenantRowsTolerant` ile okur, yazmada "phase91
 uygulanmadı" der. Canlı süit `phase91_lead_interest_live_tests` 13/13.
 Üretim doğrulaması (salt okunur): anon tablo sorgusu `401 42501`; `production:readiness` BAŞARILI, `schema_migrations` 91 mevcut. Paket: `docs/PHASE91_DEPLOY_PACKAGE.md`.
 **phase93 (`migration_phase93_notification_feed.sql`) 14 Ekim 2026'da test projesine
-uygulandı; üretim bekliyor.** Bildirim merkezini okuyan kod vardı, satır **üreten** kod
+ve 14 Ekim 2026'da üretime uygulandı; üretimde doğrulandı** (anon `rpc/sync_my_notifications` → `401 42501`, `schema_migrations` 93). Bildirim merkezini okuyan kod vardı, satır **üreten** kod
 yoktu (L-192, kullanıcı M22). Olaylar istemcide gerçek veriden türetilir
 (`core/notification_feed.js`); `sync_my_notifications` yalnız çağıranın kendi
 satırlarını yazar, biten olayı `RESOLVED` yapar. Tablo değişmedi; kişisel satırlara
