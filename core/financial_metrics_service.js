@@ -47,8 +47,9 @@ function splitBookingStayNights(b) {
   const totalNights = Math.round((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
   if (totalNights <= 0) return [];
 
-  const gross = Number(b.grossAmount || b.gross || b.gross_amount || 0);
-  const cleanFee = Number(b.cleanFee || b.cleaningFee || b.cleaning_fee || 0);
+  const finance = (b.financialDetails || b.financial_details || {}).result || {};
+  const gross = Number(b.grossAmount || b.gross || b.gross_amount || 0) - Number(finance.taxTotal || 0);
+  const cleanFee = Number(b.cleanFee || b.cleaningFee || b.cleaning_fee || 0) - Number(finance.cleaningTax || 0);
   const discount = Number(b.discount || 0);
   const otaComm = Number(b.otaComm || b.otaCommission || b.ota_commission || 0);
 

@@ -4970,6 +4970,18 @@ body {
 }
 .preview-item.preview-total strong { font-size: 15px; }
 
+/* Each finance step gets its own row, including on narrow phones. */
+#bookingModal .live-calculation-box { display: flex; flex-direction: column; gap: 10px; }
+#bookingModal .preview-item { gap: 16px; align-items: baseline; }
+#bookingModal .preview-item > span { flex: 1; min-width: 0; }
+#bookingModal .preview-item > strong { flex-shrink: 0; text-align: right; white-space: nowrap; }
+#bookingModal .preview-item.highlight { color: var(--text-muted); }
+#bookingModal .preview-item.preview-total { padding-top: 16px; margin-top: 8px; color: var(--text-primary); }
+#bookingModal .preview-item.preview-total strong { font-size: 20px; }
+#bookingModal .preview-item.preview-total small { display: block; font-size: 11px; color: var(--text-muted); }
+#bookingModal .preview-item.preview-total strong.text-positive { color: #34d399; }
+#bookingModal .preview-item.preview-total strong.text-negative { color: #fca5a5; }
+
 @media (max-width: 640px) {
   .property-analysis-context__grid { grid-template-columns: 1fr; }
   .property-analysis-context__actions { align-items: stretch; flex-direction: column; }
@@ -5350,3 +5362,24 @@ body.side-panel-open { overflow: hidden; }
 .onboard-step-btn:hover, .onboard-step-btn:focus-visible { opacity: 1; color: #DDD6FE; text-decoration: underline; }
 .lead-extra-properties { display: flex; flex-wrap: wrap; gap: 6px 12px; min-height: 34px; align-items: center; }
 .lead-extra-property { display: inline-flex; gap: 6px; align-items: center; font-size: 12px; white-space: nowrap; }
+/* Optional reservation finance follows the existing modal/card system. */
+.booking-finance-options { margin: 16px 0; padding: 16px; border: 1px solid rgba(148,163,184,.22); border-radius: 12px; }
+.finance-toggle { display: flex; align-items: center; gap: 9px; margin: 14px 0; cursor: pointer; }
+.finance-toggle input { width: auto; }
+.booking-tax-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.booking-tax-card { min-width: 0; border: 1px solid rgba(148,163,184,.22); border-radius: 10px; padding: 12px; }
+.booking-tax-card label { display: block; margin-top: 10px; font-size: 12px; }
+.booking-tax-card input, .booking-tax-card select { width: 100%; margin-top: 5px; }
+.booking-extra-row { display: grid; grid-template-columns: minmax(0,2fr) minmax(0,1fr) auto; align-items: end; gap: 8px; margin: 10px 0; }
+.booking-extra-row label { min-width: 0; font-size: 12px; }
+.booking-extra-row input { width: 100%; }
+.booking-finance-options [hidden], .booking-tax-card [hidden], #resPostExpenses[hidden] { display: none !important; }
+#bookingFinanceSettings { margin-top: 24px; }
+#bookingFinanceSettings fieldset { border: 1px solid rgba(148,163,184,.22); border-radius: 10px; padding: 14px; }
+#resPostExpenses { margin-top: 16px; }
+.text-positive { color: #34d399; }
+@media (max-width: 600px) {
+  .booking-tax-grid { grid-template-columns: 1fr; }
+  .booking-extra-row { grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
+  .booking-extra-row button { grid-column: 2; }
+}

@@ -153,6 +153,8 @@ const allTestFiles = [
   // Rezervasyon ekrani: temizlik geliri/gideri ayrimi, komisyon seffafligi,
   // tek takvimli tarih araligi
   'booking_form_economics_tests.js',
+  'booking_finance_tests.js',
+  'booking_finance_live_tests.js',
 
   // Ay kapanisi butunlugu (Phase 20)
   'month_close_integrity_tests.js',

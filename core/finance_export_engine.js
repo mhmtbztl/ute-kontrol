@@ -154,11 +154,19 @@ function buildExport(mod, kayitlar) {
   if (!E || !E.SABLON_SUTUNLARI) {
     throw new Error('İçe aktarma sütun tanımı yüklenemedi; dışa aktarma dosyası geri yüklenemez olurdu.');
   }
-  const headers = E.SABLON_SUTUNLARI[mod];
-  if (!headers) throw new Error('Bilinmeyen dışa aktarma türü: ' + mod);
+  const baseHeaders = E.SABLON_SUTUNLARI[mod];
+  if (!baseHeaders) throw new Error('Bilinmeyen dışa aktarma türü: ' + mod);
+  const headers = baseHeaders.slice();
 
   const satirla = (mod === 'BOOKINGS') ? rezervasyonSatiri : giderSatiri;
   const rows = (kayitlar || []).map(satirla);
+  if (mod === 'BOOKINGS' && (kayitlar || []).some(b => b.financialDetails || b.financial_details)) {
+    headers.push('Finans Ayrıntıları JSON');
+    rows.forEach((row,i) => {
+      const details = kayitlar[i].financialDetails || kayitlar[i].financial_details;
+      row.push(details ? JSON.stringify(details) : '');
+    });
+  }
 
   // Sutun sayisi tutmuyorsa dosya geri yuklenemez; sessizce yazmaktansa
   // burada durmak dogrudur.

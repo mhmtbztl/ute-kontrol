@@ -14,7 +14,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=86e714fc">
+  <link rel="stylesheet" href="style.css?v=63afabdb">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="supabase.umd.js?v=3810661a"></script>
@@ -1673,6 +1673,7 @@
           </table>
         </div>
         <p class="sub-text" style="margin:12px 0 0;">Mülk bazlı Airbnb/Booking ilan bağlantıları ve performans verileri <strong>Kanallar ve Pazarlama</strong> ekranından yönetilir.</p>
+        <div id="bookingFinanceSettings"></div>
       </section>
 
       <section class="card settings-section" data-settings-section="templates" id="settingsTemplatesCard" style="margin-bottom: 24px;">
@@ -2606,7 +2607,7 @@
         <div class="booking-essential-grid">
           <div class="form-group">
             <label for="resVilla">Villa Seçin</label>
-            <select id="resVilla" required data-onchange="calculateLivePreview()">
+            <select id="resVilla" required data-onchange="handleBookingPropertyFinanceChange()">
               <!-- updateAllVillaDropdowns() musterinin mulkleriyle doldurur -->
             </select>
           </div>
@@ -2645,8 +2646,8 @@
           </div>
           <div class="form-group">
             <label for="resGross">Brüt Tutar (₺)</label>
-            <input type="number" inputmode="decimal" id="resGross" placeholder="Örn: 40000" required data-oninput="syncCommissionFromRate()">
-            <small class="field-note">Misafirin ödediği toplam. Temizlik ücreti bu tutara dâhildir.</small>
+            <input type="number" inputmode="decimal" id="resGross" placeholder="Örn: 40000" required data-oninput="handleBookingGrossFinanceInput()">
+            <small id="resGrossExplanation" class="field-note">Temizlik geliri bu tutara dahildir. İndirim ayrıca düşülür.</small>
           </div>
           <div class="form-group" id="resDepositGroup">
             <label for="resDeposit">Alınan Kapora (₺)</label>
@@ -2731,7 +2732,7 @@
             </div>
             <div class="form-group">
               <label for="resCleanCost">Temizlik Maliyeti — Personele Ödenen (₺)</label>
-              <input type="number" inputmode="decimal" id="resCleanCost" placeholder="Örn: 1200 — bilinmiyorsa boş" data-oninput="calculateLivePreview()">
+              <input type="number" inputmode="decimal" id="resCleanCost" placeholder="Örn: 1200 — bilinmiyorsa boş" data-oninput="markBookingCleaningManual()">
               <small class="field-note note-expense">▼ <strong>Gider kalemi.</strong> Temizlik defterine planlı görev olarak yazılır; temizlik <strong>yapıldı</strong> işaretlenince gider olur. Misafir gelmezse gider oluşmaz.</small>
             </div>
             <div class="form-group">
@@ -2745,25 +2746,51 @@
             </div>
           </div>
         </details>
+        <section class="booking-finance-options" aria-label="Rezervasyon finans ayrıntıları">
+          <div class="form-group"><label for="resDiscount">İndirim (₺)</label><input id="resDiscount" type="number" min="0" step="0.01" data-oninput="calculateLivePreview()"></div>
+          <label class="finance-toggle"><input id="resTaxEnabled" type="checkbox" data-onchange="toggleBookingFinanceSections()"> Vergileri hesapla</label>
+          <div id="resTaxFields" hidden>
+            <div class="form-group"><label for="resTaxMode">Vergi yöntemi</label><select id="resTaxMode" data-onchange="toggleBookingFinanceSections()"><option value="inclusive">Vergiler toplam tutarın içinde</option><option value="exclusive">Vergiler fiyatın üzerine ekleniyor</option><option value="manual">Vergi tutarlarını kendim belirleyeceğim</option></select><p id="resTaxExplanation" class="field-note"></p></div>
+            <div id="resTaxProfileFields" class="booking-optional-grid">
+              <div class="form-group"><label for="resTaxProfile">İşletme vergi profili</label><select id="resTaxProfile" data-onchange="calculateLivePreview()"></select></div>
+              <div class="form-group"><label for="resInvoiceDate">Fatura / vergi işlem tarihi</label><input id="resInvoiceDate" type="date" data-onchange="calculateLivePreview()"><small class="field-note">Profil bu tarihi kullanıyorsa zorunludur.</small></div>
+            </div>
+            <div id="resTaxRows" class="booking-tax-grid"></div>
+            <p class="field-note">Tahsil eden taraf ile ödeme yükümlülüğü ayrıdır. Platform tahsilatı verginin ödendiğini kanıtlamaz. KDV karşılığı indirilecek KDV hesaba katılmadan gösterilen tahmindir.</p>
+          </div>
+          <label class="finance-toggle"><input id="resExtrasEnabled" type="checkbox" data-onchange="toggleBookingFinanceSections()"> Diğer gider ekle</label>
+          <div id="resExtrasFields" hidden><div id="resExtraRows"></div><button type="button" class="btn btn-secondary" data-onclick="addBookingExtraExpense()">+ Gider ekle</button><p class="field-note">Bu satırlar tahminidir. Kaydettikten sonra gerçekleşmiş giderleri seçtiğiniz tarihle finans defterine aktarabilirsiniz.</p></div>
+          <p id="resFinanceError" role="alert" class="text-negative"></p>
+        </section>
         <div class="live-calculation-box">
           <div class="preview-item"><span>Gece Sayısı:</span><strong id="prevNights">—</strong></div>
 
           <div class="preview-section">Gelir</div>
           <div class="preview-item"><span>Oda Geliri:</span><strong id="prevRoomRevenue">—</strong></div>
           <div class="preview-item"><span>Temizlik Geliri:</span><strong id="prevCleanRevenue">—</strong></div>
-          <div class="preview-item"><span>Brüt Toplam:</span><strong id="prevGrossTotal">—</strong></div>
+          <div class="preview-item"><span>1. Brüt rezervasyon tutarı (misafirin toplam ödemesi):</span><strong id="prevGrossTotal">—</strong></div>
 
           <div class="preview-section">Kesintiler</div>
           <div class="preview-item"><span>OTA Komisyonu <em id="prevCommissionRate">—</em>:</span><strong id="prevCommission" class="text-negative">—</strong></div>
           <div class="preview-item"><span>Ödeme Komisyonu:</span><strong id="prevPaymentCommission" class="text-negative">—</strong></div>
-          <div class="preview-item highlight"><span>Komisyonlar Sonrası Net (bize geçen):</span><strong id="prevNetAfterCommission">—</strong></div>
+          <div class="preview-item highlight"><span>2. OTA/POS kesintisi sonrası kalan:</span><strong id="prevNetAfterCommission">—</strong></div>
+          <div class="preview-item"><span>Platformun tahsil ettiği vergi:</span><strong id="prevPlatformTax" class="text-negative">—</strong></div>
+          <div class="preview-item"><span>İşletmenin tahsilatından ayrılan vergi karşılığı:</span><strong id="prevBusinessTax" class="text-negative">—</strong></div>
+          <div class="preview-item"><span>Toplam hesaplanan vergi:</span><strong id="prevTaxTotal">—</strong></div>
+          <div class="preview-item highlight"><span>3. Vergiler sonrası kalan:</span><strong id="prevAfterTax">—</strong></div>
 
           <div class="preview-section">Gider</div>
           <div class="preview-item"><span>Temizlik Maliyeti:</span><strong id="prevCleanCost" class="text-negative">—</strong></div>
 
-          <div class="preview-item preview-total"><span>Bize Kalan Net:</span><strong id="prevNetToUs">—</strong></div>
-          <div class="preview-item"><span>Saf Net Oda Geliri (ADR tabanı):</span><strong id="prevNetRevenue">—</strong></div>
-          <div class="preview-item"><span>Gecelik Net (ADR Katkısı):</span><strong id="prevNightlyNet">—</strong></div>
+          <div class="preview-item highlight"><span>4. Temizlik maliyeti sonrası kalan:</span><strong id="prevAfterCleaning">—</strong></div>
+          <div class="preview-item"><span>Diğer giderler:</span><strong id="prevOtherExpenses" class="text-negative">—</strong></div>
+          <div class="preview-item highlight"><span>5. Diğer giderler sonrası kalan:</span><strong id="prevAfterExtras">—</strong></div>
+          <div class="preview-item"><span>Vergi ve temizlik geliri hariç net oda geliri (ADR tabanı):</span><strong id="prevNetRevenue">—</strong></div>
+          <div class="preview-item"><span>ADR (komisyon düşülmez):</span><strong id="prevNightlyNet">—</strong></div>
+          <div class="preview-item preview-total"><span>Tüm Kesintiler Sonrası Kalan <small>· Tahmini</small></span><strong id="prevNetToUs">—</strong></div>
+          <p class="field-note">Rezervasyon gelirinden tanımlanan komisyon, vergi ve giderler düşüldükten sonra kalan tahmini tutar. Bankaya yatan tutar veya muhasebesel net kâr değildir.</p>
+          <p id="resFinanceCompleteness" class="field-note"></p>
+          <div id="resPostExpenses" hidden><label for="resExpensePostDate">Gerçekleşen gider tarihi</label><input type="date" id="resExpensePostDate"><button type="button" class="btn btn-secondary" data-onclick="postBookingExtraExpenses()">Kaydedilmiş giderleri deftere aktar</button><p class="field-note">Önce rezervasyonu kaydedin. Tekrar aktarım yeni kopya oluşturmaz; mevcut gider tarihini değiştirmez.</p></div>
         </div>
 
         <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
@@ -3230,13 +3257,13 @@
     </div>
   </div>
 
-  <script src="core/financial_metrics_service.js?v=4953570e"></script>
+  <script src="core/financial_metrics_service.js?v=80a48f81"></script>
   <script src="core/marketing_engine.js?v=2756f4ec"></script>
   <script src="core/analysis_export_service.js?v=d05579d8"></script>
   <script src="core/chatgpt_prompt_engine.js?v=5e7232ae"></script>
   <script src="core/property_analysis_context_service.js?v=c0cc1027"></script>
-  <script src="core/finance_import_engine.js?v=cc1156ae"></script>
-  <script src="core/finance_export_engine.js?v=ea797d31"></script>
+  <script src="core/finance_import_engine.js?v=bca438a5"></script>
+  <script src="core/finance_export_engine.js?v=86f92e3f"></script>
 
   <!-- ======================================================= -->
   <!-- MODAL: WHATSAPP BUSINESS AKILLI MESAJ AYRIŞTIRICI -->
@@ -3692,7 +3719,7 @@
   <script src="core/property_sales_readiness.js?v=3f0f97b0"></script>
   <script src="core/guest_contact_utils.js?v=84fd6474"></script>
   <script src="core/user_facing_errors.js?v=e4eb0ae5"></script>
-  <script src="core/ledger_contract.js?v=bc9fd6f2"></script>
+  <script src="core/ledger_contract.js?v=ae1796a7"></script>
   <script src="core/report_engine.js?v=a06ed31b"></script>
   <script src="core/property_profile_engine.js?v=552ff1ce"></script>
   <script src="core/property_owner_service.js?v=5c741a12"></script>
@@ -3706,7 +3733,7 @@
   <script src="core/gap_night_service.js?v=6cdf4142"></script>
   <script src="core/pricing_booking_service.js?v=0eb93c05"></script>
   <script src="core/executive_priority_service.js?v=d69011e3"></script>
-  <script src="core/executive_dashboard_service.js?v=edf2fa66"></script>
+  <script src="core/executive_dashboard_service.js?v=f93360cf"></script>
   <script src="core/operations_engine.js?v=039b8d32"></script>
   <script src="core/booking_payment_engine.js?v=91111565"></script>
   <script src="core/ads_metrics_engine.js?v=d8dd5962"></script>
@@ -3715,8 +3742,10 @@
   <script src="core/captcha_gate.js?v=3ad4a776"></script>
   <script src="core/date_range_picker.js?v=41dc564c"></script>
   <script src="core/side_panel.js?v=d763b464"></script>
-  <script src="core/action_dispatch.js?v=c171f23d"></script>
-  <script src="app.js?v=256c27bd"></script>
+  <script src="core/action_dispatch.js?v=351d2697"></script>
+  <script src="core/booking_finance.js?v=338de73f"></script>
+  <script src="core/booking_finance_ui.js?v=a85be454"></script>
+  <script src="app.js?v=345da9a3"></script>
   <script src="core/property_analysis_context_ui.js?v=0a5def2d"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=6fdf284a"></script>

@@ -1208,6 +1208,7 @@ function mapBookingFromDb(row, propertyMap = {}) {
     // borc defterinde (cleaning_tasks.amount) durur. syncBookingCleaningTasks()
     // yuklemeden sonra bu alani oradan doldurur.
     discount: discount,
+    financialDetails: row.financial_details || null,
     net: net,
     netRoomRev: net,
     netRoomRevenue: net,
@@ -1457,7 +1458,7 @@ async function createBooking(bookingInput) {
     attempts++;
     let data = null, error = null;
     try {
-      const rpcRes = await supabaseClient.rpc('create_booking_atomic', {
+      const rpcRes = await callBookingFinanceRpc('create_booking_atomic', {
         p_tenant_id: payload.tenant_id,
         p_property_id: payload.property_id,
         p_booking_code: payload.booking_code,
@@ -1474,7 +1475,7 @@ async function createBooking(bookingInput) {
         p_net_room_revenue: payload.net_room_revenue,
         p_status: payload.status,
         p_notes: payload.notes
-      });
+      }, bookingInput.financeInput);
       if (!rpcRes.error && rpcRes.data) {
         data = rpcRes.data;
       } else if (rpcRes.error) {
@@ -1640,7 +1641,7 @@ async function updateBooking(bookingId, bookingInput) {
 
   let data = null, error = null;
   try {
-    const rpcRes = await supabaseClient.rpc('update_booking_atomic', {
+    const rpcRes = await callBookingFinanceRpc('update_booking_atomic', {
       p_booking_id: propBookingId,
       p_tenant_id: tenantId,
       p_property_id: propId,
@@ -1657,7 +1658,7 @@ async function updateBooking(bookingId, bookingInput) {
       p_net_room_revenue: payload.net_room_revenue,
       p_status: payload.status,
       p_notes: payload.notes
-    });
+    }, bookingInput.financeInput, existing?.financialDetails);
     if (!rpcRes.error && rpcRes.data) {
       data = rpcRes.data;
     } else if (rpcRes.error) {
@@ -1719,6 +1720,21 @@ async function updateBooking(bookingId, bookingInput) {
   }
 
   return updatedBooking;
+}
+
+async function callBookingFinanceRpc(name, args, input, existingFinance) {
+  if (!input) return supabaseClient.rpc(name, args);
+  const payload = {};
+  Object.entries(args).forEach(([key, value]) => { payload[key.slice(2)] = value; });
+  const result = await supabaseClient.rpc('save_booking_finance', {
+    p_booking: payload, p_input: input, p_booking_id: args.p_booking_id || null
+  });
+  const missing = result.error?.code === 'PGRST202';
+  if (missing && !input.tax?.enabled && !input.extras?.length && !existingFinance && input.commissionBasis === 'gross') {
+    return supabaseClient.rpc(name, args);
+  }
+  if (missing) return { data: null, error: { code: 'FINANCE_SCHEMA_REQUIRED', message: 'Vergi ve ek gider kaydı için rezervasyon finans güncellemesi henüz uygulanmamış. Kayıt yapılmadı.' } };
+  return result;
 }
 
 /**
@@ -5221,8 +5237,9 @@ function renderFinanceModule() {
     // USALI tahakkuk: aylari kesen rezervasyonun yalnizca bu doneme dusen payi.
     const pay = getBookingFilterShare(b);
     if (pay.nights === 0 && pay.ratio === 0) return;
-    const bNet = ((Number(b.gross !== undefined ? b.gross : b.net) || 0) - (Number(b.discount) || 0)) * pay.ratio;
-    const bRoom = ((Number(b.gross !== undefined ? b.gross : b.net) || 0) - (Number(b.cleanFee ?? b.cleaningFee) || 0) - (Number(b.discount) || 0)) * pay.ratio;
+    const amounts = getLedgerContract().bookingAmounts(b);
+    const bNet = (amounts.gross - amounts.discount) * pay.ratio;
+    const bRoom = (amounts.gross - amounts.cleanFee - amounts.discount) * pay.ratio;
     const bNights = pay.nights;
 
     if (propStats[b.villa]) {
@@ -7528,6 +7545,15 @@ async function applyImportedData() {
           type: v.expenseType
         }, tenantId);
       }
+      if (rezMi && v.financeInput) {
+        // Snapshot + POS must be restored atomically; never use the legacy bulk insert.
+        const restored = await supabaseClient.rpc('save_booking_finance', { p_booking: payload, p_input: v.financeInput });
+        if (restored.error) throw restored.error;
+        if (!restored.data?.id) throw new Error('Finans kaydı doğrulanamadı.');
+        basarili.push(v.rowNum);
+        yeniKayitlar.push({rowNum:v.rowNum,id:restored.data.id});
+        continue;
+      }
       prepared.push(payload);
       sourceRowById.set(id, v.rowNum);
     } catch (err) {
@@ -8099,6 +8125,10 @@ function openBookingModal(editId = null) {
     if (deleteBtn) deleteBtn.style.display = 'none';
   }
 
+  if (typeof initBookingFinanceForm === 'function') {
+    const booking = editId ? (appData.bookings || []).find(b => b.id === editId || b.code === editId || b.dbId === editId) : null;
+    initBookingFinanceForm(booking);
+  }
   calculateLivePreview();
   modal.classList.add('active');
 }
@@ -8163,6 +8193,8 @@ function refreshBookingChannelDropdown(selectedCode = '') {
 }
 
 function handleBookingChannelChange() {
+  if (typeof bookingFinanceCommissionMode !== 'undefined') bookingFinanceCommissionMode = 'rate';
+  if (typeof bookingFinanceDraft !== 'undefined' && bookingFinanceDraft) bookingFinanceDraft.commissionBasis = null;
   const channel = document.getElementById('resChannel')?.value || '';
   const rateEl = document.getElementById('resCommissionRate');
   const commEl = document.getElementById('resCommission');
@@ -8206,8 +8238,8 @@ function computeBookingEconomics(input) {
   const netAfterCommission = gross - otaComm - paymentComm;  // bize gecen tutar
   const netToUs = netAfterCommission - cleanCost;  // temizlik odendikten sonra kalan
 
-  // ADR tabani: komisyon ve temizlik geliri disinda kalan saf oda geliri.
-  const netRoomRevenue = Math.max(0, roomRevenue - otaComm);
+  // K-04: komisyon giderdir; ADR tabani oda geliri eksi indirimdir.
+  const netRoomRevenue = Math.max(0, roomRevenue - (Number(input.discount) || 0));
 
   return {
     gross, cleanFee, cleanCost, nights, roomRevenue,
@@ -8217,6 +8249,7 @@ function computeBookingEconomics(input) {
 }
 
 function readBookingFormEconomics() {
+  if (typeof readExtendedBookingEconomics === 'function' && document.getElementById('resTaxEnabled')) return readExtendedBookingEconomics();
   const el = id => document.getElementById(id);
   const dInStr = el('resCheckIn') ? el('resCheckIn').value : '';
   const dOutStr = el('resCheckOut') ? el('resCheckOut').value : '';
@@ -8234,6 +8267,7 @@ function readBookingFormEconomics() {
 // Oran yazildiginda tutari, tutar yazildiginda orani guncelle. Ikisi de
 // kullanicinin elindedir; hangisini yazarsa digeri turetilir.
 function syncCommissionFromRate() {
+  if (typeof bookingFinanceCommissionMode !== 'undefined') bookingFinanceCommissionMode = 'rate';
   const rateEl = document.getElementById('resCommissionRate');
   const commEl = document.getElementById('resCommission');
   const gross = Number((document.getElementById('resGross') || {}).value) || 0;
@@ -8244,6 +8278,7 @@ function syncCommissionFromRate() {
 }
 
 function syncRateFromCommission() {
+  if (typeof bookingFinanceCommissionMode !== 'undefined') bookingFinanceCommissionMode = 'amount';
   const rateEl = document.getElementById('resCommissionRate');
   const commEl = document.getElementById('resCommission');
   const gross = Number((document.getElementById('resGross') || {}).value) || 0;
@@ -8254,6 +8289,7 @@ function syncRateFromCommission() {
 }
 
 function calculateLivePreview() {
+  if (typeof renderBookingFinancePreview === 'function' && document.getElementById('resTaxEnabled')) return renderBookingFinancePreview();
   const e = readBookingFormEconomics();
   const money = v => `₺${Math.round(v).toLocaleString('tr-TR')}`;
   const put = (id, text) => { const el = document.getElementById(id); if (el) el.innerText = text; };
@@ -8514,6 +8550,8 @@ async function saveBooking(e) {
       cleanFee,
       cleanCost,
       net,
+      discount: economics.financeInput ? Number(economics.financeInput.discount) : undefined,
+      financeInput: economics.financeInput,
       pax,
       status
     };
@@ -8526,7 +8564,7 @@ async function saveBooking(e) {
     // tablolardadir (bookings'e sutun eklenmedi, CLAUDE.md 3.4); yazilamazlarsa
     // rezervasyon geri alinmaz, kullaniciya acikca soylenir.
     let ekUyari = await syncBookingCleaningTaskToCloud(savedBooking, cleanCost);
-    ekUyari += await saveBookingPaymentCommission(savedBooking, paymentCommission);
+    if (!savedBooking.financialDetails) ekUyari += await saveBookingPaymentCommission(savedBooking, paymentCommission);
     if (deposit > 0) ekUyari += await recordBookingDeposit(savedBooking.id, deposit, depositMethod, null);
     if (typeof renderAll === 'function') renderAll();
 
@@ -9544,6 +9582,7 @@ function toggleBookingChannelRowRate(channelId) {
 }
 
 function renderBookingChannelSettings() {
+  if (typeof renderBookingFinanceSettings === 'function') renderBookingFinanceSettings();
   const tbody = document.getElementById('bookingChannelSettingsBody');
   const addForm = document.getElementById('bookingChannelAddForm');
   const notice = document.getElementById('bookingChannelSchemaNotice');
@@ -12198,6 +12237,7 @@ function openBookingForDate(villa, dateStr) {
   openBookingModal();
   const vSelect = document.getElementById('resVilla');
   if (vSelect) vSelect.value = villa;
+  if (typeof handleBookingPropertyFinanceChange === 'function') handleBookingPropertyFinanceChange();
   // Takvimden gelen gun giris tarihi olarak yuklenir; cikis kullanicinin
   // secimine birakilir. Gizli inputa dogrudan yazmak takvim durumunu
   // guncellemezdi, bu yuzden aralik API'si uzerinden gidilir.
@@ -17308,6 +17348,11 @@ function renderExecutiveControlCenter() {
         const share = getBookingFilterShare(b);
         return {
           ...b,
+          financialDetails: b.financialDetails ? { ...b.financialDetails, result: {
+            ...b.financialDetails.result,
+            taxTotal: b.financialDetails.result.taxTotal * share.ratio,
+            cleaningTax: b.financialDetails.result.cleaningTax * share.ratio
+          } } : null,
           gross_amount: Number(b.gross ?? b.grossAmount ?? b.gross_amount ?? 0) * share.ratio,
           cleaning_fee: Number(b.cleaningFee ?? b.cleaning_fee ?? 0) * share.ratio,
           discount: Number(b.discount || 0) * share.ratio,

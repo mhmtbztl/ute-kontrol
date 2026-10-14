@@ -247,7 +247,8 @@ const BASLIKLAR = {
     // yuklendiginde kaybolmamali.
     discount:    ['indirim', 'indirim (tl)', 'oda indirimi', 'oda indirimi (tl)', 'discount'],
     phone:       ['telefon', 'tel', 'phone', 'telefon no', 'gsm', 'misafir telefonu'],
-    notes:       ['not', 'notlar', 'notes', 'aciklama', 'açıklama']
+    notes:       ['not', 'notlar', 'notes', 'aciklama', 'açıklama'],
+    financeDetails: ['finans ayrıntıları json', 'finans ayrintilari json']
   }
 };
 
@@ -485,6 +486,22 @@ function validateBookingRows(rawRows = [], columnMap = {}, context = {}) {
     }
     const telefon = columnMap.phone ? String(raw[columnMap.phone] || '').trim() : '';
     const not = columnMap.notes ? String(raw[columnMap.notes] || '').trim() : '';
+    let financeInput;
+    const financeJson = columnMap.financeDetails ? raw[columnMap.financeDetails] : '';
+    if (financeJson) {
+      try {
+        const details = JSON.parse(financeJson);
+        const engine = typeof BookingFinance !== 'undefined' ? BookingFinance : require('./booking_finance');
+        if (details.version !== 1 || !details.input) throw new Error('Desteklenmeyen finans sürümü.');
+        const p = details.input, r = engine.calculate(p);
+        if (engine.money(r.gross + Number(p.discount || 0)) !== brut || r.commission !== komisyon ||
+          engine.money(r.cleaningRevenue + r.cleaningTax) !== temizlik || Number(p.discount || 0) !== indirim ||
+          p.checkIn !== giris || p.checkOut !== cikis || Number(p.nights) !== gece) {
+          throw new Error('Finans ayrıntıları sütunlarla uyuşmuyor; tutar ve tarihleri rezervasyon formundan düzenleyin.');
+        }
+        financeInput = p;
+      } catch (e) { satirHata.push('Finans ayrıntıları geçersiz: ' + e.message); }
+    }
 
     const paxHam = raw[columnMap.pax];
     let pax = null;
@@ -545,6 +562,7 @@ function validateBookingRows(rawRows = [], columnMap = {}, context = {}) {
         guest: misafir, checkIn: giris, checkOut: cikis, nights: gece,
         gross: brut, otaCommission: komisyon, cleaningFee: temizlik,
         discount: indirim || 0, phone: telefon, notes: not,
+        ...(financeInput ? { financeInput } : {}),
         channel: kanal, pax, status: durum, code: kod || null,
         isPotentialDuplicate: mukerrer, raw
       });

@@ -77,6 +77,66 @@ async function assertNoHorizontalOverflow(page, label) {
   assert(result.scroll <= result.width + 1, `${label}: ${result.scroll}px belge, ${result.width}px ekran`);
 }
 
+async function assertBookingFinance(page, mobile) {
+  await page.evaluate(() => {
+    switchTab('reservations');
+    appData.tenantSettings = { ...appData.tenantSettings, booking_tax_profiles: [{ name:'Test profile', dateBasis:'checkIn', validFrom:'2020-01-01',validTo:'2040-12-31',
+      vat:{rate:10,room:true,cleaning:true,includesOther:false}, accommodation:{rate:2,room:true,cleaning:false,includesOther:false} }] };
+    openBookingModal();
+    setResDateRange('2031-01-01','2031-01-05');
+  });
+  await page.fill('#resGuest','Finance browser');
+  await page.fill('#resGross','12200');
+  await page.fill('#resPax','2');
+  await page.locator('.booking-optional-details > summary').click();
+  await page.fill('#resCleanFee','1000');
+  await page.fill('#resCleanCost','500');
+  await page.fill('#resCommission','1500');
+  await page.fill('#resPaymentCommission','100');
+  assert.equal(await page.evaluate(() => readExtendedBookingEconomics().financeResult.adr),2800);
+  await page.check('#resTaxEnabled');
+  await page.selectOption('#resTaxMode','exclusive');
+  await page.selectOption('#resTaxProfile','0');
+  for (const key of ['vat','accommodation']) {
+    await page.selectOption('#financeCollector_'+key,'none');
+    await page.selectOption('#financeLiability_'+key,'all');
+  }
+  assert.equal(await page.textContent('#resFinanceError'),'');
+  assert.equal(await page.evaluate(() => readExtendedBookingEconomics().financeResult.gross),13644);
+  await page.fill('#resGross','12300');
+  assert.equal(await page.inputValue('#resCommission'),'1500','manual commission changed when gross changed');
+  await page.fill('#resGross','12200');
+  await page.check('#resExtrasEnabled');
+  await page.click('[data-onclick="addBookingExtraExpense()"]');
+  await page.locator('.finance-extra-name').fill('Akaryakıt');
+  await page.locator('.finance-extra-amount').fill('300');
+  assert.equal(await page.evaluate(() => readExtendedBookingEconomics().financeResult.remaining),9800);
+  await page.selectOption('#financeCollector_vat','split');
+  await page.fill('#financeCollected_vat','400');
+  assert.equal(await page.evaluate(() => readExtendedBookingEconomics().financeResult.remaining),9800);
+  await page.selectOption('#resTaxMode','inclusive');
+  await page.fill('#resGross','13644');
+  await page.fill('#resCleanFee','1100');
+  assert.equal(await page.evaluate(() => readExtendedBookingEconomics().financeResult.netRoomRevenue),11200);
+  await assertNoHorizontalOverflow(page,'booking finance '+(mobile ? 'mobile' : 'desktop'));
+  const fit = await page.locator('#bookingModal .modal-card').evaluate(el => el.scrollWidth <= el.clientWidth + 1);
+  assert(fit,'finance modal has horizontal overflow');
+  await page.locator('#prevNetToUs').scrollIntoViewIfNeeded();
+  await page.screenshot({path:path.join(__dirname,'..','tmp',`booking-finance-${mobile ? 'mobile' : 'desktop'}.png`)});
+  // Round trip uses the persisted snapshot, not today's settings/profile.
+  const roundTrip = await page.evaluate(() => {
+    const e = readExtendedBookingEconomics();
+    const b = { id:'finance-browser',villa:'test',propertyId:appData.villas.test.id,guest:'Finance browser',checkIn:e.financeInput.checkIn,checkOut:e.financeInput.checkOut,
+      gross:e.gross,cleanFee:e.cleanFee,cleanCost:500,otaComm:e.otaComm,paymentCommission:e.paymentComm,discount:0,pax:2,channel:'AIRBNB',status:'CONFIRMED',financialDetails:JSON.parse(JSON.stringify({input:e.financeInput,result:e.financeResult})) };
+    appData.bookings.push(b); closeBookingModal();
+    appData.tenantSettings.booking_tax_profiles[0].vat.rate = 90;
+    openBookingModal(b.id);
+    return readExtendedBookingEconomics().financeResult;
+  });
+  assert.equal(roundTrip.vat,1220); assert.equal(roundTrip.remaining,9800);
+  await page.evaluate(() => { closeBookingModal(); appData.bookings = appData.bookings.filter(b => b.id !== 'finance-browser'); });
+}
+
 async function main() {
   const executablePath = findChrome();
   if (!executablePath) throw new Error(`Chrome/Edge bulunamadı. Denenen yollar: ${chromeCandidates().join(', ')}`);
@@ -87,6 +147,7 @@ async function main() {
   const passed = [];
   try {
     await withPage(browser, baseUrl, 'owner', { width: 1280, height: 900 }, async page => {
+      await assertBookingFinance(page,false); passed.push('15. rezervasyon finansı: vergi, gider, manuel komisyon ve kayıt turu');
       // Bu kapi bellek ici fiksturde EKRANLARIN acildigini olcer; is akisinin
       // kendisini (yazma, Z/M, kapanis) olcmez. Uctan uca tur ayri betiktir:
       // scripts/a5_e2e_flow_tour.js (test projesi). Etiketler bunu soyler (L-145).
@@ -216,6 +277,7 @@ async function main() {
     });
 
     await withPage(browser, baseUrl, 'owner', { width: 390, height: 844 }, async page => {
+      await assertBookingFinance(page,true); passed.push('16. rezervasyon finansı 390 px mobil görünüm');
       // L-147b/c: ust cubuk telefonda ekranin ucte birini gecmez; pencere
       // acikken yuzen dugme pencere dugmelerini ortmez.
       const header = await page.evaluate(() => document.querySelector('.app-header').getBoundingClientRect().height);
