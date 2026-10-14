@@ -13,6 +13,7 @@
 // L-182 (M12): Mesaj ayristirici tarih, ad ve kaporayi okumuyordu; kapora odeme defterine yazilir.
 // L-183 (M13): Temizlik planlaninca mulk kendiliginden "temizlik bekliyor", yapilinca hazir.
 // L-191 (M21): Ara / Komut ilk 30 rezervasyonu tariyordu; misafir, talep, ekran, kanal yoktu.
+// L-192 (M22): Bildirim merkezine satir ureten kod yoktu; olaylar gercek veriden turetilir (phase93).
 // L-193 (M23): Defterdeki "Temizlik" sutunu maliyet saniliyordu; misafirden alinan gelir oldugu yazilir.
 // L-184..L-190 (M14-M20): kapora, kar marji hedefi, talep tarihi, mulk net kari, reklam tablosu/metrik/gunluk butce, sablon ekrani, bosluk gecesi.
 const fs = require('fs');
@@ -566,6 +567,81 @@ async function temizlikSutunuDavranisi() {
   check(/Misafirden Temizlik Ücreti/.test(csv) && /MALİYETİ bu dosyada yoktur/.test(csv), 'L-193c Yayinlanan sablon yeni basligi tasir; aciklama sayfasi maliyetin bu dosyada olmadigini yazar');
 }
 
+// L-192 (M22) — Bildirim merkezinin kaynagi: gercek veriden, role gore.
+async function bildirimDavranisi() {
+  const NF = require('./notification_feed.js');
+  const bugun = '2026-10-14';
+  const temel = {
+    today: bugun, currentUserId: 'u-sales',
+    villas: { zeytin: { name: 'Villa Zeytin' } },
+    members: [
+      { user_id: 'u-yeni', full_name: 'Ayşe Yeni', email: 'ayse@x.test', role: 'manager', joined_at: '2026-10-10T08:00:00Z' },
+      { user_id: 'u-eski', full_name: 'Eski Üye', role: 'sales', joined_at: '2026-08-01T08:00:00Z' },
+      { user_id: 'u-ben', full_name: 'Ben', role: 'owner', joined_at: '2026-10-12T08:00:00Z', is_self: true }],
+    cleaningTasks: [
+      { id: 'c1', villa: 'zeytin', date: '2026-10-13', workflowState: 'AWAITING_INSPECTION' },
+      { id: 'c2', villa: 'zeytin', date: '2026-10-13', status: 'DONE' }],
+    maintenance: [
+      { id: 'm1', title: 'Kombi', villa: 'zeytin', created_at: '2026-10-12T10:00:00Z', status: 'OPEN', priority: 'P1' },
+      { id: 'm2', title: 'Eski', villa: 'zeytin', created_at: '2026-09-01T10:00:00Z', status: 'OPEN' },
+      { id: 'm3', title: 'Kapali', villa: 'zeytin', created_at: '2026-10-13T10:00:00Z', status: 'COMPLETED' }],
+    isTicketOpen: t => !['RESOLVED', 'COMPLETED', 'CANCELLED'].includes(t.status),
+    closedPeriods: [], previousMonthHasRecords: true,
+    followUps: [
+      { id: 'l1', guestName: 'Onur', nextFollowUpAt: '2026-10-13T09:00:00Z', assignedTo: 'u-sales' },
+      { id: 'l2', guestName: 'Başkası', nextFollowUpAt: '2026-10-14T09:00:00Z', assignedTo: 'u-diger' },
+      { id: 'l3', guestName: 'Atanmamış', nextFollowUpAt: '2026-10-14T09:00:00Z' }],
+    gapNights: [
+      { villaKey: 'zeytin', villaName: 'Villa Zeytin', checkIn: '2026-10-20', checkOut: '2026-10-22', nights: 2, regularPrice: 30000 },
+      { villaKey: 'zeytin', villaName: 'Villa Zeytin', checkIn: '2026-10-25', checkOut: '2026-10-26', nights: 1, regularPrice: null },
+      { villaKey: 'zeytin', villaName: 'Villa Zeytin', checkIn: '2026-12-20', checkOut: '2026-12-22', nights: 2, regularPrice: 30000 }]
+  };
+  const tur = (liste, t) => liste.filter(e => e.event_key.startsWith(t + ':'));
+  const sahip = NF.deriveNotifications({ ...temel, role: 'owner' });
+
+  check(tur(sahip, 'member_joined').length === 1 && /Ayşe Yeni/.test(tur(sahip, 'member_joined')[0].title),
+    'L-192a Son 14 gunde katilan uye bildirilir; eski uye ve kendisi bildirilmez');
+  check(tur(sahip, 'cleaning_inspection').length === 1 && sahip.find(e => e.event_key === 'cleaning_inspection:c1'),
+    'L-192b Yalniz M kontrolu bekleyen temizlik bildirilir');
+  const ariza = tur(sahip, 'maintenance_open');
+  check(ariza.length === 1 && ariza[0].event_key === 'maintenance_open:m1' && ariza[0].severity === 'CRITICAL',
+    'L-192c Son 7 gunun acik arizasi bildirilir (P1 kritik); eski ve kapali ariza bildirilmez');
+  check(tur(sahip, 'period_unclosed').length === 1 && tur(sahip, 'period_unclosed')[0].event_key === 'period_unclosed:2026-09',
+    'L-192d Kayit olan ve kapanmamis gecen ay bildirilir');
+  check(tur(NF.deriveNotifications({ ...temel, role: 'owner', closedPeriods: [{ year: 2026, month: 9, status: 'CLOSED' }] }), 'period_unclosed').length === 0
+    && tur(NF.deriveNotifications({ ...temel, role: 'owner', previousMonthHasRecords: false }), 'period_unclosed').length === 0,
+    'L-192e Kapanmis ya da kayitsiz ay bildirilmez');
+  const firsat = tur(sahip, 'revenue_opportunity');
+  check(firsat.length === 2 && /₺30\.000/.test(firsat.find(e => e.event_key.includes('2026-10-20')).message)
+    && /Liste fiyatı girilmemiş/.test(firsat.find(e => e.event_key.includes('2026-10-25')).message),
+    'L-192f Kazanc firsati: 30 gun icindeki gercek bosluk; fiyat yoksa tutar uydurulmaz');
+  check(sahip[0].severity === 'CRITICAL', 'L-192g Kritik bildirim en ustte');
+
+  const satis = NF.deriveNotifications({ ...temel, role: 'sales' });
+  check(tur(satis, 'lead_followup').map(e => e.event_key).sort().join() === 'lead_followup:l1:2026-10-13,lead_followup:l3:2026-10-14'
+    && tur(satis, 'lead_followup').find(e => e.event_key.includes('l1')).severity === 'WARNING',
+    'L-192h Satis rolu kendine atanan ve atanmamis takipleri gorur; gecikmis takip uyari');
+  check(!tur(satis, 'member_joined').length && !tur(satis, 'cleaning_inspection').length && !tur(satis, 'period_unclosed').length && tur(satis, 'revenue_opportunity').length === 2,
+    'L-192i Satis rolu yonetim bildirimlerini almaz, kazanc firsatini alir');
+  const izleyici = NF.deriveNotifications({ ...temel, role: 'viewer' });
+  check(!tur(izleyici, 'revenue_opportunity').length && tur(izleyici, 'maintenance_open').length === 1 && tur(izleyici, 'lead_followup').length === 3,
+    'L-192j Izleyici okur (ariza, takip) ama yazma gerektiren firsat bildirimini almaz');
+  check(NF.deriveNotifications({ ...temel, role: 'staff' }).length === 0 && NF.typesForRole('staff').length === 0,
+    'L-192k Personel (staff) bildirim almaz');
+  check(sahip.every(e => /^[a-z_]{3,40}:[A-Za-z0-9_:.-]{1,200}$/.test(e.event_key) && ['TEAM', 'OPERATIONS', 'FINANCE', 'SALES', 'PRICING'].includes(e.domain)
+    && (!e.deep_link || /^[a-z]+(:[A-Za-z0-9_.-]{1,80}){0,2}$/.test(e.deep_link))),
+    'L-192l Uretilen her olay phase93 dogrulamasindan gecer');
+  check(NF.typesForRole('owner').length === 6 && NF.typesForRole('sales').length === 3,
+    'L-192m Bos merkezde rolun alacagi bildirim turleri aciklanir');
+
+  const app = read('app.js');
+  const sync = functionBody(app, 'async function syncNotificationFeed(');
+  check(/sync_my_notifications/.test(sync) && /notificationFeedPersisted = false/.test(sync), 'L-192n Istemci phase93 ile esler; goc yoksa bunu soyler');
+  const drawer = functionBody(app, 'function renderUserNotificationsDrawer(');
+  check(/Bildirimler neye göre gelir/.test(drawer) && !/Yeni bildirim bulunmuyor/.test(drawer), 'L-192o Bos cekmece ne zaman bildirim gelecegini anlatir');
+  check(/notification_feed\.js\?v=/.test(read('index.html')), 'L-192p Modul sayfaya yuklenir');
+}
+
 async function main() {
 try {
   const html = read('index.html');
@@ -598,6 +674,7 @@ try {
   await cokluMulkTalepDavranisi();
   await aramaDavranisi();
   await temizlikSutunuDavranisi();
+  await bildirimDavranisi();
 } catch (error) {
   failed++;
   console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

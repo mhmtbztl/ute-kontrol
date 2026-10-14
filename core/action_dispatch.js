@@ -68,7 +68,7 @@
     'openInviteMemberModal', 'openQuickLeadCapture', 'syncGoalProfitFromMargin', 'syncGoalMarginFromProfit', 'refreshPropertyReport', 'saveOperationalPerson', 'editOperationalPerson', 'cancelOperationalPersonEdit', 'toggleOperationalPersonActive', 'openMaintModal', 'openChatGptQuestionModal', 'openQuickBookingModal',
     'openMonthCloseModal', 'openMonthReopenModal', 'openLeadWhatsApp', 'inspectCleaningExecution',
     'openNewCleaningTaskModal', 'openCopyPreviousExpensesPanel', 'openPropertyModal', 'openPropertyOtaManager', 'openResetModal',
-    'openSettingsSection', 'openTabFromDeepLink', 'openWhatsAppModal', 'parseWhatsAppMessage', 'payAllPendingCleaning', 'payCleanerDebt', 'printCurrentReport', 'askChatGptFromCurrentReport',
+    'openSettingsSection', 'openTabFromDeepLink', 'openUserNotification', 'openWhatsAppModal', 'parseWhatsAppMessage', 'payAllPendingCleaning', 'payCleanerDebt', 'printCurrentReport', 'askChatGptFromCurrentReport',
     'promptEditTaskAmount', 'refreshExecutiveDashboardSnapshot', 'renderExpensesTable', 'renderHousekeepingTab', 'renderManageBookingsTable',
     'renderManageLeadsTable', 'recalculatePricingTarget', 'resetGuestDirectoryDateRange',
     'resetImportPreview', 'resyncTenantData', 'resolveMaintenanceFromOperations', 'runPageAction', 'generateExpenseFromTemplate', 'deleteExpenseTemplate',

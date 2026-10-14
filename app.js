@@ -15796,6 +15796,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
       invalidateExecutiveSnapshotCache();
       updateAllVillaDropdowns();
       renderAll();
+      syncNotificationFeed().catch(err => console.error('Bildirimler eslenemedi:', err));
       return;
     } catch (err) {
       console.error('Cloud data fetch error:', err);
@@ -17938,7 +17939,10 @@ function toggleNotificationDrawer() {
   if (!drawer) return;
   const isHidden = drawer.style.display === 'none';
   drawer.style.display = isHidden ? 'block' : 'none';
-  if (isHidden) renderUserNotificationsDrawer();
+  if (isHidden) {
+    renderUserNotificationsDrawer();
+    syncNotificationFeed().catch(err => console.error('Bildirimler yenilenemedi:', err));
+  }
 }
 
 function renderUserNotificationsBadge() {
@@ -17957,30 +17961,131 @@ function renderUserNotificationsBadge() {
   }
 }
 
+// Bildirim merkezinin kaynagi (L-192, kullanici M22). Tablo okunuyor ve
+// "okundu" yaziliyordu ama satir URETEN kod yoktu; merkez her hesapta bostu.
+// Olaylar core/notification_feed.js'te, kullanicinin okuyabildigi gercek
+// veriden turetilir; phase93 sync_my_notifications yalniz kendi satirlarini
+// yazar ve biten olayi RESOLVED yapar. Goc yoksa liste yine gosterilir ama
+// okundu durumu kaydedilemez ve bu acikca soylenir (dagitim sirasi, AGENTS.md).
+function buildNotificationFeedInput() {
+  const data = (typeof appData !== 'undefined' && appData) ? appData : {};
+  const today = getTodayStr();
+  const api = getOperationsApi();
+  const tasks = api ? api.attachExecutions(data.cleaningTasks || [], data.cleaningExecutions || []) : [];
+  const prev = new Date(today.slice(0, 7) + '-01T00:00:00Z');
+  prev.setUTCMonth(prev.getUTCMonth() - 1);
+  const prevKey = prev.toISOString().slice(0, 7);
+  const prevStart = prevKey + '-01';
+  const prevEnd = today.slice(0, 7) + '-01';
+  const previousMonthHasRecords = (data.bookings || []).some(b => b.status !== 'CANCELLED' && String(b.checkIn || '') < prevEnd && String(b.checkOut || b.checkIn || '') > prevStart)
+    || (data.expenses || []).some(e => String(e.date || '').slice(0, 7) === prevKey);
+  const role = activeTenant?.role || '';
+  return {
+    role,
+    today,
+    currentUserId: activeSaaSUser?.id || '',
+    villas: data.villas || {},
+    members: data.salesMembers || [],
+    cleaningTasks: tasks,
+    maintenance: data.maintenance || [],
+    isTicketOpen: isMaintenanceTicketOpen,
+    closedPeriods: data.closedPeriods || [],
+    previousMonthHasRecords,
+    followUps: canReadSalesRole(role) ? getLeadSalesView().followUpsToday : [],
+    followUpDate: istanbulDateKey,
+    gapNights: canWriteSalesRole(role) ? detectGapNights() : []
+  };
+}
+
+let notificationFeedPersisted = true;
+
+async function syncNotificationFeed() {
+  if (typeof NotificationFeed === 'undefined' || typeof appData === 'undefined' || !appData) return;
+  const events = NotificationFeed.deriveNotifications(buildNotificationFeedInput());
+  const tenantId = getActiveTenantId();
+  const local = () => events.map(e => ({ ...e, id: null, status: 'UNREAD', created_at: e.at }));
+  if (!isCloudTenant(tenantId)) {
+    appData.userNotifications = local();
+  } else {
+    const { data, error } = await supabaseClient.rpc('sync_my_notifications', {
+      p_tenant_id: tenantId,
+      p_events: events.map(({ at, ...e }) => e)
+    });
+    if (error) {
+      // PGRST202 / 42883: phase93 uygulanmamis. Liste yine gercek veriden
+      // gosterilir; okundu durumu kaydedilemez ve cekmece bunu soyler.
+      if (!/PGRST202|42883/.test(String(error.code || ''))) console.error('Bildirimler eslenemedi:', error);
+      notificationFeedPersisted = false;
+      appData.userNotifications = local();
+    } else {
+      notificationFeedPersisted = true;
+      appData.userNotifications = data || [];
+    }
+  }
+  renderUserNotificationsBadge();
+  const drawer = document.getElementById('notificationDrawer');
+  if (drawer && drawer.style.display !== 'none') renderUserNotificationsDrawer();
+}
+
+function notificationTypesHelpHtml() {
+  const types = NotificationFeed.typesForRole(activeTenant?.role || '');
+  if (!types.length) return '<div style="color: #94A3B8; font-size: 11px;">Rolünüz için bildirim üreten olay yok; işleriniz Saha işlerim ekranındadır.</div>';
+  return `<ul style="margin: 4px 0 0; padding-left: 16px; color: #CBD5E1; font-size: 11px; display: grid; gap: 4px;">${types.map(t => `<li><strong>${escapeHtml(t.label)}</strong> — ${escapeHtml(t.detail)}</li>`).join('')}</ul>`;
+}
+
 function renderUserNotificationsDrawer() {
   if (typeof document === 'undefined') return;
   const list = document.getElementById('notificationList');
   if (!list) return;
 
-  const notes = (typeof appData !== 'undefined' && appData.userNotifications) || [];
+  const notes = ((typeof appData !== 'undefined' && appData.userNotifications) || []).filter(n => n.status !== 'RESOLVED');
+  const help = typeof NotificationFeed === 'undefined' ? '' : `
+    <details style="padding: 8px 12px; font-size: 11px; color: #94A3B8;"${notes.length ? '' : ' open'}>
+      <summary style="cursor: pointer;">Bildirimler neye göre gelir?</summary>
+      ${notificationTypesHelpHtml()}
+      <div style="margin-top: 6px;">Bildirimler kayıtlarınızdan hesaplanır; olay bittiğinde (ör. temizlik onaylandı, ay kapandı) listeden kendiliğinden kalkar.</div>
+    </details>`;
+  const warn = notificationFeedPersisted ? '' : '<div style="padding: 8px 12px; color: #FCD34D; font-size: 11px;">Bildirim kaydı için veritabanı göçü (phase93) henüz uygulanmadı: liste gösteriliyor ama okundu durumu saklanamıyor.</div>';
   if (notes.length === 0) {
-    list.innerHTML = `<div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px;">Yeni bildirim bulunmuyor.</div>`;
+    list.innerHTML = `${warn}<div style="text-align: center; padding: 16px 12px 4px; color: var(--text-muted); font-size: 12px;">Şu an bildirim yok.</div>${help}`;
     return;
   }
 
-  list.innerHTML = notes.map(n => `
-    <div style="padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 12px; display: flex; flex-direction: column; gap: 4px;">
-      <div style="display: flex; justify-content: space-between; align-items: center;">
-        <strong style="color: ${n.severity === 'CRITICAL' ? '#F87171' : '#FCD34D'};">${escapeHtml(n.title || '')}</strong>
-        <span style="font-size: 10px; color: #94A3B8;">${escapeHtml(n.status || '')}</span>
-      </div>
+  const color = { CRITICAL: '#F87171', WARNING: '#FCD34D', INFO: '#93C5FD' };
+  list.innerHTML = warn + notes.map(n => `
+    <div style="padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 12px; display: flex; flex-direction: column; gap: 4px;${n.status === 'UNREAD' ? '' : ' opacity: .7;'}">
+      <strong style="color: ${color[n.severity] || '#FCD34D'};">${n.status === 'UNREAD' ? '● ' : ''}${escapeHtml(n.title || '')}</strong>
       <div style="color: #CBD5E1; font-size: 11px;">${escapeHtml(n.message || '')}</div>
       <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 4px;">
-        ${n.status === 'ACKNOWLEDGED' || n.status === 'RESOLVED' ? '' :
-          `<button class="btn btn-secondary btn-sm" data-onclick="confirmUserNotification(decodeURIComponent('${encodeActionArg(String(n.id))}'))" style="font-size: 9px; padding: 1px 5px;">Onayla</button>`}
+        ${n.id && n.status === 'UNREAD' ? `<button class="btn btn-secondary btn-sm" data-onclick="confirmUserNotification(decodeURIComponent('${encodeActionArg(String(n.id))}'))" style="font-size: 9px; padding: 1px 5px;">Okundu</button>` : ''}
+        ${n.deep_link ? `<button class="btn btn-primary btn-sm" data-onclick="openUserNotification(decodeURIComponent('${encodeActionArg(String(n.event_key || ''))}'))" style="font-size: 9px; padding: 1px 5px;">Git ›</button>` : ''}
       </div>
     </div>
-  `).join('');
+  `).join('') + help;
+}
+
+// Bildirimin hedefine gider; kayitli bildirim okundu olur.
+async function openUserNotification(eventKey) {
+  const notes = (typeof appData !== 'undefined' && appData.userNotifications) || [];
+  const n = notes.find(x => x.event_key === eventKey);
+  if (!n) return;
+  const drawer = document.getElementById('notificationDrawer');
+  if (drawer) drawer.style.display = 'none';
+  const [kind, arg] = String(n.deep_link || '').split(':');
+  if (kind === 'operations') { operationsViewState = arg || 'cleaning'; switchTab('operations'); }
+  else if (kind === 'settings') openSettingsSection(arg || 'business');
+  else if (kind === 'lead') { switchTab('leads'); openLeadModal(arg); }
+  else if (kind) switchTab(kind);
+  if (n.id && n.status === 'UNREAD') {
+    try {
+      await markUserNotificationsRead([n.id]);
+      n.status = 'READ';
+      n.read_at = new Date().toISOString();
+      renderUserNotificationsBadge();
+    } catch (err) {
+      console.error('Bildirim okundu isaretlenemedi:', err);
+    }
+  }
 }
 
 /**
