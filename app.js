@@ -6761,7 +6761,7 @@ function downloadSampleTemplate(templateType) {
         'Brüt Tutar (TL)': 72000,
         'Kanal': 'WHATSAPP',
         'OTA Komisyonu (TL)': 0,
-        'Temizlik Ücreti (TL)': 1500,
+        'Misafirden Temizlik Ücreti (TL)': 1500,
         'Kişi Sayısı': 8,
         'Durum': 'CHECKED_OUT'
       },
@@ -6774,7 +6774,7 @@ function downloadSampleTemplate(templateType) {
         'Brüt Tutar (TL)': 56000,
         'Kanal': 'AIRBNB',
         'OTA Komisyonu (TL)': 8400,
-        'Temizlik Ücreti (TL)': 1200,
+        'Misafirden Temizlik Ücreti (TL)': 1200,
         'Kişi Sayısı': 6,
         'Durum': 'CHECKED_OUT'
       }
@@ -15796,6 +15796,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
       invalidateExecutiveSnapshotCache();
       updateAllVillaDropdowns();
       renderAll();
+      syncNotificationFeed().catch(err => console.error('Bildirimler eslenemedi:', err));
       return;
     } catch (err) {
       console.error('Cloud data fetch error:', err);
@@ -17825,88 +17826,89 @@ function closeCommandPalette() {
 
 function handleCommandPaletteKeydown(e) {
   if (e.key === 'Escape') closeCommandPalette();
+  if (e.key === 'Enter') {
+    const first = document.querySelector('#commandPaletteResults [data-palette-index]');
+    if (first) { e.preventDefault(); first.click(); }
+  }
+}
+
+// Ara / Komut (L-191, kullanici M21). Dizin ve eslesme core/command_search.js'te
+// (Node'da test edilir); burada yalniz hedef tarifi calistirilir. Eski govde
+// ilk 30 rezervasyonu tariyordu; misafir, talep, ekran ve kanal hic yoktu.
+function runCommandPaletteTarget(target) {
+  if (!target) return;
+  closeCommandPalette();
+  if (target.kind === 'tab') {
+    if (target.tab === 'operations' && target.opsView) operationsViewState = target.opsView;
+    switchTab(target.tab);
+  } else if (target.kind === 'settings') {
+    openSettingsSection(target.section);
+  } else if (target.kind === 'villa') {
+    currentFilter.villa = target.key;
+    const select = document.getElementById('globalVillaFilter');
+    if (select) select.value = target.key;
+    handleFilterChange();
+    switchTab('properties');
+  } else if (target.kind === 'booking') {
+    openBookingModal(target.id);
+  } else if (target.kind === 'guest') {
+    switchTab('guests');
+    openGuestProfileModal(target.id);
+  } else if (target.kind === 'lead') {
+    switchTab('leads');
+    openLeadModal(target.id);
+  } else if (target.kind === 'command') {
+    const komutlar = {
+      newBooking: () => openBookingModal(),
+      newLead: () => openQuickLeadCapture(),
+      newCleaning: () => openNewCleaningTaskModal(),
+      newMaintenance: () => openMaintModal(),
+      newExpense: () => openExpenseModal(),
+      goals: () => openGoalsModal(),
+      whatsapp: () => openWhatsAppModal('parser')
+    };
+    if (komutlar[target.name]) komutlar[target.name]();
+  }
+}
+
+function getCommandPaletteEntries() {
+  const data = (typeof appData !== 'undefined' && appData) ? appData : {};
+  return CommandSearch.buildEntries({
+    role: activeTenant?.role || '',
+    villas: data.villas,
+    bookings: data.bookings,
+    guests: data.guests,
+    leads: data.leads,
+    channels: typeof getBookingChannelCatalog === 'function' ? getBookingChannelCatalog() : []
+  });
 }
 
 function handleCommandPaletteSearch(query) {
   const container = document.getElementById('commandPaletteResults');
   if (!container) return;
+  const groups = CommandSearch.search(getCommandPaletteEntries(), query);
 
-  const q = (query || '').toLowerCase().trim();
-  const defaultActions = [
-    { icon: '📅', title: 'Yeni Rezervasyon Girişi', action: () => { closeCommandPalette(); openBookingModal(); } },
-    { icon: '🧹', title: 'Temizlik Görevi Ekle', action: () => { closeCommandPalette(); openNewCleaningTaskModal(); } },
-    { icon: '🛠️', title: 'Arıza / Bakım Bildir', action: () => { closeCommandPalette(); openMaintModal(); } },
-    { icon: '💸', title: 'Yeni Gider / Harcama Ekle', action: () => { closeCommandPalette(); openExpenseModal(); } },
-    { icon: '🎯', title: 'Aylık Hedef Belirle', action: () => { closeCommandPalette(); openGoalsModal(); } },
-    { icon: '💬', title: 'WhatsApp Mesaj Ayrıştır', action: () => { closeCommandPalette(); openWhatsAppModal('parser'); } },
-    { icon: '💰', title: 'Finansal Performans Portalı', action: () => { closeCommandPalette(); switchTab('finance'); } }
-  ];
-
-  let items = [];
-
-  if (!q) {
-    items = defaultActions;
-  } else {
-    // Search actions
-    defaultActions.forEach(act => {
-      if (act.title.toLowerCase().includes(q)) items.push(act);
-    });
-
-    // Search properties
-    if (typeof appData !== 'undefined' && appData.villas) {
-      Object.keys(appData.villas).forEach(k => {
-        const v = appData.villas[k];
-        if (v.name.toLowerCase().includes(q) || k.toLowerCase().includes(q)) {
-          items.push({
-            icon: '🏡',
-            title: `Mülk: ${v.name}${v.capacity ? ` (${v.capacity})` : ''}`,
-            action: () => {
-              closeCommandPalette();
-              currentFilter.villa = k;
-              const select = document.getElementById('globalVillaFilter');
-              if (select) select.value = k;
-              handleFilterChange();
-              switchTab('properties');
-            }
-          });
-        }
-      });
-    }
-
-    // Search bookings
-    if (typeof appData !== 'undefined' && appData.bookings) {
-      appData.bookings.slice(0, 30).forEach(b => {
-        if ((b.guest && b.guest.toLowerCase().includes(q)) || (b.code && b.code.toLowerCase().includes(q))) {
-          items.push({
-            icon: '👤',
-            title: `Rezervasyon: ${b.guest} (${b.checkIn} - ${b.checkOut})`,
-            action: () => {
-              closeCommandPalette();
-              openBookingModal(b.id);
-            }
-          });
-        }
-      });
-    }
-  }
-
-  if (items.length === 0) {
-    container.innerHTML = `<div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px;">"${escapeHtml(query)}" ile eşleşen komut veya kayıt bulunamadı.</div>`;
+  if (!groups.length) {
+    container.innerHTML = `<div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px;">"${escapeHtml(query)}" ile eşleşen ekran, kayıt veya komut bulunamadı. Misafir adı, telefon, rezervasyon kodu, mülk ya da ekran adı (ör. "temizlik", "airbnb") yazabilirsiniz.</div>`;
     return;
   }
 
-  container.innerHTML = items.map((it, idx) => `
+  const items = [];
+  container.innerHTML = groups.map(group => {
+    const rows = group.items.map(it => {
+      const idx = items.push(it) - 1;
+      return `
     <div class="palette-item" data-palette-index="${idx}" role="button" tabindex="0">
       <span style="font-size: 16px;">${escapeHtml(it.icon)}</span>
-      <span style="flex: 1; font-weight: 600;">${escapeHtml(it.title)}</span>
+      <span style="flex: 1; min-width: 0;"><span style="font-weight: 600;">${escapeHtml(it.title)}</span>${it.subtitle ? `<span style="display: block; font-size: 11px; color: #94A3B8;">${escapeHtml(it.subtitle)}</span>` : ''}</span>
       <span style="font-size: 11px; color: #94A3B8;">Git ›</span>
-    </div>
-  `).join('');
+    </div>`;
+    }).join('');
+    const more = group.more ? `<div style="font-size: 11px; color: #94A3B8; padding: 2px 12px 6px;">+${group.more} sonuç daha — aramayı daraltın</div>` : '';
+    return `<div class="palette-group-title" style="font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #94A3B8; padding: 8px 12px 4px;">${escapeHtml(group.group)}</div>${rows}${more}`;
+  }).join('');
   container.querySelectorAll('[data-palette-index]').forEach(element => {
-    const activate = () => {
-      const selected = items[Number(element.dataset.paletteIndex)];
-      if (selected && typeof selected.action === 'function') selected.action();
-    };
+    const activate = () => runCommandPaletteTarget(items[Number(element.dataset.paletteIndex)]?.target);
     element.addEventListener('click', activate);
     element.addEventListener('keydown', event => {
       if (event.key === 'Enter' || event.key === ' ') {
@@ -17916,6 +17918,7 @@ function handleCommandPaletteSearch(query) {
     });
   });
 }
+
 
 // Global shortcut listener for Ctrl+K
 if (typeof document !== 'undefined') {
@@ -17936,7 +17939,10 @@ function toggleNotificationDrawer() {
   if (!drawer) return;
   const isHidden = drawer.style.display === 'none';
   drawer.style.display = isHidden ? 'block' : 'none';
-  if (isHidden) renderUserNotificationsDrawer();
+  if (isHidden) {
+    renderUserNotificationsDrawer();
+    syncNotificationFeed().catch(err => console.error('Bildirimler yenilenemedi:', err));
+  }
 }
 
 function renderUserNotificationsBadge() {
@@ -17955,30 +17961,131 @@ function renderUserNotificationsBadge() {
   }
 }
 
+// Bildirim merkezinin kaynagi (L-192, kullanici M22). Tablo okunuyor ve
+// "okundu" yaziliyordu ama satir URETEN kod yoktu; merkez her hesapta bostu.
+// Olaylar core/notification_feed.js'te, kullanicinin okuyabildigi gercek
+// veriden turetilir; phase93 sync_my_notifications yalniz kendi satirlarini
+// yazar ve biten olayi RESOLVED yapar. Goc yoksa liste yine gosterilir ama
+// okundu durumu kaydedilemez ve bu acikca soylenir (dagitim sirasi, AGENTS.md).
+function buildNotificationFeedInput() {
+  const data = (typeof appData !== 'undefined' && appData) ? appData : {};
+  const today = getTodayStr();
+  const api = getOperationsApi();
+  const tasks = api ? api.attachExecutions(data.cleaningTasks || [], data.cleaningExecutions || []) : [];
+  const prev = new Date(today.slice(0, 7) + '-01T00:00:00Z');
+  prev.setUTCMonth(prev.getUTCMonth() - 1);
+  const prevKey = prev.toISOString().slice(0, 7);
+  const prevStart = prevKey + '-01';
+  const prevEnd = today.slice(0, 7) + '-01';
+  const previousMonthHasRecords = (data.bookings || []).some(b => b.status !== 'CANCELLED' && String(b.checkIn || '') < prevEnd && String(b.checkOut || b.checkIn || '') > prevStart)
+    || (data.expenses || []).some(e => String(e.date || '').slice(0, 7) === prevKey);
+  const role = activeTenant?.role || '';
+  return {
+    role,
+    today,
+    currentUserId: activeSaaSUser?.id || '',
+    villas: data.villas || {},
+    members: data.salesMembers || [],
+    cleaningTasks: tasks,
+    maintenance: data.maintenance || [],
+    isTicketOpen: isMaintenanceTicketOpen,
+    closedPeriods: data.closedPeriods || [],
+    previousMonthHasRecords,
+    followUps: canReadSalesRole(role) ? getLeadSalesView().followUpsToday : [],
+    followUpDate: istanbulDateKey,
+    gapNights: canWriteSalesRole(role) ? detectGapNights() : []
+  };
+}
+
+let notificationFeedPersisted = true;
+
+async function syncNotificationFeed() {
+  if (typeof NotificationFeed === 'undefined' || typeof appData === 'undefined' || !appData) return;
+  const events = NotificationFeed.deriveNotifications(buildNotificationFeedInput());
+  const tenantId = getActiveTenantId();
+  const local = () => events.map(e => ({ ...e, id: null, status: 'UNREAD', created_at: e.at }));
+  if (!isCloudTenant(tenantId)) {
+    appData.userNotifications = local();
+  } else {
+    const { data, error } = await supabaseClient.rpc('sync_my_notifications', {
+      p_tenant_id: tenantId,
+      p_events: events.map(({ at, ...e }) => e)
+    });
+    if (error) {
+      // PGRST202 / 42883: phase93 uygulanmamis. Liste yine gercek veriden
+      // gosterilir; okundu durumu kaydedilemez ve cekmece bunu soyler.
+      if (!/PGRST202|42883/.test(String(error.code || ''))) console.error('Bildirimler eslenemedi:', error);
+      notificationFeedPersisted = false;
+      appData.userNotifications = local();
+    } else {
+      notificationFeedPersisted = true;
+      appData.userNotifications = data || [];
+    }
+  }
+  renderUserNotificationsBadge();
+  const drawer = document.getElementById('notificationDrawer');
+  if (drawer && drawer.style.display !== 'none') renderUserNotificationsDrawer();
+}
+
+function notificationTypesHelpHtml() {
+  const types = NotificationFeed.typesForRole(activeTenant?.role || '');
+  if (!types.length) return '<div style="color: #94A3B8; font-size: 11px;">Rolünüz için bildirim üreten olay yok; işleriniz Saha işlerim ekranındadır.</div>';
+  return `<ul style="margin: 4px 0 0; padding-left: 16px; color: #CBD5E1; font-size: 11px; display: grid; gap: 4px;">${types.map(t => `<li><strong>${escapeHtml(t.label)}</strong> — ${escapeHtml(t.detail)}</li>`).join('')}</ul>`;
+}
+
 function renderUserNotificationsDrawer() {
   if (typeof document === 'undefined') return;
   const list = document.getElementById('notificationList');
   if (!list) return;
 
-  const notes = (typeof appData !== 'undefined' && appData.userNotifications) || [];
+  const notes = ((typeof appData !== 'undefined' && appData.userNotifications) || []).filter(n => n.status !== 'RESOLVED');
+  const help = typeof NotificationFeed === 'undefined' ? '' : `
+    <details style="padding: 8px 12px; font-size: 11px; color: #94A3B8;"${notes.length ? '' : ' open'}>
+      <summary style="cursor: pointer;">Bildirimler neye göre gelir?</summary>
+      ${notificationTypesHelpHtml()}
+      <div style="margin-top: 6px;">Bildirimler kayıtlarınızdan hesaplanır; olay bittiğinde (ör. temizlik onaylandı, ay kapandı) listeden kendiliğinden kalkar.</div>
+    </details>`;
+  const warn = notificationFeedPersisted ? '' : '<div style="padding: 8px 12px; color: #FCD34D; font-size: 11px;">Bildirim kaydı için veritabanı göçü (phase93) henüz uygulanmadı: liste gösteriliyor ama okundu durumu saklanamıyor.</div>';
   if (notes.length === 0) {
-    list.innerHTML = `<div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px;">Yeni bildirim bulunmuyor.</div>`;
+    list.innerHTML = `${warn}<div style="text-align: center; padding: 16px 12px 4px; color: var(--text-muted); font-size: 12px;">Şu an bildirim yok.</div>${help}`;
     return;
   }
 
-  list.innerHTML = notes.map(n => `
-    <div style="padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 12px; display: flex; flex-direction: column; gap: 4px;">
-      <div style="display: flex; justify-content: space-between; align-items: center;">
-        <strong style="color: ${n.severity === 'CRITICAL' ? '#F87171' : '#FCD34D'};">${escapeHtml(n.title || '')}</strong>
-        <span style="font-size: 10px; color: #94A3B8;">${escapeHtml(n.status || '')}</span>
-      </div>
+  const color = { CRITICAL: '#F87171', WARNING: '#FCD34D', INFO: '#93C5FD' };
+  list.innerHTML = warn + notes.map(n => `
+    <div style="padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 12px; display: flex; flex-direction: column; gap: 4px;${n.status === 'UNREAD' ? '' : ' opacity: .7;'}">
+      <strong style="color: ${color[n.severity] || '#FCD34D'};">${n.status === 'UNREAD' ? '● ' : ''}${escapeHtml(n.title || '')}</strong>
       <div style="color: #CBD5E1; font-size: 11px;">${escapeHtml(n.message || '')}</div>
       <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 4px;">
-        ${n.status === 'ACKNOWLEDGED' || n.status === 'RESOLVED' ? '' :
-          `<button class="btn btn-secondary btn-sm" data-onclick="confirmUserNotification(decodeURIComponent('${encodeActionArg(String(n.id))}'))" style="font-size: 9px; padding: 1px 5px;">Onayla</button>`}
+        ${n.id && n.status === 'UNREAD' ? `<button class="btn btn-secondary btn-sm" data-onclick="confirmUserNotification(decodeURIComponent('${encodeActionArg(String(n.id))}'))" style="font-size: 9px; padding: 1px 5px;">Okundu</button>` : ''}
+        ${n.deep_link ? `<button class="btn btn-primary btn-sm" data-onclick="openUserNotification(decodeURIComponent('${encodeActionArg(String(n.event_key || ''))}'))" style="font-size: 9px; padding: 1px 5px;">Git ›</button>` : ''}
       </div>
     </div>
-  `).join('');
+  `).join('') + help;
+}
+
+// Bildirimin hedefine gider; kayitli bildirim okundu olur.
+async function openUserNotification(eventKey) {
+  const notes = (typeof appData !== 'undefined' && appData.userNotifications) || [];
+  const n = notes.find(x => x.event_key === eventKey);
+  if (!n) return;
+  const drawer = document.getElementById('notificationDrawer');
+  if (drawer) drawer.style.display = 'none';
+  const [kind, arg] = String(n.deep_link || '').split(':');
+  if (kind === 'operations') { operationsViewState = arg || 'cleaning'; switchTab('operations'); }
+  else if (kind === 'settings') openSettingsSection(arg || 'business');
+  else if (kind === 'lead') { switchTab('leads'); openLeadModal(arg); }
+  else if (kind) switchTab(kind);
+  if (n.id && n.status === 'UNREAD') {
+    try {
+      await markUserNotificationsRead([n.id]);
+      n.status = 'READ';
+      n.read_at = new Date().toISOString();
+      renderUserNotificationsBadge();
+    } catch (err) {
+      console.error('Bildirim okundu isaretlenemedi:', err);
+    }
+  }
 }
 
 /**

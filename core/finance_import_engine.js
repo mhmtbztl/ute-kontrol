@@ -239,7 +239,7 @@ const BASLIKLAR = {
     gross:       ['brut tutar', 'brüt tutar', 'brut tutar (tl)', 'brüt tutar (tl)', 'tutar', 'ciro', 'gross', 'fiyat', 'toplam'],
     channel:     ['kanal', 'channel', 'kaynak', 'platform'],
     otaCommission: ['ota komisyonu', 'ota komisyonu (tl)', 'komisyon', 'commission'],
-    cleaningFee: ['temizlik', 'temizlik ucreti', 'temizlik ücreti', 'temizlik ücreti (tl)', 'cleaning', 'cleanfee'],
+    cleaningFee: ['temizlik', 'temizlik ucreti', 'temizlik ücreti', 'temizlik ücreti (tl)', 'misafirden temizlik ücreti', 'misafirden temizlik ücreti (tl)', 'cleaning', 'cleanfee'],
     pax:         ['kisi', 'kişi', 'kisi sayisi', 'kişi sayısı', 'pax', 'misafir sayisi', 'misafir sayısı'],
     status:      ['durum', 'status'],
     code:        ['kod', 'rezervasyon kodu', 'code', 'booking code', 'referans'],
@@ -269,7 +269,7 @@ const BASLIKLAR = {
  */
 const SABLON_SUTUNLARI = {
   BOOKINGS: ['Villa', 'Misafir Adı', 'Giriş Tarihi', 'Çıkış Tarihi',
-    'Brüt Tutar (TL)', 'Kanal', 'OTA Komisyonu (TL)', 'Temizlik Ücreti (TL)',
+    'Brüt Tutar (TL)', 'Kanal', 'OTA Komisyonu (TL)', 'Misafirden Temizlik Ücreti (TL)',
     'Kişi Sayısı', 'Durum', 'Oda İndirimi (TL)', 'Telefon', 'Not'],
   EXPENSES: ['Tarih', 'Kategori', 'Tutar (TL)', 'Açıklama', 'Tür', 'Villa']
 };

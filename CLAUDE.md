@@ -630,6 +630,14 @@ mülkler (kullanıcı M16): `lead_interest_properties` bağ tablosu, okuma
 istemci tabloyu `fetchTenantRowsTolerant` ile okur, yazmada "phase91
 uygulanmadı" der. Canlı süit `phase91_lead_interest_live_tests` 13/13.
 Üretim doğrulaması (salt okunur): anon tablo sorgusu `401 42501`; `production:readiness` BAŞARILI, `schema_migrations` 91 mevcut. Paket: `docs/PHASE91_DEPLOY_PACKAGE.md`.
+**phase93 (`migration_phase93_notification_feed.sql`) 14 Ekim 2026'da test projesine
+uygulandı; üretim bekliyor.** Bildirim merkezini okuyan kod vardı, satır **üreten** kod
+yoktu (L-192, kullanıcı M22). Olaylar istemcide gerçek veriden türetilir
+(`core/notification_feed.js`); `sync_my_notifications` yalnız çağıranın kendi
+satırlarını yazar, biten olayı `RESOLVED` yapar. Tablo değişmedi; kişisel satırlara
+tekil indeks. Göç yokken liste yine görünür, çekmece okundu durumunun
+saklanamadığını söyler. Canlı süit `phase93_notification_feed_live_tests` 16/16
+(göçten önce kırmızı). Paket: `docs/PHASE93_DEPLOY_PACKAGE.md`.
 
 **Bir göçün uygulanıp uygulanmadığı, dosyaya bakarak anlaşılmaz.** Dosya repoda
 durur; veritabanı uygulanmamış olabilir. Doğrulamanın yolu üretime sormaktır:

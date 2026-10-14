@@ -213,6 +213,48 @@ async function main() {
       assert(written && written.full_name === 'Tarayici Usta' && written.kind === 'TECHNICIAN' && written.tenant_id === '00000000-0000-4000-8000-000000000001' && !dialogs.length,
         `Saha ekibi kaydi yazilmadi: ${JSON.stringify({ personWrites, dialogs })}`);
       passed.push('15. yeni talep hızlı forma gider; saha ekibine usta eklenir');
+      // L-191 (M21): Ara / Komut ekrana ve alt gorunume goturur, kanal kelimesini tanir.
+      await page.evaluate(() => openCommandPalette());
+      await page.fill('#commandPaletteInput', 'arıza');
+      await page.press('#commandPaletteInput', 'Enter');
+      const paletteState = await page.evaluate(() => ({
+        tab: document.getElementById('tab-operations').classList.contains('active'),
+        view: operationsViewState,
+        closed: getComputedStyle(document.getElementById('commandPaletteModal')).display === 'none'
+      }));
+      assert(paletteState.tab && paletteState.view === 'maintenance' && paletteState.closed, `Arama arizaya gitmedi: ${JSON.stringify(paletteState)}`);
+      await page.evaluate(() => openCommandPalette());
+      await page.fill('#commandPaletteInput', 'airbnb');
+      const airbnbText = await page.textContent('#commandPaletteResults');
+      assert(/Kanallar ve Pazarlama/.test(airbnbText), `"airbnb" kanal ekranini bulmadi: ${airbnbText}`);
+      await page.evaluate(() => closeCommandPalette());
+      passed.push('16. Ara / Komut ekrana ve alt görünüme götürür; "airbnb" kanal ekranını bulur');
+      // L-192 (M22): zil gercek olaydan bildirim gosterir, ne zaman bildirim
+      // gelecegini anlatir ve "Git" kaydin ekranina goturur.
+      const syncPayloads = [];
+      await page.route('**/rest/v1/rpc/sync_my_notifications', async route => {
+        const body = route.request().postDataJSON();
+        syncPayloads.push(body);
+        const rows = (body.p_events || []).map((e, i) => ({ ...e, id: `n-${i}`, tenant_id: body.p_tenant_id, status: 'UNREAD' }));
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(rows) });
+      });
+      await page.evaluate(() => {
+        appData.maintenance = [{ id: 'browser-new-ticket', title: 'Kombi arızası', villa: 'test', status: 'OPEN', priority: 'P2', created_at: getTodayStr() + 'T09:00:00Z' }];
+        toggleNotificationDrawer();
+      });
+      await page.waitForFunction(() => /Kombi arızası/.test(document.getElementById('notificationList').textContent));
+      const drawerText = await page.textContent('#notificationList');
+      const badge = await page.textContent('#notificationBellBadge');
+      assert(/Bildirimler neye göre gelir/.test(drawerText) && /Kazanç fırsatı/.test(drawerText) && Number(badge) >= 1,
+        `Bildirim merkezi olay ya da aciklama gostermedi: ${JSON.stringify({ drawerText, badge })}`);
+      await page.click('#notificationList [data-onclick^="openUserNotification"]');
+      const notifState = await page.evaluate(() => ({
+        tab: document.getElementById('tab-operations').classList.contains('active'),
+        view: operationsViewState
+      }));
+      assert(syncPayloads.length >= 1 && syncPayloads.every(x => Array.isArray(x.p_events) && x.p_events.every(e => !('at' in e))), `sync_my_notifications yuku: ${JSON.stringify(syncPayloads)}`);
+      assert(notifState.tab && notifState.view === 'maintenance', `Bildirim arizaya gotumedi: ${JSON.stringify(notifState)}`);
+      passed.push('17. bildirim merkezi gerçek olayı gösterir, neye göre geldiğini anlatır, Git kayda götürür');
     });
 
     await withPage(browser, baseUrl, 'owner', { width: 390, height: 844 }, async page => {
