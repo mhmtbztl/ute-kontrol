@@ -5492,6 +5492,40 @@ function filterByVilla(vKey) {
   }
 }
 
+// Mulk bazinda net kar (L-187, kullanici M17). Tablo eskiden her satirda
+// '— Gider dagilimi gerekli' yaziyordu. Mulkun defteri, kullanici o mulke
+// 'Odaklan' deyince Finans'in gosterdigi defterle AYNI hesaptir: mulke yazilmis
+// gider + komisyonlar + yapilmis temizlik maliyeti (L-36). Portfoy geneli
+// (ortak) gider mulklere bolunmez; bolmek uydurma olurdu (3.6), ayrica yazilir.
+function computePropertyFilterLedger(villaKey) {
+  const previous = currentFilter.villa;
+  try {
+    currentFilter.villa = villaKey;
+    return computeFilterLedger();
+  } finally {
+    currentFilter.villa = previous;
+  }
+}
+
+function propertyProfitView(villaKey) {
+  const ledger = computePropertyFilterLedger(villaKey);
+  const periodKey = currentFilter?.period;
+  if (isProfitUnmeasured(ledger.totalRevenue, ledger.totalOpex, ledger.capex, periodKey)) {
+    return { valueHtml: '—', note: 'Gider kaydı yok; kâr ölçülemedi', margin: '—', tone: '' };
+  }
+  if (!(ledger.totalRevenue > 0) && !(ledger.totalOpex > 0) && !(ledger.capex > 0)) {
+    return { valueHtml: '—', note: 'Bu dönem gelir ve gider yok', margin: '—', tone: '' };
+  }
+  const net = Math.round(ledger.netProfit);
+  const margin = ledger.totalRevenue > 0 ? `%${(ledger.netProfit / ledger.totalRevenue * 100).toLocaleString('tr-TR', { maximumFractionDigits: 1 })}` : '—';
+  return {
+    valueHtml: `${net < 0 ? '−' : ''}${Math.abs(net).toLocaleString('tr-TR')} TL`,
+    note: `Gider ${Math.round(ledger.totalOpex + ledger.capex).toLocaleString('tr-TR')} TL · ortak giderler hariç`,
+    margin,
+    tone: net < 0 ? 'text-rose' : 'text-emerald'
+  };
+}
+
 function renderPropertyFinanceCards(propStats, totalRevenue) {
   const tableBody = document.getElementById('propExecTableBody');
   const cardsContainer = document.getElementById('propCardsContainer');
@@ -5519,6 +5553,7 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
       const occText = occVal === null ? '—' : `%${occVal}`;
       const revparText = s.revpar === null || s.revpar === undefined ? '—' : `₺${Math.round(s.revpar).toLocaleString('tr-TR')}`;
       const adrVal = Math.round(s.adr || (s.nights > 0 ? s.revenue / s.nights : 0));
+      const profit = propertyProfitView(item.key);
 
       // Determine Strategic Diagnosis
       // Satisi olmayan mulk "Dengeli" degildir; olculecek bir dagilim yok (L-102).
@@ -5563,8 +5598,8 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
         <td><strong>${adrVal.toLocaleString('tr-TR')} TL</strong></td>
         <td>${revparText}</td>
         <td>
-          <strong class="text-emerald" title="Mülk bazında gider dağılımı bulunmadığı için hesaplanamadı">—</strong>
-          <span style="display:block; font-size:10px; color:var(--text-muted);">Gider dağılımı gerekli</span>
+          <strong class="${profit.tone}">${profit.valueHtml}</strong>
+          <span style="display:block; font-size:10px; color:var(--text-muted);">${escapeHtml(profit.note)}</span>
         </td>
         <td style="text-align: right; white-space: nowrap;">
           <button class="btn btn-secondary btn-sm" data-onclick="filterByVilla(decodeURIComponent('${encodeActionArg(item.key)}'))">🔍 Odaklan</button>
@@ -5585,6 +5620,7 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
       const occText = occVal === null ? '—' : `%${occVal}`;
       const revparText = s.revpar === null || s.revpar === undefined ? '—' : `₺${Math.round(s.revpar).toLocaleString('tr-TR')}`;
       const adrVal = Math.round(s.adr || (s.nights > 0 ? s.revenue / s.nights : 0));
+      const profit = propertyProfitView(item.key);
 
       const card = document.createElement('div');
       card.className = `prop-card-premium ${rank === 1 ? 'leader-card' : ''}`;
@@ -5630,12 +5666,12 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
             <span class="s-val">${revparText}</span>
           </div>
           <div class="subm-box">
-            <span class="s-lbl">TAHMİNİ NET KÂR</span>
-            <span class="s-val text-emerald" title="Mülk bazında gider dağılımı bulunmadığı için hesaplanamadı">—</span>
+            <span class="s-lbl">NET KÂR</span>
+            <span class="s-val ${profit.tone}" title="${escapeHtml(profit.note)}">${profit.valueHtml}</span>
           </div>
           <div class="subm-box">
             <span class="s-lbl">KÂR MARJI</span>
-            <span class="s-val" title="Mülk bazında gider dağılımı bulunmadığı için hesaplanamadı">—</span>
+            <span class="s-val" title="${escapeHtml(profit.note)}">${profit.margin}</span>
           </div>
         </div>
 
@@ -6469,6 +6505,14 @@ function loadSelectedPeriodGoal() {
 
   if (revEl) revEl.value = rev;
   if (netEl) netEl.value = netProfit;
+  const marginEl = document.getElementById('goalMarginPct');
+  if (marginEl) {
+    const savedMargin = saved ? (saved.margin ?? saved.margin_target ?? null) : null;
+    marginEl.value = savedMargin !== null && savedMargin !== undefined && savedMargin !== ''
+      ? savedMargin
+      : (Number(rev) > 0 && netProfit !== '' && netProfit !== null ? Number((Number(netProfit) / Number(rev) * 100).toFixed(1)) : '');
+  }
+  updateGoalProfitHint();
   if (expEl) expEl.value = maxExpense;
   if (nEl) nEl.value = nights;
   if (adrEl) adrEl.value = adr;
@@ -6491,6 +6535,44 @@ function autoCalculateGoalSubmetrics() {
   if (rev > 0 && nights > 0) {
     document.getElementById('goalADR').value = Math.round(rev / nights);
   }
+  // Ciro degisince oran sabit kalir, tutar yeniden hesaplanir (L-185).
+  syncGoalProfitFromMargin();
+}
+
+// Net kar hedefi oranla girilir (L-185, kullanici M15): tutari elle yazmak
+// 'tuhaf'ti ve altinda sabit 'Cironun yaklasik %35'i' yaziyordu. Oran ve
+// tutar birbirini gunceller; oran ciro hedefine goredir (margin_target ile ayni).
+function readGoalNumber(id) {
+  const raw = String(document.getElementById(id)?.value ?? '').trim();
+  if (raw === '') return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
+function updateGoalProfitHint() {
+  const hint = document.getElementById('goalNetProfitHint');
+  if (!hint) return;
+  const rev = readGoalNumber('goalRevenue');
+  const profit = readGoalNumber('goalNetProfit');
+  hint.textContent = rev > 0 && profit !== null
+    ? `Ciro hedefinin %${(profit / rev * 100).toLocaleString('tr-TR', { maximumFractionDigits: 1 })}'i`
+    : (profit !== null ? 'Oran için önce ciro hedefini girin' : 'Boş bırakılırsa kâr hedefi yok sayılır');
+}
+
+function syncGoalProfitFromMargin() {
+  const rev = readGoalNumber('goalRevenue');
+  const margin = readGoalNumber('goalMarginPct');
+  const profitEl = document.getElementById('goalNetProfit');
+  if (profitEl && rev > 0 && margin !== null) profitEl.value = Math.round(rev * margin / 100);
+  updateGoalProfitHint();
+}
+
+function syncGoalMarginFromProfit() {
+  const rev = readGoalNumber('goalRevenue');
+  const profit = readGoalNumber('goalNetProfit');
+  const marginEl = document.getElementById('goalMarginPct');
+  if (marginEl) marginEl.value = rev > 0 && profit !== null ? Number((profit / rev * 100).toFixed(1)) : '';
+  updateGoalProfitHint();
 }
 
 function autoCalculateGoalAdr() {
@@ -7847,6 +7929,7 @@ function saveQuickBooking(event) {
     guest: document.getElementById('quickBookingGuest')?.value.trim() || '',
     gross: document.getElementById('quickBookingGross')?.value || '',
     pax: document.getElementById('quickBookingPax')?.value || '',
+    deposit: document.getElementById('quickBookingDeposit')?.value || '',
     channel: document.getElementById('quickBookingChannel')?.value || ''
   };
   closeQuickBookingModal();
@@ -7856,6 +7939,8 @@ function saveQuickBooking(event) {
   document.getElementById('resGuest').value = values.guest;
   document.getElementById('resGross').value = values.gross;
   document.getElementById('resPax').value = values.pax;
+  const resDeposit = document.getElementById('resDeposit');
+  if (resDeposit) resDeposit.value = values.deposit;
   document.getElementById('resChannel').value = values.channel;
   setResDateRange(checkIn, checkOut);
   handleBookingChannelChange();
@@ -7883,6 +7968,12 @@ function openBookingModal(editId = null) {
       footer.insertBefore(deleteBtn, footer.firstChild);
     }
   }
+
+  // Kapora yalniz yeni kayitta girilir; mevcut rezervasyonun odemeleri
+  // ayrintidaki Odeme takibinden yonetilir (L-184).
+  const depositGroup = document.getElementById('resDepositGroup');
+  if (depositGroup) depositGroup.style.display = editId ? 'none' : '';
+  ['resDeposit', 'resDepositMethod'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
 
   if (editId) {
     const b = (appData.bookings || []).find(item => item.id === editId || item.code === editId || item.dbId === editId);
@@ -8277,6 +8368,28 @@ if (typeof document !== 'undefined' && document.addEventListener) {
   });
 }
 
+// Kapora tek yoldan yazilir (L-184, kullanici M14): rezervasyon formu, hizli
+// rezervasyon ve WhatsApp ayni odeme defterine DEPOSIT satiri yazar. Odeme
+// nakit hareketidir, ciroyu degistirmez. Yazilamazsa rezervasyon geri alinmaz;
+// kullaniciya soylenir (3.4 ile ayni kural).
+function readBookingDepositInput(id) {
+  const raw = String(document.getElementById(id)?.value ?? '').trim();
+  if (raw === '') return 0;
+  const n = Number(raw.replace(',', '.'));
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+async function recordBookingDeposit(bookingId, amount, method, note) {
+  if (!(amount > 0) || !bookingId) return '';
+  const { error } = await supabaseClient.from('booking_payments').insert({
+    tenant_id: getActiveTenantId(), booking_id: bookingId, paid_on: getTodayStr(),
+    amount, kind: 'DEPOSIT', method: method || null, note: note || null
+  });
+  if (error) return `\n⚠️ Kapora kaydedilemedi (${getFriendlyAuthErrorMessage(error)}). Rezervasyon ayrıntısındaki Ödeme takibinden elle ekleyin.`;
+  try { if (typeof refreshBookingPaymentData === 'function') await refreshBookingPaymentData(bookingId); } catch (_) { /* ekran yenilemesi ikincil */ }
+  return `\n💰 Kapora ₺${amount.toLocaleString('tr-TR')} ödeme takibine işlendi.`;
+}
+
 async function saveBooking(e) {
   e.preventDefault();
   const submitBtn = e.target.querySelector('button[type="submit"]');
@@ -8326,6 +8439,11 @@ async function saveBooking(e) {
       throw new Error('Temizlik ücreti brüt tutardan büyük olamaz; brüt tutara dâhildir.');
     }
 
+    const deposit = editId ? 0 : readBookingDepositInput('resDeposit');
+    if (deposit === null) throw new Error('Kapora tutarı geçerli bir sayı olmalıdır.');
+    if (deposit > gross) throw new Error('Alınan kapora brüt tutardan büyük olamaz.');
+    const depositMethod = document.getElementById('resDepositMethod')?.value || null;
+
     const net = economics.netRoomRevenue;
 
     const bookingInput = {
@@ -8353,6 +8471,7 @@ async function saveBooking(e) {
     // rezervasyon geri alinmaz, kullaniciya acikca soylenir.
     let ekUyari = await syncBookingCleaningTaskToCloud(savedBooking, cleanCost);
     ekUyari += await saveBookingPaymentCommission(savedBooking, paymentCommission);
+    if (deposit > 0) ekUyari += await recordBookingDeposit(savedBooking.id, deposit, depositMethod, null);
     if (typeof renderAll === 'function') renderAll();
 
     let guestProfileWarning = ekUyari;
@@ -9672,8 +9791,13 @@ async function loadSettingsCatalogs() {
 }
 
 function settingsTemplateRowHtml(kind, item, title, meta) {
-  return `<div class="settings-template-row"><span><strong>${escapeHtml(title || 'Adsız şablon')}</strong><small class="sub-text">${escapeHtml(meta || '')}</small></span><span><button type="button" class="btn btn-secondary btn-sm" data-onclick="editSettingsTemplate(decodeURIComponent('${encodeActionArg(kind)}'), decodeURIComponent('${encodeActionArg(item.id)}'))">Düzenle</button> <button type="button" class="btn btn-secondary btn-sm" data-onclick="archiveSettingsTemplate(decodeURIComponent('${encodeActionArg(kind)}'), decodeURIComponent('${encodeActionArg(item.id)}'))">Kapat</button></span></div>`;
+  return `<div class="settings-template-row"><span><strong>${escapeHtml(title || 'Adsız şablon')}</strong><small class="sub-text">${escapeHtml(meta || '')}</small></span><span><button type="button" class="btn btn-secondary btn-sm" data-onclick="editSettingsTemplate(decodeURIComponent('${encodeActionArg(kind)}'), decodeURIComponent('${encodeActionArg(item.id)}'))">Düzenle</button> <button type="button" class="btn btn-secondary btn-sm" data-onclick="archiveSettingsTemplate(decodeURIComponent('${encodeActionArg(kind)}'), decodeURIComponent('${encodeActionArg(item.id)}'))" title="Şablon artık listelerde çıkmaz; geçmiş kayıtlar korunur">Kullanımdan kaldır</button></span></div>`;
 }
+
+// Sablon listelerinde ham kodlar (CLEANING · MEDIUM, WHATSAPP · MANUAL) yerine
+// Turkce etiket (L-189, kullanici M19: ekran 'anlatildigi kadar basit degil').
+const TEMPLATE_TASK_TYPE_LABELS = { GENERAL: 'Genel', CLEANING: 'Temizlik', INSPECTION: 'Kontrol', MAINTENANCE: 'Bakım' };
+const TEMPLATE_PRIORITY_LABELS = { LOW: 'düşük öncelik', MEDIUM: 'orta öncelik', HIGH: 'yüksek öncelik', CRITICAL: 'kritik' };
 
 function renderSettingsTemplates() {
   const messages = appData?.settingsMessageTemplates || appData?.messageTemplates || [];
@@ -9683,10 +9807,10 @@ function renderSettingsTemplates() {
   const taskList = document.getElementById('settingsTaskTemplatesList');
   const checklistList = document.getElementById('settingsChecklistTemplatesList');
   if (messageList) messageList.innerHTML = messages.length
-    ? messages.map(item => settingsTemplateRowHtml('message', item, item.name, `${item.channel || 'WHATSAPP'} · ${item.lifecycle_stage || 'MANUAL'}${item.is_active === false ? ' · Kapalı' : ''}`)).join('')
+    ? messages.map(item => settingsTemplateRowHtml('message', item, item.name, `${String(item.channel || 'WHATSAPP').toUpperCase() === 'WHATSAPP' ? 'WhatsApp' : (item.channel || '—')} · ${String(item.lifecycle_stage || 'MANUAL').toUpperCase() === 'MANUAL' ? 'elle gönderilir' : 'otomatik'}${item.is_active === false ? ' · Kapalı' : ''}`)).join('')
     : '<div class="empty-state">Mesaj şablonu yok.</div>';
   if (taskList) taskList.innerHTML = tasks.length
-    ? tasks.map(item => settingsTemplateRowHtml('task', item, item.title, `${item.task_type || 'GENERAL'} · ${item.priority || 'MEDIUM'}${item.is_active === false ? ' · Kapalı' : ''}`)).join('')
+    ? tasks.map(item => settingsTemplateRowHtml('task', item, item.title, `${TEMPLATE_TASK_TYPE_LABELS[item.task_type] || 'Genel'} · ${TEMPLATE_PRIORITY_LABELS[item.priority] || 'orta öncelik'}${item.is_active === false ? ' · Kapalı' : ''}`)).join('')
     : '<div class="empty-state">Görev şablonu yok.</div>';
   if (checklistList) checklistList.innerHTML = checklists.length
     ? checklists.map(item => settingsTemplateRowHtml('checklist', item, item.template_name, `${item.property_id ? 'Mülke özel' : 'Genel'}${item.is_active === false ? ' · Kapalı' : ''}`)).join('')
@@ -10276,7 +10400,7 @@ function renderManageLeadsTable() {
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td><strong>${escapeHtml(l.guest)}</strong></td>
+      <td><strong>${escapeHtml(l.guest)}</strong>${l.checkIn && l.checkOut ? `<span style="display:block; font-size:11px; color:var(--text-muted);">${escapeHtml(formatTrDate(l.checkIn))} → ${escapeHtml(formatTrDate(l.checkOut))}</span>` : ''}</td>
       <td>${escapeHtml(appData.villas[l.villa]?.name || l.villa)}</td>
       <td>${escapeHtml(l.channel)}</td>
       <td>₺${Number(l.quote).toLocaleString('tr-TR')}</td>
@@ -10386,6 +10510,9 @@ function openLeadModal(editId = null) {
     document.getElementById('leadVilla').value = l.villa;
     document.getElementById('leadChannel').value = normalizeLeadChannel(l.channel);
     document.getElementById('leadQuote').value = l.quote;
+    // Ilgilenilen tarihler duzenlemede de gorunur ve degisir (L-186).
+    document.getElementById('leadCheckIn').value = l.checkIn || '';
+    document.getElementById('leadCheckOut').value = l.checkOut || '';
     document.getElementById('leadStatus').value = l.status;
     document.getElementById('leadLostReason').value = l.lostReason || '-';
     document.getElementById('leadNotes').value = l.notes || '';
@@ -10455,6 +10582,12 @@ async function saveLead(e) {
   const status = document.getElementById('leadStatus').value;
   const lostReason = document.getElementById('leadLostReason').value;
   const notes = document.getElementById('leadNotes').value.trim();
+  const checkIn = document.getElementById('leadCheckIn')?.value || null;
+  const checkOut = document.getElementById('leadCheckOut')?.value || null;
+  if ((checkIn && !checkOut) || (!checkIn && checkOut) || (checkIn && checkOut && checkOut <= checkIn)) {
+    alert('İlgilenilen tarihler için giriş ve çıkışı birlikte girin; çıkış girişten sonra olmalıdır.');
+    return;
+  }
   const assignedTo = document.getElementById('leadAssignedTo')?.value || null;
   let nextFollowUpAt = document.getElementById('leadNextFollowUp')?.value || null;
   if (status === 'QUOTE_SENT' && !nextFollowUpAt) {
@@ -10478,7 +10611,9 @@ async function saveLead(e) {
     quote,
     status,
     lostReason,
-    notes
+    notes,
+    checkIn,
+    checkOut
   });
 
   try {
@@ -12425,18 +12560,7 @@ async function saveWaAsBooking() {
     });
     // Cikis temizligi formla ayni sekilde planlanir; maliyet bilinmiyor.
     temizlikNotu = await syncBookingCleaningTaskToCloud(yeni, null);
-    if (deposit > 0) {
-      const { error: depositError } = await supabaseClient.from('booking_payments').insert({
-        tenant_id: getActiveTenantId(), booking_id: yeni.id, paid_on: getTodayStr(),
-        amount: deposit, kind: 'DEPOSIT', method: null, note: 'WhatsApp mesajından'
-      });
-      temizlikNotu = (temizlikNotu || '') + (depositError
-        ? `\n⚠️ Kapora kaydedilemedi (${getFriendlyAuthErrorMessage(depositError)}). Rezervasyon ayrıntısından elle ekleyin.`
-        : `\n💰 Kapora ₺${deposit.toLocaleString('tr-TR')} ödeme defterine işlendi.`);
-      if (!depositError && typeof refreshBookingPaymentData === 'function') {
-        try { await refreshBookingPaymentData(yeni.id); } catch (_) { /* ekran yenilemesi ikincil */ }
-      }
-    }
+    if (deposit > 0) temizlikNotu = (temizlikNotu || '') + await recordBookingDeposit(yeni.id, deposit, null, 'WhatsApp mesajından');
   } catch (err) {
     alert('⚠️ Rezervasyon kaydedilemedi: ' + (err?.message || 'veritabanı hatası'));
     return;
@@ -13705,6 +13829,7 @@ async function saveOperatorNote(villaKey) {
 // -------------------------------------------------------------
 function detectGapNights() {
   const gaps = [];
+  const today = getTodayStr();
   const villas = Object.keys(appData.villas || {});
 
   villas.forEach(vKey => {
@@ -13720,7 +13845,10 @@ function detectGapNights() {
       const d2 = new Date(b2.checkIn);
       const diffDays = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
 
-      if (diffDays >= 1 && diffDays <= 4) {
+      // Yalniz bugunden sonra biten bosluk firsattir (L-190). Gecmis bosluklar
+      // da listeleniyordu; ana sayfa ilkini gosterdigi icin aylar onceki bir
+      // bosluk 'gelir firsati' diye cikiyordu.
+      if (diffDays >= 1 && diffDays <= 4 && String(b2.checkIn || '') > today) {
         // Gecelik fiyat MULKUN KENDI liste fiyatidir. Burada bir zamanlar
         // silinmis demo anahtarlarina bagli bir merdiven vardi
         // (AZURE 18.000, BELLA 14.000, digerleri 12.000): her gercek mulk
@@ -13729,14 +13857,19 @@ function detectGapNights() {
         // Liste fiyati girilmemisse fiyat bilinmiyordur; uydurulmaz (3.6).
         const villa = (appData.villas || {})[vKey] || {};
         const baseNightly = Number(villa.basePrice) || 0;
-        const regularTotal = baseNightly > 0 ? baseNightly * diffDays : null;
+        // Bugun baslamis bosluk bugunden itibaren satilabilir; gecmis geceye
+        // fiyat onerilmez.
+        const gapStart = String(b1.checkOut) < today ? today : String(b1.checkOut);
+        const gapNights = Math.round((new Date(b2.checkIn) - new Date(gapStart)) / 86400000);
+        if (!(gapNights > 0)) continue;
+        const regularTotal = baseNightly > 0 ? baseNightly * gapNights : null;
         const discountTotal = regularTotal === null ? null : Math.round(regularTotal * 0.8);
         gaps.push({
           villaKey: vKey,
           villaName: vName,
-          checkIn: b1.checkOut,
+          checkIn: gapStart,
           checkOut: b2.checkIn,
-          nights: diffDays,
+          nights: gapNights,
           regularPrice: regularTotal,
           discountPrice: discountTotal,
           discountPct: regularTotal === null ? null : 20
@@ -13744,6 +13877,8 @@ function detectGapNights() {
       }
     }
   });
+
+  gaps.sort((x, y) => String(x.checkIn).localeCompare(String(y.checkIn)));
 
   // Gercek bosluk yoksa UYDURULMAZ. Burada, gaps.length < 3 ise ucu birden
   // sahte olarak eklenirdi: olmayan villalar (Bella Vista, Azure Bay, Sunset
@@ -17402,7 +17537,7 @@ function renderTodayCommandCenter(actionsResult) {
 
   renderActionCards(critList, critBadge, actionsResult.critical || [], 'critical', 'Açık kritik uyarı yok.');
   renderActionCards(opsList, opsBadge, actionsResult.operations || [], 'operations', 'Kayıtlı bekleyen turnover veya arıza görevi yok.');
-  renderActionCards(revList, revBadge, actionsResult.revenueOpportunities || [], 'revenue', 'Kayıtlarınızda şu an önerilecek bir gelir fırsatı yok.');
+  renderActionCards(revList, revBadge, actionsResult.revenueOpportunities || [], 'revenue', 'Önümüzdeki günlerde boşluk gecesi (iki rezervasyon arasında 1–4 gece) ya da teklif bekleyen sıcak talep yok.');
 }
 
 function renderPortfolioHealth(healthCards) {
@@ -18665,7 +18800,7 @@ function renderOperationsTab() {
     const editTemplatesLink = canManageTenantRole(activeTenant?.role)
       ? `<button class="btn btn-secondary btn-sm" data-onclick="openSettingsSection(decodeURIComponent('${encodeActionArg('templates')}'))">Şablonu düzenle →</button>`
       : '';
-    container.innerHTML = `<div class="ops-cleaning-layout"><section class="ops-group"><div class="section-title-bar"><h3>Aktif görevler <span class="badge">${operational.length}</span></h3><button class="btn btn-primary btn-sm" data-onclick="createGeneralOperationalTask()">+ Genel görev</button></div>${operational.length ? operational.map(task => { const options = assignees.map(person => `<option value="${escapeHtml(person.user_id)}"${person.user_id === task.assigned_to ? ' selected' : ''}>${escapeHtml(person.full_name)}</option>`).join(''); return `<article class="ops-row"><div class="ops-row-main"><strong>${escapeHtml(task.title || '—')}</strong><span>${task.property_id ? 'Mülke bağlı' : 'Genel görev'} · ${escapeHtml(task.status || 'TODO')}</span></div><div class="ops-row-actions"><select id="opsTaskPerson-${escapeHtml(task.id)}" aria-label="Görevli seç"><option value="">Ekip üyesi seç…</option>${options}</select><button class="btn btn-secondary btn-sm" data-onclick="assignOperationalTaskFromSelect(decodeURIComponent('${encodeActionArg(task.id)}'))">Ata</button><button class="btn btn-primary btn-sm" data-onclick="setOperationalTaskStatus(decodeURIComponent('${encodeActionArg(task.id)}'), 'DONE')">Tamamla</button><button class="btn btn-secondary btn-sm" data-onclick="setOperationalTaskStatus(decodeURIComponent('${encodeActionArg(task.id)}'), 'CANCELLED')">İptal</button></div></article>`; }).join('') : '<div class="empty-state">Aktif görev yok.</div>'}</section><aside class="ops-debt-panel"><h3>Hazır görev kütüphanesi</h3>${editTemplatesLink}${templates.length ? templates.map(template => `<div class="ops-debt-row"><div><strong>${escapeHtml(template.title)}</strong><span>${escapeHtml(template.task_type || 'GENERAL')}</span></div><button class="btn btn-secondary btn-sm" data-onclick="createTaskFromTemplate(decodeURIComponent('${encodeActionArg(template.id)}'))">Görev oluştur</button></div>`).join('') : '<div class="empty-state">Henüz görev şablonu yok.</div>'}</aside></div>`;
+    container.innerHTML = `<div class="ops-cleaning-layout"><section class="ops-group"><div class="section-title-bar"><h3>Aktif görevler <span class="badge">${operational.length}</span></h3><button class="btn btn-primary btn-sm" data-onclick="createGeneralOperationalTask()">+ Genel görev</button></div>${operational.length ? operational.map(task => { const options = assignees.map(person => `<option value="${escapeHtml(person.user_id)}"${person.user_id === task.assigned_to ? ' selected' : ''}>${escapeHtml(person.full_name)}</option>`).join(''); return `<article class="ops-row"><div class="ops-row-main"><strong>${escapeHtml(task.title || '—')}</strong><span>${task.property_id ? 'Mülke bağlı' : 'Genel görev'} · ${escapeHtml(task.status || 'TODO')}</span></div><div class="ops-row-actions"><select id="opsTaskPerson-${escapeHtml(task.id)}" aria-label="Görevli seç"><option value="">Ekip üyesi seç…</option>${options}</select><button class="btn btn-secondary btn-sm" data-onclick="assignOperationalTaskFromSelect(decodeURIComponent('${encodeActionArg(task.id)}'))">Ata</button><button class="btn btn-primary btn-sm" data-onclick="setOperationalTaskStatus(decodeURIComponent('${encodeActionArg(task.id)}'), 'DONE')">Tamamla</button><button class="btn btn-secondary btn-sm" data-onclick="setOperationalTaskStatus(decodeURIComponent('${encodeActionArg(task.id)}'), 'CANCELLED')">İptal</button></div></article>`; }).join('') : '<div class="empty-state">Aktif görev yok.</div>'}</section><aside class="ops-debt-panel"><h3>Hazır görev kütüphanesi</h3>${editTemplatesLink}${templates.length ? templates.map(template => `<div class="ops-debt-row"><div><strong>${escapeHtml(template.title)}</strong><span>${escapeHtml(TEMPLATE_TASK_TYPE_LABELS[template.task_type] || 'Genel')}</span></div><button class="btn btn-secondary btn-sm" data-onclick="createTaskFromTemplate(decodeURIComponent('${encodeActionArg(template.id)}'))">Görev oluştur</button></div>`).join('') : '<div class="empty-state">Henüz görev şablonu yok.</div>'}</aside></div>`;
   }
 }
 
@@ -19632,6 +19767,12 @@ if (typeof module !== 'undefined' && module.exports) {
     renderOperationsPeopleView,
     renderTodayCommandCenter,
     readEmailTokenHashLink,
+    recordBookingDeposit,
+    syncGoalProfitFromMargin,
+    syncGoalMarginFromProfit,
+    propertyProfitView,
+    detectGapNights,
+    renderSettingsTemplates,
     openPageReport,
     refreshPropertyReport,
     closePageReportModal,

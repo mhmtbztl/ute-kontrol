@@ -14,7 +14,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=16f0dd59">
+  <link rel="stylesheet" href="style.css?v=d886fb2d">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="supabase.umd.js?v=3810661a"></script>
@@ -926,7 +926,7 @@
                 <th>DOLULUK & SATILAN GECE</th>
                 <th>ORT. GÜNLÜK (ADR)</th>
                 <th>RevPAR</th>
-                <th>TAHMİNİ NET KÂR</th>
+                <th title="Mülke yazılmış gider, komisyon ve temizlik maliyeti düşülür; ortak giderler hariç">NET KÂR</th>
                 <th style="text-align: right;">İŞLEM</th>
               </tr>
             </thead>
@@ -1675,21 +1675,23 @@
         <div class="section-title-bar">
           <div>
             <h2>🧩 ŞABLONLAR</h2>
-            <p class="sub-text">Mesaj, görev ve kontrol listesi şablonlarının tek yönetim yeri.</p>
+            <p class="sub-text">Sık kullandığınız metinleri ve işleri bir kez yazın, sonra tek tıkla kullanın. Her bölmenin altında nerede çıktığı yazar.</p>
           </div>
         </div>
         <div class="settings-template-grid">
           <section class="settings-template-pane">
             <h3>Mesaj şablonları</h3>
+            <p class="sub-text settings-template-help">Misafire gönderdiğiniz hazır WhatsApp metinleri. <strong>Talepler</strong>de bir talebi düzenlerken seçip kopyalarsınız.</p>
             <form data-onsubmit="createSettingsMessageTemplate(event)" class="settings-inline-form">
               <input name="name" maxlength="150" required placeholder="Şablon adı">
-              <textarea name="body" maxlength="4000" required placeholder="WhatsApp mesajı"></textarea>
+              <textarea name="body" maxlength="4000" required placeholder="Örn: Merhaba, villamız için teklifimiz ektedir. Sorunuz olursa yazabilirsiniz."></textarea>
               <button type="submit" class="btn btn-secondary btn-sm">+ Mesaj şablonu</button>
             </form>
             <div id="settingsMessageTemplatesList" class="settings-template-list"></div>
           </section>
           <section class="settings-template-pane">
             <h3>Görev şablonları</h3>
+            <p class="sub-text settings-template-help">Tekrarlayan işler (örn. havuz kontrolü). <strong>Operasyon → Görevler</strong>deki <strong>Hazır görev kütüphanesi</strong>nden tek tıkla göreve dönüşür.</p>
             <form data-onsubmit="createSettingsTaskTemplate(event)" class="settings-inline-form">
               <input name="title" maxlength="200" required placeholder="Görev başlığı">
               <select name="task_type"><option value="GENERAL">Genel</option><option value="CLEANING">Temizlik</option><option value="INSPECTION">Kontrol</option><option value="MAINTENANCE">Bakım</option></select>
@@ -1699,9 +1701,10 @@
           </section>
           <section class="settings-template-pane">
             <h3>Kontrol listeleri</h3>
+            <p class="sub-text settings-template-help">Temizlikçinin telefonunda işaretlediği madde listesi. Temizlik atandığında otomatik çıkar. Her satıra bir madde yazın; <code>#</code> ile başlayan satır bölüm başlığıdır, <code>!</code> ile başlayan madde önemlidir.</p>
             <form data-onsubmit="createSettingsChecklistTemplate(event)" class="settings-inline-form">
               <input name="template_name" maxlength="150" required placeholder="Liste adı">
-              <textarea name="items" maxlength="4000" required placeholder="Her satıra bir madde · # Bölüm adı · !Önemli madde · Madde > alt işaret; alt işaret"></textarea>
+              <textarea name="items" maxlength="4000" required rows="6" placeholder="# Yatak odası&#10;Çarşaflar değişti&#10;!Klima filtresi temizlendi&#10;# Mutfak&#10;Bulaşık makinesi boşaltıldı"></textarea>
               <button type="submit" class="btn btn-secondary btn-sm">+ Kontrol listesi</button>
             </form>
             <div id="settingsChecklistTemplatesList" class="settings-template-list"></div>
@@ -2364,12 +2367,19 @@
             </div>
           </div>
 
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 8px;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
             <div class="form-group">
-              <label style="font-size: 12px; font-weight: 600;">💵 Hedef Net Kâr (TL)</label>
-              <input type="number" id="goalNetProfit" required style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
-              <span style="font-size: 10px; color: #34D399; margin-top: 3px; display: block;">Cironun yaklaşık %35'i</span>
+              <label for="goalMarginPct" style="font-size: 12px; font-weight: 600;">📈 Hedef kâr marjı (%)</label>
+              <input type="number" id="goalMarginPct" min="0" max="100" step="1" inputmode="decimal" placeholder="Örn: 35" data-oninput="syncGoalProfitFromMargin()" style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
+              <span style="font-size: 10px; color: var(--text-muted); margin-top: 3px; display: block;">Ciro hedefinin yüzdesi; tutar kendiliğinden hesaplanır</span>
             </div>
+            <div class="form-group">
+              <label for="goalNetProfit" style="font-size: 12px; font-weight: 600;">💵 Hedef Net Kâr (TL)</label>
+              <input type="number" id="goalNetProfit" data-oninput="syncGoalMarginFromProfit()" style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
+              <span id="goalNetProfitHint" style="font-size: 10px; color: #34D399; margin-top: 3px; display: block;">—</span>
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 8px;">
             <div class="form-group">
               <label style="font-size: 12px; font-weight: 600;">💸 Tavan Gider (TL)</label>
               <input type="number" id="goalMaxExpense" required style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
@@ -2634,6 +2644,21 @@
             <input type="number" inputmode="decimal" id="resGross" placeholder="Örn: 40000" required data-oninput="syncCommissionFromRate()">
             <small class="field-note">Misafirin ödediği toplam. Temizlik ücreti bu tutara dâhildir.</small>
           </div>
+          <div class="form-group" id="resDepositGroup">
+            <label for="resDeposit">Alınan Kapora (₺)</label>
+            <div style="display:flex; gap:6px;">
+              <input type="number" inputmode="decimal" id="resDeposit" min="0" step="0.01" placeholder="Alınmadıysa boş bırakın" style="flex:1;">
+              <select id="resDepositMethod" aria-label="Kapora ödeme yöntemi" style="max-width:130px;">
+                <option value="">Yöntem —</option>
+                <option value="BANK_TRANSFER">Havale/EFT</option>
+                <option value="CASH">Nakit</option>
+                <option value="CARD">Kart</option>
+                <option value="OTA">OTA</option>
+                <option value="OTHER">Diğer</option>
+              </select>
+            </div>
+            <small class="field-note">Ödeme takibine "Kapora" olarak yazılır; ciroyu değiştirmez. Sonraki ödemeler rezervasyon ayrıntısındaki <strong>Ödeme takibi</strong>nden girilir.</small>
+          </div>
           <div class="form-group">
             <label for="resPax">Kişi Sayısı</label>
             <input type="number" inputmode="numeric" id="resPax" min="1" step="1" required placeholder="Kişi sayısını girin">
@@ -2785,6 +2810,14 @@
           <div class="form-group">
             <label>Teklif Tutarı (₺)</label>
             <input type="number" id="leadQuote" placeholder="Örn: 45000" required>
+          </div>
+          <div class="form-group">
+            <label for="leadCheckIn">İlgilenilen giriş</label>
+            <input type="date" id="leadCheckIn">
+          </div>
+          <div class="form-group">
+            <label for="leadCheckOut">İlgilenilen çıkış</label>
+            <input type="date" id="leadCheckOut">
           </div>
           <div class="form-group">
             <label>Durum</label>
@@ -3046,7 +3079,7 @@
             <li><strong>Ciro</strong> = net konaklama geliri: brüt tutardan misafirden alınan temizlik ücreti ve indirim çıkarılır. Temizlik ücreti ayrı bir gelir kalemidir.</li>
             <li>Ay sınırını geçen bir rezervasyonun geliri <strong>gecelere bölünür</strong>; her ay yalnızca kendi gecelerinin payını alır.</li>
             <li><strong>Giderler:</strong> elle girdiğiniz giderler, OTA ve ödeme komisyonları ve onaylanmış temizlik maliyetleri. Kira, aidat gibi her ay tekrarlayan giderleri <strong>💰 Finans → Gider Şablonları</strong> ile tek tıkla oluşturun.</li>
-            <li><strong>Reklam harcaması:</strong> <strong>📈 Kanallar ve Pazarlama → Reklamlar</strong> bölümünde <strong>Reklam dönemi ekle</strong> ile girilir; ilgili aylara kendiliğinden bölünür.</li>
+            <li><strong>Reklam harcaması:</strong> <strong>📈 Kanallar ve Pazarlama → Reklamlar</strong> bölümünde iki adımda girilir: (1) <strong>Kampanya oluştur</strong> — adı, platformu ve isterseniz <strong>günlük bütçe sınırını</strong> yazın (üst sınırdır, her gün o kadar harcamak zorunda değilsiniz); (2) <strong>Reklam dönemi ekle</strong> — reklam panelindeki harcama, gösterim, tıklama ve mesaj rakamlarını girin. Gider Finans'a ilgili aylara bölünerek yazılır. Dönemler tabloda görünür; <strong>Kendi metriğini ekle</strong> ile iki alanı bölüp çarparak kendi sütununuzu oluşturabilirsiniz.</li>
             <li>Bir ayda gelir var ama hiç gider girilmemişse net kâr <strong>"—"</strong> görünür ve "kâr ölçülemedi" yazar. Bu bir hata değildir: giderler girilmeden kâr gösterilmez.</li>
             <li><strong>Ay kapanışı:</strong> Ay bittikten sonra Finans'taki <strong>🔒 Bu Ayı Kapat</strong> ile dönemi mühürleyin. Kapalı aya kayıt eklenemez ve değiştirilemez. Gerekirse işletme sahibi gerekçe yazarak dönemi yeniden açabilir.</li>
           </ul>
@@ -3106,7 +3139,7 @@
             </div>
             <div class="glossary-card-item" data-keywords="boşluk gecesi gap nights fırsat indirim">
               <strong style="color:#FB923C; font-size:14px;">🧩 Boşluk gecesi</strong>
-              <p style="font-size:12px; color:#E2E8F0; margin:6px 0;">İki rezervasyon arasında kalan ve satılması zor kısa boşluk. Bugün ekranı gerçek takviminizdeki boşlukları listeler; indirim oranını siz belirlersiniz.</p>
+              <p style="font-size:12px; color:#E2E8F0; margin:6px 0;">Aynı mülkte iki rezervasyon arasında kalan 1–4 gecelik, satılması zor boşluk. Ana sayfada (<strong>Bugün</strong>) <strong>Gelir fırsatı</strong> sütununda en yakın boşluk görünür; boşluk yoksa orada "boşluk gecesi yok" yazar. Mülkün liste fiyatı girilmişse uygulama liste fiyatının altında bir gecelik fiyat önerir; <strong>Uygula</strong>ya basınca önerilen fiyatı görürsünüz, onaylarsanız o gecelerin fiyatı takvime yazılır. Liste fiyatı girilmemiş mülkte fiyat önerilmez.</p>
             </div>
             <div class="glossary-card-item" data-keywords="ota komisyon airbnb booking doğrudan kanal">
               <strong style="color:#4ADE80; font-size:14px;">🌐 Kanal ve komisyon</strong>
@@ -3620,6 +3653,7 @@
           <label>Misafir adı<input id="quickBookingGuest" required autocomplete="name"></label>
           <div class="quick-booking-dates"><label>Giriş<input id="quickBookingCheckIn" type="date" required></label><label>Çıkış<input id="quickBookingCheckOut" type="date" required></label></div>
           <label>Brüt tutar (₺)<input id="quickBookingGross" type="number" inputmode="decimal" min="0" step="0.01" required></label>
+          <label>Alınan kapora (₺)<input id="quickBookingDeposit" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Alınmadıysa boş"></label>
           <label>Kişi sayısı<input id="quickBookingPax" type="number" inputmode="numeric" min="1" step="1" required></label>
           <label>Kanal<select id="quickBookingChannel" required><option value="WHATSAPP">WhatsApp</option><option value="AIRBNB">Airbnb</option><option value="BOOKING">Booking.com</option><option value="INSTAGRAM">Instagram</option><option value="WEBSITE">Web sitesi</option><option value="REPEAT">Tekrar misafir</option><option value="PHONE">Telefon</option></select></label>
         </div>
@@ -3673,10 +3707,10 @@
   <script src="core/captcha_gate.js?v=3ad4a776"></script>
   <script src="core/date_range_picker.js?v=41dc564c"></script>
   <script src="core/side_panel.js?v=d763b464"></script>
-  <script src="core/action_dispatch.js?v=d7a0f3ea"></script>
-  <script src="app.js?v=ff875722"></script>
+  <script src="core/action_dispatch.js?v=c171f23d"></script>
+  <script src="app.js?v=01a0d130"></script>
   <script src="core/property_analysis_context_ui.js?v=0a5def2d"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
-  <script src="core/marketing_ui.js?v=ec113951"></script>
+  <script src="core/marketing_ui.js?v=6fdf284a"></script>
 </body>
 </html>

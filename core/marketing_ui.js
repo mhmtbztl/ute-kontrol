@@ -219,6 +219,68 @@
     return `<div class="card" style="padding:24px;text-align:center;border:1px dashed rgba(148,163,184,.45)"><div style="font-weight:800;margin-bottom:6px">${escapeHtml(title)}</div><div class="sub-text">${escapeHtml(detail)}</div></div>`;
   }
 
+  // Reklam tablosu ve kullanici tanimli metrikler (L-188, kullanici M18).
+  // Her reklamci ayni metrigi izlemez: iki olculmus alani bolup/carparak kendi
+  // sutununu tanimlar. Olculmemis ya da sifira bolunen deger "—"dir (3.6).
+  const AD_METRIC_FIELDS = Object.freeze({
+    spend: 'Harcama', impressions: 'Gösterim', clicks: 'Tıklama', messages: 'Mesaj', calls: 'Arama', days: 'Gün'
+  });
+  const MAX_CUSTOM_METRICS = 8;
+
+  function adPeriodDays(row) {
+    const start = Date.parse(String(row && row.periodStart || '') + 'T00:00:00Z');
+    const end = Date.parse(String(row && row.periodEnd || '') + 'T00:00:00Z');
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return null;
+    return Math.floor((end - start) / 86400000) + 1;
+  }
+
+  function adFieldValue(row, field) {
+    if (field === 'days') return adPeriodDays(row);
+    const value = row ? row[field] : null;
+    return value === null || value === undefined || !Number.isFinite(Number(value)) ? null : Number(value);
+  }
+
+  function normalizeCustomMetrics(raw) {
+    const list = Array.isArray(raw) ? raw : [];
+    return list.map(item => ({
+      id: String(item && item.id || '').slice(0, 40),
+      name: String(item && item.name || '').trim().slice(0, 40),
+      num: String(item && item.num || ''),
+      op: item && item.op === '*' ? '*' : '/',
+      den: String(item && item.den || ''),
+      percent: !!(item && item.percent)
+    })).filter(item => item.id && item.name && AD_METRIC_FIELDS[item.num] && AD_METRIC_FIELDS[item.den])
+      .slice(0, MAX_CUSTOM_METRICS);
+  }
+
+  function evaluateCustomMetric(metric, row) {
+    const a = adFieldValue(row, metric.num);
+    const b = adFieldValue(row, metric.den);
+    if (a === null || b === null) return null;
+    if (metric.op === '/' && b === 0) return null;
+    const value = metric.op === '*' ? a * b : a / b;
+    return metric.percent ? value * 100 : value;
+  }
+
+  function formatCustomMetric(metric, value) {
+    if (value === null || value === undefined) return '—';
+    if (metric.percent) return number(Math.round(value * 100) / 100, '%');
+    return metric.num === 'spend' || (metric.op === '*' && metric.den === 'spend') ? money(value) : number(Math.round(value * 100) / 100);
+  }
+
+  // Kampanya butcesi GUNLUK UST SINIRDIR (kullanici M18): her gun o kadar
+  // harcamak zorunlu degil. Kayitli donemlerin ortalama gunluk harcamasi
+  // sinirla karsilastirilir; sinir girilmemisse karsilastirma yapilmaz.
+  function campaignBudgetView(campaign, periods) {
+    const limit = Number(campaign && campaign.budget) > 0 ? Number(campaign.budget) : null;
+    const own = (periods || []).filter(row => String(row.campaignId) === String(campaign && campaign.id) && row.spend != null);
+    const days = own.reduce((sum, row) => sum + (adPeriodDays(row) || 0), 0);
+    const spend = own.reduce((sum, row) => sum + Number(row.spend || 0), 0);
+    const avgDaily = days > 0 ? spend / days : null;
+    const usagePct = limit !== null && avgDaily !== null ? Math.round(avgDaily / limit * 1000) / 10 : null;
+    return { limit, avgDaily, usagePct, days, spend, overLimit: usagePct !== null && usagePct > 100 };
+  }
+
   function kpi(label, value, note) {
     return `<div class="card" style="padding:16px;min-width:170px;flex:1"><div class="sub-text" style="font-size:11px;text-transform:uppercase">${escapeHtml(label)}</div><div style="font-size:24px;font-weight:800;margin:5px 0">${escapeHtml(value)}</div><div class="sub-text" style="font-size:11px">${escapeHtml(note)}</div></div>`;
   }
@@ -550,6 +612,8 @@
       campaigns: campaigns.filter(item => ['META', 'GOOGLE'].includes(String(item.platform || '').toUpperCase())),
       allCampaigns: campaigns,
       periods,
+      allPeriods,
+      customMetrics: normalizeCustomMetrics(input.customMetrics),
       targets: input.targets || {},
       channelLeadCost: engine.channelLeadCost({ spendByPlatform: sums.spend, leadsBySource, messagesByPlatform: sums.messages }),
       adShare: engine.adShare({ adSpend: totalSpend, netRoomRevenue: input.financeSummary && input.financeSummary.netRoomRevenue }),
@@ -606,7 +670,7 @@
           <label style="display:grid;gap:5px;font-size:12px">Platform<select class="form-control" name="platform" required><option value="META">Meta</option><option value="GOOGLE">Google</option><option value="TIKTOK">TikTok</option><option value="OTHER">Diğer / Influencer</option></select></label>
           <label style="display:grid;gap:5px;font-size:12px">Başlangıç<input class="form-control" type="date" name="startDate"></label>
           <label style="display:grid;gap:5px;font-size:12px">Bitiş<input class="form-control" type="date" name="endDate"></label>
-          <label style="display:grid;gap:5px;font-size:12px">Bütçe<input class="form-control" type="number" name="budget" min="0" step="0.01"></label>
+          <label style="display:grid;gap:5px;font-size:12px" title="Üst sınırdır; her gün bu kadar harcamak zorunlu değil">Günlük bütçe sınırı (₺)<input class="form-control" type="number" name="budget" min="0" step="0.01" placeholder="Örn: 500"></label>
           <button class="btn btn-primary btn-sm" type="submit">Kampanyayı kaydet</button>
         </div>
       </form>
@@ -618,9 +682,20 @@
           <button class="btn btn-primary btn-sm" type="submit">Hedefleri kaydet</button>
         </div>
       </form>
-      <div class="card" style="padding:14px;margin-bottom:14px"><h3 style="margin:0 0 10px">Kayıtlı kampanyalar</h3>${model.allCampaigns.length ? model.allCampaigns.map(item => `<div class="lead-followup-row"><div><strong>${escapeHtml(item.name || 'Adsız kampanya')}</strong><span>${escapeHtml(item.platform || 'OTHER')} · ${escapeHtml(item.startDate || item.start_date || 'Başlangıç yok')} → ${escapeHtml(item.endDate || item.end_date || 'Bitiş yok')}</span></div><button type="button" class="btn btn-danger btn-sm" data-ads-delete-campaign="${escapeHtml(item.id)}">Sil</button></div>`).join('') : '<p class="empty-state">Henüz kampanya yok.</p>'}</div>`
+      <div class="card" style="padding:14px;margin-bottom:14px"><h3 style="margin:0 0 10px">Kayıtlı kampanyalar</h3>${model.allCampaigns.length ? model.allCampaigns.map(item => { const b = campaignBudgetView(item, model.allPeriods || []); const budgetText = b.limit === null ? 'Günlük sınır girilmedi' : `Günlük sınır ${money(b.limit)} · ort. günlük harcama ${b.avgDaily === null ? '—' : money(b.avgDaily)}${b.usagePct === null ? '' : ` (sınırın %${number(b.usagePct)}'i)`}`; return `<div class="lead-followup-row"><div><strong>${escapeHtml(item.name || 'Adsız kampanya')}</strong><span>${escapeHtml(item.platform || 'OTHER')} · ${escapeHtml(item.startDate || item.start_date || 'Başlangıç yok')} → ${escapeHtml(item.endDate || item.end_date || 'Bitiş yok')}</span><span${b.overLimit ? ' style="color:#F87171"' : ''}>${escapeHtml(budgetText)}${b.overLimit ? ' — sınır aşıldı' : ''}</span></div><button type="button" class="btn btn-danger btn-sm" data-ads-delete-campaign="${escapeHtml(item.id)}">Sil</button></div>`; }).join('') : '<p class="empty-state">Henüz kampanya yok.</p>'}</div>`
       : '';
-    const periodList = `<div class="card" style="padding:14px;margin-bottom:14px"><h3 style="margin:0 0 10px">Kayıtlı reklam dönemleri</h3>${model.periods.length ? model.periods.map(row => `<div class="lead-followup-row"><div><strong>${escapeHtml((model.allCampaigns.find(item => String(item.id) === String(row.campaignId)) || {}).name || 'Bilinmeyen kampanya')}</strong><span>${escapeHtml(row.periodStart)} → ${escapeHtml(row.periodEnd)} · ${money(row.spend)}</span></div>${model.canManage ? `<button type="button" class="btn btn-danger btn-sm" data-ads-delete-period="${escapeHtml(row.id)}">Sil</button>` : ''}</div>`).join('') : '<p class="empty-state">Henüz reklam dönemi yok.</p>'}</div>`;
+    const customMetrics = model.customMetrics || [];
+    const campaignName = row => (model.allCampaigns.find(item => String(item.id) === String(row.campaignId)) || {}).name || 'Bilinmeyen kampanya';
+    const periodRows = model.periods.map(row => {
+      const days = adPeriodDays(row);
+      const ctr = row.impressions > 0 && row.clicks != null ? row.clicks / row.impressions * 100 : null;
+      const custom = customMetrics.map(metric => `<td>${formatCustomMetric(metric, evaluateCustomMetric(metric, row))}</td>`).join('');
+      return `<tr><td><strong>${escapeHtml(campaignName(row))}</strong><span class="sub-text" style="display:block">${escapeHtml(row.platform || '—')}</span></td><td style="white-space:nowrap">${escapeHtml(row.periodStart)} → ${escapeHtml(row.periodEnd)}</td><td>${number(days)}</td><td>${money(row.spend)}</td><td>${days && row.spend != null ? money(row.spend / days) : '—'}</td><td>${number(row.impressions)}</td><td>${number(row.clicks)}</td><td>${ctr === null ? '—' : number(Math.round(ctr * 100) / 100, '%')}</td><td>${number(row.messages)}</td><td>${number(row.calls)}</td>${custom}<td>${model.canManage ? `<button type="button" class="btn btn-danger btn-sm" data-ads-delete-period="${escapeHtml(row.id)}">Sil</button>` : ''}</td></tr>`;
+    }).join('');
+    const customHeaders = customMetrics.map(metric => `<th title="${escapeHtml(AD_METRIC_FIELDS[metric.num])} ${metric.op === '*' ? '×' : '÷'} ${escapeHtml(AD_METRIC_FIELDS[metric.den])}${metric.percent ? ' × 100' : ''}">${escapeHtml(metric.name)}</th>`).join('');
+    const periodList = `<div class="card" style="padding:14px;margin-bottom:14px;overflow:auto"><h3 style="margin:0 0 10px">Kayıtlı reklam dönemleri</h3>${model.periods.length ? `<table class="data-table"><thead><tr><th>Kampanya</th><th>Dönem</th><th>Gün</th><th>Harcama</th><th>Günlük ort.</th><th>Gösterim</th><th>Tıklama</th><th>CTR</th><th>Mesaj</th><th>Arama</th>${customHeaders}<th></th></tr></thead><tbody>${periodRows}</tbody></table>` : '<p class="empty-state">Henüz reklam dönemi yok.</p>'}</div>`;
+    const fieldOptions = Object.keys(AD_METRIC_FIELDS).map(key => `<option value="${key}">${escapeHtml(AD_METRIC_FIELDS[key])}</option>`).join('');
+    const customMetricAdmin = model.canManage ? `<form data-ads-custom-metric-form class="card" style="padding:16px;margin-bottom:14px"><h3 style="margin:0 0 6px">Kendi metriğini ekle</h3><p class="sub-text" style="margin:0 0 10px">İki alanı bölerek ya da çarparak tabloya yeni bir sütun ekleyin (örn. Harcama ÷ Mesaj = mesaj başı maliyet). En fazla ${MAX_CUSTOM_METRICS} metrik.</p><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;align-items:end"><label style="display:grid;gap:5px;font-size:12px">Ad<input class="form-control" name="name" required maxlength="40" placeholder="Örn: Mesaj maliyeti"></label><label style="display:grid;gap:5px;font-size:12px">Alan<select class="form-control" name="num">${fieldOptions}</select></label><label style="display:grid;gap:5px;font-size:12px">İşlem<select class="form-control" name="op"><option value="/">÷ böl</option><option value="*">× çarp</option></select></label><label style="display:grid;gap:5px;font-size:12px">Alan<select class="form-control" name="den">${fieldOptions}</select></label><label style="display:flex;gap:6px;align-items:center;font-size:12px"><input type="checkbox" name="percent" value="1"> Yüzde (×100)</label><button class="btn btn-primary btn-sm" type="submit">Metriği ekle</button></div>${customMetrics.length ? `<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px">${customMetrics.map(metric => `<span class="badge">${escapeHtml(metric.name)} = ${escapeHtml(AD_METRIC_FIELDS[metric.num])} ${metric.op === '*' ? '×' : '÷'} ${escapeHtml(AD_METRIC_FIELDS[metric.den])}${metric.percent ? ' %' : ''} <button type="button" class="btn-text" data-ads-delete-metric="${escapeHtml(metric.id)}" aria-label="Metriği sil">✕</button></span>`).join('')}</div>` : ''}</form>` : '';
     const form = model.canManage ? (campaignOptions ? `
       <form data-ads-manual-form class="card" style="padding:16px;margin-bottom:14px">
         <h3 style="margin:0 0 6px">Reklam dönemi ekle</h3>
@@ -654,7 +729,7 @@
     const spendTrend = model.spendTrendPct === null || model.spendTrendPct === undefined
       ? 'Önceki eş dönem karşılaştırması için veri yok'
       : `Önceki eş döneme göre ${model.spendTrendPct > 0 ? '+' : ''}${number(model.spendTrendPct, '%')} (${money(model.priorSpend)} → ${money(model.totalSpend)})`;
-    return `${campaignAdmin}${form}${periodList}
+    return `${campaignAdmin}${form}${customMetricAdmin}${periodList}
       <div class="card" style="padding:14px;margin-bottom:14px"><strong>Seçili dönem reklam toplamı: ${money(model.totalSpend)}</strong><div class="sub-text">${escapeHtml(spendTrend)}</div></div>
       <div class="card" style="padding:14px;margin-bottom:14px;border-left:4px solid #f59e0b"><strong>Atıf sınırı</strong><div class="sub-text">Talep kaynağı kanal düzeyinde ölçülür; hangi reklamın rezervasyon getirdiği ölçülemez. Kampanya ROAS'ı gösterilmez.</div></div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:14px">${metricCards}</div>
@@ -677,6 +752,7 @@
       adMetricPeriods: data.adMetricPeriods || [], marketingCampaigns: data.marketingCampaigns || [],
       leadSources: data.leadSources || [], leadAcquisitions: data.leadAcquisitions || [],
       targets: { costPerMessage: settings.ads_cost_per_message_target, costPerCall: settings.ads_cost_per_call_target },
+      customMetrics: settings.ads_custom_metrics || [],
       canManageAds: typeof canManageTenantRole !== 'function' || canManageTenantRole(typeof activeTenant !== 'undefined' && activeTenant && activeTenant.role)
     };
   }
@@ -926,6 +1002,35 @@
     render();
   }
 
+  async function saveAdsCustomMetrics(list) {
+    const client = typeof supabaseClient !== 'undefined' ? supabaseClient : null;
+    const scope = cloudScope();
+    if (!client || !scope) throw new Error('ADS_METRIC_UNAVAILABLE');
+    const { error } = await client.from('tenant_settings').upsert(
+      [{ tenant_id: scope.tenantId, key: 'ads_custom_metrics', value: normalizeCustomMetrics(list) }], { onConflict: 'tenant_id,key' });
+    if (error) throw error;
+    if (typeof loadTenantAppData === 'function') await loadTenantAppData(scope.tenantId);
+    render();
+  }
+
+  function currentCustomMetrics() {
+    const data = typeof appData !== 'undefined' ? appData : {};
+    return normalizeCustomMetrics((data.tenantSettings || {}).ads_custom_metrics);
+  }
+
+  async function handleAdsCustomMetricSubmit(form) {
+    const values = Object.fromEntries(new FormData(form).entries());
+    const list = currentCustomMetrics();
+    if (list.length >= MAX_CUSTOM_METRICS) throw new Error('ADS_METRIC_LIMIT');
+    const metric = normalizeCustomMetrics([{ id: 'm' + Date.now().toString(36), name: values.name, num: values.num, op: values.op, den: values.den, percent: values.percent === '1' }])[0];
+    if (!metric) throw new Error('ADS_METRIC_INVALID');
+    await saveAdsCustomMetrics(list.concat(metric));
+  }
+
+  async function deleteAdsCustomMetric(metricId) {
+    await saveAdsCustomMetrics(currentCustomMetrics().filter(metric => metric.id !== metricId));
+  }
+
   async function deleteAdsPeriod(periodId) {
     const client = typeof supabaseClient !== 'undefined' ? supabaseClient : null;
     const scope = cloudScope();
@@ -998,6 +1103,14 @@
       if (cancelExperiment) { state.experimentFormOpen = false; render(); return; }
       if (openBenchmark) { state.benchmarkFormOpen = true; render(); return; }
       if (cancelBenchmark) { state.benchmarkFormOpen = false; render(); return; }
+      const deleteMetricButton = event.target.closest('[data-ads-delete-metric]');
+      if (deleteMetricButton) {
+        deleteAdsCustomMetric(deleteMetricButton.dataset.adsDeleteMetric).catch(() => {
+          const status = document.getElementById('marketingWorkspaceStatus');
+          if (status) status.textContent = 'Metrik silinemedi. Yetkiyi kontrol edin.';
+        });
+        return;
+      }
       const deletePeriodButton = event.target.closest('[data-ads-delete-period]');
       if (deletePeriodButton) {
         deleteAdsPeriod(deletePeriodButton.dataset.adsDeletePeriod).catch(() => {
@@ -1028,6 +1141,17 @@
         handleAdsCampaignSubmit(campaignForm).catch(() => {
           const status = document.getElementById('marketingWorkspaceStatus');
           if (status) status.textContent = 'Kampanya kaydedilemedi. Alanları ve yetkiyi kontrol edin.';
+        });
+        return;
+      }
+      const customMetricForm = event.target.closest('[data-ads-custom-metric-form]');
+      if (customMetricForm) {
+        event.preventDefault();
+        handleAdsCustomMetricSubmit(customMetricForm).catch(error => {
+          const status = document.getElementById('marketingWorkspaceStatus');
+          if (status) status.textContent = error && error.message === 'ADS_METRIC_LIMIT'
+            ? 'En fazla 8 metrik tanımlanabilir; önce birini silin.'
+            : 'Metrik kaydedilemedi. Ad ve alanları kontrol edin.';
         });
         return;
       }
@@ -1137,5 +1261,5 @@
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') initializeBrowser();
 
-  return { periodFromFilter, scopeBookings, buildWorkspaceModel, getCurrentModel: () => buildWorkspaceModel(browserInput()), buildAdsModel, buildAdsImportPreview, selectLatestSnapshot, selectCurrentBenchmark, renderWorkspaceHtml, renderAds, renderAdsImportPreview, renderMarketingHealth, renderBenchmarkPanel, renderBenchmarkForm, renderFindingActions, renderListingForm, renderSnapshotForm, renderExperimentForm, renderExperiments, escapeHtml, setData, render };
+  return { periodFromFilter, scopeBookings, buildWorkspaceModel, getCurrentModel: () => buildWorkspaceModel(browserInput()), buildAdsModel, buildAdsImportPreview, selectLatestSnapshot, selectCurrentBenchmark, renderWorkspaceHtml, renderAds, renderAdsImportPreview, normalizeCustomMetrics, evaluateCustomMetric, campaignBudgetView, renderMarketingHealth, renderBenchmarkPanel, renderBenchmarkForm, renderFindingActions, renderListingForm, renderSnapshotForm, renderExperimentForm, renderExperiments, escapeHtml, setData, render };
 }));
