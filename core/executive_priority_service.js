@@ -135,8 +135,14 @@
         propertyId: propId,
         propertyName,
         category: primaryCategory,
-        title: `${propertyName}: Zirve hazırlık & operasyonel müdahale gerekiyor`,
-        reason: `${groupActions.length} adet bağlantılı operasyonel sorun tespit edildi.`,
+        // Baslik isin ne oldugunu soyler; tek tek isler rootCauses'ta listelenir
+        // (L-178). Eski "Zirve hazırlık & operasyonel müdahale" basligi hicbir
+        // isi adlandirmiyordu ve kullanici kartin neyi gosterdigini anlamadi.
+        title: `${propertyName}: ${groupActions.length} açık iş`,
+        reason: 'Aynı mülkte birden fazla iş bekliyor.',
+        // "Incele" en oncelikli kaydi acar; birlesik kartin kendi kimligi
+        // hicbir ekranda karsiligi olmayan bir uretilmis kimliktir.
+        focusId: highestScoreAction.id,
         rootCauses: rootCauses,
         priorityScore: Math.min(100, (highestScoreAction.priorityScore || 50) + 10), // slight boost for multiple issues
         domain: highestScoreAction.domain || 'OPERATIONS',

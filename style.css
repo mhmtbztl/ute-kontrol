@@ -4980,6 +4980,7 @@ body {
 .ops-group, .ops-debt-panel { background: rgba(0,0,0,.22); border: 1px solid rgba(255,255,255,.08); border-radius: 10px; padding: 14px; margin-bottom: 12px; }
 .ops-group h3, .ops-debt-panel h3 { margin: 0 0 10px; color: #F8FAFC; font-size: 14px; }
 .ops-row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.07); }
+.ops-row.ops-row-focus { outline: 2px solid #60A5FA; outline-offset: 4px; border-radius: 8px; transition: outline-color .4s; }
 .ops-row:last-child { border-bottom: 0; }
 .ops-row-main { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .ops-row-main span, .ops-debt-row span { color: var(--text-muted); font-size: 11px; }

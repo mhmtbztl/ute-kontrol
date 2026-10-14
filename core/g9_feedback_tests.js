@@ -5,6 +5,9 @@
 //   Yeni talep tek yerden, telefon + kaynak zorunlu hizli kayit formundan acilir.
 // L-176 (M7): Saha personeli ve usta hicbir ekrandan tanimlanamiyordu;
 //   operational_people tablosuna yazan arayuz yoktu, atama listeleri hep bostu.
+// L-177 (M8): Operasyon "Temizlik borcu" karti kayittan sonra eski kaliyordu.
+// L-178 (M9): Ana sayfa kritik eylem karti isi adlandirmiyor, Incele arizaya gitmiyordu.
+// L-179 (M10): Acik arizali mulk "Satisa hazir" secilebiliyordu; cozulmus ariza mulku kapali tutuyordu.
 const fs = require('fs');
 const path = require('path');
 
@@ -147,6 +150,84 @@ async function saahaEkibiDavranisi() {
   check(/TEST Ayşe/.test(liste) && !/TEST Eski/.test(liste) && !/TEST Usta/.test(liste), 'L-176l Temizlik formu yalniz etkin temizlikcileri onerir', liste);
 }
 
+async function operasyonKartiDavranisi() {
+  sahteDom({});
+  const App = require('../app.js');
+  App.setActiveTenant({ id: TENANT, role: 'owner' });
+  App.setSupabaseClient(kaydedenIstemci());
+  App.setAppData({
+    villas: { A: { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', slug: 'A', name: 'Villa A' } },
+    bookings: [], expenses: [], operationalPeople: [], salesMembers: [], maintenance: [], maintenanceTickets: [],
+    cleaningTasks: [{ id: 't1', villa: 'A', date: '2031-05-01', status: 'DONE', paid: false, amount: 2500, cleaner: 'TEST Ayşe' }]
+  });
+  // Kayit/silme yollari yalniz listeyi (renderOperationsTab) ciziyor; kart da
+  // ayni cagride guncellenmeli (L-177).
+  global.document.getElementById('opsCombinedContainer');
+  App.renderOperationsTab();
+  const kart = global.document.getElementById('opsDebtVal').innerText;
+  check(/2\.500/.test(kart), 'L-177 Operasyon listesi cizilince Temizlik borcu karti da guncellenir', kart);
+}
+
+async function kritikEylemKartiDavranisi() {
+  const { collapseDuplicateActions } = require('./executive_priority_service.js');
+  const birlesik = collapseDuplicateActions([
+    { id: 'tk-1', domain: 'OPERATIONS', propertyId: 'p1', propertyName: 'DOĞUŞ', title: 'P1 Arıza: beton dökümü', priorityScore: 90,
+      sourceMetrics: ['Öncelik: P1', 'Durum: Devam Ediyor'], deepLink: 'maintenance' },
+    { id: 'tk-2', domain: 'OPERATIONS', propertyId: 'p1', propertyName: 'DOĞUŞ', title: 'Arıza: <b>musluk</b>', priorityScore: 60,
+      sourceMetrics: ['Öncelik: P2', 'Durum: Açık'], deepLink: 'maintenance' }
+  ])[0];
+  check(birlesik.title === 'DOĞUŞ: 2 açık iş' && !/Zirve/.test(birlesik.title), 'L-178a Birlesik kart basligi isi adlandirir', birlesik.title);
+  check(birlesik.focusId === 'tk-1', 'L-178b Birlesik kart en oncelikli kayda gider', birlesik.focusId);
+
+  sahteDom({});
+  const App = require('../app.js');
+  App.renderTodayCommandCenter({ critical: [birlesik], operations: [], revenue: [] });
+  const kart = global.document.getElementById('todayCriticalActionsList').innerHTML;
+  check(/<li>P1 Arıza: beton dökümü<\/li>/.test(kart) && /<li>Arıza: &lt;b&gt;musluk&lt;\/b&gt;<\/li>/.test(kart),
+    'L-178c Birlesik kart isleri tek tek (kacislanmis) listeler', kart);
+  check(!/Durum: Devam Ediyor • Durum: Açık/.test(kart), 'L-178d Celiskili "Durum • Durum" satiri yok');
+  check(/openTabFromDeepLink\(decodeURIComponent\('maintenance'\), decodeURIComponent\('tk-1'\)\)/.test(kart), 'L-178e Incele arizanin kendisine gider');
+  check(global.document.getElementById('criticalActionsCountBadge').innerText === '1', 'L-178f Rozet yalniz is sayisini yazar',
+    global.document.getElementById('criticalActionsCountBadge').innerText);
+
+  // Incele: menude olmayan eski sayfa yerine Operasyon -> Ariza gorunumu.
+  App.setActiveTenant({ id: TENANT, role: 'owner' });
+  App.setAppData({ villas: {}, bookings: [], cleaningTasks: [], operationalPeople: [], maintenance: [], maintenanceTickets: [] });
+  App.openTabFromDeepLink('maintenance', 'tk-1');
+  const ekran = global.document.getElementById('opsCombinedContainer').innerHTML;
+  check(/Açık arıza veya bakım kaydı yok/.test(ekran), 'L-178g Incele Operasyon\'un Ariza gorunumunu acar', ekran.slice(0, 120));
+}
+
+async function satisaHazirlikDavranisi() {
+  const Readiness = require('./property_sales_readiness.js');
+  const mulk = { id: 'p1', key: 'DOGUS', name: 'DOĞUŞ' };
+  // DB'deki RESOLVED bellekte COMPLETED'dir; cozulmus ariza mulku kapatmamali.
+  const cozulmus = Readiness.buildPropertyReadiness(mulk, { overrideStatus: 'SALES_READY',
+    maintenanceTickets: [{ id: 'tk-9', propertyId: 'p1', status: 'COMPLETED', severity: 'CRITICAL' }] });
+  check(cozulmus.status === 'SALES_READY', 'L-179a Cozulmus (COMPLETED) ariza mulku satisa kapatmaz', cozulmus.status);
+  const acik = Readiness.buildPropertyReadiness(mulk, { overrideStatus: 'SALES_READY',
+    maintenanceTickets: [{ id: 'tk-1', propertyId: 'p1', status: 'IN_PROGRESS', severity: 'CRITICAL' }] });
+  check(acik.status === 'BLOCKED_MAINTENANCE' && acik.blockingTicketIds[0] === 'tk-1', 'L-179b Acik kritik ariza satisi kapatir ve kaydini tasir');
+
+  sahteDom({});
+  const App = require('../app.js');
+  App.setActiveTenant({ id: TENANT, role: 'owner' });
+  App.setAppData({ villas: { DOGUS: { id: 'p1', slug: 'DOGUS', name: 'DOĞUŞ' } }, bookings: [], cleaningTasks: [],
+    operationalPeople: [], maintenance: [], maintenanceTickets: [{ id: 'tk-1', propertyId: 'p1', status: 'IN_PROGRESS', severity: 'CRITICAL' }],
+    housekeepingOverrides: {} });
+  App.renderPortfolioHealth([acik]);
+  const kart = global.document.getElementById('portfolioHealthCardsGrid').innerHTML;
+  check(/<option value="SALES_READY"[^>]*disabled/.test(kart) && /<option value="NON_BLOCKING_ISSUE"[^>]*disabled/.test(kart),
+    'L-179c Acik arizada satilabilir durumlar secilemez');
+  check(!/<option value="NEEDS_CLEANING"[^>]*disabled/.test(kart), 'L-179d Temizlik bekliyor secilebilir kalir');
+  check(/openTabFromDeepLink\('maintenance', decodeURIComponent\('tk-1'\)\)/.test(kart), 'L-179e Kart arizaya goturen dugme gosterir');
+
+  const ist = kaydedenIstemci();
+  App.setSupabaseClient(ist);
+  const sonuc = await App.setPropertySalesReadiness('DOGUS', 'SALES_READY');
+  check(sonuc === false && !ist.yazmalar.length, 'L-179f Acik arizada satisa acma yazilmaz (arayuz disindan cagri da)', JSON.stringify(ist.yazmalar));
+}
+
 async function main() {
 try {
   const html = read('index.html');
@@ -168,6 +249,9 @@ try {
   check(/data-operations-view="people"/.test(html), "L-176a Operasyon'da Saha ekibi gorunumu var");
   check(!/Follow-up/.test(html), 'L-186 Talep durumu Turkce ("Takip bekliyor")');
   await saahaEkibiDavranisi();
+  await operasyonKartiDavranisi();
+  await kritikEylemKartiDavranisi();
+  await satisaHazirlikDavranisi();
 } catch (error) {
   failed++;
   console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

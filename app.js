@@ -4211,7 +4211,6 @@ function switchTab(tabId) {
   if (tabId === 'executive') renderExecutiveControlCenter();
   if (tabId === 'properties') renderPropertiesTab();
   if (tabId === 'operations') renderOperationsTab();
-  if (tabId === 'operations') renderOperationsKpiStrip();
   if (tabId === 'staff-field') renderStaffFieldWork();
   if (tabId === 'guests') renderGuestsTab();
   if (tabId === 'pricing') renderPricingTab();
@@ -11276,6 +11275,9 @@ async function cycleHkStatus(vKey) {
   return await setPropertySalesReadiness(vKey, next);
 }
 
+// Satisa engel acik arizasi olan mulkte satilabilir durum secilemez (L-179).
+const SALEABLE_READINESS_STATUSES = ['SALES_READY', 'NON_BLOCKING_ISSUE'];
+
 async function setPropertySalesReadiness(vKey, status) {
   const api = getPropertySalesReadinessApi();
   if (!api || !api.SELECTABLE_STATUSES.includes(status)) {
@@ -11284,6 +11286,12 @@ async function setPropertySalesReadiness(vKey, status) {
   }
   if (!canManagePropertyReadiness()) {
     if (window.showToast) window.showToast('⚠️ Bu durumu değiştirme yetkiniz yok.', 'error');
+    return false;
+  }
+
+  if (SALEABLE_READINESS_STATUSES.includes(status) && (getPropertySalesReadiness(vKey)?.blockingIssueCount || 0) > 0) {
+    if (window.showToast) window.showToast('⚠️ Satışa engel açık arıza var. Mülkü satışa açmak için önce arızayı kapatın.', 'error');
+    renderExecutiveControlCenter();
     return false;
   }
 
@@ -17098,7 +17106,9 @@ function renderTodayCommandCenter(actionsResult) {
 
   // Helper renderer
   function renderActionCards(listEl, badgeEl, actions, typeClass, emptyMsg) {
-    if (badgeEl) badgeEl.innerText = `${actions.length} / ${badgeEl.innerText.split('/')[1]?.trim() || actions.length}`;
+    // Rozet yalniz is sayisini yazar. Eskiden paydaya bir onceki cizimin
+    // sayisini koyuyordu: 0'dan 1 ise geciste '1 / 0' gorunuyordu (L-178).
+    if (badgeEl) badgeEl.innerText = String((actions || []).length);
     if (!listEl) return;
 
     if (!actions || actions.length === 0) {
@@ -17107,7 +17117,14 @@ function renderTodayCommandCenter(actionsResult) {
     }
 
     listEl.innerHTML = actions.map(act => {
-      const metricsText = (act.sourceMetrics || []).join(' • ');
+      // Birlesik kartta isler tek tek listelenir; birden cok kaydin olcutlerini
+      // tek satira dokmek "Durum: Devam Ediyor • Durum: Açık" gibi celiskili
+      // bir satir uretiyordu (L-178).
+      const causes = act.isCollapsed ? (act.rootCauses || []).filter(Boolean) : [];
+      const metricsText = act.isCollapsed ? '' : (act.sourceMetrics || []).join(' • ');
+      const rationaleHtml = causes.length
+        ? `<ul class="action-root-causes" style="margin:4px 0 0 16px;padding:0">${causes.map(cause => `<li>${escapeHtml(cause)}</li>`).join('')}</ul>`
+        : escapeHtml(act.rationale || act.reason || '');
       // Ham kimlik (UUID) musteriye gosterilmez; ad bulunamazsa bos kalir (L-104).
       const mulkEtiketi = act.propertyName
         || (typeof appData !== 'undefined' && appData.villas && appData.villas[act.propertyId]?.name)
@@ -17120,10 +17137,10 @@ function renderTodayCommandCenter(actionsResult) {
             <span style="font-size: 10px; color: #94A3B8; font-weight: 600;">${escapeHtml(mulkEtiketi)}</span>
           </div>
           <div class="action-card-title">${escapeHtml(act.title)}</div>
-          <div class="action-card-rationale">${act.rationale || ''}</div>
-          ${metricsText ? `<div class="action-source-metrics">📊 ${metricsText}</div>` : ''}
+          <div class="action-card-rationale">${rationaleHtml}</div>
+          ${metricsText ? `<div class="action-source-metrics">📊 ${escapeHtml(metricsText)}</div>` : ''}
           <div class="action-card-footer">
-            <button type="button" class="btn btn-secondary btn-sm" data-onclick="openTabFromDeepLink(decodeURIComponent('${encodeActionArg(act.deepLink || 'executive')}'), decodeURIComponent('${encodeActionArg(act.id)}'))" style="font-size: 11px; padding: 3px 8px;">İncele ›</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-onclick="openTabFromDeepLink(decodeURIComponent('${encodeActionArg(act.deepLink || 'executive')}'), decodeURIComponent('${encodeActionArg(act.focusId || act.id)}'))" style="font-size: 11px; padding: 3px 8px;">İncele ›</button>
             ${act.quickAction
               ? `<button type="button" class="btn btn-primary btn-sm" data-onclick="handleQuickActionTrigger(decodeURIComponent('${encodeActionArg(act.quickAction)}'), decodeURIComponent('${encodeActionArg(act.id)}'))" style="font-size: 11px; padding: 3px 8px;">Uygula</button>`
               : ''}
@@ -17165,11 +17182,21 @@ function renderPortfolioHealth(healthCards) {
     const cardStatus = c.status === 'SALES_READY' ? 'HEALTHY'
       : c.status === 'BLOCKED_MAINTENANCE' ? 'CRITICAL'
         : c.status === 'NON_BLOCKING_ISSUE' ? 'INFO' : 'WARNING';
+    // Satisa engel acik ariza varken mulk elle satisa acilamaz (L-179): satisa
+    // acmanin yolu arizayi kapatmaktir. Eskiden secenek seciliyor, kaydediliyor
+    // ama kart yine "kapali" gosteriyordu.
+    const blocked = (c.blockingIssueCount || 0) > 0;
     const options = readinessApi.SELECTABLE_STATUSES.map(status => {
       const optionMeta = readinessApi.STATUS_META[status];
       const selected = c.manualStatus === status ? ' selected' : '';
-      return `<option value="${escapeHtml(status)}"${selected}>${optionMeta.icon} ${escapeHtml(optionMeta.label)}</option>`;
+      const disabled = blocked && SALEABLE_READINESS_STATUSES.includes(status) ? ' disabled' : '';
+      return `<option value="${escapeHtml(status)}"${selected}${disabled}>${optionMeta.icon} ${escapeHtml(optionMeta.label)}${disabled ? ' — önce arızayı kapatın' : ''}</option>`;
     }).join('');
+    const blockedHtml = blocked
+      ? `<div style="margin-top:8px; font-size:11px; color:#FCA5A5;">Satışa açmak için arızayı kapatın.
+           <button type="button" class="btn btn-secondary btn-sm" style="font-size:11px; padding:2px 8px; margin-left:4px;"
+             data-onclick="openTabFromDeepLink('maintenance', decodeURIComponent('${encodeActionArg(String((c.blockingTicketIds || [])[0] || ''))}'))">Arızayı gör ›</button></div>`
+      : '';
     const editor = canEdit
       ? `<label style="display:block; margin-top:9px; font-size:10px; color:#94A3B8;">
            Durumu değiştir
@@ -17201,6 +17228,7 @@ function renderPortfolioHealth(healthCards) {
             <strong style="color: ${c.openIssueCount > 0 ? '#F87171' : '#34D399'}; font-size: 13px;">${c.openIssueCount || 0} Kayıt</strong>
           </div>
         </div>
+        ${blockedHtml}
         ${editor}
       </div>
     `;
@@ -18337,6 +18365,10 @@ function renderOperationsTab() {
   if (typeof document === 'undefined') return;
   const container = document.getElementById('opsCombinedContainer');
   if (!container) return;
+  // Ust kartlar listeyle ayni anda cizilir (L-177): kart yalniz sekmeye
+  // geciste ciziliyordu; kayit/esitleme sonrasi liste guncel, "Temizlik borcu"
+  // karti sayfa yenilenene kadar eski kaliyordu.
+  renderOperationsKpiStrip();
 
   const tasks = ((typeof appData !== 'undefined' && appData.cleaningTasks) || [])
     .map(task => normalizeCleaningTask(task, appData.villas || {}));
@@ -18365,7 +18397,7 @@ function renderOperationsTab() {
       const options = technicians.map(person => `<option value="${escapeHtml(person.id)}"${person.id === assignment?.person_id ? ' selected' : ''}>${escapeHtml(person.full_name)}${person.specialty ? ` · ${escapeHtml(person.specialty)}` : ''}</option>`).join('');
       const impactClass = ticket.booking_impact ? 'badge-red' : '';
       const statusLabel = ticket.booking_impact ? 'Satışa kapatır' : getMaintenanceStatusPresentation(ticket.status).label;
-      return `<article class="ops-row"><div class="ops-row-main"><strong>${escapeHtml(ticket.title || '—')}</strong><span>${escapeHtml(ticket.description || 'Açıklama yok')}</span>${assigned ? `<span>Usta: ${escapeHtml(assigned.full_name)}${assigned.phone ? ` · <a href="tel:${escapeHtml(assigned.phone)}">Ara</a>` : ''}</span>` : ''}</div><span class="badge ${impactClass}">${escapeHtml(statusLabel)}</span><div class="ops-row-actions"><select id="opsTechnician-${escapeHtml(ticket.id)}" aria-label="Usta seç"><option value="">Usta seç…</option>${options}</select><button class="btn btn-secondary btn-sm" data-onclick="assignMaintenanceFromSelect(decodeURIComponent('${encodeActionArg(ticket.id)}'))">Usta ata</button><button class="btn btn-secondary btn-sm" data-onclick="editMaint(decodeURIComponent('${encodeActionArg(ticket.id)}'))">Durumu güncelle</button><button class="btn btn-primary btn-sm" data-onclick="resolveMaintenanceFromOperations(decodeURIComponent('${encodeActionArg(ticket.id)}'))">Çözüldü</button></div></article>`;
+      return `<article class="ops-row" data-maintenance-ticket-id="${escapeHtml(ticket.id)}"><div class="ops-row-main"><strong>${escapeHtml(ticket.title || '—')}</strong><span>${escapeHtml(ticket.description || 'Açıklama yok')}</span>${assigned ? `<span>Usta: ${escapeHtml(assigned.full_name)}${assigned.phone ? ` · <a href="tel:${escapeHtml(assigned.phone)}">Ara</a>` : ''}</span>` : ''}</div><span class="badge ${impactClass}">${escapeHtml(statusLabel)}</span><div class="ops-row-actions"><select id="opsTechnician-${escapeHtml(ticket.id)}" aria-label="Usta seç"><option value="">Usta seç…</option>${options}</select><button class="btn btn-secondary btn-sm" data-onclick="assignMaintenanceFromSelect(decodeURIComponent('${encodeActionArg(ticket.id)}'))">Usta ata</button><button class="btn btn-secondary btn-sm" data-onclick="editMaint(decodeURIComponent('${encodeActionArg(ticket.id)}'))">Durumu güncelle</button><button class="btn btn-primary btn-sm" data-onclick="resolveMaintenanceFromOperations(decodeURIComponent('${encodeActionArg(ticket.id)}'))">Çözüldü</button></div></article>`;
     }).join('') : '<div class="empty-state">Açık arıza veya bakım kaydı yok.</div>';
     if (open.length && !technicians.length) container.innerHTML = fieldTeamHintHtml('TECHNICIAN') + container.innerHTML;
   } else {
@@ -18980,8 +19012,24 @@ function renderPricingTab() {
   loadPricingRuleDraft();
 }
 
+// Ana sayfa kartlari eski, menude olmayan sayfalara (tab-maintenance,
+// tab-housekeeping) gidiyordu; kullanici "Incele"ye basinca arizayi bulamadi
+// (L-178). Operasyon isleri artik Operasyon'un ilgili gorunumunde, kayit
+// one cikarilarak acilir.
+const OPERATIONS_DEEP_LINK_VIEWS = { maintenance: 'maintenance', housekeeping: 'cleaning', operations: 'cleaning' };
+
 function openTabFromDeepLink(tabId, entityId) {
-  switchTab(tabId);
+  const view = OPERATIONS_DEEP_LINK_VIEWS[tabId];
+  if (!view) { switchTab(tabId); return; }
+  if (switchTab('operations') === false) return;
+  setOperationsView(view);
+  if (!entityId || typeof document === 'undefined') return;
+  const attr = view === 'maintenance' ? 'data-maintenance-ticket-id' : 'data-cleaning-task-id';
+  const row = Array.from(document.querySelectorAll(`[${attr}]`)).find(el => el.getAttribute(attr) === String(entityId));
+  if (!row) return;
+  row.classList.add('ops-row-focus');
+  if (typeof row.scrollIntoView === 'function') row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  setTimeout(() => row.classList.remove('ops-row-focus'), 2500);
 }
 
 async function runCommandCenterAction(actionType, entityId, options = {}) {
@@ -19323,6 +19371,8 @@ if (typeof module !== 'undefined' && module.exports) {
     setOperationsView,
     assignCleaningTask,
     renderOperationsPeopleView,
+    renderTodayCommandCenter,
+    openTabFromDeepLink,
     renderOperationsCleaningView,
     saveOperationalPerson,
     toggleOperationalPersonActive,
