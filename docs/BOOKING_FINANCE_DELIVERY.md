@@ -5,6 +5,20 @@ Tarih: 14 Ekim 2026. Dal: `codex/booking-finance`.
 
 ## Yayın hazırlığı güncellemesi
 
+15 Ekim 2026: phase92 ve phase94 üretimde salt-okunur sorguyla doğrulandı;
+finans sütunu mevcut. Saf hesap RPC'sinde 100 tutar / 10 vergi örneği,
+işletme yükümlülüğü sıfırken bile 10 karşılık ve 90 kalan döndürdü.
+Üretime test kaydı yazılmadı. Önceki SQL engeli kaldırılmıştır.
+
+Claude'un `1bf8b25` master güncellemeleri üzerine yeniden rebase edildi.
+Force push yapmamak için `codex/booking-finance-release` dalı kullanıldı.
+Arama/bildirim modülleri, phase93 ve kapora akışı korundu.
+Son doğrulama: 207/207 güvenli süit, 2.227 iddia; 19 tarayıcı akışı/4 rol;
+finans canlı 10/10 ve ödeme defteri canlı 25/25. Göç zinciri 80 göç,
+46 HTML + 15 çalışma zamanı damgası ve dört şablon doğrulandı.
+
+### Önceki hazırlık kaydı (14 Ekim)
+
 Kullanıcının rebase/commit/push/yayın isteği üzerine dal `ba2bafd` master
 tabanına rebase edildi. Kapora kaydı ve phase91 korunarak dört dosyadaki
 çakışma çözüldü; varlık damgaları yeniden üretildi.
