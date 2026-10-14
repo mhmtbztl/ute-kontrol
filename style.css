@@ -4564,6 +4564,8 @@ body {
 .settings-template-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .settings-template-pane { padding: 14px; border: 1px solid rgba(148, 163, 184, 0.18); border-radius: 10px; }
 .settings-template-pane h3 { margin: 0 0 12px; font-size: 14px; }
+.settings-template-help { margin: -6px 0 10px; font-size: 11px; line-height: 1.5; }
+.settings-template-help code { padding: 0 4px; border-radius: 4px; background: rgba(148, 163, 184, 0.15); }
 .settings-inline-form { display: grid; gap: 8px; margin-bottom: 12px; }
 .settings-inline-form textarea { min-height: 82px; resize: vertical; }
 .settings-template-list { display: grid; gap: 8px; }
@@ -4957,6 +4959,8 @@ body {
 }
 .preview-item em { font-style: normal; color: var(--text-dim); }
 .preview-item .text-negative { color: #FCA5A5; }
+.text-emerald { color: #34D399; }
+.text-rose { color: #F87171; }
 .preview-item.preview-total {
   grid-column: 1 / -1;
   border-top: 1px solid var(--border-subtle);

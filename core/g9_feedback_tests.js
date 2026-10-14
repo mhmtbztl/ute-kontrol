@@ -12,6 +12,7 @@
 // L-181 (M11): Mulk raporunda mulk ve tarih araligi secilemiyordu.
 // L-182 (M12): Mesaj ayristirici tarih, ad ve kaporayi okumuyordu; kapora odeme defterine yazilir.
 // L-183 (M13): Temizlik planlaninca mulk kendiliginden "temizlik bekliyor", yapilinca hazir.
+// L-184..L-190 (M14-M20): kapora, kar marji hedefi, talep tarihi, mulk net kari, reklam tablosu/metrik/gunluk butce, sablon ekrani, bosluk gecesi.
 const fs = require('fs');
 const path = require('path');
 
@@ -368,6 +369,104 @@ async function temizlikHazirlikDavranisi() {
   check(await App.setPropertySalesReadiness('SEYIR', 'SALES_READY') === false && !ist.yazmalar.length, 'L-183i Bekleyen temizlikte "hazir" yazilmaz');
 }
 
+function istanbulBugun(gunEkle = 0) {
+  const d = new Date(Date.now() + gunEkle * 86400000);
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+}
+
+async function asama4Davranisi() {
+  sahteDom({});
+  const App = require('../app.js');
+  const html = read('index.html');
+  App.setActiveTenant({ id: TENANT, role: 'owner' });
+
+  // L-184 (M14) — kapora tek yoldan odeme defterine
+  let ist = kaydedenIstemci();
+  App.setSupabaseClient(ist);
+  App.setAppData({ villas: {}, bookings: [], expenses: [], cleaningTasks: [], bookingPayments: [] });
+  const not = await App.recordBookingDeposit('bbbbbbbb-0000-4000-8000-000000000009', 2500, 'BANK_TRANSFER', null);
+  const dep = ist.yazmalar.find(k => k.tablo === 'booking_payments');
+  check(dep && dep.yuk.kind === 'DEPOSIT' && dep.yuk.amount === 2500 && dep.yuk.method === 'BANK_TRANSFER' && /Kapora/.test(not),
+    'L-184a Kapora odeme defterine DEPOSIT olarak yazilir', JSON.stringify(dep));
+  check(await App.recordBookingDeposit('x', 0, null, null) === '' , 'L-184b Kapora yoksa yazma yapilmaz');
+  check(/id="resDeposit"/.test(html) && /id="quickBookingDeposit"/.test(html), 'L-184c Rezervasyon ve hizli rezervasyon formunda kapora alani var');
+  check(/if \(deposit > 0\) ekUyari \+= await recordBookingDeposit\(savedBooking\.id/.test(read('app.js')), 'L-184d Rezervasyon kaydi kaporayi yazar');
+
+  // L-185 (M15) — kar hedefi oranla
+  sahteDom({ goalRevenue: '300000', goalMarginPct: '35', goalNetProfit: '' });
+  App.syncGoalProfitFromMargin();
+  check(global.document.getElementById('goalNetProfit').value === 105000, 'L-185a Oran girilince net kar tutari hesaplanir', String(global.document.getElementById('goalNetProfit').value));
+  sahteDom({ goalRevenue: '200000', goalMarginPct: '', goalNetProfit: '50000' });
+  App.syncGoalMarginFromProfit();
+  check(Number(global.document.getElementById('goalMarginPct').value) === 25, 'L-185b Tutar girilince oran hesaplanir');
+  check(!/Cironun yaklaşık %35/.test(html), 'L-185c Sabit "%35" ipucu kalkti');
+
+  // L-186 (M16) — talep duzenlemede ilgilenilen tarih
+  check(/id="leadCheckIn"/.test(html) && /id="leadCheckOut"/.test(html), 'L-186a Talep formunda ilgilenilen tarihler var');
+  check(/checkIn,\n\s*checkOut\n\s*\}\);/.test(read('app.js')), 'L-186b Talep kaydi tarihleri tasir');
+
+  // L-187 (M17) — mulk bazinda net kar
+  sahteDom({});
+  App.setSupabaseClient(kaydedenIstemci());
+  const ay = istanbulBugun().slice(0, 7);
+  App.setCurrentFilter({ period: ay, villa: 'ALL' });
+  App.setAppData({ villas: { A: { id: 'pa', slug: 'A', name: 'A' }, B: { id: 'pb', slug: 'B', name: 'B' } },
+    bookings: [
+      { id: 'a1', villa: 'A', propertyId: 'pa', checkIn: ay + '-02', checkOut: ay + '-04', gross: 20000, status: 'CONFIRMED' },
+      { id: 'b1', villa: 'B', propertyId: 'pb', checkIn: ay + '-02', checkOut: ay + '-04', gross: 10000, status: 'CONFIRMED' }],
+    expenses: [
+      { id: 'e1', villa: 'A', date: ay + '-05', amount: 5000, type: 'OPEX' },
+      { id: 'e2', villa: 'ALL', date: ay + '-05', amount: 9000, type: 'OPEX' }],
+    cleaningTasks: [], closedPeriods: [] });
+  const a = App.propertyProfitView('A');
+  const b = App.propertyProfitView('B');
+  check(/15\.000 TL/.test(a.valueHtml) && /ortak giderler hariç/.test(a.note), 'L-187a Mulk net kari: kendi geliri - kendi gideri; ortak gider bolunmez', JSON.stringify(a));
+  check(b.valueHtml === '—' && /Gider kaydı yok/.test(b.note), 'L-187b Gideri olmayan mulkte kar olculemez ("—")', JSON.stringify(b));
+  check(!/Gider dağılımı gerekli/.test(read('app.js')), 'L-187c "Gider dagilimi gerekli" sabiti kalkti');
+
+  // L-188 (M18) — reklam tablosu, gunluk butce, ozel metrik
+  const UI = require('./marketing_ui.js');
+  const [metrik] = UI.normalizeCustomMetrics([{ id: 'm1', name: 'Mesaj maliyeti', num: 'spend', op: '/', den: 'messages' }, { id: 'x', name: 'kotu', num: 'eval', op: '/', den: 'spend' }]);
+  check(metrik && UI.normalizeCustomMetrics([{ id: 'x', name: 'kotu', num: 'eval', op: '/', den: 'spend' }]).length === 0, 'L-188a Ozel metrik yalniz bilinen alanlari kabul eder');
+  check(UI.evaluateCustomMetric(metrik, { spend: 1000, messages: 40 }) === 25, 'L-188b Ozel metrik hesaplanir (Harcama / Mesaj)');
+  check(UI.evaluateCustomMetric(metrik, { spend: 1000, messages: 0 }) === null && UI.evaluateCustomMetric(metrik, { spend: 1000, messages: null }) === null,
+    'L-188c Sifira bolum ya da olculmemis alan "—" (null)');
+  const butce = UI.campaignBudgetView({ id: 'c1', budget: 500 }, [
+    { campaignId: 'c1', periodStart: '2031-05-01', periodEnd: '2031-05-10', spend: 4000 },
+    { campaignId: 'c2', periodStart: '2031-05-01', periodEnd: '2031-05-10', spend: 9999 }]);
+  check(butce.limit === 500 && butce.avgDaily === 400 && butce.usagePct === 80 && !butce.overLimit, 'L-188d Gunluk sinir ortalama gunluk harcamayla karsilastirilir', JSON.stringify(butce));
+  check(UI.campaignBudgetView({ id: 'c1', budget: 0 }, []).limit === null, 'L-188e Sinir girilmemisse karsilastirma yok');
+  const reklamHtml = UI.renderAds({ metrics: [], channelLeadCost: [], campaigns: [{ id: 'c1', name: 'TEST Kamp', platform: 'META' }],
+    allCampaigns: [{ id: 'c1', name: 'TEST Kamp', platform: 'META', budget: 500 }], canManage: true, targets: {},
+    periods: [{ id: 'p1', campaignId: 'c1', platform: 'META', periodStart: '2031-05-01', periodEnd: '2031-05-10', spend: 4000, impressions: 10000, clicks: 200, messages: 40, calls: 2 }],
+    allPeriods: [{ id: 'p1', campaignId: 'c1', periodStart: '2031-05-01', periodEnd: '2031-05-10', spend: 4000 }],
+    customMetrics: [metrik], totalSpend: 4000, adShare: { pct: null } });
+  check(/<table class="data-table"><thead><tr><th>Kampanya<\/th><th>Dönem<\/th>/.test(reklamHtml) && /<th[^>]*>Mesaj maliyeti<\/th>/.test(reklamHtml),
+    'L-188f Donemler tablo olarak listelenir, ozel metrik sutun olur');
+  check(/Günlük sınır/.test(reklamHtml) && /data-ads-custom-metric-form/.test(reklamHtml), 'L-188g Kampanya listesinde gunluk sinir, metrik ekleme formu var');
+
+  // L-189 (M19) — sablon ekrani
+  sahteDom({});
+  App.setAppData({ settingsTaskTemplates: [{ id: 't', title: 'Havuz', task_type: 'CLEANING', priority: 'MEDIUM' }],
+    settingsMessageTemplates: [{ id: 'm', name: 'Teklif', channel: 'WHATSAPP', lifecycle_stage: 'MANUAL' }], settingsChecklistTemplates: [] });
+  App.renderSettingsTemplates();
+  const sablon = global.document.getElementById('settingsTaskTemplatesList').innerHTML + global.document.getElementById('settingsMessageTemplatesList').innerHTML;
+  check(/Temizlik · orta öncelik/.test(sablon) && /WhatsApp · elle gönderilir/.test(sablon) && !/CLEANING|MEDIUM|MANUAL/.test(sablon),
+    'L-189a Sablon listelerinde ham kod yerine Turkce etiket', sablon.slice(0, 200));
+  check((html.match(/settings-template-help/g) || []).length === 3, 'L-189b Her sablon bolmesi ne ise yaradigini soyler');
+
+  // L-190 (M20) — bosluk gecesi yalniz gelecekte
+  const dun = istanbulBugun(-1);
+  App.setAppData({ villas: { A: { id: 'pa', slug: 'A', name: 'A', basePrice: 1000 } }, bookings: [
+    { id: 'g1', villa: 'A', checkIn: istanbulBugun(-10), checkOut: istanbulBugun(-8), status: 'CONFIRMED' },
+    { id: 'g2', villa: 'A', checkIn: istanbulBugun(-6), checkOut: dun, status: 'CONFIRMED' },
+    { id: 'g3', villa: 'A', checkIn: istanbulBugun(2), checkOut: istanbulBugun(4), status: 'CONFIRMED' }], expenses: [], cleaningTasks: [] });
+  const gaps = App.detectGapNights();
+  check(gaps.length === 1 && gaps[0].checkIn === istanbulBugun() && gaps[0].nights === 2,
+    'L-190a Gecmis bosluk firsat sayilmaz; bugun baslamis bosluk bugunden itibaren kirpilir', JSON.stringify(gaps));
+  check(!/indirim oranını siz belirlersiniz/.test(html), 'L-190b Rehber olmayan bir ozelligi vaat etmez');
+}
+
 async function main() {
 try {
   const html = read('index.html');
@@ -396,6 +495,7 @@ try {
   await mulkRaporuDavranisi();
   await mesajAyristiriciDavranisi();
   await temizlikHazirlikDavranisi();
+  await asama4Davranisi();
 } catch (error) {
   failed++;
   console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));
