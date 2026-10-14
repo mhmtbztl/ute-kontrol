@@ -3261,8 +3261,12 @@
             </select>
               </div>
               <div class="form-group">
-                <label style="font-size: 11px; color: var(--text-muted);">Tutar / Teklif (₺)</label>
+                <label style="font-size: 11px; color: var(--text-muted);">Toplam tutar / Teklif (₺)</label>
                 <input type="number" id="waParsedAmount" placeholder="Örn: 45000" style="width: 100%; padding: 8px 10px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #34D399; font-size: 14px; font-weight: 700;">
+              </div>
+              <div class="form-group">
+                <label for="waParsedDeposit" style="font-size: 11px; color: var(--text-muted);">Alınan kapora (₺)</label>
+                <input type="number" id="waParsedDeposit" min="0" inputmode="decimal" placeholder="Alınmadıysa boş bırakın" style="width: 100%; padding: 8px 10px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #FBBF24; font-size: 13px;">
               </div>
               <div class="form-group">
                 <label style="font-size: 11px; color: var(--text-muted);">Giriş Tarihi (Check-in)</label>
@@ -3590,6 +3594,13 @@
         <div><h3 id="pageReportTitle">Rapor</h3><p id="pageReportSubtitle" class="sub-text">—</p></div>
         <button type="button" class="close-btn" data-onclick="closePageReportModal()" aria-label="Raporu kapat">&times;</button>
       </div>
+      <div id="pageReportPropertyControls" class="report-property-controls" style="display:none; flex-wrap:wrap; gap:10px; align-items:flex-end; margin-bottom:12px;">
+        <label style="display:flex; flex-direction:column; gap:4px; font-size:12px;">Mülk<select id="pageReportProperty"></select></label>
+        <label style="display:flex; flex-direction:column; gap:4px; font-size:12px;">Başlangıç<input type="date" id="pageReportStart"></label>
+        <label style="display:flex; flex-direction:column; gap:4px; font-size:12px;">Bitiş<input type="date" id="pageReportEnd"></label>
+        <button type="button" class="btn btn-secondary btn-sm" data-onclick="refreshPropertyReport()">Raporu güncelle</button>
+        <span class="sub-text" style="flex-basis:100%; font-size:11px;">Tarihleri boş bırakırsanız tüm zamanlar raporlanır. Aralığı kesen rezervasyonun yalnız aralığa düşen geceleri sayılır.</span>
+      </div>
       <div id="pageReportPreview" class="report-preview"></div>
       <div class="modal-footer report-modal-actions">
         <button type="button" class="btn btn-secondary" data-onclick="downloadCurrentReportCsv()">CSV</button>
@@ -3636,12 +3647,12 @@
     </div>
   </div>
 
-  <script src="core/property_sales_readiness.js?v=abe54ec7"></script>
+  <script src="core/property_sales_readiness.js?v=3f0f97b0"></script>
   <script src="core/guest_contact_utils.js?v=84fd6474"></script>
   <script src="core/user_facing_errors.js?v=e4eb0ae5"></script>
   <script src="core/ledger_contract.js?v=bc9fd6f2"></script>
   <script src="core/report_engine.js?v=a06ed31b"></script>
-  <script src="core/property_profile_engine.js?v=a2f932e5"></script>
+  <script src="core/property_profile_engine.js?v=552ff1ce"></script>
   <script src="core/property_owner_service.js?v=5c741a12"></script>
   <script src="core/sales_workflow_service.js?v=46af3b73"></script>
   <script src="core/pricing_research_service.js?v=563f5895"></script>
@@ -3662,8 +3673,8 @@
   <script src="core/captcha_gate.js?v=3ad4a776"></script>
   <script src="core/date_range_picker.js?v=41dc564c"></script>
   <script src="core/side_panel.js?v=d763b464"></script>
-  <script src="core/action_dispatch.js?v=a9ce5373"></script>
-  <script src="app.js?v=cf5ed76e"></script>
+  <script src="core/action_dispatch.js?v=d7a0f3ea"></script>
+  <script src="app.js?v=ff875722"></script>
   <script src="core/property_analysis_context_ui.js?v=0a5def2d"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=ec113951"></script>

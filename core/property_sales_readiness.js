@@ -104,6 +104,21 @@
     const blockingTickets = openTickets.filter(isBlockingTicket);
     const manualStatus = normalizeStatus(opts.overrideStatus);
 
+    // Temizlik durumu kendiliginden yansir (L-183, kullanici M13): bugun ya da
+    // daha once planlanmis ve yapilmamis temizlik varken mulk "temizlik
+    // bekliyor"dur; elle "hazir" secimi bunu ortemez. Gelecek tarihli temizlik
+    // bugunu etkilemez. "Yapilmadi" (SKIPPED) bekleyen is degildir.
+    const today = /^\d{4}-\d{2}-\d{2}$/.test(opts.today || '') ? opts.today : null;
+    const propertyTasks = (opts.cleaningTasks || []).filter(task => task && matchesProperty(task, property));
+    const taskDate = task => String(task.date || task.task_date || '').slice(0, 10);
+    const taskStatus = task => String(task.status || '').toUpperCase();
+    const pendingCleaning = today ? propertyTasks
+      .filter(task => !['DONE', 'SKIPPED'].includes(taskStatus(task)) && taskDate(task) && taskDate(task) <= today)
+      .sort((a, b) => taskDate(a).localeCompare(taskDate(b))) : [];
+    const lastDoneCleaning = propertyTasks
+      .filter(task => taskStatus(task) === 'DONE' && (!today || taskDate(task) <= today))
+      .sort((a, b) => taskDate(b).localeCompare(taskDate(a)))[0] || null;
+
     let status = manualStatus;
     let source = manualStatus === 'UNSET' ? 'UNSET' : 'MANUAL';
     let reason = STATUS_META[status].description;
@@ -112,6 +127,16 @@
       status = 'BLOCKED_MAINTENANCE';
       source = 'BLOCKING_MAINTENANCE';
       reason = `${blockingTickets.length} satışa engel açık arıza veya tadilat kaydı var.`;
+    } else if (pendingCleaning.length > 0) {
+      status = 'NEEDS_CLEANING';
+      source = 'CLEANING';
+      reason = taskDate(pendingCleaning[0]) < today
+        ? `Geciken temizlik var (${taskDate(pendingCleaning[0])}); yapıldı işaretlenince hazır olur.`
+        : 'Bugün planlı temizlik var; yapıldı işaretlenince hazır olur.';
+    } else if (manualStatus === 'UNSET' && openTickets.length === 0 && lastDoneCleaning) {
+      status = 'SALES_READY';
+      source = 'CLEANING';
+      reason = `Son temizlik yapıldı (${taskDate(lastDoneCleaning)}); açık arıza yok.`;
     } else if (manualStatus === 'UNSET' && openTickets.length > 0) {
       status = 'NON_BLOCKING_ISSUE';
       source = 'MAINTENANCE';
@@ -129,6 +154,7 @@
       openIssueCount: openTickets.length,
       blockingIssueCount: blockingTickets.length,
       blockingTicketIds: blockingTickets.map(ticket => ticket.id).filter(Boolean),
+      pendingCleaningTaskIds: pendingCleaning.map(task => task.id || task.dbId).filter(Boolean),
       manualStatus
     };
   }
