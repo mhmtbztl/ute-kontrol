@@ -1,7 +1,21 @@
 # Rezervasyon finansı — geliştirme teslim notu
 
 Tarih: 14 Ekim 2026. Dal: `codex/booking-finance`.
-Üretim migration, deploy, push ve master merge yapılmadı. Commit oluşturulmadı.
+İlk teslimde üretim migration, deploy, push ve master merge yapılmamıştı.
+
+## Yayın hazırlığı güncellemesi
+
+Kullanıcının rebase/commit/push/yayın isteği üzerine dal `ba2bafd` master
+tabanına rebase edildi. Kapora kaydı ve phase91 korunarak dört dosyadaki
+çakışma çözüldü; varlık damgaları yeniden üretildi.
+
+- Rebase sonrası güvenli test: 207/207 süit, 2.194 doğrulama.
+- Tarayıcı: 17 akış, 4 rol; mobil taşma ve konsol kapısı başarılı.
+- Göç zinciri: schema + 79 göç; şablonlar ve damgalar güncel.
+- Üretime salt-okunur sorguda phase92/94 bulunmadı;
+  `bookings.financial_details` sütunu da henüz yok.
+- Geliştirme dalı/PR hazırlanabilir; üretim SQL'leri ayrı açık onay veya
+  kullanıcı uygulaması bekler. SQL doğrulanmadan otomatik merge açılmamalı.
 
 ## Değişiklikler
 
