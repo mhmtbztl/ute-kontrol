@@ -71,9 +71,14 @@
     return EDIT_ROLES.includes(String(role || '').trim().toLowerCase());
   }
 
+  // app.js isMaintenanceTicketOpen ile ayni kume (CLAUDE.md 3.4: acik ariza tek
+  // tanimdir). COMPLETED eksikti: DB'deki RESOLVED bellekte COMPLETED'e
+  // cevrildigi icin cozulmus ariza mulku satisa kapali tutuyordu (L-179).
+  const CLOSED_TICKET_STATUSES = Object.freeze(['DONE', 'CLOSED', 'TAMAMLANDI', 'RESOLVED', 'COMPLETED', 'CANCELLED']);
+
   function isOpenTicket(ticket) {
-    return !['RESOLVED', 'DONE', 'CLOSED', 'CANCELLED'].includes(
-      String(ticket?.status || '').toUpperCase()
+    return !!ticket && !CLOSED_TICKET_STATUSES.includes(
+      String(ticket.statusRaw || ticket.status || '').toUpperCase()
     );
   }
 
@@ -123,6 +128,7 @@
       reason,
       openIssueCount: openTickets.length,
       blockingIssueCount: blockingTickets.length,
+      blockingTicketIds: blockingTickets.map(ticket => ticket.id).filter(Boolean),
       manualStatus
     };
   }
@@ -131,6 +137,7 @@
     STATUS_META,
     EDIT_ROLES,
     SELECTABLE_STATUSES,
+    CLOSED_TICKET_STATUSES,
     normalizeStatus,
     canEdit,
     isOpenTicket,
