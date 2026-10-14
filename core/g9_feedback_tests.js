@@ -8,6 +8,10 @@
 // L-177 (M8): Operasyon "Temizlik borcu" karti kayittan sonra eski kaliyordu.
 // L-178 (M9): Ana sayfa kritik eylem karti isi adlandirmiyor, Incele arizaya gitmiyordu.
 // L-179 (M10): Acik arizali mulk "Satisa hazir" secilebiliyordu; cozulmus ariza mulku kapali tutuyordu.
+// L-180 (9.0.2): E-posta baglantisi supabase.co yerine lexbnb.space'e token_hash ile gelir.
+// L-181 (M11): Mulk raporunda mulk ve tarih araligi secilemiyordu.
+// L-182 (M12): Mesaj ayristirici tarih, ad ve kaporayi okumuyordu; kapora odeme defterine yazilir.
+// L-183 (M13): Temizlik planlaninca mulk kendiliginden "temizlik bekliyor", yapilinca hazir.
 const fs = require('fs');
 const path = require('path');
 
@@ -228,6 +232,142 @@ async function satisaHazirlikDavranisi() {
   check(sonuc === false && !ist.yazmalar.length, 'L-179f Acik arizada satisa acma yazilmaz (arayuz disindan cagri da)', JSON.stringify(ist.yazmalar));
 }
 
+async function epostaBaglantisiDavranisi() {
+  sahteDom({});
+  const App = require('../app.js');
+  check(App.readEmailTokenHashLink('?token_hash=abc&type=invite')?.type === 'invite', 'L-180a token_hash davet baglantisi okunur');
+  check(App.readEmailTokenHashLink('?token_hash=abc&type=admin') === null && App.readEmailTokenHashLink('?type=invite') === null,
+    'L-180b Bilinmeyen tur ya da belirtecsiz adres yok sayilir');
+
+  const kos = async (search, hata) => {
+    const cagrilar = [];
+    const adresler = [];
+    global.window.location = { search, pathname: '/', hash: '' };
+    global.window.history = { replaceState: (_s, _t, url) => adresler.push(url) };
+    App.setSupabaseClient({ auth: { verifyOtp: async args => { cagrilar.push(args); return { data: {}, error: hata || null }; } } });
+    const sonuc = await App.consumeEmailTokenHashLink();
+    return { sonuc, cagrilar, adresler };
+  };
+  let r = await kos('?token_hash=tok123&type=invite');
+  check(r.cagrilar.length === 1 && r.cagrilar[0].token_hash === 'tok123' && r.cagrilar[0].type === 'invite',
+    'L-180c Davet baglantisi verifyOtp ile dogrulanir', JSON.stringify(r.cagrilar));
+  check(r.adresler[0] === '/?type=invite' && r.sonuc.ok, 'L-180d Belirtec adresten silinir, sifre formu icin tur kalir', JSON.stringify(r.adresler));
+  r = await kos('?token_hash=eski&type=magiclink', { message: 'Token has expired or is invalid' });
+  check(r.adresler[0] === '/' && r.sonuc.ok === false, 'L-180e Gecersiz baglantida belirtec silinir ve sonuc basarisiz doner', JSON.stringify(r));
+  r = await kos('?gelen=1');
+  check(r.sonuc === null && !r.cagrilar.length && !r.adresler.length, 'L-180f Normal acilista hicbir sey yapilmaz');
+  // Sahte adres sonraki testlere tasinmaz (rapor onizlemesi new URL ile calisir).
+  delete global.window.location;
+  delete global.window.history;
+}
+
+async function mulkRaporuDavranisi() {
+  const Engine = require('./property_profile_engine.js');
+  const mulk = { id: 'pb', key: 'B', slug: 'B', name: 'TEST Zirve' };
+  // 04-28 -> 05-03, 5 gece, 50.000: Mayis araliginda 2 gece -> 20.000 (CLAUDE.md 3.4 ornegi).
+  const bookings = [{ id: 'b1', villa: 'B', propertyId: 'pb', checkIn: '2031-04-28', checkOut: '2031-05-03', gross: 50000, status: 'CONFIRMED' }];
+  const expenses = [
+    { id: 'e1', villa: 'B', date: '2031-05-10', amount: 1000, type: 'OPEX' },
+    { id: 'e2', villa: 'B', date: '2031-04-10', amount: 7000, type: 'OPEX' }];
+  const tum = Engine.buildPropertyReport({ property: mulk, bookings, expenses, cleaningTasks: [] });
+  const mayis = Engine.buildPropertyReport({ property: mulk, bookings, expenses, cleaningTasks: [], range: { start: '2031-05-01', end: '2031-05-31' } });
+  check(Math.round(tum.netRoomRevenue) === 50000 && tum.manualOpex === 8000, 'L-181a Aralik verilmezse tum zamanlar (eski davranis)', JSON.stringify([tum.netRoomRevenue, tum.manualOpex]));
+  // Tarayicida global olan motor Node'da elle baglanir.
+  global.PropertyProfileEngine = Engine;
+  global.ReportEngine = require('./report_engine.js');
+  check(Math.round(mayis.netRoomRevenue) === 20000 && mayis.soldNights === 2 && mayis.manualOpex === 1000,
+    'L-181b Aralikta gelir gecelere tahakkukla bolunur, gider kendi tarihiyle girer', JSON.stringify([mayis.netRoomRevenue, mayis.soldNights, mayis.manualOpex]));
+
+  sahteDom({});
+  const App = require('../app.js');
+  App.setActiveTenant({ id: TENANT, role: 'owner' });
+  App.setSupabaseClient(kaydedenIstemci());
+  App.setAppData({ villas: { A: { id: 'pa', slug: 'A', name: 'TEST Seyir' }, B: { id: 'pb', slug: 'B', name: 'TEST Zirve' } },
+    bookings, expenses, cleaningTasks: [], operationalPeople: [], maintenance: [], maintenanceTickets: [] });
+  App.openPageReport('PROPERTY');
+  const secici = global.document.getElementById('pageReportProperty').innerHTML;
+  check(/value="A"/.test(secici) && /value="B"/.test(secici), 'L-181c Rapor penceresinde her mulk secilebilir');
+  check(global.document.getElementById('pageReportPropertyControls').style.display === 'flex', 'L-181d Mulk raporunda secim alani gorunur');
+  const dom = global.document;
+  dom.getElementById('pageReportProperty').value = 'B';
+  dom.getElementById('pageReportStart').value = '2031-05-01';
+  dom.getElementById('pageReportEnd').value = '2031-05-31';
+  const guncelSonuc = App.refreshPropertyReport();
+  check(guncelSonuc === true, 'L-181e Raporu guncelle secimi uygular', String(guncelSonuc));
+  const alt = dom.getElementById('pageReportSubtitle').innerText;
+  check(/TEST Zirve/.test(alt) && /2031/.test(alt) && !/Tüm zamanlar/.test(alt), 'L-181f Rapor secilen mulk ve aralikla basliklanir', alt);
+  dom.getElementById('pageReportStart').value = '2031-06-01';
+  check(App.refreshPropertyReport() === false, 'L-181g Baslangic bitisten sonra olamaz');
+  App.closePageReportModal();
+  App.openPageReport('FINANCE');
+  check(dom.getElementById('pageReportPropertyControls').style.display === 'none', 'L-181h Diger raporlarda mulk secimi gizli');
+}
+
+async function mesajAyristiriciDavranisi() {
+  sahteDom({});
+  const App = require('../app.js');
+  const villas = { ZIRVE: { id: 'aaaaaaaa-aaaa-4aaa-8aaa-000000000001', slug: 'ZIRVE', name: 'ZİRVE' } };
+  const p = App.parseWhatsAppMessageText('16 Ekim cuma giriş 17 Ekim cumartesi çıkış villa Zirve İlter bey 4000 TL alındı 11.000 TL girişte alınacak', villas, '2026-10-14');
+  check(p.checkIn === '2026-10-16' && p.checkOut === '2026-10-17', 'L-182a Arada gun adi ve giris/cikis sozcugu olan tarihler okunur', JSON.stringify([p.checkIn, p.checkOut]));
+  check(p.guest === 'İlter', 'L-182b "İlter bey" ad olarak okunur; villa adi ada karismaz', p.guest);
+  check(p.deposit === 4000 && p.remaining === 11000 && p.amount === 15000, 'L-182c Kapora ve kalan ayrilir; toplam = kapora + kalan', JSON.stringify(p));
+  const yalnizKapora = App.parseWhatsAppMessageText('Kapora 5.000 TL gönderdim, 20 Kasım 3 gece', villas, '2026-10-14');
+  check(yalnizKapora.deposit === 5000 && yalnizKapora.amount === null, 'L-182d Yalniz kapora varsa toplam uydurulmaz', JSON.stringify(yalnizKapora));
+  check(yalnizKapora.checkIn === '2026-11-20' && yalnizKapora.checkOut === '2026-11-23', 'L-182e Tek tarih + gece sayisindan cikis bulunur', JSON.stringify(yalnizKapora));
+  const selam = App.parseWhatsAppMessageText('Örnek Misafir: Selamlar, 18-23 Eylül arası', villas, '2026-10-14');
+  check(selam.guest !== 'Selamlar', 'L-182f Selamlasma ad sayilmaz', selam.guest);
+
+  // Kayit: kapora rezervasyonun odeme defterine DEPOSIT olarak yazilir.
+  sahteDom({ waParsedGuest: 'TEST İlter', waParsedVilla: 'ZIRVE', waParsedAmount: '15000', waParsedCheckIn: '2031-10-16',
+    waParsedCheckOut: '2031-10-17', waParsedPax: '2', waParsedPhone: '', waParsedDeposit: '4000' });
+  const BOOKING = 'bbbbbbbb-0000-4000-8000-000000000001';
+  const ist = kaydedenIstemci();
+  ist.rpc = async (ad, args) => ad === 'create_booking_atomic'
+    ? { data: { id: BOOKING, tenant_id: TENANT, property_id: villas.ZIRVE.id, booking_code: 'X', guest_name: args.p_guest_name,
+      check_in: args.p_check_in, check_out: args.p_check_out, pax: args.p_pax, gross_amount: args.p_gross_amount, status: 'CONFIRMED' }, error: null }
+    : { data: [], error: null };
+  App.setActiveTenant({ id: TENANT, role: 'owner' });
+  App.setSupabaseClient(ist);
+  App.setAppData({ villas, bookings: [], expenses: [], cleaningTasks: [], operationalPeople: [], maintenance: [], maintenanceTickets: [], leads: [] });
+  global.__sonUyari = null;
+  await App.saveWaAsBooking();
+  const odeme = ist.yazmalar.find(k => k.tablo === 'booking_payments' && k.islem === 'insert');
+  check(odeme && odeme.yuk.booking_id === BOOKING && odeme.yuk.amount === 4000 && odeme.yuk.kind === 'DEPOSIT',
+    'L-182g Kapora rezervasyonun odeme defterine DEPOSIT olarak yazilir', JSON.stringify({ odeme, uyari: global.__sonUyari }));
+}
+
+async function temizlikHazirlikDavranisi() {
+  const R = require('./property_sales_readiness.js');
+  const mulk = { id: 'p1', key: 'SEYIR', name: 'SEYİR' };
+  const bugun = '2031-05-10';
+  const kur = (tasks, manual) => R.buildPropertyReadiness(mulk, { overrideStatus: manual, maintenanceTickets: [], cleaningTasks: tasks, today: bugun });
+  const planli = kur([{ id: 'c1', villa: 'SEYIR', date: bugun, status: 'PLANNED' }], 'SALES_READY');
+  check(planli.status === 'NEEDS_CLEANING' && planli.pendingCleaningTaskIds[0] === 'c1', 'L-183a Bugun planli temizlik mulku "temizlik bekliyor" yapar (elle "hazir" ustune)', planli.status);
+  check(kur([{ id: 'c0', villa: 'SEYIR', date: '2031-05-08', status: 'PLANNED' }]).status === 'NEEDS_CLEANING', 'L-183b Geciken temizlik de bekliyor sayilir');
+  check(kur([{ id: 'c2', villa: 'SEYIR', date: '2031-05-20', status: 'PLANNED' }]).status === 'UNSET', 'L-183c Gelecek tarihli temizlik bugunu etkilemez');
+  const yapildi = kur([{ id: 'c1', villa: 'SEYIR', date: bugun, status: 'DONE' }]);
+  check(yapildi.status === 'SALES_READY' && yapildi.source === 'CLEANING', 'L-183d Temizlik yapilinca mulk hazir olur', JSON.stringify([yapildi.status, yapildi.reason]));
+  check(kur([{ id: 'c1', villa: 'SEYIR', date: bugun, status: 'SKIPPED' }]).status === 'UNSET', 'L-183e "Yapilmadi" temizlik bekleyen is sayilmaz, hazir da yapmaz');
+  const ariza = R.buildPropertyReadiness(mulk, { maintenanceTickets: [{ id: 't', propertyId: 'p1', status: 'OPEN', severity: 'CRITICAL' }],
+    cleaningTasks: [{ id: 'c1', villa: 'SEYIR', date: bugun, status: 'PLANNED' }], today: bugun });
+  check(ariza.status === 'BLOCKED_MAINTENANCE', 'L-183f Satisa engel ariza temizlikten once gelir');
+
+  sahteDom({});
+  const App = require('../app.js');
+  App.setActiveTenant({ id: TENANT, role: 'owner' });
+  App.setAppData({ villas: { SEYIR: { id: 'p1', slug: 'SEYIR', name: 'SEYİR' } }, bookings: [], operationalPeople: [],
+    maintenance: [], maintenanceTickets: [], housekeepingOverrides: {},
+    cleaningTasks: [{ id: 'c1', villa: 'SEYIR', date: '2020-01-01', status: 'PLANNED', amount: 0 }] });
+  const durum = App.getPropertySalesReadiness('SEYIR');
+  check(durum && durum.status === 'NEEDS_CLEANING', 'L-183g Uygulama hazirlik hesabina temizlik gorevlerini verir', JSON.stringify(durum && durum.status));
+  App.renderPortfolioHealth([durum]);
+  const kart = global.document.getElementById('portfolioHealthCardsGrid').innerHTML;
+  check(/<option value="SALES_READY"[^>]*disabled/.test(kart) && /Temizliğe git/.test(kart), 'L-183h Bekleyen temizlikte "hazir" secilemez; kart temizlige goturur');
+  const ist = kaydedenIstemci();
+  App.setSupabaseClient(ist);
+  check(await App.setPropertySalesReadiness('SEYIR', 'SALES_READY') === false && !ist.yazmalar.length, 'L-183i Bekleyen temizlikte "hazir" yazilmaz');
+}
+
 async function main() {
 try {
   const html = read('index.html');
@@ -252,6 +392,10 @@ try {
   await operasyonKartiDavranisi();
   await kritikEylemKartiDavranisi();
   await satisaHazirlikDavranisi();
+  await epostaBaglantisiDavranisi();
+  await mulkRaporuDavranisi();
+  await mesajAyristiriciDavranisi();
+  await temizlikHazirlikDavranisi();
 } catch (error) {
   failed++;
   console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

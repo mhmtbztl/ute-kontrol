@@ -172,7 +172,43 @@ function consumeAuthCaptcha(formId) {
   window.LexbnbCaptcha.consume(formId);
 }
 
+// E-posta baglantisi lexbnb.space'e token_hash ile gelir (L-180). Supabase'in
+// varsayilan baglantisi *.supabase.co/auth/v1/verify adresine gidiyordu; gonderen
+// alan adiyla uyusmayan baglanti davet ve giris e-postalarinin spama dusmesinin
+// sebeplerinden biriydi. Sablonlar: docs/EMAIL_TEMPLATES.md.
+const EMAIL_LINK_OTP_TYPES = ['invite', 'magiclink', 'recovery', 'email', 'signup'];
+
+function readEmailTokenHashLink(search) {
+  const params = new URLSearchParams(search || '');
+  const tokenHash = String(params.get('token_hash') || '').trim();
+  const type = String(params.get('type') || '').trim().toLowerCase();
+  if (!tokenHash || tokenHash.length > 512 || !EMAIL_LINK_OTP_TYPES.includes(type)) return null;
+  return { tokenHash, type };
+}
+
+async function consumeEmailTokenHashLink() {
+  if (typeof window === 'undefined' || !supabaseClient) return null;
+  const link = readEmailTokenHashLink(window.location.search);
+  if (!link) return null;
+  let error = null;
+  try {
+    ({ error } = await supabaseClient.auth.verifyOtp({ token_hash: link.tokenHash, type: link.type }));
+  } catch (e) {
+    error = e;
+  }
+  // Belirtec tek kullanimliktir; adres cubugunda, gecmiste ve yer iminde
+  // kalmaz. Davet/sifre sifirlamada sifre formu ?type= ile acilir.
+  const keepType = !error && (link.type === 'invite' || link.type === 'recovery') ? `?type=${link.type}` : '';
+  if (window.history && typeof window.history.replaceState === 'function') {
+    window.history.replaceState(null, '', window.location.pathname + keepType);
+  }
+  return { type: link.type, ok: !error, error };
+}
+
 async function checkAuthStatus() {
+  // -1. E-postadaki token_hash baglantisi: oturumu ac, sonra normal akis.
+  const emailLink = await consumeEmailTokenHashLink();
+
   // 0. Sifre sifirlama linkiyle gelindiyse: recovery session'i uygulamaya
   //    sokma, once yeni sifre belirlet.
   if (isPasswordRecoveryRedirect()) {
@@ -194,6 +230,14 @@ async function checkAuthStatus() {
     appData = getBlankTenantData('guest');
   }
   showLockOverlay();
+  if (emailLink && !emailLink.ok) {
+    const err = document.getElementById('authErrorMessage');
+    if (err) {
+      err.style.display = 'block';
+      err.innerText = '⚠️ E-postadaki bağlantının süresi dolmuş ya da bağlantı daha önce kullanılmış. '
+        + 'Şifrenizle giriş yapın; şifreniz yoksa "Şifremi unuttum" ile yeni bağlantı isteyin ya da yöneticinizden daveti yeniden göndermesini isteyin.';
+    }
+  }
   return false;
 }
 
@@ -3948,13 +3992,21 @@ function buildCurrentPageReport(page) {
     } });
   }
   if (page === 'PROPERTY') {
-    const key = selectedPropertyProfileKey || currentFilter?.villa;
+    // Pencere acilmadan (ChatGPT sorusu) cagrilirsa eski varsayilan: profilde
+    // acik mulk ya da filtredeki mulk.
+    const key = propertyReportOptions.key || selectedPropertyProfileKey || currentFilter?.villa;
     const property = key && key !== 'ALL' ? appData.villas?.[key] : null;
     if (!property) throw new Error('Rapor için bir mülk seçin.');
-    const ledger = PropertyProfileEngine.buildPropertyReport({ property, bookings: appData.bookings || [], expenses: appData.expenses || [], cleaningTasks: appData.cleaningTasks || [] });
-    // Mulk raporu profil "Gecmis" ile ayni kapsamdadir: tum zamanlar. Baslik
-    // filtre donemini yazmaz (L-146c). Tum zamanlarda kapanis istisnasi yok.
-    return ReportEngine.buildReport({ ...base, period: { label: 'Tüm zamanlar' }, filters: { label: property.name || key }, data: {
+    const range = propertyReportOptions.start && propertyReportOptions.end
+      ? { start: propertyReportOptions.start, end: propertyReportOptions.end } : null;
+    const ledger = PropertyProfileEngine.buildPropertyReport({ property, range, bookings: appData.bookings || [], expenses: appData.expenses || [], cleaningTasks: appData.cleaningTasks || [] });
+    // Varsayilan kapsam profil "Gecmis" ile aynidir: tum zamanlar; baslik
+    // filtre donemini yazmaz (L-146c). Kullanici aralik secerse rapor o
+    // araliktir (L-181). Serbest aralikta kapanis istisnasi yok.
+    const period = range
+      ? { label: `${formatTrDate(range.start)} – ${formatTrDate(range.end)}`, start: range.start, end: range.end }
+      : { label: 'Tüm zamanlar' };
+    return ReportEngine.buildReport({ ...base, period, filters: { label: property.name || key }, data: {
       property, ledger,
       isProfitUnmeasured: isProfitUnmeasured(ledger.totalRevenue, ledger.totalOpex, ledger.capex, null)
     } });
@@ -4058,17 +4110,43 @@ function reportPreviewHtml(report, surface = 'screen') {
   return business + sections + unmeasured;
 }
 
+// Mulk raporunun mulku ve araligi pencerede secilir (L-181). Eskiden rapor
+// yalniz profilde acik (ya da ilk) mulku ve "tum zamanlar"i veriyordu.
+const propertyReportOptions = { key: null, start: '', end: '' };
+
+function setupPropertyReportControls(page) {
+  const box = typeof document !== 'undefined' ? document.getElementById('pageReportPropertyControls') : null;
+  if (box) box.style.display = page === 'PROPERTY' ? 'flex' : 'none';
+  if (page !== 'PROPERTY') return;
+  const villas = appData.villas || {};
+  const keys = Object.keys(villas);
+  const preferred = [selectedPropertyProfileKey, currentFilter?.villa].find(key => key && key !== 'ALL' && villas[key]);
+  propertyReportOptions.key = preferred || keys[0] || null;
+  propertyReportOptions.start = '';
+  propertyReportOptions.end = '';
+  const select = document.getElementById('pageReportProperty');
+  if (select) {
+    select.innerHTML = keys.map(key => `<option value="${escapeHtml(key)}"${key === propertyReportOptions.key ? ' selected' : ''}>${escapeHtml(villas[key]?.name || key)}</option>`).join('');
+  }
+  ['pageReportStart', 'pageReportEnd'].forEach(id => { const input = document.getElementById(id); if (input) input.value = ''; });
+}
+
+function renderCurrentPageReport(page) {
+  currentPageReport = buildCurrentPageReport(page);
+  setEl('pageReportTitle', currentPageReport.title);
+  setEl('pageReportSubtitle', currentPageReport.subtitle);
+  const preview = document.getElementById('pageReportPreview');
+  if (preview) preview.innerHTML = reportPreviewHtml(currentPageReport);
+}
+
 function openPageReport(page) {
   if (!canExportReportPage(page)) {
     showToast('Bu rol bu sayfanın raporunu alamaz.', 'error');
     return false;
   }
   try {
-    currentPageReport = buildCurrentPageReport(page);
-    setEl('pageReportTitle', currentPageReport.title);
-    setEl('pageReportSubtitle', currentPageReport.subtitle);
-    const preview = document.getElementById('pageReportPreview');
-    if (preview) preview.innerHTML = reportPreviewHtml(currentPageReport);
+    setupPropertyReportControls(page);
+    renderCurrentPageReport(page);
     const modal = document.getElementById('pageReportModal');
     if (modal) modal.style.display = 'flex';
     return true;
@@ -4078,7 +4156,41 @@ function openPageReport(page) {
   }
 }
 
+function refreshPropertyReport() {
+  const value = id => String(document.getElementById(id)?.value || '').trim();
+  const key = value('pageReportProperty');
+  const start = value('pageReportStart');
+  const end = value('pageReportEnd');
+  if ((start && !end) || (!start && end)) {
+    showToast('Aralık için başlangıç ve bitiş tarihini birlikte girin; ikisini de boş bırakırsanız tüm zamanlar raporlanır.', 'error');
+    return false;
+  }
+  if (start && end && start > end) {
+    showToast('Başlangıç tarihi bitişten sonra olamaz.', 'error');
+    return false;
+  }
+  if (!appData.villas?.[key]) {
+    showToast('Rapor için bir mülk seçin.', 'error');
+    return false;
+  }
+  propertyReportOptions.key = key;
+  propertyReportOptions.start = start;
+  propertyReportOptions.end = end;
+  try {
+    renderCurrentPageReport('PROPERTY');
+    return true;
+  } catch (error) {
+    showToast(error?.message || 'Rapor oluşturulamadı.', 'error');
+    return false;
+  }
+}
+
 function closePageReportModal() {
+  // Secim pencereye aittir; kapaninca baska bir akisa (ChatGPT sorusu) eski
+  // mulk ya da aralik olarak tasinmaz.
+  propertyReportOptions.key = null;
+  propertyReportOptions.start = '';
+  propertyReportOptions.end = '';
   const modal = document.getElementById('pageReportModal');
   if (modal) modal.style.display = 'none';
 }
@@ -4427,8 +4539,15 @@ function getPropertySalesReadiness(villaKey) {
     overrideStatus: appData?.housekeepingOverrides?.[villaKey],
     maintenanceTickets: Array.isArray(cloudTickets) && cloudTickets.length > 0
       ? cloudTickets
-      : (appData?.maintenance || [])
+      : (appData?.maintenance || []),
+    cleaningTasks: readinessCleaningTasks(),
+    today: getTodayStr()
   });
+}
+
+// Hazirlik motoru temizligi Operasyon ile ayni normallestirilmis modelden okur (L-183).
+function readinessCleaningTasks() {
+  return (appData?.cleaningTasks || []).map(task => normalizeCleaningTask(task, appData?.villas || {}));
 }
 
 // -------------------------------------------------------------
@@ -11294,6 +11413,11 @@ async function setPropertySalesReadiness(vKey, status) {
     renderExecutiveControlCenter();
     return false;
   }
+  if (SALEABLE_READINESS_STATUSES.includes(status) && (getPropertySalesReadiness(vKey)?.pendingCleaningTaskIds || []).length > 0) {
+    if (window.showToast) window.showToast('⚠️ Bekleyen temizlik var. Temizlik yapıldı işaretlenince mülk kendiliğinden hazır olur.', 'error');
+    renderExecutiveControlCenter();
+    return false;
+  }
 
   const villaName = appData?.villas?.[vKey]?.name || vKey;
   const meta = api.STATUS_META[status];
@@ -11949,10 +12073,28 @@ function parseWhatsAppMessageText(text, villas = {}, todayStr = getTodayStr()) {
     }
   }
 
+  // Ad sanilmamasi gereken sozcukler: mulk adlari, aylar, gunler (L-182).
+  // "villa Zirve İlter bey" eskiden "Zirve İlter" adini uretiyordu.
+  const trKucuk = s => String(s || '').toLocaleLowerCase('tr');
+  const adOlmayan = new Set(
+    Object.entries(villas || {}).flatMap(([anahtar, v]) => [anahtar, v && v.name])
+      .filter(Boolean).flatMap(ad => trKucuk(ad).split(/\s+/))
+      .concat(Object.keys(MONTH_MAP_TR))
+      .concat(['pazartesi', 'salı', 'sali', 'çarşamba', 'carsamba', 'perşembe', 'persembe', 'cuma', 'cumartesi', 'pazar', 'villa', 'ev', 'giriş', 'çıkış'])
+  );
+  const adTemizle = ad => String(ad || '').split(/\s+/).filter(w => w && !adOlmayan.has(trKucuk(w))).join(' ').trim() || null;
+
   let detectedGuest = null;
   const prefixMatch = text.match(/(?:misafir|isim|ad\s*soyad|ad|konuk)\s*[:=-]\s*([A-Za-zÇĞİÖŞÜçğıöşü\s]{3,30})/i);
-  if (prefixMatch) {
+  // Hitap: "İlter bey", "Ayşe hanım". Turkce yazismada adin en guvenilir isaretidir.
+  const hitapMatch = text.match(/([A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+)?)\s+(?:bey|beyefendi|hanım|hanim|hanımefendi|hn\.?|by\.?)(?=[\s,.!?]|$)/i);
+  // "Örnek Misafir: Selamlar, ..." WhatsApp baslik bicimidir; iki noktadan
+  // sonraki selam ad degildir.
+  const selamMi = s => /^(selam|selamlar|merhaba|merhabalar|iyi\s*günler|iyi\s*akşamlar|günaydın)\b/i.test(String(s || '').trim());
+  if (prefixMatch && !selamMi(prefixMatch[1])) {
     detectedGuest = prefixMatch[1].trim();
+  } else if (hitapMatch && adTemizle(hitapMatch[1])) {
+    detectedGuest = adTemizle(hitapMatch[1]);
   } else {
     const waHeaderMatch = text.match(/^(?:\[[\d\.\,\:\s]+\]\s*)?([A-Za-zÇĞİÖŞÜçğıöşü\s]{3,25}):/m);
     if (waHeaderMatch) {
@@ -11967,7 +12109,7 @@ function parseWhatsAppMessageText(text, villas = {}, todayStr = getTodayStr()) {
         .map(v => v && v.name).filter(Boolean);
       const yasakli = mulkAdlari.concat(['WhatsApp', 'Airbnb', 'Booking', 'Selamlar', 'Merhaba', 'İyi Günler']);
       if (wordsMatch && !yasakli.includes(wordsMatch[1])) {
-        detectedGuest = wordsMatch[1];
+        detectedGuest = adTemizle(wordsMatch[1]);
       }
     }
   }
@@ -11981,8 +12123,50 @@ function parseWhatsAppMessageText(text, villas = {}, todayStr = getTodayStr()) {
   // Ucret icin para birimi veya fiyat/butce baglami aranir. Boylece telefon
   // numaralari ve tarihler ucret olarak yorumlanmaz.
   let detectedAmount = null;
+  // Kapora ve kalan (L-182): "4000 TL alındı 11.000 TL girişte alınacak".
+  // Eskiden ilk para birimli sayi tutar sayiliyordu: toplam 15.000 yerine
+  // kapora 4.000 rezervasyonun brut tutari oluyordu.
+  const paraOku = raw => {
+    const decimal = raw.includes(',') && !/^\d{1,3}(?:\.\d{3})+$/.test(raw);
+    const n = Number(decimal ? raw.replace(/\./g, '').replace(',', '.') : raw.replace(/\./g, ''));
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+  const paralar = [];
+  const paraRe = /(\d{1,3}(?:\.\d{3})+|\d{1,7}(?:[.,]\d{1,2})?)\s*(bin\b|k\b)?\s*(?:tl\b|₺|lira\b)/gi;
+  let pm;
+  while ((pm = paraRe.exec(text)) !== null) {
+    const deger = paraOku(pm[1]);
+    if (deger === null) continue;
+    paralar.push({ deger: pm[2] ? deger * 1000 : deger, bas: pm.index, son: pm.index + pm[0].length });
+  }
+  let detectedDeposit = null;
+  let detectedRemaining = null;
+  let detectedTotal = null;
+  paralar.forEach((p, i) => {
+    const onceki = paralar[i - 1];
+    const sonraki = paralar[i + 1];
+    const once = trKucuk(text.slice(Math.max(onceki ? onceki.son : 0, p.bas - 25), p.bas));
+    const sonra = trKucuk(text.slice(p.son, Math.min(sonraki ? sonraki.bas : text.length, p.son + 30)));
+    if (/(girişte|giriste|kalan|alınacak|alinacak|ödenecek|odenecek)/.test(sonra) || /(kalan|bakiye)\s*$/.test(once)) {
+      detectedRemaining = (detectedRemaining || 0) + p.deger;
+    } else if (/(alındı|alindi|kapora|ön ?ödeme|on ?odeme|peşin|pesin|yatırıldı|yatirildi|yatırdı|gönderildi|gönderdi|ödendi|odendi)/.test(sonra)
+      || /(kapora|ön ?ödeme|on ?odeme|peşin|pesin)\D{0,10}$/.test(once)) {
+      detectedDeposit = (detectedDeposit || 0) + p.deger;
+    } else if (/(toplam|tutar|fiyat|ücret|ucret|teklif)\D{0,15}$/.test(once)) {
+      detectedTotal = p.deger;
+    }
+  });
+  if (detectedTotal !== null) {
+    detectedAmount = detectedTotal;
+  } else if (detectedDeposit !== null && detectedRemaining !== null) {
+    detectedAmount = detectedDeposit + detectedRemaining;
+  }
+
   const kMatch = text.match(/(\d+(?:[.,]\d+)?)\s*(?:bin|k)\b/i);
-  if (kMatch) {
+  if (detectedAmount !== null || detectedDeposit !== null || detectedRemaining !== null) {
+    // Kapora/kalan bulunduysa genel tutar arama yapilmaz; yalniz kapora varsa
+    // toplam bilinmiyordur ve uydurulmaz (3.6).
+  } else if (kMatch) {
     detectedAmount = Number(kMatch[1].replace(',', '.')) * 1000;
   } else {
     const currencyMatch = text.match(/(\d{1,3}(?:\.\d{3})+|\d{1,7}(?:[.,]\d{1,2})?)\s*(?:tl|₺|euro|usd|lira)/i);
@@ -12059,11 +12243,44 @@ function parseWhatsAppMessageText(text, villas = {}, todayStr = getTodayStr()) {
     }
   }
 
+  // "16 Ekim cuma giriş 17 Ekim cumartesi çıkış" (L-182): tarihlerin arasinda
+  // gun adi ve giris/cikis sozcukleri vardir; yukaridaki kaliplar tutmuyordu.
+  if (!checkIn) {
+    const gunler = [];
+    const gunRe = /(\d{1,2})\s+([a-zA-ZçğıöşüÇĞİÖŞÜ]+)/g;
+    let gm;
+    while ((gm = gunRe.exec(text)) !== null) {
+      const ay = MONTH_MAP_TR[trKucuk(gm[2])];
+      if (!ay) continue;
+      const sonra = trKucuk(text.slice(gm.index + gm[0].length, gm.index + gm[0].length + 25));
+      gunler.push({ gun: gm[1], ay, giris: /^\s*\S*\s*(giriş|giris|check-?in)/.test(sonra), cikis: /^\s*\S*\s*(çıkış|cikis|check-?out)/.test(sonra) });
+    }
+    const giris = gunler.find(g => g.giris) || gunler[0];
+    const cikis = gunler.find(g => g.cikis && g !== giris) || gunler.find(g => g !== giris);
+    if (giris && cikis) {
+      const range = inferFutureRange(giris.ay, giris.gun, cikis.ay, cikis.gun);
+      checkIn = range.start;
+      checkOut = range.end;
+    } else if (giris) {
+      // Tek tarih + "3 gece": cikis gece sayisindan cikar.
+      const geceMatch = text.match(/(\d{1,2})\s*gece/i);
+      const range = inferFutureRange(giris.ay, giris.gun, giris.ay, giris.gun);
+      checkIn = range.start;
+      if (checkIn && geceMatch && Number(geceMatch[1]) > 0) {
+        const d = new Date(`${checkIn}T00:00:00Z`);
+        d.setUTCDate(d.getUTCDate() + Number(geceMatch[1]));
+        checkOut = d.toISOString().slice(0, 10);
+      }
+    }
+  }
+
   return {
     guest: detectedGuest,
     phone: detectedPhone,
     villa: detectedVilla,
     amount: detectedAmount,
+    deposit: detectedDeposit,
+    remaining: detectedRemaining,
     pax: detectedPax,
     checkIn,
     checkOut
@@ -12084,8 +12301,14 @@ function parseWhatsAppMessage() {
   document.getElementById('waParsedCheckIn').value = parsed.checkIn || '';
   document.getElementById('waParsedCheckOut').value = parsed.checkOut || '';
   document.getElementById('waParsedPax').value = parsed.pax ?? '';
-  
-  const notes = `WhatsApp mesajından aktarıldı: ${text.slice(0, 60)}...`;
+  const depositInput = document.getElementById('waParsedDeposit');
+  if (depositInput) depositInput.value = parsed.deposit ?? '';
+
+  const odeme = [
+    parsed.deposit ? `Kapora ₺${parsed.deposit.toLocaleString('tr-TR')} alındı` : '',
+    parsed.remaining ? `kalan ₺${parsed.remaining.toLocaleString('tr-TR')} girişte` : ''
+  ].filter(Boolean).join(', ');
+  const notes = `WhatsApp mesajından aktarıldı${odeme ? ` (${odeme})` : ''}: ${text.slice(0, 60)}...`;
   document.getElementById('waParsedNotes').value = notes;
 }
 
@@ -12161,6 +12384,19 @@ async function saveWaAsBooking() {
     return;
   }
 
+  // Kapora rezervasyonun odeme defterine DEPOSIT olarak yazilir (L-182).
+  // Ciro degismez; kalan tahsilat rezervasyon ayrintisinda gorunur.
+  const depositText = document.getElementById('waParsedDeposit')?.value || '';
+  const deposit = depositText === '' ? 0 : Number(depositText);
+  if (!Number.isFinite(deposit) || deposit < 0) {
+    alert('Kapora tutarı geçerli bir sayı olmalıdır.');
+    return;
+  }
+  if (deposit > 0 && gross > 0 && deposit > gross) {
+    alert('Alınan kapora toplam tutardan büyük olamaz. Toplam tutarı kontrol edin.');
+    return;
+  }
+
   const d1 = new Date(checkIn);
   const d2 = new Date(checkOut);
   const nights = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
@@ -12189,6 +12425,18 @@ async function saveWaAsBooking() {
     });
     // Cikis temizligi formla ayni sekilde planlanir; maliyet bilinmiyor.
     temizlikNotu = await syncBookingCleaningTaskToCloud(yeni, null);
+    if (deposit > 0) {
+      const { error: depositError } = await supabaseClient.from('booking_payments').insert({
+        tenant_id: getActiveTenantId(), booking_id: yeni.id, paid_on: getTodayStr(),
+        amount: deposit, kind: 'DEPOSIT', method: null, note: 'WhatsApp mesajından'
+      });
+      temizlikNotu = (temizlikNotu || '') + (depositError
+        ? `\n⚠️ Kapora kaydedilemedi (${getFriendlyAuthErrorMessage(depositError)}). Rezervasyon ayrıntısından elle ekleyin.`
+        : `\n💰 Kapora ₺${deposit.toLocaleString('tr-TR')} ödeme defterine işlendi.`);
+      if (!depositError && typeof refreshBookingPaymentData === 'function') {
+        try { await refreshBookingPaymentData(yeni.id); } catch (_) { /* ekran yenilemesi ikincil */ }
+      }
+    }
   } catch (err) {
     alert('⚠️ Rezervasyon kaydedilemedi: ' + (err?.message || 'veritabanı hatası'));
     return;
@@ -17088,7 +17336,9 @@ function renderExecutiveControlCenter() {
   if (readinessApi) {
     const healthCards = propertiesList.map(property => readinessApi.buildPropertyReadiness(property, {
       overrideStatus: appData?.housekeepingOverrides?.[property.key],
-      maintenanceTickets: tickets
+      maintenanceTickets: tickets,
+      cleaningTasks: readinessCleaningTasks(),
+      today: getTodayStr()
     }));
     renderPortfolioHealth(healthCards);
   }
@@ -17186,17 +17436,25 @@ function renderPortfolioHealth(healthCards) {
     // acmanin yolu arizayi kapatmaktir. Eskiden secenek seciliyor, kaydediliyor
     // ama kart yine "kapali" gosteriyordu.
     const blocked = (c.blockingIssueCount || 0) > 0;
+    // Bekleyen temizlik de satisi tutar (L-183): secim kaydedilip kart sari
+    // kalmasin diye satilabilir secenekler kapanir; temizlik yapilinca hazir olur.
+    const cleaningPending = !blocked && (c.pendingCleaningTaskIds || []).length > 0;
+    const lockReason = blocked ? 'önce arızayı kapatın' : (cleaningPending ? 'önce temizliği tamamlayın' : '');
     const options = readinessApi.SELECTABLE_STATUSES.map(status => {
       const optionMeta = readinessApi.STATUS_META[status];
       const selected = c.manualStatus === status ? ' selected' : '';
-      const disabled = blocked && SALEABLE_READINESS_STATUSES.includes(status) ? ' disabled' : '';
-      return `<option value="${escapeHtml(status)}"${selected}${disabled}>${optionMeta.icon} ${escapeHtml(optionMeta.label)}${disabled ? ' — önce arızayı kapatın' : ''}</option>`;
+      const disabled = lockReason && SALEABLE_READINESS_STATUSES.includes(status) ? ' disabled' : '';
+      return `<option value="${escapeHtml(status)}"${selected}${disabled}>${optionMeta.icon} ${escapeHtml(optionMeta.label)}${disabled ? ` — ${lockReason}` : ''}</option>`;
     }).join('');
     const blockedHtml = blocked
       ? `<div style="margin-top:8px; font-size:11px; color:#FCA5A5;">Satışa açmak için arızayı kapatın.
            <button type="button" class="btn btn-secondary btn-sm" style="font-size:11px; padding:2px 8px; margin-left:4px;"
              data-onclick="openTabFromDeepLink('maintenance', decodeURIComponent('${encodeActionArg(String((c.blockingTicketIds || [])[0] || ''))}'))">Arızayı gör ›</button></div>`
-      : '';
+      : (cleaningPending
+        ? `<div style="margin-top:8px; font-size:11px; color:#FBBF24;">Temizlik yapıldı işaretlenince hazır olur.
+           <button type="button" class="btn btn-secondary btn-sm" style="font-size:11px; padding:2px 8px; margin-left:4px;"
+             data-onclick="openTabFromDeepLink('housekeeping', decodeURIComponent('${encodeActionArg(String((c.pendingCleaningTaskIds || [])[0] || ''))}'))">Temizliğe git ›</button></div>`
+        : '');
     const editor = canEdit
       ? `<label style="display:block; margin-top:9px; font-size:10px; color:#94A3B8;">
            Durumu değiştir
@@ -19124,6 +19382,7 @@ if (typeof module !== 'undefined' && module.exports) {
     GLOBAL_FILTER_SCOPE,
     renderTodayMonthSummary,
     parseWhatsAppMessageText,
+    saveWaAsBooking,
     isUUID,
     roundMoney,
     normalizeCleaningTask,
@@ -19372,6 +19631,11 @@ if (typeof module !== 'undefined' && module.exports) {
     assignCleaningTask,
     renderOperationsPeopleView,
     renderTodayCommandCenter,
+    readEmailTokenHashLink,
+    openPageReport,
+    refreshPropertyReport,
+    closePageReportModal,
+    consumeEmailTokenHashLink,
     openTabFromDeepLink,
     renderOperationsCleaningView,
     saveOperationalPerson,

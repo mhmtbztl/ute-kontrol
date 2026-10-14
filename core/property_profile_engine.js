@@ -90,6 +90,21 @@
     const bookings = (input.bookings || []).filter(row => belongs(row, property));
     const expenses = (input.expenses || []).filter(row => belongs(row, property));
     const cleaningTasks = (input.cleaningTasks || []).filter(row => belongs(row, property));
+    // Istege bagli tarih araligi (L-181): rapor eskiden yalniz "tum zamanlar"di.
+    // Aralikta gelir gecelere tahakkukla bolunur (CLAUDE.md 3.4), aylik defterle
+    // ayni nightShareInRange; gider ve temizlik kendi tarihine gore girer.
+    const range = input.range && /^\d{4}-\d{2}-\d{2}$/.test(input.range.start || '') && /^\d{4}-\d{2}-\d{2}$/.test(input.range.end || '')
+      && input.range.start <= input.range.end ? input.range : null;
+    if (range) {
+      const inRange = d => typeof d === 'string' && d.slice(0, 10) >= range.start && d.slice(0, 10) <= range.end;
+      return LedgerContract.computePeriodLedger({
+        bookings, expenses, allExpenses: input.expenses || [], cleaningTasks,
+        bookingInScope: () => true,
+        bookingShare: row => LedgerContract.nightShareInRange(row, range.start, range.end),
+        expenseInScope: row => inRange(row.date || row.expense_date || (row.month ? row.month + '-15' : '')),
+        taskInScope: row => inRange(row.date || row.task_date)
+      });
+    }
     return LedgerContract.computePeriodLedger({
       bookings, expenses, allExpenses: input.expenses || [], cleaningTasks,
       bookingInScope: () => true,
