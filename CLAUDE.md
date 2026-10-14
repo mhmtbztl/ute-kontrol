@@ -623,13 +623,13 @@ ayırt edilemez (imza aynı): kanıt `PHASE 51 OK` ya da `schema_migrations` 51.
 Paket: `docs/PHASE51_DEPLOY_PACKAGE.md`.
 
 **phase91 (`migration_phase91_lead_interest_properties.sql`) 14 Ekim 2026'da
-test projesine uygulandı; üretimde HENÜZ UYGULANMADI.** Talebin ek ilgilendiği
+test projesine ve 14 Ekim 2026'da üretime uygulandı; üretimde doğrulandı.** Talebin ek ilgilendiği
 mülkler (kullanıcı M16): `lead_interest_properties` bağ tablosu, okuma
 `can_read_sales`, yazma `can_write_sales`, talep ve mülk aynı kiracıda.
 `leads`'e sütun eklenmedi (§3.4 dağıtım sırası tuzağı); göç öncesinde
 istemci tabloyu `fetchTenantRowsTolerant` ile okur, yazmada "phase91
 uygulanmadı" der. Canlı süit `phase91_lead_interest_live_tests` 13/13.
-Paket: `docs/PHASE91_DEPLOY_PACKAGE.md`.
+Üretim doğrulaması (salt okunur): anon tablo sorgusu `401 42501`; `production:readiness` BAŞARILI, `schema_migrations` 91 mevcut. Paket: `docs/PHASE91_DEPLOY_PACKAGE.md`.
 
 **Bir göçün uygulanıp uygulanmadığı, dosyaya bakarak anlaşılmaz.** Dosya repoda
 durur; veritabanı uygulanmamış olabilir. Doğrulamanın yolu üretime sormaktır:
@@ -841,7 +841,7 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 | RGVQI denetim düzeltmeleri | phase24 ve phase25, 14 Eylül 2026'da üretime uygulandı ve readiness denetimiyle doğrulandı; uygulama/worker dağıtımı ayrıca izlenmeli |
 | Misafir CRM (phase27 + phase28) | göçler **üretimde uygulandı ve doğrulandı** (15 Eylül 2026, sütun sorgusuyla); test projesinde de kurulu |
 | Güvenli test kapısı | tamamlandı — canlı/çevrimdışı ayrımı artık `@supabase/supabase-js` require'ına bakıyor. Eski kaba dizgi taraması 8 çevrimdışı süiti (worker giriş noktaları) yanlışlıkla atlıyordu; güncel güvenli koşu 145 süit (25 Eylül 2026) |
-| Kullanıcı davet e-postası | **worker üretimde çalışıyor** (23 Eylül 2026 kontrolü: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `LEXBNB_PUBLIC_URL` secret'ları tanımlı, `Marketing workers` her koşuda adımı çalıştırıp `{"claimed":0}` dönüyor; kuyruk o gün boştu, yani uçtan uca henüz hiç sınanmadı). Aynı gün iki kusur düzeltildi: hesabı **zaten olan** adrese davet `already registered` ile 5 kez düşüp hiç gitmiyordu (artık giriş linki gidiyor), davet linkiyle gelen **şifresiz** hesaba şifre belirletilmiyordu (`#type=invite` artık şifre formunu açıyor). Ağı `core/invitation_worker_tests.js` (14 iddia). Açık: Supabase Invite/Magic Link şablonlarının Türkçeleştirilmesi; GitHub `*/15` zamanlaması pratikte saatlerce gecikiyor |
+| Kullanıcı davet e-postası | **worker üretimde çalışıyor** (23 Eylül 2026 kontrolü: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `LEXBNB_PUBLIC_URL` secret'ları tanımlı, `Marketing workers` her koşuda adımı çalıştırıp `{"claimed":0}` dönüyor; kuyruk o gün boştu, yani uçtan uca henüz hiç sınanmadı). Aynı gün iki kusur düzeltildi: hesabı **zaten olan** adrese davet `already registered` ile 5 kez düşüp hiç gitmiyordu (artık giriş linki gidiyor), davet linkiyle gelen **şifresiz** hesaba şifre belirletilmiyordu (`#type=invite` artık şifre formunu açıyor). Ağı `core/invitation_worker_tests.js` (14 iddia). **14 Ekim 2026:** davet Edge Function ile anında gider (phase90, Codex PR #16); şablonlar Türkçe ve bağlantı `lexbnb.space/?token_hash=` (L-180, `docs/EMAIL_TEMPLATES.md`) — kullanıcı uçtan uca doğruladı, spama düşmedi |
 
 ### `saveAppData()` — kaydetmeyen kaydedici
 
