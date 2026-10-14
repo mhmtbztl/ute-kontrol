@@ -14,7 +14,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=fb42238b">
+  <link rel="stylesheet" href="style.css?v=d979af33">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="supabase.umd.js?v=3810661a"></script>
@@ -159,8 +159,9 @@
       </div>
     </div>
 
-    <!-- Global Period & Villa Filter -->
-    <div class="header-filters">
+    <!-- Global Period & Villa Filter. Yalniz okuyan sayfada gorunur ve neyi
+         etkiledigini yazar: applyGlobalFilterScope() / GLOBAL_FILTER_SCOPE. -->
+    <div class="header-filters" id="globalFilterBar">
             <div class="filter-group">
         <label style="display: flex; align-items: center; gap: 4px;"><span>📅</span> DÖNEM / TARİH:</label>
         <select id="globalPeriodFilter" data-onchange="handleFilterChange()">
@@ -177,7 +178,7 @@
       <div id="customDateRangeWrap" style="display: none; align-items: center; gap: 6px; background: rgba(0,0,0,0.3); padding: 4px 8px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15);">
         <input type="date" id="customFilterStart" data-onchange="handleFilterChange()" title="Başlangıç Tarihi" style="padding: 6px 8px; background: rgba(30,41,59,0.9); border: 1px solid rgba(255,255,255,0.25); border-radius: 6px; color: #fff; font-size: 12px; font-weight: 600;">
         <span style="color: #94A3B8; font-weight: 700; font-size: 13px;">–</span>
-        <input type="date" id="customFilterEnd" value="2026-09-30" data-onchange="handleFilterChange()" title="Bitiş Tarihi" style="padding: 6px 8px; background: rgba(30,41,59,0.9); border: 1px solid rgba(255,255,255,0.25); border-radius: 6px; color: #fff; font-size: 12px; font-weight: 600;">
+        <input type="date" id="customFilterEnd"data-onchange="handleFilterChange()" title="Bitiş Tarihi" style="padding: 6px 8px; background: rgba(30,41,59,0.9); border: 1px solid rgba(255,255,255,0.25); border-radius: 6px; color: #fff; font-size: 12px; font-weight: 600;">
       </div>
       <div class="filter-group">
         <label>PORTFÖY:</label>
@@ -185,6 +186,7 @@
               <option value="ALL">Tüm Villalar / Portföy</option>
             </select>
       </div>
+      <p id="globalFilterScopeHint" class="filter-scope-hint"></p>
     </div>
 
         <div class="header-actions">
@@ -422,7 +424,7 @@
         </div>
       </section>
 
-      <div id="execSnapshotStatus" role="status" aria-live="polite" style="margin: -8px 0 12px; color: #94A3B8; font-size: 11px;">
+      <div id="execSnapshotStatus" hidden role="status" aria-live="polite" style="margin: -8px 0 12px; color: #94A3B8; font-size: 11px;">
         Güncel rakamlar hazırlanıyor…
       </div>
 
@@ -3659,7 +3661,7 @@
   <script src="core/date_range_picker.js?v=41dc564c"></script>
   <script src="core/side_panel.js?v=d763b464"></script>
   <script src="core/action_dispatch.js?v=c1740842"></script>
-  <script src="app.js?v=301cb282"></script>
+  <script src="app.js?v=3edeb2b0"></script>
   <script src="core/property_analysis_context_ui.js?v=0a5def2d"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=ec113951"></script>
