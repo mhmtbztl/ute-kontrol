@@ -13,6 +13,7 @@
 // L-182 (M12): Mesaj ayristirici tarih, ad ve kaporayi okumuyordu; kapora odeme defterine yazilir.
 // L-183 (M13): Temizlik planlaninca mulk kendiliginden "temizlik bekliyor", yapilinca hazir.
 // L-191 (M21): Ara / Komut ilk 30 rezervasyonu tariyordu; misafir, talep, ekran, kanal yoktu.
+// L-193 (M23): Defterdeki "Temizlik" sutunu maliyet saniliyordu; misafirden alinan gelir oldugu yazilir.
 // L-184..L-190 (M14-M20): kapora, kar marji hedefi, talep tarihi, mulk net kari, reklam tablosu/metrik/gunluk butce, sablon ekrani, bosluk gecesi.
 const fs = require('fs');
 const path = require('path');
@@ -551,6 +552,20 @@ async function aramaDavranisi() {
   check(/command_search\.js\?v=/.test(read('index.html')), 'L-191n Modul sayfaya yuklenir');
 }
 
+// L-193 (M23) — Rezervasyon defterindeki temizlik sutunu gelir oldugunu soyler.
+async function temizlikSutunuDavranisi() {
+  const FIE = require('./finance_import_engine.js');
+  const basliklar = FIE.SABLON_SUTUNLARI.BOOKINGS;
+  check(basliklar.includes('Misafirden Temizlik Ücreti (TL)') && !basliklar.includes('Temizlik Ücreti (TL)'),
+    'L-193a Defter/sablon basligi temizligin misafirden alinan gelir oldugunu soyler');
+  const yeni = FIE.autoDetectColumnMap(basliklar, 'BOOKINGS');
+  const eski = FIE.autoDetectColumnMap(['Villa', 'Misafir Adı', 'Giriş Tarihi', 'Çıkış Tarihi', 'Brüt Tutar (TL)', 'Temizlik Ücreti (TL)'], 'BOOKINGS');
+  check(yeni.cleaningFee === 'Misafirden Temizlik Ücreti (TL)' && eski.cleaningFee === 'Temizlik Ücreti (TL)',
+    'L-193b Yeni baslik eslesir; eski basligla indirilmis dosyalar da yuklenir');
+  const csv = read('sablonlar/lexbnb-rezervasyon-sablonu.csv') + read('scripts/build_sample_templates.js');
+  check(/Misafirden Temizlik Ücreti/.test(csv) && /MALİYETİ bu dosyada yoktur/.test(csv), 'L-193c Yayinlanan sablon yeni basligi tasir; aciklama sayfasi maliyetin bu dosyada olmadigini yazar');
+}
+
 async function main() {
 try {
   const html = read('index.html');
@@ -582,6 +597,7 @@ try {
   await asama4Davranisi();
   await cokluMulkTalepDavranisi();
   await aramaDavranisi();
+  await temizlikSutunuDavranisi();
 } catch (error) {
   failed++;
   console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

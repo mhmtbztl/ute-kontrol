@@ -6761,7 +6761,7 @@ function downloadSampleTemplate(templateType) {
         'Brüt Tutar (TL)': 72000,
         'Kanal': 'WHATSAPP',
         'OTA Komisyonu (TL)': 0,
-        'Temizlik Ücreti (TL)': 1500,
+        'Misafirden Temizlik Ücreti (TL)': 1500,
         'Kişi Sayısı': 8,
         'Durum': 'CHECKED_OUT'
       },
@@ -6774,7 +6774,7 @@ function downloadSampleTemplate(templateType) {
         'Brüt Tutar (TL)': 56000,
         'Kanal': 'AIRBNB',
         'OTA Komisyonu (TL)': 8400,
-        'Temizlik Ücreti (TL)': 1200,
+        'Misafirden Temizlik Ücreti (TL)': 1200,
         'Kişi Sayısı': 6,
         'Durum': 'CHECKED_OUT'
       }
