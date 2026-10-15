@@ -381,14 +381,19 @@ dalında kalır ve **haber vermeden `master`'a dokunmaz.**
 
 4. **Yeni göç eklediyseniz**
    - Dosya `supabase/migration_phase<N>_<konu>.sql` olarak eklenir.
-   - **Phase numarası sahipliği:** Codex yalnızca çift numaraları (`30`, `32`,
-     `34`, ...), Claude yalnızca tek numaraları (`29`, `31`, `33`, ...),
-     Antigravity yalnızca **`100` ve sonrasını** (`100`, `101`, `102`, ...)
-     kullanır. Bir aracın sırası kullanılmayacak olsa bile diğer araç o
-     numarayı devralmaz; böylece paralel worktree’ler aynı phase adını seçmez.
-     Tek/çift ayrımı iki araç için tasarlanmıştı ve üçüncüde tükendi; dördüncü
-     bir araç gelirse ona da **ayrı bir blok** verilir (`200+`), tek/çift
-     bölünmez. Numara bloğu, aracın ilk göçünü yazmasından **önce** verilir.
+   - **Phase numarası sahipliği (15 Ekim 2026):** Codex `1000` altında
+     yalnızca çift numaralarla, Claude `1000` altında yalnızca tek numaralarla
+     mevcut sırasından devam eder. Antigravity'nin yeni göçleri yalnızca
+     **`1000` ve sonrasını** (`1000`, `1001`, `1002`, ...) kullanır;
+     eski `100+` tahsisi yeni göçler için geçerli değildir.
+     Daha önce oluşturulmuş göçler yeniden numaralandırılmaz; mevcut veya
+     başka worktree'de ayrılmış numaralar yeniden kullanılmaz. Her araç,
+     kendi aralığında ve sırasındaki ilk kullanılmamış numarayı seçer.
+     Bir aracın sırası kullanılmayacak olsa bile diğer araç o numarayı
+     devralmaz; böylece paralel worktree’ler aynı phase adını seçmez.
+     Codex/Claude `1000` sınırına ulaşmadan veya dördüncü bir araç katılmadan
+     önce kullanıcıdan çakışmayan **ayrı bir blok** tahsisi alınır; araçlar
+     kendiliğinden aralık genişletmez. Tek/çift ayrımı korunur.
    - Sonunda kendi doğrulama bloğu bulunur; başarısızsa `RAISE EXCEPTION`
      ile durur.
    - `supabase/migration_manifest.txt`'e dosya adı + sha256 kaydedilir.
