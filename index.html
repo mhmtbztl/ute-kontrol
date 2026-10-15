@@ -14,7 +14,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=63afabdb">
+  <link rel="stylesheet" href="style.css?v=bfc4fafa">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="supabase.umd.js?v=3810661a"></script>
@@ -230,7 +230,7 @@
       </button>
       <!-- Dropdown 1: Hızlı Ekle -->
       <div class="header-dropdown-wrap">
-        <button type="button" class="btn btn-primary" data-onclick="toggleHeaderDropdown('quickAddMenu')" id="quickAddBtn" style="font-weight: 700;">
+        <button type="button" class="btn btn-primary" data-onclick="toggleHeaderDropdown('quickAddMenu')" id="quickAddBtn" data-write-action style="font-weight: 700;">
           <span>➕</span> Hızlı Ekle <span style="font-size: 10px; margin-left: 2px;">▼</span>
         </button>
         <div class="header-dropdown-menu" id="quickAddMenu">
@@ -1157,7 +1157,7 @@
             <h2>📋 REZERVASYONLAR</h2>
             <p class="sub-text">Seçili dönemin rezervasyonları; operasyon önceliğine göre sıralanır.</p>
           </div>
-          <button class="btn btn-primary" data-onclick="openBookingModal()">+ Yeni Rezervasyon Ekle</button>
+          <button class="btn btn-primary" data-onclick="openBookingModal()" data-sales-write>+ Yeni Rezervasyon Ekle</button>
         </div>
 
         <!-- Rezervasyon Tablosu Filtreleme ve Arama Çubuğu -->
@@ -1583,6 +1583,7 @@
               <label for="businessLogoInput">İşletme logosu</label>
               <input id="businessLogoInput" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" data-onchange="uploadBusinessLogo(this)">
               <small class="sub-text">PNG, JPG, WebP veya SVG · en fazla 2 MB.</small>
+              <button type="button" id="businessLogoRemoveBtn" class="btn btn-secondary btn-sm" data-onclick="removeBusinessLogo()" hidden>Logoyu kaldır</button>
             </div>
             <div id="businessSettingsMessage" class="sub-text" role="status" aria-live="polite"></div>
             <button type="submit" class="btn btn-primary">İşletme Bilgilerini Kaydet</button>
@@ -1687,6 +1688,7 @@
           <section class="settings-template-pane">
             <h3>Mesaj şablonları</h3>
             <p class="sub-text settings-template-help">Misafire gönderdiğiniz hazır WhatsApp metinleri. <strong>Talepler</strong>de bir talebi düzenlerken seçip kopyalarsınız.</p>
+            <button type="button" class="settings-template-usage-link" data-onclick="switchTab('leads')">Taleplerde kullan →</button>
             <form data-onsubmit="createSettingsMessageTemplate(event)" class="settings-inline-form">
               <input name="name" maxlength="150" required placeholder="Şablon adı">
               <textarea name="body" maxlength="4000" required placeholder="Örn: Merhaba, villamız için teklifimiz ektedir. Sorunuz olursa yazabilirsiniz."></textarea>
@@ -1697,6 +1699,7 @@
           <section class="settings-template-pane">
             <h3>Görev şablonları</h3>
             <p class="sub-text settings-template-help">Tekrarlayan işler (örn. havuz kontrolü). <strong>Operasyon → Görevler</strong>deki <strong>Hazır görev kütüphanesi</strong>nden tek tıkla göreve dönüşür.</p>
+            <button type="button" class="settings-template-usage-link" data-onclick="switchTab('operations'); setOperationsView('tasks')">Görevlerde kullan →</button>
             <form data-onsubmit="createSettingsTaskTemplate(event)" class="settings-inline-form">
               <input name="title" maxlength="200" required placeholder="Görev başlığı">
               <select name="task_type"><option value="GENERAL">Genel</option><option value="CLEANING">Temizlik</option><option value="INSPECTION">Kontrol</option><option value="MAINTENANCE">Bakım</option></select>
@@ -1707,6 +1710,7 @@
           <section class="settings-template-pane">
             <h3>Kontrol listeleri</h3>
             <p class="sub-text settings-template-help">Temizlikçinin telefonunda işaretlediği madde listesi. Temizlik atandığında otomatik çıkar. Her satıra bir madde yazın; <code>#</code> ile başlayan satır bölüm başlığıdır, <code>!</code> ile başlayan madde önemlidir.</p>
+            <button type="button" class="settings-template-usage-link" data-onclick="switchTab('operations'); setOperationsView('cleaning')">Temizlikte kullan →</button>
             <form data-onsubmit="createSettingsChecklistTemplate(event)" class="settings-inline-form">
               <input name="template_name" maxlength="150" required placeholder="Liste adı">
               <textarea name="items" maxlength="4000" required rows="6" placeholder="# Yatak odası&#10;Çarşaflar değişti&#10;!Klima filtresi temizlendi&#10;# Mutfak&#10;Bulaşık makinesi boşaltıldı"></textarea>
@@ -3763,10 +3767,10 @@
   <script src="core/side_panel.js?v=d763b464"></script>
   <script src="core/notification_feed.js?v=d8a17633"></script>
   <script src="core/command_search.js?v=89760933"></script>
-  <script src="core/action_dispatch.js?v=928acf5d"></script>
+  <script src="core/action_dispatch.js?v=fe436108"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=a85be454"></script>
-  <script src="app.js?v=c13a544a"></script>
+  <script src="app.js?v=2947822e"></script>
   <script src="core/property_analysis_context_ui.js?v=0a5def2d"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=6fdf284a"></script>
