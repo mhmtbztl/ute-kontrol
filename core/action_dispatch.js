@@ -52,7 +52,7 @@
     'deleteCleaningTask', 'deleteCleaningTaskFromModal', 'deleteExpenseUI',
     'deleteLeadUI', 'deleteMaint',
     'downloadSampleTemplate', 'downloadCurrentReportCsv', 'downloadCurrentReportXlsx', 'editBooking', 'editExpense', 'editLead', 'editSettingsTemplate', 'archiveSettingsTemplate',
-    'editMaint', 'exportLedger', 'filterByPeriod', 'filterByVilla',
+    'editMaint', 'exportIncomeStatement', 'exportLedger', 'filterByPeriod', 'filterByVilla',
     'filterExpensesByCategory', 'filterHelpGlossary', 'generateAnalysisExport',
     'handleBookingChannelChange', 'handleBookingDeleteFromModal', 'handleBookingPropertyFinanceChange',
     'markBookingCleaningManual', 'handleBookingGrossFinanceInput', 'toggleBookingFinanceSections', 'addBookingExtraExpense', 'removeBookingExtraExpense',

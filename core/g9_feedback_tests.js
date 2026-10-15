@@ -16,6 +16,7 @@
 // L-192 (M22): Bildirim merkezine satir ureten kod yoktu; olaylar gercek veriden turetilir (phase93).
 // L-194 (M24): Sablonlar gecerli mulk/kanal/kategoriyi gostermiyordu; kategori sessizce Diger e, kanal serbest metin.
 // L-195 (M25): Gecmis temizlik maliyetinin girilecek yolu yoktu; gecmis aylarda kar yuksek gorunuyordu (phase95).
+// L-196 (M26): Gelir tablosu indirilemiyordu; ekrandaki defterden, rol kapili.
 // L-199 (M29): Talep formunda rol yuklenmeden yazilan "kaydedemez" mesaji rol gelince kalmiyordu.
 // L-193 (M23): Defterdeki "Temizlik" sutunu maliyet saniliyordu; misafirden alinan gelir oldugu yazilir.
 // L-184..L-190 (M14-M20): kapora, kar marji hedefi, talep tarihi, mulk net kari, reklam tablosu/metrik/gunluk butce, sablon ekrani, bosluk gecesi.
@@ -808,6 +809,69 @@ async function gecmisTemizlikDavranisi() {
     'L-195k Gider talimati gecmis temizligi yeni sablona yonlendirir; temizlik talimati maliyet ile ucreti ayirir');
 }
 
+// L-196 (M26) — Gelir tablosu: ekrandaki defterle ayni rakam, rol kapili.
+async function gelirTablosuDavranisi() {
+  sahteDom({});
+  const App = require('../app.js');
+  App.setSupabaseClient(kaydedenIstemci());
+  App.setActiveTenant({ id: TENANT, role: 'owner' });
+  App.setAppData({
+    villas: { a: { id: 'pa', name: 'Villa A' }, b: { id: 'pb', name: 'Villa B' } },
+    bookings: [
+      // Ay sinirini kesen rezervasyon: 2 gece Agustos, 3 gece Eylul.
+      { id: 'b1', villa: 'a', propertyId: 'pa', checkIn: '2026-08-30', checkOut: '2026-09-04', gross: 50000, cleanFee: 1500, otaComm: 5000, discount: 1000, status: 'CONFIRMED' },
+      { id: 'b2', villa: 'b', propertyId: 'pb', checkIn: '2026-09-10', checkOut: '2026-09-12', gross: 20000, cleanFee: 0, otaComm: 0, discount: 0, status: 'CONFIRMED' },
+      { id: 'b3', villa: 'b', propertyId: 'pb', checkIn: '2026-10-10', checkOut: '2026-10-12', gross: 9000, cleanFee: 0, otaComm: 0, discount: 0, status: 'CONFIRMED' }
+    ],
+    expenses: [
+      { id: 'e1', villa: 'a', date: '2026-09-05', amount: 3000, type: 'OPEX', category: 'Bakım' },
+      { id: 'e2', villa: 'ALL', date: '2026-09-07', amount: 2000, type: 'OPEX', category: 'Fatura' },
+      { id: 'e3', villa: 'b', date: '2026-08-20', amount: 10000, type: 'CAPEX', category: 'Diğer' }
+    ],
+    cleaningTasks: [{ id: 'c1', villa: 'a', propertyId: 'pa', date: '2026-09-04', amount: 1200, status: 'DONE', paid: true }],
+    closedPeriods: []
+  });
+
+  const ekran = () => App.computeFilterLedger();
+  App.setCurrentFilter({ period: '2026-09', villa: 'ALL' });
+  let t = App.buildIncomeStatementForFilter();
+  let e = ekran();
+  check(t.monthly.length === 1 && t.total.netProfit === Math.round(e.netProfit * 100) / 100 && t.total.totalRevenue === Math.round(e.totalRevenue * 100) / 100
+    && t.total.soldNights === e.soldNights && t.total.cleaningCost === e.cleaningCost,
+    'L-196a Tek ay: gelir tablosu TOPLAM satiri Finans ekranindaki defterle birebir ayni', JSON.stringify({ t: t.total, e }));
+  const ortak = t.byProperty.find(r => /ortak/.test(r.label));
+  const mulkA = t.byProperty.find(r => r.label === 'Villa A');
+  check(ortak && ortak.manualOpex === 2000 && mulkA.manualOpex === 3000 && t.byProperty[t.byProperty.length - 1].label === 'TOPLAM',
+    'L-196b Mulk bazinda: ortak gider mulke bolunmez, ayri satirda; toplam en altta');
+
+  App.setCurrentFilter({ period: 'CUSTOM', startDate: '2026-08-15', endDate: '2026-10-11', villa: 'ALL' });
+  t = App.buildIncomeStatementForFilter();
+  e = ekran();
+  const toplamAy = t.monthly.reduce((s, r) => s + r.totalRevenue, 0);
+  check(t.monthly.map(r => r.label).join() === 'Ağustos 2026,Eylül 2026,Ekim 2026' && /Kısmi ay/.test(t.monthly[0].note)
+    && Math.abs(toplamAy - t.total.totalRevenue) < 0.05 && Math.abs(t.total.totalRevenue - e.totalRevenue) < 0.05,
+    'L-196c Ozel aralik: aylara bolunur (uclar kismi), aylar toplami = TOPLAM = ekran', JSON.stringify({ toplamAy, t: t.total.totalRevenue, e: e.totalRevenue }));
+  check(t.monthly[0].totalRevenue > 0 && Math.abs(t.monthly[0].netRoomRevenue - (50000 - 1500 - 1000) * 2 / 5) < 0.05,
+    'L-196d Ay sinirini kesen rezervasyonun geliri gecelere bolunur (Agustos 2/5 pay)');
+
+  App.setCurrentFilter({ period: '2026-10', villa: 'b' });
+  t = App.buildIncomeStatementForFilter();
+  check(t.total.netProfit === null && t.total.margin === null && /kâr ölçülemedi/.test(t.total.note) && t.byProperty === null,
+    'L-196e Gider yoksa kar ve marj "—" (uydurulmaz); tek mulk gorunumunde mulk sayfasi yok');
+  const IS = require('./income_statement.js');
+  const sayfa = IS.toSheets(t, {}).find(x => x.name === 'Gelir Tablosu').aoa;
+  check(sayfa[sayfa.length - 1].includes('—') && sayfa[0][0] === 'Dönem / Mülk', 'L-196f Excel satirinda olculemeyen kar "—" yazilir');
+
+  App.setCurrentFilter({ period: '2026-09', villa: 'ALL' });
+  App.setActiveTenant({ id: TENANT, role: 'sales' });
+  check(App.exportIncomeStatement() === false, 'L-196g Satis rolu gelir tablosunu indiremez (can_read_ledger)');
+  const app = read('app.js');
+  const html = read('index.html');
+  check(/data-ledger-only data-onclick="exportIncomeStatement\(\)/.test(html) && /data-ledger-only data-onclick="exportLedger\('EXPENSES'/.test(html)
+    && /\[data-ledger-only\][\s\S]{0,80}canReadLedgerRole\(role\)/.test(app) && /income_statement\.js\?v=/.test(html),
+    'L-196h Menude "Gelir Tablosunu Indir"; gelir tablosu ve gider defteri finans defteri okuyabilen rollere gorunur (izleyici dahil)');
+}
+
 async function main() {
 try {
   const html = read('index.html');
@@ -844,6 +908,7 @@ try {
   await talepRolMesajiDavranisi();
   await sablonGecerliDegerDavranisi();
   await gecmisTemizlikDavranisi();
+  await gelirTablosuDavranisi();
 } catch (error) {
   failed++;
   console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

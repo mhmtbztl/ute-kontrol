@@ -4525,6 +4525,28 @@ function computeFilterLedger() {
   });
 }
 
+/**
+ * Keyfi bir [start, end] araligi icin defter (gelir tablosu, L-196). Kapsam
+ * kurallari computeMonthLedger ve isExpenseInFilter ile aynidir: mulk
+ * gorunumu portfoy geneli gideri saymaz, gelir gecelere bolunur.
+ */
+function computeRangeLedger(start, end, villa) {
+  const L = getLedgerContract();
+  const v = villa || 'ALL';
+  const propId = v !== 'ALL' ? appData?.villas?.[v]?.id : null;
+  const tarihIcinde = d => typeof d === 'string' && d.slice(0, 10) >= start && d.slice(0, 10) <= end;
+  return L.computePeriodLedger({
+    bookings: appData.bookings || [],
+    expenses: appData.expenses || [],
+    cleaningTasks: appData.cleaningTasks || [],
+    bookingInScope: b => v === 'ALL' || b.villa === v || (!!propId && b.propertyId === propId),
+    bookingShare: b => L.nightShareInRange(b, start, end),
+    expenseInScope: e => (v === 'ALL' || e.villa === v)
+      && tarihIcinde(e.date || e.expense_date || ((e.monthKey || e.month) ? (e.monthKey || e.month) + '-15' : '')),
+    taskInScope: t => taskMatchesVilla(t, v) && tarihIcinde(t.date)
+  });
+}
+
 /** Belirli bir takvim ayi (YYYY-MM) icin defter; mulk filtresi istege bagli. */
 function computeMonthLedger(monthKey, villa) {
   const L = getLedgerContract();
@@ -11397,6 +11419,65 @@ function exportLedger(mod, bicim) {
   }
 }
 
+// Gelir tablosu (L-196, kullanici M26). Finans defterini okuyabilen roller
+// (3.3.1 can_read_ledger: owner/admin/manager/viewer — kullanici karari
+// 14.10: izleyici de indirir). Rakamlar ekrandaki defterden; TOPLAM satiri
+// Finans ekranindaki donem rakamidir.
+function getIncomeStatementApi() {
+  if (typeof IncomeStatement !== 'undefined') return IncomeStatement;
+  if (typeof require === 'function') {
+    try { return require('./core/income_statement.js'); } catch (e) { /* tarayici */ }
+  }
+  throw new Error('Gelir tablosu motoru yüklenemedi. Sayfayı yenileyin.');
+}
+
+function buildIncomeStatementForFilter() {
+  const IncomeStatement = getIncomeStatementApi();
+  const range = getFilterDateRange();
+  if (!range) throw new Error('Gelir tablosu için kayıtlı bir dönem yok.');
+  const villa = currentFilter.villa || 'ALL';
+  return IncomeStatement.buildIncomeStatement({
+    range,
+    periodKey: currentFilter.period,
+    villa,
+    villas: Object.entries(appData.villas || {}).filter(([, v]) => v && !v.archivedAt).map(([key, v]) => ({ key, name: v.name || key })),
+    ledgerFor: computeRangeLedger,
+    isUnmeasured: (l, key) => isProfitUnmeasured(l.totalRevenue, l.totalOpex, l.capex, key)
+  });
+}
+
+function exportIncomeStatement() {
+  if (!canReadLedgerRole(activeTenant?.role)) {
+    if (typeof showToast === 'function') showToast('Gelir tablosunu yalnız finans defterini görebilen roller indirebilir.', 'error');
+    return false;
+  }
+  if (typeof XLSX === 'undefined') {
+    if (typeof showToast === 'function') showToast('Excel motoru henüz yüklenmedi, birkaç saniye sonra tekrar deneyin.', 'error');
+    return false;
+  }
+  let tablo;
+  try {
+    tablo = buildIncomeStatementForFilter();
+  } catch (err) {
+    if (typeof showToast === 'function') showToast(err.message, 'info');
+    return false;
+  }
+  const villa = currentFilter.villa || 'ALL';
+  const sayfalar = getIncomeStatementApi().toSheets(tablo, {
+    periodLabel: getPeriodDisplayName(currentFilter.period),
+    scopeLabel: villa === 'ALL' ? 'Tüm portföy' : (appData.villas?.[villa]?.name || villa) + ' (portföy geneli giderler hariç)',
+    generatedAt: new Date().toLocaleString('tr-TR')
+  });
+  const wb = XLSX.utils.book_new();
+  sayfalar.forEach(sayfa => XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sayfa.aoa), sayfa.name));
+  const donem = villa !== 'ALL' ? currentFilter.period + '_' + villa : currentFilter.period;
+  const bayt = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+  triggerFileDownload(bayt, `Lexbnb_Gelir_Tablosu_${String(donem).replace(/[^A-Za-z0-9_-]/g, '-')}.xlsx`,
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  if (typeof showToast === 'function') showToast(`Gelir tablosu indirildi (${getPeriodDisplayName(currentFilter.period)}).`, 'success');
+  return true;
+}
+
 // Initialize on DOM Ready
 if (typeof document !== 'undefined') {
   document.addEventListener('DOMContentLoaded', async () => {
@@ -16181,6 +16262,9 @@ function applyRoleNavigationVisibility() {
   document.querySelectorAll('[data-sales-write]').forEach(element => {
     element.hidden = !canWriteSalesRole(role);
   });
+  document.querySelectorAll('[data-ledger-only]').forEach(element => {
+    element.hidden = !canReadLedgerRole(role);
+  });
   const quickBooking = document.getElementById('mobileQuickBookingBtn');
   if (quickBooking) quickBooking.hidden = !canWriteSalesRole(role);
 }
@@ -20066,6 +20150,9 @@ if (typeof module !== 'undefined' && module.exports) {
     getExportEngine,
     collectExportRecords,
     exportLedger,
+    exportIncomeStatement,
+    buildIncomeStatementForFilter,
+    computeRangeLedger,
     cloudLinkImportBatchRows,
     loadImportBatches,
     undoImportBatch,

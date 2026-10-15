@@ -311,11 +311,18 @@
               <small>Seçili dönem, Excel — düzenleyip geri yükleyebilirsiniz</small>
             </div>
           </button>
-          <button type="button" class="dropdown-item" data-onclick="exportLedger('EXPENSES','xlsx'); closeAllHeaderDropdowns();">
+          <button type="button" class="dropdown-item" data-ledger-only data-onclick="exportLedger('EXPENSES','xlsx'); closeAllHeaderDropdowns();">
             <span class="dropdown-icon">📕</span>
             <div>
               <strong>Gider Defterini İndir</strong>
               <small>Seçili dönem, Excel — düzenleyip geri yükleyebilirsiniz</small>
+            </div>
+          </button>
+          <button type="button" class="dropdown-item" data-ledger-only data-onclick="exportIncomeStatement(); closeAllHeaderDropdowns();">
+            <span class="dropdown-icon">📘</span>
+            <div>
+              <strong>Gelir Tablosunu İndir</strong>
+              <small>Seçili dönem ve mülk — aylık kâr-zarar, Finans ekranıyla aynı rakamlar</small>
             </div>
           </button>
           <button type="button" class="dropdown-item" data-onclick="openHelpModal(); closeAllHeaderDropdowns();">
@@ -3285,6 +3292,7 @@
   <script src="core/chatgpt_prompt_engine.js?v=1b6079e1"></script>
   <script src="core/property_analysis_context_service.js?v=c0cc1027"></script>
   <script src="core/finance_import_engine.js?v=6c5819bd"></script>
+  <script src="core/income_statement.js?v=3c2e9daf"></script>
   <script src="core/import_template_guide.js?v=18ab70b4"></script>
   <script src="core/finance_export_engine.js?v=86f92e3f"></script>
 
@@ -3767,10 +3775,10 @@
   <script src="core/side_panel.js?v=d763b464"></script>
   <script src="core/notification_feed.js?v=d8a17633"></script>
   <script src="core/command_search.js?v=89760933"></script>
-  <script src="core/action_dispatch.js?v=fe436108"></script>
+  <script src="core/action_dispatch.js?v=01451342"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=a85be454"></script>
-  <script src="app.js?v=2947822e"></script>
+  <script src="app.js?v=8cd37778"></script>
   <script src="core/property_analysis_context_ui.js?v=0a5def2d"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=6fdf284a"></script>

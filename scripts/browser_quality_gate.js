@@ -380,6 +380,29 @@ async function main() {
         && linkWrites.length === 2 && linkWrites.every(l => l.cleaning_task_id && !('expense_id' in l)),
         `Gecmis temizlik aktarimi: ${JSON.stringify({ previewMode, cleaningWrites, linkWrites })}`);
       passed.push('19. geçmiş temizlik CSV\'si algılanır, cleaning_tasks\'a "yapıldı" yazılır, geri alma bağı kurulur');
+      // L-196 (M26): gelir tablosu indirilir; TOPLAM satirindaki ciro Finans
+      // ekraninda yazan ciroyla ayni.
+      const screenRevenue = await page.evaluate(() => {
+        appData.villas = { test: { id: '00000000-0000-4000-8000-000000000010', name: 'Test Villası', slug: 'test', isActive: true } };
+        appData.bookings = [{ id: 'browser-income', villa: 'test', propertyId: '00000000-0000-4000-8000-000000000010', guest: 'Gelir Tablosu', checkIn: getTodayStr().slice(0, 7) + '-02', checkOut: getTodayStr().slice(0, 7) + '-05', gross: 30000, cleanFee: 1000, otaComm: 0, discount: 0, status: 'CONFIRMED' }];
+        currentFilter.period = getCurrentMonthKey();
+        currentFilter.villa = 'ALL';
+        switchTab('finance');
+        return document.getElementById('finActualRevenue').textContent;
+      });
+      const incomeVisible = await page.evaluate(() => !document.querySelector('[data-onclick^="exportIncomeStatement"]').hidden);
+      const [incomeDownload] = await Promise.all([
+        page.waitForEvent('download'),
+        page.evaluate(() => exportIncomeStatement())
+      ]);
+      const XLSXI = require('../xlsx.full.min.js');
+      const incomeWb = XLSXI.read(fs.readFileSync(await incomeDownload.path()), { type: 'buffer' });
+      const incomeRows = XLSXI.utils.sheet_to_json(incomeWb.Sheets['Gelir Tablosu'], { header: 1 });
+      const totalRow = incomeRows.find(r => r[0] === 'TOPLAM') || [];
+      assert(incomeVisible && incomeWb.SheetNames.join() === 'Gelir Tablosu,Mülk Bazında,Açıklama'
+        && Math.round(totalRow[2]) === screenNumber(screenRevenue),
+        `Gelir tablosu: ${JSON.stringify({ incomeVisible, sheets: incomeWb.SheetNames, totalRow, screenRevenue })}`);
+      passed.push('20. gelir tablosu indirilir; TOPLAM cirosu Finans ekranıyla aynı');
     });
 
     await withPage(browser, baseUrl, 'owner', { width: 390, height: 844 }, async page => {
