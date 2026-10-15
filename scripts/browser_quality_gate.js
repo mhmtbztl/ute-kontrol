@@ -343,6 +343,43 @@ async function main() {
         `ChatGPT donusum istemi: ${convertPrompt.slice(0, 300)}`);
       await page.evaluate(() => { closeChatGptQuestionModal(); closeImportModal(); });
       passed.push('18. içe aktarma ekranı geçerli değerleri gösterir; şablon 3 sayfa ve boş; ChatGPT dönüşüm istemi kod taşır');
+      // L-195 (M25): gecmis temizlik CSV'si otomatik algilanir, onizlenir ve
+      // cleaning_tasks'a "yapildi" yazilir; aktarim bagi temizligi tasir.
+      const cleaningWrites = [];
+      const linkWrites = [];
+      await page.route('**/rest/v1/cleaning_tasks**', async route => {
+        if (route.request().method() === 'POST') {
+          const body = route.request().postDataJSON();
+          cleaningWrites.push(...(Array.isArray(body) ? body : [body]));
+          return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(Array.isArray(body) ? body : [body]) });
+        }
+        return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+      });
+      await page.route('**/rest/v1/finance_import_batches**', async route => {
+        if (route.request().method() === 'POST') return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ id: 'batch-browser' }) });
+        return route.fulfill({ status: 200, contentType: 'application/json', body: 'null' });
+      });
+      await page.route('**/rest/v1/finance_import_batch_rows**', async route => {
+        if (route.request().method() === 'POST') linkWrites.push(...[].concat(route.request().postDataJSON()));
+        return route.fulfill({ status: route.request().method() === 'POST' ? 201 : 200, contentType: 'application/json', body: '[]' });
+      });
+      await page.evaluate(() => {
+        appData.villas = { test: { id: '00000000-0000-4000-8000-000000000010', name: 'Test Villası', slug: 'test', isActive: true } };
+        appData.cleaningTasks = [];
+        openImportModal();
+      });
+      const csv = '﻿Tarih;Villa;Tutar (TL);Temizlikçi;Ödendi;Açıklama\r\n2026-01-10;test;1200;Ayşe;;Eski temizlik\r\n2026-01-12;Test Villası;900;;Hayır;\r\n';
+      await page.setInputFiles('#excelFileInput', { name: 'temizlik.csv', mimeType: 'text/csv', buffer: Buffer.from(csv, 'utf8') });
+      await page.waitForFunction(() => /2 kaydı içe aktar/.test(document.getElementById('importConfirmBtn')?.innerText || ''));
+      const previewMode = await page.inputValue('#importModeSelect');
+      await page.click('#importConfirmBtn');
+      await page.waitForFunction(() => !document.getElementById('importModal').classList.contains('active'), null, { timeout: 10000 });
+      assert(previewMode === 'CLEANING' && cleaningWrites.length === 2
+        && cleaningWrites.every(w => w.status === 'DONE' && w.property_id === '00000000-0000-4000-8000-000000000010')
+        && cleaningWrites[0].is_paid === true && cleaningWrites[1].is_paid === false && cleaningWrites[0].amount === 1200
+        && linkWrites.length === 2 && linkWrites.every(l => l.cleaning_task_id && !('expense_id' in l)),
+        `Gecmis temizlik aktarimi: ${JSON.stringify({ previewMode, cleaningWrites, linkWrites })}`);
+      passed.push('19. geçmiş temizlik CSV\'si algılanır, cleaning_tasks\'a "yapıldı" yazılır, geri alma bağı kurulur');
     });
 
     await withPage(browser, baseUrl, 'owner', { width: 390, height: 844 }, async page => {

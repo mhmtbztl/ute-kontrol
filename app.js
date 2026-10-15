@@ -6824,7 +6824,7 @@ function downloadSampleTemplate(templateType) {
     alert('Şablon motoru yüklenemedi. Sayfayı yenileyin.');
     return;
   }
-  const mode = templateType === 'BOOKINGS' ? 'BOOKINGS' : 'EXPENSES';
+  const mode = ['BOOKINGS', 'CLEANING'].includes(templateType) ? templateType : 'EXPENSES';
   const values = getImportValidValues();
   const guide = ImportTemplateGuide.buildGuide(mode, values);
   const headers = engine.SABLON_SUTUNLARI[mode];
@@ -6838,14 +6838,17 @@ function downloadSampleTemplate(templateType) {
   const gun = n => new Date(Date.parse(getTodayStr() + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
   const ornek = mode === 'BOOKINGS'
     ? [m1, 'Ahmet Yılmaz', gun(-20), gun(-16), '72500', kanal, '0', '1500', '4', 'CHECKED_OUT', '0', '', '']
-    : [gun(-10), 'Fatura', '1850', 'Elektrik faturası', 'OPEX', m1];
+    : mode === 'CLEANING'
+      ? [gun(-12), m1, '1200', '', 'EVET', 'Çıkış temizliği']
+      : [gun(-10), 'Fatura', '1850', 'Elektrik faturası', 'OPEX', m1];
   const steps = guide.steps.concat(['', 'ÖRNEK SATIR (ilk sayfaya kendi kayıtlarınızı bu düzende yazın):', headers.join(' | '), ornek.join(' | ')]);
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers]), mode === 'BOOKINGS' ? 'Rezervasyonlar' : 'Giderler');
+  const sayfaAdi = { BOOKINGS: 'Rezervasyonlar', EXPENSES: 'Giderler', CLEANING: 'Temizlikler' }[mode];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers]), sayfaAdi);
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(steps.map(s => [s])), 'NASIL DOLDURULUR');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(guide.validValues), 'GEÇERLİ DEĞERLER');
-  XLSX.writeFile(wb, mode === 'BOOKINGS' ? 'LexBnB_Rezervasyon_Sablonu.xlsx' : 'LexBnB_Gider_Sablonu.xlsx');
+  XLSX.writeFile(wb, { BOOKINGS: 'LexBnB_Rezervasyon_Sablonu.xlsx', EXPENSES: 'LexBnB_Gider_Sablonu.xlsx', CLEANING: 'LexBnB_Gecmis_Temizlik_Sablonu.xlsx' }[mode]);
   // 'COMPANY' dali KALDIRILDI (21 Eylul 2026): sirket genel raporu bilerek
   // ICE AKTARILMIYOR (aylik toplamdan rezervasyon uretmek uydurma veri
   // olurdu, 3.6).
@@ -6985,6 +6988,9 @@ function analyzeAndPreviewSource(kaynak) {
 
   if (sheetNames.includes('GENEL') || (sheetNames.includes('GDR') && sheetNames.includes('RPR')) || sheetNames.includes('HDF')) {
     detectedType = 'COMPANY_REPORT';
+  } else if (/temizlik(ç|c)i|ödendi|odendi/i.test((kaynak.headers || []).join(' ')) && !/misafir|guest/i.test((kaynak.headers || []).join(' '))) {
+    // Gecmis temizlik sablonu (L-195): "Temizlikçi"/"Ödendi" sutunu tasir.
+    detectedType = 'CLEANING';
   } else {
     // Basliklardan tur sez. Tek sayfali CSV'de sayfa adi bilgi tasimaz;
     // karar yalnizca sutun adlarindan cikar.
@@ -7062,16 +7068,22 @@ function enSonVeriAyi(satirlar, rezMi) {
 // kurulamaz ama ICE AKTARMANIN KENDISI CALISMAYA DEVAM EDER — bu yuzden
 // eksik sema hatasi yutulmaz, yalnizca "geri alinamaz" olarak raporlanir.
 
-async function cloudLinkImportBatchRows(tenantId, batchId, rezMi, kayitlar) {
+async function cloudLinkImportBatchRows(tenantId, batchId, mode, kayitlar) {
   if (!supabaseClient || !batchId || !kayitlar || kayitlar.length === 0) return false;
 
-  const satirlar = kayitlar.map(k => ({
-    tenant_id: tenantId,
-    batch_id: batchId,
-    booking_id: rezMi ? k.id : null,
-    expense_id: rezMi ? null : k.id,
-    source_row_num: k.rowNum
-  }));
+  // Temizlik bagi phase95 sutunudur; yalniz o turde gonderilir, boylece
+  // rezervasyon/gider aktarimi goc oncesi de ayni calisir.
+  // Eski cagri bicimi (rezMi true/false) da kabul edilir.
+  const tur = mode === true ? 'BOOKINGS' : mode === false ? 'EXPENSES' : mode;
+  const satirlar = kayitlar.map(k => (tur === 'CLEANING'
+    ? { tenant_id: tenantId, batch_id: batchId, cleaning_task_id: k.id, source_row_num: k.rowNum }
+    : {
+        tenant_id: tenantId,
+        batch_id: batchId,
+        booking_id: tur === 'BOOKINGS' ? k.id : null,
+        expense_id: tur === 'BOOKINGS' ? null : k.id,
+        source_row_num: k.rowNum
+      }));
 
   // 500'lük parçalar: tek istekte binlerce satır PostgREST'i zorlar.
   for (let i = 0; i < satirlar.length; i += 500) {
@@ -7184,7 +7196,7 @@ async function undoImportBatch(batchId) {
   await loadTenantAppData(tenantId);
   await refreshImportHistory();
 
-  const silinen = (data.deleted_bookings || 0) + (data.deleted_expenses || 0);
+  const silinen = (data.deleted_bookings || 0) + (data.deleted_expenses || 0) + (data.deleted_cleaning_tasks || 0);
   if (data.skipped_modified > 0) {
     alert(`${silinen} kayıt silindi.\n\n${data.skipped_modified} kayıt SİLİNMEDİ: ` +
       'aktarımdan sonra elle düzenlenmişler. Onlar artık aktarılan veri değil, ' +
@@ -7284,12 +7296,20 @@ function parseSourceWithMode(kaynak, mode) {
       existingCategories: [...new Set(((appData && appData.expenses) || []).map(e => e.category).filter(Boolean))],
       existingChannels: [...new Set(((appData && appData.bookings) || []).map(b => b.channel).filter(Boolean))],
       isPeriodClosed: (d) => (typeof isPeriodClosed === 'function' ? isPeriodClosed(d) : false),
-      isStayPeriodClosed: (a, b) => (typeof isStayPeriodClosed === 'function' ? isStayPeriodClosed(a, b) : false)
+      isStayPeriodClosed: (a, b) => (typeof isStayPeriodClosed === 'function' ? isStayPeriodClosed(a, b) : false),
+      // L-195: ayni mulkte ayni gun var olan temizlik ikinci kez yazilmaz.
+      today: getTodayStr(),
+      existingCleaningTasks: ((appData && appData.cleaningTasks) || []).map(t => ({
+        propertyId: t.propertyId || (appData.villas && appData.villas[t.villa] && appData.villas[t.villa].id) || null,
+        date: t.date, status: t.status
+      }))
     };
     parsedData.columnMap = E.autoDetectColumnMap(headers, finalMode);
-    parsedData.result = (finalMode === 'BOOKINGS')
+    parsedData.result = finalMode === 'BOOKINGS'
       ? E.validateBookingRows(rawRows, parsedData.columnMap, ctx)
-      : E.validateExpenseRows(rawRows, parsedData.columnMap, ctx);
+      : finalMode === 'CLEANING'
+        ? E.validateCleaningRows(rawRows, parsedData.columnMap, ctx)
+        : E.validateExpenseRows(rawRows, parsedData.columnMap, ctx);
   }
 
   pendingImportData = parsedData;
@@ -7331,17 +7351,20 @@ function renderImportPreviewBox() {
   if (!r) return;
 
   const rezMi = pendingImportData.mode === 'BOOKINGS';
+  const temizlikMi = pendingImportData.mode === 'CLEANING';
   const tl = n => Math.round(Number(n) || 0).toLocaleString('tr-TR');
 
   if (badge) {
-    badge.innerText = rezMi ? 'Rezervasyon Defteri' : 'Gider Defteri';
-    badge.className = rezMi ? 'badge badge-purple' : 'badge badge-amber';
+    badge.innerText = rezMi ? 'Rezervasyon Defteri' : temizlikMi ? 'Geçmiş Temizlikler' : 'Gider Defteri';
+    badge.className = rezMi ? 'badge badge-purple' : temizlikMi ? 'badge badge-blue' : 'badge badge-amber';
   }
 
   // --- Eslesmeyen zorunlu sutun var mi? ---
   const zorunlu = rezMi
     ? { property: 'Villa', guest: 'Misafir Adı', checkIn: 'Giriş Tarihi', checkOut: 'Çıkış Tarihi', gross: 'Brüt Tutar' }
-    : { date: 'Tarih', category: 'Kategori', amount: 'Tutar' };
+    : temizlikMi
+      ? { date: 'Tarih', property: 'Villa', amount: 'Tutar' }
+      : { date: 'Tarih', category: 'Kategori', amount: 'Tutar' };
   const eksikSutun = Object.keys(zorunlu).filter(k => !pendingImportData.columnMap[k]).map(k => zorunlu[k]);
 
   const yazilacak = (r.validatedRows || []).filter(v => !v.isPotentialDuplicate && !v.hasFileOverlap).length;
@@ -7367,7 +7390,9 @@ function renderImportPreviewBox() {
   // --- Tablo ---
   const basliklar = rezMi
     ? ['Satır', 'Villa', 'Misafir', 'Giriş → Çıkış', 'Gece', 'Brüt (₺)', 'Durum']
-    : ['Satır', 'Tarih', 'Kategori', 'Açıklama', 'Mülk', 'Tutar (₺)', 'Durum'];
+    : temizlikMi
+      ? ['Satır', 'Tarih', 'Mülk', 'Temizlikçi', 'Ödendi', 'Maliyet (₺)', 'Durum']
+      : ['Satır', 'Tarih', 'Kategori', 'Açıklama', 'Mülk', 'Tutar (₺)', 'Durum'];
   if (thead) thead.innerHTML = '<tr>' + basliklar.map(h => '<th>' + escapeHtml(h) + '</th>').join('') + '</tr>';
 
   if (tbody) {
@@ -7420,6 +7445,9 @@ function renderImportPreviewBox() {
       if (rezMi) {
         satirYaz([v.rowNum, v.propertyName, v.guest, v.checkIn + ' → ' + v.checkOut,
                   v.nights, tl(v.gross), durum], renk);
+      } else if (temizlikMi) {
+        satirYaz([v.rowNum, v.date, v.propertyName || v.propertyKey || '—', v.cleaner || '—',
+                  v.paid ? 'Evet' : 'Hayır (borç)', tl(v.amount), durum], renk);
       } else {
         satirYaz([v.rowNum, v.date, v.category, v.description || '—',
                   v.propertyId ? (v.propertyKey || '—') : 'Tüm portföy', tl(v.amount), durum], renk);
@@ -7495,6 +7523,7 @@ async function applyImportedData() {
 
   const r = pendingImportData.result;
   const rezMi = pendingImportData.mode === 'BOOKINGS';
+  const temizlikMi = pendingImportData.mode === 'CLEANING';
   const yazilacaklar = (r.validatedRows || []).filter(v => !v.isPotentialDuplicate && !v.hasFileOverlap);
   if (yazilacaklar.length === 0) {
     if (typeof showToast === 'function') showToast('İçe aktarılacak geçerli kayıt yok.', 'info');
@@ -7505,6 +7534,16 @@ async function applyImportedData() {
   // (L-41): eskiden "ad | satir | toplam" idi; yeniden adlandirilan ayni dosya
   // uyarisiz ikinci kez yaziliyor, ayni ad/satir/toplamli FARKLI dosya ise
   // "daha once aktarilmis" saniliyordu.
+  // Gecmis temizlik yuzlerce maliyet satiri yazar; tek tusla geri alinamayacaksa
+  // (phase95 yok) hic baslamaz. Rezervasyon/gider bu kosula bagli degildir.
+  if (temizlikMi && supabaseClient) {
+    const { error: semaHata } = await supabaseClient.from('finance_import_batch_rows').select('cleaning_task_id').limit(0);
+    if (semaHata) {
+      alert('Geçmiş temizlik aktarımı için veritabanı göçü (phase95) henüz uygulanmadı. Aktarım geri alınamayacağı için başlatılmadı; hiçbir kayıt yazılmadı.');
+      return;
+    }
+  }
+
   const parmakIzi = await computeImportContentFingerprint(pendingImportData.mode, r, tenantId);
 
   if (parmakIzi && supabaseClient) {
@@ -7533,7 +7572,22 @@ async function applyImportedData() {
     try {
       const id = createImportRowId();
       let payload;
-      if (rezMi) {
+      if (temizlikMi) {
+        // Temizlik defterinin tek kaynagi (3.4): yapilmis temizlik, odendi ya
+        // da borc. Rezervasyona bagli degildir (gecmis gorevi yok).
+        payload = {
+          id,
+          tenant_id: tenantId,
+          property_id: v.propertyId,
+          task_date: v.date,
+          cleaner_name: v.cleaner || 'Temizlik Ekibi',
+          amount: v.amount,
+          description: v.description || 'Geçmiş temizlik (içe aktarıldı)',
+          is_paid: !!v.paid,
+          status: 'DONE',
+          created_by: activeSaaSUser?.id
+        };
+      } else if (rezMi) {
         payload = mapBookingToDb({
           id,
           propertyId: v.propertyId,
@@ -7583,7 +7637,7 @@ async function applyImportedData() {
   if (prepared.length > 0) {
     const batchResult = await insertImportedRowsInBatches(
       supabaseClient,
-      rezMi ? 'bookings' : 'expenses',
+      rezMi ? 'bookings' : temizlikMi ? 'cleaning_tasks' : 'expenses',
       prepared,
       100
     );
@@ -7620,7 +7674,7 @@ async function applyImportedData() {
         .select('id')
         .single();
       if (partiHata) throw partiHata;
-      bagKuruldu = await cloudLinkImportBatchRows(tenantId, parti.id, rezMi, yeniKayitlar);
+      bagKuruldu = await cloudLinkImportBatchRows(tenantId, parti.id, pendingImportData.mode, yeniKayitlar);
     } catch (e) {
       // Kayit tutulamazsa aktarimin KENDISI yine de gecerlidir; kullanici
       // sadece tek tusla geri alamaz. Sessiz kalmiyoruz (asagida soyleniyor).

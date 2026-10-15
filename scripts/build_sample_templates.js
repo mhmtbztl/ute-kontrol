@@ -53,6 +53,7 @@ const { SABLON_SUTUNLARI, GIDER_KATEGORILERI } = require(path.join(KOK, 'core', 
 const ImportTemplateGuide = require(path.join(KOK, 'core', 'import_template_guide.js'));
 const REZ_REHBER = ImportTemplateGuide.buildGuide('BOOKINGS', {});
 const GIDER_REHBER = ImportTemplateGuide.buildGuide('EXPENSES', { categories: GIDER_KATEGORILERI });
+const TEMIZLIK_REHBER = ImportTemplateGuide.buildGuide('CLEANING', {});
 
 const BOM = '﻿';
 const CRLF = '\r\n';
@@ -94,6 +95,20 @@ const SABLONLAR = {
     ],
     aciklama: GIDER_REHBER.steps,
     gecerli: GIDER_REHBER.validValues
+  },
+
+  // Gecmis temizlik maliyeti (L-195, kullanici M25). Ornekler yer tutucu
+  // mulke bagli: degistirilmeden yuklenirse hicbir satir yazilmaz.
+  temizlik: {
+    dosya: 'lexbnb-temizlik-sablonu',
+    sayfa: 'Temizlikler',
+    basliklar: SABLON_SUTUNLARI.CLEANING,
+    satirlar: [
+      ['2026-07-03', 'MULK_KODU_1', '1200', 'Örnek Temizlikçi', 'EVET', 'Örnek: çıkış temizliği'],
+      ['2026-07-08', 'MULK_KODU_2', '1500', '', 'HAYIR', '']
+    ],
+    aciklama: TEMIZLIK_REHBER.steps,
+    gecerli: TEMIZLIK_REHBER.validValues
   }
 };
 

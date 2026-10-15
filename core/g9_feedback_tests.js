@@ -15,6 +15,7 @@
 // L-191 (M21): Ara / Komut ilk 30 rezervasyonu tariyordu; misafir, talep, ekran, kanal yoktu.
 // L-192 (M22): Bildirim merkezine satir ureten kod yoktu; olaylar gercek veriden turetilir (phase93).
 // L-194 (M24): Sablonlar gecerli mulk/kanal/kategoriyi gostermiyordu; kategori sessizce Diger e, kanal serbest metin.
+// L-195 (M25): Gecmis temizlik maliyetinin girilecek yolu yoktu; gecmis aylarda kar yuksek gorunuyordu (phase95).
 // L-199 (M29): Talep formunda rol yuklenmeden yazilan "kaydedemez" mesaji rol gelince kalmiyordu.
 // L-193 (M23): Defterdeki "Temizlik" sutunu maliyet saniliyordu; misafirden alinan gelir oldugu yazilir.
 // L-184..L-190 (M14-M20): kapora, kar marji hedefi, talep tarihi, mulk net kari, reklam tablosu/metrik/gunluk butce, sablon ekrani, bosluk gecesi.
@@ -735,6 +736,78 @@ async function sablonGecerliDegerDavranisi() {
     'L-194k Ice aktarma ekrani gecerli degerleri ve ChatGPT dugmelerini gosterir; dogrulama kanal katalogunu alir');
 }
 
+// L-195 (M25) — Gecmis temizlik maliyeti: ayri sablon, cleaning_tasks'a "yapildi",
+// ayni gun ikinci kayit yok, geri alinabilir (phase95).
+async function gecmisTemizlikDavranisi() {
+  const E = require('./finance_import_engine.js');
+  const h = E.SABLON_SUTUNLARI.CLEANING;
+  const map = E.autoDetectColumnMap(h, 'CLEANING');
+  const satir = r => Object.fromEntries(h.map((x, i) => [x, r[i]]));
+  const ctx = {
+    properties: [{ id: 'p1', key: 'zeytin', slug: 'zeytin', name: 'Villa Zeytin' }],
+    today: '2026-10-15',
+    isPeriodClosed: d => d.startsWith('2026-05'),
+    existingCleaningTasks: [{ propertyId: 'p1', date: '2026-09-02', status: 'PLANNED' }, { propertyId: 'p1', date: '2026-09-09', status: 'SKIPPED' }]
+  };
+  const r = E.validateCleaningRows([
+    ['2026-09-01', 'zeytin', '1.200', 'Ayşe', '', 'Çıkış'],
+    ['2026-09-09', 'Villa Zeytin', '900', '', 'Hayır', ''],
+    ['2026-09-02', 'zeytin', '900', '', '', ''],
+    ['2026-11-01', 'zeytin', '900', '', '', ''],
+    ['2026-05-10', 'zeytin', '900', '', '', ''],
+    ['2026-09-03', 'zeytin', '0', '', '', ''],
+    ['2026-09-04', 'zeytin', '700', '', 'Belki', ''],
+    ['2026-09-05', 'Bilinmeyen', '700', '', '', ''],
+    ['2026-09-01', 'zeytin', '1200', '', '', '']
+  ].map(satir), map, ctx);
+  const hata = n => (r.errors.find(e => e.rowNum === n) || { errors: [] }).errors.join(' ');
+  check(Object.values(map).every(Boolean), 'L-195a Temizlik sablonunun her basligi taniniyor', JSON.stringify(map));
+  check(r.validatedRows[0].amount === 1200 && r.validatedRows[0].paid === true && r.validatedRows[0].cleaner === 'Ayşe'
+    && r.validatedRows[1].paid === false && r.validatedRows[1].propertyId === 'p1',
+    'L-195b Gecerli satir: tutar, odendi (bos = evet, Hayir = borc), mulk adi ya da kodu');
+  check(/zaten temizlik kaydı var/.test(hata(4)) && !hata(3), 'L-195c Ayni mulkte ayni gun var olan temizlik ikinci kez yazilmaz; "yapilmadi" gorev engellemez');
+  check(/Gelecek tarih/.test(hata(5)) && /kapatılmış/.test(hata(6)) && /sıfır/.test(hata(7)) && /Ödendi" anlaşılamadı/.test(hata(8)) && /Mülk bulunamadı/.test(hata(9)),
+    'L-195d Gelecek tarih, kapanmis ay, sifir tutar, anlasilmayan odendi ve bilinmeyen mulk reddedilir', JSON.stringify(r.errors.map(e => e.rowNum)));
+  check(r.duplicateCount === 1 && r.validatedRows.filter(v => !v.isPotentialDuplicate).length === 2 && r.totalAmount === 2100,
+    'L-195e Dosya icinde ayni mulk-gun ikinci kez sayilmaz; toplam yalniz yazilacaklar', JSON.stringify({ d: r.duplicateCount, t: r.totalAmount }));
+
+  // Yayinlanan sablon kendi ice aktaricimizdan gecer; degistirilmeden yuklenirse hicbir sey yazmaz.
+  const csv = E.parseCSV(read('sablonlar/lexbnb-temizlik-sablonu.csv').replace(/^﻿/, ''));
+  const tmap = E.autoDetectColumnMap(csv.headers, 'CLEANING');
+  const kendi = E.validateCleaningRows(csv.rows, tmap, { properties: [{ id: 'a', key: 'MULK_KODU_1', slug: 'MULK_KODU_1' }, { id: 'b', key: 'MULK_KODU_2', slug: 'MULK_KODU_2' }], today: '2026-10-15' });
+  const yabanci = E.validateCleaningRows(csv.rows, tmap, { properties: [{ id: 'c', key: 'CINAR', slug: 'CINAR' }], today: '2026-10-15' });
+  check(csv.rows.length === 2 && kendi.validCount === 2 && kendi.validatedRows[1].paid === false && yabanci.validCount === 0,
+    'L-195f Yayinlanan temizlik sablonu ice aktaricimizdan gecer; degistirilmeden yuklenirse hicbir satir yazilmaz');
+
+  // Bag satiri temizlik gorevini tasir; rezervasyon/gider bicimi degismedi.
+  sahteDom({});
+  const App = require('../app.js');
+  const ist = kaydedenIstemci();
+  App.setSupabaseClient(ist);
+  await App.cloudLinkImportBatchRows(TENANT, 'batch-1', 'CLEANING', [{ id: 'ct-1', rowNum: 2 }]);
+  await App.cloudLinkImportBatchRows(TENANT, 'batch-1', 'EXPENSES', [{ id: 'ex-1', rowNum: 3 }]);
+  const [tem, gid] = ist.yazmalar.map(y => (Array.isArray(y.yuk) ? y.yuk[0] : y.yuk));
+  check(tem && tem.cleaning_task_id === 'ct-1' && !('booking_id' in tem) && !('expense_id' in tem)
+    && gid && gid.expense_id === 'ex-1' && gid.booking_id === null && !('cleaning_task_id' in gid),
+    'L-195g Aktarim bagi temizlikte cleaning_task_id, giderde eski bicim (goc oncesi de calisir)', JSON.stringify(ist.yazmalar.map(y => y.yuk)));
+
+  const app = read('app.js');
+  const yaz = functionBody(app, 'async function applyImportedData(');
+  check(/temizlikMi \? 'cleaning_tasks'/.test(yaz) && /status: 'DONE'/.test(yaz) && /is_paid: !!v\.paid/.test(yaz)
+    && /select\('cleaning_task_id'\)\.limit\(0\)/.test(yaz) && yaz.indexOf("select('cleaning_task_id')") < yaz.indexOf('computeImportContentFingerprint('),
+    'L-195h Temizlik cleaning_tasks a "yapildi" yazilir; phase95 yoksa aktarim hic baslamaz');
+  check(/validateCleaningRows/.test(functionBody(app, 'function parseSourceWithMode(')) && /'CLEANING'/.test(functionBody(app, 'function analyzeAndPreviewSource('))
+    && /deleted_cleaning_tasks/.test(functionBody(app, 'async function undoImportBatch(')),
+    'L-195i Tur secimi, otomatik algilama ve geri alma ozeti temizligi tanir');
+  const html = read('index.html');
+  check(/<option value="CLEANING">/.test(html) && /downloadSampleTemplate\('CLEANING'\)/.test(html) && /lexbnb-temizlik-sablonu\.xlsx/.test(html),
+    'L-195j Ice aktarma ekraninda gecmis temizlik turu ve sablonlari var');
+  const G = require('./import_template_guide.js');
+  check(G.buildGuide('EXPENSES', { categories: [] }).steps.some(s => /Geçmiş Temizlik şablonu/.test(s))
+    && G.buildGuide('CLEANING', {}).steps.some(s => /MALİYETİ/.test(s) && /ücreti DEĞİL/.test(s)),
+    'L-195k Gider talimati gecmis temizligi yeni sablona yonlendirir; temizlik talimati maliyet ile ucreti ayirir');
+}
+
 async function main() {
 try {
   const html = read('index.html');
@@ -770,6 +843,7 @@ try {
   await bildirimDavranisi();
   await talepRolMesajiDavranisi();
   await sablonGecerliDegerDavranisi();
+  await gecmisTemizlikDavranisi();
 } catch (error) {
   failed++;
   console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

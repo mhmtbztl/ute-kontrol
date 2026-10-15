@@ -639,6 +639,16 @@ tekil indeks. Göç yokken liste yine görünür, çekmece okundu durumunun
 saklanamadığını söyler. Canlı süit `phase93_notification_feed_live_tests` 16/16
 (göçten önce kırmızı). Paket: `docs/PHASE93_DEPLOY_PACKAGE.md`.
 
+**phase95 (`migration_phase95_cleaning_import_undo.sql`) 15 Ekim 2026'da test
+projesine uygulandı; üretim bekliyor.** Geçmiş temizlik maliyeti (L-195, kullanıcı
+M25) ayrı şablonla `cleaning_tasks`'a "yapıldı" yazılır (ödendi ya da borç);
+gider tablosuna ikinci yol açılmadı. Aynı mülkte aynı gün var olan görev, gelecek
+tarih ve kapanmış ay reddedilir. Göç aktarım bağına `cleaning_task_id` ekler ve
+`undo_finance_import`'u temizliği de geri alacak şekilde yeniden tanımlar (imza
+aynı). Göç yokken geçmiş temizlik aktarımı **başlamaz**; rezervasyon/gider aynen
+çalışır. Canlı süit `phase95_cleaning_import_undo_live_tests` 10/10 (göçten önce
+kırmızı). Paket: `docs/PHASE95_DEPLOY_PACKAGE.md`.
+
 **Bir göçün uygulanıp uygulanmadığı, dosyaya bakarak anlaşılmaz.** Dosya repoda
 durur; veritabanı uygulanmamış olabilir. Doğrulamanın yolu üretime sormaktır:
 
@@ -1096,6 +1106,7 @@ gerektirmeden** indirilebilir ve link olarak paylaşılabilir:
 ```
 https://lexbnb.space/sablonlar/lexbnb-rezervasyon-sablonu.csv   (ve .xlsx)
 https://lexbnb.space/sablonlar/lexbnb-gider-sablonu.csv         (ve .xlsx)
+https://lexbnb.space/sablonlar/lexbnb-temizlik-sablonu.csv      (ve .xlsx)
 ```
 
 Bunlar uygulama içindeki `downloadSampleTemplate()`'in **yerine geçmez,

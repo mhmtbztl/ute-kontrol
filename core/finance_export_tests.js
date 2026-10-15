@@ -323,7 +323,8 @@ function tekKaynakTestleri(I) {
   // Ornek sablon uretici de ayni listeden beslenmeli.
   const uretici = fs.readFileSync(path.join(KOK, 'scripts', 'build_sample_templates.js'), 'utf8');
   check(/basliklar:\s*SABLON_SUTUNLARI\.(BOOKINGS|EXPENSES)/.test(uretici) &&
-        (uretici.match(/basliklar:\s*SABLON_SUTUNLARI\./g) || []).length === 2,
+        // Her sablon (rezervasyon, gider, gecmis temizlik L-195) ayni sabitten.
+        (uretici.match(/basliklar:\s*SABLON_SUTUNLARI\./g) || []).length === 3,
     'C4. Ornek sablon uretici de ayni sabitten besleniyor',
     'Uretici kendi baslik dizisini tutuyor; sablon ile disa aktarim ayrisabilir.');
 }
