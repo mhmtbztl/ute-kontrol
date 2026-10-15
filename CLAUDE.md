@@ -640,7 +640,8 @@ saklanamadığını söyler. Canlı süit `phase93_notification_feed_live_tests`
 (göçten önce kırmızı). Paket: `docs/PHASE93_DEPLOY_PACKAGE.md`.
 
 **phase95 (`migration_phase95_cleaning_import_undo.sql`) 15 Ekim 2026'da test
-projesine uygulandı; üretim bekliyor.** Geçmiş temizlik maliyeti (L-195, kullanıcı
+projesine ve üretime uygulandı; üretimde doğrulandı** (`schema_migrations` 95, `production:readiness`
+BAŞARILI, anon `undo_finance_import` → `401 42501`). Geçmiş temizlik maliyeti (L-195, kullanıcı
 M25) ayrı şablonla `cleaning_tasks`'a "yapıldı" yazılır (ödendi ya da borç);
 gider tablosuna ikinci yol açılmadı. Aynı mülkte aynı gün var olan görev, gelecek
 tarih ve kapanmış ay reddedilir. Göç aktarım bağına `cleaning_task_id` ekler ve
