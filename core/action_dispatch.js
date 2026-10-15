@@ -64,7 +64,7 @@
     'loadSelectedPeriodGoal', 'logoutSaaSUser', 'markAllNotificationsAsRead', 'markCleaningDone',
     'markCleaningPlanned', 'markCleaningSkipped', 'markSelectedCleaningDone',
     'openBookingDetailsPanel', 'openBookingForDate', 'openBookingFromGuestProfile',
-    'openBookingModal', 'openCommandPalette', 'openDeleteAccountModal',
+    'openBookingModal', 'openBulkSummaryModal', 'closeBulkSummaryModal', 'saveBulkSummary', 'openCommandPalette', 'openDeleteAccountModal',
     'openEditCleaningTaskModal', 'openExcelFilePicker', 'openExpenseModal', 'openGoalsModal',
     'openGuestProfileModal', 'openGuestRebookingWhatsApp', 'openHelpModal', 'openImportModal', 'openOnboardingStep',
     'openInviteMemberModal', 'openQuickLeadCapture', 'syncGoalProfitFromMargin', 'syncGoalMarginFromProfit', 'refreshPropertyReport', 'saveOperationalPerson', 'editOperationalPerson', 'cancelOperationalPersonEdit', 'toggleOperationalPersonActive', 'openMaintModal', 'openChatGptQuestionModal', 'openQuickBookingModal',

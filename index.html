@@ -1182,7 +1182,10 @@
             <h2>📋 REZERVASYONLAR</h2>
             <p class="sub-text">Seçili dönemin rezervasyonları; operasyon önceliğine göre sıralanır.</p>
           </div>
-          <button class="btn btn-primary" data-onclick="openBookingModal()" data-sales-write>+ Yeni Rezervasyon Ekle</button>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button data-sales-write class="btn btn-secondary" data-onclick="openBulkSummaryModal()" title="Rezervasyonlarını tek tek girmediğiniz geçmiş bir ayın toplamı">+ Geçmiş ay toplu girişi</button>
+            <button data-sales-write class="btn btn-primary" data-onclick="openBookingModal()">+ Yeni Rezervasyon Ekle</button>
+          </div>
         </div>
 
         <!-- Rezervasyon Tablosu Filtreleme ve Arama Çubuğu -->
@@ -2138,6 +2141,32 @@
   <!-- ========================================== -->
   <!-- MODAL: YENİ GİDER / YATIRIM EKLE -->
   <!-- ========================================== -->
+  <!-- Gecmis ay toplu girisi (L-198, kullanici M28) -->
+  <div class="modal-backdrop" id="bulkSummaryModal" role="dialog" aria-modal="true" aria-labelledby="bulkSummaryTitle">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="bulkSummaryTitle">📦 Geçmiş ay toplu girişi</h3>
+        <button class="close-btn" data-onclick="closeBulkSummaryModal()">&times;</button>
+      </div>
+      <form id="bulkSummaryForm" data-onsubmit="saveBulkSummary(event)">
+        <p class="sub-text" style="margin: 0 0 12px; line-height: 1.5;">Rezervasyonlarını tek tek girmediğiniz <strong>bitmiş</strong> bir ayın toplamını tek satırda girin. Ciro, gece, ADR ve doluluk toplamlarına girer; rezervasyon adedine, takvime ve boş gece tespitine girmez (hangi günler dolu bilinmiyor). Ay birden fazla kanaldan geldiyse her kanal için ayrı giriş yapın.</p>
+        <div class="form-grid">
+          <div class="form-group"><label for="bulkVilla">Mülk</label><select id="bulkVilla" required></select></div>
+          <div class="form-group"><label for="bulkMonth">Ay</label><input type="month" id="bulkMonth" required></div>
+          <div class="form-group"><label for="bulkChannel">Kanal</label><select id="bulkChannel" required></select></div>
+          <div class="form-group"><label for="bulkNights">Satılan gece</label><input type="number" id="bulkNights" min="1" step="1" required></div>
+          <div class="form-group"><label for="bulkGross">Toplam brüt tutar (₺)</label><input type="number" id="bulkGross" min="0" step="0.01" required></div>
+          <div class="form-group"><label for="bulkCleaningFee">Misafirden alınan temizlik ücreti (₺, varsa)</label><input type="number" id="bulkCleaningFee" min="0" step="0.01"></div>
+          <div class="form-group"><label for="bulkOta">OTA komisyonu (₺, varsa)</label><input type="number" id="bulkOta" min="0" step="0.01"></div>
+        </div>
+        <div id="bulkSummaryMessage" class="form-warning" hidden></div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-onclick="closeBulkSummaryModal()">Vazgeç</button>
+          <button type="submit" class="btn btn-primary">Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
   <div class="modal-backdrop" id="expenseModal">
     <div class="modal-card">
       <div class="modal-header">
@@ -3291,6 +3320,7 @@
   <script src="core/chatgpt_prompt_engine.js?v=1b6079e1"></script>
   <script src="core/property_analysis_context_service.js?v=c0cc1027"></script>
   <script src="core/finance_import_engine.js?v=6c5819bd"></script>
+  <script src="core/bulk_summary.js?v=48f72010"></script>
   <script src="core/income_statement.js?v=3c2e9daf"></script>
   <script src="core/import_template_guide.js?v=18ab70b4"></script>
   <script src="core/finance_export_engine.js?v=86f92e3f"></script>
@@ -3774,10 +3804,10 @@
   <script src="core/side_panel.js?v=d763b464"></script>
   <script src="core/notification_feed.js?v=d8a17633"></script>
   <script src="core/command_search.js?v=89760933"></script>
-  <script src="core/action_dispatch.js?v=2e12bebe"></script>
+  <script src="core/action_dispatch.js?v=f3589348"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=a85be454"></script>
-  <script src="app.js?v=11d0f846"></script>
+  <script src="app.js?v=e7b1877f"></script>
   <script src="core/property_analysis_context_ui.js?v=0a5def2d"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=6fdf284a"></script>

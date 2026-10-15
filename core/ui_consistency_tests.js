@@ -437,8 +437,9 @@ try {
     'P3. Sekme sayacı özeti rezervasyon saymaz', `sayac=${g('rezCountBadge').innerText}`);
   app.renderTapeChart();
   const takvim = g('tapeChartContainer').innerHTML;
-  check(!/TOPLU/.test(takvim) && /1 toplu aktarım özeti/.test(takvim),
-    'P4. Takvim özeti günlere yaymaz; altında not olarak söyler', takvim.slice(-300));
+  // L-198: not, ozetin gecesini ve tutarini rozetle soyler; hucrelere yine cizilmez.
+  check(!/>TOPLU/.test(takvim) && takvim.includes('Toplu aktarım (günlere dağılmamış)') && /gece · ₺/.test(takvim),
+    'P4. Takvim özeti günlere yaymaz; altında gece ve tutarıyla not olarak söyler', takvim.slice(-300));
   const raporModel = MarketingUI.buildWorkspaceModel({
     filter: { period: buAy, villa: 'ALL' }, bookings: app.getAppData().bookings,
     villas: app.getAppData().villas, financeSummary: app.computeFilterLedger()

@@ -440,6 +440,49 @@ async function main() {
       assert(weekCols === 7 && weekLabel !== scopeNext.label, `1 hafta gorunumu donemi 7 gune cekmedi: ${JSON.stringify({ weekCols, weekLabel })}`);
       await page.evaluate(() => { document.getElementById('rezVillaFilter').value = 'ALL'; resetReservationRange(); });
       passed.push('21. rezervasyonlar: tek dönem + mülk seçicisi takvimi ve listeyi birlikte değiştirir');
+      // L-198 (M28): gecmis ay toplu girisi formdan kaydedilir; takvimde gece
+      // ve tutarli rozet, gun hucrelerine cizilmez.
+      const bulkWrites = [];
+      const cleaningAfterBulk = [];
+      await page.route('**/rest/v1/bookings**', async route => {
+        if (route.request().method() === 'POST') bulkWrites.push(route.request().postDataJSON());
+        return route.fulfill({ status: route.request().method() === 'POST' ? 201 : 200, contentType: 'application/json', body: '[]' });
+      });
+      await page.route('**/rest/v1/cleaning_tasks**', async route => {
+        if (route.request().method() === 'POST') cleaningAfterBulk.push(route.request().postDataJSON());
+        return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+      });
+      await page.evaluate(() => {
+        appData.villas = { test: { id: '00000000-0000-4000-8000-000000000010', name: 'Test Villası', slug: 'test', isActive: true } };
+        appData.bookings = [];
+        updateAllVillaDropdowns();
+        switchTab('reservations');
+      });
+      await page.click('[data-onclick="openBulkSummaryModal()"]');
+      const bulkMonth = await page.evaluate(() => document.getElementById('bulkMonth').value);
+      await page.selectOption('#bulkVilla', 'test');
+      await page.selectOption('#bulkChannel', 'AIRBNB');
+      await page.fill('#bulkNights', '18');
+      await page.fill('#bulkGross', '144000');
+      await page.fill('#bulkOta', '21600');
+      await page.click('#bulkSummaryForm button[type="submit"]');
+      await page.waitForFunction(() => !document.getElementById('bulkSummaryModal').classList.contains('active'), null, { timeout: 10000 });
+      const bw = Array.isArray(bulkWrites[0]) ? bulkWrites[0][0] : bulkWrites[0];
+      assert(bw && /^TOPLU AKTARIM — /.test(bw.guest_name) && bw.check_in === bulkMonth + '-01' && Number(bw.gross_amount) === 144000
+        && bw.channel === 'AIRBNB' && bw.status === 'CHECKED_OUT' && cleaningAfterBulk.length === 0,
+        `Toplu giris kaydi: ${JSON.stringify({ bulkMonth, bulkWrites, cleaningAfterBulk })}`);
+      const bulkCalendar = await page.evaluate(m => {
+        // Kayittan sonra veri bos sahte sunucudan yeniden yuklendi.
+        appData.villas = { test: { id: '00000000-0000-4000-8000-000000000010', name: 'Test Villası', slug: 'test', isActive: true } };
+        appData.bookings = [{ id: 'bulk-1', villa: 'test', propertyId: '00000000-0000-4000-8000-000000000010', guest: 'TOPLU AKTARIM — Test', checkIn: m + '-01', checkOut: m + '-19', gross: 144000, cleanFee: 0, otaComm: 21600, discount: 0, channel: 'AIRBNB', status: 'CHECKED_OUT' }];
+        const r = reservationMonthRange(m);
+        setReservationScopeRange(r.start, r.end);
+        const c = document.getElementById('tapeChartContainer');
+        return { note: c.querySelector('.tape-chart-note')?.textContent || '', booked: c.querySelectorAll('.tape-booked').length };
+      }, bulkMonth);
+      assert(/18 gece · ₺144\.000/.test(bulkCalendar.note) && bulkCalendar.booked === 0, `Takvim rozeti: ${JSON.stringify(bulkCalendar)}`);
+      await page.evaluate(() => resetReservationRange());
+      passed.push('22. geçmiş ay toplu girişi formdan kaydedilir; takvimde gece ve tutarlı rozet, günlere çizilmez');
     });
 
     await withPage(browser, baseUrl, 'owner', { width: 390, height: 844 }, async page => {

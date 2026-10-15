@@ -12542,9 +12542,16 @@ function renderTapeChart() {
   });
 
   tableHtml += '</tbody></table>';
+  // Toplu aktarim ozeti gunlere CIZILMEZ (L-103): hangi geceler dolu bilinmiyor,
+  // cizmek uydurma olurdu. Yerine gecesi ve tutariyla rozet (L-198).
   if (takvimOzetleri.length) {
-    const adlar = [...new Set(takvimOzetleri)].map(escapeHtml).join(', ');
-    tableHtml += `<div class="tape-chart-note" style="font-size:11px; color:var(--text-muted); margin-top:8px;">ℹ️ Bu ayda ${takvimOzetleri.length} toplu aktarım özeti var (${adlar}). Özetler aylık toplamdır; hangi günlerde konaklandığı bilinmediği için takvimde gösterilmez. Ciro ve gece toplamlarına dahildir.</div>`;
+    const ozetler = getBulkSummaryApi().summariesInWindow(
+      (appData.bookings || []).filter(b => vKeys.some(k => b.villa === k || (appData.villas?.[k]?.id && b.propertyId === appData.villas[k].id))),
+      calendarDates[0], calendarDates[calendarDates.length - 1]);
+    const ad = b => appData.villas?.[b.villa]?.name || Object.values(appData.villas || {}).find(v => v.id === b.propertyId)?.name || b.villa || '—';
+    const gece = b => Math.max(0, Math.round((Date.parse(b.checkOut + 'T00:00:00Z') - Date.parse(b.checkIn + 'T00:00:00Z')) / 86400000));
+    const rozetler = ozetler.map(b => `<span class="badge badge-slate" style="font-size:11px;">📦 ${escapeHtml(ad(b))} · ${gece(b)} gece · ₺${Math.round(Number(b.gross) || 0).toLocaleString('tr-TR')}</span>`).join(' ');
+    tableHtml += `<div class="tape-chart-note" style="font-size:11px; color:var(--text-muted); margin-top:8px; display:flex; flex-wrap:wrap; gap:6px; align-items:center;"><strong>Toplu aktarım (günlere dağılmamış):</strong> ${rozetler} <span>Ciro ve gece toplamlarına dahil; hangi günlerde konaklandığı bilinmediği için takvime çizilmez.</span></div>`;
   }
   // Ay gorunumu donemin ilk ayini gosterir; donem daha uzunsa liste kalanini kapsar.
   const gosterilenSon = calendarDates[calendarDates.length - 1];
@@ -12552,6 +12559,97 @@ function renderTapeChart() {
     tableHtml += `<div class="tape-chart-note" style="font-size:11px; color:var(--text-muted); margin-top:6px;">Takvim ${formatTrDate(calendarDates[0])} – ${formatTrDate(gosterilenSon)} arasını gösteriyor; aşağıdaki liste seçili dönemin tamamını (${formatTrDate(reservationListRange.start)} – ${formatTrDate(reservationListRange.end)}) kapsar.</div>`;
   }
   container.innerHTML = tableHtml;
+}
+
+// Gecmis ay toplu girisi (L-198, kullanici M28). Kurallar core/bulk_summary.js:
+// bitmis ay, tek tek rezervasyonu olmayan ay, kapanmamis ay, kanal zorunlu.
+// Kayit ice aktarimin yaptigi gibi dogrudan yazilir (kisi sayisi bilinmez;
+// create_booking_atomic kisi sayisi ister ve uydurmayiz). Temizlik gorevi
+// ACILMAZ: ozetin gunleri belli degil, planli temizlik uydurma olurdu.
+function getBulkSummaryApi() {
+  if (typeof BulkSummary !== 'undefined') return BulkSummary;
+  if (typeof require === 'function') { try { return require('./core/bulk_summary.js'); } catch (e) { /* tarayici */ } }
+  throw new Error('Toplu giriş motoru yüklenemedi. Sayfayı yenileyin.');
+}
+
+function openBulkSummaryModal() {
+  if (!canWriteSalesRole(activeTenant?.role)) {
+    showToast('Rolünüz rezervasyon kaydetmeye yetkili değil.', 'error');
+    return false;
+  }
+  // Mulk listesi updateAllVillaDropdowns'tan gelir (tek kaynak); burada yalniz
+  // listede secili mulk varsa o onerilir.
+  const villaSelect = document.getElementById('bulkVilla');
+  if (villaSelect) {
+    const secili = document.getElementById('rezVillaFilter')?.value;
+    if (secili && secili !== 'ALL' && appData.villas?.[secili]) villaSelect.value = secili;
+  }
+  const channelSelect = document.getElementById('bulkChannel');
+  if (channelSelect) {
+    channelSelect.innerHTML = '<option value="">Kanal seçin…</option>' + sortBookingChannelsForSelection(getBookingChannelCatalog().filter(c => c.isActive !== false))
+      .map(c => `<option value="${escapeHtml(c.code)}">${escapeHtml(c.displayName || c.code)}</option>`).join('');
+  }
+  const monthInput = document.getElementById('bulkMonth');
+  if (monthInput) {
+    const d = new Date(`${getTodayStr().slice(0, 7)}-01T12:00:00`);
+    d.setMonth(d.getMonth() - 1);
+    monthInput.max = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    if (!monthInput.value) monthInput.value = monthInput.max;
+  }
+  setBulkSummaryMessage('');
+  document.getElementById('bulkSummaryModal')?.classList.add('active');
+  return true;
+}
+
+function closeBulkSummaryModal() {
+  document.getElementById('bulkSummaryModal')?.classList.remove('active');
+}
+
+function setBulkSummaryMessage(text) {
+  const el = document.getElementById('bulkSummaryMessage');
+  if (!el) return;
+  el.textContent = text || '';
+  el.hidden = !text;
+}
+
+async function saveBulkSummary(event) {
+  if (event && typeof event.preventDefault === 'function') event.preventDefault();
+  const tenantId = getActiveTenantId();
+  const val = id => document.getElementById(id)?.value || '';
+  const villaKey = val('bulkVilla');
+  const plan = getBulkSummaryApi().planBulkSummary({
+    propertyId: appData.villas?.[villaKey]?.id || null,
+    villaKey,
+    month: val('bulkMonth'),
+    nights: val('bulkNights'),
+    gross: val('bulkGross'),
+    cleaningFee: val('bulkCleaningFee'),
+    otaCommission: val('bulkOta'),
+    channel: val('bulkChannel'),
+    channels: getBookingChannelCatalog(),
+    bookings: appData.bookings || [],
+    today: getTodayStr(),
+    isMonthClosed: monthKey => isPeriodClosed(monthKey)
+  });
+  if (!plan.ok) { setBulkSummaryMessage(plan.error); return false; }
+  try {
+    requireCloudForWrite('Toplu giriş', tenantId);
+    const payload = mapBookingToDb({ ...plan.booking, code: generateSafeBookingCode(plan.booking.checkIn) }, tenantId);
+    if (supabaseClient && isCloudTenant(tenantId)) {
+      const { error } = await supabaseClient.from('bookings').insert(payload);
+      if (error) throw error;
+      await loadTenantAppData(tenantId);
+    }
+  } catch (err) {
+    setBulkSummaryMessage('Kaydedilemedi: ' + (err && err.message ? err.message : 'bilinmeyen hata'));
+    return false;
+  }
+  closeBulkSummaryModal();
+  invalidateExecutiveSnapshotCache();
+  showToast(`${plan.booking.guest} kaydedildi: ${plan.booking.nights} gece · ₺${Math.round(plan.booking.gross).toLocaleString('tr-TR')}.`, 'success');
+  if (typeof renderManageBookingsTable === 'function') renderManageBookingsTable();
+  if (typeof renderTapeChart === 'function') renderTapeChart();
+  return true;
 }
 
 function openBookingForDate(villa, dateStr) {
@@ -16316,6 +16414,7 @@ function updateAllVillaDropdowns() {
 
   const dropdownIds = [
     'globalVillaFilter',
+    'bulkVilla',
     'quickBookingVilla',
     'resVilla',
     'expVilla',

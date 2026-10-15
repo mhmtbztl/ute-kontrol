@@ -18,6 +18,7 @@
 // L-195 (M25): Gecmis temizlik maliyetinin girilecek yolu yoktu; gecmis aylarda kar yuksek gorunuyordu (phase95).
 // L-196 (M26): Gelir tablosu indirilemiyordu; ekrandaki defterden, rol kapili.
 // L-197 (M27): Takvim, doluluk ve liste ayri tarih seciyordu; tek donem + mulk.
+// L-198 (M28): Gecmis ay toplu girisi formdan; takvimde gece ve tutarli rozet.
 // L-199 (M29): Talep formunda rol yuklenmeden yazilan "kaydedemez" mesaji rol gelince kalmiyordu.
 // L-193 (M23): Defterdeki "Temizlik" sutunu maliyet saniliyordu; misafirden alinan gelir oldugu yazilir.
 // L-184..L-190 (M14-M20): kapora, kar marji hedefi, talep tarihi, mulk net kari, reklam tablosu/metrik/gunluk butce, sablon ekrani, bosluk gecesi.
@@ -889,6 +890,41 @@ async function rezervasyonKapsamDavranisi() {
     'L-197c Takvim donemi ve mulku listeyle ayni kaynaktan okur');
 }
 
+// L-198 (M28) — Gecmis ay toplu girisi: bitmis ay, iki kez sayma yok, kanal zorunlu.
+async function topluGirisDavranisi() {
+  const BS = require('./bulk_summary.js');
+  const kanallar = [{ code: 'AIRBNB', displayName: 'Airbnb' }, { code: 'WHATSAPP', displayName: 'WhatsApp' }];
+  const temel = { propertyId: 'pa', villaKey: 'a', month: '2026-01', nights: 20, gross: '180000', cleaningFee: '', otaCommission: '27000', channel: 'AIRBNB', channels: kanallar, bookings: [], today: '2026-10-15', isMonthClosed: () => false };
+  const p = BS.planBulkSummary(temel);
+  check(p.ok && p.booking.guest === 'TOPLU AKTARIM — Ocak 2026 (Airbnb)' && p.booking.checkIn === '2026-01-01' && p.booking.checkOut === '2026-01-21'
+    && p.booking.gross === 180000 && p.booking.otaCommission === 27000 && p.booking.cleaningFee === 0 && p.booking.channel === 'AIRBNB' && p.booking.status === 'CHECKED_OUT'
+    && !('pax' in p.booking),
+    'L-198a Toplu ozet: ay basindan gece kadar, kanal kodu, tamamlandi; istemci kisi sayisi gondermez (DB varsayilani L-200)', JSON.stringify(p));
+  check(BS.isBulkSummary(p.booking) && require('./guest_crm_engine.js').isBulkSummaryBooking(p.booking),
+    'L-198b Uretilen satir tek tanima (isBulkSummaryBooking) uyar: kayit basi metriklere girmez');
+  const ikinci = BS.planBulkSummary({ ...temel, nights: 11, channel: 'WHATSAPP', bookings: [{ ...p.booking, id: 'x' }] });
+  const fazla = BS.planBulkSummary({ ...temel, nights: 12, channel: 'WHATSAPP', bookings: [{ ...p.booking, id: 'x' }] });
+  check(ikinci.ok && ikinci.booking.checkIn === '2026-01-21' && ikinci.booking.checkOut === '2026-02-01' && !fazla.ok && /en çok 11 gece/.test(fazla.error),
+    'L-198c Ayni aya ikinci kanal ozeti oncekinden sonra yerlesir; ayin gun sayisi asilamaz', JSON.stringify({ ikinci, fazla }));
+  const tekTek = BS.planBulkSummary({ ...temel, bookings: [{ id: 'r1', villa: 'a', propertyId: 'pa', guest: 'Ali', checkIn: '2026-01-10', checkOut: '2026-01-12', status: 'CHECKED_OUT' }] });
+  const baskaMulk = BS.planBulkSummary({ ...temel, bookings: [{ id: 'r2', villa: 'b', propertyId: 'pb', guest: 'Ali', checkIn: '2026-01-10', checkOut: '2026-01-12', status: 'CHECKED_OUT' }] });
+  check(!tekTek.ok && /iki kez sayılırdı/.test(tekTek.error) && baskaMulk.ok, 'L-198d Tek tek rezervasyonu olan ayda toplu giris reddedilir (yalniz ayni mulk)');
+  check(!BS.planBulkSummary({ ...temel, month: '2026-10' }).ok && !BS.planBulkSummary({ ...temel, isMonthClosed: () => true }).ok
+    && !BS.planBulkSummary({ ...temel, channel: '' }).ok && !BS.planBulkSummary({ ...temel, gross: '' }).ok
+    && !BS.planBulkSummary({ ...temel, cleaningFee: '200000' }).ok && !BS.planBulkSummary({ ...temel, nights: '2.5' }).ok,
+    'L-198e Icinde bulunulan ay, kapanmis ay, kanalsiz, tutarsiz, temizlik > brut ve kesirli gece reddedilir');
+  check(BS.planBulkSummary({ ...temel, gross: '72500.5' }).booking.gross === 72500.5 && BS.planBulkSummary({ ...temel, gross: '72.500,50' }).booking.gross === 72500.5,
+    'L-198f Tutar sayi alani (72500.5) ve Turkce bicim (72.500,50) dogru okunur');
+
+  const app = read('app.js');
+  const kaydet = functionBody(app, 'async function saveBulkSummary(');
+  check(/planBulkSummary/.test(kaydet) && /from\('bookings'\)\.insert/.test(kaydet) && !/syncBookingCleaningTask/.test(kaydet) && /invalidateExecutiveSnapshotCache/.test(kaydet),
+    'L-198g Kayit kurallardan gecer, temizlik gorevi acmaz, ana sayfa onbellegini tazeler');
+  const html = read('index.html');
+  check(/openBulkSummaryModal\(\)/.test(html) && /id="bulkSummaryModal"/.test(html) && /bulk_summary\.js\?v=/.test(html) && /'bulkVilla'/.test(app),
+    'L-198h Rezervasyonlar ekraninda "Gecmis ay toplu girisi"; mulk listesi ortak kaynaktan');
+}
+
 async function main() {
 try {
   const html = read('index.html');
@@ -927,6 +963,7 @@ try {
   await gecmisTemizlikDavranisi();
   await gelirTablosuDavranisi();
   await rezervasyonKapsamDavranisi();
+  await topluGirisDavranisi();
 } catch (error) {
   failed++;
   console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));
