@@ -2433,6 +2433,16 @@
                 📥 Gider Şablonu (.xlsx)
               </button>
             </div>
+            <!-- L-194 (M24): dogru degerleri gormek ve kendi tablosunu sablona cevirmek. -->
+            <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px;">
+              <button type="button" class="btn btn-secondary btn-sm" data-onclick="openImportConvertPrompt('BOOKINGS')" style="font-size: 11px; padding: 4px 8px;">🧠 Rezervasyon tablomu şablona çevir (ChatGPT)</button>
+              <button type="button" class="btn btn-secondary btn-sm" data-onclick="openImportConvertPrompt('EXPENSES')" style="font-size: 11px; padding: 4px 8px;">🧠 Gider tablomu şablona çevir (ChatGPT)</button>
+            </div>
+            <details id="importValidValuesBox" style="margin-top: 8px; font-size: 11px; color: #CBD5E1;">
+              <summary style="cursor: pointer; font-weight: 600;">📋 Geçerli değerler — mülk kodları, kanallar, gider kategorileri (yanlış yazılan satır kaydedilmez)</summary>
+              <div id="importValidValues" style="margin-top: 6px;"></div>
+              <button type="button" class="btn btn-secondary btn-sm" data-onclick="copyImportValidValues()" style="font-size: 11px; padding: 4px 8px; margin-top: 6px;">Listeyi kopyala</button>
+            </details>
           </div>
 
           <!-- Bos ornek sablonlar: giris yapmadan da indirilebilen statik
@@ -3260,9 +3270,10 @@
   <script src="core/financial_metrics_service.js?v=80a48f81"></script>
   <script src="core/marketing_engine.js?v=2756f4ec"></script>
   <script src="core/analysis_export_service.js?v=d05579d8"></script>
-  <script src="core/chatgpt_prompt_engine.js?v=5e7232ae"></script>
+  <script src="core/chatgpt_prompt_engine.js?v=1b6079e1"></script>
   <script src="core/property_analysis_context_service.js?v=c0cc1027"></script>
-  <script src="core/finance_import_engine.js?v=5e45fe1b"></script>
+  <script src="core/finance_import_engine.js?v=f90563aa"></script>
+  <script src="core/import_template_guide.js?v=900f804e"></script>
   <script src="core/finance_export_engine.js?v=86f92e3f"></script>
 
   <!-- ======================================================= -->
@@ -3744,10 +3755,10 @@
   <script src="core/side_panel.js?v=d763b464"></script>
   <script src="core/notification_feed.js?v=d8a17633"></script>
   <script src="core/command_search.js?v=89760933"></script>
-  <script src="core/action_dispatch.js?v=c701f518"></script>
+  <script src="core/action_dispatch.js?v=928acf5d"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=a85be454"></script>
-  <script src="app.js?v=e60dbe44"></script>
+  <script src="app.js?v=8b64ca6d"></script>
   <script src="core/property_analysis_context_ui.js?v=0a5def2d"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=6fdf284a"></script>

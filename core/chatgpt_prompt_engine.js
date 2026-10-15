@@ -18,7 +18,8 @@
     { kind: 'FUNNEL_TEST_QUESTION', title: 'Huni testi', questions: [{ id: 'NEXT', text: 'Değişiklik işe yaradı mı, sırada ne var?' }] },
     { kind: 'ADS_SCREENSHOT_READ', title: 'Reklam ekran görüntüsü', questions: [{ id: 'READ', text: 'Görüntüdeki reklam rakamlarını oku' }] },
     { kind: 'LISTING_REVIEW', title: 'İlan incelemesi', questions: [{ id: 'REVIEW', text: 'İlanı ve fotoğrafları değerlendir' }] },
-    { kind: 'PAGE_REPORT', title: 'Sayfa raporu', questions: [{ id: 'REPORT', text: 'Bu raporu yorumla' }] }
+    { kind: 'PAGE_REPORT', title: 'Sayfa raporu', questions: [{ id: 'REPORT', text: 'Bu raporu yorumla' }] },
+    { kind: 'IMPORT_TEMPLATE_CONVERT', title: 'Tabloyu şablona çevir', questions: [{ id: 'CONVERT', text: 'Tablomu içe aktarma şablonuna çevir' }] }
   ];
   const absent = value => value === null || value === undefined || value === '' ||
     (Array.isArray(value) && value.length === 0) ||
@@ -88,6 +89,31 @@
       const p = safeProperty(context.property);
       add(lines, included, omitted, 'property', 'Mülk', p);
       add(lines, included, omitted, 'listingUrls', 'İlan bağlantıları', Array.isArray(context.listingUrls) ? context.listingUrls.filter(x => typeof x === 'string') : []);
+    } else if (kind === 'IMPORT_TEMPLATE_CONVERT') {
+      // L-194 (M24): kullanicinin kendi tablosunu sablona cevirir. Yalniz
+      // gecerli degerler (kod/ad) gider; tablonun kendisini kullanici ChatGPT'ye
+      // kendisi yapistirir, uygulama veri gondermez.
+      const kayit = context.mode === 'BOOKINGS' ? 'rezervasyon' : 'gider';
+      const sutunlar = (Array.isArray(context.columns) ? context.columns : []).filter(x => typeof x === 'string');
+      const liste = (rows, keys) => (Array.isArray(rows) ? rows : []).map(r => pickScalars(r, keys)).filter(r => Object.keys(r).length);
+      lines.push(`Görev: Aşağıya yapıştıracağım tabloyu Lexbnb ${kayit} içe aktarma şablonuna çevir.`,
+        `Çıktı yalnız noktalı virgülle (;) ayrılmış CSV olsun; ilk satır TAM olarak: ${sutunlar.join(';')}`,
+        'Kurallar:',
+        '1) Değer uydurma. Tablomda olmayan bilgiyi boş bırak; tahmin etme.',
+        '2) Villa, Kanal, Kategori, Durum ve Tür yalnız aşağıdaki listelerden olabilir. Eşleştiremediğin satırı CSV\'ye yazma; CSV\'den sonra "EŞLEŞMEYENLER" başlığıyla satırı ve nedenini listele.',
+        '3) Tarihler YYYY-AA-GG biçiminde.',
+        '4) Tutarlar binlik ayraçsız, ondalık için virgül: 72500 ya da 72500,50.',
+        '5) Toplam/ara toplam satırlarını alma; her kayıt bir satır.');
+      included.push('instructions');
+      add(lines, included, omitted, 'properties', 'Geçerli mülkler (Villa sütununa kod)', liste(context.properties, ['code', 'name']));
+      if (context.mode === 'BOOKINGS') {
+        add(lines, included, omitted, 'channels', 'Geçerli kanallar (Kanal sütununa kod)', liste(context.channels, ['code', 'displayName']));
+        add(lines, included, omitted, 'statuses', 'Geçerli durumlar', (Array.isArray(context.statuses) ? context.statuses : []).filter(x => typeof x === 'string'));
+      } else {
+        add(lines, included, omitted, 'categories', 'Geçerli kategoriler', liste(context.categories, ['name', 'label']));
+        lines.push('Tür: OPEX (işletme gideri) ya da CAPEX (yatırım). Villa boşsa ya da ALL ise tüm portföy.');
+      }
+      lines.push('', 'Tablom (aşağıya yapıştırıyorum):');
     } else if (kind === 'PAGE_REPORT') {
       const report = context.report || context;
       add(lines, included, omitted, 'title', 'Rapor', scalar(report.title));

@@ -6728,6 +6728,7 @@ async function saveMonthlyGoals(e) {
 function openImportModal() {
   document.getElementById('importModal').classList.add('active');
   initImportDropzone();
+  renderImportValidValues();
   // Gecmis asenkron yuklenir; modalin acilmasini bekletmez.
   refreshImportHistory().catch(e => console.warn('İçe aktarım geçmişi:', e));
 }
@@ -6746,95 +6747,108 @@ function closeImportModal() {
 // =============================================================
 let pendingImportData = null;
 
+// Bu isletmenin gecerli degerleri: mulk kodlari, aktif kanallar, gider
+// kategorileri (L-194, kullanici M24). Sablon, ice aktarma ekrani ve
+// ChatGPT istemi ayni listeyi kullanir.
+function getImportValidValues() {
+  const engine = getImportEngine();
+  return {
+    properties: Object.entries((appData && appData.villas) || {})
+      .filter(([, v]) => v && v.isActive !== false && !v.archivedAt)
+      .map(([anahtar, v]) => ({ code: anahtar, name: v.name || anahtar })),
+    channels: getBookingChannelCatalog().filter(c => c && c.isActive !== false)
+      .map(c => ({ code: c.code, displayName: c.displayName || c.code })),
+    categories: engine ? engine.GIDER_KATEGORILERI : []
+  };
+}
+
+function importValidValuesText() {
+  const v = getImportValidValues();
+  const satir = (baslik, liste) => `${baslik}:\n${liste.length ? liste.join('\n') : '—'}`;
+  return [
+    satir('Mülkler (Villa sütunu — kod ya da ad)', v.properties.map(p => `${p.code} — ${p.name}`)),
+    satir('Kanallar (Kanal sütunu — kod ya da ad)', v.channels.map(c => `${c.code} — ${c.displayName}`)),
+    satir('Gider kategorileri (Kategori sütunu)', v.categories.map(c => `${c.name} — ${c.label}`))
+  ].join('\n\n');
+}
+
+function renderImportValidValues() {
+  const box = document.getElementById('importValidValues');
+  if (!box) return;
+  const v = getImportValidValues();
+  const list = (title, rows) => `<div style="margin-bottom: 6px;"><strong>${escapeHtml(title)}</strong><div>${rows.length ? rows.map(r => `<code>${escapeHtml(r[0])}</code> ${escapeHtml(r[1])}`).join(' · ') : '—'}</div></div>`;
+  box.innerHTML =
+    list('Mülkler — "Villa" sütununa kod ya da ad', v.properties.map(p => [p.code, p.name])) +
+    list('Kanallar — "Kanal" sütununa kod ya da ad', v.channels.map(c => [c.code, c.displayName])) +
+    list('Gider kategorileri — "Kategori" sütunu', v.categories.map(c => [c.name, c.label]));
+}
+
+async function copyImportValidValues() {
+  try {
+    await navigator.clipboard.writeText(importValidValuesText());
+    showToast('Geçerli değerler kopyalandı.', 'success');
+  } catch (e) {
+    showToast('Kopyalanamadı; listeyi elle seçip kopyalayın.', 'error');
+  }
+}
+
+// Kendi tablosunu sablona cevirtmek icin ChatGPT istemi (L-194). Uygulama
+// ChatGPT'ye veri gondermez: istemde yalniz gecerli kodlar vardir, tabloyu
+// kullanici kendisi yapistirir.
+function openImportConvertPrompt(mode) {
+  const engine = getImportEngine();
+  const kind = mode === 'BOOKINGS' ? 'BOOKINGS' : 'EXPENSES';
+  const v = getImportValidValues();
+  return openChatGptQuestionModal({
+    kind: 'IMPORT_TEMPLATE_CONVERT',
+    scope: kind === 'BOOKINGS' ? 'Rezervasyon tablosu → şablon' : 'Gider tablosu → şablon',
+    questions: ['Tablomu içe aktarma şablonuna çevir.'],
+    context: {
+      mode: kind,
+      columns: engine ? engine.SABLON_SUTUNLARI[kind] : [],
+      properties: v.properties,
+      channels: v.channels,
+      categories: v.categories,
+      statuses: typeof ImportTemplateGuide !== 'undefined' ? ImportTemplateGuide.DURUMLAR.map(d => d[0]) : []
+    }
+  });
+}
+
 function downloadSampleTemplate(templateType) {
   if (typeof XLSX === 'undefined') {
     alert('Excel motoru yükleniyor, lütfen birkaç saniye sonra tekrar deneyin.');
     return;
   }
+  const engine = getImportEngine();
+  if (!engine || typeof ImportTemplateGuide === 'undefined') {
+    alert('Şablon motoru yüklenemedi. Sayfayı yenileyin.');
+    return;
+  }
+  const mode = templateType === 'BOOKINGS' ? 'BOOKINGS' : 'EXPENSES';
+  const values = getImportValidValues();
+  const guide = ImportTemplateGuide.buildGuide(mode, values);
+  const headers = engine.SABLON_SUTUNLARI[mode];
+
+  // Veri sayfasi YALNIZ basliktir. Eskiden ornek satirlar musterinin GERCEK
+  // mulk kodlariyla geliyordu: sablon degistirilmeden yuklenirse "Ornek
+  // Misafir" gercek rezervasyon olarak yaziliyordu (3.6). Ornek artik
+  // talimat sayfasinda durur; oradan ice aktarma okumaz (yalniz ilk sayfa).
+  const m1 = values.properties[0] ? values.properties[0].code : 'MULK_KODU';
+  const kanal = values.channels[0] ? values.channels[0].code : '';
+  const gun = n => new Date(Date.parse(getTodayStr() + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
+  const ornek = mode === 'BOOKINGS'
+    ? [m1, 'Ahmet Yılmaz', gun(-20), gun(-16), '72500', kanal, '0', '1500', '4', 'CHECKED_OUT', '0', '', '']
+    : [gun(-10), 'Fatura', '1850', 'Elektrik faturası', 'OPEX', m1];
+  const steps = guide.steps.concat(['', 'ÖRNEK SATIR (ilk sayfaya kendi kayıtlarınızı bu düzende yazın):', headers.join(' | '), ornek.join(' | ')]);
 
   const wb = XLSX.utils.book_new();
-
-  // Sablondaki ornek satirlar MUSTERININ kendi mulk anahtarlarini ve
-  // BUGUNE gore tarihleri kullanir. Eskiden 'AZURE'/'BELLA' gibi olmayan
-  // mulkler ve 2026-10 tarihleri sabitti: musteri sablonu indirip oldugu gibi
-  // doldurdugunda tanimsiz mulke, gecmis bir aya kayit girmis oluyordu.
-  const mulkAnahtarlari = Object.keys(appData.villas || {});
-  const m1 = mulkAnahtarlari[0] || 'MULK_KODU';
-  const m2 = mulkAnahtarlari[1] || m1;
-  const gunEkle = (n) => {
-    const d = new Date(getTodayStr() + 'T00:00:00');
-    d.setDate(d.getDate() + n);
-    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-  };
-
-  if (templateType === 'BOOKINGS') {
-    const data = [
-      {
-        'Villa': m1,
-        'Misafir Adı': 'Örnek Misafir (Ahmet Yılmaz)',
-        'Giriş Tarihi': gunEkle(7),
-        'Çıkış Tarihi': gunEkle(11),
-        'Gece': 4,
-        'Brüt Tutar (TL)': 72000,
-        'Kanal': 'WHATSAPP',
-        'OTA Komisyonu (TL)': 0,
-        'Misafirden Temizlik Ücreti (TL)': 1500,
-        'Kişi Sayısı': 8,
-        'Durum': 'CHECKED_OUT'
-      },
-      {
-        'Villa': m2,
-        'Misafir Adı': 'Örnek Misafir (Canan Kaya)',
-        'Giriş Tarihi': gunEkle(17),
-        'Çıkış Tarihi': gunEkle(21),
-        'Gece': 4,
-        'Brüt Tutar (TL)': 56000,
-        'Kanal': 'AIRBNB',
-        'OTA Komisyonu (TL)': 8400,
-        'Misafirden Temizlik Ücreti (TL)': 1200,
-        'Kişi Sayısı': 6,
-        'Durum': 'CHECKED_OUT'
-      }
-    ];
-    const ws = XLSX.utils.json_to_sheet(data);
-    XLSX.utils.book_append_sheet(wb, ws, 'Rezervasyonlar');
-    XLSX.writeFile(wb, 'LexBnB_Ornek_Rezervasyon_Sablonu.xlsx');
-  } else if (templateType === 'EXPENSES') {
-    const data = [
-      {
-        'Tarih': gunEkle(-10),
-        'Açıklama': 'Örnek: yakacak / elektrik faturası',
-        'Tutar (TL)': 18000,
-        'Kategori': 'Şömine & Yakacak',
-        'Tür': 'OPEX',
-        'Villa': 'ALL'
-      },
-      {
-        'Tarih': gunEkle(-6),
-        'Açıklama': 'Örnek: kombi bakımı / arıza onarımı',
-        'Tutar (TL)': 6500,
-        'Kategori': 'Bakım & Onarım',
-        'Tür': 'OPEX',
-        'Villa': m1
-      },
-      {
-        'Tarih': gunEkle(-3),
-        'Açıklama': 'Örnek: mobilya / demirbaş alımı',
-        'Tutar (TL)': 45000,
-        'Kategori': 'Yatırım & Demirbaş',
-        'Tür': 'CAPEX',
-        'Villa': m2
-      }
-    ];
-    const ws = XLSX.utils.json_to_sheet(data);
-    XLSX.utils.book_append_sheet(wb, ws, 'Giderler');
-    XLSX.writeFile(wb, 'LexBnB_Ornek_Gider_Sablonu.xlsx');
-  }
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers]), mode === 'BOOKINGS' ? 'Rezervasyonlar' : 'Giderler');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(steps.map(s => [s])), 'NASIL DOLDURULUR');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(guide.validValues), 'GEÇERLİ DEĞERLER');
+  XLSX.writeFile(wb, mode === 'BOOKINGS' ? 'LexBnB_Rezervasyon_Sablonu.xlsx' : 'LexBnB_Gider_Sablonu.xlsx');
   // 'COMPANY' dali KALDIRILDI (21 Eylul 2026): sirket genel raporu bilerek
   // ICE AKTARILMIYOR (aylik toplamdan rezervasyon uretmek uydurma veri
-  // olurdu, 3.6). Sablonu indirtmek kullaniciyi doldurup yuklemeye ve
-  // "bu dosya ice aktarilamaz" duvarina gondermekten baska bir sey
-  // yapmiyordu.
+  // olurdu, 3.6).
 }
 
 /**
@@ -7264,6 +7278,11 @@ function parseSourceWithMode(kaynak, mode) {
     const ctx = {
       properties: getImportProperties(),
       existingBookings: (appData && appData.bookings) || [],
+      // L-194: kanal katalogdan dogrulanir; defterde zaten duran eski serbest
+      // kategori/kanal degerleri (dis aktar -> geri yukle turu) kabul edilir.
+      channels: getBookingChannelCatalog(),
+      existingCategories: [...new Set(((appData && appData.expenses) || []).map(e => e.category).filter(Boolean))],
+      existingChannels: [...new Set(((appData && appData.bookings) || []).map(b => b.channel).filter(Boolean))],
       isPeriodClosed: (d) => (typeof isPeriodClosed === 'function' ? isPeriodClosed(d) : false),
       isStayPeriodClosed: (a, b) => (typeof isStayPeriodClosed === 'function' ? isStayPeriodClosed(a, b) : false)
     };

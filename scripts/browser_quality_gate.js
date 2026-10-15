@@ -316,6 +316,33 @@ async function main() {
       assert(syncPayloads.length >= 1 && syncPayloads.every(x => Array.isArray(x.p_events) && x.p_events.every(e => !('at' in e))), `sync_my_notifications yuku: ${JSON.stringify(syncPayloads)}`);
       assert(notifState.tab && notifState.view === 'maintenance', `Bildirim arizaya gotumedi: ${JSON.stringify(notifState)}`);
       passed.push('17. bildirim merkezi gerçek olayı gösterir, neye göre geldiğini anlatır, Git kayda götürür');
+      // L-194 (M24): ice aktarma ekrani gecerli degerleri gosterir; uygulama
+      // ici sablon uc sayfadir ve veri sayfasi yalniz basliktir; ChatGPT
+      // istemi isletmenin mulk kodunu tasir.
+      await page.evaluate(() => {
+        // Onceki adimlar veriyi bos sahte sunucudan yeniden yukleyebilir.
+        appData.villas = { test: { id: '00000000-0000-4000-8000-000000000010', name: 'Test Villası', slug: 'test', isActive: true } };
+        openImportModal();
+      });
+      const validText = await page.textContent('#importValidValues');
+      assert(/test/.test(validText) && /Test Villası/.test(validText) && /AIRBNB/.test(validText) && /Fatura/.test(validText),
+        `Gecerli degerler gorunmedi: ${validText}`);
+      const [download] = await Promise.all([
+        page.waitForEvent('download'),
+        page.click('[data-onclick="downloadSampleTemplate(\'EXPENSES\')"]')
+      ]);
+      const XLSXN = require('../xlsx.full.min.js');
+      const tplWb = XLSXN.read(fs.readFileSync(await download.path()), { type: 'buffer' });
+      const tplRows = XLSXN.utils.sheet_to_json(tplWb.Sheets[tplWb.SheetNames[0]], { header: 1 });
+      const tplValid = XLSXN.utils.sheet_to_json(tplWb.Sheets['GEÇERLİ DEĞERLER'] || {}, { header: 1 }).map(r => r.join('|')).join('\n');
+      assert(tplWb.SheetNames.join() === 'Giderler,NASIL DOLDURULUR,GEÇERLİ DEĞERLER' && tplRows.length === 1 && /test\|Test Villası/.test(tplValid),
+        `Gider sablonu: ${JSON.stringify({ sheets: tplWb.SheetNames, rows: tplRows.length, tplValid })}`);
+      await page.click('[data-onclick="openImportConvertPrompt(\'BOOKINGS\')"]');
+      const convertPrompt = await page.inputValue('#chatGptQuestionPrompt');
+      assert(/IMPORT_TEMPLATE_CONVERT/.test(convertPrompt) && /"code":"test"/.test(convertPrompt) && /Misafirden Temizlik Ücreti/.test(convertPrompt),
+        `ChatGPT donusum istemi: ${convertPrompt.slice(0, 300)}`);
+      await page.evaluate(() => { closeChatGptQuestionModal(); closeImportModal(); });
+      passed.push('18. içe aktarma ekranı geçerli değerleri gösterir; şablon 3 sayfa ve boş; ChatGPT dönüşüm istemi kod taşır');
     });
 
     await withPage(browser, baseUrl, 'owner', { width: 390, height: 844 }, async page => {

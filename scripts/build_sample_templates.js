@@ -48,7 +48,11 @@ const XLSX = require(path.join(KOK, 'xlsx.full.min.js'));
 // Basliklar BURADA TANIMLANMAZ. Ornek sablon, disa aktarilan defter ve ice
 // aktarma eslemesi ayni listeye bagli; uc yerde ayri ayri yazilirsa
 // "disa aktar -> duzelt -> geri yukle" dongusu sessizce kirilir.
-const { SABLON_SUTUNLARI } = require(path.join(KOK, 'core', 'finance_import_engine.js'));
+const { SABLON_SUTUNLARI, GIDER_KATEGORILERI } = require(path.join(KOK, 'core', 'finance_import_engine.js'));
+// Talimat ve gecerli degerler uygulama ici sablonla AYNI modulden gelir (L-194).
+const ImportTemplateGuide = require(path.join(KOK, 'core', 'import_template_guide.js'));
+const REZ_REHBER = ImportTemplateGuide.buildGuide('BOOKINGS', {});
+const GIDER_REHBER = ImportTemplateGuide.buildGuide('EXPENSES', { categories: GIDER_KATEGORILERI });
 
 const BOM = '﻿';
 const CRLF = '\r\n';
@@ -73,28 +77,8 @@ const SABLONLAR = {
       ['MULK_KODU_2', 'Örnek Misafir 2', '2026-07-20', '2026-07-24',
         '56000', 'AIRBNB', '8400', '1200', '6', 'CONFIRMED', '0', '', '']
     ],
-    aciklama: [
-      'LEXBNB — REZERVASYON DEFTERİ ŞABLONU',
-      '',
-      'ZORUNLU SÜTUNLAR: Villa, Misafir Adı, Giriş Tarihi, Çıkış Tarihi, Brüt Tutar',
-      'Diğer sütunlar isteğe bağlıdır; boş bırakabilir veya tamamen silebilirsiniz.',
-      '',
-      '1) "Villa" sütununa KENDİ mülk kodunuzu yazın.',
-      '   MULK_KODU_1 / MULK_KODU_2 yalnızca yer tutucudur; değiştirmezseniz',
-      '   hiçbir satır kaydedilmez (bilerek böyle — yanlış mülke kayıt girmeyin).',
-      '2) Tarihler: 2026-07-15 veya 15.07.2026 — ikisi de kabul edilir.',
-      '3) Tutar: 72500 veya 72.500,50 — ikisi de kabul edilir.',
-      '4) "Misafirden Temizlik Ücreti": misafirden ALINAN temizlik ücretidir (gelir);',
-      '   brüt tutarın içindedir ve ayrı raporlanır. Personele ödenen temizlik',
-      '   MALİYETİ bu dosyada yoktur; temizlik görevinden gider olarak yazılır.',
-      '5) Gece sayısı tarihlerden hesaplanır, ayrı sütun gerekmez.',
-      '6) Başlık satırı DOSYANIN İLK SATIRI olmalıdır; üstüne rapor başlığı eklemeyin.',
-      '7) Sütun sırası önemsizdir, fazladan sütunlar yok sayılır.',
-      '8) "Oda İndirimi" yalnız oda gelirinden düşer; temizlik ücretini etkilemez.',
-      '   "Telefon" ve "Not" isteğe bağlıdır.',
-      '',
-      'Durum değerleri: CONFIRMED, CHECKED_IN, CHECKED_OUT, CANCELLED'
-    ]
+    aciklama: REZ_REHBER.steps,
+    gecerli: REZ_REHBER.validValues
   },
 
   gider: {
@@ -102,28 +86,14 @@ const SABLONLAR = {
     sayfa: 'Giderler',
     basliklar: SABLON_SUTUNLARI.EXPENSES,
     satirlar: [
-      ['2026-07-03', 'Şömine & Yakacak', '18000', 'Örnek: yakacak alımı', 'OPEX', 'ALL'],
-      ['2026-07-08', 'Bakım & Onarım', '6500', 'Örnek: kombi bakımı', 'OPEX', 'MULK_KODU_1'],
-      ['2026-07-14', 'Yatırım & Demirbaş', '45000', 'Örnek: mobilya alımı', 'CAPEX', 'MULK_KODU_2']
+      // Ornek satirlarin HEPSI yer tutucu mulke baglidir: eskiden 'ALL'
+      // satiri degistirilmeden yuklenirse deftere ornek gider yaziliyordu.
+      ['2026-07-03', 'Fatura', '18000', 'Örnek: elektrik faturası', 'OPEX', 'MULK_KODU_1'],
+      ['2026-07-08', 'Bakım', '6500', 'Örnek: kombi bakımı', 'OPEX', 'MULK_KODU_1'],
+      ['2026-07-14', 'Diğer', '45000', 'Örnek: mobilya alımı', 'CAPEX', 'MULK_KODU_2']
     ],
-    aciklama: [
-      'LEXBNB — GİDER DEFTERİ ŞABLONU',
-      '',
-      'ZORUNLU SÜTUNLAR: Tarih, Kategori, Tutar',
-      'Diğer sütunlar isteğe bağlıdır.',
-      '',
-      '1) "Villa" sütunu boş veya ALL ise gider tüm portföye yazılır.',
-      '   Tek bir mülke yazmak için KENDİ mülk kodunuzu girin.',
-      '   MULK_KODU_1 / MULK_KODU_2 yalnızca yer tutucudur; değiştirmezseniz',
-      '   o satırlar kaydedilmez.',
-      '2) "Tür": OPEX (işletme gideri) veya CAPEX (yatırım). Boşsa OPEX sayılır.',
-      '3) Tarih: 2026-07-03 veya 03.07.2026 — ikisi de kabul edilir.',
-      '4) Tutar: 18000 veya 18.000,50 — ikisi de kabul edilir.',
-      '5) Başlık satırı DOSYANIN İLK SATIRI olmalıdır.',
-      '',
-      'NOT: Temizlik personeline ödenen tutar buraya GİRİLMEZ; o, rezervasyonun',
-      'temizlik görevinden otomatik gider yazılır.'
-    ]
+    aciklama: GIDER_REHBER.steps,
+    gecerli: GIDER_REHBER.validValues
   }
 };
 
@@ -152,6 +122,7 @@ function xlsxUret(spec) {
     wb, XLSX.utils.aoa_to_sheet([spec.basliklar].concat(spec.satirlar)), spec.sayfa);
   XLSX.utils.book_append_sheet(
     wb, XLSX.utils.aoa_to_sheet(spec.aciklama.map(s => [s])), 'NASIL DOLDURULUR');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(spec.gecerli), 'GEÇERLİ DEĞERLER');
   return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
 }
 
@@ -168,7 +139,7 @@ function xlsxOku(baytlar) {
 
 function beklenenXlsxIcerik(spec) {
   return {
-    sayfalar: [spec.sayfa, 'NASIL DOLDURULUR'],
+    sayfalar: [spec.sayfa, 'NASIL DOLDURULUR', 'GEÇERLİ DEĞERLER'],
     satirlar: [spec.basliklar].concat(spec.satirlar).map(r => r.map(c => String(c)))
   };
 }

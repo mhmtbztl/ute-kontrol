@@ -100,6 +100,9 @@ const MULKLER = [
 ];
 const CTX = {
   properties: MULKLER, existingBookings: [],
+  // Disa aktarilan giderler zaten defterde: eski serbest kategorileri
+  // (L-194 oncesi) tur sonunda kabul edilmeli, yoksa geri yukleme kirilir.
+  existingCategories: GIDERLER.map(g => g.category),
   isPeriodClosed: () => false, isStayPeriodClosed: () => false
 };
 
