@@ -403,6 +403,43 @@ async function main() {
         && Math.round(totalRow[2]) === screenNumber(screenRevenue),
         `Gelir tablosu: ${JSON.stringify({ incomeVisible, sheets: incomeWb.SheetNames, totalRow, screenRevenue })}`);
       passed.push('20. gelir tablosu indirilir; TOPLAM cirosu Finans ekranıyla aynı');
+      // L-197 (M27): takvim ve liste tek donem + mulk secicisini izler.
+      await page.evaluate(() => {
+        const ay = getTodayStr().slice(0, 7);
+        appData.villas = {
+          test: { id: '00000000-0000-4000-8000-000000000010', name: 'Test Villası', slug: 'test', isActive: true },
+          deniz: { id: '00000000-0000-4000-8000-000000000011', name: 'Deniz Evi', slug: 'deniz', isActive: true }
+        };
+        appData.bookings = [
+          { id: 'scope-a', villa: 'test', propertyId: '00000000-0000-4000-8000-000000000010', guest: 'Ayşe Takvim', checkIn: ay + '-03', checkOut: ay + '-06', gross: 9000, cleanFee: 0, otaComm: 0, discount: 0, channel: 'WHATSAPP', status: 'CONFIRMED' },
+          { id: 'scope-b', villa: 'deniz', propertyId: '00000000-0000-4000-8000-000000000011', guest: 'Bora Liste', checkIn: ay + '-08', checkOut: ay + '-10', gross: 7000, cleanFee: 0, otaComm: 0, discount: 0, channel: 'WHATSAPP', status: 'CONFIRMED' }
+        ];
+        updateAllVillaDropdowns();
+        switchTab('reservations');
+        resetReservationRange();
+      });
+      await page.selectOption('#rezVillaFilter', 'deniz');
+      const scopeVilla = await page.evaluate(() => ({
+        calendar: document.getElementById('tapeChartContainer').textContent,
+        list: document.getElementById('manageBookingsTableBody').textContent
+      }));
+      assert(/Deniz Evi/.test(scopeVilla.calendar) && !/Test Villası/.test(scopeVilla.calendar) && /Bora/.test(scopeVilla.list) && !/Ayşe/.test(scopeVilla.list),
+        `Mulk secimi takvim ve listeye birlikte uygulanmadi: ${JSON.stringify(scopeVilla).slice(0, 400)}`);
+      const labelBefore = await page.textContent('#reservationRangeLabel');
+      await page.click('[data-onclick="stepReservationPeriod(1)"]');
+      const scopeNext = await page.evaluate(() => ({
+        label: document.getElementById('reservationRangeLabel').textContent,
+        list: document.getElementById('manageBookingsTableBody').textContent,
+        firstDay: document.querySelector('#tapeChartContainer .tape-day-th')?.textContent.trim().split(/\s+/)[0]
+      }));
+      assert(scopeNext.label !== labelBefore && !/Bora/.test(scopeNext.list) && scopeNext.firstDay === '1',
+        `Sonraki donem takvimi ve listeyi birlikte kaydirmadi: ${JSON.stringify({ labelBefore, scopeNext })}`);
+      await page.click('[data-onclick="setTapeChartView(\'WEEK_1\')"]');
+      const weekCols = await page.evaluate(() => document.querySelectorAll('#tapeChartContainer .tape-day-th').length);
+      const weekLabel = await page.textContent('#reservationRangeLabel');
+      assert(weekCols === 7 && weekLabel !== scopeNext.label, `1 hafta gorunumu donemi 7 gune cekmedi: ${JSON.stringify({ weekCols, weekLabel })}`);
+      await page.evaluate(() => { document.getElementById('rezVillaFilter').value = 'ALL'; resetReservationRange(); });
+      passed.push('21. rezervasyonlar: tek dönem + mülk seçicisi takvimi ve listeyi birlikte değiştirir');
     });
 
     await withPage(browser, baseUrl, 'owner', { width: 390, height: 844 }, async page => {

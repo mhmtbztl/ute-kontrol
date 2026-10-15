@@ -7801,15 +7801,14 @@ function pickReservationRangeDate(dateKey) {
   reservationListRange = getDateRangePicker().pick(reservationListRange, dateKey, 'range');
   if (reservationListRange.start && reservationListRange.end) toggleReservationRangePicker(false);
   renderReservationRangeCalendar();
-  largeTablePageState.bookings = 1;
-  renderManageBookingsTable();
+  if (reservationListRange.start && reservationListRange.end) onReservationScopeChange();
 }
 
 function resetReservationRange() {
-  reservationListRange = reservationMonthRange(getTodayStr().slice(0, 7));
-  reservationRangeAnchor = new Date(`${reservationListRange.start}T12:00:00`);
+  tapeChartView = 'MONTH';
+  const r = reservationMonthRange(getTodayStr().slice(0, 7));
+  setReservationScopeRange(r.start, r.end);
   renderReservationRangeCalendar();
-  renderManageBookingsTable();
 }
 
 function buildReservationListView(options = {}) {
@@ -12374,67 +12373,76 @@ function deleteCleaningTaskFromModal() {
 // -------------------------------------------------------------
 // 📅 30 GÜNLÜK GÖRSEL DOLULUK ÇİZELGESİ (TAPE CHART)
 // -------------------------------------------------------------
-let tapeChartMonth = getTodayStr().slice(0, 7);
+// Takvim ve rezervasyon listesi TEK donemi kullanir (L-197, kullanici M27):
+// reservationListRange. Eskiden takvimin kendi ay secicisi vardi; liste baska
+// bir aralikta, mulk filtresi yalniz listede kaliyordu. Ay gorunumu donemin
+// ilk ayini, hafta gorunumleri donemin ilk gununden 7/14 gunu gosterir.
 let tapeChartView = 'MONTH';
-let tapeChartAnchor = getTodayStr();
+
+function addDaysToDateKey(dateKey, days) {
+  const d = new Date(`${dateKey}T12:00:00`);
+  d.setDate(d.getDate() + Number(days || 0));
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function tapeChartWindowDays() {
+  return tapeChartView === 'WEEK_2' ? 14 : tapeChartView === 'WEEK_1' ? 7 : 0;
+}
+
+function setReservationScopeRange(start, end) {
+  reservationListRange = { start, end };
+  reservationRangeAnchor = new Date(`${start}T12:00:00`);
+  onReservationScopeChange();
+}
+
+/** Donem ya da mulk degisti: takvim ve liste birlikte cizilir. */
+function onReservationScopeChange() {
+  if (typeof largeTablePageState !== 'undefined') largeTablePageState.bookings = 1;
+  syncReservationRangeUi();
+  renderTapeChart();
+  renderManageBookingsTable();
+}
 
 function setTapeChartView(view) {
   if (!['WEEK_1', 'WEEK_2', 'MONTH'].includes(view)) return false;
   tapeChartView = view;
-  if (view !== 'MONTH') tapeChartAnchor = getTodayStr();
-  renderTapeChart();
+  const today = getTodayStr();
+  if (view === 'MONTH') {
+    const r = reservationMonthRange(reservationListRange.start.slice(0, 7));
+    setReservationScopeRange(r.start, r.end);
+  } else {
+    // Bugun donemin icindeyse pencere bugunden baslar (operasyonun baktigi yer).
+    const start = reservationListRange.start <= today && reservationListRange.end >= today ? today : reservationListRange.start;
+    setReservationScopeRange(start, addDaysToDateKey(start, tapeChartWindowDays() - 1));
+  }
+  document.querySelectorAll('.calendar-view-switch [data-onclick^="setTapeChartView"]').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-onclick') === `setTapeChartView('${view}')`);
+  });
   return true;
 }
 
-function populateTapeChartMonthSelect() {
-  const select = document.getElementById('tapeChartMonthSelect');
-  if (!select) return;
-  select.innerHTML = '';
-
-  ALL_FINANCIAL_MONTHS.forEach(m => {
-    const opt = document.createElement('option');
-    opt.value = m;
-    let label = getPeriodDisplayName(m);
-    if (m === getTodayStr().slice(0, 7)) label += ' (Güncel Ay)';
-    opt.textContent = label;
-    select.appendChild(opt);
-  });
-
-  select.value = tapeChartMonth;
-}
-
-function setTapeChartMonth(month) {
-  tapeChartMonth = month;
-  tapeChartAnchor = month === getTodayStr().slice(0, 7) ? getTodayStr() : `${month}-01`;
-  const select = document.getElementById('tapeChartMonthSelect');
-  if (select) select.value = month;
-  renderTapeChart();
-}
-
-function stepTapeChartMonth(delta) {
-  if (tapeChartView !== 'MONTH') {
-    const stepDays = tapeChartView === 'WEEK_2' ? 14 : 7;
-    const anchor = new Date(`${tapeChartAnchor}T12:00:00`);
-    anchor.setDate(anchor.getDate() + Number(delta || 0) * stepDays);
-    tapeChartAnchor = `${anchor.getFullYear()}-${String(anchor.getMonth() + 1).padStart(2, '0')}-${String(anchor.getDate()).padStart(2, '0')}`;
-    tapeChartMonth = tapeChartAnchor.slice(0, 7);
-    renderTapeChart();
-    return;
+/** Onceki / sonraki: ay gorunumunde bir ay, hafta gorunumunde 7/14 gun. */
+function stepReservationPeriod(delta) {
+  const n = Number(delta) || 0;
+  if (tapeChartView === 'MONTH') {
+    const d = new Date(`${reservationListRange.start.slice(0, 7)}-01T12:00:00`);
+    d.setMonth(d.getMonth() + n);
+    const r = reservationMonthRange(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    setReservationScopeRange(r.start, r.end);
+  } else {
+    const w = tapeChartWindowDays();
+    const start = addDaysToDateKey(reservationListRange.start, n * w);
+    setReservationScopeRange(start, addDaysToDateKey(start, w - 1));
   }
-  let idx = ALL_FINANCIAL_MONTHS.indexOf(tapeChartMonth);
-  if (idx === -1) idx = ALL_FINANCIAL_MONTHS.indexOf(getTodayStr().slice(0, 7));
-  let newIdx = idx + delta;
-  if (newIdx >= 0 && newIdx < ALL_FINANCIAL_MONTHS.length) {
-    setTapeChartMonth(ALL_FINANCIAL_MONTHS[newIdx]);
-  }
+  return true;
 }
 
 function renderTapeChart() {
   const container = document.getElementById('tapeChartContainer');
   if (!container) return;
 
-  populateTapeChartMonthSelect();
-
+  const tapeChartMonth = String(reservationListRange.start || getTodayStr()).slice(0, 7);
+  const tapeChartAnchor = reservationListRange.start || getTodayStr();
   const [yStr, mStr] = tapeChartMonth.split('-');
   const year = Number(yStr);
   const month = Number(mStr);
@@ -12445,8 +12453,9 @@ function renderTapeChart() {
     return;
   }
 
+  const villaFilter = document.getElementById('rezVillaFilter')?.value || 'ALL';
   const vKeys = (typeof appData !== 'undefined' && appData.villas)
-    ? Object.keys(appData.villas)
+    ? Object.keys(appData.villas).filter(k => villaFilter === 'ALL' || k === villaFilter)
     : [];
   if (vKeys.length === 0) {
     container.innerHTML = '<div class="empty-state">Henüz gerçek mülk kaydı yok; doluluk takvimi oluşturulamadı.</div>';
@@ -12536,6 +12545,11 @@ function renderTapeChart() {
   if (takvimOzetleri.length) {
     const adlar = [...new Set(takvimOzetleri)].map(escapeHtml).join(', ');
     tableHtml += `<div class="tape-chart-note" style="font-size:11px; color:var(--text-muted); margin-top:8px;">ℹ️ Bu ayda ${takvimOzetleri.length} toplu aktarım özeti var (${adlar}). Özetler aylık toplamdır; hangi günlerde konaklandığı bilinmediği için takvimde gösterilmez. Ciro ve gece toplamlarına dahildir.</div>`;
+  }
+  // Ay gorunumu donemin ilk ayini gosterir; donem daha uzunsa liste kalanini kapsar.
+  const gosterilenSon = calendarDates[calendarDates.length - 1];
+  if (reservationListRange.end > gosterilenSon) {
+    tableHtml += `<div class="tape-chart-note" style="font-size:11px; color:var(--text-muted); margin-top:6px;">Takvim ${formatTrDate(calendarDates[0])} – ${formatTrDate(gosterilenSon)} arasını gösteriyor; aşağıdaki liste seçili dönemin tamamını (${formatTrDate(reservationListRange.start)} – ${formatTrDate(reservationListRange.end)}) kapsar.</div>`;
   }
   container.innerHTML = tableHtml;
 }

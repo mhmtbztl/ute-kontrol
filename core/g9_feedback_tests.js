@@ -17,6 +17,7 @@
 // L-194 (M24): Sablonlar gecerli mulk/kanal/kategoriyi gostermiyordu; kategori sessizce Diger e, kanal serbest metin.
 // L-195 (M25): Gecmis temizlik maliyetinin girilecek yolu yoktu; gecmis aylarda kar yuksek gorunuyordu (phase95).
 // L-196 (M26): Gelir tablosu indirilemiyordu; ekrandaki defterden, rol kapili.
+// L-197 (M27): Takvim, doluluk ve liste ayri tarih seciyordu; tek donem + mulk.
 // L-199 (M29): Talep formunda rol yuklenmeden yazilan "kaydedemez" mesaji rol gelince kalmiyordu.
 // L-193 (M23): Defterdeki "Temizlik" sutunu maliyet saniliyordu; misafirden alinan gelir oldugu yazilir.
 // L-184..L-190 (M14-M20): kapora, kar marji hedefi, talep tarihi, mulk net kari, reklam tablosu/metrik/gunluk butce, sablon ekrani, bosluk gecesi.
@@ -872,6 +873,22 @@ async function gelirTablosuDavranisi() {
     'L-196h Menude "Gelir Tablosunu Indir"; gelir tablosu ve gider defteri finans defteri okuyabilen rollere gorunur (izleyici dahil)');
 }
 
+// L-197 (M27) — Rezervasyonlar: takvim ve liste tek donem + mulk secicisi.
+async function rezervasyonKapsamDavranisi() {
+  const html = read('index.html');
+  const app = read('app.js');
+  const sekme = (html.match(/<div id="tab-reservations"[\s\S]*?<div id="tab-expenses"/) || [''])[0];
+  const cubuk = (sekme.match(/<section class="card reservation-scope-bar"[\s\S]*?<\/section>/) || [''])[0];
+  check(!/tapeChartMonthSelect/.test(html) && (sekme.match(/id="rezVillaFilter"/g) || []).length === 1 && (sekme.match(/id="reservationRangeTrigger"/g) || []).length === 1,
+    'L-197a Takvimin ayri ay secicisi yok; ekranda tek donem ve tek mulk secicisi var');
+  check(/reservationRangeTrigger/.test(cubuk) && /rezVillaFilter/.test(cubuk) && /stepReservationPeriod\(-1\)/.test(cubuk) && /setTapeChartView\('WEEK_1'\)/.test(cubuk)
+    && sekme.indexOf('reservation-scope-bar') < sekme.indexOf('tape-chart-card'),
+    'L-197b Ortak cubuk takvimin ustunde: onceki/sonraki, donem, mulk, gorunum');
+  const ciz = functionBody(app, 'function renderTapeChart(');
+  check(/reservationListRange\.start/.test(ciz) && /rezVillaFilter/.test(ciz) && /onReservationScopeChange\(\)/.test(html),
+    'L-197c Takvim donemi ve mulku listeyle ayni kaynaktan okur');
+}
+
 async function main() {
 try {
   const html = read('index.html');
@@ -909,6 +926,7 @@ try {
   await sablonGecerliDegerDavranisi();
   await gecmisTemizlikDavranisi();
   await gelirTablosuDavranisi();
+  await rezervasyonKapsamDavranisi();
 } catch (error) {
   failed++;
   console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));
