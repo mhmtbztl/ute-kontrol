@@ -249,6 +249,15 @@ const BASLIKLAR = {
     phone:       ['telefon', 'tel', 'phone', 'telefon no', 'gsm', 'misafir telefonu'],
     notes:       ['not', 'notlar', 'notes', 'aciklama', 'açıklama'],
     financeDetails: ['finans ayrıntıları json', 'finans ayrintilari json']
+  },
+  // Gecmis temizlikler (L-195, kullanici M25): cleaning_tasks'a "yapildi".
+  CLEANING: {
+    date:        ['tarih', 'temizlik tarihi', 'date', 'gun', 'gün'],
+    property:    ['villa', 'ev', 'mulk', 'mülk', 'property', 'daire'],
+    amount:      ['tutar', 'tutar (tl)', 'ucret', 'ücret', 'maliyet', 'personele odenen', 'personele ödenen', 'amount'],
+    cleaner:     ['temizlikci', 'temizlikçi', 'personel', 'temizlik personeli', 'cleaner'],
+    paid:        ['odendi', 'ödendi', 'odendi mi', 'ödendi mi', 'odeme', 'ödeme', 'paid'],
+    description: ['aciklama', 'açıklama', 'not', 'description']
   }
 };
 
@@ -272,7 +281,8 @@ const SABLON_SUTUNLARI = {
   BOOKINGS: ['Villa', 'Misafir Adı', 'Giriş Tarihi', 'Çıkış Tarihi',
     'Brüt Tutar (TL)', 'Kanal', 'OTA Komisyonu (TL)', 'Misafirden Temizlik Ücreti (TL)',
     'Kişi Sayısı', 'Durum', 'Oda İndirimi (TL)', 'Telefon', 'Not'],
-  EXPENSES: ['Tarih', 'Kategori', 'Tutar (TL)', 'Açıklama', 'Tür', 'Villa']
+  EXPENSES: ['Tarih', 'Kategori', 'Tutar (TL)', 'Açıklama', 'Tür', 'Villa'],
+  CLEANING: ['Tarih', 'Villa', 'Tutar (TL)', 'Temizlikçi', 'Ödendi', 'Açıklama']
 };
 
 /** Basliklardan sutun eslemesi cikarir. Eslesmeyen alan null kalir. */
@@ -302,6 +312,61 @@ function autoDetectColumnMap(headers = [], mode = 'EXPENSES') {
     }
   });
   return map;
+}
+
+// -----------------------------------------------------------------------------
+// Gecerli degerler (L-194, kullanici M24)
+//
+// Gider kategorisi ve kanal eskiden serbest metindi: dosyadaki "Şömine &
+// Yakacak" oldugu gibi yaziliyor, raporda taninmayip sessizce "Diğer"e
+// dusuyordu; "Airbnb " ile formun yazdigi AIRBNB iki ayri kanal oluyordu.
+// Artik taninan deger standart adina cevrilir, taninmayan satir gecerli
+// degerlerin listesiyle reddedilir. Gider kategorilerinin TEK listesi
+// burasidir; app.js EXPENSE_CATEGORIES ayni adlari tasir (renk ekler).
+// -----------------------------------------------------------------------------
+
+const GIDER_KATEGORILERI = [
+  { name: 'Maaş', label: 'Maaş (Personel / Yönetici)' },
+  { name: 'Temizlik', label: 'Temizlik & Çamaşırhane' },
+  { name: 'Bakım', label: 'Bakım, Onarım & Tesisat', aliases: ['Bakım & Onarım', 'Onarım', 'Tamir'] },
+  { name: 'Reklam', label: 'Reklam & Pazarlama (Meta/Google)', aliases: ['Pazarlama'] },
+  { name: 'Akaryakıt', label: 'Akaryakıt & Ulaşım', aliases: ['Yakıt', 'Ulaşım'] },
+  { name: 'Fatura', label: 'Fatura (Elektrik, Su, İnternet)', aliases: ['Elektrik', 'Su', 'İnternet', 'Doğalgaz'] },
+  { name: 'Muhasebe', label: 'Muhasebe & Hukuk', aliases: ['Hukuk'] },
+  { name: 'Kredi Kartı / Komisyon', label: 'Kredi Kartı / Komisyon', aliases: ['Kredi Kartı', 'K.Kartı', 'Komisyon'] },
+  { name: 'Danışmanlık', label: 'Danışmanlık & Yazılım', aliases: ['Yazılım'] },
+  { name: 'Diğer', label: 'Diğer Giderler', aliases: ['Diğer Gider'] }
+];
+
+// Turkce harf, buyuk-kucuk ve noktalama duyarsiz anahtar ("TEMİZLİK" = "temizlik").
+function degerAnahtari(v) {
+  return String(v == null ? '' : v).replace(/[İIı]/g, 'i').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/ş/g, 's').replace(/ğ/g, 'g').replace(/ç/g, 'c')
+    .replace(/[^a-z0-9]/g, '');
+}
+
+/** Serbest yazilmis gider kategorisi -> standart ad; taninmazsa null. */
+function resolveExpenseCategory(ham, kategoriler = GIDER_KATEGORILERI) {
+  const k = degerAnahtari(ham);
+  if (!k) return null;
+  const bulunan = kategoriler.find(c => [c.name, c.label, ...(c.aliases || [])].some(x => degerAnahtari(x) === k));
+  return bulunan ? bulunan.name : null;
+}
+
+/** Kanal kodu ya da adi -> katalogdaki KOD (formun yazdigi); taninmazsa null. */
+function resolveChannel(ham, kanallar = []) {
+  const k = degerAnahtari(ham);
+  if (!k) return null;
+  const bulunan = (kanallar || []).find(c => c && (degerAnahtari(c.code) === k || degerAnahtari(c.displayName) === k));
+  return bulunan ? bulunan.code : null;
+}
+
+/** Isletmenin defterinde zaten bulunan deger (birebir yazimiyla); yoksa null. */
+function mevcutDeger(ham, mevcutlar) {
+  const k = degerAnahtari(ham);
+  if (!k || !Array.isArray(mevcutlar)) return null;
+  return mevcutlar.find(x => degerAnahtari(x) === k) || null;
 }
 
 /** Mulk adi/slug/id -> mulk kimligi. Eslesme buyuk-kucuk harf duyarsizdir. */
@@ -345,8 +410,14 @@ function validateExpenseRows(rawRows = [], columnMap = {}, context = {}) {
     else if (tarihHucre.ambiguous) satirHata.push(`${BELIRSIZ_TARIH}: "${raw[columnMap.date]}"`);
     else if (!tarih) satirHata.push(`Tarih anlaşılamadı: "${raw[columnMap.date]}"`);
 
-    const kategori = String(raw[columnMap.category] || '').trim();
-    if (!kategori) satirHata.push('Kategori boş.');
+    const kategoriHam = String(raw[columnMap.category] || '').trim();
+    // Defterde zaten duran eski serbest kategori (dis aktarim -> geri yukleme
+    // turu) oldugu gibi kabul edilir; yeni ve taninmayan deger reddedilir.
+    const kategori = kategoriHam
+      ? (mevcutDeger(kategoriHam, context.existingCategories) || resolveExpenseCategory(kategoriHam))
+      : null;
+    if (!kategoriHam) satirHata.push('Kategori boş.');
+    else if (!kategori) satirHata.push(`Kategori tanınmadı: "${kategoriHam}". Geçerli: ${GIDER_KATEGORILERI.map(c => c.name).join(', ')}`);
 
     const tutar = normalizeAmount(raw[columnMap.amount]);
     if (tutar === null) satirHata.push(`Tutar anlaşılamadı: "${raw[columnMap.amount]}"`);
@@ -371,7 +442,7 @@ function validateExpenseRows(rawRows = [], columnMap = {}, context = {}) {
     }
 
     // Dosya ICI mukerrer
-    const fp = `${tarih}|${tutar}|${kategori.toLowerCase()}|${aciklama.toLowerCase()}|${mulk ? mulk.id : 'portfoy'}`;
+    const fp = `${tarih}|${tutar}|${String(kategori || '').toLowerCase()}|${aciklama.toLowerCase()}|${mulk ? mulk.id : 'portfoy'}`;
     let mukerrer = false;
     if (satirHata.length === 0) {
       if (gorulen.has(fp)) { mukerrer = true; duplicateCount++; } else gorulen.add(fp);
@@ -510,7 +581,13 @@ function validateBookingRows(rawRows = [], columnMap = {}, context = {}) {
       if (!isFinite(pax) || pax <= 0) { satirHata.push(`Kişi sayısı anlaşılamadı: "${paxHam}"`); pax = null; }
     }
 
-    const kanal = String(raw[columnMap.channel] || '').trim() || 'Direct';
+    const kanalHam = String(raw[columnMap.channel] || '').trim();
+    let kanal = kanalHam || 'Direct';
+    if (kanalHam && Array.isArray(context.channels) && context.channels.length) {
+      const kod = mevcutDeger(kanalHam, context.existingChannels) || resolveChannel(kanalHam, context.channels);
+      if (kod) kanal = kod;
+      else satirHata.push(`Kanal tanınmadı: "${kanalHam}". Geçerli: ${context.channels.map(c => c.code).join(', ')}`);
+    }
 
     let durum = String(raw[columnMap.status] || '').toUpperCase().trim() || 'CONFIRMED';
     if (durum === 'COMPLETED' || durum === 'TAMAMLANDI') durum = 'CHECKED_OUT';
@@ -607,6 +684,93 @@ function validateBookingRows(rawRows = [], columnMap = {}, context = {}) {
 }
 
 /** Geriye donuk ad (eski cagrilar icin). */
+/**
+ * Gecmis temizlik satirlarini dogrular (L-195, kullanici M25).
+ *
+ * Temizlik maliyetinin tek kaynagi cleaning_tasks'tir (CLAUDE.md 3.4); gecmis
+ * rezervasyonlarin gorevi olmadigi icin gecmis aylarda maliyet 0 gorunuyor ve
+ * kar oldugundan yuksek cikiyordu. Kurallar:
+ *   - yalniz bugun ve oncesi: gelecekteki temizlik rezervasyondan planli acilir;
+ *   - ayni mulkte ayni gun zaten temizlik gorevi varsa satir REDDEDILIR: ikinci
+ *     kayit maliyeti iki kez sayar; var olani Operasyon'dan "yapildi" yapin;
+ *   - kapanmis aya yazilmaz; tutar zorunlu ve sifirdan buyuk;
+ *   - "Ödendi" bossa EVET: gecmis temizlik cogunlukla odenmistir. HAYIR ise
+ *     temizlik yapilmis ama odenmemis sayilir, personel borcu olarak gorunur.
+ */
+function validateCleaningRows(rawRows = [], columnMap = {}, context = {}) {
+  const mulkIdx = buildPropertyIndex(context.properties || []);
+  const kapaliMi = typeof context.isPeriodClosed === 'function' ? context.isPeriodClosed : () => false;
+  const bugun = String(context.today || '').slice(0, 10);
+  const mevcut = new Set((context.existingCleaningTasks || [])
+    .filter(t => t && t.propertyId && t.date && String(t.status || '').toUpperCase() !== 'SKIPPED')
+    .map(t => `${t.propertyId}|${String(t.date).slice(0, 10)}`));
+  const validatedRows = [], errors = [];
+  let validCount = 0, invalidCount = 0, duplicateCount = 0, totalAmount = 0;
+  const gorulen = new Set();
+  const tarihSirasi = fileDateOrder(rawRows, [columnMap.date]);
+
+  rawRows.forEach((raw, idx) => {
+    const rowNum = idx + 2;
+    const satirHata = [];
+
+    const tarihHucre = parseDateCell(raw[columnMap.date], tarihSirasi.order);
+    const tarih = tarihHucre.value;
+    if (raw[columnMap.date] === undefined || raw[columnMap.date] === '') satirHata.push('Tarih boş.');
+    else if (tarihHucre.ambiguous) satirHata.push(`${BELIRSIZ_TARIH}: "${raw[columnMap.date]}"`);
+    else if (!tarih) satirHata.push(`Tarih anlaşılamadı: "${raw[columnMap.date]}"`);
+    else if (bugun && tarih > bugun) satirHata.push(`Gelecek tarih (${tarih}): yalnız yapılmış temizlik aktarılır; planlı temizlik rezervasyondan açılır.`);
+
+    let mulk = null;
+    const mulkHam = String(raw[columnMap.property] || '').trim();
+    if (!mulkHam) satirHata.push('Villa/mülk boş. Temizlik bir mülke ait olmalıdır.');
+    else {
+      mulk = mulkIdx[mulkHam.toLowerCase()] || null;
+      if (!mulk) satirHata.push(`Mülk bulunamadı: "${mulkHam}". GEÇERLİ DEĞERLER sayfasındaki mülk kodunu ya da adını yazın.`);
+    }
+
+    const tutar = normalizeAmount(raw[columnMap.amount]);
+    if (tutar === null) satirHata.push(`Tutar anlaşılamadı: "${raw[columnMap.amount]}"`);
+    else if (tutar <= 0) satirHata.push('Tutar sıfır ya da negatif: personele ödenen tutarı yazın.');
+
+    const odendiHam = degerAnahtari(columnMap.paid ? raw[columnMap.paid] : '');
+    let odendi = true;
+    if (['hayir', 'h', 'no', 'n', '0', 'false', 'odenmedi', 'borc'].includes(odendiHam)) odendi = false;
+    else if (odendiHam && !['evet', 'e', 'yes', 'y', '1', 'true', 'odendi'].includes(odendiHam)) {
+      satirHata.push(`"Ödendi" anlaşılamadı: "${raw[columnMap.paid]}". EVET ya da HAYIR yazın (boş = EVET).`);
+    }
+
+    if (tarih && kapaliMi(tarih)) satirHata.push(`Bu dönem (${tarih.slice(0, 7)}) kapatılmış; temizlik eklenemez.`);
+    const anahtar = mulk && tarih ? `${mulk.id}|${tarih}` : '';
+    if (anahtar && mevcut.has(anahtar)) {
+      satirHata.push(`Bu mülkte ${tarih} tarihinde zaten temizlik kaydı var; ikinci kayıt maliyeti iki kez sayar. Var olanı Operasyon › Temizlik'ten "yapıldı" işaretleyin.`);
+    }
+
+    let mukerrer = false;
+    if (satirHata.length === 0) {
+      if (gorulen.has(anahtar)) { mukerrer = true; duplicateCount++; } else gorulen.add(anahtar);
+      validCount++;
+      if (!mukerrer) totalAmount += tutar;
+      validatedRows.push({
+        rowNum, date: tarih, propertyId: mulk.id, propertyKey: mulk.slug || mulk.key || null, propertyName: mulk.name || null,
+        amount: tutar, cleaner: String(raw[columnMap.cleaner] || '').trim(), paid: odendi,
+        description: String(raw[columnMap.description] || '').trim(), isPotentialDuplicate: mukerrer, raw
+      });
+    } else {
+      invalidCount++;
+      errors.push({ rowNum, errors: satirHata, raw });
+    }
+  });
+
+  return {
+    mode: 'CLEANING',
+    dateOrder: tarihSirasi.order, dateOrderAssumed: tarihSirasi.assumed,
+    totalRows: rawRows.length,
+    validCount, invalidCount, duplicateCount,
+    totalAmount: Math.round(totalAmount * 100) / 100,
+    validatedRows, errors
+  };
+}
+
 const validateImportRows = validateExpenseRows;
 
 // -----------------------------------------------------------------------------
@@ -808,8 +972,12 @@ const FinanceImportEngine = {
   nightsBetween,
   autoDetectColumnMap,
   buildPropertyIndex,
+  resolveExpenseCategory,
+  resolveChannel,
+  GIDER_KATEGORILERI,
   validateExpenseRows,
   validateBookingRows,
+  validateCleaningRows,
   validateImportRows,
   BASLIKLAR,
   SABLON_SUTUNLARI

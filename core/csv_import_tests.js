@@ -559,8 +559,9 @@ function sablonTestleri(app, E) {
   // Arayuz baglantilari gercek dosyalara gitmeli.
   const linkler = (HTML.match(/href="(sablonlar\/[^"]+)"/g) || [])
     .map(m => m.replace(/^href="|"$/g, ''));
-  check(linkler.length === 4,
-    'E13. Modalda dort indirme baglantisi var',
+  // Rezervasyon, gider ve gecmis temizlik (L-195): uc sablon x Excel/CSV.
+  check(linkler.length === 6,
+    'E13. Modalda alti indirme baglantisi var',
     'Bulunan: ' + JSON.stringify(linkler));
   const kirik = linkler.filter(l => !fs.existsSync(path.join(KOK, l)));
   check(kirik.length === 0,

@@ -4,8 +4,8 @@ const Engine = require('./chatgpt_prompt_engine');
 let passed = 0, failed = 0;
 function test(name, fn) { try { fn(); passed++; console.log(`[PASS] ${name}`); } catch (e) { failed++; console.error(`[FAIL] ${name}\n       ${e.stack || e.message}`); } }
 
-test('kind kütüphanesi yedi MVP türünü verir', () => {
-  assert.deepStrictEqual(Engine.listKinds().map(x => x.kind), ['GENERAL_ANALYSIS','PRICE_RULE_QUESTION','COMPETITOR_RESEARCH','FUNNEL_TEST_QUESTION','ADS_SCREENSHOT_READ','LISTING_REVIEW','PAGE_REPORT']);
+test('kind kütüphanesi sekiz MVP türünü verir', () => {
+  assert.deepStrictEqual(Engine.listKinds().map(x => x.kind), ['GENERAL_ANALYSIS','PRICE_RULE_QUESTION','COMPETITOR_RESEARCH','FUNNEL_TEST_QUESTION','ADS_SCREENSHOT_READ','LISTING_REVIEW','PAGE_REPORT','IMPORT_TEMPLATE_CONVERT']);
 });
 
 test('izin listesi iç içe kişisel veriyi hiçbir komuta sızdırmaz', () => {
