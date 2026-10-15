@@ -41,6 +41,19 @@ async function run() {
     check(!r.error && r.data && r.data.size > 0, 'B1. Kiraci uyesi ozel logoyu okur', errorText(r.error));
     r = await outsider.client.storage.from('tenant-assets').download(objectName);
     check(!!r.error, 'B2. Yabanci kullanici logoyu okuyamaz', errorText(r.error) || 'OKUDU');
+    r = await owner.client.storage.from('tenant-assets').createSignedUrl(objectName, 60);
+    const signedResponse = !r.error && r.data?.signedUrl ? await fetch(r.data.signedUrl) : null;
+    check(!r.error && signedResponse?.ok && (await signedResponse.arrayBuffer()).byteLength > 0,
+      'B3. Imzali logo URLsi gercek goruntu bayti dondurur', errorText(r.error) || `HTTP ${signedResponse?.status || 'yok'}`);
+    const renamed = await owner.client.from('tenants').update({ name: `P74 Yeni ${stamp}` })
+      .eq('id', tenantId).select('name').single();
+    check(!renamed.error && renamed.data?.name === `P74 Yeni ${stamp}`,
+      'B4. Isletme sahibi adi degistirir ve sunucudan geri okur', errorText(renamed.error) || JSON.stringify(renamed.data));
+    const profileWrite = await owner.client.from('tenant_settings').upsert({
+      tenant_id: tenantId, key: 'business_profile', value: { logoPath: objectName }, updated_by: owner.id
+    }, { onConflict: 'tenant_id,key' }).select('value').single();
+    check(!profileWrite.error && profileWrite.data?.value?.logoPath === objectName,
+      'B5. Logo yolu isletme profiline kalici baglanir', errorText(profileWrite.error) || JSON.stringify(profileWrite.data));
     r = await sales.client.storage.from('tenant-assets').remove([objectName]);
     check(!!r.error || !(r.data || []).length, 'C1. Sales logo silemez', errorText(r.error) || JSON.stringify(r.data));
     r = await owner.client.storage.from('tenant-assets').remove([objectName]);

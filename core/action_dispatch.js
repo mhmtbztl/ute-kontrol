@@ -86,10 +86,10 @@
     'stepMonth', 'stepTapeChartMonth', 'submitAccountDeletion', 'submitMemberInvite',
     'submitMonthClose', 'submitMonthReopen', 'submitQuickLead', 'switchActiveTenant', 'switchAuthTab',
     'switchHelpTab', 'switchTab', 'switchWaModalTab', 'syncCommissionFromRate',
-    'syncRateFromCommission', 'toggleAnalysisProperties', 'toggleSettingsLeadSource', 'uploadBusinessLogo',
+    'removeBusinessLogo', 'syncRateFromCommission', 'toggleAnalysisProperties', 'toggleSettingsLeadSource', 'uploadBusinessLogo',
     'toggleBookingChannelRowRate', 'toggleExportMenu', 'toggleHeaderDropdown', 'toggleReservationRangePicker',
     'toggleNewBookingChannelRate', 'toggleNotificationDrawer', 'toggleResDatePicker',
-    'toggleTaskPaid', 'undoImportBatch', 'updateDeleteAccountButton', 'updateInviteRoleHint',
+    'toggleTaskPaid', 'undoImportBatch', 'updateDeleteAccountButton', 'updateInviteRoleHint', 'updateLeadStatusFromKanban',
     'updateExpenseCategoryWarning', 'updateMonthReopenButton', 'updateResetButton', 'shiftReservationRangeCalendar', 'resetReservationRange'
   ]);
 

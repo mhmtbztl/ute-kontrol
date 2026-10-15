@@ -8104,6 +8104,10 @@ function saveQuickBooking(event) {
 }
 
 function openBookingModal(editId = null) {
+  if (!editId && !canWriteSalesRole(activeTenant?.role)) {
+    if (typeof showToast === 'function') showToast('Bu rol yeni rezervasyon ekleyemez.', 'error');
+    return false;
+  }
   const modal = document.getElementById('bookingModal');
   const title = document.getElementById('bookingModalTitle');
   const editInput = document.getElementById('resEditId');
@@ -8203,7 +8207,21 @@ function openBookingModal(editId = null) {
     initBookingFinanceForm(booking);
   }
   calculateLivePreview();
+  applyBookingFormAccess(editId);
   modal.classList.add('active');
+}
+
+function applyBookingFormAccess(editId = null) {
+  const form = document.getElementById('bookingForm');
+  if (!form) return;
+  const canWrite = canWriteSalesRole(activeTenant?.role);
+  form.querySelectorAll('input, select, textarea').forEach(control => { control.disabled = !canWrite; });
+  const submit = form.querySelector('button[type="submit"]');
+  if (submit) { submit.hidden = !canWrite; submit.disabled = !canWrite; }
+  const deleteButton = document.getElementById('resDeleteBtn');
+  if (deleteButton) deleteButton.style.display = editId && canManageTenantRole(activeTenant?.role) ? 'inline-block' : 'none';
+  const title = document.getElementById('bookingModalTitle');
+  if (title && editId && !canWrite) title.innerText = 'Rezervasyon Ayrıntısı';
 }
 
 function closeBookingModal() {
@@ -8738,9 +8756,9 @@ function renderSettingsGoalsTable() {
 // =============================================================================
 
 const TEAM_ROLES = {
-  owner:   { label: 'Sahip',     badge: 'badge-purple',  hint: 'Tam yetki. Ekip ve rolleri yönetir, işletmeyi silebilir.' },
+  owner:   { label: 'İşletme sahibi', badge: 'badge-purple', hint: 'Tam yetki. Ekip ve rolleri yönetir, işletmeyi silebilir.' },
   admin:   { label: 'Yönetici',  badge: 'badge-blue',    hint: 'Davet gönderebilir, tüm verileri yönetir. Rol değiştiremez.' },
-  manager: { label: 'Müdür',     badge: 'badge-emerald', hint: 'İşletme ayarlarını, rezervasyonları, fiyatlamayı ve operasyonu yönetir.' },
+  manager: { label: 'Operasyon yöneticisi', badge: 'badge-emerald', hint: 'İşletme ayarlarını, rezervasyonları, fiyatlamayı ve operasyonu yönetir.' },
   sales:   { label: 'Satış',      badge: 'badge-cyan',    hint: 'Rezervasyon, talep ve misafir kaydı yapar; finansı ve giderleri görmez, rezervasyon silemez.' },
   staff:   { label: 'Saha personeli', badge: 'badge-amber', hint: 'Saha personeli (temizlik/usta): yalnız kendisine atanan işi görür ve ilerletir.' },
   viewer:  { label: 'İzleyici',  badge: 'badge-rose',    hint: 'Yalnızca görüntüler, hiçbir veriyi değiştiremez.' }
@@ -9815,6 +9833,8 @@ function renderBusinessSettings() {
   if (input) input.value = activeTenant?.name || appData?.companyName || '';
   const submit = document.querySelector('#businessSettingsForm button[type="submit"]');
   if (submit) submit.disabled = !['owner', 'admin'].includes(activeTenant?.role);
+  const removeButton = document.getElementById('businessLogoRemoveBtn');
+  if (removeButton) removeButton.hidden = !getBusinessProfileSetting().logoPath || !canManageTenantRole(activeTenant?.role);
   refreshBusinessLogoUrl();
 }
 
@@ -9857,25 +9877,74 @@ async function uploadBusinessLogo(fileInput) {
   const tenantId = getActiveTenantId();
   requireCloudForWrite('İşletme logosu', tenantId);
   const extension = ({ 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/svg+xml': 'svg' })[file.type];
-  const path = `${tenantId}/logo/business.${extension}`;
+  const previousPath = getBusinessProfileSetting().logoPath || null;
+  const path = `${tenantId}/logo/business-${Date.now()}.${extension}`;
+  const localPreviewUrl = typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function'
+    ? URL.createObjectURL(file) : '';
+  if (localPreviewUrl) applyBusinessLogoUrl(localPreviewUrl);
   setBusinessSettingsMessage('Logo yükleniyor…');
   const { error: uploadError } = await supabaseClient.storage.from('tenant-assets')
     .upload(path, file, { upsert: true, contentType: file.type, cacheControl: '3600' });
   if (uploadError) {
+    if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
+    await refreshBusinessLogoUrl(true);
     setBusinessSettingsMessage('Logo yüklenemedi: ' + kullaniciMesaji(uploadError.message), 'error');
     return false;
   }
   const profile = { ...getBusinessProfileSetting(), logoPath: path };
   const { error: settingError } = await supabaseClient.from('tenant_settings').upsert({
-    tenant_id: tenantId, key: 'business_profile', value: profile
+    tenant_id: tenantId, key: 'business_profile', value: profile, updated_by: activeSaaSUser?.id
   }, { onConflict: 'tenant_id,key' });
   if (settingError) {
+    if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
+    await supabaseClient.storage.from('tenant-assets').remove([path]);
+    await refreshBusinessLogoUrl(true);
     setBusinessSettingsMessage('Logo yüklendi ancak işletme profiline bağlanamadı.', 'error');
     return false;
   }
   appData.tenantSettings.business_profile = profile;
-  await refreshBusinessLogoUrl(true);
+  const signedUrl = await refreshBusinessLogoUrl(true);
+  if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
+  if (!signedUrl) {
+    setBusinessSettingsMessage('Logo yüklendi ancak doğrulanamadı. Lütfen yeniden deneyin.', 'error');
+    return false;
+  }
+  if (previousPath && previousPath !== path) {
+    const { error: cleanupError } = await supabaseClient.storage.from('tenant-assets').remove([previousPath]);
+    if (cleanupError) console.warn('Eski işletme logosu temizlenemedi:', cleanupError.message);
+  }
+  const removeButton = document.getElementById('businessLogoRemoveBtn');
+  if (removeButton) removeButton.hidden = false;
   setBusinessSettingsMessage('Logo kaydedildi; üst çubuk ve raporlar bu logoyu kullanacak.', 'success');
+  return true;
+}
+
+async function removeBusinessLogo() {
+  if (!canManageTenantRole(activeTenant?.role)) return false;
+  const tenantId = getActiveTenantId();
+  const profile = getBusinessProfileSetting();
+  const path = profile.logoPath;
+  if (!path) return true;
+  if (!confirm('İşletme logosu kaldırılsın mı? Raporlar varsayılan Lexbnb logosunu kullanacak.')) return false;
+  const nextProfile = { ...profile };
+  delete nextProfile.logoPath;
+  const { error: settingError } = await supabaseClient.from('tenant_settings').upsert({
+    tenant_id: tenantId, key: 'business_profile', value: nextProfile, updated_by: activeSaaSUser?.id
+  }, { onConflict: 'tenant_id,key' });
+  if (settingError) {
+    setBusinessSettingsMessage('Logo kaldırılamadı: ' + kullaniciMesaji(settingError.message), 'error');
+    return false;
+  }
+  appData.tenantSettings.business_profile = nextProfile;
+  if (businessLogoUrlCache.timer) clearTimeout(businessLogoUrlCache.timer);
+  businessLogoUrlCache = { path: null, url: null, at: 0, timer: null };
+  applyBusinessLogoUrl('');
+  const removeButton = document.getElementById('businessLogoRemoveBtn');
+  if (removeButton) removeButton.hidden = true;
+  const { error: removeError } = await supabaseClient.storage.from('tenant-assets').remove([path]);
+  setBusinessSettingsMessage(removeError
+    ? 'Logo kullanımdan kaldırıldı; eski dosya daha sonra temizlenecek.'
+    : 'İşletme logosu kaldırıldı.', removeError ? 'info' : 'success');
   return true;
 }
 
@@ -9959,7 +10028,12 @@ async function loadSettingsCatalogs() {
 }
 
 function settingsTemplateRowHtml(kind, item, title, meta) {
-  return `<div class="settings-template-row"><span><strong>${escapeHtml(title || 'Adsız şablon')}</strong><small class="sub-text">${escapeHtml(meta || '')}</small></span><span><button type="button" class="btn btn-secondary btn-sm" data-onclick="editSettingsTemplate(decodeURIComponent('${encodeActionArg(kind)}'), decodeURIComponent('${encodeActionArg(item.id)}'))">Düzenle</button> <button type="button" class="btn btn-secondary btn-sm" data-onclick="archiveSettingsTemplate(decodeURIComponent('${encodeActionArg(kind)}'), decodeURIComponent('${encodeActionArg(item.id)}'))" title="Şablon artık listelerde çıkmaz; geçmiş kayıtlar korunur">Kullanımdan kaldır</button></span></div>`;
+  const isActive = item.is_active !== false;
+  const archiveLabel = isActive ? 'Arşivle' : 'Yeniden etkinleştir';
+  const archiveTitle = isActive
+    ? 'Yeni seçimlerden kaldırır; geçmiş kayıtlar korunur'
+    : 'Şablonu yeni seçimlerde yeniden kullanılabilir yapar';
+  return `<div class="settings-template-row"><span><strong>${escapeHtml(title || 'Adsız şablon')}</strong><small class="sub-text">${escapeHtml(meta || '')}</small></span><span><button type="button" class="btn btn-secondary btn-sm" data-onclick="editSettingsTemplate(decodeURIComponent('${encodeActionArg(kind)}'), decodeURIComponent('${encodeActionArg(item.id)}'))">Düzenle</button> <button type="button" class="btn btn-secondary btn-sm" data-onclick="archiveSettingsTemplate(decodeURIComponent('${encodeActionArg(kind)}'), decodeURIComponent('${encodeActionArg(item.id)}'), ${isActive ? 'false' : 'true'})" title="${archiveTitle}">${archiveLabel}</button></span></div>`;
 }
 
 // Sablon listelerinde ham kodlar (CLEANING · MEDIUM, WHATSAPP · MANUAL) yerine
@@ -10070,6 +10144,14 @@ async function editSettingsTemplate(kind, id) {
     if (!String(body || '').trim()) return false;
     patch.body = String(body).trim();
   }
+  if (kind === 'task') {
+    const taskType = String(prompt('Görev türü (GENERAL, CLEANING, INSPECTION, MAINTENANCE):', item.task_type || 'GENERAL') || '').trim().toUpperCase();
+    if (!TEMPLATE_TASK_TYPE_LABELS[taskType]) { showToast('Geçerli bir görev türü seçin.', 'error'); return false; }
+    const priority = String(prompt('Öncelik (LOW, MEDIUM, HIGH, CRITICAL):', item.priority || 'MEDIUM') || '').trim().toUpperCase();
+    if (!TEMPLATE_PRIORITY_LABELS[priority]) { showToast('Geçerli bir öncelik seçin.', 'error'); return false; }
+    patch.task_type = taskType;
+    patch.priority = priority;
+  }
   if (kind === 'checklist') {
     const text = prompt('Maddeler (her satıra bir madde; "# Bölüm" yeni bölüm, "!" önemli, " > a; b" alt işaretler):', checklistItemsToText(item.items));
     if (text === null) return false;
@@ -10088,17 +10170,21 @@ async function editSettingsTemplate(kind, id) {
   return true;
 }
 
-async function archiveSettingsTemplate(kind, id) {
+async function archiveSettingsTemplate(kind, id, isActive = false) {
   const item = getSettingsTemplate(kind, id);
-  if (!item || !confirm('Bu şablon yeni seçimlerden kaldırılsın mı? Geçmiş kayıtlar korunur.')) return false;
+  const confirmation = isActive
+    ? 'Bu şablon yeniden etkinleştirilsin mi? Yeni seçimlerde tekrar görünecek.'
+    : 'Bu şablon arşivlensin mi? Yeni seçimlerden kaldırılır; geçmiş kayıtlar korunur.';
+  if (!item || !confirm(confirmation)) return false;
   const table = kind === 'message' ? 'message_templates' : kind === 'task' ? 'task_templates' : 'property_checklist_templates';
-  const failure = await updateSettingsRow(table, id, { is_active: false });
+  const failure = await updateSettingsRow(table, id, { is_active: isActive });
   if (failure) {
-    showToast('Şablon kapatılamadı: ' + kullaniciMesaji(failure), 'error');
+    showToast(`Şablon ${isActive ? 'etkinleştirilemedi' : 'arşivlenemedi'}: ` + kullaniciMesaji(failure), 'error');
     return false;
   }
   await loadSettingsCatalogs();
   renderSettingsTemplates();
+  showToast(isActive ? 'Şablon yeniden etkinleştirildi.' : 'Şablon arşivlendi.', 'success');
   return true;
 }
 
@@ -10370,10 +10456,42 @@ function renderLeadCard(row) {
   const villaName = appData.villas?.[row.villa]?.name || (row.villa === 'ALL' ? 'Mülk belirtilmedi' : row.villa || 'Mülk belirtilmedi');
   const assignee = (appData.salesMembers || []).find(member => member.user_id === row.assignedTo);
   const assigneeLabel = assignee?.full_name || assignee?.email || (row.assignedTo ? 'Ekip üyesi' : 'Atanmamış');
+  const canWrite = canWriteSalesRole(activeTenant?.role);
+  const quote = Number(row.quote);
+  const quoteLabel = Number.isFinite(quote) && quote > 0 ? `₺${quote.toLocaleString('tr-TR')}` : '—';
+  const currentStatus = String(row.status || row.stage || 'NEW').toUpperCase();
+  const statusLabels = { NEW: 'Yeni', CONTACTED: 'Görüşüldü', QUOTE_SENT: 'Teklif', FOLLOW_UP: 'Takip', WON: 'Kazanıldı', LOST: 'Kaybedildi' };
+  const statusAction = canWrite && currentStatus !== 'WON'
+    ? `<label class="lead-status-control"><span>Durum</span><select class="lead-status-select" aria-label="${escapeHtml(row.guest || 'Talep')} durumunu değiştir" data-onchange="updateLeadStatusFromKanban(decodeURIComponent('${encodeActionArg(row.id)}'), this.value)">${['NEW', 'CONTACTED', 'QUOTE_SENT', 'FOLLOW_UP', 'LOST'].map(status => `<option value="${escapeHtml(status)}"${status === currentStatus ? ' selected' : ''}>${escapeHtml(statusLabels[status])}</option>`).join('')}</select></label>`
+    : `<div class="lead-status-readonly"><span>Durum</span><strong>${escapeHtml(statusLabels[currentStatus] || currentStatus)}</strong></div>`;
+  const deleteAction = canWrite && String(row.status || '').toUpperCase() !== 'WON'
+    ? `<button type="button" class="btn btn-danger btn-sm" data-onclick="deleteLeadUI(decodeURIComponent('${encodeActionArg(row.id)}'))" aria-label="${escapeHtml(row.guest || 'Talep')} talebini sil">Sil</button>`
+    : '';
   return `<article class="lead-card">
     <div><strong>${escapeHtml(row.guest || 'Ad girilmedi')}</strong><span>${escapeHtml(row.sourceLabel)} · ${escapeHtml(villaName)}</span></div>
-    <div class="lead-card-meta"><span>${escapeHtml(assigneeLabel)} · ${row.nextFollowUpAt ? `Takip: ${escapeHtml(formatTrDate(String(row.nextFollowUpAt).slice(0, 10)))}` : 'Takip tarihi yok'}</span><button type="button" class="btn btn-secondary btn-sm" data-onclick="editLead(decodeURIComponent('${encodeActionArg(row.id)}'))">Aç</button></div>
+    <div class="lead-card-quote"><span>Teklif</span><strong>${escapeHtml(quoteLabel)}</strong></div>
+    ${statusAction}
+    <div class="lead-card-meta"><span>${escapeHtml(assigneeLabel)} · ${row.nextFollowUpAt ? `Takip: ${escapeHtml(formatTrDate(String(row.nextFollowUpAt).slice(0, 10)))}` : 'Takip tarihi yok'}</span><span class="lead-card-actions"><button type="button" class="btn btn-secondary btn-sm" data-onclick="editLead(decodeURIComponent('${encodeActionArg(row.id)}'))">${canWrite ? 'Aç' : 'Görüntüle'}</button>${deleteAction}</span></div>
   </article>`;
+}
+
+async function updateLeadStatusFromKanban(leadId, nextStatus) {
+  const allowedStatuses = new Set(['NEW', 'CONTACTED', 'QUOTE_SENT', 'FOLLOW_UP', 'LOST']);
+  const normalizedStatus = String(nextStatus || '').toUpperCase();
+  if (!canWriteSalesRole(activeTenant?.role) || !allowedStatuses.has(normalizedStatus)) return false;
+  try {
+    await updateLead(leadId, { status: normalizedStatus });
+    await loadLeads(getActiveTenantId());
+    renderLeadSalesWorkspace();
+    renderManageLeadsTable();
+    renderLeadAnalytics();
+    showToast('Talep durumu güncellendi.', 'success');
+    return true;
+  } catch (error) {
+    renderLeadSalesWorkspace();
+    showToast('Talep durumu güncellenemedi: ' + kullaniciMesaji(error?.message || error), 'error');
+    return false;
+  }
 }
 
 function renderLeadSalesWorkspace() {
@@ -10574,6 +10692,7 @@ function renderManageLeadsTable() {
     return g.includes(searchVal) || v.includes(searchVal) || c.includes(searchVal);
   });
 
+  const canWrite = canWriteSalesRole(activeTenant?.role);
   leads.forEach(l => {
     let statusBadge = `<span class="badge badge-amber">${escapeHtml(l.status || l.stage)}</span>`;
     if (l.status === 'WON' || l.stage === 'WON') statusBadge = `<span class="badge badge-green">Kazanıldı</span>`;
@@ -10582,8 +10701,10 @@ function renderManageLeadsTable() {
     let convertAction = '';
     if (l.status === 'WON' || l.stage === 'WON' || l.convertedBookingId) {
       convertAction = `<span class="badge badge-green" style="font-size: 11px;" title="Dönüşen Rezervasyon">✅ Rezervasyona Dönüştü</span>`;
-    } else {
+    } else if (canWrite) {
       convertAction = `<button class="btn btn-primary btn-sm" data-onclick="convertLeadAction(decodeURIComponent('${encodeActionArg(l.id)}'))" title="Kesin Rezervasyona Dönüştür">📅 Rezervasyona Dönüştür</button>`;
+    } else {
+      convertAction = '<span class="sub-text">—</span>';
     }
 
     const tr = document.createElement('tr');
@@ -10597,8 +10718,8 @@ function renderManageLeadsTable() {
       <td>${escapeHtml(l.notes || '-')}</td>
       <td style="text-align: right; white-space: nowrap; display: flex; gap: 6px; justify-content: flex-end; align-items: center;">
         ${convertAction}
-        <button class="btn btn-secondary btn-sm" data-onclick="editLead(decodeURIComponent('${encodeActionArg(l.id)}'))" title="Düzenle">✏️</button>
-        <button class="btn btn-danger btn-sm" data-onclick="deleteLeadUI(decodeURIComponent('${encodeActionArg(l.id)}'))" title="Sil">🗑️</button>
+        <button class="btn btn-secondary btn-sm" data-onclick="editLead(decodeURIComponent('${encodeActionArg(l.id)}'))" title="${canWrite ? 'Düzenle' : 'Görüntüle'}">${canWrite ? '✏️' : 'Görüntüle'}</button>
+        ${canWrite ? `<button class="btn btn-danger btn-sm" data-onclick="deleteLeadUI(decodeURIComponent('${encodeActionArg(l.id)}'))" title="Sil">🗑️</button>` : ''}
       </td>
     `;
     tbody.appendChild(tr);
@@ -10724,7 +10845,21 @@ function openLeadModal(editId = null) {
     const templateRow = document.getElementById('leadMessageTemplateRow');
     if (templateRow) templateRow.style.display = 'none';
   }
+  applyLeadFormAccess(editId);
   modal.classList.add('active');
+}
+
+function applyLeadFormAccess(editId = null) {
+  const form = document.getElementById('leadForm');
+  if (!form) return;
+  const canWrite = canWriteSalesRole(activeTenant?.role);
+  form.querySelectorAll('input, select, textarea').forEach(control => { control.disabled = !canWrite; });
+  const submit = form.querySelector('button[type="submit"]');
+  if (submit) { submit.hidden = !canWrite; submit.disabled = !canWrite; }
+  const templateRow = document.getElementById('leadMessageTemplateRow');
+  if (templateRow && !canWrite) templateRow.style.display = 'none';
+  const title = document.getElementById('leadModalTitle');
+  if (title && editId && !canWrite) title.innerText = 'Talep Ayrıntısı';
 }
 
 function renderLeadTemplateBody(template, lead) {
@@ -10837,6 +10972,10 @@ async function saveLead(e) {
 function editLead(id) { openLeadModal(id); }
 
 async function deleteLeadUI(id) {
+  if (!canWriteSalesRole(activeTenant?.role)) {
+    if (window.showToast) window.showToast('Bu rol talepleri silemez.', 'error');
+    return false;
+  }
   const l = (appData.leads || []).find(item => item.id === id || item.dbId === id);
   if (l && (l.status === 'WON' || l.stage === 'WON')) {
     alert('⚠️ Bu talep kazanılmış bir satış olup tarihsel ciro ve conversion KPI verilerine bağlıdır. Silinemez.');
@@ -16034,6 +16173,13 @@ function applyRoleNavigationVisibility() {
   });
   document.querySelectorAll('[data-management-only]').forEach(element => {
     element.hidden = !canManageTenantRole(role);
+  });
+  const canWrite = canWriteSalesRole(role) || canManageTenantRole(role);
+  document.querySelectorAll('[data-write-action]').forEach(element => {
+    element.hidden = !canWrite;
+  });
+  document.querySelectorAll('[data-sales-write]').forEach(element => {
+    element.hidden = !canWriteSalesRole(role);
   });
   const quickBooking = document.getElementById('mobileQuickBookingBtn');
   if (quickBooking) quickBooking.hidden = !canWriteSalesRole(role);
