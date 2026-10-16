@@ -5392,3 +5392,15 @@ body.side-panel-open { overflow: hidden; }
   .booking-extra-row { grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
   .booking-extra-row button { grid-column: 2; }
 }
+
+/* Rezervasyonlar: takvim ve liste icin tek donem + mulk cubugu (L-197). */
+.reservation-scope-bar { padding: 12px 16px; margin-bottom: 16px; }
+.reservation-scope-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.reservation-scope-title { display: flex; flex-direction: column; margin-right: auto; min-width: 180px; }
+.reservation-scope-title .sub-text { font-size: 11px; }
+.reservation-scope-bar .reservation-range-panel { left: 0; right: auto; }
+.calendar-view-switch .btn.active { border-color: #F59E0B; color: #FCD34D; }
+@media (max-width: 600px) {
+  .reservation-scope-title { width: 100%; margin-right: 0; }
+  .reservation-scope-row > div:has(#rezVillaFilter), .reservation-scope-row #rezVillaFilter { width: 100%; }
+}

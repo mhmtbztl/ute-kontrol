@@ -4525,6 +4525,28 @@ function computeFilterLedger() {
   });
 }
 
+/**
+ * Keyfi bir [start, end] araligi icin defter (gelir tablosu, L-196). Kapsam
+ * kurallari computeMonthLedger ve isExpenseInFilter ile aynidir: mulk
+ * gorunumu portfoy geneli gideri saymaz, gelir gecelere bolunur.
+ */
+function computeRangeLedger(start, end, villa) {
+  const L = getLedgerContract();
+  const v = villa || 'ALL';
+  const propId = v !== 'ALL' ? appData?.villas?.[v]?.id : null;
+  const tarihIcinde = d => typeof d === 'string' && d.slice(0, 10) >= start && d.slice(0, 10) <= end;
+  return L.computePeriodLedger({
+    bookings: appData.bookings || [],
+    expenses: appData.expenses || [],
+    cleaningTasks: appData.cleaningTasks || [],
+    bookingInScope: b => v === 'ALL' || b.villa === v || (!!propId && b.propertyId === propId),
+    bookingShare: b => L.nightShareInRange(b, start, end),
+    expenseInScope: e => (v === 'ALL' || e.villa === v)
+      && tarihIcinde(e.date || e.expense_date || ((e.monthKey || e.month) ? (e.monthKey || e.month) + '-15' : '')),
+    taskInScope: t => taskMatchesVilla(t, v) && tarihIcinde(t.date)
+  });
+}
+
 /** Belirli bir takvim ayi (YYYY-MM) icin defter; mulk filtresi istege bagli. */
 function computeMonthLedger(monthKey, villa) {
   const L = getLedgerContract();
@@ -7779,15 +7801,14 @@ function pickReservationRangeDate(dateKey) {
   reservationListRange = getDateRangePicker().pick(reservationListRange, dateKey, 'range');
   if (reservationListRange.start && reservationListRange.end) toggleReservationRangePicker(false);
   renderReservationRangeCalendar();
-  largeTablePageState.bookings = 1;
-  renderManageBookingsTable();
+  if (reservationListRange.start && reservationListRange.end) onReservationScopeChange();
 }
 
 function resetReservationRange() {
-  reservationListRange = reservationMonthRange(getTodayStr().slice(0, 7));
-  reservationRangeAnchor = new Date(`${reservationListRange.start}T12:00:00`);
+  tapeChartView = 'MONTH';
+  const r = reservationMonthRange(getTodayStr().slice(0, 7));
+  setReservationScopeRange(r.start, r.end);
   renderReservationRangeCalendar();
-  renderManageBookingsTable();
 }
 
 function buildReservationListView(options = {}) {
@@ -11397,6 +11418,65 @@ function exportLedger(mod, bicim) {
   }
 }
 
+// Gelir tablosu (L-196, kullanici M26). Finans defterini okuyabilen roller
+// (3.3.1 can_read_ledger: owner/admin/manager/viewer — kullanici karari
+// 14.10: izleyici de indirir). Rakamlar ekrandaki defterden; TOPLAM satiri
+// Finans ekranindaki donem rakamidir.
+function getIncomeStatementApi() {
+  if (typeof IncomeStatement !== 'undefined') return IncomeStatement;
+  if (typeof require === 'function') {
+    try { return require('./core/income_statement.js'); } catch (e) { /* tarayici */ }
+  }
+  throw new Error('Gelir tablosu motoru yüklenemedi. Sayfayı yenileyin.');
+}
+
+function buildIncomeStatementForFilter() {
+  const IncomeStatement = getIncomeStatementApi();
+  const range = getFilterDateRange();
+  if (!range) throw new Error('Gelir tablosu için kayıtlı bir dönem yok.');
+  const villa = currentFilter.villa || 'ALL';
+  return IncomeStatement.buildIncomeStatement({
+    range,
+    periodKey: currentFilter.period,
+    villa,
+    villas: Object.entries(appData.villas || {}).filter(([, v]) => v && !v.archivedAt).map(([key, v]) => ({ key, name: v.name || key })),
+    ledgerFor: computeRangeLedger,
+    isUnmeasured: (l, key) => isProfitUnmeasured(l.totalRevenue, l.totalOpex, l.capex, key)
+  });
+}
+
+function exportIncomeStatement() {
+  if (!canReadLedgerRole(activeTenant?.role)) {
+    if (typeof showToast === 'function') showToast('Gelir tablosunu yalnız finans defterini görebilen roller indirebilir.', 'error');
+    return false;
+  }
+  if (typeof XLSX === 'undefined') {
+    if (typeof showToast === 'function') showToast('Excel motoru henüz yüklenmedi, birkaç saniye sonra tekrar deneyin.', 'error');
+    return false;
+  }
+  let tablo;
+  try {
+    tablo = buildIncomeStatementForFilter();
+  } catch (err) {
+    if (typeof showToast === 'function') showToast(err.message, 'info');
+    return false;
+  }
+  const villa = currentFilter.villa || 'ALL';
+  const sayfalar = getIncomeStatementApi().toSheets(tablo, {
+    periodLabel: getPeriodDisplayName(currentFilter.period),
+    scopeLabel: villa === 'ALL' ? 'Tüm portföy' : (appData.villas?.[villa]?.name || villa) + ' (portföy geneli giderler hariç)',
+    generatedAt: new Date().toLocaleString('tr-TR')
+  });
+  const wb = XLSX.utils.book_new();
+  sayfalar.forEach(sayfa => XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sayfa.aoa), sayfa.name));
+  const donem = villa !== 'ALL' ? currentFilter.period + '_' + villa : currentFilter.period;
+  const bayt = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+  triggerFileDownload(bayt, `Lexbnb_Gelir_Tablosu_${String(donem).replace(/[^A-Za-z0-9_-]/g, '-')}.xlsx`,
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  if (typeof showToast === 'function') showToast(`Gelir tablosu indirildi (${getPeriodDisplayName(currentFilter.period)}).`, 'success');
+  return true;
+}
+
 // Initialize on DOM Ready
 if (typeof document !== 'undefined') {
   document.addEventListener('DOMContentLoaded', async () => {
@@ -12293,67 +12373,76 @@ function deleteCleaningTaskFromModal() {
 // -------------------------------------------------------------
 // 📅 30 GÜNLÜK GÖRSEL DOLULUK ÇİZELGESİ (TAPE CHART)
 // -------------------------------------------------------------
-let tapeChartMonth = getTodayStr().slice(0, 7);
+// Takvim ve rezervasyon listesi TEK donemi kullanir (L-197, kullanici M27):
+// reservationListRange. Eskiden takvimin kendi ay secicisi vardi; liste baska
+// bir aralikta, mulk filtresi yalniz listede kaliyordu. Ay gorunumu donemin
+// ilk ayini, hafta gorunumleri donemin ilk gununden 7/14 gunu gosterir.
 let tapeChartView = 'MONTH';
-let tapeChartAnchor = getTodayStr();
+
+function addDaysToDateKey(dateKey, days) {
+  const d = new Date(`${dateKey}T12:00:00`);
+  d.setDate(d.getDate() + Number(days || 0));
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function tapeChartWindowDays() {
+  return tapeChartView === 'WEEK_2' ? 14 : tapeChartView === 'WEEK_1' ? 7 : 0;
+}
+
+function setReservationScopeRange(start, end) {
+  reservationListRange = { start, end };
+  reservationRangeAnchor = new Date(`${start}T12:00:00`);
+  onReservationScopeChange();
+}
+
+/** Donem ya da mulk degisti: takvim ve liste birlikte cizilir. */
+function onReservationScopeChange() {
+  if (typeof largeTablePageState !== 'undefined') largeTablePageState.bookings = 1;
+  syncReservationRangeUi();
+  renderTapeChart();
+  renderManageBookingsTable();
+}
 
 function setTapeChartView(view) {
   if (!['WEEK_1', 'WEEK_2', 'MONTH'].includes(view)) return false;
   tapeChartView = view;
-  if (view !== 'MONTH') tapeChartAnchor = getTodayStr();
-  renderTapeChart();
+  const today = getTodayStr();
+  if (view === 'MONTH') {
+    const r = reservationMonthRange(reservationListRange.start.slice(0, 7));
+    setReservationScopeRange(r.start, r.end);
+  } else {
+    // Bugun donemin icindeyse pencere bugunden baslar (operasyonun baktigi yer).
+    const start = reservationListRange.start <= today && reservationListRange.end >= today ? today : reservationListRange.start;
+    setReservationScopeRange(start, addDaysToDateKey(start, tapeChartWindowDays() - 1));
+  }
+  document.querySelectorAll('.calendar-view-switch [data-onclick^="setTapeChartView"]').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-onclick') === `setTapeChartView('${view}')`);
+  });
   return true;
 }
 
-function populateTapeChartMonthSelect() {
-  const select = document.getElementById('tapeChartMonthSelect');
-  if (!select) return;
-  select.innerHTML = '';
-
-  ALL_FINANCIAL_MONTHS.forEach(m => {
-    const opt = document.createElement('option');
-    opt.value = m;
-    let label = getPeriodDisplayName(m);
-    if (m === getTodayStr().slice(0, 7)) label += ' (Güncel Ay)';
-    opt.textContent = label;
-    select.appendChild(opt);
-  });
-
-  select.value = tapeChartMonth;
-}
-
-function setTapeChartMonth(month) {
-  tapeChartMonth = month;
-  tapeChartAnchor = month === getTodayStr().slice(0, 7) ? getTodayStr() : `${month}-01`;
-  const select = document.getElementById('tapeChartMonthSelect');
-  if (select) select.value = month;
-  renderTapeChart();
-}
-
-function stepTapeChartMonth(delta) {
-  if (tapeChartView !== 'MONTH') {
-    const stepDays = tapeChartView === 'WEEK_2' ? 14 : 7;
-    const anchor = new Date(`${tapeChartAnchor}T12:00:00`);
-    anchor.setDate(anchor.getDate() + Number(delta || 0) * stepDays);
-    tapeChartAnchor = `${anchor.getFullYear()}-${String(anchor.getMonth() + 1).padStart(2, '0')}-${String(anchor.getDate()).padStart(2, '0')}`;
-    tapeChartMonth = tapeChartAnchor.slice(0, 7);
-    renderTapeChart();
-    return;
+/** Onceki / sonraki: ay gorunumunde bir ay, hafta gorunumunde 7/14 gun. */
+function stepReservationPeriod(delta) {
+  const n = Number(delta) || 0;
+  if (tapeChartView === 'MONTH') {
+    const d = new Date(`${reservationListRange.start.slice(0, 7)}-01T12:00:00`);
+    d.setMonth(d.getMonth() + n);
+    const r = reservationMonthRange(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    setReservationScopeRange(r.start, r.end);
+  } else {
+    const w = tapeChartWindowDays();
+    const start = addDaysToDateKey(reservationListRange.start, n * w);
+    setReservationScopeRange(start, addDaysToDateKey(start, w - 1));
   }
-  let idx = ALL_FINANCIAL_MONTHS.indexOf(tapeChartMonth);
-  if (idx === -1) idx = ALL_FINANCIAL_MONTHS.indexOf(getTodayStr().slice(0, 7));
-  let newIdx = idx + delta;
-  if (newIdx >= 0 && newIdx < ALL_FINANCIAL_MONTHS.length) {
-    setTapeChartMonth(ALL_FINANCIAL_MONTHS[newIdx]);
-  }
+  return true;
 }
 
 function renderTapeChart() {
   const container = document.getElementById('tapeChartContainer');
   if (!container) return;
 
-  populateTapeChartMonthSelect();
-
+  const tapeChartMonth = String(reservationListRange.start || getTodayStr()).slice(0, 7);
+  const tapeChartAnchor = reservationListRange.start || getTodayStr();
   const [yStr, mStr] = tapeChartMonth.split('-');
   const year = Number(yStr);
   const month = Number(mStr);
@@ -12364,8 +12453,9 @@ function renderTapeChart() {
     return;
   }
 
+  const villaFilter = document.getElementById('rezVillaFilter')?.value || 'ALL';
   const vKeys = (typeof appData !== 'undefined' && appData.villas)
-    ? Object.keys(appData.villas)
+    ? Object.keys(appData.villas).filter(k => villaFilter === 'ALL' || k === villaFilter)
     : [];
   if (vKeys.length === 0) {
     container.innerHTML = '<div class="empty-state">Henüz gerçek mülk kaydı yok; doluluk takvimi oluşturulamadı.</div>';
@@ -12452,11 +12542,114 @@ function renderTapeChart() {
   });
 
   tableHtml += '</tbody></table>';
+  // Toplu aktarim ozeti gunlere CIZILMEZ (L-103): hangi geceler dolu bilinmiyor,
+  // cizmek uydurma olurdu. Yerine gecesi ve tutariyla rozet (L-198).
   if (takvimOzetleri.length) {
-    const adlar = [...new Set(takvimOzetleri)].map(escapeHtml).join(', ');
-    tableHtml += `<div class="tape-chart-note" style="font-size:11px; color:var(--text-muted); margin-top:8px;">ℹ️ Bu ayda ${takvimOzetleri.length} toplu aktarım özeti var (${adlar}). Özetler aylık toplamdır; hangi günlerde konaklandığı bilinmediği için takvimde gösterilmez. Ciro ve gece toplamlarına dahildir.</div>`;
+    const ozetler = getBulkSummaryApi().summariesInWindow(
+      (appData.bookings || []).filter(b => vKeys.some(k => b.villa === k || (appData.villas?.[k]?.id && b.propertyId === appData.villas[k].id))),
+      calendarDates[0], calendarDates[calendarDates.length - 1]);
+    const ad = b => appData.villas?.[b.villa]?.name || Object.values(appData.villas || {}).find(v => v.id === b.propertyId)?.name || b.villa || '—';
+    const gece = b => Math.max(0, Math.round((Date.parse(b.checkOut + 'T00:00:00Z') - Date.parse(b.checkIn + 'T00:00:00Z')) / 86400000));
+    const rozetler = ozetler.map(b => `<span class="badge badge-slate" style="font-size:11px;">📦 ${escapeHtml(ad(b))} · ${gece(b)} gece · ₺${Math.round(Number(b.gross) || 0).toLocaleString('tr-TR')}</span>`).join(' ');
+    tableHtml += `<div class="tape-chart-note" style="font-size:11px; color:var(--text-muted); margin-top:8px; display:flex; flex-wrap:wrap; gap:6px; align-items:center;"><strong>Toplu aktarım (günlere dağılmamış):</strong> ${rozetler} <span>Ciro ve gece toplamlarına dahil; hangi günlerde konaklandığı bilinmediği için takvime çizilmez.</span></div>`;
+  }
+  // Ay gorunumu donemin ilk ayini gosterir; donem daha uzunsa liste kalanini kapsar.
+  const gosterilenSon = calendarDates[calendarDates.length - 1];
+  if (reservationListRange.end > gosterilenSon) {
+    tableHtml += `<div class="tape-chart-note" style="font-size:11px; color:var(--text-muted); margin-top:6px;">Takvim ${formatTrDate(calendarDates[0])} – ${formatTrDate(gosterilenSon)} arasını gösteriyor; aşağıdaki liste seçili dönemin tamamını (${formatTrDate(reservationListRange.start)} – ${formatTrDate(reservationListRange.end)}) kapsar.</div>`;
   }
   container.innerHTML = tableHtml;
+}
+
+// Gecmis ay toplu girisi (L-198, kullanici M28). Kurallar core/bulk_summary.js:
+// bitmis ay, tek tek rezervasyonu olmayan ay, kapanmamis ay, kanal zorunlu.
+// Kayit ice aktarimin yaptigi gibi dogrudan yazilir (kisi sayisi bilinmez;
+// create_booking_atomic kisi sayisi ister ve uydurmayiz). Temizlik gorevi
+// ACILMAZ: ozetin gunleri belli degil, planli temizlik uydurma olurdu.
+function getBulkSummaryApi() {
+  if (typeof BulkSummary !== 'undefined') return BulkSummary;
+  if (typeof require === 'function') { try { return require('./core/bulk_summary.js'); } catch (e) { /* tarayici */ } }
+  throw new Error('Toplu giriş motoru yüklenemedi. Sayfayı yenileyin.');
+}
+
+function openBulkSummaryModal() {
+  if (!canWriteSalesRole(activeTenant?.role)) {
+    showToast('Rolünüz rezervasyon kaydetmeye yetkili değil.', 'error');
+    return false;
+  }
+  // Mulk listesi updateAllVillaDropdowns'tan gelir (tek kaynak); burada yalniz
+  // listede secili mulk varsa o onerilir.
+  const villaSelect = document.getElementById('bulkVilla');
+  if (villaSelect) {
+    const secili = document.getElementById('rezVillaFilter')?.value;
+    if (secili && secili !== 'ALL' && appData.villas?.[secili]) villaSelect.value = secili;
+  }
+  const channelSelect = document.getElementById('bulkChannel');
+  if (channelSelect) {
+    channelSelect.innerHTML = '<option value="">Kanal seçin…</option>' + sortBookingChannelsForSelection(getBookingChannelCatalog().filter(c => c.isActive !== false))
+      .map(c => `<option value="${escapeHtml(c.code)}">${escapeHtml(c.displayName || c.code)}</option>`).join('');
+  }
+  const monthInput = document.getElementById('bulkMonth');
+  if (monthInput) {
+    const d = new Date(`${getTodayStr().slice(0, 7)}-01T12:00:00`);
+    d.setMonth(d.getMonth() - 1);
+    monthInput.max = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    if (!monthInput.value) monthInput.value = monthInput.max;
+  }
+  setBulkSummaryMessage('');
+  document.getElementById('bulkSummaryModal')?.classList.add('active');
+  return true;
+}
+
+function closeBulkSummaryModal() {
+  document.getElementById('bulkSummaryModal')?.classList.remove('active');
+}
+
+function setBulkSummaryMessage(text) {
+  const el = document.getElementById('bulkSummaryMessage');
+  if (!el) return;
+  el.textContent = text || '';
+  el.hidden = !text;
+}
+
+async function saveBulkSummary(event) {
+  if (event && typeof event.preventDefault === 'function') event.preventDefault();
+  const tenantId = getActiveTenantId();
+  const val = id => document.getElementById(id)?.value || '';
+  const villaKey = val('bulkVilla');
+  const plan = getBulkSummaryApi().planBulkSummary({
+    propertyId: appData.villas?.[villaKey]?.id || null,
+    villaKey,
+    month: val('bulkMonth'),
+    nights: val('bulkNights'),
+    gross: val('bulkGross'),
+    cleaningFee: val('bulkCleaningFee'),
+    otaCommission: val('bulkOta'),
+    channel: val('bulkChannel'),
+    channels: getBookingChannelCatalog(),
+    bookings: appData.bookings || [],
+    today: getTodayStr(),
+    isMonthClosed: monthKey => isPeriodClosed(monthKey)
+  });
+  if (!plan.ok) { setBulkSummaryMessage(plan.error); return false; }
+  try {
+    requireCloudForWrite('Toplu giriş', tenantId);
+    const payload = mapBookingToDb({ ...plan.booking, code: generateSafeBookingCode(plan.booking.checkIn) }, tenantId);
+    if (supabaseClient && isCloudTenant(tenantId)) {
+      const { error } = await supabaseClient.from('bookings').insert(payload);
+      if (error) throw error;
+      await loadTenantAppData(tenantId);
+    }
+  } catch (err) {
+    setBulkSummaryMessage('Kaydedilemedi: ' + (err && err.message ? err.message : 'bilinmeyen hata'));
+    return false;
+  }
+  closeBulkSummaryModal();
+  invalidateExecutiveSnapshotCache();
+  showToast(`${plan.booking.guest} kaydedildi: ${plan.booking.nights} gece · ₺${Math.round(plan.booking.gross).toLocaleString('tr-TR')}.`, 'success');
+  if (typeof renderManageBookingsTable === 'function') renderManageBookingsTable();
+  if (typeof renderTapeChart === 'function') renderTapeChart();
+  return true;
 }
 
 function openBookingForDate(villa, dateStr) {
@@ -16181,6 +16374,9 @@ function applyRoleNavigationVisibility() {
   document.querySelectorAll('[data-sales-write]').forEach(element => {
     element.hidden = !canWriteSalesRole(role);
   });
+  document.querySelectorAll('[data-ledger-only]').forEach(element => {
+    element.hidden = !canReadLedgerRole(role);
+  });
   const quickBooking = document.getElementById('mobileQuickBookingBtn');
   if (quickBooking) quickBooking.hidden = !canWriteSalesRole(role);
 }
@@ -16218,6 +16414,7 @@ function updateAllVillaDropdowns() {
 
   const dropdownIds = [
     'globalVillaFilter',
+    'bulkVilla',
     'quickBookingVilla',
     'resVilla',
     'expVilla',
@@ -20066,6 +20263,9 @@ if (typeof module !== 'undefined' && module.exports) {
     getExportEngine,
     collectExportRecords,
     exportLedger,
+    exportIncomeStatement,
+    buildIncomeStatementForFilter,
+    computeRangeLedger,
     cloudLinkImportBatchRows,
     loadImportBatches,
     undoImportBatch,

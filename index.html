@@ -14,7 +14,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=bfc4fafa">
+  <link rel="stylesheet" href="style.css?v=f866848a">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="supabase.umd.js?v=3810661a"></script>
@@ -311,11 +311,18 @@
               <small>Seçili dönem, Excel — düzenleyip geri yükleyebilirsiniz</small>
             </div>
           </button>
-          <button type="button" class="dropdown-item" data-onclick="exportLedger('EXPENSES','xlsx'); closeAllHeaderDropdowns();">
+          <button type="button" class="dropdown-item" data-ledger-only data-onclick="exportLedger('EXPENSES','xlsx'); closeAllHeaderDropdowns();">
             <span class="dropdown-icon">📕</span>
             <div>
               <strong>Gider Defterini İndir</strong>
               <small>Seçili dönem, Excel — düzenleyip geri yükleyebilirsiniz</small>
+            </div>
+          </button>
+          <button type="button" class="dropdown-item" data-ledger-only data-onclick="exportIncomeStatement(); closeAllHeaderDropdowns();">
+            <span class="dropdown-icon">📘</span>
+            <div>
+              <strong>Gelir Tablosunu İndir</strong>
+              <small>Seçili dönem ve mülk — aylık kâr-zarar, Finans ekranıyla aynı rakamlar</small>
             </div>
           </button>
           <button type="button" class="dropdown-item" data-onclick="openHelpModal(); closeAllHeaderDropdowns();">
@@ -1117,54 +1124,13 @@
     <!-- TAB: REZERVASYONLAR (FULL CRUD) -->
     <!-- ========================================== -->
     <div id="tab-reservations" class="tab-content">
-      <!-- DOLULUK VE REZERVASYON TAKVİMİ -->
-      <section class="card tape-chart-card">
-        <div class="section-title-bar">
-          <div>
-            <h2>📅 DOLULUK VE REZERVASYON TAKVİMİ</h2>
-            <p class="sub-text">Portföyünüzdeki gerçek mülklerin gün gün doluluk durumu. Boş günlere tıklayarak doğrudan rezervasyon girebilirsiniz.</p>
-          </div>
-          <div style="display: flex; gap: 12px; align-items: center; font-size: 11px;">
-            <span style="display: inline-flex; align-items: center; gap: 4px;"><span style="width: 10px; height: 10px; border-radius: 2px; background: #E11D48;"></span> Airbnb</span>
-            <span style="display: inline-flex; align-items: center; gap: 4px;"><span style="width: 10px; height: 10px; border-radius: 2px; background: #1D4ED8;"></span> Booking</span>
-            <span style="display: inline-flex; align-items: center; gap: 4px;"><span style="width: 10px; height: 10px; border-radius: 2px; background: #059669;"></span> WhatsApp / Direkt</span>
-          </div>
-        </div>
-
-        <!-- Takvim Gezinme ve Hızlı Atlama Araç Çubuğu -->
-        <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); padding: 12px 16px; border-radius: 8px; margin-top: 10px; margin-bottom: 12px; flex-wrap: wrap; gap: 10px; border: 1px solid rgba(255,255,255,0.08);">
-          <div style="display: flex; align-items: center; gap: 8px; flex-wrap:wrap;">
-            <button type="button" class="btn btn-secondary btn-sm" data-onclick="stepTapeChartMonth(-1)" title="Önceki Ay">‹ Önceki Ay</button>
-            <select id="tapeChartMonthSelect" data-onchange="setTapeChartMonth(this.value)" style="padding: 7px 14px; background: #1E293B; border: 1px solid rgba(255,255,255,0.25); border-radius: 6px; color: #fff; font-weight: 700; font-size: 13px; cursor: pointer;">
-              <!-- Populated dynamically via JS -->
-            </select>
-            <button type="button" class="btn btn-secondary btn-sm" data-onclick="stepTapeChartMonth(1)" title="Sonraki Ay">Sonraki Ay ›</button>
-            <div class="calendar-view-switch" aria-label="Takvim görünümü">
-              <button type="button" class="btn btn-secondary btn-sm" data-onclick="setTapeChartView('WEEK_1')">1 hafta</button>
-              <button type="button" class="btn btn-secondary btn-sm" data-onclick="setTapeChartView('WEEK_2')">2 hafta</button>
-              <button type="button" class="btn btn-secondary btn-sm" data-onclick="setTapeChartView('MONTH')">Ay</button>
-            </div>
-          </div>
-          
-        </div>
-
-        <div class="tape-chart-wrapper" id="tapeChartContainer"></div>
-      </section>
-
-      <section class="card">
-        <div class="section-title-bar">
-          <div>
-            <h2>📋 REZERVASYONLAR</h2>
-            <p class="sub-text">Seçili dönemin rezervasyonları; operasyon önceliğine göre sıralanır.</p>
-          </div>
-          <button class="btn btn-primary" data-onclick="openBookingModal()" data-sales-write>+ Yeni Rezervasyon Ekle</button>
-        </div>
-
-        <!-- Rezervasyon Tablosu Filtreleme ve Arama Çubuğu -->
-        <div style="display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; background: rgba(0,0,0,0.25); padding: 12px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
-          <div style="flex: 1; min-width: 200px;">
-            <input type="text" id="rezSearchInput" placeholder="🔍 Misafir adı veya villa ara..." data-oninput="renderManageBookingsTable()" style="width: 100%; padding: 8px 12px; background: rgba(30,41,59,0.8); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff;">
-          </div>
+      <!-- Donem ve mulk (L-197, kullanici M27): takvim ve liste ayni secimi
+           kullanir. Eskiden takvimin ay secicisi, listenin tarih araligi ve
+           mulk filtresi ayri ayriydi; biri degisince digeri eski donemde kaliyordu. -->
+      <section class="card reservation-scope-bar" aria-label="Takvim ve rezervasyon listesi dönemi">
+        <div class="reservation-scope-row">
+          <div class="reservation-scope-title"><strong>Dönem ve mülk</strong><span class="sub-text">Takvim ve rezervasyon listesi birlikte değişir.</span></div>
+          <button type="button" class="btn btn-secondary btn-sm" data-onclick="stepReservationPeriod(-1)" title="Önceki dönem">‹ Önceki</button>
           <div class="reservation-range-group">
             <button type="button" id="reservationRangeTrigger" class="btn btn-secondary" data-onclick="toggleReservationRangePicker()" aria-expanded="false">
               <span id="reservationRangeLabel">Bu ay</span>
@@ -1179,10 +1145,53 @@
               <div class="daterange-foot"><span>Başlangıç ve bitiş tarihini seçin</span><button type="button" class="daterange-clear" data-onclick="resetReservationRange()">Bu ay</button></div>
             </div>
           </div>
+          <button type="button" class="btn btn-secondary btn-sm" data-onclick="stepReservationPeriod(1)" title="Sonraki dönem">Sonraki ›</button>
           <div>
-            <select id="rezVillaFilter" data-onchange="renderManageBookingsTable()" style="padding: 8px 12px; background: rgba(30,41,59,0.9); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px;">
+            <select id="rezVillaFilter" data-onchange="onReservationScopeChange()" style="padding: 8px 12px; background: rgba(30,41,59,0.9); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px;">
               <option value="ALL">Tüm Villalar / Portföy</option>
             </select>
+          </div>
+          <div class="calendar-view-switch" aria-label="Takvim görünümü">
+            <button type="button" class="btn btn-secondary btn-sm" data-onclick="setTapeChartView('WEEK_1')">1 hafta</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-onclick="setTapeChartView('WEEK_2')">2 hafta</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-onclick="setTapeChartView('MONTH')">Ay</button>
+          </div>
+        </div>
+      </section>
+      <!-- DOLULUK VE REZERVASYON TAKVİMİ -->
+      <section class="card tape-chart-card">
+        <div class="section-title-bar">
+          <div>
+            <h2>📅 DOLULUK VE REZERVASYON TAKVİMİ</h2>
+            <p class="sub-text">Portföyünüzdeki gerçek mülklerin gün gün doluluk durumu. Boş günlere tıklayarak doğrudan rezervasyon girebilirsiniz.</p>
+          </div>
+          <div style="display: flex; gap: 12px; align-items: center; font-size: 11px;">
+            <span style="display: inline-flex; align-items: center; gap: 4px;"><span style="width: 10px; height: 10px; border-radius: 2px; background: #E11D48;"></span> Airbnb</span>
+            <span style="display: inline-flex; align-items: center; gap: 4px;"><span style="width: 10px; height: 10px; border-radius: 2px; background: #1D4ED8;"></span> Booking</span>
+            <span style="display: inline-flex; align-items: center; gap: 4px;"><span style="width: 10px; height: 10px; border-radius: 2px; background: #059669;"></span> WhatsApp / Direkt</span>
+          </div>
+        </div>
+
+
+        <div class="tape-chart-wrapper" id="tapeChartContainer"></div>
+      </section>
+
+      <section class="card">
+        <div class="section-title-bar">
+          <div>
+            <h2>📋 REZERVASYONLAR</h2>
+            <p class="sub-text">Seçili dönemin rezervasyonları; operasyon önceliğine göre sıralanır.</p>
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn btn-secondary" data-onclick="openBulkSummaryModal()" data-sales-write title="Rezervasyonlarını tek tek girmediğiniz geçmiş bir ayın toplamı">+ Geçmiş ay toplu girişi</button>
+            <button class="btn btn-primary" data-onclick="openBookingModal()" data-sales-write>+ Yeni Rezervasyon Ekle</button>
+          </div>
+        </div>
+
+        <!-- Rezervasyon Tablosu Filtreleme ve Arama Çubuğu -->
+        <div style="display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; background: rgba(0,0,0,0.25); padding: 12px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
+          <div style="flex: 1; min-width: 200px;">
+            <input type="text" id="rezSearchInput" placeholder="🔍 Misafir adı veya villa ara..." data-oninput="renderManageBookingsTable()" style="width: 100%; padding: 8px 12px; background: rgba(30,41,59,0.8); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff;">
           </div>
           <div>
             <select id="rezStatusFilter" data-onchange="renderManageBookingsTable()" style="padding: 8px 12px; background: rgba(30,41,59,0.9); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px;">
@@ -2132,6 +2141,32 @@
   <!-- ========================================== -->
   <!-- MODAL: YENİ GİDER / YATIRIM EKLE -->
   <!-- ========================================== -->
+  <!-- Gecmis ay toplu girisi (L-198, kullanici M28) -->
+  <div class="modal-backdrop" id="bulkSummaryModal" role="dialog" aria-modal="true" aria-labelledby="bulkSummaryTitle">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="bulkSummaryTitle">📦 Geçmiş ay toplu girişi</h3>
+        <button class="close-btn" data-onclick="closeBulkSummaryModal()">&times;</button>
+      </div>
+      <form id="bulkSummaryForm" data-onsubmit="saveBulkSummary(event)">
+        <p class="sub-text" style="margin: 0 0 12px; line-height: 1.5;">Rezervasyonlarını tek tek girmediğiniz <strong>bitmiş</strong> bir ayın toplamını tek satırda girin. Ciro, gece, ADR ve doluluk toplamlarına girer; rezervasyon adedine, takvime ve boş gece tespitine girmez (hangi günler dolu bilinmiyor). Ay birden fazla kanaldan geldiyse her kanal için ayrı giriş yapın.</p>
+        <div class="form-grid">
+          <div class="form-group"><label for="bulkVilla">Mülk</label><select id="bulkVilla" required></select></div>
+          <div class="form-group"><label for="bulkMonth">Ay</label><input type="month" id="bulkMonth" required></div>
+          <div class="form-group"><label for="bulkChannel">Kanal</label><select id="bulkChannel" required></select></div>
+          <div class="form-group"><label for="bulkNights">Satılan gece</label><input type="number" id="bulkNights" min="1" step="1" required></div>
+          <div class="form-group"><label for="bulkGross">Toplam brüt tutar (₺)</label><input type="number" id="bulkGross" min="0" step="0.01" required></div>
+          <div class="form-group"><label for="bulkCleaningFee">Misafirden alınan temizlik ücreti (₺, varsa)</label><input type="number" id="bulkCleaningFee" min="0" step="0.01"></div>
+          <div class="form-group"><label for="bulkOta">OTA komisyonu (₺, varsa)</label><input type="number" id="bulkOta" min="0" step="0.01"></div>
+        </div>
+        <div id="bulkSummaryMessage" class="form-warning" hidden></div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-onclick="closeBulkSummaryModal()">Vazgeç</button>
+          <button type="submit" class="btn btn-primary">Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
   <div class="modal-backdrop" id="expenseModal">
     <div class="modal-card">
       <div class="modal-header">
@@ -3285,6 +3320,8 @@
   <script src="core/chatgpt_prompt_engine.js?v=1b6079e1"></script>
   <script src="core/property_analysis_context_service.js?v=c0cc1027"></script>
   <script src="core/finance_import_engine.js?v=6c5819bd"></script>
+  <script src="core/bulk_summary.js?v=48f72010"></script>
+  <script src="core/income_statement.js?v=3c2e9daf"></script>
   <script src="core/import_template_guide.js?v=18ab70b4"></script>
   <script src="core/finance_export_engine.js?v=86f92e3f"></script>
 
@@ -3767,10 +3804,10 @@
   <script src="core/side_panel.js?v=d763b464"></script>
   <script src="core/notification_feed.js?v=d8a17633"></script>
   <script src="core/command_search.js?v=89760933"></script>
-  <script src="core/action_dispatch.js?v=fe436108"></script>
+  <script src="core/action_dispatch.js?v=f3589348"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=a85be454"></script>
-  <script src="app.js?v=2947822e"></script>
+  <script src="app.js?v=e7b1877f"></script>
   <script src="core/property_analysis_context_ui.js?v=0a5def2d"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=6fdf284a"></script>
