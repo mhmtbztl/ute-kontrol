@@ -14,7 +14,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=f866848a">
+  <link rel="stylesheet" href="style.css?v=cf36bfaf">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="supabase.umd.js?v=3810661a"></script>
@@ -1718,12 +1718,22 @@
           </section>
           <section class="settings-template-pane">
             <h3>Kontrol listeleri</h3>
-            <p class="sub-text settings-template-help">Temizlikçinin telefonunda işaretlediği madde listesi. Temizlik atandığında otomatik çıkar. Her satıra bir madde yazın; <code>#</code> ile başlayan satır bölüm başlığıdır, <code>!</code> ile başlayan madde önemlidir.</p>
+            <p class="sub-text settings-template-help">Temizlik ve misafir öncesi son kontrol listelerini bölüm bölüm hazırlayın. Önemli maddeler ve onların alt kontrolleri tamamlanmadan görev kapatılamaz.</p>
             <button type="button" class="settings-template-usage-link" data-onclick="switchTab('operations'); setOperationsView('cleaning')">Temizlikte kullan →</button>
-            <form data-onsubmit="createSettingsChecklistTemplate(event)" class="settings-inline-form">
-              <input name="template_name" maxlength="150" required placeholder="Liste adı">
-              <textarea name="items" maxlength="4000" required rows="6" placeholder="# Yatak odası&#10;Çarşaflar değişti&#10;!Klima filtresi temizlendi&#10;# Mutfak&#10;Bulaşık makinesi boşaltıldı"></textarea>
-              <button type="submit" class="btn btn-secondary btn-sm">+ Kontrol listesi</button>
+            <form id="settingsChecklistTemplateForm" data-onsubmit="createSettingsChecklistTemplate(event)" class="settings-inline-form checklist-builder-form">
+              <div class="checklist-builder-meta">
+                <div class="form-group"><label for="settingsChecklistName">Liste adı</label><input id="settingsChecklistName" name="template_name" maxlength="150" required placeholder="Örn. Misafir öncesi son kontrol"></div>
+                <div class="form-group"><label for="settingsChecklistType">Kullanım</label><select id="settingsChecklistType" name="task_type" data-onchange="toggleSettingsChecklistSupplyVisibility(); renderSettingsChecklistMergePreview()"><option value="CLEANING">Temizlik</option><option value="CHECKIN_PREP">Misafir öncesi son kontrol</option></select></div>
+                <div class="form-group"><label for="settingsChecklistProperty">Kapsam</label><select id="settingsChecklistProperty" name="property_id" data-onchange="renderSettingsChecklistMergePreview()"><option value="">Tüm mülkler</option></select></div>
+              </div>
+              <div id="settingsChecklistMergePreview" class="sub-text checklist-merge-preview" aria-live="polite"></div>
+              <div id="settingsChecklistBuilder" class="checklist-builder" aria-live="polite"></div>
+              <button type="button" class="btn btn-secondary btn-sm" data-onclick="addChecklistBuilderSection()">+ Bölüm ekle</button>
+              <section id="settingsChecklistSupplies" class="checklist-builder-supplies">
+                <div class="section-title-bar"><div><h4>Malzemeler</h4><p class="sub-text">Temizlikçinin Var / Az var / Yok olarak kontrol edeceği sarflar.</p></div><button type="button" class="btn btn-secondary btn-sm" data-onclick="addChecklistBuilderSupply()">+ Malzeme ekle</button></div>
+                <div id="settingsChecklistSupplyRows"></div>
+              </section>
+              <div class="checklist-builder-submit"><button id="settingsChecklistSubmitButton" type="submit" class="btn btn-primary btn-sm">Kontrol listesini kaydet</button><button id="settingsChecklistCancelButton" type="button" class="btn btn-secondary btn-sm" data-onclick="cancelSettingsChecklistEdit()" hidden>Vazgeç</button></div>
             </form>
             <div id="settingsChecklistTemplatesList" class="settings-template-list"></div>
           </section>
@@ -3794,7 +3804,7 @@
   <script src="core/pricing_booking_service.js?v=0eb93c05"></script>
   <script src="core/executive_priority_service.js?v=d69011e3"></script>
   <script src="core/executive_dashboard_service.js?v=f93360cf"></script>
-  <script src="core/operations_engine.js?v=039b8d32"></script>
+  <script src="core/operations_engine.js?v=8dd8c501"></script>
   <script src="core/booking_payment_engine.js?v=91111565"></script>
   <script src="core/ads_metrics_engine.js?v=d8dd5962"></script>
   <script src="core/ads_period_service.js?v=3f125702"></script>
@@ -3804,10 +3814,10 @@
   <script src="core/side_panel.js?v=d763b464"></script>
   <script src="core/notification_feed.js?v=d8a17633"></script>
   <script src="core/command_search.js?v=89760933"></script>
-  <script src="core/action_dispatch.js?v=f3589348"></script>
+  <script src="core/action_dispatch.js?v=2baf31c3"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=a85be454"></script>
-  <script src="app.js?v=e7b1877f"></script>
+  <script src="app.js?v=bb6361a8"></script>
   <script src="core/property_analysis_context_ui.js?v=0a5def2d"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=6fdf284a"></script>

@@ -35,6 +35,105 @@ const DEFAULT_CHECKIN_PREP_CHECKLIST = [
   { id: 'chk_welcome', text: 'Hoş geldiniz ikramı ve karşılama rehberi hazırlandı', completed: false, required: false }
 ];
 
+function cloneChecklistValue(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+/**
+ * Converts the historical array contract and the rich section contract to one
+ * validated shape. Invalid persisted JSON is reported instead of being treated
+ * as an empty checklist, so an editor cannot silently overwrite it.
+ */
+function normalizeChecklistTemplate(rawItems) {
+  const errors = [];
+  if (Array.isArray(rawItems)) {
+    if (!rawItems.length) errors.push('Kontrol listesinde en az bir madde olmalı.');
+    const items = rawItems.map((item, index) => {
+      const text = typeof item?.text === 'string' ? item.text.trim() : '';
+      if (!text) errors.push(`Eski biçimdeki ${index + 1}. maddenin metni boş.`);
+      return {
+        ...(item?.id ? { id: item.id } : {}),
+        text,
+        important: item?.important === true || item?.required === true,
+        completed: item?.completed === true,
+        subChecks: []
+      };
+    });
+    return {
+      valid: errors.length === 0,
+      errors,
+      sourceFormat: 'legacy',
+      checklist: { sections: [{ title: 'Genel', items }], supplies: [] }
+    };
+  }
+
+  if (!rawItems || typeof rawItems !== 'object' || Array.isArray(rawItems.sections) === false) {
+    return {
+      valid: false,
+      errors: ['Kontrol listesi bölümler içeren bir nesne veya eski biçimli bir dizi olmalı.'],
+      sourceFormat: 'invalid',
+      checklist: null
+    };
+  }
+
+  if (!rawItems.sections.length) errors.push('Kontrol listesinde en az bir bölüm olmalı.');
+  rawItems.sections.forEach((section, sectionIndex) => {
+    if (typeof section?.title !== 'string' || !section.title.trim()) {
+      errors.push(`${sectionIndex + 1}. bölümün adı boş.`);
+    }
+    if (!Array.isArray(section?.items) || !section.items.length) {
+      errors.push(`${sectionIndex + 1}. bölümde en az bir madde olmalı.`);
+      return;
+    }
+    section.items.forEach((item, itemIndex) => {
+      if (typeof item?.text !== 'string' || !item.text.trim()) {
+        errors.push(`${sectionIndex + 1}. bölümdeki ${itemIndex + 1}. maddenin metni boş.`);
+      }
+      if (item?.subChecks != null && !Array.isArray(item.subChecks)) {
+        errors.push(`${sectionIndex + 1}. bölümdeki ${itemIndex + 1}. maddenin alt kontrolleri dizi olmalı.`);
+      } else if ((item?.subChecks || []).some(value => typeof value !== 'string' || !value.trim())) {
+        errors.push(`${sectionIndex + 1}. bölümdeki ${itemIndex + 1}. maddede boş alt kontrol var.`);
+      }
+    });
+  });
+  if (rawItems.supplies != null && !Array.isArray(rawItems.supplies)) {
+    errors.push('Malzeme listesi dizi olmalı.');
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    sourceFormat: 'rich',
+    checklist: cloneChecklistValue({
+      sections: rawItems.sections,
+      supplies: Array.isArray(rawItems.supplies) ? rawItems.supplies : []
+    })
+  };
+}
+
+/** Critical completion rule approved for G9: only important items and every
+ * sub-check below an important item block completion. */
+function checklistCompletionState(rawChecklist, result = {}) {
+  const normalized = normalizeChecklistTemplate(rawChecklist);
+  if (!normalized.valid) {
+    return { canComplete: false, missingKeys: [], errors: normalized.errors };
+  }
+  const missingKeys = [];
+  normalized.checklist.sections.forEach((section, sectionIndex) => {
+    section.items.forEach((item, itemIndex) => {
+      if (!item.important) return;
+      const key = `s${sectionIndex}.i${itemIndex}`;
+      const mainDone = result?.[key]?.z === true || result?.[key] === true || item.completed === true;
+      if (!mainDone) missingKeys.push(key);
+      (item.subChecks || []).forEach((unused, subIndex) => {
+        const subKey = `${key}.sub${subIndex}`;
+        if (!(result?.[subKey]?.z === true || result?.[subKey] === true)) missingKeys.push(subKey);
+      });
+    });
+  });
+  return { canComplete: missingKeys.length === 0, missingKeys, errors: [] };
+}
+
 /**
  * Resolves checklist template for a property, snapshotting items into the task.
  * @param {string} propertyId
@@ -43,23 +142,39 @@ const DEFAULT_CHECKIN_PREP_CHECKLIST = [
  * @returns {{ checklist: Array<Object>, templateVersion: number }}
  */
 function resolveChecklistSnapshot(propertyId, taskType, templates = []) {
-  const propertyTemplate = (templates || []).find(
-    t => t.property_id === propertyId && t.task_type === taskType && t.is_active !== false
-  );
-  if (propertyTemplate && Array.isArray(propertyTemplate.items) && propertyTemplate.items.length > 0) {
-    return {
-      checklist: JSON.parse(JSON.stringify(propertyTemplate.items)),
-      templateVersion: propertyTemplate.version || 1
-    };
-  }
+  const candidates = (templates || [])
+    .filter(template => template?.task_type === taskType
+      && template.is_active !== false
+      && (!template.property_id || template.property_id === propertyId));
+  const newest = list => list.slice().sort((left, right) =>
+    (Number(right.version) || 1) - (Number(left.version) || 1)
+      || String(right.updated_at || '').localeCompare(String(left.updated_at || ''))
+  )[0];
+  const selected = [
+    newest(candidates.filter(template => !template.property_id)),
+    newest(candidates.filter(template => template.property_id === propertyId))
+  ].filter(Boolean);
+  const normalized = selected.map(template => ({
+    template,
+    normalized: normalizeChecklistTemplate(template.items)
+  })).filter(entry => entry.normalized.valid);
 
-  const portfolioDefault = (templates || []).find(
-    t => !t.property_id && t.task_type === taskType && t.is_active !== false
-  );
-  if (portfolioDefault && Array.isArray(portfolioDefault.items) && portfolioDefault.items.length > 0) {
+  if (normalized.length) {
+    const templateVersion = normalized.reduce(
+      (highest, entry) => Math.max(highest, Number(entry.template.version) || 1), 1
+    );
+    if (normalized.every(entry => entry.normalized.sourceFormat === 'legacy')) {
+      return {
+        checklist: normalized.flatMap(entry => cloneChecklistValue(entry.template.items)),
+        templateVersion
+      };
+    }
     return {
-      checklist: JSON.parse(JSON.stringify(portfolioDefault.items)),
-      templateVersion: portfolioDefault.version || 1
+      checklist: {
+        sections: normalized.flatMap(entry => cloneChecklistValue(entry.normalized.checklist.sections)),
+        supplies: normalized.flatMap(entry => cloneChecklistValue(entry.normalized.checklist.supplies))
+      },
+      templateVersion
     };
   }
 
@@ -400,6 +515,8 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     DEFAULT_CLEANING_CHECKLIST,
     DEFAULT_CHECKIN_PREP_CHECKLIST,
+    normalizeChecklistTemplate,
+    checklistCompletionState,
     resolveChecklistSnapshot,
     reconcileBookingOperations,
     reconcileAllTenantBookings,
@@ -417,10 +534,14 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
   window.DEFAULT_CLEANING_CHECKLIST = DEFAULT_CLEANING_CHECKLIST;
   window.DEFAULT_CHECKIN_PREP_CHECKLIST = DEFAULT_CHECKIN_PREP_CHECKLIST;
+  window.normalizeChecklistTemplate = normalizeChecklistTemplate;
+  window.checklistCompletionState = checklistCompletionState;
   window.resolveChecklistSnapshot = resolveChecklistSnapshot;
   window.reconcileBookingOperations = reconcileBookingOperations;
   window.reconcileAllTenantBookings = reconcileAllTenantBookings;
   window.OperationsEngine = {
+    normalizeChecklistTemplate,
+    checklistCompletionState,
     isCleaningDebt,
     eligibleCleaners,
     canAssignCleaner,

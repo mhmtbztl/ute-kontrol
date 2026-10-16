@@ -487,6 +487,36 @@ async function main() {
 
     await withPage(browser, baseUrl, 'owner', { width: 390, height: 844 }, async page => {
       await assertBookingFinance(page,true); passed.push('16. rezervasyon finansı 390 px mobil görünüm');
+      // G9 L-207: teknik metin DSL'si yerine gercek gorsel checklist
+      // duzenleyicisi mobilde bolum, onemli madde ve alt kontrolu korur.
+      await page.evaluate(() => {
+        switchTab('settings');
+        appData.settingsChecklistTemplates = [];
+        renderSettingsTemplates();
+      });
+      await page.waitForSelector('#settingsChecklistTemplateForm', { state: 'visible' });
+      await page.fill('#settingsChecklistName', 'Misafir öncesi tarayıcı kontrolü');
+      await page.selectOption('#settingsChecklistType', 'CHECKIN_PREP');
+      await page.selectOption('#settingsChecklistProperty', '00000000-0000-4000-8000-000000000010');
+      await page.fill('[data-checklist-section-title]', 'Giriş');
+      await page.fill('[data-checklist-item-text]', 'Kapı kodu denendi');
+      await page.check('[data-checklist-important]');
+      await page.click('[data-onclick^="addChecklistBuilderSubCheck"]');
+      await page.fill('[data-checklist-sub] input', 'Kod misafir gibi denendi');
+      const checklistDraft = await page.evaluate(() => ({
+        draft: readSettingsChecklistBuilder(),
+        suppliesHidden: document.getElementById('settingsChecklistSupplies').hidden,
+        preview: document.getElementById('settingsChecklistMergePreview').textContent,
+        labelled: [...document.querySelectorAll('#settingsChecklistTemplateForm input, #settingsChecklistTemplateForm select')]
+          .every(control => !!control.closest('label') || (!!control.id && !!document.querySelector(`label[for="${control.id}"]`)))
+      }));
+      assert.strictEqual(checklistDraft.draft.sections[0].items[0].important, true);
+      assert.deepStrictEqual(checklistDraft.draft.sections[0].items[0].subChecks, ['Kod misafir gibi denendi']);
+      assert(checklistDraft.suppliesHidden && checklistDraft.labelled && checklistDraft.preview.includes('birleşme'),
+        `Checklist mobil durumu: ${JSON.stringify(checklistDraft)}`);
+      await assertNoHorizontalOverflow(page, 'zengin checklist mobil');
+      await page.screenshot({ path: path.join(__dirname, '..', 'tmp', 'rich-checklist-mobile.png') });
+      passed.push('23. zengin kontrol listesi görsel düzenleyicisi 390 px mobil görünüm');
       // L-147b/c: ust cubuk telefonda ekranin ucte birini gecmez; pencere
       // acikken yuzen dugme pencere dugmelerini ortmez.
       const header = await page.evaluate(() => document.querySelector('.app-header').getBoundingClientRect().height);
