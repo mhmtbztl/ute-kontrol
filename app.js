@@ -16293,7 +16293,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
         : Promise.resolve([]);
       // Independent datasets are loaded concurrently and every list is paged;
       // Supabase's per-response cap must never silently truncate a dashboard.
-      const [villas, bookings, expenses, cleanList, leads, leadSalesContext, closeList, targetList, maintenanceTickets, operationalTasks, financialTransactions, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications, campaignRows, influencerRows, settingRows, operatorNoteRows, pricingLadderRows, hkOverrideRows, paymentCommissionRows, operationalPeopleRows, cleaningExecutionRows, maintenanceAssignmentRows, taskTemplateRows, checklistTemplateRows, bookingPayments, bookingPaymentBalances, adMetricPeriods, propertyContextRows, propertyOwnerRows, propertyOwnerLinkRows, messageTemplateRows, guestClassificationRows, salesMembers, propertyPricingRuleRows, competitorResearchRows, expenseTemplateRows, expenseTemplateOccurrenceRows, leadInterestRows] = await Promise.all([
+      const [villas, bookings, expenses, cleanList, leads, leadSalesContext, closeList, targetList, maintenanceTickets, operationalTasks, financialTransactions, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications, campaignRows, influencerRows, settingRows, operatorNoteRows, pricingLadderRows, hkOverrideRows, paymentCommissionRows, operationalPeopleRows, cleaningExecutionRows, maintenanceAssignmentRows, taskTemplateRows, checklistTemplateRows, bookingPayments, bookingPaymentBalances, adMetricPeriods, propertyContextRows, propertyOwnerRows, propertyOwnerLinkRows, messageTemplateRows, guestClassificationRows, salesMembers, propertyPricingRuleRows, competitorResearchRows, expenseTemplateRows, expenseTemplateOccurrenceRows, leadInterestRows, channelListingRows] = await Promise.all([
         loadProperties(tenantId),
         loadBookings(tenantId),
         mayReadLedger ? loadExpenses(tenantId) : Promise.resolve([]),
@@ -16344,7 +16344,9 @@ async function loadTenantAppData(tenantIdOrUserId) {
         mayReadLedger ? fetchTenantRowsTolerant(() => supabaseClient.from('expense_templates').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false })) : Promise.resolve([]),
         mayReadLedger ? fetchTenantRowsTolerant(() => supabaseClient.from('expense_template_occurrences').select('*').eq('tenant_id', tenantId).order('period_month', { ascending: false })) : Promise.resolve([]),
         // phase91 uygulanmadan once tablo yoktur: null doner, ekran ayakta kalir.
-        mayReadSales ? fetchTenantRowsTolerant(() => supabaseClient.from('lead_interest_properties').select('lead_id, property_id').eq('tenant_id', tenantId)) : Promise.resolve([])
+        mayReadSales ? fetchTenantRowsTolerant(() => supabaseClient.from('lead_interest_properties').select('lead_id, property_id').eq('tenant_id', tenantId)) : Promise.resolve([]),
+        // Kanal ilanlari mulk profilinde listelenir (L-214); okuma can_read_sales (phase53).
+        mayReadSales ? fetchTenantRowsTolerant(() => supabaseClient.from('property_channel_listings').select(CHANNEL_LISTING_COLUMNS).eq('tenant_id', tenantId).neq('status', 'ARCHIVED').order('created_at')) : Promise.resolve([])
       ]);
       const propIdMap = {};
       Object.values(villas || {}).forEach(p => {
@@ -16450,6 +16452,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
         propertyAnalysisContexts: propertyContextRows || [],
         propertyOwners: propertyOwnerRows || [],
         propertyOwnerLinks: propertyOwnerLinkRows || [],
+        channelListings: channelListingRows || [],
         messageTemplates: messageTemplateRows || [],
         guestPrivateClassifications: guestClassificationRows || [],
         salesMembers: salesMembers || [],
@@ -16545,6 +16548,7 @@ function getBlankTenantData(userId) {
     propertyAnalysisContexts: [],
     propertyOwners: [],
     propertyOwnerLinks: [],
+    channelListings: [],
     messageTemplates: [],
     guestPrivateClassifications: [],
     salesMembers: [],
@@ -16736,6 +16740,53 @@ function populatePropertyOwnerForm(propertyId = null) {
   });
 }
 
+// "Kayitli sahip" secimi yeni ad alanindan once gelir; ikisi de bossa ve mulkun
+// bir sahibi varsa bag kaldirilir (kullanici "belirtilmedi"yi secti).
+async function savePropertyOwnerFromForm(propertyId) {
+  if (!canManageTenantRole(activeTenant?.role) || typeof PropertyOwnerService === 'undefined') return { skipped: true };
+  const value = id => String(document.getElementById(id)?.value ?? '').trim();
+  const ownerId = value('propOwnerId');
+  const fullName = value('propOwnerName');
+  const link = (appData?.propertyOwnerLinks || []).find(row => (row.property_id || row.propertyId) === propertyId);
+  const linkedOwnerId = link ? (link.owner_id || link.ownerId) : '';
+  if (ownerId && ownerId === linkedOwnerId) return { skipped: true };
+  if (ownerId || fullName) {
+    requireCloudForWrite('Mülk sahibi kaydetme', getActiveTenantId());
+    return PropertyOwnerService.saveOwnerAndLink(supabaseClient, {
+      tenantId: getActiveTenantId(), propertyId, ownerId: ownerId || null,
+      fullName, phone: value('propOwnerPhone'), email: value('propOwnerEmail')
+    });
+  }
+  if (!linkedOwnerId) return { skipped: true };
+  requireCloudForWrite('Mülk sahibi kaldırma', getActiveTenantId());
+  const { error } = await supabaseClient.from('property_owner_links').delete()
+    .eq('tenant_id', getActiveTenantId()).eq('property_id', propertyId);
+  if (error) throw error;
+  return { removed: true };
+}
+
+async function refreshPropertyProfileRows() {
+  if (!supabaseClient || !isCloudTenant(getActiveTenantId())) return false;
+  const tenantId = getActiveTenantId();
+  const mayReadLedger = canReadLedgerRole(activeTenant?.role);
+  // Yenileme basarisizsa kayit yine yapilmistir; ekran bir sonraki yuklemede duzelir.
+  let contexts = null; let owners = null; let links = null;
+  try {
+    [contexts, owners, links] = await Promise.all([
+      fetchTenantRowsTolerant(() => supabaseClient.from('property_analysis_context').select('*').eq('tenant_id', tenantId)),
+      mayReadLedger ? fetchTenantRowsTolerant(() => supabaseClient.from('property_owners').select('*').eq('tenant_id', tenantId).order('full_name')) : Promise.resolve(null),
+      mayReadLedger ? fetchTenantRowsTolerant(() => supabaseClient.from('property_owner_links').select('*').eq('tenant_id', tenantId)) : Promise.resolve(null)
+    ]);
+  } catch (error) {
+    console.warn('refreshPropertyProfileRows:', error?.message || error);
+    return false;
+  }
+  if (contexts !== null) appData.propertyAnalysisContexts = contexts;
+  if (owners !== null) appData.propertyOwners = owners;
+  if (links !== null) appData.propertyOwnerLinks = links;
+  return true;
+}
+
 function openPropertyModal(villaKey = null) {
   if (!canManageTenantRole(activeTenant?.role)) {
     if (typeof showToast === 'function') showToast('Bu işlem için mülk yönetimi yetkisi gerekir.', 'error');
@@ -16877,6 +16928,18 @@ async function saveProperty(e) {
           ? '\n\n⚠️ Mülk kaydedildi; konum/sosyal profil için Phase 40 göçü henüz uygulanmamış.'
           : '\n\n⚠️ Mülk kaydedildi; konum/sosyal profil kaydedilemedi. Lütfen yeniden deneyin.';
       }
+    }
+    // Sahip alanlari formda vardi ama hicbir yere yazilmiyordu; profil hep
+    // "Belirtilmedi" diyordu (L-212, kullanici M41).
+    if (savedProperty?.id) {
+      try {
+        await savePropertyOwnerFromForm(savedProperty.id);
+      } catch (ownerError) {
+        contextWarning += '\n\n⚠️ Mülk kaydedildi; mülk sahibi kaydedilemedi: ' + kullaniciMesaji(ownerError?.message || '');
+      }
+      // Konum ve sahip veritabanina yazildi ama bellekteki kopya eski
+      // kaliyordu: profil sayfa yenilenene kadar "Belirtilmedi" gosteriyordu (L-213).
+      await refreshPropertyProfileRows();
     }
 
     closePropertyModal();
@@ -18877,6 +18940,7 @@ function setPropertyProfile(villaKey) {
   if (!appData?.villas?.[villaKey]) return false;
   selectedPropertyProfileKey = villaKey;
   selectedPropertyProfileTab = 'GENERAL';
+  propertyChannelForm = null;
   renderPropertiesTab();
   return true;
 }
@@ -18973,6 +19037,178 @@ function buildPropertyHistoryView(report = {}, role = activeTenant?.role) {
   };
 }
 
+// ---- Kanal ilanlari (L-214, kullanici M43) ---------------------------------
+// Pazarlama'dan kaydedilen ilan hicbir ekranda listelenmiyordu: ne mulk
+// formunda ne profilin Kanallar sekmesinde. Ilanin evi mulk profilidir;
+// pazarlama hunisi ayni servis ve ayni appData.channelListings'i kullanir.
+const CHANNEL_LISTING_COLUMNS = 'id,property_id,channel_code,external_listing_id,display_name,external_url,payout_currency,status';
+let propertyChannelForm = null; // { villaKey, listingId } — acik form
+
+function channelListingApi() {
+  return typeof MarketingChannelListingService !== 'undefined' ? MarketingChannelListingService : null;
+}
+
+function propertyChannelListings(property) {
+  const api = channelListingApi();
+  return api && property ? api.listingsForProperty(appData?.channelListings || [], property.id) : [];
+}
+
+async function reloadChannelListings() {
+  if (!supabaseClient || !canReadSalesRole(activeTenant?.role)) return false;
+  let rows = null;
+  try {
+    rows = await fetchTenantRowsTolerant(() => supabaseClient.from('property_channel_listings')
+      .select(CHANNEL_LISTING_COLUMNS).eq('tenant_id', getActiveTenantId()).neq('status', 'ARCHIVED').order('created_at'));
+  } catch (error) {
+    console.warn('reloadChannelListings:', error?.message || error);
+    return false;
+  }
+  if (rows === null) return false;
+  appData.channelListings = rows;
+  return true;
+}
+
+function propertyChannelFormHtml(villaKey, property) {
+  const api = channelListingApi();
+  if (!api || !propertyChannelForm || propertyChannelForm.villaKey !== villaKey) return '';
+  const editing = propertyChannelForm.listingId
+    ? propertyChannelListings(property).find(row => row.id === propertyChannelForm.listingId) : null;
+  const code = String(editing?.channel_code || 'AIRBNB').toUpperCase();
+  const channelOptions = api.CHANNELS.map(value => `<option value="${value}"${value === code ? ' selected' : ''}>${escapeHtml(value === 'OTHER_OTA' ? 'Diğer OTA (ETS Tur vb.)' : api.CHANNEL_LABELS[value])}</option>`).join('');
+  const currency = String(editing?.payout_currency || 'TRY').toUpperCase();
+  const currencyOptions = api.CURRENCIES.map(value => `<option value="${value}"${value === currency ? ' selected' : ''}>${value}</option>`).join('');
+  // Duzenlemede kanal ve ID ilanin kimligidir; degisirse yeni ilan acilirdi.
+  const lock = editing ? ' disabled' : '';
+  // <form> degil: app.js formlari div ile kurar (L-15 temizleyici).
+  return `<div class="property-ladder-form" id="propertyChannelForm"><h4>${editing ? 'Kanal ilanını düzenle' : 'Kanal ilanı ekle'}</h4>
+    <div class="property-profile-grid">
+      <div class="form-group"><label for="channelListingCode">Kanal</label><select id="channelListingCode" data-onchange="updateChannelListingHelp(this.value)"${lock}>${channelOptions}</select></div>
+      <div class="form-group"><label for="channelListingUrl">İlan bağlantısı</label><input id="channelListingUrl" type="url" inputmode="url" placeholder="https://www.airbnb.com.tr/rooms/…" value="${escapeHtml(editing?.external_url || '')}"><small class="sub-text">İlanı tarayıcıda açın, adres çubuğundaki bağlantıyı yapıştırın.</small></div>
+      <div class="form-group"><label for="channelListingId">İlan ID (isteğe bağlı)</label><input id="channelListingId" type="text" maxlength="200" placeholder="Bağlantıdan okunur" value="${escapeHtml(editing?.external_listing_id || '')}"${lock}><small class="sub-text" id="channelListingIdHelp">${escapeHtml(api.LISTING_ID_HELP[code] || '')}</small></div>
+      <div class="form-group"><label for="channelListingName">Platformdaki ilan adı</label><input id="channelListingName" type="text" maxlength="200" placeholder="Misafirin gördüğü başlık" value="${escapeHtml(editing?.display_name || '')}"><small class="sub-text">Aynı kanalda birden çok ilanı ayırt etmek için. “Diğer OTA”da platform adını yazın (zorunlu).</small></div>
+      <div class="form-group"><label for="channelListingCurrency">Ödeme para birimi</label><select id="channelListingCurrency">${currencyOptions}</select><small class="sub-text">Platformun size ödediği para birimi; Booking.com EUR ödüyorsa EUR seçin. Yalnız bilgidir, rezervasyon tutarlarınız çevrilmez.</small></div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn btn-secondary btn-sm" data-onclick="closePropertyChannelForm()">Vazgeç</button><button type="button" class="btn btn-primary btn-sm" data-onclick="savePropertyChannelListing(decodeURIComponent('${encodeActionArg(villaKey)}'))">Kanal ilanını kaydet</button></div>
+  </div>`;
+}
+
+function propertyChannelsTabHtml(villaKey, property, context) {
+  const api = channelListingApi();
+  const canManage = canManageTenantRole(activeTenant?.role);
+  const listings = propertyChannelListings(property);
+  const rows = listings.map(row => {
+    const url = propertySafeLink(row.external_url);
+    const nameHtml = row.display_name && String(row.channel_code).toUpperCase() !== 'OTHER_OTA' ? `<span class="sub-text">${escapeHtml(row.display_name)}</span>` : '';
+    const actions = [
+      url ? `<a class="btn btn-secondary btn-sm" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">İlanı aç</a>` : '<span class="sub-text">Bağlantı girilmemiş</span>',
+      canManage ? `<button type="button" class="btn btn-secondary btn-sm" data-onclick="openPropertyChannelForm(decodeURIComponent('${encodeActionArg(villaKey)}'), decodeURIComponent('${encodeActionArg(row.id)}'))">Düzenle</button>` : '',
+      canManage ? `<button type="button" class="btn btn-secondary btn-sm" data-onclick="archivePropertyChannelListing(decodeURIComponent('${encodeActionArg(villaKey)}'), decodeURIComponent('${encodeActionArg(row.id)}'))">Arşivle</button>` : ''
+    ].join('');
+    return `<div class="lead-followup-row property-channel-row"><div><strong>${escapeHtml(api ? api.channelName(row) : row.channel_code)}</strong> ${nameHtml}<small class="sub-text" style="display:block">ID: ${escapeHtml(row.external_listing_id || '—')} · Ödeme: ${escapeHtml(row.payout_currency || 'TRY')}</small></div><div style="display:flex;gap:6px;flex-wrap:wrap">${actions}</div></div>`;
+  }).join('');
+  const copyButton = listings.length ? `<button type="button" class="btn btn-secondary btn-sm" data-onclick="copyPropertyChannelLinks(decodeURIComponent('${encodeActionArg(villaKey)}'))">Bağlantıları kopyala (ChatGPT için)</button>` : '';
+  const addButton = canManage && !propertyChannelForm ? `<button type="button" class="btn btn-primary btn-sm" data-onclick="openPropertyChannelForm(decodeURIComponent('${encodeActionArg(villaKey)}'))">+ Kanal ilanı ekle</button>` : '';
+  const toolbar = `<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-bottom:10px">${copyButton}${addButton}</div>`;
+  const listHtml = rows || '<p class="empty-state">Bu mülk için kanal ilanı kaydedilmemiş. Airbnb, Booking.com gibi ilan bağlantılarınızı ekleyin; ChatGPT analizine liste olarak gider.</p>';
+  const links = { ...(context.social_links || {}) };
+  if (property.url) links.ota = property.url;
+  const labels = { website: 'Web sitesi', instagram: 'Instagram', youtube: 'YouTube', googleBusiness: 'Google İşletme', facebook: 'Facebook', tiktok: 'TikTok', ota: 'OTA ilanı (mülk formu)' };
+  const social = Object.entries(links).map(([key, value]) => {
+    const url = propertySafeLink(value);
+    return url && labels[key] ? `<a class="btn btn-secondary btn-sm" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(labels[key])}</a>` : '';
+  }).filter(Boolean).join('');
+  return `<h4 style="margin:0 0 8px">Kanal ilanları</h4>${toolbar}${propertyChannelFormHtml(villaKey, property)}${listHtml}
+    <h4 style="margin:16px 0 8px">Sosyal profiller</h4>${social ? `<div style="display:flex;gap:8px;flex-wrap:wrap">${social}</div>` : '<p class="empty-state">Sosyal profil bağlantısı girilmemiş (mülk formu › Pazar konumu ve dijital profiller).</p>'}`;
+}
+
+function openPropertyChannelForm(villaKey, listingId = null) {
+  if (!canManageTenantRole(activeTenant?.role) || !appData?.villas?.[villaKey]) return false;
+  propertyChannelForm = { villaKey, listingId: listingId || null };
+  selectedPropertyProfileKey = villaKey;
+  selectedPropertyProfileTab = 'CHANNELS';
+  renderPropertiesTab();
+  return true;
+}
+
+function closePropertyChannelForm() {
+  propertyChannelForm = null;
+  renderPropertiesTab();
+  return true;
+}
+
+function updateChannelListingHelp(code) {
+  const api = channelListingApi();
+  const help = document.getElementById('channelListingIdHelp');
+  if (api && help) help.textContent = api.LISTING_ID_HELP[String(code || '').toUpperCase()] || '';
+  return true;
+}
+
+async function savePropertyChannelListing(villaKey) {
+  const api = channelListingApi();
+  const property = appData?.villas?.[villaKey];
+  if (!api || !property || !canManageTenantRole(activeTenant?.role)) return false;
+  const value = id => String(document.getElementById(id)?.value ?? '').trim();
+  try {
+    requireCloudForWrite('Kanal ilanı kaydetme', getActiveTenantId());
+    const result = await api.saveChannelListing(supabaseClient, {
+      tenantId: getActiveTenantId(), propertyId: property.id,
+      channelCode: value('channelListingCode'), externalListingId: value('channelListingId'),
+      externalUrl: value('channelListingUrl'), displayName: value('channelListingName'),
+      payoutCurrency: value('channelListingCurrency')
+    });
+    await reloadChannelListings();
+    propertyChannelForm = null;
+    renderPropertiesTab();
+    showToast(result?.reused ? 'Kanal ilanı güncellendi.' : 'Kanal ilanı kaydedildi.', 'success');
+    return true;
+  } catch (error) {
+    showToast(/Bulut bağlantısı/.test(error?.message || '') ? error.message : api.errorMessage(error), 'error');
+    return false;
+  }
+}
+
+async function archivePropertyChannelListing(villaKey, listingId) {
+  const api = channelListingApi();
+  if (!api || !canManageTenantRole(activeTenant?.role)) return false;
+  if (!confirm('Bu kanal ilanı arşivlensin mi? Geçmiş ölçümler korunur; aynı ilanı yeniden ekleyebilirsiniz.')) return false;
+  try {
+    requireCloudForWrite('Kanal ilanı arşivleme', getActiveTenantId());
+    await api.archiveChannelListing(supabaseClient, { tenantId: getActiveTenantId(), listingId });
+    showToast('Kanal ilanı arşivlendi.', 'success');
+    return true;
+  } catch (error) {
+    showToast(/Bulut bağlantısı/.test(error?.message || '') ? error.message : api.errorMessage(error), 'error');
+    return false;
+  } finally {
+    await reloadChannelListings();
+    renderPropertiesTab();
+  }
+}
+
+async function copyPropertyChannelLinks(villaKey) {
+  const api = channelListingApi();
+  const property = appData?.villas?.[villaKey];
+  if (!api || !property) return false;
+  const text = api.linkListText(property.name, propertyChannelListings(property));
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast('Kanal bağlantıları kopyalandı; ChatGPT’ye yapıştırabilirsiniz.', 'success');
+  } catch (_) {
+    prompt('Kopyalayın:', text);
+  }
+  return true;
+}
+
+// Fiyat adlari (L-216, kullanici M45): mulk formu "Taban fiyat" yazip baz
+// fiyata kaydediyordu; kart ise ayni anda bos "Taban" ve dolu "Baz" gosteriyordu.
+const PROPERTY_PRICE_TERMS_HTML = '<div class="sub-text property-price-terms"><p><strong>Baz fiyat</strong> normal bir gecenin satış fiyatıdır; Fiyatlar ekranındaki önerilen fiyat hafta sonu, özel gün, doluluk, son dakika ve boş gece kurallarıyla bunun üstüne ya da altına hesaplanır.</p><p><strong>Taban fiyat</strong> asla altına inmeyeceğiniz en düşük gecelik fiyattır; önerilen fiyat, son dakika ve boş gece indirimi dahil, bunun altına düşmez.</p><p><strong>Hedef, premium, yoğun dönem</strong> sizin referans basamaklarınızdır (ortalama hedef, talep yüksek günler, zirve sezon). Hiçbiri sabit değildir; istediğiniz zaman değiştirebilirsiniz. Boş bırakılan basamak tahmin edilmez.</p></div>';
+
+function propertyLocationText(context = {}) {
+  const country = context.country_code && typeof PropertyAnalysisContextService !== 'undefined'
+    ? (PropertyAnalysisContextService.countryName(context.country_code) || context.country_code) : context.country_code;
+  return [context.district_region, context.city, context.admin_area, country].filter(Boolean).join(', ');
+}
+
 function renderPropertyProfile(villaKey) {
   const property = appData?.villas?.[villaKey];
   if (!property || typeof PropertyProfileEngine === 'undefined') return '';
@@ -18988,22 +19224,16 @@ function renderPropertyProfile(villaKey) {
     body = `<div class="property-profile-grid">
       <div><span class="sub-text">Kapasite</span><strong>${escapeHtml(property.capacity || 'Belirtilmedi')}</strong></div>
       <div><span class="sub-text">Faaliyete başlama</span><strong>${escapeHtml(property.activationDate || 'Belirtilmedi')}</strong></div>
+      <div><span class="sub-text">Konum</span><strong>${escapeHtml(propertyLocationText(context) || 'Belirtilmedi')}</strong></div>
       <div><span class="sub-text">Köy / mahalle</span><strong>${escapeHtml(context.locality || 'Belirtilmedi')}</strong></div>
       <div><span class="sub-text">Koordinat</span><strong>${escapeHtml(coordinates)}</strong></div>
       <div><span class="sub-text">Araştırma yarıçapı</span><strong>${context.research_radius_km == null ? 'Belirtilmedi' : escapeHtml(context.research_radius_km) + ' km'}</strong></div>
       <div><span class="sub-text">Mülk sahibi</span><strong>${escapeHtml(owner?.full_name || 'Belirtilmedi')}</strong><small>${escapeHtml(owner?.phone || owner?.email || '')}</small></div>
     </div>`;
   } else if (selectedPropertyProfileTab === 'PRICES') {
-    body = `<div class="property-profile-grid"><div><span class="sub-text">Baz fiyat</span><strong>${propertyMoney(property.basePrice)}</strong></div><div><span class="sub-text">Taban fiyat</span><strong>${propertyMoney(property.floor ?? property.floorPrice)}</strong></div><div><span class="sub-text">Hedef fiyat</span><strong>${propertyMoney(property.target)}</strong></div><div><span class="sub-text">Premium fiyat</span><strong>${propertyMoney(property.premium)}</strong></div><div><span class="sub-text">Yoğun dönem</span><strong>${propertyMoney(property.peak)}</strong></div></div><p class="sub-text">Baz fiyat normal satış referansıdır; taban fiyat alt koruma sınırıdır.</p>${propertyPricingLadderFormHtml(villaKey, property)}`;
+    body = `<div class="property-profile-grid"><div><span class="sub-text">Baz fiyat</span><strong>${propertyMoney(property.basePrice)}</strong></div><div><span class="sub-text">Taban fiyat</span><strong>${propertyMoney(property.floor ?? property.floorPrice)}</strong></div><div><span class="sub-text">Hedef fiyat</span><strong>${propertyMoney(property.target)}</strong></div><div><span class="sub-text">Premium fiyat</span><strong>${propertyMoney(property.premium)}</strong></div><div><span class="sub-text">Yoğun dönem</span><strong>${propertyMoney(property.peak)}</strong></div></div>${PROPERTY_PRICE_TERMS_HTML}${propertyPricingLadderFormHtml(villaKey, property)}`;
   } else if (selectedPropertyProfileTab === 'CHANNELS') {
-    const links = { ...(context.social_links || {}) };
-    if (property.url) links.ota = property.url;
-    const labels = { website: 'Web sitesi', instagram: 'Instagram', youtube: 'YouTube', googleBusiness: 'Google İşletme', facebook: 'Facebook', tiktok: 'TikTok', ota: 'OTA ilanı' };
-    const rendered = Object.entries(links).map(([key, value]) => {
-      const url = propertySafeLink(value);
-      return url && labels[key] ? `<a class="btn btn-secondary btn-sm" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(labels[key])}</a>` : '';
-    }).filter(Boolean).join('');
-    body = rendered ? `<div style="display:flex;gap:8px;flex-wrap:wrap">${rendered}</div>` : '<p class="empty-state">Kanal veya sosyal profil bağlantısı girilmemiş.</p>';
+    body = propertyChannelsTabHtml(villaKey, property, context);
   } else {
     const history = (appData.bookings || []).filter(row => row.propertyId === property.id || row.villa === villaKey).sort((a, b) => String(b.checkIn || '').localeCompare(String(a.checkIn || ''))).slice(0, 8);
     const financial = buildPropertyHistoryView(report);
@@ -19042,15 +19272,11 @@ function renderPropertiesTab() {
           </div>
           <span class="badge badge-green">AKTİF</span>
         </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px; margin: 6px 0;">
-          <div style="background: rgba(0,0,0,0.25); padding: 6px 8px; border-radius: 6px;">
-            <span style="color: #94A3B8; display: block;">Taban Fiyat:</span>
-            <strong style="color: #F8FAFC; font-size: 12px;">${(() => { const t = v.floor ?? v.floorPrice; return t !== null && t !== undefined && t !== '' && Number.isFinite(Number(t)) ? '₺' + Number(t).toLocaleString('tr-TR') : '—'; })()}</strong>
-          </div>
-          <div style="background: rgba(0,0,0,0.25); padding: 6px 8px; border-radius: 6px;">
-            <span style="color: #94A3B8; display: block;">Baz Fiyat:</span>
-            <strong style="color: #34D399; font-size: 12px;">${Number.isFinite(Number(v.basePrice)) ? '₺' + Number(v.basePrice).toLocaleString('tr-TR') : '—'}</strong>
-          </div>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-size: 11px; margin: 6px 0;">
+          ${[['Baz fiyat', v.basePrice, '#34D399', 'Normal bir gecenin satış fiyatı'], ['Taban fiyat', v.floor ?? v.floorPrice, '#F8FAFC', 'Altına inilmeyen en düşük gecelik fiyat'], ['Hedef fiyat', v.target, '#F8FAFC', 'Ortalama hedeflediğiniz gecelik fiyat']].map(([label, value, color, title]) => `<div style="background: rgba(0,0,0,0.25); padding: 6px 8px; border-radius: 6px;" title="${escapeHtml(title)}">
+            <span style="color: #94A3B8; display: block;">${escapeHtml(label)}</span>
+            <strong style="color: ${color}; font-size: 12px;">${propertyMoney(value === '' ? null : value)}</strong>
+          </div>`).join('')}
         </div>
         <div style="font-size: 11px; color: #CBD5E1;">
           <strong>Olanaklar:</strong> ${escapeHtml(v.amenities || 'Belirtilmedi')}
@@ -20719,6 +20945,14 @@ if (typeof module !== 'undefined' && module.exports) {
     setOperationsView,
     assignCleaningTask,
     renderOperationsPeopleView,
+    renderPropertyProfile,
+    renderPropertiesTab,
+    setPropertyProfileTab,
+    openPropertyChannelForm,
+    savePropertyChannelListing,
+    archivePropertyChannelListing,
+    savePropertyOwnerFromForm,
+    saveProperty,
     renderLeadQuickCapture,
     renderTodayCommandCenter,
     readEmailTokenHashLink,

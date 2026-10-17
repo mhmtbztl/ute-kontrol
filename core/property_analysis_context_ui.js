@@ -65,12 +65,14 @@ function resetPropertyAnalysisContextForm() {
   propertyAnalysisContextLoading = false;
   propertyAnalysisContextPropertyId = null;
   setPropertyAnalysisFieldValues();
+  renderPropertyOtaSummary(null);
   setPropertyAnalysisContextStatus('Konum ve sosyal profiller ChatGPT pazar analizine güvenli bağlantı olarak eklenir.');
 }
 
 async function loadPropertyAnalysisContextForm(propertyId) {
   resetPropertyAnalysisContextForm();
   propertyAnalysisContextPropertyId = propertyId || null;
+  renderPropertyOtaSummary(propertyId);
   if (!propertyId || typeof isUUID !== 'function' || !isUUID(propertyId)) {
     setPropertyAnalysisContextStatus('Konum ve profilleri kaydetmek için önce mülkü kaydedin.');
     return;
@@ -143,9 +145,26 @@ function openPropertyOtaManager() {
     setPropertyAnalysisContextStatus('OTA bağlantısı eklemek için önce mülkü kaydedin.', 'warning');
     return;
   }
+  // Ilanlarin evi mulk profilinin Kanallar sekmesidir (L-214): eskiden
+  // pazarlama hunisine gidiyordu ve kaydedilen ilan hicbir yerde listelenmiyordu.
+  const villaKey = typeof appData !== 'undefined' && Object.keys(appData?.villas || {})
+    .find(key => appData.villas[key]?.id === propertyAnalysisContextPropertyId);
   closePropertyModal();
-  if (typeof openMarketingListingManager === 'function') openMarketingListingManager(propertyAnalysisContextPropertyId);
-  else if (typeof switchTab === 'function') switchTab('marketing');
+  if (typeof switchTab === 'function') switchTab('properties');
+  if (villaKey && typeof openPropertyChannelForm === 'function') openPropertyChannelForm(villaKey);
+}
+
+// Mulk formunda bu mulkun kayitli ilanlari gorunur (kullanici: "ne duzenleme
+// ekraninda ne profilde gozukmedi").
+function renderPropertyOtaSummary(propertyId) {
+  const element = document.getElementById('propOtaSummary');
+  if (!element) return;
+  const api = typeof MarketingChannelListingService !== 'undefined' ? MarketingChannelListingService : null;
+  const listings = api && propertyId && typeof appData !== 'undefined'
+    ? api.listingsForProperty(appData.channelListings || [], propertyId) : [];
+  element.textContent = !propertyId ? ''
+    : listings.length ? `Kayıtlı kanal ilanları: ${listings.map(row => api.channelName(row)).join(', ')}`
+      : 'Bu mülk için kayıtlı kanal ilanı yok.';
 }
 
 function initializePropertyAnalysisContextUi() {

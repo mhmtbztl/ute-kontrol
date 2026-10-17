@@ -128,6 +128,41 @@ async function run() {
   check((bench || []).length === 0,
     '6b. Yabanci referans veritabanina ULASMIYOR', `satir: ${(bench || []).length}`);
 
+  // --- L-214: profilden arsivleme dogrudan UPDATE ile (istemcinin yolu) ----
+  const Listings = require('./marketing_channel_listing_service.js');
+  if (listingId) {
+    let xArchive = null;
+    try { await Listings.archiveChannelListing(B.client, { tenantId: A.tenantId, listingId }); } catch (e) { xArchive = e; }
+    const { data: still } = await admin.from('property_channel_listings').select('status').eq('id', listingId).single();
+    check(!!xArchive && still && still.status === 'ACTIVE',
+      '8. Yabanci kiraci ilani arsivleyemiyor; 0 satir "arsivlendi" sayilmiyor', JSON.stringify({ xArchive: xArchive && xArchive.message, still }));
+    let ownArchive = null;
+    try { ownArchive = await Listings.archiveChannelListing(A.client, { tenantId: A.tenantId, listingId }); } catch (e) { ownArchive = e.message; }
+    const { data: archived } = await admin.from('property_channel_listings').select('status').eq('id', listingId).single();
+    check(ownArchive && ownArchive.listingId === listingId && archived && archived.status === 'ARCHIVED',
+      '9. Sahip kendi ilanini arsivliyor (RLS UPDATE)', JSON.stringify({ ownArchive, archived }));
+    const again = await Listings.saveChannelListing(A.client, {
+      tenantId: A.tenantId, propertyId: A.propertyId, channelCode: 'AIRBNB', externalListingId: 'ISO-OWN-' + stamp, payoutCurrency: 'EUR'
+    }).catch(e => ({ error: e.message }));
+    const { data: back } = await admin.from('property_channel_listings').select('status,payout_currency').eq('id', listingId).single();
+    check(again && again.reused === true && back && back.status === 'ACTIVE' && back.payout_currency === 'EUR',
+      '10. Ayni ilan yeniden kaydedilince arsivden doner (ikinci satir acilmaz)', JSON.stringify({ again, back }));
+  }
+
+  // --- L-212: mulk sahibi istemcinin yolundan yazilir ----------------------
+  const Owners = require('./property_owner_service.js');
+  const ownerResult = await Owners.saveOwnerAndLink(A.client, {
+    tenantId: A.tenantId, propertyId: A.propertyId, fullName: 'ISO Sahip ' + stamp, phone: '05320000000'
+  }).catch(e => ({ error: e.message }));
+  const { data: link } = await admin.from('property_owner_links').select('owner_id').eq('property_id', A.propertyId);
+  check(ownerResult && ownerResult.ownerId && (link || []).length === 1 && link[0].owner_id === ownerResult.ownerId,
+    '11. Mulk sahibi ve bag kaydediliyor (property_owners + property_owner_links)', JSON.stringify({ ownerResult, link }));
+  const xOwner = await Owners.saveOwnerAndLink(B.client, { tenantId: A.tenantId, propertyId: A.propertyId, fullName: 'ISO Yabanci' })
+    .then(() => null, e => e);
+  const { data: linkAfter } = await admin.from('property_owner_links').select('owner_id').eq('property_id', A.propertyId);
+  check(!!xOwner && (linkAfter || []).length === 1 && linkAfter[0].owner_id === ownerResult.ownerId,
+    '12. Yabanci kiraci baska mulke sahip yazamiyor', JSON.stringify({ xOwner: xOwner && xOwner.message, linkAfter }));
+
   // --- Okuma tarafi (RLS) zaten dogru olmali ----------------------------
   const { data: xread } = await B.client.from('property_channel_listings')
     .select('id').eq('tenant_id', A.tenantId);

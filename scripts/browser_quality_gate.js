@@ -483,6 +483,36 @@ async function main() {
       assert(/18 gece · ₺144\.000/.test(bulkCalendar.note) && bulkCalendar.booked === 0, `Takvim rozeti: ${JSON.stringify(bulkCalendar)}`);
       await page.evaluate(() => resetReservationRange());
       passed.push('22. geçmiş ay toplu girişi formdan kaydedilir; takvimde gece ve tutarlı rozet, günlere çizilmez');
+      // L-215 (M44): Google Haritalar'in 15 ondalikli koordinati formu
+      // "gecerli bir deger girin" ile durduruyordu.
+      await page.evaluate(() => { switchTab('properties'); openPropertyModal('test'); });
+      await page.fill('#propMapCoordinatesLink', '36.794852353716564, 28.24900388719855');
+      const coord = await page.evaluate(() => ({
+        lat: document.getElementById('propAnalysisLatitude').value, lng: document.getElementById('propAnalysisLongitude').value,
+        valid: document.getElementById('propAnalysisLatitude').checkValidity() && document.getElementById('propAnalysisLongitude').checkValidity()
+      }));
+      assert(coord.lat === '36.794852' && coord.lng === '28.249004' && coord.valid, `Koordinat: ${JSON.stringify(coord)}`);
+      await page.evaluate(() => closePropertyModal());
+      // L-214 (M43): kanal ilani profilden kaydedilir ve Kanallar sekmesinde listelenir.
+      const listingRpc = [];
+      const listingRows = [];
+      await page.route('**/rest/v1/rpc/save_property_channel_listing', async route => {
+        const body = route.request().postDataJSON();
+        listingRpc.push(body);
+        listingRows.push({ id: '00000000-0000-4000-8000-000000000077', property_id: body.p_property_id, channel_code: body.p_channel_code, external_listing_id: body.p_external_listing_id, display_name: body.p_display_name, external_url: body.p_external_url, payout_currency: body.p_payout_currency, status: 'ACTIVE' });
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ listingId: '00000000-0000-4000-8000-000000000077', reused: false }) });
+      });
+      await page.route('**/rest/v1/property_channel_listings**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(listingRows) }));
+      await page.evaluate(() => openPropertyChannelForm('test'));
+      await page.fill('#channelListingUrl', 'https://www.airbnb.com.tr/rooms/12345678?adults=2');
+      await page.selectOption('#channelListingCurrency', 'EUR');
+      await page.click('[data-onclick^="savePropertyChannelListing("]');
+      await page.waitForFunction(() => /ID: 12345678/.test(document.getElementById('propertyProfileWorkspace').textContent), null, { timeout: 10000 });
+      const channelText = await page.evaluate(() => document.getElementById('propertyProfileWorkspace').textContent);
+      assert(listingRpc.length === 1 && listingRpc[0].p_external_listing_id === '12345678' && listingRpc[0].p_payout_currency === 'EUR'
+        && /Airbnb/.test(channelText) && /Ödeme: EUR/.test(channelText) && /İlanı aç/.test(channelText),
+        `Kanal ilani: ${JSON.stringify({ listingRpc, channelText: channelText.slice(0, 300) })}`);
+      passed.push('24. mülkler: uzun koordinat formu durdurmaz; kanal ilanı bağlantıdan ID okunarak kaydedilir ve profilde listelenir');
     });
 
     await withPage(browser, baseUrl, 'owner', { width: 390, height: 844 }, async page => {

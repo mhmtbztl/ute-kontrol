@@ -65,7 +65,7 @@
     ['MarketingDataService', 'core/marketing_data_service.js?v=0c6b8c4f'],
     ['MarketingReviewService', 'core/marketing_review_service.js?v=9207dee5'],
     ['MarketingSnapshotService', 'core/marketing_snapshot_service.js?v=184ad517'],
-    ['MarketingChannelListingService', 'core/marketing_channel_listing_service.js?v=f3dbce3f'],
+    ['MarketingChannelListingService', 'core/marketing_channel_listing_service.js?v=515fe386'],
     ['MarketingExperimentService', 'core/marketing_experiment_service.js?v=4a2ffb14'],
     ['MarketingHealthResultsService', 'core/marketing_health_results_service.js?v=662edeea'],
     ['AdsMetricsEngine', 'core/ads_metrics_engine.js?v=d8dd5962'],
@@ -400,7 +400,10 @@
       && String(item.mediaStatus || item.media_status || '').toUpperCase() === 'ACTIVE');
     const experimentDisabled = !selectedId || !scopedListings.length || activeMedia.length < 2;
     const toolbar = `<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-bottom:12px"><button type="button" class="btn btn-secondary btn-sm" data-marketing-open-listing>＋ Kanal ilanı ekle</button><button type="button" class="btn btn-secondary btn-sm" data-marketing-open-experiment${experimentDisabled ? ' disabled' : ''}>Değişikliği ölç</button><button type="button" class="btn btn-primary btn-sm" data-marketing-open-snapshot>＋ Manuel snapshot ekle</button></div>`;
-    const listingForm = state.listingFormOpen ? renderListingForm(model) : '';
+    const listingApi = services.MarketingChannelListingService;
+    const listingNote = scopedListings.length
+      ? `<div class="sub-text" style="margin-bottom:10px">Kayıtlı kanal ilanları: ${escapeHtml(scopedListings.map(item => listingApi && listingApi.channelName ? listingApi.channelName(item) : (item.channel_code || item.channelCode)).join(', '))} — Mülkler › profil › Kanallar sekmesinde düzenlenir.</div>` : '';
+    const listingForm = (state.listingFormOpen ? renderListingForm(model) : '') + listingNote;
     const form = state.snapshotFormOpen ? renderSnapshotForm(model) : '';
     const experimentForm = state.experimentFormOpen ? renderExperimentForm(model) : '';
     const experimentResults = renderExperiments(model.experiments, selectedId);
@@ -451,12 +454,12 @@
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px">
         <label style="display:grid;gap:5px;font-size:12px">Mülk<select class="form-control" name="propertyId" required>${propertyOptions}</select></label>
         <label style="display:grid;gap:5px;font-size:12px">Kanal<select class="form-control" name="channelCode" required>${channelOptions}</select></label>
-        <label style="display:grid;gap:5px;font-size:12px">İlan ID / sabit referans<input class="form-control" name="externalListingId" maxlength="200" required placeholder="Örn. Airbnb ilan ID"></label>
-        <label style="display:grid;gap:5px;font-size:12px">Platform / ilan adı<input class="form-control" name="displayName" maxlength="200" placeholder="Platformdaki ilan adı"></label>
+        <label style="display:grid;gap:5px;font-size:12px">İlan ID (isteğe bağlı)<input class="form-control" name="externalListingId" maxlength="200" placeholder="Bağlantıdan okunur"><small class="sub-text">Airbnb: adresteki /rooms/ sonrası sayı. Booking.com: tesis numarası.</small></label>
+        <label style="display:grid;gap:5px;font-size:12px">Platformdaki ilan adı<input class="form-control" name="displayName" maxlength="200" placeholder="Misafirin gördüğü başlık"></label>
         <label style="display:grid;gap:5px;font-size:12px">İlan URL’si<input class="form-control" type="url" name="externalUrl" placeholder="https://..." inputmode="url"></label>
-        <label style="display:grid;gap:5px;font-size:12px">Ödeme para birimi<input class="form-control" name="payoutCurrency" value="TRY" minlength="3" maxlength="3" required></label>
+        <label style="display:grid;gap:5px;font-size:12px">Ödeme para birimi<select class="form-control" name="payoutCurrency" required>${['TRY', 'EUR', 'USD', 'GBP'].map(code => `<option value="${escapeHtml(code)}">${escapeHtml(code)}</option>`).join('')}</select><small class="sub-text">Booking.com EUR ödüyorsa EUR seçin; tutarlar çevrilmez.</small></label>
       </div>
-      <div class="sub-text" style="margin-top:10px">ETS Tur gibi listede olmayan bir kanal için “Diğer OTA” seçin ve platform adını yazın. URL eklerseniz ChatGPT analiz paketine güvenli bağlantı olarak alınır. Sabit referans aynı kanal içinde tekrar gönderilirse mevcut kayıt güncellenir; başka mülke taşınmaz.</div>
+      <div class="sub-text" style="margin-top:10px">ETS Tur gibi listede olmayan bir kanal için “Diğer OTA” seçin ve platform adını yazın. İlan bağlantısını yapıştırmanız yeterli; ID bağlantıdan okunur. Kaydedilen ilanlar Mülkler › profil › Kanallar sekmesinde listelenir ve ChatGPT analizine bağlantı olarak gider. Aynı ilan tekrar kaydedilirse mevcut kayıt güncellenir.</div>
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button type="button" class="btn btn-secondary btn-sm" data-marketing-cancel-listing>Vazgeç</button><button type="submit" class="btn btn-primary btn-sm">Kanal ilanını kaydet</button></div>
     </form>`;
   }
@@ -919,8 +922,12 @@
       state.listingFormOpen = false;
       state.remoteStatus = 'LOADING';
       render();
+      // Mulk profili ayni listeyi okur; orada da hemen gorunsun (L-214).
+      if (typeof reloadChannelListings === 'function') await reloadChannelListings();
       await hydrateCloudData();
       render();
+      const status = document.getElementById('marketingWorkspaceStatus');
+      if (status) status.textContent = 'Kanal ilanı kaydedildi. Mülkler › profil › Kanallar sekmesinde listelenir.';
       return result;
     } finally {
       if (submit) submit.disabled = false;
@@ -1212,9 +1219,10 @@
       const listingForm = event.target.closest('[data-marketing-listing-form]');
       if (listingForm) {
         event.preventDefault();
-        handleListingSubmit(listingForm).catch(() => {
+        handleListingSubmit(listingForm).catch(error => {
           const status = document.getElementById('marketingWorkspaceStatus');
-          if (status) status.textContent = 'Kanal ilanı kaydedilemedi. Alanları kontrol edip yeniden deneyin.';
+          const api = services.MarketingChannelListingService;
+          if (status) status.textContent = api && api.errorMessage ? api.errorMessage(error) : 'Kanal ilanı kaydedilemedi. Alanları kontrol edip yeniden deneyin.';
         });
         return;
       }

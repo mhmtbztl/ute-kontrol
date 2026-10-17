@@ -558,7 +558,8 @@ const yazmalar = (istemci, tablo) =>
     });
     assert.deepStrictEqual(visible.map(item => item.booking.id), ['overlap']);
     assert.match(kaynak37, /fiyatAlani\(v\.base !== undefined \? v\.base : v\.basePrice\)/);
-    assert.match(kaynak37, /const t = v\.floor \?\? v\.floorPrice/);
+    // Kart L-216'da baz/taban/hedef uclusune dondu; taban kutusu yine floor ?? floorPrice okur.
+    assert.match(kaynak37, /\['Taban fiyat', v\.floor \?\? v\.floorPrice/);
   });
 
   await test('L-31 Görev uyduran villa düzeyi fonksiyonlar yok', async () => {

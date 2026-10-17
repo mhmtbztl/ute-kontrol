@@ -3509,8 +3509,9 @@
         </div>
         <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
           <div class="form-group">
-            <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Gecelik Taban Fiyat (₺):</label>
+            <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Gecelik Baz Fiyat (₺) — normal satış fiyatı:</label>
             <input type="number" id="propBasePrice" placeholder="Örn: 20000" required style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff;">
+            <span style="display:block; font-size:10px; color: var(--text-muted); margin-top: 4px;">Taban (en düşük), hedef ve yoğun dönem fiyatları mülk profili › Fiyatlar sekmesinden girilir.</span>
           </div>
           <div class="form-group">
             <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Temizlik Maliyeti (₺):</label>
@@ -3543,8 +3544,8 @@
           </div>
           <div class="property-analysis-context__grid">
             <div class="form-group"><label for="propMapCoordinatesLink">Konum: Google Haritalar bağlantısı, Plus Code ya da koordinat</label><input type="text" id="propMapCoordinatesLink" autocomplete="off" spellcheck="false" placeholder="Örn. 8G8F6J2V+F6 ya da 36.2012, 29.6431"><small class="sub-text">Kolay yol: Google Haritalar’da evin üzerine basılı tutun (bilgisayarda sağ tıklayın); çıkan “36.2012, 29.6431” sayısını kopyalayıp buraya yapıştırın. Enlem ve boylam kendiliğinden dolar. Elinizde “6J2V+F6 Kaş” gibi kısa kod varsa plus.codes/map sitesinde uzun koda çevirip yapıştırın.</small></div>
-            <div class="form-group"><label for="propAnalysisLatitude">Enlem</label><input type="number" id="propAnalysisLatitude" min="-90" max="90" step="0.000001" placeholder="40.123456"></div>
-            <div class="form-group"><label for="propAnalysisLongitude">Boylam</label><input type="number" id="propAnalysisLongitude" min="-180" max="180" step="0.000001" placeholder="29.012345"></div>
+            <div class="form-group"><label for="propAnalysisLatitude">Enlem</label><input type="number" id="propAnalysisLatitude" min="-90" max="90" step="any" placeholder="40.123456"></div>
+            <div class="form-group"><label for="propAnalysisLongitude">Boylam</label><input type="number" id="propAnalysisLongitude" min="-180" max="180" step="any" placeholder="29.012345"></div>
           </div>
           <div class="property-analysis-context__grid property-analysis-context__links">
             <div class="form-group"><label for="propSocialWebsite">Web sitesi</label><input type="url" inputmode="url" id="propSocialWebsite" placeholder="https://..."></div>
@@ -3556,6 +3557,7 @@
           </div>
           <div class="property-analysis-context__actions">
             <button type="button" class="btn btn-secondary btn-sm" data-onclick="openPropertyOtaManager()">OTA bağlantılarını yönet</button>
+            <span id="propOtaSummary" class="sub-text"></span>
             <span id="propAnalysisContextStatus" role="status" aria-live="polite">Konum ve sosyal profiller ChatGPT pazar analizine güvenli bağlantı olarak eklenir.</span>
           </div>
         </fieldset>
@@ -3666,7 +3668,7 @@
         </div>
         <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
           <div class="form-group">
-            <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Gecelik Taban Fiyat (₺):</label>
+            <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Gecelik Baz Fiyat (₺) — normal satış fiyatı:</label>
             <input type="number" id="onboardPropBasePrice" placeholder="Örn: 20000" required style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff;">
           </div>
           <div class="form-group">
@@ -3791,8 +3793,9 @@
   <script src="core/user_facing_errors.js?v=e4eb0ae5"></script>
   <script src="core/ledger_contract.js?v=ae1796a7"></script>
   <script src="core/report_engine.js?v=a06ed31b"></script>
-  <script src="core/property_profile_engine.js?v=552ff1ce"></script>
+  <script src="core/property_profile_engine.js?v=9d2f3d03"></script>
   <script src="core/property_owner_service.js?v=5c741a12"></script>
+  <script src="core/marketing_channel_listing_service.js?v=515fe386"></script>
   <script src="core/sales_workflow_service.js?v=46af3b73"></script>
   <script src="core/pricing_research_service.js?v=563f5895"></script>
   <script src="core/suggested_price_engine.js?v=6c3ac01e"></script>
@@ -3814,12 +3817,12 @@
   <script src="core/side_panel.js?v=d763b464"></script>
   <script src="core/notification_feed.js?v=d8a17633"></script>
   <script src="core/command_search.js?v=89760933"></script>
-  <script src="core/action_dispatch.js?v=2baf31c3"></script>
+  <script src="core/action_dispatch.js?v=4d7d7ea4"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=a85be454"></script>
-  <script src="app.js?v=bb6361a8"></script>
-  <script src="core/property_analysis_context_ui.js?v=0a5def2d"></script>
+  <script src="app.js?v=f8462853"></script>
+  <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
-  <script src="core/marketing_ui.js?v=6fdf284a"></script>
+  <script src="core/marketing_ui.js?v=e5503243"></script>
 </body>
 </html>
