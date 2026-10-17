@@ -10031,6 +10031,215 @@ function checklistTextToItems(text, supplies = []) {
   return { sections: sections.filter(section => section.items.length), supplies: Array.isArray(supplies) ? supplies : [] };
 }
 
+let settingsChecklistEditorId = null;
+
+function defaultSettingsChecklistDraft() {
+  return {
+    sections: [{ title: 'Genel', items: [{ text: '', important: false, subChecks: [] }] }],
+    supplies: []
+  };
+}
+
+function settingsChecklistNormalizer(items) {
+  const api = getOperationsApi();
+  return api?.normalizeChecklistTemplate
+    ? api.normalizeChecklistTemplate(items)
+    : { valid: false, errors: ['Kontrol listesi doğrulayıcısı yüklenemedi.'], checklist: null };
+}
+
+function checklistBuilderActionsHtml(kind, sectionIndex, itemIndex = -1, childIndex = -1) {
+  const args = `'${kind}', ${sectionIndex}, ${itemIndex}, ${childIndex}`;
+  return `<span class="checklist-builder-actions"><button type="button" class="btn btn-secondary btn-sm" aria-label="Yukarı taşı" data-onclick="moveChecklistBuilderNode(${args}, -1)">↑</button><button type="button" class="btn btn-secondary btn-sm" aria-label="Aşağı taşı" data-onclick="moveChecklistBuilderNode(${args}, 1)">↓</button><button type="button" class="btn btn-secondary btn-sm" aria-label="Sil" data-onclick="removeChecklistBuilderNode(${args})">Sil</button></span>`;
+}
+
+function settingsChecklistSectionHtml(section, sectionIndex) {
+  const items = (section.items || []).map((item, itemIndex) => {
+    const subs = (item.subChecks || []).map((subCheck, subIndex) => `<div class="checklist-builder-sub" data-checklist-sub><label>Alt kontrol <input type="text" maxlength="300" value="${escapeHtml(subCheck)}" placeholder="Örn. Fırın içi"></label>${checklistBuilderActionsHtml('sub', sectionIndex, itemIndex, subIndex)}</div>`).join('');
+    return `<div class="checklist-builder-item" data-checklist-item>
+      <div class="checklist-builder-item-main"><label>Kontrol maddesi <input type="text" maxlength="500" data-checklist-item-text value="${escapeHtml(item.text || '')}" placeholder="Örn. Kapı kodu denendi"></label><label class="checklist-builder-important"><input type="checkbox" data-checklist-important ${item.important ? 'checked' : ''}> Önemli / zorunlu</label></div>
+      ${checklistBuilderActionsHtml('item', sectionIndex, itemIndex)}
+      <div class="checklist-builder-subs">${subs}<button type="button" class="btn btn-secondary btn-sm" data-onclick="addChecklistBuilderSubCheck(${sectionIndex}, ${itemIndex})">+ Alt kontrol</button></div>
+    </div>`;
+  }).join('');
+  return `<section class="checklist-builder-section" data-checklist-section>
+    <div class="checklist-builder-section-head"><label>Bölüm adı <input type="text" maxlength="200" data-checklist-section-title value="${escapeHtml(section.title || '')}" placeholder="Örn. Mutfak"></label>${checklistBuilderActionsHtml('section', sectionIndex)}</div>
+    <div data-checklist-items>${items}</div>
+    <button type="button" class="btn btn-secondary btn-sm" data-onclick="addChecklistBuilderItem(${sectionIndex})">+ Madde ekle</button>
+  </section>`;
+}
+
+function renderSettingsChecklistBuilder(items = defaultSettingsChecklistDraft()) {
+  const builder = typeof document !== 'undefined' ? document.getElementById('settingsChecklistBuilder') : null;
+  const supplyRows = typeof document !== 'undefined' ? document.getElementById('settingsChecklistSupplyRows') : null;
+  if (!builder || !supplyRows) return false;
+  const normalized = Array.isArray(items)
+    ? settingsChecklistNormalizer(items)
+    : {
+        valid: !!items && Array.isArray(items.sections) && (items.supplies == null || Array.isArray(items.supplies)),
+        errors: ['Kontrol listesi yapısı okunamadı.'],
+        checklist: items ? JSON.parse(JSON.stringify({ sections: items.sections || [], supplies: items.supplies || [] })) : null
+      };
+  if (!normalized.valid) {
+    builder.dataset.invalid = 'true';
+    builder.innerHTML = `<div class="empty-state">Bu kayıt düzenlenemiyor: ${escapeHtml(normalized.errors.join(' '))}</div>`;
+    supplyRows.innerHTML = '';
+    return false;
+  }
+  builder.dataset.invalid = 'false';
+  builder.dataset.ready = 'true';
+  builder.innerHTML = normalized.checklist.sections.map(settingsChecklistSectionHtml).join('');
+  supplyRows.innerHTML = normalized.checklist.supplies.map((supply, index) => `<div class="checklist-builder-supply" data-checklist-supply><div class="checklist-builder-meta"><label>Alan <input type="text" maxlength="200" data-checklist-supply-area value="${escapeHtml(supply.area || '')}" placeholder="Örn. Mutfak"></label><label>Malzeme <input type="text" maxlength="300" data-checklist-supply-item value="${escapeHtml(supply.item || '')}" placeholder="Örn. Çay"></label></div>${checklistBuilderActionsHtml('supply', -1, -1, index)}</div>`).join('');
+  toggleSettingsChecklistSupplyVisibility();
+  return true;
+}
+
+function readSettingsChecklistBuilder() {
+  if (typeof document === 'undefined') return defaultSettingsChecklistDraft();
+  const sections = Array.from(document.querySelectorAll('#settingsChecklistBuilder [data-checklist-section]')).map(section => ({
+    title: String(section.querySelector('[data-checklist-section-title]')?.value || '').trim(),
+    items: Array.from(section.querySelectorAll(':scope > [data-checklist-items] > [data-checklist-item]')).map(item => ({
+      text: String(item.querySelector('[data-checklist-item-text]')?.value || '').trim(),
+      important: item.querySelector('[data-checklist-important]')?.checked === true,
+      subChecks: Array.from(item.querySelectorAll('[data-checklist-sub] input')).map(input => String(input.value || '').trim())
+    }))
+  }));
+  const supplies = Array.from(document.querySelectorAll('#settingsChecklistSupplyRows [data-checklist-supply]')).map(row => ({
+    area: String(row.querySelector('[data-checklist-supply-area]')?.value || '').trim(),
+    item: String(row.querySelector('[data-checklist-supply-item]')?.value || '').trim()
+  }));
+  return { sections, supplies };
+}
+
+function mutateSettingsChecklistBuilder(mutator) {
+  const draft = readSettingsChecklistBuilder();
+  mutator(draft);
+  return renderSettingsChecklistBuilder(draft);
+}
+
+function addChecklistBuilderSection() {
+  return mutateSettingsChecklistBuilder(draft => draft.sections.push({ title: '', items: [{ text: '', important: false, subChecks: [] }] }));
+}
+
+function addChecklistBuilderItem(sectionIndex) {
+  return mutateSettingsChecklistBuilder(draft => draft.sections[sectionIndex]?.items.push({ text: '', important: false, subChecks: [] }));
+}
+
+function addChecklistBuilderSubCheck(sectionIndex, itemIndex) {
+  return mutateSettingsChecklistBuilder(draft => draft.sections[sectionIndex]?.items[itemIndex]?.subChecks.push(''));
+}
+
+function addChecklistBuilderSupply() {
+  return mutateSettingsChecklistBuilder(draft => draft.supplies.push({ area: '', item: '' }));
+}
+
+function removeChecklistBuilderNode(kind, sectionIndex, itemIndex = -1, childIndex = -1) {
+  return mutateSettingsChecklistBuilder(draft => {
+    if (kind === 'section') draft.sections.splice(sectionIndex, 1);
+    if (kind === 'item') draft.sections[sectionIndex]?.items.splice(itemIndex, 1);
+    if (kind === 'sub') draft.sections[sectionIndex]?.items[itemIndex]?.subChecks.splice(childIndex, 1);
+    if (kind === 'supply') draft.supplies.splice(childIndex, 1);
+  });
+}
+
+function moveChecklistBuilderNode(kind, sectionIndex, itemIndex = -1, childIndex = -1, direction = 0) {
+  return mutateSettingsChecklistBuilder(draft => {
+    let list = null;
+    let index = -1;
+    if (kind === 'section') { list = draft.sections; index = sectionIndex; }
+    if (kind === 'item') { list = draft.sections[sectionIndex]?.items; index = itemIndex; }
+    if (kind === 'sub') { list = draft.sections[sectionIndex]?.items[itemIndex]?.subChecks; index = childIndex; }
+    if (kind === 'supply') { list = draft.supplies; index = childIndex; }
+    const target = index + Number(direction || 0);
+    if (!list || index < 0 || target < 0 || target >= list.length) return;
+    [list[index], list[target]] = [list[target], list[index]];
+  });
+}
+
+function toggleSettingsChecklistSupplyVisibility() {
+  if (typeof document === 'undefined') return false;
+  const form = document.getElementById('settingsChecklistTemplateForm');
+  const supplies = document.getElementById('settingsChecklistSupplies');
+  const taskType = form?.elements?.task_type;
+  if (!form || !supplies || !taskType) return false;
+  supplies.hidden = taskType.value !== 'CLEANING';
+  return !supplies.hidden;
+}
+
+function renderSettingsChecklistPropertyOptions(selectedValue = null) {
+  if (typeof document === 'undefined') return false;
+  const select = document.getElementById('settingsChecklistProperty');
+  if (!select) return false;
+  const selected = selectedValue == null ? select.value : String(selectedValue || '');
+  const properties = Object.values(appData?.villas || {}).filter(property => property?.id && property.isActive !== false && !property.archivedAt);
+  select.innerHTML = `<option value="">Tüm mülkler</option>${properties.map(property => `<option value="${escapeHtml(property.id)}">${escapeHtml(property.name || 'Adsız mülk')}</option>`).join('')}`;
+  select.value = properties.some(property => property.id === selected) ? selected : '';
+  renderSettingsChecklistMergePreview();
+  return true;
+}
+
+function renderSettingsChecklistMergePreview() {
+  if (typeof document === 'undefined') return false;
+  const form = document.getElementById('settingsChecklistTemplateForm');
+  const preview = document.getElementById('settingsChecklistMergePreview');
+  const taskTypeField = form?.elements?.task_type;
+  const propertyField = form?.elements?.property_id;
+  if (!form || !preview || !taskTypeField || !propertyField) return false;
+  const taskType = taskTypeField.value;
+  const propertyId = propertyField.value || null;
+  const candidates = (appData?.settingsChecklistTemplates || [])
+    .filter(item => item.is_active !== false && item.task_type === taskType
+      && (!item.property_id || item.property_id === propertyId))
+    .sort((left, right) => Number(Boolean(left.property_id)) - Number(Boolean(right.property_id))
+      || (Number(right.version) || 1) - (Number(left.version) || 1));
+  const selected = [];
+  for (const item of candidates) {
+    const scope = item.property_id ? 'property' : 'portfolio';
+    if (!selected.some(entry => entry.scope === scope)) selected.push({ scope, item });
+  }
+  const names = selected.map(entry => `${entry.scope === 'portfolio' ? 'Tüm mülkler' : 'Mülke özel'}: ${entry.item.template_name || 'Adsız'}`);
+  preview.textContent = propertyId
+    ? `Görevde birleşme sırası: ${names.length ? names.join(' → ') : 'Henüz kaydedilmiş uygun şablon yok.'}`
+    : `Görevde kullanılacak liste: ${names[0] || 'Henüz kaydedilmiş genel şablon yok.'}`;
+  return true;
+}
+
+function cancelSettingsChecklistEdit() {
+  settingsChecklistEditorId = null;
+  const form = typeof document !== 'undefined' ? document.getElementById('settingsChecklistTemplateForm') : null;
+  if (!form) return false;
+  form.reset();
+  renderSettingsChecklistPropertyOptions('');
+  renderSettingsChecklistBuilder(defaultSettingsChecklistDraft());
+  const submit = document.getElementById('settingsChecklistSubmitButton');
+  const cancel = document.getElementById('settingsChecklistCancelButton');
+  if (submit) submit.textContent = 'Kontrol listesini kaydet';
+  if (cancel) cancel.hidden = true;
+  return true;
+}
+
+function startEditingSettingsChecklist(id) {
+  const item = getSettingsTemplate('checklist', id);
+  const normalized = item ? settingsChecklistNormalizer(item.items) : null;
+  if (!item || !normalized?.valid) {
+    showToast('Bu kontrol listesi güvenle düzenlenemiyor: ' + (normalized?.errors || ['Kayıt bulunamadı.']).join(' '), 'error');
+    return false;
+  }
+  const form = document.getElementById('settingsChecklistTemplateForm');
+  if (!form) return false;
+  settingsChecklistEditorId = id;
+  form.elements.template_name.value = item.template_name || '';
+  form.elements.task_type.value = item.task_type === 'CHECKIN_PREP' ? 'CHECKIN_PREP' : 'CLEANING';
+  renderSettingsChecklistPropertyOptions(item.property_id || '');
+  renderSettingsChecklistBuilder(normalized.checklist);
+  renderSettingsChecklistMergePreview();
+  const submit = document.getElementById('settingsChecklistSubmitButton');
+  const cancel = document.getElementById('settingsChecklistCancelButton');
+  if (submit) submit.textContent = 'Değişiklikleri kaydet';
+  if (cancel) cancel.hidden = false;
+  form.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  return true;
+}
+
 async function loadSettingsCatalogs() {
   const tenantId = getActiveTenantId();
   if (!isCloudTenant(tenantId) || !canManageTenantRole(activeTenant?.role)) return false;
@@ -10069,6 +10278,9 @@ function renderSettingsTemplates() {
   const messageList = document.getElementById('settingsMessageTemplatesList');
   const taskList = document.getElementById('settingsTaskTemplatesList');
   const checklistList = document.getElementById('settingsChecklistTemplatesList');
+  renderSettingsChecklistPropertyOptions();
+  const checklistBuilder = document.getElementById('settingsChecklistBuilder');
+  if (checklistBuilder && checklistBuilder.dataset.ready !== 'true') renderSettingsChecklistBuilder(defaultSettingsChecklistDraft());
   if (messageList) messageList.innerHTML = messages.length
     ? messages.map(item => settingsTemplateRowHtml('message', item, item.name, `${String(item.channel || 'WHATSAPP').toUpperCase() === 'WHATSAPP' ? 'WhatsApp' : (item.channel || '—')} · ${String(item.lifecycle_stage || 'MANUAL').toUpperCase() === 'MANUAL' ? 'elle gönderilir' : 'otomatik'}${item.is_active === false ? ' · Kapalı' : ''}`)).join('')
     : '<div class="empty-state">Mesaj şablonu yok.</div>';
@@ -10076,7 +10288,12 @@ function renderSettingsTemplates() {
     ? tasks.map(item => settingsTemplateRowHtml('task', item, item.title, `${TEMPLATE_TASK_TYPE_LABELS[item.task_type] || 'Genel'} · ${TEMPLATE_PRIORITY_LABELS[item.priority] || 'orta öncelik'}${item.is_active === false ? ' · Kapalı' : ''}`)).join('')
     : '<div class="empty-state">Görev şablonu yok.</div>';
   if (checklistList) checklistList.innerHTML = checklists.length
-    ? checklists.map(item => settingsTemplateRowHtml('checklist', item, item.template_name, `${item.property_id ? 'Mülke özel' : 'Genel'}${item.is_active === false ? ' · Kapalı' : ''}`)).join('')
+    ? checklists.map(item => {
+      const property = Object.values(appData?.villas || {}).find(candidate => candidate?.id === item.property_id);
+      const typeLabel = item.task_type === 'CHECKIN_PREP' ? 'Misafir öncesi' : 'Temizlik';
+      const scopeLabel = item.property_id ? (property?.name || 'Mülke özel') : 'Tüm mülkler';
+      return settingsTemplateRowHtml('checklist', item, item.template_name, `${typeLabel} · ${scopeLabel}${item.is_active === false ? ' · Kapalı' : ''}`);
+    }).join('')
     : '<div class="empty-state">Kontrol listesi şablonu yok.</div>';
 }
 
@@ -10121,26 +10338,46 @@ async function createSettingsTaskTemplate(event) {
 async function createSettingsChecklistTemplate(event) {
   event.preventDefault();
   const form = event.currentTarget;
-  const parsedItems = checklistTextToItems(form.elements.items.value);
-  if (!parsedItems.sections.length) {
-    showToast('Kontrol listesine en az bir madde yazın.', 'error');
+  const taskType = form.elements.task_type.value === 'CHECKIN_PREP' ? 'CHECKIN_PREP' : 'CLEANING';
+  const draft = readSettingsChecklistBuilder();
+  if (taskType !== 'CLEANING') draft.supplies = [];
+  const normalized = settingsChecklistNormalizer(draft);
+  if (!normalized.valid) {
+    showToast('Kontrol listesi kaydedilemedi: ' + normalized.errors[0], 'error');
     return false;
   }
   const payload = {
-    tenant_id: getActiveTenantId(), property_id: null, task_type: 'CLEANING',
+    tenant_id: getActiveTenantId(), property_id: form.elements.property_id.value || null, task_type: taskType,
     template_name: String(form.elements.template_name.value || '').trim(),
-    items: parsedItems,
+    items: normalized.checklist,
     is_active: true
   };
-  const { error } = await supabaseClient.from('property_checklist_templates').insert(payload);
-  if (error) {
-    showToast('Kontrol listesi kaydedilemedi: ' + kullaniciMesaji(error.message), 'error');
+  const sameScope = (appData?.settingsChecklistTemplates || []).filter(item =>
+    item.is_active !== false
+      && item.task_type === payload.task_type
+      && (item.property_id || null) === payload.property_id
+      && item.id !== settingsChecklistEditorId
+  );
+  if (!settingsChecklistEditorId && sameScope.length) {
+    showToast('Bu kullanım ve kapsam için etkin bir liste zaten var. Listedeki kaydı düzenleyin veya önce arşivleyin.', 'error');
     return false;
   }
-  form.reset();
+  const failure = settingsChecklistEditorId
+    ? await updateSettingsRow('property_checklist_templates', settingsChecklistEditorId, {
+        property_id: payload.property_id, task_type: payload.task_type,
+        template_name: payload.template_name, items: payload.items,
+        version: (Number(getSettingsTemplate('checklist', settingsChecklistEditorId)?.version) || 1) + 1
+      })
+    : (await supabaseClient.from('property_checklist_templates').insert(payload)).error?.message;
+  if (failure) {
+    showToast('Kontrol listesi kaydedilemedi: ' + kullaniciMesaji(failure), 'error');
+    return false;
+  }
+  const wasEditing = !!settingsChecklistEditorId;
+  cancelSettingsChecklistEdit();
   await loadSettingsCatalogs();
   renderSettingsTemplates();
-  showToast('Kontrol listesi kaydedildi.', 'success');
+  showToast(wasEditing ? 'Kontrol listesi güncellendi.' : 'Kontrol listesi kaydedildi.', 'success');
   return true;
 }
 
@@ -10155,6 +10392,7 @@ function getSettingsTemplate(kind, id) {
 async function editSettingsTemplate(kind, id) {
   const item = getSettingsTemplate(kind, id);
   if (!item) return false;
+  if (kind === 'checklist') return startEditingSettingsChecklist(id);
   const table = kind === 'message' ? 'message_templates' : kind === 'task' ? 'task_templates' : 'property_checklist_templates';
   const nameField = kind === 'message' ? 'name' : kind === 'task' ? 'title' : 'template_name';
   const nextName = prompt('Şablon adı:', item[nameField] || '');
@@ -10172,13 +10410,6 @@ async function editSettingsTemplate(kind, id) {
     if (!TEMPLATE_PRIORITY_LABELS[priority]) { showToast('Geçerli bir öncelik seçin.', 'error'); return false; }
     patch.task_type = taskType;
     patch.priority = priority;
-  }
-  if (kind === 'checklist') {
-    const text = prompt('Maddeler (her satıra bir madde; "# Bölüm" yeni bölüm, "!" önemli, " > a; b" alt işaretler):', checklistItemsToText(item.items));
-    if (text === null) return false;
-    const items = checklistTextToItems(text, item.items?.supplies);
-    if (!items.sections.length) { showToast('Kontrol listesine en az bir madde yazın.', 'error'); return false; }
-    patch.items = items;
   }
   const failure = await updateSettingsRow(table, id, patch);
   if (failure) {
@@ -18908,6 +19139,13 @@ async function saveStaffCleaningProgress(executionId) {
 }
 
 async function signStaffCleaningDone(executionId) {
+  const row = staffFieldWork.cleanings.find(item => item.execution_id === executionId);
+  const completion = row ? getOperationsApi()?.checklistCompletionState?.(row.checklist, row.checklist_result || {}) : null;
+  if (!row || !completion?.canComplete) {
+    const detail = completion?.errors?.[0] || `${completion?.missingKeys?.length || 0} önemli kontrol eksik.`;
+    if (typeof showToast === 'function') showToast('⚠️ Temizlik tamamlanamaz: ' + detail, 'error');
+    return false;
+  }
   if (!confirm('Temizliği tamamladığınızı imzalıyor musunuz? Yönetici denetiminden sonra kapanır.')) return false;
   if (!await saveStaffCleaningProgress(executionId)) return false;
   const { error } = await supabaseClient.rpc('sign_cleaning_done', { p_execution_id: executionId });
@@ -18922,6 +19160,9 @@ async function signStaffCleaningDone(executionId) {
 
 async function setMyOperationalTaskStatus(taskId, status) {
   if (!['IN_PROGRESS', 'DONE'].includes(status)) return false;
+  const task = staffFieldWork.tasks.find(item => item.id === taskId);
+  const normalized = task?.checklist ? getOperationsApi()?.normalizeChecklistTemplate?.(task.checklist) : null;
+  if (normalized?.valid) return saveMyOperationalTaskChecklist(taskId, status);
   const { error } = await supabaseClient.rpc('set_my_task_status', {
     p_task_id: taskId, p_status: status, p_note: null
   });
@@ -18930,6 +19171,60 @@ async function setMyOperationalTaskStatus(taskId, status) {
     return false;
   }
   await loadStaffFieldWork();
+  return true;
+}
+
+function staffTaskChecklistResult(task) {
+  if (task?.checklist_result && typeof task.checklist_result === 'object') return task.checklist_result;
+  if (task?.checklist && !Array.isArray(task.checklist) && task.checklist.result && typeof task.checklist.result === 'object') {
+    return JSON.parse(JSON.stringify(task.checklist.result));
+  }
+  if (Array.isArray(task?.checklist)) {
+    return Object.fromEntries(task.checklist.map((item, index) => [`s0.i${index}`, { z: item?.completed === true }]));
+  }
+  return {};
+}
+
+function setStaffTaskChecklistMark(taskId, key, checked) {
+  const task = staffFieldWork.tasks.find(item => item.id === taskId);
+  if (!task) return false;
+  const result = staffTaskChecklistResult(task);
+  task.checklist_result = { ...result, [key]: { z: !!checked } };
+  return true;
+}
+
+function renderStaffOperationalChecklist(task) {
+  const normalized = getOperationsApi()?.normalizeChecklistTemplate?.(task?.checklist);
+  if (!normalized?.valid) return task?.checklist ? '<div class="empty-state">Kontrol listesi okunamadı; yöneticinize bildirin.</div>' : '';
+  const result = staffTaskChecklistResult(task);
+  task.checklist_result = result;
+  return `<div class="staff-task-checklist">${normalized.checklist.sections.map((section, sectionIndex) => `<fieldset class="staff-check-section"><legend>${escapeHtml(section.title || 'Kontrol')}</legend>${section.items.map((item, itemIndex) => {
+    const key = `s${sectionIndex}.i${itemIndex}`;
+    const checked = result[key]?.z === true || item.completed === true;
+    const subs = (item.subChecks || []).map((subCheck, subIndex) => { const subKey = `${key}.sub${subIndex}`; return `<label style="margin-left:22px"><input type="checkbox" ${result[subKey]?.z === true ? 'checked' : ''} data-onchange="setStaffTaskChecklistMark(decodeURIComponent('${encodeActionArg(task.id)}'), decodeURIComponent('${encodeActionArg(subKey)}'), this.checked)"> ${escapeHtml(subCheck)}</label>`; }).join('');
+    return `<label><input type="checkbox" ${checked ? 'checked' : ''} data-onchange="setStaffTaskChecklistMark(decodeURIComponent('${encodeActionArg(task.id)}'), decodeURIComponent('${encodeActionArg(key)}'), this.checked)"> ${item.important ? '<strong>Önemli · </strong>' : ''}${escapeHtml(item.text || '—')}</label>${subs}`;
+  }).join('')}</fieldset>`).join('')}</div>`;
+}
+
+async function saveMyOperationalTaskChecklist(taskId, status = 'IN_PROGRESS') {
+  const task = staffFieldWork.tasks.find(item => item.id === taskId);
+  if (!task || !['IN_PROGRESS', 'DONE'].includes(status)) return false;
+  const result = staffTaskChecklistResult(task);
+  const completion = getOperationsApi()?.checklistCompletionState?.(task.checklist, result);
+  if (status === 'DONE' && !completion?.canComplete) {
+    const detail = completion?.errors?.[0] || `${completion?.missingKeys?.length || 0} önemli kontrol eksik.`;
+    if (typeof showToast === 'function') showToast('⚠️ Görev tamamlanamaz: ' + detail, 'error');
+    return false;
+  }
+  const { error } = await supabaseClient.rpc('save_my_task_checklist', {
+    p_task_id: taskId, p_result: result, p_status: status, p_note: null
+  });
+  if (error) {
+    if (typeof showToast === 'function') showToast('⚠️ Kontrol listesi kaydedilemedi: ' + getFriendlyAuthErrorMessage(error), 'error');
+    return false;
+  }
+  await loadStaffFieldWork();
+  if (typeof showToast === 'function') showToast(status === 'DONE' ? '✅ Görev tamamlandı.' : '✅ İlerleme kaydedildi.');
   return true;
 }
 
@@ -18953,7 +19248,13 @@ function renderStaffFieldWork() {
   }).join('') : '<div class="empty-state">Açık veya yeniden açılmış temizlik göreviniz yok.</div>';
   const tasks = staffFieldWork.tasks || [];
   if (tasks.length) {
-    container.innerHTML += `<section class="ops-group"><h2>Genel görevler</h2>${tasks.map(task => `<article class="ops-row"><div class="ops-row-main"><strong>${escapeHtml(task.title || 'Görev')}</strong><span>${escapeHtml(task.description || '')}</span></div><span class="badge">${escapeHtml(task.status || 'TODO')}</span><div class="ops-row-actions">${task.status === 'TODO' ? `<button class="btn btn-secondary btn-sm" data-onclick="setMyOperationalTaskStatus(decodeURIComponent('${encodeActionArg(task.id)}'), 'IN_PROGRESS')">Başla</button>` : ''}<button class="btn btn-primary btn-sm" data-onclick="setMyOperationalTaskStatus(decodeURIComponent('${encodeActionArg(task.id)}'), 'DONE')">Tamamla</button></div></article>`).join('')}</section>`;
+    container.innerHTML += `<section class="ops-group"><h2>Genel görevler</h2>${tasks.map(task => {
+      const checklist = renderStaffOperationalChecklist(task);
+      const actions = checklist
+        ? `<button class="btn btn-secondary btn-sm" data-onclick="saveMyOperationalTaskChecklist(decodeURIComponent('${encodeActionArg(task.id)}'), 'IN_PROGRESS')">İlerlemeyi kaydet</button><button class="btn btn-primary btn-sm" data-onclick="saveMyOperationalTaskChecklist(decodeURIComponent('${encodeActionArg(task.id)}'), 'DONE')">Kontrolü tamamla</button>`
+        : `${task.status === 'TODO' ? `<button class="btn btn-secondary btn-sm" data-onclick="setMyOperationalTaskStatus(decodeURIComponent('${encodeActionArg(task.id)}'), 'IN_PROGRESS')">Başla</button>` : ''}<button class="btn btn-primary btn-sm" data-onclick="setMyOperationalTaskStatus(decodeURIComponent('${encodeActionArg(task.id)}'), 'DONE')">Tamamla</button>`;
+      return `<article class="ops-row staff-task-row"><div class="ops-row-main"><strong>${escapeHtml(task.title || 'Görev')}</strong><span>${escapeHtml(task.description || '')}</span></div><span class="badge">${escapeHtml(task.status || 'TODO')}</span>${checklist}<div class="ops-row-actions">${actions}</div></article>`;
+    }).join('')}</section>`;
   }
 }
 

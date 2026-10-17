@@ -5021,6 +5021,7 @@ body {
 .staff-check-section { border: 1px solid rgba(255,255,255,.09); border-radius: 8px; padding: 10px 12px; margin: 0 0 10px; }
 .staff-check-section legend { padding: 0 5px; color: #F8FAFC; font-weight: 700; }
 .staff-check-section label { display: block; padding: 6px 0; color: #E2E8F0; }
+.staff-task-checklist { grid-column: 1 / -1; width: 100%; }
 .staff-supplies h3 { font-size: 14px; margin: 14px 0 8px; }
 .staff-supply { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 6px 0; }
 .staff-supply select { min-width: 120px; padding: 7px; background: var(--bg-input); color: #fff; border: 1px solid rgba(255,255,255,.15); border-radius: 6px; }
@@ -5403,4 +5404,25 @@ body.side-panel-open { overflow: hidden; }
 @media (max-width: 600px) {
   .reservation-scope-title { width: 100%; margin-right: 0; }
   .reservation-scope-row > div:has(#rezVillaFilter), .reservation-scope-row #rezVillaFilter { width: 100%; }
+}
+/* G9 zengin kontrol listesi duzenleyicisi */
+.checklist-builder-form { gap: 14px; }
+.checklist-builder-meta { display: grid; grid-template-columns: minmax(180px, 2fr) minmax(160px, 1fr) minmax(160px, 1fr); gap: 10px; }
+.checklist-builder { display: grid; gap: 12px; }
+.checklist-builder-section { border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; background: rgba(15, 23, 42, .35); }
+.checklist-builder-section-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; margin-bottom: 10px; }
+.checklist-builder-actions { display: flex; flex-wrap: wrap; gap: 5px; }
+.checklist-builder-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 10px 0; border-top: 1px solid rgba(148, 163, 184, .15); }
+.checklist-builder-item-main { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.checklist-builder-important { display: flex; gap: 6px; align-items: center; white-space: nowrap; font-size: 12px; }
+.checklist-builder-subs { grid-column: 1 / -1; display: grid; gap: 6px; padding-left: 18px; }
+.checklist-builder-sub, .checklist-builder-supply { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; align-items: center; }
+.checklist-builder-supplies { border-top: 1px solid var(--border-color); padding-top: 12px; }
+.checklist-builder-submit { display: flex; flex-wrap: wrap; gap: 8px; }
+.checklist-merge-preview { padding: 8px 10px; border-radius: 8px; background: rgba(59, 130, 246, .08); }
+
+@media (max-width: 768px) {
+  .checklist-builder-meta, .checklist-builder-section-head, .checklist-builder-item, .checklist-builder-item-main { grid-template-columns: 1fr; }
+  .checklist-builder-item { grid-template-columns: 1fr; }
+  .checklist-builder-subs { padding-left: 8px; }
 }
