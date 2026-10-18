@@ -561,6 +561,27 @@ async function main() {
         'Talep listesi: ' + JSON.stringify(leadList));
       await page.click('#leadViewKanban');
       passed.push('26. talepler: ek mülk adı okunur; hızlı talep pencerede kaydedilebilir; liste kanbanın yerinde açılır');
+      // G9 M50 (L-221): rezervasyondaki kisi Misafirler ekranindan deftere eklenir.
+      const guestRpc = [];
+      await page.route('**/rest/v1/rpc/upsert_booking_guest_atomic', async route => {
+        const body = route.request().postDataJSON();
+        guestRpc.push(body);
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: '00000000-0000-4000-8000-0000000000e1', tenant_id: body.p_tenant_id, first_name: body.p_first_name, last_name: body.p_last_name, phone: body.p_phone, email: body.p_email }) });
+      });
+      await page.evaluate(() => {
+        appData.guests = [];
+        appData.bookings = [{ id: '00000000-0000-4000-8000-0000000000b1', villa: 'test', propertyId: appData.villas.test.id, guest: 'Onur Bey', phone: '0532 111 22 33', checkIn: getTodayStr(), checkOut: getTodayStr(), gross: 1000, channel: 'WHATSAPP', status: 'CONFIRMED' }];
+        switchTab('guests');
+      });
+      await page.click('#guestDataNotice [data-onclick="toggleGuestUnlinkedPanel()"]');
+      await page.waitForSelector('#guestUnlinkedPanel:not([hidden]) #guestLinkPhone_0');
+      await page.click('#guestUnlinkedPanel [data-onclick="linkUnlinkedBookingGuest(0)"]');
+      await page.waitForFunction(() => document.getElementById('guestUnlinkedPanel').hidden === true, null, { timeout: 10000 });
+      const guestState = await page.evaluate(() => ({ linked: appData.bookings[0].primaryGuestId, guests: appData.guests.length }));
+      assert(guestRpc.length === 1 && guestRpc[0].p_phone === '+905321112233' && guestRpc[0].p_first_name === 'Onur'
+        && guestState.linked === '00000000-0000-4000-8000-0000000000e1' && guestState.guests === 1,
+        'Rezervasyondan misafir: ' + JSON.stringify({ guestRpc, guestState }));
+      passed.push('27. misafirler: rezervasyondaki kişi panelden telefonla deftere eklenir ve rezervasyona bağlanır');
     });
 
     await withPage(browser, baseUrl, 'owner', { width: 390, height: 844 }, async page => {

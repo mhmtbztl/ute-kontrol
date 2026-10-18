@@ -5460,3 +5460,8 @@ body.side-panel-open { overflow: hidden; }
 .today-performance__row:nth-child(even) { background: rgba(255,255,255,0.03); }
 .today-performance__row--head { font-size: 10px; color: #94A3B8; text-transform: uppercase; }
 @media (max-width: 520px) { .today-performance__row { grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr)); } .today-performance__row > :last-child { grid-column: 1 / -1; justify-self: end; } }
+/* Rezervasyonlardan misafir ekleme paneli (G9 M50). */
+.guest-unlinked-panel { margin-bottom: 14px; padding: 12px; border: 1px solid var(--border-subtle); border-radius: 10px; background: var(--bg-surface); }
+.guest-unlinked-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.guest-unlinked-head p { margin: 4px 0 0; }
+.guest-unlinked-panel input { width: 100%; min-width: 120px; padding: 6px 8px; border: 1px solid var(--border-subtle); border-radius: 6px; background: var(--bg-surface-elevated); color: var(--text-main); font-size: 12px; }
