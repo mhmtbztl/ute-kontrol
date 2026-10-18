@@ -22,6 +22,7 @@
 // L-199 (M29): Talep formunda rol yuklenmeden yazilan "kaydedemez" mesaji rol gelince kalmiyordu.
 // L-193 (M23): Defterdeki "Temizlik" sutunu maliyet saniliyordu; misafirden alinan gelir oldugu yazilir.
 // L-212..L-216 (M41-M45, 9.3): mulk sahibi kaydi, profilin tazelenmesi, kanal ilani listesi, koordinat, fiyat adlari.
+// L-217 (M46): Bugun ekraninda doluluk/ADR/RevPAR kartlari, ev ev secilebilir; Finans ile ayni hesap.
 // L-184..L-190 (M14-M20): kapora, kar marji hedefi, talep tarihi, mulk net kari, reklam tablosu/metrik/gunluk butce, sablon ekrani, bosluk gecesi.
 const fs = require('fs');
 const path = require('path');
@@ -1094,6 +1095,72 @@ async function mulklerAsama11Davranisi() {
   check(/asla altına inmeyeceğiniz/.test(profil) && /Hiçbiri sabit değildir/.test(profil), 'L-216c Fiyatlar sekmesi baz/taban/hedef farkini ve sabit olmadiklarini aciklar');
 }
 
+// L-217 (M46) — Bugun ekraninda Finans'in doluluk / ADR / RevPAR kartlari, ev ev.
+async function bugunPerformansDavranisi() {
+  sahteDom({});
+  global.FinancialMetricsService = require('./financial_metrics_service.js');
+  const App = require('../app.js');
+  const A = 'aaaaaaaa-aaaa-4aaa-8aaa-00000000000a';
+  const B = 'aaaaaaaa-aaaa-4aaa-8aaa-00000000000b';
+  const kur = (rol, ekRezervasyon = []) => {
+    App.setActiveTenant({ id: TENANT, role: rol });
+    App.setAppData({
+      villas: {
+        DENIZ: { id: A, slug: 'DENIZ', name: 'Deniz Evi', isActive: true, activationDate: '2026-01-01' },
+        ORMAN: { id: B, slug: 'ORMAN', name: 'Orman Evi', isActive: true, activationDate: '2026-03-17' }
+      },
+      bookings: [
+        // 10 gece, 55.000 brut, 5.000 temizlik ucreti -> 50.000 net konaklama.
+        { id: 'r1', villa: 'DENIZ', propertyId: A, guest: 'Ali', checkIn: '2026-03-10', checkOut: '2026-03-20', gross: 55000, cleanFee: 5000, otaComm: 0, discount: 0, status: 'CHECKED_OUT' },
+        // Ay sinirini kesiyor: 5 gecenin 4'u Mart'ta -> 8.000 (tahakkuk).
+        { id: 'r2', villa: 'ORMAN', propertyId: B, guest: 'Ayse', checkIn: '2026-03-28', checkOut: '2026-04-02', gross: 10000, cleanFee: 0, otaComm: 0, discount: 0, status: 'CHECKED_OUT' },
+        { id: 'r3', villa: 'DENIZ', propertyId: A, guest: 'Iptal', checkIn: '2026-03-01', checkOut: '2026-03-05', gross: 99000, cleanFee: 0, otaComm: 0, discount: 0, status: 'CANCELLED' },
+        ...ekRezervasyon
+      ],
+      expenses: [], cleaningTasks: [], maintenance: []
+    });
+  };
+  kur('owner');
+  const deniz = App.computeMonthPerformance('2026-03', 'DENIZ');
+  const orman = App.computeMonthPerformance('2026-03', 'ORMAN');
+  const tumu = App.computeMonthPerformance('2026-03', 'ALL');
+  check(deniz.nights === 10 && deniz.available === 31 && deniz.occupancy === 32.3 && deniz.adr === 5000 && deniz.revpar === 1613,
+    'L-217a Tek mulk: doluluk 10/31, ADR = net konaklama / gece, RevPAR = net konaklama / satilabilir gece', JSON.stringify(deniz));
+  check(orman.nights === 4 && orman.available === 15 && orman.occupancy === 26.7 && orman.adr === 2000 && orman.revpar === 533,
+    'L-217b Ay ortasinda faaliyete baslayan mulk: kapasite baslama gununden, ay sinirini kesen rezervasyonun payi', JSON.stringify(orman));
+  check(tumu.nights === 14 && tumu.available === 46 && tumu.occupancy === 30.4 && tumu.adr === 4143 && tumu.revpar === 1261,
+    'L-217c Portfoy toplami ev ev toplamdan (iptal haric)', JSON.stringify(tumu));
+  const bos = App.computeMonthPerformance('2025-12', 'ORMAN');
+  check(bos.available === 0 && bos.occupancy === null && bos.revpar === null && bos.adr === null,
+    'L-217d Faaliyette olmayan ayda doluluk/ADR/RevPAR uydurulmaz (null -> "—")', JSON.stringify(bos));
+
+  // Ekran: Bugun, bu ay; secici ev ev degistirir; Finans defterini okumayan rolde gizli.
+  const buAy = App.getCurrentMonthKey();
+  kur('owner', [{ id: 'r4', villa: 'DENIZ', propertyId: A, guest: 'Bu ay', checkIn: `${buAy}-02`, checkOut: `${buAy}-05`, gross: 30000, cleanFee: 0, otaComm: 0, discount: 0, status: 'CONFIRMED' }]);
+  App.setTodayPerformanceVilla('ALL');
+  const kartlar = () => global.document.getElementById('todayPerformanceCards').innerHTML;
+  const liste = () => global.document.getElementById('todayPerformanceList').innerHTML;
+  const portfoy = App.computeMonthPerformance(buAy, 'ALL');
+  check(global.document.getElementById('todayPerformance').hidden === false && /Doluluk/.test(kartlar()) && /ADR/.test(kartlar()) && /RevPAR/.test(kartlar())
+    && kartlar().includes(`%${portfoy.occupancy.toLocaleString('tr-TR')}`) && /Deniz Evi/.test(liste()) && /Orman Evi/.test(liste()),
+    'L-217e Bugun: "Tum mulkler" portfoy kartlari ve ev ev liste', kartlar().slice(0, 300));
+  App.setTodayPerformanceVilla('DENIZ');
+  const tek = App.computeMonthPerformance(buAy, 'DENIZ');
+  check(kartlar().includes('₺10.000') && kartlar().includes(`%${tek.occupancy.toLocaleString('tr-TR')}`) && liste() === ''
+    && /Deniz Evi/.test(global.document.getElementById('todayPerformancePeriod').textContent || global.document.getElementById('todayPerformancePeriod').innerText || ''),
+    'L-217f Ev secilince kartlar o evin rakamlarini gosterir (ADR 30.000 / 3 gece)', kartlar().slice(0, 300));
+  for (const rol of ['sales', 'staff']) {
+    kur(rol);
+    App.renderTodayPerformance();
+    check(global.document.getElementById('todayPerformance').hidden === true, `L-217g ${rol} rolunde finans kartlari gizli (§3.3.1)`);
+  }
+  const app = read('app.js');
+  const html = read('index.html');
+  check(/computeMonthPerformance\(m, secili\)/.test(functionBody(app, 'function getMonthlyKpiDataset(')) && /'todayPerfVilla'/.test(functionBody(app, 'function updateAllVillaDropdowns('))
+    && /renderTodayPerformance\(\)/.test(functionBody(app, 'function renderExecutiveControlCenter(')) && /id="todayPerfVilla"[^>]*setTodayPerformanceVilla/.test(html),
+    'L-217h Finans aylik tablosu ve Bugun ayni fonksiyondan; mulk listesi ortak doldurucudan');
+}
+
 async function main() {
 try {
   const html = read('index.html');
@@ -1134,6 +1201,7 @@ try {
   await rezervasyonKapsamDavranisi();
   await topluGirisDavranisi();
   await mulklerAsama11Davranisi();
+  await bugunPerformansDavranisi();
 } catch (error) {
   failed++;
   console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

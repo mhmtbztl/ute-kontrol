@@ -513,10 +513,22 @@ async function main() {
         && /Airbnb/.test(channelText) && /Ödeme: EUR/.test(channelText) && /İlanı aç/.test(channelText),
         `Kanal ilani: ${JSON.stringify({ listingRpc, channelText: channelText.slice(0, 300) })}`);
       passed.push('24. mülkler: uzun koordinat formu durdurmaz; kanal ilanı bağlantıdan ID okunarak kaydedilir ve profilde listelenir');
+      // L-217 (M46): Bugun ekraninda doluluk / ADR / RevPAR, ev ev secilebilir.
+      await page.evaluate(() => { updateAllVillaDropdowns(); switchTab('executive'); renderTodayPerformance(); });
+      const perfAll = await page.evaluate(() => ({ visible: !document.getElementById('todayPerformance').hidden && document.getElementById('todayPerformance').offsetHeight > 0, cards: document.querySelectorAll('#todayPerformanceCards .today-performance__card').length, options: [...document.getElementById('todayPerfVilla').options].map(o => o.value) }));
+      assert(perfAll.visible && perfAll.cards === 5 && perfAll.options.includes('ALL') && perfAll.options.includes('test'), 'Bugun performans: ' + JSON.stringify(perfAll));
+      await page.selectOption('#todayPerfVilla', 'test');
+      const perfOne = await page.evaluate(() => document.getElementById('todayPerformancePeriod').textContent);
+      assert(/Test Villası/.test(perfOne), 'Bugun mulk secimi: ' + perfOne);
+      await page.selectOption('#todayPerfVilla', 'ALL');
+      passed.push('25. Bugün: doluluk, ADR, RevPAR kartları; mülk seçici ev ev değiştirir');
     });
 
     await withPage(browser, baseUrl, 'owner', { width: 390, height: 844 }, async page => {
       await assertBookingFinance(page,true); passed.push('16. rezervasyon finansı 390 px mobil görünüm');
+      await page.evaluate(() => { switchTab('executive'); renderTodayPerformance(); });
+      await assertNoHorizontalOverflow(page, 'Bugun performans mobil');
+      passed.push('25b. Bugün performans kartları 390 px mobilde taşmaz');
       // G9 L-207: teknik metin DSL'si yerine gercek gorsel checklist
       // duzenleyicisi mobilde bolum, onemli madde ve alt kontrolu korur.
       await page.evaluate(() => {

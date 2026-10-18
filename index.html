@@ -14,7 +14,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=cf36bfaf">
+  <link rel="stylesheet" href="style.css?v=8ad22071">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="supabase.umd.js?v=3810661a"></script>
@@ -410,6 +410,24 @@
       <section id="todayDateStrip" class="today-date-strip" aria-label="Bugün özeti">
         <div><strong id="todayDateLabel">—</strong><span id="todayRoleLabel">—</span></div>
         <span id="todayShiftSummary">—</span>
+      </section>
+
+      <!-- BU AYIN PERFORMANSI — doluluk, ADR, RevPAR; ev ev secilebilir (Finans ile ayni hesap) -->
+      <section class="card today-performance" id="todayPerformance" hidden aria-labelledby="todayPerformanceTitle">
+        <div class="section-title-bar">
+          <div>
+            <h3 id="todayPerformanceTitle">Bu ayın performansı</h3>
+            <p class="sub-text" id="todayPerformancePeriod">—</p>
+          </div>
+          <label class="today-performance__picker">
+            <span class="sub-text">Mülk</span>
+            <select id="todayPerfVilla" data-onchange="setTodayPerformanceVilla(this.value)">
+              <option value="ALL">Tüm Villalar / Portföy</option>
+            </select>
+          </label>
+        </div>
+        <div class="today-performance__cards" id="todayPerformanceCards"></div>
+        <div class="today-performance__list" id="todayPerformanceList"></div>
       </section>
 
       <!-- 1. TENANT ONBOARDING PROGRESS BANNER -->
@@ -3817,10 +3835,10 @@
   <script src="core/side_panel.js?v=d763b464"></script>
   <script src="core/notification_feed.js?v=d8a17633"></script>
   <script src="core/command_search.js?v=89760933"></script>
-  <script src="core/action_dispatch.js?v=4d7d7ea4"></script>
+  <script src="core/action_dispatch.js?v=7a9d31bb"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=a85be454"></script>
-  <script src="app.js?v=f8462853"></script>
+  <script src="app.js?v=77f5a0b1"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=e5503243"></script>
