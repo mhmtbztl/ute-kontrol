@@ -1096,6 +1096,61 @@ async function mulklerAsama11Davranisi() {
 }
 
 // L-217 (M46) — Bugun ekraninda Finans'in doluluk / ADR / RevPAR kartlari, ev ev.
+// M47–M49 (L-218…L-220) — talep ekrani: ek mulk secimi okunur, kanban karti
+// kompakt, duzenleme penceresi hizli formdan gelen talebi kaydedebilir, liste yerinde acilir.
+async function talepEkraniDavranisi() {
+  sahteDom({});
+  const App = require('../app.js');
+  const PA = 'aaaaaaaa-0000-4000-8000-0000000000a1', PB = 'aaaaaaaa-0000-4000-8000-0000000000b1';
+  const LEAD = 'cccccccc-0000-4000-8000-0000000000a1';
+  App.setActiveTenant({ id: TENANT, role: 'owner' });
+  const ist = kaydedenIstemci();
+  App.setSupabaseClient(ist);
+  // Hizli formdan gelen talep: ad yok, teklif yok, mulk yok, durum Yeni.
+  const talep = { id: LEAD, dbId: LEAD, villa: 'ALL', propertyId: null, guest: 'Ad girilmedi (05339294514)', guestName: '', phone: '05339294514',
+    channel: 'WhatsApp', quote: 0, status: 'NEW', stage: 'NEW', notes: '', extraPropertyIds: [] };
+  App.setAppData({ villas: { A: { id: PA, slug: 'A', name: 'TEST A' }, B: { id: PB, slug: 'B', name: 'TEST B' } },
+    leads: [talep], leadSources: [], leadAcquisitions: [], leadWorkflows: [], salesMembers: [], bookings: [], expenses: [], cleaningTasks: [] });
+
+  const kart = App.renderLeadCard({ ...talep, sourceLabel: 'TEST Kaynak' });
+  check(/lead-card-name[^>]*>05339294514</.test(kart) && !/Ad girilmedi \(/.test(kart) && /lead-card-quote[^>]*>—</.test(kart),
+    'L-219a Kart adsiz talepte telefonu ad yerine yazar, teklif yoksa "—"', kart);
+
+  App.openLeadModal(LEAD);
+  const d = id => global.document.getElementById(id).value;
+  check(d('leadStatus') === 'NEW' && d('leadQuote') === '' && d('leadGuest') === '' && d('leadVilla') === 'ALL',
+    'L-219b Pencere Yeni durumu, bos teklifi, bos adi ve "belli degil" mulku dogru acar',
+    JSON.stringify({ s: d('leadStatus'), q: d('leadQuote'), g: d('leadGuest'), v: d('leadVilla') }));
+
+  global.document.getElementById('leadVilla').value = 'B';
+  global.document.getElementById('leadStatus').value = 'CONTACTED';
+  await App.saveLead({ preventDefault() {} });
+  const yazma = ist.yazmalar.find(k => k.tablo === 'leads' && k.islem === 'update');
+  check(yazma && yazma.yuk.property_id === PB && yazma.yuk.status === 'CONTACTED' && yazma.yuk.guest_name === null
+    && yazma.yuk.guest_phone === '05339294514' && yazma.yuk.quote_amount === 0,
+    'L-219c Kaydet secilen mulku ve durumu yazar; "Ad girilmedi" isim olarak yazilmaz', JSON.stringify(yazma && yazma.yuk));
+
+  const html = read('index.html');
+  const css = read('style.css');
+  const app = read('app.js');
+  const durum = (html.match(/<select id="leadStatus">[\s\S]*?<\/select>/) || [''])[0];
+  check(/value="NEW"/.test(durum) && /value="CONTACTED"/.test(durum), 'L-219d Durum listesinde Yeni ve Gorusuldu var');
+  check(!/id="leadQuote"[^>]*required/.test(html) && !/id="leadVilla"[^>]*required/.test(html) && !/id="leadGuest"[^>]*required/.test(html),
+    'L-219e Teklif, mulk ve ad hizli talepte bos olabilir; kaydi engellemez');
+  check(/selectId === 'leadVilla'[\s\S]{0,120}optUnknown\.value = 'ALL'/.test(functionBody(app, 'function updateAllVillaDropdowns(')),
+    'L-219f Mulk listesinde "Henuz belli degil" secenegi var');
+  check(/\.lead-extra-properties input\[type="checkbox"\][^}]*min-height: 0/.test(css) && /\.lead-extra-properties \.lead-extra-property \{[^}]*margin: 0/.test(css),
+    'L-218 Ek mulk onay kutusu hizli formun 40px tam genislik kuralindan cikar, ad okunur');
+  const calisma = html.slice(html.indexOf('id="leadWorkspaceTitle"'), html.indexOf('</section>', html.indexOf('id="leadKanbanContainer"')));
+  check(/id="leadLegacyListSection"/.test(calisma) && /id="manageLeadsTableBody"/.test(calisma),
+    'L-220a Liste gorunumu kanbanin yerinde (satis hunisi kartinin icinde) acilir');
+  const liste = functionBody(app, 'function renderManageLeadsTable(');
+  check(/getLeadSalesView\(\)\.rows/.test(liste) && /leadQuoteLabel\(l\)/.test(liste) && /LEAD_STATUS_LABELS\[/.test(liste),
+    'L-220b Liste kanbanla ayni satirlar; Turkce durum, teklif yoksa "—"');
+  check(/renderLeadSalesWorkspace\(\)/.test(functionBody(app, 'async function deleteLeadUI(')) && /renderLeadSalesWorkspace\(\)/.test(functionBody(app, 'async function saveLead(')),
+    'L-220c Silme ve kaydetme kanbani da yeniler');
+}
+
 async function bugunPerformansDavranisi() {
   sahteDom({});
   global.FinancialMetricsService = require('./financial_metrics_service.js');
@@ -1202,6 +1257,7 @@ try {
   await topluGirisDavranisi();
   await mulklerAsama11Davranisi();
   await bugunPerformansDavranisi();
+  await talepEkraniDavranisi();
 } catch (error) {
   failed++;
   console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

@@ -10704,26 +10704,40 @@ function getLeadSalesView() {
   });
 }
 
+// Talep durumlarinin ekrandaki adi: kanban, liste ve duzenleme penceresi ayni sozlugu kullanir.
+const LEAD_STATUS_LABELS = { NEW: 'Yeni', CONTACTED: 'Görüşüldü', QUOTE_SENT: 'Teklif', FOLLOW_UP: 'Takip', WON: 'Kazanıldı', LOST: 'Kaybedildi' };
+
+function leadQuoteLabel(lead) {
+  const quote = Number(lead?.quote);
+  return Number.isFinite(quote) && quote > 0 ? `₺${quote.toLocaleString('tr-TR')}` : '—';
+}
+
+function leadPropertyLabel(lead) {
+  return appData.villas?.[lead?.villa]?.name || (!lead?.villa || lead.villa === 'ALL' ? 'Mülk belli değil' : lead.villa);
+}
+
+// Kart kompakt: ad tek satir; telefon, kaynak ve mulk tek alt satir. Duzenleme "Aç" ile pencerede.
 function renderLeadCard(row) {
-  const villaName = appData.villas?.[row.villa]?.name || (row.villa === 'ALL' ? 'Mülk belirtilmedi' : row.villa || 'Mülk belirtilmedi');
+  const villaName = leadPropertyLabel(row);
+  const name = row.guestName || row.phone || row.guest || 'Ad girilmedi';
   const assignee = (appData.salesMembers || []).find(member => member.user_id === row.assignedTo);
   const assigneeLabel = assignee?.full_name || assignee?.email || (row.assignedTo ? 'Ekip üyesi' : 'Atanmamış');
   const canWrite = canWriteSalesRole(activeTenant?.role);
-  const quote = Number(row.quote);
-  const quoteLabel = Number.isFinite(quote) && quote > 0 ? `₺${quote.toLocaleString('tr-TR')}` : '—';
+  const quoteLabel = leadQuoteLabel(row);
   const currentStatus = String(row.status || row.stage || 'NEW').toUpperCase();
-  const statusLabels = { NEW: 'Yeni', CONTACTED: 'Görüşüldü', QUOTE_SENT: 'Teklif', FOLLOW_UP: 'Takip', WON: 'Kazanıldı', LOST: 'Kaybedildi' };
+  const statusLabels = LEAD_STATUS_LABELS;
   const statusAction = canWrite && currentStatus !== 'WON'
-    ? `<label class="lead-status-control"><span>Durum</span><select class="lead-status-select" aria-label="${escapeHtml(row.guest || 'Talep')} durumunu değiştir" data-onchange="updateLeadStatusFromKanban(decodeURIComponent('${encodeActionArg(row.id)}'), this.value)">${['NEW', 'CONTACTED', 'QUOTE_SENT', 'FOLLOW_UP', 'LOST'].map(status => `<option value="${escapeHtml(status)}"${status === currentStatus ? ' selected' : ''}>${escapeHtml(statusLabels[status])}</option>`).join('')}</select></label>`
+    ? `<label class="lead-status-control"><select class="lead-status-select" aria-label="${escapeHtml(name)} durumunu değiştir" data-onchange="updateLeadStatusFromKanban(decodeURIComponent('${encodeActionArg(row.id)}'), this.value)">${['NEW', 'CONTACTED', 'QUOTE_SENT', 'FOLLOW_UP', 'LOST'].map(status => `<option value="${escapeHtml(status)}"${status === currentStatus ? ' selected' : ''}>${escapeHtml(statusLabels[status])}</option>`).join('')}</select></label>`
     : `<div class="lead-status-readonly"><span>Durum</span><strong>${escapeHtml(statusLabels[currentStatus] || currentStatus)}</strong></div>`;
   const deleteAction = canWrite && String(row.status || '').toUpperCase() !== 'WON'
-    ? `<button type="button" class="btn btn-danger btn-sm" data-onclick="deleteLeadUI(decodeURIComponent('${encodeActionArg(row.id)}'))" aria-label="${escapeHtml(row.guest || 'Talep')} talebini sil">Sil</button>`
+    ? `<button type="button" class="btn btn-danger btn-sm" data-onclick="deleteLeadUI(decodeURIComponent('${encodeActionArg(row.id)}'))" aria-label="${escapeHtml(name)} talebini sil">Sil</button>`
     : '';
+  const subParts = [row.guestName ? row.phone : '', row.sourceLabel !== '—' ? row.sourceLabel : '', villaName].filter(Boolean);
   return `<article class="lead-card">
-    <div><strong>${escapeHtml(row.guest || 'Ad girilmedi')}</strong><span>${escapeHtml(row.sourceLabel)} · ${escapeHtml(villaName)}</span></div>
-    <div class="lead-card-quote"><span>Teklif</span><strong>${escapeHtml(quoteLabel)}</strong></div>
+    <div class="lead-card-head"><strong class="lead-card-name" title="${escapeHtml(row.guestName && row.phone ? `${name} · ${row.phone}` : name)}">${escapeHtml(name)}</strong><span class="lead-card-quote" title="Teklif">${escapeHtml(quoteLabel)}</span></div>
+    <span class="lead-card-sub">${escapeHtml(subParts.join(' · '))}</span>
     ${statusAction}
-    <div class="lead-card-meta"><span>${escapeHtml(assigneeLabel)} · ${row.nextFollowUpAt ? `Takip: ${escapeHtml(formatTrDate(String(row.nextFollowUpAt).slice(0, 10)))}` : 'Takip tarihi yok'}</span><span class="lead-card-actions"><button type="button" class="btn btn-secondary btn-sm" data-onclick="editLead(decodeURIComponent('${encodeActionArg(row.id)}'))">${canWrite ? 'Aç' : 'Görüntüle'}</button>${deleteAction}</span></div>
+    <div class="lead-card-meta"><span>${escapeHtml(assigneeLabel)} · ${row.nextFollowUpAt ? `Takip: ${escapeHtml(formatTrDate(String(row.nextFollowUpAt).slice(0, 10)))}` : 'Takip yok'}</span><span class="lead-card-actions"><button type="button" class="btn btn-secondary btn-sm" data-onclick="editLead(decodeURIComponent('${encodeActionArg(row.id)}'))">${canWrite ? 'Aç' : 'Görüntüle'}</button>${deleteAction}</span></div>
   </article>`;
 }
 
@@ -10935,18 +10949,24 @@ function renderManageLeadsTable() {
   if (!tbody) return;
   tbody.innerHTML = '';
 
-  const searchVal = (document.getElementById('leadSearchInput')?.value || '').toLowerCase().trim();
-  const leads = (appData.leads || []).filter(l => {
+  // Liste kanbanla ayni satirlari (kaynak dahil) ayni sirada gosterir.
+  const searchVal = (document.getElementById('leadSearchInput')?.value || '').toLocaleLowerCase('tr').trim();
+  const searchDigits = searchVal.replace(/\D/g, '');
+  const leads = getLeadSalesView().rows.filter(l => {
     if (!searchVal) return true;
-    const g = (l.guest || l.guestName || '').toLowerCase();
-    const v = (l.villa || '').toLowerCase();
-    const c = (l.channel || '').toLowerCase();
-    return g.includes(searchVal) || v.includes(searchVal) || c.includes(searchVal);
+    const text = [l.guest, l.guestName, leadPropertyLabel(l), l.villa, l.channel, l.sourceLabel, l.notes]
+      .map(value => String(value || '').toLocaleLowerCase('tr')).join(' ');
+    return text.includes(searchVal) || (searchDigits.length >= 3 && String(l.phone || '').replace(/\D/g, '').includes(searchDigits));
   });
+  if (!leads.length) {
+    tbody.innerHTML = `<tr><td colspan="8" class="empty-state">${searchVal ? 'Aramaya uyan talep yok.' : 'Henüz talep yok.'}</td></tr>`;
+    return;
+  }
 
   const canWrite = canWriteSalesRole(activeTenant?.role);
   leads.forEach(l => {
-    let statusBadge = `<span class="badge badge-amber">${escapeHtml(l.status || l.stage)}</span>`;
+    const statusCode = String(l.status || l.stage || 'NEW').toUpperCase();
+    let statusBadge = `<span class="badge badge-amber">${escapeHtml(LEAD_STATUS_LABELS[statusCode] || statusCode)}</span>`;
     if (l.status === 'WON' || l.stage === 'WON') statusBadge = `<span class="badge badge-green">Kazanıldı</span>`;
     if (l.status === 'LOST' || l.stage === 'LOST') statusBadge = `<span class="badge badge-rose">Kaybedildi</span>`;
 
@@ -10961,18 +10981,18 @@ function renderManageLeadsTable() {
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td><strong>${escapeHtml(l.guest)}</strong>${l.checkIn && l.checkOut ? `<span style="display:block; font-size:11px; color:var(--text-muted);">${escapeHtml(formatTrDate(l.checkIn))} → ${escapeHtml(formatTrDate(l.checkOut))}</span>` : ''}</td>
-      <td>${escapeHtml(appData.villas[l.villa]?.name || l.villa)}${(l.extraPropertyIds || []).length ? `<span style="display:block; font-size:11px; color:var(--text-muted);">+ ${escapeHtml((l.extraPropertyIds || []).map(id => Object.values(appData.villas || {}).find(v => v.id === id)?.name).filter(Boolean).join(', '))}</span>` : ''}</td>
-      <td>${escapeHtml(l.channel)}</td>
-      <td>₺${Number(l.quote).toLocaleString('tr-TR')}</td>
+      <td><strong>${escapeHtml(l.guestName || l.phone || l.guest)}</strong>${l.guestName && l.phone ? `<span style="display:block; font-size:11px; color:var(--text-muted);">${escapeHtml(l.phone)}</span>` : ''}${l.checkIn && l.checkOut ? `<span style="display:block; font-size:11px; color:var(--text-muted);">${escapeHtml(formatTrDate(l.checkIn))} → ${escapeHtml(formatTrDate(l.checkOut))}</span>` : ''}</td>
+      <td>${escapeHtml(leadPropertyLabel(l))}${(l.extraPropertyIds || []).length ? `<span style="display:block; font-size:11px; color:var(--text-muted);">+ ${escapeHtml((l.extraPropertyIds || []).map(id => Object.values(appData.villas || {}).find(v => v.id === id)?.name).filter(Boolean).join(', '))}</span>` : ''}</td>
+      <td>${escapeHtml([l.sourceLabel !== '—' ? l.sourceLabel : '', l.channel].filter(Boolean).join(' · '))}</td>
+      <td>${escapeHtml(leadQuoteLabel(l))}</td>
       <td>${statusBadge}</td>
       <td>${escapeHtml(l.lostReason || '-')}</td>
       <td>${escapeHtml(l.notes || '-')}</td>
-      <td style="text-align: right; white-space: nowrap; display: flex; gap: 6px; justify-content: flex-end; align-items: center;">
+      <td style="text-align: right; white-space: nowrap;"><div style="display: inline-flex; gap: 6px; align-items: center;">
         ${convertAction}
         <button class="btn btn-secondary btn-sm" data-onclick="editLead(decodeURIComponent('${encodeActionArg(l.id)}'))" title="${canWrite ? 'Düzenle' : 'Görüntüle'}">${canWrite ? '✏️' : 'Görüntüle'}</button>
         ${canWrite ? `<button class="btn btn-danger btn-sm" data-onclick="deleteLeadUI(decodeURIComponent('${encodeActionArg(l.id)}'))" title="Sil">🗑️</button>` : ''}
-      </td>
+      </div></td>
     `;
     tbody.appendChild(tr);
   });
@@ -11065,17 +11085,25 @@ function openLeadModal(editId = null) {
   if (editId) {
     const l = appData.leads.find(item => item.id === editId || item.dbId === editId);
     if (!l) return;
-    title.innerText = '✏️ Lead Güncelle';
+    title.innerText = l.phone ? `✏️ Talebi düzenle · ${l.phone}` : '✏️ Talebi düzenle';
     editInput.value = l.id;
-    document.getElementById('leadGuest').value = l.guestName || l.guest;
-    document.getElementById('leadVilla').value = l.villa;
+    // Ad yoksa alan bos kalir: "Ad girilmedi (telefon)" etiketi isim olarak geri yazilmaz.
+    document.getElementById('leadGuest').value = l.guestName || '';
+    document.getElementById('leadVilla').value = appData.villas?.[l.villa] ? l.villa : 'ALL';
     renderLeadExtraPropertyPicker('leadExtraProperties', l.extraPropertyIds || [], l.villa);
-    document.getElementById('leadChannel').value = normalizeLeadChannel(l.channel);
-    document.getElementById('leadQuote').value = l.quote;
+    const channelSelect = document.getElementById('leadChannel');
+    const channel = normalizeLeadChannel(l.channel);
+    channelSelect.value = channel;
+    // Listede olmayan kanal kaydedince sessizce WhatsApp'a donmesin: secenek olarak eklenir.
+    if (channelSelect.value !== channel && typeof channelSelect.add === 'function') {
+      channelSelect.add(new Option(channel, channel));
+      channelSelect.value = channel;
+    }
+    document.getElementById('leadQuote').value = Number(l.quote) > 0 ? l.quote : '';
     // Ilgilenilen tarihler duzenlemede de gorunur ve degisir (L-186).
     document.getElementById('leadCheckIn').value = l.checkIn || '';
     document.getElementById('leadCheckOut').value = l.checkOut || '';
-    document.getElementById('leadStatus').value = l.status;
+    document.getElementById('leadStatus').value = ALLOWED_LEAD_STAGES.includes(l.status) ? l.status : 'NEW';
     document.getElementById('leadLostReason').value = l.lostReason || '-';
     document.getElementById('leadNotes').value = l.notes || '';
     const workflow = (appData.leadWorkflows || []).find(row => row.lead_id === l.id);
@@ -11183,6 +11211,8 @@ async function saveLead(e) {
     guest,
     guestName: guest,
     villa,
+    // mapLeadToDb kayitli mulk kimligini once okur; secim onu da degistirmeli.
+    propertyId: appData.villas?.[villa]?.id || null,
     channel,
     quote,
     status,
@@ -11209,6 +11239,7 @@ async function saveLead(e) {
         alert('Talep bilgileri kaydedildi; ancak atama/takip bilgisi kaydedilemedi: ' + workflowError.message);
         return;
       }
+      renderLeadSalesWorkspace();
       if (window.showToast) window.showToast('✅ Talep başarıyla güncellendi.');
     } else {
       throw new Error('Yeni talepler telefon ve kaynak zorunlu hızlı kayıt alanından oluşturulur.');
@@ -11236,6 +11267,7 @@ async function deleteLeadUI(id) {
   if (confirm('Bu talebi silmek istediğinizden emin misiniz?')) {
     try {
       await deleteLead(id);
+      renderLeadSalesWorkspace();
       renderManageLeadsTable();
       renderLeadAnalytics();
       if (window.showToast) window.showToast('🗑️ Talep başarıyla silindi.');
@@ -16711,6 +16743,13 @@ function updateAllVillaDropdowns() {
       el.appendChild(optAll);
     }
 
+    if (selectId === 'leadVilla') {
+      const optUnknown = document.createElement('option');
+      optUnknown.value = 'ALL';
+      optUnknown.innerText = 'Henüz belli değil';
+      el.appendChild(optUnknown);
+    }
+
     if (selectId === 'waParsedVilla') {
       const optUnknown = document.createElement('option');
       optUnknown.value = '';
@@ -21027,6 +21066,9 @@ if (typeof module !== 'undefined' && module.exports) {
     assignCleaningTask,
     renderOperationsPeopleView,
     renderTodayPerformance,
+    renderLeadCard,
+    openLeadModal,
+    saveLead,
     setTodayPerformanceVilla,
     computeMonthPerformance,
     getCurrentMonthKey,
