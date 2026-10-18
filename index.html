@@ -14,7 +14,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=8ad22071">
+  <link rel="stylesheet" href="style.css?v=47176a67">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="supabase.umd.js?v=3810661a"></script>
@@ -1460,6 +1460,28 @@
         </div>
         <div id="leadFollowUpList" class="lead-followup-list"></div>
         <div id="leadKanbanContainer" class="lead-kanban" aria-live="polite"></div>
+        <div id="leadLegacyListSection" class="lead-list-view" hidden>
+          <div class="lead-list-toolbar">
+            <input type="search" id="leadSearchInput" placeholder="Misafir, telefon, mülk veya kaynak ara" aria-label="Taleplerde ara" data-oninput="renderManageLeadsTable()">
+          </div>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>MİSAFİR</th>
+                  <th>İLGİLENİLEN MÜLK</th>
+                  <th>KAYNAK / KANAL</th>
+                  <th>TEKLİF</th>
+                  <th>DURUM</th>
+                  <th>KAYIP NEDENİ</th>
+                  <th>NOTLAR</th>
+                  <th style="text-align: right;">İŞLEM</th>
+                </tr>
+              </thead>
+              <tbody id="manageLeadsTableBody"></tbody>
+            </table>
+          </div>
+        </div>
       </section>
 
       <!-- 1. WHATSAPP & SATIŞ TALEP ANALİZİ (EXECUTIVE RADAR) -->
@@ -1537,32 +1559,6 @@
         </div>
       </section>
 
-      <!-- 2. LEAD LİSTESİ VE GELEN TALEPLER TABLOSU -->
-      <section id="leadLegacyListSection" class="card">
-        <div class="section-title-bar">
-          <div><h2>📋 GELEN TALEP VE LEAD LİSTESİ</h2><p class="sub-text">WhatsApp, Instagram ve telefon teklifleri. Durumu güncelleyin veya rezervasyona dönüştürün.</p></div>
-          <div style="display: flex; gap: 8px;">
-            <input type="text" id="leadSearchInput" placeholder="🔍 Misafir veya Villa ara..." data-oninput="renderManageLeadsTable()" style="padding: 6px 12px; background: rgba(30,41,59,0.8); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px;">
-          </div>
-        </div>
-        <div class="table-responsive">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>MİSAFİR</th>
-                <th>İLGİLENİLEN VİLLA</th>
-                <th>KANAL</th>
-                <th>TEKLİF (₺)</th>
-                <th>DURUM</th>
-                <th>KAYIP NEDENİ</th>
-                <th>NOTLAR</th>
-                <th style="text-align: right;">İŞLEM</th>
-              </tr>
-            </thead>
-            <tbody id="manageLeadsTableBody"></tbody>
-          </table>
-        </div>
-      </section>
     </div>
 
     <!-- ========================================== -->
@@ -2895,19 +2891,19 @@
   <div class="modal-backdrop" id="leadModal">
     <div class="modal-card">
       <div class="modal-header">
-        <h3 id="leadModalTitle">🎯 Lead / Talep Girişi</h3>
+        <h3 id="leadModalTitle">✏️ Talebi düzenle</h3>
         <button class="close-btn" data-onclick="closeLeadModal()">&times;</button>
       </div>
       <form id="leadForm" data-onsubmit="saveLead(event)">
         <input type="hidden" id="leadEditId">
         <div class="form-grid">
           <div class="form-group">
-            <label>Misafir Adı / Telefon</label>
-            <input type="text" id="leadGuest" placeholder="Örn: Selin B." required>
+            <label for="leadGuest">Misafir adı</label>
+            <input type="text" id="leadGuest" maxlength="200" placeholder="Ad girilmedi">
           </div>
           <div class="form-group">
-            <label>İlgilenilen Villa</label>
-            <select id="leadVilla" required>
+            <label for="leadVilla">İlgilendiği mülk</label>
+            <select id="leadVilla">
               <!-- updateAllVillaDropdowns() musterinin mulkleriyle doldurur -->
             </select>
           </div>
@@ -2928,8 +2924,8 @@
             </select>
           </div>
           <div class="form-group">
-            <label>Teklif Tutarı (₺)</label>
-            <input type="number" id="leadQuote" placeholder="Örn: 45000" required>
+            <label for="leadQuote">Teklif tutarı (₺)</label>
+            <input type="number" id="leadQuote" min="0" step="any" placeholder="Teklif verilmediyse boş bırakın">
           </div>
           <div class="form-group">
             <label for="leadCheckIn">İlgilenilen giriş</label>
@@ -2940,10 +2936,12 @@
             <input type="date" id="leadCheckOut">
           </div>
           <div class="form-group">
-            <label>Durum</label>
+            <label for="leadStatus">Durum</label>
             <select id="leadStatus">
+              <option value="NEW">Yeni</option>
+              <option value="CONTACTED">Görüşüldü</option>
+              <option value="QUOTE_SENT">Teklif verildi</option>
               <option value="FOLLOW_UP">Takip bekliyor (sıcak)</option>
-              <option value="QUOTE_SENT">Teklif Verildi</option>
               <option value="WON">Rezervasyona Dönüştü</option>
               <option value="LOST">Kaybedildi</option>
             </select>
@@ -3838,7 +3836,7 @@
   <script src="core/action_dispatch.js?v=7a9d31bb"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=a85be454"></script>
-  <script src="app.js?v=77f5a0b1"></script>
+  <script src="app.js?v=5ff64292"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=e5503243"></script>

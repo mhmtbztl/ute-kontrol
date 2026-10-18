@@ -5372,6 +5372,24 @@ body.side-panel-open { overflow: hidden; }
 .onboard-step-btn:hover, .onboard-step-btn:focus-visible { opacity: 1; color: #DDD6FE; text-decoration: underline; }
 .lead-extra-properties { display: flex; flex-wrap: wrap; gap: 6px 12px; min-height: 34px; align-items: center; }
 .lead-extra-property { display: inline-flex; gap: 6px; align-items: center; font-size: 12px; white-space: nowrap; }
+/* Ek mulk secimi: hizli formun genel input/label kurali (tam genislik, 40px, blok etiket)
+   onay kutusunu dev kareye, etiketi kutunun altina itiyordu (G9 M47). Etiket secilebilir cip olur. */
+.lead-extra-properties-group { grid-column: 1 / -1; }
+.lead-extra-properties .lead-extra-property { display: inline-flex; gap: 6px; align-items: center; margin: 0; padding: 5px 10px; border: 1px solid var(--border-subtle); border-radius: 999px; background: var(--bg-surface-elevated); color: var(--text-main); font-size: 12px; font-weight: 600; cursor: pointer; }
+.lead-extra-properties .lead-extra-property:has(input:checked) { border-color: var(--border-focus); background: rgba(16,185,129,0.15); }
+.lead-extra-properties input[type="checkbox"] { width: 14px; height: 14px; min-height: 0; margin: 0; padding: 0; flex: 0 0 auto; accent-color: #10B981; }
+/* Kanban karti kompakt; uzun sutun kendi icinde kayar (G9 M48). */
+.lead-column > div { max-height: 62vh; overflow-y: auto; padding-right: 2px; }
+.lead-card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; min-width: 0; }
+.lead-card-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.lead-card .lead-card-quote { display: inline; flex: 0 0 auto; margin: 0; padding: 0; color: var(--text-primary); font-size: 12px; font-weight: 700; }
+.lead-card .lead-card-sub { margin-top: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lead-card .lead-status-select { width: 100%; min-width: 0; padding: 4px 24px 4px 8px; }
+.lead-card .lead-status-control { display: block; }
+.lead-card .btn-sm { padding: 3px 8px; font-size: 11px; }
+/* Liste gorunumu kanbanin yerinde acilir (G9 M49). */
+.lead-list-toolbar { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+.lead-list-toolbar input { width: min(320px, 100%); padding: 7px 12px; border: 1px solid var(--border-subtle); border-radius: 8px; background: var(--bg-surface-elevated); color: var(--text-main); font-size: 13px; }
 /* Optional reservation finance follows the existing modal/card system. */
 .booking-finance-options { margin: 16px 0; padding: 16px; border: 1px solid rgba(148,163,184,.22); border-radius: 12px; }
 .finance-toggle { display: flex; align-items: center; gap: 9px; margin: 14px 0; cursor: pointer; }

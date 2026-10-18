@@ -522,6 +522,45 @@ async function main() {
       assert(/Test Villası/.test(perfOne), 'Bugun mulk secimi: ' + perfOne);
       await page.selectOption('#todayPerfVilla', 'ALL');
       passed.push('25. Bugün: doluluk, ADR, RevPAR kartları; mülk seçici ev ev değiştirir');
+      // G9 M47–M49 (L-218…L-220): talep ekrani — ek mulk adi okunur, hizli talep
+      // pencerede kaydedilebilir (form gecerli), liste kanbanin yerinde acilir.
+      await page.evaluate(() => {
+        appData.villas.ikinci = { id: '00000000-0000-4000-8000-000000000011', name: 'İkinci Ev', slug: 'ikinci', isActive: true, capacity: 4 };
+        appData.leads = [{ id: 'browser-lead', guest: 'Ad girilmedi (05339294514)', guestName: '', phone: '05339294514', villa: 'ALL', status: 'NEW', quote: 0, createdAt: getTodayStr() }];
+        updateAllVillaDropdowns();
+        switchTab('leads');
+      });
+      const picker = await page.evaluate(() => [...document.querySelectorAll('#leadQuickExtraProperties .lead-extra-property')].map(label => {
+        const box = label.querySelector('input').getBoundingClientRect();
+        const row = label.getBoundingClientRect();
+        return { w: box.width, h: box.height, rowH: row.height, text: label.textContent.trim(), textW: row.right - box.right };
+      }));
+      assert(picker.length === 2 && picker.every(p => p.w <= 20 && p.h <= 20 && p.rowH <= 36 && p.text && p.textW > 30),
+        'Ek mulk secimi: ' + JSON.stringify(picker));
+      await page.click('#leadKanbanContainer [data-onclick^="editLead("]');
+      const leadModal = await page.evaluate(() => ({
+        active: document.getElementById('leadModal').classList.contains('active'),
+        valid: document.getElementById('leadForm').checkValidity(),
+        status: document.getElementById('leadStatus').value,
+        villa: document.getElementById('leadVilla').value,
+        guest: document.getElementById('leadGuest').value,
+        quote: document.getElementById('leadQuote').value
+      }));
+      assert(leadModal.active && leadModal.valid && leadModal.status === 'NEW' && leadModal.villa === 'ALL' && leadModal.guest === '' && leadModal.quote === '',
+        'Talep penceresi: ' + JSON.stringify(leadModal));
+      await page.evaluate(() => closeLeadModal());
+      await page.click('#leadViewList');
+      const leadList = await page.evaluate(() => {
+        const list = document.getElementById('leadLegacyListSection');
+        const workspace = document.querySelector('.lead-workspace').getBoundingClientRect();
+        const rect = list.getBoundingClientRect();
+        return { visible: !list.hidden && rect.height > 0, inside: rect.top >= workspace.top && rect.bottom <= workspace.bottom,
+          kanbanHidden: document.getElementById('leadKanbanContainer').hidden, text: document.getElementById('manageLeadsTableBody').textContent };
+      });
+      assert(leadList.visible && leadList.inside && leadList.kanbanHidden && /Yeni/.test(leadList.text) && /—/.test(leadList.text) && !/₺0/.test(leadList.text),
+        'Talep listesi: ' + JSON.stringify(leadList));
+      await page.click('#leadViewKanban');
+      passed.push('26. talepler: ek mülk adı okunur; hızlı talep pencerede kaydedilebilir; liste kanbanın yerinde açılır');
     });
 
     await withPage(browser, baseUrl, 'owner', { width: 390, height: 844 }, async page => {
