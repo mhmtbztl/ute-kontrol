@@ -1151,6 +1151,71 @@ async function talepEkraniDavranisi() {
     'L-220c Silme ve kaydetme kanbani da yeniler');
 }
 
+// M50 (L-221) — rezervasyondaki kisi misafir defterine eklenebilir.
+async function rezervasyondanMisafirDavranisi() {
+  Object.assign(global, require('./guest_contact_utils.js'));
+  sahteDom({});
+  const App = require('../app.js');
+  const P = 'aaaaaaaa-0000-4000-8000-0000000000c1';
+  const B1 = 'dddddddd-0000-4000-8000-000000000001', B2 = 'dddddddd-0000-4000-8000-000000000002';
+  const B3 = 'dddddddd-0000-4000-8000-000000000003', B4 = 'dddddddd-0000-4000-8000-000000000004', B5 = 'dddddddd-0000-4000-8000-000000000005';
+  const rpcCagrilari = [];
+  const ist = kaydedenIstemci();
+  ist.rpc = async (ad, arg) => {
+    rpcCagrilari.push({ ad, arg });
+    return { data: { id: 'eeeeeeee-0000-4000-8000-000000000001', tenant_id: TENANT, first_name: arg.p_first_name, last_name: arg.p_last_name, phone: arg.p_phone, email: arg.p_email }, error: null };
+  };
+  const kur = rol => {
+    App.setActiveTenant({ id: TENANT, role: rol });
+    App.setSupabaseClient(ist);
+    App.setAppData({ villas: { V: { id: P, slug: 'V', name: 'TEST Ev' } }, guests: [], leads: [], expenses: [], cleaningTasks: [],
+      bookings: [
+        { id: B1, villa: 'V', guest: 'Onur Bey', phone: '0532 111 22 33', checkIn: '2026-10-10', checkOut: '2026-10-12', status: 'CONFIRMED' },
+        { id: B2, villa: 'V', guest: 'Bağlı Misafir', phone: '05320000000', primaryGuestId: 'eeeeeeee-0000-4000-8000-000000000009', checkIn: '2026-10-09', checkOut: '2026-10-10', status: 'CONFIRMED' },
+        { id: B3, villa: 'V', guest: 'TOPLU AKTARIM — Ocak 2026', checkIn: '2026-01-01', checkOut: '2026-01-20', status: 'CONFIRMED' },
+        { id: B4, villa: 'V', guest: 'İptal Misafir', phone: '05321112233', checkIn: '2026-10-05', checkOut: '2026-10-06', status: 'CANCELLED' },
+        { id: B5, villa: 'V', guest: 'Telefonsuz Misafir', phone: '', checkIn: '2026-10-01', checkOut: '2026-10-03', status: 'CONFIRMED' }
+      ] });
+  };
+
+  kur('owner');
+  App.toggleGuestUnlinkedPanel();
+  const panel = global.document.getElementById('guestUnlinkedPanel');
+  check(panel.hidden === false && /Onur Bey/.test(panel.innerHTML) && /Telefonsuz Misafir/.test(panel.innerHTML)
+    && !/Bağlı Misafir|TOPLU AKTARIM|İptal Misafir/.test(panel.innerHTML) && /Telefonu olan 1 rezervasyonu ekle/.test(panel.innerHTML),
+    'L-221a Panel yalniz bagsiz, iptal olmayan, gercek rezervasyonlari listeler; telefonu olanlari sayar', panel.innerHTML.slice(0, 300));
+  check(/Rezervasyonlardan misafir ekle|Paneli kapat/.test(global.document.getElementById('guestDataNotice').innerHTML),
+    'L-221b Misafirler uyarisi paneli acan dugmeyi tasir');
+
+  const d = (id, v) => { global.document.getElementById(id).value = v; };
+  d('guestLinkName_0', 'Onur Bey'); d('guestLinkPhone_0', '0532 111 22 33'); d('guestLinkEmail_0', '');
+  check(await App.linkUnlinkedBookingGuest(0) === true, 'L-221c Ekle basarili doner', global.__sonUyari);
+  const cagri = rpcCagrilari.find(c => c.ad === 'upsert_booking_guest_atomic');
+  check(cagri && cagri.arg.p_booking_id === B1 && cagri.arg.p_phone === '+905321112233' && cagri.arg.p_first_name === 'Onur' && cagri.arg.p_last_name === 'Bey',
+    'L-221d Ekle rezervasyonu telefonla misafir defterine baglar (sunucu ayni telefonu tekrar acmaz)', JSON.stringify(cagri && cagri.arg));
+  check(App.getAppData().bookings.find(b => b.id === B1).primaryGuestId === 'eeeeeeee-0000-4000-8000-000000000001',
+    'L-221e Baglanan rezervasyon panelden duser');
+
+  rpcCagrilari.length = 0;
+  global.__sonUyari = '';
+  App.toggleGuestUnlinkedPanel(); App.toggleGuestUnlinkedPanel();
+  d('guestLinkName_0', 'Telefonsuz Misafir'); d('guestLinkPhone_0', ''); d('guestLinkEmail_0', '');
+  check(await App.linkUnlinkedBookingGuest(0) === false && rpcCagrilari.length === 0 && /telefon veya e-posta/.test(global.__sonUyari),
+    'L-221f Telefon ve e-posta yoksa sunucuya gidilmez, ne gerektigi soylenir', global.__sonUyari);
+
+  kur('viewer');
+  App.renderGuestsTab();
+  check(global.document.getElementById('guestUnlinkedPanel').hidden === true, 'L-221g Izleyici paneli gormez (satis yazma rolu yok)');
+
+  const html = read('index.html');
+  const ayrinti = (html.match(/<details class="booking-optional-details">[\s\S]*?<\/details>/) || [''])[0];
+  check(/id="resGuestPhone"/.test(html) && !/id="resGuestPhone"/.test(ayrinti) && !/id="resGuestEmail"/.test(ayrinti),
+    'L-221h Rezervasyon formunda telefon/e-posta "Istege bagli ayrintilar" icinde saklanmaz');
+  const eylem = read('core/action_dispatch.js');
+  check(['toggleGuestUnlinkedPanel', 'linkUnlinkedBookingGuest', 'linkAllUnlinkedBookingsWithPhone'].every(ad => eylem.includes(`'${ad}'`)),
+    'L-221i Panel eylemleri izin listesinde');
+}
+
 async function bugunPerformansDavranisi() {
   sahteDom({});
   global.FinancialMetricsService = require('./financial_metrics_service.js');
@@ -1258,6 +1323,7 @@ try {
   await mulklerAsama11Davranisi();
   await bugunPerformansDavranisi();
   await talepEkraniDavranisi();
+  await rezervasyondanMisafirDavranisi();
 } catch (error) {
   failed++;
   console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

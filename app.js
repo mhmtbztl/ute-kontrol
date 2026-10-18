@@ -20210,10 +20210,14 @@ function renderGuestsTab() {
   if (notice) {
     const notes = [];
     if (metrics.excludedAggregateBookingCount) notes.push(`${metrics.excludedAggregateBookingCount} toplu aktarım özeti kişi olmadığı için CRM dışında tutuldu.`);
-    if (metrics.unlinkedBookingCount) notes.push(`${metrics.unlinkedBookingCount} gerçek rezervasyon henüz bir misafir profiline bağlı değil; düzenleyip telefon veya e-posta ekleyerek bağlayabilirsiniz.`);
-    notice.innerText = notes.join(' ');
+    if (metrics.unlinkedBookingCount) notes.push(`${metrics.unlinkedBookingCount} gerçek rezervasyonun misafiri henüz defterde değil.`);
+    const linkButton = metrics.unlinkedBookingCount && canWriteSalesRole(activeTenant?.role)
+      ? ` <button type="button" class="btn btn-secondary btn-sm" style="margin-left:8px;" data-onclick="toggleGuestUnlinkedPanel()">${guestUnlinkedPanelOpen ? 'Paneli kapat' : 'Rezervasyonlardan misafir ekle'}</button>`
+      : '';
+    notice.innerHTML = escapeHtml(notes.join(' ')) + linkButton;
     notice.style.display = notes.length ? 'block' : 'none';
   }
+  renderGuestUnlinkedPanel();
 
   const editAllowed = ['owner', 'admin', 'manager', 'sales'].includes(activeTenant?.role);
   const newButton = document.getElementById('newGuestProfileBtn');
@@ -20301,6 +20305,93 @@ function applyGuestProfileAccess(form, role = activeTenant?.role) {
     submit.disabled = !canEdit;
   }
   return { canEdit, canManagePrivate };
+}
+
+// Rezervasyondaki kisiyi misafir defterine ekleme (G9 M50). Defter kisiyi
+// telefon/e-postayla tanir (phase27, upsert_booking_guest_atomic): ayni telefon
+// kayitliysa yeni profil acilmaz, rezervasyon mevcut profile baglanir.
+let guestUnlinkedPanelOpen = false;
+let guestUnlinkedRows = [];
+
+function getUnlinkedGuestBookings() {
+  return (appData.bookings || [])
+    .filter(b => b && String(b.status || '').toUpperCase() !== 'CANCELLED' && !isBulkSummaryBooking(b)
+      && !(b.primaryGuestId || b.primary_guest_id) && isUUID(b.id))
+    .sort((a, b) => String(b.checkIn || '').localeCompare(String(a.checkIn || '')));
+}
+
+function toggleGuestUnlinkedPanel() {
+  guestUnlinkedPanelOpen = !guestUnlinkedPanelOpen;
+  renderGuestsTab();
+}
+
+function renderGuestUnlinkedPanel() {
+  const panel = typeof document !== 'undefined' ? document.getElementById('guestUnlinkedPanel') : null;
+  if (!panel) return;
+  const canWrite = canWriteSalesRole(activeTenant?.role);
+  guestUnlinkedRows = canWrite && guestUnlinkedPanelOpen ? getUnlinkedGuestBookings() : [];
+  panel.hidden = !guestUnlinkedRows.length;
+  if (panel.hidden) { panel.innerHTML = ''; return; }
+  const limit = 50;
+  const withPhone = guestUnlinkedRows.filter(b => String(b.phone || '').trim()).length;
+  const rows = guestUnlinkedRows.slice(0, limit).map((b, i) => {
+    const villaName = appData.villas?.[b.villa]?.name || b.villa || '—';
+    return `<tr>
+      <td><input id="guestLinkName_${i}" type="text" maxlength="200" value="${escapeHtml(b.guest || '')}" aria-label="Misafir adı"></td>
+      <td>${escapeHtml(villaName)}<span class="sub-text" style="display:block;">${escapeHtml(formatTrDate(b.checkIn))} – ${escapeHtml(formatTrDate(b.checkOut))}</span></td>
+      <td><input id="guestLinkPhone_${i}" type="tel" inputmode="tel" value="${escapeHtml(b.phone || '')}" placeholder="05xx xxx xx xx" aria-label="Telefon"></td>
+      <td><input id="guestLinkEmail_${i}" type="email" inputmode="email" placeholder="isteğe bağlı" aria-label="E-posta"></td>
+      <td style="text-align:right;"><button type="button" class="btn btn-primary btn-sm" data-onclick="linkUnlinkedBookingGuest(${i})">Ekle</button></td>
+    </tr>`;
+  }).join('');
+  panel.innerHTML = `<div class="guest-unlinked-head">
+      <div><strong>Rezervasyonlardan misafir ekle</strong><p class="sub-text">Misafir telefon veya e-postayla tanınır. Aynı telefon zaten kayıtlıysa yeni profil açılmaz, rezervasyon o misafire bağlanır (tekrar gelen misafir).</p></div>
+      ${withPhone ? `<button type="button" class="btn btn-primary btn-sm" data-onclick="linkAllUnlinkedBookingsWithPhone()">Telefonu olan ${withPhone} rezervasyonu ekle</button>` : ''}
+    </div>
+    <div class="table-responsive"><table class="data-table"><thead><tr><th>MİSAFİR</th><th>MÜLK / TARİH</th><th>TELEFON</th><th>E-POSTA</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+    ${guestUnlinkedRows.length > limit ? `<p class="sub-text">İlk ${limit} rezervasyon gösteriliyor; ekledikçe sıradakiler gelir (${guestUnlinkedRows.length} toplam).</p>` : ''}`;
+}
+
+function readUnlinkedGuestInput(index) {
+  const value = id => (document.getElementById(`${id}_${index}`)?.value || '').trim();
+  return { fullName: value('guestLinkName'), phone: value('guestLinkPhone'), email: value('guestLinkEmail') };
+}
+
+async function linkUnlinkedBookingGuest(index) {
+  if (!canWriteSalesRole(activeTenant?.role)) return false;
+  const booking = guestUnlinkedRows[index];
+  if (!booking) return false;
+  const input = readUnlinkedGuestInput(index);
+  if (!input.fullName) { alert('Misafir adını yazın.'); return false; }
+  if (!input.phone && !input.email) { alert('Misafiri defterde tanımak için telefon veya e-posta girin.'); return false; }
+  try {
+    await linkBookingGuestProfile(booking.id, input);
+    if (window.showToast) window.showToast(`✅ ${input.fullName} misafir defterine eklendi.`);
+    return true;
+  } catch (error) {
+    alert('Misafir eklenemedi: ' + kullaniciMesaji(error?.message || error));
+    return false;
+  }
+}
+
+async function linkAllUnlinkedBookingsWithPhone() {
+  if (!canWriteSalesRole(activeTenant?.role)) return false;
+  // Girdiler cizim yenilenmeden once okunur; her baglama paneli yeniden cizer.
+  const jobs = guestUnlinkedRows.slice(0, 50).map((booking, i) => ({ booking, input: readUnlinkedGuestInput(i) }))
+    .filter(job => job.input.fullName && (job.input.phone || job.input.email));
+  let added = 0;
+  const failures = [];
+  for (const job of jobs) {
+    try {
+      await linkBookingGuestProfile(job.booking.id, job.input);
+      added++;
+    } catch (error) {
+      failures.push(`${job.input.fullName}: ${kullaniciMesaji(error?.message || error)}`);
+    }
+  }
+  renderGuestsTab();
+  alert(`${added} rezervasyonun misafiri deftere eklendi.` + (failures.length ? `\n\nEklenemeyen ${failures.length}:\n` + failures.slice(0, 10).join('\n') : ''));
+  return added;
 }
 
 function openGuestProfileModal(guestId = null) {
@@ -21067,6 +21158,10 @@ if (typeof module !== 'undefined' && module.exports) {
     renderOperationsPeopleView,
     renderTodayPerformance,
     renderLeadCard,
+    renderGuestsTab,
+    toggleGuestUnlinkedPanel,
+    linkUnlinkedBookingGuest,
+    linkAllUnlinkedBookingsWithPhone,
     openLeadModal,
     saveLead,
     setTodayPerformanceVilla,

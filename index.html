@@ -14,7 +14,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=47176a67">
+  <link rel="stylesheet" href="style.css?v=646dc566">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="supabase.umd.js?v=3810661a"></script>
@@ -1909,6 +1909,7 @@
         </div>
         <div id="guestOpportunityNotice" style="display:none; margin-bottom:12px; padding:12px; border-radius:10px; background:rgba(16,185,129,.08); border:1px solid rgba(16,185,129,.25); color:#D1FAE5; font-size:12px;"></div>
         <div id="guestDataNotice" style="display:none; margin-bottom:12px; padding:10px 12px; border-radius:8px; background:rgba(245,158,11,.08); border:1px solid rgba(245,158,11,.25); color:#FDE68A; font-size:12px;"></div>
+        <div id="guestUnlinkedPanel" class="guest-unlinked-panel" hidden></div>
         <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
           <input id="guestDirectorySearch" type="search" placeholder="İsim, telefon veya e-posta ara" data-oninput="setGuestDirectoryQuery(this.value)" style="min-width:240px; flex:1;">
           <!-- Tek takvimde aralik (ENVANTER 27.09): ortak secici core/date_range_picker.js -->
@@ -2696,6 +2697,17 @@
             <label for="resGuest">Misafir Adı</label>
             <input type="text" id="resGuest" placeholder="Örn: Ahmet Yılmaz" required autocomplete="name">
           </div>
+          <!-- Misafir defteri kisiyi telefon/e-postayla tanir (phase27); alanlar
+               "Istege bagli ayrintilar" icinde saklıydi, profil hic olusmuyordu (G9 M50). -->
+          <div class="form-group">
+            <label for="resGuestPhone">Misafir Telefonu</label>
+            <input type="tel" inputmode="tel" id="resGuestPhone" placeholder="Örn: 0532 123 45 67" autocomplete="tel">
+            <small class="field-note">Telefon veya e-posta girilirse misafir, Misafirler defterine eklenir; tekrar gelişleri tanınır.</small>
+          </div>
+          <div class="form-group">
+            <label for="resGuestEmail">Misafir E-postası</label>
+            <input type="email" inputmode="email" id="resGuestEmail" placeholder="ornek@email.com" autocomplete="email">
+          </div>
           <div class="form-group daterange-group">
             <label for="resDateRangeBtn">Konaklama Tarihleri</label>
             <button type="button" id="resDateRangeBtn" class="daterange-trigger" data-onclick="toggleResDatePicker()" aria-haspopup="dialog" aria-expanded="false">
@@ -2766,15 +2778,6 @@
         <details class="booking-optional-details">
           <summary>İsteğe bağlı ayrıntılar</summary>
           <div class="booking-optional-grid">
-            <div class="form-group">
-              <label for="resGuestPhone">Misafir Telefonu</label>
-              <input type="tel" inputmode="tel" id="resGuestPhone" placeholder="Örn: 0532 123 45 67" autocomplete="tel">
-              <small class="field-note">Tekrar eden misafiri güvenilir biçimde tanımak için telefon veya e-posta girin.</small>
-            </div>
-            <div class="form-group">
-              <label for="resGuestEmail">Misafir E-postası</label>
-              <input type="email" inputmode="email" id="resGuestEmail" placeholder="ornek@email.com" autocomplete="email">
-            </div>
             <div class="form-group">
               <label for="resGuestLanguage">İletişim Dili</label>
               <select id="resGuestLanguage">
@@ -3833,10 +3836,10 @@
   <script src="core/side_panel.js?v=d763b464"></script>
   <script src="core/notification_feed.js?v=d8a17633"></script>
   <script src="core/command_search.js?v=89760933"></script>
-  <script src="core/action_dispatch.js?v=7a9d31bb"></script>
+  <script src="core/action_dispatch.js?v=1f5708a6"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=a85be454"></script>
-  <script src="app.js?v=5ff64292"></script>
+  <script src="app.js?v=c9c4493c"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=e5503243"></script>
