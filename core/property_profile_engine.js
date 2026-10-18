@@ -45,6 +45,8 @@
   //   Google Haritalar baglantisi (pin !3d!4d, @, ?q=, ?ll=, /search/),
   //   kopyalanan duz koordinat "36.2012, 29.6431", tam Plus Code.
   // Okunamazsa { error } doner ki arayuz NEDENINI soyleyebilsin.
+  function round6(n) { return Math.round(n * 1e6) / 1e6; }
+
   function readLocationInput(value) {
     const raw = String(value || '').trim();
     if (!raw) return { error: 'EMPTY' };
@@ -68,7 +70,10 @@
       if (!match) continue;
       const latitude = Number(match[1]);
       const longitude = Number(match[2]);
-      if (validPair(latitude, longitude)) return { latitude, longitude, source: 'COORDINATES' };
+      // Google Haritalar 15 ondalik verir; enlem/boylam alani 6 ondalik (~11 cm)
+      // kabul eder, fazlasi tarayicida 'gecerli bir deger girin' hatasiyla
+      // formu durduruyordu (L-215, kullanici M44).
+      if (validPair(latitude, longitude)) return { latitude: round6(latitude), longitude: round6(longitude), source: 'COORDINATES' };
     }
     return { error: 'NOT_FOUND' };
   }

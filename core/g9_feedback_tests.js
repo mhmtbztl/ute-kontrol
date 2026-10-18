@@ -21,6 +21,7 @@
 // L-198 (M28): Gecmis ay toplu girisi formdan; takvimde gece ve tutarli rozet.
 // L-199 (M29): Talep formunda rol yuklenmeden yazilan "kaydedemez" mesaji rol gelince kalmiyordu.
 // L-193 (M23): Defterdeki "Temizlik" sutunu maliyet saniliyordu; misafirden alinan gelir oldugu yazilir.
+// L-212..L-216 (M41-M45, 9.3): mulk sahibi kaydi, profilin tazelenmesi, kanal ilani listesi, koordinat, fiyat adlari.
 // L-184..L-190 (M14-M20): kapora, kar marji hedefi, talep tarihi, mulk net kari, reklam tablosu/metrik/gunluk butce, sablon ekrani, bosluk gecesi.
 const fs = require('fs');
 const path = require('path');
@@ -925,6 +926,174 @@ async function topluGirisDavranisi() {
     'L-198h Rezervasyonlar ekraninda "Gecmis ay toplu girisi"; mulk listesi ortak kaynaktan');
 }
 
+// L-212..L-216 (M41-M45, 9.3) — Mulkler: sahip kaydi, profilin tazelenmesi,
+// kanal ilanlarinin listesi, koordinat hassasiyeti, fiyat adlari.
+function kanalIstemcisi() {
+  const yazmalar = [];
+  const rpcler = [];
+  const secimler = [];
+  const client = {
+    yazmalar, rpcler, secimler, guncelSatir: 1,
+    rpc: async (ad, args) => { rpcler.push({ ad, args }); return { data: { listingId: 'yeni', reused: false }, error: null }; },
+    from(tablo) {
+      const k = { tablo, islem: 'select', yuk: null, filtre: [] };
+      const q = {
+        insert(y) { k.islem = 'insert'; k.yuk = y; yazmalar.push(k); return q; },
+        update(y) { k.islem = 'update'; k.yuk = y; yazmalar.push(k); return q; },
+        delete() { k.islem = 'delete'; yazmalar.push(k); return q; },
+        select(c) { if (k.islem === 'select') secimler.push(tablo); k.kolon = c; return q; },
+        eq(c, v) { k.filtre.push([c, v]); return q; }, neq() { return q; }, in() { return q; },
+        order() { return q; }, limit() { return q; }, range() { return q; },
+        async single() { return { data: { id: 'sahip-yeni' }, error: null }; },
+        then(res, rej) {
+          const data = k.islem === 'select' ? [] : (k.islem === 'update' ? Array.from({ length: client.guncelSatir }, () => ({ id: 'l1' })) : null);
+          return Promise.resolve({ data, error: null }).then(res, rej);
+        }
+      };
+      return q;
+    }
+  };
+  return client;
+}
+
+async function mulklerAsama11Davranisi() {
+  const PID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const LID = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+  const html = read('index.html');
+  const app = read('app.js');
+
+  // L-215 — koordinat: Google Haritalar 15 ondalik verir, alan 6 ondalik kabul eder.
+  const PPE = require('./property_profile_engine.js');
+  const konum = PPE.readLocationInput('36.794852353716564, 28.24900388719855');
+  check(konum.latitude === 36.794852 && konum.longitude === 28.249004,
+    'L-215a Yapistirilan uzun koordinat 6 ondaliga yuvarlanir (DB NUMERIC(9,6))', JSON.stringify(konum));
+  check(/id="propAnalysisLatitude"[^>]*step="any"/.test(html) && /id="propAnalysisLongitude"[^>]*step="any"/.test(html),
+    'L-215b Enlem/boylam alani fazla ondalikta formu durdurmaz (step="any")');
+
+  // L-214 — kanal ilani servisi: ID baglantidan okunur, arsiv olculur, liste ChatGPT icin.
+  const KS = require('./marketing_channel_listing_service.js');
+  check(KS.deriveListingId('AIRBNB', 'https://www.airbnb.com.tr/rooms/12345678?adults=2') === '12345678'
+    && KS.deriveListingId('BOOKING_COM', 'https://www.booking.com/hotel/tr/villa-deniz.tr.html?aid=1') === 'villa-deniz'
+    && KS.deriveListingId('VRBO', 'https://www.vrbo.com/1234567ha') === '1234567'
+    && KS.deriveListingId('EXPEDIA', 'https://www.expedia.com/Kas-Hotels-Villa.h12345678.Hotel-Information') === '12345678'
+    && KS.deriveListingId('DIRECT', 'https://www.villam.com/villa-deniz/') === 'villam.com/villa-deniz'
+    && KS.deriveListingId('AIRBNB', 'http://www.airbnb.com/rooms/1') === null,
+    'L-214a Ilan ID baglantidan okunur (Airbnb, Booking, Vrbo, Expedia); okunamazsa adres sabit referans olur');
+  let gecerli = null;
+  try { gecerli = KS.validateInput({ tenantId: TENANT, propertyId: PID, channelCode: 'AIRBNB', externalUrl: 'https://www.airbnb.com.tr/rooms/12345678', payoutCurrency: 'eur' }); } catch (e) { gecerli = e.message; }
+  let bos = null;
+  try { KS.validateInput({ tenantId: TENANT, propertyId: PID, channelCode: 'AIRBNB' }); } catch (e) { bos = e.message; }
+  check(gecerli && gecerli.externalListingId === '12345678' && gecerli.payoutCurrency === 'EUR' && bos === 'CHANNEL_LISTING_REFERENCE_REQUIRED'
+    && /bağlantısını ya da ilan ID/.test(KS.errorMessage(new Error(bos))) && KS.CURRENCIES.includes('EUR'),
+    'L-214b ID girmeden baglantiyla kaydedilir; ikisi de yoksa anlasilir Turkce hata', JSON.stringify(gecerli));
+  const satirlar = [
+    { id: LID, property_id: PID, channel_code: 'BOOKING_COM', external_listing_id: 'villa-deniz', display_name: null, external_url: 'https://www.booking.com/hotel/tr/villa-deniz.html', payout_currency: 'EUR', status: 'ACTIVE' },
+    { id: 'l2', property_id: PID, channel_code: 'AIRBNB', external_listing_id: '123', display_name: 'Deniz Evi', external_url: 'https://www.airbnb.com/rooms/123', payout_currency: 'TRY', status: 'ACTIVE' },
+    { id: 'l3', property_id: PID, channel_code: 'VRBO', external_listing_id: '99', status: 'ARCHIVED' },
+    { id: 'l4', property_id: 'baska', channel_code: 'AIRBNB', external_listing_id: '5', status: 'ACTIVE' }
+  ];
+  const liste = KS.listingsForProperty(satirlar, PID);
+  check(liste.map(r => r.id).join(',') === `l2,${LID}`, 'L-214c Mulkun listesi arsivi ve baska mulku dislar, kanal sirasiyla');
+  const metin = KS.linkListText('Deniz Evi', liste);
+  check(/Airbnb — Deniz Evi: https:\/\/www\.airbnb\.com\/rooms\/123/.test(metin) && /Booking\.com: https:\/\/www\.booking\.com/.test(metin),
+    'L-214d ChatGPT icin baglanti listesi kanal ve ad tasir', metin);
+  const arsivIst = kanalIstemcisi();
+  await KS.archiveChannelListing(arsivIst, { tenantId: TENANT, listingId: LID });
+  const arsiv = arsivIst.yazmalar.find(k => k.tablo === 'property_channel_listings' && k.islem === 'update');
+  arsivIst.guncelSatir = 0;
+  let reddedildi = false;
+  try { await KS.archiveChannelListing(arsivIst, { tenantId: TENANT, listingId: LID }); } catch (_) { reddedildi = true; }
+  check(arsiv && arsiv.yuk.status === 'ARCHIVED' && arsiv.filtre.some(([c, v]) => c === 'tenant_id' && v === TENANT) && reddedildi,
+    'L-214e Arsiv silmez, ARCHIVED yazar; RLS reddi (0 satir) "arsivlendi" sayilmaz');
+
+  // L-214 — mulk profili: Kanallar sekmesi ilanlari listeler, yonetir.
+  sahteDom({});
+  global.MarketingChannelListingService = KS;
+  global.PropertyProfileEngine = PPE;
+  global.PropertyAnalysisContextService = require('./property_analysis_context_service.js');
+  global.PropertyOwnerService = require('./property_owner_service.js');
+  const App = require('../app.js');
+  const villa = { id: PID, slug: 'DENIZ', name: 'Deniz Evi', capacity: '6', basePrice: 23000, floor: null, target: 25000, isActive: true, activationDate: '2026-09-01' };
+  const kur = (rol = 'owner', ek = {}) => {
+    App.setActiveTenant({ id: TENANT, role: rol });
+    const ist = kanalIstemcisi();
+    App.setSupabaseClient(ist);
+    App.setAppData({ villas: { DENIZ: { ...villa } }, bookings: [], expenses: [], cleaningTasks: [], channelListings: satirlar, propertyAnalysisContexts: [], propertyOwners: [], propertyOwnerLinks: [], ...ek });
+    return ist;
+  };
+  kur();
+  App.setPropertyProfileTab('CHANNELS');
+  let profil = App.renderPropertyProfile('DENIZ');
+  check(/Deniz Evi/.test(profil) && /Booking\.com/.test(profil) && /Ödeme: EUR/.test(profil) && /ID: villa-deniz/.test(profil)
+    && !/ID: 99/.test(profil) && /İlanı aç/.test(profil) && /archivePropertyChannelListing/.test(profil) && /Bağlantıları kopyala/.test(profil),
+    'L-214f Profil Kanallar sekmesi kayitli ilanlari listeler (kanal, ad, ID, para birimi, baglanti)');
+  kur('viewer');
+  profil = App.renderPropertyProfile('DENIZ');
+  check(/Booking\.com/.test(profil) && !/archivePropertyChannelListing|openPropertyChannelForm/.test(profil),
+    'L-214g Izleyici ilanlari gorur, ekleyemez/arsivleyemez');
+  let ist = kur();
+  App.openPropertyChannelForm('DENIZ');
+  profil = App.renderPropertyProfile('DENIZ');
+  check(/id="channelListingUrl"/.test(profil) && /<select id="channelListingCurrency">/.test(profil) && /Booking\.com EUR ödüyorsa/.test(profil) && /\/rooms\/ sonrası sayı/.test(profil),
+    'L-214h Form ID ve para birimini aciklar; para birimi secimli (TRY/EUR/USD/GBP)');
+  sahteDom({ channelListingCode: 'BOOKING_COM', channelListingUrl: 'https://www.booking.com/hotel/tr/villa-deniz.html', channelListingId: '', channelListingName: '', channelListingCurrency: 'EUR' });
+  const kaydedildi = await App.savePropertyChannelListing('DENIZ');
+  const rpc = ist.rpcler.find(r => r.ad === 'save_property_channel_listing');
+  check(kaydedildi === true && rpc && rpc.args.p_property_id === PID && rpc.args.p_external_listing_id === 'villa-deniz' && rpc.args.p_payout_currency === 'EUR'
+    && ist.secimler.includes('property_channel_listings'),
+    'L-214i Profilden kayit korumali RPC ile yazar ve listeyi yeniden okur', JSON.stringify(rpc));
+  check(/'property_channel_listings'\)\.select\(CHANNEL_LISTING_COLUMNS\)/.test(functionBody(app, 'async function loadTenantAppData(')) || /from\('property_channel_listings'\)\.select\(CHANNEL_LISTING_COLUMNS\)\.eq\('tenant_id', tenantId\)/.test(app),
+    'L-214j Kiraci yuklemesi kanal ilanlarini okur (can_read_sales)');
+  const otaUi = read('core/property_analysis_context_ui.js');
+  check(!/openMarketingListingManager\(/.test(functionBody(otaUi, 'function openPropertyOtaManager(')) && /openPropertyChannelForm\(villaKey\)/.test(otaUi)
+    && /id="propOtaSummary"/.test(html) && /marketing_channel_listing_service\.js\?v=/.test(html),
+    'L-214k Mulk formundaki "OTA baglantilarini yonet" profilin Kanallar sekmesini acar; formda kayitli ilanlar yazar');
+
+  // L-212 — mulk sahibi kaydi (form vardi, yazan kod yoktu).
+  ist = kur();
+  sahteDom({ propOwnerId: '', propOwnerName: 'TEST Mehmet', propOwnerPhone: '05320000000', propOwnerEmail: '' });
+  await App.savePropertyOwnerFromForm(PID);
+  const sahip = ist.yazmalar.find(k => k.tablo === 'property_owners' && k.islem === 'insert');
+  const bag = ist.yazmalar.find(k => k.tablo === 'property_owner_links' && k.islem === 'insert');
+  check(sahip && sahip.yuk.full_name === 'TEST Mehmet' && sahip.yuk.tenant_id === TENANT && bag && bag.yuk.property_id === PID && bag.yuk.owner_id === 'sahip-yeni',
+    'L-212a Yeni sahip adi property_owners + property_owner_links tablolarina yazilir');
+  ist = kur('owner', { propertyOwnerLinks: [{ property_id: PID, owner_id: 'o1' }] });
+  sahteDom({ propOwnerId: 'o1', propOwnerName: '' });
+  await App.savePropertyOwnerFromForm(PID);
+  const degismedi = ist.yazmalar.length === 0;
+  sahteDom({ propOwnerId: '', propOwnerName: '' });
+  await App.savePropertyOwnerFromForm(PID);
+  const kaldir = ist.yazmalar.find(k => k.tablo === 'property_owner_links' && k.islem === 'delete');
+  check(degismedi && kaldir && kaldir.filtre.some(([c, v]) => c === 'property_id' && v === PID),
+    'L-212b Degismeyen secim yazmaz; "belirtilmedi" secilirse bag kaldirilir');
+  ist = kur('viewer');
+  sahteDom({ propOwnerId: '', propOwnerName: 'TEST Mehmet' });
+  await App.savePropertyOwnerFromForm(PID);
+  check(ist.yazmalar.length === 0, 'L-212c Yonetim yetkisi olmayan rol sahip yazmaz');
+
+  // L-213 — kayittan sonra profil bellekteki eski kopyayi gostermez.
+  const kaydet = functionBody(app, 'async function saveProperty(');
+  check(/savePropertyOwnerFromForm\(savedProperty\.id\)/.test(kaydet) && /refreshPropertyProfileRows\(\)/.test(kaydet)
+    && kaydet.indexOf('refreshPropertyProfileRows') < kaydet.indexOf('renderAll()'),
+    'L-213a Mulk kaydi sahibi yazar ve profil satirlarini ekrani cizmeden once yeniden okur');
+  kur('owner', { propertyAnalysisContexts: [{ property_id: PID, city: 'Fethiye', district_region: 'Ölüdeniz', country_code: 'TR', latitude: 36.794852, longitude: 28.249004 }] });
+  App.setPropertyProfileTab('GENERAL');
+  profil = App.renderPropertyProfile('DENIZ');
+  check(/Ölüdeniz, Fethiye/.test(profil) && /36\.794852, 28\.249004/.test(profil), 'L-213b Profil Genel sekmesi konumu (ilce, sehir, ulke) ve koordinati gosterir');
+
+  // L-216 — fiyat adlari: formdaki "taban" baz fiyata yaziliyordu.
+  check(!/Gecelik Taban Fiyat/.test(html) && (html.match(/Gecelik Baz Fiyat/g) || []).length === 2,
+    'L-216a Mulk ve ilk mulk formu baz fiyati "Baz fiyat" diye sorar');
+  kur();
+  App.renderPropertiesTab();
+  const kart = global.document.getElementById('propertiesManagementGrid').innerHTML;
+  check(/Baz fiyat/.test(kart) && /₺23\.000/.test(kart) && /Taban fiyat/.test(kart) && /Hedef fiyat/.test(kart) && /₺25\.000/.test(kart),
+    'L-216b Mulk karti baz, taban ve hedef fiyati yan yana gosterir', kart.slice(0, 400));
+  App.setPropertyProfileTab('PRICES');
+  profil = App.renderPropertyProfile('DENIZ');
+  check(/asla altına inmeyeceğiniz/.test(profil) && /Hiçbiri sabit değildir/.test(profil), 'L-216c Fiyatlar sekmesi baz/taban/hedef farkini ve sabit olmadiklarini aciklar');
+}
+
 async function main() {
 try {
   const html = read('index.html');
@@ -964,6 +1133,7 @@ try {
   await gelirTablosuDavranisi();
   await rezervasyonKapsamDavranisi();
   await topluGirisDavranisi();
+  await mulklerAsama11Davranisi();
 } catch (error) {
   failed++;
   console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));
