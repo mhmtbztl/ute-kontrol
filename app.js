@@ -13670,6 +13670,30 @@ function computeMonthActuals(monthKey, villa) {
   };
 }
 
+// Bir ayin doluluk / ADR / RevPAR'i — tek kaynak. Finans'in aylik KPI tablosu
+// ve Bugun ekraninin mulk kartlari ayni fonksiyonu kullanir; ikisi ayri
+// hesaplasaydi ayni ay icin farkli rakam gosterirlerdi (§3.4).
+// Payda mulkun o aydaki gercek kapasitesidir (faaliyete baslama, bakim
+// kesintisi). Kapasite 0 ise doluluk/RevPAR olculemez: null, ekranda "—".
+function computeMonthPerformance(monthKey, villa) {
+  const secili = villa || 'ALL';
+  const actuals = computeMonthActuals(monthKey, secili);
+  const [year, month] = String(monthKey).split('-').map(Number);
+  const properties = secili === 'ALL'
+    ? Object.values(appData.villas || {})
+    : [appData.villas?.[secili]].filter(Boolean);
+  const available = typeof FinancialMetricsService !== 'undefined'
+    ? FinancialMetricsService.calculateAvailableNights(properties, year, month, appData.maintenance || [])
+    : null;
+  return {
+    ...actuals,
+    available,
+    occupancy: available > 0 ? Number(((actuals.nights / available) * 100).toFixed(1)) : null,
+    adr: actuals.nights > 0 ? Math.round(actuals.roomRevenue / actuals.nights) : null,
+    revpar: available > 0 ? Math.round(actuals.roomRevenue / available) : null
+  };
+}
+
 function getMonthlyKpiDataset() {
   const months = ALL_FINANCIAL_MONTHS.slice();
 
@@ -13682,18 +13706,15 @@ function getMonthlyKpiDataset() {
     const target = getConfiguredRevenueTarget(targetFilter, appData.targets, secili) || 0;
     const monthName = getPeriodDisplayName(m);
 
-    const { ciro, totalIncome, roomRevenue, opex, capex, nights, netProfit } = computeMonthActuals(m, secili);
     // ADR ve RevPAR NET ODA GELIRINDEN (K-04). Marj, kar gibi TOPLAM GELIR
-    // uzerinden (temizlik geliri karin icinde kalir).
-    const adr = nights > 0 ? Math.round(roomRevenue / nights) : 0;
+    // uzerinden (temizlik geliri karin icinde kalir). Doluluk/ADR/RevPAR
+    // Bugun ekraniyla ayni fonksiyondan (computeMonthPerformance).
+    const perf = computeMonthPerformance(m, secili);
+    const { ciro, totalIncome, opex, capex, nights, netProfit, occupancy, revpar } = perf;
+    const adr = perf.adr ?? 0;
     const margin = totalIncome > 0 ? Number(((netProfit / totalIncome) * 100).toFixed(1)) : 0;
     // L-101: hic gider yoksa o ayin kari/marji olculmemistir.
     const profitUnmeasured = isProfitUnmeasured(totalIncome, opex, capex, m);
-    const available = typeof FinancialMetricsService !== 'undefined'
-      ? FinancialMetricsService.calculateAvailableNights(secili === 'ALL' ? Object.values(appData.villas || {}) : [appData.villas[secili]].filter(Boolean), metricYear, metricMonth, appData.maintenance || [])
-      : null;
-    const occupancy = available > 0 ? Number(((nights / available) * 100).toFixed(1)) : null;
-    const revpar = available > 0 ? Math.round(roomRevenue / available) : null;
 
     const totalExp = opex + capex;
     const targetPct = target > 0 ? Number(((ciro / target) * 100).toFixed(1)) : null;
@@ -16667,7 +16688,8 @@ function updateAllVillaDropdowns() {
     // Bu ikisi listede yoktu: markup'taki bes uydurma villa hicbir zaman
     // yenilenmiyor, musteri kendi mulklerini burada goremiyordu.
     'rezVillaFilter',
-    'waParsedVilla'
+    'waParsedVilla',
+    'todayPerfVilla'
   ];
 
   dropdownIds.forEach(selectId => {
@@ -16681,7 +16703,7 @@ function updateAllVillaDropdowns() {
     // markup'ta bu secenege sahipti ama listeye alinmadigi icin JS onlari
     // yeniden kurarken secenek kayboluyordu.
     const TUMU_OLANLAR = ['globalVillaFilter', 'mktVilla', 'expVilla', 'rezVillaFilter',
-                          'calendarVillaFilter', 'pricingVillaFilter', 'opsVillaFilter'];
+                          'calendarVillaFilter', 'pricingVillaFilter', 'opsVillaFilter', 'todayPerfVilla'];
     if (TUMU_OLANLAR.includes(selectId)) {
       const optAll = document.createElement('option');
       optAll.value = 'ALL';
@@ -18001,6 +18023,64 @@ function renderTodayTodoList(tasks, tickets, leads) {
   container.innerHTML = items.length ? items.slice(0, 8).map(item => `<div class="today-todo-item"><span>${escapeHtml(item.label)}</span><button class="btn btn-secondary btn-sm" data-onclick="switchTab(decodeURIComponent('${encodeActionArg(item.tab)}'))">Aç</button></div>`).join('') : '<div class="empty-state">Bugüne ait açık iş yok.</div>';
 }
 
+// Bugun > "Bu ayin performansi": Finans'taki doluluk / ADR / RevPAR kartlari,
+// ev ev secilebilir. Rakamlar Finans'in aylik tablosuyla ayni fonksiyondan
+// (computeMonthPerformance); ustteki global filtreden bagimsiz, her zaman bu ay.
+let todayPerformanceVilla = 'ALL';
+
+function setTodayPerformanceVilla(villa) {
+  todayPerformanceVilla = villa && (villa === 'ALL' || appData?.villas?.[villa]) ? villa : 'ALL';
+  renderTodayPerformance();
+  return true;
+}
+
+function todayPerformanceMoney(value) {
+  return value === null || value === undefined || !Number.isFinite(Number(value)) ? '—' : `₺${Math.round(Number(value)).toLocaleString('tr-TR')}`;
+}
+
+function todayPerformanceCardHtml(label, value, note) {
+  return `<div class="today-performance__card"><span class="sub-text">${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong>${note ? `<small>${escapeHtml(note)}</small>` : ''}</div>`;
+}
+
+function renderTodayPerformance() {
+  if (typeof document === 'undefined') return;
+  const section = document.getElementById('todayPerformance');
+  if (!section) return;
+  // Ciro, ADR ve RevPAR finans defteridir (§3.3.1): yalniz defteri okuyan roller.
+  const mayReadLedger = !activeTenant || canReadLedgerRole(activeTenant?.role);
+  section.hidden = !mayReadLedger;
+  if (!mayReadLedger) return;
+  const active = Object.keys(appData?.villas || {}).filter(key => {
+    const villa = appData.villas[key];
+    return villa && villa.isActive !== false && !villa.archivedAt;
+  });
+  if (todayPerformanceVilla !== 'ALL' && !active.includes(todayPerformanceVilla)) todayPerformanceVilla = 'ALL';
+  const picker = document.getElementById('todayPerfVilla');
+  if (picker) picker.value = todayPerformanceVilla;
+  const month = getCurrentMonthKey();
+  const perf = computeMonthPerformance(month, todayPerformanceVilla);
+  const scopeName = todayPerformanceVilla === 'ALL' ? 'Tüm mülkler' : (appData.villas[todayPerformanceVilla]?.name || todayPerformanceVilla);
+  setEl('todayPerformancePeriod', `${getPeriodDisplayName(month)} · ${scopeName} · Finans ekranıyla aynı hesap`);
+  const capacityNote = perf.available > 0 ? `${perf.nights} / ${perf.available} gece` : 'Kapasite yok: bu ay faaliyette görünmüyor (faaliyete başlama tarihi)';
+  const cards = document.getElementById('todayPerformanceCards');
+  if (cards) {
+    cards.innerHTML = [
+      todayPerformanceCardHtml('Ciro (net konaklama)', todayPerformanceMoney(perf.ciro), 'Bu aya düşen gecelerin payı'),
+      todayPerformanceCardHtml('Satılan gece', String(perf.nights), ''),
+      todayPerformanceCardHtml('Doluluk', perf.occupancy === null ? '—' : `%${perf.occupancy.toLocaleString('tr-TR')}`, capacityNote),
+      todayPerformanceCardHtml('ADR (ort. gecelik)', todayPerformanceMoney(perf.adr), perf.adr === null ? 'Bu ay satılmış gece yok' : 'Ciro ÷ satılan gece'),
+      todayPerformanceCardHtml('RevPAR', todayPerformanceMoney(perf.revpar), perf.revpar === null ? 'Kapasite yok' : 'Ciro ÷ satılabilir gece')
+    ].join('');
+  }
+  const list = document.getElementById('todayPerformanceList');
+  if (!list) return;
+  if (todayPerformanceVilla !== 'ALL' || active.length < 2) { list.innerHTML = ''; return; }
+  const rows = active.map(key => ({ key, name: appData.villas[key].name || key, perf: computeMonthPerformance(month, key) }))
+    .sort((a, b) => (b.perf.ciro || 0) - (a.perf.ciro || 0));
+  list.innerHTML = `<div class="today-performance__row today-performance__row--head"><span>Mülk</span><span>Doluluk</span><span>ADR</span><span>RevPAR</span><span></span></div>`
+    + rows.map(row => `<div class="today-performance__row"><strong>${escapeHtml(row.name)}</strong><span>${row.perf.occupancy === null ? '—' : `%${escapeHtml(row.perf.occupancy.toLocaleString('tr-TR'))}`}</span><span>${escapeHtml(todayPerformanceMoney(row.perf.adr))}</span><span>${escapeHtml(todayPerformanceMoney(row.perf.revpar))}</span><button type="button" class="btn btn-secondary btn-sm" data-onclick="setTodayPerformanceVilla(decodeURIComponent('${encodeActionArg(row.key)}'))">Seç</button></div>`).join('');
+}
+
 function renderTodayMonthSummary(bookings) {
   const element = document.getElementById('todayMonthSummary');
   if (!element) return;
@@ -18056,6 +18136,7 @@ function renderExecutiveControlCenter() {
   renderTodayDateStrip(bookings, tasks);
   renderTodayTodoList(tasks, tickets, leads);
   renderTodayMonthSummary(bookings);
+  renderTodayPerformance();
 
   // activeTenant bulunmayan yerel/test gorunumunde eski cevrimdisi hesap
   // calisir; gercek oturumda rol kapisi zorunludur.
@@ -20945,6 +21026,11 @@ if (typeof module !== 'undefined' && module.exports) {
     setOperationsView,
     assignCleaningTask,
     renderOperationsPeopleView,
+    renderTodayPerformance,
+    setTodayPerformanceVilla,
+    computeMonthPerformance,
+    getCurrentMonthKey,
+    getMonthlyKpiDataset,
     renderPropertyProfile,
     renderPropertiesTab,
     setPropertyProfileTab,

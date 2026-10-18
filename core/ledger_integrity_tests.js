@@ -508,7 +508,11 @@ const yazmalar = (istemci, tablo) =>
     // Ciro temizlik ucretini (A'da 2.000) icermez.
     yakin(App.computeMonthActuals('2031-05', 'A').ciro, 28000, 'A ciro');
     yakin(App.computeMonthActuals('2031-05').ciro, 33000, 'portföy ciro');
-    assert.match(kaynak37, /computeMonthActuals\(m, secili\)/);
+    // Tablo L-217'den beri computeMonthPerformance(m, secili) uzerinden okur;
+    // o da ayni secili mulkle computeMonthActuals'i cagirir.
+    assert.match(kaynak37, /computeMonthPerformance\(m, secili\)/);
+    assert.match(kaynak37, /const actuals = computeMonthActuals\(monthKey, secili\)/);
+    yakin(App.computeMonthPerformance('2031-05', 'A').ciro, 28000, 'A ciro (performans)');
   });
 
   await test('L-37 Boş bırakılan hedef 0 değil null yazılır', async () => {
