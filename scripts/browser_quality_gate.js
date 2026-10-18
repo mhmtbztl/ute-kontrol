@@ -570,6 +570,10 @@ async function main() {
       passed.push('25b. Bugün performans kartları 390 px mobilde taşmaz');
       // G9 L-207: teknik metin DSL'si yerine gercek gorsel checklist
       // duzenleyicisi mobilde bolum, onemli madde ve alt kontrolu korur.
+      // Ayarlar sekmesi acilinca ekip, sablon ve talep kaynagi okumalari
+      // buluta gider; fikstur oturumsuz oldugu icin 401 doner ve konsol
+      // kapisi zamanlamaya bagli olarak kirmizi olurdu. Okumalar bos doner.
+      await page.route('**/rest/v1/**', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
       await page.evaluate(() => {
         switchTab('settings');
         appData.settingsChecklistTemplates = [];
