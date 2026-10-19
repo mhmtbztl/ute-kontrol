@@ -59,7 +59,7 @@
     'handleBookingChannelChange', 'handleBookingDeleteFromModal', 'handleBookingPropertyFinanceChange',
     'markBookingCleaningManual', 'handleBookingGrossFinanceInput', 'toggleBookingFinanceSections', 'addBookingExtraExpense', 'removeBookingExtraExpense',
     'saveBookingTaxProfile', 'saveBookingCommissionBases', 'postBookingExtraExpenses',
-    'openBookingTaxProfileCreator', 'closeBookingTaxProfileCreator', 'saveBookingTaxProfileInline', 'handleBookingTaxProfileCreatorKey', 'editBookingTaxProfile', 'cancelBookingTaxProfileEdit', 'deleteBookingTaxProfile', 'saveBookingDepositChannels',
+    'openBookingTaxProfileCreator', 'closeBookingTaxProfileCreator', 'saveBookingTaxProfileInline', 'handleBookingTaxProfileCreatorKey', 'editBookingTaxProfile', 'cancelBookingTaxProfileEdit', 'deleteBookingTaxProfile', 'saveBookingDepositChannels', 'saveBookingCollectionSchedule',
     'toggleTapeChartZoom', 'syncQuickBookingDepositVisibility',
     'handleCommandPaletteKeydown', 'handleCommandPaletteSearch', 'handleFileImport',
     'handleFilterChange', 'handleOnboardingSubmit', 'handlePropertyDeleteFromModal',
@@ -77,10 +77,10 @@
     'openSettingsSection', 'openImportConvertPrompt', 'openTabFromDeepLink', 'openUserNotification', 'openWhatsAppModal', 'parseWhatsAppMessage', 'payAllPendingCleaning', 'payCleanerDebt', 'printCurrentReport', 'askChatGptFromCurrentReport',
     'promptEditTaskAmount', 'refreshExecutiveDashboardSnapshot', 'renderExpensesTable', 'renderHousekeepingTab', 'renderManageBookingsTable',
     'renderManageLeadsTable', 'recalculatePricingTarget', 'resetGuestDirectoryDateRange',
-    'resetImportPreview', 'resyncTenantData', 'resolveMaintenanceFromOperations', 'runPageAction', 'generateExpenseFromTemplate', 'deleteExpenseTemplate',
+    'resetImportPreview', 'resyncTenantData', 'resolveMaintenanceFromOperations', 'runPageAction',
     'saveBooking', 'saveBookingChannelRow', 'saveBookingPayment', 'saveBusinessSettings', 'savePropertyPricingLadder', 'saveCleaningTask', 'saveCompetitorResearch', 'saveExpense', 'saveGuestProfile', 'saveQuickBooking',
     'saveLead', 'saveMaint', 'saveMonthlyGoals', 'savePricingRuleSettings', 'saveStaffCleaningProgress', 'saveMyOperationalTaskChecklist', 'signStaffCleaningDone', 'bumpLeadInterestFromQuick',
-    'saveProperty', 'saveExpenseTemplate', 'saveWaAsBooking', 'saveWaAsLead',
+    'saveProperty', 'saveWaAsBooking', 'saveWaAsLead',
     'sendGuestLoyaltyMessage', 'setBookingChannelActive', 'setLeadFollowUpScope', 'setLeadViewMode',
     'setGuestDirectoryPage', 'setGuestDirectoryProperty',
     'setGuestDirectoryQuery', 'setGuestDirectorySegment', 'setGuestDirectorySort',
@@ -94,7 +94,9 @@
     'toggleBookingChannelRowRate', 'toggleExportMenu', 'toggleHeaderDropdown', 'toggleReservationRangePicker',
     'toggleNewBookingChannelRate', 'toggleNotificationDrawer', 'toggleResDatePicker',
     'toggleTaskPaid', 'undoImportBatch', 'updateDeleteAccountButton', 'updateInviteRoleHint', 'updateLeadStatusFromKanban',
-    'updateExpenseCategoryWarning', 'updateMonthReopenButton', 'updateResetButton', 'shiftReservationRangeCalendar', 'resetReservationRange'
+    'onExpenseCategoryChange', 'updateMonthReopenButton', 'updateResetButton', 'shiftReservationRangeCalendar', 'resetReservationRange',
+    'updateExpenseTypeHint', 'toggleExpenseCategoryCreate', 'createExpenseCategoryFromForm', 'updateExpenseRecurrencePreview',
+    'createSettingsExpenseCategory', 'setCustomExpenseCategoryType', 'deleteCustomExpenseCategory'
   ]);
 
   // encodeURIComponent tek tirnagi ve parantezleri KODLAMAZ: "O'Brien" ile

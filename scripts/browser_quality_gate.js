@@ -516,7 +516,7 @@ async function main() {
       // L-217 (M46): Bugun ekraninda doluluk / ADR / RevPAR, ev ev secilebilir.
       await page.evaluate(() => { updateAllVillaDropdowns(); switchTab('executive'); renderTodayPerformance(); });
       const perfAll = await page.evaluate(() => ({ visible: !document.getElementById('todayPerformance').hidden && document.getElementById('todayPerformance').offsetHeight > 0, cards: document.querySelectorAll('#todayPerformanceCards .today-performance__card').length, options: [...document.getElementById('todayPerfVilla').options].map(o => o.value) }));
-      assert(perfAll.visible && perfAll.cards === 5 && perfAll.options.includes('ALL') && perfAll.options.includes('test'), 'Bugun performans: ' + JSON.stringify(perfAll));
+      assert(perfAll.visible && perfAll.cards === 6 && perfAll.options.includes('ALL') && perfAll.options.includes('test'), 'Bugun performans: ' + JSON.stringify(perfAll));
       await page.selectOption('#todayPerfVilla', 'test');
       const perfOne = await page.evaluate(() => document.getElementById('todayPerformancePeriod').textContent);
       assert(/Test Villası/.test(perfOne), 'Bugun mulk secimi: ' + perfOne);
@@ -748,6 +748,44 @@ async function main() {
       });
       assert(rozet95 === '1', 'Operasyon rozeti: ' + rozet95);
       passed.push('30. temizlik (9.5): kontrol listesi kendi bölümünde, Word listesi yapıştırılır, Enter yeni madde; personel kartı onaylı işi göstermez, giriş bilgisini gösterir, boş listede Z açık; Operasyon rozeti bugünün işi');
+
+      // 9.6 Gider (M66-M68): kategori turu doldurur, formdan ozel kategori
+      // eklenir, "her ay x3" tek istekte uc kayit yazar; Bugun'de net kar.
+      const giderPost96 = [];
+      await page.route('**/rest/v1/tenant_settings**', route => route.fulfill({ status: 201, contentType: 'application/json', body: '[]' }));
+      await page.route('**/rest/v1/expenses**', route => {
+        if (route.request().method() !== 'POST') return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+        const govde = JSON.parse(route.request().postData() || '[]');
+        const satirlar = Array.isArray(govde) ? govde : [govde];
+        giderPost96.push(satirlar);
+        return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(satirlar.map((r, i) => ({ ...r, id: `eeeeeeee-eeee-4eee-8eee-00000000009${i}`, created_at: new Date().toISOString() }))) });
+      });
+      await page.evaluate(() => { switchTab('finance'); openExpenseModal(); });
+      await page.selectOption('#expCategory', 'Demirbaş');
+      const tur96 = await page.evaluate(() => ({ type: document.getElementById('expType').value, hint: document.getElementById('expTypeHint').textContent }));
+      assert(tur96.type === 'CAPEX' && /Yatırım \(CAPEX\)/.test(tur96.hint), 'Kategori turu: ' + JSON.stringify(tur96));
+      await page.click('#expenseModal .expense-category-add');
+      await page.fill('#expNewCategoryName', 'Havuz bakımı');
+      await page.selectOption('#expNewCategoryType', 'OPEX');
+      await page.click('[data-onclick="createExpenseCategoryFromForm()"]');
+      await page.waitForFunction(() => document.getElementById('expCategory').value === 'Havuz bakımı', null, { timeout: 10000 });
+      assert(await page.evaluate(() => document.getElementById('expType').value) === 'OPEX', 'Ozel kategori turu formu doldurmadi');
+      await page.fill('#expAmount', '800');
+      await page.fill('#expDesc', 'TEST internet');
+      await page.selectOption('#expRecurFreq', 'MONTHLY');
+      await page.fill('#expRecurCount', '3');
+      const onizleme96 = await page.evaluate(() => document.getElementById('expRecurPreview').textContent);
+      assert(/3 ayrı kayıt/.test(onizleme96) && /toplam 2\.400 TL/.test(onizleme96), 'Tekrar onizleme: ' + onizleme96);
+      const tasma96 = await page.evaluate(() => { const k = document.querySelector('#expenseModal .modal-card'); return { sw: k.scrollWidth, cw: k.clientWidth }; });
+      assert(tasma96.sw <= tasma96.cw + 1, 'Gider formu yatay tasiyor: ' + JSON.stringify(tasma96));
+      await page.locator('#expenseModal .modal-card').screenshot({ path: path.join(__dirname, '..', 'tmp', 'g96-expense-form.png') });
+      await page.click('#expenseForm button[type="submit"]');
+      await page.waitForFunction(() => !document.getElementById('expenseModal').classList.contains('active'), null, { timeout: 10000 });
+      assert(giderPost96.length === 1 && giderPost96[0].length === 3 && giderPost96[0].every(r => r.category === 'Havuz bakımı' && r.amount === 800 && /^RECUR:/.test(r.legacy_id)),
+        'Tekrarlayan gider istegi: ' + JSON.stringify(giderPost96).slice(0, 500));
+      const kar96 = await page.evaluate(() => { switchTab('executive'); renderTodayPerformance(); return document.getElementById('todayPerformanceCards').textContent; });
+      assert(/Net kâr/.test(kar96), 'Bugun net kar: ' + kar96.slice(0, 300));
+      passed.push('31. gider (9.6): kategori OPEX/CAPEX türünü doldurur, formdan özel kategori eklenir, "her ay ×3" tek istekte 3 kayıt; Bugün\'de net kâr');
     });
 
     await withPage(browser, baseUrl, 'owner', { width: 390, height: 844 }, async page => {

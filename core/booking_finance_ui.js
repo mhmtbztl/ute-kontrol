@@ -240,7 +240,31 @@ function renderBookingFinanceSettings() {
     <form data-onsubmit="saveBookingTaxProfile(event)"><fieldset ${canEdit ? '' : 'disabled'}><legend id="profileFormLegend">Yeni profil / yeni geçerlilik dönemi</legend>${bookingTaxProfileFieldsHtml('profile', true)}<button type="submit" id="profileSubmitBtn" class="btn btn-primary">Profili kaydet</button> <button type="button" id="profileCancelEditBtn" class="btn btn-secondary" hidden data-onclick="cancelBookingTaxProfileEdit()">Vazgeç</button></fieldset></form>
     <h3>Komisyon matrahı</h3><form data-onsubmit="saveBookingCommissionBases(event)"><fieldset ${canEdit ? '' : 'disabled'}><legend>Kanal bazında hesaplama</legend>${getBookingChannelCatalog().map((c,i) => `<div class="form-group"><label for="financeChannelBase_${i}">${escapeHtml(c.displayName)}</label><select id="financeChannelBase_${i}" data-finance-channel="${escapeHtml(c.code)}">${[['gross','Misafirin toplam ödemesi (mevcut davranış)'],['excluding_tax','Vergi hariç oda ve temizlik geliri'],['room','Vergi ve temizlik geliri hariç oda geliri']].map(([v,label]) => `<option value="${v}" ${escapeHtml(((appData.tenantSettings?.booking_commission_bases || {})[c.code] || 'gross') === v ? 'selected' : '')}>${escapeHtml(label)}</option>`).join('')}</select></div>`).join('')}<button type="submit" class="btn btn-primary">Matrahları kaydet</button></fieldset></form>
     <h3>Kapora</h3><p class="field-note">Kapora alınan kanallarda yeni rezervasyon formu ve ödeme takibi "Kapora" seçeneğini gösterir. İşaretsiz kanallarda (çoğu OTA) ödemeyi platform tahsil eder; kapora alanı gizlenir.</p>
-    <form data-onsubmit="saveBookingDepositChannels(event)"><fieldset ${canEdit ? '' : 'disabled'}><legend>Kapora alınan kanallar</legend>${getBookingChannelCatalog().map((c,i) => `<label class="finance-toggle" for="financeDepositChannel_${i}"><input type="checkbox" id="financeDepositChannel_${i}" data-deposit-channel="${escapeHtml(c.code)}" ${channelTakesDeposit(c.code) ? 'checked' : ''}> ${escapeHtml(c.displayName)}</label>`).join('')}<button type="submit" class="btn btn-primary">Kapora ayarını kaydet</button></fieldset></form>`;
+    <form data-onsubmit="saveBookingDepositChannels(event)"><fieldset ${canEdit ? '' : 'disabled'}><legend>Kapora alınan kanallar</legend>${getBookingChannelCatalog().map((c,i) => `<label class="finance-toggle" for="financeDepositChannel_${i}"><input type="checkbox" id="financeDepositChannel_${i}" data-deposit-channel="${escapeHtml(c.code)}" ${channelTakesDeposit(c.code) ? 'checked' : ''}> ${escapeHtml(c.displayName)}</label>`).join('')}<button type="submit" class="btn btn-primary">Kapora ayarını kaydet</button></fieldset></form>
+    <h3>Tahsilat günü</h3><p class="field-note">Para ne zaman gelmeli? Doğrudan kanalda çıkış günü; Booking.com, Etstur gibi parayı ay başında aktaran kanalda "çıkış ayını izleyen ayın … günü". Bu gün geçip ödeme kaydı tutarı karşılamazsa bildirim merkezine "Tahsilat bekliyor" düşer. Platformun kestiği komisyon açık sayılmaz.</p>
+    <form data-onsubmit="saveBookingCollectionSchedule(event)"><fieldset ${canEdit ? '' : 'disabled'}><legend>Kanal bazında tahsilat günü</legend>${getBookingChannelCatalog().map((c,i) => { const k = channelCollectionRule(c.code); return `<div class="form-group finance-collection-row"><label for="financeCollectionMode_${i}">${escapeHtml(c.displayName)}</label><div class="finance-collection-inputs"><select id="financeCollectionMode_${i}" data-collection-channel="${escapeHtml(c.code)}" data-collection-index="${i}">${[['CHECKOUT','Çıkış günü'],['NEXT_MONTH','Çıkış ayını izleyen ayın … günü'],['NONE','Takip etme']].map(([v,label]) => `<option value="${v}" ${k.mode === v ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('')}</select><input id="financeCollectionDay_${i}" type="number" min="1" max="31" step="1" aria-label="${escapeHtml(c.displayName)} ödeme günü" placeholder="Gün" value="${k.day || ''}"></div></div>`; }).join('')}<button type="submit" class="btn btn-primary">Tahsilat günlerini kaydet</button></fieldset></form>`;
+}
+// Tahsilat gunu (L-245): kanal bazinda isletme ayari; rezervasyona sutun
+// eklenmedi (3.4 dagitim sirasi). "Izleyen ayin gunu" secilip gun bos
+// birakilirsa kayit yapilmaz: gun uydurulmaz.
+async function saveBookingCollectionSchedule(event) {
+  event.preventDefault();
+  try {
+    if (!canManageTenantRole(activeTenant?.role)) throw new Error('Yalnız işletme yöneticileri değiştirebilir.');
+    const kurallar = {};
+    document.querySelectorAll('[data-collection-channel]').forEach(el => {
+      const kod = String(el.dataset.collectionChannel).toUpperCase();
+      const mode = ['CHECKOUT', 'NEXT_MONTH', 'NONE'].includes(el.value) ? el.value : 'NONE';
+      if (mode !== 'NEXT_MONTH') { kurallar[kod] = { mode }; return; }
+      const gun = Number(financeValue('financeCollectionDay_' + el.dataset.collectionIndex));
+      if (!Number.isInteger(gun) || gun < 1 || gun > 31) throw new Error(`${kod} için 1–31 arası ödeme günü girin.`);
+      kurallar[kod] = { mode, day: gun };
+    });
+    await cloudSaveTenantSetting('booking_collection_schedule', kurallar);
+    appData.tenantSettings = { ...appData.tenantSettings, booking_collection_schedule: kurallar };
+    if (typeof syncNotificationFeed === 'function') syncNotificationFeed().catch(() => {});
+    alert('Tahsilat günleri kaydedildi. Bildirimler yeni kurala göre güncellenir.');
+  } catch (e) { alert('Tahsilat günleri kaydedilemedi: ' + e.message); }
 }
 function readBookingTaxProfileForm(prefix) {
   const p = { id: crypto.randomUUID(), name: financeValue(prefix+'Name').trim(), dateBasis: financeValue(prefix+'DateBasis'), validFrom: financeValue(prefix+'From'), validTo: financeValue(prefix+'To') };

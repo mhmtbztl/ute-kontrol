@@ -48,7 +48,7 @@ async function test(name, fn) {
         return { success: true };
       }
     });
-    assert.deepStrictEqual(args, ['ticket-1', 1250, 'Tadilat', 'Komuta Merkezi üzerinden çözüldü.']);
+    assert.deepStrictEqual(args, ['ticket-1', 1250, 'Bakım', 'Arıza onarımı: başlıksız arıza']);
   });
 
   await test('A failed command-center write is propagated instead of reported as success', async () => {

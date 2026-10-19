@@ -36,3 +36,9 @@ kapatılan iş ise göç uygulanana kadar personelde görünmeye devam eder.
    99'u ve anon `rpc/get_my_field_work` → `401 42501` kapısını salt okunur
    doğrularım. İmza aynı olduğu için anon cevabı phase55 ile phase99'u ayırt
    etmez; kanıt `schema_migrations` 99 ve SQL Editor'deki `PHASE 99 OK`.
+
+## Üretim durumu
+
+19.10.2026: kullanıcı SQL Editor'de uyguladı (başarılı). Salt okunur doğrulama:
+`production:readiness` BAŞARILI (kanonik RPC ve anon kapıları uyumlu),
+`schema_migrations` 99 mevcut.

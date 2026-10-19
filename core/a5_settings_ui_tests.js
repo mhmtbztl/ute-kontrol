@@ -12,7 +12,7 @@ const actions = fs.readFileSync(path.join(ROOT, 'core', 'action_dispatch.js'), '
 const settings = (html.match(/<div id="tab-settings"[\s\S]*?<div id="tab-properties"/) || [''])[0];
 const sectionNames = [...settings.matchAll(/data-settings-section="([^"]+)"/g)].map(match => match[1]);
 
-assert.deepStrictEqual(sectionNames, ['business', 'team', 'channels', 'templates', 'checklists', 'lead-sources', 'danger']);
+assert.deepStrictEqual(sectionNames, ['business', 'team', 'channels', 'templates', 'checklists', 'expense-categories', 'lead-sources', 'danger']);
 assert(!/settingsGoalsTableBody|settingsTableBody|AYLIK CİRO VE KÂR HEDEFLERİ|VİLLA FİYAT BASAMAKLARI/.test(settings),
   'Hedef ve fiyat basamağı yönetimi Ayarlar ekranında kalmamalı');
 

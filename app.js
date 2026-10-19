@@ -321,25 +321,76 @@ function eslesenGiderKategorisi(ham) {
     .replace(/ü/g, 'u').replace(/ö/g, 'o').replace(/ç/g, 'c')
     .replace(/[^a-z0-9]/g, '');
   const hedef = sadelestir(t);
-  const bulunan = EXPENSE_CATEGORIES.find(c => sadelestir(c.name) === hedef);
+  const bulunan = getExpenseCategories().find(c => sadelestir(c.name) === hedef);
   if (bulunan) return bulunan.name;
+  // Ice aktarmanin es anlamlilari (Elektrik -> Fatura, Bakım & Onarım ->
+  // Bakım): ayni kayit grafikte ve ice aktarmada ayni kategoriye duser.
+  const motor = typeof getImportEngine === 'function' ? getImportEngine() : null;
+  const esAnlam = motor && typeof motor.resolveExpenseCategory === 'function' ? motor.resolveExpenseCategory(t) : null;
+  if (esAnlam) return esAnlam;
   // Yaygin kisaltmalar
   if (hedef === 'kkarti' || hedef === 'kredikarti' || hedef === 'komisyon') return 'Kredi Kartı / Komisyon';
   return 'Diğer';
 }
 
+// Standart liste core/finance_import_engine.js GIDER_KATEGORILERI ile ayni
+// adlari ve turu tasir (L-194d). Isletmenin ekledigi kategoriler (M66)
+// getExpenseCategories() ile araya, "Diğer"den once girer.
 const EXPENSE_CATEGORIES = [
-  { name: 'Maaş', color: '#3B82F6' },
-  { name: 'Temizlik', color: '#10B981' },
-  { name: 'Bakım', color: '#F59E0B' },
-  { name: 'Reklam', color: '#EC4899' },
-  { name: 'Akaryakıt', color: '#8B5CF6' },
-  { name: 'Fatura', color: '#06B6D4' },
-  { name: 'Muhasebe', color: '#64748B' },
-  { name: 'Kredi Kartı / Komisyon', color: '#EF4444' },
-  { name: 'Danışmanlık', color: '#14B8A6' },
-  { name: 'Diğer', color: '#94A3B8' }
+  { name: 'Maaş', type: 'OPEX', color: '#3B82F6' },
+  { name: 'Temizlik', type: 'OPEX', color: '#10B981' },
+  { name: 'Bakım', type: 'OPEX', color: '#F59E0B' },
+  { name: 'Reklam', type: 'OPEX', color: '#EC4899' },
+  { name: 'Akaryakıt', type: 'OPEX', color: '#8B5CF6' },
+  { name: 'Fatura', type: 'OPEX', color: '#06B6D4' },
+  { name: 'Muhasebe', type: 'OPEX', color: '#64748B' },
+  { name: 'Kredi Kartı / Komisyon', type: 'OPEX', color: '#EF4444' },
+  { name: 'Danışmanlık', type: 'OPEX', color: '#14B8A6' },
+  { name: 'Demirbaş', type: 'CAPEX', color: '#F97316' },
+  { name: 'Tadilat', type: 'CAPEX', color: '#A855F7' },
+  { name: 'Diğer', type: null, color: '#94A3B8' }
 ];
+
+// Isletmenin ekledigi gider kategorileri (M66, 9.6.2). tenant_settings
+// `expense_categories` = [{ name, type }]; tur zorunlu (OPEX/CAPEX), cunku
+// kullanicinin sorusu tam olarak "bu harcama hangisi?" idi. Ayar defter
+// degildir: sifirlamada silinmez (3.7). Gider satiri kategoriyi metin olarak
+// tasidigi icin kategori silinse de eski kayit adini korur.
+const CUSTOM_EXPENSE_CATEGORY_COLORS = ['#22C55E', '#EAB308', '#0EA5E9', '#F43F5E', '#84CC16', '#6366F1', '#D946EF', '#78716C'];
+
+function expenseCategoryKey(name) {
+  return String(name || '').replace(/[İIı]/g, 'i').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+}
+
+function getCustomExpenseCategories() {
+  const raw = (typeof appData !== 'undefined' && appData && appData.tenantSettings) ? appData.tenantSettings.expense_categories : null;
+  const standart = new Set(EXPENSE_CATEGORIES.map(c => expenseCategoryKey(c.name)));
+  const gorulen = new Set();
+  return (Array.isArray(raw) ? raw : []).filter(c => {
+    const ad = String(c && c.name || '').trim();
+    const k = expenseCategoryKey(ad);
+    if (!ad || !k || standart.has(k) || gorulen.has(k)) return false;
+    gorulen.add(k);
+    return true;
+  }).map((c, i) => ({
+    name: String(c.name).trim(),
+    type: c.type === 'CAPEX' ? 'CAPEX' : 'OPEX',
+    color: CUSTOM_EXPENSE_CATEGORY_COLORS[i % CUSTOM_EXPENSE_CATEGORY_COLORS.length],
+    custom: true
+  }));
+}
+
+function getExpenseCategories() {
+  const diger = EXPENSE_CATEGORIES[EXPENSE_CATEGORIES.length - 1];
+  return [...EXPENSE_CATEGORIES.slice(0, -1), ...getCustomExpenseCategories(), diger];
+}
+
+function getExpenseCategoryType(name) {
+  const k = expenseCategoryKey(name);
+  const bulunan = getExpenseCategories().find(c => expenseCategoryKey(c.name) === k);
+  return bulunan ? bulunan.type : null;
+}
 
 
 // App State Container
@@ -349,8 +400,6 @@ let appData = {
   targets: {},
   bookings: [],
   expenses: [],
-  expenseTemplates: [],
-  expenseTemplateOccurrences: [],
   leads: [],
   maintenance: []
 };
@@ -2583,9 +2632,11 @@ async function createExpense(expenseInput) {
   return mapped;
 }
 
-async function createExpensesBatch(expenseInputs) {
+// `islem` hata metnindeki fiildir: kopyalama ve tekrarlayan gider (M67) ayni
+// tek ifadelik (hep ya da hic) yazmayi kullanir.
+async function createExpensesBatch(expenseInputs, islem = 'kopyalanamadı') {
   const inputs = Array.isArray(expenseInputs) ? expenseInputs : [];
-  if (!inputs.length) throw new Error('Kopyalanacak gider bulunamadı.');
+  if (!inputs.length) throw new Error('Eklenecek gider bulunamadı.');
   const tenantId = getActiveTenantId();
   const isCloud = !!isCloudTenant(tenantId);
   requireCloudForWrite('Gider', tenantId);
@@ -2598,7 +2649,7 @@ async function createExpensesBatch(expenseInputs) {
     const category = String(expenseInput.category || '').trim();
     if (!Number.isFinite(amount) || amount <= 0) throw new Error(`${index + 1}. giderin tutarı geçersiz.`);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error(`${index + 1}. giderin tarihi geçersiz.`);
-    if (isPeriodClosed(date)) throw new Error(`Bu dönem (${date.slice(0, 7)}) kapatılmıştır. Giderler kopyalanamaz.`);
+    if (isPeriodClosed(date)) throw new Error(`Bu dönem (${date.slice(0, 7)}) kapatılmıştır. Giderler ${islem}.`);
     if (!category) throw new Error(`${index + 1}. giderin kategorisi eksik.`);
     let propertyId = expenseInput.propertyId || expenseInput.property_id || null;
     if (!propertyId && expenseInput.villa && expenseInput.villa !== 'ALL') {
@@ -2640,7 +2691,7 @@ async function createExpensesBatch(expenseInputs) {
     });
     const { data, error } = await supabaseClient.from('expenses').insert(payloads).select();
     if (error || !Array.isArray(data) || data.length !== payloads.length) {
-      throw new Error('Giderler kopyalanamadı; hiçbir kayıt eklenmedi: ' + (error?.message || 'Veritabanı hatası'));
+      throw new Error(`Giderler ${islem}; hiçbir kayıt eklenmedi: ` + (error?.message || 'Veritabanı hatası'));
     }
     created = data.map(mapExpenseFromDb);
   }
@@ -2836,6 +2887,33 @@ async function deleteExpense(expenseId, skipConfirm = false) {
 
   invalidateExecutiveSnapshotCache(); // ana sayfa bayat kalmasin (ui_consistency_tests F)
   return true;
+}
+
+// Birden cok gideri tek ifadeyle siler (tekrarlayan giderin kalan tekrarlari,
+// M67). RLS 0 satira dusururse Supabase hata dondurmez; silinen satir sayisi
+// okunur ve eksikse bellek degistirilmez (5.1).
+async function deleteExpensesByIds(ids) {
+  const liste = [...new Set((ids || []).map(String).filter(Boolean))];
+  if (!liste.length) return 0;
+  const tenantId = getActiveTenantId();
+  requireCloudForWrite('Gider silme', tenantId);
+  const kayitlar = (appData.expenses || []).filter(e => liste.includes(String(e.id)));
+  const kapali = kayitlar.find(e => isPeriodClosed(e.date));
+  if (kapali) throw new Error(`Bu dönem (${String(kapali.date).slice(0, 7)}) kapatılmıştır. Gider silinemez.`);
+  if (isCloudTenant(tenantId)) {
+    const { data, error } = await supabaseClient.from('expenses').delete()
+      .eq('tenant_id', tenantId).in('id', liste).select('id');
+    if (error) throw new Error('Giderler silinemedi: ' + (error.message || 'Veritabanı hatası'));
+    if (!Array.isArray(data) || data.length !== liste.length) {
+      try { await loadTenantAppData(tenantId); } catch (_) { /* yeniden yukleme de dustu */ }
+      throw new Error(`Giderlerin ${Array.isArray(data) ? data.length : 0}/${liste.length} kadarı silindi (yetki ya da kayıt artık yok). Ekran yeniden yüklendi.`);
+    }
+  }
+  appData.expenses = (appData.expenses || []).filter(e => !liste.includes(String(e.id)));
+  invalidateExecutiveSnapshotCache(); // ana sayfa bayat kalmasin (ui_consistency_tests F)
+  if (typeof renderAll === 'function') renderAll();
+  if (typeof renderExpensesTable === 'function') renderExpensesTable();
+  return liste.length;
 }
 
 // Backwards compatibility wrappers
@@ -4942,12 +5020,13 @@ function matchesVillaFilter(record) {
 function computePreviousPeriodCategoryTotals() {
   const prev = getPreviousPeriodKey(currentFilter && currentFilter.period);
   const totals = {};
-  EXPENSE_CATEGORIES.forEach(c => { totals[c.name] = 0; });
+  getExpenseCategories().forEach(c => { totals[c.name] = 0; });
   if (!prev || !appData || !Array.isArray(appData.expenses)) return totals;
   appData.expenses.forEach(e => {
     if (!inPeriodKey(e.date || e.expense_date, prev)) return;
     if (!matchesVillaFilter(e)) return;
-    if (totals[e.category] !== undefined) totals[e.category] += Number(e.amount) || 0;
+    const kat = eslesenGiderKategorisi(e.category);
+    totals[kat] = (totals[kat] || 0) + (Number(e.amount) || 0);
   });
   return totals;
 }
@@ -5131,7 +5210,7 @@ const ACTIVE_RENDER_PLANS = {
   // (ENVANTER Finans 28.09.2026); olu tab-dashboard da silindi (A1-G1).
   'tab-finance': ['renderFinanceModule'],
   'tab-reservations': ['renderManageBookingsTable', 'renderTapeChart'],
-  'tab-expenses': ['renderExpenseTemplates', 'renderExpensesTable'],
+  'tab-expenses': ['renderExpensesTable'],
   'tab-leads': ['renderLeadQuickCapture', 'renderLeadSalesWorkspace', 'renderManageLeadsTable', 'renderLeadAnalytics'],
   'tab-maintenance': ['renderManageMaintTable'],
   'tab-housekeeping': ['renderHousekeepingTab'],
@@ -5167,7 +5246,6 @@ function renderAll() {
     renderFinanceModule,
     renderManageBookingsTable,
     renderExpensesTable,
-    renderExpenseTemplates,
     renderLeadQuickCapture,
     renderLeadSalesWorkspace,
     renderManageLeadsTable,
@@ -5276,7 +5354,7 @@ function renderFinanceModule() {
   });
 
   const categoryTotals = {};
-  EXPENSE_CATEGORIES.forEach(c => { categoryTotals[c.name] = 0; });
+  getExpenseCategories().forEach(c => { categoryTotals[c.name] = 0; });
 
 
   // Resolve only explicitly configured targets. Missing data stays missing.
@@ -5516,7 +5594,7 @@ function renderExpenseDonutAndTable(categoryTotals, totalExpense, totalRevenue, 
   let startAngle = 0;
 
   // Donut slices
-  EXPENSE_CATEGORIES.forEach(cat => {
+  getExpenseCategories().forEach(cat => {
     const amt = categoryTotals[cat.name] || 0;
     if (amt <= 0 || totalExpense <= 0) return;
     const sliceAngle = (amt / totalExpense) * 360;
@@ -5558,7 +5636,7 @@ function renderExpenseDonutAndTable(categoryTotals, totalExpense, totalRevenue, 
   // gibi gosteriliyordu - hangi ay secilirse secilsin ayni sayilar.
   const prevCategoryTotals = computePreviousPeriodCategoryTotals();
 
-  EXPENSE_CATEGORIES.forEach(cat => {
+  getExpenseCategories().forEach(cat => {
     const amt = categoryTotals[cat.name] || 0;
     if (amt <= 0) return;
     const shareExpense = totalExpense > 0 ? (amt / totalExpense) * 100 : 0;
@@ -5614,9 +5692,11 @@ function expenseCategoryRowsHtml(catName) {
       : (yonetir ? `<button class="btn btn-secondary btn-sm" data-onclick="editExpense(decodeURIComponent('${encodeActionArg(String(exp.id))}'))" title="Düzenle">✏️</button>
          <button class="btn btn-danger btn-sm" data-onclick="deleteExpenseUI(decodeURIComponent('${encodeActionArg(String(exp.id))}'))" title="Sil">🗑️</button>` : '');
     const kategori = exp.category && exp.category !== catName ? ` <small>(${escapeHtml(exp.category)})</small>` : '';
+    const seri = expenseSeriesInfo(exp);
+    const tekrar = seri ? ` <span class="badge badge-blue" title="Tekrarlayan gider">🔁 ${seri.index}/${seri.total}</span>` : '';
     return `<tr>
       <td>${formatTrDate(exp.date)}</td>
-      <td>${escapeHtml(exp.description || exp.desc || '-')}${kategori}</td>
+      <td>${escapeHtml(exp.description || exp.desc || '-')}${kategori}${tekrar}</td>
       <td>${escapeHtml(exp.villa === 'ALL' ? 'Tüm Portföy' : (appData.villas[exp.villa]?.name || exp.villa))}</td>
       <td><strong>${Number(exp.amount).toLocaleString('tr-TR')} TL</strong></td>
       <td style="text-align: right; white-space: nowrap;">${islem}</td>
@@ -6583,7 +6663,7 @@ function renderExpensesTable() {
       <td><span class="badge ${exp.type === 'CAPEX' ? 'badge-amber' : 'badge-blue'}">${exp.type === 'CAPEX' ? 'Yatırım (Capex)' : 'Operasyonel (Opex)'}</span></td>
       <td><strong>${escapeHtml(exp.category)}</strong></td>
       <td>${escapeHtml(exp.villa === 'ALL' ? 'Tüm Portföy' : (appData.villas[exp.villa]?.name || exp.villa))}</td>
-      <td>${escapeHtml(exp.description || exp.desc || "-")}</td>
+      <td>${escapeHtml(exp.description || exp.desc || "-")}${expenseSeriesInfo(exp) ? ` <span class="badge badge-blue" title="Tekrarlayan gider">🔁 ${expenseSeriesInfo(exp).index}/${expenseSeriesInfo(exp).total}</span>` : ''}</td>
       <td><strong>${Number(exp.amount).toLocaleString('tr-TR')} TL</strong></td>
       <td style="text-align: right; white-space: nowrap;">
         ${adsManaged ? '<span class="badge badge-blue">Reklamlar’dan yönetin</span>' : `<button class="btn btn-secondary btn-sm" data-onclick="editExpense(decodeURIComponent('${encodeActionArg(String(exp.id))}'))">✏️</button>
@@ -6592,118 +6672,6 @@ function renderExpensesTable() {
     `;
     tbody.appendChild(tr);
   });
-}
-
-function renderExpenseTemplates() {
-  const tbody = document.getElementById('expenseTemplatesTableBody');
-  if (!tbody) return;
-  const status = document.getElementById('expenseTemplatesStatus');
-  const select = document.getElementById('expenseTemplateProperty');
-  if (select) {
-    const selected = select.value || 'ALL';
-    select.innerHTML = '<option value="ALL">Tüm Portföy</option>' + Object.values(appData.villas || {})
-      .map(property => `<option value="${escapeHtml(property.id)}">${escapeHtml(property.name || property.slug)}</option>`).join('');
-    select.value = [...select.options].some(option => option.value === selected) ? selected : 'ALL';
-  }
-  if (appData.phase78SchemaReady === false) {
-    if (status) { status.hidden = false; status.textContent = 'Göç bekleniyor: phase78 gider şablonları henüz kullanılamıyor.'; }
-    tbody.innerHTML = '<tr><td colspan="5">Gider şablonu şeması hazır değil.</td></tr>';
-    return;
-  }
-  if (status) status.hidden = true;
-  const month = /^\d{4}-\d{2}$/.test(String(currentFilter?.period || '')) ? currentFilter.period : getTodayStr().slice(0, 7);
-  const occurred = new Set((appData.expenseTemplateOccurrences || [])
-    .filter(row => String(row.period_month || '').slice(0, 7) === month)
-    .map(row => row.template_id));
-  const rows = (appData.expenseTemplates || []).filter(row => row.is_active !== false);
-  if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;">Kayıtlı gider şablonu yok.</td></tr>';
-    return;
-  }
-  const canManage = canManageTenantRole(activeTenant?.role);
-  tbody.innerHTML = rows.map(row => {
-    const property = Object.values(appData.villas || {}).find(item => item.id === row.property_id);
-    const done = occurred.has(row.id);
-    const actions = canManage
-      ? `${done ? `<span class="badge badge-green">${escapeHtml(month)} işlendi</span>` : `<button class="btn btn-primary btn-sm" data-onclick="generateExpenseFromTemplate(decodeURIComponent('${encodeActionArg(row.id)}'))">${escapeHtml(month)} ayına işle</button>`}
-         <button class="btn btn-danger btn-sm" data-onclick="deleteExpenseTemplate(decodeURIComponent('${encodeActionArg(row.id)}'))">Sil</button>`
-      : (done ? `<span class="badge badge-green">${escapeHtml(month)} işlendi</span>` : 'Henüz işlenmedi');
-    return `<tr><td><strong>${escapeHtml(row.name)}</strong><br><small>${escapeHtml(row.description || '')}</small></td><td>${escapeHtml(row.category)} · ${escapeHtml(row.expense_type)}</td><td>${escapeHtml(property?.name || 'Tüm Portföy')}</td><td>${Number(row.amount).toLocaleString('tr-TR')} TL</td><td>${actions}</td></tr>`;
-  }).join('');
-}
-
-async function saveExpenseTemplate(event) {
-  event?.preventDefault?.();
-  if (!canManageTenantRole(activeTenant?.role)) return false;
-  try {
-    const tenantId = getActiveTenantId();
-    const propertyValue = document.getElementById('expenseTemplateProperty')?.value || 'ALL';
-    const payload = {
-      tenant_id: tenantId,
-      property_id: propertyValue === 'ALL' ? null : propertyValue,
-      name: (document.getElementById('expenseTemplateName')?.value || '').trim(),
-      category: document.getElementById('expenseTemplateCategory')?.value || 'Diğer',
-      expense_type: document.getElementById('expenseTemplateType')?.value === 'CAPEX' ? 'CAPEX' : 'OPEX',
-      amount: Number(document.getElementById('expenseTemplateAmount')?.value),
-      description: (document.getElementById('expenseTemplateDescription')?.value || '').trim() || null
-    };
-    if (!payload.name || !(payload.amount > 0)) throw new Error('Şablon adı ve pozitif tutar zorunludur.');
-    const { data, error } = await supabaseClient.from('expense_templates').insert(payload).select().single();
-    if (error) throw error;
-    appData.expenseTemplates = [...(appData.expenseTemplates || []), data];
-    document.getElementById('expenseTemplateForm')?.reset();
-    renderExpenseTemplates();
-    if (typeof showToast === 'function') showToast('Gider şablonu oluşturuldu.', 'success');
-    return data;
-  } catch (error) {
-    if (typeof showToast === 'function') showToast('Gider şablonu oluşturulamadı: ' + getFriendlyAuthErrorMessage(error), 'error');
-    return false;
-  }
-}
-
-async function generateExpenseFromTemplate(templateId) {
-  if (!canManageTenantRole(activeTenant?.role)) return false;
-  const month = /^\d{4}-\d{2}$/.test(String(currentFilter?.period || '')) ? currentFilter.period : getTodayStr().slice(0, 7);
-  try {
-    if (isPeriodClosed(month + '-01')) throw new Error(`Bu dönem (${month}) kapatılmıştır.`);
-    const tenantId = getActiveTenantId();
-    const { data, error } = await supabaseClient.rpc('generate_expense_from_template', {
-      p_tenant_id: tenantId,
-      p_template_id: templateId,
-      p_period_month: month + '-01'
-    });
-    if (error) {
-      if (error.code === '23505' || /already|duplicate|SABLON_DONEMI_ZATEN_ISLENDI/i.test(error.message || '')) throw new Error(`${month} dönemi bu şablondan zaten işlendi.`);
-      throw error;
-    }
-    invalidateExecutiveSnapshotCache();
-    await loadExpenses(tenantId);
-    appData.expenseTemplateOccurrences = await fetchTenantRowsTolerant(() => supabaseClient.from('expense_template_occurrences').select('*').eq('tenant_id', tenantId));
-    renderExpenseTemplates();
-    if (typeof showToast === 'function') showToast(`${month} gideri oluşturuldu.`, 'success');
-    return data;
-  } catch (error) {
-    if (typeof showToast === 'function') showToast('Gider oluşturulamadı: ' + getFriendlyAuthErrorMessage(error), 'error');
-    return false;
-  }
-}
-
-async function deleteExpenseTemplate(templateId) {
-  if (!canManageTenantRole(activeTenant?.role)) return false;
-  if (typeof confirm === 'function' && !confirm('Bu gider şablonunu silmek istiyor musunuz? Daha önce üretilen giderler korunur.')) return false;
-  try {
-    const { data, error } = await supabaseClient.from('expense_templates').delete()
-      .eq('tenant_id', getActiveTenantId()).eq('id', templateId).select('id').maybeSingle();
-    if (error) throw error;
-    if (!data) throw new Error('Şablon bulunamadı veya silme yetkiniz yok.');
-    appData.expenseTemplates = (appData.expenseTemplates || []).filter(row => row.id !== templateId);
-    renderExpenseTemplates();
-    if (typeof showToast === 'function') showToast('Gider şablonu silindi.', 'success');
-    return true;
-  } catch (error) {
-    if (typeof showToast === 'function') showToast('Gider şablonu silinemedi: ' + getFriendlyAuthErrorMessage(error), 'error');
-    return false;
-  }
 }
 
 function openExpenseModal(editId = null) {
@@ -6728,8 +6696,17 @@ function openExpenseModal(editId = null) {
     document.getElementById('expenseForm').reset();
     document.getElementById('expDate').value = getTodayStr();
   }
+  renderExpenseCategoryOptions(editId ? (appData.expenses.find(e => e.id === editId)?.category || '') : '');
+  // Tekrar yalniz yeni kayitta: duzenleme tek satiri degistirir (M67).
+  const tekrar = document.getElementById('expRecurGroup');
+  if (tekrar) tekrar.hidden = !!editId;
+  const seri = editId ? expenseSeriesInfo(appData.expenses.find(e => e.id === editId)) : null;
+  setEl('expRecurEditNote', seri ? `Bu kayıt tekrarlayan bir giderin ${seri.index}/${seri.total}. tekrarı; düzenleme yalnız bu kaydı değiştirir.` : '');
+  const kategoriSatiri = document.getElementById('expNewCategoryRow');
+  if (kategoriSatiri) kategoriSatiri.hidden = true;
 
-  updateExpenseCategoryWarning(document.getElementById('expCategory')?.value || '');
+  onExpenseCategoryChange(document.getElementById('expCategory')?.value || '', !!editId);
+  updateExpenseRecurrencePreview();
 
   modal.classList.add('active');
 }
@@ -6737,6 +6714,231 @@ function openExpenseModal(editId = null) {
 function updateExpenseCategoryWarning(category) {
   const warning = document.getElementById('expenseAdCategoryWarning');
   if (warning) warning.hidden = String(category || '') !== 'Reklam';
+}
+
+// Formdaki kategori listesi: standart secenekler index.html'de durur (L-194d),
+// isletmenin ekledikleri turune gore OPEX / CAPEX grubuna eklenir. Duzenlenen
+// kayit listede olmayan eski bir kategori tasiyorsa secenek olarak korunur;
+// yoksa select bos kalir ve kayit sessizce baska kategoriye gecerdi.
+function renderExpenseCategoryOptions(selected) {
+  const select = document.getElementById('expCategory');
+  if (!select) return;
+  select.querySelectorAll('option[data-custom-category]').forEach(o => o.remove());
+  getCustomExpenseCategories().forEach(cat => {
+    const group = select.querySelector(`optgroup[data-expense-group="${cat.type}"]`) || select;
+    const option = document.createElement('option');
+    option.value = cat.name;
+    option.textContent = cat.name;
+    option.setAttribute('data-custom-category', '1');
+    group.appendChild(option);
+  });
+  const hedef = String(selected || '');
+  if (hedef && !Array.from(select.options).some(o => o.value === hedef)) {
+    const option = document.createElement('option');
+    option.value = hedef;
+    option.textContent = `${hedef} (listede yok)`;
+    option.setAttribute('data-custom-category', '1');
+    select.appendChild(option);
+  }
+  if (hedef) select.value = hedef;
+}
+
+// Kategori secilince tur kategoriden gelir (M66): "hangi harcama OPEX, hangisi
+// CAPEX?" sorusunun cevabi formda yazar. Tur elle degistirilebilir; "Diğer"
+// turu degistirmez. Duzenlemede kaydin kendi turu korunur.
+function onExpenseCategoryChange(category, keepType = false) {
+  updateExpenseCategoryWarning(category);
+  const tur = getExpenseCategoryType(category);
+  const typeSelect = document.getElementById('expType');
+  if (tur && typeSelect && !keepType) typeSelect.value = tur;
+  updateExpenseTypeHint();
+}
+
+function updateExpenseTypeHint() {
+  const tur = document.getElementById('expType')?.value === 'CAPEX' ? 'CAPEX' : 'OPEX';
+  setEl('expTypeHint', tur === 'CAPEX'
+    ? 'Yatırım (CAPEX): yıllarca kullanılan alım — klima, mobilya, tadilat. Faaliyet giderinde (OPEX) görünmez, net kârdan düşer.'
+    : 'Operasyonel gider (OPEX): işin süregelen gideri — fatura, maaş, bakım. Faaliyet giderine girer, net kârdan düşer.');
+}
+
+function toggleExpenseCategoryCreate() {
+  const row = document.getElementById('expNewCategoryRow');
+  if (!row) return false;
+  row.hidden = !row.hidden;
+  if (!row.hidden) {
+    const tur = document.getElementById('expNewCategoryType');
+    if (tur) tur.value = document.getElementById('expType')?.value === 'CAPEX' ? 'CAPEX' : 'OPEX';
+    document.getElementById('expNewCategoryName')?.focus?.();
+  }
+  return true;
+}
+
+async function createExpenseCategoryFromForm() {
+  const name = (document.getElementById('expNewCategoryName')?.value || '').trim();
+  const type = document.getElementById('expNewCategoryType')?.value === 'CAPEX' ? 'CAPEX' : 'OPEX';
+  const eklendi = await addCustomExpenseCategory(name, type);
+  if (!eklendi) return false;
+  const input = document.getElementById('expNewCategoryName');
+  if (input) input.value = '';
+  const row = document.getElementById('expNewCategoryRow');
+  if (row) row.hidden = true;
+  renderExpenseCategoryOptions(eklendi.name);
+  onExpenseCategoryChange(eklendi.name);
+  return true;
+}
+
+// Kategori kaydi tek yerden: Ayarlar bolumu ve gider formu ayni fonksiyonu
+// kullanir. Bellek ancak yazma basarili olunca degisir (3.3).
+async function addCustomExpenseCategory(name, type) {
+  const ad = String(name || '').trim().replace(/\s+/g, ' ');
+  if (!ad) { showToast('Kategori adı girin.', 'error'); return null; }
+  if (ad.length > 60) { showToast('Kategori adı en fazla 60 karakter olabilir.', 'error'); return null; }
+  const k = expenseCategoryKey(ad);
+  if (!k) { showToast('Kategori adı harf ya da rakam içermeli.', 'error'); return null; }
+  const mevcut = getExpenseCategories().find(c => expenseCategoryKey(c.name) === k);
+  if (mevcut) { showToast(`"${mevcut.name}" kategorisi zaten var.`, 'error'); return null; }
+  const yeni = { name: ad, type: type === 'CAPEX' ? 'CAPEX' : 'OPEX' };
+  const liste = getCustomExpenseCategories().map(c => ({ name: c.name, type: c.type })).concat(yeni);
+  if (liste.length > 40) { showToast('En fazla 40 özel kategori eklenebilir.', 'error'); return null; }
+  try {
+    await saveCustomExpenseCategories(liste);
+  } catch (error) {
+    showToast('Kategori kaydedilemedi: ' + kullaniciMesaji(error?.message || ''), 'error');
+    return null;
+  }
+  showToast(`"${ad}" kategorisi eklendi (${yeni.type}).`, 'success');
+  return yeni;
+}
+
+async function saveCustomExpenseCategories(liste) {
+  await cloudSaveTenantSetting('expense_categories', liste);
+  if (!appData.tenantSettings) appData.tenantSettings = {};
+  appData.tenantSettings.expense_categories = liste;
+  renderSettingsExpenseCategories();
+}
+
+function renderSettingsExpenseCategories() {
+  const body = document.getElementById('settingsExpenseCategoriesBody');
+  if (!body) return;
+  const kullanim = {};
+  (appData?.expenses || []).forEach(e => { const k = expenseCategoryKey(e.category); kullanim[k] = (kullanim[k] || 0) + 1; });
+  const turAdi = t => t === 'CAPEX' ? 'CAPEX — yatırım' : (t === 'OPEX' ? 'OPEX — süregelen gider' : 'Kayıtta seçilir');
+  body.innerHTML = getExpenseCategories().map(cat => {
+    const adet = kullanim[expenseCategoryKey(cat.name)] || 0;
+    const tur = cat.custom
+      ? `<select class="tbl-input" aria-label="${escapeHtml(cat.name)} türü" data-onchange="setCustomExpenseCategoryType(decodeURIComponent('${encodeActionArg(cat.name)}'), this.value)"><option value="OPEX"${cat.type === 'OPEX' ? ' selected' : ''}>OPEX — süregelen gider</option><option value="CAPEX"${cat.type === 'CAPEX' ? ' selected' : ''}>CAPEX — yatırım</option></select>`
+      : escapeHtml(turAdi(cat.type));
+    const islem = cat.custom
+      ? `<button type="button" class="btn btn-danger btn-sm" data-onclick="deleteCustomExpenseCategory(decodeURIComponent('${encodeActionArg(cat.name)}'))">Sil</button>`
+      : '<span class="sub-text">Standart</span>';
+    return `<tr><td><span class="cat-dot" style="background:${cat.color};"></span> <strong>${escapeHtml(cat.name)}</strong></td><td>${tur}</td><td>${adet ? `${adet} kayıt` : '—'}</td><td style="text-align:right">${islem}</td></tr>`;
+  }).join('');
+}
+
+async function createSettingsExpenseCategory(event) {
+  if (event && typeof event.preventDefault === 'function') event.preventDefault();
+  const name = document.getElementById('settingsExpenseCategoryName')?.value || '';
+  const type = document.getElementById('settingsExpenseCategoryType')?.value;
+  const eklendi = await addCustomExpenseCategory(name, type);
+  if (eklendi) {
+    const input = document.getElementById('settingsExpenseCategoryName');
+    if (input) input.value = '';
+  }
+  return !!eklendi;
+}
+
+async function setCustomExpenseCategoryType(name, type) {
+  const liste = getCustomExpenseCategories().map(c => ({ name: c.name, type: c.name === name ? (type === 'CAPEX' ? 'CAPEX' : 'OPEX') : c.type }));
+  try {
+    await saveCustomExpenseCategories(liste);
+    showToast(`"${name}" artık ${type === 'CAPEX' ? 'CAPEX' : 'OPEX'}. Eski kayıtların türü değişmedi; yeni kayıtlarda geçerli.`, 'success');
+    return true;
+  } catch (error) {
+    showToast('Kategori güncellenemedi: ' + kullaniciMesaji(error?.message || ''), 'error');
+    renderSettingsExpenseCategories();
+    return false;
+  }
+}
+
+// Kategori silinince gider satirlari silinmez: satir kategoriyi metin olarak
+// tasir, raporda "Diğer" altinda kendi adiyla gorunur.
+async function deleteCustomExpenseCategory(name) {
+  const adet = (appData?.expenses || []).filter(e => expenseCategoryKey(e.category) === expenseCategoryKey(name)).length;
+  const soru = adet
+    ? `"${name}" kategorisi silinsin mi? ${adet} gider kaydı silinmez; raporda "Diğer" altında kendi adıyla görünür.`
+    : `"${name}" kategorisi silinsin mi?`;
+  if (typeof confirm === 'function' && !confirm(soru)) return false;
+  const liste = getCustomExpenseCategories().filter(c => c.name !== name).map(c => ({ name: c.name, type: c.type }));
+  try {
+    await saveCustomExpenseCategories(liste);
+    showToast('Kategori silindi.', 'success');
+    return true;
+  } catch (error) {
+    showToast('Kategori silinemedi: ' + kullaniciMesaji(error?.message || ''), 'error');
+    return false;
+  }
+}
+
+// -------------------------------------------------------------
+// TEKRARLAYAN GİDER (M67, 9.6.3)
+// -------------------------------------------------------------
+// Kullanici sablon ekrani yerine gider formunda "tekrar" istedi: her ay /
+// hafta / gun, kac kez. Her tekrar AYRI bir gider satiridir ve tek ifadeyle
+// yazilir (createExpensesBatch: hep ya da hic). Seri, satirin legacy_id'sinde
+// `RECUR:<seri>:<sira>/<toplam>` olarak durur; tabloya sutun eklenmedi
+// (3.4 dagitim sirasi tuzagi).
+const EXPENSE_RECUR_LIMITS = { MONTHLY: 60, WEEKLY: 104, DAILY: 92 };
+
+function buildRecurringExpenseDates(startDate, frequency, count) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(startDate || ''));
+  const limit = EXPENSE_RECUR_LIMITS[frequency];
+  const n = Number(count);
+  if (!m || !limit || !Number.isInteger(n) || n < 2 || n > limit) return [];
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    let date;
+    if (frequency === 'MONTHLY') {
+      // Ayin 31'i olmayan ayda son gune kayar; sonraki ay yine 31'ine doner.
+      const hedef = new Date(Date.UTC(y, mo - 1 + i, 1));
+      const sonGun = new Date(Date.UTC(hedef.getUTCFullYear(), hedef.getUTCMonth() + 1, 0)).getUTCDate();
+      hedef.setUTCDate(Math.min(d, sonGun));
+      date = hedef;
+    } else {
+      date = new Date(Date.UTC(y, mo - 1, d + i * (frequency === 'WEEKLY' ? 7 : 1)));
+    }
+    out.push(date.toISOString().slice(0, 10));
+  }
+  return out;
+}
+
+function expenseSeriesInfo(expense) {
+  const m = /^RECUR:([A-Za-z0-9]+):(\d+)\/(\d+)$/.exec(String(expense?.legacyId || expense?.legacy_id || ''));
+  return m ? { id: m[1], index: Number(m[2]), total: Number(m[3]) } : null;
+}
+
+function newExpenseSeriesId() {
+  const rastgele = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+    ? crypto.randomUUID().replace(/-/g, '').slice(0, 12)
+    : Math.random().toString(36).slice(2, 14);
+  return rastgele.replace(/[^A-Za-z0-9]/g, '') || String(Date.now());
+}
+
+function updateExpenseRecurrencePreview() {
+  const freq = document.getElementById('expRecurFreq')?.value || 'NONE';
+  const countInput = document.getElementById('expRecurCount');
+  const wrap = document.getElementById('expRecurCountWrap');
+  if (wrap) wrap.hidden = freq === 'NONE';
+  if (freq === 'NONE') { setEl('expRecurPreview', 'Tek kayıt yazılır.'); return; }
+  if (countInput) countInput.max = String(EXPENSE_RECUR_LIMITS[freq] || 60);
+  const dates = buildRecurringExpenseDates(document.getElementById('expDate')?.value, freq, Number(countInput?.value));
+  if (!dates.length) {
+    setEl('expRecurPreview', `Tekrar sayısı 2 ile ${EXPENSE_RECUR_LIMITS[freq]} arasında olmalı.`);
+    return;
+  }
+  const tutar = Number(document.getElementById('expAmount')?.value) || 0;
+  const toplam = tutar > 0 ? ` · toplam ${(tutar * dates.length).toLocaleString('tr-TR')} TL` : '';
+  setEl('expRecurPreview', `${dates.length} ayrı kayıt: ${formatTrDate(dates[0])} → ${formatTrDate(dates[dates.length - 1])}${toplam}. Her biri kendi tarihinin ayına yazılır; tek tek düzenlenir ya da silinir.`);
 }
 
 function closeExpenseModal() {
@@ -6754,11 +6956,22 @@ async function saveExpense(e) {
   const description = (document.getElementById('expDesc')?.value || '').trim();
 
   const expRecord = { id: editId || undefined, type, category, villa, date, amount, description };
+  const freq = editId ? 'NONE' : (document.getElementById('expRecurFreq')?.value || 'NONE');
 
   try {
     if (editId) {
       await updateExpense(editId, expRecord);
       if (typeof window !== 'undefined' && window.showToast) window.showToast('✅ Gider başarıyla güncellendi.');
+    } else if (freq !== 'NONE') {
+      const count = Number(document.getElementById('expRecurCount')?.value);
+      const dates = buildRecurringExpenseDates(date, freq, count);
+      if (!dates.length) throw new Error(`Tekrar sayısı 2 ile ${EXPENSE_RECUR_LIMITS[freq] || 60} arasında olmalı.`);
+      if (!(amount > 0)) throw new Error('Tutar sıfırdan büyük olmalı.');
+      const seri = newExpenseSeriesId();
+      await createExpensesBatch(dates.map((gun, i) => ({
+        ...expRecord, id: undefined, date: gun, legacyId: `RECUR:${seri}:${i + 1}/${dates.length}`
+      })), 'eklenemedi');
+      if (typeof window !== 'undefined' && window.showToast) window.showToast(`✅ ${dates.length} tekrarlı gider kaydedildi (${formatTrDate(dates[0])} → ${formatTrDate(dates[dates.length - 1])}).`);
     } else {
       await createExpense(expRecord);
       if (typeof window !== 'undefined' && window.showToast) window.showToast('✅ Gider başarıyla kaydedildi.');
@@ -6792,7 +7005,21 @@ async function deleteExpenseUI(id) {
   if (typeof confirm === 'function' && !confirm('Bu harcamayı silmek istediğinizden emin misiniz?')) {
     return false;
   }
+  // Tekrarlayan giderin sonraki tekrarlari (M67): tekrari durdurmak icin
+  // 11 kaydi tek tek silmek gerekmesin. Kapanmis donemdeki tekrar dokunulmaz.
+  const seri = expenseSeriesInfo(expense);
+  const sonrakiler = seri ? (appData.expenses || []).filter(e => {
+    const s = expenseSeriesInfo(e);
+    return e.id !== id && s && s.id === seri.id && s.index > seri.index && !isPeriodClosed(e.date);
+  }) : [];
+  const hepsi = sonrakiler.length > 0 && typeof confirm === 'function'
+    && confirm(`Bu tekrarlayan giderin sonraki ${sonrakiler.length} tekrarı da silinsin mi?\n\nTamam: bu ve sonrakiler silinir · İptal: yalnız bu kayıt silinir`);
   try {
+    if (hepsi) {
+      await deleteExpensesByIds([id, ...sonrakiler.map(e => e.id)]);
+      if (typeof showToast === 'function') showToast(`🗑️ ${sonrakiler.length + 1} kayıt silindi; tekrar durduruldu.`);
+      return true;
+    }
     await deleteExpense(id, true);
     return true;
   } catch (err) {
@@ -7054,7 +7281,7 @@ function getImportValidValues() {
       .map(([anahtar, v]) => ({ code: anahtar, name: v.name || anahtar })),
     channels: getBookingChannelCatalog().filter(c => c && c.isActive !== false)
       .map(c => ({ code: c.code, displayName: c.displayName || c.code })),
-    categories: engine ? engine.GIDER_KATEGORILERI : []
+    categories: engine ? engine.GIDER_KATEGORILERI.slice(0, -1).concat(getCustomExpenseCategories().map(c => ({ name: c.name, label: c.name, type: c.type })), engine.GIDER_KATEGORILERI.slice(-1)) : []
   };
 }
 
@@ -7590,6 +7817,7 @@ function parseSourceWithMode(kaynak, mode) {
       // kategori/kanal degerleri (dis aktar -> geri yukle turu) kabul edilir.
       channels: getBookingChannelCatalog(),
       existingCategories: [...new Set(((appData && appData.expenses) || []).map(e => e.category).filter(Boolean))],
+      customCategories: getCustomExpenseCategories(),
       existingChannels: [...new Set(((appData && appData.bookings) || []).map(b => b.channel).filter(Boolean))],
       isPeriodClosed: (d) => (typeof isPeriodClosed === 'function' ? isPeriodClosed(d) : false),
       isStayPeriodClosed: (a, b) => (typeof isStayPeriodClosed === 'function' ? isStayPeriodClosed(a, b) : false),
@@ -8208,6 +8436,8 @@ async function refreshBookingPaymentData(bookingId) {
   if (balanceResult.error) throw balanceResult.error;
   appData.bookingPayments = (appData.bookingPayments || []).filter(item => String(item.booking_id) !== String(bookingId)).concat(paymentsResult.data || []);
   appData.bookingPaymentBalances = (appData.bookingPaymentBalances || []).filter(item => String(item.booking_id) !== String(bookingId)).concat(balanceResult.data ? [balanceResult.data] : []);
+  // Tahsilat bildirimi (M69) odeme girilince hemen kapansin.
+  syncNotificationFeed().catch(err => console.error('Bildirimler yenilenemedi:', err));
 }
 
 async function saveBookingPayment(bookingId) {
@@ -8675,6 +8905,38 @@ function channelTakesDeposit(channel) {
   const kod = String(channel || '').toUpperCase();
   if (ayar && Object.prototype.hasOwnProperty.call(ayar, kod)) return ayar[kod] === true;
   return isDirectBookingChannel(channel, typeof appData !== 'undefined' ? appData.bookingChannels : []);
+}
+
+/**
+ * Kanalin tahsilat gunu (kullanici 19.10, L-245): Booking.com ve Etstur gibi
+ * kanallar parayi cikis ayini izleyen ayin belli bir gununde aktarir.
+ * Ayar `tenant_settings.booking_collection_schedule` = { KOD: { mode, day } }:
+ *   CHECKOUT    son tahsilat gunu cikis gunu (dogrudan kanal varsayilani)
+ *   NEXT_MONTH  cikis ayini izleyen ayin `day`. gunu (ay sonuna kirpilir)
+ *   NONE        takip edilmez (OTA varsayilani; platform tahsil eder)
+ */
+function channelCollectionRule(channel) {
+  const ayar = (typeof appData !== 'undefined' && appData.tenantSettings?.booking_collection_schedule) || null;
+  const kod = String(channel || '').toUpperCase();
+  const kural = ayar && Object.prototype.hasOwnProperty.call(ayar, kod) ? ayar[kod] : null;
+  if (kural && kural.mode === 'NEXT_MONTH') {
+    const gun = Math.round(Number(kural.day));
+    if (gun >= 1 && gun <= 31) return { mode: 'NEXT_MONTH', day: gun };
+  }
+  if (kural && (kural.mode === 'CHECKOUT' || kural.mode === 'NONE')) return { mode: kural.mode, day: null };
+  return { mode: isDirectBookingChannel(channel, typeof appData !== 'undefined' ? appData.bookingChannels : []) ? 'CHECKOUT' : 'NONE', day: null };
+}
+
+function getBookingCollectionDueDate(booking) {
+  const cikis = String(booking?.checkOut || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(cikis)) return null;
+  const kural = channelCollectionRule(booking.channel);
+  if (kural.mode === 'NONE') return null;
+  if (kural.mode === 'CHECKOUT') return cikis;
+  const y = Number(cikis.slice(0, 4));
+  const m = Number(cikis.slice(5, 7)); // sonraki ay = m (0 tabanli)
+  const sonGun = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(y, m, Math.min(kural.day, sonGun))).toISOString().slice(0, 10);
 }
 
 /** Yeni rezervasyonda kapora alani kanala gore gorunur; gizlenince deger silinir. */
@@ -10371,6 +10633,7 @@ async function renderSettingsWorkspace() {
   renderBusinessSettings();
   renderBookingChannelSettings();
   renderSettingsTemplates();
+  renderSettingsExpenseCategories();
   renderSettingsLeadSources();
   // renderAll her cagrida 4 katalog istiyordu (L-148d). Yazmalar ve sekme
   // acilisi kendi yuklemesini yapar; burada 60 sn onbellek yeter.
@@ -16891,7 +17154,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
         : Promise.resolve([]);
       // Independent datasets are loaded concurrently and every list is paged;
       // Supabase's per-response cap must never silently truncate a dashboard.
-      const [villas, bookings, expenses, cleanList, leads, leadSalesContext, closeList, targetList, maintenanceTickets, operationalTasks, financialTransactions, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications, campaignRows, influencerRows, settingRows, operatorNoteRows, pricingLadderRows, hkOverrideRows, paymentCommissionRows, operationalPeopleRows, cleaningExecutionRows, maintenanceAssignmentRows, taskTemplateRows, checklistTemplateRows, bookingPayments, bookingPaymentBalances, adMetricPeriods, propertyContextRows, propertyOwnerRows, propertyOwnerLinkRows, messageTemplateRows, guestClassificationRows, salesMembers, propertyPricingRuleRows, competitorResearchRows, expenseTemplateRows, expenseTemplateOccurrenceRows, leadInterestRows, channelListingRows, incomeEntryRows] = await Promise.all([
+      const [villas, bookings, expenses, cleanList, leads, leadSalesContext, closeList, targetList, maintenanceTickets, operationalTasks, financialTransactions, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications, campaignRows, influencerRows, settingRows, operatorNoteRows, pricingLadderRows, hkOverrideRows, paymentCommissionRows, operationalPeopleRows, cleaningExecutionRows, maintenanceAssignmentRows, taskTemplateRows, checklistTemplateRows, bookingPayments, bookingPaymentBalances, adMetricPeriods, propertyContextRows, propertyOwnerRows, propertyOwnerLinkRows, messageTemplateRows, guestClassificationRows, salesMembers, propertyPricingRuleRows, competitorResearchRows, leadInterestRows, channelListingRows, incomeEntryRows] = await Promise.all([
         loadProperties(tenantId),
         loadBookings(tenantId),
         mayReadLedger ? loadExpenses(tenantId) : Promise.resolve([]),
@@ -16939,8 +17202,6 @@ async function loadTenantAppData(tenantIdOrUserId) {
         salesMembersPromise,
         mayReadSales ? fetchTenantRowsTolerant(() => supabaseClient.from('property_pricing_rule_settings').select('*').eq('tenant_id', tenantId)) : Promise.resolve([]),
         mayReadSales ? fetchTenantRowsTolerant(() => supabaseClient.from('competitor_price_research').select('*').eq('tenant_id', tenantId).order('researched_on', { ascending: false }).order('created_at', { ascending: false })) : Promise.resolve([]),
-        mayReadLedger ? fetchTenantRowsTolerant(() => supabaseClient.from('expense_templates').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false })) : Promise.resolve([]),
-        mayReadLedger ? fetchTenantRowsTolerant(() => supabaseClient.from('expense_template_occurrences').select('*').eq('tenant_id', tenantId).order('period_month', { ascending: false })) : Promise.resolve([]),
         // phase91 uygulanmadan once tablo yoktur: null doner, ekran ayakta kalir.
         mayReadSales ? fetchTenantRowsTolerant(() => supabaseClient.from('lead_interest_properties').select('lead_id, property_id').eq('tenant_id', tenantId)) : Promise.resolve([]),
         // Kanal ilanlari mulk profilinde listelenir (L-214); okuma can_read_sales (phase53).
@@ -17058,12 +17319,9 @@ async function loadTenantAppData(tenantIdOrUserId) {
         salesMembers: salesMembers || [],
         propertyPricingRules: propertyPricingRuleRows || [],
         competitorPriceResearch: competitorResearchRows || [],
-        expenseTemplates: expenseTemplateRows || [],
-        expenseTemplateOccurrences: expenseTemplateOccurrenceRows || [],
         incomeEntries: (incomeEntryRows || []).map(r => mapIncomeEntryFromDb(r, villas)).filter(Boolean),
         phase97SchemaReady: incomeEntryRows !== null,
-        phase78SchemaReady: propertyPricingRuleRows !== null && competitorResearchRows !== null
-          && expenseTemplateRows !== null && expenseTemplateOccurrenceRows !== null,
+        phase78SchemaReady: propertyPricingRuleRows !== null && competitorResearchRows !== null,
         influencerCollabs: (influencerRows || []).map(r => mapInfluencerCollabFromDb(r, propIdMap)),
         housekeepingOverrides,
         airbnbListings,
@@ -17126,8 +17384,6 @@ function getBlankTenantData(userId) {
     scheduledMessages: [],
     extensionOffers: [],
     expenses: [],
-    expenseTemplates: [],
-    expenseTemplateOccurrences: [],
     cleaningTasks: [],
     leads: [],
     leadSources: [],
@@ -18716,6 +18972,17 @@ function todayPerformanceCardHtml(label, value, note) {
   return `<div class="today-performance__card"><span class="sub-text">${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong>${note ? `<small>${escapeHtml(note)}</small>` : ''}</div>`;
 }
 
+// Net kar (M68, 9.6.5): Finans'in net kari ile ayni defter (computeMonthLedger,
+// K-04). Gider hic yoksa kar olculmemistir (L-101): "—" ve nedeni.
+function todayPerformanceProfitCardHtml(perf, month) {
+  if (isProfitUnmeasured(perf.totalIncome, perf.opex, perf.capex, month)) {
+    return todayPerformanceCardHtml('Net kâr', '—', 'Gider kaydı yok; kâr ölçülemedi');
+  }
+  const kar = Math.round(Number(perf.netProfit) || 0);
+  const deger = `${kar < 0 ? '−' : ''}₺${Math.abs(kar).toLocaleString('tr-TR')}`;
+  return todayPerformanceCardHtml('Net kâr', deger, 'Toplam gelir − OPEX − CAPEX (Finans ile aynı)');
+}
+
 function renderTodayPerformance() {
   if (typeof document === 'undefined') return;
   const section = document.getElementById('todayPerformance');
@@ -18743,7 +19010,8 @@ function renderTodayPerformance() {
       todayPerformanceCardHtml('Satılan gece', String(perf.nights), ''),
       todayPerformanceCardHtml('Doluluk', perf.occupancy === null ? '—' : `%${perf.occupancy.toLocaleString('tr-TR')}`, capacityNote),
       todayPerformanceCardHtml('ADR (ort. gecelik)', todayPerformanceMoney(perf.adr), perf.adr === null ? 'Bu ay satılmış gece yok' : 'Ciro ÷ satılan gece'),
-      todayPerformanceCardHtml('RevPAR', todayPerformanceMoney(perf.revpar), perf.revpar === null ? 'Kapasite yok' : 'Ciro ÷ satılabilir gece')
+      todayPerformanceCardHtml('RevPAR', todayPerformanceMoney(perf.revpar), perf.revpar === null ? 'Kapasite yok' : 'Ciro ÷ satılabilir gece'),
+      todayPerformanceProfitCardHtml(perf, month)
     ].join('');
   }
   const list = document.getElementById('todayPerformanceList');
@@ -19517,8 +19785,29 @@ function buildNotificationFeedInput() {
     previousMonthHasRecords,
     followUps: canReadSalesRole(role) ? getLeadSalesView().followUpsToday : [],
     followUpDate: istanbulDateKey,
-    gapNights: canWriteSalesRole(role) ? detectGapNights() : []
+    gapNights: canWriteSalesRole(role) ? detectGapNights() : [],
+    unpaidBookings: canReadSalesRole(role) ? getUnpaidDirectBookings(data) : []
   };
+}
+
+// Tahsilat bildirimi girdisi (M69, L-245): iptal ve toplu aktarim ozeti
+// degil, kanalin tahsilat kurali takip ediyor, bakiye satiri yuklenmis ve
+// kalan > 0. Platformun aktardigi kanalda (NEXT_MONTH) platform komisyonunu
+// keserek oder; komisyon kadar acik "tahsil edilmedi" sayilmaz.
+function getUnpaidDirectBookings(data) {
+  const bakiyeler = new Map((data.bookingPaymentBalances || []).map(r => [String(r.booking_id), r]));
+  return (data.bookings || []).filter(b => b && b.status !== 'CANCELLED' && !isBulkSummaryBooking(b))
+    .map(b => {
+      const dueDate = getBookingCollectionDueDate(b);
+      const bakiye = bakiyeler.get(String(b.id));
+      if (!dueDate || !bakiye) return null;
+      const platform = channelCollectionRule(b.channel).mode === 'NEXT_MONTH';
+      const kalan = Number(bakiye.remaining) - (platform ? (Number(b.otaComm) || 0) : 0);
+      if (!(kalan >= 1)) return null;
+      return { id: b.id, guest: b.guest, villa: b.villa, checkOut: b.checkOut, dueDate, platform,
+        channelName: getChannelDisplayName(b.channel), amountDue: Number(bakiye.amount_due), remaining: Math.round(kalan * 100) / 100 };
+    })
+    .filter(Boolean);
 }
 
 let notificationFeedPersisted = true;
@@ -19599,6 +19888,7 @@ async function openUserNotification(eventKey) {
   if (kind === 'operations') { operationsViewState = arg || 'cleaning'; switchTab('operations'); }
   else if (kind === 'settings') openSettingsSection(arg || 'business');
   else if (kind === 'lead') { switchTab('leads'); openLeadModal(arg); }
+  else if (kind === 'booking') { switchTab('reservations'); openBookingDetailsPanel(arg); }
   else if (kind) switchTab(kind);
   if (n.id && n.status === 'UNREAD') {
     try {
@@ -20632,7 +20922,7 @@ async function resolveMaintenanceFromOperations(ticketId) {
   const createExpense = actualCost > 0 && confirm('Gider olarak kaydedilsin mi?');
   try {
     if (createExpense) {
-      await resolveMaintenanceTicket(ticketId, actualCost, 'Bakım & Onarım', `Bakım gideri: ${ticket.title || 'Arıza'}`);
+      await resolveMaintenanceTicket(ticketId, actualCost, 'Bakım', `Arıza onarımı: ${ticket.title || 'başlıksız arıza'}`);
       invalidateExecutiveSnapshotCache();
     } else {
       const { error } = await supabaseClient.from('maintenance_tickets').update({
@@ -21606,7 +21896,11 @@ async function runCommandCenterAction(actionType, entityId, options = {}) {
       throw new Error('Gerçekleşen maliyet sıfır veya pozitif bir sayı olmalıdır.');
     }
     const resolveTicket = options.resolveMaintenanceTicket || resolveMaintenanceTicket;
-    return await resolveTicket(entityId, actualCost, 'Tadilat', 'Komuta Merkezi üzerinden çözüldü.');
+    // Ariza onarimi isletme gideridir (Bakım, OPEX). Eskiden "Tadilat" ve
+    // "Komuta Merkezi üzerinden çözüldü." yaziyordu: giderler listesinde hangi
+    // arizanin bedeli oldugu okunmuyordu (9.6 ekran goruntusu).
+    const ariza = ((typeof appData !== 'undefined' && (appData.maintenanceTickets || appData.maintenance)) || []).find(t => String(t.id) === String(entityId));
+    return await resolveTicket(entityId, actualCost, 'Bakım', `Arıza onarımı: ${ariza?.title || 'başlıksız arıza'}`);
   }
   if (actionType === 'RESOLVE_ALERT') {
     const resolveAlert = options.resolveExecutiveAlert || resolveExecutiveAlert;
@@ -21732,10 +22026,6 @@ if (typeof module !== 'undefined' && module.exports) {
     mapExpenseFromDb,
     mapExpenseToDb,
     isAdsPeriodExpense,
-    renderExpenseTemplates,
-    saveExpenseTemplate,
-    generateExpenseFromTemplate,
-    deleteExpenseTemplate,
     loadExpenses,
     createExpense,
     createExpensesBatch,
@@ -21745,6 +22035,21 @@ if (typeof module !== 'undefined' && module.exports) {
     deleteExpense,
     saveExpense,
     deleteExpenseUI,
+    deleteExpensesByIds,
+    getExpenseCategories,
+    getCustomExpenseCategories,
+    getExpenseCategoryType,
+    eslesenGiderKategorisi,
+    addCustomExpenseCategory,
+    deleteCustomExpenseCategory,
+    renderSettingsExpenseCategories,
+    buildRecurringExpenseDates,
+    expenseSeriesInfo,
+    todayPerformanceProfitCardHtml,
+    getUnpaidDirectBookings,
+    channelCollectionRule,
+    getBookingCollectionDueDate,
+    buildNotificationFeedInput,
     ALLOWED_LEAD_STAGES,
     ALLOWED_LEAD_SOURCES,
     normalizeLeadChannel,

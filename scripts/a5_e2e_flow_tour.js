@@ -432,7 +432,7 @@ async function main() {
       const resolved = await p.evaluate(id => resolveMaintenanceFromOperations(id), ticket.id);
       const row = must(await admin.from('maintenance_tickets').select('status').eq('id', ticket.id).single(), 'ariza');
       assert.strictEqual(row.status, 'RESOLVED', 'Arıza çözülmedi');
-      const expense = must(await admin.from('expenses').select('amount').eq('tenant_id', tenantId).eq('description', 'Bakım gideri: Tur arızası').maybeSingle(), 'bakim gideri');
+      const expense = must(await admin.from('expenses').select('amount').eq('tenant_id', tenantId).eq('description', 'Arıza onarımı: Tur arızası').maybeSingle(), 'bakim gideri');
       assert(expense && Number(expense.amount) === 750, 'Bakım gideri yazılmadı');
       assert.strictEqual(resolved, true, `Arıza çözüldü ama kullanıcıya hata gösterildi: ${(await errorToasts(p)).join(' | ')}`);
     });

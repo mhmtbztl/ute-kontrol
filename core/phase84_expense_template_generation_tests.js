@@ -25,11 +25,13 @@ test('2. Gider ve occurrence aynı transaction içinde yazılır', () => {
   assert.match(sql, /FOR UPDATE/);
 });
 
-test('3. Giderler ekranı şablon oluşturma ve aya işleme yolunu sunar', () => {
-  assert.match(html, /id="expenseTemplateForm"/);
-  assert.match(html, /id="expenseTemplatesTableBody"/);
-  assert.match(app, /function renderExpenseTemplates/);
-  assert.match(app, /generate_expense_from_template/);
+// Kullanici karari (19.10.2026, L-245): sablon karti kaldirildi; sabit gider
+// gider formundaki "Tekrar" ile girilir (L-242). Tablolar ve RPC veritabaninda
+// kalir (gocler degismez); istemci onlari artik okumaz ve cagirmaz.
+test('3. Şablon kartı kaldırıldı; sabit gider formdaki "Tekrar" ile girilir', () => {
+  assert.doesNotMatch(html, /id="expenseTemplateForm"|id="expenseTemplatesTableBody"|GİDER ŞABLONLARI/);
+  assert.doesNotMatch(app, /function renderExpenseTemplates|generate_expense_from_template|from\('expense_templates'\)/);
+  assert.match(html, /id="expRecurFreq"/);
 });
 
 test('4. Phase86 yetkiyi tenant kimliğiyle kayıt kilidinden önce doğrular', () => {
@@ -38,13 +40,11 @@ test('4. Phase86 yetkiyi tenant kimliğiyle kayıt kilidinden önce doğrular', 
   assert.match(phase86, /REVOKE ALL ON FUNCTION public\.generate_expense_from_template\(UUID, DATE\) FROM authenticated/);
 });
 
-test('5. Şablon yazmaları kullanıcıya hata verir ve finans önbelleğini temizler', () => {
-  const body = name => (app.match(new RegExp(`async function ${name}\\([^)]*\\) \\{[\\s\\S]*?\\n\\}`)) || [''])[0];
+test('5. Şablon eylemleri izin listesinden çıktı', () => {
+  const eylemler = fs.readFileSync(path.join(__dirname, 'action_dispatch.js'), 'utf8');
   for (const name of ['saveExpenseTemplate', 'generateExpenseFromTemplate', 'deleteExpenseTemplate']) {
-    assert.match(body(name), /catch \(error\)[\s\S]*showToast/);
+    assert.ok(!eylemler.includes(`'${name}'`), name);
   }
-  assert.match(body('generateExpenseFromTemplate'), /p_tenant_id:[\s\S]*invalidateExecutiveSnapshotCache\(\)/);
-  assert.match(body('deleteExpenseTemplate'), /select\(['"]id['"]\)/);
 });
 
 console.log(`TEST SUMMARY: ${passed} / ${passed} TESTS PASSED (0 FAILED)`);

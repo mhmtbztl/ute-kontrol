@@ -14,7 +14,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=3843fccb">
+  <link rel="stylesheet" href="style.css?v=5b1f61ef">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="supabase.umd.js?v=3810661a"></script>
@@ -1308,26 +1308,6 @@
     <!-- TAB: GİDER DEFTERİ (FULL CRUD) -->
     <!-- ========================================== -->
     <div id="tab-expenses" class="tab-content">
-      <section class="card" id="expenseTemplatesCard">
-        <div class="section-title-bar">
-          <div><h2>🔁 GİDER ŞABLONLARI</h2><p class="sub-text">Sabit gideri bir kez tanımlayın; seçili aya tek kayıt olarak işleyin.</p></div>
-        </div>
-        <form id="expenseTemplateForm" data-management-only data-onsubmit="saveExpenseTemplate(event)" class="form-grid" style="margin-bottom:16px;">
-          <div class="form-group"><label>Şablon adı</label><input id="expenseTemplateName" maxlength="150" required placeholder="Aylık internet"></div>
-          <div class="form-group"><label>Kategori</label><select id="expenseTemplateCategory" required>
-            <option value="Maaş">Maaş</option><option value="Temizlik">Temizlik</option><option value="Bakım">Bakım</option>
-            <option value="Akaryakıt">Akaryakıt</option><option value="Fatura" selected>Fatura</option><option value="Muhasebe">Muhasebe</option>
-            <option value="Kredi Kartı / Komisyon">Kredi Kartı / Komisyon</option><option value="Danışmanlık">Danışmanlık</option><option value="Diğer">Diğer</option>
-          </select></div>
-          <div class="form-group"><label>Tür</label><select id="expenseTemplateType"><option value="OPEX">Opex</option><option value="CAPEX">Capex</option></select></div>
-          <div class="form-group"><label>Mülk / kapsam</label><select id="expenseTemplateProperty"><option value="ALL">Tüm Portföy</option></select></div>
-          <div class="form-group"><label>Tutar (TL)</label><input id="expenseTemplateAmount" type="number" min="0.01" step="0.01" required></div>
-          <div class="form-group"><label>Açıklama</label><input id="expenseTemplateDescription" maxlength="2000"></div>
-          <div class="form-group" style="justify-content:flex-end;"><button class="btn btn-primary" type="submit">Şablon oluştur</button></div>
-        </form>
-        <div id="expenseTemplatesStatus" class="sub-text" hidden></div>
-        <div class="table-responsive"><table class="data-table"><thead><tr><th>ŞABLON</th><th>KATEGORİ</th><th>KAPSAM</th><th>TUTAR</th><th>DURUM / İŞLEM</th></tr></thead><tbody id="expenseTemplatesTableBody"></tbody></table></div>
-      </section>
       <section class="card">
         <div class="section-title-bar">
           <div><h2>💸 GİDER VE YATIRIM DEFTERİ</h2><p class="sub-text">Tüm operasyonel (Opex) ve yatırım (Capex) harcamaları.</p></div>
@@ -1832,6 +1812,23 @@
         <div id="settingsChecklistTemplatesList" class="settings-template-list"></div>
       </section>
 
+      <section class="card settings-section" data-settings-section="expense-categories" id="settingsExpenseCategoriesCard" style="margin-bottom:24px;">
+        <div class="section-title-bar">
+          <div><h2>🏷️ GİDER KATEGORİLERİ</h2><p class="sub-text">Her kategori bir türe bağlıdır. <strong>OPEX</strong>: işin süregelen gideri (fatura, maaş, bakım). <strong>CAPEX</strong>: yıllarca kullanılan yatırım (klima, mobilya, tadilat). Gider formu kategori seçilince türü buna göre doldurur; ikisi de net kârdan düşer.</p></div>
+        </div>
+        <form data-onsubmit="createSettingsExpenseCategory(event)" class="settings-source-form">
+          <div class="form-group"><label for="settingsExpenseCategoryName">Yeni kategori</label><input id="settingsExpenseCategoryName" maxlength="60" required placeholder="Örn: Havuz bakımı"></div>
+          <div class="form-group"><label for="settingsExpenseCategoryType">Tür</label><select id="settingsExpenseCategoryType"><option value="OPEX">OPEX — süregelen gider</option><option value="CAPEX">CAPEX — yatırım</option></select></div>
+          <button type="submit" class="btn btn-primary btn-sm">+ Kategori Ekle</button>
+        </form>
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead><tr><th>KATEGORİ</th><th>TÜR</th><th>KULLANIM</th><th style="text-align:right;">İŞLEM</th></tr></thead>
+            <tbody id="settingsExpenseCategoriesBody"></tbody>
+          </table>
+        </div>
+      </section>
+
       <section class="card settings-section" data-settings-section="lead-sources" id="settingsLeadSourcesCard" style="margin-bottom:24px;">
         <div class="section-title-bar">
           <div><h2>🧭 TALEP KAYNAKLARI</h2><p class="sub-text">“Nereden geldi?” seçeneklerini yönetin. Bilinmiyor sistem kaynağı silinemez ve kapatılamaz.</p></div>
@@ -2326,25 +2323,40 @@
         <div class="form-grid">
           <div class="form-group">
             <label>Harcama Türü</label>
-            <select id="expType" required>
+            <select id="expType" required data-onchange="updateExpenseTypeHint()">
               <option value="OPEX" selected>Operasyonel Gider (Opex)</option>
               <option value="CAPEX">Yatırım Harcaması (Capex / Ekipman)</option>
             </select>
+            <small id="expTypeHint" class="sub-text">—</small>
           </div>
           <div class="form-group">
-            <label>Gider Kategorisi</label>
-            <select id="expCategory" required data-onchange="updateExpenseCategoryWarning(this.value)">
-              <option value="Maaş">Maaş (Personel / Yönetici)</option>
-              <option value="Temizlik">Temizlik & Çamaşırhane</option>
-              <option value="Bakım">Bakım, Onarım & Tesisat</option>
-              <option value="Reklam">Reklam & Pazarlama (Meta/Google)</option>
-              <option value="Akaryakıt">Akaryakıt & Ulaşım</option>
-              <option value="Fatura">Fatura (Elektrik, Su, İnternet)</option>
-              <option value="Muhasebe">Muhasebe & Hukuk</option>
-              <option value="Kredi Kartı / Komisyon">Kredi Kartı / Komisyon</option>
-              <option value="Danışmanlık">Danışmanlık & Yazılım</option>
+            <label>Gider Kategorisi <button type="button" class="btn-text expense-category-add" data-management-only data-onclick="toggleExpenseCategoryCreate()">+ Yeni kategori</button></label>
+            <select id="expCategory" required data-onchange="onExpenseCategoryChange(this.value)">
+              <optgroup label="Operasyonel gider (OPEX)" data-expense-group="OPEX">
+                <option value="Maaş">Maaş (Personel / Yönetici)</option>
+                <option value="Temizlik">Temizlik & Çamaşırhane</option>
+                <option value="Bakım">Bakım, Onarım & Tesisat</option>
+                <option value="Reklam">Reklam & Pazarlama (Meta/Google)</option>
+                <option value="Akaryakıt">Akaryakıt & Ulaşım</option>
+                <option value="Fatura">Fatura (Elektrik, Su, İnternet)</option>
+                <option value="Muhasebe">Muhasebe & Hukuk</option>
+                <option value="Kredi Kartı / Komisyon">Kredi Kartı / Komisyon</option>
+                <option value="Danışmanlık">Danışmanlık & Yazılım</option>
+              </optgroup>
+              <optgroup label="Yatırım (CAPEX)" data-expense-group="CAPEX">
+                <option value="Demirbaş">Demirbaş & Ekipman (klima, beyaz eşya, mobilya)</option>
+                <option value="Tadilat">Tadilat & Yenileme</option>
+              </optgroup>
               <option value="Diğer">Diğer Giderler</option>
             </select>
+            <div id="expNewCategoryRow" class="expense-new-category" hidden>
+              <input id="expNewCategoryName" maxlength="60" placeholder="Yeni kategori adı (örn: Havuz bakımı)" aria-label="Yeni kategori adı">
+              <select id="expNewCategoryType" aria-label="Yeni kategorinin türü">
+                <option value="OPEX">OPEX — süregelen gider</option>
+                <option value="CAPEX">CAPEX — yatırım</option>
+              </select>
+              <button type="button" class="btn btn-secondary btn-sm" data-onclick="createExpenseCategoryFromForm()">Ekle</button>
+            </div>
             <div id="expenseAdCategoryWarning" class="form-warning" hidden>Reklam harcamasını Kanallar ve Pazarlama’dan girin. Buraya da girerseniz gider iki kez sayılır.</div>
           </div>
           <div class="form-group">
@@ -2355,11 +2367,11 @@
           </div>
           <div class="form-group">
             <label>Tarih</label>
-            <input type="date" id="expDate" required>
+            <input type="date" id="expDate" required data-onchange="updateExpenseRecurrencePreview()">
           </div>
           <div class="form-group">
             <label>Tutar (TL)</label>
-            <input type="number" step="0.01" id="expAmount" placeholder="Örn: 15000" required>
+            <input type="number" step="0.01" id="expAmount" placeholder="Örn: 15000" required data-oninput="updateExpenseRecurrencePreview()">
           </div>
           <div class="form-group">
             <label>Ödeme / Fiş No</label>
@@ -2369,6 +2381,20 @@
             <label>Açıklama</label>
             <input type="text" id="expDesc" placeholder="Örn: Ağustos ayı temizlik ekibi hakedişi" required>
           </div>
+          <div class="form-group" id="expRecurGroup" style="grid-column: span 2;">
+            <label for="expRecurFreq">Tekrar</label>
+            <div class="expense-recur">
+              <select id="expRecurFreq" data-onchange="updateExpenseRecurrencePreview()">
+                <option value="NONE" selected>Tekrarlamaz (tek kayıt)</option>
+                <option value="MONTHLY">Her ay</option>
+                <option value="WEEKLY">Her hafta</option>
+                <option value="DAILY">Her gün</option>
+              </select>
+              <span id="expRecurCountWrap" hidden><input id="expRecurCount" type="number" min="2" max="60" step="1" value="12" aria-label="Tekrar sayısı" data-oninput="updateExpenseRecurrencePreview()"> kez</span>
+            </div>
+            <small id="expRecurPreview" class="sub-text">Tek kayıt yazılır.</small>
+          </div>
+          <small id="expRecurEditNote" class="sub-text" style="grid-column: span 2;"></small>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-onclick="closeExpenseModal()">Vazgeç</button>
@@ -3472,7 +3498,7 @@
   <script src="core/analysis_export_service.js?v=d05579d8"></script>
   <script src="core/chatgpt_prompt_engine.js?v=1b6079e1"></script>
   <script src="core/property_analysis_context_service.js?v=c0cc1027"></script>
-  <script src="core/finance_import_engine.js?v=6c5819bd"></script>
+  <script src="core/finance_import_engine.js?v=8bf85c28"></script>
   <script src="core/bulk_summary.js?v=48f72010"></script>
   <script src="core/income_statement.js?v=3c2e9daf"></script>
   <script src="core/import_template_guide.js?v=18ab70b4"></script>
@@ -3975,12 +4001,12 @@
   <script src="core/captcha_gate.js?v=3ad4a776"></script>
   <script src="core/date_range_picker.js?v=41dc564c"></script>
   <script src="core/side_panel.js?v=d763b464"></script>
-  <script src="core/notification_feed.js?v=d8a17633"></script>
+  <script src="core/notification_feed.js?v=97d955bf"></script>
   <script src="core/command_search.js?v=89760933"></script>
-  <script src="core/action_dispatch.js?v=05b8f2c9"></script>
+  <script src="core/action_dispatch.js?v=9462ac96"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
-  <script src="core/booking_finance_ui.js?v=cb9a574c"></script>
-  <script src="app.js?v=f8e97a4a"></script>
+  <script src="core/booking_finance_ui.js?v=fa6d0372"></script>
+  <script src="app.js?v=b38fec57"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=e5503243"></script>

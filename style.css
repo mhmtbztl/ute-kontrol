@@ -5527,6 +5527,8 @@ body.side-panel-open { overflow: hidden; }
 .booking-finance-options { margin: 16px 0; padding: 16px; border: 1px solid rgba(148,163,184,.22); border-radius: 12px; }
 .finance-toggle { display: flex; align-items: center; gap: 9px; margin: 14px 0; cursor: pointer; }
 .finance-toggle input { width: auto; }
+.finance-collection-row { margin: 10px 0; }
+.finance-collection-inputs { display: grid; grid-template-columns: minmax(0, 1fr) 80px; gap: 8px; }
 .booking-tax-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
 .booking-tax-card { min-width: 0; border: 1px solid rgba(148,163,184,.22); border-radius: 10px; padding: 12px; }
 .booking-tax-card label { display: block; margin-top: 10px; font-size: 12px; }
@@ -5664,4 +5666,18 @@ body.side-panel-open { overflow: hidden; }
 /* Kar koprusundeki istege bagli adimlar (temizlik geliri, diger gelir) */
 .bridge-step[hidden] {
   display: none !important;
+}
+
+/* Gider formu: kategori ekleme ve tekrar (M66, M67). Uzun kategori adi
+   (Demirbas & Ekipman ...) 1fr sutunu icerik genisligine itiyordu. */
+#expenseForm .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+#expenseForm .form-group select, #expenseForm .form-group input { min-width: 0; max-width: 100%; }
+.expense-category-add { float: right; font-size: 11px; padding: 0; }
+.expense-new-category { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px; margin-top: 6px; }
+.expense-new-category[hidden], #expRecurGroup[hidden], #expRecurCountWrap[hidden] { display: none !important; }
+.expense-recur { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.expense-recur #expRecurCount { width: 80px; }
+#expTypeHint, #expRecurPreview { display: block; margin-top: 4px; font-size: 11px; line-height: 1.45; }
+@media (max-width: 720px) {
+  .expense-new-category { grid-template-columns: 1fr; }
 }
