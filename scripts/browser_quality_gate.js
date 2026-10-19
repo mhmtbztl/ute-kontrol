@@ -707,6 +707,47 @@ async function main() {
       const duzenle = await page.evaluate(() => ({ count: appData.tenantSettings.booking_tax_profiles.length, list: document.querySelector('.booking-tax-profile-list').textContent }));
       assert(settingPosts.length === 2 && duzenle.count === 1 && /KDV %20/.test(duzenle.list), 'Profil duzenleme: ' + JSON.stringify({ duzenle, posts: settingPosts.length }));
       passed.push('29. rezervasyon (9.4): kesirli komisyon geçerli; vergi profili formdan eklenip seçilir, Ayarlar\'da düzenlenir; OTA\'da kapora yok; liste dönem payı ve kesintileri; takvim büyür');
+
+      // G9 9.5 (L-235...L-240): kontrol listesi kendi bolumunde kagit liste gibi;
+      // Word listesi yapistirilir, Enter yeni madde acar. Personel karti
+      // onaylanan isi gostermez, bos listede Z'yi kilitlemez, giris bilgisini
+      // gosterir. Menudeki Operasyon sayisi bugunun acik isi.
+      await page.evaluate(() => { appData.settingsChecklistTemplates = []; openSettingsSection('checklists'); renderSettingsTemplates(); });
+      await page.waitForSelector('#settingsChecklistsCard #settingsChecklistTemplateForm', { state: 'visible' });
+      await page.click('#settingsChecklistsCard .checklist-paste summary');
+      await page.fill('#settingsChecklistPaste', 'Mutfak\n    Bulaşıklar yıkandı mı\n        Kireç kontrol edildi mi\n    Süpürüldü mü\nYatak odası\n    !Çarşaf yıkandı mı?\nMalzeme listesi\n    Çay\n    Kahve\n    Bulaşık deterjanı');
+      await page.click('[data-onclick="importChecklistFromText()"]');
+      await page.focus('[data-checklist-item-text]');
+      await page.keyboard.press('End');
+      await page.keyboard.press('Enter');
+      await page.keyboard.type('Ocak silindi mi');
+      const liste95 = await page.evaluate(() => readSettingsChecklistBuilder());
+      assert(liste95.sections.length === 2 && liste95.sections[0].items.map(i => i.text).join('|') === 'Bulaşıklar yıkandı mı|Ocak silindi mi|Süpürüldü mü'
+        && liste95.sections[0].items[0].subChecks[0] === 'Kireç kontrol edildi mi' && liste95.sections[1].items[0].important === true && liste95.supplies.length === 3,
+        'Yapistirma / Enter: ' + JSON.stringify(liste95));
+      await page.locator('#settingsChecklistsCard').screenshot({ path: path.join(__dirname, '..', 'tmp', 'g95-checklist-editor.png') });
+      await page.evaluate(() => {
+        staffFieldWork = { tasks: [], tickets: [], cleanings: [
+          { execution_id: 'g95-a', status: 'ASSIGNED', task_status: 'PLANNED', task_date: getTodayStr(), property: { name: 'Açık Ev' },
+            access: { address: 'Kalkan Mah. 5', door_code: '4321', wifi_name: 'EvNet', wifi_password: 'sifre1', check_out_time: '11:00', check_in_time: '15:00' },
+            checklist: { sections: [], supplies: [] }, checklist_result: {}, supplies_result: {} },
+          { execution_id: 'g95-b', status: 'INSPECTED', task_status: 'DONE', property: { name: 'Onaylı Ev' }, checklist: { sections: [] } }] };
+        renderStaffFieldWork();
+      });
+      const saha95 = await page.evaluate(() => {
+        const box = document.getElementById('staffFieldWorkContainer');
+        return { text: box.textContent, z: !!box.querySelector('[data-onclick^="signStaffCleaningDone"]'), canSign: staffCleaningCompletionState(staffFieldWork.cleanings[0]).canComplete };
+      });
+      assert(/Açık Ev/.test(saha95.text) && !/Onaylı Ev/.test(saha95.text) && /4321/.test(saha95.text) && /şifre: sifre1/.test(saha95.text)
+        && saha95.z && saha95.canSign, 'Personel karti: ' + JSON.stringify(saha95).slice(0, 500));
+      const rozet95 = await page.evaluate(() => {
+        appData.cleaningTasks = [{ id: 'g95-t', villa: 'test', date: getTodayStr(), amount: 2500, status: 'PLANNED' }];
+        appData.maintenanceTickets = [];
+        renderAll();
+        return document.getElementById('opsTaskCountBadge').textContent;
+      });
+      assert(rozet95 === '1', 'Operasyon rozeti: ' + rozet95);
+      passed.push('30. temizlik (9.5): kontrol listesi kendi bölümünde, Word listesi yapıştırılır, Enter yeni madde; personel kartı onaylı işi göstermez, giriş bilgisini gösterir, boş listede Z açık; Operasyon rozeti bugünün işi');
     });
 
     await withPage(browser, baseUrl, 'owner', { width: 390, height: 844 }, async page => {

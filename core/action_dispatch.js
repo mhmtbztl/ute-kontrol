@@ -48,7 +48,7 @@
     'closeOnboardingModal', 'closePropertyModal', 'closeResetModal', 'closeWhatsAppModal', 'createGeneralOperationalTask', 'createTaskFromTemplate',
     'confirmCopyPreviousExpenses', 'copyImportValidValues', 'confirmUserNotification', 'convertLeadAction', 'copyAiTitle', 'copyAnalysisPrompt',
     'copyGapStoryText', 'copyChatGptQuestionPrompt', 'createBookingChannelFromSettings', 'createSettingsChecklistTemplate', 'createSettingsLeadSource',
-    'addChecklistBuilderSection', 'addChecklistBuilderItem', 'addChecklistBuilderSubCheck', 'addChecklistBuilderSupply', 'removeChecklistBuilderNode', 'moveChecklistBuilderNode', 'toggleSettingsChecklistSupplyVisibility', 'renderSettingsChecklistMergePreview', 'cancelSettingsChecklistEdit',
+    'addChecklistBuilderSection', 'addChecklistBuilderItem', 'addChecklistBuilderSubCheck', 'addChecklistBuilderSupply', 'removeChecklistBuilderNode', 'moveChecklistBuilderNode', 'checklistBuilderKeydown', 'importChecklistFromText', 'refreshCleaningExecutionChecklist', 'toggleSettingsChecklistSupplyVisibility', 'renderSettingsChecklistMergePreview', 'cancelSettingsChecklistEdit',
     'createSettingsMessageTemplate', 'createSettingsTaskTemplate', 'cycleHkStatus', 'deleteBookingPayment', 'deleteBookingUI',
     'deleteCleaningTask', 'deleteCleaningTaskFromModal', 'deleteExpenseUI',
     'toggleIncomeAddMenu', 'startIncomeEntry', 'openIncomeModal', 'closeIncomeModal', 'saveIncomeEntry', 'deleteIncomeEntry', 'updateIncomeTypeHint',

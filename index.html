@@ -14,13 +14,13 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=c41bba44">
+  <link rel="stylesheet" href="style.css?v=3843fccb">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="supabase.umd.js?v=3810661a"></script>
   <script src="xlsx.full.min.js?v=56e27b47"></script>
 </head>
-<body>
+<body class="auth-pending">
   <!-- GÜVENLİK VE GİZLİLİK KİLİT EKRANI (GİZLİ ERİŞİM KORUMASI) -->
   <!-- ======================================================= -->
   <!-- SAAS AUTHENTICATION & MULTI-TENANT GATEWAY             -->
@@ -1789,28 +1789,47 @@
             </form>
             <div id="settingsTaskTemplatesList" class="settings-template-list"></div>
           </section>
-          <section class="settings-template-pane">
-            <h3>Kontrol listeleri</h3>
-            <p class="sub-text settings-template-help">Temizlik ve misafir öncesi son kontrol listelerini bölüm bölüm hazırlayın. Önemli maddeler ve onların alt kontrolleri tamamlanmadan görev kapatılamaz.</p>
-            <button type="button" class="settings-template-usage-link" data-onclick="switchTab('operations'); setOperationsView('cleaning')">Temizlikte kullan →</button>
-            <form id="settingsChecklistTemplateForm" data-onsubmit="createSettingsChecklistTemplate(event)" class="settings-inline-form checklist-builder-form">
-              <div class="checklist-builder-meta">
-                <div class="form-group"><label for="settingsChecklistName">Liste adı</label><input id="settingsChecklistName" name="template_name" maxlength="150" required placeholder="Örn. Misafir öncesi son kontrol"></div>
-                <div class="form-group"><label for="settingsChecklistType">Kullanım</label><select id="settingsChecklistType" name="task_type" data-onchange="toggleSettingsChecklistSupplyVisibility(); renderSettingsChecklistMergePreview()"><option value="CLEANING">Temizlik</option><option value="CHECKIN_PREP">Misafir öncesi son kontrol</option></select></div>
-                <div class="form-group"><label for="settingsChecklistProperty">Kapsam</label><select id="settingsChecklistProperty" name="property_id" data-onchange="renderSettingsChecklistMergePreview()"><option value="">Tüm mülkler</option></select></div>
-              </div>
-              <div id="settingsChecklistMergePreview" class="sub-text checklist-merge-preview" aria-live="polite"></div>
-              <div id="settingsChecklistBuilder" class="checklist-builder" aria-live="polite"></div>
-              <button type="button" class="btn btn-secondary btn-sm" data-onclick="addChecklistBuilderSection()">+ Bölüm ekle</button>
-              <section id="settingsChecklistSupplies" class="checklist-builder-supplies">
-                <div class="section-title-bar"><div><h4>Malzemeler</h4><p class="sub-text">Temizlikçinin Var / Az var / Yok olarak kontrol edeceği sarflar.</p></div><button type="button" class="btn btn-secondary btn-sm" data-onclick="addChecklistBuilderSupply()">+ Malzeme ekle</button></div>
-                <div id="settingsChecklistSupplyRows"></div>
-              </section>
-              <div class="checklist-builder-submit"><button id="settingsChecklistSubmitButton" type="submit" class="btn btn-primary btn-sm">Kontrol listesini kaydet</button><button id="settingsChecklistCancelButton" type="button" class="btn btn-secondary btn-sm" data-onclick="cancelSettingsChecklistEdit()" hidden>Vazgeç</button></div>
-            </form>
-            <div id="settingsChecklistTemplatesList" class="settings-template-list"></div>
-          </section>
         </div>
+      </section>
+
+      <!-- Kontrol listeleri kendi bolumunde (M60, 9.5.3): Sablonlar kartinin ucte
+           birlik bolmesinde sikisiyor, cizgiler alanlarin ustune biniyordu. -->
+      <section class="card settings-section" data-settings-section="checklists" id="settingsChecklistsCard" style="margin-bottom: 24px;">
+        <div class="section-title-bar">
+          <div>
+            <h2>🧹 KONTROL LİSTELERİ</h2>
+            <p class="sub-text">Temizlik ve misafir öncesi son kontrol listesi. Bir kâğıt liste gibi yazın: bölüm başlığı, altında maddeler, maddenin altında alt kontroller. <strong>Zorunlu</strong> işaretli madde ve alt kontrolleri tamamlanmadan iş kapatılamaz.</p>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" data-onclick="switchTab('operations'); setOperationsView('cleaning')">Temizlikte kullan →</button>
+        </div>
+        <form id="settingsChecklistTemplateForm" data-onsubmit="createSettingsChecklistTemplate(event)" class="checklist-builder-form">
+          <div class="checklist-builder-meta">
+            <div class="form-group"><label for="settingsChecklistName">Liste adı</label><input id="settingsChecklistName" name="template_name" maxlength="150" required placeholder="Örn. Standart temizlik"></div>
+            <div class="form-group"><label for="settingsChecklistType">Kullanım</label><select id="settingsChecklistType" name="task_type" data-onchange="toggleSettingsChecklistSupplyVisibility(); renderSettingsChecklistMergePreview()"><option value="CLEANING">Temizlik</option><option value="CHECKIN_PREP">Misafir öncesi son kontrol</option></select></div>
+            <div class="form-group"><label for="settingsChecklistProperty">Kapsam</label><select id="settingsChecklistProperty" name="property_id" data-onchange="renderSettingsChecklistMergePreview()"><option value="">Tüm mülkler</option></select></div>
+          </div>
+          <div id="settingsChecklistMergePreview" class="sub-text checklist-merge-preview" aria-live="polite"></div>
+          <details class="checklist-paste">
+            <summary>📋 Word'den ya da metinden yapıştır</summary>
+            <p class="sub-text">Her satır bir madde. Girintisiz satır bölüm başlığı, bir kez girintili satır madde, iki kez girintili satır alt kontrol olur. "Malzeme" ile başlayan başlığın altındakiler malzeme listesine gider. Başına <strong>!</strong> koyduğunuz madde zorunlu olur.</p>
+            <label for="settingsChecklistPaste" class="sr-only">Yapıştırılacak liste</label>
+            <textarea id="settingsChecklistPaste" rows="8" placeholder="Mutfak&#10;    Bulaşıklar yıkandı mı&#10;        Kireç kontrol edildi mi&#10;    Yerler süpürüldü mü&#10;Yatak odası&#10;    !Çarşaflar değişti mi&#10;Malzeme listesi&#10;    Çay&#10;    Kahve"></textarea>
+            <button type="button" class="btn btn-secondary btn-sm" data-onclick="importChecklistFromText()">Listeye dönüştür</button>
+          </details>
+          <div class="checklist-doc">
+            <div id="settingsChecklistBuilder" class="checklist-builder" aria-live="polite"></div>
+            <button type="button" class="checklist-doc-add checklist-doc-add--section" data-onclick="addChecklistBuilderSection()">+ Bölüm ekle</button>
+            <section id="settingsChecklistSupplies" class="checklist-builder-supplies">
+              <h4 class="checklist-doc-heading-static">Malzeme listesi</h4>
+              <p class="sub-text">Temizlikçi her birini Var / Az var / Yok olarak işaretler.</p>
+              <div id="settingsChecklistSupplyRows"></div>
+              <button type="button" class="checklist-doc-add" data-onclick="addChecklistBuilderSupply()">+ Malzeme ekle</button>
+            </section>
+          </div>
+          <div class="checklist-builder-submit"><button id="settingsChecklistSubmitButton" type="submit" class="btn btn-primary btn-sm">Kontrol listesini kaydet</button><button id="settingsChecklistCancelButton" type="button" class="btn btn-secondary btn-sm" data-onclick="cancelSettingsChecklistEdit()" hidden>Vazgeç</button></div>
+        </form>
+        <h3 class="checklist-saved-title">Kayıtlı listeler</h3>
+        <div id="settingsChecklistTemplatesList" class="settings-template-list"></div>
       </section>
 
       <section class="card settings-section" data-settings-section="lead-sources" id="settingsLeadSourcesCard" style="margin-bottom:24px;">
@@ -3695,6 +3714,23 @@
             <div class="form-group"><label for="propOwnerEmail">E-posta</label><input type="email" id="propOwnerEmail"></div>
           </div>
         </fieldset>
+        <fieldset class="property-analysis-context" id="propAccessFieldset">
+          <legend>Saha ve giriş bilgileri</legend>
+          <p class="property-analysis-context__help">Temizlikçi ve ustanın telefonundaki iş kartında görünür (satış ve finans ekranlarında görünmez). Boş bırakılan alan kartta çıkmaz.</p>
+          <div class="property-analysis-context__grid">
+            <div class="form-group full-width"><label for="propAccessAddress">Açık adres</label><input type="text" id="propAccessAddress" maxlength="500" placeholder="Mahalle, sokak, kapı no"></div>
+            <div class="form-group"><label for="propAccessMapUrl">Harita bağlantısı</label><input type="url" inputmode="url" id="propAccessMapUrl" maxlength="1000" placeholder="https://maps.app.goo.gl/..."><small class="sub-text">Boşsa yukarıdaki konum koordinatından üretilir.</small></div>
+            <div class="form-group"><label for="propAccessDoorCode">Kapı / kilit kodu</label><input type="text" id="propAccessDoorCode" maxlength="100" autocomplete="off"></div>
+            <div class="form-group"><label for="propAccessWifiName">Wi-Fi adı</label><input type="text" id="propAccessWifiName" maxlength="100" autocomplete="off"></div>
+            <div class="form-group"><label for="propAccessWifiPassword">Wi-Fi şifresi</label><input type="text" id="propAccessWifiPassword" maxlength="100" autocomplete="off"></div>
+            <div class="form-group"><label for="propAccessCheckOut">Çıkış saati</label><input type="time" id="propAccessCheckOut"></div>
+            <div class="form-group"><label for="propAccessCheckIn">Giriş saati</label><input type="time" id="propAccessCheckIn"></div>
+            <div class="form-group"><label for="propAccessParking">Otopark</label><input type="text" id="propAccessParking" maxlength="500"></div>
+            <div class="form-group"><label for="propAccessEmergency">Acil durumda aranacak</label><input type="text" id="propAccessEmergency" maxlength="100" placeholder="Ad ve telefon"></div>
+            <div class="form-group full-width"><label for="propAccessArrival">Varış tarifi</label><input type="text" id="propAccessArrival" maxlength="1000" placeholder="Örn. Anahtar kutusu bahçe kapısının solunda"></div>
+          </div>
+          <span id="propAccessStatus" class="sub-text" role="status" aria-live="polite"></span>
+        </fieldset>
         <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
           <button type="button" id="propDeleteBtn" class="btn btn-danger" style="display: none; background: #EF4444; border: none; font-size: 12px; padding: 8px 14px; border-radius: 6px; color: #fff; cursor: pointer;" data-onclick="handlePropertyDeleteFromModal()">📦 Satıştan Çek / Arşivle</button>
           <div style="display: flex; gap: 10px; margin-left: auto;">
@@ -3748,7 +3784,7 @@
               <option value="PLANNED">🗓️ Planlandı (henüz yapılmadı)</option>
               <option value="PENDING">⏳ Yapıldı — ödenecek (personele borç)</option>
               <option value="PAID">✅ Yapıldı — ödendi</option>
-              <option value="SKIPPED">✖ Yapılmadı (gider ve borç yok)</option>
+              <option value="SKIPPED">✖ Gerek kalmadı (gider ve borç yok)</option>
             </select>
           </div>
         </div>
@@ -3941,10 +3977,10 @@
   <script src="core/side_panel.js?v=d763b464"></script>
   <script src="core/notification_feed.js?v=d8a17633"></script>
   <script src="core/command_search.js?v=89760933"></script>
-  <script src="core/action_dispatch.js?v=25a00c0f"></script>
+  <script src="core/action_dispatch.js?v=05b8f2c9"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=cb9a574c"></script>
-  <script src="app.js?v=210fe0e0"></script>
+  <script src="app.js?v=f8e97a4a"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=e5503243"></script>

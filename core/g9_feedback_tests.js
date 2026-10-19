@@ -24,6 +24,7 @@
 // L-212..L-216 (M41-M45, 9.3): mulk sahibi kaydi, profilin tazelenmesi, kanal ilani listesi, koordinat, fiyat adlari.
 // L-217 (M46): Bugun ekraninda doluluk/ADR/RevPAR kartlari, ev ev secilebilir; Finans ile ayni hesap.
 // L-226..L-231 (M51-M56, 9.4): kesirli tutar, liste donem payi ve kesintiler, takvim buyutme, kanal bazli kapora, formdan vergi profili, POS komisyonu bellegi.
+// L-233..L-240 (M58-M65, 9.5): acilista panel titremesi, saha giris bilgileri, kagit liste duzenleyici, bos/eski kontrol listesi, kapanan temizligin personelden dusmesi, "gerek kalmadi", Operasyon rozeti.
 // L-184..L-190 (M14-M20): kapora, kar marji hedefi, talep tarihi, mulk net kari, reklam tablosu/metrik/gunluk butce, sablon ekrani, bosluk gecesi.
 const fs = require('fs');
 const path = require('path');
@@ -465,7 +466,9 @@ async function asama4Davranisi() {
   const sablon = global.document.getElementById('settingsTaskTemplatesList').innerHTML + global.document.getElementById('settingsMessageTemplatesList').innerHTML;
   check(/Temizlik · orta öncelik/.test(sablon) && /WhatsApp · elle gönderilir/.test(sablon) && !/CLEANING|MEDIUM|MANUAL/.test(sablon),
     'L-189a Sablon listelerinde ham kod yerine Turkce etiket', sablon.slice(0, 200));
-  check((html.match(/settings-template-help/g) || []).length === 3, 'L-189b Her sablon bolmesi ne ise yaradigini soyler');
+  // Kontrol listeleri M60 ile kendi bolumune tasindi; aciklamasi bolum basliginda.
+  check((html.match(/settings-template-help/g) || []).length === 2 && /data-settings-section="checklists"[\s\S]{0,900}Bir kâğıt liste gibi yazın/.test(html),
+    'L-189b Her sablon bolmesi ve kontrol listesi bolumu ne ise yaradigini soyler');
 
   // L-190 (M20) — bosluk gecesi yalniz gelecekte
   const dun = istanbulBugun(-1);
@@ -1446,6 +1449,128 @@ async function rezervasyonOdemeDavranisi() {
     'L-231b Olusturma ve guncelleme sonrasi bellek sunucunun yazdigi komisyonu alir');
 }
 
+async function temizlikIkiImzaDavranisi() {
+  // 9.5 Temizlik (kullanici PDF'i, 19.10): M58-M65 = L-233...L-240.
+  sahteDom({});
+  const App = require('../app.js');
+  const html = read('index.html');
+  const app = read('app.js');
+  const css = read('style.css');
+  const eylemler = read('core/action_dispatch.js');
+
+  // L-233 (M58): oturum cozulene kadar panel cizilmez; oturum yoksa giris ekrani beklemeden acilir.
+  const acilis = app.slice(app.indexOf("document.addEventListener('DOMContentLoaded'"), app.indexOf("document.addEventListener('DOMContentLoaded'") + 1200);
+  check(/<body class="auth-pending">/.test(html) && /body\.auth-pending > :not\(#securityLockOverlay\) \{ visibility: hidden/.test(css)
+    && /if \(!hasStoredAuthSession\(\) && !readEmailTokenHashLink\(window\.location\.search\) && !isPasswordRecoveryRedirect\(\)\) \{\s*showLockOverlay\(\);/.test(acilis)
+    && /finally \{\s*endAuthPending\(\);/.test(acilis) && /endAuthPending\(\);/.test(functionBody(app, 'function showLockOverlay('))
+    && /endAuthPending\(\);/.test(functionBody(app, 'function hideLockOverlay(')),
+    'L-233a Acilista bos panel gorunmez; saklanmis oturum yoksa giris ekrani hemen, varsa oturum dogrulaninca panel');
+  check(App.hasStoredAuthSession() === false, 'L-233b Saklanmis oturum yokken "oturum var" denmez');
+
+  // L-234 (M59): temizlikci kartindaki giris bilgileri yazilabilir ve kartta gorunur.
+  const bos = App.staffAccessHtml(null);
+  const dolu = App.staffAccessHtml({ address: 'Kalkan Mah. 5', map_url: 'https://maps.example/x', door_code: '4321', wifi_name: 'EvNet', wifi_password: 'sifre1', check_out_time: '11:00', check_in_time: '15:00', parking: '', emergency_contact: 'Ali 0532' });
+  const kotu = App.staffAccessHtml({ address: 'X', map_url: 'javascript:alert(1)' });
+  check(/Saha ve giriş bilgileri/.test(bos) && !/—<\/span>/.test(bos), 'L-234a Bilgi yokken dort "—" yerine nereden girilecegi yazar', bos);
+  check(/4321/.test(dolu) && /şifre: sifre1/.test(dolu) && /href="https:\/\/maps\.example\/x"/.test(dolu) && /Ali 0532/.test(dolu) && !/Otopark/.test(dolu),
+    'L-234b Kapi kodu, Wi-Fi sifresi, harita ve acil iletisim gorunur; bos alan kutusu cizilmez', dolu);
+  check(!/javascript:/.test(kotu), 'L-234c Harita baglantisi yalniz http(s)', kotu);
+  check(['propAccessAddress', 'propAccessDoorCode', 'propAccessWifiName', 'propAccessWifiPassword', 'propAccessCheckIn', 'propAccessCheckOut', 'propAccessArrival', 'propAccessEmergency']
+    .every(id => html.includes(`id="${id}"`)), 'L-234d Mulk formunda "Saha ve giris bilgileri" alanlari var');
+  App.setActiveTenant({ id: TENANT, role: 'owner' });
+  let ist = kaydedenIstemci();
+  App.setSupabaseClient(ist);
+  sahteDom({ propAccessDoorCode: ' 4321 ', propAnalysisLatitude: '36.2', propAnalysisLongitude: '29.6' });
+  check(App.readPropertyAccessForm().map_url === 'https://www.google.com/maps?q=36.2,29.6', 'L-234e Harita bossa girilen koordinattan uretilir');
+  await App.savePropertyAccessFromForm('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee');
+  const giris = ist.yazmalar.find(k => k.tablo === 'property_guest_settings');
+  check(giris && giris.islem === 'upsert' && giris.yuk.tenant_id === TENANT && giris.yuk.door_code === '4321' && !('check_in_time' in giris.yuk),
+    'L-234f Kayit property_guest_settings tablosuna kiraci ve mulkle yazar; bos saat varsayilani ezmez', JSON.stringify(giris));
+  ist = kaydedenIstemci();
+  App.setSupabaseClient(ist);
+  sahteDom({});
+  await App.savePropertyAccessFromForm('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee');
+  check(!ist.yazmalar.length, 'L-234g Bos form ve kayitsiz mulkte hicbir sey yazilmaz');
+
+  // L-235 (M60): kontrol listesi kendi bolumunde, kagit liste gibi; metinden yapistirilir.
+  const sablonKarti = (html.match(/data-settings-section="templates"[\s\S]*?<\/section>\s*<!-- Kontrol listeleri/) || [''])[0];
+  check(/data-settings-section="checklists"[\s\S]*id="settingsChecklistTemplateForm"/.test(html) && !/settingsChecklistTemplateForm/.test(sablonKarti) && sablonKarti.length > 0,
+    'L-235a Kontrol listesi duzenleyicisi Sablonlar kartindan cikti, kendi bolumunde');
+  const bolum = App.settingsChecklistSectionHtml({ title: 'Mutfak', items: [{ text: 'Bulaşık', important: true, subChecks: ['Kireç'] }] }, 0);
+  check(/class="sr-only">Bölüm adı/.test(bolum) && /class="sr-only">Kontrol maddesi/.test(bolum) && /checklistBuilderKeydown\(event, 'item', 0, 0, -1\)/.test(bolum)
+    && /checklist-doc-box/.test(bolum) && !/>Bölüm adı <input/.test(bolum),
+    'L-235b Satirlar etiketli kutu yerine kutucuklu liste satiri; etiket ekran okuyucuda, Enter yeni satir');
+  const yapistir = App.checklistIndentedTextToItems('Mutfak\n    ☐ Bulaşıklar yıkandı mı\n        Kireç kontrol edildi mi\n    süpürüldü mü\nYatak odası\n\t!Çarşaf yıkandı mı?\nMalzeme listesi\n    çay\n    kahve\n    bulaşık deterjanı');
+  check(JSON.stringify(yapistir) === JSON.stringify({ sections: [
+    { title: 'Mutfak', items: [{ text: 'Bulaşıklar yıkandı mı', important: false, subChecks: ['Kireç kontrol edildi mi'] }, { text: 'süpürüldü mü', important: false, subChecks: [] }] },
+    { title: 'Yatak odası', items: [{ text: 'Çarşaf yıkandı mı?', important: true, subChecks: [] }] }],
+    supplies: [{ area: '', item: 'çay' }, { area: '', item: 'kahve' }, { area: '', item: 'bulaşık deterjanı' }] }),
+    'L-235c Kullanicinin Word listesi girintiye gore bolum / madde / alt kontrol / malzeme olur', JSON.stringify(yapistir));
+  check(['checklistBuilderKeydown', 'importChecklistFromText', 'refreshCleaningExecutionChecklist'].every(ad => eylemler.includes(`'${ad}'`)),
+    'L-235d Yeni eylemler izin listesinde');
+
+  // L-236 (M61): bos liste Z imzasini kilitlemez; sonradan eklenen liste baslanmamis goreve gider.
+  check(App.staffCleaningCompletionState({ checklist: { sections: [], supplies: [] } }).canComplete === true,
+    'L-236a Kontrol listesi bos is "en az bir bolum olmali" ile kilitlenmez');
+  const zorunlu = { checklist: { sections: [{ title: 'M', items: [{ text: 'a', important: true, subChecks: [] }] }], supplies: [] }, checklist_result: {} };
+  check(App.staffCleaningCompletionState(zorunlu).canComplete === false
+    && App.staffCleaningCompletionState({ ...zorunlu, checklist_result: { 's0.i0': { z: true } } }).canComplete === true,
+    'L-236b Liste varsa zorunlu madde kurali aynen gecerli');
+  const rpcler = [];
+  ist = kaydedenIstemci();
+  ist.rpc = async (ad, arg) => { rpcler.push([ad, arg]); return { data: {}, error: null }; };
+  App.setSupabaseClient(ist);
+  App.setAppData({ villas: {}, bookings: [], expenses: [], operationalPeople: [], cleaningTasks: [
+    { id: 'ct1', dbId: 'ct1', status: 'PLANNED' }, { id: 'ct2', dbId: 'ct2', status: 'PLANNED' },
+    { id: 'ct3', dbId: 'ct3', status: 'DONE' }, { id: 'ct4', dbId: 'ct4', status: 'PLANNED' }],
+  cleaningExecutions: [
+    { id: 'e1', cleaning_task_id: 'ct1', person_id: 'p', status: 'ASSIGNED', checklist_snapshot: { sections: [] }, checklist_result: {}, supplies_result: {} },
+    { id: 'e2', cleaning_task_id: 'ct2', person_id: 'p', status: 'IN_PROGRESS', checklist_snapshot: { sections: [] }, checklist_result: { 's0.i0': { z: true } }, supplies_result: {} },
+    { id: 'e3', cleaning_task_id: 'ct3', person_id: 'p', status: 'ASSIGNED', checklist_snapshot: { sections: [] }, checklist_result: {}, supplies_result: {} },
+    { id: 'e4', cleaning_task_id: 'ct4', person_id: 'p', status: 'CLEANED', checklist_snapshot: { sections: [] }, checklist_result: {}, supplies_result: {} }] });
+  const yenile = await App.refreshUnstartedCleaningChecklists();
+  const atamalar = rpcler.filter(([ad]) => ad === 'assign_cleaning_task');
+  check(atamalar.length === 1 && atamalar[0][1].p_cleaning_task_id === 'ct1' && atamalar[0][1].p_template_id === null && yenile.refreshed === 1,
+    'L-236c Liste yenileme yalniz imzasiz, isaretlenmemis, acik goreve gider (ayni kisiye yeniden atama)', JSON.stringify(rpcler));
+  check(/createSettingsChecklistTemplate[\s\S]*/.test(app) && /refreshUnstartedCleaningChecklists\(\)/.test(functionBody(app, 'async function createSettingsChecklistTemplate('))
+    && /Listeyi güncelle/.test(App.cleaningExecutionChecklistHintHtml({ id: 'e1', cleaning_task_id: 'ct1', status: 'ASSIGNED', checklist_snapshot: { sections: [] }, checklist_result: {}, supplies_result: {} })),
+    'L-236d Liste kaydedilince baslanmamis gorevler yenilenir; bos listeli atamada yonetici "Listeyi guncelle" gorur');
+
+  // L-237 (M62): onaylanan / kapatilan temizlik personel ekranindan duser.
+  check(App.isStaffCleaningVisible({ status: 'ASSIGNED', task_status: 'PLANNED' }) && App.isStaffCleaningVisible({ status: 'CLEANED' })
+    && !App.isStaffCleaningVisible({ status: 'INSPECTED' }) && !App.isStaffCleaningVisible({ status: 'ASSIGNED', task_status: 'DONE' })
+    && !App.isStaffCleaningVisible({ status: 'ASSIGNED', task_status: 'SKIPPED' }),
+    'L-237a Personel ekraninda yalniz acik ya da denetim bekleyen temizlik kalir');
+  ist = kaydedenIstemci();
+  ist.rpc = async () => ({ data: { cleanings: [
+    { execution_id: 'x1', status: 'INSPECTED', property: { name: 'ONAYLI-EV' }, checklist: { sections: [] } },
+    { execution_id: 'x2', status: 'ASSIGNED', task_status: 'DONE', property: { name: 'KAPALI-EV' }, checklist: { sections: [] } },
+    { execution_id: 'x3', status: 'REOPENED', inspector_note: 'Banyo eksik', property: { name: 'ACIK-EV' }, checklist: { sections: [] } }], tasks: [], tickets: [] }, error: null });
+  App.setSupabaseClient(ist);
+  sahteDom({});
+  await App.loadStaffFieldWork();
+  const saha = global.document.getElementById('staffFieldWorkContainer').innerHTML;
+  check(/ACIK-EV/.test(saha) && !/ONAYLI-EV/.test(saha) && !/KAPALI-EV/.test(saha) && /Banyo eksik/.test(saha) && /Yeniden açıldı/.test(saha),
+    'L-237b Onayli ve kapatilmis is kartta yok; yeniden acilan is yoneticinin notuyla gorunur', saha.slice(0, 300));
+  const goc = read('supabase/migration_phase99_field_work_closed_cleanings.sql');
+  check(/e\.status <> 'INSPECTED'/.test(goc) && /COALESCE\(ct\.status, ''\) NOT IN \('DONE', 'SKIPPED'\)/.test(goc) && /'task_status', ct\.status/.test(goc)
+    && /REVOKE ALL ON FUNCTION public\.get_my_field_work\(UUID, DATE, DATE\) FROM anon/.test(goc) && /VALUES \(99, 'phase99_field_work_closed_cleanings'\)/.test(goc),
+    'L-237c phase99 sunucuda da kapanan isi dondurmez; anon kapali, schema_migrations kaydi');
+
+  // L-238 (M63): "Yapilmadi" etiketi "Gerek kalmadi".
+  check(!/Yapılmadı/.test(app) && !/Yapılmadı/.test(html) && /✖ Gerek kalmadı/.test(app),
+    'L-238 Temizlik "Yapilmadi" yerine "Gerek kalmadi" (durum kodu SKIPPED ayni)');
+
+  // L-240 (M65): menudeki Operasyon sayisi bugunun acik isi.
+  const bugun = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Istanbul' });
+  App.setAppData({ villas: {}, bookings: [], expenses: [], operationalPeople: [], cleaningExecutions: [],
+    cleaningTasks: [{ id: 'a', date: bugun, status: 'PLANNED' }, { id: 'b', date: bugun, status: 'DONE', paid: false }, { id: 'c', date: '2999-01-01', status: 'PLANNED' }],
+    maintenanceTickets: [{ id: 't', status: 'OPEN' }, { id: 'u', status: 'RESOLVED' }] });
+  const sayi = App.getOperationsAttentionCount();
+  check(sayi.cleanings === 1 && sayi.tickets === 1 && sayi.total === 2, 'L-240a Bugunku acik temizlik + acik ariza sayilir; yapilmis ve gelecek is sayilmaz', JSON.stringify(sayi));
+  check(/renderOperationsTabBadge\(\);\s*\}/.test(functionBody(app, 'function renderAll(')), 'L-240b Rozet her cizimde guncellenir, yalniz Operasyon sekmesinde degil');
+}
+
 async function main() {
 try {
   const html = read('index.html');
@@ -1490,6 +1615,7 @@ try {
   await talepEkraniDavranisi();
   await rezervasyondanMisafirDavranisi();
   await rezervasyonOdemeDavranisi();
+  await temizlikIkiImzaDavranisi();
 } catch (error) {
   failed++;
   console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

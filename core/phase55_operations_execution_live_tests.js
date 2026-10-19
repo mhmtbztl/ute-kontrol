@@ -157,6 +157,10 @@ async function run() {
     check(!r.error && ex2.status === 'REOPENED' && ex2.cleaner_signed_at === null && ex2.checklist_result['s0.i0'].m === false
       && (await admin.from('cleaning_tasks').select('status').eq('id', ct.id).single()).data.status === 'PLANNED',
       'C8. M reddi: Z imzasi silinir, madde yeniden acilir, gider yok', hataMetni(r.error) || JSON.stringify(ex2));
+    r = await stf.client.rpc('get_my_field_work', { p_tenant_id: A, p_from: '2026-08-01', p_to: '2026-08-31' });
+    const acik = (r.data && r.data.cleanings || []).find(c => c.execution_id === execId);
+    check(!r.error && acik && acik.status === 'REOPENED' && acik.task_status === 'PLANNED' && acik.inspector_note === 'Ocak yeniden',
+      'C8b. Yeniden acilan temizlik personelde notuyla gorunur; durum task_status ile gelir (phase99)', hataMetni(r.error) || JSON.stringify(acik));
 
     must(await stf.client.rpc('sign_cleaning_done', { p_execution_id: execId }), 'yeniden Z');
     const zAt = (await admin.from('cleaning_task_executions').select('cleaner_signed_at').eq('id', execId).single()).data.cleaner_signed_at;
@@ -164,6 +168,10 @@ async function run() {
     const t2 = must(await admin.from('cleaning_tasks').select('status, completed_at').eq('id', ct.id).single(), 'temizlik');
     check(!r.error && t2.status === 'DONE' && new Date(t2.completed_at).getTime() === new Date(zAt).getTime(),
       'C9. M onayi temizligi DONE yapar; tamamlanma ani Z imzasinin ani', hataMetni(r.error) || JSON.stringify(t2));
+    // phase99 (M62): onaylanan temizlik personel ekranindan duser.
+    r = await stf.client.rpc('get_my_field_work', { p_tenant_id: A, p_from: '2026-08-01', p_to: '2026-08-31' });
+    check(!r.error && !(r.data.cleanings || []).some(c => c.execution_id === execId),
+      'C9b. M onayindan sonra temizlik personelin saha listesinde YOK (phase99)', hataMetni(r.error) || JSON.stringify(r.data && r.data.cleanings));
     const costAfter = await snap();
     check(costAfter === costBefore + 1500, 'C10. Gider temizlik gununun ayina (2026-08) yazildi: sunucu +1.500', `${costBefore} -> ${costAfter}`);
     r = await stf.client.rpc('save_cleaning_progress', { p_execution_id: execId, p_checklist_result: {}, p_supplies_result: {}, p_note: 'sonradan' });
