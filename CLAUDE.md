@@ -136,6 +136,23 @@ hedefler toplam gelire göre girilmişti ve artık ciroyla karşılaştırılır
 `ui_consistency_tests` S1–S6, `executive_snapshot_ui_tests`,
 `ledger_integrity_tests` L-32/L-37.
 
+**Aylık hedef formülü (Aşama 1, 19.10.2026):** Aylık hedef ciro ana hedeftir.
+ADR elle değişirse gerekli gece `ceil(hedef ciro / ADR)`, gece elle değişirse
+gerekli ADR hedefin altında kalmamak için yukarı doğru kuruşa yuvarlanmış
+`hedef ciro / gece` olur. Hedef net kâr `hedef ciro × hedef marj`, **hedef
+gider bütçesi tavanı** ise `hedef ciro − hedef net kâr`dır. Bu son değer bir
+planlama sınırıdır; yukarıdaki USALI gerçekleşen OPEX/CAPEX hesabının yeni adı
+veya yerine geçen formül değildir. Modal kayıt açılışında değerleri yeniden
+hesaplamaz; yalnız kullanıcı girdisi bağımlı alanı değiştirir. Kapasite aşımı
+%100'e sıkıştırılmaz ve kayıt reddedilir. Ağı `monthly_goal_calculator_tests`
+ve `monthly_goal_ui_tests`.
+
+**Bugün net kâr hedefi (19.10.2026):** `net_profit_target` önceliklidir;
+eski `profit_target` / `profitTarget` alanları yedektir. Eksik hedef `null`,
+gerçek sıfır hedef `0` kalır; sıfır hedefte yüzde sapma hesaplanmaz.
+Ağı `executive_snapshot_ui_tests`; gerçek Chrome + ayrı test projesi turu
+`scripts/monthly_goal_integration_tour.js` (9.7.1–9.7.3).
+
 **Temizlik iki ayrı kalemdir; asla tek sayıya indirgenmez (2026-09-14 kararı).**
 
 | | Alan | Nerede durur | Ne |

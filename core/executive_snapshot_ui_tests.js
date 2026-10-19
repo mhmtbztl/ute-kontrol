@@ -66,6 +66,40 @@ test('Sunucu snapshot finansal KPI sekline kayipsiz donusur', () => {
   assert.strictEqual(result.forecast.monthEndRevenue, null);
 });
 
+test('Net kar hedefi yeni alan, eski alanlar, eksik ve sifir icin iki yolda da korunur', () => {
+  const cases = [
+    [{ net_profit_target: 30000, profit_target: 90000 }, 30000],
+    [{ net_profit_target: '30000.25' }, 30000.25],
+    [{ profit_target: 30000 }, 30000],
+    [{ profitTarget: 30000 }, 30000],
+    [{ net_profit_target: null, profit_target: 30000 }, 30000],
+    [{ net_profit_target: 0, profit_target: 30000 }, 0],
+    [{ profit_target: 0, profitTarget: 30000 }, 0],
+    [{ net_profit_target: '0' }, 0],
+    [{}, null], [{ net_profit_target: null }, null],
+    [{ net_profit_target: '' }, null], [{ net_profit_target: ' ' }, null],
+    [{ net_profit_target: -1 }, null], [{ net_profit_target: Infinity }, null],
+    [{ net_profit_target: 'invalid' }, null], [{ net_profit_target: false }, null]
+  ];
+  for (const [targets, expected] of cases) {
+    for (const kpis of [
+      ExecutiveDashboardService.computeExecutiveTopKpisFromSnapshot({ net_profit: 0 }, { targets }),
+      ExecutiveDashboardService.computeExecutiveTopKpis({ targets })
+    ]) {
+      assert.strictEqual(kpis.netProfit.target, expected, JSON.stringify(targets));
+      if (expected === null) assert.strictEqual(kpis.netProfit.variance.status, 'NEUTRAL');
+      if (expected === 0) {
+        assert.strictEqual(kpis.netProfit.variance.variancePercent, null);
+        assert.strictEqual(kpis.netProfit.variance.status, 'ON_TARGET');
+      }
+    }
+  }
+  const positive = ExecutiveDashboardService.computeExecutiveTopKpisFromSnapshot(
+    { net_profit: 20000 }, { targets: { net_profit_target: 30000 } });
+  assert.strictEqual(positive.netProfit.variance.varianceAmount, -10000);
+  assert.strictEqual(positive.netProfit.variance.variancePercent, -33);
+});
+
 test('Eski semada room_revenue yoksa ADR ve RevPAR uydurulmaz', () => {
   const result = ExecutiveDashboardService.computeExecutiveTopKpisFromSnapshot({
     total_revenue: 50000,
@@ -181,6 +215,18 @@ async function runAsyncTests() {
   assert.match(elements.execSnapshotStatus.innerText, /sunucudaki kayıtlarınızdan hesaplandı$/);
   passed++;
   console.log('[PASS] Gercek istemci akisi mevcut ve onceki snapshot ile DOM KPI degerlerini gunceller');
+
+  for (const [value, expected] of [[30000, '+%17 Hedef'], [0, 'Hedef: ₺0'], [null, 'Hedef belirlenmemiş']]) {
+    App.setAppData({ villas: {}, targets: [
+      { id: 'other-month', year: 2026, month: 3, property_id: null, net_profit_target: 90000 },
+      { id: 'property-target', year: 2026, month: 4, property_id: 'property-1', net_profit_target: 80000 },
+      { id: 'finance-target', year: 2026, month: 4, property_id: null, net_profit_target: value }
+    ] });
+    App.renderExecutiveSnapshotKpis();
+    assert.strictEqual(elements.execProfitVariance.innerText, expected);
+  }
+  passed++;
+  console.log('[PASS] Bugun dogru ayin portfoy net kar hedefini gosterir; sifir ile eksik ayrilir');
 
   App.setSupabaseClient(null);
   App.setActiveTenant(null);
