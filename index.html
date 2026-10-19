@@ -14,7 +14,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=9af7634e">
+  <link rel="stylesheet" href="style.css?v=7010c306">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="supabase.umd.js?v=3810661a"></script>
@@ -2132,8 +2132,9 @@
         </section>
         <section class="pricing-config-card pricing-target-card">
           <h3 id="pricingTargetTitle">Hedef ciro hesaplayıcısı</h3>
-          <p>Seçili ayın hedefinden bu ay gerçekleşen ciroyu düşer, kalanı ayın açık geceleriyle karşılaştırır. Hedef doluluk girilirse talep kuralı da bu orana göre çalışır.</p>
+          <p>Seçili ayın hedefinden bu ay gerçekleşen ciroyu düşer, kalanı ayın açık geceleriyle karşılaştırır. <strong>Tüm mülkler</strong> Hedefleri Yönet'teki işletme hedefini ve Finans'taki ciroyu kullanır. Hedef doluluk girilirse talep kuralı da bu orana göre çalışır.</p>
           <div class="pricing-controls">
+            <div class="form-group"><label for="pricingTargetScope">Kapsam</label><select id="pricingTargetScope" data-onchange="setPricingTargetScope(this.value)"><option value="ALL">Tüm mülkler (işletme hedefi)</option><option value="PROPERTY">Seçili mülk</option></select></div>
             <div class="form-group"><label for="pricingTargetInput">Hedef ciro (₺)</label><input id="pricingTargetInput" type="number" min="0" step="1000" placeholder="—"></div>
             <div class="form-group"><label for="pricingExpectedOccupancy">Hedef doluluk (%)</label><input id="pricingExpectedOccupancy" type="number" min="1" max="100" step="1" placeholder="—"></div>
             <div class="form-group"><label for="pricingFocusSelect">Odak</label><select id="pricingFocusSelect"><option value="BALANCED">Dengeli</option><option value="OCCUPANCY">Doluluk</option><option value="REVENUE">Gelir</option></select></div>
@@ -2166,7 +2167,7 @@
               <div class="form-group"><label for="pricingResearchSpecial">Özel gün (₺)</label><input id="pricingResearchSpecial" type="number" step="0.01" min="1" placeholder="—"></div>
               <div class="form-group" style="grid-column:1/-1"><label for="pricingResearchNote">Ham not</label><textarea id="pricingResearchNote" rows="2" maxlength="10000"></textarea></div>
             </div>
-            <button type="button" class="btn btn-primary btn-sm" data-onclick="saveCompetitorResearch()">Araştırmayı kaydet</button>
+            <button type="button" id="pricingResearchSaveBtn" class="btn btn-primary btn-sm" data-onclick="saveCompetitorResearch()">Araştırmayı kaydet</button> <button type="button" id="pricingResearchCancelBtn" class="btn btn-secondary btn-sm" style="display:none" data-onclick="cancelCompetitorResearchEdit()">Vazgeç</button>
           </section>
           <section class="pricing-research-history"><h3>Kaynaklı rakip geçmişi</h3><div id="pricingResearchList"></div></section>
         </div>
@@ -3536,7 +3537,7 @@
   <script src="core/financial_metrics_service.js?v=80a48f81"></script>
   <script src="core/marketing_engine.js?v=2756f4ec"></script>
   <script src="core/analysis_export_service.js?v=d05579d8"></script>
-  <script src="core/chatgpt_prompt_engine.js?v=1b6079e1"></script>
+  <script src="core/chatgpt_prompt_engine.js?v=bbc159aa"></script>
   <script src="core/property_analysis_context_service.js?v=c0cc1027"></script>
   <script src="core/finance_import_engine.js?v=8bf85c28"></script>
   <script src="core/bulk_summary.js?v=48f72010"></script>
@@ -4023,7 +4024,7 @@
   <script src="core/property_owner_service.js?v=5c741a12"></script>
   <script src="core/marketing_channel_listing_service.js?v=515fe386"></script>
   <script src="core/sales_workflow_service.js?v=46af3b73"></script>
-  <script src="core/pricing_research_service.js?v=630ea23a"></script>
+  <script src="core/pricing_research_service.js?v=a01b01a8"></script>
   <script src="core/suggested_price_engine.js?v=95584845"></script>
   <script src="core/target_revenue_calculator.js?v=fe49dcc0"></script>
   <script src="core/monthly_goal_calculator.js?v=245a5fea"></script>
@@ -4044,10 +4045,10 @@
   <script src="core/side_panel.js?v=d763b464"></script>
   <script src="core/notification_feed.js?v=97d955bf"></script>
   <script src="core/command_search.js?v=89760933"></script>
-  <script src="core/action_dispatch.js?v=c9a30e92"></script>
+  <script src="core/action_dispatch.js?v=e506d15b"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=fa6d0372"></script>
-  <script src="app.js?v=83377395"></script>
+  <script src="app.js?v=ecb3b033"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=e5503243"></script>

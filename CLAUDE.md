@@ -712,6 +712,16 @@ değiştirmez (formda referans olarak görünür). Tam kısıt `(property_id, pr
 gösterir. Canlı süit `phase101_daily_prices_live_tests` 18/18 (göçten önce kırmızı).
 Paket: `docs/PHASE101_DEPLOY_PACKAGE.md`.
 
+**phase103 (`migration_phase103_property_closures_for_sales.sql`) 19 Ekim 2026'da
+test projesine uygulandı; üretime kullanıcı uygulayacak.** Satış ve izleyici rolü
+arızaları okuyamadığı (phase53) için fiyat takviminde bakımla kapalı günü "Açık"
+görüyordu (kullanıcı M83, L-262). `get_property_closures` yalnız
+`(mülk, başlangıç, bitiş)` döndürür — başlık/açıklama/maliyet dönmez; tanım
+istemcideki `isTicketBlockingOn` ile aynı. Yetki `can_read_sales`, kayıt aramadan
+önce. Göç yokken takvim "kapalı günler okunamadı" der, günü sessizce açık göstermez.
+Canlı süit `phase103_property_closures_live_tests` 11/11 (göçten önce 7 kırmızı).
+Paket: `docs/PHASE103_DEPLOY_PACKAGE.md`.
+
 **Bir göçün uygulanıp uygulanmadığı, dosyaya bakarak anlaşılmaz.** Dosya repoda
 durur; veritabanı uygulanmamış olabilir. Doğrulamanın yolu üretime sormaktır:
 

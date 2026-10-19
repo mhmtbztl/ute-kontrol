@@ -62,17 +62,34 @@
       add(lines, included, omitted, 'property.amenities', 'Olanaklar', p.amenities);
       add(lines, included, omitted, 'basePrice', 'Baz fiyat', scalar(context.basePrice));
       add(lines, included, omitted, 'floorPrice', 'Taban fiyat', scalar(context.floorPrice));
-      const rules = context.rules || {};
-      add(lines, included, omitted, 'rules', 'Kurallar', { weekendPct: scalar(rules.weekendPct), specialDayPct: scalar(rules.specialDayPct), lastMinutePct: scalar(rules.lastMinutePct), gapNightPct: scalar(rules.gapNightPct) });
+      // Kurallar okunur Turkce satir olarak gider (L-261); ham JSON ChatGPT'ye
+      // kaynak bilgisini (bu mulk / portfoy / sistem varsayilani) vermiyordu.
+      const ruleLines = Array.isArray(context.ruleLines) ? context.ruleLines.filter(x => typeof x === 'string' && x.trim()) : [];
+      if (ruleLines.length) { lines.push('Kurallar:', ...ruleLines.map(x => `- ${x}`)); included.push('rules'); }
+      else {
+        const rules = context.rules || {};
+        add(lines, included, omitted, 'rules', 'Kurallar', { weekendPct: scalar(rules.weekendPct), specialDayPct: scalar(rules.specialDayPct), lastMinutePct: scalar(rules.lastMinutePct), gapNightPct: scalar(rules.gapNightPct) });
+      }
       const next = context.next30 || {};
-      add(lines, included, omitted, 'next30', 'Sonraki 30 gün', { soldNights: scalar(next.soldNights), sellableNights: scalar(next.sellableNights) });
+      const num = value => typeof value === 'number' && Number.isFinite(value) ? value : null;
+      const nextParts = [];
+      if (num(next.soldNights) !== null && num(next.sellableNights) !== null) nextParts.push(`${next.soldNights} / ${next.sellableNights} satılabilir gece satıldı`);
+      if (num(next.openNights) !== null) nextParts.push(`${next.openNights} gece açık`);
+      if (num(next.avgSuggestedWeekday) !== null) nextParts.push(`önerilen ortalama hafta içi ${Math.round(next.avgSuggestedWeekday)} TL`);
+      if (num(next.avgSuggestedWeekend) !== null) nextParts.push(`hafta sonu ${Math.round(next.avgSuggestedWeekend)} TL`);
+      if (nextParts.length) { lines.push(`Sonraki 30 gün: ${nextParts.join(', ')}`); included.push('next30'); }
+      else omitted.push({ field: 'next30', reason: 'Veri yok' });
       add(lines, included, omitted, 'history', 'Geçmiş ipucu', context.history && {
         weekendOccupancy: safeMetric(context.history.weekendOccupancy), weekdayOccupancy: safeMetric(context.history.weekdayOccupancy),
         weekendAdr: safeMetric(context.history.weekendAdr), weekdayAdr: safeMetric(context.history.weekdayAdr),
         sampleNights: pickScalars(context.history.sampleNights, ['weekend','weekday'])
       });
+      const research = context.competitorResearch;
       const median = context.competitorMedian;
-      if (median && median.researchedOn) add(lines, included, omitted, 'competitorMedian', `Rakip medyanı (ChatGPT'nin bildirdiği, ${median.researchedOn})`, { fri: scalar(median.fri), sat: scalar(median.sat), weekday: scalar(median.weekday) });
+      const researchParts = research && research.researchedOn
+        ? [['hafta içi', research.weekday], ['hafta sonu', research.weekend], ['özel gün', research.special]].filter(([, v]) => typeof v === 'number' && Number.isFinite(v)).map(([k, v]) => `${k} ${Math.round(v)} TL`) : [];
+      if (researchParts.length) { lines.push(`Rakip araştırması (kullanıcının girdiği, ${scalar(research.researchedOn)}${scalar(research.sourceKind) ? ', ' + research.sourceKind : ''}): ${researchParts.join(', ')}`); included.push('competitorResearch'); }
+      else if (median && median.researchedOn) add(lines, included, omitted, 'competitorMedian', `Rakip medyanı (ChatGPT'nin bildirdiği, ${median.researchedOn})`, { fri: scalar(median.fri), sat: scalar(median.sat), weekday: scalar(median.weekday) });
       else omitted.push({ field: 'competitorMedian', reason: 'Kaynak tarihiyle rakip medyanı yok' });
       add(lines, included, omitted, 'questionId', 'Kural', scalar(context.questionId));
     } else if (kind === 'COMPETITOR_RESEARCH') {
