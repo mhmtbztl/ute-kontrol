@@ -698,7 +698,15 @@ async function main() {
       }));
       assert(!odeme.kinds.includes('DEPOSIT') && odeme.method === 'OTA', 'OTA odeme takibi kapora sunmamali: ' + JSON.stringify(odeme));
       await page.evaluate(() => SidePanel.close && SidePanel.close());
-      passed.push('29. rezervasyon (9.4): kesirli komisyon geçerli; vergi profili formdan eklenip seçilir; OTA\'da kapora yok; liste dönem payı ve kesintileri; takvim büyür');
+      // Profil Ayarlar'da duzenlenir: ayni kimlik, yeni oran; yeni profil eklenmez.
+      await page.evaluate(() => { switchTab('settings'); openSettingsSection('channels'); renderBookingFinanceSettings(); });
+      await page.click('[data-onclick="editBookingTaxProfile(0)"]');
+      await page.fill('#profileRate_vat', '20');
+      await page.click('#profileSubmitBtn');
+      await page.waitForFunction(() => appData.tenantSettings.booking_tax_profiles[0].vat.rate === '20', null, { timeout: 10000 });
+      const duzenle = await page.evaluate(() => ({ count: appData.tenantSettings.booking_tax_profiles.length, list: document.querySelector('.booking-tax-profile-list').textContent }));
+      assert(settingPosts.length === 2 && duzenle.count === 1 && /KDV %20/.test(duzenle.list), 'Profil duzenleme: ' + JSON.stringify({ duzenle, posts: settingPosts.length }));
+      passed.push('29. rezervasyon (9.4): kesirli komisyon geçerli; vergi profili formdan eklenip seçilir, Ayarlar\'da düzenlenir; OTA\'da kapora yok; liste dönem payı ve kesintileri; takvim büyür');
     });
 
     await withPage(browser, baseUrl, 'owner', { width: 390, height: 844 }, async page => {

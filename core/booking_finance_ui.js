@@ -235,8 +235,9 @@ function renderBookingFinanceSettings() {
   const profiles = appData.tenantSettings?.booking_tax_profiles || [];
   const canEdit = canManageTenantRole(activeTenant?.role);
   host.innerHTML = `<h3>İsteğe bağlı vergi profilleri</h3><p class="field-note">Doğruladığınız oranları, matrahı ve geçerlilik tarihini tanımlayın. Vergi hesabı rezervasyonda ayrıca açılır. Kaydedilen rezervasyon kendi profil kopyasını korur.</p>
-    <ul>${profiles.map(p => `<li>${escapeHtml(p.name)} · ${escapeHtml(p.validFrom)} – ${escapeHtml(p.validTo)}</li>`).join('')}</ul>
-    <form data-onsubmit="saveBookingTaxProfile(event)"><fieldset ${canEdit ? '' : 'disabled'}><legend>Yeni profil / yeni geçerlilik dönemi</legend>${bookingTaxProfileFieldsHtml('profile', true)}<button type="submit" class="btn btn-primary">Profili kaydet</button></fieldset></form>
+    <ul class="booking-tax-profile-list">${profiles.map((p,i) => `<li><span>${escapeHtml(p.name)} · ${escapeHtml(p.validFrom)} – ${escapeHtml(p.validTo)} · KDV %${escapeHtml(p.vat?.rate ?? '—')} · Konaklama %${escapeHtml(p.accommodation?.rate ?? '—')}</span>${canEdit ? `<span class="booking-tax-profile-actions"><button type="button" class="btn btn-secondary btn-sm" data-onclick="editBookingTaxProfile(${i})">Düzenle</button><button type="button" class="btn btn-danger btn-sm" data-onclick="deleteBookingTaxProfile(${i})">Sil</button></span>` : ''}</li>`).join('')}</ul>
+    <p class="field-note">Düzenleme ve silme yalnız bundan sonra seçilen rezervasyonları etkiler; kaydedilmiş rezervasyonlar kendi profil kopyasını ve vergisini korur.</p>
+    <form data-onsubmit="saveBookingTaxProfile(event)"><fieldset ${canEdit ? '' : 'disabled'}><legend id="profileFormLegend">Yeni profil / yeni geçerlilik dönemi</legend>${bookingTaxProfileFieldsHtml('profile', true)}<button type="submit" id="profileSubmitBtn" class="btn btn-primary">Profili kaydet</button> <button type="button" id="profileCancelEditBtn" class="btn btn-secondary" hidden data-onclick="cancelBookingTaxProfileEdit()">Vazgeç</button></fieldset></form>
     <h3>Komisyon matrahı</h3><form data-onsubmit="saveBookingCommissionBases(event)"><fieldset ${canEdit ? '' : 'disabled'}><legend>Kanal bazında hesaplama</legend>${getBookingChannelCatalog().map((c,i) => `<div class="form-group"><label for="financeChannelBase_${i}">${escapeHtml(c.displayName)}</label><select id="financeChannelBase_${i}" data-finance-channel="${escapeHtml(c.code)}">${[['gross','Misafirin toplam ödemesi (mevcut davranış)'],['excluding_tax','Vergi hariç oda ve temizlik geliri'],['room','Vergi ve temizlik geliri hariç oda geliri']].map(([v,label]) => `<option value="${v}" ${escapeHtml(((appData.tenantSettings?.booking_commission_bases || {})[c.code] || 'gross') === v ? 'selected' : '')}>${escapeHtml(label)}</option>`).join('')}</select></div>`).join('')}<button type="submit" class="btn btn-primary">Matrahları kaydet</button></fieldset></form>
     <h3>Kapora</h3><p class="field-note">Kapora alınan kanallarda yeni rezervasyon formu ve ödeme takibi "Kapora" seçeneğini gösterir. İşaretsiz kanallarda (çoğu OTA) ödemeyi platform tahsil eder; kapora alanı gizlenir.</p>
     <form data-onsubmit="saveBookingDepositChannels(event)"><fieldset ${canEdit ? '' : 'disabled'}><legend>Kapora alınan kanallar</legend>${getBookingChannelCatalog().map((c,i) => `<label class="finance-toggle" for="financeDepositChannel_${i}"><input type="checkbox" id="financeDepositChannel_${i}" data-deposit-channel="${escapeHtml(c.code)}" ${channelTakesDeposit(c.code) ? 'checked' : ''}> ${escapeHtml(c.displayName)}</label>`).join('')}<button type="submit" class="btn btn-primary">Kapora ayarını kaydet</button></fieldset></form>`;
@@ -259,10 +260,60 @@ async function appendBookingTaxProfile(p) {
   appData.tenantSettings = { ...appData.tenantSettings, booking_tax_profiles: profiles };
   return profiles;
 }
+// Profil duzenleme / silme (kullanici 19.10, L-232). Kayitli rezervasyon
+// profilin kendi kopyasini financial_details icinde tasir (tax.profile), bu
+// yuzden degisiklik yalniz bundan sonra secilen rezervasyonlari etkiler.
+let bookingTaxProfileEditIndex = null;
+function editBookingTaxProfile(index) {
+  const p = (appData.tenantSettings?.booking_tax_profiles || [])[Number(index)];
+  if (!p || !canManageTenantRole(activeTenant?.role)) return false;
+  bookingTaxProfileEditIndex = Number(index);
+  financeSet('profileName', p.name); financeSet('profileDateBasis', p.dateBasis);
+  financeSet('profileFrom', p.validFrom); financeSet('profileTo', p.validTo);
+  for (const key of ['vat','accommodation']) {
+    const t = p[key] || {};
+    financeSet('profileRate_'+key, t.rate);
+    financeSet('profileBase_'+key, t.room && t.cleaning ? 'both' : t.room ? 'room' : t.cleaning ? 'cleaning' : 'none');
+    financeSet('profileOther_'+key, t.includesOther ? 'yes' : 'no');
+  }
+  financeText('profileFormLegend', 'Profili düzenle: ' + p.name);
+  financeText('profileSubmitBtn', 'Değişiklikleri kaydet');
+  if (financeEl('profileCancelEditBtn')) financeEl('profileCancelEditBtn').hidden = false;
+  financeEl('profileName')?.focus?.();
+  return true;
+}
+function cancelBookingTaxProfileEdit() {
+  bookingTaxProfileEditIndex = null;
+  renderBookingFinanceSettings();
+}
+async function writeBookingTaxProfiles(profiles) {
+  if (!canManageTenantRole(activeTenant?.role)) throw new Error('Vergi profilini yalnız işletme yöneticileri değiştirebilir.');
+  await cloudSaveTenantSetting('booking_tax_profiles',profiles);
+  appData.tenantSettings = { ...appData.tenantSettings, booking_tax_profiles: profiles };
+  bookingTaxProfileEditIndex = null;
+  renderBookingFinanceSettings();
+  if (financeEl('resTaxProfile')) fillBookingTaxProfileOptions();
+}
+async function deleteBookingTaxProfile(index) {
+  const profiles = [...(appData.tenantSettings?.booking_tax_profiles || [])];
+  const p = profiles[Number(index)];
+  if (!p) return false;
+  if (typeof confirm === 'function' && !confirm(`"${p.name}" profili silinsin mi? Bu profille kaydedilmiş rezervasyonların vergisi değişmez.`)) return false;
+  profiles.splice(Number(index), 1);
+  try { await writeBookingTaxProfiles(profiles); return true; }
+  catch (e) { alert('Vergi profili silinemedi: '+e.message); return false; }
+}
 async function saveBookingTaxProfile(event) {
   event.preventDefault();
   try {
-    await appendBookingTaxProfile(readBookingTaxProfileForm('profile'));
+    const p = readBookingTaxProfileForm('profile');
+    const profiles = [...(appData.tenantSettings?.booking_tax_profiles || [])];
+    if (bookingTaxProfileEditIndex !== null && profiles[bookingTaxProfileEditIndex]) {
+      profiles[bookingTaxProfileEditIndex] = { ...p, id: profiles[bookingTaxProfileEditIndex].id || p.id };
+      await writeBookingTaxProfiles(profiles);
+      return;
+    }
+    await appendBookingTaxProfile(p);
     renderBookingFinanceSettings();
     if (financeEl('resTaxProfile')) fillBookingTaxProfileOptions();
   } catch (e) { alert('Vergi profili kaydedilemedi: '+e.message); }

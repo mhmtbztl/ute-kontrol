@@ -1403,6 +1403,40 @@ async function rezervasyonOdemeDavranisi() {
   try { ctx.readBookingTaxProfileForm('x'); } catch (e) { hata = e.message; }
   check(/tamamlayın/.test(hata), 'L-230c Eksik profil kaydedilmez', hata);
 
+  // L-232 (kullanici 19.10): vergi profili duzenlenip silinebilir; kayitli
+  // rezervasyonun kopyasi degismez (degisiklik yalniz sonraki secimleri etkiler).
+  const elemanlar = new Map();
+  const el = id => { if (!elemanlar.has(id)) elemanlar.set(id, { id, value: '', textContent: '', innerHTML: '', hidden: false, focus() {} }); return elemanlar.get(id); };
+  const yazilan = [];
+  const eskiProfil = { id: 'p-1', name: 'Bodrum', dateBasis: 'checkIn', validFrom: '2026-01-01', validTo: '2026-12-31',
+    vat: { rate: '1', room: true, cleaning: true, includesOther: false }, accommodation: { rate: '2', room: true, cleaning: false, includesOther: false } };
+  const kayitliRezervasyonKopyasi = JSON.parse(JSON.stringify(eskiProfil));
+  const ctx2 = { crypto: require('crypto'), escapeHtml: s => String(s), document: { getElementById: el, querySelectorAll: () => [] },
+    appData: { tenantSettings: { booking_tax_profiles: [eskiProfil, { ...eskiProfil, id: 'p-2', name: 'İkinci' }] } },
+    activeTenant: { role: 'owner' }, canManageTenantRole: () => true, getBookingChannelCatalog: () => [], channelTakesDeposit: () => false,
+    cloudSaveTenantSetting: async (k, v) => { yazilan.push([k, JSON.parse(JSON.stringify(v))]); }, alert() {}, confirm: () => true };
+  vm.runInNewContext(read('core/booking_finance_ui.js'), ctx2);
+  vm.runInNewContext("this.BookingFinance = { validateProfile: p => p };", ctx2);
+  ctx2.renderBookingFinanceSettings();
+  check(/data-onclick="editBookingTaxProfile\(0\)"/.test(el('bookingFinanceSettings').innerHTML) && /data-onclick="deleteBookingTaxProfile\(1\)"/.test(el('bookingFinanceSettings').innerHTML)
+    && /yalnız bundan sonra seçilen rezervasyonları etkiler/.test(el('bookingFinanceSettings').innerHTML),
+    'L-232a Ayarlar profil listesinde Duzenle / Sil var ve etkisi acikca yazili');
+  ctx2.editBookingTaxProfile(0);
+  check(el('profileName').value === 'Bodrum' && el('profileRate_vat').value === '1' && el('profileBase_vat').value === 'both' && el('profileBase_accommodation').value === 'room'
+    && el('profileOther_vat').value === 'no' && el('profileSubmitBtn').textContent === 'Değişiklikleri kaydet',
+    'L-232b Duzenle profili forma doldurur (matrah ve "diger vergi" secimleri dahil)');
+  el('profileRate_vat').value = '10';
+  await ctx2.saveBookingTaxProfile({ preventDefault() {} });
+  const sonra = ctx2.appData.tenantSettings.booking_tax_profiles;
+  check(yazilan.length === 1 && sonra.length === 2 && sonra[0].id === 'p-1' && sonra[0].vat.rate === '10' && sonra[1].id === 'p-2'
+    && eskiProfil.vat.rate === '1' && JSON.stringify(eskiProfil) === JSON.stringify(kayitliRezervasyonKopyasi),
+    'L-232c Duzenleme ayni kimlikle yerinde kaydeder, yeni profil eklemez; eski profil nesnesi (rezervasyon kopyasi) degismez', JSON.stringify(sonra));
+  await ctx2.deleteBookingTaxProfile(1);
+  check(yazilan.length === 2 && ctx2.appData.tenantSettings.booking_tax_profiles.length === 1 && ctx2.appData.tenantSettings.booking_tax_profiles[0].id === 'p-1',
+    'L-232d Sil yalniz secilen profili kaldirir');
+  check(read('core/action_dispatch.js').includes("'editBookingTaxProfile'") && read('core/action_dispatch.js').includes("'deleteBookingTaxProfile'"),
+    'L-232e Eylemler izin listesinde');
+
   // L-231 (M56): finans yolu POS komisyonunu yaziyor, bellek eskisini tutuyordu.
   check(App.bookingPaymentCommissionFromFinance({ financialDetails: { result: { paymentCommission: 450 } } }) === 450
     && App.bookingPaymentCommissionFromFinance({ financialDetails: null }) === null,
