@@ -814,8 +814,30 @@ async function main() {
       assert(fiyat97.tabs === 3 && /is-blocked/.test(fiyat97.blocked) && /Kapalı · Boya/.test(fiyat97.blockedText)
         && fiyat97.gap === '1 Gece' && fiyat97.ladder && (!fiyat97.open || /₺\d/.test(fiyat97.open) && /Baz ₺5\.000/.test(fiyat97.open)) && /Sistem varsayılanı/.test(fiyat97.rules) && fiyat97.hazir !== 'BLOCKED_MAINTENANCE',
         'Fiyat takvimi: ' + JSON.stringify(fiyat97).slice(0, 600));
+      // Gunluk fiyat (phase101): acik gune tikla, oneriyi onayla; istek upsert
+      // onConflict ile gider, kart "Onaylı" olur.
+      const gunlukPost = [];
+      await page.route('**/rest/v1/property_daily_prices**', route => {
+        if (route.request().method() !== 'POST') return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+        const satirlar = JSON.parse(route.request().postData() || '[]');
+        gunlukPost.push({ url: route.request().url(), satirlar });
+        return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(satirlar.map((r, i) => ({ id: `dddddddd-dddd-4ddd-8ddd-00000000010${i}`, ...r }))) });
+      });
+      const acikGun = await page.evaluate(() => {
+        appData.phase101SchemaReady = true;
+        renderPricingTab();
+        const kart = document.querySelector('#pricingManagerContainer .pricing-day.is-selectable');
+        return kart ? kart.querySelector('strong').textContent.split(' ')[0] : null;
+      });
+      assert(acikGun, 'Secilebilir acik gun yok');
+      await page.locator('#pricingManagerContainer .pricing-day.is-selectable').first().click();
+      await page.click('[data-onclick="applyPricingDayPrices(\'APPROVE\')"]');
+      await page.waitForFunction(() => /Onaylı/.test(document.getElementById('pricingManagerContainer').textContent), null, { timeout: 10000 });
+      assert(gunlukPost.length === 1 && /on_conflict=property_id%2Cprice_date|on_conflict=property_id,price_date/.test(gunlukPost[0].url)
+        && gunlukPost[0].satirlar.length === 1 && gunlukPost[0].satirlar[0].source === 'APPROVED',
+        'Gunluk fiyat istegi: ' + JSON.stringify(gunlukPost).slice(0, 400));
       await page.locator('#tab-pricing').screenshot({ path: path.join(__dirname, '..', 'tmp', 'g97-pricing.png') });
-      passed.push('32. fiyatlandırma (9.7): bakım aralığı takvimde "Kapalı", bugünü kapatmaz; boş gece sayılır; 3 ay sekmesi, fiyat tablosu ve kural kaynağı görünür');
+      passed.push('32. fiyatlandırma (9.7): bakım aralığı takvimde "Kapalı", bugünü kapatmaz; boş gece sayılır; 3 ay sekmesi, fiyat tablosu ve kural kaynağı görünür; gün tıklanıp öneri onaylanır');
     });
 
     await withPage(browser, baseUrl, 'owner', { width: 390, height: 844 }, async page => {

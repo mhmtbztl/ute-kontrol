@@ -702,6 +702,16 @@ döndürür (icra `INSPECTED` değil, temizlik `DONE`/`SKIPPED` değil) ve
 `phase55_operations_execution_live_tests` 39/39 (C8b, C9b). Paket:
 `docs/PHASE99_DEPLOY_PACKAGE.md`.
 
+**phase101 (`migration_phase101_property_daily_prices.sql`) 19 Ekim 2026'da test
+projesine uygulandı; üretime henüz uygulanmadı.** Günlük fiyat kaydı (kullanıcı M76,
+L-255): fiyat takviminde gün seçilip öneri onaylanır (`APPROVED`) ya da elle fiyat
+yazılır (`MANUAL`); kayıt referanstır, OTA'ya gitmez, rezervasyon tutarını
+değiştirmez (formda referans olarak görünür). Tam kısıt `(property_id, price_date)`
++ istemci upsert `onConflict` (§5.15). Okuma `can_read_sales`, yazma
+`can_manage_tenant`; sıfırlama listesine eklendi. Göç yokken takvim yalnız öneriyi
+gösterir. Canlı süit `phase101_daily_prices_live_tests` 18/18 (göçten önce kırmızı).
+Paket: `docs/PHASE101_DEPLOY_PACKAGE.md`.
+
 **Bir göçün uygulanıp uygulanmadığı, dosyaya bakarak anlaşılmaz.** Dosya repoda
 durur; veritabanı uygulanmamış olabilir. Doğrulamanın yolu üretime sormaktır:
 

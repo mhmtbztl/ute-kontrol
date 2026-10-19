@@ -14,7 +14,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=f40859ef">
+  <link rel="stylesheet" href="style.css?v=9af7634e">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="supabase.umd.js?v=3810661a"></script>
@@ -2115,6 +2115,7 @@
           <div id="pricingManagerContainer">
             <!-- Fiyat takvimi: gun kartlari, gerekce ve uyarilar -->
           </div>
+          <div id="pricingDayEditor" aria-live="polite"></div>
         </section>
         <section class="pricing-config-card pricing-special-card">
           <h3>Özel günler ve etkinlikler</h3>
@@ -2927,6 +2928,7 @@
             <label for="resGross">Brüt Tutar (₺)</label>
             <input type="number" step="0.01" inputmode="decimal" id="resGross" placeholder="Örn: 40000" required data-oninput="handleBookingGrossFinanceInput()">
             <small id="resGrossExplanation" class="field-note">Temizlik geliri bu tutara dahildir. İndirim ayrıca düşülür.</small>
+            <small id="resPriceCalendarHint" class="field-note" style="display:none"></small>
           </div>
           <div class="form-group" id="resDepositGroup">
             <label for="resDeposit">Alınan Kapora (₺)</label>
@@ -4042,10 +4044,10 @@
   <script src="core/side_panel.js?v=d763b464"></script>
   <script src="core/notification_feed.js?v=97d955bf"></script>
   <script src="core/command_search.js?v=89760933"></script>
-  <script src="core/action_dispatch.js?v=d9bcdd3a"></script>
+  <script src="core/action_dispatch.js?v=c9a30e92"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=fa6d0372"></script>
-  <script src="app.js?v=6251c380"></script>
+  <script src="app.js?v=83377395"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=e5503243"></script>

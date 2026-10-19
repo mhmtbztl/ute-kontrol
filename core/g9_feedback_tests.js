@@ -28,6 +28,7 @@
 // L-241..L-244 (M66-M69, 9.6): isletmenin gider kategorileri ve OPEX/CAPEX turu, tekrarlayan gider, Bugun'de net kar, tahsilat bildirimi.
 // L-246 (M70, 9.7): tarihli bakim yalniz kendi araligini kapatir; fiyat takvimi ve hazirlik ayni tanimi kullanir.
 // L-247..L-254 (M71-M76, 9.7): talep kurali, 3 aylik takvim, ozel etkinlik, kural kaynagi, fiyat tablosu, bos gece, yillik hedef, fiyat tablosu karti.
+// L-255 (M76, 9.7 F.2.9): gunluk fiyat onaylanir / elle yazilir (phase101); rezervasyon formunda referans.
 // L-184..L-190 (M14-M20): kapora, kar marji hedefi, talep tarihi, mulk net kari, reklam tablosu/metrik/gunluk butce, sablon ekrani, bosluk gecesi.
 const fs = require('fs');
 const path = require('path');
@@ -1957,6 +1958,105 @@ async function fiyatEkraniDavranisi() {
   check(String(el('pricingTargetInput').value) === '68000', 'L-248e Ay degisip geri gelince girilen hedef kaybolmaz', String(el('pricingTargetInput').value));
 }
 
+async function gunlukFiyatDavranisi() {
+  // 9.7 F.2.9 (kullanici M76, karar 19.10): gunluk fiyat onaylanir / elle yazilir (phase101) = L-255.
+  sahteDom({});
+  global.FinancialMetricsService = require('./financial_metrics_service.js');
+  const App = require('../app.js');
+  const app = read('app.js');
+  const sql = read('supabase/migration_phase101_property_daily_prices.sql');
+  const el = id => global.document.getElementById(id);
+  const BUGUN = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const gun = n => new Date(Date.parse(BUGUN + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
+  const P = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000101';
+  const kur = (ek = {}, rol = 'owner') => {
+    App.setActiveTenant({ id: TENANT, role: rol });
+    App.setAppData({
+      villas: { SEYIR: { id: P, slug: 'SEYIR', name: 'Seyir', basePrice: 10000, floor: 8000, isActive: true, activationDate: '2025-01-01' } },
+      bookings: [], expenses: [], maintenanceTickets: [], propertyPricingRules: [], competitorPriceResearch: [], tenantSettings: {}, targets: [],
+      propertyDailyPrices: [], phase78SchemaReady: true, phase101SchemaReady: true, ...ek
+    });
+    App.clearPricingDaySelection();
+    App.setPricingProperty(P);
+    App.setPricingMonth(gun(20).slice(0, 7));
+  };
+  const istemci = () => {
+    const ist = kaydedenIstemci();
+    const ilk = ist.from.bind(ist);
+    ist.from = tablo => {
+      const q = ilk(tablo);
+      const sonThen = q.then;
+      q.then = (res, rej) => {
+        const son = ist.yazmalar[ist.yazmalar.length - 1];
+        if (son && son.tablo === 'property_daily_prices' && son.islem === 'upsert') return Promise.resolve({ data: son.yuk.map((r, i) => ({ id: 'dp' + i, ...r })), error: null }).then(res, rej);
+        return sonThen(res, rej);
+      };
+      return q;
+    };
+    App.setSupabaseClient(ist);
+    return ist;
+  };
+
+  check(/CONSTRAINT property_daily_prices_property_date_key UNIQUE \(property_id, price_date\)/.test(sql) && !/CREATE UNIQUE INDEX[^;]*WHERE/i.test(sql)
+    && app.includes(".upsert(rows.map(row => ({ ...row, tenant_id: tenantId })), { onConflict: 'property_id,price_date' })"),
+    'L-255a Benzersizlik tam kisit; istemcinin upsert onConflict sutunlari kisitla ayni (CLAUDE.md 5.15)');
+  check(/can_read_sales\(tenant_id\)/.test(sql) && (sql.match(/can_manage_tenant\(tenant_id\)/g) || []).length >= 3 && /'property_daily_prices'/.test(sql.slice(sql.indexOf('reset_tenant_data'))),
+    'L-255b Okuma satis verisi, yazma yonetim; sifirlama listesinde');
+
+  kur();
+  let takvim = el('pricingManagerContainer').innerHTML;
+  check(takvim.includes(`togglePricingDay(decodeURIComponent('${encodeURIComponent(gun(20))}'))`) && /Fiyatı onaylamak ya da değiştirmek için açık günlere tıklayın/.test(el('pricingDayEditor').innerHTML),
+    'L-255c Yonetici acik gune tiklayarak secer; duzenleyici ne yapilacagini soyler');
+  App.togglePricingDay(gun(20)); App.togglePricingDay(gun(21));
+  check(/2 gün seçili/.test(el('pricingDayEditor').innerHTML) && /applyPricingDayPrices\('APPROVE'\)/.test(el('pricingDayEditor').innerHTML) && /is-selected/.test(el('pricingManagerContainer').innerHTML),
+    'L-255d Secilen gunler isaretlenir; "Öneriyi onayla" ve elle fiyat secenekleri cikar');
+  let ist = istemci();
+  const oneri20 = App.computePricingCalendar({ key: 'SEYIR', property: App.getAppData().villas.SEYIR }, BUGUN, null).suggestions.days.find(d => d.date === gun(20)).price;
+  await App.applyPricingDayPrices('APPROVE');
+  let yazma = ist.yazmalar.find(k => k.tablo === 'property_daily_prices' && k.islem === 'upsert');
+  check(yazma && yazma.yuk.length === 2 && yazma.yuk.every(r => r.source === 'APPROVED' && r.tenant_id === TENANT && r.property_id === P && r.price === r.suggested_price)
+    && yazma.yuk.find(r => r.price_date === gun(20)).price === oneri20,
+    'L-255e "Öneriyi onayla" her gune kendi onerisini APPROVED olarak yazar', JSON.stringify(yazma && yazma.yuk));
+  check(App.getAppData().propertyDailyPrices.length === 2 && /Onaylı/.test(el('pricingManagerContainer').innerHTML) && /0 gün seçili|Fiyatı onaylamak/.test(el('pricingDayEditor').innerHTML),
+    'L-255f Kayittan sonra kart "Onaylı" der, secim temizlenir');
+
+  ist = istemci();
+  App.togglePricingDay(gun(22));
+  el('pricingDayManualPrice').value = '7000'; el('pricingDayNote').value = 'Son dakika anlasmasi';
+  global.confirm = () => false;
+  check(await App.applyPricingDayPrices('MANUAL') === false && !ist.yazmalar.some(k => k.tablo === 'property_daily_prices'),
+    'L-255g Taban altindaki elle fiyat onay ister; vazgecilirse yazilmaz');
+  global.confirm = () => true;
+  await App.applyPricingDayPrices('MANUAL');
+  yazma = ist.yazmalar.find(k => k.tablo === 'property_daily_prices' && k.islem === 'upsert');
+  check(yazma && yazma.yuk[0].price === 7000 && yazma.yuk[0].source === 'MANUAL' && yazma.yuk[0].suggested_price > 0 && yazma.yuk[0].note === 'Son dakika anlasmasi',
+    'L-255h Elle fiyat MANUAL yazilir; oneri ve not yaninda saklanir', JSON.stringify(yazma && yazma.yuk));
+  check(/₺7\.000/.test(el('pricingManagerContainer').innerHTML) && /Elle · öneri ₺/.test(el('pricingManagerContainer').innerHTML),
+    'L-255i Kart kayitli fiyati gosterir ve oneriyi yanina yazar');
+
+  ist = istemci();
+  App.togglePricingDay(gun(22));
+  await App.applyPricingDayPrices('REMOVE');
+  check(ist.yazmalar.some(k => k.tablo === 'property_daily_prices' && k.islem === 'delete' && k.filtre.some(([c, v]) => c === 'tenant_id' && v === TENANT) && k.filtre.some(([c, v]) => c === 'property_id' && v === P))
+    && !App.getAppData().propertyDailyPrices.some(r => r.price_date === gun(22)),
+    'L-255j "Kaydı kaldır" kiraci + mulk kapsamli siler; gun yeniden oneriyi gosterir');
+
+  // Rezervasyon formu referansi
+  el('resVilla').value = 'SEYIR'; el('resCheckIn').value = gun(20); el('resCheckOut').value = gun(23);
+  App.renderBookingPriceCalendarHint();
+  check(/Fiyat takvimi: 3 gece/.test(el('resPriceCalendarHint').innerText) && /2 onaylı, 1 öneri/.test(el('resPriceCalendarHint').innerText) && /kendiliğinden değişmez/.test(el('resPriceCalendarHint').innerText),
+    'L-255k Rezervasyon formu secilen geceler icin onayli fiyat + oneri toplamini referans olarak gosterir', el('resPriceCalendarHint').innerText);
+
+  // Goc yokken ve rol siniri
+  kur({ phase101SchemaReady: false });
+  ist = istemci();
+  check(!/togglePricingDay\(/.test(el('pricingManagerContainer').innerHTML) && /phase101 göçü bekleniyor/.test(el('pricingDayEditor').innerHTML),
+    'L-255l Goc uygulanmadan takvim yalniz oneriyi gosterir ve bunu soyler');
+  kur({}, 'sales');
+  check(!/togglePricingDay\(/.test(el('pricingManagerContainer').innerHTML) && el('pricingDayEditor').innerHTML === '',
+    'L-255m Satis rolu fiyati gorur ama secemez / yazamaz');
+}
+
 async function main() {
 try {
   const html = read('index.html');
@@ -2005,6 +2105,7 @@ try {
   await giderAsamasiDavranisi();
   await fiyatBakimDavranisi();
   await fiyatEkraniDavranisi();
+  await gunlukFiyatDavranisi();
 } catch (error) {
   failed++;
   console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

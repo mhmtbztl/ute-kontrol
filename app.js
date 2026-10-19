@@ -9109,6 +9109,7 @@ function syncRateFromCommission() {
 }
 
 function calculateLivePreview() {
+  renderBookingPriceCalendarHint();
   if (typeof renderBookingFinancePreview === 'function' && document.getElementById('resTaxEnabled')) return renderBookingFinancePreview();
   const e = readBookingFormEconomics();
   const money = v => `₺${Math.round(v).toLocaleString('tr-TR')}`;
@@ -17209,7 +17210,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
         : Promise.resolve([]);
       // Independent datasets are loaded concurrently and every list is paged;
       // Supabase's per-response cap must never silently truncate a dashboard.
-      const [villas, bookings, expenses, cleanList, leads, leadSalesContext, closeList, targetList, maintenanceTickets, operationalTasks, financialTransactions, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications, campaignRows, influencerRows, settingRows, operatorNoteRows, pricingLadderRows, hkOverrideRows, paymentCommissionRows, operationalPeopleRows, cleaningExecutionRows, maintenanceAssignmentRows, taskTemplateRows, checklistTemplateRows, bookingPayments, bookingPaymentBalances, adMetricPeriods, propertyContextRows, propertyOwnerRows, propertyOwnerLinkRows, messageTemplateRows, guestClassificationRows, salesMembers, propertyPricingRuleRows, competitorResearchRows, leadInterestRows, channelListingRows, incomeEntryRows] = await Promise.all([
+      const [villas, bookings, expenses, cleanList, leads, leadSalesContext, closeList, targetList, maintenanceTickets, operationalTasks, financialTransactions, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications, campaignRows, influencerRows, settingRows, operatorNoteRows, pricingLadderRows, hkOverrideRows, paymentCommissionRows, operationalPeopleRows, cleaningExecutionRows, maintenanceAssignmentRows, taskTemplateRows, checklistTemplateRows, bookingPayments, bookingPaymentBalances, adMetricPeriods, propertyContextRows, propertyOwnerRows, propertyOwnerLinkRows, messageTemplateRows, guestClassificationRows, salesMembers, propertyPricingRuleRows, competitorResearchRows, leadInterestRows, channelListingRows, incomeEntryRows, dailyPriceRows] = await Promise.all([
         loadProperties(tenantId),
         loadBookings(tenantId),
         mayReadLedger ? loadExpenses(tenantId) : Promise.resolve([]),
@@ -17262,7 +17263,9 @@ async function loadTenantAppData(tenantIdOrUserId) {
         // Kanal ilanlari mulk profilinde listelenir (L-214); okuma can_read_sales (phase53).
         mayReadSales ? fetchTenantRowsTolerant(() => supabaseClient.from('property_channel_listings').select(CHANNEL_LISTING_COLUMNS).eq('tenant_id', tenantId).neq('status', 'ARCHIVED').order('created_at')) : Promise.resolve([]),
         // phase97 gelir/sermaye defteri; goc yoksa null doner, ekran ayakta kalir.
-        mayReadLedger ? fetchTenantRowsTolerant(() => supabaseClient.from('income_entries').select('*').eq('tenant_id', tenantId).order('income_date', { ascending: false })) : Promise.resolve([])
+        mayReadLedger ? fetchTenantRowsTolerant(() => supabaseClient.from('income_entries').select('*').eq('tenant_id', tenantId).order('income_date', { ascending: false })) : Promise.resolve([]),
+        // phase101 gunluk fiyat kaydi; goc yoksa null doner, takvim yalniz oneriyi gosterir.
+        mayReadSales ? fetchTenantRowsTolerant(() => supabaseClient.from('property_daily_prices').select('*').eq('tenant_id', tenantId).order('price_date')) : Promise.resolve([])
       ]);
       const propIdMap = {};
       Object.values(villas || {}).forEach(p => {
@@ -17376,6 +17379,8 @@ async function loadTenantAppData(tenantIdOrUserId) {
         competitorPriceResearch: competitorResearchRows || [],
         incomeEntries: (incomeEntryRows || []).map(r => mapIncomeEntryFromDb(r, villas)).filter(Boolean),
         phase97SchemaReady: incomeEntryRows !== null,
+        propertyDailyPrices: dailyPriceRows || [],
+        phase101SchemaReady: dailyPriceRows !== null,
         phase78SchemaReady: propertyPricingRuleRows !== null && competitorResearchRows !== null,
         influencerCollabs: (influencerRows || []).map(r => mapInfluencerCollabFromDb(r, propIdMap)),
         housekeepingOverrides,
@@ -17468,6 +17473,8 @@ function getBlankTenantData(userId) {
     propertyPricingRules: [],
     competitorPriceResearch: [],
     phase78SchemaReady: false,
+    propertyDailyPrices: [],
+    phase101SchemaReady: false,
     influencerCollabs: [],
     housekeepingOverrides: {},
     airbnbListings: {},
@@ -21901,6 +21908,9 @@ function pricingDayCardHtml(day, ctx) {
   const special = ctx.specialByDate.get(day.date);
   const isGap = ctx.gapSet.has(day.date) && day.status === 'OPEN';
   const cls = day.status === 'BOOKED' ? 'is-booked' : day.status === 'BLOCKED' ? 'is-blocked' : isGap ? 'is-gap' : special ? 'is-special' : 'is-open';
+  const saved = day.status === 'OPEN' ? ctx.saved?.get(day.date) : null;
+  const selectable = ctx.canManage && ctx.dailyReady && day.status === 'OPEN';
+  const selected = selectable && ctx.selected?.has(day.date);
   const weekday = new Date(day.date + 'T00:00:00Z').toLocaleDateString('tr-TR', { weekday: 'short', timeZone: 'UTC' });
   const status = day.status === 'BOOKED' ? 'Dolu' : day.status === 'BLOCKED' ? `Kapalı · ${blocks[0]?.title || 'bakım'}` : (isGap ? 'Açık · boş gece' : 'Açık');
   let explain = '';
@@ -21911,7 +21921,10 @@ function pricingDayCardHtml(day, ctx) {
       explain = `Baz ${pricingMoney(day.basePrice)}${steps.length ? ' · ' + steps.join(' · ') : ' · kural uygulanmadı'}${day.floorApplied ? ' · tabana yükseltildi' : ''}`;
     }
   }
-  return `<div class="pricing-day ${cls}"><strong>${escapeHtml(formatTrDate(day.date))} <em>${escapeHtml(weekday)}</em></strong>${special ? `<span class="pricing-day-special">${escapeHtml(special.name)}</span>` : ''}<span>${escapeHtml(status)}</span><b>${day.status === 'OPEN' && day.price != null ? escapeHtml(pricingMoney(day.price)) : '—'}</b>${explain ? `<small>${escapeHtml(explain)}</small>` : ''}</div>`;
+  const shown = saved ? Number(saved.price) : day.price;
+  const savedLine = saved ? `${saved.source === 'MANUAL' ? 'Elle' : 'Onaylı'}${day.price != null && Number(saved.price) !== day.price ? ` · öneri ${pricingMoney(day.price)}` : ''}${saved.note ? ` · ${saved.note}` : ''}` : '';
+  const action = selectable ? ` role="button" tabindex="0" aria-pressed="${selected ? 'true' : 'false'}" data-onclick="togglePricingDay(decodeURIComponent('${encodeActionArg(day.date)}'))"` : '';
+  return `<div class="pricing-day ${cls}${saved ? ' is-saved' : ''}${selected ? ' is-selected' : ''}${selectable ? ' is-selectable' : ''}"${action}><strong>${escapeHtml(formatTrDate(day.date))} <em>${escapeHtml(weekday)}</em></strong>${special ? `<span class="pricing-day-special">${escapeHtml(special.name)}</span>` : ''}<span>${escapeHtml(status)}</span><b>${day.status === 'OPEN' && shown != null ? escapeHtml(pricingMoney(shown)) : '—'}</b>${savedLine ? `<span class="pricing-day-saved">${escapeHtml(savedLine)}</span>` : ''}${explain ? `<small>${escapeHtml(explain)}</small>` : ''}</div>`;
 }
 
 function pricingHistoryHintHtml(history, entry, monthKey) {
@@ -21949,6 +21962,7 @@ function pricingTargetHtml(result, ctx) {
 }
 
 function setPricingProperty(propertyId) {
+  if ((propertyId || '') !== pricingSelectedPropertyId) pricingSelectedDays.clear();
   pricingSelectedPropertyId = propertyId || '';
   renderPricingTab();
 }
@@ -22236,6 +22250,125 @@ function computePricingCalendar(entry, today = getTodayStr(), occupancyTarget = 
   return { horizon, blocks, specialDays, rules, suggestions };
 }
 
+// Gunluk fiyat kaydi (phase101, L-255, kullanici M76/F.2.9): oneri yalniz
+// gosteriliyordu; isletme "bu fiyati kullan" diyemiyor, bir gunun fiyatini
+// elle degistiremiyordu. Kayit referanstir: OTA'ya gitmez, rezervasyon
+// tutarini kendiliginden degistirmez.
+const pricingSelectedDays = new Set();
+const PHASE101_SEMA_YOK = 'Günlük fiyat kaydı için phase101 göçü henüz uygulanmadı. Değişiklik kaydedilmedi.';
+
+function pricingDailyPriceMap(propertyId) {
+  return new Map((appData?.propertyDailyPrices || []).filter(row => row.property_id === propertyId).map(row => [String(row.price_date).slice(0, 10), row]));
+}
+
+function togglePricingDay(date) {
+  if (!canManageTenantRole(activeTenant?.role) || !/^\d{4}-\d{2}-\d{2}$/.test(String(date || ''))) return false;
+  if (pricingSelectedDays.has(date)) pricingSelectedDays.delete(date); else pricingSelectedDays.add(date);
+  renderPricingTab();
+  return true;
+}
+
+function clearPricingDaySelection() {
+  pricingSelectedDays.clear();
+  renderPricingTab();
+  return true;
+}
+
+async function cloudSaveDailyPrices(rows) {
+  const tenantId = getActiveTenantId();
+  requireCloudForWrite('Günlük fiyat', tenantId);
+  const { data, error } = await supabaseClient.from('property_daily_prices')
+    .upsert(rows.map(row => ({ ...row, tenant_id: tenantId })), { onConflict: 'property_id,price_date' }).select();
+  if (error) throw error;
+  return data || [];
+}
+
+async function cloudDeleteDailyPrices(propertyId, dates) {
+  const tenantId = getActiveTenantId();
+  requireCloudForWrite('Günlük fiyat', tenantId);
+  const { error } = await supabaseClient.from('property_daily_prices').delete()
+    .eq('tenant_id', tenantId).eq('property_id', propertyId).in('price_date', dates);
+  if (error) throw error;
+}
+
+// mode: APPROVE (her gune kendi onerisi) | MANUAL (girilen tek fiyat) | REMOVE (oneriye don)
+async function applyPricingDayPrices(mode) {
+  if (!canManageTenantRole(activeTenant?.role)) return false;
+  if (!appData.phase101SchemaReady) { alert(PHASE101_SEMA_YOK); return false; }
+  const entry = pricingActiveProperties().find(item => item.property.id === pricingSelectedPropertyId);
+  const dates = [...pricingSelectedDays].sort();
+  if (!entry || !dates.length) return false;
+  try {
+    if (mode === 'REMOVE') {
+      await cloudDeleteDailyPrices(entry.property.id, dates);
+      appData.propertyDailyPrices = (appData.propertyDailyPrices || []).filter(row => !(row.property_id === entry.property.id && dates.includes(String(row.price_date).slice(0, 10))));
+    } else {
+      const suggestions = new Map(computePricingCalendar(entry).suggestions.days.map(day => [day.date, day]));
+      const note = String(document.getElementById('pricingDayNote')?.value || '').trim().slice(0, 500) || null;
+      let manual = null;
+      if (mode === 'MANUAL') {
+        manual = Number(document.getElementById('pricingDayManualPrice')?.value);
+        if (!Number.isFinite(manual) || manual <= 0) { alert('Elle fiyat sıfırdan büyük bir tutar olmalıdır.'); return false; }
+        const floor = Number(entry.property.floor);
+        if (floor > 0 && manual < floor && !confirm(`₺${manual.toLocaleString('tr-TR')} taban fiyatın (₺${floor.toLocaleString('tr-TR')}) altında. Yine de kaydedilsin mi?`)) return false;
+      }
+      const rows = dates.map(date => {
+        const suggested = suggestions.get(date)?.price ?? null;
+        if (mode === 'APPROVE' && !(suggested > 0)) return null;
+        return { property_id: entry.property.id, price_date: date, price: mode === 'APPROVE' ? suggested : manual, source: mode === 'APPROVE' ? 'APPROVED' : 'MANUAL', suggested_price: suggested > 0 ? suggested : null, note };
+      }).filter(Boolean);
+      if (!rows.length) { alert('Seçili günlerde onaylanacak öneri yok (baz fiyat girilmemiş ya da gün dolu/kapalı).'); return false; }
+      const saved = await cloudSaveDailyPrices(rows);
+      const keys = new Set(saved.map(row => `${row.property_id}|${String(row.price_date).slice(0, 10)}`));
+      appData.propertyDailyPrices = [...(appData.propertyDailyPrices || []).filter(row => !keys.has(`${row.property_id}|${String(row.price_date).slice(0, 10)}`)), ...saved];
+    }
+  } catch (error) {
+    alert((isMissingSchemaError(error) ? PHASE101_SEMA_YOK : 'Günlük fiyat kaydedilemedi: ' + (error.message || 'Bilinmeyen hata')));
+    return false;
+  }
+  pricingSelectedDays.clear();
+  renderPricingTab();
+  if (window.showToast) window.showToast(mode === 'REMOVE' ? 'Kayıt kaldırıldı; günler yeniden öneriyi gösteriyor.' : `${dates.length} günün fiyatı kaydedildi.`, 'success');
+  return true;
+}
+
+function pricingDayEditorHtml(canManage) {
+  if (!canManage) return '';
+  if (!appData.phase101SchemaReady) return '<div class="pricing-day-editor is-muted">Günlük fiyatı onaylamak için phase101 göçü bekleniyor; takvim yalnız öneriyi gösterir.</div>';
+  const dates = [...pricingSelectedDays].sort();
+  if (!dates.length) return '<div class="pricing-day-editor is-muted">Fiyatı onaylamak ya da değiştirmek için açık günlere tıklayın; birden çok gün seçebilirsiniz. Kaydedilen fiyat referanstır, OTA\'ya gönderilmez.</div>';
+  const list = dates.slice(0, 8).map(date => formatTrDate(date)).join(', ') + (dates.length > 8 ? ` +${dates.length - 8}` : '');
+  return `<div class="pricing-day-editor"><strong>${dates.length} gün seçili</strong><span>${escapeHtml(list)}</span><div class="pricing-day-editor-actions"><button type="button" class="btn btn-primary btn-sm" data-onclick="applyPricingDayPrices('APPROVE')">Öneriyi onayla</button><input id="pricingDayManualPrice" type="number" min="1" step="1" inputmode="numeric" placeholder="Elle fiyat (₺)"><button type="button" class="btn btn-secondary btn-sm" data-onclick="applyPricingDayPrices('MANUAL')">Elle fiyatı uygula</button><input id="pricingDayNote" type="text" maxlength="500" placeholder="Not (isteğe bağlı)"><button type="button" class="btn btn-secondary btn-sm" data-onclick="applyPricingDayPrices('REMOVE')">Kaydı kaldır</button><button type="button" class="btn btn-secondary btn-sm" data-onclick="clearPricingDaySelection()">Seçimi temizle</button></div></div>`;
+}
+
+// Rezervasyon formu: secilen geceler icin onayli fiyat (yoksa oneri) referansi.
+// Tutari kendiliginden doldurmaz; kullanici karsilastirir.
+function renderBookingPriceCalendarHint() {
+  if (typeof document === 'undefined') return;
+  const hint = document.getElementById('resPriceCalendarHint');
+  if (!hint) return;
+  const villaKey = document.getElementById('resVilla')?.value || '';
+  const checkIn = document.getElementById('resCheckIn')?.value || '';
+  const checkOut = document.getElementById('resCheckOut')?.value || '';
+  const property = appData?.villas?.[villaKey];
+  const nights = [];
+  for (let ms = Date.parse(checkIn + 'T00:00:00Z'); Number.isFinite(ms) && ms < Date.parse(checkOut + 'T00:00:00Z') && nights.length < 120; ms += 86400000) nights.push(new Date(ms).toISOString().slice(0, 10));
+  if (!property || !nights.length) { hint.style.display = 'none'; hint.innerText = ''; return; }
+  const saved = pricingDailyPriceMap(property.id);
+  const suggestions = new Map(computePricingCalendar({ key: villaKey, property }, getTodayStr(), null).suggestions.days.map(day => [day.date, day.price]));
+  let total = 0, approved = 0, suggested = 0, unknown = 0;
+  nights.forEach(date => {
+    const row = saved.get(date);
+    if (row) { total += Number(row.price); approved++; return; }
+    const price = suggestions.get(date);
+    if (price > 0) { total += price; suggested++; } else unknown++;
+  });
+  if (!approved && !suggested) { hint.style.display = 'none'; hint.innerText = ''; return; }
+  const parts = [approved ? `${approved} onaylı` : '', suggested ? `${suggested} öneri` : '', unknown ? `${unknown} gece fiyatsız` : ''].filter(Boolean).join(', ');
+  hint.style.display = '';
+  hint.innerText = `Fiyat takvimi: ${nights.length} gece · ${pricingMoney(total)}${unknown ? ' (eksik)' : ''} — ${parts}. Tutar kendiliğinden değişmez.`;
+}
+
 function renderPricingTab() {
   if (typeof document === 'undefined') return;
   const container = document.getElementById('pricingManagerContainer');
@@ -22301,7 +22434,10 @@ function renderPricingTab() {
   const warningText = { OCCUPANCY_TARGET_MISSING: 'Talep kuralı çalışmıyor: aşağıdaki hesaplayıcıda hedef doluluk girin.', BASE_PRICE_MISSING: 'Baz fiyat girilmemiş: öneri hesaplanamaz, fiyat tablosundan girin.', FLOOR_PRICE_MISSING: 'Taban fiyat girilmemiş: indirimler için alt sınır yok.' };
   const warnings = suggestions.warnings.map(item => warningText[item.code] || item.text);
   const warningHtml = warnings.length ? `<div class="pricing-warnings">${warnings.map(text => `<span>${escapeHtml(text)}</span>`).join('')}</div>` : '';
-  const ctx = { blocks, specialByDate: new Map(specialDays.map(day => [day.date, day])), gapSet: new Set(suggestions.gapDates || []) };
+  const ctx = { blocks, specialByDate: new Map(specialDays.map(day => [day.date, day])), gapSet: new Set(suggestions.gapDates || []),
+    saved: pricingDailyPriceMap(entry.property.id), canManage, dailyReady: !!appData.phase101SchemaReady, selected: pricingSelectedDays };
+  const editor = document.getElementById('pricingDayEditor');
+  if (editor) editor.innerHTML = pricingDayEditorHtml(canManage);
   setEl('pricingCalendarTitle', `Fiyat takvimi · ${pricingMonthLabel(monthKey)}`);
   container.innerHTML = `${warningHtml}${pricingHistoryHintHtml(result.history, entry, monthKey)}<div class="pricing-days">${monthDays.map(day => pricingDayCardHtml(day, ctx)).join('')}</div>`;
 
@@ -22682,6 +22818,10 @@ if (typeof module !== 'undefined' && module.exports) {
     savePricingSpecialEvent,
     removePricingSpecialEvent,
     togglePricingHoliday,
+    togglePricingDay,
+    clearPricingDaySelection,
+    applyPricingDayPrices,
+    renderBookingPriceCalendarHint,
     buildPropertyHistoryView,
     applyRoleNavigationVisibility,
     invalidateExecutiveSnapshotCache,
