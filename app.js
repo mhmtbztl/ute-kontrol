@@ -4466,7 +4466,7 @@ function renderPageActionBar(tabId) {
 const GLOBAL_FILTER_SCOPE = {
   finance: 'Bu sayfadaki tüm rakamlar, tablolar ve dışa aktarım bu döneme ve mülke göre hesaplanır.',
   expenses: 'Gider listesi ve şablondan işlenecek ay bu döneme ve mülke göre.',
-  pricing: 'Hedef ayı ve üstteki ADR / boş gece kartları bu döneme göre. Fiyat önerisinin mülkü aşağıdaki seçiciden.',
+  pricing: 'Yalnız üstteki ADR kartı bu döneme göre. Fiyat takvimi, boş gece ve hedef hesaplayıcı bugünden 3 aylık takvimi kullanır; ayı takvimin sekmesinden seçin.',
   operations: 'Geçmiş temizlik listesi bu döneme ve mülke göre. Bugünün işleri filtreden bağımsız.',
   housekeeping: 'Temizlik görevleri ve borç özeti bu döneme ve mülke göre.',
   marketing: 'Kampanyalar ve kanal dağılımı bu döneme ve mülke göre.'
@@ -4850,51 +4850,55 @@ function renderOperationsKpiStrip() {
 
 function renderPricingKpiStrip() {
   if (typeof document === 'undefined' || !appData) return;
-  const bookings = (appData.bookings || []).filter(b => b.status !== 'CANCELLED' && isBookingInFilter(b));
   // ADR tek tanimdan: net oda geliri / satilan gece (K-04, L-37). Burada
   // eskiden brut / gece hesaplaniyordu; temizlik ucreti ve indirim ADR'yi
   // ayni ay icin Finans ekranindan farkli gosteriyordu.
   const defter = computeFilterLedger();
   setEl('pricingAdrVal', defter.adr === null ? '—' : `₺${Math.round(defter.adr).toLocaleString('tr-TR')}`);
 
-  let gapSayisi = 0;
-  try {
-    if (typeof GapNightService !== 'undefined' && GapNightService.detectGapNights) {
-      const g = GapNightService.detectGapNights({ bookings: bookings.filter(b => !isBulkSummaryBooking(b)), properties: Object.values(appData.villas || {}) });
-      gapSayisi = Array.isArray(g) ? g.length : (g && g.gapNights ? g.gapNights.length : 0);
-    }
-  } catch (e) { gapSayisi = 0; }
-  const fiyatVerisiVar = Object.keys(appData.villas || {}).length > 0 && bookings.length > 0;
-  setEl('pricingGapCountVal', fiyatVerisiVar ? `${gapSayisi} Gece` : '—');
+  // Bos gece fiyat takviminin kendi hesabindan (L-252). Eskiden
+  // GapNightService imzasina aykiri cagriliyor ve her zaman 0 yaziyordu.
+  const today = getTodayStr();
+  const entries = pricingActiveProperties();
+  const futureBookings = (appData.bookings || []).some(b => b.status !== 'CANCELLED' && String(b.checkOut || '') > today);
+  if (!entries.length || !futureBookings) {
+    setEl('pricingGapCountVal', '—');
+    setEl('pricingGapCountMeta', entries.length ? 'Gelecek rezervasyon yok; boşluk ölçülemez' : 'Mülk kaydı yok');
+  } else {
+    const gaps = entries.map(entry => ({ entry, dates: computePricingCalendar(entry, today).suggestions.gapDates || [] })).filter(item => item.dates.length);
+    const total = gaps.reduce((sum, item) => sum + item.dates.length, 0);
+    setEl('pricingGapCountVal', `${total} Gece`);
+    setEl('pricingGapCountMeta', total
+      ? `${gaps.map(item => `${item.entry.property.name || item.entry.key} (${item.dates.length})`).join(', ')} · önümüzdeki 3 ay`
+      : 'Önümüzdeki 3 ayda rezervasyonlar arasında kısa boşluk yok');
+  }
 
-  // Yillik hedef, guardrail ve uzatma donusumu ancak kayit varsa gosterilir.
-  // Ilk musteriye ait butce ve oranlar tum hesaplara sabit yazilmiyordu.
-  const hedefler = Array.isArray(appData.targets) ? appData.targets : Object.values(appData.targets || {});
-  const yillik = hedefler.find(t => {
-    const tur = String(t.type || t.metric || t.target_type || '').toUpperCase();
-    return tur.includes('REVENUE') && (tur.includes('YEAR') || t.year);
-  });
-  const hedefTutar = Number(yillik && (yillik.amount ?? yillik.target ?? yillik.value));
-  setEl('pricingAnnualTargetVal', hedefTutar > 0 ? `₺${Math.round(hedefTutar).toLocaleString('tr-TR')}` : '—');
-  setEl('pricingAnnualTargetMeta', hedefTutar > 0
-    ? `${yillik.year || 'Seçili yıl'} hedef kaydı`
-    : 'Yıllık hedef kaydı yok; tutar hesaplanamadı');
+  // Yillik hedef = secili yilin aylik portfoy hedeflerinin toplami (L-253).
+  // Hedef aylik girilir; kart eskiden "yillik" turlu bir kayit ariyordu ve
+  // boyle bir kayit hic olmadigi icin her zaman "—" yaziyordu.
+  const year = Number((pricingSelectedMonth || today).slice(0, 4));
+  const hedefler = (Array.isArray(appData.targets) ? appData.targets : Object.values(appData.targets || {}))
+    .filter(t => !(t.property_id || t.propertyId) && Number(t.year) === year);
+  const ayHedefi = t => hedefDegeri(t.revenue_target, t.revenue);
+  const hedefliAylar = hedefler.filter(t => ayHedefi(t) !== null);
+  const hedefTutar = hedefliAylar.reduce((sum, t) => sum + ayHedefi(t), 0);
+  setEl('pricingAnnualTargetVal', hedefliAylar.length ? `₺${Math.round(hedefTutar).toLocaleString('tr-TR')}` : '—');
+  if (!hedefliAylar.length) {
+    setEl('pricingAnnualTargetMeta', `${year} için aylık hedef yok; Hedefleri Yönet'ten her ay girilir, toplamı burada görünür`);
+  } else {
+    const kayitli = canReadLedgerRole()
+      ? Array.from({ length: 12 }, (_, i) => computeMonthLedger(`${year}-${String(i + 1).padStart(2, '0')}`, 'ALL')?.netRoomRevenue || 0).reduce((a, b) => a + b, 0)
+      : null;
+    setEl('pricingAnnualTargetMeta', `${year}: ${hedefliAylar.length}/12 ayda hedef${kayitli === null ? '' : ` · kayıtlı ciro ₺${Math.round(kayitli).toLocaleString('tr-TR')}${hedefTutar > 0 ? ` (%${Math.round(kayitli / hedefTutar * 100)})` : ''}`}`);
+  }
 
-  const profiller = Array.isArray(appData.pricingProfiles) ? appData.pricingProfiles : [];
-  const korumali = profiller.filter(p => Number(p.min_price ?? p.minPrice) > 0 && Number(p.max_price ?? p.maxPrice) > 0);
-  setEl('pricingGuardrailVal', profiller.length ? `${korumali.length} / ${profiller.length}` : '—');
-  setEl('pricingGuardrailMeta', profiller.length
-    ? 'Alt ve üst fiyat sınırı kayıtlı profil'
-    : 'Fiyat profili kaydı yok; koruma durumu hesaplanamadı');
-
-  const teklifler = Array.isArray(appData.extensionOffers) ? appData.extensionOffers : [];
-  const sonuclanan = teklifler.filter(t => ['ACCEPTED', 'REJECTED', 'DECLINED'].includes(String(t.status || '').toUpperCase()));
-  const kabul = sonuclanan.filter(t => String(t.status || '').toUpperCase() === 'ACCEPTED').length;
-  setEl('pricingExtensionConversionVal', sonuclanan.length
-    ? `%${Math.round((kabul / sonuclanan.length) * 100)}` : '—');
-  setEl('pricingExtensionConversionMeta', sonuclanan.length
-    ? `${kabul} kabul / ${sonuclanan.length} sonuçlanan teklif`
-    : 'Sonuçlanmış uzatma teklifi yok; oran hesaplanamadı');
+  // Koruma limitleri karti hic yuklenmeyen eski fiyat profillerine bakiyordu
+  // (L-254). Gercek alt sinir mulkun taban fiyatidir.
+  const eksik = entries.filter(({ property }) => !(Number(property.basePrice) > 0) || !(Number(property.floor) > 0));
+  setEl('pricingLadderReadyVal', entries.length ? `${entries.length - eksik.length} / ${entries.length}` : '—');
+  setEl('pricingLadderReadyMeta', !entries.length ? 'Mülk kaydı yok'
+    : eksik.length ? `Baz/taban eksik: ${eksik.map(({ key, property }) => property.name || key).join(', ')}`
+      : 'Tüm mülklerde baz ve taban fiyat girili');
 }
 
 // -------------------------------------------------------------
@@ -12211,9 +12215,11 @@ async function saveMaint(e) {
   const priority = document.getElementById('maintPriority').value;
   const title = document.getElementById('maintTitle').value;
   const assignee = document.getElementById('maintAssignee').value.trim();
-  const blocksAvailability = document.getElementById('maintBlocksAvailability').checked;
   const downtimeStart = document.getElementById('maintDowntimeStart').value || null;
   const downtimeEnd = document.getElementById('maintDowntimeEnd').value || null;
+  // Kapali tarih girmek takvimi kapatmak demektir (L-246): kutu isaretsizken
+  // girilen 22-24.10 sessizce null yaziliyor, ariza bugunu kapatiyordu.
+  const blocksAvailability = document.getElementById('maintBlocksAvailability').checked || !!(downtimeStart || downtimeEnd);
   const cost = Number(document.getElementById('maintCost').value) || 0;
   const status = document.getElementById('maintStatus').value;
 
@@ -20079,13 +20085,13 @@ function propertyPricingLadderFormHtml(villaKey, property) {
   return `<div class="property-ladder-form"><h4>Fiyat basamaklarını düzenle</h4><div class="property-profile-grid">${PROPERTY_LADDER_FIELDS.map(field).join('')}</div><p class="sub-text">Boş bırakılan basamak "girilmedi" olarak kalır; tahmin edilmez.</p><button type="button" class="btn btn-primary btn-sm" data-onclick="savePropertyPricingLadder(decodeURIComponent('${encodeActionArg(villaKey)}'))">Basamakları kaydet</button></div>`;
 }
 
-async function savePropertyPricingLadder(villaKey) {
+async function savePropertyPricingLadder(villaKey, prefix = 'ladder') {
   if (!canManageTenantRole(activeTenant?.role)) return false;
   const property = appData?.villas?.[villaKey];
   if (!property) return false;
   const values = {};
   for (const [key, label] of PROPERTY_LADDER_FIELDS) {
-    const raw = String(document.getElementById(`ladder_${key}`)?.value ?? '').trim();
+    const raw = String(document.getElementById(`${prefix}_${key}`)?.value ?? '').trim();
     if (raw === '') { values[key] = null; continue; }
     const number = Number(raw);
     if (!Number.isFinite(number) || number < 0) {
@@ -21208,7 +21214,8 @@ function renderOperationsTab() {
       const options = technicians.map(person => `<option value="${escapeHtml(person.id)}"${person.id === assignment?.person_id ? ' selected' : ''}>${escapeHtml(person.full_name)}${person.specialty ? ` · ${escapeHtml(person.specialty)}` : ''}</option>`).join('');
       const impactClass = ticket.booking_impact ? 'badge-red' : '';
       const statusLabel = ticket.booking_impact ? 'Satışa kapatır' : getMaintenanceStatusPresentation(ticket.status).label;
-      return `<article class="ops-row" data-maintenance-ticket-id="${escapeHtml(ticket.id)}"><div class="ops-row-main"><strong>${escapeHtml(ticket.title || '—')}</strong><span>${escapeHtml(ticket.description || 'Açıklama yok')}</span>${assigned ? `<span>Usta: ${escapeHtml(assigned.full_name)}${assigned.phone ? ` · <a href="tel:${escapeHtml(assigned.phone)}">Ara</a>` : ''}</span>` : ''}</div><span class="badge ${impactClass}">${escapeHtml(statusLabel)}</span><div class="ops-row-actions"><select id="opsTechnician-${escapeHtml(ticket.id)}" aria-label="Usta seç"><option value="">Usta seç…</option>${options}</select><button class="btn btn-secondary btn-sm" data-onclick="assignMaintenanceFromSelect(decodeURIComponent('${encodeActionArg(ticket.id)}'))">Usta ata</button><button class="btn btn-secondary btn-sm" data-onclick="editMaint(decodeURIComponent('${encodeActionArg(ticket.id)}'))">Durumu güncelle</button><button class="btn btn-primary btn-sm" data-onclick="resolveMaintenanceFromOperations(decodeURIComponent('${encodeActionArg(ticket.id)}'))">Çözüldü</button></div></article>`;
+      const closure = maintenanceClosureText(ticket, getTodayStr());
+      return `<article class="ops-row" data-maintenance-ticket-id="${escapeHtml(ticket.id)}"><div class="ops-row-main"><strong>${escapeHtml(ticket.title || '—')}</strong><span>${escapeHtml(ticket.description || 'Açıklama yok')}</span>${closure ? `<span class="ops-closure">${escapeHtml(closure)}</span>` : ''}${assigned ? `<span>Usta: ${escapeHtml(assigned.full_name)}${assigned.phone ? ` · <a href="tel:${escapeHtml(assigned.phone)}">Ara</a>` : ''}</span>` : ''}</div><span class="badge ${impactClass}">${escapeHtml(statusLabel)}</span><div class="ops-row-actions"><select id="opsTechnician-${escapeHtml(ticket.id)}" aria-label="Usta seç"><option value="">Usta seç…</option>${options}</select><button class="btn btn-secondary btn-sm" data-onclick="assignMaintenanceFromSelect(decodeURIComponent('${encodeActionArg(ticket.id)}'))">Usta ata</button><button class="btn btn-secondary btn-sm" data-onclick="editMaint(decodeURIComponent('${encodeActionArg(ticket.id)}'))">Durumu güncelle</button><button class="btn btn-primary btn-sm" data-onclick="resolveMaintenanceFromOperations(decodeURIComponent('${encodeActionArg(ticket.id)}'))">Çözüldü</button></div></article>`;
     }).join('') : '<div class="empty-state">Açık arıza veya bakım kaydı yok.</div>';
     if (open.length && !technicians.length) container.innerHTML = fieldTeamHintHtml('TECHNICIAN') + container.innerHTML;
   } else {
@@ -21696,7 +21703,9 @@ function buildPricingWorkspace(input = {}) {
     property: input.property || {}, monthKey: input.monthKey,
     sellableDates: input.historySellableDates || [], bookings: input.bookings || []
   });
-  let suggestions = priceEngine.suggest({
+  // Fiyat ekrani 3 aylik takvimi bir kez hesaplar ve secili ayin gunlerini
+  // verir (L-248); hazir hesap yoksa motor burada calisir.
+  let suggestions = input.suggestions || priceEngine.suggest({
     property: input.property || {}, rules: input.rules || {}, bookings: input.bookings || [], blocks: input.blocks || [],
     specialDays: input.specialDays || [], occupancyTarget: input.occupancyTarget, today: input.today, days: input.days || 30
   });
@@ -21739,21 +21748,222 @@ function resolvePricingTargetPeriod(filter = {}, today = getTodayStr()) {
   return { monthKey, start, end, remainingStart, remainingDays };
 }
 
+// Fiyat takvimi arizayi Operasyon/hazirlik ile ayni tanimdan kapatir
+// (L-246): tarih araligi varsa yalniz o aralik, araligi olmayan kritik ariza
+// yalniz bugun. Eskiden fiyat yalniz "Takvimi kapatir" isaretli kaydi,
+// hazirlik ise tarihe bakmadan her P1'i kapatiyordu.
+function pricingMaintenanceBlocks(property, today = getTodayStr()) {
+  const api = getPropertySalesReadinessApi();
+  if (!api || !property) return [];
+  const cloudTickets = appData?.maintenanceTickets;
+  const tickets = Array.isArray(cloudTickets) && cloudTickets.length ? cloudTickets : (appData?.maintenance || []);
+  return tickets
+    .filter(ticket => String(ticket?.property_id || ticket?.propertyId || '') === String(property.id) && api.isOpenTicket(ticket))
+    .map(ticket => {
+      const range = api.ticketDowntimeRange(ticket);
+      if (range) return { propertyId: property.id, start: range.start, end: range.end, title: ticket.title || 'Bakım' };
+      return api.isBlockingTicket(ticket) ? { propertyId: property.id, start: today, end: today, title: ticket.title || 'Kritik arıza' } : null;
+    })
+    .filter(Boolean);
+}
+
+function maintenanceClosureText(ticket, today = getTodayStr()) {
+  const api = getPropertySalesReadinessApi();
+  if (!api || !api.isOpenTicket(ticket)) return '';
+  const range = api.ticketDowntimeRange(ticket);
+  if (range) {
+    const span = `${formatTrDate(range.start)} – ${formatTrDate(range.end)}`;
+    if (range.end < today) return `Satışa kapalı aralık geçti: ${span}`;
+    return range.start > today ? `Planlı kapatma: ${span}` : `Satışa kapalı: ${span}`;
+  }
+  return api.isBlockingTicket(ticket) ? 'Tarih aralığı yok: bugün satışa kapalı' : '';
+}
+
+// Fiyat takvimi kendi ufkunu tasir (L-248, kullanici M72): eskiden gun
+// kartlari ustteki donem filtresinin ayina ve "bugun -> ay sonu"na bagliydi;
+// gelecek ayi gormek icin filtreyi degistirmek gerekiyor, ay sonuna dogru ekran
+// bosaliyordu. Artik bugunden 3 takvim ayi tek hesapla cizilir (son dakika
+// mesafesi gercek bugunden olculur), ay sekmesi yalniz gosterimi secer.
+const PRICING_HORIZON_MONTHS = 3;
+const PRICING_RULE_LABELS = { weekend: 'Hafta sonu', specialDay: 'Özel gün', demand: 'Talep', lastMinute: 'Son dakika', gapNight: 'Boş gece' };
+
 let pricingSelectedPropertyId = '';
-let pricingTargetDraft = null;
+let pricingSelectedMonth = '';
+const pricingTargetDrafts = {};
 let pricingExpectedOccupancyDraft = null;
 let pricingFocusDraft = 'BALANCED';
 
+function pricingActiveProperties() {
+  return Object.entries(appData?.villas || {})
+    .filter(([, property]) => property && property.isActive !== false && !property.archivedAt)
+    .map(([key, property]) => ({ key, property }));
+}
+
+function pricingHorizon(today = getTodayStr()) {
+  const [year, month] = String(today).slice(0, 7).split('-').map(Number);
+  const months = Array.from({ length: PRICING_HORIZON_MONTHS }, (_, index) => new Date(Date.UTC(year, month - 1 + index, 1)).toISOString().slice(0, 7));
+  const last = months[months.length - 1];
+  const [lastYear, lastMonth] = last.split('-').map(Number);
+  const end = `${last}-${String(new Date(Date.UTC(lastYear, lastMonth, 0)).getUTCDate()).padStart(2, '0')}`;
+  const days = Math.floor((Date.parse(end + 'T00:00:00Z') - Date.parse(today + 'T00:00:00Z')) / 86400000) + 1;
+  return { start: today, end, days, months };
+}
+
+function pricingMonthLabel(monthKey) {
+  const [year, month] = String(monthKey).split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString('tr-TR', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+}
+
+function pricingPropertyBookings(entry) {
+  return (appData.bookings || []).filter(booking => booking.propertyId === entry.property.id || booking.villa === entry.key)
+    .map(booking => booking.propertyId ? booking : { ...booking, propertyId: entry.property.id });
+}
+
+// Ozel gunler: resmi/dini tatil tablosu + isletmenin kendi etkinlikleri
+// (L-249, kullanici M75). Etkinlik kendi yuzdesini tasiyabilir; tatil satiri
+// isletmece kapatilabilir. Kayit tenant_settings 'pricing_special_days'.
+function pricingSpecialSettings() {
+  const raw = appData?.tenantSettings?.pricing_special_days;
+  const value = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  const iso = date => /^\d{4}-\d{2}-\d{2}$/.test(String(date || ''));
+  const events = (Array.isArray(value.events) ? value.events : [])
+    .filter(event => event && event.id && String(event.name || '').trim() && iso(event.start) && iso(event.end) && event.end >= event.start);
+  return { events, disabledHolidays: (Array.isArray(value.disabledHolidays) ? value.disabledHolidays : []).filter(iso) };
+}
+
+function pricingSpecialDaysFor(propertyId, start, end) {
+  const settings = pricingSpecialSettings();
+  const disabled = new Set(settings.disabledHolidays);
+  const holidays = getTrSpecialDays().forRange(start, end);
+  const rows = holidays.filter(day => !disabled.has(day.date)).map(day => ({ ...day, source: 'HOLIDAY' }));
+  settings.events.filter(event => !event.propertyId || event.propertyId === propertyId).forEach(event => {
+    const from = event.start > start ? event.start : start;
+    const to = event.end < end ? event.end : end;
+    for (let ms = Date.parse(from + 'T00:00:00Z'); ms <= Date.parse(to + 'T00:00:00Z'); ms += 86400000) {
+      rows.push({ date: new Date(ms).toISOString().slice(0, 10), name: event.name, kind: 'ETKINLIK', pct: event.pct ?? null, eventId: event.id, source: 'EVENT' });
+    }
+  });
+  rows.sort((a, b) => a.date.localeCompare(b.date));
+  Object.defineProperty(rows, 'warnings', { value: holidays.warnings || [], enumerable: false });
+  return rows;
+}
+
+// Her kuralin bu mulkte gecerli degeri ve kaynagi (L-250, kullanici M74):
+// motor kayit yokken kendi varsayilanini sessizce uyguluyordu, form ise bos
+// gorunuyordu. Kaynak: bu mulk > portfoy > sistem varsayilani.
+function pricingEffectiveRules(propertyId) {
+  const engine = getSuggestedPriceEngine();
+  const portfolio = getPricingResearchService().mergeRules(appData.tenantSettings?.pricing_rules || {}, [], null);
+  const rows = (appData.propertyPricingRules || []).filter(row => row.property_id === propertyId);
+  return Object.keys(engine.DEFAULTS).map(key => {
+    const row = rows.find(item => item.rule_key === key);
+    const fromPortfolio = portfolio[key] && typeof portfolio[key] === 'object' ? portfolio[key] : null;
+    const value = { ...engine.DEFAULTS[key], ...(fromPortfolio || {}), ...(row ? { ...(row.parameters || {}), enabled: row.enabled === true, pct: Number(row.pct) } : {}) };
+    return { key, label: PRICING_RULE_LABELS[key], source: row ? 'PROPERTY' : (fromPortfolio ? 'PORTFOLIO' : 'DEFAULT'), ...value };
+  });
+}
+
+function pricingPct(value) {
+  const n = Number(value);
+  return `${n > 0 ? '+' : n < 0 ? '−' : ''}%${Math.abs(n).toLocaleString('tr-TR', { maximumFractionDigits: 1 })}`;
+}
+
+function pricingMoney(value) {
+  return value === null || value === undefined || !Number.isFinite(Number(value)) ? '—' : `₺${Math.round(Number(value)).toLocaleString('tr-TR')}`;
+}
+
+function pricingRuleDetail(rule, occupancyTarget) {
+  if (rule.key === 'weekend') return 'Cuma ve cumartesi geceleri';
+  if (rule.key === 'specialDay') return 'Tatil ve etkinlik günleri; büyük olan artış uygulanır';
+  if (rule.key === 'demand') return occupancyTarget == null ? 'Hedef doluluk girilmedi; uygulanmıyor' : `Ayın doluluğu %${Math.round(occupancyTarget * 100)} hedefini geçince`;
+  if (rule.key === 'lastMinute') return `${Number(rule.withinDays)} gün ve daha az kala`;
+  return `Rezervasyonlar arasında en çok ${Number(rule.maxGap)} gecelik boşluk`;
+}
+
+function pricingRulesTableHtml(rules, occupancyTarget) {
+  const sourceText = { PROPERTY: 'Bu mülk', PORTFOLIO: 'Portföy', DEFAULT: 'Sistem varsayılanı' };
+  return `<div class="pricing-rules-table">${rules.map(rule => `<div class="pricing-rule-row${rule.enabled ? '' : ' is-off'}"><strong>${escapeHtml(rule.label)}</strong><b>${rule.enabled ? escapeHtml(pricingPct(rule.pct)) : 'Kapalı'}</b><span>${escapeHtml(pricingRuleDetail(rule, occupancyTarget))}</span><small class="pricing-rule-source is-${escapeHtml(rule.source.toLowerCase())}">${escapeHtml(sourceText[rule.source])}</small></div>`).join('')}</div><p class="sub-text">Artışlardan (hafta sonu / özel gün) büyük olan, indirimlerden (son dakika / boş gece) derin olan uygulanır; talep artışı bunlara eklenir.</p>`;
+}
+
+function pricingLadderCardHtml(entry, canManage) {
+  const property = entry.property;
+  const base = property.basePrice ?? property.base ?? null;
+  const fields = [['base', 'Baz fiyat (₺/gece)', base], ...PROPERTY_LADDER_FIELDS.map(([key, label]) => [key, label, key === 'floor' ? (property.floor ?? property.floorPrice) : property[key]])];
+  const valueOf = raw => raw === null || raw === undefined || raw === '' || !Number.isFinite(Number(raw)) ? '' : String(Number(raw));
+  const bodyHtml = canManage
+    ? `<div class="pricing-ladder-grid">${fields.map(([key, label, raw]) => `<div class="form-group"><label for="pricingLadder_${key}">${escapeHtml(label)}</label><input id="pricingLadder_${key}" type="number" min="0" step="1" inputmode="numeric" value="${escapeHtml(valueOf(raw))}" placeholder="Girilmedi"></div>`).join('')}</div><button type="button" class="btn btn-primary btn-sm" data-onclick="savePricingPriceTable(decodeURIComponent('${encodeActionArg(entry.key)}'))">Fiyat tablosunu kaydet</button>`
+    : `<div class="pricing-ladder-grid">${fields.map(([, label, raw]) => `<div><small>${escapeHtml(label)}</small><strong>${escapeHtml(pricingMoney(valueOf(raw) === '' ? null : raw))}</strong></div>`).join('')}</div>`;
+  return `<h3>${escapeHtml(property.name || entry.key)} · fiyat tablosu</h3><p><strong>Baz fiyat</strong> normal bir gecenin fiyatıdır; öneri kuralları bunun üstüne uygular. <strong>Taban</strong> önerinin inemeyeceği en düşük fiyattır. Hedef, premium ve yoğun dönem basamakları referanstır; öneriyi değiştirmez.</p>${bodyHtml}`;
+}
+
+function pricingDayCardHtml(day, ctx) {
+  const blocks = ctx.blocks.filter(block => day.date >= block.start && day.date <= block.end);
+  const special = ctx.specialByDate.get(day.date);
+  const isGap = ctx.gapSet.has(day.date) && day.status === 'OPEN';
+  const cls = day.status === 'BOOKED' ? 'is-booked' : day.status === 'BLOCKED' ? 'is-blocked' : isGap ? 'is-gap' : special ? 'is-special' : 'is-open';
+  const weekday = new Date(day.date + 'T00:00:00Z').toLocaleDateString('tr-TR', { weekday: 'short', timeZone: 'UTC' });
+  const status = day.status === 'BOOKED' ? 'Dolu' : day.status === 'BLOCKED' ? `Kapalı · ${blocks[0]?.title || 'bakım'}` : (isGap ? 'Açık · boş gece' : 'Açık');
+  let explain = '';
+  if (day.status === 'OPEN') {
+    if (day.price == null) explain = 'Baz fiyat girilmemiş';
+    else {
+      const steps = day.reasons.map(reason => `${reason.text}${reason.code === 'DEMAND' && Number.isFinite(reason.occupancy) ? ` (ay %${Math.round(reason.occupancy * 100)})` : ''} ${pricingPct(reason.pct)}`);
+      explain = `Baz ${pricingMoney(day.basePrice)}${steps.length ? ' · ' + steps.join(' · ') : ' · kural uygulanmadı'}${day.floorApplied ? ' · tabana yükseltildi' : ''}`;
+    }
+  }
+  return `<div class="pricing-day ${cls}"><strong>${escapeHtml(formatTrDate(day.date))} <em>${escapeHtml(weekday)}</em></strong>${special ? `<span class="pricing-day-special">${escapeHtml(special.name)}</span>` : ''}<span>${escapeHtml(status)}</span><b>${day.status === 'OPEN' && day.price != null ? escapeHtml(pricingMoney(day.price)) : '—'}</b>${explain ? `<small>${escapeHtml(explain)}</small>` : ''}</div>`;
+}
+
+function pricingHistoryHintHtml(history, entry, monthKey) {
+  const previousYear = Number(monthKey.slice(0, 4)) - 1;
+  const label = pricingMonthLabel(`${previousYear}${monthKey.slice(4)}`);
+  const bookings = pricingPropertyBookings(entry).filter(booking => String(booking.status || '').toUpperCase() !== 'CANCELLED');
+  const prefix = `${previousYear}${monthKey.slice(4)}-`;
+  const sold = new Set();
+  bookings.forEach(booking => {
+    for (let ms = Date.parse((booking.checkIn || '') + 'T00:00:00Z'); Number.isFinite(ms) && ms < Date.parse((booking.checkOut || '') + 'T00:00:00Z'); ms += 86400000) {
+      const date = new Date(ms).toISOString().slice(0, 10);
+      if (date.startsWith(prefix)) sold.add(date);
+    }
+  });
+  const part = (metric, nights, name) => metric?.value == null ? `${name}: — (${nights} gece; en az 8 gerekir)` : `${name} ADR ${pricingMoney(metric.value)} (${nights} gece)`;
+  if (!history) return `<div class="pricing-history-hint"><strong>Geçen yıl ${escapeHtml(label)}</strong><span>${sold.size} satılmış gece. ADR ipucu için hafta içi ya da hafta sonu en az 8 satılmış gece gerekir.</span></div>`;
+  return `<div class="pricing-history-hint"><strong>Geçen yıl ${escapeHtml(label)}</strong><span>${escapeHtml(part(history.weekdayAdr, history.sampleNights.weekday, 'Hafta içi'))} · ${escapeHtml(part(history.weekendAdr, history.sampleNights.weekend, 'Hafta sonu'))}</span></div>`;
+}
+
+function pricingTargetHtml(result, ctx) {
+  const target = result.target;
+  if (ctx.targetValue == null) return '<div class="pricing-target-empty">Hedef ciro girin ya da Hedefleri Yönet\'ten bu ayın hedefini kaydedin; gereken fiyat–doluluk seçenekleri burada görünür.</div>';
+  const nights = target.openNightsTotal;
+  const head = `<div class="pricing-target-summary"><strong>${escapeHtml(target.reason?.text || (target.status === 'OK' ? 'Hedef hesaplandı' : 'Bu fiyatlarla hedefe ulaşılamıyor'))}</strong><span>Ay hedefi: ${escapeHtml(pricingMoney(ctx.targetValue))}</span><span>Gerçekleşen: ${escapeHtml(pricingMoney(ctx.soldRevenue))}</span><span>Kalan: ${escapeHtml(pricingMoney(target.remaining))}</span><span>Açık gece: ${nights == null ? '—' : nights}</span><span>Önerilerin ortalaması: ${escapeHtml(pricingMoney(target.weightedAvgPrice))}</span></div>`;
+  if (!target.table.length) return head;
+  const steps = [0.8, 0.9, 1, 1.1, 1.2];
+  const focusText = { BALANCED: 'Dengeli: ortadaki uygulanabilir seçenek', OCCUPANCY: 'Doluluk: en düşük fiyatlı uygulanabilir seçenek', REVENUE: 'Gelir: en yüksek fiyatlı uygulanabilir seçenek' };
+  const rows = target.table.map((row, index) => {
+    const step = steps[index] ?? 1;
+    const need = Math.ceil(row.requiredOccupancy * nights - 1e-9);
+    const share = step === 1 ? 'önerilen fiyatlar' : `önerinin %${Math.round(step * 100)}'i`;
+    return `<div class="${index === target.highlightedRow ? 'is-highlighted' : ''}"><span>Ortalama ${escapeHtml(pricingMoney(row.avgPrice))} / gece <small>(${escapeHtml(share)})</small></span><strong>${row.feasible ? `${need} / ${nights} açık gece satılmalı (%${(row.requiredOccupancy * 100).toFixed(1)})` : `Bu fiyatla mümkün değil: ${nights} açık gecenin hepsi satılsa da yetmez`}</strong></div>`;
+  }).join('');
+  return `${head}<div class="pricing-target-table">${rows}</div><p class="sub-text">İşaretli satır odak seçimine göre: ${escapeHtml(focusText[ctx.focus] || focusText.BALANCED)}.</p>`;
+}
+
 function setPricingProperty(propertyId) {
   pricingSelectedPropertyId = propertyId || '';
-  pricingTargetDraft = null;
   renderPricingTab();
+}
+
+function setPricingMonth(monthKey) {
+  if (!/^\d{4}-\d{2}$/.test(String(monthKey || ''))) return false;
+  pricingSelectedMonth = monthKey;
+  renderPricingTab();
+  return true;
 }
 
 function recalculatePricingTarget() {
   const targetValue = document.getElementById('pricingTargetInput')?.value;
   const occupancyValue = document.getElementById('pricingExpectedOccupancy')?.value;
-  pricingTargetDraft = targetValue === '' ? null : Number(targetValue);
+  pricingTargetDrafts[`${pricingSelectedPropertyId}|${pricingSelectedMonth}`] = targetValue === '' ? null : Number(targetValue);
   pricingExpectedOccupancyDraft = occupancyValue === '' ? null : Number(occupancyValue) / 100;
   pricingFocusDraft = document.getElementById('pricingFocusSelect')?.value || 'BALANCED';
   renderPricingTab();
@@ -21768,30 +21978,62 @@ function pricingRuleParameters(ruleKey, rawValue) {
   return {};
 }
 
+// Form, secilen kapsamda gecerli degeri gosterir (bos kutu "kural yok"
+// sanilip varsayilan sessizce uygulaniyordu, L-250).
 function loadPricingRuleDraft() {
   const ruleKey = document.getElementById('pricingRuleKey')?.value || 'weekend';
-  const row = (appData.propertyPricingRules || []).find(item => item.property_id === pricingSelectedPropertyId && item.rule_key === ruleKey);
+  const scope = document.getElementById('pricingRuleScope')?.value || 'PROPERTY';
+  const engine = getSuggestedPriceEngine();
+  const portfolio = getPricingResearchService().mergeRules(appData.tenantSettings?.pricing_rules || {}, [], null);
+  const fromPortfolio = portfolio[ruleKey] && typeof portfolio[ruleKey] === 'object' ? portfolio[ruleKey] : null;
+  const effective = scope === 'PORTFOLIO'
+    ? { ...engine.DEFAULTS[ruleKey], ...(fromPortfolio || {}), source: fromPortfolio ? 'PORTFOLIO' : 'DEFAULT' }
+    : pricingEffectiveRules(pricingSelectedPropertyId).find(rule => rule.key === ruleKey);
   const pct = document.getElementById('pricingRulePct');
   const enabled = document.getElementById('pricingRuleEnabled');
   const parameter = document.getElementById('pricingRuleParameter');
   const label = document.getElementById('pricingRuleParameterLabel');
-  if (pct) pct.value = row ? Number(row.pct) : '';
-  if (enabled) enabled.checked = row ? row.enabled === true : true;
+  const reset = document.getElementById('pricingRuleResetBtn');
+  if (pct) pct.value = effective && Number.isFinite(Number(effective.pct)) ? Number(effective.pct) : '';
+  if (enabled) enabled.checked = effective ? effective.enabled !== false : true;
   if (parameter) {
     parameter.disabled = !['lastMinute', 'gapNight'].includes(ruleKey);
-    parameter.value = ruleKey === 'lastMinute' ? (row?.parameters?.withinDays ?? '')
-      : ruleKey === 'gapNight' ? (row?.parameters?.maxGap ?? '') : '';
+    parameter.value = ruleKey === 'lastMinute' ? (effective?.withinDays ?? '') : ruleKey === 'gapNight' ? (effective?.maxGap ?? '') : '';
   }
   if (label) label.textContent = ruleKey === 'lastMinute' ? 'Kaç gün kala' : ruleKey === 'gapNight' ? 'En çok boş gece' : 'Ek parametre yok';
+  if (reset) {
+    const own = scope === 'PORTFOLIO' ? !!fromPortfolio : effective?.source === 'PROPERTY';
+    reset.disabled = !own;
+    reset.textContent = scope === 'PORTFOLIO' ? 'Sistem varsayılanına dön' : 'Mülk istisnasını kaldır';
+  }
 }
 
 async function savePricingRuleSettings() {
   if (!canManageTenantRole(activeTenant?.role)) return false;
+  const ruleKey = document.getElementById('pricingRuleKey')?.value || '';
+  const scope = document.getElementById('pricingRuleScope')?.value || 'PROPERTY';
+  if (scope === 'PORTFOLIO') {
+    try {
+      const pct = Number(document.getElementById('pricingRulePct')?.value);
+      if (!PRICING_RULE_LABELS[ruleKey] || !Number.isFinite(pct) || pct < -100 || pct > 1000) throw new Error('Yüzde -100 ile 1000 arasında olmalıdır.');
+      const current = getPricingResearchService().mergeRules(appData.tenantSettings?.pricing_rules || {}, [], null);
+      const next = { ...current, [ruleKey]: { enabled: document.getElementById('pricingRuleEnabled')?.checked === true, pct, ...pricingRuleParameters(ruleKey, document.getElementById('pricingRuleParameter')?.value) } };
+      await cloudSaveTenantSetting('pricing_rules', next);
+      if (!appData.tenantSettings) appData.tenantSettings = {};
+      appData.tenantSettings.pricing_rules = next;
+      renderPricingTab();
+      renderPricingKpiStrip();
+      if (window.showToast) window.showToast('Portföy fiyat kuralı kaydedildi; istisnası olmayan tüm mülklere uygulanır.', 'success');
+      return true;
+    } catch (error) {
+      alert('Portföy fiyat kuralı kaydedilemedi: ' + (error.message || 'Bilinmeyen hata'));
+      return false;
+    }
+  }
   if (!appData.phase78SchemaReady) {
     alert('Ev bazlı fiyat kuralı kaydedilemedi: phase78 ve phase80 üretim göçleri bekleniyor.');
     return false;
   }
-  const ruleKey = document.getElementById('pricingRuleKey')?.value || '';
   try {
     const saved = await getPricingResearchService().saveRule(supabaseClient, {
       tenantId: getActiveTenantId(), propertyId: pricingSelectedPropertyId, ruleKey,
@@ -21802,12 +22044,144 @@ async function savePricingRuleSettings() {
     appData.propertyPricingRules = (appData.propertyPricingRules || []).filter(item => !(item.property_id === saved.property_id && item.rule_key === saved.rule_key));
     appData.propertyPricingRules.push(saved);
     renderPricingTab();
+    renderPricingKpiStrip();
     if (window.showToast) window.showToast('Ev bazlı fiyat kuralı kaydedildi.', 'success');
     return true;
   } catch (error) {
     alert('Fiyat kuralı kaydedilemedi: ' + (error.message || 'Bilinmeyen hata'));
     return false;
   }
+}
+
+async function resetPricingRuleSetting() {
+  if (!canManageTenantRole(activeTenant?.role)) return false;
+  const ruleKey = document.getElementById('pricingRuleKey')?.value || '';
+  const scope = document.getElementById('pricingRuleScope')?.value || 'PROPERTY';
+  try {
+    if (scope === 'PORTFOLIO') {
+      const next = { ...getPricingResearchService().mergeRules(appData.tenantSettings?.pricing_rules || {}, [], null) };
+      delete next[ruleKey];
+      await cloudSaveTenantSetting('pricing_rules', next);
+      if (!appData.tenantSettings) appData.tenantSettings = {};
+      appData.tenantSettings.pricing_rules = next;
+    } else {
+      await getPricingResearchService().deleteRule(supabaseClient, { tenantId: getActiveTenantId(), propertyId: pricingSelectedPropertyId, ruleKey });
+      appData.propertyPricingRules = (appData.propertyPricingRules || []).filter(item => !(item.property_id === pricingSelectedPropertyId && item.rule_key === ruleKey));
+    }
+    renderPricingTab();
+    renderPricingKpiStrip();
+    if (window.showToast) window.showToast(scope === 'PORTFOLIO' ? 'Portföy kuralı kaldırıldı; sistem varsayılanı geçerli.' : 'Mülk istisnası kaldırıldı; portföy kuralı geçerli.', 'success');
+    return true;
+  } catch (error) {
+    alert('Kural sıfırlanamadı: ' + (error.message || 'Bilinmeyen hata'));
+    return false;
+  }
+}
+
+// Fiyatlandirmada mulk secilince baz ve basamaklar ayni yerde duzenlenir
+// (L-251, kullanici M71/M73). Basamak kaydi mulk profiliyle ayni yoldan gider.
+async function savePricingPriceTable(villaKey) {
+  if (!canManageTenantRole(activeTenant?.role)) return false;
+  const property = appData?.villas?.[villaKey];
+  if (!property) return false;
+  const rawBase = String(document.getElementById('pricingLadder_base')?.value ?? '').trim();
+  const base = Number(rawBase);
+  if (rawBase === '' || !Number.isFinite(base) || base <= 0) {
+    showToast('Baz fiyat sıfırdan büyük bir tutar olmalıdır.', 'error');
+    return false;
+  }
+  const rawFloor = String(document.getElementById('pricingLadder_floor')?.value ?? '').trim();
+  if (rawFloor !== '' && Number(rawFloor) > base) {
+    showToast('Taban fiyat baz fiyattan yüksek olamaz; öneri hep tabana yükselirdi.', 'error');
+    return false;
+  }
+  if (Number(property.basePrice) !== base) {
+    const ladder = { floor: property.floor, floorPrice: property.floorPrice, target: property.target, premium: property.premium, peak: property.peak, heatCost: property.heatCost };
+    try {
+      await updateProperty(villaKey, { basePrice: base });
+    } catch (error) {
+      showToast('Baz fiyat kaydedilemedi: ' + kullaniciMesaji(error?.message || ''), 'error');
+      return false;
+    }
+    // updateProperty mulku veritabani satirindan yeniden kurar; basamaklar
+    // ayri tabloda durdugu icin geri tasinir.
+    const updated = appData.villas[villaKey];
+    if (updated) Object.keys(ladder).forEach(key => { if (ladder[key] !== undefined && updated[key] === undefined) updated[key] = ladder[key]; });
+  }
+  return savePropertyPricingLadder(villaKey, 'pricingLadder');
+}
+
+function pricingSpecialEventKey() {
+  return `evt_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+}
+
+async function savePricingSpecialSettings(next, message) {
+  await cloudSaveTenantSetting('pricing_special_days', next);
+  if (!appData.tenantSettings) appData.tenantSettings = {};
+  appData.tenantSettings.pricing_special_days = next;
+  renderPricingTab();
+  if (message && window.showToast) window.showToast(message, 'success');
+}
+
+async function savePricingSpecialEvent() {
+  if (!canManageTenantRole(activeTenant?.role)) return false;
+  const name = String(document.getElementById('pricingEventName')?.value || '').trim();
+  const start = document.getElementById('pricingEventStart')?.value || '';
+  const end = document.getElementById('pricingEventEnd')?.value || start;
+  const rawPct = String(document.getElementById('pricingEventPct')?.value ?? '').trim();
+  const scope = document.getElementById('pricingEventScope')?.value || 'PROPERTY';
+  const pct = rawPct === '' ? null : Number(rawPct);
+  if (!name) { alert('Etkinlik adı girin.'); return false; }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end) || end < start) { alert('Geçerli bir başlangıç ve bitiş tarihi girin.'); return false; }
+  if (pct !== null && (!Number.isFinite(pct) || pct < -100 || pct > 1000)) { alert('Yüzde -100 ile 1000 arasında olmalıdır.'); return false; }
+  const settings = pricingSpecialSettings();
+  const event = { id: pricingSpecialEventKey(), name: name.slice(0, 80), start, end, pct, propertyId: scope === 'PORTFOLIO' ? null : (pricingSelectedPropertyId || null) };
+  try {
+    await savePricingSpecialSettings({ ...settings, events: [...settings.events, event] }, `"${event.name}" eklendi; fiyat takvimine işlendi.`);
+    ['pricingEventName', 'pricingEventStart', 'pricingEventEnd', 'pricingEventPct'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    return true;
+  } catch (error) {
+    alert('Etkinlik kaydedilemedi: ' + (error.message || 'Bilinmeyen hata'));
+    return false;
+  }
+}
+
+async function removePricingSpecialEvent(eventId) {
+  if (!canManageTenantRole(activeTenant?.role)) return false;
+  const settings = pricingSpecialSettings();
+  try {
+    await savePricingSpecialSettings({ ...settings, events: settings.events.filter(event => event.id !== eventId) }, 'Etkinlik silindi.');
+    return true;
+  } catch (error) {
+    alert('Etkinlik silinemedi: ' + (error.message || 'Bilinmeyen hata'));
+    return false;
+  }
+}
+
+async function togglePricingHoliday(date) {
+  if (!canManageTenantRole(activeTenant?.role) || !/^\d{4}-\d{2}-\d{2}$/.test(String(date || ''))) return false;
+  const settings = pricingSpecialSettings();
+  const disabled = settings.disabledHolidays.includes(date);
+  try {
+    await savePricingSpecialSettings({ ...settings, disabledHolidays: disabled ? settings.disabledHolidays.filter(item => item !== date) : [...settings.disabledHolidays, date] },
+      disabled ? 'Tatil yeniden özel gün sayılıyor.' : 'Bu tatil bu işletmede özel gün sayılmayacak.');
+    return true;
+  } catch (error) {
+    alert('Tatil ayarı kaydedilemedi: ' + (error.message || 'Bilinmeyen hata'));
+    return false;
+  }
+}
+
+function pricingSpecialListHtml(entry, horizon, canManage) {
+  const settings = pricingSpecialSettings();
+  const disabled = new Set(settings.disabledHolidays);
+  const holidays = getTrSpecialDays().forRange(horizon.start, horizon.end);
+  const holidayRows = holidays.map(day => `<div class="pricing-special-row${disabled.has(day.date) ? ' is-off' : ''}"><strong>${escapeHtml(formatTrDate(day.date))}</strong><span>${escapeHtml(day.name)}</span><small>${disabled.has(day.date) ? 'Özel gün sayılmıyor' : 'Resmî / dinî tatil · özel gün kuralı'}</small>${canManage ? `<button type="button" class="btn btn-secondary btn-sm" data-onclick="togglePricingHoliday(decodeURIComponent('${encodeActionArg(day.date)}'))">${disabled.has(day.date) ? 'Özel gün say' : 'Sayma'}</button>` : ''}</div>`);
+  const events = settings.events.filter(event => event.end >= horizon.start && (!event.propertyId || event.propertyId === entry.property.id));
+  const eventRows = events.map(event => `<div class="pricing-special-row is-event"><strong>${escapeHtml(formatTrDate(event.start))}${event.end !== event.start ? ' – ' + escapeHtml(formatTrDate(event.end)) : ''}</strong><span>${escapeHtml(event.name)}</span><small>${event.pct == null ? 'Özel gün kuralı' : escapeHtml(pricingPct(event.pct))} · ${event.propertyId ? 'Yalnız bu mülk' : 'Tüm portföy'}</small>${canManage ? `<button type="button" class="btn btn-secondary btn-sm" data-onclick="removePricingSpecialEvent(decodeURIComponent('${encodeActionArg(event.id)}'))">Sil</button>` : ''}</div>`);
+  const warn = (holidays.warnings || []).length ? `<p class="sub-text">${escapeHtml(holidays.warnings.map(item => item.text).join(' · '))}</p>` : '';
+  const rows = [...eventRows, ...holidayRows];
+  return `${rows.length ? `<div class="pricing-special-list">${rows.join('')}</div>` : '<div class="empty-state">Önümüzdeki 3 ayda tatil ya da etkinlik yok.</div>'}${warn}`;
 }
 
 async function saveCompetitorResearch() {
@@ -21847,39 +22221,73 @@ function askPricingChatGpt() {
   return openChatGptQuestionModal({ kind: 'PRICE_RULE_QUESTION', scope: 'Fiyatlandırma', questions: [question], selectedQuestion: question, context: pricingChatGptContext() });
 }
 
+// Bir mulkun 3 aylik takvim hesabi; fiyat ekrani ve bos gece karti ayni
+// hesaptan okur (L-252: kart GapNightService'i imzasina aykiri cagirip hep 0 yaziyordu).
+function computePricingCalendar(entry, today = getTodayStr(), occupancyTarget = pricingExpectedOccupancyDraft) {
+  const horizon = pricingHorizon(today);
+  const blocks = pricingMaintenanceBlocks(entry.property, today);
+  const specialDays = pricingSpecialDaysFor(entry.property.id, horizon.start, horizon.end);
+  const rules = getPricingResearchService().mergeRules(appData.tenantSettings?.pricing_rules || {}, appData.propertyPricingRules || [], entry.property.id);
+  const suggestions = getSuggestedPriceEngine().suggest({
+    property: { id: entry.property.id, basePrice: entry.property.basePrice ?? entry.property.base ?? null, floorPrice: entry.property.floor ?? null },
+    bookings: pricingPropertyBookings(entry).filter(booking => !isBulkSummaryBooking(booking)), blocks, rules, specialDays,
+    occupancyTarget, today, days: horizon.days
+  });
+  return { horizon, blocks, specialDays, rules, suggestions };
+}
+
 function renderPricingTab() {
   if (typeof document === 'undefined') return;
   const container = document.getElementById('pricingManagerContainer');
   if (!container) return;
-  const properties = Object.values(appData.villas || {}).filter(property => property && property.isActive !== false && !property.archivedAt);
-  const property = properties.find(item => item.id === pricingSelectedPropertyId) || properties[0] || null;
-  if (property && !pricingSelectedPropertyId) pricingSelectedPropertyId = property.id;
+  const entries = pricingActiveProperties();
+  const entry = entries.find(item => item.property.id === pricingSelectedPropertyId) || entries[0] || null;
+  if (entry && pricingSelectedPropertyId !== entry.property.id) pricingSelectedPropertyId = entry.property.id;
   const select = document.getElementById('pricingPropertySelect');
-  if (select) select.innerHTML = properties.length ? properties.map(item => `<option value="${escapeHtml(item.id)}"${item.id === pricingSelectedPropertyId ? ' selected' : ''}>${escapeHtml(item.name || item.slug || 'Adlandırılmamış mülk')}</option>`).join('') : '<option value="">Mülk yok</option>';
-  if (!property) {
+  if (select) select.innerHTML = entries.length ? entries.map(item => `<option value="${escapeHtml(item.property.id)}"${item.property.id === pricingSelectedPropertyId ? ' selected' : ''}>${escapeHtml(item.property.name || item.property.slug || 'Adlandırılmamış mülk')}</option>`).join('') : '<option value="">Mülk yok</option>';
+  const canManage = canManageTenantRole(activeTenant?.role);
+  ['pricingManagePanels', 'pricingSpecialDayForm', 'pricingResearchPanel'].forEach(id => {
+    const element = document.getElementById(id); if (element) element.style.display = canManage ? '' : 'none';
+  });
+  if (!entry) {
     container.innerHTML = '<div class="empty-state">Fiyat önerisi hesaplanamadı: mülk kaydı yok.</div>';
-    document.getElementById('pricingTargetResult').innerHTML = '';
+    ['pricingTargetResult', 'pricingLadderCard', 'pricingRulesTable', 'pricingSpecialDaysList', 'pricingMonthTabs'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
+    setEl('pricingSelectedPropertyVal', '—');
+    setEl('pricingSelectedPropertyMeta', 'Mülk kaydı yok');
     return;
   }
   const today = getTodayStr();
-  const targetPeriod = resolvePricingTargetPeriod(currentFilter, today);
-  const pricingStart = targetPeriod.remainingStart || targetPeriod.end;
-  const specialDays = getTrSpecialDays().forRange(pricingStart, targetPeriod.end);
-  const slug = Object.entries(appData.villas || {}).find(([, value]) => value === property)?.[0] || property.slug;
-  const bookings = (appData.bookings || []).filter(booking => booking.propertyId === property.id || booking.villa === slug);
-  const targetRecord = getConfiguredRevenueTarget({ ...currentFilter, period: targetPeriod.monthKey }, appData.targets || [], slug || 'ALL');
-  const targetValue = pricingTargetDraft === null ? targetRecord : pricingTargetDraft;
-  const ledger = computeMonthLedger(targetPeriod.monthKey, slug || 'ALL');
-  const previousYear = Number(targetPeriod.monthKey.slice(0, 4)) - 1;
-  const month = Number(targetPeriod.monthKey.slice(5, 7));
+  const calendar = computePricingCalendar(entry, today);
+  const { horizon, blocks, specialDays, suggestions } = calendar;
+  if (!horizon.months.includes(pricingSelectedMonth)) pricingSelectedMonth = horizon.months[0];
+  const monthKey = pricingSelectedMonth;
+  const monthDays = suggestions.days.filter(day => day.date.startsWith(monthKey + '-'));
+
+  const tabs = document.getElementById('pricingMonthTabs');
+  if (tabs) tabs.innerHTML = horizon.months.map(key => {
+    const open = suggestions.days.filter(day => day.date.startsWith(key + '-') && day.status === 'OPEN').length;
+    return `<button type="button" role="tab" aria-selected="${key === monthKey}" class="btn btn-sm ${key === monthKey ? 'btn-primary' : 'btn-secondary'}" data-onclick="setPricingMonth(decodeURIComponent('${encodeActionArg(key)}'))">${escapeHtml(pricingMonthLabel(key))} <small>${open} açık</small></button>`;
+  }).join('');
+
+  const ladder = document.getElementById('pricingLadderCard');
+  if (ladder) ladder.innerHTML = pricingLadderCardHtml(entry, canManage);
+  const rulesTable = document.getElementById('pricingRulesTable');
+  if (rulesTable) rulesTable.innerHTML = pricingRulesTableHtml(pricingEffectiveRules(entry.property.id), pricingExpectedOccupancyDraft);
+  const specialList = document.getElementById('pricingSpecialDaysList');
+  if (specialList) specialList.innerHTML = pricingSpecialListHtml(entry, horizon, canManage);
+
+  // Hedef hesaplayici secili ayin kalan gecelerini ve ayni ay defterini kullanir.
+  const ledger = computeMonthLedger(monthKey, entry.key);
+  const draftKey = `${entry.property.id}|${monthKey}`;
+  const targetRecord = getConfiguredRevenueTarget({ ...currentFilter, period: monthKey }, appData.targets || [], entry.key);
+  const targetValue = Object.prototype.hasOwnProperty.call(pricingTargetDrafts, draftKey) ? pricingTargetDrafts[draftKey] : targetRecord;
+  const previousYear = Number(monthKey.slice(0, 4)) - 1;
+  const month = Number(monthKey.slice(5, 7));
   const previousMonthDays = new Date(Date.UTC(previousYear, month, 0)).getUTCDate();
   const historySellableDates = Array.from({ length: previousMonthDays }, (_, index) => `${previousYear}-${String(month).padStart(2, '0')}-${String(index + 1).padStart(2, '0')}`);
-  const rules = getPricingResearchService().mergeRules(appData.tenantSettings?.pricing_rules || {}, appData.propertyPricingRules || [], property.id);
   const result = buildPricingWorkspace({
-    property: { id: property.id, basePrice: property.basePrice ?? property.base ?? null, floorPrice: property.floor ?? null },
-    bookings, blocks: (appData.maintenanceTickets || []).filter(ticket => ticket.property_id === property.id && ticket.blocks_availability).map(ticket => ({ propertyId: property.id, start: ticket.downtime_start, end: ticket.downtime_end })),
-    rules, specialDays, monthKey: targetPeriod.monthKey, historySellableDates,
-    occupancyTarget: null, today: pricingStart, days: targetPeriod.remainingDays,
+    property: { id: entry.property.id }, bookings: pricingPropertyBookings(entry), monthKey, historySellableDates,
+    suggestions: { ...suggestions, days: monthDays }, specialDays,
     target: targetValue, soldRevenue: ledger?.netRoomRevenue ?? null,
     expectedOccupancy: pricingExpectedOccupancyDraft, focus: pricingFocusDraft
   });
@@ -21889,24 +22297,32 @@ function renderPricingTab() {
   if (occupancyInput) occupancyInput.value = pricingExpectedOccupancyDraft == null ? '' : Math.round(pricingExpectedOccupancyDraft * 100);
   const focusInput = document.getElementById('pricingFocusSelect');
   if (focusInput) focusInput.value = pricingFocusDraft;
-  const warningHtml = result.suggestions.warnings.length ? `<div class="pricing-warnings">${result.suggestions.warnings.map(item => `<span>${escapeHtml(item.text)}</span>`).join('')}</div>` : '';
-  const historyHtml = result.history
-    ? `<div class="pricing-history-hint"><strong>Geçen yıl ipucu</strong><span>Hafta içi ADR: ${result.history.weekdayAdr?.value == null ? '— (en az 8 gece)' : `₺${Math.round(result.history.weekdayAdr.value).toLocaleString('tr-TR')}`} · Hafta sonu ADR: ${result.history.weekendAdr?.value == null ? '— (en az 8 gece)' : `₺${Math.round(result.history.weekendAdr.value).toLocaleString('tr-TR')}`}</span></div>`
-    : '<div class="pricing-history-hint"><strong>Geçmiş ipucu yok</strong><span>Geçen yılın aynı ayında yeterli satılmış gece bulunamadı.</span></div>';
-  container.innerHTML = `${warningHtml}${historyHtml}<div class="pricing-days">${result.suggestions.days.map(day => `<div class="pricing-day"><strong>${escapeHtml(formatTrDate(day.date))}</strong><span>${escapeHtml(day.status === 'OPEN' ? 'Açık' : day.status === 'BOOKED' ? 'Dolu' : 'Kapalı')}</span><b>${day.price == null ? '—' : `₺${Number(day.price).toLocaleString('tr-TR')}`}</b><small>${day.reasons.length ? escapeHtml(day.reasons.map(reason => `${reason.text} ${reason.pct > 0 ? '+' : ''}${reason.pct}%`).join(' · ')) : 'Kural uygulanmadı'}</small></div>`).join('')}</div>`;
+
+  const warningText = { OCCUPANCY_TARGET_MISSING: 'Talep kuralı çalışmıyor: aşağıdaki hesaplayıcıda hedef doluluk girin.', BASE_PRICE_MISSING: 'Baz fiyat girilmemiş: öneri hesaplanamaz, fiyat tablosundan girin.', FLOOR_PRICE_MISSING: 'Taban fiyat girilmemiş: indirimler için alt sınır yok.' };
+  const warnings = suggestions.warnings.map(item => warningText[item.code] || item.text);
+  const warningHtml = warnings.length ? `<div class="pricing-warnings">${warnings.map(text => `<span>${escapeHtml(text)}</span>`).join('')}</div>` : '';
+  const ctx = { blocks, specialByDate: new Map(specialDays.map(day => [day.date, day])), gapSet: new Set(suggestions.gapDates || []) };
+  setEl('pricingCalendarTitle', `Fiyat takvimi · ${pricingMonthLabel(monthKey)}`);
+  container.innerHTML = `${warningHtml}${pricingHistoryHintHtml(result.history, entry, monthKey)}<div class="pricing-days">${monthDays.map(day => pricingDayCardHtml(day, ctx)).join('')}</div>`;
+
+  setEl('pricingTargetTitle', `Hedef ciro hesaplayıcısı · ${pricingMonthLabel(monthKey)}`);
   const targetBox = document.getElementById('pricingTargetResult');
-  if (targetBox) targetBox.innerHTML = targetValue == null
-    ? '<div class="pricing-target-empty">Hedef ciro girildiğinde gereken fiyat–doluluk seçenekleri burada görünür.</div>'
-    : `<div class="pricing-target-summary"><strong>${escapeHtml(result.target.reason?.text || (result.target.status === 'OK' ? 'Hedef hesaplandı' : result.target.status))}</strong><span>Kalan hedef: ${result.target.remaining == null ? '—' : `₺${Number(result.target.remaining).toLocaleString('tr-TR')}`}</span><span>Gereken doluluk: ${result.target.requiredOccupancy == null ? '—' : `%${(result.target.requiredOccupancy * 100).toFixed(1)}`}</span></div>${result.target.table.length ? `<div class="pricing-target-table">${result.target.table.map((row, index) => `<div class="${index === result.target.highlightedRow ? 'is-highlighted' : ''}"><span>₺${Number(row.avgPrice).toLocaleString('tr-TR')}</span><strong>${row.feasible ? `%${(row.requiredOccupancy * 100).toFixed(1)} doluluk` : 'Bu fiyatla mümkün değil'}</strong></div>`).join('')}</div>` : ''}`;
+  if (targetBox) targetBox.innerHTML = pricingTargetHtml(result, { targetValue, soldRevenue: ledger?.netRoomRevenue ?? null, focus: pricingFocusDraft });
+
+  const base = entry.property.basePrice ?? entry.property.base ?? null;
+  const next30 = suggestions.days.slice(0, 30);
+  const sold = next30.filter(day => day.status === 'BOOKED').length;
+  const sellable = next30.filter(day => day.status !== 'BLOCKED').length;
+  setEl('pricingSelectedPropertyVal', base > 0 ? pricingMoney(base) : '—');
+  setEl('pricingSelectedPropertyMeta', `${entry.property.name || entry.key}: baz · taban ${pricingMoney(entry.property.floor ?? null)} · yoğun ${pricingMoney(entry.property.peak ?? null)} · 30 gün doluluk ${sellable > 0 ? '%' + Math.round(sold / sellable * 100) : '—'}`);
+
   const schemaStatus = document.getElementById('pricingPhase78Status');
   if (schemaStatus) schemaStatus.textContent = appData.phase78SchemaReady
     ? 'Ev kuralları ve rakip araştırması veritabanına bağlı.'
     : 'Göç bekleniyor: phase78 ve phase80 uygulanana kadar bu iki kayıt alanı salt okunur.';
-  const managePanels = document.getElementById('pricingManagePanels');
-  if (managePanels) managePanels.style.display = canManageTenantRole(activeTenant?.role) ? '' : 'none';
   const researchList = document.getElementById('pricingResearchList');
   if (researchList) {
-    const rows = (appData.competitorPriceResearch || []).filter(row => row.property_id === property.id);
+    const rows = (appData.competitorPriceResearch || []).filter(row => row.property_id === entry.property.id);
     researchList.innerHTML = rows.length ? rows.map(row => `<article><strong>${escapeHtml(formatTrDate(row.researched_on))} · ${escapeHtml(row.source_kind)}</strong><a href="${escapeHtml(row.source_url)}" target="_blank" rel="noopener noreferrer">Kaynağı aç</a><span>${escapeHtml((row.prices || []).map(point => `${point.type}: ₺${Number(point.amount).toLocaleString('tr-TR')}`).join(' · '))}</span><small>${escapeHtml(row.raw_note || 'Not yok')}</small></article>`).join('') : '<div class="empty-state">Bu mülk için kaynaklı rakip araştırması yok.</div>';
   }
   const researchDate = document.getElementById('pricingResearchDate');
@@ -22251,6 +22667,21 @@ if (typeof module !== 'undefined' && module.exports) {
     applyGuestProfileAccess,
     buildPricingWorkspace,
     resolvePricingTargetPeriod,
+    pricingMaintenanceBlocks,
+    maintenanceClosureText,
+    pricingHorizon,
+    pricingSpecialDaysFor,
+    pricingEffectiveRules,
+    computePricingCalendar,
+    setPricingMonth,
+    setPricingProperty,
+    recalculatePricingTarget,
+    savePricingRuleSettings,
+    resetPricingRuleSetting,
+    savePricingPriceTable,
+    savePricingSpecialEvent,
+    removePricingSpecialEvent,
+    togglePricingHoliday,
     buildPropertyHistoryView,
     applyRoleNavigationVisibility,
     invalidateExecutiveSnapshotCache,

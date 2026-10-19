@@ -208,6 +208,22 @@ edilemez. **Kapatılmış ay istisnadır**: kapanış defterin onayıdır, 0 gid
 gerçek 0'dır. Ana sayfa, Finans, kâr köprüsü, aylık KPI tablosu, radar,
 simülatör ve Raporlar aynı yardımcıyı kullanır.
 
+**Arızanın satışa kapattığı gün tek tanımdır: `isTicketBlockingOn(ticket, gün, bugün)`**
+(`core/property_sales_readiness.js`, L-246, 19.10.2026). Kapalı tarih aralığı varsa
+yalnız o aralık kapanır (öncelik ne olursa olsun); aralığı olmayan kritik arıza yalnız
+bugünü kapatır. Hazırlık durumu ve fiyat takvimi (`pricingMaintenanceBlocks`) bunu
+kullanır. Eskiden hazırlık tarihe bakmadan her P1'i kapatıyor, fiyat takvimi yalnız
+"Takvimi kapatır" işaretli kaydı görüyordu; 22–24.10 bakımı bugünü kapatıp fiyatta
+açık görünüyordu. Kapalı tarih girmek takvimi kapatmak demektir (`saveMaint`).
+
+**Fiyat takvimi (9.7, L-247…L-254):** bugünden 3 takvim ayı tek hesap
+(`computePricingCalendar`), ay sekmesi yalnız gösterimi seçer; üst dönem filtresi yalnız
+ADR kartını etkiler. Kural kaynağı: mülk istisnası > portföy (`tenant_settings.pricing_rules`)
+> sistem varsayılanı (`SuggestedPriceEngine.DEFAULTS`); ekranda kaynağıyla yazar. Talep
+kuralı gecenin **ayının** doluluğunu hedef dolulukla karşılaştırır. İşletme etkinlikleri ve
+kapatılan tatiller `tenant_settings.pricing_special_days`. Yıllık hedef = aylık portföy
+hedeflerinin toplamı. Göç gerekmedi. Ağı `g9_feedback_tests` L-246…L-254, tarayıcı kapısı 32/32b.
+
 **Toplu aktarım özeti (`isBulkSummaryBooking`, "TOPLU AKTARIM — Ocak 2026") toplam
 metriklere girer, kayıt ve gün başı metriklere girmez (L-103).** Ciro, gece,
 ADR, doluluk doğrudur; rezervasyon adedi, takvimdeki gün, boş gece tespiti
