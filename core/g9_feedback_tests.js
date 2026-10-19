@@ -23,6 +23,7 @@
 // L-193 (M23): Defterdeki "Temizlik" sutunu maliyet saniliyordu; misafirden alinan gelir oldugu yazilir.
 // L-212..L-216 (M41-M45, 9.3): mulk sahibi kaydi, profilin tazelenmesi, kanal ilani listesi, koordinat, fiyat adlari.
 // L-217 (M46): Bugun ekraninda doluluk/ADR/RevPAR kartlari, ev ev secilebilir; Finans ile ayni hesap.
+// L-226..L-231 (M51-M56, 9.4): kesirli tutar, liste donem payi ve kesintiler, takvim buyutme, kanal bazli kapora, formdan vergi profili, POS komisyonu bellegi.
 // L-184..L-190 (M14-M20): kapora, kar marji hedefi, talep tarihi, mulk net kari, reklam tablosu/metrik/gunluk butce, sablon ekrani, bosluk gecesi.
 const fs = require('fs');
 const path = require('path');
@@ -1308,6 +1309,109 @@ async function bugunPerformansDavranisi() {
     'L-225d Gelir yazmasi bulut zorunlu, yalniz yonetim, kapali donemde durur, goc yoksa soyler');
 }
 
+// L-226..L-231 (M51-M56, Gorev 9.4 Rezervasyon ve odeme, 19.10).
+async function rezervasyonOdemeDavranisi() {
+  const html = read('index.html');
+  const app = read('app.js');
+  const fin = read('core/booking_finance_ui.js');
+
+  // L-226 (M51): kesirli tutar tarayici dogrulamasina takiliyordu (5812,5 "gecersiz").
+  const adimsiz = (html.match(/<input[^>]*type="number"[^>]*>/g) || []).filter(t => !/step=/.test(t))
+    .map(t => (t.match(/id="([^"]+)"/) || [])[1]).filter(id => !['goalOccupancyNights', 'waParsedPax'].includes(id));
+  const komisyon = (html.match(/<input[^>]*id="resCommission"[^>]*>/) || [''])[0];
+  check(adimsiz.length === 0 && /step="0\.01"/.test(komisyon) && /min="0"/.test(komisyon)
+    && (app.match(/type="number" step="0\.01" min="0" class="tbl-input" id="set_/g) || []).length === 7,
+    'L-226 Tutar alanlari kurus kabul eder (step 0.01); yalniz gece/kisi sayisi tam sayi', adimsiz.join(', '));
+
+  sahteDom({});
+  const App = require('../app.js');
+  App.setAppData({ villas: {}, bookings: [], cleaningTasks: [], expenses: [], bookingChannels: [] });
+
+  // L-227 (M52): liste brutu tam tutarla yaziyordu; kesintiler gorunmuyordu.
+  const ayse = { id: 'ayse', checkIn: '2026-10-10', checkOut: '2026-10-13', gross: 40000, discount: 2500, cleanFee: 0, otaComm: 5812.5, status: 'CONFIRMED' };
+  const ayseGorev = { bookingId: 'ayse', status: 'PLANNED', amount: 2500, date: '2026-10-13' };
+  const murtaza = { id: 'murtaza', checkIn: '2026-10-30', checkOut: '2026-11-03', gross: 40000, discount: 0, cleanFee: 0, otaComm: 0, status: 'CONFIRMED' };
+  const murtazaGorev = { bookingId: 'murtaza', status: 'PLANNED', amount: 2500, date: '2026-11-03' };
+  const a = App.computeReservationRowEconomics(ayse, ayseGorev, '2026-10-01', '2026-10-31');
+  check(a.gross === 40000 && a.netRoomRevenue === 37500 && a.discount === 2500 && a.commission === 5812.5 && a.cleaningCost === 2500 && a.remaining === 29187.5,
+    'L-227a Satir: brut, indirim, komisyon, temizlik ve kalan onizlemeyle ayni (29.187,50)', JSON.stringify(a));
+  const ekim = App.computeReservationRowEconomics(murtaza, murtazaGorev, '2026-10-01', '2026-10-31');
+  const kasim = App.computeReservationRowEconomics(murtaza, murtazaGorev, '2026-11-01', '2026-11-30');
+  check(ekim.gross === 20000 && kasim.gross === 20000 && ekim.nights === 2 && ekim.totalNights === 4 && ekim.netRoomRevenue === 20000,
+    'L-227b Ay sinirini kesen rezervasyon her ayda yalniz kendi gecelerinin brutunu gosterir (20.000 + 20.000)', JSON.stringify({ ekim, kasim }));
+  check(ekim.cleaningCost === 0 && ekim.cleaning.inRange === false && kasim.cleaningCost === 2500 && ekim.remaining === 20000 && kasim.remaining === 17500,
+    'L-227c Temizlik maliyeti defterdeki gibi gorev gununun ayindan dusulur, iki kez dusulmez');
+  const iptal = App.computeReservationRowEconomics({ ...ayse, status: 'CANCELLED' }, ayseGorev, '2026-10-01', '2026-10-31');
+  check(iptal.cancelled && iptal.gross === 0 && iptal.remaining === 0 && iptal.cleaningCost === 0, 'L-227d Iptal satiri hesaba girmez');
+  const ozet = App.computeReservationListSummary({ rows: [{ booking: ayse, cleaningTask: ayseGorev }, { booking: murtaza, cleaningTask: murtazaGorev }], rangeStart: '2026-10-01', rangeEnd: '2026-10-31' });
+  check(ozet.netRoomRevenue === 57500 && ozet.gross === 60000 && ozet.deductions === 2500 + 5812.5 + 2500 && ozet.remaining === 49187.5,
+    'L-227e Liste ozeti: brut 60.000, ciro 57.500, kesintiler, kalan satirlarin toplami', JSON.stringify(ozet));
+  // Gercek render: satirda donem payi, ciro, kesintiler ve kalan yazilir.
+  const ay = App.getCurrentMonthKey();
+  App.setAppData({ villas: { V: { id: 'p1', name: 'TEST Villa' } }, expenses: [], bookingChannels: [], bookingPayments: [], bookingPaymentBalances: [],
+    bookings: [{ ...ayse, villa: 'V', guest: 'TEST Ayşe', channel: 'AIRBNB', checkIn: ay + '-10', checkOut: ay + '-13' }],
+    cleaningTasks: [{ ...ayseGorev, date: ay + '-13' }] });
+  const satirlar = [];
+  global.document.getElementById('manageBookingsTableBody').appendChild = c => { satirlar.push(c.innerHTML); return c; };
+  App.resetReservationRange();
+  const satir = satirlar.join('');
+  const pill = global.document.getElementById('rezTableSummaryPill').innerHTML;
+  check(/data-label="Ciro"/.test(satir) && /data-label="Kesintiler"/.test(satir) && /İndirim −2\.500 ₺/.test(satir) && /Komisyon −5\.812,5 ₺/.test(satir)
+    && /Temizlik −2\.500 ₺ \(planlı\)/.test(satir) && /29\.187,5 ₺/.test(satir),
+    'L-227f Liste satiri ciro, indirim, komisyon, planli temizlik ve kalani gosterir', satir.slice(0, 600));
+  check(/Ciro \(oda geliri, indirim sonrası\): <strong>37\.500 TL<\/strong>/.test(pill) && /Brüt \(bu döneme düşen\): 40\.000 TL/.test(pill) && /Kalan \(tahmini\)/.test(pill),
+    'L-227g Ozet cubugu brut, ciro (indirim sonrasi), kesinti ve kalani ayri yazar', pill);
+  check((html.match(/<th[^>]*>(BRÜT \(₺\)|CİRO \(₺\)|KESİNTİLER|KALAN \(₺\))<\/th>/g) || []).length === 4 && /colspan="9"/.test(app),
+    'L-227h Tablo basliklari ve bos durum yeni sutun sayisiyla uyumlu');
+  const panel = functionBody(app, 'function openBookingDetailsPanel(');
+  check(/computeReservationRowEconomics\(booking, cleaning/.test(panel) && /'İndirim'/.test(panel) && /Kalan \(tahmini\)/.test(panel) && !/'Net oda geliri'/.test(panel),
+    'L-227i Rezervasyon ayrintisi ayni hesapla indirim, komisyon, temizlik maliyeti ve kalani gosterir');
+
+  // L-228 (M53): takvim kucuk kaliyordu.
+  const ciz = functionBody(app, 'function renderTapeChart(');
+  check(/id="tapeZoomBtn"[^>]*data-onclick="toggleTapeChartZoom\(\)"/.test(html) && /classList\.toggle\('tape-zoom', tapeChartZoom\)/.test(ciz)
+    && /\.tape-zoom \.tape-cell \{ height: 58px; \}/.test(read('style.css')) && read('core/action_dispatch.js').includes("'toggleTapeChartZoom'"),
+    'L-228 Takvim "Büyüt" dugmesiyle yakinlasir; tercih tarayicida kalir');
+
+  // L-229 (M54): OTA'da kapora sorulmamali; kanal bazli ayar.
+  App.setAppData({ villas: {}, bookings: [], bookingChannels: [], tenantSettings: {} });
+  const varsayilan = [App.channelTakesDeposit('AIRBNB'), App.channelTakesDeposit('BOOKING'), App.channelTakesDeposit('WHATSAPP')];
+  App.setAppData({ villas: {}, bookings: [], bookingChannels: [], tenantSettings: { booking_deposit_channels: { AIRBNB: true, WHATSAPP: false } } });
+  const ayarli = [App.channelTakesDeposit('AIRBNB'), App.channelTakesDeposit('WHATSAPP'), App.channelTakesDeposit('BOOKING')];
+  check(JSON.stringify(varsayilan) === '[false,false,true]' && JSON.stringify(ayarli) === '[true,false,false]',
+    'L-229a Kapora: ayar yoksa dogrudan kanal alir, OTA almaz; isletme ayari kanal bazinda bunu degistirir', JSON.stringify({ varsayilan, ayarli }));
+  check(/const kaporaAlinir = channelTakesDeposit\(booking\.channel\)/.test(panel) && /kaporaAlinir \? '<option value="DEPOSIT">Kapora<\/option>' : ''/.test(panel),
+    'L-229b Odeme takibi kapora almayan kanalda "Kapora" secenegi sunmaz');
+  const kanalDegisti = functionBody(app, 'function handleBookingChannelChange(');
+  check(/syncBookingDepositVisibility\(\)/.test(kanalDegisti) && /saveBookingDepositChannels\(event\)/.test(fin) && /cloudSaveTenantSetting\('booking_deposit_channels'/.test(fin)
+    && /data-onchange="syncQuickBookingDepositVisibility\(\)"/.test(html),
+    'L-229c Yeni rezervasyon ve hizli formda kapora alani kanala gore; ayar Ayarlar → Kanallar → Kapora');
+
+  // L-230 (M55): vergi profili formdan cikmadan tanimlanir.
+  const vm = require('vm');
+  const ctx = { crypto: require('crypto'), escapeHtml: s => String(s), document: { getElementById: () => null }, appData: { tenantSettings: {} }, activeTenant: { role: 'owner' }, canManageTenantRole: () => true };
+  vm.runInNewContext(fin, ctx);
+  const satirIci = ctx.bookingTaxProfileFieldsHtml('resNewProfile', false);
+  const ayarlar = ctx.bookingTaxProfileFieldsHtml('profile', true);
+  check(!/required/.test(satirIci) && /id="resNewProfileRate_vat"/.test(satirIci) && /id="profileName" maxlength="100" required/.test(ayarlar) && /id="profileOther_accommodation" required/.test(ayarlar),
+    'L-230a Satir ici profil alanlari zorunlu isareti tasimaz (gizli zorunlu alan rezervasyon kaydini kilitlerdi); Ayarlar formu ayni');
+  check(/data-onclick="openBookingTaxProfileCreator\(\)"/.test(html) && /id="resTaxProfileCreator" hidden/.test(html)
+    && /readBookingTaxProfileForm\('resNewProfile'\)/.test(fin) && /readBookingTaxProfileForm\('profile'\)/.test(fin)
+    && /handleBookingTaxProfileCreatorKey/.test(fin) && /financeSet\('resTaxProfile', String\(profiles\.length - 1\)\)/.test(fin),
+    'L-230b "+ Yeni profil" formun icinde acilir, ayni dogrulamadan gecer, kaydedilen profil secilir; Enter rezervasyonu gondermez');
+  let hata = '';
+  try { ctx.readBookingTaxProfileForm('x'); } catch (e) { hata = e.message; }
+  check(/tamamlayın/.test(hata), 'L-230c Eksik profil kaydedilmez', hata);
+
+  // L-231 (M56): finans yolu POS komisyonunu yaziyor, bellek eskisini tutuyordu.
+  check(App.bookingPaymentCommissionFromFinance({ financialDetails: { result: { paymentCommission: 450 } } }) === 450
+    && App.bookingPaymentCommissionFromFinance({ financialDetails: null }) === null,
+    'L-231a Kaydedilen finans sonucundaki odeme komisyonu okunur');
+  check(/bookingPaymentCommissionFromFinance\(updatedBooking\)/.test(functionBody(app, 'async function updateBooking('))
+    && /bookingPaymentCommissionFromFinance\(createdBooking\)/.test(functionBody(app, 'async function createBooking(')),
+    'L-231b Olusturma ve guncelleme sonrasi bellek sunucunun yazdigi komisyonu alir');
+}
+
 async function main() {
 try {
   const html = read('index.html');
@@ -1351,6 +1455,7 @@ try {
   await bugunPerformansDavranisi();
   await talepEkraniDavranisi();
   await rezervasyondanMisafirDavranisi();
+  await rezervasyonOdemeDavranisi();
 } catch (error) {
   failed++;
   console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

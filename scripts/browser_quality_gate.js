@@ -626,6 +626,79 @@ async function main() {
         && incomePosts[0].amount === 2500 && /2\.500 TL/.test(gelir.other) && /\+2\.500 TL/.test(gelir.bridge) && gelir.stepVisible
         && gelir.rows === 1 && !gelir.modalOpen, 'Gelir ekleme: ' + JSON.stringify({ incomePosts, gelir }));
       passed.push('28. finans: portföy seçilir; "+ Gelir Ekle" rezervasyon formunu ya da açıklamalı diğer gelir formunu açar, kâr köprüsüne girer');
+
+      // Kullanici 19.10.2026 (Gorev 9.4): kesirli komisyon gecerli, vergi profili
+      // formdan cikmadan eklenir, OTA'da kapora sorulmaz, listede donem payi ve
+      // kesintiler, takvim buyur.
+      const settingPosts = [];
+      await page.route('**/rest/v1/tenant_settings**', async route => {
+        if (route.request().method() !== 'POST') return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+        settingPosts.push(route.request().postDataJSON());
+        return route.fulfill({ status: 201, contentType: 'application/json', body: '[]' });
+      });
+      await page.evaluate(() => { appData.tenantSettings = {}; switchTab('reservations'); openBookingModal(); });
+      await page.selectOption('#resChannel', 'AIRBNB');
+      await page.fill('#resGross', '40000');
+      await page.fill('#resDiscount', '2500');
+      await page.fill('#resCommissionRate', '15.5');
+      const komisyon = await page.evaluate(() => ({
+        value: document.getElementById('resCommission').value,
+        valid: document.getElementById('resCommission').checkValidity(),
+        depositHidden: getComputedStyle(document.getElementById('resDepositGroup')).display === 'none'
+      }));
+      assert(komisyon.value === '5812.5' && komisyon.valid && komisyon.depositHidden, 'Kesirli komisyon / OTA kaporasi: ' + JSON.stringify(komisyon));
+      await page.check('#resTaxEnabled');
+      await page.click('[data-onclick="openBookingTaxProfileCreator()"]');
+      await page.fill('#resNewProfileName', 'Bodrum 2026');
+      await page.selectOption('#resNewProfileDateBasis', 'checkIn');
+      await page.fill('#resNewProfileFrom', '2026-01-01');
+      await page.fill('#resNewProfileTo', '2026-12-31');
+      for (const [key, rate, base] of [['vat', '10', 'both'], ['accommodation', '2', 'room']]) {
+        await page.fill(`#resNewProfileRate_${key}`, rate);
+        await page.selectOption(`#resNewProfileBase_${key}`, base);
+        await page.selectOption(`#resNewProfileOther_${key}`, 'no');
+      }
+      await page.click('[data-onclick="saveBookingTaxProfileInline()"]');
+      await page.waitForFunction(() => (appData.tenantSettings.booking_tax_profiles || []).length === 1, null, { timeout: 10000 });
+      const profil = await page.evaluate(() => ({
+        selected: document.getElementById('resTaxProfile').value,
+        creatorHidden: document.getElementById('resTaxProfileCreator').hidden,
+        gross: document.getElementById('resGross').value,
+        modalOpen: document.getElementById('bookingModal').classList.contains('active')
+      }));
+      assert(settingPosts.length === 1 && settingPosts[0].key === 'booking_tax_profiles' && profil.selected === '0' && profil.creatorHidden
+        && profil.gross === '40000' && profil.modalOpen, 'Satir ici vergi profili: ' + JSON.stringify({ settingPosts, profil }));
+      await page.evaluate(() => closeBookingModal());
+      await page.evaluate(() => {
+        const r = reservationMonthRange(getTodayStr().slice(0, 7));
+        const pid = appData.villas.test.id;
+        appData.bookings = [
+          { id: 'g94-ayse', villa: 'test', propertyId: pid, guest: 'TEST Ayşe', channel: 'AIRBNB', checkIn: r.start, checkOut: addDaysToDateKey(r.start, 3), gross: 40000, discount: 2500, cleanFee: 0, otaComm: 5812.5, status: 'CONFIRMED' },
+          { id: 'g94-mehmet', villa: 'test', propertyId: pid, guest: 'TEST Mehmet', channel: 'WHATSAPP', checkIn: addDaysToDateKey(r.end, -1), checkOut: addDaysToDateKey(r.end, 3), gross: 40000, discount: 0, cleanFee: 0, otaComm: 0, status: 'CONFIRMED' }
+        ];
+        appData.cleaningTasks = [{ id: 'g94-t1', bookingId: 'g94-ayse', villa: 'test', date: addDaysToDateKey(r.start, 3), amount: 2500, status: 'PLANNED' }];
+        appData.bookingPayments = []; appData.bookingPaymentBalances = [];
+        resetReservationRange();
+      });
+      const liste = await page.evaluate(() => ({
+        rows: document.getElementById('manageBookingsTableBody').textContent.replace(/\s+/g, ' '),
+        pill: document.getElementById('rezTableSummaryPill').textContent
+      }));
+      assert(/29\.187,5 ₺/.test(liste.rows) && /Komisyon −5\.812,5 ₺/.test(liste.rows) && /Toplam 40\.000 ₺ · 2\/4 gece bu dönemde/.test(liste.rows)
+        && /20\.000 ₺/.test(liste.rows) && /57\.500 TL/.test(liste.pill), 'Liste donem payi / kesintiler: ' + JSON.stringify(liste).slice(0, 700));
+      const once = await page.evaluate(() => document.querySelector('#tapeChartContainer .tape-cell').getBoundingClientRect().height);
+      await page.click('#tapeZoomBtn');
+      const sonra = await page.evaluate(() => document.querySelector('#tapeChartContainer .tape-cell').getBoundingClientRect().height);
+      await page.click('#tapeZoomBtn');
+      assert(sonra >= 55 && sonra > once, `Takvim buyutme: ${once} -> ${sonra}`);
+      await page.evaluate(() => openBookingDetailsPanel('g94-ayse'));
+      const odeme = await page.evaluate(() => ({
+        kinds: Array.from(document.querySelectorAll('#bookingPaymentKind option')).map(o => o.value),
+        method: document.getElementById('bookingPaymentMethod').value
+      }));
+      assert(!odeme.kinds.includes('DEPOSIT') && odeme.method === 'OTA', 'OTA odeme takibi kapora sunmamali: ' + JSON.stringify(odeme));
+      await page.evaluate(() => SidePanel.close && SidePanel.close());
+      passed.push('29. rezervasyon (9.4): kesirli komisyon geçerli; vergi profili formdan eklenip seçilir; OTA\'da kapora yok; liste dönem payı ve kesintileri; takvim büyür');
     });
 
     await withPage(browser, baseUrl, 'owner', { width: 390, height: 844 }, async page => {

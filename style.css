@@ -5424,6 +5424,14 @@ body.side-panel-open { overflow: hidden; }
 .reservation-list-row { cursor: pointer; }
 .reservation-list-row:hover { background: rgba(59,130,246,0.08); }
 .reservation-markers { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+.reservation-sub { font-size: 11px; color: var(--text-muted); white-space: nowrap; line-height: 1.5; }
+/* Takvim yakinlastirma (M53): daha uzun satir, okunur ad ve gun basligi */
+.tape-zoom .tape-chart-table { min-width: 1500px !important; }
+.tape-zoom .tape-day-th { font-size: 13px; width: 46px; padding: 10px 2px; }
+.tape-zoom .tape-cell { height: 58px; }
+.tape-zoom .tape-booked { height: 46px; font-size: 12px; }
+.tape-zoom .tape-villa-th, .tape-zoom .tape-villa-td { min-width: 200px; font-size: 14px; }
+.tape-zoom.tape-week .tape-chart-table { min-width: 900px !important; }
 .reservation-marker { font-size: 9px; font-weight: 800; border-radius: 999px; padding: 2px 6px; }
 .marker-checkin { color: #93C5FD; background: rgba(59,130,246,0.16); }
 .marker-checkout { color: #FDE68A; background: rgba(245,158,11,0.16); }
@@ -5513,6 +5521,11 @@ body.side-panel-open { overflow: hidden; }
 #bookingFinanceSettings { margin-top: 24px; }
 #bookingFinanceSettings fieldset { border: 1px solid rgba(148,163,184,.22); border-radius: 10px; padding: 14px; }
 #resPostExpenses { margin-top: 16px; }
+.booking-tax-profile-pick { display: flex; gap: 8px; align-items: stretch; }
+.booking-tax-profile-pick select { flex: 1; min-width: 0; }
+.booking-tax-profile-creator { border: 1px solid rgba(59,130,246,.45); border-radius: 10px; padding: 14px; margin: 12px 0; }
+.booking-tax-profile-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+#bookingFinanceSettings .finance-toggle { margin: 8px 0; }
 .text-positive { color: #34d399; }
 @media (max-width: 600px) {
   .booking-tax-grid { grid-template-columns: 1fr; }
