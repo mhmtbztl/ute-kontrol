@@ -107,5 +107,37 @@ test('Satilan gece yoksa ADR "bilinmiyor" (null), 0 degil', () => {
   assert.strictEqual(ay('2031-07', {}).adr, null);
 });
 
+// phase97 canli suitinin (phase97_income_live_tests) Mart 2031 senaryosu.
+const MART = {
+  bookings: [{ id: 'bM', checkIn: '2031-03-10', checkOut: '2031-03-12', gross: 20000, cleanFee: 2000, discount: 1000, status: 'CONFIRMED' }],
+  expenses: [{ id: 'gM', date: '2031-03-05', type: 'OPEX', amount: 4000 }],
+  incomes: [
+    { id: 'iM1', date: '2031-03-15', type: 'OTHER_INCOME', amount: 2500 },
+    { id: 'iM2', date: '2031-03-20', type: 'CAPITAL', amount: 50000 },
+    { id: 'iM3', date: '2031-04-01', type: 'OTHER_INCOME', amount: 999 }
+  ]
+};
+
+test('phase97: diger gelir toplam gelire ve kara girer, ciroya girmez', () => {
+  const k = ay('2031-03', MART);
+  yakin(k.netRoomRevenue, 17000, 'ciro (net oda geliri) degismez');
+  yakin(k.otherIncome, 2500, 'diger gelir');
+  yakin(k.totalRevenue, 21500, 'toplam gelir = 17000 + 2000 + 2500');
+  yakin(k.netProfit, 17500, 'net kar = 21500 - 4000');
+  yakin(k.adr, 8500, 'ADR yalniz oda gelirinden');
+});
+
+test('phase97: sermaye girisi gelir degildir; kara girmez, ayri tasinir', () => {
+  const k = ay('2031-03', MART);
+  yakin(k.capitalIn, 50000, 'sermaye girisi');
+  const sermayesiz = ay('2031-03', { ...MART, incomes: MART.incomes.filter(i => i.type !== 'CAPITAL') });
+  yakin(k.netProfit, sermayesiz.netProfit, 'sermaye kari degistirmez');
+});
+
+test('phase97: gelir kaydi kendi tarihinin donemine yazilir; turu bilinmeyen sayilmaz', () => {
+  yakin(ay('2031-04', MART).otherIncome, 999, 'Nisan');
+  yakin(ay('2031-03', { incomes: [{ date: '2031-03-02', type: 'BILINMIYOR', amount: 5 }] }).totalRevenue, 0, 'bilinmeyen tur');
+});
+
 console.log(`\n${passed} geçti, ${failed} başarısız`);
 if (failed > 0) process.exit(1);

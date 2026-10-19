@@ -3870,9 +3870,8 @@ function updateStepperLabels() {
   const nextEl = document.getElementById('stepperNextLabel');
   if (nextEl) nextEl.innerText = curIdx >= 0 && curIdx < ALL_FINANCIAL_MONTHS.length - 1 ? getPeriodDisplayName(ALL_FINANCIAL_MONTHS[curIdx + 1]) : '';
 
-  const vLabel = currentFilter.villa === 'ALL' ? ('Tüm Mülkler (' + portfolioLabel() + ')') : (appData.villas[currentFilter.villa]?.name || currentFilter.villa);
-  const vEl = document.getElementById('finTopPropertyLabel');
-  if (vEl) vEl.innerText = vLabel;
+  const vEl = document.getElementById('finTopVillaFilter');
+  if (vEl) vEl.value = currentFilter.villa || 'ALL';
 }
 
 // Menude kendi kalemi olmayan sayfa, ait oldugu menu kalemini secili gosterir
@@ -4517,6 +4516,7 @@ function computeFilterLedger() {
   return getLedgerContract().computePeriodLedger({
     bookings: appData.bookings || [],
     expenses: appData.expenses || [],
+    incomes: appData.incomeEntries || [],
     cleaningTasks: appData.cleaningTasks || [],
     bookingInScope: isBookingInFilter,
     bookingShare: getBookingFilterShare,
@@ -4538,6 +4538,7 @@ function computeRangeLedger(start, end, villa) {
   return L.computePeriodLedger({
     bookings: appData.bookings || [],
     expenses: appData.expenses || [],
+    incomes: appData.incomeEntries || [],
     cleaningTasks: appData.cleaningTasks || [],
     bookingInScope: b => v === 'ALL' || b.villa === v || (!!propId && b.propertyId === propId),
     bookingShare: b => L.nightShareInRange(b, start, end),
@@ -4558,6 +4559,7 @@ function computeMonthLedger(monthKey, villa) {
   return L.computePeriodLedger({
     bookings: appData.bookings || [],
     expenses: appData.expenses || [],
+    incomes: appData.incomeEntries || [],
     cleaningTasks: appData.cleaningTasks || [],
     bookingInScope: b => v === 'ALL' || b.villa === v || (!!propId && b.propertyId === propId),
     bookingShare: b => L.nightShareInRange(b, r.start, r.end),
@@ -5413,10 +5415,17 @@ function renderFinanceModule() {
   // Kar koprusu: Konaklama cirosu (+ Temizlik geliri = Toplam gelir) → giderler.
   // Cogu isletme ayri temizlik ucreti almaz: 0 ise iki adim hic gorunmez.
   setEl('brCiro', `${Math.round(ciro).toLocaleString('tr-TR')} TL`);
+  // Diger gelir (phase97) ayni grupta ayri adimdir; ikisi de 0 ise grup gizli.
   const temizlikGeliri = ledger.cleaningRevenue;
+  const digerGelir = ledger.otherIncome;
   const temizlikAdimi = document.getElementById('brCleaningGroup');
-  if (temizlikAdimi) temizlikAdimi.style.display = temizlikGeliri > 0 ? '' : 'none';
+  if (temizlikAdimi) temizlikAdimi.style.display = (temizlikGeliri > 0 || digerGelir > 0) ? '' : 'none';
+  const temizlikKutusu = document.getElementById('brCleaningStep');
+  if (temizlikKutusu) temizlikKutusu.hidden = !(temizlikGeliri > 0);
+  const digerKutusu = document.getElementById('brOtherIncomeStep');
+  if (digerKutusu) digerKutusu.hidden = !(digerGelir > 0);
   setEl('brCleaningRevenue', temizlikGeliri > 0 ? `+${Math.round(temizlikGeliri).toLocaleString('tr-TR')} TL` : '—');
+  setEl('brOtherIncome', digerGelir > 0 ? `+${Math.round(digerGelir).toLocaleString('tr-TR')} TL` : '—');
   setEl('brTotalIncome', `${Math.round(totalRevenue).toLocaleString('tr-TR')} TL`);
   setEl('brOpex', formatDeductionTl(totalOpex));
   setEl('brOpProfit', karOlculemez ? '—' : `${Math.round(operatingProfit).toLocaleString('tr-TR')} TL`);
@@ -5439,6 +5448,9 @@ function renderFinanceModule() {
 
   // Render Expense Donut Chart & Category Table
   renderExpenseDonutAndTable(categoryTotals, totalExpense, totalRevenue, totalOpex, totalCapex);
+
+  // Gelirler karti (phase97): ayni defterden
+  renderIncomeSection(ledger);
 
   // Render Property Finance Scorecards
   renderPropertyFinanceCards(propStats, ciro);
@@ -5523,11 +5535,12 @@ function renderExpenseDonutAndTable(categoryTotals, totalExpense, totalRevenue, 
     const shareRev = totalRevenue > 0 ? (amt / totalRevenue) * 100 : 0;
     const deltaStr = formatMoMDelta(amt, prevCategoryTotals[cat.name] || 0);
 
+    const acik = expandedExpenseCategory === cat.name;
     const tr = document.createElement('tr');
     tr.className = 'clickable-row';
-    tr.onclick = () => filterExpensesByCategory(cat.name);
+    tr.onclick = () => toggleExpenseCategoryRows(cat.name);
     tr.innerHTML = `
-      <td><span class="cat-dot" style="background:${cat.color};"></span> <strong>${escapeHtml(cat.name)}</strong></td>
+      <td><span class="cat-dot" style="background:${cat.color};"></span> <strong>${escapeHtml(cat.name)}</strong> <span style="color: var(--text-muted); font-size: 11px;">${acik ? '▾' : '▸'}</span></td>
       <td><strong>${Math.round(amt).toLocaleString('tr-TR')} TL</strong></td>
       <td>%${shareExpense.toFixed(1)}</td>
       <td>%${shareRev.toFixed(1)}</td>
@@ -5535,7 +5548,235 @@ function renderExpenseDonutAndTable(categoryTotals, totalExpense, totalRevenue, 
       <td style="text-align: right;"><button class="btn-text" data-onclick="filterExpensesByCategory(decodeURIComponent('${encodeActionArg(cat.name)}'), event)">Detay ›</button></td>
     `;
     tbody.appendChild(tr);
+    if (acik) {
+      const detay = document.createElement('tr');
+      detay.className = 'expense-category-detail-row';
+      detay.innerHTML = `<td colspan="6">${expenseCategoryRowsHtml(cat.name)}</td>`;
+      tbody.appendChild(detay);
+    }
   });
+}
+
+// Gider analizinde kategori satiri yerinde acilir: kayitlar Giderler sayfasina
+// gitmeden duzenlenir/silinir (kullanici, 19.10.2026). Esleme grafikle ayni
+// (eslesenGiderKategorisi); otomatik kalemler (komisyon, temizlik maliyeti)
+// gider defterinde satir degildir, burada yalniz not olarak gecer.
+let expandedExpenseCategory = null;
+
+function toggleExpenseCategoryRows(catName) {
+  expandedExpenseCategory = expandedExpenseCategory === catName ? null : catName;
+  renderFinanceModule();
+}
+
+function expenseCategoryRowsHtml(catName) {
+  const rows = (appData.expenses || [])
+    .filter(exp => isExpenseInFilter(exp) && eslesenGiderKategorisi(exp.category) === catName)
+    .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+  const otomatik = catName === 'Temizlik'
+    ? 'Yapılmış temizliklerin maliyeti Operasyon’dan gelir; burada düzenlenmez.'
+    : (catName === 'Kredi Kartı / Komisyon' ? 'Rezervasyon ve ödeme komisyonları rezervasyondan gelir; burada düzenlenmez.' : '');
+  const not = otomatik ? `<p class="expense-category-detail-note">${escapeHtml(otomatik)}</p>` : '';
+  if (!rows.length) return `${not}<p class="expense-category-detail-note">Bu kategoride elle girilmiş gider kaydı yok.</p>`;
+  const yonetir = canManageTenantRole(activeTenant?.role);
+  const satirlar = rows.map(exp => {
+    const islem = isAdsPeriodExpense(exp)
+      ? '<span class="badge badge-blue">Reklamlar’dan yönetin</span>'
+      : (yonetir ? `<button class="btn btn-secondary btn-sm" data-onclick="editExpense(decodeURIComponent('${encodeActionArg(String(exp.id))}'))" title="Düzenle">✏️</button>
+         <button class="btn btn-danger btn-sm" data-onclick="deleteExpenseUI(decodeURIComponent('${encodeActionArg(String(exp.id))}'))" title="Sil">🗑️</button>` : '');
+    const kategori = exp.category && exp.category !== catName ? ` <small>(${escapeHtml(exp.category)})</small>` : '';
+    return `<tr>
+      <td>${formatTrDate(exp.date)}</td>
+      <td>${escapeHtml(exp.description || exp.desc || '-')}${kategori}</td>
+      <td>${escapeHtml(exp.villa === 'ALL' ? 'Tüm Portföy' : (appData.villas[exp.villa]?.name || exp.villa))}</td>
+      <td><strong>${Number(exp.amount).toLocaleString('tr-TR')} TL</strong></td>
+      <td style="text-align: right; white-space: nowrap;">${islem}</td>
+    </tr>`;
+  }).join('');
+  return `${not}<table class="expense-category-detail-table"><tbody>${satirlar}</tbody></table>`;
+}
+
+// -------------------------------------------------------------
+// GELİR VE SERMAYE DEFTERİ (phase97, kullanici 19.10.2026)
+// -------------------------------------------------------------
+// Rezervasyon disi para girisi iki turdur: "diger gelir" Toplam Gelir'e ve
+// kara girer, ciroya girmez; "sermaye / ortak girisi" gelir DEGILDIR (ozkaynak),
+// kara girmez ve ayri gosterilir. Formul tek yerde: core/ledger_contract.js.
+const INCOME_TYPE_LABELS = { OTHER_INCOME: 'Diğer gelir', CAPITAL: 'Sermaye / ortak girişi' };
+const PHASE97_SEMA_YOK = 'Gelir defteri için veritabanı güncellemesi (phase97) henüz uygulanmadı; kayıt yapılmadı.';
+
+function mapIncomeEntryFromDb(row, villas) {
+  if (!row) return null;
+  const liste = villas || (typeof appData !== 'undefined' && appData.villas) || {};
+  const anahtar = row.property_id ? Object.keys(liste).find(k => liste[k] && liste[k].id === row.property_id) : null;
+  const date = typeof row.income_date === 'string' ? row.income_date.slice(0, 10) : '';
+  return {
+    id: row.id,
+    tenantId: row.tenant_id,
+    propertyId: row.property_id || null,
+    villa: row.property_id ? (anahtar || row.property_id) : 'ALL',
+    type: row.income_type === 'CAPITAL' ? 'CAPITAL' : 'OTHER_INCOME',
+    date,
+    month: date.slice(0, 7),
+    amount: roundMoney(row.amount),
+    description: row.description || ''
+  };
+}
+
+function toggleIncomeAddMenu(olay) {
+  if (olay) olay.stopPropagation();
+  const menu = document.getElementById('incomeAddMenu');
+  if (!menu) return;
+  const acik = !menu.hidden;
+  menu.hidden = acik;
+  if (!acik && !menu.dataset.disKapatmaHazir) {
+    menu.dataset.disKapatmaHazir = '1';
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#incomeAddMenu') && !e.target.closest('[data-onclick*="toggleIncomeAddMenu"]')) menu.hidden = true;
+    });
+  }
+}
+
+/** "+ Gelir Ekle" menusu: rezervasyon dogrudan rezervasyon formunu acar. */
+function startIncomeEntry(kind) {
+  const menu = document.getElementById('incomeAddMenu');
+  if (menu) menu.hidden = true;
+  if (kind === 'BOOKING') return openBookingModal();
+  return openIncomeModal();
+}
+
+function openIncomeModal(editId = null) {
+  if (!canManageTenantRole(activeTenant?.role)) {
+    if (typeof showToast === 'function') showToast('Gelir kaydını yalnız işletme yönetimi girebilir.', 'error');
+    return false;
+  }
+  const modal = document.getElementById('incomeModal');
+  if (!modal) return false;
+  const form = document.getElementById('incomeForm');
+  const kayit = editId ? (appData.incomeEntries || []).find(i => i.id === editId) : null;
+  if (editId && !kayit) return false;
+  if (form) form.reset();
+  document.getElementById('incEditId').value = kayit ? kayit.id : '';
+  document.getElementById('incomeModalTitle').innerText = kayit ? '✏️ Gelir Kaydını Düzenle' : '💰 Yeni Gelir Girişi';
+  document.getElementById('incType').value = kayit ? kayit.type : 'OTHER_INCOME';
+  document.getElementById('incVilla').value = kayit ? kayit.villa : (currentFilter?.villa || 'ALL');
+  document.getElementById('incDate').value = kayit ? kayit.date : getTodayStr();
+  document.getElementById('incAmount').value = kayit ? kayit.amount : '';
+  document.getElementById('incDesc').value = kayit ? kayit.description : '';
+  updateIncomeTypeHint(document.getElementById('incType').value);
+  modal.classList.add('active');
+  return true;
+}
+
+function updateIncomeTypeHint(type) {
+  setEl('incomeTypeHint', type === 'CAPITAL'
+    ? 'Sermaye gelir değildir: kâra ve ciroya girmez, ayrı "sermaye girişi" olarak görünür.'
+    : 'Toplam gelire ve kâra girer; ciroya (konaklama geliri) girmez.');
+}
+
+function closeIncomeModal() {
+  document.getElementById('incomeModal')?.classList.remove('active');
+}
+
+async function saveIncomeEntry(event) {
+  if (event && typeof event.preventDefault === 'function') event.preventDefault();
+  const tenantId = getActiveTenantId();
+  try {
+    if (!canManageTenantRole(activeTenant?.role)) throw new Error('Gelir kaydını yalnız işletme yönetimi girebilir.');
+    requireCloudForWrite('Gelir', tenantId);
+    const editId = document.getElementById('incEditId')?.value || '';
+    const villa = document.getElementById('incVilla')?.value || 'ALL';
+    const payload = {
+      income_type: document.getElementById('incType')?.value === 'CAPITAL' ? 'CAPITAL' : 'OTHER_INCOME',
+      property_id: villa === 'ALL' ? null : (appData.villas?.[villa]?.id || null),
+      income_date: document.getElementById('incDate')?.value || '',
+      amount: roundMoney(document.getElementById('incAmount')?.value),
+      description: (document.getElementById('incDesc')?.value || '').trim()
+    };
+    if (villa !== 'ALL' && !payload.property_id) throw new Error('Seçilen mülk bulunamadı.');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(payload.income_date)) throw new Error('Geçerli bir tarih girin.');
+    if (!(payload.amount > 0)) throw new Error('Tutar sıfırdan büyük olmalı.');
+    if (!payload.description) throw new Error('Açıklama zorunludur.');
+    if (isPeriodClosed(payload.income_date)) throw new Error(`Bu dönem (${payload.income_date.slice(0, 7)}) kapatılmıştır.`);
+    const eski = editId ? (appData.incomeEntries || []).find(i => i.id === editId) : null;
+    if (eski && isPeriodClosed(eski.date)) throw new Error(`Bu kayıt kapatılmış döneme (${eski.month}) ait; değiştirilemez.`);
+
+    const sorgu = editId
+      ? supabaseClient.from('income_entries').update(payload).eq('id', editId).eq('tenant_id', tenantId)
+      : supabaseClient.from('income_entries').insert({ ...payload, tenant_id: tenantId });
+    const { data, error } = await sorgu.select().single();
+    if (error) throw error;
+    const kayit = mapIncomeEntryFromDb(data);
+    appData.incomeEntries = [kayit, ...(appData.incomeEntries || []).filter(i => i.id !== kayit.id)];
+    invalidateExecutiveSnapshotCache(); // ana sayfa bayat kalmasin (ui_consistency_tests F)
+    closeIncomeModal();
+    renderAll();
+    if (typeof showToast === 'function') showToast(editId ? '✅ Gelir kaydı güncellendi.' : '✅ Gelir kaydedildi.', 'success');
+    return kayit;
+  } catch (error) {
+    const mesaj = isMissingSchemaError(error) ? PHASE97_SEMA_YOK : (error?.message || 'Gelir kaydedilemedi.');
+    if (typeof showToast === 'function') showToast('⚠️ ' + mesaj, 'error');
+    else console.error(mesaj);
+    return false;
+  }
+}
+
+async function deleteIncomeEntry(id) {
+  const kayit = (appData.incomeEntries || []).find(i => i.id === id);
+  if (!kayit) return false;
+  try {
+    if (!canManageTenantRole(activeTenant?.role)) throw new Error('Gelir kaydını yalnız işletme yönetimi silebilir.');
+    if (isPeriodClosed(kayit.date)) throw new Error(`Bu kayıt kapatılmış döneme (${kayit.month}) ait; silinemez.`);
+    if (typeof confirm === 'function' && !confirm('Bu gelir kaydını silmek istediğinizden emin misiniz?')) return false;
+    const tenantId = getActiveTenantId();
+    requireCloudForWrite('Gelir', tenantId);
+    const { error } = await supabaseClient.from('income_entries').delete().eq('id', id).eq('tenant_id', tenantId);
+    if (error) throw error;
+    appData.incomeEntries = (appData.incomeEntries || []).filter(i => i.id !== id);
+    invalidateExecutiveSnapshotCache();
+    renderAll();
+    if (typeof showToast === 'function') showToast('🗑️ Gelir kaydı silindi.');
+    return true;
+  } catch (error) {
+    const mesaj = isMissingSchemaError(error) ? PHASE97_SEMA_YOK : (error?.message || 'Gelir silinemedi.');
+    if (typeof showToast === 'function') showToast('⚠️ ' + mesaj, 'error');
+    return false;
+  }
+}
+
+/** Finans > Gelirler karti: defterle ayni rakamlar ve donemin gelir kayitlari. */
+function renderIncomeSection(ledger) {
+  if (typeof document === 'undefined' || !document.getElementById('incomeEntriesBody')) return;
+  const tl = v => `${Math.round(v || 0).toLocaleString('tr-TR')} TL`;
+  setEl('incomeRoomVal', tl(ledger.netRoomRevenue));
+  const temizlikSatiri = document.getElementById('incomeCleaningRow');
+  if (temizlikSatiri) temizlikSatiri.hidden = !(ledger.cleaningRevenue > 0);
+  setEl('incomeCleaningVal', tl(ledger.cleaningRevenue));
+  setEl('incomeOtherVal', tl(ledger.otherIncome));
+  setEl('incomeTotalVal', tl(ledger.totalRevenue));
+  setEl('incomeCapitalVal', tl(ledger.capitalIn));
+
+  const govde = document.getElementById('incomeEntriesBody');
+  if (appData.phase97SchemaReady === false) {
+    govde.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:16px;">${escapeHtml(PHASE97_SEMA_YOK)}</td></tr>`;
+    return;
+  }
+  const satirlar = (appData.incomeEntries || [])
+    .filter(i => isExpenseInFilter(i))
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  if (!satirlar.length) {
+    govde.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:16px;color:var(--text-muted);">Bu dönemde elle girilmiş gelir kaydı yok.</td></tr>';
+    return;
+  }
+  const yonetir = canManageTenantRole(activeTenant?.role);
+  govde.innerHTML = satirlar.map(i => `<tr>
+      <td>${formatTrDate(i.date)}</td>
+      <td><span class="badge ${i.type === 'CAPITAL' ? 'badge-amber' : 'badge-green'}">${escapeHtml(INCOME_TYPE_LABELS[i.type])}</span></td>
+      <td>${escapeHtml(i.villa === 'ALL' ? 'Tüm Portföy' : (appData.villas[i.villa]?.name || i.villa))}</td>
+      <td>${escapeHtml(i.description || '-')}</td>
+      <td><strong>${Number(i.amount).toLocaleString('tr-TR')} TL</strong></td>
+      <td style="text-align: right; white-space: nowrap;">${yonetir ? `<button class="btn btn-secondary btn-sm" data-onclick="openIncomeModal(decodeURIComponent('${encodeActionArg(String(i.id))}'))" title="Düzenle">✏️</button>
+        <button class="btn btn-danger btn-sm" data-onclick="deleteIncomeEntry(decodeURIComponent('${encodeActionArg(String(i.id))}'))" title="Sil">🗑️</button>` : ''}</td>
+    </tr>`).join('');
 }
 
 function filterExpensesByCategory(catName, clickEvent) {
@@ -6291,7 +6532,10 @@ function renderExpensesTable() {
   const filtered = appData.expenses.filter(exp => {
     if (!isExpenseInFilter(exp)) return false;
     if (!search) return true;
-    return (exp.description || exp.desc || "").toLowerCase().includes(search) || (exp.category || "").toLowerCase().includes(search);
+    // Grafik taninmayan kategoriyi "Diger"e toplar (eslesenGiderKategorisi);
+    // arama da ayni eslemeye bakar, yoksa "Diger > Detay" bos liste aciyordu.
+    return (exp.description || exp.desc || "").toLowerCase().includes(search) || (exp.category || "").toLowerCase().includes(search)
+      || eslesenGiderKategorisi(exp.category).toLowerCase().includes(search);
   });
 
   if (filtered.length === 0) {
@@ -16346,7 +16590,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
         : Promise.resolve([]);
       // Independent datasets are loaded concurrently and every list is paged;
       // Supabase's per-response cap must never silently truncate a dashboard.
-      const [villas, bookings, expenses, cleanList, leads, leadSalesContext, closeList, targetList, maintenanceTickets, operationalTasks, financialTransactions, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications, campaignRows, influencerRows, settingRows, operatorNoteRows, pricingLadderRows, hkOverrideRows, paymentCommissionRows, operationalPeopleRows, cleaningExecutionRows, maintenanceAssignmentRows, taskTemplateRows, checklistTemplateRows, bookingPayments, bookingPaymentBalances, adMetricPeriods, propertyContextRows, propertyOwnerRows, propertyOwnerLinkRows, messageTemplateRows, guestClassificationRows, salesMembers, propertyPricingRuleRows, competitorResearchRows, expenseTemplateRows, expenseTemplateOccurrenceRows, leadInterestRows, channelListingRows] = await Promise.all([
+      const [villas, bookings, expenses, cleanList, leads, leadSalesContext, closeList, targetList, maintenanceTickets, operationalTasks, financialTransactions, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications, campaignRows, influencerRows, settingRows, operatorNoteRows, pricingLadderRows, hkOverrideRows, paymentCommissionRows, operationalPeopleRows, cleaningExecutionRows, maintenanceAssignmentRows, taskTemplateRows, checklistTemplateRows, bookingPayments, bookingPaymentBalances, adMetricPeriods, propertyContextRows, propertyOwnerRows, propertyOwnerLinkRows, messageTemplateRows, guestClassificationRows, salesMembers, propertyPricingRuleRows, competitorResearchRows, expenseTemplateRows, expenseTemplateOccurrenceRows, leadInterestRows, channelListingRows, incomeEntryRows] = await Promise.all([
         loadProperties(tenantId),
         loadBookings(tenantId),
         mayReadLedger ? loadExpenses(tenantId) : Promise.resolve([]),
@@ -16399,7 +16643,9 @@ async function loadTenantAppData(tenantIdOrUserId) {
         // phase91 uygulanmadan once tablo yoktur: null doner, ekran ayakta kalir.
         mayReadSales ? fetchTenantRowsTolerant(() => supabaseClient.from('lead_interest_properties').select('lead_id, property_id').eq('tenant_id', tenantId)) : Promise.resolve([]),
         // Kanal ilanlari mulk profilinde listelenir (L-214); okuma can_read_sales (phase53).
-        mayReadSales ? fetchTenantRowsTolerant(() => supabaseClient.from('property_channel_listings').select(CHANNEL_LISTING_COLUMNS).eq('tenant_id', tenantId).neq('status', 'ARCHIVED').order('created_at')) : Promise.resolve([])
+        mayReadSales ? fetchTenantRowsTolerant(() => supabaseClient.from('property_channel_listings').select(CHANNEL_LISTING_COLUMNS).eq('tenant_id', tenantId).neq('status', 'ARCHIVED').order('created_at')) : Promise.resolve([]),
+        // phase97 gelir/sermaye defteri; goc yoksa null doner, ekran ayakta kalir.
+        mayReadLedger ? fetchTenantRowsTolerant(() => supabaseClient.from('income_entries').select('*').eq('tenant_id', tenantId).order('income_date', { ascending: false })) : Promise.resolve([])
       ]);
       const propIdMap = {};
       Object.values(villas || {}).forEach(p => {
@@ -16513,6 +16759,8 @@ async function loadTenantAppData(tenantIdOrUserId) {
         competitorPriceResearch: competitorResearchRows || [],
         expenseTemplates: expenseTemplateRows || [],
         expenseTemplateOccurrences: expenseTemplateOccurrenceRows || [],
+        incomeEntries: (incomeEntryRows || []).map(r => mapIncomeEntryFromDb(r, villas)).filter(Boolean),
+        phase97SchemaReady: incomeEntryRows !== null,
         phase78SchemaReady: propertyPricingRuleRows !== null && competitorResearchRows !== null
           && expenseTemplateRows !== null && expenseTemplateOccurrenceRows !== null,
         influencerCollabs: (influencerRows || []).map(r => mapInfluencerCollabFromDb(r, propIdMap)),
@@ -16702,10 +16950,12 @@ function updateAllVillaDropdowns() {
 
   const dropdownIds = [
     'globalVillaFilter',
+    'finTopVillaFilter',
     'bulkVilla',
     'quickBookingVilla',
     'resVilla',
     'expVilla',
+    'incVilla',
     'leadVilla',
     'maintVilla',
     'mktVilla',
@@ -16734,7 +16984,7 @@ function updateAllVillaDropdowns() {
     // "Tüm portföy" secenegi olmasi gerekenler. expVilla ve rezVillaFilter
     // markup'ta bu secenege sahipti ama listeye alinmadigi icin JS onlari
     // yeniden kurarken secenek kayboluyordu.
-    const TUMU_OLANLAR = ['globalVillaFilter', 'mktVilla', 'expVilla', 'rezVillaFilter',
+    const TUMU_OLANLAR = ['globalVillaFilter', 'finTopVillaFilter', 'mktVilla', 'expVilla', 'incVilla', 'rezVillaFilter',
                           'calendarVillaFilter', 'pricingVillaFilter', 'opsVillaFilter', 'todayPerfVilla'];
     if (TUMU_OLANLAR.includes(selectId)) {
       const optAll = document.createElement('option');

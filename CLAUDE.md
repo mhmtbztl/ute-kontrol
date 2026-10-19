@@ -101,7 +101,9 @@ K-04 sözleşmesi (kullanıcı kararı 23–25 Eylül 2026; phase45):
 Brüt Oda Geliri = brüt − misafirden alınan temizlik ücreti
 Net Oda Geliri  = Brüt Oda Geliri − indirim          ← "CİRO" (net konaklama geliri)
 Temizlik Geliri = misafirden alınan temizlik ücreti  ← ayrı gelir kalemi
-Toplam Gelir    = Net Oda Geliri + Temizlik Geliri   (= brüt − indirim; iptaller hariç) ← kârın tabanı
+Diğer Gelir     = elle girilen diğer gelir (income_entries, phase97) ← ayrı gelir kalemi, ciroya girmez
+Toplam Gelir    = Net Oda Geliri + Temizlik Geliri + Diğer Gelir   (iptaller hariç) ← kârın tabanı
+Sermaye girişi  = ortak/sermaye girişi (income_entries CAPITAL) ← gelir DEĞİLDİR, kâra girmez
 OPEX            = elle girilen giderler
                 + Σ OTA komisyonu         ← rezervasyondan, gecelere tahakkuk
                 + Σ ödeme komisyonu       ← booking_payment_commissions, gecelere tahakkuk
@@ -649,6 +651,14 @@ tarih ve kapanmış ay reddedilir. Göç aktarım bağına `cleaning_task_id` ek
 aynı). Göç yokken geçmiş temizlik aktarımı **başlamaz**; rezervasyon/gider aynen
 çalışır. Canlı süit `phase95_cleaning_import_undo_live_tests` 10/10 (göçten önce
 kırmızı). Paket: `docs/PHASE95_DEPLOY_PACKAGE.md`.
+
+**phase97 (`migration_phase97_income_entries.sql`) 19 Ekim 2026'da test projesine
+uygulandı; üretime henüz uygulanmadı.** Gelir ve sermaye defteri (kullanıcı,
+19.10.2026): Finans'ta "+ Gelir Ekle" → Rezervasyon (rezervasyon formu) ya da
+Diğer gelirler / sermaye (açıklama zorunlu). Diğer gelir Toplam Gelir'e ve kâra
+girer, ciroya girmez; sermaye gelir değildir, kâra girmez (§3.4). Göç iki
+anlık görüntüyü ve sıfırlamayı yeniden tanımlar. Canlı süit
+`phase97_income_live_tests` 26/26. Paket: `docs/PHASE97_DEPLOY_PACKAGE.md`.
 
 **Bir göçün uygulanıp uygulanmadığı, dosyaya bakarak anlaşılmaz.** Dosya repoda
 durur; veritabanı uygulanmamış olabilir. Doğrulamanın yolu üretime sormaktır:

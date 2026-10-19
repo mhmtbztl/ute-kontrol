@@ -1279,6 +1279,33 @@ async function bugunPerformansDavranisi() {
   check(/computeMonthPerformance\(m, secili\)/.test(functionBody(app, 'function getMonthlyKpiDataset(')) && /'todayPerfVilla'/.test(functionBody(app, 'function updateAllVillaDropdowns('))
     && /renderTodayPerformance\(\)/.test(functionBody(app, 'function renderExecutiveControlCenter(')) && /id="todayPerfVilla"[^>]*setTodayPerformanceVilla/.test(html),
     'L-217h Finans aylik tablosu ve Bugun ayni fonksiyondan; mulk listesi ortak doldurucudan');
+  // Finans ust seridindeki Portfoy etiketi secilebilir olmali (kullanici, 19.10.2026)
+  check(/<select id="finTopVillaFilter" data-onchange="filterByVilla\(this\.value\)"/.test(html)
+    && /'finTopVillaFilter'/.test(functionBody(app, 'function updateAllVillaDropdowns('))
+    && /finTopVillaFilter[\s\S]{0,80}currentFilter\.villa/.test(functionBody(app, 'function updateStepperLabels(')),
+    'L-223 Finans Portfoy secicisi ortak filtreye bagli; listesi ortak doldurucudan, degeri filtreyle esit');
+  // "Diger > Detay" bos liste aciyordu: grafik eslemeyle topluyor, arama ham metne bakiyordu
+  check(/eslesenGiderKategorisi\(exp\.category\)\.toLowerCase\(\)\.includes\(search\)/.test(functionBody(app, 'function renderExpensesTable(')),
+    'L-224a Gider defteri aramasi grafikle ayni kategori eslemesini kullanir');
+  const satirlar = functionBody(app, 'function expenseCategoryRowsHtml(');
+  check(/eslesenGiderKategorisi\(exp\.category\) === catName/.test(satirlar) && /isExpenseInFilter\(exp\)/.test(satirlar)
+    && /editExpense\(/.test(satirlar) && /deleteExpenseUI\(/.test(satirlar) && /canManageTenantRole/.test(satirlar)
+    && /toggleExpenseCategoryRows\(cat\.name\)/.test(functionBody(app, 'function renderExpenseDonutAndTable(')),
+    'L-224b Gider analizi kategorisi yerinde acilir; kayit oradan duzenlenir/silinir (yalniz yonetim rolu)');
+  // Gelir ekleme (phase97, kullanici 19.10.2026): iki secenek, rezervasyon dogrudan rezervasyon formu
+  check(/startIncomeEntry\('BOOKING'\)[^<]*Rezervasyon/.test(html) && /startIncomeEntry\('OTHER'\)/.test(html)
+    && /if \(kind === 'BOOKING'\) return openBookingModal\(\);/.test(functionBody(app, 'function startIncomeEntry(')),
+    'L-225a "+ Gelir Ekle" iki secenek sunar; Rezervasyon dogrudan rezervasyon formunu acar');
+  check(/<input type="text" id="incDesc"[^>]*required/.test(html) && /value="CAPITAL"/.test(html) && /value="OTHER_INCOME"/.test(html)
+    && /Açıklama zorunludur/.test(functionBody(app, 'async function saveIncomeEntry(')),
+    'L-225b Gelir formu diger gelir / sermaye turu ve zorunlu aciklama tasir');
+  check((app.match(/incomes: appData\.incomeEntries \|\| \[\],/g) || []).length === 3
+    && /renderIncomeSection\(ledger\)/.test(functionBody(app, 'function renderFinanceModule(')),
+    'L-225c Finans, aylik ve aralik defterleri gelir kayitlarini ayni sozlesmeden okur');
+  const kaydet = functionBody(app, 'async function saveIncomeEntry(');
+  check(/requireCloudForWrite\('Gelir'/.test(kaydet) && /canManageTenantRole/.test(kaydet) && /isPeriodClosed/.test(kaydet)
+    && /PHASE97_SEMA_YOK/.test(kaydet),
+    'L-225d Gelir yazmasi bulut zorunlu, yalniz yonetim, kapali donemde durur, goc yoksa soyler');
 }
 
 async function main() {

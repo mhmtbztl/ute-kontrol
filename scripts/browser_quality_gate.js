@@ -582,6 +582,50 @@ async function main() {
         && guestState.linked === '00000000-0000-4000-8000-0000000000e1' && guestState.guests === 1,
         'Rezervasyondan misafir: ' + JSON.stringify({ guestRpc, guestState }));
       passed.push('27. misafirler: rezervasyondaki kişi panelden telefonla deftere eklenir ve rezervasyona bağlanır');
+      // Kullanici 19.10.2026: Finans'ta portfoy secilebilir; "+ Gelir Ekle" iki
+      // secenek (rezervasyon formu / diger gelir), gelir aciklamasiyla kaydedilir.
+      const incomePosts = [];
+      await page.route('**/rest/v1/income_entries**', async route => {
+        if (route.request().method() !== 'POST') return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+        const body = route.request().postDataJSON();
+        incomePosts.push(body);
+        return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ id: '00000000-0000-4000-8000-0000000000f1', ...body }) });
+      });
+      await page.evaluate(() => {
+        appData.bookings = [];
+        appData.expenses = [];
+        appData.incomeEntries = [];
+        appData.phase97SchemaReady = true;
+        currentFilter.period = getTodayStr().slice(0, 7);
+        switchTab('finance');
+        handleFilterChange();
+        document.getElementById('financeIncomeDisclosure').open = true;
+      });
+      await page.selectOption('#finTopVillaFilter', 'test');
+      const portfoy = await page.evaluate(() => ({ villa: currentFilter.villa, global: document.getElementById('globalVillaFilter').value }));
+      assert(portfoy.villa === 'test' && portfoy.global === 'test', 'Finans portfoy secici: ' + JSON.stringify(portfoy));
+      await page.selectOption('#finTopVillaFilter', 'ALL');
+      await page.click('[data-onclick="toggleIncomeAddMenu(event)"]');
+      await page.click('#incomeAddMenu [data-onclick="startIncomeEntry(\'BOOKING\')"]');
+      assert(await page.evaluate(() => document.getElementById('bookingModal').classList.contains('active')), 'Rezervasyon secenegi rezervasyon formunu acmadi');
+      await page.evaluate(() => closeBookingModal());
+      await page.click('[data-onclick="toggleIncomeAddMenu(event)"]');
+      await page.click('#incomeAddMenu [data-onclick="startIncomeEntry(\'OTHER\')"]');
+      await page.fill('#incAmount', '2500');
+      await page.fill('#incDesc', 'Havalimanı transferi');
+      await page.click('#incomeForm button[type="submit"]');
+      await page.waitForFunction(() => (appData.incomeEntries || []).length === 1, null, { timeout: 10000 });
+      const gelir = await page.evaluate(() => ({
+        other: document.getElementById('incomeOtherVal').textContent,
+        bridge: document.getElementById('brOtherIncome').textContent,
+        stepVisible: !document.getElementById('brOtherIncomeStep').hidden,
+        rows: document.querySelectorAll('#incomeEntriesBody [data-onclick^="deleteIncomeEntry("]').length,
+        modalOpen: document.getElementById('incomeModal').classList.contains('active')
+      }));
+      assert(incomePosts.length === 1 && incomePosts[0].income_type === 'OTHER_INCOME' && incomePosts[0].description === 'Havalimanı transferi'
+        && incomePosts[0].amount === 2500 && /2\.500 TL/.test(gelir.other) && /\+2\.500 TL/.test(gelir.bridge) && gelir.stepVisible
+        && gelir.rows === 1 && !gelir.modalOpen, 'Gelir ekleme: ' + JSON.stringify({ incomePosts, gelir }));
+      passed.push('28. finans: portföy seçilir; "+ Gelir Ekle" rezervasyon formunu ya da açıklamalı diğer gelir formunu açar, kâr köprüsüne girer');
     });
 
     await withPage(browser, baseUrl, 'owner', { width: 390, height: 844 }, async page => {

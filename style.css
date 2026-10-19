@@ -943,6 +943,114 @@ body {
   margin-left: 4px;
 }
 
+.meta-pill-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.meta-pill-select select {
+  background: transparent;
+  border: none;
+  color: var(--text-main);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  max-width: 220px;
+}
+
+.expense-category-detail-row > td {
+  background: rgba(255, 255, 255, 0.02);
+  padding: 8px 12px 12px;
+}
+
+.expense-category-detail-table {
+  width: 100%;
+  font-size: 12px;
+}
+
+.expense-category-detail-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.expense-category-detail-note {
+  margin: 4px 0 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Finans > Gelirler (phase97) */
+.income-add-wrap {
+  position: relative;
+}
+
+.income-add-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 60;
+  min-width: 230px;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 6px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+.income-add-menu[hidden] {
+  display: none;
+}
+
+.income-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+  margin: 12px 0 16px;
+}
+
+.income-summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.income-summary-item[hidden] {
+  display: none;
+}
+
+.income-summary-item strong {
+  font-size: 16px;
+  color: var(--text-main);
+}
+
+.income-summary-total {
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+.income-summary-capital {
+  border-style: dashed;
+}
+
+#incomeTypeHint {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.meta-pill-select select option {
+  background: var(--bg-surface-elevated);
+  color: var(--text-main);
+}
+
 /* 5-Column KPI Cards Grid */
 .kpi-cards-grid.five-cols {
   grid-template-columns: repeat(5, 1fr);
@@ -5465,3 +5573,8 @@ body.side-panel-open { overflow: hidden; }
 .guest-unlinked-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
 .guest-unlinked-head p { margin: 4px 0 0; }
 .guest-unlinked-panel input { width: 100%; min-width: 120px; padding: 6px 8px; border: 1px solid var(--border-subtle); border-radius: 6px; background: var(--bg-surface-elevated); color: var(--text-main); font-size: 12px; }
+
+/* Kar koprusundeki istege bagli adimlar (temizlik geliri, diger gelir) */
+.bridge-step[hidden] {
+  display: none !important;
+}

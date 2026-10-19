@@ -10,7 +10,9 @@
  *   Brut Oda Geliri = brut - misafirden alinan temizlik ucreti
  *   Net Oda Geliri  = Brut Oda Geliri - indirim              ("konaklama cirosu")
  *   Temizlik Geliri = misafirden alinan temizlik ucreti
- *   Toplam Gelir    = Net Oda Geliri + Temizlik Geliri        (= brut - indirim)
+ *   Diger Gelir     = elle girilen diger gelir (income_entries, phase97)
+ *   Toplam Gelir    = Net Oda Geliri + Temizlik Geliri + Diger Gelir
+ *   Sermaye girisi  = ortak/sermaye girisi; gelir DEGILDIR, kara girmez
  *   OPEX            = elle giderler + OTA komisyonu + odeme komisyonu
  *                     + YAPILMIS temizliklerin maliyeti
  *   Net Kar         = Toplam Gelir - OPEX - CAPEX
@@ -86,9 +88,12 @@
     const expenseInScope = o.expenseInScope || (() => true);
     const taskInScope = o.taskInScope || (() => true);
     const bookingInScope = o.bookingInScope || (() => true);
+    // Gelir kaydi gider gibi tarih + mulk tasir; kapsami ayri verilmezse
+    // giderin kapsam kurali kullanilir.
+    const incomeInScope = o.incomeInScope || expenseInScope;
 
     const out = {
-      grossRoomRevenue: 0, discount: 0, netRoomRevenue: 0, cleaningRevenue: 0, totalRevenue: 0,
+      grossRoomRevenue: 0, discount: 0, netRoomRevenue: 0, cleaningRevenue: 0, otherIncome: 0, capitalIn: 0, totalRevenue: 0,
       otaCommission: 0, paymentCommission: 0, cleaningCost: 0, cleaningDebt: 0,
       manualOpex: 0, capex: 0, totalOpex: 0, operatingProfit: 0, netProfit: 0,
       soldNights: 0, bookingCount: 0, adr: null
@@ -111,7 +116,13 @@
       out.bookingCount += 1;
     });
     out.netRoomRevenue = out.grossRoomRevenue - out.discount;
-    out.totalRevenue = out.netRoomRevenue + out.cleaningRevenue;
+    (o.incomes || []).forEach(i => {
+      if (!i || !incomeInScope(i)) return;
+      const tur = String(i.type || i.incomeType || i.income_type || '').toUpperCase();
+      if (tur === 'CAPITAL') out.capitalIn += sayi(i.amount);
+      else if (tur === 'OTHER_INCOME') out.otherIncome += sayi(i.amount);
+    });
+    out.totalRevenue = out.netRoomRevenue + out.cleaningRevenue + out.otherIncome;
 
     (o.expenses || []).forEach(e => {
       if (!e || !expenseInScope(e)) return;
