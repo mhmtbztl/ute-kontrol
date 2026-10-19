@@ -47,6 +47,15 @@
     return data;
   }
 
+  // Mulk istisnasini kaldirir; mulk yeniden portfoy kuralina / varsayilana duser.
+  async function deleteRule(client, input = {}) {
+    if (!client || !input.tenantId || !input.propertyId || !RULE_KEYS.includes(input.ruleKey)) throw new Error('PRICING_RULE_SCOPE_REQUIRED');
+    const { error } = await client.from('property_pricing_rule_settings').delete()
+      .eq('tenant_id', input.tenantId).eq('property_id', input.propertyId).eq('rule_key', input.ruleKey);
+    if (error) throw error;
+    return true;
+  }
+
   function buildPricePoints(values = {}, currency = 'TRY') {
     return Object.entries(values).flatMap(([type, raw]) => {
       if (raw === '' || raw === null || raw === undefined) return [];
@@ -77,5 +86,5 @@
     return data;
   }
 
-  return { RULE_KEYS, mergeRules, saveRule, buildPricePoints, saveResearch };
+  return { RULE_KEYS, mergeRules, saveRule, deleteRule, buildPricePoints, saveResearch };
 });

@@ -44,12 +44,27 @@
     const soldNights = dates.filter(date => status[date] === 'BOOKED').length;
     const sellableNights = dates.filter(date => status[date] !== 'BLOCKED').length;
     const occupancy = sellableNights > 0 ? soldNights / sellableNights : null;
+    // Talep kurali gecenin AYINA bakar (L-247): 90 gunluk takvimde Kasim'in
+    // dolulugu Ekim'in fiyatini artirmamali. Tek ayli ufukta genel doluluga esittir.
+    const monthOccupancy = {};
+    dates.forEach(date => {
+      const key = date.slice(0, 7), row = monthOccupancy[key] || (monthOccupancy[key] = { sold: 0, sellable: 0 });
+      if (status[date] === 'BOOKED') row.sold++;
+      if (status[date] !== 'BLOCKED') row.sellable++;
+    });
+    const occupancyOf = date => { const row = monthOccupancy[date.slice(0, 7)]; return row && row.sellable > 0 ? row.sold / row.sellable : null; };
     const warnings = [];
     if (missing(property.basePrice)) warnings.push({ code: 'BASE_PRICE_MISSING', text: 'Baz fiyat girilmemiş' });
     if (missing(property.floorPrice)) warnings.push({ code: 'FLOOR_PRICE_MISSING', text: 'Taban fiyat girilmemiş' });
     if (rules.demand.enabled && missing(o.occupancyTarget)) warnings.push({ code: 'OCCUPANCY_TARGET_MISSING', text: 'Doluluk hedefi girilmediği için talep kuralı uygulanmadı' });
     ((o.specialDays && o.specialDays.warnings) || []).forEach(w => warnings.push(w));
-    const specialSet = new Set((Array.isArray(o.specialDays) ? o.specialDays : []).map(x => x.date));
+    // Isletmenin kendi etkinligi kendi yuzdesini tasiyabilir (L-249); yoksa ozel gun kurali.
+    const specialMap = new Map();
+    (Array.isArray(o.specialDays) ? o.specialDays : []).forEach(x => {
+      if (!x || !x.date) return;
+      const prev = specialMap.get(x.date);
+      if (!prev || (!missing(x.pct) && (missing(prev.pct) || Number(x.pct) > Number(prev.pct)))) specialMap.set(x.date, x);
+    });
     const gapDates = new Set();
     for (let i = 0; i < dates.length;) {
       if (status[dates[i]] !== 'OPEN') { i++; continue; }
@@ -70,10 +85,13 @@
       if (rowStatus !== 'OPEN' || basePrice === null) return { date, status: rowStatus, price: null, basePrice, floorApplied: false, reasons: [] };
       const calendar = [];
       if (rules.weekend.enabled && rules.weekend.nights.includes(dayOfWeek(date))) calendar.push({ code: 'WEEKEND', pct: Number(rules.weekend.pct), text: 'hafta sonu' });
-      if (rules.specialDay.enabled && specialSet.has(date)) calendar.push({ code: 'SPECIAL_DAY', pct: Number(rules.specialDay.pct), text: 'özel gün' });
+      const special = specialMap.get(date);
+      if (special && !missing(special.pct)) calendar.push({ code: 'SPECIAL_DAY', pct: Number(special.pct), text: 'özel gün', label: special.name || null });
+      else if (special && rules.specialDay.enabled) calendar.push({ code: 'SPECIAL_DAY', pct: Number(rules.specialDay.pct), text: 'özel gün', label: special.name || null });
       const positive = calendar.sort((a, b) => b.pct - a.pct)[0];
       const reasons = positive ? [positive] : [];
-      if (rules.demand.enabled && !missing(o.occupancyTarget) && occupancy !== null && occupancy >= Number(o.occupancyTarget)) reasons.push({ code: 'DEMAND', pct: Number(rules.demand.pct), text: 'hedef doluluğa ulaşıldı' });
+      const monthOcc = occupancyOf(date);
+      if (rules.demand.enabled && !missing(o.occupancyTarget) && monthOcc !== null && monthOcc >= Number(o.occupancyTarget)) reasons.push({ code: 'DEMAND', pct: Number(rules.demand.pct), text: 'hedef doluluğa ulaşıldı', occupancy: monthOcc });
       const discounts = [];
       const daysAway = Math.round((parse(date) - todayMs) / DAY);
       if (rules.lastMinute.enabled && daysAway <= Number(rules.lastMinute.withinDays)) discounts.push({ code: 'LAST_MINUTE', pct: Number(rules.lastMinute.pct), text: 'son dakika' });
@@ -85,7 +103,7 @@
       if (floorPrice !== null && price < floorPrice) { price = floorPrice; floorApplied = true; }
       return { date, status: rowStatus, price, basePrice, floorApplied, reasons };
     });
-    return { days: resultDays, next30: { soldNights, sellableNights, occupancy }, warnings, rules };
+    return { days: resultDays, next30: { soldNights, sellableNights, occupancy }, monthOccupancy: Object.fromEntries(Object.keys(monthOccupancy).map(key => [key, occupancyOf(key + '-01')])), gapDates: [...gapDates].sort(), warnings, rules };
   }
   function metric(value, code, text) { return value === null ? { value: null, reason: { code, text } } : { value, reason: null }; }
   function historyHint(input) {
@@ -147,5 +165,5 @@
     }, 0);
     return { actual, planned, expected: actual === null ? null : actual + planned };
   }
-  return { suggest, historyHint, forecastMonth };
+  return { DEFAULTS, suggest, historyHint, forecastMonth };
 }));

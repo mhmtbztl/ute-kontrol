@@ -786,6 +786,58 @@ async function main() {
       const kar96 = await page.evaluate(() => { switchTab('executive'); renderTodayPerformance(); return document.getElementById('todayPerformanceCards').textContent; });
       assert(/Net kâr/.test(kar96), 'Bugun net kar: ' + kar96.slice(0, 300));
       passed.push('31. gider (9.6): kategori OPEX/CAPEX türünü doldurur, formdan özel kategori eklenir, "her ay ×3" tek istekte 3 kayıt; Bugün\'de net kâr');
+
+      // 9.7 Fiyatlandirma (M70-M76): bakim araligi takvimde kapali ve bugunu
+      // kapatmaz, bos gece karti sayar, ay sekmesi, fiyat tablosu ve kural kaynagi.
+      const fiyat97 = await page.evaluate(() => {
+        const gun = n => new Date(Date.parse(getTodayStr() + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
+        const id = appData.villas.test.id;
+        Object.assign(appData.villas.test, { basePrice: 5000, floor: 3500, peak: 7000 });
+        appData.bookings = [
+          { id: 'g97-a', villa: 'test', propertyId: id, guest: 'A', checkIn: gun(2), checkOut: gun(5), gross: 15000, status: 'CONFIRMED', channel: 'Direct' },
+          { id: 'g97-b', villa: 'test', propertyId: id, guest: 'B', checkIn: gun(6), checkOut: gun(8), gross: 10000, status: 'CONFIRMED', channel: 'Direct' }];
+        appData.maintenanceTickets = [{ id: 'g97-m', title: 'Boya', status: 'OPEN', priority: 'P1', property_id: id, blocks_availability: true, downtime_start: gun(10), downtime_end: gun(11) }];
+        renderAll();
+        switchTab('pricing');
+        setPricingMonth(gun(10).slice(0, 7));
+        const kart = d => [...document.querySelectorAll('#pricingManagerContainer .pricing-day')].find(c => c.textContent.includes(formatTrDate(d)));
+        return {
+          tabs: document.querySelectorAll('#pricingMonthTabs button').length,
+          blocked: kart(gun(10))?.className || '', blockedText: kart(gun(10))?.textContent || '',
+          open: kart(gun(12))?.textContent || '',
+          gap: document.getElementById('pricingGapCountVal').textContent,
+          ladder: !!document.getElementById('pricingLadder_base'),
+          rules: document.getElementById('pricingRulesTable').textContent,
+          hazir: getPropertySalesReadiness('test')?.status
+        };
+      });
+      assert(fiyat97.tabs === 3 && /is-blocked/.test(fiyat97.blocked) && /Kapalı · Boya/.test(fiyat97.blockedText)
+        && fiyat97.gap === '1 Gece' && fiyat97.ladder && (!fiyat97.open || /₺\d/.test(fiyat97.open) && /Baz ₺5\.000/.test(fiyat97.open)) && /Sistem varsayılanı/.test(fiyat97.rules) && fiyat97.hazir !== 'BLOCKED_MAINTENANCE',
+        'Fiyat takvimi: ' + JSON.stringify(fiyat97).slice(0, 600));
+      // Gunluk fiyat (phase101): acik gune tikla, oneriyi onayla; istek upsert
+      // onConflict ile gider, kart "Onaylı" olur.
+      const gunlukPost = [];
+      await page.route('**/rest/v1/property_daily_prices**', route => {
+        if (route.request().method() !== 'POST') return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+        const satirlar = JSON.parse(route.request().postData() || '[]');
+        gunlukPost.push({ url: route.request().url(), satirlar });
+        return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(satirlar.map((r, i) => ({ id: `dddddddd-dddd-4ddd-8ddd-00000000010${i}`, ...r }))) });
+      });
+      const acikGun = await page.evaluate(() => {
+        appData.phase101SchemaReady = true;
+        renderPricingTab();
+        const kart = document.querySelector('#pricingManagerContainer .pricing-day.is-selectable');
+        return kart ? kart.querySelector('strong').textContent.split(' ')[0] : null;
+      });
+      assert(acikGun, 'Secilebilir acik gun yok');
+      await page.locator('#pricingManagerContainer .pricing-day.is-selectable').first().click();
+      await page.click('[data-onclick="applyPricingDayPrices(\'APPROVE\')"]');
+      await page.waitForFunction(() => /Onaylı/.test(document.getElementById('pricingManagerContainer').textContent), null, { timeout: 10000 });
+      assert(gunlukPost.length === 1 && /on_conflict=property_id%2Cprice_date|on_conflict=property_id,price_date/.test(gunlukPost[0].url)
+        && gunlukPost[0].satirlar.length === 1 && gunlukPost[0].satirlar[0].source === 'APPROVED',
+        'Gunluk fiyat istegi: ' + JSON.stringify(gunlukPost).slice(0, 400));
+      await page.locator('#tab-pricing').screenshot({ path: path.join(__dirname, '..', 'tmp', 'g97-pricing.png') });
+      passed.push('32. fiyatlandırma (9.7): bakım aralığı takvimde "Kapalı", bugünü kapatmaz; boş gece sayılır; 3 ay sekmesi, fiyat tablosu ve kural kaynağı görünür; gün tıklanıp öneri onaylanır');
     });
 
     await withPage(browser, baseUrl, 'owner', { width: 390, height: 844 }, async page => {
@@ -793,6 +845,10 @@ async function main() {
       await page.evaluate(() => { switchTab('executive'); renderTodayPerformance(); });
       await assertNoHorizontalOverflow(page, 'Bugun performans mobil');
       passed.push('25b. Bugün performans kartları 390 px mobilde taşmaz');
+      await page.evaluate(() => { switchTab('pricing'); });
+      await assertNoHorizontalOverflow(page, 'Fiyatlandirma mobil');
+      await page.screenshot({ path: path.join(__dirname, '..', 'tmp', 'g97-pricing-mobile.png'), fullPage: true });
+      passed.push('32b. fiyatlandırma 390 px mobilde taşmaz');
       // G9 L-207: teknik metin DSL'si yerine gercek gorsel checklist
       // duzenleyicisi mobilde bolum, onemli madde ve alt kontrolu korur.
       // Ayarlar sekmesi acilinca ekip, sablon ve talep kaynagi okumalari

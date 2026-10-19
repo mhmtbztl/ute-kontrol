@@ -91,7 +91,7 @@ function run() {
 
   console.log('\n--- D. SIFIRLAMA ---');
   const reset = (bodies.reset_tenant_data || {});
-  check(['migration_phase78_pricing_research_expense_templates.sql', 'migration_phase97_income_entries.sql'].includes(reset.from) && /'lead_interest_daily'/.test(reset.body)
+  check(['migration_phase78_pricing_research_expense_templates.sql', 'migration_phase97_income_entries.sql', 'migration_phase101_property_daily_prices.sql'].includes(reset.from) && /'lead_interest_daily'/.test(reset.body)
     && /'property_owners'/.test(reset.body) && /'competitor_price_research'/.test(reset.body)
     && !/'lead_source_catalog'/.test(reset.body),
     'D1. Son sifirlama phase59 defterlerini ve phase78 verisini siler, kaynak katalogunu korur', `${reset.from}`);
@@ -105,11 +105,17 @@ function run() {
     && eklenen.every(l => /phase78|expense_template_occurrences|competitor_price_research|expense_templates|property_pricing_rule_settings/.test(l))
     && silinen.length === 0,
     'D2. Govde phase59 ile ayni; yalniz phase78 tablolari eklendi', `eklenen ${JSON.stringify(eklenen)} silinen ${JSON.stringify(silinen)}`);
-  const eklenen97 = lines(reset.body || '').filter(l => !lines(reset78.body || '').includes(l));
-  const silinen97 = lines(reset78.body || '').filter(l => !lines(reset.body || '').includes(l));
-  check(reset.from !== 'migration_phase97_income_entries.sql'
-    || (eklenen97.length > 0 && eklenen97.every(l => /phase97|income_entries/.test(l)) && silinen97.length === 0),
+  const reset97 = lastBodies(['schema.sql', ...files.slice(0, idx('migration_phase97_income_entries.sql') + 1)]).reset_tenant_data || {};
+  const eklenen97 = lines(reset97.body || '').filter(l => !lines(reset78.body || '').includes(l));
+  const silinen97 = lines(reset78.body || '').filter(l => !lines(reset97.body || '').includes(l));
+  check(reset97.from === 'migration_phase97_income_entries.sql'
+    && eklenen97.length > 0 && eklenen97.every(l => /phase97|income_entries/.test(l)) && silinen97.length === 0,
     'D3. phase97 govdesi phase78 ile ayni; yalniz income_entries eklendi', `eklenen ${JSON.stringify(eklenen97)} silinen ${JSON.stringify(silinen97)}`);
+  const eklenen101 = lines(reset.body || '').filter(l => !lines(reset97.body || '').includes(l));
+  const silinen101 = lines(reset97.body || '').filter(l => !lines(reset.body || '').includes(l));
+  check(reset.from !== 'migration_phase101_property_daily_prices.sql'
+    || (eklenen101.length > 0 && eklenen101.every(l => /phase101|property_daily_prices/.test(l)) && silinen101.length === 0),
+    'D4. phase101 govdesi phase97 ile ayni; yalniz property_daily_prices eklendi', `eklenen ${JSON.stringify(eklenen101)} silinen ${JSON.stringify(silinen101)}`);
 
   console.log('\n=============================================================================');
   console.log(`TEST SUMMARY: ${passed} / ${passed + failed} TESTS PASSED (${failed} FAILED)`);

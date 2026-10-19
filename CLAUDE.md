@@ -208,6 +208,22 @@ edilemez. **Kapatılmış ay istisnadır**: kapanış defterin onayıdır, 0 gid
 gerçek 0'dır. Ana sayfa, Finans, kâr köprüsü, aylık KPI tablosu, radar,
 simülatör ve Raporlar aynı yardımcıyı kullanır.
 
+**Arızanın satışa kapattığı gün tek tanımdır: `isTicketBlockingOn(ticket, gün, bugün)`**
+(`core/property_sales_readiness.js`, L-246, 19.10.2026). Kapalı tarih aralığı varsa
+yalnız o aralık kapanır (öncelik ne olursa olsun); aralığı olmayan kritik arıza yalnız
+bugünü kapatır. Hazırlık durumu ve fiyat takvimi (`pricingMaintenanceBlocks`) bunu
+kullanır. Eskiden hazırlık tarihe bakmadan her P1'i kapatıyor, fiyat takvimi yalnız
+"Takvimi kapatır" işaretli kaydı görüyordu; 22–24.10 bakımı bugünü kapatıp fiyatta
+açık görünüyordu. Kapalı tarih girmek takvimi kapatmak demektir (`saveMaint`).
+
+**Fiyat takvimi (9.7, L-247…L-254):** bugünden 3 takvim ayı tek hesap
+(`computePricingCalendar`), ay sekmesi yalnız gösterimi seçer; üst dönem filtresi yalnız
+ADR kartını etkiler. Kural kaynağı: mülk istisnası > portföy (`tenant_settings.pricing_rules`)
+> sistem varsayılanı (`SuggestedPriceEngine.DEFAULTS`); ekranda kaynağıyla yazar. Talep
+kuralı gecenin **ayının** doluluğunu hedef dolulukla karşılaştırır. İşletme etkinlikleri ve
+kapatılan tatiller `tenant_settings.pricing_special_days`. Yıllık hedef = aylık portföy
+hedeflerinin toplamı. Göç gerekmedi. Ağı `g9_feedback_tests` L-246…L-254, tarayıcı kapısı 32/32b.
+
 **Toplu aktarım özeti (`isBulkSummaryBooking`, "TOPLU AKTARIM — Ocak 2026") toplam
 metriklere girer, kayıt ve gün başı metriklere girmez (L-103).** Ciro, gece,
 ADR, doluluk doğrudur; rezervasyon adedi, takvimdeki gün, boş gece tespiti
@@ -685,6 +701,16 @@ döndürür (icra `INSPECTED` değil, temizlik `DONE`/`SKIPPED` değil) ve
 `task_status` ekler; imza aynı, tablo değişmedi. Canlı süit
 `phase55_operations_execution_live_tests` 39/39 (C8b, C9b). Paket:
 `docs/PHASE99_DEPLOY_PACKAGE.md`.
+
+**phase101 (`migration_phase101_property_daily_prices.sql`) 19 Ekim 2026'da test
+projesine uygulandı; üretime henüz uygulanmadı.** Günlük fiyat kaydı (kullanıcı M76,
+L-255): fiyat takviminde gün seçilip öneri onaylanır (`APPROVED`) ya da elle fiyat
+yazılır (`MANUAL`); kayıt referanstır, OTA'ya gitmez, rezervasyon tutarını
+değiştirmez (formda referans olarak görünür). Tam kısıt `(property_id, price_date)`
++ istemci upsert `onConflict` (§5.15). Okuma `can_read_sales`, yazma
+`can_manage_tenant`; sıfırlama listesine eklendi. Göç yokken takvim yalnız öneriyi
+gösterir. Canlı süit `phase101_daily_prices_live_tests` 18/18 (göçten önce kırmızı).
+Paket: `docs/PHASE101_DEPLOY_PACKAGE.md`.
 
 **Bir göçün uygulanıp uygulanmadığı, dosyaya bakarak anlaşılmaz.** Dosya repoda
 durur; veritabanı uygulanmamış olabilir. Doğrulamanın yolu üretime sormaktır:

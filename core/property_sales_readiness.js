@@ -97,11 +97,30 @@
       || ['P1', 'CRITICAL', 'P1_CRITICAL'].includes(priority);
   }
 
+  function ticketDowntimeRange(ticket) {
+    const start = String(ticket?.downtime_start || ticket?.downtimeStart || '').slice(0, 10);
+    const end = String(ticket?.downtime_end || ticket?.downtimeEnd || '').slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(start) && /^\d{4}-\d{2}-\d{2}$/.test(end) && end >= start
+      ? { start, end } : null;
+  }
+
+  // Bir arizanin bir gunu satisa kapatip kapatmadigi tek tanimdir (L-246,
+  // kullanici M70): 22-24.10 icin girilen bakim bugunu kapatiyor, fiyat
+  // ekraninda ise 22-24 acik gorunuyordu. Kapali tarih araligi varsa yalniz o
+  // aralik kapanir (oncelik ne olursa olsun); araligi olmayan kritik ariza
+  // yalniz bugunu (ve gecmisi) kapatir, gelecegi tahmin etmez.
+  function isTicketBlockingOn(ticket, date, today) {
+    if (!isOpenTicket(ticket) || !/^\d{4}-\d{2}-\d{2}$/.test(date || '')) return false;
+    const range = ticketDowntimeRange(ticket);
+    if (range) return date >= range.start && date <= range.end;
+    if (!isBlockingTicket(ticket)) return false;
+    return !/^\d{4}-\d{2}-\d{2}$/.test(today || '') || date <= today;
+  }
+
   function buildPropertyReadiness(property, options) {
     const opts = options || {};
     const openTickets = (opts.maintenanceTickets || [])
       .filter(ticket => isOpenTicket(ticket) && matchesProperty(ticket, property));
-    const blockingTickets = openTickets.filter(isBlockingTicket);
     const manualStatus = normalizeStatus(opts.overrideStatus);
 
     // Temizlik durumu kendiliginden yansir (L-183, kullanici M13): bugun ya da
@@ -109,6 +128,13 @@
     // bekliyor"dur; elle "hazir" secimi bunu ortemez. Gelecek tarihli temizlik
     // bugunu etkilemez. "Yapilmadi" (SKIPPED) bekleyen is degildir.
     const today = /^\d{4}-\d{2}-\d{2}$/.test(opts.today || '') ? opts.today : null;
+    const blockingTickets = today
+      ? openTickets.filter(ticket => isTicketBlockingOn(ticket, today, today))
+      : openTickets.filter(isBlockingTicket);
+    const upcomingBlocks = today ? openTickets
+      .map(ticket => ({ ticket, range: ticketDowntimeRange(ticket) }))
+      .filter(item => item.range && item.range.start > today)
+      .sort((a, b) => a.range.start.localeCompare(b.range.start)) : [];
     const propertyTasks = (opts.cleaningTasks || []).filter(task => task && matchesProperty(task, property));
     const taskDate = task => String(task.date || task.task_date || '').slice(0, 10);
     const taskStatus = task => String(task.status || '').toUpperCase();
@@ -142,6 +168,10 @@
       source = 'MAINTENANCE';
       reason = `${openTickets.length} satışa engel olmayan açık arıza kaydı var.`;
     }
+    if (status !== 'BLOCKED_MAINTENANCE' && upcomingBlocks.length > 0) {
+      const next = upcomingBlocks[0].range;
+      reason += ` Planlı kapatma: ${next.start} – ${next.end}.`;
+    }
 
     return {
       propertyId: property?.id || property?.dbId || null,
@@ -155,6 +185,7 @@
       blockingIssueCount: blockingTickets.length,
       blockingTicketIds: blockingTickets.map(ticket => ticket.id).filter(Boolean),
       pendingCleaningTaskIds: pendingCleaning.map(task => task.id || task.dbId).filter(Boolean),
+      upcomingBlocks: upcomingBlocks.map(item => ({ ticketId: item.ticket.id || null, ...item.range })),
       manualStatus
     };
   }
@@ -168,6 +199,8 @@
     canEdit,
     isOpenTicket,
     isBlockingTicket,
+    ticketDowntimeRange,
+    isTicketBlockingOn,
     buildPropertyReadiness
   };
 }));
