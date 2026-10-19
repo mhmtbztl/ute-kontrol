@@ -241,7 +241,23 @@ async function checkAuthStatus() {
   return false;
 }
 
+// Acilis karari verildi: panel ya da giris ekrani gosterilebilir (M58).
+function endAuthPending() {
+  if (typeof document !== 'undefined') document.body?.classList?.remove('auth-pending');
+}
+
+// Saklanmis oturum yoksa giris ekrani AG BEKLEMEDEN acilir; varsa oturum
+// dogrulanana kadar "yukleniyor" kalir (panel bir an gorunmez).
+function hasStoredAuthSession() {
+  try {
+    return !!createAuthSessionStorage().getItem('LEXBNB_SUPA_AUTH');
+  } catch (_) {
+    return true;
+  }
+}
+
 function showLockOverlay() {
+  endAuthPending();
   const overlay = document.getElementById('securityLockOverlay');
   if (overlay) {
     setApplicationInert(true);
@@ -257,6 +273,7 @@ function hideLockOverlay() {
   const overlay = document.getElementById('securityLockOverlay');
   if (overlay) overlay.style.display = 'none';
   setApplicationInert(false);
+  endAuthPending();
 }
 
 function setApplicationInert(locked) {
@@ -415,7 +432,7 @@ function normalizeCleaningTask(source, villasOrPropertyMap) {
     status,
     completedAt: task.completedAt || task.completed_at || null,
     notes,
-    paymentLabel: paid ? 'Ödendi' : (status === 'DONE' ? 'Ödenecek' : (status === 'SKIPPED' ? 'Yapılmadı' : 'Planlandı'))
+    paymentLabel: paid ? 'Ödendi' : (status === 'DONE' ? 'Ödenecek' : (status === 'SKIPPED' ? 'Gerek kalmadı' : 'Planlandı'))
   };
 }
 
@@ -5192,6 +5209,7 @@ function renderAll() {
   if (lBadge) lBadge.innerText = appData.leads.length;
   const mBadge = document.getElementById('maintCountBadge');
   if (mBadge) mBadge.innerText = appData.maintenance.filter(m => m.status === 'OPEN').length;
+  renderOperationsTabBadge();
 }
 
 // =============================================================
@@ -8244,7 +8262,7 @@ function openBookingDetailsPanel(bookingId) {
   const cleaning = findBookingCleaningTask(booking);
   const lead = (appData.leads || []).find(item => String(item.convertedBookingId || item.converted_booking_id || '') === String(booking.id));
   const cleaningStatus = cleaning
-    ? ({ PLANNED: 'Planlandı', DONE: 'Yapıldı', SKIPPED: 'Yapılmadı' }[cleaning.status] || cleaning.status || '—')
+    ? ({ PLANNED: 'Planlandı', DONE: 'Yapıldı', SKIPPED: 'Gerek kalmadı' }[cleaning.status] || cleaning.status || '—')
     : 'Görev yok';
   const paymentEngine = getBookingPaymentEngine();
   const payments = (appData.bookingPayments || []).filter(item => String(item.booking_id) === String(booking.id));
@@ -8270,7 +8288,7 @@ function openBookingDetailsPanel(bookingId) {
   // Konaklamanin tamami (donem payi degil): liste satiriyla ayni hesap.
   const e = computeReservationRowEconomics(booking, cleaning, '0000-01-01', '9999-12-31');
   const tl = value => `${Number(value || 0).toLocaleString('tr-TR', { maximumFractionDigits: 2 })} ₺`;
-  const temizlikMaliyeti = !cleaning ? 'Girilmedi' : !e.cleaning ? 'Yapılmadı (gider yok)' : e.cleaning.amount === null ? 'Bilinmiyor' : `${tl(e.cleaning.amount)} (${e.cleaning.done ? 'yapıldı' : 'planlı'})`;
+  const temizlikMaliyeti = !cleaning ? 'Girilmedi' : !e.cleaning ? 'Gerek kalmadı (gider yok)' : e.cleaning.amount === null ? 'Bilinmiyor' : `${tl(e.cleaning.amount)} (${e.cleaning.done ? 'yapıldı' : 'planlı'})`;
   const detailHtml = (label, value) => `<div class="booking-detail-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value == null || value === '' ? '—' : String(value))}</strong></div>`;
   const bodyHtml = `<div class="booking-detail-grid">
     ${detailHtml('Mülk', villaName)}
@@ -8371,7 +8389,7 @@ function renderManageBookingsTable() {
       e.tax > 0 ? `Vergi −${para(e.tax)}` : '',
       e.commission > 0 ? `Komisyon −${para(e.commission)}` : '',
       !cleaningTask ? (isBulkSummaryBooking(b) ? '' : 'Temizlik maliyeti girilmedi')
-        : !e.cleaning ? 'Temizlik yapılmadı (gider yok)'
+        : !e.cleaning ? 'Temizliğe gerek kalmadı (gider yok)'
         : e.cleaning.amount === null ? 'Temizlik maliyeti bilinmiyor'
         : e.cleaning.inRange ? `Temizlik −${para(e.cleaning.amount)} (${e.cleaning.done ? 'yapıldı' : 'planlı'})`
         : `Temizlik ${para(e.cleaning.amount)} → ${formatTrDate(e.cleaning.date)} döneminde`
@@ -10422,25 +10440,139 @@ function settingsChecklistNormalizer(items) {
     : { valid: false, errors: ['Kontrol listesi doğrulayıcısı yüklenemedi.'], checklist: null };
 }
 
+// Duzenleyici bir kagit kontrol listesi gibi gorunur (M60, 9.5.3): bolum
+// basligi, altinda kutucuklu maddeler, maddenin altinda alt kontroller.
+// Eskiden her satir "Bolum adi / Kontrol maddesi / Alt kontrol" etiketli kutu
+// ve uc dugmeden olusuyordu; ucte birlik bolmede alanlar ust uste biniyordu.
+// Etiketler ekran okuyucu icin durur (sr-only). Enter yeni satir acar.
 function checklistBuilderActionsHtml(kind, sectionIndex, itemIndex = -1, childIndex = -1) {
   const args = `'${kind}', ${sectionIndex}, ${itemIndex}, ${childIndex}`;
-  return `<span class="checklist-builder-actions"><button type="button" class="btn btn-secondary btn-sm" aria-label="Yukarı taşı" data-onclick="moveChecklistBuilderNode(${args}, -1)">↑</button><button type="button" class="btn btn-secondary btn-sm" aria-label="Aşağı taşı" data-onclick="moveChecklistBuilderNode(${args}, 1)">↓</button><button type="button" class="btn btn-secondary btn-sm" aria-label="Sil" data-onclick="removeChecklistBuilderNode(${args})">Sil</button></span>`;
+  return `<span class="checklist-builder-actions"><button type="button" class="checklist-doc-icon" aria-label="Yukarı taşı" title="Yukarı taşı" data-onclick="moveChecklistBuilderNode(${args}, -1)">↑</button><button type="button" class="checklist-doc-icon" aria-label="Aşağı taşı" title="Aşağı taşı" data-onclick="moveChecklistBuilderNode(${args}, 1)">↓</button><button type="button" class="checklist-doc-icon checklist-doc-icon--danger" aria-label="Sil" title="Sil" data-onclick="removeChecklistBuilderNode(${args})">✕</button></span>`;
+}
+
+function checklistBuilderKeyAttr(kind, sectionIndex, itemIndex = -1, childIndex = -1) {
+  return `data-onkeydown="checklistBuilderKeydown(event, '${kind}', ${sectionIndex}, ${itemIndex}, ${childIndex})"`;
 }
 
 function settingsChecklistSectionHtml(section, sectionIndex) {
   const items = (section.items || []).map((item, itemIndex) => {
-    const subs = (item.subChecks || []).map((subCheck, subIndex) => `<div class="checklist-builder-sub" data-checklist-sub><label>Alt kontrol <input type="text" maxlength="300" value="${escapeHtml(subCheck)}" placeholder="Örn. Fırın içi"></label>${checklistBuilderActionsHtml('sub', sectionIndex, itemIndex, subIndex)}</div>`).join('');
+    const subs = (item.subChecks || []).map((subCheck, subIndex) => `<div class="checklist-builder-sub" data-checklist-sub><span class="checklist-doc-box" aria-hidden="true"></span><label class="checklist-doc-field"><span class="sr-only">Alt kontrol</span><input type="text" maxlength="300" value="${escapeHtml(subCheck)}" placeholder="Alt kontrol" ${checklistBuilderKeyAttr('sub', sectionIndex, itemIndex, subIndex)}></label>${checklistBuilderActionsHtml('sub', sectionIndex, itemIndex, subIndex)}</div>`).join('');
     return `<div class="checklist-builder-item" data-checklist-item>
-      <div class="checklist-builder-item-main"><label>Kontrol maddesi <input type="text" maxlength="500" data-checklist-item-text value="${escapeHtml(item.text || '')}" placeholder="Örn. Kapı kodu denendi"></label><label class="checklist-builder-important"><input type="checkbox" data-checklist-important ${item.important ? 'checked' : ''}> Önemli / zorunlu</label></div>
-      ${checklistBuilderActionsHtml('item', sectionIndex, itemIndex)}
-      <div class="checklist-builder-subs">${subs}<button type="button" class="btn btn-secondary btn-sm" data-onclick="addChecklistBuilderSubCheck(${sectionIndex}, ${itemIndex})">+ Alt kontrol</button></div>
+      <div class="checklist-builder-item-main"><span class="checklist-doc-box" aria-hidden="true"></span><label class="checklist-doc-field"><span class="sr-only">Kontrol maddesi</span><input type="text" maxlength="500" data-checklist-item-text value="${escapeHtml(item.text || '')}" placeholder="Kontrol maddesi (örn. Bulaşıklar yıkandı mı)" ${checklistBuilderKeyAttr('item', sectionIndex, itemIndex)}></label><label class="checklist-builder-important" title="Tamamlanmadan iş kapatılamaz"><input type="checkbox" data-checklist-important ${item.important ? 'checked' : ''}> Zorunlu</label>${checklistBuilderActionsHtml('item', sectionIndex, itemIndex)}</div>
+      <div class="checklist-builder-subs">${subs}<button type="button" class="checklist-doc-add" data-onclick="addChecklistBuilderSubCheck(${sectionIndex}, ${itemIndex})">+ alt kontrol</button></div>
     </div>`;
   }).join('');
   return `<section class="checklist-builder-section" data-checklist-section>
-    <div class="checklist-builder-section-head"><label>Bölüm adı <input type="text" maxlength="200" data-checklist-section-title value="${escapeHtml(section.title || '')}" placeholder="Örn. Mutfak"></label>${checklistBuilderActionsHtml('section', sectionIndex)}</div>
+    <div class="checklist-builder-section-head"><label class="checklist-doc-field checklist-doc-heading"><span class="sr-only">Bölüm adı</span><input type="text" maxlength="200" data-checklist-section-title value="${escapeHtml(section.title || '')}" placeholder="Bölüm başlığı (örn. Mutfak)" ${checklistBuilderKeyAttr('section', sectionIndex)}></label>${checklistBuilderActionsHtml('section', sectionIndex)}</div>
     <div data-checklist-items>${items}</div>
-    <button type="button" class="btn btn-secondary btn-sm" data-onclick="addChecklistBuilderItem(${sectionIndex})">+ Madde ekle</button>
+    <button type="button" class="checklist-doc-add" data-onclick="addChecklistBuilderItem(${sectionIndex})">+ madde</button>
   </section>`;
+}
+
+function settingsChecklistSupplyHtml(supply, index) {
+  return `<div class="checklist-builder-supply" data-checklist-supply><span class="checklist-doc-box" aria-hidden="true"></span><label class="checklist-doc-field"><span class="sr-only">Malzeme</span><input type="text" maxlength="300" data-checklist-supply-item value="${escapeHtml(supply.item || '')}" placeholder="Malzeme (örn. Çay)" ${checklistBuilderKeyAttr('supply', -1, -1, index)}></label><label class="checklist-doc-field checklist-doc-area"><span class="sr-only">Alan</span><input type="text" maxlength="200" data-checklist-supply-area value="${escapeHtml(supply.area || '')}" placeholder="Alan (isteğe bağlı)"></label>${checklistBuilderActionsHtml('supply', -1, -1, index)}</div>`;
+}
+
+// Enter: ayni duzeyde altina yeni satir (bolum basliginda ilk maddeye gider).
+// Yeni satira odaklanilir; kullanici fareye donmeden yazmaya devam eder.
+function checklistBuilderKeydown(event, kind, sectionIndex, itemIndex = -1, childIndex = -1) {
+  if (!event || event.key !== 'Enter' || event.isComposing) return true;
+  event.preventDefault?.();
+  if (kind === 'section') {
+    const draft = readSettingsChecklistBuilder();
+    if (!draft.sections[sectionIndex]?.items.length) mutateSettingsChecklistBuilder(next => next.sections[sectionIndex]?.items.push({ text: '', important: false, subChecks: [] }));
+    focusChecklistBuilderInput('item', sectionIndex, 0);
+    return false;
+  }
+  if (kind === 'item') {
+    mutateSettingsChecklistBuilder(draft => draft.sections[sectionIndex]?.items.splice(itemIndex + 1, 0, { text: '', important: false, subChecks: [] }));
+    focusChecklistBuilderInput('item', sectionIndex, itemIndex + 1);
+  } else if (kind === 'sub') {
+    mutateSettingsChecklistBuilder(draft => draft.sections[sectionIndex]?.items[itemIndex]?.subChecks.splice(childIndex + 1, 0, ''));
+    focusChecklistBuilderInput('sub', sectionIndex, itemIndex, childIndex + 1);
+  } else if (kind === 'supply') {
+    mutateSettingsChecklistBuilder(draft => draft.supplies.splice(childIndex + 1, 0, { area: '', item: '' }));
+    focusChecklistBuilderInput('supply', -1, -1, childIndex + 1);
+  }
+  return false;
+}
+
+function focusChecklistBuilderInput(kind, sectionIndex, itemIndex = -1, childIndex = -1) {
+  if (typeof document === 'undefined') return false;
+  let input = null;
+  if (kind === 'supply') {
+    input = document.querySelectorAll('#settingsChecklistSupplyRows [data-checklist-supply-item]')[childIndex];
+  } else {
+    const section = document.querySelectorAll('#settingsChecklistBuilder [data-checklist-section]')[sectionIndex];
+    const item = section?.querySelectorAll(':scope > [data-checklist-items] > [data-checklist-item]')[itemIndex];
+    input = kind === 'sub' ? item?.querySelectorAll('[data-checklist-sub] input')[childIndex] : item?.querySelector('[data-checklist-item-text]');
+  }
+  input?.focus?.();
+  return !!input;
+}
+
+// Word'den ya da duz metinden yapistirma. Girinti duzeyi bolum / madde / alt
+// kontrolu belirler; madde imleri (☐, •, -, 1.) atilir. Girinti hic yoksa
+// ":" ile biten ya da "#" ile baslayan satir bolumdur. "Malzeme" ile baslayan
+// bolumun altindakiler malzeme listesidir. "!" ile baslayan madde zorunludur.
+function checklistIndentedTextToItems(text) {
+  const rows = String(text || '').split(/\r?\n/).map(raw => {
+    const expanded = raw.replace(/\t/g, '    ');
+    const indent = expanded.length - expanded.trimStart().length;
+    let line = expanded.trim()
+      .replace(/^(?:[☐☑☒□■▪•◦·○●▫◻◼✓✔\-*–—]|\[\s?[xX]?\s?\])\s*/, '')
+      .replace(/^(?:\d{1,2}|[a-zA-Z])[.)]\s+/, '')
+      .trim();
+    const heading = line.startsWith('#');
+    if (heading) line = line.replace(/^#+\s*/, '');
+    return { indent, line, heading };
+  }).filter(row => row.line);
+  if (!rows.length) return { sections: [], supplies: [] };
+  const indents = [...new Set(rows.map(row => row.indent))].sort((a, b) => a - b);
+  const flat = indents.length === 1;
+  const sections = [];
+  const supplies = [];
+  let section = null;
+  let item = null;
+  let supplyMode = false;
+  const isSectionRow = row => (flat ? (row.heading || /:$/.test(row.line)) : (row.heading || indents.indexOf(row.indent) === 0));
+  rows.forEach(row => {
+    const level = flat ? 1 : Math.min(2, indents.indexOf(row.indent));
+    if (isSectionRow(row)) {
+      const title = row.line.replace(/:$/, '').trim();
+      supplyMode = /^malzeme/i.test(title.toLocaleLowerCase('tr'));
+      item = null;
+      if (!supplyMode) { section = { title, items: [] }; sections.push(section); }
+      return;
+    }
+    if (supplyMode) { supplies.push({ area: '', item: row.line.replace(/^!\s*/, '') }); return; }
+    if (level >= 2 && item) { item.subChecks.push(row.line.replace(/^!\s*/, '')); return; }
+    if (!section) { section = { title: 'Genel', items: [] }; sections.push(section); }
+    const important = row.line.startsWith('!') || /\(zorunlu\)$/i.test(row.line);
+    item = { text: row.line.replace(/^!\s*/, '').replace(/\s*\(zorunlu\)$/i, '').trim(), important, subChecks: [] };
+    section.items.push(item);
+  });
+  return { sections: sections.filter(entry => entry.items.length), supplies };
+}
+
+function importChecklistFromText() {
+  if (typeof document === 'undefined') return false;
+  const box = document.getElementById('settingsChecklistPaste');
+  const parsed = checklistIndentedTextToItems(box?.value || '');
+  if (!parsed.sections.length && !parsed.supplies.length) {
+    showToast('Yapıştırılan metinde madde bulunamadı.', 'error');
+    return false;
+  }
+  const current = readSettingsChecklistBuilder();
+  // Bos taslaktaki varsayilan "Genel" basligi icerik sayilmaz.
+  const hasContent = current.sections.some(section => section.items.some(item => item.text)) || current.supplies.some(supply => supply.item);
+  if (hasContent && !confirm('Düzenleyicideki liste yapıştırılan metinle değiştirilsin mi?')) return false;
+  const draft = parsed.sections.length ? parsed : { sections: defaultSettingsChecklistDraft().sections, supplies: parsed.supplies };
+  renderSettingsChecklistBuilder(draft);
+  if (box) box.value = '';
+  const itemCount = parsed.sections.reduce((sum, section) => sum + section.items.length, 0);
+  showToast(`${parsed.sections.length} bölüm, ${itemCount} madde, ${parsed.supplies.length} malzeme aktarıldı. Kontrol edip kaydedin.`, 'success');
+  return true;
 }
 
 function renderSettingsChecklistBuilder(items = defaultSettingsChecklistDraft()) {
@@ -10463,7 +10595,7 @@ function renderSettingsChecklistBuilder(items = defaultSettingsChecklistDraft())
   builder.dataset.invalid = 'false';
   builder.dataset.ready = 'true';
   builder.innerHTML = normalized.checklist.sections.map(settingsChecklistSectionHtml).join('');
-  supplyRows.innerHTML = normalized.checklist.supplies.map((supply, index) => `<div class="checklist-builder-supply" data-checklist-supply><div class="checklist-builder-meta"><label>Alan <input type="text" maxlength="200" data-checklist-supply-area value="${escapeHtml(supply.area || '')}" placeholder="Örn. Mutfak"></label><label>Malzeme <input type="text" maxlength="300" data-checklist-supply-item value="${escapeHtml(supply.item || '')}" placeholder="Örn. Çay"></label></div>${checklistBuilderActionsHtml('supply', -1, -1, index)}</div>`).join('');
+  supplyRows.innerHTML = normalized.checklist.supplies.map(settingsChecklistSupplyHtml).join('');
   toggleSettingsChecklistSupplyVisibility();
   return true;
 }
@@ -10752,7 +10884,10 @@ async function createSettingsChecklistTemplate(event) {
   cancelSettingsChecklistEdit();
   await loadSettingsCatalogs();
   renderSettingsTemplates();
-  showToast(wasEditing ? 'Kontrol listesi güncellendi.' : 'Kontrol listesi kaydedildi.', 'success');
+  // Yeni liste, atanmis ama baslanmamis temizliklere de gider (M61).
+  const refresh = taskType === 'CLEANING' ? await refreshUnstartedCleaningChecklists() : { refreshed: 0 };
+  const refreshNote = refresh.refreshed ? ` Başlanmamış ${refresh.refreshed} temizlik görevi yeni listeyi aldı.` : '';
+  showToast((wasEditing ? 'Kontrol listesi güncellendi.' : 'Kontrol listesi kaydedildi.') + refreshNote, 'success');
   return true;
 }
 
@@ -10811,6 +10946,7 @@ async function archiveSettingsTemplate(kind, id, isActive = false) {
   }
   await loadSettingsCatalogs();
   renderSettingsTemplates();
+  if (kind === 'checklist' && item.task_type === 'CLEANING') await refreshUnstartedCleaningChecklists();
   showToast(isActive ? 'Şablon yeniden etkinleştirildi.' : 'Şablon arşivlendi.', 'success');
   return true;
 }
@@ -12121,9 +12257,20 @@ if (typeof document !== 'undefined') {
     wireAccessibleFormLabels();
     if (isBrowserQualityFixture()) {
       installBrowserQualityFixture(new URLSearchParams(window.location.search).get('role') || 'owner');
+      endAuthPending();
       return;
     }
-    const isAuth = await checkAuthStatus();
+    if (!hasStoredAuthSession() && !readEmailTokenHashLink(window.location.search) && !isPasswordRecoveryRedirect()) {
+      showLockOverlay();
+    }
+    // Ag takilirsa ekran sonsuza dek "yukleniyor" kalmaz; eski davranisa doner.
+    setTimeout(endAuthPending, 15000);
+    let isAuth = false;
+    try {
+      isAuth = await checkAuthStatus();
+    } finally {
+      endAuthPending();
+    }
     if (!isAuth) {
       if (typeof getBlankTenantData === 'function') {
         appData = getBlankTenantData('guest');
@@ -12400,7 +12547,7 @@ function renderDailyOps() {
             </div>
           </div>
           <span class="badge ${isPaid ? 'badge-emerald' : (task.status === 'DONE' ? 'badge-amber' : (task.status === 'SKIPPED' ? '' : 'badge-blue'))}" style="font-size: 10px; font-weight: 700; white-space: nowrap;">
-            ${isPaid ? '✅ Ödendi' : (task.status === 'DONE' ? '⏳ Borç' : (task.status === 'SKIPPED' ? '✖ Yapılmadı' : '🗓️ Planlı'))}
+            ${isPaid ? '✅ Ödendi' : (task.status === 'DONE' ? '⏳ Borç' : (task.status === 'SKIPPED' ? '✖ Gerek kalmadı' : '🗓️ Planlı'))}
           </span>
         </div>
 
@@ -12513,18 +12660,20 @@ async function markCleaningDone(taskId) {
   return ok;
 }
 
-/** Temizlik YAPILMADI (gelmeyen misafir, iptal): ne gider ne borc. */
+/** Temizlige GEREK KALMADI (gelmeyen misafir, iptal): ne gider ne borc.
+ * Etiket eskiden "Yapilmadi"ydi; kullanici aksamis is algisi yarattigini
+ * soyledi (M63, 9.5.8). Durum kodu SKIPPED aynen kalir. */
 async function markCleaningSkipped(taskId) {
   const task = findCleaningTask(taskId);
   if (!task) return false;
   if (task.paid) {
-    alert('Ödenmiş bir temizlik "yapılmadı" yapılamaz. Önce ödemeyi geri alın.');
+    alert('Ödenmiş bir temizlik "gerek kalmadı" yapılamaz. Önce ödemeyi geri alın.');
     return false;
   }
-  if (!confirm('Bu temizlik yapılmadı olarak işaretlensin mi? Gider ve personel borcu oluşmaz.')) return false;
+  if (!confirm('Bu temizliğe gerek kalmadı olarak işaretlensin mi (misafir gelmedi, iptal, ev kullanılmadı)? Gider ve personel borcu oluşmaz.')) return false;
   task.status = 'SKIPPED';
   renderHousekeepingTab();
-  const ok = await reportCleaningPersist(task, '⏭️ Temizlik yapılmadı olarak işaretlendi; gider ve borç oluşmaz.');
+  const ok = await reportCleaningPersist(task, '⏭️ Temizliğe gerek kalmadı olarak işaretlendi; gider ve borç oluşmaz.');
   if (typeof renderFinanceModule === 'function') renderFinanceModule();
   return ok;
 }
@@ -12702,11 +12851,11 @@ function renderHousekeepingTab() {
       durum = `<span class="badge badge-emerald">✔ Yapıldı</span>`
         + (isPaid ? '' : ` <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:10px;" data-onclick="markCleaningPlanned(decodeURIComponent('${encodeActionArg(task.id)}'))" title="Yanlışlıkla işaretlendiyse geri al">↩︎</button>`);
     } else if (task.status === 'SKIPPED') {
-      durum = `<span class="badge">Yapılmadı</span> <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:10px;" data-onclick="markCleaningPlanned(decodeURIComponent('${encodeActionArg(task.id)}'))" title="Geri al">↩︎</button>`;
+      durum = `<span class="badge">Gerek kalmadı</span> <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:10px;" data-onclick="markCleaningPlanned(decodeURIComponent('${encodeActionArg(task.id)}'))" title="Geri al">↩︎</button>`;
     } else {
       durum = `<span class="badge ${gecmisPlanli ? 'badge-amber' : 'badge-blue'}">${gecmisPlanli ? 'Yapıldı mı?' : 'Planlandı'}</span>
         <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:10px; margin-left:4px;" data-onclick="markCleaningDone(decodeURIComponent('${encodeActionArg(task.id)}'))">✔ Yapıldı</button>
-        <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:10px;" data-onclick="markCleaningSkipped(decodeURIComponent('${encodeActionArg(task.id)}'))">✖ Yapılmadı</button>`;
+        <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:10px;" data-onclick="markCleaningSkipped(decodeURIComponent('${encodeActionArg(task.id)}'))" title="Misafir gelmedi, iptal ya da ev kullanılmadı: gider ve borç oluşmaz">✖ Gerek kalmadı</button>`;
     }
 
     let odeme;
@@ -17228,6 +17377,83 @@ async function savePropertyOwnerFromForm(propertyId) {
   return { removed: true };
 }
 
+// Saha ve giris bilgileri (M59, 9.5.3): property_guest_settings phase10'dan
+// beri vardi ve temizlikci kartini o besliyordu (fn_property_access_json), ama
+// tabloya yazan hicbir ekran yoktu; kart her evde "—" gosteriyordu.
+// Yazma RLS ile yonetim rollerine acik (phase41), goc gerekmedi.
+const PROPERTY_ACCESS_FIELDS = {
+  address_text: 'propAccessAddress', map_url: 'propAccessMapUrl', door_code: 'propAccessDoorCode',
+  wifi_name: 'propAccessWifiName', wifi_password: 'propAccessWifiPassword',
+  check_out_time: 'propAccessCheckOut', check_in_time: 'propAccessCheckIn',
+  parking_instructions: 'propAccessParking', arrival_instructions: 'propAccessArrival',
+  emergency_contact: 'propAccessEmergency'
+};
+let propertyAccessLoadedRow = null;
+
+function setPropertyAccessStatus(message) {
+  const status = document.getElementById('propAccessStatus');
+  if (status) status.textContent = message || '';
+}
+
+function resetPropertyAccessForm() {
+  propertyAccessLoadedRow = null;
+  Object.values(PROPERTY_ACCESS_FIELDS).forEach(id => {
+    const element = document.getElementById(id);
+    if (element) element.value = '';
+  });
+  setPropertyAccessStatus('');
+}
+
+async function loadPropertyAccessForm(propertyId) {
+  resetPropertyAccessForm();
+  if (!propertyId || !isCloudTenant(getActiveTenantId())) return null;
+  const { data, error } = await supabaseClient.from('property_guest_settings').select('*')
+    .eq('tenant_id', getActiveTenantId()).eq('property_id', propertyId).maybeSingle();
+  if (error) {
+    setPropertyAccessStatus('Giriş bilgileri okunamadı: ' + kullaniciMesaji(error.message || ''));
+    return null;
+  }
+  propertyAccessLoadedRow = data || null;
+  Object.entries(PROPERTY_ACCESS_FIELDS).forEach(([column, id]) => {
+    const element = document.getElementById(id);
+    const raw = data?.[column] ? String(data[column]) : '';
+    if (element) element.value = column.endsWith('_time') ? raw.slice(0, 5) : raw;
+  });
+  return data;
+}
+
+// Harita bos ama konum koordinati girilmisse baglanti koordinattan uretilir:
+// ayni veri, uydurma degil.
+function readPropertyAccessForm() {
+  const value = id => String(document.getElementById(id)?.value ?? '').trim();
+  const row = {};
+  Object.entries(PROPERTY_ACCESS_FIELDS).forEach(([column, id]) => { row[column] = value(id) || null; });
+  if (row.map_url && !/^https?:\/\//i.test(row.map_url)) row.map_url = `https://${row.map_url}`;
+  const lat = Number(value('propAnalysisLatitude'));
+  const lng = Number(value('propAnalysisLongitude'));
+  if (!row.map_url && value('propAnalysisLatitude') && value('propAnalysisLongitude') && Number.isFinite(lat) && Number.isFinite(lng)) {
+    row.map_url = `https://www.google.com/maps?q=${lat},${lng}`;
+  }
+  return row;
+}
+
+async function savePropertyAccessFromForm(propertyId) {
+  if (!propertyId || !canManageTenantRole(activeTenant?.role)) return { skipped: true };
+  const row = readPropertyAccessForm();
+  const filled = Object.values(row).some(Boolean);
+  if (!filled && !propertyAccessLoadedRow) return { skipped: true };
+  const tenantId = getActiveTenantId();
+  requireCloudForWrite('Saha ve giriş bilgileri', tenantId);
+  // Saat sutunlari NULL olunca misafir mesajlari varsayilan saati kaybeder;
+  // bos saat yazilmaz, mevcut deger korunur.
+  if (!row.check_in_time) delete row.check_in_time;
+  if (!row.check_out_time) delete row.check_out_time;
+  const { error } = await supabaseClient.from('property_guest_settings')
+    .upsert({ ...row, tenant_id: tenantId, property_id: propertyId }, { onConflict: 'tenant_id,property_id' });
+  if (error) throw error;
+  return { saved: true };
+}
+
 async function refreshPropertyProfileRows() {
   if (!supabaseClient || !isCloudTenant(getActiveTenantId())) return false;
   const tenantId = getActiveTenantId();
@@ -17264,6 +17490,7 @@ function openPropertyModal(villaKey = null) {
   document.getElementById('propEditKey').value = '';
   if (typeof resetPropertyAnalysisContextForm === 'function') resetPropertyAnalysisContextForm();
   populatePropertyOwnerForm();
+  resetPropertyAccessForm();
 
   let deleteBtn = document.getElementById('propDeleteBtn');
   if (!deleteBtn) {
@@ -17298,6 +17525,7 @@ function openPropertyModal(villaKey = null) {
     if (activationInput) activationInput.value = v.activationDate || '';
     if (typeof loadPropertyAnalysisContextForm === 'function') loadPropertyAnalysisContextForm(v.id);
     populatePropertyOwnerForm(v.id);
+    loadPropertyAccessForm(v.id);
     if (deleteBtn) {
       deleteBtn.style.display = 'inline-block';
     }
@@ -17399,6 +17627,11 @@ async function saveProperty(e) {
         await savePropertyOwnerFromForm(savedProperty.id);
       } catch (ownerError) {
         contextWarning += '\n\n⚠️ Mülk kaydedildi; mülk sahibi kaydedilemedi: ' + kullaniciMesaji(ownerError?.message || '');
+      }
+      try {
+        await savePropertyAccessFromForm(savedProperty.id);
+      } catch (accessError) {
+        contextWarning += '\n\n⚠️ Mülk kaydedildi; saha ve giriş bilgileri kaydedilemedi: ' + kullaniciMesaji(accessError?.message || '');
       }
       // Konum ve sahip veritabanina yazildi ama bellekteki kopya eski
       // kaliyordu: profil sayfa yenilenene kadar "Belirtilmedi" gosteriyordu (L-213).
@@ -19888,7 +20121,7 @@ async function saveStaffCleaningProgress(executionId) {
 
 async function signStaffCleaningDone(executionId) {
   const row = staffFieldWork.cleanings.find(item => item.execution_id === executionId);
-  const completion = row ? getOperationsApi()?.checklistCompletionState?.(row.checklist, row.checklist_result || {}) : null;
+  const completion = row ? staffCleaningCompletionState(row) : null;
   if (!row || !completion?.canComplete) {
     const detail = completion?.errors?.[0] || `${completion?.missingKeys?.length || 0} önemli kontrol eksik.`;
     if (typeof showToast === 'function') showToast('⚠️ Temizlik tamamlanamaz: ' + detail, 'error');
@@ -19976,6 +20209,49 @@ async function saveMyOperationalTaskChecklist(taskId, status = 'IN_PROGRESS') {
   return true;
 }
 
+const STAFF_CLEANING_STATUS_LABELS = { ASSIGNED: 'Açık', IN_PROGRESS: 'Devam ediyor', REOPENED: 'Yeniden açıldı', CLEANED: 'Denetim bekliyor' };
+
+// Temizlikcinin ekraninda kalan is: imzalanmamis ya da denetim bekleyen.
+// Onaylanan (INSPECTED) ve yoneticinin kapattigi (yapildi / gerek kalmadi) is
+// listeden duser (M62, 9.5.4–9.5.5): onaydan sonra "Onaylandi" karti
+// duruyor, dogrudan kapatilan is "Acik" kaliyordu. task_status phase99'dan
+// gelir; goc yokken onaylanan is yine burada elenir.
+function isStaffCleaningVisible(row) {
+  if (!row || row.status === 'INSPECTED') return false;
+  return !['DONE', 'SKIPPED'].includes(String(row.task_status || '').toUpperCase());
+}
+
+// Bos kontrol listesi "liste yok" demektir, Z imzasini kilitlemez. Sunucu
+// (fn_checklist_critical_complete) bos listeyi zaten tamam sayiyordu; istemci
+// sablon editorunun "en az bir bolum" kuralini imzaya da uyguluyordu ve liste
+// atamadan sonra eklenen evde temizlikci isi hic kapatamiyordu (M61, 9.5.4).
+function staffCleaningCompletionState(row) {
+  const sections = row?.checklist?.sections;
+  if (!Array.isArray(sections) || !sections.length) return { canComplete: true, missingKeys: [], errors: [] };
+  return getOperationsApi()?.checklistCompletionState?.(row.checklist, row.checklist_result || {})
+    || { canComplete: false, missingKeys: [], errors: ['Kontrol listesi doğrulayıcısı yüklenemedi.'] };
+}
+
+// Giris bilgisi property_guest_settings'ten gelir (fn_property_access_json).
+// Bos alan kutusu cizilmez; hic bilgi yoksa nereden girilecegi soylenir
+// (M59, 9.5.3: kart dort "—" gosteriyordu ve bu alanlari yazan ekran yoktu).
+function staffAccessHtml(access) {
+  const a = access || {};
+  const text = value => String(value ?? '').trim();
+  const mapUrl = /^https?:\/\//i.test(text(a.map_url)) ? text(a.map_url) : '';
+  const cells = [];
+  const cell = (label, valueHtml) => cells.push(`<div><strong>${escapeHtml(label)}</strong><span>${valueHtml}</span></div>`);
+  if (text(a.address) || mapUrl) cell('Adres', `${escapeHtml(text(a.address) || '—')}${mapUrl ? ` <a href="${escapeHtml(mapUrl)}" target="_blank" rel="noopener noreferrer">Haritada aç ↗</a>` : ''}`);
+  if (text(a.door_code)) cell('Kapı kodu', escapeHtml(text(a.door_code)));
+  if (text(a.wifi_name) || text(a.wifi_password)) cell('Wi-Fi', `${escapeHtml(text(a.wifi_name) || '—')}${text(a.wifi_password) ? ` · şifre: ${escapeHtml(text(a.wifi_password))}` : ''}`);
+  if (text(a.check_out_time) || text(a.check_in_time)) cell('Çıkış → giriş saati', `${escapeHtml(text(a.check_out_time) || '—')} → ${escapeHtml(text(a.check_in_time) || '—')}`);
+  if (text(a.parking)) cell('Otopark', escapeHtml(text(a.parking)));
+  if (text(a.arrival)) cell('Varış tarifi', escapeHtml(text(a.arrival)));
+  if (text(a.emergency_contact)) cell('Acil durumda', escapeHtml(text(a.emergency_contact)));
+  if (!cells.length) return '<p class="sub-text staff-access-empty">Bu evin giriş bilgileri (adres, kapı kodu, Wi-Fi) girilmemiş. Yöneticiniz <strong>Mülkler → ✏️ Düzenle → Saha ve giriş bilgileri</strong> bölümünden ekler.</p>';
+  return `<div class="staff-access">${cells.join('')}</div>`;
+}
+
 function renderStaffFieldWork() {
   if (typeof document === 'undefined') return;
   const container = document.getElementById('staffFieldWorkContainer');
@@ -19984,16 +20260,33 @@ function renderStaffFieldWork() {
     container.innerHTML = `<div class="empty-state">${escapeHtml(staffFieldWork.error)}</div>`;
     return;
   }
-  const rows = staffFieldWork.cleanings || [];
+  const rows = (staffFieldWork.cleanings || []).filter(isStaffCleaningVisible);
   container.innerHTML = rows.length ? rows.map(row => {
-    const access = row.access || {};
-    const locked = ['CLEANED', 'INSPECTED'].includes(row.status);
-    const statusLabel = row.status === 'INSPECTED' ? 'Onaylandı' : (row.status === 'CLEANED' ? 'Denetim bekliyor' : 'Açık');
-    const sections = (row.checklist?.sections || []).map((section, sectionIndex) => `<fieldset class="staff-check-section"><legend>${escapeHtml(section.title || 'Kontrol')}</legend>${(section.items || []).map((item, itemIndex) => { const key = `s${sectionIndex}.i${itemIndex}`; const checked = row.checklist_result?.[key]?.z === true; const subChecks = (item.subChecks || []).map((subCheck, subIndex) => { const subKey = `${key}.sub${subIndex}`; const subChecked = row.checklist_result?.[subKey]?.z === true; return `<label style="margin-left:22px"><input type="checkbox" ${subChecked ? 'checked' : ''} ${locked ? 'disabled' : ''} data-onchange="setStaffChecklistMark(decodeURIComponent('${encodeActionArg(row.execution_id)}'), decodeURIComponent('${encodeActionArg(subKey)}'), this.checked)"> ${escapeHtml(subCheck)}</label>`; }).join(''); return `<label><input type="checkbox" ${checked ? 'checked' : ''} ${locked ? 'disabled' : ''} data-onchange="setStaffChecklistMark(decodeURIComponent('${encodeActionArg(row.execution_id)}'), decodeURIComponent('${encodeActionArg(key)}'), this.checked)"> ${item.important ? '<strong>Önemli · </strong>' : ''}${escapeHtml(item.text || '—')}</label>${subChecks}`; }).join('')}</fieldset>`).join('');
-    const supplies = (row.checklist?.supplies || []).map((item, index) => { const current = row.supplies_result?.[String(index)] || ''; return `<label class="staff-supply"><span>${escapeHtml(item.item || '—')}</span><select ${locked ? 'disabled' : ''} data-onchange="setStaffSupplyStatus(decodeURIComponent('${encodeActionArg(row.execution_id)}'), '${index}', this.value)"><option value="">Seçin…</option><option value="OK"${current === 'OK' ? ' selected' : ''}>Var</option><option value="LOW"${current === 'LOW' ? ' selected' : ''}>Az var</option><option value="OUT"${current === 'OUT' ? ' selected' : ''}>Yok</option></select></label>`; }).join('');
-    const lockedMessage = row.status === 'INSPECTED' ? 'Yönetici denetimi tamamlandı.' : 'Z imzanız kayıtlı; yönetici denetimi bekleniyor.';
-    return `<article class="staff-field-card"><header><div><h2>${escapeHtml(row.property?.name || '—')}</h2><span>${escapeHtml(row.task_date || '—')} · Sonraki giriş: ${escapeHtml(row.next_check_in || '—')}</span></div><span class="badge">${statusLabel}</span></header><div class="staff-access"><div><strong>Adres</strong><span>${escapeHtml(access.address || '—')}</span></div><div><strong>Kapı kodu</strong><span>${escapeHtml(access.door_code || '—')}</span></div><div><strong>Wi-Fi</strong><span>${escapeHtml(access.wifi_name || '—')}</span></div><div><strong>Saatler</strong><span>${escapeHtml(access.check_out_time || '—')} → ${escapeHtml(access.check_in_time || '—')}</span></div></div>${sections || '<div class="empty-state">Kontrol listesi tanımlanmamış.</div>'}<div class="staff-supplies"><h3>Malzemeler</h3>${supplies || '<div class="empty-state">Malzeme listesi yok.</div>'}</div><label class="staff-note">Not<textarea id="staffNote-${escapeHtml(row.execution_id)}" ${locked ? 'disabled' : ''}>${escapeHtml(row.note || '')}</textarea></label>${locked ? `<p class="sub-text">${lockedMessage}</p>` : `<div class="staff-field-actions"><button class="btn btn-secondary" data-onclick="saveStaffCleaningProgress(decodeURIComponent('${encodeActionArg(row.execution_id)}'))">Kaydet</button><button class="btn btn-primary" data-onclick="signStaffCleaningDone(decodeURIComponent('${encodeActionArg(row.execution_id)}'))">Yaptım (Z)</button></div>`}</article>`;
-  }).join('') : '<div class="empty-state">Açık veya yeniden açılmış temizlik göreviniz yok.</div>';
+    const locked = row.status === 'CLEANED';
+    const statusLabel = STAFF_CLEANING_STATUS_LABELS[row.status] || 'Açık';
+    const sections = (row.checklist?.sections || []).map((section, sectionIndex) => `<fieldset class="staff-check-section"><legend>${escapeHtml(section.title || 'Kontrol')}</legend>${(section.items || []).map((item, itemIndex) => {
+      const key = `s${sectionIndex}.i${itemIndex}`;
+      const checked = row.checklist_result?.[key]?.z === true;
+      const subChecks = (item.subChecks || []).map((subCheck, subIndex) => {
+        const subKey = `${key}.sub${subIndex}`;
+        const subChecked = row.checklist_result?.[subKey]?.z === true;
+        return `<label class="staff-check-item staff-check-sub"><input type="checkbox" ${subChecked ? 'checked' : ''} ${locked ? 'disabled' : ''} data-onchange="setStaffChecklistMark(decodeURIComponent('${encodeActionArg(row.execution_id)}'), decodeURIComponent('${encodeActionArg(subKey)}'), this.checked)"><span>${escapeHtml(subCheck)}</span></label>`;
+      }).join('');
+      return `<label class="staff-check-item"><input type="checkbox" ${checked ? 'checked' : ''} ${locked ? 'disabled' : ''} data-onchange="setStaffChecklistMark(decodeURIComponent('${encodeActionArg(row.execution_id)}'), decodeURIComponent('${encodeActionArg(key)}'), this.checked)"><span>${escapeHtml(item.text || '—')}</span>${item.important ? '<em class="staff-check-required">zorunlu</em>' : ''}</label>${subChecks}`;
+    }).join('')}</fieldset>`).join('');
+    const supplies = (row.checklist?.supplies || []).map((item, index) => {
+      const current = row.supplies_result?.[String(index)] || '';
+      return `<label class="staff-supply"><span>${item.area ? `<small>${escapeHtml(item.area)}</small> ` : ''}${escapeHtml(item.item || '—')}</span><select ${locked ? 'disabled' : ''} data-onchange="setStaffSupplyStatus(decodeURIComponent('${encodeActionArg(row.execution_id)}'), '${index}', this.value)"><option value="">Seçin…</option><option value="OK"${current === 'OK' ? ' selected' : ''}>Var</option><option value="LOW"${current === 'LOW' ? ' selected' : ''}>Az var</option><option value="OUT"${current === 'OUT' ? ' selected' : ''}>Yok</option></select></label>`;
+    }).join('');
+    const reopened = row.status === 'REOPENED'
+      ? `<div class="staff-reopened" role="status">↩️ Yöneticiniz bu temizliği yeniden açtı${row.inspector_note ? `: <strong>${escapeHtml(row.inspector_note)}</strong>` : '.'} Eksikleri tamamlayıp yeniden <strong>Yaptım (Z)</strong> deyin.</div>`
+      : '';
+    const checklistHtml = sections
+      ? `<div class="staff-checklist">${sections}</div>`
+      : '<p class="sub-text staff-checklist-empty">Bu temizlik için kontrol listesi yok; işi bitirince doğrudan <strong>Yaptım (Z)</strong> diyebilirsiniz.</p>';
+    const suppliesHtml = supplies ? `<div class="staff-supplies"><h3>Malzemeler</h3>${supplies}</div>` : '';
+    return `<article class="staff-field-card"><header><div><h2>${escapeHtml(row.property?.name || '—')}</h2><span>${escapeHtml(row.task_date || '—')} · Sonraki giriş: ${escapeHtml(row.next_check_in || '—')}</span></div><span class="badge">${statusLabel}</span></header>${reopened}${staffAccessHtml(row.access)}${checklistHtml}${suppliesHtml}<label class="staff-note">Not<textarea id="staffNote-${escapeHtml(row.execution_id)}" ${locked ? 'disabled' : ''}>${escapeHtml(row.note || '')}</textarea></label>${locked ? '<p class="sub-text">Z imzanız kayıtlı; yönetici denetimi bekleniyor. Onaylanınca listeden düşer.</p>' : `<div class="staff-field-actions"><button class="btn btn-secondary" data-onclick="saveStaffCleaningProgress(decodeURIComponent('${encodeActionArg(row.execution_id)}'))">Kaydet</button><button class="btn btn-primary" data-onclick="signStaffCleaningDone(decodeURIComponent('${encodeActionArg(row.execution_id)}'))">Yaptım (Z)</button></div>`}</article>`;
+  }).join('') : '<div class="empty-state">Açık temizlik göreviniz yok. Yöneticinin onayladığı ya da kapattığı işler listeden düşer.</div>';
   const tasks = staffFieldWork.tasks || [];
   if (tasks.length) {
     container.innerHTML += `<section class="ops-group"><h2>Genel görevler</h2>${tasks.map(task => {
@@ -20218,6 +20511,51 @@ async function assignCleaningTaskFromSelect(taskId) {
   return assignCleaningTask(taskId, select?.value || '');
 }
 
+// Atamada kontrol listesi o anki sablondan dondurulur (phase55) ki imzadan
+// sonra sablon degisse de gecmis bozulmasin. Ama liste atamadan SONRA
+// eklenince/degisince henuz baslanmamis gorev eski (cogu zaman bos) listeyle
+// kaliyordu: temizlikci yeni maddeleri hic gormuyordu (M61, 9.5.4).
+// Baslanmamis = imzasiz, tek isaret ya da malzeme girilmemis, otomatik sablon.
+// Yenileme ayni kisiye yeniden atamadir; sablonu birlestirme kurali tek yerde
+// (assign_cleaning_task) kalir.
+function isCleaningExecutionRefreshable(execution) {
+  if (!execution || execution.template_id || !['ASSIGNED', 'IN_PROGRESS'].includes(execution.status)) return false;
+  const empty = value => !value || (typeof value === 'object' && !Object.keys(value).length);
+  if (!empty(execution.checklist_result) || !empty(execution.supplies_result)) return false;
+  const task = findCleaningTask(execution.cleaning_task_id);
+  return !!task && !['DONE', 'SKIPPED'].includes(String(task.status || '').toUpperCase());
+}
+
+async function refreshUnstartedCleaningChecklists(executionIds = null) {
+  const tenantId = getActiveTenantId();
+  if (!isCloudTenant(tenantId) || !canManageTenantRole(activeTenant?.role)) return { refreshed: 0, failed: 0 };
+  const wanted = Array.isArray(executionIds) ? new Set(executionIds) : null;
+  const targets = (appData?.cleaningExecutions || [])
+    .filter(execution => (!wanted || wanted.has(execution.id)) && isCleaningExecutionRefreshable(execution));
+  let refreshed = 0;
+  let failed = 0;
+  for (const execution of targets) {
+    const { error } = await supabaseClient.rpc('assign_cleaning_task', {
+      p_cleaning_task_id: execution.cleaning_task_id,
+      p_person_id: execution.person_id,
+      p_template_id: null
+    });
+    if (error) failed += 1; else refreshed += 1;
+  }
+  if (refreshed) await loadTenantAppData(tenantId);
+  return { refreshed, failed };
+}
+
+async function refreshCleaningExecutionChecklist(executionId) {
+  const result = await refreshUnstartedCleaningChecklists([executionId]);
+  if (typeof showToast === 'function') {
+    showToast(result.refreshed
+      ? '✅ Kontrol listesi güncel şablondan yenilendi.'
+      : '⚠️ Liste yenilenemedi: temizlikçi işaretlemeye başlamış ya da iş kapanmış olabilir.', result.refreshed ? 'success' : 'error');
+  }
+  return result.refreshed > 0;
+}
+
 async function inspectCleaningExecution(executionId, approve) {
   const execution = (appData?.cleaningExecutions || []).find(item => item.id === executionId);
   const note = approve ? null : prompt('Yeniden açma notu (temizlikçi neyi düzeltmeli?):', '');
@@ -20397,6 +20735,48 @@ function renderManagerChecklist(execution) {
   return `<div class="ops-manager-checklist">${sections.map((section, sectionIndex) => `<fieldset><legend>${escapeHtml(section.title || 'Kontrol')}</legend>${(section.items || []).map((item, itemIndex) => { const key = `s${sectionIndex}.i${itemIndex}`; const checked = execution.manager_marks?.[key] ?? execution.checklist_result?.[key]?.m; return `<label><input type="checkbox" ${checked === true ? 'checked' : ''} data-onchange="setManagerChecklistMark(decodeURIComponent('${encodeActionArg(execution.id)}'), decodeURIComponent('${encodeActionArg(key)}'), this.checked)"> ${item.important ? '<strong>Önemli · </strong>' : ''}${escapeHtml(item.text || '—')}</label>`; }).join('')}</fieldset>`).join('')}</div>`;
 }
 
+// Atanmis ama kontrol listesi bos gorev: yonetici satirda gorur ve tek tikla
+// guncel sablona cevirir (M61). Temizlikci isaretlemeye basladiysa yenilenmez.
+function cleaningExecutionChecklistHintHtml(execution) {
+  if (!execution || !['ASSIGNED', 'IN_PROGRESS', 'REOPENED'].includes(execution.status)) return '';
+  if ((execution.checklist_snapshot?.sections || []).length) return '';
+  const button = isCleaningExecutionRefreshable(execution)
+    ? ` <button class="btn btn-secondary btn-sm" data-onclick="refreshCleaningExecutionChecklist(decodeURIComponent('${encodeActionArg(execution.id)}'))">↻ Listeyi güncelle</button>`
+    : '';
+  return `<span class="ops-checklist-hint">Kontrol listesi yok: atama, liste kaydedilmeden önce yapılmış.${button}</span>`;
+}
+
+// Menudeki "Operasyon (N)": bugun ve geciken acik temizlik (denetim bekleyen
+// dahil) + acik ariza. Eskiden yalniz Operasyon sekmesi cizilince
+// guncelleniyor ve yapilmis-odenmemis temizligi sayiyordu: ana sayfada
+// bugunku temizlik varken menu "Operasyon (0)" diyordu (M65, 9.5.11).
+function getOperationsAttentionCount() {
+  const today = getTodayStr();
+  const api = getOperationsApi();
+  const tasks = (appData?.cleaningTasks || []).map(task => normalizeCleaningTask(task, appData.villas || {}));
+  const withExecutions = api ? api.attachExecutions(tasks, appData?.cleaningExecutions || []) : tasks;
+  const cleanings = withExecutions.filter(task => {
+    const date = String(task.date || '').slice(0, 10);
+    const status = String(task.status || '').toUpperCase();
+    const open = !['DONE', 'SKIPPED', 'CANCELLED'].includes(status) || task.workflowState === 'AWAITING_INSPECTION';
+    return open && !!date && date <= today;
+  }).length;
+  const tickets = (appData?.maintenanceTickets || []).filter(isMaintenanceTicketOpen).length;
+  return { cleanings, tickets, total: cleanings + tickets };
+}
+
+function renderOperationsTabBadge() {
+  if (typeof document === 'undefined') return false;
+  const badge = document.getElementById('opsTaskCountBadge');
+  if (!badge) return false;
+  const count = getOperationsAttentionCount();
+  badge.innerText = String(count.total);
+  const title = `Bugün ve geciken açık temizlik: ${count.cleanings} · açık arıza: ${count.tickets}`;
+  badge.setAttribute?.('title', title);
+  badge.parentNode?.setAttribute?.('title', title);
+  return true;
+}
+
 function renderOperationsCleaningView(tasks) {
   const api = getOperationsApi();
   if (!api) return '<div class="empty-state">Operasyon motoru yüklenemedi.</div>';
@@ -20424,23 +20804,27 @@ function renderOperationsCleaningView(tasks) {
         // Atama yalniz giris hesabi olan temizlikci varsa gosterilir.
         const assignHtml = eligible.length ? `<select id="opsCleaner-${escapeHtml(task.id)}" aria-label="Temizlikçi seç" title="Yalnız uygulamaya giriş hesabı olan temizlikçiler listelenir"><option value="">Temizlikçi seç…</option>${optionsHtml}</select>
               <button class="btn btn-secondary btn-sm" data-onclick="assignCleaningTaskFromSelect(decodeURIComponent('${encodeActionArg(task.id)}'))">Ata</button>` : '';
-        const status = waiting ? 'Denetim bekliyor' : task.status === 'DONE' ? (task.paid ? 'Ödendi' : 'Borç') : task.status === 'SKIPPED' ? 'Yapılmadı' : execution ? 'Atandı' : 'Planlı';
+        const status = waiting ? 'Denetim bekliyor' : task.status === 'DONE' ? (task.paid ? 'Ödendi' : 'Borç') : task.status === 'SKIPPED' ? 'Gerek kalmadı' : execution ? 'Atandı' : 'Planlı';
         return `<article class="ops-row" data-cleaning-task-id="${escapeHtml(task.id)}">
-          <div class="ops-row-main"><strong>${escapeHtml(property)}</strong><span>${escapeHtml(task.date || '—')} · ${escapeHtml(task.cleaner || 'Personel belirtilmedi')}</span>${waiting ? renderCleaningExecutionFlags(execution) + renderManagerChecklist(execution) : ''}</div>
+          <div class="ops-row-main"><strong>${escapeHtml(property)}</strong><span>${escapeHtml(task.date || '—')} · ${escapeHtml(task.cleaner || 'Personel belirtilmedi')}</span>${waiting ? renderCleaningExecutionFlags(execution) + renderManagerChecklist(execution) : ''}${cleaningExecutionChecklistHintHtml(execution)}</div>
           <span class="badge ${waiting ? 'badge-blue' : (isCleaningDebt(task) ? 'badge-amber' : '')}">${escapeHtml(status)}</span>
           <div class="ops-row-actions">
             ${waiting ? `<button class="btn btn-primary btn-sm" data-onclick="inspectCleaningExecution(decodeURIComponent('${encodeActionArg(execution.id)}'), true)">M Onayla</button><button class="btn btn-secondary btn-sm" data-onclick="inspectCleaningExecution(decodeURIComponent('${encodeActionArg(execution.id)}'), false)">Yeniden aç</button>` : task.status !== 'DONE' && task.status !== 'SKIPPED' ? `
               ${assignHtml}
               ${!execution ? `<button class="btn btn-primary btn-sm" data-onclick="markCleaningDone(decodeURIComponent('${encodeActionArg(task.id)}'))">✔ Kontrol ettim, yapıldı</button>` : ''}
-              <button class="btn btn-secondary btn-sm" data-onclick="markCleaningSkipped(decodeURIComponent('${encodeActionArg(task.id)}'))">✖ Yapılmadı</button>` : ''}
+              <button class="btn btn-secondary btn-sm" data-onclick="markCleaningSkipped(decodeURIComponent('${encodeActionArg(task.id)}'))" title="Misafir gelmedi, iptal ya da ev kullanılmadı: gider ve borç oluşmaz">✖ Gerek kalmadı</button>` : ''}
             <button class="btn btn-secondary btn-sm" title="Ayrıntı / Düzenle" data-onclick="openEditCleaningTaskModal(decodeURIComponent('${encodeActionArg(task.id || task.dbId)}'))">✏️ Düzenle</button>
             <button class="btn btn-danger btn-sm" title="Temizliği ve ona bağlı gideri sil" data-onclick="deleteCleaningTask(decodeURIComponent('${encodeActionArg(task.id || task.dbId)}'))">🗑️ Sil</button>
           </div>
         </article>`;
       }).join('') : '<div class="empty-state">Bu aralıkta temizlik yok.</div>'}
     </section>`;
+  const checklistLink = canManageTenantRole(activeTenant?.role)
+    ? `<div class="ops-checklist-link"><button class="btn btn-secondary btn-sm" data-onclick="openSettingsSection(decodeURIComponent('${encodeActionArg('checklists')}'))">📋 Kontrol listelerini düzenle →</button></div>`
+    : '';
   return `
     ${eligible.length ? '' : fieldTeamHintHtml('CLEANER')}
+    ${checklistLink}
     <div class="ops-cleaning-layout">
       <div>${groupHtml('Geciken / denetim bekleyen', grouped.overdue)}${groupHtml('Bugün', grouped.today)}${groupHtml('Yarın', grouped.tomorrow)}${groupHtml('Bu hafta', grouped.week)}${groupHtml('Geçmiş temizlikler (seçili dönem)', history, 'opsCleaningHistory')}</div>
       <aside class="ops-debt-panel"><h3>Bekleyen Temizlik Borçları (${debt.reduce((sum, item) => sum + item.count, 0)})</h3>
@@ -20464,12 +20848,8 @@ function renderOperationsTab() {
 
   const tasks = ((typeof appData !== 'undefined' && appData.cleaningTasks) || [])
     .map(task => normalizeCleaningTask(task, appData.villas || {}));
-  // Borc = YAPILMIS ve odenmemis temizlik (K-04). Planli gorev borc degildir.
-  const pendingTasks = tasks.filter(task => task.status === 'DONE' && !task.paid);
   const tickets = (typeof appData !== 'undefined' && appData.maintenanceTickets) || [];
-
-  const taskBadge = document.getElementById('opsTaskCountBadge');
-  if (taskBadge) taskBadge.innerText = String(pendingTasks.length);
+  renderOperationsTabBadge();
 
   document.querySelectorAll('[data-operations-view]').forEach(button => {
     button.classList.toggle('active', button.dataset.operationsView === operationsViewState);
@@ -21601,6 +21981,19 @@ if (typeof module !== 'undefined' && module.exports) {
     consumeEmailTokenHashLink,
     openTabFromDeepLink,
     renderOperationsCleaningView,
+    isStaffCleaningVisible,
+    staffCleaningCompletionState,
+    staffAccessHtml,
+    isCleaningExecutionRefreshable,
+    refreshUnstartedCleaningChecklists,
+    cleaningExecutionChecklistHintHtml,
+    getOperationsAttentionCount,
+    renderOperationsTabBadge,
+    checklistIndentedTextToItems,
+    settingsChecklistSectionHtml,
+    readPropertyAccessForm,
+    savePropertyAccessFromForm,
+    hasStoredAuthSession,
     saveOperationalPerson,
     toggleOperationalPersonActive,
     addMemberToFieldTeam,

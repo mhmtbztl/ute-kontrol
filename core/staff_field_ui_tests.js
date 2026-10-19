@@ -33,7 +33,7 @@ try {
   check(/sign_cleaning_done/.test(sign), 'B3. Yaptim dugmesi Z imzasini dar RPC ile yazar', sign.slice(0, 700));
   const render = body('renderStaffFieldWork');
   check(/Var/.test(render) && /Az var/.test(render) && /Yok/.test(render)
-    && /Kapı kodu/.test(render) && /Adres/.test(render),
+    && /staffAccessHtml\(row\.access\)/.test(render) && /Kapı kodu/.test(body('staffAccessHtml')) && /Adres/.test(body('staffAccessHtml')),
     'B4. Saha karti erisim bilgisi ve uc malzeme durumunu gosterir', render.slice(0, 1200));
   check(!/amount|is_paid|guest_name|gross_amount/.test(render),
     'B5. Staff render finansal tutar, odeme veya misafir adi istemez/gostermez', render.match(/amount|is_paid|guest_name|gross_amount/g));
@@ -41,8 +41,10 @@ try {
     'B5b. Personele atanan genel gorev gorunur ve dar RPC ile tamamlanir', render.slice(-1200));
   check(/important|Önemli/.test(render) && /subChecks/.test(render),
     'B5c. Onemli ve oda alt isaretleri personel kartinda korunur', render.slice(0, 1800));
-  check(/Onaylandı/.test(render) && /Denetim bekliyor/.test(render),
-    'B5d. Personel karti INSPECTED isi onaylandi, CLEANED isi denetim bekliyor diye ayirir', render.slice(0, 2200));
+  // M62 (9.5.5): onaylanan is kartta "Onaylandi" diye durmaz, listeden duser.
+  check(/filter\(isStaffCleaningVisible\)/.test(render) && /row\.status === 'INSPECTED'\) return false/.test(body('isStaffCleaningVisible'))
+    && /CLEANED: 'Denetim bekliyor'/.test(APP),
+    'B5d. Personel karti INSPECTED isi gostermez, CLEANED isi denetim bekliyor diye ayirir', render.slice(0, 2200));
   const managerFlags = body('renderCleaningExecutionFlags');
   check(/supplies_result/.test(managerFlags) && /LOW/.test(managerFlags) && /OUT/.test(managerFlags) && /note/.test(managerFlags),
     'B6. Yonetici denetiminde az/yok malzeme ve personel notu gorunur', managerFlags);
