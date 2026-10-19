@@ -2568,19 +2568,20 @@
               <label style="font-weight: 700; color: #FFFFFF; font-size: 13px;">🎯 Aylık Hedef Ciro (TL)</label>
               <span id="goalRevenueHint" style="font-size: 11px; color: #93C5FD;"></span>
             </div>
-            <input type="number" id="goalRevenue" step="5000" required data-oninput="autoCalculateGoalSubmetrics()" style="font-size: 16px; font-weight: 700; padding: 12px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff;">
+            <input type="number" id="goalRevenue" min="0.01" step="0.01" required data-oninput="autoCalculateGoalSubmetrics()" style="font-size: 16px; font-weight: 700; padding: 12px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff;">
             
           </div>
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
             <div class="form-group">
               <label style="font-size: 12px; font-weight: 600;">🌙 Hedef Gece Sayısı</label>
-              <input type="number" id="goalOccupancyNights" placeholder="Örn: 75" data-oninput="autoCalculateGoalAdr()" style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
+              <input type="number" id="goalOccupancyNights" min="1" step="1" placeholder="Örn: 75" data-oninput="autoCalculateGoalAdr()" style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
               <span style="font-size: 10px; color: var(--text-muted); margin-top: 3px; display: block;">Tahmini doluluk: <strong id="goalCalcOccLabel" style="color:#60A5FA;">—</strong></span>
+              <span id="goalCapacityWarning" role="alert" style="display:none; font-size: 10px; color: #FCA5A5; margin-top: 3px;"></span>
             </div>
             <div class="form-group">
               <label style="font-size: 12px; font-weight: 600;">🏷️ Hedef Ortalama ADR</label>
-              <input type="number" step="0.01" id="goalADR" placeholder="Örn: 6.000" style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
+              <input type="number" id="goalADR" min="0.01" step="0.01" placeholder="Örn: 6.000" data-oninput="autoCalculateGoalNights()" style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
               <span style="font-size: 10px; color: var(--text-muted); margin-top: 3px; display: block;">Gecelik ortalama fiyat</span>
             </div>
           </div>
@@ -2593,15 +2594,15 @@
             </div>
             <div class="form-group">
               <label for="goalNetProfit" style="font-size: 12px; font-weight: 600;">💵 Hedef Net Kâr (TL)</label>
-              <input type="number" step="0.01" id="goalNetProfit" data-oninput="syncGoalMarginFromProfit()" style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
+              <input type="number" id="goalNetProfit" min="0" step="0.01" data-oninput="syncGoalMarginFromProfit()" style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
               <span id="goalNetProfitHint" style="font-size: 10px; color: #34D399; margin-top: 3px; display: block;">—</span>
             </div>
           </div>
           <div style="display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 8px;">
             <div class="form-group">
-              <label style="font-size: 12px; font-weight: 600;">💸 Tavan Gider (TL)</label>
-              <input type="number" step="0.01" id="goalMaxExpense" required style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
-              <span style="font-size: 10px; color: #FCA5A5; margin-top: 3px; display: block;">Aşılmaması gereken gider</span>
+              <label style="font-size: 12px; font-weight: 600;">💸 Hedef Gider Bütçesi Tavanı (TL)</label>
+              <input type="number" id="goalMaxExpense" min="0" step="0.01" readonly aria-readonly="true" style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
+              <span style="font-size: 10px; color: #FCA5A5; margin-top: 3px; display: block;">Hedef ciro − hedef net kâr. Planlama değeridir; gerçekleşen muhasebe gideri değildir.</span>
             </div>
           </div>
         </div>
@@ -3986,13 +3987,14 @@
   <script src="core/pricing_research_service.js?v=563f5895"></script>
   <script src="core/suggested_price_engine.js?v=6c3ac01e"></script>
   <script src="core/target_revenue_calculator.js?v=fe49dcc0"></script>
+  <script src="core/monthly_goal_calculator.js?v=245a5fea"></script>
   <script src="core/tr_special_days.js?v=0227d5dd"></script>
   <script src="core/business_date.js?v=a1518391"></script>
   <script src="core/guest_crm_engine.js?v=eb788dbf"></script>
   <script src="core/gap_night_service.js?v=6cdf4142"></script>
   <script src="core/pricing_booking_service.js?v=0eb93c05"></script>
   <script src="core/executive_priority_service.js?v=d69011e3"></script>
-  <script src="core/executive_dashboard_service.js?v=f93360cf"></script>
+  <script src="core/executive_dashboard_service.js?v=f3af126e"></script>
   <script src="core/operations_engine.js?v=8dd8c501"></script>
   <script src="core/booking_payment_engine.js?v=91111565"></script>
   <script src="core/ads_metrics_engine.js?v=d8dd5962"></script>
@@ -4003,10 +4005,10 @@
   <script src="core/side_panel.js?v=d763b464"></script>
   <script src="core/notification_feed.js?v=97d955bf"></script>
   <script src="core/command_search.js?v=89760933"></script>
-  <script src="core/action_dispatch.js?v=9462ac96"></script>
+  <script src="core/action_dispatch.js?v=dc889202"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=fa6d0372"></script>
-  <script src="app.js?v=b38fec57"></script>
+  <script src="app.js?v=63dd6a31"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=e5503243"></script>

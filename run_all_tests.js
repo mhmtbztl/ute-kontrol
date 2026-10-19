@@ -352,6 +352,8 @@ const allTestFiles = [
   'suggested_price_engine_tests.js',
   'tr_special_days_tests.js',
   'target_revenue_calculator_tests.js',
+  'monthly_goal_calculator_tests.js',
+  'monthly_goal_ui_tests.js',
 
   // Ice aktarma: tarih sirasi dosyadan (GG/AA - AA/GG), TL ekli tutar, yabanci para reddi
   'import_parsing_tests.js'

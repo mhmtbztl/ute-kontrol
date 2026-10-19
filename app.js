@@ -7057,6 +7057,15 @@ function getAvailableNightsForMonth(period) {
   return null;
 }
 
+function getMonthlyGoalCalculator() {
+  if (typeof MonthlyGoalCalculator !== 'undefined') return MonthlyGoalCalculator;
+  if (typeof require === 'function') return require('./core/monthly_goal_calculator.js');
+  return null;
+}
+
+let goalRateDriver = null;
+let goalProfitDriver = null;
+
 function openGoalsModal(targetPeriod) {
   const select = document.getElementById('goalPeriodSelect');
   if (select) {
@@ -7079,6 +7088,10 @@ function loadSelectedPeriodGoal() {
   const period = select ? select.value : (/^\d{4}-\d{2}$/.test(currentFilter.period) ? currentFilter.period : getTodayStr().slice(0, 7));
   
   const saved = getTargetRecordForPeriod(period);
+  // Kayit yukleme bir kullanici duzenlemesi degildir. Kayitli degerler modal
+  // acilirken yeniden hesaplanmaz; suruculer ancak gercek input olayinda secilir.
+  goalRateDriver = null;
+  goalProfitDriver = null;
   const rev = saved ? (saved.revenue ?? saved.revenue_target ?? '') : '';
   const netProfit = saved ? (saved.netProfit ?? saved.net_profit_target ?? '') : '';
   const maxExpense = saved ? (saved.maxExpense ?? saved.max_expense_target ?? '') : '';
@@ -7117,32 +7130,80 @@ function loadSelectedPeriodGoal() {
     hintEl.textContent = saved ? 'Kayıtlı hedef değerleri gösteriliyor.' : 'Bu dönem için henüz hedef belirlenmedi.';
   }
   
-  const occLabel = document.getElementById('goalCalcOccLabel');
-  if (occLabel) {
-    const capacity = getAvailableNightsForMonth(period);
-    const occPct = capacity > 0 && Number(nights) >= 0 ? Math.min(100, Math.round((Number(nights) / capacity) * 100)) : null;
-    occLabel.textContent = occPct === null ? 'Kullanılabilir gece hesaplanamadı' : `%${occPct} (${nights}/${capacity} gece)`;
-  }
+  updateGoalCapacityFeedback();
 }
 
-function autoCalculateGoalSubmetrics() {
-  const rev = Number(document.getElementById('goalRevenue').value) || 0;
-  const nights = Number(document.getElementById('goalOccupancyNights').value) || 0;
-  if (rev > 0 && nights > 0) {
-    document.getElementById('goalADR').value = Math.round(rev / nights);
-  }
-  // Ciro degisince oran sabit kalir, tutar yeniden hesaplanir (L-185).
-  syncGoalProfitFromMargin();
-}
-
-// Net kar hedefi oranla girilir (L-185, kullanici M15): tutari elle yazmak
-// 'tuhaf'ti ve altinda sabit 'Cironun yaklasik %35'i' yaziyordu. Oran ve
-// tutar birbirini gunceller; oran ciro hedefine goredir (margin_target ile ayni).
 function readGoalNumber(id) {
   const raw = String(document.getElementById(id)?.value ?? '').trim();
   if (raw === '') return null;
   const n = Number(raw);
   return Number.isFinite(n) ? n : null;
+}
+
+function readGoalFormValues() {
+  return {
+    revenue: readGoalNumber('goalRevenue'),
+    nights: readGoalNumber('goalOccupancyNights'),
+    adr: readGoalNumber('goalADR'),
+    margin: readGoalNumber('goalMarginPct'),
+    profit: readGoalNumber('goalNetProfit'),
+    maxExpense: readGoalNumber('goalMaxExpense')
+  };
+}
+
+function updateGoalCapacityFeedback() {
+  const calculator = getMonthlyGoalCalculator();
+  if (!calculator) return null;
+  const period = document.getElementById('goalPeriodSelect')?.value;
+  const nights = readGoalNumber('goalOccupancyNights');
+  const result = calculator.evaluateCapacity(nights, getAvailableNightsForMonth(period));
+  const occLabel = document.getElementById('goalCalcOccLabel');
+  const warning = document.getElementById('goalCapacityWarning');
+  if (occLabel) {
+    occLabel.textContent = result.occupancy === null
+      ? 'Kullanılabilir gece hesaplanamadı'
+      : `%${result.occupancy.toLocaleString('tr-TR', { maximumFractionDigits: 2 })} (${nights}/${result.available} gece)`;
+  }
+  if (warning) {
+    warning.textContent = result.exceeds
+      ? `Bu hedef kapasiteyi ${Number(nights) - result.available} gece aşıyor. ADR veya gece hedefini düzeltin.`
+      : '';
+    warning.style.display = result.exceeds ? 'block' : 'none';
+  }
+  return result;
+}
+
+function applyGoalCalculation(source) {
+  const calculator = getMonthlyGoalCalculator();
+  if (!calculator) return null;
+  if (source === 'adr' || source === 'nights') goalRateDriver = source;
+  if (source === 'margin' || source === 'profit') goalProfitDriver = source;
+  const result = calculator.recalculate(readGoalFormValues(), source, {
+    rateDriver: goalRateDriver,
+    profitDriver: goalProfitDriver
+  });
+  const ids = {
+    nights: 'goalOccupancyNights',
+    adr: 'goalADR',
+    margin: 'goalMarginPct',
+    profit: 'goalNetProfit',
+    maxExpense: 'goalMaxExpense'
+  };
+  Object.entries(result.updates).forEach(([key, value]) => {
+    const el = document.getElementById(ids[key]);
+    if (el) el.value = value;
+  });
+  updateGoalProfitHint();
+  updateGoalCapacityFeedback();
+  return result;
+}
+
+function autoCalculateGoalSubmetrics() {
+  return applyGoalCalculation('revenue');
+}
+
+function autoCalculateGoalNights() {
+  return applyGoalCalculation('adr');
 }
 
 function updateGoalProfitHint() {
@@ -7156,34 +7217,15 @@ function updateGoalProfitHint() {
 }
 
 function syncGoalProfitFromMargin() {
-  const rev = readGoalNumber('goalRevenue');
-  const margin = readGoalNumber('goalMarginPct');
-  const profitEl = document.getElementById('goalNetProfit');
-  if (profitEl && rev > 0 && margin !== null) profitEl.value = Math.round(rev * margin / 100);
-  updateGoalProfitHint();
+  return applyGoalCalculation('margin');
 }
 
 function syncGoalMarginFromProfit() {
-  const rev = readGoalNumber('goalRevenue');
-  const profit = readGoalNumber('goalNetProfit');
-  const marginEl = document.getElementById('goalMarginPct');
-  if (marginEl) marginEl.value = rev > 0 && profit !== null ? Number((profit / rev * 100).toFixed(1)) : '';
-  updateGoalProfitHint();
+  return applyGoalCalculation('profit');
 }
 
 function autoCalculateGoalAdr() {
-  const nights = Number(document.getElementById('goalOccupancyNights').value) || 0;
-  const rev = Number(document.getElementById('goalRevenue').value) || 0;
-  const occLabel = document.getElementById('goalCalcOccLabel');
-  if (occLabel) {
-    const period = document.getElementById('goalPeriodSelect')?.value;
-    const capacity = getAvailableNightsForMonth(period);
-    const occPct = capacity > 0 ? Math.min(100, Math.round((nights / capacity) * 100)) : null;
-    occLabel.textContent = occPct === null ? 'Kullanılabilir gece hesaplanamadı' : `%${occPct} (${nights}/${capacity} gece)`;
-  }
-  if (rev > 0 && nights > 0) {
-    document.getElementById('goalADR').value = Math.round(rev / nights);
-  }
+  return applyGoalCalculation('nights');
 }
 
 function setGoalPreset(amount) {
@@ -7203,9 +7245,9 @@ async function saveMonthlyGoals(e) {
   const select = document.getElementById('goalPeriodSelect');
   const period = select ? select.value : (/^\d{4}-\d{2}$/.test(currentFilter.period) ? currentFilter.period : getTodayStr().slice(0, 7));
   
-  const revenue = Number(document.getElementById('goalRevenue').value);
-  if (!Number.isFinite(revenue) || revenue <= 0) {
-    alert('Aylık ciro hedefini girin. Sistem hedef uydurmaz.');
+  const calculator = getMonthlyGoalCalculator();
+  if (!calculator) {
+    alert('Hedef hesaplama motoru yüklenemedi. Sayfayı yenileyin.');
     return;
   }
   // Bos birakilan hedef 0 DEGIL, "hedef yok"tur (3.6): 0 yazmak ekranda
@@ -7216,14 +7258,21 @@ async function saveMonthlyGoals(e) {
     const n = Number(v);
     return Number.isFinite(n) ? n : null;
   };
+  const revenue = oku('goalRevenue');
   const netProfit = oku('goalNetProfit');
   const maxExpense = oku('goalMaxExpense');
   const nights = oku('goalOccupancyNights');
   const adr = oku('goalADR');
+  const margin = oku('goalMarginPct');
   const capacity = getAvailableNightsForMonth(period);
-  const occupancy = nights !== null && capacity > 0 ? Math.min(100, Number(((nights / capacity) * 100).toFixed(1))) : null;
-  const margin = netProfit !== null && revenue > 0 ? Number(((netProfit / revenue) * 100).toFixed(1)) : null;
-  const revpar = capacity > 0 ? Math.round(revenue / capacity) : null;
+  const validation = calculator.validateForSave({ revenue, netProfit, profit: netProfit, maxExpense, nights, adr, margin }, capacity);
+  updateGoalCapacityFeedback();
+  if (!validation.valid) {
+    alert(validation.errors[0].message);
+    return;
+  }
+  const occupancy = validation.capacity.occupancy;
+  const revpar = capacity > 0 ? calculator.roundMoney(revenue / capacity) : null;
   const [year, month] = period.split('-').map(Number);
 
   try {
@@ -18802,7 +18851,7 @@ function renderExecutiveKpiValues(kpis) {
   }
   setEl('execProfitVariance', kpis.netProfit.target > 0
     ? `${kpis.netProfit.variance.varianceAmount >= 0 ? '+' : ''}%${kpis.netProfit.variance.variancePercent} Hedef`
-    : 'Hedef belirlenmemiş');
+    : (kpis.netProfit.target === 0 ? 'Hedef: ₺0' : 'Hedef belirlenmemiş'));
   const occVariance = document.getElementById('execOccVariance');
   if (occVariance) {
     occVariance.className = kpis.occupancy.variance.varianceAmount >= 0 ? 'badge badge-green' : 'badge badge-yellow';
@@ -22275,6 +22324,11 @@ if (typeof module !== 'undefined' && module.exports) {
     renderLeadExtraPropertyPicker,
     syncLeadInterestProperties,
     recordBookingDeposit,
+    loadSelectedPeriodGoal,
+    saveMonthlyGoals,
+    autoCalculateGoalSubmetrics,
+    autoCalculateGoalAdr,
+    autoCalculateGoalNights,
     syncGoalProfitFromMargin,
     syncGoalMarginFromProfit,
     propertyProfitView,

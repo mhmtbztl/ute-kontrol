@@ -17,6 +17,27 @@
     return Math.round((Number(val) || 0) * 100) / 100;
   }
 
+  function readNetProfitTarget(targets) {
+    // Canonical monthly_targets field first; retain legacy aliases and real zero.
+    const value = targets.net_profit_target ?? targets.profit_target ?? targets.profitTarget;
+    if ((typeof value !== 'number' && typeof value !== 'string')
+      || (typeof value === 'string' && value.trim() === '')) return null;
+    const amount = Number(value);
+    return Number.isFinite(amount) && amount >= 0 ? amount : null;
+  }
+
+  function netProfitVariance(current, target) {
+    if (target === null || current === null) {
+      return { varianceAmount: 0, variancePercent: null, status: 'NEUTRAL' };
+    }
+    const diff = roundMoney(current - target);
+    return {
+      varianceAmount: diff,
+      variancePercent: target === 0 ? null : Math.round((diff / target) * 100),
+      status: diff >= 0 ? 'ON_TARGET' : 'BELOW_TARGET'
+    };
+  }
+
   /**
    * Computes top executive KPIs with target variance and prior period comparisons.
    */
@@ -95,7 +116,7 @@
 
     // Target comparisons
     const targetRevenue = Number(targets.revenue_target || targets.revenueTarget || 0);
-    const targetProfit = Number(targets.profit_target || targets.profitTarget || 0);
+    const targetProfit = readNetProfitTarget(targets);
     const targetOccupancy = Number(targets.occupancy_target || targets.occupancyTarget || 0);
 
     function calcVariance(current, target) {
@@ -144,7 +165,7 @@
       netProfit: {
         current: netCashProfit,
         target: targetProfit,
-        variance: calcVariance(netCashProfit, targetProfit),
+        variance: netProfitVariance(netCashProfit, targetProfit),
         prior: priorPeriodMetrics ? priorPeriodMetrics.netProfit : null
       },
       occupancy: {
@@ -208,7 +229,7 @@
       ? null : roundMoney(snapshot.cleaning_revenue);
 
     const targetRevenue = Number(targets.revenue_target || targets.revenueTarget || 0);
-    const targetProfit = Number(targets.profit_target || targets.profitTarget || 0);
+    const targetProfit = readNetProfitTarget(targets);
     const targetOccupancy = Number(targets.occupancy_target || targets.occupancyTarget || 0);
 
     function variance(current, target) {
@@ -258,7 +279,7 @@
         current: operatingProfit,
         prior: priorHasExpenseBreakdown ? roundMoney(prior.operating_profit) : null
       },
-      netProfit: { current: netProfit, target: targetProfit, variance: variance(netProfit, targetProfit), prior: priorNetProfit },
+      netProfit: { current: netProfit, target: targetProfit, variance: netProfitVariance(netProfit, targetProfit), prior: priorNetProfit },
       occupancy: { current: occupancy, target: targetOccupancy, variance: variance(occupancy, targetOccupancy), prior: priorOccupancy },
       adr: {
         current: hasRoomRevenue && bookedNights > 0 ? roundMoney(roomRevenue / bookedNights) : null,
