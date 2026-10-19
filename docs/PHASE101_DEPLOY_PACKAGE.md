@@ -52,4 +52,6 @@ yazar, kayıt yapılmaz.
 
 ## Üretim durumu
 
-Uygulanmadı (19.10.2026).
+19.10.2026: kullanıcı SQL Editor'de uyguladı (başarılı). Salt okunur doğrulama:
+anon `property_daily_prices` sorgusu `401 42501 permission denied for table`;
+`production:readiness` BAŞARILI, `schema_migrations` 101 mevcut.
