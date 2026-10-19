@@ -400,8 +400,6 @@ let appData = {
   targets: {},
   bookings: [],
   expenses: [],
-  expenseTemplates: [],
-  expenseTemplateOccurrences: [],
   leads: [],
   maintenance: []
 };
@@ -5212,7 +5210,7 @@ const ACTIVE_RENDER_PLANS = {
   // (ENVANTER Finans 28.09.2026); olu tab-dashboard da silindi (A1-G1).
   'tab-finance': ['renderFinanceModule'],
   'tab-reservations': ['renderManageBookingsTable', 'renderTapeChart'],
-  'tab-expenses': ['renderExpenseTemplates', 'renderExpensesTable'],
+  'tab-expenses': ['renderExpensesTable'],
   'tab-leads': ['renderLeadQuickCapture', 'renderLeadSalesWorkspace', 'renderManageLeadsTable', 'renderLeadAnalytics'],
   'tab-maintenance': ['renderManageMaintTable'],
   'tab-housekeeping': ['renderHousekeepingTab'],
@@ -5248,7 +5246,6 @@ function renderAll() {
     renderFinanceModule,
     renderManageBookingsTable,
     renderExpensesTable,
-    renderExpenseTemplates,
     renderLeadQuickCapture,
     renderLeadSalesWorkspace,
     renderManageLeadsTable,
@@ -6675,118 +6672,6 @@ function renderExpensesTable() {
     `;
     tbody.appendChild(tr);
   });
-}
-
-function renderExpenseTemplates() {
-  const tbody = document.getElementById('expenseTemplatesTableBody');
-  if (!tbody) return;
-  const status = document.getElementById('expenseTemplatesStatus');
-  const select = document.getElementById('expenseTemplateProperty');
-  if (select) {
-    const selected = select.value || 'ALL';
-    select.innerHTML = '<option value="ALL">Tüm Portföy</option>' + Object.values(appData.villas || {})
-      .map(property => `<option value="${escapeHtml(property.id)}">${escapeHtml(property.name || property.slug)}</option>`).join('');
-    select.value = [...select.options].some(option => option.value === selected) ? selected : 'ALL';
-  }
-  if (appData.phase78SchemaReady === false) {
-    if (status) { status.hidden = false; status.textContent = 'Göç bekleniyor: phase78 gider şablonları henüz kullanılamıyor.'; }
-    tbody.innerHTML = '<tr><td colspan="5">Gider şablonu şeması hazır değil.</td></tr>';
-    return;
-  }
-  if (status) status.hidden = true;
-  const month = /^\d{4}-\d{2}$/.test(String(currentFilter?.period || '')) ? currentFilter.period : getTodayStr().slice(0, 7);
-  const occurred = new Set((appData.expenseTemplateOccurrences || [])
-    .filter(row => String(row.period_month || '').slice(0, 7) === month)
-    .map(row => row.template_id));
-  const rows = (appData.expenseTemplates || []).filter(row => row.is_active !== false);
-  if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;">Kayıtlı gider şablonu yok.</td></tr>';
-    return;
-  }
-  const canManage = canManageTenantRole(activeTenant?.role);
-  tbody.innerHTML = rows.map(row => {
-    const property = Object.values(appData.villas || {}).find(item => item.id === row.property_id);
-    const done = occurred.has(row.id);
-    const actions = canManage
-      ? `${done ? `<span class="badge badge-green">${escapeHtml(month)} işlendi</span>` : `<button class="btn btn-primary btn-sm" data-onclick="generateExpenseFromTemplate(decodeURIComponent('${encodeActionArg(row.id)}'))">${escapeHtml(month)} ayına işle</button>`}
-         <button class="btn btn-danger btn-sm" data-onclick="deleteExpenseTemplate(decodeURIComponent('${encodeActionArg(row.id)}'))">Sil</button>`
-      : (done ? `<span class="badge badge-green">${escapeHtml(month)} işlendi</span>` : 'Henüz işlenmedi');
-    return `<tr><td><strong>${escapeHtml(row.name)}</strong><br><small>${escapeHtml(row.description || '')}</small></td><td>${escapeHtml(row.category)} · ${escapeHtml(row.expense_type)}</td><td>${escapeHtml(property?.name || 'Tüm Portföy')}</td><td>${Number(row.amount).toLocaleString('tr-TR')} TL</td><td>${actions}</td></tr>`;
-  }).join('');
-}
-
-async function saveExpenseTemplate(event) {
-  event?.preventDefault?.();
-  if (!canManageTenantRole(activeTenant?.role)) return false;
-  try {
-    const tenantId = getActiveTenantId();
-    const propertyValue = document.getElementById('expenseTemplateProperty')?.value || 'ALL';
-    const payload = {
-      tenant_id: tenantId,
-      property_id: propertyValue === 'ALL' ? null : propertyValue,
-      name: (document.getElementById('expenseTemplateName')?.value || '').trim(),
-      category: document.getElementById('expenseTemplateCategory')?.value || 'Diğer',
-      expense_type: document.getElementById('expenseTemplateType')?.value === 'CAPEX' ? 'CAPEX' : 'OPEX',
-      amount: Number(document.getElementById('expenseTemplateAmount')?.value),
-      description: (document.getElementById('expenseTemplateDescription')?.value || '').trim() || null
-    };
-    if (!payload.name || !(payload.amount > 0)) throw new Error('Şablon adı ve pozitif tutar zorunludur.');
-    const { data, error } = await supabaseClient.from('expense_templates').insert(payload).select().single();
-    if (error) throw error;
-    appData.expenseTemplates = [...(appData.expenseTemplates || []), data];
-    document.getElementById('expenseTemplateForm')?.reset();
-    renderExpenseTemplates();
-    if (typeof showToast === 'function') showToast('Gider şablonu oluşturuldu.', 'success');
-    return data;
-  } catch (error) {
-    if (typeof showToast === 'function') showToast('Gider şablonu oluşturulamadı: ' + getFriendlyAuthErrorMessage(error), 'error');
-    return false;
-  }
-}
-
-async function generateExpenseFromTemplate(templateId) {
-  if (!canManageTenantRole(activeTenant?.role)) return false;
-  const month = /^\d{4}-\d{2}$/.test(String(currentFilter?.period || '')) ? currentFilter.period : getTodayStr().slice(0, 7);
-  try {
-    if (isPeriodClosed(month + '-01')) throw new Error(`Bu dönem (${month}) kapatılmıştır.`);
-    const tenantId = getActiveTenantId();
-    const { data, error } = await supabaseClient.rpc('generate_expense_from_template', {
-      p_tenant_id: tenantId,
-      p_template_id: templateId,
-      p_period_month: month + '-01'
-    });
-    if (error) {
-      if (error.code === '23505' || /already|duplicate|SABLON_DONEMI_ZATEN_ISLENDI/i.test(error.message || '')) throw new Error(`${month} dönemi bu şablondan zaten işlendi.`);
-      throw error;
-    }
-    invalidateExecutiveSnapshotCache();
-    await loadExpenses(tenantId);
-    appData.expenseTemplateOccurrences = await fetchTenantRowsTolerant(() => supabaseClient.from('expense_template_occurrences').select('*').eq('tenant_id', tenantId));
-    renderExpenseTemplates();
-    if (typeof showToast === 'function') showToast(`${month} gideri oluşturuldu.`, 'success');
-    return data;
-  } catch (error) {
-    if (typeof showToast === 'function') showToast('Gider oluşturulamadı: ' + getFriendlyAuthErrorMessage(error), 'error');
-    return false;
-  }
-}
-
-async function deleteExpenseTemplate(templateId) {
-  if (!canManageTenantRole(activeTenant?.role)) return false;
-  if (typeof confirm === 'function' && !confirm('Bu gider şablonunu silmek istiyor musunuz? Daha önce üretilen giderler korunur.')) return false;
-  try {
-    const { data, error } = await supabaseClient.from('expense_templates').delete()
-      .eq('tenant_id', getActiveTenantId()).eq('id', templateId).select('id').maybeSingle();
-    if (error) throw error;
-    if (!data) throw new Error('Şablon bulunamadı veya silme yetkiniz yok.');
-    appData.expenseTemplates = (appData.expenseTemplates || []).filter(row => row.id !== templateId);
-    renderExpenseTemplates();
-    if (typeof showToast === 'function') showToast('Gider şablonu silindi.', 'success');
-    return true;
-  } catch (error) {
-    if (typeof showToast === 'function') showToast('Gider şablonu silinemedi: ' + getFriendlyAuthErrorMessage(error), 'error');
-    return false;
-  }
 }
 
 function openExpenseModal(editId = null) {
@@ -9020,6 +8905,38 @@ function channelTakesDeposit(channel) {
   const kod = String(channel || '').toUpperCase();
   if (ayar && Object.prototype.hasOwnProperty.call(ayar, kod)) return ayar[kod] === true;
   return isDirectBookingChannel(channel, typeof appData !== 'undefined' ? appData.bookingChannels : []);
+}
+
+/**
+ * Kanalin tahsilat gunu (kullanici 19.10, L-245): Booking.com ve Etstur gibi
+ * kanallar parayi cikis ayini izleyen ayin belli bir gununde aktarir.
+ * Ayar `tenant_settings.booking_collection_schedule` = { KOD: { mode, day } }:
+ *   CHECKOUT    son tahsilat gunu cikis gunu (dogrudan kanal varsayilani)
+ *   NEXT_MONTH  cikis ayini izleyen ayin `day`. gunu (ay sonuna kirpilir)
+ *   NONE        takip edilmez (OTA varsayilani; platform tahsil eder)
+ */
+function channelCollectionRule(channel) {
+  const ayar = (typeof appData !== 'undefined' && appData.tenantSettings?.booking_collection_schedule) || null;
+  const kod = String(channel || '').toUpperCase();
+  const kural = ayar && Object.prototype.hasOwnProperty.call(ayar, kod) ? ayar[kod] : null;
+  if (kural && kural.mode === 'NEXT_MONTH') {
+    const gun = Math.round(Number(kural.day));
+    if (gun >= 1 && gun <= 31) return { mode: 'NEXT_MONTH', day: gun };
+  }
+  if (kural && (kural.mode === 'CHECKOUT' || kural.mode === 'NONE')) return { mode: kural.mode, day: null };
+  return { mode: isDirectBookingChannel(channel, typeof appData !== 'undefined' ? appData.bookingChannels : []) ? 'CHECKOUT' : 'NONE', day: null };
+}
+
+function getBookingCollectionDueDate(booking) {
+  const cikis = String(booking?.checkOut || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(cikis)) return null;
+  const kural = channelCollectionRule(booking.channel);
+  if (kural.mode === 'NONE') return null;
+  if (kural.mode === 'CHECKOUT') return cikis;
+  const y = Number(cikis.slice(0, 4));
+  const m = Number(cikis.slice(5, 7)); // sonraki ay = m (0 tabanli)
+  const sonGun = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(y, m, Math.min(kural.day, sonGun))).toISOString().slice(0, 10);
 }
 
 /** Yeni rezervasyonda kapora alani kanala gore gorunur; gizlenince deger silinir. */
@@ -17237,7 +17154,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
         : Promise.resolve([]);
       // Independent datasets are loaded concurrently and every list is paged;
       // Supabase's per-response cap must never silently truncate a dashboard.
-      const [villas, bookings, expenses, cleanList, leads, leadSalesContext, closeList, targetList, maintenanceTickets, operationalTasks, financialTransactions, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications, campaignRows, influencerRows, settingRows, operatorNoteRows, pricingLadderRows, hkOverrideRows, paymentCommissionRows, operationalPeopleRows, cleaningExecutionRows, maintenanceAssignmentRows, taskTemplateRows, checklistTemplateRows, bookingPayments, bookingPaymentBalances, adMetricPeriods, propertyContextRows, propertyOwnerRows, propertyOwnerLinkRows, messageTemplateRows, guestClassificationRows, salesMembers, propertyPricingRuleRows, competitorResearchRows, expenseTemplateRows, expenseTemplateOccurrenceRows, leadInterestRows, channelListingRows, incomeEntryRows] = await Promise.all([
+      const [villas, bookings, expenses, cleanList, leads, leadSalesContext, closeList, targetList, maintenanceTickets, operationalTasks, financialTransactions, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications, campaignRows, influencerRows, settingRows, operatorNoteRows, pricingLadderRows, hkOverrideRows, paymentCommissionRows, operationalPeopleRows, cleaningExecutionRows, maintenanceAssignmentRows, taskTemplateRows, checklistTemplateRows, bookingPayments, bookingPaymentBalances, adMetricPeriods, propertyContextRows, propertyOwnerRows, propertyOwnerLinkRows, messageTemplateRows, guestClassificationRows, salesMembers, propertyPricingRuleRows, competitorResearchRows, leadInterestRows, channelListingRows, incomeEntryRows] = await Promise.all([
         loadProperties(tenantId),
         loadBookings(tenantId),
         mayReadLedger ? loadExpenses(tenantId) : Promise.resolve([]),
@@ -17285,8 +17202,6 @@ async function loadTenantAppData(tenantIdOrUserId) {
         salesMembersPromise,
         mayReadSales ? fetchTenantRowsTolerant(() => supabaseClient.from('property_pricing_rule_settings').select('*').eq('tenant_id', tenantId)) : Promise.resolve([]),
         mayReadSales ? fetchTenantRowsTolerant(() => supabaseClient.from('competitor_price_research').select('*').eq('tenant_id', tenantId).order('researched_on', { ascending: false }).order('created_at', { ascending: false })) : Promise.resolve([]),
-        mayReadLedger ? fetchTenantRowsTolerant(() => supabaseClient.from('expense_templates').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false })) : Promise.resolve([]),
-        mayReadLedger ? fetchTenantRowsTolerant(() => supabaseClient.from('expense_template_occurrences').select('*').eq('tenant_id', tenantId).order('period_month', { ascending: false })) : Promise.resolve([]),
         // phase91 uygulanmadan once tablo yoktur: null doner, ekran ayakta kalir.
         mayReadSales ? fetchTenantRowsTolerant(() => supabaseClient.from('lead_interest_properties').select('lead_id, property_id').eq('tenant_id', tenantId)) : Promise.resolve([]),
         // Kanal ilanlari mulk profilinde listelenir (L-214); okuma can_read_sales (phase53).
@@ -17404,12 +17319,9 @@ async function loadTenantAppData(tenantIdOrUserId) {
         salesMembers: salesMembers || [],
         propertyPricingRules: propertyPricingRuleRows || [],
         competitorPriceResearch: competitorResearchRows || [],
-        expenseTemplates: expenseTemplateRows || [],
-        expenseTemplateOccurrences: expenseTemplateOccurrenceRows || [],
         incomeEntries: (incomeEntryRows || []).map(r => mapIncomeEntryFromDb(r, villas)).filter(Boolean),
         phase97SchemaReady: incomeEntryRows !== null,
-        phase78SchemaReady: propertyPricingRuleRows !== null && competitorResearchRows !== null
-          && expenseTemplateRows !== null && expenseTemplateOccurrenceRows !== null,
+        phase78SchemaReady: propertyPricingRuleRows !== null && competitorResearchRows !== null,
         influencerCollabs: (influencerRows || []).map(r => mapInfluencerCollabFromDb(r, propIdMap)),
         housekeepingOverrides,
         airbnbListings,
@@ -17472,8 +17384,6 @@ function getBlankTenantData(userId) {
     scheduledMessages: [],
     extensionOffers: [],
     expenses: [],
-    expenseTemplates: [],
-    expenseTemplateOccurrences: [],
     cleaningTasks: [],
     leads: [],
     leadSources: [],
@@ -19880,16 +19790,22 @@ function buildNotificationFeedInput() {
   };
 }
 
-// Tahsilat bildirimi girdisi (M69): OTA disi kanal, iptal ve toplu aktarim
-// ozeti degil, bakiye satiri yuklenmis ve kalan > 0. Vade = cikis gunu.
+// Tahsilat bildirimi girdisi (M69, L-245): iptal ve toplu aktarim ozeti
+// degil, kanalin tahsilat kurali takip ediyor, bakiye satiri yuklenmis ve
+// kalan > 0. Platformun aktardigi kanalda (NEXT_MONTH) platform komisyonunu
+// keserek oder; komisyon kadar acik "tahsil edilmedi" sayilmaz.
 function getUnpaidDirectBookings(data) {
   const bakiyeler = new Map((data.bookingPaymentBalances || []).map(r => [String(r.booking_id), r]));
-  return (data.bookings || []).filter(b => b && b.status !== 'CANCELLED' && !isBulkSummaryBooking(b)
-    && isDirectBookingChannel(b.channel, data.bookingChannels))
+  return (data.bookings || []).filter(b => b && b.status !== 'CANCELLED' && !isBulkSummaryBooking(b))
     .map(b => {
+      const dueDate = getBookingCollectionDueDate(b);
       const bakiye = bakiyeler.get(String(b.id));
-      if (!bakiye || !(Number(bakiye.remaining) > 0)) return null;
-      return { id: b.id, guest: b.guest, villa: b.villa, checkOut: b.checkOut, amountDue: Number(bakiye.amount_due), remaining: Number(bakiye.remaining) };
+      if (!dueDate || !bakiye) return null;
+      const platform = channelCollectionRule(b.channel).mode === 'NEXT_MONTH';
+      const kalan = Number(bakiye.remaining) - (platform ? (Number(b.otaComm) || 0) : 0);
+      if (!(kalan >= 1)) return null;
+      return { id: b.id, guest: b.guest, villa: b.villa, checkOut: b.checkOut, dueDate, platform,
+        channelName: getChannelDisplayName(b.channel), amountDue: Number(bakiye.amount_due), remaining: Math.round(kalan * 100) / 100 };
     })
     .filter(Boolean);
 }
@@ -22110,10 +22026,6 @@ if (typeof module !== 'undefined' && module.exports) {
     mapExpenseFromDb,
     mapExpenseToDb,
     isAdsPeriodExpense,
-    renderExpenseTemplates,
-    saveExpenseTemplate,
-    generateExpenseFromTemplate,
-    deleteExpenseTemplate,
     loadExpenses,
     createExpense,
     createExpensesBatch,
@@ -22135,6 +22047,8 @@ if (typeof module !== 'undefined' && module.exports) {
     expenseSeriesInfo,
     todayPerformanceProfitCardHtml,
     getUnpaidDirectBookings,
+    channelCollectionRule,
+    getBookingCollectionDueDate,
     buildNotificationFeedInput,
     ALLOWED_LEAD_STAGES,
     ALLOWED_LEAD_SOURCES,

@@ -14,7 +14,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=747c4187">
+  <link rel="stylesheet" href="style.css?v=5b1f61ef">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="supabase.umd.js?v=3810661a"></script>
@@ -1308,26 +1308,6 @@
     <!-- TAB: GİDER DEFTERİ (FULL CRUD) -->
     <!-- ========================================== -->
     <div id="tab-expenses" class="tab-content">
-      <section class="card" id="expenseTemplatesCard">
-        <div class="section-title-bar">
-          <div><h2>🔁 GİDER ŞABLONLARI</h2><p class="sub-text">Sabit gideri bir kez tanımlayın; seçili aya tek kayıt olarak işleyin.</p></div>
-        </div>
-        <form id="expenseTemplateForm" data-management-only data-onsubmit="saveExpenseTemplate(event)" class="form-grid" style="margin-bottom:16px;">
-          <div class="form-group"><label>Şablon adı</label><input id="expenseTemplateName" maxlength="150" required placeholder="Aylık internet"></div>
-          <div class="form-group"><label>Kategori</label><select id="expenseTemplateCategory" required>
-            <option value="Maaş">Maaş</option><option value="Temizlik">Temizlik</option><option value="Bakım">Bakım</option>
-            <option value="Akaryakıt">Akaryakıt</option><option value="Fatura" selected>Fatura</option><option value="Muhasebe">Muhasebe</option>
-            <option value="Kredi Kartı / Komisyon">Kredi Kartı / Komisyon</option><option value="Danışmanlık">Danışmanlık</option><option value="Diğer">Diğer</option>
-          </select></div>
-          <div class="form-group"><label>Tür</label><select id="expenseTemplateType"><option value="OPEX">Opex</option><option value="CAPEX">Capex</option></select></div>
-          <div class="form-group"><label>Mülk / kapsam</label><select id="expenseTemplateProperty"><option value="ALL">Tüm Portföy</option></select></div>
-          <div class="form-group"><label>Tutar (TL)</label><input id="expenseTemplateAmount" type="number" min="0.01" step="0.01" required></div>
-          <div class="form-group"><label>Açıklama</label><input id="expenseTemplateDescription" maxlength="2000"></div>
-          <div class="form-group" style="justify-content:flex-end;"><button class="btn btn-primary" type="submit">Şablon oluştur</button></div>
-        </form>
-        <div id="expenseTemplatesStatus" class="sub-text" hidden></div>
-        <div class="table-responsive"><table class="data-table"><thead><tr><th>ŞABLON</th><th>KATEGORİ</th><th>KAPSAM</th><th>TUTAR</th><th>DURUM / İŞLEM</th></tr></thead><tbody id="expenseTemplatesTableBody"></tbody></table></div>
-      </section>
       <section class="card">
         <div class="section-title-bar">
           <div><h2>💸 GİDER VE YATIRIM DEFTERİ</h2><p class="sub-text">Tüm operasyonel (Opex) ve yatırım (Capex) harcamaları.</p></div>
@@ -4021,12 +4001,12 @@
   <script src="core/captcha_gate.js?v=3ad4a776"></script>
   <script src="core/date_range_picker.js?v=41dc564c"></script>
   <script src="core/side_panel.js?v=d763b464"></script>
-  <script src="core/notification_feed.js?v=185a356e"></script>
+  <script src="core/notification_feed.js?v=97d955bf"></script>
   <script src="core/command_search.js?v=89760933"></script>
-  <script src="core/action_dispatch.js?v=edd98afe"></script>
+  <script src="core/action_dispatch.js?v=9462ac96"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
-  <script src="core/booking_finance_ui.js?v=cb9a574c"></script>
-  <script src="app.js?v=9e9abe10"></script>
+  <script src="core/booking_finance_ui.js?v=fa6d0372"></script>
+  <script src="app.js?v=b38fec57"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=e5503243"></script>

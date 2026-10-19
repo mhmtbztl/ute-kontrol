@@ -1607,6 +1607,36 @@ async function giderAsamasiDavranisi() {
   check(/kind === 'booking'\) \{ switchTab\('reservations'\); openBookingDetailsPanel\(arg\); \}/.test(functionBody(app, 'async function openUserNotification('))
     && /syncNotificationFeed\(\)/.test(functionBody(app, 'async function refreshBookingPaymentData(')),
     'L-244d "Git" rezervasyon detayini (odeme takibi) acar; odeme girilince bildirim yeniden eslenir');
+
+  // L-245 (kullanici, 19.10): Booking ve Etstur parayi ay basinda belli gunde
+  // aktarir -> kanal bazinda tahsilat gunu. Ayrica sablon karti kaldirildi.
+  App.setAppData({ villas: {}, bookings: [], expenses: [], bookingChannels: [], closedPeriods: [], tenantSettings: {} });
+  check(App.channelCollectionRule('WHATSAPP').mode === 'CHECKOUT' && App.channelCollectionRule('AIRBNB').mode === 'NONE'
+    && App.getBookingCollectionDueDate({ channel: 'AIRBNB', checkOut: '2026-09-28' }) === null,
+    'L-245a Ayar yokken dogrudan kanal cikis gunu, OTA takip edilmez (eskisi gibi)');
+  App.setAppData({ villas: {}, bookings: [], expenses: [], bookingChannels: [], closedPeriods: [], tenantSettings: { booking_collection_schedule: {
+    BOOKING: { mode: 'NEXT_MONTH', day: 5 }, ETSTUR: { mode: 'NEXT_MONTH', day: 31 }, WHATSAPP: { mode: 'NONE' }, AIRBNB: { mode: 'NEXT_MONTH', day: 0 } } } });
+  check(App.getBookingCollectionDueDate({ channel: 'BOOKING', checkOut: '2026-09-28' }) === '2026-10-05'
+    && App.getBookingCollectionDueDate({ channel: 'etstur', checkOut: '2026-01-15' }) === '2026-02-28'
+    && App.getBookingCollectionDueDate({ channel: 'BOOKING', checkOut: '2026-12-31' }) === '2027-01-05'
+    && App.getBookingCollectionDueDate({ channel: 'WHATSAPP', checkOut: '2026-09-28' }) === null
+    && App.channelCollectionRule('AIRBNB').mode === 'NONE',
+    'L-245b "Izleyen ayin N. gunu": ay sonuna kirpilir, yil donumu; "takip etme" bildirim uretmez; gecersiz gun uydurulmaz');
+  const otaRez = [
+    { id: 'aaaaaaaa-0000-4000-8000-000000000011', villa: 'DENIZ', guest: 'Booking Ödedi', checkOut: '2026-09-20', channel: 'BOOKING', status: 'CHECKED_OUT', otaComm: 3000 },
+    { id: 'aaaaaaaa-0000-4000-8000-000000000012', villa: 'DENIZ', guest: 'Booking Bekliyor', checkOut: '2026-09-20', channel: 'BOOKING', status: 'CHECKED_OUT', otaComm: 3000 }];
+  const otaAcik = App.getUnpaidDirectBookings({ bookings: otaRez, bookingChannels: [], bookingPaymentBalances: [
+    { booking_id: otaRez[0].id, amount_due: 20000, remaining: 3000 }, { booking_id: otaRez[1].id, amount_due: 20000, remaining: 20000 }] });
+  const otaOlay = NF.deriveNotifications({ role: 'owner', today: '2026-10-19', unpaidBookings: otaAcik }).filter(e => e.event_key.startsWith('collection_due:'));
+  check(otaAcik.length === 1 && otaAcik[0].remaining === 17000 && otaAcik[0].dueDate === '2026-10-05'
+    && otaOlay.length === 1 && /Booking\.com ödemesi 5 Ekim bekleniyordu \(14 gün geçti\)/.test(otaOlay[0].message) && /₺17\.000 tahsil edilmedi/.test(otaOlay[0].message),
+    'L-245c Platform odemesi gunu gecince bildirim; platformun kestigi komisyon acik sayilmaz', JSON.stringify({ otaAcik, otaOlay }));
+  const fin = read('core/booking_finance_ui.js');
+  check(/saveBookingCollectionSchedule\(event\)/.test(fin) && /cloudSaveTenantSetting\('booking_collection_schedule'/.test(fin) && /Çıkış ayını izleyen ayın … günü/.test(fin)
+    && eylemler.includes("'saveBookingCollectionSchedule'"),
+    'L-245d Ayarlar → Kanallar → Tahsilat gunu formu isletme ayarina yazar');
+  check(!/GİDER ŞABLONLARI|id="expenseTemplateForm"/.test(html) && !/from\('expense_templates'\)/.test(app),
+    'L-245e Gider sablonu karti kaldirildi (kullanici karari); sabit gider formdaki "Tekrar" ile');
 }
 
 async function temizlikIkiImzaDavranisi() {
