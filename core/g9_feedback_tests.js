@@ -25,6 +25,7 @@
 // L-217 (M46): Bugun ekraninda doluluk/ADR/RevPAR kartlari, ev ev secilebilir; Finans ile ayni hesap.
 // L-226..L-231 (M51-M56, 9.4): kesirli tutar, liste donem payi ve kesintiler, takvim buyutme, kanal bazli kapora, formdan vergi profili, POS komisyonu bellegi.
 // L-233..L-240 (M58-M65, 9.5): acilista panel titremesi, saha giris bilgileri, kagit liste duzenleyici, bos/eski kontrol listesi, kapanan temizligin personelden dusmesi, "gerek kalmadi", Operasyon rozeti.
+// L-241..L-244 (M66-M69, 9.6): isletmenin gider kategorileri ve OPEX/CAPEX turu, tekrarlayan gider, Bugun'de net kar, tahsilat bildirimi.
 // L-184..L-190 (M14-M20): kapora, kar marji hedefi, talep tarihi, mulk net kari, reklam tablosu/metrik/gunluk butce, sablon ekrani, bosluk gecesi.
 const fs = require('fs');
 const path = require('path');
@@ -643,7 +644,7 @@ async function bildirimDavranisi() {
   check(sahip.every(e => /^[a-z_]{3,40}:[A-Za-z0-9_:.-]{1,200}$/.test(e.event_key) && ['TEAM', 'OPERATIONS', 'FINANCE', 'SALES', 'PRICING'].includes(e.domain)
     && (!e.deep_link || /^[a-z]+(:[A-Za-z0-9_.-]{1,80}){0,2}$/.test(e.deep_link))),
     'L-192l Uretilen her olay phase93 dogrulamasindan gecer');
-  check(NF.typesForRole('owner').length === 6 && NF.typesForRole('sales').length === 3,
+  check(NF.typesForRole('owner').length === 7 && NF.typesForRole('sales').length === 4,
     'L-192m Bos merkezde rolun alacagi bildirim turleri aciklanir');
 
   const app = read('app.js');
@@ -1449,6 +1450,165 @@ async function rezervasyonOdemeDavranisi() {
     'L-231b Olusturma ve guncelleme sonrasi bellek sunucunun yazdigi komisyonu alir');
 }
 
+async function giderAsamasiDavranisi() {
+  // 9.6 Gider (kullanici PDF'i, 19.10): M66-M69 = L-241...L-244.
+  sahteDom({});
+  global.FinancialMetricsService = require('./financial_metrics_service.js');
+  const App = require('../app.js');
+  const E = require('./finance_import_engine.js');
+  const NF = require('./notification_feed.js');
+  const html = read('index.html');
+  const app = read('app.js');
+  const eylemler = read('core/action_dispatch.js');
+  const A = 'aaaaaaaa-aaaa-4aaa-8aaa-00000000000a';
+  App.setActiveTenant({ id: TENANT, role: 'owner' });
+
+  // L-241 (M66): kategoriler isletmece eklenir; her kategori OPEX ya da CAPEX'tir.
+  check(E.GIDER_KATEGORILERI.filter(c => c.name !== 'Diğer').every(c => c.type === 'OPEX' || c.type === 'CAPEX')
+    && E.GIDER_KATEGORILERI.find(c => c.name === 'Demirbaş').type === 'CAPEX' && E.GIDER_KATEGORILERI.find(c => c.name === 'Tadilat').type === 'CAPEX'
+    && E.GIDER_KATEGORILERI.find(c => c.name === 'Fatura').type === 'OPEX',
+    'L-241a Standart her kategorinin turu var; klima/mobilya icin CAPEX kategorisi (Demirbas, Tadilat) eklendi');
+  App.setAppData({ villas: {}, bookings: [], expenses: [], closedPeriods: [], tenantSettings: { expense_categories: [
+    { name: 'Havuz Bakımı', type: 'OPEX' }, { name: 'Jakuzi', type: 'CAPEX' }, { name: 'FATURA', type: 'CAPEX' }, { name: '  ', type: 'OPEX' }, { name: 'havuz  bakımı', type: 'OPEX' }] } });
+  const adlar = App.getExpenseCategories().map(c => c.name);
+  check(adlar.slice(-3).join('|') === 'Havuz Bakımı|Jakuzi|Diğer' && adlar.filter(a => /fatura/i.test(a)).length === 1,
+    'L-241b Ozel kategoriler "Diğer"den once listeye girer; standartla ayni ad, bos ve mukerrer ad alinmaz', adlar.join('|'));
+  check(App.getExpenseCategoryType('Jakuzi') === 'CAPEX' && App.getExpenseCategoryType('fatura') === 'OPEX' && App.getExpenseCategoryType('Diğer') === null
+    && App.eslesenGiderKategorisi('HAVUZ BAKIMI') === 'Havuz Bakımı',
+    'L-241c Tur kategoriden okunur; ozel kategori grafikte kendi dilimine duser ("Diğer"e degil)');
+  let ist = kaydedenIstemci();
+  App.setSupabaseClient(ist);
+  const eklenen = await App.addCustomExpenseCategory('Bahçe ', 'CAPEX');
+  const ayar = ist.yazmalar.find(k => k.tablo === 'tenant_settings');
+  check(eklenen && ayar && ayar.islem === 'upsert' && ayar.yuk.key === 'expense_categories' && ayar.yuk.tenant_id === TENANT
+    && JSON.stringify(ayar.yuk.value.slice(-1)) === JSON.stringify([{ name: 'Bahçe', type: 'CAPEX' }])
+    && App.getExpenseCategoryType('Bahçe') === 'CAPEX',
+    'L-241d Yeni kategori isletme ayarina (tenant_settings) turuyle yazilir; bellek yazmadan sonra degisir', JSON.stringify(ayar && ayar.yuk));
+  ist = kaydedenIstemci();
+  App.setSupabaseClient(ist);
+  check(await App.addCustomExpenseCategory('fatura', 'OPEX') === null && !ist.yazmalar.length,
+    'L-241e Standart kategoriyle ayni ad eklenmez, hicbir sey yazilmaz');
+  const giderMap = { date: 'Tarih', category: 'Kategori', amount: 'Tutar', description: 'Aciklama', property: 'Mulk' };
+  const satir = [{ Tarih: '2026-09-01', Kategori: 'jakuzi', Tutar: '5000', Aciklama: 'x', Mulk: '' }];
+  const ozelle = E.validateExpenseRows(satir, giderMap, { properties: [], customCategories: [{ name: 'Jakuzi', type: 'CAPEX' }] });
+  const ozelsiz = E.validateExpenseRows(satir, giderMap, { properties: [] });
+  check(ozelle.validCount === 1 && ozelle.validatedRows[0].category === 'Jakuzi' && ozelsiz.validCount === 0,
+    'L-241f Ice aktarma isletmenin ekledigi kategoriyi tanir', JSON.stringify(ozelle.errors));
+  const kategoriSecici = (html.match(/<select id="expCategory"[\s\S]*?<\/select>/) || [''])[0];
+  check(/<optgroup label="Operasyonel gider \(OPEX\)" data-expense-group="OPEX">/.test(kategoriSecici) && /<optgroup label="Yatırım \(CAPEX\)" data-expense-group="CAPEX">/.test(kategoriSecici)
+    && /id="expTypeHint"/.test(html) && /data-settings-section="expense-categories"/.test(html) && /onExpenseCategoryChange\(this\.value\)/.test(kategoriSecici)
+    && /renderSettingsExpenseCategories\(\)/.test(functionBody(app, 'async function renderSettingsWorkspace(')),
+    'L-241g Formda kategoriler OPEX / CAPEX gruplu, tur aciklamasi var; Ayarlar\'da Gider kategorileri bolumu');
+
+  let arizaArg = null;
+  App.setAppData({ villas: {}, bookings: [], expenses: [], closedPeriods: [], maintenanceTickets: [{ id: 't-9', title: 'Klima arızası' }] });
+  await App.runCommandCenterAction('RESOLVE_TICKET', 't-9', { actualCost: 11000, resolveMaintenanceTicket: async (...a) => { arizaArg = a; return { success: true }; } });
+  check(App.eslesenGiderKategorisi('Elektrik') === 'Fatura' && App.eslesenGiderKategorisi('Bakım & Onarım') === 'Bakım'
+    && JSON.stringify(arizaArg) === JSON.stringify(['t-9', 11000, 'Bakım', 'Arıza onarımı: Klima arızası']),
+    'L-241h Es anlamli kategori grafikte de eslesir; ariza onarimi "Bakım" (OPEX) olarak, arizanin adiyla yazilir', JSON.stringify(arizaArg));
+
+  // L-242 (M67): gider formunda tekrar — her ay / hafta / gun, kac kez.
+  check(JSON.stringify(App.buildRecurringExpenseDates('2026-01-31', 'MONTHLY', 4)) === JSON.stringify(['2026-01-31', '2026-02-28', '2026-03-31', '2026-04-30'])
+    && JSON.stringify(App.buildRecurringExpenseDates('2026-12-28', 'WEEKLY', 2)) === JSON.stringify(['2026-12-28', '2027-01-04'])
+    && JSON.stringify(App.buildRecurringExpenseDates('2026-02-27', 'DAILY', 3)) === JSON.stringify(['2026-02-27', '2026-02-28', '2026-03-01'])
+    && App.buildRecurringExpenseDates('2026-01-01', 'MONTHLY', 1).length === 0 && App.buildRecurringExpenseDates('2026-01-01', 'MONTHLY', 61).length === 0
+    && App.buildRecurringExpenseDates('2026-01-01', 'YEARLY', 3).length === 0,
+    'L-242a Tekrar tarihleri: ayin 31\'i kisa ayda son gune kayar ve geri doner; hafta/gun; 2..sinir disi reddedilir');
+  const eklenenler = [];
+  const silinenler = [];
+  const yazanIstemci = {
+    rpc: async () => ({ data: [], error: null }),
+    from(tablo) {
+      const q = {
+        _sil: false,
+        insert(rows) { const liste = Array.isArray(rows) ? rows : [rows]; eklenenler.push({ tablo, liste }); q._veri = liste.map((r, i) => ({ ...r, id: `eeeeeeee-eeee-4eee-8eee-00000000000${i}` })); return q; },
+        delete() { q._sil = true; return q; },
+        eq() { return q; }, in(_, ids) { if (q._sil) silinenler.push({ tablo, ids }); q._ids = ids; return q; },
+        select() { return q; }, order() { return q; },
+        async single() { return { data: q._veri ? q._veri[0] : null, error: null }; },
+        then(res, rej) { const data = q._sil ? (q._ids || []).map(id => ({ id })) : (q._veri || []); return Promise.resolve({ data, error: null }).then(res, rej); }
+      };
+      return q;
+    }
+  };
+  App.setSupabaseClient(yazanIstemci);
+  App.setAppData({ villas: {}, bookings: [], expenses: [], closedPeriods: [], tenantSettings: {} });
+  sahteDom({ expEditId: '', expType: 'OPEX', expCategory: 'Fatura', expVilla: 'ALL', expDate: '2026-01-31', expAmount: '800', expDesc: 'TEST internet', expRecurFreq: 'MONTHLY', expRecurCount: '3' });
+  await App.saveExpense({ preventDefault() {} });
+  const toplu = eklenenler.filter(k => k.tablo === 'expenses');
+  const seriler = toplu[0] ? toplu[0].liste.map(r => r.legacy_id) : [];
+  check(toplu.length === 1 && toplu[0].liste.length === 3 && toplu[0].liste.map(r => r.expense_date).join(',') === '2026-01-31,2026-02-28,2026-03-31'
+    && toplu[0].liste.every(r => r.amount === 800 && r.category === 'Fatura' && r.expense_type === 'OPEX' && r.description === 'TEST internet')
+    && /^RECUR:[A-Za-z0-9]+:1\/3$/.test(seriler[0]) && seriler[2].endsWith(':3/3') && new Set(seriler.map(s => s.split(':')[1])).size === 1,
+    'L-242b "Her ay x3" tek ifadeyle (hep ya da hic) 3 ayri gider yazar; seri legacy_id\'de', JSON.stringify(toplu.map(k => k.liste)));
+  const kayitlar = App.getAppData().expenses;
+  check(kayitlar.length === 3 && App.expenseSeriesInfo(kayitlar[1]).index === 2 && App.expenseSeriesInfo(kayitlar[1]).total === 3
+    && App.expenseSeriesInfo({ legacyId: 'EXP-CLEAN-1' }) === null,
+    'L-242c Seri bilgisi kayittan okunur (rozet "🔁 2/3"); diger legacy_id seri sayilmaz');
+  eklenenler.length = 0;
+  sahteDom({ expEditId: '', expType: 'OPEX', expCategory: 'Fatura', expVilla: 'ALL', expDate: '2026-01-31', expAmount: '800', expDesc: 'tek', expRecurFreq: 'NONE', expRecurCount: '12' });
+  await App.saveExpense({ preventDefault() {} });
+  check(eklenenler.length === 1 && !Array.isArray(eklenenler[0].liste[0].legacy_id) && eklenenler[0].liste.length === 1 && !eklenenler[0].liste[0].legacy_id,
+    'L-242d "Tekrarlamaz" eskisi gibi tek kayit, seri izi yok');
+  sahteDom({});
+  global.confirm = () => true;
+  const ilk = App.getAppData().expenses.find(e => App.expenseSeriesInfo(e) && App.expenseSeriesInfo(e).index === 1);
+  await App.deleteExpenseUI(ilk.id);
+  check(silinenler.length === 1 && silinenler[0].ids.length === 3 && App.getAppData().expenses.filter(e => App.expenseSeriesInfo(e)).length === 0,
+    'L-242e Tekrarin ilk kaydi silinirken "sonrakiler de" secilirse seri tek ifadeyle silinir', JSON.stringify(silinenler));
+  check(/id="expRecurFreq"/.test(html) && /<option value="MONTHLY">Her ay<\/option>/.test(html) && /<option value="WEEKLY">Her hafta<\/option>/.test(html)
+    && /<option value="DAILY">Her gün<\/option>/.test(html) && /id="expRecurCount"/.test(html)
+    && ['updateExpenseRecurrencePreview', 'onExpenseCategoryChange', 'createExpenseCategoryFromForm', 'createSettingsExpenseCategory', 'deleteCustomExpenseCategory', 'setCustomExpenseCategoryType'].every(ad => eylemler.includes(`'${ad}'`))
+    && /invalidateExecutiveSnapshotCache\(\)/.test(functionBody(app, 'async function deleteExpensesByIds(')),
+    'L-242f Formda Tekrar secenekleri; yeni eylemler izin listesinde; toplu silme ana sayfa onbellegini temizler');
+
+  // L-243 (M68): Bugun kartinda net kar, Finans ile ayni defterden.
+  const buAy = App.getCurrentMonthKey();
+  App.setAppData({ villas: { DENIZ: { id: A, slug: 'DENIZ', name: 'Deniz Evi', isActive: true, activationDate: '2026-01-01' } },
+    bookings: [{ id: 'r1', villa: 'DENIZ', propertyId: A, guest: 'Ali', checkIn: `${buAy}-02`, checkOut: `${buAy}-05`, gross: 30000, cleanFee: 0, otaComm: 0, discount: 0, status: 'CONFIRMED', channel: 'WHATSAPP' }],
+    expenses: [], cleaningTasks: [], maintenance: [], closedPeriods: [] });
+  let perf = App.computeMonthPerformance(buAy, 'ALL');
+  check(/Net kâr<\/span><strong>—<\/strong><small>Gider kaydı yok; kâr ölçülemedi/.test(App.todayPerformanceProfitCardHtml(perf, buAy)),
+    'L-243a Gider yokken net kar uydurulmaz ("—", L-101)');
+  App.setAppData({ ...App.getAppData(), expenses: [
+    { id: 'x1', villa: 'ALL', date: `${buAy}-03`, month: buAy, category: 'Fatura', type: 'OPEX', amount: 2500, description: 'e' },
+    { id: 'x2', villa: 'ALL', date: `${buAy}-03`, month: buAy, category: 'Demirbaş', type: 'CAPEX', amount: 20000, description: 'k' }] });
+  perf = App.computeMonthPerformance(buAy, 'ALL');
+  check(perf.netProfit === 30000 - 2500 - 20000 && App.todayPerformanceProfitCardHtml(perf, buAy).includes('₺7.500'),
+    'L-243b Net kar = toplam gelir − OPEX − CAPEX (Finans defteri, computeMonthLedger)', JSON.stringify(perf));
+  App.setAppData({ ...App.getAppData(), expenses: [{ id: 'x3', villa: 'ALL', date: `${buAy}-03`, month: buAy, category: 'Demirbaş', type: 'CAPEX', amount: 40000, description: 'k' }] });
+  check(App.todayPerformanceProfitCardHtml(App.computeMonthPerformance(buAy, 'ALL'), buAy).includes('−₺10.000'),
+    'L-243c Zarar eksi isaretiyle yazilir');
+  check(/todayPerformanceProfitCardHtml\(perf, month\)/.test(functionBody(app, 'function renderTodayPerformance(')),
+    'L-243d Bugun kartlari net kari cizer (finans rolune kapili blok icinde)');
+
+  // L-244 (M69): OTA disi rezervasyonda cikis gunu gecti, tahsilat eksik -> bildirim.
+  const bugun = '2026-10-19';
+  const rez = [
+    { id: 'aaaaaaaa-0000-4000-8000-000000000001', villa: 'DENIZ', guest: 'Ali', checkOut: '2026-10-10', channel: 'WHATSAPP', status: 'CHECKED_OUT' },
+    { id: 'aaaaaaaa-0000-4000-8000-000000000002', villa: 'DENIZ', guest: 'Ota', checkOut: '2026-10-10', channel: 'AIRBNB', status: 'CHECKED_OUT' },
+    { id: 'aaaaaaaa-0000-4000-8000-000000000003', villa: 'DENIZ', guest: 'Odedi', checkOut: '2026-10-10', channel: 'PHONE', status: 'CHECKED_OUT' },
+    { id: 'aaaaaaaa-0000-4000-8000-000000000004', villa: 'DENIZ', guest: 'Gelecek', checkOut: '2026-11-10', channel: 'PHONE', status: 'CONFIRMED' },
+    { id: 'aaaaaaaa-0000-4000-8000-000000000005', villa: 'DENIZ', guest: 'Iptal', checkOut: '2026-10-10', channel: 'PHONE', status: 'CANCELLED' },
+    { id: 'aaaaaaaa-0000-4000-8000-000000000006', villa: 'DENIZ', guest: 'Bakiyesiz', checkOut: '2026-10-10', channel: 'PHONE', status: 'CHECKED_OUT' },
+    { id: 'aaaaaaaa-0000-4000-8000-000000000007', villa: 'DENIZ', guest: 'Bugun', checkOut: bugun, channel: 'INSTAGRAM', status: 'CHECKED_OUT' }];
+  const bakiye = (n, kalan) => ({ booking_id: `aaaaaaaa-0000-4000-8000-00000000000${n}`, amount_due: 20000, paid_total: 20000 - kalan, remaining: kalan });
+  const acik = App.getUnpaidDirectBookings({ bookings: rez, bookingChannels: [], bookingPaymentBalances: [bakiye(1, 5000), bakiye(2, 20000), bakiye(3, 0), bakiye(4, 20000), bakiye(5, 20000), bakiye(7, 1000)] });
+  check(acik.map(b => b.guest).join(',') === 'Ali,Gelecek,Bugun',
+    'L-244a Aday: OTA disi, iptal degil, bakiye satiri yuklu ve kalan > 0 (OTA, odenmis, iptal, bakiyesiz haric)', JSON.stringify(acik));
+  const olaylar = NF.deriveNotifications({ role: 'owner', today: bugun, unpaidBookings: acik }).filter(e => e.event_key.startsWith('collection_due:'));
+  check(olaylar.length === 2 && olaylar.some(e => /Tahsilat bekliyor: Ali/.test(e.title) && /9 gün geçti/.test(e.message) && /₺5\.000 tahsil edilmedi/.test(e.message) && e.severity === 'CRITICAL')
+    && olaylar.some(e => /Çıkış bugün/.test(e.message) && e.severity === 'WARNING')
+    && olaylar.every(e => e.domain === 'FINANCE' && /^booking:[A-Za-z0-9_.-]+$/.test(e.deep_link) && /^[a-z_]{3,40}:[A-Za-z0-9_:.-]{1,200}$/.test(e.event_key)),
+    'L-244b Vadesi (cikis) gelen eksik tahsilat bildirim olur; gelecek cikis olmaz; 7 gunu gecen kritik; phase93 dogrulamasina uyar', JSON.stringify(olaylar));
+  check(NF.deriveNotifications({ role: 'staff', today: bugun, unpaidBookings: acik }).length === 0
+    && NF.deriveNotifications({ role: 'sales', today: bugun, unpaidBookings: acik }).some(e => e.event_key.startsWith('collection_due:')),
+    'L-244c Satis rolu tahsilati gorur, personel gormez');
+  check(/kind === 'booking'\) \{ switchTab\('reservations'\); openBookingDetailsPanel\(arg\); \}/.test(functionBody(app, 'async function openUserNotification('))
+    && /syncNotificationFeed\(\)/.test(functionBody(app, 'async function refreshBookingPaymentData(')),
+    'L-244d "Git" rezervasyon detayini (odeme takibi) acar; odeme girilince bildirim yeniden eslenir');
+}
+
 async function temizlikIkiImzaDavranisi() {
   // 9.5 Temizlik (kullanici PDF'i, 19.10): M58-M65 = L-233...L-240.
   sahteDom({});
@@ -1616,6 +1776,7 @@ try {
   await rezervasyondanMisafirDavranisi();
   await rezervasyonOdemeDavranisi();
   await temizlikIkiImzaDavranisi();
+  await giderAsamasiDavranisi();
 } catch (error) {
   failed++;
   console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

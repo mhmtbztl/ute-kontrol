@@ -5665,3 +5665,17 @@ body.side-panel-open { overflow: hidden; }
 .bridge-step[hidden] {
   display: none !important;
 }
+
+/* Gider formu: kategori ekleme ve tekrar (M66, M67). Uzun kategori adi
+   (Demirbas & Ekipman ...) 1fr sutunu icerik genisligine itiyordu. */
+#expenseForm .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+#expenseForm .form-group select, #expenseForm .form-group input { min-width: 0; max-width: 100%; }
+.expense-category-add { float: right; font-size: 11px; padding: 0; }
+.expense-new-category { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px; margin-top: 6px; }
+.expense-new-category[hidden], #expRecurGroup[hidden], #expRecurCountWrap[hidden] { display: none !important; }
+.expense-recur { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.expense-recur #expRecurCount { width: 80px; }
+#expTypeHint, #expRecurPreview { display: block; margin-top: 4px; font-size: 11px; line-height: 1.45; }
+@media (max-width: 720px) {
+  .expense-new-category { grid-template-columns: 1fr; }
+}

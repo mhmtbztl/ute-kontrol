@@ -325,17 +325,22 @@ function autoDetectColumnMap(headers = [], mode = 'EXPENSES') {
 // burasidir; app.js EXPENSE_CATEGORIES ayni adlari tasir (renk ekler).
 // -----------------------------------------------------------------------------
 
+// Tur (M66, 9.6.2): kategori giderin OPEX mi CAPEX mi oldugunu soyler; form
+// kategori secilince turu buna gore doldurur. Tur satirda (expense_type)
+// durur; kategori yalniz varsayilani verir. "Diğer" turu belirlemez.
 const GIDER_KATEGORILERI = [
-  { name: 'Maaş', label: 'Maaş (Personel / Yönetici)' },
-  { name: 'Temizlik', label: 'Temizlik & Çamaşırhane' },
-  { name: 'Bakım', label: 'Bakım, Onarım & Tesisat', aliases: ['Bakım & Onarım', 'Onarım', 'Tamir'] },
-  { name: 'Reklam', label: 'Reklam & Pazarlama (Meta/Google)', aliases: ['Pazarlama'] },
-  { name: 'Akaryakıt', label: 'Akaryakıt & Ulaşım', aliases: ['Yakıt', 'Ulaşım'] },
-  { name: 'Fatura', label: 'Fatura (Elektrik, Su, İnternet)', aliases: ['Elektrik', 'Su', 'İnternet', 'Doğalgaz'] },
-  { name: 'Muhasebe', label: 'Muhasebe & Hukuk', aliases: ['Hukuk'] },
-  { name: 'Kredi Kartı / Komisyon', label: 'Kredi Kartı / Komisyon', aliases: ['Kredi Kartı', 'K.Kartı', 'Komisyon'] },
-  { name: 'Danışmanlık', label: 'Danışmanlık & Yazılım', aliases: ['Yazılım'] },
-  { name: 'Diğer', label: 'Diğer Giderler', aliases: ['Diğer Gider'] }
+  { name: 'Maaş', label: 'Maaş (Personel / Yönetici)', type: 'OPEX' },
+  { name: 'Temizlik', label: 'Temizlik & Çamaşırhane', type: 'OPEX' },
+  { name: 'Bakım', label: 'Bakım, Onarım & Tesisat', type: 'OPEX', aliases: ['Bakım & Onarım', 'Onarım', 'Tamir'] },
+  { name: 'Reklam', label: 'Reklam & Pazarlama (Meta/Google)', type: 'OPEX', aliases: ['Pazarlama'] },
+  { name: 'Akaryakıt', label: 'Akaryakıt & Ulaşım', type: 'OPEX', aliases: ['Yakıt', 'Ulaşım'] },
+  { name: 'Fatura', label: 'Fatura (Elektrik, Su, İnternet)', type: 'OPEX', aliases: ['Elektrik', 'Su', 'İnternet', 'Doğalgaz'] },
+  { name: 'Muhasebe', label: 'Muhasebe & Hukuk', type: 'OPEX', aliases: ['Hukuk'] },
+  { name: 'Kredi Kartı / Komisyon', label: 'Kredi Kartı / Komisyon', type: 'OPEX', aliases: ['Kredi Kartı', 'K.Kartı', 'Komisyon'] },
+  { name: 'Danışmanlık', label: 'Danışmanlık & Yazılım', type: 'OPEX', aliases: ['Yazılım'] },
+  { name: 'Demirbaş', label: 'Demirbaş & Ekipman (klima, beyaz eşya, mobilya)', type: 'CAPEX', aliases: ['Ekipman', 'Demirbaş & Ekipman', 'Mobilya', 'Beyaz Eşya', 'Klima'] },
+  { name: 'Tadilat', label: 'Tadilat & Yenileme', type: 'CAPEX', aliases: ['Renovasyon', 'Yenileme', 'Yatırım'] },
+  { name: 'Diğer', label: 'Diğer Giderler', type: null, aliases: ['Diğer Gider'] }
 ];
 
 // Turkce harf, buyuk-kucuk ve noktalama duyarsiz anahtar ("TEMİZLİK" = "temizlik").
@@ -397,6 +402,8 @@ function validateExpenseRows(rawRows = [], columnMap = {}, context = {}) {
   const validatedRows = [], errors = [];
   let validCount = 0, invalidCount = 0, duplicateCount = 0, totalAmount = 0;
   const gorulen = new Set();
+  // Isletmenin Ayarlar'da ekledigi kategoriler (M66) standart listeye eklenir.
+  const tumKategoriler = GIDER_KATEGORILERI.concat((context.customCategories || []).filter(c => c && c.name));
 
   const tarihSirasi = fileDateOrder(rawRows, [columnMap.date]);
 
@@ -414,10 +421,10 @@ function validateExpenseRows(rawRows = [], columnMap = {}, context = {}) {
     // Defterde zaten duran eski serbest kategori (dis aktarim -> geri yukleme
     // turu) oldugu gibi kabul edilir; yeni ve taninmayan deger reddedilir.
     const kategori = kategoriHam
-      ? (mevcutDeger(kategoriHam, context.existingCategories) || resolveExpenseCategory(kategoriHam))
+      ? (mevcutDeger(kategoriHam, context.existingCategories) || resolveExpenseCategory(kategoriHam, tumKategoriler))
       : null;
     if (!kategoriHam) satirHata.push('Kategori boş.');
-    else if (!kategori) satirHata.push(`Kategori tanınmadı: "${kategoriHam}". Geçerli: ${GIDER_KATEGORILERI.map(c => c.name).join(', ')}`);
+    else if (!kategori) satirHata.push(`Kategori tanınmadı: "${kategoriHam}". Geçerli: ${tumKategoriler.map(c => c.name).join(', ')}`);
 
     const tutar = normalizeAmount(raw[columnMap.amount]);
     if (tutar === null) satirHata.push(`Tutar anlaşılamadı: "${raw[columnMap.amount]}"`);

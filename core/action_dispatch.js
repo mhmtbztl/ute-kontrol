@@ -94,7 +94,9 @@
     'toggleBookingChannelRowRate', 'toggleExportMenu', 'toggleHeaderDropdown', 'toggleReservationRangePicker',
     'toggleNewBookingChannelRate', 'toggleNotificationDrawer', 'toggleResDatePicker',
     'toggleTaskPaid', 'undoImportBatch', 'updateDeleteAccountButton', 'updateInviteRoleHint', 'updateLeadStatusFromKanban',
-    'updateExpenseCategoryWarning', 'updateMonthReopenButton', 'updateResetButton', 'shiftReservationRangeCalendar', 'resetReservationRange'
+    'onExpenseCategoryChange', 'updateMonthReopenButton', 'updateResetButton', 'shiftReservationRangeCalendar', 'resetReservationRange',
+    'updateExpenseTypeHint', 'toggleExpenseCategoryCreate', 'createExpenseCategoryFromForm', 'updateExpenseRecurrencePreview',
+    'createSettingsExpenseCategory', 'setCustomExpenseCategoryType', 'deleteCustomExpenseCategory'
   ]);
 
   // encodeURIComponent tek tirnagi ve parantezleri KODLAMAZ: "O'Brien" ile

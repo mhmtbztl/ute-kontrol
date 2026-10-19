@@ -39,6 +39,7 @@
     { type: 'cleaning_inspection', need: 'manage', label: 'Temizlik onayınızı bekliyor', detail: 'Temizlikçi işi tamamladı (Z), yönetici kontrolü (M) yapılmadı. Onaylanmadan gider ve borç doğmaz.' },
     { type: 'maintenance_open', need: 'member', label: 'Yeni açık arıza', detail: 'Son 7 günde açılan ve kapanmamış arıza kaydı.' },
     { type: 'period_unclosed', need: 'manage', label: 'Geçen ay kapatılmadı', detail: 'Biten ayda kayıt var ama ay kapanışı yapılmadı.' },
+    { type: 'collection_due', need: 'readSales', label: 'Tahsilat bekliyor', detail: 'OTA dışı kanaldaki rezervasyonda çıkış günü geldi ya da geçti, ödeme kayıtları tutarı karşılamıyor. OTA’da tahsilatı platform yapar; bu bildirim orada üretilmez. Ödeme girilince kendiliğinden kapanır.' },
     { type: 'lead_followup', need: 'readSales', label: 'Talebin takip zamanı geldi', detail: 'Takip tarihi bugün ya da geçmiş, açık talepler. Satış rolü yalnız kendisine atanan ve atanmamış talepleri görür.' },
     { type: 'revenue_opportunity', need: 'writeSales', label: 'Kazanç fırsatı: boş gece', detail: 'Önümüzdeki 30 gün içinde iki rezervasyon arasında kalan 1–4 gecelik gerçek boşluk.' }
   ];
@@ -79,7 +80,8 @@
    *   cleaningTasks: workflowState eklenmis gorevler, maintenance: arizalar,
    *   isTicketOpen: fn, closedPeriods: [{year, month, status}],
    *   previousMonthHasRecords: bool, followUps: [{id, guestName, guest, nextFollowUpAt, assignedTo}],
-   *   followUpDate: fn(ts) -> YYYY-MM-DD, gapNights: [{villaKey, villaName, checkIn, checkOut, nights, regularPrice}]
+   *   followUpDate: fn(ts) -> YYYY-MM-DD, gapNights: [{villaKey, villaName, checkIn, checkOut, nights, regularPrice}],
+   *   unpaidBookings: [{id, guest, villa, checkOut, amountDue, remaining}] (yalniz OTA disi kanal)
    * }
    */
   function deriveNotifications(girdi) {
@@ -139,6 +141,24 @@
         deep_link: 'operations:maintenance', at: gun
       });
     });
+
+    // Tahsilat (M69, 9.6.7): son tahsil gunu cikis gunudur (kullanici onerisi:
+    // OTA disi kanalda "en gec cikis"). Bakiye phase57 gorunumunden gelir;
+    // satiri yuklenmemis rezervasyon icin bildirim uydurulmaz (3.6).
+    if (izinli(rol, 'readSales')) {
+      (g.unpaidBookings || []).forEach(b => {
+        const vade = String(b.checkOut || '').slice(0, 10);
+        const kalan = Number(b.remaining);
+        if (!b.id || !vade || vade > bugun || !(kalan >= 1)) return;
+        const gecikme = Math.round((Date.parse(bugun + 'T00:00:00Z') - Date.parse(vade + 'T00:00:00Z')) / 86400000);
+        olaylar.push({
+          event_key: anahtar('collection_due', b.id), domain: 'FINANCE', severity: gecikme > 7 ? 'CRITICAL' : 'WARNING',
+          title: `Tahsilat bekliyor: ${b.guest || 'Misafir adı yok'} (${mulkAdi(b.villa)})`,
+          message: `${gecikme === 0 ? 'Çıkış bugün' : `Çıkış ${trTarih(vade)} idi (${gecikme} gün geçti)`}; ${tl(kalan)} tahsil edilmedi${Number(b.amountDue) > 0 ? ` (tutar ${tl(b.amountDue)})` : ''}. Ödeme kaydı girildiğinde bildirim kapanır.`,
+          deep_link: `booking:${String(b.id).replace(/[^A-Za-z0-9_.-]/g, '-')}`, at: vade
+        });
+      });
+    }
 
     if (izinli(rol, 'readSales')) {
       const gunu = typeof g.followUpDate === 'function' ? g.followUpDate : ts => String(ts || '').slice(0, 10);
