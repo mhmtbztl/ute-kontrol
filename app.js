@@ -1534,6 +1534,8 @@ async function createBooking(bookingInput) {
 
   // 4. Update local state ONLY on DB success
   const createdBooking = mapBookingFromDb(createdRow);
+  const yeniKomisyon = bookingPaymentCommissionFromFinance(createdBooking);
+  if (yeniKomisyon !== null) createdBooking.paymentCommission = yeniKomisyon;
   if (typeof appData !== 'undefined') {
     if (!appData.bookings) appData.bookings = [];
     const exists = appData.bookings.some(b => b.id === createdBooking.id);
@@ -1708,7 +1710,11 @@ async function updateBooking(bookingId, bookingInput) {
   const updatedBooking = mapBookingFromDb(data);
   // Odeme komisyonu ayri tabloda durur (phase45); bookings satirindan
   // gelmez, bellekteki deger korunur.
-  if (existing && existing.paymentCommission !== undefined) updatedBooking.paymentCommission = existing.paymentCommission;
+  // Finans yolu (phase92) komisyonu ayni islemde yazar: bellek o degeri alir;
+  // eskisini tutmak POS giderini sayfa yenilenene kadar eski gosteriyordu (9.4.6).
+  const finansKomisyonu = bookingPaymentCommissionFromFinance(updatedBooking);
+  if (finansKomisyonu !== null) updatedBooking.paymentCommission = finansKomisyonu;
+  else if (existing && existing.paymentCommission !== undefined) updatedBooking.paymentCommission = existing.paymentCommission;
   if (typeof appData !== 'undefined' && appData.bookings) {
     const idx = appData.bookings.findIndex(b => b.id === updatedBooking.id);
     if (idx !== -1) {
@@ -1720,6 +1726,12 @@ async function updateBooking(bookingId, bookingInput) {
   }
 
   return updatedBooking;
+}
+
+/** save_booking_finance ile yazilan odeme komisyonu; finans kaydi yoksa null. */
+function bookingPaymentCommissionFromFinance(booking) {
+  const deger = booking?.financialDetails?.result?.paymentCommission;
+  return deger === undefined || deger === null || !Number.isFinite(Number(deger)) ? null : Number(deger);
 }
 
 async function callBookingFinanceRpc(name, args, input, existingFinance) {
@@ -8101,7 +8113,55 @@ function computeReservationListSummary({ rows, rangeStart, rangeEnd }) {
     bookingShare: booking => getLedgerContract().nightShareInRange(booking, rangeStart, rangeEnd),
     expenses: [], cleaningTasks: []
   });
-  return { soldNights: ledger.soldNights, netRoomRevenue: ledger.netRoomRevenue };
+  const toplam = { gross: 0, deductions: 0, remaining: 0 };
+  (rows || []).forEach(row => {
+    const e = computeReservationRowEconomics(row.booking || row, row.cleaningTask || null, rangeStart, rangeEnd);
+    toplam.gross += e.gross;
+    toplam.deductions += e.discount + e.tax + e.commission + e.cleaningCost;
+    toplam.remaining += e.remaining;
+  });
+  return { soldNights: ledger.soldNights, netRoomRevenue: ledger.netRoomRevenue, ...toplam };
+}
+
+/**
+ * Listedeki satirin secili doneme dusen ekonomisi (M52, Gorev 9.4.3).
+ * Liste brutu tam tutarla yaziyordu: aylari kesen 40.000'lik rezervasyon iki
+ * ayda da 40.000 gorunuyor, ozet ise 20.000 diyordu; indirim, komisyon ve
+ * temizlik maliyeti hic gorunmuyordu. Tutarlar gecelere tahakkukla bolunur,
+ * ciro ve kesintiler K-04 sozlesmesinden gelir (computePeriodLedger). Temizlik
+ * maliyeti defterdeki gibi gorev gununun donemine yazilir; baska doneme dusen
+ * maliyet bu satirdan dusulmez. Kalan tahminidir: planli temizlik dahildir.
+ */
+function computeReservationRowEconomics(booking, cleaningTask, rangeStart, rangeEnd) {
+  const LC = getLedgerContract();
+  const share = LC.nightShareInRange(booking, rangeStart, rangeEnd);
+  const cancelled = String(booking?.status || '').toUpperCase() === 'CANCELLED';
+  const ledger = LC.computePeriodLedger({ bookings: [booking], bookingShare: () => share, expenses: [], cleaningTasks: [] });
+  const ratio = cancelled ? 0 : share.ratio;
+  const finance = (booking?.financialDetails || booking?.financial_details || {}).result || {};
+  let cleaning = null;
+  if (cleaningTask && String(cleaningTask.status || '').toUpperCase() !== 'SKIPPED') {
+    const tutar = cleaningTask.amount === null || cleaningTask.amount === undefined || cleaningTask.amount === '' ? null : Number(cleaningTask.amount);
+    const gun = cleaningTask.date || cleaningTask.task_date || booking.checkOut;
+    cleaning = {
+      amount: Number.isFinite(tutar) ? tutar : null, date: gun,
+      done: String(cleaningTask.status || '').toUpperCase() === 'DONE',
+      inRange: !!gun && gun >= rangeStart && gun <= rangeEnd
+    };
+  }
+  const commission = ledger.otaCommission + ledger.paymentCommission;
+  const cleaningCost = !cancelled && cleaning && cleaning.inRange && cleaning.amount !== null ? cleaning.amount : 0;
+  return {
+    cancelled, nights: share.nights, totalNights: share.total, ratio,
+    fullGross: Number(booking?.gross) || 0,
+    gross: (Number(booking?.gross) || 0) * ratio,
+    discount: ledger.discount,
+    tax: (Number(finance.taxTotal) || 0) * ratio,
+    netRoomRevenue: ledger.netRoomRevenue,
+    cleaningRevenue: ledger.cleaningRevenue,
+    commission, cleaning, cleaningCost,
+    remaining: ledger.totalRevenue - commission - cleaningCost
+  };
 }
 
 function reservationStatusBadge(status) {
@@ -8196,18 +8256,35 @@ function openBookingDetailsPanel(bookingId) {
       : '';
     return `<div class="booking-payment-row"><div><strong>${escapeHtml(paymentEngine?.kindLabel(payment.kind) || payment.kind || '—')}</strong><span>${escapeHtml(formatTrDate(payment.paid_on))} · ${escapeHtml(paymentEngine?.methodLabel(payment.method) || payment.method || '—')}</span>${payment.note ? `<span>${escapeHtml(payment.note)}</span>` : ''}</div><strong>${money(payment.amount)}</strong>${deleteButton}</div>`;
   }).join('') : '<div class="empty-state">Henüz ödeme kaydı yok.</div>';
-  const paymentForm = canWriteSalesRole(activeTenant?.role) ? `<div class="booking-payment-form"><input id="bookingPaymentAmount" type="number" min="0.01" step="0.01" placeholder="Tutar"><input id="bookingPaymentDate" type="date" value="${escapeHtml(getTodayStr())}"><select id="bookingPaymentKind"><option value="DEPOSIT">Kapora</option><option value="INTERIM">Ara ödeme</option><option value="BALANCE">Kalan</option></select><select id="bookingPaymentMethod"><option value="">Yöntem —</option><option value="CASH">Nakit</option><option value="BANK_TRANSFER">Havale/EFT</option><option value="CARD">Kart</option><option value="OTA">OTA</option><option value="OTHER">Diğer</option></select><input id="bookingPaymentNote" maxlength="1000" placeholder="Not —"><button class="btn btn-primary" data-onclick="saveBookingPayment(decodeURIComponent('${encodeActionArg(String(booking.id))}'))">Ödeme ekle</button></div>` : '';
+  // Kapora kanal ayarina baglidir (M54): OTA'da platform tahsil eder, kapora
+  // secenegi sunulmaz; varsayilan tur "Kalan", yontem "OTA".
+  const kaporaAlinir = channelTakesDeposit(booking.channel);
+  const otaKanali = !isDirectBookingChannel(booking.channel, appData.bookingChannels);
+  const kindOptions = (kaporaAlinir ? '<option value="DEPOSIT">Kapora</option>' : '')
+    + `<option value="INTERIM">Ara ödeme</option><option value="BALANCE"${kaporaAlinir ? '' : ' selected'}>Kalan</option>`;
+  const methodOptions = [['', 'Yöntem —'], ['CASH', 'Nakit'], ['BANK_TRANSFER', 'Havale/EFT'], ['CARD', 'Kart'], ['OTA', 'OTA'], ['OTHER', 'Diğer']]
+    .map(([v, l]) => `<option value="${v}"${otaKanali && !kaporaAlinir && v === 'OTA' ? ' selected' : ''}>${l}</option>`).join('');
+  const kaporaNotu = kaporaAlinir ? '' : '<p class="sub-text">Bu kanalda kapora alınmıyor; ödemeyi platform aktarır. Değiştirmek için Ayarlar → Kanallar → Kapora.</p>';
+  const paymentForm = canWriteSalesRole(activeTenant?.role) ? `<div class="booking-payment-form"><input id="bookingPaymentAmount" type="number" min="0.01" step="0.01" placeholder="Tutar"><input id="bookingPaymentDate" type="date" value="${escapeHtml(getTodayStr())}"><select id="bookingPaymentKind">${kindOptions}</select><select id="bookingPaymentMethod">${methodOptions}</select><input id="bookingPaymentNote" maxlength="1000" placeholder="Not —"><button class="btn btn-primary" data-onclick="saveBookingPayment(decodeURIComponent('${encodeActionArg(String(booking.id))}'))">Ödeme ekle</button></div>${kaporaNotu}` : '';
   const paymentHtml = `<section class="booking-payments"><h3>Ödeme takibi</h3><div class="booking-payment-summary"><div><span>Tahsil edilecek</span><strong>${money(balance?.amount_due)}</strong></div><div><span>Toplam tahsilat</span><strong>${money(balance?.paid_total)}</strong></div><div><span>Kalan</span><strong>${money(balance?.remaining)}</strong></div></div>${paymentRows}${paymentForm}<p class="sub-text">Ödeme nakit hareketidir; rezervasyon cirosunu değiştirmez.</p></section>`;
+  // Konaklamanin tamami (donem payi degil): liste satiriyla ayni hesap.
+  const e = computeReservationRowEconomics(booking, cleaning, '0000-01-01', '9999-12-31');
+  const tl = value => `${Number(value || 0).toLocaleString('tr-TR', { maximumFractionDigits: 2 })} ₺`;
+  const temizlikMaliyeti = !cleaning ? 'Girilmedi' : !e.cleaning ? 'Yapılmadı (gider yok)' : e.cleaning.amount === null ? 'Bilinmiyor' : `${tl(e.cleaning.amount)} (${e.cleaning.done ? 'yapıldı' : 'planlı'})`;
   const detailHtml = (label, value) => `<div class="booking-detail-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value == null || value === '' ? '—' : String(value))}</strong></div>`;
   const bodyHtml = `<div class="booking-detail-grid">
     ${detailHtml('Mülk', villaName)}
     ${detailHtml('Misafir', booking.guest || 'Belirtilmedi')}
     ${detailHtml('Kanal', getChannelDisplayName(booking.channel))}
     ${detailHtml('Konaklama', `${formatTrDate(booking.checkIn)} – ${formatTrDate(booking.checkOut)} · ${booking.nights || calculateNightsBetween(booking.checkIn, booking.checkOut)} gece`)}
-    ${detailHtml('Brüt tutar', `${Number(booking.gross || 0).toLocaleString('tr-TR')} ₺`)}
-    ${detailHtml('OTA komisyonu', `${Number(booking.otaComm || 0).toLocaleString('tr-TR')} ₺`)}
-    ${detailHtml('Temizlik ücreti', `${Number(booking.cleanFee || 0).toLocaleString('tr-TR')} ₺`)}
-    ${detailHtml('Net oda geliri', `${Number(booking.net || 0).toLocaleString('tr-TR')} ₺`)}
+    ${detailHtml('Brüt tutar', tl(booking.gross))}
+    ${detailHtml('İndirim', e.discount > 0 ? '− ' + tl(e.discount) : tl(0))}
+    ${e.tax > 0 ? detailHtml('Vergi', '− ' + tl(e.tax)) : ''}
+    ${detailHtml('Temizlik ücreti (misafirden, gelir)', tl(e.cleaningRevenue))}
+    ${detailHtml('Ciro (oda geliri, indirim sonrası)', e.cancelled ? '—' : tl(e.netRoomRevenue))}
+    ${detailHtml('OTA + ödeme komisyonu (gider)', '− ' + tl(e.commission))}
+    ${detailHtml('Temizlik maliyeti (personele, gider)', temizlikMaliyeti)}
+    ${detailHtml('Kalan (tahmini)', e.cancelled ? '—' : tl(e.remaining))}
     ${detailHtml('Temizlik görevi', cleaningStatus)}
     ${detailHtml('Kaynak talep', lead ? (lead.guest || lead.guestName || lead.channel || 'Bağlı talep') : 'Bağlı talep yok')}
   </div>${paymentHtml}`;
@@ -8269,19 +8346,37 @@ function renderManageBookingsTable() {
     // Toplu aktarim ozeti rezervasyon sayilmaz (L-103); gece ve tutara dahildir.
     const ozetSayisi = filteredRows.filter(row => isBulkSummaryBooking(row.booking)).length;
     const rezSayisi = filteredRows.length - ozetSayisi;
-    summaryPill.innerHTML = `📊 Gösterilen: <strong>${rezSayisi} Rezervasyon</strong>${ozetSayisi ? ` + ${ozetSayisi} toplu aktarım özeti` : ''} | 🌙 ${listSummary.soldNights} Gece | 💰 Net oda geliri: ${Math.round(listSummary.netRoomRevenue).toLocaleString('tr-TR')} TL`;
+    const tl = n => `${Math.round(n).toLocaleString('tr-TR')} TL`;
+    summaryPill.innerHTML = `📊 Gösterilen: <strong>${rezSayisi} Rezervasyon</strong>${ozetSayisi ? ` + ${ozetSayisi} toplu aktarım özeti` : ''} | 🌙 ${listSummary.soldNights} Gece`
+      + ` | Brüt (bu döneme düşen): ${tl(listSummary.gross)} | 💰 Ciro (oda geliri, indirim sonrası): <strong>${tl(listSummary.netRoomRevenue)}</strong>`
+      + ` | Kesintiler: −${tl(listSummary.deductions)} | Kalan (tahmini): ${tl(listSummary.remaining)}`;
   }
 
   if (filteredRows.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 30px; color: var(--color-slate-400);">Seçili dönemde rezervasyon bulunamadı.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 30px; color: var(--color-slate-400);">Seçili dönemde rezervasyon bulunamadı.</td></tr>';
     renderTablePagination('bookingsPagination', 'bookings', paginateRows([], 1), 'renderManageBookingsTable');
     return;
   }
 
   const pageInfo = paginateRows(filteredRows, largeTablePageState.bookings);
   renderTablePagination('bookingsPagination', 'bookings', pageInfo, 'renderManageBookingsTable');
-  pageInfo.rows.forEach(({ booking: b, markers }) => {
+  const para = n => `${Number(n || 0).toLocaleString('tr-TR', { maximumFractionDigits: 2 })} ₺`;
+  pageInfo.rows.forEach(({ booking: b, markers, cleaningTask }) => {
     const vName = appData.villas[b.villa]?.name || b.villa;
+    const e = computeReservationRowEconomics(b, cleaningTask, reservationListRange.start, reservationListRange.end);
+    const payNotu = !e.cancelled && e.totalNights > 0 && e.nights < e.totalNights
+      ? `<div class="reservation-sub">Toplam ${para(e.fullGross)} · ${e.nights}/${e.totalNights} gece bu dönemde</div>` : '';
+    const kesintiler = e.cancelled ? [] : [
+      e.discount > 0 ? `İndirim −${para(e.discount)}` : '',
+      e.tax > 0 ? `Vergi −${para(e.tax)}` : '',
+      e.commission > 0 ? `Komisyon −${para(e.commission)}` : '',
+      !cleaningTask ? (isBulkSummaryBooking(b) ? '' : 'Temizlik maliyeti girilmedi')
+        : !e.cleaning ? 'Temizlik yapılmadı (gider yok)'
+        : e.cleaning.amount === null ? 'Temizlik maliyeti bilinmiyor'
+        : e.cleaning.inRange ? `Temizlik −${para(e.cleaning.amount)} (${e.cleaning.done ? 'yapıldı' : 'planlı'})`
+        : `Temizlik ${para(e.cleaning.amount)} → ${formatTrDate(e.cleaning.date)} döneminde`
+    ].filter(Boolean);
+    const kesintiHtml = kesintiler.length ? kesintiler.map(k => `<div class="reservation-sub">${escapeHtml(k)}</div>`).join('') : '—';
     const statusBadge = reservationStatusBadge(b.status);
     const markerHtml = [
       markers.todayCheckIn ? '<span class="reservation-marker marker-checkin">Bugün giriş</span>' : '',
@@ -8299,7 +8394,10 @@ function renderManageBookingsTable() {
       <td data-label="Misafir">${escapeHtml(b.guest || 'Belirtilmedi')}${isBulkSummaryBooking(b) ? ' <span class="badge badge-slate" style="font-size:10px;">Aylık özet</span>' : ''}</td>
       <td data-label="Kanal"><span class="badge ${b.channel === 'AIRBNB' ? 'badge-rose' : (b.channel === 'BOOKING' ? 'badge-blue' : 'badge-emerald')}">${escapeHtml(getChannelDisplayName(b.channel))}</span></td>
       <td data-label="Tarihler">${formatTrDate(b.checkIn)} – ${formatTrDate(b.checkOut)}</td>
-      <td data-label="Brüt"><strong>${Number(b.gross || 0).toLocaleString('tr-TR')} ₺</strong></td>
+      <td data-label="Brüt">${e.cancelled ? `<span class="reservation-sub">${para(e.fullGross)} · iptal, hesaba girmez</span>` : `<strong>${para(e.gross)}</strong>${payNotu}`}</td>
+      <td data-label="Ciro">${e.cancelled ? '—' : `<strong>${para(e.netRoomRevenue)}</strong>${e.cleaningRevenue > 0 ? `<div class="reservation-sub">+ temizlik geliri ${para(e.cleaningRevenue)}</div>` : ''}`}</td>
+      <td data-label="Kesintiler">${kesintiHtml}</td>
+      <td data-label="Kalan">${e.cancelled ? '—' : `<strong class="${e.remaining < 0 ? 'text-negative' : 'text-positive'}">${para(e.remaining)}</strong>`}</td>
       <td data-label="Durum">${statusBadge}</td>
     `;
     tbody.appendChild(tr);
@@ -8324,6 +8422,7 @@ function openQuickBookingModal() {
   }
   const form = document.getElementById('quickBookingForm');
   if (form) form.reset();
+  syncQuickBookingDepositVisibility();
   const modal = document.getElementById('quickBookingModal');
   if (modal) modal.style.display = 'flex';
   document.getElementById('quickBookingGuest')?.focus();
@@ -8548,7 +8647,39 @@ function refreshBookingChannelDropdown(selectedCode = '') {
   if (selected && channels.some(channel => channel.code === selected)) select.value = selected;
 }
 
+/**
+ * Kanal kapora alir mi (M54, Gorev 9.4.4)? Isletme ayari (Ayarlar → Kanallar →
+ * Kapora) kanal bazinda belirler; ayar yoksa dogrudan kanallar kapora alir,
+ * OTA'larda odemeyi platform tahsil eder.
+ */
+function channelTakesDeposit(channel) {
+  const ayar = (typeof appData !== 'undefined' && appData.tenantSettings?.booking_deposit_channels) || null;
+  const kod = String(channel || '').toUpperCase();
+  if (ayar && Object.prototype.hasOwnProperty.call(ayar, kod)) return ayar[kod] === true;
+  return isDirectBookingChannel(channel, typeof appData !== 'undefined' ? appData.bookingChannels : []);
+}
+
+/** Yeni rezervasyonda kapora alani kanala gore gorunur; gizlenince deger silinir. */
+function syncBookingDepositVisibility() {
+  const grup = document.getElementById('resDepositGroup');
+  if (!grup) return;
+  const yeniKayit = !document.getElementById('resEditId')?.value;
+  const goster = yeniKayit && channelTakesDeposit(document.getElementById('resChannel')?.value || '');
+  grup.style.display = goster ? '' : 'none';
+  if (!goster) ['resDeposit', 'resDepositMethod'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+}
+
+function syncQuickBookingDepositVisibility() {
+  const alan = document.getElementById('quickBookingDeposit');
+  const etiket = alan?.closest ? alan.closest('label') : null;
+  if (!alan || !etiket) return;
+  const goster = channelTakesDeposit(document.getElementById('quickBookingChannel')?.value || '');
+  etiket.style.display = goster ? '' : 'none';
+  if (!goster) alan.value = '';
+}
+
 function handleBookingChannelChange() {
+  syncBookingDepositVisibility();
   if (typeof bookingFinanceCommissionMode !== 'undefined') bookingFinanceCommissionMode = 'rate';
   if (typeof bookingFinanceDraft !== 'undefined' && bookingFinanceDraft) bookingFinanceDraft.commissionBasis = null;
   const channel = document.getElementById('resChannel')?.value || '';
@@ -10755,13 +10886,13 @@ function renderSettingsTable() {
     tr.innerHTML = `
       <td><strong>${escapeHtml(v.name)}</strong></td>
       <td>${v.capacity}</td>
-      <td><input type="number" class="tbl-input" id="set_floor_${vKey}" value="${fiyatAlani(v.floor)}"></td>
-      <td><input type="number" class="tbl-input" id="set_base_${vKey}" value="${fiyatAlani(v.base !== undefined ? v.base : v.basePrice)}"></td>
-      <td><input type="number" class="tbl-input" id="set_target_${vKey}" value="${fiyatAlani(v.target)}"></td>
-      <td><input type="number" class="tbl-input" id="set_premium_${vKey}" value="${fiyatAlani(v.premium)}"></td>
-      <td><input type="number" class="tbl-input" id="set_peak_${vKey}" value="${fiyatAlani(v.peak)}"></td>
-      <td><input type="number" class="tbl-input" id="set_clean_${vKey}" value="${fiyatAlani(v.cleanCost)}"></td>
-      <td><input type="number" class="tbl-input" id="set_heat_${vKey}" value="${fiyatAlani(v.heatCost)}"></td>
+      <td><input type="number" step="0.01" min="0" class="tbl-input" id="set_floor_${vKey}" value="${fiyatAlani(v.floor)}"></td>
+      <td><input type="number" step="0.01" min="0" class="tbl-input" id="set_base_${vKey}" value="${fiyatAlani(v.base !== undefined ? v.base : v.basePrice)}"></td>
+      <td><input type="number" step="0.01" min="0" class="tbl-input" id="set_target_${vKey}" value="${fiyatAlani(v.target)}"></td>
+      <td><input type="number" step="0.01" min="0" class="tbl-input" id="set_premium_${vKey}" value="${fiyatAlani(v.premium)}"></td>
+      <td><input type="number" step="0.01" min="0" class="tbl-input" id="set_peak_${vKey}" value="${fiyatAlani(v.peak)}"></td>
+      <td><input type="number" step="0.01" min="0" class="tbl-input" id="set_clean_${vKey}" value="${fiyatAlani(v.cleanCost)}"></td>
+      <td><input type="number" step="0.01" min="0" class="tbl-input" id="set_heat_${vKey}" value="${fiyatAlani(v.heatCost)}"></td>
     `;
     tbody.appendChild(tr);
   });
@@ -12910,6 +13041,19 @@ function onReservationScopeChange() {
   renderManageBookingsTable();
 }
 
+// Takvim yakinlastirma (M53): gorunum tercihi tarayicida kalir (yalniz izleyen
+// kisinin kolayligi; is verisi degil). Depolama kapaliysa normal boyut.
+let tapeChartZoom = (() => {
+  try { return typeof localStorage !== 'undefined' && localStorage.getItem('lexbnb.tapeChartZoom') === '1'; } catch (_) { return false; }
+})();
+
+function toggleTapeChartZoom() {
+  tapeChartZoom = !tapeChartZoom;
+  try { if (typeof localStorage !== 'undefined') localStorage.setItem('lexbnb.tapeChartZoom', tapeChartZoom ? '1' : '0'); } catch (_) { /* tercih saklanamadi */ }
+  renderTapeChart();
+  return true;
+}
+
 function setTapeChartView(view) {
   if (!['WEEK_1', 'WEEK_2', 'MONTH'].includes(view)) return false;
   tapeChartView = view;
@@ -13066,6 +13210,14 @@ function renderTapeChart() {
     tableHtml += `<div class="tape-chart-note" style="font-size:11px; color:var(--text-muted); margin-top:6px;">Takvim ${formatTrDate(calendarDates[0])} – ${formatTrDate(gosterilenSon)} arasını gösteriyor; aşağıdaki liste seçili dönemin tamamını (${formatTrDate(reservationListRange.start)} – ${formatTrDate(reservationListRange.end)}) kapsar.</div>`;
   }
   container.innerHTML = tableHtml;
+  container.classList.toggle('tape-zoom', tapeChartZoom);
+  container.classList.toggle('tape-week', tapeChartView !== 'MONTH');
+  const zoomBtn = document.getElementById('tapeZoomBtn');
+  if (zoomBtn) {
+    zoomBtn.setAttribute('aria-pressed', tapeChartZoom ? 'true' : 'false');
+    zoomBtn.classList.toggle('active', tapeChartZoom);
+    zoomBtn.textContent = tapeChartZoom ? '🔍 Küçült' : '🔍 Büyüt';
+  }
 }
 
 // Gecmis ay toplu girisi (L-198, kullanici M28). Kurallar core/bulk_summary.js:
@@ -21271,6 +21423,11 @@ if (typeof module !== 'undefined' && module.exports) {
     confirmCopyPreviousExpenses,
     buildReservationListView,
     computeReservationListSummary,
+    computeReservationRowEconomics,
+    channelTakesDeposit,
+    syncBookingDepositVisibility,
+    bookingPaymentCommissionFromFinance,
+    toggleTapeChartZoom,
     openBookingDetailsPanel,
     saveBookingPayment,
     deleteBookingPayment,

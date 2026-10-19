@@ -653,7 +653,7 @@ aynı). Göç yokken geçmiş temizlik aktarımı **başlamaz**; rezervasyon/gid
 kırmızı). Paket: `docs/PHASE95_DEPLOY_PACKAGE.md`.
 
 **phase97 (`migration_phase97_income_entries.sql`) 19 Ekim 2026'da test projesine
-uygulandı; üretime henüz uygulanmadı.** Gelir ve sermaye defteri (kullanıcı,
+ve üretime uygulandı; üretimde doğrulandı** (anon `income_entries` → `401 42501`, `production:readiness` BAŞARILI, `schema_migrations` 97). Gelir ve sermaye defteri (kullanıcı,
 19.10.2026): Finans'ta "+ Gelir Ekle" → Rezervasyon (rezervasyon formu) ya da
 Diğer gelirler / sermaye (açıklama zorunlu). Diğer gelir Toplam Gelir'e ve kâra
 girer, ciroya girmez; sermaye gelir değildir, kâra girmez (§3.4). Göç iki

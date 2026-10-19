@@ -38,7 +38,8 @@ test('Rezervasyon listesi özeti tarih aralığını kesen konaklamayı tahakkuk
     ],
     rangeStart: '2026-09-01', rangeEnd: '2026-09-30'
   });
-  assert.deepStrictEqual(summary, { soldNights: 4, netRoomRevenue: 35000 });
+  // Brut: 45.000'in 1/3'u + 24.000; kesinti yok; kalan = ciro + temizlik geliri (1.000 + 3.000).
+  assert.deepStrictEqual(summary, { soldNights: 4, netRoomRevenue: 35000, gross: 39000, deductions: 0, remaining: 39000 });
 });
 
 test('Liste karar bilgilerini korur; A3 ödeme takibi ortak SidePanel ayrıntısında açılır', () => {

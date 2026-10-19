@@ -59,6 +59,8 @@
     'handleBookingChannelChange', 'handleBookingDeleteFromModal', 'handleBookingPropertyFinanceChange',
     'markBookingCleaningManual', 'handleBookingGrossFinanceInput', 'toggleBookingFinanceSections', 'addBookingExtraExpense', 'removeBookingExtraExpense',
     'saveBookingTaxProfile', 'saveBookingCommissionBases', 'postBookingExtraExpenses',
+    'openBookingTaxProfileCreator', 'closeBookingTaxProfileCreator', 'saveBookingTaxProfileInline', 'handleBookingTaxProfileCreatorKey', 'editBookingTaxProfile', 'cancelBookingTaxProfileEdit', 'deleteBookingTaxProfile', 'saveBookingDepositChannels',
+    'toggleTapeChartZoom', 'syncQuickBookingDepositVisibility',
     'handleCommandPaletteKeydown', 'handleCommandPaletteSearch', 'handleFileImport',
     'handleFilterChange', 'handleOnboardingSubmit', 'handlePropertyDeleteFromModal',
     'handleQuickActionTrigger', 'handleSaaSForgotPassword', 'handleSaaSLogin',

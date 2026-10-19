@@ -14,7 +14,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=0c513795">
+  <link rel="stylesheet" href="style.css?v=c41bba44">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="supabase.umd.js?v=3810661a"></script>
@@ -1228,6 +1228,7 @@
             <button type="button" class="btn btn-secondary btn-sm" data-onclick="setTapeChartView('WEEK_1')">1 hafta</button>
             <button type="button" class="btn btn-secondary btn-sm" data-onclick="setTapeChartView('WEEK_2')">2 hafta</button>
             <button type="button" class="btn btn-secondary btn-sm" data-onclick="setTapeChartView('MONTH')">Ay</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="tapeZoomBtn" aria-pressed="false" title="Takvimi büyütür: daha uzun satırlar ve okunur adlar" data-onclick="toggleTapeChartZoom()">🔍 Büyüt</button>
           </div>
         </div>
       </section>
@@ -1253,7 +1254,7 @@
         <div class="section-title-bar">
           <div>
             <h2>📋 REZERVASYONLAR</h2>
-            <p class="sub-text">Seçili dönemin rezervasyonları; operasyon önceliğine göre sıralanır.</p>
+            <p class="sub-text">Seçili dönemin rezervasyonları; operasyon önceliğine göre sıralanır. Tutarlar seçili döneme düşen gecelerin payıdır.</p>
           </div>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
             <button class="btn btn-secondary" data-onclick="openBulkSummaryModal()" data-sales-write title="Rezervasyonlarını tek tek girmediğiniz geçmiş bir ayın toplamı">+ Geçmiş ay toplu girişi</button>
@@ -1289,7 +1290,10 @@
                 <th>MİSAFİR</th>
                 <th>KANAL</th>
                 <th>TARİHLER</th>
-                <th>BRÜT (₺)</th>
+                <th title="Misafirin ödediği tutarın seçili döneme düşen payı (geceye göre bölünür)">BRÜT (₺)</th>
+                <th title="Oda geliri: brüt − indirim − temizlik geliri − vergi. Komisyon ciroyu azaltmaz, gider yazılır.">CİRO (₺)</th>
+                <th title="İndirim, vergi, OTA/POS komisyonu ve bu döneme düşen temizlik maliyeti">KESİNTİLER</th>
+                <th title="Tahmini: ciro + temizlik geliri − komisyon − bu döneme düşen temizlik maliyeti (planlı temizlik dahil)">KALAN (₺)</th>
                 <th>DURUM</th>
               </tr>
             </thead>
@@ -2101,9 +2105,9 @@
               <div class="form-group"><label for="pricingResearchDate">Araştırma tarihi</label><input id="pricingResearchDate" type="date"></div>
               <div class="form-group"><label for="pricingResearchSource">Kaynak türü</label><select id="pricingResearchSource"><option value="OTA">OTA</option><option value="WEBSITE">Web sitesi</option><option value="CHATGPT">ChatGPT</option><option value="MANUAL">Elle araştırma</option><option value="OTHER">Diğer</option></select></div>
               <div class="form-group" style="grid-column:1/-1"><label for="pricingResearchUrl">Kaynak bağlantısı</label><input id="pricingResearchUrl" type="url" placeholder="https://…"></div>
-              <div class="form-group"><label for="pricingResearchWeekday">Hafta içi (₺)</label><input id="pricingResearchWeekday" type="number" min="1" placeholder="—"></div>
-              <div class="form-group"><label for="pricingResearchWeekend">Hafta sonu (₺)</label><input id="pricingResearchWeekend" type="number" min="1" placeholder="—"></div>
-              <div class="form-group"><label for="pricingResearchSpecial">Özel gün (₺)</label><input id="pricingResearchSpecial" type="number" min="1" placeholder="—"></div>
+              <div class="form-group"><label for="pricingResearchWeekday">Hafta içi (₺)</label><input id="pricingResearchWeekday" type="number" step="0.01" min="1" placeholder="—"></div>
+              <div class="form-group"><label for="pricingResearchWeekend">Hafta sonu (₺)</label><input id="pricingResearchWeekend" type="number" step="0.01" min="1" placeholder="—"></div>
+              <div class="form-group"><label for="pricingResearchSpecial">Özel gün (₺)</label><input id="pricingResearchSpecial" type="number" step="0.01" min="1" placeholder="—"></div>
               <div class="form-group" style="grid-column:1/-1"><label for="pricingResearchNote">Ham not</label><textarea id="pricingResearchNote" rows="2" maxlength="10000"></textarea></div>
             </div>
             <button type="button" class="btn btn-primary btn-sm" data-onclick="saveCompetitorResearch()">Araştırmayı kaydet</button>
@@ -2336,7 +2340,7 @@
           </div>
           <div class="form-group">
             <label>Tutar (TL)</label>
-            <input type="number" id="expAmount" placeholder="Örn: 15000" required>
+            <input type="number" step="0.01" id="expAmount" placeholder="Örn: 15000" required>
           </div>
           <div class="form-group">
             <label>Ödeme / Fiş No</label>
@@ -2531,7 +2535,7 @@
             </div>
             <div class="form-group">
               <label style="font-size: 12px; font-weight: 600;">🏷️ Hedef Ortalama ADR</label>
-              <input type="number" id="goalADR" placeholder="Örn: 6.000" style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
+              <input type="number" step="0.01" id="goalADR" placeholder="Örn: 6.000" style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
               <span style="font-size: 10px; color: var(--text-muted); margin-top: 3px; display: block;">Gecelik ortalama fiyat</span>
             </div>
           </div>
@@ -2544,14 +2548,14 @@
             </div>
             <div class="form-group">
               <label for="goalNetProfit" style="font-size: 12px; font-weight: 600;">💵 Hedef Net Kâr (TL)</label>
-              <input type="number" id="goalNetProfit" data-oninput="syncGoalMarginFromProfit()" style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
+              <input type="number" step="0.01" id="goalNetProfit" data-oninput="syncGoalMarginFromProfit()" style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
               <span id="goalNetProfitHint" style="font-size: 10px; color: #34D399; margin-top: 3px; display: block;">—</span>
             </div>
           </div>
           <div style="display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 8px;">
             <div class="form-group">
               <label style="font-size: 12px; font-weight: 600;">💸 Tavan Gider (TL)</label>
-              <input type="number" id="goalMaxExpense" required style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
+              <input type="number" step="0.01" id="goalMaxExpense" required style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
               <span style="font-size: 10px; color: #FCA5A5; margin-top: 3px; display: block;">Aşılmaması gereken gider</span>
             </div>
           </div>
@@ -2839,7 +2843,7 @@
           </div>
           <div class="form-group">
             <label for="resGross">Brüt Tutar (₺)</label>
-            <input type="number" inputmode="decimal" id="resGross" placeholder="Örn: 40000" required data-oninput="handleBookingGrossFinanceInput()">
+            <input type="number" step="0.01" inputmode="decimal" id="resGross" placeholder="Örn: 40000" required data-oninput="handleBookingGrossFinanceInput()">
             <small id="resGrossExplanation" class="field-note">Temizlik geliri bu tutara dahildir. İndirim ayrıca düşülür.</small>
           </div>
           <div class="form-group" id="resDepositGroup">
@@ -2901,7 +2905,7 @@
             </div>
             <div class="form-group">
               <label for="resCommission">OTA Komisyonu (₺)</label>
-              <input type="number" inputmode="decimal" id="resCommission" placeholder="Otomatik veya Manuel" data-oninput="syncRateFromCommission()">
+              <input type="number" step="0.01" inputmode="decimal" id="resCommission" min="0" placeholder="Otomatik veya Manuel" data-oninput="syncRateFromCommission()">
               <small class="field-note">Oran ve tutar birbirini günceller; hangisini yazarsanız diğeri hesaplanır.</small>
             </div>
             <div class="form-group">
@@ -2911,12 +2915,12 @@
             </div>
             <div class="form-group">
               <label for="resCleanFee">Temizlik Ücreti — Misafirden Alınan (₺)</label>
-              <input type="number" inputmode="decimal" id="resCleanFee" placeholder="Örn: 1500" value="0" data-oninput="calculateLivePreview()">
+              <input type="number" step="0.01" inputmode="decimal" id="resCleanFee" placeholder="Örn: 1500" value="0" data-oninput="calculateLivePreview()">
               <small class="field-note note-revenue">▲ <strong>Gelir kalemi.</strong> Brüt tutarın içindedir; oda gelirinden ayrı raporlanır.</small>
             </div>
             <div class="form-group">
               <label for="resCleanCost">Temizlik Maliyeti — Personele Ödenen (₺)</label>
-              <input type="number" inputmode="decimal" id="resCleanCost" placeholder="Örn: 1200 — bilinmiyorsa boş" data-oninput="markBookingCleaningManual()">
+              <input type="number" step="0.01" inputmode="decimal" id="resCleanCost" placeholder="Örn: 1200 — bilinmiyorsa boş" data-oninput="markBookingCleaningManual()">
               <small class="field-note note-expense">▼ <strong>Gider kalemi.</strong> Temizlik defterine planlı görev olarak yazılır; temizlik <strong>yapıldı</strong> işaretlenince gider olur. Misafir gelmezse gider oluşmaz.</small>
             </div>
             <div class="form-group">
@@ -2936,9 +2940,10 @@
           <div id="resTaxFields" hidden>
             <div class="form-group"><label for="resTaxMode">Vergi yöntemi</label><select id="resTaxMode" data-onchange="toggleBookingFinanceSections()"><option value="inclusive">Vergiler toplam tutarın içinde</option><option value="exclusive">Vergiler fiyatın üzerine ekleniyor</option><option value="manual">Vergi tutarlarını kendim belirleyeceğim</option></select><p id="resTaxExplanation" class="field-note"></p></div>
             <div id="resTaxProfileFields" class="booking-optional-grid">
-              <div class="form-group"><label for="resTaxProfile">İşletme vergi profili</label><select id="resTaxProfile" data-onchange="calculateLivePreview()"></select></div>
+              <div class="form-group"><label for="resTaxProfile">İşletme vergi profili</label><div class="booking-tax-profile-pick"><select id="resTaxProfile" data-onchange="calculateLivePreview()"></select><button type="button" class="btn btn-secondary btn-sm" data-onclick="openBookingTaxProfileCreator()" title="Formdan çıkmadan yeni vergi profili tanımlayın">+ Yeni profil</button></div></div>
               <div class="form-group"><label for="resInvoiceDate">Fatura / vergi işlem tarihi</label><input id="resInvoiceDate" type="date" data-onchange="calculateLivePreview()"><small class="field-note">Profil bu tarihi kullanıyorsa zorunludur.</small></div>
             </div>
+            <div id="resTaxProfileCreator" hidden></div>
             <div id="resTaxRows" class="booking-tax-grid"></div>
             <p class="field-note">Tahsil eden taraf ile ödeme yükümlülüğü ayrıdır. Platform tahsilatı verginin ödendiğini kanıtlamaz. KDV karşılığı indirilecek KDV hesaba katılmadan gösterilen tahmindir.</p>
           </div>
@@ -3132,7 +3137,7 @@
           </div>
           <div class="form-group">
             <label>Tahmini Maliyet (₺)</label>
-            <input type="number" id="maintCost" value="0">
+            <input type="number" step="0.01" id="maintCost" value="0">
             <span style="display:block; font-size:10px; color: var(--text-muted); margin-top: 4px;">Planlama içindir; gider defterine yazılmaz. Ödenen tutarı Finans → Gider Girişi'nden girin.</span>
           </div>
           <div class="form-group">
@@ -3519,11 +3524,11 @@
               </div>
               <div class="form-group">
                 <label style="font-size: 11px; color: var(--text-muted);">Toplam tutar / Teklif (₺)</label>
-                <input type="number" id="waParsedAmount" placeholder="Örn: 45000" style="width: 100%; padding: 8px 10px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #34D399; font-size: 14px; font-weight: 700;">
+                <input type="number" step="0.01" id="waParsedAmount" placeholder="Örn: 45000" style="width: 100%; padding: 8px 10px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #34D399; font-size: 14px; font-weight: 700;">
               </div>
               <div class="form-group">
                 <label for="waParsedDeposit" style="font-size: 11px; color: var(--text-muted);">Alınan kapora (₺)</label>
-                <input type="number" id="waParsedDeposit" min="0" inputmode="decimal" placeholder="Alınmadıysa boş bırakın" style="width: 100%; padding: 8px 10px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #FBBF24; font-size: 13px;">
+                <input type="number" step="0.01" id="waParsedDeposit" min="0" inputmode="decimal" placeholder="Alınmadıysa boş bırakın" style="width: 100%; padding: 8px 10px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #FBBF24; font-size: 13px;">
               </div>
               <div class="form-group">
                 <label style="font-size: 11px; color: var(--text-muted);">Giriş Tarihi (Check-in)</label>
@@ -3629,12 +3634,12 @@
         <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
           <div class="form-group">
             <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Gecelik Baz Fiyat (₺) — normal satış fiyatı:</label>
-            <input type="number" id="propBasePrice" placeholder="Örn: 20000" required style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff;">
+            <input type="number" step="0.01" id="propBasePrice" placeholder="Örn: 20000" required style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff;">
             <span style="display:block; font-size:10px; color: var(--text-muted); margin-top: 4px;">Taban (en düşük), hedef ve yoğun dönem fiyatları mülk profili › Fiyatlar sekmesinden girilir.</span>
           </div>
           <div class="form-group">
             <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Temizlik Maliyeti (₺):</label>
-            <input type="number" id="propCleanCost" placeholder="Örn: 1500" value="0" style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff;">
+            <input type="number" step="0.01" id="propCleanCost" placeholder="Örn: 1500" value="0" style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff;">
           </div>
         </div>
         <div class="form-group" style="margin-bottom: 12px;">
@@ -3788,11 +3793,11 @@
         <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
           <div class="form-group">
             <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Gecelik Baz Fiyat (₺) — normal satış fiyatı:</label>
-            <input type="number" id="onboardPropBasePrice" placeholder="Örn: 20000" required style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff;">
+            <input type="number" step="0.01" id="onboardPropBasePrice" placeholder="Örn: 20000" required style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff;">
           </div>
           <div class="form-group">
             <label style="font-size: 11px; color: #CBD5E1; font-weight: 600; display: block; margin-bottom: 4px;">Temizlik Maliyeti (₺):</label>
-            <input type="number" id="onboardPropCleanCost" placeholder="Örn: 1500" value="0" style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff;">
+            <input type="number" step="0.01" id="onboardPropCleanCost" placeholder="Örn: 1500" value="0" style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff;">
           </div>
         </div>
         <div class="form-group" style="margin-bottom: 16px;">
@@ -3881,7 +3886,7 @@
           <label>Brüt tutar (₺)<input id="quickBookingGross" type="number" inputmode="decimal" min="0" step="0.01" required></label>
           <label>Alınan kapora (₺)<input id="quickBookingDeposit" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Alınmadıysa boş"></label>
           <label>Kişi sayısı<input id="quickBookingPax" type="number" inputmode="numeric" min="1" step="1" required></label>
-          <label>Kanal<select id="quickBookingChannel" required><option value="WHATSAPP">WhatsApp</option><option value="AIRBNB">Airbnb</option><option value="BOOKING">Booking.com</option><option value="INSTAGRAM">Instagram</option><option value="WEBSITE">Web sitesi</option><option value="REPEAT">Tekrar misafir</option><option value="PHONE">Telefon</option></select></label>
+          <label>Kanal<select id="quickBookingChannel" required data-onchange="syncQuickBookingDepositVisibility()"><option value="WHATSAPP">WhatsApp</option><option value="AIRBNB">Airbnb</option><option value="BOOKING">Booking.com</option><option value="INSTAGRAM">Instagram</option><option value="WEBSITE">Web sitesi</option><option value="REPEAT">Tekrar misafir</option><option value="PHONE">Telefon</option></select></label>
         </div>
         <p class="sub-text">Temel bilgilerle doğrudan kaydeder. Komisyon ve temizlik ayrıntıları daha sonra rezervasyon detayından eklenebilir.</p>
         <div class="modal-footer"><button type="button" class="btn btn-secondary" data-onclick="closeQuickBookingModal()">Vazgeç</button><button type="submit" class="btn btn-primary">Rezervasyonu kaydet</button></div>
@@ -3936,10 +3941,10 @@
   <script src="core/side_panel.js?v=d763b464"></script>
   <script src="core/notification_feed.js?v=d8a17633"></script>
   <script src="core/command_search.js?v=89760933"></script>
-  <script src="core/action_dispatch.js?v=2b0c6a18"></script>
+  <script src="core/action_dispatch.js?v=25a00c0f"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
-  <script src="core/booking_finance_ui.js?v=a85be454"></script>
-  <script src="app.js?v=2ff88aa4"></script>
+  <script src="core/booking_finance_ui.js?v=cb9a574c"></script>
+  <script src="app.js?v=210fe0e0"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=e5503243"></script>
