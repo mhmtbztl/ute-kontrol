@@ -703,7 +703,7 @@ döndürür (icra `INSPECTED` değil, temizlik `DONE`/`SKIPPED` değil) ve
 `docs/PHASE99_DEPLOY_PACKAGE.md`.
 
 **phase101 (`migration_phase101_property_daily_prices.sql`) 19 Ekim 2026'da test
-projesine uygulandı; üretime henüz uygulanmadı.** Günlük fiyat kaydı (kullanıcı M76,
+projesine ve üretime uygulandı; üretimde doğrulandı** (anon `property_daily_prices` → `401 42501`, `production:readiness` BAŞARILI, `schema_migrations` 101). Günlük fiyat kaydı (kullanıcı M76,
 L-255): fiyat takviminde gün seçilip öneri onaylanır (`APPROVED`) ya da elle fiyat
 yazılır (`MANUAL`); kayıt referanstır, OTA'ya gitmez, rezervasyon tutarını
 değiştirmez (formda referans olarak görünür). Tam kısıt `(property_id, price_date)`
