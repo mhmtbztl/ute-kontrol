@@ -660,6 +660,15 @@ girer, ciroya girmez; sermaye gelir değildir, kâra girmez (§3.4). Göç iki
 anlık görüntüyü ve sıfırlamayı yeniden tanımlar. Canlı süit
 `phase97_income_live_tests` 26/26. Paket: `docs/PHASE97_DEPLOY_PACKAGE.md`.
 
+**phase99 (`migration_phase99_field_work_closed_cleanings.sql`) 19 Ekim 2026'da
+test projesine ve üretime uygulandı; üretimde doğrulandı** (`production:readiness`
+BAŞARILI — anon kapıları dahil, `schema_migrations` 99). Kapanan temizlik personel
+ekranından düşer (kullanıcı M62, L-237): `get_my_field_work` yalnız açık işi
+döndürür (icra `INSPECTED` değil, temizlik `DONE`/`SKIPPED` değil) ve
+`task_status` ekler; imza aynı, tablo değişmedi. Canlı süit
+`phase55_operations_execution_live_tests` 39/39 (C8b, C9b). Paket:
+`docs/PHASE99_DEPLOY_PACKAGE.md`.
+
 **Bir göçün uygulanıp uygulanmadığı, dosyaya bakarak anlaşılmaz.** Dosya repoda
 durur; veritabanı uygulanmamış olabilir. Doğrulamanın yolu üretime sormaktır:
 
