@@ -51,3 +51,9 @@ kaydı yapılmaz. Rezervasyon ve gider aynen çalışır.
 3. Bana "GÖÇ UYGULANDI" yazın; üretime salt okunur sorarak doğrularım:
    anon `income_entries` sorgusu `401 42501` (öncesinde `404 PGRST205`) ve
    `production:readiness` ile `schema_migrations` 97.
+
+## Üretim durumu
+
+19.10.2026: kullanıcı SQL Editor'de uyguladı (başarılı). Salt okunur doğrulama:
+anon `income_entries` sorgusu `401 42501 permission denied for table`;
+`production:readiness` BAŞARILI, `schema_migrations` 97 mevcut.
