@@ -14,7 +14,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=646dc566">
+  <link rel="stylesheet" href="style.css?v=0c513795">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="supabase.umd.js?v=3810661a"></script>
@@ -669,10 +669,14 @@
         </div>
 
         <div class="finance-top-meta">
-          <div class="meta-pill">
+          <!-- Ustteki PORTFOY seciciyle ayni filtre (filterByVilla); secenekleri
+               updateAllVillaDropdowns kurar, degeri updateStepperLabels esitler. -->
+          <label class="meta-pill meta-pill-select">
             <span>Portföy:</span>
-            <strong id="finTopPropertyLabel">Tüm Villalar / Portföy</strong>
-          </div>
+            <select id="finTopVillaFilter" data-onchange="filterByVilla(this.value)" aria-label="Portföy / mülk seçimi">
+              <option value="ALL">Tüm Villalar / Portföy</option>
+            </select>
+          </label>
           <!-- (Raporlar sekmesinden tasindi, 30.09.2026 — A5'te "Rapor al" olur.)
                Defter disa aktarma: sutunlar ice aktarma sablonuyla ayni,
                yani indirilen dosya duzeltilip geri yuklenebilir. Burada
@@ -821,10 +825,16 @@
                adim hic gorunmez; JS temizlik geliri > 0 ise acar. -->
           <div id="brCleaningGroup" class="bridge-optional-group" style="display: none;">
             <div class="bridge-arrow">+</div>
-            <div class="bridge-step ciro">
+            <div class="bridge-step ciro" id="brCleaningStep">
               <span class="step-label">Temizlik Geliri</span>
               <strong class="step-val" id="brCleaningRevenue">—</strong>
               <span class="step-sub">Misafirden alınan temizlik ücreti</span>
+            </div>
+            <!-- Elle girilen diger gelir (phase97); 0 ise gizli. Sermaye burada yok: gelir degildir. -->
+            <div class="bridge-step ciro" id="brOtherIncomeStep" hidden>
+              <span class="step-label">Diğer Gelir</span>
+              <strong class="step-val" id="brOtherIncome">—</strong>
+              <span class="step-sub">Rezervasyon dışı gelir kayıtları</span>
             </div>
             <div class="bridge-arrow">=</div>
             <div class="bridge-step ciro">
@@ -867,6 +877,51 @@
           </div>
         </div>
       </section>
+
+      <!-- 4b. GELİRLER (phase97). Rakamlar defter sozlesmesinden (renderIncomeSection);
+           "+ Gelir Ekle" rezervasyon formunu ya da diger gelir/sermaye formunu acar. -->
+      <details class="card expense-analysis-card finance-disclosure" id="financeIncomeDisclosure">
+        <summary><strong>Gelirler</strong><span>Konaklama, temizlik, diğer gelir ve sermaye</span></summary>
+        <div class="section-title-bar">
+          <div>
+            <h2>💰 GELİRLER</h2>
+            <p class="sub-text">Rezervasyon gelirleri otomatik gelir; rezervasyon dışı gelir ve sermaye girişi buradan eklenir</p>
+          </div>
+          <div class="income-add-wrap">
+            <button type="button" class="btn btn-primary btn-sm" data-onclick="toggleIncomeAddMenu(event)">+ Gelir Ekle</button>
+            <div id="incomeAddMenu" class="income-add-menu" hidden>
+              <button type="button" class="dropdown-item" data-onclick="startIncomeEntry('BOOKING')">🛏️ Rezervasyon</button>
+              <button type="button" class="dropdown-item" data-onclick="startIncomeEntry('OTHER')">💵 Diğer gelirler / sermaye</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="income-summary-grid">
+          <div class="income-summary-item"><span>Konaklama cirosu</span><strong id="incomeRoomVal">—</strong></div>
+          <div class="income-summary-item" id="incomeCleaningRow" hidden><span>Temizlik geliri</span><strong id="incomeCleaningVal">—</strong></div>
+          <div class="income-summary-item"><span>Diğer gelir</span><strong id="incomeOtherVal">—</strong></div>
+          <div class="income-summary-item income-summary-total"><span>Toplam gelir (kârın tabanı)</span><strong id="incomeTotalVal">—</strong></div>
+          <div class="income-summary-item income-summary-capital"><span>Sermaye / ortak girişi <small>kâra dahil değil</small></span><strong id="incomeCapitalVal">—</strong></div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>TARİH</th>
+                <th>TÜR</th>
+                <th>MÜLK / KAPSAM</th>
+                <th>AÇIKLAMA</th>
+                <th>TUTAR (TL)</th>
+                <th style="text-align: right;">İŞLEM</th>
+              </tr>
+            </thead>
+            <tbody id="incomeEntriesBody">
+              <!-- Injected via JS -->
+            </tbody>
+          </table>
+        </div>
+      </details>
 
       <!-- 5. GİDER ANALİZİ (DONUT CHART & 10 KATEGORİ DETAYI) -->
       <details class="card expense-analysis-card finance-disclosure" id="financeExpensesDisclosure">
@@ -2192,6 +2247,51 @@
       </form>
     </div>
   </div>
+  <!-- Gelir / sermaye girisi (phase97). Yazan: saveIncomeEntry -> income_entries. -->
+  <div class="modal-backdrop" id="incomeModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="incomeModalTitle">💰 Yeni Gelir Girişi</h3>
+        <button class="close-btn" data-onclick="closeIncomeModal()">&times;</button>
+      </div>
+      <form id="incomeForm" data-onsubmit="saveIncomeEntry(event)">
+        <input type="hidden" id="incEditId">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="incType">Tür</label>
+            <select id="incType" required data-onchange="updateIncomeTypeHint(this.value)">
+              <option value="OTHER_INCOME" selected>Diğer gelir (transfer, hasar bedeli, erken giriş…)</option>
+              <option value="CAPITAL">Sermaye / ortak girişi (yatırım, nakit dengeleme)</option>
+            </select>
+            <div id="incomeTypeHint" class="form-hint"></div>
+          </div>
+          <div class="form-group">
+            <label for="incVilla">İlgili Mülk / Kapsam</label>
+            <select id="incVilla" required>
+              <option value="ALL">Tüm Villalar / Portföy</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="incDate">Tarih</label>
+            <input type="date" id="incDate" required>
+          </div>
+          <div class="form-group">
+            <label for="incAmount">Tutar (TL)</label>
+            <input type="number" id="incAmount" min="0.01" step="0.01" placeholder="Örn: 2500" required>
+          </div>
+          <div class="form-group" style="grid-column: span 2;">
+            <label for="incDesc">Açıklama</label>
+            <input type="text" id="incDesc" maxlength="500" placeholder="Örn: Havalimanı transfer ücreti" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-onclick="closeIncomeModal()">Vazgeç</button>
+          <button type="submit" class="btn btn-primary">Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div class="modal-backdrop" id="expenseModal">
     <div class="modal-card">
       <div class="modal-header">
@@ -3810,7 +3910,7 @@
   <script src="core/property_sales_readiness.js?v=3f0f97b0"></script>
   <script src="core/guest_contact_utils.js?v=84fd6474"></script>
   <script src="core/user_facing_errors.js?v=e4eb0ae5"></script>
-  <script src="core/ledger_contract.js?v=ae1796a7"></script>
+  <script src="core/ledger_contract.js?v=533527e0"></script>
   <script src="core/report_engine.js?v=a06ed31b"></script>
   <script src="core/property_profile_engine.js?v=9d2f3d03"></script>
   <script src="core/property_owner_service.js?v=5c741a12"></script>
@@ -3836,10 +3936,10 @@
   <script src="core/side_panel.js?v=d763b464"></script>
   <script src="core/notification_feed.js?v=d8a17633"></script>
   <script src="core/command_search.js?v=89760933"></script>
-  <script src="core/action_dispatch.js?v=1f5708a6"></script>
+  <script src="core/action_dispatch.js?v=2b0c6a18"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=a85be454"></script>
-  <script src="app.js?v=c9c4493c"></script>
+  <script src="app.js?v=2ff88aa4"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=e5503243"></script>

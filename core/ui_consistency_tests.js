@@ -189,7 +189,7 @@ try {
   };
   const yazicilar = ['createExpense', 'updateExpense', 'deleteExpense', 'cloudUpsertCleaningTask',
     'cloudDeleteCleaningTask', 'cloudDeleteCleaningExpense', 'saveBookingPaymentCommission', 'inspectCleaningExecution',
-    'generateExpenseFromTemplate'];
+    'generateExpenseFromTemplate', 'saveIncomeEntry', 'deleteIncomeEntry'];
   const eksik = yazicilar.filter(ad => { const g = govde(ad); return !g || !g.includes('invalidateExecutiveSnapshotCache()'); });
   check(eksik.length === 0, `F1. Ana sayfa rakamını etkileyen ${yazicilar.length} yazıcı, başarılı yazmadan sonra anlık görüntü önbelleğini temizler`,
     'temizlemeyenler: ' + eksik.join(', '));

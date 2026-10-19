@@ -116,7 +116,8 @@ async function run() {
 
     let k = await kapanis(2031, 1);
     // Ocak: A (SKIPPED) 0 · eski 300 · B 1200 · D 800 · E eski satirdan (Subat'ta) -> 2300
-    check(k.schemaVersion === 4, '2a. Kapanis snapshot surumu 4', String(k.schemaVersion));
+    // phase97 surumu 5'e tasidi (diger gelir alanlari eklendi; phase45 alanlari aynen duruyor).
+    check(k.schemaVersion >= 4, '2a. Kapanis snapshot surumu 4 ya da sonrasi', String(k.schemaVersion));
     check(esit(k.cleaningCost, 2300), '2b. A+B+D: yapilmayan 0, yapilanlar yapildigi ayda; E ikinci kez sayilmaz (2300)', String(k.cleaningCost));
     check(esit(k.cleaningDebt, 2000), '2c. B: yapilmis ve odenmemis temizlik borctur (1200 + 800)', String(k.cleaningDebt));
     check(esit(k.revenue, 20000) && esit(k.cleaningRevenue, 1500), '2d. A: misafir odedi, gelmedi -> ciro ve temizlik GELIRI yerinde', JSON.stringify({ rev: k.revenue, cr: k.cleaningRevenue }));

@@ -51,6 +51,7 @@
     'addChecklistBuilderSection', 'addChecklistBuilderItem', 'addChecklistBuilderSubCheck', 'addChecklistBuilderSupply', 'removeChecklistBuilderNode', 'moveChecklistBuilderNode', 'toggleSettingsChecklistSupplyVisibility', 'renderSettingsChecklistMergePreview', 'cancelSettingsChecklistEdit',
     'createSettingsMessageTemplate', 'createSettingsTaskTemplate', 'cycleHkStatus', 'deleteBookingPayment', 'deleteBookingUI',
     'deleteCleaningTask', 'deleteCleaningTaskFromModal', 'deleteExpenseUI',
+    'toggleIncomeAddMenu', 'startIncomeEntry', 'openIncomeModal', 'closeIncomeModal', 'saveIncomeEntry', 'deleteIncomeEntry', 'updateIncomeTypeHint',
     'deleteLeadUI', 'deleteMaint',
     'downloadSampleTemplate', 'downloadCurrentReportCsv', 'downloadCurrentReportXlsx', 'editBooking', 'editExpense', 'editLead', 'editSettingsTemplate', 'archiveSettingsTemplate',
     'editMaint', 'exportIncomeStatement', 'exportLedger', 'filterByPeriod', 'filterByVilla',
