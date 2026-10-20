@@ -32,6 +32,20 @@
     return start && end && date >= start && date <= end;
   }
   function roundTo(value, step) { return Math.round(value / step) * step; }
+  // Sezon (L-266, kullanici karari KF-1): tarih araligi + yuzde, varsayilan
+  // yok. "Her yil" sezonu ay-gun araligina bakar ve yil sonunu asabilir
+  // (20.12 - 05.01). Liste oncelik sirasiyla gelir; ilk eslesen gecerlidir.
+  function seasonFor(date, seasons) {
+    const md = date.slice(5);
+    return (seasons || []).find(season => {
+      if (!season || season.enabled === false || missing(season.pct)) return false;
+      const start = String(season.start || ''), end = String(season.end || '');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) return false;
+      if (!season.repeatYearly) return date >= start && date <= end;
+      const from = start.slice(5), to = end.slice(5);
+      return from <= to ? md >= from && md <= to : md >= from || md <= to;
+    }) || null;
+  }
   function suggest(input) {
     const o = input || {}, property = o.property || {}, rules = rulesWithDefaults(o.rules);
     const todayMs = parse(o.today), days = Number.isInteger(o.days) && o.days > 0 ? o.days : 30;
@@ -89,7 +103,9 @@
       if (special && !missing(special.pct)) calendar.push({ code: 'SPECIAL_DAY', pct: Number(special.pct), text: 'özel gün', label: special.name || null });
       else if (special && rules.specialDay.enabled) calendar.push({ code: 'SPECIAL_DAY', pct: Number(rules.specialDay.pct), text: 'özel gün', label: special.name || null });
       const positive = calendar.sort((a, b) => b.pct - a.pct)[0];
-      const reasons = positive ? [positive] : [];
+      const season = seasonFor(date, o.seasons);
+      const reasons = season ? [{ code: 'SEASON', pct: Number(season.pct), text: season.name ? `sezon (${season.name})` : 'sezon', label: season.name || null }] : [];
+      if (positive) reasons.push(positive);
       const monthOcc = occupancyOf(date);
       if (rules.demand.enabled && !missing(o.occupancyTarget) && monthOcc !== null && monthOcc >= Number(o.occupancyTarget)) reasons.push({ code: 'DEMAND', pct: Number(rules.demand.pct), text: 'hedef doluluğa ulaşıldı', occupancy: monthOcc });
       const discounts = [];
@@ -165,5 +181,5 @@
     }, 0);
     return { actual, planned, expected: actual === null ? null : actual + planned };
   }
-  return { DEFAULTS, suggest, historyHint, forecastMonth };
+  return { seasonFor, DEFAULTS, suggest, historyHint, forecastMonth };
 }));

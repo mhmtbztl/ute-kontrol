@@ -5749,6 +5749,8 @@ body.side-panel-open { overflow: hidden; }
 .pricing-day.is-saved b { color: #FBBF24; }
 .pricing-day-saved { color: #FDE68A !important; font-size: 11px; }
 .pricing-day-proposal { color: #94A3B8; font-size: 11px; font-style: italic; }
+.pricing-day-minstay { color: #FCA5A5; font-size: 11px; }
+.pricing-day.is-unsellable { border-color: rgba(248,113,113,.55); }
 .pricing-day-editor { display: grid; gap: 6px; margin-top: 10px; padding: 10px 12px; border: 1px solid rgba(52,211,153,.4); border-radius: 9px; background: rgba(16,185,129,.06); }
 .pricing-day-editor.is-muted { border-color: var(--border-subtle); background: transparent; color: var(--text-muted); font-size: 12px; }
 .pricing-day-editor-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }

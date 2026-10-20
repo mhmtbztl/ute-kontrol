@@ -29,6 +29,9 @@
 // L-246 (M70, 9.7): tarihli bakim yalniz kendi araligini kapatir; fiyat takvimi ve hazirlik ayni tanimi kullanir.
 // L-247..L-254 (M71-M76, 9.7): talep kurali, 3 aylik takvim, ozel etkinlik, kural kaynagi, fiyat tablosu, bos gece, yillik hedef, fiyat tablosu karti.
 // L-255 (M76, 9.7 F.2.9): gunluk fiyat onaylanir / elle yazilir (phase101); rezervasyon formunda referans.
+// L-267 (M88, KF-1): uzun konaklama indirimi (tenant_settings pricing_long_stay), konaklama toplamina, taban gece basina.
+// L-266 (M87, KF-1): sezon kurali (tenant_settings pricing_seasons), her yil secenegi, mulk > portfoy, taban korumasi en son.
+// L-265 (M86, KF-1): minimum gece satis kisiti (tenant_settings pricing_min_stay), takvimde satilamaz bosluk, formda uyari + onay.
 // L-263..L-264 (M84-M85, urun kararlari KF-2/KF-3 20.10): ChatGPT 30 gun eylem sorusu; satisciya onayli fiyat esas, oneri etiketli.
 // L-256..L-262 (M77-M83, 9.7 kontrol turu): hesaplayici kapsami, hedef doluluk/odak, baz fiyatsiz mulk, rakip arastirmasi duzenle/sil + kartta bilgi, ChatGPT baglami, satis rolune kapali tarihler (phase103).
 // L-184..L-190 (M14-M20): kapora, kar marji hedefi, talep tarihi, mulk net kari, reklam tablosu/metrik/gunluk butce, sablon ekrani, bosluk gecesi.
@@ -2294,6 +2297,267 @@ async function fiyatKararlariDavranisi() {
     'L-264d Rezervasyon formu satisciya onaysiz gecelerin yonetici onayi bekledigini soyler', el('resPriceCalendarHint').innerText);
 }
 
+async function minimumGeceDavranisi() {
+  // Urun karari KF-1 (20.10): minimum gece satis kisitidir, varsayilan kapali. M86 = L-265.
+  sahteDom({});
+  global.FinancialMetricsService = require('./financial_metrics_service.js');
+  const App = require('../app.js');
+  const el = id => global.document.getElementById(id);
+  const BUGUN = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const gun = n => new Date(Date.parse(BUGUN + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
+  const P = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000086';
+  const P2 = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000087';
+  // Rezervasyonlar gun(10)-gun(12) ve gun(14)-gun(20): aralarinda 2 gecelik bosluk (12, 13).
+  const kur = (rol, minStay, ek = {}) => {
+    App.setActiveTenant({ id: TENANT, role: rol });
+    App.setAppData({
+      villas: {
+        SEYIR: { id: P, slug: 'SEYIR', name: 'Seyir', basePrice: 13000, floor: 8000, isActive: true, activationDate: '2025-01-01' },
+        KOY: { id: P2, slug: 'KOY', name: 'Koy', basePrice: 9000, floor: 6000, isActive: true, activationDate: '2025-01-01' }
+      },
+      bookings: [
+        { id: 'm1', villa: 'SEYIR', propertyId: P, checkIn: gun(10), checkOut: gun(12), gross: 26000, status: 'CONFIRMED', channel: 'DIRECT' },
+        { id: 'm2', villa: 'SEYIR', propertyId: P, checkIn: gun(14), checkOut: gun(20), gross: 78000, status: 'CONFIRMED', channel: 'DIRECT' }
+      ],
+      expenses: [], maintenanceTickets: [], propertyPricingRules: [], competitorPriceResearch: [], targets: [], propertyDailyPrices: [],
+      tenantSettings: minStay ? { pricing_min_stay: minStay } : {}, phase78SchemaReady: true, phase101SchemaReady: true, propertyClosuresReady: true, ...ek
+    });
+  };
+  const gunler = () => App.computePricingCalendar({ key: 'SEYIR', property: { id: P, basePrice: 13000, floor: 8000 } }, BUGUN, null).suggestions.days;
+
+  kur('owner', null);
+  const bos = App.pricingMinStayMap(P, gunler());
+  check(bos.size === 0 && App.bookingMinStayViolation('SEYIR', gun(30), gun(31)) === null,
+    'L-265a Kural yokken kisit yok: her uzunlukta konaklama satilabilir (varsayilan kapali)');
+
+  const kural3 = { rules: [{ id: 'k3', name: 'Yaz', propertyId: P, start: null, end: null, minNights: 3, enabled: true }] };
+  kur('owner', kural3);
+  const harita = App.pricingMinStayMap(P, gunler());
+  check(harita.get(gun(12))?.sellable === false && harita.get(gun(13))?.sellable === false && harita.get(gun(25))?.sellable === true && harita.get(gun(25))?.minNights === 3,
+    'L-265b En az 3 gece kurali: iki rezervasyon arasindaki 2 gecelik bosluk satilamaz; uzun bosluk satilir', JSON.stringify([...harita].slice(0, 16)));
+  check(App.pricingMinStayMap(P2, App.computePricingCalendar({ key: 'KOY', property: { id: P2, basePrice: 9000, floor: 6000 } }, BUGUN, null).suggestions.days).size === 0,
+    'L-265c Mulk kurali baska mulke uygulanmaz');
+  App.setPricingProperty(P);
+  App.setPricingMonth(gun(12).slice(0, 7));
+  const takvim = el('pricingManagerContainer').innerHTML;
+  check(takvim.includes('Açık · satılamaz boşluk') && takvim.includes('Minimum gece kuralı yüzünden bu boşluk satılamaz') && takvim.includes('is-unsellable')
+    && takvim.includes('minimum gece kuralı yüzünden satılamaz'),
+    'L-265d Takvim kisa boslugu "satilamaz" isaretler ve ust uyarida sayar', takvim.slice(0, 400));
+  check(el('pricingMinStayList').innerHTML.includes('En az 3 gece') && el('pricingMinStayList').innerHTML.includes('removePricingMinStayRule('),
+    'L-265e Kural listesi yonetime kaldirma dugmesiyle gorunur');
+
+  const coklu = { rules: [
+    { id: 'p', name: 'Portfoy', propertyId: null, start: null, end: null, minNights: 2, enabled: true },
+    { id: 't', name: 'Temmuz', propertyId: P, start: gun(40), end: gun(50), minNights: 5, enabled: true },
+    { id: 'x', name: 'Kapali', propertyId: P, start: null, end: null, minNights: 9, enabled: false }] };
+  kur('owner', coklu);
+  check(App.pricingMinNightsFor(P, gun(45)).minNights === 5 && App.pricingMinNightsFor(P, gun(30)).minNights === 2 && App.pricingMinNightsFor(P2, gun(45)).minNights === 2,
+    'L-265f Ayni gune dusen kurallarin en buyugu gecerli; tarih araligi ve kapsam uygulanir; kapali kural sayilmaz');
+  const ihlal = App.bookingMinStayViolation('SEYIR', gun(45), gun(48));
+  check(ihlal && ihlal.minNights === 5 && ihlal.nights === 3 && App.bookingMinStayViolation('SEYIR', gun(45), gun(50)) === null,
+    'L-265g Kisit giris gunune gore olculur; kisa konaklama ihlal sayilir');
+
+  kur('sales', coklu);
+  el('resVilla').value = 'SEYIR'; el('resCheckIn').value = gun(45); el('resCheckOut').value = gun(47);
+  App.renderBookingPriceCalendarHint();
+  check(String(el('resPriceCalendarHint').innerText).includes('Minimum gece kuralı: bu girişte en az 5 gece (Temmuz); seçilen 2 gece — bu haliyle kaydedilemez.'),
+    'L-265h Rezervasyon formu kisa konaklamada kurali, secilen geceyi ve kaydedilemeyecegini yazar', el('resPriceCalendarHint').innerText);
+  const kaydet = functionBody(read('app.js'), 'async function saveBooking(');
+  check(kaydet.includes('minStayBlockMessage(villa, checkIn, checkOut, { status })') && !kaydet.includes('confirm(') && !kaydet.includes('userCancelled'),
+    'L-265i Rezervasyon kaydi kisa konaklamayi onayla asmaz (kullanici karari 21.10)');
+
+  // Kullanici karari 21.10: kisit hicbir rolde onayla asilmaz; uc kayit yolu da engeller.
+  const formuDoldur = (giris, cikis, durum = 'CONFIRMED') => {
+    el('resEditId').value = ''; el('resVilla').value = 'SEYIR'; el('resGuest').value = 'Kisa Misafir'; el('resGuestPhone').value = '+905550000000';
+    el('resCheckIn').value = giris; el('resCheckOut').value = cikis; el('resChannel').value = 'WHATSAPP'; el('resStatus').value = durum; el('resPax').value = '2';
+  };
+  const formKaydi = async (rol, giris, cikis, durum) => {
+    kur(rol, coklu);
+    const ist = kaydedenIstemci(); App.setSupabaseClient(ist);
+    let soruldu = false;
+    global.confirm = () => { soruldu = true; return true; };
+    global.__sonUyari = '';
+    formuDoldur(giris, cikis, durum);
+    await App.saveBooking({ preventDefault() {}, target: { querySelector: () => null } });
+    global.confirm = () => true;
+    return { uyari: String(global.__sonUyari || ''), soruldu, yazildi: ist.yazmalar.some(k => k.tablo === 'bookings' && k.islem === 'insert') };
+  };
+  for (const rol of ['owner', 'manager', 'sales']) {
+    const r = await formKaydi(rol, gun(45), gun(47));
+    check(r.uyari.includes('Minimum gece kuralı: bu girişte en az 5 gece (Temmuz), seçilen 2 gece. Kayıt yapılmadı.') && !r.soruldu && !r.yazildi,
+      `L-265o ${rol}: kisa konaklama formdan kaydedilmez, onay sorusu yok (Evet ile asilamaz)`, JSON.stringify(r));
+  }
+  const yonetici = await formKaydi('owner', gun(45), gun(47));
+  const satisci = await formKaydi('sales', gun(45), gun(47));
+  check(yonetici.uyari.includes('Fiyatlandırma → Minimum gece bölümünden değiştirin ya da kaldırın') && satisci.uyari.includes('Kuralı yalnız yönetici değiştirebilir.') && !satisci.uyari.includes('kaldırın'),
+    'L-265p Yonetici istisna yolunu (kurali degistir/kaldir), satisci yalniz nedeni gorur');
+  kur('sales', coklu);
+  check(App.minStayBlockMessage('SEYIR', gun(45), gun(50)) === null && App.minStayBlockMessage('SEYIR', gun(45), gun(47), { status: 'CANCELLED' }) === null
+    && App.minStayBlockMessage('SEYIR', gun(-10), gun(-9)) === null && App.minStayBlockMessage(P, gun(45), gun(47)) !== null,
+    'L-265q Kurali saglayan, iptal ve gecmis girisli (yasanmis) konaklama engellenmez; mulk kimligiyle de olculur');
+  // WhatsApp mesajindan rezervasyon
+  kur('sales', coklu);
+  const istWa = kaydedenIstemci(); App.setSupabaseClient(istWa);
+  global.__sonUyari = '';
+  el('waParsedGuest').value = 'Kisa Misafir'; el('waParsedVilla').value = 'SEYIR'; el('waParsedAmount').value = '20000';
+  el('waParsedCheckIn').value = gun(45); el('waParsedCheckOut').value = gun(47); el('waParsedPax').value = '2'; el('waParsedPhone').value = '+905550000000';
+  await App.saveWaAsBooking();
+  check(String(global.__sonUyari).includes('Minimum gece kuralı') && !istWa.yazmalar.some(k => k.tablo === 'bookings'),
+    'L-265r WhatsApp mesajindan kisa konaklama kaydedilmez', global.__sonUyari);
+  // Talep donusumu: RPC'ye hic gidilmez
+  kur('sales', { ...coklu });
+  App.getAppData().leads = [{ id: 'bbbbbbbb-0000-4000-8000-000000000265', propertyId: P, checkIn: gun(45), checkOut: gun(47), status: 'QUOTE_SENT' }];
+  const rpcler = [];
+  App.setSupabaseClient({ ...kaydedenIstemci(), rpc: async (ad) => { rpcler.push(ad); return { data: null, error: null }; } });
+  let donusumHatasi = '';
+  try { await App.convertLeadToBooking('bbbbbbbb-0000-4000-8000-000000000265', {}); } catch (e) { donusumHatasi = e.message; }
+  check(donusumHatasi.includes('Minimum gece kuralı') && !rpcler.includes('convert_lead_to_booking_atomic'),
+    'L-265s Talep rezervasyona donusturulurken kisa konaklama engellenir; donusum RPC\'si cagrilmaz', JSON.stringify({ donusumHatasi, rpcler }));
+  check(read('index.html').includes('Kısa konaklama hiçbir rolde kaydedilmez') && read('index.html').includes('Yalnız fiyat referansıdır:'),
+    'L-265t Ekran kuralin asilamadigini ve uzun konaklama indiriminin yalniz referans oldugunu acikca yazar');
+  App.setPricingProperty(P);
+  check(el('pricingMinStayForm').style.display === 'none' && el('pricingMinStayList').innerHTML.includes('En az 5 gece') && !el('pricingMinStayList').innerHTML.includes('removePricingMinStayRule('),
+    'L-265j Satisci kurali gorur, ekleyemez / kaldiramaz');
+  check(await App.savePricingMinStayRule() === false, 'L-265k Satis rolu kural kaydedemez');
+
+  kur('owner', null);
+  const ist = kaydedenIstemci(); App.setSupabaseClient(ist);
+  App.setPricingProperty(P);
+  el('pricingMinStayNights').value = '1';
+  check(await App.savePricingMinStayRule() === false, 'L-265l En az gece 2-60 arasi tam sayi olmali');
+  el('pricingMinStayNights').value = '4'; el('pricingMinStayStart').value = gun(40); el('pricingMinStayEnd').value = gun(70); el('pricingMinStayName').value = 'Yaz'; el('pricingMinStayScope').value = 'PORTFOLIO';
+  await App.savePricingMinStayRule();
+  const yazma = ist.yazmalar.find(k => k.tablo === 'tenant_settings');
+  const yeni = yazma && yazma.yuk.value.rules[0];
+  check(yazma && yazma.yuk.key === 'pricing_min_stay' && yeni && yeni.minNights === 4 && yeni.propertyId === null && yeni.start === gun(40) && yeni.end === gun(70) && yeni.enabled === true,
+    'L-265m Kural tenant_settings pricing_min_stay anahtarina yazilir (goc gerekmez)', JSON.stringify(yazma && yazma.yuk));
+  const baglam = App.pricingChatGptContext();
+  check(baglam.ruleLines.some(line => line.startsWith('Minimum gece (satış kısıtı): en az 4 gece')),
+    'L-265n ChatGPT baglami minimum gece kisitini tasir');
+}
+
+async function sezonDavranisi() {
+  // Urun karari KF-1 (20.10): sezon kurali, varsayilan yok, taban korumasi en son. M87 = L-266.
+  sahteDom({});
+  global.FinancialMetricsService = require('./financial_metrics_service.js');
+  const App = require('../app.js');
+  const E = require('./suggested_price_engine.js');
+  const el = id => global.document.getElementById(id);
+  const BUGUN = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const gun = n => new Date(Date.parse(BUGUN + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
+  const P = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000088';
+  const P2 = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000089';
+  const sakin = { weekend: { enabled: false }, specialDay: { enabled: false }, lastMinute: { enabled: false }, gapNight: { enabled: false }, demand: { enabled: false } };
+  const fiyat = (seasons, today = '2026-12-28', floorPrice = 9000) => E.suggest({ property: { id: 'p', basePrice: 10000, floorPrice }, today, days: 10, seasons, rules: sakin }).days;
+
+  check(fiyat([]).every(d => d.price === 10000 && !d.reasons.length), 'L-266a Sezon tanimi yokken fiyat degismez (varsayilan yok)');
+  const kis = fiyat([{ name: 'Kis', start: '2025-12-20', end: '2026-01-05', pct: -20, repeatYearly: true }]);
+  check(kis.find(d => d.date === '2026-12-31').floorApplied && kis.find(d => d.date === '2026-12-31').price === 9000 && kis.find(d => d.date === '2027-01-05').reasons[0].code === 'SEASON' && !kis.find(d => d.date === '2027-01-06').reasons.length,
+    'L-266b Her yil sezonu yil sonunu asar; indirim tabanin altina inmez (taban korumasi en son)', JSON.stringify(kis.map(d => d.date + ':' + d.price)));
+  const yaz = fiyat([{ name: 'Yaz', start: '2026-07-01', end: '2026-08-31', pct: 30, repeatYearly: false }], '2026-08-30');
+  check(yaz.find(d => d.date === '2026-08-31').price === 13000 && yaz.find(d => d.date === '2026-09-01').price === 10000 && yaz.find(d => d.date === '2026-08-31').reasons[0].text === 'sezon (Yaz)',
+    'L-266c Tek seferlik sezon yalniz kendi araliginda uygulanir; gerekce sezon adini yazar');
+  const ust = E.suggest({ property: { id: 'p', basePrice: 10000, floorPrice: 5000 }, today: '2026-08-28', days: 3, rules: { ...sakin, weekend: { enabled: true, pct: 25, nights: [5, 6] } },
+    seasons: [{ name: 'Yaz', start: '2026-07-01', end: '2026-08-31', pct: 30 }] }).days.find(d => d.date === '2026-08-28');
+  check(ust.price === 15500 && ust.reasons.map(r => r.code).join('+') === 'SEASON+WEEKEND', 'L-266d Sezon yuzdesi diger kurallarla toplanir (yaz +30 ve hafta sonu +25 = +55)', JSON.stringify(ust));
+
+  App.setActiveTenant({ id: TENANT, role: 'owner' });
+  App.setAppData({
+    villas: { SEYIR: { id: P, slug: 'SEYIR', name: 'Seyir', basePrice: 13000, floor: 8000, isActive: true }, KOY: { id: P2, slug: 'KOY', name: 'Koy', basePrice: 9000, floor: 6000, isActive: true } },
+    bookings: [], expenses: [], maintenanceTickets: [], propertyPricingRules: [], competitorPriceResearch: [], targets: [], propertyDailyPrices: [],
+    tenantSettings: { pricing_seasons: { seasons: [
+      { id: 'a', name: 'Portfoy kis', start: gun(0), end: gun(60), pct: -10, propertyId: null, enabled: true },
+      { id: 'b', name: 'Seyir ozel', start: gun(0), end: gun(60), pct: 15, propertyId: P, enabled: true },
+      { id: 'c', name: 'Kapali', start: gun(0), end: gun(60), pct: 90, propertyId: P, enabled: false }] } },
+    phase78SchemaReady: true, phase101SchemaReady: true, propertyClosuresReady: true
+  });
+  check(App.pricingSeasonsFor(P)[0].id === 'b' && App.pricingSeasonsFor(P).length === 2 && App.pricingSeasonsFor(P2).map(x => x.id).join() === 'a',
+    'L-266e Mulk sezonu portfoy sezonundan once gelir; kapali sezon sayilmaz; baska mulke mulk sezonu uygulanmaz');
+  const takvim = App.computePricingCalendar({ key: 'SEYIR', property: App.getAppData().villas.SEYIR }, BUGUN, null).suggestions.days;
+  check(takvim.filter(d => d.status === 'OPEN' && d.date <= gun(60)).every(d => d.reasons.some(r => r.code === 'SEASON' && r.pct === 15)),
+    'L-266f Fiyat takvimi isletmenin sezonunu uygular');
+  check(!takvim.find(d => d.date === gun(61))?.reasons.some(r => r.code === 'SEASON'), 'L-266f2 Sezon bitince takvimde uygulanmaz');
+  App.setPricingProperty(P);
+  check(el('pricingSeasonList').innerHTML.includes('Seyir ozel') && el('pricingSeasonList').innerHTML.includes('removePricingSeason('),
+    'L-266g Sezon listesi yonetime kaldirma dugmesiyle gorunur');
+  check(App.pricingChatGptContext().ruleLines.some(line => line.startsWith('Sezon Seyir ozel: +%15')),
+    'L-266h ChatGPT baglami sezonlari tasir');
+
+  const ist = kaydedenIstemci(); App.setSupabaseClient(ist);
+  el('pricingSeasonName').value = 'Yeni yil'; el('pricingSeasonStart').value = '2026-12-20'; el('pricingSeasonEnd').value = '2026-01-05'; el('pricingSeasonPct').value = '40'; el('pricingSeasonScope').value = 'PORTFOLIO'; el('pricingSeasonRepeat').checked = false;
+  check(await App.savePricingSeason() === false, 'L-266i Bitis baslangictan once ise ("Her yil" degilse) reddedilir');
+  el('pricingSeasonRepeat').checked = true;
+  await App.savePricingSeason();
+  const yazma = ist.yazmalar.find(k => k.tablo === 'tenant_settings');
+  const yeni = yazma && yazma.yuk.value.seasons.find(x => x.name === 'Yeni yil');
+  check(yazma && yazma.yuk.key === 'pricing_seasons' && yeni && yeni.pct === 40 && yeni.repeatYearly === true && yeni.propertyId === null,
+    'L-266j Sezon tenant_settings pricing_seasons anahtarina yazilir (goc gerekmez)', JSON.stringify(yazma && yazma.yuk));
+  App.setActiveTenant({ id: TENANT, role: 'sales' });
+  App.setPricingProperty(P);
+  check(el('pricingSeasonForm').style.display === 'none' && !el('pricingSeasonList').innerHTML.includes('removePricingSeason(') && await App.savePricingSeason() === false,
+    'L-266k Satisci sezonu gorur, ekleyemez / kaldiramaz');
+}
+
+async function uzunKonaklamaDavranisi() {
+  // Urun karari KF-1 (20.10): uzun konaklama indirimi, varsayilan yok, konaklama toplamina, taban gece basina. M88 = L-267.
+  sahteDom({});
+  global.FinancialMetricsService = require('./financial_metrics_service.js');
+  const App = require('../app.js');
+  const el = id => global.document.getElementById(id);
+  const BUGUN = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const gun = n => new Date(Date.parse(BUGUN + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
+  const P = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000090';
+  const P2 = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000092';
+  const kur = (rol, longStay) => {
+    App.setActiveTenant({ id: TENANT, role: rol });
+    App.setAppData({
+      villas: { SEYIR: { id: P, slug: 'SEYIR', name: 'Seyir', basePrice: 10000, floor: 9500, isActive: true }, KOY: { id: P2, slug: 'KOY', name: 'Koy', basePrice: 9000, floor: 6000, isActive: true } },
+      bookings: [], expenses: [], maintenanceTickets: [], propertyPricingRules: [], competitorPriceResearch: [], targets: [], propertyDailyPrices: [],
+      tenantSettings: { pricing_rules: { weekend: { enabled: false }, lastMinute: { enabled: false }, gapNight: { enabled: false }, specialDay: { enabled: false }, demand: { enabled: false } }, ...(longStay ? { pricing_long_stay: longStay } : {}) },
+      phase78SchemaReady: true, phase101SchemaReady: true, propertyClosuresReady: true
+    });
+  };
+  const ipucu = (giris, cikis, villa = 'SEYIR') => { el('resVilla').value = villa; el('resCheckIn').value = giris; el('resCheckOut').value = cikis; App.renderBookingPriceCalendarHint(); return String(el('resPriceCalendarHint').innerText); };
+
+  kur('owner', null);
+  check(App.pricingLongStayFor(P, 30) === null && !ipucu(gun(40), gun(70)).includes('Uzun konaklama'), 'L-267a Kademe yokken indirim yok (varsayilan yok)');
+  const kademeler = { tiers: [
+    { id: 't7', minNights: 7, pct: 10, propertyId: null, enabled: true },
+    { id: 't28', minNights: 28, pct: 20, propertyId: null, enabled: true },
+    { id: 'm7', minNights: 7, pct: 4, propertyId: P2, enabled: true },
+    { id: 'off', minNights: 3, pct: 50, propertyId: null, enabled: false }] };
+  kur('owner', kademeler);
+  check(App.pricingLongStayFor(P, 6) === null && App.pricingLongStayFor(P, 7).pct === 10 && App.pricingLongStayFor(P, 30).pct === 20 && App.pricingLongStayFor(P2, 7).pct === 4,
+    'L-267b Ulasilan en yuksek kademe gecerli; ayni kademede mulk kurali portfoyden once; kapali kademe sayilmaz');
+  const taban = App.applyLongStayDiscount([10000, 10000, 9000], { pct: 10 }, 9500);
+  check(taban.total === 9500 + 9500 + 9000 && taban.floorNights === 3,
+    'L-267c Indirim geceyi tabanin altina indirmez; zaten tabanin altindaki onayli fiyati yukseltmez', JSON.stringify(taban));
+  const yedi = ipucu(gun(40), gun(47), 'KOY');
+  check(yedi.includes('Uzun konaklama −%4 (7+ gece): ₺63.000 → ₺60.480'),
+    'L-267d Rezervasyon formu kademeyi toplam uzerinde gosterir (tutar kendiliginden degismez)', yedi);
+  const tabanli = ipucu(gun(40), gun(47));
+  check(tabanli.includes('Uzun konaklama −%10 (7+ gece): ₺70.000 → ₺66.500; 7 gece tabanda durdu'),
+    'L-267e Taban korumasi gece basina; kac gecenin tabanda durdugunu yazar', tabanli);
+  App.setPricingProperty(P);
+  check(el('pricingLongStayList').innerHTML.includes('28+ gece') && el('pricingLongStayList').innerHTML.includes('removePricingLongStayTier('),
+    'L-267f Kademe listesi yonetime kaldirma dugmesiyle gorunur');
+  check(App.pricingChatGptContext().ruleLines.some(line => line.startsWith('Uzun konaklama: 7+ gece −%10')),
+    'L-267g ChatGPT baglami uzun konaklama kademelerini tasir');
+  const ist = kaydedenIstemci(); App.setSupabaseClient(ist);
+  el('pricingLongStayNights').value = '14'; el('pricingLongStayPct').value = '95';
+  check(await App.savePricingLongStayTier() === false, 'L-267h Indirim 0-90 arasinda olmali');
+  el('pricingLongStayPct').value = '15'; el('pricingLongStayScope').value = 'PROPERTY';
+  await App.savePricingLongStayTier();
+  const yazma = ist.yazmalar.find(k => k.tablo === 'tenant_settings');
+  const yeni = yazma && yazma.yuk.value.tiers.find(t => t.minNights === 14);
+  check(yazma && yazma.yuk.key === 'pricing_long_stay' && yeni && yeni.pct === 15 && yeni.propertyId === P,
+    'L-267i Kademe tenant_settings pricing_long_stay anahtarina yazilir (goc gerekmez)', JSON.stringify(yazma && yazma.yuk));
+  kur('sales', kademeler);
+  App.setPricingProperty(P);
+  check(el('pricingLongStayForm').style.display === 'none' && !el('pricingLongStayList').innerHTML.includes('removePricingLongStayTier(') && await App.savePricingLongStayTier() === false,
+    'L-267j Satisci kademeleri gorur, ekleyemez / kaldiramaz');
+}
+
 async function main() {
 try {
   const html = read('index.html');
@@ -2345,6 +2609,9 @@ try {
   await gunlukFiyatDavranisi();
   await fiyatKontrolTuruDavranisi();
   await fiyatKararlariDavranisi();
+  await minimumGeceDavranisi();
+  await sezonDavranisi();
+  await uzunKonaklamaDavranisi();
 } catch (error) {
   failed++;
   console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));
