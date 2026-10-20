@@ -3707,6 +3707,14 @@ function buildLeadConversionOptions(lead = {}, overrides = {}) {
 
 async function convertLeadToBooking(leadId, options = {}) {
   if (!leadId) throw new Error('Dönüştürülecek lead kimliği gereklidir.');
+  {
+    const talep = (typeof appData !== 'undefined' && appData.leads || []).find(item => String(item.id) === String(leadId)) || {};
+    const giris = options.checkIn || talep.checkIn || talep.check_in;
+    const cikis = options.checkOut || talep.checkOut || talep.check_out;
+    const mulk = options.propertyId || options.villa || talep.propertyId || talep.property_id || talep.villa;
+    const minStayEngeli = mulk && giris && cikis ? minStayBlockMessage(mulk, giris, cikis) : null;
+    if (minStayEngeli) throw new Error(minStayEngeli);
+  }
   const tenantId = getActiveTenantId();
   const isCloud = !!(isCloudTenant(tenantId));
 
@@ -9371,16 +9379,12 @@ async function saveBooking(e) {
     if (calculateNightsBetween(checkIn, checkOut) <= 0) {
       throw new Error('Çıkış tarihi giriş tarihinden sonra olmalıdır.');
     }
-    // Minimum gece satis kisitidir (L-265): kisa konaklama sessizce kaydedilmez;
-    // tarihleri degismeyen eski kayit duzenlenirken yeniden sorulmaz.
+    // Minimum gece satis kisitidir (L-265): kisa konaklama hicbir rolde kaydedilmez;
+    // tarihi ve mulku degismeyen eski kayit duzenlenirken olculmez.
     const eskiKayit = editId ? (appData.bookings || []).find(b => String(b.id) === String(editId)) : null;
     const tarihDegisti = !eskiKayit || eskiKayit.checkIn !== checkIn || eskiKayit.checkOut !== checkOut || eskiKayit.villa !== villa;
-    const minStayIhlali = status !== 'CANCELLED' && tarihDegisti ? bookingMinStayViolation(villa, checkIn, checkOut) : null;
-    if (minStayIhlali && !confirm(`Minimum gece kuralı: bu girişte en az ${minStayIhlali.minNights} gece${minStayIhlali.name ? ` (${minStayIhlali.name})` : ''}, seçilen ${minStayIhlali.nights} gece. Yine de kaydedilsin mi?`)) {
-      const vazgecildi = new Error('Kaydedilmedi: minimum gece kuralı.');
-      vazgecildi.userCancelled = true;
-      throw vazgecildi;
-    }
+    const minStayEngeli = tarihDegisti ? minStayBlockMessage(villa, checkIn, checkOut, { status }) : null;
+    if (minStayEngeli) throw new Error(minStayEngeli);
 
     const economics = readBookingFormEconomics();
     const cleanFee = economics.cleanFee;
@@ -9451,8 +9455,6 @@ async function saveBooking(e) {
     closeBookingModal();
     if (typeof alert === 'function') alert('✅ Rezervasyon başarıyla kaydedildi!' + guestProfileWarning);
   } catch (err) {
-    // Kullanici onay sorusunda vazgectiyse ikinci bir hata uyarisi gosterilmez.
-    if (err && err.userCancelled) return false;
     console.error('saveBooking error:', err);
     if (typeof alert === 'function') alert('Rezervasyon kaydedilemedi: ' + (err.message || 'Lütfen bilgileri kontrol edin.'));
   } finally {
@@ -14211,6 +14213,11 @@ async function saveWaAsBooking() {
     return;
   }
 
+  const minStayEngeli = minStayBlockMessage(villa, checkIn, checkOut);
+  if (checkIn && checkOut && minStayEngeli) {
+    alert(minStayEngeli);
+    return;
+  }
   if (!checkIn || !checkOut) {
     alert('Lütfen rezervasyon için giriş ve çıkış tarihlerini seçiniz!');
     return;
@@ -22179,6 +22186,26 @@ async function removePricingMinStayRule(ruleId) {
   }
 }
 
+// Minimum gece kisiti hicbir rolde onayla asilmaz (kullanici karari 21.10):
+// kisa konaklama kaydedilmez; istisna gerekiyorsa yonetim kurali degistirir ya
+// da kaldirir, satisci yalniz nedeni gorur. Uc kayit yolu (form, WhatsApp,
+// talep donusumu) bu tek kapidan gecer. Iptal kayit, gecmis girisli kayit
+// (yasanmis konaklamanin girilmesi) ve tarihi/mulku degismeyen eski kayit
+// olculmez. Sunucu tarafinda zorlanmaz (istemci kapisi).
+function minStayBlockMessage(villaOrPropertyId, checkIn, checkOut, options = {}) {
+  if (String(options.status || '').toUpperCase() === 'CANCELLED') return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(checkIn || '') || checkIn < getTodayStr()) return null;
+  const villas = appData?.villas || {};
+  const key = villas[villaOrPropertyId] ? villaOrPropertyId
+    : (Object.entries(villas).find(([, p]) => p && (p.id === villaOrPropertyId || p.slug === villaOrPropertyId)) || [])[0];
+  const ihlal = key ? bookingMinStayViolation(key, checkIn, checkOut) : null;
+  if (!ihlal) return null;
+  const nasil = canManageTenantRole(activeTenant?.role)
+    ? 'İstisna gerekiyorsa kuralı Fiyatlandırma → Minimum gece bölümünden değiştirin ya da kaldırın.'
+    : 'Kuralı yalnız yönetici değiştirebilir.';
+  return `Minimum gece kuralı: bu girişte en az ${ihlal.minNights} gece${ihlal.name ? ` (${ihlal.name})` : ''}, seçilen ${ihlal.nights} gece. Kayıt yapılmadı. ${nasil}`;
+}
+
 // Rezervasyon formu icin: giris gunundeki kisit ve konaklama onu sagliyor mu.
 function bookingMinStayViolation(villaKey, checkIn, checkOut) {
   const property = appData?.villas?.[villaKey];
@@ -22871,7 +22898,7 @@ function renderBookingPriceCalendarHint() {
     if (price > 0) { total += price; nightPrices.push(price); suggested++; } else unknown++;
   });
   const minStay = bookingMinStayViolation(villaKey, checkIn, checkOut);
-  const minStayText = minStay ? ` ⚠ Minimum gece kuralı: bu girişte en az ${minStay.minNights} gece${minStay.name ? ` (${minStay.name})` : ''}; seçilen ${minStay.nights} gece.` : '';
+  const minStayText = minStay && checkIn >= getTodayStr() ? ` ⚠ Minimum gece kuralı: bu girişte en az ${minStay.minNights} gece${minStay.name ? ` (${minStay.name})` : ''}; seçilen ${minStay.nights} gece — bu haliyle kaydedilemez.` : '';
   if (!approved && !suggested) {
     hint.style.display = minStayText ? '' : 'none';
     hint.innerText = minStayText.trim();
@@ -22883,7 +22910,7 @@ function renderBookingPriceCalendarHint() {
   // Uzun konaklama kademesi toplam uzerinde gosterilir; tutar yine kendiliginden degismez (L-267).
   const longStay = pricingLongStayFor(property.id, nights.length);
   const discounted = longStay ? applyLongStayDiscount(nightPrices, longStay, property.floor ?? property.floorPrice) : null;
-  const longStayText = longStay ? ` Uzun konaklama −%${String(longStay.pct).replace('.', ',')} (${longStay.minNights}+ gece): ${pricingMoney(total)} → ${pricingMoney(discounted.total)}${discounted.floorNights ? `; ${discounted.floorNights} gece tabanda durdu` : ''}.` : '';
+  const longStayText = longStay ? ` Uzun konaklama −%${String(longStay.pct).replace('.', ',')} (${longStay.minNights}+ gece): ${pricingMoney(total)} → ${pricingMoney(discounted.total)}${discounted.floorNights ? `; ${discounted.floorNights} gece tabanda durdu` : ''} — yalnız fiyat referansı; tutara uygulanmadı.` : '';
   hint.innerText = `Fiyat takvimi: ${nights.length} gece · ${pricingMoney(total)}${unknown ? ' (eksik)' : ''} — ${parts}. Tutar kendiliğinden değişmez.${longStayText}${minStayText}`;
 }
 
@@ -23114,6 +23141,7 @@ if (typeof module !== 'undefined' && module.exports) {
     renderTodayMonthSummary,
     parseWhatsAppMessageText,
     saveWaAsBooking,
+    saveBooking,
     isUUID,
     roundMoney,
     normalizeCleaningTask,
@@ -23367,6 +23395,7 @@ if (typeof module !== 'undefined' && module.exports) {
     pricingMinStayMap,
     pricingMinNightsFor,
     bookingMinStayViolation,
+    minStayBlockMessage,
     savePricingMinStayRule,
     removePricingMinStayRule,
     removePricingSpecialEvent,

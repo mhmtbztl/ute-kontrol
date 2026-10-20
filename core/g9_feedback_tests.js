@@ -2360,11 +2360,61 @@ async function minimumGeceDavranisi() {
   kur('sales', coklu);
   el('resVilla').value = 'SEYIR'; el('resCheckIn').value = gun(45); el('resCheckOut').value = gun(47);
   App.renderBookingPriceCalendarHint();
-  check(String(el('resPriceCalendarHint').innerText).includes('Minimum gece kuralı: bu girişte en az 5 gece (Temmuz); seçilen 2 gece.'),
-    'L-265h Rezervasyon formu kisa konaklamada kurali ve secilen geceyi yazar', el('resPriceCalendarHint').innerText);
+  check(String(el('resPriceCalendarHint').innerText).includes('Minimum gece kuralı: bu girişte en az 5 gece (Temmuz); seçilen 2 gece — bu haliyle kaydedilemez.'),
+    'L-265h Rezervasyon formu kisa konaklamada kurali, secilen geceyi ve kaydedilemeyecegini yazar', el('resPriceCalendarHint').innerText);
   const kaydet = functionBody(read('app.js'), 'async function saveBooking(');
-  check(kaydet.includes('bookingMinStayViolation(villa, checkIn, checkOut)') && kaydet.includes('confirm(') && kaydet.includes('vazgecildi.userCancelled = true') && kaydet.includes('if (err && err.userCancelled) return false;'),
-    'L-265i Rezervasyon kaydi kisa konaklamayi sessizce kaydetmez; onay ister (tarihi degismeyen eski kayit haric)');
+  check(kaydet.includes('minStayBlockMessage(villa, checkIn, checkOut, { status })') && !kaydet.includes('confirm(') && !kaydet.includes('userCancelled'),
+    'L-265i Rezervasyon kaydi kisa konaklamayi onayla asmaz (kullanici karari 21.10)');
+
+  // Kullanici karari 21.10: kisit hicbir rolde onayla asilmaz; uc kayit yolu da engeller.
+  const formuDoldur = (giris, cikis, durum = 'CONFIRMED') => {
+    el('resEditId').value = ''; el('resVilla').value = 'SEYIR'; el('resGuest').value = 'Kisa Misafir'; el('resGuestPhone').value = '+905550000000';
+    el('resCheckIn').value = giris; el('resCheckOut').value = cikis; el('resChannel').value = 'WHATSAPP'; el('resStatus').value = durum; el('resPax').value = '2';
+  };
+  const formKaydi = async (rol, giris, cikis, durum) => {
+    kur(rol, coklu);
+    const ist = kaydedenIstemci(); App.setSupabaseClient(ist);
+    let soruldu = false;
+    global.confirm = () => { soruldu = true; return true; };
+    global.__sonUyari = '';
+    formuDoldur(giris, cikis, durum);
+    await App.saveBooking({ preventDefault() {}, target: { querySelector: () => null } });
+    global.confirm = () => true;
+    return { uyari: String(global.__sonUyari || ''), soruldu, yazildi: ist.yazmalar.some(k => k.tablo === 'bookings' && k.islem === 'insert') };
+  };
+  for (const rol of ['owner', 'manager', 'sales']) {
+    const r = await formKaydi(rol, gun(45), gun(47));
+    check(r.uyari.includes('Minimum gece kuralı: bu girişte en az 5 gece (Temmuz), seçilen 2 gece. Kayıt yapılmadı.') && !r.soruldu && !r.yazildi,
+      `L-265o ${rol}: kisa konaklama formdan kaydedilmez, onay sorusu yok (Evet ile asilamaz)`, JSON.stringify(r));
+  }
+  const yonetici = await formKaydi('owner', gun(45), gun(47));
+  const satisci = await formKaydi('sales', gun(45), gun(47));
+  check(yonetici.uyari.includes('Fiyatlandırma → Minimum gece bölümünden değiştirin ya da kaldırın') && satisci.uyari.includes('Kuralı yalnız yönetici değiştirebilir.') && !satisci.uyari.includes('kaldırın'),
+    'L-265p Yonetici istisna yolunu (kurali degistir/kaldir), satisci yalniz nedeni gorur');
+  kur('sales', coklu);
+  check(App.minStayBlockMessage('SEYIR', gun(45), gun(50)) === null && App.minStayBlockMessage('SEYIR', gun(45), gun(47), { status: 'CANCELLED' }) === null
+    && App.minStayBlockMessage('SEYIR', gun(-10), gun(-9)) === null && App.minStayBlockMessage(P, gun(45), gun(47)) !== null,
+    'L-265q Kurali saglayan, iptal ve gecmis girisli (yasanmis) konaklama engellenmez; mulk kimligiyle de olculur');
+  // WhatsApp mesajindan rezervasyon
+  kur('sales', coklu);
+  const istWa = kaydedenIstemci(); App.setSupabaseClient(istWa);
+  global.__sonUyari = '';
+  el('waParsedGuest').value = 'Kisa Misafir'; el('waParsedVilla').value = 'SEYIR'; el('waParsedAmount').value = '20000';
+  el('waParsedCheckIn').value = gun(45); el('waParsedCheckOut').value = gun(47); el('waParsedPax').value = '2'; el('waParsedPhone').value = '+905550000000';
+  await App.saveWaAsBooking();
+  check(String(global.__sonUyari).includes('Minimum gece kuralı') && !istWa.yazmalar.some(k => k.tablo === 'bookings'),
+    'L-265r WhatsApp mesajindan kisa konaklama kaydedilmez', global.__sonUyari);
+  // Talep donusumu: RPC'ye hic gidilmez
+  kur('sales', { ...coklu });
+  App.getAppData().leads = [{ id: 'bbbbbbbb-0000-4000-8000-000000000265', propertyId: P, checkIn: gun(45), checkOut: gun(47), status: 'QUOTE_SENT' }];
+  const rpcler = [];
+  App.setSupabaseClient({ ...kaydedenIstemci(), rpc: async (ad) => { rpcler.push(ad); return { data: null, error: null }; } });
+  let donusumHatasi = '';
+  try { await App.convertLeadToBooking('bbbbbbbb-0000-4000-8000-000000000265', {}); } catch (e) { donusumHatasi = e.message; }
+  check(donusumHatasi.includes('Minimum gece kuralı') && !rpcler.includes('convert_lead_to_booking_atomic'),
+    'L-265s Talep rezervasyona donusturulurken kisa konaklama engellenir; donusum RPC\'si cagrilmaz', JSON.stringify({ donusumHatasi, rpcler }));
+  check(read('index.html').includes('Kısa konaklama hiçbir rolde kaydedilmez') && read('index.html').includes('Yalnız fiyat referansıdır:'),
+    'L-265t Ekran kuralin asilamadigini ve uzun konaklama indiriminin yalniz referans oldugunu acikca yazar');
   App.setPricingProperty(P);
   check(el('pricingMinStayForm').style.display === 'none' && el('pricingMinStayList').innerHTML.includes('En az 5 gece') && !el('pricingMinStayList').innerHTML.includes('removePricingMinStayRule('),
     'L-265j Satisci kurali gorur, ekleyemez / kaldiramaz');
