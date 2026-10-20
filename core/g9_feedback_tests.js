@@ -29,6 +29,7 @@
 // L-246 (M70, 9.7): tarihli bakim yalniz kendi araligini kapatir; fiyat takvimi ve hazirlik ayni tanimi kullanir.
 // L-247..L-254 (M71-M76, 9.7): talep kurali, 3 aylik takvim, ozel etkinlik, kural kaynagi, fiyat tablosu, bos gece, yillik hedef, fiyat tablosu karti.
 // L-255 (M76, 9.7 F.2.9): gunluk fiyat onaylanir / elle yazilir (phase101); rezervasyon formunda referans.
+// L-263..L-264 (M84-M85, urun kararlari KF-2/KF-3 20.10): ChatGPT 30 gun eylem sorusu; satisciya onayli fiyat esas, oneri etiketli.
 // L-256..L-262 (M77-M83, 9.7 kontrol turu): hesaplayici kapsami, hedef doluluk/odak, baz fiyatsiz mulk, rakip arastirmasi duzenle/sil + kartta bilgi, ChatGPT baglami, satis rolune kapali tarihler (phase103).
 // L-184..L-190 (M14-M20): kapora, kar marji hedefi, talep tarihi, mulk net kari, reklam tablosu/metrik/gunluk butce, sablon ekrani, bosluk gecesi.
 const fs = require('fs');
@@ -2032,7 +2033,7 @@ async function gunlukFiyatDavranisi() {
   yazma = ist.yazmalar.find(k => k.tablo === 'property_daily_prices' && k.islem === 'upsert');
   check(yazma && yazma.yuk[0].price === 7000 && yazma.yuk[0].source === 'MANUAL' && yazma.yuk[0].suggested_price > 0 && yazma.yuk[0].note === 'Son dakika anlasmasi',
     'L-255h Elle fiyat MANUAL yazilir; oneri ve not yaninda saklanir', JSON.stringify(yazma && yazma.yuk));
-  check(/₺7\.000/.test(el('pricingManagerContainer').innerHTML) && /Elle · öneri ₺/.test(el('pricingManagerContainer').innerHTML),
+  check(/₺7\.000/.test(el('pricingManagerContainer').innerHTML) && /Elle fiyat · öneri ₺/.test(el('pricingManagerContainer').innerHTML),
     'L-255i Kart kayitli fiyati gosterir ve oneriyi yanina yazar');
 
   ist = istemci();
@@ -2254,6 +2255,45 @@ async function fiyatKontrolTuruDavranisi() {
     'L-262d phase103: yetki kayit aramadan once, ariza ayrintisi donmez, anon kapali, schema_migrations 103, manifestte');
 }
 
+async function fiyatKararlariDavranisi() {
+  // Urun kararlari 20.10 (KF-2, KF-3): M84-M85 = L-263, L-264.
+  sahteDom({});
+  global.FinancialMetricsService = require('./financial_metrics_service.js');
+  const App = require('../app.js');
+  const el = id => global.document.getElementById(id);
+  const BUGUN = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const gun = n => new Date(Date.parse(BUGUN + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
+  const P = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000091';
+  const kur = (rol, ek = {}) => {
+    App.setActiveTenant({ id: TENANT, role: rol });
+    App.setAppData({
+      villas: { SEYIR: { id: P, slug: 'SEYIR', name: 'Seyir', basePrice: 13000, floor: 8000, isActive: true, activationDate: '2025-01-01' } },
+      bookings: [], expenses: [], maintenanceTickets: [], propertyPricingRules: [], competitorPriceResearch: [], tenantSettings: {}, targets: [],
+      propertyDailyPrices: [{ property_id: P, price_date: gun(1), price: 15000, source: 'APPROVED', suggested_price: 13000 }],
+      phase78SchemaReady: true, phase101SchemaReady: true, propertyClosuresReady: true, ...ek
+    });
+    App.setPricingProperty(P);
+    App.setPricingMonth(gun(1).slice(0, 7));
+    return el('pricingManagerContainer').innerHTML;
+  };
+  check(read('index.html').includes('Önümüzdeki 30 günde hangi tarihlerde fiyatı değiştirmeliyim? Her tarih için önerilen fiyatı, gerekçeyi ve riski sırala.'),
+    'L-263a ChatGPT hazir sorularinda 30 gunluk eylem sorusu var (KF-2)');
+  const satis = kur('sales');
+  check(satis.includes('Onaylı fiyat · öneri ₺') && satis.includes('<b>₺15.000</b>') && satis.includes('pricing-day-proposal">Öneri · yönetici onayı bekleniyor') && !satis.includes('togglePricingDay('),
+    'L-264a Satisci onayli fiyati esas gorur; onaysiz gunde "Öneri · yönetici onayı bekleniyor"; secemez/onaylayamaz', satis.slice(0, 500));
+  const sahip = kur('owner');
+  check(sahip.includes('pricing-day-proposal">Öneri · onaylanmadı') && !sahip.includes('yönetici onayı bekleniyor'),
+    'L-264b Yonetim onaysiz oneriyi "onaylanmadı" diye gorur (kendisi onaylayabilir)');
+  const gocsuz = kur('sales', { phase101SchemaReady: false, propertyDailyPrices: [] });
+  check(gocsuz.includes('pricing-day-proposal">Öneri<') && !gocsuz.includes('onay bekleniyor') && !gocsuz.includes('onaylanmadı'),
+    'L-264c Gunluk fiyat defteri yokken yalniz "Öneri" yazar; olmayan bir onay surecini vaat etmez');
+  kur('sales');
+  el('resVilla').value = 'SEYIR'; el('resCheckIn').value = gun(1); el('resCheckOut').value = gun(4);
+  App.renderBookingPriceCalendarHint();
+  check(String(el('resPriceCalendarHint').innerText).includes('1 onaylı, 2 öneri (yönetici onayı bekleniyor)'),
+    'L-264d Rezervasyon formu satisciya onaysiz gecelerin yonetici onayi bekledigini soyler', el('resPriceCalendarHint').innerText);
+}
+
 async function main() {
 try {
   const html = read('index.html');
@@ -2304,6 +2344,7 @@ try {
   await fiyatEkraniDavranisi();
   await gunlukFiyatDavranisi();
   await fiyatKontrolTuruDavranisi();
+  await fiyatKararlariDavranisi();
 } catch (error) {
   failed++;
   console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));
