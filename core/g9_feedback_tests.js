@@ -29,6 +29,7 @@
 // L-246 (M70, 9.7): tarihli bakim yalniz kendi araligini kapatir; fiyat takvimi ve hazirlik ayni tanimi kullanir.
 // L-247..L-254 (M71-M76, 9.7): talep kurali, 3 aylik takvim, ozel etkinlik, kural kaynagi, fiyat tablosu, bos gece, yillik hedef, fiyat tablosu karti.
 // L-255 (M76, 9.7 F.2.9): gunluk fiyat onaylanir / elle yazilir (phase101); rezervasyon formunda referans.
+// L-266 (M87, KF-1): sezon kurali (tenant_settings pricing_seasons), her yil secenegi, mulk > portfoy, taban korumasi en son.
 // L-265 (M86, KF-1): minimum gece satis kisiti (tenant_settings pricing_min_stay), takvimde satilamaz bosluk, formda uyari + onay.
 // L-263..L-264 (M84-M85, urun kararlari KF-2/KF-3 20.10): ChatGPT 30 gun eylem sorusu; satisciya onayli fiyat esas, oneri etiketli.
 // L-256..L-262 (M77-M83, 9.7 kontrol turu): hesaplayici kapsami, hedef doluluk/odak, baz fiyatsiz mulk, rakip arastirmasi duzenle/sil + kartta bilgi, ChatGPT baglami, satis rolune kapali tarihler (phase103).
@@ -2384,6 +2385,68 @@ async function minimumGeceDavranisi() {
     'L-265n ChatGPT baglami minimum gece kisitini tasir');
 }
 
+async function sezonDavranisi() {
+  // Urun karari KF-1 (20.10): sezon kurali, varsayilan yok, taban korumasi en son. M87 = L-266.
+  sahteDom({});
+  global.FinancialMetricsService = require('./financial_metrics_service.js');
+  const App = require('../app.js');
+  const E = require('./suggested_price_engine.js');
+  const el = id => global.document.getElementById(id);
+  const BUGUN = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const gun = n => new Date(Date.parse(BUGUN + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
+  const P = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000088';
+  const P2 = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000089';
+  const sakin = { weekend: { enabled: false }, specialDay: { enabled: false }, lastMinute: { enabled: false }, gapNight: { enabled: false }, demand: { enabled: false } };
+  const fiyat = (seasons, today = '2026-12-28', floorPrice = 9000) => E.suggest({ property: { id: 'p', basePrice: 10000, floorPrice }, today, days: 10, seasons, rules: sakin }).days;
+
+  check(fiyat([]).every(d => d.price === 10000 && !d.reasons.length), 'L-266a Sezon tanimi yokken fiyat degismez (varsayilan yok)');
+  const kis = fiyat([{ name: 'Kis', start: '2025-12-20', end: '2026-01-05', pct: -20, repeatYearly: true }]);
+  check(kis.find(d => d.date === '2026-12-31').floorApplied && kis.find(d => d.date === '2026-12-31').price === 9000 && kis.find(d => d.date === '2027-01-05').reasons[0].code === 'SEASON' && !kis.find(d => d.date === '2027-01-06').reasons.length,
+    'L-266b Her yil sezonu yil sonunu asar; indirim tabanin altina inmez (taban korumasi en son)', JSON.stringify(kis.map(d => d.date + ':' + d.price)));
+  const yaz = fiyat([{ name: 'Yaz', start: '2026-07-01', end: '2026-08-31', pct: 30, repeatYearly: false }], '2026-08-30');
+  check(yaz.find(d => d.date === '2026-08-31').price === 13000 && yaz.find(d => d.date === '2026-09-01').price === 10000 && yaz.find(d => d.date === '2026-08-31').reasons[0].text === 'sezon (Yaz)',
+    'L-266c Tek seferlik sezon yalniz kendi araliginda uygulanir; gerekce sezon adini yazar');
+  const ust = E.suggest({ property: { id: 'p', basePrice: 10000, floorPrice: 5000 }, today: '2026-08-28', days: 3, rules: { ...sakin, weekend: { enabled: true, pct: 25, nights: [5, 6] } },
+    seasons: [{ name: 'Yaz', start: '2026-07-01', end: '2026-08-31', pct: 30 }] }).days.find(d => d.date === '2026-08-28');
+  check(ust.price === 15500 && ust.reasons.map(r => r.code).join('+') === 'SEASON+WEEKEND', 'L-266d Sezon yuzdesi diger kurallarla toplanir (yaz +30 ve hafta sonu +25 = +55)', JSON.stringify(ust));
+
+  App.setActiveTenant({ id: TENANT, role: 'owner' });
+  App.setAppData({
+    villas: { SEYIR: { id: P, slug: 'SEYIR', name: 'Seyir', basePrice: 13000, floor: 8000, isActive: true }, KOY: { id: P2, slug: 'KOY', name: 'Koy', basePrice: 9000, floor: 6000, isActive: true } },
+    bookings: [], expenses: [], maintenanceTickets: [], propertyPricingRules: [], competitorPriceResearch: [], targets: [], propertyDailyPrices: [],
+    tenantSettings: { pricing_seasons: { seasons: [
+      { id: 'a', name: 'Portfoy kis', start: gun(0), end: gun(60), pct: -10, propertyId: null, enabled: true },
+      { id: 'b', name: 'Seyir ozel', start: gun(0), end: gun(60), pct: 15, propertyId: P, enabled: true },
+      { id: 'c', name: 'Kapali', start: gun(0), end: gun(60), pct: 90, propertyId: P, enabled: false }] } },
+    phase78SchemaReady: true, phase101SchemaReady: true, propertyClosuresReady: true
+  });
+  check(App.pricingSeasonsFor(P)[0].id === 'b' && App.pricingSeasonsFor(P).length === 2 && App.pricingSeasonsFor(P2).map(x => x.id).join() === 'a',
+    'L-266e Mulk sezonu portfoy sezonundan once gelir; kapali sezon sayilmaz; baska mulke mulk sezonu uygulanmaz');
+  const takvim = App.computePricingCalendar({ key: 'SEYIR', property: App.getAppData().villas.SEYIR }, BUGUN, null).suggestions.days;
+  check(takvim.filter(d => d.status === 'OPEN' && d.date <= gun(60)).every(d => d.reasons.some(r => r.code === 'SEASON' && r.pct === 15)),
+    'L-266f Fiyat takvimi isletmenin sezonunu uygular');
+  check(!takvim.find(d => d.date === gun(61))?.reasons.some(r => r.code === 'SEASON'), 'L-266f2 Sezon bitince takvimde uygulanmaz');
+  App.setPricingProperty(P);
+  check(el('pricingSeasonList').innerHTML.includes('Seyir ozel') && el('pricingSeasonList').innerHTML.includes('removePricingSeason('),
+    'L-266g Sezon listesi yonetime kaldirma dugmesiyle gorunur');
+  check(App.pricingChatGptContext().ruleLines.some(line => line.startsWith('Sezon Seyir ozel: +%15')),
+    'L-266h ChatGPT baglami sezonlari tasir');
+
+  const ist = kaydedenIstemci(); App.setSupabaseClient(ist);
+  el('pricingSeasonName').value = 'Yeni yil'; el('pricingSeasonStart').value = '2026-12-20'; el('pricingSeasonEnd').value = '2026-01-05'; el('pricingSeasonPct').value = '40'; el('pricingSeasonScope').value = 'PORTFOLIO'; el('pricingSeasonRepeat').checked = false;
+  check(await App.savePricingSeason() === false, 'L-266i Bitis baslangictan once ise ("Her yil" degilse) reddedilir');
+  el('pricingSeasonRepeat').checked = true;
+  await App.savePricingSeason();
+  const yazma = ist.yazmalar.find(k => k.tablo === 'tenant_settings');
+  const yeni = yazma && yazma.yuk.value.seasons.find(x => x.name === 'Yeni yil');
+  check(yazma && yazma.yuk.key === 'pricing_seasons' && yeni && yeni.pct === 40 && yeni.repeatYearly === true && yeni.propertyId === null,
+    'L-266j Sezon tenant_settings pricing_seasons anahtarina yazilir (goc gerekmez)', JSON.stringify(yazma && yazma.yuk));
+  App.setActiveTenant({ id: TENANT, role: 'sales' });
+  App.setPricingProperty(P);
+  check(el('pricingSeasonForm').style.display === 'none' && !el('pricingSeasonList').innerHTML.includes('removePricingSeason(') && await App.savePricingSeason() === false,
+    'L-266k Satisci sezonu gorur, ekleyemez / kaldiramaz');
+}
+
 async function main() {
 try {
   const html = read('index.html');
@@ -2436,6 +2499,7 @@ try {
   await fiyatKontrolTuruDavranisi();
   await fiyatKararlariDavranisi();
   await minimumGeceDavranisi();
+  await sezonDavranisi();
 } catch (error) {
   failed++;
   console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

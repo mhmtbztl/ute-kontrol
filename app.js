@@ -4060,6 +4060,7 @@ function pricingChatGptContext() {
   const svc = getPricingResearchService();
   const sourceText = { PROPERTY: 'bu mülk', PORTFOLIO: 'portföy', DEFAULT: 'sistem varsayılanı' };
   const ruleLines = pricingEffectiveRules(property.id).map(rule => `${rule.label}: ${rule.enabled ? pricingPct(rule.pct) : 'kapalı'} (${sourceText[rule.source] || rule.source})`);
+  pricingSeasonsFor(property.id).forEach(season => ruleLines.push(`Sezon ${season.name}: ${pricingPct(season.pct)}, ${season.repeatYearly ? `her yıl ${season.start.slice(5)} – ${season.end.slice(5)}` : `${season.start} – ${season.end}`} (${season.propertyId ? 'bu mülk' : 'portföy'})`));
   pricingMinStaySettings().rules.filter(rule => rule.enabled !== false && (!rule.propertyId || rule.propertyId === property.id))
     .forEach(rule => ruleLines.push(`Minimum gece (satış kısıtı): en az ${rule.minNights} gece, ${rule.start || rule.end ? `${rule.start || '…'} – ${rule.end || '…'}` : 'her zaman'} (${rule.propertyId ? 'bu mülk' : 'portföy'})`));
   const today = getTodayStr();
@@ -21917,6 +21918,81 @@ function pricingPropertyBookings(entry) {
 // tenant_settings 'pricing_min_stay' (tum uyeler okur, yalniz yonetim yazar;
 // goc gerekmez). Bir konaklamanin kisiti GIRIS gunune gore olculur; ayni gune
 // birden fazla kural dusuyorsa en buyugu gecerlidir.
+// Sezon kurallari (L-266, KF-1): varsayilan yok; tenant_settings
+// 'pricing_seasons' (tum uyeler okur, yonetim yazar; goc gerekmez). Ayni gune
+// mulk sezonu portfoy sezonundan once gelir; ayni kapsamda en yeni eklenen.
+// Yuzde diger kurallarla toplanir; taban fiyat korumasi her zaman en sonda.
+function pricingSeasonSettings() {
+  const raw = appData?.tenantSettings?.pricing_seasons;
+  const value = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  const iso = date => /^\d{4}-\d{2}-\d{2}$/.test(String(date || ''));
+  const seasons = (Array.isArray(value.seasons) ? value.seasons : []).filter(season => season && season.id && iso(season.start) && iso(season.end)
+    && Number.isFinite(Number(season.pct)) && Number(season.pct) >= -90 && Number(season.pct) <= 500
+    && (season.repeatYearly || season.end >= season.start));
+  return { seasons: seasons.map(season => ({ ...season, pct: Number(season.pct), repeatYearly: season.repeatYearly === true })) };
+}
+
+function pricingSeasonsFor(propertyId) {
+  const own = pricingSeasonSettings().seasons.filter(season => season.enabled !== false && (!season.propertyId || season.propertyId === propertyId));
+  return [...own.filter(season => season.propertyId).reverse(), ...own.filter(season => !season.propertyId).reverse()];
+}
+
+function pricingSeasonListHtml(entry, canManage) {
+  const seasons = pricingSeasonSettings().seasons.filter(season => !season.propertyId || season.propertyId === entry.property.id);
+  if (!seasons.length) return '<div class="empty-state">Sezon tanımı yok; fiyat sezona göre değişmez.</div>';
+  const range = season => season.repeatYearly
+    ? `${season.start.slice(8, 10)}.${season.start.slice(5, 7)} – ${season.end.slice(8, 10)}.${season.end.slice(5, 7)} · her yıl`
+    : `${formatTrDate(season.start)} – ${formatTrDate(season.end)}`;
+  return `<div class="pricing-special-list">${seasons.map(season => `<div class="pricing-special-row is-event"><strong>${escapeHtml(pricingPct(season.pct))}</strong><span>${escapeHtml(season.name || 'Sezon')}</span><small>${escapeHtml(range(season))} · ${season.propertyId ? 'Bu mülk' : 'Portföy'}</small>${canManage ? `<button type="button" class="btn btn-secondary btn-sm" data-onclick="removePricingSeason(decodeURIComponent('${encodeActionArg(season.id)}'))">Kaldır</button>` : ''}</div>`).join('')}</div>`;
+}
+
+async function savePricingSeasonSettings(next, message) {
+  await cloudSaveTenantSetting('pricing_seasons', next);
+  if (!appData.tenantSettings) appData.tenantSettings = {};
+  appData.tenantSettings.pricing_seasons = next;
+  renderPricingTab();
+  if (message && window.showToast) window.showToast(message, 'success');
+}
+
+async function savePricingSeason() {
+  if (!canManageTenantRole(activeTenant?.role)) return false;
+  const value = id => String(document.getElementById(id)?.value ?? '').trim();
+  const name = value('pricingSeasonName');
+  const start = value('pricingSeasonStart');
+  const end = value('pricingSeasonEnd');
+  const pct = Number(value('pricingSeasonPct'));
+  const repeatYearly = document.getElementById('pricingSeasonRepeat')?.checked === true;
+  const scope = value('pricingSeasonScope') || 'PROPERTY';
+  if (!name) { alert('Sezon adı girin.'); return false; }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) { alert('Başlangıç ve bitiş tarihini girin.'); return false; }
+  if (!repeatYearly && end < start) { alert('Bitiş başlangıçtan önce olamaz (yıl sonunu aşan sezon için "Her yıl" seçin).'); return false; }
+  if (value('pricingSeasonPct') === '' || !Number.isFinite(pct) || pct < -90 || pct > 500) { alert('Yüzde -90 ile 500 arasında olmalıdır.'); return false; }
+  const season = { id: `se_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, name: name.slice(0, 80), start, end, pct, repeatYearly, enabled: true,
+    propertyId: scope === 'PORTFOLIO' ? null : (pricingSelectedPropertyId || null) };
+  try {
+    const settings = pricingSeasonSettings();
+    await savePricingSeasonSettings({ ...settings, seasons: [...settings.seasons, season] }, `"${season.name}" sezonu eklendi; fiyat takvimine işlendi.`);
+    ['pricingSeasonName', 'pricingSeasonStart', 'pricingSeasonEnd', 'pricingSeasonPct'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    const repeat = document.getElementById('pricingSeasonRepeat'); if (repeat) repeat.checked = false;
+    return true;
+  } catch (error) {
+    alert('Sezon kaydedilemedi: ' + (error.message || 'Bilinmeyen hata'));
+    return false;
+  }
+}
+
+async function removePricingSeason(seasonId) {
+  if (!canManageTenantRole(activeTenant?.role)) return false;
+  const settings = pricingSeasonSettings();
+  try {
+    await savePricingSeasonSettings({ ...settings, seasons: settings.seasons.filter(season => season.id !== seasonId) }, 'Sezon kaldırıldı.');
+    return true;
+  } catch (error) {
+    alert('Sezon kaldırılamadı: ' + (error.message || 'Bilinmeyen hata'));
+    return false;
+  }
+}
+
 function pricingMinStaySettings() {
   const raw = appData?.tenantSettings?.pricing_min_stay;
   const value = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
@@ -22592,7 +22668,7 @@ function computePricingCalendar(entry, today = getTodayStr(), occupancyTarget = 
   const suggestions = getSuggestedPriceEngine().suggest({
     property: { id: entry.property.id, basePrice: pricingBasePriceOf(entry.property), floorPrice: entry.property.floor ?? null },
     bookings: pricingPropertyBookings(entry).filter(booking => !isBulkSummaryBooking(booking)), blocks, rules, specialDays,
-    occupancyTarget, today, days: horizon.days
+    occupancyTarget, today, days: horizon.days, seasons: pricingSeasonsFor(entry.property.id)
   });
   return { horizon, blocks, specialDays, rules, suggestions };
 }
@@ -22733,7 +22809,7 @@ function renderPricingTab() {
   const select = document.getElementById('pricingPropertySelect');
   if (select) select.innerHTML = entries.length ? entries.map(item => `<option value="${escapeHtml(item.property.id)}"${item.property.id === pricingSelectedPropertyId ? ' selected' : ''}>${escapeHtml(item.property.name || item.property.slug || 'Adlandırılmamış mülk')}</option>`).join('') : '<option value="">Mülk yok</option>';
   const canManage = canManageTenantRole(activeTenant?.role);
-  ['pricingManagePanels', 'pricingSpecialDayForm', 'pricingResearchPanel', 'pricingMinStayForm'].forEach(id => {
+  ['pricingManagePanels', 'pricingSpecialDayForm', 'pricingResearchPanel', 'pricingMinStayForm', 'pricingSeasonForm'].forEach(id => {
     const element = document.getElementById(id); if (element) element.style.display = canManage ? '' : 'none';
   });
   if (!entry) {
@@ -22797,6 +22873,8 @@ function renderPricingTab() {
     minStay };
   const minStayList = document.getElementById('pricingMinStayList');
   if (minStayList) minStayList.innerHTML = pricingMinStayListHtml(entry, canManage);
+  const seasonList = document.getElementById('pricingSeasonList');
+  if (seasonList) seasonList.innerHTML = pricingSeasonListHtml(entry, canManage);
   const editor = document.getElementById('pricingDayEditor');
   if (editor) editor.innerHTML = pricingDayEditorHtml(canManage);
   setEl('pricingCalendarTitle', `Fiyat takvimi · ${pricingMonthLabel(monthKey)}`);
@@ -23189,6 +23267,9 @@ if (typeof module !== 'undefined' && module.exports) {
     resetPricingRuleSetting,
     savePricingPriceTable,
     savePricingSpecialEvent,
+    pricingSeasonsFor,
+    savePricingSeason,
+    removePricingSeason,
     pricingMinStayMap,
     pricingMinNightsFor,
     bookingMinStayViolation,
