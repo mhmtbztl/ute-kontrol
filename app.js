@@ -21991,9 +21991,13 @@ function pricingDayCardHtml(day, ctx) {
     }
   }
   const shown = saved ? Number(saved.price) : day.price;
-  const savedLine = saved ? `${saved.source === 'MANUAL' ? 'Elle' : 'Onaylı'}${day.price != null && Number(saved.price) !== day.price ? ` · öneri ${pricingMoney(day.price)}` : ''}${saved.note ? ` · ${saved.note}` : ''}` : '';
+  // Onayli/elle fiyat esastir; algoritma onerisi acikca "Öneri" etiketlidir
+  // (L-264, kullanici karari KF-3). Satisci onaylayamaz: onay yoksa bekledigini gorur.
+  const savedLine = saved ? `${saved.source === 'MANUAL' ? 'Elle fiyat' : 'Onaylı fiyat'}${day.price != null && Number(saved.price) !== day.price ? ` · öneri ${pricingMoney(day.price)}` : ''}${saved.note ? ` · ${saved.note}` : ''}` : '';
+  const proposalLine = !saved && day.status === 'OPEN' && day.price != null
+    ? `Öneri${ctx.dailyReady ? (ctx.canManage ? ' · onaylanmadı' : ' · yönetici onayı bekleniyor') : ''}` : '';
   const action = selectable ? ` role="button" tabindex="0" aria-pressed="${selected ? 'true' : 'false'}" data-onclick="togglePricingDay(decodeURIComponent('${encodeActionArg(day.date)}'))"` : '';
-  return `<div class="pricing-day ${cls}${saved ? ' is-saved' : ''}${selected ? ' is-selected' : ''}${selectable ? ' is-selectable' : ''}"${action}><strong>${escapeHtml(formatTrDate(day.date))} <em>${escapeHtml(weekday)}</em></strong>${special ? `<span class="pricing-day-special">${escapeHtml(special.name)}</span>` : ''}<span>${escapeHtml(status)}</span><b>${day.status === 'OPEN' && shown != null ? escapeHtml(pricingMoney(shown)) : '—'}</b>${savedLine ? `<span class="pricing-day-saved">${escapeHtml(savedLine)}</span>` : ''}${explain ? `<small>${escapeHtml(explain)}</small>` : ''}${day.status === 'OPEN' ? pricingRivalLineHtml(day, shown, Boolean(special), ctx) : ''}</div>`;
+  return `<div class="pricing-day ${cls}${saved ? ' is-saved' : ''}${selected ? ' is-selected' : ''}${selectable ? ' is-selectable' : ''}"${action}><strong>${escapeHtml(formatTrDate(day.date))} <em>${escapeHtml(weekday)}</em></strong>${special ? `<span class="pricing-day-special">${escapeHtml(special.name)}</span>` : ''}<span>${escapeHtml(status)}</span><b>${day.status === 'OPEN' && shown != null ? escapeHtml(pricingMoney(shown)) : '—'}</b>${savedLine ? `<span class="pricing-day-saved">${escapeHtml(savedLine)}</span>` : ''}${proposalLine ? `<span class="pricing-day-proposal">${escapeHtml(proposalLine)}</span>` : ''}${explain ? `<small>${escapeHtml(explain)}</small>` : ''}${day.status === 'OPEN' ? pricingRivalLineHtml(day, shown, Boolean(special), ctx) : ''}</div>`;
 }
 
 // Rakip fiyati gun kartinda yalniz bilgi olarak yazilir (L-260, kullanici
@@ -22574,7 +22578,8 @@ function renderBookingPriceCalendarHint() {
     if (price > 0) { total += price; suggested++; } else unknown++;
   });
   if (!approved && !suggested) { hint.style.display = 'none'; hint.innerText = ''; return; }
-  const parts = [approved ? `${approved} onaylı` : '', suggested ? `${suggested} öneri` : '', unknown ? `${unknown} gece fiyatsız` : ''].filter(Boolean).join(', ');
+  const waiting = suggested && appData.phase101SchemaReady && !canManageTenantRole(activeTenant?.role) ? ' (yönetici onayı bekleniyor)' : '';
+  const parts = [approved ? `${approved} onaylı` : '', suggested ? `${suggested} öneri${waiting}` : '', unknown ? `${unknown} gece fiyatsız` : ''].filter(Boolean).join(', ');
   hint.style.display = '';
   hint.innerText = `Fiyat takvimi: ${nights.length} gece · ${pricingMoney(total)}${unknown ? ' (eksik)' : ''} — ${parts}. Tutar kendiliğinden değişmez.`;
 }
