@@ -42,3 +42,9 @@ kendisini okurlar).
    103'ü ve anon `rpc/get_property_closures` → `401 42501` kapısını salt
    okunur doğrularım. Uygulanmadan önce aynı çağrı `404 PGRST202` döner (yeni
    fonksiyon), yani bu ölçüm göçü ayırt eder.
+
+## Üretim durumu
+
+20.10.2026: kullanıcı SQL Editor'de uyguladı (başarılı). Salt okunur doğrulama:
+anon `rpc/get_property_closures` → `401 42501 permission denied for function`,
+`production:readiness` BAŞARILI, `schema_migrations` 103 mevcut.

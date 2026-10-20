@@ -713,7 +713,7 @@ gösterir. Canlı süit `phase101_daily_prices_live_tests` 18/18 (göçten önce
 Paket: `docs/PHASE101_DEPLOY_PACKAGE.md`.
 
 **phase103 (`migration_phase103_property_closures_for_sales.sql`) 19 Ekim 2026'da
-test projesine uygulandı; üretime kullanıcı uygulayacak.** Satış ve izleyici rolü
+test projesine ve 20 Ekim 2026'da üretime uygulandı; üretimde doğrulandı** (anon `rpc/get_property_closures` → `401 42501`, `production:readiness` BAŞARILI, `schema_migrations` 103). Satış ve izleyici rolü
 arızaları okuyamadığı (phase53) için fiyat takviminde bakımla kapalı günü "Açık"
 görüyordu (kullanıcı M83, L-262). `get_property_closures` yalnız
 `(mülk, başlangıç, bitiş)` döndürür — başlık/açıklama/maliyet dönmez; tanım
