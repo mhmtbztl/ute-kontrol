@@ -4060,6 +4060,8 @@ function pricingChatGptContext() {
   const svc = getPricingResearchService();
   const sourceText = { PROPERTY: 'bu mülk', PORTFOLIO: 'portföy', DEFAULT: 'sistem varsayılanı' };
   const ruleLines = pricingEffectiveRules(property.id).map(rule => `${rule.label}: ${rule.enabled ? pricingPct(rule.pct) : 'kapalı'} (${sourceText[rule.source] || rule.source})`);
+  pricingLongStaySettings().tiers.filter(tier => tier.enabled !== false && (!tier.propertyId || tier.propertyId === property.id)).sort((a, b) => a.minNights - b.minNights)
+    .forEach(tier => ruleLines.push(`Uzun konaklama: ${tier.minNights}+ gece −%${tier.pct} (konaklama toplamına, taban korumalı; ${tier.propertyId ? 'bu mülk' : 'portföy'})`));
   pricingSeasonsFor(property.id).forEach(season => ruleLines.push(`Sezon ${season.name}: ${pricingPct(season.pct)}, ${season.repeatYearly ? `her yıl ${season.start.slice(5)} – ${season.end.slice(5)}` : `${season.start} – ${season.end}`} (${season.propertyId ? 'bu mülk' : 'portföy'})`));
   pricingMinStaySettings().rules.filter(rule => rule.enabled !== false && (!rule.propertyId || rule.propertyId === property.id))
     .forEach(rule => ruleLines.push(`Minimum gece (satış kısıtı): en az ${rule.minNights} gece, ${rule.start || rule.end ? `${rule.start || '…'} – ${rule.end || '…'}` : 'her zaman'} (${rule.propertyId ? 'bu mülk' : 'portföy'})`));
@@ -21922,6 +21924,87 @@ function pricingPropertyBookings(entry) {
 // 'pricing_seasons' (tum uyeler okur, yonetim yazar; goc gerekmez). Ayni gune
 // mulk sezonu portfoy sezonundan once gelir; ayni kapsamda en yeni eklenen.
 // Yuzde diger kurallarla toplanir; taban fiyat korumasi her zaman en sonda.
+// Uzun konaklama indirimi (L-267, KF-1): varsayilan yok; tenant_settings
+// 'pricing_long_stay' (tum uyeler okur, yonetim yazar; goc gerekmez). Gun
+// kartina degil KONAKLAMA toplamina uygulanir: gece sayisinin ulastigi en
+// yuksek kademe gecerli, ayni kademede mulk kurali portfoyunkunden once.
+// Taban fiyat korumasi gece basina en son uygulanir.
+function pricingLongStaySettings() {
+  const raw = appData?.tenantSettings?.pricing_long_stay;
+  const value = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  const tiers = (Array.isArray(value.tiers) ? value.tiers : []).filter(tier => tier && tier.id
+    && Number.isInteger(Number(tier.minNights)) && Number(tier.minNights) >= 2 && Number(tier.minNights) <= 365
+    && Number.isFinite(Number(tier.pct)) && Number(tier.pct) > 0 && Number(tier.pct) <= 90);
+  return { tiers: tiers.map(tier => ({ ...tier, minNights: Number(tier.minNights), pct: Number(tier.pct) })) };
+}
+
+function pricingLongStayFor(propertyId, nights, settings = pricingLongStaySettings()) {
+  const own = settings.tiers.filter(tier => tier.enabled !== false && (!tier.propertyId || tier.propertyId === propertyId) && nights >= tier.minNights);
+  own.sort((a, b) => b.minNights - a.minNights || (b.propertyId ? 1 : 0) - (a.propertyId ? 1 : 0));
+  return own[0] || null;
+}
+
+// Gece fiyatlarina kademeyi uygular; indirim geceyi tabanin altina indirmez,
+// zaten tabanin altindaki (elle onayli) fiyati da yukseltmez.
+function applyLongStayDiscount(nightPrices, tier, floorPrice) {
+  if (!tier) return { total: nightPrices.reduce((sum, price) => sum + price, 0), floorNights: 0 };
+  const floor = Number(floorPrice) > 0 ? Number(floorPrice) : null;
+  let total = 0, floorNights = 0;
+  nightPrices.forEach(price => {
+    let discounted = Math.round(price * (1 - tier.pct / 100));
+    if (floor !== null && discounted < floor) { discounted = Math.min(price, floor); floorNights++; }
+    total += discounted;
+  });
+  return { total, floorNights };
+}
+
+function pricingLongStayListHtml(entry, canManage) {
+  const tiers = pricingLongStaySettings().tiers.filter(tier => !tier.propertyId || tier.propertyId === entry.property.id).sort((a, b) => a.minNights - b.minNights);
+  if (!tiers.length) return '<div class="empty-state">Uzun konaklama indirimi yok.</div>';
+  return `<div class="pricing-special-list">${tiers.map(tier => `<div class="pricing-special-row is-event"><strong>${tier.minNights}+ gece</strong><span>−%${escapeHtml(String(tier.pct).replace('.', ','))} indirim</span><small>${tier.propertyId ? 'Bu mülk' : 'Portföy'} · konaklama toplamına, taban korumalı</small>${canManage ? `<button type="button" class="btn btn-secondary btn-sm" data-onclick="removePricingLongStayTier(decodeURIComponent('${encodeActionArg(tier.id)}'))">Kaldır</button>` : ''}</div>`).join('')}</div>`;
+}
+
+async function savePricingLongStaySettings(next, message) {
+  await cloudSaveTenantSetting('pricing_long_stay', next);
+  if (!appData.tenantSettings) appData.tenantSettings = {};
+  appData.tenantSettings.pricing_long_stay = next;
+  renderPricingTab();
+  if (message && window.showToast) window.showToast(message, 'success');
+}
+
+async function savePricingLongStayTier() {
+  if (!canManageTenantRole(activeTenant?.role)) return false;
+  const value = id => String(document.getElementById(id)?.value ?? '').trim();
+  const minNights = Number(value('pricingLongStayNights'));
+  const pct = Number(value('pricingLongStayPct'));
+  const scope = value('pricingLongStayScope') || 'PROPERTY';
+  if (!Number.isInteger(minNights) || minNights < 2 || minNights > 365) { alert('Gece sayısı 2 ile 365 arasında bir tam sayı olmalıdır.'); return false; }
+  if (value('pricingLongStayPct') === '' || !Number.isFinite(pct) || pct <= 0 || pct > 90) { alert('İndirim yüzdesi 0 ile 90 arasında olmalıdır.'); return false; }
+  const tier = { id: `ls_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, minNights, pct, enabled: true,
+    propertyId: scope === 'PORTFOLIO' ? null : (pricingSelectedPropertyId || null) };
+  try {
+    const settings = pricingLongStaySettings();
+    await savePricingLongStaySettings({ ...settings, tiers: [...settings.tiers, tier] }, `${minNights}+ gece için %${pct} indirim eklendi.`);
+    ['pricingLongStayNights', 'pricingLongStayPct'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    return true;
+  } catch (error) {
+    alert('Uzun konaklama indirimi kaydedilemedi: ' + (error.message || 'Bilinmeyen hata'));
+    return false;
+  }
+}
+
+async function removePricingLongStayTier(tierId) {
+  if (!canManageTenantRole(activeTenant?.role)) return false;
+  const settings = pricingLongStaySettings();
+  try {
+    await savePricingLongStaySettings({ ...settings, tiers: settings.tiers.filter(tier => tier.id !== tierId) }, 'Uzun konaklama indirimi kaldırıldı.');
+    return true;
+  } catch (error) {
+    alert('Uzun konaklama indirimi kaldırılamadı: ' + (error.message || 'Bilinmeyen hata'));
+    return false;
+  }
+}
+
 function pricingSeasonSettings() {
   const raw = appData?.tenantSettings?.pricing_seasons;
   const value = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
@@ -22780,11 +22863,12 @@ function renderBookingPriceCalendarHint() {
   const saved = pricingDailyPriceMap(property.id);
   const suggestions = new Map(computePricingCalendar({ key: villaKey, property }, getTodayStr(), null).suggestions.days.map(day => [day.date, day.price]));
   let total = 0, approved = 0, suggested = 0, unknown = 0;
+  const nightPrices = [];
   nights.forEach(date => {
     const row = saved.get(date);
-    if (row) { total += Number(row.price); approved++; return; }
+    if (row) { total += Number(row.price); nightPrices.push(Number(row.price)); approved++; return; }
     const price = suggestions.get(date);
-    if (price > 0) { total += price; suggested++; } else unknown++;
+    if (price > 0) { total += price; nightPrices.push(price); suggested++; } else unknown++;
   });
   const minStay = bookingMinStayViolation(villaKey, checkIn, checkOut);
   const minStayText = minStay ? ` ⚠ Minimum gece kuralı: bu girişte en az ${minStay.minNights} gece${minStay.name ? ` (${minStay.name})` : ''}; seçilen ${minStay.nights} gece.` : '';
@@ -22796,7 +22880,11 @@ function renderBookingPriceCalendarHint() {
   const waiting = suggested && appData.phase101SchemaReady && !canManageTenantRole(activeTenant?.role) ? ' (yönetici onayı bekleniyor)' : '';
   const parts = [approved ? `${approved} onaylı` : '', suggested ? `${suggested} öneri${waiting}` : '', unknown ? `${unknown} gece fiyatsız` : ''].filter(Boolean).join(', ');
   hint.style.display = '';
-  hint.innerText = `Fiyat takvimi: ${nights.length} gece · ${pricingMoney(total)}${unknown ? ' (eksik)' : ''} — ${parts}. Tutar kendiliğinden değişmez.${minStayText}`;
+  // Uzun konaklama kademesi toplam uzerinde gosterilir; tutar yine kendiliginden degismez (L-267).
+  const longStay = pricingLongStayFor(property.id, nights.length);
+  const discounted = longStay ? applyLongStayDiscount(nightPrices, longStay, property.floor ?? property.floorPrice) : null;
+  const longStayText = longStay ? ` Uzun konaklama −%${String(longStay.pct).replace('.', ',')} (${longStay.minNights}+ gece): ${pricingMoney(total)} → ${pricingMoney(discounted.total)}${discounted.floorNights ? `; ${discounted.floorNights} gece tabanda durdu` : ''}.` : '';
+  hint.innerText = `Fiyat takvimi: ${nights.length} gece · ${pricingMoney(total)}${unknown ? ' (eksik)' : ''} — ${parts}. Tutar kendiliğinden değişmez.${longStayText}${minStayText}`;
 }
 
 function renderPricingTab() {
@@ -22809,7 +22897,7 @@ function renderPricingTab() {
   const select = document.getElementById('pricingPropertySelect');
   if (select) select.innerHTML = entries.length ? entries.map(item => `<option value="${escapeHtml(item.property.id)}"${item.property.id === pricingSelectedPropertyId ? ' selected' : ''}>${escapeHtml(item.property.name || item.property.slug || 'Adlandırılmamış mülk')}</option>`).join('') : '<option value="">Mülk yok</option>';
   const canManage = canManageTenantRole(activeTenant?.role);
-  ['pricingManagePanels', 'pricingSpecialDayForm', 'pricingResearchPanel', 'pricingMinStayForm', 'pricingSeasonForm'].forEach(id => {
+  ['pricingManagePanels', 'pricingSpecialDayForm', 'pricingResearchPanel', 'pricingMinStayForm', 'pricingSeasonForm', 'pricingLongStayForm'].forEach(id => {
     const element = document.getElementById(id); if (element) element.style.display = canManage ? '' : 'none';
   });
   if (!entry) {
@@ -22873,6 +22961,8 @@ function renderPricingTab() {
     minStay };
   const minStayList = document.getElementById('pricingMinStayList');
   if (minStayList) minStayList.innerHTML = pricingMinStayListHtml(entry, canManage);
+  const longStayList = document.getElementById('pricingLongStayList');
+  if (longStayList) longStayList.innerHTML = pricingLongStayListHtml(entry, canManage);
   const seasonList = document.getElementById('pricingSeasonList');
   if (seasonList) seasonList.innerHTML = pricingSeasonListHtml(entry, canManage);
   const editor = document.getElementById('pricingDayEditor');
@@ -23267,6 +23357,10 @@ if (typeof module !== 'undefined' && module.exports) {
     resetPricingRuleSetting,
     savePricingPriceTable,
     savePricingSpecialEvent,
+    pricingLongStayFor,
+    applyLongStayDiscount,
+    savePricingLongStayTier,
+    removePricingLongStayTier,
     pricingSeasonsFor,
     savePricingSeason,
     removePricingSeason,

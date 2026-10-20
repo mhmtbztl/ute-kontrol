@@ -29,6 +29,7 @@
 // L-246 (M70, 9.7): tarihli bakim yalniz kendi araligini kapatir; fiyat takvimi ve hazirlik ayni tanimi kullanir.
 // L-247..L-254 (M71-M76, 9.7): talep kurali, 3 aylik takvim, ozel etkinlik, kural kaynagi, fiyat tablosu, bos gece, yillik hedef, fiyat tablosu karti.
 // L-255 (M76, 9.7 F.2.9): gunluk fiyat onaylanir / elle yazilir (phase101); rezervasyon formunda referans.
+// L-267 (M88, KF-1): uzun konaklama indirimi (tenant_settings pricing_long_stay), konaklama toplamina, taban gece basina.
 // L-266 (M87, KF-1): sezon kurali (tenant_settings pricing_seasons), her yil secenegi, mulk > portfoy, taban korumasi en son.
 // L-265 (M86, KF-1): minimum gece satis kisiti (tenant_settings pricing_min_stay), takvimde satilamaz bosluk, formda uyari + onay.
 // L-263..L-264 (M84-M85, urun kararlari KF-2/KF-3 20.10): ChatGPT 30 gun eylem sorusu; satisciya onayli fiyat esas, oneri etiketli.
@@ -2447,6 +2448,66 @@ async function sezonDavranisi() {
     'L-266k Satisci sezonu gorur, ekleyemez / kaldiramaz');
 }
 
+async function uzunKonaklamaDavranisi() {
+  // Urun karari KF-1 (20.10): uzun konaklama indirimi, varsayilan yok, konaklama toplamina, taban gece basina. M88 = L-267.
+  sahteDom({});
+  global.FinancialMetricsService = require('./financial_metrics_service.js');
+  const App = require('../app.js');
+  const el = id => global.document.getElementById(id);
+  const BUGUN = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const gun = n => new Date(Date.parse(BUGUN + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
+  const P = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000090';
+  const P2 = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000092';
+  const kur = (rol, longStay) => {
+    App.setActiveTenant({ id: TENANT, role: rol });
+    App.setAppData({
+      villas: { SEYIR: { id: P, slug: 'SEYIR', name: 'Seyir', basePrice: 10000, floor: 9500, isActive: true }, KOY: { id: P2, slug: 'KOY', name: 'Koy', basePrice: 9000, floor: 6000, isActive: true } },
+      bookings: [], expenses: [], maintenanceTickets: [], propertyPricingRules: [], competitorPriceResearch: [], targets: [], propertyDailyPrices: [],
+      tenantSettings: { pricing_rules: { weekend: { enabled: false }, lastMinute: { enabled: false }, gapNight: { enabled: false }, specialDay: { enabled: false }, demand: { enabled: false } }, ...(longStay ? { pricing_long_stay: longStay } : {}) },
+      phase78SchemaReady: true, phase101SchemaReady: true, propertyClosuresReady: true
+    });
+  };
+  const ipucu = (giris, cikis, villa = 'SEYIR') => { el('resVilla').value = villa; el('resCheckIn').value = giris; el('resCheckOut').value = cikis; App.renderBookingPriceCalendarHint(); return String(el('resPriceCalendarHint').innerText); };
+
+  kur('owner', null);
+  check(App.pricingLongStayFor(P, 30) === null && !ipucu(gun(40), gun(70)).includes('Uzun konaklama'), 'L-267a Kademe yokken indirim yok (varsayilan yok)');
+  const kademeler = { tiers: [
+    { id: 't7', minNights: 7, pct: 10, propertyId: null, enabled: true },
+    { id: 't28', minNights: 28, pct: 20, propertyId: null, enabled: true },
+    { id: 'm7', minNights: 7, pct: 4, propertyId: P2, enabled: true },
+    { id: 'off', minNights: 3, pct: 50, propertyId: null, enabled: false }] };
+  kur('owner', kademeler);
+  check(App.pricingLongStayFor(P, 6) === null && App.pricingLongStayFor(P, 7).pct === 10 && App.pricingLongStayFor(P, 30).pct === 20 && App.pricingLongStayFor(P2, 7).pct === 4,
+    'L-267b Ulasilan en yuksek kademe gecerli; ayni kademede mulk kurali portfoyden once; kapali kademe sayilmaz');
+  const taban = App.applyLongStayDiscount([10000, 10000, 9000], { pct: 10 }, 9500);
+  check(taban.total === 9500 + 9500 + 9000 && taban.floorNights === 3,
+    'L-267c Indirim geceyi tabanin altina indirmez; zaten tabanin altindaki onayli fiyati yukseltmez', JSON.stringify(taban));
+  const yedi = ipucu(gun(40), gun(47), 'KOY');
+  check(yedi.includes('Uzun konaklama −%4 (7+ gece): ₺63.000 → ₺60.480'),
+    'L-267d Rezervasyon formu kademeyi toplam uzerinde gosterir (tutar kendiliginden degismez)', yedi);
+  const tabanli = ipucu(gun(40), gun(47));
+  check(tabanli.includes('Uzun konaklama −%10 (7+ gece): ₺70.000 → ₺66.500; 7 gece tabanda durdu'),
+    'L-267e Taban korumasi gece basina; kac gecenin tabanda durdugunu yazar', tabanli);
+  App.setPricingProperty(P);
+  check(el('pricingLongStayList').innerHTML.includes('28+ gece') && el('pricingLongStayList').innerHTML.includes('removePricingLongStayTier('),
+    'L-267f Kademe listesi yonetime kaldirma dugmesiyle gorunur');
+  check(App.pricingChatGptContext().ruleLines.some(line => line.startsWith('Uzun konaklama: 7+ gece −%10')),
+    'L-267g ChatGPT baglami uzun konaklama kademelerini tasir');
+  const ist = kaydedenIstemci(); App.setSupabaseClient(ist);
+  el('pricingLongStayNights').value = '14'; el('pricingLongStayPct').value = '95';
+  check(await App.savePricingLongStayTier() === false, 'L-267h Indirim 0-90 arasinda olmali');
+  el('pricingLongStayPct').value = '15'; el('pricingLongStayScope').value = 'PROPERTY';
+  await App.savePricingLongStayTier();
+  const yazma = ist.yazmalar.find(k => k.tablo === 'tenant_settings');
+  const yeni = yazma && yazma.yuk.value.tiers.find(t => t.minNights === 14);
+  check(yazma && yazma.yuk.key === 'pricing_long_stay' && yeni && yeni.pct === 15 && yeni.propertyId === P,
+    'L-267i Kademe tenant_settings pricing_long_stay anahtarina yazilir (goc gerekmez)', JSON.stringify(yazma && yazma.yuk));
+  kur('sales', kademeler);
+  App.setPricingProperty(P);
+  check(el('pricingLongStayForm').style.display === 'none' && !el('pricingLongStayList').innerHTML.includes('removePricingLongStayTier(') && await App.savePricingLongStayTier() === false,
+    'L-267j Satisci kademeleri gorur, ekleyemez / kaldiramaz');
+}
+
 async function main() {
 try {
   const html = read('index.html');
@@ -2500,6 +2561,7 @@ try {
   await fiyatKararlariDavranisi();
   await minimumGeceDavranisi();
   await sezonDavranisi();
+  await uzunKonaklamaDavranisi();
 } catch (error) {
   failed++;
   console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));
