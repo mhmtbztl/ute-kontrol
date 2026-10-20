@@ -4735,6 +4735,8 @@ body.auth-pending::after {
 .pricing-config-card h3, .pricing-research-history h3 { margin:0 0 6px; }
 .pricing-config-card > p { color:var(--text-muted); font-size:12px; min-height:34px; }
 .pricing-research-history { margin-bottom:16px; }
+.pricing-research-actions { display:flex; gap:6px; margin-top:6px; }
+.pricing-day-rival { display:block; color:#93C5FD; font-size:11px; }
 #pricingResearchList { display:grid; gap:8px; }
 #pricingResearchList article { display:grid; grid-template-columns:minmax(150px,.8fr) auto minmax(220px,1.2fr); gap:8px 14px; align-items:center; padding:10px; border-radius:8px; background:rgba(255,255,255,.035); }
 #pricingResearchList article small { grid-column:1/-1; color:var(--text-muted); }
@@ -5421,7 +5423,10 @@ body.side-panel-open { overflow: hidden; }
 .pricing-target-summary { display: flex; flex-wrap: wrap; gap: 18px; }
 .pricing-target-table { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-bottom: 16px; }
 .pricing-target-table > div { display: grid; gap: 4px; padding: 10px; border: 1px solid var(--border-subtle); border-radius: 8px; }
-.pricing-target-table > .is-highlighted { border-color: #34D399; background: rgba(16,185,129,.1); }
+.pricing-target-table > .is-highlighted { border-color: #34D399; border-width: 2px; background: rgba(16,185,129,.16); }
+.pricing-target-badge { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: #34D399; color: #052e1f; font-size: 11px; font-style: normal; font-weight: 700; }
+.pricing-target-choice { color: #34D399; font-weight: 600; }
+.pricing-target-note { margin: 0 0 10px; color: #FDE68A; font-size: 13px; }
 @media (max-width: 900px) {
   .lead-quick-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pricing-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }

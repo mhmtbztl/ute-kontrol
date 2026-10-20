@@ -4050,19 +4050,47 @@ function activePageTabId() {
   return getMenuTabFor(String(active?.id || 'tab-executive').replace(/^tab-/, ''));
 }
 
+// ChatGPT'ye giden fiyat baglami (L-261, kullanici F.6.1): rakip arastirmasi
+// olmayan bir alandan (values) okunuyordu ve hic gitmiyordu; onumuzdeki 30 gun
+// ve gecen yil ipucu bos (null) gidiyordu; kurallar ham JSON'du.
 function pricingChatGptContext() {
-  const property = Object.values(appData.villas || {}).find(item => item.id === pricingSelectedPropertyId) || null;
-  if (!property) return {};
-  const rules = getPricingResearchService().mergeRules(appData.tenantSettings?.pricing_rules || {}, appData.propertyPricingRules || [], property.id);
-  const latest = (appData.competitorPriceResearch || []).find(item => item.property_id === property.id) || null;
+  const entry = pricingActiveProperties().find(item => item.property.id === pricingSelectedPropertyId) || null;
+  if (!entry) return {};
+  const property = entry.property;
+  const svc = getPricingResearchService();
+  const sourceText = { PROPERTY: 'bu mülk', PORTFOLIO: 'portföy', DEFAULT: 'sistem varsayılanı' };
+  const ruleLines = pricingEffectiveRules(property.id).map(rule => `${rule.label}: ${rule.enabled ? pricingPct(rule.pct) : 'kapalı'} (${sourceText[rule.source] || rule.source})`);
+  const today = getTodayStr();
+  const calendar = computePricingCalendar(entry, today);
+  const next = calendar.suggestions.days.slice(0, 30);
+  const open = next.filter(day => day.status === 'OPEN' && Number.isFinite(day.price));
+  const avg = list => list.length ? Math.round(list.reduce((sum, day) => sum + day.price, 0) / list.length) : null;
+  const isWeekend = day => [5, 6].includes(new Date(day.date + 'T00:00:00Z').getUTCDay());
+  const monthKey = today.slice(0, 7);
+  const previousYear = Number(monthKey.slice(0, 4)) - 1, month = Number(monthKey.slice(5, 7));
+  const history = getSuggestedPriceEngine().historyHint({
+    property: { id: property.id }, monthKey, bookings: pricingPropertyBookings(entry),
+    sellableDates: Array.from({ length: new Date(Date.UTC(previousYear, month, 0)).getUTCDate() }, (_, index) => `${previousYear}-${String(month).padStart(2, '0')}-${String(index + 1).padStart(2, '0')}`)
+  });
+  const point = type => svc.latestResearchPrice(appData.competitorPriceResearch || [], property.id, type);
+  const latest = point('WEEKDAY') || point('WEEKEND') || point('SPECIAL');
   return {
     property: { name: property.name, locationText: property.locationText || property.location_text, capacity: property.capacity, amenities: property.amenities || [] },
-    basePrice: property.basePrice ?? property.base ?? null,
+    basePrice: pricingBasePriceOf(property),
     floorPrice: property.floor ?? property.floorPrice ?? null,
-    rules: { weekendPct: rules.weekend?.pct, specialDayPct: rules.specialDay?.pct, lastMinutePct: rules.lastMinute?.pct, gapNightPct: rules.gapNight?.pct },
-    next30: null, history: null,
-    competitorMedian: latest ? { weekday: latest.values?.WEEKDAY, fri: latest.values?.WEEKEND, sat: latest.values?.WEEKEND, researchedOn: latest.researched_on } : null,
-    questionId: 'WEEKEND'
+    ruleLines,
+    next30: {
+      soldNights: next.filter(day => day.status === 'BOOKED').length,
+      sellableNights: next.filter(day => day.status !== 'BLOCKED').length,
+      openNights: next.filter(day => day.status === 'OPEN').length,
+      avgSuggestedWeekday: avg(open.filter(day => !isWeekend(day))),
+      avgSuggestedWeekend: avg(open.filter(isWeekend))
+    },
+    history,
+    competitorResearch: latest ? {
+      researchedOn: latest.researchedOn, sourceKind: svc.SOURCE_KIND_LABELS[latest.sourceKind] || latest.sourceKind,
+      weekday: point('WEEKDAY')?.amount ?? null, weekend: point('WEEKEND')?.amount ?? null, special: point('SPECIAL')?.amount ?? null
+    } : null
   };
 }
 
@@ -16951,6 +16979,24 @@ async function logoutSaaSUser() {
 // ekranda "kaydedilmis" gibi kalmaz.
 // =============================================================================
 
+// Fiyat takviminin kapali gunleri (L-262, kullanici M83). Defter okuyucusu
+// arizalarin kendisini okur; satis ve izleyici rolu yalniz (mulk, baslangic,
+// bitis) alir. Goc (phase103) yoksa ya da cagri duserse null: takvim
+// kapanislari bilinmedigini soyler, gunu sessizce acik gostermez.
+async function loadPropertyClosures(tenantId, access = {}) {
+  if (access.mayReadLedger || !access.mayReadSales) return [];
+  const from = getTodayStr();
+  const to = new Date(Date.parse(from + 'T00:00:00Z') + 150 * 86400000).toISOString().slice(0, 10);
+  try {
+    const { data, error } = await supabaseClient.rpc('get_property_closures', { p_tenant_id: tenantId, p_from: from, p_to: to });
+    if (error) { console.warn('Kapali tarihler okunamadi:', error.message || error.code); return null; }
+    return data || [];
+  } catch (err) {
+    console.warn('Kapali tarihler okunamadi:', err?.message || err);
+    return null;
+  }
+}
+
 /**
  * Goc uygulanmadan once de ekran calissin: tablo yoksa `null` doner.
  * `null` = "sema hazir degil", `[]` = "hazir ama bos". Ikisi ayri seydir;
@@ -17210,7 +17256,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
         : Promise.resolve([]);
       // Independent datasets are loaded concurrently and every list is paged;
       // Supabase's per-response cap must never silently truncate a dashboard.
-      const [villas, bookings, expenses, cleanList, leads, leadSalesContext, closeList, targetList, maintenanceTickets, operationalTasks, financialTransactions, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications, campaignRows, influencerRows, settingRows, operatorNoteRows, pricingLadderRows, hkOverrideRows, paymentCommissionRows, operationalPeopleRows, cleaningExecutionRows, maintenanceAssignmentRows, taskTemplateRows, checklistTemplateRows, bookingPayments, bookingPaymentBalances, adMetricPeriods, propertyContextRows, propertyOwnerRows, propertyOwnerLinkRows, messageTemplateRows, guestClassificationRows, salesMembers, propertyPricingRuleRows, competitorResearchRows, leadInterestRows, channelListingRows, incomeEntryRows, dailyPriceRows] = await Promise.all([
+      const [villas, bookings, expenses, cleanList, leads, leadSalesContext, closeList, targetList, maintenanceTickets, operationalTasks, financialTransactions, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications, campaignRows, influencerRows, settingRows, operatorNoteRows, pricingLadderRows, hkOverrideRows, paymentCommissionRows, operationalPeopleRows, cleaningExecutionRows, maintenanceAssignmentRows, taskTemplateRows, checklistTemplateRows, bookingPayments, bookingPaymentBalances, adMetricPeriods, propertyContextRows, propertyOwnerRows, propertyOwnerLinkRows, messageTemplateRows, guestClassificationRows, salesMembers, propertyPricingRuleRows, competitorResearchRows, leadInterestRows, channelListingRows, incomeEntryRows, dailyPriceRows, closureRows] = await Promise.all([
         loadProperties(tenantId),
         loadBookings(tenantId),
         mayReadLedger ? loadExpenses(tenantId) : Promise.resolve([]),
@@ -17265,7 +17311,9 @@ async function loadTenantAppData(tenantIdOrUserId) {
         // phase97 gelir/sermaye defteri; goc yoksa null doner, ekran ayakta kalir.
         mayReadLedger ? fetchTenantRowsTolerant(() => supabaseClient.from('income_entries').select('*').eq('tenant_id', tenantId).order('income_date', { ascending: false })) : Promise.resolve([]),
         // phase101 gunluk fiyat kaydi; goc yoksa null doner, takvim yalniz oneriyi gosterir.
-        mayReadSales ? fetchTenantRowsTolerant(() => supabaseClient.from('property_daily_prices').select('*').eq('tenant_id', tenantId).order('price_date')) : Promise.resolve([])
+        mayReadSales ? fetchTenantRowsTolerant(() => supabaseClient.from('property_daily_prices').select('*').eq('tenant_id', tenantId).order('price_date')) : Promise.resolve([]),
+        // Satis/izleyici arizalari okuyamaz; fiyat takvimi kapali gunleri phase103 RPC'sinden alir (L-262).
+        loadPropertyClosures(tenantId, { mayReadLedger, mayReadSales })
       ]);
       const propIdMap = {};
       Object.values(villas || {}).forEach(p => {
@@ -17381,6 +17429,8 @@ async function loadTenantAppData(tenantIdOrUserId) {
         phase97SchemaReady: incomeEntryRows !== null,
         propertyDailyPrices: dailyPriceRows || [],
         phase101SchemaReady: dailyPriceRows !== null,
+        propertyClosures: closureRows || [],
+        propertyClosuresReady: closureRows !== null,
         phase78SchemaReady: propertyPricingRuleRows !== null && competitorResearchRows !== null,
         influencerCollabs: (influencerRows || []).map(r => mapInfluencerCollabFromDb(r, propIdMap)),
         housekeepingOverrides,
@@ -17475,6 +17525,8 @@ function getBlankTenantData(userId) {
     phase78SchemaReady: false,
     propertyDailyPrices: [],
     phase101SchemaReady: false,
+    propertyClosures: [],
+    propertyClosuresReady: true,
     influencerCollabs: [],
     housekeepingOverrides: {},
     airbnbListings: {},
@@ -21706,7 +21758,7 @@ function getPricingResearchService() {
 function buildPricingWorkspace(input = {}) {
   const priceEngine = getSuggestedPriceEngine();
   const targetEngine = getTargetRevenueCalculator();
-  const history = input.history || priceEngine.historyHint({
+  const history = Object.prototype.hasOwnProperty.call(input, 'history') ? input.history : priceEngine.historyHint({
     property: input.property || {}, monthKey: input.monthKey,
     sellableDates: input.historySellableDates || [], bookings: input.bookings || []
   });
@@ -21771,7 +21823,11 @@ function pricingMaintenanceBlocks(property, today = getTodayStr()) {
       if (range) return { propertyId: property.id, start: range.start, end: range.end, title: ticket.title || 'Bakım' };
       return api.isBlockingTicket(ticket) ? { propertyId: property.id, start: today, end: today, title: ticket.title || 'Kritik arıza' } : null;
     })
-    .filter(Boolean);
+    .filter(Boolean)
+    // Satis/izleyici arizayi okuyamaz; sunucu yalniz kapali araligi verir (phase103, L-262).
+    .concat((appData?.propertyClosures || [])
+      .filter(row => String(row?.property_id || '') === String(property.id))
+      .map(row => ({ propertyId: property.id, start: String(row.start_date).slice(0, 10), end: String(row.end_date).slice(0, 10), title: 'bakım' })));
 }
 
 function maintenanceClosureText(ticket, today = getTodayStr()) {
@@ -21797,6 +21853,10 @@ const PRICING_RULE_LABELS = { weekend: 'Hafta sonu', specialDay: 'Özel gün', d
 let pricingSelectedPropertyId = '';
 let pricingSelectedMonth = '';
 const pricingTargetDrafts = {};
+// Hesaplayicinin kapsami (L-256, kullanici M77): Hedefleri Yonet yalniz
+// isletme hedefi yazar; hesaplayici yalniz mulk hedefi aradigi icin kutu hic
+// dolmuyor, elle girilen isletme hedefinden tek mulkun cirosu dusuluyordu.
+let pricingTargetScope = 'ALL';
 let pricingExpectedOccupancyDraft = null;
 let pricingFocusDraft = 'BALANCED';
 
@@ -21804,6 +21864,15 @@ function pricingActiveProperties() {
   return Object.entries(appData?.villas || {})
     .filter(([, property]) => property && property.isActive !== false && !property.archivedAt)
     .map(([key, property]) => ({ key, property }));
+}
+
+// Girilmemis baz fiyat bilinmiyordur, 0 degil (L-258, CLAUDE.md 3.6):
+// mapPropertyFromDb bos base_price'i 0'a ceviriyor ve motor 0'i "girilmis"
+// sayip her gune ₺0 oneriyordu.
+function pricingBasePriceOf(property) {
+  const raw = property?.basePrice ?? property?.base ?? null;
+  const value = raw === null || raw === '' ? NaN : Number(raw);
+  return Number.isFinite(value) && value > 0 ? value : null;
 }
 
 function pricingHorizon(today = getTodayStr()) {
@@ -21894,7 +21963,7 @@ function pricingRulesTableHtml(rules, occupancyTarget) {
 
 function pricingLadderCardHtml(entry, canManage) {
   const property = entry.property;
-  const base = property.basePrice ?? property.base ?? null;
+  const base = pricingBasePriceOf(property);
   const fields = [['base', 'Baz fiyat (₺/gece)', base], ...PROPERTY_LADDER_FIELDS.map(([key, label]) => [key, label, key === 'floor' ? (property.floor ?? property.floorPrice) : property[key]])];
   const valueOf = raw => raw === null || raw === undefined || raw === '' || !Number.isFinite(Number(raw)) ? '' : String(Number(raw));
   const bodyHtml = canManage
@@ -21924,7 +21993,27 @@ function pricingDayCardHtml(day, ctx) {
   const shown = saved ? Number(saved.price) : day.price;
   const savedLine = saved ? `${saved.source === 'MANUAL' ? 'Elle' : 'Onaylı'}${day.price != null && Number(saved.price) !== day.price ? ` · öneri ${pricingMoney(day.price)}` : ''}${saved.note ? ` · ${saved.note}` : ''}` : '';
   const action = selectable ? ` role="button" tabindex="0" aria-pressed="${selected ? 'true' : 'false'}" data-onclick="togglePricingDay(decodeURIComponent('${encodeActionArg(day.date)}'))"` : '';
-  return `<div class="pricing-day ${cls}${saved ? ' is-saved' : ''}${selected ? ' is-selected' : ''}${selectable ? ' is-selectable' : ''}"${action}><strong>${escapeHtml(formatTrDate(day.date))} <em>${escapeHtml(weekday)}</em></strong>${special ? `<span class="pricing-day-special">${escapeHtml(special.name)}</span>` : ''}<span>${escapeHtml(status)}</span><b>${day.status === 'OPEN' && shown != null ? escapeHtml(pricingMoney(shown)) : '—'}</b>${savedLine ? `<span class="pricing-day-saved">${escapeHtml(savedLine)}</span>` : ''}${explain ? `<small>${escapeHtml(explain)}</small>` : ''}</div>`;
+  return `<div class="pricing-day ${cls}${saved ? ' is-saved' : ''}${selected ? ' is-selected' : ''}${selectable ? ' is-selectable' : ''}"${action}><strong>${escapeHtml(formatTrDate(day.date))} <em>${escapeHtml(weekday)}</em></strong>${special ? `<span class="pricing-day-special">${escapeHtml(special.name)}</span>` : ''}<span>${escapeHtml(status)}</span><b>${day.status === 'OPEN' && shown != null ? escapeHtml(pricingMoney(shown)) : '—'}</b>${savedLine ? `<span class="pricing-day-saved">${escapeHtml(savedLine)}</span>` : ''}${explain ? `<small>${escapeHtml(explain)}</small>` : ''}${day.status === 'OPEN' ? pricingRivalLineHtml(day, shown, Boolean(special), ctx) : ''}</div>`;
+}
+
+// Rakip fiyati gun kartinda yalniz bilgi olarak yazilir (L-260, kullanici
+// F.5.3 karari): oneriyi degistirmez. Gunun turune gore mulkun en yeni
+// arastirmasi; tarihi her zaman yazilir, 60 gunden eskisi "eski" diye isaretlenir.
+function pricingRivalLineHtml(day, shown, isSpecial, ctx) {
+  const rows = ctx.research || [];
+  if (!rows.length || !ctx.propertyId) return '';
+  const dow = new Date(day.date + 'T00:00:00Z').getUTCDay();
+  const type = isSpecial ? 'SPECIAL' : ([5, 6].includes(dow) ? 'WEEKEND' : 'WEEKDAY');
+  const rival = getPricingResearchService().latestResearchPrice(rows, ctx.propertyId, type);
+  if (!rival) return '';
+  const ageDays = Math.floor((Date.parse((ctx.today || getTodayStr()) + 'T00:00:00Z') - Date.parse(rival.researchedOn + 'T00:00:00Z')) / 86400000);
+  const when = `${formatTrDate(rival.researchedOn)}${ageDays > 60 ? ', eski' : ''}`;
+  let diff = '';
+  if (Number.isFinite(shown) && shown > 0) {
+    const pct = Math.round((shown - rival.amount) / rival.amount * 100);
+    diff = pct === 0 ? ' · öneri aynı' : ` · öneri %${Math.abs(pct)} ${pct < 0 ? 'düşük' : 'yüksek'}`;
+  }
+  return `<span class="pricing-day-rival">Rakip ${escapeHtml(pricingMoney(rival.amount))} (${escapeHtml(when)})${escapeHtml(diff)}</span>`;
 }
 
 function pricingHistoryHintHtml(history, entry, monthKey) {
@@ -21946,25 +22035,88 @@ function pricingHistoryHintHtml(history, entry, monthKey) {
 
 function pricingTargetHtml(result, ctx) {
   const target = result.target;
-  if (ctx.targetValue == null) return '<div class="pricing-target-empty">Hedef ciro girin ya da Hedefleri Yönet\'ten bu ayın hedefini kaydedin; gereken fiyat–doluluk seçenekleri burada görünür.</div>';
+  const noteHtml = ctx.note ? `<p class="pricing-target-note">${escapeHtml(ctx.note)}</p>` : '';
+  if (ctx.targetValue == null) return `${noteHtml}<div class="pricing-target-empty">Hedef ciro girin ya da Hedefleri Yönet'ten bu ayın hedefini kaydedin; gereken fiyat–doluluk seçenekleri burada görünür.</div>`;
   const nights = target.openNightsTotal;
-  const head = `<div class="pricing-target-summary"><strong>${escapeHtml(target.reason?.text || (target.status === 'OK' ? 'Hedef hesaplandı' : 'Bu fiyatlarla hedefe ulaşılamıyor'))}</strong><span>Ay hedefi: ${escapeHtml(pricingMoney(ctx.targetValue))}</span><span>Gerçekleşen: ${escapeHtml(pricingMoney(ctx.soldRevenue))}</span><span>Kalan: ${escapeHtml(pricingMoney(target.remaining))}</span><span>Açık gece: ${nights == null ? '—' : nights}</span><span>Önerilerin ortalaması: ${escapeHtml(pricingMoney(target.weightedAvgPrice))}</span></div>`;
-  if (!target.table.length) return head;
   const steps = [0.8, 0.9, 1, 1.1, 1.2];
-  const focusText = { BALANCED: 'Dengeli: ortadaki uygulanabilir seçenek', OCCUPANCY: 'Doluluk: en düşük fiyatlı uygulanabilir seçenek', REVENUE: 'Gelir: en yüksek fiyatlı uygulanabilir seçenek' };
+  const focusName = { BALANCED: 'Dengeli', OCCUPANCY: 'Doluluk', REVENUE: 'Gelir' };
+  const focusText = { BALANCED: 'ortadaki uygulanabilir seçenek', OCCUPANCY: 'en düşük fiyatlı uygulanabilir seçenek (daha çok gece satmak)', REVENUE: 'en yüksek fiyatlı uygulanabilir seçenek (daha az gece, yüksek fiyat)' };
+  const need = row => Math.ceil(row.requiredOccupancy * nights - 1e-9);
+  // Hedef doluluk girildiyse gereken ortalama fiyat (L-257): hesaplanip
+  // hic yazilmiyordu; kullanici doluluk girince sonucun degismedigini gordu.
+  const expected = Number.isFinite(ctx.expectedOccupancy) && ctx.expectedOccupancy > 0 && target.requiredAvgPriceAtExpected != null
+    ? `<span>%${Math.round(ctx.expectedOccupancy * 100)} dolulukla gereken ortalama: ${escapeHtml(pricingMoney(target.requiredAvgPriceAtExpected))} / gece</span>` : '';
+  const chosen = target.highlightedRow != null ? target.table[target.highlightedRow] : null;
+  const chosenHtml = chosen
+    ? `<span class="pricing-target-choice">Seçilen (${escapeHtml(focusName[ctx.focus] || focusName.BALANCED)}): ortalama ${escapeHtml(pricingMoney(chosen.avgPrice))} → ${need(chosen)} / ${nights} gece</span>` : '';
+  const headline = target.reason?.text || (target.status === 'OK' ? 'Hedef hesaplandı' : 'Bu fiyatlarla hedefe ulaşılamıyor');
+  const head = `<div class="pricing-target-summary"><strong>${escapeHtml(headline)}</strong><span>Ay hedefi: ${escapeHtml(pricingMoney(ctx.targetValue))}</span><span>Gerçekleşen: ${escapeHtml(pricingMoney(ctx.soldRevenue))}</span><span>Kalan: ${escapeHtml(pricingMoney(target.remaining))}</span><span>Açık gece: ${nights == null ? '—' : nights}</span><span>Önerilerin ortalaması: ${escapeHtml(pricingMoney(target.weightedAvgPrice))}</span>${expected}${chosenHtml}</div>`;
+  if (!target.table.length) return noteHtml + head;
   const rows = target.table.map((row, index) => {
     const step = steps[index] ?? 1;
-    const need = Math.ceil(row.requiredOccupancy * nights - 1e-9);
     const share = step === 1 ? 'önerilen fiyatlar' : `önerinin %${Math.round(step * 100)}'i`;
-    return `<div class="${index === target.highlightedRow ? 'is-highlighted' : ''}"><span>Ortalama ${escapeHtml(pricingMoney(row.avgPrice))} / gece <small>(${escapeHtml(share)})</small></span><strong>${row.feasible ? `${need} / ${nights} açık gece satılmalı (%${(row.requiredOccupancy * 100).toFixed(1)})` : `Bu fiyatla mümkün değil: ${nights} açık gecenin hepsi satılsa da yetmez`}</strong></div>`;
+    const badge = index === target.highlightedRow ? ' <em class="pricing-target-badge">Seçilen</em>' : '';
+    return `<div class="${index === target.highlightedRow ? 'is-highlighted' : ''}"><span>Ortalama ${escapeHtml(pricingMoney(row.avgPrice))} / gece <small>(${escapeHtml(share)})</small>${badge}</span><strong>${row.feasible ? `${need(row)} / ${nights} açık gece satılmalı (%${(row.requiredOccupancy * 100).toFixed(1)})` : `Bu fiyatla mümkün değil: ${nights} açık gecenin hepsi satılsa da yetmez`}</strong></div>`;
   }).join('');
-  return `${head}<div class="pricing-target-table">${rows}</div><p class="sub-text">İşaretli satır odak seçimine göre: ${escapeHtml(focusText[ctx.focus] || focusText.BALANCED)}.</p>`;
+  return `${noteHtml}${head}<div class="pricing-target-table">${rows}</div><p class="sub-text">Odak ${escapeHtml(focusName[ctx.focus] || focusName.BALANCED)}: ${escapeHtml(focusText[ctx.focus] || focusText.BALANCED)}.</p>`;
 }
 
 function setPricingProperty(propertyId) {
   if ((propertyId || '') !== pricingSelectedPropertyId) pricingSelectedDays.clear();
   pricingSelectedPropertyId = propertyId || '';
   renderPricingTab();
+}
+
+function setPricingTargetScope(scope) {
+  pricingTargetScope = scope === 'PROPERTY' ? 'PROPERTY' : 'ALL';
+  renderPricingTab();
+  return true;
+}
+
+function pricingTargetDraftKey(propertyId, monthKey) {
+  return `${pricingTargetScope === 'ALL' ? 'ALL' : propertyId}|${monthKey}`;
+}
+
+// Tum mulkler: hedef = isletme hedefi, gerceklesen = Finans cirosu (ayni
+// defter), acik geceler = her mulkun ayni ayki onerileri. Baz fiyati olmayan
+// mulkun acik gecesi fiyatsizdir; hesaba katilmaz ve adi yazilir (3.6).
+function pricingTargetWorkspace({ entry, entries, calendar, monthKey, today, historySellableDates }) {
+  const common = { expectedOccupancy: pricingExpectedOccupancyDraft, focus: pricingFocusDraft };
+  const draftKey = pricingTargetDraftKey(entry.property.id, monthKey);
+  const drafted = Object.prototype.hasOwnProperty.call(pricingTargetDrafts, draftKey);
+  const portfolioTarget = getConfiguredRevenueTarget({ ...currentFilter, period: monthKey }, appData.targets || [], 'ALL');
+  if (pricingTargetScope === 'ALL') {
+    const ledger = computeMonthLedger(monthKey, 'ALL');
+    const targetValue = drafted ? pricingTargetDrafts[draftKey] : portfolioTarget;
+    const days = [], specialDays = [], excluded = [];
+    entries.forEach(item => {
+      const cal = item === entry ? calendar : computePricingCalendar(item, today);
+      const own = cal.suggestions.days.filter(day => day.date.startsWith(monthKey + '-'));
+      if (pricingBasePriceOf(item.property) == null && own.some(day => day.status === 'OPEN')) { excluded.push(item.property.name || item.key); return; }
+      days.push(...own);
+      specialDays.push(...cal.specialDays);
+    });
+    const result = buildPricingWorkspace({
+      property: {}, bookings: [], monthKey, history: null,
+      suggestions: { days, warnings: [] }, specialDays,
+      target: targetValue, soldRevenue: ledger?.netRoomRevenue ?? null, ...common
+    });
+    const note = excluded.length ? `Baz fiyatı olmayan ${excluded.length} mülk hesaba katılmadı: ${excluded.join(', ')}.` : '';
+    return { result, targetValue, soldRevenue: ledger?.netRoomRevenue ?? null, scopeLabel: 'Tüm mülkler', note };
+  }
+  const ledger = computeMonthLedger(monthKey, entry.key);
+  const propertyTarget = (appData.targets || []).some(t => (t.property_id || t.propertyId) === entry.property.id)
+    ? getConfiguredRevenueTarget({ ...currentFilter, period: monthKey }, appData.targets || [], entry.key) : null;
+  const targetValue = drafted ? pricingTargetDrafts[draftKey] : propertyTarget;
+  const monthDays = calendar.suggestions.days.filter(day => day.date.startsWith(monthKey + '-'));
+  const result = buildPricingWorkspace({
+    property: { id: entry.property.id }, bookings: pricingPropertyBookings(entry), monthKey, historySellableDates,
+    suggestions: { ...calendar.suggestions, days: monthDays }, specialDays: calendar.specialDays,
+    target: targetValue, soldRevenue: ledger?.netRoomRevenue ?? null, ...common
+  });
+  const note = targetValue == null && portfolioTarget != null
+    ? `İşletme hedefi ${pricingMoney(portfolioTarget)}; bu mülk için hedefi elle girin ya da kapsamı "Tüm mülkler" yapın.` : '';
+  return { result, targetValue, soldRevenue: ledger?.netRoomRevenue ?? null, scopeLabel: entry.property.name || entry.key, note };
 }
 
 function setPricingMonth(monthKey) {
@@ -21977,7 +22129,10 @@ function setPricingMonth(monthKey) {
 function recalculatePricingTarget() {
   const targetValue = document.getElementById('pricingTargetInput')?.value;
   const occupancyValue = document.getElementById('pricingExpectedOccupancy')?.value;
-  pricingTargetDrafts[`${pricingSelectedPropertyId}|${pricingSelectedMonth}`] = targetValue === '' ? null : Number(targetValue);
+  // Bos kutu taslak degildir: kayitli hedefe (Hedefleri Yonet) geri doner (L-256).
+  const draftKey = pricingTargetDraftKey(pricingSelectedPropertyId, pricingSelectedMonth);
+  if (targetValue === '' || targetValue == null) delete pricingTargetDrafts[draftKey];
+  else pricingTargetDrafts[draftKey] = Number(targetValue);
   pricingExpectedOccupancyDraft = occupancyValue === '' ? null : Number(occupancyValue) / 100;
   pricingFocusDraft = document.getElementById('pricingFocusSelect')?.value || 'BALANCED';
   renderPricingTab();
@@ -22040,7 +22195,7 @@ async function savePricingRuleSettings() {
       if (window.showToast) window.showToast('Portföy fiyat kuralı kaydedildi; istisnası olmayan tüm mülklere uygulanır.', 'success');
       return true;
     } catch (error) {
-      alert('Portföy fiyat kuralı kaydedilemedi: ' + (error.message || 'Bilinmeyen hata'));
+      alert('Portföy fiyat kuralı kaydedilemedi: ' + getPricingResearchService().errorText(error));
       return false;
     }
   }
@@ -22062,7 +22217,7 @@ async function savePricingRuleSettings() {
     if (window.showToast) window.showToast('Ev bazlı fiyat kuralı kaydedildi.', 'success');
     return true;
   } catch (error) {
-    alert('Fiyat kuralı kaydedilemedi: ' + (error.message || 'Bilinmeyen hata'));
+    alert('Fiyat kuralı kaydedilemedi: ' + getPricingResearchService().errorText(error));
     return false;
   }
 }
@@ -22198,6 +22353,61 @@ function pricingSpecialListHtml(entry, horizon, canManage) {
   return `${rows.length ? `<div class="pricing-special-list">${rows.join('')}</div>` : '<div class="empty-state">Önümüzdeki 3 ayda tatil ya da etkinlik yok.</div>'}${warn}`;
 }
 
+// Duzenlenen arastirmanin kimligi; bos ise form yeni kayit acar (L-259).
+let pricingResearchEditId = null;
+const PRICING_RESEARCH_FIELDS = ['pricingResearchUrl', 'pricingResearchWeekday', 'pricingResearchWeekend', 'pricingResearchSpecial', 'pricingResearchNote'];
+
+function setPricingResearchEditMode(id) {
+  pricingResearchEditId = id || null;
+  const button = document.getElementById('pricingResearchSaveBtn');
+  if (button) button.textContent = pricingResearchEditId ? 'Değişikliği kaydet' : 'Araştırmayı kaydet';
+  const cancel = document.getElementById('pricingResearchCancelBtn');
+  if (cancel) cancel.style.display = pricingResearchEditId ? '' : 'none';
+}
+
+function editCompetitorResearch(id) {
+  if (!canManageTenantRole(activeTenant?.role)) return false;
+  const row = (appData.competitorPriceResearch || []).find(item => String(item.id) === String(id));
+  if (!row) return false;
+  const price = type => (row.prices || []).find(point => point.type === type)?.amount ?? '';
+  const set = (elementId, value) => { const element = document.getElementById(elementId); if (element) element.value = value ?? ''; };
+  set('pricingResearchDate', String(row.researched_on || '').slice(0, 10));
+  set('pricingResearchSource', row.source_kind);
+  set('pricingResearchUrl', row.source_url);
+  set('pricingResearchWeekday', price('WEEKDAY'));
+  set('pricingResearchWeekend', price('WEEKEND'));
+  set('pricingResearchSpecial', price('SPECIAL'));
+  set('pricingResearchNote', row.raw_note || '');
+  setPricingResearchEditMode(row.id);
+  document.getElementById('pricingResearchPanel')?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+  return true;
+}
+
+function cancelCompetitorResearchEdit() {
+  PRICING_RESEARCH_FIELDS.forEach(id => { const element = document.getElementById(id); if (element) element.value = ''; });
+  setPricingResearchEditMode(null);
+  return true;
+}
+
+async function deleteCompetitorResearch(id) {
+  if (!canManageTenantRole(activeTenant?.role)) return false;
+  const row = (appData.competitorPriceResearch || []).find(item => String(item.id) === String(id));
+  if (!row) return false;
+  if (!confirm(`${formatTrDate(row.researched_on)} tarihli rakip araştırması silinsin mi?`)) return false;
+  try {
+    await getPricingResearchService().deleteResearch(supabaseClient, { tenantId: getActiveTenantId(), id: row.id });
+    appData.competitorPriceResearch = (appData.competitorPriceResearch || []).filter(item => item.id !== row.id);
+    if (pricingResearchEditId === row.id) cancelCompetitorResearchEdit();
+    renderPricingTab();
+    if (window.showToast) window.showToast('Rakip araştırması silindi.', 'success');
+    return true;
+  } catch (error) {
+    alert('Rakip araştırması silinemedi: ' + getPricingResearchService().errorText(error));
+    await loadTenantAppData().then(() => renderPricingTab()).catch(() => {});
+    return false;
+  }
+}
+
 async function saveCompetitorResearch() {
   if (!canManageTenantRole(activeTenant?.role)) return false;
   if (!appData.phase78SchemaReady) {
@@ -22205,8 +22415,10 @@ async function saveCompetitorResearch() {
     return false;
   }
   try {
+    const editing = (appData.competitorPriceResearch || []).find(item => item.id === pricingResearchEditId) || null;
     const saved = await getPricingResearchService().saveResearch(supabaseClient, {
-      tenantId: getActiveTenantId(), propertyId: pricingSelectedPropertyId,
+      id: editing?.id || null,
+      tenantId: getActiveTenantId(), propertyId: editing?.property_id || pricingSelectedPropertyId,
       researchedOn: document.getElementById('pricingResearchDate')?.value,
       sourceKind: document.getElementById('pricingResearchSource')?.value,
       sourceUrl: document.getElementById('pricingResearchUrl')?.value,
@@ -22217,15 +22429,13 @@ async function saveCompetitorResearch() {
       },
       rawNote: document.getElementById('pricingResearchNote')?.value
     });
-    appData.competitorPriceResearch = [saved, ...(appData.competitorPriceResearch || [])];
-    ['pricingResearchUrl', 'pricingResearchWeekday', 'pricingResearchWeekend', 'pricingResearchSpecial', 'pricingResearchNote'].forEach(id => {
-      const element = document.getElementById(id); if (element) element.value = '';
-    });
+    appData.competitorPriceResearch = [saved, ...(appData.competitorPriceResearch || []).filter(item => item.id !== saved.id)];
+    cancelCompetitorResearchEdit();
     renderPricingTab();
-    if (window.showToast) window.showToast('Kaynaklı rakip araştırması kaydedildi.', 'success');
+    if (window.showToast) window.showToast(editing ? 'Rakip araştırması güncellendi.' : 'Kaynaklı rakip araştırması kaydedildi.', 'success');
     return true;
   } catch (error) {
-    alert('Rakip araştırması kaydedilemedi: ' + (error.message || 'Bilinmeyen hata'));
+    alert('Rakip araştırması kaydedilemedi: ' + getPricingResearchService().errorText(error));
     return false;
   }
 }
@@ -22243,7 +22453,7 @@ function computePricingCalendar(entry, today = getTodayStr(), occupancyTarget = 
   const specialDays = pricingSpecialDaysFor(entry.property.id, horizon.start, horizon.end);
   const rules = getPricingResearchService().mergeRules(appData.tenantSettings?.pricing_rules || {}, appData.propertyPricingRules || [], entry.property.id);
   const suggestions = getSuggestedPriceEngine().suggest({
-    property: { id: entry.property.id, basePrice: entry.property.basePrice ?? entry.property.base ?? null, floorPrice: entry.property.floor ?? null },
+    property: { id: entry.property.id, basePrice: pricingBasePriceOf(entry.property), floorPrice: entry.property.floor ?? null },
     bookings: pricingPropertyBookings(entry).filter(booking => !isBulkSummaryBooking(booking)), blocks, rules, specialDays,
     occupancyTarget, today, days: horizon.days
   });
@@ -22410,10 +22620,6 @@ function renderPricingTab() {
   if (specialList) specialList.innerHTML = pricingSpecialListHtml(entry, horizon, canManage);
 
   // Hedef hesaplayici secili ayin kalan gecelerini ve ayni ay defterini kullanir.
-  const ledger = computeMonthLedger(monthKey, entry.key);
-  const draftKey = `${entry.property.id}|${monthKey}`;
-  const targetRecord = getConfiguredRevenueTarget({ ...currentFilter, period: monthKey }, appData.targets || [], entry.key);
-  const targetValue = Object.prototype.hasOwnProperty.call(pricingTargetDrafts, draftKey) ? pricingTargetDrafts[draftKey] : targetRecord;
   const previousYear = Number(monthKey.slice(0, 4)) - 1;
   const month = Number(monthKey.slice(5, 7));
   const previousMonthDays = new Date(Date.UTC(previousYear, month, 0)).getUTCDate();
@@ -22421,9 +22627,12 @@ function renderPricingTab() {
   const result = buildPricingWorkspace({
     property: { id: entry.property.id }, bookings: pricingPropertyBookings(entry), monthKey, historySellableDates,
     suggestions: { ...suggestions, days: monthDays }, specialDays,
-    target: targetValue, soldRevenue: ledger?.netRoomRevenue ?? null,
-    expectedOccupancy: pricingExpectedOccupancyDraft, focus: pricingFocusDraft
+    target: null, soldRevenue: null, expectedOccupancy: pricingExpectedOccupancyDraft, focus: pricingFocusDraft
   });
+  const targetWs = pricingTargetWorkspace({ entry, entries, calendar, monthKey, today, historySellableDates });
+  const targetValue = targetWs.targetValue;
+  const scopeInput = document.getElementById('pricingTargetScope');
+  if (scopeInput) scopeInput.value = pricingTargetScope;
   const targetInput = document.getElementById('pricingTargetInput');
   if (targetInput) targetInput.value = targetValue ?? '';
   const occupancyInput = document.getElementById('pricingExpectedOccupancy');
@@ -22433,19 +22642,21 @@ function renderPricingTab() {
 
   const warningText = { OCCUPANCY_TARGET_MISSING: 'Talep kuralı çalışmıyor: aşağıdaki hesaplayıcıda hedef doluluk girin.', BASE_PRICE_MISSING: 'Baz fiyat girilmemiş: öneri hesaplanamaz, fiyat tablosundan girin.', FLOOR_PRICE_MISSING: 'Taban fiyat girilmemiş: indirimler için alt sınır yok.' };
   const warnings = suggestions.warnings.map(item => warningText[item.code] || item.text);
+  if (appData.propertyClosuresReady === false) warnings.unshift('Bakımla kapalı günler bu rolde okunamadı (phase103 bekleniyor): "Açık" görünen bir gün bakımda olabilir.');
   const warningHtml = warnings.length ? `<div class="pricing-warnings">${warnings.map(text => `<span>${escapeHtml(text)}</span>`).join('')}</div>` : '';
   const ctx = { blocks, specialByDate: new Map(specialDays.map(day => [day.date, day])), gapSet: new Set(suggestions.gapDates || []),
-    saved: pricingDailyPriceMap(entry.property.id), canManage, dailyReady: !!appData.phase101SchemaReady, selected: pricingSelectedDays };
+    saved: pricingDailyPriceMap(entry.property.id), canManage, dailyReady: !!appData.phase101SchemaReady, selected: pricingSelectedDays,
+    research: appData.competitorPriceResearch || [], propertyId: entry.property.id, today };
   const editor = document.getElementById('pricingDayEditor');
   if (editor) editor.innerHTML = pricingDayEditorHtml(canManage);
   setEl('pricingCalendarTitle', `Fiyat takvimi · ${pricingMonthLabel(monthKey)}`);
   container.innerHTML = `${warningHtml}${pricingHistoryHintHtml(result.history, entry, monthKey)}<div class="pricing-days">${monthDays.map(day => pricingDayCardHtml(day, ctx)).join('')}</div>`;
 
-  setEl('pricingTargetTitle', `Hedef ciro hesaplayıcısı · ${pricingMonthLabel(monthKey)}`);
+  setEl('pricingTargetTitle', `Hedef ciro hesaplayıcısı · ${pricingMonthLabel(monthKey)} · ${targetWs.scopeLabel}`);
   const targetBox = document.getElementById('pricingTargetResult');
-  if (targetBox) targetBox.innerHTML = pricingTargetHtml(result, { targetValue, soldRevenue: ledger?.netRoomRevenue ?? null, focus: pricingFocusDraft });
+  if (targetBox) targetBox.innerHTML = pricingTargetHtml(targetWs.result, { targetValue, soldRevenue: targetWs.soldRevenue, focus: pricingFocusDraft, expectedOccupancy: pricingExpectedOccupancyDraft, scopeLabel: targetWs.scopeLabel, note: targetWs.note });
 
-  const base = entry.property.basePrice ?? entry.property.base ?? null;
+  const base = pricingBasePriceOf(entry.property);
   const next30 = suggestions.days.slice(0, 30);
   const sold = next30.filter(day => day.status === 'BOOKED').length;
   const sellable = next30.filter(day => day.status !== 'BLOCKED').length;
@@ -22459,7 +22670,9 @@ function renderPricingTab() {
   const researchList = document.getElementById('pricingResearchList');
   if (researchList) {
     const rows = (appData.competitorPriceResearch || []).filter(row => row.property_id === entry.property.id);
-    researchList.innerHTML = rows.length ? rows.map(row => `<article><strong>${escapeHtml(formatTrDate(row.researched_on))} · ${escapeHtml(row.source_kind)}</strong><a href="${escapeHtml(row.source_url)}" target="_blank" rel="noopener noreferrer">Kaynağı aç</a><span>${escapeHtml((row.prices || []).map(point => `${point.type}: ₺${Number(point.amount).toLocaleString('tr-TR')}`).join(' · '))}</span><small>${escapeHtml(row.raw_note || 'Not yok')}</small></article>`).join('') : '<div class="empty-state">Bu mülk için kaynaklı rakip araştırması yok.</div>';
+    const svc = getPricingResearchService();
+    const actions = row => canManage && appData.phase78SchemaReady ? `<div class="pricing-research-actions"><button type="button" class="btn btn-secondary btn-sm" data-onclick="editCompetitorResearch(decodeURIComponent('${encodeActionArg(row.id)}'))">Düzenle</button><button type="button" class="btn btn-danger btn-sm" data-onclick="deleteCompetitorResearch(decodeURIComponent('${encodeActionArg(row.id)}'))">Sil</button></div>` : '';
+    researchList.innerHTML = rows.length ? rows.map(row => `<article><strong>${escapeHtml(formatTrDate(row.researched_on))} · ${escapeHtml(svc.SOURCE_KIND_LABELS[row.source_kind] || row.source_kind)}</strong><a href="${escapeHtml(row.source_url)}" target="_blank" rel="noopener noreferrer">Kaynağı aç</a><span>${escapeHtml((row.prices || []).map(point => `${svc.PRICE_TYPE_LABELS[point.type] || point.type}: ${pricingMoney(Number(point.amount))}`).join(' · '))}</span><small>${escapeHtml(row.raw_note || 'Not yok')}</small>${actions(row)}</article>`).join('') : '<div class="empty-state">Bu mülk için kaynaklı rakip araştırması yok.</div>';
   }
   const researchDate = document.getElementById('pricingResearchDate');
   if (researchDate && !researchDate.value) researchDate.value = today;
@@ -22810,6 +23023,16 @@ if (typeof module !== 'undefined' && module.exports) {
     pricingEffectiveRules,
     computePricingCalendar,
     setPricingMonth,
+    setPricingTargetScope,
+    pricingTargetWorkspace,
+    pricingTargetHtml,
+    pricingBasePriceOf,
+    loadPropertyClosures,
+    pricingChatGptContext,
+    editCompetitorResearch,
+    cancelCompetitorResearchEdit,
+    deleteCompetitorResearch,
+    saveCompetitorResearch,
     setPricingProperty,
     recalculatePricingTarget,
     savePricingRuleSettings,

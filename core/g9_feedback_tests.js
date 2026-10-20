@@ -29,6 +29,7 @@
 // L-246 (M70, 9.7): tarihli bakim yalniz kendi araligini kapatir; fiyat takvimi ve hazirlik ayni tanimi kullanir.
 // L-247..L-254 (M71-M76, 9.7): talep kurali, 3 aylik takvim, ozel etkinlik, kural kaynagi, fiyat tablosu, bos gece, yillik hedef, fiyat tablosu karti.
 // L-255 (M76, 9.7 F.2.9): gunluk fiyat onaylanir / elle yazilir (phase101); rezervasyon formunda referans.
+// L-256..L-262 (M77-M83, 9.7 kontrol turu): hesaplayici kapsami, hedef doluluk/odak, baz fiyatsiz mulk, rakip arastirmasi duzenle/sil + kartta bilgi, ChatGPT baglami, satis rolune kapali tarihler (phase103).
 // L-184..L-190 (M14-M20): kapora, kar marji hedefi, talep tarihi, mulk net kari, reklam tablosu/metrik/gunluk butce, sablon ekrani, bosluk gecesi.
 const fs = require('fs');
 const path = require('path');
@@ -2057,6 +2058,202 @@ async function gunlukFiyatDavranisi() {
     'L-255m Satis rolu fiyati gorur ama secemez / yazamaz');
 }
 
+async function fiyatKontrolTuruDavranisi() {
+  // 9.7 kontrol turu (Claude tarayici turu + kullanici kararlari, 19.10): M77-M83 = L-256...L-262.
+  sahteDom({});
+  global.FinancialMetricsService = require('./financial_metrics_service.js');
+  const App = require('../app.js');
+  const Svc = require('./pricing_research_service.js');
+  const Prompt = require('./chatgpt_prompt_engine.js');
+  const el = id => global.document.getElementById(id);
+  const BUGUN = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const gun = n => new Date(Date.parse(BUGUN + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
+  const para = n => `₺${Math.round(n).toLocaleString('tr-TR')}`;
+  const AY = BUGUN.slice(0, 7);
+  const P = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000081';
+  const P2 = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000082';
+  const P3 = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000083';
+  const ARASTIRMA = { id: 'r1', tenant_id: TENANT, property_id: P, researched_on: BUGUN, source_kind: 'WEBSITE', source_url: 'https://ornek.example/villa', prices: [{ type: 'WEEKDAY', amount: 9000 }, { type: 'WEEKEND', amount: 14000 }], raw_note: 'not' };
+  const kur = (ek = {}, rol = 'owner') => {
+    App.setActiveTenant({ id: TENANT, role: rol });
+    App.setAppData({
+      villas: {
+        SEYIR: { id: P, slug: 'SEYIR', name: 'Seyir', basePrice: 13000, floor: 8000, isActive: true, activationDate: '2025-01-01' },
+        KOY: { id: P2, slug: 'KOY', name: 'Koy Evi', basePrice: 9000, floor: 6000, isActive: true, activationDate: '2025-01-01' }
+      },
+      bookings: [
+        { id: 'k1', villa: 'SEYIR', propertyId: P, checkIn: `${AY}-01`, checkOut: `${AY}-03`, gross: 26000, status: 'CONFIRMED', channel: 'DIRECT' },
+        { id: 'k2', villa: 'KOY', propertyId: P2, checkIn: `${AY}-01`, checkOut: `${AY}-02`, gross: 9000, status: 'CONFIRMED', channel: 'DIRECT' }
+      ],
+      expenses: [], maintenanceTickets: [], propertyPricingRules: [], competitorPriceResearch: [], tenantSettings: {},
+      targets: [{ year: Number(AY.slice(0, 4)), month: Number(AY.slice(5, 7)), revenue_target: 400000, property_id: null }],
+      phase78SchemaReady: true, ...ek
+    });
+  };
+
+  // L-256 (M77, F.3.1/F.3.3): "Tüm mülkler" isletme hedefini ve Finans cirosunu kullanir.
+  kur();
+  App.setPricingTargetScope('ALL');
+  App.setPricingProperty(P);
+  App.setPricingMonth(AY);
+  // Bos kutu + Hesapla taslagi siler, kayitli hedefe doner.
+  el('pricingTargetInput').value = ''; App.recalculatePricingTarget();
+  const portfoyCiro = App.computeMonthLedger(AY, 'ALL').netRoomRevenue;
+  const seyirCiro = App.computeMonthLedger(AY, 'SEYIR').netRoomRevenue;
+  let sonuc = el('pricingTargetResult').innerHTML;
+  check(String(el('pricingTargetInput').value) === '400000' && sonuc.includes(`Gerçekleşen: ${para(portfoyCiro)}`) && portfoyCiro !== seyirCiro,
+    'L-256a Tum mulkler kapsami Hedefleri Yonet\'teki isletme hedefiyle dolu gelir; gerceklesen Finans cirosudur (tek mulkun cirosu degil)', el('pricingTargetInput').value + ' | ' + portfoyCiro + '/' + seyirCiro + ' | ' + sonuc.slice(0, 300));
+  App.setPricingTargetScope('PROPERTY');
+  sonuc = el('pricingTargetResult').innerHTML;
+  check(String(el('pricingTargetInput').value) === '' && /İşletme hedefi ₺400\.000; bu mülk için hedefi elle girin/.test(sonuc),
+    'L-256b Secili mulk kapsaminda isletme hedefi mulke yazilmaz; kutu bos gelir ve neden yazilir', sonuc.slice(0, 300));
+  kur({ villas: {
+    SEYIR: { id: P, slug: 'SEYIR', name: 'Seyir', basePrice: 13000, floor: 8000, isActive: true, activationDate: '2025-01-01' },
+    BAZSIZ: { id: P3, slug: 'BAZSIZ', name: 'Bazsız Ev', basePrice: 0, isActive: true, activationDate: '2025-01-01' }
+  } });
+  App.setPricingTargetScope('ALL');
+  App.setPricingProperty(P);
+  check(/Baz fiyatı olmayan 1 mülk hesaba katılmadı: Bazsız Ev/.test(el('pricingTargetResult').innerHTML),
+    'L-256c Tum mulklerde baz fiyati olmayan mulk acik gece sayilmaz ve adi yazilir', el('pricingTargetResult').innerHTML.slice(0, 300));
+
+  // L-257 (M78, F.3.2/F.3.5): hedef doluluk ve odak sonucu gorunur degistirir.
+  kur();
+  App.setPricingTargetScope('ALL');
+  App.setPricingProperty(P);
+  el('pricingTargetInput').value = String(Math.round(portfoyCiro + 30000));
+  el('pricingExpectedOccupancy').value = '50';
+  el('pricingFocusSelect').value = 'REVENUE';
+  App.recalculatePricingTarget();
+  const gelir = el('pricingTargetResult').innerHTML;
+  el('pricingFocusSelect').value = 'OCCUPANCY';
+  App.recalculatePricingTarget();
+  const doluluk = el('pricingTargetResult').innerHTML;
+  check(/%50 dolulukla gereken ortalama: ₺[\d.]+ \/ gece/.test(gelir),
+    'L-257a Hedef doluluk girilince gereken ortalama fiyat yazilir (hesaplaniyordu, gosterilmiyordu)', gelir.slice(0, 400));
+  check(/Seçilen \(Gelir\)/.test(gelir) && /Seçilen \(Doluluk\)/.test(doluluk) && gelir.match(/Seçilen \(Gelir\): ortalama (₺[\d.]+)/)[1] !== doluluk.match(/Seçilen \(Doluluk\): ortalama (₺[\d.]+)/)[1] && /pricing-target-badge/.test(gelir),
+    'L-257b Odak degisince secilen secenek basta yazilir ve degisir; satirda "Seçilen" rozeti var');
+  App.setPricingTargetScope('ALL');
+  el('pricingExpectedOccupancy').value = ''; el('pricingFocusSelect').value = 'BALANCED'; App.recalculatePricingTarget();
+
+  // L-258 (M79, F.2.6): baz fiyati girilmemis mulkte fiyat ₺0 degil "—".
+  check(App.pricingBasePriceOf({ basePrice: 0 }) === null && App.pricingBasePriceOf({ basePrice: null }) === null && App.pricingBasePriceOf({ basePrice: 12500 }) === 12500,
+    'L-258a Girilmemis baz fiyat (0/null) bilinmiyor sayilir');
+  kur({ villas: { BAZSIZ: { id: P3, slug: 'BAZSIZ', name: 'Bazsız Ev', basePrice: 0, isActive: true, activationDate: '2025-01-01' } } });
+  const bazsiz = App.computePricingCalendar({ key: 'BAZSIZ', property: { id: P3, basePrice: 0 } }, BUGUN, null).suggestions;
+  App.setPricingProperty(P3);
+  check(bazsiz.days.filter(d => d.status === 'OPEN').every(d => d.price === null) && bazsiz.warnings.some(w => w.code === 'BASE_PRICE_MISSING')
+    && !/<b>₺0<\/b>/.test(el('pricingManagerContainer').innerHTML) && /Baz fiyat girilmemiş/.test(el('pricingManagerContainer').innerHTML),
+    'L-258b Baz fiyatsiz mulkte gun kartlari fiyat uydurmaz (eskiden her gun ₺0)', el('pricingManagerContainer').innerHTML.slice(0, 300));
+
+  // L-259 (M80, F.5.1/F.5.2/F.5.4): Turkce etiket ve hata, duzenle/sil.
+  check(Svc.errorText(new Error('COMPETITOR_URL_INVALID')) === 'Geçerli bir kaynak bağlantısı girin (https://…).' && Svc.errorText(new Error('COMPETITOR_RESEARCH_SCOPE_REQUIRED')).startsWith('Araştırma tarihi'),
+    'L-259a Rakip arastirmasi hatalari ham kod yerine Turkce yazilir');
+  kur({ competitorPriceResearch: [ARASTIRMA] });
+  App.setPricingProperty(P);
+  const liste = el('pricingResearchList').innerHTML;
+  check(/Web sitesi/.test(liste) && /Hafta içi: ₺9\.000 · Hafta sonu: ₺14\.000/.test(liste) && !/WEEKEND|WEEKDAY/.test(liste)
+    && /editCompetitorResearch\(/.test(liste) && /deleteCompetitorResearch\(/.test(liste),
+    'L-259b Liste Turkce etiketlidir; yonetim her kayitta Duzenle / Sil gorur', liste.slice(0, 400));
+  kur({ competitorPriceResearch: [ARASTIRMA] }, 'sales');
+  App.setPricingProperty(P);
+  check(!/editCompetitorResearch\(|deleteCompetitorResearch\(/.test(el('pricingResearchList').innerHTML) && /Hafta sonu: ₺14\.000/.test(el('pricingResearchList').innerHTML),
+    'L-259c Satis rolu arastirmayi okur, duzenleyemez / silemez');
+  kur({ competitorPriceResearch: [ARASTIRMA] });
+  App.setPricingProperty(P);
+  const cagrilar = [];
+  const arastirmaIstemcisi = {
+    from(tablo) {
+      const k = { tablo, islem: 'select', filtre: [], yuk: null };
+      cagrilar.push(k);
+      const q = {
+        insert(y) { k.islem = 'insert'; k.yuk = y; return q; }, update(y) { k.islem = 'update'; k.yuk = y; return q; },
+        delete() { k.islem = 'delete'; return q; }, eq(c, v) { k.filtre.push([c, v]); return q; }, select() { return q; },
+        async single() { return { data: { ...ARASTIRMA, ...k.yuk, id: 'r1' }, error: null }; },
+        then(res, rej) { return Promise.resolve({ data: k.islem === 'delete' ? [{ id: 'r1' }] : [], error: null }).then(res, rej); }
+      };
+      return q;
+    }
+  };
+  App.setSupabaseClient(arastirmaIstemcisi);
+  App.editCompetitorResearch('r1');
+  check(el('pricingResearchUrl').value === 'https://ornek.example/villa' && String(el('pricingResearchWeekend').value) === '14000' && el('pricingResearchSaveBtn').textContent === 'Değişikliği kaydet',
+    'L-259d Duzenle formu kaydin degerleriyle doldurur');
+  el('pricingResearchWeekend').value = '15000';
+  await App.saveCompetitorResearch();
+  const guncelleme = cagrilar.find(k => k.tablo === 'competitor_price_research' && k.islem === 'update');
+  check(guncelleme && guncelleme.filtre.some(([c, v]) => c === 'id' && v === 'r1') && guncelleme.filtre.some(([c, v]) => c === 'tenant_id' && v === TENANT)
+    && guncelleme.yuk.prices.some(p => p.type === 'WEEKEND' && p.amount === 15000) && !cagrilar.some(k => k.islem === 'insert'),
+    'L-259e Duzenlenen arastirma yeni satir acmaz; ayni kaydi kiraci kapsamli gunceller', JSON.stringify(cagrilar.map(k => k.islem)));
+  global.confirm = () => true;
+  const silindi = await App.deleteCompetitorResearch('r1');
+  const silme = cagrilar.find(k => k.tablo === 'competitor_price_research' && k.islem === 'delete');
+  check(silindi === true && silme && silme.filtre.some(([c, v]) => c === 'id' && v === 'r1') && silme.filtre.some(([c, v]) => c === 'tenant_id' && v === TENANT)
+    && !(App.getAppData ? App.getAppData() : global.appData || { competitorPriceResearch: [] }).competitorPriceResearch?.some?.(r => r.id === 'r1'),
+    'L-259f Yanlis girilen arastirma silinir (kiraci + kayit kapsamli)');
+  global.__sonUyari = '';
+  el('pricingResearchUrl').value = 'adres-degil'; el('pricingResearchWeekday').value = '9000';
+  await App.saveCompetitorResearch();
+  check(/Geçerli bir kaynak bağlantısı/.test(global.__sonUyari || '') && !/COMPETITOR_/.test(global.__sonUyari || ''),
+    'L-259g Gecersiz baglantida kullanici Turkce sebep gorur', global.__sonUyari);
+
+  // L-260 (M81, F.5.3): rakip fiyati kartta bilgi olarak, oneriyi degistirmeden.
+  kur();
+  const onerisiz = App.computePricingCalendar({ key: 'SEYIR', property: { id: P, basePrice: 13000, floor: 8000 } }, BUGUN, null).suggestions.days.map(d => d.price);
+  kur({ competitorPriceResearch: [ARASTIRMA] });
+  const onerili = App.computePricingCalendar({ key: 'SEYIR', property: { id: P, basePrice: 13000, floor: 8000 } }, BUGUN, null).suggestions.days.map(d => d.price);
+  App.setPricingProperty(P);
+  const kartlar = el('pricingManagerContainer').innerHTML;
+  check(/Rakip ₺14\.000 \([\d.]+\) · öneri %\d+ (düşük|yüksek)|Rakip ₺14\.000 \([\d.]+\) · öneri aynı/.test(kartlar) && /Rakip ₺9\.000/.test(kartlar),
+    'L-260a Gun karti gunun turune gore rakip fiyatini, tarihini ve farki yazar', kartlar.slice(0, 500));
+  check(JSON.stringify(onerisiz) === JSON.stringify(onerili),
+    'L-260b Rakip arastirmasi onerilen fiyati degistirmez (kullanici karari)');
+  const eski = Svc.latestResearchPrice([{ ...ARASTIRMA, researched_on: '2020-01-01' }], P, 'WEEKEND');
+  kur({ competitorPriceResearch: [{ ...ARASTIRMA, researched_on: '2020-01-01' }] });
+  App.setPricingProperty(P);
+  check(eski && eski.amount === 14000 && /, eski\)/.test(el('pricingManagerContainer').innerHTML),
+    'L-260c 60 gunden eski arastirma "eski" diye isaretlenir');
+
+  // L-261 (M82, F.6.1): ChatGPT baglami mulkun verisini tasir.
+  kur({ competitorPriceResearch: [ARASTIRMA] });
+  App.setPricingProperty(P);
+  const baglam = App.pricingChatGptContext();
+  const komut = Prompt.buildPrompt({ kind: 'PRICE_RULE_QUESTION', context: baglam, question: 'Soru', today: BUGUN }).prompt;
+  check(baglam.competitorResearch && baglam.competitorResearch.weekend === 14000 && baglam.competitorResearch.weekday === 9000 && /Rakip araştırması \(kullanıcının girdiği/.test(komut) && /14000/.test(komut),
+    'L-261a Kaydedilen rakip arastirmasi ChatGPT sorusuna gider (eskiden olmayan alandan okunuyordu)', komut);
+  check(baglam.next30 && baglam.next30.sellableNights > 0 && Number.isFinite(baglam.next30.avgSuggestedWeekday) && /Sonraki 30 gün:/.test(komut),
+    'L-261b Onumuzdeki 30 gunun satilan/satilabilir gecesi ve onerilen fiyat ortalamasi gider');
+  check(/Kurallar:\n- Hafta sonu: \+%25 \(sistem varsayılanı\)/.test(komut) && !/weekendPct/.test(komut) && !('questionId' in baglam) && !/Kural: WEEKEND/.test(komut),
+    'L-261c Kurallar kaynaklariyla Turkce satir; sabit "Kural: WEEKEND" yok', komut);
+
+  // L-262 (M83, F.7.1): satis rolu bakimla kapali gunu "Acik" gormez.
+  kur({ maintenanceTickets: [], propertyClosures: [{ property_id: P, start_date: gun(3), end_date: gun(4) }], propertyClosuresReady: true }, 'sales');
+  const kapali = App.computePricingCalendar({ key: 'SEYIR', property: { id: P, basePrice: 13000, floor: 8000 } }, BUGUN, null).suggestions.days;
+  check(kapali.find(d => d.date === gun(3))?.status === 'BLOCKED' && kapali.find(d => d.date === gun(4))?.status === 'BLOCKED' && kapali.find(d => d.date === gun(5))?.status !== 'BLOCKED',
+    'L-262a Ariza okuyamayan rol sunucunun kapali tarihleriyle gunu "Kapali" gorur', JSON.stringify(kapali.slice(0, 6).map(d => d.date + ':' + d.status)));
+  kur({ maintenanceTickets: [], propertyClosures: [], propertyClosuresReady: false }, 'sales');
+  App.setPricingProperty(P);
+  check(/Bakımla kapalı günler bu rolde okunamadı/.test(el('pricingManagerContainer').innerHTML),
+    'L-262b Kapali tarihler okunamazsa takvim bunu soyler; gunu sessizce acik gostermez');
+  const rpcler = [];
+  const rpcIstemci = hata => ({ rpc: async (ad, args) => { rpcler.push([ad, args]); return hata ? { data: null, error: { code: 'PGRST202', message: 'yok' } } : { data: [{ property_id: P, start_date: gun(1), end_date: gun(1) }], error: null }; } });
+  App.setSupabaseClient(rpcIstemci(false));
+  const defter = await App.loadPropertyClosures(TENANT, { mayReadLedger: true, mayReadSales: true });
+  const satis = await App.loadPropertyClosures(TENANT, { mayReadLedger: false, mayReadSales: true });
+  App.setSupabaseClient(rpcIstemci(true));
+  const gocsuz = await App.loadPropertyClosures(TENANT, { mayReadLedger: false, mayReadSales: true });
+  check(Array.isArray(defter) && defter.length === 0 && rpcler.length === 2 && rpcler[0][0] === 'get_property_closures' && rpcler[0][1].p_tenant_id === TENANT && satis.length === 1 && gocsuz === null,
+    'L-262c Defter okuyucusu arizanin kendisini kullanir; satis/izleyici yalniz kapali tarih RPC\'sini cagirir; goc yoksa null', JSON.stringify({ defter, satis, gocsuz, rpcler }));
+  const sql = read('supabase/migration_phase103_property_closures_for_sales.sql');
+  const govde = sql.slice(sql.indexOf('CREATE OR REPLACE FUNCTION public.get_property_closures'), sql.indexOf('REVOKE ALL ON FUNCTION public.get_property_closures'));
+  check(govde.indexOf('can_read_sales') > 0 && govde.indexOf('can_read_sales') < govde.indexOf('FROM public.maintenance_tickets')
+    && govde.indexOf('auth.uid()') < govde.indexOf('FROM public.maintenance_tickets')
+    && !/mt\.(title|description|estimated_cost|actual_cost|assigned_to)/.test(govde)
+    && /REVOKE ALL ON FUNCTION public\.get_property_closures\(UUID, DATE, DATE\) FROM anon/.test(sql)
+    && /VALUES \(103, 'phase103_property_closures_for_sales'\)/.test(sql)
+    && read('supabase/migration_manifest.txt').includes('migration_phase103_property_closures_for_sales.sql'),
+    'L-262d phase103: yetki kayit aramadan once, ariza ayrintisi donmez, anon kapali, schema_migrations 103, manifestte');
+}
+
 async function main() {
 try {
   const html = read('index.html');
@@ -2106,6 +2303,7 @@ try {
   await fiyatBakimDavranisi();
   await fiyatEkraniDavranisi();
   await gunlukFiyatDavranisi();
+  await fiyatKontrolTuruDavranisi();
 } catch (error) {
   failed++;
   console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

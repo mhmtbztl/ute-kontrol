@@ -73,7 +73,7 @@
       throw new Error('COMPETITOR_RESEARCH_SCOPE_REQUIRED');
     }
     if (!['http:', 'https:'].includes(url.protocol) || !prices.length) throw new Error('COMPETITOR_RESEARCH_INPUT_REQUIRED');
-    const { data, error } = await client.from('competitor_price_research').insert({
+    const payload = {
       tenant_id: input.tenantId,
       property_id: input.propertyId,
       researched_on: input.researchedOn,
@@ -81,10 +81,52 @@
       source_url: url.href,
       prices,
       raw_note: String(input.rawNote || '').trim() || null
-    }).select().single();
+    };
+    // Yanlis girilen arastirma duzeltilebilir (L-259, kullanici F.5.4).
+    const query = input.id
+      ? client.from('competitor_price_research').update(payload).eq('id', input.id).eq('tenant_id', input.tenantId)
+      : client.from('competitor_price_research').insert(payload);
+    const { data, error } = await query.select().single();
     if (error) throw error;
     return data;
   }
 
-  return { RULE_KEYS, mergeRules, saveRule, deleteRule, buildPricePoints, saveResearch };
+  async function deleteResearch(client, input = {}) {
+    if (!client || !input.tenantId || !input.id) throw new Error('COMPETITOR_RESEARCH_SCOPE_REQUIRED');
+    const { data, error } = await client.from('competitor_price_research').delete()
+      .eq('id', input.id).eq('tenant_id', input.tenantId).select('id');
+    if (error) throw error;
+    if (!data || !data.length) throw new Error('COMPETITOR_RESEARCH_NOT_FOUND');
+    return true;
+  }
+
+  const PRICE_TYPE_LABELS = Object.freeze({ WEEKDAY: 'Hafta içi', WEEKEND: 'Hafta sonu', SPECIAL: 'Özel gün' });
+  const SOURCE_KIND_LABELS = Object.freeze({ OTA: 'OTA', WEBSITE: 'Web sitesi', CHATGPT: 'ChatGPT', MANUAL: 'Elle', OTHER: 'Diğer' });
+  const ERROR_TEXT = Object.freeze({
+    COMPETITOR_URL_INVALID: 'Geçerli bir kaynak bağlantısı girin (https://…).',
+    COMPETITOR_RESEARCH_SCOPE_REQUIRED: 'Araştırma tarihi, kaynak türü ve mülk zorunlu.',
+    COMPETITOR_RESEARCH_INPUT_REQUIRED: 'Bağlantı http/https olmalı ve en az bir fiyat girilmeli.',
+    COMPETITOR_PRICE_INVALID: 'Fiyatlar sıfırdan büyük olmalı.',
+    COMPETITOR_RESEARCH_NOT_FOUND: 'Araştırma kaydı bulunamadı; liste yenilendi.',
+    PRICING_RULE_SCOPE_REQUIRED: 'Kural ve mülk seçilmeli.',
+    PRICING_RULE_PCT_INVALID: 'Yüzde −100 ile 1000 arasında olmalı.'
+  });
+  function errorText(error) {
+    const code = String(error?.message || error?.code || error || '');
+    return ERROR_TEXT[code] || code || 'Bilinmeyen hata';
+  }
+
+  // Bir gunun turune gore mulkun EN YENI arastirmasindaki fiyat (L-260).
+  // Oneriyi degistirmez; yalniz bilgi olarak gosterilir.
+  function latestResearchPrice(rows, propertyId, type) {
+    const own = (rows || []).filter(row => row && row.property_id === propertyId)
+      .sort((a, b) => String(b.researched_on || '').localeCompare(String(a.researched_on || '')) || String(b.created_at || '').localeCompare(String(a.created_at || '')));
+    for (const row of own) {
+      const point = (Array.isArray(row.prices) ? row.prices : []).find(item => item && item.type === type && Number(item.amount) > 0);
+      if (point) return { amount: Number(point.amount), researchedOn: String(row.researched_on).slice(0, 10), sourceKind: row.source_kind };
+    }
+    return null;
+  }
+
+  return { RULE_KEYS, PRICE_TYPE_LABELS, SOURCE_KIND_LABELS, mergeRules, saveRule, deleteRule, buildPricePoints, saveResearch, deleteResearch, errorText, latestResearchPrice };
 });
