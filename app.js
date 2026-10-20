@@ -4060,6 +4060,8 @@ function pricingChatGptContext() {
   const svc = getPricingResearchService();
   const sourceText = { PROPERTY: 'bu mülk', PORTFOLIO: 'portföy', DEFAULT: 'sistem varsayılanı' };
   const ruleLines = pricingEffectiveRules(property.id).map(rule => `${rule.label}: ${rule.enabled ? pricingPct(rule.pct) : 'kapalı'} (${sourceText[rule.source] || rule.source})`);
+  pricingMinStaySettings().rules.filter(rule => rule.enabled !== false && (!rule.propertyId || rule.propertyId === property.id))
+    .forEach(rule => ruleLines.push(`Minimum gece (satış kısıtı): en az ${rule.minNights} gece, ${rule.start || rule.end ? `${rule.start || '…'} – ${rule.end || '…'}` : 'her zaman'} (${rule.propertyId ? 'bu mülk' : 'portföy'})`));
   const today = getTodayStr();
   const calendar = computePricingCalendar(entry, today);
   const next = calendar.suggestions.days.slice(0, 30);
@@ -9366,6 +9368,16 @@ async function saveBooking(e) {
     if (calculateNightsBetween(checkIn, checkOut) <= 0) {
       throw new Error('Çıkış tarihi giriş tarihinden sonra olmalıdır.');
     }
+    // Minimum gece satis kisitidir (L-265): kisa konaklama sessizce kaydedilmez;
+    // tarihleri degismeyen eski kayit duzenlenirken yeniden sorulmaz.
+    const eskiKayit = editId ? (appData.bookings || []).find(b => String(b.id) === String(editId)) : null;
+    const tarihDegisti = !eskiKayit || eskiKayit.checkIn !== checkIn || eskiKayit.checkOut !== checkOut || eskiKayit.villa !== villa;
+    const minStayIhlali = status !== 'CANCELLED' && tarihDegisti ? bookingMinStayViolation(villa, checkIn, checkOut) : null;
+    if (minStayIhlali && !confirm(`Minimum gece kuralı: bu girişte en az ${minStayIhlali.minNights} gece${minStayIhlali.name ? ` (${minStayIhlali.name})` : ''}, seçilen ${minStayIhlali.nights} gece. Yine de kaydedilsin mi?`)) {
+      const vazgecildi = new Error('Kaydedilmedi: minimum gece kuralı.');
+      vazgecildi.userCancelled = true;
+      throw vazgecildi;
+    }
 
     const economics = readBookingFormEconomics();
     const cleanFee = economics.cleanFee;
@@ -9436,6 +9448,8 @@ async function saveBooking(e) {
     closeBookingModal();
     if (typeof alert === 'function') alert('✅ Rezervasyon başarıyla kaydedildi!' + guestProfileWarning);
   } catch (err) {
+    // Kullanici onay sorusunda vazgectiyse ikinci bir hata uyarisi gosterilmez.
+    if (err && err.userCancelled) return false;
     console.error('saveBooking error:', err);
     if (typeof alert === 'function') alert('Rezervasyon kaydedilemedi: ' + (err.message || 'Lütfen bilgileri kontrol edin.'));
   } finally {
@@ -21898,6 +21912,123 @@ function pricingPropertyBookings(entry) {
 // Ozel gunler: resmi/dini tatil tablosu + isletmenin kendi etkinlikleri
 // (L-249, kullanici M75). Etkinlik kendi yuzdesini tasiyabilir; tatil satiri
 // isletmece kapatilabilir. Kayit tenant_settings 'pricing_special_days'.
+// Minimum gece bir SATIS KISITIDIR, fiyat yuzdesi degil (L-265, kullanici
+// karari KF-1). Varsayilan kapali: kural yoksa kisit yok. Kayit
+// tenant_settings 'pricing_min_stay' (tum uyeler okur, yalniz yonetim yazar;
+// goc gerekmez). Bir konaklamanin kisiti GIRIS gunune gore olculur; ayni gune
+// birden fazla kural dusuyorsa en buyugu gecerlidir.
+function pricingMinStaySettings() {
+  const raw = appData?.tenantSettings?.pricing_min_stay;
+  const value = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  const iso = date => /^\d{4}-\d{2}-\d{2}$/.test(String(date || ''));
+  const rules = (Array.isArray(value.rules) ? value.rules : []).filter(rule => rule && rule.id
+    && Number.isInteger(Number(rule.minNights)) && Number(rule.minNights) >= 2 && Number(rule.minNights) <= 60
+    && (rule.start == null || iso(rule.start)) && (rule.end == null || iso(rule.end))
+    && !(rule.start && rule.end && rule.end < rule.start));
+  return { rules: rules.map(rule => ({ ...rule, minNights: Number(rule.minNights) })) };
+}
+
+function pricingMinNightsFor(propertyId, date, settings = pricingMinStaySettings()) {
+  let best = null;
+  settings.rules.forEach(rule => {
+    if (rule.enabled === false) return;
+    if (rule.propertyId && rule.propertyId !== propertyId) return;
+    if (rule.start && date < rule.start) return;
+    if (rule.end && date > rule.end) return;
+    if (!best || rule.minNights > best.minNights) best = { minNights: rule.minNights, name: rule.name || '', ruleId: rule.id };
+  });
+  return best;
+}
+
+// Takvimdeki her acik gece icin: kisit ve o gece satilabilir mi. Iki dolu /
+// kapali gun arasindaki acik bosluk, girisi bosluk icinde olan HICBIR
+// konaklama kisiti saglayamiyorsa satilamaz. Ufkun sonu acik sayilir (sonrasi
+// bilinmiyor, satilamaz denmez).
+function pricingMinStayMap(propertyId, days) {
+  const settings = pricingMinStaySettings();
+  const map = new Map();
+  if (!settings.rules.length) return map;
+  let i = 0;
+  while (i < days.length) {
+    if (days[i].status !== 'OPEN') { i++; continue; }
+    let j = i;
+    while (j + 1 < days.length && days[j + 1].status === 'OPEN') j++;
+    const closedAfter = j + 1 < days.length;
+    for (let d = i; d <= j; d++) {
+      const own = pricingMinNightsFor(propertyId, days[d].date, settings);
+      let sellable = true;
+      if (closedAfter) {
+        sellable = false;
+        for (let s = i; s <= d && !sellable; s++) {
+          const rule = pricingMinNightsFor(propertyId, days[s].date, settings);
+          if (!rule || (j - s + 1) >= rule.minNights) sellable = true;
+        }
+      }
+      if (own || !sellable) map.set(days[d].date, { minNights: own ? own.minNights : null, name: own ? own.name : '', sellable });
+    }
+    i = j + 1;
+  }
+  return map;
+}
+
+function pricingMinStayListHtml(entry, canManage) {
+  const rules = pricingMinStaySettings().rules.filter(rule => !rule.propertyId || rule.propertyId === entry.property.id);
+  if (!rules.length) return '<div class="empty-state">Minimum gece kuralı yok; her uzunlukta konaklama satılabilir.</div>';
+  const range = rule => rule.start || rule.end ? `${rule.start ? formatTrDate(rule.start) : '…'} – ${rule.end ? formatTrDate(rule.end) : '…'}` : 'Her zaman';
+  return `<div class="pricing-special-list">${rules.map(rule => `<div class="pricing-special-row is-event"><strong>En az ${rule.minNights} gece</strong><span>${escapeHtml(rule.name || 'Minimum gece')}</span><small>${escapeHtml(range(rule))} · ${rule.propertyId ? 'Bu mülk' : 'Portföy'} · giriş gününe göre</small>${canManage ? `<button type="button" class="btn btn-secondary btn-sm" data-onclick="removePricingMinStayRule(decodeURIComponent('${encodeActionArg(rule.id)}'))">Kaldır</button>` : ''}</div>`).join('')}</div>`;
+}
+
+async function savePricingMinStaySettings(next, message) {
+  await cloudSaveTenantSetting('pricing_min_stay', next);
+  if (!appData.tenantSettings) appData.tenantSettings = {};
+  appData.tenantSettings.pricing_min_stay = next;
+  renderPricingTab();
+  if (message && window.showToast) window.showToast(message, 'success');
+}
+
+async function savePricingMinStayRule() {
+  if (!canManageTenantRole(activeTenant?.role)) return false;
+  const value = id => String(document.getElementById(id)?.value ?? '').trim();
+  const minNights = Number(value('pricingMinStayNights'));
+  const start = value('pricingMinStayStart') || null;
+  const end = value('pricingMinStayEnd') || null;
+  const scope = value('pricingMinStayScope') || 'PROPERTY';
+  if (!Number.isInteger(minNights) || minNights < 2 || minNights > 60) { alert('En az gece 2 ile 60 arasında bir tam sayı olmalıdır.'); return false; }
+  if (start && end && end < start) { alert('Bitiş başlangıçtan önce olamaz.'); return false; }
+  const rule = { id: `ms_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, name: value('pricingMinStayName').slice(0, 80), start, end, minNights, enabled: true,
+    propertyId: scope === 'PORTFOLIO' ? null : (pricingSelectedPropertyId || null) };
+  try {
+    const settings = pricingMinStaySettings();
+    await savePricingMinStaySettings({ ...settings, rules: [...settings.rules, rule] }, `En az ${minNights} gece kuralı eklendi.`);
+    ['pricingMinStayName', 'pricingMinStayStart', 'pricingMinStayEnd', 'pricingMinStayNights'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    return true;
+  } catch (error) {
+    alert('Minimum gece kuralı kaydedilemedi: ' + (error.message || 'Bilinmeyen hata'));
+    return false;
+  }
+}
+
+async function removePricingMinStayRule(ruleId) {
+  if (!canManageTenantRole(activeTenant?.role)) return false;
+  const settings = pricingMinStaySettings();
+  try {
+    await savePricingMinStaySettings({ ...settings, rules: settings.rules.filter(rule => rule.id !== ruleId) }, 'Minimum gece kuralı kaldırıldı.');
+    return true;
+  } catch (error) {
+    alert('Minimum gece kuralı kaldırılamadı: ' + (error.message || 'Bilinmeyen hata'));
+    return false;
+  }
+}
+
+// Rezervasyon formu icin: giris gunundeki kisit ve konaklama onu sagliyor mu.
+function bookingMinStayViolation(villaKey, checkIn, checkOut) {
+  const property = appData?.villas?.[villaKey];
+  if (!property || !/^\d{4}-\d{2}-\d{2}$/.test(checkIn || '') || !/^\d{4}-\d{2}-\d{2}$/.test(checkOut || '')) return null;
+  const rule = pricingMinNightsFor(property.id, checkIn);
+  const nights = Math.round((Date.parse(checkOut + 'T00:00:00Z') - Date.parse(checkIn + 'T00:00:00Z')) / 86400000);
+  return rule && nights > 0 && nights < rule.minNights ? { ...rule, nights } : null;
+}
+
 function pricingSpecialSettings() {
   const raw = appData?.tenantSettings?.pricing_special_days;
   const value = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
@@ -21981,7 +22112,9 @@ function pricingDayCardHtml(day, ctx) {
   const selectable = ctx.canManage && ctx.dailyReady && day.status === 'OPEN';
   const selected = selectable && ctx.selected?.has(day.date);
   const weekday = new Date(day.date + 'T00:00:00Z').toLocaleDateString('tr-TR', { weekday: 'short', timeZone: 'UTC' });
-  const status = day.status === 'BOOKED' ? 'Dolu' : day.status === 'BLOCKED' ? `Kapalı · ${blocks[0]?.title || 'bakım'}` : (isGap ? 'Açık · boş gece' : 'Açık');
+  const minStay = day.status === 'OPEN' ? ctx.minStay?.get(day.date) : null;
+  const unsellable = minStay && minStay.sellable === false;
+  const status = day.status === 'BOOKED' ? 'Dolu' : day.status === 'BLOCKED' ? `Kapalı · ${blocks[0]?.title || 'bakım'}` : unsellable ? 'Açık · satılamaz boşluk' : (isGap ? 'Açık · boş gece' : 'Açık');
   let explain = '';
   if (day.status === 'OPEN') {
     if (day.price == null) explain = 'Baz fiyat girilmemiş';
@@ -21997,7 +22130,7 @@ function pricingDayCardHtml(day, ctx) {
   const proposalLine = !saved && day.status === 'OPEN' && day.price != null
     ? `Öneri${ctx.dailyReady ? (ctx.canManage ? ' · onaylanmadı' : ' · yönetici onayı bekleniyor') : ''}` : '';
   const action = selectable ? ` role="button" tabindex="0" aria-pressed="${selected ? 'true' : 'false'}" data-onclick="togglePricingDay(decodeURIComponent('${encodeActionArg(day.date)}'))"` : '';
-  return `<div class="pricing-day ${cls}${saved ? ' is-saved' : ''}${selected ? ' is-selected' : ''}${selectable ? ' is-selectable' : ''}"${action}><strong>${escapeHtml(formatTrDate(day.date))} <em>${escapeHtml(weekday)}</em></strong>${special ? `<span class="pricing-day-special">${escapeHtml(special.name)}</span>` : ''}<span>${escapeHtml(status)}</span><b>${day.status === 'OPEN' && shown != null ? escapeHtml(pricingMoney(shown)) : '—'}</b>${savedLine ? `<span class="pricing-day-saved">${escapeHtml(savedLine)}</span>` : ''}${proposalLine ? `<span class="pricing-day-proposal">${escapeHtml(proposalLine)}</span>` : ''}${explain ? `<small>${escapeHtml(explain)}</small>` : ''}${day.status === 'OPEN' ? pricingRivalLineHtml(day, shown, Boolean(special), ctx) : ''}</div>`;
+  return `<div class="pricing-day ${cls}${unsellable ? ' is-unsellable' : ''}${saved ? ' is-saved' : ''}${selected ? ' is-selected' : ''}${selectable ? ' is-selectable' : ''}"${action}><strong>${escapeHtml(formatTrDate(day.date))} <em>${escapeHtml(weekday)}</em></strong>${special ? `<span class="pricing-day-special">${escapeHtml(special.name)}</span>` : ''}<span>${escapeHtml(status)}</span><b>${day.status === 'OPEN' && shown != null ? escapeHtml(pricingMoney(shown)) : '—'}</b>${savedLine ? `<span class="pricing-day-saved">${escapeHtml(savedLine)}</span>` : ''}${proposalLine ? `<span class="pricing-day-proposal">${escapeHtml(proposalLine)}</span>` : ''}${minStay && (minStay.minNights || unsellable) ? `<span class="pricing-day-minstay">${escapeHtml(unsellable ? 'Minimum gece kuralı yüzünden bu boşluk satılamaz' : `Giriş için en az ${minStay.minNights} gece`)}</span>` : ''}${explain ? `<small>${escapeHtml(explain)}</small>` : ''}${day.status === 'OPEN' ? pricingRivalLineHtml(day, shown, Boolean(special), ctx) : ''}</div>`;
 }
 
 // Rakip fiyati gun kartinda yalniz bilgi olarak yazilir (L-260, kullanici
@@ -22577,11 +22710,17 @@ function renderBookingPriceCalendarHint() {
     const price = suggestions.get(date);
     if (price > 0) { total += price; suggested++; } else unknown++;
   });
-  if (!approved && !suggested) { hint.style.display = 'none'; hint.innerText = ''; return; }
+  const minStay = bookingMinStayViolation(villaKey, checkIn, checkOut);
+  const minStayText = minStay ? ` ⚠ Minimum gece kuralı: bu girişte en az ${minStay.minNights} gece${minStay.name ? ` (${minStay.name})` : ''}; seçilen ${minStay.nights} gece.` : '';
+  if (!approved && !suggested) {
+    hint.style.display = minStayText ? '' : 'none';
+    hint.innerText = minStayText.trim();
+    return;
+  }
   const waiting = suggested && appData.phase101SchemaReady && !canManageTenantRole(activeTenant?.role) ? ' (yönetici onayı bekleniyor)' : '';
   const parts = [approved ? `${approved} onaylı` : '', suggested ? `${suggested} öneri${waiting}` : '', unknown ? `${unknown} gece fiyatsız` : ''].filter(Boolean).join(', ');
   hint.style.display = '';
-  hint.innerText = `Fiyat takvimi: ${nights.length} gece · ${pricingMoney(total)}${unknown ? ' (eksik)' : ''} — ${parts}. Tutar kendiliğinden değişmez.`;
+  hint.innerText = `Fiyat takvimi: ${nights.length} gece · ${pricingMoney(total)}${unknown ? ' (eksik)' : ''} — ${parts}. Tutar kendiliğinden değişmez.${minStayText}`;
 }
 
 function renderPricingTab() {
@@ -22594,7 +22733,7 @@ function renderPricingTab() {
   const select = document.getElementById('pricingPropertySelect');
   if (select) select.innerHTML = entries.length ? entries.map(item => `<option value="${escapeHtml(item.property.id)}"${item.property.id === pricingSelectedPropertyId ? ' selected' : ''}>${escapeHtml(item.property.name || item.property.slug || 'Adlandırılmamış mülk')}</option>`).join('') : '<option value="">Mülk yok</option>';
   const canManage = canManageTenantRole(activeTenant?.role);
-  ['pricingManagePanels', 'pricingSpecialDayForm', 'pricingResearchPanel'].forEach(id => {
+  ['pricingManagePanels', 'pricingSpecialDayForm', 'pricingResearchPanel', 'pricingMinStayForm'].forEach(id => {
     const element = document.getElementById(id); if (element) element.style.display = canManage ? '' : 'none';
   });
   if (!entry) {
@@ -22648,10 +22787,16 @@ function renderPricingTab() {
   const warningText = { OCCUPANCY_TARGET_MISSING: 'Talep kuralı çalışmıyor: aşağıdaki hesaplayıcıda hedef doluluk girin.', BASE_PRICE_MISSING: 'Baz fiyat girilmemiş: öneri hesaplanamaz, fiyat tablosundan girin.', FLOOR_PRICE_MISSING: 'Taban fiyat girilmemiş: indirimler için alt sınır yok.' };
   const warnings = suggestions.warnings.map(item => warningText[item.code] || item.text);
   if (appData.propertyClosuresReady === false) warnings.unshift('Bakımla kapalı günler bu rolde okunamadı (phase103 bekleniyor): "Açık" görünen bir gün bakımda olabilir.');
+  const minStay = pricingMinStayMap(entry.property.id, suggestions.days);
+  const unsellableNights = monthDays.filter(day => minStay.get(day.date)?.sellable === false).length;
+  if (unsellableNights) warnings.push(`${unsellableNights} açık gece minimum gece kuralı yüzünden satılamaz (boşluk kuralın istediğinden kısa).`);
   const warningHtml = warnings.length ? `<div class="pricing-warnings">${warnings.map(text => `<span>${escapeHtml(text)}</span>`).join('')}</div>` : '';
   const ctx = { blocks, specialByDate: new Map(specialDays.map(day => [day.date, day])), gapSet: new Set(suggestions.gapDates || []),
     saved: pricingDailyPriceMap(entry.property.id), canManage, dailyReady: !!appData.phase101SchemaReady, selected: pricingSelectedDays,
-    research: appData.competitorPriceResearch || [], propertyId: entry.property.id, today };
+    research: appData.competitorPriceResearch || [], propertyId: entry.property.id, today,
+    minStay };
+  const minStayList = document.getElementById('pricingMinStayList');
+  if (minStayList) minStayList.innerHTML = pricingMinStayListHtml(entry, canManage);
   const editor = document.getElementById('pricingDayEditor');
   if (editor) editor.innerHTML = pricingDayEditorHtml(canManage);
   setEl('pricingCalendarTitle', `Fiyat takvimi · ${pricingMonthLabel(monthKey)}`);
@@ -23044,6 +23189,11 @@ if (typeof module !== 'undefined' && module.exports) {
     resetPricingRuleSetting,
     savePricingPriceTable,
     savePricingSpecialEvent,
+    pricingMinStayMap,
+    pricingMinNightsFor,
+    bookingMinStayViolation,
+    savePricingMinStayRule,
+    removePricingMinStayRule,
     removePricingSpecialEvent,
     togglePricingHoliday,
     togglePricingDay,

@@ -14,7 +14,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=914af94e">
+  <link rel="stylesheet" href="style.css?v=e2dc09f9">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="supabase.umd.js?v=3810661a"></script>
@@ -2130,6 +2130,19 @@
             <div class="form-group"><label>&nbsp;</label><button type="button" class="btn btn-primary btn-sm" data-onclick="savePricingSpecialEvent()">Etkinlik ekle</button></div>
           </div>
         </section>
+        <section class="pricing-config-card pricing-special-card">
+          <h3>Minimum gece</h3>
+          <p>Satış kısıtıdır, fiyatı değiştirmez. Varsayılan kapalı; kural eklemezseniz her uzunlukta konaklama satılabilir. Kısıt giriş gününe göre uygulanır; daha kısa boşluklar takvimde "satılamaz" görünür, rezervasyon formu kaydetmeden önce sorar.</p>
+          <div id="pricingMinStayList"></div>
+          <div id="pricingMinStayForm" class="form-grid pricing-special-form">
+            <div class="form-group"><label for="pricingMinStayNights">En az gece</label><input id="pricingMinStayNights" type="number" min="2" max="60" step="1" placeholder="—"></div>
+            <div class="form-group"><label for="pricingMinStayStart">Başlangıç (boşsa her zaman)</label><input id="pricingMinStayStart" type="date"></div>
+            <div class="form-group"><label for="pricingMinStayEnd">Bitiş (boşsa açık uçlu)</label><input id="pricingMinStayEnd" type="date"></div>
+            <div class="form-group"><label for="pricingMinStayName">Ad (isteğe bağlı)</label><input id="pricingMinStayName" type="text" maxlength="80" placeholder="Örn: Temmuz–Ağustos"></div>
+            <div class="form-group"><label for="pricingMinStayScope">Kapsam</label><select id="pricingMinStayScope"><option value="PROPERTY">Yalnız bu mülk</option><option value="PORTFOLIO">Tüm portföy</option></select></div>
+            <div class="form-group"><label>&nbsp;</label><button type="button" class="btn btn-primary btn-sm" data-onclick="savePricingMinStayRule()">Kural ekle</button></div>
+          </div>
+        </section>
         <section class="pricing-config-card pricing-target-card">
           <h3 id="pricingTargetTitle">Hedef ciro hesaplayıcısı</h3>
           <p>Seçili ayın hedefinden bu ay gerçekleşen ciroyu düşer, kalanı ayın açık geceleriyle karşılaştırır. <strong>Tüm mülkler</strong> Hedefleri Yönet'teki işletme hedefini ve Finans'taki ciroyu kullanır. Hedef doluluk girilirse talep kuralı da bu orana göre çalışır.</p>
@@ -4046,10 +4059,10 @@
   <script src="core/side_panel.js?v=d763b464"></script>
   <script src="core/notification_feed.js?v=97d955bf"></script>
   <script src="core/command_search.js?v=89760933"></script>
-  <script src="core/action_dispatch.js?v=e506d15b"></script>
+  <script src="core/action_dispatch.js?v=7eff8db9"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=fa6d0372"></script>
-  <script src="app.js?v=e68c2f88"></script>
+  <script src="app.js?v=ea9aa4b9"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=e5503243"></script>
