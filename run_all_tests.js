@@ -359,7 +359,8 @@ const allTestFiles = [
   'monthly_goal_ui_tests.js',
 
   // Ice aktarma: tarih sirasi dosyadan (GG/AA - AA/GG), TL ekli tutar, yabanci para reddi
-  'import_parsing_tests.js'
+  'import_parsing_tests.js',
+  'property_color_tests.js'
 ];
 
 const testEnv = require('./core/test_env.js');

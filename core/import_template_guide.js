@@ -45,7 +45,7 @@
     ['CAPEX', 'Yatırım / demirbaş']
   ];
 
-  const YER_TUTUCU_NOTU = 'Yer tutucu — kendi mülk kodunuzu yazın. Kodlarınız hazır yazılı şablon için: uygulamada Araçlar › Excel / CSV yükle › "Kendi mülk kodlarınızla hazır şablon".';
+  const YER_TUTUCU_NOTU = 'Yer tutucu — kendi mülk kodunuzu yazın. Kodlarınız hazır yazılı şablon için: uygulamada Veri ve yardım › Excel / CSV yükle › "Kendi mülk kodlarınızla hazır şablon".';
 
   function mulkSatirlari(mulkler) {
     if (!mulkler || !mulkler.length) {
@@ -68,7 +68,7 @@
       'ADIM 6 — "Brüt Tutar" misafirin ödediği toplamdır. "Misafirden Temizlik Ücreti" bunun İÇİNDEDİR ve ayrı gelir olarak raporlanır. Personele ödenen temizlik MALİYETİ bu dosyaya yazılmaz; geçmiş temizlik maliyetleri için Geçmiş Temizlik şablonunu kullanın.',
       'ADIM 7 — "OTA Komisyonu" gider olarak yazılır, ciroyu düşürmez. "Oda İndirimi" yalnız oda gelirinden düşer.',
       'ADIM 8 — "Durum": GEÇERLİ DEĞERLER sayfasındaki değerlerden biri; boşsa CONFIRMED.',
-      'ADIM 9 — Kaydedip Araçlar › Excel / CSV yükle ekranına bırakın. Önizlemede her hatalı satırı ve nedenini görürsünüz; onaylamadan hiçbir şey kaydedilmez.',
+      'ADIM 9 — Kaydedip Veri ve yardım › Excel / CSV yükle ekranına bırakın. Önizlemede her hatalı satırı ve nedenini görürsünüz; onaylamadan hiçbir şey kaydedilmez.',
       '',
       'Elinizde başka biçimde bir tablo mu var? Aynı ekrandaki "Tablomu şablona çevir (ChatGPT)" düğmesi, tablonuzu bu sütunlara çevirecek hazır bir istem kopyalar.'
     ];
@@ -87,7 +87,7 @@
       'ADIM 5 — "Tür": OPEX (işletme gideri) ya da CAPEX (yatırım). Boşsa OPEX.',
       'ADIM 6 — Tarih: 2026-07-03 ya da 03.07.2026. Tutar: 18000 ya da 18.000,50.',
       'ADIM 7 — Temizlik personeline ödenen tutar buraya GİRİLMEZ: yeni temizlikler görevden gider yazılır, GEÇMİŞ temizlikler için Geçmiş Temizlik şablonunu kullanın. Reklam harcamasını Kanallar ve Pazarlama ekranından girin; burada da girilirse iki kez sayılır.',
-      'ADIM 8 — Kaydedip Araçlar › Excel / CSV yükle ekranına bırakın. Önizlemede hatalı satırları ve nedenini görürsünüz; onaylamadan hiçbir şey kaydedilmez.'
+      'ADIM 8 — Kaydedip Veri ve yardım › Excel / CSV yükle ekranına bırakın. Önizlemede hatalı satırları ve nedenini görürsünüz; onaylamadan hiçbir şey kaydedilmez.'
     ];
   }
 
@@ -107,7 +107,7 @@
       'ADIM 6 — "Ödendi": EVET ya da HAYIR; boşsa EVET. HAYIR yazarsanız temizlik yapılmış ama ödenmemiş sayılır ve personel borcu olarak görünür.',
       'ADIM 7 — Aynı mülkte aynı gün zaten bir temizlik görevi varsa o satır kaydedilmez (maliyet iki kez sayılmasın); var olanı Operasyon › Temizlik\'ten "yapıldı" işaretleyin.',
       'ADIM 8 — "Temizlikçi" ve "Açıklama" isteğe bağlı.',
-      'ADIM 9 — Araçlar › Excel / CSV yükle ekranına bırakın, türü "Geçmiş temizlik" seçin. Önizlemede hatalı satırları ve nedenini görürsünüz. Yanlış dosya yüklediyseniz aynı ekrandan tek tuşla geri alabilirsiniz.'
+      'ADIM 9 — Veri ve yardım › Excel / CSV yükle ekranına bırakın, türü "Geçmiş temizlik" seçin. Önizlemede hatalı satırları ve nedenini görürsünüz. Yanlış dosya yüklediyseniz aynı ekrandan tek tuşla geri alabilirsiniz.'
     ];
   }
 
