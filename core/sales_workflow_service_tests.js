@@ -28,5 +28,9 @@ function query(result, calls) {
   assert.strictEqual(marketingDenied.allowed, false);
   const transactional = Service.buildWhatsAppLink({ phone: '+905551112233', body: 'Teklifiniz hazır', messageType: 'TRANSACTIONAL', marketingOptIn: false, allowWhatsapp: true });
   assert(transactional.allowed && transactional.url.startsWith('https://wa.me/905551112233'));
+  const localTurkish = Service.buildWhatsAppLink({ phone: '0555 000 00 00', body: 'Teklifiniz hazır', messageType: 'TRANSACTIONAL', allowWhatsapp: true });
+  assert.strictEqual(localTurkish.url, 'https://wa.me/905550000000?text=Teklifiniz%20haz%C4%B1r');
+  assert.strictEqual(Service.normalizeWhatsAppPhone('5550000000'), '905550000000');
+  assert.strictEqual(Service.normalizeWhatsAppPhone('00905550000000'), '905550000000');
   console.log('[PASS] Satış iş akışı takip, ilgi ve izinli WhatsApp sözleşmelerini uygular');
 })().catch(error => { console.error(error); process.exit(1); });

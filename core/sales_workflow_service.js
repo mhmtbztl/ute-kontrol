@@ -55,14 +55,23 @@
     return data;
   }
 
+  function normalizeWhatsAppPhone(value, defaultCountryCode = '90') {
+    let digits = String(value || '').replace(/\D/g, '');
+    if (digits.startsWith('00')) digits = digits.slice(2);
+    const countryCode = String(defaultCountryCode || '').replace(/\D/g, '');
+    if (/^0\d{10}$/.test(digits) && countryCode) return countryCode + digits.slice(1);
+    if (/^5\d{9}$/.test(digits) && countryCode) return countryCode + digits;
+    return digits;
+  }
+
   function buildWhatsAppLink(input = {}) {
     if (!input.allowWhatsapp) return { allowed: false, reason: 'WHATSAPP_NOT_ALLOWED' };
     if (input.messageType === 'MARKETING' && input.marketingOptIn !== true) return { allowed: false, reason: 'MARKETING_CONSENT_REQUIRED' };
-    const phone = String(input.phone || '').replace(/\D/g, '');
+    const phone = normalizeWhatsAppPhone(input.phone, input.defaultCountryCode || '90');
     const body = String(input.body || '').trim();
     if (!phone || !body) return { allowed: false, reason: 'RECIPIENT_OR_BODY_MISSING' };
     return { allowed: true, url: `https://wa.me/${encodeURIComponent(phone)}?text=${encodeURIComponent(body)}` };
   }
 
-  return { saveWorkflow, bumpInterest, createSource, saveClassification, buildWhatsAppLink };
+  return { saveWorkflow, bumpInterest, createSource, saveClassification, normalizeWhatsAppPhone, buildWhatsAppLink };
 });
