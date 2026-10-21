@@ -37,6 +37,19 @@ test('Explicit numeric dates parse and a phone is not mistaken for money', () =>
   assert.strictEqual(result.villa, null);
 });
 
+test('A price question followed by a phone does not turn phone digits into an amount', () => {
+  const result = App.parseWhatsAppMessageText(
+    'Merhaba, 15-18 Ağustos arası 4 kişi villa fiyatı nedir? Ayşe 0555 111 2233',
+    villas,
+    '2026-10-21'
+  );
+  assert.strictEqual(result.phone, '0555 111 22 33');
+  assert.strictEqual(result.amount, null);
+  assert.strictEqual(result.pax, 4);
+  assert.strictEqual(result.checkIn, '2027-08-15');
+  assert.strictEqual(result.checkOut, '2027-08-18');
+});
+
 test('Month names roll forward to the next future occurrence without inventing pax or property', () => {
   const result = App.parseWhatsAppMessageText(
     '20-24 Ocak için yer var mı? Bütçemiz 45 bin',

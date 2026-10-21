@@ -11616,6 +11616,12 @@ function leadPropertyLabel(lead) {
   return appData.villas?.[lead?.villa]?.name || (!lead?.villa || lead.villa === 'ALL' ? 'Mülk belli değil' : lead.villa);
 }
 
+function canConvertLeadToBooking(lead, role = activeTenant?.role) {
+  const status = String(lead?.status || lead?.stage || 'NEW').toUpperCase();
+  return canWriteSalesRole(role) && status !== 'WON' && status !== 'LOST' &&
+    !lead?.convertedBookingId && !lead?.converted_booking_id;
+}
+
 // Kart kompakt: ad tek satir; telefon, kaynak ve mulk tek alt satir. Duzenleme "Aç" ile pencerede.
 function renderLeadCard(row) {
   const villaName = leadPropertyLabel(row);
@@ -11873,7 +11879,7 @@ function renderManageLeadsTable() {
     let convertAction = '';
     if (l.status === 'WON' || l.stage === 'WON' || l.convertedBookingId) {
       convertAction = `<span class="badge badge-green" style="font-size: 11px;" title="Dönüşen Rezervasyon">✅ Rezervasyona Dönüştü</span>`;
-    } else if (canWrite) {
+    } else if (canConvertLeadToBooking(l)) {
       convertAction = `<button class="btn btn-primary btn-sm" data-onclick="convertLeadAction(decodeURIComponent('${encodeActionArg(l.id)}'))" title="Kesin Rezervasyona Dönüştür">📅 Rezervasyona Dönüştür</button>`;
     } else {
       convertAction = '<span class="sub-text">—</span>';
@@ -11907,6 +11913,11 @@ async function convertLeadAction(leadId) {
 
   if (l.status === 'WON' || l.convertedBookingId) {
     alert('Bu talep zaten bir rezervasyona dönüştürülmüş.');
+    return false;
+  }
+
+  if (String(l.status || l.stage || '').toUpperCase() === 'LOST') {
+    alert('Kaybedilmiş bir talep rezervasyona dönüştürülemez. Önce talebi yeniden açık bir duruma alın.');
     return false;
   }
 
@@ -13979,6 +13990,13 @@ function parseWhatsAppMessageText(text, villas = {}, todayStr = getTodayStr()) {
     detectedPhone = `0${phoneMatch[1]} ${phoneMatch[2]} ${phoneMatch[3]} ${phoneMatch[4]}`;
   }
 
+  // Telefon fiyat sorusunun hemen ardindaysa ("fiyatı nedir? Ayşe 0555…")
+  // baglam aramasi numaranin ilk rakamlarini teklif sanmasin. Konumu koruyan
+  // bosluklar, asagidaki para baglami dilimlerinin indislerini de korur.
+  const priceSearchText = phoneMatch
+    ? `${text.slice(0, phoneMatch.index)}${' '.repeat(phoneMatch[0].length)}${text.slice(phoneMatch.index + phoneMatch[0].length)}`
+    : text;
+
   // Ucret icin para birimi veya fiyat/butce baglami aranir. Boylece telefon
   // numaralari ve tarihler ucret olarak yorumlanmaz.
   let detectedAmount = null;
@@ -13993,7 +14011,7 @@ function parseWhatsAppMessageText(text, villas = {}, todayStr = getTodayStr()) {
   const paralar = [];
   const paraRe = /(\d{1,3}(?:\.\d{3})+|\d{1,7}(?:[.,]\d{1,2})?)\s*(bin\b|k\b)?\s*(?:tl\b|₺|lira\b)/gi;
   let pm;
-  while ((pm = paraRe.exec(text)) !== null) {
+  while ((pm = paraRe.exec(priceSearchText)) !== null) {
     const deger = paraOku(pm[1]);
     if (deger === null) continue;
     paralar.push({ deger: pm[2] ? deger * 1000 : deger, bas: pm.index, son: pm.index + pm[0].length });
@@ -14004,8 +14022,8 @@ function parseWhatsAppMessageText(text, villas = {}, todayStr = getTodayStr()) {
   paralar.forEach((p, i) => {
     const onceki = paralar[i - 1];
     const sonraki = paralar[i + 1];
-    const once = trKucuk(text.slice(Math.max(onceki ? onceki.son : 0, p.bas - 25), p.bas));
-    const sonra = trKucuk(text.slice(p.son, Math.min(sonraki ? sonraki.bas : text.length, p.son + 30)));
+    const once = trKucuk(priceSearchText.slice(Math.max(onceki ? onceki.son : 0, p.bas - 25), p.bas));
+    const sonra = trKucuk(priceSearchText.slice(p.son, Math.min(sonraki ? sonraki.bas : priceSearchText.length, p.son + 30)));
     if (/(girişte|giriste|kalan|alınacak|alinacak|ödenecek|odenecek)/.test(sonra) || /(kalan|bakiye)\s*$/.test(once)) {
       detectedRemaining = (detectedRemaining || 0) + p.deger;
     } else if (/(alındı|alindi|kapora|ön ?ödeme|on ?odeme|peşin|pesin|yatırıldı|yatirildi|yatırdı|gönderildi|gönderdi|ödendi|odendi)/.test(sonra)
@@ -14021,15 +14039,15 @@ function parseWhatsAppMessageText(text, villas = {}, todayStr = getTodayStr()) {
     detectedAmount = detectedDeposit + detectedRemaining;
   }
 
-  const kMatch = text.match(/(\d+(?:[.,]\d+)?)\s*(?:bin|k)\b/i);
+  const kMatch = priceSearchText.match(/(\d+(?:[.,]\d+)?)\s*(?:bin|k)\b/i);
   if (detectedAmount !== null || detectedDeposit !== null || detectedRemaining !== null) {
     // Kapora/kalan bulunduysa genel tutar arama yapilmaz; yalniz kapora varsa
     // toplam bilinmiyordur ve uydurulmaz (3.6).
   } else if (kMatch) {
     detectedAmount = Number(kMatch[1].replace(',', '.')) * 1000;
   } else {
-    const currencyMatch = text.match(/(\d{1,3}(?:\.\d{3})+|\d{1,7}(?:[.,]\d{1,2})?)\s*(?:tl|₺|euro|usd|lira)/i);
-    const contextMatch = text.match(/(?:bütçe(?:miz)?|butce(?:miz)?|fiyat|tutar|teklif)\D{0,20}(\d{1,3}(?:\.\d{3})+|\d{1,7}(?:[.,]\d{1,2})?)/i);
+    const currencyMatch = priceSearchText.match(/(\d{1,3}(?:\.\d{3})+|\d{1,7}(?:[.,]\d{1,2})?)\s*(?:tl|₺|euro|usd|lira)/i);
+    const contextMatch = priceSearchText.match(/(?:bütçe(?:miz)?|butce(?:miz)?|fiyat|tutar|teklif)\D{0,20}(\d{1,3}(?:\.\d{3})+|\d{1,7}(?:[.,]\d{1,2})?)/i);
     const priceMatch = currencyMatch || contextMatch;
     if (priceMatch) {
       const rawAmount = priceMatch[1];
@@ -14188,8 +14206,9 @@ async function saveWaAsLead() {
   const sourceId = document.getElementById('waParsedSource')?.value || '';
   const notes = document.getElementById('waParsedNotes').value.trim();
 
+  let result;
   try {
-    await quickCaptureLead({
+    result = await quickCaptureLead({
       guestName: guest,
       phone,
       sourceId,
@@ -14208,7 +14227,12 @@ async function saveWaAsLead() {
   switchTab('leads');
   renderManageLeadsTable();
 
-  alert(`✅ WhatsApp talebi${guest ? ` "${guest}"` : ''} başarıyla Talep & Satış listesine kaydedildi!`);
+  alert(buildWhatsAppLeadSaveMessage(result, guest));
+}
+
+function buildWhatsAppLeadSaveMessage(result, guest) {
+  if (result?.created === false) return 'ℹ️ WhatsApp bilgileri mevcut açık talebe eklendi.';
+  return `✅ WhatsApp talebi${guest ? ` "${guest}"` : ''} başarıyla Talep & Satış listesine kaydedildi!`;
 }
 
 async function saveWaAsBooking() {
@@ -23172,6 +23196,8 @@ if (typeof module !== 'undefined' && module.exports) {
     GLOBAL_FILTER_SCOPE,
     renderTodayMonthSummary,
     parseWhatsAppMessageText,
+    buildWhatsAppLeadSaveMessage,
+    canConvertLeadToBooking,
     saveWaAsBooking,
     saveBooking,
     isUUID,
