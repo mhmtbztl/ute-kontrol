@@ -6062,7 +6062,7 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
             <span class="rank-badge ${rankClass}">#${rank}</span>
             <div class="villa-icon-avatar">${item.meta.icon || '🏡'}</div>
             <div class="villa-text-meta">
-              <h4>${escapeHtml(item.conf.name)}</h4>
+              <h4>${propertyNameHtml(item.key, item.conf.name)}</h4>
               <span>${item.meta.spec}</span>
             </div>
           </div>
@@ -8732,7 +8732,7 @@ function renderManageBookingsTable() {
     tr.className = 'reservation-list-row';
     tr.setAttribute('data-onclick', `openBookingDetailsPanel(decodeURIComponent('${encodeActionArg(String(b.id))}'))`);
     tr.innerHTML = `
-      <td data-label="Mülk" data-onclick="openBookingDetailsPanel(decodeURIComponent('${encodeActionArg(String(b.id))}'))"><strong>${escapeHtml(vName)}</strong>${markerHtml ? `<div class="reservation-markers">${markerHtml}</div>` : ''}</td>
+      <td data-label="Mülk" data-onclick="openBookingDetailsPanel(decodeURIComponent('${encodeActionArg(String(b.id))}'))"><strong>${propertyNameHtml(b.villa, vName)}</strong>${markerHtml ? `<div class="reservation-markers">${markerHtml}</div>` : ''}</td>
       <td data-label="Misafir">${escapeHtml(b.guest || 'Belirtilmedi')}${isBulkSummaryBooking(b) ? ' <span class="badge badge-slate" style="font-size:10px;">Aylık özet</span>' : ''}</td>
       <td data-label="Kanal"><span class="badge ${b.channel === 'AIRBNB' ? 'badge-rose' : (b.channel === 'BOOKING' ? 'badge-blue' : 'badge-emerald')}">${escapeHtml(getChannelDisplayName(b.channel))}</span></td>
       <td data-label="Tarihler">${formatTrDate(b.checkIn)} – ${formatTrDate(b.checkOut)}</td>
@@ -13699,12 +13699,11 @@ function renderTapeChart() {
 
   // Find bookings for each villa
   const takvimOzetleri = [];
-  vKeys.forEach((vKey, villaIndex) => {
+  vKeys.forEach(vKey => {
     const vConf = appData.villas?.[vKey] || {};
     const vName = vConf.name || vKey;
     const vPropId = vConf.id;
-    const propertyColor = ['#38BDF8', '#A78BFA', '#30D158', '#FFB340', '#FB7185'][villaIndex % 5];
-    tableHtml += `<tr><td class="tape-villa-td"><span class="tape-property-dot" style="background:${propertyColor}"></span><strong>${escapeHtml(vName)}</strong></td>`;
+    tableHtml += `<tr><td class="tape-villa-td"><strong>${propertyNameHtml(vKey, vName)}</strong></td>`;
 
     const tumu = (appData.bookings || []).filter(b =>
       (b.villa === vKey || (vPropId && b.propertyId === vPropId)) && b.status !== 'CANCELLED'
@@ -19215,7 +19214,7 @@ function renderTodayPerformance() {
   const rows = active.map(key => ({ key, name: appData.villas[key].name || key, perf: computeMonthPerformance(month, key) }))
     .sort((a, b) => (b.perf.ciro || 0) - (a.perf.ciro || 0));
   list.innerHTML = `<div class="today-performance__row today-performance__row--head"><span>Mülk</span><span>Doluluk</span><span>ADR</span><span>RevPAR</span><span></span></div>`
-    + rows.map(row => `<div class="today-performance__row"><strong>${escapeHtml(row.name)}</strong><span>${row.perf.occupancy === null ? '—' : `%${escapeHtml(row.perf.occupancy.toLocaleString('tr-TR'))}`}</span><span>${escapeHtml(todayPerformanceMoney(row.perf.adr))}</span><span>${escapeHtml(todayPerformanceMoney(row.perf.revpar))}</span><button type="button" class="btn btn-secondary btn-sm" data-onclick="setTodayPerformanceVilla(decodeURIComponent('${encodeActionArg(row.key)}'))">Seç</button></div>`).join('');
+    + rows.map(row => `<div class="today-performance__row"><strong>${propertyNameHtml(row.key, row.name)}</strong><span>${row.perf.occupancy === null ? '—' : `%${escapeHtml(row.perf.occupancy.toLocaleString('tr-TR'))}`}</span><span>${escapeHtml(todayPerformanceMoney(row.perf.adr))}</span><span>${escapeHtml(todayPerformanceMoney(row.perf.revpar))}</span><button type="button" class="btn btn-secondary btn-sm" data-onclick="setTodayPerformanceVilla(decodeURIComponent('${encodeActionArg(row.key)}'))">Seç</button></div>`).join('');
 }
 
 function renderTodayMonthSummary(bookings) {
@@ -19661,7 +19660,7 @@ function renderPortfolioHealth(healthCards) {
       <div class="property-health-card status-${cardStatus}" data-readiness-status="${escapeHtml(c.status)}" data-property-key="${escapeHtml(c.propertyKey)}">
         <div class="health-card-head">
           <div>
-            <strong class="health-card-name">${escapeHtml(c.propertyName)}</strong>
+            <strong class="health-card-name">${propertyNameHtml(c.propertyKey, c.propertyName)}</strong>
             <div class="health-card-reason">${escapeHtml(c.reason)}</div>
           </div>
           <span class="badge ${badgeClass}">${meta.icon} ${escapeHtml(meta.label)}</span>
@@ -20485,6 +20484,52 @@ function renderPropertyProfile(villaKey) {
   return `<section class="card property-profile-card"><div class="section-title-bar"><div><h2>${escapeHtml(property.name)}</h2><p class="sub-text">Sekmeli mülk profili</p></div>${editButton}</div><div class="subpage-switch" role="tablist" aria-label="Mülk profili">${tabButtons}</div><div style="margin-top:14px">${propertyProfileBodyHtml(body)}</div></section>`;
 }
 
+// Mulk rengi: ad gecen her yerde (takvim, listeler, kartlar) ayni nokta.
+// Secilen renk tenant_settings 'property_colors' = { <mulk UUID>: '#RRGGBB' };
+// UUID'ye bagli oldugu icin ad ya da sira degisince renk kaymaz. Secilmemisse
+// paletten sabit bir renk gosterilir (gorunum varsayilani, veri degil).
+const PROPERTY_COLOR_PALETTE = [
+  ['#0A84FF', 'Mavi'], ['#30D158', 'Yeşil'], ['#FF9F0A', 'Turuncu'], ['#FF453A', 'Kırmızı'], ['#BF5AF2', 'Mor'],
+  ['#64D2FF', 'Açık mavi'], ['#FFD60A', 'Sarı'], ['#FF375F', 'Pembe'], ['#5E5CE6', 'Çivit'], ['#AC8E68', 'Kahverengi']
+];
+
+function getPropertyColor(villaKey) {
+  const villas = (typeof appData !== 'undefined' && appData?.villas) || {};
+  const saved = appData?.tenantSettings?.property_colors?.[villas[villaKey]?.id];
+  // Veritabanindan gelen deger style ozniteligine girer: yalniz #RRGGBB kabul edilir.
+  if (typeof saved === 'string' && /^#[0-9a-f]{6}$/i.test(saved)) return saved.toUpperCase();
+  const index = Math.max(0, Object.keys(villas).indexOf(villaKey));
+  return PROPERTY_COLOR_PALETTE[index % PROPERTY_COLOR_PALETTE.length][0];
+}
+
+function propertyNameHtml(villaKey, name) {
+  return `<span class="property-name"><span class="property-color-dot" style="background:${escapeHtml(getPropertyColor(villaKey))}" aria-hidden="true"></span>${escapeHtml(name)}</span>`;
+}
+
+function propertyColorPickerHtml(villaKey) {
+  const current = getPropertyColor(villaKey);
+  return `<div class="property-color-picker" role="group" aria-label="Mülk rengi"><span class="sub-text">Renk</span>${PROPERTY_COLOR_PALETTE.map(([color, label]) => `<button type="button" class="property-color-swatch${color === current ? ' is-selected' : ''}" style="background:${escapeHtml(color)}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}" aria-pressed="${color === current}" data-onclick="setPropertyColor(decodeURIComponent('${encodeActionArg(villaKey)}'), decodeURIComponent('${encodeActionArg(color)}'))"></button>`).join('')}</div>`;
+}
+
+async function setPropertyColor(villaKey, color) {
+  if (!canManageTenantRole(activeTenant?.role)) return false;
+  const propertyId = appData?.villas?.[villaKey]?.id;
+  const next = String(color || '').toUpperCase();
+  if (!propertyId || !PROPERTY_COLOR_PALETTE.some(([value]) => value === next)) return false;
+  const colors = { ...(appData?.tenantSettings?.property_colors || {}), [propertyId]: next };
+  try {
+    await cloudSaveTenantSetting('property_colors', colors);
+  } catch (error) {
+    if (typeof showToast === 'function') showToast('Mülk rengi kaydedilemedi: ' + kullaniciMesaji(error?.message || ''), 'error');
+    return false;
+  }
+  if (!appData.tenantSettings) appData.tenantSettings = {};
+  appData.tenantSettings.property_colors = colors;
+  if (typeof renderAll === 'function') renderAll();
+  else renderPropertiesTab();
+  return true;
+}
+
 function renderPropertiesTab() {
   if (typeof document === 'undefined') return;
   const grid = document.getElementById('propertiesManagementGrid');
@@ -20506,7 +20551,7 @@ function renderPropertiesTab() {
       <div class="property-health-card status-HEALTHY">
         <div style="display: flex; justify-content: space-between; align-items: flex-start;">
           <div>
-            <strong style="font-size: 15px; color: #FFFFFF;">${escapeHtml(v.name || 'Adsız mülk')}</strong>
+            <strong style="font-size: 15px; color: #FFFFFF;">${propertyNameHtml(k, v.name || 'Adsız mülk')}</strong>
             <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Kod: ${escapeHtml(k)} • Kapasite: ${escapeHtml(v.capacity || 'Belirtilmedi')}</div>
           </div>
           <span class="badge badge-green">Aktif</span>
@@ -20520,6 +20565,7 @@ function renderPropertiesTab() {
         <div style="font-size: 11px; color: #C7C7CC;">
           <strong>Olanaklar:</strong> ${escapeHtml(v.amenities || 'Belirtilmedi')}
         </div>
+        ${canManage ? propertyColorPickerHtml(k) : ''}
         <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px;">
           <button class="btn btn-primary btn-sm" data-onclick="setPropertyProfile(decodeURIComponent('${encodeActionArg(k)}'))" style="font-size: 10px;">Profili Aç</button>
           ${canManage ? `<button class="btn btn-secondary btn-sm" data-onclick="openPropertyModal(decodeURIComponent('${encodeActionArg(k)}'))" style="font-size: 10px;">Düzenle</button>` : ''}
@@ -23288,6 +23334,11 @@ if (typeof module !== 'undefined' && module.exports) {
     setAppData,
     getAppData,
     setSupabaseClient,
+    getPropertyColor,
+    propertyNameHtml,
+    propertyColorPickerHtml,
+    setPropertyColor,
+    PROPERTY_COLOR_PALETTE,
     getSupabaseClient,
     getActiveTenantId,
     setActiveTenant,

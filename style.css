@@ -6643,7 +6643,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent-blue); 
 
 /* Arama: yer tutucu metinli kapsul, sagda kisayol. */
 .app-header .header-palette-btn {
-  min-width: 220px;
+  min-width: 180px;
   justify-content: flex-start;
   background: var(--fill-4);
   color: var(--text-dim);
@@ -6696,6 +6696,11 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent-blue); 
   border: 1px solid var(--hairline) !important;
   border-radius: var(--radius-md) !important;
   box-shadow: var(--shadow-lg) !important;
+}
+
+/* Alt baslik genis ekranda kalir; orta genislikte arac cubugu tek satira sigsin. */
+@media (max-width: 1520px) {
+  .app-header .brand-meta p { display: none; }
 }
 
 @media (max-width: 1180px) {
@@ -6842,3 +6847,44 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent-blue); 
   }
   .settings-nav__icon { width: 22px; height: 22px; border-radius: 50%; font-size: 12px; background: transparent; }
 }
+
+/* =====================================================================
+   MULK RENGI — propertyNameHtml / propertyColorPickerHtml
+   Ad gecen her yerde ayni renkli nokta; Mulkler kartinda renk secici.
+   ===================================================================== */
+.property-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.property-color-dot {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.08);
+}
+
+.property-color-picker {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.property-color-picker .sub-text { flex-basis: 100%; font-size: 12px; }
+
+.property-color-swatch {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast);
+}
+.property-color-swatch:hover { transform: scale(1.12); }
+.property-color-swatch.is-selected { box-shadow: 0 0 0 2px var(--bg-surface-elevated), 0 0 0 4px #FFFFFF; }
+.property-color-swatch:focus-visible { box-shadow: 0 0 0 2px var(--bg-surface-elevated), 0 0 0 4px var(--accent-blue); }
