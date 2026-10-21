@@ -166,6 +166,25 @@ async function test(name, fn) {
     assert.match(html, /id="waParsedSource"[^>]+required/);
     assert.match(body, /quickCaptureLead/);
     assert.doesNotMatch(body, /createLead|WhatsApp Misafiri/);
+    assert.match(body, /buildWhatsAppLeadSaveMessage\(result, guest\)/);
+  });
+
+  await test('WhatsApp talep sonucu yeni kayıt ile mevcut talebe eklemeyi doğru bildirir', () => {
+    assert.strictEqual(
+      App.buildWhatsAppLeadSaveMessage({ created: true }, 'Ayşe'),
+      '✅ WhatsApp talebi "Ayşe" başarıyla Talep & Satış listesine kaydedildi!'
+    );
+    assert.strictEqual(
+      App.buildWhatsAppLeadSaveMessage({ created: false }, ''),
+      'ℹ️ WhatsApp bilgileri mevcut açık talebe eklendi.'
+    );
+  });
+
+  await test('kaybedilen ve kazanılan talepler rezervasyona dönüştürülemez', () => {
+    assert.strictEqual(App.canConvertLeadToBooking({ status: 'LOST' }, 'sales'), false);
+    assert.strictEqual(App.canConvertLeadToBooking({ status: 'WON' }, 'sales'), false);
+    assert.strictEqual(App.canConvertLeadToBooking({ status: 'QUOTE_SENT' }, 'sales'), true);
+    assert.strictEqual(App.canConvertLeadToBooking({ status: 'QUOTE_SENT' }, 'viewer'), false);
   });
 
   await test('izleyici misafir profilini salt okunur görür; satış rolü düzenler ama özel listeyi yönetemez', () => {
