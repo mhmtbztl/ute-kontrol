@@ -6688,6 +6688,9 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent-blue); 
 .dropdown-item.header-cache-btn:hover { background: var(--fill-3) !important; }
 .dropdown-item.header-cache-btn:disabled { opacity: 0.55; cursor: progress; }
 
+/* Rehber eskiden ust cubukta dikkat ceken nabizla duruyordu; menude gerekmez. */
+.dropdown-item.header-guide-btn { animation: none; box-shadow: none; }
+
 .notification-drawer-menu {
   background: rgba(40, 40, 42, 0.92) !important;
   border: 1px solid var(--hairline) !important;
