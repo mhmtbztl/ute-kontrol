@@ -337,18 +337,18 @@ function eslesenGiderKategorisi(ham) {
 // adlari ve turu tasir (L-194d). Isletmenin ekledigi kategoriler (M66)
 // getExpenseCategories() ile araya, "Diğer"den once girer.
 const EXPENSE_CATEGORIES = [
-  { name: 'Maaş', type: 'OPEX', color: '#3B82F6' },
-  { name: 'Temizlik', type: 'OPEX', color: '#10B981' },
-  { name: 'Bakım', type: 'OPEX', color: '#F59E0B' },
+  { name: 'Maaş', type: 'OPEX', color: '#0A84FF' },
+  { name: 'Temizlik', type: 'OPEX', color: '#30D158' },
+  { name: 'Bakım', type: 'OPEX', color: '#FF9F0A' },
   { name: 'Reklam', type: 'OPEX', color: '#EC4899' },
-  { name: 'Akaryakıt', type: 'OPEX', color: '#8B5CF6' },
+  { name: 'Akaryakıt', type: 'OPEX', color: '#BF5AF2' },
   { name: 'Fatura', type: 'OPEX', color: '#06B6D4' },
-  { name: 'Muhasebe', type: 'OPEX', color: '#64748B' },
-  { name: 'Kredi Kartı / Komisyon', type: 'OPEX', color: '#EF4444' },
+  { name: 'Muhasebe', type: 'OPEX', color: '#6E6E73' },
+  { name: 'Kredi Kartı / Komisyon', type: 'OPEX', color: '#FF453A' },
   { name: 'Danışmanlık', type: 'OPEX', color: '#14B8A6' },
   { name: 'Demirbaş', type: 'CAPEX', color: '#F97316' },
   { name: 'Tadilat', type: 'CAPEX', color: '#A855F7' },
-  { name: 'Diğer', type: null, color: '#94A3B8' }
+  { name: 'Diğer', type: null, color: '#98989D' }
 ];
 
 // Isletmenin ekledigi gider kategorileri (M66, 9.6.2). tenant_settings
@@ -5656,7 +5656,7 @@ function renderExpenseDonutAndTable(categoryTotals, totalExpense, totalRevenue, 
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     path.setAttribute('d', pathData);
     path.setAttribute('fill', cat.color);
-    path.setAttribute('stroke', '#111827');
+    path.setAttribute('stroke', '#1C1C1E');
     path.setAttribute('stroke-width', '2');
     path.innerHTML = `<title>${escapeHtml(cat.name)}: ${amt.toLocaleString('tr-TR')} TL (%${((amt/totalExpense)*100).toFixed(1)})</title>`;
     svg.appendChild(path);
@@ -5669,7 +5669,7 @@ function renderExpenseDonutAndTable(categoryTotals, totalExpense, totalRevenue, 
   innerCircle.setAttribute('cx', cx);
   innerCircle.setAttribute('cy', cy);
   innerCircle.setAttribute('r', '50');
-  innerCircle.setAttribute('fill', '#111827');
+  innerCircle.setAttribute('fill', '#1C1C1E');
   svg.appendChild(innerCircle);
 
   // Category Table
@@ -6131,7 +6131,7 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
 
         <div class="prop-hero-ciro-box">
           <div>
-            <span style="font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">AYLIK FİİLİ CİRO</span>
+            <span style="font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Aylık fiili ciro</span>
             <div class="hero-ciro-val">${Math.round(s.revenue).toLocaleString('tr-TR')} TL</div>
           </div>
           <span class="badge badge-emerald">%${ciroShare.toFixed(1)} Pay</span>
@@ -6149,7 +6149,7 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
 
         <div class="prop-submetrics-2x2">
           <div class="subm-box">
-            <span class="s-lbl">ORT. GÜNLÜK (ADR)</span>
+            <span class="s-lbl">Ort. günlük (ADR)</span>
             <span class="s-val">${adrVal.toLocaleString('tr-TR')} TL</span>
           </div>
           <div class="subm-box">
@@ -6157,16 +6157,16 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
             <span class="s-val">${revparText}</span>
           </div>
           <div class="subm-box">
-            <span class="s-lbl">NET KÂR</span>
+            <span class="s-lbl">Net kâr</span>
             <span class="s-val ${profit.tone}" title="${escapeHtml(profit.note)}">${profit.valueHtml}</span>
           </div>
           <div class="subm-box">
-            <span class="s-lbl">KÂR MARJI</span>
+            <span class="s-lbl">Kâr marjı</span>
             <span class="s-val" title="${escapeHtml(profit.note)}">${profit.margin}</span>
           </div>
         </div>
 
-        <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid rgba(255,255,255,0.06); padding-top:10px; font-size:11px; color:#60A5FA;">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid rgba(255,255,255,0.06); padding-top:10px; font-size:11px; color:#409CFF;">
           <span>🔍 Villaya Göre Filtrele</span>
           <span>Detayı Gör ›</span>
         </div>
@@ -6339,7 +6339,7 @@ function renderMonthlyTrendChart() {
     rCiro.setAttribute('y', 175 - hCiro);
     rCiro.setAttribute('width', barW);
     rCiro.setAttribute('height', hCiro);
-    rCiro.setAttribute('fill', '#3B82F6');
+    rCiro.setAttribute('fill', '#0A84FF');
     rCiro.setAttribute('rx', '3');
     rCiro.innerHTML = `<title>${d.key} Ciro: ${d.ciro.toLocaleString('tr-TR')} TL</title>`;
     svg.appendChild(rCiro);
@@ -6350,7 +6350,7 @@ function renderMonthlyTrendChart() {
     rOpex.setAttribute('y', 175 - hOpex);
     rOpex.setAttribute('width', barW);
     rOpex.setAttribute('height', hOpex);
-    rOpex.setAttribute('fill', '#EF4444');
+    rOpex.setAttribute('fill', '#FF453A');
     rOpex.setAttribute('rx', '3');
     rOpex.innerHTML = `<title>${d.key} Gider: ${d.opex.toLocaleString('tr-TR')} TL</title>`;
     svg.appendChild(rOpex);
@@ -6361,7 +6361,7 @@ function renderMonthlyTrendChart() {
     rProfit.setAttribute('y', 175 - hProfit);
     rProfit.setAttribute('width', barW);
     rProfit.setAttribute('height', hProfit);
-    rProfit.setAttribute('fill', '#10B981');
+    rProfit.setAttribute('fill', '#30D158');
     rProfit.setAttribute('rx', '3');
     if (d.profitUnmeasured) rProfit.setAttribute('opacity', '0.25');
     rProfit.innerHTML = d.profitUnmeasured
@@ -7330,7 +7330,7 @@ async function saveMonthlyGoals(e) {
 
     // Show friendly notification toast
     const toast = document.createElement('div');
-    toast.style.cssText = 'position:fixed; bottom:24px; right:24px; background:#10B981; color:#fff; padding:14px 20px; border-radius:10px; font-weight:700; font-size:14px; box-shadow:0 10px 25px rgba(0,0,0,0.5); z-index:99999; display:flex; align-items:center; gap:8px;';
+    toast.style.cssText = 'position:fixed; bottom:24px; right:24px; background:#30D158; color:#fff; padding:14px 20px; border-radius:10px; font-weight:700; font-size:14px; box-shadow:0 10px 25px rgba(0,0,0,0.5); z-index:99999; display:flex; align-items:center; gap:8px;';
     toast.innerHTML = `<span>✓</span> <strong>${period}</strong> hedefi ${revenue.toLocaleString('tr-TR')} TL olarak güncellendi!`;
     document.body.appendChild(toast);
     setTimeout(() => { toast.remove(); }, 3500);
@@ -7844,13 +7844,13 @@ async function refreshImportHistory() {
     const tarih = p.importedAt ? new Date(p.importedAt).toLocaleString('tr-TR') : '—';
     const geriAlinabilir = p.linkedCount > 0;
     const dugme = geriAlinabilir
-      ? `<button type="button" class="btn btn-secondary btn-sm" style="font-size:10px; padding:3px 8px; border-color:#EF4444; color:#FCA5A5;"
+      ? `<button type="button" class="btn btn-secondary btn-sm" style="font-size:10px; padding:3px 8px; border-color:#FF453A; color:#FCA5A5;"
                  data-onclick="undoImportBatch(decodeURIComponent('${encodeActionArg(String(p.id))}'))">↩︎ Geri Al (${p.linkedCount})</button>`
-      : `<span style="font-size:10px; color:#64748B;" title="Bu aktarım, geri alma özelliği eklenmeden önce yapıldı.">geri alınamaz</span>`;
+      : `<span style="font-size:10px; color:#6E6E73;" title="Bu aktarım, geri alma özelliği eklenmeden önce yapıldı.">geri alınamaz</span>`;
     return `<div style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:6px 8px; border-bottom:1px solid rgba(255,255,255,0.06);">
       <div style="min-width:0;">
-        <div style="font-size:11px; color:#E2E8F0; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(p.filename)}</div>
-        <div style="font-size:10px; color:#64748B;">${escapeHtml(tarih)} · ${p.rowCount} kayıt · ${tl(p.amount)} TL</div>
+        <div style="font-size:11px; color:#E5E5EA; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(p.filename)}</div>
+        <div style="font-size:10px; color:#6E6E73;">${escapeHtml(tarih)} · ${p.rowCount} kayıt · ${tl(p.amount)} TL</div>
       </div>
       ${dugme}
     </div>`;
@@ -8025,7 +8025,7 @@ function renderImportPreviewBox() {
         && pendingImportData.source.kind === 'CSV'
         && (pendingImportData.headers || []).length <= 1;
       const ipucu = tekSutun
-        ? `<br><br><strong style="color:#FBBF24;">Bu bir CSV/metin dosyası ve tek sütun olarak okundu.</strong>
+        ? `<br><br><strong style="color:#FFB340;">Bu bir CSV/metin dosyası ve tek sütun olarak okundu.</strong>
            Sütun ayırıcısı bulunamadı — dosya büyük ihtimalle desteklenmeyen bir
            ayırıcıyla kaydedilmiş. Kabul edilen ayırıcılar: noktalı virgül (;),
            virgül (,), sekme ve dikey çizgi (|). Excel'de
@@ -8035,7 +8035,7 @@ function renderImportPreviewBox() {
         <strong>Dosya içe aktarılamaz:</strong> zorunlu sütun bulunamadı — ${escapeHtml(eksikSutun.join(', '))}.<br>
         Dosyanızın ilk satırı başlık satırı olmalı ve bu sütunları içermeli.
         En kolayı yukarıdan örnek şablonu indirip kendi verinizi oraya yapıştırmak.${ipucu}<br><br>
-        <span style="color:#94A3B8;">Bulunan sütunlar: ${escapeHtml((pendingImportData.headers || []).join(', ') || '—')}</span>
+        <span style="color:#98989D;">Bulunan sütunlar: ${escapeHtml((pendingImportData.headers || []).join(', ') || '—')}</span>
       </td></tr>`;
       if (btn) { btn.disabled = true; btn.innerText = 'Zorunlu sütun eksik'; }
       return;
@@ -8053,13 +8053,13 @@ function renderImportPreviewBox() {
     const hatalar = (r.errors || []).concat(r.overlaps || []);
     hatalar.slice(0, 15).forEach(e => {
       const bos = new Array(basliklar.length - 2).fill('');
-      satirYaz([e.rowNum, ...bos, '✕ ' + e.errors.join(' ')], 'rgba(239,68,68,0.10)', e.errors.join('\n'));
+      satirYaz([e.rowNum, ...bos, '✕ ' + e.errors.join(' ')], 'rgba(255, 69, 58,0.10)', e.errors.join('\n'));
     });
 
     // Sonra gecerli satirlardan ornek
     (r.validatedRows || []).filter(v => !v.hasFileOverlap).slice(0, Math.max(0, 15 - hatalar.length)).forEach(v => {
       const durum = v.isPotentialDuplicate ? '⊘ mükerrer, atlanacak' : '✓ eklenecek';
-      const renk = v.isPotentialDuplicate ? 'rgba(245,158,11,0.10)' : '';
+      const renk = v.isPotentialDuplicate ? 'rgba(255, 159, 10,0.10)' : '';
       if (rezMi) {
         satirYaz([v.rowNum, v.propertyName, v.guest, v.checkIn + ' → ' + v.checkOut,
                   v.nights, tl(v.gross), durum], renk);
@@ -8827,7 +8827,7 @@ function openBookingModal(editId = null) {
       deleteBtn.id = 'resDeleteBtn';
       deleteBtn.type = 'button';
       deleteBtn.className = 'btn btn-danger';
-      deleteBtn.style.cssText = 'background:#ef4444; border:none; margin-right:auto; cursor:pointer; font-size:12px; padding:8px 14px; border-radius:6px; color:#fff;';
+      deleteBtn.style.cssText = 'background:#FF453A; border:none; margin-right:auto; cursor:pointer; font-size:12px; padding:8px 14px; border-radius:6px; color:#fff;';
       deleteBtn.innerText = '🗑️ Rezervasyonu Sil';
       deleteBtn.onclick = handleBookingDeleteFromModal;
       footer.insertBefore(deleteBtn, footer.firstChild);
@@ -9493,7 +9493,7 @@ function renderSettingsGoalsTable() {
     const isCurrent = (currentFilter.period === period);
     const tr = document.createElement('tr');
     if (isCurrent) {
-      tr.style.background = 'rgba(59, 130, 246, 0.08)';
+      tr.style.background = 'rgba(10, 132, 255, 0.08)';
     }
 
     tr.innerHTML = `
@@ -9502,9 +9502,9 @@ function renderSettingsGoalsTable() {
         ${isCurrent ? ' <span class="badge badge-blue" style="font-size:10px; margin-left:4px;">Seçili Dönem</span>' : ''}
       </td>
       <td>
-        <strong style="color: #60A5FA;">${Number.isFinite(rev) ? rev.toLocaleString('tr-TR') + ' TL' : '—'}</strong>
+        <strong style="color: #409CFF;">${Number.isFinite(rev) ? rev.toLocaleString('tr-TR') + ' TL' : '—'}</strong>
       </td>
-      <td style="color: #34D399; font-weight: 600;">
+      <td style="color: #30D158; font-weight: 600;">
         ${Number.isFinite(netProfit) ? netProfit.toLocaleString('tr-TR') + ' TL' : '—'}
       </td>
       <td>
@@ -9513,7 +9513,7 @@ function renderSettingsGoalsTable() {
       <td>
         ${Number.isFinite(adr) ? adr.toLocaleString('tr-TR') + ' TL' : '—'}
       </td>
-      <td style="color: #F87171;">
+      <td style="color: #FF6961;">
         ${Number.isFinite(maxExpense) ? maxExpense.toLocaleString('tr-TR') + ' TL' : '—'}
       </td>
       <td style="text-align: right;">
@@ -9587,9 +9587,9 @@ function showToast(mesaj, tur = 'info') {
     document.body.appendChild(kap);
   }
 
-  const renk = tur === 'success' ? '#34D399' : (tur === 'error' ? '#F87171' : '#60A5FA');
+  const renk = tur === 'success' ? '#30D158' : (tur === 'error' ? '#FF6961' : '#409CFF');
   const el = document.createElement('div');
-  el.style.cssText = 'background:rgba(15,23,42,0.97);color:#E2E8F0;border:1px solid rgba(255,255,255,0.12);' +
+  el.style.cssText = 'background:rgba(28, 28, 30,0.97);color:#E5E5EA;border:1px solid rgba(255,255,255,0.12);' +
     'border-left:3px solid ' + renk + ';border-radius:8px;padding:11px 14px;font-size:13px;line-height:1.45;' +
     'box-shadow:0 8px 24px rgba(0,0,0,0.45);opacity:0;transform:translateY(6px);' +
     'transition:opacity .18s ease,transform .18s ease;word-break:break-word;';
@@ -9930,7 +9930,7 @@ function renderMonthCloseCard() {
 
   if (rozet) {
     rozet.textContent = kapali ? 'KAPALI' : 'AÇIK';
-    rozet.style.background = kapali ? 'rgba(239,68,68,0.18)' : 'rgba(52,211,153,0.15)';
+    rozet.style.background = kapali ? 'rgba(255, 69, 58,0.18)' : 'rgba(52,211,153,0.15)';
     rozet.style.color = kapali ? '#FCA5A5' : '#6EE7B7';
   }
 
@@ -10552,7 +10552,7 @@ function setBusinessSettingsMessage(message, type = 'info') {
   const element = document.getElementById('businessSettingsMessage');
   if (!element) return;
   element.textContent = message || '';
-  element.style.color = type === 'error' ? '#FCA5A5' : (type === 'success' ? '#6EE7B7' : '#CBD5E1');
+  element.style.color = type === 'error' ? '#FCA5A5' : (type === 'success' ? '#6EE7B7' : '#C7C7CC');
 }
 
 function applyBusinessLogoUrl(url) {
@@ -10730,7 +10730,10 @@ async function renderSettingsWorkspace() {
   const allowed = canManageTenantRole(activeTenant?.role);
   if (denied) denied.hidden = allowed;
   document.querySelectorAll('#tab-settings [data-settings-section]').forEach(section => { section.hidden = !allowed; });
+  const layout = document.getElementById('settingsLayout');
+  if (layout) layout.hidden = !allowed;
   if (!allowed) return false;
+  selectSettingsSection(activeSettingsSection);
   renderBusinessSettings();
   renderBookingChannelSettings();
   renderSettingsTemplates();
@@ -11365,12 +11368,34 @@ async function toggleSettingsLeadSource(id, isActive) {
   return true;
 }
 
+// Ayarlar bir anda tek bolum gosterir (sol menu). Secim sekme yeniden
+// cizildiginde korunur; derin baglanti once secer, sonra sekmeyi acar.
+let activeSettingsSection = 'business';
+
+function selectSettingsSection(sectionName) {
+  if (typeof document === 'undefined') return false;
+  const name = String(sectionName || '').replace(/[^a-z-]/g, '');
+  const sections = [...document.querySelectorAll('#tab-settings [data-settings-section]')];
+  const target = sections.find(section => section.dataset.settingsSection === name) || sections[0];
+  if (!target) return false;
+  activeSettingsSection = target.dataset.settingsSection;
+  sections.forEach(section => section.classList.toggle('is-active', section === target));
+  document.querySelectorAll('#settingsNav [data-settings-target]').forEach(button => {
+    const on = button.dataset.settingsTarget === activeSettingsSection;
+    button.classList.toggle('active', on);
+    if (on) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  });
+  return target.dataset.settingsSection === name;
+}
+
 function openSettingsSection(sectionName) {
   if (!canManageTenantRole(activeTenant?.role)) return false;
+  activeSettingsSection = String(sectionName || '').replace(/[^a-z-]/g, '') || 'business';
   switchTab('settings');
-  const target = document.querySelector(`#tab-settings [data-settings-section="${String(sectionName).replace(/[^a-z-]/g, '')}"]`);
-  target?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
-  return !!target;
+  const found = selectSettingsSection(activeSettingsSection);
+  document.getElementById('settingsLayout')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  return found;
 }
 
 function renderSettingsTable() {
@@ -12363,7 +12388,7 @@ function renderResetImpact() {
   kutu.innerHTML = satirlar.length
     ? '<strong>Silinecek kayıtlar:</strong><br>' +
       satirlar.map(([ad, n]) => `• ${escapeHtml(ad)}: <strong>${n}</strong>`).join('<br>') +
-      '<br><span style="color:#94A3B8;">Ekip üyeleriniz ve işletme hesabınız korunur.</span>'
+      '<br><span style="color:#98989D;">Ekip üyeleriniz ve işletme hesabınız korunur.</span>'
     : 'Sıfırlanacak kayıt bulunmuyor; işletmeniz zaten boş.';
 }
 
@@ -12687,7 +12712,7 @@ function renderDailyOps() {
     if (upcoming.length > 0) {
       upcomingHtml = `
         <div class="ops-upcoming-box">
-          <div style="font-size: 11px; color: #60A5FA; font-weight: 600; margin-bottom: 4px;">📅 Yaklaşan İlk Girişler:</div>
+          <div style="font-size: 11px; color: #409CFF; font-weight: 600; margin-bottom: 4px;">📅 Yaklaşan İlk Girişler:</div>
           ${upcoming.map(u => `
             <div style="font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between; padding: 2px 0;">
               <span><strong>${formatShortDate(u.checkIn)}</strong> - ${escapeHtml(u.guest)}</span>
@@ -12716,7 +12741,7 @@ function renderDailyOps() {
           <div class="ops-guest-meta" style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
             ${escapeHtml(vName)} • ${escapeHtml(b.channel)} • ${b.nights || '—'} Gece • ${b.pax || '—'} Kişi
           </div>
-          <div style="font-size: 11px; color: #34D399; margin-top: 2px;">Net Gelir: ₺${Number(b.net || 0).toLocaleString('tr-TR')}</div>
+          <div style="font-size: 11px; color: #30D158; margin-top: 2px;">Net Gelir: ₺${Number(b.net || 0).toLocaleString('tr-TR')}</div>
         </div>
         <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
           <span class="badge badge-green" style="font-weight: 700;">🟢 ${checkInTime ? escapeHtml(checkInTime) + ' Giriş' : 'Giriş saati kayıtlı değil'}</span>
@@ -12770,7 +12795,7 @@ function renderDailyOps() {
           <div class="ops-guest-meta" style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
             ${escapeHtml(vName)} • ${escapeHtml(b.channel)} • Çıkış Günü
           </div>
-          <div style="font-size: 11px; color: #FBBF24; margin-top: 2px;">🧹 Temizlik Planına Alındı</div>
+          <div style="font-size: 11px; color: #FFB340; margin-top: 2px;">🧹 Temizlik Planına Alındı</div>
         </div>
         <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
           <span class="badge badge-blue" style="font-weight: 700;">🔵 ${checkOutTime ? escapeHtml(checkOutTime) + ' Çıkış' : 'Çıkış saati kayıtlı değil'}</span>
@@ -12880,13 +12905,13 @@ function renderDailyOps() {
       const isPast = (task.date && task.date < todayStr);
 
       let dateBadge = `<span class="badge badge-blue" style="font-size: 10px; font-weight: 700;">📅 ${formatTrDate(task.date)}</span>`;
-      let borderColor = 'rgba(59, 130, 246, 0.4)';
+      let borderColor = 'rgba(10, 132, 255, 0.4)';
 
       if (isToday) {
-        dateBadge = `<span class="badge badge-amber" style="font-size: 10px; font-weight: 800; background: rgba(245, 158, 11, 0.25); border: 1px solid #F59E0B;">⚡ BUGÜN (${formatShortDate(task.date)})</span>`;
-        borderColor = 'rgba(245, 158, 11, 0.8)';
+        dateBadge = `<span class="badge badge-amber" style="font-size: 10px; font-weight: 800; background: rgba(255, 159, 10, 0.25); border: 1px solid #FF9F0A;">⚡ BUGÜN (${formatShortDate(task.date)})</span>`;
+        borderColor = 'rgba(255, 159, 10, 0.8)';
       } else if (isPast) {
-        dateBadge = `<span class="badge" style="font-size: 10px; font-weight: 600; background: rgba(148, 163, 184, 0.15); color: #94A3B8;">🕒 ${formatTrDate(task.date)}</span>`;
+        dateBadge = `<span class="badge" style="font-size: 10px; font-weight: 600; background: rgba(148, 163, 184, 0.15); color: #98989D;">🕒 ${formatTrDate(task.date)}</span>`;
         borderColor = 'rgba(148, 163, 184, 0.3)';
       }
 
@@ -12898,7 +12923,7 @@ function renderDailyOps() {
       div.style.gap = '8px';
       div.style.padding = '10px 12px';
       div.style.marginBottom = '8px';
-      div.style.background = isToday ? 'rgba(245, 158, 11, 0.06)' : 'rgba(255, 255, 255, 0.03)';
+      div.style.background = isToday ? 'rgba(255, 159, 10, 0.06)' : 'rgba(255, 255, 255, 0.03)';
       div.style.borderRadius = '8px';
 
       div.innerHTML = `
@@ -12920,7 +12945,7 @@ function renderDailyOps() {
         <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 6px; border-top: 1px dashed rgba(255, 255, 255, 0.1); font-size: 11px;">
           <span style="color: var(--text-muted); display: flex; align-items: center; gap: 4px;">
             🧹 Bedel: 
-            <b style="color: #60A5FA; cursor: pointer; text-decoration: underline dashed; font-size: 12px;" 
+            <b style="color: #409CFF; cursor: pointer; text-decoration: underline dashed; font-size: 12px;" 
                data-onclick="promptEditTaskAmount(decodeURIComponent('${encodeActionArg(task.id)}'))" 
                title="Maliyeti değiştirmek için tıklayın">
               ₺${amt.toLocaleString('tr-TR')} ✏️
@@ -12951,7 +12976,7 @@ function renderDailyOps() {
   const navBadge = document.getElementById('cleanDebtBadge');
   if (navBadge) {
     navBadge.innerText = '₺' + totalPendingDebtKokpit.toLocaleString('tr-TR') + ' Borç';
-    navBadge.style.color = totalPendingDebtKokpit > 0 ? '#FBBF24' : '#34D399';
+    navBadge.style.color = totalPendingDebtKokpit > 0 ? '#FFB340' : '#30D158';
   }
 }
 
@@ -13231,7 +13256,7 @@ function renderHousekeepingTab() {
                 title="${isPaid ? 'Ödenmedi olarak değiştir' : 'Ödendi olarak işaretle'}">
           ${isPaid ? '✅ ÖDENDİ' : '⏳ ÖDENECEK'}
         </button>
-        <div style="color: var(--text-muted); font-size: 11px; margin-top: 2px;">${isPaid ? (task.paidDate ? formatTrDate(task.paidDate) : 'Ödendi') : '<span style="color: #F87171;">Borç</span>'}</div>`;
+        <div style="color: var(--text-muted); font-size: 11px; margin-top: 2px;">${isPaid ? (task.paidDate ? formatTrDate(task.paidDate) : 'Ödendi') : '<span style="color: #FF6961;">Borç</span>'}</div>`;
     } else {
       odeme = `<span style="color: var(--text-muted); font-size: 11px;">${task.status === 'SKIPPED' ? 'Gider ve borç yok' : 'Yapılınca borç olur'}</span>`;
     }
@@ -13248,7 +13273,7 @@ function renderHousekeepingTab() {
         <span style="color: #93C5FD; font-weight: 500;">👤 ${escapeHtml(task.cleaner || 'Temizlik personeli belirtilmedi')}</span>
       </td>
       <td>
-        <b style="color: #60A5FA; cursor: pointer; text-decoration: underline dashed; font-size: 13px;"
+        <b style="color: #409CFF; cursor: pointer; text-decoration: underline dashed; font-size: 13px;"
            data-onclick="promptEditTaskAmount(decodeURIComponent('${encodeActionArg(task.id)}'))"
            title="Tıklayarak maliyeti değiştirin">
           ${amount > 0 ? '₺' + amount.toLocaleString('tr-TR') : 'Tutar girilmedi'} ✏️
@@ -13646,7 +13671,7 @@ function renderTapeChart() {
   const dayNamesShort = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
   const todayStr = getTodayStr();
 
-  let tableHtml = '<table class="tape-chart-table"><thead><tr><th class="tape-villa-th">MÜLK \\ GÜNLER</th>';
+  let tableHtml = '<table class="tape-chart-table"><thead><tr><th class="tape-villa-th">Mülk \\ günler</th>';
   calendarDates.forEach(curDateStr => {
     const dateObj = new Date(`${curDateStr}T12:00:00`);
     const d = dateObj.getDate();
@@ -13654,7 +13679,7 @@ function renderTapeChart() {
     const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
     const isToday = (curDateStr === todayStr);
 
-    tableHtml += `<th class="tape-day-th ${isWeekend ? 'weekend' : ''} ${isToday ? 'today' : ''}" style="${isToday ? 'background: rgba(245, 158, 11, 0.25); color: #FCD34D; border-bottom: 2px solid #F59E0B;' : ''}">
+    tableHtml += `<th class="tape-day-th ${isWeekend ? 'weekend' : ''} ${isToday ? 'today' : ''}" style="${isToday ? 'background: rgba(255, 159, 10, 0.25); color: #FCD34D; border-bottom: 2px solid #FF9F0A;' : ''}">
       ${d}<br>
       <span style="font-size:9px; font-weight:normal; opacity:0.8;">${dayNamesShort[dayOfWeek]}</span>
     </th>`;
@@ -13667,7 +13692,7 @@ function renderTapeChart() {
     const vConf = appData.villas?.[vKey] || {};
     const vName = vConf.name || vKey;
     const vPropId = vConf.id;
-    const propertyColor = ['#38BDF8', '#A78BFA', '#34D399', '#FBBF24', '#FB7185'][villaIndex % 5];
+    const propertyColor = ['#38BDF8', '#A78BFA', '#30D158', '#FFB340', '#FB7185'][villaIndex % 5];
     tableHtml += `<tr><td class="tape-villa-td"><span class="tape-property-dot" style="background:${propertyColor}"></span><strong>${escapeHtml(vName)}</strong></td>`;
 
     const tumu = (appData.bookings || []).filter(b =>
@@ -13701,7 +13726,7 @@ function renderTapeChart() {
           </div>
         </td>`;
       } else {
-        tableHtml += `<td class="tape-cell ${isToday ? 'today-cell' : ''}" title="${formatTrDate(dateStr)} - Müsait (Rezervasyon eklemek için tıklayın)" data-onclick="openBookingForDate(decodeURIComponent('${encodeActionArg(vKey)}'), decodeURIComponent('${encodeActionArg(dateStr)}'))" style="cursor: pointer; ${isToday ? 'background: rgba(245, 158, 11, 0.05);' : ''}"></td>`;
+        tableHtml += `<td class="tape-cell ${isToday ? 'today-cell' : ''}" title="${formatTrDate(dateStr)} - Müsait (Rezervasyon eklemek için tıklayın)" data-onclick="openBookingForDate(decodeURIComponent('${encodeActionArg(vKey)}'), decodeURIComponent('${encodeActionArg(dateStr)}'))" style="cursor: pointer; ${isToday ? 'background: rgba(255, 159, 10, 0.05);' : ''}"></td>`;
       }
     });
     tableHtml += '</tr>';
@@ -14392,11 +14417,11 @@ function renderLeadAnalytics() {
     lossBox.innerHTML = '';
     const totalLostCount = lostLeads.length || 1;
     const reasonsKeys = [
-      { key: 'Fiyat Yüksek', color: '#EF4444', label: 'Bütçe / Fiyat Yüksek Geldi' },
-      { key: 'Tarih Dolu', color: '#F59E0B', label: 'İstenen Tarih Doluydu' },
-      { key: 'Cevap Vermedi', color: '#64748B', label: 'Geri Dönüş Yapmadı' },
+      { key: 'Fiyat Yüksek', color: '#FF453A', label: 'Bütçe / Fiyat Yüksek Geldi' },
+      { key: 'Tarih Dolu', color: '#FF9F0A', label: 'İstenen Tarih Doluydu' },
+      { key: 'Cevap Vermedi', color: '#6E6E73', label: 'Geri Dönüş Yapmadı' },
       { key: 'Başka Yer Seçti', color: '#0EA5E9', label: 'Başka Yer Seçti' },
-      { key: 'Diğer', color: '#8B5CF6', label: 'Diğer Nedenler' }
+      { key: 'Diğer', color: '#BF5AF2', label: 'Diğer Nedenler' }
     ];
 
     reasonsKeys.forEach(r => {
@@ -14429,7 +14454,7 @@ function renderLeadAnalytics() {
     const totalVCounts = totalLeads || 1;
     // Musterinin kendi mulkleri. Bes uydurma villa sabit yaziliydi ve talep
     // grafigi herkese ayni bes ismi gosteriyordu.
-    const RENKLER = ['#3B82F6', '#10B981', '#F59E0B', '#EC4899', '#8B5CF6', '#F97316', '#14B8A6'];
+    const RENKLER = ['#0A84FF', '#30D158', '#FF9F0A', '#EC4899', '#BF5AF2', '#F97316', '#14B8A6'];
     const villaMeta = Object.keys(appData.villas || {}).map((k, i) => ({
       key: k,
       name: (appData.villas[k] && appData.villas[k].name) || k,
@@ -14533,6 +14558,8 @@ function renderDataSyncStamp() {
   if (typeof document === 'undefined') return;
   const btn = document.getElementById('dataSyncBtn');
   const durum = (typeof appData !== 'undefined' && appData && appData.loadState) || null;
+  // Esitleme dugmesi Araclar menusunde durur; hata menu kapaliyken de gorunsun.
+  document.getElementById('toolsBtn')?.classList.toggle('has-alert', !!(durum && durum.status === 'ERROR'));
   if (durum && durum.status === 'ERROR') {
     setEl('dataSyncBtnText', 'Eşitlenemedi — tekrar dene');
     if (btn) btn.title = 'Son eşitleme başarısız; ekranda son doğrulanmış veri duruyor. Tekrar denemek için tıklayın.';
@@ -14728,26 +14755,26 @@ function renderMonthlyKpiTracker() {
   const metricConfigs = {
     ciro: {
       title: '💰 Aylara Göre Ciro Evrimi (TL)',
-      color: '#3B82F6',
-      activeBtnStyle: 'background: rgba(59,130,246,0.25); border-color: #3B82F6; color: #93C5FD; font-weight: 700;',
+      color: '#0A84FF',
+      activeBtnStyle: 'background: rgba(10, 132, 255,0.25); border-color: #0A84FF; color: #93C5FD; font-weight: 700;',
       format: (val) => Math.round(val).toLocaleString('tr-TR') + ' ₺'
     },
     netProfit: {
       title: '💵 Aylara Göre Net Nakit Kâr Dağılımı (TL)',
-      color: '#10B981',
-      activeBtnStyle: 'background: rgba(16,185,129,0.25); border-color: #10B981; color: #A7F3D0; font-weight: 700;',
+      color: '#30D158',
+      activeBtnStyle: 'background: rgba(48, 209, 88,0.25); border-color: #30D158; color: #A7F3D0; font-weight: 700;',
       format: (val) => Math.round(val).toLocaleString('tr-TR') + ' ₺'
     },
     adr: {
       title: '🏷️ Aylara Göre Ortalama Günlük Satış Fiyatı - ADR (₺/Gece)',
-      color: '#F59E0B',
-      activeBtnStyle: 'background: rgba(245,158,11,0.25); border-color: #F59E0B; color: #FDE68A; font-weight: 700;',
+      color: '#FF9F0A',
+      activeBtnStyle: 'background: rgba(255, 159, 10,0.25); border-color: #FF9F0A; color: #FDE68A; font-weight: 700;',
       format: (val) => Math.round(val).toLocaleString('tr-TR') + ' ₺'
     },
     occupancy: {
       title: '🌙 Aylara Göre Doluluk Oranı Dağılımı (%)',
-      color: '#8B5CF6',
-      activeBtnStyle: 'background: rgba(139,92,246,0.25); border-color: #8B5CF6; color: #DDD6FE; font-weight: 700;',
+      color: '#BF5AF2',
+      activeBtnStyle: 'background: rgba(191, 90, 242,0.25); border-color: #BF5AF2; color: #DDD6FE; font-weight: 700;',
       format: (val) => '%' + Number(val).toFixed(1)
     },
     opex: {
@@ -14806,7 +14833,7 @@ function renderMonthlyKpiTracker() {
       const shortYear = parts[0].substring(2);
       const isCurrentFilter = (currentFilter.period === d.key);
 
-      const barColor = (val < 0 && activeKpiTrackerMetric === 'netProfit') ? '#EF4444' : activeConf.color;
+      const barColor = (val < 0 && activeKpiTrackerMetric === 'netProfit') ? '#FF453A' : activeConf.color;
       const borderStyle = isCurrentFilter ? 'border: 2px solid #FFFFFF; box-shadow: 0 0 12px ' + activeConf.color + ';' : 'border: 1px solid rgba(255,255,255,0.15);';
 
       const barEl = document.createElement('div');
@@ -14816,11 +14843,11 @@ function renderMonthlyKpiTracker() {
       barEl.onclick = () => filterByPeriod(d.key);
 
       barEl.innerHTML = `
-        <div style="font-size: 10px; font-weight: 700; color: ${isCurrentFilter ? '#FFFFFF' : '#94A3B8'}; margin-bottom: 4px; white-space: nowrap; text-align: center;">
+        <div style="font-size: 10px; font-weight: 700; color: ${isCurrentFilter ? '#FFFFFF' : '#98989D'}; margin-bottom: 4px; white-space: nowrap; text-align: center;">
           ${olculmedi ? '—' : (activeKpiTrackerMetric === 'occupancy' ? ('%' + Number(val).toFixed(0)) : (val >= 1000 ? Math.round(val / 1000) + 'k' : Math.round(val)))}
         </div>
         <div class="kpi-bar-fill" style="width: 100%; height: ${barHeightPx}px; background: ${barColor}; opacity: ${isCurrentFilter ? '1' : '0.8'}; border-radius: 4px 4px 1px 1px; ${borderStyle}"></div>
-        <div style="font-size: 10px; color: ${isCurrentFilter ? '#60A5FA' : 'var(--text-muted)'}; font-weight: ${isCurrentFilter ? '800' : '500'}; margin-top: 6px; white-space: nowrap;">
+        <div style="font-size: 10px; color: ${isCurrentFilter ? '#409CFF' : 'var(--text-muted)'}; font-weight: ${isCurrentFilter ? '800' : '500'}; margin-top: 6px; white-space: nowrap;">
           ${shortMonth} ${shortYear}
         </div>
       `;
@@ -14836,13 +14863,13 @@ function renderMonthlyKpiTracker() {
     dataset.forEach(d => {
       const isSelected = (currentFilter.period === d.key);
       const rowStyle = isSelected 
-        ? 'background: rgba(59, 130, 246, 0.12); border-left: 4px solid #3B82F6;' 
-        : (d.isCurrentMonth ? 'background: rgba(16, 185, 129, 0.05);' : '');
+        ? 'background: rgba(10, 132, 255, 0.12); border-left: 4px solid #0A84FF;' 
+        : (d.isCurrentMonth ? 'background: rgba(48, 209, 88, 0.05);' : '');
 
       let targetBadge = '<span style="color: var(--text-muted);">-</span>';
       if (d.target > 0 && d.targetPct !== null) {
         const isTargetWon = d.targetPct >= 100;
-        const color = isTargetWon ? '#34D399' : (d.targetPct >= 75 ? '#FBBF24' : '#F87171');
+        const color = isTargetWon ? '#30D158' : (d.targetPct >= 75 ? '#FFB340' : '#FF6961');
         targetBadge = `
           <div>
             <span style="font-weight: 800; color: ${color};">%${d.targetPct}</span>
@@ -14853,18 +14880,18 @@ function renderMonthlyKpiTracker() {
         `;
       }
 
-      const profitColor = d.netProfit >= 0 ? '#34D399' : '#F87171';
+      const profitColor = d.netProfit >= 0 ? '#30D158' : '#FF6961';
       const marginBadge = d.margin >= 40 ? 'badge-green' : (d.margin >= 20 ? 'badge-blue' : (d.margin > 0 ? 'badge-yellow' : 'badge-red'));
 
       let periodLabel = d.monthName;
-      if (d.isCurrentMonth) periodLabel += ' <span class="badge badge-green" style="font-size:10px; margin-left:4px;">GÜNCEL AY</span>';
+      if (d.isCurrentMonth) periodLabel += ' <span class="badge badge-green" style="font-size:10px; margin-left:4px;">Güncel ay</span>';
 
       const tr = document.createElement('tr');
       if (rowStyle) tr.setAttribute('style', rowStyle);
 
       tr.innerHTML = `
         <td style="font-weight: 700; white-space: nowrap;">${periodLabel}</td>
-        <td style="font-weight: 800; color: #60A5FA; white-space: nowrap;">${Math.round(d.ciro).toLocaleString('tr-TR')} ₺</td>
+        <td style="font-weight: 800; color: #409CFF; white-space: nowrap;">${Math.round(d.ciro).toLocaleString('tr-TR')} ₺</td>
         <td style="font-weight: 700; color: var(--text-secondary); white-space: nowrap;">${d.previousYearCiro > 0 ? Math.round(d.previousYearCiro).toLocaleString('tr-TR') + ' ₺' : '—'}</td>
         <td style="color: var(--text-muted); white-space: nowrap;">${d.target > 0 ? (Math.round(d.target).toLocaleString('tr-TR') + ' ₺') : '-'}</td>
         <td style="white-space: nowrap;">${targetBadge}</td>
@@ -14875,9 +14902,9 @@ function renderMonthlyKpiTracker() {
         <td style="white-space: nowrap;"><span class="badge ${marginBadge}">%${d.margin}</span></td>`}
         <td style="font-weight: 700; white-space: nowrap;">${d.nights} Gece</td>
         <td style="font-weight: 700; white-space: nowrap;">${d.occupancy === null ? '—' : '%' + d.occupancy}</td>
-        <td style="font-weight: 700; color: #FBBF24; white-space: nowrap;">${d.adr > 0 ? (Math.round(d.adr).toLocaleString('tr-TR') + ' ₺') : '-'}</td>
+        <td style="font-weight: 700; color: #FFB340; white-space: nowrap;">${d.adr > 0 ? (Math.round(d.adr).toLocaleString('tr-TR') + ' ₺') : '-'}</td>
         <td style="font-weight: 600; color: #DDD6FE; white-space: nowrap;">${d.revpar > 0 ? (Math.round(d.revpar).toLocaleString('tr-TR') + ' ₺') : '-'}</td>
-        <td style="color: #F87171; font-weight: 600; white-space: nowrap;">${Math.round(d.totalExp).toLocaleString('tr-TR')} ₺</td>
+        <td style="color: #FF6961; font-weight: 600; white-space: nowrap;">${Math.round(d.totalExp).toLocaleString('tr-TR')} ₺</td>
         <td style="text-align: right; white-space: nowrap;">
           <button type="button" class="btn btn-secondary btn-sm" data-onclick="filterByPeriod(decodeURIComponent('${encodeActionArg(d.key)}'))" style="padding: 4px 8px; font-size: 11px;">
             🔍 ${isSelected ? 'Seçili' : 'Aya Git'}
@@ -15074,25 +15101,25 @@ function showKpiExplanation(code) {
         <div style="font-size: 13px; color: #FFFFFF; font-weight: 600; line-height: 1.5;">${guide.summary}</div>
       </div>
 
-      <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px;">
+      <div style="background: rgba(255, 159, 10, 0.08); border: 1px solid rgba(255, 159, 10, 0.25); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px;">
         <div style="font-size: 11px; color: #FDE68A; font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">💡 Başlangıç Seviyesi İpucu</div>
-        <div style="font-size: 12px; color: #E2E8F0; line-height: 1.4;">${guide.warning}</div>
+        <div style="font-size: 12px; color: #E5E5EA; line-height: 1.4;">${guide.warning}</div>
       </div>
 
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px;">
         <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 10px;">
           <div style="font-size: 10px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">📐 Nasıl Hesaplanır?</div>
-          <div style="font-size: 11px; color: #60A5FA; font-family: var(--font-mono); margin-top: 4px; font-weight: 600;">${guide.formula}</div>
+          <div style="font-size: 11px; color: #409CFF; font-family: var(--font-mono); margin-top: 4px; font-weight: 600;">${guide.formula}</div>
         </div>
         <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 10px;">
           <div style="font-size: 10px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">📊 Pratik Örnek</div>
-          <div style="font-size: 11px; color: #34D399; margin-top: 4px;">${guide.example}</div>
+          <div style="font-size: 11px; color: #30D158; margin-top: 4px;">${guide.example}</div>
         </div>
       </div>
 
-      <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 10px; padding: 12px 14px;">
+      <div style="background: rgba(48, 209, 88, 0.08); border: 1px solid rgba(48, 209, 88, 0.25); border-radius: 10px; padding: 12px 14px;">
         <div style="font-size: 11px; color: #A7F3D0; font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">🚀 Ne Zaman Aksiyon Almalısın?</div>
-        <div style="font-size: 12px; color: #E2E8F0; line-height: 1.4;">${guide.actionRule}</div>
+        <div style="font-size: 12px; color: #E5E5EA; line-height: 1.4;">${guide.actionRule}</div>
       </div>
     `;
   }
@@ -15106,6 +15133,8 @@ function closeKpiExplanationModal() {
 }
 
 function openHelpModal(targetTab = 'setup') {
+  // Rehber artik Araclar menusunden de acilir; menu pencerenin arkasinda acik kalmasin.
+  if (typeof closeAllHeaderDropdowns === 'function') closeAllHeaderDropdowns();
   const modal = document.getElementById('helpModal');
   if (modal) modal.classList.add('active');
   if (targetTab) switchHelpTab(targetTab);
@@ -15115,8 +15144,7 @@ function openHelpModal(targetTab = 'setup') {
 function openOnboardingStep(action) {
   const settingsSection = { settings: 'business', team: 'team', templates: 'templates' }[action];
   if (settingsSection) {
-    switchTab('settings');
-    document.querySelector(`[data-settings-section="${settingsSection}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    openSettingsSection(settingsSection);
     return;
   }
   if (action === 'properties') return switchTab('properties');
@@ -15447,15 +15475,15 @@ function renderCoverAbTestLab(villaKey = null) {
       <div class="ab-box current">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
           <span class="badge badge-secondary">Versiyon A (Şu An Yayında Olan)</span>
-          <span style="font-weight: 700; color: #94A3B8; font-size: 12px;">Mevcut Sıra: ${item.searchRank}</span>
+          <span style="font-weight: 700; color: #98989D; font-size: 12px;">Mevcut Sıra: ${item.searchRank}</span>
         </div>
         <div style="margin-bottom: 8px;">
           <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Aktif Kapak Görseli:</div>
-          <div style="font-weight: 700; color: #F8FAFC; font-size: 13px; margin-top: 2px;">${item.coverPhoto}</div>
+          <div style="font-weight: 700; color: #F5F5F7; font-size: 13px; margin-top: 2px;">${item.coverPhoto}</div>
         </div>
         <div style="margin-bottom: 12px;">
           <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Mevcut Başlık:</div>
-          <div style="font-size: 12px; color: #CBD5E1; font-weight: 600; margin-top: 2px;">"${escapeHtml(item.title)}"</div>
+          <div style="font-size: 12px; color: #C7C7CC; font-weight: 600; margin-top: 2px;">"${escapeHtml(item.title)}"</div>
         </div>
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: rgba(255,255,255,0.04); border-radius: 8px;">
           <span style="font-size: 12px; color: var(--text-muted);">Ölçülen Tıklama (CTR):</span>
@@ -15467,26 +15495,26 @@ function renderCoverAbTestLab(villaKey = null) {
       <div class="ab-box ai-optimized">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
           <span class="badge badge-green">Versiyon B (AI Optimize Edilmiş Öneri ⭐)</span>
-          <span style="font-weight: 800; color: #34D399; font-size: 12px;">Öneri; sonuç henüz ölçülmedi</span>
+          <span style="font-weight: 800; color: #30D158; font-size: 12px;">Öneri; sonuç henüz ölçülmedi</span>
         </div>
         <div style="margin-bottom: 8px;">
           <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Önerilen Yeni Kapak Konsepti:</div>
-          <div style="font-weight: 700; color: #34D399; font-size: 13px; margin-top: 2px;">
+          <div style="font-weight: 700; color: #30D158; font-size: 13px; margin-top: 2px;">
             ${item.aiCoverAdvice}
           </div>
         </div>
         <div style="margin-bottom: 12px;">
           <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">AI Tarafından Üretilen SEO Başlığı:</div>
-          <div style="font-size: 12px; color: #F8FAFC; font-weight: 700; margin-top: 2px; background: rgba(0,0,0,0.4); padding: 6px 10px; border-radius: 6px; border: 1px dashed rgba(52, 211, 153, 0.4);">
+          <div style="font-size: 12px; color: #F5F5F7; font-weight: 700; margin-top: 2px; background: rgba(0,0,0,0.4); padding: 6px 10px; border-radius: 6px; border: 1px dashed rgba(52, 211, 153, 0.4);">
             "${escapeHtml(item.aiOptimizedTitle || item.title)}"
           </div>
         </div>
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: rgba(16, 185, 129, 0.1); border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.2);">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: rgba(48, 209, 88, 0.1); border-radius: 8px; border: 1px solid rgba(48, 209, 88, 0.2);">
           <div>
             <span style="font-size: 12px; color: #DDD6FE;">Beklenen Tıklama (CTR):</span>
-            <strong style="color: #34D399; font-size: 14px; margin-left: 6px;">— (A/B testi çalıştırılmadı)</strong>
+            <strong style="color: #30D158; font-size: 14px; margin-left: 6px;">— (A/B testi çalıştırılmadı)</strong>
           </div>
-          <button type="button" class="btn btn-secondary btn-sm" data-onclick="copyAiTitle(decodeURIComponent('${encodeActionArg(item.aiOptimizedTitle || item.title)}'))" style="border-color: #34D399; color: #34D399; font-size: 11px; font-weight: 700;">
+          <button type="button" class="btn btn-secondary btn-sm" data-onclick="copyAiTitle(decodeURIComponent('${encodeActionArg(item.aiOptimizedTitle || item.title)}'))" style="border-color: #30D158; color: #30D158; font-size: 11px; font-weight: 700;">
             📋 Başlığı Kopyala
           </button>
         </div>
@@ -15636,7 +15664,7 @@ function renderGapNightsRadar() {
     const fiyatKutusu = fiyatBiliniyor
       ? `<div>
           <div style="font-size:10px; color:var(--text-muted); text-decoration:line-through;">Liste: ₺${g.regularPrice.toLocaleString('tr-TR')}</div>
-          <div style="font-size:15px; font-weight:800; color:#34D399;">₺${g.discountPrice.toLocaleString('tr-TR')}</div>
+          <div style="font-size:15px; font-weight:800; color:#30D158;">₺${g.discountPrice.toLocaleString('tr-TR')}</div>
         </div>
         <span class="badge badge-green" style="font-size:10px;">OTA Komisyonsuz</span>`
       : `<div style="font-size:11px; color:var(--text-muted);">
@@ -15645,10 +15673,10 @@ function renderGapNightsRadar() {
         </div>`;
     const butonlar = fiyatBiliniyor
       ? `<div style="display:flex; gap:6px; flex-wrap:wrap;">
-        <button type="button" class="btn btn-secondary btn-sm" data-onclick="copyGapStoryText(decodeURIComponent('${encodeActionArg(g.villaName)}'), decodeURIComponent('${encodeActionArg(g.checkIn + ' - ' + g.checkOut)}'), ${Number(g.nights) || 0}, decodeURIComponent('${encodeActionArg(g.discountPrice.toLocaleString('tr-TR'))}'), decodeURIComponent('${encodeActionArg(g.regularPrice.toLocaleString('tr-TR'))}'))" style="flex:1; border-color:#EF4444; color:#FCA5A5; font-size:11px; font-weight:700;">
+        <button type="button" class="btn btn-secondary btn-sm" data-onclick="copyGapStoryText(decodeURIComponent('${encodeActionArg(g.villaName)}'), decodeURIComponent('${encodeActionArg(g.checkIn + ' - ' + g.checkOut)}'), ${Number(g.nights) || 0}, decodeURIComponent('${encodeActionArg(g.discountPrice.toLocaleString('tr-TR'))}'), decodeURIComponent('${encodeActionArg(g.regularPrice.toLocaleString('tr-TR'))}'))" style="flex:1; border-color:#FF453A; color:#FCA5A5; font-size:11px; font-weight:700;">
           ⚡ Flaş Hikaye Kopyala
         </button>
-        <button type="button" class="btn btn-primary btn-sm" data-onclick="shareGapWhatsApp(decodeURIComponent('${encodeActionArg(g.villaName)}'), decodeURIComponent('${encodeActionArg(g.checkIn + ' - ' + g.checkOut)}'), ${Number(g.nights) || 0}, decodeURIComponent('${encodeActionArg(g.discountPrice.toLocaleString('tr-TR'))}'))" style="background:#10B981; border:none; font-size:11px; font-weight:700;">
+        <button type="button" class="btn btn-primary btn-sm" data-onclick="shareGapWhatsApp(decodeURIComponent('${encodeActionArg(g.villaName)}'), decodeURIComponent('${encodeActionArg(g.checkIn + ' - ' + g.checkOut)}'), ${Number(g.nights) || 0}, decodeURIComponent('${encodeActionArg(g.discountPrice.toLocaleString('tr-TR'))}'))" style="background:#30D158; border:none; font-size:11px; font-weight:700;">
           📲 Durum
         </button>
       </div>`
@@ -15664,7 +15692,7 @@ function renderGapNightsRadar() {
       <div class="gap-price-box">
         ${fiyatKutusu}
       </div>
-      <div style="font-size:11px; color:#CBD5E1; margin-bottom:10px;">
+      <div style="font-size:11px; color:#C7C7CC; margin-bottom:10px;">
         💡 <strong>STR Aksiyonu:</strong> Airbnb'de minimum konaklamayı ${g.nights} geceye düşürün ve aşağıdaki hikaye şablonunu paylaşın.
       </div>
       ${butonlar}
@@ -15858,16 +15886,16 @@ function renderRetentionCrm() {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>
-        <strong style="color:#F8FAFC;">${escapeHtml(g.guest)}</strong>
+        <strong style="color:#F5F5F7;">${escapeHtml(g.guest)}</strong>
         <div style="font-size:11px; color:var(--text-muted);">${g.bookingsCount} Konaklama</div>
       </td>
       <td><span class="badge badge-secondary">${escapeHtml(g.villaName || 'Belirtilmedi')}</span></td>
-      <td style="font-weight:700; color:#E2E8F0;">${g.totalNights} Gece</td>
-      <td style="font-weight:800; color:#34D399;">₺${g.totalSpent.toLocaleString('tr-TR')}</td>
+      <td style="font-weight:700; color:#E5E5EA;">${g.totalNights} Gece</td>
+      <td style="font-weight:800; color:#30D158;">₺${g.totalSpent.toLocaleString('tr-TR')}</td>
       <td style="font-size:12px; color:var(--text-muted);">${g.lastStay || '-'}</td>
       <td>${badge}</td>
       <td style="text-align: right;">
-        <button type="button" class="btn btn-secondary btn-sm" data-onclick="sendGuestLoyaltyMessage(decodeURIComponent('${encodeActionArg(g.guest)}'), decodeURIComponent('${encodeActionArg(String(g.villa || ''))}'), '')" style="border-color:#10B981; color:#34D399; font-size:11px; font-weight:700;">
+        <button type="button" class="btn btn-secondary btn-sm" data-onclick="sendGuestLoyaltyMessage(decodeURIComponent('${encodeActionArg(g.guest)}'), decodeURIComponent('${encodeActionArg(String(g.villa || ''))}'), '')" style="border-color:#30D158; color:#30D158; font-size:11px; font-weight:700;">
           💬 VIP Davet
         </button>
       </td>
@@ -15984,7 +16012,7 @@ function renderSeasonalEventRadar() {
       <div>
         <div class="seasonal-card-header">
           <div>
-            <div style="font-size:15px; font-weight:800; color:#F8FAFC; display:flex; align-items:center; gap:6px;">
+            <div style="font-size:15px; font-weight:800; color:#F5F5F7; display:flex; align-items:center; gap:6px;">
               <span>${ev.icon}</span> ${escapeHtml(ev.name)}
             </div>
             <div style="font-size:11px; color:#F0ABFC; margin-top:3px; font-weight:600;">${escapeHtml(ev.dates)}</div>
@@ -15999,7 +16027,7 @@ function renderSeasonalEventRadar() {
           </div>
         </div>
 
-        <div style="font-size:11px; color:#CBD5E1; line-height:1.4; background:rgba(0,0,0,0.3); padding:8px; border-radius:6px; border:1px dashed rgba(217, 70, 239, 0.3);">
+        <div style="font-size:11px; color:#C7C7CC; line-height:1.4; background:rgba(0,0,0,0.3); padding:8px; border-radius:6px; border:1px dashed rgba(217, 70, 239, 0.3);">
           🎯 <strong>Strateji:</strong> ${escapeHtml(ev.advice)}
         </div>
       </div>
@@ -16199,13 +16227,13 @@ function switchAuthTab(tab) {
 
   if (tab === 'login') {
     if (btnLogin) {
-      btnLogin.style.background = '#8B5CF6';
+      btnLogin.style.background = '#BF5AF2';
       btnLogin.style.color = '#fff';
       btnLogin.style.fontWeight = '700';
     }
     if (btnRegister) {
       btnRegister.style.background = 'transparent';
-      btnRegister.style.color = '#94A3B8';
+      btnRegister.style.color = '#98989D';
       btnRegister.style.fontWeight = '600';
     }
     if (formLogin) formLogin.style.display = 'block';
@@ -16213,11 +16241,11 @@ function switchAuthTab(tab) {
   } else {
     if (btnLogin) {
       btnLogin.style.background = 'transparent';
-      btnLogin.style.color = '#94A3B8';
+      btnLogin.style.color = '#98989D';
       btnLogin.style.fontWeight = '600';
     }
     if (btnRegister) {
-      btnRegister.style.background = '#10B981';
+      btnRegister.style.background = '#30D158';
       btnRegister.style.color = '#fff';
       btnRegister.style.fontWeight = '700';
     }
@@ -16306,8 +16334,8 @@ async function handleSaaSForgotPassword(e) {
       if (error && /rate limit|Too many requests/i.test(error.message || '')) {
         err.innerText = '⚠️ ' + getFriendlyAuthErrorMessage(error);
       } else {
-        err.style.background = 'rgba(59, 130, 246, 0.15)';
-        err.style.border = '1px solid #3B82F6';
+        err.style.background = 'rgba(10, 132, 255, 0.15)';
+        err.style.border = '1px solid #0A84FF';
         err.style.color = '#93C5FD';
         err.innerHTML = `📬 <strong>Sıfırlama Bağlantısı Gönderildi</strong><br>
         <span style="font-size:12px;">Bu adrese ait bir hesap varsa, <strong>${escapeHtml(email)}</strong> adresine şifre yenileme bağlantısı gönderildi. Gelen kutunuzu ve spam klasörünü kontrol edin.</span>`;
@@ -16405,8 +16433,8 @@ async function handleSaaSNewPassword(e) {
       switchAuthTab('login');
       if (err) {
         err.style.display = 'block';
-        err.style.background = 'rgba(16, 185, 129, 0.15)';
-        err.style.border = '1px solid #10B981';
+        err.style.background = 'rgba(48, 209, 88, 0.15)';
+        err.style.border = '1px solid #30D158';
         err.style.color = '#A7F3D0';
         err.innerText = '✅ Şifreniz güncellendi. Yeni şifrenizle giriş yapabilirsiniz.';
       }
@@ -16752,8 +16780,8 @@ async function handleSaaSLogin(e) {
       if (err) {
         err.style.display = 'block';
         if (authErr.message && authErr.message.includes('Email not confirmed')) {
-          err.style.background = 'rgba(245, 158, 11, 0.15)';
-          err.style.border = '1px solid #F59E0B';
+          err.style.background = 'rgba(255, 159, 10, 0.15)';
+          err.style.border = '1px solid #FF9F0A';
           err.style.color = '#FDE68A';
           err.innerHTML = '📬 <strong>E-posta Doğrulaması Gerekiyor:</strong><br><span style="font-size:12px;">Lütfen gelen kutunuzdaki aktivasyon bağlantısına tıklayıp ardından yeniden giriş yapın.</span>';
         } else {
@@ -16892,8 +16920,8 @@ async function handleSaaSRegister(e) {
 
       if (err) {
         err.style.display = 'block';
-        err.style.background = 'rgba(59, 130, 246, 0.15)';
-        err.style.border = '1px solid #3B82F6';
+        err.style.background = 'rgba(10, 132, 255, 0.15)';
+        err.style.border = '1px solid #0A84FF';
         err.style.color = '#93C5FD';
         err.innerHTML = `📬 <strong>Aktivasyon E-postası Gönderildi!</strong><br>
         <span style="font-size:12px;">Lütfen <strong>${escapeHtml(email)}</strong> adresine gönderilen onay linkine tıklayın. Doğrulama sonrası kaldığınız yerden devam edebilirsiniz.</span>`;
@@ -17894,7 +17922,7 @@ function openPropertyModal(villaKey = null) {
       deleteBtn.id = 'propDeleteBtn';
       deleteBtn.type = 'button';
       deleteBtn.className = 'btn btn-danger';
-      deleteBtn.style.cssText = 'background:#ef4444; border:none; margin-right:auto;';
+      deleteBtn.style.cssText = 'background:#FF453A; border:none; margin-right:auto;';
       deleteBtn.innerText = '📦 Satıştan Çek / Arşivle';
       deleteBtn.onclick = handlePropertyDeleteFromModal;
       footer.insertBefore(deleteBtn, footer.firstChild);
@@ -19071,7 +19099,12 @@ function renderTodayDateStrip(bookings, tasks) {
   const cleanings = tasks.filter(item => item.status === 'PLANNED' && String(item.date || '').slice(0, 10) === today).length;
   setEl('todayDateLabel', new Intl.DateTimeFormat('tr-TR', { dateStyle: 'full', timeZone: 'Europe/Istanbul' }).format(new Date(`${today}T12:00:00+03:00`)));
   setEl('todayRoleLabel', `${role} görünümü`);
-  setEl('todayShiftSummary', `${arrivals} giriş · ${departures} çıkış · ${cleanings} temizlik`);
+  const summary = document.getElementById('todayShiftSummary');
+  if (summary) {
+    summary.setAttribute('aria-label', `${arrivals} giriş · ${departures} çıkış · ${cleanings} temizlik`);
+    summary.innerHTML = [[arrivals, 'Giriş'], [departures, 'Çıkış'], [cleanings, 'Temizlik']]
+      .map(([count, label]) => `<div class="today-hero__stat"><strong>${Number(count)}</strong><span>${escapeHtml(label)}</span></div>`).join('');
+  }
 }
 
 function renderTodayTodoList(tasks, tickets, leads) {
@@ -19312,8 +19345,8 @@ function renderExecutiveControlCenter() {
     const stepsEl = document.getElementById('onboardStepsList');
     if (stepsEl && Array.isArray(onboarding.steps)) {
       stepsEl.innerHTML = onboarding.steps.map(s => s.completed
-        ? `<span>✅ ${escapeHtml(s.title)}</span>`
-        : `<button type="button" class="onboard-step-btn" data-onclick="openOnboardingStep(decodeURIComponent('${encodeActionArg(s.action)}'))">⬜ ${escapeHtml(s.title)} →</button>`
+        ? `<span class="onboard-step is-done">${escapeHtml(s.title)}</span>`
+        : `<button type="button" class="onboard-step onboard-step-btn" data-onclick="openOnboardingStep(decodeURIComponent('${encodeActionArg(s.action)}'))">${escapeHtml(s.title)}</button>`
       ).join('');
     }
 
@@ -19507,7 +19540,7 @@ function renderTodayCommandCenter(actionsResult) {
       const causes = act.isCollapsed ? (act.rootCauses || []).filter(Boolean) : [];
       const metricsText = act.isCollapsed ? '' : (act.sourceMetrics || []).join(' • ');
       const rationaleHtml = causes.length
-        ? `<ul class="action-root-causes" style="margin:4px 0 0 16px;padding:0">${causes.map(cause => `<li>${escapeHtml(cause)}</li>`).join('')}</ul>`
+        ? `<ul class="action-root-causes">${causes.map(cause => `<li>${escapeHtml(cause)}</li>`).join('')}</ul>`
         : escapeHtml(act.rationale || act.reason || '');
       // Ham kimlik (UUID) musteriye gosterilmez; ad bulunamazsa bos kalir (L-104).
       const mulkEtiketi = act.propertyName
@@ -19517,16 +19550,16 @@ function renderTodayCommandCenter(actionsResult) {
       return `
         <div class="command-action-card ${typeClass}">
           <div class="action-card-top">
-            <span class="badge">${escapeHtml(act.domain === 'REVENUE' ? 'Gelir fırsatı' : act.domain === 'OPERATIONS' ? 'Operasyon' : 'Kritik')}</span>
-            <span style="font-size: 10px; color: #94A3B8; font-weight: 600;">${escapeHtml(mulkEtiketi)}</span>
+            <span class="action-card-domain">${escapeHtml(act.domain === 'REVENUE' ? 'Gelir fırsatı' : act.domain === 'OPERATIONS' ? 'Operasyon' : 'Kritik')}</span>
+            <span class="action-card-property">${escapeHtml(mulkEtiketi)}</span>
           </div>
           <div class="action-card-title">${escapeHtml(act.title)}</div>
           <div class="action-card-rationale">${rationaleHtml}</div>
-          ${metricsText ? `<div class="action-source-metrics">📊 ${escapeHtml(metricsText)}</div>` : ''}
+          ${metricsText ? `<div class="action-source-metrics">${escapeHtml(metricsText)}</div>` : ''}
           <div class="action-card-footer">
-            <button type="button" class="btn btn-secondary btn-sm" data-onclick="openTabFromDeepLink(decodeURIComponent('${encodeActionArg(act.deepLink || 'executive')}'), decodeURIComponent('${encodeActionArg(act.focusId || act.id)}'))" style="font-size: 11px; padding: 3px 8px;">İncele ›</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-onclick="openTabFromDeepLink(decodeURIComponent('${encodeActionArg(act.deepLink || 'executive')}'), decodeURIComponent('${encodeActionArg(act.focusId || act.id)}'))">İncele</button>
             ${act.quickAction
-              ? `<button type="button" class="btn btn-primary btn-sm" data-onclick="handleQuickActionTrigger(decodeURIComponent('${encodeActionArg(act.quickAction)}'), decodeURIComponent('${encodeActionArg(act.id)}'))" style="font-size: 11px; padding: 3px 8px;">Uygula</button>`
+              ? `<button type="button" class="btn btn-primary btn-sm" data-onclick="handleQuickActionTrigger(decodeURIComponent('${encodeActionArg(act.quickAction)}'), decodeURIComponent('${encodeActionArg(act.id)}'))">Uygula</button>`
               : ''}
           </div>
         </div>
@@ -19581,43 +19614,42 @@ function renderPortfolioHealth(healthCards) {
       return `<option value="${escapeHtml(status)}"${selected}${disabled}>${optionMeta.icon} ${escapeHtml(optionMeta.label)}${disabled ? ` — ${lockReason}` : ''}</option>`;
     }).join('');
     const blockedHtml = blocked
-      ? `<div style="margin-top:8px; font-size:11px; color:#FCA5A5;">Satışa açmak için arızayı kapatın.
-           <button type="button" class="btn btn-secondary btn-sm" style="font-size:11px; padding:2px 8px; margin-left:4px;"
-             data-onclick="openTabFromDeepLink('maintenance', decodeURIComponent('${encodeActionArg(String((c.blockingTicketIds || [])[0] || ''))}'))">Arızayı gör ›</button></div>`
+      ? `<div class="health-card-note is-blocked">Satışa açmak için arızayı kapatın.
+           <button type="button" class="btn btn-secondary btn-sm"
+             data-onclick="openTabFromDeepLink('maintenance', decodeURIComponent('${encodeActionArg(String((c.blockingTicketIds || [])[0] || ''))}'))">Arızayı gör</button></div>`
       : (cleaningPending
-        ? `<div style="margin-top:8px; font-size:11px; color:#FBBF24;">Temizlik yapıldı işaretlenince hazır olur.
-           <button type="button" class="btn btn-secondary btn-sm" style="font-size:11px; padding:2px 8px; margin-left:4px;"
-             data-onclick="openTabFromDeepLink('housekeeping', decodeURIComponent('${encodeActionArg(String((c.pendingCleaningTaskIds || [])[0] || ''))}'))">Temizliğe git ›</button></div>`
+        ? `<div class="health-card-note is-cleaning">Temizlik yapıldı işaretlenince hazır olur.
+           <button type="button" class="btn btn-secondary btn-sm"
+             data-onclick="openTabFromDeepLink('housekeeping', decodeURIComponent('${encodeActionArg(String((c.pendingCleaningTaskIds || [])[0] || ''))}'))">Temizliğe git</button></div>`
         : '');
     const editor = canEdit
-      ? `<label style="display:block; margin-top:9px; font-size:10px; color:#94A3B8;">
+      ? `<label class="health-card-editor">
            Durumu değiştir
            <select class="property-readiness-select" data-property-readiness-key="${escapeHtml(c.propertyKey)}"
-             data-onchange="setPropertySalesReadiness(decodeURIComponent('${encodeActionArg(String(c.propertyKey))}'), this.value)"
-             style="width:100%; margin-top:4px; padding:6px 8px; border-radius:6px; background:#0F172A; color:#E2E8F0; border:1px solid rgba(255,255,255,.16); font-size:11px;">
+             data-onchange="setPropertySalesReadiness(decodeURIComponent('${encodeActionArg(String(c.propertyKey))}'), this.value)">
              <option value="" disabled${c.manualStatus === 'UNSET' ? ' selected' : ''}>⚪ Durum seçin</option>
              ${options}
            </select>
          </label>`
-      : '<div style="margin-top:9px; font-size:10px; color:#64748B;">Salt okunur · değiştirme yetkiniz yok</div>';
+      : '<div class="health-card-editor is-readonly">Salt okunur · değiştirme yetkiniz yok</div>';
 
     return `
       <div class="property-health-card status-${cardStatus}" data-readiness-status="${escapeHtml(c.status)}" data-property-key="${escapeHtml(c.propertyKey)}">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div class="health-card-head">
           <div>
-            <strong style="font-size: 14px; color: #FFFFFF;">${escapeHtml(c.propertyName)}</strong>
-            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">${escapeHtml(c.reason)}</div>
+            <strong class="health-card-name">${escapeHtml(c.propertyName)}</strong>
+            <div class="health-card-reason">${escapeHtml(c.reason)}</div>
           </div>
-          <span class="badge ${badgeClass}" style="white-space:nowrap;">${meta.icon} ${escapeHtml(meta.label)}</span>
+          <span class="badge ${badgeClass}">${meta.icon} ${escapeHtml(meta.label)}</span>
         </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px; margin: 4px 0;">
-          <div style="background: rgba(0,0,0,0.25); padding: 6px 8px; border-radius: 6px;">
-            <span style="color: #94A3B8; display: block;">Satış Durumu:</span>
-            <strong style="color: #F8FAFC; font-size: 12px;">${c.status === 'BLOCKED_MAINTENANCE' ? 'Kapalı' : (c.status === 'UNSET' ? 'Belirsiz' : 'Açık')}</strong>
+        <div class="health-card-stats">
+          <div>
+            <span>Satış durumu</span>
+            <strong>${c.status === 'BLOCKED_MAINTENANCE' ? 'Kapalı' : (c.status === 'UNSET' ? 'Belirsiz' : 'Açık')}</strong>
           </div>
-          <div style="background: rgba(0,0,0,0.25); padding: 6px 8px; border-radius: 6px;">
-            <span style="color: #94A3B8; display: block;">Açık İş / Arıza:</span>
-            <strong style="color: ${c.openIssueCount > 0 ? '#F87171' : '#34D399'}; font-size: 13px;">${c.openIssueCount || 0} Kayıt</strong>
+          <div>
+            <span>Açık iş / arıza</span>
+            <strong class="${c.openIssueCount > 0 ? 'is-negative' : 'is-positive'}">${c.openIssueCount || 0} kayıt</strong>
           </div>
         </div>
         ${blockedHtml}
@@ -19830,12 +19862,12 @@ function handleCommandPaletteSearch(query) {
       return `
     <div class="palette-item" data-palette-index="${idx}" role="button" tabindex="0">
       <span style="font-size: 16px;">${escapeHtml(it.icon)}</span>
-      <span style="flex: 1; min-width: 0;"><span style="font-weight: 600;">${escapeHtml(it.title)}</span>${it.subtitle ? `<span style="display: block; font-size: 11px; color: #94A3B8;">${escapeHtml(it.subtitle)}</span>` : ''}</span>
-      <span style="font-size: 11px; color: #94A3B8;">Git ›</span>
+      <span style="flex: 1; min-width: 0;"><span style="font-weight: 600;">${escapeHtml(it.title)}</span>${it.subtitle ? `<span style="display: block; font-size: 11px; color: #98989D;">${escapeHtml(it.subtitle)}</span>` : ''}</span>
+      <span style="font-size: 11px; color: #98989D;">Git ›</span>
     </div>`;
     }).join('');
-    const more = group.more ? `<div style="font-size: 11px; color: #94A3B8; padding: 2px 12px 6px;">+${group.more} sonuç daha — aramayı daraltın</div>` : '';
-    return `<div class="palette-group-title" style="font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #94A3B8; padding: 8px 12px 4px;">${escapeHtml(group.group)}</div>${rows}${more}`;
+    const more = group.more ? `<div style="font-size: 11px; color: #98989D; padding: 2px 12px 6px;">+${group.more} sonuç daha — aramayı daraltın</div>` : '';
+    return `<div class="palette-group-title" style="font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #98989D; padding: 8px 12px 4px;">${escapeHtml(group.group)}</div>${rows}${more}`;
   }).join('');
   container.querySelectorAll('[data-palette-index]').forEach(element => {
     const activate = () => runCommandPaletteTarget(items[Number(element.dataset.paletteIndex)]?.target);
@@ -19980,8 +20012,8 @@ async function syncNotificationFeed() {
 
 function notificationTypesHelpHtml() {
   const types = NotificationFeed.typesForRole(activeTenant?.role || '');
-  if (!types.length) return '<div style="color: #94A3B8; font-size: 11px;">Rolünüz için bildirim üreten olay yok; işleriniz Saha işlerim ekranındadır.</div>';
-  return `<ul style="margin: 4px 0 0; padding-left: 16px; color: #CBD5E1; font-size: 11px; display: grid; gap: 4px;">${types.map(t => `<li><strong>${escapeHtml(t.label)}</strong> — ${escapeHtml(t.detail)}</li>`).join('')}</ul>`;
+  if (!types.length) return '<div style="color: #98989D; font-size: 11px;">Rolünüz için bildirim üreten olay yok; işleriniz Saha işlerim ekranındadır.</div>';
+  return `<ul style="margin: 4px 0 0; padding-left: 16px; color: #C7C7CC; font-size: 11px; display: grid; gap: 4px;">${types.map(t => `<li><strong>${escapeHtml(t.label)}</strong> — ${escapeHtml(t.detail)}</li>`).join('')}</ul>`;
 }
 
 function renderUserNotificationsDrawer() {
@@ -19991,7 +20023,7 @@ function renderUserNotificationsDrawer() {
 
   const notes = ((typeof appData !== 'undefined' && appData.userNotifications) || []).filter(n => n.status !== 'RESOLVED');
   const help = typeof NotificationFeed === 'undefined' ? '' : `
-    <details style="padding: 8px 12px; font-size: 11px; color: #94A3B8;"${notes.length ? '' : ' open'}>
+    <details style="padding: 8px 12px; font-size: 11px; color: #98989D;"${notes.length ? '' : ' open'}>
       <summary style="cursor: pointer;">Bildirimler neye göre gelir?</summary>
       ${notificationTypesHelpHtml()}
       <div style="margin-top: 6px;">Bildirimler kayıtlarınızdan hesaplanır; olay bittiğinde (ör. temizlik onaylandı, ay kapandı) listeden kendiliğinden kalkar.</div>
@@ -20002,11 +20034,11 @@ function renderUserNotificationsDrawer() {
     return;
   }
 
-  const color = { CRITICAL: '#F87171', WARNING: '#FCD34D', INFO: '#93C5FD' };
+  const color = { CRITICAL: '#FF6961', WARNING: '#FCD34D', INFO: '#93C5FD' };
   list.innerHTML = warn + notes.map(n => `
     <div style="padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 12px; display: flex; flex-direction: column; gap: 4px;${n.status === 'UNREAD' ? '' : ' opacity: .7;'}">
       <strong style="color: ${color[n.severity] || '#FCD34D'};">${n.status === 'UNREAD' ? '● ' : ''}${escapeHtml(n.title || '')}</strong>
-      <div style="color: #CBD5E1; font-size: 11px;">${escapeHtml(n.message || '')}</div>
+      <div style="color: #C7C7CC; font-size: 11px;">${escapeHtml(n.message || '')}</div>
       <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 4px;">
         ${n.id && n.status === 'UNREAD' ? `<button class="btn btn-secondary btn-sm" data-onclick="confirmUserNotification(decodeURIComponent('${encodeActionArg(String(n.id))}'))" style="font-size: 9px; padding: 1px 5px;">Okundu</button>` : ''}
         ${n.deep_link ? `<button class="btn btn-primary btn-sm" data-onclick="openUserNotification(decodeURIComponent('${encodeActionArg(String(n.event_key || ''))}'))" style="font-size: 9px; padding: 1px 5px;">Git ›</button>` : ''}
@@ -20453,15 +20485,15 @@ function renderPropertiesTab() {
             <strong style="font-size: 15px; color: #FFFFFF;">${escapeHtml(v.name || 'Adsız mülk')}</strong>
             <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Kod: ${escapeHtml(k)} • Kapasite: ${escapeHtml(v.capacity || 'Belirtilmedi')}</div>
           </div>
-          <span class="badge badge-green">AKTİF</span>
+          <span class="badge badge-green">Aktif</span>
         </div>
         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-size: 11px; margin: 6px 0;">
-          ${[['Baz fiyat', v.basePrice, '#34D399', 'Normal bir gecenin satış fiyatı'], ['Taban fiyat', v.floor ?? v.floorPrice, '#F8FAFC', 'Altına inilmeyen en düşük gecelik fiyat'], ['Hedef fiyat', v.target, '#F8FAFC', 'Ortalama hedeflediğiniz gecelik fiyat']].map(([label, value, color, title]) => `<div style="background: rgba(0,0,0,0.25); padding: 6px 8px; border-radius: 6px;" title="${escapeHtml(title)}">
-            <span style="color: #94A3B8; display: block;">${escapeHtml(label)}</span>
+          ${[['Baz fiyat', v.basePrice, '#30D158', 'Normal bir gecenin satış fiyatı'], ['Taban fiyat', v.floor ?? v.floorPrice, '#F5F5F7', 'Altına inilmeyen en düşük gecelik fiyat'], ['Hedef fiyat', v.target, '#F5F5F7', 'Ortalama hedeflediğiniz gecelik fiyat']].map(([label, value, color, title]) => `<div style="background: rgba(0,0,0,0.25); padding: 6px 8px; border-radius: 6px;" title="${escapeHtml(title)}">
+            <span style="color: #98989D; display: block;">${escapeHtml(label)}</span>
             <strong style="color: ${color}; font-size: 12px;">${propertyMoney(value === '' ? null : value)}</strong>
           </div>`).join('')}
         </div>
-        <div style="font-size: 11px; color: #CBD5E1;">
+        <div style="font-size: 11px; color: #C7C7CC;">
           <strong>Olanaklar:</strong> ${escapeHtml(v.amenities || 'Belirtilmedi')}
         </div>
         <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px;">
@@ -21467,10 +21499,10 @@ function renderGuestsTab() {
         : (row.nextStay || row.lifecycle?.booking || row.lastStay);
       const dateValue = dateBooking ? `${formatTrDate(dateBooking.checkIn)} – ${formatTrDate(dateBooking.checkOut)}` : '—';
       const lifecycleClass = row.lifecycle.code === 'IN_HOUSE' ? 'badge-green' : (row.lifecycle.code === 'UPCOMING' ? 'badge-yellow' : 'badge-blue');
-      const segment = row.isRepeat ? '<span class="badge badge-purple">TEKRAR</span>' : '<span class="badge badge-slate">İLK KONAKLAMA</span>';
-      const opportunity = row.rebookingEligible ? '<br><span class="badge badge-green" style="margin-top:4px;">YENİDEN REZERVASYON</span>' : '';
+      const segment = row.isRepeat ? '<span class="badge badge-purple">Tekrar</span>' : '<span class="badge badge-slate">İlk konaklama</span>';
+      const opportunity = row.rebookingEligible ? '<br><span class="badge badge-green" style="margin-top:4px;">Yeniden rezervasyon</span>' : '';
       const contact = [row.phone, row.email].filter(Boolean).map(escapeHtml).join('<br>') || '<span style="color:var(--text-muted);">Eksik</span>';
-      const consent = row.marketingOptIn ? '<span class="badge badge-green">KAMPANYA İZNİ VAR</span>' : '<span class="badge badge-slate">KAMPANYA İZNİ YOK</span>';
+      const consent = row.marketingOptIn ? '<span class="badge badge-green">Kampanya izni var</span>' : '<span class="badge badge-slate">Kampanya izni yok</span>';
       const directShare = row.directShare == null ? '—' : `%${Math.round(row.directShare * 100)} doğrudan`;
       const villaKey = dateBooking?.villa || dateBooking?.propertyId || '';
       const villaName = villaKey ? (appData.villas?.[villaKey]?.name || villaKey) : '';
@@ -21559,7 +21591,7 @@ function renderGuestUnlinkedPanel() {
       <div><strong>Rezervasyonlardan misafir ekle</strong><p class="sub-text">Misafir telefon veya e-postayla tanınır. Aynı telefon zaten kayıtlıysa yeni profil açılmaz, rezervasyon o misafire bağlanır (tekrar gelen misafir).</p></div>
       ${withPhone ? `<button type="button" class="btn btn-primary btn-sm" data-onclick="linkAllUnlinkedBookingsWithPhone()">Telefonu olan ${withPhone} rezervasyonu ekle</button>` : ''}
     </div>
-    <div class="table-responsive"><table class="data-table"><thead><tr><th>MİSAFİR</th><th>MÜLK / TARİH</th><th>TELEFON</th><th>E-POSTA</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="table-responsive"><table class="data-table"><thead><tr><th>Misafir</th><th>Mülk / tarih</th><th>Telefon</th><th>E-posta</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
     ${guestUnlinkedRows.length > limit ? `<p class="sub-text">İlk ${limit} rezervasyon gösteriliyor; ekledikçe sıradakiler gelir (${guestUnlinkedRows.length} toplam).</p>` : ''}`;
 }
 
@@ -21654,7 +21686,7 @@ function openGuestProfileModal(guestId = null) {
       ? consentEvents.map(event => `<div style="padding:5px 0; font-size:12px;"><span class="badge ${event.marketing_opt_in ? 'badge-green' : 'badge-slate'}">${event.marketing_opt_in ? 'İZİN VERİLDİ' : 'İZİN GERİ ÇEKİLDİ'}</span> ${escapeHtml(formatGuestDateTime(event.recorded_at))} · ${escapeHtml(event.source || 'APPLICATION')}</div>`).join('')
       : '<div style="color:var(--text-muted); font-size:12px;">Henüz kaydedilmiş izin değişikliği yok.</div>';
     const tagBadges = (guest.tags || []).length ? `<div style="margin-bottom:10px;">${guest.tags.map(tag => `<span class="badge badge-purple" style="margin-right:5px;">${escapeHtml(tag)}</span>`).join('')}</div>` : '';
-    insights.innerHTML = `<div class="kpi-cards-grid" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); margin-bottom:12px;"><div class="kpi-card"><span class="kpi-label">KONAKLAMA</span><div class="kpi-value">${row.stayCount}</div></div><div class="kpi-card"><span class="kpi-label">GECE</span><div class="kpi-value">${row.nights}</div></div><div class="kpi-card"><span class="kpi-label">CİRO</span><div class="kpi-value">₺${Number(row.lifetimeRevenue).toLocaleString('tr-TR')}</div></div><div class="kpi-card"><span class="kpi-label">DOĞRUDAN PAY</span><div class="kpi-value">${directShare}</div></div><div class="kpi-card"><span class="kpi-label">PLANLI MESAJ</span><div class="kpi-value">${row.scheduledCount}</div><div class="kpi-meta">Uzatma: ${offerStatus}</div></div></div>${tagBadges}<h4>Konaklama Geçmişi</h4>${history}<h4 style="margin-top:14px;">Kampanya İzni Geçmişi</h4>${consentHistory}`;
+    insights.innerHTML = `<div class="kpi-cards-grid" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); margin-bottom:12px;"><div class="kpi-card"><span class="kpi-label">Konaklama</span><div class="kpi-value">${row.stayCount}</div></div><div class="kpi-card"><span class="kpi-label">Gece</span><div class="kpi-value">${row.nights}</div></div><div class="kpi-card"><span class="kpi-label">Ciro</span><div class="kpi-value">₺${Number(row.lifetimeRevenue).toLocaleString('tr-TR')}</div></div><div class="kpi-card"><span class="kpi-label">Doğrudan pay</span><div class="kpi-value">${directShare}</div></div><div class="kpi-card"><span class="kpi-label">Planlı mesaj</span><div class="kpi-value">${row.scheduledCount}</div><div class="kpi-meta">Uzatma: ${offerStatus}</div></div></div>${tagBadges}<h4>Konaklama Geçmişi</h4>${history}<h4 style="margin-top:14px;">Kampanya İzni Geçmişi</h4>${consentHistory}`;
     insights.style.display = 'block';
     if (rebookingAction) {
       rebookingAction.innerHTML = row.rebookingEligible

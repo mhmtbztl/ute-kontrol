@@ -261,7 +261,7 @@ try {
   const formEtiket = (INDEX2.match(/<label[^>]*>([^<]*)<\/label>\s*<input[^>]*id="maintCost"/) || [])[1] || '';
   check(/Tahmini/i.test(formEtiket) && /gider defterine yazılmaz/i.test(INDEX2),
     'J1. Arıza maliyeti "Tahmini" diye etiketli ve gider olmadığı formda söyleniyor', `etiket="${formEtiket}"`);
-  check(/<th>TAHMİNİ MALİYET \(₺\)<\/th>/.test(INDEX2) && !/<th>MALİYET \(₺\)<\/th>/.test(INDEX2),
+  check(/<th>Tahmini maliyet \(₺\)<\/th>/.test(INDEX2) && !/<th>(MALİYET|Maliyet) \(₺\)<\/th>/.test(INDEX2),
     'J2. Arıza tablosu başlığı da "Tahmini maliyet"', 'tablo başlığı hâlâ MALİYET');
 
   // --- D. Kanal tablosu hizasi ------------------------------------------------
@@ -491,9 +491,9 @@ try {
   app.renderFinanceModule();
   check(g('brCleaningGroup').style.display === 'none' && g('finActualRevenue').innerText === '12.000 TL',
     'S5. Temizlik ücreti alınmıyorsa köprüde temizlik adımları hiç görünmez', `grup=${g('brCleaningGroup').style.display}`);
-  check(/<span class="kpi-label">CİRO \(NET KONAKLAMA GELİRİ\)<\/span>[\s\S]{0,200}id="finActualRevenue"/.test(INDEX2)
-    && /<span class="kpi-label">CİRO \(NET KONAKLAMA GELİRİ\)<\/span>[\s\S]{0,200}id="execKpiRevenue"/.test(INDEX2)
-    && !/TOPLAM GELİR \(NET ODA \+ TEMİZLİK\)/.test(INDEX2),
+  check(/<span class="kpi-label">Ciro \(net konaklama geliri\)<\/span>[\s\S]{0,200}id="finActualRevenue"/.test(INDEX2)
+    && /<span class="kpi-label">Ciro \(net konaklama geliri\)<\/span>[\s\S]{0,200}id="execKpiRevenue"/.test(INDEX2)
+    && !/(TOPLAM GELİR|Toplam gelir) \((NET ODA|net oda) \+ (TEMİZLİK|temizlik)\)/.test(INDEX2),
     'S6. Finans ve Bugün kartlarının etiketi aynı: "Ciro (net konaklama geliri)"', 'etiket eski ya da farklı');
 } finally {
   console.log(`\nTEST SUMMARY: ${passed} / ${passed + failed} TESTS PASSED (${failed} FAILED)`);

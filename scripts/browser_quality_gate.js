@@ -856,7 +856,8 @@ async function main() {
       // kapisi zamanlamaya bagli olarak kirmizi olurdu. Okumalar bos doner.
       await page.route('**/rest/v1/**', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
       await page.evaluate(() => {
-        switchTab('settings');
+        // Ayarlar bir anda tek bolum gosterir; kontrol listeleri menuden secilir.
+        openSettingsSection('checklists');
         appData.settingsChecklistTemplates = [];
         renderSettingsTemplates();
       });

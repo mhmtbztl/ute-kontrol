@@ -1373,7 +1373,7 @@ async function rezervasyonOdemeDavranisi() {
     'L-227f Liste satiri ciro, indirim, komisyon, planli temizlik ve kalani gosterir', satir.slice(0, 600));
   check(/Ciro \(oda geliri, indirim sonrası\): <strong>37\.500 TL<\/strong>/.test(pill) && /Brüt \(bu döneme düşen\): 40\.000 TL/.test(pill) && /Kalan \(tahmini\)/.test(pill),
     'L-227g Ozet cubugu brut, ciro (indirim sonrasi), kesinti ve kalani ayri yazar', pill);
-  check((html.match(/<th[^>]*>(BRÜT \(₺\)|CİRO \(₺\)|KESİNTİLER|KALAN \(₺\))<\/th>/g) || []).length === 4 && /colspan="9"/.test(app),
+  check((html.match(/<th[^>]*>(Brüt \(₺\)|Ciro \(₺\)|Kesintiler|Kalan \(₺\))<\/th>/g) || []).length === 4 && /colspan="9"/.test(app),
     'L-227h Tablo basliklari ve bos durum yeni sutun sayisiyla uyumlu');
   const panel = functionBody(app, 'function openBookingDetailsPanel(');
   check(/computeReservationRowEconomics\(booking, cleaning/.test(panel) && /'İndirim'/.test(panel) && /Kalan \(tahmini\)/.test(panel) && !/'Net oda geliri'/.test(panel),
