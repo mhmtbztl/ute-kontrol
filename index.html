@@ -14,7 +14,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=807db1d8">
+  <link rel="stylesheet" href="style.css?v=e90c6029">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <script src="supabase.umd.js?v=3810661a"></script>
@@ -163,7 +163,7 @@
          etkiledigini yazar: applyGlobalFilterScope() / GLOBAL_FILTER_SCOPE. -->
     <div class="header-filters" id="globalFilterBar">
             <div class="filter-group">
-        <label style="display: flex; align-items: center; gap: 4px;"><span>📅</span> DÖNEM / TARİH:</label>
+        <label style="display: flex; align-items: center; gap: 4px;"><span>📅</span> Dönem / tarih:</label>
         <select id="globalPeriodFilter" data-onchange="handleFilterChange()">
           <!-- Bu liste refreshPeriodSelectors() tarafindan musterinin kendi
                veri araligindan yeniden kurulur. Asagisi yalnizca yedektir. -->
@@ -181,7 +181,7 @@
         <input type="date" id="customFilterEnd"data-onchange="handleFilterChange()" title="Bitiş Tarihi" style="padding: 6px 8px; background: rgba(44, 44, 46,0.9); border: 1px solid rgba(255,255,255,0.25); border-radius: 6px; color: #fff; font-size: 12px; font-weight: 600;">
       </div>
       <div class="filter-group">
-        <label>PORTFÖY:</label>
+        <label>Portföy:</label>
         <select id="globalVillaFilter" data-onchange="handleFilterChange()">
               <option value="ALL">Tüm Villalar / Portföy</option>
             </select>
@@ -197,6 +197,11 @@
         <kbd class="header-kbd">Ctrl+K</kbd>
       </button>
 
+      <!-- Tek ChatGPT kapısı: açılan sayfanın güvenli bağlamını ve hazır sorularını kullanır. -->
+      <button type="button" id="askChatGptBtn" class="btn btn-secondary header-chatgpt-btn" data-onclick="openChatGptQuestionModal()" title="Verilerinizden ChatGPT için hazır, kişisel veri içermeyen bir analiz komutu üretir">
+        <span>🧠</span>
+        <span class="chatgpt-btn-text">ChatGPT'ye sor</span>
+      </button>
       <!-- Bildirim Merkezi (Notification Bell & Drawer) -->
       <div class="header-dropdown-wrap">
         <button type="button" class="btn btn-secondary header-bell-btn" data-onclick="toggleNotificationDrawer()" id="notificationBellBtn" title="Bildirim Merkezi">
@@ -214,24 +219,76 @@
         </div>
       </div>
 
-      <!-- Başlangıç Rehberi Butonu -->
-      <button type="button" id="dataSyncBtn" class="btn btn-secondary header-cache-btn" data-onclick="resyncTenantData()" title="Verileri sunucudan yeniden okur; hiçbir kaydı değiştirmez">
-        <span>🔄</span>
-        <span class="cache-btn-text" id="dataSyncBtnText">Verileri eşitle</span>
-      </button>
-      <button type="button" class="btn btn-secondary header-guide-btn" data-onclick="openHelpModal('setup')" title="Başlangıç Seviyesi Terimler Sözlüğü & Kılavuz">
-        <span>🎓</span>
-        <span class="guide-btn-text">Başlangıç Rehberi</span>
-      </button>
-      <!-- Tek ChatGPT kapısı: açılan sayfanın güvenli bağlamını ve hazır sorularını kullanır. -->
-      <button type="button" id="askChatGptBtn" class="btn btn-secondary header-chatgpt-btn" data-onclick="openChatGptQuestionModal()" title="Verilerinizden ChatGPT için hazır, kişisel veri içermeyen bir analiz komutu üretir">
-        <span>🧠</span>
-        <span class="chatgpt-btn-text">ChatGPT'ye sor</span>
-      </button>
+      <!-- Dropdown 2: Araçlar & Yönetim -->
+      <div class="header-dropdown-wrap">
+        <button type="button" class="btn btn-secondary" data-onclick="toggleHeaderDropdown('toolsMenu')" id="toolsBtn">
+          <span>⚙️</span> <span class="header-btn-text">Araçlar</span> <span class="header-chevron" aria-hidden="true">▾</span>
+        </button>
+        <div class="header-dropdown-menu" id="toolsMenu">
+          <div class="dropdown-section-label">Veri</div>
+          <button type="button" id="dataSyncBtn" class="dropdown-item header-cache-btn" data-onclick="resyncTenantData()" title="Verileri sunucudan yeniden okur; hiçbir kaydı değiştirmez">
+            <span class="dropdown-icon">🔄</span>
+            <div>
+              <strong id="dataSyncBtnText">Verileri eşitle</strong>
+              <small>Sunucudan yeniden okur; hiçbir kaydı değiştirmez</small>
+            </div>
+          </button>
+          <button type="button" class="dropdown-item" data-onclick="openImportModal(); closeAllHeaderDropdowns();">
+            <span class="dropdown-icon">📥</span>
+            <div>
+              <strong>Excel / CSV Rapor Yükle</strong>
+              <small>Finansal verileri sisteme aktarın</small>
+            </div>
+          </button>
+          <!-- Burada "Veri Tabanı Yedeği İndir — Tüm kayıtları JSON olarak
+               indirin" vardı. Etiketi dürüsttü ama YEDEK DEGILDI: JSON'u
+               geri okuyan hicbir kod yok, yani geri yuklenemeyen bir
+               dosyaydi. Yerine gelen defterler ice aktarma sablonuyla ayni
+               sutunlari tasir ve GERCEKTEN geri yuklenebilir. -->
+          <button type="button" class="dropdown-item" data-onclick="exportLedger('BOOKINGS','xlsx'); closeAllHeaderDropdowns();">
+            <span class="dropdown-icon">📗</span>
+            <div>
+              <strong>Rezervasyon Defterini İndir</strong>
+              <small>Seçili dönem, Excel — düzenleyip geri yükleyebilirsiniz</small>
+            </div>
+          </button>
+          <button type="button" class="dropdown-item" data-ledger-only data-onclick="exportLedger('EXPENSES','xlsx'); closeAllHeaderDropdowns();">
+            <span class="dropdown-icon">📕</span>
+            <div>
+              <strong>Gider Defterini İndir</strong>
+              <small>Seçili dönem, Excel — düzenleyip geri yükleyebilirsiniz</small>
+            </div>
+          </button>
+          <button type="button" class="dropdown-item" data-ledger-only data-onclick="exportIncomeStatement(); closeAllHeaderDropdowns();">
+            <span class="dropdown-icon">📘</span>
+            <div>
+              <strong>Gelir Tablosunu İndir</strong>
+              <small>Seçili dönem ve mülk — aylık kâr-zarar, Finans ekranıyla aynı rakamlar</small>
+            </div>
+          </button>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-section-label">Yardım</div>
+          <button type="button" class="dropdown-item header-guide-btn" data-onclick="openHelpModal('setup')">
+            <span class="dropdown-icon">🎓</span>
+            <div>
+              <strong>Başlangıç Rehberi</strong>
+              <small>İlk kurulum adımları ve terimler sözlüğü</small>
+            </div>
+          </button>
+          <button type="button" class="dropdown-item" data-onclick="openHelpModal(); closeAllHeaderDropdowns();">
+            <span class="dropdown-icon">❓</span>
+            <div>
+              <strong>Nasıl Kullanılır?</strong>
+              <small>Günlük işletmeci rutini ve terimler</small>
+            </div>
+          </button>
+        </div>
+      </div>
+
       <!-- Dropdown 1: Hızlı Ekle -->
       <div class="header-dropdown-wrap">
         <button type="button" class="btn btn-primary" data-onclick="toggleHeaderDropdown('quickAddMenu')" id="quickAddBtn" data-write-action>
-          <span>➕</span> Hızlı Ekle <span style="font-size: 10px; margin-left: 2px;">▼</span>
+          <span>＋</span> <span class="header-btn-text">Hızlı Ekle</span> <span class="header-chevron" aria-hidden="true">▾</span>
         </button>
         <div class="header-dropdown-menu" id="quickAddMenu">
           <button type="button" class="dropdown-item" data-onclick="openBookingModal(); closeAllHeaderDropdowns();">
@@ -286,59 +343,10 @@
         </div>
       </div>
 
-      <!-- Dropdown 2: Araçlar & Yönetim -->
-      <div class="header-dropdown-wrap">
-        <button type="button" class="btn btn-secondary" data-onclick="toggleHeaderDropdown('toolsMenu')" id="toolsBtn">
-          <span>⚙️</span> Araçlar <span style="font-size: 10px; margin-left: 2px;">▼</span>
-        </button>
-        <div class="header-dropdown-menu" id="toolsMenu">
-          <button type="button" class="dropdown-item" data-onclick="openImportModal(); closeAllHeaderDropdowns();">
-            <span class="dropdown-icon">📥</span>
-            <div>
-              <strong>Excel / CSV Rapor Yükle</strong>
-              <small>Finansal verileri sisteme aktarın</small>
-            </div>
-          </button>
-          <!-- Burada "Veri Tabanı Yedeği İndir — Tüm kayıtları JSON olarak
-               indirin" vardı. Etiketi dürüsttü ama YEDEK DEGILDI: JSON'u
-               geri okuyan hicbir kod yok, yani geri yuklenemeyen bir
-               dosyaydi. Yerine gelen defterler ice aktarma sablonuyla ayni
-               sutunlari tasir ve GERCEKTEN geri yuklenebilir. -->
-          <button type="button" class="dropdown-item" data-onclick="exportLedger('BOOKINGS','xlsx'); closeAllHeaderDropdowns();">
-            <span class="dropdown-icon">📗</span>
-            <div>
-              <strong>Rezervasyon Defterini İndir</strong>
-              <small>Seçili dönem, Excel — düzenleyip geri yükleyebilirsiniz</small>
-            </div>
-          </button>
-          <button type="button" class="dropdown-item" data-ledger-only data-onclick="exportLedger('EXPENSES','xlsx'); closeAllHeaderDropdowns();">
-            <span class="dropdown-icon">📕</span>
-            <div>
-              <strong>Gider Defterini İndir</strong>
-              <small>Seçili dönem, Excel — düzenleyip geri yükleyebilirsiniz</small>
-            </div>
-          </button>
-          <button type="button" class="dropdown-item" data-ledger-only data-onclick="exportIncomeStatement(); closeAllHeaderDropdowns();">
-            <span class="dropdown-icon">📘</span>
-            <div>
-              <strong>Gelir Tablosunu İndir</strong>
-              <small>Seçili dönem ve mülk — aylık kâr-zarar, Finans ekranıyla aynı rakamlar</small>
-            </div>
-          </button>
-          <button type="button" class="dropdown-item" data-onclick="openHelpModal(); closeAllHeaderDropdowns();">
-            <span class="dropdown-icon">❓</span>
-            <div>
-              <strong>Nasıl Kullanılır?</strong>
-              <small>Günlük işletmeci rutini ve terimler</small>
-            </div>
-          </button>
-        </div>
-      </div>
-
       <!-- Dropdown 3: SaaS Kullanıcı Hesabı & Profil -->
       <div class="header-dropdown-wrap">
         <button type="button" class="btn btn-secondary" data-onclick="toggleHeaderDropdown('userProfileMenu')" id="userProfileBtn">
-          <span id="headerUserAvatar">👤</span> <span id="headerCompanyName">LexBnB Portföyü</span> <span style="font-size: 10px; margin-left: 2px;">▼</span>
+          <span id="headerUserAvatar">👤</span> <span id="headerCompanyName">LexBnB Portföyü</span> <span class="header-chevron" aria-hidden="true">▾</span>
         </button>
         <div class="header-dropdown-menu" id="userProfileMenu" style="min-width: 220px;">
           <div style="padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,0.08); background: rgba(191, 90, 242, 0.1);">
@@ -462,7 +470,7 @@
         <!-- 1. Realized Revenue -->
         <div class="executive-kpi-card" id="execCardRevenue">
           <div class="kpi-card-header">
-            <span class="kpi-label">CİRO (NET KONAKLAMA GELİRİ)</span>
+            <span class="kpi-label">Ciro (net konaklama geliri)</span>
             <button class="kpi-info-btn" data-onclick="showKpiExplanation('REVENUE')">ℹ️</button>
           </div>
           <div class="kpi-val" id="execKpiRevenue">—</div>
@@ -475,7 +483,7 @@
         <!-- 2. Operating Expenses -->
         <div class="executive-kpi-card" id="execCardOpex">
           <div class="kpi-card-header">
-            <span class="kpi-label">OPEX (FAALİYET GİDERİ)</span>
+            <span class="kpi-label">OPEX (faaliyet gideri)</span>
             <button class="kpi-info-btn" data-onclick="showKpiExplanation('OPEX')">ℹ️</button>
           </div>
           <div class="kpi-val" id="execKpiOpex" style="color: #FFB340;">—</div>
@@ -488,7 +496,7 @@
         <!-- 3. Capital Expenses -->
         <div class="executive-kpi-card" id="execCardCapex">
           <div class="kpi-card-header">
-            <span class="kpi-label">CAPEX (YATIRIM GİDERİ)</span>
+            <span class="kpi-label">CAPEX (yatırım gideri)</span>
             <button class="kpi-info-btn" data-onclick="showKpiExplanation('CAPEX')">ℹ️</button>
           </div>
           <div class="kpi-val" id="execKpiCapex" style="color: #FB7185;">—</div>
@@ -501,7 +509,7 @@
         <!-- 4. Operating Profit -->
         <div class="executive-kpi-card" id="execCardOperatingProfit">
           <div class="kpi-card-header">
-            <span class="kpi-label">FAALİYET KÂRI</span>
+            <span class="kpi-label">Faaliyet kârı</span>
             <button class="kpi-info-btn" data-onclick="showKpiExplanation('OPERATING_PROFIT')">ℹ️</button>
           </div>
           <div class="kpi-val" id="execKpiOperatingProfit">—</div>
@@ -514,7 +522,7 @@
         <!-- 5. Net Cash Profit -->
         <div class="executive-kpi-card highlight-profit" id="execCardProfit">
           <div class="kpi-card-header">
-            <span class="kpi-label">NET NAKİT KÂRI</span>
+            <span class="kpi-label">Net nakit kârı</span>
             <button class="kpi-info-btn" data-onclick="showKpiExplanation('NET_PROFIT')">ℹ️</button>
           </div>
           <div class="kpi-val" id="execKpiProfit" style="color: #30D158;">—</div>
@@ -527,7 +535,7 @@
         <!-- 6. Occupancy -->
         <div class="executive-kpi-card" id="execCardOccupancy">
           <div class="kpi-card-header">
-            <span class="kpi-label">DOLULUK ORANI</span>
+            <span class="kpi-label">Doluluk oranı</span>
             <button class="kpi-info-btn" data-onclick="showKpiExplanation('OCCUPANCY')">ℹ️</button>
           </div>
           <div class="kpi-val" id="execKpiOccupancy">—</div>
@@ -540,7 +548,7 @@
         <!-- 7. ADR -->
         <div class="executive-kpi-card" id="execCardAdr">
           <div class="kpi-card-header">
-            <span class="kpi-label">ADR (ORT. GÜNLÜK FİYAT)</span>
+            <span class="kpi-label">ADR (ort. günlük fiyat)</span>
             <button class="kpi-info-btn" data-onclick="showKpiExplanation('ADR')">ℹ️</button>
           </div>
           <div class="kpi-val" id="execKpiAdr">—</div>
@@ -553,7 +561,7 @@
         <!-- 8. RevPAR -->
         <div class="executive-kpi-card" id="execCardRevpar">
           <div class="kpi-card-header">
-            <span class="kpi-label">RevPAR (ODA BAŞI GELİR)</span>
+            <span class="kpi-label">RevPAR (oda başı gelir)</span>
             <button class="kpi-info-btn" data-onclick="showKpiExplanation('REVPAR')">ℹ️</button>
           </div>
           <div class="kpi-val" id="execKpiRevpar">—</div>
@@ -715,7 +723,7 @@
         <!-- Gerçekleşen Ciro -->
         <div class="kpi-card fin-kpi-card">
           <div class="kpi-card-header">
-            <span class="kpi-label">CİRO (NET KONAKLAMA GELİRİ)</span>
+            <span class="kpi-label">Ciro (net konaklama geliri)</span>
             <button class="kpi-info-btn" data-onclick="showKpiExplanation('REVENUE')">ℹ️</button>
           </div>
           <div class="kpi-value" id="finActualRevenue">—</div>
@@ -728,7 +736,7 @@
         <!-- Hedef Ciro (Doğrudan Tıklanabilir & Düzenlenebilir) -->
         <div class="kpi-card fin-kpi-card" data-onclick="openGoalsModal()" style="cursor: pointer;" title="Hedefi değiştirmek için tıklayın">
           <div class="kpi-card-header">
-            <span class="kpi-label">HEDEF CİRO</span>
+            <span class="kpi-label">Hedef ciro</span>
             <div style="display: flex; gap: 4px;">
               <button class="kpi-info-btn" data-onclick="event.stopPropagation(); openGoalsModal()" title="Hedefi Hızlı Değiştir">✏️</button>
               <button class="kpi-info-btn" data-onclick="event.stopPropagation(); showKpiExplanation('TARGET')">ℹ️</button>
@@ -754,7 +762,7 @@
         <!-- Net Kâr (Ciro - Opex - Capex) -->
         <div class="kpi-card fin-kpi-card highlight-profit">
           <div class="kpi-card-header">
-            <span class="kpi-label">NET KÂR (CASH PROFIT)</span>
+            <span class="kpi-label">Net kâr (cash profit)</span>
             <button class="kpi-info-btn" data-onclick="showKpiExplanation('NET_PROFIT')">ℹ️</button>
           </div>
           <div class="kpi-value" id="finNetProfit">—</div>
@@ -767,7 +775,7 @@
         <!-- Toplam Gider (Opex + Capex) -->
         <div class="kpi-card fin-kpi-card">
           <div class="kpi-card-header">
-            <span class="kpi-label">TOPLAM GİDER (OPEX+CAPEX)</span>
+            <span class="kpi-label">Toplam gider (OPEX+CAPEX)</span>
             <button class="kpi-info-btn" data-onclick="showKpiExplanation('TOTAL_EXPENSE')">ℹ️</button>
           </div>
           <div class="kpi-value" id="finTotalExpense">—</div>
@@ -781,7 +789,7 @@
         <!-- Satılan Gece & Ortalama Gelir -->
         <div class="kpi-card fin-kpi-card">
           <div class="kpi-card-header">
-            <span class="kpi-label">SATILAN GECE</span>
+            <span class="kpi-label">Satılan gece</span>
             <button class="kpi-info-btn" data-onclick="showKpiExplanation('SOLD_NIGHTS')">ℹ️</button>
           </div>
           <div class="kpi-value" id="finSoldNights">—</div>
@@ -796,7 +804,7 @@
       <section class="card profit-bridge-card">
         <div class="section-title-bar">
           <div>
-            <h2>🌉 KÂR KÖPRÜSÜ (PROFIT WATERFALL)</h2>
+            <h2>🌉 Kâr köprüsü (profit waterfall)</h2>
             <p class="sub-text">Cirodan başlayarak operasyonel kâra ve yatırımlar sonrası net nakit kârına adım adım geçiş</p>
           </div>
           <div class="bridge-tag">Operasyonel Kâr vs Yatırımlar Ayrıştırılmıştır</div>
@@ -872,7 +880,7 @@
         <summary><strong>Gelirler</strong><span>Konaklama, temizlik, diğer gelir ve sermaye</span></summary>
         <div class="section-title-bar">
           <div>
-            <h2>💰 GELİRLER</h2>
+            <h2>💰 Gelirler</h2>
             <p class="sub-text">Rezervasyon gelirleri otomatik gelir; rezervasyon dışı gelir ve sermaye girişi buradan eklenir</p>
           </div>
           <div class="income-add-wrap">
@@ -896,12 +904,12 @@
           <table class="data-table">
             <thead>
               <tr>
-                <th>TARİH</th>
+                <th>Tarih</th>
                 <th>TÜR</th>
-                <th>MÜLK / KAPSAM</th>
-                <th>AÇIKLAMA</th>
-                <th>TUTAR (TL)</th>
-                <th style="text-align: right;">İŞLEM</th>
+                <th>Mülk / kapsam</th>
+                <th>Açıklama</th>
+                <th>Tutar (TL)</th>
+                <th style="text-align: right;">İşlem</th>
               </tr>
             </thead>
             <tbody id="incomeEntriesBody">
@@ -916,7 +924,7 @@
         <summary><strong>Giderler</strong><span>Yalnız tutarı olan kategoriler</span></summary>
         <div class="section-title-bar">
           <div>
-            <h2>📊 GİDER ANALİZİ (KATEGORİ BAZLI DAĞILIM)</h2>
+            <h2>📊 Gider analizi (kategori bazlı dağılım)</h2>
             <p class="sub-text">Gider kalemlerinin toplam bütçe ve ciro içindeki payları ile geçen aya göre değişimleri</p>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -948,12 +956,12 @@
             <table class="data-table category-table">
               <thead>
                 <tr>
-                  <th>GİDER KATEGORİSİ</th>
-                  <th>TUTAR (TL)</th>
-                  <th>GİDER İÇİ PAY %</th>
-                  <th>CİRO İÇİ PAY %</th>
-                  <th>GEÇEN AYA GÖRE</th>
-                  <th style="text-align: right;">İŞLEM</th>
+                  <th>Gider kategorisi</th>
+                  <th>Tutar (TL)</th>
+                  <th>Gider içi pay %</th>
+                  <th>Ciro içi pay %</th>
+                  <th>Geçen aya göre</th>
+                  <th style="text-align: right;">İşlem</th>
                 </tr>
               </thead>
               <tbody id="expenseCategoryTableBody">
@@ -968,7 +976,7 @@
       <section class="card property-finance-section">
         <div class="section-title-bar">
           <div>
-            <h2>🏡 MÜLK BAZLI FİNANSAL PERFORMANS</h2>
+            <h2>🏡 Mülk bazlı finansal performans</h2>
             <p class="sub-text">Ciro üretimi, doluluk oranları, gecelik fiyat savunması ve net kâr katkısı</p>
           </div>
           <div class="prop-header-actions">
@@ -988,14 +996,14 @@
           <table class="prop-exec-table">
             <thead>
               <tr>
-                <th>🏆 SIRA & MÜLK</th>
-                <th>STRATEJİK DURUM</th>
-                <th>CİRO & PORTFÖY PAYI</th>
-                <th>DOLULUK & SATILAN GECE</th>
-                <th>ORT. GÜNLÜK (ADR)</th>
+                <th>🏆 Sıra & mülk</th>
+                <th>Stratejik durum</th>
+                <th>Ciro & portföy payı</th>
+                <th>Doluluk & satılan gece</th>
+                <th>Ort. günlük (ADR)</th>
                 <th>RevPAR</th>
-                <th title="Mülke yazılmış gider, komisyon ve temizlik maliyeti düşülür; ortak giderler hariç">NET KÂR</th>
-                <th style="text-align: right;">İŞLEM</th>
+                <th title="Mülke yazılmış gider, komisyon ve temizlik maliyeti düşülür; ortak giderler hariç">Net kâr</th>
+                <th style="text-align: right;">İşlem</th>
               </tr>
             </thead>
             <tbody id="propExecTableBody">
@@ -1020,7 +1028,7 @@
           <div>
             <div class="title-with-badge">
               <span style="font-size: 20px;">📊</span>
-              <h2>AYLARA GÖRE KPI TAKİP & GELİŞİM MATRİSİ (14+ AY)</h2>
+              <h2>Aylara göre KPI takip & gelişim matrisi (14+ ay)</h2>
               <span class="badge badge-blue">Tarihsel Performans</span>
             </div>
             <p class="sub-text">Şirketin kuruluşundan bugüne tüm aylık metrikleri: Ciro, Net Kâr, ADR, Doluluk ve Hedef başarıları.</p>
@@ -1079,19 +1087,19 @@
           <table class="data-table">
             <thead>
               <tr>
-                <th>DÖNEM / AY</th>
-                <th>CİRO (TL)</th>
-                <th>GEÇEN YIL CİROSU</th>
-                <th>HEDEF CİRO</th>
-                <th>HEDEF BAŞARISI</th>
-                <th>NET KÂR (TL)</th>
-                <th>MARJ (%)</th>
-                <th>SATILAN GECE</th>
-                <th>DOLULUK (%)</th>
-                <th>ADR (₺/GECE)</th>
+                <th>Dönem / ay</th>
+                <th>Ciro (TL)</th>
+                <th>Geçen yıl cirosu</th>
+                <th>Hedef ciro</th>
+                <th>Hedef başarısı</th>
+                <th>Net kâr (TL)</th>
+                <th>Marj (%)</th>
+                <th>Satılan gece</th>
+                <th>Doluluk (%)</th>
+                <th>ADR (₺/gece)</th>
                 <th>RevPAR (₺)</th>
-                <th>GİDER (TL)</th>
-                <th style="text-align: right;">İŞLEM</th>
+                <th>Gider (TL)</th>
+                <th style="text-align: right;">İşlem</th>
               </tr>
             </thead>
             <tbody id="monthlyKpiTableBody">
@@ -1107,7 +1115,7 @@
         <section class="card trend-card">
           <div class="section-title-bar">
             <div>
-              <h2>📈 AYLIK FİNANSAL TREND</h2>
+              <h2>📈 Aylık finansal trend</h2>
               <span class="sub-text">Ciro, Gider ve Net Kâr Evrimi</span>
             </div>
             <div class="trend-range-selector">
@@ -1131,7 +1139,7 @@
         <section class="card yoy-card">
           <div class="section-title-bar">
             <div>
-              <h2>📅 GEÇEN YIL KARŞILAŞTIRMASI (YOY)</h2>
+              <h2>📅 Geçen yıl karşılaştırması (YOY)</h2>
               <span class="sub-text" id="yoySubText">—</span>
             </div>
             <span class="badge badge-emerald" id="yoyBadge">—</span>
@@ -1149,7 +1157,7 @@
         <div class="section-title-bar">
           <div class="title-with-badge">
             <span class="ai-sparkle-icon">📌</span>
-            <h2>DÖNEM ÖZETİ</h2>
+            <h2>Dönem özeti</h2>
             <span class="badge badge-purple">Kural bazlı</span>
           </div>
           <span class="sub-text">Defterde ölçülen rakamlardan en fazla dört kısa içgörü</span>
@@ -1165,7 +1173,7 @@
     <div id="tab-marketing" class="tab-content">
       <div class="section-title-bar" style="align-items: flex-start; gap: 16px; flex-wrap: wrap;">
         <div>
-          <h2 style="margin: 0;">📈 KANALLAR VE PAZARLAMA</h2>
+          <h2 style="margin: 0;">📈 Kanallar ve pazarlama</h2>
           <p class="sub-text" style="margin: 5px 0 0;">Kanal ekonomisi ile ölçülebilir huni değişiklikleri.</p>
         </div>
         <span id="marketingDataQualityBadge" class="badge badge-secondary">Veri kontrol ediliyor</span>
@@ -1224,7 +1232,7 @@
       <section class="card tape-chart-card">
         <div class="section-title-bar">
           <div>
-            <h2>📅 DOLULUK VE REZERVASYON TAKVİMİ</h2>
+            <h2>📅 Doluluk ve rezervasyon takvimi</h2>
             <p class="sub-text">Portföyünüzdeki gerçek mülklerin gün gün doluluk durumu. Boş günlere tıklayarak doğrudan rezervasyon girebilirsiniz.</p>
           </div>
           <div style="display: flex; gap: 12px; align-items: center; font-size: 11px;">
@@ -1241,7 +1249,7 @@
       <section class="card">
         <div class="section-title-bar">
           <div>
-            <h2>📋 REZERVASYONLAR</h2>
+            <h2>📋 Rezervasyonlar</h2>
             <p class="sub-text">Seçili dönemin rezervasyonları; operasyon önceliğine göre sıralanır. Tutarlar seçili döneme düşen gecelerin payıdır.</p>
           </div>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -1274,15 +1282,15 @@
           <table class="data-table reservation-list-table">
             <thead>
               <tr>
-                <th>VİLLA</th>
-                <th>MİSAFİR</th>
-                <th>KANAL</th>
-                <th>TARİHLER</th>
-                <th title="Misafirin ödediği tutarın seçili döneme düşen payı (geceye göre bölünür)">BRÜT (₺)</th>
-                <th title="Oda geliri: brüt − indirim − temizlik geliri − vergi. Komisyon ciroyu azaltmaz, gider yazılır.">CİRO (₺)</th>
-                <th title="İndirim, vergi, OTA/POS komisyonu ve bu döneme düşen temizlik maliyeti">KESİNTİLER</th>
-                <th title="Tahmini: ciro + temizlik geliri − komisyon − bu döneme düşen temizlik maliyeti (planlı temizlik dahil)">KALAN (₺)</th>
-                <th>DURUM</th>
+                <th>Villa</th>
+                <th>Misafir</th>
+                <th>Kanal</th>
+                <th>Tarihler</th>
+                <th title="Misafirin ödediği tutarın seçili döneme düşen payı (geceye göre bölünür)">Brüt (₺)</th>
+                <th title="Oda geliri: brüt − indirim − temizlik geliri − vergi. Komisyon ciroyu azaltmaz, gider yazılır.">Ciro (₺)</th>
+                <th title="İndirim, vergi, OTA/POS komisyonu ve bu döneme düşen temizlik maliyeti">Kesintiler</th>
+                <th title="Tahmini: ciro + temizlik geliri − komisyon − bu döneme düşen temizlik maliyeti (planlı temizlik dahil)">Kalan (₺)</th>
+                <th>Durum</th>
               </tr>
             </thead>
             <tbody id="manageBookingsTableBody"></tbody>
@@ -1298,7 +1306,7 @@
     <div id="tab-expenses" class="tab-content">
       <section class="card">
         <div class="section-title-bar">
-          <div><h2>💸 GİDER VE YATIRIM DEFTERİ</h2><p class="sub-text">Tüm operasyonel (Opex) ve yatırım (Capex) harcamaları.</p></div>
+          <div><h2>💸 Gider ve yatırım defteri</h2><p class="sub-text">Tüm operasyonel (Opex) ve yatırım (Capex) harcamaları.</p></div>
           <div class="table-actions">
             <input type="text" id="expSearchInput" placeholder="🔍 Açıklama veya Kategori ara..." data-oninput="renderExpensesTable()">
             <button class="btn btn-primary" data-onclick="openExpenseModal()">+ Yeni Gider Ekle</button>
@@ -1307,7 +1315,7 @@
         <div class="table-responsive">
           <table class="data-table">
             <thead>
-              <tr><th>TARİH</th><th>TÜR</th><th>KATEGORİ</th><th>MÜLK / KAPSAM</th><th>AÇIKLAMA</th><th>TUTAR (TL)</th><th style="text-align: right;">İŞLEM</th></tr>
+              <tr><th>Tarih</th><th>TÜR</th><th>Kategori</th><th>Mülk / kapsam</th><th>Açıklama</th><th>Tutar (TL)</th><th style="text-align: right;">İşlem</th></tr>
             </thead>
             <tbody id="expensesTableBody"></tbody>
           </table>
@@ -1324,7 +1332,7 @@
       <section class="kpi-cards-grid" style="margin-bottom: 20px;">
         <div class="kpi-card" style="border-top: 3px solid #FF9F0A;">
           <div class="kpi-card-header">
-            <span class="kpi-label">BEKLEYEN TEMİZLİK BORCU</span>
+            <span class="kpi-label">Bekleyen temizlik borcu</span>
           </div>
           <div class="kpi-value" id="hkKpiPendingDebt" style="color: #FFB340;">₺0</div>
           <div class="kpi-meta">
@@ -1334,7 +1342,7 @@
 
         <div class="kpi-card" style="border-top: 3px solid #30D158;">
           <div class="kpi-card-header">
-            <span class="kpi-label">ÖDENEN TEMİZLİK BEDELİ</span>
+            <span class="kpi-label">Ödenen temizlik bedeli</span>
           </div>
           <div class="kpi-value" id="hkKpiPaidAmount" style="color: #30D158;">₺0</div>
           <div class="kpi-meta">
@@ -1344,7 +1352,7 @@
 
         <div class="kpi-card" style="border-top: 3px solid #0A84FF;">
           <div class="kpi-card-header">
-            <span class="kpi-label">TOPLAM OPERASYON</span>
+            <span class="kpi-label">Toplam operasyon</span>
           </div>
           <div class="kpi-value" id="hkKpiTotalOps" style="color: #409CFF;">0</div>
           <div class="kpi-meta">
@@ -1357,7 +1365,7 @@
       <section class="card">
         <div class="section-title-bar">
           <div>
-            <h2>🧹 TEMİZLİK & OPERASYON BORÇ DEFTERİ</h2>
+            <h2>🧹 Temizlik & operasyon borç defteri</h2>
             <p class="sub-text">Rezervasyonlardan gelen temizlikler. Maliyet temizlik <strong>yapıldı</strong> işaretlendiği günün ayına gider yazılır; ödeme ayrı bir adımdır. Yapılmayan temizlik (gelmeyen misafir) ne gider ne borç olur.</p>
           </div>
           <div class="table-actions" style="display: flex; gap: 8px; flex-wrap: wrap;">
@@ -1379,14 +1387,14 @@
           <table class="data-table">
             <thead>
               <tr>
-                <th>TEMİZLİK TARİHİ</th>
-                <th>VİLLA (EV)</th>
-                <th>MİSAFİR / GÖREV</th>
-                <th>PERSONEL / EKİP</th>
-                <th>MALİYET (TL)</th>
-                <th>DURUM</th>
-                <th>ÖDEME</th>
-                <th style="text-align: right;">İŞLEM</th>
+                <th>Temizlik tarihi</th>
+                <th>Villa (ev)</th>
+                <th>Misafir / görev</th>
+                <th>Personel / ekip</th>
+                <th>Maliyet (TL)</th>
+                <th>Durum</th>
+                <th>Ödeme</th>
+                <th style="text-align: right;">İşlem</th>
               </tr>
             </thead>
             <tbody id="hkTableBody"></tbody>
@@ -1495,14 +1503,14 @@
             <table class="data-table">
               <thead>
                 <tr>
-                  <th>MİSAFİR</th>
-                  <th>İLGİLENİLEN MÜLK</th>
-                  <th>KAYNAK / KANAL</th>
-                  <th>TEKLİF</th>
-                  <th>DURUM</th>
-                  <th>KAYIP NEDENİ</th>
-                  <th>NOTLAR</th>
-                  <th style="text-align: right;">İŞLEM</th>
+                  <th>Misafir</th>
+                  <th>İlgilenilen mülk</th>
+                  <th>Kaynak / kanal</th>
+                  <th>Teklif</th>
+                  <th>Durum</th>
+                  <th>Kayıp nedeni</th>
+                  <th>Notlar</th>
+                  <th style="text-align: right;">İşlem</th>
                 </tr>
               </thead>
               <tbody id="manageLeadsTableBody"></tbody>
@@ -1515,7 +1523,7 @@
       <section class="card" style="margin-bottom: 24px;">
         <div class="section-title-bar">
           <div>
-            <h2>📊 WHATSAPP TALEP & DÖNÜŞÜM ANALİTİĞİ (SATIŞ RADARI)</h2>
+            <h2>📊 WhatsApp talep & dönüşüm analitiği (satış radarı)</h2>
             <p class="sub-text">Gelen mesajların rezervasyona dönüşüm oranı, kayıp analizleri ve misafir talepleri.</p>
           </div>
           <div style="display: flex; gap: 8px;">
@@ -1528,22 +1536,22 @@
         <!-- 4 Ana Metrik KPI Kartları -->
         <div class="kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
           <div class="kpi-card" style="border-left: 4px solid #25D366;">
-            <div class="kpi-title">💬 TOPLAM WHATSAPP TALEBİ</div>
+            <div class="kpi-title">💬 Toplam WhatsApp talebi</div>
             <div class="kpi-value" id="waKpiTotalLeads">0</div>
             <div class="kpi-sub" id="waKpiTotalLeadsSub">Kayıtlı tüm talepler (dönem filtresi uygulanmaz)</div>
           </div>
           <div class="kpi-card" style="border-left: 4px solid #0A84FF;">
-            <div class="kpi-title">🎯 DÖNÜŞÜM ORANI (CONVERSION)</div>
+            <div class="kpi-title">🎯 Dönüşüm oranı (conversion)</div>
             <div class="kpi-value" id="waKpiConvRate">%0</div>
             <div class="kpi-sub" id="waKpiConvRateSub">Rezervasyona dönen oran</div>
           </div>
           <div class="kpi-card" style="border-left: 4px solid #30D158;">
-            <div class="kpi-title">💰 KAZANILAN DİREKT CİRO</div>
+            <div class="kpi-title">💰 Kazanılan direkt ciro</div>
             <div class="kpi-value" id="waKpiWonRevenue">—</div>
             <div class="kpi-sub" style="color: #30D158;">%0 OTA Komisyonu (Net Kâr)</div>
           </div>
           <div class="kpi-card" style="border-left: 4px solid #FF453A;">
-            <div class="kpi-title">📉 KAÇAN POTANSİYEL CİRO</div>
+            <div class="kpi-title">📉 Kaçan potansiyel ciro</div>
             <div class="kpi-value" id="waKpiLostRevenue">—</div>
             <div class="kpi-sub" id="waKpiLostCountSub">—</div>
           </div>
@@ -1594,12 +1602,12 @@
     <div id="tab-maintenance" class="tab-content">
       <section class="card">
         <div class="section-title-bar">
-          <div><h2>🛠️ BAKIM, ONARIM VE ARIZA DEFTERİ</h2><p class="sub-text">P1, P2 ve P3 arıza kayıtları.</p></div>
+          <div><h2>🛠️ Bakım, onarım ve arıza defteri</h2><p class="sub-text">P1, P2 ve P3 arıza kayıtları.</p></div>
           <button class="btn btn-primary" data-onclick="openMaintModal()">+ Yeni Arıza Ekle</button>
         </div>
         <div class="table-responsive">
           <table class="data-table">
-            <thead><tr><th>ÖNCELİK</th><th>VİLLA</th><th>YAPILACAK İŞ / SORUN</th><th>SORUMLU</th><th>TAHMİNİ MALİYET (₺)</th><th>DOWNTIME (GECE)</th><th>DURUM</th><th style="text-align: right;">İŞLEM</th></tr></thead>
+            <thead><tr><th>Öncelik</th><th>Villa</th><th>Yapılacak iş / sorun</th><th>Sorumlu</th><th>Tahmini maliyet (₺)</th><th>Downtime (gece)</th><th>Durum</th><th style="text-align: right;">İşlem</th></tr></thead>
             <tbody id="manageMaintTableBody"></tbody>
           </table>
         </div>
@@ -1612,17 +1620,37 @@
     <div id="tab-settings" class="tab-content">
       <div id="settingsAccessDenied" class="empty-state" hidden>Bu sayfa yalnızca işletme yönetim rollerine açıktır.</div>
 
+      <!-- Bolum menusu (macOS Sistem Ayarlari): bir anda tek bolum gorunur.
+           Secim selectSettingsSection(); derin baglantilar openSettingsSection(). -->
+      <div class="settings-layout" id="settingsLayout">
+      <nav class="settings-nav" id="settingsNav" aria-label="Ayar bölümleri">
+        <div class="settings-nav__group">İşletme</div>
+        <button type="button" class="settings-nav__item" data-settings-target="business" data-onclick="selectSettingsSection('business')"><span class="settings-nav__icon" aria-hidden="true">🏢</span><span>İşletme bilgileri</span></button>
+        <button type="button" class="settings-nav__item" data-settings-target="team" data-onclick="selectSettingsSection('team')"><span class="settings-nav__icon" aria-hidden="true">👥</span><span>Ekip ve roller</span></button>
+        <div class="settings-nav__group">Satış</div>
+        <button type="button" class="settings-nav__item" data-settings-target="channels" data-onclick="selectSettingsSection('channels')"><span class="settings-nav__icon" aria-hidden="true">🌐</span><span>Rezervasyon kanalları</span></button>
+        <button type="button" class="settings-nav__item" data-settings-target="lead-sources" data-onclick="selectSettingsSection('lead-sources')"><span class="settings-nav__icon" aria-hidden="true">🧭</span><span>Talep kaynakları</span></button>
+        <button type="button" class="settings-nav__item" data-settings-target="templates" data-onclick="selectSettingsSection('templates')"><span class="settings-nav__icon" aria-hidden="true">🧩</span><span>Şablonlar</span></button>
+        <div class="settings-nav__group">Operasyon</div>
+        <button type="button" class="settings-nav__item" data-settings-target="checklists" data-onclick="selectSettingsSection('checklists')"><span class="settings-nav__icon" aria-hidden="true">🧹</span><span>Kontrol listeleri</span></button>
+        <div class="settings-nav__group">Finans</div>
+        <button type="button" class="settings-nav__item" data-settings-target="expense-categories" data-onclick="selectSettingsSection('expense-categories')"><span class="settings-nav__icon" aria-hidden="true">🏷️</span><span>Gider kategorileri</span></button>
+        <div class="settings-nav__group">Hesap</div>
+        <button type="button" class="settings-nav__item" data-settings-target="danger" data-onclick="selectSettingsSection('danger')"><span class="settings-nav__icon" aria-hidden="true">⚠️</span><span>Veri ve hesap</span></button>
+      </nav>
+      <div class="settings-panes">
+
       <section class="card settings-section" data-settings-section="business" style="margin-bottom: 24px;">
         <div class="section-title-bar">
           <div>
-            <h2>🏢 İŞLETME</h2>
+            <h2>🏢 İşletme</h2>
             <p class="sub-text">İşletme adını ve raporlarda kullanılacak logoyu yönetin.</p>
           </div>
         </div>
         <form id="businessSettingsForm" data-onsubmit="saveBusinessSettings(event)" class="settings-business-form">
           <div class="settings-logo-preview-wrap">
             <img id="businessLogoPreview" alt="İşletme logosu önizlemesi" hidden>
-            <div id="businessLogoPlaceholder" class="settings-logo-placeholder" aria-hidden="true">LOGO</div>
+            <div id="businessLogoPlaceholder" class="settings-logo-placeholder" aria-hidden="true">Logo</div>
           </div>
           <div class="settings-business-fields">
             <div class="form-group">
@@ -1645,7 +1673,7 @@
       <section class="card settings-section" data-settings-section="team" style="margin-bottom: 24px;">
         <div class="section-title-bar">
           <div>
-            <h2>👥 EKİP VE ROL YÖNETİMİ</h2>
+            <h2>👥 Ekip ve rol yönetimi</h2>
             <p class="sub-text">İşletmenize kullanıcı davet edin ve her birinin yetki seviyesini belirleyin.</p>
           </div>
           <button class="btn btn-primary btn-sm" id="inviteMemberBtn" data-onclick="openInviteMemberModal()">+ Ekibe Üye Davet Et</button>
@@ -1665,10 +1693,10 @@
             <thead>
               <tr>
                 <th>AD</th>
-                <th>E-POSTA</th>
+                <th>E-posta</th>
                 <th>ROL</th>
-                <th>KATILIM</th>
-                <th style="text-align: right;">İŞLEM</th>
+                <th>Katılım</th>
+                <th style="text-align: right;">İşlem</th>
               </tr>
             </thead>
             <tbody id="teamMembersTableBody">
@@ -1680,7 +1708,7 @@
         <div id="pendingInvitationsWrap" style="display: none; margin-top: 22px;">
           <div class="section-title-bar" style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 16px;">
             <div>
-              <h2 style="font-size: 15px;">✉️ BEKLEYEN DAVETLER</h2>
+              <h2 style="font-size: 15px;">✉️ Bekleyen davetler</h2>
               <p class="sub-text">Davet edilen kişi bu e-posta ile kayıt olup giriş yaptığında ekibinize otomatik katılır.</p>
             </div>
           </div>
@@ -1688,11 +1716,11 @@
             <table class="data-table">
               <thead>
                 <tr>
-                  <th>E-POSTA</th>
+                  <th>E-posta</th>
                   <th>ROL</th>
-                  <th>GÖNDERİLDİ</th>
-                  <th>GEÇERLİLİK</th>
-                  <th style="text-align: right;">İŞLEM</th>
+                  <th>Gönderildi</th>
+                  <th>Geçerlilik</th>
+                  <th style="text-align: right;">İşlem</th>
                 </tr>
               </thead>
               <tbody id="pendingInvitationsTableBody"></tbody>
@@ -1705,7 +1733,7 @@
       <section class="card settings-section" data-settings-section="channels" id="bookingChannelSettingsCard" style="margin-bottom: 24px;">
         <div class="section-title-bar">
           <div>
-            <h2>🌐 REZERVASYON KANALLARI VE OTA KOMİSYONLARI</h2>
+            <h2>🌐 Rezervasyon kanalları ve OTA komisyonları</h2>
             <p class="sub-text">Rezervasyon formunda kullanılacak kanalları ve varsayılan komisyon oranlarını yönetin.</p>
           </div>
         </div>
@@ -1719,7 +1747,7 @@
         </form>
         <div class="table-responsive">
           <table class="data-table">
-            <thead><tr><th>KANAL</th><th>TÜR</th><th>VARSAYILAN KOMİSYON (%)</th><th>DURUM</th><th style="text-align:right;">İŞLEM</th></tr></thead>
+            <thead><tr><th>Kanal</th><th>TÜR</th><th>Varsayılan komisyon (%)</th><th>Durum</th><th style="text-align:right;">İşlem</th></tr></thead>
             <tbody id="bookingChannelSettingsBody"></tbody>
           </table>
         </div>
@@ -1730,7 +1758,7 @@
       <section class="card settings-section" data-settings-section="templates" id="settingsTemplatesCard" style="margin-bottom: 24px;">
         <div class="section-title-bar">
           <div>
-            <h2>🧩 ŞABLONLAR</h2>
+            <h2>🧩 Şablonlar</h2>
             <p class="sub-text">Sık kullandığınız metinleri ve işleri bir kez yazın, sonra tek tıkla kullanın. Her bölmenin altında nerede çıktığı yazar.</p>
           </div>
         </div>
@@ -1765,7 +1793,7 @@
       <section class="card settings-section" data-settings-section="checklists" id="settingsChecklistsCard" style="margin-bottom: 24px;">
         <div class="section-title-bar">
           <div>
-            <h2>🧹 KONTROL LİSTELERİ</h2>
+            <h2>🧹 Kontrol listeleri</h2>
             <p class="sub-text">Temizlik ve misafir öncesi son kontrol listesi. Bir kâğıt liste gibi yazın: bölüm başlığı, altında maddeler, maddenin altında alt kontroller. <strong>Zorunlu</strong> işaretli madde ve alt kontrolleri tamamlanmadan iş kapatılamaz.</p>
           </div>
           <button type="button" class="btn btn-secondary btn-sm" data-onclick="switchTab('operations'); setOperationsView('cleaning')">Temizlikte kullan →</button>
@@ -1802,7 +1830,7 @@
 
       <section class="card settings-section" data-settings-section="expense-categories" id="settingsExpenseCategoriesCard" style="margin-bottom:24px;">
         <div class="section-title-bar">
-          <div><h2>🏷️ GİDER KATEGORİLERİ</h2><p class="sub-text">Her kategori bir türe bağlıdır. <strong>OPEX</strong>: işin süregelen gideri (fatura, maaş, bakım). <strong>CAPEX</strong>: yıllarca kullanılan yatırım (klima, mobilya, tadilat). Gider formu kategori seçilince türü buna göre doldurur; ikisi de net kârdan düşer.</p></div>
+          <div><h2>🏷️ Gider kategorileri</h2><p class="sub-text">Her kategori bir türe bağlıdır. <strong>OPEX</strong>: işin süregelen gideri (fatura, maaş, bakım). <strong>CAPEX</strong>: yıllarca kullanılan yatırım (klima, mobilya, tadilat). Gider formu kategori seçilince türü buna göre doldurur; ikisi de net kârdan düşer.</p></div>
         </div>
         <form data-onsubmit="createSettingsExpenseCategory(event)" class="settings-source-form">
           <div class="form-group"><label for="settingsExpenseCategoryName">Yeni kategori</label><input id="settingsExpenseCategoryName" maxlength="60" required placeholder="Örn: Havuz bakımı"></div>
@@ -1811,7 +1839,7 @@
         </form>
         <div class="table-responsive">
           <table class="data-table">
-            <thead><tr><th>KATEGORİ</th><th>TÜR</th><th>KULLANIM</th><th style="text-align:right;">İŞLEM</th></tr></thead>
+            <thead><tr><th>Kategori</th><th>TÜR</th><th>Kullanım</th><th style="text-align:right;">İşlem</th></tr></thead>
             <tbody id="settingsExpenseCategoriesBody"></tbody>
           </table>
         </div>
@@ -1819,7 +1847,7 @@
 
       <section class="card settings-section" data-settings-section="lead-sources" id="settingsLeadSourcesCard" style="margin-bottom:24px;">
         <div class="section-title-bar">
-          <div><h2>🧭 TALEP KAYNAKLARI</h2><p class="sub-text">“Nereden geldi?” seçeneklerini yönetin. Bilinmiyor sistem kaynağı silinemez ve kapatılamaz.</p></div>
+          <div><h2>🧭 Talep kaynakları</h2><p class="sub-text">“Nereden geldi?” seçeneklerini yönetin. Bilinmiyor sistem kaynağı silinemez ve kapatılamaz.</p></div>
         </div>
         <form data-onsubmit="createSettingsLeadSource(event)" class="settings-source-form">
           <div class="form-group"><label for="settingsLeadSourceName">Yeni kaynak</label><input id="settingsLeadSourceName" name="label" maxlength="100" required placeholder="Örn: TikTok"></div>
@@ -1827,7 +1855,7 @@
         </form>
         <div class="table-responsive">
           <table class="data-table">
-            <thead><tr><th>KAYNAK</th><th>TÜR</th><th>DURUM</th><th style="text-align:right;">İŞLEM</th></tr></thead>
+            <thead><tr><th>Kaynak</th><th>TÜR</th><th>Durum</th><th style="text-align:right;">İşlem</th></tr></thead>
             <tbody id="settingsLeadSourcesBody"></tbody>
           </table>
         </div>
@@ -1858,7 +1886,7 @@
       <section class="card" id="dangerZoneCard" style="margin-top: 24px; border: 1px solid rgba(255, 69, 58, 0.35);">
         <div class="section-title-bar">
           <div>
-            <h2 style="color: #FCA5A5;">⚠️ TEHLİKELİ BÖLGE</h2>
+            <h2 style="color: #FCA5A5;">⚠️ Tehlikeli bölge</h2>
             <p class="sub-text">Hesabınızı kalıcı olarak kapatın. Bu işlem geri alınamaz.</p>
           </div>
         </div>
@@ -1872,6 +1900,8 @@
         </div>
       </section>
       </div>
+      </div>
+      </div>
     </div>
 
     <!-- ======================================================= -->
@@ -1881,7 +1911,7 @@
       <section class="card" style="margin-bottom: 24px;">
         <div class="section-title-bar">
           <div>
-            <h2>🏡 PORTFÖY & MÜLK YÖNETİMİ</h2>
+            <h2>🏡 Portföy & mülk yönetimi</h2>
             <p class="sub-text">Sistemdeki tüm villalar, operasyonel hazırlık durumları, baz fiyatlar ve koruma sınırları.</p>
           </div>
           <button class="btn btn-primary btn-sm" id="newPropertyBtn" data-onclick="openPropertyModal()">+ Yeni Villa / Mülk Ekle</button>
@@ -1900,7 +1930,7 @@
       <section class="card" style="margin-bottom: 20px;">
         <div class="section-title-bar">
           <div>
-            <h2>🧹 OPERASYON</h2>
+            <h2>🧹 Operasyon</h2>
             <p class="sub-text">Temizlik, arıza ve ekip görevlerini tek yerden yönetin.</p>
           </div>
           <div style="display: flex; gap: 8px;">
@@ -1916,22 +1946,22 @@
         </div>
         <div class="kpi-cards-grid five-cols" style="margin-bottom: 20px;">
           <div class="kpi-card">
-            <span class="kpi-label">HAZIR MÜLKLER</span>
+            <span class="kpi-label">Hazır mülkler</span>
             <div class="kpi-value" id="opsReadyPropsVal" style="color: #30D158;">—</div>
             <div class="kpi-meta">Misafir kabulüne hazır</div>
           </div>
           <div class="kpi-card">
-            <span class="kpi-label">BUGÜNKÜ TURNOVER</span>
+            <span class="kpi-label">Bugünkü turnover</span>
             <div class="kpi-value" id="opsTurnoverVal" style="color: #409CFF;">0 Görev</div>
             <div class="kpi-meta">Giriş / Çıkış temizliği</div>
           </div>
           <div class="kpi-card">
-            <span class="kpi-label">AÇIK ARIZALAR (P1)</span>
+            <span class="kpi-label">Açık arızalar (P1)</span>
             <div class="kpi-value" id="opsOpenMaintVal" style="color: #FF6961;">0 İş</div>
             <div class="kpi-meta">Kritik müdahale</div>
           </div>
           <div class="kpi-card">
-            <span class="kpi-label">TEMİZLİK BORCU</span>
+            <span class="kpi-label">Temizlik borcu</span>
             <div class="kpi-value" id="opsDebtVal" style="color: #FFB340;">₺0</div>
             <div class="kpi-meta">Personele ödenecek</div>
           </div>
@@ -1954,7 +1984,7 @@
       <section class="card" style="margin-bottom: 24px;">
         <div class="section-title-bar">
           <div>
-            <h2>👥 MİSAFİR REHBERİ & YAŞAM DÖNGÜSÜ</h2>
+            <h2>👥 Misafir rehberi & yaşam döngüsü</h2>
             <p class="sub-text">Kanonik misafir profilleri, tekrar konaklama değeri ve izinli doğrudan satış takibi.</p>
           </div>
           <div style="display: flex; gap: 8px;">
@@ -1963,12 +1993,12 @@
           </div>
         </div>
         <div class="kpi-cards-grid" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); margin-bottom: 16px;">
-          <div class="kpi-card"><span class="kpi-label">MİSAFİR PROFİLİ</span><div class="kpi-value" id="guestKpiTotal">—</div><div class="kpi-meta">Gerçek kişi profili</div></div>
-          <div class="kpi-card"><span class="kpi-label">TEKRAR EDEN</span><div class="kpi-value" id="guestKpiRepeat">—</div><div class="kpi-meta" id="guestKpiRepeatRate">—</div></div>
-          <div class="kpi-card"><span class="kpi-label">TEKRAR CİROSU</span><div class="kpi-value" id="guestKpiRepeatRevenue">—</div><div class="kpi-meta">Bağlı konaklamaların brütü</div></div>
-          <div class="kpi-card"><span class="kpi-label">ULAŞILABİLİR</span><div class="kpi-value" id="guestKpiContactable">—</div><div class="kpi-meta">Telefon veya e-posta var</div></div>
-          <div class="kpi-card"><span class="kpi-label">YENİDEN REZERVASYON</span><div class="kpi-value" id="guestKpiRebooking">—</div><div class="kpi-meta">İzinli ve gelecekte rezervasyonu yok</div></div>
-          <div class="kpi-card"><span class="kpi-label">BAĞLANTISIZ REZ.</span><div class="kpi-value" id="guestKpiUnlinked">—</div><div class="kpi-meta">Profil eşleştirmesi bekliyor</div></div>
+          <div class="kpi-card"><span class="kpi-label">Misafir profili</span><div class="kpi-value" id="guestKpiTotal">—</div><div class="kpi-meta">Gerçek kişi profili</div></div>
+          <div class="kpi-card"><span class="kpi-label">Tekrar eden</span><div class="kpi-value" id="guestKpiRepeat">—</div><div class="kpi-meta" id="guestKpiRepeatRate">—</div></div>
+          <div class="kpi-card"><span class="kpi-label">Tekrar cirosu</span><div class="kpi-value" id="guestKpiRepeatRevenue">—</div><div class="kpi-meta">Bağlı konaklamaların brütü</div></div>
+          <div class="kpi-card"><span class="kpi-label">Ulaşılabilir</span><div class="kpi-value" id="guestKpiContactable">—</div><div class="kpi-meta">Telefon veya e-posta var</div></div>
+          <div class="kpi-card"><span class="kpi-label">Yeniden rezervasyon</span><div class="kpi-value" id="guestKpiRebooking">—</div><div class="kpi-meta">İzinli ve gelecekte rezervasyonu yok</div></div>
+          <div class="kpi-card"><span class="kpi-label">Bağlantısız rez.</span><div class="kpi-value" id="guestKpiUnlinked">—</div><div class="kpi-meta">Profil eşleştirmesi bekliyor</div></div>
         </div>
         <div id="guestOpportunityNotice" style="display:none; margin-bottom:12px; padding:12px; border-radius:10px; background:rgba(48, 209, 88,.08); border:1px solid rgba(48, 209, 88,.25); color:#D1FAE5; font-size:12px;"></div>
         <div id="guestDataNotice" style="display:none; margin-bottom:12px; padding:10px 12px; border-radius:8px; background:rgba(255, 159, 10,.08); border:1px solid rgba(255, 159, 10,.25); color:#FDE68A; font-size:12px;"></div>
@@ -2009,15 +2039,15 @@
           <table class="data-table">
             <thead>
               <tr>
-                <th>MİSAFİR ADI</th>
-                <th>İLETİŞİM</th>
-                <th>KONAKLAMA</th>
-                <th>GECE</th>
-                <th>YAŞAM BOYU CİRO</th>
-                <th>SONRAKİ / SON KONAKLAMA</th>
-                <th>KANAL / İZİN</th>
-                <th>DURUM</th>
-                <th style="text-align: right;">İŞLEM</th>
+                <th>Misafir adı</th>
+                <th>İletişim</th>
+                <th>Konaklama</th>
+                <th>Gece</th>
+                <th>Yaşam boyu ciro</th>
+                <th>Sonraki / son konaklama</th>
+                <th>Kanal / izin</th>
+                <th>Durum</th>
+                <th style="text-align: right;">İşlem</th>
               </tr>
             </thead>
             <tbody id="guestsTableBody">
@@ -2036,7 +2066,7 @@
       <section class="card" style="margin-bottom: 24px;">
         <div class="section-title-bar">
           <div>
-            <h2>🏷️ GELİR YÖNETİMİ & DİNAMİK FİYATLANDIRMA</h2>
+            <h2>🏷️ Gelir yönetimi & dinamik fiyatlandırma</h2>
             <p class="sub-text">Önerilen fiyat = mülkün baz fiyatı + takvim artışları (hafta sonu, özel gün, talep) − indirimler (son dakika, boş gece). Taban fiyatın altına inmez.</p>
           </div>
           <div style="display: flex; gap: 8px;">
@@ -2045,27 +2075,27 @@
         </div>
         <div class="kpi-cards-grid five-cols" style="margin-bottom: 20px;">
           <div class="kpi-card">
-            <span class="kpi-label">YILLIK HEDEF CİRO</span>
+            <span class="kpi-label">Yıllık hedef ciro</span>
             <div class="kpi-value" id="pricingAnnualTargetVal" style="color: #409CFF;">—</div>
             <div class="kpi-meta" id="pricingAnnualTargetMeta">Aylık hedeflerin toplamı</div>
           </div>
           <div class="kpi-card">
-            <span class="kpi-label">ORTALAMA ADR</span>
+            <span class="kpi-label">Ortalama ADR</span>
             <div class="kpi-value" id="pricingAdrVal" style="color: #30D158;">—</div>
             <div class="kpi-meta">Seçili dönem (Finans ile aynı)</div>
           </div>
           <div class="kpi-card">
-            <span class="kpi-label">BOŞ GECE (GAP NIGHTS)</span>
+            <span class="kpi-label">Boş gece (gap nights)</span>
             <div class="kpi-value" id="pricingGapCountVal" style="color: #FF6961;">—</div>
             <div class="kpi-meta" id="pricingGapCountMeta">İki rezervasyon arasında kalan kısa boşluklar</div>
           </div>
           <div class="kpi-card">
-            <span class="kpi-label">FİYAT TABLOSU</span>
+            <span class="kpi-label">Fiyat tablosu</span>
             <div class="kpi-value" id="pricingLadderReadyVal" style="color: #A78BFA;">—</div>
             <div class="kpi-meta" id="pricingLadderReadyMeta">Baz ve taban fiyatı girili mülkler</div>
           </div>
           <div class="kpi-card">
-            <span class="kpi-label">SEÇİLİ MÜLK</span>
+            <span class="kpi-label">Seçili mülk</span>
             <div class="kpi-value" id="pricingSelectedPropertyVal" style="color: #FFB340;">—</div>
             <div class="kpi-meta" id="pricingSelectedPropertyMeta">Mülk seçin</div>
           </div>
@@ -2207,7 +2237,7 @@
     <div id="tab-analysis" class="tab-content">
       <section class="card analysis-hero" aria-labelledby="analysisTitle">
         <div>
-          <span class="analysis-eyebrow">KARAR DESTEK PAKETİ</span>
+          <span class="analysis-eyebrow">Karar destek paketi</span>
           <h2 id="analysisTitle">🧠 ChatGPT Analiz Merkezi</h2>
           <p>Seçtiğiniz dönem ve mülkler için kişisel veri içermeyen finans, rezervasyon ve kanal özetini üretin.</p>
         </div>
@@ -3695,7 +3725,7 @@
           <span id="kpiExplIcon" style="font-size: 26px; background: rgba(10, 132, 255, 0.2); padding: 6px; border-radius: 8px; border: 1px solid rgba(10, 132, 255, 0.4);">📊</span>
           <div>
             <h3 id="kpiExplTitle" style="margin: 0; font-size: 17px; color: #FFFFFF; font-weight: 800;">Metrik Açıklaması</h3>
-            <span id="kpiExplCategory" class="badge badge-blue" style="font-size: 10px; margin-top: 4px; display: inline-block;">FİNANS & GELİR YÖNETİMİ</span>
+            <span id="kpiExplCategory" class="badge badge-blue" style="font-size: 10px; margin-top: 4px; display: inline-block;">Finans & gelir yönetimi</span>
           </div>
         </div>
         <button class="close-btn" data-onclick="closeKpiExplanationModal()">&times;</button>
@@ -4072,10 +4102,10 @@
   <script src="core/side_panel.js?v=d763b464"></script>
   <script src="core/notification_feed.js?v=97d955bf"></script>
   <script src="core/command_search.js?v=89760933"></script>
-  <script src="core/action_dispatch.js?v=a4cd6c06"></script>
+  <script src="core/action_dispatch.js?v=3ac4f2f7"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=fa6d0372"></script>
-  <script src="app.js?v=6e148c54"></script>
+  <script src="app.js?v=84a31871"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=e5503243"></script>

@@ -67,7 +67,7 @@ test('Dönem özeti otomatik komisyon ve temizliği içeren ortak kategori topla
 test('Aylık gelişim gelecek boş ayları gizler ve geçen yıl cirosunu tek sütunda taşır', () => {
   assert.match(source, /previousYearCiro/);
   assert.match(source, /d\.key <= currentMonthKey/);
-  assert.match(html, /GEÇEN YIL CİROSU/);
+  assert.match(html, /Geçen yıl cirosu/);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

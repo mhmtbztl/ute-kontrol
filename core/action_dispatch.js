@@ -74,7 +74,7 @@
     'openInviteMemberModal', 'openQuickLeadCapture', 'syncGoalProfitFromMargin', 'syncGoalMarginFromProfit', 'refreshPropertyReport', 'saveOperationalPerson', 'editOperationalPerson', 'cancelOperationalPersonEdit', 'toggleOperationalPersonActive', 'openMaintModal', 'openChatGptQuestionModal', 'openQuickBookingModal',
     'openMonthCloseModal', 'openMonthReopenModal', 'openLeadWhatsApp', 'inspectCleaningExecution',
     'openNewCleaningTaskModal', 'openCopyPreviousExpensesPanel', 'openPropertyModal', 'openPropertyOtaManager', 'openPropertyChannelForm', 'setTodayPerformanceVilla', 'closePropertyChannelForm', 'updateChannelListingHelp', 'savePropertyChannelListing', 'archivePropertyChannelListing', 'copyPropertyChannelLinks', 'openResetModal',
-    'openSettingsSection', 'openImportConvertPrompt', 'openTabFromDeepLink', 'openUserNotification', 'openWhatsAppModal', 'parseWhatsAppMessage', 'payAllPendingCleaning', 'payCleanerDebt', 'printCurrentReport', 'askChatGptFromCurrentReport',
+    'openSettingsSection', 'selectSettingsSection', 'openImportConvertPrompt', 'openTabFromDeepLink', 'openUserNotification', 'openWhatsAppModal', 'parseWhatsAppMessage', 'payAllPendingCleaning', 'payCleanerDebt', 'printCurrentReport', 'askChatGptFromCurrentReport',
     'promptEditTaskAmount', 'refreshExecutiveDashboardSnapshot', 'renderExpensesTable', 'renderHousekeepingTab', 'renderManageBookingsTable',
     'renderManageLeadsTable', 'recalculatePricingTarget', 'resetGuestDirectoryDateRange',
     'resetImportPreview', 'resyncTenantData', 'resolveMaintenanceFromOperations', 'runPageAction',

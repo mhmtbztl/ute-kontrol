@@ -6625,3 +6625,217 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent-blue); 
   .today-performance__cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .today-performance__card strong { font-size: 22px; }
 }
+
+/* =====================================================================
+   UST CUBUK — macOS arac cubugu duzeni
+   9 kontrol 6'ya indi: Ara | ChatGPT | Bildirim | Araclar | Hizli Ekle |
+   Hesap. Esitleme ve Baslangic Rehberi Araclar menusundedir ("Veri",
+   "Yardim"). Eski mobil kurallar !important kullandigi icin buradaki
+   gecersiz kilmalar daha ozgul secici ve !important tasir.
+   ===================================================================== */
+.app-header .header-actions {
+  margin-left: auto;
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+
+.app-header .header-actions .btn { min-height: 34px; }
+
+/* Arama: yer tutucu metinli kapsul, sagda kisayol. */
+.app-header .header-palette-btn {
+  min-width: 220px;
+  justify-content: flex-start;
+  background: var(--fill-4);
+  color: var(--text-dim);
+  font-weight: 500;
+}
+.app-header .header-palette-btn:hover { background: var(--fill-3); color: var(--text-muted); }
+.app-header .header-palette-btn .palette-btn-text { flex: 1; text-align: left; }
+
+.app-header .header-bell-btn { width: 34px; padding: 0; justify-content: center; }
+
+.header-chevron { font-size: 11px; opacity: 0.6; margin-left: 2px; }
+
+#userProfileBtn { max-width: 240px; }
+#headerCompanyName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Esitleme hatasi menu kapaliyken de gorunur (renderDataSyncStamp). */
+#toolsBtn { position: relative; }
+#toolsBtn.has-alert::after {
+  content: "";
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-rose);
+  box-shadow: 0 0 0 2px var(--bg-surface);
+}
+
+/* Menu ici basliklar ve esitleme satiri. */
+.dropdown-section-label {
+  padding: 8px 12px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.dropdown-item.header-cache-btn,
+.dropdown-item.header-cache-btn:hover {
+  border: 0 !important;
+}
+.dropdown-item.header-cache-btn { background: transparent !important; }
+.dropdown-item.header-cache-btn:hover { background: var(--fill-3) !important; }
+.dropdown-item.header-cache-btn:disabled { opacity: 0.55; cursor: progress; }
+
+.notification-drawer-menu {
+  background: rgba(40, 40, 42, 0.92) !important;
+  border: 1px solid var(--hairline) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+
+@media (max-width: 1180px) {
+  .app-header .header-palette-btn { min-width: 0; }
+  .app-header .header-palette-btn .palette-btn-text,
+  .app-header .header-palette-btn .header-kbd,
+  .app-header .header-chatgpt-btn .chatgpt-btn-text { display: none; }
+  #userProfileBtn { max-width: 190px; }
+}
+
+@media (max-width: 900px) {
+  .app-header .header-actions {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    width: 100% !important;
+    margin-left: 0;
+  }
+  .app-header .header-actions > .btn.header-palette-btn,
+  .app-header .header-actions > .btn.header-chatgpt-btn,
+  .app-header .header-actions > .header-dropdown-wrap:has(#notificationBellBtn) {
+    flex: 0 0 40px !important;
+    width: 40px !important;
+    min-width: 0 !important;
+  }
+  .app-header .header-actions > .btn.header-palette-btn,
+  .app-header .header-actions > .btn.header-chatgpt-btn,
+  .app-header .header-actions .header-bell-btn {
+    width: 40px !important;
+    min-height: 40px;
+    padding: 0 !important;
+    justify-content: center !important;
+  }
+  .app-header .header-actions > .header-dropdown-wrap:has(#toolsBtn),
+  .app-header .header-actions > .header-dropdown-wrap:has(#quickAddBtn) {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+  }
+  .app-header .header-actions > .header-dropdown-wrap:has(#userProfileBtn) {
+    flex: 1 1 100% !important;
+  }
+  .app-header .header-actions .btn { min-height: 40px; padding: 8px 10px !important; font-size: 13px !important; }
+  #userProfileBtn { max-width: none; width: 100%; }
+}
+
+/* =====================================================================
+   AYARLAR — macOS Sistem Ayarlari duzeni
+   Solda gruplu menu, sagda tek bolum (selectSettingsSection). Telefonda
+   menu yatay kaydirilan kapsul satiri olur.
+   ===================================================================== */
+.settings-layout {
+  display: grid;
+  grid-template-columns: 232px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.settings-layout[hidden] { display: none; }
+
+.settings-nav {
+  position: sticky;
+  top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+}
+
+.settings-nav__group {
+  padding: 12px 10px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.settings-nav__group:first-child { padding-top: 4px; }
+
+.settings-nav__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-main);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast);
+}
+.settings-nav__item:hover { background: var(--fill-4); }
+.settings-nav__item.active { background: var(--accent-blue); color: #FFFFFF; }
+
+.settings-nav__icon {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 7px;
+  background: var(--fill-3);
+  font-size: 14px;
+}
+.settings-nav__item.active .settings-nav__icon { background: rgba(255, 255, 255, 0.22); }
+
+/* Bir anda tek bolum. */
+.settings-panes > [data-settings-section]:not(.is-active) { display: none; }
+.settings-panes > .settings-section { margin: 0 !important; }
+.settings-panes > [data-settings-section="danger"] { display: grid; gap: 20px; }
+.settings-panes > [data-settings-section="danger"]:not(.is-active) { display: none; }
+.settings-panes > [data-settings-section="danger"] > .card { margin: 0 !important; }
+
+#dataResetCard { border-color: rgba(255, 159, 10, 0.35) !important; }
+#dangerZoneCard { border-color: rgba(255, 69, 58, 0.35) !important; }
+
+@media (max-width: 900px) {
+  .settings-layout { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .settings-nav {
+    position: static;
+    flex-direction: row;
+    gap: 6px;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .settings-nav::-webkit-scrollbar { display: none; }
+  .settings-nav__group { display: none; }
+  .settings-nav__item {
+    width: auto;
+    flex: 0 0 auto;
+    padding: 7px 12px 7px 8px;
+    border-radius: var(--radius-pill);
+    background: var(--fill-4);
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .settings-nav__icon { width: 22px; height: 22px; border-radius: 50%; font-size: 12px; background: transparent; }
+}

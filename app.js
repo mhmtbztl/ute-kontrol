@@ -6131,7 +6131,7 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
 
         <div class="prop-hero-ciro-box">
           <div>
-            <span style="font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">AYLIK FİİLİ CİRO</span>
+            <span style="font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Aylık fiili ciro</span>
             <div class="hero-ciro-val">${Math.round(s.revenue).toLocaleString('tr-TR')} TL</div>
           </div>
           <span class="badge badge-emerald">%${ciroShare.toFixed(1)} Pay</span>
@@ -6149,7 +6149,7 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
 
         <div class="prop-submetrics-2x2">
           <div class="subm-box">
-            <span class="s-lbl">ORT. GÜNLÜK (ADR)</span>
+            <span class="s-lbl">Ort. günlük (ADR)</span>
             <span class="s-val">${adrVal.toLocaleString('tr-TR')} TL</span>
           </div>
           <div class="subm-box">
@@ -6157,11 +6157,11 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
             <span class="s-val">${revparText}</span>
           </div>
           <div class="subm-box">
-            <span class="s-lbl">NET KÂR</span>
+            <span class="s-lbl">Net kâr</span>
             <span class="s-val ${profit.tone}" title="${escapeHtml(profit.note)}">${profit.valueHtml}</span>
           </div>
           <div class="subm-box">
-            <span class="s-lbl">KÂR MARJI</span>
+            <span class="s-lbl">Kâr marjı</span>
             <span class="s-val" title="${escapeHtml(profit.note)}">${profit.margin}</span>
           </div>
         </div>
@@ -10730,7 +10730,10 @@ async function renderSettingsWorkspace() {
   const allowed = canManageTenantRole(activeTenant?.role);
   if (denied) denied.hidden = allowed;
   document.querySelectorAll('#tab-settings [data-settings-section]').forEach(section => { section.hidden = !allowed; });
+  const layout = document.getElementById('settingsLayout');
+  if (layout) layout.hidden = !allowed;
   if (!allowed) return false;
+  selectSettingsSection(activeSettingsSection);
   renderBusinessSettings();
   renderBookingChannelSettings();
   renderSettingsTemplates();
@@ -11365,12 +11368,34 @@ async function toggleSettingsLeadSource(id, isActive) {
   return true;
 }
 
+// Ayarlar bir anda tek bolum gosterir (sol menu). Secim sekme yeniden
+// cizildiginde korunur; derin baglanti once secer, sonra sekmeyi acar.
+let activeSettingsSection = 'business';
+
+function selectSettingsSection(sectionName) {
+  if (typeof document === 'undefined') return false;
+  const name = String(sectionName || '').replace(/[^a-z-]/g, '');
+  const sections = [...document.querySelectorAll('#tab-settings [data-settings-section]')];
+  const target = sections.find(section => section.dataset.settingsSection === name) || sections[0];
+  if (!target) return false;
+  activeSettingsSection = target.dataset.settingsSection;
+  sections.forEach(section => section.classList.toggle('is-active', section === target));
+  document.querySelectorAll('#settingsNav [data-settings-target]').forEach(button => {
+    const on = button.dataset.settingsTarget === activeSettingsSection;
+    button.classList.toggle('active', on);
+    if (on) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  });
+  return target.dataset.settingsSection === name;
+}
+
 function openSettingsSection(sectionName) {
   if (!canManageTenantRole(activeTenant?.role)) return false;
+  activeSettingsSection = String(sectionName || '').replace(/[^a-z-]/g, '') || 'business';
   switchTab('settings');
-  const target = document.querySelector(`#tab-settings [data-settings-section="${String(sectionName).replace(/[^a-z-]/g, '')}"]`);
-  target?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
-  return !!target;
+  const found = selectSettingsSection(activeSettingsSection);
+  document.getElementById('settingsLayout')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  return found;
 }
 
 function renderSettingsTable() {
@@ -13646,7 +13671,7 @@ function renderTapeChart() {
   const dayNamesShort = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
   const todayStr = getTodayStr();
 
-  let tableHtml = '<table class="tape-chart-table"><thead><tr><th class="tape-villa-th">MÜLK \\ GÜNLER</th>';
+  let tableHtml = '<table class="tape-chart-table"><thead><tr><th class="tape-villa-th">Mülk \\ günler</th>';
   calendarDates.forEach(curDateStr => {
     const dateObj = new Date(`${curDateStr}T12:00:00`);
     const d = dateObj.getDate();
@@ -14533,6 +14558,8 @@ function renderDataSyncStamp() {
   if (typeof document === 'undefined') return;
   const btn = document.getElementById('dataSyncBtn');
   const durum = (typeof appData !== 'undefined' && appData && appData.loadState) || null;
+  // Esitleme dugmesi Araclar menusunde durur; hata menu kapaliyken de gorunsun.
+  document.getElementById('toolsBtn')?.classList.toggle('has-alert', !!(durum && durum.status === 'ERROR'));
   if (durum && durum.status === 'ERROR') {
     setEl('dataSyncBtnText', 'Eşitlenemedi — tekrar dene');
     if (btn) btn.title = 'Son eşitleme başarısız; ekranda son doğrulanmış veri duruyor. Tekrar denemek için tıklayın.';
@@ -14857,7 +14884,7 @@ function renderMonthlyKpiTracker() {
       const marginBadge = d.margin >= 40 ? 'badge-green' : (d.margin >= 20 ? 'badge-blue' : (d.margin > 0 ? 'badge-yellow' : 'badge-red'));
 
       let periodLabel = d.monthName;
-      if (d.isCurrentMonth) periodLabel += ' <span class="badge badge-green" style="font-size:10px; margin-left:4px;">GÜNCEL AY</span>';
+      if (d.isCurrentMonth) periodLabel += ' <span class="badge badge-green" style="font-size:10px; margin-left:4px;">Güncel ay</span>';
 
       const tr = document.createElement('tr');
       if (rowStyle) tr.setAttribute('style', rowStyle);
@@ -15106,6 +15133,8 @@ function closeKpiExplanationModal() {
 }
 
 function openHelpModal(targetTab = 'setup') {
+  // Rehber artik Araclar menusunden de acilir; menu pencerenin arkasinda acik kalmasin.
+  if (typeof closeAllHeaderDropdowns === 'function') closeAllHeaderDropdowns();
   const modal = document.getElementById('helpModal');
   if (modal) modal.classList.add('active');
   if (targetTab) switchHelpTab(targetTab);
@@ -15115,8 +15144,7 @@ function openHelpModal(targetTab = 'setup') {
 function openOnboardingStep(action) {
   const settingsSection = { settings: 'business', team: 'team', templates: 'templates' }[action];
   if (settingsSection) {
-    switchTab('settings');
-    document.querySelector(`[data-settings-section="${settingsSection}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    openSettingsSection(settingsSection);
     return;
   }
   if (action === 'properties') return switchTab('properties');
@@ -20457,7 +20485,7 @@ function renderPropertiesTab() {
             <strong style="font-size: 15px; color: #FFFFFF;">${escapeHtml(v.name || 'Adsız mülk')}</strong>
             <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Kod: ${escapeHtml(k)} • Kapasite: ${escapeHtml(v.capacity || 'Belirtilmedi')}</div>
           </div>
-          <span class="badge badge-green">AKTİF</span>
+          <span class="badge badge-green">Aktif</span>
         </div>
         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-size: 11px; margin: 6px 0;">
           ${[['Baz fiyat', v.basePrice, '#30D158', 'Normal bir gecenin satış fiyatı'], ['Taban fiyat', v.floor ?? v.floorPrice, '#F5F5F7', 'Altına inilmeyen en düşük gecelik fiyat'], ['Hedef fiyat', v.target, '#F5F5F7', 'Ortalama hedeflediğiniz gecelik fiyat']].map(([label, value, color, title]) => `<div style="background: rgba(0,0,0,0.25); padding: 6px 8px; border-radius: 6px;" title="${escapeHtml(title)}">
@@ -21471,10 +21499,10 @@ function renderGuestsTab() {
         : (row.nextStay || row.lifecycle?.booking || row.lastStay);
       const dateValue = dateBooking ? `${formatTrDate(dateBooking.checkIn)} – ${formatTrDate(dateBooking.checkOut)}` : '—';
       const lifecycleClass = row.lifecycle.code === 'IN_HOUSE' ? 'badge-green' : (row.lifecycle.code === 'UPCOMING' ? 'badge-yellow' : 'badge-blue');
-      const segment = row.isRepeat ? '<span class="badge badge-purple">TEKRAR</span>' : '<span class="badge badge-slate">İLK KONAKLAMA</span>';
-      const opportunity = row.rebookingEligible ? '<br><span class="badge badge-green" style="margin-top:4px;">YENİDEN REZERVASYON</span>' : '';
+      const segment = row.isRepeat ? '<span class="badge badge-purple">Tekrar</span>' : '<span class="badge badge-slate">İlk konaklama</span>';
+      const opportunity = row.rebookingEligible ? '<br><span class="badge badge-green" style="margin-top:4px;">Yeniden rezervasyon</span>' : '';
       const contact = [row.phone, row.email].filter(Boolean).map(escapeHtml).join('<br>') || '<span style="color:var(--text-muted);">Eksik</span>';
-      const consent = row.marketingOptIn ? '<span class="badge badge-green">KAMPANYA İZNİ VAR</span>' : '<span class="badge badge-slate">KAMPANYA İZNİ YOK</span>';
+      const consent = row.marketingOptIn ? '<span class="badge badge-green">Kampanya izni var</span>' : '<span class="badge badge-slate">Kampanya izni yok</span>';
       const directShare = row.directShare == null ? '—' : `%${Math.round(row.directShare * 100)} doğrudan`;
       const villaKey = dateBooking?.villa || dateBooking?.propertyId || '';
       const villaName = villaKey ? (appData.villas?.[villaKey]?.name || villaKey) : '';
@@ -21563,7 +21591,7 @@ function renderGuestUnlinkedPanel() {
       <div><strong>Rezervasyonlardan misafir ekle</strong><p class="sub-text">Misafir telefon veya e-postayla tanınır. Aynı telefon zaten kayıtlıysa yeni profil açılmaz, rezervasyon o misafire bağlanır (tekrar gelen misafir).</p></div>
       ${withPhone ? `<button type="button" class="btn btn-primary btn-sm" data-onclick="linkAllUnlinkedBookingsWithPhone()">Telefonu olan ${withPhone} rezervasyonu ekle</button>` : ''}
     </div>
-    <div class="table-responsive"><table class="data-table"><thead><tr><th>MİSAFİR</th><th>MÜLK / TARİH</th><th>TELEFON</th><th>E-POSTA</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="table-responsive"><table class="data-table"><thead><tr><th>Misafir</th><th>Mülk / tarih</th><th>Telefon</th><th>E-posta</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
     ${guestUnlinkedRows.length > limit ? `<p class="sub-text">İlk ${limit} rezervasyon gösteriliyor; ekledikçe sıradakiler gelir (${guestUnlinkedRows.length} toplam).</p>` : ''}`;
 }
 
@@ -21658,7 +21686,7 @@ function openGuestProfileModal(guestId = null) {
       ? consentEvents.map(event => `<div style="padding:5px 0; font-size:12px;"><span class="badge ${event.marketing_opt_in ? 'badge-green' : 'badge-slate'}">${event.marketing_opt_in ? 'İZİN VERİLDİ' : 'İZİN GERİ ÇEKİLDİ'}</span> ${escapeHtml(formatGuestDateTime(event.recorded_at))} · ${escapeHtml(event.source || 'APPLICATION')}</div>`).join('')
       : '<div style="color:var(--text-muted); font-size:12px;">Henüz kaydedilmiş izin değişikliği yok.</div>';
     const tagBadges = (guest.tags || []).length ? `<div style="margin-bottom:10px;">${guest.tags.map(tag => `<span class="badge badge-purple" style="margin-right:5px;">${escapeHtml(tag)}</span>`).join('')}</div>` : '';
-    insights.innerHTML = `<div class="kpi-cards-grid" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); margin-bottom:12px;"><div class="kpi-card"><span class="kpi-label">KONAKLAMA</span><div class="kpi-value">${row.stayCount}</div></div><div class="kpi-card"><span class="kpi-label">GECE</span><div class="kpi-value">${row.nights}</div></div><div class="kpi-card"><span class="kpi-label">CİRO</span><div class="kpi-value">₺${Number(row.lifetimeRevenue).toLocaleString('tr-TR')}</div></div><div class="kpi-card"><span class="kpi-label">DOĞRUDAN PAY</span><div class="kpi-value">${directShare}</div></div><div class="kpi-card"><span class="kpi-label">PLANLI MESAJ</span><div class="kpi-value">${row.scheduledCount}</div><div class="kpi-meta">Uzatma: ${offerStatus}</div></div></div>${tagBadges}<h4>Konaklama Geçmişi</h4>${history}<h4 style="margin-top:14px;">Kampanya İzni Geçmişi</h4>${consentHistory}`;
+    insights.innerHTML = `<div class="kpi-cards-grid" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); margin-bottom:12px;"><div class="kpi-card"><span class="kpi-label">Konaklama</span><div class="kpi-value">${row.stayCount}</div></div><div class="kpi-card"><span class="kpi-label">Gece</span><div class="kpi-value">${row.nights}</div></div><div class="kpi-card"><span class="kpi-label">Ciro</span><div class="kpi-value">₺${Number(row.lifetimeRevenue).toLocaleString('tr-TR')}</div></div><div class="kpi-card"><span class="kpi-label">Doğrudan pay</span><div class="kpi-value">${directShare}</div></div><div class="kpi-card"><span class="kpi-label">Planlı mesaj</span><div class="kpi-value">${row.scheduledCount}</div><div class="kpi-meta">Uzatma: ${offerStatus}</div></div></div>${tagBadges}<h4>Konaklama Geçmişi</h4>${history}<h4 style="margin-top:14px;">Kampanya İzni Geçmişi</h4>${consentHistory}`;
     insights.style.display = 'block';
     if (rebookingAction) {
       rebookingAction.innerHTML = row.rebookingEligible

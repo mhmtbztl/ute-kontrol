@@ -20,7 +20,7 @@ assert.match(settings, /İşletme adı/);
 assert.match(settings, /businessLogoInput/);
 assert.match(settings, /businessLogoPreview/);
 assert.match(settings, /Mesaj şablonları[\s\S]*Görev şablonları[\s\S]*Kontrol listeleri/);
-assert.match(settings, /TALEP KAYNAKLARI[\s\S]*settingsLeadSourcesBody/);
+assert.match(settings, /Talep kaynakları[\s\S]*settingsLeadSourcesBody/);
 assert.match(settings, /Saha personeli/);
 
 assert.match(app, /function renderSettingsWorkspace\(/);
