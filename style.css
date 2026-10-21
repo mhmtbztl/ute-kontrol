@@ -6238,3 +6238,390 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent-blue); 
   .modal-backdrop.active .modal-card,
   .modal-overlay.active .modal-content { animation: none; }
 }
+
+/* Eksik rozet renkleri: index.html ve app.js kullaniyordu ama tanimli
+   degildi; "Temizlik" ve "Kapalı" sayaclari renksiz kaliyordu. */
+.badge-yellow { background: var(--accent-amber-subtle); color: var(--accent-amber); border: 0; }
+.badge-red { background: var(--accent-rose-subtle); color: var(--accent-rose); border: 0; }
+
+/* =====================================================================
+   BUGUN EKRANI — Apple duzeni
+   Buyuk baslik, gruplanmis kartlar, sakin renk: renk yalniz durum
+   bildirir (kritik / operasyon / gelir), suslemez.
+   ===================================================================== */
+
+#tab-executive { display: none; }
+#tab-executive.active { display: flex; flex-direction: column; gap: 20px; }
+#tab-executive > .card,
+#tab-executive > section { margin: 0; }
+
+/* --- Buyuk baslik ------------------------------------------------------ */
+.today-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 8px 2px 0;
+}
+
+.today-hero__title { display: grid; gap: 2px; }
+
+.today-hero__eyebrow {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.today-hero__title h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  color: var(--text-main);
+}
+
+.today-hero__role { font-size: 13px; color: var(--text-muted); }
+
+.today-hero__stats { display: flex; gap: 8px; }
+
+.today-hero__stat {
+  display: grid;
+  gap: 2px;
+  min-width: 96px;
+  padding: 10px 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+}
+
+.today-hero__stat strong {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: var(--text-main);
+}
+
+.today-hero__stat span { font-size: 12px; color: var(--text-muted); }
+
+/* --- Bolum basligi -------------------------------------------------------- */
+.today-section__head,
+.today-performance .section-title-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.today-section__head h3,
+.today-performance h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-main);
+}
+
+.today-section__head p { margin: 4px 0 0; font-size: 13px; color: var(--text-dim); }
+.today-performance .section-title-bar .sub-text { margin-top: 4px; display: block; }
+
+/* --- Bu ayin performansi --------------------------------------------------- */
+.today-performance { margin: 0; }
+
+.today-performance__picker { display: grid; gap: 6px; min-width: 210px; }
+
+.today-performance__picker select {
+  padding: 8px 12px;
+  background: var(--bg-input);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-main);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.today-performance__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.today-performance__card {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  padding: 14px 16px;
+  background: var(--bg-surface-elevated);
+  border: 0;
+  border-radius: var(--radius-md);
+}
+
+.today-performance__card .sub-text { font-size: 12px; font-weight: 500; color: var(--text-muted); }
+
+.today-performance__card strong {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  color: var(--text-main);
+}
+
+.today-performance__card small { font-size: 11px; line-height: 1.35; color: var(--text-dim); }
+
+.today-performance__list { gap: 0; margin-top: 14px; }
+.today-performance__row { padding: 10px 4px; border-bottom: 1px solid var(--hairline); border-radius: 0; }
+.today-performance__row:nth-child(even) { background: transparent; }
+.today-performance__row:last-child { border-bottom: 0; }
+.today-performance__row--head { font-size: 12px; color: var(--text-dim); text-transform: none; }
+
+/* --- Kurulum karti ----------------------------------------------------------- */
+.onboarding-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.onboarding-banner[hidden] { display: none; }
+
+.onboarding-banner__body { flex: 1; min-width: 260px; }
+
+.onboarding-banner__head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.onboarding-banner__head strong { font-size: 15px; font-weight: 600; color: var(--text-main); }
+.onboarding-banner__pct { font-size: 13px; font-weight: 600; color: var(--accent-blue); }
+
+.onboarding-banner__track {
+  height: 6px;
+  background: var(--fill-3);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.onboarding-banner__fill {
+  height: 100%;
+  background: var(--accent-blue);
+  border-radius: var(--radius-pill);
+  transition: width 0.4s var(--ease-emphasized);
+}
+
+.onboarding-banner__steps { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+
+.onboard-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--fill-4);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  opacity: 1;
+}
+.onboard-step.is-done { color: var(--text-dim); }
+.onboard-step.is-done::before { content: "✓"; color: var(--accent-emerald); font-weight: 700; }
+.onboard-step-btn { color: var(--accent-blue); cursor: pointer; }
+.onboard-step-btn::after { content: "›"; font-size: 14px; line-height: 1; }
+.onboard-step-btn:hover,
+.onboard-step-btn:focus-visible { background: var(--accent-blue-subtle); color: var(--accent-blue); text-decoration: none; }
+
+/* --- Komuta merkezi ------------------------------------------------------------ */
+.command-center-container { gap: 12px; margin-bottom: 0; }
+
+.command-center-col {
+  background: var(--bg-surface-elevated);
+  border: 0;
+  border-radius: var(--radius-md);
+  padding: 14px;
+  gap: 10px;
+}
+
+.command-center-col-header { padding: 0 2px; margin: 0; border: 0; }
+
+.command-col-title { gap: 8px; font-size: 14px; font-weight: 600; color: var(--text-main); }
+
+.command-col-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; }
+.command-center-col--critical .command-col-dot { background: var(--accent-rose); }
+.command-center-col--operations .command-col-dot { background: var(--accent-amber); }
+.command-center-col--revenue .command-col-dot { background: var(--accent-emerald); }
+
+.command-col-badge {
+  min-width: 24px;
+  height: 22px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  background: var(--fill-3);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.command-action-card {
+  margin: 0;
+  gap: 6px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 0;
+  border-radius: 12px;
+  transition: background var(--dur-fast);
+}
+.command-action-card + .command-action-card { margin-top: 8px; }
+.command-action-card:hover { background: rgba(255, 255, 255, 0.08); border: 0; }
+.command-action-card.critical,
+.command-action-card.operations,
+.command-action-card.revenue { border-left: 0; }
+
+.action-card-top { gap: 8px; }
+.action-card-domain { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.command-action-card.critical .action-card-domain { color: var(--accent-rose); }
+.command-action-card.operations .action-card-domain { color: var(--accent-amber); }
+.command-action-card.revenue .action-card-domain { color: var(--accent-emerald); }
+.action-card-property { font-size: 12px; color: var(--text-dim); text-align: right; }
+
+.action-card-title { font-size: 14px; font-weight: 600; line-height: 1.3; color: var(--text-main); }
+.action-card-rationale { font-size: 13px; line-height: 1.4; color: var(--text-muted); }
+.action-root-causes { margin: 4px 0 0 16px; padding: 0; }
+
+.action-source-metrics {
+  display: block;
+  padding: 0;
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.action-card-footer { justify-content: flex-end; gap: 8px; margin-top: 4px; }
+
+.empty-action-state {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 96px;
+  padding: 16px 12px;
+  background: transparent;
+  border: 0;
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: center;
+}
+.command-center-col > div:last-child { flex: 1; display: flex; flex-direction: column; }
+
+/* --- Mulk satis hazirligi ------------------------------------------------------ */
+.today-health-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.portfolio-health-grid {
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  margin-top: 0;
+}
+
+.property-health-card {
+  gap: 12px;
+  padding: 16px;
+  background: var(--bg-surface-elevated);
+  border: 0;
+  border-radius: var(--radius-md);
+  transition: background var(--dur-fast);
+}
+.property-health-card:hover { border: 0; transform: none; background: #323234; }
+.property-health-card.status-HEALTHY,
+.property-health-card.status-WARNING,
+.property-health-card.status-INFO,
+.property-health-card.status-CRITICAL { border-top: 0; }
+
+.health-card-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 8px 10px; }
+.health-card-head > div { flex: 1 1 140px; min-width: 0; }
+.health-card-head .badge { white-space: nowrap; }
+.health-card-name { font-size: 15px; font-weight: 600; color: var(--text-main); }
+.health-card-reason { margin-top: 2px; font-size: 12px; line-height: 1.4; color: var(--text-muted); }
+
+.health-card-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.health-card-stats > div { padding: 8px 10px; background: rgba(255, 255, 255, 0.05); border-radius: 10px; }
+.health-card-stats span { display: block; font-size: 11px; color: var(--text-dim); }
+.health-card-stats strong { font-size: 14px; font-weight: 600; color: var(--text-main); }
+.health-card-stats strong.is-negative { color: var(--accent-rose); }
+.health-card-stats strong.is-positive { color: var(--accent-emerald); }
+
+.health-card-note { font-size: 12px; line-height: 1.4; }
+.health-card-note.is-blocked { color: var(--accent-rose); }
+.health-card-note.is-cleaning { color: var(--accent-amber); }
+.health-card-note .btn { margin-left: 6px; }
+
+.health-card-editor { display: block; font-size: 12px; color: var(--text-dim); }
+.health-card-editor.is-readonly { color: var(--text-dim); }
+
+.property-readiness-select {
+  width: 100%;
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: var(--bg-input);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-main);
+  font: inherit;
+  font-size: 13px;
+}
+.property-readiness-select:focus { outline: none; border-color: var(--accent-blue); box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.3); }
+
+/* --- Yapilacaklar: iOS gruplanmis liste -------------------------------------------- */
+.today-todo-card { padding: 20px 22px; margin: 0; }
+
+.today-todo-list {
+  gap: 0;
+  background: var(--bg-surface-elevated);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.today-todo-item {
+  padding: 12px 14px;
+  background: transparent;
+  border-radius: 0;
+  font-size: 14px;
+  color: var(--text-main);
+}
+.today-todo-item + .today-todo-item { box-shadow: inset 0 1px 0 var(--hairline); }
+
+.today-todo-list .empty-state { padding: 18px 14px; color: var(--text-dim); font-size: 13px; text-align: center; }
+
+.today-month-summary {
+  margin: 0;
+  padding: 4px 14px 24px;
+  border-top: 0;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+@media (max-width: 640px) {
+  .today-hero { align-items: stretch; }
+  .today-hero__title h2 { font-size: 30px; }
+  .today-hero__stats { width: 100%; }
+  .today-hero__stat { flex: 1; min-width: 0; padding: 10px 12px; }
+  .today-performance__picker { min-width: 0; width: 100%; }
+  .today-performance__cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .today-performance__card strong { font-size: 22px; }
+}

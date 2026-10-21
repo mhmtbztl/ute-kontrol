@@ -19071,7 +19071,12 @@ function renderTodayDateStrip(bookings, tasks) {
   const cleanings = tasks.filter(item => item.status === 'PLANNED' && String(item.date || '').slice(0, 10) === today).length;
   setEl('todayDateLabel', new Intl.DateTimeFormat('tr-TR', { dateStyle: 'full', timeZone: 'Europe/Istanbul' }).format(new Date(`${today}T12:00:00+03:00`)));
   setEl('todayRoleLabel', `${role} görünümü`);
-  setEl('todayShiftSummary', `${arrivals} giriş · ${departures} çıkış · ${cleanings} temizlik`);
+  const summary = document.getElementById('todayShiftSummary');
+  if (summary) {
+    summary.setAttribute('aria-label', `${arrivals} giriş · ${departures} çıkış · ${cleanings} temizlik`);
+    summary.innerHTML = [[arrivals, 'Giriş'], [departures, 'Çıkış'], [cleanings, 'Temizlik']]
+      .map(([count, label]) => `<div class="today-hero__stat"><strong>${Number(count)}</strong><span>${escapeHtml(label)}</span></div>`).join('');
+  }
 }
 
 function renderTodayTodoList(tasks, tickets, leads) {
@@ -19312,8 +19317,8 @@ function renderExecutiveControlCenter() {
     const stepsEl = document.getElementById('onboardStepsList');
     if (stepsEl && Array.isArray(onboarding.steps)) {
       stepsEl.innerHTML = onboarding.steps.map(s => s.completed
-        ? `<span>✅ ${escapeHtml(s.title)}</span>`
-        : `<button type="button" class="onboard-step-btn" data-onclick="openOnboardingStep(decodeURIComponent('${encodeActionArg(s.action)}'))">⬜ ${escapeHtml(s.title)} →</button>`
+        ? `<span class="onboard-step is-done">${escapeHtml(s.title)}</span>`
+        : `<button type="button" class="onboard-step onboard-step-btn" data-onclick="openOnboardingStep(decodeURIComponent('${encodeActionArg(s.action)}'))">${escapeHtml(s.title)}</button>`
       ).join('');
     }
 
@@ -19507,7 +19512,7 @@ function renderTodayCommandCenter(actionsResult) {
       const causes = act.isCollapsed ? (act.rootCauses || []).filter(Boolean) : [];
       const metricsText = act.isCollapsed ? '' : (act.sourceMetrics || []).join(' • ');
       const rationaleHtml = causes.length
-        ? `<ul class="action-root-causes" style="margin:4px 0 0 16px;padding:0">${causes.map(cause => `<li>${escapeHtml(cause)}</li>`).join('')}</ul>`
+        ? `<ul class="action-root-causes">${causes.map(cause => `<li>${escapeHtml(cause)}</li>`).join('')}</ul>`
         : escapeHtml(act.rationale || act.reason || '');
       // Ham kimlik (UUID) musteriye gosterilmez; ad bulunamazsa bos kalir (L-104).
       const mulkEtiketi = act.propertyName
@@ -19517,16 +19522,16 @@ function renderTodayCommandCenter(actionsResult) {
       return `
         <div class="command-action-card ${typeClass}">
           <div class="action-card-top">
-            <span class="badge">${escapeHtml(act.domain === 'REVENUE' ? 'Gelir fırsatı' : act.domain === 'OPERATIONS' ? 'Operasyon' : 'Kritik')}</span>
-            <span style="font-size: 10px; color: #98989D; font-weight: 600;">${escapeHtml(mulkEtiketi)}</span>
+            <span class="action-card-domain">${escapeHtml(act.domain === 'REVENUE' ? 'Gelir fırsatı' : act.domain === 'OPERATIONS' ? 'Operasyon' : 'Kritik')}</span>
+            <span class="action-card-property">${escapeHtml(mulkEtiketi)}</span>
           </div>
           <div class="action-card-title">${escapeHtml(act.title)}</div>
           <div class="action-card-rationale">${rationaleHtml}</div>
-          ${metricsText ? `<div class="action-source-metrics">📊 ${escapeHtml(metricsText)}</div>` : ''}
+          ${metricsText ? `<div class="action-source-metrics">${escapeHtml(metricsText)}</div>` : ''}
           <div class="action-card-footer">
-            <button type="button" class="btn btn-secondary btn-sm" data-onclick="openTabFromDeepLink(decodeURIComponent('${encodeActionArg(act.deepLink || 'executive')}'), decodeURIComponent('${encodeActionArg(act.focusId || act.id)}'))" style="font-size: 11px; padding: 3px 8px;">İncele ›</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-onclick="openTabFromDeepLink(decodeURIComponent('${encodeActionArg(act.deepLink || 'executive')}'), decodeURIComponent('${encodeActionArg(act.focusId || act.id)}'))">İncele</button>
             ${act.quickAction
-              ? `<button type="button" class="btn btn-primary btn-sm" data-onclick="handleQuickActionTrigger(decodeURIComponent('${encodeActionArg(act.quickAction)}'), decodeURIComponent('${encodeActionArg(act.id)}'))" style="font-size: 11px; padding: 3px 8px;">Uygula</button>`
+              ? `<button type="button" class="btn btn-primary btn-sm" data-onclick="handleQuickActionTrigger(decodeURIComponent('${encodeActionArg(act.quickAction)}'), decodeURIComponent('${encodeActionArg(act.id)}'))">Uygula</button>`
               : ''}
           </div>
         </div>
@@ -19581,43 +19586,42 @@ function renderPortfolioHealth(healthCards) {
       return `<option value="${escapeHtml(status)}"${selected}${disabled}>${optionMeta.icon} ${escapeHtml(optionMeta.label)}${disabled ? ` — ${lockReason}` : ''}</option>`;
     }).join('');
     const blockedHtml = blocked
-      ? `<div style="margin-top:8px; font-size:11px; color:#FCA5A5;">Satışa açmak için arızayı kapatın.
-           <button type="button" class="btn btn-secondary btn-sm" style="font-size:11px; padding:2px 8px; margin-left:4px;"
-             data-onclick="openTabFromDeepLink('maintenance', decodeURIComponent('${encodeActionArg(String((c.blockingTicketIds || [])[0] || ''))}'))">Arızayı gör ›</button></div>`
+      ? `<div class="health-card-note is-blocked">Satışa açmak için arızayı kapatın.
+           <button type="button" class="btn btn-secondary btn-sm"
+             data-onclick="openTabFromDeepLink('maintenance', decodeURIComponent('${encodeActionArg(String((c.blockingTicketIds || [])[0] || ''))}'))">Arızayı gör</button></div>`
       : (cleaningPending
-        ? `<div style="margin-top:8px; font-size:11px; color:#FFB340;">Temizlik yapıldı işaretlenince hazır olur.
-           <button type="button" class="btn btn-secondary btn-sm" style="font-size:11px; padding:2px 8px; margin-left:4px;"
-             data-onclick="openTabFromDeepLink('housekeeping', decodeURIComponent('${encodeActionArg(String((c.pendingCleaningTaskIds || [])[0] || ''))}'))">Temizliğe git ›</button></div>`
+        ? `<div class="health-card-note is-cleaning">Temizlik yapıldı işaretlenince hazır olur.
+           <button type="button" class="btn btn-secondary btn-sm"
+             data-onclick="openTabFromDeepLink('housekeeping', decodeURIComponent('${encodeActionArg(String((c.pendingCleaningTaskIds || [])[0] || ''))}'))">Temizliğe git</button></div>`
         : '');
     const editor = canEdit
-      ? `<label style="display:block; margin-top:9px; font-size:10px; color:#98989D;">
+      ? `<label class="health-card-editor">
            Durumu değiştir
            <select class="property-readiness-select" data-property-readiness-key="${escapeHtml(c.propertyKey)}"
-             data-onchange="setPropertySalesReadiness(decodeURIComponent('${encodeActionArg(String(c.propertyKey))}'), this.value)"
-             style="width:100%; margin-top:4px; padding:6px 8px; border-radius:6px; background:#1C1C1E; color:#E5E5EA; border:1px solid rgba(255,255,255,.16); font-size:11px;">
+             data-onchange="setPropertySalesReadiness(decodeURIComponent('${encodeActionArg(String(c.propertyKey))}'), this.value)">
              <option value="" disabled${c.manualStatus === 'UNSET' ? ' selected' : ''}>⚪ Durum seçin</option>
              ${options}
            </select>
          </label>`
-      : '<div style="margin-top:9px; font-size:10px; color:#6E6E73;">Salt okunur · değiştirme yetkiniz yok</div>';
+      : '<div class="health-card-editor is-readonly">Salt okunur · değiştirme yetkiniz yok</div>';
 
     return `
       <div class="property-health-card status-${cardStatus}" data-readiness-status="${escapeHtml(c.status)}" data-property-key="${escapeHtml(c.propertyKey)}">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div class="health-card-head">
           <div>
-            <strong style="font-size: 14px; color: #FFFFFF;">${escapeHtml(c.propertyName)}</strong>
-            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">${escapeHtml(c.reason)}</div>
+            <strong class="health-card-name">${escapeHtml(c.propertyName)}</strong>
+            <div class="health-card-reason">${escapeHtml(c.reason)}</div>
           </div>
-          <span class="badge ${badgeClass}" style="white-space:nowrap;">${meta.icon} ${escapeHtml(meta.label)}</span>
+          <span class="badge ${badgeClass}">${meta.icon} ${escapeHtml(meta.label)}</span>
         </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px; margin: 4px 0;">
-          <div style="background: rgba(0,0,0,0.25); padding: 6px 8px; border-radius: 6px;">
-            <span style="color: #98989D; display: block;">Satış Durumu:</span>
-            <strong style="color: #F5F5F7; font-size: 12px;">${c.status === 'BLOCKED_MAINTENANCE' ? 'Kapalı' : (c.status === 'UNSET' ? 'Belirsiz' : 'Açık')}</strong>
+        <div class="health-card-stats">
+          <div>
+            <span>Satış durumu</span>
+            <strong>${c.status === 'BLOCKED_MAINTENANCE' ? 'Kapalı' : (c.status === 'UNSET' ? 'Belirsiz' : 'Açık')}</strong>
           </div>
-          <div style="background: rgba(0,0,0,0.25); padding: 6px 8px; border-radius: 6px;">
-            <span style="color: #98989D; display: block;">Açık İş / Arıza:</span>
-            <strong style="color: ${c.openIssueCount > 0 ? '#FF6961' : '#30D158'}; font-size: 13px;">${c.openIssueCount || 0} Kayıt</strong>
+          <div>
+            <span>Açık iş / arıza</span>
+            <strong class="${c.openIssueCount > 0 ? 'is-negative' : 'is-positive'}">${c.openIssueCount || 0} kayıt</strong>
           </div>
         </div>
         ${blockedHtml}

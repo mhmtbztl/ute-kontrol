@@ -14,7 +14,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=8fb964e1">
+  <link rel="stylesheet" href="style.css?v=807db1d8">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <script src="supabase.umd.js?v=3810661a"></script>
@@ -154,7 +154,7 @@
     <div class="brand-area">
       <div class="brand-logo"><img id="headerBusinessLogo" src="assets/brand/lexbnb-logo-dark.svg" alt="Lexbnb"></div>
       <div class="brand-meta">
-        <h1>KONTROL MERKEZİ</h1>
+        <h1>Kontrol Merkezi</h1>
         <p id="brandSubTitle">Kısa Dönem Kiralama & Finansal Performans Portalı</p>
       </div>
     </div>
@@ -407,9 +407,15 @@
     <!-- ======================================================= -->
     <div id="tab-executive" class="tab-content active">
 
-      <section id="todayDateStrip" class="today-date-strip" aria-label="Bugün özeti">
-        <div><strong id="todayDateLabel">—</strong><span id="todayRoleLabel">—</span></div>
-        <span id="todayShiftSummary">—</span>
+      <!-- Buyuk baslik (Apple "Today" duzeni): tarih ust satirda, sag tarafta
+           gunun hareketleri. Sayilar renderTodayDateStrip'ten gelir. -->
+      <section id="todayDateStrip" class="today-hero" aria-label="Bugün özeti">
+        <div class="today-hero__title">
+          <span class="today-hero__eyebrow" id="todayDateLabel">—</span>
+          <h2>Bugün</h2>
+          <span class="today-hero__role" id="todayRoleLabel">—</span>
+        </div>
+        <div class="today-hero__stats" id="todayShiftSummary" aria-label="Bugünün hareketleri">—</div>
       </section>
 
       <!-- BU AYIN PERFORMANSI — doluluk, ADR, RevPAR; ev ev secilebilir (Finans ile ayni hesap) -->
@@ -431,22 +437,20 @@
       </section>
 
       <!-- 1. TENANT ONBOARDING PROGRESS BANNER -->
-      <section class="card onboarding-banner" id="execOnboardingBanner" style="background: linear-gradient(135deg, rgba(44, 44, 46, 0.6), rgba(28, 28, 30, 0.8)); border: 1px solid rgba(191, 90, 242, 0.3); border-radius: 12px; padding: 16px 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-        <div style="flex: 1; min-width: 260px;">
-          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-            <span style="font-size: 18px;">🚀</span>
-            <strong style="color: #F5F5F7; font-size: 14px;">İşletme Kurulum Durumu: <span id="onboardProgressPct" style="color: #A78BFA;">—</span></strong>
+      <section class="card onboarding-banner" id="execOnboardingBanner">
+        <div class="onboarding-banner__body">
+          <div class="onboarding-banner__head">
+            <strong>İşletme kurulumu</strong>
+            <span class="onboarding-banner__pct" id="onboardProgressPct">—</span>
           </div>
-          <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; margin-bottom: 8px;">
-            <div id="onboardProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #BF5AF2, #30D158); border-radius: 3px;"></div>
+          <div class="onboarding-banner__track">
+            <div id="onboardProgressBar" class="onboarding-banner__fill" style="width: 0%;"></div>
           </div>
-          <div id="onboardStepsList" style="display: flex; gap: 12px; flex-wrap: wrap; font-size: 11px; color: #C7C7CC;">
+          <div id="onboardStepsList" class="onboarding-banner__steps">
             <!-- JS ile doldurulur: renderExecutiveControlCenter -->
           </div>
         </div>
-        <div>
-          <button class="btn btn-secondary btn-sm" data-onclick="openGoalsModal()" style="font-size: 11px;">⚙️ Hedefleri Düzenle</button>
-        </div>
+        <button class="btn btn-secondary btn-sm" data-onclick="openGoalsModal()">Hedefleri düzenle</button>
       </section>
 
       <div id="execSnapshotStatus" hidden role="status" aria-live="polite" style="margin: -8px 0 12px; color: #98989D; font-size: 11px;">
@@ -561,29 +565,21 @@
       </section>
 
       <!-- 3. TODAY COMMAND CENTER (ÖNCELİK SIRALI KOMUTA MERKEZİ - 3+2+1) -->
-      <section class="card" style="background: rgba(28, 28, 30, 0.75); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 20px; margin-bottom: 24px;">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+      <section class="card today-section">
+        <div class="today-section__head">
           <div>
-            <h3 style="margin: 0; font-size: 16px; color: #F5F5F7; display: flex; align-items: center; gap: 8px;">
-              <span>🎯</span> BUGÜNÜN KOMUTA MERKEZİ (ÖNCELİK SIRALI İŞLER)
-            </h3>
-            <p style="margin: 4px 0 0 0; font-size: 12px; color: #98989D;">
-              Bugün yapılması gereken işler, önem sırasına göre. Yalnız kayıtlarınızdan çıkan işler gösterilir.
-            </p>
+            <h3>Komuta merkezi</h3>
+            <p>Bugün yapılması gereken işler, önem sırasına göre. Yalnız kayıtlarınızdan çıkan işler gösterilir.</p>
           </div>
-          <div style="display: flex; gap: 8px;">
-            <button class="btn btn-secondary btn-sm" data-onclick="refreshExecutiveDashboardSnapshot(true)" style="font-size: 11px;">🔄 Yenile</button>
-          </div>
+          <button class="btn btn-secondary btn-sm" data-onclick="refreshExecutiveDashboardSnapshot(true)">Yenile</button>
         </div>
 
         <div class="command-center-container">
           <!-- Column 1: Critical Actions (Max 3) -->
-          <div class="command-center-col">
+          <div class="command-center-col command-center-col--critical">
             <div class="command-center-col-header">
-              <div class="command-col-title">
-                <span style="color: #FF453A;">🚨</span> KRİTİK EYLEMLER
-              </div>
-              <span class="command-col-badge badge-red" id="criticalActionsCountBadge">—</span>
+              <div class="command-col-title"><span class="command-col-dot" aria-hidden="true"></span>Kritik eylemler</div>
+              <span class="command-col-badge" id="criticalActionsCountBadge">—</span>
             </div>
             <div id="todayCriticalActionsList">
               <div class="empty-action-state">Açık kritik uyarı yok.</div>
@@ -591,12 +587,10 @@
           </div>
 
           <!-- Column 2: Operations Tasks (Max 2) -->
-          <div class="command-center-col">
+          <div class="command-center-col command-center-col--operations">
             <div class="command-center-col-header">
-              <div class="command-col-title">
-                <span style="color: #FF9F0A;">🧹</span> OPERASYON GÖREVLERİ
-              </div>
-              <span class="command-col-badge badge-yellow" id="operationsActionsCountBadge">—</span>
+              <div class="command-col-title"><span class="command-col-dot" aria-hidden="true"></span>Operasyon görevleri</div>
+              <span class="command-col-badge" id="operationsActionsCountBadge">—</span>
             </div>
             <div id="todayOperationsActionsList">
               <div class="empty-action-state">Kayıtlı bekleyen turnover veya arıza görevi yok.</div>
@@ -604,12 +598,10 @@
           </div>
 
           <!-- Column 3: Revenue Opportunities (Max 1) -->
-          <div class="command-center-col">
+          <div class="command-center-col command-center-col--revenue">
             <div class="command-center-col-header">
-              <div class="command-col-title">
-                <span style="color: #30D158;">💡</span> GELİR FIRSATLARI
-              </div>
-              <span class="command-col-badge badge-green" id="revenueActionsCountBadge">—</span>
+              <div class="command-col-title"><span class="command-col-dot" aria-hidden="true"></span>Gelir fırsatları</div>
+              <span class="command-col-badge" id="revenueActionsCountBadge">—</span>
             </div>
             <div id="todayRevenueActionsList">
               <div class="empty-action-state">Kayıtlarınızda şu an önerilecek bir gelir fırsatı yok.</div>
@@ -619,17 +611,13 @@
       </section>
 
       <!-- 4. MÜLK SATIŞ HAZIRLIĞI -->
-      <section class="card" style="background: rgba(28, 28, 30, 0.75); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 20px; margin-bottom: 24px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+      <section class="card today-section">
+        <div class="today-section__head">
           <div>
-            <h3 style="margin: 0; font-size: 15px; color: #F5F5F7; display: flex; align-items: center; gap: 8px;">
-              <span>🏡</span> MÜLK SATIŞ HAZIRLIĞI
-            </h3>
-            <p style="margin: 3px 0 0 0; font-size: 11px; color: #98989D;">
-              Satışa hazır, temizlik bekleyen ve arıza nedeniyle açık veya kapalı mülkler.
-            </p>
+            <h3>Mülk satış hazırlığı</h3>
+            <p>Satışa hazır, temizlik bekleyen ve arıza nedeniyle açık veya kapalı mülkler.</p>
           </div>
-          <div style="display: flex; gap: 6px;">
+          <div class="today-health-pills">
             <span class="badge badge-green" id="healthPillReady">—</span>
             <span class="badge badge-yellow" id="healthPillCleaning">—</span>
             <span class="badge badge-blue" id="healthPillMinorIssue">—</span>
@@ -642,8 +630,8 @@
         </div>
       </section>
 
-      <section class="card today-todo-card">
-        <div class="section-title-bar"><div><h3>Yapılacaklar</h3><p class="sub-text">Bugüne ait açık operasyon ve satış işleri.</p></div></div>
+      <section class="card today-section today-todo-card">
+        <div class="today-section__head"><div><h3>Yapılacaklar</h3><p>Bugüne ait açık operasyon ve satış işleri.</p></div></div>
         <div id="todayTodoList"></div>
       </section>
 
@@ -4087,7 +4075,7 @@
   <script src="core/action_dispatch.js?v=a4cd6c06"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=fa6d0372"></script>
-  <script src="app.js?v=a135433d"></script>
+  <script src="app.js?v=6e148c54"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=e5503243"></script>
