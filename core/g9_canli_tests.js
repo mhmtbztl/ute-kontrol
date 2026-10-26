@@ -60,6 +60,8 @@
 // L-311: bildirim akisi giris/cikis ve geciken genel gorev icin bildirim uretmiyor, saati
 //   gecmis takibi "bugun" (INFO) yaziyordu.
 // L-286: raporlarda, kartlarda ve hatalarda ham kod / Ingilizce gorunumler.
+// L-285: ChatGPT metinleri cilizdi: rapordan Ingilizce anahtarli 3 sayi, ham ondalik;
+//   "Testi ChatGPT'ye sor" huni verisi tasimiyordu.
 const fs = require('fs');
 const path = require('path');
 
@@ -1128,6 +1130,27 @@ async function L286() {
   check(/createdAt: row\.createdAt \? formatTrDate/.test(src), 'L-286h Satis raporunda ISO zaman damgasi yok');
 }
 
+// ---------------------------------------------------------------------------
+// L-285 ChatGPT metinleri: Turkce etiketli, yuvarlanmis rapor; huni sorusu veri tasir
+// ---------------------------------------------------------------------------
+async function L285() {
+  const P = require('./chatgpt_prompt_engine.js');
+  const rapor = { title: 'Finans raporu', subtitle: 'Ekim 2026 · Tüm mülkler',
+    summary: { netRoomRevenue: 89250, totalOpex: 28004.059999999998 },
+    metrics: [{ label: 'Net konaklama geliri', value: 89250, type: 'money' }, { label: 'Toplam OPEX', value: 28004.059999999998, type: 'money' },
+      { label: 'CAPEX', value: 20000, type: 'money' }, { label: 'Satılan gece', value: 8, type: 'int' }, { label: 'ADR', value: 11156.25, type: 'money' }] };
+  const p = P.buildPrompt({ kind: 'PAGE_REPORT', today: '2026-10-26', question: 'Bu raporu yorumla.', context: { report: rapor } }).prompt;
+  check(/Toplam OPEX: 28\.004,06 ₺/.test(p) && /CAPEX: 20\.000 ₺/.test(p) && /Satılan gece: 8/.test(p) && !/totalOpex|28004\.05/.test(p),
+    'L-285a Rapor metni Turkce etiketli, kurusa yuvarlanmis tum KPI kalemlerini tasir', p);
+  const R = require('./report_engine.js');
+  check(/metrics/.test(read('core/report_engine.js').match(/chatGptContext: \{[^}]*\}/)[0]), 'L-285b Rapor motoru ChatGPT baglamina KPI kalemlerini verir');
+  const f = P.buildPrompt({ kind: 'FUNNEL_TEST_QUESTION', today: '2026-10-26', question: 'Değişiklik işe yaradı mı?', context: {
+    testName: 'Kapak fotoğrafı', changedOn: '2026-10-10', verdict: 'Yetersiz veri',
+    snapshots: [{ label: 'Airbnb · aaa · 01.10–10.10', impressions: 1000, listingViews: 100, bookings: 2, ctr: 10, conversion: 2 }] } }).prompt;
+  check(/Gösterim 1\.000/.test(f) && /tıklama %10/.test(f) && /Kapak fotoğrafı/.test(f), 'L-285c Huni sorusu deney ve snapshot verisini tasir', f);
+  check(/verdict: [^,]+, snapshots }/.test(functionBody(read('app.js'), 'function openFunnelTestQuestion(')), 'L-285d Huni sorusu uygulamadan snapshot verisiyle acilir');
+}
+
 async function main() {
   try {
     await L304();
@@ -1168,6 +1191,7 @@ async function main() {
     await L312();
     await L311();
     await L286();
+    await L285();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

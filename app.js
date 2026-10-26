@@ -4506,11 +4506,23 @@ function askChatGptFromCurrentReport() {
 function openFunnelTestQuestion() {
   const model = typeof LexBnBMarketingUI !== 'undefined' && LexBnBMarketingUI.getCurrentModel ? LexBnBMarketingUI.getCurrentModel() : null;
   const experiment = model?.experiments?.[0] || {};
+  // Gercek huni verisi gider (L-285): deney alan adlari tutmuyordu, metin bostu.
+  const huni = typeof MarketingFunnelService !== 'undefined' ? MarketingFunnelService : null;
+  const ilanAdi = id => { const ilan = (model?.listings || []).find(item => item.id === id); return ilan ? (ilan.title || ilan.listing_title || ilan.channel || 'İlan') : 'İlan'; };
+  const snapshots = (model?.snapshots || []).slice(0, 6).map(s => {
+    const sayac = k => (s[k] ?? s[k.replace(/[A-Z]/g, ch => '_' + ch.toLowerCase())]);
+    const oran = huni ? huni.deriveFunnelMetrics(s).rates : null;
+    return {
+      label: `${ilanAdi(s.channel_listing_id || s.channelListingId)} · ${s.period_start || s.periodStart || '?'} → ${s.period_end_exclusive || s.periodEndExclusive || '?'}`,
+      impressions: sayac('impressions'), listingViews: sayac('listingViews'), bookings: sayac('platformReportedBookings'),
+      ctr: oran ? oran.searchToViewCtrPercent : null, conversion: oran ? oran.viewToBookingConversionPercent : null
+    };
+  });
   return openChatGptQuestionModal({
     tabId: 'marketing', kind: 'FUNNEL_TEST_QUESTION', scope: 'Kanallar ve Pazarlama',
     selectedQuestion: 'Değişiklik işe yaradı mı, sırada ne var?',
     questions: ['Değişiklik işe yaradı mı, sırada ne var?'],
-    context: { testName: experiment.name || experiment.title, changedOn: experiment.started_on || experiment.startedAt, beforeRate: experiment.before_rate, afterRate: experiment.after_rate, sampleBefore: experiment.sample_before, sampleAfter: experiment.sample_after }
+    context: { testName: experiment.primary_metric || experiment.primaryMetric || experiment.name || null, changedOn: experiment.change_date || experiment.changeDate || null, verdict: experiment.verdict || experiment.status || null, snapshots }
   });
 }
 

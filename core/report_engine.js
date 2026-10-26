@@ -99,7 +99,13 @@
     const summary = page === 'FINANCE' || page === 'PROPERTY'
       ? Object.fromEntries(sections[0].items.filter(x => x.value !== null).map(x => [x.id, x.value]))
       : data.summary || (page === 'SALES' ? { funnel: data.funnel || null } : page === 'FINANCE' || page === 'PROPERTY' ? Object.fromEntries((sections[0].items || []).map(x => [x.id, x.value])) : { recordCount: ((sections.find(section => section.kind === 'table') || {}).rows || []).length });
-    return { title, subtitle, business: { name: business.name || null, logoUrl: business.logoUrl || null }, sections, unmeasured, excel, chatGptContext: { title, subtitle, summary } };
+    // ChatGPT'ye etiketli KPI kalemleri gider (L-285): eskiden Ingilizce anahtarli
+    // 2-3 sayi ve ham ondalik gidiyordu. Tablo satirlari (misafir adi vb.) gitmez.
+    const metrics = sections.filter(section => section.kind === 'kpis')
+      .flatMap(section => section.items || [])
+      .filter(item => item && item.value !== null && item.value !== undefined && typeof item.value !== 'object')
+      .map(item => ({ label: item.label, value: item.value, type: item.type }));
+    return { title, subtitle, business: { name: business.name || null, logoUrl: business.logoUrl || null }, sections, unmeasured, excel, chatGptContext: { title, subtitle, summary, metrics } };
   }
   function toCSV(report) {
     const rows = [];
