@@ -8762,10 +8762,13 @@ function renderManageBookingsTable() {
   const summaryPill = document.getElementById('rezTableSummaryPill');
   if (summaryPill) {
     // Toplu aktarim ozeti rezervasyon sayilmaz (L-103); gece ve tutara dahildir.
-    const ozetSayisi = filteredRows.filter(row => isBulkSummaryBooking(row.booking)).length;
-    const rezSayisi = filteredRows.length - ozetSayisi;
+    // Iptal rezervasyon sayilmaz (L-284); listede gorunur, ozette ayri yazilir.
+    const iptalMi = row => String(row.booking?.status || '').toUpperCase() === 'CANCELLED';
+    const iptalSayisi = filteredRows.filter(iptalMi).length;
+    const ozetSayisi = filteredRows.filter(row => !iptalMi(row) && isBulkSummaryBooking(row.booking)).length;
+    const rezSayisi = filteredRows.length - ozetSayisi - iptalSayisi;
     const tl = n => `${Math.round(n).toLocaleString('tr-TR')} TL`;
-    summaryPill.innerHTML = `📊 Gösterilen: <strong>${rezSayisi} Rezervasyon</strong>${ozetSayisi ? ` + ${ozetSayisi} toplu aktarım özeti` : ''} | 🌙 ${listSummary.soldNights} Gece`
+    summaryPill.innerHTML = `📊 Gösterilen: <strong>${rezSayisi} Rezervasyon</strong>${ozetSayisi ? ` + ${ozetSayisi} toplu aktarım özeti` : ''}${iptalSayisi ? ` (+ ${iptalSayisi} iptal, hesaba girmez)` : ''} | 🌙 ${listSummary.soldNights} Gece`
       + ` | Brüt (bu döneme düşen): ${tl(listSummary.gross)} | 💰 Ciro (oda geliri, indirim sonrası): <strong>${tl(listSummary.netRoomRevenue)}</strong>`
       + ` | Kesintiler: −${tl(listSummary.deductions)} | Kalan (tahmini): ${tl(listSummary.remaining)}`;
   }
@@ -23574,6 +23577,7 @@ if (typeof module !== 'undefined' && module.exports) {
     getImportEngine,
     buildImportSource,
     parseSourceWithMode,
+    setReservationScopeRange,
     hasUnsavedModalForm,
     markModalFormDirty,
     unsavedFormBeforeUnload,

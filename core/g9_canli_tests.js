@@ -35,6 +35,7 @@
 // L-282: kapatilan talep kaynaginin adi gecmis talep satirinda kayboluyordu
 //   (yalniz etkin kaynaklar yukleniyordu).
 // L-283: dolu formda tarayici geri tusu veriyi uyarisiz siliyordu (beforeunload yok).
+// L-284: rezervasyon listesi ozeti iptal kayitlari rezervasyon sayiyordu.
 const fs = require('fs');
 const path = require('path');
 
@@ -661,6 +662,20 @@ async function L283() {
   check(/beforeunload/.test(read('app.js')) && /installUnsavedFormGuard\(\)/.test(read('app.js')), 'L-283e Uyari uygulama acilisinda kurulur');
 }
 
+// ---------------------------------------------------------------------------
+// L-284 rezervasyon listesi ozeti iptali rezervasyon saymaz
+// ---------------------------------------------------------------------------
+async function L284() {
+  const dom = sahteDom();
+  const App = require('../app.js');
+  const r = (id, durum, ad) => ({ id, villa: 'DENE', propertyId: PROP_A, guest: ad || ('TEST ' + id), checkIn: '2026-11-10', checkOut: '2026-11-12', gross: 1000, pax: 2, status: durum });
+  kur(App, { bookings: [r('a', 'CONFIRMED'), r('b', 'CHECKED_OUT'), r('c', 'CANCELLED'), r('d', 'CANCELLED')] });
+  App.setReservationScopeRange('2026-11-01', '2026-11-30');
+  App.renderManageBookingsTable();
+  const ozet = dom.getElementById('rezTableSummaryPill').innerHTML;
+  check(/<strong>2 Rezervasyon<\/strong>/.test(ozet) && /2 iptal/.test(ozet), 'L-284a Ozet iptalleri rezervasyon saymaz, ayrica yazar', ozet.slice(0, 160));
+}
+
 async function main() {
   try {
     await L304();
@@ -681,6 +696,7 @@ async function main() {
     await L281();
     await L282();
     await L283();
+    await L284();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));
