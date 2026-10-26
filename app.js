@@ -4471,6 +4471,8 @@ function printCurrentReport() {
   popup.document.write(`<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>${escapeHtml(currentPageReport.title)}</title><style>body{font:14px Arial;color:#111;padding:24px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:7px;text-align:left}.report-business{display:flex;gap:12px;align-items:center;margin-bottom:16px}.report-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.report-kpi{border:1px solid #ccc;padding:10px;display:flex;flex-direction:column}.sub-text{color:#555;display:block}img{max-width:180px;max-height:64px}</style></head><body><h1>${escapeHtml(currentPageReport.title)}</h1>${reportPreviewHtml(currentPageReport, 'print')}</body></html>`);
   popup.document.close();
   popup.opener = null;
+  // Yazdirma bitince bos sekme kapanir (L-289): her yazdirmada about:blank kaliyordu.
+  popup.addEventListener('afterprint', () => popup.close(), { once: true });
   popup.focus();
   // Logo yuklenmeden yazdirilirsa PDF logosuz cikar.
   const logo = popup.document.images[0];
@@ -23704,6 +23706,8 @@ if (typeof module !== 'undefined' && module.exports) {
     getImportEngine,
     buildImportSource,
     parseSourceWithMode,
+    printCurrentReport,
+    setCurrentPageReportForTests: report => { currentPageReport = report; },
     openMaintModal,
     bumpLeadInterestFromQuick,
     refreshImportHistory,

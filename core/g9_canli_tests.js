@@ -53,6 +53,7 @@
 // L-293: "+1 yalniz fiyat sorusu" sayaci 0 iken Geri al "Girilen degerlerden biri gecersiz" diyordu.
 // L-294: ariza duzenleme penceresindeki "Sorumlu" alani atanan ustayi gostermiyordu.
 // L-295: tamamlanan genel gorevde completed_at bos kaliyordu.
+// L-289: Yazdir/PDF sonrasi about:blank sekmesi acik kaliyordu.
 const fs = require('fs');
 const path = require('path');
 
@@ -980,6 +981,26 @@ async function L295() {
     'L-295a Tamamlanan gorev completed_at ile yazilir', JSON.stringify(y && y.yuk));
 }
 
+// ---------------------------------------------------------------------------
+// L-289 yazdirma bitince bos sekme kapanir
+// ---------------------------------------------------------------------------
+async function L289() {
+  sahteDom();
+  const App = require('../app.js');
+  kur(App, {});
+  const dinleyiciler = {};
+  let kapandi = false;
+  const popup = {
+    document: { write() {}, close() {}, images: [] },
+    focus() {}, print() { if (dinleyiciler.afterprint) dinleyiciler.afterprint(); },
+    close() { kapandi = true; }, addEventListener(ad, fn) { dinleyiciler[ad] = fn; }, opener: {}
+  };
+  global.window.open = () => popup;
+  App.setCurrentPageReportForTests({ title: 'TEST rapor', sections: [], unmeasured: [], business: { name: 'TEST' } });
+  App.printCurrentReport();
+  check(kapandi, 'L-289a Yazdirma penceresi yazdirma bitince kapanir (about:blank kalmaz)');
+}
+
 async function main() {
   try {
     await L304();
@@ -1015,6 +1036,7 @@ async function main() {
     await L293();
     await L294();
     await L295();
+    await L289();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));
