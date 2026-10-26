@@ -28,6 +28,8 @@
 //   saniliyordu (yalniz baslikli Excel'de basliklar okunmuyordu).
 // L-279: talep neden secilmeden Kaybedildi kaydediliyor, DB'ye lost_reason "-"
 //   (kanbandan "Diger") yaziliyordu.
+// L-280: Bugun kartlari giris/cikis yapildiktan sonra da "Giris 1" diyordu; giris
+//   gunu "Cikis Yapti" uyarisiz kabul ediliyor, temizlik eski cikis gununde kaliyordu.
 const fs = require('fs');
 const path = require('path');
 
@@ -550,6 +552,36 @@ async function L279() {
   check(!/lost_reason: \(status === 'LOST' \? \(lead\.lostReason \|\| lead\.lost_reason \|\| 'Diğer'\)/.test(read('app.js')), 'L-279d Nedeni olmayan kayba "Diger" yazilmaz');
 }
 
+// ---------------------------------------------------------------------------
+// L-280 Bugun kartlari rezervasyon durumunu izler; erken cikis uyarilir
+// ---------------------------------------------------------------------------
+async function L280() {
+  const dom = sahteDom();
+  const App = require('../app.js');
+  const bugun = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const ileri = n => { const d = new Date(bugun + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+  const r = (id, g, c, durum) => ({ id, villa: 'DENE', propertyId: PROP_A, guest: 'TEST ' + id, checkIn: g, checkOut: c, gross: 1000, pax: 2, status: durum });
+  kur(App, { bookings: [r('a', bugun, ileri(3), 'CHECKED_IN'), r('b', bugun, ileri(2), 'CONFIRMED'), r('c', ileri(-2), bugun, 'CHECKED_OUT')] });
+  App.renderTodayDateStrip(App.getAppData().bookings, []);
+  const ozet = dom.getElementById('todayShiftSummary').innerHTML;
+  check(/<strong>1<\/strong><span>Giriş<\/span>/.test(ozet) && /1 yapıldı/.test(ozet) && /<strong>0<\/strong><span>Çıkış<\/span>/.test(ozet),
+    'L-280a Bugun seridi giris/cikis yapilanlari bekleyenlerden ayirir', ozet);
+  // Erken cikis: temizlik bugune alinir.
+  const erken = r('d', ileri(-1), ileri(3), 'CHECKED_OUT');
+  check(App.bookingCleaningDate(erken, ileri(3), bugun) === bugun, 'L-280b Erken cikista temizlik bugune alinir');
+  check(App.bookingCleaningDate({ ...erken, status: 'CONFIRMED' }, ileri(3), bugun) === ileri(3), 'L-280c Normal rezervasyonda temizlik cikis gunudur');
+  check(App.bookingCleaningDate(erken, bugun, ileri(1)) === bugun, 'L-280d Erken cikista one alinmis temizlik sonraki duzenlemede geri tasinmaz');
+  let soruldu = false;
+  global.confirm = () => { soruldu = true; return false; };
+  check(App.confirmEarlyCheckout(ileri(-1), ileri(3), 'CHECKED_OUT', { status: 'CHECKED_IN' }, bugun) === false && soruldu,
+    'L-280e Cikis tarihinden once "Cikis yapti" onay ister; vazgecilirse kaydedilmez');
+  let hata = null;
+  try { App.confirmEarlyCheckout(ileri(1), ileri(3), 'CHECKED_OUT', null, bugun); } catch (e) { hata = e; }
+  check(hata && /Giriş tarihi gelmemiş/.test(hata.message), 'L-280f Giris gunu gelmemis rezervasyon "Cikis yapti" olamaz');
+  check(/confirmEarlyCheckout\(checkIn, checkOut, status, eskiKayit\)/.test(functionBody(read('app.js'), 'async function saveBooking(')), 'L-280g Rezervasyon kaydi erken cikis kapisindan gecer');
+  global.confirm = () => true;
+}
+
 async function main() {
   try {
     await L304();
@@ -566,6 +598,7 @@ async function main() {
     await L276();
     await L278();
     await L279();
+    await L280();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

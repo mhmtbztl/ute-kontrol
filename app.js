@@ -599,7 +599,7 @@ async function syncBookingCleaningTaskToCloud(booking, cleanCost) {
       mevcut.bookingId = booking.id;
       mevcut.villa = booking.villa;
       mevcut.guest = booking.guest;
-      mevcut.date = booking.checkOut;
+      mevcut.date = bookingCleaningDate(booking, mevcut.date);
       if (maliyet !== null) mevcut.amount = maliyet;
       // Yeniden etkinlesen rezervasyonun "yapilmadi" gorevi yeniden planlanir.
       if (mevcut.status === 'SKIPPED') mevcut.status = 'PLANNED';
@@ -614,7 +614,7 @@ async function syncBookingCleaningTaskToCloud(booking, cleanCost) {
       bookingId: booking.id,
       villa: booking.villa,
       guest: booking.guest,
-      date: booking.checkOut,
+      date: bookingCleaningDate(booking),
       cleaner: '',
       amount: maliyet || 0,
       paid: false,
@@ -9458,6 +9458,8 @@ async function saveBooking(e) {
     const tarihDegisti = !eskiKayit || eskiKayit.checkIn !== checkIn || eskiKayit.checkOut !== checkOut || eskiKayit.villa !== villa;
     const minStayEngeli = tarihDegisti ? minStayBlockMessage(villa, checkIn, checkOut, { status }) : null;
     if (minStayEngeli) throw new Error(minStayEngeli);
+    // Cikis tarihinden once "Cikis yapti" (L-280): uyarisiz kabul ediliyordu.
+    if (!confirmEarlyCheckout(checkIn, checkOut, status, eskiKayit)) throw new Error('Kayıt yapılmadı.');
 
     const economics = readBookingFormEconomics();
     const cleanFee = economics.cleanFee;
@@ -12812,7 +12814,8 @@ function renderDailyOps() {
 
   // 1. Check-ins for Today
   const checkins = appData.bookings.filter(b => b.status !== 'CANCELLED' && b.checkIn === todayStr);
-  if (inBadge) inBadge.innerText = checkins.length + ' Giriş';
+  const gunSayim = todayStayCounts(appData.bookings, todayStr);
+  if (inBadge) inBadge.innerText = gunSayim.arrivalsPending + ' Giriş' + (gunSayim.arrivalsDone ? ` · ${gunSayim.arrivalsDone} yapıldı` : '');
 
   if (checkins.length === 0) {
     const upcoming = appData.bookings
@@ -19227,19 +19230,56 @@ const getSupabaseClient = function () {
 
 let pendingAiAction = null;
 
+// Bugunun giris ve cikislari durumla birlikte sayilir (L-280): giris ya da
+// cikis yapildiktan sonra kart "Giris 1" demeye devam ediyordu.
+function todayStayCounts(bookings, today = getTodayStr()) {
+  const aktif = (bookings || []).filter(item => item && String(item.status || '').toUpperCase() !== 'CANCELLED');
+  const durum = item => String(item.status || '').toUpperCase();
+  const girisler = aktif.filter(item => item.checkIn === today);
+  const cikislar = aktif.filter(item => item.checkOut === today);
+  const girisYapildi = girisler.filter(item => ['CHECKED_IN', 'CHECKED_OUT'].includes(durum(item))).length;
+  const cikisYapildi = cikislar.filter(item => durum(item) === 'CHECKED_OUT').length;
+  return {
+    arrivalsPending: girisler.length - girisYapildi, arrivalsDone: girisYapildi,
+    departuresPending: cikislar.length - cikisYapildi, departuresDone: cikisYapildi
+  };
+}
+
+// Temizlik gununun tek kurali (L-280): cikis gunu; erken cikista (Cikis yapti,
+// cikis tarihi gelmeden) bugun. One alinmis gun sonraki duzenlemede geri
+// tasinmaz. Geceler ve tutar degismez.
+function bookingCleaningDate(booking, currentTaskDate = null, today = getTodayStr()) {
+  const cikis = booking?.checkOut;
+  if (String(booking?.status || '').toUpperCase() !== 'CHECKED_OUT' || !cikis) return cikis;
+  if (currentTaskDate && currentTaskDate >= booking.checkIn && currentTaskDate < cikis) return currentTaskDate;
+  if (today >= booking.checkIn && today < cikis) return today;
+  return cikis;
+}
+
+// Cikis tarihi gelmeden "Cikis yapti" (L-280): giris oncesi reddedilir,
+// sonrasi onay ister. Onaylanmazsa false.
+function confirmEarlyCheckout(checkIn, checkOut, status, previous = null, today = getTodayStr()) {
+  if (String(status || '').toUpperCase() !== 'CHECKED_OUT' || !(today < checkOut)) return true;
+  if (String(previous?.status || '').toUpperCase() === 'CHECKED_OUT') return true;
+  if (today < checkIn) throw new Error('Giriş tarihi gelmemiş bir rezervasyon "Çıkış yaptı" olarak işaretlenemez.');
+  if (typeof confirm !== 'function') return true;
+  return confirm(`Çıkış tarihi ${formatTrDate(checkOut)}. Misafir bugün erken çıkmış olarak işaretlenecek; temizlik bugüne alınır. Geceler ve tutar değişmez (gerekirse çıkış tarihini ayrıca düzeltin). Devam edilsin mi?`);
+}
+
 function renderTodayDateStrip(bookings, tasks) {
   const today = getTodayStr();
   const role = TEAM_ROLES[activeTenant?.role]?.label || activeTenant?.role || '—';
-  const arrivals = bookings.filter(item => item.status !== 'CANCELLED' && item.checkIn === today).length;
-  const departures = bookings.filter(item => item.status !== 'CANCELLED' && item.checkOut === today).length;
+  const sayim = todayStayCounts(bookings, today);
+  const arrivals = sayim.arrivalsPending;
+  const departures = sayim.departuresPending;
   const cleanings = tasks.filter(item => item.status === 'PLANNED' && String(item.date || '').slice(0, 10) === today).length;
   setEl('todayDateLabel', new Intl.DateTimeFormat('tr-TR', { dateStyle: 'full', timeZone: 'Europe/Istanbul' }).format(new Date(`${today}T12:00:00+03:00`)));
   setEl('todayRoleLabel', `${role} görünümü`);
   const summary = document.getElementById('todayShiftSummary');
   if (summary) {
     summary.setAttribute('aria-label', `${arrivals} giriş · ${departures} çıkış · ${cleanings} temizlik`);
-    summary.innerHTML = [[arrivals, 'Giriş'], [departures, 'Çıkış'], [cleanings, 'Temizlik']]
-      .map(([count, label]) => `<div class="today-hero__stat"><strong>${Number(count)}</strong><span>${escapeHtml(label)}</span></div>`).join('');
+    summary.innerHTML = [[arrivals, 'Giriş', sayim.arrivalsDone], [departures, 'Çıkış', sayim.departuresDone], [cleanings, 'Temizlik', 0]]
+      .map(([count, label, done]) => `<div class="today-hero__stat"><strong>${Number(count)}</strong><span>${escapeHtml(label)}</span>${done ? `<small>${Number(done)} yapıldı</small>` : ''}</div>`).join('');
   }
 }
 
@@ -23473,6 +23513,10 @@ if (typeof module !== 'undefined' && module.exports) {
     getImportEngine,
     buildImportSource,
     parseSourceWithMode,
+    renderTodayDateStrip,
+    todayStayCounts,
+    bookingCleaningDate,
+    confirmEarlyCheckout,
     updateLeadStatusFromKanban,
     analyzeAndPreviewSource,
     maintenanceTicketPriorityCandidate,
