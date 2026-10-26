@@ -48,6 +48,8 @@
 // L-310: yillik hedef karti tek ayin hedefini yilin tum cirosuyla oranliyordu (%1315).
 // L-299: Finans'ta "Hedefin %70 altinda" yesil; "Kapsama: %60" anlasilmiyor; huni
 //   snapshot'i gelecek gunleri kapsayan donemi kabul ediyordu.
+// L-291: ice aktarma: gecmis yenilenmiyor, geri alma sonucu ve donem donusu yok, kayitlari
+//   silinmis parti "geri alinamaz" diyor, gelecek tarihli aktarilan rezervasyona temizlik acilmiyordu.
 const fs = require('fs');
 const path = require('path');
 
@@ -900,6 +902,36 @@ async function L299() {
   check(!hata2, 'L-299e Bugunu kapsayan donem kabul edilir', hata2 && hata2.message);
 }
 
+// ---------------------------------------------------------------------------
+// L-291 ice aktarma gecmisi, geri alma sonucu ve donem, gelecek rezervasyon temizligi
+// ---------------------------------------------------------------------------
+async function L291() {
+  const dom = sahteDom();
+  const App = require('../app.js');
+  const BATCH = '99999999-9999-4999-8999-999999999991';
+  const ist = kur(App, {}, 'owner', {
+    cevap: k => (k.tablo === 'finance_import_batches' && k.islem === 'select'
+      ? { data: [{ id: BATCH, filename: 'TEST.csv', imported_at: '2026-10-26T10:00:00Z', row_count: 5, imported_amount: 1641, finance_import_batch_rows: [{ count: 0 }] }], error: null } : null),
+    rpc: ad => (ad === 'undo_finance_import' ? { deleted_bookings: 2, deleted_expenses: 0, deleted_cleaning_tasks: 0, skipped_modified: 0 } : [])
+  });
+  dom.getElementById('importHistoryBox');
+  await App.refreshImportHistory();
+  const liste = dom.getElementById('importHistoryList').innerHTML;
+  check(!/geri alınamaz/.test(liste) && /geri alınacak kayıt yok/.test(liste), 'L-291a Kayitlari kalmayan parti "geri alinamaz" degil "geri alinacak kayit yok" der', liste.slice(0, 200));
+  // Geri alma: sonuc kutuda yazar, aktarimin degistirdigi donem geri gelir.
+  App.setCurrentFilter({ period: '2026-12', startDate: '2026-12-01', endDate: '2026-12-31' });
+  App.rememberImportPeriod(BATCH, { period: '2026-10', startDate: '2026-10-01', endDate: '2026-10-31' }, '2026-12');
+  App.getAppData().importBatches = [{ id: BATCH, filename: 'TEST.csv', linkedCount: 2 }];
+  await App.undoImportBatch(BATCH);
+  const mesaj = dom.getElementById('importHistoryMessage').textContent;
+  check(/2 kayıt geri alındı/.test(mesaj), 'L-291b Geri alma sonucu ice aktarma penceresinde yazar', mesaj);
+  check(App.setCurrentFilter({}).period === '2026-10', 'L-291c Geri alininca aktarimin degistirdigi donem eski haline doner', App.setCurrentFilter({}).period);
+  const govde = functionBody(read('app.js'), 'async function applyImportedData(');
+  check(/refreshImportHistory\(\)/.test(govde), 'L-291d Aktarim bitince "Son ice aktarimlar" yenilenir');
+  check(/syncBookingCleaningTaskToCloud\(/.test(govde), 'L-291e Gelecek tarihli aktarilan rezervasyona planli temizlik acilir');
+  check(/rememberImportPeriod\(/.test(govde), 'L-291f Aktarim donemi degistirirken eskisini hatirlar');
+}
+
 async function main() {
   try {
     await L304();
@@ -931,6 +963,7 @@ async function main() {
     await L309();
     await L310();
     await L299();
+    await L291();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

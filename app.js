@@ -7844,6 +7844,25 @@ async function loadImportBatches(tenantId) {
   }));
 }
 
+// Aktarim donemi degistirdiyse eskisi hatirlanir (L-291): geri alinca kullanici
+// bos kalan aya (ör. Aralik) bakmaya devam ediyordu.
+let importPeriodMemory = null;
+function rememberImportPeriod(batchId, previous, movedTo) {
+  importPeriodMemory = batchId && previous && movedTo ? { batchId, previous: { ...previous }, movedTo } : null;
+}
+
+function setImportHistoryMessage(text, tone = 'info') {
+  if (typeof document === 'undefined') return;
+  const kutu = document.getElementById('importHistoryBox');
+  const mesaj = document.getElementById('importHistoryMessage');
+  if (mesaj) {
+    mesaj.textContent = text || '';
+    mesaj.style.color = tone === 'error' ? '#FCA5A5' : tone === 'success' ? '#6EE7B7' : '#C7C7CC';
+    mesaj.hidden = !text;
+  }
+  if (kutu && text) kutu.style.display = 'block';
+}
+
 async function undoImportBatch(batchId) {
   const tenantId = getActiveTenantId();
   try {
@@ -7883,9 +7902,21 @@ async function undoImportBatch(batchId) {
   }
 
   await loadTenantAppData(tenantId);
-  await refreshImportHistory();
 
   const silinen = (data.deleted_bookings || 0) + (data.deleted_expenses || 0) + (data.deleted_cleaning_tasks || 0);
+  // Aktarimin degistirdigi donem hala seciliyse eskisine donulur (L-291).
+  let donemNotu = '';
+  if (importPeriodMemory && importPeriodMemory.batchId === batchId && currentFilter.period === importPeriodMemory.movedTo) {
+    Object.assign(currentFilter, importPeriodMemory.previous);
+    const secici = document.getElementById('globalPeriodFilter');
+    if (secici && secici.querySelector && secici.querySelector(`option[value="${currentFilter.period}"]`)) secici.value = currentFilter.period;
+    donemNotu = ` Dönem ${getPeriodDisplayName(currentFilter.period)} olarak geri alındı.`;
+    importPeriodMemory = null;
+    if (typeof renderAll === 'function') renderAll();
+  }
+  await refreshImportHistory();
+  // Sonuc pencerede yazar (L-291): bolum kayboluyor, toast pencerenin arkasinda kaliyordu.
+  setImportHistoryMessage(`${silinen} kayıt geri alındı.${data.skipped_modified > 0 ? ` ${data.skipped_modified} kayıt elle düzenlendiği için silinmedi.` : ''}${donemNotu}`, 'success');
   if (data.skipped_modified > 0) {
     alert(`${silinen} kayıt silindi.\n\n${data.skipped_modified} kayıt SİLİNMEDİ: ` +
       'aktarımdan sonra elle düzenlenmişler. Onlar artık aktarılan veri değil, ' +
@@ -7905,10 +7936,14 @@ async function refreshImportHistory() {
   const partiler = await loadImportBatches(tenantId);
   appData.importBatches = partiler;
 
-  if (partiler.length === 0) { kutu.style.display = 'none'; return; }
-  kutu.style.display = 'block';
-
+  const mesajVar = !!(document.getElementById('importHistoryMessage') || {}).textContent;
   const govde = document.getElementById('importHistoryList');
+  if (partiler.length === 0) {
+    if (govde) govde.innerHTML = '';
+    kutu.style.display = mesajVar ? 'block' : 'none';
+    return;
+  }
+  kutu.style.display = 'block';
   if (!govde) return;
   const tl = n => { const v = Math.round((Number(n) || 0) * 100) / 100; return v.toLocaleString('tr-TR', { minimumFractionDigits: Number.isInteger(v) ? 0 : 2, maximumFractionDigits: 2 }); };
 
@@ -7918,7 +7953,7 @@ async function refreshImportHistory() {
     const dugme = geriAlinabilir
       ? `<button type="button" class="btn btn-secondary btn-sm" style="font-size:10px; padding:3px 8px; border-color:#FF453A; color:#FCA5A5;"
                  data-onclick="undoImportBatch(decodeURIComponent('${encodeActionArg(String(p.id))}'))">↩︎ Geri Al (${p.linkedCount})</button>`
-      : `<span style="font-size:10px; color:#6E6E73;" title="Bu aktarım, geri alma özelliği eklenmeden önce yapıldı.">geri alınamaz</span>`;
+      : `<span style="font-size:10px; color:#6E6E73;" title="Bu aktarımın kayıtları sonradan silinmiş ya da aktarım geri alma özelliği eklenmeden önce yapılmış.">geri alınacak kayıt yok</span>`;
     return `<div style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:6px 8px; border-bottom:1px solid rgba(255,255,255,0.06);">
       <div style="min-width:0;">
         <div style="font-size:11px; color:#E5E5EA; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(p.filename)}</div>
@@ -8368,6 +8403,7 @@ async function applyImportedData() {
   // Basarili bir aktarim kaydi birak (mukerrer engeli bunu okur) ve yazilan
   // kayitlari ona BAGLA — geri alma bu bagin ustunde durur (phase35).
   let bagKuruldu = false;
+  let partiKimligi = null;
   if (parmakIzi && supabaseClient && basarili.length > 0) {
     try {
       const { data: parti, error: partiHata } = await supabaseClient
@@ -8382,6 +8418,7 @@ async function applyImportedData() {
         .select('id')
         .single();
       if (partiHata) throw partiHata;
+      partiKimligi = parti.id;
       bagKuruldu = await cloudLinkImportBatchRows(tenantId, parti.id, pendingImportData.mode, yeniKayitlar);
     } catch (e) {
       // Kayit tutulamazsa aktarimin KENDISI yine de gecerlidir; kullanici
@@ -8393,6 +8430,19 @@ async function applyImportedData() {
   await loadTenantAppData(tenantId);
   if (btn) { btn.disabled = false; }
 
+  // Gelecek tarihli aktarilan rezervasyona planli temizlik acilir (L-291):
+  // formdan girilen rezervasyonla ayni kural; maliyet bilinmiyorsa uydurulmaz.
+  let temizlikUyarisi = '';
+  if (rezMi) {
+    const bugunTarih = getTodayStr();
+    for (const kayit of yeniKayitlar) {
+      const rez = (appData.bookings || []).find(b => String(b.id) === String(kayit.id));
+      if (!rez || String(rez.status || '').toUpperCase() === 'CANCELLED' || !(rez.checkOut >= bugunTarih) || findBookingCleaningTask(rez)) continue;
+      temizlikUyarisi = temizlikUyarisi || await syncBookingCleaningTaskToCloud(rez, null);
+    }
+  }
+  await refreshImportHistory();
+
   // Ice aktarilan kayitlarin bulundugu SON aya gec.
   //
   // Bunsuz, gecmis veri aktaran kullanici hicbir sey gormuyordu: donem filtresi
@@ -8402,6 +8452,7 @@ async function applyImportedData() {
   const gidilenAy = enSonVeriAyi(yazilacaklar, rezMi);
   let ayDegisti = false;
   if (gidilenAy && gidilenAy !== currentFilter.period) {
+    rememberImportPeriod(partiKimligi, { period: currentFilter.period, startDate: currentFilter.startDate, endDate: currentFilter.endDate }, gidilenAy);
     currentFilter.period = gidilenAy;
     currentFilter.startDate = gidilenAy + '-01';
     const sg = new Date(Date.UTC(Number(gidilenAy.slice(0, 4)), Number(gidilenAy.slice(5, 7)), 0)).getUTCDate();
@@ -8426,7 +8477,7 @@ async function applyImportedData() {
     resetImportPreview();
     if (typeof showToast === 'function') {
       const ek = ayDegisti ? ` Dönem ${getPeriodDisplayName(gidilenAy)} olarak değiştirildi.` : '';
-      showToast(`${basarili.length} kayıt içe aktarıldı.${ek}`, 'success');
+      showToast(`${basarili.length} kayıt içe aktarıldı.${ek}${temizlikUyarisi ? ' ' + temizlikUyarisi.trim() : ''}`, 'success');
     }
   } else {
     // Kismi basari: NE YAZILDI, NE YAZILMADI acikca soylenir.
@@ -23632,6 +23683,8 @@ if (typeof module !== 'undefined' && module.exports) {
     getImportEngine,
     buildImportSource,
     parseSourceWithMode,
+    refreshImportHistory,
+    rememberImportPeriod,
     submitMemberInvite,
     openResetModal,
     deleteBookingUI,
