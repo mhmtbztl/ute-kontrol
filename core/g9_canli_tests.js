@@ -51,6 +51,7 @@
 // L-291: ice aktarma: gecmis yenilenmiyor, geri alma sonucu ve donem donusu yok, kayitlari
 //   silinmis parti "geri alinamaz" diyor, gelecek tarihli aktarilan rezervasyona temizlik acilmiyordu.
 // L-293: "+1 yalniz fiyat sorusu" sayaci 0 iken Geri al "Girilen degerlerden biri gecersiz" diyordu.
+// L-294: ariza duzenleme penceresindeki "Sorumlu" alani atanan ustayi gostermiyordu.
 const fs = require('fs');
 const path = require('path');
 
@@ -948,6 +949,23 @@ async function L293() {
   delete global.SalesWorkflowService;
 }
 
+// ---------------------------------------------------------------------------
+// L-294 ariza duzenleme penceresi atanan ustayi gosterir
+// ---------------------------------------------------------------------------
+async function L294() {
+  const dom = sahteDom();
+  const App = require('../app.js');
+  kur(App, {
+    maintenance: [{ id: 'm5', villa: 'DENE', title: 'TEST', priority: 'P2', status: 'IN_PROGRESS', assignee: '', cost: null }],
+    maintenanceAssignments: [{ maintenance_ticket_id: 'm5', person_id: 'u1' }],
+    operationalPeople: [{ id: 'u1', kind: 'TECHNICIAN', full_name: 'TEST Ünal Usta', is_active: true }]
+  });
+  App.openMaintModal('m5');
+  const metin = dom.getElementById('maintAssignedTechnician').textContent;
+  check(/TEST Ünal Usta/.test(metin), 'L-294a Duzenleme penceresi atanan ustayi gosterir', metin);
+  check(/Not \/ dış sorumlu|Sorumlu \(not\)/.test(read('index.html')), 'L-294b Serbest "Sorumlu" alani usta atamasiyla karistirilmayacak sekilde adlandirilir');
+}
+
 async function main() {
   try {
     await L304();
@@ -981,6 +999,7 @@ async function main() {
     await L299();
     await L291();
     await L293();
+    await L294();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

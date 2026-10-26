@@ -12473,6 +12473,8 @@ function openMaintModal(editId = null) {
   const modal = document.getElementById('maintModal');
   const title = document.getElementById('maintModalTitle');
   const editInput = document.getElementById('maintEditId');
+  const ustaSatiri = document.getElementById('maintAssignedTechnician');
+  if (ustaSatiri) ustaSatiri.textContent = '';
 
   if (editId) {
     const m = appData.maintenance.find(item => item.id === editId);
@@ -12483,6 +12485,13 @@ function openMaintModal(editId = null) {
     document.getElementById('maintPriority').value = m.priority;
     document.getElementById('maintTitle').value = m.title;
     document.getElementById('maintAssignee').value = m.assignee || '';
+    // Atanan usta ayri kavramdir (L-294): Operasyon > Ariza'dan atanir, burada gorunur.
+    const atama = (appData.maintenanceAssignments || []).find(item => String(item.maintenance_ticket_id) === String(m.id));
+    const usta = atama ? (appData.operationalPeople || []).find(person => person.id === atama.person_id) : null;
+    const ustaYazisi = document.getElementById('maintAssignedTechnician');
+    if (ustaYazisi) ustaYazisi.textContent = usta
+      ? `Atanan usta: ${usta.full_name}${usta.phone ? ' · ' + usta.phone : ''} (Operasyon › Arıza & Bakım'dan değiştirilir)`
+      : 'Atanan usta yok — Operasyon › Arıza & Bakım\'dan atanır.';
     document.getElementById('maintBlocksAvailability').checked = !!(m.blocks_availability || m.blocksAvailability);
     document.getElementById('maintDowntimeStart').value = m.downtime_start || m.downtimeStart || '';
     document.getElementById('maintDowntimeEnd').value = m.downtime_end || m.downtimeEnd || '';
@@ -23691,6 +23700,7 @@ if (typeof module !== 'undefined' && module.exports) {
     getImportEngine,
     buildImportSource,
     parseSourceWithMode,
+    openMaintModal,
     bumpLeadInterestFromQuick,
     refreshImportHistory,
     rememberImportPeriod,
