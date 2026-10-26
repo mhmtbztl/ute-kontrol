@@ -64,6 +64,8 @@
 //   "Testi ChatGPT'ye sor" huni verisi tasimiyordu.
 // L-287: kaynak ekle, genel gorev basligi, ariza maliyeti ve basari mesajlari ham tarayici
 //   prompt/confirm/alert kutusuyla geliyordu.
+// L-288: mobilde kucuk dokunma hedefleri ve secici, 22 px renk kutucugu, alttaki karti ortulen
+//   hizli rezervasyon dugmesi, seritte gorunmeyen aktif sekme, ipucusuz rehber sekmeleri.
 const fs = require('fs');
 const path = require('path');
 
@@ -1176,6 +1178,22 @@ async function L287() {
   delete global.prompt;
 }
 
+// ---------------------------------------------------------------------------
+// L-288 mobil: dokunma hedefleri, renk kutucugu, FAB altinda bosluk, aktif sekme gorunur
+// ---------------------------------------------------------------------------
+async function L288() {
+  const css = read('style.css');
+  const blok = (css.match(/\/\* L-288[\s\S]*?\/\* \/L-288 \*\//) || [''])[0];
+  check(/\.btn-sm[^{]*\{[^}]*min-height:\s*(3[6-9]|4\d)px/.test(blok) && /select[^{]*\{[^}]*min-height:\s*(3[6-9]|4\d)px/.test(blok),
+    'L-288a Telefonda kucuk dugme ve donem/portfoy secicileri en az 36 px');
+  check(/\.property-color-swatch\s*\{[^}]*width:\s*(2[8-9]|3\d)px/.test(blok), 'L-288b Mulk renk kutucugu telefonda en az 28 px (WCAG 24 ustu)');
+  check(/padding-bottom:[^;]*(7\d|8\d|9\d)px/.test(blok), 'L-288c Hizli rezervasyon dugmesi alttaki karti ortmez (alt bosluk)');
+  check(/help-tabs-nav[\s\S]{0,200}mask-image/.test(blok), 'L-288d Rehber sekmeleri kaydirilabilir oldugunu gosterir');
+  const src = read('app.js');
+  check(/scrollIntoView\(\{[^}]*inline: 'center'/.test(functionBody(src, 'function switchTab(')), 'L-288e Aktif sekme seritte gorunur kaydirilir');
+  check(/scrollIntoView\(\{[^}]*inline: 'center'/.test(functionBody(src, 'function switchHelpTab(')), 'L-288f Rehberde secilen sekme gorunur kaydirilir');
+}
+
 async function main() {
   try {
     await L304();
@@ -1218,6 +1236,7 @@ async function main() {
     await L286();
     await L285();
     await L287();
+    await L288();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

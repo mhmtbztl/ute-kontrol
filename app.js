@@ -4597,6 +4597,8 @@ function switchTab(tabId) {
   const menuTab = getMenuTabFor(tabId);
   const activeBtn = document.querySelector(`.tab-btn[data-onclick="switchTab('${menuTab}')"]`);
   if (activeBtn) activeBtn.classList.add('active');
+  // Telefonda aktif sekme seritte gorunur kalir (L-288).
+  if (activeBtn && typeof activeBtn.scrollIntoView === 'function') activeBtn.scrollIntoView({ block: 'nearest', inline: 'center' });
   renderPageActionBar(tabId);
   applyGlobalFilterScope(tabId);
 
@@ -15607,6 +15609,7 @@ function switchHelpTab(tabKey) {
 
   const targetBtn = document.getElementById('helpTabBtn-' + tabKey);
   if (targetBtn) targetBtn.classList.add('active');
+  if (targetBtn && typeof targetBtn.scrollIntoView === 'function') targetBtn.scrollIntoView({ block: 'nearest', inline: 'center' });
 
   const activePane = document.getElementById('helpTab-' + tabKey);
   if (activePane) activePane.style.display = 'block';

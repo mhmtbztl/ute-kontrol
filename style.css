@@ -6896,3 +6896,16 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent-blue); 
 .property-color-swatch:hover { transform: scale(1.12); }
 .property-color-swatch.is-selected { box-shadow: 0 0 0 2px var(--bg-surface-elevated), 0 0 0 4px #FFFFFF; }
 .property-color-swatch:focus-visible { box-shadow: 0 0 0 2px var(--bg-surface-elevated), 0 0 0 4px var(--accent-blue); }
+
+/* L-288 Telefon: dokunma hedefleri ve okunurluk (Android olcumu, 412 px) */
+@media (max-width: 640px) {
+  .btn-sm { min-height: 36px; }
+  select, .form-control, input[type="date"] { min-height: 36px; }
+  .property-color-swatch { width: 28px; height: 28px; }
+  /* Hizli rezervasyon dugmesi alttaki kartin rakamini ortmez */
+  .main-content, .app-main, main { padding-bottom: 84px; }
+  /* Rehber sekmeleri saga kaydigini gosterir */
+  .help-tabs-nav { -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent); mask-image: linear-gradient(90deg, #000 85%, transparent); }
+  .help-tab-btn { white-space: nowrap; padding-bottom: 10px; }
+}
+/* /L-288 */
