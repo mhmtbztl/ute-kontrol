@@ -6909,3 +6909,8 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent-blue); 
   .help-tab-btn { white-space: nowrap; padding-bottom: 10px; }
 }
 /* /L-288 */
+
+/* L-301: tiklanabilir KPI karti */
+.kpi-card--action { cursor: pointer; }
+.kpi-card--action:hover { border-color: var(--accent-blue, #0A84FF); }
+.kpi-card--action:focus-visible { outline: 2px solid var(--accent-blue, #0A84FF); outline-offset: 2px; }

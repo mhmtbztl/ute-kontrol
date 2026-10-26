@@ -66,6 +66,7 @@
 //   prompt/confirm/alert kutusuyla geliyordu.
 // L-288: mobilde kucuk dokunma hedefleri ve secici, 22 px renk kutucugu, alttaki karti ortulen
 //   hizli rezervasyon dugmesi, seritte gorunmeyen aktif sekme, ipucusuz rehber sekmeleri.
+// L-301 (M89): "Baglantisiz rez." karti tiklanmiyordu; panel yalniz kucuk dugmeyle aciliyordu.
 const fs = require('fs');
 const path = require('path');
 
@@ -1194,6 +1195,33 @@ async function L288() {
   check(/scrollIntoView\(\{[^}]*inline: 'center'/.test(functionBody(src, 'function switchHelpTab(')), 'L-288f Rehberde secilen sekme gorunur kaydirilir');
 }
 
+// ---------------------------------------------------------------------------
+// L-301 (M89) Baglantisiz rezervasyon karti tiklaninca misafir ekleme paneli acilir
+// ---------------------------------------------------------------------------
+async function L301() {
+  const html = read('index.html');
+  const kart = (html.match(/<div class="kpi-card[^"]*"[^>]*>(?:(?!<\/div><\/div>)[\s\S])*guestKpiUnlinked/) || [''])[0];
+  check(/data-onclick="openGuestUnlinkedPanel\(event\)"/.test(kart) && /role="button"/.test(kart) && /tabindex="0"/.test(kart),
+    'L-301a "Baglantisiz rez." karti tiklanabilir ve klavyeyle acilir', kart.slice(0, 200));
+  check(/'openGuestUnlinkedPanel'/.test(read('core/action_dispatch.js')), 'L-301b Eylem izin listesinde');
+  const dom = sahteDom();
+  const App = require('../app.js');
+  kur(App, { bookings: [{ id: BOOK_1, villa: 'DENE', propertyId: PROP_A, guest: 'TEST Bağsız', checkIn: '2026-11-10', checkOut: '2026-11-12', gross: 1000, pax: 2, status: 'CONFIRMED', phone: '05550000009' }] });
+  const panel = dom.getElementById('guestUnlinkedPanel');
+  panel.hidden = true;
+  App.openGuestUnlinkedPanel({ type: 'click' });
+  check(panel.hidden === false && /guestLinkName_0/.test(panel.innerHTML) && /linkUnlinkedBookingGuest\(0\)/.test(panel.innerHTML),
+    'L-301c Karta tiklayinca panel acilir; satirdan misafir bilgisi girilip baglanir', panel.innerHTML.slice(0, 200));
+  App.openGuestUnlinkedPanel({ type: 'click' });
+  check(panel.hidden === false, 'L-301d Karta ikinci tiklama paneli kapatmaz (acik kalir)');
+  const dom2 = sahteDom();
+  kur(App, { bookings: [{ id: BOOK_2, villa: 'DENE', propertyId: PROP_A, guest: 'TEST', checkIn: '2026-11-10', checkOut: '2026-11-12', gross: 1000, pax: 2, status: 'CONFIRMED' }] }, 'viewer');
+  App.openGuestUnlinkedPanel({ type: 'click' });
+  check(dom2.getElementById('guestUnlinkedPanel').innerHTML === '', 'L-301e Izleyici rolunde panel acilmaz (yazma yetkisi yok)');
+  const tus = { type: 'keydown', key: 'a' };
+  check(App.openGuestUnlinkedPanel(tus) === false, 'L-301f Klavyede yalniz Enter/Bosluk paneli acar');
+}
+
 async function main() {
   try {
     await L304();
@@ -1237,6 +1265,7 @@ async function main() {
     await L285();
     await L287();
     await L288();
+    await L301();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

@@ -22092,6 +22092,26 @@ function getUnlinkedGuestBookings() {
     .sort((a, b) => String(b.checkIn || '').localeCompare(String(a.checkIn || '')));
 }
 
+// "Baglantisiz rez." karti paneli acar (L-301, kullanici M89): panel yalniz
+// sari uyaridaki kucuk dugmeyle aciliyordu. Kart tiklaninca (ya da Enter/
+// Bosluk) panel acik kalir ve gorunur kaydirilir; satirdan ad + telefon/
+// e-posta girilip rezervasyon misafir kartina baglanir.
+function openGuestUnlinkedPanel(event) {
+  if (event && event.type === 'keydown') {
+    if (!['Enter', ' '].includes(event.key)) return false;
+    if (typeof event.preventDefault === 'function') event.preventDefault();
+  }
+  if (!canWriteSalesRole(activeTenant?.role)) {
+    if (typeof showToast === 'function') showToast('Rezervasyonu misafire bağlamak satış ya da yönetim rolü ister.', 'info');
+    return false;
+  }
+  guestUnlinkedPanelOpen = true;
+  renderGuestsTab();
+  const panel = typeof document !== 'undefined' ? document.getElementById('guestUnlinkedPanel') : null;
+  if (panel && !panel.hidden && typeof panel.scrollIntoView === 'function') panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  return true;
+}
+
 function toggleGuestUnlinkedPanel() {
   guestUnlinkedPanelOpen = !guestUnlinkedPanelOpen;
   renderGuestsTab();
@@ -23839,6 +23859,7 @@ if (typeof module !== 'undefined' && module.exports) {
     getImportEngine,
     buildImportSource,
     parseSourceWithMode,
+    openGuestUnlinkedPanel,
     leadChannelLabel,
     handleModalKeydown,
     focusModalOnOpen,
