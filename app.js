@@ -6681,6 +6681,25 @@ function isDirectBookingChannel(channel, channels) {
 // -------------------------------------------------------------
 // GİDER DEFTERİ (EXPENSES CRUD)
 // -------------------------------------------------------------
+// Arama: aranan metin ve kayit ayni Turkce katlamadan gecer (L-302,
+// core/search_text.js). Duz toLowerCase "seyir" ile SEYİR'i eslemiyordu.
+function searchTextApi() {
+  if (typeof LexbnbSearchText !== 'undefined') return LexbnbSearchText;
+  return require('./core/search_text.js');
+}
+function searchMatches(query, values) { return searchTextApi().matches(query, values); }
+function reservationSearchMatches(b, search) {
+  return searchMatches(search, [appData.villas?.[b.villa]?.name || b.villa, b.guest, b.channel]);
+}
+function expenseSearchMatches(exp, search) {
+  // Grafik taninmayan kategoriyi "Diger"e toplar (eslesenGiderKategorisi);
+  // arama da ayni eslemeye bakar, yoksa "Diger > Detay" bos liste aciyordu.
+  return searchMatches(search, [exp.description || exp.desc, exp.category, eslesenGiderKategorisi(exp.category)]);
+}
+function cleaningTaskSearchMatches(t, search) {
+  return searchMatches(search, [appData.villas?.[t.villa]?.name || t.villa, t.guest, t.cleaner, t.notes]);
+}
+
 function isAdsPeriodExpense(expense) {
   return String(expense?.legacyId || expense?.legacy_id || '').startsWith('ADS_PERIOD:');
 }
@@ -6690,15 +6709,12 @@ function renderExpensesTable() {
   if (!tbody) return;
   tbody.innerHTML = '';
 
-  const search = (document.getElementById('expSearchInput')?.value || '').toLowerCase();
+  const search = (document.getElementById('expSearchInput')?.value || '').trim();
 
   const filtered = appData.expenses.filter(exp => {
     if (!isExpenseInFilter(exp)) return false;
     if (!search) return true;
-    // Grafik taninmayan kategoriyi "Diger"e toplar (eslesenGiderKategorisi);
-    // arama da ayni eslemeye bakar, yoksa "Diger > Detay" bos liste aciyordu.
-    return (exp.description || exp.desc || "").toLowerCase().includes(search) || (exp.category || "").toLowerCase().includes(search)
-      || eslesenGiderKategorisi(exp.category).toLowerCase().includes(search);
+    return expenseSearchMatches(exp, search);
   });
 
   if (filtered.length === 0) {
@@ -8668,7 +8684,7 @@ function openBookingDetailsPanel(bookingId) {
 }
 
 function getFilteredReservationListRows() {
-  const search = (document.getElementById('rezSearchInput')?.value || '').toLowerCase();
+  const search = (document.getElementById('rezSearchInput')?.value || '').trim();
   const villaFilter = document.getElementById('rezVillaFilter')?.value || 'ALL';
   const statusFilter = document.getElementById('rezStatusFilter')?.value || 'ALL';
   const todayStr = getTodayStr();
@@ -8684,12 +8700,7 @@ function getFilteredReservationListRows() {
     if (statusFilter !== 'ALL' && b.status !== statusFilter) return false;
 
     // Search
-    if (search) {
-      const vName = (appData.villas[b.villa]?.name || b.villa).toLowerCase();
-      const gName = (b.guest || '').toLowerCase();
-      const chName = (b.channel || '').toLowerCase();
-      if (!vName.includes(search) && !gName.includes(search) && !chName.includes(search)) return false;
-    }
+    if (search && !reservationSearchMatches(b, search)) return false;
 
     return true;
   });
@@ -11886,13 +11897,12 @@ function renderManageLeadsTable() {
   tbody.innerHTML = '';
 
   // Liste kanbanla ayni satirlari (kaynak dahil) ayni sirada gosterir.
-  const searchVal = (document.getElementById('leadSearchInput')?.value || '').toLocaleLowerCase('tr').trim();
+  const searchVal = (document.getElementById('leadSearchInput')?.value || '').trim();
   const searchDigits = searchVal.replace(/\D/g, '');
   const leads = getLeadSalesView().rows.filter(l => {
     if (!searchVal) return true;
-    const text = [l.guest, l.guestName, leadPropertyLabel(l), l.villa, l.channel, l.sourceLabel, l.notes]
-      .map(value => String(value || '').toLocaleLowerCase('tr')).join(' ');
-    return text.includes(searchVal) || (searchDigits.length >= 3 && String(l.phone || '').replace(/\D/g, '').includes(searchDigits));
+    return searchMatches(searchVal, [l.guest, l.guestName, leadPropertyLabel(l), l.villa, l.channel, l.sourceLabel, l.notes])
+      || (searchDigits.length >= 3 && String(l.phone || '').replace(/\D/g, '').includes(searchDigits));
   });
   if (!leads.length) {
     tbody.innerHTML = `<tr><td colspan="8" class="empty-state">${searchVal ? 'Aramaya uyan talep yok.' : 'Henüz talep yok.'}</td></tr>`;
@@ -13212,7 +13222,7 @@ function renderHousekeepingTab() {
   }
 
   const statusFilter = document.getElementById('hkStatusFilter')?.value || 'ALL';
-  const searchTerm = (document.getElementById('hkSearchInput')?.value || '').toLowerCase();
+  const searchTerm = (document.getElementById('hkSearchInput')?.value || '').trim();
   const bugun = getTodayStr();
 
   // Kapsam: secili mulk ve donem. Gorev tarihi = temizligin yapildigi (ya da
@@ -13238,13 +13248,7 @@ function renderHousekeepingTab() {
   }
 
   if (searchTerm) {
-    filtered = filtered.filter(t => {
-      const vName = (appData.villas[t.villa]?.name || t.villa || '').toLowerCase();
-      const guest = (t.guest || '').toLowerCase();
-      const cleaner = (t.cleaner || '').toLowerCase();
-      const notes = (t.notes || '').toLowerCase();
-      return vName.includes(searchTerm) || guest.includes(searchTerm) || cleaner.includes(searchTerm) || notes.includes(searchTerm);
-    });
+    filtered = filtered.filter(t => cleaningTaskSearchMatches(t, searchTerm));
   }
 
   // KPI'lar. Borc = YAPILMIS ve odenmemis temizlik; planli gorev borc degil.
@@ -23406,6 +23410,9 @@ if (typeof module !== 'undefined' && module.exports) {
     getImportEngine,
     buildImportSource,
     parseSourceWithMode,
+    reservationSearchMatches,
+    expenseSearchMatches,
+    cleaningTaskSearchMatches,
     saveWaAsLead,
     getPendingImportData: () => pendingImportData,
     paginateRows,

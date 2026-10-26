@@ -92,6 +92,7 @@ vm.runInNewContext(guestCrmSource, {
   require(request) {
     if (request === './business_date') return { getBusinessDate: () => '2026-09-14' };
     if (request === './ledger_contract') return null;
+    if (request === './search_text') return require('./search_text');
     throw new Error(`Beklenmeyen require: ${request}`);
   },
   globalThis: {}

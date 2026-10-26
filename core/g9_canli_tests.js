@@ -10,6 +10,8 @@
 //   not), sondaki imza adini gormuyor, telefonu bosluklu sakliyordu.
 // L-305: rezervasyon aktarim onizlemesi kisi sayisi eksikligini ve mulk
 //   takvimindeki cakismayi gormuyor, yazma ham Postgres hatasiyla dusuyordu.
+// L-302: rezervasyon, gider ve temizlik aramalari toLowerCase kullaniyor; SEYİR/ÇİFT
+//   gibi Turkce buyuk harfli kayitlar kucuk harfle bulunmuyordu.
 const fs = require('fs');
 const path = require('path');
 
@@ -302,6 +304,41 @@ async function L305() {
   check(/0 kayıt eklenecek/.test(st) && /çakışma/.test(st), 'L-305e Onizleme cakisan satiri eklenecek saymaz', st);
 }
 
+// ---------------------------------------------------------------------------
+// L-302 aramalar Turkce buyuk/kucuk harfi esler; Ingilizce adlar bozulmaz
+// ---------------------------------------------------------------------------
+async function L302() {
+  sahteDom();
+  const App = require('../app.js');
+  kur(App, {});
+  const rez = { villa: 'SEYIR', guest: 'TEST-EK İĞÜŞÖÇ O\'Brien <b>KALIN</b>', channel: 'Booking' };
+  const rezAra = q => typeof App.reservationSearchMatches === 'function' && App.reservationSearchMatches(rez, q);
+  check(['seyir', 'Seyir', 'SEYİR', 'iğüşöç', 'test-ek iğ', 'kalın', 'KALIN', 'o\'brien', 'booking', 'BOOKING'].every(rezAra),
+    'L-302a Rezervasyon aramasi mulk, misafir ve kanalda harf buyuklugunden bagimsiz', ['seyir', 'iğüşöç', 'kalın'].map(q => q + '=' + rezAra(q)).join(' '));
+  check(!rezAra('zirve'), 'L-302b Eslesmeyen arama elenir');
+  const gider = { description: 'TEST-EK çift tıklama', category: 'Bakım' };
+  const giderAra = q => typeof App.expenseSearchMatches === 'function' && App.expenseSearchMatches(gider, q);
+  check(['ÇİFT', 'TIKLAMA', 'çift', 'tıklama', 'BAKIM', 'bakım'].every(giderAra), 'L-302c Gider aramasi Turkce harfleri esler',
+    ['ÇİFT', 'TIKLAMA', 'BAKIM'].map(q => q + '=' + giderAra(q)).join(' '));
+  const gorev = { villa: 'SEYIR', guest: 'İĞÜŞÖÇ', cleaner: 'Invoice Team', notes: 'ZİRVE çıkış' };
+  const tAra = q => typeof App.cleaningTaskSearchMatches === 'function' && App.cleaningTaskSearchMatches(gorev, q);
+  check(['seyir', 'iğüşöç', 'zirve', 'invoice', 'INVOICE', 'Invoice'].every(tAra), 'L-302d Temizlik aramasi Turkce harfleri ve Ingilizce adlari esler',
+    ['seyir', 'iğüşöç', 'zirve', 'invoice'].map(q => q + '=' + tAra(q)).join(' '));
+  // Talep ve misafir aramasi ayni katlamayi kullanir; Ingilizce "I" bozulmaz.
+  const ST = require('./search_text.js');
+  check(ST.fold('SEYİR') === ST.fold('seyir') && ST.fold('Invoice') === ST.fold('invoice') && ST.fold('Bozatlı') === ST.fold('bozatli'),
+    'L-302e Ortak katlama iki tarafi ayni anahtara indirir');
+  const G = require('./guest_crm_engine.js');
+  const satir = { name: 'Mehmet BOZATLI', phone: '', email: 'INFO@EXAMPLE.COM', bookings: [], lifecycle: { code: 'POST_STAY' } };
+  check(G.filterGuestRows([satir], { query: 'bozatli' }).length === 1 && G.filterGuestRows([satir], { query: 'info@example' }).length === 1,
+    'L-302f Misafir aramasi ayni katlamayi kullanir (sapkasiz yazim, Ingilizce I)');
+  const src = read('app.js');
+  const leadGovde = functionBody(src, 'function renderManageLeadsTable(');
+  check(/LexbnbSearchText|searchFold|searchMatches/.test(leadGovde), 'L-302g Talep aramasi ortak katlamayi kullanir');
+  check(/core\/search_text\.js\?v=/.test(read('index.html')) && read('index.html').indexOf('core/search_text.js') < read('index.html').indexOf('core/guest_crm_engine.js'),
+    'L-302h Katlama modulu misafir motorundan once yuklenir');
+}
+
 async function main() {
   try {
     await L304();
@@ -309,6 +346,7 @@ async function main() {
     await L269();
     await L270();
     await L305();
+    await L302();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

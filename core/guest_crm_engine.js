@@ -10,10 +10,13 @@
   const ledgerContract = typeof module === 'object' && module.exports
     ? require('./ledger_contract')
     : root.LedgerContract;
-  const api = factory(businessDate, ledgerContract);
+  const searchText = typeof module === 'object' && module.exports
+    ? require('./search_text')
+    : root.LexbnbSearchText;
+  const api = factory(businessDate, ledgerContract, searchText);
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.LexbnbGuestCrm = api;
-})(typeof globalThis !== 'undefined' ? globalThis : this, function (BusinessDate, LedgerContract) {
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (BusinessDate, LedgerContract, SearchText) {
   const DIRECT_CHANNELS = new Set(['DIRECT', 'WHATSAPP', 'INSTAGRAM', 'WEBSITE', 'REPEAT', 'PHONE']);
 
   function isBulkSummaryBooking(booking) {
@@ -186,7 +189,7 @@
   }
 
   function filterGuestRows(rows, options = {}) {
-    const query = String(options.query || '').trim().toLocaleLowerCase('tr-TR');
+    const query = String(options.query || '').trim();
     const segment = String(options.segment || 'ALL');
     const dateStart = String(options.dateStart || '');
     const dateEnd = String(options.dateEnd || '');
@@ -211,7 +214,8 @@
         if (!hasBookingInRange) return false;
       }
       if (!query) return true;
-      return [row.name, row.phone, row.email].some(value => String(value || '').toLocaleLowerCase('tr-TR').includes(query));
+      // Ayni katlama (L-302): "bozatli" Bozatlı'yı, Ingilizce "I" bozulmadan bulunur.
+      return SearchText.matches(query, [row.name, row.phone, row.email]);
     });
     const sort = String(options.sort || 'RECENT');
     const direction = String(options.direction || 'DESC') === 'ASC' ? 1 : -1;

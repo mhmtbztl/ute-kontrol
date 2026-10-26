@@ -1298,7 +1298,9 @@ async function bugunPerformansDavranisi() {
     && /finTopVillaFilter[\s\S]{0,80}currentFilter\.villa/.test(functionBody(app, 'function updateStepperLabels(')),
     'L-223 Finans Portfoy secicisi ortak filtreye bagli; listesi ortak doldurucudan, degeri filtreyle esit');
   // "Diger > Detay" bos liste aciyordu: grafik eslemeyle topluyor, arama ham metne bakiyordu
-  check(/eslesenGiderKategorisi\(exp\.category\)\.toLowerCase\(\)\.includes\(search\)/.test(functionBody(app, 'function renderExpensesTable(')),
+  // L-302: arama ortak katlamadan gecer; esleme expenseSearchMatches icinde kaldi.
+  check(/eslesenGiderKategorisi\(exp\.category\)/.test(functionBody(app, 'function expenseSearchMatches('))
+    && /expenseSearchMatches\(exp, search\)/.test(functionBody(app, 'function renderExpensesTable(')),
     'L-224a Gider defteri aramasi grafikle ayni kategori eslemesini kullanir');
   const satirlar = functionBody(app, 'function expenseCategoryRowsHtml(');
   check(/eslesenGiderKategorisi\(exp\.category\) === catName/.test(satirlar) && /isExpenseInFilter\(exp\)/.test(satirlar)
