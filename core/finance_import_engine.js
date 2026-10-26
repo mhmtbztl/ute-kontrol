@@ -65,6 +65,21 @@ function bookingFingerprint(row = {}) {
   return [propertyId, guest, checkIn, checkOut, gross, otaCommission, cleaningFee, pax, channel, status].join('|');
 }
 
+/**
+ * Gider kaydinin parmak izi: dosya ici ve defterdeki kayitla karsilastirma
+ * ayni anahtari kullanir (L-304). Aciklama ve kategori Turkce kucuk harfe
+ * indirilir; portfoy geneli gider 'portfoy' anahtarini alir.
+ */
+function expenseFingerprint(row = {}) {
+  const date = normalizeDate(row.date || row.expense_date) || '';
+  const amountRaw = normalizeAmount(row.amount);
+  const amount = amountRaw === null ? '' : String(Math.round(amountRaw * 100) / 100);
+  const category = String(row.category || '').trim().toLocaleLowerCase('tr-TR');
+  const description = String(row.description || '').trim().toLocaleLowerCase('tr-TR');
+  const propertyId = String(row.propertyId || row.property_id || '').trim().toLowerCase() || 'portfoy';
+  return [date, amount, category, description, propertyId].join('|');
+}
+
 // -----------------------------------------------------------------------------
 // Normalizasyon
 // -----------------------------------------------------------------------------
@@ -400,8 +415,11 @@ function validateExpenseRows(rawRows = [], columnMap = {}, context = {}) {
   const kapaliMi = typeof context.isPeriodClosed === 'function' ? context.isPeriodClosed : () => false;
 
   const validatedRows = [], errors = [];
-  let validCount = 0, invalidCount = 0, duplicateCount = 0, totalAmount = 0;
+  let validCount = 0, invalidCount = 0, duplicateCount = 0, existingDuplicateCount = 0, totalAmount = 0;
   const gorulen = new Set();
+  // L-304: defterde zaten duran gider de mukerrerdir (duzeltilip yeniden
+  // yuklenen dosya, disa aktarilip geri verilen defter).
+  const mevcutGiderler = new Set((context.existingExpenses || []).map(expenseFingerprint));
   // Isletmenin Ayarlar'da ekledigi kategoriler (M66) standart listeye eklenir.
   const tumKategoriler = GIDER_KATEGORILERI.concat((context.customCategories || []).filter(c => c && c.name));
 
@@ -448,11 +466,13 @@ function validateExpenseRows(rawRows = [], columnMap = {}, context = {}) {
       satirHata.push(`Bu dönem (${tarih.slice(0, 7)}) kapatılmış; gider eklenemez.`);
     }
 
-    // Dosya ICI mukerrer
-    const fp = `${tarih}|${tutar}|${String(kategori || '').toLowerCase()}|${aciklama.toLowerCase()}|${mulk ? mulk.id : 'portfoy'}`;
+    // Dosya ici ve defterdeki mukerrer
+    const fp = expenseFingerprint({ date: tarih, amount: tutar, category: kategori, description: aciklama, propertyId: mulk ? mulk.id : null });
     let mukerrer = false;
     if (satirHata.length === 0) {
-      if (gorulen.has(fp)) { mukerrer = true; duplicateCount++; } else gorulen.add(fp);
+      if (gorulen.has(fp)) { mukerrer = true; duplicateCount++; }
+      else if (mevcutGiderler.has(fp)) { mukerrer = true; duplicateCount++; existingDuplicateCount++; gorulen.add(fp); }
+      else gorulen.add(fp);
     }
 
     if (satirHata.length === 0) {
@@ -472,7 +492,7 @@ function validateExpenseRows(rawRows = [], columnMap = {}, context = {}) {
     mode: 'EXPENSES',
     dateOrder: tarihSirasi.order, dateOrderAssumed: tarihSirasi.assumed,
     totalRows: rawRows.length,
-    validCount, invalidCount, duplicateCount,
+    validCount, invalidCount, duplicateCount, existingDuplicateCount,
     totalAmount: Math.round(totalAmount * 100) / 100,
     validatedRows, errors
   };
@@ -968,6 +988,7 @@ function parseCSV(text) {
 const FinanceImportEngine = {
   computeHash,
   bookingFingerprint,
+  expenseFingerprint,
   parseCSV,
   formulKoruyucusunuSoy,
   detectDelimiter,

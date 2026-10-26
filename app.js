@@ -7907,6 +7907,11 @@ function parseSourceWithMode(kaynak, mode) {
     const ctx = {
       properties: getImportProperties(),
       existingBookings: (appData && appData.bookings) || [],
+      // L-304: gider de defterdeki kayda karsi mukerrer denetlenir.
+      existingExpenses: ((appData && appData.expenses) || []).map(e => ({
+        date: e.date, amount: e.amount, category: e.category, description: e.description,
+        propertyId: e.propertyId || (appData.villas && appData.villas[e.villa] && appData.villas[e.villa].id) || null
+      })),
       // L-194: kanal katalogdan dogrulanir; defterde zaten duran eski serbest
       // kategori/kanal degerleri (dis aktar -> geri yukle turu) kabul edilir.
       channels: getBookingChannelCatalog(),
@@ -7990,7 +7995,7 @@ function renderImportPreviewBox() {
   if (stats) {
     const p = [`${r.totalRows} satır okundu`];
     p.push(`${yazilacak} kayıt eklenecek`);
-    if (r.duplicateCount) p.push(`${r.duplicateCount} mükerrer atlanacak`);
+    if (r.duplicateCount) p.push(`${r.duplicateCount} mükerrer atlanacak` + (r.existingDuplicateCount ? ` (${r.existingDuplicateCount} kayıt defterde zaten var)` : ''));
     if (r.invalidCount) p.push(`${r.invalidCount} hatalı`);
     if (r.overlaps && r.overlaps.length) p.push(`${r.overlaps.length} tarih çakışması`);
     p.push(rezMi ? `toplam ${tl(r.totalGross)} TL / ${r.totalNights} gece` : `toplam ${tl(r.totalAmount)} TL`);
@@ -23344,6 +23349,8 @@ if (typeof module !== 'undefined' && module.exports) {
     setActiveTenant,
     getImportEngine,
     buildImportSource,
+    parseSourceWithMode,
+    getPendingImportData: () => pendingImportData,
     paginateRows,
     getActiveRenderPlan,
     insertImportedRowsInBatches,
