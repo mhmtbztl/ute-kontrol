@@ -39,6 +39,7 @@
 // L-292: bilinmeyen deger 0 yaziliyordu (teklif, ariza maliyeti) ve "−0 ₺" gosteriliyordu.
 // L-298: odemeli rezervasyon silinirken once "emin misiniz?" soruluyor, sonra reddediliyordu.
 // L-296: rezervasyon detay paneli silmeden sonra ve sekme degisince acik kaliyordu.
+// L-297: sifirlama menusu admin rolune de gorunuyordu (yalniz owner calistirabilir).
 const fs = require('fs');
 const path = require('path');
 
@@ -756,6 +757,33 @@ async function L296() {
   delete global.SidePanel;
 }
 
+// ---------------------------------------------------------------------------
+// L-297 sifirlama menusu yalniz isletme sahibine gorunur
+// ---------------------------------------------------------------------------
+async function L297() {
+  const html = read('index.html');
+  const sifirlaDugmeleri = html.match(/<button[^>]*openResetModal\(\)[^>]*>/g) || [];
+  check(sifirlaDugmeleri.length >= 2 && sifirlaDugmeleri.every(b => /data-owner-only/.test(b)), 'L-297a Sifirlama dugmeleri yalniz sahibe isaretli', JSON.stringify(sifirlaDugmeleri));
+  const elemanlar = [];
+  const dom = sahteDom();
+  const eleman = () => { const e = { hidden: false }; elemanlar.push(e); return e; };
+  const sahip = eleman(), not = eleman();
+  dom.querySelectorAll = sel => (sel === '[data-owner-only]' ? [sahip] : sel === '[data-owner-only-note]' ? [not] : []);
+  const App = require('../app.js');
+  kur(App, {}, 'admin');
+  App.applyRoleNavigationVisibility();
+  check(sahip.hidden === true && not.hidden === false, 'L-297b Yonetici (admin) sifirlama dugmesini gormez, yalniz sahibin yapabilecegini okur');
+  kur(App, {}, 'owner');
+  App.applyRoleNavigationVisibility();
+  check(sahip.hidden === false && not.hidden === true, 'L-297c Isletme sahibi sifirlama dugmesini gorur');
+  kur(App, {}, 'admin');
+  const modal = dom.getElementById('resetModal');
+  let acildi = false;
+  modal.classList = { add() { acildi = true; }, remove() {}, contains: () => false, toggle() {} };
+  App.openResetModal();
+  check(!acildi, 'L-297d Admin sifirlama penceresini acamaz');
+}
+
 async function main() {
   try {
     await L304();
@@ -780,6 +808,7 @@ async function main() {
     await L292();
     await L298();
     await L296();
+    await L297();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

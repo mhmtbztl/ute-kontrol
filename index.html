@@ -1876,9 +1876,10 @@
             dahil bütün kayıtlar kalıcı olarak silinir. Kapatılmış dönemler de dahildir.
             Deneme verisi yükleyip temizlemek için bunu kullanın.
           </p>
-          <button type="button" class="btn btn-secondary" data-onclick="openResetModal()">
+          <button type="button" class="btn btn-secondary" data-owner-only data-onclick="openResetModal()">
             🗑️ Veri Sıfırlama Menüsünü Aç
           </button>
+          <p class="sub-text" data-owner-only-note hidden>Veri sıfırlamayı yalnız işletme sahibi yapabilir.</p>
         </div>
       </section>
 
@@ -3529,7 +3530,7 @@
               • Onaylamak için <code>VERILERI SIFIRLA</code> yazmanız gerekir; işlemi yalnızca işletme sahibi yapabilir.<br>
               • Aynı ekrana <strong>⚙️ Ayarlar → Veri Sıfırlama</strong> bölümünden de ulaşabilirsiniz.
             </p>
-            <button type="button" class="btn btn-secondary btn-sm" data-onclick="closeHelpModal(); openResetModal();">
+            <button type="button" class="btn btn-secondary btn-sm" data-owner-only data-onclick="closeHelpModal(); openResetModal();">
               🗑️ Sıfırlama Menüsünü Aç
             </button>
           </div>
@@ -4106,7 +4107,7 @@
   <script src="core/action_dispatch.js?v=89d49373"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=fa6d0372"></script>
-  <script src="app.js?v=28867a5a"></script>
+  <script src="app.js?v=52323789"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=929d8c2b"></script>

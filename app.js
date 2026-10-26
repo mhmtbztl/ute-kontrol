@@ -12501,6 +12501,10 @@ async function deleteMaint(id) {
 // -------------------------------------------------------------
 
 function openResetModal() {
+  if (activeTenant?.role !== 'owner') {
+    if (typeof showToast === 'function') showToast('Veri sıfırlamayı yalnız işletme sahibi yapabilir.', 'error');
+    return;
+  }
   const modal = document.getElementById('resetModal');
   if (!modal) return;
   const input = document.getElementById('resetConfirmInput');
@@ -17845,6 +17849,14 @@ function applyRoleNavigationVisibility() {
   });
   document.querySelectorAll('[data-ledger-only]').forEach(element => {
     element.hidden = !canReadLedgerRole(role);
+  });
+  // Veri sifirlama yalniz isletme sahibidir (reset_tenant_data, L-297): admin
+  // dugmeyi goruyor, sunucu reddediyordu.
+  document.querySelectorAll('[data-owner-only]').forEach(element => {
+    element.hidden = role !== 'owner';
+  });
+  document.querySelectorAll('[data-owner-only-note]').forEach(element => {
+    element.hidden = role === 'owner';
   });
   const quickBooking = document.getElementById('mobileQuickBookingBtn');
   if (quickBooking) quickBooking.hidden = !canWriteSalesRole(role);
@@ -23596,6 +23608,7 @@ if (typeof module !== 'undefined' && module.exports) {
     getImportEngine,
     buildImportSource,
     parseSourceWithMode,
+    openResetModal,
     deleteBookingUI,
     saveMaint,
     resolveMaintenanceFromOperations,
