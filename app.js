@@ -21544,7 +21544,11 @@ async function setOperationalTaskStatus(taskId, status) {
   // Iptal geri alinamaz; onay ister (L-281).
   if (status === 'CANCELLED' && typeof confirm === 'function'
     && !confirm('Görev iptal edilsin mi? İptal edilen görev aktif listeden çıkar; "Kapanan görevler" bölümünde görünmeye devam eder.')) return false;
-  await updateOperationalTask(taskId, { status });
+  // Tamamlanma zamani ve kim tamamladi yazilir (L-295): completed_at bos kaliyordu.
+  const patch = status === 'DONE'
+    ? { status, completed_at: new Date().toISOString(), completed_by: isUUID(activeSaaSUser?.id) ? activeSaaSUser.id : null }
+    : { status };
+  await updateOperationalTask(taskId, patch);
   await loadTenantAppData(getActiveTenantId());
   if (typeof showToast === 'function') showToast(status === 'DONE' ? '✅ Görev tamamlandı.' : 'Görev iptal edildi.');
   return true;

@@ -52,6 +52,7 @@
 //   silinmis parti "geri alinamaz" diyor, gelecek tarihli aktarilan rezervasyona temizlik acilmiyordu.
 // L-293: "+1 yalniz fiyat sorusu" sayaci 0 iken Geri al "Girilen degerlerden biri gecersiz" diyordu.
 // L-294: ariza duzenleme penceresindeki "Sorumlu" alani atanan ustayi gostermiyordu.
+// L-295: tamamlanan genel gorevde completed_at bos kaliyordu.
 const fs = require('fs');
 const path = require('path');
 
@@ -966,6 +967,19 @@ async function L294() {
   check(/Not \/ dış sorumlu|Sorumlu \(not\)/.test(read('index.html')), 'L-294b Serbest "Sorumlu" alani usta atamasiyla karistirilmayacak sekilde adlandirilir');
 }
 
+// ---------------------------------------------------------------------------
+// L-295 tamamlanan gorev completed_at tasir
+// ---------------------------------------------------------------------------
+async function L295() {
+  sahteDom();
+  const App = require('../app.js');
+  const ist = kur(App, { operationalTasks: [{ id: 'g7', title: 'TEST görev', status: 'TODO' }] });
+  await App.setOperationalTaskStatus('g7', 'DONE');
+  const y = ist.yazmalar.find(k => k.tablo === 'operational_tasks' && k.islem === 'update');
+  check(y && y.yuk.status === 'DONE' && typeof y.yuk.completed_at === 'string' && !Number.isNaN(Date.parse(y.yuk.completed_at)),
+    'L-295a Tamamlanan gorev completed_at ile yazilir', JSON.stringify(y && y.yuk));
+}
+
 async function main() {
   try {
     await L304();
@@ -1000,6 +1014,7 @@ async function main() {
     await L291();
     await L293();
     await L294();
+    await L295();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));
