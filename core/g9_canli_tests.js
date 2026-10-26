@@ -59,6 +59,7 @@
 //   yok, Esc kapatmiyordu.
 // L-311: bildirim akisi giris/cikis ve geciken genel gorev icin bildirim uretmiyor, saati
 //   gecmis takibi "bugun" (INFO) yaziyordu.
+// L-286: raporlarda, kartlarda ve hatalarda ham kod / Ingilizce gorunumler.
 const fs = require('fs');
 const path = require('path');
 
@@ -1103,6 +1104,30 @@ async function L311() {
     'L-311f Uygulama rezervasyon ve gorevleri bildirim akisina verir');
 }
 
+// ---------------------------------------------------------------------------
+// L-286 ham kod / Ingilizce gorunumler
+// ---------------------------------------------------------------------------
+async function L286() {
+  const R = require('./report_engine.js');
+  check(['gross', 'deductions', 'remaining'].every(k => R.LABELS[k] && !/^[a-z]+$/.test(R.LABELS[k][0])), 'L-286a Rezervasyon raporu ozetinde Ingilizce anahtar yok');
+  const E2 = require('./finance_import_engine.js');
+  const r = E2.validateBookingRows([{ V: 'Deneme Evi', M: 'TEST', G: '2026-12-10', C: '2026-12-12', B: '1000', K: '2', N: 'Tripadvisor' }],
+    { property: 'V', guest: 'M', checkIn: 'G', checkOut: 'C', gross: 'B', pax: 'K', channel: 'N' },
+    { properties: [{ id: PROP_A, slug: 'DENE', key: 'DENE', name: 'Deneme Evi' }], channels: [{ code: 'CUSTOM_595340EB05B4', displayName: 'TEST Kanal' }] });
+  const msj = (r.errors[0] && r.errors[0].errors.join(' ')) || '';
+  check(/TEST Kanal/.test(msj) && !/CUSTOM_/.test(msj), 'L-286b Aktarim kanal hatasi kanal adlarini listeler, ham kodu degil', msj);
+  sahteDom();
+  const App = require('../app.js');
+  kur(App, {});
+  check(typeof App.leadChannelLabel === 'function' && App.leadChannelLabel('Phone') === 'Telefon', 'L-286c Talep kanali "Phone" degil "Telefon" yazilir');
+  const src = read('app.js');
+  check(!src.includes("escapeHtml(task.status || 'TODO')"), 'L-286d Gorev durumu ham TODO yazilmaz');
+  check(!src.includes('sourceMetrics: [`Durum: ${l.status}`'), 'L-286e Bugun kartinda talep durumu ham QUOTE_SENT yazilmaz');
+  check(/kullaniciMesaji\(err\.message \|\| 'Gider kaydedilemedi\.'\)/.test(src), 'L-286f Gider kayit hatasi "TypeError: Failed to fetch" yerine anlasilir mesaj');
+  check(/bu adla bir kanal zaten var/.test(src), 'L-286g Ayni adli kanal hatasi ham "duplicate key" degil');
+  check(/createdAt: row\.createdAt \? formatTrDate/.test(src), 'L-286h Satis raporunda ISO zaman damgasi yok');
+}
+
 async function main() {
   try {
     await L304();
@@ -1142,6 +1167,7 @@ async function main() {
     await L290();
     await L312();
     await L311();
+    await L286();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

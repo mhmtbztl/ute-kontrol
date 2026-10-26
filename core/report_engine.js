@@ -20,7 +20,8 @@
     roomRevenueBeforeDistribution: ['Net konaklama geliri', 'money'], distributionCost: ['Dağıtım maliyeti (komisyon)', 'money'],
     roomRevenueAfterDistribution: ['Dağıtım sonrası konaklama geliri', 'money'], netRoomRevenueAfterDistribution: ['Dağıtım sonrası konaklama geliri', 'money'],
     roomAdr: ['ADR', 'money'], netRoomAdr: ['Dağıtım sonrası ADR', 'money'], availableNights: ['Satılabilir gece', 'int'],
-    roomRevPar: ['RevPAR', 'money'], netRoomRevPar: ['Dağıtım sonrası RevPAR', 'money'], channel: ['Kanal', 'text']
+    roomRevPar: ['RevPAR', 'money'], netRoomRevPar: ['Dağıtım sonrası RevPAR', 'money'], channel: ['Kanal', 'text'],
+    gross: ['Brüt (bu döneme düşen)', 'money'], deductions: ['Kesintiler', 'money'], remaining: ['Kalan (tahmini)', 'money']
   };
   const labelOf = id => (LABELS[id] ? LABELS[id][0] : id);
   const typeOf = (id, value) => (LABELS[id] ? LABELS[id][1] : (typeof value === 'number' ? 'number' : 'text'));

@@ -617,7 +617,8 @@ function validateBookingRows(rawRows = [], columnMap = {}, context = {}) {
     if (kanalHam && Array.isArray(context.channels) && context.channels.length) {
       const kod = mevcutDeger(kanalHam, context.existingChannels) || resolveChannel(kanalHam, context.channels);
       if (kod) kanal = kod;
-      else satirHata.push(`Kanal tanınmadı: "${kanalHam}". Geçerli: ${context.channels.map(c => c.code).join(', ')}`);
+      // Kullanici kanal ADINI gorur, ic kodu degil (L-286).
+      else satirHata.push(`Kanal tanınmadı: "${kanalHam}". Geçerli kanallar: ${context.channels.map(c => c.displayName || c.display_name || c.code).join(', ')}`);
     }
 
     let durum = String(raw[columnMap.status] || '').toUpperCase().trim() || 'CONFIRMED';

@@ -3190,6 +3190,16 @@ const ALLOWED_LEAD_STAGES = ['NEW', 'CONTACTED', 'QUOTE_SENT', 'FOLLOW_UP', 'WON
 const ALLOWED_LEAD_SOURCES = ['WHATSAPP', 'INSTAGRAM', 'META', 'AIRBNB', 'BOOKING', 'DIRECT', 'PHONE', 'OTHER'];
 const ALLOWED_LOST_REASONS = ['Fiyat Yüksek', 'Tarih Dolu', 'Cevap Vermedi', 'Başka Yer Seçti', 'Diğer'];
 
+// Ekranda ham kod yazilmaz (L-286): talep kanali, gorev ve rezervasyon durumu.
+const LEAD_CHANNEL_LABELS = { Phone: 'Telefon', WhatsApp: 'WhatsApp', Instagram: 'Instagram', Email: 'E-posta', Other: 'Diğer', Airbnb: 'Airbnb', Booking: 'Booking.com', Website: 'Web sitesi' };
+function leadChannelLabel(value) {
+  const kod = normalizeLeadChannel(value);
+  return LEAD_CHANNEL_LABELS[kod] || kod;
+}
+const OPERATIONAL_TASK_STATUS_LABELS = { TODO: 'Yapılacak', IN_PROGRESS: 'Sürüyor', BLOCKED: 'Engelli', DONE: 'Tamamlandı', CANCELLED: 'İptal edildi' };
+const BOOKING_STATUS_LABELS = { CONFIRMED: 'Onaylı', CHECKED_IN: 'İçeride', CHECKED_OUT: 'Tamamlandı', CANCELLED: 'İptal' };
+const CLEANING_STATUS_LABELS = { PLANNED: 'Planlandı', DONE: 'Yapıldı', SKIPPED: 'Gerek kalmadı' };
+
 function normalizeLeadChannel(value) {
   const channel = String(value || '').trim();
   if (!channel) return 'WhatsApp';
@@ -4262,7 +4272,7 @@ function buildCurrentPageReport(page) {
       guest: b.guest || null, property: appData.villas?.[b.villa]?.name || b.villa || null,
       checkIn: b.checkIn || null, checkOut: b.checkOut || null,
       nights: b.checkIn && b.checkOut ? calculateNightsBetween(b.checkIn, b.checkOut) : null,
-      channel: b.channel || null, status: b.status || null,
+      channel: b.channel ? getChannelDisplayName(b.channel) : null, status: b.status ? (BOOKING_STATUS_LABELS[String(b.status).toUpperCase()] || b.status) : null,
       gross: Number.isFinite(Number(b.gross)) ? Number(b.gross) : null,
       discount: Number.isFinite(Number(b.discount)) ? Number(b.discount) : null
     }));
@@ -4289,11 +4299,11 @@ function buildCurrentPageReport(page) {
     const operationalTasks = (appData.operationalTasks || []).filter(mine).filter(inVilla);
     const maintenance = (appData.maintenanceTickets || []).filter(mine).filter(inVilla);
     const rows = cleaningTasks.filter(row => inScope(row.date, !closedTask(row.status)))
-      .map(row => ({ kind: 'Temizlik', title: row.propertyName || row.villa || '—', status: row.status || '—', date: row.date || null, amount: row.amount ?? null }))
+      .map(row => ({ kind: 'Temizlik', title: row.propertyName || row.villa || '—', status: CLEANING_STATUS_LABELS[String(row.status || '').toUpperCase()] || row.status || '—', date: row.date || null, amount: row.amount ?? null }))
       .concat(operationalTasks.filter(row => inScope(row.due_date, !closedTask(row.status)))
-        .map(row => ({ kind: 'Görev', title: row.title || '—', status: row.status || '—', date: row.due_date || null, amount: null })))
+        .map(row => ({ kind: 'Görev', title: row.title || '—', status: OPERATIONAL_TASK_STATUS_LABELS[String(row.status || '').toUpperCase()] || row.status || '—', date: row.due_date || null, amount: null })))
       .concat(maintenance.filter(row => inScope(row.reported_at, isMaintenanceTicketOpen(row)))
-        .map(row => ({ kind: 'Arıza', title: row.title || '—', status: row.status || '—', date: row.reported_at ? String(row.reported_at).slice(0, 10) : null, amount: row.cost ?? null })));
+        .map(row => ({ kind: 'Arıza', title: row.title || '—', status: getMaintenanceStatusPresentation(row.status).label || row.status || '—', date: row.reported_at ? String(row.reported_at).slice(0, 10) : null, amount: row.cost ?? null })));
     // Borc bir bakiyedir, donem akisi degil: tek tanim isCleaningDebt, tum donemler.
     const pendingDebt = cleaningTasks.filter(isCleaningDebt).reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
     const columns = [
@@ -4306,7 +4316,7 @@ function buildCurrentPageReport(page) {
   if (page === 'SALES') {
     const view = getLeadSalesView();
     const funnel = Object.fromEntries(Object.entries(view.columns).map(([stage, rows]) => [stage, rows.length]));
-    const rows = view.rows.map(row => ({ source: row.sourceLabel, status: row.status, property: appData.villas?.[row.villa]?.name || row.villa || null, createdAt: row.createdAt || null }));
+    const rows = view.rows.map(row => ({ source: row.sourceLabel, status: LEAD_STATUS_LABELS[String(row.status || '').toUpperCase()] || row.status, property: appData.villas?.[row.villa]?.name || row.villa || null, createdAt: row.createdAt ? formatTrDate(String(row.createdAt).slice(0, 10)) : null }));
     const columns = [
       { key: 'source', label: 'Kaynak', type: 'text' }, { key: 'status', label: 'Aşama', type: 'text' },
       { key: 'property', label: 'Mülk', type: 'text' }, { key: 'createdAt', label: 'Talep tarihi', type: 'text' }
@@ -7091,7 +7101,7 @@ async function saveExpenseOnce() {
     closeExpenseModal();
   } catch (err) {
     console.error('saveExpense error:', err);
-    if (typeof alert === 'function') alert(err.message || 'Gider kaydedilemedi.');
+    if (typeof alert === 'function') alert(kullaniciMesaji(err.message || 'Gider kaydedilemedi.'));
   }
 }
 
@@ -10720,7 +10730,8 @@ async function createBookingChannelFromSettings(formEvent) {
     await refreshBookingChannelSettings();
     setBookingChannelMessage('Yeni rezervasyon kanalı eklendi.', 'success');
   } catch (error) {
-    setBookingChannelMessage('Kanal eklenemedi: ' + (error.message || 'Bilinmeyen hata'), 'error');
+    const ayniAd = /duplicate key|23505/i.test(String(error?.message || '')) || error?.code === '23505';
+    setBookingChannelMessage(ayniAd ? 'Kanal eklenemedi: bu adla bir kanal zaten var.' : 'Kanal eklenemedi: ' + kullaniciMesaji(error.message || 'Bilinmeyen hata'), 'error');
   } finally {
     if (submit) submit.disabled = false;
   }
@@ -12091,7 +12102,7 @@ function renderManageLeadsTable() {
     tr.innerHTML = `
       <td><strong>${escapeHtml(l.guestName || l.phone || l.guest)}</strong>${l.guestName && l.phone ? `<span style="display:block; font-size:11px; color:var(--text-muted);">${escapeHtml(l.phone)}</span>` : ''}${l.checkIn && l.checkOut ? `<span style="display:block; font-size:11px; color:var(--text-muted);">${escapeHtml(formatTrDate(l.checkIn))} → ${escapeHtml(formatTrDate(l.checkOut))}</span>` : ''}</td>
       <td>${escapeHtml(leadPropertyLabel(l))}${(l.extraPropertyIds || []).length ? `<span style="display:block; font-size:11px; color:var(--text-muted);">+ ${escapeHtml((l.extraPropertyIds || []).map(id => Object.values(appData.villas || {}).find(v => v.id === id)?.name).filter(Boolean).join(', '))}</span>` : ''}</td>
-      <td>${escapeHtml([l.sourceLabel !== '—' ? l.sourceLabel : '', l.channel].filter(Boolean).join(' · '))}</td>
+      <td>${escapeHtml([l.sourceLabel !== '—' ? l.sourceLabel : '', l.channel ? leadChannelLabel(l.channel) : ''].filter(Boolean).join(' · '))}</td>
       <td>${escapeHtml(leadQuoteLabel(l))}</td>
       <td>${statusBadge}</td>
       <td>${escapeHtml(l.lostReason || '-')}</td>
@@ -19896,7 +19907,7 @@ function renderExecutiveControlCenter() {
         revenueImpact: 'HIGH',
         confidence: 'HIGH',
         rationale: 'Rezervasyona dönüşme olasılığı yüksek müşteri teklifi bekliyor.',
-        sourceMetrics: [`Durum: ${l.status}`, `Değer: ₺${Number(l.quote || 0).toLocaleString('tr-TR')}`],
+        sourceMetrics: [`Durum: ${LEAD_STATUS_LABELS[String(l.status || '').toUpperCase()] || l.status}`, Number(l.quote) > 0 ? `Değer: ₺${Number(l.quote).toLocaleString('tr-TR')}` : 'Değer: teklif girilmedi'],
         deepLink: 'leads',
         quickAction: 'CONVERT_LEAD'
       });
@@ -21222,7 +21233,7 @@ function renderStaffFieldWork() {
       const actions = checklist
         ? `<button class="btn btn-secondary btn-sm" data-onclick="saveMyOperationalTaskChecklist(decodeURIComponent('${encodeActionArg(task.id)}'), 'IN_PROGRESS')">İlerlemeyi kaydet</button><button class="btn btn-primary btn-sm" data-onclick="saveMyOperationalTaskChecklist(decodeURIComponent('${encodeActionArg(task.id)}'), 'DONE')">Kontrolü tamamla</button>`
         : `${task.status === 'TODO' ? `<button class="btn btn-secondary btn-sm" data-onclick="setMyOperationalTaskStatus(decodeURIComponent('${encodeActionArg(task.id)}'), 'IN_PROGRESS')">Başla</button>` : ''}<button class="btn btn-primary btn-sm" data-onclick="setMyOperationalTaskStatus(decodeURIComponent('${encodeActionArg(task.id)}'), 'DONE')">Tamamla</button>`;
-      return `<article class="ops-row staff-task-row"><div class="ops-row-main"><strong>${escapeHtml(task.title || 'Görev')}</strong><span>${escapeHtml(task.description || '')}</span></div><span class="badge">${escapeHtml(task.status || 'TODO')}</span>${checklist}<div class="ops-row-actions">${actions}</div></article>`;
+      return `<article class="ops-row staff-task-row"><div class="ops-row-main"><strong>${escapeHtml(task.title || 'Görev')}</strong><span>${escapeHtml(task.description || '')}</span></div><span class="badge">${escapeHtml(OPERATIONAL_TASK_STATUS_LABELS[String(task.status || 'TODO').toUpperCase()] || task.status || 'Yapılacak')}</span>${checklist}<div class="ops-row-actions">${actions}</div></article>`;
     }).join('')}</section>`;
   }
 }
@@ -21824,7 +21835,7 @@ function renderOperationsTab() {
     const editTemplatesLink = canManageTenantRole(activeTenant?.role)
       ? `<button class="btn btn-secondary btn-sm" data-onclick="openSettingsSection(decodeURIComponent('${encodeActionArg('templates')}'))">Şablonu düzenle →</button>`
       : '';
-    container.innerHTML = `<div class="ops-cleaning-layout"><section class="ops-group"><div class="section-title-bar"><h3>Aktif görevler <span class="badge">${operational.length}</span></h3><button class="btn btn-primary btn-sm" data-onclick="createGeneralOperationalTask()">+ Genel görev</button></div>${operational.length ? operational.map(task => { const options = assignees.map(person => `<option value="${escapeHtml(person.user_id)}"${person.user_id === task.assigned_to ? ' selected' : ''}>${escapeHtml(person.full_name)}</option>`).join(''); return `<article class="ops-row"><div class="ops-row-main"><strong>${escapeHtml(task.title || '—')}</strong><span>${task.property_id ? 'Mülke bağlı' : 'Genel görev'} · ${escapeHtml(task.status || 'TODO')}</span></div><div class="ops-row-actions"><select id="opsTaskPerson-${escapeHtml(task.id)}" aria-label="Görevli seç"><option value="">Ekip üyesi seç…</option>${options}</select><button class="btn btn-secondary btn-sm" data-onclick="assignOperationalTaskFromSelect(decodeURIComponent('${encodeActionArg(task.id)}'))">Ata</button><button class="btn btn-primary btn-sm" data-onclick="setOperationalTaskStatus(decodeURIComponent('${encodeActionArg(task.id)}'), 'DONE')">Tamamla</button><button class="btn btn-secondary btn-sm" data-onclick="setOperationalTaskStatus(decodeURIComponent('${encodeActionArg(task.id)}'), 'CANCELLED')">İptal</button></div></article>`; }).join('') : '<div class="empty-state">Aktif görev yok.</div>'}${kapananHtml}</section><aside class="ops-debt-panel"><h3>Hazır görev kütüphanesi</h3>${editTemplatesLink}${templates.length ? templates.map(template => `<div class="ops-debt-row"><div><strong>${escapeHtml(template.title)}</strong><span>${escapeHtml(TEMPLATE_TASK_TYPE_LABELS[template.task_type] || 'Genel')}</span></div><button class="btn btn-secondary btn-sm" data-onclick="createTaskFromTemplate(decodeURIComponent('${encodeActionArg(template.id)}'))">Görev oluştur</button></div>`).join('') : '<div class="empty-state">Henüz görev şablonu yok.</div>'}</aside></div>`;
+    container.innerHTML = `<div class="ops-cleaning-layout"><section class="ops-group"><div class="section-title-bar"><h3>Aktif görevler <span class="badge">${operational.length}</span></h3><button class="btn btn-primary btn-sm" data-onclick="createGeneralOperationalTask()">+ Genel görev</button></div>${operational.length ? operational.map(task => { const options = assignees.map(person => `<option value="${escapeHtml(person.user_id)}"${person.user_id === task.assigned_to ? ' selected' : ''}>${escapeHtml(person.full_name)}</option>`).join(''); return `<article class="ops-row"><div class="ops-row-main"><strong>${escapeHtml(task.title || '—')}</strong><span>${task.property_id ? 'Mülke bağlı' : 'Genel görev'} · ${escapeHtml(OPERATIONAL_TASK_STATUS_LABELS[String(task.status || 'TODO').toUpperCase()] || task.status || 'Yapılacak')}</span></div><div class="ops-row-actions"><select id="opsTaskPerson-${escapeHtml(task.id)}" aria-label="Görevli seç"><option value="">Ekip üyesi seç…</option>${options}</select><button class="btn btn-secondary btn-sm" data-onclick="assignOperationalTaskFromSelect(decodeURIComponent('${encodeActionArg(task.id)}'))">Ata</button><button class="btn btn-primary btn-sm" data-onclick="setOperationalTaskStatus(decodeURIComponent('${encodeActionArg(task.id)}'), 'DONE')">Tamamla</button><button class="btn btn-secondary btn-sm" data-onclick="setOperationalTaskStatus(decodeURIComponent('${encodeActionArg(task.id)}'), 'CANCELLED')">İptal</button></div></article>`; }).join('') : '<div class="empty-state">Aktif görev yok.</div>'}${kapananHtml}</section><aside class="ops-debt-panel"><h3>Hazır görev kütüphanesi</h3>${editTemplatesLink}${templates.length ? templates.map(template => `<div class="ops-debt-row"><div><strong>${escapeHtml(template.title)}</strong><span>${escapeHtml(TEMPLATE_TASK_TYPE_LABELS[template.task_type] || 'Genel')}</span></div><button class="btn btn-secondary btn-sm" data-onclick="createTaskFromTemplate(decodeURIComponent('${encodeActionArg(template.id)}'))">Görev oluştur</button></div>`).join('') : '<div class="empty-state">Henüz görev şablonu yok.</div>'}</aside></div>`;
   }
 }
 
@@ -23794,6 +23805,7 @@ if (typeof module !== 'undefined' && module.exports) {
     getImportEngine,
     buildImportSource,
     parseSourceWithMode,
+    leadChannelLabel,
     handleModalKeydown,
     focusModalOnOpen,
     openLeadWhatsApp,
