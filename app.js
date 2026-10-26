@@ -6996,8 +6996,25 @@ function closeExpenseModal() {
   document.getElementById('expenseModal').classList.remove('active');
 }
 
+// Suren gider kaydi: cift tiklama ikinci bir gider yazmasin (L-269).
+let expenseSaveInFlight = false;
+
 async function saveExpense(e) {
   if (e && typeof e.preventDefault === 'function') e.preventDefault();
+  if (expenseSaveInFlight) return;
+  expenseSaveInFlight = true;
+  const submitBtn = (e && e.target && typeof e.target.querySelector === 'function')
+    ? e.target.querySelector('button[type="submit"]') : null;
+  if (submitBtn) submitBtn.disabled = true;
+  try {
+    await saveExpenseOnce();
+  } finally {
+    expenseSaveInFlight = false;
+    if (submitBtn) submitBtn.disabled = false;
+  }
+}
+
+async function saveExpenseOnce() {
   const editId = document.getElementById('expEditId')?.value;
   const type = document.getElementById('expType')?.value || 'OPEX';
   const category = (document.getElementById('expCategory')?.value || '').trim();

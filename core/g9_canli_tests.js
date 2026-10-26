@@ -5,6 +5,7 @@
 //   geri verilen defter) "eklenecek" gorunuyor ve gideri ikiliyordu.
 // L-268: rezervasyonun mulku degistirilince "kaydedildi" deniyor ama eski
 //   mulkte kaliyordu; cakisma kontrolu de eski mulke bakiyordu.
+// L-269: gider formunda cift tiklama iki gider yaziyordu.
 const fs = require('fs');
 const path = require('path');
 
@@ -196,10 +197,31 @@ async function L268() {
   check(c3 && c3.yuk.p_property_id === PROP_A, 'L-268d Mulk gonderilmeyen guncelleme mevcut mulku korur');
 }
 
+// ---------------------------------------------------------------------------
+// L-269 gider formunda cift tiklama tek gider yazar
+// ---------------------------------------------------------------------------
+async function L269() {
+  const App = require('../app.js');
+  const deger = { expType: 'OPEX', expCategory: 'Bakım', expVilla: 'ALL', expDate: '2026-10-20', expAmount: '100', expDesc: 'TEST çift tıklama', expRecurFreq: 'NONE' };
+  sahteDom(deger);
+  const ist = kur(App, {});
+  const dugme = { disabled: false, innerText: 'Kaydet' };
+  const olay = { preventDefault() {}, target: { querySelector: () => dugme } };
+  await Promise.all([App.saveExpense(olay), App.saveExpense(olay)]);
+  const yazma = ist.yazmalar.filter(k => k.tablo === 'expenses' && k.islem === 'insert');
+  check(yazma.length === 1, 'L-269a Ayni anda iki kaydet tek gider yazar', String(yazma.length) + ' ' + (global.__sonUyari || ''));
+  check(dugme.disabled === false, 'L-269b Kayit bitince dugme yeniden etkin');
+  // Kayit bittikten sonra yeni bir kaydet yine calisir.
+  sahteDom(deger);
+  await App.saveExpense(olay);
+  check(ist.yazmalar.filter(k => k.tablo === 'expenses' && k.islem === 'insert').length === 2, 'L-269c Sonraki kayit engellenmez');
+}
+
 async function main() {
   try {
     await L304();
     await L268();
+    await L269();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));
