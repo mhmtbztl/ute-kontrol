@@ -327,6 +327,7 @@ const allTestFiles = [
   'phase95_cleaning_import_undo_live_tests.js',
   'phase101_daily_prices_live_tests.js',
   'phase103_property_closures_live_tests.js',
+  'phase105_guest_erasure_live_tests.js',
   'phase97_income_live_tests.js',
   'phase53_staff_boundary_live_tests.js',
   'phase53_staff_boundary_tests.js',
