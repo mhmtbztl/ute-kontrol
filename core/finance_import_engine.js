@@ -572,6 +572,9 @@ function validateBookingRows(rawRows = [], columnMap = {}, context = {}) {
 
     if (brut !== null && komisyon !== null && temizlik !== null && (komisyon + temizlik) > brut) {
       satirHata.push(`Komisyon + temizlik (${komisyon + temizlik}) brüt tutarı (${brut}) aşıyor.`);
+    } else if (brut > 0 && komisyon !== null && komisyon > brut / 2) {
+      // Rezervasyon formuyla ayni sinir (L-300): komisyon brutun en fazla %50'si.
+      satirHata.push(`OTA komisyonu (${komisyon}) brüt tutarın %50'sinden (${brut / 2}) büyük olamaz.`);
     }
 
     // Indirim yalniz oda gelirinden duser (K-04); temizlik ucretini asamaz.

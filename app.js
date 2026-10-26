@@ -776,7 +776,7 @@ async function saveTenantBookingChannel(input = {}) {
   const rate = type === 'DIRECT' ? 0 : Number(input.defaultCommissionRate);
   if (!input.displayName || !String(input.displayName).trim()) throw new Error('Kanal adı zorunludur.');
   if (!['OTA', 'DIRECT'].includes(type)) throw new Error('Kanal türü geçersiz.');
-  if (!Number.isFinite(rate) || rate < 0 || rate > 100) throw new Error('Komisyon oranı 0 ile 100 arasında olmalıdır.');
+  if (!Number.isFinite(rate) || rate < 0 || rate > BOOKING_MAX_COMMISSION_PCT) throw new Error(`Komisyon oranı 0 ile ${BOOKING_MAX_COMMISSION_PCT} arasında olmalıdır.`);
   const { data, error } = await supabaseClient.rpc('save_tenant_booking_channel', {
     p_tenant_id: tenantId,
     p_channel_id: input.id || null,
@@ -1431,6 +1431,41 @@ async function loadBookings(targetTenantId) {
   }
 }
 
+// Rezervasyon kaydinda engellenmeyen ama sorulan durumlar (L-300, kullanici
+// karari 27.10.2026). 0 TL ucretsiz konaklama (ortak/aile kullanimi, takas)
+// olabilir; kapasiteyi asan kisi sayisi ek yatakla olabilir. Ikisi de sessizce
+// kabul ediliyordu. Kapasitesi girilmemis mulkte kapasite olculmez.
+function bookingSaveWarnings({ gross, pax, villa } = {}) {
+  const uyarilar = [];
+  if (!(Number(gross) > 0)) uyarilar.push('Toplam tutar 0 TL. Ücretsiz konaklama (ortak/aile kullanımı, takas) olarak kaydedilecek; ciroya 0 TL yazılır.');
+  const villalar = (typeof appData !== 'undefined' && appData && appData.villas) || {};
+  const mulk = villalar[villa] || Object.values(villalar).find(v => v && v.id === villa) || null;
+  const kapasite = parseInt(String(mulk?.capacity ?? ''), 10);
+  const kisi = Number(pax);
+  if (Number.isFinite(kapasite) && kapasite > 0 && Number.isFinite(kisi) && kisi > kapasite) {
+    uyarilar.push(`${kisi} kişi, ${mulk.name || 'mülkün'} kapasitesini (${kapasite} kişi) aşıyor.`);
+  }
+  return uyarilar;
+}
+
+/** Uyari yoksa sormaz; varsa tek pencerede sorar. Vazgecilirse false. */
+async function confirmBookingWarnings(uyarilar) {
+  if (!Array.isArray(uyarilar) || uyarilar.length === 0) return true;
+  return await uiAskConfirm({ title: 'Kaydetmeden önce kontrol edin', message: uyarilar.join('\n\n') + '\n\nYine de kaydedilsin mi?', okText: 'Kaydet' });
+}
+
+// Komisyon brutun en fazla %50'si (L-300). %100 komisyon kabul ediliyordu;
+// kanal varsayilani da ayni sinira baglidir.
+const BOOKING_MAX_COMMISSION_PCT = 50;
+function bookingCommissionError(gross, otaComm) {
+  const brut = Number(gross) || 0;
+  const komisyon = Number(otaComm) || 0;
+  if (brut > 0 && komisyon > brut * BOOKING_MAX_COMMISSION_PCT / 100) {
+    return `Komisyon brüt tutarın %${BOOKING_MAX_COMMISSION_PCT}'sinden büyük olamaz (brüt ${brut.toLocaleString('tr-TR')} ₺, komisyon ${komisyon.toLocaleString('tr-TR')} ₺).`;
+  }
+  return null;
+}
+
 async function createBooking(bookingInput) {
   const tenantId = getActiveTenantId() || bookingInput?.tenantId;
   const isCloud = isCloudTenant(tenantId);
@@ -1467,6 +1502,8 @@ async function createBooking(bookingInput) {
   if (gross < 0) {
     throw new Error('Toplam tutar negatif olamaz.');
   }
+  const komisyonHatasi = bookingCommissionError(gross, bookingInput.otaComm);
+  if (komisyonHatasi) throw new Error(komisyonHatasi);
 
   // Resolve property UUID and verify active tenant ownership
   let propId = bookingInput.propertyId || bookingInput.property_id;
@@ -1676,6 +1713,8 @@ async function updateBooking(bookingId, bookingInput) {
   if (gross < 0) {
     throw new Error('Toplam tutar negatif olamaz.');
   }
+  const komisyonHatasi = bookingCommissionError(gross, bookingInput.otaComm !== undefined ? bookingInput.otaComm : existing?.otaComm);
+  if (komisyonHatasi) throw new Error(komisyonHatasi);
 
   // Formun gonderdigi mulk kaydin eski mulkunun onune gecer (L-268): once
   // existing.propertyId okunuyordu ve mulk degisikligi sessizce yok sayiliyordu.
@@ -4618,6 +4657,7 @@ function switchTab(tabId) {
   if (tabId === 'settings') loadDeletionImpact();
   if (tabId === 'finance') renderFinanceModule();
   if (tabId === 'reservations') {
+    adoptGlobalFilterForReservations();
     renderManageBookingsTable();
     renderTapeChart();
   }
@@ -8545,6 +8585,55 @@ function reservationMonthRange(monthKey) {
 let reservationListRange = reservationMonthRange(getTodayStr().slice(0, 7));
 let reservationRangeAnchor = new Date(`${reservationListRange.start}T12:00:00`);
 
+// Rezervasyonlar ustteki donem ve mulk secimiyle aynidir (L-300, kullanici
+// karari 27.10.2026). Eskiden kendi "bu ay / tum portfoy" secimiyle aciliyordu;
+// Finans'ta Kasim + bir mulk seciliyken burada Ekim + tum portfoy gorunuyordu.
+// Sekmeye girerken ust secim alinir; burada degisen ay ya da mulk ustte de
+// degisir. Hafta gorunumu yalniz takvimin penceresidir, ust donemi degistirmez.
+function getReservationListRange() { return { ...reservationListRange }; }
+
+let reservationAdoptedFilterKey = null;
+function adoptGlobalFilterForReservations() {
+  const anahtar = [currentFilter.period, currentFilter.startDate, currentFilter.endDate, currentFilter.villa].join('|');
+  if (anahtar === reservationAdoptedFilterKey) return;
+  reservationAdoptedFilterKey = anahtar;
+  const select = document.getElementById('rezVillaFilter');
+  if (select) select.value = currentFilter.villa || 'ALL';
+  // "Tum zamanlar" bir takvim araligi degildir; liste o zaman bulundugu donemde kalir.
+  if (!currentFilter.startDate || !currentFilter.endDate) return;
+  if (typeof tapeChartView !== 'undefined') tapeChartView = 'MONTH';
+  reservationListRange = { start: currentFilter.startDate, end: currentFilter.endDate };
+  reservationRangeAnchor = new Date(`${reservationListRange.start}T12:00:00`);
+}
+
+function writeReservationScopeToGlobalFilter() {
+  const select = document.getElementById('rezVillaFilter');
+  if (select && select.value) currentFilter.villa = select.value;
+  if (typeof tapeChartView === 'undefined' || tapeChartView === 'MONTH') {
+    const { start, end } = reservationListRange;
+    const ay = start.slice(0, 7);
+    const tamAy = start === `${ay}-01` && end === reservationMonthRange(ay).end;
+    const listede = typeof ALL_FINANCIAL_MONTHS === 'undefined' || ALL_FINANCIAL_MONTHS.includes(ay);
+    currentFilter.period = tamAy && listede ? ay : 'CUSTOM';
+    currentFilter.startDate = start;
+    currentFilter.endDate = end;
+  }
+  const periodSel = document.getElementById('globalPeriodFilter');
+  if (periodSel) periodSel.value = currentFilter.period;
+  const villaSel = document.getElementById('globalVillaFilter');
+  if (villaSel) villaSel.value = currentFilter.villa;
+  if (currentFilter.period === 'CUSTOM') {
+    const s = document.getElementById('customFilterStart');
+    const e = document.getElementById('customFilterEnd');
+    if (s) s.value = currentFilter.startDate;
+    if (e) e.value = currentFilter.endDate;
+  }
+  const customWrap = document.getElementById('customDateRangeWrap');
+  if (customWrap && customWrap.style) customWrap.style.display = currentFilter.period === 'CUSTOM' ? 'inline-flex' : 'none';
+  if (typeof updateStepperLabels === 'function') updateStepperLabels();
+  reservationAdoptedFilterKey = [currentFilter.period, currentFilter.startDate, currentFilter.endDate, currentFilter.villa].join('|');
+}
+
 function syncReservationRangeUi() {
   const label = document.getElementById('reservationRangeLabel');
   if (label) label.textContent = `${formatTrDate(reservationListRange.start)} – ${formatTrDate(reservationListRange.end)}`;
@@ -9603,6 +9692,14 @@ async function saveBooking(e) {
     const depositMethod = document.getElementById('resDepositMethod')?.value || null;
 
     const net = economics.netRoomRevenue;
+
+    // 0 TL ve kapasite asimi sorulur (L-300); duzenlemede yalniz degisen alan.
+    const uyarilar = bookingSaveWarnings({ gross, pax, villa }).filter((_, i, liste) => {
+      if (!eskiKayit) return true;
+      const sifirMi = /^Toplam tutar 0 TL/.test(liste[i]);
+      return sifirMi ? Number(eskiKayit.gross) !== gross : (Number(eskiKayit.pax) !== pax || eskiKayit.villa !== villa);
+    });
+    if (!(await confirmBookingWarnings(uyarilar))) throw new Error('Kayıt yapılmadı.');
 
     const bookingInput = {
       villa,
@@ -10698,7 +10795,7 @@ function renderBookingChannelSettings() {
     return `<tr style="${channel.isActive ? '' : 'opacity:.6;'}">
       <td><input class="tbl-input" id="bookingChannelName_${id}" maxlength="100" value="${escapeHtml(channel.displayName)}" ${disabled ? 'disabled' : ''}><br><small>${escapeHtml(channel.code)}${channel.isSystem ? ' · Sistem kanalı' : ' · Özel kanal'}</small></td>
       <td><select class="tbl-input" id="bookingChannelType_${id}" data-onchange="toggleBookingChannelRowRate(decodeURIComponent('${encodeActionArg(id)}'))" ${typeDisabled ? 'disabled' : ''}><option value="OTA" ${channel.channelType === 'OTA' ? 'selected' : ''}>OTA</option><option value="DIRECT" ${channel.channelType === 'DIRECT' ? 'selected' : ''}>Direkt</option></select></td>
-      <td><input class="tbl-input" id="bookingChannelRate_${id}" type="number" min="0" max="100" step="0.01" value="${Number(channel.defaultCommissionRate)}" ${(disabled || channel.channelType === 'DIRECT') ? 'disabled' : ''}></td>
+      <td><input class="tbl-input" id="bookingChannelRate_${id}" type="number" min="0" max="50" step="0.01" value="${Number(channel.defaultCommissionRate)}" ${(disabled || channel.channelType === 'DIRECT') ? 'disabled' : ''}></td>
       <td><span class="badge ${channel.isActive ? 'badge-green' : 'badge-slate'}">${channel.isActive ? 'AKTİF' : 'PASİF'}</span></td>
       <td style="text-align:right; white-space:nowrap;">
         <button type="button" class="btn btn-secondary btn-sm" data-onclick="saveBookingChannelRow(event, decodeURIComponent('${encodeActionArg(channel.id || '')}'))" ${disabled ? 'disabled' : ''}>Kaydet</button>
@@ -13983,6 +14080,7 @@ function setReservationScopeRange(start, end) {
 /** Donem ya da mulk degisti: takvim ve liste birlikte cizilir. */
 function onReservationScopeChange() {
   if (typeof largeTablePageState !== 'undefined') largeTablePageState.bookings = 1;
+  writeReservationScopeToGlobalFilter();
   syncReservationRangeUi();
   renderTapeChart();
   renderManageBookingsTable();
@@ -14718,6 +14816,8 @@ async function saveWaAsBooking() {
     alert('Çıkış tarihi giriş tarihinden sonra olmalıdır.');
     return;
   }
+
+  if (!(await confirmBookingWarnings(bookingSaveWarnings({ gross, pax, villa })))) return;
 
   let temizlikNotu = '';
   try {
@@ -23937,6 +24037,12 @@ if (typeof module !== 'undefined' && module.exports) {
     getImportEngine,
     buildImportSource,
     parseSourceWithMode,
+    bookingSaveWarnings,
+    confirmBookingWarnings,
+    bookingCommissionError,
+    adoptGlobalFilterForReservations,
+    getReservationListRange,
+    stepReservationPeriod,
     createSettingsMessageTemplate,
     sendGuestMarketingMessage,
     eraseGuestPersonalData,

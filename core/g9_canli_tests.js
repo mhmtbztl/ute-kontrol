@@ -71,6 +71,7 @@
 //   26.10.2026: silme her seyi temizler (phase105 erase_guest_personal_data).
 // L-277: sablonda tur secilemiyor (hep TRANSACTIONAL), pazarlama izin kapisi hic calismiyor,
 //   misafir rehberinde pazarlama eylemi yok, yeni sablon esitlemeden once gorunmuyordu.
+// L-300 urun karari: 0 TL ve kapasite asimi onayla; komisyon <= %50; Rezervasyonlar ust secimle ayni
 const fs = require('fs');
 const path = require('path');
 
@@ -1305,6 +1306,75 @@ async function L277() {
   check(App.sendGuestMarketingMessage() === true && /wa\.me|whatsapp/.test(String(acilan)) && /TEST/.test(decodeURIComponent(String(acilan))), 'L-277e Izinli misafire pazarlama mesaji WhatsApp\'ta acilir', String(acilan));
 }
 
+// ---------------------------------------------------------------------------
+// L-300 urun karari (27.10): 0 TL ve kapasite asimi onayla, komisyon en fazla
+// %50; Rezervasyonlar ust donem/mulk secimiyle ayni
+// ---------------------------------------------------------------------------
+async function L300() {
+  sahteDom();
+  const App = require('../app.js');
+  kur(App);
+  const w0 = App.bookingSaveWarnings ? App.bookingSaveWarnings({ gross: 0, pax: 2, villa: 'DENE' }) : [];
+  check(w0.length === 1 && /0 TL/.test(w0[0]), 'L-300a 0 TL rezervasyon uyari ile onaya gelir', JSON.stringify(w0));
+  const wK = App.bookingSaveWarnings ? App.bookingSaveWarnings({ gross: 1000, pax: 7, villa: 'DENE' }) : [];
+  check(wK.length === 1 && /7/.test(wK[0]) && /6/.test(wK[0]), 'L-300b Kapasite asimi (7/6) uyari ile onaya gelir', JSON.stringify(wK));
+  const wOk = App.bookingSaveWarnings ? App.bookingSaveWarnings({ gross: 1000, pax: 6, villa: 'DENE' }) : null;
+  const wBilinmez = App.bookingSaveWarnings ? App.bookingSaveWarnings({ gross: 1000, pax: 20, villa: 'YOK' }) : null;
+  check(Array.isArray(wOk) && wOk.length === 0 && Array.isArray(wBilinmez) && wBilinmez.length === 0,
+    'L-300c Kapasite icinde ya da kapasitesi bilinmeyen mulkte uyari yok');
+
+  let soruldu = 0;
+  global.confirm = () => { soruldu++; return false; };
+  const iptal = App.confirmBookingWarnings ? await App.confirmBookingWarnings(w0) : true;
+  const bos = App.confirmBookingWarnings ? await App.confirmBookingWarnings([]) : false;
+  check(iptal === false && bos === true && soruldu === 1, 'L-300d Uyari onaylanmazsa kayit yapilmaz; uyari yoksa sorulmaz');
+  global.confirm = () => true;
+  const kaydet = functionBody(read('app.js'), 'async function saveBooking(');
+  const wa = functionBody(read('app.js'), 'async function saveWaAsBooking(');
+  check(/bookingSaveWarnings\(/.test(kaydet) && /confirmBookingWarnings\(/.test(kaydet) && /confirmBookingWarnings\(/.test(wa),
+    'L-300e Rezervasyon formu ve WhatsApp yolu uyari kapisindan gecer');
+
+  // Komisyon en fazla brutun %50'si: tum kayit yollari createBooking/updateBooking'den gecer.
+  let hata = null;
+  try { await App.createBooking({ villa: 'DENE', guest: 'TEST Komisyon', checkIn: '2030-01-10', checkOut: '2030-01-12', gross: 10000, otaComm: 6000, pax: 2, status: 'CONFIRMED' }); } catch (e) { hata = e; }
+  check(hata && /%50/.test(hata.message), 'L-300f Brutun %50sinden buyuk komisyon reddedilir', hata && hata.message);
+  check(App.bookingCommissionError && App.bookingCommissionError(10000, 5000) === null && App.bookingCommissionError(0, 0) === null,
+    'L-300g %50 ve alti komisyon kabul');
+  let kanalHata = null;
+  try { await App.saveTenantBookingChannel({ displayName: 'TEST Kanal', channelType: 'OTA', defaultCommissionRate: 60 }); } catch (e) { kanalHata = e; }
+  check(kanalHata && /50/.test(kanalHata.message), 'L-300h Kanal varsayilan komisyonu %50yi asamaz', kanalHata && kanalHata.message);
+  check(/id="resCommissionRate"[^>]*max="50"/.test(read('index.html')) && /id="newBookingChannelRate"[^>]*max="50"/.test(read('index.html')),
+    'L-300i Formlar %50 ustunu tarayicida da reddeder');
+
+  // Rezervasyonlar ust donem ve mulk secimini izler; burada degisen secim ustte de degisir.
+  const dom = sahteDom();
+  kur(App);
+  App.setCurrentFilter({ period: '2026-11', villa: 'DENE', startDate: '2026-11-01', endDate: '2026-11-30' });
+  if (App.adoptGlobalFilterForReservations) App.adoptGlobalFilterForReservations();
+  const r1 = App.getReservationListRange ? App.getReservationListRange() : {};
+  check(r1.start === '2026-11-01' && r1.end === '2026-11-30' && dom.getElementById('rezVillaFilter').value === 'DENE',
+    'L-300j Rezervasyonlar ustteki donemi ve mulku alir', JSON.stringify(r1) + ' ' + dom.getElementById('rezVillaFilter').value);
+  App.stepReservationPeriod(1);
+  const f = App.setCurrentFilter({});
+  check(f.period === '2026-12' && f.startDate === '2026-12-01' && f.endDate === '2026-12-31' && f.villa === 'DENE',
+    'L-300k Rezervasyonlarda degisen ay ustteki secime yazilir (Finans ayni donemi gosterir)', JSON.stringify(f));
+  App.setCurrentFilter({ period: 'CUSTOM', villa: 'ALL', startDate: '2026-10-20', endDate: '2026-11-30' });
+  App.adoptGlobalFilterForReservations && App.adoptGlobalFilterForReservations();
+  const r2 = App.getReservationListRange ? App.getReservationListRange() : {};
+  check(r2.start === '2026-10-20' && r2.end === '2026-11-30' && dom.getElementById('rezVillaFilter').value === 'ALL',
+    'L-300l Ozel aralik ve tum portfoy de alinir', JSON.stringify(r2));
+  check(/adoptGlobalFilterForReservations\(\)/.test(functionBody(read('app.js'), 'function switchTab(')),
+    'L-300m Sekmeye girerken ust secim uygulanir');
+  const IE = require('./finance_import_engine.js');
+  const satir = komisyon => ({ V: 'Deneme Evi', M: 'TEST Aktarim', G: '2030-02-10', C: '2030-02-12', B: '1000', O: komisyon, K: '2' });
+  const imp = komisyon => IE.validateBookingRows([satir(komisyon)],
+    { property: 'V', guest: 'M', checkIn: 'G', checkOut: 'C', gross: 'B', otaCommission: 'O', pax: 'K' },
+    { properties: [{ id: PROP_A, slug: 'DENE', key: 'DENE', name: 'Deneme Evi' }] });
+  const fazla = imp('600');
+  check(fazla.validCount === 0 && /%50/.test((fazla.errors[0] && fazla.errors[0].errors.join(' ')) || '') && imp('500').validCount === 1,
+    'L-300n Ice aktarimda da brutun %50sinden buyuk komisyon reddedilir', JSON.stringify(fazla.errors));
+}
+
 async function main() {
   try {
     await L304();
@@ -1352,6 +1422,7 @@ async function main() {
     await L271();
     await L281b();
     await L277();
+    await L300();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));
