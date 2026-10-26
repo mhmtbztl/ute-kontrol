@@ -7905,7 +7905,7 @@ async function refreshImportHistory() {
 
   const govde = document.getElementById('importHistoryList');
   if (!govde) return;
-  const tl = n => Math.round(Number(n) || 0).toLocaleString('tr-TR');
+  const tl = n => { const v = Math.round((Number(n) || 0) * 100) / 100; return v.toLocaleString('tr-TR', { minimumFractionDigits: Number.isInteger(v) ? 0 : 2, maximumFractionDigits: 2 }); };
 
   govde.innerHTML = partiler.map(p => {
     const tarih = p.importedAt ? new Date(p.importedAt).toLocaleString('tr-TR') : '—';
@@ -8052,7 +8052,8 @@ function renderImportPreviewBox() {
 
   const rezMi = pendingImportData.mode === 'BOOKINGS';
   const temizlikMi = pendingImportData.mode === 'CLEANING';
-  const tl = n => Math.round(Number(n) || 0).toLocaleString('tr-TR');
+  // Kurus yuvarlanmaz (L-306): 101,50 onizlemede "102" yaziyordu.
+  const tl = n => { const v = Math.round((Number(n) || 0) * 100) / 100; return v.toLocaleString('tr-TR', { minimumFractionDigits: Number.isInteger(v) ? 0 : 2, maximumFractionDigits: 2 }); };
 
   if (badge) {
     badge.innerText = rezMi ? 'Rezervasyon Defteri' : temizlikMi ? 'Geçmiş Temizlikler' : 'Gider Defteri';

@@ -41,6 +41,7 @@
 // L-296: rezervasyon detay paneli silmeden sonra ve sekme degisince acik kaliyordu.
 // L-297: sifirlama menusu admin rolune de gorunuyordu (yalniz owner calistirabilir).
 // L-303: misafir aramasi "0555 000 00 02" / "+90 555 000 00 02" bicimli telefonu bulmuyordu.
+// L-306: ice aktarma onizlemesi tutarlari kurussuz yuvarliyordu (101,50 -> "102").
 const fs = require('fs');
 const path = require('path');
 
@@ -804,6 +805,24 @@ async function L303() {
   check(/phoneMatches/.test(functionBody(read('app.js'), 'function renderManageLeadsTable(')), 'L-303e Talep aramasi ortak telefon eslesmesini kullanir');
 }
 
+// ---------------------------------------------------------------------------
+// L-306 ice aktarma onizlemesi kurusu yuvarlamaz
+// ---------------------------------------------------------------------------
+async function L306() {
+  const dom = sahteDom();
+  const App = require('../app.js');
+  kur(App, {});
+  const satirlar = [
+    { Tarih: '01.10.2026', Kategori: 'Fatura', Tutar: '101,50', Açıklama: 'a' },
+    { Tarih: '02.10.2026', Kategori: 'Fatura', Tutar: '1.234,56', Açıklama: 'b' }
+  ];
+  App.parseSourceWithMode({ fileName: 'g.csv', headers: Object.keys(satirlar[0]), rows: satirlar, sheetNames: [] }, 'EXPENSES');
+  const st = dom.getElementById('importFileStats').innerText;
+  check(/1\.336,06 TL/.test(st), 'L-306a Onizleme toplami kurusuyla yazilir', st);
+  const govde = functionBody(read('app.js'), 'function renderImportPreviewBox(');
+  check(!/const tl = n => Math\.round\(/.test(govde), 'L-306b Onizleme satir tutarlari yuvarlanmaz');
+}
+
 async function main() {
   try {
     await L304();
@@ -830,6 +849,7 @@ async function main() {
     await L296();
     await L297();
     await L303();
+    await L306();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));
