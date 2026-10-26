@@ -12359,7 +12359,7 @@ function renderManageMaintTable() {
       <td><span class="badge ${statusPresentation.badgeClass}">${escapeHtml(statusPresentation.label)}</span></td>
       <td style="text-align: right; white-space: nowrap;">
         ${statusPresentation.archived ? '' : `<button class="btn btn-secondary btn-sm" data-onclick="editMaint(decodeURIComponent('${encodeActionArg(String(m.id))}'))">✏️</button>
-        <button class="btn btn-danger btn-sm" data-onclick="deleteMaint(decodeURIComponent('${encodeActionArg(String(m.id))}'))">Arşivle</button>`}
+        ${isMaintenanceTicketOpen(m) ? `<button class="btn btn-danger btn-sm" data-onclick="deleteMaint(decodeURIComponent('${encodeActionArg(String(m.id))}'))">Arşivle</button>` : ''}`}
       </td>
     `;
     tbody.appendChild(tr);
@@ -12449,6 +12449,14 @@ async function saveMaint(e) {
 
 function editMaint(id) { openMaintModal(id); }
 async function deleteMaint(id) {
+  // Cozulmus onarim IPTAL yapilmaz (L-281): "Arsivle" onu iptal gosteriyor,
+  // gecmisi yanlis anlatiyordu. Kapali kayit oldugu gibi kalir.
+  const kayit = (appData.maintenanceTickets || []).find(t => String(t.id) === String(id))
+    || (appData.maintenance || []).find(t => String(t.id) === String(id));
+  if (kayit && !isMaintenanceTicketOpen(kayit)) {
+    alert('Bu kayıt kapanmış (çözüldü ya da iptal). Çözülmüş onarım iptal edilmez; geçmişte olduğu gibi kalır.');
+    return false;
+  }
   if (confirm('Bu bakım kaydını iptal ederek arşivlemek istediğinize emin misiniz?')) {
     const tenantId = getActiveTenantId();
     try {
@@ -21365,6 +21373,9 @@ function assignOperationalTaskFromSelect(taskId) {
 
 async function setOperationalTaskStatus(taskId, status) {
   if (!['DONE', 'CANCELLED'].includes(status)) return false;
+  // Iptal geri alinamaz; onay ister (L-281).
+  if (status === 'CANCELLED' && typeof confirm === 'function'
+    && !confirm('Görev iptal edilsin mi? İptal edilen görev aktif listeden çıkar; "Kapanan görevler" bölümünde görünmeye devam eder.')) return false;
   await updateOperationalTask(taskId, { status });
   await loadTenantAppData(getActiveTenantId());
   if (typeof showToast === 'function') showToast(status === 'DONE' ? '✅ Görev tamamlandı.' : 'Görev iptal edildi.');
@@ -21539,12 +21550,19 @@ function renderOperationsTab() {
     if (open.length && !technicians.length) container.innerHTML = fieldTeamHintHtml('TECHNICIAN') + container.innerHTML;
   } else {
     const operational = (appData?.operationalTasks || []).filter(task => !['DONE', 'CANCELLED'].includes(String(task.status || '').toUpperCase()));
+    // Kapanan gorevlerin izi arayuzde kalir (L-281): iptal edilen gorev
+    // hicbir listede gorunmuyordu, iz yalniz veritabanindaydi.
+    const kapananlar = (appData?.operationalTasks || []).filter(task => ['DONE', 'CANCELLED'].includes(String(task.status || '').toUpperCase()))
+      .sort((a, b) => String(b.updated_at || b.completed_at || '').localeCompare(String(a.updated_at || a.completed_at || ''))).slice(0, 20);
+    const kapananHtml = kapananlar.length
+      ? `<section class="ops-group" style="margin-top:12px"><details><summary><strong>Kapanan görevler</strong> <span class="badge">${kapananlar.length}</span></summary>${kapananlar.map(task => `<article class="ops-row"><div class="ops-row-main"><strong>${escapeHtml(task.title || '—')}</strong><span>${String(task.status).toUpperCase() === 'DONE' ? 'Tamamlandı' : 'İptal edildi'}${task.completed_at || task.updated_at ? ' · ' + escapeHtml(formatTrDate(String(task.completed_at || task.updated_at).slice(0, 10))) : ''}</span></div></article>`).join('')}</details></section>`
+      : '';
     const templates = appData?.taskTemplates || [];
     const assignees = (appData?.operationalPeople || []).filter(person => person.user_id && person.is_active !== false);
     const editTemplatesLink = canManageTenantRole(activeTenant?.role)
       ? `<button class="btn btn-secondary btn-sm" data-onclick="openSettingsSection(decodeURIComponent('${encodeActionArg('templates')}'))">Şablonu düzenle →</button>`
       : '';
-    container.innerHTML = `<div class="ops-cleaning-layout"><section class="ops-group"><div class="section-title-bar"><h3>Aktif görevler <span class="badge">${operational.length}</span></h3><button class="btn btn-primary btn-sm" data-onclick="createGeneralOperationalTask()">+ Genel görev</button></div>${operational.length ? operational.map(task => { const options = assignees.map(person => `<option value="${escapeHtml(person.user_id)}"${person.user_id === task.assigned_to ? ' selected' : ''}>${escapeHtml(person.full_name)}</option>`).join(''); return `<article class="ops-row"><div class="ops-row-main"><strong>${escapeHtml(task.title || '—')}</strong><span>${task.property_id ? 'Mülke bağlı' : 'Genel görev'} · ${escapeHtml(task.status || 'TODO')}</span></div><div class="ops-row-actions"><select id="opsTaskPerson-${escapeHtml(task.id)}" aria-label="Görevli seç"><option value="">Ekip üyesi seç…</option>${options}</select><button class="btn btn-secondary btn-sm" data-onclick="assignOperationalTaskFromSelect(decodeURIComponent('${encodeActionArg(task.id)}'))">Ata</button><button class="btn btn-primary btn-sm" data-onclick="setOperationalTaskStatus(decodeURIComponent('${encodeActionArg(task.id)}'), 'DONE')">Tamamla</button><button class="btn btn-secondary btn-sm" data-onclick="setOperationalTaskStatus(decodeURIComponent('${encodeActionArg(task.id)}'), 'CANCELLED')">İptal</button></div></article>`; }).join('') : '<div class="empty-state">Aktif görev yok.</div>'}</section><aside class="ops-debt-panel"><h3>Hazır görev kütüphanesi</h3>${editTemplatesLink}${templates.length ? templates.map(template => `<div class="ops-debt-row"><div><strong>${escapeHtml(template.title)}</strong><span>${escapeHtml(TEMPLATE_TASK_TYPE_LABELS[template.task_type] || 'Genel')}</span></div><button class="btn btn-secondary btn-sm" data-onclick="createTaskFromTemplate(decodeURIComponent('${encodeActionArg(template.id)}'))">Görev oluştur</button></div>`).join('') : '<div class="empty-state">Henüz görev şablonu yok.</div>'}</aside></div>`;
+    container.innerHTML = `<div class="ops-cleaning-layout"><section class="ops-group"><div class="section-title-bar"><h3>Aktif görevler <span class="badge">${operational.length}</span></h3><button class="btn btn-primary btn-sm" data-onclick="createGeneralOperationalTask()">+ Genel görev</button></div>${operational.length ? operational.map(task => { const options = assignees.map(person => `<option value="${escapeHtml(person.user_id)}"${person.user_id === task.assigned_to ? ' selected' : ''}>${escapeHtml(person.full_name)}</option>`).join(''); return `<article class="ops-row"><div class="ops-row-main"><strong>${escapeHtml(task.title || '—')}</strong><span>${task.property_id ? 'Mülke bağlı' : 'Genel görev'} · ${escapeHtml(task.status || 'TODO')}</span></div><div class="ops-row-actions"><select id="opsTaskPerson-${escapeHtml(task.id)}" aria-label="Görevli seç"><option value="">Ekip üyesi seç…</option>${options}</select><button class="btn btn-secondary btn-sm" data-onclick="assignOperationalTaskFromSelect(decodeURIComponent('${encodeActionArg(task.id)}'))">Ata</button><button class="btn btn-primary btn-sm" data-onclick="setOperationalTaskStatus(decodeURIComponent('${encodeActionArg(task.id)}'), 'DONE')">Tamamla</button><button class="btn btn-secondary btn-sm" data-onclick="setOperationalTaskStatus(decodeURIComponent('${encodeActionArg(task.id)}'), 'CANCELLED')">İptal</button></div></article>`; }).join('') : '<div class="empty-state">Aktif görev yok.</div>'}${kapananHtml}</section><aside class="ops-debt-panel"><h3>Hazır görev kütüphanesi</h3>${editTemplatesLink}${templates.length ? templates.map(template => `<div class="ops-debt-row"><div><strong>${escapeHtml(template.title)}</strong><span>${escapeHtml(TEMPLATE_TASK_TYPE_LABELS[template.task_type] || 'Genel')}</span></div><button class="btn btn-secondary btn-sm" data-onclick="createTaskFromTemplate(decodeURIComponent('${encodeActionArg(template.id)}'))">Görev oluştur</button></div>`).join('') : '<div class="empty-state">Henüz görev şablonu yok.</div>'}</aside></div>`;
   }
 }
 
@@ -23513,6 +23531,8 @@ if (typeof module !== 'undefined' && module.exports) {
     getImportEngine,
     buildImportSource,
     parseSourceWithMode,
+    deleteMaint,
+    setOperationalTaskStatus,
     renderTodayDateStrip,
     todayStayCounts,
     bookingCleaningDate,

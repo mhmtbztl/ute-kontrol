@@ -30,6 +30,8 @@
 //   (kanbandan "Diger") yaziliyordu.
 // L-280: Bugun kartlari giris/cikis yapildiktan sonra da "Giris 1" diyordu; giris
 //   gunu "Cikis Yapti" uyarisiz kabul ediliyor, temizlik eski cikis gununde kaliyordu.
+// L-281: "Arsivle" cozulmus onarimi IPTAL yapiyordu; genel gorev iptali onay sormuyor,
+//   iptal edilen gorev arayuzde hic gorunmuyordu.
 const fs = require('fs');
 const path = require('path');
 
@@ -582,6 +584,33 @@ async function L280() {
   global.confirm = () => true;
 }
 
+// ---------------------------------------------------------------------------
+// L-281 cozulmus ariza iptal edilmez; gorev iptali onay ister ve izi gorunur
+// ---------------------------------------------------------------------------
+async function L281() {
+  sahteDom();
+  const App = require('../app.js');
+  const cozulmus = { id: 'm1', title: 'TEST musluk', status: 'RESOLVED', property_id: PROP_A, severity: 'HIGH' };
+  const ist = kur(App, { maintenanceTickets: [cozulmus], maintenance: [{ id: 'm1', status: 'RESOLVED', villa: 'DENE', title: 'TEST musluk' }] });
+  await App.deleteMaint('m1');
+  check(!ist.yazmalar.some(k => k.tablo === 'maintenance_tickets' && k.islem === 'update') && /çözül/i.test(global.__sonUyari || ''),
+    'L-281a Cozulmus ariza "Arsivle" ile IPTAL yapilmaz; nedeni soylenir', JSON.stringify(ist.yazmalar.map(k => k.tablo + ':' + k.islem)) + ' ' + global.__sonUyari);
+  // Genel gorev iptali onay ister.
+  let soru = null;
+  global.confirm = m => { soru = m; return false; };
+  const ist2 = kur(App, { operationalTasks: [{ id: 'g1', title: 'TEST görev', status: 'TODO' }] });
+  await App.setOperationalTaskStatus('g1', 'CANCELLED');
+  check(soru && !ist2.yazmalar.some(k => k.tablo === 'operational_tasks'), 'L-281b Genel gorev iptali onay ister; vazgecince yazilmaz', soru);
+  global.confirm = () => true;
+  // Iptal/tamamlanan gorev Operasyon'da gorunur (iz yalniz DB'de kalmaz).
+  const dom = sahteDom();
+  kur(App, { operationalTasks: [{ id: 'g2', title: 'TEST iptal görevi', status: 'CANCELLED', updated_at: new Date().toISOString() }, { id: 'g3', title: 'TEST açık', status: 'TODO' }] });
+  App.setOperationsView('tasks');
+  App.renderOperationsTab();
+  const html = dom.getElementById('opsCombinedContainer').innerHTML;
+  check(/TEST iptal görevi/.test(html) && /İptal edildi/.test(html), 'L-281c Iptal edilen gorev kapanan gorevler listesinde gorunur', html.slice(0, 300));
+}
+
 async function main() {
   try {
     await L304();
@@ -599,6 +628,7 @@ async function main() {
     await L278();
     await L279();
     await L280();
+    await L281();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));
