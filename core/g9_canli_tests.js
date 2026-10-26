@@ -34,6 +34,7 @@
 //   iptal edilen gorev arayuzde hic gorunmuyordu.
 // L-282: kapatilan talep kaynaginin adi gecmis talep satirinda kayboluyordu
 //   (yalniz etkin kaynaklar yukleniyordu).
+// L-283: dolu formda tarayici geri tusu veriyi uyarisiz siliyordu (beforeunload yok).
 const fs = require('fs');
 const path = require('path');
 
@@ -640,6 +641,26 @@ async function L282() {
   check((App.getAppData().leadSources || []).every(s => s.is_active !== false), 'L-282b Yeni kayit formu yalniz etkin kaynaklari sunar');
 }
 
+// ---------------------------------------------------------------------------
+// L-283 dolu pencere varken sayfadan cikis (geri tusu) uyarir
+// ---------------------------------------------------------------------------
+async function L283() {
+  sahteDom();
+  const App = require('../app.js');
+  const modal = { classList: { contains: c => c === 'active' }, dataset: {} };
+  global.document.querySelectorAll = sel => (/\.active/.test(sel) ? [modal] : []);
+  const guard = typeof App.hasUnsavedModalForm === 'function' ? App.hasUnsavedModalForm : () => 'yok';
+  check(guard() === false, 'L-283a Kullanici yazmadiysa uyari yok', String(guard()));
+  if (typeof App.markModalFormDirty === 'function') App.markModalFormDirty({ target: { closest: () => modal } });
+  check(guard() === true, 'L-283b Acik pencerede yazilmis veri varken cikis uyarisi gerekir', String(guard()));
+  const olay = { preventDefault() { this.durdu = true; }, returnValue: undefined };
+  if (typeof App.unsavedFormBeforeUnload === 'function') App.unsavedFormBeforeUnload(olay);
+  check(olay.durdu === true && olay.returnValue === '', 'L-283c beforeunload tarayicinin "sayfadan ayril?" uyarisini acar');
+  delete modal.dataset.dirty;
+  check(guard() === false, 'L-283d Pencere kapaninca (kirli isaret silinince) uyari kalkar');
+  check(/beforeunload/.test(read('app.js')) && /installUnsavedFormGuard\(\)/.test(read('app.js')), 'L-283e Uyari uygulama acilisinda kurulur');
+}
+
 async function main() {
   try {
     await L304();
@@ -659,6 +680,7 @@ async function main() {
     await L280();
     await L281();
     await L282();
+    await L283();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

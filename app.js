@@ -12768,10 +12768,48 @@ function exportIncomeStatement() {
   return true;
 }
 
+// Kaydedilmemis pencere (L-283): dolu formda geri tusu ya da sekme kapatma
+// veriyi uyarisiz siliyordu. Kullanici acik bir pencerede yazinca pencere
+// "kirli" isaretlenir; pencere kapaninca isaret silinir. Programla doldurulan
+// duzenleme penceresi kullanici dokunmadikca uyari vermez.
+const UNSAVED_MODAL_SELECTOR = '.modal-backdrop.active, .modal-overlay.active';
+
+function markModalFormDirty(event) {
+  const modal = event && event.target && typeof event.target.closest === 'function'
+    ? event.target.closest('.modal-backdrop, .modal-overlay') : null;
+  if (modal && modal.classList.contains('active')) modal.dataset.dirty = '1';
+}
+
+function hasUnsavedModalForm() {
+  if (typeof document === 'undefined') return false;
+  return Array.from(document.querySelectorAll(UNSAVED_MODAL_SELECTOR) || []).some(modal => modal.dataset && modal.dataset.dirty === '1');
+}
+
+function unsavedFormBeforeUnload(event) {
+  if (!hasUnsavedModalForm()) return undefined;
+  event.preventDefault();
+  event.returnValue = '';
+  return '';
+}
+
+function installUnsavedFormGuard() {
+  if (typeof document === 'undefined' || typeof window === 'undefined') return;
+  document.addEventListener('input', markModalFormDirty, true);
+  document.addEventListener('change', markModalFormDirty, true);
+  window.addEventListener('beforeunload', unsavedFormBeforeUnload);
+  if (typeof MutationObserver === 'function') {
+    new MutationObserver(kayitlar => kayitlar.forEach(kayit => {
+      const el = kayit.target;
+      if (el && el.dataset && el.dataset.dirty && !el.classList.contains('active')) delete el.dataset.dirty;
+    })).observe(document.body, { attributes: true, attributeFilter: ['class'], subtree: true });
+  }
+}
+
 // Initialize on DOM Ready
 if (typeof document !== 'undefined') {
   document.addEventListener('DOMContentLoaded', async () => {
     wireAccessibleFormLabels();
+    installUnsavedFormGuard();
     if (isBrowserQualityFixture()) {
       installBrowserQualityFixture(new URLSearchParams(window.location.search).get('role') || 'owner');
       endAuthPending();
@@ -23536,6 +23574,9 @@ if (typeof module !== 'undefined' && module.exports) {
     getImportEngine,
     buildImportSource,
     parseSourceWithMode,
+    hasUnsavedModalForm,
+    markModalFormDirty,
+    unsavedFormBeforeUnload,
     refreshLeadSalesContext,
     getLeadSalesView,
     deleteMaint,
