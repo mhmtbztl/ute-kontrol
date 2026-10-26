@@ -26,6 +26,8 @@
 //   kapatiyor" diye kritik eylemde ve bildirimde gorunuyordu.
 // L-278: uygulama ici rezervasyon sablonu degistirilmeden yuklenince Gider Defteri
 //   saniliyordu (yalniz baslikli Excel'de basliklar okunmuyordu).
+// L-279: talep neden secilmeden Kaybedildi kaydediliyor, DB'ye lost_reason "-"
+//   (kanbandan "Diger") yaziliyordu.
 const fs = require('fs');
 const path = require('path');
 
@@ -527,6 +529,27 @@ async function L278() {
   delete global.XLSX;
 }
 
+// ---------------------------------------------------------------------------
+// L-279 Kaybedildi nedeni secilmeden kaydedilmez; "-" ya da "Diger" uydurulmaz
+// ---------------------------------------------------------------------------
+async function L279() {
+  const App = require('../app.js');
+  const talep = { id: LEAD_1, dbId: LEAD_1, guestName: 'TEST Kayıp', guest: 'TEST Kayıp', phone: '05550000001', status: 'QUOTE_SENT', villa: 'DENE' };
+  const dom = sahteDom({ leadEditId: LEAD_1, leadGuest: 'TEST Kayıp', leadVilla: 'DENE', leadChannel: 'Phone', leadQuote: '', leadStatus: 'LOST', leadLostReason: '-', leadNotes: '' });
+  const ist = kur(App, { leads: [{ ...talep }] });
+  await App.saveLead({ preventDefault() {} });
+  const yazma = ist.yazmalar.find(k => k.tablo === 'leads' && k.islem === 'update');
+  check(!yazma && /neden/i.test(global.__sonUyari || ''), 'L-279a Neden secilmeden Kaybedildi kaydedilmez, kullaniciya soylenir', JSON.stringify(yazma && yazma.yuk) + ' ' + global.__sonUyari);
+  check(!/<option value="-">/.test(read('index.html')), 'L-279b Formda "-" bir neden degeri degildir');
+  // Kanban'dan Kaybedildi secilince neden sorulmadan yazilmaz; "Diger" uydurulmaz.
+  sahteDom();
+  const ist2 = kur(App, { leads: [{ ...talep }] });
+  await App.updateLeadStatusFromKanban(LEAD_1, 'LOST');
+  const y2 = ist2.yazmalar.find(k => k.tablo === 'leads' && k.islem === 'update');
+  check(!y2 || (y2.yuk.lost_reason && y2.yuk.lost_reason !== 'Diğer' && y2.yuk.lost_reason !== '-'), 'L-279c Kanban Kaybedildi nedensiz yazmaz', JSON.stringify(y2 && y2.yuk.lost_reason));
+  check(!/lost_reason: \(status === 'LOST' \? \(lead\.lostReason \|\| lead\.lost_reason \|\| 'Diğer'\)/.test(read('app.js')), 'L-279d Nedeni olmayan kayba "Diger" yazilmaz');
+}
+
 async function main() {
   try {
     await L304();
@@ -542,6 +565,7 @@ async function main() {
     await L275();
     await L276();
     await L278();
+    await L279();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

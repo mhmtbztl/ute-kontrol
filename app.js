@@ -3301,7 +3301,8 @@ function mapLeadToDb(lead, targetTenantId) {
     pax: normalizePositiveInteger(lead.pax),
     quote_amount: Number(lead.quote ?? lead.quoteAmount ?? 0) >= 0 ? Number(lead.quote ?? lead.quoteAmount ?? 0) : 0,
     status: status,
-    lost_reason: (status === 'LOST' ? (lead.lostReason || lead.lost_reason || 'Diğer') : null),
+    // Neden bilinmiyorsa uydurulmaz (L-279): eskiden "Diğer" ya da "-" yaziliyordu.
+    lost_reason: (status === 'LOST' ? (gercekKayipNedeni(lead.lostReason || lead.lost_reason) || null) : null),
     notes: (lead.notes || '').trim()
   };
 
@@ -11732,6 +11733,16 @@ async function updateLeadStatusFromKanban(leadId, nextStatus) {
   const allowedStatuses = new Set(['NEW', 'CONTACTED', 'QUOTE_SENT', 'FOLLOW_UP', 'LOST']);
   const normalizedStatus = String(nextStatus || '').toUpperCase();
   if (!canWriteSalesRole(activeTenant?.role) || !allowedStatuses.has(normalizedStatus)) return false;
+  // Kaybedildi neden ister (L-279): kanbandan nedensiz yazilmaz, duzenleme
+  // penceresi durum secili olarak acilir.
+  if (normalizedStatus === 'LOST') {
+    renderLeadSalesWorkspace();
+    openLeadModal(leadId);
+    const durum = document.getElementById('leadStatus');
+    if (durum) durum.value = 'LOST';
+    showToast('Kayıp nedenini seçip kaydedin.', 'info');
+    return false;
+  }
   try {
     await updateLead(leadId, { status: normalizedStatus });
     await loadLeads(getActiveTenantId());
@@ -12095,7 +12106,7 @@ function openLeadModal(editId = null) {
     document.getElementById('leadCheckIn').value = l.checkIn || '';
     document.getElementById('leadCheckOut').value = l.checkOut || '';
     document.getElementById('leadStatus').value = ALLOWED_LEAD_STAGES.includes(l.status) ? l.status : 'NEW';
-    document.getElementById('leadLostReason').value = l.lostReason || '-';
+    document.getElementById('leadLostReason').value = gercekKayipNedeni(l.lostReason);
     document.getElementById('leadNotes').value = l.notes || '';
     const workflow = (appData.leadWorkflows || []).find(row => row.lead_id === l.id);
     if (assignee) assignee.value = workflow?.assigned_to || '';
@@ -12167,6 +12178,12 @@ function openLeadWhatsApp() {
 
 function closeLeadModal() { document.getElementById('leadModal').classList.remove('active'); }
 
+// "-" ve bos deger bir neden degildir (L-279).
+function gercekKayipNedeni(value) {
+  const neden = String(value == null ? '' : value).trim();
+  return neden && neden !== '-' ? neden : '';
+}
+
 async function saveLead(e) {
   e.preventDefault();
   const editId = document.getElementById('leadEditId').value;
@@ -12175,8 +12192,12 @@ async function saveLead(e) {
   const channel = normalizeLeadChannel(document.getElementById('leadChannel').value);
   const quote = Number(document.getElementById('leadQuote').value) || 0;
   const status = document.getElementById('leadStatus').value;
-  const lostReason = document.getElementById('leadLostReason').value;
+  const lostReason = gercekKayipNedeni(document.getElementById('leadLostReason').value);
   const notes = document.getElementById('leadNotes').value.trim();
+  if (status === 'LOST' && !lostReason) {
+    alert('Talebi "Kaybedildi" yapmak için kayıp nedenini seçin.');
+    return;
+  }
   const checkIn = document.getElementById('leadCheckIn')?.value || null;
   const checkOut = document.getElementById('leadCheckOut')?.value || null;
   if ((checkIn && !checkOut) || (!checkIn && checkOut) || (checkIn && checkOut && checkOut <= checkIn)) {
@@ -23452,6 +23473,7 @@ if (typeof module !== 'undefined' && module.exports) {
     getImportEngine,
     buildImportSource,
     parseSourceWithMode,
+    updateLeadStatusFromKanban,
     analyzeAndPreviewSource,
     maintenanceTicketPriorityCandidate,
     createBookingChannelFromSettings,
