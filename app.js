@@ -10433,6 +10433,21 @@ async function submitMemberInvite(e) {
     return;
   }
 
+  // Ayni adrese bekleyen davet (L-307): sunucu ayni satiri gunceller (rol,
+  // 14 gunluk sure). Rol sessizce degisiyor, mesaj "gonderildi" diyordu.
+  const rolAdi = r => TEAM_ROLES[r]?.label || r;
+  let bekleyen = null;
+  try {
+    const { data: davetler } = await supabaseClient.rpc('get_tenant_invitations', { p_tenant_id: tenantId });
+    bekleyen = (davetler || []).find(d => String(d.email || '').trim().toLowerCase() === email && String(d.status || 'PENDING').toUpperCase() === 'PENDING') || null;
+  } catch (_) { bekleyen = null; }
+  if (bekleyen) {
+    const soru = bekleyen.role !== role
+      ? `${email} adresine bekleyen bir "${rolAdi(bekleyen.role)}" daveti var. Rolü "${rolAdi(role)}" olarak güncelleyip daveti yeniden göndermek istiyor musunuz?\n\nÖnceki e-postadaki bağlantı da geçerli kalır; katılan kişi yeni rolle (${rolAdi(role)}) katılır.`
+      : `${email} adresine zaten bekleyen bir "${rolAdi(role)}" daveti var. Davet yeniden gönderilsin ve süresi 14 gün uzatılsın mı?`;
+    if (typeof confirm === 'function' && !confirm(soru)) return;
+  }
+
   if (btn) { btn.disabled = true; btn.innerText = '⏳ Gönderiliyor...'; }
 
   try {
@@ -10462,7 +10477,10 @@ async function submitMemberInvite(e) {
     const deliveryText = delivery === 'sent'
       ? 'Davet e-postası gönderildi.'
       : 'Davet oluşturuldu; e-posta teslim kuyruğuna alındı.';
-    alert(`✉️ ${deliveryText}\n\n${email} bu adresle kayıt olup giriş yaptığında ekibinize otomatik katılacak.\nDavet 14 gün geçerlidir.`);
+    const guncellemeText = bekleyen
+      ? `Bekleyen davet güncellendi${bekleyen.role !== role ? ` (rol: ${rolAdi(bekleyen.role)} → ${rolAdi(role)})` : ''}; süresi 14 gün uzatıldı. Önceki e-postadaki bağlantı da geçerli, katılım yeni rolle olur.\n\n`
+      : '';
+    alert(`✉️ ${guncellemeText}${deliveryText}\n\n${email} bu adresle kayıt olup giriş yaptığında ekibinize ${rolAdi(role)} rolüyle otomatik katılacak.\nDavet 14 gün geçerlidir.`);
   } catch (ex) {
     showInviteError(ex && ex.message ? ex.message : 'Davet gönderilemedi.');
   } finally {
@@ -23608,6 +23626,7 @@ if (typeof module !== 'undefined' && module.exports) {
     getImportEngine,
     buildImportSource,
     parseSourceWithMode,
+    submitMemberInvite,
     openResetModal,
     deleteBookingUI,
     saveMaint,

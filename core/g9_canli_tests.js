@@ -42,6 +42,8 @@
 // L-297: sifirlama menusu admin rolune de gorunuyordu (yalniz owner calistirabilir).
 // L-303: misafir aramasi "0555 000 00 02" / "+90 555 000 00 02" bicimli telefonu bulmuyordu.
 // L-306: ice aktarma onizlemesi tutarlari kurussuz yuvarliyordu (101,50 -> "102").
+// L-307: ayni adrese ikinci davet rolu sessizce degistiriyor, mesaj yine "Davet e-postasi
+//   gonderildi" diyordu.
 const fs = require('fs');
 const path = require('path');
 
@@ -823,6 +825,27 @@ async function L306() {
   check(!/const tl = n => Math\.round\(/.test(govde), 'L-306b Onizleme satir tutarlari yuvarlanmaz');
 }
 
+// ---------------------------------------------------------------------------
+// L-307 ayni adrese ikinci davet: rol degisikligi soylenir, mesaj dogrudur
+// ---------------------------------------------------------------------------
+async function L307() {
+  sahteDom({ inviteMemberEmail: ' MrLexiago+TestEk@gmail.com ', inviteMemberRole: 'sales' });
+  const App = require('../app.js');
+  const ist = kur(App, {}, 'owner', { rpc: ad => (ad === 'get_tenant_invitations'
+    ? [{ id: 'i1', email: 'mrlexiago+testek@gmail.com', role: 'viewer', status: 'PENDING', expires_at: '2026-11-08T00:00:00Z' }] : []) });
+  let gonderildi = 0;
+  ist.functions = { invoke: async () => { gonderildi++; return { data: { delivery: 'sent' }, error: null }; } };
+  let soru = '';
+  global.confirm = m => { soru = m; return false; };
+  await App.submitMemberInvite({ preventDefault() {} });
+  check(gonderildi === 0 && /İzleyici/.test(soru) && /Satış/.test(soru), 'L-307a Bekleyen davetin rolu degisecekse once sorulur; vazgecilirse gonderilmez', soru);
+  global.confirm = () => true;
+  sahteDom({ inviteMemberEmail: 'mrlexiago+testek@gmail.com', inviteMemberRole: 'sales' });
+  await App.submitMemberInvite({ preventDefault() {} });
+  check(gonderildi === 1 && /güncellendi/.test(global.__sonUyari || '') && /Satış/.test(global.__sonUyari || '') && /önceki/i.test(global.__sonUyari || ''),
+    'L-307b Mesaj davetin guncellendigini, yeni rolu ve onceki baglantinin durumunu soyler', global.__sonUyari);
+}
+
 async function main() {
   try {
     await L304();
@@ -850,6 +873,7 @@ async function main() {
     await L297();
     await L303();
     await L306();
+    await L307();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));
