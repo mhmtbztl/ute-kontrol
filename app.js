@@ -22887,7 +22887,8 @@ async function savePricingRuleSettings() {
   if (scope === 'PORTFOLIO') {
     try {
       const pct = Number(document.getElementById('pricingRulePct')?.value);
-      if (!PRICING_RULE_LABELS[ruleKey] || !Number.isFinite(pct) || pct < -100 || pct > 1000) throw new Error('Yüzde -100 ile 1000 arasında olmalıdır.');
+      // -%100 fiyati sifira indirir (L-309); kural en cok -%99 olabilir.
+      if (!PRICING_RULE_LABELS[ruleKey] || !Number.isFinite(pct) || pct <= -100 || pct > 1000) throw new Error('Yüzde -99 ile 1000 arasında olmalıdır.');
       const current = getPricingResearchService().mergeRules(appData.tenantSettings?.pricing_rules || {}, [], null);
       const next = { ...current, [ruleKey]: { enabled: document.getElementById('pricingRuleEnabled')?.checked === true, pct, ...pricingRuleParameters(ruleKey, document.getElementById('pricingRuleParameter')?.value) } };
       await cloudSaveTenantSetting('pricing_rules', next);
@@ -23005,7 +23006,7 @@ async function savePricingSpecialEvent() {
   const pct = rawPct === '' ? null : Number(rawPct);
   if (!name) { alert('Etkinlik adı girin.'); return false; }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end) || end < start) { alert('Geçerli bir başlangıç ve bitiş tarihi girin.'); return false; }
-  if (pct !== null && (!Number.isFinite(pct) || pct < -100 || pct > 1000)) { alert('Yüzde -100 ile 1000 arasında olmalıdır.'); return false; }
+  if (pct !== null && (!Number.isFinite(pct) || pct <= -100 || pct > 1000)) { alert('Yüzde -99 ile 1000 arasında olmalıdır.'); return false; }
   const settings = pricingSpecialSettings();
   const event = { id: pricingSpecialEventKey(), name: name.slice(0, 80), start, end, pct, propertyId: scope === 'PORTFOLIO' ? null : (pricingSelectedPropertyId || null) };
   try {
@@ -23358,7 +23359,7 @@ function renderPricingTab() {
   const focusInput = document.getElementById('pricingFocusSelect');
   if (focusInput) focusInput.value = pricingFocusDraft;
 
-  const warningText = { OCCUPANCY_TARGET_MISSING: 'Talep kuralı çalışmıyor: aşağıdaki hesaplayıcıda hedef doluluk girin.', BASE_PRICE_MISSING: 'Baz fiyat girilmemiş: öneri hesaplanamaz, fiyat tablosundan girin.', FLOOR_PRICE_MISSING: 'Taban fiyat girilmemiş: indirimler için alt sınır yok.' };
+  const warningText = { OCCUPANCY_TARGET_MISSING: 'Talep kuralı çalışmıyor: aşağıdaki hesaplayıcıda hedef doluluk girin.', BASE_PRICE_MISSING: 'Baz fiyat girilmemiş: öneri hesaplanamaz, fiyat tablosundan girin.', FLOOR_PRICE_MISSING: 'Taban fiyat girilmemiş: indirimler için alt sınır yok.', NON_POSITIVE_PRICE: 'İndirimler bazı günlerde fiyatı sıfıra ya da altına indiriyor; o günlere öneri verilmedi. Taban fiyat girin ya da indirimleri azaltın.' };
   const warnings = suggestions.warnings.map(item => warningText[item.code] || item.text);
   if (appData.propertyClosuresReady === false) warnings.unshift('Bakımla kapalı günler bu rolde okunamadı (phase103 bekleniyor): "Açık" görünen bir gün bakımda olabilir.');
   const minStay = pricingMinStayMap(entry.property.id, suggestions.days);

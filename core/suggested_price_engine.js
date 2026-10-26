@@ -94,6 +94,7 @@
     const basePrice = missing(property.basePrice) ? null : Number(property.basePrice);
     const floorPrice = missing(property.floorPrice) ? null : Number(property.floorPrice);
     const rounding = Number(o.rounding) > 0 ? Number(o.rounding) : 50;
+    let nonPositive = false;
     const resultDays = dates.map(date => {
       const rowStatus = status[date];
       if (rowStatus !== 'OPEN' || basePrice === null) return { date, status: rowStatus, price: null, basePrice, floorApplied: false, reasons: [] };
@@ -117,8 +118,12 @@
       const totalPct = reasons.reduce((sum, reason) => sum + reason.pct, 0);
       let price = roundTo(basePrice * (1 + totalPct / 100), rounding), floorApplied = false;
       if (floorPrice !== null && price < floorPrice) { price = floorPrice; floorApplied = true; }
+      // Taban yokken birikmis indirim fiyati 0'a ya da altina indirebilir
+      // (L-309): o gun icin oneri verilmez, uyari yazilir; fiyat uydurulmaz.
+      if (basePrice > 0 && !(price > 0)) { nonPositive = true; return { date, status: rowStatus, price: null, basePrice, floorApplied: false, reasons }; }
       return { date, status: rowStatus, price, basePrice, floorApplied, reasons };
     });
+    if (nonPositive) warnings.push({ code: 'NON_POSITIVE_PRICE', text: 'İndirimler fiyatı sıfıra ya da altına indiriyor; o günlere öneri verilmedi' });
     return { days: resultDays, next30: { soldNights, sellableNights, occupancy }, monthOccupancy: Object.fromEntries(Object.keys(monthOccupancy).map(key => [key, occupancyOf(key + '-01')])), gapDates: [...gapDates].sort(), warnings, rules };
   }
   function metric(value, code, text) { return value === null ? { value: null, reason: { code, text } } : { value, reason: null }; }

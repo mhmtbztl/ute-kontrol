@@ -2115,7 +2115,7 @@
               <div class="form-grid">
                 <div class="form-group"><label for="pricingRuleScope">Kapsam</label><select id="pricingRuleScope" data-onchange="loadPricingRuleDraft()"><option value="PROPERTY">Yalnız bu mülk</option><option value="PORTFOLIO">Tüm portföy</option></select></div>
                 <div class="form-group"><label for="pricingRuleKey">Kural</label><select id="pricingRuleKey" data-onchange="loadPricingRuleDraft()"><option value="weekend">Hafta sonu</option><option value="specialDay">Özel gün</option><option value="demand">Talep</option><option value="lastMinute">Son dakika</option><option value="gapNight">Boş gece</option></select></div>
-                <div class="form-group"><label for="pricingRulePct">Yüzde</label><input id="pricingRulePct" type="number" min="-100" max="1000" step="0.1" placeholder="—"></div>
+                <div class="form-group"><label for="pricingRulePct">Yüzde</label><input id="pricingRulePct" type="number" min="-99" max="1000" step="0.1" placeholder="—"></div>
                 <div class="form-group"><label id="pricingRuleParameterLabel" for="pricingRuleParameter">Ek parametre yok</label><input id="pricingRuleParameter" type="number" min="0" step="1" placeholder="—" disabled></div>
                 <label class="analysis-check"><input id="pricingRuleEnabled" type="checkbox" checked><span>Etkin</span></label>
               </div>
@@ -2144,7 +2144,7 @@
             <div class="form-group"><label for="pricingEventName">Etkinlik adı</label><input id="pricingEventName" type="text" maxlength="80" placeholder="Örn: Caz festivali"></div>
             <div class="form-group"><label for="pricingEventStart">Başlangıç</label><input id="pricingEventStart" type="date"></div>
             <div class="form-group"><label for="pricingEventEnd">Bitiş</label><input id="pricingEventEnd" type="date"></div>
-            <div class="form-group"><label for="pricingEventPct">Yüzde (boşsa özel gün kuralı)</label><input id="pricingEventPct" type="number" min="-100" max="1000" step="0.1" placeholder="—"></div>
+            <div class="form-group"><label for="pricingEventPct">Yüzde (boşsa özel gün kuralı)</label><input id="pricingEventPct" type="number" min="-99" max="1000" step="0.1" placeholder="—"></div>
             <div class="form-group"><label for="pricingEventScope">Kapsam</label><select id="pricingEventScope"><option value="PROPERTY">Yalnız bu mülk</option><option value="PORTFOLIO">Tüm portföy</option></select></div>
             <div class="form-group"><label>&nbsp;</label><button type="button" class="btn btn-primary btn-sm" data-onclick="savePricingSpecialEvent()">Etkinlik ekle</button></div>
           </div>
@@ -4082,8 +4082,8 @@
   <script src="core/property_owner_service.js?v=5c741a12"></script>
   <script src="core/marketing_channel_listing_service.js?v=515fe386"></script>
   <script src="core/sales_workflow_service.js?v=0305af5c"></script>
-  <script src="core/pricing_research_service.js?v=a01b01a8"></script>
-  <script src="core/suggested_price_engine.js?v=a694265a"></script>
+  <script src="core/pricing_research_service.js?v=fb97b560"></script>
+  <script src="core/suggested_price_engine.js?v=c2d35002"></script>
   <script src="core/target_revenue_calculator.js?v=fe49dcc0"></script>
   <script src="core/monthly_goal_calculator.js?v=245a5fea"></script>
   <script src="core/tr_special_days.js?v=0227d5dd"></script>
@@ -4107,7 +4107,7 @@
   <script src="core/action_dispatch.js?v=89d49373"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=fa6d0372"></script>
-  <script src="app.js?v=caa3ade5"></script>
+  <script src="app.js?v=d9aa95df"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=929d8c2b"></script>

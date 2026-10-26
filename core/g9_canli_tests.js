@@ -44,6 +44,7 @@
 // L-306: ice aktarma onizlemesi tutarlari kurussuz yuvarliyordu (101,50 -> "102").
 // L-307: ayni adrese ikinci davet rolu sessizce degistiriyor, mesaj yine "Davet e-postasi
 //   gonderildi" diyordu.
+// L-309: fiyat kurali -%100'e kadar kabul ediliyor; tabansiz mulkte oneri 0'a iniyordu.
 const fs = require('fs');
 const path = require('path');
 
@@ -846,6 +847,24 @@ async function L307() {
     'L-307b Mesaj davetin guncellendigini, yeni rolu ve onceki baglantinin durumunu soyler', global.__sonUyari);
 }
 
+// ---------------------------------------------------------------------------
+// L-309 indirim fiyati sifira/eksiye indiremez; -%100 kural kabul edilmez
+// ---------------------------------------------------------------------------
+async function L309() {
+  const P = require('./suggested_price_engine.js');
+  const bugun = '2026-10-26';
+  const kurallar = { ...P.DEFAULTS, weekend: { ...P.DEFAULTS.weekend, enabled: false }, specialDay: { ...P.DEFAULTS.specialDay, enabled: false },
+    demand: { ...P.DEFAULTS.demand, enabled: false }, gapNight: { ...P.DEFAULTS.gapNight, enabled: false },
+    lastMinute: { enabled: true, pct: -100, withinDays: 30 } };
+  const s = P.suggest({ property: { id: PROP_A, basePrice: 10000, floorPrice: null }, bookings: [], rules: kurallar, today: bugun, days: 5 });
+  const gunler = s.days.filter(d => d.status === 'OPEN');
+  check(gunler.length && gunler.every(d => d.price === null), 'L-309a Tabansiz mulkte indirim fiyati 0 yapamaz; oneri "bilinmiyor" olur', JSON.stringify(gunler.map(d => d.price)));
+  check(s.warnings.some(w => w.code === 'NON_POSITIVE_PRICE'), 'L-309b Sifir/eksi oneride uyari verilir', JSON.stringify(s.warnings.map(w => w.code)));
+  const src = read('app.js');
+  check(!/pct < -100 \|\| pct > 1000/.test(src) && /pct <= -100/.test(src), 'L-309c Kural ve etkinlik formu -%100\'u reddeder');
+  check(/id="pricingRulePct" type="number" min="-99"/.test(read('index.html')), 'L-309d Form alani -%99 altina inmez');
+}
+
 async function main() {
   try {
     await L304();
@@ -874,6 +893,7 @@ async function main() {
     await L303();
     await L306();
     await L307();
+    await L309();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

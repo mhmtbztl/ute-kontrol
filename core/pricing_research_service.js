@@ -33,7 +33,7 @@
   async function saveRule(client, input = {}) {
     const pct = Number(input.pct);
     if (!client || !input.tenantId || !input.propertyId || !RULE_KEYS.includes(input.ruleKey)) throw new Error('PRICING_RULE_SCOPE_REQUIRED');
-    if (!Number.isFinite(pct) || pct < -100 || pct > 1000) throw new Error('PRICING_RULE_PCT_INVALID');
+    if (!Number.isFinite(pct) || pct <= -100 || pct > 1000) throw new Error('PRICING_RULE_PCT_INVALID');
     const parameters = asObject(input.parameters);
     const { data, error } = await client.from('property_pricing_rule_settings').upsert({
       tenant_id: input.tenantId,
@@ -109,7 +109,7 @@
     COMPETITOR_PRICE_INVALID: 'Fiyatlar sıfırdan büyük olmalı.',
     COMPETITOR_RESEARCH_NOT_FOUND: 'Araştırma kaydı bulunamadı; liste yenilendi.',
     PRICING_RULE_SCOPE_REQUIRED: 'Kural ve mülk seçilmeli.',
-    PRICING_RULE_PCT_INVALID: 'Yüzde −100 ile 1000 arasında olmalı.'
+    PRICING_RULE_PCT_INVALID: 'Yüzde −99 ile 1000 arasında olmalı.'
   });
   function errorText(error) {
     const code = String(error?.message || error?.code || error || '');
