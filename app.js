@@ -105,6 +105,22 @@ function getUserFacingErrors() {
   return null;
 }
 
+// Uygulama ici pencere (L-287, core/ui_dialog.js). Tarayici kutusu yerine.
+function uiDialogApi() {
+  if (typeof LexbnbDialog !== 'undefined') return LexbnbDialog;
+  if (typeof require === 'function') { try { return require('./core/ui_dialog.js'); } catch (e) { /* tarayici */ } }
+  return null;
+}
+function uiAskText(options) {
+  const api = uiDialogApi();
+  return api ? api.askText(options) : Promise.resolve(typeof prompt === 'function' ? prompt(options.label || options.title || '', options.value || '') : null);
+}
+function uiAskConfirm(options) {
+  const api = uiDialogApi();
+  const o = typeof options === 'string' ? { message: options } : options;
+  return api ? api.askConfirm(o) : Promise.resolve(typeof confirm === 'function' ? confirm(o.message || '') : false);
+}
+
 function kullaniciMesaji(metin) {
   const U = getUserFacingErrors();
   return U ? U.sanitizeUserMessage(metin) : metin;
@@ -9639,7 +9655,10 @@ async function saveBooking(e) {
     }
 
     closeBookingModal();
-    if (typeof alert === 'function') alert('✅ Rezervasyon başarıyla kaydedildi!' + guestProfileWarning);
+    // Basari bildirimi ham alert degil (L-287); ek uyari varsa okunur pencerede.
+    if (guestProfileWarning && typeof uiDialogApi === 'function' && uiDialogApi()) uiDialogApi().notify({ title: 'Rezervasyon kaydedildi', message: String(guestProfileWarning).trim() });
+    else if (guestProfileWarning && typeof alert === 'function') alert('Rezervasyon kaydedildi.' + guestProfileWarning);
+    if (typeof showToast === 'function') showToast('✅ Rezervasyon kaydedildi.', 'success');
   } catch (err) {
     console.error('saveBooking error:', err);
     if (typeof alert === 'function') alert('Rezervasyon kaydedilemedi: ' + (err.message || 'Lütfen bilgileri kontrol edin.'));
@@ -11991,7 +12010,7 @@ async function refreshLeadSalesContext() {
 
 async function addLeadSource() {
   if (!canManageTenantRole(activeTenant?.role)) return false;
-  const label = prompt('Yeni talep kaynağının adı:', '');
+  const label = await uiAskText({ title: 'Yeni talep kaynağı', label: 'Kaynağın adı', placeholder: 'Örn: Google Haritalar' });
   if (!String(label || '').trim()) return false;
   try {
     const source = await SalesWorkflowService.createSource(supabaseClient, { tenantId: getActiveTenantId(), label });
@@ -21574,7 +21593,7 @@ async function resolveMaintenanceFromOperations(ticketId) {
   const ticket = (appData?.maintenanceTickets || []).find(item => item.id === ticketId);
   if (!ticket) return false;
   const oneri = Number(ticket.actual_cost) > 0 ? ticket.actual_cost : (Number(ticket.estimated_cost) > 0 ? ticket.estimated_cost : '');
-  const entered = prompt('Gerçekleşen maliyet (TL; bilinmiyorsa boş bırakın, maliyet yoksa 0):', String(oneri));
+  const entered = await uiAskText({ title: 'Arıza çözüldü', label: 'Gerçekleşen maliyet (₺) — bilinmiyorsa boş bırakın, maliyet yoksa 0', value: String(oneri), inputType: 'number' });
   if (entered === null) return false;
   // Bos = bilinmiyor; 0 yazilmaz (L-292).
   const actualCost = String(entered).trim() === '' ? null : Number(String(entered).replace(',', '.'));
@@ -21582,7 +21601,7 @@ async function resolveMaintenanceFromOperations(ticketId) {
     alert('Geçerli ve negatif olmayan bir tutar girin.');
     return false;
   }
-  const createExpense = actualCost > 0 && confirm('Gider olarak kaydedilsin mi?');
+  const createExpense = actualCost > 0 && await uiAskConfirm({ title: 'Gider kaydı', message: `${actualCost.toLocaleString('tr-TR')} ₺ onarım maliyeti. Gider olarak kaydedilsin mi?`, okText: 'Gider olarak kaydet', cancelText: 'Yalnız çözüldü yap' });
   try {
     if (createExpense) {
       await resolveMaintenanceTicket(ticketId, actualCost, 'Bakım', `Arıza onarımı: ${ticket.title || 'başlıksız arıza'}`);
@@ -21607,7 +21626,7 @@ async function resolveMaintenanceFromOperations(ticketId) {
 
 async function createGeneralOperationalTask(templateId = null) {
   const template = templateId ? (appData?.taskTemplates || []).find(item => item.id === templateId) : null;
-  const title = template?.title || prompt('Genel görev başlığı:', '');
+  const title = template?.title || await uiAskText({ title: 'Yeni genel görev', label: 'Görev başlığı', placeholder: 'Örn: Bahçe sulama sistemini kontrol et' });
   if (!String(title || '').trim()) return false;
   try {
     await createOperationalTask({

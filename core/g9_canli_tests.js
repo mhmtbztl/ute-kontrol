@@ -62,6 +62,8 @@
 // L-286: raporlarda, kartlarda ve hatalarda ham kod / Ingilizce gorunumler.
 // L-285: ChatGPT metinleri cilizdi: rapordan Ingilizce anahtarli 3 sayi, ham ondalik;
 //   "Testi ChatGPT'ye sor" huni verisi tasimiyordu.
+// L-287: kaynak ekle, genel gorev basligi, ariza maliyeti ve basari mesajlari ham tarayici
+//   prompt/confirm/alert kutusuyla geliyordu.
 const fs = require('fs');
 const path = require('path');
 
@@ -1151,6 +1153,29 @@ async function L285() {
   check(/verdict: [^,]+, snapshots }/.test(functionBody(read('app.js'), 'function openFunnelTestQuestion(')), 'L-285d Huni sorusu uygulamadan snapshot verisiyle acilir');
 }
 
+// ---------------------------------------------------------------------------
+// L-287 bulguda adi gecen akislar ham tarayici kutusu yerine uygulama penceresi kullanir
+// ---------------------------------------------------------------------------
+async function L287() {
+  const src = read('app.js');
+  const akislar = ['async function addLeadSource(', 'async function createGeneralOperationalTask(', 'async function resolveMaintenanceFromOperations('];
+  akislar.forEach(imza => {
+    const govde = functionBody(src, imza);
+    check(govde && !/[^.\w]prompt\(|[^.\w]confirm\(/.test(govde) && /uiAskText|uiAskConfirm/.test(govde), `L-287 ${imza.replace('async function ', '').replace('(', '')} uygulama penceresi kullanir`);
+  });
+  const kayit = functionBody(src, 'async function saveBooking(');
+  check(!/alert\('✅ Rezervasyon başarıyla kaydedildi!'/.test(kayit), 'L-287d Rezervasyon basari mesaji ham alert degil');
+  check(/core\/ui_dialog\.js\?v=/.test(read('index.html')) && read('index.html').indexOf('core/ui_dialog.js') < read('index.html').indexOf('src="app.js'), 'L-287e Pencere modulu app.js\'ten once yuklenir');
+  // Node'da yerel kutuya duser; davranis korunur.
+  sahteDom();
+  const App = require('../app.js');
+  const ist = kur(App, {});
+  global.prompt = () => 'TEST görev';
+  await App.createGeneralOperationalTask();
+  check(ist.yazmalar.some(k => k.tablo === 'operational_tasks' && k.islem === 'insert' && k.yuk.title === 'TEST görev'), 'L-287f Genel gorev basligi pencereden alinip yazilir');
+  delete global.prompt;
+}
+
 async function main() {
   try {
     await L304();
@@ -1192,6 +1217,7 @@ async function main() {
     await L311();
     await L286();
     await L285();
+    await L287();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));
