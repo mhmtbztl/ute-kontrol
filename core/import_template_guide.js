@@ -54,11 +54,19 @@
     return mulkler.map(m => [m.code, m.name || '']);
   }
 
-  function rezervasyonAdimlari(genel) {
+  // Uygulama ici sablonun veri sayfasi yalniz basliktir (L-278); yayinlanan
+  // sablonda yer tutuculu ornek satirlar vardir.
+  function adim1(yalnizBaslik, ek) {
+    return yalnizBaslik
+      ? 'ADIM 1 — İlk sayfada yalnız başlık satırı var; kayıtlarınızı başlığın altına, her kayıt bir satır olacak şekilde yazın. ' + ek + ' Örnek bir satır bu sayfanın sonunda.'
+      : 'ADIM 1 — İlk sayfadaki örnek satırları silin ya da üzerine yazın. ' + ek;
+  }
+
+  function rezervasyonAdimlari(genel, yalnizBaslik) {
     return [
       'LEXBNB — REZERVASYON DEFTERİ ŞABLONU · NASIL DOLDURULUR',
       '',
-      'ADIM 1 — İlk sayfadaki örnek satırları silin ya da üzerine yazın. Başlık satırına dokunmayın: DOSYANIN İLK SATIRI olmalı, üstüne başlık eklemeyin.',
+      adim1(yalnizBaslik, 'Başlık satırına dokunmayın: DOSYANIN İLK SATIRI olmalı, üstüne başlık eklemeyin.'),
       'ADIM 2 — Her rezervasyon bir satırdır. ZORUNLU: Villa, Misafir Adı, Giriş Tarihi, Çıkış Tarihi, Brüt Tutar. Diğer sütunları boş bırakabilir ya da silebilirsiniz.',
       genel
         ? 'ADIM 3 — "Villa": kendi mülk kodunuzu yazın. MULK_KODU_1 / MULK_KODU_2 yalnız yer tutucudur; değiştirmezseniz o satırlar kaydedilmez (bilerek: yanlış mülke kayıt girmesin).'
@@ -74,11 +82,11 @@
     ];
   }
 
-  function giderAdimlari(genel) {
+  function giderAdimlari(genel, yalnizBaslik) {
     return [
       'LEXBNB — GİDER DEFTERİ ŞABLONU · NASIL DOLDURULUR',
       '',
-      'ADIM 1 — İlk sayfadaki örnek satırları silin ya da üzerine yazın. Başlık satırı DOSYANIN İLK SATIRI olmalı.',
+      adim1(yalnizBaslik, 'Başlık satırı DOSYANIN İLK SATIRI olmalı.'),
       'ADIM 2 — Her gider bir satırdır. ZORUNLU: Tarih, Kategori, Tutar.',
       'ADIM 3 — "Kategori": GEÇERLİ DEĞERLER sayfasındaki kategorilerden birini yazın (büyük/küçük harf önemsiz). Listede olmayan kategorinin satırı kaydedilmez ve nedeni yazılır — "Diğer"e sessizce düşmez.',
       genel
@@ -91,13 +99,13 @@
     ];
   }
 
-  function temizlikAdimlari(genel) {
+  function temizlikAdimlari(genel, yalnizBaslik) {
     return [
       'LEXBNB — GEÇMİŞ TEMİZLİK ŞABLONU · NASIL DOLDURULUR',
       '',
       'Ne için: Lexbnb\'ye geçmeden önceki temizliklerin MALİYETİNİ girmek için. Rezervasyonu girilmiş ama temizlik görevi olmayan aylarda temizlik maliyeti 0 görünür ve kâr olduğundan yüksek çıkar.',
       '',
-      'ADIM 1 — İlk sayfadaki örnek satırları silin ya da üzerine yazın. Başlık satırı DOSYANIN İLK SATIRI olmalı.',
+      adim1(yalnizBaslik, 'Başlık satırı DOSYANIN İLK SATIRI olmalı.'),
       'ADIM 2 — Her yapılmış temizlik bir satırdır. ZORUNLU: Tarih, Villa, Tutar.',
       'ADIM 3 — "Tutar": personele ödenen (ya da ödenecek) temizlik MALİYETİ. Misafirden alınan temizlik ücreti DEĞİL; o rezervasyon defterine yazılır.',
       genel
@@ -129,13 +137,13 @@
       kanallar.forEach(c => satirlar.push([c.code, c.displayName || c.code]));
       satirlar.push([], ['DURUM — "Durum" sütunu'], ['Değer', 'Anlamı']);
       DURUMLAR.forEach(r => satirlar.push(r));
-      return { steps: rezervasyonAdimlari(genel), validValues: satirlar };
+      return { steps: rezervasyonAdimlari(genel, v.headerOnly === true), validValues: satirlar };
     }
     if (mode === 'CLEANING') {
       satirlar.push(['MÜLKLER — "Villa" sütununa KODU ya da ADI yazın'], ['Kod', 'Ad']);
       mulkSatirlari(v.properties).forEach(r => satirlar.push(r));
       satirlar.push([], ['ÖDENDİ — "Ödendi" sütunu'], ['Değer', 'Anlamı'], ['EVET', 'Ödendi (boş da EVET sayılır)'], ['HAYIR', 'Yapıldı ama ödenmedi — personel borcu']);
-      return { steps: temizlikAdimlari(genel), validValues: satirlar };
+      return { steps: temizlikAdimlari(genel, v.headerOnly === true), validValues: satirlar };
     }
     satirlar.push(['KATEGORİLER — "Kategori" sütununa KATEGORİ adını yazın'], ['Kategori', 'Neleri kapsar']);
     (v.categories || []).forEach(c => satirlar.push([c.name, c.label || c.name]));
@@ -143,7 +151,7 @@
     mulkSatirlari(v.properties).forEach(r => satirlar.push(r));
     satirlar.push([], ['TÜR — "Tür" sütunu'], ['Değer', 'Anlamı']);
     TURLER.forEach(r => satirlar.push(r));
-    return { steps: giderAdimlari(genel), validValues: satirlar };
+    return { steps: giderAdimlari(genel, v.headerOnly === true), validValues: satirlar };
   }
 
   return { buildGuide, SISTEM_KANALLARI, DURUMLAR, TURLER };

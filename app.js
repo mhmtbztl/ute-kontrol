@@ -7484,7 +7484,8 @@ function downloadSampleTemplate(templateType) {
   }
   const mode = ['BOOKINGS', 'CLEANING'].includes(templateType) ? templateType : 'EXPENSES';
   const values = getImportValidValues();
-  const guide = ImportTemplateGuide.buildGuide(mode, values);
+  // Veri sayfasi yalniz basliktir; rehber ornek satirdan soz etmez (L-278).
+  const guide = ImportTemplateGuide.buildGuide(mode, { ...values, headerOnly: true });
   const headers = engine.SABLON_SUTUNLARI[mode];
 
   // Veri sayfasi YALNIZ basliktir. Eskiden ornek satirlar musterinin GERCEK
@@ -7567,11 +7568,16 @@ function buildImportSource(bytes, fileName) {
   const ws = wb.Sheets[wb.SheetNames[0]];
   const rows = ws ? XLSX.utils.sheet_to_json(ws, { defval: '', raw: true }) : [];
   if (rows.length > IMPORT_MAX_ROWS) throw importSinirHatasi(rows.length);
+  // Basliklar ilk satirdan okunur (L-278): yalniz baslik satiri olan dosyada
+  // (degistirilmemis uygulama ici sablon) satir yok, Object.keys bos
+  // donuyordu; tur sezilemiyor ve dosya "Gider Defteri" saniliyordu.
+  const ilkSatir = ws ? (XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: true })[0] || []) : [];
+  const basliklar = ilkSatir.map(h => String(h == null ? '' : h).trim()).filter(Boolean);
   return {
     kind: 'XLSX',
     fileName,
     sheetNames: (wb.SheetNames || []).slice(),
-    headers: rows.length ? Object.keys(rows[0]) : [],
+    headers: basliklar.length ? basliklar : (rows.length ? Object.keys(rows[0]) : []),
     rows
   };
 }
@@ -7667,9 +7673,13 @@ function analyzeAndPreviewSource(kaynak) {
     }
   }
 
+  // Tur anlasilamadiysa gider defteri VARSAYILMAZ (L-278): kullanici turu
+  // secer. Eskiden GENERIC gider dogrulamasina dusuyordu.
+  if (detectedType === 'GENERIC') detectedType = 'UNKNOWN';
+
   // Update UI Select
   const select = document.getElementById('importModeSelect');
-  if (select) select.value = detectedType;
+  if (select) select.value = detectedType === 'UNKNOWN' ? 'AUTO' : detectedType;
 
   parseSourceWithMode(kaynak, detectedType);
 }
@@ -7942,7 +7952,7 @@ function parseSourceWithMode(kaynak, mode) {
     result: null
   };
 
-  if (finalMode === 'COMPANY_REPORT') {
+  if (finalMode === 'COMPANY_REPORT' || finalMode === 'UNKNOWN') {
     parsedData.result = null;   // onizleme kutusu kendi mesajini yazar
   } else {
     const ctx = {
@@ -8012,6 +8022,16 @@ function renderImportPreviewBox() {
     return;
   }
 
+  // --- Tur anlasilamadi (L-278): kullanici secer, gider varsayilmaz ---
+  if (pendingImportData.mode === 'UNKNOWN') {
+    if (badge) { badge.innerText = 'Tür belirlenemedi'; badge.className = 'badge badge-amber'; }
+    if (stats) stats.innerText = 'Dosyanın rezervasyon, gider ya da geçmiş temizlik defteri olduğu sütun adlarından anlaşılamadı. Yukarıdaki listeden türü seçin.';
+    if (thead) thead.innerHTML = '';
+    if (tbody) tbody.innerHTML = '';
+    if (btn) { btn.disabled = true; btn.innerText = 'Önce dosya türünü seçin'; }
+    return;
+  }
+
   if (!r) return;
 
   const rezMi = pendingImportData.mode === 'BOOKINGS';
@@ -8048,6 +8068,8 @@ function renderImportPreviewBox() {
     } else if (r.dateOrder === 'MDY') {
       p.push('ℹ️ Tarihler dosyadan AY/GÜN (ABD) sırasıyla tespit edildi');
     }
+    // Bos sablon (L-278): baslik var, kayit yok.
+    if (!r.totalRows) p.unshift('Dosyada başlık satırından başka kayıt satırı yok — kayıtlarınızı başlığın altına yazın');
     stats.innerText = p.join(' · ');
   }
 
@@ -23430,6 +23452,7 @@ if (typeof module !== 'undefined' && module.exports) {
     getImportEngine,
     buildImportSource,
     parseSourceWithMode,
+    analyzeAndPreviewSource,
     maintenanceTicketPriorityCandidate,
     createBookingChannelFromSettings,
     reservationSearchMatches,

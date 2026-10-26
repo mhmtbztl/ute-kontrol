@@ -24,6 +24,8 @@
 //   suzulmeden tum gecmisten sayilip adetten dusuluyordu.
 // L-276: gelecek tarihli satisa kapatan bakim bugun "Acik ariza mulku satisa
 //   kapatiyor" diye kritik eylemde ve bildirimde gorunuyordu.
+// L-278: uygulama ici rezervasyon sablonu degistirilmeden yuklenince Gider Defteri
+//   saniliyordu (yalniz baslikli Excel'de basliklar okunmuyordu).
 const fs = require('fs');
 const path = require('path');
 
@@ -485,6 +487,44 @@ async function L276() {
   check(ariza && !/satışa kapatıyor/.test(ariza.message) && ariza.severity !== 'CRITICAL', 'L-276c Bildirim gelecek bakimi bugun kapatiyor demez', JSON.stringify(ariza));
 }
 
+// ---------------------------------------------------------------------------
+// L-278 uygulama ici sablon degistirilmeden yuklenince gider defteri sanilmaz
+// ---------------------------------------------------------------------------
+async function L278() {
+  const dom = sahteDom();
+  global.XLSX = require('../xlsx.full.min.js');
+  const App = require('../app.js');
+  const E = require('./finance_import_engine.js');
+  kur(App, {});
+  const basliklar = E.SABLON_SUTUNLARI.BOOKINGS;
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([basliklar]), 'Rezervasyonlar');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['NASIL DOLDURULUR']]), 'NASIL DOLDURULUR');
+  const bytes = new Uint8Array(XLSX.write(wb, { type: 'array', bookType: 'xlsx' }));
+  const kaynak = App.buildImportSource(bytes, 'LexBnB_Rezervasyon_Sablonu.xlsx');
+  check(kaynak.headers.length === basliklar.length && kaynak.headers[0] === basliklar[0],
+    'L-278a Yalniz baslik satiri olan Excel dosyasinin basliklari okunur', JSON.stringify(kaynak.headers));
+  App.analyzeAndPreviewSource(kaynak);
+  const p = App.getPendingImportData();
+  check(p && p.mode === 'BOOKINGS', 'L-278b Degistirilmemis rezervasyon sablonu rezervasyon defteri olarak taninir', p && p.mode);
+  check(/kayıt satırı yok/i.test(dom.getElementById('importFileStats').innerText) && dom.getElementById('importConfirmBtn').disabled === true,
+    'L-278c Bos sablon "kayit satiri yok" der, ice aktarma dugmesi kapali', dom.getElementById('importFileStats').innerText);
+  // Turu anlasilamayan dosya gider defteri sanilmaz.
+  sahteDom();
+  kur(App, {});
+  App.analyzeAndPreviewSource({ kind: 'CSV', fileName: 'x.csv', sheetNames: ['CSV'], headers: ['Kolon A', 'Kolon B'], rows: [{ 'Kolon A': '1', 'Kolon B': '2' }] });
+  const p2 = App.getPendingImportData();
+  const rozet = global.document.getElementById('importTypeBadge').innerText;
+  check(p2 && p2.mode !== 'EXPENSES' && !/Gider/.test(rozet) && global.document.getElementById('importConfirmBtn').disabled === true,
+    'L-278d Turu anlasilamayan dosya gider defteri sanilmaz; tur secilmeden aktarilmaz', (p2 && p2.mode) + ' / ' + rozet);
+  // Uygulama ici sablonun rehberi "ornek satirlari silin" demez (veri sayfasi yalniz baslik).
+  const G = require('./import_template_guide.js');
+  const adim = G.buildGuide('BOOKINGS', { properties: [{ code: 'DENE', name: 'Deneme Evi' }], headerOnly: true }).steps.join('\n');
+  check(!/örnek satırları silin/.test(adim) && /başlığın altına/.test(adim), 'L-278e Uygulama ici sablon rehberi olmayan ornek satirlardan soz etmez');
+  check(/headerOnly: true/.test(functionBody(read('app.js'), 'function downloadSampleTemplate(')), 'L-278f Uygulama ici sablon rehberi headerOnly ile uretilir');
+  delete global.XLSX;
+}
+
 async function main() {
   try {
     await L304();
@@ -499,6 +539,7 @@ async function main() {
     await L274();
     await L275();
     await L276();
+    await L278();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));
