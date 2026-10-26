@@ -90,7 +90,7 @@ async function test(name, fn) {
     assert.strictEqual(calls[0].name, 'quick_capture_lead');
     assert.deepStrictEqual(calls[0].args, {
       p_tenant_id: '22222222-2222-4222-8222-222222222222',
-      p_phone: '0532 123 45 67',
+      p_phone: '05321234567', // L-270: bosluksuz saklanir
       p_source_id: '33333333-3333-4333-8333-333333333333',
       p_channel: 'Phone',
       p_check_in: null,

@@ -6,6 +6,8 @@
 // L-268: rezervasyonun mulku degistirilince "kaydedildi" deniyor ama eski
 //   mulkte kaliyordu; cakisma kontrolu de eski mulke bakiyordu.
 // L-269: gider formunda cift tiklama iki gider yaziyordu.
+// L-270: WhatsApp "Sicak Lead" tarih, kisi ve tutari talebe yazmiyor (yalniz
+//   not), sondaki imza adini gormuyor, telefonu bosluklu sakliyordu.
 const fs = require('fs');
 const path = require('path');
 
@@ -217,11 +219,52 @@ async function L269() {
   check(ist.yazmalar.filter(k => k.tablo === 'expenses' && k.islem === 'insert').length === 2, 'L-269c Sonraki kayit engellenmez');
 }
 
+// ---------------------------------------------------------------------------
+// L-270 WhatsApp sicak talep alanlari
+// ---------------------------------------------------------------------------
+const LEAD_1 = 'ffffffff-ffff-4fff-8fff-fffffffffff1';
+async function L270() {
+  sahteDom();
+  const App = require('../app.js');
+  const villas = { DENE: { id: PROP_A, name: 'Deneme Evi' } };
+  const p = App.parseWhatsAppMessageText('Merhaba, 15-18 Ağustos 2027 için 4 kişi villa fiyatı nedir? 0555 111 22 33 Ayşe', villas, '2026-10-25');
+  check(p.guest === 'Ayşe', 'L-270a Mesajin sonundaki imza adi algilanir', JSON.stringify(p.guest));
+  check(p.pax === 4 && p.checkIn === '2027-08-15' && p.checkOut === '2027-08-18', 'L-270b Tarih ve kisi ayristirilir', JSON.stringify(p));
+  const p2 = App.parseWhatsAppMessageText('Merhaba, 15-18 Ağustos 2027 için 4 kişi fiyat nedir? Teşekkürler', villas, '2026-10-25');
+  check(!p2.guest, 'L-270c Kapanis sozcugu ad sanilmaz', JSON.stringify(p2.guest));
+  const p3 = App.parseWhatsAppMessageText('Merhaba, 15-18 Ağustos 2027 için 4 kişi fiyat nedir?\nAyşe Yılmaz', villas, '2026-10-25');
+  check(p3.guest === 'Ayşe Yılmaz', 'L-270d Son satirdaki ad soyad algilanir', JSON.stringify(p3.guest));
+
+  sahteDom({ waParsedGuest: 'Ayşe', waParsedVilla: 'DENE', waParsedAmount: '25000', waParsedPhone: '0555 111 22 33',
+    waParsedSource: 'src-1', waParsedNotes: 'WhatsApp mesajından aktarıldı', waParsedCheckIn: '2027-08-15', waParsedCheckOut: '2027-08-18', waParsedPax: '4' });
+  const ist = kur(App, {}, 'owner', { rpc: ad => (ad === 'quick_capture_lead' ? { success: true, lead_id: LEAD_1, created: true } : []) });
+  await App.saveWaAsLead();
+  const cagri = ist.yazmalar.find(k => k.tablo === 'rpc:quick_capture_lead');
+  const a = cagri && cagri.yuk;
+  check(a && a.p_check_in === '2027-08-15' && a.p_check_out === '2027-08-18' && a.p_pax === 4,
+    'L-270e Tarih ve kisi talebin alanlarina yazilir', JSON.stringify(a) + ' ' + (global.__sonUyari || ''));
+  check(a && a.p_phone === '05551112233', 'L-270f Telefon bosluksuz saklanir', JSON.stringify(a && a.p_phone));
+  const teklif = ist.yazmalar.find(k => k.tablo === 'leads' && k.islem === 'update');
+  check(teklif && teklif.yuk.quote_amount === 25000 && teklif.filtre.some(([c, v]) => c === 'id' && v === LEAD_1),
+    'L-270g Tutar talebin teklif alanina yazilir', JSON.stringify(teklif));
+  check(a && !/Teklif/.test(a.p_note || ''), 'L-270h Teklif alana yazildiysa nota tekrar yazilmaz', JSON.stringify(a && a.p_note));
+  // Mevcut acik talebe eklenen mesaj, talebin kendi teklifini ezmez.
+  sahteDom({ waParsedGuest: 'Ayşe', waParsedVilla: 'DENE', waParsedAmount: '30000', waParsedPhone: '05551112233',
+    waParsedSource: 'src-1', waParsedNotes: '', waParsedCheckIn: '', waParsedCheckOut: '', waParsedPax: '' });
+  const ist2 = kur(App, { leads: [{ id: LEAD_1, dbId: LEAD_1, guestName: 'Ayşe', phone: '05551112233', quote: 25000, quoteAmount: 25000, status: 'QUOTE_SENT' }] }, 'owner',
+    { rpc: ad => (ad === 'quick_capture_lead' ? { success: true, lead_id: LEAD_1, created: false } : []) });
+  await App.saveWaAsLead();
+  const a2 = (ist2.yazmalar.find(k => k.tablo === 'rpc:quick_capture_lead') || {}).yuk;
+  check(!ist2.yazmalar.some(k => k.tablo === 'leads' && k.islem === 'update') && a2 && /30.000/.test(a2.p_note || ''),
+    'L-270i Mevcut talebin teklifi ezilmez, yeni tutar nota duser', JSON.stringify(a2 && a2.p_note));
+}
+
 async function main() {
   try {
     await L304();
     await L268();
     await L269();
+    await L270();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

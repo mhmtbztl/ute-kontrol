@@ -3550,7 +3550,9 @@ async function quickCaptureLead(input, options = {}) {
   const data = input || {};
   const tenantId = options.tenantId || getActiveTenantId();
   const client = options.client || supabaseClient;
-  const phone = String(data.phone || '').trim();
+  // Telefon bosluksuz saklanir (L-270): "0555 111 22 33" ile "05551112233"
+  // ayni numaradir; hizli form ve WhatsApp ayni bicimi yazar.
+  const phone = String(data.phone || '').trim().replace(/[\s().\-]/g, '');
   const sourceId = String(data.sourceId || '').trim();
   const rawChannel = String(data.channel || '').trim();
 
@@ -14010,6 +14012,16 @@ function parseWhatsAppMessageText(text, villas = {}, todayStr = getTodayStr()) {
       }
     }
   }
+  // Imza (L-270): "... fiyat nedir? 0555 111 22 33 Ayşe" — mesajin sonunda,
+  // telefon, satir sonu ya da noktalama ardindan tek basina duran ad.
+  if (!detectedGuest) {
+    const imza = text.match(/(?:^|[\n,;\-–—]|\d)\s*([A-ZÇĞİÖŞÜ][a-zçğıöşü]{2,}(?:\s+[A-ZÇĞİÖŞÜ][a-zçğıöşü]{2,})?)\s*[.!]*\s*$/);
+    const kapanis = ['teşekkürler', 'teşekkür', 'tesekkurler', 'saygılar', 'saygılarımla', 'selamlar', 'merhaba', 'iyi', 'günler',
+      'akşamlar', 'kolay', 'gelsin', 'rica', 'lütfen', 'tamam', 'evet', 'hayır', 'bekliyorum', 'whatsapp', 'airbnb', 'booking'];
+    if (imza && !trKucuk(imza[1]).split(/\s+/).some(w => kapanis.includes(w))) {
+      detectedGuest = adTemizle(imza[1]);
+    }
+  }
 
   let detectedPhone = null;
   const phoneMatch = text.match(/(?:\+?90\s*|\b0)?\s*(5\d{2})[\s\.-]*(\d{3})[\s\.-]*(\d{2})[\s\.-]*(\d{2})\b/);
@@ -14232,6 +14244,17 @@ async function saveWaAsLead() {
   const phone = document.getElementById('waParsedPhone').value.trim();
   const sourceId = document.getElementById('waParsedSource')?.value || '';
   const notes = document.getElementById('waParsedNotes').value.trim();
+  const checkIn = document.getElementById('waParsedCheckIn')?.value || '';
+  const checkOut = document.getElementById('waParsedCheckOut')?.value || '';
+  const pax = document.getElementById('waParsedPax')?.value || '';
+
+  // Ayristirilan tarih, kisi ve tutar talebin kendi alanlarina yazilir (L-270);
+  // eskiden yalniz nota dusuyor, talep listesinde ve satis hesaplarinda yoktu.
+  // Mevcut acik talebe eklenen mesajda talebin kendi teklifi ezilmez.
+  const telefonAnahtari = v => String(v || '').replace(/\D/g, '').slice(-10);
+  const acikTalep = (appData.leads || []).find(l => telefonAnahtari(l.phone) && telefonAnahtari(l.phone) === telefonAnahtari(phone)
+    && ['NEW', 'CONTACTED', 'QUOTE_SENT', 'FOLLOW_UP'].includes(String(l.status || '').toUpperCase()));
+  const teklifAlana = quote > 0 && !(acikTalep && Number(acikTalep.quote ?? acikTalep.quoteAmount) > 0);
 
   let result;
   try {
@@ -14241,8 +14264,18 @@ async function saveWaAsLead() {
       sourceId,
       propertyId: appData.villas?.[villa]?.id || null,
       channel: 'WhatsApp',
-      note: [notes, quote > 0 ? `Teklif: ₺${quote.toLocaleString('tr-TR')}` : ''].filter(Boolean).join(' · ')
+      checkIn: checkIn || null,
+      checkOut: checkIn ? (checkOut || null) : null,
+      pax: pax || null,
+      note: [notes, quote > 0 && !teklifAlana ? `Teklif: ₺${quote.toLocaleString('tr-TR')}` : ''].filter(Boolean).join(' · ')
     });
+    if (teklifAlana && result?.lead_id) {
+      const { error } = await supabaseClient.from('leads')
+        .update({ quote_amount: quote })
+        .eq('id', result.lead_id)
+        .eq('tenant_id', getActiveTenantId());
+      if (error) throw new Error('Talep kaydedildi; teklif tutarı yazılamadı: ' + (error.message || 'veritabanı hatası'));
+    }
     await loadLeads(getActiveTenantId());
     await refreshLeadSalesContext();
   } catch (err) {
@@ -23373,6 +23406,7 @@ if (typeof module !== 'undefined' && module.exports) {
     getImportEngine,
     buildImportSource,
     parseSourceWithMode,
+    saveWaAsLead,
     getPendingImportData: () => pendingImportData,
     paginateRows,
     getActiveRenderPlan,
