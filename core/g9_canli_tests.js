@@ -16,6 +16,8 @@
 //   sabit %20 ile takvimle (en cok 2 gece, ozel gun, taban) celisiyordu.
 // L-272: kanal eklenince "Cannot read properties of null (reading 'reset')";
 //   await sonrasi olayin currentTarget'i bosaliyordu.
+// L-273: kisi sayisi pax'ta, ama phase10'un guest_count/adults sutunlari varsayilan
+//   2 kaliyor ve misafir mesaj motoru once guest_count'u okuyordu.
 const fs = require('fs');
 const path = require('path');
 
@@ -389,6 +391,18 @@ async function L272() {
   check(sifirlandi, 'L-272a Kanal kaydedilince form sifirlanir (await sonrasi null currentTarget hatasi yok)');
 }
 
+// ---------------------------------------------------------------------------
+// L-273 kisi sayisinin tek kaynagi pax
+// ---------------------------------------------------------------------------
+async function L273() {
+  const M = require('./guest_messaging_engine.js');
+  // phase10'un guest_count sutunu uygulamaca yazilmaz, varsayilani 2 kalir.
+  const c = M.buildTemplateContext({ guest_name: 'TEST Ayşe', check_in: '2026-11-10', check_out: '2026-11-12', pax: 7, guest_count: 2 });
+  check(String(c.guest_count) === '7', 'L-273a Mesaj sablonundaki kisi sayisi pax\'tan gelir (guest_count varsayilani 2 degil)', String(c.guest_count));
+  const c2 = M.buildTemplateContext({ guest_name: 'TEST', check_in: '2026-11-10', check_out: '2026-11-12' });
+  check(c2.guest_count === '', 'L-273b Kisi sayisi bilinmiyorsa 2 uydurulmaz', JSON.stringify(c2.guest_count));
+}
+
 async function main() {
   try {
     await L304();
@@ -399,6 +413,7 @@ async function main() {
     await L302();
     await L308();
     await L272();
+    await L273();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

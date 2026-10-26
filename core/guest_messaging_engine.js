@@ -77,7 +77,10 @@ function buildTemplateContext(booking, guest = {}, property = {}, guestSettings 
     booking_total: Number(booking.gross_amount || booking.gross || 0).toLocaleString('tr-TR') + ' ₺',
     remaining_balance: '0,00 ₺',
     nights_count: nightsCount,
-    guest_count: booking.guest_count || booking.pax || 2,
+    // Kisi sayisinin tek kaynagi pax (L-273). phase10'un guest_count sutunu
+    // uygulamaca yazilmaz ve varsayilani 2 kalir; bilinmeyen kisi sayisi
+    // uydurulmaz (CLAUDE.md 3.6).
+    guest_count: Number(booking.pax) > 0 ? String(Number(booking.pax)) : '',
     extension_discount_percent: extra.discountPercent || 20,
     extension_night_rate: extra.offeredPrice ? `${extra.offeredPrice.toLocaleString('tr-TR')} ₺` : '',
     ...extra
