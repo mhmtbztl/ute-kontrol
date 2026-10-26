@@ -11985,6 +11985,14 @@ async function bumpLeadInterestFromQuick(delta) {
     return false;
   }
   const channel = normalizeLeadChannel(rawChannel);
+  // Sayac 0 iken geri al sunucuda CHECK hatasina dusup ham kod gosteriyordu (L-293).
+  if (Number(delta) === -1) {
+    const satir = (appData.leadInterests || []).find(row => row.day === getTodayStr() && String(row.source_id) === String(sourceId) && normalizeLeadChannel(row.channel) === channel);
+    if (!(Number(satir?.count) > 0)) {
+      setLeadQuickMessage('Bugün bu kaynak ve kanal için geri alınacak sayaç yok.', 'error');
+      return false;
+    }
+  }
   try {
     const result = await SalesWorkflowService.bumpInterest(supabaseClient, {
       tenantId: getActiveTenantId(), day: getTodayStr(), sourceId, channel, delta
@@ -23683,6 +23691,7 @@ if (typeof module !== 'undefined' && module.exports) {
     getImportEngine,
     buildImportSource,
     parseSourceWithMode,
+    bumpLeadInterestFromQuick,
     refreshImportHistory,
     rememberImportPeriod,
     submitMemberInvite,

@@ -50,6 +50,7 @@
 //   snapshot'i gelecek gunleri kapsayan donemi kabul ediyordu.
 // L-291: ice aktarma: gecmis yenilenmiyor, geri alma sonucu ve donem donusu yok, kayitlari
 //   silinmis parti "geri alinamaz" diyor, gelecek tarihli aktarilan rezervasyona temizlik acilmiyordu.
+// L-293: "+1 yalniz fiyat sorusu" sayaci 0 iken Geri al "Girilen degerlerden biri gecersiz" diyordu.
 const fs = require('fs');
 const path = require('path');
 
@@ -932,6 +933,21 @@ async function L291() {
   check(/rememberImportPeriod\(/.test(govde), 'L-291f Aktarim donemi degistirirken eskisini hatirlar');
 }
 
+// ---------------------------------------------------------------------------
+// L-293 sayac 0'dayken geri al anlamsiz hata vermez
+// ---------------------------------------------------------------------------
+async function L293() {
+  const dom = sahteDom({ leadQuickSource: 's1', leadQuickChannel: 'Phone' });
+  const App = require('../app.js');
+  const ist = kur(App, { leadInterests: [] });
+  global.SalesWorkflowService = require('./sales_workflow_service.js');
+  const sonuc = await App.bumpLeadInterestFromQuick(-1);
+  const mesaj = dom.getElementById('leadQuickMessage').textContent || dom.getElementById('leadQuickMessage').innerText;
+  check(sonuc === false && !ist.yazmalar.some(k => k.tablo === 'rpc:bump_lead_interest') && /geri alınacak/.test(mesaj),
+    'L-293a Sayac 0 iken geri al sunucuya gitmez, anlasilir mesaj verir', mesaj);
+  delete global.SalesWorkflowService;
+}
+
 async function main() {
   try {
     await L304();
@@ -964,6 +980,7 @@ async function main() {
     await L310();
     await L299();
     await L291();
+    await L293();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));
