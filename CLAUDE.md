@@ -224,6 +224,14 @@ kuralı gecenin **ayının** doluluğunu hedef dolulukla karşılaştırır. İ�
 kapatılan tatiller `tenant_settings.pricing_special_days`. Yıllık hedef = aylık portföy
 hedeflerinin toplamı. Göç gerekmedi. Ağı `g9_feedback_tests` L-246…L-254, tarayıcı kapısı 32/32b.
 
+**Rezervasyon kayıt sınırları (L-300, kullanıcı kararı 27.10.2026):** 0 TL ve mülk
+kapasitesini aşan kişi sayısı engellenmez, **sorulur** (`bookingSaveWarnings` +
+`confirmBookingWarnings`; düzenlemede yalnız değişen alan). Komisyon brütün en fazla
+%50'sidir (`bookingCommissionError`): form, WhatsApp, talepten dönüşüm, kanal
+varsayılanı ve içe aktarım aynı sınırı kullanır. Rezervasyonlar sayfası üstteki dönem
+ve mülk seçimiyle aynıdır; orada değişen ay/mülk üstte de değişir (hafta görünümü
+yalnız takvim penceresidir). Göç gerekmedi. Ağı `g9_canli_tests` L-300a–n.
+
 **Toplu aktarım özeti (`isBulkSummaryBooking`, "TOPLU AKTARIM — Ocak 2026") toplam
 metriklere girer, kayıt ve gün başı metriklere girmez (L-103).** Ciro, gece,
 ADR, doluluk doğrudur; rezervasyon adedi, takvimdeki gün, boş gece tespiti
@@ -721,6 +729,16 @@ istemcideki `isTicketBlockingOn` ile aynı. Yetki `can_read_sales`, kayıt arama
 önce. Göç yokken takvim "kapalı günler okunamadı" der, günü sessizce açık göstermez.
 Canlı süit `phase103_property_closures_live_tests` 11/11 (göçten önce 7 kırmızı).
 Paket: `docs/PHASE103_DEPLOY_PACKAGE.md`.
+
+**phase105 (`migration_phase105_guest_erasure_and_g9_followups.sql`) 26 Ekim 2026'da
+test projesine ve üretime uygulandı; 27 Ekim 2026'da üretimde doğrulandı** (anon
+`rpc/erase_guest_personal_data` → `401 42501`, önce `404 PGRST202`; `production:readiness`
+BAŞARILI, `schema_migrations` 105). KVKK silme hakkı (L-271, kullanıcı kararı 26.10.2026:
+"her şeyi temizler"): misafir kartı silinir; rezervasyon ve talepler muhasebe kaydı
+oldukları için anonimleşir (tutar/tarih değişmez, kapalı ay dahil); mesaj ve bildirimler
+silinir; `guest_erasure_log` kişisel verisiz. Kapalı dönem korumaları yalnız işlem içinde
+sıfırlama bayrağıyla askıya alınır. Canlı süit `phase105_guest_erasure_live_tests` 24/24.
+Paket: `docs/PHASE105_DEPLOY_PACKAGE.md`.
 
 **Bir göçün uygulanıp uygulanmadığı, dosyaya bakarak anlaşılmaz.** Dosya repoda
 durur; veritabanı uygulanmamış olabilir. Doğrulamanın yolu üretime sormaktır:

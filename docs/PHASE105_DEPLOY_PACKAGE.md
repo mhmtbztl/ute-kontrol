@@ -56,4 +56,4 @@ GitHub Pages kodu göçten önce yayına alır. Göç uygulanana kadar:
 
 ## Üretim durumu
 
-Uygulanmadı (26.10.2026).
+Uygulandı ve doğrulandı (27.10.2026). Kullanıcı SQL Editor'de uyguladı (`schema_migrations` 105, `applied_at` 2026-10-26 23:05 UTC). Salt okunur ölçüm: anon `rpc/erase_guest_personal_data` → `401 42501` (önce `404 PGRST202`), anon `guest_erasure_log` → `401 42501`, `production:readiness` BAŞARILI.
