@@ -316,6 +316,8 @@ async function L305() {
   App.parseSourceWithMode({ fileName: 'rez.csv', headers: b2, rows: [{ Villa: 'Deneme Evi', 'Misafir Adı': 'TEST Çakışan', 'Giriş Tarihi': '2026-12-03', 'Çıkış Tarihi': '2026-12-05', 'Brüt Tutar': '9000', 'Kişi Sayısı': '2' }], sheetNames: [] }, 'BOOKINGS');
   const st = global.document.getElementById('importFileStats').innerText;
   check(/0 kayıt eklenecek/.test(st) && /çakışma/.test(st), 'L-305e Onizleme cakisan satiri eklenecek saymaz', st);
+  const G = require('./import_template_guide.js');
+  check(/ZORUNLU:[^.]*Kişi Sayısı/.test(G.buildGuide('BOOKINGS', {}).steps.join(' ')), 'L-305f Sablon rehberi kisi sayisini zorunlu yazar');
 }
 
 // ---------------------------------------------------------------------------

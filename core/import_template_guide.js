@@ -67,7 +67,7 @@
       'LEXBNB — REZERVASYON DEFTERİ ŞABLONU · NASIL DOLDURULUR',
       '',
       adim1(yalnizBaslik, 'Başlık satırına dokunmayın: DOSYANIN İLK SATIRI olmalı, üstüne başlık eklemeyin.'),
-      'ADIM 2 — Her rezervasyon bir satırdır. ZORUNLU: Villa, Misafir Adı, Giriş Tarihi, Çıkış Tarihi, Brüt Tutar. Diğer sütunları boş bırakabilir ya da silebilirsiniz.',
+      'ADIM 2 — Her rezervasyon bir satırdır. ZORUNLU: Villa, Misafir Adı, Giriş Tarihi, Çıkış Tarihi, Brüt Tutar, Kişi Sayısı (kişi sayısı tahmin edilmez; boş satır kaydedilmez). Diğer sütunları boş bırakabilir ya da silebilirsiniz.',
       genel
         ? 'ADIM 3 — "Villa": kendi mülk kodunuzu yazın. MULK_KODU_1 / MULK_KODU_2 yalnız yer tutucudur; değiştirmezseniz o satırlar kaydedilmez (bilerek: yanlış mülke kayıt girmesin).'
         : 'ADIM 3 — "Villa": GEÇERLİ DEĞERLER sayfasındaki mülk KODUNU ya da ADINI aynen yazın. Listede olmayan mülkün satırı kaydedilmez.',
