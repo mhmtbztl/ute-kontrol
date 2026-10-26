@@ -65,7 +65,7 @@
     ['MarketingCoverChangeService', 'core/marketing_cover_change_service.js?v=81211a39'],
     ['MarketingDataService', 'core/marketing_data_service.js?v=0c6b8c4f'],
     ['MarketingReviewService', 'core/marketing_review_service.js?v=9207dee5'],
-    ['MarketingSnapshotService', 'core/marketing_snapshot_service.js?v=184ad517'],
+    ['MarketingSnapshotService', 'core/marketing_snapshot_service.js?v=04136be1'],
     ['MarketingChannelListingService', 'core/marketing_channel_listing_service.js?v=515fe386'],
     ['MarketingExperimentService', 'core/marketing_experiment_service.js?v=4a2ffb14'],
     ['MarketingHealthResultsService', 'core/marketing_health_results_service.js?v=662edeea'],
@@ -435,7 +435,7 @@
     const r = derived.rates;
     const findings = rankFindings(model.findings);
     return `${toolbar}${listingForm}${form}${experimentForm}<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
-      ${kpi('Gösterim', number(c.impressions), `Kapsama: ${number(derived.validation.coveragePercent, '%')}`)}
+      ${kpi('Gösterim', number(c.impressions), `Veri tamlığı: 5 sayaçtan ${number(Math.round((derived.validation.coveragePercent || 0) * 5 / 100))} tanesi girildi (${number(derived.validation.coveragePercent, '%')})`)}
       ${kpi('İlan görüntüleme', number(c.listingViews), `Arama → görüntüleme: ${number(r.searchToViewCtrPercent, '%')}`)}
       ${kpi('Rezervasyon denemesi', number(c.bookingAttempts), `Görüntüleme → deneme: ${number(r.viewToAttemptConversionPercent, '%')}`)}
       ${kpi('Platform rezervasyonu', number(c.platformReportedBookings), `Görüntüleme → rezervasyon: ${number(r.viewToBookingConversionPercent, '%')}`)}
@@ -887,8 +887,9 @@
     const submit = form.querySelector('[type="submit"]');
     if (submit) submit.disabled = true;
     try {
+      // Gelecek gunleri kapsayan donem kaydedilmez (L-299): sayac henuz olusmadi.
       const result = await services.MarketingSnapshotService.recordManualSnapshot(client, {
-        ...values, tenantId: scope.tenantId
+        ...values, tenantId: scope.tenantId, today: services.LexbnbBusinessDate.getBusinessDate()
       });
       state.snapshotFormOpen = false;
       state.remoteStatus = 'LOADING';
@@ -1240,9 +1241,12 @@
       const form = event.target.closest('[data-marketing-snapshot-form]');
       if (!form) return;
       event.preventDefault();
-      handleSnapshotSubmit(form).catch(() => {
+      handleSnapshotSubmit(form).catch(error => {
         const status = document.getElementById('marketingWorkspaceStatus');
-        if (status) status.textContent = 'Snapshot kaydedilemedi. Alanları kontrol edip yeniden deneyin.';
+        const gelecek = /SNAPSHOT_PERIOD_IN_FUTURE/.test(String(error && error.message || ''));
+        if (status) status.textContent = gelecek
+          ? 'Snapshot dönemi bugünü geçemez: bitiş (hariç) en geç yarın olabilir. Gelecek günlerin sayacı henüz oluşmadı.'
+          : 'Snapshot kaydedilemedi. Alanları kontrol edip yeniden deneyin.';
       });
     });
     if (content) content.addEventListener('change', event => {

@@ -46,6 +46,8 @@
 //   gonderildi" diyordu.
 // L-309: fiyat kurali -%100'e kadar kabul ediliyor; tabansiz mulkte oneri 0'a iniyordu.
 // L-310: yillik hedef karti tek ayin hedefini yilin tum cirosuyla oranliyordu (%1315).
+// L-299: Finans'ta "Hedefin %70 altinda" yesil; "Kapsama: %60" anlasilmiyor; huni
+//   snapshot'i gelecek gunleri kapsayan donemi kabul ediyordu.
 const fs = require('fs');
 const path = require('path');
 
@@ -878,6 +880,26 @@ async function L310() {
   check(/hedefli aylarda ciro/.test(blok), 'L-310b Kart neyin neyle karsilastirildigini yazar');
 }
 
+// ---------------------------------------------------------------------------
+// L-299 hedef altinda kirmizi; kapsama acik; huni donemi gelecegi kapsamaz
+// ---------------------------------------------------------------------------
+async function L299() {
+  const src = read('app.js');
+  check(/finRevTargetDelta[\s\S]{0,400}className = `kpi-trend \$\{/.test(src) || /hedefRengi/.test(src), 'L-299a "Hedefin altinda" yesil degil; rozet rengi hedefe gore');
+  check(/\.kpi-trend\.negative\s*\{/.test(read('style.css')), 'L-299b Olumsuz rozet stili var');
+  const ui = read('core/marketing_ui.js');
+  check(!/`Kapsama: \$\{number\(derived\.validation\.coveragePercent, '%'\)\}`/.test(ui) && /sayaçtan/.test(ui), 'L-299c Huni karti kapsamayi "N sayactan M tanesi girildi" diye aciklar');
+  const S = require('./marketing_snapshot_service.js');
+  let hata = null;
+  try {
+    S.validateInput({ tenantId: TENANT, channelListingId: PROP_A, periodStart: '2026-10-01', periodEndExclusive: '2026-11-02', listingViews: 100, today: '2026-10-26' });
+  } catch (e) { hata = e; }
+  check(hata && /FUTURE/.test(hata.message), 'L-299d Gelecek gunleri kapsayan huni donemi reddedilir', hata ? hata.message : 'hata yok');
+  let hata2 = null;
+  try { S.validateInput({ tenantId: TENANT, channelListingId: PROP_A, periodStart: '2026-10-01', periodEndExclusive: '2026-10-27', listingViews: 100, today: '2026-10-26' }); } catch (e) { hata2 = e; }
+  check(!hata2, 'L-299e Bugunu kapsayan donem kabul edilir', hata2 && hata2.message);
+}
+
 async function main() {
   try {
     await L304();
@@ -908,6 +930,7 @@ async function main() {
     await L307();
     await L309();
     await L310();
+    await L299();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

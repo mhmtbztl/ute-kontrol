@@ -5557,6 +5557,9 @@ function renderFinanceModule() {
 
   setEl('finActualRevenue', `${Math.round(ciro).toLocaleString('tr-TR')} TL`);
   setEl('finRevTargetDelta', hasTarget ? `Hedefin %${Math.round(Math.abs(targetPct - 100))} ${targetDiff >= 0 ? 'üzerinde' : 'altında'}` : 'Hedef belirlenmedi');
+  // Rozet rengi hedefe gore (L-299): "Hedefin %70 altinda" yesil yaziyordu.
+  const hedefRozeti = typeof document !== 'undefined' ? document.getElementById('finRevTargetDelta') : null;
+  if (hedefRozeti) hedefRozeti.className = `kpi-trend ${!hasTarget ? 'neutral' : targetDiff >= 0 ? 'positive' : 'negative'}`;
   setEl('finTargetRevenue', hasTarget ? `${Math.round(targetRev).toLocaleString('tr-TR')} TL` : '—');
   setEl('finTargetDiff', hasTarget ? `${targetDiff >= 0 ? '+' : ''}${Math.round(targetDiff).toLocaleString('tr-TR')} TL fark` : '—');
 

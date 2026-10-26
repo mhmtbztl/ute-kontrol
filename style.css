@@ -555,6 +555,13 @@ body {
   color: var(--accent-emerald);
   font-weight: 700;
 }
+.kpi-trend.negative {
+  color: var(--accent-rose);
+  font-weight: 700;
+}
+.kpi-trend.neutral {
+  color: var(--text-muted);
+}
 
 /* Tables */
 .table-responsive {

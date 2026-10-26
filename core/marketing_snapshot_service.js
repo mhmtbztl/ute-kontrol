@@ -30,6 +30,11 @@
     if (!validDate(input.periodStart) || !validDate(input.periodEndExclusive) || input.periodEndExclusive <= input.periodStart) {
       throw new Error('INVALID_SNAPSHOT_PERIOD');
     }
+    // Donem bugunu gecemez (L-299): bitis (haric) en gec yarindir.
+    if (validDate(input.today)) {
+      const yarin = new Date(Date.parse(input.today + 'T00:00:00Z') + 86400000).toISOString().slice(0, 10);
+      if (input.periodEndExclusive > yarin) throw new Error('SNAPSHOT_PERIOD_IN_FUTURE');
+    }
     const counters = Object.fromEntries(COUNTERS.map(key => [key, normalizeCounter(input[key])]));
     if (Object.values(counters).some(Number.isNaN)) throw new Error('INVALID_FUNNEL_COUNTER');
     if (Object.values(counters).every(value => value === null)) throw new Error('AT_LEAST_ONE_FUNNEL_COUNTER_REQUIRED');
