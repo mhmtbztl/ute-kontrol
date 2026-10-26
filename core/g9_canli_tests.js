@@ -12,6 +12,8 @@
 //   takvimindeki cakismayi gormuyor, yazma ham Postgres hatasiyla dusuyordu.
 // L-302: rezervasyon, gider ve temizlik aramalari toLowerCase kullaniyor; SEYİR/ÇİFT
 //   gibi Turkce buyuk harfli kayitlar kucuk harfle bulunmuyordu.
+// L-308: iki ayri bos gece tanimi; Bugun firsati ve misafire giden metin 1-4 gece,
+//   sabit %20 ile takvimle (en cok 2 gece, ozel gun, taban) celisiyordu.
 const fs = require('fs');
 const path = require('path');
 
@@ -339,6 +341,36 @@ async function L302() {
     'L-302h Katlama modulu misafir motorundan once yuklenir');
 }
 
+// ---------------------------------------------------------------------------
+// L-308 bos gece tek tanim: fiyat takvimi (gapDates + takvim fiyati)
+// ---------------------------------------------------------------------------
+function gunEkle(gun, n) { const d = new Date(gun + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+async function L308() {
+  sahteDom();
+  const App = require('../app.js');
+  const bugun = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const r = (ad, g, c) => ({ id: 'r-' + ad, villa: 'DENE', propertyId: PROP_A, guest: ad, checkIn: gunEkle(bugun, g), checkOut: gunEkle(bugun, c), gross: 1000, pax: 2, status: 'CONFIRMED' });
+  kur(App, {
+    villas: { DENE: { id: PROP_A, name: 'Deneme Evi', capacity: 6, basePrice: 10000, isActive: true } },
+    bookings: [r('A', 10, 14), r('B', 15, 20), r('C', 24, 28)],
+    tenantSettings: {}, propertyPricingRules: []
+  });
+  const gaps = App.detectGapNights();
+  const takvim = App.computePricingCalendar({ key: 'DENE', property: App.getAppData().villas.DENE }, bugun);
+  const takvimBos = takvim.suggestions.gapDates;
+  check(gaps.length === 1 && gaps[0].checkIn === gunEkle(bugun, 14) && gaps[0].checkOut === gunEkle(bugun, 15) && gaps[0].nights === 1,
+    'L-308a Firsat listesi yalniz takvimin bos gecelerini sayar (4 gecelik bosluk bos gece degil)', JSON.stringify(gaps.map(g => [g.checkIn, g.nights])) + ' takvim ' + JSON.stringify(takvimBos));
+  const gun = takvim.suggestions.days.find(d => d.date === gunEkle(bugun, 14));
+  check(gaps[0] && gun && gaps[0].discountPrice === gun.price, 'L-308b Firsat fiyati takvimin o gece onerdigi fiyattir', JSON.stringify({ firsat: gaps[0] && gaps[0].discountPrice, takvim: gun && gun.price }));
+  check(gaps[0] && gaps[0].regularPrice > gaps[0].discountPrice && gaps[0].discountPct === Math.round((1 - gaps[0].discountPrice / gaps[0].regularPrice) * 100),
+    'L-308c Liste fiyati ayni takvimin bos gece kurali olmadan fiyati; indirim orani ondan', JSON.stringify(gaps[0]));
+  const src = read('app.js');
+  check(!/regularTotal \* 0\.8/.test(src), 'L-308d Sabit %20 indirim kalmadi');
+  // Minimum gece kurali bosluga izin vermiyorsa firsat da yoktur (KF-6).
+  App.getAppData().tenantSettings = { pricing_min_stay: { rules: [{ id: 'k', name: 'Kural', propertyId: PROP_A, start: null, end: null, minNights: 2, enabled: true }] } };
+  check(App.detectGapNights().length === 0, 'L-308e Minimum gece kuralina takilan bosluk firsat sayilmaz');
+}
+
 async function main() {
   try {
     await L304();
@@ -347,6 +379,7 @@ async function main() {
     await L270();
     await L305();
     await L302();
+    await L308();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

@@ -479,15 +479,16 @@ async function asama4Davranisi() {
   check((html.match(/settings-template-help/g) || []).length === 2 && /data-settings-section="checklists"[\s\S]{0,900}Bir kâğıt liste gibi yazın/.test(html),
     'L-189b Her sablon bolmesi ve kontrol listesi bolumu ne ise yaradigini soyler');
 
-  // L-190 (M20) — bosluk gecesi yalniz gelecekte
-  const dun = istanbulBugun(-1);
+  // L-190 (M20) — bosluk gecesi yalniz gelecekte. L-308: bos gece fiyat
+  // takviminin tanimidir (en cok 2 gece, iki dolu gece arasinda); takvim
+  // bugunden baslar, gecmis bosluk hic gorunmez.
   App.setAppData({ villas: { A: { id: 'pa', slug: 'A', name: 'A', basePrice: 1000 } }, bookings: [
     { id: 'g1', villa: 'A', checkIn: istanbulBugun(-10), checkOut: istanbulBugun(-8), status: 'CONFIRMED' },
-    { id: 'g2', villa: 'A', checkIn: istanbulBugun(-6), checkOut: dun, status: 'CONFIRMED' },
-    { id: 'g3', villa: 'A', checkIn: istanbulBugun(2), checkOut: istanbulBugun(4), status: 'CONFIRMED' }], expenses: [], cleaningTasks: [] });
+    { id: 'g2', villa: 'A', checkIn: istanbulBugun(-6), checkOut: istanbulBugun(), status: 'CONFIRMED' },
+    { id: 'g3', villa: 'A', checkIn: istanbulBugun(1), checkOut: istanbulBugun(4), status: 'CONFIRMED' }], expenses: [], cleaningTasks: [] });
   const gaps = App.detectGapNights();
-  check(gaps.length === 1 && gaps[0].checkIn === istanbulBugun() && gaps[0].nights === 2,
-    'L-190a Gecmis bosluk firsat sayilmaz; bugun baslamis bosluk bugunden itibaren kirpilir', JSON.stringify(gaps));
+  check(gaps.length === 1 && gaps[0].checkIn === istanbulBugun() && gaps[0].nights === 1,
+    'L-190a Gecmis bosluk firsat sayilmaz; bugunku bos gece firsattir', JSON.stringify(gaps));
   check(!/indirim oranını siz belirlersiniz/.test(html), 'L-190b Rehber olmayan bir ozelligi vaat etmez');
 }
 
@@ -1924,7 +1925,7 @@ async function fiyatEkraniDavranisi() {
     && !talep.warnings.some(w => w.code === 'OCCUPANCY_TARGET_MISSING')
     && !App.computePricingCalendar(entry, BUGUN, null).suggestions.days.some(d => d.reasons.some(r => r.code === 'DEMAND')),
     'L-247a Hedef doluluk girilince talep kurali calisir; girilmeyince uygulanmaz (eskiden hic gonderilmiyordu)');
-  check(app.includes('function computePricingCalendar(entry, today = getTodayStr(), occupancyTarget = pricingExpectedOccupancyDraft)'),
+  check(app.includes('function computePricingCalendar(entry, today = getTodayStr(), occupancyTarget = pricingExpectedOccupancyDraft'),
     'L-247b Hesaplayicidaki hedef doluluk fiyat motorunun talep kuralina gider');
 
   // L-249 (M75): isletme kendi etkinligini ekler; tatil kapatilabilir.

@@ -15669,63 +15669,50 @@ async function saveOperatorNote(villaKey) {
 // 1. 🛑 TAKVİMDEKİ "YETİM GECELER" (GAP NIGHTS) MOTORU
 // -------------------------------------------------------------
 function detectGapNights() {
+  // Bos gece TEK tanimdir: fiyat takviminin bos gece kurali (L-308). Burada
+  // bir zamanlar ayri bir tanim vardi (1-4 gece, sabit %20, ozel gun ve taban
+  // yok); Bugun'un gelir firsati ve misafire giden "Durum/Hikaye" metni
+  // bayram gecesi icin takvimin onerdiginden binlerce lira dusuk fiyat
+  // yaziyordu. Simdi bosluk takvimin gapDates'i, firsat fiyati takvimin o
+  // gecelere onerdigi fiyat, liste fiyati ayni takvimin bos gece kurali
+  // olmadan fiyatidir. Takvim kurali kapaliysa firsat da yoktur.
+  // Gercek bosluk yoksa UYDURULMAZ; baz fiyat yoksa fiyat bilinmiyordur (3.6).
   const gaps = [];
   const today = getTodayStr();
-  const villas = Object.keys(appData.villas || {});
-
-  villas.forEach(vKey => {
-    const vName = (appData.villas && appData.villas[vKey]?.name) ? appData.villas[vKey].name : vKey;
-    const vBookings = (appData.bookings || [])
-      .filter(b => b.villa === vKey && b.status !== 'CANCELLED' && !isBulkSummaryBooking(b))
-      .sort((a, b) => new Date(a.checkIn) - new Date(b.checkIn));
-
-    for (let i = 0; i < vBookings.length - 1; i++) {
-      const b1 = vBookings[i];
-      const b2 = vBookings[i + 1];
-      const d1 = new Date(b1.checkOut);
-      const d2 = new Date(b2.checkIn);
-      const diffDays = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
-
-      // Yalniz bugunden sonra biten bosluk firsattir (L-190). Gecmis bosluklar
-      // da listeleniyordu; ana sayfa ilkini gosterdigi icin aylar onceki bir
-      // bosluk 'gelir firsati' diye cikiyordu.
-      if (diffDays >= 1 && diffDays <= 4 && String(b2.checkIn || '') > today) {
-        // Gecelik fiyat MULKUN KENDI liste fiyatidir. Burada bir zamanlar
-        // silinmis demo anahtarlarina bagli bir merdiven vardi
-        // (AZURE 18.000, BELLA 14.000, digerleri 12.000): her gercek mulk
-        // icin 12.000 TL uyduruyordu ve bu rakam asagidaki "Durum" /
-        // "Hikaye" butonlariyla MISAFIRE GONDERILEN metne giriyordu.
-        // Liste fiyati girilmemisse fiyat bilinmiyordur; uydurulmaz (3.6).
-        const villa = (appData.villas || {})[vKey] || {};
-        const baseNightly = Number(villa.basePrice) || 0;
-        // Bugun baslamis bosluk bugunden itibaren satilabilir; gecmis geceye
-        // fiyat onerilmez.
-        const gapStart = String(b1.checkOut) < today ? today : String(b1.checkOut);
-        const gapNights = Math.round((new Date(b2.checkIn) - new Date(gapStart)) / 86400000);
-        if (!(gapNights > 0)) continue;
-        const regularTotal = baseNightly > 0 ? baseNightly * gapNights : null;
-        const discountTotal = regularTotal === null ? null : Math.round(regularTotal * 0.8);
-        gaps.push({
-          villaKey: vKey,
-          villaName: vName,
-          checkIn: gapStart,
-          checkOut: b2.checkIn,
-          nights: gapNights,
-          regularPrice: regularTotal,
-          discountPrice: discountTotal,
-          discountPct: regularTotal === null ? null : 20
-        });
-      }
-    }
+  pricingActiveProperties().forEach(entry => {
+    const takvim = computePricingCalendar(entry, today);
+    const bosGunler = (takvim.suggestions.gapDates || []).slice().sort();
+    if (!bosGunler.length) return;
+    const kuralsiz = computePricingCalendar(entry, today, undefined, rules => ({ ...rules, gapNight: { ...(rules.gapNight || {}), enabled: false } }));
+    const fiyat = new Map(takvim.suggestions.days.map(d => [d.date, d.price]));
+    const listeFiyati = new Map(kuralsiz.suggestions.days.map(d => [d.date, d.price]));
+    const gruplar = [];
+    bosGunler.forEach(gun => {
+      const son = gruplar[gruplar.length - 1];
+      if (son && addDaysToDateKey(son[son.length - 1], 1) === gun) son.push(gun);
+      else gruplar.push([gun]);
+    });
+    gruplar.forEach(geceler => {
+      // Minimum gece kuralina takilan bosluk satilamaz (KF-6); firsat degildir.
+      if (minStayBlockMessage(entry.key, geceler[0], addDaysToDateKey(geceler[geceler.length - 1], 1))) return;
+      const topla = harita => geceler.every(g => Number.isFinite(harita.get(g)))
+        ? geceler.reduce((sum, g) => sum + harita.get(g), 0) : null;
+      const discountTotal = topla(fiyat);
+      const regularTotal = topla(listeFiyati);
+      const fiyatBiliniyor = discountTotal !== null && regularTotal !== null && regularTotal > 0;
+      gaps.push({
+        villaKey: entry.key,
+        villaName: entry.property.name || entry.key,
+        checkIn: geceler[0],
+        checkOut: addDaysToDateKey(geceler[geceler.length - 1], 1),
+        nights: geceler.length,
+        regularPrice: fiyatBiliniyor ? regularTotal : null,
+        discountPrice: fiyatBiliniyor ? discountTotal : null,
+        discountPct: fiyatBiliniyor ? Math.round((1 - discountTotal / regularTotal) * 100) : null
+      });
+    });
   });
-
   gaps.sort((x, y) => String(x.checkIn).localeCompare(String(y.checkIn)));
-
-  // Gercek bosluk yoksa UYDURULMAZ. Burada, gaps.length < 3 ise ucu birden
-  // sahte olarak eklenirdi: olmayan villalar (Bella Vista, Azure Bay, Sunset
-  // Horizon), uydurma tarihler ve "%20 indirim" fiyatlari. Yeni musteri
-  // sahip olmadigi villalar icin firsat listesi goruyordu.
-
   return gaps;
 }
 
@@ -22937,11 +22924,14 @@ function askPricingChatGpt() {
 
 // Bir mulkun 3 aylik takvim hesabi; fiyat ekrani ve bos gece karti ayni
 // hesaptan okur (L-252: kart GapNightService'i imzasina aykiri cagirip hep 0 yaziyordu).
-function computePricingCalendar(entry, today = getTodayStr(), occupancyTarget = pricingExpectedOccupancyDraft) {
+// rulesTransform: ayni takvimi bir kural degisikligiyle hesaplamak icin
+// (bos gece firsatinin liste fiyati, L-308). Ekranda kullanilmaz.
+function computePricingCalendar(entry, today = getTodayStr(), occupancyTarget = pricingExpectedOccupancyDraft, rulesTransform = null) {
   const horizon = pricingHorizon(today);
   const blocks = pricingMaintenanceBlocks(entry.property, today);
   const specialDays = pricingSpecialDaysFor(entry.property.id, horizon.start, horizon.end);
-  const rules = getPricingResearchService().mergeRules(appData.tenantSettings?.pricing_rules || {}, appData.propertyPricingRules || [], entry.property.id);
+  const birlesik = getPricingResearchService().mergeRules(appData.tenantSettings?.pricing_rules || {}, appData.propertyPricingRules || [], entry.property.id);
+  const rules = typeof rulesTransform === 'function' ? rulesTransform(birlesik) : birlesik;
   const suggestions = getSuggestedPriceEngine().suggest({
     property: { id: entry.property.id, basePrice: pricingBasePriceOf(entry.property), floorPrice: entry.property.floor ?? null },
     bookings: pricingPropertyBookings(entry).filter(booking => !isBulkSummaryBooking(booking)), blocks, rules, specialDays,
