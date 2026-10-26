@@ -105,6 +105,22 @@ function getUserFacingErrors() {
   return null;
 }
 
+// Uygulama ici pencere (L-287, core/ui_dialog.js). Tarayici kutusu yerine.
+function uiDialogApi() {
+  if (typeof LexbnbDialog !== 'undefined') return LexbnbDialog;
+  if (typeof require === 'function') { try { return require('./core/ui_dialog.js'); } catch (e) { /* tarayici */ } }
+  return null;
+}
+function uiAskText(options) {
+  const api = uiDialogApi();
+  return api ? api.askText(options) : Promise.resolve(typeof prompt === 'function' ? prompt(options.label || options.title || '', options.value || '') : null);
+}
+function uiAskConfirm(options) {
+  const api = uiDialogApi();
+  const o = typeof options === 'string' ? { message: options } : options;
+  return api ? api.askConfirm(o) : Promise.resolve(typeof confirm === 'function' ? confirm(o.message || '') : false);
+}
+
 function kullaniciMesaji(metin) {
   const U = getUserFacingErrors();
   return U ? U.sanitizeUserMessage(metin) : metin;
@@ -599,7 +615,7 @@ async function syncBookingCleaningTaskToCloud(booking, cleanCost) {
       mevcut.bookingId = booking.id;
       mevcut.villa = booking.villa;
       mevcut.guest = booking.guest;
-      mevcut.date = booking.checkOut;
+      mevcut.date = bookingCleaningDate(booking, mevcut.date);
       if (maliyet !== null) mevcut.amount = maliyet;
       // Yeniden etkinlesen rezervasyonun "yapilmadi" gorevi yeniden planlanir.
       if (mevcut.status === 'SKIPPED') mevcut.status = 'PLANNED';
@@ -614,7 +630,7 @@ async function syncBookingCleaningTaskToCloud(booking, cleanCost) {
       bookingId: booking.id,
       villa: booking.villa,
       guest: booking.guest,
-      date: booking.checkOut,
+      date: bookingCleaningDate(booking),
       cleaner: '',
       amount: maliyet || 0,
       paid: false,
@@ -1661,14 +1677,19 @@ async function updateBooking(bookingId, bookingInput) {
     throw new Error('Toplam tutar negatif olamaz.');
   }
 
-  let propId = bookingInput.propertyId || bookingInput.property_id || existing?.propertyId;
+  // Formun gonderdigi mulk kaydin eski mulkunun onune gecer (L-268): once
+  // existing.propertyId okunuyordu ve mulk degisikligi sessizce yok sayiliyordu.
+  let propId = bookingInput.propertyId || bookingInput.property_id || null;
   if (!propId && bookingInput.villa) {
     if (isUUID(bookingInput.villa)) {
       propId = bookingInput.villa;
     } else if (typeof appData !== 'undefined' && appData.villas && appData.villas[bookingInput.villa]) {
       propId = appData.villas[bookingInput.villa].id;
+    } else {
+      throw new Error('Seçilen mülk bulunamadı. Sayfayı eşitleyip tekrar deneyin.');
     }
   }
+  if (!propId) propId = existing?.propertyId;
 
   if (typeof appData !== 'undefined' && appData.villas && propId) {
     const validPropertyIds = Object.values(appData.villas).map(p => p.id).filter(Boolean);
@@ -1688,6 +1709,7 @@ async function updateBooking(bookingId, bookingInput) {
     const updated = {
       ...(existing || {}),
       ...bookingInput,
+      propertyId: propId,
       checkIn,
       checkOut,
       gross,
@@ -1854,6 +1876,12 @@ async function deleteBooking(bookingId) {
     throw new Error('Bu rezervasyonun konakladığı dönem kapatılmıştır. Silinemez. Önce dönemi yeniden açın.');
   }
 
+  // Odemesi olan rezervasyon silinemez (sunucu BOOKING_HAS_PAYMENTS ile
+  // reddeder). Once "emin misiniz" sorup sonra reddetmek yerine hemen
+  // soylenir (L-298).
+  const odemeVar = (appData?.bookingPayments || []).some(p => [existing?.id, existing?.dbId, bookingId].filter(Boolean).map(String).includes(String(p.booking_id)));
+  if (odemeVar) throw new Error('BOOKING_HAS_PAYMENTS');
+
   if (typeof confirm === 'function') {
     if (!confirm(`${guestName} rezervasyonunu silmek istediğinize emin misiniz?`)) {
       return false;
@@ -1924,7 +1952,10 @@ async function deleteBooking(bookingId) {
 
 async function deleteBookingUI(bookingId) {
   try {
-    return await deleteBooking(bookingId);
+    const silindi = await deleteBooking(bookingId);
+    // Silinen kaydin detay paneli acik kalmaz (L-296).
+    if (silindi && typeof SidePanel !== 'undefined') SidePanel.close();
+    return silindi;
   } catch (error) {
     const raw = String(error?.message || '');
     const message = raw.includes('BOOKING_HAS_PAYMENTS')
@@ -3175,6 +3206,16 @@ const ALLOWED_LEAD_STAGES = ['NEW', 'CONTACTED', 'QUOTE_SENT', 'FOLLOW_UP', 'WON
 const ALLOWED_LEAD_SOURCES = ['WHATSAPP', 'INSTAGRAM', 'META', 'AIRBNB', 'BOOKING', 'DIRECT', 'PHONE', 'OTHER'];
 const ALLOWED_LOST_REASONS = ['Fiyat Yüksek', 'Tarih Dolu', 'Cevap Vermedi', 'Başka Yer Seçti', 'Diğer'];
 
+// Ekranda ham kod yazilmaz (L-286): talep kanali, gorev ve rezervasyon durumu.
+const LEAD_CHANNEL_LABELS = { Phone: 'Telefon', WhatsApp: 'WhatsApp', Instagram: 'Instagram', Email: 'E-posta', Other: 'Diğer', Airbnb: 'Airbnb', Booking: 'Booking.com', Website: 'Web sitesi' };
+function leadChannelLabel(value) {
+  const kod = normalizeLeadChannel(value);
+  return LEAD_CHANNEL_LABELS[kod] || kod;
+}
+const OPERATIONAL_TASK_STATUS_LABELS = { TODO: 'Yapılacak', IN_PROGRESS: 'Sürüyor', BLOCKED: 'Engelli', DONE: 'Tamamlandı', CANCELLED: 'İptal edildi' };
+const BOOKING_STATUS_LABELS = { CONFIRMED: 'Onaylı', CHECKED_IN: 'İçeride', CHECKED_OUT: 'Tamamlandı', CANCELLED: 'İptal' };
+const CLEANING_STATUS_LABELS = { PLANNED: 'Planlandı', DONE: 'Yapıldı', SKIPPED: 'Gerek kalmadı' };
+
 function normalizeLeadChannel(value) {
   const channel = String(value || '').trim();
   if (!channel) return 'WhatsApp';
@@ -3293,9 +3334,11 @@ function mapLeadToDb(lead, targetTenantId) {
     requested_check_in: checkIn,
     requested_check_out: checkOut,
     pax: normalizePositiveInteger(lead.pax),
-    quote_amount: Number(lead.quote ?? lead.quoteAmount ?? 0) >= 0 ? Number(lead.quote ?? lead.quoteAmount ?? 0) : 0,
+    // Teklif girilmemisse bilinmiyordur; 0 yazilmaz (L-292, CLAUDE.md 3.6).
+    quote_amount: Number(lead.quote ?? lead.quoteAmount) > 0 ? Number(lead.quote ?? lead.quoteAmount) : null,
     status: status,
-    lost_reason: (status === 'LOST' ? (lead.lostReason || lead.lost_reason || 'Diğer') : null),
+    // Neden bilinmiyorsa uydurulmaz (L-279): eskiden "Diğer" ya da "-" yaziliyordu.
+    lost_reason: (status === 'LOST' ? (gercekKayipNedeni(lead.lostReason || lead.lost_reason) || null) : null),
     notes: (lead.notes || '').trim()
   };
 
@@ -3457,15 +3500,18 @@ async function loadLeads(targetTenantId) {
 async function loadLeadSalesContext(targetTenantId) {
   const tenantId = targetTenantId || getActiveTenantId();
   if (!isCloudTenant(tenantId) || !canReadSalesRole(activeTenant?.role)) {
-    return { sources: [], acquisitions: [], workflows: [], interests: [] };
+    return { sources: [], allSources: [], acquisitions: [], workflows: [], interests: [] };
   }
-  const [sources, acquisitions, workflows, interests] = await Promise.all([
-    fetchAllCloudRows(() => supabaseClient.from('lead_source_catalog').select('*').eq('tenant_id', tenantId).eq('is_active', true).order('sort_order').order('label')),
+  // Kapatilan kaynak da yuklenir (L-282): gecmis talep satiri adini kaybedip
+  // yalniz ham kanal kodunu gosteriyordu. Formlar yalniz etkinleri sunar.
+  const [allSources, acquisitions, workflows, interests] = await Promise.all([
+    fetchAllCloudRows(() => supabaseClient.from('lead_source_catalog').select('*').eq('tenant_id', tenantId).order('sort_order').order('label')),
     fetchAllCloudRows(() => supabaseClient.from('lead_acquisition').select('*').eq('tenant_id', tenantId)),
     fetchAllCloudRows(() => supabaseClient.from('lead_workflow').select('*').eq('tenant_id', tenantId)),
     fetchAllCloudRows(() => supabaseClient.from('lead_interest_daily').select('*').eq('tenant_id', tenantId).order('day', { ascending: false }))
   ]);
-  return { sources, acquisitions, workflows, interests };
+  const sources = (allSources || []).filter(source => source && source.is_active !== false);
+  return { sources, allSources: allSources || [], acquisitions, workflows, interests };
 }
 
 async function createLead(leadInput) {
@@ -3544,7 +3590,9 @@ async function quickCaptureLead(input, options = {}) {
   const data = input || {};
   const tenantId = options.tenantId || getActiveTenantId();
   const client = options.client || supabaseClient;
-  const phone = String(data.phone || '').trim();
+  // Telefon bosluksuz saklanir (L-270): "0555 111 22 33" ile "05551112233"
+  // ayni numaradir; hizli form ve WhatsApp ayni bicimi yazar.
+  const phone = String(data.phone || '').trim().replace(/[\s().\-]/g, '');
   const sourceId = String(data.sourceId || '').trim();
   const rawChannel = String(data.channel || '').trim();
 
@@ -4240,7 +4288,7 @@ function buildCurrentPageReport(page) {
       guest: b.guest || null, property: appData.villas?.[b.villa]?.name || b.villa || null,
       checkIn: b.checkIn || null, checkOut: b.checkOut || null,
       nights: b.checkIn && b.checkOut ? calculateNightsBetween(b.checkIn, b.checkOut) : null,
-      channel: b.channel || null, status: b.status || null,
+      channel: b.channel ? getChannelDisplayName(b.channel) : null, status: b.status ? (BOOKING_STATUS_LABELS[String(b.status).toUpperCase()] || b.status) : null,
       gross: Number.isFinite(Number(b.gross)) ? Number(b.gross) : null,
       discount: Number.isFinite(Number(b.discount)) ? Number(b.discount) : null
     }));
@@ -4267,11 +4315,11 @@ function buildCurrentPageReport(page) {
     const operationalTasks = (appData.operationalTasks || []).filter(mine).filter(inVilla);
     const maintenance = (appData.maintenanceTickets || []).filter(mine).filter(inVilla);
     const rows = cleaningTasks.filter(row => inScope(row.date, !closedTask(row.status)))
-      .map(row => ({ kind: 'Temizlik', title: row.propertyName || row.villa || '—', status: row.status || '—', date: row.date || null, amount: row.amount ?? null }))
+      .map(row => ({ kind: 'Temizlik', title: row.propertyName || row.villa || '—', status: CLEANING_STATUS_LABELS[String(row.status || '').toUpperCase()] || row.status || '—', date: row.date || null, amount: row.amount ?? null }))
       .concat(operationalTasks.filter(row => inScope(row.due_date, !closedTask(row.status)))
-        .map(row => ({ kind: 'Görev', title: row.title || '—', status: row.status || '—', date: row.due_date || null, amount: null })))
+        .map(row => ({ kind: 'Görev', title: row.title || '—', status: OPERATIONAL_TASK_STATUS_LABELS[String(row.status || '').toUpperCase()] || row.status || '—', date: row.due_date || null, amount: null })))
       .concat(maintenance.filter(row => inScope(row.reported_at, isMaintenanceTicketOpen(row)))
-        .map(row => ({ kind: 'Arıza', title: row.title || '—', status: row.status || '—', date: row.reported_at ? String(row.reported_at).slice(0, 10) : null, amount: row.cost ?? null })));
+        .map(row => ({ kind: 'Arıza', title: row.title || '—', status: getMaintenanceStatusPresentation(row.status).label || row.status || '—', date: row.reported_at ? String(row.reported_at).slice(0, 10) : null, amount: row.cost ?? null })));
     // Borc bir bakiyedir, donem akisi degil: tek tanim isCleaningDebt, tum donemler.
     const pendingDebt = cleaningTasks.filter(isCleaningDebt).reduce((sum, row) => sum + (Number(row.amount) || 0), 0);
     const columns = [
@@ -4284,7 +4332,7 @@ function buildCurrentPageReport(page) {
   if (page === 'SALES') {
     const view = getLeadSalesView();
     const funnel = Object.fromEntries(Object.entries(view.columns).map(([stage, rows]) => [stage, rows.length]));
-    const rows = view.rows.map(row => ({ source: row.sourceLabel, status: row.status, property: appData.villas?.[row.villa]?.name || row.villa || null, createdAt: row.createdAt || null }));
+    const rows = view.rows.map(row => ({ source: row.sourceLabel, status: LEAD_STATUS_LABELS[String(row.status || '').toUpperCase()] || row.status, property: appData.villas?.[row.villa]?.name || row.villa || null, createdAt: row.createdAt ? formatTrDate(String(row.createdAt).slice(0, 10)) : null }));
     const columns = [
       { key: 'source', label: 'Kaynak', type: 'text' }, { key: 'status', label: 'Aşama', type: 'text' },
       { key: 'property', label: 'Mülk', type: 'text' }, { key: 'createdAt', label: 'Talep tarihi', type: 'text' }
@@ -4449,6 +4497,8 @@ function printCurrentReport() {
   popup.document.write(`<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>${escapeHtml(currentPageReport.title)}</title><style>body{font:14px Arial;color:#111;padding:24px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:7px;text-align:left}.report-business{display:flex;gap:12px;align-items:center;margin-bottom:16px}.report-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.report-kpi{border:1px solid #ccc;padding:10px;display:flex;flex-direction:column}.sub-text{color:#555;display:block}img{max-width:180px;max-height:64px}</style></head><body><h1>${escapeHtml(currentPageReport.title)}</h1>${reportPreviewHtml(currentPageReport, 'print')}</body></html>`);
   popup.document.close();
   popup.opener = null;
+  // Yazdirma bitince bos sekme kapanir (L-289): her yazdirmada about:blank kaliyordu.
+  popup.addEventListener('afterprint', () => popup.close(), { once: true });
   popup.focus();
   // Logo yuklenmeden yazdirilirsa PDF logosuz cikar.
   const logo = popup.document.images[0];
@@ -4472,11 +4522,23 @@ function askChatGptFromCurrentReport() {
 function openFunnelTestQuestion() {
   const model = typeof LexBnBMarketingUI !== 'undefined' && LexBnBMarketingUI.getCurrentModel ? LexBnBMarketingUI.getCurrentModel() : null;
   const experiment = model?.experiments?.[0] || {};
+  // Gercek huni verisi gider (L-285): deney alan adlari tutmuyordu, metin bostu.
+  const huni = typeof MarketingFunnelService !== 'undefined' ? MarketingFunnelService : null;
+  const ilanAdi = id => { const ilan = (model?.listings || []).find(item => item.id === id); return ilan ? (ilan.title || ilan.listing_title || ilan.channel || 'İlan') : 'İlan'; };
+  const snapshots = (model?.snapshots || []).slice(0, 6).map(s => {
+    const sayac = k => (s[k] ?? s[k.replace(/[A-Z]/g, ch => '_' + ch.toLowerCase())]);
+    const oran = huni ? huni.deriveFunnelMetrics(s).rates : null;
+    return {
+      label: `${ilanAdi(s.channel_listing_id || s.channelListingId)} · ${s.period_start || s.periodStart || '?'} → ${s.period_end_exclusive || s.periodEndExclusive || '?'}`,
+      impressions: sayac('impressions'), listingViews: sayac('listingViews'), bookings: sayac('platformReportedBookings'),
+      ctr: oran ? oran.searchToViewCtrPercent : null, conversion: oran ? oran.viewToBookingConversionPercent : null
+    };
+  });
   return openChatGptQuestionModal({
     tabId: 'marketing', kind: 'FUNNEL_TEST_QUESTION', scope: 'Kanallar ve Pazarlama',
     selectedQuestion: 'Değişiklik işe yaradı mı, sırada ne var?',
     questions: ['Değişiklik işe yaradı mı, sırada ne var?'],
-    context: { testName: experiment.name || experiment.title, changedOn: experiment.started_on || experiment.startedAt, beforeRate: experiment.before_rate, afterRate: experiment.after_rate, sampleBefore: experiment.sample_before, sampleAfter: experiment.sample_after }
+    context: { testName: experiment.primary_metric || experiment.primaryMetric || experiment.name || null, changedOn: experiment.change_date || experiment.changeDate || null, verdict: experiment.verdict || experiment.status || null, snapshots }
   });
 }
 
@@ -4527,12 +4589,16 @@ function switchTab(tabId) {
     if (typeof showToast === 'function') showToast('Ayarlar yalnızca işletme yönetim rollerine açıktır.', 'error');
     return false;
   }
+  // Onceki sekmenin yan paneli yeni sekmede acik kalmaz (L-296).
+  if (typeof SidePanel !== 'undefined' && (typeof SidePanel.isOpen !== 'function' || SidePanel.isOpen())) SidePanel.close();
   document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 
   const menuTab = getMenuTabFor(tabId);
   const activeBtn = document.querySelector(`.tab-btn[data-onclick="switchTab('${menuTab}')"]`);
   if (activeBtn) activeBtn.classList.add('active');
+  // Telefonda aktif sekme seritte gorunur kalir (L-288).
+  if (activeBtn && typeof activeBtn.scrollIntoView === 'function') activeBtn.scrollIntoView({ block: 'nearest', inline: 'center' });
   renderPageActionBar(tabId);
   applyGlobalFilterScope(tabId);
 
@@ -4927,10 +4993,12 @@ function renderPricingKpiStrip() {
   if (!hedefliAylar.length) {
     setEl('pricingAnnualTargetMeta', `${year} için aylık hedef yok; Hedefleri Yönet'ten her ay girilir, toplamı burada görünür`);
   } else {
+    // Gerceklesme yalniz HEDEFI GIRILMIS aylarin cirosudur (L-310): eskiden
+    // 12 ayin cirosu tek ayin hedefine oranlaniyor, %1315 cikiyordu.
     const kayitli = canReadLedgerRole()
-      ? Array.from({ length: 12 }, (_, i) => computeMonthLedger(`${year}-${String(i + 1).padStart(2, '0')}`, 'ALL')?.netRoomRevenue || 0).reduce((a, b) => a + b, 0)
+      ? hedefliAylar.map(t => computeMonthLedger(`${year}-${String(t.month).padStart(2, '0')}`, 'ALL')?.netRoomRevenue || 0).reduce((a, b) => a + b, 0)
       : null;
-    setEl('pricingAnnualTargetMeta', `${year}: ${hedefliAylar.length}/12 ayda hedef${kayitli === null ? '' : ` · kayıtlı ciro ₺${Math.round(kayitli).toLocaleString('tr-TR')}${hedefTutar > 0 ? ` (%${Math.round(kayitli / hedefTutar * 100)})` : ''}`}`);
+    setEl('pricingAnnualTargetMeta', `${year}: ${hedefliAylar.length}/12 ayda hedef${kayitli === null ? '' : ` · hedefli aylarda ciro ₺${Math.round(kayitli).toLocaleString('tr-TR')}${hedefTutar > 0 ? ` (%${Math.round(kayitli / hedefTutar * 100)})` : ''}`}`);
   }
 
   // Koruma limitleri karti hic yuklenmeyen eski fiyat profillerine bakiyordu
@@ -5531,6 +5599,9 @@ function renderFinanceModule() {
 
   setEl('finActualRevenue', `${Math.round(ciro).toLocaleString('tr-TR')} TL`);
   setEl('finRevTargetDelta', hasTarget ? `Hedefin %${Math.round(Math.abs(targetPct - 100))} ${targetDiff >= 0 ? 'üzerinde' : 'altında'}` : 'Hedef belirlenmedi');
+  // Rozet rengi hedefe gore (L-299): "Hedefin %70 altinda" yesil yaziyordu.
+  const hedefRozeti = typeof document !== 'undefined' ? document.getElementById('finRevTargetDelta') : null;
+  if (hedefRozeti) hedefRozeti.className = `kpi-trend ${!hasTarget ? 'neutral' : targetDiff >= 0 ? 'positive' : 'negative'}`;
   setEl('finTargetRevenue', hasTarget ? `${Math.round(targetRev).toLocaleString('tr-TR')} TL` : '—');
   setEl('finTargetDiff', hasTarget ? `${targetDiff >= 0 ? '+' : ''}${Math.round(targetDiff).toLocaleString('tr-TR')} TL fark` : '—');
 
@@ -6673,6 +6744,25 @@ function isDirectBookingChannel(channel, channels) {
 // -------------------------------------------------------------
 // GİDER DEFTERİ (EXPENSES CRUD)
 // -------------------------------------------------------------
+// Arama: aranan metin ve kayit ayni Turkce katlamadan gecer (L-302,
+// core/search_text.js). Duz toLowerCase "seyir" ile SEYİR'i eslemiyordu.
+function searchTextApi() {
+  if (typeof LexbnbSearchText !== 'undefined') return LexbnbSearchText;
+  return require('./core/search_text.js');
+}
+function searchMatches(query, values) { return searchTextApi().matches(query, values); }
+function reservationSearchMatches(b, search) {
+  return searchMatches(search, [appData.villas?.[b.villa]?.name || b.villa, b.guest, b.channel]);
+}
+function expenseSearchMatches(exp, search) {
+  // Grafik taninmayan kategoriyi "Diger"e toplar (eslesenGiderKategorisi);
+  // arama da ayni eslemeye bakar, yoksa "Diger > Detay" bos liste aciyordu.
+  return searchMatches(search, [exp.description || exp.desc, exp.category, eslesenGiderKategorisi(exp.category)]);
+}
+function cleaningTaskSearchMatches(t, search) {
+  return searchMatches(search, [appData.villas?.[t.villa]?.name || t.villa, t.guest, t.cleaner, t.notes]);
+}
+
 function isAdsPeriodExpense(expense) {
   return String(expense?.legacyId || expense?.legacy_id || '').startsWith('ADS_PERIOD:');
 }
@@ -6682,15 +6772,12 @@ function renderExpensesTable() {
   if (!tbody) return;
   tbody.innerHTML = '';
 
-  const search = (document.getElementById('expSearchInput')?.value || '').toLowerCase();
+  const search = (document.getElementById('expSearchInput')?.value || '').trim();
 
   const filtered = appData.expenses.filter(exp => {
     if (!isExpenseInFilter(exp)) return false;
     if (!search) return true;
-    // Grafik taninmayan kategoriyi "Diger"e toplar (eslesenGiderKategorisi);
-    // arama da ayni eslemeye bakar, yoksa "Diger > Detay" bos liste aciyordu.
-    return (exp.description || exp.desc || "").toLowerCase().includes(search) || (exp.category || "").toLowerCase().includes(search)
-      || eslesenGiderKategorisi(exp.category).toLowerCase().includes(search);
+    return expenseSearchMatches(exp, search);
   });
 
   if (filtered.length === 0) {
@@ -6990,8 +7077,25 @@ function closeExpenseModal() {
   document.getElementById('expenseModal').classList.remove('active');
 }
 
+// Suren gider kaydi: cift tiklama ikinci bir gider yazmasin (L-269).
+let expenseSaveInFlight = false;
+
 async function saveExpense(e) {
   if (e && typeof e.preventDefault === 'function') e.preventDefault();
+  if (expenseSaveInFlight) return;
+  expenseSaveInFlight = true;
+  const submitBtn = (e && e.target && typeof e.target.querySelector === 'function')
+    ? e.target.querySelector('button[type="submit"]') : null;
+  if (submitBtn) submitBtn.disabled = true;
+  try {
+    await saveExpenseOnce();
+  } finally {
+    expenseSaveInFlight = false;
+    if (submitBtn) submitBtn.disabled = false;
+  }
+}
+
+async function saveExpenseOnce() {
   const editId = document.getElementById('expEditId')?.value;
   const type = document.getElementById('expType')?.value || 'OPEX';
   const category = (document.getElementById('expCategory')?.value || '').trim();
@@ -7027,7 +7131,7 @@ async function saveExpense(e) {
     closeExpenseModal();
   } catch (err) {
     console.error('saveExpense error:', err);
-    if (typeof alert === 'function') alert(err.message || 'Gider kaydedilemedi.');
+    if (typeof alert === 'function') alert(kullaniciMesaji(err.message || 'Gider kaydedilemedi.'));
   }
 }
 
@@ -7443,7 +7547,8 @@ function downloadSampleTemplate(templateType) {
   }
   const mode = ['BOOKINGS', 'CLEANING'].includes(templateType) ? templateType : 'EXPENSES';
   const values = getImportValidValues();
-  const guide = ImportTemplateGuide.buildGuide(mode, values);
+  // Veri sayfasi yalniz basliktir; rehber ornek satirdan soz etmez (L-278).
+  const guide = ImportTemplateGuide.buildGuide(mode, { ...values, headerOnly: true });
   const headers = engine.SABLON_SUTUNLARI[mode];
 
   // Veri sayfasi YALNIZ basliktir. Eskiden ornek satirlar musterinin GERCEK
@@ -7526,11 +7631,16 @@ function buildImportSource(bytes, fileName) {
   const ws = wb.Sheets[wb.SheetNames[0]];
   const rows = ws ? XLSX.utils.sheet_to_json(ws, { defval: '', raw: true }) : [];
   if (rows.length > IMPORT_MAX_ROWS) throw importSinirHatasi(rows.length);
+  // Basliklar ilk satirdan okunur (L-278): yalniz baslik satiri olan dosyada
+  // (degistirilmemis uygulama ici sablon) satir yok, Object.keys bos
+  // donuyordu; tur sezilemiyor ve dosya "Gider Defteri" saniliyordu.
+  const ilkSatir = ws ? (XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: true })[0] || []) : [];
+  const basliklar = ilkSatir.map(h => String(h == null ? '' : h).trim()).filter(Boolean);
   return {
     kind: 'XLSX',
     fileName,
     sheetNames: (wb.SheetNames || []).slice(),
-    headers: rows.length ? Object.keys(rows[0]) : [],
+    headers: basliklar.length ? basliklar : (rows.length ? Object.keys(rows[0]) : []),
     rows
   };
 }
@@ -7626,9 +7736,13 @@ function analyzeAndPreviewSource(kaynak) {
     }
   }
 
+  // Tur anlasilamadiysa gider defteri VARSAYILMAZ (L-278): kullanici turu
+  // secer. Eskiden GENERIC gider dogrulamasina dusuyordu.
+  if (detectedType === 'GENERIC') detectedType = 'UNKNOWN';
+
   // Update UI Select
   const select = document.getElementById('importModeSelect');
-  if (select) select.value = detectedType;
+  if (select) select.value = detectedType === 'UNKNOWN' ? 'AUTO' : detectedType;
 
   parseSourceWithMode(kaynak, detectedType);
 }
@@ -7772,6 +7886,25 @@ async function loadImportBatches(tenantId) {
   }));
 }
 
+// Aktarim donemi degistirdiyse eskisi hatirlanir (L-291): geri alinca kullanici
+// bos kalan aya (ör. Aralik) bakmaya devam ediyordu.
+let importPeriodMemory = null;
+function rememberImportPeriod(batchId, previous, movedTo) {
+  importPeriodMemory = batchId && previous && movedTo ? { batchId, previous: { ...previous }, movedTo } : null;
+}
+
+function setImportHistoryMessage(text, tone = 'info') {
+  if (typeof document === 'undefined') return;
+  const kutu = document.getElementById('importHistoryBox');
+  const mesaj = document.getElementById('importHistoryMessage');
+  if (mesaj) {
+    mesaj.textContent = text || '';
+    mesaj.style.color = tone === 'error' ? '#FCA5A5' : tone === 'success' ? '#6EE7B7' : '#C7C7CC';
+    mesaj.hidden = !text;
+  }
+  if (kutu && text) kutu.style.display = 'block';
+}
+
 async function undoImportBatch(batchId) {
   const tenantId = getActiveTenantId();
   try {
@@ -7811,9 +7944,21 @@ async function undoImportBatch(batchId) {
   }
 
   await loadTenantAppData(tenantId);
-  await refreshImportHistory();
 
   const silinen = (data.deleted_bookings || 0) + (data.deleted_expenses || 0) + (data.deleted_cleaning_tasks || 0);
+  // Aktarimin degistirdigi donem hala seciliyse eskisine donulur (L-291).
+  let donemNotu = '';
+  if (importPeriodMemory && importPeriodMemory.batchId === batchId && currentFilter.period === importPeriodMemory.movedTo) {
+    Object.assign(currentFilter, importPeriodMemory.previous);
+    const secici = document.getElementById('globalPeriodFilter');
+    if (secici && secici.querySelector && secici.querySelector(`option[value="${currentFilter.period}"]`)) secici.value = currentFilter.period;
+    donemNotu = ` Dönem ${getPeriodDisplayName(currentFilter.period)} olarak geri alındı.`;
+    importPeriodMemory = null;
+    if (typeof renderAll === 'function') renderAll();
+  }
+  await refreshImportHistory();
+  // Sonuc pencerede yazar (L-291): bolum kayboluyor, toast pencerenin arkasinda kaliyordu.
+  setImportHistoryMessage(`${silinen} kayıt geri alındı.${data.skipped_modified > 0 ? ` ${data.skipped_modified} kayıt elle düzenlendiği için silinmedi.` : ''}${donemNotu}`, 'success');
   if (data.skipped_modified > 0) {
     alert(`${silinen} kayıt silindi.\n\n${data.skipped_modified} kayıt SİLİNMEDİ: ` +
       'aktarımdan sonra elle düzenlenmişler. Onlar artık aktarılan veri değil, ' +
@@ -7833,12 +7978,16 @@ async function refreshImportHistory() {
   const partiler = await loadImportBatches(tenantId);
   appData.importBatches = partiler;
 
-  if (partiler.length === 0) { kutu.style.display = 'none'; return; }
-  kutu.style.display = 'block';
-
+  const mesajVar = !!(document.getElementById('importHistoryMessage') || {}).textContent;
   const govde = document.getElementById('importHistoryList');
+  if (partiler.length === 0) {
+    if (govde) govde.innerHTML = '';
+    kutu.style.display = mesajVar ? 'block' : 'none';
+    return;
+  }
+  kutu.style.display = 'block';
   if (!govde) return;
-  const tl = n => Math.round(Number(n) || 0).toLocaleString('tr-TR');
+  const tl = n => { const v = Math.round((Number(n) || 0) * 100) / 100; return v.toLocaleString('tr-TR', { minimumFractionDigits: Number.isInteger(v) ? 0 : 2, maximumFractionDigits: 2 }); };
 
   govde.innerHTML = partiler.map(p => {
     const tarih = p.importedAt ? new Date(p.importedAt).toLocaleString('tr-TR') : '—';
@@ -7846,7 +7995,7 @@ async function refreshImportHistory() {
     const dugme = geriAlinabilir
       ? `<button type="button" class="btn btn-secondary btn-sm" style="font-size:10px; padding:3px 8px; border-color:#FF453A; color:#FCA5A5;"
                  data-onclick="undoImportBatch(decodeURIComponent('${encodeActionArg(String(p.id))}'))">↩︎ Geri Al (${p.linkedCount})</button>`
-      : `<span style="font-size:10px; color:#6E6E73;" title="Bu aktarım, geri alma özelliği eklenmeden önce yapıldı.">geri alınamaz</span>`;
+      : `<span style="font-size:10px; color:#6E6E73;" title="Bu aktarımın kayıtları sonradan silinmiş ya da aktarım geri alma özelliği eklenmeden önce yapılmış.">geri alınacak kayıt yok</span>`;
     return `<div style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:6px 8px; border-bottom:1px solid rgba(255,255,255,0.06);">
       <div style="min-width:0;">
         <div style="font-size:11px; color:#E5E5EA; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(p.filename)}</div>
@@ -7901,12 +8050,17 @@ function parseSourceWithMode(kaynak, mode) {
     result: null
   };
 
-  if (finalMode === 'COMPANY_REPORT') {
+  if (finalMode === 'COMPANY_REPORT' || finalMode === 'UNKNOWN') {
     parsedData.result = null;   // onizleme kutusu kendi mesajini yazar
   } else {
     const ctx = {
       properties: getImportProperties(),
       existingBookings: (appData && appData.bookings) || [],
+      // L-304: gider de defterdeki kayda karsi mukerrer denetlenir.
+      existingExpenses: ((appData && appData.expenses) || []).map(e => ({
+        date: e.date, amount: e.amount, category: e.category, description: e.description,
+        propertyId: e.propertyId || (appData.villas && appData.villas[e.villa] && appData.villas[e.villa].id) || null
+      })),
       // L-194: kanal katalogdan dogrulanir; defterde zaten duran eski serbest
       // kategori/kanal degerleri (dis aktar -> geri yukle turu) kabul edilir.
       channels: getBookingChannelCatalog(),
@@ -7966,11 +8120,22 @@ function renderImportPreviewBox() {
     return;
   }
 
+  // --- Tur anlasilamadi (L-278): kullanici secer, gider varsayilmaz ---
+  if (pendingImportData.mode === 'UNKNOWN') {
+    if (badge) { badge.innerText = 'Tür belirlenemedi'; badge.className = 'badge badge-amber'; }
+    if (stats) stats.innerText = 'Dosyanın rezervasyon, gider ya da geçmiş temizlik defteri olduğu sütun adlarından anlaşılamadı. Yukarıdaki listeden türü seçin.';
+    if (thead) thead.innerHTML = '';
+    if (tbody) tbody.innerHTML = '';
+    if (btn) { btn.disabled = true; btn.innerText = 'Önce dosya türünü seçin'; }
+    return;
+  }
+
   if (!r) return;
 
   const rezMi = pendingImportData.mode === 'BOOKINGS';
   const temizlikMi = pendingImportData.mode === 'CLEANING';
-  const tl = n => Math.round(Number(n) || 0).toLocaleString('tr-TR');
+  // Kurus yuvarlanmaz (L-306): 101,50 onizlemede "102" yaziyordu.
+  const tl = n => { const v = Math.round((Number(n) || 0) * 100) / 100; return v.toLocaleString('tr-TR', { minimumFractionDigits: Number.isInteger(v) ? 0 : 2, maximumFractionDigits: 2 }); };
 
   if (badge) {
     badge.innerText = rezMi ? 'Rezervasyon Defteri' : temizlikMi ? 'Geçmiş Temizlikler' : 'Gider Defteri';
@@ -7979,18 +8144,18 @@ function renderImportPreviewBox() {
 
   // --- Eslesmeyen zorunlu sutun var mi? ---
   const zorunlu = rezMi
-    ? { property: 'Villa', guest: 'Misafir Adı', checkIn: 'Giriş Tarihi', checkOut: 'Çıkış Tarihi', gross: 'Brüt Tutar' }
+    ? { property: 'Villa', guest: 'Misafir Adı', checkIn: 'Giriş Tarihi', checkOut: 'Çıkış Tarihi', gross: 'Brüt Tutar', pax: 'Kişi Sayısı' }
     : temizlikMi
       ? { date: 'Tarih', property: 'Villa', amount: 'Tutar' }
       : { date: 'Tarih', category: 'Kategori', amount: 'Tutar' };
   const eksikSutun = Object.keys(zorunlu).filter(k => !pendingImportData.columnMap[k]).map(k => zorunlu[k]);
 
-  const yazilacak = (r.validatedRows || []).filter(v => !v.isPotentialDuplicate && !v.hasFileOverlap).length;
+  const yazilacak = (r.validatedRows || []).filter(v => !v.isPotentialDuplicate && !v.hasFileOverlap && !v.hasLedgerOverlap).length;
 
   if (stats) {
     const p = [`${r.totalRows} satır okundu`];
     p.push(`${yazilacak} kayıt eklenecek`);
-    if (r.duplicateCount) p.push(`${r.duplicateCount} mükerrer atlanacak`);
+    if (r.duplicateCount) p.push(`${r.duplicateCount} mükerrer atlanacak` + (r.existingDuplicateCount ? ` (${r.existingDuplicateCount} kayıt defterde zaten var)` : ''));
     if (r.invalidCount) p.push(`${r.invalidCount} hatalı`);
     if (r.overlaps && r.overlaps.length) p.push(`${r.overlaps.length} tarih çakışması`);
     p.push(rezMi ? `toplam ${tl(r.totalGross)} TL / ${r.totalNights} gece` : `toplam ${tl(r.totalAmount)} TL`);
@@ -8002,6 +8167,8 @@ function renderImportPreviewBox() {
     } else if (r.dateOrder === 'MDY') {
       p.push('ℹ️ Tarihler dosyadan AY/GÜN (ABD) sırasıyla tespit edildi');
     }
+    // Bos sablon (L-278): baslik var, kayit yok.
+    if (!r.totalRows) p.unshift('Dosyada başlık satırından başka kayıt satırı yok — kayıtlarınızı başlığın altına yazın');
     stats.innerText = p.join(' · ');
   }
 
@@ -8057,7 +8224,7 @@ function renderImportPreviewBox() {
     });
 
     // Sonra gecerli satirlardan ornek
-    (r.validatedRows || []).filter(v => !v.hasFileOverlap).slice(0, Math.max(0, 15 - hatalar.length)).forEach(v => {
+    (r.validatedRows || []).filter(v => !v.hasFileOverlap && !v.hasLedgerOverlap).slice(0, Math.max(0, 15 - hatalar.length)).forEach(v => {
       const durum = v.isPotentialDuplicate ? '⊘ mükerrer, atlanacak' : '✓ eklenecek';
       const renk = v.isPotentialDuplicate ? 'rgba(255, 159, 10,0.10)' : '';
       if (rezMi) {
@@ -8110,7 +8277,7 @@ function resetImportPreview() {
  */
 async function computeImportContentFingerprint(mode, result, tenantId) {
   const alanlar = r => {
-    const { raw, rowNum, isPotentialDuplicate, hasFileOverlap, ...kalan } = r || {};
+    const { raw, rowNum, isPotentialDuplicate, hasFileOverlap, hasLedgerOverlap, ...kalan } = r || {};
     return JSON.stringify(Object.keys(kalan).sort().map(k => [k, kalan[k]]));
   };
   const satirlar = ((result && result.validatedRows) || []).map(alanlar).sort();
@@ -8142,7 +8309,7 @@ async function applyImportedData() {
   const r = pendingImportData.result;
   const rezMi = pendingImportData.mode === 'BOOKINGS';
   const temizlikMi = pendingImportData.mode === 'CLEANING';
-  const yazilacaklar = (r.validatedRows || []).filter(v => !v.isPotentialDuplicate && !v.hasFileOverlap);
+  const yazilacaklar = (r.validatedRows || []).filter(v => !v.isPotentialDuplicate && !v.hasFileOverlap && !v.hasLedgerOverlap);
   if (yazilacaklar.length === 0) {
     if (typeof showToast === 'function') showToast('İçe aktarılacak geçerli kayıt yok.', 'info');
     return;
@@ -8278,6 +8445,7 @@ async function applyImportedData() {
   // Basarili bir aktarim kaydi birak (mukerrer engeli bunu okur) ve yazilan
   // kayitlari ona BAGLA — geri alma bu bagin ustunde durur (phase35).
   let bagKuruldu = false;
+  let partiKimligi = null;
   if (parmakIzi && supabaseClient && basarili.length > 0) {
     try {
       const { data: parti, error: partiHata } = await supabaseClient
@@ -8292,6 +8460,7 @@ async function applyImportedData() {
         .select('id')
         .single();
       if (partiHata) throw partiHata;
+      partiKimligi = parti.id;
       bagKuruldu = await cloudLinkImportBatchRows(tenantId, parti.id, pendingImportData.mode, yeniKayitlar);
     } catch (e) {
       // Kayit tutulamazsa aktarimin KENDISI yine de gecerlidir; kullanici
@@ -8303,6 +8472,19 @@ async function applyImportedData() {
   await loadTenantAppData(tenantId);
   if (btn) { btn.disabled = false; }
 
+  // Gelecek tarihli aktarilan rezervasyona planli temizlik acilir (L-291):
+  // formdan girilen rezervasyonla ayni kural; maliyet bilinmiyorsa uydurulmaz.
+  let temizlikUyarisi = '';
+  if (rezMi) {
+    const bugunTarih = getTodayStr();
+    for (const kayit of yeniKayitlar) {
+      const rez = (appData.bookings || []).find(b => String(b.id) === String(kayit.id));
+      if (!rez || String(rez.status || '').toUpperCase() === 'CANCELLED' || !(rez.checkOut >= bugunTarih) || findBookingCleaningTask(rez)) continue;
+      temizlikUyarisi = temizlikUyarisi || await syncBookingCleaningTaskToCloud(rez, null);
+    }
+  }
+  await refreshImportHistory();
+
   // Ice aktarilan kayitlarin bulundugu SON aya gec.
   //
   // Bunsuz, gecmis veri aktaran kullanici hicbir sey gormuyordu: donem filtresi
@@ -8312,6 +8494,7 @@ async function applyImportedData() {
   const gidilenAy = enSonVeriAyi(yazilacaklar, rezMi);
   let ayDegisti = false;
   if (gidilenAy && gidilenAy !== currentFilter.period) {
+    rememberImportPeriod(partiKimligi, { period: currentFilter.period, startDate: currentFilter.startDate, endDate: currentFilter.endDate }, gidilenAy);
     currentFilter.period = gidilenAy;
     currentFilter.startDate = gidilenAy + '-01';
     const sg = new Date(Date.UTC(Number(gidilenAy.slice(0, 4)), Number(gidilenAy.slice(5, 7)), 0)).getUTCDate();
@@ -8336,7 +8519,7 @@ async function applyImportedData() {
     resetImportPreview();
     if (typeof showToast === 'function') {
       const ek = ayDegisti ? ` Dönem ${getPeriodDisplayName(gidilenAy)} olarak değiştirildi.` : '';
-      showToast(`${basarili.length} kayıt içe aktarıldı.${ek}`, 'success');
+      showToast(`${basarili.length} kayıt içe aktarıldı.${ek}${temizlikUyarisi ? ' ' + temizlikUyarisi.trim() : ''}`, 'success');
     }
   } else {
     // Kismi basari: NE YAZILDI, NE YAZILMADI acikca soylenir.
@@ -8481,7 +8664,9 @@ function computeReservationRowEconomics(booking, cleaningTask, rangeStart, range
   const finance = (booking?.financialDetails || booking?.financial_details || {}).result || {};
   let cleaning = null;
   if (cleaningTask && String(cleaningTask.status || '').toUpperCase() !== 'SKIPPED') {
-    const tutar = cleaningTask.amount === null || cleaningTask.amount === undefined || cleaningTask.amount === '' ? null : Number(cleaningTask.amount);
+    // cleaning_tasks.amount NOT NULL varsayilan 0'dir: maliyeti girilmemis gorev 0
+    // tasir. 0 bilinmiyor sayilir, "−0 ₺" yazilmaz (L-292).
+    const tutar = cleaningTask.amount === null || cleaningTask.amount === undefined || cleaningTask.amount === '' || Number(cleaningTask.amount) === 0 ? null : Number(cleaningTask.amount);
     const gun = cleaningTask.date || cleaningTask.task_date || booking.checkOut;
     cleaning = {
       amount: Number.isFinite(tutar) ? tutar : null, date: gun,
@@ -8607,8 +8792,17 @@ function openBookingDetailsPanel(bookingId) {
   const methodOptions = [['', 'Yöntem —'], ['CASH', 'Nakit'], ['BANK_TRANSFER', 'Havale/EFT'], ['CARD', 'Kart'], ['OTA', 'OTA'], ['OTHER', 'Diğer']]
     .map(([v, l]) => `<option value="${v}"${otaKanali && !kaporaAlinir && v === 'OTA' ? ' selected' : ''}>${l}</option>`).join('');
   const kaporaNotu = kaporaAlinir ? '' : '<p class="sub-text">Bu kanalda kapora alınmıyor; ödemeyi platform aktarır. Değiştirmek için Ayarlar → Kanallar → Kapora.</p>';
-  const paymentForm = canWriteSalesRole(activeTenant?.role) ? `<div class="booking-payment-form"><input id="bookingPaymentAmount" type="number" min="0.01" step="0.01" placeholder="Tutar"><input id="bookingPaymentDate" type="date" value="${escapeHtml(getTodayStr())}"><select id="bookingPaymentKind">${kindOptions}</select><select id="bookingPaymentMethod">${methodOptions}</select><input id="bookingPaymentNote" maxlength="1000" placeholder="Not —"><button class="btn btn-primary" data-onclick="saveBookingPayment(decodeURIComponent('${encodeActionArg(String(booking.id))}'))">Ödeme ekle</button></div>${kaporaNotu}` : '';
-  const paymentHtml = `<section class="booking-payments"><h3>Ödeme takibi</h3><div class="booking-payment-summary"><div><span>Tahsil edilecek</span><strong>${money(balance?.amount_due)}</strong></div><div><span>Toplam tahsilat</span><strong>${money(balance?.paid_total)}</strong></div><div><span>Kalan</span><strong>${money(balance?.remaining)}</strong></div></div>${paymentRows}${paymentForm}<p class="sub-text">Ödeme nakit hareketidir; rezervasyon cirosunu değiştirmez.</p></section>`;
+  const iptal = String(booking.status || '').toUpperCase() === 'CANCELLED';
+  const paymentForm = canWriteSalesRole(activeTenant?.role) && !iptal ? `<div class="booking-payment-form"><input id="bookingPaymentAmount" type="number" min="0.01" step="0.01" placeholder="Tutar"><input id="bookingPaymentDate" type="date" value="${escapeHtml(getTodayStr())}"><select id="bookingPaymentKind">${kindOptions}</select><select id="bookingPaymentMethod">${methodOptions}</select><input id="bookingPaymentNote" maxlength="1000" placeholder="Not —"><button class="btn btn-primary" data-onclick="saveBookingPayment(decodeURIComponent('${encodeActionArg(String(booking.id))}'))">Ödeme ekle</button></div>${kaporaNotu}` : '';
+  // Iptal edilen rezervasyon tahsilat beklemez (L-274): bakiye gorunumu
+  // iptali bilmiyor, "Kalan 15.000" diyordu. Alinan para iade ya da mahsup
+  // edilmelidir; odeme kaydi silinmez (nakit hareketidir).
+  const alinan = Number(balance?.paid_total) || 0;
+  const ozetHtml = iptal
+    ? `<div class="booking-payment-summary"><div><span>Tahsil edilecek</span><strong>— (iptal)</strong></div><div><span>Toplam tahsilat</span><strong>${money(balance?.paid_total)}</strong></div></div>`
+      + (alinan > 0 ? `<p class="sub-text" style="color:#FFB340;">Rezervasyon iptal edildi; alınan ${money(alinan)} misafire iade edilmeli ya da başka bir rezervasyona mahsup edilmelidir.</p>` : '')
+    : `<div class="booking-payment-summary"><div><span>Tahsil edilecek</span><strong>${money(balance?.amount_due)}</strong></div><div><span>Toplam tahsilat</span><strong>${money(balance?.paid_total)}</strong></div><div><span>Kalan</span><strong>${money(balance?.remaining)}</strong></div></div>`;
+  const paymentHtml = `<section class="booking-payments"><h3>Ödeme takibi</h3>${ozetHtml}${paymentRows}${paymentForm}<p class="sub-text">Ödeme nakit hareketidir; rezervasyon cirosunu değiştirmez.</p></section>`;
   // Konaklamanin tamami (donem payi degil): liste satiriyla ayni hesap.
   const e = computeReservationRowEconomics(booking, cleaning, '0000-01-01', '9999-12-31');
   const tl = value => `${Number(value || 0).toLocaleString('tr-TR', { maximumFractionDigits: 2 })} ₺`;
@@ -8624,7 +8818,7 @@ function openBookingDetailsPanel(bookingId) {
     ${e.tax > 0 ? detailHtml('Vergi', '− ' + tl(e.tax)) : ''}
     ${detailHtml('Temizlik ücreti (misafirden, gelir)', tl(e.cleaningRevenue))}
     ${detailHtml('Ciro (oda geliri, indirim sonrası)', e.cancelled ? '—' : tl(e.netRoomRevenue))}
-    ${detailHtml('OTA + ödeme komisyonu (gider)', '− ' + tl(e.commission))}
+    ${detailHtml('OTA + ödeme komisyonu (gider)', e.commission > 0 ? '− ' + tl(e.commission) : tl(0))}
     ${detailHtml('Temizlik maliyeti (personele, gider)', temizlikMaliyeti)}
     ${detailHtml('Kalan (tahmini)', e.cancelled ? '—' : tl(e.remaining))}
     ${detailHtml('Temizlik görevi', cleaningStatus)}
@@ -8638,7 +8832,7 @@ function openBookingDetailsPanel(bookingId) {
 }
 
 function getFilteredReservationListRows() {
-  const search = (document.getElementById('rezSearchInput')?.value || '').toLowerCase();
+  const search = (document.getElementById('rezSearchInput')?.value || '').trim();
   const villaFilter = document.getElementById('rezVillaFilter')?.value || 'ALL';
   const statusFilter = document.getElementById('rezStatusFilter')?.value || 'ALL';
   const todayStr = getTodayStr();
@@ -8654,12 +8848,7 @@ function getFilteredReservationListRows() {
     if (statusFilter !== 'ALL' && b.status !== statusFilter) return false;
 
     // Search
-    if (search) {
-      const vName = (appData.villas[b.villa]?.name || b.villa).toLowerCase();
-      const gName = (b.guest || '').toLowerCase();
-      const chName = (b.channel || '').toLowerCase();
-      if (!vName.includes(search) && !gName.includes(search) && !chName.includes(search)) return false;
-    }
+    if (search && !reservationSearchMatches(b, search)) return false;
 
     return true;
   });
@@ -8686,10 +8875,13 @@ function renderManageBookingsTable() {
   const summaryPill = document.getElementById('rezTableSummaryPill');
   if (summaryPill) {
     // Toplu aktarim ozeti rezervasyon sayilmaz (L-103); gece ve tutara dahildir.
-    const ozetSayisi = filteredRows.filter(row => isBulkSummaryBooking(row.booking)).length;
-    const rezSayisi = filteredRows.length - ozetSayisi;
+    // Iptal rezervasyon sayilmaz (L-284); listede gorunur, ozette ayri yazilir.
+    const iptalMi = row => String(row.booking?.status || '').toUpperCase() === 'CANCELLED';
+    const iptalSayisi = filteredRows.filter(iptalMi).length;
+    const ozetSayisi = filteredRows.filter(row => !iptalMi(row) && isBulkSummaryBooking(row.booking)).length;
+    const rezSayisi = filteredRows.length - ozetSayisi - iptalSayisi;
     const tl = n => `${Math.round(n).toLocaleString('tr-TR')} TL`;
-    summaryPill.innerHTML = `📊 Gösterilen: <strong>${rezSayisi} Rezervasyon</strong>${ozetSayisi ? ` + ${ozetSayisi} toplu aktarım özeti` : ''} | 🌙 ${listSummary.soldNights} Gece`
+    summaryPill.innerHTML = `📊 Gösterilen: <strong>${rezSayisi} Rezervasyon</strong>${ozetSayisi ? ` + ${ozetSayisi} toplu aktarım özeti` : ''}${iptalSayisi ? ` (+ ${iptalSayisi} iptal, hesaba girmez)` : ''} | 🌙 ${listSummary.soldNights} Gece`
       + ` | Brüt (bu döneme düşen): ${tl(listSummary.gross)} | 💰 Ciro (oda geliri, indirim sonrası): <strong>${tl(listSummary.netRoomRevenue)}</strong>`
       + ` | Kesintiler: −${tl(listSummary.deductions)} | Kalan (tahmini): ${tl(listSummary.remaining)}`;
   }
@@ -9318,7 +9510,11 @@ if (typeof document !== 'undefined' && document.addEventListener) {
     if (event.target.closest && !event.target.closest('.daterange-group')) toggleResDatePicker(false);
   });
   document.addEventListener('keydown', event => {
-    if (event.key === 'Escape') toggleResDatePicker(false);
+    if (event.key !== 'Escape') return;
+    const panel = document.getElementById('resDatePicker');
+    // Acik secici Esc'i kendisi alir; pencere kapanmasin (L-312).
+    if (panel && !panel.hidden) event.preventDefault();
+    toggleResDatePicker(false);
   });
 }
 
@@ -9385,6 +9581,8 @@ async function saveBooking(e) {
     const tarihDegisti = !eskiKayit || eskiKayit.checkIn !== checkIn || eskiKayit.checkOut !== checkOut || eskiKayit.villa !== villa;
     const minStayEngeli = tarihDegisti ? minStayBlockMessage(villa, checkIn, checkOut, { status }) : null;
     if (minStayEngeli) throw new Error(minStayEngeli);
+    // Cikis tarihinden once "Cikis yapti" (L-280): uyarisiz kabul ediliyordu.
+    if (!confirmEarlyCheckout(checkIn, checkOut, status, eskiKayit)) throw new Error('Kayıt yapılmadı.');
 
     const economics = readBookingFormEconomics();
     const cleanFee = economics.cleanFee;
@@ -9436,6 +9634,12 @@ async function saveBooking(e) {
     if (deposit > 0) ekUyari += await recordBookingDeposit(savedBooking.id, deposit, depositMethod, null);
     if (typeof renderAll === 'function') renderAll();
 
+    // Iptalde alinmis para iade ya da mahsup edilmelidir (L-274).
+    if (String(status || '').toUpperCase() === 'CANCELLED') {
+      const bakiye = (appData.bookingPaymentBalances || []).find(item => String(item.booking_id) === String(savedBooking.id));
+      const alinan = Number(bakiye?.paid_total) || 0;
+      if (alinan > 0) ekUyari += `\n\nNot: Bu rezervasyon için ${alinan.toLocaleString('tr-TR')} ₺ tahsilat kayıtlı; misafire iade edin ya da başka bir rezervasyona mahsup edin. Ödeme kaydı silinmedi.`;
+    }
     let guestProfileWarning = ekUyari;
     if (guestPhone || guestEmail) {
       try {
@@ -9453,7 +9657,10 @@ async function saveBooking(e) {
     }
 
     closeBookingModal();
-    if (typeof alert === 'function') alert('✅ Rezervasyon başarıyla kaydedildi!' + guestProfileWarning);
+    // Basari bildirimi ham alert degil (L-287); ek uyari varsa okunur pencerede.
+    if (guestProfileWarning && typeof uiDialogApi === 'function' && uiDialogApi()) uiDialogApi().notify({ title: 'Rezervasyon kaydedildi', message: String(guestProfileWarning).trim() });
+    else if (guestProfileWarning && typeof alert === 'function') alert('Rezervasyon kaydedildi.' + guestProfileWarning);
+    if (typeof showToast === 'function') showToast('✅ Rezervasyon kaydedildi.', 'success');
   } catch (err) {
     console.error('saveBooking error:', err);
     if (typeof alert === 'function') alert('Rezervasyon kaydedilemedi: ' + (err.message || 'Lütfen bilgileri kontrol edin.'));
@@ -10331,6 +10538,21 @@ async function submitMemberInvite(e) {
     return;
   }
 
+  // Ayni adrese bekleyen davet (L-307): sunucu ayni satiri gunceller (rol,
+  // 14 gunluk sure). Rol sessizce degisiyor, mesaj "gonderildi" diyordu.
+  const rolAdi = r => TEAM_ROLES[r]?.label || r;
+  let bekleyen = null;
+  try {
+    const { data: davetler } = await supabaseClient.rpc('get_tenant_invitations', { p_tenant_id: tenantId });
+    bekleyen = (davetler || []).find(d => String(d.email || '').trim().toLowerCase() === email && String(d.status || 'PENDING').toUpperCase() === 'PENDING') || null;
+  } catch (_) { bekleyen = null; }
+  if (bekleyen) {
+    const soru = bekleyen.role !== role
+      ? `${email} adresine bekleyen bir "${rolAdi(bekleyen.role)}" daveti var. Rolü "${rolAdi(role)}" olarak güncelleyip daveti yeniden göndermek istiyor musunuz?\n\nÖnceki e-postadaki bağlantı da geçerli kalır; katılan kişi yeni rolle (${rolAdi(role)}) katılır.`
+      : `${email} adresine zaten bekleyen bir "${rolAdi(role)}" daveti var. Davet yeniden gönderilsin ve süresi 14 gün uzatılsın mı?`;
+    if (typeof confirm === 'function' && !confirm(soru)) return;
+  }
+
   if (btn) { btn.disabled = true; btn.innerText = '⏳ Gönderiliyor...'; }
 
   try {
@@ -10360,7 +10582,10 @@ async function submitMemberInvite(e) {
     const deliveryText = delivery === 'sent'
       ? 'Davet e-postası gönderildi.'
       : 'Davet oluşturuldu; e-posta teslim kuyruğuna alındı.';
-    alert(`✉️ ${deliveryText}\n\n${email} bu adresle kayıt olup giriş yaptığında ekibinize otomatik katılacak.\nDavet 14 gün geçerlidir.`);
+    const guncellemeText = bekleyen
+      ? `Bekleyen davet güncellendi${bekleyen.role !== role ? ` (rol: ${rolAdi(bekleyen.role)} → ${rolAdi(role)})` : ''}; süresi 14 gün uzatıldı. Önceki e-postadaki bağlantı da geçerli, katılım yeni rolle olur.\n\n`
+      : '';
+    alert(`✉️ ${guncellemeText}${deliveryText}\n\n${email} bu adresle kayıt olup giriş yaptığında ekibinize ${rolAdi(role)} rolüyle otomatik katılacak.\nDavet 14 gün geçerlidir.`);
   } catch (ex) {
     showInviteError(ex && ex.message ? ex.message : 'Davet gönderilemedi.');
   } finally {
@@ -10521,7 +10746,10 @@ async function setBookingChannelActive(channelId, isActive) {
 
 async function createBookingChannelFromSettings(formEvent) {
   formEvent.preventDefault();
-  const submit = formEvent.currentTarget.querySelector('button[type="submit"]');
+  // Olayin currentTarget'i ilk await'ten sonra null olur (L-272): kanal
+  // kaydediliyor ama reset() hatasi "Kanal eklenemedi" diyordu.
+  const form = formEvent.currentTarget;
+  const submit = form.querySelector('button[type="submit"]');
   if (submit) submit.disabled = true;
   try {
     await saveTenantBookingChannel({
@@ -10530,12 +10758,13 @@ async function createBookingChannelFromSettings(formEvent) {
       defaultCommissionRate: document.getElementById('newBookingChannelRate')?.value,
       isActive: true
     });
-    formEvent.currentTarget.reset();
+    form.reset();
     toggleNewBookingChannelRate();
     await refreshBookingChannelSettings();
     setBookingChannelMessage('Yeni rezervasyon kanalı eklendi.', 'success');
   } catch (error) {
-    setBookingChannelMessage('Kanal eklenemedi: ' + (error.message || 'Bilinmeyen hata'), 'error');
+    const ayniAd = /duplicate key|23505/i.test(String(error?.message || '')) || error?.code === '23505';
+    setBookingChannelMessage(ayniAd ? 'Kanal eklenemedi: bu adla bir kanal zaten var.' : 'Kanal eklenemedi: ' + kullaniciMesaji(error.message || 'Bilinmeyen hata'), 'error');
   } finally {
     if (submit) submit.disabled = false;
   }
@@ -11156,7 +11385,7 @@ function renderSettingsTemplates() {
   const checklistBuilder = document.getElementById('settingsChecklistBuilder');
   if (checklistBuilder && checklistBuilder.dataset.ready !== 'true') renderSettingsChecklistBuilder(defaultSettingsChecklistDraft());
   if (messageList) messageList.innerHTML = messages.length
-    ? messages.map(item => settingsTemplateRowHtml('message', item, item.name, `${String(item.channel || 'WHATSAPP').toUpperCase() === 'WHATSAPP' ? 'WhatsApp' : (item.channel || '—')} · ${String(item.lifecycle_stage || 'MANUAL').toUpperCase() === 'MANUAL' ? 'elle gönderilir' : 'otomatik'}${item.is_active === false ? ' · Kapalı' : ''}`)).join('')
+    ? messages.map(item => settingsTemplateRowHtml('message', item, item.name, `${String(item.channel || 'WHATSAPP').toUpperCase() === 'WHATSAPP' ? 'WhatsApp' : (item.channel || '—')} · ${String(item.lifecycle_stage || 'MANUAL').toUpperCase() === 'MANUAL' ? 'elle gönderilir' : 'otomatik'} · ${String(item.message_type || '').toUpperCase() === 'MARKETING' ? 'pazarlama (kampanya izni gerekir)' : 'işlemsel'}${item.is_active === false ? ' · Kapalı' : ''}`)).join('')
     : '<div class="empty-state">Mesaj şablonu yok.</div>';
   if (taskList) taskList.innerHTML = tasks.length
     ? tasks.map(item => settingsTemplateRowHtml('task', item, item.title, `${TEMPLATE_TASK_TYPE_LABELS[item.task_type] || 'Genel'} · ${TEMPLATE_PRIORITY_LABELS[item.priority] || 'orta öncelik'}${item.is_active === false ? ' · Kapalı' : ''}`)).join('')
@@ -11175,12 +11404,17 @@ async function createSettingsMessageTemplate(event) {
   event.preventDefault();
   const form = event.currentTarget;
   try {
+    // Tur secilir (L-277): pazarlama sablonu yalniz kampanya izni olan
+    // misafire gider; hep TRANSACTIONAL yazildigi icin izin kapisi hic calismiyordu.
+    const tur = String(form.elements.message_type?.value || 'TRANSACTIONAL').toUpperCase() === 'MARKETING' ? 'MARKETING' : 'TRANSACTIONAL';
     await createMessageTemplate({
       name: String(form.elements.name.value || '').trim(), body: String(form.elements.body.value || '').trim(),
-      channel: 'WHATSAPP', lifecycle_stage: 'MANUAL', message_type: 'TRANSACTIONAL', language: 'tr', is_active: true
+      channel: 'WHATSAPP', lifecycle_stage: 'MANUAL', message_type: tur, language: 'tr', is_active: true
     });
     form.reset();
     await loadSettingsCatalogs();
+    // Yeni sablon talep ve misafir penceresinde esitleme beklemeden gorunur (L-277).
+    appData.messageTemplates = (appData.settingsMessageTemplates || []).filter(item => item.is_active !== false);
     renderSettingsTemplates();
     showToast('Mesaj şablonu kaydedildi.', 'success');
     return true;
@@ -11569,7 +11803,7 @@ function buildLeadSalesView({ leads = [], sources = [], acquisitions = [], workf
       ...lead,
       channel: normalizeLeadChannel(lead.channel),
       sourceId: acquisition?.source_id || null,
-      sourceLabel: source?.label || '—',
+      sourceLabel: source ? (source.is_active === false ? `${source.label} (kapalı)` : source.label) : '—',
       assignedTo: workflow?.assigned_to || null,
       nextFollowUpAt: workflow?.next_follow_up_at || null
     };
@@ -11596,7 +11830,7 @@ function setLeadFollowUpScope(scope) {
 function getLeadSalesView() {
   return buildLeadSalesView({
     leads: appData.leads || [],
-    sources: appData.leadSources || [],
+    sources: appData.leadSourcesAll || appData.leadSources || [],
     acquisitions: appData.leadAcquisitions || [],
     workflows: appData.leadWorkflows || [],
     today: getTodayStr(),
@@ -11651,6 +11885,16 @@ async function updateLeadStatusFromKanban(leadId, nextStatus) {
   const allowedStatuses = new Set(['NEW', 'CONTACTED', 'QUOTE_SENT', 'FOLLOW_UP', 'LOST']);
   const normalizedStatus = String(nextStatus || '').toUpperCase();
   if (!canWriteSalesRole(activeTenant?.role) || !allowedStatuses.has(normalizedStatus)) return false;
+  // Kaybedildi neden ister (L-279): kanbandan nedensiz yazilmaz, duzenleme
+  // penceresi durum secili olarak acilir.
+  if (normalizedStatus === 'LOST') {
+    renderLeadSalesWorkspace();
+    openLeadModal(leadId);
+    const durum = document.getElementById('leadStatus');
+    if (durum) durum.value = 'LOST';
+    showToast('Kayıp nedenini seçip kaydedin.', 'info');
+    return false;
+  }
   try {
     await updateLead(leadId, { status: normalizedStatus });
     await loadLeads(getActiveTenantId());
@@ -11762,6 +12006,7 @@ function renderLeadQuickCapture() {
 async function refreshLeadSalesContext() {
   const context = await loadLeadSalesContext(getActiveTenantId());
   appData.leadSources = context.sources;
+  appData.leadSourcesAll = context.allSources;
   appData.leadAcquisitions = context.acquisitions;
   appData.leadWorkflows = context.workflows;
   appData.leadInterests = context.interests;
@@ -11772,7 +12017,7 @@ async function refreshLeadSalesContext() {
 
 async function addLeadSource() {
   if (!canManageTenantRole(activeTenant?.role)) return false;
-  const label = prompt('Yeni talep kaynağının adı:', '');
+  const label = await uiAskText({ title: 'Yeni talep kaynağı', label: 'Kaynağın adı', placeholder: 'Örn: Google Haritalar' });
   if (!String(label || '').trim()) return false;
   try {
     const source = await SalesWorkflowService.createSource(supabaseClient, { tenantId: getActiveTenantId(), label });
@@ -11795,6 +12040,14 @@ async function bumpLeadInterestFromQuick(delta) {
     return false;
   }
   const channel = normalizeLeadChannel(rawChannel);
+  // Sayac 0 iken geri al sunucuda CHECK hatasina dusup ham kod gosteriyordu (L-293).
+  if (Number(delta) === -1) {
+    const satir = (appData.leadInterests || []).find(row => row.day === getTodayStr() && String(row.source_id) === String(sourceId) && normalizeLeadChannel(row.channel) === channel);
+    if (!(Number(satir?.count) > 0)) {
+      setLeadQuickMessage('Bugün bu kaynak ve kanal için geri alınacak sayaç yok.', 'error');
+      return false;
+    }
+  }
   try {
     const result = await SalesWorkflowService.bumpInterest(supabaseClient, {
       tenantId: getActiveTenantId(), day: getTodayStr(), sourceId, channel, delta
@@ -11856,13 +12109,11 @@ function renderManageLeadsTable() {
   tbody.innerHTML = '';
 
   // Liste kanbanla ayni satirlari (kaynak dahil) ayni sirada gosterir.
-  const searchVal = (document.getElementById('leadSearchInput')?.value || '').toLocaleLowerCase('tr').trim();
-  const searchDigits = searchVal.replace(/\D/g, '');
+  const searchVal = (document.getElementById('leadSearchInput')?.value || '').trim();
   const leads = getLeadSalesView().rows.filter(l => {
     if (!searchVal) return true;
-    const text = [l.guest, l.guestName, leadPropertyLabel(l), l.villa, l.channel, l.sourceLabel, l.notes]
-      .map(value => String(value || '').toLocaleLowerCase('tr')).join(' ');
-    return text.includes(searchVal) || (searchDigits.length >= 3 && String(l.phone || '').replace(/\D/g, '').includes(searchDigits));
+    return searchMatches(searchVal, [l.guest, l.guestName, leadPropertyLabel(l), l.villa, l.channel, l.sourceLabel, l.notes])
+      || searchTextApi().phoneMatches(searchVal, l.phone);
   });
   if (!leads.length) {
     tbody.innerHTML = `<tr><td colspan="8" class="empty-state">${searchVal ? 'Aramaya uyan talep yok.' : 'Henüz talep yok.'}</td></tr>`;
@@ -11889,7 +12140,7 @@ function renderManageLeadsTable() {
     tr.innerHTML = `
       <td><strong>${escapeHtml(l.guestName || l.phone || l.guest)}</strong>${l.guestName && l.phone ? `<span style="display:block; font-size:11px; color:var(--text-muted);">${escapeHtml(l.phone)}</span>` : ''}${l.checkIn && l.checkOut ? `<span style="display:block; font-size:11px; color:var(--text-muted);">${escapeHtml(formatTrDate(l.checkIn))} → ${escapeHtml(formatTrDate(l.checkOut))}</span>` : ''}</td>
       <td>${escapeHtml(leadPropertyLabel(l))}${(l.extraPropertyIds || []).length ? `<span style="display:block; font-size:11px; color:var(--text-muted);">+ ${escapeHtml((l.extraPropertyIds || []).map(id => Object.values(appData.villas || {}).find(v => v.id === id)?.name).filter(Boolean).join(', '))}</span>` : ''}</td>
-      <td>${escapeHtml([l.sourceLabel !== '—' ? l.sourceLabel : '', l.channel].filter(Boolean).join(' · '))}</td>
+      <td>${escapeHtml([l.sourceLabel !== '—' ? l.sourceLabel : '', l.channel ? leadChannelLabel(l.channel) : ''].filter(Boolean).join(' · '))}</td>
       <td>${escapeHtml(leadQuoteLabel(l))}</td>
       <td>${statusBadge}</td>
       <td>${escapeHtml(l.lostReason || '-')}</td>
@@ -12014,8 +12265,10 @@ function openLeadModal(editId = null) {
     // Ilgilenilen tarihler duzenlemede de gorunur ve degisir (L-186).
     document.getElementById('leadCheckIn').value = l.checkIn || '';
     document.getElementById('leadCheckOut').value = l.checkOut || '';
+    const paxAlani = document.getElementById('leadPax');
+    if (paxAlani) paxAlani.value = Number(l.pax) > 0 ? l.pax : '';
     document.getElementById('leadStatus').value = ALLOWED_LEAD_STAGES.includes(l.status) ? l.status : 'NEW';
-    document.getElementById('leadLostReason').value = l.lostReason || '-';
+    document.getElementById('leadLostReason').value = gercekKayipNedeni(l.lostReason);
     document.getElementById('leadNotes').value = l.notes || '';
     const workflow = (appData.leadWorkflows || []).find(row => row.lead_id === l.id);
     if (assignee) assignee.value = workflow?.assigned_to || '';
@@ -12066,7 +12319,12 @@ function openLeadWhatsApp() {
   const templateId = document.getElementById('leadMessageTemplate')?.value;
   const lead = (appData.leads || []).find(item => item.id === leadId);
   const template = (appData.messageTemplates || []).find(item => item.id === templateId);
-  if (!lead || !template) return false;
+  if (!lead) return false;
+  // Sablonsuz dugme sessiz kaliyordu (L-290).
+  if (!template) {
+    alert('Önce bir mesaj şablonu seçin. Şablonlar Ayarlar › Şablonlar bölümünden eklenir.');
+    return false;
+  }
   const digits = String(lead.phone || '').replace(/\D/g, '');
   const guest = (appData.guests || []).find(item => String(item.phone || '').replace(/\D/g, '') === digits);
   const link = SalesWorkflowService.buildWhatsAppLink({
@@ -12087,6 +12345,12 @@ function openLeadWhatsApp() {
 
 function closeLeadModal() { document.getElementById('leadModal').classList.remove('active'); }
 
+// "-" ve bos deger bir neden degildir (L-279).
+function gercekKayipNedeni(value) {
+  const neden = String(value == null ? '' : value).trim();
+  return neden && neden !== '-' ? neden : '';
+}
+
 async function saveLead(e) {
   e.preventDefault();
   const editId = document.getElementById('leadEditId').value;
@@ -12095,10 +12359,18 @@ async function saveLead(e) {
   const channel = normalizeLeadChannel(document.getElementById('leadChannel').value);
   const quote = Number(document.getElementById('leadQuote').value) || 0;
   const status = document.getElementById('leadStatus').value;
-  const lostReason = document.getElementById('leadLostReason').value;
+  const lostReason = gercekKayipNedeni(document.getElementById('leadLostReason').value);
   const notes = document.getElementById('leadNotes').value.trim();
+  if (status === 'LOST' && !lostReason) {
+    alert('Talebi "Kaybedildi" yapmak için kayıp nedenini seçin.');
+    return;
+  }
   const checkIn = document.getElementById('leadCheckIn')?.value || null;
   const checkOut = document.getElementById('leadCheckOut')?.value || null;
+  // Kisi sayisi duzenlemede de girilir (L-290); bos = bilinmiyor.
+  const paxHam = String(document.getElementById('leadPax')?.value ?? '').trim();
+  const pax = paxHam === '' ? null : normalizePositiveInteger(paxHam);
+  if (paxHam !== '' && pax === null) { alert('Kişi sayısı pozitif bir tam sayı olmalıdır.'); return; }
   if ((checkIn && !checkOut) || (!checkIn && checkOut) || (checkIn && checkOut && checkOut <= checkIn)) {
     alert('İlgilenilen tarihler için giriş ve çıkışı birlikte girin; çıkış girişten sonra olmalıdır.');
     return;
@@ -12130,7 +12402,8 @@ async function saveLead(e) {
     lostReason,
     notes,
     checkIn,
-    checkOut
+    checkOut,
+    pax
   });
 
   try {
@@ -12251,12 +12524,12 @@ function renderManageMaintTable() {
       <td><strong>${escapeHtml(appData.villas[m.villa]?.name || m.villa)}</strong></td>
       <td>${escapeHtml(m.title || '')}</td>
       <td>${escapeHtml(m.assignee || 'Atanmadı')}</td>
-      <td>₺${Number(m.cost).toLocaleString('tr-TR')}</td>
+      <td>${Number(m.cost) > 0 ? '₺' + Number(m.cost).toLocaleString('tr-TR') : '—'}</td>
       <td>${m.downtime || 0} Gece</td>
       <td><span class="badge ${statusPresentation.badgeClass}">${escapeHtml(statusPresentation.label)}</span></td>
       <td style="text-align: right; white-space: nowrap;">
         ${statusPresentation.archived ? '' : `<button class="btn btn-secondary btn-sm" data-onclick="editMaint(decodeURIComponent('${encodeActionArg(String(m.id))}'))">✏️</button>
-        <button class="btn btn-danger btn-sm" data-onclick="deleteMaint(decodeURIComponent('${encodeActionArg(String(m.id))}'))">Arşivle</button>`}
+        ${isMaintenanceTicketOpen(m) ? `<button class="btn btn-danger btn-sm" data-onclick="deleteMaint(decodeURIComponent('${encodeActionArg(String(m.id))}'))">Arşivle</button>` : ''}`}
       </td>
     `;
     tbody.appendChild(tr);
@@ -12267,6 +12540,8 @@ function openMaintModal(editId = null) {
   const modal = document.getElementById('maintModal');
   const title = document.getElementById('maintModalTitle');
   const editInput = document.getElementById('maintEditId');
+  const ustaSatiri = document.getElementById('maintAssignedTechnician');
+  if (ustaSatiri) ustaSatiri.textContent = '';
 
   if (editId) {
     const m = appData.maintenance.find(item => item.id === editId);
@@ -12277,10 +12552,17 @@ function openMaintModal(editId = null) {
     document.getElementById('maintPriority').value = m.priority;
     document.getElementById('maintTitle').value = m.title;
     document.getElementById('maintAssignee').value = m.assignee || '';
+    // Atanan usta ayri kavramdir (L-294): Operasyon > Ariza'dan atanir, burada gorunur.
+    const atama = (appData.maintenanceAssignments || []).find(item => String(item.maintenance_ticket_id) === String(m.id));
+    const usta = atama ? (appData.operationalPeople || []).find(person => person.id === atama.person_id) : null;
+    const ustaYazisi = document.getElementById('maintAssignedTechnician');
+    if (ustaYazisi) ustaYazisi.textContent = usta
+      ? `Atanan usta: ${usta.full_name}${usta.phone ? ' · ' + usta.phone : ''} (Operasyon › Arıza & Bakım'dan değiştirilir)`
+      : 'Atanan usta yok — Operasyon › Arıza & Bakım\'dan atanır.';
     document.getElementById('maintBlocksAvailability').checked = !!(m.blocks_availability || m.blocksAvailability);
     document.getElementById('maintDowntimeStart').value = m.downtime_start || m.downtimeStart || '';
     document.getElementById('maintDowntimeEnd').value = m.downtime_end || m.downtimeEnd || '';
-    document.getElementById('maintCost').value = m.cost || 0;
+    document.getElementById('maintCost').value = Number(m.cost) > 0 ? m.cost : '';
     document.getElementById('maintStatus').value = m.statusRaw || (m.status === 'COMPLETED' ? 'RESOLVED' : m.status);
   } else {
     title.innerText = '🛠️ Yeni Arıza / Bakım İşi';
@@ -12304,7 +12586,10 @@ async function saveMaint(e) {
   // Kapali tarih girmek takvimi kapatmak demektir (L-246): kutu isaretsizken
   // girilen 22-24.10 sessizce null yaziliyor, ariza bugunu kapatiyordu.
   const blocksAvailability = document.getElementById('maintBlocksAvailability').checked || !!(downtimeStart || downtimeEnd);
-  const cost = Number(document.getElementById('maintCost').value) || 0;
+  // Bos maliyet bilinmiyordur, 0 degil (L-292).
+  const hamMaliyet = String(document.getElementById('maintCost').value || '').trim();
+  const cost = hamMaliyet === '' ? null : Number(hamMaliyet);
+  if (cost !== null && (!Number.isFinite(cost) || cost < 0)) { alert('Tahmini maliyet geçerli ve negatif olmayan bir tutar olmalı ya da boş bırakılmalı.'); return; }
   const status = document.getElementById('maintStatus').value;
 
   if (blocksAvailability && (!downtimeStart || !downtimeEnd || downtimeEnd < downtimeStart)) {
@@ -12346,6 +12631,14 @@ async function saveMaint(e) {
 
 function editMaint(id) { openMaintModal(id); }
 async function deleteMaint(id) {
+  // Cozulmus onarim IPTAL yapilmaz (L-281): "Arsivle" onu iptal gosteriyor,
+  // gecmisi yanlis anlatiyordu. Kapali kayit oldugu gibi kalir.
+  const kayit = (appData.maintenanceTickets || []).find(t => String(t.id) === String(id))
+    || (appData.maintenance || []).find(t => String(t.id) === String(id));
+  if (kayit && !isMaintenanceTicketOpen(kayit)) {
+    alert('Bu kayıt kapanmış (çözüldü ya da iptal). Çözülmüş onarım iptal edilmez; geçmişte olduğu gibi kalır.');
+    return false;
+  }
   if (confirm('Bu bakım kaydını iptal ederek arşivlemek istediğinize emin misiniz?')) {
     const tenantId = getActiveTenantId();
     try {
@@ -12366,6 +12659,10 @@ async function deleteMaint(id) {
 // -------------------------------------------------------------
 
 function openResetModal() {
+  if (activeTenant?.role !== 'owner') {
+    if (typeof showToast === 'function') showToast('Veri sıfırlamayı yalnız işletme sahibi yapabilir.', 'error');
+    return;
+  }
   const modal = document.getElementById('resetModal');
   if (!modal) return;
   const input = document.getElementById('resetConfirmInput');
@@ -12653,10 +12950,114 @@ function exportIncomeStatement() {
   return true;
 }
 
+// Kaydedilmemis pencere (L-283): dolu formda geri tusu ya da sekme kapatma
+// veriyi uyarisiz siliyordu. Kullanici acik bir pencerede yazinca pencere
+// "kirli" isaretlenir; pencere kapaninca isaret silinir. Programla doldurulan
+// duzenleme penceresi kullanici dokunmadikca uyari vermez.
+const UNSAVED_MODAL_SELECTOR = '.modal-backdrop.active, .modal-overlay.active';
+
+function markModalFormDirty(event) {
+  const modal = event && event.target && typeof event.target.closest === 'function'
+    ? event.target.closest('.modal-backdrop, .modal-overlay') : null;
+  if (modal && modal.classList.contains('active')) modal.dataset.dirty = '1';
+}
+
+function hasUnsavedModalForm() {
+  if (typeof document === 'undefined') return false;
+  return Array.from(document.querySelectorAll(UNSAVED_MODAL_SELECTOR) || []).some(modal => modal.dataset && modal.dataset.dirty === '1');
+}
+
+function unsavedFormBeforeUnload(event) {
+  if (!hasUnsavedModalForm()) return undefined;
+  event.preventDefault();
+  event.returnValue = '';
+  return '';
+}
+
+// Pencere klavye destegi (L-312): acilista odak pencereye tasinir, Tab
+// pencere icinde doner, Esc ustteki pencereyi kendi kapat dugmesiyle kapatir.
+// Komut paleti ve tarih secici kendi Esc isleyicilerini korur.
+const MODAL_FOCUSABLE = 'input:not([type="hidden"]), select, textarea, button, a[href], [tabindex]:not([tabindex="-1"])';
+
+function topActiveModal() {
+  if (typeof document === 'undefined') return null;
+  const acik = Array.from(document.querySelectorAll(UNSAVED_MODAL_SELECTOR) || []);
+  return acik.length ? acik[acik.length - 1] : null;
+}
+
+function modalFocusables(modal) {
+  return Array.from((modal && modal.querySelectorAll(MODAL_FOCUSABLE)) || [])
+    .filter(el => !el.disabled && el.offsetParent !== null && el.getAttribute('aria-hidden') !== 'true');
+}
+
+function focusModalOnOpen(modal) {
+  const ogeler = modalFocusables(modal);
+  const ilk = ogeler.find(el => !(el.classList && el.classList.contains && el.classList.contains('close-btn'))) || ogeler[0];
+  if (ilk && typeof ilk.focus === 'function') ilk.focus();
+}
+
+function handleModalKeydown(event) {
+  const modal = topActiveModal();
+  if (!modal || !event) return;
+  if (event.key === 'Escape') {
+    // Pencere icindeki tarih secici once kendi Esc'ini alir; pencere kapanmaz.
+    const tarihSecici = document.getElementById('resDatePicker');
+    if (event.defaultPrevented || (tarihSecici && tarihSecici.hidden === false && modal.contains(tarihSecici))) return;
+    const kapat = modal.querySelector('.close-btn');
+    if (kapat && typeof kapat.click === 'function') kapat.click();
+    else if (modal.classList && typeof modal.classList.remove === 'function') modal.classList.remove('active');
+    event.preventDefault();
+    return;
+  }
+  if (event.key !== 'Tab') return;
+  const ogeler = modalFocusables(modal);
+  if (!ogeler.length) return;
+  const ilk = ogeler[0], son = ogeler[ogeler.length - 1];
+  const aktif = document.activeElement;
+  if (!modal.contains(aktif)) { event.preventDefault(); ilk.focus(); return; }
+  if (!event.shiftKey && aktif === son) { event.preventDefault(); ilk.focus(); }
+  else if (event.shiftKey && aktif === ilk) { event.preventDefault(); son.focus(); }
+}
+
+function installModalKeyboardSupport() {
+  if (typeof document === 'undefined') return;
+  document.addEventListener('keydown', handleModalKeydown);
+  if (typeof MutationObserver !== 'function') return;
+  const acanlar = new WeakMap();
+  new MutationObserver(kayitlar => kayitlar.forEach(kayit => {
+    const el = kayit.target;
+    if (!el || !el.classList || !(el.classList.contains('modal-backdrop') || el.classList.contains('modal-overlay'))) return;
+    const simdiAcik = el.classList.contains('active');
+    const onceAcik = String(kayit.oldValue || '').split(/\s+/).includes('active');
+    if (simdiAcik && !onceAcik) {
+      acanlar.set(el, document.activeElement);
+      setTimeout(() => { if (!el.contains(document.activeElement)) focusModalOnOpen(el); }, 0);
+    } else if (!simdiAcik && onceAcik) {
+      const acan = acanlar.get(el);
+      if (acan && typeof acan.focus === 'function' && document.contains(acan)) acan.focus();
+    }
+  })).observe(document.body, { attributes: true, attributeFilter: ['class'], attributeOldValue: true, subtree: true });
+}
+
+function installUnsavedFormGuard() {
+  if (typeof document === 'undefined' || typeof window === 'undefined') return;
+  document.addEventListener('input', markModalFormDirty, true);
+  document.addEventListener('change', markModalFormDirty, true);
+  window.addEventListener('beforeunload', unsavedFormBeforeUnload);
+  if (typeof MutationObserver === 'function') {
+    new MutationObserver(kayitlar => kayitlar.forEach(kayit => {
+      const el = kayit.target;
+      if (el && el.dataset && el.dataset.dirty && !el.classList.contains('active')) delete el.dataset.dirty;
+    })).observe(document.body, { attributes: true, attributeFilter: ['class'], subtree: true });
+  }
+}
+
 // Initialize on DOM Ready
 if (typeof document !== 'undefined') {
   document.addEventListener('DOMContentLoaded', async () => {
     wireAccessibleFormLabels();
+    installUnsavedFormGuard();
+    installModalKeyboardSupport();
     if (isBrowserQualityFixture()) {
       installBrowserQualityFixture(new URLSearchParams(window.location.search).get('role') || 'owner');
       endAuthPending();
@@ -12711,7 +13112,8 @@ function renderDailyOps() {
 
   // 1. Check-ins for Today
   const checkins = appData.bookings.filter(b => b.status !== 'CANCELLED' && b.checkIn === todayStr);
-  if (inBadge) inBadge.innerText = checkins.length + ' Giriş';
+  const gunSayim = todayStayCounts(appData.bookings, todayStr);
+  if (inBadge) inBadge.innerText = gunSayim.arrivalsPending + ' Giriş' + (gunSayim.arrivalsDone ? ` · ${gunSayim.arrivalsDone} yapıldı` : '');
 
   if (checkins.length === 0) {
     const upcoming = appData.bookings
@@ -13182,7 +13584,7 @@ function renderHousekeepingTab() {
   }
 
   const statusFilter = document.getElementById('hkStatusFilter')?.value || 'ALL';
-  const searchTerm = (document.getElementById('hkSearchInput')?.value || '').toLowerCase();
+  const searchTerm = (document.getElementById('hkSearchInput')?.value || '').trim();
   const bugun = getTodayStr();
 
   // Kapsam: secili mulk ve donem. Gorev tarihi = temizligin yapildigi (ya da
@@ -13208,13 +13610,7 @@ function renderHousekeepingTab() {
   }
 
   if (searchTerm) {
-    filtered = filtered.filter(t => {
-      const vName = (appData.villas[t.villa]?.name || t.villa || '').toLowerCase();
-      const guest = (t.guest || '').toLowerCase();
-      const cleaner = (t.cleaner || '').toLowerCase();
-      const notes = (t.notes || '').toLowerCase();
-      return vName.includes(searchTerm) || guest.includes(searchTerm) || cleaner.includes(searchTerm) || notes.includes(searchTerm);
-    });
+    filtered = filtered.filter(t => cleaningTaskSearchMatches(t, searchTerm));
   }
 
   // KPI'lar. Borc = YAPILMIS ve odenmemis temizlik; planli gorev borc degil.
@@ -13982,6 +14378,16 @@ function parseWhatsAppMessageText(text, villas = {}, todayStr = getTodayStr()) {
       }
     }
   }
+  // Imza (L-270): "... fiyat nedir? 0555 111 22 33 Ayşe" — mesajin sonunda,
+  // telefon, satir sonu ya da noktalama ardindan tek basina duran ad.
+  if (!detectedGuest) {
+    const imza = text.match(/(?:^|[\n,;\-–—]|\d)\s*([A-ZÇĞİÖŞÜ][a-zçğıöşü]{2,}(?:\s+[A-ZÇĞİÖŞÜ][a-zçğıöşü]{2,})?)\s*[.!]*\s*$/);
+    const kapanis = ['teşekkürler', 'teşekkür', 'tesekkurler', 'saygılar', 'saygılarımla', 'selamlar', 'merhaba', 'iyi', 'günler',
+      'akşamlar', 'kolay', 'gelsin', 'rica', 'lütfen', 'tamam', 'evet', 'hayır', 'bekliyorum', 'whatsapp', 'airbnb', 'booking'];
+    if (imza && !trKucuk(imza[1]).split(/\s+/).some(w => kapanis.includes(w))) {
+      detectedGuest = adTemizle(imza[1]);
+    }
+  }
 
   let detectedPhone = null;
   const phoneMatch = text.match(/(?:\+?90\s*|\b0)?\s*(5\d{2})[\s\.-]*(\d{3})[\s\.-]*(\d{2})[\s\.-]*(\d{2})\b/);
@@ -14204,6 +14610,17 @@ async function saveWaAsLead() {
   const phone = document.getElementById('waParsedPhone').value.trim();
   const sourceId = document.getElementById('waParsedSource')?.value || '';
   const notes = document.getElementById('waParsedNotes').value.trim();
+  const checkIn = document.getElementById('waParsedCheckIn')?.value || '';
+  const checkOut = document.getElementById('waParsedCheckOut')?.value || '';
+  const pax = document.getElementById('waParsedPax')?.value || '';
+
+  // Ayristirilan tarih, kisi ve tutar talebin kendi alanlarina yazilir (L-270);
+  // eskiden yalniz nota dusuyor, talep listesinde ve satis hesaplarinda yoktu.
+  // Mevcut acik talebe eklenen mesajda talebin kendi teklifi ezilmez.
+  const telefonAnahtari = v => String(v || '').replace(/\D/g, '').slice(-10);
+  const acikTalep = (appData.leads || []).find(l => telefonAnahtari(l.phone) && telefonAnahtari(l.phone) === telefonAnahtari(phone)
+    && ['NEW', 'CONTACTED', 'QUOTE_SENT', 'FOLLOW_UP'].includes(String(l.status || '').toUpperCase()));
+  const teklifAlana = quote > 0 && !(acikTalep && Number(acikTalep.quote ?? acikTalep.quoteAmount) > 0);
 
   let result;
   try {
@@ -14213,8 +14630,18 @@ async function saveWaAsLead() {
       sourceId,
       propertyId: appData.villas?.[villa]?.id || null,
       channel: 'WhatsApp',
-      note: [notes, quote > 0 ? `Teklif: ₺${quote.toLocaleString('tr-TR')}` : ''].filter(Boolean).join(' · ')
+      checkIn: checkIn || null,
+      checkOut: checkIn ? (checkOut || null) : null,
+      pax: pax || null,
+      note: [notes, quote > 0 && !teklifAlana ? `Teklif: ₺${quote.toLocaleString('tr-TR')}` : ''].filter(Boolean).join(' · ')
     });
+    if (teklifAlana && result?.lead_id) {
+      const { error } = await supabaseClient.from('leads')
+        .update({ quote_amount: quote })
+        .eq('id', result.lead_id)
+        .eq('tenant_id', getActiveTenantId());
+      if (error) throw new Error('Talep kaydedildi; teklif tutarı yazılamadı: ' + (error.message || 'veritabanı hatası'));
+    }
     await loadLeads(getActiveTenantId());
     await refreshLeadSalesContext();
   } catch (err) {
@@ -15187,6 +15614,7 @@ function switchHelpTab(tabKey) {
 
   const targetBtn = document.getElementById('helpTabBtn-' + tabKey);
   if (targetBtn) targetBtn.classList.add('active');
+  if (targetBtn && typeof targetBtn.scrollIntoView === 'function') targetBtn.scrollIntoView({ block: 'nearest', inline: 'center' });
 
   const activePane = document.getElementById('helpTab-' + tabKey);
   if (activePane) activePane.style.display = 'block';
@@ -15604,63 +16032,50 @@ async function saveOperatorNote(villaKey) {
 // 1. 🛑 TAKVİMDEKİ "YETİM GECELER" (GAP NIGHTS) MOTORU
 // -------------------------------------------------------------
 function detectGapNights() {
+  // Bos gece TEK tanimdir: fiyat takviminin bos gece kurali (L-308). Burada
+  // bir zamanlar ayri bir tanim vardi (1-4 gece, sabit %20, ozel gun ve taban
+  // yok); Bugun'un gelir firsati ve misafire giden "Durum/Hikaye" metni
+  // bayram gecesi icin takvimin onerdiginden binlerce lira dusuk fiyat
+  // yaziyordu. Simdi bosluk takvimin gapDates'i, firsat fiyati takvimin o
+  // gecelere onerdigi fiyat, liste fiyati ayni takvimin bos gece kurali
+  // olmadan fiyatidir. Takvim kurali kapaliysa firsat da yoktur.
+  // Gercek bosluk yoksa UYDURULMAZ; baz fiyat yoksa fiyat bilinmiyordur (3.6).
   const gaps = [];
   const today = getTodayStr();
-  const villas = Object.keys(appData.villas || {});
-
-  villas.forEach(vKey => {
-    const vName = (appData.villas && appData.villas[vKey]?.name) ? appData.villas[vKey].name : vKey;
-    const vBookings = (appData.bookings || [])
-      .filter(b => b.villa === vKey && b.status !== 'CANCELLED' && !isBulkSummaryBooking(b))
-      .sort((a, b) => new Date(a.checkIn) - new Date(b.checkIn));
-
-    for (let i = 0; i < vBookings.length - 1; i++) {
-      const b1 = vBookings[i];
-      const b2 = vBookings[i + 1];
-      const d1 = new Date(b1.checkOut);
-      const d2 = new Date(b2.checkIn);
-      const diffDays = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
-
-      // Yalniz bugunden sonra biten bosluk firsattir (L-190). Gecmis bosluklar
-      // da listeleniyordu; ana sayfa ilkini gosterdigi icin aylar onceki bir
-      // bosluk 'gelir firsati' diye cikiyordu.
-      if (diffDays >= 1 && diffDays <= 4 && String(b2.checkIn || '') > today) {
-        // Gecelik fiyat MULKUN KENDI liste fiyatidir. Burada bir zamanlar
-        // silinmis demo anahtarlarina bagli bir merdiven vardi
-        // (AZURE 18.000, BELLA 14.000, digerleri 12.000): her gercek mulk
-        // icin 12.000 TL uyduruyordu ve bu rakam asagidaki "Durum" /
-        // "Hikaye" butonlariyla MISAFIRE GONDERILEN metne giriyordu.
-        // Liste fiyati girilmemisse fiyat bilinmiyordur; uydurulmaz (3.6).
-        const villa = (appData.villas || {})[vKey] || {};
-        const baseNightly = Number(villa.basePrice) || 0;
-        // Bugun baslamis bosluk bugunden itibaren satilabilir; gecmis geceye
-        // fiyat onerilmez.
-        const gapStart = String(b1.checkOut) < today ? today : String(b1.checkOut);
-        const gapNights = Math.round((new Date(b2.checkIn) - new Date(gapStart)) / 86400000);
-        if (!(gapNights > 0)) continue;
-        const regularTotal = baseNightly > 0 ? baseNightly * gapNights : null;
-        const discountTotal = regularTotal === null ? null : Math.round(regularTotal * 0.8);
-        gaps.push({
-          villaKey: vKey,
-          villaName: vName,
-          checkIn: gapStart,
-          checkOut: b2.checkIn,
-          nights: gapNights,
-          regularPrice: regularTotal,
-          discountPrice: discountTotal,
-          discountPct: regularTotal === null ? null : 20
-        });
-      }
-    }
+  pricingActiveProperties().forEach(entry => {
+    const takvim = computePricingCalendar(entry, today);
+    const bosGunler = (takvim.suggestions.gapDates || []).slice().sort();
+    if (!bosGunler.length) return;
+    const kuralsiz = computePricingCalendar(entry, today, undefined, rules => ({ ...rules, gapNight: { ...(rules.gapNight || {}), enabled: false } }));
+    const fiyat = new Map(takvim.suggestions.days.map(d => [d.date, d.price]));
+    const listeFiyati = new Map(kuralsiz.suggestions.days.map(d => [d.date, d.price]));
+    const gruplar = [];
+    bosGunler.forEach(gun => {
+      const son = gruplar[gruplar.length - 1];
+      if (son && addDaysToDateKey(son[son.length - 1], 1) === gun) son.push(gun);
+      else gruplar.push([gun]);
+    });
+    gruplar.forEach(geceler => {
+      // Minimum gece kuralina takilan bosluk satilamaz (KF-6); firsat degildir.
+      if (minStayBlockMessage(entry.key, geceler[0], addDaysToDateKey(geceler[geceler.length - 1], 1))) return;
+      const topla = harita => geceler.every(g => Number.isFinite(harita.get(g)))
+        ? geceler.reduce((sum, g) => sum + harita.get(g), 0) : null;
+      const discountTotal = topla(fiyat);
+      const regularTotal = topla(listeFiyati);
+      const fiyatBiliniyor = discountTotal !== null && regularTotal !== null && regularTotal > 0;
+      gaps.push({
+        villaKey: entry.key,
+        villaName: entry.property.name || entry.key,
+        checkIn: geceler[0],
+        checkOut: addDaysToDateKey(geceler[geceler.length - 1], 1),
+        nights: geceler.length,
+        regularPrice: fiyatBiliniyor ? regularTotal : null,
+        discountPrice: fiyatBiliniyor ? discountTotal : null,
+        discountPct: fiyatBiliniyor ? Math.round((1 - discountTotal / regularTotal) * 100) : null
+      });
+    });
   });
-
   gaps.sort((x, y) => String(x.checkIn).localeCompare(String(y.checkIn)));
-
-  // Gercek bosluk yoksa UYDURULMAZ. Burada, gaps.length < 3 ise ucu birden
-  // sahte olarak eklenirdi: olmayan villalar (Bella Vista, Azure Bay, Sunset
-  // Horizon), uydurma tarihler ve "%20 indirim" fiyatlari. Yeni musteri
-  // sahip olmadigi villalar icin firsat listesi goruyordu.
-
   return gaps;
 }
 
@@ -17472,6 +17887,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
         cleaningPayments,
         leads: leadsWithSlugs,
         leadSources: leadSalesContext.sources,
+        leadSourcesAll: leadSalesContext.allSources || leadSalesContext.sources,
         leadAcquisitions: leadSalesContext.acquisitions,
         leadWorkflows: leadSalesContext.workflows,
         leadInterests: leadSalesContext.interests,
@@ -17658,6 +18074,14 @@ function applyRoleNavigationVisibility() {
   });
   document.querySelectorAll('[data-ledger-only]').forEach(element => {
     element.hidden = !canReadLedgerRole(role);
+  });
+  // Veri sifirlama yalniz isletme sahibidir (reset_tenant_data, L-297): admin
+  // dugmeyi goruyor, sunucu reddediyordu.
+  document.querySelectorAll('[data-owner-only]').forEach(element => {
+    element.hidden = role !== 'owner';
+  });
+  document.querySelectorAll('[data-owner-only-note]').forEach(element => {
+    element.hidden = role === 'owner';
   });
   const quickBooking = document.getElementById('mobileQuickBookingBtn');
   if (quickBooking) quickBooking.hidden = !canWriteSalesRole(role);
@@ -19114,19 +19538,56 @@ const getSupabaseClient = function () {
 
 let pendingAiAction = null;
 
+// Bugunun giris ve cikislari durumla birlikte sayilir (L-280): giris ya da
+// cikis yapildiktan sonra kart "Giris 1" demeye devam ediyordu.
+function todayStayCounts(bookings, today = getTodayStr()) {
+  const aktif = (bookings || []).filter(item => item && String(item.status || '').toUpperCase() !== 'CANCELLED');
+  const durum = item => String(item.status || '').toUpperCase();
+  const girisler = aktif.filter(item => item.checkIn === today);
+  const cikislar = aktif.filter(item => item.checkOut === today);
+  const girisYapildi = girisler.filter(item => ['CHECKED_IN', 'CHECKED_OUT'].includes(durum(item))).length;
+  const cikisYapildi = cikislar.filter(item => durum(item) === 'CHECKED_OUT').length;
+  return {
+    arrivalsPending: girisler.length - girisYapildi, arrivalsDone: girisYapildi,
+    departuresPending: cikislar.length - cikisYapildi, departuresDone: cikisYapildi
+  };
+}
+
+// Temizlik gununun tek kurali (L-280): cikis gunu; erken cikista (Cikis yapti,
+// cikis tarihi gelmeden) bugun. One alinmis gun sonraki duzenlemede geri
+// tasinmaz. Geceler ve tutar degismez.
+function bookingCleaningDate(booking, currentTaskDate = null, today = getTodayStr()) {
+  const cikis = booking?.checkOut;
+  if (String(booking?.status || '').toUpperCase() !== 'CHECKED_OUT' || !cikis) return cikis;
+  if (currentTaskDate && currentTaskDate >= booking.checkIn && currentTaskDate < cikis) return currentTaskDate;
+  if (today >= booking.checkIn && today < cikis) return today;
+  return cikis;
+}
+
+// Cikis tarihi gelmeden "Cikis yapti" (L-280): giris oncesi reddedilir,
+// sonrasi onay ister. Onaylanmazsa false.
+function confirmEarlyCheckout(checkIn, checkOut, status, previous = null, today = getTodayStr()) {
+  if (String(status || '').toUpperCase() !== 'CHECKED_OUT' || !(today < checkOut)) return true;
+  if (String(previous?.status || '').toUpperCase() === 'CHECKED_OUT') return true;
+  if (today < checkIn) throw new Error('Giriş tarihi gelmemiş bir rezervasyon "Çıkış yaptı" olarak işaretlenemez.');
+  if (typeof confirm !== 'function') return true;
+  return confirm(`Çıkış tarihi ${formatTrDate(checkOut)}. Misafir bugün erken çıkmış olarak işaretlenecek; temizlik bugüne alınır. Geceler ve tutar değişmez (gerekirse çıkış tarihini ayrıca düzeltin). Devam edilsin mi?`);
+}
+
 function renderTodayDateStrip(bookings, tasks) {
   const today = getTodayStr();
   const role = TEAM_ROLES[activeTenant?.role]?.label || activeTenant?.role || '—';
-  const arrivals = bookings.filter(item => item.status !== 'CANCELLED' && item.checkIn === today).length;
-  const departures = bookings.filter(item => item.status !== 'CANCELLED' && item.checkOut === today).length;
+  const sayim = todayStayCounts(bookings, today);
+  const arrivals = sayim.arrivalsPending;
+  const departures = sayim.departuresPending;
   const cleanings = tasks.filter(item => item.status === 'PLANNED' && String(item.date || '').slice(0, 10) === today).length;
   setEl('todayDateLabel', new Intl.DateTimeFormat('tr-TR', { dateStyle: 'full', timeZone: 'Europe/Istanbul' }).format(new Date(`${today}T12:00:00+03:00`)));
   setEl('todayRoleLabel', `${role} görünümü`);
   const summary = document.getElementById('todayShiftSummary');
   if (summary) {
     summary.setAttribute('aria-label', `${arrivals} giriş · ${departures} çıkış · ${cleanings} temizlik`);
-    summary.innerHTML = [[arrivals, 'Giriş'], [departures, 'Çıkış'], [cleanings, 'Temizlik']]
-      .map(([count, label]) => `<div class="today-hero__stat"><strong>${Number(count)}</strong><span>${escapeHtml(label)}</span></div>`).join('');
+    summary.innerHTML = [[arrivals, 'Giriş', sayim.arrivalsDone], [departures, 'Çıkış', sayim.departuresDone], [cleanings, 'Temizlik', 0]]
+      .map(([count, label, done]) => `<div class="today-hero__stat"><strong>${Number(count)}</strong><span>${escapeHtml(label)}</span>${done ? `<small>${Number(done)} yapıldı</small>` : ''}</div>`).join('');
   }
 }
 
@@ -19423,28 +19884,7 @@ function renderExecutiveControlCenter() {
     // donanım arızası" yaziliyordu; iptal edilmis ariza bile.
     tickets.forEach(tk => {
       if (!isMaintenanceTicketOpen(tk)) return;
-      const oncelik = getMaintenancePriorityFromSeverity(tk.severity);
-      const kritik = oncelik === 'P1';
-      const durum = getMaintenanceStatusPresentation(tk.statusRaw || tk.status).label;
-      const ad = mulkAdi(tk.villa || tk.propertyId || tk.property_id);
-      candidates.push({
-        id: tk.id,
-        domain: 'OPERATIONS',
-        propertyId: tk.propertyId || tk.property_id || null,
-        propertyName: ad,
-        title: `${kritik ? 'P1 ' : ''}Arıza: ${tk.title || 'Başlık girilmemiş'}`,
-        severity: tk.severity || null,
-        guestImpact: kritik ? 'HIGH' : 'MEDIUM',
-        urgencyDueTime: kritik ? 25 : 12,
-        revenueImpact: tk.blocks_availability ? 'HIGH' : 'MEDIUM',
-        confidence: 'HIGH',
-        rationale: tk.blocks_availability
-          ? 'Açık arıza mülkü satışa kapatıyor.'
-          : (kritik ? 'Kritik öncelikli açık arıza.' : 'Açık arıza kaydı.'),
-        sourceMetrics: [`Öncelik: ${oncelik}`, `Durum: ${durum}`],
-        deepLink: 'maintenance',
-        quickAction: 'RESOLVE_TICKET'
-      });
+      candidates.push(maintenanceTicketPriorityCandidate(tk, getTodayStr(), mulkAdi(tk.villa || tk.propertyId || tk.property_id)));
     });
 
     // Executive alerts
@@ -19506,7 +19946,7 @@ function renderExecutiveControlCenter() {
         revenueImpact: 'HIGH',
         confidence: 'HIGH',
         rationale: 'Rezervasyona dönüşme olasılığı yüksek müşteri teklifi bekliyor.',
-        sourceMetrics: [`Durum: ${l.status}`, `Değer: ₺${Number(l.quote || 0).toLocaleString('tr-TR')}`],
+        sourceMetrics: [`Durum: ${LEAD_STATUS_LABELS[String(l.status || '').toUpperCase()] || l.status}`, Number(l.quote) > 0 ? `Değer: ₺${Number(l.quote).toLocaleString('tr-TR')}` : 'Değer: teklif girilmedi'],
         deepLink: 'leads',
         quickAction: 'CONVERT_LEAD'
       });
@@ -19974,10 +20414,18 @@ function buildNotificationFeedInput() {
     cleaningTasks: tasks,
     maintenance: data.maintenance || [],
     isTicketOpen: isMaintenanceTicketOpen,
+    // L-276: "satisa kapatiyor" yalniz bugunu kapatan ariza icin.
+    isTicketBlockingToday: ticket => { const api = getPropertySalesReadinessApi(); const gun = getTodayStr(); return !!(api && api.isTicketBlockingOn(ticket, gun, gun)); },
     closedPeriods: data.closedPeriods || [],
     previousMonthHasRecords,
     followUps: canReadSalesRole(role) ? getLeadSalesView().followUpsToday : [],
     followUpDate: istanbulDateKey,
+    followUpTime: ts => toIstanbulDateTimeLocal(ts).slice(11, 16),
+    now: new Date().toISOString(),
+    // L-311: bugunun giris/cikisi ve geciken genel gorevler.
+    bookings: data.bookings || [],
+    isBulkSummary: isBulkSummaryBooking,
+    operationalTasks: data.operationalTasks || [],
     gapNights: canWriteSalesRole(role) ? detectGapNights() : [],
     unpaidBookings: canReadSalesRole(role) ? getUnpaidDirectBookings(data) : []
   };
@@ -20824,7 +21272,7 @@ function renderStaffFieldWork() {
       const actions = checklist
         ? `<button class="btn btn-secondary btn-sm" data-onclick="saveMyOperationalTaskChecklist(decodeURIComponent('${encodeActionArg(task.id)}'), 'IN_PROGRESS')">İlerlemeyi kaydet</button><button class="btn btn-primary btn-sm" data-onclick="saveMyOperationalTaskChecklist(decodeURIComponent('${encodeActionArg(task.id)}'), 'DONE')">Kontrolü tamamla</button>`
         : `${task.status === 'TODO' ? `<button class="btn btn-secondary btn-sm" data-onclick="setMyOperationalTaskStatus(decodeURIComponent('${encodeActionArg(task.id)}'), 'IN_PROGRESS')">Başla</button>` : ''}<button class="btn btn-primary btn-sm" data-onclick="setMyOperationalTaskStatus(decodeURIComponent('${encodeActionArg(task.id)}'), 'DONE')">Tamamla</button>`;
-      return `<article class="ops-row staff-task-row"><div class="ops-row-main"><strong>${escapeHtml(task.title || 'Görev')}</strong><span>${escapeHtml(task.description || '')}</span></div><span class="badge">${escapeHtml(task.status || 'TODO')}</span>${checklist}<div class="ops-row-actions">${actions}</div></article>`;
+      return `<article class="ops-row staff-task-row"><div class="ops-row-main"><strong>${escapeHtml(task.title || 'Görev')}</strong><span>${escapeHtml(task.description || '')}</span></div><span class="badge">${escapeHtml(OPERATIONAL_TASK_STATUS_LABELS[String(task.status || 'TODO').toUpperCase()] || task.status || 'Yapılacak')}</span>${checklist}<div class="ops-row-actions">${actions}</div></article>`;
     }).join('')}</section>`;
   }
 }
@@ -21152,14 +21600,16 @@ function assignMaintenanceFromSelect(ticketId) {
 async function resolveMaintenanceFromOperations(ticketId) {
   const ticket = (appData?.maintenanceTickets || []).find(item => item.id === ticketId);
   if (!ticket) return false;
-  const entered = prompt('Gerçekleşen maliyet (TL; yoksa 0):', String(ticket.actual_cost || ticket.estimated_cost || 0));
+  const oneri = Number(ticket.actual_cost) > 0 ? ticket.actual_cost : (Number(ticket.estimated_cost) > 0 ? ticket.estimated_cost : '');
+  const entered = await uiAskText({ title: 'Arıza çözüldü', label: 'Gerçekleşen maliyet (₺) — bilinmiyorsa boş bırakın, maliyet yoksa 0', value: String(oneri), inputType: 'number' });
   if (entered === null) return false;
-  const actualCost = Number(String(entered).replace(',', '.'));
-  if (!Number.isFinite(actualCost) || actualCost < 0) {
+  // Bos = bilinmiyor; 0 yazilmaz (L-292).
+  const actualCost = String(entered).trim() === '' ? null : Number(String(entered).replace(',', '.'));
+  if (actualCost !== null && (!Number.isFinite(actualCost) || actualCost < 0)) {
     alert('Geçerli ve negatif olmayan bir tutar girin.');
     return false;
   }
-  const createExpense = actualCost > 0 && confirm('Gider olarak kaydedilsin mi?');
+  const createExpense = actualCost > 0 && await uiAskConfirm({ title: 'Gider kaydı', message: `${actualCost.toLocaleString('tr-TR')} ₺ onarım maliyeti. Gider olarak kaydedilsin mi?`, okText: 'Gider olarak kaydet', cancelText: 'Yalnız çözüldü yap' });
   try {
     if (createExpense) {
       await resolveMaintenanceTicket(ticketId, actualCost, 'Bakım', `Arıza onarımı: ${ticket.title || 'başlıksız arıza'}`);
@@ -21184,7 +21634,7 @@ async function resolveMaintenanceFromOperations(ticketId) {
 
 async function createGeneralOperationalTask(templateId = null) {
   const template = templateId ? (appData?.taskTemplates || []).find(item => item.id === templateId) : null;
-  const title = template?.title || prompt('Genel görev başlığı:', '');
+  const title = template?.title || await uiAskText({ title: 'Yeni genel görev', label: 'Görev başlığı', placeholder: 'Örn: Bahçe sulama sistemini kontrol et' });
   if (!String(title || '').trim()) return false;
   try {
     await createOperationalTask({
@@ -21231,7 +21681,14 @@ function assignOperationalTaskFromSelect(taskId) {
 
 async function setOperationalTaskStatus(taskId, status) {
   if (!['DONE', 'CANCELLED'].includes(status)) return false;
-  await updateOperationalTask(taskId, { status });
+  // Iptal geri alinamaz; onay ister (L-281).
+  if (status === 'CANCELLED' && typeof confirm === 'function'
+    && !confirm('Görev iptal edilsin mi? İptal edilen görev aktif listeden çıkar; "Kapanan görevler" bölümünde görünmeye devam eder.')) return false;
+  // Tamamlanma zamani ve kim tamamladi yazilir (L-295): completed_at bos kaliyordu.
+  const patch = status === 'DONE'
+    ? { status, completed_at: new Date().toISOString(), completed_by: isUUID(activeSaaSUser?.id) ? activeSaaSUser.id : null }
+    : { status };
+  await updateOperationalTask(taskId, patch);
   await loadTenantAppData(getActiveTenantId());
   if (typeof showToast === 'function') showToast(status === 'DONE' ? '✅ Görev tamamlandı.' : 'Görev iptal edildi.');
   return true;
@@ -21405,12 +21862,19 @@ function renderOperationsTab() {
     if (open.length && !technicians.length) container.innerHTML = fieldTeamHintHtml('TECHNICIAN') + container.innerHTML;
   } else {
     const operational = (appData?.operationalTasks || []).filter(task => !['DONE', 'CANCELLED'].includes(String(task.status || '').toUpperCase()));
+    // Kapanan gorevlerin izi arayuzde kalir (L-281): iptal edilen gorev
+    // hicbir listede gorunmuyordu, iz yalniz veritabanindaydi.
+    const kapananlar = (appData?.operationalTasks || []).filter(task => ['DONE', 'CANCELLED'].includes(String(task.status || '').toUpperCase()))
+      .sort((a, b) => String(b.updated_at || b.completed_at || '').localeCompare(String(a.updated_at || a.completed_at || ''))).slice(0, 20);
+    const kapananHtml = kapananlar.length
+      ? `<section class="ops-group" style="margin-top:12px"><details><summary><strong>Kapanan görevler</strong> <span class="badge">${kapananlar.length}</span></summary>${kapananlar.map(task => `<article class="ops-row"><div class="ops-row-main"><strong>${escapeHtml(task.title || '—')}</strong><span>${String(task.status).toUpperCase() === 'DONE' ? 'Tamamlandı' : 'İptal edildi'}${task.completed_at || task.updated_at ? ' · ' + escapeHtml(formatTrDate(String(task.completed_at || task.updated_at).slice(0, 10))) : ''}</span></div></article>`).join('')}</details></section>`
+      : '';
     const templates = appData?.taskTemplates || [];
     const assignees = (appData?.operationalPeople || []).filter(person => person.user_id && person.is_active !== false);
     const editTemplatesLink = canManageTenantRole(activeTenant?.role)
       ? `<button class="btn btn-secondary btn-sm" data-onclick="openSettingsSection(decodeURIComponent('${encodeActionArg('templates')}'))">Şablonu düzenle →</button>`
       : '';
-    container.innerHTML = `<div class="ops-cleaning-layout"><section class="ops-group"><div class="section-title-bar"><h3>Aktif görevler <span class="badge">${operational.length}</span></h3><button class="btn btn-primary btn-sm" data-onclick="createGeneralOperationalTask()">+ Genel görev</button></div>${operational.length ? operational.map(task => { const options = assignees.map(person => `<option value="${escapeHtml(person.user_id)}"${person.user_id === task.assigned_to ? ' selected' : ''}>${escapeHtml(person.full_name)}</option>`).join(''); return `<article class="ops-row"><div class="ops-row-main"><strong>${escapeHtml(task.title || '—')}</strong><span>${task.property_id ? 'Mülke bağlı' : 'Genel görev'} · ${escapeHtml(task.status || 'TODO')}</span></div><div class="ops-row-actions"><select id="opsTaskPerson-${escapeHtml(task.id)}" aria-label="Görevli seç"><option value="">Ekip üyesi seç…</option>${options}</select><button class="btn btn-secondary btn-sm" data-onclick="assignOperationalTaskFromSelect(decodeURIComponent('${encodeActionArg(task.id)}'))">Ata</button><button class="btn btn-primary btn-sm" data-onclick="setOperationalTaskStatus(decodeURIComponent('${encodeActionArg(task.id)}'), 'DONE')">Tamamla</button><button class="btn btn-secondary btn-sm" data-onclick="setOperationalTaskStatus(decodeURIComponent('${encodeActionArg(task.id)}'), 'CANCELLED')">İptal</button></div></article>`; }).join('') : '<div class="empty-state">Aktif görev yok.</div>'}</section><aside class="ops-debt-panel"><h3>Hazır görev kütüphanesi</h3>${editTemplatesLink}${templates.length ? templates.map(template => `<div class="ops-debt-row"><div><strong>${escapeHtml(template.title)}</strong><span>${escapeHtml(TEMPLATE_TASK_TYPE_LABELS[template.task_type] || 'Genel')}</span></div><button class="btn btn-secondary btn-sm" data-onclick="createTaskFromTemplate(decodeURIComponent('${encodeActionArg(template.id)}'))">Görev oluştur</button></div>`).join('') : '<div class="empty-state">Henüz görev şablonu yok.</div>'}</aside></div>`;
+    container.innerHTML = `<div class="ops-cleaning-layout"><section class="ops-group"><div class="section-title-bar"><h3>Aktif görevler <span class="badge">${operational.length}</span></h3><button class="btn btn-primary btn-sm" data-onclick="createGeneralOperationalTask()">+ Genel görev</button></div>${operational.length ? operational.map(task => { const options = assignees.map(person => `<option value="${escapeHtml(person.user_id)}"${person.user_id === task.assigned_to ? ' selected' : ''}>${escapeHtml(person.full_name)}</option>`).join(''); return `<article class="ops-row"><div class="ops-row-main"><strong>${escapeHtml(task.title || '—')}</strong><span>${task.property_id ? 'Mülke bağlı' : 'Genel görev'} · ${escapeHtml(OPERATIONAL_TASK_STATUS_LABELS[String(task.status || 'TODO').toUpperCase()] || task.status || 'Yapılacak')}</span></div><div class="ops-row-actions"><select id="opsTaskPerson-${escapeHtml(task.id)}" aria-label="Görevli seç"><option value="">Ekip üyesi seç…</option>${options}</select><button class="btn btn-secondary btn-sm" data-onclick="assignOperationalTaskFromSelect(decodeURIComponent('${encodeActionArg(task.id)}'))">Ata</button><button class="btn btn-primary btn-sm" data-onclick="setOperationalTaskStatus(decodeURIComponent('${encodeActionArg(task.id)}'), 'DONE')">Tamamla</button><button class="btn btn-secondary btn-sm" data-onclick="setOperationalTaskStatus(decodeURIComponent('${encodeActionArg(task.id)}'), 'CANCELLED')">İptal</button></div></article>`; }).join('') : '<div class="empty-state">Aktif görev yok.</div>'}${kapananHtml}</section><aside class="ops-debt-panel"><h3>Hazır görev kütüphanesi</h3>${editTemplatesLink}${templates.length ? templates.map(template => `<div class="ops-debt-row"><div><strong>${escapeHtml(template.title)}</strong><span>${escapeHtml(TEMPLATE_TASK_TYPE_LABELS[template.task_type] || 'Genel')}</span></div><button class="btn btn-secondary btn-sm" data-onclick="createTaskFromTemplate(decodeURIComponent('${encodeActionArg(template.id)}'))">Görev oluştur</button></div>`).join('') : '<div class="empty-state">Henüz görev şablonu yok.</div>'}</aside></div>`;
   }
 }
 
@@ -21633,6 +22097,26 @@ function getUnlinkedGuestBookings() {
     .sort((a, b) => String(b.checkIn || '').localeCompare(String(a.checkIn || '')));
 }
 
+// "Baglantisiz rez." karti paneli acar (L-301, kullanici M89): panel yalniz
+// sari uyaridaki kucuk dugmeyle aciliyordu. Kart tiklaninca (ya da Enter/
+// Bosluk) panel acik kalir ve gorunur kaydirilir; satirdan ad + telefon/
+// e-posta girilip rezervasyon misafir kartina baglanir.
+function openGuestUnlinkedPanel(event) {
+  if (event && event.type === 'keydown') {
+    if (!['Enter', ' '].includes(event.key)) return false;
+    if (typeof event.preventDefault === 'function') event.preventDefault();
+  }
+  if (!canWriteSalesRole(activeTenant?.role)) {
+    if (typeof showToast === 'function') showToast('Rezervasyonu misafire bağlamak satış ya da yönetim rolü ister.', 'info');
+    return false;
+  }
+  guestUnlinkedPanelOpen = true;
+  renderGuestsTab();
+  const panel = typeof document !== 'undefined' ? document.getElementById('guestUnlinkedPanel') : null;
+  if (panel && !panel.hidden && typeof panel.scrollIntoView === 'function') panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  return true;
+}
+
 function toggleGuestUnlinkedPanel() {
   guestUnlinkedPanelOpen = !guestUnlinkedPanelOpen;
   renderGuestsTab();
@@ -21716,6 +22200,13 @@ function openGuestProfileModal(guestId = null) {
   const guest = guestId ? (appData.guests || []).find(item => item.id === guestId) : null;
   document.getElementById('guestProfileId').value = guest?.id || '';
   document.getElementById('guestProfileModalTitle').innerText = guest ? '👤 Misafir Detayı' : '➕ Yeni Misafir';
+  const pazarlamaSecici = document.getElementById('guestMarketingTemplate');
+  const pazarlamaSatiri = document.getElementById('guestMarketingRow');
+  const pazarlamaSablonlari = (appData.messageTemplates || []).filter(item => String(item.message_type || '').toUpperCase() === 'MARKETING');
+  if (pazarlamaSecici) pazarlamaSecici.innerHTML = '<option value="">Pazarlama şablonu seçin</option>' + pazarlamaSablonlari.map(item => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`).join('');
+  if (pazarlamaSatiri) pazarlamaSatiri.hidden = !guest || !canWriteSalesRole(activeTenant?.role);
+  const silDugmesi = document.getElementById('guestProfileEraseBtn');
+  if (silDugmesi) silDugmesi.hidden = !guest || !canManageTenantRole(activeTenant?.role);
   document.getElementById('guestFirstName').value = guest?.firstName || '';
   document.getElementById('guestLastName').value = guest?.lastName || '';
   document.getElementById('guestPhone').value = guest?.phone || '';
@@ -21785,6 +22276,72 @@ function openGuestRebookingWhatsApp(guestId) {
   if (typeof window !== 'undefined' && typeof window.open === 'function') {
     window.open(`https://wa.me/${encodeURIComponent(phone)}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
   }
+}
+
+// KVKK silme hakki (L-271, kullanici karari 26.10.2026: her sey temizlenir).
+// phase105 erase_guest_personal_data: misafir ve izin kayitlari silinir;
+// rezervasyon ve talepler muhasebe kaydi oldugu icin anonimlesir (ad,
+// telefon, e-posta, not); mesajlar ve bildirimler silinir. Geri alinamaz.
+const PHASE105_SEMA_YOK = 'KVKK silme için veritabanı göçü (phase105) henüz uygulanmadı. Hiçbir şey silinmedi.';
+async function eraseGuestPersonalData() {
+  if (!canManageTenantRole(activeTenant?.role)) {
+    if (typeof showToast === 'function') showToast('Misafir verisini silmek yönetim rolü ister.', 'error');
+    return false;
+  }
+  const guestId = document.getElementById('guestProfileId')?.value || '';
+  const guest = (appData.guests || []).find(item => item.id === guestId);
+  if (!guestId || !guest) return false;
+  const ad = [guest.firstName, guest.lastName].filter(Boolean).join(' ') || 'Bu misafir';
+  const yazilan = await uiAskText({
+    title: 'Misafiri kalıcı sil (KVKK)',
+    message: `${ad} için kişisel veriler kalıcı olarak silinecek:\n• Misafir kartı, izin kayıtları ve iç notlar silinir.\n• Rezervasyon ve talepler muhasebe kaydı olduğu için silinmez; ad, telefon, e-posta ve notlar "Silinmiş misafir" olarak anonimleşir. Tutar ve tarihler değişmez.\n• Bu misafire ait mesajlar ve bildirimler silinir.\nBu işlem geri alınamaz.`,
+    label: 'Onaylamak için MISAFIRI SIL yazın',
+    placeholder: 'MISAFIRI SIL'
+  });
+  if (yazilan === null || yazilan === undefined) return false;
+  if (String(yazilan).trim() !== 'MISAFIRI SIL') {
+    alert('Onay metni eşleşmedi; hiçbir şey silinmedi.');
+    return false;
+  }
+  const { data, error } = await supabaseClient.rpc('erase_guest_personal_data', {
+    p_tenant_id: getActiveTenantId(), p_guest_id: guestId, p_confirm: 'MISAFIRI SIL'
+  });
+  if (error) {
+    const yok = error.code === 'PGRST202' || /Could not find the function/i.test(String(error.message || ''));
+    alert(yok ? PHASE105_SEMA_YOK : 'Misafir silinemedi: ' + kullaniciMesaji(error.message || 'veritabanı hatası'));
+    return false;
+  }
+  if (typeof closeGuestProfileModal === 'function') closeGuestProfileModal();
+  await loadTenantAppData(getActiveTenantId());
+  if (typeof showToast === 'function') {
+    showToast(`Misafir silindi. ${Number(data?.bookings) || 0} rezervasyon ve ${Number(data?.leads) || 0} talep anonimleşti.`, 'success');
+  }
+  return true;
+}
+
+// Misafir rehberinden pazarlama mesaji (L-277). Izin kapisi tek yerde:
+// SalesWorkflowService.buildWhatsAppLink (kampanya izni + WhatsApp izni).
+function sendGuestMarketingMessage() {
+  const guestId = document.getElementById('guestProfileId')?.value || '';
+  const guest = (appData.guests || []).find(item => item.id === guestId);
+  const templateId = document.getElementById('guestMarketingTemplate')?.value || '';
+  const template = (appData.messageTemplates || []).find(item => item.id === templateId && String(item.message_type || '').toUpperCase() === 'MARKETING');
+  if (!guest) return false;
+  if (!template) { alert('Önce bir pazarlama şablonu seçin. Şablonlar Ayarlar › Şablonlar bölümünden "Pazarlama" türüyle eklenir.'); return false; }
+  const ad = [guest.firstName, guest.lastName].filter(Boolean).join(' ') || 'Misafir';
+  const workflow = typeof SalesWorkflowService !== 'undefined' ? SalesWorkflowService : require('./core/sales_workflow_service.js');
+  const link = workflow.buildWhatsAppLink({
+    phone: guest.phone, body: renderLeadTemplateBody(template, { guest: ad }),
+    messageType: 'MARKETING', allowWhatsapp: guest.allowWhatsapp === true, marketingOptIn: guest.marketingOptIn === true
+  });
+  if (!link.allowed) {
+    alert(link.reason === 'MARKETING_CONSENT_REQUIRED'
+      ? 'Bu misafirin kampanya (pazarlama) izni yok; pazarlama mesajı gönderilemez. İzin misafir kartında açıkça alınıp işaretlenmelidir.'
+      : 'WhatsApp mesajı için telefon ve WhatsApp iletişim izni gerekir.');
+    return false;
+  }
+  window.open(link.url, '_blank', 'noopener,noreferrer');
+  return true;
 }
 
 async function saveGuestProfile(event) {
@@ -21954,6 +22511,37 @@ function pricingMaintenanceBlocks(property, today = getTodayStr()) {
     .concat((appData?.propertyClosures || [])
       .filter(row => String(row?.property_id || '') === String(property.id))
       .map(row => ({ propertyId: property.id, start: String(row.start_date).slice(0, 10), end: String(row.end_date).slice(0, 10), title: 'bakım' })));
+}
+
+// Ana sayfa oncelik motoru icin ariza adayi (L-276). "Satisa kapatiyor"
+// yalniz BUGUNU kapatan ariza icindir; tek tanim isTicketBlockingOn (L-246).
+// Eskiden blocks_availability isareti yetiyordu: 27-28.10 icin planlanan
+// bakim 25.10'da kritik eylemde "mulku satisa kapatiyor" diyordu.
+function maintenanceTicketPriorityCandidate(tk, today = getTodayStr(), propertyName = null) {
+  const api = getPropertySalesReadinessApi();
+  const oncelik = getMaintenancePriorityFromSeverity(tk.severity);
+  const kritik = oncelik === 'P1';
+  const durum = getMaintenanceStatusPresentation(tk.statusRaw || tk.status).label;
+  const bugunKapali = api ? api.isTicketBlockingOn(tk, today, today) : false;
+  const kapanis = maintenanceClosureText(tk, today);
+  return {
+    id: tk.id,
+    domain: 'OPERATIONS',
+    propertyId: tk.propertyId || tk.property_id || null,
+    propertyName: propertyName || tk.villa || null,
+    title: `${kritik ? 'P1 ' : ''}Arıza: ${tk.title || 'Başlık girilmemiş'}`,
+    severity: tk.severity || null,
+    guestImpact: kritik || bugunKapali ? 'HIGH' : 'MEDIUM',
+    urgencyDueTime: kritik || bugunKapali ? 25 : 12,
+    revenueImpact: bugunKapali ? 'HIGH' : 'MEDIUM',
+    confidence: 'HIGH',
+    rationale: bugunKapali
+      ? 'Açık arıza mülkü bugün satışa kapatıyor.'
+      : (kapanis && !/geçti/.test(kapanis) ? `${kapanis}.` : (kritik ? 'Kritik öncelikli açık arıza.' : 'Açık arıza kaydı.')),
+    sourceMetrics: [`Öncelik: ${oncelik}`, `Durum: ${durum}`],
+    deepLink: 'maintenance',
+    quickAction: 'RESOLVE_TICKET'
+  };
 }
 
 function maintenanceClosureText(ticket, today = getTodayStr()) {
@@ -22609,7 +23197,8 @@ async function savePricingRuleSettings() {
   if (scope === 'PORTFOLIO') {
     try {
       const pct = Number(document.getElementById('pricingRulePct')?.value);
-      if (!PRICING_RULE_LABELS[ruleKey] || !Number.isFinite(pct) || pct < -100 || pct > 1000) throw new Error('Yüzde -100 ile 1000 arasında olmalıdır.');
+      // -%100 fiyati sifira indirir (L-309); kural en cok -%99 olabilir.
+      if (!PRICING_RULE_LABELS[ruleKey] || !Number.isFinite(pct) || pct <= -100 || pct > 1000) throw new Error('Yüzde -99 ile 1000 arasında olmalıdır.');
       const current = getPricingResearchService().mergeRules(appData.tenantSettings?.pricing_rules || {}, [], null);
       const next = { ...current, [ruleKey]: { enabled: document.getElementById('pricingRuleEnabled')?.checked === true, pct, ...pricingRuleParameters(ruleKey, document.getElementById('pricingRuleParameter')?.value) } };
       await cloudSaveTenantSetting('pricing_rules', next);
@@ -22727,7 +23316,7 @@ async function savePricingSpecialEvent() {
   const pct = rawPct === '' ? null : Number(rawPct);
   if (!name) { alert('Etkinlik adı girin.'); return false; }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end) || end < start) { alert('Geçerli bir başlangıç ve bitiş tarihi girin.'); return false; }
-  if (pct !== null && (!Number.isFinite(pct) || pct < -100 || pct > 1000)) { alert('Yüzde -100 ile 1000 arasında olmalıdır.'); return false; }
+  if (pct !== null && (!Number.isFinite(pct) || pct <= -100 || pct > 1000)) { alert('Yüzde -99 ile 1000 arasında olmalıdır.'); return false; }
   const settings = pricingSpecialSettings();
   const event = { id: pricingSpecialEventKey(), name: name.slice(0, 80), start, end, pct, propertyId: scope === 'PORTFOLIO' ? null : (pricingSelectedPropertyId || null) };
   try {
@@ -22872,11 +23461,14 @@ function askPricingChatGpt() {
 
 // Bir mulkun 3 aylik takvim hesabi; fiyat ekrani ve bos gece karti ayni
 // hesaptan okur (L-252: kart GapNightService'i imzasina aykiri cagirip hep 0 yaziyordu).
-function computePricingCalendar(entry, today = getTodayStr(), occupancyTarget = pricingExpectedOccupancyDraft) {
+// rulesTransform: ayni takvimi bir kural degisikligiyle hesaplamak icin
+// (bos gece firsatinin liste fiyati, L-308). Ekranda kullanilmaz.
+function computePricingCalendar(entry, today = getTodayStr(), occupancyTarget = pricingExpectedOccupancyDraft, rulesTransform = null) {
   const horizon = pricingHorizon(today);
   const blocks = pricingMaintenanceBlocks(entry.property, today);
   const specialDays = pricingSpecialDaysFor(entry.property.id, horizon.start, horizon.end);
-  const rules = getPricingResearchService().mergeRules(appData.tenantSettings?.pricing_rules || {}, appData.propertyPricingRules || [], entry.property.id);
+  const birlesik = getPricingResearchService().mergeRules(appData.tenantSettings?.pricing_rules || {}, appData.propertyPricingRules || [], entry.property.id);
+  const rules = typeof rulesTransform === 'function' ? rulesTransform(birlesik) : birlesik;
   const suggestions = getSuggestedPriceEngine().suggest({
     property: { id: entry.property.id, basePrice: pricingBasePriceOf(entry.property), floorPrice: entry.property.floor ?? null },
     bookings: pricingPropertyBookings(entry).filter(booking => !isBulkSummaryBooking(booking)), blocks, rules, specialDays,
@@ -23077,7 +23669,7 @@ function renderPricingTab() {
   const focusInput = document.getElementById('pricingFocusSelect');
   if (focusInput) focusInput.value = pricingFocusDraft;
 
-  const warningText = { OCCUPANCY_TARGET_MISSING: 'Talep kuralı çalışmıyor: aşağıdaki hesaplayıcıda hedef doluluk girin.', BASE_PRICE_MISSING: 'Baz fiyat girilmemiş: öneri hesaplanamaz, fiyat tablosundan girin.', FLOOR_PRICE_MISSING: 'Taban fiyat girilmemiş: indirimler için alt sınır yok.' };
+  const warningText = { OCCUPANCY_TARGET_MISSING: 'Talep kuralı çalışmıyor: aşağıdaki hesaplayıcıda hedef doluluk girin.', BASE_PRICE_MISSING: 'Baz fiyat girilmemiş: öneri hesaplanamaz, fiyat tablosundan girin.', FLOOR_PRICE_MISSING: 'Taban fiyat girilmemiş: indirimler için alt sınır yok.', NON_POSITIVE_PRICE: 'İndirimler bazı günlerde fiyatı sıfıra ya da altına indiriyor; o günlere öneri verilmedi. Taban fiyat girin ya da indirimleri azaltın.' };
   const warnings = suggestions.warnings.map(item => warningText[item.code] || item.text);
   if (appData.propertyClosuresReady === false) warnings.unshift('Bakımla kapalı günler bu rolde okunamadı (phase103 bekleniyor): "Açık" görünen bir gün bakımda olabilir.');
   const minStay = pricingMinStayMap(entry.property.id, suggestions.days);
@@ -23344,6 +23936,47 @@ if (typeof module !== 'undefined' && module.exports) {
     setActiveTenant,
     getImportEngine,
     buildImportSource,
+    parseSourceWithMode,
+    createSettingsMessageTemplate,
+    sendGuestMarketingMessage,
+    eraseGuestPersonalData,
+    openGuestUnlinkedPanel,
+    leadChannelLabel,
+    handleModalKeydown,
+    focusModalOnOpen,
+    openLeadWhatsApp,
+    printCurrentReport,
+    setCurrentPageReportForTests: report => { currentPageReport = report; },
+    openMaintModal,
+    bumpLeadInterestFromQuick,
+    refreshImportHistory,
+    rememberImportPeriod,
+    submitMemberInvite,
+    openResetModal,
+    deleteBookingUI,
+    saveMaint,
+    resolveMaintenanceFromOperations,
+    setReservationScopeRange,
+    hasUnsavedModalForm,
+    markModalFormDirty,
+    unsavedFormBeforeUnload,
+    refreshLeadSalesContext,
+    getLeadSalesView,
+    deleteMaint,
+    setOperationalTaskStatus,
+    renderTodayDateStrip,
+    todayStayCounts,
+    bookingCleaningDate,
+    confirmEarlyCheckout,
+    updateLeadStatusFromKanban,
+    analyzeAndPreviewSource,
+    maintenanceTicketPriorityCandidate,
+    createBookingChannelFromSettings,
+    reservationSearchMatches,
+    expenseSearchMatches,
+    cleaningTaskSearchMatches,
+    saveWaAsLead,
+    getPendingImportData: () => pendingImportData,
     paginateRows,
     getActiveRenderPlan,
     insertImportedRowsInBatches,

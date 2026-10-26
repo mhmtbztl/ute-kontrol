@@ -14,7 +14,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=893ddaec">
+  <link rel="stylesheet" href="style.css?v=59c0f09b">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <script src="supabase.umd.js?v=3810661a"></script>
@@ -1770,6 +1770,10 @@
             <form data-onsubmit="createSettingsMessageTemplate(event)" class="settings-inline-form">
               <input name="name" maxlength="150" required placeholder="Şablon adı">
               <textarea name="body" maxlength="4000" required placeholder="Örn: Merhaba, villamız için teklifimiz ektedir. Sorunuz olursa yazabilirsiniz."></textarea>
+              <select name="message_type" aria-label="Mesaj türü">
+                <option value="TRANSACTIONAL">İşlemsel — teklif, rezervasyon, giriş bilgisi</option>
+                <option value="MARKETING">Pazarlama — kampanya, indirim (misafirin kampanya izni gerekir)</option>
+              </select>
               <button type="submit" class="btn btn-secondary btn-sm">+ Mesaj şablonu</button>
             </form>
             <div id="settingsMessageTemplatesList" class="settings-template-list"></div>
@@ -1876,9 +1880,10 @@
             dahil bütün kayıtlar kalıcı olarak silinir. Kapatılmış dönemler de dahildir.
             Deneme verisi yükleyip temizlemek için bunu kullanın.
           </p>
-          <button type="button" class="btn btn-secondary" data-onclick="openResetModal()">
+          <button type="button" class="btn btn-secondary" data-owner-only data-onclick="openResetModal()">
             🗑️ Veri Sıfırlama Menüsünü Aç
           </button>
+          <p class="sub-text" data-owner-only-note hidden>Veri sıfırlamayı yalnız işletme sahibi yapabilir.</p>
         </div>
       </section>
 
@@ -1998,7 +2003,7 @@
           <div class="kpi-card"><span class="kpi-label">Tekrar cirosu</span><div class="kpi-value" id="guestKpiRepeatRevenue">—</div><div class="kpi-meta">Bağlı konaklamaların brütü</div></div>
           <div class="kpi-card"><span class="kpi-label">Ulaşılabilir</span><div class="kpi-value" id="guestKpiContactable">—</div><div class="kpi-meta">Telefon veya e-posta var</div></div>
           <div class="kpi-card"><span class="kpi-label">Yeniden rezervasyon</span><div class="kpi-value" id="guestKpiRebooking">—</div><div class="kpi-meta">İzinli ve gelecekte rezervasyonu yok</div></div>
-          <div class="kpi-card"><span class="kpi-label">Bağlantısız rez.</span><div class="kpi-value" id="guestKpiUnlinked">—</div><div class="kpi-meta">Profil eşleştirmesi bekliyor</div></div>
+          <div class="kpi-card kpi-card--action" role="button" tabindex="0" aria-controls="guestUnlinkedPanel" data-onclick="openGuestUnlinkedPanel(event)" data-onkeydown="openGuestUnlinkedPanel(event)"><span class="kpi-label">Bağlantısız rez.</span><div class="kpi-value" id="guestKpiUnlinked">—</div><div class="kpi-meta">Profil eşleştirmesi bekliyor · eklemek için tıklayın</div></div>
         </div>
         <div id="guestOpportunityNotice" style="display:none; margin-bottom:12px; padding:12px; border-radius:10px; background:rgba(48, 209, 88,.08); border:1px solid rgba(48, 209, 88,.25); color:#D1FAE5; font-size:12px;"></div>
         <div id="guestDataNotice" style="display:none; margin-bottom:12px; padding:10px 12px; border-radius:8px; background:rgba(255, 159, 10,.08); border:1px solid rgba(255, 159, 10,.25); color:#FDE68A; font-size:12px;"></div>
@@ -2114,7 +2119,7 @@
               <div class="form-grid">
                 <div class="form-group"><label for="pricingRuleScope">Kapsam</label><select id="pricingRuleScope" data-onchange="loadPricingRuleDraft()"><option value="PROPERTY">Yalnız bu mülk</option><option value="PORTFOLIO">Tüm portföy</option></select></div>
                 <div class="form-group"><label for="pricingRuleKey">Kural</label><select id="pricingRuleKey" data-onchange="loadPricingRuleDraft()"><option value="weekend">Hafta sonu</option><option value="specialDay">Özel gün</option><option value="demand">Talep</option><option value="lastMinute">Son dakika</option><option value="gapNight">Boş gece</option></select></div>
-                <div class="form-group"><label for="pricingRulePct">Yüzde</label><input id="pricingRulePct" type="number" min="-100" max="1000" step="0.1" placeholder="—"></div>
+                <div class="form-group"><label for="pricingRulePct">Yüzde</label><input id="pricingRulePct" type="number" min="-99" max="1000" step="0.1" placeholder="—"></div>
                 <div class="form-group"><label id="pricingRuleParameterLabel" for="pricingRuleParameter">Ek parametre yok</label><input id="pricingRuleParameter" type="number" min="0" step="1" placeholder="—" disabled></div>
                 <label class="analysis-check"><input id="pricingRuleEnabled" type="checkbox" checked><span>Etkin</span></label>
               </div>
@@ -2143,7 +2148,7 @@
             <div class="form-group"><label for="pricingEventName">Etkinlik adı</label><input id="pricingEventName" type="text" maxlength="80" placeholder="Örn: Caz festivali"></div>
             <div class="form-group"><label for="pricingEventStart">Başlangıç</label><input id="pricingEventStart" type="date"></div>
             <div class="form-group"><label for="pricingEventEnd">Bitiş</label><input id="pricingEventEnd" type="date"></div>
-            <div class="form-group"><label for="pricingEventPct">Yüzde (boşsa özel gün kuralı)</label><input id="pricingEventPct" type="number" min="-100" max="1000" step="0.1" placeholder="—"></div>
+            <div class="form-group"><label for="pricingEventPct">Yüzde (boşsa özel gün kuralı)</label><input id="pricingEventPct" type="number" min="-99" max="1000" step="0.1" placeholder="—"></div>
             <div class="form-group"><label for="pricingEventScope">Kapsam</label><select id="pricingEventScope"><option value="PROPERTY">Yalnız bu mülk</option><option value="PORTFOLIO">Tüm portföy</option></select></div>
             <div class="form-group"><label>&nbsp;</label><button type="button" class="btn btn-primary btn-sm" data-onclick="savePricingSpecialEvent()">Etkinlik ekle</button></div>
           </div>
@@ -2849,6 +2854,7 @@
                yakalar; yanlis DOSYA hicbir kapiya takilmaz. -->
           <div id="importHistoryBox" style="display: none; margin-top: 18px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 12px;">
             <div style="font-size: 11px; color: #C7C7CC; font-weight: 700; margin-bottom: 6px;">🕘 Son İçe Aktarımlar</div>
+            <p id="importHistoryMessage" role="status" hidden style="font-size: 12px; margin: 0 0 6px;"></p>
             <div id="importHistoryList"></div>
             <div style="font-size: 10px; color: #6E6E73; margin-top: 6px; line-height: 1.5;">
               Geri alma yalnızca aktarımın eklediği kayıtları siler.
@@ -2911,7 +2917,14 @@
         </fieldset>
         <div id="guestProfileInsights" style="display:none; margin-top:14px; padding-top:14px; border-top:1px solid rgba(255,255,255,.08);"></div>
         <div id="guestRebookingAction" style="display:none; margin-top:14px; padding:12px; border-radius:10px; background:rgba(48, 209, 88,.08); border:1px solid rgba(48, 209, 88,.25);"></div>
+        <div class="form-group" id="guestMarketingRow" hidden style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:0 16px 12px;">
+          <label for="guestMarketingTemplate" style="margin:0;">📣 Kampanya mesajı</label>
+          <select id="guestMarketingTemplate" style="flex:1; min-width:180px;"></select>
+          <button type="button" class="btn btn-secondary btn-sm" data-onclick="sendGuestMarketingMessage()">WhatsApp'ta aç</button>
+          <span class="sub-text" style="flex-basis:100%;">Yalnız kampanya izni ve WhatsApp izni olan misafire gönderilir.</span>
+        </div>
         <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:10px;">
+          <button type="button" class="btn btn-danger" id="guestProfileEraseBtn" hidden style="margin-right:auto;" data-onclick="eraseGuestPersonalData()">🗑️ Kalıcı sil (KVKK)</button>
           <button type="button" class="btn btn-secondary" data-onclick="closeGuestProfileModal()">Vazgeç</button>
           <button type="submit" class="btn btn-primary">Misafiri Kaydet</button>
         </div>
@@ -3186,6 +3199,10 @@
             <input type="date" id="leadCheckOut">
           </div>
           <div class="form-group">
+            <label for="leadPax">Kişi sayısı</label>
+            <input type="number" id="leadPax" min="1" step="1" inputmode="numeric" placeholder="Bilinmiyorsa boş">
+          </div>
+          <div class="form-group">
             <label for="leadStatus">Durum</label>
             <select id="leadStatus">
               <option value="NEW">Yeni</option>
@@ -3207,7 +3224,7 @@
           <div class="form-group">
             <label>Kayıp Nedeni</label>
             <select id="leadLostReason">
-              <option value="-">-</option>
+              <option value="">— Neden seçin —</option>
               <option value="Fiyat Yüksek">Fiyat Yüksek</option>
               <option value="Tarih Dolu">Tarih Dolu</option>
               <option value="Cevap Vermedi">Cevap Vermedi</option>
@@ -3263,8 +3280,9 @@
             <input type="text" id="maintTitle" placeholder="Örn: Isı pompası sensör arızası" required>
           </div>
           <div class="form-group">
-            <label>Sorumlu</label>
-            <input type="text" id="maintAssignee" placeholder="Örn: Ahmet Usta">
+            <label>Sorumlu (not)</label>
+            <input type="text" id="maintAssignee" placeholder="Örn: dış firma, mülk sahibi">
+            <p class="sub-text" id="maintAssignedTechnician" style="margin-top:4px;"></p>
           </div>
           <div class="form-group">
             <label><input type="checkbox" id="maintBlocksAvailability"> Takvimi kapatır</label>
@@ -3280,7 +3298,7 @@
           </div>
           <div class="form-group">
             <label>Tahmini Maliyet (₺)</label>
-            <input type="number" step="0.01" id="maintCost" value="0">
+            <input type="number" step="0.01" min="0" id="maintCost" value="" placeholder="Bilinmiyorsa boş bırakın">
             <span style="display:block; font-size:10px; color: var(--text-muted); margin-top: 4px;">Planlama içindir; gider defterine yazılmaz. Ödenen tutarı Finans → Gider Girişi'nden girin.</span>
           </div>
           <div class="form-group">
@@ -3529,7 +3547,7 @@
               • Onaylamak için <code>VERILERI SIFIRLA</code> yazmanız gerekir; işlemi yalnızca işletme sahibi yapabilir.<br>
               • Aynı ekrana <strong>⚙️ Ayarlar → Veri Sıfırlama</strong> bölümünden de ulaşabilirsiniz.
             </p>
-            <button type="button" class="btn btn-secondary btn-sm" data-onclick="closeHelpModal(); openResetModal();">
+            <button type="button" class="btn btn-secondary btn-sm" data-owner-only data-onclick="closeHelpModal(); openResetModal();">
               🗑️ Sıfırlama Menüsünü Aç
             </button>
           </div>
@@ -3594,12 +3612,12 @@
   <script src="core/financial_metrics_service.js?v=80a48f81"></script>
   <script src="core/marketing_engine.js?v=2756f4ec"></script>
   <script src="core/analysis_export_service.js?v=d05579d8"></script>
-  <script src="core/chatgpt_prompt_engine.js?v=bbc159aa"></script>
+  <script src="core/chatgpt_prompt_engine.js?v=0bab01a2"></script>
   <script src="core/property_analysis_context_service.js?v=c0cc1027"></script>
-  <script src="core/finance_import_engine.js?v=8bf85c28"></script>
+  <script src="core/finance_import_engine.js?v=d8d534ef"></script>
   <script src="core/bulk_summary.js?v=48f72010"></script>
   <script src="core/income_statement.js?v=3c2e9daf"></script>
-  <script src="core/import_template_guide.js?v=d1fb325b"></script>
+  <script src="core/import_template_guide.js?v=3a7e4d66"></script>
   <script src="core/finance_export_engine.js?v=86f92e3f"></script>
 
   <!-- ======================================================= -->
@@ -4076,18 +4094,19 @@
   <script src="core/guest_contact_utils.js?v=84fd6474"></script>
   <script src="core/user_facing_errors.js?v=e4eb0ae5"></script>
   <script src="core/ledger_contract.js?v=533527e0"></script>
-  <script src="core/report_engine.js?v=a06ed31b"></script>
+  <script src="core/report_engine.js?v=ead1838e"></script>
   <script src="core/property_profile_engine.js?v=9d2f3d03"></script>
   <script src="core/property_owner_service.js?v=5c741a12"></script>
   <script src="core/marketing_channel_listing_service.js?v=515fe386"></script>
   <script src="core/sales_workflow_service.js?v=0305af5c"></script>
-  <script src="core/pricing_research_service.js?v=a01b01a8"></script>
-  <script src="core/suggested_price_engine.js?v=a694265a"></script>
+  <script src="core/pricing_research_service.js?v=fb97b560"></script>
+  <script src="core/suggested_price_engine.js?v=c2d35002"></script>
   <script src="core/target_revenue_calculator.js?v=fe49dcc0"></script>
   <script src="core/monthly_goal_calculator.js?v=245a5fea"></script>
   <script src="core/tr_special_days.js?v=0227d5dd"></script>
   <script src="core/business_date.js?v=a1518391"></script>
-  <script src="core/guest_crm_engine.js?v=eb788dbf"></script>
+  <script src="core/search_text.js?v=e45a0d1a"></script>
+  <script src="core/guest_crm_engine.js?v=7bcaa2de"></script>
   <script src="core/gap_night_service.js?v=6cdf4142"></script>
   <script src="core/pricing_booking_service.js?v=0eb93c05"></script>
   <script src="core/executive_priority_service.js?v=d69011e3"></script>
@@ -4100,14 +4119,15 @@
   <script src="core/captcha_gate.js?v=3ad4a776"></script>
   <script src="core/date_range_picker.js?v=41dc564c"></script>
   <script src="core/side_panel.js?v=d763b464"></script>
-  <script src="core/notification_feed.js?v=97d955bf"></script>
+  <script src="core/notification_feed.js?v=941306f6"></script>
   <script src="core/command_search.js?v=89760933"></script>
-  <script src="core/action_dispatch.js?v=89d49373"></script>
+  <script src="core/action_dispatch.js?v=3e7b285e"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=fa6d0372"></script>
-  <script src="app.js?v=ce596d7e"></script>
+  <script src="core/ui_dialog.js?v=8f939605"></script>
+  <script src="app.js?v=6391dba0"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
-  <script src="core/marketing_ui.js?v=e5503243"></script>
+  <script src="core/marketing_ui.js?v=e45a0e9a"></script>
 </body>
 </html>

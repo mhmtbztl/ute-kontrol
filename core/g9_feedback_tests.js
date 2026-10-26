@@ -425,7 +425,8 @@ async function asama4Davranisi() {
 
   // L-186 (M16) — talep duzenlemede ilgilenilen tarih
   check(/id="leadCheckIn"/.test(html) && /id="leadCheckOut"/.test(html), 'L-186a Talep formunda ilgilenilen tarihler var');
-  check(/checkIn,\r?\n\s*checkOut\r?\n\s*\}\);/.test(read('app.js')), 'L-186b Talep kaydi tarihleri tasir');
+  // L-290: kayda kisi sayisi da eklendi.
+  check(/checkIn,\r?\n\s*checkOut,?\r?\n\s*(pax\r?\n\s*)?\}\);/.test(read('app.js')), 'L-186b Talep kaydi tarihleri tasir');
 
   // L-187 (M17) — mulk bazinda net kar
   sahteDom({});
@@ -479,15 +480,16 @@ async function asama4Davranisi() {
   check((html.match(/settings-template-help/g) || []).length === 2 && /data-settings-section="checklists"[\s\S]{0,900}Bir kâğıt liste gibi yazın/.test(html),
     'L-189b Her sablon bolmesi ve kontrol listesi bolumu ne ise yaradigini soyler');
 
-  // L-190 (M20) — bosluk gecesi yalniz gelecekte
-  const dun = istanbulBugun(-1);
+  // L-190 (M20) — bosluk gecesi yalniz gelecekte. L-308: bos gece fiyat
+  // takviminin tanimidir (en cok 2 gece, iki dolu gece arasinda); takvim
+  // bugunden baslar, gecmis bosluk hic gorunmez.
   App.setAppData({ villas: { A: { id: 'pa', slug: 'A', name: 'A', basePrice: 1000 } }, bookings: [
     { id: 'g1', villa: 'A', checkIn: istanbulBugun(-10), checkOut: istanbulBugun(-8), status: 'CONFIRMED' },
-    { id: 'g2', villa: 'A', checkIn: istanbulBugun(-6), checkOut: dun, status: 'CONFIRMED' },
-    { id: 'g3', villa: 'A', checkIn: istanbulBugun(2), checkOut: istanbulBugun(4), status: 'CONFIRMED' }], expenses: [], cleaningTasks: [] });
+    { id: 'g2', villa: 'A', checkIn: istanbulBugun(-6), checkOut: istanbulBugun(), status: 'CONFIRMED' },
+    { id: 'g3', villa: 'A', checkIn: istanbulBugun(1), checkOut: istanbulBugun(4), status: 'CONFIRMED' }], expenses: [], cleaningTasks: [] });
   const gaps = App.detectGapNights();
-  check(gaps.length === 1 && gaps[0].checkIn === istanbulBugun() && gaps[0].nights === 2,
-    'L-190a Gecmis bosluk firsat sayilmaz; bugun baslamis bosluk bugunden itibaren kirpilir', JSON.stringify(gaps));
+  check(gaps.length === 1 && gaps[0].checkIn === istanbulBugun() && gaps[0].nights === 1,
+    'L-190a Gecmis bosluk firsat sayilmaz; bugunku bos gece firsattir', JSON.stringify(gaps));
   check(!/indirim oranını siz belirlersiniz/.test(html), 'L-190b Rehber olmayan bir ozelligi vaat etmez');
 }
 
@@ -652,7 +654,8 @@ async function bildirimDavranisi() {
   check(sahip.every(e => /^[a-z_]{3,40}:[A-Za-z0-9_:.-]{1,200}$/.test(e.event_key) && ['TEAM', 'OPERATIONS', 'FINANCE', 'SALES', 'PRICING'].includes(e.domain)
     && (!e.deep_link || /^[a-z]+(:[A-Za-z0-9_.-]{1,80}){0,2}$/.test(e.deep_link))),
     'L-192l Uretilen her olay phase93 dogrulamasindan gecer');
-  check(NF.typesForRole('owner').length === 7 && NF.typesForRole('sales').length === 4,
+  // L-311: bugunun giris/cikisi (member) ve geciken gorev (manage) eklendi.
+  check(NF.typesForRole('owner').length === 10 && NF.typesForRole('sales').length === 6,
     'L-192m Bos merkezde rolun alacagi bildirim turleri aciklanir');
 
   const app = read('app.js');
@@ -709,12 +712,12 @@ async function sablonGecerliDegerDavranisi() {
     'L-194b Taninmayan kategori gecerli listeyle reddedilir; defterdeki eski kategori aynen kabul edilir', JSON.stringify(g.errors));
 
   const kanallar = [{ code: 'AIRBNB', displayName: 'Airbnb' }, { code: 'BOOKING', displayName: 'Booking.com' }];
-  const bMap = { property: 'Villa', guest: 'Misafir', checkIn: 'Giris', checkOut: 'Cikis', gross: 'Brut', channel: 'Kanal' };
-  const satir = (kanal, i) => ({ Villa: 'zeytin', Misafir: 'Test ' + i, Giris: '2026-08-0' + (i + 1), Cikis: '2026-08-1' + i, Brut: '1000', Kanal: kanal });
+  const bMap = { property: 'Villa', guest: 'Misafir', checkIn: 'Giris', checkOut: 'Cikis', gross: 'Brut', channel: 'Kanal', pax: 'Kisi' };
+  const satir = (kanal, i) => ({ Villa: 'zeytin', Misafir: 'Test ' + i, Giris: '2026-08-0' + (i + 1), Cikis: '2026-08-1' + i, Brut: '1000', Kanal: kanal, Kisi: '2' });
   const ctx = { properties: [{ id: 'p1', key: 'zeytin', slug: 'zeytin', name: 'Villa Zeytin' }], existingBookings: [], channels: kanallar };
   const b = E.validateBookingRows([satir('airbnb ', 0), satir('Booking.com', 1), satir('Tripadvisor', 2), satir('', 3)], bMap, ctx);
   check(b.validCount === 3 && b.validatedRows[0].channel === 'AIRBNB' && b.validatedRows[1].channel === 'BOOKING'
-    && b.errors.length === 1 && /Kanal tanınmadı: "Tripadvisor"\. Geçerli: AIRBNB, BOOKING/.test(b.errors[0].errors.join(' ')),
+    && b.errors.length === 1 && /Kanal tanınmadı: "Tripadvisor"\. Geçerli kanallar: Airbnb, Booking\.com/.test(b.errors[0].errors.join(' ')),
     'L-194c Kanal kod ya da adla formun koduna cevrilir; taninmayan reddedilir; bos kanal eskisi gibi', JSON.stringify(b.errors));
 
   const appKategoriler = (app.match(/const EXPENSE_CATEGORIES = \[([\s\S]*?)\];/) || ['', ''])[1].match(/name: '([^']+)'/g).map(x => x.slice(7, -1));
@@ -1140,7 +1143,7 @@ async function talepEkraniDavranisi() {
   await App.saveLead({ preventDefault() {} });
   const yazma = ist.yazmalar.find(k => k.tablo === 'leads' && k.islem === 'update');
   check(yazma && yazma.yuk.property_id === PB && yazma.yuk.status === 'CONTACTED' && yazma.yuk.guest_name === null
-    && yazma.yuk.guest_phone === '05339294514' && yazma.yuk.quote_amount === 0,
+    && yazma.yuk.guest_phone === '05339294514' && yazma.yuk.quote_amount === null, // L-292: teklif yoksa 0 yazilmaz
     'L-219c Kaydet secilen mulku ve durumu yazar; "Ad girilmedi" isim olarak yazilmaz', JSON.stringify(yazma && yazma.yuk));
 
   const html = read('index.html');
@@ -1298,7 +1301,9 @@ async function bugunPerformansDavranisi() {
     && /finTopVillaFilter[\s\S]{0,80}currentFilter\.villa/.test(functionBody(app, 'function updateStepperLabels(')),
     'L-223 Finans Portfoy secicisi ortak filtreye bagli; listesi ortak doldurucudan, degeri filtreyle esit');
   // "Diger > Detay" bos liste aciyordu: grafik eslemeyle topluyor, arama ham metne bakiyordu
-  check(/eslesenGiderKategorisi\(exp\.category\)\.toLowerCase\(\)\.includes\(search\)/.test(functionBody(app, 'function renderExpensesTable(')),
+  // L-302: arama ortak katlamadan gecer; esleme expenseSearchMatches icinde kaldi.
+  check(/eslesenGiderKategorisi\(exp\.category\)/.test(functionBody(app, 'function expenseSearchMatches('))
+    && /expenseSearchMatches\(exp, search\)/.test(functionBody(app, 'function renderExpensesTable(')),
     'L-224a Gider defteri aramasi grafikle ayni kategori eslemesini kullanir');
   const satirlar = functionBody(app, 'function expenseCategoryRowsHtml(');
   check(/eslesenGiderKategorisi\(exp\.category\) === catName/.test(satirlar) && /isExpenseInFilter\(exp\)/.test(satirlar)
@@ -1922,7 +1927,7 @@ async function fiyatEkraniDavranisi() {
     && !talep.warnings.some(w => w.code === 'OCCUPANCY_TARGET_MISSING')
     && !App.computePricingCalendar(entry, BUGUN, null).suggestions.days.some(d => d.reasons.some(r => r.code === 'DEMAND')),
     'L-247a Hedef doluluk girilince talep kurali calisir; girilmeyince uygulanmaz (eskiden hic gonderilmiyordu)');
-  check(app.includes('function computePricingCalendar(entry, today = getTodayStr(), occupancyTarget = pricingExpectedOccupancyDraft)'),
+  check(app.includes('function computePricingCalendar(entry, today = getTodayStr(), occupancyTarget = pricingExpectedOccupancyDraft'),
     'L-247b Hesaplayicidaki hedef doluluk fiyat motorunun talep kuralina gider');
 
   // L-249 (M75): isletme kendi etkinligini ekler; tatil kapatilabilir.

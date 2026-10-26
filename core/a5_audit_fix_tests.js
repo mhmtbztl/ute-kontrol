@@ -55,8 +55,9 @@ try {
     const report = ReportEngine.buildReport({ page: 'FINANCE', period: { start: '2026-09-01', end: '2026-09-30' }, data: { ledger, summary: { ...ledger }, isProfitUnmeasured: true } });
     assert.strictEqual(report.chatGptContext.summary.netProfit, undefined);
     const prompt = ChatGptPromptEngine.buildPrompt({ kind: 'PAGE_REPORT', today: '2026-10-03', question: 'Yorumla', context: { report: report.chatGptContext } }).prompt;
-    assert(!prompt.includes('netProfit'), 'prompt net kar tasiyor');
-    assert(prompt.includes('"netRoomRevenue":40000'), 'olculmus ciro prompta girmeli');
+    // L-285: rapor kalemleri Turkce etiketle ve Turkce sayi bicimiyle gider.
+    assert(!prompt.includes('netProfit') && !prompt.includes('Net kâr'), 'prompt net kar tasiyor');
+    assert(prompt.includes('Net konaklama geliri: 40.000 ₺'), 'olculmus ciro prompta girmeli');
   });
   test('A2. Olculmus kar ChatGPT ozetinde kalir', () => {
     const report = ReportEngine.buildReport({ page: 'FINANCE', period: {}, data: { ledger: { ...ledger, totalOpex: 1200, netProfit: 38800 }, isProfitUnmeasured: false } });

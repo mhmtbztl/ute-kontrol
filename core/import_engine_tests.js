@@ -107,7 +107,7 @@ function run() {
   const komisyonsuz = E.validateBookingRows([
     { 'Villa': 'SEYİR', 'Misafir Adı': 'Ali', 'Giriş Tarihi': '2026-03-10',
       'Çıkış Tarihi': '2026-03-14', 'Brüt Tutar (TL)': '40000', 'Kanal': 'AIRBNB',
-      'OTA Komisyonu (TL)': '' }
+      'OTA Komisyonu (TL)': '', 'Kişi Sayısı': '2' }
   ], bMap, { properties: MULKLER });
   check(komisyonsuz.validCount === 1 && komisyonsuz.validatedRows[0].otaCommission === 0,
     '11. Boş OTA komisyonu 0 kalır, %15 diye TAHMİN EDİLMEZ',
@@ -137,16 +137,16 @@ function run() {
   // --- 5. Cakisma ve mukerrer ---------------------------------------------------
   console.log('\n--- 5. ÇAKIŞMA VE MÜKERRER ---');
   const cakisan = E.validateBookingRows([
-    { 'Villa': 'SEYİR', 'Misafir Adı': 'Ali', 'Giriş Tarihi': '2026-03-10', 'Çıkış Tarihi': '2026-03-14', 'Brüt Tutar (TL)': '40000' },
-    { 'Villa': 'SEYİR', 'Misafir Adı': 'Veli', 'Giriş Tarihi': '2026-03-12', 'Çıkış Tarihi': '2026-03-16', 'Brüt Tutar (TL)': '30000' }
+    { 'Villa': 'SEYİR', 'Misafir Adı': 'Ali', 'Giriş Tarihi': '2026-03-10', 'Çıkış Tarihi': '2026-03-14', 'Brüt Tutar (TL)': '40000', 'Kişi Sayısı': '2' },
+    { 'Villa': 'SEYİR', 'Misafir Adı': 'Veli', 'Giriş Tarihi': '2026-03-12', 'Çıkış Tarihi': '2026-03-16', 'Brüt Tutar (TL)': '30000', 'Kişi Sayısı': '2' }
   ], bMap, { properties: MULKLER });
   check(cakisan.overlaps.length === 1,
     '15. Dosya içindeki tarih çakışması yazmadan önce bildirilir',
     JSON.stringify(cakisan.overlaps));
 
   const ayniIki = E.validateBookingRows([
-    { 'Villa': 'SEYİR', 'Misafir Adı': 'Ali', 'Giriş Tarihi': '2026-03-10', 'Çıkış Tarihi': '2026-03-14', 'Brüt Tutar (TL)': '40000' },
-    { 'Villa': 'SEYİR', 'Misafir Adı': 'Ali', 'Giriş Tarihi': '2026-03-10', 'Çıkış Tarihi': '2026-03-14', 'Brüt Tutar (TL)': '40000' }
+    { 'Villa': 'SEYİR', 'Misafir Adı': 'Ali', 'Giriş Tarihi': '2026-03-10', 'Çıkış Tarihi': '2026-03-14', 'Brüt Tutar (TL)': '40000', 'Kişi Sayısı': '2' },
+    { 'Villa': 'SEYİR', 'Misafir Adı': 'Ali', 'Giriş Tarihi': '2026-03-10', 'Çıkış Tarihi': '2026-03-14', 'Brüt Tutar (TL)': '40000', 'Kişi Sayısı': '2' }
   ], bMap, { properties: MULKLER });
   check(ayniIki.duplicateCount === 1,
     '16. Birebir aynı satır mükerrer olarak işaretlenir', 'mükerrer = ' + ayniIki.duplicateCount);
@@ -157,7 +157,7 @@ function run() {
   };
   const yenidenYukleme = E.validateBookingRows([
     { 'Villa': 'SEYİR', 'Misafir Adı': 'Ali', 'Giriş Tarihi': '2026-03-10',
-      'Çıkış Tarihi': '2026-03-14', 'Brüt Tutar (TL)': '40000' }
+      'Çıkış Tarihi': '2026-03-14', 'Brüt Tutar (TL)': '40000', 'Kişi Sayısı': '2' }
   ], bMap, { properties: MULKLER, existingBookings: [mevcutKayit] });
   check(yenidenYukleme.duplicateCount === 1 && yenidenYukleme.existingDuplicateCount === 1 &&
         yenidenYukleme.validatedRows[0].isPotentialDuplicate === true,
@@ -171,7 +171,7 @@ function run() {
   // --- 6. Kapali donem ------------------------------------------------------------
   console.log('\n--- 6. KAPALI DÖNEM ---');
   const kapali = E.validateBookingRows([
-    { 'Villa': 'SEYİR', 'Misafir Adı': 'Ali', 'Giriş Tarihi': '2026-03-10', 'Çıkış Tarihi': '2026-03-14', 'Brüt Tutar (TL)': '40000' }
+    { 'Villa': 'SEYİR', 'Misafir Adı': 'Ali', 'Giriş Tarihi': '2026-03-10', 'Çıkış Tarihi': '2026-03-14', 'Brüt Tutar (TL)': '40000', 'Kişi Sayısı': '2' }
   ], bMap, { properties: MULKLER, isStayPeriodClosed: () => true });
   check(kapali.validCount === 0 && kapali.errors[0].errors.some(e => e.includes('kapatılmış')),
     '19. Kapatılmış döneme denk gelen rezervasyon önizlemede engellenir',

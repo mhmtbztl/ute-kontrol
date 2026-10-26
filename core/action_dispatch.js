@@ -70,7 +70,7 @@
     'openBookingDetailsPanel', 'openBookingForDate', 'openBookingFromGuestProfile',
     'openBookingModal', 'openBulkSummaryModal', 'closeBulkSummaryModal', 'saveBulkSummary', 'openCommandPalette', 'openDeleteAccountModal',
     'openEditCleaningTaskModal', 'openExcelFilePicker', 'openExpenseModal', 'openGoalsModal',
-    'openGuestProfileModal', 'openGuestRebookingWhatsApp', 'toggleGuestUnlinkedPanel', 'linkUnlinkedBookingGuest', 'linkAllUnlinkedBookingsWithPhone', 'openHelpModal', 'openImportModal', 'openOnboardingStep',
+    'openGuestProfileModal', 'eraseGuestPersonalData', 'sendGuestMarketingMessage', 'openGuestRebookingWhatsApp', 'toggleGuestUnlinkedPanel', 'openGuestUnlinkedPanel', 'linkUnlinkedBookingGuest', 'linkAllUnlinkedBookingsWithPhone', 'openHelpModal', 'openImportModal', 'openOnboardingStep',
     'openInviteMemberModal', 'openQuickLeadCapture', 'syncGoalProfitFromMargin', 'syncGoalMarginFromProfit', 'refreshPropertyReport', 'saveOperationalPerson', 'editOperationalPerson', 'cancelOperationalPersonEdit', 'toggleOperationalPersonActive', 'openMaintModal', 'openChatGptQuestionModal', 'openQuickBookingModal',
     'openMonthCloseModal', 'openMonthReopenModal', 'openLeadWhatsApp', 'inspectCleaningExecution',
     'openNewCleaningTaskModal', 'openCopyPreviousExpensesPanel', 'openPropertyModal', 'openPropertyOtaManager', 'openPropertyChannelForm', 'setTodayPerformanceVilla', 'closePropertyChannelForm', 'updateChannelListingHelp', 'savePropertyChannelListing', 'archivePropertyChannelListing', 'copyPropertyChannelLinks', 'openResetModal',

@@ -10,6 +10,7 @@
       MarketingFunnelService: require('./marketing_funnel_service'),
       MarketingPriorityService: require('./marketing_priority_service'),
       LexbnbBusinessDate: require('./business_date'),
+      LexbnbGuestCrm: require('./guest_crm_engine'),
       MarketingBenchmarkService: require('./marketing_benchmark_service'),
       MarketingCoverChangeService: require('./marketing_cover_change_service'),
       MarketingHealthResultsService: require('./marketing_health_results_service'),
@@ -64,7 +65,7 @@
     ['MarketingCoverChangeService', 'core/marketing_cover_change_service.js?v=81211a39'],
     ['MarketingDataService', 'core/marketing_data_service.js?v=0c6b8c4f'],
     ['MarketingReviewService', 'core/marketing_review_service.js?v=9207dee5'],
-    ['MarketingSnapshotService', 'core/marketing_snapshot_service.js?v=184ad517'],
+    ['MarketingSnapshotService', 'core/marketing_snapshot_service.js?v=04136be1'],
     ['MarketingChannelListingService', 'core/marketing_channel_listing_service.js?v=515fe386'],
     ['MarketingExperimentService', 'core/marketing_experiment_service.js?v=4a2ffb14'],
     ['MarketingHealthResultsService', 'core/marketing_health_results_service.js?v=662edeea'],
@@ -165,13 +166,23 @@
     });
     // Aylik toplu aktarim satiri gelir/gece tasir ama gercek bir rezervasyon
     // degildir. Kanal ekonomisi tutari korur, adet ve pay hesaplarinda saymaz.
-    const bulkSummaries = bookings.filter(item => /^TOPLU AKTARIM\s*[—-]/i.test(String(item.guest || item.guest_name || '')));
-    bulkSummaries.forEach(item => {
-      const channel = engine.normalizeChannel(item.channel).canonicalChannel;
-      const row = economics.channels.find(entry => entry.channel === channel);
-      if (row) row.reservationCount = Math.max(0, row.reservationCount - 1);
-      economics.totals.reservationCount = Math.max(0, economics.totals.reservationCount - 1);
-    });
+    // Yalniz DONEMDE sayilmis ozetler dusulur (L-275): eskiden tum gecmisin
+    // ozetleri her doneme dusuluyor, Dogrudan adedi 0'a iniyordu. Tanim tek
+    // yerde: guest_crm_engine.isBulkSummaryBooking.
+    const bulkSummaries = bookings.filter(item => services.LexbnbGuestCrm.isBulkSummaryBooking(item));
+    const bulkEconomics = bulkSummaries.length ? engine.computeChannelEconomics({
+      bookings: bulkSummaries,
+      periodStart: period.start,
+      periodEndExclusive: period.endExclusive,
+      baseCurrency: input.baseCurrency || 'TRY'
+    }) : null;
+    if (bulkEconomics) {
+      bulkEconomics.channels.forEach(bulk => {
+        const row = economics.channels.find(entry => entry.channel === bulk.channel);
+        if (row) row.reservationCount = Math.max(0, row.reservationCount - bulk.reservationCount);
+      });
+      economics.totals.reservationCount = Math.max(0, economics.totals.reservationCount - bulkEconomics.totals.reservationCount);
+    }
     const direct = economics.channels.find(row => row.channel === 'DIRECT');
     economics.mix.directReservationSharePercent = economics.totals.reservationCount > 0
       ? Number((((direct && direct.reservationCount) || 0) / economics.totals.reservationCount * 100).toFixed(2)) : null;
@@ -182,7 +193,7 @@
         slug, id: property && property.id, name: property && property.name || slug
       })),
       economics,
-      bulkSummaryCount: bulkSummaries.length,
+      bulkSummaryCount: bulkEconomics ? bulkEconomics.totals.reservationCount : 0,
       financeSummary: input.financeSummary || null,
       listings: Array.isArray(input.listings) ? input.listings.filter(item => String(item.status || 'ACTIVE').toUpperCase() !== 'ARCHIVED') : [],
       snapshots: Array.isArray(input.snapshots) ? input.snapshots : [],
@@ -424,11 +435,46 @@
     const r = derived.rates;
     const findings = rankFindings(model.findings);
     return `${toolbar}${listingForm}${form}${experimentForm}<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
-      ${kpi('Gösterim', number(c.impressions), `Kapsama: ${number(derived.validation.coveragePercent, '%')}`)}
+      ${kpi('Gösterim', number(c.impressions), `Veri tamlığı: 5 sayaçtan ${number(Math.round((derived.validation.coveragePercent || 0) * 5 / 100))} tanesi girildi (${number(derived.validation.coveragePercent, '%')})`)}
       ${kpi('İlan görüntüleme', number(c.listingViews), `Arama → görüntüleme: ${number(r.searchToViewCtrPercent, '%')}`)}
       ${kpi('Rezervasyon denemesi', number(c.bookingAttempts), `Görüntüleme → deneme: ${number(r.viewToAttemptConversionPercent, '%')}`)}
       ${kpi('Platform rezervasyonu', number(c.platformReportedBookings), `Görüntüleme → rezervasyon: ${number(r.viewToBookingConversionPercent, '%')}`)}
-    </div>${renderFindings(findings)}${experimentResults}`;
+    </div>${renderSnapshotList(model)}${renderFindings(findings)}${experimentResults}`;
+  }
+
+  // Huni snapshot'lari ve yonetim icin silme (L-281, phase105 DELETE politikasi).
+  function renderSnapshotList(model) {
+    const rows = (model.snapshots || []).slice(0, 10);
+    if (!rows.length) return '';
+    const canManage = !!(model.ads && model.ads.canManage);
+    return `<div class="card" style="padding:14px;margin-bottom:12px"><strong>Kayıtlı snapshot'lar</strong><div style="display:grid;gap:6px;margin-top:8px">${rows.map(row => `<div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><span>${escapeHtml(row.period_start || row.periodStart || '?')} → ${escapeHtml(row.period_end_exclusive || row.periodEndExclusive || '?')} · gösterim ${number(row.impressions)}${row.notes ? ' · ' + escapeHtml(row.notes) : ''}</span>${canManage ? `<button type="button" class="btn btn-danger btn-sm" data-marketing-delete-snapshot="${escapeHtml(row.id)}">Sil</button>` : ''}</div>`).join('')}</div></div>`;
+  }
+
+  async function deleteSnapshot(snapshotId) {
+    const client = typeof supabaseClient !== 'undefined' ? supabaseClient : null;
+    const scope = cloudScope();
+    if (!client || !scope || !snapshotId) throw new Error('SNAPSHOT_DELETE_UNAVAILABLE');
+    if (typeof window !== 'undefined' && !window.confirm('Bu huni snapshot\'ı silinsin mi?')) return false;
+    const status = document.getElementById('marketingWorkspaceStatus');
+    const { data, error } = await client.from('channel_performance_snapshots').delete()
+      .eq('id', snapshotId).eq('tenant_id', scope.tenantId).select('id');
+    if (error) {
+      if (status) status.textContent = String(error.code) === '23503'
+        ? 'Bu snapshot bir değişiklik ölçümünde kullanılıyor; silinemez.'
+        : 'Snapshot silinemedi. Lütfen yeniden deneyin.';
+      return false;
+    }
+    if (!data || !data.length) {
+      // Politika yoksa satir sessizce filtrelenir (RLS).
+      if (status) status.textContent = 'Snapshot silinemedi: veritabanı göçü (phase105) henüz uygulanmadı ya da bu rolün silme yetkisi yok.';
+      return false;
+    }
+    state.remoteStatus = 'LOADING';
+    render();
+    await hydrateCloudData();
+    render();
+    if (status) status.textContent = 'Snapshot silindi.';
+    return true;
   }
 
   function selectLatestSnapshot(snapshots = []) {
@@ -876,8 +922,9 @@
     const submit = form.querySelector('[type="submit"]');
     if (submit) submit.disabled = true;
     try {
+      // Gelecek gunleri kapsayan donem kaydedilmez (L-299): sayac henuz olusmadi.
       const result = await services.MarketingSnapshotService.recordManualSnapshot(client, {
-        ...values, tenantId: scope.tenantId
+        ...values, tenantId: scope.tenantId, today: services.LexbnbBusinessDate.getBusinessDate()
       });
       state.snapshotFormOpen = false;
       state.remoteStatus = 'LOADING';
@@ -1118,6 +1165,14 @@
         });
         return;
       }
+      const deleteSnapshotButton = event.target.closest('[data-marketing-delete-snapshot]');
+      if (deleteSnapshotButton) {
+        deleteSnapshot(deleteSnapshotButton.dataset.marketingDeleteSnapshot).catch(() => {
+          const status = document.getElementById('marketingWorkspaceStatus');
+          if (status) status.textContent = 'Snapshot silinemedi. Lütfen yeniden deneyin.';
+        });
+        return;
+      }
       const deletePeriodButton = event.target.closest('[data-ads-delete-period]');
       if (deletePeriodButton) {
         deleteAdsPeriod(deletePeriodButton.dataset.adsDeletePeriod).catch(() => {
@@ -1229,9 +1284,12 @@
       const form = event.target.closest('[data-marketing-snapshot-form]');
       if (!form) return;
       event.preventDefault();
-      handleSnapshotSubmit(form).catch(() => {
+      handleSnapshotSubmit(form).catch(error => {
         const status = document.getElementById('marketingWorkspaceStatus');
-        if (status) status.textContent = 'Snapshot kaydedilemedi. Alanları kontrol edip yeniden deneyin.';
+        const gelecek = /SNAPSHOT_PERIOD_IN_FUTURE/.test(String(error && error.message || ''));
+        if (status) status.textContent = gelecek
+          ? 'Snapshot dönemi bugünü geçemez: bitiş (hariç) en geç yarın olabilir. Gelecek günlerin sayacı henüz oluşmadı.'
+          : 'Snapshot kaydedilemedi. Alanları kontrol edip yeniden deneyin.';
       });
     });
     if (content) content.addEventListener('change', event => {
@@ -1269,5 +1327,5 @@
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') initializeBrowser();
 
-  return { periodFromFilter, scopeBookings, buildWorkspaceModel, getCurrentModel: () => buildWorkspaceModel(browserInput()), buildAdsModel, buildAdsImportPreview, selectLatestSnapshot, selectCurrentBenchmark, renderWorkspaceHtml, renderAds, renderAdsImportPreview, normalizeCustomMetrics, evaluateCustomMetric, campaignBudgetView, renderMarketingHealth, renderBenchmarkPanel, renderBenchmarkForm, renderFindingActions, renderListingForm, renderSnapshotForm, renderExperimentForm, renderExperiments, escapeHtml, setData, render };
+  return { renderSnapshotList, deleteSnapshot, periodFromFilter, scopeBookings, buildWorkspaceModel, getCurrentModel: () => buildWorkspaceModel(browserInput()), buildAdsModel, buildAdsImportPreview, selectLatestSnapshot, selectCurrentBenchmark, renderWorkspaceHtml, renderAds, renderAdsImportPreview, normalizeCustomMetrics, evaluateCustomMetric, campaignBudgetView, renderMarketingHealth, renderBenchmarkPanel, renderBenchmarkForm, renderFindingActions, renderListingForm, renderSnapshotForm, renderExperimentForm, renderExperiments, escapeHtml, setData, render };
 }));

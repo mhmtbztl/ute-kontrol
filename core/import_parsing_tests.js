@@ -18,9 +18,9 @@ const ok = n => { passed++; console.log(`[PASS] ${n}`); };
 const no = (n, d) => { failed++; console.error(`[FAIL] ${n}\n       ${d}`); };
 const check = (c, n, d) => c ? ok(n) : no(n, d);
 
-const MAP = { property: 'Villa', guest: 'Misafir', checkIn: 'Giris', checkOut: 'Cikis', gross: 'Tutar' };
+const MAP = { property: 'Villa', guest: 'Misafir', checkIn: 'Giris', checkOut: 'Cikis', gross: 'Tutar', pax: 'Kisi' };
 const PROPS = [{ id: 'p1', name: 'Villa Deniz', slug: 'deniz' }];
-const satir = (gi, ci, tutar = '10000') => ({ Villa: 'Villa Deniz', Misafir: 'Ali', Giris: gi, Cikis: ci, Tutar: tutar });
+const satir = (gi, ci, tutar = '10000') => ({ Villa: 'Villa Deniz', Misafir: 'Ali', Giris: gi, Cikis: ci, Tutar: tutar, Kisi: '2' });
 
 // --- 1. Tarih sirasi dosyadan belirlenir ---
 {
