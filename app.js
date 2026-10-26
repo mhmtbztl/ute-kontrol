@@ -9470,7 +9470,11 @@ if (typeof document !== 'undefined' && document.addEventListener) {
     if (event.target.closest && !event.target.closest('.daterange-group')) toggleResDatePicker(false);
   });
   document.addEventListener('keydown', event => {
-    if (event.key === 'Escape') toggleResDatePicker(false);
+    if (event.key !== 'Escape') return;
+    const panel = document.getElementById('resDatePicker');
+    // Acik secici Esc'i kendisi alir; pencere kapanmasin (L-312).
+    if (panel && !panel.hidden) event.preventDefault();
+    toggleResDatePicker(false);
   });
 }
 
@@ -12921,6 +12925,71 @@ function unsavedFormBeforeUnload(event) {
   return '';
 }
 
+// Pencere klavye destegi (L-312): acilista odak pencereye tasinir, Tab
+// pencere icinde doner, Esc ustteki pencereyi kendi kapat dugmesiyle kapatir.
+// Komut paleti ve tarih secici kendi Esc isleyicilerini korur.
+const MODAL_FOCUSABLE = 'input:not([type="hidden"]), select, textarea, button, a[href], [tabindex]:not([tabindex="-1"])';
+
+function topActiveModal() {
+  if (typeof document === 'undefined') return null;
+  const acik = Array.from(document.querySelectorAll(UNSAVED_MODAL_SELECTOR) || []);
+  return acik.length ? acik[acik.length - 1] : null;
+}
+
+function modalFocusables(modal) {
+  return Array.from((modal && modal.querySelectorAll(MODAL_FOCUSABLE)) || [])
+    .filter(el => !el.disabled && el.offsetParent !== null && el.getAttribute('aria-hidden') !== 'true');
+}
+
+function focusModalOnOpen(modal) {
+  const ogeler = modalFocusables(modal);
+  const ilk = ogeler.find(el => !(el.classList && el.classList.contains && el.classList.contains('close-btn'))) || ogeler[0];
+  if (ilk && typeof ilk.focus === 'function') ilk.focus();
+}
+
+function handleModalKeydown(event) {
+  const modal = topActiveModal();
+  if (!modal || !event) return;
+  if (event.key === 'Escape') {
+    // Pencere icindeki tarih secici once kendi Esc'ini alir; pencere kapanmaz.
+    const tarihSecici = document.getElementById('resDatePicker');
+    if (event.defaultPrevented || (tarihSecici && tarihSecici.hidden === false && modal.contains(tarihSecici))) return;
+    const kapat = modal.querySelector('.close-btn');
+    if (kapat && typeof kapat.click === 'function') kapat.click();
+    else if (modal.classList && typeof modal.classList.remove === 'function') modal.classList.remove('active');
+    event.preventDefault();
+    return;
+  }
+  if (event.key !== 'Tab') return;
+  const ogeler = modalFocusables(modal);
+  if (!ogeler.length) return;
+  const ilk = ogeler[0], son = ogeler[ogeler.length - 1];
+  const aktif = document.activeElement;
+  if (!modal.contains(aktif)) { event.preventDefault(); ilk.focus(); return; }
+  if (!event.shiftKey && aktif === son) { event.preventDefault(); ilk.focus(); }
+  else if (event.shiftKey && aktif === ilk) { event.preventDefault(); son.focus(); }
+}
+
+function installModalKeyboardSupport() {
+  if (typeof document === 'undefined') return;
+  document.addEventListener('keydown', handleModalKeydown);
+  if (typeof MutationObserver !== 'function') return;
+  const acanlar = new WeakMap();
+  new MutationObserver(kayitlar => kayitlar.forEach(kayit => {
+    const el = kayit.target;
+    if (!el || !el.classList || !(el.classList.contains('modal-backdrop') || el.classList.contains('modal-overlay'))) return;
+    const simdiAcik = el.classList.contains('active');
+    const onceAcik = String(kayit.oldValue || '').split(/\s+/).includes('active');
+    if (simdiAcik && !onceAcik) {
+      acanlar.set(el, document.activeElement);
+      setTimeout(() => { if (!el.contains(document.activeElement)) focusModalOnOpen(el); }, 0);
+    } else if (!simdiAcik && onceAcik) {
+      const acan = acanlar.get(el);
+      if (acan && typeof acan.focus === 'function' && document.contains(acan)) acan.focus();
+    }
+  })).observe(document.body, { attributes: true, attributeFilter: ['class'], attributeOldValue: true, subtree: true });
+}
+
 function installUnsavedFormGuard() {
   if (typeof document === 'undefined' || typeof window === 'undefined') return;
   document.addEventListener('input', markModalFormDirty, true);
@@ -12939,6 +13008,7 @@ if (typeof document !== 'undefined') {
   document.addEventListener('DOMContentLoaded', async () => {
     wireAccessibleFormLabels();
     installUnsavedFormGuard();
+    installModalKeyboardSupport();
     if (isBrowserQualityFixture()) {
       installBrowserQualityFixture(new URLSearchParams(window.location.search).get('role') || 'owner');
       endAuthPending();
@@ -23718,6 +23788,8 @@ if (typeof module !== 'undefined' && module.exports) {
     getImportEngine,
     buildImportSource,
     parseSourceWithMode,
+    handleModalKeydown,
+    focusModalOnOpen,
     openLeadWhatsApp,
     printCurrentReport,
     setCurrentPageReportForTests: report => { currentPageReport = report; },

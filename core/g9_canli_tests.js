@@ -55,6 +55,8 @@
 // L-295: tamamlanan genel gorevde completed_at bos kaliyordu.
 // L-289: Yazdir/PDF sonrasi about:blank sekmesi acik kaliyordu.
 // L-290: "WhatsApp'ta ac" sablon secilmezse sessiz kaliyor; talep duzenlemede kisi sayisi alani yoktu.
+// L-312: pencereler klavyeyle kullanilamiyordu: acilista odak iceri gecmiyor, odak tuzagi
+//   yok, Esc kapatmiyordu.
 const fs = require('fs');
 const path = require('path');
 
@@ -1023,6 +1025,47 @@ async function L290() {
   check(y && y.yuk.pax === 5, 'L-290c Talep duzenleme kisi sayisini yazar', JSON.stringify(y && y.yuk.pax));
 }
 
+// ---------------------------------------------------------------------------
+// L-312 pencere klavye: Esc kapatir, Tab pencere icinde doner, acilista odak iceride
+// ---------------------------------------------------------------------------
+async function L312() {
+  const dom = sahteDom();
+  const App = require('../app.js');
+  let kapat = 0;
+  const odak = [];
+  const ogeler = ['ilk', 'orta', 'son'].map(ad => ({ ad, focus() { dom.activeElement = this; odak.push(ad); }, disabled: false, offsetParent: {}, getAttribute: () => null }));
+  const kapatDugmesi = { click() { kapat++; } };
+  const modal = {
+    classList: { contains: c => c === 'active' },
+    contains: el => ogeler.includes(el) || el === kapatDugmesi,
+    querySelector: sel => (sel === '.close-btn' ? kapatDugmesi : null),
+    querySelectorAll: () => ogeler
+  };
+  dom.querySelectorAll = sel => (/\.active/.test(sel) ? [modal] : []);
+  const olay = (key, shift = false) => ({ key, shiftKey: shift, prevented: false, preventDefault() { this.prevented = true; } });
+  check(typeof App.handleModalKeydown === 'function', 'L-312a Pencere klavye isleyicisi var');
+  if (typeof App.handleModalKeydown !== 'function') return;
+  const esc = olay('Escape');
+  App.handleModalKeydown(esc);
+  check(kapat === 1 && esc.prevented, 'L-312b Esc acik pencereyi kapatir');
+  dom.activeElement = ogeler[2];
+  const tab = olay('Tab');
+  App.handleModalKeydown(tab);
+  check(tab.prevented && odak[odak.length - 1] === 'ilk', 'L-312c Son ogede Tab pencerenin ilk ogesine doner (odak arka sayfaya kacmaz)');
+  dom.activeElement = ogeler[0];
+  const geri = olay('Tab', true);
+  App.handleModalKeydown(geri);
+  check(geri.prevented && odak[odak.length - 1] === 'son', 'L-312d Ilk ogede Shift+Tab son ogeye doner');
+  dom.activeElement = { ad: 'arka sayfa' };
+  const disari = olay('Tab');
+  App.handleModalKeydown(disari);
+  check(disari.prevented && odak[odak.length - 1] === 'ilk', 'L-312e Odak pencere disindaysa Tab pencereye girer');
+  odak.length = 0;
+  App.focusModalOnOpen(modal);
+  check(odak[0] === 'ilk', 'L-312f Pencere acilinca odak ilk alana tasinir');
+  check(/installModalKeyboardSupport\(\)/.test(read('app.js')), 'L-312g Klavye destegi acilista kurulur');
+}
+
 async function main() {
   try {
     await L304();
@@ -1060,6 +1103,7 @@ async function main() {
     await L295();
     await L289();
     await L290();
+    await L312();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));
