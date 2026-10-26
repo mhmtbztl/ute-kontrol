@@ -10562,7 +10562,10 @@ async function setBookingChannelActive(channelId, isActive) {
 
 async function createBookingChannelFromSettings(formEvent) {
   formEvent.preventDefault();
-  const submit = formEvent.currentTarget.querySelector('button[type="submit"]');
+  // Olayin currentTarget'i ilk await'ten sonra null olur (L-272): kanal
+  // kaydediliyor ama reset() hatasi "Kanal eklenemedi" diyordu.
+  const form = formEvent.currentTarget;
+  const submit = form.querySelector('button[type="submit"]');
   if (submit) submit.disabled = true;
   try {
     await saveTenantBookingChannel({
@@ -10571,7 +10574,7 @@ async function createBookingChannelFromSettings(formEvent) {
       defaultCommissionRate: document.getElementById('newBookingChannelRate')?.value,
       isActive: true
     });
-    formEvent.currentTarget.reset();
+    form.reset();
     toggleNewBookingChannelRate();
     await refreshBookingChannelSettings();
     setBookingChannelMessage('Yeni rezervasyon kanalı eklendi.', 'success');
@@ -23400,6 +23403,7 @@ if (typeof module !== 'undefined' && module.exports) {
     getImportEngine,
     buildImportSource,
     parseSourceWithMode,
+    createBookingChannelFromSettings,
     reservationSearchMatches,
     expenseSearchMatches,
     cleaningTaskSearchMatches,

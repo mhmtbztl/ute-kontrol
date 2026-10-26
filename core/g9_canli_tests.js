@@ -14,6 +14,8 @@
 //   gibi Turkce buyuk harfli kayitlar kucuk harfle bulunmuyordu.
 // L-308: iki ayri bos gece tanimi; Bugun firsati ve misafire giden metin 1-4 gece,
 //   sabit %20 ile takvimle (en cok 2 gece, ozel gun, taban) celisiyordu.
+// L-272: kanal eklenince "Cannot read properties of null (reading 'reset')";
+//   await sonrasi olayin currentTarget'i bosaliyordu.
 const fs = require('fs');
 const path = require('path');
 
@@ -371,6 +373,22 @@ async function L308() {
   check(App.detectGapNights().length === 0, 'L-308e Minimum gece kuralina takilan bosluk firsat sayilmaz');
 }
 
+// ---------------------------------------------------------------------------
+// L-272 kanal ekleme: await sonrasi event.currentTarget bos
+// ---------------------------------------------------------------------------
+async function L272() {
+  const dom = sahteDom({ newBookingChannelName: 'TEST Kanal', newBookingChannelType: 'OTA', newBookingChannelRate: '12' });
+  const App = require('../app.js');
+  kur(App, {}, 'owner', { rpc: ad => (ad === 'save_tenant_booking_channel' ? { id: 'c1', display_name: 'TEST Kanal', code: 'CUSTOM_C1' } : []) });
+  let sifirlandi = false;
+  const form = { reset() { sifirlandi = true; }, querySelector: () => ({ disabled: false }) };
+  // Tarayici: olay isleyicisi ilk await'ten sonra currentTarget null olur.
+  let erisim = 0;
+  const olay = { preventDefault() {}, get currentTarget() { erisim++; return erisim === 1 ? form : null; } };
+  await App.createBookingChannelFromSettings(olay);
+  check(sifirlandi, 'L-272a Kanal kaydedilince form sifirlanir (await sonrasi null currentTarget hatasi yok)');
+}
+
 async function main() {
   try {
     await L304();
@@ -380,6 +398,7 @@ async function main() {
     await L305();
     await L302();
     await L308();
+    await L272();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));
