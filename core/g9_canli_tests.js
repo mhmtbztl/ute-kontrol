@@ -119,6 +119,7 @@ function kaydedenIstemci(secimler = {}) {
         select() { return q; }, eq(c, v) { k.filtre.push([c, v]); return q; }, in() { return q; },
         is() { return q; }, gte() { return q; }, lte() { return q; }, lt() { return q; }, gt() { return q; },
         or() { return q; }, not() { return q; }, order() { return q; }, limit() { return q; }, range() { return q; },
+        neq() { return q; }, ilike() { return q; }, like() { return q; }, contains() { return q; }, filter() { return q; }, match() { return q; },
         async single() { return cevap(); },
         async maybeSingle() { return cevap(); },
         then(res, rej) { return Promise.resolve(cevap()).then(res, rej); }
