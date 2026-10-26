@@ -8009,13 +8009,13 @@ function renderImportPreviewBox() {
 
   // --- Eslesmeyen zorunlu sutun var mi? ---
   const zorunlu = rezMi
-    ? { property: 'Villa', guest: 'Misafir Adı', checkIn: 'Giriş Tarihi', checkOut: 'Çıkış Tarihi', gross: 'Brüt Tutar' }
+    ? { property: 'Villa', guest: 'Misafir Adı', checkIn: 'Giriş Tarihi', checkOut: 'Çıkış Tarihi', gross: 'Brüt Tutar', pax: 'Kişi Sayısı' }
     : temizlikMi
       ? { date: 'Tarih', property: 'Villa', amount: 'Tutar' }
       : { date: 'Tarih', category: 'Kategori', amount: 'Tutar' };
   const eksikSutun = Object.keys(zorunlu).filter(k => !pendingImportData.columnMap[k]).map(k => zorunlu[k]);
 
-  const yazilacak = (r.validatedRows || []).filter(v => !v.isPotentialDuplicate && !v.hasFileOverlap).length;
+  const yazilacak = (r.validatedRows || []).filter(v => !v.isPotentialDuplicate && !v.hasFileOverlap && !v.hasLedgerOverlap).length;
 
   if (stats) {
     const p = [`${r.totalRows} satır okundu`];
@@ -8087,7 +8087,7 @@ function renderImportPreviewBox() {
     });
 
     // Sonra gecerli satirlardan ornek
-    (r.validatedRows || []).filter(v => !v.hasFileOverlap).slice(0, Math.max(0, 15 - hatalar.length)).forEach(v => {
+    (r.validatedRows || []).filter(v => !v.hasFileOverlap && !v.hasLedgerOverlap).slice(0, Math.max(0, 15 - hatalar.length)).forEach(v => {
       const durum = v.isPotentialDuplicate ? '⊘ mükerrer, atlanacak' : '✓ eklenecek';
       const renk = v.isPotentialDuplicate ? 'rgba(255, 159, 10,0.10)' : '';
       if (rezMi) {
@@ -8140,7 +8140,7 @@ function resetImportPreview() {
  */
 async function computeImportContentFingerprint(mode, result, tenantId) {
   const alanlar = r => {
-    const { raw, rowNum, isPotentialDuplicate, hasFileOverlap, ...kalan } = r || {};
+    const { raw, rowNum, isPotentialDuplicate, hasFileOverlap, hasLedgerOverlap, ...kalan } = r || {};
     return JSON.stringify(Object.keys(kalan).sort().map(k => [k, kalan[k]]));
   };
   const satirlar = ((result && result.validatedRows) || []).map(alanlar).sort();
@@ -8172,7 +8172,7 @@ async function applyImportedData() {
   const r = pendingImportData.result;
   const rezMi = pendingImportData.mode === 'BOOKINGS';
   const temizlikMi = pendingImportData.mode === 'CLEANING';
-  const yazilacaklar = (r.validatedRows || []).filter(v => !v.isPotentialDuplicate && !v.hasFileOverlap);
+  const yazilacaklar = (r.validatedRows || []).filter(v => !v.isPotentialDuplicate && !v.hasFileOverlap && !v.hasLedgerOverlap);
   if (yazilacaklar.length === 0) {
     if (typeof showToast === 'function') showToast('İçe aktarılacak geçerli kayıt yok.', 'info');
     return;

@@ -8,6 +8,8 @@
 // L-269: gider formunda cift tiklama iki gider yaziyordu.
 // L-270: WhatsApp "Sicak Lead" tarih, kisi ve tutari talebe yazmiyor (yalniz
 //   not), sondaki imza adini gormuyor, telefonu bosluklu sakliyordu.
+// L-305: rezervasyon aktarim onizlemesi kisi sayisi eksikligini ve mulk
+//   takvimindeki cakismayi gormuyor, yazma ham Postgres hatasiyla dusuyordu.
 const fs = require('fs');
 const path = require('path');
 
@@ -259,12 +261,54 @@ async function L270() {
     'L-270i Mevcut talebin teklifi ezilmez, yeni tutar nota duser', JSON.stringify(a2 && a2.p_note));
 }
 
+// ---------------------------------------------------------------------------
+// L-305 rezervasyon aktarim onizlemesi kisi sayisini ve takvim cakismasini gorur
+// ---------------------------------------------------------------------------
+async function L305() {
+  const E = require('./finance_import_engine.js');
+  const props = [{ id: PROP_A, slug: 'DENE', key: 'DENE', name: 'Deneme Evi' }];
+  const harita = { property: 'Villa', guest: 'Misafir Adı', checkIn: 'Giriş', checkOut: 'Çıkış', gross: 'Brüt', pax: 'Kişi Sayısı', status: 'Durum' };
+  const { pax: _p, ...paxsiz } = harita;
+  const satir = (g, c, ad, ek = {}) => ({ Villa: 'Deneme Evi', 'Misafir Adı': ad, Giriş: g, Çıkış: c, Brüt: '9000', 'Kişi Sayısı': '2', Durum: '', ...ek });
+  const r1 = E.validateBookingRows([satir('2026-12-10', '2026-12-12', 'TEST Paxsız')], paxsiz, { properties: props });
+  check(r1.validCount === 0 && r1.errors.length === 1 && /Kişi sayısı/.test(r1.errors[0].errors.join(' ')),
+    'L-305a Kisi sayisi olmayan satir onizlemede reddedilir (varsayilmaz)', JSON.stringify(r1.errors));
+  const mevcut = [{ propertyId: PROP_A, villa: 'DENE', guest: 'TEST Mevcut', checkIn: '2026-12-02', checkOut: '2026-12-04', gross: 18000, pax: 2, status: 'CONFIRMED' }];
+  const r2 = E.validateBookingRows([
+    satir('2026-12-03', '2026-12-05', 'TEST Çakışan'),
+    satir('2026-12-03', '2026-12-05', 'TEST İptal', { Durum: 'CANCELLED' }),
+    satir('2026-12-01', '2026-12-02', 'TEST Bitişik')
+  ], harita, { properties: props, existingBookings: mevcut });
+  const cak = r2.validatedRows.find(v => v.guest === 'TEST Çakışan');
+  check(cak && cak.hasLedgerOverlap === true && (r2.overlaps || []).some(o => /TEST Mevcut/.test(o.errors.join(' '))),
+    'L-305b Mulk takvimindeki rezervasyonla cakisan satir isaretlenir ve nedeni yazilir', JSON.stringify(r2.overlaps));
+  check(!r2.validatedRows.find(v => v.guest === 'TEST İptal').hasLedgerOverlap && !r2.validatedRows.find(v => v.guest === 'TEST Bitişik').hasLedgerOverlap,
+    'L-305c Iptal satir ve mevcut girisin gunu cikan satir cakisma sayilmaz');
+
+  // Uygulama: Kisi Sayisi sutunu yoksa zorunlu sutun eksik der; cakisan satir yazilacaklara girmez.
+  const dom = sahteDom();
+  const App = require('../app.js');
+  kur(App, { bookings: mevcut.map((b, i) => ({ id: 'b' + i, ...b })) });
+  const basliklar = ['Villa', 'Misafir Adı', 'Giriş Tarihi', 'Çıkış Tarihi', 'Brüt Tutar'];
+  App.parseSourceWithMode({ fileName: 'rez.csv', headers: basliklar, rows: [{ Villa: 'Deneme Evi', 'Misafir Adı': 'TEST', 'Giriş Tarihi': '2026-12-10', 'Çıkış Tarihi': '2026-12-12', 'Brüt Tutar': '9000' }], sheetNames: [] }, 'BOOKINGS');
+  const btn = dom.getElementById('importConfirmBtn');
+  check(btn.disabled === true && /Zorunlu/.test(btn.innerText) && /Kişi Sayısı/.test(dom.getElementById('importPreviewTableBody').innerHTML),
+    'L-305d Kisi Sayisi sutunu olmayan dosya zorunlu sutun eksik der', btn.innerText);
+  sahteDom();
+  kur(App, { bookings: mevcut.map((b, i) => ({ id: 'b' + i, ...b })) });
+  const b2 = basliklar.concat('Kişi Sayısı');
+  App.parseSourceWithMode({ fileName: 'rez.csv', headers: b2, rows: [{ Villa: 'Deneme Evi', 'Misafir Adı': 'TEST Çakışan', 'Giriş Tarihi': '2026-12-03', 'Çıkış Tarihi': '2026-12-05', 'Brüt Tutar': '9000', 'Kişi Sayısı': '2' }], sheetNames: [] }, 'BOOKINGS');
+  const st = global.document.getElementById('importFileStats').innerText;
+  check(/0 kayıt eklenecek/.test(st) && /çakışma/.test(st), 'L-305e Onizleme cakisan satiri eklenecek saymaz', st);
+}
+
 async function main() {
   try {
     await L304();
     await L268();
     await L269();
     await L270();
+    await L305();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

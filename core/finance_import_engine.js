@@ -601,9 +601,13 @@ function validateBookingRows(rawRows = [], columnMap = {}, context = {}) {
       } catch (e) { satirHata.push('Finans ayrıntıları geçersiz: ' + e.message); }
     }
 
-    const paxHam = raw[columnMap.pax];
+    // Kisi sayisi ZORUNLU (L-305): veritabani bos kabul etmez ve 2 varsaymak
+    // uydurma olur (CLAUDE.md 3.6); onizleme yazmadan once soyler.
+    const paxHam = columnMap.pax ? raw[columnMap.pax] : undefined;
     let pax = null;
-    if (paxHam !== undefined && paxHam !== '') {
+    if (paxHam === undefined || paxHam === null || String(paxHam).trim() === '') {
+      satirHata.push('Kişi sayısı boş.');
+    } else {
       pax = Number(String(paxHam).replace(/[^\d]/g, ''));
       if (!isFinite(pax) || pax <= 0) { satirHata.push(`Kişi sayısı anlaşılamadı: "${paxHam}"`); pax = null; }
     }
@@ -676,11 +680,31 @@ function validateBookingRows(rawRows = [], columnMap = {}, context = {}) {
     }
   });
 
+  // Mulk takviminde duran rezervasyonla cakisma (L-305): veritabani
+  // exclude_overlapping_bookings ile reddediyordu ama onizleme "eklenecek"
+  // diyor, yazma ham Postgres hatasiyla dusuyordu.
+  const cakisma = [];
+  const takvim = (context.existingBookings || []).filter(b => b && String(b.status || '').toUpperCase() !== 'CANCELLED');
+  validatedRows.filter(r => r.status !== 'CANCELLED' && !r.isPotentialDuplicate).forEach(r => {
+    const mevcut = takvim.find(b => {
+      const pid = b.propertyId || b.property_id;
+      const bIn = normalizeDate(b.checkIn || b.check_in);
+      const bOut = normalizeDate(b.checkOut || b.check_out);
+      return pid === r.propertyId && bIn && bOut && r.checkIn < bOut && bIn < r.checkOut;
+    });
+    if (!mevcut) return;
+    r.hasLedgerOverlap = true;
+    cakisma.push({
+      rowNum: r.rowNum,
+      errors: [`Mülk takviminde mevcut rezervasyonla çakışıyor: ${mevcut.guest || mevcut.guest_name || 'kayıt'} (${normalizeDate(mevcut.checkIn || mevcut.check_in)} → ${normalizeDate(mevcut.checkOut || mevcut.check_out)}).`],
+      raw: r.raw
+    });
+  });
+
   // Dosya ICINDE ayni mulkte tarih cakismasi (veritabani da reddeder,
   // ama kullaniciya yazmadan once soylemek daha iyi)
-  const cakisma = [];
   const mulkeGore = {};
-  validatedRows.filter(r => r.status !== 'CANCELLED' && !r.isPotentialDuplicate).forEach(r => {
+  validatedRows.filter(r => r.status !== 'CANCELLED' && !r.isPotentialDuplicate && !r.hasLedgerOverlap).forEach(r => {
     (mulkeGore[r.propertyId] = mulkeGore[r.propertyId] || []).push(r);
   });
   Object.values(mulkeGore).forEach(list => {
@@ -696,7 +720,7 @@ function validateBookingRows(rawRows = [], columnMap = {}, context = {}) {
     }
   });
   const cakisanSatirlar = new Set(cakisma.map(c => c.rowNum));
-  validatedRows.forEach(r => { r.hasFileOverlap = cakisanSatirlar.has(r.rowNum); });
+  validatedRows.forEach(r => { r.hasLedgerOverlap = !!r.hasLedgerOverlap; r.hasFileOverlap = !r.hasLedgerOverlap && cakisanSatirlar.has(r.rowNum); });
 
   return {
     mode: 'BOOKINGS',
