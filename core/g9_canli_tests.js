@@ -20,6 +20,8 @@
 //   2 kaliyor ve misafir mesaj motoru once guest_count'u okuyordu.
 // L-274: iptal edilen kaporali rezervasyonun detayi "Tahsil edilecek 20.000 · Kalan
 //   15.000" diyordu; iade/mahsup soylenmiyordu.
+// L-275: kanal ekonomisinde Dogrudan adedi 0; toplu aktarim ozetleri donem
+//   suzulmeden tum gecmisten sayilip adetten dusuluyordu.
 const fs = require('fs');
 const path = require('path');
 
@@ -433,6 +435,29 @@ async function L274() {
   check(/CANCELLED[\s\S]{0,300}paid_total[\s\S]{0,300}iade/.test(functionBody(read('app.js'), 'async function saveBooking(')), 'L-274e Iptal kaydedilirken tahsilat varsa iade/mahsup notu verilir');
 }
 
+// ---------------------------------------------------------------------------
+// L-275 kanal ekonomisi: donem disindaki toplu aktarim ozetleri adetten dusulmez
+// ---------------------------------------------------------------------------
+async function L275() {
+  const UI = require('./marketing_ui.js');
+  const rez = (id, kanal, g, c, ad) => ({ id, propertyId: PROP_A, villa: 'DENE', guest: ad || ('TEST ' + id), channel: kanal, checkIn: g, checkOut: c, gross: 10000, pax: 2, status: 'CONFIRMED' });
+  const bookings = [
+    rez('d1', 'Direct', '2026-10-05', '2026-10-07'), rez('d2', 'WhatsApp', '2026-10-10', '2026-10-12'),
+    rez('a1', 'Airbnb', '2026-10-15', '2026-10-18'),
+    // Gecmis aylarin toplu aktarim ozetleri (Ekim disinda)
+    ...['01', '02', '03', '04', '05'].map(ay => rez('t' + ay, 'Direct', `2026-${ay}-01`, `2026-${ay}-28`, `TOPLU AKTARIM — 2026-${ay}`)),
+    // Ekim'e dusen bir toplu ozet: geliri sayilir, adede girmez
+    rez('t10', 'Airbnb', '2026-10-20', '2026-10-22', 'TOPLU AKTARIM — Ekim 2026')
+  ];
+  const m = UI.buildWorkspaceModel({ bookings, villas: { DENE: { id: PROP_A, name: 'Deneme Evi' } }, filter: { period: 'CUSTOM', startDate: '2026-10-01', endDate: '2026-10-31' } });
+  const dogrudan = m.economics.channels.find(r => r.channel === 'DIRECT');
+  const airbnb = m.economics.channels.find(r => r.channel === 'AIRBNB');
+  check(dogrudan && dogrudan.reservationCount === 2, 'L-275a Dogrudan satirinin rezervasyon adedi donemdeki rezervasyonlardir', JSON.stringify(dogrudan && dogrudan.reservationCount));
+  check(airbnb && airbnb.reservationCount === 1 && airbnb.bookedNights === 5, 'L-275b Donemdeki toplu ozet gece/ciroda kalir, adetten duser', JSON.stringify(airbnb && [airbnb.reservationCount, airbnb.bookedNights]));
+  check(m.economics.totals.reservationCount === 3 && m.economics.mix.directReservationSharePercent === 66.67 && m.bulkSummaryCount === 1,
+    'L-275c Toplam adet ve dogrudan pay yalniz donemi sayar', JSON.stringify([m.economics.totals.reservationCount, m.economics.mix.directReservationSharePercent, m.bulkSummaryCount]));
+}
+
 async function main() {
   try {
     await L304();
@@ -445,6 +470,7 @@ async function main() {
     await L272();
     await L273();
     await L274();
+    await L275();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

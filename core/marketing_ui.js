@@ -10,6 +10,7 @@
       MarketingFunnelService: require('./marketing_funnel_service'),
       MarketingPriorityService: require('./marketing_priority_service'),
       LexbnbBusinessDate: require('./business_date'),
+      LexbnbGuestCrm: require('./guest_crm_engine'),
       MarketingBenchmarkService: require('./marketing_benchmark_service'),
       MarketingCoverChangeService: require('./marketing_cover_change_service'),
       MarketingHealthResultsService: require('./marketing_health_results_service'),
@@ -165,13 +166,23 @@
     });
     // Aylik toplu aktarim satiri gelir/gece tasir ama gercek bir rezervasyon
     // degildir. Kanal ekonomisi tutari korur, adet ve pay hesaplarinda saymaz.
-    const bulkSummaries = bookings.filter(item => /^TOPLU AKTARIM\s*[—-]/i.test(String(item.guest || item.guest_name || '')));
-    bulkSummaries.forEach(item => {
-      const channel = engine.normalizeChannel(item.channel).canonicalChannel;
-      const row = economics.channels.find(entry => entry.channel === channel);
-      if (row) row.reservationCount = Math.max(0, row.reservationCount - 1);
-      economics.totals.reservationCount = Math.max(0, economics.totals.reservationCount - 1);
-    });
+    // Yalniz DONEMDE sayilmis ozetler dusulur (L-275): eskiden tum gecmisin
+    // ozetleri her doneme dusuluyor, Dogrudan adedi 0'a iniyordu. Tanim tek
+    // yerde: guest_crm_engine.isBulkSummaryBooking.
+    const bulkSummaries = bookings.filter(item => services.LexbnbGuestCrm.isBulkSummaryBooking(item));
+    const bulkEconomics = bulkSummaries.length ? engine.computeChannelEconomics({
+      bookings: bulkSummaries,
+      periodStart: period.start,
+      periodEndExclusive: period.endExclusive,
+      baseCurrency: input.baseCurrency || 'TRY'
+    }) : null;
+    if (bulkEconomics) {
+      bulkEconomics.channels.forEach(bulk => {
+        const row = economics.channels.find(entry => entry.channel === bulk.channel);
+        if (row) row.reservationCount = Math.max(0, row.reservationCount - bulk.reservationCount);
+      });
+      economics.totals.reservationCount = Math.max(0, economics.totals.reservationCount - bulkEconomics.totals.reservationCount);
+    }
     const direct = economics.channels.find(row => row.channel === 'DIRECT');
     economics.mix.directReservationSharePercent = economics.totals.reservationCount > 0
       ? Number((((direct && direct.reservationCount) || 0) / economics.totals.reservationCount * 100).toFixed(2)) : null;
@@ -182,7 +193,7 @@
         slug, id: property && property.id, name: property && property.name || slug
       })),
       economics,
-      bulkSummaryCount: bulkSummaries.length,
+      bulkSummaryCount: bulkEconomics ? bulkEconomics.totals.reservationCount : 0,
       financeSummary: input.financeSummary || null,
       listings: Array.isArray(input.listings) ? input.listings.filter(item => String(item.status || 'ACTIVE').toUpperCase() !== 'ARCHIVED') : [],
       snapshots: Array.isArray(input.snapshots) ? input.snapshots : [],
