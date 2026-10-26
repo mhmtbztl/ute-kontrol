@@ -1770,6 +1770,10 @@
             <form data-onsubmit="createSettingsMessageTemplate(event)" class="settings-inline-form">
               <input name="name" maxlength="150" required placeholder="Şablon adı">
               <textarea name="body" maxlength="4000" required placeholder="Örn: Merhaba, villamız için teklifimiz ektedir. Sorunuz olursa yazabilirsiniz."></textarea>
+              <select name="message_type" aria-label="Mesaj türü">
+                <option value="TRANSACTIONAL">İşlemsel — teklif, rezervasyon, giriş bilgisi</option>
+                <option value="MARKETING">Pazarlama — kampanya, indirim (misafirin kampanya izni gerekir)</option>
+              </select>
               <button type="submit" class="btn btn-secondary btn-sm">+ Mesaj şablonu</button>
             </form>
             <div id="settingsMessageTemplatesList" class="settings-template-list"></div>
@@ -2913,7 +2917,14 @@
         </fieldset>
         <div id="guestProfileInsights" style="display:none; margin-top:14px; padding-top:14px; border-top:1px solid rgba(255,255,255,.08);"></div>
         <div id="guestRebookingAction" style="display:none; margin-top:14px; padding:12px; border-radius:10px; background:rgba(48, 209, 88,.08); border:1px solid rgba(48, 209, 88,.25);"></div>
+        <div class="form-group" id="guestMarketingRow" hidden style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:0 16px 12px;">
+          <label for="guestMarketingTemplate" style="margin:0;">📣 Kampanya mesajı</label>
+          <select id="guestMarketingTemplate" style="flex:1; min-width:180px;"></select>
+          <button type="button" class="btn btn-secondary btn-sm" data-onclick="sendGuestMarketingMessage()">WhatsApp'ta aç</button>
+          <span class="sub-text" style="flex-basis:100%;">Yalnız kampanya izni ve WhatsApp izni olan misafire gönderilir.</span>
+        </div>
         <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:10px;">
+          <button type="button" class="btn btn-danger" id="guestProfileEraseBtn" hidden style="margin-right:auto;" data-onclick="eraseGuestPersonalData()">🗑️ Kalıcı sil (KVKK)</button>
           <button type="button" class="btn btn-secondary" data-onclick="closeGuestProfileModal()">Vazgeç</button>
           <button type="submit" class="btn btn-primary">Misafiri Kaydet</button>
         </div>
@@ -4110,13 +4121,13 @@
   <script src="core/side_panel.js?v=d763b464"></script>
   <script src="core/notification_feed.js?v=941306f6"></script>
   <script src="core/command_search.js?v=89760933"></script>
-  <script src="core/action_dispatch.js?v=73bef1a5"></script>
+  <script src="core/action_dispatch.js?v=3e7b285e"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=fa6d0372"></script>
   <script src="core/ui_dialog.js?v=8f939605"></script>
-  <script src="app.js?v=3f221fee"></script>
+  <script src="app.js?v=6391dba0"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
-  <script src="core/marketing_ui.js?v=91f5a824"></script>
+  <script src="core/marketing_ui.js?v=e45a0e9a"></script>
 </body>
 </html>

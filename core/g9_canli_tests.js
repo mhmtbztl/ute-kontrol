@@ -67,6 +67,10 @@
 // L-288: mobilde kucuk dokunma hedefleri ve secici, 22 px renk kutucugu, alttaki karti ortulen
 //   hizli rezervasyon dugmesi, seritte gorunmeyen aktif sekme, ipucusuz rehber sekmeleri.
 // L-301 (M89): "Baglantisiz rez." karti tiklanmiyordu; panel yalniz kucuk dugmeyle aciliyordu.
+// L-271: misafir profili arayuzden silinemiyordu (KVKK silme hakki); kullanici karari
+//   26.10.2026: silme her seyi temizler (phase105 erase_guest_personal_data).
+// L-277: sablonda tur secilemiyor (hep TRANSACTIONAL), pazarlama izin kapisi hic calismiyor,
+//   misafir rehberinde pazarlama eylemi yok, yeni sablon esitlemeden once gorunmuyordu.
 const fs = require('fs');
 const path = require('path');
 
@@ -1222,6 +1226,85 @@ async function L301() {
   check(App.openGuestUnlinkedPanel(tus) === false, 'L-301f Klavyede yalniz Enter/Bosluk paneli acar');
 }
 
+// ---------------------------------------------------------------------------
+// L-271 KVKK: misafir profili arayuzden kalici silinir (phase105 RPC)
+// ---------------------------------------------------------------------------
+async function L271() {
+  const GUEST = '77777777-7777-4777-8777-777777777771';
+  const html = read('index.html');
+  check(/id="guestProfileEraseBtn"[^>]*data-onclick="eraseGuestPersonalData\(\)"/.test(html), 'L-271a Misafir profilinde KVKK silme dugmesi var');
+  check(/'eraseGuestPersonalData'/.test(read('core/action_dispatch.js')), 'L-271b Eylem izin listesinde');
+  sahteDom({ guestProfileId: GUEST });
+  const App = require('../app.js');
+  let ist = kur(App, { guests: [{ id: GUEST, firstName: 'TEST', lastName: 'Kvkk', phone: '+905551230105' }] }, 'owner',
+    { rpc: ad => (ad === 'erase_guest_personal_data' ? { success: true, bookings: 2, leads: 1, messages: 0, notifications: 1 } : []) });
+  global.prompt = () => 'MISAFIRI SIL';
+  const sonuc = await App.eraseGuestPersonalData();
+  const cagri = ist.yazmalar.find(k => k.tablo === 'rpc:erase_guest_personal_data');
+  check(sonuc === true && cagri && cagri.yuk.p_guest_id === GUEST && cagri.yuk.p_tenant_id === TENANT && cagri.yuk.p_confirm === 'MISAFIRI SIL',
+    'L-271c Onay metni yazilinca silme RPC\'si dogru kiraci ve misafirle cagrilir', JSON.stringify(cagri && cagri.yuk));
+  // Onay metni yanlissa cagrilmaz.
+  sahteDom({ guestProfileId: GUEST });
+  ist = kur(App, { guests: [{ id: GUEST, firstName: 'TEST' }] });
+  global.prompt = () => 'sil';
+  await App.eraseGuestPersonalData();
+  check(!ist.yazmalar.some(k => k.tablo === 'rpc:erase_guest_personal_data'), 'L-271d Onay metni yazilmadan silinmez');
+  // Satis rolu silemez.
+  sahteDom({ guestProfileId: GUEST });
+  ist = kur(App, { guests: [{ id: GUEST, firstName: 'TEST' }] }, 'sales');
+  global.prompt = () => 'MISAFIRI SIL';
+  await App.eraseGuestPersonalData();
+  check(!ist.yazmalar.some(k => k.tablo === 'rpc:erase_guest_personal_data'), 'L-271e Satis rolu silme cagirmaz');
+  // Goc yoksa acikca soylenir.
+  sahteDom({ guestProfileId: GUEST });
+  ist = kur(App, { guests: [{ id: GUEST, firstName: 'TEST' }] });
+  ist.rpc = async () => ({ data: null, error: { code: 'PGRST202', message: 'Could not find the function public.erase_guest_personal_data' } });
+  global.__sonUyari = '';
+  await App.eraseGuestPersonalData();
+  check(/phase105/.test(global.__sonUyari || ''), 'L-271f phase105 uygulanmadiysa bunu soyler', global.__sonUyari);
+  delete global.prompt;
+}
+
+// ---------------------------------------------------------------------------
+// L-281 (devam) huni snapshot'i yonetimce silinir (phase105)
+// ---------------------------------------------------------------------------
+async function L281b() {
+  const UI = require('./marketing_ui.js');
+  const snap = [{ id: 's1', period_start: '2026-10-01', period_end_exclusive: '2026-10-10', impressions: 100 }];
+  check(/data-marketing-delete-snapshot="s1"/.test(UI.renderSnapshotList({ snapshots: snap, ads: { canManage: true } })), 'L-281d Yonetim snapshot satirinda Sil gorur');
+  check(!/data-marketing-delete-snapshot/.test(UI.renderSnapshotList({ snapshots: snap, ads: { canManage: false } })), 'L-281e Yonetim disi rol Sil gormez');
+  check(/phase105/.test(read('core/marketing_ui.js')) && /23503/.test(read('core/marketing_ui.js')), 'L-281f Goc yoksa ya da olcumde kullaniliyorsa nedeni soylenir');
+}
+
+// ---------------------------------------------------------------------------
+// L-277 sablon turu secilir; pazarlama izin kapisi calisir; yeni sablon hemen gorunur
+// ---------------------------------------------------------------------------
+async function L277() {
+  const GUEST = '77777777-7777-4777-8777-777777777772';
+  check(/<select name="message_type"[^>]*>[\s\S]{0,300}value="MARKETING"/.test(read('index.html')), 'L-277a Sablon formunda tur (islemsel/pazarlama) secilir');
+  const App = require('../app.js');
+  const form = { elements: { name: { value: 'TEST Kampanya' }, body: { value: 'Merhaba {{guest_name}}' }, message_type: { value: 'MARKETING' } }, reset() {} };
+  sahteDom();
+  const yeni = { id: 'tm1', name: 'TEST Kampanya', body: 'Merhaba {{guest_name}}', channel: 'WHATSAPP', lifecycle_stage: 'MANUAL', message_type: 'MARKETING', is_active: true };
+  const ist = kur(App, { messageTemplates: [] }, 'owner', {
+    cevap: k => (k.tablo === 'message_templates' && k.islem === 'select' ? { data: [yeni], error: null } : null)
+  });
+  await App.createSettingsMessageTemplate({ preventDefault() {}, currentTarget: form });
+  const yaz = ist.yazmalar.find(k => k.tablo === 'message_templates' && k.islem === 'insert');
+  check(yaz && (Array.isArray(yaz.yuk) ? yaz.yuk[0] : yaz.yuk).message_type === 'MARKETING', 'L-277b Secilen tur kaydedilir', JSON.stringify(yaz && yaz.yuk));
+  check((App.getAppData().messageTemplates || []).some(t => t.id === 'tm1'), 'L-277c Yeni sablon esitleme beklemeden talep/misafir penceresinde gorunur');
+  // Misafir rehberinden pazarlama mesaji: izin yoksa acilmaz, varsa WhatsApp acilir.
+  let acilan = null;
+  global.window.open = url => { acilan = url; return {}; };
+  sahteDom({ guestProfileId: GUEST, guestMarketingTemplate: 'tm1' });
+  kur(App, { messageTemplates: [yeni], guests: [{ id: GUEST, firstName: 'TEST', phone: '+905551230106', marketingOptIn: false, allowWhatsapp: true }] });
+  global.__sonUyari = '';
+  check(App.sendGuestMarketingMessage() === false && acilan === null && /izni|izin/i.test(global.__sonUyari || ''), 'L-277d Kampanya izni yoksa pazarlama mesaji acilmaz (izin kapisi)', global.__sonUyari);
+  sahteDom({ guestProfileId: GUEST, guestMarketingTemplate: 'tm1' });
+  kur(App, { messageTemplates: [yeni], guests: [{ id: GUEST, firstName: 'TEST', phone: '+905551230106', marketingOptIn: true, allowWhatsapp: true }] });
+  check(App.sendGuestMarketingMessage() === true && /wa\.me|whatsapp/.test(String(acilan)) && /TEST/.test(decodeURIComponent(String(acilan))), 'L-277e Izinli misafire pazarlama mesaji WhatsApp\'ta acilir', String(acilan));
+}
+
 async function main() {
   try {
     await L304();
@@ -1266,6 +1349,9 @@ async function main() {
     await L287();
     await L288();
     await L301();
+    await L271();
+    await L281b();
+    await L277();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

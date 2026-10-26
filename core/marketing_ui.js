@@ -439,7 +439,42 @@
       ${kpi('İlan görüntüleme', number(c.listingViews), `Arama → görüntüleme: ${number(r.searchToViewCtrPercent, '%')}`)}
       ${kpi('Rezervasyon denemesi', number(c.bookingAttempts), `Görüntüleme → deneme: ${number(r.viewToAttemptConversionPercent, '%')}`)}
       ${kpi('Platform rezervasyonu', number(c.platformReportedBookings), `Görüntüleme → rezervasyon: ${number(r.viewToBookingConversionPercent, '%')}`)}
-    </div>${renderFindings(findings)}${experimentResults}`;
+    </div>${renderSnapshotList(model)}${renderFindings(findings)}${experimentResults}`;
+  }
+
+  // Huni snapshot'lari ve yonetim icin silme (L-281, phase105 DELETE politikasi).
+  function renderSnapshotList(model) {
+    const rows = (model.snapshots || []).slice(0, 10);
+    if (!rows.length) return '';
+    const canManage = !!(model.ads && model.ads.canManage);
+    return `<div class="card" style="padding:14px;margin-bottom:12px"><strong>Kayıtlı snapshot'lar</strong><div style="display:grid;gap:6px;margin-top:8px">${rows.map(row => `<div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><span>${escapeHtml(row.period_start || row.periodStart || '?')} → ${escapeHtml(row.period_end_exclusive || row.periodEndExclusive || '?')} · gösterim ${number(row.impressions)}${row.notes ? ' · ' + escapeHtml(row.notes) : ''}</span>${canManage ? `<button type="button" class="btn btn-danger btn-sm" data-marketing-delete-snapshot="${escapeHtml(row.id)}">Sil</button>` : ''}</div>`).join('')}</div></div>`;
+  }
+
+  async function deleteSnapshot(snapshotId) {
+    const client = typeof supabaseClient !== 'undefined' ? supabaseClient : null;
+    const scope = cloudScope();
+    if (!client || !scope || !snapshotId) throw new Error('SNAPSHOT_DELETE_UNAVAILABLE');
+    if (typeof window !== 'undefined' && !window.confirm('Bu huni snapshot\'ı silinsin mi?')) return false;
+    const status = document.getElementById('marketingWorkspaceStatus');
+    const { data, error } = await client.from('channel_performance_snapshots').delete()
+      .eq('id', snapshotId).eq('tenant_id', scope.tenantId).select('id');
+    if (error) {
+      if (status) status.textContent = String(error.code) === '23503'
+        ? 'Bu snapshot bir değişiklik ölçümünde kullanılıyor; silinemez.'
+        : 'Snapshot silinemedi. Lütfen yeniden deneyin.';
+      return false;
+    }
+    if (!data || !data.length) {
+      // Politika yoksa satir sessizce filtrelenir (RLS).
+      if (status) status.textContent = 'Snapshot silinemedi: veritabanı göçü (phase105) henüz uygulanmadı ya da bu rolün silme yetkisi yok.';
+      return false;
+    }
+    state.remoteStatus = 'LOADING';
+    render();
+    await hydrateCloudData();
+    render();
+    if (status) status.textContent = 'Snapshot silindi.';
+    return true;
   }
 
   function selectLatestSnapshot(snapshots = []) {
@@ -1130,6 +1165,14 @@
         });
         return;
       }
+      const deleteSnapshotButton = event.target.closest('[data-marketing-delete-snapshot]');
+      if (deleteSnapshotButton) {
+        deleteSnapshot(deleteSnapshotButton.dataset.marketingDeleteSnapshot).catch(() => {
+          const status = document.getElementById('marketingWorkspaceStatus');
+          if (status) status.textContent = 'Snapshot silinemedi. Lütfen yeniden deneyin.';
+        });
+        return;
+      }
       const deletePeriodButton = event.target.closest('[data-ads-delete-period]');
       if (deletePeriodButton) {
         deleteAdsPeriod(deletePeriodButton.dataset.adsDeletePeriod).catch(() => {
@@ -1284,5 +1327,5 @@
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') initializeBrowser();
 
-  return { periodFromFilter, scopeBookings, buildWorkspaceModel, getCurrentModel: () => buildWorkspaceModel(browserInput()), buildAdsModel, buildAdsImportPreview, selectLatestSnapshot, selectCurrentBenchmark, renderWorkspaceHtml, renderAds, renderAdsImportPreview, normalizeCustomMetrics, evaluateCustomMetric, campaignBudgetView, renderMarketingHealth, renderBenchmarkPanel, renderBenchmarkForm, renderFindingActions, renderListingForm, renderSnapshotForm, renderExperimentForm, renderExperiments, escapeHtml, setData, render };
+  return { renderSnapshotList, deleteSnapshot, periodFromFilter, scopeBookings, buildWorkspaceModel, getCurrentModel: () => buildWorkspaceModel(browserInput()), buildAdsModel, buildAdsImportPreview, selectLatestSnapshot, selectCurrentBenchmark, renderWorkspaceHtml, renderAds, renderAdsImportPreview, normalizeCustomMetrics, evaluateCustomMetric, campaignBudgetView, renderMarketingHealth, renderBenchmarkPanel, renderBenchmarkForm, renderFindingActions, renderListingForm, renderSnapshotForm, renderExperimentForm, renderExperiments, escapeHtml, setData, render };
 }));

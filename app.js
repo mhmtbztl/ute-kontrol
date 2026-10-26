@@ -11385,7 +11385,7 @@ function renderSettingsTemplates() {
   const checklistBuilder = document.getElementById('settingsChecklistBuilder');
   if (checklistBuilder && checklistBuilder.dataset.ready !== 'true') renderSettingsChecklistBuilder(defaultSettingsChecklistDraft());
   if (messageList) messageList.innerHTML = messages.length
-    ? messages.map(item => settingsTemplateRowHtml('message', item, item.name, `${String(item.channel || 'WHATSAPP').toUpperCase() === 'WHATSAPP' ? 'WhatsApp' : (item.channel || '—')} · ${String(item.lifecycle_stage || 'MANUAL').toUpperCase() === 'MANUAL' ? 'elle gönderilir' : 'otomatik'}${item.is_active === false ? ' · Kapalı' : ''}`)).join('')
+    ? messages.map(item => settingsTemplateRowHtml('message', item, item.name, `${String(item.channel || 'WHATSAPP').toUpperCase() === 'WHATSAPP' ? 'WhatsApp' : (item.channel || '—')} · ${String(item.lifecycle_stage || 'MANUAL').toUpperCase() === 'MANUAL' ? 'elle gönderilir' : 'otomatik'} · ${String(item.message_type || '').toUpperCase() === 'MARKETING' ? 'pazarlama (kampanya izni gerekir)' : 'işlemsel'}${item.is_active === false ? ' · Kapalı' : ''}`)).join('')
     : '<div class="empty-state">Mesaj şablonu yok.</div>';
   if (taskList) taskList.innerHTML = tasks.length
     ? tasks.map(item => settingsTemplateRowHtml('task', item, item.title, `${TEMPLATE_TASK_TYPE_LABELS[item.task_type] || 'Genel'} · ${TEMPLATE_PRIORITY_LABELS[item.priority] || 'orta öncelik'}${item.is_active === false ? ' · Kapalı' : ''}`)).join('')
@@ -11404,12 +11404,17 @@ async function createSettingsMessageTemplate(event) {
   event.preventDefault();
   const form = event.currentTarget;
   try {
+    // Tur secilir (L-277): pazarlama sablonu yalniz kampanya izni olan
+    // misafire gider; hep TRANSACTIONAL yazildigi icin izin kapisi hic calismiyordu.
+    const tur = String(form.elements.message_type?.value || 'TRANSACTIONAL').toUpperCase() === 'MARKETING' ? 'MARKETING' : 'TRANSACTIONAL';
     await createMessageTemplate({
       name: String(form.elements.name.value || '').trim(), body: String(form.elements.body.value || '').trim(),
-      channel: 'WHATSAPP', lifecycle_stage: 'MANUAL', message_type: 'TRANSACTIONAL', language: 'tr', is_active: true
+      channel: 'WHATSAPP', lifecycle_stage: 'MANUAL', message_type: tur, language: 'tr', is_active: true
     });
     form.reset();
     await loadSettingsCatalogs();
+    // Yeni sablon talep ve misafir penceresinde esitleme beklemeden gorunur (L-277).
+    appData.messageTemplates = (appData.settingsMessageTemplates || []).filter(item => item.is_active !== false);
     renderSettingsTemplates();
     showToast('Mesaj şablonu kaydedildi.', 'success');
     return true;
@@ -22195,6 +22200,13 @@ function openGuestProfileModal(guestId = null) {
   const guest = guestId ? (appData.guests || []).find(item => item.id === guestId) : null;
   document.getElementById('guestProfileId').value = guest?.id || '';
   document.getElementById('guestProfileModalTitle').innerText = guest ? '👤 Misafir Detayı' : '➕ Yeni Misafir';
+  const pazarlamaSecici = document.getElementById('guestMarketingTemplate');
+  const pazarlamaSatiri = document.getElementById('guestMarketingRow');
+  const pazarlamaSablonlari = (appData.messageTemplates || []).filter(item => String(item.message_type || '').toUpperCase() === 'MARKETING');
+  if (pazarlamaSecici) pazarlamaSecici.innerHTML = '<option value="">Pazarlama şablonu seçin</option>' + pazarlamaSablonlari.map(item => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`).join('');
+  if (pazarlamaSatiri) pazarlamaSatiri.hidden = !guest || !canWriteSalesRole(activeTenant?.role);
+  const silDugmesi = document.getElementById('guestProfileEraseBtn');
+  if (silDugmesi) silDugmesi.hidden = !guest || !canManageTenantRole(activeTenant?.role);
   document.getElementById('guestFirstName').value = guest?.firstName || '';
   document.getElementById('guestLastName').value = guest?.lastName || '';
   document.getElementById('guestPhone').value = guest?.phone || '';
@@ -22264,6 +22276,72 @@ function openGuestRebookingWhatsApp(guestId) {
   if (typeof window !== 'undefined' && typeof window.open === 'function') {
     window.open(`https://wa.me/${encodeURIComponent(phone)}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
   }
+}
+
+// KVKK silme hakki (L-271, kullanici karari 26.10.2026: her sey temizlenir).
+// phase105 erase_guest_personal_data: misafir ve izin kayitlari silinir;
+// rezervasyon ve talepler muhasebe kaydi oldugu icin anonimlesir (ad,
+// telefon, e-posta, not); mesajlar ve bildirimler silinir. Geri alinamaz.
+const PHASE105_SEMA_YOK = 'KVKK silme için veritabanı göçü (phase105) henüz uygulanmadı. Hiçbir şey silinmedi.';
+async function eraseGuestPersonalData() {
+  if (!canManageTenantRole(activeTenant?.role)) {
+    if (typeof showToast === 'function') showToast('Misafir verisini silmek yönetim rolü ister.', 'error');
+    return false;
+  }
+  const guestId = document.getElementById('guestProfileId')?.value || '';
+  const guest = (appData.guests || []).find(item => item.id === guestId);
+  if (!guestId || !guest) return false;
+  const ad = [guest.firstName, guest.lastName].filter(Boolean).join(' ') || 'Bu misafir';
+  const yazilan = await uiAskText({
+    title: 'Misafiri kalıcı sil (KVKK)',
+    message: `${ad} için kişisel veriler kalıcı olarak silinecek:\n• Misafir kartı, izin kayıtları ve iç notlar silinir.\n• Rezervasyon ve talepler muhasebe kaydı olduğu için silinmez; ad, telefon, e-posta ve notlar "Silinmiş misafir" olarak anonimleşir. Tutar ve tarihler değişmez.\n• Bu misafire ait mesajlar ve bildirimler silinir.\nBu işlem geri alınamaz.`,
+    label: 'Onaylamak için MISAFIRI SIL yazın',
+    placeholder: 'MISAFIRI SIL'
+  });
+  if (yazilan === null || yazilan === undefined) return false;
+  if (String(yazilan).trim() !== 'MISAFIRI SIL') {
+    alert('Onay metni eşleşmedi; hiçbir şey silinmedi.');
+    return false;
+  }
+  const { data, error } = await supabaseClient.rpc('erase_guest_personal_data', {
+    p_tenant_id: getActiveTenantId(), p_guest_id: guestId, p_confirm: 'MISAFIRI SIL'
+  });
+  if (error) {
+    const yok = error.code === 'PGRST202' || /Could not find the function/i.test(String(error.message || ''));
+    alert(yok ? PHASE105_SEMA_YOK : 'Misafir silinemedi: ' + kullaniciMesaji(error.message || 'veritabanı hatası'));
+    return false;
+  }
+  if (typeof closeGuestProfileModal === 'function') closeGuestProfileModal();
+  await loadTenantAppData(getActiveTenantId());
+  if (typeof showToast === 'function') {
+    showToast(`Misafir silindi. ${Number(data?.bookings) || 0} rezervasyon ve ${Number(data?.leads) || 0} talep anonimleşti.`, 'success');
+  }
+  return true;
+}
+
+// Misafir rehberinden pazarlama mesaji (L-277). Izin kapisi tek yerde:
+// SalesWorkflowService.buildWhatsAppLink (kampanya izni + WhatsApp izni).
+function sendGuestMarketingMessage() {
+  const guestId = document.getElementById('guestProfileId')?.value || '';
+  const guest = (appData.guests || []).find(item => item.id === guestId);
+  const templateId = document.getElementById('guestMarketingTemplate')?.value || '';
+  const template = (appData.messageTemplates || []).find(item => item.id === templateId && String(item.message_type || '').toUpperCase() === 'MARKETING');
+  if (!guest) return false;
+  if (!template) { alert('Önce bir pazarlama şablonu seçin. Şablonlar Ayarlar › Şablonlar bölümünden "Pazarlama" türüyle eklenir.'); return false; }
+  const ad = [guest.firstName, guest.lastName].filter(Boolean).join(' ') || 'Misafir';
+  const workflow = typeof SalesWorkflowService !== 'undefined' ? SalesWorkflowService : require('./core/sales_workflow_service.js');
+  const link = workflow.buildWhatsAppLink({
+    phone: guest.phone, body: renderLeadTemplateBody(template, { guest: ad }),
+    messageType: 'MARKETING', allowWhatsapp: guest.allowWhatsapp === true, marketingOptIn: guest.marketingOptIn === true
+  });
+  if (!link.allowed) {
+    alert(link.reason === 'MARKETING_CONSENT_REQUIRED'
+      ? 'Bu misafirin kampanya (pazarlama) izni yok; pazarlama mesajı gönderilemez. İzin misafir kartında açıkça alınıp işaretlenmelidir.'
+      : 'WhatsApp mesajı için telefon ve WhatsApp iletişim izni gerekir.');
+    return false;
+  }
+  window.open(link.url, '_blank', 'noopener,noreferrer');
+  return true;
 }
 
 async function saveGuestProfile(event) {
@@ -23859,6 +23937,9 @@ if (typeof module !== 'undefined' && module.exports) {
     getImportEngine,
     buildImportSource,
     parseSourceWithMode,
+    createSettingsMessageTemplate,
+    sendGuestMarketingMessage,
+    eraseGuestPersonalData,
     openGuestUnlinkedPanel,
     leadChannelLabel,
     handleModalKeydown,
