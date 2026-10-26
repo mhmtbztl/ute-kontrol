@@ -22,6 +22,8 @@
 //   15.000" diyordu; iade/mahsup soylenmiyordu.
 // L-275: kanal ekonomisinde Dogrudan adedi 0; toplu aktarim ozetleri donem
 //   suzulmeden tum gecmisten sayilip adetten dusuluyordu.
+// L-276: gelecek tarihli satisa kapatan bakim bugun "Acik ariza mulku satisa
+//   kapatiyor" diye kritik eylemde ve bildirimde gorunuyordu.
 const fs = require('fs');
 const path = require('path');
 
@@ -458,6 +460,31 @@ async function L275() {
     'L-275c Toplam adet ve dogrudan pay yalniz donemi sayar', JSON.stringify([m.economics.totals.reservationCount, m.economics.mix.directReservationSharePercent, m.bulkSummaryCount]));
 }
 
+// ---------------------------------------------------------------------------
+// L-276 gelecek tarihli bakim bugunu satisa kapatmaz; kritik eylemde degildir
+// ---------------------------------------------------------------------------
+async function L276() {
+  sahteDom();
+  const App = require('../app.js');
+  kur(App, {});
+  const bugun = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const ileri = n => { const d = new Date(bugun + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+  const aday = typeof App.maintenanceTicketPriorityCandidate === 'function' ? App.maintenanceTicketPriorityCandidate : null;
+  const planli = { id: 't1', title: 'TEST boya bakımı', severity: 'MEDIUM', status: 'OPEN', propertyId: PROP_A, villa: 'DENE', blocks_availability: true, downtime_start: ileri(2), downtime_end: ileri(3) };
+  const c1 = aday && aday(planli, bugun);
+  check(c1 && !/satışa kapatıyor/.test(c1.rationale) && c1.revenueImpact !== 'HIGH' && /Planlı kapatma/.test(c1.rationale),
+    'L-276a Gelecek tarihli bakim bugun "satisa kapatiyor" denmez, planli kapatma olarak yazilir', JSON.stringify(c1));
+  const bugunKapali = { ...planli, id: 't2', downtime_start: bugun, downtime_end: ileri(1) };
+  const c2 = aday && aday(bugunKapali, bugun);
+  check(c2 && /satışa kapatıyor/.test(c2.rationale) && c2.revenueImpact === 'HIGH', 'L-276b Bugunu kapatan bakim kritik eylemde kalir', JSON.stringify(c2));
+  // Bildirim akisi da ayni tanimi kullanir.
+  const NF = require('./notification_feed.js');
+  const olaylar = NF.deriveNotifications({ today: bugun, role: 'owner', maintenance: [{ ...planli, priority: 'P2', created_at: bugun }],
+    isTicketOpen: () => true, isTicketBlockingToday: t => t.id === 't2' });
+  const ariza = olaylar.find(o => String(o.event_key || '').includes('maintenance_open'));
+  check(ariza && !/satışa kapatıyor/.test(ariza.message) && ariza.severity !== 'CRITICAL', 'L-276c Bildirim gelecek bakimi bugun kapatiyor demez', JSON.stringify(ariza));
+}
+
 async function main() {
   try {
     await L304();
@@ -471,6 +498,7 @@ async function main() {
     await L273();
     await L274();
     await L275();
+    await L276();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

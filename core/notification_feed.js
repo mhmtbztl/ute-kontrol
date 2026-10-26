@@ -133,11 +133,14 @@
     (g.maintenance || []).forEach(t => {
       const gun = String(t.created_at || t.createdAt || '').slice(0, 10);
       if (!t.id || !gun || gun < arizaSiniri || !acikMi(t)) return;
-      const kritik = t.priority === 'P1' || t.blocks_availability === true;
+      // "Satisa kapatiyor" yalniz bugunu kapatan ariza icindir (L-276); gelecek
+      // tarihli planli bakim bugun kritik degildir.
+      const bugunKapali = typeof g.isTicketBlockingToday === 'function' ? g.isTicketBlockingToday(t) : t.blocks_availability === true;
+      const kritik = t.priority === 'P1' || bugunKapali;
       olaylar.push({
         event_key: anahtar('maintenance_open', t.id), domain: 'OPERATIONS', severity: kritik ? 'CRITICAL' : 'WARNING',
         title: `Açık arıza: ${t.title || 'başlıksız'} (${mulkAdi(t.villa)})`,
-        message: `${trTarih(gun)} tarihinde açıldı${kritik ? '; mülkü satışa kapatıyor' : ''}.`,
+        message: `${trTarih(gun)} tarihinde açıldı${bugunKapali ? '; mülkü bugün satışa kapatıyor' : ''}.`,
         deep_link: 'operations:maintenance', at: gun
       });
     });

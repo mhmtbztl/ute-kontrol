@@ -19493,28 +19493,7 @@ function renderExecutiveControlCenter() {
     // donanım arızası" yaziliyordu; iptal edilmis ariza bile.
     tickets.forEach(tk => {
       if (!isMaintenanceTicketOpen(tk)) return;
-      const oncelik = getMaintenancePriorityFromSeverity(tk.severity);
-      const kritik = oncelik === 'P1';
-      const durum = getMaintenanceStatusPresentation(tk.statusRaw || tk.status).label;
-      const ad = mulkAdi(tk.villa || tk.propertyId || tk.property_id);
-      candidates.push({
-        id: tk.id,
-        domain: 'OPERATIONS',
-        propertyId: tk.propertyId || tk.property_id || null,
-        propertyName: ad,
-        title: `${kritik ? 'P1 ' : ''}Arıza: ${tk.title || 'Başlık girilmemiş'}`,
-        severity: tk.severity || null,
-        guestImpact: kritik ? 'HIGH' : 'MEDIUM',
-        urgencyDueTime: kritik ? 25 : 12,
-        revenueImpact: tk.blocks_availability ? 'HIGH' : 'MEDIUM',
-        confidence: 'HIGH',
-        rationale: tk.blocks_availability
-          ? 'Açık arıza mülkü satışa kapatıyor.'
-          : (kritik ? 'Kritik öncelikli açık arıza.' : 'Açık arıza kaydı.'),
-        sourceMetrics: [`Öncelik: ${oncelik}`, `Durum: ${durum}`],
-        deepLink: 'maintenance',
-        quickAction: 'RESOLVE_TICKET'
-      });
+      candidates.push(maintenanceTicketPriorityCandidate(tk, getTodayStr(), mulkAdi(tk.villa || tk.propertyId || tk.property_id)));
     });
 
     // Executive alerts
@@ -20044,6 +20023,8 @@ function buildNotificationFeedInput() {
     cleaningTasks: tasks,
     maintenance: data.maintenance || [],
     isTicketOpen: isMaintenanceTicketOpen,
+    // L-276: "satisa kapatiyor" yalniz bugunu kapatan ariza icin.
+    isTicketBlockingToday: ticket => { const api = getPropertySalesReadinessApi(); const gun = getTodayStr(); return !!(api && api.isTicketBlockingOn(ticket, gun, gun)); },
     closedPeriods: data.closedPeriods || [],
     previousMonthHasRecords,
     followUps: canReadSalesRole(role) ? getLeadSalesView().followUpsToday : [],
@@ -22026,6 +22007,37 @@ function pricingMaintenanceBlocks(property, today = getTodayStr()) {
       .map(row => ({ propertyId: property.id, start: String(row.start_date).slice(0, 10), end: String(row.end_date).slice(0, 10), title: 'bakım' })));
 }
 
+// Ana sayfa oncelik motoru icin ariza adayi (L-276). "Satisa kapatiyor"
+// yalniz BUGUNU kapatan ariza icindir; tek tanim isTicketBlockingOn (L-246).
+// Eskiden blocks_availability isareti yetiyordu: 27-28.10 icin planlanan
+// bakim 25.10'da kritik eylemde "mulku satisa kapatiyor" diyordu.
+function maintenanceTicketPriorityCandidate(tk, today = getTodayStr(), propertyName = null) {
+  const api = getPropertySalesReadinessApi();
+  const oncelik = getMaintenancePriorityFromSeverity(tk.severity);
+  const kritik = oncelik === 'P1';
+  const durum = getMaintenanceStatusPresentation(tk.statusRaw || tk.status).label;
+  const bugunKapali = api ? api.isTicketBlockingOn(tk, today, today) : false;
+  const kapanis = maintenanceClosureText(tk, today);
+  return {
+    id: tk.id,
+    domain: 'OPERATIONS',
+    propertyId: tk.propertyId || tk.property_id || null,
+    propertyName: propertyName || tk.villa || null,
+    title: `${kritik ? 'P1 ' : ''}Arıza: ${tk.title || 'Başlık girilmemiş'}`,
+    severity: tk.severity || null,
+    guestImpact: kritik || bugunKapali ? 'HIGH' : 'MEDIUM',
+    urgencyDueTime: kritik || bugunKapali ? 25 : 12,
+    revenueImpact: bugunKapali ? 'HIGH' : 'MEDIUM',
+    confidence: 'HIGH',
+    rationale: bugunKapali
+      ? 'Açık arıza mülkü bugün satışa kapatıyor.'
+      : (kapanis && !/geçti/.test(kapanis) ? `${kapanis}.` : (kritik ? 'Kritik öncelikli açık arıza.' : 'Açık arıza kaydı.')),
+    sourceMetrics: [`Öncelik: ${oncelik}`, `Durum: ${durum}`],
+    deepLink: 'maintenance',
+    quickAction: 'RESOLVE_TICKET'
+  };
+}
+
 function maintenanceClosureText(ticket, today = getTodayStr()) {
   const api = getPropertySalesReadinessApi();
   if (!api || !api.isOpenTicket(ticket)) return '';
@@ -23418,6 +23430,7 @@ if (typeof module !== 'undefined' && module.exports) {
     getImportEngine,
     buildImportSource,
     parseSourceWithMode,
+    maintenanceTicketPriorityCandidate,
     createBookingChannelFromSettings,
     reservationSearchMatches,
     expenseSearchMatches,
