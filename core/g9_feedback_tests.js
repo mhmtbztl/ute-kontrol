@@ -425,7 +425,8 @@ async function asama4Davranisi() {
 
   // L-186 (M16) — talep duzenlemede ilgilenilen tarih
   check(/id="leadCheckIn"/.test(html) && /id="leadCheckOut"/.test(html), 'L-186a Talep formunda ilgilenilen tarihler var');
-  check(/checkIn,\r?\n\s*checkOut\r?\n\s*\}\);/.test(read('app.js')), 'L-186b Talep kaydi tarihleri tasir');
+  // L-290: kayda kisi sayisi da eklendi.
+  check(/checkIn,\r?\n\s*checkOut,?\r?\n\s*(pax\r?\n\s*)?\}\);/.test(read('app.js')), 'L-186b Talep kaydi tarihleri tasir');
 
   // L-187 (M17) — mulk bazinda net kar
   sahteDom({});
