@@ -37,6 +37,7 @@
 // L-283: dolu formda tarayici geri tusu veriyi uyarisiz siliyordu (beforeunload yok).
 // L-284: rezervasyon listesi ozeti iptal kayitlari rezervasyon sayiyordu.
 // L-292: bilinmeyen deger 0 yaziliyordu (teklif, ariza maliyeti) ve "−0 ₺" gosteriliyordu.
+// L-298: odemeli rezervasyon silinirken once "emin misiniz?" soruluyor, sonra reddediliyordu.
 const fs = require('fs');
 const path = require('path');
 
@@ -716,6 +717,24 @@ async function L292() {
   delete global.SidePanel;
 }
 
+// ---------------------------------------------------------------------------
+// L-298 odemeli rezervasyon silinmeden once "emin misiniz" sorulmaz; once reddedilir
+// ---------------------------------------------------------------------------
+async function L298() {
+  sahteDom();
+  const App = require('../app.js');
+  let soruldu = false;
+  global.confirm = () => { soruldu = true; return true; };
+  const ist = kur(App, {
+    bookings: [{ id: BOOK_1, dbId: BOOK_1, villa: 'DENE', propertyId: PROP_A, guest: 'TEST Ödemeli', checkIn: '2026-11-10', checkOut: '2026-11-12', gross: 10000, pax: 2, status: 'CONFIRMED' }],
+    bookingPayments: [{ id: 'p1', booking_id: BOOK_1, amount: 5000, kind: 'DEPOSIT', paid_on: '2026-10-20' }]
+  });
+  const sonuc = await App.deleteBookingUI(BOOK_1);
+  check(sonuc === false && !soruldu && /Ödemesi bulunan/.test(global.__sonUyari || '') && !ist.yazmalar.some(k => /delete/.test(k.tablo + k.islem)),
+    'L-298a Odemeli rezervasyonda once onay sorulmaz; silinemeyecegi hemen soylenir', `soruldu=${soruldu} ${global.__sonUyari}`);
+  global.confirm = () => true;
+}
+
 async function main() {
   try {
     await L304();
@@ -738,6 +757,7 @@ async function main() {
     await L283();
     await L284();
     await L292();
+    await L298();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

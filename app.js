@@ -1860,6 +1860,12 @@ async function deleteBooking(bookingId) {
     throw new Error('Bu rezervasyonun konakladığı dönem kapatılmıştır. Silinemez. Önce dönemi yeniden açın.');
   }
 
+  // Odemesi olan rezervasyon silinemez (sunucu BOOKING_HAS_PAYMENTS ile
+  // reddeder). Once "emin misiniz" sorup sonra reddetmek yerine hemen
+  // soylenir (L-298).
+  const odemeVar = (appData?.bookingPayments || []).some(p => [existing?.id, existing?.dbId, bookingId].filter(Boolean).map(String).includes(String(p.booking_id)));
+  if (odemeVar) throw new Error('BOOKING_HAS_PAYMENTS');
+
   if (typeof confirm === 'function') {
     if (!confirm(`${guestName} rezervasyonunu silmek istediğinize emin misiniz?`)) {
       return false;
@@ -23585,6 +23591,7 @@ if (typeof module !== 'undefined' && module.exports) {
     getImportEngine,
     buildImportSource,
     parseSourceWithMode,
+    deleteBookingUI,
     saveMaint,
     resolveMaintenanceFromOperations,
     setReservationScopeRange,
