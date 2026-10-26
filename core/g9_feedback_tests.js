@@ -1955,6 +1955,8 @@ async function fiyatEkraniDavranisi() {
   App.setPricingProperty(P);
   check(/Geçen yıl .*satılmış gece/.test(el('pricingManagerContainer').innerHTML) && !/— \(en az 8 gece\)/.test(el('pricingManagerContainer').innerHTML),
     'L-253b Gecen yil ipucu kac satilmis gece oldugunu ve kac gerektigini yazar');
+  // Hedef ilk ayda girilir; onceki adimlarin sectigi gun (gun(20)) ay sonunda sonraki aya duser.
+  App.setPricingMonth(App.pricingHorizon(BUGUN).months[0]);
   global.document.getElementById('pricingTargetInput').value = '68000';
   global.document.getElementById('pricingExpectedOccupancy').value = '';
   App.recalculatePricingTarget();
