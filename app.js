@@ -4951,10 +4951,12 @@ function renderPricingKpiStrip() {
   if (!hedefliAylar.length) {
     setEl('pricingAnnualTargetMeta', `${year} için aylık hedef yok; Hedefleri Yönet'ten her ay girilir, toplamı burada görünür`);
   } else {
+    // Gerceklesme yalniz HEDEFI GIRILMIS aylarin cirosudur (L-310): eskiden
+    // 12 ayin cirosu tek ayin hedefine oranlaniyor, %1315 cikiyordu.
     const kayitli = canReadLedgerRole()
-      ? Array.from({ length: 12 }, (_, i) => computeMonthLedger(`${year}-${String(i + 1).padStart(2, '0')}`, 'ALL')?.netRoomRevenue || 0).reduce((a, b) => a + b, 0)
+      ? hedefliAylar.map(t => computeMonthLedger(`${year}-${String(t.month).padStart(2, '0')}`, 'ALL')?.netRoomRevenue || 0).reduce((a, b) => a + b, 0)
       : null;
-    setEl('pricingAnnualTargetMeta', `${year}: ${hedefliAylar.length}/12 ayda hedef${kayitli === null ? '' : ` · kayıtlı ciro ₺${Math.round(kayitli).toLocaleString('tr-TR')}${hedefTutar > 0 ? ` (%${Math.round(kayitli / hedefTutar * 100)})` : ''}`}`);
+    setEl('pricingAnnualTargetMeta', `${year}: ${hedefliAylar.length}/12 ayda hedef${kayitli === null ? '' : ` · hedefli aylarda ciro ₺${Math.round(kayitli).toLocaleString('tr-TR')}${hedefTutar > 0 ? ` (%${Math.round(kayitli / hedefTutar * 100)})` : ''}`}`);
   }
 
   // Koruma limitleri karti hic yuklenmeyen eski fiyat profillerine bakiyordu

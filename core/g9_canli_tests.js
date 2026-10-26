@@ -45,6 +45,7 @@
 // L-307: ayni adrese ikinci davet rolu sessizce degistiriyor, mesaj yine "Davet e-postasi
 //   gonderildi" diyordu.
 // L-309: fiyat kurali -%100'e kadar kabul ediliyor; tabansiz mulkte oneri 0'a iniyordu.
+// L-310: yillik hedef karti tek ayin hedefini yilin tum cirosuyla oranliyordu (%1315).
 const fs = require('fs');
 const path = require('path');
 
@@ -865,6 +866,18 @@ async function L309() {
   check(/id="pricingRulePct" type="number" min="-99"/.test(read('index.html')), 'L-309d Form alani -%99 altina inmez');
 }
 
+// ---------------------------------------------------------------------------
+// L-310 yillik hedef karti hedefli aylarin cirosunu hedefle karsilastirir
+// ---------------------------------------------------------------------------
+async function L310() {
+  const src = read('app.js');
+  const i = src.indexOf("// Yillik hedef = secili yilin aylik portfoy hedeflerinin toplami (L-253).");
+  const blok = i >= 0 ? src.slice(i, i + 2600) : '';
+  check(/hedefliAylar\.map\(/.test(blok) && !/Array\.from\(\{ length: 12 \}, \(_, i\) => computeMonthLedger/.test(blok),
+    'L-310a Gerceklesme yalniz hedef girilmis aylarin cirosundan hesaplanir (12 ayin cirosu tek ayin hedefine oranlanmaz)');
+  check(/hedefli aylarda ciro/.test(blok), 'L-310b Kart neyin neyle karsilastirildigini yazar');
+}
+
 async function main() {
   try {
     await L304();
@@ -894,6 +907,7 @@ async function main() {
     await L306();
     await L307();
     await L309();
+    await L310();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));
