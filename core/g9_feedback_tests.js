@@ -1141,7 +1141,7 @@ async function talepEkraniDavranisi() {
   await App.saveLead({ preventDefault() {} });
   const yazma = ist.yazmalar.find(k => k.tablo === 'leads' && k.islem === 'update');
   check(yazma && yazma.yuk.property_id === PB && yazma.yuk.status === 'CONTACTED' && yazma.yuk.guest_name === null
-    && yazma.yuk.guest_phone === '05339294514' && yazma.yuk.quote_amount === 0,
+    && yazma.yuk.guest_phone === '05339294514' && yazma.yuk.quote_amount === null, // L-292: teklif yoksa 0 yazilmaz
     'L-219c Kaydet secilen mulku ve durumu yazar; "Ad girilmedi" isim olarak yazilmaz', JSON.stringify(yazma && yazma.yuk));
 
   const html = read('index.html');

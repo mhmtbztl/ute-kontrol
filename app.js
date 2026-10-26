@@ -3299,7 +3299,8 @@ function mapLeadToDb(lead, targetTenantId) {
     requested_check_in: checkIn,
     requested_check_out: checkOut,
     pax: normalizePositiveInteger(lead.pax),
-    quote_amount: Number(lead.quote ?? lead.quoteAmount ?? 0) >= 0 ? Number(lead.quote ?? lead.quoteAmount ?? 0) : 0,
+    // Teklif girilmemisse bilinmiyordur; 0 yazilmaz (L-292, CLAUDE.md 3.6).
+    quote_amount: Number(lead.quote ?? lead.quoteAmount) > 0 ? Number(lead.quote ?? lead.quoteAmount) : null,
     status: status,
     // Neden bilinmiyorsa uydurulmaz (L-279): eskiden "Diğer" ya da "-" yaziliyordu.
     lost_reason: (status === 'LOST' ? (gercekKayipNedeni(lead.lostReason || lead.lost_reason) || null) : null),
@@ -8553,7 +8554,9 @@ function computeReservationRowEconomics(booking, cleaningTask, rangeStart, range
   const finance = (booking?.financialDetails || booking?.financial_details || {}).result || {};
   let cleaning = null;
   if (cleaningTask && String(cleaningTask.status || '').toUpperCase() !== 'SKIPPED') {
-    const tutar = cleaningTask.amount === null || cleaningTask.amount === undefined || cleaningTask.amount === '' ? null : Number(cleaningTask.amount);
+    // cleaning_tasks.amount NOT NULL varsayilan 0'dir: maliyeti girilmemis gorev 0
+    // tasir. 0 bilinmiyor sayilir, "−0 ₺" yazilmaz (L-292).
+    const tutar = cleaningTask.amount === null || cleaningTask.amount === undefined || cleaningTask.amount === '' || Number(cleaningTask.amount) === 0 ? null : Number(cleaningTask.amount);
     const gun = cleaningTask.date || cleaningTask.task_date || booking.checkOut;
     cleaning = {
       amount: Number.isFinite(tutar) ? tutar : null, date: gun,
@@ -8705,7 +8708,7 @@ function openBookingDetailsPanel(bookingId) {
     ${e.tax > 0 ? detailHtml('Vergi', '− ' + tl(e.tax)) : ''}
     ${detailHtml('Temizlik ücreti (misafirden, gelir)', tl(e.cleaningRevenue))}
     ${detailHtml('Ciro (oda geliri, indirim sonrası)', e.cancelled ? '—' : tl(e.netRoomRevenue))}
-    ${detailHtml('OTA + ödeme komisyonu (gider)', '− ' + tl(e.commission))}
+    ${detailHtml('OTA + ödeme komisyonu (gider)', e.commission > 0 ? '− ' + tl(e.commission) : tl(0))}
     ${detailHtml('Temizlik maliyeti (personele, gider)', temizlikMaliyeti)}
     ${detailHtml('Kalan (tahmini)', e.cancelled ? '—' : tl(e.remaining))}
     ${detailHtml('Temizlik görevi', cleaningStatus)}
@@ -12361,7 +12364,7 @@ function renderManageMaintTable() {
       <td><strong>${escapeHtml(appData.villas[m.villa]?.name || m.villa)}</strong></td>
       <td>${escapeHtml(m.title || '')}</td>
       <td>${escapeHtml(m.assignee || 'Atanmadı')}</td>
-      <td>₺${Number(m.cost).toLocaleString('tr-TR')}</td>
+      <td>${Number(m.cost) > 0 ? '₺' + Number(m.cost).toLocaleString('tr-TR') : '—'}</td>
       <td>${m.downtime || 0} Gece</td>
       <td><span class="badge ${statusPresentation.badgeClass}">${escapeHtml(statusPresentation.label)}</span></td>
       <td style="text-align: right; white-space: nowrap;">
@@ -12390,7 +12393,7 @@ function openMaintModal(editId = null) {
     document.getElementById('maintBlocksAvailability').checked = !!(m.blocks_availability || m.blocksAvailability);
     document.getElementById('maintDowntimeStart').value = m.downtime_start || m.downtimeStart || '';
     document.getElementById('maintDowntimeEnd').value = m.downtime_end || m.downtimeEnd || '';
-    document.getElementById('maintCost').value = m.cost || 0;
+    document.getElementById('maintCost').value = Number(m.cost) > 0 ? m.cost : '';
     document.getElementById('maintStatus').value = m.statusRaw || (m.status === 'COMPLETED' ? 'RESOLVED' : m.status);
   } else {
     title.innerText = '🛠️ Yeni Arıza / Bakım İşi';
@@ -12414,7 +12417,10 @@ async function saveMaint(e) {
   // Kapali tarih girmek takvimi kapatmak demektir (L-246): kutu isaretsizken
   // girilen 22-24.10 sessizce null yaziliyor, ariza bugunu kapatiyordu.
   const blocksAvailability = document.getElementById('maintBlocksAvailability').checked || !!(downtimeStart || downtimeEnd);
-  const cost = Number(document.getElementById('maintCost').value) || 0;
+  // Bos maliyet bilinmiyordur, 0 degil (L-292).
+  const hamMaliyet = String(document.getElementById('maintCost').value || '').trim();
+  const cost = hamMaliyet === '' ? null : Number(hamMaliyet);
+  if (cost !== null && (!Number.isFinite(cost) || cost < 0)) { alert('Tahmini maliyet geçerli ve negatif olmayan bir tutar olmalı ya da boş bırakılmalı.'); return; }
   const status = document.getElementById('maintStatus').value;
 
   if (blocksAvailability && (!downtimeStart || !downtimeEnd || downtimeEnd < downtimeStart)) {
@@ -21340,10 +21346,12 @@ function assignMaintenanceFromSelect(ticketId) {
 async function resolveMaintenanceFromOperations(ticketId) {
   const ticket = (appData?.maintenanceTickets || []).find(item => item.id === ticketId);
   if (!ticket) return false;
-  const entered = prompt('Gerçekleşen maliyet (TL; yoksa 0):', String(ticket.actual_cost || ticket.estimated_cost || 0));
+  const oneri = Number(ticket.actual_cost) > 0 ? ticket.actual_cost : (Number(ticket.estimated_cost) > 0 ? ticket.estimated_cost : '');
+  const entered = prompt('Gerçekleşen maliyet (TL; bilinmiyorsa boş bırakın, maliyet yoksa 0):', String(oneri));
   if (entered === null) return false;
-  const actualCost = Number(String(entered).replace(',', '.'));
-  if (!Number.isFinite(actualCost) || actualCost < 0) {
+  // Bos = bilinmiyor; 0 yazilmaz (L-292).
+  const actualCost = String(entered).trim() === '' ? null : Number(String(entered).replace(',', '.'));
+  if (actualCost !== null && (!Number.isFinite(actualCost) || actualCost < 0)) {
     alert('Geçerli ve negatif olmayan bir tutar girin.');
     return false;
   }
@@ -23577,6 +23585,8 @@ if (typeof module !== 'undefined' && module.exports) {
     getImportEngine,
     buildImportSource,
     parseSourceWithMode,
+    saveMaint,
+    resolveMaintenanceFromOperations,
     setReservationScopeRange,
     hasUnsavedModalForm,
     markModalFormDirty,

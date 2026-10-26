@@ -36,6 +36,7 @@
 //   (yalniz etkin kaynaklar yukleniyordu).
 // L-283: dolu formda tarayici geri tusu veriyi uyarisiz siliyordu (beforeunload yok).
 // L-284: rezervasyon listesi ozeti iptal kayitlari rezervasyon sayiyordu.
+// L-292: bilinmeyen deger 0 yaziliyordu (teklif, ariza maliyeti) ve "−0 ₺" gosteriliyordu.
 const fs = require('fs');
 const path = require('path');
 
@@ -676,6 +677,45 @@ async function L284() {
   check(/<strong>2 Rezervasyon<\/strong>/.test(ozet) && /2 iptal/.test(ozet), 'L-284a Ozet iptalleri rezervasyon saymaz, ayrica yazar', ozet.slice(0, 160));
 }
 
+// ---------------------------------------------------------------------------
+// L-292 bilinmeyen deger 0 yazilmaz / "−0 ₺" gosterilmez
+// ---------------------------------------------------------------------------
+async function L292() {
+  sahteDom();
+  const App = require('../app.js');
+  kur(App, {});
+  const satir = App.mapLeadToDb({ guestName: 'TEST', phone: '05550000000', status: 'NEW', quote: 0 }, TENANT);
+  check(satir.quote_amount === null, 'L-292a Teklif girilmemis talebe quote_amount 0 yazilmaz', JSON.stringify(satir.quote_amount));
+  // Ariza formu: maliyet bos = bilinmiyor.
+  sahteDom({ maintEditId: '', maintVilla: 'DENE', maintPriority: 'P2', maintTitle: 'TEST arıza', maintAssignee: '', maintDowntimeStart: '', maintDowntimeEnd: '', maintCost: '', maintStatus: 'OPEN' });
+  const ist = kur(App, { maintenance: [] });
+  await App.saveMaint({ preventDefault() {} });
+  const ariza = ist.yazmalar.find(k => k.tablo === 'maintenance_tickets' && k.islem === 'insert');
+  check(ariza && ariza.yuk.estimated_cost === null, 'L-292b Bos tahmini maliyet 0 degil bos yazilir', JSON.stringify(ariza && ariza.yuk.estimated_cost) + ' ' + (global.__sonUyari || ''));
+  check(!/id="maintCost" value="0"/.test(read('index.html')), 'L-292c Ariza formunda maliyet varsayilani 0 degil');
+  // Cozuldu: gerceklesen maliyet bos birakilirsa 0 yazilmaz.
+  sahteDom();
+  global.prompt = () => '';
+  const ist2 = kur(App, { maintenanceTickets: [{ id: 't9', title: 'TEST', status: 'OPEN', property_id: PROP_A }] });
+  await App.resolveMaintenanceFromOperations('t9');
+  const coz = ist2.yazmalar.find(k => k.tablo === 'maintenance_tickets' && k.islem === 'update');
+  check(coz && coz.yuk.status === 'RESOLVED' && coz.yuk.actual_cost === null, 'L-292d Gerceklesen maliyet bos birakilinca 0 yazilmaz', JSON.stringify(coz && coz.yuk));
+  delete global.prompt;
+  // Rezervasyon detayi: komisyon yoksa "− 0 ₺" yazmaz; maliyeti girilmemis temizlik "−0 ₺" degil.
+  let panel = null;
+  global.SidePanel = { open(o) { panel = o; }, close() {} };
+  sahteDom();
+  kur(App, {
+    bookings: [{ id: BOOK_1, villa: 'DENE', propertyId: PROP_A, guest: 'TEST', checkIn: '2026-11-10', checkOut: '2026-11-12', gross: 10000, otaComm: 0, cleanFee: 0, pax: 2, channel: 'Direct', status: 'CONFIRMED' }],
+    cleaningTasks: [{ id: 'c1', bookingId: BOOK_1, villa: 'DENE', date: '2026-11-12', status: 'PLANNED', amount: 0, paid: false }]
+  });
+  App.openBookingDetailsPanel(BOOK_1);
+  const html = panel ? panel.bodyHtml : '';
+  check(!/−\s*0\s*₺/.test(html) && !/− 0 ₺/.test(html), 'L-292e Detayda "−0 ₺" gosterilmez', (html.match(/komisyon[\s\S]{0,120}/) || [''])[0]);
+  check(/Temizlik maliyeti \(personele, gider\)<\/span><strong>Bilinmiyor/.test(html), 'L-292f Maliyeti girilmemis temizlik "Bilinmiyor" yazar', (html.match(/Temizlik maliyeti[\s\S]{0,80}/) || [''])[0]);
+  delete global.SidePanel;
+}
+
 async function main() {
   try {
     await L304();
@@ -697,6 +737,7 @@ async function main() {
     await L282();
     await L283();
     await L284();
+    await L292();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));
