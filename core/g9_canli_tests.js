@@ -54,6 +54,7 @@
 // L-294: ariza duzenleme penceresindeki "Sorumlu" alani atanan ustayi gostermiyordu.
 // L-295: tamamlanan genel gorevde completed_at bos kaliyordu.
 // L-289: Yazdir/PDF sonrasi about:blank sekmesi acik kaliyordu.
+// L-290: "WhatsApp'ta ac" sablon secilmezse sessiz kaliyor; talep duzenlemede kisi sayisi alani yoktu.
 const fs = require('fs');
 const path = require('path');
 
@@ -1001,6 +1002,27 @@ async function L289() {
   check(kapandi, 'L-289a Yazdirma penceresi yazdirma bitince kapanir (about:blank kalmaz)');
 }
 
+// ---------------------------------------------------------------------------
+// L-290 WhatsApp'ta ac sablonsuz sessiz kalmaz; talep duzenlemede kisi sayisi
+// ---------------------------------------------------------------------------
+async function L290() {
+  sahteDom({ leadEditId: LEAD_1, leadMessageTemplate: '' });
+  const App = require('../app.js');
+  kur(App, { leads: [{ id: LEAD_1, guestName: 'TEST', phone: '05550000000', status: 'QUOTE_SENT' }], messageTemplates: [] });
+  global.__sonUyari = '';
+  const sonuc = App.openLeadWhatsApp();
+  check(sonuc === false && /şablon/i.test(global.__sonUyari || ''), 'L-290a Sablon secilmeden "WhatsApp\'ta ac" ne yapilacagini soyler', global.__sonUyari);
+  check(/id="leadPax"/.test(read('index.html')), 'L-290b Talep duzenleme penceresinde kisi sayisi alani var');
+  // Kayit kisi sayisini yazar.
+  sahteDom({ leadEditId: LEAD_1, leadGuest: 'TEST', leadVilla: 'DENE', leadChannel: 'Phone', leadQuote: '', leadStatus: 'QUOTE_SENT', leadLostReason: '', leadNotes: '', leadPax: '5' });
+  const ist = kur(App, { leads: [{ id: LEAD_1, dbId: LEAD_1, guestName: 'TEST', guest: 'TEST', phone: '05550000000', status: 'QUOTE_SENT' }] });
+  global.SalesWorkflowService = require('./sales_workflow_service.js');
+  await App.saveLead({ preventDefault() {} });
+  delete global.SalesWorkflowService;
+  const y = ist.yazmalar.find(k => k.tablo === 'leads' && k.islem === 'update');
+  check(y && y.yuk.pax === 5, 'L-290c Talep duzenleme kisi sayisini yazar', JSON.stringify(y && y.yuk.pax));
+}
+
 async function main() {
   try {
     await L304();
@@ -1037,6 +1059,7 @@ async function main() {
     await L294();
     await L295();
     await L289();
+    await L290();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

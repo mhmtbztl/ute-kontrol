@@ -12212,6 +12212,8 @@ function openLeadModal(editId = null) {
     // Ilgilenilen tarihler duzenlemede de gorunur ve degisir (L-186).
     document.getElementById('leadCheckIn').value = l.checkIn || '';
     document.getElementById('leadCheckOut').value = l.checkOut || '';
+    const paxAlani = document.getElementById('leadPax');
+    if (paxAlani) paxAlani.value = Number(l.pax) > 0 ? l.pax : '';
     document.getElementById('leadStatus').value = ALLOWED_LEAD_STAGES.includes(l.status) ? l.status : 'NEW';
     document.getElementById('leadLostReason').value = gercekKayipNedeni(l.lostReason);
     document.getElementById('leadNotes').value = l.notes || '';
@@ -12264,7 +12266,12 @@ function openLeadWhatsApp() {
   const templateId = document.getElementById('leadMessageTemplate')?.value;
   const lead = (appData.leads || []).find(item => item.id === leadId);
   const template = (appData.messageTemplates || []).find(item => item.id === templateId);
-  if (!lead || !template) return false;
+  if (!lead) return false;
+  // Sablonsuz dugme sessiz kaliyordu (L-290).
+  if (!template) {
+    alert('Önce bir mesaj şablonu seçin. Şablonlar Ayarlar › Şablonlar bölümünden eklenir.');
+    return false;
+  }
   const digits = String(lead.phone || '').replace(/\D/g, '');
   const guest = (appData.guests || []).find(item => String(item.phone || '').replace(/\D/g, '') === digits);
   const link = SalesWorkflowService.buildWhatsAppLink({
@@ -12307,6 +12314,10 @@ async function saveLead(e) {
   }
   const checkIn = document.getElementById('leadCheckIn')?.value || null;
   const checkOut = document.getElementById('leadCheckOut')?.value || null;
+  // Kisi sayisi duzenlemede de girilir (L-290); bos = bilinmiyor.
+  const paxHam = String(document.getElementById('leadPax')?.value ?? '').trim();
+  const pax = paxHam === '' ? null : normalizePositiveInteger(paxHam);
+  if (paxHam !== '' && pax === null) { alert('Kişi sayısı pozitif bir tam sayı olmalıdır.'); return; }
   if ((checkIn && !checkOut) || (!checkIn && checkOut) || (checkIn && checkOut && checkOut <= checkIn)) {
     alert('İlgilenilen tarihler için giriş ve çıkışı birlikte girin; çıkış girişten sonra olmalıdır.');
     return;
@@ -12338,7 +12349,8 @@ async function saveLead(e) {
     lostReason,
     notes,
     checkIn,
-    checkOut
+    checkOut,
+    pax
   });
 
   try {
@@ -23706,6 +23718,7 @@ if (typeof module !== 'undefined' && module.exports) {
     getImportEngine,
     buildImportSource,
     parseSourceWithMode,
+    openLeadWhatsApp,
     printCurrentReport,
     setCurrentPageReportForTests: report => { currentPageReport = report; },
     openMaintModal,
