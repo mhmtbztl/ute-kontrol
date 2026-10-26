@@ -1936,7 +1936,10 @@ async function deleteBooking(bookingId) {
 
 async function deleteBookingUI(bookingId) {
   try {
-    return await deleteBooking(bookingId);
+    const silindi = await deleteBooking(bookingId);
+    // Silinen kaydin detay paneli acik kalmaz (L-296).
+    if (silindi && typeof SidePanel !== 'undefined') SidePanel.close();
+    return silindi;
   } catch (error) {
     const raw = String(error?.message || '');
     const message = raw.includes('BOOKING_HAS_PAYMENTS')
@@ -4546,6 +4549,8 @@ function switchTab(tabId) {
     if (typeof showToast === 'function') showToast('Ayarlar yalnızca işletme yönetim rollerine açıktır.', 'error');
     return false;
   }
+  // Onceki sekmenin yan paneli yeni sekmede acik kalmaz (L-296).
+  if (typeof SidePanel !== 'undefined' && (typeof SidePanel.isOpen !== 'function' || SidePanel.isOpen())) SidePanel.close();
   document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 

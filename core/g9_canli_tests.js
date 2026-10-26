@@ -38,6 +38,7 @@
 // L-284: rezervasyon listesi ozeti iptal kayitlari rezervasyon sayiyordu.
 // L-292: bilinmeyen deger 0 yaziliyordu (teklif, ariza maliyeti) ve "−0 ₺" gosteriliyordu.
 // L-298: odemeli rezervasyon silinirken once "emin misiniz?" soruluyor, sonra reddediliyordu.
+// L-296: rezervasyon detay paneli silmeden sonra ve sekme degisince acik kaliyordu.
 const fs = require('fs');
 const path = require('path');
 
@@ -138,6 +139,7 @@ function kur(App, veri = {}, rol = 'owner', secimler) {
       SEYIR: { id: PROP_B, name: 'SEYİR', capacity: 8 }
     },
     bookings: [], expenses: [], cleaningTasks: [], leads: [], operationalPeople: [], salesMembers: [],
+    bookingPayments: [], bookingPaymentBalances: [], maintenanceTickets: [], maintenance: [], operationalTasks: [],
     ...veri
   });
   return ist;
@@ -735,6 +737,24 @@ async function L298() {
   global.confirm = () => true;
 }
 
+// ---------------------------------------------------------------------------
+// L-296 detay paneli silmeden sonra ve sekme degisince kapanir
+// ---------------------------------------------------------------------------
+async function L296() {
+  sahteDom();
+  const App = require('../app.js');
+  let kapandi = 0;
+  global.SidePanel = { open() {}, close() { kapandi++; }, isOpen: () => true };
+  kur(App, { bookings: [{ id: BOOK_1, dbId: BOOK_1, villa: 'DENE', propertyId: PROP_A, guest: 'TEST Sil', checkIn: '2026-11-10', checkOut: '2026-11-12', gross: 10000, pax: 2, status: 'CONFIRMED' }] },
+    'owner', { rpc: ad => (ad === 'delete_booking_atomic' ? { success: true } : []) });
+  const silindi = await App.deleteBookingUI(BOOK_1);
+  check(silindi === true && kapandi > 0, 'L-296a Rezervasyon silinince detay paneli kapanir', `silindi=${silindi} kapandi=${kapandi} ${global.__sonUyari}`);
+  kapandi = 0;
+  try { App.switchTab('finance'); } catch (e) { /* sahte DOM'da cizim hatasi onemsiz */ }
+  check(kapandi > 0, 'L-296b Sekme degisince detay paneli kapanir');
+  delete global.SidePanel;
+}
+
 async function main() {
   try {
     await L304();
@@ -758,6 +778,7 @@ async function main() {
     await L284();
     await L292();
     await L298();
+    await L296();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));
