@@ -1661,14 +1661,19 @@ async function updateBooking(bookingId, bookingInput) {
     throw new Error('Toplam tutar negatif olamaz.');
   }
 
-  let propId = bookingInput.propertyId || bookingInput.property_id || existing?.propertyId;
+  // Formun gonderdigi mulk kaydin eski mulkunun onune gecer (L-268): once
+  // existing.propertyId okunuyordu ve mulk degisikligi sessizce yok sayiliyordu.
+  let propId = bookingInput.propertyId || bookingInput.property_id || null;
   if (!propId && bookingInput.villa) {
     if (isUUID(bookingInput.villa)) {
       propId = bookingInput.villa;
     } else if (typeof appData !== 'undefined' && appData.villas && appData.villas[bookingInput.villa]) {
       propId = appData.villas[bookingInput.villa].id;
+    } else {
+      throw new Error('Seçilen mülk bulunamadı. Sayfayı eşitleyip tekrar deneyin.');
     }
   }
+  if (!propId) propId = existing?.propertyId;
 
   if (typeof appData !== 'undefined' && appData.villas && propId) {
     const validPropertyIds = Object.values(appData.villas).map(p => p.id).filter(Boolean);
@@ -1688,6 +1693,7 @@ async function updateBooking(bookingId, bookingInput) {
     const updated = {
       ...(existing || {}),
       ...bookingInput,
+      propertyId: propId,
       checkIn,
       checkOut,
       gross,

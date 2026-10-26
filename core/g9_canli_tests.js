@@ -3,6 +3,8 @@
 // L-304: gider aktarimi yalniz dosya icinde kopya ariyordu; defterdeki
 //   giderle ayni satir (duzeltilip yeniden yuklenen dosya, disa aktarilip
 //   geri verilen defter) "eklenecek" gorunuyor ve gideri ikiliyordu.
+// L-268: rezervasyonun mulku degistirilince "kaydedildi" deniyor ama eski
+//   mulkte kaliyordu; cakisma kontrolu de eski mulke bakiyordu.
 const fs = require('fs');
 const path = require('path');
 
@@ -147,9 +149,57 @@ async function L304() {
     'L-304d Onizleme defterdeki giderleri mukerrer gosterir', JSON.stringify(sonuc && { d: sonuc.duplicateCount, e: sonuc.existingDuplicateCount }));
 }
 
+// ---------------------------------------------------------------------------
+// L-268 rezervasyonun mulku degisir; cakisma yeni mulke gore denetlenir
+// ---------------------------------------------------------------------------
+const BOOK_1 = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd1';
+const BOOK_2 = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd2';
+function rezervasyonSatiri(arg) {
+  return {
+    id: arg.p_booking_id, tenant_id: TENANT, property_id: arg.p_property_id, guest_name: arg.p_guest_name,
+    guest_phone: arg.p_guest_phone, channel: arg.p_channel, check_in: arg.p_check_in, check_out: arg.p_check_out,
+    pax: arg.p_pax, gross_amount: arg.p_gross_amount, ota_commission: arg.p_ota_commission,
+    cleaning_fee: arg.p_cleaning_fee, discount: arg.p_discount, net_room_revenue: arg.p_net_room_revenue,
+    status: arg.p_status, notes: arg.p_notes
+  };
+}
+async function L268() {
+  sahteDom();
+  const App = require('../app.js');
+  const mevcut = { id: BOOK_1, dbId: BOOK_1, propertyId: PROP_A, villa: 'DENE', guest: 'TEST Taşıma', checkIn: '2026-11-10', checkOut: '2026-11-12', gross: 20000, pax: 2, channel: 'Direct', status: 'CONFIRMED' };
+  const girdi = { villa: 'SEYIR', guest: 'TEST Taşıma', phone: '', checkIn: '2026-11-10', checkOut: '2026-11-12', channel: 'Direct', gross: 20000, otaComm: 0, cleanFee: 0, cleanCost: null, net: 20000, pax: 2, status: 'CONFIRMED' };
+  const ist = kur(App, { bookings: [{ ...mevcut }] }, 'owner', { rpc: (ad, arg) => (ad === 'update_booking_atomic' ? rezervasyonSatiri(arg) : []) });
+  let sonuc = null, hata = null;
+  try { sonuc = await App.updateBooking(BOOK_1, { ...girdi }); } catch (e) { hata = e; }
+  const cagri = ist.yazmalar.find(k => k.tablo === 'rpc:update_booking_atomic');
+  check(cagri && cagri.yuk.p_property_id === PROP_B, 'L-268a Mulk degisikligi sunucuya yeni mulkle gider', JSON.stringify(cagri && cagri.yuk.p_property_id) + (hata ? ' ' + hata.message : ''));
+  check(sonuc && sonuc.propertyId === PROP_B, 'L-268b Bellekteki kayit yeni mulke tasinir', JSON.stringify(sonuc && sonuc.propertyId));
+  // Planli temizlik gorevi de yeni mulke tasinir.
+  const ist1b = kur(App, { bookings: [{ ...sonuc }], cleaningTasks: [{ id: 'eeeeeeee-eeee-4eee-8eee-000000000001', dbId: 'eeeeeeee-eeee-4eee-8eee-000000000001', bookingId: BOOK_1, villa: 'DENE', propertyId: PROP_A, date: '2026-11-12', status: 'PLANNED', amount: 1500, paid: false }] });
+  await App.syncBookingCleaningTaskToCloud(sonuc, null);
+  const tYaz = ist1b.yazmalar.find(k => k.tablo === 'cleaning_tasks' && k.islem !== 'select');
+  const tYuk = tYaz && (Array.isArray(tYaz.yuk) ? tYaz.yuk[0] : tYaz.yuk);
+  check(tYuk && tYuk.property_id === PROP_B, 'L-268e Temizlik gorevi yeni mulke tasinir', JSON.stringify(tYuk));
+
+  // Yeni mulkte ayni gecelerde rezervasyon varsa tasima reddedilir, sunucuya gidilmez.
+  const engel = { id: BOOK_2, dbId: BOOK_2, propertyId: PROP_B, villa: 'SEYIR', guest: 'TEST Engel', checkIn: '2026-11-11', checkOut: '2026-11-13', gross: 10000, pax: 2, status: 'CONFIRMED' };
+  const ist2 = kur(App, { bookings: [{ ...mevcut }, engel] }, 'owner', { rpc: (ad, arg) => (ad === 'update_booking_atomic' ? rezervasyonSatiri(arg) : []) });
+  hata = null;
+  try { await App.updateBooking(BOOK_1, { ...girdi }); } catch (e) { hata = e; }
+  check(hata && /çakışıyor/.test(hata.message) && !ist2.yazmalar.some(k => k.tablo === 'rpc:update_booking_atomic'),
+    'L-268c Cakisma yeni mulke gore denetlenir', hata ? hata.message : 'hata yok');
+  // Mulk alani gonderilmezse kayit kendi mulkunde kalir.
+  const ist3 = kur(App, { bookings: [{ ...mevcut }] }, 'owner', { rpc: (ad, arg) => (ad === 'update_booking_atomic' ? rezervasyonSatiri(arg) : []) });
+  const { villa, ...mulksuz } = girdi;
+  await App.updateBooking(BOOK_1, mulksuz);
+  const c3 = ist3.yazmalar.find(k => k.tablo === 'rpc:update_booking_atomic');
+  check(c3 && c3.yuk.p_property_id === PROP_A, 'L-268d Mulk gonderilmeyen guncelleme mevcut mulku korur');
+}
+
 async function main() {
   try {
     await L304();
+    await L268();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));
