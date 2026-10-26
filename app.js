@@ -3464,15 +3464,18 @@ async function loadLeads(targetTenantId) {
 async function loadLeadSalesContext(targetTenantId) {
   const tenantId = targetTenantId || getActiveTenantId();
   if (!isCloudTenant(tenantId) || !canReadSalesRole(activeTenant?.role)) {
-    return { sources: [], acquisitions: [], workflows: [], interests: [] };
+    return { sources: [], allSources: [], acquisitions: [], workflows: [], interests: [] };
   }
-  const [sources, acquisitions, workflows, interests] = await Promise.all([
-    fetchAllCloudRows(() => supabaseClient.from('lead_source_catalog').select('*').eq('tenant_id', tenantId).eq('is_active', true).order('sort_order').order('label')),
+  // Kapatilan kaynak da yuklenir (L-282): gecmis talep satiri adini kaybedip
+  // yalniz ham kanal kodunu gosteriyordu. Formlar yalniz etkinleri sunar.
+  const [allSources, acquisitions, workflows, interests] = await Promise.all([
+    fetchAllCloudRows(() => supabaseClient.from('lead_source_catalog').select('*').eq('tenant_id', tenantId).order('sort_order').order('label')),
     fetchAllCloudRows(() => supabaseClient.from('lead_acquisition').select('*').eq('tenant_id', tenantId)),
     fetchAllCloudRows(() => supabaseClient.from('lead_workflow').select('*').eq('tenant_id', tenantId)),
     fetchAllCloudRows(() => supabaseClient.from('lead_interest_daily').select('*').eq('tenant_id', tenantId).order('day', { ascending: false }))
   ]);
-  return { sources, acquisitions, workflows, interests };
+  const sources = (allSources || []).filter(source => source && source.is_active !== false);
+  return { sources, allSources: allSources || [], acquisitions, workflows, interests };
 }
 
 async function createLead(leadInput) {
@@ -11653,7 +11656,7 @@ function buildLeadSalesView({ leads = [], sources = [], acquisitions = [], workf
       ...lead,
       channel: normalizeLeadChannel(lead.channel),
       sourceId: acquisition?.source_id || null,
-      sourceLabel: source?.label || '—',
+      sourceLabel: source ? (source.is_active === false ? `${source.label} (kapalı)` : source.label) : '—',
       assignedTo: workflow?.assigned_to || null,
       nextFollowUpAt: workflow?.next_follow_up_at || null
     };
@@ -11680,7 +11683,7 @@ function setLeadFollowUpScope(scope) {
 function getLeadSalesView() {
   return buildLeadSalesView({
     leads: appData.leads || [],
-    sources: appData.leadSources || [],
+    sources: appData.leadSourcesAll || appData.leadSources || [],
     acquisitions: appData.leadAcquisitions || [],
     workflows: appData.leadWorkflows || [],
     today: getTodayStr(),
@@ -11856,6 +11859,7 @@ function renderLeadQuickCapture() {
 async function refreshLeadSalesContext() {
   const context = await loadLeadSalesContext(getActiveTenantId());
   appData.leadSources = context.sources;
+  appData.leadSourcesAll = context.allSources;
   appData.leadAcquisitions = context.acquisitions;
   appData.leadWorkflows = context.workflows;
   appData.leadInterests = context.interests;
@@ -17596,6 +17600,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
         cleaningPayments,
         leads: leadsWithSlugs,
         leadSources: leadSalesContext.sources,
+        leadSourcesAll: leadSalesContext.allSources || leadSalesContext.sources,
         leadAcquisitions: leadSalesContext.acquisitions,
         leadWorkflows: leadSalesContext.workflows,
         leadInterests: leadSalesContext.interests,
@@ -23531,6 +23536,8 @@ if (typeof module !== 'undefined' && module.exports) {
     getImportEngine,
     buildImportSource,
     parseSourceWithMode,
+    refreshLeadSalesContext,
+    getLeadSalesView,
     deleteMaint,
     setOperationalTaskStatus,
     renderTodayDateStrip,

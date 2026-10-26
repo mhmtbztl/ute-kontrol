@@ -32,6 +32,8 @@
 //   gunu "Cikis Yapti" uyarisiz kabul ediliyor, temizlik eski cikis gununde kaliyordu.
 // L-281: "Arsivle" cozulmus onarimi IPTAL yapiyordu; genel gorev iptali onay sormuyor,
 //   iptal edilen gorev arayuzde hic gorunmuyordu.
+// L-282: kapatilan talep kaynaginin adi gecmis talep satirinda kayboluyordu
+//   (yalniz etkin kaynaklar yukleniyordu).
 const fs = require('fs');
 const path = require('path');
 
@@ -611,6 +613,33 @@ async function L281() {
   check(/TEST iptal görevi/.test(html) && /İptal edildi/.test(html), 'L-281c Iptal edilen gorev kapanan gorevler listesinde gorunur', html.slice(0, 300));
 }
 
+// ---------------------------------------------------------------------------
+// L-282 kapatilan talep kaynaginin adi gecmis talepte kalir
+// ---------------------------------------------------------------------------
+async function L282() {
+  sahteDom();
+  const App = require('../app.js');
+  const kaynaklar = [
+    { id: 's1', tenant_id: TENANT, code: 'UNKNOWN', label: 'Bilinmiyor', is_active: true, sort_order: 0 },
+    { id: 's2', tenant_id: TENANT, code: 'CUSTOM', label: 'TEST Kaynak', is_active: false, sort_order: 1 }
+  ];
+  kur(App, { leads: [{ id: LEAD_1, guestName: 'TEST', phone: '05550000044', status: 'NEW', channel: 'Phone' }] }, 'owner', {
+    cevap: k => {
+      if (k.islem !== 'select') return null;
+      if (k.tablo === 'lead_source_catalog') {
+        const yalnizAktif = k.filtre.some(([c, v]) => c === 'is_active' && v === true);
+        return { data: kaynaklar.filter(s => !yalnizAktif || s.is_active), error: null };
+      }
+      if (k.tablo === 'lead_acquisition') return { data: [{ lead_id: LEAD_1, tenant_id: TENANT, source_id: 's2' }], error: null };
+      return null;
+    }
+  });
+  await App.refreshLeadSalesContext();
+  const satir = App.getLeadSalesView().rows.find(r => r.id === LEAD_1);
+  check(satir && /TEST Kaynak/.test(satir.sourceLabel), 'L-282a Kapatilan kaynagin adi gecmis talep satirinda kalir', JSON.stringify(satir && satir.sourceLabel));
+  check((App.getAppData().leadSources || []).every(s => s.is_active !== false), 'L-282b Yeni kayit formu yalniz etkin kaynaklari sunar');
+}
+
 async function main() {
   try {
     await L304();
@@ -629,6 +658,7 @@ async function main() {
     await L279();
     await L280();
     await L281();
+    await L282();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));
