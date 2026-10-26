@@ -8653,8 +8653,17 @@ function openBookingDetailsPanel(bookingId) {
   const methodOptions = [['', 'Yöntem —'], ['CASH', 'Nakit'], ['BANK_TRANSFER', 'Havale/EFT'], ['CARD', 'Kart'], ['OTA', 'OTA'], ['OTHER', 'Diğer']]
     .map(([v, l]) => `<option value="${v}"${otaKanali && !kaporaAlinir && v === 'OTA' ? ' selected' : ''}>${l}</option>`).join('');
   const kaporaNotu = kaporaAlinir ? '' : '<p class="sub-text">Bu kanalda kapora alınmıyor; ödemeyi platform aktarır. Değiştirmek için Ayarlar → Kanallar → Kapora.</p>';
-  const paymentForm = canWriteSalesRole(activeTenant?.role) ? `<div class="booking-payment-form"><input id="bookingPaymentAmount" type="number" min="0.01" step="0.01" placeholder="Tutar"><input id="bookingPaymentDate" type="date" value="${escapeHtml(getTodayStr())}"><select id="bookingPaymentKind">${kindOptions}</select><select id="bookingPaymentMethod">${methodOptions}</select><input id="bookingPaymentNote" maxlength="1000" placeholder="Not —"><button class="btn btn-primary" data-onclick="saveBookingPayment(decodeURIComponent('${encodeActionArg(String(booking.id))}'))">Ödeme ekle</button></div>${kaporaNotu}` : '';
-  const paymentHtml = `<section class="booking-payments"><h3>Ödeme takibi</h3><div class="booking-payment-summary"><div><span>Tahsil edilecek</span><strong>${money(balance?.amount_due)}</strong></div><div><span>Toplam tahsilat</span><strong>${money(balance?.paid_total)}</strong></div><div><span>Kalan</span><strong>${money(balance?.remaining)}</strong></div></div>${paymentRows}${paymentForm}<p class="sub-text">Ödeme nakit hareketidir; rezervasyon cirosunu değiştirmez.</p></section>`;
+  const iptal = String(booking.status || '').toUpperCase() === 'CANCELLED';
+  const paymentForm = canWriteSalesRole(activeTenant?.role) && !iptal ? `<div class="booking-payment-form"><input id="bookingPaymentAmount" type="number" min="0.01" step="0.01" placeholder="Tutar"><input id="bookingPaymentDate" type="date" value="${escapeHtml(getTodayStr())}"><select id="bookingPaymentKind">${kindOptions}</select><select id="bookingPaymentMethod">${methodOptions}</select><input id="bookingPaymentNote" maxlength="1000" placeholder="Not —"><button class="btn btn-primary" data-onclick="saveBookingPayment(decodeURIComponent('${encodeActionArg(String(booking.id))}'))">Ödeme ekle</button></div>${kaporaNotu}` : '';
+  // Iptal edilen rezervasyon tahsilat beklemez (L-274): bakiye gorunumu
+  // iptali bilmiyor, "Kalan 15.000" diyordu. Alinan para iade ya da mahsup
+  // edilmelidir; odeme kaydi silinmez (nakit hareketidir).
+  const alinan = Number(balance?.paid_total) || 0;
+  const ozetHtml = iptal
+    ? `<div class="booking-payment-summary"><div><span>Tahsil edilecek</span><strong>— (iptal)</strong></div><div><span>Toplam tahsilat</span><strong>${money(balance?.paid_total)}</strong></div></div>`
+      + (alinan > 0 ? `<p class="sub-text" style="color:#FFB340;">Rezervasyon iptal edildi; alınan ${money(alinan)} misafire iade edilmeli ya da başka bir rezervasyona mahsup edilmelidir.</p>` : '')
+    : `<div class="booking-payment-summary"><div><span>Tahsil edilecek</span><strong>${money(balance?.amount_due)}</strong></div><div><span>Toplam tahsilat</span><strong>${money(balance?.paid_total)}</strong></div><div><span>Kalan</span><strong>${money(balance?.remaining)}</strong></div></div>`;
+  const paymentHtml = `<section class="booking-payments"><h3>Ödeme takibi</h3>${ozetHtml}${paymentRows}${paymentForm}<p class="sub-text">Ödeme nakit hareketidir; rezervasyon cirosunu değiştirmez.</p></section>`;
   // Konaklamanin tamami (donem payi degil): liste satiriyla ayni hesap.
   const e = computeReservationRowEconomics(booking, cleaning, '0000-01-01', '9999-12-31');
   const tl = value => `${Number(value || 0).toLocaleString('tr-TR', { maximumFractionDigits: 2 })} ₺`;
@@ -9477,6 +9486,12 @@ async function saveBooking(e) {
     if (deposit > 0) ekUyari += await recordBookingDeposit(savedBooking.id, deposit, depositMethod, null);
     if (typeof renderAll === 'function') renderAll();
 
+    // Iptalde alinmis para iade ya da mahsup edilmelidir (L-274).
+    if (String(status || '').toUpperCase() === 'CANCELLED') {
+      const bakiye = (appData.bookingPaymentBalances || []).find(item => String(item.booking_id) === String(savedBooking.id));
+      const alinan = Number(bakiye?.paid_total) || 0;
+      if (alinan > 0) ekUyari += `\n\nNot: Bu rezervasyon için ${alinan.toLocaleString('tr-TR')} ₺ tahsilat kayıtlı; misafire iade edin ya da başka bir rezervasyona mahsup edin. Ödeme kaydı silinmedi.`;
+    }
     let guestProfileWarning = ekUyari;
     if (guestPhone || guestEmail) {
       try {

@@ -18,6 +18,8 @@
 //   await sonrasi olayin currentTarget'i bosaliyordu.
 // L-273: kisi sayisi pax'ta, ama phase10'un guest_count/adults sutunlari varsayilan
 //   2 kaliyor ve misafir mesaj motoru once guest_count'u okuyordu.
+// L-274: iptal edilen kaporali rezervasyonun detayi "Tahsil edilecek 20.000 · Kalan
+//   15.000" diyordu; iade/mahsup soylenmiyordu.
 const fs = require('fs');
 const path = require('path');
 
@@ -403,6 +405,34 @@ async function L273() {
   check(c2.guest_count === '', 'L-273b Kisi sayisi bilinmiyorsa 2 uydurulmaz', JSON.stringify(c2.guest_count));
 }
 
+// ---------------------------------------------------------------------------
+// L-274 iptal edilen kaporali rezervasyon tahsilat beklemez, iade/mahsup soylenir
+// ---------------------------------------------------------------------------
+async function L274() {
+  sahteDom();
+  const App = require('../app.js');
+  let panel = null;
+  global.SidePanel = { open(o) { panel = o; }, close() {} };
+  const rez = { id: BOOK_1, dbId: BOOK_1, propertyId: PROP_A, villa: 'DENE', guest: 'TEST Kısmi', checkIn: '2026-11-20', checkOut: '2026-11-22', gross: 20000, pax: 2, channel: 'Direct', status: 'CANCELLED' };
+  kur(App, {
+    bookings: [rez],
+    bookingPayments: [{ id: 'p1', booking_id: BOOK_1, kind: 'DEPOSIT', amount: 5000, paid_on: '2026-10-20', method: 'CASH' }],
+    bookingPaymentBalances: [{ booking_id: BOOK_1, amount_due: 20000, paid_total: 5000, remaining: 15000 }]
+  });
+  App.openBookingDetailsPanel(BOOK_1);
+  const html = panel ? panel.bodyHtml : '';
+  check(!/Kalan<\/span><strong>15\.000/.test(html) && !/Tahsil edilecek<\/span><strong>20\.000/.test(html),
+    'L-274a Iptal rezervasyonda tahsil edilecek ve kalan gosterilmez', (html.match(/booking-payment-summary[\s\S]{0,400}/) || [''])[0]);
+  check(/iade/i.test(html) && /5\.000/.test(html), 'L-274b Alinan kapora icin iade/mahsup uyarisi cikar');
+  check(!/data-onclick="saveBookingPayment/.test(html), 'L-274c Iptal rezervasyona yeni tahsilat formu sunulmaz');
+  // Iptal edilmemis rezervasyonda ozet aynen kalir.
+  App.getAppData().bookings[0].status = 'CONFIRMED';
+  App.openBookingDetailsPanel(BOOK_1);
+  check(/Kalan<\/span><strong>15\.000/.test(panel.bodyHtml), 'L-274d Aktif rezervasyonda kalan tutar gorunur');
+  delete global.SidePanel;
+  check(/CANCELLED[\s\S]{0,300}paid_total[\s\S]{0,300}iade/.test(functionBody(read('app.js'), 'async function saveBooking(')), 'L-274e Iptal kaydedilirken tahsilat varsa iade/mahsup notu verilir');
+}
+
 async function main() {
   try {
     await L304();
@@ -414,6 +444,7 @@ async function main() {
     await L308();
     await L272();
     await L273();
+    await L274();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));
