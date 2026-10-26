@@ -654,7 +654,8 @@ async function bildirimDavranisi() {
   check(sahip.every(e => /^[a-z_]{3,40}:[A-Za-z0-9_:.-]{1,200}$/.test(e.event_key) && ['TEAM', 'OPERATIONS', 'FINANCE', 'SALES', 'PRICING'].includes(e.domain)
     && (!e.deep_link || /^[a-z]+(:[A-Za-z0-9_.-]{1,80}){0,2}$/.test(e.deep_link))),
     'L-192l Uretilen her olay phase93 dogrulamasindan gecer');
-  check(NF.typesForRole('owner').length === 7 && NF.typesForRole('sales').length === 4,
+  // L-311: bugunun giris/cikisi (member) ve geciken gorev (manage) eklendi.
+  check(NF.typesForRole('owner').length === 10 && NF.typesForRole('sales').length === 6,
     'L-192m Bos merkezde rolun alacagi bildirim turleri aciklanir');
 
   const app = read('app.js');

@@ -41,7 +41,10 @@
     { type: 'period_unclosed', need: 'manage', label: 'Geçen ay kapatılmadı', detail: 'Biten ayda kayıt var ama ay kapanışı yapılmadı.' },
     { type: 'collection_due', need: 'readSales', label: 'Tahsilat bekliyor', detail: 'Kanalın tahsilat günü geldi ya da geçti (doğrudan kanalda çıkış günü; Booking, Etstur gibi kanallarda Ayarlar → Kanallar → Tahsilat günü) ve ödeme kayıtları tutarı karşılamıyor. Platformun komisyonu açık sayılmaz. Ödeme girilince kendiliğinden kapanır.' },
     { type: 'lead_followup', need: 'readSales', label: 'Talebin takip zamanı geldi', detail: 'Takip tarihi bugün ya da geçmiş, açık talepler. Satış rolü yalnız kendisine atanan ve atanmamış talepleri görür.' },
-    { type: 'revenue_opportunity', need: 'writeSales', label: 'Kazanç fırsatı: boş gece', detail: 'Önümüzdeki 30 gün içinde iki rezervasyon arasında kalan 1–4 gecelik gerçek boşluk.' }
+    { type: 'revenue_opportunity', need: 'writeSales', label: 'Kazanç fırsatı: boş gece', detail: 'Önümüzdeki 30 gün içinde fiyat takviminin "boş gece" saydığı, iki rezervasyon arasında kalan kısa boşluk (minimum gece kuralına takılanlar hariç).' },
+    { type: 'stay_arrival', need: 'member', label: 'Bugün giriş', detail: 'Bugün girişi olan ve henüz "içeride" işaretlenmemiş rezervasyon. Giriş yapılınca kapanır.' },
+    { type: 'stay_departure', need: 'member', label: 'Bugün çıkış', detail: 'Bugün çıkışı olan ve henüz "çıkış yaptı" işaretlenmemiş rezervasyon. Çıkış yapılınca kapanır.' },
+    { type: 'task_overdue', need: 'manage', label: 'Geciken görev', detail: 'Bitiş zamanı geçmiş, tamamlanmamış ve iptal edilmemiş genel görev.' }
   ];
 
   function izinli(rol, gerek) { return (ROLLER[gerek] || []).includes(rol); }
@@ -168,16 +171,59 @@
       });
     }
 
+    // Bugunun girisi ve cikisi (L-311): durum ilerleyince olay biter, satir RESOLVED olur.
+    if (izinli(rol, 'member')) {
+      (g.bookings || []).forEach(b => {
+        const durum = String(b.status || '').toUpperCase();
+        // Toplu aktarim ozeti gercek konaklama degildir; tanim app.js'ten (guest_crm_engine).
+        if (!b.id || durum === 'CANCELLED' || (typeof g.isBulkSummary === 'function' && g.isBulkSummary(b))) return;
+        if (b.checkIn === bugun && durum === 'CONFIRMED') {
+          olaylar.push({
+            event_key: anahtar('stay_arrival', b.id), domain: 'OPERATIONS', severity: 'INFO',
+            title: `Bugün giriş: ${b.guest || 'Misafir adı yok'} (${mulkAdi(b.villa)})`,
+            message: 'Misafir gelince rezervasyonu "İçeride" olarak işaretleyin.',
+            deep_link: `booking:${String(b.id).replace(/[^A-Za-z0-9_.-]/g, '-')}`, at: bugun
+          });
+        }
+        if (b.checkOut === bugun && durum !== 'CHECKED_OUT') {
+          olaylar.push({
+            event_key: anahtar('stay_departure', b.id), domain: 'OPERATIONS', severity: 'INFO',
+            title: `Bugün çıkış: ${b.guest || 'Misafir adı yok'} (${mulkAdi(b.villa)})`,
+            message: 'Çıkıştan sonra rezervasyonu "Çıkış yaptı" olarak işaretleyin; çıkış temizliği planlıdır.',
+            deep_link: `booking:${String(b.id).replace(/[^A-Za-z0-9_.-]/g, '-')}`, at: bugun
+          });
+        }
+      });
+    }
+
+    // Geciken genel gorev (L-311).
+    if (izinli(rol, 'manage') && g.now) {
+      (g.operationalTasks || []).forEach(t => {
+        const durum = String(t.status || '').toUpperCase();
+        if (!t.id || !t.due_at || durum === 'DONE' || durum === 'CANCELLED' || !(String(t.due_at) < String(g.now))) return;
+        const gun = String(t.due_at).slice(0, 10);
+        olaylar.push({
+          event_key: anahtar('task_overdue', t.id), domain: 'OPERATIONS', severity: 'WARNING',
+          title: `Geciken görev: ${t.title || 'başlıksız'}`,
+          message: `Bitiş ${trTarih(gun)} idi; görev tamamlanmadı.`,
+          deep_link: 'operations:tasks', at: gun
+        });
+      });
+    }
+
     if (izinli(rol, 'readSales')) {
       const gunu = typeof g.followUpDate === 'function' ? g.followUpDate : ts => String(ts || '').slice(0, 10);
       (g.followUps || []).forEach(l => {
         if (!l.id || !l.nextFollowUpAt) return;
         if (rol === 'sales' && l.assignedTo && l.assignedTo !== g.currentUserId) return;
         const gun = gunu(l.nextFollowUpAt);
+        // Bugunun takip saati gectiyse uyaridir (L-311): "bugun" INFO yaziyordu.
+        const saatGecti = gun === bugun && g.now && Date.parse(l.nextFollowUpAt) < Date.parse(g.now);
+        const saat = typeof g.followUpTime === 'function' ? g.followUpTime(l.nextFollowUpAt) : '';
         olaylar.push({
-          event_key: anahtar('lead_followup', l.id, gun), domain: 'SALES', severity: gun < bugun ? 'WARNING' : 'INFO',
+          event_key: anahtar('lead_followup', l.id, gun), domain: 'SALES', severity: gun < bugun || saatGecti ? 'WARNING' : 'INFO',
           title: `Takip zamanı: ${l.guestName || l.guest || 'Ad girilmedi'}`,
-          message: gun < bugun ? `Takip tarihi ${trTarih(gun)} idi; geçti.` : 'Takip tarihi bugün.',
+          message: gun < bugun ? `Takip tarihi ${trTarih(gun)} idi; geçti.` : saatGecti ? `Takip saati${saat ? ' ' + saat : ''} geçti.` : 'Takip tarihi bugün.',
           deep_link: `lead:${String(l.id).replace(/[^A-Za-z0-9_.-]/g, '-')}`, at: gun
         });
       });

@@ -20370,6 +20370,12 @@ function buildNotificationFeedInput() {
     previousMonthHasRecords,
     followUps: canReadSalesRole(role) ? getLeadSalesView().followUpsToday : [],
     followUpDate: istanbulDateKey,
+    followUpTime: ts => toIstanbulDateTimeLocal(ts).slice(11, 16),
+    now: new Date().toISOString(),
+    // L-311: bugunun giris/cikisi ve geciken genel gorevler.
+    bookings: data.bookings || [],
+    isBulkSummary: isBulkSummaryBooking,
+    operationalTasks: data.operationalTasks || [],
     gapNights: canWriteSalesRole(role) ? detectGapNights() : [],
     unpaidBookings: canReadSalesRole(role) ? getUnpaidDirectBookings(data) : []
   };

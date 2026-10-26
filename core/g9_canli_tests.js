@@ -57,6 +57,8 @@
 // L-290: "WhatsApp'ta ac" sablon secilmezse sessiz kaliyor; talep duzenlemede kisi sayisi alani yoktu.
 // L-312: pencereler klavyeyle kullanilamiyordu: acilista odak iceri gecmiyor, odak tuzagi
 //   yok, Esc kapatmiyordu.
+// L-311: bildirim akisi giris/cikis ve geciken genel gorev icin bildirim uretmiyor, saati
+//   gecmis takibi "bugun" (INFO) yaziyordu.
 const fs = require('fs');
 const path = require('path');
 
@@ -1066,6 +1068,41 @@ async function L312() {
   check(/installModalKeyboardSupport\(\)/.test(read('app.js')), 'L-312g Klavye destegi acilista kurulur');
 }
 
+// ---------------------------------------------------------------------------
+// L-311 bildirim akisi: bugunku giris/cikis, geciken gorev, saati gecmis takip
+// ---------------------------------------------------------------------------
+async function L311() {
+  const NF = require('./notification_feed.js');
+  const girdi = {
+    role: 'owner', today: '2026-10-26', now: '2026-10-26T08:00:00Z', villas: { DENE: { name: 'Deneme Evi' } },
+    bookings: [
+      { id: 'b1', guest: 'TEST Giriş', villa: 'DENE', checkIn: '2026-10-26', checkOut: '2026-10-28', status: 'CONFIRMED' },
+      { id: 'b2', guest: 'TEST İçeride', villa: 'DENE', checkIn: '2026-10-26', checkOut: '2026-10-27', status: 'CHECKED_IN' },
+      { id: 'b3', guest: 'TEST Çıkış', villa: 'DENE', checkIn: '2026-10-24', checkOut: '2026-10-26', status: 'CHECKED_IN' },
+      { id: 'b4', guest: 'TEST İptal', villa: 'DENE', checkIn: '2026-10-26', checkOut: '2026-10-28', status: 'CANCELLED' }
+    ],
+    operationalTasks: [
+      { id: 't1', title: 'TEST geciken', status: 'TODO', due_at: '2026-10-25T10:00:00Z' },
+      { id: 't2', title: 'TEST bitmiş', status: 'DONE', due_at: '2026-10-25T10:00:00Z' },
+      { id: 't3', title: 'TEST ileride', status: 'TODO', due_at: '2026-10-27T10:00:00Z' }
+    ],
+    followUps: [{ id: 'l1', guestName: 'TEST Takip', nextFollowUpAt: '2026-10-26T06:00:00Z' }],
+    followUpDate: ts => String(ts).slice(0, 10)
+  };
+  const olaylar = NF.deriveNotifications(girdi);
+  const anahtarlar = olaylar.map(o => o.event_key);
+  check(anahtarlar.includes('stay_arrival:b1') && !anahtarlar.includes('stay_arrival:b2') && !anahtarlar.includes('stay_arrival:b4'),
+    'L-311a Bugun girisi beklenen rezervasyon bildirimi uretilir (giris yapilmis ve iptal haric)', JSON.stringify(anahtarlar));
+  check(anahtarlar.includes('stay_departure:b3'), 'L-311b Bugun cikisi beklenen rezervasyon bildirimi uretilir');
+  check(anahtarlar.includes('task_overdue:t1') && !anahtarlar.some(k => /t2|t3/.test(k)), 'L-311c Suresi gecmis acik genel gorev bildirimi uretilir');
+  const takip = olaylar.find(o => /^lead_followup/.test(o.event_key));
+  check(takip && takip.severity === 'WARNING' && /geçti/.test(takip.message), 'L-311d Saati gecmis takip "bugun" INFO degil, gecti uyarisidir', JSON.stringify(takip));
+  check(NF.TURLER.some(t => t.type === 'stay_arrival') && NF.TURLER.some(t => t.type === 'task_overdue') && !NF.TURLER.find(t => t.type === 'revenue_opportunity').detail.includes('1–4'),
+    'L-311e Bildirim katalogu yeni olaylari ve guncel bos gece tanimini yazar');
+  check(/bookings: data\.bookings/.test(functionBody(read('app.js'), 'function buildNotificationFeedInput(')) && /operationalTasks/.test(functionBody(read('app.js'), 'function buildNotificationFeedInput(')),
+    'L-311f Uygulama rezervasyon ve gorevleri bildirim akisina verir');
+}
+
 async function main() {
   try {
     await L304();
@@ -1104,6 +1141,7 @@ async function main() {
     await L289();
     await L290();
     await L312();
+    await L311();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));
