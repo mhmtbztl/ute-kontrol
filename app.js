@@ -11972,11 +11972,10 @@ function renderManageLeadsTable() {
 
   // Liste kanbanla ayni satirlari (kaynak dahil) ayni sirada gosterir.
   const searchVal = (document.getElementById('leadSearchInput')?.value || '').trim();
-  const searchDigits = searchVal.replace(/\D/g, '');
   const leads = getLeadSalesView().rows.filter(l => {
     if (!searchVal) return true;
     return searchMatches(searchVal, [l.guest, l.guestName, leadPropertyLabel(l), l.villa, l.channel, l.sourceLabel, l.notes])
-      || (searchDigits.length >= 3 && String(l.phone || '').replace(/\D/g, '').includes(searchDigits));
+      || searchTextApi().phoneMatches(searchVal, l.phone);
   });
   if (!leads.length) {
     tbody.innerHTML = `<tr><td colspan="8" class="empty-state">${searchVal ? 'Aramaya uyan talep yok.' : 'Henüz talep yok.'}</td></tr>`;

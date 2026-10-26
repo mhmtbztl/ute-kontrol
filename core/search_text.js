@@ -22,7 +22,7 @@
     return String(value == null ? '' : value)
       .toLocaleLowerCase('tr-TR')
       .normalize('NFD')
-      .replace(/[̀-ͯ]/g, '')
+      .replace(/\p{M}/gu, '')
       .replace(/[ıçşğöüâîû]/g, ch => HARF[ch] || ch)
       .replace(/\s+/g, ' ')
       .trim();
@@ -35,5 +35,24 @@
     return (values || []).some(v => fold(v).includes(q));
   }
 
-  return { fold, matches };
+  // Telefon aramasi (L-303): rakamlar karsilastirilir; Turkiye ulke kodu (90)
+  // ve bastaki 0 iki taraftan da atilir. "0555 000 00 02", "+90 555 000 00 02"
+  // ve "5550000002" ayni numaradir. En az 3 rakam gerekir.
+  function phoneKey(value) {
+    let d = String(value == null ? '' : value).replace(/\D/g, '');
+    if (d.length === 12 && d.startsWith('90')) d = d.slice(2);
+    if (d.length === 11 && d.startsWith('0')) d = d.slice(1);
+    return d;
+  }
+
+  function phoneMatches(query, phone) {
+    const qRaw = String(query == null ? '' : query).replace(/\D/g, '');
+    if (qRaw.length < 3) return false;
+    const p = phoneKey(phone);
+    if (!p) return false;
+    const q = phoneKey(qRaw);
+    return p.includes(q) || p.includes(qRaw);
+  }
+
+  return { fold, matches, phoneKey, phoneMatches };
 });

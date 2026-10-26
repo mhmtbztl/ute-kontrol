@@ -40,6 +40,7 @@
 // L-298: odemeli rezervasyon silinirken once "emin misiniz?" soruluyor, sonra reddediliyordu.
 // L-296: rezervasyon detay paneli silmeden sonra ve sekme degisince acik kaliyordu.
 // L-297: sifirlama menusu admin rolune de gorunuyordu (yalniz owner calistirabilir).
+// L-303: misafir aramasi "0555 000 00 02" / "+90 555 000 00 02" bicimli telefonu bulmuyordu.
 const fs = require('fs');
 const path = require('path');
 
@@ -784,6 +785,25 @@ async function L297() {
   check(!acildi, 'L-297d Admin sifirlama penceresini acamaz');
 }
 
+// ---------------------------------------------------------------------------
+// L-303 misafir aramasi bicimli telefonu bulur
+// ---------------------------------------------------------------------------
+async function L303() {
+  const G = require('./guest_crm_engine.js');
+  const satir = { name: 'TEST Misafir', phone: '+905550000002', email: '', bookings: [], lifecycle: { code: 'POST_STAY' } };
+  const bul = q => G.filterGuestRows([satir], { query: q }).length === 1;
+  check(['0555 000 00 02', '+90 555 000 00 02', '5550000002', '0555-000-0002', '000 00 02'].every(bul),
+    'L-303a Misafir aramasi bosluklu, +90 ve 0 ile baslayan telefonu bulur', ['0555 000 00 02', '+90 555 000 00 02'].map(q => q + '=' + bul(q)).join(' '));
+  check(!bul('0555 000 00 03'), 'L-303b Farkli numara eslesmez');
+  check(G.filterGuestRows([satir], { query: 'bozatli' }).length === 0 && G.filterGuestRows([{ ...satir, name: 'Bozatlı' }], { query: 'bozatli' }).length === 1,
+    'L-303c Sapkasiz yazim ayni katlamayla bulunur');
+  // Talep aramasi ayni telefon kuralini kullanir.
+  const ST = require('./search_text.js');
+  check(typeof ST.phoneMatches === 'function' && ST.phoneMatches('+90 555 000 0044', '05550000044') && ST.phoneMatches('0555 000 0044', '+905550000044'),
+    'L-303d Ortak telefon eslesmesi ulke kodu ve bastaki 0 farkini tolere eder');
+  check(/phoneMatches/.test(functionBody(read('app.js'), 'function renderManageLeadsTable(')), 'L-303e Talep aramasi ortak telefon eslesmesini kullanir');
+}
+
 async function main() {
   try {
     await L304();
@@ -809,6 +829,7 @@ async function main() {
     await L298();
     await L296();
     await L297();
+    await L303();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

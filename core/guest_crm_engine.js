@@ -215,7 +215,7 @@
       }
       if (!query) return true;
       // Ayni katlama (L-302): "bozatli" Bozatlı'yı, Ingilizce "I" bozulmadan bulunur.
-      return SearchText.matches(query, [row.name, row.phone, row.email]);
+      return SearchText.matches(query, [row.name, row.phone, row.email]) || SearchText.phoneMatches(query, row.phone);
     });
     const sort = String(options.sort || 'RECENT');
     const direction = String(options.direction || 'DESC') === 'ASC' ? 1 : -1;
