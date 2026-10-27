@@ -95,6 +95,22 @@ Yeni politika veya arayüz kapısı için bağımsız `['owner', ...]` dizisi
 yazmayın. `sales` ve `staff` finans RPC'lerini çağırmaz; `staff` yalnız dar
 alan-işi RPC'leriyle kendi görevini görür ve ilerletir.
 
+**Kişi bazında izin matrisi (L-211, phase107, kullanıcı 27.10.2026).** Tablo
+yukarıdaki rol **varsayılanıdır**; sahip her üyenin `sales.read`, `sales.write`,
+`ledger.read`, `ledger.write`, `operations.manage` iznini ayrı ayrı değiştirir
+(Ayarlar → Ekip → İzinler, `set_member_permissions`). Yeni iki yetki:
+`can_write_ledger` (gider, gelir, şablon, aktarım, hedef, ay kapanışı) ve
+`can_manage_operations` (temizlik, arıza, görev, saha ekibi, kontrol listesi);
+istemcide `canWriteLedgerRole` / `canManageOperationsRole`. Yazma okumayı içerir.
+**Yönetim (`can_manage_tenant`) izinle verilmez**, sahibin izinleri değişmez.
+Varsayılan tablo iki yerde ve **aynı** olmak zorunda: `fn_permission_default`
+(SQL) ve `core/permission_matrix.js` (`permission_matrix_tests` A1 karşılaştırır).
+Finans ya da operasyon tablosuna yeni yazma politikası/RPC'si eklerken
+`can_manage_tenant` değil bu iki fonksiyonu kullanın. **Tuzak (yaşandı):**
+`tenant_members` ile `tenants`'ın ikisine birden FK veren yeni bir tablo PostgREST'te
+ikinci ilişki yolu açar ve giriş sorgusunu (`tenant_members.select('…, tenants(…)')`)
+`PGRST201` ile düşürür; izin tablosu bu yüzden yalnız üyeliğe bağlıdır.
+
 ### 3.4 Finansal hesaplama — USALI
 K-04 sözleşmesi (kullanıcı kararı 23–25 Eylül 2026; phase45):
 ```

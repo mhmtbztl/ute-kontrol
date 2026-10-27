@@ -298,14 +298,14 @@
               <small>Giriş, çıkış, misafir ve fiyat kaydı</small>
             </div>
           </button>
-          <button type="button" class="dropdown-item" data-onclick="openNewCleaningTaskModal(); closeAllHeaderDropdowns();">
+          <button data-operations-only type="button" class="dropdown-item" data-onclick="openNewCleaningTaskModal(); closeAllHeaderDropdowns();">
             <span class="dropdown-icon">🧹</span>
             <div>
               <strong>Temizlik & Borç Kaydı Ekle</strong>
               <small>Personel temizlik hakedişi ve ödeme takibi</small>
             </div>
           </button>
-          <button type="button" class="dropdown-item" data-onclick="openExpenseModal(); closeAllHeaderDropdowns();">
+          <button data-ledger-write-only type="button" class="dropdown-item" data-onclick="openExpenseModal(); closeAllHeaderDropdowns();">
             <span class="dropdown-icon">💸</span>
             <div>
               <strong>Gider / Yatırım Ekle</strong>
@@ -333,7 +333,7 @@
               <small>Telefon ve kaynakla hızlı talep kaydı</small>
             </div>
           </button>
-          <button type="button" class="dropdown-item" data-onclick="openMaintModal(); closeAllHeaderDropdowns();">
+          <button data-operations-only type="button" class="dropdown-item" data-onclick="openMaintModal(); closeAllHeaderDropdowns();">
             <span class="dropdown-icon">🛠️</span>
             <div>
               <strong>Arıza / Bakım İşi Bildir</strong>
@@ -696,7 +696,7 @@
             </div>
           </div>
           <button class="btn btn-secondary btn-sm" data-onclick="openGoalsModal()">⚙️ Hedefleri Düzenle</button>
-          <button class="btn btn-secondary btn-sm" data-onclick="openExpenseModal()">+ Gider Girişi</button>
+          <button data-ledger-write-only class="btn btn-secondary btn-sm" data-onclick="openExpenseModal()">+ Gider Girişi</button>
         </div>
       </section>
 
@@ -928,8 +928,8 @@
             <p class="sub-text">Gider kalemlerinin toplam bütçe ve ciro içindeki payları ile geçen aya göre değişimleri</p>
           </div>
           <div data-lx-style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button class="btn btn-secondary btn-sm" data-onclick="openCopyPreviousExpensesPanel()">Geçen ayın giderlerini kopyala</button>
-            <button class="btn btn-primary btn-sm" data-onclick="openExpenseModal()">+ Yeni Gider / Harcama Ekle</button>
+            <button data-ledger-write-only class="btn btn-secondary btn-sm" data-onclick="openCopyPreviousExpensesPanel()">Geçen ayın giderlerini kopyala</button>
+            <button data-ledger-write-only class="btn btn-primary btn-sm" data-onclick="openExpenseModal()">+ Yeni Gider / Harcama Ekle</button>
           </div>
         </div>
 
@@ -1309,7 +1309,7 @@
           <div><h2>💸 Gider ve yatırım defteri</h2><p class="sub-text">Tüm operasyonel (Opex) ve yatırım (Capex) harcamaları.</p></div>
           <div class="table-actions">
             <input type="text" id="expSearchInput" placeholder="🔍 Açıklama veya Kategori ara..." data-oninput="renderExpensesTable()">
-            <button class="btn btn-primary" data-onclick="openExpenseModal()">+ Yeni Gider Ekle</button>
+            <button data-ledger-write-only class="btn btn-primary" data-onclick="openExpenseModal()">+ Yeni Gider Ekle</button>
           </div>
         </div>
         <div class="table-responsive">
@@ -1380,7 +1380,7 @@
             <input type="text" id="hkSearchInput" placeholder="🔍 Ev, misafir, personel ara..." data-oninput="renderHousekeepingTab()" data-lx-style="width: 220px; font-size: 12px; padding: 6px 12px; background: rgba(0,0,0,0.4); color: #fff; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px;">
             <button class="btn btn-secondary btn-sm" data-onclick="markSelectedCleaningDone()" data-lx-style="font-size: 12px; font-weight: 700;" title="Listede işaretlediğiniz planlı temizlikleri planlandıkları gün yapılmış sayar">✔ Seçilenler Yapıldı</button>
             <button class="btn btn-warning btn-sm" data-onclick="payAllPendingCleaning()" data-lx-style="font-size: 12px; font-weight: 700; background: #FF9F0A; color: #000;">💳 Tüm Borcu Öde</button>
-            <button class="btn btn-primary btn-sm" data-onclick="openNewCleaningTaskModal()" data-lx-style="font-size: 12px; font-weight: 700;">+ Yeni Temizlik Ekle</button>
+            <button data-operations-only class="btn btn-primary btn-sm" data-onclick="openNewCleaningTaskModal()" data-lx-style="font-size: 12px; font-weight: 700;">+ Yeni Temizlik Ekle</button>
           </div>
         </div>
         <div class="table-responsive">
@@ -1603,7 +1603,7 @@
       <section class="card">
         <div class="section-title-bar">
           <div><h2>🛠️ Bakım, onarım ve arıza defteri</h2><p class="sub-text">P1, P2 ve P3 arıza kayıtları.</p></div>
-          <button class="btn btn-primary" data-onclick="openMaintModal()">+ Yeni Arıza Ekle</button>
+          <button data-operations-only class="btn btn-primary" data-onclick="openMaintModal()">+ Yeni Arıza Ekle</button>
         </div>
         <div class="table-responsive">
           <table class="data-table">
@@ -1961,8 +1961,8 @@
             <p class="sub-text">Temizlik, arıza ve ekip görevlerini tek yerden yönetin.</p>
           </div>
           <div data-lx-style="display: flex; gap: 8px;">
-            <button class="btn btn-primary btn-sm" data-onclick="openNewCleaningTaskModal()">+ Temizlik Görevi Ekle</button>
-            <button class="btn btn-primary btn-sm" data-onclick="openMaintModal()">+ Arıza Bildir</button>
+            <button data-operations-only class="btn btn-primary btn-sm" data-onclick="openNewCleaningTaskModal()">+ Temizlik Görevi Ekle</button>
+            <button data-operations-only class="btn btn-primary btn-sm" data-onclick="openMaintModal()">+ Arıza Bildir</button>
           </div>
         </div>
         <div class="subpage-switch operations-switch" role="tablist" aria-label="Operasyon görünümü">
@@ -2631,6 +2631,26 @@
   <!-- ======================================================= -->
   <!-- MODAL: EKİBE ÜYE DAVET ET                               -->
   <!-- ======================================================= -->
+  <!-- KISI BAZINDA IZINLER (L-211) -->
+  <div class="modal-backdrop" id="memberPermissionsModal">
+    <div class="modal-card" data-lx-style="max-width: 520px;">
+      <div class="modal-header">
+        <h3 id="memberPermissionsTitle">🔐 İzinler</h3>
+        <button class="close-btn" data-onclick="closeMemberPermissionsModal()">&times;</button>
+      </div>
+      <div data-lx-style="padding: 20px;">
+        <p class="sub-text" id="memberPermissionsRoleNote"></p>
+        <div id="memberPermissionsList"></div>
+        <p class="sub-text" data-lx-style="margin-top: 12px;">Yönetim (mülk, ayar, ekip) role bağlıdır. Yazma izni görmeyi de açar; görme kapanırsa yazma da kapanır. Rol değişirse kişiye özel izinler silinir.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-onclick="resetMemberPermissionsToRole()">Rol varsayılanına dön</button>
+        <button type="button" class="btn btn-secondary" data-onclick="closeMemberPermissionsModal()">Vazgeç</button>
+        <button type="button" class="btn btn-primary" id="memberPermissionsSaveBtn" data-onclick="saveMemberPermissionsFromModal()">Kaydet</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-backdrop" id="inviteMemberModal">
     <div class="modal-card" data-lx-style="max-width: 520px;">
       <div class="modal-header">
@@ -4143,12 +4163,13 @@
   <script src="core/side_panel.js?v=d763b464"></script>
   <script src="core/notification_feed.js?v=941306f6"></script>
   <script src="core/command_search.js?v=89760933"></script>
-  <script src="core/action_dispatch.js?v=40fc0b50"></script>
+  <script src="core/action_dispatch.js?v=3ad5c8f4"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=ca7b5399"></script>
-  <script src="core/tenant_backup_export.js?v=820fdf51"></script>
+  <script src="core/permission_matrix.js?v=e3a3cef2"></script>
+  <script src="core/tenant_backup_export.js?v=2f2292a6"></script>
   <script src="core/ui_dialog.js?v=d0680970"></script>
-  <script src="app.js?v=e276397e"></script>
+  <script src="app.js?v=ba24cbc9"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=e45a0e9a"></script>

@@ -5960,8 +5960,8 @@ function startIncomeEntry(kind) {
 }
 
 function openIncomeModal(editId = null) {
-  if (!canManageTenantRole(activeTenant?.role)) {
-    if (typeof showToast === 'function') showToast('Gelir kaydını yalnız işletme yönetimi girebilir.', 'error');
+  if (!canWriteLedgerRole(activeTenant?.role)) {
+    if (typeof showToast === 'function') showToast('Gelir kaydı girmek için finans kaydı izni gerekir.', 'error');
     return false;
   }
   const modal = document.getElementById('incomeModal');
@@ -5996,7 +5996,7 @@ async function saveIncomeEntry(event) {
   if (event && typeof event.preventDefault === 'function') event.preventDefault();
   const tenantId = getActiveTenantId();
   try {
-    if (!canManageTenantRole(activeTenant?.role)) throw new Error('Gelir kaydını yalnız işletme yönetimi girebilir.');
+    if (!canWriteLedgerRole(activeTenant?.role)) throw new Error('Gelir kaydı girmek için finans kaydı izni gerekir.');
     requireCloudForWrite('Gelir', tenantId);
     const editId = document.getElementById('incEditId')?.value || '';
     const villa = document.getElementById('incVilla')?.value || 'ALL';
@@ -6039,7 +6039,7 @@ async function deleteIncomeEntry(id) {
   const kayit = (appData.incomeEntries || []).find(i => i.id === id);
   if (!kayit) return false;
   try {
-    if (!canManageTenantRole(activeTenant?.role)) throw new Error('Gelir kaydını yalnız işletme yönetimi silebilir.');
+    if (!canWriteLedgerRole(activeTenant?.role)) throw new Error('Gelir kaydını silmek için finans kaydı izni gerekir.');
     if (isPeriodClosed(kayit.date)) throw new Error(`Bu kayıt kapatılmış döneme (${kayit.month}) ait; silinemez.`);
     if (!(await uiAskConfirm('Bu gelir kaydını silmek istediğinizden emin misiniz?'))) return false;
     const tenantId = getActiveTenantId();
@@ -6082,7 +6082,7 @@ function renderIncomeSection(ledger) {
     govde.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:16px;color:var(--text-muted);">Bu dönemde elle girilmiş gelir kaydı yok.</td></tr>';
     return;
   }
-  const yonetir = canManageTenantRole(activeTenant?.role);
+  const yonetir = canWriteLedgerRole(activeTenant?.role);
   govde.innerHTML = satirlar.map(i => `<tr>
       <td>${formatTrDate(i.date)}</td>
       <td><span class="badge ${i.type === 'CAPITAL' ? 'badge-amber' : 'badge-green'}">${escapeHtml(INCOME_TYPE_LABELS[i.type])}</span></td>
@@ -9954,20 +9954,56 @@ const TEAM_ROLES = {
   viewer:  { label: 'İzleyici',  badge: 'badge-rose',    hint: 'Yalnızca görüntüler, hiçbir veriyi değiştiremez.' }
 };
 
+// Yonetim (mulk, ayar, ekip) role baglidir; izinle verilemez (L-211).
 function canManageTenantRole(role = activeTenant?.role) {
   return ['owner', 'admin', 'manager'].includes(role);
 }
 
+// Kisi bazinda izin matrisi (L-211, phase107): rol baslangic paketidir, sahip
+// uye bazinda satis, finans ve operasyon izinlerini degistirir. Kayit yalniz
+// aktif kullanicinin KENDI rolu soruldugunda uygulanir (activeTenant.permissions).
+function getPermissionMatrix() {
+  if (typeof PermissionMatrix !== 'undefined') return PermissionMatrix;
+  return require('./core/permission_matrix.js');
+}
+
+function activePermissionOverrides(role) {
+  return activeTenant && role === activeTenant.role ? (activeTenant.permissions || {}) : {};
+}
+
 function canReadLedgerRole(role = activeTenant?.role) {
-  return ['owner', 'admin', 'manager', 'viewer'].includes(role);
+  return getPermissionMatrix().allows(role, 'ledger.read', activePermissionOverrides(role));
 }
 
 function canReadSalesRole(role = activeTenant?.role) {
-  return ['owner', 'admin', 'manager', 'sales', 'viewer'].includes(role);
+  return getPermissionMatrix().allows(role, 'sales.read', activePermissionOverrides(role));
 }
 
 function canWriteSalesRole(role = activeTenant?.role) {
-  return ['owner', 'admin', 'manager', 'sales'].includes(role);
+  return getPermissionMatrix().allows(role, 'sales.write', activePermissionOverrides(role));
+}
+
+function canWriteLedgerRole(role = activeTenant?.role) {
+  return getPermissionMatrix().allows(role, 'ledger.write', activePermissionOverrides(role));
+}
+
+function canManageOperationsRole(role = activeTenant?.role) {
+  return getPermissionMatrix().allows(role, 'operations.manage', activePermissionOverrides(role));
+}
+
+// Aktif kullanicinin kendi izin kayitlari. Goc (phase107) uygulanmadan tablo
+// yoktur: rol varsayilani gecerlidir, ekran ayakta kalir.
+async function loadActiveMemberPermissions(tenantId) {
+  if (!activeTenant || !isCloudTenant(tenantId) || !activeSaaSUser?.id) return {};
+  try {
+    const { data, error } = await supabaseClient.from('tenant_member_permissions')
+      .select('permission, granted').eq('tenant_id', tenantId).eq('user_id', activeSaaSUser.id);
+    activeTenant.permissions = error ? {} : getPermissionMatrix().overridesFromRows(data);
+  } catch (e) {
+    activeTenant.permissions = {};
+  }
+  applyRoleNavigationVisibility();
+  return activeTenant.permissions;
 }
 
 function roleBadgeHtml(role) {
@@ -10054,6 +10090,103 @@ function formatTeamDate(value) {
   return d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
+// --- Kisi bazinda izinler (L-211, phase107) --------------------------------
+let teamMembersCache = [];
+let teamPermissionOverrides = {};
+let memberPermissionsEditing = null;
+
+async function loadTeamPermissionOverrides(tenantId) {
+  try {
+    const { data, error } = await supabaseClient.from('tenant_member_permissions')
+      .select('user_id, permission, granted').eq('tenant_id', tenantId);
+    if (error) return {};
+    const gruplar = {};
+    (data || []).forEach(row => { (gruplar[row.user_id] = gruplar[row.user_id] || []).push(row); });
+    return Object.fromEntries(Object.entries(gruplar).map(([u, rows]) => [u, getPermissionMatrix().overridesFromRows(rows)]));
+  } catch (e) {
+    return {};
+  }
+}
+
+function openMemberPermissionsModal(userId) {
+  const uye = teamMembersCache.find(m => m.user_id === userId);
+  const modal = document.getElementById('memberPermissionsModal');
+  if (!uye || !modal || activeTenant?.role !== 'owner' || uye.role === 'owner') return false;
+  const M = getPermissionMatrix();
+  const kayit = teamPermissionOverrides[userId] || {};
+  memberPermissionsEditing = { userId, role: uye.role };
+  document.getElementById('memberPermissionsTitle').textContent = `🔐 İzinler — ${uye.full_name || uye.email}`;
+  document.getElementById('memberPermissionsRoleNote').textContent = `Rol: ${(TEAM_ROLES[uye.role] || {}).label || uye.role}. İşaretler rolün başlangıç paketidir; değiştirdiğiniz izin yalnız bu kişiye uygulanır.`;
+  document.getElementById('memberPermissionsList').innerHTML = M.PERMISSIONS.map(p => {
+    const acik = M.granted(uye.role, p.key, kayit);
+    const varsayilan = M.defaultFor(uye.role, p.key) ? 'açık' : 'kapalı';
+    return `<label class="member-permission-row" style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.08);">
+      <input type="checkbox" data-permission="${p.key}" ${acik ? 'checked' : ''} data-onchange="onMemberPermissionToggle(this)">
+      <span><strong>${escapeHtml(p.label)}</strong><br><span class="sub-text">${escapeHtml(p.hint)} Rol varsayılanı: ${varsayilan}.</span></span>
+    </label>`;
+  }).join('');
+  modal.classList.add('active');
+  return true;
+}
+
+function closeMemberPermissionsModal() {
+  const modal = document.getElementById('memberPermissionsModal');
+  if (modal) modal.classList.remove('active');
+  memberPermissionsEditing = null;
+}
+
+// Yazma okumayi icerir: yazma acilinca okuma acilir, okuma kapaninca yazma kapanir.
+function onMemberPermissionToggle(el) {
+  const kutu = key => document.querySelector(`#memberPermissionsList input[data-permission="${key}"]`);
+  const izin = el && el.getAttribute('data-permission');
+  [['sales.read', 'sales.write'], ['ledger.read', 'ledger.write']].forEach(([oku, yaz]) => {
+    if (izin === yaz && el.checked && kutu(oku)) kutu(oku).checked = true;
+    if (izin === oku && !el.checked && kutu(yaz)) kutu(yaz).checked = false;
+  });
+}
+
+function resetMemberPermissionsToRole() {
+  if (!memberPermissionsEditing) return;
+  const M = getPermissionMatrix();
+  document.querySelectorAll('#memberPermissionsList input[data-permission]').forEach(kutu => {
+    kutu.checked = M.defaultFor(memberPermissionsEditing.role, kutu.getAttribute('data-permission'));
+  });
+}
+
+async function saveMemberPermissionsFromModal() {
+  if (!memberPermissionsEditing) return false;
+  const secim = {};
+  document.querySelectorAll('#memberPermissionsList input[data-permission]').forEach(kutu => { secim[kutu.getAttribute('data-permission')] = !!kutu.checked; });
+  const btn = document.getElementById('memberPermissionsSaveBtn');
+  if (btn) btn.disabled = true;
+  try {
+    const tamam = await saveMemberPermissions(memberPermissionsEditing.userId, memberPermissionsEditing.role, secim);
+    if (tamam) { closeMemberPermissionsModal(); renderTeamManagement(); }
+    return tamam;
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+// Izni degistiren tek yol sunucudaki set_member_permissions (yalniz sahip).
+async function saveMemberPermissions(userId, role, secim) {
+  if (activeTenant?.role !== 'owner') {
+    uiNotify('İzinleri yalnız işletme sahibi değiştirebilir.');
+    return false;
+  }
+  const istek = getPermissionMatrix().requestFromSelection(role, secim);
+  const { data, error } = await supabaseClient.rpc('set_member_permissions', {
+    p_tenant_id: getActiveTenantId(), p_user_id: userId, p_permissions: istek
+  });
+  if (error) {
+    const gocYok = /set_member_permissions|PGRST202|42883/.test(`${error.code} ${error.message}`);
+    uiNotify(gocYok ? 'İzinler kaydedilemedi: veritabanı göçü (phase107) henüz uygulanmamış.' : 'İzinler kaydedilemedi: ' + kullaniciMesaji(error.message || ''));
+    return false;
+  }
+  uiNotify('✅ İzinler kaydedildi. Kişi bir sonraki ekran yenilemesinde yeni izinlerle çalışır.');
+  return !!(data && data.success !== false);
+}
+
 async function renderTeamManagement() {
   const memberBody = document.getElementById('teamMembersTableBody');
   const inviteWrap = document.getElementById('pendingInvitationsWrap');
@@ -10086,6 +10219,8 @@ async function renderTeamManagement() {
   const canManageRoles = myRole === 'owner';
   const canInvite = myRole === 'owner' || myRole === 'admin';
   const ownerCount = (members || []).filter(m => m.role === 'owner').length;
+  teamMembersCache = members || [];
+  teamPermissionOverrides = canManageRoles ? await loadTeamPermissionOverrides(tenantId) : {};
 
   if (inviteBtn) inviteBtn.style.display = canInvite ? '' : 'none';
 
@@ -10110,6 +10245,11 @@ async function renderTeamManagement() {
     }
 
     const canRemove = canManageRoles && !m.is_self && !isLastOwner;
+    // Kisi bazinda izin (L-211): yalniz sahip, sahip olmayan uyeye verir.
+    const ozel = Object.keys(teamPermissionOverrides[m.user_id] || {}).length;
+    const izinDugmesi = canManageRoles && m.role !== 'owner'
+      ? `<button class="btn btn-secondary btn-sm" data-action="permissions" data-user="${escapeHtml(m.user_id)}">🔐 İzinler${ozel ? ' · özel' : ''}</button> `
+      : '';
     // Personel hesabı saha ekibine bağlanmadan temizliğe atanamaz (L-176).
     const inFieldTeam = (appData?.operationalPeople || []).some(person => person.user_id === m.user_id);
     const fieldCell = m.role === 'staff' && canManageTenantRole(myRole)
@@ -10117,10 +10257,10 @@ async function renderTeamManagement() {
         ? '<span class="sub-text" style="font-size:11px;">Saha ekibinde</span> '
         : `<button class="btn btn-secondary btn-sm" data-action="field" data-user="${escapeHtml(m.user_id)}">👷 Saha ekibine ekle</button> `)
       : '';
-    const actionCell = fieldCell + (canRemove
+    const actionCell = izinDugmesi + fieldCell + (canRemove
       ? `<button class="btn btn-secondary btn-sm" data-action="remove"
            data-user="${escapeHtml(m.user_id)}" data-email="${escapeHtml(m.email)}">Çıkar</button>`
-      : (fieldCell ? '' : '<span class="sub-text" style="font-size:11px;">—</span>'));
+      : (fieldCell || izinDugmesi ? '' : '<span class="sub-text" style="font-size:11px;">—</span>'));
 
     return `<tr>
       <td><strong>${escapeHtml(m.full_name)}</strong>${m.is_self ? ' <span class="sub-text" style="font-size:11px;">(siz)</span>' : ''}</td>
@@ -10182,6 +10322,8 @@ function bindTeamTableEvents() {
       if (el) removeTeamMember(el.dataset.user, el.dataset.email);
       const field = ev.target.closest('[data-action="field"]');
       if (field) addMemberToFieldTeam(field.dataset.user);
+      const izin = ev.target.closest('[data-action="permissions"]');
+      if (izin) openMemberPermissionsModal(izin.dataset.user);
     });
   }
 
@@ -18042,6 +18184,7 @@ async function cloudSaveHousekeepingOverride(villaKey, status) {
 async function loadTenantAppData(tenantIdOrUserId) {
   const targetId = tenantIdOrUserId || getActiveTenantId();
   scheduleXlsxEnginePreload();
+  if (isCloudTenant(targetId)) await loadActiveMemberPermissions(targetId);
 
   // 1. Supabase Cloud Source of Truth
   if (isCloudTenant(targetId)) {
@@ -18365,8 +18508,10 @@ function applyRoleNavigationVisibility() {
   const role = activeTenant?.role || 'viewer';
   const nav = document.querySelector('.nav-tabs');
   if (nav) nav.hidden = role === 'staff';
-  const hiddenTabs = new Set(['sales', 'staff'].includes(role) ? ['finance', 'marketing', 'settings'] : []);
+  const hiddenTabs = new Set(['sales', 'staff'].includes(role) ? ['marketing', 'settings'] : []);
   if (!canManageTenantRole(role)) hiddenTabs.add('settings');
+  // Finans sekmesi finans okuma iznine gore (L-211: satisa verilebilir, yoneticiden alinabilir).
+  if (!canReadLedgerRole(role)) hiddenTabs.add('finance');
   document.querySelectorAll('.nav-tabs .tab-btn').forEach(button => {
     const match = String(button.getAttribute('data-onclick') || '').match(/^switchTab\('([^']+)'\)$/);
     button.hidden = !!(match && hiddenTabs.has(match[1]));
@@ -18383,6 +18528,12 @@ function applyRoleNavigationVisibility() {
   });
   document.querySelectorAll('[data-ledger-only]').forEach(element => {
     element.hidden = !canReadLedgerRole(role);
+  });
+  document.querySelectorAll('[data-ledger-write-only]').forEach(element => {
+    element.hidden = !canWriteLedgerRole(role);
+  });
+  document.querySelectorAll('[data-operations-only]').forEach(element => {
+    element.hidden = !canManageOperationsRole(role);
   });
   // Veri sifirlama yalniz isletme sahibidir (reset_tenant_data, L-297): admin
   // dugmeyi goruyor, sunucu reddediyordu.
@@ -21621,7 +21772,7 @@ function linkableFieldMembers(currentUserId) {
 }
 
 function renderOperationsPeopleView() {
-  const canManage = canManageTenantRole(activeTenant?.role);
+  const canManage = canManageOperationsRole(activeTenant?.role);
   const people = (appData?.operationalPeople || []).slice()
     .sort((a, b) => Number(b.is_active !== false) - Number(a.is_active !== false) || String(a.full_name || '').localeCompare(String(b.full_name || ''), 'tr'));
   const members = new Map((appData?.salesMembers || []).map(member => [member.user_id, member]));
@@ -21815,7 +21966,7 @@ function isCleaningExecutionRefreshable(execution) {
 
 async function refreshUnstartedCleaningChecklists(executionIds = null) {
   const tenantId = getActiveTenantId();
-  if (!isCloudTenant(tenantId) || !canManageTenantRole(activeTenant?.role)) return { refreshed: 0, failed: 0 };
+  if (!isCloudTenant(tenantId) || !canManageOperationsRole(activeTenant?.role)) return { refreshed: 0, failed: 0 };
   const wanted = Array.isArray(executionIds) ? new Set(executionIds) : null;
   const targets = (appData?.cleaningExecutions || [])
     .filter(execution => (!wanted || wanted.has(execution.id)) && isCleaningExecutionRefreshable(execution));
@@ -24246,6 +24397,10 @@ if (typeof module !== 'undefined' && module.exports) {
     getImportEngine,
     buildImportSource,
     buildImportSourceAsync,
+    canWriteLedgerRole,
+    canManageOperationsRole,
+    saveMemberPermissions,
+    loadActiveMemberPermissions,
     legalConsentRequired,
     ensureLegalConsent,
     downloadTenantBackup,

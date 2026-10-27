@@ -328,6 +328,7 @@ const allTestFiles = [
   'phase101_daily_prices_live_tests.js',
   'phase103_property_closures_live_tests.js',
   'phase105_guest_erasure_live_tests.js',
+  'phase107_member_permissions_live_tests.js',
   'phase97_income_live_tests.js',
   'phase53_staff_boundary_live_tests.js',
   'phase53_staff_boundary_tests.js',
@@ -351,6 +352,7 @@ const allTestFiles = [
   'backup_restore_live_tests.js',
   'tenant_backup_export_tests.js',
   'tenant_backup_live_tests.js',
+  'permission_matrix_tests.js',
 
   // A1 saf motorlar: rapor/ChatGPT, fiyat onerisi, ozel gun ve hedef ciro
   'chatgpt_prompt_engine_tests.js',

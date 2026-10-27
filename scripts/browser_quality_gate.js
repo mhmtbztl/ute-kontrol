@@ -250,6 +250,29 @@ async function main() {
       });
       const davetMesaji = await closeUiDialog(page);
       assert(/Davet 14 gün geçerlidir/.test(davetMesaji), `Davet bilgisi pencerede gorunmedi: ${davetMesaji}`);
+      // L-211: sahip bir uyeye finans yazma izni verir; okuma kendiliginden acilir,
+      // istek yalniz varsayilandan farkli izinleri kesin degerle tasir.
+      const permissionCalls = [];
+      await page.route('**/rest/v1/rpc/set_member_permissions', async route => {
+        permissionCalls.push(route.request().postDataJSON());
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, role: 'sales', effective: {} }) });
+      });
+      await page.evaluate(() => {
+        teamMembersCache = [{ user_id: '00000000-0000-4000-8000-0000000000aa', role: 'sales', full_name: 'Satış Kişisi', email: 'satis@browser.test' }];
+        teamPermissionOverrides = {};
+        openMemberPermissionsModal('00000000-0000-4000-8000-0000000000aa');
+      });
+      await page.waitForSelector('#memberPermissionsModal.active');
+      await page.click('#memberPermissionsList input[data-permission="ledger.write"]');
+      const readAuto = await page.isChecked('#memberPermissionsList input[data-permission="ledger.read"]');
+      await page.click('#memberPermissionsSaveBtn');
+      await page.waitForFunction(() => !document.getElementById('memberPermissionsModal').classList.contains('active'));
+      await page.unroute('**/rest/v1/rpc/set_member_permissions');
+      const izinIstegi = permissionCalls[0] && permissionCalls[0].p_permissions;
+      assert(readAuto && permissionCalls.length === 1 && izinIstegi['ledger.write'] === true && izinIstegi['ledger.read'] === true
+        && izinIstegi['sales.write'] === null && permissionCalls[0].p_user_id === '00000000-0000-4000-8000-0000000000aa',
+        `Izin penceresi: ${JSON.stringify({ readAuto, permissionCalls })}`);
+      passed.push('14b. sahip üyeye izin verir: yazma okumayı açar, yalnız farklı izinler sunucuya gider');
       assert.deepStrictEqual(invitationCalls, [{
         tenantId: '00000000-0000-4000-8000-000000000001',
         email: 'm4-yonetici@browser.test',

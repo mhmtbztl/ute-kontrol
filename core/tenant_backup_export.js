@@ -48,7 +48,7 @@
     'property_operator_notes', 'property_owner_links', 'property_owners', 'property_pricing_ladder',
     'property_pricing_rule_settings', 'rate_change_logs', 'recurring_task_rules',
     'scheduled_messages', 'task_templates', 'tenant_booking_channels', 'tenant_invitations',
-    'tenant_members', 'tenant_migrations', 'tenant_onboarding', 'tenant_settings',
+    'tenant_member_permissions', 'tenant_members', 'tenant_migrations', 'tenant_onboarding', 'tenant_settings',
     'user_notifications'
   ];
   // Bilerek yok: ad_metric_period_days (reklam donemlerinden tetikleyiciyle
@@ -63,7 +63,8 @@
     lead_interest_properties: ['lead_id', 'property_id'], lead_workflow: ['lead_id'],
     maintenance_assignments: ['maintenance_ticket_id'], property_analysis_context: ['property_id'],
     property_operator_notes: ['property_id'], property_owner_links: ['property_id', 'owner_id'],
-    property_pricing_ladder: ['property_id'], tenant_settings: ['key'], tenant_members: ['user_id']
+    property_pricing_ladder: ['property_id'], tenant_settings: ['key'], tenant_members: ['user_id'],
+    tenant_member_permissions: ['user_id', 'permission']
   };
 
   async function readAll(client, table, filter) {

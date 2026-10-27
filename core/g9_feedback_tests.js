@@ -1321,9 +1321,9 @@ async function bugunPerformansDavranisi() {
     && /renderIncomeSection\(ledger\)/.test(functionBody(app, 'function renderFinanceModule(')),
     'L-225c Finans, aylik ve aralik defterleri gelir kayitlarini ayni sozlesmeden okur');
   const kaydet = functionBody(app, 'async function saveIncomeEntry(');
-  check(/requireCloudForWrite\('Gelir'/.test(kaydet) && /canManageTenantRole/.test(kaydet) && /isPeriodClosed/.test(kaydet)
+  check(/requireCloudForWrite\('Gelir'/.test(kaydet) && /canWriteLedgerRole/.test(kaydet) && /isPeriodClosed/.test(kaydet)
     && /PHASE97_SEMA_YOK/.test(kaydet),
-    'L-225d Gelir yazmasi bulut zorunlu, yalniz yonetim, kapali donemde durur, goc yoksa soyler');
+    'L-225d Gelir yazmasi bulut zorunlu, finans yazma izni (L-211), kapali donemde durur, goc yoksa soyler');
 }
 
 // L-226..L-231 (M51-M56, Gorev 9.4 Rezervasyon ve odeme, 19.10).
