@@ -438,6 +438,19 @@ Hedef deponun DIŞINDA (`Masaüstülexbnb-yedekler`); geri yükleme `npm run res
 Yedek geri yüklenebilir olduğu için yedektir: canlı tur (`backup_restore_live_tests`)
 işletmeyi siler ve yedekten birebir geri getirir. Ayrıntı: `docs/BACKUP_RESTORE.md`.
 
+**Uygulama içi işletme yedeği (L-42 2. kısım, 27.10.2026):** Ayarlar → İşletme
+Yedeği, yalnız sahip. Sahibin **kendi oturumuyla** (RLS altında) tek `.json`
+indirir (`core/tenant_backup_export.js`, biçim `lexbnb-backup/1`); geri yükleme
+`npm run restore -- <dosya.json>` (dosya başka işletmeye yüklenmez). Supabase
+OpenAPI'yi kullanıcı oturumuna vermez (401), bu yüzden tablo listesi
+`TENANT_TABLES`'tadır; **yeni bir `tenant_id` tablosu açarsanız oraya ekleyin**,
+`tenant_backup_export_tests` A1 göçlerle karşılaştırıp kırılır. Okunamayan
+tablo yedeği "eksik" yapar ve dosya indirilmez. Kullanıcıya kapalı yan etki
+tabloları (reklam günleri, davet kuyruğu) bilerek yoktur; geri yükleme türetilmiş
+reklam günlerini silmez (`DERIVED`), davet kuyruğunu temizler. Canlı tur
+`tenant_backup_live_tests`: yedek → `reset_tenant_data` → geri yükleme, her tablo
+satır satır aynı.
+
 Yeni bir tetikleyici başka tabloya satır yazıyorsa hedef tabloyu
 `core/restore_engine.js` içindeki `SIDE_EFFECTS` listesine ve geri yükleme ağına
 ekleyin; yoksa restore temiz bir tur olmaz. Silme kilitleri de yedek/restore
@@ -947,6 +960,7 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 | Sahte Airbnb senkronizasyonu | **düzeltildi** (20 Eylül 2026) — `syncLiveAirbnbData()` 600 ms bekleyip `lastSync`'e "Şimdi" yazıyor ve "✅ Canlı Skorlar Güncel!" diyordu; Airbnb'ye istek gitmiyordu. Artık durumu açıkça söylüyor |
 | OTA ilan analizi (`runAiListingCritic`) | veri bağlantısı yok; artık skor uydurmuyor, durumu açıkça söylüyor |
 | Demo'yu Supabase'de gerçek tenant olarak yeniden kurma | yapılmadı |
+| Yasal metinler (L-157) | **taslak hazır, hukuki onay bekliyor** (27.10.2026) — `docs/yasal_taslak/` (yayınlanmaz). Onaydan sonra metin `yasal/*.html`'e taşınır ve `LEGAL_TEXT_VERSION` değişir; `iskelet` dışındaki sürümde onaylamamış herkese girişte bir kez sorulur (`ensureLegalConsent`, reddeden çıkar). Uydurma bilgi yazılmadı, bilinmeyenler `[köşeli parantez]` |
 | Pazarlama ROAS’ı | **tamamlandı** (17 Eylül 2026) — reklam cirosu artık "girilen" olarak etiketleniyor; simülatör sabit çarpan yerine işletmenin kendi ölçülmüş ROAS'ını kullanıyor, ölçülmemiş kanal için tahmin üretmiyor |
 | RGVQI denetim düzeltmeleri | phase24 ve phase25, 14 Eylül 2026'da üretime uygulandı ve readiness denetimiyle doğrulandı; uygulama/worker dağıtımı ayrıca izlenmeli |
 | Misafir CRM (phase27 + phase28) | göçler **üretimde uygulandı ve doğrulandı** (15 Eylül 2026, sütun sorgusuyla); test projesinde de kurulu |
@@ -1274,8 +1288,19 @@ Ağı `core/csv_import_tests.js` (52 iddia: motor, `app.js` kaynağı, gerçek
   `stopPropagation` ve `return false` satır içi işleyicidekiyle aynı çalışır.
   Global `innerHTML` temizleyicisi artık **her** `on*` özniteliğini siler.
   Tarayıcıda ölçüldü: eklenen satır içi `onclick` CSP ile reddediliyor
-  (`script-src-attr`), 184 eylemin hepsi fonksiyona çözülüyor. `style-src`
-  hâlâ `'unsafe-inline'` (satır içi `style=` yüzlerce yerde) — ayrı iş.
+  (`script-src-attr`), 184 eylemin hepsi fonksiyona çözülüyor.
+- **`style-src` da `'unsafe-inline'` içermez (L-15 kalan, 27.10.2026).** Satır
+  içi `style=` özniteliği CSP'ye takılır ve konsola hata basar; CSSOM
+  (`el.style.cssText`) takılmaz. Bu yüzden `style=` HTML'de `data-lx-style`
+  olarak durur ve CSSOM ile uygulanır: index.html açılışta
+  (`applyDeferredInlineStyles(document)`), her `innerHTML` güvenlik sınırında,
+  yazdırma penceresi `deferInlineStyleAttributes` + `adoptedStyleSheets` ile.
+  Şablona `style="…"` yazmak serbesttir (sınır çevirir); **`setAttribute('style')`
+  yazmayın** (CSP reddeder) — `el.style.cssText` kullanın. index.html'e elle
+  `style=` eklemeyin, `data-lx-style=` yazın. `insertAdjacentHTML`/`outerHTML`
+  sınırdan geçmez; kullanmayın. Stiller uygulanana kadar
+  `html:not(.lx-styles-ready) body` gizlidir. Ağı `g9_canli_tests` L-15s1–s6;
+  tarayıcı kapısı konsol hatasını (CSP ihlali dahil) kırmızı sayar.
 - `.env` **asla** commit edilmez (`.gitignore`'da). İçinde `service_role` anahtarı var — tam yetkili.
   Tarayıcı koduna hiç girmedi, git geçmişine hiç girmedi.
 - **Supabase, `public` şemasındaki yeni fonksiyonlara varsayılan olarak `anon` rolüne EXECUTE verir.**
