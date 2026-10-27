@@ -1422,6 +1422,29 @@ async function L300() {
     'L-300n Ice aktarimda da brutun %50sinden buyuk komisyon reddedilir', JSON.stringify(fazla.errors));
 }
 
+// ---------------------------------------------------------------------------
+// L-15 kalan: CSP style-src 'unsafe-inline' olmadan calisir. Satir ici stil
+// CSSOM ile (data-lx-style) uygulanir; statik ve dinamik HTML'de style= kalmaz.
+// ---------------------------------------------------------------------------
+async function L015Style() {
+  const html = read('index.html');
+  const csp = (html.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/) || [])[1] || '';
+  const styleSrc = (csp.match(/style-src([^;]*)/) || [])[1] || '';
+  check(styleSrc && !/unsafe-inline/.test(styleSrc), "L-15s1 CSP style-src 'unsafe-inline' icermez", styleSrc);
+  const etiketler = html.match(/<[a-zA-Z][^<>]*>/g) || [];
+  const stilli = etiketler.filter(t => /\sstyle=/.test(t));
+  check(stilli.length === 0, 'L-15s2 index.html etiketlerinde style= yok (data-lx-style)', stilli.slice(0, 3).join(' | ') + (stilli.length > 3 ? ` (+${stilli.length - 3})` : ''));
+  const kaynaklar = ['app.js', ...fs.readdirSync(__dirname).filter(x => x.endsWith('.js') && !/_tests?\.js$/.test(x)).map(x => 'core/' + x)];
+  const setAttr = kaynaklar.filter(d => /setAttribute\(['"]style['"]/.test(read(d)));
+  check(setAttr.length === 0, "L-15s3 setAttribute('style') yok (CSP engeller; style.cssText kullanilir)", setAttr.join(', '));
+  const src = read('app.js');
+  const sinir = functionBody(src, 'function installInnerHtmlSecurityBoundary(');
+  check(/data-lx-style/.test(sinir) && /applyDeferredInlineStyles\(this\)/.test(sinir), 'L-15s4 innerHTML siniri style= ozniteligini CSSOM ile uygular');
+  check(/applyDeferredInlineStyles\(document\)/.test(src), 'L-15s5 Acilista statik sayfa stilleri uygulanir');
+  const yazdir = functionBody(src, 'function printCurrentReport(');
+  check(yazdir && !/<style/.test(yazdir) && /adoptedStyleSheets/.test(yazdir), 'L-15s6 Yazdirma penceresi satir ici <style> yerine CSSOM stil sayfasi kullanir');
+}
+
 async function main() {
   try {
     await L304();
@@ -1470,6 +1493,7 @@ async function main() {
     await L281b();
     await L277();
     await L300();
+    await L015Style();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

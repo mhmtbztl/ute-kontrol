@@ -1,3 +1,7 @@
+/* L-15: satir ici stiller (data-lx-style) app.js acilisinda CSSOM ile
+   uygulanir; o ana kadar sayfa stilsiz gorunmesin. */
+html:not(.lx-styles-ready) body { visibility: hidden; }
+
 /* LEXBNB TASARIM SISTEMI — Apple (koyu) dili.
    Renkler Apple'in koyu sistem renkleridir; zemin katmanlari siyah ->
    gruplanmis yuzey -> yukseltilmis yuzey sirasiyla aciklasir. Kenarlik yerine

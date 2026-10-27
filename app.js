@@ -28,9 +28,12 @@ function installInnerHtmlSecurityBoundary() {
   // ayristirilir, izinli eylem listesi disinda hicbir sey cagrilamaz). Bu
   // yuzden HER on* ozniteligi silinir. CSP de satir ici betigi reddeder;
   // bu ikinci kattir (ornegin CSP'yi desteklemeyen bir gomulu goruntuleyici).
+  // L-15 kalan: CSP style-src 'unsafe-inline' icermez. Satir ici style=
+  // ozniteligi CSP'ye takilir; data-lx-style olarak tasinir ve yerlestirildikten
+  // sonra CSSOM ile (el.style.cssText, CSP'nin izin verdigi yol) uygulanir.
   function sanitizeHtml(value) {
     const template = document.createElement('template');
-    descriptor.set.call(template, String(value == null ? '' : value));
+    descriptor.set.call(template, deferInlineStyleAttributes(value));
     template.content.querySelectorAll('*').forEach(node => {
       if (forbiddenTags.has(node.tagName)) {
         node.remove();
@@ -46,7 +49,7 @@ function installInnerHtmlSecurityBoundary() {
         }
         if (['href', 'src', 'xlink:href', 'formaction'].includes(name) &&
             /^(?:javascript|vbscript|data):/i.test(val)) node.removeAttribute(attr.name);
-        if (name === 'srcdoc' || (name === 'style' && /(?:url\s*\(|expression\s*\(|@import)/i.test(val))) {
+        if (name === 'srcdoc' || ((name === 'style' || name === 'data-lx-style') && /(?:url\s*\(|expression\s*\(|@import)/i.test(val))) {
           node.removeAttribute(attr.name);
         }
       });
@@ -58,12 +61,29 @@ function installInnerHtmlSecurityBoundary() {
     configurable: descriptor.configurable,
     enumerable: descriptor.enumerable,
     get: descriptor.get,
-    set(value) { descriptor.set.call(this, sanitizeHtml(value)); }
+    set(value) { descriptor.set.call(this, sanitizeHtml(value)); applyDeferredInlineStyles(this); }
   });
   Object.defineProperty(Element.prototype, '__lexbnbHtmlGuard', { value: true });
 }
 
+function deferInlineStyleAttributes(html) {
+  return String(html == null ? '' : html)
+    .replace(/<[a-zA-Z][^<>]*>/g, etiket => etiket.replace(/(\s)style=/gi, '$1data-lx-style='));
+}
+
+// data-lx-style -> el.style.cssText (CSSOM; CSP satir ici stili engeller, bunu engellemez).
+function applyDeferredInlineStyles(root) {
+  if (!root || typeof root.querySelectorAll !== 'function') return;
+  const uygula = el => { el.style.cssText = el.getAttribute('data-lx-style') || ''; el.removeAttribute('data-lx-style'); };
+  if (typeof root.hasAttribute === 'function' && root.hasAttribute('data-lx-style')) uygula(root);
+  root.querySelectorAll('[data-lx-style]').forEach(uygula);
+}
+
 installInnerHtmlSecurityBoundary();
+if (typeof document !== 'undefined' && document.documentElement) {
+  applyDeferredInlineStyles(document);
+  document.documentElement.classList.add('lx-styles-ready');
+}
 
 // data-on* isleyicisine giren dize (L-15 adim 3, core/action_dispatch.js).
 // encodeURIComponent tek tirnagi kodlamaz; sablonlar bunu kullanir.
@@ -4547,6 +4567,7 @@ function downloadCurrentReportXlsx() {
   return true;
 }
 
+const PRINT_REPORT_CSS = 'body{font:14px Arial;color:#111;padding:24px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:7px;text-align:left}.report-business{display:flex;gap:12px;align-items:center;margin-bottom:16px}.report-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.report-kpi{border:1px solid #ccc;padding:10px;display:flex;flex-direction:column}.sub-text{color:#555;display:block}img{max-width:180px;max-height:64px}';
 function printCurrentReport() {
   if (!currentPageReport) return false;
   // 'noopener' ozelligiyle window.open standart geregi her zaman null doner;
@@ -4554,8 +4575,15 @@ function printCurrentReport() {
   // yazildiktan sonra opener baglantisi elle kesilir.
   const popup = window.open('', '_blank');
   if (!popup) { showToast('Yazdırma penceresi engellendi. Tarayıcıda açılır pencerelere izin verin.', 'error'); return false; }
-  popup.document.write(`<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>${escapeHtml(currentPageReport.title)}</title><style>body{font:14px Arial;color:#111;padding:24px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:7px;text-align:left}.report-business{display:flex;gap:12px;align-items:center;margin-bottom:16px}.report-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.report-kpi{border:1px solid #ccc;padding:10px;display:flex;flex-direction:column}.sub-text{color:#555;display:block}img{max-width:180px;max-height:64px}</style></head><body><h1>${escapeHtml(currentPageReport.title)}</h1>${reportPreviewHtml(currentPageReport, 'print')}</body></html>`);
+  popup.document.write(deferInlineStyleAttributes(`<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>${escapeHtml(currentPageReport.title)}</title></head><body><h1>${escapeHtml(currentPageReport.title)}</h1>${reportPreviewHtml(currentPageReport, 'print')}</body></html>`));
   popup.document.close();
+  // Satir ici stil etiketi CSP'ye takilir (L-15); stil sayfasi CSSOM ile verilir.
+  try {
+    const sayfa = new popup.CSSStyleSheet();
+    sayfa.replaceSync(PRINT_REPORT_CSS);
+    popup.document.adoptedStyleSheets = [sayfa];
+  } catch (e) { /* eski tarayici: rapor stilsiz yazdirilir */ }
+  applyDeferredInlineStyles(popup.document);
   popup.opener = null;
   // Yazdirma bitince bos sekme kapanir (L-289): her yazdirmada about:blank kaliyordu.
   popup.addEventListener('afterprint', () => popup.close(), { once: true });
@@ -15454,9 +15482,9 @@ function renderMonthlyKpiTracker() {
     const btn = document.getElementById('kpiTrackBtn-' + mKey);
     if (btn) {
       if (mKey === activeKpiTrackerMetric) {
-        btn.setAttribute('style', activeConf.activeBtnStyle);
+        btn.style.cssText = activeConf.activeBtnStyle;
       } else {
-        btn.setAttribute('style', 'background: transparent; border-color: var(--border-color); color: var(--text-muted); font-weight: 500;');
+        btn.style.cssText = 'background: transparent; border-color: var(--border-color); color: var(--text-muted); font-weight: 500;';
       }
     }
   });
@@ -15548,7 +15576,7 @@ function renderMonthlyKpiTracker() {
       if (d.isCurrentMonth) periodLabel += ' <span class="badge badge-green" style="font-size:11px; margin-left:4px;">Güncel ay</span>';
 
       const tr = document.createElement('tr');
-      if (rowStyle) tr.setAttribute('style', rowStyle);
+      if (rowStyle) tr.style.cssText = rowStyle;
 
       tr.innerHTML = `
         <td style="font-weight: 700; white-space: nowrap;">${periodLabel}</td>
@@ -24149,6 +24177,7 @@ if (typeof module !== 'undefined' && module.exports) {
     getImportEngine,
     buildImportSource,
     buildImportSourceAsync,
+    deferInlineStyleAttributes,
     loadXlsxEngine,
     parseSourceWithMode,
     bookingSaveWarnings,
