@@ -16677,12 +16677,12 @@ function setActiveTenant(tenantObj) {
 // (finans ve misafir verisi) bir sonraki kisiye acik kaliyordu.
 //
 // Supabase oturumu artik tercihe gore yazilir: isaretliyse localStorage'a ve
-// en fazla 30 gun; isaretsizse sessionStorage'a (tarayici kapaninca biter).
+// en fazla 7 gun (L-161; ortak bilgisayarda kalmasin diye kutu bos gelir); isaretsizse sessionStorage'a (tarayici kapaninca biter).
 // Tercih girisin HEMEN ONCESINDE yazilir; tercih yoksa (davet / sifre
 // sifirlama baglantisi) oturum sekmeyle sinirli kalir.
 const REMEMBER_PREF_KEY = 'LEXBNB_REMEMBER_DEVICE';
 const REMEMBER_UNTIL_KEY = 'LEXBNB_REMEMBER_UNTIL';
-const REMEMBER_DAYS = 30;
+const REMEMBER_DAYS = 7;
 
 function guvenliDepo(ad) {
   try {

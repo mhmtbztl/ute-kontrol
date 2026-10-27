@@ -116,7 +116,7 @@ function eleman() {
     assert.strictEqual(depo.getItem('LEXBNB_SUPA_AUTH'), 'tok');
   });
 
-  await test('L-21 İşaretliyse kalıcı; 30 gün dolunca oturum okunmaz ve silinir', async () => {
+  await test('L-21 İşaretliyse kalıcı; süre dolunca oturum okunmaz ve silinir', async () => {
     global.localStorage = bellekDepo(); global.sessionStorage = bellekDepo();
     const t0 = Date.UTC(2026, 8, 1);
     App.setRememberDevicePreference(true, t0);
@@ -125,9 +125,25 @@ function eleman() {
     depo.setItem('LEXBNB_SUPA_AUTH', 'tok');
     assert.strictEqual(global.localStorage.getItem('LEXBNB_SUPA_AUTH'), 'tok');
     assert.strictEqual(depo.getItem('LEXBNB_SUPA_AUTH'), 'tok');
-    simdi = t0 + 31 * 86400000;
-    assert.strictEqual(depo.getItem('LEXBNB_SUPA_AUTH'), null, '30 gün sonra oturum dönmemeli');
+    simdi = t0 + 8 * 86400000;
+    assert.strictEqual(depo.getItem('LEXBNB_SUPA_AUTH'), null, 'süre dolunca oturum dönmemeli');
     assert.strictEqual(global.localStorage.getItem('LEXBNB_SUPA_AUTH'), null, 'süresi dolan oturum silinmeli');
+  });
+
+  await test('L-161 "Beni hatırla" en fazla 7 gün ve varsayılan olarak işaretsiz', async () => {
+    global.localStorage = bellekDepo(); global.sessionStorage = bellekDepo();
+    const t0 = Date.UTC(2026, 9, 1);
+    App.setRememberDevicePreference(true, t0);
+    let simdi = t0 + 6 * 86400000;
+    const depo = App.createAuthSessionStorage(() => simdi);
+    depo.setItem('LEXBNB_SUPA_AUTH', 'tok');
+    assert.strictEqual(depo.getItem('LEXBNB_SUPA_AUTH'), 'tok', '6. gün oturum durmalı');
+    simdi = t0 + 8 * 86400000;
+    assert.strictEqual(depo.getItem('LEXBNB_SUPA_AUTH'), null, '7 günden sonra oturum dönmemeli');
+    const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    const kutu = (html.match(/<input[^>]*id="authRememberCheckbox"[^>]*>/) || [''])[0];
+    assert.ok(kutu && !/\bchecked\b/.test(kutu), 'kutu varsayılan işaretli olmamalı');
+    assert.match(html, /beni hatırla \(7 gün\)/);
   });
 
   await test('L-21 Tercih yokken eski sürümün kalıcı oturumu okunmaz ve temizlenir', async () => {
