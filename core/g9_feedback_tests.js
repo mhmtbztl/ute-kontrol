@@ -1321,9 +1321,9 @@ async function bugunPerformansDavranisi() {
     && /renderIncomeSection\(ledger\)/.test(functionBody(app, 'function renderFinanceModule(')),
     'L-225c Finans, aylik ve aralik defterleri gelir kayitlarini ayni sozlesmeden okur');
   const kaydet = functionBody(app, 'async function saveIncomeEntry(');
-  check(/requireCloudForWrite\('Gelir'/.test(kaydet) && /canManageTenantRole/.test(kaydet) && /isPeriodClosed/.test(kaydet)
+  check(/requireCloudForWrite\('Gelir'/.test(kaydet) && /canWriteLedgerRole/.test(kaydet) && /isPeriodClosed/.test(kaydet)
     && /PHASE97_SEMA_YOK/.test(kaydet),
-    'L-225d Gelir yazmasi bulut zorunlu, yalniz yonetim, kapali donemde durur, goc yoksa soyler');
+    'L-225d Gelir yazmasi bulut zorunlu, finans yazma izni (L-211), kapali donemde durur, goc yoksa soyler');
 }
 
 // L-226..L-231 (M51-M56, Gorev 9.4 Rezervasyon ve odeme, 19.10).
@@ -1431,7 +1431,7 @@ async function rezervasyonOdemeDavranisi() {
   const ctx2 = { crypto: require('crypto'), escapeHtml: s => String(s), document: { getElementById: el, querySelectorAll: () => [] },
     appData: { tenantSettings: { booking_tax_profiles: [eskiProfil, { ...eskiProfil, id: 'p-2', name: 'İkinci' }] } },
     activeTenant: { role: 'owner' }, canManageTenantRole: () => true, getBookingChannelCatalog: () => [], channelTakesDeposit: () => false,
-    cloudSaveTenantSetting: async (k, v) => { yazilan.push([k, JSON.parse(JSON.stringify(v))]); }, alert() {}, confirm: () => true };
+    cloudSaveTenantSetting: async (k, v) => { yazilan.push([k, JSON.parse(JSON.stringify(v))]); }, uiNotify: async () => {}, uiAskConfirm: async () => true };
   vm.runInNewContext(read('core/booking_finance_ui.js'), ctx2);
   vm.runInNewContext("this.BookingFinance = { validateProfile: p => p };", ctx2);
   ctx2.renderBookingFinanceSettings();
@@ -1955,6 +1955,8 @@ async function fiyatEkraniDavranisi() {
   App.setPricingProperty(P);
   check(/Geçen yıl .*satılmış gece/.test(el('pricingManagerContainer').innerHTML) && !/— \(en az 8 gece\)/.test(el('pricingManagerContainer').innerHTML),
     'L-253b Gecen yil ipucu kac satilmis gece oldugunu ve kac gerektigini yazar');
+  // Hedef ilk ayda girilir; onceki adimlarin sectigi gun (gun(20)) ay sonunda sonraki aya duser.
+  App.setPricingMonth(App.pricingHorizon(BUGUN).months[0]);
   global.document.getElementById('pricingTargetInput').value = '68000';
   global.document.getElementById('pricingExpectedOccupancy').value = '';
   App.recalculatePricingTarget();

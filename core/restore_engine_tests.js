@@ -73,6 +73,25 @@ check(!order.includes('channel_performance_rates'), '6. Gorunum yukleme sirasind
   let e2 = null; try { await restoreBackup({ client: { auth: { admin: {} } }, spec, readJson: iyi }); } catch (e) { e2 = e; }
   check(!!e2 && /STARTED_AT_REQUIRED/.test(e2.message), '8. Sunucu saati verilmeden yan etki temizligi yapilmaz', e2 ? e2.message : 'hata yok');
 
+  // 10. Uygulama ici isletme yedeginde kullaniciya kapali yan etki tablolari
+  // yoktur. Davet kuyrugunun yeniden urettigi satir silinir (e-posta yeniden
+  // gitmez); reklam gunleri ise verinin kendisinden turer ve silinmez.
+  const yanSpec = { definitions: {
+    ad_metric_period_days: { properties: { id: { description: '<pk/>' }, tenant_id: {}, created_at: {} } },
+    invitation_delivery_outbox: { properties: { id: { description: '<pk/>' }, tenant_id: {}, created_at: {} } }
+  } };
+  const silinen = [];
+  const sahte = { from: name => {
+    const q = { select: () => q, gte: () => q, eq: () => q, in: () => q, insert: async () => ({ error: null }),
+      delete: () => ({ in: async (_c, ids) => { silinen.push(name + ':' + ids.join(',')); return { error: null }; } }),
+      then: (ok) => ok({ data: [{ id: name + '-uretilen' }], error: null }) };
+    return q;
+  }, auth: { admin: {} } };
+  const dosyasiz = rel => rel === 'manifest.json' ? { format: 'lexbnb-backup/1', errors: [] } : (rel === 'tables/tenant_members.json' ? [] : null);
+  await restoreBackup({ client: sahte, spec: yanSpec, readJson: dosyasiz, tenantId: 't1', startedAt: new Date() });
+  check(silinen.some(x => x.startsWith('invitation_delivery_outbox:')) && !silinen.some(x => x.startsWith('ad_metric_period_days:')),
+    '10. Yedekte olmayan tablo: davet kuyrugu temizlenir, turetilmis reklam gunleri silinmez', silinen.join(' | ') || 'hic silme yok');
+
   const script = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'run_restore.js'), 'utf8');
   check(/isProductionTarget\(url\)/.test(script) && /RESTORE_GUARD: uretime TUM yedek yuklenemez/.test(script) && /--confirm-production/.test(script),
     '9. Uretime tum yedek yuklenemez; tek isletme icin referans onayi sart', 'koruma yok');

@@ -1,3 +1,7 @@
+/* L-15: satir ici stiller (data-lx-style) app.js acilisinda CSSOM ile
+   uygulanir; o ana kadar sayfa stilsiz gorunmesin. */
+html:not(.lx-styles-ready) body { visibility: hidden; }
+
 /* LEXBNB TASARIM SISTEMI — Apple (koyu) dili.
    Renkler Apple'in koyu sistem renkleridir; zemin katmanlari siyah ->
    gruplanmis yuzey -> yukseltilmis yuzey sirasiyla aciklasir. Kenarlik yerine
@@ -763,7 +767,7 @@ body {
   font-family: var(--font-mono);
 }
 .gap-pricing .floor-hint {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-dim);
 }
 
@@ -1478,7 +1482,7 @@ body {
 }
 
 .prop-fin-badge {
-  font-size: 10px;
+  font-size: 11px;
   padding: 3px 8px;
   border-radius: 12px;
   font-weight: 700;
@@ -1497,7 +1501,7 @@ body {
 }
 
 .prop-fin-metric .m-lbl {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-muted);
   text-transform: uppercase;
   display: block;
@@ -2043,7 +2047,7 @@ body {
 }
 
 .score-denom {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-muted);
 }
 
@@ -2065,7 +2069,7 @@ body {
 }
 
 .barometer-card .b-lbl {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-muted);
   text-transform: uppercase;
   font-weight: 700;
@@ -2210,7 +2214,7 @@ body {
 }
 
 .slider-hint {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-dim);
 }
 
@@ -2238,7 +2242,7 @@ body {
 }
 
 .r-lbl {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-muted);
   text-transform: uppercase;
   font-weight: 700;
@@ -2521,7 +2525,7 @@ body {
 }
 
 .subm-box .s-lbl {
-  font-size: 10px;
+  font-size: 11px;
   text-transform: uppercase;
   color: var(--text-muted);
   display: block;
@@ -2736,7 +2740,7 @@ body {
 }
 
 .tape-day-th {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--text-muted);
   width: 28px;
@@ -2766,7 +2770,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   color: #FFFFFF;
   text-shadow: 0 1px 2px rgba(0,0,0,0.6);
@@ -3203,7 +3207,7 @@ body.auth-pending::after {
   .table-responsive::after {
     content: '👉 Tabloyu sağa kaydırarak tüm detayları görebilirsiniz';
     display: block;
-    font-size: 10px;
+    font-size: 11px;
     color: #409CFF;
     padding: 6px 4px 0 4px;
     text-align: right;
@@ -3688,7 +3692,7 @@ body.auth-pending::after {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   color: #fff;
   transition: width 0.4s ease;
@@ -3968,7 +3972,7 @@ body.auth-pending::after {
   display: inline-block;
   padding: 2px 6px;
   border-radius: 4px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   margin-right: 4px;
   margin-bottom: 4px;
@@ -4118,7 +4122,7 @@ body.auth-pending::after {
 }
 
 .command-col-badge {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   padding: 2px 8px;
   border-radius: 10px;
@@ -4160,7 +4164,7 @@ body.auth-pending::after {
 }
 
 .action-score-pill {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   font-family: var(--font-mono, monospace);
   padding: 2px 6px;
@@ -4196,7 +4200,7 @@ body.auth-pending::after {
 }
 
 .action-source-metrics {
-  font-size: 10px;
+  font-size: 11px;
   font-family: var(--font-mono, monospace);
   color: #98989D;
   background: rgba(0, 0, 0, 0.3);
@@ -4426,7 +4430,7 @@ body.auth-pending::after {
 
 .daterange-leg { display: flex; flex-direction: column; gap: 2px; min-width: 104px; }
 .daterange-cap {
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: .08em;
   text-transform: uppercase;
   color: var(--text-dim);
@@ -4548,7 +4552,7 @@ body.auth-pending::after {
 
 .analysis-eyebrow {
   color: var(--accent-emerald);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 1.6px;
 }
@@ -4958,7 +4962,7 @@ body.auth-pending::after {
 .analysis-summary span {
   margin-top: 2px;
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .analysis-empty-state span {
@@ -5061,7 +5065,7 @@ body.auth-pending::after {
 }
 .daterange-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
 .daterange-dow {
-  font-size: 10px;
+  font-size: 11px;
   text-align: center;
   color: var(--text-dim);
   padding-bottom: 4px;
@@ -5129,7 +5133,7 @@ body.auth-pending::after {
 /* --- Canli onizleme: bolum basliklari ve toplam --- */
 .preview-section {
   grid-column: 1 / -1;
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: .1em;
   text-transform: uppercase;
   color: var(--text-dim);
@@ -5505,7 +5509,7 @@ body.side-panel-open { overflow: hidden; }
 .tape-zoom .tape-booked { height: 46px; font-size: 12px; }
 .tape-zoom .tape-villa-th, .tape-zoom .tape-villa-td { min-width: 200px; font-size: 14px; }
 .tape-zoom.tape-week .tape-chart-table { min-width: 900px !important; }
-.reservation-marker { font-size: 9px; font-weight: 800; border-radius: 999px; padding: 2px 6px; }
+.reservation-marker { font-size: 11px; font-weight: 800; border-radius: 999px; padding: 2px 6px; }
 .marker-checkin { color: #93C5FD; background: rgba(10, 132, 255,0.16); }
 .marker-checkout { color: #FDE68A; background: rgba(255, 159, 10,0.16); }
 .marker-cleaning { color: #FCA5A5; background: rgba(255, 69, 58,0.16); }
@@ -5707,11 +5711,11 @@ body.side-panel-open { overflow: hidden; }
 .today-performance__cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
 .today-performance__card { display: grid; gap: 4px; padding: 12px 14px; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; }
 .today-performance__card strong { font-size: 20px; color: #F5F5F7; }
-.today-performance__card small { font-size: 10px; color: #98989D; }
+.today-performance__card small { font-size: 11px; color: #98989D; }
 .today-performance__list { display: grid; gap: 4px; margin-top: 12px; }
 .today-performance__row { display: grid; grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)) auto; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 6px; font-size: 12px; color: #C7C7CC; }
 .today-performance__row:nth-child(even) { background: rgba(255,255,255,0.03); }
-.today-performance__row--head { font-size: 10px; color: #98989D; text-transform: uppercase; }
+.today-performance__row--head { font-size: 11px; color: #98989D; text-transform: uppercase; }
 @media (max-width: 520px) { .today-performance__row { grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr)); } .today-performance__row > :last-child { grid-column: 1 / -1; justify-self: end; } }
 /* Rezervasyonlardan misafir ekleme paneli (G9 M50). */
 .guest-unlinked-panel { margin-bottom: 14px; padding: 12px; border: 1px solid var(--border-subtle); border-radius: 10px; background: var(--bg-surface); }

@@ -18,6 +18,7 @@ const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
 const testEnv = require('../core/test_env.js');
 const { restoreBackup } = require('../core/restore_engine.js');
+const { readerFromFile } = require('../core/tenant_backup_export.js');
 
 function arg(name) {
   const i = process.argv.indexOf(name);
@@ -26,12 +27,18 @@ function arg(name) {
 
 async function main() {
   const dir = process.argv[2] && !process.argv[2].startsWith('--') ? path.resolve(process.argv[2]) : null;
-  if (!dir || !fs.existsSync(path.join(dir, 'manifest.json'))) throw new Error('Kullanim: npm run restore -- <yedek-klasoru> [--env .env.test] [--tenant <uuid>]');
+  // Uygulama ici isletme yedegi tek .json dosyadir (L-42 2. kisim, Ayarlar).
+  const tekDosya = dir && /\.json$/i.test(dir) && fs.existsSync(dir) && fs.statSync(dir).isFile()
+    ? JSON.parse(fs.readFileSync(dir, 'utf8')) : null;
+  if (!dir || (!tekDosya && !fs.existsSync(path.join(dir, 'manifest.json')))) throw new Error('Kullanim: npm run restore -- <yedek-klasoru | isletme-yedegi.json> [--env .env.test] [--tenant <uuid>]');
   const envFile = arg('--env') || '.env';
   const env = testEnv.readEnvFileUnguarded(envFile);
   const url = String(env.SUPABASE_URL || '').trim();
   const key = String(env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
-  const tenantId = arg('--tenant');
+  const tenantId = arg('--tenant') || (tekDosya && tekDosya.manifest && tekDosya.manifest.tenantId) || null;
+  if (tekDosya && tekDosya.manifest && tekDosya.manifest.tenantId !== tenantId) {
+    throw new Error(`RESTORE_GUARD: bu dosya ${tekDosya.manifest.tenantId} isletmesinin yedegi; --tenant ile baska isletme secilemez.`);
+  }
   const ref = testEnv.projectRefOf(new URL(url).hostname);
 
   if (testEnv.isProductionTarget(url)) {
@@ -39,7 +46,7 @@ async function main() {
     if (arg('--confirm-production') !== ref) throw new Error(`RESTORE_GUARD: uretim hedefi icin --confirm-production ${ref} yazin.`);
   }
 
-  const readJson = rel => {
+  const readJson = tekDosya ? readerFromFile(tekDosya) : rel => {
     const p = path.join(dir, rel);
     return fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : null;
   };

@@ -95,6 +95,22 @@ Yeni politika veya arayüz kapısı için bağımsız `['owner', ...]` dizisi
 yazmayın. `sales` ve `staff` finans RPC'lerini çağırmaz; `staff` yalnız dar
 alan-işi RPC'leriyle kendi görevini görür ve ilerletir.
 
+**Kişi bazında izin matrisi (L-211, phase107, kullanıcı 27.10.2026).** Tablo
+yukarıdaki rol **varsayılanıdır**; sahip her üyenin `sales.read`, `sales.write`,
+`ledger.read`, `ledger.write`, `operations.manage` iznini ayrı ayrı değiştirir
+(Ayarlar → Ekip → İzinler, `set_member_permissions`). Yeni iki yetki:
+`can_write_ledger` (gider, gelir, şablon, aktarım, hedef, ay kapanışı) ve
+`can_manage_operations` (temizlik, arıza, görev, saha ekibi, kontrol listesi);
+istemcide `canWriteLedgerRole` / `canManageOperationsRole`. Yazma okumayı içerir.
+**Yönetim (`can_manage_tenant`) izinle verilmez**, sahibin izinleri değişmez.
+Varsayılan tablo iki yerde ve **aynı** olmak zorunda: `fn_permission_default`
+(SQL) ve `core/permission_matrix.js` (`permission_matrix_tests` A1 karşılaştırır).
+Finans ya da operasyon tablosuna yeni yazma politikası/RPC'si eklerken
+`can_manage_tenant` değil bu iki fonksiyonu kullanın. **Tuzak (yaşandı):**
+`tenant_members` ile `tenants`'ın ikisine birden FK veren yeni bir tablo PostgREST'te
+ikinci ilişki yolu açar ve giriş sorgusunu (`tenant_members.select('…, tenants(…)')`)
+`PGRST201` ile düşürür; izin tablosu bu yüzden yalnız üyeliğe bağlıdır.
+
 ### 3.4 Finansal hesaplama — USALI
 K-04 sözleşmesi (kullanıcı kararı 23–25 Eylül 2026; phase45):
 ```
@@ -223,6 +239,14 @@ ADR kartını etkiler. Kural kaynağı: mülk istisnası > portföy (`tenant_set
 kuralı gecenin **ayının** doluluğunu hedef dolulukla karşılaştırır. İşletme etkinlikleri ve
 kapatılan tatiller `tenant_settings.pricing_special_days`. Yıllık hedef = aylık portföy
 hedeflerinin toplamı. Göç gerekmedi. Ağı `g9_feedback_tests` L-246…L-254, tarayıcı kapısı 32/32b.
+
+**Rezervasyon kayıt sınırları (L-300, kullanıcı kararı 27.10.2026):** 0 TL ve mülk
+kapasitesini aşan kişi sayısı engellenmez, **sorulur** (`bookingSaveWarnings` +
+`confirmBookingWarnings`; düzenlemede yalnız değişen alan). Komisyon brütün en fazla
+%50'sidir (`bookingCommissionError`): form, WhatsApp, talepten dönüşüm, kanal
+varsayılanı ve içe aktarım aynı sınırı kullanır. Rezervasyonlar sayfası üstteki dönem
+ve mülk seçimiyle aynıdır; orada değişen ay/mülk üstte de değişir (hafta görünümü
+yalnız takvim penceresidir). Göç gerekmedi. Ağı `g9_canli_tests` L-300a–n.
 
 **Toplu aktarım özeti (`isBulkSummaryBooking`, "TOPLU AKTARIM — Ocak 2026") toplam
 metriklere girer, kayıt ve gün başı metriklere girmez (L-103).** Ciro, gece,
@@ -429,6 +453,19 @@ değiştiremiyoruz). Deploy sonrası eski sürüm görürseniz `Ctrl+Shift+R`.
 Hedef deponun DIŞINDA (`Masaüstülexbnb-yedekler`); geri yükleme `npm run restore`.
 Yedek geri yüklenebilir olduğu için yedektir: canlı tur (`backup_restore_live_tests`)
 işletmeyi siler ve yedekten birebir geri getirir. Ayrıntı: `docs/BACKUP_RESTORE.md`.
+
+**Uygulama içi işletme yedeği (L-42 2. kısım, 27.10.2026):** Ayarlar → İşletme
+Yedeği, yalnız sahip. Sahibin **kendi oturumuyla** (RLS altında) tek `.json`
+indirir (`core/tenant_backup_export.js`, biçim `lexbnb-backup/1`); geri yükleme
+`npm run restore -- <dosya.json>` (dosya başka işletmeye yüklenmez). Supabase
+OpenAPI'yi kullanıcı oturumuna vermez (401), bu yüzden tablo listesi
+`TENANT_TABLES`'tadır; **yeni bir `tenant_id` tablosu açarsanız oraya ekleyin**,
+`tenant_backup_export_tests` A1 göçlerle karşılaştırıp kırılır. Okunamayan
+tablo yedeği "eksik" yapar ve dosya indirilmez. Kullanıcıya kapalı yan etki
+tabloları (reklam günleri, davet kuyruğu) bilerek yoktur; geri yükleme türetilmiş
+reklam günlerini silmez (`DERIVED`), davet kuyruğunu temizler. Canlı tur
+`tenant_backup_live_tests`: yedek → `reset_tenant_data` → geri yükleme, her tablo
+satır satır aynı.
 
 Yeni bir tetikleyici başka tabloya satır yazıyorsa hedef tabloyu
 `core/restore_engine.js` içindeki `SIDE_EFFECTS` listesine ve geri yükleme ağına
@@ -722,6 +759,16 @@ istemcideki `isTicketBlockingOn` ile aynı. Yetki `can_read_sales`, kayıt arama
 Canlı süit `phase103_property_closures_live_tests` 11/11 (göçten önce 7 kırmızı).
 Paket: `docs/PHASE103_DEPLOY_PACKAGE.md`.
 
+**phase105 (`migration_phase105_guest_erasure_and_g9_followups.sql`) 26 Ekim 2026'da
+test projesine ve üretime uygulandı; 27 Ekim 2026'da üretimde doğrulandı** (anon
+`rpc/erase_guest_personal_data` → `401 42501`, önce `404 PGRST202`; `production:readiness`
+BAŞARILI, `schema_migrations` 105). KVKK silme hakkı (L-271, kullanıcı kararı 26.10.2026:
+"her şeyi temizler"): misafir kartı silinir; rezervasyon ve talepler muhasebe kaydı
+oldukları için anonimleşir (tutar/tarih değişmez, kapalı ay dahil); mesaj ve bildirimler
+silinir; `guest_erasure_log` kişisel verisiz. Kapalı dönem korumaları yalnız işlem içinde
+sıfırlama bayrağıyla askıya alınır. Canlı süit `phase105_guest_erasure_live_tests` 24/24.
+Paket: `docs/PHASE105_DEPLOY_PACKAGE.md`.
+
 **Bir göçün uygulanıp uygulanmadığı, dosyaya bakarak anlaşılmaz.** Dosya repoda
 durur; veritabanı uygulanmamış olabilir. Doğrulamanın yolu üretime sormaktır:
 
@@ -929,6 +976,7 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 | Sahte Airbnb senkronizasyonu | **düzeltildi** (20 Eylül 2026) — `syncLiveAirbnbData()` 600 ms bekleyip `lastSync`'e "Şimdi" yazıyor ve "✅ Canlı Skorlar Güncel!" diyordu; Airbnb'ye istek gitmiyordu. Artık durumu açıkça söylüyor |
 | OTA ilan analizi (`runAiListingCritic`) | veri bağlantısı yok; artık skor uydurmuyor, durumu açıkça söylüyor |
 | Demo'yu Supabase'de gerçek tenant olarak yeniden kurma | yapılmadı |
+| Yasal metinler (L-157) | **taslak hazır, hukuki onay bekliyor** (27.10.2026) — `docs/yasal_taslak/` (yayınlanmaz). Onaydan sonra metin `yasal/*.html`'e taşınır ve `LEGAL_TEXT_VERSION` değişir; `iskelet` dışındaki sürümde onaylamamış herkese girişte bir kez sorulur (`ensureLegalConsent`, reddeden çıkar). Uydurma bilgi yazılmadı, bilinmeyenler `[köşeli parantez]` |
 | Pazarlama ROAS’ı | **tamamlandı** (17 Eylül 2026) — reklam cirosu artık "girilen" olarak etiketleniyor; simülatör sabit çarpan yerine işletmenin kendi ölçülmüş ROAS'ını kullanıyor, ölçülmemiş kanal için tahmin üretmiyor |
 | RGVQI denetim düzeltmeleri | phase24 ve phase25, 14 Eylül 2026'da üretime uygulandı ve readiness denetimiyle doğrulandı; uygulama/worker dağıtımı ayrıca izlenmeli |
 | Misafir CRM (phase27 + phase28) | göçler **üretimde uygulandı ve doğrulandı** (15 Eylül 2026, sütun sorgusuyla); test projesinde de kurulu |
@@ -1256,8 +1304,19 @@ Ağı `core/csv_import_tests.js` (52 iddia: motor, `app.js` kaynağı, gerçek
   `stopPropagation` ve `return false` satır içi işleyicidekiyle aynı çalışır.
   Global `innerHTML` temizleyicisi artık **her** `on*` özniteliğini siler.
   Tarayıcıda ölçüldü: eklenen satır içi `onclick` CSP ile reddediliyor
-  (`script-src-attr`), 184 eylemin hepsi fonksiyona çözülüyor. `style-src`
-  hâlâ `'unsafe-inline'` (satır içi `style=` yüzlerce yerde) — ayrı iş.
+  (`script-src-attr`), 184 eylemin hepsi fonksiyona çözülüyor.
+- **`style-src` da `'unsafe-inline'` içermez (L-15 kalan, 27.10.2026).** Satır
+  içi `style=` özniteliği CSP'ye takılır ve konsola hata basar; CSSOM
+  (`el.style.cssText`) takılmaz. Bu yüzden `style=` HTML'de `data-lx-style`
+  olarak durur ve CSSOM ile uygulanır: index.html açılışta
+  (`applyDeferredInlineStyles(document)`), her `innerHTML` güvenlik sınırında,
+  yazdırma penceresi `deferInlineStyleAttributes` + `adoptedStyleSheets` ile.
+  Şablona `style="…"` yazmak serbesttir (sınır çevirir); **`setAttribute('style')`
+  yazmayın** (CSP reddeder) — `el.style.cssText` kullanın. index.html'e elle
+  `style=` eklemeyin, `data-lx-style=` yazın. `insertAdjacentHTML`/`outerHTML`
+  sınırdan geçmez; kullanmayın. Stiller uygulanana kadar
+  `html:not(.lx-styles-ready) body` gizlidir. Ağı `g9_canli_tests` L-15s1–s6;
+  tarayıcı kapısı konsol hatasını (CSP ihlali dahil) kırmızı sayar.
 - `.env` **asla** commit edilmez (`.gitignore`'da). İçinde `service_role` anahtarı var — tam yetkili.
   Tarayıcı koduna hiç girmedi, git geçmişine hiç girmedi.
 - **Supabase, `public` şemasındaki yeni fonksiyonlara varsayılan olarak `anon` rolüne EXECUTE verir.**

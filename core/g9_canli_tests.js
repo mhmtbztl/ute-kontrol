@@ -71,6 +71,7 @@
 //   26.10.2026: silme her seyi temizler (phase105 erase_guest_personal_data).
 // L-277: sablonda tur secilemiyor (hep TRANSACTIONAL), pazarlama izin kapisi hic calismiyor,
 //   misafir rehberinde pazarlama eylemi yok, yeni sablon esitlemeden once gorunmuyordu.
+// L-300 urun karari: 0 TL ve kapasite asimi onayla; komisyon <= %50; Rezervasyonlar ust secimle ayni
 const fs = require('fs');
 const path = require('path');
 
@@ -616,10 +617,10 @@ async function L280() {
   check(App.bookingCleaningDate(erken, bugun, ileri(1)) === bugun, 'L-280d Erken cikista one alinmis temizlik sonraki duzenlemede geri tasinmaz');
   let soruldu = false;
   global.confirm = () => { soruldu = true; return false; };
-  check(App.confirmEarlyCheckout(ileri(-1), ileri(3), 'CHECKED_OUT', { status: 'CHECKED_IN' }, bugun) === false && soruldu,
+  check((await App.confirmEarlyCheckout(ileri(-1), ileri(3), 'CHECKED_OUT', { status: 'CHECKED_IN' }, bugun)) === false && soruldu,
     'L-280e Cikis tarihinden once "Cikis yapti" onay ister; vazgecilirse kaydedilmez');
   let hata = null;
-  try { App.confirmEarlyCheckout(ileri(1), ileri(3), 'CHECKED_OUT', null, bugun); } catch (e) { hata = e; }
+  try { await App.confirmEarlyCheckout(ileri(1), ileri(3), 'CHECKED_OUT', null, bugun); } catch (e) { hata = e; }
   check(hata && /Giriş tarihi gelmemiş/.test(hata.message), 'L-280f Giris gunu gelmemis rezervasyon "Cikis yapti" olamaz');
   check(/confirmEarlyCheckout\(checkIn, checkOut, status, eskiKayit\)/.test(functionBody(read('app.js'), 'async function saveBooking(')), 'L-280g Rezervasyon kaydi erken cikis kapisindan gecer');
   global.confirm = () => true;
@@ -1037,6 +1038,24 @@ async function L290() {
   delete global.SalesWorkflowService;
   const y = ist.yazmalar.find(k => k.tablo === 'leads' && k.islem === 'update');
   check(y && y.yuk.pax === 5, 'L-290c Talep duzenleme kisi sayisini yazar', JSON.stringify(y && y.yuk.pax));
+
+  // Sablonu olmayan isletmeye hazir teklif/takip mesaji; yalniz talebin verisi.
+  const tam = { guest: 'TEST Ayşe', villa: 'DENE', checkIn: '2030-07-10', checkOut: '2030-07-14', pax: 4, quote: 48000 };
+  const teklif = App.buildLeadSuggestedMessage ? App.buildLeadSuggestedMessage('lexbnb:teklif', tam) : '';
+  check(/TEST Ayşe/.test(teklif) && /4 gece/.test(teklif) && /4 kişi/.test(teklif) && /48\.000/.test(teklif) && !/undefined|NaN|null/.test(teklif),
+    'L-290d Teklif mesaji talebin adi, tarihi, kisi sayisi ve fiyatiyla kurulur', teklif);
+  const bos = App.buildLeadSuggestedMessage ? App.buildLeadSuggestedMessage('lexbnb:teklif', { guest: '', villa: 'YOK' }) : 'x undefined';
+  check(/^Merhaba,/.test(bos) && !/₺|gece|kişi|undefined|NaN|null/.test(bos), 'L-290e Bilinmeyen tarih/kisi/fiyat mesaja uydurulmaz', bos);
+  const takip = App.buildLeadSuggestedMessage ? App.buildLeadSuggestedMessage('lexbnb:takip', tam) : '';
+  check(/dönüşünüzü bekliyoruz/.test(takip) && !/indirim|müsait|garanti/i.test(teklif + takip), 'L-290f Takip mesaji var; isletme adina indirim/musaitlik taahhudu yok', takip);
+  sahteDom({ leadEditId: LEAD_1, leadMessageTemplate: 'lexbnb:takip' });
+  kur(App, { leads: [{ id: LEAD_1, guestName: 'TEST', guest: 'TEST', phone: '05550000000', status: 'QUOTE_SENT' }], messageTemplates: [] });
+  global.SalesWorkflowService = require('./sales_workflow_service.js');
+  let acilan = '';
+  global.window = Object.assign(global.window || {}, { open: url => { acilan = url; } });
+  const gitti = App.openLeadWhatsApp();
+  delete global.SalesWorkflowService;
+  check(gitti === true && /wa\.me|whatsapp/.test(acilan) && /bekliyoruz/.test(decodeURIComponent(acilan)), 'L-290g Sablonsuz isletmede onerilen mesaj WhatsApp\'ta acilir', acilan);
 }
 
 // ---------------------------------------------------------------------------
@@ -1181,6 +1200,28 @@ async function L287() {
   await App.createGeneralOperationalTask();
   check(ist.yazmalar.some(k => k.tablo === 'operational_tasks' && k.islem === 'insert' && k.yuk.title === 'TEST görev'), 'L-287f Genel gorev basligi pencereden alinip yazilir');
   delete global.prompt;
+
+  // Kalan tum akislar (MVP oncesi, 27.10): uygulama ve modullerde ham kutu kalmaz.
+  // Yalniz pencere yardimcilarinin Node yedegi yerel kutuyu cagirir.
+  const hamKutu = /(^|[^.\w'"`])(alert|confirm|prompt)\(/;
+  const izinli = /function uiAsk|function uiNotify|typeof alert === 'function'\) alert\(metin\)|typeof prompt === 'function' \? prompt\(options|typeof confirm === 'function' \? confirm\(o\.message|root\.(alert|confirm|prompt)\(/;
+  const kalanlar = [];
+  ['app.js', ...fs.readdirSync(path.join(__dirname)).filter(f => f.endsWith('.js') && !/_tests?\.js$|_scan\.js$/.test(f)).map(f => 'core/' + f)].forEach(dosya => {
+    read(dosya).split('\n').forEach((satir, i) => {
+      const kod = satir.replace(/\r$/, '').replace(/\/\/.*$/, '');
+      if (hamKutu.test(kod) && !izinli.test(kod) && !/^\s*\*/.test(satir)) kalanlar.push(`${dosya}:${i + 1}`);
+    });
+  });
+  check(kalanlar.length === 0, 'L-287g Uygulamada ham alert/confirm/prompt kalmadi', kalanlar.slice(0, 12).join(', ') + (kalanlar.length > 12 ? ` (+${kalanlar.length - 12})` : ''));
+  check(/function uiNotify\(/.test(src) && /showToast\(metin/.test(src.slice(src.indexOf('function uiNotify('), src.indexOf('\n}\n', src.indexOf('function uiNotify(')))), 'L-287h Kisa bildirim seride, uzun bildirim pencereye gider');
+  let soruldu = 0;
+  delete global.confirm;
+  const yedekEvet = await App.uiAskConfirm('X');
+  const yedekHayir = await App.uiAskConfirm({ message: 'X', fallback: false });
+  global.confirm = () => { soruldu++; return false; };
+  const ret = await App.uiAskConfirm('X');
+  delete global.confirm;
+  check(yedekEvet === true && yedekHayir === false && ret === false && soruldu === 1, 'L-287i Onay yedegi eski davranisi korur (kutu yoksa devam; "fallback:false" yerde durur)');
 }
 
 // ---------------------------------------------------------------------------
@@ -1197,6 +1238,13 @@ async function L288() {
   const src = read('app.js');
   check(/scrollIntoView\(\{[^}]*inline: 'center'/.test(functionBody(src, 'function switchTab(')), 'L-288e Aktif sekme seritte gorunur kaydirilir');
   check(/scrollIntoView\(\{[^}]*inline: 'center'/.test(functionBody(src, 'function switchHelpTab(')), 'L-288f Rehberde secilen sekme gorunur kaydirilir');
+  // 11 px alti yazi kalmaz (telefonda okunmuyordu: Rezervasyonlar 42, Finans 19 oge).
+  const kucuk = /font-size:\s*(([0-9]|10)(\.\d+)?px|0?\.([0-5]\d*|6[0-8]\d*)r?em)\b/;
+  const kucukler = [];
+  ['style.css', 'index.html', 'app.js', ...fs.readdirSync(__dirname).filter(f => f.endsWith('.js') && !/_tests?\.js$/.test(f)).map(f => 'core/' + f)].forEach(dosya => {
+    read(dosya).split('\n').forEach((satir, i) => { if (kucuk.test(satir)) kucukler.push(`${dosya}:${i + 1}`); });
+  });
+  check(kucukler.length === 0, 'L-288g 11 px altinda yazi boyutu kalmadi', kucukler.slice(0, 10).join(', ') + (kucukler.length > 10 ? ` (+${kucukler.length - 10})` : ''));
 }
 
 // ---------------------------------------------------------------------------
@@ -1305,6 +1353,127 @@ async function L277() {
   check(App.sendGuestMarketingMessage() === true && /wa\.me|whatsapp/.test(String(acilan)) && /TEST/.test(decodeURIComponent(String(acilan))), 'L-277e Izinli misafire pazarlama mesaji WhatsApp\'ta acilir', String(acilan));
 }
 
+// ---------------------------------------------------------------------------
+// L-300 urun karari (27.10): 0 TL ve kapasite asimi onayla, komisyon en fazla
+// %50; Rezervasyonlar ust donem/mulk secimiyle ayni
+// ---------------------------------------------------------------------------
+async function L300() {
+  sahteDom();
+  const App = require('../app.js');
+  kur(App);
+  const w0 = App.bookingSaveWarnings ? App.bookingSaveWarnings({ gross: 0, pax: 2, villa: 'DENE' }) : [];
+  check(w0.length === 1 && /0 TL/.test(w0[0]), 'L-300a 0 TL rezervasyon uyari ile onaya gelir', JSON.stringify(w0));
+  const wK = App.bookingSaveWarnings ? App.bookingSaveWarnings({ gross: 1000, pax: 7, villa: 'DENE' }) : [];
+  check(wK.length === 1 && /7/.test(wK[0]) && /6/.test(wK[0]), 'L-300b Kapasite asimi (7/6) uyari ile onaya gelir', JSON.stringify(wK));
+  const wOk = App.bookingSaveWarnings ? App.bookingSaveWarnings({ gross: 1000, pax: 6, villa: 'DENE' }) : null;
+  const wBilinmez = App.bookingSaveWarnings ? App.bookingSaveWarnings({ gross: 1000, pax: 20, villa: 'YOK' }) : null;
+  check(Array.isArray(wOk) && wOk.length === 0 && Array.isArray(wBilinmez) && wBilinmez.length === 0,
+    'L-300c Kapasite icinde ya da kapasitesi bilinmeyen mulkte uyari yok');
+
+  let soruldu = 0;
+  global.confirm = () => { soruldu++; return false; };
+  const iptal = App.confirmBookingWarnings ? await App.confirmBookingWarnings(w0) : true;
+  const bos = App.confirmBookingWarnings ? await App.confirmBookingWarnings([]) : false;
+  check(iptal === false && bos === true && soruldu === 1, 'L-300d Uyari onaylanmazsa kayit yapilmaz; uyari yoksa sorulmaz');
+  global.confirm = () => true;
+  const kaydet = functionBody(read('app.js'), 'async function saveBooking(');
+  const wa = functionBody(read('app.js'), 'async function saveWaAsBooking(');
+  check(/bookingSaveWarnings\(/.test(kaydet) && /confirmBookingWarnings\(/.test(kaydet) && /confirmBookingWarnings\(/.test(wa),
+    'L-300e Rezervasyon formu ve WhatsApp yolu uyari kapisindan gecer');
+
+  // Komisyon en fazla brutun %50'si: tum kayit yollari createBooking/updateBooking'den gecer.
+  let hata = null;
+  try { await App.createBooking({ villa: 'DENE', guest: 'TEST Komisyon', checkIn: '2030-01-10', checkOut: '2030-01-12', gross: 10000, otaComm: 6000, pax: 2, status: 'CONFIRMED' }); } catch (e) { hata = e; }
+  check(hata && /%50/.test(hata.message), 'L-300f Brutun %50sinden buyuk komisyon reddedilir', hata && hata.message);
+  check(App.bookingCommissionError && App.bookingCommissionError(10000, 5000) === null && App.bookingCommissionError(0, 0) === null,
+    'L-300g %50 ve alti komisyon kabul');
+  let kanalHata = null;
+  try { await App.saveTenantBookingChannel({ displayName: 'TEST Kanal', channelType: 'OTA', defaultCommissionRate: 60 }); } catch (e) { kanalHata = e; }
+  check(kanalHata && /50/.test(kanalHata.message), 'L-300h Kanal varsayilan komisyonu %50yi asamaz', kanalHata && kanalHata.message);
+  check(/id="resCommissionRate"[^>]*max="50"/.test(read('index.html')) && /id="newBookingChannelRate"[^>]*max="50"/.test(read('index.html')),
+    'L-300i Formlar %50 ustunu tarayicida da reddeder');
+
+  // Rezervasyonlar ust donem ve mulk secimini izler; burada degisen secim ustte de degisir.
+  const dom = sahteDom();
+  kur(App);
+  App.setCurrentFilter({ period: '2026-11', villa: 'DENE', startDate: '2026-11-01', endDate: '2026-11-30' });
+  if (App.adoptGlobalFilterForReservations) App.adoptGlobalFilterForReservations();
+  const r1 = App.getReservationListRange ? App.getReservationListRange() : {};
+  check(r1.start === '2026-11-01' && r1.end === '2026-11-30' && dom.getElementById('rezVillaFilter').value === 'DENE',
+    'L-300j Rezervasyonlar ustteki donemi ve mulku alir', JSON.stringify(r1) + ' ' + dom.getElementById('rezVillaFilter').value);
+  App.stepReservationPeriod(1);
+  const f = App.setCurrentFilter({});
+  check(f.period === '2026-12' && f.startDate === '2026-12-01' && f.endDate === '2026-12-31' && f.villa === 'DENE',
+    'L-300k Rezervasyonlarda degisen ay ustteki secime yazilir (Finans ayni donemi gosterir)', JSON.stringify(f));
+  App.setCurrentFilter({ period: 'CUSTOM', villa: 'ALL', startDate: '2026-10-20', endDate: '2026-11-30' });
+  App.adoptGlobalFilterForReservations && App.adoptGlobalFilterForReservations();
+  const r2 = App.getReservationListRange ? App.getReservationListRange() : {};
+  check(r2.start === '2026-10-20' && r2.end === '2026-11-30' && dom.getElementById('rezVillaFilter').value === 'ALL',
+    'L-300l Ozel aralik ve tum portfoy de alinir', JSON.stringify(r2));
+  check(/adoptGlobalFilterForReservations\(\)/.test(functionBody(read('app.js'), 'function switchTab(')),
+    'L-300m Sekmeye girerken ust secim uygulanir');
+  const IE = require('./finance_import_engine.js');
+  const satir = komisyon => ({ V: 'Deneme Evi', M: 'TEST Aktarim', G: '2030-02-10', C: '2030-02-12', B: '1000', O: komisyon, K: '2' });
+  const imp = komisyon => IE.validateBookingRows([satir(komisyon)],
+    { property: 'V', guest: 'M', checkIn: 'G', checkOut: 'C', gross: 'B', otaCommission: 'O', pax: 'K' },
+    { properties: [{ id: PROP_A, slug: 'DENE', key: 'DENE', name: 'Deneme Evi' }] });
+  const fazla = imp('600');
+  check(fazla.validCount === 0 && /%50/.test((fazla.errors[0] && fazla.errors[0].errors.join(' ')) || '') && imp('500').validCount === 1,
+    'L-300n Ice aktarimda da brutun %50sinden buyuk komisyon reddedilir', JSON.stringify(fazla.errors));
+}
+
+// ---------------------------------------------------------------------------
+// L-15 kalan: CSP style-src 'unsafe-inline' olmadan calisir. Satir ici stil
+// CSSOM ile (data-lx-style) uygulanir; statik ve dinamik HTML'de style= kalmaz.
+// ---------------------------------------------------------------------------
+async function L015Style() {
+  const html = read('index.html');
+  const csp = (html.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/) || [])[1] || '';
+  const styleSrc = (csp.match(/style-src([^;]*)/) || [])[1] || '';
+  check(styleSrc && !/unsafe-inline/.test(styleSrc), "L-15s1 CSP style-src 'unsafe-inline' icermez", styleSrc);
+  const etiketler = html.match(/<[a-zA-Z][^<>]*>/g) || [];
+  const stilli = etiketler.filter(t => /\sstyle=/.test(t));
+  check(stilli.length === 0, 'L-15s2 index.html etiketlerinde style= yok (data-lx-style)', stilli.slice(0, 3).join(' | ') + (stilli.length > 3 ? ` (+${stilli.length - 3})` : ''));
+  const kaynaklar = ['app.js', ...fs.readdirSync(__dirname).filter(x => x.endsWith('.js') && !/_tests?\.js$/.test(x)).map(x => 'core/' + x)];
+  const setAttr = kaynaklar.filter(d => /setAttribute\(['"]style['"]/.test(read(d)));
+  check(setAttr.length === 0, "L-15s3 setAttribute('style') yok (CSP engeller; style.cssText kullanilir)", setAttr.join(', '));
+  const src = read('app.js');
+  const sinir = functionBody(src, 'function installInnerHtmlSecurityBoundary(');
+  check(/data-lx-style/.test(sinir) && /applyDeferredInlineStyles\(this\)/.test(sinir), 'L-15s4 innerHTML siniri style= ozniteligini CSSOM ile uygular');
+  check(/applyDeferredInlineStyles\(document\)/.test(src), 'L-15s5 Acilista statik sayfa stilleri uygulanir');
+  const yazdir = functionBody(src, 'function printCurrentReport(');
+  check(yazdir && !/<style/.test(yazdir) && /adoptedStyleSheets/.test(yazdir), 'L-15s6 Yazdirma penceresi satir ici <style> yerine CSSOM stil sayfasi kullanir');
+}
+
+// ---------------------------------------------------------------------------
+// L-157: yasal metin surumu degisince kullanici girişte yeni surumu onaylar.
+// Iskelet surumde kimseye sorulmaz; onaylanirsa user_metadata'ya yazilir,
+// reddedilirse oturum kapanir.
+// ---------------------------------------------------------------------------
+async function L157() {
+  sahteDom();
+  const App = require('../app.js');
+  const gerekli = App.legalConsentRequired || (() => null);
+  check(gerekli('iskelet-2026-10-03', 'iskelet-2026-10-03') === false && gerekli(undefined, 'iskelet-2026-10-03') === false,
+    'L-157a Iskelet surumde kimseye onay sorulmaz');
+  check(gerekli('iskelet-2026-10-03', 'v1-2026-11-01') === true && gerekli(undefined, 'v1-2026-11-01') === true && gerekli('v1-2026-11-01', 'v1-2026-11-01') === false,
+    'L-157b Onayli surum yayinlaninca o surumu onaylamayan herkese bir kez sorulur');
+  const guncellenen = [];
+  let cikis = 0;
+  App.setSupabaseClient({ auth: { updateUser: async arg => { guncellenen.push(arg); return { data: {}, error: null }; }, signOut: async () => { cikis++; return { error: null }; } } });
+  global.confirm = () => true;
+  const evet = App.ensureLegalConsent ? await App.ensureLegalConsent({ id: 'u1', user_metadata: { legal_text_version: 'iskelet-2026-10-03' } }, 'v1-2026-11-01') : false;
+  check(evet === true && guncellenen.length === 1 && guncellenen[0].data.legal_text_version === 'v1-2026-11-01' && /^\d{4}-/.test(guncellenen[0].data.legal_consent_at),
+    'L-157c Kabul edilen surum ve zaman kullanici kaydina yazilir', JSON.stringify(guncellenen));
+  global.confirm = () => false;
+  const hayir = App.ensureLegalConsent ? await App.ensureLegalConsent({ id: 'u1', user_metadata: {} }, 'v1-2026-11-01') : true;
+  check(hayir === false && cikis === 1 && guncellenen.length === 1, 'L-157d Reddeden kullanicinin oturumu kapanir, kayit yazilmaz');
+  global.confirm = () => true;
+  check(/await ensureLegalConsent\(u\)/.test(functionBody(read('app.js'), 'async function handleAuthenticatedSession(')), 'L-157e Her giriste surum kontrol edilir');
+  check(['README.md', 'kvkk_aydinlatma.md', 'gizlilik_politikasi.md', 'kullanim_sartlari.md', 'veri_isleme_eki.md'].every(d => fs.existsSync(path.join(root, 'docs', 'yasal_taslak', d)))
+    && !require('../server.js').isAllowed('docs/yasal_taslak/kvkk_aydinlatma.md'), 'L-157f Yasal taslaklar hazir ve sitede yayinlanmaz (hukuki onay bekliyor)');
+}
+
 async function main() {
   try {
     await L304();
@@ -1352,6 +1521,9 @@ async function main() {
     await L271();
     await L281b();
     await L277();
+    await L300();
+    await L015Style();
+    await L157();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

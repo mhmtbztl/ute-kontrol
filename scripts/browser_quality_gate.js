@@ -39,6 +39,18 @@ async function withPage(browser, baseUrl, role, viewport, run) {
   await page.close();
 }
 
+// Uygulama ici bilgi/onay penceresini (core/ui_dialog.js, L-287) okur ve
+// birincil dugmeyle kapatir. Ham tarayici kutusunu Playwright kendiliginden
+// kapatiyordu; uygulama penceresi ise acik kalir ve sonraki tiklamayi engeller.
+async function closeUiDialog(page, button = '.btn-primary, .btn-danger') {
+  const dialog = page.locator('.ui-dialog.active').last();
+  await dialog.waitFor({ state: 'visible', timeout: 5000 });
+  const text = await dialog.locator('.modal-body').innerText();
+  await dialog.locator(`.modal-footer ${button.split(',').map(b => b.trim()).join(', .modal-footer ')}`).first().click();
+  await dialog.waitFor({ state: 'detached', timeout: 5000 });
+  return text;
+}
+
 // Ekrandaki "12.345 TL" metninden tam sayi; "—" ise null.
 function screenNumber(text) {
   const digits = String(text || '').replace(/[^0-9-]/g, '');
@@ -236,6 +248,31 @@ async function main() {
         document.getElementById('inviteMemberRole').value = 'admin';
         await submitMemberInvite({ preventDefault() {} });
       });
+      const davetMesaji = await closeUiDialog(page);
+      assert(/Davet 14 gün geçerlidir/.test(davetMesaji), `Davet bilgisi pencerede gorunmedi: ${davetMesaji}`);
+      // L-211: sahip bir uyeye finans yazma izni verir; okuma kendiliginden acilir,
+      // istek yalniz varsayilandan farkli izinleri kesin degerle tasir.
+      const permissionCalls = [];
+      await page.route('**/rest/v1/rpc/set_member_permissions', async route => {
+        permissionCalls.push(route.request().postDataJSON());
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, role: 'sales', effective: {} }) });
+      });
+      await page.evaluate(() => {
+        teamMembersCache = [{ user_id: '00000000-0000-4000-8000-0000000000aa', role: 'sales', full_name: 'Satış Kişisi', email: 'satis@browser.test' }];
+        teamPermissionOverrides = {};
+        openMemberPermissionsModal('00000000-0000-4000-8000-0000000000aa');
+      });
+      await page.waitForSelector('#memberPermissionsModal.active');
+      await page.click('#memberPermissionsList input[data-permission="ledger.write"]');
+      const readAuto = await page.isChecked('#memberPermissionsList input[data-permission="ledger.read"]');
+      await page.click('#memberPermissionsSaveBtn');
+      await page.waitForFunction(() => !document.getElementById('memberPermissionsModal').classList.contains('active'));
+      await page.unroute('**/rest/v1/rpc/set_member_permissions');
+      const izinIstegi = permissionCalls[0] && permissionCalls[0].p_permissions;
+      assert(readAuto && permissionCalls.length === 1 && izinIstegi['ledger.write'] === true && izinIstegi['ledger.read'] === true
+        && izinIstegi['sales.write'] === null && permissionCalls[0].p_user_id === '00000000-0000-4000-8000-0000000000aa',
+        `Izin penceresi: ${JSON.stringify({ readAuto, permissionCalls })}`);
+      passed.push('14b. sahip üyeye izin verir: yazma okumayı açar, yalnız farklı izinler sunucuya gider');
       assert.deepStrictEqual(invitationCalls, [{
         tenantId: '00000000-0000-4000-8000-000000000001',
         email: 'm4-yonetici@browser.test',
@@ -380,6 +417,23 @@ async function main() {
         && linkWrites.length === 2 && linkWrites.every(l => l.cleaning_task_id && !('expense_id' in l)),
         `Gecmis temizlik aktarimi: ${JSON.stringify({ previewMode, cleaningWrites, linkWrites })}`);
       passed.push('19. geçmiş temizlik CSV\'si algılanır, cleaning_tasks\'a "yapıldı" yazılır, geri alma bağı kurulur');
+      // L-162: Excel dosyasi arka planda (Web Worker) ayristirilir.
+      const XLSXW = require('../xlsx.full.min.js');
+      const wbW = XLSXW.utils.book_new();
+      XLSXW.utils.book_append_sheet(wbW, XLSXW.utils.aoa_to_sheet([['Tarih', 'Villa', 'Tutar (TL)', 'Temizlikçi', 'Ödendi', 'Açıklama'], ['2026-01-10', 'test', 1200, 'Ayşe', '', ''], ['2026-01-12', 'test', 900, 'Ayşe', 'Hayır', '']]), 'Temizlik');
+      await page.evaluate(() => {
+        window.__xlsxWorkers = 0;
+        const Gercek = window.Worker;
+        window.Worker = class extends Gercek { constructor(...a) { super(...a); window.__xlsxWorkers++; } };
+        appData.villas = { test: { id: '00000000-0000-4000-8000-000000000010', name: 'Test Villası', slug: 'test', isActive: true } };
+        appData.cleaningTasks = [];
+        openImportModal();
+      });
+      await page.setInputFiles('#excelFileInput', { name: 'temizlik.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: Buffer.from(XLSXW.write(wbW, { type: 'buffer', bookType: 'xlsx' })) });
+      await page.waitForFunction(() => /2 kaydı içe aktar/.test(document.getElementById('importConfirmBtn')?.innerText || ''), null, { timeout: 15000 });
+      const workerCount = await page.evaluate(() => { closeImportModal(); return window.__xlsxWorkers; });
+      assert(workerCount === 1, `Excel dosyasi Worker ile okunmadi: ${workerCount}`);
+      passed.push('19b. Excel dosyası arka planda (Web Worker) okunur, önizleme aynı');
       // L-196 (M26): gelir tablosu indirilir; TOPLAM satirindaki ciro Finans
       // ekraninda yazan ciroyla ayni.
       const screenRevenue = await page.evaluate(() => {

@@ -102,7 +102,84 @@ function eleman() {
   await test('L-16 10 MB\'ı aşan dosya ayrıştırılmadan reddedilir', async () => {
     const buyuk = new Uint8Array(10 * 1024 * 1024 + 1);
     assert.throws(() => App.buildImportSource(buyuk, 'b.xlsx'), /çok büyük/);
-    assert.match(APP, /sheetRows: IMPORT_MAX_ROWS \+ 2/, 'SheetJS ayrıştırması satır sınırıyla çağrılmalı');
+    const isci = fs.readFileSync(path.join(__dirname, 'xlsx_import_worker.js'), 'utf8');
+    assert.match(isci, /sheetRows: maxRows \+ 2/, 'SheetJS ayrıştırması satır sınırıyla çağrılmalı');
+    assert.match(APP, /\.parse\(XLSX, bytes, IMPORT_MAX_ROWS\)/, 'senkron yol aynı sınırı geçirmeli');
+  });
+
+  // --- L-162 ------------------------------------------------------------------
+  await test('L-162 Excel ayrıştırması tek kaynakta; uygulama dosyayı arka planda (Worker) okur', async () => {
+    const isciYolu = path.join(__dirname, 'xlsx_import_worker.js');
+    assert.ok(fs.existsSync(isciYolu), 'core/xlsx_import_worker.js yok');
+    assert.ok(!/XLSX\.read\(/.test(APP), 'app.js kendi XLSX.read çağrısını tutmamalı (tek kaynak)');
+    const oku = APP.slice(APP.indexOf('function readImportFile('), APP.indexOf('function handleFileImport('));
+    assert.match(oku, /buildImportSourceAsync\(/, 'dosya seçimi arka plan yolunu kullanmalı');
+    assert.match(APP, /'core\/xlsx_import_worker\.js\?v=[0-9a-f]{8}'/, 'worker adresi damgalı olmalı');
+    assert.match(fs.readFileSync(path.join(__dirname, '..', 'stamp_assets.js'), 'utf8'), /SATELLITE_FILES = \[[^\]]*'app\.js'/, 'damgalayıcı app.js içindeki worker adresini görmeli');
+  });
+
+  await test('L-162 Worker, gerçek SheetJS ile senkron yolla birebir aynı sonucu verir', async () => {
+    const XLSX = require(path.join(__dirname, '..', 'xlsx.full.min.js'));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([
+      { 'Villa': 'M1', 'Misafir Adı': 'Ayşe Şahin', 'Brüt Tutar (TL)': 72500.5 },
+      { 'Villa': 'M2', 'Misafir Adı': 'İlker Işık', 'Brüt Tutar (TL)': 1000 }
+    ]), 'Rezervasyonlar');
+    const bayt = () => new Uint8Array(XLSX.write(wb, { type: 'array', bookType: 'xlsx' }));
+    global.XLSX = XLSX;
+    let senkron;
+    try { senkron = App.buildImportSource(bayt(), 'd.xlsx'); } finally { delete global.XLSX; }
+    // Worker kapsamı taklidi: kendi XLSX'ini importScripts ile yükler.
+    const vm = require('vm');
+    class WorkerGlobalScope {}
+    const kapsam = new WorkerGlobalScope();
+    const gonderilen = [];
+    let yuklenen = null;
+    Object.assign(kapsam, { postMessage: m => gonderilen.push(m), importScripts: url => { yuklenen = url; kapsam.XLSX = XLSX; } });
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname, 'xlsx_import_worker.js'), 'utf8'), { self: kapsam, WorkerGlobalScope, globalThis: kapsam });
+    kapsam.onmessage({ data: { xlsxUrl: 'https://x/xlsx.full.min.js?v=1', bytes: bayt(), maxRows: 10000 } });
+    assert.strictEqual(yuklenen, 'https://x/xlsx.full.min.js?v=1');
+    assert.strictEqual(gonderilen.length, 1);
+    const g = gonderilen[0];
+    assert.ok(g.ok, g.message);
+    assert.deepStrictEqual({ sheetNames: g.sheetNames, headers: g.headers, rows: JSON.parse(JSON.stringify(g.rows)) },
+      { sheetNames: senkron.sheetNames, headers: senkron.headers, rows: JSON.parse(JSON.stringify(senkron.rows)) });
+    assert.strictEqual(g.rows[0]['Brüt Tutar (TL)'], 72500.5, 'sayı sayı kalmalı');
+  });
+
+  await test('L-163 Excel motoru giriş sayfasında yüklenmez; giriş sonrası önceden ve gerektiğinde yüklenir', async () => {
+    const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    assert.ok(!/<script[^>]*src="xlsx\.full\.min\.js/.test(html), 'index.html SheetJS\'i açılışta yüklememeli');
+    assert.match(APP, /const XLSX_ENGINE_URL = 'xlsx\.full\.min\.js\?v=[0-9a-f]{8}'/);
+    const yukle = APP.slice(APP.indexOf('async function loadTenantAppData('), APP.indexOf('async function loadTenantAppData(') + 300);
+    assert.match(yukle, /scheduleXlsxEnginePreload\(\)/, 'giriş sonrası önceden yüklenmeli');
+    ['function exportLedger(', 'function exportIncomeStatement(', 'function downloadSampleTemplate(', 'function downloadCurrentReportXlsx('].forEach(imza => {
+      const govde = APP.slice(APP.indexOf(imza), APP.indexOf(imza) + 1500);
+      assert.match(govde, /retryWithXlsxEngine\(/, `${imza} motor yoksa yükleyip devam etmeli`);
+    });
+    // Açılış bütçesi: index.html'in yüklediği yerel JS toplamı.
+    const kok = path.join(__dirname, '..');
+    const toplam = [...html.matchAll(/<script[^>]*src="([^"?]+)/g)].map(m => m[1]).filter(f => fs.existsSync(path.join(kok, f)))
+      .reduce((t, f) => t + fs.statSync(path.join(kok, f)).size, 0);
+    assert.ok(toplam <= 2.2 * 1048576, `açılış JS bütçesi aşıldı: ${(toplam / 1048576).toFixed(2)} MiB > 2,2 MiB`);
+  });
+
+  await test('L-162 Worker cevap vermezse sonlandırılır; sekme donmaz, kullanıcıya söylenir', async () => {
+    assert.match(APP, /IMPORT_WORKER_TIMEOUT_MS = \d+/);
+    const govde = APP.slice(APP.indexOf('function buildImportSourceAsync('), APP.indexOf('function buildImportSourceAsync(') + 2500);
+    assert.match(govde, /setTimeout\([\s\S]*bitir\(\)[\s\S]*reject\(/, 'zaman aşımı worker\'ı bitirip hata vermeli');
+    assert.match(govde, /const bitir = \(\) => \{ clearTimeout\(zamanlayici\); w\.terminate\(\); \}/);
+    // Worker'ın hata cevabı ve satır sınırı ana tarafta aynı mesajla döner.
+    const sahteDoc = { querySelector: () => ({ getAttribute: () => 'xlsx.full.min.js?v=1' }), baseURI: 'https://lexbnb.space/' };
+    const eskiDoc = global.document; const eskiW = global.Worker;
+    let sonlandi = 0;
+    global.document = sahteDoc;
+    global.Worker = class { constructor(u) { this.u = u; } postMessage(m) { setTimeout(() => this.onmessage({ data: { ok: true, rowCount: 10001, sheetNames: ['S'], headers: [], rows: [] } }), 0); } terminate() { sonlandi++; } };
+    try {
+      const pk = new Uint8Array([0x50, 0x4B, 0x03, 0x04, 0, 0, 0, 0]);
+      await assert.rejects(App.buildImportSourceAsync(pk, 'x.xlsx'), /en fazla 10\.000 satır/);
+      assert.strictEqual(sonlandi, 1, 'cevaptan sonra worker sonlandırılmalı');
+    } finally { global.document = eskiDoc; global.Worker = eskiW; }
   });
 
   // --- L-21 -------------------------------------------------------------------
@@ -116,7 +193,7 @@ function eleman() {
     assert.strictEqual(depo.getItem('LEXBNB_SUPA_AUTH'), 'tok');
   });
 
-  await test('L-21 İşaretliyse kalıcı; 30 gün dolunca oturum okunmaz ve silinir', async () => {
+  await test('L-21 İşaretliyse kalıcı; süre dolunca oturum okunmaz ve silinir', async () => {
     global.localStorage = bellekDepo(); global.sessionStorage = bellekDepo();
     const t0 = Date.UTC(2026, 8, 1);
     App.setRememberDevicePreference(true, t0);
@@ -125,9 +202,25 @@ function eleman() {
     depo.setItem('LEXBNB_SUPA_AUTH', 'tok');
     assert.strictEqual(global.localStorage.getItem('LEXBNB_SUPA_AUTH'), 'tok');
     assert.strictEqual(depo.getItem('LEXBNB_SUPA_AUTH'), 'tok');
-    simdi = t0 + 31 * 86400000;
-    assert.strictEqual(depo.getItem('LEXBNB_SUPA_AUTH'), null, '30 gün sonra oturum dönmemeli');
+    simdi = t0 + 8 * 86400000;
+    assert.strictEqual(depo.getItem('LEXBNB_SUPA_AUTH'), null, 'süre dolunca oturum dönmemeli');
     assert.strictEqual(global.localStorage.getItem('LEXBNB_SUPA_AUTH'), null, 'süresi dolan oturum silinmeli');
+  });
+
+  await test('L-161 "Beni hatırla" en fazla 7 gün ve varsayılan olarak işaretsiz', async () => {
+    global.localStorage = bellekDepo(); global.sessionStorage = bellekDepo();
+    const t0 = Date.UTC(2026, 9, 1);
+    App.setRememberDevicePreference(true, t0);
+    let simdi = t0 + 6 * 86400000;
+    const depo = App.createAuthSessionStorage(() => simdi);
+    depo.setItem('LEXBNB_SUPA_AUTH', 'tok');
+    assert.strictEqual(depo.getItem('LEXBNB_SUPA_AUTH'), 'tok', '6. gün oturum durmalı');
+    simdi = t0 + 8 * 86400000;
+    assert.strictEqual(depo.getItem('LEXBNB_SUPA_AUTH'), null, '7 günden sonra oturum dönmemeli');
+    const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    const kutu = (html.match(/<input[^>]*id="authRememberCheckbox"[^>]*>/) || [''])[0];
+    assert.ok(kutu && !/\bchecked\b/.test(kutu), 'kutu varsayılan işaretli olmamalı');
+    assert.match(html, /beni hatırla \(7 gün\)/);
   });
 
   await test('L-21 Tercih yokken eski sürümün kalıcı oturumu okunmaz ve temizlenir', async () => {

@@ -28,9 +28,12 @@ function installInnerHtmlSecurityBoundary() {
   // ayristirilir, izinli eylem listesi disinda hicbir sey cagrilamaz). Bu
   // yuzden HER on* ozniteligi silinir. CSP de satir ici betigi reddeder;
   // bu ikinci kattir (ornegin CSP'yi desteklemeyen bir gomulu goruntuleyici).
+  // L-15 kalan: CSP style-src 'unsafe-inline' icermez. Satir ici style=
+  // ozniteligi CSP'ye takilir; data-lx-style olarak tasinir ve yerlestirildikten
+  // sonra CSSOM ile (el.style.cssText, CSP'nin izin verdigi yol) uygulanir.
   function sanitizeHtml(value) {
     const template = document.createElement('template');
-    descriptor.set.call(template, String(value == null ? '' : value));
+    descriptor.set.call(template, deferInlineStyleAttributes(value));
     template.content.querySelectorAll('*').forEach(node => {
       if (forbiddenTags.has(node.tagName)) {
         node.remove();
@@ -46,7 +49,7 @@ function installInnerHtmlSecurityBoundary() {
         }
         if (['href', 'src', 'xlink:href', 'formaction'].includes(name) &&
             /^(?:javascript|vbscript|data):/i.test(val)) node.removeAttribute(attr.name);
-        if (name === 'srcdoc' || (name === 'style' && /(?:url\s*\(|expression\s*\(|@import)/i.test(val))) {
+        if (name === 'srcdoc' || ((name === 'style' || name === 'data-lx-style') && /(?:url\s*\(|expression\s*\(|@import)/i.test(val))) {
           node.removeAttribute(attr.name);
         }
       });
@@ -58,12 +61,29 @@ function installInnerHtmlSecurityBoundary() {
     configurable: descriptor.configurable,
     enumerable: descriptor.enumerable,
     get: descriptor.get,
-    set(value) { descriptor.set.call(this, sanitizeHtml(value)); }
+    set(value) { descriptor.set.call(this, sanitizeHtml(value)); applyDeferredInlineStyles(this); }
   });
   Object.defineProperty(Element.prototype, '__lexbnbHtmlGuard', { value: true });
 }
 
+function deferInlineStyleAttributes(html) {
+  return String(html == null ? '' : html)
+    .replace(/<[a-zA-Z][^<>]*>/g, etiket => etiket.replace(/(\s)style=/gi, '$1data-lx-style='));
+}
+
+// data-lx-style -> el.style.cssText (CSSOM; CSP satir ici stili engeller, bunu engellemez).
+function applyDeferredInlineStyles(root) {
+  if (!root || typeof root.querySelectorAll !== 'function') return;
+  const uygula = el => { el.style.cssText = el.getAttribute('data-lx-style') || ''; el.removeAttribute('data-lx-style'); };
+  if (typeof root.hasAttribute === 'function' && root.hasAttribute('data-lx-style')) uygula(root);
+  root.querySelectorAll('[data-lx-style]').forEach(uygula);
+}
+
 installInnerHtmlSecurityBoundary();
+if (typeof document !== 'undefined' && document.documentElement) {
+  applyDeferredInlineStyles(document);
+  document.documentElement.classList.add('lx-styles-ready');
+}
 
 // data-on* isleyicisine giren dize (L-15 adim 3, core/action_dispatch.js).
 // encodeURIComponent tek tirnagi kodlamaz; sablonlar bunu kullanir.
@@ -118,7 +138,27 @@ function uiAskText(options) {
 function uiAskConfirm(options) {
   const api = uiDialogApi();
   const o = typeof options === 'string' ? { message: options } : options;
-  return api ? api.askConfirm(o) : Promise.resolve(typeof confirm === 'function' ? confirm(o.message || '') : false);
+  const yedek = o.fallback !== undefined ? o.fallback : true;
+  return api ? api.askConfirm(o) : Promise.resolve(typeof confirm === 'function' ? confirm(o.message || '') : yedek);
+}
+// Tarayici alert() yerine (L-287). Kisa mesaj bildirim seridine (toast) gider;
+// cok satirli ya da uzun mesaj uygulama penceresinde acilir ve kapaninca biter.
+// Ardindan sayfa yenilenecekse pencere await edilir.
+function uiNotify(message, options = {}) {
+  const metin = String(message == null ? '' : message);
+  const api = uiDialogApi();
+  const dom = typeof document !== 'undefined' && document.body && typeof HTMLElement === 'function';
+  if (!dom || !api) {
+    if (typeof alert === 'function') alert(metin);
+    return Promise.resolve();
+  }
+  if (!options.modal && !/\n/.test(metin) && metin.length <= 180 && typeof showToast === 'function') {
+    const hata = /^(⚠️|❌|⛔|🚫)|hata|edilemedi|yapılamadı|olamaz|bulunamadı|geçersiz|başarısız|giriniz|girin\b|seçin|zorunlu|reddedildi|yetki/i.test(metin);
+    const basari = /^(✅|🗑️|📦|🎉|💾|✔)/.test(metin);
+    showToast(metin, hata ? 'error' : (basari ? 'success' : 'info'));
+    return Promise.resolve();
+  }
+  return api.notify({ title: options.title || 'Lexbnb', message: kullaniciMesaji(metin) });
 }
 
 function kullaniciMesaji(metin) {
@@ -776,7 +816,7 @@ async function saveTenantBookingChannel(input = {}) {
   const rate = type === 'DIRECT' ? 0 : Number(input.defaultCommissionRate);
   if (!input.displayName || !String(input.displayName).trim()) throw new Error('Kanal adı zorunludur.');
   if (!['OTA', 'DIRECT'].includes(type)) throw new Error('Kanal türü geçersiz.');
-  if (!Number.isFinite(rate) || rate < 0 || rate > 100) throw new Error('Komisyon oranı 0 ile 100 arasında olmalıdır.');
+  if (!Number.isFinite(rate) || rate < 0 || rate > BOOKING_MAX_COMMISSION_PCT) throw new Error(`Komisyon oranı 0 ile ${BOOKING_MAX_COMMISSION_PCT} arasında olmalıdır.`);
   const { data, error } = await supabaseClient.rpc('save_tenant_booking_channel', {
     p_tenant_id: tenantId,
     p_channel_id: input.id || null,
@@ -1109,7 +1149,7 @@ async function deleteProperty(propIdOrSlug) {
   }
 
   if (typeof confirm === 'function') {
-    if (!confirm(vName + ' kaydını arşivlemek istediğinize emin misiniz? Geçmiş finans ve rezervasyon kayıtları korunacaktır.')) {
+    if (!(await uiAskConfirm(vName + ' kaydını arşivlemek istediğinize emin misiniz? Geçmiş finans ve rezervasyon kayıtları korunacaktır.'))) {
       return false;
     }
   }
@@ -1163,7 +1203,7 @@ async function deleteProperty(propIdOrSlug) {
     if (typeof closePropertyModal === 'function') closePropertyModal();
     if (typeof updateAllVillaDropdowns === 'function') updateAllVillaDropdowns();
     if (typeof renderAll === 'function') renderAll();
-    if (typeof alert === 'function') alert('📦 ' + vName + ' arşivlendi; geçmiş kayıtları korundu.');
+    uiNotify('📦 ' + vName + ' arşivlendi; geçmiş kayıtları korundu.');
   }
 
   return true;
@@ -1173,7 +1213,7 @@ async function deletePropertyUI(propIdOrSlug) {
   try {
     return await deleteProperty(propIdOrSlug);
   } catch (error) {
-    if (typeof alert === 'function') alert(error?.message || 'Mülk arşivlenemedi.');
+    uiNotify(error?.message || 'Mülk arşivlenemedi.');
     return false;
   }
 }
@@ -1431,6 +1471,41 @@ async function loadBookings(targetTenantId) {
   }
 }
 
+// Rezervasyon kaydinda engellenmeyen ama sorulan durumlar (L-300, kullanici
+// karari 27.10.2026). 0 TL ucretsiz konaklama (ortak/aile kullanimi, takas)
+// olabilir; kapasiteyi asan kisi sayisi ek yatakla olabilir. Ikisi de sessizce
+// kabul ediliyordu. Kapasitesi girilmemis mulkte kapasite olculmez.
+function bookingSaveWarnings({ gross, pax, villa } = {}) {
+  const uyarilar = [];
+  if (!(Number(gross) > 0)) uyarilar.push('Toplam tutar 0 TL. Ücretsiz konaklama (ortak/aile kullanımı, takas) olarak kaydedilecek; ciroya 0 TL yazılır.');
+  const villalar = (typeof appData !== 'undefined' && appData && appData.villas) || {};
+  const mulk = villalar[villa] || Object.values(villalar).find(v => v && v.id === villa) || null;
+  const kapasite = parseInt(String(mulk?.capacity ?? ''), 10);
+  const kisi = Number(pax);
+  if (Number.isFinite(kapasite) && kapasite > 0 && Number.isFinite(kisi) && kisi > kapasite) {
+    uyarilar.push(`${kisi} kişi, ${mulk.name || 'mülkün'} kapasitesini (${kapasite} kişi) aşıyor.`);
+  }
+  return uyarilar;
+}
+
+/** Uyari yoksa sormaz; varsa tek pencerede sorar. Vazgecilirse false. */
+async function confirmBookingWarnings(uyarilar) {
+  if (!Array.isArray(uyarilar) || uyarilar.length === 0) return true;
+  return await uiAskConfirm({ title: 'Kaydetmeden önce kontrol edin', message: uyarilar.join('\n\n') + '\n\nYine de kaydedilsin mi?', okText: 'Kaydet' });
+}
+
+// Komisyon brutun en fazla %50'si (L-300). %100 komisyon kabul ediliyordu;
+// kanal varsayilani da ayni sinira baglidir.
+const BOOKING_MAX_COMMISSION_PCT = 50;
+function bookingCommissionError(gross, otaComm) {
+  const brut = Number(gross) || 0;
+  const komisyon = Number(otaComm) || 0;
+  if (brut > 0 && komisyon > brut * BOOKING_MAX_COMMISSION_PCT / 100) {
+    return `Komisyon brüt tutarın %${BOOKING_MAX_COMMISSION_PCT}'sinden büyük olamaz (brüt ${brut.toLocaleString('tr-TR')} ₺, komisyon ${komisyon.toLocaleString('tr-TR')} ₺).`;
+  }
+  return null;
+}
+
 async function createBooking(bookingInput) {
   const tenantId = getActiveTenantId() || bookingInput?.tenantId;
   const isCloud = isCloudTenant(tenantId);
@@ -1467,6 +1542,8 @@ async function createBooking(bookingInput) {
   if (gross < 0) {
     throw new Error('Toplam tutar negatif olamaz.');
   }
+  const komisyonHatasi = bookingCommissionError(gross, bookingInput.otaComm);
+  if (komisyonHatasi) throw new Error(komisyonHatasi);
 
   // Resolve property UUID and verify active tenant ownership
   let propId = bookingInput.propertyId || bookingInput.property_id;
@@ -1676,6 +1753,8 @@ async function updateBooking(bookingId, bookingInput) {
   if (gross < 0) {
     throw new Error('Toplam tutar negatif olamaz.');
   }
+  const komisyonHatasi = bookingCommissionError(gross, bookingInput.otaComm !== undefined ? bookingInput.otaComm : existing?.otaComm);
+  if (komisyonHatasi) throw new Error(komisyonHatasi);
 
   // Formun gonderdigi mulk kaydin eski mulkunun onune gecer (L-268): once
   // existing.propertyId okunuyordu ve mulk degisikligi sessizce yok sayiliyordu.
@@ -1883,7 +1962,7 @@ async function deleteBooking(bookingId) {
   if (odemeVar) throw new Error('BOOKING_HAS_PAYMENTS');
 
   if (typeof confirm === 'function') {
-    if (!confirm(`${guestName} rezervasyonunu silmek istediğinize emin misiniz?`)) {
+    if (!(await uiAskConfirm(`${guestName} rezervasyonunu silmek istediğinize emin misiniz?`))) {
       return false;
     }
   }
@@ -1944,7 +2023,7 @@ async function deleteBooking(bookingId) {
     if (typeof saveAppData === 'function') saveAppData();
     if (typeof renderAll === 'function') renderAll();
     if (typeof closeBookingModal === 'function') closeBookingModal();
-    if (typeof alert === 'function') alert('🗑️ Rezervasyon başarıyla silindi.');
+    uiNotify('🗑️ Rezervasyon başarıyla silindi.');
   }
 
   return true;
@@ -1961,7 +2040,7 @@ async function deleteBookingUI(bookingId) {
     const message = raw.includes('BOOKING_HAS_PAYMENTS')
       ? 'Ödemesi bulunan rezervasyon silinemez. Önce ödeme kayıtlarını silin veya rezervasyonu iptal edin.'
       : (raw || 'Rezervasyon silinemedi.');
-    if (typeof alert === 'function') alert(message);
+    uiNotify(message);
     return false;
   }
 }
@@ -2869,7 +2948,7 @@ async function updateExpense(expenseId, expenseInput) {
 async function deleteExpense(expenseId, skipConfirm = false) {
   if (!expenseId) throw new Error('Silinecek gider ID belirtilmedi.');
   if (!skipConfirm && typeof confirm === 'function') {
-    const ok = confirm('Bu harcamayı silmek istediğinizden emin misiniz?');
+    const ok = (await uiAskConfirm('Bu harcamayı silmek istediğinizden emin misiniz?'));
     if (!ok) return false;
   }
 
@@ -2896,7 +2975,7 @@ async function deleteExpense(expenseId, skipConfirm = false) {
     if (error) {
       console.error('deleteExpense DB error:', error);
       const msg = 'Gider silinemedi: ' + (error.message || 'Veritabanı hatası');
-      if (typeof alert === 'function') alert(msg);
+      uiNotify(msg);
       throw new Error(msg);
     }
   }
@@ -4474,7 +4553,8 @@ function downloadCurrentReportCsv() {
 }
 
 function downloadCurrentReportXlsx() {
-  if (!currentPageReport || typeof XLSX === 'undefined') return false;
+  if (!currentPageReport) return false;
+  if (typeof XLSX === 'undefined') return retryWithXlsxEngine(() => downloadCurrentReportXlsx()) && false;
   const workbook = XLSX.utils.book_new();
   currentPageReport.excel.sheets.forEach(sheet => {
     const columns = sheet.columns || [];
@@ -4487,6 +4567,7 @@ function downloadCurrentReportXlsx() {
   return true;
 }
 
+const PRINT_REPORT_CSS = 'body{font:14px Arial;color:#111;padding:24px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:7px;text-align:left}.report-business{display:flex;gap:12px;align-items:center;margin-bottom:16px}.report-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.report-kpi{border:1px solid #ccc;padding:10px;display:flex;flex-direction:column}.sub-text{color:#555;display:block}img{max-width:180px;max-height:64px}';
 function printCurrentReport() {
   if (!currentPageReport) return false;
   // 'noopener' ozelligiyle window.open standart geregi her zaman null doner;
@@ -4494,8 +4575,15 @@ function printCurrentReport() {
   // yazildiktan sonra opener baglantisi elle kesilir.
   const popup = window.open('', '_blank');
   if (!popup) { showToast('Yazdırma penceresi engellendi. Tarayıcıda açılır pencerelere izin verin.', 'error'); return false; }
-  popup.document.write(`<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>${escapeHtml(currentPageReport.title)}</title><style>body{font:14px Arial;color:#111;padding:24px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:7px;text-align:left}.report-business{display:flex;gap:12px;align-items:center;margin-bottom:16px}.report-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.report-kpi{border:1px solid #ccc;padding:10px;display:flex;flex-direction:column}.sub-text{color:#555;display:block}img{max-width:180px;max-height:64px}</style></head><body><h1>${escapeHtml(currentPageReport.title)}</h1>${reportPreviewHtml(currentPageReport, 'print')}</body></html>`);
+  popup.document.write(deferInlineStyleAttributes(`<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>${escapeHtml(currentPageReport.title)}</title></head><body><h1>${escapeHtml(currentPageReport.title)}</h1>${reportPreviewHtml(currentPageReport, 'print')}</body></html>`));
   popup.document.close();
+  // Satir ici stil etiketi CSP'ye takilir (L-15); stil sayfasi CSSOM ile verilir.
+  try {
+    const sayfa = new popup.CSSStyleSheet();
+    sayfa.replaceSync(PRINT_REPORT_CSS);
+    popup.document.adoptedStyleSheets = [sayfa];
+  } catch (e) { /* eski tarayici: rapor stilsiz yazdirilir */ }
+  applyDeferredInlineStyles(popup.document);
   popup.opener = null;
   // Yazdirma bitince bos sekme kapanir (L-289): her yazdirmada about:blank kaliyordu.
   popup.addEventListener('afterprint', () => popup.close(), { once: true });
@@ -4618,6 +4706,7 @@ function switchTab(tabId) {
   if (tabId === 'settings') loadDeletionImpact();
   if (tabId === 'finance') renderFinanceModule();
   if (tabId === 'reservations') {
+    adoptGlobalFilterForReservations();
     renderManageBookingsTable();
     renderTapeChart();
   }
@@ -5109,7 +5198,7 @@ async function confirmCopyPreviousExpenses() {
     showToast('Kopyalanacak en az bir gider seçin.', 'warning');
     return false;
   }
-  if (!confirm(`${copies.length} gider ${currentFilter.period} dönemine yeni kayıt olarak yazılsın mı?`)) return false;
+  if (!(await uiAskConfirm(`${copies.length} gider ${currentFilter.period} dönemine yeni kayıt olarak yazılsın mı?`))) return false;
   try {
     await createExpensesBatch(copies);
     if (typeof SidePanel !== 'undefined') SidePanel.close();
@@ -5243,7 +5332,7 @@ function getCurrentAppBuildVersion(doc = typeof document !== 'undefined' ? docum
 const CURRENT_APP_BUILD_VERSION = getCurrentAppBuildVersion();
 
 async function forceHardRefresh() {
-  const confirmed = confirm('Tarayıcı ve mobildeki eski önbellek (cache) ve çerez kalıntıları temizlenip en güncel canlı sürüm yüklensin mi?\n\n(Not: Oturum bilgileriniz korunacaktır.)');
+  const confirmed = (await uiAskConfirm('Tarayıcı ve mobildeki eski önbellek (cache) ve çerez kalıntıları temizlenip en güncel canlı sürüm yüklensin mi?\n\n(Not: Oturum bilgileriniz korunacaktır.)'));
   if (!confirmed) return;
 
   if (window.showToast) {
@@ -5871,8 +5960,8 @@ function startIncomeEntry(kind) {
 }
 
 function openIncomeModal(editId = null) {
-  if (!canManageTenantRole(activeTenant?.role)) {
-    if (typeof showToast === 'function') showToast('Gelir kaydını yalnız işletme yönetimi girebilir.', 'error');
+  if (!canWriteLedgerRole(activeTenant?.role)) {
+    if (typeof showToast === 'function') showToast('Gelir kaydı girmek için finans kaydı izni gerekir.', 'error');
     return false;
   }
   const modal = document.getElementById('incomeModal');
@@ -5907,7 +5996,7 @@ async function saveIncomeEntry(event) {
   if (event && typeof event.preventDefault === 'function') event.preventDefault();
   const tenantId = getActiveTenantId();
   try {
-    if (!canManageTenantRole(activeTenant?.role)) throw new Error('Gelir kaydını yalnız işletme yönetimi girebilir.');
+    if (!canWriteLedgerRole(activeTenant?.role)) throw new Error('Gelir kaydı girmek için finans kaydı izni gerekir.');
     requireCloudForWrite('Gelir', tenantId);
     const editId = document.getElementById('incEditId')?.value || '';
     const villa = document.getElementById('incVilla')?.value || 'ALL';
@@ -5950,9 +6039,9 @@ async function deleteIncomeEntry(id) {
   const kayit = (appData.incomeEntries || []).find(i => i.id === id);
   if (!kayit) return false;
   try {
-    if (!canManageTenantRole(activeTenant?.role)) throw new Error('Gelir kaydını yalnız işletme yönetimi silebilir.');
+    if (!canWriteLedgerRole(activeTenant?.role)) throw new Error('Gelir kaydını silmek için finans kaydı izni gerekir.');
     if (isPeriodClosed(kayit.date)) throw new Error(`Bu kayıt kapatılmış döneme (${kayit.month}) ait; silinemez.`);
-    if (typeof confirm === 'function' && !confirm('Bu gelir kaydını silmek istediğinizden emin misiniz?')) return false;
+    if (!(await uiAskConfirm('Bu gelir kaydını silmek istediğinizden emin misiniz?'))) return false;
     const tenantId = getActiveTenantId();
     requireCloudForWrite('Gelir', tenantId);
     const { error } = await supabaseClient.from('income_entries').delete().eq('id', id).eq('tenant_id', tenantId);
@@ -5993,7 +6082,7 @@ function renderIncomeSection(ledger) {
     govde.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:16px;color:var(--text-muted);">Bu dönemde elle girilmiş gelir kaydı yok.</td></tr>';
     return;
   }
-  const yonetir = canManageTenantRole(activeTenant?.role);
+  const yonetir = canWriteLedgerRole(activeTenant?.role);
   govde.innerHTML = satirlar.map(i => `<tr>
       <td>${formatTrDate(i.date)}</td>
       <td><span class="badge ${i.type === 'CAPITAL' ? 'badge-amber' : 'badge-green'}">${escapeHtml(INCOME_TYPE_LABELS[i.type])}</span></td>
@@ -6145,7 +6234,7 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
             <div class="table-bar-track">
               <div class="table-bar-fill bar-blue" style="width: ${Math.min(100, Math.max(0, ciroShare))}%;"></div>
             </div>
-            <span style="font-size:10px; color:var(--text-muted);">Portföy Payı: %${ciroShare.toFixed(1)}</span>
+            <span style="font-size:11px; color:var(--text-muted);">Portföy Payı: %${ciroShare.toFixed(1)}</span>
           </div>
         </td>
         <td>
@@ -6154,14 +6243,14 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
             <div class="table-bar-track">
               <div class="table-bar-fill ${occVal >= 75 ? 'bar-emerald' : (occVal >= 45 ? 'bar-blue' : 'bar-amber')}" style="width: ${Math.min(100, Math.max(0, occVal || 0))}%;"></div>
             </div>
-            <span style="font-size:10px; color:var(--text-muted);" title="${occVal === null ? 'Mülk bu dönemde faaliyette görünmüyor (faaliyete başlama tarihi)' : ''}">Doluluk: ${occText}</span>
+            <span style="font-size:11px; color:var(--text-muted);" title="${occVal === null ? 'Mülk bu dönemde faaliyette görünmüyor (faaliyete başlama tarihi)' : ''}">Doluluk: ${occText}</span>
           </div>
         </td>
         <td><strong>${adrVal.toLocaleString('tr-TR')} TL</strong></td>
         <td>${revparText}</td>
         <td>
           <strong class="${profit.tone}">${profit.valueHtml}</strong>
-          <span style="display:block; font-size:10px; color:var(--text-muted);">${escapeHtml(profit.note)}</span>
+          <span style="display:block; font-size:11px; color:var(--text-muted);">${escapeHtml(profit.note)}</span>
         </td>
         <td style="text-align: right; white-space: nowrap;">
           <button class="btn btn-secondary btn-sm" data-onclick="filterByVilla(decodeURIComponent('${encodeActionArg(item.key)}'))">🔍 Odaklan</button>
@@ -6202,7 +6291,7 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
 
         <div class="prop-hero-ciro-box">
           <div>
-            <span style="font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Aylık fiili ciro</span>
+            <span style="font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Aylık fiili ciro</span>
             <div class="hero-ciro-val">${Math.round(s.revenue).toLocaleString('tr-TR')} TL</div>
           </div>
           <span class="badge badge-emerald">%${ciroShare.toFixed(1)} Pay</span>
@@ -6999,7 +7088,7 @@ async function deleteCustomExpenseCategory(name) {
   const soru = adet
     ? `"${name}" kategorisi silinsin mi? ${adet} gider kaydı silinmez; raporda "Diğer" altında kendi adıyla görünür.`
     : `"${name}" kategorisi silinsin mi?`;
-  if (typeof confirm === 'function' && !confirm(soru)) return false;
+  if (!(await uiAskConfirm(soru))) return false;
   const liste = getCustomExpenseCategories().filter(c => c.name !== name).map(c => ({ name: c.name, type: c.type }));
   try {
     await saveCustomExpenseCategories(liste);
@@ -7131,7 +7220,7 @@ async function saveExpenseOnce() {
     closeExpenseModal();
   } catch (err) {
     console.error('saveExpense error:', err);
-    if (typeof alert === 'function') alert(kullaniciMesaji(err.message || 'Gider kaydedilemedi.'));
+    uiNotify(kullaniciMesaji(err.message || 'Gider kaydedilemedi.'));
   }
 }
 
@@ -7151,7 +7240,7 @@ async function deleteExpenseUI(id) {
     if (typeof showToast === 'function') showToast('Bu gider Reklamlar ekranındaki dönemden yönetilir.', 'error');
     return false;
   }
-  if (typeof confirm === 'function' && !confirm('Bu harcamayı silmek istediğinizden emin misiniz?')) {
+  if (!(await uiAskConfirm('Bu harcamayı silmek istediğinizden emin misiniz?'))) {
     return false;
   }
   // Tekrarlayan giderin sonraki tekrarlari (M67): tekrari durdurmak icin
@@ -7161,8 +7250,7 @@ async function deleteExpenseUI(id) {
     const s = expenseSeriesInfo(e);
     return e.id !== id && s && s.id === seri.id && s.index > seri.index && !isPeriodClosed(e.date);
   }) : [];
-  const hepsi = sonrakiler.length > 0 && typeof confirm === 'function'
-    && confirm(`Bu tekrarlayan giderin sonraki ${sonrakiler.length} tekrarı da silinsin mi?\n\nTamam: bu ve sonrakiler silinir · İptal: yalnız bu kayıt silinir`);
+  const hepsi = sonrakiler.length > 0 && (await uiAskConfirm({ message: `Bu tekrarlayan giderin sonraki ${sonrakiler.length} tekrarı da silinsin mi?\n\nTamam: bu ve sonrakiler silinir · İptal: yalnız bu kayıt silinir`, fallback: false }));
   try {
     if (hepsi) {
       await deleteExpensesByIds([id, ...sonrakiler.map(e => e.id)]);
@@ -7173,7 +7261,7 @@ async function deleteExpenseUI(id) {
     return true;
   } catch (err) {
     console.error('deleteExpense error:', err);
-    if (typeof alert === 'function') alert(err.message || 'Gider silinemedi.');
+    uiNotify(err.message || 'Gider silinemedi.');
     return false;
   }
 }
@@ -7396,7 +7484,7 @@ async function saveMonthlyGoals(e) {
   
   const calculator = getMonthlyGoalCalculator();
   if (!calculator) {
-    alert('Hedef hesaplama motoru yüklenemedi. Sayfayı yenileyin.');
+    uiNotify('Hedef hesaplama motoru yüklenemedi. Sayfayı yenileyin.');
     return;
   }
   // Bos birakilan hedef 0 DEGIL, "hedef yok"tur (3.6): 0 yazmak ekranda
@@ -7417,7 +7505,7 @@ async function saveMonthlyGoals(e) {
   const validation = calculator.validateForSave({ revenue, netProfit, profit: netProfit, maxExpense, nights, adr, margin }, capacity);
   updateGoalCapacityFeedback();
   if (!validation.valid) {
-    alert(validation.errors[0].message);
+    uiNotify(validation.errors[0].message);
     return;
   }
   const occupancy = validation.capacity.occupancy;
@@ -7439,7 +7527,7 @@ async function saveMonthlyGoals(e) {
     document.body.appendChild(toast);
     setTimeout(() => { toast.remove(); }, 3500);
   } catch (err) {
-    alert('Hedef kaydedilemedi: ' + getFriendlyAuthErrorMessage(err));
+    uiNotify('Hedef kaydedilemedi: ' + getFriendlyAuthErrorMessage(err));
   }
 }
 
@@ -7537,12 +7625,12 @@ function openImportConvertPrompt(mode) {
 
 function downloadSampleTemplate(templateType) {
   if (typeof XLSX === 'undefined') {
-    alert('Excel motoru yükleniyor, lütfen birkaç saniye sonra tekrar deneyin.');
+    if (!retryWithXlsxEngine(() => downloadSampleTemplate(templateType))) uiNotify('Excel motoru yüklenemedi, sayfayı yenileyin.');
     return;
   }
   const engine = getImportEngine();
   if (!engine || typeof ImportTemplateGuide === 'undefined') {
-    alert('Şablon motoru yüklenemedi. Sayfayı yenileyin.');
+    uiNotify('Şablon motoru yüklenemedi. Sayfayı yenileyin.');
     return;
   }
   const mode = ['BOOKINGS', 'CLEANING'].includes(templateType) ? templateType : 'EXPENSES';
@@ -7625,30 +7713,94 @@ function buildImportSource(bytes, fileName) {
   if (typeof XLSX === 'undefined') {
     throw new Error('Excel motoru henüz yüklenmedi, lütfen sayfayı yenileyin.');
   }
-  // Yalniz ilk sayfa ve siniri bir satir asacak kadar okunur: SheetJS'in
-  // butun dosyayi bellege acmasina izin verilmez.
-  const wb = XLSX.read(bytes, { type: 'array', cellDates: true, sheets: 0, sheetRows: IMPORT_MAX_ROWS + 2 });
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  const rows = ws ? XLSX.utils.sheet_to_json(ws, { defval: '', raw: true }) : [];
-  if (rows.length > IMPORT_MAX_ROWS) throw importSinirHatasi(rows.length);
-  // Basliklar ilk satirdan okunur (L-278): yalniz baslik satiri olan dosyada
-  // (degistirilmemis uygulama ici sablon) satir yok, Object.keys bos
-  // donuyordu; tur sezilemiyor ve dosya "Gider Defteri" saniliyordu.
-  const ilkSatir = ws ? (XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: true })[0] || []) : [];
-  const basliklar = ilkSatir.map(h => String(h == null ? '' : h).trim()).filter(Boolean);
-  return {
-    kind: 'XLSX',
-    fileName,
-    sheetNames: (wb.SheetNames || []).slice(),
-    headers: basliklar.length ? basliklar : (rows.length ? Object.keys(rows[0]) : []),
-    rows
-  };
+  // Ayristirma tek yerde: core/xlsx_import_worker.js (L-162).
+  return xlsxImportResultToSource(getXlsxImportParser().parse(XLSX, bytes, IMPORT_MAX_ROWS), fileName);
+}
+
+// Excel motoru (SheetJS, ~930 KB) giris sayfasinda yuklenmez (L-163). Giristen
+// sonra bosta onceden yuklenir; o ana kadar hazir degilse ice/disa aktarma
+// once motoru yukler, sonra devam eder.
+const XLSX_ENGINE_URL = 'xlsx.full.min.js?v=56e27b47';
+let xlsxEngineYukleniyor = null;
+function loadXlsxEngine() {
+  if (typeof XLSX !== 'undefined') return Promise.resolve(XLSX);
+  if (typeof document === 'undefined' || !document.head) return Promise.reject(new Error('Excel motoru yüklenemedi.'));
+  if (!xlsxEngineYukleniyor) {
+    xlsxEngineYukleniyor = new Promise((resolve, reject) => {
+      const etiket = document.createElement('script');
+      etiket.src = XLSX_ENGINE_URL;
+      etiket.onload = () => (typeof XLSX !== 'undefined' ? resolve(XLSX) : reject(new Error('Excel motoru yüklenemedi.')));
+      etiket.onerror = () => { xlsxEngineYukleniyor = null; reject(new Error('Excel motoru yüklenemedi; bağlantınızı kontrol edip tekrar deneyin.')); };
+      document.head.appendChild(etiket);
+    });
+  }
+  return xlsxEngineYukleniyor;
+}
+function scheduleXlsxEnginePreload() {
+  if (typeof window === 'undefined' || typeof XLSX !== 'undefined') return;
+  const basla = () => loadXlsxEngine().catch(() => { /* gereken anda yeniden denenir */ });
+  if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(basla, { timeout: 8000 });
+  else setTimeout(basla, 3000);
+}
+// Motor yoksa yukleyip ayni islemi yeniden cagirir; yuklenemezse soyler.
+function retryWithXlsxEngine(islem) {
+  if (typeof document === 'undefined' || !document.head) return false;
+  if (typeof showToast === 'function') showToast('Excel motoru yükleniyor…', 'info');
+  loadXlsxEngine().then(() => islem()).catch(err => uiNotify(err.message));
+  return true;
+}
+
+function getXlsxImportParser() {
+  if (typeof LexbnbXlsxImport !== 'undefined') return LexbnbXlsxImport;
+  return require('./core/xlsx_import_worker.js');
+}
+
+function xlsxImportResultToSource(sonuc, fileName) {
+  if (sonuc.rowCount > IMPORT_MAX_ROWS) throw importSinirHatasi(sonuc.rowCount);
+  return { kind: 'XLSX', fileName, sheetNames: sonuc.sheetNames, headers: sonuc.headers, rows: sonuc.rows };
+}
+
+// Excel dosyasi arka planda (Web Worker) ayristirilir (L-162): hazirlanmis
+// sikistirilmis bir dosya sekmeyi dondurmaz; sure asilirsa worker sonlandirilir.
+// Worker yoksa (Node, eski tarayici) ayni ayristirici senkron calisir.
+const XLSX_IMPORT_WORKER_URL = 'core/xlsx_import_worker.js?v=b0939d47';
+const IMPORT_WORKER_TIMEOUT_MS = 30000;
+function buildImportSourceAsync(bytes, fileName) {
+  const E = getImportEngine();
+  const worker = typeof Worker === 'function' && typeof document !== 'undefined' && E
+    && bytes && bytes.length <= IMPORT_MAX_BYTES && E.detectImportSourceKind(bytes) !== 'TEXT';
+  if (!worker) {
+    const metin = !E || !bytes || bytes.length > IMPORT_MAX_BYTES || E.detectImportSourceKind(bytes) === 'TEXT';
+    const hazir = metin || typeof XLSX !== 'undefined' || typeof document === 'undefined' ? Promise.resolve() : loadXlsxEngine();
+    return hazir.then(() => buildImportSource(bytes, fileName));
+  }
+  const xlsxUrl = new URL(XLSX_ENGINE_URL, document.baseURI).href;
+  return new Promise((resolve, reject) => {
+    const w = new Worker(XLSX_IMPORT_WORKER_URL);
+    const bitir = () => { clearTimeout(zamanlayici); w.terminate(); };
+    const zamanlayici = setTimeout(() => {
+      bitir();
+      reject(new Error(`Dosya ${IMPORT_WORKER_TIMEOUT_MS / 1000} saniyede okunamadı. Dosyayı Excel'de açıp yalnız ilk sayfayı yeniden kaydederek deneyin.`));
+    }, IMPORT_WORKER_TIMEOUT_MS);
+    w.onmessage = event => {
+      bitir();
+      const veri = event.data || {};
+      if (!veri.ok) { reject(new Error(veri.message || 'Excel dosyası okunamadı.')); return; }
+      try { resolve(xlsxImportResultToSource(veri, fileName)); } catch (err) { reject(err); }
+    };
+    w.onerror = event => {
+      bitir();
+      if (event && typeof event.preventDefault === 'function') event.preventDefault();
+      reject(new Error('Excel dosyası okunamadı.'));
+    };
+    w.postMessage({ xlsxUrl, bytes, maxRows: IMPORT_MAX_ROWS }, [bytes.buffer]);
+  });
 }
 
 function readImportFile(file) {
   if (!file) return;
   if (file.size > IMPORT_MAX_BYTES) {
-    alert(`Dosya çok büyük (${(file.size / 1048576).toFixed(1)} MB). En fazla ${IMPORT_MAX_BYTES / 1048576} MB içe aktarılabilir.`);
+    uiNotify(`Dosya çok büyük (${(file.size / 1048576).toFixed(1)} MB). En fazla ${IMPORT_MAX_BYTES / 1048576} MB içe aktarılabilir.`);
     return;
   }
 
@@ -7656,13 +7808,12 @@ function readImportFile(file) {
   const reader = new FileReader();
 
   reader.onload = function(evt) {
-    try {
-      const kaynak = buildImportSource(new Uint8Array(evt.target.result), fileName);
-      analyzeAndPreviewSource(kaynak);
-    } catch (err) {
-      console.error('File parsing error:', err);
-      alert('Dosya okunurken bir hata oluştu: ' + (err.message || 'Bilinmeyen format'));
-    }
+    buildImportSourceAsync(new Uint8Array(evt.target.result), fileName)
+      .then(kaynak => analyzeAndPreviewSource(kaynak))
+      .catch(err => {
+        console.error('File parsing error:', err);
+        uiNotify('Dosya okunurken bir hata oluştu: ' + (err.message || 'Bilinmeyen format'));
+      });
   };
 
   reader.readAsArrayBuffer(file);
@@ -7916,11 +8067,11 @@ async function undoImportBatch(batchId) {
 
   const parti = (appData.importBatches || []).find(p => p.id === batchId);
   const adet = parti ? parti.linkedCount : 0;
-  const onay = typeof confirm === 'function' ? confirm(
+  const onay = (await uiAskConfirm({ message: 
     `"${parti ? parti.filename : 'Bu dosya'}" aktarımıyla eklenen ${adet} kayıt SİLİNECEK.\n\n` +
     'Aktarımdan sonra elle düzenlediğiniz kayıtlar silinmez, atlanır.\n' +
     'Kapanmış bir döneme düşen kayıt varsa hiçbir şey silinmez.\n\n' +
-    'Devam edilsin mi?') : false;
+    'Devam edilsin mi?', fallback: false }));
   if (!onay) return;
 
   const { data, error } = await supabaseClient.rpc('undo_finance_import', {
@@ -7932,13 +8083,13 @@ async function undoImportBatch(batchId) {
   if (error) {
     const mesaj = String(error.message || '');
     if (mesaj.indexOf('CLOSED_PERIOD_BLOCK') !== -1) {
-      alert('Geri alınamadı: bu aktarımın bir kısmı KAPATILMIŞ bir döneme ait.\n\n' +
+      uiNotify('Geri alınamadı: bu aktarımın bir kısmı KAPATILMIŞ bir döneme ait.\n\n' +
         'Yarım bir geri alma, düzeltmek istediğiniz karışıklığın daha kötüsünü ' +
         'üretirdi; bu yüzden hiçbir kayıt silinmedi. Önce ilgili dönemi açın.');
     } else if (mesaj.indexOf('Could not find the function') !== -1 || error.code === 'PGRST202') {
-      alert('Geri alma özelliği için veritabanı göçü (phase35) henüz uygulanmamış.');
+      uiNotify('Geri alma özelliği için veritabanı göçü (phase35) henüz uygulanmamış.');
     } else {
-      alert('Geri alınamadı: ' + (error.message || 'bilinmeyen hata'));
+      uiNotify('Geri alınamadı: ' + (error.message || 'bilinmeyen hata'));
     }
     return;
   }
@@ -7960,7 +8111,7 @@ async function undoImportBatch(batchId) {
   // Sonuc pencerede yazar (L-291): bolum kayboluyor, toast pencerenin arkasinda kaliyordu.
   setImportHistoryMessage(`${silinen} kayıt geri alındı.${data.skipped_modified > 0 ? ` ${data.skipped_modified} kayıt elle düzenlendiği için silinmedi.` : ''}${donemNotu}`, 'success');
   if (data.skipped_modified > 0) {
-    alert(`${silinen} kayıt silindi.\n\n${data.skipped_modified} kayıt SİLİNMEDİ: ` +
+    uiNotify(`${silinen} kayıt silindi.\n\n${data.skipped_modified} kayıt SİLİNMEDİ: ` +
       'aktarımdan sonra elle düzenlenmişler. Onlar artık aktarılan veri değil, ' +
       'sizin düzenlemeniz; istiyorsanız tek tek silebilirsiniz.');
   } else if (typeof showToast === 'function') {
@@ -7993,13 +8144,13 @@ async function refreshImportHistory() {
     const tarih = p.importedAt ? new Date(p.importedAt).toLocaleString('tr-TR') : '—';
     const geriAlinabilir = p.linkedCount > 0;
     const dugme = geriAlinabilir
-      ? `<button type="button" class="btn btn-secondary btn-sm" style="font-size:10px; padding:3px 8px; border-color:#FF453A; color:#FCA5A5;"
+      ? `<button type="button" class="btn btn-secondary btn-sm" style="font-size:11px; padding:3px 8px; border-color:#FF453A; color:#FCA5A5;"
                  data-onclick="undoImportBatch(decodeURIComponent('${encodeActionArg(String(p.id))}'))">↩︎ Geri Al (${p.linkedCount})</button>`
-      : `<span style="font-size:10px; color:#6E6E73;" title="Bu aktarımın kayıtları sonradan silinmiş ya da aktarım geri alma özelliği eklenmeden önce yapılmış.">geri alınacak kayıt yok</span>`;
+      : `<span style="font-size:11px; color:#6E6E73;" title="Bu aktarımın kayıtları sonradan silinmiş ya da aktarım geri alma özelliği eklenmeden önce yapılmış.">geri alınacak kayıt yok</span>`;
     return `<div style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:6px 8px; border-bottom:1px solid rgba(255,255,255,0.06);">
       <div style="min-width:0;">
         <div style="font-size:11px; color:#E5E5EA; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(p.filename)}</div>
-        <div style="font-size:10px; color:#6E6E73;">${escapeHtml(tarih)} · ${p.rowCount} kayıt · ${tl(p.amount)} TL</div>
+        <div style="font-size:11px; color:#6E6E73;">${escapeHtml(tarih)} · ${p.rowCount} kayıt · ${tl(p.amount)} TL</div>
       </div>
       ${dugme}
     </div>`;
@@ -8025,7 +8176,7 @@ function getImportProperties() {
 
 function parseSourceWithMode(kaynak, mode) {
   const E = getImportEngine();
-  if (!E) { alert('İçe aktarma motoru yüklenemedi. Sayfayı yenileyin.'); return; }
+  if (!E) { uiNotify('İçe aktarma motoru yüklenemedi. Sayfayı yenileyin.'); return; }
 
   let finalMode = mode;
   if (finalMode === 'AUTO') {
@@ -8324,7 +8475,7 @@ async function applyImportedData() {
   if (temizlikMi && supabaseClient) {
     const { error: semaHata } = await supabaseClient.from('finance_import_batch_rows').select('cleaning_task_id').limit(0);
     if (semaHata) {
-      alert('Geçmiş temizlik aktarımı için veritabanı göçü (phase95) henüz uygulanmadı. Aktarım geri alınamayacağı için başlatılmadı; hiçbir kayıt yazılmadı.');
+      uiNotify('Geçmiş temizlik aktarımı için veritabanı göçü (phase95) henüz uygulanmadı. Aktarım geri alınamayacağı için başlatılmadı; hiçbir kayıt yazılmadı.');
       return;
     }
   }
@@ -8336,9 +8487,7 @@ async function applyImportedData() {
       .select('id,filename,imported_at,row_count').eq('tenant_id', tenantId).eq('file_hash', parmakIzi).maybeSingle();
     if (onceki) {
       const t = onceki.imported_at ? new Date(onceki.imported_at).toLocaleString('tr-TR') : '';
-      const devam = typeof confirm === 'function'
-        ? confirm(`Bu dosya daha önce içe aktarılmış (${onceki.filename}, ${t}, ${onceki.row_count} satır).\n\nAynı kayıtları ikinci kez eklemek cironuzu ve giderinizi iki katına çıkarır.\n\nYine de devam etmek istiyor musunuz?`)
-        : false;
+      const devam = (await uiAskConfirm({ message: `Bu dosya daha önce içe aktarılmış (${onceki.filename}, ${t}, ${onceki.row_count} satır).\n\nAynı kayıtları ikinci kez eklemek cironuzu ve giderinizi iki katına çıkarır.\n\nYine de devam etmek istiyor musunuz?`, fallback: false }));
       if (!devam) return;
     }
   }
@@ -8525,7 +8674,7 @@ async function applyImportedData() {
     // Kismi basari: NE YAZILDI, NE YAZILMADI acikca soylenir.
     const ozet = basarisiz.slice(0, 5).map(f => `satır ${f.rowNum}: ${f.mesaj}`).join('\n');
     const kalan = basarisiz.length > 5 ? `\n… ${basarisiz.length - 5} hata daha` : '';
-    alert(`${basarili.length} kayıt eklendi, ${basarisiz.length} kayıt eklenemedi.\n\n${ozet}${kalan}\n\n` +
+    uiNotify(`${basarili.length} kayıt eklendi, ${basarisiz.length} kayıt eklenemedi.\n\n${ozet}${kalan}\n\n` +
           `Eklenen kayıtlar sistemde kaldı. Hatalı satırları dosyanızda düzeltip yeniden yükleyebilirsiniz.`);
     renderImportPreviewBox();
   }
@@ -8544,6 +8693,55 @@ function reservationMonthRange(monthKey) {
 
 let reservationListRange = reservationMonthRange(getTodayStr().slice(0, 7));
 let reservationRangeAnchor = new Date(`${reservationListRange.start}T12:00:00`);
+
+// Rezervasyonlar ustteki donem ve mulk secimiyle aynidir (L-300, kullanici
+// karari 27.10.2026). Eskiden kendi "bu ay / tum portfoy" secimiyle aciliyordu;
+// Finans'ta Kasim + bir mulk seciliyken burada Ekim + tum portfoy gorunuyordu.
+// Sekmeye girerken ust secim alinir; burada degisen ay ya da mulk ustte de
+// degisir. Hafta gorunumu yalniz takvimin penceresidir, ust donemi degistirmez.
+function getReservationListRange() { return { ...reservationListRange }; }
+
+let reservationAdoptedFilterKey = null;
+function adoptGlobalFilterForReservations() {
+  const anahtar = [currentFilter.period, currentFilter.startDate, currentFilter.endDate, currentFilter.villa].join('|');
+  if (anahtar === reservationAdoptedFilterKey) return;
+  reservationAdoptedFilterKey = anahtar;
+  const select = document.getElementById('rezVillaFilter');
+  if (select) select.value = currentFilter.villa || 'ALL';
+  // "Tum zamanlar" bir takvim araligi degildir; liste o zaman bulundugu donemde kalir.
+  if (!currentFilter.startDate || !currentFilter.endDate) return;
+  if (typeof tapeChartView !== 'undefined') tapeChartView = 'MONTH';
+  reservationListRange = { start: currentFilter.startDate, end: currentFilter.endDate };
+  reservationRangeAnchor = new Date(`${reservationListRange.start}T12:00:00`);
+}
+
+function writeReservationScopeToGlobalFilter() {
+  const select = document.getElementById('rezVillaFilter');
+  if (select && select.value) currentFilter.villa = select.value;
+  if (typeof tapeChartView === 'undefined' || tapeChartView === 'MONTH') {
+    const { start, end } = reservationListRange;
+    const ay = start.slice(0, 7);
+    const tamAy = start === `${ay}-01` && end === reservationMonthRange(ay).end;
+    const listede = typeof ALL_FINANCIAL_MONTHS === 'undefined' || ALL_FINANCIAL_MONTHS.includes(ay);
+    currentFilter.period = tamAy && listede ? ay : 'CUSTOM';
+    currentFilter.startDate = start;
+    currentFilter.endDate = end;
+  }
+  const periodSel = document.getElementById('globalPeriodFilter');
+  if (periodSel) periodSel.value = currentFilter.period;
+  const villaSel = document.getElementById('globalVillaFilter');
+  if (villaSel) villaSel.value = currentFilter.villa;
+  if (currentFilter.period === 'CUSTOM') {
+    const s = document.getElementById('customFilterStart');
+    const e = document.getElementById('customFilterEnd');
+    if (s) s.value = currentFilter.startDate;
+    if (e) e.value = currentFilter.endDate;
+  }
+  const customWrap = document.getElementById('customDateRangeWrap');
+  if (customWrap && customWrap.style) customWrap.style.display = currentFilter.period === 'CUSTOM' ? 'inline-flex' : 'none';
+  if (typeof updateStepperLabels === 'function') updateStepperLabels();
+  reservationAdoptedFilterKey = [currentFilter.period, currentFilter.startDate, currentFilter.endDate, currentFilter.villa].join('|');
+}
 
 function syncReservationRangeUi() {
   const label = document.getElementById('reservationRangeLabel');
@@ -8750,7 +8948,7 @@ async function saveBookingPayment(bookingId) {
 
 async function deleteBookingPayment(paymentId, bookingId) {
   if (!canManageTenantRole(activeTenant?.role)) return false;
-  if (typeof confirm === 'function' && !confirm('Bu ödeme kaydı silinsin mi?')) return false;
+  if (!(await uiAskConfirm('Bu ödeme kaydı silinsin mi?'))) return false;
   try {
     const { error } = await supabaseClient.from('booking_payments').delete().eq('id', paymentId);
     if (error) throw error;
@@ -8925,7 +9123,7 @@ function renderManageBookingsTable() {
     tr.setAttribute('data-onclick', `openBookingDetailsPanel(decodeURIComponent('${encodeActionArg(String(b.id))}'))`);
     tr.innerHTML = `
       <td data-label="Mülk" data-onclick="openBookingDetailsPanel(decodeURIComponent('${encodeActionArg(String(b.id))}'))"><strong>${propertyNameHtml(b.villa, vName)}</strong>${markerHtml ? `<div class="reservation-markers">${markerHtml}</div>` : ''}</td>
-      <td data-label="Misafir">${escapeHtml(b.guest || 'Belirtilmedi')}${isBulkSummaryBooking(b) ? ' <span class="badge badge-slate" style="font-size:10px;">Aylık özet</span>' : ''}</td>
+      <td data-label="Misafir">${escapeHtml(b.guest || 'Belirtilmedi')}${isBulkSummaryBooking(b) ? ' <span class="badge badge-slate" style="font-size:11px;">Aylık özet</span>' : ''}</td>
       <td data-label="Kanal"><span class="badge ${b.channel === 'AIRBNB' ? 'badge-rose' : (b.channel === 'BOOKING' ? 'badge-blue' : 'badge-emerald')}">${escapeHtml(getChannelDisplayName(b.channel))}</span></td>
       <td data-label="Tarihler">${formatTrDate(b.checkIn)} – ${formatTrDate(b.checkOut)}</td>
       <td data-label="Brüt">${e.cancelled ? `<span class="reservation-sub">${para(e.fullGross)} · iptal, hesaba girmez</span>` : `<strong>${para(e.gross)}</strong>${payNotu}`}</td>
@@ -9582,7 +9780,7 @@ async function saveBooking(e) {
     const minStayEngeli = tarihDegisti ? minStayBlockMessage(villa, checkIn, checkOut, { status }) : null;
     if (minStayEngeli) throw new Error(minStayEngeli);
     // Cikis tarihinden once "Cikis yapti" (L-280): uyarisiz kabul ediliyordu.
-    if (!confirmEarlyCheckout(checkIn, checkOut, status, eskiKayit)) throw new Error('Kayıt yapılmadı.');
+    if (!(await confirmEarlyCheckout(checkIn, checkOut, status, eskiKayit))) throw new Error('Kayıt yapılmadı.');
 
     const economics = readBookingFormEconomics();
     const cleanFee = economics.cleanFee;
@@ -9603,6 +9801,14 @@ async function saveBooking(e) {
     const depositMethod = document.getElementById('resDepositMethod')?.value || null;
 
     const net = economics.netRoomRevenue;
+
+    // 0 TL ve kapasite asimi sorulur (L-300); duzenlemede yalniz degisen alan.
+    const uyarilar = bookingSaveWarnings({ gross, pax, villa }).filter((_, i, liste) => {
+      if (!eskiKayit) return true;
+      const sifirMi = /^Toplam tutar 0 TL/.test(liste[i]);
+      return sifirMi ? Number(eskiKayit.gross) !== gross : (Number(eskiKayit.pax) !== pax || eskiKayit.villa !== villa);
+    });
+    if (!(await confirmBookingWarnings(uyarilar))) throw new Error('Kayıt yapılmadı.');
 
     const bookingInput = {
       villa,
@@ -9659,11 +9865,11 @@ async function saveBooking(e) {
     closeBookingModal();
     // Basari bildirimi ham alert degil (L-287); ek uyari varsa okunur pencerede.
     if (guestProfileWarning && typeof uiDialogApi === 'function' && uiDialogApi()) uiDialogApi().notify({ title: 'Rezervasyon kaydedildi', message: String(guestProfileWarning).trim() });
-    else if (guestProfileWarning && typeof alert === 'function') alert('Rezervasyon kaydedildi.' + guestProfileWarning);
+    else if (guestProfileWarning && typeof alert === 'function') uiNotify('Rezervasyon kaydedildi.' + guestProfileWarning);
     if (typeof showToast === 'function') showToast('✅ Rezervasyon kaydedildi.', 'success');
   } catch (err) {
     console.error('saveBooking error:', err);
-    if (typeof alert === 'function') alert('Rezervasyon kaydedilemedi: ' + (err.message || 'Lütfen bilgileri kontrol edin.'));
+    uiNotify('Rezervasyon kaydedilemedi: ' + (err.message || 'Lütfen bilgileri kontrol edin.'));
   } finally {
     if (submitBtn) {
       submitBtn.disabled = false;
@@ -9706,7 +9912,7 @@ function renderSettingsGoalsTable() {
     tr.innerHTML = `
       <td>
         <strong>${escapeHtml(m.name)}</strong>
-        ${isCurrent ? ' <span class="badge badge-blue" style="font-size:10px; margin-left:4px;">Seçili Dönem</span>' : ''}
+        ${isCurrent ? ' <span class="badge badge-blue" style="font-size:11px; margin-left:4px;">Seçili Dönem</span>' : ''}
       </td>
       <td>
         <strong style="color: #409CFF;">${Number.isFinite(rev) ? rev.toLocaleString('tr-TR') + ' TL' : '—'}</strong>
@@ -9748,20 +9954,56 @@ const TEAM_ROLES = {
   viewer:  { label: 'İzleyici',  badge: 'badge-rose',    hint: 'Yalnızca görüntüler, hiçbir veriyi değiştiremez.' }
 };
 
+// Yonetim (mulk, ayar, ekip) role baglidir; izinle verilemez (L-211).
 function canManageTenantRole(role = activeTenant?.role) {
   return ['owner', 'admin', 'manager'].includes(role);
 }
 
+// Kisi bazinda izin matrisi (L-211, phase107): rol baslangic paketidir, sahip
+// uye bazinda satis, finans ve operasyon izinlerini degistirir. Kayit yalniz
+// aktif kullanicinin KENDI rolu soruldugunda uygulanir (activeTenant.permissions).
+function getPermissionMatrix() {
+  if (typeof PermissionMatrix !== 'undefined') return PermissionMatrix;
+  return require('./core/permission_matrix.js');
+}
+
+function activePermissionOverrides(role) {
+  return activeTenant && role === activeTenant.role ? (activeTenant.permissions || {}) : {};
+}
+
 function canReadLedgerRole(role = activeTenant?.role) {
-  return ['owner', 'admin', 'manager', 'viewer'].includes(role);
+  return getPermissionMatrix().allows(role, 'ledger.read', activePermissionOverrides(role));
 }
 
 function canReadSalesRole(role = activeTenant?.role) {
-  return ['owner', 'admin', 'manager', 'sales', 'viewer'].includes(role);
+  return getPermissionMatrix().allows(role, 'sales.read', activePermissionOverrides(role));
 }
 
 function canWriteSalesRole(role = activeTenant?.role) {
-  return ['owner', 'admin', 'manager', 'sales'].includes(role);
+  return getPermissionMatrix().allows(role, 'sales.write', activePermissionOverrides(role));
+}
+
+function canWriteLedgerRole(role = activeTenant?.role) {
+  return getPermissionMatrix().allows(role, 'ledger.write', activePermissionOverrides(role));
+}
+
+function canManageOperationsRole(role = activeTenant?.role) {
+  return getPermissionMatrix().allows(role, 'operations.manage', activePermissionOverrides(role));
+}
+
+// Aktif kullanicinin kendi izin kayitlari. Goc (phase107) uygulanmadan tablo
+// yoktur: rol varsayilani gecerlidir, ekran ayakta kalir.
+async function loadActiveMemberPermissions(tenantId) {
+  if (!activeTenant || !isCloudTenant(tenantId) || !activeSaaSUser?.id) return {};
+  try {
+    const { data, error } = await supabaseClient.from('tenant_member_permissions')
+      .select('permission, granted').eq('tenant_id', tenantId).eq('user_id', activeSaaSUser.id);
+    activeTenant.permissions = error ? {} : getPermissionMatrix().overridesFromRows(data);
+  } catch (e) {
+    activeTenant.permissions = {};
+  }
+  applyRoleNavigationVisibility();
+  return activeTenant.permissions;
 }
 
 function roleBadgeHtml(role) {
@@ -9848,6 +10090,103 @@ function formatTeamDate(value) {
   return d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
+// --- Kisi bazinda izinler (L-211, phase107) --------------------------------
+let teamMembersCache = [];
+let teamPermissionOverrides = {};
+let memberPermissionsEditing = null;
+
+async function loadTeamPermissionOverrides(tenantId) {
+  try {
+    const { data, error } = await supabaseClient.from('tenant_member_permissions')
+      .select('user_id, permission, granted').eq('tenant_id', tenantId);
+    if (error) return {};
+    const gruplar = {};
+    (data || []).forEach(row => { (gruplar[row.user_id] = gruplar[row.user_id] || []).push(row); });
+    return Object.fromEntries(Object.entries(gruplar).map(([u, rows]) => [u, getPermissionMatrix().overridesFromRows(rows)]));
+  } catch (e) {
+    return {};
+  }
+}
+
+function openMemberPermissionsModal(userId) {
+  const uye = teamMembersCache.find(m => m.user_id === userId);
+  const modal = document.getElementById('memberPermissionsModal');
+  if (!uye || !modal || activeTenant?.role !== 'owner' || uye.role === 'owner') return false;
+  const M = getPermissionMatrix();
+  const kayit = teamPermissionOverrides[userId] || {};
+  memberPermissionsEditing = { userId, role: uye.role };
+  document.getElementById('memberPermissionsTitle').textContent = `🔐 İzinler — ${uye.full_name || uye.email}`;
+  document.getElementById('memberPermissionsRoleNote').textContent = `Rol: ${(TEAM_ROLES[uye.role] || {}).label || uye.role}. İşaretler rolün başlangıç paketidir; değiştirdiğiniz izin yalnız bu kişiye uygulanır.`;
+  document.getElementById('memberPermissionsList').innerHTML = M.PERMISSIONS.map(p => {
+    const acik = M.granted(uye.role, p.key, kayit);
+    const varsayilan = M.defaultFor(uye.role, p.key) ? 'açık' : 'kapalı';
+    return `<label class="member-permission-row" style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.08);">
+      <input type="checkbox" data-permission="${p.key}" ${acik ? 'checked' : ''} data-onchange="onMemberPermissionToggle(this)">
+      <span><strong>${escapeHtml(p.label)}</strong><br><span class="sub-text">${escapeHtml(p.hint)} Rol varsayılanı: ${varsayilan}.</span></span>
+    </label>`;
+  }).join('');
+  modal.classList.add('active');
+  return true;
+}
+
+function closeMemberPermissionsModal() {
+  const modal = document.getElementById('memberPermissionsModal');
+  if (modal) modal.classList.remove('active');
+  memberPermissionsEditing = null;
+}
+
+// Yazma okumayi icerir: yazma acilinca okuma acilir, okuma kapaninca yazma kapanir.
+function onMemberPermissionToggle(el) {
+  const kutu = key => document.querySelector(`#memberPermissionsList input[data-permission="${key}"]`);
+  const izin = el && el.getAttribute('data-permission');
+  [['sales.read', 'sales.write'], ['ledger.read', 'ledger.write']].forEach(([oku, yaz]) => {
+    if (izin === yaz && el.checked && kutu(oku)) kutu(oku).checked = true;
+    if (izin === oku && !el.checked && kutu(yaz)) kutu(yaz).checked = false;
+  });
+}
+
+function resetMemberPermissionsToRole() {
+  if (!memberPermissionsEditing) return;
+  const M = getPermissionMatrix();
+  document.querySelectorAll('#memberPermissionsList input[data-permission]').forEach(kutu => {
+    kutu.checked = M.defaultFor(memberPermissionsEditing.role, kutu.getAttribute('data-permission'));
+  });
+}
+
+async function saveMemberPermissionsFromModal() {
+  if (!memberPermissionsEditing) return false;
+  const secim = {};
+  document.querySelectorAll('#memberPermissionsList input[data-permission]').forEach(kutu => { secim[kutu.getAttribute('data-permission')] = !!kutu.checked; });
+  const btn = document.getElementById('memberPermissionsSaveBtn');
+  if (btn) btn.disabled = true;
+  try {
+    const tamam = await saveMemberPermissions(memberPermissionsEditing.userId, memberPermissionsEditing.role, secim);
+    if (tamam) { closeMemberPermissionsModal(); renderTeamManagement(); }
+    return tamam;
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+// Izni degistiren tek yol sunucudaki set_member_permissions (yalniz sahip).
+async function saveMemberPermissions(userId, role, secim) {
+  if (activeTenant?.role !== 'owner') {
+    uiNotify('İzinleri yalnız işletme sahibi değiştirebilir.');
+    return false;
+  }
+  const istek = getPermissionMatrix().requestFromSelection(role, secim);
+  const { data, error } = await supabaseClient.rpc('set_member_permissions', {
+    p_tenant_id: getActiveTenantId(), p_user_id: userId, p_permissions: istek
+  });
+  if (error) {
+    const gocYok = /set_member_permissions|PGRST202|42883/.test(`${error.code} ${error.message}`);
+    uiNotify(gocYok ? 'İzinler kaydedilemedi: veritabanı göçü (phase107) henüz uygulanmamış.' : 'İzinler kaydedilemedi: ' + kullaniciMesaji(error.message || ''));
+    return false;
+  }
+  uiNotify('✅ İzinler kaydedildi. Kişi bir sonraki ekran yenilemesinde yeni izinlerle çalışır.');
+  return !!(data && data.success !== false);
+}
+
 async function renderTeamManagement() {
   const memberBody = document.getElementById('teamMembersTableBody');
   const inviteWrap = document.getElementById('pendingInvitationsWrap');
@@ -9880,6 +10219,8 @@ async function renderTeamManagement() {
   const canManageRoles = myRole === 'owner';
   const canInvite = myRole === 'owner' || myRole === 'admin';
   const ownerCount = (members || []).filter(m => m.role === 'owner').length;
+  teamMembersCache = members || [];
+  teamPermissionOverrides = canManageRoles ? await loadTeamPermissionOverrides(tenantId) : {};
 
   if (inviteBtn) inviteBtn.style.display = canInvite ? '' : 'none';
 
@@ -9900,10 +10241,15 @@ async function renderTeamManagement() {
         border-radius:6px; color:#fff; font-size:12px; font-weight:600;">${opts}</select>`;
     } else {
       roleCell = roleBadgeHtml(m.role) + (isLastOwner
-        ? ' <span class="sub-text" style="font-size:10px;">(tek sahip)</span>' : '');
+        ? ' <span class="sub-text" style="font-size:11px;">(tek sahip)</span>' : '');
     }
 
     const canRemove = canManageRoles && !m.is_self && !isLastOwner;
+    // Kisi bazinda izin (L-211): yalniz sahip, sahip olmayan uyeye verir.
+    const ozel = Object.keys(teamPermissionOverrides[m.user_id] || {}).length;
+    const izinDugmesi = canManageRoles && m.role !== 'owner'
+      ? `<button class="btn btn-secondary btn-sm" data-action="permissions" data-user="${escapeHtml(m.user_id)}">🔐 İzinler${ozel ? ' · özel' : ''}</button> `
+      : '';
     // Personel hesabı saha ekibine bağlanmadan temizliğe atanamaz (L-176).
     const inFieldTeam = (appData?.operationalPeople || []).some(person => person.user_id === m.user_id);
     const fieldCell = m.role === 'staff' && canManageTenantRole(myRole)
@@ -9911,13 +10257,13 @@ async function renderTeamManagement() {
         ? '<span class="sub-text" style="font-size:11px;">Saha ekibinde</span> '
         : `<button class="btn btn-secondary btn-sm" data-action="field" data-user="${escapeHtml(m.user_id)}">👷 Saha ekibine ekle</button> `)
       : '';
-    const actionCell = fieldCell + (canRemove
+    const actionCell = izinDugmesi + fieldCell + (canRemove
       ? `<button class="btn btn-secondary btn-sm" data-action="remove"
            data-user="${escapeHtml(m.user_id)}" data-email="${escapeHtml(m.email)}">Çıkar</button>`
-      : (fieldCell ? '' : '<span class="sub-text" style="font-size:11px;">—</span>'));
+      : (fieldCell || izinDugmesi ? '' : '<span class="sub-text" style="font-size:11px;">—</span>'));
 
     return `<tr>
-      <td><strong>${escapeHtml(m.full_name)}</strong>${m.is_self ? ' <span class="sub-text" style="font-size:10px;">(siz)</span>' : ''}</td>
+      <td><strong>${escapeHtml(m.full_name)}</strong>${m.is_self ? ' <span class="sub-text" style="font-size:11px;">(siz)</span>' : ''}</td>
       <td>${escapeHtml(m.email)}</td>
       <td>${roleCell}</td>
       <td>${formatTeamDate(m.joined_at)}</td>
@@ -9976,6 +10322,8 @@ function bindTeamTableEvents() {
       if (el) removeTeamMember(el.dataset.user, el.dataset.email);
       const field = ev.target.closest('[data-action="field"]');
       if (field) addMemberToFieldTeam(field.dataset.user);
+      const izin = ev.target.closest('[data-action="permissions"]');
+      if (izin) openMemberPermissionsModal(izin.dataset.user);
     });
   }
 
@@ -10348,7 +10696,7 @@ function openMonthCloseModal() {
       <div>Rezervasyon: <strong>${bkl.length}</strong> &nbsp;•&nbsp; Satılan gece: <strong>${geceler}</strong></div>
       <div>Ciro (tahakkuk): <strong>${Math.round(ciro).toLocaleString('tr-TR')} TL</strong></div>
       <div>Gider kaydı: <strong>${gid.length}</strong> &nbsp;•&nbsp; <strong>${Math.round(gidTop).toLocaleString('tr-TR')} TL</strong></div>
-      <p class="sub-text" style="font-size:10px; margin:10px 0 0;">
+      <p class="sub-text" style="font-size:11px; margin:10px 0 0;">
         Bu rakamlar ekrandaki hesaptır. Kaydedilecek resmî rakam kapanış anında sunucuda yeniden hesaplanır.
       </p>`;
   }
@@ -10467,7 +10815,7 @@ async function submitAccountDeletion(e) {
     try { clearLexbnbBrowserStorage(); } catch (ex) {}
 
     const n = (data && data.deleted_tenants) || 0;
-    alert(`Hesabınız kalıcı olarak kapatıldı.${n ? `\n${n} işletme ve tüm verisi silindi.` : ''}\n\nİlginiz için teşekkür ederiz.`);
+    await uiNotify(`Hesabınız kalıcı olarak kapatıldı.${n ? `\n${n} işletme ve tüm verisi silindi.` : ''}\n\nİlginiz için teşekkür ederiz.`);
     window.location.replace(window.location.pathname);
   } catch (ex) {
     if (err) { err.style.display = 'block'; err.innerText = '⚠️ ' + (ex && ex.message ? ex.message : 'Hesap kapatılamadı.'); }
@@ -10514,7 +10862,7 @@ function closeInviteMemberModal() {
 
 function showInviteError(message) {
   const err = document.getElementById('inviteMemberError');
-  if (!err) { alert(message); return; }
+  if (!err) { uiNotify(message); return; }
   err.style.display = 'block';
   err.innerText = '⚠️ ' + message;
 }
@@ -10550,7 +10898,7 @@ async function submitMemberInvite(e) {
     const soru = bekleyen.role !== role
       ? `${email} adresine bekleyen bir "${rolAdi(bekleyen.role)}" daveti var. Rolü "${rolAdi(role)}" olarak güncelleyip daveti yeniden göndermek istiyor musunuz?\n\nÖnceki e-postadaki bağlantı da geçerli kalır; katılan kişi yeni rolle (${rolAdi(role)}) katılır.`
       : `${email} adresine zaten bekleyen bir "${rolAdi(role)}" daveti var. Davet yeniden gönderilsin ve süresi 14 gün uzatılsın mı?`;
-    if (typeof confirm === 'function' && !confirm(soru)) return;
+    if (!(await uiAskConfirm(soru))) return;
   }
 
   if (btn) { btn.disabled = true; btn.innerText = '⏳ Gönderiliyor...'; }
@@ -10585,7 +10933,7 @@ async function submitMemberInvite(e) {
     const guncellemeText = bekleyen
       ? `Bekleyen davet güncellendi${bekleyen.role !== role ? ` (rol: ${rolAdi(bekleyen.role)} → ${rolAdi(role)})` : ''}; süresi 14 gün uzatıldı. Önceki e-postadaki bağlantı da geçerli, katılım yeni rolle olur.\n\n`
       : '';
-    alert(`✉️ ${guncellemeText}${deliveryText}\n\n${email} bu adresle kayıt olup giriş yaptığında ekibinize ${rolAdi(role)} rolüyle otomatik katılacak.\nDavet 14 gün geçerlidir.`);
+    uiNotify(`✉️ ${guncellemeText}${deliveryText}\n\n${email} bu adresle kayıt olup giriş yaptığında ekibinize ${rolAdi(role)} rolüyle otomatik katılacak.\nDavet 14 gün geçerlidir.`);
   } catch (ex) {
     showInviteError(ex && ex.message ? ex.message : 'Davet gönderilemedi.');
   } finally {
@@ -10604,7 +10952,7 @@ async function changeMemberRole(userId, newRole) {
     .eq('user_id', userId);
 
   if (error) {
-    alert('⚠️ Rol değiştirilemedi: ' + error.message);
+    uiNotify('⚠️ Rol değiştirilemedi: ' + error.message);
   }
   // Basarili da olsa hatali da olsa listeyi sunucudan tazele: acilir menu
   // asla sunucudaki gercek rolden farkli bir sey gostermesin.
@@ -10612,7 +10960,7 @@ async function changeMemberRole(userId, newRole) {
 }
 
 async function removeTeamMember(userId, email) {
-  if (!confirm(`${email} adlı kullanıcıyı ekipten çıkarmak istediğinize emin misiniz?\n\nBu kişi işletme verilerine anında erişimini kaybeder.`)) return;
+  if (!(await uiAskConfirm(`${email} adlı kullanıcıyı ekipten çıkarmak istediğinize emin misiniz?\n\nBu kişi işletme verilerine anında erişimini kaybeder.`))) return;
 
   const tenantId = getActiveTenantId();
   if (!isCloudTenant(tenantId)) return;
@@ -10624,18 +10972,18 @@ async function removeTeamMember(userId, email) {
     .eq('user_id', userId);
 
   if (error) {
-    alert('⚠️ Üye çıkarılamadı: ' + error.message);
+    uiNotify('⚠️ Üye çıkarılamadı: ' + error.message);
     return;
   }
   await renderTeamManagement();
 }
 
 async function revokeMemberInvite(invitationId, email) {
-  if (!confirm(`${email} adresine gönderilen daveti iptal etmek istiyor musunuz?`)) return;
+  if (!(await uiAskConfirm(`${email} adresine gönderilen daveti iptal etmek istiyor musunuz?`))) return;
 
   const { error } = await supabaseClient.rpc('revoke_tenant_invitation', { p_invitation_id: invitationId });
   if (error) {
-    alert('⚠️ Davet iptal edilemedi: ' + error.message);
+    uiNotify('⚠️ Davet iptal edilemedi: ' + error.message);
     return;
   }
   await renderTeamManagement();
@@ -10647,7 +10995,7 @@ function canManageBookingChannels() {
 
 function setBookingChannelMessage(message, type = 'info') {
   if (typeof showToast === 'function') showToast(message, type);
-  else if (typeof alert === 'function') alert(message);
+  else uiNotify(message);
 }
 
 async function refreshBookingChannelSettings() {
@@ -10698,7 +11046,7 @@ function renderBookingChannelSettings() {
     return `<tr style="${channel.isActive ? '' : 'opacity:.6;'}">
       <td><input class="tbl-input" id="bookingChannelName_${id}" maxlength="100" value="${escapeHtml(channel.displayName)}" ${disabled ? 'disabled' : ''}><br><small>${escapeHtml(channel.code)}${channel.isSystem ? ' · Sistem kanalı' : ' · Özel kanal'}</small></td>
       <td><select class="tbl-input" id="bookingChannelType_${id}" data-onchange="toggleBookingChannelRowRate(decodeURIComponent('${encodeActionArg(id)}'))" ${typeDisabled ? 'disabled' : ''}><option value="OTA" ${channel.channelType === 'OTA' ? 'selected' : ''}>OTA</option><option value="DIRECT" ${channel.channelType === 'DIRECT' ? 'selected' : ''}>Direkt</option></select></td>
-      <td><input class="tbl-input" id="bookingChannelRate_${id}" type="number" min="0" max="100" step="0.01" value="${Number(channel.defaultCommissionRate)}" ${(disabled || channel.channelType === 'DIRECT') ? 'disabled' : ''}></td>
+      <td><input class="tbl-input" id="bookingChannelRate_${id}" type="number" min="0" max="50" step="0.01" value="${Number(channel.defaultCommissionRate)}" ${(disabled || channel.channelType === 'DIRECT') ? 'disabled' : ''}></td>
       <td><span class="badge ${channel.isActive ? 'badge-green' : 'badge-slate'}">${channel.isActive ? 'AKTİF' : 'PASİF'}</span></td>
       <td style="text-align:right; white-space:nowrap;">
         <button type="button" class="btn btn-secondary btn-sm" data-onclick="saveBookingChannelRow(event, decodeURIComponent('${encodeActionArg(channel.id || '')}'))" ${disabled ? 'disabled' : ''}>Kaydet</button>
@@ -10734,7 +11082,7 @@ async function saveBookingChannelRow(clickEvent, channelId) {
 async function setBookingChannelActive(channelId, isActive) {
   const channel = (appData.bookingChannels || []).find(item => item.id === channelId);
   if (!channel) return;
-  if (!isActive && typeof confirm === 'function' && !confirm(`${channel.displayName} yeni rezervasyonlardan kaldırılacak. Eski rezervasyonlar korunur. Devam edilsin mi?`)) return;
+  if (!isActive && !(await uiAskConfirm(`${channel.displayName} yeni rezervasyonlardan kaldırılacak. Eski rezervasyonlar korunur. Devam edilsin mi?`))) return;
   try {
     await saveTenantBookingChannel({ ...channel, isActive });
     await refreshBookingChannelSettings();
@@ -10931,7 +11279,7 @@ async function removeBusinessLogo() {
   const profile = getBusinessProfileSetting();
   const path = profile.logoPath;
   if (!path) return true;
-  if (!confirm('İşletme logosu kaldırılsın mı? Raporlar varsayılan Lexbnb logosunu kullanacak.')) return false;
+  if (!(await uiAskConfirm('İşletme logosu kaldırılsın mı? Raporlar varsayılan Lexbnb logosunu kullanacak.'))) return false;
   const nextProfile = { ...profile };
   delete nextProfile.logoPath;
   const { error: settingError } = await supabaseClient.from('tenant_settings').upsert({
@@ -11151,7 +11499,7 @@ function checklistIndentedTextToItems(text) {
   return { sections: sections.filter(entry => entry.items.length), supplies };
 }
 
-function importChecklistFromText() {
+async function importChecklistFromText() {
   if (typeof document === 'undefined') return false;
   const box = document.getElementById('settingsChecklistPaste');
   const parsed = checklistIndentedTextToItems(box?.value || '');
@@ -11162,7 +11510,7 @@ function importChecklistFromText() {
   const current = readSettingsChecklistBuilder();
   // Bos taslaktaki varsayilan "Genel" basligi icerik sayilmaz.
   const hasContent = current.sections.some(section => section.items.some(item => item.text)) || current.supplies.some(supply => supply.item);
-  if (hasContent && !confirm('Düzenleyicideki liste yapıştırılan metinle değiştirilsin mi?')) return false;
+  if (hasContent && !(await uiAskConfirm('Düzenleyicideki liste yapıştırılan metinle değiştirilsin mi?'))) return false;
   const draft = parsed.sections.length ? parsed : { sections: defaultSettingsChecklistDraft().sections, supplies: parsed.supplies };
   renderSettingsChecklistBuilder(draft);
   if (box) box.value = '';
@@ -11506,18 +11854,18 @@ async function editSettingsTemplate(kind, id) {
   if (kind === 'checklist') return startEditingSettingsChecklist(id);
   const table = kind === 'message' ? 'message_templates' : kind === 'task' ? 'task_templates' : 'property_checklist_templates';
   const nameField = kind === 'message' ? 'name' : kind === 'task' ? 'title' : 'template_name';
-  const nextName = prompt('Şablon adı:', item[nameField] || '');
+  const nextName = (await uiAskText({ label: 'Şablon adı:', value: item[nameField] || '' }));
   if (!String(nextName || '').trim()) return false;
   const patch = { [nameField]: String(nextName).trim() };
   if (kind === 'message') {
-    const body = prompt('Mesaj metni:', item.body || '');
+    const body = (await uiAskText({ label: 'Mesaj metni:', value: item.body || '' }));
     if (!String(body || '').trim()) return false;
     patch.body = String(body).trim();
   }
   if (kind === 'task') {
-    const taskType = String(prompt('Görev türü (GENERAL, CLEANING, INSPECTION, MAINTENANCE):', item.task_type || 'GENERAL') || '').trim().toUpperCase();
+    const taskType = String((await uiAskText({ label: 'Görev türü (GENERAL, CLEANING, INSPECTION, MAINTENANCE):', value: item.task_type || 'GENERAL' })) || '').trim().toUpperCase();
     if (!TEMPLATE_TASK_TYPE_LABELS[taskType]) { showToast('Geçerli bir görev türü seçin.', 'error'); return false; }
-    const priority = String(prompt('Öncelik (LOW, MEDIUM, HIGH, CRITICAL):', item.priority || 'MEDIUM') || '').trim().toUpperCase();
+    const priority = String((await uiAskText({ label: 'Öncelik (LOW, MEDIUM, HIGH, CRITICAL):', value: item.priority || 'MEDIUM' })) || '').trim().toUpperCase();
     if (!TEMPLATE_PRIORITY_LABELS[priority]) { showToast('Geçerli bir öncelik seçin.', 'error'); return false; }
     patch.task_type = taskType;
     patch.priority = priority;
@@ -11538,7 +11886,7 @@ async function archiveSettingsTemplate(kind, id, isActive = false) {
   const confirmation = isActive
     ? 'Bu şablon yeniden etkinleştirilsin mi? Yeni seçimlerde tekrar görünecek.'
     : 'Bu şablon arşivlensin mi? Yeni seçimlerden kaldırılır; geçmiş kayıtlar korunur.';
-  if (!item || !confirm(confirmation)) return false;
+  if (!item || !(await uiAskConfirm(confirmation))) return false;
   const table = kind === 'message' ? 'message_templates' : kind === 'task' ? 'task_templates' : 'property_checklist_templates';
   const failure = await updateSettingsRow(table, id, { is_active: isActive });
   if (failure) {
@@ -11718,7 +12066,7 @@ async function saveAllSettings() {
 
   const tenantId = getActiveTenantId();
   if (!isCloudTenant(tenantId)) {
-    alert('Bulut bağlantısı kurulamadı. Değişiklikler kaydedilmedi.');
+    uiNotify('Bulut bağlantısı kurulamadı. Değişiklikler kaydedilmedi.');
     return;
   }
 
@@ -11752,11 +12100,11 @@ async function saveAllSettings() {
   }
 
   if (hatalar.length > 0) {
-    alert('⚠️ Bazı mülkler kaydedilemedi:\n' + hatalar.join('\n'));
+    uiNotify('⚠️ Bazı mülkler kaydedilemedi:\n' + hatalar.join('\n'));
     return;
   }
 
-  alert(
+  uiNotify(
     merdivenKirik
       ? 'Gecelik taban fiyat ve temizlik maliyeti kaydedildi.\n\n' +
         '⚠️ Fiyat merdiveni (taban/hedef/premium/zirve) ve ısıtma maliyeti ' +
@@ -12158,41 +12506,41 @@ function renderManageLeadsTable() {
 async function convertLeadAction(leadId) {
   const l = (appData.leads || []).find(item => item.id === leadId || item.dbId === leadId);
   if (!l) {
-    alert('Talep bulunamadı.');
+    uiNotify('Talep bulunamadı.');
     return false;
   }
 
   if (l.status === 'WON' || l.convertedBookingId) {
-    alert('Bu talep zaten bir rezervasyona dönüştürülmüş.');
+    uiNotify('Bu talep zaten bir rezervasyona dönüştürülmüş.');
     return false;
   }
 
   if (String(l.status || l.stage || '').toUpperCase() === 'LOST') {
-    alert('Kaybedilmiş bir talep rezervasyona dönüştürülemez. Önce talebi yeniden açık bir duruma alın.');
+    uiNotify('Kaybedilmiş bir talep rezervasyona dönüştürülemez. Önce talebi yeniden açık bir duruma alın.');
     return false;
   }
 
   let checkIn = l.checkIn;
   let checkOut = l.checkOut;
   if (!checkIn || !checkOut) {
-    checkIn = prompt(`"${l.guest}" için Giriş Tarihini giriniz (YYYY-AA-GG):`, getTodayStr());
+    checkIn = (await uiAskText({ label: `"${l.guest}" için Giriş Tarihini giriniz (YYYY-AA-GG):`, value: getTodayStr() }));
     if (!checkIn) return false;
-    checkOut = prompt(`"${l.guest}" için Çıkış Tarihini giriniz (YYYY-AA-GG):`, checkIn);
+    checkOut = (await uiAskText({ label: `"${l.guest}" için Çıkış Tarihini giriniz (YYYY-AA-GG):`, value: checkIn }));
     if (!checkOut) return false;
   }
 
   let pax = normalizePositiveInteger(l.pax);
   if (pax === null) {
-    const enteredPax = prompt(`"${l.guest}" için kişi sayısını giriniz:`, '');
+    const enteredPax = (await uiAskText({ label: `"${l.guest}" için kişi sayısını giriniz:`, value: '' }));
     if (enteredPax === null) return false;
     pax = normalizePositiveInteger(enteredPax);
     if (pax === null) {
-      alert('Kişi sayısı pozitif bir tam sayı olmalıdır.');
+      uiNotify('Kişi sayısı pozitif bir tam sayı olmalıdır.');
       return false;
     }
   }
 
-  if (!confirm(`"${l.guest}" talebi ₺${Number(l.quote).toLocaleString('tr-TR')} bedelle kesin rezervasyona dönüştürülecek. Onaylıyor musunuz?`)) {
+  if (!(await uiAskConfirm(`"${l.guest}" talebi ₺${Number(l.quote).toLocaleString('tr-TR')} bedelle kesin rezervasyona dönüştürülecek. Onaylıyor musunuz?`))) {
     return false;
   }
 
@@ -12206,12 +12554,12 @@ async function convertLeadAction(leadId) {
       ...buildLeadConversionOptions(l, { grossAmount: Number(l.quote) || 0 })
     });
     if (window.showToast) window.showToast('🎉 Talep başarıyla rezervasyona dönüştürüldü ve takvime eklendi!');
-    else alert('🎉 Talep başarıyla rezervasyona dönüştürüldü ve takvime eklendi!');
+    else uiNotify('🎉 Talep başarıyla rezervasyona dönüştürüldü ve takvime eklendi!');
     renderManageLeadsTable();
     renderLeadAnalytics();
     return true;
   } catch (err) {
-    alert('Dönüştürme Hatası: ' + err.message);
+    uiNotify('Dönüştürme Hatası: ' + err.message);
     return false;
   }
 }
@@ -12279,8 +12627,10 @@ function openLeadModal(editId = null) {
     const lifecycle = l.status === 'QUOTE_SENT' ? 'LEAD_QUOTE_FOLLOW_UP' : 'LEAD_REENGAGEMENT';
     const templates = (appData.messageTemplates || []).filter(template => template.channel === 'WHATSAPP'
       && [lifecycle, 'MANUAL'].includes(template.lifecycle_stage));
-    if (templateSelect) templateSelect.innerHTML = '<option value="">Şablon seçin</option>' + templates.map(template => `<option value="${escapeHtml(template.id)}">${escapeHtml(template.name)}</option>`).join('');
-    if (templateRow) templateRow.style.display = templates.length && l.phone ? 'grid' : 'none';
+    const oneriler = LEAD_SUGGESTED_MESSAGES.map(o => `<option value="${o.id}">${escapeHtml(o.name)}</option>`).join('');
+    if (templateSelect) templateSelect.innerHTML = '<option value="">Şablon seçin</option>' + templates.map(template => `<option value="${escapeHtml(template.id)}">${escapeHtml(template.name)}</option>`).join('') + oneriler;
+    if (templateSelect) templateSelect.value = l.status === 'QUOTE_SENT' ? 'lexbnb:takip' : 'lexbnb:teklif';
+    if (templateRow) templateRow.style.display = l.phone ? 'grid' : 'none';
   } else {
     title.innerText = '🎯 Yeni Lead / Fırsat Girişi';
     editInput.value = '';
@@ -12306,7 +12656,34 @@ function applyLeadFormAccess(editId = null) {
   if (title && editId && !canWrite) title.innerText = 'Talep Ayrıntısı';
 }
 
+// Sablonu olmayan isletmeye hazir satis mesaji (L-290). Metin yalniz talebin
+// kendi verisinden kurulur; bilinmeyen parca (tarih, kisi, fiyat) hic yazilmaz
+// ve isletme adina musaitlik ya da indirim taahhudu verilmez (§3.6).
+const LEAD_SUGGESTED_MESSAGES = [
+  { id: 'lexbnb:teklif', name: 'Teklif mesajı (Lexbnb önerisi)', message_type: 'TRANSACTIONAL' },
+  { id: 'lexbnb:takip', name: 'Teklif takibi (Lexbnb önerisi)', message_type: 'TRANSACTIONAL' }
+];
+function buildLeadSuggestedMessage(kind, lead) {
+  const ad = String(lead.guest || '').trim();
+  const mulk = appData.villas?.[lead.villa]?.name || '';
+  const giris = lead.checkIn ? formatTrDate(lead.checkIn) : '';
+  const cikis = lead.checkOut ? formatTrDate(lead.checkOut) : '';
+  const gece = lead.checkIn && lead.checkOut ? Math.round((new Date(`${lead.checkOut}T12:00:00`) - new Date(`${lead.checkIn}T12:00:00`)) / 86400000) : 0;
+  const kisi = Number(lead.pax) > 0 ? Number(lead.pax) : 0;
+  const ayrinti = [giris && cikis ? `${giris} – ${cikis}${gece > 0 ? ` (${gece} gece)` : ''}` : '', kisi ? `${kisi} kişi` : ''].filter(Boolean).join(', ');
+  const konu = [mulk, ayrinti].filter(Boolean).join(' · ');
+  const fiyat = Number(lead.quote) > 0 ? `₺${Number(lead.quote).toLocaleString('tr-TR')}` : '';
+  const selam = ad ? `Merhaba ${ad},` : 'Merhaba,';
+  if (kind === 'lexbnb:takip') {
+    return [selam, `${konu ? konu + ' için ' : ''}ilettiğimiz teklifle ilgili dönüşünüzü bekliyoruz.`,
+      'Karar verdiyseniz rezervasyonu sizin adınıza oluşturabiliriz; sorunuz varsa buradan yazabilirsiniz.'].join(' ');
+  }
+  return [selam, konu ? `${konu} için talebinizi aldık.` : 'Talebinizi aldık.', fiyat ? `Toplam fiyatımız ${fiyat}.` : '',
+    'Uygun görürseniz rezervasyonu sizin adınıza oluşturabiliriz; sorunuz varsa buradan yazabilirsiniz.'].filter(Boolean).join(' ');
+}
+
 function renderLeadTemplateBody(template, lead) {
+  if (template && String(template.id || '').startsWith('lexbnb:')) return buildLeadSuggestedMessage(template.id, lead);
   const villaName = appData.villas?.[lead.villa]?.name || lead.villa || '';
   return String(template?.body || '')
     .replace(/\{\{?guest_name\}?\}/gi, lead.guest || 'Misafir')
@@ -12318,11 +12695,12 @@ function openLeadWhatsApp() {
   const leadId = document.getElementById('leadEditId')?.value;
   const templateId = document.getElementById('leadMessageTemplate')?.value;
   const lead = (appData.leads || []).find(item => item.id === leadId);
-  const template = (appData.messageTemplates || []).find(item => item.id === templateId);
+  const template = (appData.messageTemplates || []).find(item => item.id === templateId)
+    || LEAD_SUGGESTED_MESSAGES.find(item => item.id === templateId);
   if (!lead) return false;
   // Sablonsuz dugme sessiz kaliyordu (L-290).
   if (!template) {
-    alert('Önce bir mesaj şablonu seçin. Şablonlar Ayarlar › Şablonlar bölümünden eklenir.');
+    uiNotify('Önce bir mesaj şablonu seçin. Şablonlar Ayarlar › Şablonlar bölümünden eklenir.');
     return false;
   }
   const digits = String(lead.phone || '').replace(/\D/g, '');
@@ -12334,7 +12712,7 @@ function openLeadWhatsApp() {
     marketingOptIn: guest?.marketingOptIn === true
   });
   if (!link.allowed) {
-    alert(link.reason === 'MARKETING_CONSENT_REQUIRED'
+    uiNotify(link.reason === 'MARKETING_CONSENT_REQUIRED'
       ? 'Pazarlama mesajı için misafirin açık kampanya izni gerekir.'
       : 'WhatsApp mesajı için telefon ve iletişim izni gerekir.');
     return false;
@@ -12362,7 +12740,7 @@ async function saveLead(e) {
   const lostReason = gercekKayipNedeni(document.getElementById('leadLostReason').value);
   const notes = document.getElementById('leadNotes').value.trim();
   if (status === 'LOST' && !lostReason) {
-    alert('Talebi "Kaybedildi" yapmak için kayıp nedenini seçin.');
+    uiNotify('Talebi "Kaybedildi" yapmak için kayıp nedenini seçin.');
     return;
   }
   const checkIn = document.getElementById('leadCheckIn')?.value || null;
@@ -12370,9 +12748,9 @@ async function saveLead(e) {
   // Kisi sayisi duzenlemede de girilir (L-290); bos = bilinmiyor.
   const paxHam = String(document.getElementById('leadPax')?.value ?? '').trim();
   const pax = paxHam === '' ? null : normalizePositiveInteger(paxHam);
-  if (paxHam !== '' && pax === null) { alert('Kişi sayısı pozitif bir tam sayı olmalıdır.'); return; }
+  if (paxHam !== '' && pax === null) { uiNotify('Kişi sayısı pozitif bir tam sayı olmalıdır.'); return; }
   if ((checkIn && !checkOut) || (!checkIn && checkOut) || (checkIn && checkOut && checkOut <= checkIn)) {
-    alert('İlgilenilen tarihler için giriş ve çıkışı birlikte girin; çıkış girişten sonra olmalıdır.');
+    uiNotify('İlgilenilen tarihler için giriş ve çıkışı birlikte girin; çıkış girişten sonra olmalıdır.');
     return;
   }
   const assignedTo = document.getElementById('leadAssignedTo')?.value || null;
@@ -12384,7 +12762,7 @@ async function saveLead(e) {
   } else if (nextFollowUpAt) {
     const normalized = fromIstanbulDateTimeLocal(nextFollowUpAt);
     if (!normalized) {
-      alert('Hata: Geçerli bir takip tarihi seçin.');
+      uiNotify('Hata: Geçerli bir takip tarihi seçin.');
       return;
     }
     nextFollowUpAt = normalized;
@@ -12411,7 +12789,7 @@ async function saveLead(e) {
       await updateLead(editId, payload);
       const extraWarning = await syncLeadInterestProperties(editId,
         readLeadExtraPropertyPicker('leadExtraProperties'), appData.villas?.[villa]?.id || null);
-      if (extraWarning) alert('Talep kaydedildi.' + extraWarning);
+      if (extraWarning) uiNotify('Talep kaydedildi.' + extraWarning);
       try {
         await SalesWorkflowService.saveWorkflow(supabaseClient, {
           tenantId: getActiveTenantId(), leadId: editId, assignedTo, nextFollowUpAt
@@ -12420,7 +12798,7 @@ async function saveLead(e) {
       } catch (workflowError) {
         renderManageLeadsTable();
         renderLeadAnalytics();
-        alert('Talep bilgileri kaydedildi; ancak atama/takip bilgisi kaydedilemedi: ' + workflowError.message);
+        uiNotify('Talep bilgileri kaydedildi; ancak atama/takip bilgisi kaydedilemedi: ' + workflowError.message);
         return;
       }
       renderLeadSalesWorkspace();
@@ -12432,7 +12810,7 @@ async function saveLead(e) {
     renderManageLeadsTable();
     renderLeadAnalytics();
   } catch (err) {
-    alert('Hata: ' + err.message);
+    uiNotify('Hata: ' + err.message);
   }
 }
 
@@ -12445,10 +12823,10 @@ async function deleteLeadUI(id) {
   }
   const l = (appData.leads || []).find(item => item.id === id || item.dbId === id);
   if (l && (l.status === 'WON' || l.stage === 'WON')) {
-    alert('⚠️ Bu talep kazanılmış bir satış olup tarihsel ciro ve conversion KPI verilerine bağlıdır. Silinemez.');
+    uiNotify('⚠️ Bu talep kazanılmış bir satış olup tarihsel ciro ve conversion KPI verilerine bağlıdır. Silinemez.');
     return;
   }
-  if (confirm('Bu talebi silmek istediğinizden emin misiniz?')) {
+  if ((await uiAskConfirm('Bu talebi silmek istediğinizden emin misiniz?'))) {
     try {
       await deleteLead(id);
       renderLeadSalesWorkspace();
@@ -12456,7 +12834,7 @@ async function deleteLeadUI(id) {
       renderLeadAnalytics();
       if (window.showToast) window.showToast('🗑️ Talep başarıyla silindi.');
     } catch (err) {
-      alert('Silme Hatası: ' + err.message);
+      uiNotify('Silme Hatası: ' + err.message);
     }
   }
 }
@@ -12589,11 +12967,11 @@ async function saveMaint(e) {
   // Bos maliyet bilinmiyordur, 0 degil (L-292).
   const hamMaliyet = String(document.getElementById('maintCost').value || '').trim();
   const cost = hamMaliyet === '' ? null : Number(hamMaliyet);
-  if (cost !== null && (!Number.isFinite(cost) || cost < 0)) { alert('Tahmini maliyet geçerli ve negatif olmayan bir tutar olmalı ya da boş bırakılmalı.'); return; }
+  if (cost !== null && (!Number.isFinite(cost) || cost < 0)) { uiNotify('Tahmini maliyet geçerli ve negatif olmayan bir tutar olmalı ya da boş bırakılmalı.'); return; }
   const status = document.getElementById('maintStatus').value;
 
   if (blocksAvailability && (!downtimeStart || !downtimeEnd || downtimeEnd < downtimeStart)) {
-    alert('Takvimi kapatan bakım için geçerli başlangıç ve bitiş tarihleri zorunludur.');
+    uiNotify('Takvimi kapatan bakım için geçerli başlangıç ve bitiş tarihleri zorunludur.');
     return;
   }
   try {
@@ -12625,7 +13003,7 @@ async function saveMaint(e) {
     await loadTenantAppData(tenantId);
     closeMaintModal();
   } catch (err) {
-    alert('Bakım kaydı kaydedilemedi: ' + getFriendlyAuthErrorMessage(err));
+    uiNotify('Bakım kaydı kaydedilemedi: ' + getFriendlyAuthErrorMessage(err));
   }
 }
 
@@ -12636,10 +13014,10 @@ async function deleteMaint(id) {
   const kayit = (appData.maintenanceTickets || []).find(t => String(t.id) === String(id))
     || (appData.maintenance || []).find(t => String(t.id) === String(id));
   if (kayit && !isMaintenanceTicketOpen(kayit)) {
-    alert('Bu kayıt kapanmış (çözüldü ya da iptal). Çözülmüş onarım iptal edilmez; geçmişte olduğu gibi kalır.');
+    uiNotify('Bu kayıt kapanmış (çözüldü ya da iptal). Çözülmüş onarım iptal edilmez; geçmişte olduğu gibi kalır.');
     return false;
   }
-  if (confirm('Bu bakım kaydını iptal ederek arşivlemek istediğinize emin misiniz?')) {
+  if ((await uiAskConfirm('Bu bakım kaydını iptal ederek arşivlemek istediğinize emin misiniz?'))) {
     const tenantId = getActiveTenantId();
     try {
       const { error } = await supabaseClient.from('maintenance_tickets')
@@ -12649,7 +13027,7 @@ async function deleteMaint(id) {
       await loadTenantAppData(tenantId);
       if (window.showToast) window.showToast('Bakım kaydı iptal edilerek arşivlendi.');
     } catch (err) {
-      alert('Bakım kaydı arşivlenemedi: ' + getFriendlyAuthErrorMessage(err));
+      uiNotify('Bakım kaydı arşivlenemedi: ' + getFriendlyAuthErrorMessage(err));
     }
   }
 }
@@ -12822,6 +13200,43 @@ function collectExportRecords(mod) {
 }
 
 /** Tarayiciya dosya indirtir. */
+// Isletme yedegi (L-42 2. kisim). Sahip isletmenin butun kayitlarini tek
+// dosya olarak indirir; dosya `npm run restore` ile geri yuklenir
+// (core/tenant_backup_export.js, gidis-donus tenant_backup_live_tests).
+// Eksik alinan yedek indirilmez: "yedek aldim" sanilip guvenilmesin.
+async function downloadTenantBackup() {
+  if (activeTenant?.role !== 'owner') {
+    uiNotify('İşletme yedeğini yalnız işletme sahibi indirebilir.');
+    return false;
+  }
+  const tenantId = getActiveTenantId();
+  if (!isCloudTenant(tenantId)) {
+    uiNotify('Yedek için bulut bağlantısı gerekir. Sayfayı yenileyip tekrar deneyin.');
+    return false;
+  }
+  const motor = typeof TenantBackupExport !== 'undefined' ? TenantBackupExport : require('./core/tenant_backup_export.js');
+  const btn = typeof document !== 'undefined' ? document.getElementById('tenantBackupBtn') : null;
+  const eskiMetin = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Yedek hazırlanıyor…'; }
+  try {
+    const yedek = await motor.exportTenantBackup({ client: supabaseClient, tenantId });
+    if (yedek.manifest.errors.length) {
+      uiNotify(`Yedek eksik alındı, indirilmedi (${yedek.manifest.errors.length} tablo okunamadı). Bağlantınızı kontrol edip tekrar deneyin.\n\n${yedek.manifest.errors.slice(0, 3).join('\n')}`, { modal: true });
+      return false;
+    }
+    const kayit = Object.values(yedek.tables).reduce((t, r) => t + r.length, 0);
+    const ad = String(activeTenant?.name || 'isletme').toLocaleLowerCase('tr').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ı/g, 'i').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'isletme';
+    triggerFileDownload(JSON.stringify(yedek), `lexbnb-yedek-${ad}-${getTodayStr()}.json`, 'application/json;charset=utf-8');
+    uiNotify(`✅ İşletme yedeği indirildi: ${kayit.toLocaleString('tr-TR')} kayıt.`);
+    return true;
+  } catch (err) {
+    uiNotify('Yedek alınamadı: ' + (err && err.message ? err.message : 'bilinmeyen hata'));
+    return false;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = eskiMetin; }
+  }
+}
+
 function triggerFileDownload(icerik, ad, mimeTur) {
   const blob = new Blob([icerik], { type: mimeTur });
   const url = URL.createObjectURL(blob);
@@ -12875,7 +13290,7 @@ function exportLedger(mod, bicim) {
       'text/csv;charset=utf-8');
   } else {
     if (typeof XLSX === 'undefined') {
-      if (typeof showToast === 'function') showToast('Excel motoru henüz yüklenmedi, birkaç saniye sonra tekrar deneyin.', 'error');
+      if (!retryWithXlsxEngine(() => exportLedger(mod, bicim)) && typeof showToast === 'function') showToast('Excel motoru yüklenemedi, sayfayı yenileyin.', 'error');
       return;
     }
     const wb = XLSX.utils.book_new();
@@ -12924,7 +13339,7 @@ function exportIncomeStatement() {
     return false;
   }
   if (typeof XLSX === 'undefined') {
-    if (typeof showToast === 'function') showToast('Excel motoru henüz yüklenmedi, birkaç saniye sonra tekrar deneyin.', 'error');
+    if (!retryWithXlsxEngine(() => exportIncomeStatement()) && typeof showToast === 'function') showToast('Excel motoru yüklenemedi, sayfayı yenileyin.', 'error');
     return false;
   }
   let tablo;
@@ -13158,7 +13573,7 @@ function renderDailyOps() {
         </div>
         <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
           <span class="badge badge-green" style="font-weight: 700;">🟢 ${checkInTime ? escapeHtml(checkInTime) + ' Giriş' : 'Giriş saati kayıtlı değil'}</span>
-          <button class="btn btn-secondary btn-sm" style="font-size: 10px; padding: 2px 6px;" data-onclick="openBookingModal(decodeURIComponent('${encodeActionArg(b.id)}'))">Detay</button>
+          <button class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 2px 6px;" data-onclick="openBookingModal(decodeURIComponent('${encodeActionArg(b.id)}'))">Detay</button>
         </div>
       `;
       inList.appendChild(div);
@@ -13212,7 +13627,7 @@ function renderDailyOps() {
         </div>
         <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
           <span class="badge badge-blue" style="font-weight: 700;">🔵 ${checkOutTime ? escapeHtml(checkOutTime) + ' Çıkış' : 'Çıkış saati kayıtlı değil'}</span>
-          <button class="btn btn-secondary btn-sm" style="font-size: 10px; padding: 2px 6px;" data-onclick="openBookingModal(decodeURIComponent('${encodeActionArg(b.id)}'))">Detay</button>
+          <button class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 2px 6px;" data-onclick="openBookingModal(decodeURIComponent('${encodeActionArg(b.id)}'))">Detay</button>
         </div>
       `;
       outList.appendChild(div);
@@ -13255,15 +13670,15 @@ function renderDailyOps() {
     villaCardsHtml += `
       <div style="display: inline-flex; align-items: center; gap: 4px; background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.07); padding: 3px 6px; border-radius: 6px; font-size: 11px; margin: 2px;">
         <span style="color: #FFFFFF; font-weight: 600;">${escapeHtml(vConf.name.split(' ')[0])}:</span>
-        <span class="badge ${badgeClass}" data-readiness-status="${escapeHtml(readiness?.status || 'UNSET')}" style="font-size: 9px; padding: 1px 5px; cursor: ${canEditReadiness ? 'pointer' : 'default'};" ${actionAttrs}>${statusBadge}</span>
+        <span class="badge ${badgeClass}" data-readiness-status="${escapeHtml(readiness?.status || 'UNSET')}" style="font-size: 11px; padding: 1px 5px; cursor: ${canEditReadiness ? 'pointer' : 'default'};" ${actionAttrs}>${statusBadge}</span>
       </div>
     `;
   });
 
   villaBar.innerHTML = `
-    <div style="font-size: 10px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
+    <div style="font-size: 11px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
       <span>🏡 Mülk Satış Hazırlığı</span>
-      <span style="color: #93C5FD; font-size: 10px;">${canManagePropertyReadiness() ? 'Durum Değiştir 🔄' : 'Salt Okunur'}</span>
+      <span style="color: #93C5FD; font-size: 11px;">${canManagePropertyReadiness() ? 'Durum Değiştir 🔄' : 'Salt Okunur'}</span>
     </div>
     <div style="display: flex; flex-wrap: wrap; gap: 2px;">
       ${villaCardsHtml}
@@ -13282,7 +13697,7 @@ function renderDailyOps() {
   taskListHeader.style.alignItems = 'center';
   taskListHeader.innerHTML = `
     <span>📅 Planlanan Temizlik & Borçlar (Tarih Sıralı):</span>
-    <span style="font-size: 10px; color: var(--text-muted);">Tarihe Göre</span>
+    <span style="font-size: 11px; color: var(--text-muted);">Tarihe Göre</span>
   `;
   hkList.appendChild(taskListHeader);
 
@@ -13317,14 +13732,14 @@ function renderDailyOps() {
       const isToday = (task.date === todayStr);
       const isPast = (task.date && task.date < todayStr);
 
-      let dateBadge = `<span class="badge badge-blue" style="font-size: 10px; font-weight: 700;">📅 ${formatTrDate(task.date)}</span>`;
+      let dateBadge = `<span class="badge badge-blue" style="font-size: 11px; font-weight: 700;">📅 ${formatTrDate(task.date)}</span>`;
       let borderColor = 'rgba(10, 132, 255, 0.4)';
 
       if (isToday) {
-        dateBadge = `<span class="badge badge-amber" style="font-size: 10px; font-weight: 800; background: rgba(255, 159, 10, 0.25); border: 1px solid #FF9F0A;">⚡ BUGÜN (${formatShortDate(task.date)})</span>`;
+        dateBadge = `<span class="badge badge-amber" style="font-size: 11px; font-weight: 800; background: rgba(255, 159, 10, 0.25); border: 1px solid #FF9F0A;">⚡ BUGÜN (${formatShortDate(task.date)})</span>`;
         borderColor = 'rgba(255, 159, 10, 0.8)';
       } else if (isPast) {
-        dateBadge = `<span class="badge" style="font-size: 10px; font-weight: 600; background: rgba(148, 163, 184, 0.15); color: #98989D;">🕒 ${formatTrDate(task.date)}</span>`;
+        dateBadge = `<span class="badge" style="font-size: 11px; font-weight: 600; background: rgba(148, 163, 184, 0.15); color: #98989D;">🕒 ${formatTrDate(task.date)}</span>`;
         borderColor = 'rgba(148, 163, 184, 0.3)';
       }
 
@@ -13350,7 +13765,7 @@ function renderDailyOps() {
               ${task.guest ? `<strong>${escapeHtml(task.guest)}</strong> • Çıkış Temizliği & Hazırlık` : escapeHtml(task.notes || 'Temizlik')}
             </div>
           </div>
-          <span class="badge ${isPaid ? 'badge-emerald' : (task.status === 'DONE' ? 'badge-amber' : (task.status === 'SKIPPED' ? '' : 'badge-blue'))}" style="font-size: 10px; font-weight: 700; white-space: nowrap;">
+          <span class="badge ${isPaid ? 'badge-emerald' : (task.status === 'DONE' ? 'badge-amber' : (task.status === 'SKIPPED' ? '' : 'badge-blue'))}" style="font-size: 11px; font-weight: 700; white-space: nowrap;">
             ${isPaid ? '✅ Ödendi' : (task.status === 'DONE' ? '⏳ Borç' : (task.status === 'SKIPPED' ? '✖ Gerek kalmadı' : '🗓️ Planlı'))}
           </span>
         </div>
@@ -13415,11 +13830,11 @@ async function promptEditTaskAmount(taskId) {
   const task = findCleaningTask(taskId);
   if (!task) return;
 
-  const input = prompt(`${task.guest || task.villa} temizlik maliyetini giriniz (TL):`, task.amount || '');
+  const input = (await uiAskText({ label: `${task.guest || task.villa} temizlik maliyetini giriniz (TL):`, value: task.amount || '' }));
   if (input === null) return;
   const newAmount = parseCleaningAmountInput(input);
   if (newAmount === null) {
-    alert('Lütfen geçerli bir tutar giriniz (ör. 1.500 veya 1500,50).');
+    uiNotify('Lütfen geçerli bir tutar giriniz (ör. 1.500 veya 1500,50).');
     return;
   }
 
@@ -13445,15 +13860,15 @@ function isValidIsoDate(v) {
 async function markCleaningDone(taskId) {
   const task = findCleaningTask(taskId);
   if (!task) return false;
-  const girilen = prompt('Temizlik hangi gün yapıldı? (YYYY-AA-GG)', task.date || getTodayStr());
+  const girilen = (await uiAskText({ label: 'Temizlik hangi gün yapıldı? (YYYY-AA-GG)', value: task.date || getTodayStr() }));
   if (girilen === null) return false;
   const gun = String(girilen).trim();
   if (!isValidIsoDate(gun)) {
-    alert('Lütfen tarihi YYYY-AA-GG biçiminde girin.');
+    uiNotify('Lütfen tarihi YYYY-AA-GG biçiminde girin.');
     return false;
   }
   if (gun > getTodayStr()) {
-    alert('Henüz gelmemiş bir gün için temizlik "yapıldı" işaretlenemez.');
+    uiNotify('Henüz gelmemiş bir gün için temizlik "yapıldı" işaretlenemez.');
     return false;
   }
   task.status = 'DONE';
@@ -13471,10 +13886,10 @@ async function markCleaningSkipped(taskId) {
   const task = findCleaningTask(taskId);
   if (!task) return false;
   if (task.paid) {
-    alert('Ödenmiş bir temizlik "gerek kalmadı" yapılamaz. Önce ödemeyi geri alın.');
+    uiNotify('Ödenmiş bir temizlik "gerek kalmadı" yapılamaz. Önce ödemeyi geri alın.');
     return false;
   }
-  if (!confirm('Bu temizliğe gerek kalmadı olarak işaretlensin mi (misafir gelmedi, iptal, ev kullanılmadı)? Gider ve personel borcu oluşmaz.')) return false;
+  if (!(await uiAskConfirm('Bu temizliğe gerek kalmadı olarak işaretlensin mi (misafir gelmedi, iptal, ev kullanılmadı)? Gider ve personel borcu oluşmaz.'))) return false;
   task.status = 'SKIPPED';
   renderHousekeepingTab();
   const ok = await reportCleaningPersist(task, '⏭️ Temizliğe gerek kalmadı olarak işaretlendi; gider ve borç oluşmaz.');
@@ -13487,7 +13902,7 @@ async function markCleaningPlanned(taskId) {
   const task = findCleaningTask(taskId);
   if (!task) return false;
   if (task.paid) {
-    alert('Ödenmiş bir temizlik planlı duruma alınamaz. Önce ödemeyi geri alın.');
+    uiNotify('Ödenmiş bir temizlik planlı duruma alınamaz. Önce ödemeyi geri alın.');
     return false;
   }
   task.status = 'PLANNED';
@@ -13503,16 +13918,16 @@ async function markSelectedCleaningDone() {
     .map(el => decodeURIComponent(el.value));
   const gorevler = secili.map(findCleaningTask).filter(t => t && t.status === 'PLANNED');
   if (gorevler.length === 0) {
-    alert('Önce listeden yapılmış (planlı) temizlikleri seçin.');
+    uiNotify('Önce listeden yapılmış (planlı) temizlikleri seçin.');
     return false;
   }
   const bugun = getTodayStr();
   const gelecek = gorevler.filter(t => (t.date || '') > bugun);
   if (gelecek.length) {
-    alert(`${gelecek.length} seçili temizlik henüz gelmemiş bir güne planlı; yalnız geçmiş tarihli olanlar işaretlenebilir.`);
+    uiNotify(`${gelecek.length} seçili temizlik henüz gelmemiş bir güne planlı; yalnız geçmiş tarihli olanlar işaretlenebilir.`);
     return false;
   }
-  if (!confirm(`${gorevler.length} temizlik planlandıkları gün yapılmış olarak işaretlensin mi? Maliyetleri o günlerin ayına gider yazılır.`)) return false;
+  if (!(await uiAskConfirm(`${gorevler.length} temizlik planlandıkları gün yapılmış olarak işaretlensin mi? Maliyetleri o günlerin ayına gider yazılır.`))) return false;
   gorevler.forEach(t => { t.status = 'DONE'; });
   renderHousekeepingTab();
   const ok = await reportCleaningPersist(gorevler, `✅ ${gorevler.length} temizlik yapıldı olarak işaretlendi.`);
@@ -13647,13 +14062,13 @@ function renderHousekeepingTab() {
     let durum;
     if (task.status === 'DONE') {
       durum = `<span class="badge badge-emerald">✔ Yapıldı</span>`
-        + (isPaid ? '' : ` <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:10px;" data-onclick="markCleaningPlanned(decodeURIComponent('${encodeActionArg(task.id)}'))" title="Yanlışlıkla işaretlendiyse geri al">↩︎</button>`);
+        + (isPaid ? '' : ` <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:11px;" data-onclick="markCleaningPlanned(decodeURIComponent('${encodeActionArg(task.id)}'))" title="Yanlışlıkla işaretlendiyse geri al">↩︎</button>`);
     } else if (task.status === 'SKIPPED') {
-      durum = `<span class="badge">Gerek kalmadı</span> <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:10px;" data-onclick="markCleaningPlanned(decodeURIComponent('${encodeActionArg(task.id)}'))" title="Geri al">↩︎</button>`;
+      durum = `<span class="badge">Gerek kalmadı</span> <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:11px;" data-onclick="markCleaningPlanned(decodeURIComponent('${encodeActionArg(task.id)}'))" title="Geri al">↩︎</button>`;
     } else {
       durum = `<span class="badge ${gecmisPlanli ? 'badge-amber' : 'badge-blue'}">${gecmisPlanli ? 'Yapıldı mı?' : 'Planlandı'}</span>
-        <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:10px; margin-left:4px;" data-onclick="markCleaningDone(decodeURIComponent('${encodeActionArg(task.id)}'))">✔ Yapıldı</button>
-        <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:10px;" data-onclick="markCleaningSkipped(decodeURIComponent('${encodeActionArg(task.id)}'))" title="Misafir gelmedi, iptal ya da ev kullanılmadı: gider ve borç oluşmaz">✖ Gerek kalmadı</button>`;
+        <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:11px; margin-left:4px;" data-onclick="markCleaningDone(decodeURIComponent('${encodeActionArg(task.id)}'))">✔ Yapıldı</button>
+        <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:11px;" data-onclick="markCleaningSkipped(decodeURIComponent('${encodeActionArg(task.id)}'))" title="Misafir gelmedi, iptal ya da ev kullanılmadı: gider ve borç oluşmaz">✖ Gerek kalmadı</button>`;
     }
 
     let odeme;
@@ -13703,18 +14118,18 @@ async function toggleTaskPaid(taskId) {
 
   const newPaid = !task.paid;
   if (newPaid && task.status === 'SKIPPED') {
-    alert('Yapılmamış bir temizlik ödenemez.');
+    uiNotify('Yapılmamış bir temizlik ödenemez.');
     return;
   }
   if (newPaid && task.status !== 'DONE') {
     // Odeme yapilmis temizlige yapilir. Planli gorev once "yapildi" olur;
     // gider o anda ve yapildigi gunun ayinda dogar.
-    if (!confirm('Bu temizlik henüz "yapıldı" işaretlenmemiş. Yapıldı olarak işaretleyip ödensin mi?')) return;
-    const girilen = prompt('Temizlik hangi gün yapıldı? (YYYY-AA-GG)', task.date || getTodayStr());
+    if (!(await uiAskConfirm('Bu temizlik henüz "yapıldı" işaretlenmemiş. Yapıldı olarak işaretleyip ödensin mi?'))) return;
+    const girilen = (await uiAskText({ label: 'Temizlik hangi gün yapıldı? (YYYY-AA-GG)', value: task.date || getTodayStr() }));
     if (girilen === null) return;
     const gun = String(girilen).trim();
     if (!isValidIsoDate(gun) || gun > getTodayStr()) {
-      alert('Geçerli ve gelecekte olmayan bir tarih girin (YYYY-AA-GG).');
+      uiNotify('Geçerli ve gelecekte olmayan bir tarih girin (YYYY-AA-GG).');
       return;
     }
     task.status = 'DONE';
@@ -13743,12 +14158,12 @@ async function payAllPendingCleaning() {
   // yapilmamis temizligin parasi odenmez (K-04).
   const pending = appData.cleaningTasks.filter(t => t.status === 'DONE' && !t.paid);
   if (pending.length === 0) {
-    alert('Şu anda ödenecek temizlik borcu yok. (Planlı temizlikler önce "yapıldı" işaretlenmelidir.)');
+    uiNotify('Şu anda ödenecek temizlik borcu yok. (Planlı temizlikler önce "yapıldı" işaretlenmelidir.)');
     return;
   }
 
   const totalDebt = pending.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
-  const confirmPay = confirm(`Yapılmış ${pending.length} temizliğin borcu (₺${totalDebt.toLocaleString('tr-TR')}) ödendi olarak kapatılsın mı?`);
+  const confirmPay = (await uiAskConfirm(`Yapılmış ${pending.length} temizliğin borcu (₺${totalDebt.toLocaleString('tr-TR')}) ödendi olarak kapatılsın mı?`));
   if (!confirmPay) return;
 
   const todayStr = getTodayStr();
@@ -13837,13 +14252,13 @@ async function saveCleaningTask(e) {
   const date = document.getElementById('hkDate').value;
   const cleaner = document.getElementById('hkCleaner').value.trim();
   if (!cleaner) {
-    alert('Lütfen temizlik personelini belirtin.');
+    uiNotify('Lütfen temizlik personelini belirtin.');
     return;
   }
   const hamTutar = String(document.getElementById('hkAmount').value || '').trim();
   const amount = hamTutar === '' ? 0 : parseCleaningAmountInput(hamTutar);
   if (amount === null) {
-    alert('Lütfen geçerli bir tutar giriniz (ör. 1.500 veya 1500,50).');
+    uiNotify('Lütfen geçerli bir tutar giriniz (ör. 1.500 veya 1500,50).');
     return;
   }
   const notes = document.getElementById('hkDesc').value.trim();
@@ -13852,7 +14267,7 @@ async function saveCleaningTask(e) {
   // Odenmis ya da borc olan temizlik yapilmistir (K-04).
   const status = (secim === 'PAID' || secim === 'PENDING') ? 'DONE' : (secim === 'SKIPPED' ? 'SKIPPED' : 'PLANNED');
   if (status === 'DONE' && date > getTodayStr()) {
-    alert('Henüz gelmemiş bir gün için temizlik "yapıldı" kaydedilemez.');
+    uiNotify('Henüz gelmemiş bir gün için temizlik "yapıldı" kaydedilemez.');
     return;
   }
 
@@ -13912,7 +14327,7 @@ async function saveCleaningTask(e) {
 }
 
 async function deleteCleaningTask(taskId) {
-  if (!confirm('Bu temizlik kaydını silmek istediğinize emin misiniz?')) return false;
+  if (!(await uiAskConfirm('Bu temizlik kaydını silmek istediğinize emin misiniz?'))) return false;
   const task = findCleaningTask(taskId);
   if (!task) return false;
 
@@ -13983,6 +14398,7 @@ function setReservationScopeRange(start, end) {
 /** Donem ya da mulk degisti: takvim ve liste birlikte cizilir. */
 function onReservationScopeChange() {
   if (typeof largeTablePageState !== 'undefined') largeTablePageState.bookings = 1;
+  writeReservationScopeToGlobalFilter();
   syncReservationRangeUi();
   renderTapeChart();
   renderManageBookingsTable();
@@ -14088,7 +14504,7 @@ function renderTapeChart() {
 
     tableHtml += `<th class="tape-day-th ${isWeekend ? 'weekend' : ''} ${isToday ? 'today' : ''}" style="${isToday ? 'background: rgba(255, 159, 10, 0.25); color: #FCD34D; border-bottom: 2px solid #FF9F0A;' : ''}">
       ${d}<br>
-      <span style="font-size:9px; font-weight:normal; opacity:0.8;">${dayNamesShort[dayOfWeek]}</span>
+      <span style="font-size:11px; font-weight:normal; opacity:0.8;">${dayNamesShort[dayOfWeek]}</span>
     </th>`;
   });
   tableHtml += '</tr></thead><tbody>';
@@ -14645,7 +15061,7 @@ async function saveWaAsLead() {
     await loadLeads(getActiveTenantId());
     await refreshLeadSalesContext();
   } catch (err) {
-    alert('⚠️ Talep kaydedilemedi: ' + (err?.message || 'veritabanı hatası'));
+    uiNotify('⚠️ Talep kaydedilemedi: ' + (err?.message || 'veritabanı hatası'));
     return;
   }
 
@@ -14653,7 +15069,7 @@ async function saveWaAsLead() {
   switchTab('leads');
   renderManageLeadsTable();
 
-  alert(buildWhatsAppLeadSaveMessage(result, guest));
+  uiNotify(buildWhatsAppLeadSaveMessage(result, guest));
 }
 
 function buildWhatsAppLeadSaveMessage(result, guest) {
@@ -14674,27 +15090,27 @@ async function saveWaAsBooking() {
   const phone = document.getElementById('waParsedPhone').value.trim();
 
   if (!guest) {
-    alert('Lütfen rezervasyon için misafir adını giriniz! Ad bilinmiyorsa mesajı talep olarak kaydedin.');
+    uiNotify('Lütfen rezervasyon için misafir adını giriniz! Ad bilinmiyorsa mesajı talep olarak kaydedin.');
     return;
   }
 
   if (!villa) {
-    alert('Lütfen rezervasyon için villayı seçiniz!');
+    uiNotify('Lütfen rezervasyon için villayı seçiniz!');
     return;
   }
 
   if (!paxText || !Number.isFinite(pax) || pax <= 0) {
-    alert('Lütfen rezervasyon için kişi sayısını giriniz!');
+    uiNotify('Lütfen rezervasyon için kişi sayısını giriniz!');
     return;
   }
 
   const minStayEngeli = minStayBlockMessage(villa, checkIn, checkOut);
   if (checkIn && checkOut && minStayEngeli) {
-    alert(minStayEngeli);
+    uiNotify(minStayEngeli);
     return;
   }
   if (!checkIn || !checkOut) {
-    alert('Lütfen rezervasyon için giriş ve çıkış tarihlerini seçiniz!');
+    uiNotify('Lütfen rezervasyon için giriş ve çıkış tarihlerini seçiniz!');
     return;
   }
 
@@ -14703,11 +15119,11 @@ async function saveWaAsBooking() {
   const depositText = document.getElementById('waParsedDeposit')?.value || '';
   const deposit = depositText === '' ? 0 : Number(depositText);
   if (!Number.isFinite(deposit) || deposit < 0) {
-    alert('Kapora tutarı geçerli bir sayı olmalıdır.');
+    uiNotify('Kapora tutarı geçerli bir sayı olmalıdır.');
     return;
   }
   if (deposit > 0 && gross > 0 && deposit > gross) {
-    alert('Alınan kapora toplam tutardan büyük olamaz. Toplam tutarı kontrol edin.');
+    uiNotify('Alınan kapora toplam tutardan büyük olamaz. Toplam tutarı kontrol edin.');
     return;
   }
 
@@ -14715,9 +15131,11 @@ async function saveWaAsBooking() {
   const d2 = new Date(checkOut);
   const nights = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
   if (!Number.isInteger(nights) || nights <= 0) {
-    alert('Çıkış tarihi giriş tarihinden sonra olmalıdır.');
+    uiNotify('Çıkış tarihi giriş tarihinden sonra olmalıdır.');
     return;
   }
+
+  if (!(await confirmBookingWarnings(bookingSaveWarnings({ gross, pax, villa })))) return;
 
   let temizlikNotu = '';
   try {
@@ -14741,7 +15159,7 @@ async function saveWaAsBooking() {
     temizlikNotu = await syncBookingCleaningTaskToCloud(yeni, null);
     if (deposit > 0) temizlikNotu = (temizlikNotu || '') + await recordBookingDeposit(yeni.id, deposit, null, 'WhatsApp mesajından');
   } catch (err) {
-    alert('⚠️ Rezervasyon kaydedilemedi: ' + (err?.message || 'veritabanı hatası'));
+    uiNotify('⚠️ Rezervasyon kaydedilemedi: ' + (err?.message || 'veritabanı hatası'));
     return;
   }
 
@@ -14750,7 +15168,7 @@ async function saveWaAsBooking() {
   renderManageBookingsTable();
   renderTapeChart();
 
-  alert(`✅ Tebrikler! "${guest}" için ${nights} gecelik WhatsApp rezervasyonu kesinleştirildi ve takvime işlendi!${temizlikNotu || ''}`);
+  uiNotify(`✅ Tebrikler! "${guest}" için ${nights} gecelik WhatsApp rezervasyonu kesinleştirildi ve takvime işlendi!${temizlikNotu || ''}`);
 }
 
 
@@ -15243,9 +15661,9 @@ function renderMonthlyKpiTracker() {
     const btn = document.getElementById('kpiTrackBtn-' + mKey);
     if (btn) {
       if (mKey === activeKpiTrackerMetric) {
-        btn.setAttribute('style', activeConf.activeBtnStyle);
+        btn.style.cssText = activeConf.activeBtnStyle;
       } else {
-        btn.setAttribute('style', 'background: transparent; border-color: var(--border-color); color: var(--text-muted); font-weight: 500;');
+        btn.style.cssText = 'background: transparent; border-color: var(--border-color); color: var(--text-muted); font-weight: 500;';
       }
     }
   });
@@ -15293,11 +15711,11 @@ function renderMonthlyKpiTracker() {
       barEl.onclick = () => filterByPeriod(d.key);
 
       barEl.innerHTML = `
-        <div style="font-size: 10px; font-weight: 700; color: ${isCurrentFilter ? '#FFFFFF' : '#98989D'}; margin-bottom: 4px; white-space: nowrap; text-align: center;">
+        <div style="font-size: 11px; font-weight: 700; color: ${isCurrentFilter ? '#FFFFFF' : '#98989D'}; margin-bottom: 4px; white-space: nowrap; text-align: center;">
           ${olculmedi ? '—' : (activeKpiTrackerMetric === 'occupancy' ? ('%' + Number(val).toFixed(0)) : (val >= 1000 ? Math.round(val / 1000) + 'k' : Math.round(val)))}
         </div>
         <div class="kpi-bar-fill" style="width: 100%; height: ${barHeightPx}px; background: ${barColor}; opacity: ${isCurrentFilter ? '1' : '0.8'}; border-radius: 4px 4px 1px 1px; ${borderStyle}"></div>
-        <div style="font-size: 10px; color: ${isCurrentFilter ? '#409CFF' : 'var(--text-muted)'}; font-weight: ${isCurrentFilter ? '800' : '500'}; margin-top: 6px; white-space: nowrap;">
+        <div style="font-size: 11px; color: ${isCurrentFilter ? '#409CFF' : 'var(--text-muted)'}; font-weight: ${isCurrentFilter ? '800' : '500'}; margin-top: 6px; white-space: nowrap;">
           ${shortMonth} ${shortYear}
         </div>
       `;
@@ -15334,10 +15752,10 @@ function renderMonthlyKpiTracker() {
       const marginBadge = d.margin >= 40 ? 'badge-green' : (d.margin >= 20 ? 'badge-blue' : (d.margin > 0 ? 'badge-yellow' : 'badge-red'));
 
       let periodLabel = d.monthName;
-      if (d.isCurrentMonth) periodLabel += ' <span class="badge badge-green" style="font-size:10px; margin-left:4px;">Güncel ay</span>';
+      if (d.isCurrentMonth) periodLabel += ' <span class="badge badge-green" style="font-size:11px; margin-left:4px;">Güncel ay</span>';
 
       const tr = document.createElement('tr');
-      if (rowStyle) tr.setAttribute('style', rowStyle);
+      if (rowStyle) tr.style.cssText = rowStyle;
 
       tr.innerHTML = `
         <td style="font-weight: 700; white-space: nowrap;">${periodLabel}</td>
@@ -15558,11 +15976,11 @@ function showKpiExplanation(code) {
 
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px;">
         <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 10px;">
-          <div style="font-size: 10px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">📐 Nasıl Hesaplanır?</div>
+          <div style="font-size: 11px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">📐 Nasıl Hesaplanır?</div>
           <div style="font-size: 11px; color: #409CFF; font-family: var(--font-mono); margin-top: 4px; font-weight: 600;">${guide.formula}</div>
         </div>
         <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 10px;">
-          <div style="font-size: 10px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">📊 Pratik Örnek</div>
+          <div style="font-size: 11px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">📊 Pratik Örnek</div>
           <div style="font-size: 11px; color: #30D158; margin-top: 4px;">${guide.example}</div>
         </div>
       </div>
@@ -15976,9 +16394,9 @@ function renderCoverAbTestLab(villaKey = null) {
 
 function copyAiTitle(titleText) {
   navigator.clipboard.writeText(titleText).then(() => {
-    alert('✅ Optimize edilmiş Airbnb başlığı panoya kopyalandı! İlanınızda doğrudan kullanabilirsiniz.');
+    uiNotify('✅ Optimize edilmiş Airbnb başlığı panoya kopyalandı! İlanınızda doğrudan kullanabilirsiniz.');
   }).catch(() => {
-    alert('Başlık: ' + titleText);
+    uiNotify('Başlık: ' + titleText);
   });
 }
 
@@ -16101,10 +16519,10 @@ function renderGapNightsRadar() {
     const fiyatBiliniyor = g.regularPrice !== null && g.discountPrice !== null;
     const fiyatKutusu = fiyatBiliniyor
       ? `<div>
-          <div style="font-size:10px; color:var(--text-muted); text-decoration:line-through;">Liste: ₺${g.regularPrice.toLocaleString('tr-TR')}</div>
+          <div style="font-size:11px; color:var(--text-muted); text-decoration:line-through;">Liste: ₺${g.regularPrice.toLocaleString('tr-TR')}</div>
           <div style="font-size:15px; font-weight:800; color:#30D158;">₺${g.discountPrice.toLocaleString('tr-TR')}</div>
         </div>
-        <span class="badge badge-green" style="font-size:10px;">OTA Komisyonsuz</span>`
+        <span class="badge badge-green" style="font-size:11px;">OTA Komisyonsuz</span>`
       : `<div style="font-size:11px; color:var(--text-muted);">
           Bu mülkün liste fiyatı girilmemiş — fırsat fiyatı hesaplanamıyor.
           <div style="margin-top:2px;">Mülk kartından gecelik fiyatı girin.</div>
@@ -16151,9 +16569,9 @@ function copyGapStoryText(vName, dates, nights, discPrice, regPrice) {
     '📲 İlk yazan rezerve eder! Detay ve rezervasyon için hemen DM veya WhatsApp\'tan yazın.';
 
   navigator.clipboard.writeText(storyText).then(() => {
-    alert('✅ Instagram Hikaye & WhatsApp Durum metni panoya kopyalandı! Doğrudan paylaşabilirsiniz.');
+    uiNotify('✅ Instagram Hikaye & WhatsApp Durum metni panoya kopyalandı! Doğrudan paylaşabilirsiniz.');
   }).catch(() => {
-    alert(storyText);
+    uiNotify(storyText);
   });
 }
 
@@ -16253,9 +16671,9 @@ function copyClosingScript() {
   const text = document.getElementById('scriptPreviewText')?.innerText;
   if (!text) return;
   navigator.clipboard.writeText(text).then(() => {
-    alert('✅ Satış kapatma yanıtı panoya kopyalandı! WhatsApp veya Instagram DM penceresine yapıştırabilirsiniz.');
+    uiNotify('✅ Satış kapatma yanıtı panoya kopyalandı! WhatsApp veya Instagram DM penceresine yapıştırabilirsiniz.');
   }).catch(() => {
-    alert(text);
+    uiNotify(text);
   });
 }
 
@@ -16357,9 +16775,9 @@ function sendBroadcastLoyaltyMessage() {
     'Yeni bir konaklama düşünüyorsanız güncel müsaitlik ve fiyat bilgisini memnuniyetle paylaşabiliriz. ' +
     'Bilgi almak için bu mesaja yanıt vermeniz yeterli.';
   navigator.clipboard.writeText(text).then(() => {
-    alert('✅ Toplu kış sezonu VIP davet metni kopyalandı! WhatsApp bülten veya toplu mesaj listenizde kullanabilirsiniz.');
+    uiNotify('✅ Toplu kış sezonu VIP davet metni kopyalandı! WhatsApp bülten veya toplu mesaj listenizde kullanabilirsiniz.');
   }).catch(() => {
-    alert(text);
+    uiNotify(text);
   });
 }
 
@@ -16530,12 +16948,12 @@ function setActiveTenant(tenantObj) {
 // (finans ve misafir verisi) bir sonraki kisiye acik kaliyordu.
 //
 // Supabase oturumu artik tercihe gore yazilir: isaretliyse localStorage'a ve
-// en fazla 30 gun; isaretsizse sessionStorage'a (tarayici kapaninca biter).
+// en fazla 7 gun (L-161; ortak bilgisayarda kalmasin diye kutu bos gelir); isaretsizse sessionStorage'a (tarayici kapaninca biter).
 // Tercih girisin HEMEN ONCESINDE yazilir; tercih yoksa (davet / sifre
 // sifirlama baglantisi) oturum sekmeyle sinirli kalir.
 const REMEMBER_PREF_KEY = 'LEXBNB_REMEMBER_DEVICE';
 const REMEMBER_UNTIL_KEY = 'LEXBNB_REMEMBER_UNTIL';
-const REMEMBER_DAYS = 30;
+const REMEMBER_DAYS = 7;
 
 function guvenliDepo(ad) {
   try {
@@ -16927,8 +17345,40 @@ if (typeof window !== 'undefined') {
 }
 
 // Merkezi Authenticated Session Yöneticisi (PHASE 3)
+// Yasal metin surumu degisince kullanici giriste yeni surumu onaylar (L-157).
+// Iskelet surumde (metinler hukuki onay bekliyor, docs/yasal_taslak) kimseye
+// sorulmaz. Onayli surum yayinlaninca kayitta eski surumu (ya da davetle gelip
+// hic) onaylamis herkese bir kez sorulur; reddeden oturumu kapatir.
+function legalConsentRequired(kabulEdilen, guncel = LEGAL_TEXT_VERSION) {
+  if (String(guncel || '').startsWith('iskelet')) return false;
+  return kabulEdilen !== guncel;
+}
+
+async function ensureLegalConsent(u, guncel = LEGAL_TEXT_VERSION) {
+  if (!legalConsentRequired(u?.user_metadata?.legal_text_version, guncel)) return true;
+  const kabul = await uiAskConfirm({
+    title: 'Yasal metinler güncellendi',
+    message: 'Kullanım Şartları, Gizlilik Politikası ve KVKK Aydınlatma Metni güncellendi. ' +
+      'Metinleri lexbnb.space/yasal/ adresinde okuyabilirsiniz.\n\nDevam etmek için güncel metinleri kabul etmeniz gerekir.',
+    okText: 'Okudum, kabul ediyorum',
+    cancelText: 'Çıkış yap'
+  });
+  if (kabul) {
+    const { error } = await supabaseClient.auth.updateUser({ data: { legal_consent_at: new Date().toISOString(), legal_text_version: guncel } });
+    if (!error) return true;
+    uiNotify('Onayınız kaydedilemedi. Bağlantınızı kontrol edip yeniden giriş yapın.');
+  }
+  try { await supabaseClient.auth.signOut(); } catch (e) { /* oturum zaten kapali */ }
+  return false;
+}
+
 async function handleAuthenticatedSession(u) {
   if (!u || !u.id) return false;
+  if (!(await ensureLegalConsent(u))) {
+    const kutu = typeof document !== 'undefined' ? document.getElementById('authErrorMessage') : null;
+    if (kutu) { kutu.style.display = 'block'; kutu.innerText = 'Devam etmek için güncel yasal metinleri kabul etmeniz gerekir.'; }
+    return false;
+  }
 
   activeSaaSUser = {
     id: u.id,
@@ -17422,7 +17872,7 @@ async function handleSaaSRegister(e) {
 }
 
 async function logoutSaaSUser() {
-  if (!confirm('Oturumunuzu kapatmak istediğinize emin misiniz?')) return;
+  if (!(await uiAskConfirm('Oturumunuzu kapatmak istediğinize emin misiniz?'))) return;
 
   unsubscribeTenantRealtime();
   if (supabaseClient) {
@@ -17733,6 +18183,8 @@ async function cloudSaveHousekeepingOverride(villaKey, status) {
 // -------------------------------------------------------------
 async function loadTenantAppData(tenantIdOrUserId) {
   const targetId = tenantIdOrUserId || getActiveTenantId();
+  scheduleXlsxEnginePreload();
+  if (isCloudTenant(targetId)) await loadActiveMemberPermissions(targetId);
 
   // 1. Supabase Cloud Source of Truth
   if (isCloudTenant(targetId)) {
@@ -18056,8 +18508,10 @@ function applyRoleNavigationVisibility() {
   const role = activeTenant?.role || 'viewer';
   const nav = document.querySelector('.nav-tabs');
   if (nav) nav.hidden = role === 'staff';
-  const hiddenTabs = new Set(['sales', 'staff'].includes(role) ? ['finance', 'marketing', 'settings'] : []);
+  const hiddenTabs = new Set(['sales', 'staff'].includes(role) ? ['marketing', 'settings'] : []);
   if (!canManageTenantRole(role)) hiddenTabs.add('settings');
+  // Finans sekmesi finans okuma iznine gore (L-211: satisa verilebilir, yoneticiden alinabilir).
+  if (!canReadLedgerRole(role)) hiddenTabs.add('finance');
   document.querySelectorAll('.nav-tabs .tab-btn').forEach(button => {
     const match = String(button.getAttribute('data-onclick') || '').match(/^switchTab\('([^']+)'\)$/);
     button.hidden = !!(match && hiddenTabs.has(match[1]));
@@ -18074,6 +18528,12 @@ function applyRoleNavigationVisibility() {
   });
   document.querySelectorAll('[data-ledger-only]').forEach(element => {
     element.hidden = !canReadLedgerRole(role);
+  });
+  document.querySelectorAll('[data-ledger-write-only]').forEach(element => {
+    element.hidden = !canWriteLedgerRole(role);
+  });
+  document.querySelectorAll('[data-operations-only]').forEach(element => {
+    element.hidden = !canManageOperationsRole(role);
   });
   // Veri sifirlama yalniz isletme sahibidir (reset_tenant_data, L-297): admin
   // dugmeyi goruyor, sunucu reddediyordu.
@@ -18454,7 +18914,7 @@ async function saveProperty(e) {
     const activationDate = activationInput ? document.getElementById('propActivatedOn').value : '';
 
     if (!name || !rawKey || !capacity || !(basePrice > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(activationDate)) {
-      alert('Mülk adı, sistem kodu, kapasite, pozitif baz fiyat ve faaliyete başlama tarihi zorunludur.');
+      uiNotify('Mülk adı, sistem kodu, kapasite, pozitif baz fiyat ve faaliyete başlama tarihi zorunludur.');
       return;
     }
 
@@ -18510,10 +18970,10 @@ async function saveProperty(e) {
     closePropertyModal();
     updateAllVillaDropdowns();
     renderAll();
-    alert('✅ ' + name + ' başarıyla mülk portföyünüze kaydedildi!' + contextWarning);
+    uiNotify('✅ ' + name + ' başarıyla mülk portföyünüze kaydedildi!' + contextWarning);
   } catch (err) {
     console.error('saveProperty error:', err);
-    alert('Mülk kaydedilemedi: ' + (err.message || 'Lütfen bilgileri kontrol edip tekrar deneyin.'));
+    uiNotify('Mülk kaydedilemedi: ' + (err.message || 'Lütfen bilgileri kontrol edip tekrar deneyin.'));
   } finally {
     if (submitBtn) {
       submitBtn.disabled = false;
@@ -18551,7 +19011,7 @@ async function handleOnboardingSubmit(e) {
   try {
     const name = document.getElementById('onboardPropName')?.value.trim();
     if (!name) {
-      alert('Lütfen geçerli bir mülk adı giriniz.');
+      uiNotify('Lütfen geçerli bir mülk adı giriniz.');
       return;
     }
 
@@ -18563,11 +19023,11 @@ async function handleOnboardingSubmit(e) {
     const amenities = document.getElementById('onboardPropAmenities')?.value.trim() || '';
 
     if (!Number.isFinite(basePrice) || basePrice < 0) {
-      alert('Lütfen sıfır veya daha büyük geçerli bir gecelik fiyat giriniz.');
+      uiNotify('Lütfen sıfır veya daha büyük geçerli bir gecelik fiyat giriniz.');
       return;
     }
     if (!Number.isFinite(cleanCost) || cleanCost < 0) {
-      alert('Lütfen sıfır veya daha büyük geçerli bir temizlik maliyeti giriniz.');
+      uiNotify('Lütfen sıfır veya daha büyük geçerli bir temizlik maliyeti giriniz.');
       return;
     }
 
@@ -18584,10 +19044,10 @@ async function handleOnboardingSubmit(e) {
     closeOnboardingModal();
     updateAllVillaDropdowns();
     renderAll();
-    alert('🎉 Tebrikler! ' + name + ' başarıyla eklendi. Yönetim kokpitiniz hazır!');
+    uiNotify('🎉 Tebrikler! ' + name + ' başarıyla eklendi. Yönetim kokpitiniz hazır!');
   } catch (err) {
     console.error('Onboarding submit error:', err);
-    alert('İlk mülk kaydedilemedi: ' + (err.message || 'Lütfen tekrar deneyin.'));
+    uiNotify('İlk mülk kaydedilemedi: ' + (err.message || 'Lütfen tekrar deneyin.'));
   } finally {
     if (submitBtn) {
       submitBtn.disabled = false;
@@ -19566,12 +20026,12 @@ function bookingCleaningDate(booking, currentTaskDate = null, today = getTodaySt
 
 // Cikis tarihi gelmeden "Cikis yapti" (L-280): giris oncesi reddedilir,
 // sonrasi onay ister. Onaylanmazsa false.
-function confirmEarlyCheckout(checkIn, checkOut, status, previous = null, today = getTodayStr()) {
+async function confirmEarlyCheckout(checkIn, checkOut, status, previous = null, today = getTodayStr()) {
   if (String(status || '').toUpperCase() !== 'CHECKED_OUT' || !(today < checkOut)) return true;
   if (String(previous?.status || '').toUpperCase() === 'CHECKED_OUT') return true;
   if (today < checkIn) throw new Error('Giriş tarihi gelmemiş bir rezervasyon "Çıkış yaptı" olarak işaretlenemez.');
   if (typeof confirm !== 'function') return true;
-  return confirm(`Çıkış tarihi ${formatTrDate(checkOut)}. Misafir bugün erken çıkmış olarak işaretlenecek; temizlik bugüne alınır. Geceler ve tutar değişmez (gerekirse çıkış tarihini ayrıca düzeltin). Devam edilsin mi?`);
+  return (await uiAskConfirm(`Çıkış tarihi ${formatTrDate(checkOut)}. Misafir bugün erken çıkmış olarak işaretlenecek; temizlik bugüne alınır. Geceler ve tutar değişmez (gerekirse çıkış tarihini ayrıca düzeltin). Devam edilsin mi?`));
 }
 
 function renderTodayDateStrip(bookings, tasks) {
@@ -20330,7 +20790,7 @@ function handleCommandPaletteSearch(query) {
     </div>`;
     }).join('');
     const more = group.more ? `<div style="font-size: 11px; color: #98989D; padding: 2px 12px 6px;">+${group.more} sonuç daha — aramayı daraltın</div>` : '';
-    return `<div class="palette-group-title" style="font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #98989D; padding: 8px 12px 4px;">${escapeHtml(group.group)}</div>${rows}${more}`;
+    return `<div class="palette-group-title" style="font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #98989D; padding: 8px 12px 4px;">${escapeHtml(group.group)}</div>${rows}${more}`;
   }).join('');
   container.querySelectorAll('[data-palette-index]').forEach(element => {
     const activate = () => runCommandPaletteTarget(items[Number(element.dataset.paletteIndex)]?.target);
@@ -20511,8 +20971,8 @@ function renderUserNotificationsDrawer() {
       <strong style="color: ${color[n.severity] || '#FCD34D'};">${n.status === 'UNREAD' ? '● ' : ''}${escapeHtml(n.title || '')}</strong>
       <div style="color: #C7C7CC; font-size: 11px;">${escapeHtml(n.message || '')}</div>
       <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 4px;">
-        ${n.id && n.status === 'UNREAD' ? `<button class="btn btn-secondary btn-sm" data-onclick="confirmUserNotification(decodeURIComponent('${encodeActionArg(String(n.id))}'))" style="font-size: 9px; padding: 1px 5px;">Okundu</button>` : ''}
-        ${n.deep_link ? `<button class="btn btn-primary btn-sm" data-onclick="openUserNotification(decodeURIComponent('${encodeActionArg(String(n.event_key || ''))}'))" style="font-size: 9px; padding: 1px 5px;">Git ›</button>` : ''}
+        ${n.id && n.status === 'UNREAD' ? `<button class="btn btn-secondary btn-sm" data-onclick="confirmUserNotification(decodeURIComponent('${encodeActionArg(String(n.id))}'))" style="font-size: 11px; padding: 1px 5px;">Okundu</button>` : ''}
+        ${n.deep_link ? `<button class="btn btn-primary btn-sm" data-onclick="openUserNotification(decodeURIComponent('${encodeActionArg(String(n.event_key || ''))}'))" style="font-size: 11px; padding: 1px 5px;">Git ›</button>` : ''}
       </div>
     </div>
   `).join('') + help;
@@ -20856,7 +21316,7 @@ async function savePropertyChannelListing(villaKey) {
 async function archivePropertyChannelListing(villaKey, listingId) {
   const api = channelListingApi();
   if (!api || !canManageTenantRole(activeTenant?.role)) return false;
-  if (!confirm('Bu kanal ilanı arşivlensin mi? Geçmiş ölçümler korunur; aynı ilanı yeniden ekleyebilirsiniz.')) return false;
+  if (!(await uiAskConfirm('Bu kanal ilanı arşivlensin mi? Geçmiş ölçümler korunur; aynı ilanı yeniden ekleyebilirsiniz.'))) return false;
   try {
     requireCloudForWrite('Kanal ilanı arşivleme', getActiveTenantId());
     await api.archiveChannelListing(supabaseClient, { tenantId: getActiveTenantId(), listingId });
@@ -20880,7 +21340,7 @@ async function copyPropertyChannelLinks(villaKey) {
     await navigator.clipboard.writeText(text);
     showToast('Kanal bağlantıları kopyalandı; ChatGPT’ye yapıştırabilirsiniz.', 'success');
   } catch (_) {
-    prompt('Kopyalayın:', text);
+    (await uiAskText({ label: 'Kopyalayın:', value: text }));
   }
   return true;
 }
@@ -21015,8 +21475,8 @@ function renderPropertiesTab() {
         </div>
         ${canManage ? propertyColorPickerHtml(k) : ''}
         <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px;">
-          <button class="btn btn-primary btn-sm" data-onclick="setPropertyProfile(decodeURIComponent('${encodeActionArg(k)}'))" style="font-size: 10px;">Profili Aç</button>
-          ${canManage ? `<button class="btn btn-secondary btn-sm" data-onclick="openPropertyModal(decodeURIComponent('${encodeActionArg(k)}'))" style="font-size: 10px;">Düzenle</button>` : ''}
+          <button class="btn btn-primary btn-sm" data-onclick="setPropertyProfile(decodeURIComponent('${encodeActionArg(k)}'))" style="font-size: 11px;">Profili Aç</button>
+          ${canManage ? `<button class="btn btn-secondary btn-sm" data-onclick="openPropertyModal(decodeURIComponent('${encodeActionArg(k)}'))" style="font-size: 11px;">Düzenle</button>` : ''}
         </div>
       </div>
     `;
@@ -21105,7 +21565,7 @@ async function signStaffCleaningDone(executionId) {
     if (typeof showToast === 'function') showToast('⚠️ Temizlik tamamlanamaz: ' + detail, 'error');
     return false;
   }
-  if (!confirm('Temizliği tamamladığınızı imzalıyor musunuz? Yönetici denetiminden sonra kapanır.')) return false;
+  if (!(await uiAskConfirm('Temizliği tamamladığınızı imzalıyor musunuz? Yönetici denetiminden sonra kapanır.'))) return false;
   if (!await saveStaffCleaningProgress(executionId)) return false;
   const { error } = await supabaseClient.rpc('sign_cleaning_done', { p_execution_id: executionId });
   if (error) {
@@ -21312,7 +21772,7 @@ function linkableFieldMembers(currentUserId) {
 }
 
 function renderOperationsPeopleView() {
-  const canManage = canManageTenantRole(activeTenant?.role);
+  const canManage = canManageOperationsRole(activeTenant?.role);
   const people = (appData?.operationalPeople || []).slice()
     .sort((a, b) => Number(b.is_active !== false) - Number(a.is_active !== false) || String(a.full_name || '').localeCompare(String(b.full_name || ''), 'tr'));
   const members = new Map((appData?.salesMembers || []).map(member => [member.user_id, member]));
@@ -21381,11 +21841,11 @@ async function saveOperationalPerson() {
   const tenantId = getActiveTenantId();
   const row = readOperationalPersonForm();
   if (!row.full_name) {
-    alert('Ad soyad zorunludur.');
+    uiNotify('Ad soyad zorunludur.');
     return false;
   }
   if (row.phone && row.phone.length < 3) {
-    alert('Telefon en az 3 karakter olmalı.');
+    uiNotify('Telefon en az 3 karakter olmalı.');
     return false;
   }
   try {
@@ -21398,7 +21858,7 @@ async function saveOperationalPerson() {
       throw new Error(error.code === '23505' ? 'Bu giriş hesabı zaten saha ekibinde başka bir kişiye bağlı.' : (error.message || 'Veritabanı hatası'));
     }
   } catch (err) {
-    alert('Saha ekibi kaydedilemedi: ' + err.message);
+    uiNotify('Saha ekibi kaydedilemedi: ' + err.message);
     return false;
   }
   const wasEdit = !!operationalPersonEditId;
@@ -21428,14 +21888,14 @@ async function toggleOperationalPersonActive(personId) {
   const person = (appData?.operationalPeople || []).find(item => item.id === personId);
   if (!person) return false;
   const nextActive = person.is_active === false;
-  if (!nextActive && !confirm(`${person.full_name} pasifleştirilsin mi? Geçmiş kayıtları korunur, yeni işe atanamaz.`)) return false;
+  if (!nextActive && !(await uiAskConfirm(`${person.full_name} pasifleştirilsin mi? Geçmiş kayıtları korunur, yeni işe atanamaz.`))) return false;
   try {
     requireCloudForWrite('Saha ekibi', tenantId);
     const { error } = await supabaseClient.from('operational_people')
       .update({ is_active: nextActive }).eq('id', personId).eq('tenant_id', tenantId);
     if (error) throw new Error(error.message || 'Veritabanı hatası');
   } catch (err) {
-    alert('Saha ekibi kaydedilemedi: ' + err.message);
+    uiNotify('Saha ekibi kaydedilemedi: ' + err.message);
     return false;
   }
   await loadTenantAppData(tenantId);
@@ -21506,7 +21966,7 @@ function isCleaningExecutionRefreshable(execution) {
 
 async function refreshUnstartedCleaningChecklists(executionIds = null) {
   const tenantId = getActiveTenantId();
-  if (!isCloudTenant(tenantId) || !canManageTenantRole(activeTenant?.role)) return { refreshed: 0, failed: 0 };
+  if (!isCloudTenant(tenantId) || !canManageOperationsRole(activeTenant?.role)) return { refreshed: 0, failed: 0 };
   const wanted = Array.isArray(executionIds) ? new Set(executionIds) : null;
   const targets = (appData?.cleaningExecutions || [])
     .filter(execution => (!wanted || wanted.has(execution.id)) && isCleaningExecutionRefreshable(execution));
@@ -21536,11 +21996,11 @@ async function refreshCleaningExecutionChecklist(executionId) {
 
 async function inspectCleaningExecution(executionId, approve) {
   const execution = (appData?.cleaningExecutions || []).find(item => item.id === executionId);
-  const note = approve ? null : prompt('Yeniden açma notu (temizlikçi neyi düzeltmeli?):', '');
+  const note = approve ? null : (await uiAskText({ label: 'Yeniden açma notu (temizlikçi neyi düzeltmeli?):', value: '' }));
   if (!approve && note === null) return false;
-  if (!confirm(approve
+  if (!(await uiAskConfirm(approve
     ? 'Temizlik denetlendi ve onaylandı olarak işaretlensin mi? Gider bu onayla doğar.'
-    : 'Eksik maddeler temizlikçiye yeniden açılsın mı?')) return false;
+    : 'Eksik maddeler temizlikçiye yeniden açılsın mı?'))) return false;
   const { error } = await supabaseClient.rpc('inspect_cleaning', {
     p_execution_id: executionId,
     p_approve: !!approve,
@@ -21563,7 +22023,7 @@ async function payCleanerDebt(cleanerName) {
     && String(task.cleaner || task.cleaner_name || 'Personel belirtilmedi').trim() === cleanerName);
   if (!pending.length) return false;
   const total = pending.reduce((sum, task) => sum + (Number(task.amount) || 0), 0);
-  if (!confirm(`${cleanerName}: ${pending.length} temizlik, ₺${total.toLocaleString('tr-TR')} ödendi olarak kapatılsın mı?`)) return false;
+  if (!(await uiAskConfirm(`${cleanerName}: ${pending.length} temizlik, ₺${total.toLocaleString('tr-TR')} ödendi olarak kapatılsın mı?`))) return false;
   const paidDate = getTodayStr();
   pending.forEach(task => { task.paid = true; task.paidDate = paidDate; });
   const ok = await reportCleaningPersist(pending, `✅ ${cleanerName} için ₺${total.toLocaleString('tr-TR')} temizlik borcu kapandı.`);
@@ -21606,7 +22066,7 @@ async function resolveMaintenanceFromOperations(ticketId) {
   // Bos = bilinmiyor; 0 yazilmaz (L-292).
   const actualCost = String(entered).trim() === '' ? null : Number(String(entered).replace(',', '.'));
   if (actualCost !== null && (!Number.isFinite(actualCost) || actualCost < 0)) {
-    alert('Geçerli ve negatif olmayan bir tutar girin.');
+    uiNotify('Geçerli ve negatif olmayan bir tutar girin.');
     return false;
   }
   const createExpense = actualCost > 0 && await uiAskConfirm({ title: 'Gider kaydı', message: `${actualCost.toLocaleString('tr-TR')} ₺ onarım maliyeti. Gider olarak kaydedilsin mi?`, okText: 'Gider olarak kaydet', cancelText: 'Yalnız çözüldü yap' });
@@ -21683,7 +22143,7 @@ async function setOperationalTaskStatus(taskId, status) {
   if (!['DONE', 'CANCELLED'].includes(status)) return false;
   // Iptal geri alinamaz; onay ister (L-281).
   if (status === 'CANCELLED' && typeof confirm === 'function'
-    && !confirm('Görev iptal edilsin mi? İptal edilen görev aktif listeden çıkar; "Kapanan görevler" bölümünde görünmeye devam eder.')) return false;
+    && !(await uiAskConfirm('Görev iptal edilsin mi? İptal edilen görev aktif listeden çıkar; "Kapanan görevler" bölümünde görünmeye devam eder.'))) return false;
   // Tamamlanma zamani ve kim tamamladi yazilir (L-295): completed_at bos kaliyordu.
   const patch = status === 'DONE'
     ? { status, completed_at: new Date().toISOString(), completed_by: isUUID(activeSaaSUser?.id) ? activeSaaSUser.id : null }
@@ -22159,14 +22619,14 @@ async function linkUnlinkedBookingGuest(index) {
   const booking = guestUnlinkedRows[index];
   if (!booking) return false;
   const input = readUnlinkedGuestInput(index);
-  if (!input.fullName) { alert('Misafir adını yazın.'); return false; }
-  if (!input.phone && !input.email) { alert('Misafiri defterde tanımak için telefon veya e-posta girin.'); return false; }
+  if (!input.fullName) { uiNotify('Misafir adını yazın.'); return false; }
+  if (!input.phone && !input.email) { uiNotify('Misafiri defterde tanımak için telefon veya e-posta girin.'); return false; }
   try {
     await linkBookingGuestProfile(booking.id, input);
     if (window.showToast) window.showToast(`✅ ${input.fullName} misafir defterine eklendi.`);
     return true;
   } catch (error) {
-    alert('Misafir eklenemedi: ' + kullaniciMesaji(error?.message || error));
+    uiNotify('Misafir eklenemedi: ' + kullaniciMesaji(error?.message || error));
     return false;
   }
 }
@@ -22187,7 +22647,7 @@ async function linkAllUnlinkedBookingsWithPhone() {
     }
   }
   renderGuestsTab();
-  alert(`${added} rezervasyonun misafiri deftere eklendi.` + (failures.length ? `\n\nEklenemeyen ${failures.length}:\n` + failures.slice(0, 10).join('\n') : ''));
+  uiNotify(`${added} rezervasyonun misafiri deftere eklendi.` + (failures.length ? `\n\nEklenemeyen ${failures.length}:\n` + failures.slice(0, 10).join('\n') : ''));
   return added;
 }
 
@@ -22266,7 +22726,7 @@ function openGuestProfileModal(guestId = null) {
 function openGuestRebookingWhatsApp(guestId) {
   const row = getGuestCrmView().rows.find(item => item.id === guestId);
   if (!row || !row.rebookingEligible) {
-    if (typeof alert === 'function') alert('Bu misafir için telefon, WhatsApp izni, kampanya açık onayı ve tamamlanmış konaklama birlikte bulunmalıdır.');
+    uiNotify('Bu misafir için telefon, WhatsApp izni, kampanya açık onayı ve tamamlanmış konaklama birlikte bulunmalıdır.');
     return;
   }
   const phone = String(row.phone || '').replace(/\D/g, '');
@@ -22300,7 +22760,7 @@ async function eraseGuestPersonalData() {
   });
   if (yazilan === null || yazilan === undefined) return false;
   if (String(yazilan).trim() !== 'MISAFIRI SIL') {
-    alert('Onay metni eşleşmedi; hiçbir şey silinmedi.');
+    uiNotify('Onay metni eşleşmedi; hiçbir şey silinmedi.');
     return false;
   }
   const { data, error } = await supabaseClient.rpc('erase_guest_personal_data', {
@@ -22308,7 +22768,7 @@ async function eraseGuestPersonalData() {
   });
   if (error) {
     const yok = error.code === 'PGRST202' || /Could not find the function/i.test(String(error.message || ''));
-    alert(yok ? PHASE105_SEMA_YOK : 'Misafir silinemedi: ' + kullaniciMesaji(error.message || 'veritabanı hatası'));
+    uiNotify(yok ? PHASE105_SEMA_YOK : 'Misafir silinemedi: ' + kullaniciMesaji(error.message || 'veritabanı hatası'));
     return false;
   }
   if (typeof closeGuestProfileModal === 'function') closeGuestProfileModal();
@@ -22327,7 +22787,7 @@ function sendGuestMarketingMessage() {
   const templateId = document.getElementById('guestMarketingTemplate')?.value || '';
   const template = (appData.messageTemplates || []).find(item => item.id === templateId && String(item.message_type || '').toUpperCase() === 'MARKETING');
   if (!guest) return false;
-  if (!template) { alert('Önce bir pazarlama şablonu seçin. Şablonlar Ayarlar › Şablonlar bölümünden "Pazarlama" türüyle eklenir.'); return false; }
+  if (!template) { uiNotify('Önce bir pazarlama şablonu seçin. Şablonlar Ayarlar › Şablonlar bölümünden "Pazarlama" türüyle eklenir.'); return false; }
   const ad = [guest.firstName, guest.lastName].filter(Boolean).join(' ') || 'Misafir';
   const workflow = typeof SalesWorkflowService !== 'undefined' ? SalesWorkflowService : require('./core/sales_workflow_service.js');
   const link = workflow.buildWhatsAppLink({
@@ -22335,7 +22795,7 @@ function sendGuestMarketingMessage() {
     messageType: 'MARKETING', allowWhatsapp: guest.allowWhatsapp === true, marketingOptIn: guest.marketingOptIn === true
   });
   if (!link.allowed) {
-    alert(link.reason === 'MARKETING_CONSENT_REQUIRED'
+    uiNotify(link.reason === 'MARKETING_CONSENT_REQUIRED'
       ? 'Bu misafirin kampanya (pazarlama) izni yok; pazarlama mesajı gönderilemez. İzin misafir kartında açıkça alınıp işaretlenmelidir.'
       : 'WhatsApp mesajı için telefon ve WhatsApp iletişim izni gerekir.');
     return false;
@@ -22406,9 +22866,9 @@ async function saveGuestProfile(event) {
     }
     closeGuestProfileModal();
     renderGuestsTab();
-    if (typeof alert === 'function') alert('✅ Misafir profili kaydedildi.' + classificationWarning);
+    uiNotify('✅ Misafir profili kaydedildi.' + classificationWarning);
   } catch (error) {
-    if (typeof alert === 'function') alert('Misafir profili kaydedilemedi: ' + (error.message || 'Bilinmeyen hata'));
+    uiNotify('Misafir profili kaydedilemedi: ' + (error.message || 'Bilinmeyen hata'));
   } finally {
     if (submit) submit.disabled = false;
   }
@@ -22675,8 +23135,8 @@ async function savePricingLongStayTier() {
   const minNights = Number(value('pricingLongStayNights'));
   const pct = Number(value('pricingLongStayPct'));
   const scope = value('pricingLongStayScope') || 'PROPERTY';
-  if (!Number.isInteger(minNights) || minNights < 2 || minNights > 365) { alert('Gece sayısı 2 ile 365 arasında bir tam sayı olmalıdır.'); return false; }
-  if (value('pricingLongStayPct') === '' || !Number.isFinite(pct) || pct <= 0 || pct > 90) { alert('İndirim yüzdesi 0 ile 90 arasında olmalıdır.'); return false; }
+  if (!Number.isInteger(minNights) || minNights < 2 || minNights > 365) { uiNotify('Gece sayısı 2 ile 365 arasında bir tam sayı olmalıdır.'); return false; }
+  if (value('pricingLongStayPct') === '' || !Number.isFinite(pct) || pct <= 0 || pct > 90) { uiNotify('İndirim yüzdesi 0 ile 90 arasında olmalıdır.'); return false; }
   const tier = { id: `ls_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, minNights, pct, enabled: true,
     propertyId: scope === 'PORTFOLIO' ? null : (pricingSelectedPropertyId || null) };
   try {
@@ -22685,7 +23145,7 @@ async function savePricingLongStayTier() {
     ['pricingLongStayNights', 'pricingLongStayPct'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     return true;
   } catch (error) {
-    alert('Uzun konaklama indirimi kaydedilemedi: ' + (error.message || 'Bilinmeyen hata'));
+    uiNotify('Uzun konaklama indirimi kaydedilemedi: ' + (error.message || 'Bilinmeyen hata'));
     return false;
   }
 }
@@ -22697,7 +23157,7 @@ async function removePricingLongStayTier(tierId) {
     await savePricingLongStaySettings({ ...settings, tiers: settings.tiers.filter(tier => tier.id !== tierId) }, 'Uzun konaklama indirimi kaldırıldı.');
     return true;
   } catch (error) {
-    alert('Uzun konaklama indirimi kaldırılamadı: ' + (error.message || 'Bilinmeyen hata'));
+    uiNotify('Uzun konaklama indirimi kaldırılamadı: ' + (error.message || 'Bilinmeyen hata'));
     return false;
   }
 }
@@ -22743,10 +23203,10 @@ async function savePricingSeason() {
   const pct = Number(value('pricingSeasonPct'));
   const repeatYearly = document.getElementById('pricingSeasonRepeat')?.checked === true;
   const scope = value('pricingSeasonScope') || 'PROPERTY';
-  if (!name) { alert('Sezon adı girin.'); return false; }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) { alert('Başlangıç ve bitiş tarihini girin.'); return false; }
-  if (!repeatYearly && end < start) { alert('Bitiş başlangıçtan önce olamaz (yıl sonunu aşan sezon için "Her yıl" seçin).'); return false; }
-  if (value('pricingSeasonPct') === '' || !Number.isFinite(pct) || pct < -90 || pct > 500) { alert('Yüzde -90 ile 500 arasında olmalıdır.'); return false; }
+  if (!name) { uiNotify('Sezon adı girin.'); return false; }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) { uiNotify('Başlangıç ve bitiş tarihini girin.'); return false; }
+  if (!repeatYearly && end < start) { uiNotify('Bitiş başlangıçtan önce olamaz (yıl sonunu aşan sezon için "Her yıl" seçin).'); return false; }
+  if (value('pricingSeasonPct') === '' || !Number.isFinite(pct) || pct < -90 || pct > 500) { uiNotify('Yüzde -90 ile 500 arasında olmalıdır.'); return false; }
   const season = { id: `se_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, name: name.slice(0, 80), start, end, pct, repeatYearly, enabled: true,
     propertyId: scope === 'PORTFOLIO' ? null : (pricingSelectedPropertyId || null) };
   try {
@@ -22756,7 +23216,7 @@ async function savePricingSeason() {
     const repeat = document.getElementById('pricingSeasonRepeat'); if (repeat) repeat.checked = false;
     return true;
   } catch (error) {
-    alert('Sezon kaydedilemedi: ' + (error.message || 'Bilinmeyen hata'));
+    uiNotify('Sezon kaydedilemedi: ' + (error.message || 'Bilinmeyen hata'));
     return false;
   }
 }
@@ -22768,7 +23228,7 @@ async function removePricingSeason(seasonId) {
     await savePricingSeasonSettings({ ...settings, seasons: settings.seasons.filter(season => season.id !== seasonId) }, 'Sezon kaldırıldı.');
     return true;
   } catch (error) {
-    alert('Sezon kaldırılamadı: ' + (error.message || 'Bilinmeyen hata'));
+    uiNotify('Sezon kaldırılamadı: ' + (error.message || 'Bilinmeyen hata'));
     return false;
   }
 }
@@ -22849,8 +23309,8 @@ async function savePricingMinStayRule() {
   const start = value('pricingMinStayStart') || null;
   const end = value('pricingMinStayEnd') || null;
   const scope = value('pricingMinStayScope') || 'PROPERTY';
-  if (!Number.isInteger(minNights) || minNights < 2 || minNights > 60) { alert('En az gece 2 ile 60 arasında bir tam sayı olmalıdır.'); return false; }
-  if (start && end && end < start) { alert('Bitiş başlangıçtan önce olamaz.'); return false; }
+  if (!Number.isInteger(minNights) || minNights < 2 || minNights > 60) { uiNotify('En az gece 2 ile 60 arasında bir tam sayı olmalıdır.'); return false; }
+  if (start && end && end < start) { uiNotify('Bitiş başlangıçtan önce olamaz.'); return false; }
   const rule = { id: `ms_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, name: value('pricingMinStayName').slice(0, 80), start, end, minNights, enabled: true,
     propertyId: scope === 'PORTFOLIO' ? null : (pricingSelectedPropertyId || null) };
   try {
@@ -22859,7 +23319,7 @@ async function savePricingMinStayRule() {
     ['pricingMinStayName', 'pricingMinStayStart', 'pricingMinStayEnd', 'pricingMinStayNights'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     return true;
   } catch (error) {
-    alert('Minimum gece kuralı kaydedilemedi: ' + (error.message || 'Bilinmeyen hata'));
+    uiNotify('Minimum gece kuralı kaydedilemedi: ' + (error.message || 'Bilinmeyen hata'));
     return false;
   }
 }
@@ -22871,7 +23331,7 @@ async function removePricingMinStayRule(ruleId) {
     await savePricingMinStaySettings({ ...settings, rules: settings.rules.filter(rule => rule.id !== ruleId) }, 'Minimum gece kuralı kaldırıldı.');
     return true;
   } catch (error) {
-    alert('Minimum gece kuralı kaldırılamadı: ' + (error.message || 'Bilinmeyen hata'));
+    uiNotify('Minimum gece kuralı kaldırılamadı: ' + (error.message || 'Bilinmeyen hata'));
     return false;
   }
 }
@@ -23209,12 +23669,12 @@ async function savePricingRuleSettings() {
       if (window.showToast) window.showToast('Portföy fiyat kuralı kaydedildi; istisnası olmayan tüm mülklere uygulanır.', 'success');
       return true;
     } catch (error) {
-      alert('Portföy fiyat kuralı kaydedilemedi: ' + getPricingResearchService().errorText(error));
+      uiNotify('Portföy fiyat kuralı kaydedilemedi: ' + getPricingResearchService().errorText(error));
       return false;
     }
   }
   if (!appData.phase78SchemaReady) {
-    alert('Ev bazlı fiyat kuralı kaydedilemedi: phase78 ve phase80 üretim göçleri bekleniyor.');
+    uiNotify('Ev bazlı fiyat kuralı kaydedilemedi: phase78 ve phase80 üretim göçleri bekleniyor.');
     return false;
   }
   try {
@@ -23231,7 +23691,7 @@ async function savePricingRuleSettings() {
     if (window.showToast) window.showToast('Ev bazlı fiyat kuralı kaydedildi.', 'success');
     return true;
   } catch (error) {
-    alert('Fiyat kuralı kaydedilemedi: ' + getPricingResearchService().errorText(error));
+    uiNotify('Fiyat kuralı kaydedilemedi: ' + getPricingResearchService().errorText(error));
     return false;
   }
 }
@@ -23256,7 +23716,7 @@ async function resetPricingRuleSetting() {
     if (window.showToast) window.showToast(scope === 'PORTFOLIO' ? 'Portföy kuralı kaldırıldı; sistem varsayılanı geçerli.' : 'Mülk istisnası kaldırıldı; portföy kuralı geçerli.', 'success');
     return true;
   } catch (error) {
-    alert('Kural sıfırlanamadı: ' + (error.message || 'Bilinmeyen hata'));
+    uiNotify('Kural sıfırlanamadı: ' + (error.message || 'Bilinmeyen hata'));
     return false;
   }
 }
@@ -23314,9 +23774,9 @@ async function savePricingSpecialEvent() {
   const rawPct = String(document.getElementById('pricingEventPct')?.value ?? '').trim();
   const scope = document.getElementById('pricingEventScope')?.value || 'PROPERTY';
   const pct = rawPct === '' ? null : Number(rawPct);
-  if (!name) { alert('Etkinlik adı girin.'); return false; }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end) || end < start) { alert('Geçerli bir başlangıç ve bitiş tarihi girin.'); return false; }
-  if (pct !== null && (!Number.isFinite(pct) || pct <= -100 || pct > 1000)) { alert('Yüzde -99 ile 1000 arasında olmalıdır.'); return false; }
+  if (!name) { uiNotify('Etkinlik adı girin.'); return false; }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end) || end < start) { uiNotify('Geçerli bir başlangıç ve bitiş tarihi girin.'); return false; }
+  if (pct !== null && (!Number.isFinite(pct) || pct <= -100 || pct > 1000)) { uiNotify('Yüzde -99 ile 1000 arasında olmalıdır.'); return false; }
   const settings = pricingSpecialSettings();
   const event = { id: pricingSpecialEventKey(), name: name.slice(0, 80), start, end, pct, propertyId: scope === 'PORTFOLIO' ? null : (pricingSelectedPropertyId || null) };
   try {
@@ -23324,7 +23784,7 @@ async function savePricingSpecialEvent() {
     ['pricingEventName', 'pricingEventStart', 'pricingEventEnd', 'pricingEventPct'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     return true;
   } catch (error) {
-    alert('Etkinlik kaydedilemedi: ' + (error.message || 'Bilinmeyen hata'));
+    uiNotify('Etkinlik kaydedilemedi: ' + (error.message || 'Bilinmeyen hata'));
     return false;
   }
 }
@@ -23336,7 +23796,7 @@ async function removePricingSpecialEvent(eventId) {
     await savePricingSpecialSettings({ ...settings, events: settings.events.filter(event => event.id !== eventId) }, 'Etkinlik silindi.');
     return true;
   } catch (error) {
-    alert('Etkinlik silinemedi: ' + (error.message || 'Bilinmeyen hata'));
+    uiNotify('Etkinlik silinemedi: ' + (error.message || 'Bilinmeyen hata'));
     return false;
   }
 }
@@ -23350,7 +23810,7 @@ async function togglePricingHoliday(date) {
       disabled ? 'Tatil yeniden özel gün sayılıyor.' : 'Bu tatil bu işletmede özel gün sayılmayacak.');
     return true;
   } catch (error) {
-    alert('Tatil ayarı kaydedilemedi: ' + (error.message || 'Bilinmeyen hata'));
+    uiNotify('Tatil ayarı kaydedilemedi: ' + (error.message || 'Bilinmeyen hata'));
     return false;
   }
 }
@@ -23407,7 +23867,7 @@ async function deleteCompetitorResearch(id) {
   if (!canManageTenantRole(activeTenant?.role)) return false;
   const row = (appData.competitorPriceResearch || []).find(item => String(item.id) === String(id));
   if (!row) return false;
-  if (!confirm(`${formatTrDate(row.researched_on)} tarihli rakip araştırması silinsin mi?`)) return false;
+  if (!(await uiAskConfirm(`${formatTrDate(row.researched_on)} tarihli rakip araştırması silinsin mi?`))) return false;
   try {
     await getPricingResearchService().deleteResearch(supabaseClient, { tenantId: getActiveTenantId(), id: row.id });
     appData.competitorPriceResearch = (appData.competitorPriceResearch || []).filter(item => item.id !== row.id);
@@ -23416,7 +23876,7 @@ async function deleteCompetitorResearch(id) {
     if (window.showToast) window.showToast('Rakip araştırması silindi.', 'success');
     return true;
   } catch (error) {
-    alert('Rakip araştırması silinemedi: ' + getPricingResearchService().errorText(error));
+    uiNotify('Rakip araştırması silinemedi: ' + getPricingResearchService().errorText(error));
     await loadTenantAppData().then(() => renderPricingTab()).catch(() => {});
     return false;
   }
@@ -23425,7 +23885,7 @@ async function deleteCompetitorResearch(id) {
 async function saveCompetitorResearch() {
   if (!canManageTenantRole(activeTenant?.role)) return false;
   if (!appData.phase78SchemaReady) {
-    alert('Rakip araştırması kaydedilemedi: phase78 ve phase80 üretim göçleri bekleniyor.');
+    uiNotify('Rakip araştırması kaydedilemedi: phase78 ve phase80 üretim göçleri bekleniyor.');
     return false;
   }
   try {
@@ -23449,7 +23909,7 @@ async function saveCompetitorResearch() {
     if (window.showToast) window.showToast(editing ? 'Rakip araştırması güncellendi.' : 'Kaynaklı rakip araştırması kaydedildi.', 'success');
     return true;
   } catch (error) {
-    alert('Rakip araştırması kaydedilemedi: ' + getPricingResearchService().errorText(error));
+    uiNotify('Rakip araştırması kaydedilemedi: ' + getPricingResearchService().errorText(error));
     return false;
   }
 }
@@ -23521,7 +23981,7 @@ async function cloudDeleteDailyPrices(propertyId, dates) {
 // mode: APPROVE (her gune kendi onerisi) | MANUAL (girilen tek fiyat) | REMOVE (oneriye don)
 async function applyPricingDayPrices(mode) {
   if (!canManageTenantRole(activeTenant?.role)) return false;
-  if (!appData.phase101SchemaReady) { alert(PHASE101_SEMA_YOK); return false; }
+  if (!appData.phase101SchemaReady) { uiNotify(PHASE101_SEMA_YOK); return false; }
   const entry = pricingActiveProperties().find(item => item.property.id === pricingSelectedPropertyId);
   const dates = [...pricingSelectedDays].sort();
   if (!entry || !dates.length) return false;
@@ -23535,22 +23995,22 @@ async function applyPricingDayPrices(mode) {
       let manual = null;
       if (mode === 'MANUAL') {
         manual = Number(document.getElementById('pricingDayManualPrice')?.value);
-        if (!Number.isFinite(manual) || manual <= 0) { alert('Elle fiyat sıfırdan büyük bir tutar olmalıdır.'); return false; }
+        if (!Number.isFinite(manual) || manual <= 0) { uiNotify('Elle fiyat sıfırdan büyük bir tutar olmalıdır.'); return false; }
         const floor = Number(entry.property.floor);
-        if (floor > 0 && manual < floor && !confirm(`₺${manual.toLocaleString('tr-TR')} taban fiyatın (₺${floor.toLocaleString('tr-TR')}) altında. Yine de kaydedilsin mi?`)) return false;
+        if (floor > 0 && manual < floor && !(await uiAskConfirm(`₺${manual.toLocaleString('tr-TR')} taban fiyatın (₺${floor.toLocaleString('tr-TR')}) altında. Yine de kaydedilsin mi?`))) return false;
       }
       const rows = dates.map(date => {
         const suggested = suggestions.get(date)?.price ?? null;
         if (mode === 'APPROVE' && !(suggested > 0)) return null;
         return { property_id: entry.property.id, price_date: date, price: mode === 'APPROVE' ? suggested : manual, source: mode === 'APPROVE' ? 'APPROVED' : 'MANUAL', suggested_price: suggested > 0 ? suggested : null, note };
       }).filter(Boolean);
-      if (!rows.length) { alert('Seçili günlerde onaylanacak öneri yok (baz fiyat girilmemiş ya da gün dolu/kapalı).'); return false; }
+      if (!rows.length) { uiNotify('Seçili günlerde onaylanacak öneri yok (baz fiyat girilmemiş ya da gün dolu/kapalı).'); return false; }
       const saved = await cloudSaveDailyPrices(rows);
       const keys = new Set(saved.map(row => `${row.property_id}|${String(row.price_date).slice(0, 10)}`));
       appData.propertyDailyPrices = [...(appData.propertyDailyPrices || []).filter(row => !keys.has(`${row.property_id}|${String(row.price_date).slice(0, 10)}`)), ...saved];
     }
   } catch (error) {
-    alert((isMissingSchemaError(error) ? PHASE101_SEMA_YOK : 'Günlük fiyat kaydedilemedi: ' + (error.message || 'Bilinmeyen hata')));
+    uiNotify((isMissingSchemaError(error) ? PHASE101_SEMA_YOK : 'Günlük fiyat kaydedilemedi: ' + (error.message || 'Bilinmeyen hata')));
     return false;
   }
   pricingSelectedDays.clear();
@@ -23790,7 +24250,7 @@ async function handleQuickActionTrigger(actionType, entityId) {
 
   let actualCost;
   if (actionType === 'RESOLVE_TICKET') {
-    const entered = prompt('Arıza için gerçekleşen maliyeti giriniz (₺):', '0');
+    const entered = (await uiAskText({ label: 'Arıza için gerçekleşen maliyeti giriniz (₺):', value: '0' }));
     if (entered === null) return false;
     actualCost = Number(String(entered).replace(',', '.'));
   }
@@ -23936,7 +24396,28 @@ if (typeof module !== 'undefined' && module.exports) {
     setActiveTenant,
     getImportEngine,
     buildImportSource,
+    buildImportSourceAsync,
+    canWriteLedgerRole,
+    canManageOperationsRole,
+    saveMemberPermissions,
+    loadActiveMemberPermissions,
+    legalConsentRequired,
+    ensureLegalConsent,
+    downloadTenantBackup,
+    deferInlineStyleAttributes,
+    loadXlsxEngine,
     parseSourceWithMode,
+    bookingSaveWarnings,
+    confirmBookingWarnings,
+    buildLeadSuggestedMessage,
+    renderLeadTemplateBody,
+    uiAskConfirm,
+    uiAskText,
+    uiNotify,
+    bookingCommissionError,
+    adoptGlobalFilterForReservations,
+    getReservationListRange,
+    stepReservationPeriod,
     createSettingsMessageTemplate,
     sendGuestMarketingMessage,
     eraseGuestPersonalData,
