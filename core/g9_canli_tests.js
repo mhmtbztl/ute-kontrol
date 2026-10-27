@@ -1038,6 +1038,24 @@ async function L290() {
   delete global.SalesWorkflowService;
   const y = ist.yazmalar.find(k => k.tablo === 'leads' && k.islem === 'update');
   check(y && y.yuk.pax === 5, 'L-290c Talep duzenleme kisi sayisini yazar', JSON.stringify(y && y.yuk.pax));
+
+  // Sablonu olmayan isletmeye hazir teklif/takip mesaji; yalniz talebin verisi.
+  const tam = { guest: 'TEST Ayşe', villa: 'DENE', checkIn: '2030-07-10', checkOut: '2030-07-14', pax: 4, quote: 48000 };
+  const teklif = App.buildLeadSuggestedMessage ? App.buildLeadSuggestedMessage('lexbnb:teklif', tam) : '';
+  check(/TEST Ayşe/.test(teklif) && /4 gece/.test(teklif) && /4 kişi/.test(teklif) && /48\.000/.test(teklif) && !/undefined|NaN|null/.test(teklif),
+    'L-290d Teklif mesaji talebin adi, tarihi, kisi sayisi ve fiyatiyla kurulur', teklif);
+  const bos = App.buildLeadSuggestedMessage ? App.buildLeadSuggestedMessage('lexbnb:teklif', { guest: '', villa: 'YOK' }) : 'x undefined';
+  check(/^Merhaba,/.test(bos) && !/₺|gece|kişi|undefined|NaN|null/.test(bos), 'L-290e Bilinmeyen tarih/kisi/fiyat mesaja uydurulmaz', bos);
+  const takip = App.buildLeadSuggestedMessage ? App.buildLeadSuggestedMessage('lexbnb:takip', tam) : '';
+  check(/dönüşünüzü bekliyoruz/.test(takip) && !/indirim|müsait|garanti/i.test(teklif + takip), 'L-290f Takip mesaji var; isletme adina indirim/musaitlik taahhudu yok', takip);
+  sahteDom({ leadEditId: LEAD_1, leadMessageTemplate: 'lexbnb:takip' });
+  kur(App, { leads: [{ id: LEAD_1, guestName: 'TEST', guest: 'TEST', phone: '05550000000', status: 'QUOTE_SENT' }], messageTemplates: [] });
+  global.SalesWorkflowService = require('./sales_workflow_service.js');
+  let acilan = '';
+  global.window = Object.assign(global.window || {}, { open: url => { acilan = url; } });
+  const gitti = App.openLeadWhatsApp();
+  delete global.SalesWorkflowService;
+  check(gitti === true && /wa\.me|whatsapp/.test(acilan) && /bekliyoruz/.test(decodeURIComponent(acilan)), 'L-290g Sablonsuz isletmede onerilen mesaj WhatsApp\'ta acilir', acilan);
 }
 
 // ---------------------------------------------------------------------------

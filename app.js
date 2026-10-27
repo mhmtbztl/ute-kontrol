@@ -12393,8 +12393,10 @@ function openLeadModal(editId = null) {
     const lifecycle = l.status === 'QUOTE_SENT' ? 'LEAD_QUOTE_FOLLOW_UP' : 'LEAD_REENGAGEMENT';
     const templates = (appData.messageTemplates || []).filter(template => template.channel === 'WHATSAPP'
       && [lifecycle, 'MANUAL'].includes(template.lifecycle_stage));
-    if (templateSelect) templateSelect.innerHTML = '<option value="">Şablon seçin</option>' + templates.map(template => `<option value="${escapeHtml(template.id)}">${escapeHtml(template.name)}</option>`).join('');
-    if (templateRow) templateRow.style.display = templates.length && l.phone ? 'grid' : 'none';
+    const oneriler = LEAD_SUGGESTED_MESSAGES.map(o => `<option value="${o.id}">${escapeHtml(o.name)}</option>`).join('');
+    if (templateSelect) templateSelect.innerHTML = '<option value="">Şablon seçin</option>' + templates.map(template => `<option value="${escapeHtml(template.id)}">${escapeHtml(template.name)}</option>`).join('') + oneriler;
+    if (templateSelect) templateSelect.value = l.status === 'QUOTE_SENT' ? 'lexbnb:takip' : 'lexbnb:teklif';
+    if (templateRow) templateRow.style.display = l.phone ? 'grid' : 'none';
   } else {
     title.innerText = '🎯 Yeni Lead / Fırsat Girişi';
     editInput.value = '';
@@ -12420,7 +12422,34 @@ function applyLeadFormAccess(editId = null) {
   if (title && editId && !canWrite) title.innerText = 'Talep Ayrıntısı';
 }
 
+// Sablonu olmayan isletmeye hazir satis mesaji (L-290). Metin yalniz talebin
+// kendi verisinden kurulur; bilinmeyen parca (tarih, kisi, fiyat) hic yazilmaz
+// ve isletme adina musaitlik ya da indirim taahhudu verilmez (§3.6).
+const LEAD_SUGGESTED_MESSAGES = [
+  { id: 'lexbnb:teklif', name: 'Teklif mesajı (Lexbnb önerisi)', message_type: 'TRANSACTIONAL' },
+  { id: 'lexbnb:takip', name: 'Teklif takibi (Lexbnb önerisi)', message_type: 'TRANSACTIONAL' }
+];
+function buildLeadSuggestedMessage(kind, lead) {
+  const ad = String(lead.guest || '').trim();
+  const mulk = appData.villas?.[lead.villa]?.name || '';
+  const giris = lead.checkIn ? formatTrDate(lead.checkIn) : '';
+  const cikis = lead.checkOut ? formatTrDate(lead.checkOut) : '';
+  const gece = lead.checkIn && lead.checkOut ? Math.round((new Date(`${lead.checkOut}T12:00:00`) - new Date(`${lead.checkIn}T12:00:00`)) / 86400000) : 0;
+  const kisi = Number(lead.pax) > 0 ? Number(lead.pax) : 0;
+  const ayrinti = [giris && cikis ? `${giris} – ${cikis}${gece > 0 ? ` (${gece} gece)` : ''}` : '', kisi ? `${kisi} kişi` : ''].filter(Boolean).join(', ');
+  const konu = [mulk, ayrinti].filter(Boolean).join(' · ');
+  const fiyat = Number(lead.quote) > 0 ? `₺${Number(lead.quote).toLocaleString('tr-TR')}` : '';
+  const selam = ad ? `Merhaba ${ad},` : 'Merhaba,';
+  if (kind === 'lexbnb:takip') {
+    return [selam, `${konu ? konu + ' için ' : ''}ilettiğimiz teklifle ilgili dönüşünüzü bekliyoruz.`,
+      'Karar verdiyseniz rezervasyonu sizin adınıza oluşturabiliriz; sorunuz varsa buradan yazabilirsiniz.'].join(' ');
+  }
+  return [selam, konu ? `${konu} için talebinizi aldık.` : 'Talebinizi aldık.', fiyat ? `Toplam fiyatımız ${fiyat}.` : '',
+    'Uygun görürseniz rezervasyonu sizin adınıza oluşturabiliriz; sorunuz varsa buradan yazabilirsiniz.'].filter(Boolean).join(' ');
+}
+
 function renderLeadTemplateBody(template, lead) {
+  if (template && String(template.id || '').startsWith('lexbnb:')) return buildLeadSuggestedMessage(template.id, lead);
   const villaName = appData.villas?.[lead.villa]?.name || lead.villa || '';
   return String(template?.body || '')
     .replace(/\{\{?guest_name\}?\}/gi, lead.guest || 'Misafir')
@@ -12432,7 +12461,8 @@ function openLeadWhatsApp() {
   const leadId = document.getElementById('leadEditId')?.value;
   const templateId = document.getElementById('leadMessageTemplate')?.value;
   const lead = (appData.leads || []).find(item => item.id === leadId);
-  const template = (appData.messageTemplates || []).find(item => item.id === templateId);
+  const template = (appData.messageTemplates || []).find(item => item.id === templateId)
+    || LEAD_SUGGESTED_MESSAGES.find(item => item.id === templateId);
   if (!lead) return false;
   // Sablonsuz dugme sessiz kaliyordu (L-290).
   if (!template) {
@@ -24056,6 +24086,8 @@ if (typeof module !== 'undefined' && module.exports) {
     parseSourceWithMode,
     bookingSaveWarnings,
     confirmBookingWarnings,
+    buildLeadSuggestedMessage,
+    renderLeadTemplateBody,
     uiAskConfirm,
     uiAskText,
     uiNotify,
