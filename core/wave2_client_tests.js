@@ -147,6 +147,23 @@ function eleman() {
     assert.strictEqual(g.rows[0]['Brüt Tutar (TL)'], 72500.5, 'sayı sayı kalmalı');
   });
 
+  await test('L-163 Excel motoru giriş sayfasında yüklenmez; giriş sonrası önceden ve gerektiğinde yüklenir', async () => {
+    const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    assert.ok(!/<script[^>]*src="xlsx\.full\.min\.js/.test(html), 'index.html SheetJS\'i açılışta yüklememeli');
+    assert.match(APP, /const XLSX_ENGINE_URL = 'xlsx\.full\.min\.js\?v=[0-9a-f]{8}'/);
+    const yukle = APP.slice(APP.indexOf('async function loadTenantAppData('), APP.indexOf('async function loadTenantAppData(') + 300);
+    assert.match(yukle, /scheduleXlsxEnginePreload\(\)/, 'giriş sonrası önceden yüklenmeli');
+    ['function exportLedger(', 'function exportIncomeStatement(', 'function downloadSampleTemplate(', 'function downloadCurrentReportXlsx('].forEach(imza => {
+      const govde = APP.slice(APP.indexOf(imza), APP.indexOf(imza) + 1500);
+      assert.match(govde, /retryWithXlsxEngine\(/, `${imza} motor yoksa yükleyip devam etmeli`);
+    });
+    // Açılış bütçesi: index.html'in yüklediği yerel JS toplamı.
+    const kok = path.join(__dirname, '..');
+    const toplam = [...html.matchAll(/<script[^>]*src="([^"?]+)/g)].map(m => m[1]).filter(f => fs.existsSync(path.join(kok, f)))
+      .reduce((t, f) => t + fs.statSync(path.join(kok, f)).size, 0);
+    assert.ok(toplam <= 2.2 * 1048576, `açılış JS bütçesi aşıldı: ${(toplam / 1048576).toFixed(2)} MiB > 2,2 MiB`);
+  });
+
   await test('L-162 Worker cevap vermezse sonlandırılır; sekme donmaz, kullanıcıya söylenir', async () => {
     assert.match(APP, /IMPORT_WORKER_TIMEOUT_MS = \d+/);
     const govde = APP.slice(APP.indexOf('function buildImportSourceAsync('), APP.indexOf('function buildImportSourceAsync(') + 2500);

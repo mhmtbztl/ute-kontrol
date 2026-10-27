@@ -4533,7 +4533,8 @@ function downloadCurrentReportCsv() {
 }
 
 function downloadCurrentReportXlsx() {
-  if (!currentPageReport || typeof XLSX === 'undefined') return false;
+  if (!currentPageReport) return false;
+  if (typeof XLSX === 'undefined') return retryWithXlsxEngine(() => downloadCurrentReportXlsx()) && false;
   const workbook = XLSX.utils.book_new();
   currentPageReport.excel.sheets.forEach(sheet => {
     const columns = sheet.columns || [];
@@ -7596,7 +7597,7 @@ function openImportConvertPrompt(mode) {
 
 function downloadSampleTemplate(templateType) {
   if (typeof XLSX === 'undefined') {
-    uiNotify('Excel motoru yükleniyor, lütfen birkaç saniye sonra tekrar deneyin.');
+    if (!retryWithXlsxEngine(() => downloadSampleTemplate(templateType))) uiNotify('Excel motoru yüklenemedi, sayfayı yenileyin.');
     return;
   }
   const engine = getImportEngine();
@@ -7688,6 +7689,39 @@ function buildImportSource(bytes, fileName) {
   return xlsxImportResultToSource(getXlsxImportParser().parse(XLSX, bytes, IMPORT_MAX_ROWS), fileName);
 }
 
+// Excel motoru (SheetJS, ~930 KB) giris sayfasinda yuklenmez (L-163). Giristen
+// sonra bosta onceden yuklenir; o ana kadar hazir degilse ice/disa aktarma
+// once motoru yukler, sonra devam eder.
+const XLSX_ENGINE_URL = 'xlsx.full.min.js?v=56e27b47';
+let xlsxEngineYukleniyor = null;
+function loadXlsxEngine() {
+  if (typeof XLSX !== 'undefined') return Promise.resolve(XLSX);
+  if (typeof document === 'undefined' || !document.head) return Promise.reject(new Error('Excel motoru yüklenemedi.'));
+  if (!xlsxEngineYukleniyor) {
+    xlsxEngineYukleniyor = new Promise((resolve, reject) => {
+      const etiket = document.createElement('script');
+      etiket.src = XLSX_ENGINE_URL;
+      etiket.onload = () => (typeof XLSX !== 'undefined' ? resolve(XLSX) : reject(new Error('Excel motoru yüklenemedi.')));
+      etiket.onerror = () => { xlsxEngineYukleniyor = null; reject(new Error('Excel motoru yüklenemedi; bağlantınızı kontrol edip tekrar deneyin.')); };
+      document.head.appendChild(etiket);
+    });
+  }
+  return xlsxEngineYukleniyor;
+}
+function scheduleXlsxEnginePreload() {
+  if (typeof window === 'undefined' || typeof XLSX !== 'undefined') return;
+  const basla = () => loadXlsxEngine().catch(() => { /* gereken anda yeniden denenir */ });
+  if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(basla, { timeout: 8000 });
+  else setTimeout(basla, 3000);
+}
+// Motor yoksa yukleyip ayni islemi yeniden cagirir; yuklenemezse soyler.
+function retryWithXlsxEngine(islem) {
+  if (typeof document === 'undefined' || !document.head) return false;
+  if (typeof showToast === 'function') showToast('Excel motoru yükleniyor…', 'info');
+  loadXlsxEngine().then(() => islem()).catch(err => uiNotify(err.message));
+  return true;
+}
+
 function getXlsxImportParser() {
   if (typeof LexbnbXlsxImport !== 'undefined') return LexbnbXlsxImport;
   return require('./core/xlsx_import_worker.js');
@@ -7707,9 +7741,12 @@ function buildImportSourceAsync(bytes, fileName) {
   const E = getImportEngine();
   const worker = typeof Worker === 'function' && typeof document !== 'undefined' && E
     && bytes && bytes.length <= IMPORT_MAX_BYTES && E.detectImportSourceKind(bytes) !== 'TEXT';
-  if (!worker) return Promise.resolve().then(() => buildImportSource(bytes, fileName));
-  const xlsxEtiketi = document.querySelector('script[src^="xlsx.full.min.js"]');
-  const xlsxUrl = new URL(xlsxEtiketi ? xlsxEtiketi.getAttribute('src') : 'xlsx.full.min.js', document.baseURI).href;
+  if (!worker) {
+    const metin = !E || !bytes || bytes.length > IMPORT_MAX_BYTES || E.detectImportSourceKind(bytes) === 'TEXT';
+    const hazir = metin || typeof XLSX !== 'undefined' || typeof document === 'undefined' ? Promise.resolve() : loadXlsxEngine();
+    return hazir.then(() => buildImportSource(bytes, fileName));
+  }
+  const xlsxUrl = new URL(XLSX_ENGINE_URL, document.baseURI).href;
   return new Promise((resolve, reject) => {
     const w = new Worker(XLSX_IMPORT_WORKER_URL);
     const bitir = () => { clearTimeout(zamanlayici); w.terminate(); };
@@ -13046,7 +13083,7 @@ function exportLedger(mod, bicim) {
       'text/csv;charset=utf-8');
   } else {
     if (typeof XLSX === 'undefined') {
-      if (typeof showToast === 'function') showToast('Excel motoru henüz yüklenmedi, birkaç saniye sonra tekrar deneyin.', 'error');
+      if (!retryWithXlsxEngine(() => exportLedger(mod, bicim)) && typeof showToast === 'function') showToast('Excel motoru yüklenemedi, sayfayı yenileyin.', 'error');
       return;
     }
     const wb = XLSX.utils.book_new();
@@ -13095,7 +13132,7 @@ function exportIncomeStatement() {
     return false;
   }
   if (typeof XLSX === 'undefined') {
-    if (typeof showToast === 'function') showToast('Excel motoru henüz yüklenmedi, birkaç saniye sonra tekrar deneyin.', 'error');
+    if (!retryWithXlsxEngine(() => exportIncomeStatement()) && typeof showToast === 'function') showToast('Excel motoru yüklenemedi, sayfayı yenileyin.', 'error');
     return false;
   }
   let tablo;
@@ -17907,6 +17944,7 @@ async function cloudSaveHousekeepingOverride(villaKey, status) {
 // -------------------------------------------------------------
 async function loadTenantAppData(tenantIdOrUserId) {
   const targetId = tenantIdOrUserId || getActiveTenantId();
+  scheduleXlsxEnginePreload();
 
   // 1. Supabase Cloud Source of Truth
   if (isCloudTenant(targetId)) {
@@ -24111,6 +24149,7 @@ if (typeof module !== 'undefined' && module.exports) {
     getImportEngine,
     buildImportSource,
     buildImportSourceAsync,
+    loadXlsxEngine,
     parseSourceWithMode,
     bookingSaveWarnings,
     confirmBookingWarnings,
