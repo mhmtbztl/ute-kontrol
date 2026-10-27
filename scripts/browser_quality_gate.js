@@ -39,6 +39,18 @@ async function withPage(browser, baseUrl, role, viewport, run) {
   await page.close();
 }
 
+// Uygulama ici bilgi/onay penceresini (core/ui_dialog.js, L-287) okur ve
+// birincil dugmeyle kapatir. Ham tarayici kutusunu Playwright kendiliginden
+// kapatiyordu; uygulama penceresi ise acik kalir ve sonraki tiklamayi engeller.
+async function closeUiDialog(page, button = '.btn-primary, .btn-danger') {
+  const dialog = page.locator('.ui-dialog.active').last();
+  await dialog.waitFor({ state: 'visible', timeout: 5000 });
+  const text = await dialog.locator('.modal-body').innerText();
+  await dialog.locator(`.modal-footer ${button.split(',').map(b => b.trim()).join(', .modal-footer ')}`).first().click();
+  await dialog.waitFor({ state: 'detached', timeout: 5000 });
+  return text;
+}
+
 // Ekrandaki "12.345 TL" metninden tam sayi; "—" ise null.
 function screenNumber(text) {
   const digits = String(text || '').replace(/[^0-9-]/g, '');
@@ -236,6 +248,8 @@ async function main() {
         document.getElementById('inviteMemberRole').value = 'admin';
         await submitMemberInvite({ preventDefault() {} });
       });
+      const davetMesaji = await closeUiDialog(page);
+      assert(/Davet 14 gün geçerlidir/.test(davetMesaji), `Davet bilgisi pencerede gorunmedi: ${davetMesaji}`);
       assert.deepStrictEqual(invitationCalls, [{
         tenantId: '00000000-0000-4000-8000-000000000001',
         email: 'm4-yonetici@browser.test',

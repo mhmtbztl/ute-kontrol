@@ -617,10 +617,10 @@ async function L280() {
   check(App.bookingCleaningDate(erken, bugun, ileri(1)) === bugun, 'L-280d Erken cikista one alinmis temizlik sonraki duzenlemede geri tasinmaz');
   let soruldu = false;
   global.confirm = () => { soruldu = true; return false; };
-  check(App.confirmEarlyCheckout(ileri(-1), ileri(3), 'CHECKED_OUT', { status: 'CHECKED_IN' }, bugun) === false && soruldu,
+  check((await App.confirmEarlyCheckout(ileri(-1), ileri(3), 'CHECKED_OUT', { status: 'CHECKED_IN' }, bugun)) === false && soruldu,
     'L-280e Cikis tarihinden once "Cikis yapti" onay ister; vazgecilirse kaydedilmez');
   let hata = null;
-  try { App.confirmEarlyCheckout(ileri(1), ileri(3), 'CHECKED_OUT', null, bugun); } catch (e) { hata = e; }
+  try { await App.confirmEarlyCheckout(ileri(1), ileri(3), 'CHECKED_OUT', null, bugun); } catch (e) { hata = e; }
   check(hata && /Giriş tarihi gelmemiş/.test(hata.message), 'L-280f Giris gunu gelmemis rezervasyon "Cikis yapti" olamaz');
   check(/confirmEarlyCheckout\(checkIn, checkOut, status, eskiKayit\)/.test(functionBody(read('app.js'), 'async function saveBooking(')), 'L-280g Rezervasyon kaydi erken cikis kapisindan gecer');
   global.confirm = () => true;
@@ -1182,6 +1182,28 @@ async function L287() {
   await App.createGeneralOperationalTask();
   check(ist.yazmalar.some(k => k.tablo === 'operational_tasks' && k.islem === 'insert' && k.yuk.title === 'TEST görev'), 'L-287f Genel gorev basligi pencereden alinip yazilir');
   delete global.prompt;
+
+  // Kalan tum akislar (MVP oncesi, 27.10): uygulama ve modullerde ham kutu kalmaz.
+  // Yalniz pencere yardimcilarinin Node yedegi yerel kutuyu cagirir.
+  const hamKutu = /(^|[^.\w'"`])(alert|confirm|prompt)\(/;
+  const izinli = /function uiAsk|function uiNotify|typeof alert === 'function'\) alert\(metin\)|typeof prompt === 'function' \? prompt\(options|typeof confirm === 'function' \? confirm\(o\.message|root\.(alert|confirm|prompt)\(/;
+  const kalanlar = [];
+  ['app.js', ...fs.readdirSync(path.join(__dirname)).filter(f => f.endsWith('.js') && !/_tests?\.js$|_scan\.js$/.test(f)).map(f => 'core/' + f)].forEach(dosya => {
+    read(dosya).split('\n').forEach((satir, i) => {
+      const kod = satir.replace(/\r$/, '').replace(/\/\/.*$/, '');
+      if (hamKutu.test(kod) && !izinli.test(kod) && !/^\s*\*/.test(satir)) kalanlar.push(`${dosya}:${i + 1}`);
+    });
+  });
+  check(kalanlar.length === 0, 'L-287g Uygulamada ham alert/confirm/prompt kalmadi', kalanlar.slice(0, 12).join(', ') + (kalanlar.length > 12 ? ` (+${kalanlar.length - 12})` : ''));
+  check(/function uiNotify\(/.test(src) && /showToast\(metin/.test(src.slice(src.indexOf('function uiNotify('), src.indexOf('\n}\n', src.indexOf('function uiNotify(')))), 'L-287h Kisa bildirim seride, uzun bildirim pencereye gider');
+  let soruldu = 0;
+  delete global.confirm;
+  const yedekEvet = await App.uiAskConfirm('X');
+  const yedekHayir = await App.uiAskConfirm({ message: 'X', fallback: false });
+  global.confirm = () => { soruldu++; return false; };
+  const ret = await App.uiAskConfirm('X');
+  delete global.confirm;
+  check(yedekEvet === true && yedekHayir === false && ret === false && soruldu === 1, 'L-287i Onay yedegi eski davranisi korur (kutu yoksa devam; "fallback:false" yerde durur)');
 }
 
 // ---------------------------------------------------------------------------

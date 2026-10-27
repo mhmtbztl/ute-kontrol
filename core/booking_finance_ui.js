@@ -263,8 +263,8 @@ async function saveBookingCollectionSchedule(event) {
     await cloudSaveTenantSetting('booking_collection_schedule', kurallar);
     appData.tenantSettings = { ...appData.tenantSettings, booking_collection_schedule: kurallar };
     if (typeof syncNotificationFeed === 'function') syncNotificationFeed().catch(() => {});
-    alert('Tahsilat günleri kaydedildi. Bildirimler yeni kurala göre güncellenir.');
-  } catch (e) { alert('Tahsilat günleri kaydedilemedi: ' + e.message); }
+    uiNotify('Tahsilat günleri kaydedildi. Bildirimler yeni kurala göre güncellenir.');
+  } catch (e) { uiNotify('Tahsilat günleri kaydedilemedi: ' + e.message); }
 }
 function readBookingTaxProfileForm(prefix) {
   const p = { id: crypto.randomUUID(), name: financeValue(prefix+'Name').trim(), dateBasis: financeValue(prefix+'DateBasis'), validFrom: financeValue(prefix+'From'), validTo: financeValue(prefix+'To') };
@@ -322,10 +322,10 @@ async function deleteBookingTaxProfile(index) {
   const profiles = [...(appData.tenantSettings?.booking_tax_profiles || [])];
   const p = profiles[Number(index)];
   if (!p) return false;
-  if (typeof confirm === 'function' && !confirm(`"${p.name}" profili silinsin mi? Bu profille kaydedilmiş rezervasyonların vergisi değişmez.`)) return false;
+  if (!(await uiAskConfirm(`"${p.name}" profili silinsin mi? Bu profille kaydedilmiş rezervasyonların vergisi değişmez.`))) return false;
   profiles.splice(Number(index), 1);
   try { await writeBookingTaxProfiles(profiles); return true; }
-  catch (e) { alert('Vergi profili silinemedi: '+e.message); return false; }
+  catch (e) { uiNotify('Vergi profili silinemedi: '+e.message); return false; }
 }
 async function saveBookingTaxProfile(event) {
   event.preventDefault();
@@ -340,7 +340,7 @@ async function saveBookingTaxProfile(event) {
     await appendBookingTaxProfile(p);
     renderBookingFinanceSettings();
     if (financeEl('resTaxProfile')) fillBookingTaxProfileOptions();
-  } catch (e) { alert('Vergi profili kaydedilemedi: '+e.message); }
+  } catch (e) { uiNotify('Vergi profili kaydedilemedi: '+e.message); }
 }
 async function saveBookingCommissionBases(event) {
   event.preventDefault();
@@ -349,8 +349,8 @@ async function saveBookingCommissionBases(event) {
     document.querySelectorAll('[data-finance-channel]').forEach(el => { bases[el.dataset.financeChannel] = el.value; });
     await cloudSaveTenantSetting('booking_commission_bases',bases);
     appData.tenantSettings = { ...appData.tenantSettings, booking_commission_bases: bases };
-    alert('Komisyon matrahları kaydedildi. Geçmiş rezervasyonlar değişmedi.');
-  } catch (e) { alert('Komisyon matrahları kaydedilemedi: '+e.message); }
+    uiNotify('Komisyon matrahları kaydedildi. Geçmiş rezervasyonlar değişmedi.');
+  } catch (e) { uiNotify('Komisyon matrahları kaydedilemedi: '+e.message); }
 }
 async function saveBookingDepositChannels(event) {
   event.preventDefault();
@@ -360,8 +360,8 @@ async function saveBookingDepositChannels(event) {
     document.querySelectorAll('[data-deposit-channel]').forEach(el => { kanallar[String(el.dataset.depositChannel).toUpperCase()] = el.checked === true; });
     await cloudSaveTenantSetting('booking_deposit_channels', kanallar);
     appData.tenantSettings = { ...appData.tenantSettings, booking_deposit_channels: kanallar };
-    alert('Kapora ayarı kaydedildi. Mevcut ödeme kayıtları değişmedi.');
-  } catch (e) { alert('Kapora ayarı kaydedilemedi: ' + e.message); }
+    uiNotify('Kapora ayarı kaydedildi. Mevcut ödeme kayıtları değişmedi.');
+  } catch (e) { uiNotify('Kapora ayarı kaydedilemedi: ' + e.message); }
 }
 async function postBookingExtraExpenses() {
   const id = financeValue('resEditId');
@@ -376,7 +376,7 @@ async function postBookingExtraExpenses() {
     if (error) throw error;
     invalidateExecutiveSnapshotCache();
     await loadTenantAppData();
-    alert(`${data} gider deftere aktarıldı. Mevcut satırlar tekrar oluşturulmadı.`);
+    uiNotify(`${data} gider deftere aktarıldı. Mevcut satırlar tekrar oluşturulmadı.`);
     closeBookingModal();
-  } catch (e) { alert('Gider aktarımı tamamlanamadı: '+e.message); }
+  } catch (e) { uiNotify('Gider aktarımı tamamlanamadı: '+e.message); }
 }

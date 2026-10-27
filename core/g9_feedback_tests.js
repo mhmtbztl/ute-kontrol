@@ -1431,7 +1431,7 @@ async function rezervasyonOdemeDavranisi() {
   const ctx2 = { crypto: require('crypto'), escapeHtml: s => String(s), document: { getElementById: el, querySelectorAll: () => [] },
     appData: { tenantSettings: { booking_tax_profiles: [eskiProfil, { ...eskiProfil, id: 'p-2', name: 'İkinci' }] } },
     activeTenant: { role: 'owner' }, canManageTenantRole: () => true, getBookingChannelCatalog: () => [], channelTakesDeposit: () => false,
-    cloudSaveTenantSetting: async (k, v) => { yazilan.push([k, JSON.parse(JSON.stringify(v))]); }, alert() {}, confirm: () => true };
+    cloudSaveTenantSetting: async (k, v) => { yazilan.push([k, JSON.parse(JSON.stringify(v))]); }, uiNotify: async () => {}, uiAskConfirm: async () => true };
   vm.runInNewContext(read('core/booking_finance_ui.js'), ctx2);
   vm.runInNewContext("this.BookingFinance = { validateProfile: p => p };", ctx2);
   ctx2.renderBookingFinanceSettings();

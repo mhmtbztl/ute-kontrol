@@ -89,7 +89,7 @@
 
   function askConfirm(o) {
     const opts = typeof o === 'string' ? { message: o } : (o || {});
-    if (!hasDom()) return Promise.resolve(typeof root.confirm === 'function' ? root.confirm(opts.message || '') : false);
+    if (!hasDom()) return Promise.resolve(typeof root.confirm === 'function' ? root.confirm(opts.message || '') : (opts.fallback !== undefined ? opts.fallback : true));
     return open(opts);
   }
 
