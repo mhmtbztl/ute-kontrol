@@ -1445,6 +1445,35 @@ async function L015Style() {
   check(yazdir && !/<style/.test(yazdir) && /adoptedStyleSheets/.test(yazdir), 'L-15s6 Yazdirma penceresi satir ici <style> yerine CSSOM stil sayfasi kullanir');
 }
 
+// ---------------------------------------------------------------------------
+// L-157: yasal metin surumu degisince kullanici girişte yeni surumu onaylar.
+// Iskelet surumde kimseye sorulmaz; onaylanirsa user_metadata'ya yazilir,
+// reddedilirse oturum kapanir.
+// ---------------------------------------------------------------------------
+async function L157() {
+  sahteDom();
+  const App = require('../app.js');
+  const gerekli = App.legalConsentRequired || (() => null);
+  check(gerekli('iskelet-2026-10-03', 'iskelet-2026-10-03') === false && gerekli(undefined, 'iskelet-2026-10-03') === false,
+    'L-157a Iskelet surumde kimseye onay sorulmaz');
+  check(gerekli('iskelet-2026-10-03', 'v1-2026-11-01') === true && gerekli(undefined, 'v1-2026-11-01') === true && gerekli('v1-2026-11-01', 'v1-2026-11-01') === false,
+    'L-157b Onayli surum yayinlaninca o surumu onaylamayan herkese bir kez sorulur');
+  const guncellenen = [];
+  let cikis = 0;
+  App.setSupabaseClient({ auth: { updateUser: async arg => { guncellenen.push(arg); return { data: {}, error: null }; }, signOut: async () => { cikis++; return { error: null }; } } });
+  global.confirm = () => true;
+  const evet = App.ensureLegalConsent ? await App.ensureLegalConsent({ id: 'u1', user_metadata: { legal_text_version: 'iskelet-2026-10-03' } }, 'v1-2026-11-01') : false;
+  check(evet === true && guncellenen.length === 1 && guncellenen[0].data.legal_text_version === 'v1-2026-11-01' && /^\d{4}-/.test(guncellenen[0].data.legal_consent_at),
+    'L-157c Kabul edilen surum ve zaman kullanici kaydina yazilir', JSON.stringify(guncellenen));
+  global.confirm = () => false;
+  const hayir = App.ensureLegalConsent ? await App.ensureLegalConsent({ id: 'u1', user_metadata: {} }, 'v1-2026-11-01') : true;
+  check(hayir === false && cikis === 1 && guncellenen.length === 1, 'L-157d Reddeden kullanicinin oturumu kapanir, kayit yazilmaz');
+  global.confirm = () => true;
+  check(/await ensureLegalConsent\(u\)/.test(functionBody(read('app.js'), 'async function handleAuthenticatedSession(')), 'L-157e Her giriste surum kontrol edilir');
+  check(['README.md', 'kvkk_aydinlatma.md', 'gizlilik_politikasi.md', 'kullanim_sartlari.md', 'veri_isleme_eki.md'].every(d => fs.existsSync(path.join(root, 'docs', 'yasal_taslak', d)))
+    && !require('../server.js').isAllowed('docs/yasal_taslak/kvkk_aydinlatma.md'), 'L-157f Yasal taslaklar hazir ve sitede yayinlanmaz (hukuki onay bekliyor)');
+}
+
 async function main() {
   try {
     await L304();
@@ -1494,6 +1523,7 @@ async function main() {
     await L277();
     await L300();
     await L015Style();
+    await L157();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

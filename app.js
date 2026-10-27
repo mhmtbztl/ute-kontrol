@@ -17203,8 +17203,40 @@ if (typeof window !== 'undefined') {
 }
 
 // Merkezi Authenticated Session Yöneticisi (PHASE 3)
+// Yasal metin surumu degisince kullanici giriste yeni surumu onaylar (L-157).
+// Iskelet surumde (metinler hukuki onay bekliyor, docs/yasal_taslak) kimseye
+// sorulmaz. Onayli surum yayinlaninca kayitta eski surumu (ya da davetle gelip
+// hic) onaylamis herkese bir kez sorulur; reddeden oturumu kapatir.
+function legalConsentRequired(kabulEdilen, guncel = LEGAL_TEXT_VERSION) {
+  if (String(guncel || '').startsWith('iskelet')) return false;
+  return kabulEdilen !== guncel;
+}
+
+async function ensureLegalConsent(u, guncel = LEGAL_TEXT_VERSION) {
+  if (!legalConsentRequired(u?.user_metadata?.legal_text_version, guncel)) return true;
+  const kabul = await uiAskConfirm({
+    title: 'Yasal metinler güncellendi',
+    message: 'Kullanım Şartları, Gizlilik Politikası ve KVKK Aydınlatma Metni güncellendi. ' +
+      'Metinleri lexbnb.space/yasal/ adresinde okuyabilirsiniz.\n\nDevam etmek için güncel metinleri kabul etmeniz gerekir.',
+    okText: 'Okudum, kabul ediyorum',
+    cancelText: 'Çıkış yap'
+  });
+  if (kabul) {
+    const { error } = await supabaseClient.auth.updateUser({ data: { legal_consent_at: new Date().toISOString(), legal_text_version: guncel } });
+    if (!error) return true;
+    uiNotify('Onayınız kaydedilemedi. Bağlantınızı kontrol edip yeniden giriş yapın.');
+  }
+  try { await supabaseClient.auth.signOut(); } catch (e) { /* oturum zaten kapali */ }
+  return false;
+}
+
 async function handleAuthenticatedSession(u) {
   if (!u || !u.id) return false;
+  if (!(await ensureLegalConsent(u))) {
+    const kutu = typeof document !== 'undefined' ? document.getElementById('authErrorMessage') : null;
+    if (kutu) { kutu.style.display = 'block'; kutu.innerText = 'Devam etmek için güncel yasal metinleri kabul etmeniz gerekir.'; }
+    return false;
+  }
 
   activeSaaSUser = {
     id: u.id,
@@ -24214,6 +24246,8 @@ if (typeof module !== 'undefined' && module.exports) {
     getImportEngine,
     buildImportSource,
     buildImportSourceAsync,
+    legalConsentRequired,
+    ensureLegalConsent,
     downloadTenantBackup,
     deferInlineStyleAttributes,
     loadXlsxEngine,
