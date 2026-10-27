@@ -38,6 +38,10 @@
   //   tenant_invitations -> invitation_delivery_outbox (enqueue_invitation_delivery)
   //   tenants          -> lead_source_catalog     (seed_lead_source_catalog_for_new_tenant, phase59)
   const SIDE_EFFECTS = ['tenant_booking_channels', 'guest_consent_events', 'invitation_delivery_outbox', 'lead_source_catalog', 'ad_metric_period_days'];
+  // Verinin kendisinden TURETILEN yan etki: yedekte bu tablo hic yoksa (uygulama
+  // ici isletme yedegi, kullaniciya kapali tablo) tetikleyicinin yeniden urettigi
+  // satirlar dogrudur ve silinmez. Davet kuyrugu gibi disari etki edenler silinir.
+  const DERIVED = ['ad_metric_period_days'];
   // Olusturma zamaninin sutunu (varsayilan created_at).
   const CREATED_COL = { guest_consent_events: 'recorded_at' };
   const BATCH = 500;
@@ -123,6 +127,7 @@
     async function cleanSideEffects(name) {
       const tsCol = CREATED_COL[name] || 'created_at';
       if (!SIDE_EFFECTS.includes(name) || !tables[name]) return;
+      if (DERIVED.includes(name) && readJson(`tables/${name}.json`) === null) return;
       if (!tables[name].columns.includes(tsCol)) { report.errors.push(`SIDE_EFFECT_NO_TIMESTAMP ${name}.${tsCol}`); return; }
       const keep = backupIds(name);
       let q = client.from(name).select('id').gte(tsCol, startedAt);
@@ -182,5 +187,5 @@
     return report;
   }
 
-  return { parseSpec, loadOrder, tenantRows, restoreBackup, VIEWS, INFRA, LAST, SIDE_EFFECTS };
+  return { parseSpec, loadOrder, tenantRows, restoreBackup, VIEWS, INFRA, LAST, SIDE_EFFECTS, DERIVED };
 }));

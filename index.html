@@ -1866,6 +1866,28 @@
       </section>
 
       <div class="settings-section" data-settings-section="danger">
+      <!-- İŞLETME YEDEĞİ (L-42) -->
+      <section class="card" id="tenantBackupCard" data-lx-style="margin-top: 24px;">
+        <div class="section-title-bar">
+          <div>
+            <h2>💾 İşletme Yedeği</h2>
+            <p class="sub-text">İşletmenizin bütün kayıtlarını tek dosya olarak indirin.</p>
+          </div>
+        </div>
+        <div data-lx-style="padding: 0 4px 4px;">
+          <p data-lx-style="font-size: 12px; color: #C7C7CC; line-height: 1.6; margin: 0 0 12px;">
+            Mülkler, rezervasyonlar, misafirler, giderler, temizlik, talepler, ayarlar ve ay kapanışları dosyaya girer.
+            Dosya misafirlerinizin kişisel verilerini içerir; güvenli bir yerde saklayın ve kimseyle paylaşmayın.
+            Geri yükleme için dosyayı destek ekibine iletin: işletmeniz bu dosyadan geri kurulur, var olan kayıtlarınıza dokunulmaz,
+            yalnız eksik kayıtlar eklenir. Kullanıcı şifreleri yedekte yoktur.
+          </p>
+          <button type="button" class="btn btn-secondary" id="tenantBackupBtn" data-owner-only data-onclick="downloadTenantBackup()">
+            💾 İşletme yedeğini indir (.json)
+          </button>
+          <p class="sub-text" data-owner-only-note hidden>İşletme yedeğini yalnız işletme sahibi indirebilir.</p>
+        </div>
+      </section>
+
       <!-- VERİ SIFIRLAMA -->
       <section class="card" id="dataResetCard" data-lx-style="margin-top: 24px; border: 1px solid rgba(255, 159, 10, 0.35);">
         <div class="section-title-bar">
@@ -4121,11 +4143,12 @@
   <script src="core/side_panel.js?v=d763b464"></script>
   <script src="core/notification_feed.js?v=941306f6"></script>
   <script src="core/command_search.js?v=89760933"></script>
-  <script src="core/action_dispatch.js?v=3e7b285e"></script>
+  <script src="core/action_dispatch.js?v=40fc0b50"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=ca7b5399"></script>
+  <script src="core/tenant_backup_export.js?v=820fdf51"></script>
   <script src="core/ui_dialog.js?v=d0680970"></script>
-  <script src="app.js?v=da6929d9"></script>
+  <script src="app.js?v=2fcf4699"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=e45a0e9a"></script>

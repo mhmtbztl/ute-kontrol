@@ -349,6 +349,8 @@ const allTestFiles = [
   'backup_engine_tests.js',
   'restore_engine_tests.js',
   'backup_restore_live_tests.js',
+  'tenant_backup_export_tests.js',
+  'tenant_backup_live_tests.js',
 
   // A1 saf motorlar: rapor/ChatGPT, fiyat onerisi, ozel gun ve hedef ciro
   'chatgpt_prompt_engine_tests.js',

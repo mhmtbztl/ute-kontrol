@@ -13058,6 +13058,43 @@ function collectExportRecords(mod) {
 }
 
 /** Tarayiciya dosya indirtir. */
+// Isletme yedegi (L-42 2. kisim). Sahip isletmenin butun kayitlarini tek
+// dosya olarak indirir; dosya `npm run restore` ile geri yuklenir
+// (core/tenant_backup_export.js, gidis-donus tenant_backup_live_tests).
+// Eksik alinan yedek indirilmez: "yedek aldim" sanilip guvenilmesin.
+async function downloadTenantBackup() {
+  if (activeTenant?.role !== 'owner') {
+    uiNotify('İşletme yedeğini yalnız işletme sahibi indirebilir.');
+    return false;
+  }
+  const tenantId = getActiveTenantId();
+  if (!isCloudTenant(tenantId)) {
+    uiNotify('Yedek için bulut bağlantısı gerekir. Sayfayı yenileyip tekrar deneyin.');
+    return false;
+  }
+  const motor = typeof TenantBackupExport !== 'undefined' ? TenantBackupExport : require('./core/tenant_backup_export.js');
+  const btn = typeof document !== 'undefined' ? document.getElementById('tenantBackupBtn') : null;
+  const eskiMetin = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Yedek hazırlanıyor…'; }
+  try {
+    const yedek = await motor.exportTenantBackup({ client: supabaseClient, tenantId });
+    if (yedek.manifest.errors.length) {
+      uiNotify(`Yedek eksik alındı, indirilmedi (${yedek.manifest.errors.length} tablo okunamadı). Bağlantınızı kontrol edip tekrar deneyin.\n\n${yedek.manifest.errors.slice(0, 3).join('\n')}`, { modal: true });
+      return false;
+    }
+    const kayit = Object.values(yedek.tables).reduce((t, r) => t + r.length, 0);
+    const ad = String(activeTenant?.name || 'isletme').toLocaleLowerCase('tr').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/ı/g, 'i').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'isletme';
+    triggerFileDownload(JSON.stringify(yedek), `lexbnb-yedek-${ad}-${getTodayStr()}.json`, 'application/json;charset=utf-8');
+    uiNotify(`✅ İşletme yedeği indirildi: ${kayit.toLocaleString('tr-TR')} kayıt.`);
+    return true;
+  } catch (err) {
+    uiNotify('Yedek alınamadı: ' + (err && err.message ? err.message : 'bilinmeyen hata'));
+    return false;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = eskiMetin; }
+  }
+}
+
 function triggerFileDownload(icerik, ad, mimeTur) {
   const blob = new Blob([icerik], { type: mimeTur });
   const url = URL.createObjectURL(blob);
@@ -24177,6 +24214,7 @@ if (typeof module !== 'undefined' && module.exports) {
     getImportEngine,
     buildImportSource,
     buildImportSourceAsync,
+    downloadTenantBackup,
     deferInlineStyleAttributes,
     loadXlsxEngine,
     parseSourceWithMode,
