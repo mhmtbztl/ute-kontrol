@@ -14,7 +14,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=59c0f09b">
+  <link rel="stylesheet" href="style.css?v=fe5c96ea">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <script src="supabase.umd.js?v=3810661a"></script>
@@ -206,12 +206,12 @@
       <div class="header-dropdown-wrap">
         <button type="button" class="btn btn-secondary header-bell-btn" data-onclick="toggleNotificationDrawer()" id="notificationBellBtn" title="Bildirim Merkezi">
           <span>🔔</span>
-          <span id="notificationBellBadge" class="badge badge-red" style="position: absolute; top: -5px; right: -5px; padding: 2px 6px; font-size: 10px; border-radius: 10px; display: none; background: #FF453A; color: #fff;">0</span>
+          <span id="notificationBellBadge" class="badge badge-red" style="position: absolute; top: -5px; right: -5px; padding: 2px 6px; font-size: 11px; border-radius: 10px; display: none; background: #FF453A; color: #fff;">0</span>
         </button>
         <div class="header-dropdown-menu notification-drawer-menu" id="notificationDrawer" style="display: none; width: 360px; right: 0; max-height: 480px; overflow-y: auto; padding: 0; background: #1C1C1E; border: 1px solid rgba(191, 90, 242, 0.3); box-shadow: 0 15px 35px rgba(0,0,0,0.7); z-index: 1000;">
           <div style="padding: 12px 16px; background: rgba(44, 44, 46, 0.95); border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center;">
             <strong style="color: #F5F5F7; font-size: 13px;">🔔 Bildirim Merkezi</strong>
-            <button type="button" class="btn btn-secondary btn-sm" data-onclick="markAllNotificationsAsRead()" style="font-size: 10px; padding: 2px 6px;">Tümünü Okundu Say</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-onclick="markAllNotificationsAsRead()" style="font-size: 11px; padding: 2px 6px;">Tümünü Okundu Say</button>
           </div>
           <div id="notificationList" style="padding: 8px;">
             <div style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px;">Yeni bildirim bulunmuyor.</div>
@@ -352,10 +352,10 @@
           <div style="padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,0.08); background: rgba(191, 90, 242, 0.1);">
             <div style="font-size: 13px; font-weight: 800; color: #F5F5F7;" id="menuCompanyTitle">LexBnB Portföyü</div>
             <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;" id="menuUserEmail">Hesap bilgisi yükleniyor…</div>
-            <span class="badge badge-purple" id="menuPlanBadge" style="margin-top: 6px; font-size: 10px;">Enterprise Plan 🚀</span>
+            <span class="badge badge-purple" id="menuPlanBadge" style="margin-top: 6px; font-size: 11px;">Enterprise Plan 🚀</span>
           </div>
           <div id="tenantSwitcherContainer" style="display: none; padding: 8px 14px; border-bottom: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.25);">
-            <label style="font-size: 10px; color: #A78BFA; text-transform: uppercase; font-weight: 700; display: block; margin-bottom: 4px;">Aktif İşletme:</label>
+            <label style="font-size: 11px; color: #A78BFA; text-transform: uppercase; font-weight: 700; display: block; margin-bottom: 4px;">Aktif İşletme:</label>
             <select id="tenantSelectDropdown" data-onchange="switchActiveTenant(this.value); closeAllHeaderDropdowns();" style="width: 100%; padding: 6px 8px; font-size: 12px; border-radius: 6px; background: #2C2C2E; color: #EDE9FE; border: 1px solid #6366F1; outline: none; cursor: pointer;">
             </select>
           </div>
@@ -681,7 +681,7 @@
           <div class="dropdown" style="position: relative;">
             <button type="button" class="btn btn-secondary btn-sm" data-onclick="toggleExportMenu(event)">⬇️ Defteri Dışa Aktar</button>
             <div id="ledgerExportMenu" class="dropdown-menu" style="display: none; position: absolute; right: 0; top: calc(100% + 6px); z-index: 60; min-width: 250px; background: #111C2E; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 6px; box-shadow: 0 12px 32px rgba(0,0,0,0.45);">
-              <div style="font-size: 10px; color: #6E6E73; padding: 6px 10px 4px; line-height: 1.5;">
+              <div style="font-size: 11px; color: #6E6E73; padding: 6px 10px 4px; line-height: 1.5;">
                 Seçili dönem ve mülk filtresine göre. Sütunlar içe aktarma
                 şablonuyla aynıdır: düzenleyip geri yükleyebilirsiniz.
               </div>
@@ -689,7 +689,7 @@
               <button type="button" class="dropdown-item" data-onclick="exportLedger('BOOKINGS','csv'); toggleExportMenu(event);">📄 Rezervasyon Defteri (.csv)</button>
               <button type="button" class="dropdown-item" data-onclick="exportLedger('EXPENSES','xlsx'); toggleExportMenu(event);">📕 Gider Defteri (.xlsx)</button>
               <button type="button" class="dropdown-item" data-onclick="exportLedger('EXPENSES','csv'); toggleExportMenu(event);">📄 Gider Defteri (.csv)</button>
-              <div style="font-size: 10px; color: #6E6E73; padding: 6px 10px 4px; border-top: 1px solid rgba(255,255,255,0.08); margin-top: 4px; line-height: 1.5;">
+              <div style="font-size: 11px; color: #6E6E73; padding: 6px 10px 4px; border-top: 1px solid rgba(255,255,255,0.08); margin-top: 4px; line-height: 1.5;">
                 Ay sınırını kesen bir rezervasyon dosyada <strong>tam tutarıyla</strong>
                 görünür; ekrandaki aylık ciro ise gecelere bölünmüş payı gösterir.
               </div>
@@ -715,7 +715,7 @@
             <button type="button" class="btn btn-secondary btn-sm" id="monthReopenBtn" data-onclick="openMonthReopenModal()" hidden>🔓 Dönemi Yeniden Aç</button>
           </div>
         </div>
-        <div id="monthCloseHistory" class="sub-text" style="font-size:10px; margin-top:8px; color:#98989D;"></div>
+        <div id="monthCloseHistory" class="sub-text" style="font-size:11px; margin-top:8px; color:#98989D;"></div>
       </section>
 
       <!-- 2. ANA KPI KARTLARI (5 SANİYEDE ANLAŞILIR) -->
@@ -782,7 +782,7 @@
           <div class="kpi-meta">
             <span class="kpi-trend negative" id="finExpenseRatio">—</span>
             <span id="finExpenseMoM">—</span>
-            <div id="finAutoDerivedCost" class="sub-text" style="font-size:10px; margin-top:6px; color:#93C5FD;"></div>
+            <div id="finAutoDerivedCost" class="sub-text" style="font-size:11px; margin-top:6px; color:#93C5FD;"></div>
           </div>
         </div>
 
@@ -2558,7 +2558,7 @@
           <div class="form-group">
             <label style="font-weight:700; color:#FFFFFF; font-size:13px;">Gerekçe <span style="color:#FCA5A5;">*</span></label>
             <textarea id="monthReopenReason" rows="3" placeholder="Örn: Nisan elektrik faturası geç geldi, gider kaydı eksik kalmıştı." data-oninput="updateMonthReopenButton()" style="width:100%; padding:10px 12px; background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.15); border-radius:8px; color:#fff; font-size:13px; margin-top:6px; resize:vertical;"></textarea>
-            <p class="sub-text" style="font-size:10px; margin:6px 0 0;">En az 10 karakter. <span id="monthReopenCharCount">0</span> karakter yazıldı.</p>
+            <p class="sub-text" style="font-size:11px; margin:6px 0 0;">En az 10 karakter. <span id="monthReopenCharCount">0</span> karakter yazıldı.</p>
           </div>
 
           <div id="monthReopenError" class="auth-error-msg" style="display:none; margin-top:12px;"></div>
@@ -2676,13 +2676,13 @@
             <div class="form-group">
               <label style="font-size: 12px; font-weight: 600;">🌙 Hedef Gece Sayısı</label>
               <input type="number" id="goalOccupancyNights" min="1" step="1" placeholder="Örn: 75" data-oninput="autoCalculateGoalAdr()" style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
-              <span style="font-size: 10px; color: var(--text-muted); margin-top: 3px; display: block;">Tahmini doluluk: <strong id="goalCalcOccLabel" style="color:#409CFF;">—</strong></span>
-              <span id="goalCapacityWarning" role="alert" style="display:none; font-size: 10px; color: #FCA5A5; margin-top: 3px;"></span>
+              <span style="font-size: 11px; color: var(--text-muted); margin-top: 3px; display: block;">Tahmini doluluk: <strong id="goalCalcOccLabel" style="color:#409CFF;">—</strong></span>
+              <span id="goalCapacityWarning" role="alert" style="display:none; font-size: 11px; color: #FCA5A5; margin-top: 3px;"></span>
             </div>
             <div class="form-group">
               <label style="font-size: 12px; font-weight: 600;">🏷️ Hedef Ortalama ADR</label>
               <input type="number" id="goalADR" min="0.01" step="0.01" placeholder="Örn: 6.000" data-oninput="autoCalculateGoalNights()" style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
-              <span style="font-size: 10px; color: var(--text-muted); margin-top: 3px; display: block;">Gecelik ortalama fiyat</span>
+              <span style="font-size: 11px; color: var(--text-muted); margin-top: 3px; display: block;">Gecelik ortalama fiyat</span>
             </div>
           </div>
 
@@ -2690,19 +2690,19 @@
             <div class="form-group">
               <label for="goalMarginPct" style="font-size: 12px; font-weight: 600;">📈 Hedef kâr marjı (%)</label>
               <input type="number" id="goalMarginPct" min="0" max="100" step="1" inputmode="decimal" placeholder="Örn: 35" data-oninput="syncGoalProfitFromMargin()" style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
-              <span style="font-size: 10px; color: var(--text-muted); margin-top: 3px; display: block;">Ciro hedefinin yüzdesi; tutar kendiliğinden hesaplanır</span>
+              <span style="font-size: 11px; color: var(--text-muted); margin-top: 3px; display: block;">Ciro hedefinin yüzdesi; tutar kendiliğinden hesaplanır</span>
             </div>
             <div class="form-group">
               <label for="goalNetProfit" style="font-size: 12px; font-weight: 600;">💵 Hedef Net Kâr (TL)</label>
               <input type="number" id="goalNetProfit" min="0" step="0.01" data-oninput="syncGoalMarginFromProfit()" style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
-              <span id="goalNetProfitHint" style="font-size: 10px; color: #30D158; margin-top: 3px; display: block;">—</span>
+              <span id="goalNetProfitHint" style="font-size: 11px; color: #30D158; margin-top: 3px; display: block;">—</span>
             </div>
           </div>
           <div style="display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 8px;">
             <div class="form-group">
               <label style="font-size: 12px; font-weight: 600;">💸 Hedef Gider Bütçesi Tavanı (TL)</label>
               <input type="number" id="goalMaxExpense" min="0" step="0.01" readonly aria-readonly="true" style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
-              <span style="font-size: 10px; color: #FCA5A5; margin-top: 3px; display: block;">Hedef ciro − hedef net kâr. Planlama değeridir; gerçekleşen muhasebe gideri değildir.</span>
+              <span style="font-size: 11px; color: #FCA5A5; margin-top: 3px; display: block;">Hedef ciro − hedef net kâr. Planlama değeridir; gerçekleşen muhasebe gideri değildir.</span>
             </div>
           </div>
         </div>
@@ -2784,7 +2784,7 @@
                 <a href="sablonlar/lexbnb-temizlik-sablonu.csv" download style="color: #6EE7B7; font-weight: 600;">CSV</a>
               </span>
             </div>
-            <span style="font-size: 10px; color: #6E6E73; display: block; margin-top: 5px; line-height: 1.5;">
+            <span style="font-size: 11px; color: #6E6E73; display: block; margin-top: 5px; line-height: 1.5;">
               Villa sütununda <strong>MULK_KODU_1</strong> yazan satırlar yalnızca örnektir;
               kendi mülk kodunuzla değiştirmezseniz o satırlar kaydedilmez.
               Excel dosyasının ikinci sayfasında doldurma talimatı var.
@@ -2856,7 +2856,7 @@
             <div style="font-size: 11px; color: #C7C7CC; font-weight: 700; margin-bottom: 6px;">🕘 Son İçe Aktarımlar</div>
             <p id="importHistoryMessage" role="status" hidden style="font-size: 12px; margin: 0 0 6px;"></p>
             <div id="importHistoryList"></div>
-            <div style="font-size: 10px; color: #6E6E73; margin-top: 6px; line-height: 1.5;">
+            <div style="font-size: 11px; color: #6E6E73; margin-top: 6px; line-height: 1.5;">
               Geri alma yalnızca aktarımın eklediği kayıtları siler.
               Sonradan elle düzenlediğiniz kayıtlar <strong>atlanır</strong>;
               kapanmış bir döneme düşen kayıt varsa <strong>hiçbir şey silinmez</strong>.
@@ -3286,7 +3286,7 @@
           </div>
           <div class="form-group">
             <label><input type="checkbox" id="maintBlocksAvailability"> Takvimi kapatır</label>
-            <span style="display:block; font-size:10px; color: var(--text-muted); margin-top: 4px;">Tarih girilirse mülk yalnız bu aralıkta satışa kapanır (fiyat takviminde "Kapalı"). Tarihsiz P1 arıza yalnız bugünü kapatır.</span>
+            <span style="display:block; font-size:11px; color: var(--text-muted); margin-top: 4px;">Tarih girilirse mülk yalnız bu aralıkta satışa kapanır (fiyat takviminde "Kapalı"). Tarihsiz P1 arıza yalnız bugünü kapatır.</span>
           </div>
           <div class="form-group">
             <label>Kapalı Başlangıç</label>
@@ -3299,7 +3299,7 @@
           <div class="form-group">
             <label>Tahmini Maliyet (₺)</label>
             <input type="number" step="0.01" min="0" id="maintCost" value="" placeholder="Bilinmiyorsa boş bırakın">
-            <span style="display:block; font-size:10px; color: var(--text-muted); margin-top: 4px;">Planlama içindir; gider defterine yazılmaz. Ödenen tutarı Finans → Gider Girişi'nden girin.</span>
+            <span style="display:block; font-size:11px; color: var(--text-muted); margin-top: 4px;">Planlama içindir; gider defterine yazılmaz. Ödenen tutarı Finans → Gider Girişi'nden girin.</span>
           </div>
           <div class="form-group">
             <label>Durum</label>
@@ -3743,7 +3743,7 @@
           <span id="kpiExplIcon" style="font-size: 26px; background: rgba(10, 132, 255, 0.2); padding: 6px; border-radius: 8px; border: 1px solid rgba(10, 132, 255, 0.4);">📊</span>
           <div>
             <h3 id="kpiExplTitle" style="margin: 0; font-size: 17px; color: #FFFFFF; font-weight: 800;">Metrik Açıklaması</h3>
-            <span id="kpiExplCategory" class="badge badge-blue" style="font-size: 10px; margin-top: 4px; display: inline-block;">Finans & gelir yönetimi</span>
+            <span id="kpiExplCategory" class="badge badge-blue" style="font-size: 11px; margin-top: 4px; display: inline-block;">Finans & gelir yönetimi</span>
           </div>
         </div>
         <button class="close-btn" data-onclick="closeKpiExplanationModal()">&times;</button>
@@ -3796,7 +3796,7 @@
           <div class="form-group">
             <label style="font-size: 11px; color: #C7C7CC; font-weight: 600; display: block; margin-bottom: 4px;">Gecelik Baz Fiyat (₺) — normal satış fiyatı:</label>
             <input type="number" step="0.01" id="propBasePrice" placeholder="Örn: 20000" required style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff;">
-            <span style="display:block; font-size:10px; color: var(--text-muted); margin-top: 4px;">Taban (en düşük), hedef ve yoğun dönem fiyatları mülk profili › Fiyatlar sekmesinden girilir.</span>
+            <span style="display:block; font-size:11px; color: var(--text-muted); margin-top: 4px;">Taban (en düşük), hedef ve yoğun dönem fiyatları mülk profili › Fiyatlar sekmesinden girilir.</span>
           </div>
           <div class="form-group">
             <label style="font-size: 11px; color: #C7C7CC; font-weight: 600; display: block; margin-bottom: 4px;">Temizlik Maliyeti (₺):</label>
@@ -3806,7 +3806,7 @@
         <div class="form-group" style="margin-bottom: 12px;">
           <label for="propActivatedOn" style="font-size: 11px; color: #C7C7CC; font-weight: 600; display: block; margin-bottom: 4px;">Faaliyete Başlama Tarihi:</label>
           <input type="date" id="propActivatedOn" required style="width: 100%; padding: 8px 12px; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff;">
-          <span style="display:block; font-size:10px; color: var(--text-muted); margin-top: 4px;">Doluluk ve RevPAR kapasitesi bu tarihten itibaren sayılır. Boş bırakılırsa kayıt günü kullanılır; daha eski bir rezervasyon girilirse tarih kendiliğinden geri çekilir.</span>
+          <span style="display:block; font-size:11px; color: var(--text-muted); margin-top: 4px;">Doluluk ve RevPAR kapasitesi bu tarihten itibaren sayılır. Boş bırakılırsa kayıt günü kullanılır; daha eski bir rezervasyon girilirse tarih kendiliğinden geri çekilir.</span>
         </div>
         <div class="form-group" style="margin-bottom: 12px;">
           <label style="font-size: 11px; color: #C7C7CC; font-weight: 600; display: block; margin-bottom: 4px;">Öne Çıkan Özellikler & Olanaklar:</label>
@@ -4125,7 +4125,7 @@
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=ca7b5399"></script>
   <script src="core/ui_dialog.js?v=cc4505e4"></script>
-  <script src="app.js?v=f4ab048c"></script>
+  <script src="app.js?v=6ecb15a9"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=e45a0e9a"></script>

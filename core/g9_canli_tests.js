@@ -1220,6 +1220,13 @@ async function L288() {
   const src = read('app.js');
   check(/scrollIntoView\(\{[^}]*inline: 'center'/.test(functionBody(src, 'function switchTab(')), 'L-288e Aktif sekme seritte gorunur kaydirilir');
   check(/scrollIntoView\(\{[^}]*inline: 'center'/.test(functionBody(src, 'function switchHelpTab(')), 'L-288f Rehberde secilen sekme gorunur kaydirilir');
+  // 11 px alti yazi kalmaz (telefonda okunmuyordu: Rezervasyonlar 42, Finans 19 oge).
+  const kucuk = /font-size:\s*(([0-9]|10)(\.\d+)?px|0?\.([0-5]\d*|6[0-8]\d*)r?em)\b/;
+  const kucukler = [];
+  ['style.css', 'index.html', 'app.js', ...fs.readdirSync(__dirname).filter(f => f.endsWith('.js') && !/_tests?\.js$/.test(f)).map(f => 'core/' + f)].forEach(dosya => {
+    read(dosya).split('\n').forEach((satir, i) => { if (kucuk.test(satir)) kucukler.push(`${dosya}:${i + 1}`); });
+  });
+  check(kucukler.length === 0, 'L-288g 11 px altinda yazi boyutu kalmadi', kucukler.slice(0, 10).join(', ') + (kucukler.length > 10 ? ` (+${kucukler.length - 10})` : ''));
 }
 
 // ---------------------------------------------------------------------------

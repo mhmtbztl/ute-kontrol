@@ -6205,7 +6205,7 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
             <div class="table-bar-track">
               <div class="table-bar-fill bar-blue" style="width: ${Math.min(100, Math.max(0, ciroShare))}%;"></div>
             </div>
-            <span style="font-size:10px; color:var(--text-muted);">Portföy Payı: %${ciroShare.toFixed(1)}</span>
+            <span style="font-size:11px; color:var(--text-muted);">Portföy Payı: %${ciroShare.toFixed(1)}</span>
           </div>
         </td>
         <td>
@@ -6214,14 +6214,14 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
             <div class="table-bar-track">
               <div class="table-bar-fill ${occVal >= 75 ? 'bar-emerald' : (occVal >= 45 ? 'bar-blue' : 'bar-amber')}" style="width: ${Math.min(100, Math.max(0, occVal || 0))}%;"></div>
             </div>
-            <span style="font-size:10px; color:var(--text-muted);" title="${occVal === null ? 'Mülk bu dönemde faaliyette görünmüyor (faaliyete başlama tarihi)' : ''}">Doluluk: ${occText}</span>
+            <span style="font-size:11px; color:var(--text-muted);" title="${occVal === null ? 'Mülk bu dönemde faaliyette görünmüyor (faaliyete başlama tarihi)' : ''}">Doluluk: ${occText}</span>
           </div>
         </td>
         <td><strong>${adrVal.toLocaleString('tr-TR')} TL</strong></td>
         <td>${revparText}</td>
         <td>
           <strong class="${profit.tone}">${profit.valueHtml}</strong>
-          <span style="display:block; font-size:10px; color:var(--text-muted);">${escapeHtml(profit.note)}</span>
+          <span style="display:block; font-size:11px; color:var(--text-muted);">${escapeHtml(profit.note)}</span>
         </td>
         <td style="text-align: right; white-space: nowrap;">
           <button class="btn btn-secondary btn-sm" data-onclick="filterByVilla(decodeURIComponent('${encodeActionArg(item.key)}'))">🔍 Odaklan</button>
@@ -6262,7 +6262,7 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
 
         <div class="prop-hero-ciro-box">
           <div>
-            <span style="font-size:10px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Aylık fiili ciro</span>
+            <span style="font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Aylık fiili ciro</span>
             <div class="hero-ciro-val">${Math.round(s.revenue).toLocaleString('tr-TR')} TL</div>
           </div>
           <span class="badge badge-emerald">%${ciroShare.toFixed(1)} Pay</span>
@@ -8052,13 +8052,13 @@ async function refreshImportHistory() {
     const tarih = p.importedAt ? new Date(p.importedAt).toLocaleString('tr-TR') : '—';
     const geriAlinabilir = p.linkedCount > 0;
     const dugme = geriAlinabilir
-      ? `<button type="button" class="btn btn-secondary btn-sm" style="font-size:10px; padding:3px 8px; border-color:#FF453A; color:#FCA5A5;"
+      ? `<button type="button" class="btn btn-secondary btn-sm" style="font-size:11px; padding:3px 8px; border-color:#FF453A; color:#FCA5A5;"
                  data-onclick="undoImportBatch(decodeURIComponent('${encodeActionArg(String(p.id))}'))">↩︎ Geri Al (${p.linkedCount})</button>`
-      : `<span style="font-size:10px; color:#6E6E73;" title="Bu aktarımın kayıtları sonradan silinmiş ya da aktarım geri alma özelliği eklenmeden önce yapılmış.">geri alınacak kayıt yok</span>`;
+      : `<span style="font-size:11px; color:#6E6E73;" title="Bu aktarımın kayıtları sonradan silinmiş ya da aktarım geri alma özelliği eklenmeden önce yapılmış.">geri alınacak kayıt yok</span>`;
     return `<div style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:6px 8px; border-bottom:1px solid rgba(255,255,255,0.06);">
       <div style="min-width:0;">
         <div style="font-size:11px; color:#E5E5EA; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(p.filename)}</div>
-        <div style="font-size:10px; color:#6E6E73;">${escapeHtml(tarih)} · ${p.rowCount} kayıt · ${tl(p.amount)} TL</div>
+        <div style="font-size:11px; color:#6E6E73;">${escapeHtml(tarih)} · ${p.rowCount} kayıt · ${tl(p.amount)} TL</div>
       </div>
       ${dugme}
     </div>`;
@@ -9031,7 +9031,7 @@ function renderManageBookingsTable() {
     tr.setAttribute('data-onclick', `openBookingDetailsPanel(decodeURIComponent('${encodeActionArg(String(b.id))}'))`);
     tr.innerHTML = `
       <td data-label="Mülk" data-onclick="openBookingDetailsPanel(decodeURIComponent('${encodeActionArg(String(b.id))}'))"><strong>${propertyNameHtml(b.villa, vName)}</strong>${markerHtml ? `<div class="reservation-markers">${markerHtml}</div>` : ''}</td>
-      <td data-label="Misafir">${escapeHtml(b.guest || 'Belirtilmedi')}${isBulkSummaryBooking(b) ? ' <span class="badge badge-slate" style="font-size:10px;">Aylık özet</span>' : ''}</td>
+      <td data-label="Misafir">${escapeHtml(b.guest || 'Belirtilmedi')}${isBulkSummaryBooking(b) ? ' <span class="badge badge-slate" style="font-size:11px;">Aylık özet</span>' : ''}</td>
       <td data-label="Kanal"><span class="badge ${b.channel === 'AIRBNB' ? 'badge-rose' : (b.channel === 'BOOKING' ? 'badge-blue' : 'badge-emerald')}">${escapeHtml(getChannelDisplayName(b.channel))}</span></td>
       <td data-label="Tarihler">${formatTrDate(b.checkIn)} – ${formatTrDate(b.checkOut)}</td>
       <td data-label="Brüt">${e.cancelled ? `<span class="reservation-sub">${para(e.fullGross)} · iptal, hesaba girmez</span>` : `<strong>${para(e.gross)}</strong>${payNotu}`}</td>
@@ -9820,7 +9820,7 @@ function renderSettingsGoalsTable() {
     tr.innerHTML = `
       <td>
         <strong>${escapeHtml(m.name)}</strong>
-        ${isCurrent ? ' <span class="badge badge-blue" style="font-size:10px; margin-left:4px;">Seçili Dönem</span>' : ''}
+        ${isCurrent ? ' <span class="badge badge-blue" style="font-size:11px; margin-left:4px;">Seçili Dönem</span>' : ''}
       </td>
       <td>
         <strong style="color: #409CFF;">${Number.isFinite(rev) ? rev.toLocaleString('tr-TR') + ' TL' : '—'}</strong>
@@ -10014,7 +10014,7 @@ async function renderTeamManagement() {
         border-radius:6px; color:#fff; font-size:12px; font-weight:600;">${opts}</select>`;
     } else {
       roleCell = roleBadgeHtml(m.role) + (isLastOwner
-        ? ' <span class="sub-text" style="font-size:10px;">(tek sahip)</span>' : '');
+        ? ' <span class="sub-text" style="font-size:11px;">(tek sahip)</span>' : '');
     }
 
     const canRemove = canManageRoles && !m.is_self && !isLastOwner;
@@ -10031,7 +10031,7 @@ async function renderTeamManagement() {
       : (fieldCell ? '' : '<span class="sub-text" style="font-size:11px;">—</span>'));
 
     return `<tr>
-      <td><strong>${escapeHtml(m.full_name)}</strong>${m.is_self ? ' <span class="sub-text" style="font-size:10px;">(siz)</span>' : ''}</td>
+      <td><strong>${escapeHtml(m.full_name)}</strong>${m.is_self ? ' <span class="sub-text" style="font-size:11px;">(siz)</span>' : ''}</td>
       <td>${escapeHtml(m.email)}</td>
       <td>${roleCell}</td>
       <td>${formatTeamDate(m.joined_at)}</td>
@@ -10462,7 +10462,7 @@ function openMonthCloseModal() {
       <div>Rezervasyon: <strong>${bkl.length}</strong> &nbsp;•&nbsp; Satılan gece: <strong>${geceler}</strong></div>
       <div>Ciro (tahakkuk): <strong>${Math.round(ciro).toLocaleString('tr-TR')} TL</strong></div>
       <div>Gider kaydı: <strong>${gid.length}</strong> &nbsp;•&nbsp; <strong>${Math.round(gidTop).toLocaleString('tr-TR')} TL</strong></div>
-      <p class="sub-text" style="font-size:10px; margin:10px 0 0;">
+      <p class="sub-text" style="font-size:11px; margin:10px 0 0;">
         Bu rakamlar ekrandaki hesaptır. Kaydedilecek resmî rakam kapanış anında sunucuda yeniden hesaplanır.
       </p>`;
   }
@@ -13272,7 +13272,7 @@ function renderDailyOps() {
         </div>
         <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
           <span class="badge badge-green" style="font-weight: 700;">🟢 ${checkInTime ? escapeHtml(checkInTime) + ' Giriş' : 'Giriş saati kayıtlı değil'}</span>
-          <button class="btn btn-secondary btn-sm" style="font-size: 10px; padding: 2px 6px;" data-onclick="openBookingModal(decodeURIComponent('${encodeActionArg(b.id)}'))">Detay</button>
+          <button class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 2px 6px;" data-onclick="openBookingModal(decodeURIComponent('${encodeActionArg(b.id)}'))">Detay</button>
         </div>
       `;
       inList.appendChild(div);
@@ -13326,7 +13326,7 @@ function renderDailyOps() {
         </div>
         <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
           <span class="badge badge-blue" style="font-weight: 700;">🔵 ${checkOutTime ? escapeHtml(checkOutTime) + ' Çıkış' : 'Çıkış saati kayıtlı değil'}</span>
-          <button class="btn btn-secondary btn-sm" style="font-size: 10px; padding: 2px 6px;" data-onclick="openBookingModal(decodeURIComponent('${encodeActionArg(b.id)}'))">Detay</button>
+          <button class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 2px 6px;" data-onclick="openBookingModal(decodeURIComponent('${encodeActionArg(b.id)}'))">Detay</button>
         </div>
       `;
       outList.appendChild(div);
@@ -13369,15 +13369,15 @@ function renderDailyOps() {
     villaCardsHtml += `
       <div style="display: inline-flex; align-items: center; gap: 4px; background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.07); padding: 3px 6px; border-radius: 6px; font-size: 11px; margin: 2px;">
         <span style="color: #FFFFFF; font-weight: 600;">${escapeHtml(vConf.name.split(' ')[0])}:</span>
-        <span class="badge ${badgeClass}" data-readiness-status="${escapeHtml(readiness?.status || 'UNSET')}" style="font-size: 9px; padding: 1px 5px; cursor: ${canEditReadiness ? 'pointer' : 'default'};" ${actionAttrs}>${statusBadge}</span>
+        <span class="badge ${badgeClass}" data-readiness-status="${escapeHtml(readiness?.status || 'UNSET')}" style="font-size: 11px; padding: 1px 5px; cursor: ${canEditReadiness ? 'pointer' : 'default'};" ${actionAttrs}>${statusBadge}</span>
       </div>
     `;
   });
 
   villaBar.innerHTML = `
-    <div style="font-size: 10px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
+    <div style="font-size: 11px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
       <span>🏡 Mülk Satış Hazırlığı</span>
-      <span style="color: #93C5FD; font-size: 10px;">${canManagePropertyReadiness() ? 'Durum Değiştir 🔄' : 'Salt Okunur'}</span>
+      <span style="color: #93C5FD; font-size: 11px;">${canManagePropertyReadiness() ? 'Durum Değiştir 🔄' : 'Salt Okunur'}</span>
     </div>
     <div style="display: flex; flex-wrap: wrap; gap: 2px;">
       ${villaCardsHtml}
@@ -13396,7 +13396,7 @@ function renderDailyOps() {
   taskListHeader.style.alignItems = 'center';
   taskListHeader.innerHTML = `
     <span>📅 Planlanan Temizlik & Borçlar (Tarih Sıralı):</span>
-    <span style="font-size: 10px; color: var(--text-muted);">Tarihe Göre</span>
+    <span style="font-size: 11px; color: var(--text-muted);">Tarihe Göre</span>
   `;
   hkList.appendChild(taskListHeader);
 
@@ -13431,14 +13431,14 @@ function renderDailyOps() {
       const isToday = (task.date === todayStr);
       const isPast = (task.date && task.date < todayStr);
 
-      let dateBadge = `<span class="badge badge-blue" style="font-size: 10px; font-weight: 700;">📅 ${formatTrDate(task.date)}</span>`;
+      let dateBadge = `<span class="badge badge-blue" style="font-size: 11px; font-weight: 700;">📅 ${formatTrDate(task.date)}</span>`;
       let borderColor = 'rgba(10, 132, 255, 0.4)';
 
       if (isToday) {
-        dateBadge = `<span class="badge badge-amber" style="font-size: 10px; font-weight: 800; background: rgba(255, 159, 10, 0.25); border: 1px solid #FF9F0A;">⚡ BUGÜN (${formatShortDate(task.date)})</span>`;
+        dateBadge = `<span class="badge badge-amber" style="font-size: 11px; font-weight: 800; background: rgba(255, 159, 10, 0.25); border: 1px solid #FF9F0A;">⚡ BUGÜN (${formatShortDate(task.date)})</span>`;
         borderColor = 'rgba(255, 159, 10, 0.8)';
       } else if (isPast) {
-        dateBadge = `<span class="badge" style="font-size: 10px; font-weight: 600; background: rgba(148, 163, 184, 0.15); color: #98989D;">🕒 ${formatTrDate(task.date)}</span>`;
+        dateBadge = `<span class="badge" style="font-size: 11px; font-weight: 600; background: rgba(148, 163, 184, 0.15); color: #98989D;">🕒 ${formatTrDate(task.date)}</span>`;
         borderColor = 'rgba(148, 163, 184, 0.3)';
       }
 
@@ -13464,7 +13464,7 @@ function renderDailyOps() {
               ${task.guest ? `<strong>${escapeHtml(task.guest)}</strong> • Çıkış Temizliği & Hazırlık` : escapeHtml(task.notes || 'Temizlik')}
             </div>
           </div>
-          <span class="badge ${isPaid ? 'badge-emerald' : (task.status === 'DONE' ? 'badge-amber' : (task.status === 'SKIPPED' ? '' : 'badge-blue'))}" style="font-size: 10px; font-weight: 700; white-space: nowrap;">
+          <span class="badge ${isPaid ? 'badge-emerald' : (task.status === 'DONE' ? 'badge-amber' : (task.status === 'SKIPPED' ? '' : 'badge-blue'))}" style="font-size: 11px; font-weight: 700; white-space: nowrap;">
             ${isPaid ? '✅ Ödendi' : (task.status === 'DONE' ? '⏳ Borç' : (task.status === 'SKIPPED' ? '✖ Gerek kalmadı' : '🗓️ Planlı'))}
           </span>
         </div>
@@ -13761,13 +13761,13 @@ function renderHousekeepingTab() {
     let durum;
     if (task.status === 'DONE') {
       durum = `<span class="badge badge-emerald">✔ Yapıldı</span>`
-        + (isPaid ? '' : ` <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:10px;" data-onclick="markCleaningPlanned(decodeURIComponent('${encodeActionArg(task.id)}'))" title="Yanlışlıkla işaretlendiyse geri al">↩︎</button>`);
+        + (isPaid ? '' : ` <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:11px;" data-onclick="markCleaningPlanned(decodeURIComponent('${encodeActionArg(task.id)}'))" title="Yanlışlıkla işaretlendiyse geri al">↩︎</button>`);
     } else if (task.status === 'SKIPPED') {
-      durum = `<span class="badge">Gerek kalmadı</span> <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:10px;" data-onclick="markCleaningPlanned(decodeURIComponent('${encodeActionArg(task.id)}'))" title="Geri al">↩︎</button>`;
+      durum = `<span class="badge">Gerek kalmadı</span> <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:11px;" data-onclick="markCleaningPlanned(decodeURIComponent('${encodeActionArg(task.id)}'))" title="Geri al">↩︎</button>`;
     } else {
       durum = `<span class="badge ${gecmisPlanli ? 'badge-amber' : 'badge-blue'}">${gecmisPlanli ? 'Yapıldı mı?' : 'Planlandı'}</span>
-        <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:10px; margin-left:4px;" data-onclick="markCleaningDone(decodeURIComponent('${encodeActionArg(task.id)}'))">✔ Yapıldı</button>
-        <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:10px;" data-onclick="markCleaningSkipped(decodeURIComponent('${encodeActionArg(task.id)}'))" title="Misafir gelmedi, iptal ya da ev kullanılmadı: gider ve borç oluşmaz">✖ Gerek kalmadı</button>`;
+        <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:11px; margin-left:4px;" data-onclick="markCleaningDone(decodeURIComponent('${encodeActionArg(task.id)}'))">✔ Yapıldı</button>
+        <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:11px;" data-onclick="markCleaningSkipped(decodeURIComponent('${encodeActionArg(task.id)}'))" title="Misafir gelmedi, iptal ya da ev kullanılmadı: gider ve borç oluşmaz">✖ Gerek kalmadı</button>`;
     }
 
     let odeme;
@@ -14203,7 +14203,7 @@ function renderTapeChart() {
 
     tableHtml += `<th class="tape-day-th ${isWeekend ? 'weekend' : ''} ${isToday ? 'today' : ''}" style="${isToday ? 'background: rgba(255, 159, 10, 0.25); color: #FCD34D; border-bottom: 2px solid #FF9F0A;' : ''}">
       ${d}<br>
-      <span style="font-size:9px; font-weight:normal; opacity:0.8;">${dayNamesShort[dayOfWeek]}</span>
+      <span style="font-size:11px; font-weight:normal; opacity:0.8;">${dayNamesShort[dayOfWeek]}</span>
     </th>`;
   });
   tableHtml += '</tr></thead><tbody>';
@@ -15410,11 +15410,11 @@ function renderMonthlyKpiTracker() {
       barEl.onclick = () => filterByPeriod(d.key);
 
       barEl.innerHTML = `
-        <div style="font-size: 10px; font-weight: 700; color: ${isCurrentFilter ? '#FFFFFF' : '#98989D'}; margin-bottom: 4px; white-space: nowrap; text-align: center;">
+        <div style="font-size: 11px; font-weight: 700; color: ${isCurrentFilter ? '#FFFFFF' : '#98989D'}; margin-bottom: 4px; white-space: nowrap; text-align: center;">
           ${olculmedi ? '—' : (activeKpiTrackerMetric === 'occupancy' ? ('%' + Number(val).toFixed(0)) : (val >= 1000 ? Math.round(val / 1000) + 'k' : Math.round(val)))}
         </div>
         <div class="kpi-bar-fill" style="width: 100%; height: ${barHeightPx}px; background: ${barColor}; opacity: ${isCurrentFilter ? '1' : '0.8'}; border-radius: 4px 4px 1px 1px; ${borderStyle}"></div>
-        <div style="font-size: 10px; color: ${isCurrentFilter ? '#409CFF' : 'var(--text-muted)'}; font-weight: ${isCurrentFilter ? '800' : '500'}; margin-top: 6px; white-space: nowrap;">
+        <div style="font-size: 11px; color: ${isCurrentFilter ? '#409CFF' : 'var(--text-muted)'}; font-weight: ${isCurrentFilter ? '800' : '500'}; margin-top: 6px; white-space: nowrap;">
           ${shortMonth} ${shortYear}
         </div>
       `;
@@ -15451,7 +15451,7 @@ function renderMonthlyKpiTracker() {
       const marginBadge = d.margin >= 40 ? 'badge-green' : (d.margin >= 20 ? 'badge-blue' : (d.margin > 0 ? 'badge-yellow' : 'badge-red'));
 
       let periodLabel = d.monthName;
-      if (d.isCurrentMonth) periodLabel += ' <span class="badge badge-green" style="font-size:10px; margin-left:4px;">Güncel ay</span>';
+      if (d.isCurrentMonth) periodLabel += ' <span class="badge badge-green" style="font-size:11px; margin-left:4px;">Güncel ay</span>';
 
       const tr = document.createElement('tr');
       if (rowStyle) tr.setAttribute('style', rowStyle);
@@ -15675,11 +15675,11 @@ function showKpiExplanation(code) {
 
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px;">
         <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 10px;">
-          <div style="font-size: 10px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">📐 Nasıl Hesaplanır?</div>
+          <div style="font-size: 11px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">📐 Nasıl Hesaplanır?</div>
           <div style="font-size: 11px; color: #409CFF; font-family: var(--font-mono); margin-top: 4px; font-weight: 600;">${guide.formula}</div>
         </div>
         <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 10px;">
-          <div style="font-size: 10px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">📊 Pratik Örnek</div>
+          <div style="font-size: 11px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">📊 Pratik Örnek</div>
           <div style="font-size: 11px; color: #30D158; margin-top: 4px;">${guide.example}</div>
         </div>
       </div>
@@ -16218,10 +16218,10 @@ function renderGapNightsRadar() {
     const fiyatBiliniyor = g.regularPrice !== null && g.discountPrice !== null;
     const fiyatKutusu = fiyatBiliniyor
       ? `<div>
-          <div style="font-size:10px; color:var(--text-muted); text-decoration:line-through;">Liste: ₺${g.regularPrice.toLocaleString('tr-TR')}</div>
+          <div style="font-size:11px; color:var(--text-muted); text-decoration:line-through;">Liste: ₺${g.regularPrice.toLocaleString('tr-TR')}</div>
           <div style="font-size:15px; font-weight:800; color:#30D158;">₺${g.discountPrice.toLocaleString('tr-TR')}</div>
         </div>
-        <span class="badge badge-green" style="font-size:10px;">OTA Komisyonsuz</span>`
+        <span class="badge badge-green" style="font-size:11px;">OTA Komisyonsuz</span>`
       : `<div style="font-size:11px; color:var(--text-muted);">
           Bu mülkün liste fiyatı girilmemiş — fırsat fiyatı hesaplanamıyor.
           <div style="margin-top:2px;">Mülk kartından gecelik fiyatı girin.</div>
@@ -20447,7 +20447,7 @@ function handleCommandPaletteSearch(query) {
     </div>`;
     }).join('');
     const more = group.more ? `<div style="font-size: 11px; color: #98989D; padding: 2px 12px 6px;">+${group.more} sonuç daha — aramayı daraltın</div>` : '';
-    return `<div class="palette-group-title" style="font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #98989D; padding: 8px 12px 4px;">${escapeHtml(group.group)}</div>${rows}${more}`;
+    return `<div class="palette-group-title" style="font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #98989D; padding: 8px 12px 4px;">${escapeHtml(group.group)}</div>${rows}${more}`;
   }).join('');
   container.querySelectorAll('[data-palette-index]').forEach(element => {
     const activate = () => runCommandPaletteTarget(items[Number(element.dataset.paletteIndex)]?.target);
@@ -20628,8 +20628,8 @@ function renderUserNotificationsDrawer() {
       <strong style="color: ${color[n.severity] || '#FCD34D'};">${n.status === 'UNREAD' ? '● ' : ''}${escapeHtml(n.title || '')}</strong>
       <div style="color: #C7C7CC; font-size: 11px;">${escapeHtml(n.message || '')}</div>
       <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 4px;">
-        ${n.id && n.status === 'UNREAD' ? `<button class="btn btn-secondary btn-sm" data-onclick="confirmUserNotification(decodeURIComponent('${encodeActionArg(String(n.id))}'))" style="font-size: 9px; padding: 1px 5px;">Okundu</button>` : ''}
-        ${n.deep_link ? `<button class="btn btn-primary btn-sm" data-onclick="openUserNotification(decodeURIComponent('${encodeActionArg(String(n.event_key || ''))}'))" style="font-size: 9px; padding: 1px 5px;">Git ›</button>` : ''}
+        ${n.id && n.status === 'UNREAD' ? `<button class="btn btn-secondary btn-sm" data-onclick="confirmUserNotification(decodeURIComponent('${encodeActionArg(String(n.id))}'))" style="font-size: 11px; padding: 1px 5px;">Okundu</button>` : ''}
+        ${n.deep_link ? `<button class="btn btn-primary btn-sm" data-onclick="openUserNotification(decodeURIComponent('${encodeActionArg(String(n.event_key || ''))}'))" style="font-size: 11px; padding: 1px 5px;">Git ›</button>` : ''}
       </div>
     </div>
   `).join('') + help;
@@ -21132,8 +21132,8 @@ function renderPropertiesTab() {
         </div>
         ${canManage ? propertyColorPickerHtml(k) : ''}
         <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px;">
-          <button class="btn btn-primary btn-sm" data-onclick="setPropertyProfile(decodeURIComponent('${encodeActionArg(k)}'))" style="font-size: 10px;">Profili Aç</button>
-          ${canManage ? `<button class="btn btn-secondary btn-sm" data-onclick="openPropertyModal(decodeURIComponent('${encodeActionArg(k)}'))" style="font-size: 10px;">Düzenle</button>` : ''}
+          <button class="btn btn-primary btn-sm" data-onclick="setPropertyProfile(decodeURIComponent('${encodeActionArg(k)}'))" style="font-size: 11px;">Profili Aç</button>
+          ${canManage ? `<button class="btn btn-secondary btn-sm" data-onclick="openPropertyModal(decodeURIComponent('${encodeActionArg(k)}'))" style="font-size: 11px;">Düzenle</button>` : ''}
         </div>
       </div>
     `;
