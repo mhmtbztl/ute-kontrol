@@ -394,6 +394,23 @@ async function main() {
         && linkWrites.length === 2 && linkWrites.every(l => l.cleaning_task_id && !('expense_id' in l)),
         `Gecmis temizlik aktarimi: ${JSON.stringify({ previewMode, cleaningWrites, linkWrites })}`);
       passed.push('19. geçmiş temizlik CSV\'si algılanır, cleaning_tasks\'a "yapıldı" yazılır, geri alma bağı kurulur');
+      // L-162: Excel dosyasi arka planda (Web Worker) ayristirilir.
+      const XLSXW = require('../xlsx.full.min.js');
+      const wbW = XLSXW.utils.book_new();
+      XLSXW.utils.book_append_sheet(wbW, XLSXW.utils.aoa_to_sheet([['Tarih', 'Villa', 'Tutar (TL)', 'Temizlikçi', 'Ödendi', 'Açıklama'], ['2026-01-10', 'test', 1200, 'Ayşe', '', ''], ['2026-01-12', 'test', 900, 'Ayşe', 'Hayır', '']]), 'Temizlik');
+      await page.evaluate(() => {
+        window.__xlsxWorkers = 0;
+        const Gercek = window.Worker;
+        window.Worker = class extends Gercek { constructor(...a) { super(...a); window.__xlsxWorkers++; } };
+        appData.villas = { test: { id: '00000000-0000-4000-8000-000000000010', name: 'Test Villası', slug: 'test', isActive: true } };
+        appData.cleaningTasks = [];
+        openImportModal();
+      });
+      await page.setInputFiles('#excelFileInput', { name: 'temizlik.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: Buffer.from(XLSXW.write(wbW, { type: 'buffer', bookType: 'xlsx' })) });
+      await page.waitForFunction(() => /2 kaydı içe aktar/.test(document.getElementById('importConfirmBtn')?.innerText || ''), null, { timeout: 15000 });
+      const workerCount = await page.evaluate(() => { closeImportModal(); return window.__xlsxWorkers; });
+      assert(workerCount === 1, `Excel dosyasi Worker ile okunmadi: ${workerCount}`);
+      passed.push('19b. Excel dosyası arka planda (Web Worker) okunur, önizleme aynı');
       // L-196 (M26): gelir tablosu indirilir; TOPLAM satirindaki ciro Finans
       // ekraninda yazan ciroyla ayni.
       const screenRevenue = await page.evaluate(() => {

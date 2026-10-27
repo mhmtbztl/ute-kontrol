@@ -49,7 +49,7 @@ function hashFile(rel) {
 // uyusmuyordu; yani bu dosyalar icin onbellek kirma hic calismiyordu.
 // Burada index.html'den ONCE damgalanmalari sart: kendi icerigi degistigi icin
 // marketing_ui.js'in index.html'deki damgasi da yeniden hesaplanmali.
-const SATELLITE_FILES = ['core/marketing_ui.js'];
+const SATELLITE_FILES = ['core/marketing_ui.js', 'app.js'];
 const SATELLITE_RE = /(['"])(core\/[A-Za-z0-9_.-]+\.(?:js|css))\?v=([0-9a-f]{8})\1/g;
 
 const missing = [];

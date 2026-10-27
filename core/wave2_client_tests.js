@@ -102,7 +102,67 @@ function eleman() {
   await test('L-16 10 MB\'ı aşan dosya ayrıştırılmadan reddedilir', async () => {
     const buyuk = new Uint8Array(10 * 1024 * 1024 + 1);
     assert.throws(() => App.buildImportSource(buyuk, 'b.xlsx'), /çok büyük/);
-    assert.match(APP, /sheetRows: IMPORT_MAX_ROWS \+ 2/, 'SheetJS ayrıştırması satır sınırıyla çağrılmalı');
+    const isci = fs.readFileSync(path.join(__dirname, 'xlsx_import_worker.js'), 'utf8');
+    assert.match(isci, /sheetRows: maxRows \+ 2/, 'SheetJS ayrıştırması satır sınırıyla çağrılmalı');
+    assert.match(APP, /\.parse\(XLSX, bytes, IMPORT_MAX_ROWS\)/, 'senkron yol aynı sınırı geçirmeli');
+  });
+
+  // --- L-162 ------------------------------------------------------------------
+  await test('L-162 Excel ayrıştırması tek kaynakta; uygulama dosyayı arka planda (Worker) okur', async () => {
+    const isciYolu = path.join(__dirname, 'xlsx_import_worker.js');
+    assert.ok(fs.existsSync(isciYolu), 'core/xlsx_import_worker.js yok');
+    assert.ok(!/XLSX\.read\(/.test(APP), 'app.js kendi XLSX.read çağrısını tutmamalı (tek kaynak)');
+    const oku = APP.slice(APP.indexOf('function readImportFile('), APP.indexOf('function handleFileImport('));
+    assert.match(oku, /buildImportSourceAsync\(/, 'dosya seçimi arka plan yolunu kullanmalı');
+    assert.match(APP, /'core\/xlsx_import_worker\.js\?v=[0-9a-f]{8}'/, 'worker adresi damgalı olmalı');
+    assert.match(fs.readFileSync(path.join(__dirname, '..', 'stamp_assets.js'), 'utf8'), /SATELLITE_FILES = \[[^\]]*'app\.js'/, 'damgalayıcı app.js içindeki worker adresini görmeli');
+  });
+
+  await test('L-162 Worker, gerçek SheetJS ile senkron yolla birebir aynı sonucu verir', async () => {
+    const XLSX = require(path.join(__dirname, '..', 'xlsx.full.min.js'));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([
+      { 'Villa': 'M1', 'Misafir Adı': 'Ayşe Şahin', 'Brüt Tutar (TL)': 72500.5 },
+      { 'Villa': 'M2', 'Misafir Adı': 'İlker Işık', 'Brüt Tutar (TL)': 1000 }
+    ]), 'Rezervasyonlar');
+    const bayt = () => new Uint8Array(XLSX.write(wb, { type: 'array', bookType: 'xlsx' }));
+    global.XLSX = XLSX;
+    let senkron;
+    try { senkron = App.buildImportSource(bayt(), 'd.xlsx'); } finally { delete global.XLSX; }
+    // Worker kapsamı taklidi: kendi XLSX'ini importScripts ile yükler.
+    const vm = require('vm');
+    class WorkerGlobalScope {}
+    const kapsam = new WorkerGlobalScope();
+    const gonderilen = [];
+    let yuklenen = null;
+    Object.assign(kapsam, { postMessage: m => gonderilen.push(m), importScripts: url => { yuklenen = url; kapsam.XLSX = XLSX; } });
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname, 'xlsx_import_worker.js'), 'utf8'), { self: kapsam, WorkerGlobalScope, globalThis: kapsam });
+    kapsam.onmessage({ data: { xlsxUrl: 'https://x/xlsx.full.min.js?v=1', bytes: bayt(), maxRows: 10000 } });
+    assert.strictEqual(yuklenen, 'https://x/xlsx.full.min.js?v=1');
+    assert.strictEqual(gonderilen.length, 1);
+    const g = gonderilen[0];
+    assert.ok(g.ok, g.message);
+    assert.deepStrictEqual({ sheetNames: g.sheetNames, headers: g.headers, rows: JSON.parse(JSON.stringify(g.rows)) },
+      { sheetNames: senkron.sheetNames, headers: senkron.headers, rows: JSON.parse(JSON.stringify(senkron.rows)) });
+    assert.strictEqual(g.rows[0]['Brüt Tutar (TL)'], 72500.5, 'sayı sayı kalmalı');
+  });
+
+  await test('L-162 Worker cevap vermezse sonlandırılır; sekme donmaz, kullanıcıya söylenir', async () => {
+    assert.match(APP, /IMPORT_WORKER_TIMEOUT_MS = \d+/);
+    const govde = APP.slice(APP.indexOf('function buildImportSourceAsync('), APP.indexOf('function buildImportSourceAsync(') + 2500);
+    assert.match(govde, /setTimeout\([\s\S]*bitir\(\)[\s\S]*reject\(/, 'zaman aşımı worker\'ı bitirip hata vermeli');
+    assert.match(govde, /const bitir = \(\) => \{ clearTimeout\(zamanlayici\); w\.terminate\(\); \}/);
+    // Worker'ın hata cevabı ve satır sınırı ana tarafta aynı mesajla döner.
+    const sahteDoc = { querySelector: () => ({ getAttribute: () => 'xlsx.full.min.js?v=1' }), baseURI: 'https://lexbnb.space/' };
+    const eskiDoc = global.document; const eskiW = global.Worker;
+    let sonlandi = 0;
+    global.document = sahteDoc;
+    global.Worker = class { constructor(u) { this.u = u; } postMessage(m) { setTimeout(() => this.onmessage({ data: { ok: true, rowCount: 10001, sheetNames: ['S'], headers: [], rows: [] } }), 0); } terminate() { sonlandi++; } };
+    try {
+      const pk = new Uint8Array([0x50, 0x4B, 0x03, 0x04, 0, 0, 0, 0]);
+      await assert.rejects(App.buildImportSourceAsync(pk, 'x.xlsx'), /en fazla 10\.000 satır/);
+      assert.strictEqual(sonlandi, 1, 'cevaptan sonra worker sonlandırılmalı');
+    } finally { global.document = eskiDoc; global.Worker = eskiW; }
   });
 
   // --- L-21 -------------------------------------------------------------------

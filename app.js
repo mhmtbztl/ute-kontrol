@@ -7684,24 +7684,52 @@ function buildImportSource(bytes, fileName) {
   if (typeof XLSX === 'undefined') {
     throw new Error('Excel motoru henüz yüklenmedi, lütfen sayfayı yenileyin.');
   }
-  // Yalniz ilk sayfa ve siniri bir satir asacak kadar okunur: SheetJS'in
-  // butun dosyayi bellege acmasina izin verilmez.
-  const wb = XLSX.read(bytes, { type: 'array', cellDates: true, sheets: 0, sheetRows: IMPORT_MAX_ROWS + 2 });
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  const rows = ws ? XLSX.utils.sheet_to_json(ws, { defval: '', raw: true }) : [];
-  if (rows.length > IMPORT_MAX_ROWS) throw importSinirHatasi(rows.length);
-  // Basliklar ilk satirdan okunur (L-278): yalniz baslik satiri olan dosyada
-  // (degistirilmemis uygulama ici sablon) satir yok, Object.keys bos
-  // donuyordu; tur sezilemiyor ve dosya "Gider Defteri" saniliyordu.
-  const ilkSatir = ws ? (XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: true })[0] || []) : [];
-  const basliklar = ilkSatir.map(h => String(h == null ? '' : h).trim()).filter(Boolean);
-  return {
-    kind: 'XLSX',
-    fileName,
-    sheetNames: (wb.SheetNames || []).slice(),
-    headers: basliklar.length ? basliklar : (rows.length ? Object.keys(rows[0]) : []),
-    rows
-  };
+  // Ayristirma tek yerde: core/xlsx_import_worker.js (L-162).
+  return xlsxImportResultToSource(getXlsxImportParser().parse(XLSX, bytes, IMPORT_MAX_ROWS), fileName);
+}
+
+function getXlsxImportParser() {
+  if (typeof LexbnbXlsxImport !== 'undefined') return LexbnbXlsxImport;
+  return require('./core/xlsx_import_worker.js');
+}
+
+function xlsxImportResultToSource(sonuc, fileName) {
+  if (sonuc.rowCount > IMPORT_MAX_ROWS) throw importSinirHatasi(sonuc.rowCount);
+  return { kind: 'XLSX', fileName, sheetNames: sonuc.sheetNames, headers: sonuc.headers, rows: sonuc.rows };
+}
+
+// Excel dosyasi arka planda (Web Worker) ayristirilir (L-162): hazirlanmis
+// sikistirilmis bir dosya sekmeyi dondurmaz; sure asilirsa worker sonlandirilir.
+// Worker yoksa (Node, eski tarayici) ayni ayristirici senkron calisir.
+const XLSX_IMPORT_WORKER_URL = 'core/xlsx_import_worker.js?v=b0939d47';
+const IMPORT_WORKER_TIMEOUT_MS = 30000;
+function buildImportSourceAsync(bytes, fileName) {
+  const E = getImportEngine();
+  const worker = typeof Worker === 'function' && typeof document !== 'undefined' && E
+    && bytes && bytes.length <= IMPORT_MAX_BYTES && E.detectImportSourceKind(bytes) !== 'TEXT';
+  if (!worker) return Promise.resolve().then(() => buildImportSource(bytes, fileName));
+  const xlsxEtiketi = document.querySelector('script[src^="xlsx.full.min.js"]');
+  const xlsxUrl = new URL(xlsxEtiketi ? xlsxEtiketi.getAttribute('src') : 'xlsx.full.min.js', document.baseURI).href;
+  return new Promise((resolve, reject) => {
+    const w = new Worker(XLSX_IMPORT_WORKER_URL);
+    const bitir = () => { clearTimeout(zamanlayici); w.terminate(); };
+    const zamanlayici = setTimeout(() => {
+      bitir();
+      reject(new Error(`Dosya ${IMPORT_WORKER_TIMEOUT_MS / 1000} saniyede okunamadı. Dosyayı Excel'de açıp yalnız ilk sayfayı yeniden kaydederek deneyin.`));
+    }, IMPORT_WORKER_TIMEOUT_MS);
+    w.onmessage = event => {
+      bitir();
+      const veri = event.data || {};
+      if (!veri.ok) { reject(new Error(veri.message || 'Excel dosyası okunamadı.')); return; }
+      try { resolve(xlsxImportResultToSource(veri, fileName)); } catch (err) { reject(err); }
+    };
+    w.onerror = event => {
+      bitir();
+      if (event && typeof event.preventDefault === 'function') event.preventDefault();
+      reject(new Error('Excel dosyası okunamadı.'));
+    };
+    w.postMessage({ xlsxUrl, bytes, maxRows: IMPORT_MAX_ROWS }, [bytes.buffer]);
+  });
 }
 
 function readImportFile(file) {
@@ -7715,13 +7743,12 @@ function readImportFile(file) {
   const reader = new FileReader();
 
   reader.onload = function(evt) {
-    try {
-      const kaynak = buildImportSource(new Uint8Array(evt.target.result), fileName);
-      analyzeAndPreviewSource(kaynak);
-    } catch (err) {
-      console.error('File parsing error:', err);
-      uiNotify('Dosya okunurken bir hata oluştu: ' + (err.message || 'Bilinmeyen format'));
-    }
+    buildImportSourceAsync(new Uint8Array(evt.target.result), fileName)
+      .then(kaynak => analyzeAndPreviewSource(kaynak))
+      .catch(err => {
+        console.error('File parsing error:', err);
+        uiNotify('Dosya okunurken bir hata oluştu: ' + (err.message || 'Bilinmeyen format'));
+      });
   };
 
   reader.readAsArrayBuffer(file);
@@ -24083,6 +24110,7 @@ if (typeof module !== 'undefined' && module.exports) {
     setActiveTenant,
     getImportEngine,
     buildImportSource,
+    buildImportSourceAsync,
     parseSourceWithMode,
     bookingSaveWarnings,
     confirmBookingWarnings,
