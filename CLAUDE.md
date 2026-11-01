@@ -769,6 +769,16 @@ silinir; `guest_erasure_log` kişisel verisiz. Kapalı dönem korumaları yalnı
 sıfırlama bayrağıyla askıya alınır. Canlı süit `phase105_guest_erasure_live_tests` 24/24.
 Paket: `docs/PHASE105_DEPLOY_PACKAGE.md`.
 
+**phase107 (`migration_phase107_member_permissions.sql`) ve phase109
+(`migration_phase109_snapshot_tax_reapply.sql`) 27 Ekim 2026'da test projesine,
+kullanıcı tarafından üretime uygulandı; 1 Kasım 2026'da üretimde doğrulandı**
+(anon `rpc/set_member_permissions`, `tenant_member_permissions`, `rpc/can_write_ledger`
+→ `401 42501`; `production:readiness` BAŞARILI; `schema_migrations` 107 ve 109;
+giriş sorgusunun `tenants` gömmesi `PGRST201` vermiyor). phase107 kişi bazında izin
+matrisi (L-211, §3.3.1); phase109 phase97'nin sildiği vergi düşümünü ay kapanışı ve
+ana sayfa anlık görüntüsüne geri getirir (L-313). Paketler: `docs/PHASE107_DEPLOY_PACKAGE.md`,
+`docs/PHASE109_DEPLOY_PACKAGE.md`.
+
 **Bir göçün uygulanıp uygulanmadığı, dosyaya bakarak anlaşılmaz.** Dosya repoda
 durur; veritabanı uygulanmamış olabilir. Doğrulamanın yolu üretime sormaktır:
 

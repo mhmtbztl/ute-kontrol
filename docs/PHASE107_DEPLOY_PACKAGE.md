@@ -61,4 +61,4 @@ Rol davranışı göçten önce ve sonra aynıdır (varsayılan tablo phase53 il
 
 ## Üretim durumu
 
-Uygulanmadı.
+Uygulandı ve doğrulandı (kullanıcı SQL Editor'de uyguladı; doğrulama 01.11.2026). Salt okunur ölçüm: anon `rpc/set_member_permissions` → `401 42501`, anon `tenant_member_permissions` → `401 42501`, anon `rpc/can_write_ledger` → `401 42501`; `production:readiness` BAŞARILI, `schema_migrations` 107. Giriş sorgusunun gömmesi (`tenant_members → tenants`) `PGRST201` vermiyor: oturumsuz aynı sorgu planlamayı geçip `401 42501` ile veritabanında duruyor. Oturumlu kontrol CAPTCHA nedeniyle betikle yapılamadı.
