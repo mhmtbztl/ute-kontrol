@@ -18596,6 +18596,7 @@ function updateAllVillaDropdowns() {
     'pricingVillaFilter',
     'opsVillaFilter',
     'hkVilla',
+    'opTaskVilla',
     'guestVilla',
     // Bu ikisi listede yoktu: markup'taki bes uydurma villa hicbir zaman
     // yenilenmiyor, musteri kendi mulklerini burada goremiyordu.
@@ -18630,6 +18631,13 @@ function updateAllVillaDropdowns() {
       el.appendChild(optUnknown);
     }
 
+    if (selectId === 'opTaskVilla') {
+      const optGeneral = document.createElement('option');
+      optGeneral.value = '';
+      optGeneral.innerText = 'Genel görev (mülke bağlı değil)';
+      el.appendChild(optGeneral);
+    }
+
     if (selectId === 'waParsedVilla') {
       const optUnknown = document.createElement('option');
       optUnknown.value = '';
@@ -18654,6 +18662,8 @@ function updateAllVillaDropdowns() {
     });
 
     if (currentVal && (currentVal === 'ALL' || villaKeys.includes(currentVal))) {
+      el.value = currentVal;
+    } else if (selectId === 'opTaskVilla' && currentVal === '') {
       el.value = currentVal;
     }
   });
@@ -22154,6 +22164,205 @@ async function setOperationalTaskStatus(taskId, status) {
   return true;
 }
 
+// Gorev duzenleme ekrani: gorev yalniz baslikla acilip atanabiliyor,
+// tamamlanip iptal edilebiliyordu; baslik, aciklama, mulk, oncelik, son tarih
+// ve durum hicbir ekrandan degistirilemiyordu.
+const OPERATIONAL_TASK_PRIORITY_LABELS = { LOW: 'Düşük', MEDIUM: 'Orta', HIGH: 'Yüksek', CRITICAL: 'Kritik' };
+const OPERATIONAL_TASK_TYPE_LABELS = { GENERAL: 'Genel', CHECKIN_PREP: 'Giriş hazırlığı', CHECKOUT: 'Çıkış', INSPECTION: 'Kontrol', MAINTENANCE: 'Bakım', INVENTORY: 'Envanter', CLEANING: 'Temizlik' };
+const OPERATIONAL_TASK_OPEN_STATUSES = ['TODO', 'IN_PROGRESS', 'BLOCKED'];
+// Saat girilmezse son tarih o gunun sonudur. Turkiye 2016'dan beri sabit UTC+3.
+const OPERATIONAL_TASK_DAY_END = '23:59';
+
+function operationalTaskDueParts(dueAt) {
+  if (!dueAt) return { date: '', time: '' };
+  const date = new Date(dueAt);
+  if (Number.isNaN(date.getTime())) return { date: '', time: '' };
+  const local = new Date(date.getTime() + 3 * 60 * 60 * 1000).toISOString();
+  const time = local.slice(11, 16);
+  return { date: local.slice(0, 10), time: time === OPERATIONAL_TASK_DAY_END ? '' : time };
+}
+
+function buildOperationalTaskDueAt(date, time) {
+  if (!date) return null;
+  return `${date}T${time || OPERATIONAL_TASK_DAY_END}:00+03:00`;
+}
+
+function operationalTaskDueLabel(task, today = getTodayStr()) {
+  const due = operationalTaskDueParts(task?.due_at);
+  if (!due.date) return '';
+  const open = !['DONE', 'CANCELLED'].includes(String(task.status || '').toUpperCase());
+  const late = open && due.date < today;
+  return `${late ? 'Gecikti · ' : 'Son tarih '}${formatTrDate(due.date)}${due.time ? ' ' + due.time : ''}`;
+}
+
+function operationalTaskAssigneeName(task) {
+  if (!task?.assigned_to) return '';
+  const person = (appData?.operationalPeople || []).find(item => item.user_id === task.assigned_to);
+  return person?.full_name || 'Atanmış ekip üyesi';
+}
+
+function fillOperationalTaskAssigneeOptions(selected) {
+  const select = typeof document !== 'undefined' ? document.getElementById('opTaskAssignee') : null;
+  if (!select) return;
+  const people = (appData?.operationalPeople || []).filter(person => person.user_id && (person.is_active !== false || person.user_id === selected));
+  select.innerHTML = '<option value="">Atanmadı</option>' + people
+    .map(person => `<option value="${escapeHtml(person.user_id)}"${person.user_id === selected ? ' selected' : ''}>${escapeHtml(person.full_name || '—')}${person.is_active === false ? ' (pasif)' : ''}</option>`).join('');
+  select.value = selected || '';
+}
+
+function fillOperationalTaskStatusOptions(current) {
+  const select = typeof document !== 'undefined' ? document.getElementById('opTaskStatus') : null;
+  if (!select) return;
+  const options = OPERATIONAL_TASK_OPEN_STATUSES.map(status => `<option value="${escapeHtml(status)}">${escapeHtml(OPERATIONAL_TASK_STATUS_LABELS[status])}</option>`);
+  // Kapali gorev durumunu korur; acik bir durum secilirse yeniden acilir.
+  if (['DONE', 'CANCELLED'].includes(current)) options.unshift(`<option value="${escapeHtml(current)}">${escapeHtml(OPERATIONAL_TASK_STATUS_LABELS[current])} (kapalı)</option>`);
+  select.innerHTML = options.join('');
+  select.value = current || 'TODO';
+}
+
+function openOperationalTaskModal(taskId = null) {
+  if (typeof document === 'undefined') return false;
+  if (!canManageOperationsRole(activeTenant?.role)) {
+    if (typeof showToast === 'function') showToast('⚠️ Görevleri düzenleme yetkiniz yok.', 'error');
+    return false;
+  }
+  const task = taskId ? (appData?.operationalTasks || []).find(item => item.id === taskId) : null;
+  if (taskId && !task) {
+    if (typeof showToast === 'function') showToast('⚠️ Görev bulunamadı; liste yenilenmiş olabilir.', 'error');
+    return false;
+  }
+  updateAllVillaDropdowns();
+  const villaKey = task?.property_id
+    ? (Object.keys(appData?.villas || {}).find(key => appData.villas[key]?.id === task.property_id) || '')
+    : '';
+  const status = String(task?.status || 'TODO').toUpperCase();
+  const due = operationalTaskDueParts(task?.due_at);
+  document.getElementById('opTaskModalTitle').innerText = task ? '✏️ Görevi Düzenle' : '✅ Yeni Görev';
+  document.getElementById('opTaskEditId').value = task?.id || '';
+  document.getElementById('opTaskTitle').value = task?.title || '';
+  document.getElementById('opTaskDesc').value = task?.description || '';
+  document.getElementById('opTaskVilla').value = villaKey;
+  document.getElementById('opTaskType').value = OPERATIONAL_TASK_TYPE_LABELS[task?.task_type] ? task.task_type : 'GENERAL';
+  document.getElementById('opTaskPriority').value = OPERATIONAL_TASK_PRIORITY_LABELS[task?.priority] ? task.priority : 'MEDIUM';
+  document.getElementById('opTaskDueDate').value = due.date;
+  document.getElementById('opTaskDueTime').value = due.time;
+  fillOperationalTaskStatusOptions(status);
+  fillOperationalTaskAssigneeOptions(task?.assigned_to || '');
+  const meta = document.getElementById('opTaskMeta');
+  if (meta) {
+    const parts = [];
+    if (task?.created_at) parts.push('Oluşturuldu: ' + formatTrDate(String(task.created_at).slice(0, 10)));
+    if (task?.completed_at) parts.push('Kapandı: ' + formatTrDate(String(task.completed_at).slice(0, 10)));
+    const items = (task?.checklist?.sections || []).reduce((sum, section) => sum + (section.items || []).length, 0);
+    if (items) parts.push(`Kontrol listesi: ${items} madde`);
+    meta.innerText = parts.join(' · ');
+    meta.style.display = parts.length ? 'block' : 'none';
+  }
+  document.getElementById('opTaskDeleteBtn').style.display = task ? 'inline-block' : 'none';
+  document.getElementById('operationalTaskModal').classList.add('active');
+  return true;
+}
+
+function closeOperationalTaskModal() {
+  const modal = typeof document !== 'undefined' ? document.getElementById('operationalTaskModal') : null;
+  if (modal) modal.classList.remove('active');
+}
+
+// Formdan veritabani yukunu kurar; hata varsa { error } doner. Durum DONE'a
+// buradan gecmez: tamamlama kontrol listesi korumasindan gecen "Tamamla"dir.
+function buildOperationalTaskPatch(form, existing) {
+  const title = String(form.title || '').trim();
+  if (!title) return { error: 'Görev başlığı boş olamaz.' };
+  if (title.length > 255) return { error: 'Görev başlığı en fazla 255 karakter olabilir.' };
+  if (form.dueTime && !form.dueDate) return { error: 'Saat girildiyse son tarih de girilmeli.' };
+  const priority = OPERATIONAL_TASK_PRIORITY_LABELS[form.priority] ? form.priority : 'MEDIUM';
+  const taskType = OPERATIONAL_TASK_TYPE_LABELS[form.taskType] ? form.taskType : 'GENERAL';
+  let propertyId = null;
+  if (form.villa) {
+    propertyId = appData?.villas?.[form.villa]?.id || null;
+    if (!isUUID(propertyId)) return { error: 'Seçilen mülk bulunamadı.' };
+  }
+  const assignedTo = form.assignedTo || null;
+  if (assignedTo && !(appData?.operationalPeople || []).some(person => person.user_id === assignedTo)) {
+    return { error: 'Seçilen ekip üyesi saha ekibinde yok.' };
+  }
+  const previous = String(existing?.status || 'TODO').toUpperCase();
+  const requested = String(form.status || previous).toUpperCase();
+  const status = OPERATIONAL_TASK_OPEN_STATUSES.includes(requested) || requested === previous ? requested : previous;
+  const patch = {
+    title,
+    description: String(form.description || '').trim() || null,
+    property_id: propertyId,
+    task_type: taskType,
+    priority,
+    status,
+    assigned_to: assignedTo,
+    due_at: buildOperationalTaskDueAt(form.dueDate, form.dueTime)
+  };
+  // Kapali gorev yeniden acilinca kapanis izi temizlenir.
+  if (['DONE', 'CANCELLED'].includes(previous) && OPERATIONAL_TASK_OPEN_STATUSES.includes(status)) {
+    patch.completed_at = null;
+    patch.completed_by = null;
+  }
+  return { patch, reopened: !!patch.hasOwnProperty('completed_at') };
+}
+
+async function saveOperationalTask(event) {
+  event?.preventDefault?.();
+  const tenantId = getActiveTenantId();
+  try { requireCloudForWrite('Görev', tenantId); } catch (error) {
+    if (typeof showToast === 'function') showToast('⚠️ ' + error.message, 'error');
+    return false;
+  }
+  const value = id => document.getElementById(id)?.value || '';
+  const editId = value('opTaskEditId');
+  const existing = editId ? (appData?.operationalTasks || []).find(item => item.id === editId) : null;
+  if (editId && !existing) {
+    if (typeof showToast === 'function') showToast('⚠️ Görev bulunamadı; liste yenilenmiş olabilir.', 'error');
+    return false;
+  }
+  const built = buildOperationalTaskPatch({
+    title: value('opTaskTitle'), description: value('opTaskDesc'), villa: value('opTaskVilla'),
+    taskType: value('opTaskType'), priority: value('opTaskPriority'), status: value('opTaskStatus'),
+    assignedTo: value('opTaskAssignee'), dueDate: value('opTaskDueDate'), dueTime: value('opTaskDueTime')
+  }, existing);
+  if (built.error) {
+    uiNotify(built.error);
+    return false;
+  }
+  const saveButton = document.getElementById('opTaskSaveBtn');
+  if (saveButton) saveButton.disabled = true;
+  try {
+    if (existing) await updateOperationalTask(editId, built.patch);
+    else await createOperationalTask({ ...built.patch, checklist: {}, source: 'MANUAL' });
+  } catch (error) {
+    if (typeof showToast === 'function') showToast('⚠️ Görev kaydedilemedi: ' + getFriendlyAuthErrorMessage(error), 'error');
+    return false;
+  } finally {
+    if (saveButton) saveButton.disabled = false;
+  }
+  closeOperationalTaskModal();
+  await loadTenantAppData(tenantId);
+  if (typeof showToast === 'function') showToast(existing ? (built.reopened ? '✅ Görev yeniden açıldı.' : '✅ Görev güncellendi.') : '✅ Görev oluşturuldu.');
+  return true;
+}
+
+async function deleteOperationalTaskFromModal() {
+  const taskId = typeof document !== 'undefined' ? document.getElementById('opTaskEditId')?.value : '';
+  if (!taskId) return false;
+  if (!(await uiAskConfirm('Görev kalıcı olarak silinsin mi? İz bırakmak istiyorsanız silmek yerine iptal edin.'))) return false;
+  try {
+    await deleteOperationalTask(taskId);
+  } catch (error) {
+    if (typeof showToast === 'function') showToast('⚠️ Görev silinemedi: ' + getFriendlyAuthErrorMessage(error), 'error');
+    return false;
+  }
+  closeOperationalTaskModal();
+  await loadTenantAppData(getActiveTenantId());
+  if (typeof showToast === 'function') showToast('Görev silindi.');
+  return true;
+}
+
 function renderCleaningExecutionFlags(execution) {
   if (!execution) return '';
   const snapshot = Array.isArray(execution.supplies_snapshot) ? execution.supplies_snapshot : [];
@@ -22326,15 +22535,41 @@ function renderOperationsTab() {
     // hicbir listede gorunmuyordu, iz yalniz veritabanindaydi.
     const kapananlar = (appData?.operationalTasks || []).filter(task => ['DONE', 'CANCELLED'].includes(String(task.status || '').toUpperCase()))
       .sort((a, b) => String(b.updated_at || b.completed_at || '').localeCompare(String(a.updated_at || a.completed_at || ''))).slice(0, 20);
+    const canEditTasks = canManageOperationsRole(activeTenant?.role);
+    const editTaskButton = task => canEditTasks
+      ? `<button class="btn btn-secondary btn-sm" title="Ayrıntı / Düzenle" data-onclick="openOperationalTaskModal(decodeURIComponent('${encodeActionArg(task.id)}'))">✏️ Düzenle</button>`
+      : '';
     const kapananHtml = kapananlar.length
-      ? `<section class="ops-group" style="margin-top:12px"><details><summary><strong>Kapanan görevler</strong> <span class="badge">${kapananlar.length}</span></summary>${kapananlar.map(task => `<article class="ops-row"><div class="ops-row-main"><strong>${escapeHtml(task.title || '—')}</strong><span>${String(task.status).toUpperCase() === 'DONE' ? 'Tamamlandı' : 'İptal edildi'}${task.completed_at || task.updated_at ? ' · ' + escapeHtml(formatTrDate(String(task.completed_at || task.updated_at).slice(0, 10))) : ''}</span></div></article>`).join('')}</details></section>`
+      ? `<section class="ops-group" style="margin-top:12px"><details><summary><strong>Kapanan görevler</strong> <span class="badge">${kapananlar.length}</span></summary>${kapananlar.map(task => `<article class="ops-row"><div class="ops-row-main"><strong>${escapeHtml(task.title || '—')}</strong><span>${String(task.status).toUpperCase() === 'DONE' ? 'Tamamlandı' : 'İptal edildi'}${task.completed_at || task.updated_at ? ' · ' + escapeHtml(formatTrDate(String(task.completed_at || task.updated_at).slice(0, 10))) : ''}</span></div><div class="ops-row-actions">${editTaskButton(task)}</div></article>`).join('')}</details></section>`
+      : '';
+    // Geciken once, sonra oncelik, sonra son tarih; tarihsiz gorev en sonda.
+    const priorityRank = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+    const today = getTodayStr();
+    const dueKey = task => operationalTaskDueParts(task.due_at).date || '9999-99-99';
+    operational.sort((a, b) => (dueKey(a) < today ? 0 : 1) - (dueKey(b) < today ? 0 : 1)
+      || (priorityRank[a.priority] ?? 2) - (priorityRank[b.priority] ?? 2)
+      || dueKey(a).localeCompare(dueKey(b)));
+    const taskLine = task => {
+      const property = task.property_id ? Object.values(appData?.villas || {}).find(villa => villa.id === task.property_id) : null;
+      const parts = [
+        property ? property.name : (task.property_id ? 'Mülke bağlı' : 'Genel görev'),
+        OPERATIONAL_TASK_STATUS_LABELS[String(task.status || 'TODO').toUpperCase()] || task.status || 'Yapılacak'
+      ];
+      const due = operationalTaskDueLabel(task, today);
+      if (due) parts.push(due);
+      const assignee = operationalTaskAssigneeName(task);
+      if (assignee) parts.push('Görevli: ' + assignee);
+      return parts.map(escapeHtml).join(' · ');
+    };
+    const priorityBadge = task => ['HIGH', 'CRITICAL'].includes(task.priority)
+      ? `<span class="badge ${task.priority === 'CRITICAL' ? 'badge-red' : 'badge-amber'}">${escapeHtml(OPERATIONAL_TASK_PRIORITY_LABELS[task.priority])}</span>`
       : '';
     const templates = appData?.taskTemplates || [];
     const assignees = (appData?.operationalPeople || []).filter(person => person.user_id && person.is_active !== false);
     const editTemplatesLink = canManageTenantRole(activeTenant?.role)
       ? `<button class="btn btn-secondary btn-sm" data-onclick="openSettingsSection(decodeURIComponent('${encodeActionArg('templates')}'))">Şablonu düzenle →</button>`
       : '';
-    container.innerHTML = `<div class="ops-cleaning-layout"><section class="ops-group"><div class="section-title-bar"><h3>Aktif görevler <span class="badge">${operational.length}</span></h3><button class="btn btn-primary btn-sm" data-onclick="createGeneralOperationalTask()">+ Genel görev</button></div>${operational.length ? operational.map(task => { const options = assignees.map(person => `<option value="${escapeHtml(person.user_id)}"${person.user_id === task.assigned_to ? ' selected' : ''}>${escapeHtml(person.full_name)}</option>`).join(''); return `<article class="ops-row"><div class="ops-row-main"><strong>${escapeHtml(task.title || '—')}</strong><span>${task.property_id ? 'Mülke bağlı' : 'Genel görev'} · ${escapeHtml(OPERATIONAL_TASK_STATUS_LABELS[String(task.status || 'TODO').toUpperCase()] || task.status || 'Yapılacak')}</span></div><div class="ops-row-actions"><select id="opsTaskPerson-${escapeHtml(task.id)}" aria-label="Görevli seç"><option value="">Ekip üyesi seç…</option>${options}</select><button class="btn btn-secondary btn-sm" data-onclick="assignOperationalTaskFromSelect(decodeURIComponent('${encodeActionArg(task.id)}'))">Ata</button><button class="btn btn-primary btn-sm" data-onclick="setOperationalTaskStatus(decodeURIComponent('${encodeActionArg(task.id)}'), 'DONE')">Tamamla</button><button class="btn btn-secondary btn-sm" data-onclick="setOperationalTaskStatus(decodeURIComponent('${encodeActionArg(task.id)}'), 'CANCELLED')">İptal</button></div></article>`; }).join('') : '<div class="empty-state">Aktif görev yok.</div>'}${kapananHtml}</section><aside class="ops-debt-panel"><h3>Hazır görev kütüphanesi</h3>${editTemplatesLink}${templates.length ? templates.map(template => `<div class="ops-debt-row"><div><strong>${escapeHtml(template.title)}</strong><span>${escapeHtml(TEMPLATE_TASK_TYPE_LABELS[template.task_type] || 'Genel')}</span></div><button class="btn btn-secondary btn-sm" data-onclick="createTaskFromTemplate(decodeURIComponent('${encodeActionArg(template.id)}'))">Görev oluştur</button></div>`).join('') : '<div class="empty-state">Henüz görev şablonu yok.</div>'}</aside></div>`;
+    container.innerHTML = `<div class="ops-cleaning-layout"><section class="ops-group"><div class="section-title-bar"><h3>Aktif görevler <span class="badge">${operational.length}</span></h3>${canEditTasks ? '<button class="btn btn-primary btn-sm" data-onclick="openOperationalTaskModal()">+ Yeni görev</button>' : ''}</div>${operational.length ? operational.map(task => { const options = assignees.map(person => `<option value="${escapeHtml(person.user_id)}"${person.user_id === task.assigned_to ? ' selected' : ''}>${escapeHtml(person.full_name)}</option>`).join(''); return `<article class="ops-row" data-operational-task-id="${escapeHtml(task.id)}"><div class="ops-row-main"><strong>${escapeHtml(task.title || '—')}</strong><span>${taskLine(task)}</span>${task.description ? `<span>${escapeHtml(task.description)}</span>` : ''}</div>${priorityBadge(task)}<div class="ops-row-actions">${editTaskButton(task)}<select id="opsTaskPerson-${escapeHtml(task.id)}" aria-label="Görevli seç"><option value="">Ekip üyesi seç…</option>${options}</select><button class="btn btn-secondary btn-sm" data-onclick="assignOperationalTaskFromSelect(decodeURIComponent('${encodeActionArg(task.id)}'))">Ata</button><button class="btn btn-primary btn-sm" data-onclick="setOperationalTaskStatus(decodeURIComponent('${encodeActionArg(task.id)}'), 'DONE')">Tamamla</button><button class="btn btn-secondary btn-sm" data-onclick="setOperationalTaskStatus(decodeURIComponent('${encodeActionArg(task.id)}'), 'CANCELLED')">İptal</button></div></article>`; }).join('') : '<div class="empty-state">Aktif görev yok.</div>'}${kapananHtml}</section><aside class="ops-debt-panel"><h3>Hazır görev kütüphanesi</h3>${editTemplatesLink}${templates.length ? templates.map(template => `<div class="ops-debt-row"><div><strong>${escapeHtml(template.title)}</strong><span>${escapeHtml(TEMPLATE_TASK_TYPE_LABELS[template.task_type] || 'Genel')}</span></div><button class="btn btn-secondary btn-sm" data-onclick="createTaskFromTemplate(decodeURIComponent('${encodeActionArg(template.id)}'))">Görev oluştur</button></div>`).join('') : '<div class="empty-state">Henüz görev şablonu yok.</div>'}</aside></div>`;
   }
 }
 
@@ -24445,6 +24680,11 @@ if (typeof module !== 'undefined' && module.exports) {
     getLeadSalesView,
     deleteMaint,
     setOperationalTaskStatus,
+    openOperationalTaskModal,
+    saveOperationalTask,
+    deleteOperationalTaskFromModal,
+    buildOperationalTaskPatch,
+    operationalTaskDueParts,
     renderTodayDateStrip,
     todayStayCounts,
     bookingCleaningDate,

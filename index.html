@@ -3984,6 +3984,87 @@
   </div>
 
   <!-- ========================================== -->
+  <!-- MODAL: OPERASYON GÖREVİ EKLE & DÜZENLE     -->
+  <!-- ========================================== -->
+  <div class="modal-backdrop" id="operationalTaskModal">
+    <div class="modal-card" data-lx-style="max-width: 560px;">
+      <div class="modal-header">
+        <h3 id="opTaskModalTitle">✅ Görev</h3>
+        <button class="close-btn" data-onclick="closeOperationalTaskModal()">&times;</button>
+      </div>
+      <form id="operationalTaskForm" data-onsubmit="saveOperationalTask(event)">
+        <input type="hidden" id="opTaskEditId">
+        <div class="form-grid">
+          <div class="form-group full-width">
+            <label for="opTaskTitle">Görev başlığı</label>
+            <input type="text" id="opTaskTitle" maxlength="255" required placeholder="Örn: Bahçe sulama sistemini kontrol et">
+          </div>
+          <div class="form-group full-width">
+            <label for="opTaskDesc">Açıklama</label>
+            <textarea id="opTaskDesc" rows="3" placeholder="Ne yapılacak, nereye dikkat edilmeli"></textarea>
+          </div>
+          <div class="form-group">
+            <label for="opTaskVilla">Mülk</label>
+            <select id="opTaskVilla">
+              <!-- updateAllVillaDropdowns() musterinin mulkleriyle doldurur -->
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="opTaskType">Tür</label>
+            <select id="opTaskType">
+              <option value="GENERAL">Genel</option>
+              <option value="CHECKIN_PREP">Giriş hazırlığı</option>
+              <option value="CHECKOUT">Çıkış</option>
+              <option value="INSPECTION">Kontrol</option>
+              <option value="MAINTENANCE">Bakım</option>
+              <option value="INVENTORY">Envanter</option>
+              <option value="CLEANING">Temizlik</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="opTaskPriority">Öncelik</label>
+            <select id="opTaskPriority">
+              <option value="LOW">Düşük</option>
+              <option value="MEDIUM">Orta</option>
+              <option value="HIGH">Yüksek</option>
+              <option value="CRITICAL">Kritik</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="opTaskStatus">Durum</label>
+            <select id="opTaskStatus">
+              <!-- fillOperationalTaskStatusOptions() doldurur -->
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="opTaskDueDate">Son tarih</label>
+            <input type="date" id="opTaskDueDate">
+          </div>
+          <div class="form-group">
+            <label for="opTaskDueTime">Saat (isteğe bağlı)</label>
+            <input type="time" id="opTaskDueTime">
+          </div>
+          <div class="form-group full-width">
+            <label for="opTaskAssignee">Görevli</label>
+            <select id="opTaskAssignee" title="Yalnız uygulamaya giriş hesabı olan ekip üyeleri listelenir">
+              <!-- fillOperationalTaskAssigneeOptions() doldurur -->
+            </select>
+          </div>
+        </div>
+        <p class="sub-text" id="opTaskMeta" data-lx-style="display: none; margin-top: 8px;"></p>
+        <p class="sub-text" data-lx-style="margin-top: 8px;">Tamamlamak için listedeki <strong>Tamamla</strong> düğmesini kullanın; kontrol listesindeki önemli maddeler orada denetlenir.</p>
+        <div class="modal-footer" data-lx-style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px;">
+          <button type="button" class="btn btn-danger btn-sm" id="opTaskDeleteBtn" data-onclick="deleteOperationalTaskFromModal()" data-lx-style="display: none;">🗑️ Sil</button>
+          <div data-lx-style="display: flex; gap: 8px; margin-left: auto;">
+            <button type="button" class="btn btn-secondary" data-onclick="closeOperationalTaskModal()">Vazgeç</button>
+            <button type="submit" class="btn btn-primary" id="opTaskSaveBtn">Kaydet</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
   <!-- MODAL: ONBOARDING - İLK MÜLKÜNÜZÜ EKLEYİN  -->
   <!-- ========================================== -->
   <div class="modal-backdrop" id="onboardingModal">
@@ -4163,13 +4244,13 @@
   <script src="core/side_panel.js?v=d763b464"></script>
   <script src="core/notification_feed.js?v=941306f6"></script>
   <script src="core/command_search.js?v=89760933"></script>
-  <script src="core/action_dispatch.js?v=3ad5c8f4"></script>
+  <script src="core/action_dispatch.js?v=cf8b00ff"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=ca7b5399"></script>
   <script src="core/permission_matrix.js?v=e3a3cef2"></script>
   <script src="core/tenant_backup_export.js?v=2f2292a6"></script>
   <script src="core/ui_dialog.js?v=d0680970"></script>
-  <script src="app.js?v=ba24cbc9"></script>
+  <script src="app.js?v=83d75425"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=e45a0e9a"></script>
