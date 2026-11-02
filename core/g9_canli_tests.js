@@ -1180,6 +1180,102 @@ async function L285() {
 }
 
 // ---------------------------------------------------------------------------
+// GOREV-DUZENLE: Operasyon gorevi duzenleme ekrani (kullanici, 02.11.2026).
+// Gorev yalniz baslikla acilip atanabiliyor, tamamlanip iptal edilebiliyordu;
+// baslik, aciklama, mulk, oncelik, son tarih ve durum degistirilemiyordu.
+// ---------------------------------------------------------------------------
+async function GorevDuzenle() {
+  const GOREV = 'aaaaaaaa-0000-4000-8000-00000000a001';
+  const KISI = 'bbbbbbbb-0000-4000-8000-000000000001';
+  const temel = () => ({
+    operationalPeople: [{ id: 'p1', user_id: KISI, full_name: 'Ayşe Usta', kind: 'TECHNICIAN', is_active: true }],
+    operationalTasks: [{ id: GOREV, title: 'Havuz kontrolü', description: null, property_id: null, task_type: 'GENERAL', status: 'TODO', priority: 'MEDIUM', assigned_to: null, due_at: null, checklist: {} }]
+  });
+
+  let dom = sahteDom();
+  const App = require('../app.js');
+  let ist = kur(App, temel());
+  check(App.openOperationalTaskModal(GOREV) === true && dom.getElementById('opTaskTitle').value === 'Havuz kontrolü' && dom.getElementById('opTaskEditId').value === GOREV,
+    'GD-a Duzenle formu gorevin mevcut degerleriyle acilir');
+  dom.getElementById('opTaskTitle').value = 'Havuz pompası kontrolü';
+  dom.getElementById('opTaskDesc').value = 'Filtreyi de değiştir';
+  dom.getElementById('opTaskVilla').value = 'DENE';
+  dom.getElementById('opTaskPriority').value = 'HIGH';
+  dom.getElementById('opTaskStatus').value = 'IN_PROGRESS';
+  dom.getElementById('opTaskAssignee').value = KISI;
+  dom.getElementById('opTaskDueDate').value = '2026-11-05';
+  dom.getElementById('opTaskDueTime').value = '';
+  await App.saveOperationalTask({ preventDefault() {} });
+  const guncelleme = ist.yazmalar.find(k => k.tablo === 'operational_tasks' && k.islem === 'update');
+  const y = (guncelleme && guncelleme.yuk) || {};
+  check(y.title === 'Havuz pompası kontrolü' && y.description === 'Filtreyi de değiştir' && y.property_id === PROP_A
+    && y.priority === 'HIGH' && y.status === 'IN_PROGRESS' && y.assigned_to === KISI && y.due_at === '2026-11-05T23:59:00+03:00',
+    'GD-b Kayit tum alanlari gorev satirina yazar', JSON.stringify(y));
+  check(guncelleme && guncelleme.filtre.some(([c, v]) => c === 'id' && v === GOREV) && guncelleme.filtre.some(([c, v]) => c === 'tenant_id' && v === TENANT),
+    'GD-c Guncelleme gorev ve kiraci kimligiyle sinirli', JSON.stringify(guncelleme && guncelleme.filtre));
+  const parca = App.operationalTaskDueParts('2026-11-05T23:59:00+03:00');
+  const saatli = App.operationalTaskDueParts('2026-11-05T09:30:00+03:00');
+  check(parca.date === '2026-11-05' && parca.time === '' && saatli.time === '09:30',
+    'GD-d Son tarih Istanbul saatine gore forma geri okunur', JSON.stringify({ parca, saatli }));
+
+  // Kapali gorev yeniden acilir; kapanis izi temizlenir. DONE formdan gecmez.
+  const kapali = App.buildOperationalTaskPatch({ title: 'X', status: 'TODO' }, { status: 'DONE' });
+  check(kapali.patch.status === 'TODO' && kapali.patch.completed_at === null && kapali.patch.completed_by === null && kapali.reopened === true,
+    'GD-e Kapali gorev acik duruma alininca yeniden acilir', JSON.stringify(kapali));
+  const tamam = App.buildOperationalTaskPatch({ title: 'X', status: 'DONE' }, { status: 'TODO' });
+  check(tamam.patch.status === 'TODO' && !('completed_at' in tamam.patch),
+    'GD-f Tamamlama formdan gecmez (kontrol listesi korumasi Tamamla dugmesinde)', JSON.stringify(tamam));
+  const yabanci = App.buildOperationalTaskPatch({ title: 'X', assignedTo: 'cccccccc-0000-4000-8000-000000000009' }, { status: 'TODO' });
+  check(!!yabanci.error, 'GD-g Saha ekibinde olmayan kisiye atanamaz', JSON.stringify(yabanci));
+  const saatTek = App.buildOperationalTaskPatch({ title: 'X', dueTime: '10:00' }, { status: 'TODO' });
+  check(!!saatTek.error, 'GD-h Tarihsiz saat reddedilir', JSON.stringify(saatTek));
+
+  // Bos baslik yazmaz.
+  dom = sahteDom();
+  ist = kur(App, temel());
+  App.openOperationalTaskModal(GOREV);
+  dom.getElementById('opTaskTitle').value = '   ';
+  const bos = await App.saveOperationalTask({ preventDefault() {} });
+  check(bos === false && !ist.yazmalar.some(k => k.tablo === 'operational_tasks'), 'GD-i Bos baslik kaydedilmez');
+
+  // Yeni gorev ayni formdan, mulke bagli acilir.
+  dom = sahteDom();
+  ist = kur(App, temel());
+  App.openOperationalTaskModal();
+  dom.getElementById('opTaskTitle').value = 'Klima filtresi';
+  dom.getElementById('opTaskVilla').value = 'SEYIR';
+  dom.getElementById('opTaskStatus').value = 'TODO';
+  dom.getElementById('opTaskPriority').value = 'LOW';
+  await App.saveOperationalTask({ preventDefault() {} });
+  const ekleme = ist.yazmalar.find(k => k.tablo === 'operational_tasks' && k.islem === 'insert');
+  check(ekleme && ekleme.yuk.title === 'Klima filtresi' && ekleme.yuk.property_id === PROP_B && ekleme.yuk.tenant_id === TENANT && ekleme.yuk.source === 'MANUAL',
+    'GD-j Yeni gorev formdan mulke bagli yazilir', JSON.stringify(ekleme && ekleme.yuk));
+
+  // Silme yalniz bu gorevi siler.
+  dom = sahteDom();
+  ist = kur(App, temel());
+  App.openOperationalTaskModal(GOREV);
+  await App.deleteOperationalTaskFromModal();
+  const silme = ist.yazmalar.find(k => k.tablo === 'operational_tasks' && k.islem === 'delete');
+  check(silme && silme.filtre.some(([c, v]) => c === 'id' && v === GOREV), 'GD-k Sil yalniz secili gorevi siler', JSON.stringify(silme && silme.filtre));
+
+  // Liste: Duzenle dugmesi yonetebilen rolde var, satis rolunde yok.
+  dom = sahteDom();
+  kur(App, temel());
+  App.setOperationsView('tasks');
+  const sahipHtml = dom.getElementById('opsCombinedContainer').innerHTML;
+  check(/openOperationalTaskModal\(decodeURIComponent/.test(sahipHtml) && /\+ Yeni görev/.test(sahipHtml),
+    'GD-l Gorev listesinde Duzenle ve Yeni gorev dugmesi var');
+  dom = sahteDom();
+  kur(App, temel(), 'sales');
+  App.setOperationsView('tasks');
+  const satisHtml = dom.getElementById('opsCombinedContainer').innerHTML;
+  check(!/openOperationalTaskModal/.test(satisHtml), 'GD-m Operasyon yetkisi olmayan rol duzenleme dugmesini gormez');
+  check(App.openOperationalTaskModal(GOREV) === false, 'GD-n Yetkisiz rol formu acamaz');
+  App.setOperationsView('cleaning');
+}
+
+// ---------------------------------------------------------------------------
 // L-287 bulguda adi gecen akislar ham tarayici kutusu yerine uygulama penceresi kullanir
 // ---------------------------------------------------------------------------
 async function L287() {
@@ -1524,6 +1620,7 @@ async function main() {
     await L300();
     await L015Style();
     await L157();
+    await GorevDuzenle();
   } catch (error) {
     failed++;
     console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

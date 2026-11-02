@@ -37,4 +37,4 @@ kırmızı ("12544 == 11200"), sonra 10/10.
 
 ## Üretim durumu
 
-Uygulanmadı.
+Uygulandı ve doğrulandı (01.11.2026): `schema_migrations` 109, `production:readiness` BAŞARILI. Gövdedeki vergi izdüşümünün kanıtı göçün kendi doğrulama bloğudur (hata vermeden tamamlandı).
