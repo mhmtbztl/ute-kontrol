@@ -32,12 +32,13 @@ const executablePath = [process.env.CHROME_PATH, process.env.PROGRAMFILES && pat
             const row={id:args.p_request_id,channel_listing_id:args.p_listing_id,change_date:args.p_date,kind:args.p_kind,notes:args.p_notes};db.airbnb_listing_changes.push(row);return {data:row};
           }
         };
-        const model={properties:[{id:'p1',slug:'zirve',name:'Zirve <img src=x>'}],selectedProperty:'ALL',listings:[{id:listing,property_id:'p1',channel_code:'AIRBNB',display_name:'Zirve Airbnb'}],snapshots:[],period:{}};
+        const model={properties:[{id:'p1',slug:'zirve',name:'Zirve <img src=x>'},{id:'p2',slug:'seyir',name:'Villa Seyir'}],selectedProperty:'zirve',listings:[{id:listing,property_id:'p1',channel_code:'AIRBNB',display_name:'Zirve Airbnb'},{id:'33333333-3333-4333-8333-333333333333',property_id:'p2',channel_code:'AIRBNB',display_name:'Seyir Airbnb'}],snapshots:[],period:{}};
         window.remount=(canManage=true,fail=false)=>AirbnbPerformanceUI.mount(document.getElementById('test-root'),{model,client:fail?{from(){throw {code:'42P01'};}}:client,tenantId:tenant,canManage});
         window.remount();
       });
       await page.getByRole('button',{name:'＋ Veri ekle',exact:true}).click();
       const form = page.locator('[data-ab-form="record"]');
+      assert.deepEqual(await form.locator('[name=listingId] option').allTextContents(), ['Zirve <img src=x> · Zirve Airbnb', 'Villa Seyir · Seyir Airbnb']);
       await form.locator('[name=start]').fill('2026-10-04');
       await form.locator('[name=end]').fill('2026-11-03');
       await form.locator('[name=views]').fill('436');
