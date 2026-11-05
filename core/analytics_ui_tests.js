@@ -40,6 +40,7 @@ class FakeNode {
   appendChild(c) { c.parentNode = this; this.children.push(c); return c; }
   get isConnected() { let n = this; while (n.parentNode) n = n.parentNode; return n === global.document.body; }
   get clientWidth() { return 0; }
+  getBoundingClientRect() { return { left: 0, top: 0, width: 0, height: 0 }; }
   get textContent() { return this.tagName === '#TEXT' ? this._text : this.children.map(c => c.textContent).join(''); }
   set textContent(v) { this.children = []; if (this.tagName === '#TEXT') this._text = String(v); else if (v !== '') this.appendChild(textNode(v)); }
   set innerHTML(v) { throw new Error('innerHTML kullanildi'); }
@@ -225,6 +226,21 @@ test('U10. Talep bolumu yetki yoksa cizilmez; destroy dinleyicileri kaldirir', (
   ui.destroy();
   assert.strictEqual((root.listeners.click || []).length, 0);
   assert.strictEqual(root.children.length, 0);
+});
+
+test('U13. Telefonda dokunus grafik ipucunu acar; parmak kalkinca kapanmaz (emulatorde bulundu)', () => {
+  const { root } = mountWith(BOOKINGS);
+  const hit = root.querySelector('.ba-hit');
+  const tip = root.querySelector('.ba-tip');
+  assert.ok(hit && tip, 'trend grafigi cizilmeli');
+  const ates = (tur, ev) => (hit.listeners[tur] || []).forEach(fn => fn(ev));
+  ates('pointerdown', { clientX: 0, clientY: 0, pointerType: 'touch' });
+  assert.strictEqual(tip.hidden, false, 'dokununca ipucu acilmali');
+  assert.ok(/₺/.test(tip.textContent), tip.textContent);
+  ates('pointerleave', { pointerType: 'touch' });
+  assert.strictEqual(tip.hidden, false, 'parmak kalkinca ipucu acik kalmali');
+  ates('pointerleave', { pointerType: 'mouse' });
+  assert.strictEqual(tip.hidden, true, 'fare ayrilinca kapanir');
 });
 
 test('U12. Hedefleri okuyamayan rolde Hedef kiyasi gosterilmez', () => {

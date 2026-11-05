@@ -334,7 +334,10 @@
       return Math.max(0, Math.min(months.length - 1, Math.round((px - pad.l) / iw * (months.length - 1))));
     }
     hit.addEventListener('pointermove', ev => goster(indexFromEvent(ev)));
-    hit.addEventListener('pointerleave', gizle);
+    // Telefonda dokunus pointermove uretmez; ipucu dokunulan ayda acilir.
+    // Parmak kalkinca gelen pointerleave ipucunu kapatmasin: yalniz fare.
+    hit.addEventListener('pointerdown', ev => goster(indexFromEvent(ev)));
+    hit.addEventListener('pointerleave', ev => { if (!ev || ev.pointerType === 'mouse') gizle(); });
     wrap.addEventListener('keydown', ev => {
       if (ev.key === 'ArrowRight') { goster(Math.min(months.length - 1, aktif + 1)); ev.preventDefault(); }
       else if (ev.key === 'ArrowLeft') { goster(Math.max(0, aktif < 0 ? months.length - 1 : aktif - 1)); ev.preventDefault(); }
