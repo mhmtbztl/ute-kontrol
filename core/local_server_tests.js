@@ -56,7 +56,7 @@ async function run() {
       const r = await get(base, p);
       check(r.status === 404 || r.status === 400, `1. ${p} verilmez`, `durum ${r.status}, ${r.len} bayt`);
     }
-    const izinli = ['/', '/index.html', '/app.js', '/style.css', '/xlsx.full.min.js', '/core/captcha_gate.js',
+    const izinli = ['/', '/index.html', '/app.js', '/style.css', '/analytics.css', '/xlsx.full.min.js', '/core/captcha_gate.js',
       '/core/marketing_ui.js', '/sablonlar/lexbnb-rezervasyon-sablonu.csv', '/index.html?v=abc',
       '/assets/brand/lexbnb-logo.svg', '/assets/brand/lexbnb-logo-dark.svg', '/assets/brand/lexbnb-mark.svg', '/assets/brand/favicon-32.png',
       '/assets/brand/apple-touch-icon.png', '/yasal/kvkk.html'];

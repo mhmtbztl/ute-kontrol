@@ -227,6 +227,13 @@ test('U10. Talep bolumu yetki yoksa cizilmez; destroy dinleyicileri kaldirir', (
   assert.strictEqual(root.children.length, 0);
 });
 
+test('U12. Hedefleri okuyamayan rolde Hedef kiyasi gosterilmez', () => {
+  const { root } = mountWith(BOOKINGS, { canSeeTargets: () => false });
+  assert.strictEqual(root.querySelector('[data-ba-toggle="target"]'), null);
+  assert.ok(!root.textContent.includes('hedefe göre'));
+  assert.ok(!root.textContent.includes('hedef girilmemiş'));
+});
+
 test('U11. Yeniden cizimden sonra klavye odagi ayni kontrole doner (WCAG 2.4.3)', () => {
   const { root, ui } = mountWith(BOOKINGS);
   FakeNode.prototype.focus = function () { global.document.activeElement = this; };

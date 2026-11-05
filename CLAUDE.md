@@ -278,6 +278,25 @@ metriklere girer, kayıt ve gün başı metriklere girmez (L-103).** Ciro, gece,
 ADR, doluluk doğrudur; rezervasyon adedi, takvimdeki gün, boş gece tespiti
 özeti gerçek konaklama saymaz. Tanım tek yerde: `guest_crm_engine`.
 
+**Analiz sekmesi (kullanıcı kararı 05.11.2026).** Girilen rezervasyonlardan mülk
+mülk ve portföy analizi; `core/booking_analytics.js` hesaplar, `core/analytics_ui.js`
+çizer. **Para ve gece kendisi hesaplamaz:** ay performansı `computeMonthPerformance`
+(Bugün ve Finans KPI tablosuyla aynı), kanal cirosu ve ileriye dolu
+`LedgerContract`'tan. Çok aylık dönemde ciro/gece/kapasite toplanır, oranlar
+toplamdan hesaplanır. Kayıt başı metrikler (adet, konaklama, rezervasyon öncesi
+süre, iptal, giriş günü) dönemi **giriş tarihine** göre seçer; toplu aktarım özeti
+adede girmez. Rezervasyon öncesi süre `created_at`'ten; girişten sonra girilmiş ve
+içe aktarılmış (`finance_import_batch_rows`, sekme açılınca bir kez okunur) kayıt
+örneklenmez. Geçen yılın "aynı tarihte elde olan"ı, o ayın kaydı sonradan
+girildiyse ölçülemez ("—"). Kıyas yoksa `null`, 0 değil. Varsayılan dönem **son
+tamamlanan ay**; süren ay seçilirse "sürüyor" notu çıkar. Hedef kıyası yalnız
+finans okuyabilen rolde (hedefler başka role yüklenmez); 0 girilmiş doluluk/ADR/
+RevPAR hedefi "girilmemiş"tir. Sekme `canReadSalesRole`, `staff` görmez. Ekran
+`innerHTML` kullanmaz (güvenlik sınırı `<svg>`'yi siler); grafik paleti koyu
+yüzeyde renk körlüğü doğrulamasından geçti, halka en fazla 3 renk + "Diğer".
+Göç gerekmedi. Ağı `booking_analytics_tests`, `analytics_ui_tests`,
+`analytics_integration_tests` (gerçek app.js ile birebir eşitlik).
+
 **Ana sayfa sunucu anlık görüntüsünü önbellekte tutar; deftere yazan her
 fonksiyon başarılı yazmadan sonra `invalidateExecutiveSnapshotCache()` çağırır.**
 Kural düğmede değil **tabloya yazan fonksiyondadır** (`createExpense`,
@@ -1045,6 +1064,7 @@ Bu tuzaklar gerçekten yaşandı; tekrar etmeyin.
 | Sahte Airbnb senkronizasyonu | **düzeltildi** (20 Eylül 2026) — `syncLiveAirbnbData()` 600 ms bekleyip `lastSync`'e "Şimdi" yazıyor ve "✅ Canlı Skorlar Güncel!" diyordu; Airbnb'ye istek gitmiyordu. Artık durumu açıkça söylüyor |
 | OTA ilan analizi (`runAiListingCritic`) | veri bağlantısı yok; artık skor uydurmuyor, durumu açıkça söylüyor |
 | Demo'yu Supabase'de gerçek tenant olarak yeniden kurma | yapılmadı |
+| Analiz sekmesi (rezervasyon istatistikleri) | **tamamlandı** (5 Kasım 2026, göç yok) — menüde Finans ile Kanallar ve Pazarlama arasında; KPI, aylık trend (önceki dönem / geçen yıl / 2 yıl önce / portföy ortalaması / hedef), mülk tablosu, kanal, ileriye dolu, rezervasyon davranışı, talep hunisi. Kurallar §3.4 |
 | Yasal metinler (L-157) | **taslak hazır, hukuki onay bekliyor** (27.10.2026) — `docs/yasal_taslak/` (yayınlanmaz). Onaydan sonra metin `yasal/*.html`'e taşınır ve `LEGAL_TEXT_VERSION` değişir; `iskelet` dışındaki sürümde onaylamamış herkese girişte bir kez sorulur (`ensureLegalConsent`, reddeden çıkar). Uydurma bilgi yazılmadı, bilinmeyenler `[köşeli parantez]` |
 | Pazarlama ROAS’ı | **tamamlandı** (17 Eylül 2026) — reklam cirosu artık "girilen" olarak etiketleniyor; simülatör sabit çarpan yerine işletmenin kendi ölçülmüş ROAS'ını kullanıyor, ölçülmemiş kanal için tahmin üretmiyor |
 | RGVQI denetim düzeltmeleri | phase24 ve phase25, 14 Eylül 2026'da üretime uygulandı ve readiness denetimiyle doğrulandı; uygulama/worker dağıtımı ayrıca izlenmeli |

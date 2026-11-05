@@ -2,10 +2,18 @@
 
 Dal: `claude/analiz` · worktree: `lexbnb-claude-analiz` · 5 Kasım 2026
 
-**Durum:** hesap ve arayüz katmanı bitti, testli ve commit'li. Ancak uygulamaya
-**bağlı değil**. Kullanıcı kararı (5.11.2026): başka işler sürerken paylaşılan
-dosyalara (`index.html`, `app.js`, `style.css`, `server.js`, `run_all_tests.js`,
-`CLAUDE.md`) dokunulmadı. Bu not, son adımda yapılacak değişiklikleri listeler.
+**Durum: UYGULANDI (5.11.2026).** Dal Codex'in Airbnb işini içeren master'a
+(PR #57, #58) çakışmasız taşındı ve aşağıdaki adımların hepsi uygulandı:
+3.e (içe aktarım bağı) dahil. Bağlama tek bir yükleme dizisine eklenmedi; sekme
+ilk açıldığında arka planda bir kez okunur. Talep kanalları kendi Türkçe
+adlarıyla çıkar (`leadChannelLabel`). Menü testleri 10 kaleme güncellendi.
+Tarayıcı kapısına 33 ve 33b adımları eklendi. Doğrulama: `npm test` 225/225,
+`test:browser` iki ardışık koşuda yeşil, göç zinciri ve damgalar temiz.
+Aşağıdaki metin tarihçe olarak duruyor.
+
+İlk durum: hesap ve arayüz katmanı bitmişti ama uygulamaya bağlı değildi.
+Kullanıcı kararıyla (5.11.2026) başka işler sürerken paylaşılan dosyalara
+dokunulmadı; bu not son adımda yapılacak değişiklikleri listeliyordu.
 
 Uygulama sırası: dal güncel `master`'a **REBASE** edilir, aşağıdaki adımlar
 tek commit'te uygulanır, ardından `node stamp_assets.js` + doğrulama koşulur.

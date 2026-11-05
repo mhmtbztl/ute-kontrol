@@ -510,7 +510,7 @@
     const kanallar = new Map();
     leads.forEach(l => {
       const k = String(l.channel || l.source || '').trim() || 'Other';
-      if (!kanallar.has(k)) kanallar.set(k, { key: k, label: ctx.channelName(k), total: 0, won: 0 });
+      if (!kanallar.has(k)) kanallar.set(k, { key: k, label: ctx.leadChannelName(k), total: 0, won: 0 });
       const r = kanallar.get(k);
       r.total += 1;
       if (stage(l) === 'WON') r.won += 1;
@@ -624,7 +624,8 @@
    *   monthPerformance(monthKey, villa) -> { roomRevenue, nights, available }
    *   monthTarget(monthKey, villa)      -> { revenue, occupancy, adr, revpar } | null
    *   isBulkSummary(booking)            -> boolean
-   *   channelName(code)                 -> string
+   *   channelName(code)                 -> string (rezervasyon kanali)
+   *   leadChannelName(code)             -> string (talep kanali; yoksa channelName)
    *   isImported(booking)               -> boolean (istege bagli)
    */
   function buildReport(o) {
@@ -647,6 +648,9 @@
       monthTarget: typeof deps.monthTarget === 'function' ? deps.monthTarget : () => null,
       isBulkSummary: typeof deps.isBulkSummary === 'function' ? deps.isBulkSummary : () => false,
       channelName: typeof deps.channelName === 'function' ? deps.channelName : k => k,
+      // Talep kanallari ayri kodlar kullanir (Phone, Email, Other): kendi adlandiricisi.
+      leadChannelName: typeof deps.leadChannelName === 'function' ? deps.leadChannelName
+        : (typeof deps.channelName === 'function' ? deps.channelName : k => k),
       isImported: typeof deps.isImported === 'function' ? deps.isImported : () => false
     };
     const cmp = comparisonPeriods(period);

@@ -21,6 +21,7 @@
  *     deps: { monthPerformance, monthTarget, isBulkSummary, channelName, isImported },
  *     monthOptions: () => ['2025-01', ...],     // secilebilir aylar
  *     canReadLeads: () => true,
+ *     canSeeTargets: () => true,               // false: Hedef kiyasi hic gosterilmez
  *     initialVilla: 'ALL',
  *     onVillaChange: villa => {}                 // istege bagli
  *   });
@@ -623,7 +624,7 @@
         h('span', { class: 'ba-chips-label', text: 'Karşılaştır' }),
         // Portfoy ortalamasi yalniz tek mulkte anlamlidir; tum mulklerde
         // devre disi bir dugme yerine hic gosterilmez.
-        COMPARES.filter(c => !(c.key === 'portfolio' && report.villa === 'ALL')).map(c => {
+        COMPARES.filter(c => visibleCompare(c, report)).map(c => {
           return h('button', {
             type: 'button',
             class: 'ba-chip' + (state.compare[c.key] ? ' is-on' : ''),
@@ -646,8 +647,16 @@
       ]);
     }
 
+    // Portfoy ortalamasi yalniz tek mulkte; hedef yalniz hedefleri okuyabilen
+    // rolde (satis rolune hedefler yuklenmez, 'hedef girilmemis' demek yanlis olur).
+    function visibleCompare(c, report) {
+      if (c.key === 'portfolio' && report.villa === 'ALL') return false;
+      if (c.key === 'target' && typeof opt.canSeeTargets === 'function' && !opt.canSeeTargets()) return false;
+      return true;
+    }
+
     function activeCompares(report) {
-      return COMPARES.filter(c => state.compare[c.key] && !(c.key === 'portfolio' && report.villa === 'ALL'));
+      return COMPARES.filter(c => state.compare[c.key] && visibleCompare(c, report));
     }
 
     // ----------------------------------------------------------- KPI ---

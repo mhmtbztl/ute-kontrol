@@ -306,6 +306,12 @@ test('L1. Talep hunisi ve kanal donusumu', () => {
   assert.strictEqual(r.leads.byChannel.find(c => c.key === 'Instagram').conversion, 50);
   const d = report({ leads, villa: 'deniz' });
   assert.strictEqual(d.leads.total, 2);
+  // Talep kanali kendi adlandiricisiyla (Other -> Diger)
+  const app = makeApp(BOOKINGS, TARGETS);
+  const t = BookingAnalytics.buildReport({ bookings: app.bookings, villas: app.villas, today: app.today,
+    period: { start: '2026-10', end: '2026-10' }, leads: [{ id: 9, date: '2026-10-02', status: 'NEW', channel: 'Other' }],
+    deps: Object.assign({}, app.deps, { leadChannelName: c => ({ Other: 'Diğer' }[c] || c) }) });
+  assert.strictEqual(t.leads.byChannel[0].label, 'Diğer');
 });
 
 // ----------------------------------------------------- ileriye dolu --

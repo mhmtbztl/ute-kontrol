@@ -34,8 +34,9 @@ try {
   const kalemler = [...nav.matchAll(/<button class="tab-btn[^"]*" data-onclick="switchTab\('([a-z]+)'\)">([^<]*)/g)]
     .map(m => ({ tab: m[1], etiket: m[2].replace(/\s*\($/, '').trim() }));
 
-  check(kalemler.length === 9, 'A1. Menüde 9 kalem var', `${kalemler.length}: ${kalemler.map(k => k.tab).join(', ')}`);
-  const beklenen = ['executive', 'reservations', 'properties', 'operations', 'leads', 'pricing', 'finance', 'marketing', 'settings'];
+  // 10. kalem Analiz: kullanici karari 05.11.2026 (ayri sekme, Pazarlama'nin yaninda).
+  check(kalemler.length === 10, 'A1. Menüde 10 kalem var', `${kalemler.length}: ${kalemler.map(k => k.tab).join(', ')}`);
+  const beklenen = ['executive', 'reservations', 'properties', 'operations', 'leads', 'pricing', 'finance', 'analytics', 'marketing', 'settings'];
   check(JSON.stringify(kalemler.map(k => k.tab)) === JSON.stringify(beklenen),
     'A2. Menü sırası kullanıcı kararıyla aynı', kalemler.map(k => k.tab).join(', '));
   const etiket = t => (kalemler.find(k => k.tab === t) || {}).etiket || '';
