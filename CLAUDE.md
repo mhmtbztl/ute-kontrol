@@ -861,7 +861,10 @@ genelidir: `tenant_settings.ads_visible_metrics` (boş = sözlüğün `DEFAULT_V
 `MAX_VISIBLE`); özel metrikler `ads_custom_metrics` ile **tek upsert'te** yazılır. Ölçülmeyen sütun
 soluk "—" ve nedenini söyler (`missingInputs` → Meta sütun adı). Talep metrikleri kampanya satırında
 "—", yalnız Toplam'da (kanal düzeyi). İstem seçimden bağımsızdır, yalnız seçili özel metrikler
-eklenir. Ağı `ads_campaign_table_tests`, tarayıcı kapısı 12. Paketler:
+eklenir. Ağı `ads_campaign_table_tests`, tarayıcı kapısı 12. **Görünüm Analiz sekmesinin dilidir**
+(`analytics.css` `ba-*`: `ba-kpi`, `ba-delta`, `ba-card`, `ba-table`, `ba-chip`); reklam ekranına özel
+ek yalnız `style.css` `ads-*`. `innerHTML` sınırı `<svg>`'yi sildiği için KPI mini eğrisi CSS
+çubuğudur ve yalnız dönemin tamamı günlük kırılımlıysa çizilir. Paketler:
 `docs/PHASE111_DEPLOY_PACKAGE.md`, `docs/PHASE113_DEPLOY_PACKAGE.md`.
 
 **Bir göçün uygulanıp uygulanmadığı, dosyaya bakarak anlaşılmaz.** Dosya repoda

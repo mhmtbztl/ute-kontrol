@@ -230,7 +230,7 @@ async function main() {
         });
         const content = document.getElementById('marketingWorkspaceContent');
         content.innerHTML = UI.renderAdsKpiStrip(model, UI.adsColumns(model)) + UI.renderAdsCampaignTable(model, UI.adsColumns(model)) + UI.renderAdsMetricPicker(model);
-        return { rows: content.querySelectorAll('.ads-table tbody tr').length, groups: content.querySelectorAll('.ads-metric-group').length };
+        return { rows: content.querySelectorAll('.ads-table tbody tr, .ads-table tfoot tr').length, groups: content.querySelectorAll('.ads-metric-group').length };
       });
       assert(adsTable.rows === 2 && adsTable.groups === 6, `reklam kampanya tablosu/seçici çizilmedi: ${JSON.stringify(adsTable)}`);
       await page.setViewportSize({ width: 390, height: 844 });

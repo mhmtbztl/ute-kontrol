@@ -23,7 +23,7 @@ const base = {
   targets: { costPerMessage: 60 }, canManageAds: true
 };
 const cellsOf = (html, label) => {
-  const row = (html.match(new RegExp(`<tr[^>]*><th scope="row">(?:<strong>)?${label}[\\s\\S]*?</tr>`)) || [''])[0];
+  const row = (html.match(new RegExp(`<tr[^>]*><th scope="row">(?:<span class="ads-campaign-name">)?${label}[\\s\\S]*?</tr>`)) || [''])[0];
   return [...row.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map(m => m[1]);
 };
 const headersOf = html => [...(html.match(/<thead>[\s\S]*?<\/thead>/) || [''])[0].matchAll(/<th[^>]*>([^<]*)<\/th>/g)].map(m => m[1]);
@@ -50,7 +50,7 @@ try {
     && cellsOf(chosenTable, 'Kış &lt;b&gt;Satış&lt;/b&gt;').slice(2).join('|') === '₺50|₺3.100|62',
     'T2. Kayıtlı seçim sırasıyla uygulanır, rakamlar analiz motorundan', cellsOf(chosenTable, 'Kış &lt;b&gt;Satış&lt;/b&gt;').join('|'));
 
-  const ctrHead = (table.match(/<th class="num is-unmeasured" title="([^"]*)">TO \(tıklama oranı\)<\/th>/) || [])[1] || '';
+  const ctrHead = (table.match(/<th scope="col" class="num is-unmeasured" title="([^"]*)">TO \(tıklama oranı\)<\/th>/) || [])[1] || '';
   check(/Bağlantı Tıklamaları/.test(ctrHead) && cellsOf(table, 'Profil trafik')[2 + cols.findIndex(c => c.key === 'ctr')] === '—',
     'T3. Hiçbir kampanyada ölçülmeyen TO soluk, "—" ve eksik Meta sütununu söyler', ctrHead);
 
@@ -81,8 +81,8 @@ try {
   const picker = UI.renderAdsMetricPicker(withCustom);
   const groups = (picker.match(/<legend>([^<]*)<\/legend>/g) || []).length;
   check(groups === G.GROUPS.length && /value="m1" checked/.test(picker) && /value="spend" checked/.test(picker) && !/value="ctr" checked/.test(picker)
-    && /ads-metric-option is-unmeasured"><input type="checkbox" name="metric" value="ctr"/.test(picker) && /data-ads-custom-metric-form/.test(picker),
-    'T7b. Seçici gruplu; seçili kutular işaretli, ölçülmeyen soluk, özel metrik formu Özel grubunda', picker.slice(0, 200));
+    && /ads-metric-chip is-unmeasured" title="[^"]*Bağlantı Tıklamaları[^"]*"><input type="checkbox" name="metric" value="ctr"/.test(picker) && /data-ads-custom-metric-form/.test(picker),
+    'T7b. Seçici gruplu çipler; seçililer işaretli, ölçülmeyen kesik kenarlı ve nedeni ipucunda, özel metrik formu panelde', picker.slice(0, 200));
 
   const empty = UI.buildAdsModel({ ...base, adMetricPeriods: [], leadAcquisitions: [] });
   const emptyHtml = UI.renderAds(empty, 'overview');
@@ -92,7 +92,7 @@ try {
   check(/Kış &lt;b&gt;Satış&lt;\/b&gt;/.test(table) && !/Kış <b>Satış<\/b>/.test(table), 'T9. Kampanya adı kaçışlanır', 'kaçışsız ad');
 
   const strip = UI.renderAdsKpiStrip(model, cols);
-  check((strip.match(/ads-kpi-tile/g) || []).length === cols.length && /ads-kpi-tile is-unmeasured"[^>]*><div class="ads-kpi-label">TO/.test(strip) && /₺4\.650/.test(strip),
+  check((strip.match(/ads-kpi-tile/g) || []).length === cols.length && /ads-kpi-tile is-unmeasured"><p class="ba-kpi-label"[^>]*>TO/.test(strip) && /₺4\.650/.test(strip),
     'T10. KPI şeridi seçili metrik başına bir kutu; ölçülmeyen soluk', strip.slice(0, 200));
 } catch (error) { failed++; console.error(error.stack); }
 console.log(`\nTEST SUMMARY: ${passed} / ${passed + failed} TESTS PASSED (${failed} FAILED)`);
