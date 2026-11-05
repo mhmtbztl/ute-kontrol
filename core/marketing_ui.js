@@ -845,7 +845,7 @@
   }
 
   function matchBadge(entry) {
-    if (entry.choice === '__new__') return '<span class="badge badge-blue">Yeni kampanya açılacak</span>';
+    if (entry.choice === '__new__') return '<span class="badge badge-blue">Bu adla yeni kampanya açılacak</span>';
     if (entry.manual) return '<span class="badge badge-emerald">Elle seçildi</span>';
     if (entry.matchedBy === 'EXACT') return '<span class="badge badge-emerald">Birebir eşleşti</span>';
     return '<span class="badge badge-amber ads-badge-dashed">Benzer ad · kontrol edin</span>';
@@ -875,7 +875,8 @@
     const ownCampaigns = platform => (campaigns || []).filter(item => item.platform === platform);
     const mappingRows = plan.names.map(entry => {
       const manual = importState.mapping && importState.mapping[entry.key] !== undefined;
-      const options = [`<option value="__new__"${entry.choice === '__new__' ? ' selected' : ''}>+ Yeni kampanya oluştur</option>`,
+      // Yeni kampanya dosyadaki adla açılır; seçenek o adı gösterir ki ne açılacağı belli olsun.
+      const options = [`<option value="__new__"${entry.choice === '__new__' ? ' selected' : ''}>+ Yeni kampanya: ${escapeHtml(entry.name)}</option>`,
         ...ownCampaigns(entry.platform).map(item => `<option value="${escapeHtml(item.id)}"${String(item.id) === entry.choice ? ' selected' : ''}>${escapeHtml(item.name)}</option>`)].join('');
       return `<tr><td><strong>${escapeHtml(entry.name)}</strong><span class="sub-text" style="display:block">${escapeHtml(entry.platform)}</span></td><td><select class="form-control" data-ads-map-campaign="${escapeHtml(entry.key)}" aria-label="${escapeHtml(entry.name)} için kampanya">${options}</select></td><td>${matchBadge({ ...entry, manual })}</td></tr>`;
     }).join('');
@@ -889,7 +890,7 @@
       ${list('Kaydetmeden önce düzeltin', 'rose', blockers)}
       ${saveNoticeHtml}
       ${list('Dikkat', 'amber', importState.parseWarnings ? [...importState.parseWarnings, ...plan.warnings] : plan.warnings)}
-      <div class="card" style="padding:14px;margin-bottom:14px;overflow:auto"><h3 style="margin:0 0 4px">Kampanyaları eşleştir</h3><p class="sub-text" style="margin:0 0 10px">Dosyadaki her ad kayıtlı bir kampanyaya bağlanır. Eşleşmeyen ad için yeni kampanya açılır; isterseniz listeden mevcut kampanyayı seçin.</p><table class="data-table"><thead><tr><th>Dosyadaki ad</th><th>Lexbnb kampanyası</th><th>Durum</th></tr></thead><tbody>${mappingRows}</tbody></table></div>
+      <div class="card" style="padding:14px;margin-bottom:14px;overflow:auto"><h3 style="margin:0 0 4px">Kampanyaları eşleştir</h3><p class="sub-text" style="margin:0 0 10px">Dosyadaki her ad kayıtlı bir kampanyaya bağlanır. Eşleşmeyen ad için dosyadaki adla yeni kampanya açılır; isterseniz listeden mevcut kampanyayı seçin.</p><table class="data-table"><thead><tr><th>Dosyadaki ad</th><th>Lexbnb kampanyası</th><th>Durum</th></tr></thead><tbody>${mappingRows}</tbody></table></div>
       <div class="card" style="padding:14px;margin-bottom:14px;overflow:auto"><h3 style="margin:0 0 10px">Kaydedilecek dönemler</h3><table class="data-table"><thead><tr><th>Kampanya</th><th>Dönem</th><th>Gün</th><th>Sonuç türü</th><th>Harcama</th><th>Gösterim</th><th>Tıklama</th><th>Sonuç</th></tr></thead><tbody>${previewRows}</tbody></table>
         <form data-ads-import-confirm class="ads-confirm-bar"><span class="sub-text">${escapeHtml(reason)}</span><div style="display:flex;gap:8px"><button type="button" class="btn btn-secondary btn-sm" data-ads-import-reset>Vazgeç</button><button type="submit" class="btn btn-primary btn-sm"${disabled ? ' disabled' : ''}>Onayla ve kaydet</button></div></form>
       </div>`;

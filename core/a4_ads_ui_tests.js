@@ -44,7 +44,7 @@ const blocked = UI.renderAdsImportView(importState, kampanyalar, ['2026-10']);
 assert(/kapatılmış/.test(blocked) && disabledConfirm.test(blocked), 'kapalı ay: onay kapalı ve nedeni yazılı');
 const loading = UI.renderAdsImportView({ ...importState, status: 'LOADING' }, [], []);
 assert(disabledConfirm.test(loading), 'kayıtlı veri kontrol edilirken onay kapalı');
-assert(/Yeni kampanya açılacak/.test(loading) && /value="__new__" selected/.test(loading), 'eşleşmeyen ad: varsayılan yeni kampanya');
+assert(/Bu adla yeni kampanya açılacak/.test(loading) && /value="__new__" selected>\+ Yeni kampanya: Kış kampanyası</.test(loading), 'eşleşmeyen ad: varsayılan yeni kampanya, dosyadaki adla');
 const saveFailed = UI.renderAdsImportView({ ...importState, saveError: 'Bağlantı koptu' }, kampanyalar, []);
 assert(/Kaydedilemedi/.test(saveFailed) && !disabledConfirm.test(saveFailed), 'kayıt hatası gösterilir, yeniden deneme açık kalır');
 const viewerHtml = UI.renderAds({ ...model, canManage: false }, 'import');
