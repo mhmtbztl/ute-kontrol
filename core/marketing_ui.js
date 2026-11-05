@@ -13,6 +13,7 @@
       LexbnbGuestCrm: require('./guest_crm_engine'),
       MarketingBenchmarkService: require('./marketing_benchmark_service'),
       MarketingCoverChangeService: require('./marketing_cover_change_service'),
+      MarketingDataService: require('./marketing_data_service'),
       MarketingHealthResultsService: require('./marketing_health_results_service'),
       AdsMetricsEngine: require('./ads_metrics_engine'),
       AdsImportParser: require('./ads_import_parser'),
@@ -66,7 +67,7 @@
 
   const BROWSER_DEPENDENCIES = Object.freeze([
     ['AirbnbPerformanceService', 'core/airbnb_performance_service.js?v=324a48bb'],
-    ['AirbnbPerformanceUI', 'core/airbnb_performance_ui.js?v=42982bf1'],
+    ['AirbnbPerformanceUI', 'core/airbnb_performance_ui.js?v=42eb6e0f'],
     ['LexbnbBusinessDate', 'core/business_date.js?v=a1518391'],
     ['MarketingEngine', 'core/marketing_engine.js?v=2756f4ec'],
     ['MarketingFunnelService', 'core/marketing_funnel_service.js?v=a5ecbdaa'],
@@ -1022,16 +1023,21 @@
     };
   }
 
-  function cloudScope() {
-    const tenantId = typeof getActiveTenantId === 'function' ? getActiveTenantId() : null;
+  function cloudScopeForView(tenantId, data = {}, filter = {}, view = state.view) {
     if (!services.MarketingDataService || !services.MarketingDataService.UUID_RE.test(String(tenantId || ''))) return null;
-    const data = typeof appData !== 'undefined' ? appData : {};
-    const filter = typeof currentFilter !== 'undefined' ? currentFilter : {};
+    if (view === 'funnel') return { tenantId, propertyId: null };
     const selectedProperty = filter.villa || 'ALL';
     if (selectedProperty === 'ALL') return { tenantId, propertyId: null };
     const propertyId = data.villas && data.villas[selectedProperty] && data.villas[selectedProperty].id;
     if (!services.MarketingDataService.UUID_RE.test(String(propertyId || ''))) return null;
     return { tenantId, propertyId };
+  }
+
+  function cloudScope() {
+    const tenantId = typeof getActiveTenantId === 'function' ? getActiveTenantId() : null;
+    const data = typeof appData !== 'undefined' ? appData : {};
+    const filter = typeof currentFilter !== 'undefined' ? currentFilter : {};
+    return cloudScopeForView(tenantId, data, filter, state.view);
   }
 
   // Backend maliyeti (kullanıcı, 05.11.2026): reklam dönemleri her sayfa yüklemesinde
@@ -1484,6 +1490,10 @@
     document.querySelectorAll('[data-marketing-view]').forEach(button => button.addEventListener('click', () => {
       state.view = button.dataset.marketingView;
       render();
+      hydrateCloudData().then(render).catch(() => {
+        const status = document.getElementById('marketingWorkspaceStatus');
+        if (status) status.textContent = 'Pazarlama verisi yüklenemedi. Lütfen yeniden deneyin.';
+      });
     }));
     const content = document.getElementById('marketingWorkspaceContent');
     if (content) content.addEventListener('click', event => {
@@ -1722,5 +1732,5 @@
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') initializeBrowser();
 
-  return { renderSnapshotList, deleteSnapshot, periodFromFilter, adsWindow, scopeBookings, buildWorkspaceModel, getCurrentModel: () => buildWorkspaceModel(browserInput()), buildAdsModel, buildAdsChatGptContext, renderAdsChatGptCard, adsImportPlan, renderAdsImportView, selectLatestSnapshot, selectCurrentBenchmark, renderWorkspaceHtml, renderAds, normalizeCustomMetrics, evaluateCustomMetric, campaignBudgetView, renderMarketingHealth, renderBenchmarkPanel, renderBenchmarkForm, renderFindingActions, renderListingForm, renderSnapshotForm, renderExperimentForm, renderExperiments, escapeHtml, setData, render };
+  return { renderSnapshotList, deleteSnapshot, periodFromFilter, adsWindow, scopeBookings, cloudScopeForView, buildWorkspaceModel, getCurrentModel: () => buildWorkspaceModel(browserInput()), buildAdsModel, buildAdsChatGptContext, renderAdsChatGptCard, adsImportPlan, renderAdsImportView, selectLatestSnapshot, selectCurrentBenchmark, renderWorkspaceHtml, renderAds, normalizeCustomMetrics, evaluateCustomMetric, campaignBudgetView, renderMarketingHealth, renderBenchmarkPanel, renderBenchmarkForm, renderFindingActions, renderListingForm, renderSnapshotForm, renderExperimentForm, renderExperiments, escapeHtml, setData, render };
 }));

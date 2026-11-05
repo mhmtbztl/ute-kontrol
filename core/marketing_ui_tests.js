@@ -132,6 +132,19 @@ runTest('Airbnb view mounts the dedicated period-based workspace', () => {
   assert.match(MarketingUI.renderWorkspaceHtml(model, 'funnel'), /id="airbnbPerformanceWorkspace"/);
 });
 
+runTest('Airbnb workspace loads every listing even when the global property filter selects one home', () => {
+  const scope = MarketingUI.cloudScopeForView(
+    '11111111-1111-4111-8111-111111111111',
+    { villas: { DEMO: { id: '22222222-2222-4222-8222-222222222222' } } },
+    { villa: 'DEMO' },
+    'funnel'
+  );
+  assert.deepStrictEqual(scope, {
+    tenantId: '11111111-1111-4111-8111-111111111111',
+    propertyId: null
+  });
+});
+
 runTest('Injected markup is escaped in finding output', () => {
   const model = MarketingUI.buildWorkspaceModel({
     filter: { period: 'ALL', villa: 'ALL' }, bookings: [],

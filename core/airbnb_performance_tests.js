@@ -1,6 +1,7 @@
 'use strict';
 const assert = require('assert');
 const S = require('./airbnb_performance_service');
+const UI = require('./airbnb_performance_ui');
 const listing = '11111111-1111-4111-8111-111111111111';
 const input = { listingId: listing, start: '2026-10-04', end: '2026-11-03', metrics: { views: '436', searchConversion: '18,73', bookingConversion: '0,16' } };
 const valid = S.validate(input);
@@ -31,5 +32,18 @@ assert.deepEqual(windows, { before: { start: '2026-10-22', endExclusive: '2026-1
 assert.equal(S.validate({ ...input, metrics: { views: 500, impressions: 100 } }).metrics.views, 500); // Independent platform definitions.
 assert.equal(S.difference({metrics:{bookingConversion:3}},{metrics:{bookingConversion:2}},'bookingConversion'),1);
 assert.equal(S.difference({metrics:{views:0}},{metrics:{views:0}},'views'),0);
+const workspaceListings = UI.listingsForWorkspace({
+  selectedProperty: 'DEMO',
+  properties: [
+    { slug: 'DEMO', id: 'property-demo', name: 'Deneme Evi AAA' },
+    { slug: 'REAL', id: 'property-real', name: 'Gerçek İlan' }
+  ],
+  listings: [
+    { id: 'airbnb-demo', property_id: 'property-demo', channel_code: 'AIRBNB' },
+    { id: 'airbnb-real', property_id: 'property-real', channel_code: 'AIRBNB' },
+    { id: 'booking-real', property_id: 'property-real', channel_code: 'BOOKING_COM' }
+  ]
+});
+assert.deepEqual(workspaceListings.map(item => item.id), ['airbnb-demo', 'airbnb-real']);
 console.log('Airbnb performance: validation, exact periods, revisions, isolation, legacy semantics passed.');
 console.log('TEST SUMMARY: 1 / 1 TESTS PASSED');

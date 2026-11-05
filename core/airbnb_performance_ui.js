@@ -19,6 +19,10 @@
     if (e && e.code === '42501') return 'Bu işlem için yönetim yetkisi gerekiyor.';
     return e && !e.code && e instanceof Error ? e.message : 'Veriler alınamadı veya kaydedilemedi. Bağlantınızı kontrol edip yeniden deneyin.';
   }
+  function listingsForWorkspace(model = {}) {
+    return (Array.isArray(model.listings) ? model.listings : [])
+      .filter(listing => String(listing.channel_code || listing.channelCode || '').toUpperCase() === 'AIRBNB');
+  }
   function chart(records, key) {
     const points = S.currentRecords(records).sort((a, b) => a.period_end.localeCompare(b.period_end));
     const max = Math.max(1, ...points.map(r => Number(r.metrics[key]) || 0));
@@ -28,8 +32,7 @@
   function mount(root, context) {
     if (!root || !S) return;
     const { model, client, tenantId, canManage } = context;
-    const selectedProperty = model.properties.find(p => p.slug === model.selectedProperty);
-    const listings = model.listings.filter(l => (l.channel_code || l.channelCode) === 'AIRBNB' && (!selectedProperty || (l.property_id || l.propertyId) === selectedProperty.id));
+    const listings = listingsForWorkspace(model);
     const listingIds = new Set(listings.map(l => l.id));
     const legacy = model.snapshots.filter(r => listingIds.has(r.channel_listing_id)).map(S.fromLegacy);
     const state = { records: [], changes: [], loading: true, available: false, error: '', message: '', section: 'performance', selected: '', form: null, draft: null, preview: null, busy: false, metric: 'views', period: { ...model.period } };
@@ -145,5 +148,5 @@
     });
     draw(); reload();
   }
-  return { mount, chart, delta, errorText };
+  return { mount, chart, delta, errorText, listingsForWorkspace };
 }));
