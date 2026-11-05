@@ -4146,8 +4146,8 @@ function registerPageAction(tabId, action) {
 
 registerPageAction('marketing', {
   id: 'funnel-test-question',
-  label: "🧪 Testi ChatGPT'ye sor",
-  title: 'Huni değişikliğinin etkisini ChatGPT ile değerlendir',
+  label: "🧪 Önceki kapak testini sor",
+  title: 'Önceki kapak testi kayıtlarını değerlendirir; yeni Airbnb performans kayıtlarını içermez',
   kind: 'FUNNEL_TEST_QUESTION',
   run: () => openFunnelTestQuestion()
 });

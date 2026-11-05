@@ -1,0 +1,35 @@
+'use strict';
+const assert = require('assert');
+const S = require('./airbnb_performance_service');
+const listing = '11111111-1111-4111-8111-111111111111';
+const input = { listingId: listing, start: '2026-10-04', end: '2026-11-03', metrics: { views: '436', searchConversion: '18,73', bookingConversion: '0,16' } };
+const valid = S.validate(input);
+assert.equal(valid.metrics.searchConversion, 18.73);
+assert.equal(valid.metrics.favorites, null);
+assert.equal(valid.endExclusive, '2026-11-04');
+assert.equal(S.validate({ ...input, metrics: { views: '0' } }).metrics.views, 0);
+for (const value of ['-1', '1.5', 'abc', 'Infinity']) assert.throws(() => S.validate({ ...input, metrics: { views: value } }));
+assert.throws(() => S.validate({ ...input, metrics: { bookingConversion: 101 } }));
+assert.throws(() => S.validate({ ...input, start: '2026-02-30' }));
+assert.throws(() => S.validate({ ...input, metrics: {} }));
+const row = (id, start, end, views, extra = {}) => ({ id, channel_listing_id: listing, period_start: start, period_end: end, metrics: { views }, ...extra });
+const records = [row('old', '2026-09-03', '2026-10-03', 393), row('new', '2026-10-04', '2026-11-03', 436)];
+const pair = S.compare(records, listing, { start: '2026-10-04', endExclusive: '2026-11-04' });
+assert.equal(pair.current.id, 'new');
+assert.equal(pair.previous.id, 'old');
+assert.equal(S.difference(pair.current, pair.previous, 'views'), 43);
+assert.equal(S.difference(pair.current, null, 'views'), null);
+assert.equal(S.compare(records, listing, { start: '2026-10-05', endExclusive: '2026-11-04' }).current, null);
+assert.equal(S.currentRecords([...records, row('revised', '2026-10-04', '2026-11-03', 440, { supersedes_id: 'new' })]).length, 2);
+assert.equal(S.compare([...records, row('other', '2026-10-04', '2026-11-03', 99, { channel_listing_id: 'other' })], listing, {}).current.id, 'new');
+const legacy = S.fromLegacy({ id: 'legacy', channel_listing_id: listing, period_start: '2026-10-04', period_end_exclusive: '2026-11-04', impressions: 1832, listing_views: 436, wishlist_saves: 30 });
+assert.equal(legacy.metrics.views, 436);
+assert.equal(legacy.metrics.searchConversion, null); // Not the same denominator as Airbnb's reported rate.
+assert.equal(S.currentRecords([legacy, ...records]).filter(r => r.period_start === '2026-10-04').length, 1);
+const windows = S.changeWindows('2026-11-05');
+assert.deepEqual(windows, { before: { start: '2026-10-22', endExclusive: '2026-11-05' }, after: { start: '2026-11-05', endExclusive: '2026-11-19' } });
+assert.equal(S.validate({ ...input, metrics: { views: 500, impressions: 100 } }).metrics.views, 500); // Independent platform definitions.
+assert.equal(S.difference({metrics:{bookingConversion:3}},{metrics:{bookingConversion:2}},'bookingConversion'),1);
+assert.equal(S.difference({metrics:{views:0}},{metrics:{views:0}},'views'),0);
+console.log('Airbnb performance: validation, exact periods, revisions, isolation, legacy semantics passed.');
+console.log('TEST SUMMARY: 1 / 1 TESTS PASSED');

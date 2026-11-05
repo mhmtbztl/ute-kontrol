@@ -1,5 +1,17 @@
 # ChatGPT Analysis Export Tasks
 
+## Airbnb İlan Performansı — 5 Kasım 2026
+
+- [x] Kalıcı dönem kaydı ve sürümlü düzeltme; servis ve canlı test doğrulaması.
+- [x] Airbnb alanlarıyla form, önizleme, mülk tablosu ve geçmiş; tarayıcı doğrulaması.
+- [x] Tam eşleşen dönem karşılaştırması ve gerçek kayıt grafiği; hesap testleri.
+- [x] Değişiklik notu ve 14+14 gün karşılaştırması; canlı/UI testleri.
+- [x] Tam test, göç zinciri, damga ve tarayıcı kapısı; 215/215 güvenli süit,
+  ayrı canlı süit ve mobil/masaüstü akışları geçti. Üretim göçü/push yapılmadı.
+- [ ] Sonraki aşama: örnek CSV alındıktan sonra önizlemeli toplu aktarım.
+
+## Önceki tamamlanmış çalışma
+
 - [x] Task 1: Persist the approved specification and implementation plan.
   - Acceptance: Scope, contracts, risks and delivery gates are recorded.
   - Verify: Files exist and do not overwrite another active plan.
