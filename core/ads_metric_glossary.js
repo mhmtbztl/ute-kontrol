@@ -30,43 +30,43 @@
       short: 'Seçili dönemde reklama ödenen para. Finans\'ta "Reklam" gideri olarak görünür.' },
     { key: 'results', label: 'Sonuçlar', group: 'results', unit: 'COUNT', good: 'UP', base: true, metaColumn: 'Sonuçlar',
       short: 'Kampanyanın hedeflediği eylemin kaç kez gerçekleştiği (mesaj, profil ziyareti, sayfa görüntüleme…). Türü "Sonuç göstergesi" söyler.' },
-    { key: 'costPerResult', label: 'Sonuç başına ücret', group: 'results', unit: 'TRY', good: 'DOWN', formula: 'Harcanan tutar ÷ Sonuçlar',
+    { key: 'costPerResult', inputs: ['spend', 'results'], label: 'Sonuç başına ücret', group: 'results', unit: 'TRY', good: 'DOWN', formula: 'Harcanan tutar ÷ Sonuçlar',
       short: 'Bir sonucun ortalama maliyeti. Aynı türde sonuç üreten kampanyaları karşılaştırmanın ana ölçüsü.',
       compute: t => ratio(t.spend, t.results) },
     { key: 'impressions', label: 'Gösterim', group: 'delivery', unit: 'COUNT', good: 'UP', base: true, metaColumn: 'Gösterim',
       short: 'Reklamın ekranda kaç kez gösterildiği. Aynı kişi birden çok kez sayılabilir.' },
     { key: 'reach', label: 'Erişim', group: 'delivery', unit: 'COUNT', good: 'UP', base: true, metaColumn: 'Erişim',
       short: 'Reklamı en az bir kez gören tekil kişi sayısı. Farklı günlerin ya da kampanyaların erişimi toplanamaz; bu yüzden birden çok dönemde "—" görünür.' },
-    { key: 'frequency', label: 'Sıklık', group: 'delivery', unit: 'RATIO', good: null, formula: 'Gösterim ÷ Erişim',
+    { key: 'frequency', inputs: ['impressions', 'reach'], label: 'Sıklık', group: 'delivery', unit: 'RATIO', good: null, formula: 'Gösterim ÷ Erişim',
       short: 'Bir kişinin reklamı ortalama kaç kez gördüğü. 3\'ün üstü genelde aynı kişilere fazla gösterildiğine (reklam yorgunluğu) işaret eder.',
       compute: t => ratio(t.impressions, t.reach) },
-    { key: 'cpm', label: 'BGBM (1.000 gösterim başına ücret)', group: 'delivery', unit: 'TRY', good: 'DOWN', formula: 'Harcanan tutar ÷ Gösterim × 1.000',
+    { key: 'cpm', inputs: ['spend', 'impressions'], label: 'BGBM (1.000 gösterim başına ücret)', group: 'delivery', unit: 'TRY', good: 'DOWN', formula: 'Harcanan tutar ÷ Gösterim × 1.000',
       short: 'Reklamı 1.000 kez göstermenin maliyeti. Yükselmesi rekabetin ya da hedef kitlenin pahalılaştığını gösterebilir.',
       compute: t => ratio(t.spend, t.impressions, 1000) },
     { key: 'clicks', label: 'Bağlantı tıklamaları', group: 'engagement', unit: 'COUNT', good: 'UP', base: true, metaColumn: 'Bağlantı Tıklamaları',
       short: 'Reklamdaki bağlantıya (web sitesi, WhatsApp, profil) yapılan tıklama sayısı.' },
-    { key: 'ctr', label: 'TO (tıklama oranı)', group: 'engagement', unit: 'PCT', good: 'UP', formula: 'Bağlantı tıklamaları ÷ Gösterim × 100',
+    { key: 'ctr', inputs: ['clicks', 'impressions'], label: 'TO (tıklama oranı)', group: 'engagement', unit: 'PCT', good: 'UP', formula: 'Bağlantı tıklamaları ÷ Gösterim × 100',
       short: 'Reklamı görenlerin yüzde kaçının tıkladığı. Görsel ve metnin ilgi çekip çekmediğinin ölçüsü.',
       compute: t => ratio(t.clicks, t.impressions, 100) },
-    { key: 'cpc', label: 'TBM (tıklama başına ücret)', group: 'engagement', unit: 'TRY', good: 'DOWN', formula: 'Harcanan tutar ÷ Bağlantı tıklamaları',
+    { key: 'cpc', inputs: ['spend', 'clicks'], label: 'TBM (tıklama başına ücret)', group: 'engagement', unit: 'TRY', good: 'DOWN', formula: 'Harcanan tutar ÷ Bağlantı tıklamaları',
       short: 'Bir tıklamanın ortalama maliyeti.',
       compute: t => ratio(t.spend, t.clicks) },
     { key: 'messages', label: 'Mesajlaşma başlatma', group: 'messaging', unit: 'COUNT', good: 'UP', base: true, metaColumn: 'Sonuçlar (mesaj hedefli kampanya)',
       short: 'Reklamdan WhatsApp, Instagram ya da Messenger\'da başlayan sohbet sayısı.' },
-    { key: 'costPerMessage', label: 'Mesaj başına ücret', group: 'messaging', unit: 'TRY', good: 'DOWN', formula: 'Harcanan tutar ÷ Mesajlaşma başlatma',
+    { key: 'costPerMessage', inputs: ['spend', 'messages'], label: 'Mesaj başına ücret', group: 'messaging', unit: 'TRY', good: 'DOWN', formula: 'Harcanan tutar ÷ Mesajlaşma başlatma',
       short: 'Bir sohbeti başlatmanın ortalama maliyeti. Verimlilik hedefinizle karşılaştırılır.',
       compute: t => ratio(t.messageSpend ?? t.spend, t.messages) },
     { key: 'calls', label: 'Arama', group: 'messaging', unit: 'COUNT', good: 'UP', base: true, metaColumn: 'Sonuçlar (arama hedefli kampanya)',
       short: 'Reklamdaki "Ara" düğmesiyle yapılan arama sayısı.' },
-    { key: 'costPerCall', label: 'Arama başına ücret', group: 'messaging', unit: 'TRY', good: 'DOWN', formula: 'Harcanan tutar ÷ Arama',
+    { key: 'costPerCall', inputs: ['spend', 'calls'], label: 'Arama başına ücret', group: 'messaging', unit: 'TRY', good: 'DOWN', formula: 'Harcanan tutar ÷ Arama',
       short: 'Bir aramanın ortalama maliyeti.',
       compute: t => ratio(t.callSpend ?? t.spend, t.calls) },
     { key: 'leads', label: 'Talep (Lexbnb)', group: 'lexbnb', unit: 'COUNT', good: 'UP', base: true, metaColumn: null,
       short: 'Lexbnb\'ye kaynağı Instagram/Facebook reklamı olarak girilen talep sayısı. Kanal düzeyindedir: hangi kampanyadan geldiği bilinmez.' },
-    { key: 'costPerLead', label: 'Talep başına ücret', group: 'lexbnb', unit: 'TRY', good: 'DOWN', formula: 'Harcanan tutar ÷ Talep',
+    { key: 'costPerLead', inputs: ['spend', 'leads'], label: 'Talep başına ücret', group: 'lexbnb', unit: 'TRY', good: 'DOWN', formula: 'Harcanan tutar ÷ Talep',
       short: 'Lexbnb\'ye düşen bir talebin ortalama reklam maliyeti (kanal düzeyi).',
       compute: t => ratio(t.spend, t.leads) },
-    { key: 'messageToLead', label: 'Mesaj → talep oranı', group: 'lexbnb', unit: 'PCT', good: 'UP', formula: 'Talep ÷ Mesajlaşma başlatma × 100',
+    { key: 'messageToLead', inputs: ['leads', 'messages'], label: 'Mesaj → talep oranı', group: 'lexbnb', unit: 'PCT', good: 'UP', formula: 'Talep ÷ Mesajlaşma başlatma × 100',
       short: 'Başlayan sohbetlerin yüzde kaçının Lexbnb\'ye talep olarak girildiği. Düşükse sohbetler satışa dönmüyor ya da talepler kaydedilmiyor olabilir.',
       compute: t => ratio(t.leads, t.messages, 100) }
   ]);
@@ -76,7 +76,31 @@
   // Metrik seçicinin ilk açılıştaki seçimi: yeni başlayan biri için en anlamlı altı ölçü.
   const DEFAULT_VISIBLE = Object.freeze(['spend', 'results', 'costPerResult', 'impressions', 'ctr', 'costPerMessage']);
 
+  // Tablo ve şeritteki sütun sınırı (taban + türetilen + özel metrikler).
+  const MAX_VISIBLE = 14;
+
   function get(key) { return BY_KEY[key] || null; }
+
+  // Ölçülmeyen metriğin hangi taban sayaçlarının eksik olduğu; ekran onların Meta
+  // sütun adını yazar. Taban metrikte kendisi, türetilende inputs'tan ölçülmeyenler.
+  function missingInputs(key, metrics = {}) {
+    const metric = get(key);
+    if (!metric) return [];
+    const keys = metric.base ? [metric.key] : (metric.inputs || []);
+    return keys.filter(input => metrics[input] === null || metrics[input] === undefined).map(get).filter(Boolean);
+  }
+
+  // Kayıtlı seçim: bilinen metrik anahtarları ve verilen özel metrik kimlikleri, sırası
+  // korunur, tekrar atılır. Geçerli öğe kalmazsa varsayılan seçim.
+  function normalizeVisible(raw, customIds = []) {
+    const allowed = new Set(customIds.map(String));
+    const out = [];
+    (Array.isArray(raw) ? raw : []).forEach(item => {
+      const key = String(item || '');
+      if ((BY_KEY[key] || allowed.has(key)) && !out.includes(key) && out.length < MAX_VISIBLE) out.push(key);
+    });
+    return out.length ? out : DEFAULT_VISIBLE.slice();
+  }
 
   // Taban toplamlardan bütün türetilen metrikler; ölçülemeyen null kalır.
   function derive(totals = {}) {
@@ -107,5 +131,5 @@
     return n.toLocaleString('tr-TR', { maximumFractionDigits: 0 });
   }
 
-  return { GROUPS, METRICS, BASE_KEYS, DEFAULT_VISIBLE, get, derive, compare, format, ratio };
+  return { GROUPS, METRICS, BASE_KEYS, DEFAULT_VISIBLE, MAX_VISIBLE, get, derive, compare, format, ratio, missingInputs, normalizeVisible };
 });

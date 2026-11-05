@@ -46,6 +46,7 @@
     adsView: 'overview',
     adsImport: null,
     adsImportResult: null,
+    adsMetricsOpen: false,
     adPeriods: [],
     adPeriodsKey: null,
     adPeriodsStatus: 'IDLE',
@@ -81,8 +82,8 @@
     ['MarketingExperimentService', 'core/marketing_experiment_service.js?v=4a2ffb14'],
     ['MarketingHealthResultsService', 'core/marketing_health_results_service.js?v=662edeea'],
     ['AdsMetricsEngine', 'core/ads_metrics_engine.js?v=d8dd5962'],
-    ['AdsMetricGlossary', 'core/ads_metric_glossary.js?v=71d344c8'],
-    ['AdsAnalyticsEngine', 'core/ads_analytics_engine.js?v=1aa01604'],
+    ['AdsMetricGlossary', 'core/ads_metric_glossary.js?v=cc78ebd3'],
+    ['AdsAnalyticsEngine', 'core/ads_analytics_engine.js?v=4250b14d'],
     ['AdsImportParser', 'core/ads_import_parser.js?v=ceff62b1'],
     ['AdsPeriodService', 'core/ads_period_service.js?v=1b4f5123']
   ]);
@@ -259,7 +260,8 @@
   }
 
   function adFieldValue(row, field) {
-    if (field === 'days') return adPeriodDays(row);
+    // Kampanya toplamı satırı gün sayısını analiz motorundan taşır; dönem satırı tarihlerden.
+    if (field === 'days') return row && row.days != null ? Number(row.days) : adPeriodDays(row);
     const value = row ? row[field] : null;
     return value === null || value === undefined || !Number.isFinite(Number(value)) ? null : Number(value);
   }
@@ -686,13 +688,16 @@
       ? priorPeriods.reduce((sum, row) => sum + (row.spend || 0), 0) : null;
     const spendTrendPct = totalSpend !== null && priorSpend > 0
       ? Math.round(((totalSpend - priorSpend) / priorSpend) * 1000) / 10 : null;
+    const customMetrics = normalizeCustomMetrics(input.customMetrics);
+    const glossary = services.AdsMetricGlossary;
     return {
       metrics,
       campaigns: campaigns.filter(item => ['META', 'GOOGLE'].includes(String(item.platform || '').toUpperCase())),
       allCampaigns: campaigns,
       periods,
       allPeriods,
-      customMetrics: normalizeCustomMetrics(input.customMetrics),
+      customMetrics,
+      visibleMetrics: glossary ? glossary.normalizeVisible(input.visibleMetrics, customMetrics.map(metric => metric.id)) : [],
       targets: input.targets || {},
       channelLeadCost: engine.channelLeadCost({ spendByPlatform: sums.spend, leadsBySource, messagesByPlatform: sums.messages }),
       adShare: engine.adShare({ adSpend: totalSpend, netRoomRevenue: input.financeSummary && input.financeSummary.netRoomRevenue }),
@@ -748,22 +753,31 @@
     const G = services.AdsMetricGlossary, analysis = model && model.analysis;
     if (!G || !analysis) return null;
     const fmt = (key, value) => G.format(key, value);
-    const change = pct => pct === null || pct === undefined ? null : `${pct > 0 ? '+' : pct < 0 ? '−' : ''}%${Math.abs(Number(pct)).toLocaleString('tr-TR', { maximumFractionDigits: 1 })}`;
+    const change = adsChangeText;
     const used = new Set();
     const totals = G.METRICS.filter(metric => analysis.metrics[metric.key] !== null || (analysis.priorMetrics && analysis.priorMetrics[metric.key] !== null)).map(metric => {
       used.add(metric.key);
       return { label: metric.label, value: fmt(metric.key, analysis.metrics[metric.key]),
         prior: analysis.priorMetrics ? fmt(metric.key, analysis.priorMetrics[metric.key]) : null, change: change(analysis.changes[metric.key] && analysis.changes[metric.key].pct) };
     });
-    const columnKeys = ADS_PROMPT_COLUMNS.filter(key => analysis.campaigns.some(row => row.metrics[key] !== null));
+    // Kullanıcının tabloya seçtiği kendi metrikleri de isteme girer; istem tablosu 12
+    // sütunla sınırlı olduğu için önce onlara yer ayrılır (1 sütun harcama payının).
+    const selected = new Set(model.visibleMetrics || []);
+    const customs = (model.customMetrics || []).filter(metric => selected.has(metric.id)
+      && analysis.campaigns.some(row => evaluateCustomMetric(metric, { ...row.metrics, days: row.days }) !== null));
+    const columnKeys = ADS_PROMPT_COLUMNS.filter(key => analysis.campaigns.some(row => row.metrics[key] !== null))
+      .slice(0, Math.max(0, 11 - customs.length));
     columnKeys.forEach(key => used.add(key));
     const parser = services.AdsImportParser;
     const typeLabels = { MESSAGE: 'Mesaj', CALL: 'Arama', OTHER: 'Diğer' };
     const campaigns = analysis.campaigns.map(row => ({
       name: row.name, resultLabel: (parser && parser.resultLabel(row.resultMetric)) || typeLabels[row.resultType] || null,
-      values: { ...Object.fromEntries(columnKeys.map(key => [key, fmt(key, row.metrics[key])])), share: row.spendShare === null ? null : `%${Number(row.spendShare).toLocaleString('tr-TR', { maximumFractionDigits: 1 })}` }
+      values: { ...Object.fromEntries(columnKeys.map(key => [key, fmt(key, row.metrics[key])])),
+        ...Object.fromEntries(customs.map(metric => [`custom_${metric.id}`, formatCustomMetric(metric, evaluateCustomMetric(metric, { ...row.metrics, days: row.days }))])),
+        share: row.spendShare === null ? null : `%${Number(row.spendShare).toLocaleString('tr-TR', { maximumFractionDigits: 1 })}` }
     }));
-    const campaignColumns = columnKeys.map(key => ({ key, label: G.get(key).label }));
+    const campaignColumns = columnKeys.map(key => ({ key, label: G.get(key).label }))
+      .concat(customs.map(metric => ({ key: `custom_${metric.id}`, label: metric.name })));
     if (columnKeys.includes('spend')) campaignColumns.splice(1, 0, { key: 'share', label: 'Harcama payı' });
     const range = analysis.range, prior = analysis.priorRange;
     const lastDay = iso => iso ? addUtcDays(iso, -1) : null;
@@ -775,7 +789,8 @@
         costPerCall: model.targets && model.targets.costPerCall != null ? Number(model.targets.costPerCall) : null },
       leads: { current: analysis.metrics.leads, prior: analysis.priorMetrics ? analysis.priorMetrics.leads : null },
       notes: analysis.notes.map(code => ADS_NOTE_TEXT[code]).filter(Boolean),
-      glossary: G.METRICS.filter(metric => used.has(metric.key)).map(metric => ({ label: metric.label, short: metric.short, formula: metric.formula || null })),
+      glossary: G.METRICS.filter(metric => used.has(metric.key)).map(metric => ({ label: metric.label, short: metric.short, formula: metric.formula || null }))
+        .concat(customs.map(metric => ({ label: metric.name, short: 'İşletmenin kendi tanımladığı metrik.', formula: customFormula(metric) }))),
       unmeasured: G.METRICS.filter(metric => metric.base && analysis.metrics[metric.key] === null).map(metric => metric.label)
     };
   }
@@ -796,6 +811,121 @@
     const questions = engine.ADS_QUESTIONS.map(q => q.text);
     const selected = (engine.ADS_QUESTIONS.find(q => q.id === questionId) || engine.ADS_QUESTIONS[0]).text;
     return window.openChatGptQuestionModal({ kind: 'ADS_ANALYSIS', scope: `Reklamlar · ${model.periodLabel || 'Tüm dönem'}`, questions, selectedQuestion: selected, context });
+  }
+
+  // Aşama 6 — seçilen metriklerle KPI şeridi ve kampanya tablosu. Rakamlar analiz
+  // motorundan (tek kaynak), ad ve açıklamalar sözlükten; durum rozeti hedefe göre
+  // AdsMetricsEngine'den. Seçim tenant_settings.ads_visible_metrics'te durur.
+  const ADS_LEAD_KEYS = Object.freeze(['leads', 'costPerLead', 'messageToLead']);
+  const adsChangeText = pct => pct === null || pct === undefined ? null
+    : `${pct > 0 ? '+' : pct < 0 ? '−' : ''}%${Math.abs(Number(pct)).toLocaleString('tr-TR', { maximumFractionDigits: 1 })}`;
+  const customFormula = metric => `${AD_METRIC_FIELDS[metric.num]} ${metric.op === '*' ? '×' : '÷'} ${AD_METRIC_FIELDS[metric.den]}${metric.percent ? ' × 100' : ''}`;
+
+  function adsColumns(model) {
+    const G = services.AdsMetricGlossary;
+    const custom = new Map((model.customMetrics || []).map(metric => [metric.id, metric]));
+    return (model.visibleMetrics || []).map(key => {
+      if (custom.has(key)) { const metric = custom.get(key); return { key, custom: metric, label: metric.name, short: `Kendi metriğiniz: ${customFormula(metric)}` }; }
+      const metric = G && G.get(key);
+      return metric ? { key, label: metric.label, short: metric.short } : null;
+    }).filter(Boolean);
+  }
+
+  // Kampanya ya da toplam satırındaki bir sütunun değeri; ölçülemeyen null.
+  function adsCellValue(column, metrics, days) {
+    return column.custom ? evaluateCustomMetric(column.custom, { ...metrics, days }) : metrics[column.key];
+  }
+  function adsCellText(column, value) {
+    return column.custom ? formatCustomMetric(column.custom, value) : services.AdsMetricGlossary.format(column.key, value);
+  }
+
+  // Değer neden yok: karışık sonuç türü, toplanamayan erişim, kanal düzeyi talep ya da
+  // dosyada olmayan Meta sütunu. Payda 0 gibi bir neden yoksa boş.
+  // brief: kutu ve seçicide kısa metin; uzun açıklama başlığın ipucunda (title) kalır.
+  function adsUnmeasuredReason(column, metrics, notes, brief) {
+    const G = services.AdsMetricGlossary;
+    if (column.custom) return 'Formüldeki alanlardan biri ölçülmedi ya da sıfır.';
+    if (['results', 'costPerResult'].includes(column.key) && notes.includes('RESULT_TYPES_MIXED')) return brief ? 'Sonuç türleri farklı; toplanmadı.' : ADS_NOTE_TEXT.RESULT_TYPES_MIXED;
+    if (['reach', 'frequency'].includes(column.key) && notes.includes('REACH_NOT_ADDITIVE')) return brief ? 'Erişim kampanyalar arasında toplanamaz.' : ADS_NOTE_TEXT.REACH_NOT_ADDITIVE;
+    if (ADS_LEAD_KEYS.includes(column.key) && (metrics.leads === null || metrics.leads === undefined)) return 'Lexbnb talebinde kaynak olarak Instagram/Facebook reklamı seçilmedi.';
+    const columns = G.missingInputs(column.key, metrics).map(metric => metric.metaColumn).filter(Boolean);
+    return columns.length ? `Dosyada yok · Meta'da ${columns.join(', ')} sütununu ekleyin.` : '';
+  }
+
+  function renderAdsKpiStrip(model, columns) {
+    const analysis = model.analysis;
+    const tones = { GOOD: 'badge-emerald', BAD: 'badge-red', NEUTRAL: '' };
+    return `<div class="ads-kpi-row">${columns.map(column => {
+      const value = adsCellValue(column, analysis.metrics, analysis.days);
+      const change = column.custom ? null : analysis.changes[column.key];
+      const pct = change && adsChangeText(change.pct);
+      const reason = value === null ? adsUnmeasuredReason(column, analysis.metrics, analysis.notes) : '';
+      const foot = value === null ? adsUnmeasuredReason(column, analysis.metrics, analysis.notes, true)
+        : pct ? 'önceki eş döneme göre' : '';
+      return `<div class="card ads-kpi-tile${value === null ? ' is-unmeasured' : ''}" title="${escapeHtml(reason || column.short)}"><div class="ads-kpi-label">${escapeHtml(column.label)}</div><div class="ads-kpi-value">${escapeHtml(adsCellText(column, value))}</div><div class="ads-kpi-foot">${pct ? `<span class="badge ${tones[change.tone] || ''}">${escapeHtml(pct)}</span>` : ''}<span>${escapeHtml(foot)}</span></div></div>`;
+    }).join('')}</div>`;
+  }
+
+  function renderAdsCampaignTable(model, columns) {
+    const analysis = model.analysis;
+    const parser = services.AdsImportParser;
+    const statusLabels = { VERIMLI: 'Verimli', PAHALI: 'Pahalı', IZLE: 'İzle' };
+    const statusTones = { VERIMLI: 'badge-emerald', PAHALI: 'badge-red', IZLE: 'badge-amber' };
+    const statusOf = new Map((model.metrics || []).map(row => [String(row.campaignId), row]));
+    const typeLabels = { MESSAGE: 'Mesaj', CALL: 'Arama', OTHER: 'Diğer sonuç' };
+    const unmeasuredColumn = column => !column.custom && analysis.metrics[column.key] === null
+      && analysis.campaigns.every(row => row.metrics[column.key] === null);
+    const header = columns.map(column => {
+      const reason = unmeasuredColumn(column) ? adsUnmeasuredReason(column, analysis.metrics, analysis.notes) : '';
+      return `<th class="num${reason ? ' is-unmeasured' : ''}" title="${escapeHtml(reason || column.short)}">${escapeHtml(column.label)}</th>`;
+    }).join('');
+    const cellHtml = (column, metrics, days, notes, isCampaign) => {
+      if (isCampaign && ADS_LEAD_KEYS.includes(column.key)) return '<td class="num is-unmeasured" title="Kanal düzeyi; kampanyaya atfedilmez. Değer Toplam satırında.">—</td>';
+      const value = adsCellValue(column, metrics, days);
+      const reason = value === null ? adsUnmeasuredReason(column, metrics, notes || []) : '';
+      return `<td class="num${value === null ? ' is-unmeasured' : ''}"${reason ? ` title="${escapeHtml(reason)}"` : ''}>${escapeHtml(adsCellText(column, value))}</td>`;
+    };
+    const cellsHtml = (metrics, days, notes, isCampaign) => columns.map(column => cellHtml(column, metrics, days, notes, isCampaign)).join('');
+    const rows = analysis.campaigns.map(row => {
+      const status = statusOf.get(String(row.campaignId));
+      const badge = `<span class="badge ${escapeHtml(statusTones[status && status.status] || '')}" title="${escapeHtml(status && status.statusReason && status.statusReason.text || 'Durum için hedef ve yeterli örnek gerekli.')}">${escapeHtml(statusLabels[status && status.status] || 'Hedef gerekli')}</span>`;
+      const kind = (parser && parser.resultLabel(row.resultMetric)) || typeLabels[row.resultType] || '—';
+      return `<tr><th scope="row"><strong>${escapeHtml(row.name)}</strong><span class="sub-text">${escapeHtml(row.platform || '—')} · ${escapeHtml(kind)}</span></th><td>${badge}</td><td class="num">${row.spendShare === null ? '—' : escapeHtml(`%${Number(row.spendShare).toLocaleString('tr-TR', { maximumFractionDigits: 1 })}`)}</td>${cellsHtml(row.metrics, row.days, row.notes, true)}</tr>`;
+    }).join('');
+    const total = `<tr class="ads-total-row"><th scope="row">Toplam</th><td></td><td class="num">${analysis.campaigns.length ? '%100' : '—'}</td>${cellsHtml(analysis.metrics, analysis.days, analysis.notes, false)}</tr>`;
+    const customize = model.canManage ? '<button type="button" class="btn btn-secondary btn-sm" data-ads-metrics-toggle aria-controls="adsMetricPicker">Sütunları özelleştir</button>' : '';
+    return `<div class="card ads-table-card"><div class="ads-table-head"><div><h3>Kampanyalar</h3><div class="sub-text">Seçili dönem, harcamaya göre sıralı. Bir başlığın üzerine gelince ne ölçtüğü yazar.</div></div>${customize}</div>
+      ${model.canManage && state.adsMetricsOpen ? renderAdsMetricPicker(model) : ''}
+      <div class="ads-table-scroll"><table class="data-table ads-table"><thead><tr><th scope="col">Kampanya</th><th scope="col">Durum</th><th scope="col" class="num">Harcama payı</th>${header}</tr></thead><tbody>${rows}${total}</tbody></table></div></div>`;
+  }
+
+  function renderAdsMetricPicker(model) {
+    const G = services.AdsMetricGlossary;
+    const selected = new Set(model.visibleMetrics || []);
+    const metrics = (model.analysis && model.analysis.metrics) || {};
+    const notes = (model.analysis && model.analysis.notes) || [];
+    const optionHtml = (key, label, short, hint) => `<label class="ads-metric-option${hint ? ' is-unmeasured' : ''}"><input type="checkbox" name="metric" value="${escapeHtml(key)}"${selected.has(key) ? ' checked' : ''}><span><strong>${escapeHtml(label)}</strong><span class="sub-text">${escapeHtml(short)}</span>${hint ? `<span class="ads-metric-hint">${escapeHtml(hint)}</span>` : ''}</span></label>`;
+    const groups = G.GROUPS.filter(group => group.id !== 'custom').map(group => {
+      const items = G.METRICS.filter(metric => metric.group === group.id).map(metric => optionHtml(metric.key, metric.label, metric.short,
+        metrics[metric.key] === null || metrics[metric.key] === undefined ? adsUnmeasuredReason({ key: metric.key }, metrics, notes, true) : ''));
+      return `<fieldset class="ads-metric-group"><legend>${escapeHtml(group.label)}</legend>${items.join('')}</fieldset>`;
+    }).join('');
+    const customItems = (model.customMetrics || []).map(metric => `<div class="ads-metric-custom">${optionHtml(metric.id, metric.name, customFormula(metric), '')}<button type="button" class="btn-text" data-ads-delete-metric="${escapeHtml(metric.id)}" aria-label="${escapeHtml(metric.name)} metriğini sil">Sil</button></div>`).join('');
+    const custom = `<fieldset class="ads-metric-group"><legend>Özel</legend>${customItems || '<p class="sub-text">Henüz kendi metriğiniz yok. Aşağıdan ekleyin.</p>'}</fieldset>`;
+    return `<div class="ads-metric-picker" id="adsMetricPicker">
+      <form data-ads-metrics-form>
+        <p class="sub-text">Tabloda ve üstteki kutularda görünecek metrikleri seçin (en fazla ${G.MAX_VISIBLE}). Seçim bu işletmedeki herkes için geçerlidir. Soluk olanlar bu dönemin dosyasında yok.</p>
+        <div class="ads-metric-groups">${groups}${custom}</div>
+        <div class="ads-confirm-bar"><button type="button" class="btn-text" data-ads-metrics-reset>Varsayılana dön</button><div style="display:flex;gap:8px"><button type="button" class="btn btn-secondary btn-sm" data-ads-metrics-toggle>Vazgeç</button><button type="submit" class="btn btn-primary btn-sm">Kaydet</button></div></div>
+      </form>
+      ${renderAdsCustomMetricForm(model.customMetrics || [])}
+    </div>`;
+  }
+
+  function renderAdsCustomMetricForm(customMetrics) {
+    const fieldOptions = Object.keys(AD_METRIC_FIELDS).map(key => `<option value="${key}">${escapeHtml(AD_METRIC_FIELDS[key])}</option>`).join('');
+    const full = customMetrics.length >= MAX_CUSTOM_METRICS;
+    return `<form data-ads-custom-metric-form class="ads-custom-metric-form"><strong>Kendi metriğini ekle</strong><p class="sub-text" style="margin:2px 0 10px">İki alanı bölerek ya da çarparak yeni bir sütun tanımlayın (örn. Harcama ÷ Gün = günlük ortalama harcama). En fazla ${MAX_CUSTOM_METRICS} metrik; eklenen metrik tabloya da eklenir.</p><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;align-items:end"><label style="display:grid;gap:5px;font-size:12px">Ad<input class="form-control" name="name" required maxlength="40" placeholder="Örn: Günlük harcama"></label><label style="display:grid;gap:5px;font-size:12px">Alan<select class="form-control" name="num">${fieldOptions}</select></label><label style="display:grid;gap:5px;font-size:12px">İşlem<select class="form-control" name="op"><option value="/">÷ böl</option><option value="*">× çarp</option></select></label><label style="display:grid;gap:5px;font-size:12px">Alan<select class="form-control" name="den">${fieldOptions}</select></label><label style="display:flex;gap:6px;align-items:center;font-size:12px"><input type="checkbox" name="percent" value="1"> Yüzde (×100)</label><button class="btn btn-secondary btn-sm" type="submit"${full ? ' disabled' : ''}>Metriği ekle</button></div></form>`;
   }
 
   function renderAdsSubnav(active, canManage) {
@@ -910,22 +1040,9 @@
 
   function renderAds(model, view) {
     const active = ADS_VIEWS.some(item => item.id === view && (model.canManage || !item.manage)) ? view : 'overview';
-    const statusLabels = { VERIMLI: 'Verimli', PAHALI: 'Pahalı', IZLE: 'İzle' };
-    const metricCards = model.metrics.length ? model.metrics.map(row => `
-      <article class="card" style="padding:14px">
-        <div style="display:flex;justify-content:space-between;gap:10px;align-items:start;flex-wrap:wrap">
-          <div><strong>${escapeHtml(row.campaignName)}</strong><div class="sub-text">${escapeHtml(row.platform)} · ${row.resultType === 'MESSAGE' ? 'Mesaj' : row.resultType === 'CALL' ? 'Arama' : 'Diğer sonuç'}</div></div>
-          <span class="badge ${row.status === 'VERIMLI' ? 'badge-emerald' : row.status === 'PAHALI' ? 'badge-red' : 'badge-amber'}">${escapeHtml(statusLabels[row.status] || 'Hedef gerekli')}</span>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:10px;margin-top:12px">
-          <div><span class="sub-text">Harcama</span><strong style="display:block">${money(row.spend)}</strong></div>
-          <div><span class="sub-text">CTR</span><strong style="display:block">${number(row.ctr, '%')}</strong></div>
-          <div><span class="sub-text">Tıklama maliyeti</span><strong style="display:block">${money(row.cpc)}</strong></div>
-          <div><span class="sub-text">Mesaj maliyeti</span><strong style="display:block">${money(row.costPerMessage)}</strong></div>
-          <div><span class="sub-text">Arama maliyeti</span><strong style="display:block">${money(row.costPerCall)}</strong></div>
-        </div>
-        <div class="sub-text" style="margin-top:8px">${escapeHtml(row.statusReason && row.statusReason.text || 'Durum için hedef ve yeterli örnek gerekli.')}</div>
-      </article>`).join('')
+    const adsColumnsList = adsColumns(model);
+    const overviewBody = model.analysis && model.analysis.periodCount && services.AdsMetricGlossary
+      ? renderAdsKpiStrip(model, adsColumnsList) + renderAdsCampaignTable(model, adsColumnsList)
       : model.loadStatus === 'LOADING' ? emptyState('Reklam verisi yükleniyor', 'Seçili dönemin kayıtları getiriliyor.')
       : model.loadStatus === 'ERROR' ? emptyState('Reklam verisi okunamadı', model.loadError || 'Bağlantıyı kontrol edip sayfayı yenileyin.')
       : emptyState('Henüz reklam dönemi yok', 'İlk gerçek reklam dönemi kaydedildiğinde kampanya maliyetleri burada görünür.');
@@ -963,8 +1080,6 @@
     }).join('');
     const customHeaders = customMetrics.map(metric => `<th title="${escapeHtml(AD_METRIC_FIELDS[metric.num])} ${metric.op === '*' ? '×' : '÷'} ${escapeHtml(AD_METRIC_FIELDS[metric.den])}${metric.percent ? ' × 100' : ''}">${escapeHtml(metric.name)}</th>`).join('');
     const periodList = `<div class="card" style="padding:14px;margin-bottom:14px;overflow:auto"><h3 style="margin:0 0 10px">Kayıtlı reklam dönemleri</h3>${model.periods.length ? `<table class="data-table"><thead><tr><th>Kampanya</th><th>Dönem</th><th>Gün</th><th>Harcama</th><th>Günlük ort.</th><th>Gösterim</th><th>Tıklama</th><th>CTR</th><th>Mesaj</th><th>Arama</th>${customHeaders}<th></th></tr></thead><tbody>${periodRows}</tbody></table>` : '<p class="empty-state">Henüz reklam dönemi yok.</p>'}</div>`;
-    const fieldOptions = Object.keys(AD_METRIC_FIELDS).map(key => `<option value="${key}">${escapeHtml(AD_METRIC_FIELDS[key])}</option>`).join('');
-    const customMetricAdmin = model.canManage ? `<form data-ads-custom-metric-form class="card" style="padding:16px;margin-bottom:14px"><h3 style="margin:0 0 6px">Kendi metriğini ekle</h3><p class="sub-text" style="margin:0 0 10px">İki alanı bölerek ya da çarparak tabloya yeni bir sütun ekleyin (örn. Harcama ÷ Mesaj = mesaj başı maliyet). En fazla ${MAX_CUSTOM_METRICS} metrik.</p><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;align-items:end"><label style="display:grid;gap:5px;font-size:12px">Ad<input class="form-control" name="name" required maxlength="40" placeholder="Örn: Mesaj maliyeti"></label><label style="display:grid;gap:5px;font-size:12px">Alan<select class="form-control" name="num">${fieldOptions}</select></label><label style="display:grid;gap:5px;font-size:12px">İşlem<select class="form-control" name="op"><option value="/">÷ böl</option><option value="*">× çarp</option></select></label><label style="display:grid;gap:5px;font-size:12px">Alan<select class="form-control" name="den">${fieldOptions}</select></label><label style="display:flex;gap:6px;align-items:center;font-size:12px"><input type="checkbox" name="percent" value="1"> Yüzde (×100)</label><button class="btn btn-primary btn-sm" type="submit">Metriği ekle</button></div>${customMetrics.length ? `<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px">${customMetrics.map(metric => `<span class="badge">${escapeHtml(metric.name)} = ${escapeHtml(AD_METRIC_FIELDS[metric.num])} ${metric.op === '*' ? '×' : '÷'} ${escapeHtml(AD_METRIC_FIELDS[metric.den])}${metric.percent ? ' %' : ''} <button type="button" class="btn-text" data-ads-delete-metric="${escapeHtml(metric.id)}" aria-label="Metriği sil">✕</button></span>`).join('')}</div>` : ''}</form>` : '';
     const manualForm = `
       <form data-ads-manual-form class="card" style="padding:16px;margin-bottom:14px">
         <h3 style="margin:0 0 6px">Reklam dönemi ekle</h3>
@@ -983,21 +1098,17 @@
           <button class="btn btn-primary btn-sm" type="submit">Dönemi kaydet</button>
         </div>
       </form>`;
-    const spendTrend = model.spendTrendPct === null || model.spendTrendPct === undefined
-      ? 'Önceki eş dönem karşılaştırması için veri yok'
-      : `Önceki eş döneme göre ${model.spendTrendPct > 0 ? '+' : ''}${number(model.spendTrendPct, '%')} (${money(model.priorSpend)} → ${money(model.totalSpend)})`;
-    const emptyCta = !model.metrics.length && model.loadStatus !== 'LOADING' && model.canManage
+    const emptyCta = !(model.analysis && model.analysis.periodCount) && model.loadStatus !== 'LOADING' && model.canManage
       ? '<div style="display:flex;justify-content:center;margin:-4px 0 14px"><button type="button" class="btn btn-primary btn-sm" data-ads-view="import">Meta CSV yükle</button></div>' : '';
     const resultNote = state.adsImportResult ? `<div class="card ads-notice ads-notice-emerald"><strong>Kaydedildi</strong><div class="sub-text">${escapeHtml(state.adsImportResult)}</div></div>` : '';
     const sections = {
       overview: `${resultNote}${renderAdsChatGptCard(model)}
-      <div class="card" style="padding:14px;margin-bottom:14px"><strong>Seçili dönem reklam toplamı: ${money(model.totalSpend)}</strong><div class="sub-text">${escapeHtml(spendTrend)}</div></div>
+      ${overviewBody}${emptyCta}
       <div class="card" style="padding:14px;margin-bottom:14px;border-left:4px solid #f59e0b"><strong>Atıf sınırı</strong><div class="sub-text">Talep kaynağı kanal düzeyinde ölçülür; hangi reklamın rezervasyon getirdiği ölçülemez. Kampanya ROAS'ı gösterilmez.</div></div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:14px">${metricCards}</div>${emptyCta}
       <div class="card" style="padding:14px;overflow:auto"><h3 style="margin:0 0 10px">Kanal → talep maliyeti</h3><table class="data-table"><thead><tr><th>Kanal</th><th>Harcama</th><th>Talep</th><th>Talep maliyeti</th><th>Mesaj→talep</th></tr></thead><tbody>${channelRows}</tbody></table><div class="sub-text" style="margin-top:10px">Toplam reklam harcaması ${money(model.totalSpend)} · net konaklama cirosundaki pay ${number(model.adShare.pct, '%')}</div></div>`,
       import: renderAdsImportView(state.adsImport, model.allCampaigns, model.closedMonths || []) + renderAdsAlternativeImports(campaignOptions, manualForm),
       campaigns: campaignAdmin,
-      records: `${customMetricAdmin}${periodList}`
+      records: `${model.canManage ? '<p class="sub-text" style="margin:0 0 10px">Tabloda görünen metrikleri ve kendi metriklerinizi Genel bakış → <strong>Sütunları özelleştir</strong> bölümünden yönetin.</p>' : ''}${periodList}`
     };
     return `${renderAdsSubnav(active, model.canManage)}<div role="tabpanel" data-ads-panel="${active}">${sections[active]}</div>`;
   }
@@ -1019,6 +1130,7 @@
       leadSources: data.leadSources || [], leadAcquisitions: data.leadAcquisitions || [],
       targets: { costPerMessage: settings.ads_cost_per_message_target, costPerCall: settings.ads_cost_per_call_target },
       customMetrics: settings.ads_custom_metrics || [],
+      visibleMetrics: settings.ads_visible_metrics || null,
       closedMonths: closedMonthKeys(data),
       canManageAds: typeof canManageTenantRole !== 'function' || canManageTenantRole(typeof activeTenant !== 'undefined' && activeTenant && activeTenant.role)
     };
@@ -1330,33 +1442,55 @@
     render();
   }
 
-  async function saveAdsCustomMetrics(list) {
+  // Özel metrikler ve sütun seçimi tek upsert'te yazılır: yeni özel metrik seçime
+  // eklenir, silinen seçimden düşer; ikisi ayrı yazılsaydı arada yarım durum kalırdı.
+  async function saveAdsMetricSettings({ customMetrics, visibleMetrics }) {
     const client = typeof supabaseClient !== 'undefined' ? supabaseClient : null;
     const scope = cloudScope();
     if (!client || !scope) throw new Error('ADS_METRIC_UNAVAILABLE');
-    const { error } = await client.from('tenant_settings').upsert(
-      [{ tenant_id: scope.tenantId, key: 'ads_custom_metrics', value: normalizeCustomMetrics(list) }], { onConflict: 'tenant_id,key' });
+    const rows = [];
+    if (customMetrics !== undefined) rows.push({ tenant_id: scope.tenantId, key: 'ads_custom_metrics', value: normalizeCustomMetrics(customMetrics) });
+    if (visibleMetrics !== undefined) rows.push({ tenant_id: scope.tenantId, key: 'ads_visible_metrics', value: visibleMetrics });
+    const { error } = await client.from('tenant_settings').upsert(rows, { onConflict: 'tenant_id,key' });
     if (error) throw error;
     if (typeof loadTenantAppData === 'function') await loadTenantAppData(scope.tenantId);
     render();
   }
 
-  function currentCustomMetrics() {
-    const data = typeof appData !== 'undefined' ? appData : {};
-    return normalizeCustomMetrics((data.tenantSettings || {}).ads_custom_metrics);
+  function currentAdsMetricSettings() {
+    const settings = (typeof appData !== 'undefined' ? appData : {}).tenantSettings || {};
+    const custom = normalizeCustomMetrics(settings.ads_custom_metrics);
+    const G = services.AdsMetricGlossary;
+    const visible = G ? G.normalizeVisible(settings.ads_visible_metrics, custom.map(metric => metric.id)) : [];
+    return { custom, visible };
+  }
+
+  // null: varsayılana dön (kayıtlı seçim boşalır, sözlüğün DEFAULT_VISIBLE'ı geçerli olur).
+  async function saveAdsVisibleMetrics(list) {
+    const G = services.AdsMetricGlossary;
+    if (!G) throw new Error('ADS_METRIC_UNAVAILABLE');
+    if (list !== null && !list.length) throw new Error('ADS_VISIBLE_EMPTY');
+    const { custom } = currentAdsMetricSettings();
+    state.adsMetricsOpen = false;
+    try {
+      await saveAdsMetricSettings({ visibleMetrics: list === null ? [] : G.normalizeVisible(list, custom.map(metric => metric.id)) });
+    } catch (error) { state.adsMetricsOpen = true; render(); throw error; }
   }
 
   async function handleAdsCustomMetricSubmit(form) {
     const values = Object.fromEntries(new FormData(form).entries());
-    const list = currentCustomMetrics();
-    if (list.length >= MAX_CUSTOM_METRICS) throw new Error('ADS_METRIC_LIMIT');
+    const { custom, visible } = currentAdsMetricSettings();
+    if (custom.length >= MAX_CUSTOM_METRICS) throw new Error('ADS_METRIC_LIMIT');
     const metric = normalizeCustomMetrics([{ id: 'm' + Date.now().toString(36), name: values.name, num: values.num, op: values.op, den: values.den, percent: values.percent === '1' }])[0];
     if (!metric) throw new Error('ADS_METRIC_INVALID');
-    await saveAdsCustomMetrics(list.concat(metric));
+    const G = services.AdsMetricGlossary;
+    const nextVisible = G && visible.length < G.MAX_VISIBLE ? visible.concat(metric.id) : visible;
+    await saveAdsMetricSettings({ customMetrics: custom.concat(metric), visibleMetrics: nextVisible });
   }
 
   async function deleteAdsCustomMetric(metricId) {
-    await saveAdsCustomMetrics(currentCustomMetrics().filter(metric => metric.id !== metricId));
+    const { custom, visible } = currentAdsMetricSettings();
+    await saveAdsMetricSettings({ customMetrics: custom.filter(metric => metric.id !== metricId), visibleMetrics: visible.filter(key => key !== metricId) });
   }
 
   async function deleteAdsPeriod(periodId) {
@@ -1518,6 +1652,18 @@
         render();
         return;
       }
+      if (event.target.closest('[data-ads-metrics-toggle]')) {
+        state.adsMetricsOpen = !state.adsMetricsOpen;
+        render();
+        return;
+      }
+      if (event.target.closest('[data-ads-metrics-reset]')) {
+        saveAdsVisibleMetrics(null).catch(() => {
+          const status = document.getElementById('marketingWorkspaceStatus');
+          if (status) status.textContent = 'Sütun seçimi kaydedilemedi. Yetkiyi kontrol edin.';
+        });
+        return;
+      }
       const open = event.target.closest('[data-marketing-open-snapshot]');
       const cancel = event.target.closest('[data-marketing-cancel-snapshot]');
       const openListing = event.target.closest('[data-marketing-open-listing]');
@@ -1580,6 +1726,18 @@
         handleAdsCampaignSubmit(campaignForm).catch(() => {
           const status = document.getElementById('marketingWorkspaceStatus');
           if (status) status.textContent = 'Kampanya kaydedilemedi. Alanları ve yetkiyi kontrol edin.';
+        });
+        return;
+      }
+      const metricsForm = event.target.closest('[data-ads-metrics-form]');
+      if (metricsForm) {
+        event.preventDefault();
+        const chosen = Array.from(metricsForm.querySelectorAll('input[name="metric"]:checked')).map(input => input.value);
+        saveAdsVisibleMetrics(chosen).catch(error => {
+          const status = document.getElementById('marketingWorkspaceStatus');
+          if (status) status.textContent = error && error.message === 'ADS_VISIBLE_EMPTY'
+            ? 'En az bir metrik seçin.'
+            : 'Sütun seçimi kaydedilemedi. Yetkiyi kontrol edin.';
         });
         return;
       }
@@ -1733,5 +1891,5 @@
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') initializeBrowser();
 
-  return { renderSnapshotList, deleteSnapshot, periodFromFilter, adsWindow, scopeBookings, cloudScopeForView, buildWorkspaceModel, getCurrentModel: () => buildWorkspaceModel(browserInput()), buildAdsModel, buildAdsChatGptContext, renderAdsChatGptCard, adsImportPlan, renderAdsImportView, selectLatestSnapshot, selectCurrentBenchmark, renderWorkspaceHtml, renderAds, normalizeCustomMetrics, evaluateCustomMetric, campaignBudgetView, renderMarketingHealth, renderBenchmarkPanel, renderBenchmarkForm, renderFindingActions, renderListingForm, renderSnapshotForm, renderExperimentForm, renderExperiments, escapeHtml, setData, render };
+  return { renderSnapshotList, deleteSnapshot, periodFromFilter, adsWindow, scopeBookings, cloudScopeForView, buildWorkspaceModel, getCurrentModel: () => buildWorkspaceModel(browserInput()), buildAdsModel, buildAdsChatGptContext, renderAdsChatGptCard, adsColumns, renderAdsKpiStrip, renderAdsCampaignTable, renderAdsMetricPicker, adsImportPlan, renderAdsImportView, selectLatestSnapshot, selectCurrentBenchmark, renderWorkspaceHtml, renderAds, normalizeCustomMetrics, evaluateCustomMetric, campaignBudgetView, renderMarketingHealth, renderBenchmarkPanel, renderBenchmarkForm, renderFindingActions, renderListingForm, renderSnapshotForm, renderExperimentForm, renderExperiments, escapeHtml, setData, render };
 }));

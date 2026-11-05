@@ -6957,6 +6957,34 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent-blue); 
 textarea.form-control { resize: vertical; }
 .ads-ai-card { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 16px; margin-bottom: 14px; border-left: 4px solid var(--accent-purple); }
 .ads-ai-card > div:first-child { flex: 1; min-width: 220px; }
+/* Asama 6: secilen metriklerle KPI seridi, kampanya tablosu ve metrik secici. */
+.ads-kpi-tile { flex: 1 1 150px; min-width: 150px; padding: 14px 16px; }
+.ads-kpi-label { font-size: 11px; text-transform: uppercase; letter-spacing: .02em; color: var(--text-muted); }
+.ads-kpi-value { font-size: 22px; font-weight: 800; margin: 4px 0; font-variant-numeric: tabular-nums; }
+.ads-kpi-foot { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 11px; color: var(--text-muted); }
+.is-unmeasured { opacity: .55; }
+.ads-kpi-tile.is-unmeasured .ads-kpi-value { color: var(--text-muted); }
+.ads-table-card { padding: 14px; margin-bottom: 14px; }
+.ads-table-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.ads-table-head h3 { margin: 0 0 2px; }
+.ads-table-scroll { overflow-x: auto; max-width: 100%; }
+.ads-table th, .ads-table td { white-space: nowrap; }
+.ads-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.ads-table tbody th { text-align: left; font-weight: 400; }
+.ads-table tbody th .sub-text { display: block; font-size: 11px; }
+.ads-table thead th:first-child, .ads-table tbody th { position: sticky; left: 0; z-index: 1; background: var(--bg-card); }
+.ads-table .ads-total-row th, .ads-table .ads-total-row td { font-weight: 700; border-top: 2px solid var(--border-subtle); }
+.ads-metric-picker { padding: 12px; margin-bottom: 12px; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); background: var(--bg-elevated); }
+.ads-metric-picker > form > p { margin: 0 0 10px; }
+.ads-metric-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+.ads-metric-group { border: 0; margin: 0; padding: 0; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.ads-metric-group legend { font-size: 12px; font-weight: 700; margin-bottom: 4px; padding: 0; }
+.ads-metric-option { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; cursor: pointer; }
+.ads-metric-option input { margin-top: 3px; flex: none; }
+.ads-metric-option .sub-text { display: block; font-size: 11px; line-height: 1.4; }
+.ads-metric-hint { display: block; font-size: 11px; color: var(--accent-amber); }
+.ads-metric-custom { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.ads-custom-metric-form { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-subtle); }
 /* Airbnb performance: period data, readable comparisons and compact mobile forms. */
 .ab-workspace { display: grid; gap: 16px; }
 .ab-heading, .ab-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
