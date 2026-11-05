@@ -779,6 +779,34 @@ matrisi (L-211, §3.3.1); phase109 phase97'nin sildiği vergi düşümünü ay k
 ana sayfa anlık görüntüsüne geri getirir (L-313). Paketler: `docs/PHASE107_DEPLOY_PACKAGE.md`,
 `docs/PHASE109_DEPLOY_PACKAGE.md`.
 
+**phase111 (`migration_phase111_meta_ads_import.sql`) 5 Kasım 2026'da test projesine ve
+üretime uygulandı; üretimde doğrulandı** (anon `rpc/import_ad_metric_batch` → `401 42501`,
+`production:readiness` BAŞARILI, `schema_migrations` 111). Meta CSV içe aktarımı: eşleşmeyen
+kampanya aynı işlemde açılır, dosyanın **tamamen** kapsadığı eski dönem giderleriyle değişir,
+kısmi kapsama `ADS_PARTIAL_OVERLAP` ile durur; `results` + `extra_metrics` sütunları; yetki
+`can_manage_tenant` **ve** `can_write_ledger`. Canlı süit `phase111_ads_import_live_tests` 20/20.
+
+**phase113 (`migration_phase113_ads_daily_compact.sql`) 5 Kasım 2026'da test projesine ve
+üretime uygulandı; üretimde doğrulandı** (anon `ad_metric_periods?select=daily_metrics` →
+`401 42501`, `production:readiness` BAŞARILI, `schema_migrations` 113). Backend maliyeti (kullanıcı, 05.11.2026): günlük döküm
+kampanya × ay başına **tek dönem satırına** toplanır (`AdsImportParser.compactDaily`), günlük
+kırılım `daily_metrics` dizisinde (`d,s,i,c,r`) durur; gider de kampanya-ay başına tek satır
+olur (6 kampanyalı ay: 186+186 → 6+6). Günlük toplam dönem harcamasına eşit değilse ret
+(`ADS_DAILY_SPEND_MISMATCH`). Reklam verisine yeni alan eklerken gün başına satır açmayın.
+Canlı süit `phase113_ads_daily_compact_live_tests` 12/12.
+**Okuma da ölçülüdür:** `loadTenantAppData` reklam dönemi **çekmez** (her sayfa yüklemesinde
+ve her yazmadan sonra çalışır); `marketing_ui` `hydrateAdPeriods` Pazarlama açılınca yalnız
+seçili dönem + önceki eş dönemi (`adsWindow`), açık sütun listesiyle (`PERIOD_COLUMNS`, `*`
+değil) çeker ve aralığı önbellekte tutar; dönem yazan işleyici `reloadAdPeriods()` çağırır.
+Ağı `ads_period_service_tests`.
+**Reklamlar ekranı (Aşama 3, 05.11.2026):** iç sekmeler Genel bakış · İçe aktar · Kampanyalar ve
+hedefler · Kayıtlar (`state.adsView`). İçe aktarma planı saf: `AdsImportParser.planImport`
+(eşleştirme, yeni kampanya, değişecek kayıt, kısmi kapsama, kapalı ay) — onay düğmesi sunucunun
+reddedeceği planda kapalıdır, sunucu yine hakemdir. Görsel referans 21st.dev, kod değil (CSP);
+sınıflar uygulamanın kendi dilinden (`card`, `badge-*`, `btn-*`, `upload-dropzone`, `.form-control`).
+Ağı `ads_import_parser_tests` P1–P10, `a4_ads_ui_tests`. Paketler:
+`docs/PHASE111_DEPLOY_PACKAGE.md`, `docs/PHASE113_DEPLOY_PACKAGE.md`.
+
 **Bir göçün uygulanıp uygulanmadığı, dosyaya bakarak anlaşılmaz.** Dosya repoda
 durur; veritabanı uygulanmamış olabilir. Doğrulamanın yolu üretime sormaktır:
 
