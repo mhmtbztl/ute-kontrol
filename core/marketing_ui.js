@@ -16,6 +16,8 @@
       MarketingHealthResultsService: require('./marketing_health_results_service'),
       AdsMetricsEngine: require('./ads_metrics_engine'),
       AdsImportParser: require('./ads_import_parser'),
+      AdsMetricGlossary: require('./ads_metric_glossary'),
+      AdsAnalyticsEngine: require('./ads_analytics_engine'),
       AdsPeriodService: require('./ads_period_service')
     });
   } else {
@@ -76,6 +78,8 @@
     ['MarketingExperimentService', 'core/marketing_experiment_service.js?v=4a2ffb14'],
     ['MarketingHealthResultsService', 'core/marketing_health_results_service.js?v=662edeea'],
     ['AdsMetricsEngine', 'core/ads_metrics_engine.js?v=d8dd5962'],
+    ['AdsMetricGlossary', 'core/ads_metric_glossary.js?v=71d344c8'],
+    ['AdsAnalyticsEngine', 'core/ads_analytics_engine.js?v=1aa01604'],
     ['AdsImportParser', 'core/ads_import_parser.js?v=ceff62b1'],
     ['AdsPeriodService', 'core/ads_period_service.js?v=1b4f5123']
   ]);
@@ -651,6 +655,23 @@
       const code = sourceCodes.get(String(item.sourceId || item.source_id));
       if (code) leadsBySource[code] = (leadsBySource[code] || 0) + 1;
     });
+    const metaLeadCodes = ['INSTAGRAM_AD', 'FACEBOOK_AD'];
+    const countMetaLeads = (start, endExclusive) => {
+      if (!(input.leadAcquisitions || []).length) return null;
+      return (input.leadAcquisitions || []).filter(item => {
+        const date = String(item.leadDate || item.lead_date || item.createdAt || item.created_at || '').slice(0, 10);
+        return metaLeadCodes.includes(sourceCodes.get(String(item.sourceId || item.source_id)))
+          && (!start || (date && date >= start && date < endExclusive));
+      }).length;
+    };
+    const analytics = services.AdsAnalyticsEngine;
+    const analysisRange = selectedPeriod.start && selectedPeriod.endExclusive ? { start: selectedPeriod.start, endExclusive: selectedPeriod.endExclusive } : null;
+    const priorAnalysisRange = analytics && analysisRange ? analytics.priorRangeOf(analysisRange) : null;
+    const analysis = analytics ? analytics.analyze({
+      periods: input.adMetricPeriods || [], campaigns, range: analysisRange,
+      leads: { current: countMetaLeads(analysisRange && analysisRange.start, analysisRange && analysisRange.endExclusive),
+        prior: priorAnalysisRange ? countMetaLeads(priorAnalysisRange.start, priorAnalysisRange.endExclusive) : null }
+    }) : null;
     const sums = periods.reduce((out, row) => {
       if (row.spend != null) out.spend[row.platform] = (out.spend[row.platform] || 0) + row.spend;
       if (row.messages != null) out.messages[row.platform] = (out.messages[row.platform] || 0) + row.messages;
@@ -676,6 +697,9 @@
       priorSpend,
       spendTrendPct,
       canManage: input.canManageAds !== false,
+      analysis,
+      periodLabel: selectedPeriod.label,
+      propertyCount: input.villas && typeof input.villas === 'object' ? Object.keys(input.villas).length : null,
       loadStatus: input.adPeriodsStatus || 'OK',
       loadError: input.adPeriodsError || null,
       closedMonths: input.closedMonths || []
@@ -706,6 +730,69 @@
       rows: importState.rows || [], campaigns: campaigns || [], mapping: importState.mapping || {},
       existingPeriods: importState.existing || [], closedMonths: closedMonths || []
     });
+  }
+
+  // Aşama 5: ChatGPT reklam istemi bağlamı — saf. Rakamlar analiz motorundan,
+  // açıklamalar sözlükten; misafir verisi yok, yalnız kampanya adı ve sayılar.
+  const ADS_NOTE_TEXT = Object.freeze({
+    RESULT_TYPES_MIXED: 'Kampanyaların sonuç türleri farklı (ör. mesaj ve profil ziyareti); bu yüzden toplam "Sonuçlar" ve "Sonuç başına ücret" verilmedi.',
+    REACH_NOT_ADDITIVE: 'Erişim tekil kişi sayısıdır; kampanyalar ya da günler arasında toplanamadığı için toplamda yok.',
+    PRORATED: "Bazı kayıtlar seçili dönemin dışına taştığı için gün oranıyla kırpıldı (Finans'taki gider dağıtımıyla aynı)."
+  });
+  // Önem sırası: istem motoru tabloyu 12 sütunla sınırlar, sondakiler düşer.
+  const ADS_PROMPT_COLUMNS = Object.freeze(['spend', 'results', 'costPerResult', 'messages', 'costPerMessage', 'calls', 'costPerCall', 'impressions', 'ctr', 'cpc', 'cpm', 'frequency', 'clicks']);
+  function buildAdsChatGptContext(model) {
+    const G = services.AdsMetricGlossary, analysis = model && model.analysis;
+    if (!G || !analysis) return null;
+    const fmt = (key, value) => G.format(key, value);
+    const change = pct => pct === null || pct === undefined ? null : `${pct > 0 ? '+' : pct < 0 ? '−' : ''}%${Math.abs(Number(pct)).toLocaleString('tr-TR', { maximumFractionDigits: 1 })}`;
+    const used = new Set();
+    const totals = G.METRICS.filter(metric => analysis.metrics[metric.key] !== null || (analysis.priorMetrics && analysis.priorMetrics[metric.key] !== null)).map(metric => {
+      used.add(metric.key);
+      return { label: metric.label, value: fmt(metric.key, analysis.metrics[metric.key]),
+        prior: analysis.priorMetrics ? fmt(metric.key, analysis.priorMetrics[metric.key]) : null, change: change(analysis.changes[metric.key] && analysis.changes[metric.key].pct) };
+    });
+    const columnKeys = ADS_PROMPT_COLUMNS.filter(key => analysis.campaigns.some(row => row.metrics[key] !== null));
+    columnKeys.forEach(key => used.add(key));
+    const parser = services.AdsImportParser;
+    const typeLabels = { MESSAGE: 'Mesaj', CALL: 'Arama', OTHER: 'Diğer' };
+    const campaigns = analysis.campaigns.map(row => ({
+      name: row.name, resultLabel: (parser && parser.resultLabel(row.resultMetric)) || typeLabels[row.resultType] || null,
+      values: { ...Object.fromEntries(columnKeys.map(key => [key, fmt(key, row.metrics[key])])), share: row.spendShare === null ? null : `%${Number(row.spendShare).toLocaleString('tr-TR', { maximumFractionDigits: 1 })}` }
+    }));
+    const campaignColumns = columnKeys.map(key => ({ key, label: G.get(key).label }));
+    if (columnKeys.includes('spend')) campaignColumns.splice(1, 0, { key: 'share', label: 'Harcama payı' });
+    const range = analysis.range, prior = analysis.priorRange;
+    const lastDay = iso => iso ? addUtcDays(iso, -1) : null;
+    return {
+      business: { propertyCount: model.propertyCount || null },
+      period: { label: model.periodLabel || null, start: range && range.start, end: range && lastDay(range.endExclusive), priorStart: prior && prior.start, priorEnd: prior && lastDay(prior.endExclusive) },
+      totals, campaignColumns, campaigns,
+      targets: { costPerMessage: model.targets && model.targets.costPerMessage != null ? Number(model.targets.costPerMessage) : null,
+        costPerCall: model.targets && model.targets.costPerCall != null ? Number(model.targets.costPerCall) : null },
+      leads: { current: analysis.metrics.leads, prior: analysis.priorMetrics ? analysis.priorMetrics.leads : null },
+      notes: analysis.notes.map(code => ADS_NOTE_TEXT[code]).filter(Boolean),
+      glossary: G.METRICS.filter(metric => used.has(metric.key)).map(metric => ({ label: metric.label, short: metric.short, formula: metric.formula || null })),
+      unmeasured: G.METRICS.filter(metric => metric.base && analysis.metrics[metric.key] === null).map(metric => metric.label)
+    };
+  }
+
+  function renderAdsChatGptCard(model) {
+    const engine = typeof ChatGptPromptEngine !== 'undefined' ? ChatGptPromptEngine : null;
+    if (!model.analysis || !model.analysis.periodCount || !engine || !engine.ADS_QUESTIONS) return '';
+    const short = { OVERVIEW: 'Genel değerlendirme', GLOSSARY: 'Bu metrikler ne demek?', BUDGET: 'Bütçeyi nereye kaydırmalıyım?', COST_CHANGE: 'Maliyet neden değişti?' };
+    return `<div class="card ads-ai-card"><div><strong>ChatGPT'ye yorumlat</strong><div class="sub-text">Bu dönemin rakamları ve her metriğin açıklaması hazır bir isteme dönüşür. Kopyalamadan önce istemi görürsünüz; misafir bilgisi gitmez.</div></div><div class="ads-chip-row">${engine.ADS_QUESTIONS.map(q => `<button type="button" class="btn btn-secondary btn-sm" data-ads-chatgpt="${escapeHtml(q.id)}">${escapeHtml(short[q.id] || q.text)}</button>`).join('')}</div></div>`;
+  }
+
+  function openAdsChatGpt(questionId) {
+    const engine = typeof ChatGptPromptEngine !== 'undefined' ? ChatGptPromptEngine : null;
+    if (!engine || typeof window === 'undefined' || typeof window.openChatGptQuestionModal !== 'function') return false;
+    const model = buildAdsModel(browserInput());
+    const context = buildAdsChatGptContext(model);
+    if (!context) return false;
+    const questions = engine.ADS_QUESTIONS.map(q => q.text);
+    const selected = (engine.ADS_QUESTIONS.find(q => q.id === questionId) || engine.ADS_QUESTIONS[0]).text;
+    return window.openChatGptQuestionModal({ kind: 'ADS_ANALYSIS', scope: `Reklamlar · ${model.periodLabel || 'Tüm dönem'}`, questions, selectedQuestion: selected, context });
   }
 
   function renderAdsSubnav(active, canManage) {
@@ -899,7 +986,7 @@
       ? '<div style="display:flex;justify-content:center;margin:-4px 0 14px"><button type="button" class="btn btn-primary btn-sm" data-ads-view="import">Meta CSV yükle</button></div>' : '';
     const resultNote = state.adsImportResult ? `<div class="card ads-notice ads-notice-emerald"><strong>Kaydedildi</strong><div class="sub-text">${escapeHtml(state.adsImportResult)}</div></div>` : '';
     const sections = {
-      overview: `${resultNote}
+      overview: `${resultNote}${renderAdsChatGptCard(model)}
       <div class="card" style="padding:14px;margin-bottom:14px"><strong>Seçili dönem reklam toplamı: ${money(model.totalSpend)}</strong><div class="sub-text">${escapeHtml(spendTrend)}</div></div>
       <div class="card" style="padding:14px;margin-bottom:14px;border-left:4px solid #f59e0b"><strong>Atıf sınırı</strong><div class="sub-text">Talep kaynağı kanal düzeyinde ölçülür; hangi reklamın rezervasyon getirdiği ölçülemez. Kampanya ROAS'ı gösterilmez.</div></div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:14px">${metricCards}</div>${emptyCta}
@@ -1390,6 +1477,14 @@
     }));
     const content = document.getElementById('marketingWorkspaceContent');
     if (content) content.addEventListener('click', event => {
+      const adsChatGpt = event.target.closest('[data-ads-chatgpt]');
+      if (adsChatGpt) {
+        if (!openAdsChatGpt(adsChatGpt.dataset.adsChatgpt)) {
+          const status = document.getElementById('marketingWorkspaceStatus');
+          if (status) status.textContent = 'ChatGPT istemi hazırlanamadı.';
+        }
+        return;
+      }
       const adsViewButton = event.target.closest('[data-ads-view]');
       if (adsViewButton) {
         state.adsView = adsViewButton.dataset.adsView;
@@ -1617,5 +1712,5 @@
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') initializeBrowser();
 
-  return { renderSnapshotList, deleteSnapshot, periodFromFilter, adsWindow, scopeBookings, buildWorkspaceModel, getCurrentModel: () => buildWorkspaceModel(browserInput()), buildAdsModel, adsImportPlan, renderAdsImportView, selectLatestSnapshot, selectCurrentBenchmark, renderWorkspaceHtml, renderAds, normalizeCustomMetrics, evaluateCustomMetric, campaignBudgetView, renderMarketingHealth, renderBenchmarkPanel, renderBenchmarkForm, renderFindingActions, renderListingForm, renderSnapshotForm, renderExperimentForm, renderExperiments, escapeHtml, setData, render };
+  return { renderSnapshotList, deleteSnapshot, periodFromFilter, adsWindow, scopeBookings, buildWorkspaceModel, getCurrentModel: () => buildWorkspaceModel(browserInput()), buildAdsModel, buildAdsChatGptContext, renderAdsChatGptCard, adsImportPlan, renderAdsImportView, selectLatestSnapshot, selectCurrentBenchmark, renderWorkspaceHtml, renderAds, normalizeCustomMetrics, evaluateCustomMetric, campaignBudgetView, renderMarketingHealth, renderBenchmarkPanel, renderBenchmarkForm, renderFindingActions, renderListingForm, renderSnapshotForm, renderExperimentForm, renderExperiments, escapeHtml, setData, render };
 }));

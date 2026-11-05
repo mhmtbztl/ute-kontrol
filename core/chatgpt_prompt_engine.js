@@ -11,6 +11,23 @@
     'META;Arama Reklamı IG;2026-10-05;2026-10-11;ARAMA;900;7100;85;;12',
     'GOOGLE;Kirazlı Arama;2026-10-05;2026-10-11;ARAMA;1800;5200;140;;9'
   ].join('\n');
+  // Aşama 5 (05.11.2026): reklam verisini işi yeni öğrenen birine yorumlatan istem.
+  // Rakamlar ve metrik açıklamaları uygulamadan gelir (AdsAnalyticsEngine +
+  // AdsMetricGlossary); istem misafir verisi taşımaz, yalnız kampanya ve sayılar.
+  const ADS_QUESTIONS = Object.freeze([
+    { id: 'OVERVIEW', text: 'Reklamlarımı genel olarak değerlendir: ne iyi gidiyor, ne kötü, ilk ne yapmalıyım?' },
+    { id: 'GLOSSARY', text: 'Bu metrikler ne anlama geliyor? Benim rakamlarımla, reklama yeni başlamış birine anlatır gibi açıkla.' },
+    { id: 'BUDGET', text: 'Bütçeyi hangi kampanyadan hangisine kaydırmalıyım? Neden?' },
+    { id: 'COST_CHANGE', text: 'Maliyetlerim önceki döneme göre neden değişti? Hangi rakam bunu gösteriyor?' }
+  ]);
+  const ADS_RULES = Object.freeze([
+    'Yalnız aşağıdaki rakamlara dayan. Tabloda olmayan bir rakamı uydurma, tahmin etme; "—" ölçülmedi demektir.',
+    'Hangi reklamın rezervasyon ya da ciro getirdiği ölçülmüyor. Kampanya başına ROAS ya da reklam gelir tahmini yapma.',
+    'Farklı sonuç türlerini (ör. mesaj ile profil ziyareti) birbirinin maliyetiyle kıyaslama; yalnız aynı türdekileri karşılaştır.',
+    '10 sonuçtan azı olan kampanya için kesin hüküm verme; "örnek az" de.',
+    'Sade Türkçe yaz; her teknik terimi ilk geçtiği yerde bir cümleyle açıkla.',
+    'Sonunda en fazla 3 somut, uygulanabilir adım öner ve her birinin hangi rakama dayandığını yaz.'
+  ]);
   const CATALOG = [
     { kind: 'GENERAL_ANALYSIS', title: 'Genel analiz', questions: [{ id: 'OVERVIEW', text: 'İşletmeyi dönem bazında analiz et' }] },
     { kind: 'PRICE_RULE_QUESTION', title: 'Fiyat kuralı', questions: ['WEEKEND','SPECIAL_DAY','LAST_MINUTE','GAP_NIGHT'].map(id => ({ id, text: `${id} kuralını değerlendir` })) },
@@ -19,7 +36,8 @@
     { kind: 'ADS_SCREENSHOT_READ', title: 'Reklam ekran görüntüsü', questions: [{ id: 'READ', text: 'Görüntüdeki reklam rakamlarını oku' }] },
     { kind: 'LISTING_REVIEW', title: 'İlan incelemesi', questions: [{ id: 'REVIEW', text: 'İlanı ve fotoğrafları değerlendir' }] },
     { kind: 'PAGE_REPORT', title: 'Sayfa raporu', questions: [{ id: 'REPORT', text: 'Bu raporu yorumla' }] },
-    { kind: 'IMPORT_TEMPLATE_CONVERT', title: 'Tabloyu şablona çevir', questions: [{ id: 'CONVERT', text: 'Tablomu içe aktarma şablonuna çevir' }] }
+    { kind: 'IMPORT_TEMPLATE_CONVERT', title: 'Tabloyu şablona çevir', questions: [{ id: 'CONVERT', text: 'Tablomu içe aktarma şablonuna çevir' }] },
+    { kind: 'ADS_ANALYSIS', title: 'Reklam analizi', questions: ADS_QUESTIONS.map(q => ({ ...q })) }
   ];
   const absent = value => value === null || value === undefined || value === '' ||
     (Array.isArray(value) && value.length === 0) ||
@@ -156,6 +174,55 @@
         lines.push('Tür: OPEX (işletme gideri) ya da CAPEX (yatırım). Villa boşsa ya da ALL ise tüm portföy.');
       }
       lines.push('', 'Tablom (aşağıya yapıştırıyorum):');
+    } else if (kind === 'ADS_ANALYSIS') {
+      const text = value => typeof value === 'string' && value.trim() ? value.trim().slice(0, 200) : null;
+      // Tablo hücresi: kampanya adındaki dikey çizgi tabloyu bozmasın.
+      const cell = value => (text(value) || '—').split('|').join('/');
+      lines.push('Rol: Sen deneyimli bir dijital reklam danışmanısın. Karşındaki kişi lüks kısa dönem kiralama (villa / bungalov) işletiyor ve Meta reklamlarına yeni başladı.');
+      const business = context.business || {};
+      if (Number.isFinite(business.propertyCount) && business.propertyCount > 0) { lines.push(`İşletme: ${business.propertyCount} mülk`); included.push('business'); }
+      else omitted.push({ field: 'business', reason: 'Mülk sayısı yok' });
+      const period = context.period || {};
+      if (text(period.label)) {
+        const range = text(period.start) && text(period.end) ? ` (${text(period.start)} – ${text(period.end)})` : '';
+        const prior = text(period.priorStart) && text(period.priorEnd) ? `; karşılaştırılan önceki dönem ${text(period.priorStart)} – ${text(period.priorEnd)}` : '';
+        lines.push(`Dönem: ${text(period.label)}${range}${prior}`); included.push('period');
+      } else omitted.push({ field: 'period', reason: 'Dönem yok' });
+      const totals = (Array.isArray(context.totals) ? context.totals : []).filter(row => text(row && row.label)).slice(0, 25);
+      if (totals.length) {
+        lines.push('', 'Dönem özeti:', '| Metrik | Bu dönem | Önceki dönem | Değişim |', '|---|---|---|---|',
+          ...totals.map(row => `| ${cell(row.label)} | ${cell(row.value)} | ${cell(row.prior)} | ${cell(row.change)} |`));
+        included.push('totals');
+      } else omitted.push({ field: 'totals', reason: 'Bu dönemde reklam verisi yok' });
+      const campaigns = (Array.isArray(context.campaigns) ? context.campaigns : []).filter(row => text(row && row.name)).slice(0, 30);
+      const columns = (Array.isArray(context.campaignColumns) ? context.campaignColumns : []).filter(col => text(col && col.key) && text(col.label)).slice(0, 12);
+      if (campaigns.length && columns.length) {
+        lines.push('', 'Kampanyalar:', `| Kampanya | Sonuç türü | ${columns.map(col => cell(col.label)).join(' | ')} |`, `|---|---|${columns.map(() => '---').join('|')}|`,
+          ...campaigns.map(row => `| ${cell(row.name)} | ${cell(row.resultLabel)} | ${columns.map(col => cell(row.values && row.values[col.key])).join(' | ')} |`));
+        included.push('campaigns');
+      } else omitted.push({ field: 'campaigns', reason: 'Kampanya verisi yok' });
+      // null, Number(null) = 0 ile "0 ₺ hedef" / "0 talep" olmasın: yalnız gerçek sayı yazılır.
+      const present = value => typeof value === 'number' && Number.isFinite(value);
+      const targets = context.targets || {};
+      const targetParts = [['mesaj', targets.costPerMessage], ['arama', targets.costPerCall]].filter(([, v]) => present(v) && v > 0).map(([k, v]) => `${k} başına en fazla ${trSayi(v, 'money')}`);
+      if (targetParts.length) { lines.push(`İşletmenin verimlilik hedefi: ${targetParts.join(', ')}`); included.push('targets'); }
+      else omitted.push({ field: 'targets', reason: 'Hedef girilmemiş' });
+      const leads = context.leads || {};
+      if (present(leads.current)) {
+        lines.push(`Lexbnb'ye reklam kaynaklı girilen talep: bu dönem ${trSayi(leads.current, 'int')}${present(leads.prior) ? `, önceki dönem ${trSayi(leads.prior, 'int')}` : ''} (kanal düzeyi; hangi kampanyadan geldiği bilinmez)`);
+        included.push('leads');
+      } else omitted.push({ field: 'leads', reason: 'Talep kaydı yok' });
+      const notes = (Array.isArray(context.notes) ? context.notes : []).map(text).filter(Boolean).slice(0, 8);
+      if (notes.length) { lines.push('', 'Veriyle ilgili notlar:', ...notes.map(x => `- ${x}`)); included.push('notes'); }
+      const glossary = (Array.isArray(context.glossary) ? context.glossary : []).filter(row => text(row && row.label) && text(row.short)).slice(0, 25);
+      if (glossary.length) {
+        lines.push('', 'Metriklerin anlamı (bu açıklamaları kullan):', ...glossary.map(row => `- ${text(row.label)}: ${text(row.short)}${text(row.formula) ? ` Formül: ${text(row.formula)}.` : ''}`));
+        included.push('glossary');
+      }
+      const unmeasured = (Array.isArray(context.unmeasured) ? context.unmeasured : []).map(text).filter(Boolean).slice(0, 20);
+      if (unmeasured.length) { lines.push('', `Ölçülmeyenler (dosyada yok ya da hesaplanamıyor; yorum yapma, gerekiyorsa Meta'da hangi sütunun ekleneceğini söyle): ${unmeasured.join(', ')}`); included.push('unmeasured'); }
+      lines.push('', 'Kurallar:', ...ADS_RULES.map((rule, index) => `${index + 1}) ${rule}`));
+      included.push('rules');
     } else if (kind === 'PAGE_REPORT') {
       const report = context.report || context;
       add(lines, included, omitted, 'title', 'Rapor', scalar(report.title));
@@ -174,5 +241,5 @@
     return { prompt, kind, includedSections: included, omitted, charCount: prompt.length };
   }
   function listKinds() { return CATALOG.map(item => ({ kind: item.kind, title: item.title, questions: item.questions.map(q => ({ ...q })) })); }
-  return { ADS_FORMAT_SPEC, buildPrompt, listKinds };
+  return { ADS_FORMAT_SPEC, ADS_QUESTIONS, buildPrompt, listKinds };
 }));

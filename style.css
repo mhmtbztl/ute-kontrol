@@ -6955,3 +6955,5 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent-blue); 
 .form-control { width: 100%; background: var(--bg-surface-elevated); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 8px 10px; color: var(--text-main); font-size: 13px; font-family: inherit; }
 .form-control:focus { outline: none; border-color: var(--border-focus); }
 textarea.form-control { resize: vertical; }
+.ads-ai-card { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 16px; margin-bottom: 14px; border-left: 4px solid var(--accent-purple); }
+.ads-ai-card > div:first-child { flex: 1; min-width: 220px; }

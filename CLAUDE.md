@@ -804,7 +804,13 @@ hedefler · Kayıtlar (`state.adsView`). İçe aktarma planı saf: `AdsImportPar
 (eşleştirme, yeni kampanya, değişecek kayıt, kısmi kapsama, kapalı ay) — onay düğmesi sunucunun
 reddedeceği planda kapalıdır, sunucu yine hakemdir. Görsel referans 21st.dev, kod değil (CSP);
 sınıflar uygulamanın kendi dilinden (`card`, `badge-*`, `btn-*`, `upload-dropzone`, `.form-control`).
-Ağı `ads_import_parser_tests` P1–P10, `a4_ads_ui_tests`. Paketler:
+Ağı `ads_import_parser_tests` P1–P10, `a4_ads_ui_tests`.
+**Reklam metrikleri tek kaynak (Aşama 4–5):** ad, sade açıklama, formül ve iyi yön
+`core/ads_metric_glossary.js`; dönem kırpma, önceki dönem, kampanya payı, huni
+`core/ads_analytics_engine.js` (toplam harcama `buildAdsModel` ile aynı — `ads_analytics_engine_tests`
+E12). Erişim toplanmaz, farklı sonuç türleri toplanmaz, mesaj başına ücret yalnız mesaj
+kampanyalarının harcamasıyla. ChatGPT istemi `ADS_ANALYSIS` (`buildAdsChatGptContext`): misafir
+verisi yok; `null` istemde "0" olmaz (girilmemiş hedef/talep yazılmaz). Ağı `ads_chatgpt_prompt_tests`. Paketler:
 `docs/PHASE111_DEPLOY_PACKAGE.md`, `docs/PHASE113_DEPLOY_PACKAGE.md`.
 
 **Bir göçün uygulanıp uygulanmadığı, dosyaya bakarak anlaşılmaz.** Dosya repoda
