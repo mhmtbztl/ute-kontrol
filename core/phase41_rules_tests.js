@@ -83,7 +83,15 @@ function forwardRuleViolations(file, sql) {
 function unresolvedForwardRuleViolations(entries) {
   return entries.flatMap((entry, index) => forwardRuleViolations(entry.file, entry.sql).filter(violation => {
     const match = violation.match(/tenant_id tablosu aciyor \(([^)]+)\) ama trg_tenant_id_immutable/);
-    if (!match) return true;
+    if (!match) {
+      // An applied migration is immutable. A later explicit registration of its
+      // exact phase is the only acceptable repair of a missing ledger entry.
+      if (!violation.endsWith('kendini schema_migrations defterine yazmiyor')) return true;
+      const phase = entry.file.match(/^migration_phase(\d+)_/);
+      if (!phase) return true;
+      const later = entries.slice(index + 1).map(item => stripComments(item.sql)).join('\n');
+      return !new RegExp(`INSERT\\s+INTO\\s+public\\.schema_migrations\\s*\\(\\s*version\\s*,\\s*name\\s*\\)\\s*VALUES\\s*\\(\\s*${Number(phase[1])}\\s*,`, 'i').test(later);
+    }
     const tables = match[1].split(',').map(value => value.trim().replace(/^public\./i, ''));
     const later = entries.slice(index + 1).map(item => stripComments(item.sql)).join('\n');
     return !tables.every(table => new RegExp(
@@ -159,6 +167,12 @@ function run() {
     JSON.stringify(forwardRuleViolations('yorum.sql', yorumdaKalan)));
 
   const sonraki = files.slice(i41 + 1);
+  const missingLedger = { file: 'migration_phase98_example.sql', sql: 'SELECT 1;' };
+  const repairLedger = phase => ({ file: 'migration_phase100_repair.sql', sql: `INSERT INTO public.schema_migrations(version, name) VALUES (${phase}, 'repair');` });
+  check(unresolvedForwardRuleViolations([missingLedger, repairLedger(98)]).length === 0,
+    'B3a. Sonraki göç aynı phase defter kaydını açıkça onarabilir');
+  check(unresolvedForwardRuleViolations([missingLedger, repairLedger(97)]).length === 1,
+    'B3b. Başka phase kaydı eksik defteri onarmaz');
   const ihlal = unresolvedForwardRuleViolations(sonraki.map(file => ({ file, sql: read(file) })));
   check(ihlal.length === 0, `B4. phase41 sonrasi ${sonraki.length} goc kurala uyuyor`, ihlal.join('\n       '));
 

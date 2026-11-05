@@ -3,6 +3,8 @@ const path = require('path');
 const fs = require('fs');
 
 const allTestFiles = [
+  'airbnb_performance_tests.js',
+  'airbnb_performance_live_tests.js',
   // Prior 29 Regression Suites (Phases 1-10)
   'auth_lifecycle_tests.js',
   'captcha_gate_tests.js',

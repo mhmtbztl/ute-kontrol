@@ -1,5 +1,30 @@
 # CLAUDE.md — Lexbnb Proje Beyni
 
+### Airbnb İlan Performansı (5 Kasım 2026)
+
+`Huniler ve Testler` yüzeyi Airbnb'ye özgü dönem girişiyle değiştirildi.
+`core/airbnb_performance_service.js` / `core/airbnb_performance_ui.js`:
+görüntülenme, ilk sayfa gösterimi, favori sayısı ve Airbnb'nin bildirdiği dört
+yüzde ayrı saklanır. İlk sayfa gösteriminden türetilen oran Airbnb'nin bildirdiği
+aramadan ilana dönüşüm oranı değildir; oranlardan rezervasyon adedi türetilmez.
+Tüm ilanlar ortalaması mülk toplamı olarak kaydedilmez. Bitiş günü kullanıcıya
+dahil gösterilir; dönemler tam eşleşmeyince veri bölüştürülmez/toplanmaz.
+Düzeltme eski sürümü korur. Değişiklik notları fotoğraf yüklemeyi gerektirmez;
+14+14 günlük gözlemsel karşılaştırma Airbnb'ye yayın veya nedensellik kanıtı değildir.
+
+Göç sırası: phase98 → phase100 → phase102. Üçü ayrı test projesine uygulandı;
+üretimde de kullanıcı tarafından uygulandı ve 5 Kasım 2026'da `schema_migrations`
+98/100/102 kayıtları, tablo varlığı ve anon tablo/RPC erişim engelleri salt okunur
+sorgularla doğrulandı. Phase100, testte uygulanmış phase98'in
+kiracı kimliği tetikleyicisi/defter eksiklerini yeni göçle onarır. Phase102,
+bilinçli sürüm çakışmasında `40001` yerine `23505` döndürür: canlı RPC testinde
+40001 yanıtı tekrar denemelerle `upstream request timeout` oluyordu; 23505 ile
+çakışma ve eşzamanlı düzenleme testleri geçti. Testler: `airbnb_performance_tests`,
+`airbnb_performance_live_tests`, `scripts/airbnb_performance_browser_test.js`.
+CSV aktarımı kullanıcı örneği geldikten sonraki aşamadır; plan
+`docs/AIRBNB_PERFORMANCE_PLAN.md`. Eski kapak testi ChatGPT eylemi yeni performans
+kayıtlarını içermez; düğmenin açıklaması bu sınırı açıklar.
+
 Bu dosya, projede çalışan herkes (ve her AI aracı) için tek referans noktasıdır.
 **Yeni bir şey öğrenildiğinde buraya yazılır.**
 

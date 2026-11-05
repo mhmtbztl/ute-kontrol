@@ -6957,3 +6957,36 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent-blue); 
 textarea.form-control { resize: vertical; }
 .ads-ai-card { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 16px; margin-bottom: 14px; border-left: 4px solid var(--accent-purple); }
 .ads-ai-card > div:first-child { flex: 1; min-width: 220px; }
+/* Airbnb performance: period data, readable comparisons and compact mobile forms. */
+.ab-workspace { display: grid; gap: 16px; }
+.ab-heading, .ab-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.ab-actions { justify-content: flex-start; }
+.ab-heading h3, .ab-panel h3 { margin: 0 0 8px; }
+.ab-panel { padding: 20px; }
+.ab-form-grid, .ab-metrics { display: grid; grid-template-columns: repeat(auto-fit,minmax(210px,1fr)); gap: 16px; margin: 16px 0; }
+.ab-workspace label { display: grid; gap: 6px; font-size: 13px; }
+.ab-workspace .form-control { min-width: 0; width: 100%; box-sizing: border-box; min-height: 44px; padding: 10px 12px; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); background: var(--bg-input); color: var(--text-primary); font: inherit; }
+.ab-workspace .btn { min-height: 44px; }
+.ab-workspace :focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+.ab-workspace textarea { min-height: 70px; }
+.ab-panel .ab-actions { margin-top: 16px; justify-content: flex-end; }
+.ab-metrics dd { margin: 6px 0; font-size: 23px; font-weight: 700; }
+.ab-metrics dt, .ab-metrics small { color: var(--text-secondary, #94a3b8); }
+.ab-table-wrap { overflow-x: auto; }
+.ab-table-wrap table { min-width: 720px; width: 100%; }
+.ab-block { display: block; margin-top: 5px; }
+.ab-filters { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; }
+.ab-chart { display: grid; gap: 12px; margin-top: 16px; }
+.ab-chart-row { display: grid; grid-template-columns: 190px minmax(60px,1fr) 90px; gap: 12px; align-items: center; font-size: 12px; }
+.ab-bar-track { background: rgba(148,163,184,.15); height: 16px; }
+.ab-bar { display: block; height: 100%; background: var(--accent-primary); }
+.ab-error { padding: 12px; border-left: 3px solid #f59e0b; }
+.ab-workspace button[aria-pressed="true"] { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+.ab-workspace summary { cursor: pointer; padding: 10px 0; }
+@media (max-width: 600px) {
+  .ab-panel { padding: 14px; }
+  .ab-form-grid, .ab-metrics { grid-template-columns: 1fr; }
+  .ab-filters label { flex: 1 1 120px; }
+  .ab-chart-row { grid-template-columns: 1fr 70px; }
+  .ab-chart-row > span:first-child { grid-column: 1 / -1; }
+}

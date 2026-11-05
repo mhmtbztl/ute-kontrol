@@ -195,9 +195,21 @@ async function main() {
       // bos dondurulur ki konsol kapisi ag hatasi gormesin.
       await page.route('**/rest/v1/**', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
       await page.evaluate(() => { switchTab('marketing'); document.querySelector('[data-marketing-view="funnel"]').click(); });
-      await page.waitForSelector('[data-marketing-open-listing]');
-      await page.click('[data-marketing-open-listing]');
+      await page.waitForSelector('#airbnbPerformanceWorkspace');
+      // Listing creation remains available from the property profile manager.
+      await page.evaluate(() => window.openMarketingListingManager(null));
       await page.waitForSelector('[data-marketing-listing-form] [name="externalUrl"]', { timeout: 5000 });
+      await page.click('[data-marketing-cancel-listing]');
+      await page.evaluate(() => {
+        currentFilter.villa = 'ALL';
+        LexBnBMarketingUI.setData({ listings: [{ id:'11111111-1111-4111-8111-111111111111',property_id:Object.values(appData.villas)[0].id,channel_code:'AIRBNB',display_name:'Airbnb browser fixture' }] });
+      });
+      await page.locator('#airbnbPerformanceWorkspace [data-ab-action="new"]').click();
+      await page.locator('[data-ab-form="record"] [name="start"]').fill('2026-10-04');
+      await page.locator('[data-ab-form="record"] [name="end"]').fill('2026-11-03');
+      await page.locator('[data-ab-form="record"] [name="bookingConversion"]').fill('0,16');
+      await page.locator('[data-ab-form="record"] [type="submit"]').click();
+      assert(await page.getByText('Kaydetmeden önce kontrol et',{exact:true}).isVisible(), 'Airbnb formu gerçek uygulama temizleyicisinden sonra çalışmalı');
       await page.evaluate(() => document.querySelector('[data-marketing-view="ads"]').click());
       // Aşama 3 (05.11.2026): reklam formları iç sekmelerde.
       await page.waitForSelector('[data-ads-view="campaigns"]', { timeout: 5000 });

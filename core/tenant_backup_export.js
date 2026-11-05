@@ -26,6 +26,7 @@
   // diye tenant_backup_export_tests goclerden turettigi listeyle karsilastirir:
   // yeni bir tenant_id tablosu eklenip buraya yazilmazsa test kirilir.
   const TENANT_TABLES = [
+    'airbnb_listing_changes', 'airbnb_performance_records',
     'ad_metric_periods', 'audit_logs', 'booking_payment_commissions',
     'booking_payments', 'booking_quotes', 'bookings', 'channel_media_placements',
     'channel_performance_snapshots', 'cleaning_task_executions', 'cleaning_tasks',

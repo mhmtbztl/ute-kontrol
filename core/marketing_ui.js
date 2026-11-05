@@ -65,6 +65,8 @@
   });
 
   const BROWSER_DEPENDENCIES = Object.freeze([
+    ['AirbnbPerformanceService', 'core/airbnb_performance_service.js?v=324a48bb'],
+    ['AirbnbPerformanceUI', 'core/airbnb_performance_ui.js?v=42982bf1'],
     ['LexbnbBusinessDate', 'core/business_date.js?v=a1518391'],
     ['MarketingEngine', 'core/marketing_engine.js?v=2756f4ec'],
     ['MarketingFunnelService', 'core/marketing_funnel_service.js?v=a5ecbdaa'],
@@ -999,7 +1001,7 @@
   }
 
   function renderWorkspaceHtml(model, view) {
-    if (view === 'funnel') return renderFunnel(model);
+    if (view === 'funnel') return (state.listingFormOpen ? renderListingForm(model) : '') + '<div id="airbnbPerformanceWorkspace">Airbnb İlan Performansı yükleniyor…</div>';
     if (view === 'ads') return renderAds(model.ads || buildAdsModel(model), state.adsView);
     return renderEconomics(model);
   }
@@ -1108,11 +1110,19 @@
     try {
       const model = buildWorkspaceModel(browserInput());
       content.innerHTML = renderWorkspaceHtml(model, state.view);
+      if (state.view === 'funnel' && services.AirbnbPerformanceUI) {
+        services.AirbnbPerformanceUI.mount(document.getElementById('airbnbPerformanceWorkspace'), {
+          model,
+          client: typeof supabaseClient !== 'undefined' ? supabaseClient : null,
+          tenantId: cloudScope()?.tenantId,
+          canManage: typeof canManageTenantRole === 'function' && canManageTenantRole(typeof activeTenant !== 'undefined' && activeTenant && activeTenant.role)
+        });
+      }
       const sourceLabel = model.remoteStatus === 'LOADING' ? 'Bulut verisi yükleniyor'
         : model.remoteStatus === 'OK' ? 'Bulut verisi güncel'
           : model.remoteStatus === 'PARTIAL' ? `Kısmi bulut verisi (${model.remoteErrors.length} kaynak kullanılamıyor)`
             : model.remoteStatus === 'UNAVAILABLE' ? 'Bulut pazarlama verisi kullanılamıyor' : 'Yerel rezervasyon verisi';
-      status.innerHTML = `<strong>${escapeHtml(model.period.label)}</strong> · ${model.selectedProperty === 'ALL' ? 'Tüm mülkler' : escapeHtml(model.selectedProperty)} · Kalış tarihine göre · ${escapeHtml(sourceLabel)}`;
+      status.innerHTML = `<strong>${escapeHtml(model.period.label)}</strong> · ${model.selectedProperty === 'ALL' ? 'Tüm mülkler' : escapeHtml(model.selectedProperty)} · ${state.view === 'funnel' ? 'Airbnb rapor dönemine göre' : 'Kalış tarihine göre'} · ${escapeHtml(sourceLabel)}`;
       status.style.display = '';
       const badge = document.getElementById('marketingDataQualityBadge');
       if (badge) {

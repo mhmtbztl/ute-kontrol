@@ -12,7 +12,7 @@ function test(name, fn) { try { fn(); passed++; console.log(`[PASS] ${name}`); }
 
 test('Kanallar ve Pazarlama A4 reklam çalışma alanıyla üç canlı alt sekme gösterir', () => {
   assert.match(html, /data-marketing-view="economics"[^>]*>[^<]*Kanallar/);
-  assert.match(html, /data-marketing-view="funnel"[^>]*>[^<]*Huniler ve Testler/);
+  assert.match(html, /data-marketing-view="funnel"[^>]*>[^<]*Airbnb İlan Performansı/);
   assert.match(html, /data-marketing-view="ads"[^>]*>[^<]*Reklamlar/);
 });
 
@@ -30,11 +30,11 @@ test('Kanal ekonomisi karar sütunlarını ve net payı gösterir', () => {
   assert.doesNotMatch(output, />Net oda geliri</);
 });
 
-test('Huni eksik sayaçları sıfır diye uydurmaz ve kanalın kendi aşamalarını açıklar', () => {
+test('Airbnb workspace replaces the generic funnel without mixing Booking data', () => {
   const model = MarketingUI.buildWorkspaceModel({ filter: { period: 'ALL', villa: 'ALL' }, bookings: [], listings: [{ id: 'l1', channel_code: 'BOOKING_COM' }] });
   const output = MarketingUI.renderWorkspaceHtml(model, 'funnel');
-  assert.match(output, /ölçülmedi/i);
-  assert.match(output, /Booking\.com Extranet/i);
+  assert.match(output, /Airbnb İlan Performansı/i);
+  assert.doesNotMatch(output, /Booking\.com Extranet/i);
 });
 
 test('Değişiklik ölçümü olası etki diye sunulur ve veri/karıştırıcı uyarılarını taşır', () => {

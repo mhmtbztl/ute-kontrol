@@ -126,10 +126,10 @@ runTest('Insufficient health evidence remains scoreless in the UI', () => {
   assert.doesNotMatch(html, />70</);
 });
 
-runTest('Missing funnel input renders an explicit unmeasured state', () => {
+runTest('Airbnb view mounts the dedicated period-based workspace', () => {
   const model = MarketingUI.buildWorkspaceModel({ filter: { period: 'ALL', villa: 'ALL' }, bookings: [] });
-  assert.match(MarketingUI.renderWorkspaceHtml(model, 'funnel'), /Huni verisi henüz yok/);
-  assert.match(MarketingUI.renderWorkspaceHtml(model, 'funnel'), /ölçülmedi/);
+  assert.match(MarketingUI.renderWorkspaceHtml(model, 'funnel'), /Airbnb İlan Performansı/);
+  assert.match(MarketingUI.renderWorkspaceHtml(model, 'funnel'), /id="airbnbPerformanceWorkspace"/);
 });
 
 runTest('Injected markup is escaped in finding output', () => {

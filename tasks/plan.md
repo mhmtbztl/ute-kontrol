@@ -1,5 +1,12 @@
 # Implementation Plan: ChatGPT Analysis Export
 
+## Yeni onaylı çalışma: Airbnb İlan Performansı (2026-11-05)
+
+Önceki tamamlanmış plan aşağıda korunmuştur. Güncel kapsam, veri sözleşmesi,
+dilimler ve sonraki CSV aşaması: `docs/AIRBNB_PERFORMANCE_PLAN.md`.
+Sıra: kalıcı dönem kaydı → form/tablo/geçmiş → karşılaştırma → değişiklik takibi
+→ tam test ve tarayıcı doğrulaması. Üretim göçü ve push ayrıca onaylıdır.
+
 ## Overview
 
 Deliver the Analysis Center in small, independently verified slices while

@@ -51,14 +51,15 @@
     const out = {};
     for (const [name, d] of Object.entries(defs)) {
       const props = d.properties || {};
-      const pk = [], deps = new Set();
+      const pk = [], deps = new Set(), selfReferences = [];
       for (const [col, p] of Object.entries(props)) {
         const desc = p.description || '';
         if (/<pk\/>/.test(desc)) pk.push(col);
-        const m = desc.match(/<fk table='([^']+)' column='[^']+'\/>/);
+        const m = desc.match(/<fk table='([^']+)' column='([^']+)'\/>/);
         if (m && m[1] !== name) deps.add(m[1]);
+        if (m && m[1] === name) selfReferences.push({ column: col, target: m[2] });
       }
-      out[name] = { pk, deps: [...deps], columns: Object.keys(props) };
+      out[name] = { pk, deps: [...deps], columns: Object.keys(props), selfReferences };
     }
     return out;
   }
@@ -86,6 +87,28 @@
     if (name === 'profiles') return rows.filter(r => memberIds.has(r.id));
     if (rows.length && Object.prototype.hasOwnProperty.call(rows[0], 'tenant_id')) return rows.filter(r => r.tenant_id === tenantId);
     return []; // isletmeye baglanamayan tablo: tek isletme kurtariminda yuklenmez
+  }
+
+  // Keep self-referencing predecessors ahead of children across batch boundaries.
+  // Missing predecessors may already exist at the target; PostgreSQL verifies them.
+  function orderSelfReferences(rows, references) {
+    if (!references.length) return rows;
+    const children = rows.map(() => []), incoming = rows.map(() => 0);
+    for (const ref of references) {
+      const targets = new Map(rows.map((r, i) => [String(r[ref.target]), i]));
+      rows.forEach((row, child) => {
+        if (row[ref.column] == null) return;
+        const parent = targets.get(String(row[ref.column]));
+        if (parent === undefined || parent === child) return;
+        children[parent].push(child); incoming[child]++;
+      });
+    }
+    const queue = incoming.flatMap((count, i) => count === 0 ? [i] : []);
+    for (let i = 0; i < queue.length; i++) {
+      for (const child of children[queue[i]]) if (--incoming[child] === 0) queue.push(child);
+    }
+    if (queue.length !== rows.length) throw new Error('SELF_REFERENCE_CYCLE');
+    return queue.map(i => rows[i]);
   }
 
   /**
@@ -157,12 +180,13 @@
     for (const name of loadOrder(tables)) {
       const all = readJson(`tables/${name}.json`);
       if (all === null) continue; // hedefte var, yedekte yok (daha yeni sema)
-      const rows = tenantRows(name, all, deps.tenantId, memberIds);
+      let rows = tenantRows(name, all, deps.tenantId, memberIds);
       report.tables[name] = { inBackup: rows.length, inserted: 0, alreadyPresent: 0 };
       await cleanSideEffects(name);
       if (!rows.length) continue;
       const pk = tables[name].pk;
       try {
+        rows = orderSelfReferences(rows, tables[name].selfReferences);
         for (let i = 0; i < rows.length; i += BATCH) {
           const batch = rows.slice(i, i + BATCH);
           // Var olan satira dokunulmaz — ve INSERT denenmez bile: BEFORE INSERT
