@@ -463,7 +463,9 @@ async function asama4Davranisi() {
     allCampaigns: [{ id: 'c1', name: 'TEST Kamp', platform: 'META', budget: 500 }], canManage: true, targets: {},
     periods: [{ id: 'p1', campaignId: 'c1', platform: 'META', periodStart: '2031-05-01', periodEnd: '2031-05-10', spend: 4000, impressions: 10000, clicks: 200, messages: 40, calls: 2 }],
     allPeriods: [{ id: 'p1', campaignId: 'c1', periodStart: '2031-05-01', periodEnd: '2031-05-10', spend: 4000 }],
-    customMetrics: [metrik], totalSpend: 4000, adShare: { pct: null } });
+    customMetrics: [metrik], totalSpend: 4000, adShare: { pct: null } }, 'records')
+    + UI.renderAds({ metrics: [], channelLeadCost: [], campaigns: [], allCampaigns: [{ id: 'c1', name: 'TEST Kamp', platform: 'META', budget: 500 }], canManage: true, targets: {}, periods: [],
+      allPeriods: [{ id: 'p1', campaignId: 'c1', periodStart: '2031-05-01', periodEnd: '2031-05-10', spend: 4000 }], customMetrics: [], adShare: { pct: null } }, 'campaigns');
   check(/<table class="data-table"><thead><tr><th>Kampanya<\/th><th>Dönem<\/th>/.test(reklamHtml) && /<th[^>]*>Mesaj maliyeti<\/th>/.test(reklamHtml),
     'L-188f Donemler tablo olarak listelenir, ozel metrik sutun olur');
   check(/Günlük sınır/.test(reklamHtml) && /data-ads-custom-metric-form/.test(reklamHtml), 'L-188g Kampanya listesinde gunluk sinir, metrik ekleme formu var');

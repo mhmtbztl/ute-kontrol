@@ -15,7 +15,8 @@ assert.strictEqual(model.metrics[0].status, 'VERIMLI');
 assert.strictEqual(model.metrics[0].campaignName, 'Kış kampanyası');
 assert.strictEqual(model.channelLeadCost.find(row => row.platform === 'META').leads, 1);
 assert.strictEqual(model.adShare.pct, 1);
-const html = UI.renderAds(model);
+// Aşama 3: formlar iç sekmelerde; her sekme ayrı çizilir.
+const html = ['overview', 'import', 'campaigns', 'records'].map(view => UI.renderAds(model, view)).join('');
 assert(html.includes('hangi reklamın rezervasyon getirdiği ölçülemez'));
 assert(html.includes('data-ads-manual-form'));
 assert(html.includes('data-ads-import-form'));
@@ -26,14 +27,28 @@ assert(html.includes('data-ads-delete-period'));
 assert(html.includes('LEXBNB_REKLAM_V2'));
 assert(html.includes('Kış kampanyası'));
 
-const preview = UI.buildAdsImportPreview(
-  'LEXBNB_REKLAM_V2\nplatform;kampanya;baslangic;bitis;sonuc_turu;harcama;gosterim;tiklama;mesaj;arama\nMETA;Kış kampanyası;2026-10-01;2026-10-07;MESAJ;700;10000;200;14;',
-  'CHATGPT',
-  [{ id: 'c1', name: 'Kış kampanyası', platform: 'META' }]
+const pasted = require('./ads_import_parser').parsePasted(
+  'LEXBNB_REKLAM_V2\nplatform;kampanya;baslangic;bitis;sonuc_turu;harcama;gosterim;tiklama;mesaj;arama\nMETA;Kış kampanyası;2026-10-01;2026-10-07;MESAJ;700;10000;200;14;'
 );
+const kampanyalar = [{ id: 'c1', name: 'Kış kampanyası', platform: 'META' }];
+const importState = { mode: 'CHATGPT', fileName: 'ChatGPT çıktısı', rows: pasted.rows, parseErrors: [], parseWarnings: [], existing: [], mapping: {}, status: 'READY' };
+const preview = UI.adsImportPlan(importState, kampanyalar, []);
 assert.strictEqual(preview.errors.length, 0);
 assert.strictEqual(preview.rows[0].campaignId, 'c1');
-assert(UI.renderAdsImportPreview(preview).includes('data-ads-import-confirm'));
+const disabledConfirm = /type="submit" class="btn btn-primary btn-sm" disabled/;
+const importHtml = UI.renderAdsImportView(importState, kampanyalar, []);
+assert(importHtml.includes('data-ads-import-confirm') && !disabledConfirm.test(importHtml), 'hazır plan onaylanabilir');
+const emptyImport = UI.renderAdsImportView(null, [], []);
+assert(emptyImport.includes('data-ads-dropzone') && emptyImport.includes('Döküm → Zaman → Gün'), 'boş ekran: bırakma alanı + Meta tarifi');
+const blocked = UI.renderAdsImportView(importState, kampanyalar, ['2026-10']);
+assert(/kapatılmış/.test(blocked) && disabledConfirm.test(blocked), 'kapalı ay: onay kapalı ve nedeni yazılı');
+const loading = UI.renderAdsImportView({ ...importState, status: 'LOADING' }, [], []);
+assert(disabledConfirm.test(loading), 'kayıtlı veri kontrol edilirken onay kapalı');
+assert(/Yeni kampanya açılacak/.test(loading) && /value="__new__" selected/.test(loading), 'eşleşmeyen ad: varsayılan yeni kampanya');
+const saveFailed = UI.renderAdsImportView({ ...importState, saveError: 'Bağlantı koptu' }, kampanyalar, []);
+assert(/Kaydedilemedi/.test(saveFailed) && !disabledConfirm.test(saveFailed), 'kayıt hatası gösterilir, yeniden deneme açık kalır');
+const viewerHtml = UI.renderAds({ ...model, canManage: false }, 'import');
+assert(!/data-ads-view="import"/.test(viewerHtml) && !/data-ads-dropzone/.test(viewerHtml), 'yönetemeyen kullanıcıya içe aktarma sekmesi yok');
 
 const october = UI.buildAdsModel({
   filter: { period: '2026-10' },

@@ -18198,7 +18198,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
         : Promise.resolve([]);
       // Independent datasets are loaded concurrently and every list is paged;
       // Supabase's per-response cap must never silently truncate a dashboard.
-      const [villas, bookings, expenses, cleanList, leads, leadSalesContext, closeList, targetList, maintenanceTickets, operationalTasks, financialTransactions, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications, campaignRows, influencerRows, settingRows, operatorNoteRows, pricingLadderRows, hkOverrideRows, paymentCommissionRows, operationalPeopleRows, cleaningExecutionRows, maintenanceAssignmentRows, taskTemplateRows, checklistTemplateRows, bookingPayments, bookingPaymentBalances, adMetricPeriods, propertyContextRows, propertyOwnerRows, propertyOwnerLinkRows, messageTemplateRows, guestClassificationRows, salesMembers, propertyPricingRuleRows, competitorResearchRows, leadInterestRows, channelListingRows, incomeEntryRows, dailyPriceRows, closureRows] = await Promise.all([
+      const [villas, bookings, expenses, cleanList, leads, leadSalesContext, closeList, targetList, maintenanceTickets, operationalTasks, financialTransactions, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications, campaignRows, influencerRows, settingRows, operatorNoteRows, pricingLadderRows, hkOverrideRows, paymentCommissionRows, operationalPeopleRows, cleaningExecutionRows, maintenanceAssignmentRows, taskTemplateRows, checklistTemplateRows, bookingPayments, bookingPaymentBalances, propertyContextRows, propertyOwnerRows, propertyOwnerLinkRows, messageTemplateRows, guestClassificationRows, salesMembers, propertyPricingRuleRows, competitorResearchRows, leadInterestRows, channelListingRows, incomeEntryRows, dailyPriceRows, closureRows] = await Promise.all([
         loadProperties(tenantId),
         loadBookings(tenantId),
         mayReadLedger ? loadExpenses(tenantId) : Promise.resolve([]),
@@ -18237,7 +18237,6 @@ async function loadTenantAppData(tenantIdOrUserId) {
         fetchTenantRowsTolerant(() => supabaseClient.from('property_checklist_templates').select('*').eq('tenant_id', tenantId).eq('is_active', true).order('updated_at', { ascending: false })),
         fetchTenantRowsTolerant(() => supabaseClient.from('booking_payments').select('*').eq('tenant_id', tenantId).order('paid_on', { ascending: false })),
         fetchTenantRowsTolerant(() => supabaseClient.from('booking_payment_balances').select('*').eq('tenant_id', tenantId)),
-        mayManageAds ? fetchTenantRowsTolerant(() => supabaseClient.from('ad_metric_periods').select('*').eq('tenant_id', tenantId).order('period_start', { ascending: false })) : Promise.resolve([]),
         fetchTenantRowsTolerant(() => supabaseClient.from('property_analysis_context').select('*').eq('tenant_id', tenantId)),
         mayReadLedger ? fetchTenantRowsTolerant(() => supabaseClient.from('property_owners').select('*').eq('tenant_id', tenantId).order('full_name')) : Promise.resolve([]),
         mayReadLedger ? fetchTenantRowsTolerant(() => supabaseClient.from('property_owner_links').select('*').eq('tenant_id', tenantId)) : Promise.resolve([]),
@@ -18358,7 +18357,6 @@ async function loadTenantAppData(tenantIdOrUserId) {
         financialTransactions: financialTransactions || [],
         userNotifications: userNotifications || [],
         marketingCampaigns: (campaignRows || []).map(r => mapMarketingCampaignFromDb(r, propIdMap)),
-        adMetricPeriods: adMetricPeriods || [],
         propertyAnalysisContexts: propertyContextRows || [],
         propertyOwners: propertyOwnerRows || [],
         propertyOwnerLinks: propertyOwnerLinkRows || [],
@@ -18455,7 +18453,6 @@ function getBlankTenantData(userId) {
     checklistTemplates: [],
     financialTransactions: [],
     marketingCampaigns: [],
-    adMetricPeriods: [],
     propertyAnalysisContexts: [],
     propertyOwners: [],
     propertyOwnerLinks: [],

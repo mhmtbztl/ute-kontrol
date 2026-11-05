@@ -5,9 +5,17 @@ Lexbnb reklam verisini kampanya ve en fazla 31 günlük dönem düzeyinde alır.
 ## Meta Ads
 
 1. Meta Ads Manager’da **Kampanyalar** tablosunu açın ve tarih aralığını en fazla 31 gün seçin.
-2. Sütunlarda kampanya adı, sonuçlar, sonuç göstergesi, erişim, harcanan tutar, gösterim ve bağlantı tıklamalarını bulundurun.
-3. Tabloyu CSV olarak dışa aktarın. Lexbnb Türkçe Meta dışa aktarımındaki şu başlıkları doğrular: `Rapor Başlangıcı`, `Rapor Sonu`, `Kampanya Adı`, `Sonuçlar`, `Sonuç Göstergesi`, `Erişim`, `Harcanan Tutar (TRY)`, `Gösterim`, `Bağlantı Tıklamaları`.
-4. Dosyayı önce önizleyin. `Sonuç Göstergesi` mesajlaşma başlatmayı gösteriyorsa sonuç mesaj, `click_to_call` gösteriyorsa arama sayılır; diğer sonuçlar mesaj/arama diye yorumlanmaz.
+   Grafiklerde günlük eğri için **Döküm → Zaman → Gün** seçin; o zaman aralık uzun olabilir, her satır bir gündür.
+2. **Dışa aktar → CSV** (Excel'de açıp yeniden kaydetmeyin; kaydederseniz de okunur).
+3. Zorunlu sütunlar: `Kampanya Adı`, `Harcanan Tutar (TRY)` ve ya `Rapor Başlangıcı` + `Rapor Sonu` ya da `Gün`.
+   Okunan diğer sütunlar: `Sonuçlar`, `Sonuç Göstergesi`, `Gösterim`, `Erişim`, `Bağlantı Tıklamaları`,
+   `Reklam Seti Bütçesi`, `Reklam Seti Bütçe Türü`, `Kampanya yayını`. İngilizce arayüzün karşılıkları
+   (`Campaign name`, `Amount spent (TRY)`, `Reporting starts`, `Day` …) da kabul edilir.
+   Dosyada olmayan sütun **ölçülmedi** sayılır, 0 yazılmaz. Meta'nın varsayılan Kampanyalar görünümünde
+   `Bağlantı Tıklamaları` yoktur; tıklama ve CTR için Sütunlar → Özelleştir ile ekleyin.
+4. Dosyayı önce önizleyin. `Sonuç Göstergesi` mesajlaşma başlatmayı gösteriyorsa sonuç mesaj, `click_to_call` gösteriyorsa arama sayılır; profil ziyareti, açılış sayfası görüntüleme gibi diğer sonuçlar adıyla gösterilir ama mesaj/arama diye yorumlanmaz.
+5. Harcama TRY dışında bir para birimindeyse dosya reddedilir (gider deftere TL yazılır).
+   Reklam seti düzeyi dosyada aynı kampanya ve dönemin satırları toplanır; erişim tekil kişi sayısı olduğu için toplanmaz.
 
 Meta’nın işletme yardım sayfaları oturum isteyebilir. Uygulamadaki sütun eşlemesi, kullanıcının gerçek Meta CSV’siyle de doğrulanmıştır.
 

@@ -1,0 +1,7 @@
+"Rapor Başlangıcı","Rapor Sonu","Kampanya Adı","Kampanya yayını","İlişkilendirme Ayarı",Sonuçlar,"Sonuç Göstergesi","Sonuçlar Başına Ücret","Reklam Seti Bütçesi","Reklam Seti Bütçe Türü","Harcanan Tutar (TRY)",Gösterim,Erişim,Bitiş,"Sonuçlar (ilk)","Sonuçlar (ilk) göstergesi"
+2026-10-01,2026-10-31,"Kış Satış WP-IG",active,"7 günlük tıklama veya 1 günlük görüntüleme",640,actions:onsite_conversion.messaging_conversation_started_7d,7.95312500,180,Günlük,5090.00,58100,39400,Sürekli,,
+2026-10-01,2026-10-31,"Profil trafik",active,"1 günlük tıklama",2050,profile_visit_view,1.36097561,100,Günlük,2790.00,65500,51000,Sürekli,,
+2026-10-01,2026-10-31,"Influencer A",active,"7 günlük tıklama veya 1 günlük görüntüleme",40,actions:onsite_conversion.messaging_conversation_started_7d,27.00000000,35,Günlük,1080.00,9300,6800,Sürekli,,
+2026-10-01,2026-10-31,"Seyir trafik mesaj",active,"7 günlük tıklama veya 1 günlük görüntüleme",74,actions:onsite_conversion.messaging_conversation_started_7d,20.13513514,"Reklam seti bütçesi kullanılıyor",0,1490.00,17800,12900,Sürekli,,
+2026-10-01,2026-10-31,"Web site trafik",active,"7 günlük tıklama veya 1 günlük görüntüleme",3430,actions:omni_landing_page_view,0.79300292,"Reklam seti bütçesi kullanılıyor",0,2720.00,99500,68100,Sürekli,,
+2026-10-01,2026-10-31,"Influencer B",active,"7 günlük tıklama veya 1 günlük görüntüleme",51,actions:onsite_conversion.messaging_conversation_started_7d,15.68627451,"Reklam seti bütçesi kullanılıyor",0,800.00,8800,5700,Sürekli,,

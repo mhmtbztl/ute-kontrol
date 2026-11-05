@@ -5,10 +5,18 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  async function loadPeriods(client, tenantId) {
+  // Backend maliyeti (kullanıcı, 05.11.2026): yalnız ekranın kullandığı sütunlar ve
+  // yalnız istenen tarih aralığına değen dönemler çekilir. `range` yoksa tüm geçmiş.
+  const PERIOD_COLUMNS = 'id, campaign_id, platform, period_start, period_end, result_type, result_metric, '
+    + 'spend, impressions, reach, clicks, messages, calls, results, extra_metrics, daily_metrics, source';
+
+  async function loadPeriods(client, tenantId, range = {}) {
     if (!client || !tenantId) return [];
-    const { data, error } = await client.from('ad_metric_periods').select('*')
-      .eq('tenant_id', tenantId).order('period_start', { ascending: false });
+    let query = client.from('ad_metric_periods').select(PERIOD_COLUMNS).eq('tenant_id', tenantId);
+    if (range.campaignIds) query = query.in('campaign_id', range.campaignIds);
+    if (range.from) query = query.gte('period_end', range.from);
+    if (range.to) query = query.lte('period_start', range.to);
+    const { data, error } = await query.order('period_start', { ascending: false });
     if (error) throw error;
     return data || [];
   }
@@ -56,5 +64,41 @@
     return data;
   }
 
-  return { loadPeriods, savePeriod, savePeriodsAtomic, deletePeriod };
+  // phase111: eşleşmeyen kampanyaları açar, dosyanın tamamen kapsadığı eski
+  // dönemleri değiştirir; hepsi tek işlemde. Satır ya mevcut `campaignId` ya da
+  // `newCampaigns` içindeki geçici `campaignKey` taşır. phase113: kampanya × ay
+  // satırı günlük kırılımı `daily` dizisinde taşır (AdsImportParser.compactDaily).
+  async function importBatch(client, tenantId, newCampaigns = [], rows = []) {
+    if (!client || !tenantId || !Array.isArray(rows) || !rows.length) throw new Error('İçe aktarılacak reklam dönemleri zorunludur.');
+    const campaigns = (newCampaigns || []).map(item => ({
+      key: item.key, name: item.name, platform: item.platform, budget: numeric(item.budget)
+    }));
+    const payload = rows.map(input => {
+      const extra = input.extraMetrics && typeof input.extraMetrics === 'object' && Object.keys(input.extraMetrics).length ? input.extraMetrics : null;
+      return {
+        campaign_id: nullable(input.campaignId), campaign_key: nullable(input.campaignKey), platform: input.platform,
+        period_start: input.periodStart, period_end: input.periodEnd, result_type: input.resultType,
+        result_metric: nullable(input.resultMetric), spend: numeric(input.spend),
+        impressions: numeric(input.impressions), reach: numeric(input.reach), clicks: numeric(input.clicks),
+        messages: numeric(input.messages), calls: numeric(input.calls), results: numeric(input.results),
+        extra_metrics: extra, daily: Array.isArray(input.daily) && input.daily.length ? input.daily : null,
+        source: input.source || 'CSV'
+      };
+    });
+    const { data, error } = await client.rpc('import_ad_metric_batch', {
+      p_tenant_id: tenantId, p_new_campaigns: campaigns, p_rows: payload
+    });
+    if (error) {
+      // Göç uygulanmadan yayına çıkan kod: kullanıcıya nedeni söylenir (§4.2 dağıtım sırası).
+      if (error.code === 'PGRST202' || /Could not find the function/i.test(String(error.message || ''))) {
+        const missing = new Error('PHASE111_NOT_APPLIED: Reklam içe aktarma güncellemesi (phase111) veritabanına henüz uygulanmadı.');
+        missing.code = 'PHASE111_NOT_APPLIED';
+        throw missing;
+      }
+      throw error;
+    }
+    return data;
+  }
+
+  return { PERIOD_COLUMNS, loadPeriods, savePeriod, savePeriodsAtomic, importBatch, deletePeriod };
 });

@@ -199,7 +199,12 @@ async function main() {
       await page.click('[data-marketing-open-listing]');
       await page.waitForSelector('[data-marketing-listing-form] [name="externalUrl"]', { timeout: 5000 });
       await page.evaluate(() => document.querySelector('[data-marketing-view="ads"]').click());
-      await page.waitForSelector('[data-ads-manual-form], [data-ads-campaign-form]', { timeout: 5000 });
+      // Aşama 3 (05.11.2026): reklam formları iç sekmelerde.
+      await page.waitForSelector('[data-ads-view="campaigns"]', { timeout: 5000 });
+      await page.click('[data-ads-view="campaigns"]');
+      await page.waitForSelector('[data-ads-campaign-form]', { timeout: 5000 });
+      await page.click('[data-ads-view="import"]');
+      await page.waitForSelector('[data-ads-dropzone]', { timeout: 5000 });
       // Form izinlidir ama hicbir yere gonderemez: gezinme oznitelikleri silinir.
       const stripped = await page.evaluate(() => {
         const box = document.createElement('div');

@@ -40,7 +40,13 @@
     analysisRuns: [],
     experiments: [],
     healthSnapshots: [],
-    adsImportPreview: null,
+    adsView: 'overview',
+    adsImport: null,
+    adsImportResult: null,
+    adPeriods: [],
+    adPeriodsKey: null,
+    adPeriodsStatus: 'IDLE',
+    adPeriodsError: null,
     remoteScopeKey: null,
     remoteStatus: 'LOCAL',
     remoteErrors: []
@@ -70,8 +76,8 @@
     ['MarketingExperimentService', 'core/marketing_experiment_service.js?v=4a2ffb14'],
     ['MarketingHealthResultsService', 'core/marketing_health_results_service.js?v=662edeea'],
     ['AdsMetricsEngine', 'core/ads_metrics_engine.js?v=d8dd5962'],
-    ['AdsImportParser', 'core/ads_import_parser.js?v=35136382'],
-    ['AdsPeriodService', 'core/ads_period_service.js?v=3f125702']
+    ['AdsImportParser', 'core/ads_import_parser.js?v=ceff62b1'],
+    ['AdsPeriodService', 'core/ads_period_service.js?v=1b4f5123']
   ]);
   let dependencyPromise = null;
 
@@ -669,30 +675,150 @@
       totalSpend,
       priorSpend,
       spendTrendPct,
-      canManage: input.canManageAds !== false
+      canManage: input.canManageAds !== false,
+      loadStatus: input.adPeriodsStatus || 'OK',
+      loadError: input.adPeriodsError || null,
+      closedMonths: input.closedMonths || []
     };
   }
 
-  function buildAdsImportPreview(text, mode, campaigns) {
+  // Aşama 3 — Meta CSV içe aktarma ekranı. Görsel referans 21st.dev (kod değil):
+  // File Dropzone (joyco), Configuration Stepper (shadcnspace), Segmented Tabs
+  // (micka_design), Import Patchbay (n1m4mz: emin olunmayan eşleşme ayrı işaretlenir).
+  // Sınıflar uygulamanın kendi tasarım dilinden: card, badge-*, btn-*, upload-dropzone.
+  const ADS_VIEWS = [
+    { id: 'overview', label: 'Genel bakış', manage: false },
+    { id: 'import', label: 'İçe aktar', manage: true },
+    { id: 'campaigns', label: 'Kampanyalar ve hedefler', manage: true },
+    { id: 'records', label: 'Kayıtlar', manage: false }
+  ];
+  const META_RECOMMENDED_COLUMNS = ['Kampanya adı', 'Kampanya yayını', 'Sonuçlar', 'Sonuç göstergesi', 'Harcanan tutar (TRY)', 'Gösterim', 'Erişim', 'Bağlantı tıklamaları', 'Reklam seti bütçesi'];
+
+  function closedMonthKeys(data) {
+    return ((data && data.closedPeriods) || []).filter(item => item.status === 'CLOSED')
+      .map(item => `${item.year}-${String(item.month).padStart(2, '0')}`);
+  }
+
+  function adsImportPlan(importState, campaigns, closedMonths) {
     const parser = services.AdsImportParser;
-    if (!parser) throw new Error('ADS_IMPORT_PARSER_UNAVAILABLE');
-    const parsed = mode === 'CSV_META' ? parser.parseCsv(text, 'META') : parser.parsePasted(text);
-    const rows = parser.matchCampaigns(parsed.rows, campaigns || []);
-    const unmatched = rows.filter(row => !row.campaignId).map((row, index) => ({
-      line: index + 1, code: 'CAMPAIGN_NOT_MATCHED', text: `${row.campaignName || 'Adsız kampanya'} kayıtlı kampanyalarla eşleşmedi.`
-    }));
-    return { rows, errors: [...parsed.errors, ...unmatched], warnings: parsed.warnings || [], mode };
+    if (!parser || !importState) return null;
+    return parser.planImport({
+      rows: importState.rows || [], campaigns: campaigns || [], mapping: importState.mapping || {},
+      existingPeriods: importState.existing || [], closedMonths: closedMonths || []
+    });
   }
 
-  function renderAdsImportPreview(preview) {
-    if (!preview) return '';
-    const errors = preview.errors.length
-      ? `<div class="card" style="padding:12px;border-left:4px solid #ef4444;margin-top:10px"><strong>İçe aktarma durduruldu</strong><ul>${preview.errors.map(item => `<li>${escapeHtml(item.text)}</li>`).join('')}</ul></div>` : '';
-    const rows = preview.rows.length ? `<div class="card" style="padding:12px;overflow:auto;margin-top:10px"><table class="data-table"><thead><tr><th>Kampanya</th><th>Dönem</th><th>Tür</th><th>Harcama</th><th>Sonuç</th><th>Eşleşme</th></tr></thead><tbody>${preview.rows.map(row => `<tr><td>${escapeHtml(row.campaignName)}</td><td>${escapeHtml(row.periodStart)} – ${escapeHtml(row.periodEnd)}</td><td>${escapeHtml(row.resultType)}</td><td>${money(row.spend)}</td><td>${number(row.resultType === 'MESSAGE' ? row.messages : row.calls)}</td><td>${row.campaignId ? 'Hazır' : 'Eşleşmedi'}</td></tr>`).join('')}</tbody></table>${preview.errors.length ? '' : '<form data-ads-import-confirm style="display:flex;justify-content:flex-end;margin-top:10px"><button type="submit" class="btn btn-primary btn-sm">Önizlemeyi onayla ve kaydet</button></form>'}</div>` : '';
-    return `${errors}${rows}`;
+  function renderAdsSubnav(active, canManage) {
+    return `<div class="ads-subnav" role="tablist" aria-label="Reklamlar bölümleri">${ADS_VIEWS.filter(view => canManage || !view.manage).map(view =>
+      `<button type="button" role="tab" class="ads-subnav-btn${view.id === active ? ' active' : ''}" aria-selected="${view.id === active ? 'true' : 'false'}" data-ads-view="${view.id}">${escapeHtml(view.label)}</button>`).join('')}</div>`;
   }
 
-  function renderAds(model) {
+  function renderAdsStepper(step) {
+    const steps = ['Dosyayı yükle', 'Kampanyaları eşleştir', 'Kontrol et ve kaydet'];
+    return `<ol class="ads-stepper" aria-label="İçe aktarma adımları">${steps.map((label, index) => {
+      const state = index + 1 < step ? 'is-done' : index + 1 === step ? 'is-current' : '';
+      return `<li class="${state}"${index + 1 === step ? ' aria-current="step"' : ''}><span class="ads-step-num">${index + 1 < step ? '✓' : index + 1}</span>${escapeHtml(label)}</li>`;
+    }).join('')}</ol>`;
+  }
+
+  function renderMetaRecipe(open) {
+    return `<details class="card ads-recipe"${open ? ' open' : ''}><summary><strong>Meta'dan dosya nasıl indirilir?</strong> <span class="sub-text">2 dakika</span></summary>
+      <ol>
+        <li>Reklam Yöneticisi'nde <strong>Kampanyalar</strong> sekmesini açın.</li>
+        <li>Sağ üstten tarih aralığını seçin (ör. <em>Geçen ay</em>).</li>
+        <li><strong>Döküm → Zaman → Gün</strong> seçin. Grafikler günlük çizilir ve 31 günlük sınır sorun olmaz.</li>
+        <li><strong>Sütunlar → Sütunları özelleştir</strong> ile şunları ekleyin:<div class="ads-chip-row">${META_RECOMMENDED_COLUMNS.map(name => `<span class="badge">${escapeHtml(name)}</span>`).join('')}</div></li>
+        <li><strong>Dışa aktar → Tablo verilerini dışa aktar → .csv</strong> ile indirin.</li>
+        <li>Dosyayı yukarıdaki alana bırakın. Ay ortasında indirip ay sonunda yeniden yüklerseniz günler birleşir, gider iki kez yazılmaz.</li>
+      </ol>
+      <div class="sub-text">Reklam hesabının para birimi TRY olmalı. Dosya tarayıcınızda okunur; yalnız kampanya başına toplamlar ve günlük harcamalar kaydedilir.</div>
+    </details>`;
+  }
+
+  function renderAdsDropzone() {
+    return `<label class="upload-dropzone ads-dropzone" data-ads-dropzone>
+      <input type="file" accept=".csv,.txt,text/csv" class="ads-file-input" data-ads-import-file>
+      <span class="dropzone-icon" aria-hidden="true">📄</span>
+      <strong>Meta CSV dosyasını buraya bırakın</strong>
+      <span class="dropzone-hint">ya da tıklayıp seçin · Kampanyalar düzeyi · TRY · en fazla 5 MB</span>
+    </label>`;
+  }
+
+  // '2026-10-01'..'2026-10-31' -> '1–31 Eki 2026'; ay/yıl farklıysa iki uç da yazılır.
+  function formatAdsRange(start, end) {
+    if (!start || !end) return '—';
+    const part = (iso, opts) => new Date(iso + 'T00:00:00Z').toLocaleDateString('tr-TR', { timeZone: 'UTC', ...opts });
+    const full = { day: 'numeric', month: 'short', year: 'numeric' };
+    if (start.slice(0, 7) === end.slice(0, 7)) return `${Number(start.slice(8))}–${part(end, full)}`;
+    if (start.slice(0, 4) === end.slice(0, 4)) return `${part(start, { day: 'numeric', month: 'short' })} – ${part(end, full)}`;
+    return `${part(start, full)} – ${part(end, full)}`;
+  }
+
+  function matchBadge(entry) {
+    if (entry.choice === '__new__') return '<span class="badge badge-blue">Yeni kampanya açılacak</span>';
+    if (entry.manual) return '<span class="badge badge-emerald">Elle seçildi</span>';
+    if (entry.matchedBy === 'EXACT') return '<span class="badge badge-emerald">Birebir eşleşti</span>';
+    return '<span class="badge badge-amber ads-badge-dashed">Benzer ad · kontrol edin</span>';
+  }
+
+  function renderAdsImportView(importState, campaigns, closedMonths) {
+    const head = `<div class="card" style="padding:16px;margin-bottom:14px"><h3 style="margin:0 0 4px">Meta reklam verisini içe aktar</h3><p class="sub-text" style="margin:0 0 12px">Kampanya başına harcama, gösterim, tıklama ve sonuç Finans giderine aynı işlemde bağlanır.</p>`;
+    if (!importState) {
+      return `${head}${renderAdsStepper(1)}${renderAdsDropzone()}</div>${renderMetaRecipe(true)}`;
+    }
+    const fileCard = `<div class="ads-file-card"><span aria-hidden="true">📄</span><div><strong>${escapeHtml(importState.fileName || 'Yapıştırılan veri')}</strong><div class="sub-text">${number((importState.rows || []).length)} satır okundu</div></div><button type="button" class="btn btn-secondary btn-sm" data-ads-import-reset>Başka dosya seç</button></div>`;
+    const list = (title, tone, items) => items.length ? `<div class="card ads-notice ads-notice-${tone}"><strong>${escapeHtml(title)}</strong><ul>${items.map(item => `<li>${escapeHtml(item.text)}</li>`).join('')}</ul></div>` : '';
+    if ((importState.parseErrors || []).length) {
+      return `${head}${renderAdsStepper(1)}${fileCard}${list('Dosya okunamadı', 'rose', importState.parseErrors)}</div>${renderMetaRecipe(true)}`;
+    }
+    const plan = adsImportPlan(importState, campaigns, closedMonths);
+    const loading = importState.status === 'LOADING';
+    const saving = importState.status === 'SAVING';
+    const blockers = [...plan.errors, ...(importState.loadError ? [{ text: importState.loadError }] : [])];
+    const s = plan.summary;
+    const kpis = `<div class="ads-kpi-row">
+      ${kpi('Dönem', formatAdsRange(s.rangeStart, s.rangeEnd), `${number(s.dayCount)} gün`)}
+      ${kpi('Kampanya', number(s.campaignCount), s.newCampaignCount ? `${number(s.newCampaignCount)} yeni açılacak` : 'hepsi kayıtlı')}
+      ${kpi('Toplam harcama', money(s.totalSpend), 'Finans giderine yazılır')}
+      ${kpi('Kayıt', number(s.periodCount), loading ? 'kayıtlı veri kontrol ediliyor' : s.replacedCount ? `${number(s.replacedCount)} eski kayıt yenisiyle değişecek` : 'yeni kayıt')}
+    </div>`;
+    const ownCampaigns = platform => (campaigns || []).filter(item => item.platform === platform);
+    const mappingRows = plan.names.map(entry => {
+      const manual = importState.mapping && importState.mapping[entry.key] !== undefined;
+      const options = [`<option value="__new__"${entry.choice === '__new__' ? ' selected' : ''}>+ Yeni kampanya oluştur</option>`,
+        ...ownCampaigns(entry.platform).map(item => `<option value="${escapeHtml(item.id)}"${String(item.id) === entry.choice ? ' selected' : ''}>${escapeHtml(item.name)}</option>`)].join('');
+      return `<tr><td><strong>${escapeHtml(entry.name)}</strong><span class="sub-text" style="display:block">${escapeHtml(entry.platform)}</span></td><td><select class="form-control" data-ads-map-campaign="${escapeHtml(entry.key)}" aria-label="${escapeHtml(entry.name)} için kampanya">${options}</select></td><td>${matchBadge({ ...entry, manual })}</td></tr>`;
+    }).join('');
+    const typeLabels = { MESSAGE: 'Mesaj', CALL: 'Arama', OTHER: 'Diğer' };
+    const previewRows = plan.rows.map(row => `<tr><td>${escapeHtml(row.campaignName)}</td><td style="white-space:nowrap">${escapeHtml(row.periodStart)} – ${escapeHtml(row.periodEnd)}</td><td>${number(adPeriodDays(row))}</td><td>${escapeHtml(row.resultLabel || typeLabels[row.resultType] || '—')}</td><td>${money(row.spend)}</td><td>${number(row.impressions)}</td><td>${number(row.clicks)}</td><td>${number(row.results)}</td></tr>`).join('');
+    const saveNoticeHtml = importState.saveError ? list('Kaydedilemedi', 'rose', [{ text: importState.saveError }]) : '';
+    const disabled = blockers.length || loading || saving;
+    const reason = loading ? 'Bu aylarda kayıtlı reklam verisi kontrol ediliyor…' : saving ? 'Kaydediliyor…' : blockers.length ? 'Yukarıdaki sorunlar çözülmeden kaydedilemez.' : `${number(s.periodCount)} kayıt tek işlemde yazılır; hata olursa hiçbiri yazılmaz.`;
+    return `${head}${renderAdsStepper(blockers.length ? 2 : 3)}${fileCard}</div>
+      ${kpis}
+      ${list('Kaydetmeden önce düzeltin', 'rose', blockers)}
+      ${saveNoticeHtml}
+      ${list('Dikkat', 'amber', importState.parseWarnings ? [...importState.parseWarnings, ...plan.warnings] : plan.warnings)}
+      <div class="card" style="padding:14px;margin-bottom:14px;overflow:auto"><h3 style="margin:0 0 4px">Kampanyaları eşleştir</h3><p class="sub-text" style="margin:0 0 10px">Dosyadaki her ad kayıtlı bir kampanyaya bağlanır. Eşleşmeyen ad için yeni kampanya açılır; isterseniz listeden mevcut kampanyayı seçin.</p><table class="data-table"><thead><tr><th>Dosyadaki ad</th><th>Lexbnb kampanyası</th><th>Durum</th></tr></thead><tbody>${mappingRows}</tbody></table></div>
+      <div class="card" style="padding:14px;margin-bottom:14px;overflow:auto"><h3 style="margin:0 0 10px">Kaydedilecek dönemler</h3><table class="data-table"><thead><tr><th>Kampanya</th><th>Dönem</th><th>Gün</th><th>Sonuç türü</th><th>Harcama</th><th>Gösterim</th><th>Tıklama</th><th>Sonuç</th></tr></thead><tbody>${previewRows}</tbody></table>
+        <form data-ads-import-confirm class="ads-confirm-bar"><span class="sub-text">${escapeHtml(reason)}</span><div style="display:flex;gap:8px"><button type="button" class="btn btn-secondary btn-sm" data-ads-import-reset>Vazgeç</button><button type="submit" class="btn btn-primary btn-sm"${disabled ? ' disabled' : ''}>Onayla ve kaydet</button></div></form>
+      </div>`;
+  }
+
+  function renderAdsAlternativeImports(campaignOptions, manualForm) {
+    return `<details class="card ads-recipe"><summary><strong>Diğer yollar</strong> <span class="sub-text">ChatGPT çıktısı yapıştır · elle dönem ekle</span></summary>
+      <form data-ads-import-form style="margin-top:10px">
+        <p class="sub-text" style="margin:0 0 8px">Reklam ekran görüntüsünü ChatGPT'ye okutun, çıktıyı bu kesin biçimde yapıştırın. Kaydetmeden önce aynı eşleştirme ekranı açılır.</p>
+        <code style="display:block;white-space:pre-wrap;margin-bottom:8px">LEXBNB_REKLAM_V2\nplatform;kampanya;baslangic;bitis;sonuc_turu;harcama;gosterim;tiklama;mesaj;arama</code>
+        <textarea class="form-control" name="payload" rows="5" required aria-label="ChatGPT çıktısı"></textarea>
+        <div style="display:flex;justify-content:flex-end;margin-top:8px"><button type="submit" class="btn btn-secondary btn-sm">Önizle</button></div>
+      </form>
+      ${campaignOptions ? manualForm : '<p class="sub-text">Elle dönem eklemek için önce Kampanyalar ve hedefler bölümünde kampanya oluşturun.</p>'}
+    </details>`;
+  }
+
+  function renderAds(model, view) {
+    const active = ADS_VIEWS.some(item => item.id === view && (model.canManage || !item.manage)) ? view : 'overview';
     const statusLabels = { VERIMLI: 'Verimli', PAHALI: 'Pahalı', IZLE: 'İzle' };
     const metricCards = model.metrics.length ? model.metrics.map(row => `
       <article class="card" style="padding:14px">
@@ -708,7 +834,10 @@
           <div><span class="sub-text">Arama maliyeti</span><strong style="display:block">${money(row.costPerCall)}</strong></div>
         </div>
         <div class="sub-text" style="margin-top:8px">${escapeHtml(row.statusReason && row.statusReason.text || 'Durum için hedef ve yeterli örnek gerekli.')}</div>
-      </article>`).join('') : emptyState('Henüz reklam dönemi yok', 'İlk gerçek reklam dönemi kaydedildiğinde kampanya maliyetleri burada görünür.');
+      </article>`).join('')
+      : model.loadStatus === 'LOADING' ? emptyState('Reklam verisi yükleniyor', 'Seçili dönemin kayıtları getiriliyor.')
+      : model.loadStatus === 'ERROR' ? emptyState('Reklam verisi okunamadı', model.loadError || 'Bağlantıyı kontrol edip sayfayı yenileyin.')
+      : emptyState('Henüz reklam dönemi yok', 'İlk gerçek reklam dönemi kaydedildiğinde kampanya maliyetleri burada görünür.');
     const channelRows = model.channelLeadCost.map(row => `<tr><td>${escapeHtml(row.platform)}</td><td>${money(row.spend)}</td><td>${number(row.leads)}</td><td>${money(row.costPerLead)}</td><td>${number(row.messageToLeadRatio)}</td></tr>`).join('');
     const campaignOptions = model.campaigns.map(item => `<option value="${escapeHtml(item.id)}" data-platform="${escapeHtml(item.platform)}">${escapeHtml(item.name)} · ${escapeHtml(item.platform)}</option>`).join('');
     const campaignAdmin = model.canManage ? `
@@ -745,7 +874,7 @@
     const periodList = `<div class="card" style="padding:14px;margin-bottom:14px;overflow:auto"><h3 style="margin:0 0 10px">Kayıtlı reklam dönemleri</h3>${model.periods.length ? `<table class="data-table"><thead><tr><th>Kampanya</th><th>Dönem</th><th>Gün</th><th>Harcama</th><th>Günlük ort.</th><th>Gösterim</th><th>Tıklama</th><th>CTR</th><th>Mesaj</th><th>Arama</th>${customHeaders}<th></th></tr></thead><tbody>${periodRows}</tbody></table>` : '<p class="empty-state">Henüz reklam dönemi yok.</p>'}</div>`;
     const fieldOptions = Object.keys(AD_METRIC_FIELDS).map(key => `<option value="${key}">${escapeHtml(AD_METRIC_FIELDS[key])}</option>`).join('');
     const customMetricAdmin = model.canManage ? `<form data-ads-custom-metric-form class="card" style="padding:16px;margin-bottom:14px"><h3 style="margin:0 0 6px">Kendi metriğini ekle</h3><p class="sub-text" style="margin:0 0 10px">İki alanı bölerek ya da çarparak tabloya yeni bir sütun ekleyin (örn. Harcama ÷ Mesaj = mesaj başı maliyet). En fazla ${MAX_CUSTOM_METRICS} metrik.</p><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;align-items:end"><label style="display:grid;gap:5px;font-size:12px">Ad<input class="form-control" name="name" required maxlength="40" placeholder="Örn: Mesaj maliyeti"></label><label style="display:grid;gap:5px;font-size:12px">Alan<select class="form-control" name="num">${fieldOptions}</select></label><label style="display:grid;gap:5px;font-size:12px">İşlem<select class="form-control" name="op"><option value="/">÷ böl</option><option value="*">× çarp</option></select></label><label style="display:grid;gap:5px;font-size:12px">Alan<select class="form-control" name="den">${fieldOptions}</select></label><label style="display:flex;gap:6px;align-items:center;font-size:12px"><input type="checkbox" name="percent" value="1"> Yüzde (×100)</label><button class="btn btn-primary btn-sm" type="submit">Metriği ekle</button></div>${customMetrics.length ? `<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px">${customMetrics.map(metric => `<span class="badge">${escapeHtml(metric.name)} = ${escapeHtml(AD_METRIC_FIELDS[metric.num])} ${metric.op === '*' ? '×' : '÷'} ${escapeHtml(AD_METRIC_FIELDS[metric.den])}${metric.percent ? ' %' : ''} <button type="button" class="btn-text" data-ads-delete-metric="${escapeHtml(metric.id)}" aria-label="Metriği sil">✕</button></span>`).join('')}</div>` : ''}</form>` : '';
-    const form = model.canManage ? (campaignOptions ? `
+    const manualForm = `
       <form data-ads-manual-form class="card" style="padding:16px;margin-bottom:14px">
         <h3 style="margin:0 0 6px">Reklam dönemi ekle</h3>
         <p class="sub-text" style="margin:0 0 12px">Kaydetme işlemi reklam giderini Finans'a aynı işlem içinde bağlar.</p>
@@ -762,32 +891,29 @@
           <label style="display:grid;gap:5px;font-size:12px">Arama<input class="form-control" type="number" name="calls" min="0" step="1"></label>
           <button class="btn btn-primary btn-sm" type="submit">Dönemi kaydet</button>
         </div>
-      </form>
-      <form data-ads-import-form class="card" style="padding:16px;margin-bottom:14px">
-        <h3 style="margin:0 0 6px">Ekran görüntüsü veya CSV içe aktar</h3>
-        <p class="sub-text" style="margin:0 0 10px">Varsayılan akış: reklam ekran görüntüsünü ChatGPT'ye okutun, çıktıyı aşağıdaki kesin biçimde yapıştırın. Kaydetmeden önce tüm satırlar gösterilir.</p>
-        <code style="display:block;white-space:pre-wrap;margin-bottom:10px">LEXBNB_REKLAM_V2\nplatform;kampanya;baslangic;bitis;sonuc_turu;harcama;gosterim;tiklama;mesaj;arama</code>
-        <div style="display:grid;grid-template-columns:minmax(160px,220px) 1fr;gap:10px;align-items:start">
-          <label style="display:grid;gap:5px;font-size:12px">Biçim<select class="form-control" name="mode"><option value="CHATGPT">ChatGPT çıktısı</option><option value="CSV_META">Meta CSV</option></select></label>
-          <label style="display:grid;gap:5px;font-size:12px">Dosya (isteğe bağlı)<input class="form-control" type="file" accept=".csv,.txt" data-ads-import-file></label>
-        </div>
-        <label style="display:grid;gap:5px;font-size:12px;margin-top:10px">Veri<textarea class="form-control" name="payload" rows="7" required></textarea></label>
-        <div style="display:flex;justify-content:flex-end;margin-top:10px"><button type="submit" class="btn btn-secondary btn-sm">Önizle</button></div>
-      </form>
-      ${renderAdsImportPreview(state.adsImportPreview)}` : emptyState('Önce kampanya oluşturun', 'Meta veya Google kampanyası olmadan reklam dönemi kaydedilemez.')) : '';
+      </form>`;
     const spendTrend = model.spendTrendPct === null || model.spendTrendPct === undefined
       ? 'Önceki eş dönem karşılaştırması için veri yok'
       : `Önceki eş döneme göre ${model.spendTrendPct > 0 ? '+' : ''}${number(model.spendTrendPct, '%')} (${money(model.priorSpend)} → ${money(model.totalSpend)})`;
-    return `${campaignAdmin}${form}${customMetricAdmin}${periodList}
+    const emptyCta = !model.metrics.length && model.loadStatus !== 'LOADING' && model.canManage
+      ? '<div style="display:flex;justify-content:center;margin:-4px 0 14px"><button type="button" class="btn btn-primary btn-sm" data-ads-view="import">Meta CSV yükle</button></div>' : '';
+    const resultNote = state.adsImportResult ? `<div class="card ads-notice ads-notice-emerald"><strong>Kaydedildi</strong><div class="sub-text">${escapeHtml(state.adsImportResult)}</div></div>` : '';
+    const sections = {
+      overview: `${resultNote}
       <div class="card" style="padding:14px;margin-bottom:14px"><strong>Seçili dönem reklam toplamı: ${money(model.totalSpend)}</strong><div class="sub-text">${escapeHtml(spendTrend)}</div></div>
       <div class="card" style="padding:14px;margin-bottom:14px;border-left:4px solid #f59e0b"><strong>Atıf sınırı</strong><div class="sub-text">Talep kaynağı kanal düzeyinde ölçülür; hangi reklamın rezervasyon getirdiği ölçülemez. Kampanya ROAS'ı gösterilmez.</div></div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:14px">${metricCards}</div>
-      <div class="card" style="padding:14px;overflow:auto"><h3 style="margin:0 0 10px">Kanal → talep maliyeti</h3><table class="data-table"><thead><tr><th>Kanal</th><th>Harcama</th><th>Talep</th><th>Talep maliyeti</th><th>Mesaj→talep</th></tr></thead><tbody>${channelRows}</tbody></table><div class="sub-text" style="margin-top:10px">Toplam reklam harcaması ${money(model.totalSpend)} · net konaklama cirosundaki pay ${number(model.adShare.pct, '%')}</div></div>`;
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:14px">${metricCards}</div>${emptyCta}
+      <div class="card" style="padding:14px;overflow:auto"><h3 style="margin:0 0 10px">Kanal → talep maliyeti</h3><table class="data-table"><thead><tr><th>Kanal</th><th>Harcama</th><th>Talep</th><th>Talep maliyeti</th><th>Mesaj→talep</th></tr></thead><tbody>${channelRows}</tbody></table><div class="sub-text" style="margin-top:10px">Toplam reklam harcaması ${money(model.totalSpend)} · net konaklama cirosundaki pay ${number(model.adShare.pct, '%')}</div></div>`,
+      import: renderAdsImportView(state.adsImport, model.allCampaigns, model.closedMonths || []) + renderAdsAlternativeImports(campaignOptions, manualForm),
+      campaigns: campaignAdmin,
+      records: `${customMetricAdmin}${periodList}`
+    };
+    return `${renderAdsSubnav(active, model.canManage)}<div role="tabpanel" data-ads-panel="${active}">${sections[active]}</div>`;
   }
 
   function renderWorkspaceHtml(model, view) {
     if (view === 'funnel') return renderFunnel(model);
-    if (view === 'ads') return renderAds(model.ads || buildAdsModel(model));
+    if (view === 'ads') return renderAds(model.ads || buildAdsModel(model), state.adsView);
     return renderEconomics(model);
   }
 
@@ -798,10 +924,11 @@
     const settings = data.tenantSettings || {};
     return {
       ...state, bookings: data.bookings || [], villas: data.villas || {}, filter, baseCurrency: 'TRY', financeSummary,
-      adMetricPeriods: data.adMetricPeriods || [], marketingCampaigns: data.marketingCampaigns || [],
+      adMetricPeriods: state.adPeriods, marketingCampaigns: data.marketingCampaigns || [],
       leadSources: data.leadSources || [], leadAcquisitions: data.leadAcquisitions || [],
       targets: { costPerMessage: settings.ads_cost_per_message_target, costPerCall: settings.ads_cost_per_call_target },
       customMetrics: settings.ads_custom_metrics || [],
+      closedMonths: closedMonthKeys(data),
       canManageAds: typeof canManageTenantRole !== 'function' || canManageTenantRole(typeof activeTenant !== 'undefined' && activeTenant && activeTenant.role)
     };
   }
@@ -816,6 +943,48 @@
     const propertyId = data.villas && data.villas[selectedProperty] && data.villas[selectedProperty].id;
     if (!services.MarketingDataService.UUID_RE.test(String(propertyId || ''))) return null;
     return { tenantId, propertyId };
+  }
+
+  // Backend maliyeti (kullanıcı, 05.11.2026): reklam dönemleri her sayfa yüklemesinde
+  // değil, yalnız Pazarlama açıldığında ve yalnız seçili dönem + karşılaştırılan önceki
+  // eş dönem için çekilir. Aynı aralık ikinci kez istenmez; yazmadan sonra
+  // `reloadAdPeriods` önbelleği düşürür.
+  function adsWindow(filter) {
+    const selected = periodFromFilter(filter || {});
+    if (!selected.start || !selected.endExclusive) return {};
+    const durationDays = Math.round((Date.parse(selected.endExclusive + 'T00:00:00Z') - Date.parse(selected.start + 'T00:00:00Z')) / 86400000);
+    return { from: addUtcDays(selected.start, -durationDays), to: addUtcDays(selected.endExclusive, -1) };
+  }
+
+  async function hydrateAdPeriods() {
+    const client = typeof supabaseClient !== 'undefined' ? supabaseClient : null;
+    const tenantId = typeof getActiveTenantId === 'function' ? getActiveTenantId() : null;
+    const input = browserInput();
+    if (!client || !services.AdsPeriodService || !services.MarketingDataService
+      || !services.MarketingDataService.UUID_RE.test(String(tenantId || '')) || !input.canManageAds) {
+      state.adPeriods = []; state.adPeriodsKey = null; state.adPeriodsStatus = 'IDLE'; state.adPeriodsError = null;
+      return null;
+    }
+    const range = adsWindow(input.filter);
+    const key = `${tenantId}|${range.from || ''}|${range.to || ''}`;
+    if (state.adPeriodsKey === key) return null;
+    state.adPeriodsKey = key;
+    state.adPeriodsStatus = 'LOADING';
+    try {
+      const rows = await services.AdsPeriodService.loadPeriods(client, tenantId, range);
+      if (state.adPeriodsKey !== key) return null;
+      state.adPeriods = rows; state.adPeriodsStatus = 'OK'; state.adPeriodsError = null;
+    } catch (error) {
+      if (state.adPeriodsKey !== key) return null;
+      state.adPeriods = []; state.adPeriodsKey = null; state.adPeriodsStatus = 'ERROR';
+      state.adPeriodsError = `Reklam kayıtları okunamadı: ${error && error.message || 'bilinmeyen hata'}`;
+    }
+    return state.adPeriods;
+  }
+
+  async function reloadAdPeriods() {
+    state.adPeriodsKey = null;
+    await hydrateAdPeriods();
   }
 
   async function hydrateCloudData() {
@@ -1015,6 +1184,7 @@
         ...values, tenantId: scope.tenantId, source: 'MANUAL'
       });
       if (typeof loadTenantAppData === 'function') await loadTenantAppData(scope.tenantId);
+      await reloadAdPeriods();
       render();
       return result;
     } finally {
@@ -1092,6 +1262,7 @@
     if (typeof window !== 'undefined' && !window.confirm('Bu reklam dönemi ve bağlı Finans gideri silinsin mi?')) return false;
     await services.AdsPeriodService.deletePeriod(client, periodId);
     if (typeof loadTenantAppData === 'function') await loadTenantAppData(scope.tenantId);
+    await reloadAdPeriods();
     render();
     return true;
   }
@@ -1102,35 +1273,113 @@
     if (typeof window !== 'undefined' && !window.confirm('Kampanya ve bağlı reklam dönemleri silinsin mi?')) return false;
     await cloudDeleteMarketingCampaign(campaignId);
     if (typeof loadTenantAppData === 'function') await loadTenantAppData(scope.tenantId);
+    await reloadAdPeriods();
     render();
     return true;
   }
 
-  function handleAdsImportPreview(form) {
-    const values = Object.fromEntries(new FormData(form).entries());
-    const data = typeof appData !== 'undefined' ? appData : {};
-    state.adsImportPreview = buildAdsImportPreview(values.payload, values.mode, data.marketingCampaigns || []);
+  function adsTenantId() {
+    const tenantId = typeof getActiveTenantId === 'function' ? getActiveTenantId() : null;
+    return services.MarketingDataService && services.MarketingDataService.UUID_RE.test(String(tenantId || '')) ? tenantId : null;
+  }
+
+  // Birleştirme ve "değişecek kayıt" hesabı için yalnız dosyanın aylarına değen
+  // kayıtlar okunur (backend maliyeti, kullanıcı 05.11.2026).
+  async function loadAdsImportContext(importState) {
+    const client = typeof supabaseClient !== 'undefined' ? supabaseClient : null;
+    const tenantId = adsTenantId();
+    const days = (importState.rows || []).flatMap(row => [row.periodStart, row.periodEnd]).filter(Boolean).sort();
+    if (!days.length || (importState.parseErrors || []).length) { importState.status = 'READY'; return; }
+    if (!client || !tenantId || !services.AdsPeriodService) {
+      importState.status = 'READY';
+      importState.loadError = 'Bulut bağlantısı yok; kayıtlı reklam verisi kontrol edilemedi.';
+      return;
+    }
+    const from = `${days[0].slice(0, 7)}-01`;
+    const last = days[days.length - 1];
+    const to = addUtcDays(`${new Date(Date.UTC(Number(last.slice(0, 4)), Number(last.slice(5, 7)), 1)).toISOString().slice(0, 10)}`, -1);
+    try {
+      importState.existing = await services.AdsPeriodService.loadPeriods(client, tenantId, { from, to });
+      importState.loadError = null;
+    } catch (error) {
+      importState.existing = [];
+      importState.loadError = `Kayıtlı reklam verisi okunamadı: ${error && error.message || 'bilinmeyen hata'}`;
+    }
+    importState.status = 'READY';
+  }
+
+  async function startAdsImport(importState) {
+    state.adsImport = importState;
+    state.adsImportResult = null;
+    state.adsView = 'import';
     render();
-    return state.adsImportPreview;
+    await loadAdsImportContext(importState);
+    if (state.adsImport === importState) render();
+  }
+
+  const ADS_MAX_FILE_BYTES = 5 * 1024 * 1024;
+  async function handleAdsFile(file) {
+    const parser = services.AdsImportParser;
+    if (!file || !parser) return null;
+    const base = { mode: 'CSV_META', fileName: file.name, rows: [], parseWarnings: [], existing: [], mapping: {}, status: 'LOADING' };
+    if (file.size > ADS_MAX_FILE_BYTES) {
+      return startAdsImport({ ...base, parseErrors: [{ text: 'Dosya 5 MB\'tan büyük. Meta\'da kampanyalar düzeyinde ve en fazla birkaç aylık dönem seçerek indirin.' }] });
+    }
+    // Excel-TR ile yeniden kaydedilen CSV windows-1254 olur; file.text() onu
+    // UTF-8 sanıp kampanya adlarını bozardı. Kod sayfası ortak motorla çözülür.
+    const buffer = await file.arrayBuffer();
+    const engine = typeof FinanceImportEngine !== 'undefined' ? FinanceImportEngine : null;
+    const text = engine ? engine.decodeImportText(new Uint8Array(buffer)) : new TextDecoder('utf-8').decode(buffer);
+    const parsed = parser.parseCsv(text, 'META');
+    return startAdsImport({ ...base, rows: parsed.rows, parseErrors: parsed.errors, parseWarnings: parsed.warnings || [] });
+  }
+
+  function handleAdsImportPreview(form) {
+    const parser = services.AdsImportParser;
+    if (!parser) throw new Error('ADS_IMPORT_PARSER_UNAVAILABLE');
+    const values = Object.fromEntries(new FormData(form).entries());
+    const parsed = parser.parsePasted(values.payload);
+    return startAdsImport({ mode: 'CHATGPT', fileName: 'ChatGPT çıktısı', rows: parsed.rows, parseErrors: parsed.errors,
+      parseWarnings: parsed.warnings || [], existing: [], mapping: {}, status: 'LOADING' });
+  }
+
+  function adsImportErrorText(error) {
+    const message = String(error && error.message || '');
+    if (error && error.code === 'PHASE111_NOT_APPLIED') return message.replace(/^PHASE111_NOT_APPLIED:\s*/, '');
+    if (/ADS_PARTIAL_OVERLAP/.test(message)) return message.replace(/^.*?ADS_PARTIAL_OVERLAP:\s*/, '');
+    if (/CLOSED_PERIOD/.test(message)) return 'Dosya kapatılmış bir aya dokunuyor; reklam gideri o aya yazılamaz. Ayı yeniden açın ya da o günleri çıkarın.';
+    if (error && error.code === '42501' || /FORBIDDEN_ROLE/.test(message)) return 'Bu işlem için yönetim ve finans yazma izni gerekir (Ayarlar → Ekip → İzinler).';
+    return `Kaydedilemedi: ${message || 'bilinmeyen hata'}. Hiçbir satır yazılmadı.`;
   }
 
   async function handleAdsImportConfirm(form) {
     const client = typeof supabaseClient !== 'undefined' ? supabaseClient : null;
-    const scope = cloudScope();
-    const preview = state.adsImportPreview;
-    if (!client || !scope || !services.AdsPeriodService || !preview || preview.errors.length) throw new Error('ADS_IMPORT_NOT_READY');
-    const submit = form.querySelector('[type="submit"]');
-    if (submit) submit.disabled = true;
+    const tenantId = adsTenantId();
+    const importState = state.adsImport;
+    const data = typeof appData !== 'undefined' ? appData : {};
+    const plan = adsImportPlan(importState, data.marketingCampaigns || [], closedMonthKeys(data));
+    if (!client || !tenantId || !services.AdsPeriodService || !plan || plan.errors.length
+      || (importState.parseErrors || []).length || importState.loadError || importState.status !== 'READY') throw new Error('ADS_IMPORT_NOT_READY');
+    importState.status = 'SAVING';
+    importState.saveError = null;
+    render();
     try {
-      await services.AdsPeriodService.savePeriodsAtomic(client, scope.tenantId, preview.rows.map(row => ({
-        ...row, source: preview.mode === 'CSV_META' ? 'CSV' : 'SCREENSHOT_CHATGPT'
-      })));
-      state.adsImportPreview = null;
-      if (typeof loadTenantAppData === 'function') await loadTenantAppData(scope.tenantId);
-      render();
-    } finally {
-      if (submit) submit.disabled = false;
+      const source = importState.mode === 'CSV_META' ? 'CSV' : 'SCREENSHOT_CHATGPT';
+      const result = await services.AdsPeriodService.importBatch(client, tenantId, plan.newCampaigns, plan.rows.map(row => ({ ...row, source })));
+      const created = (result && result.created_campaigns || []).length;
+      const replaced = result && result.replaced_periods || 0;
+      state.adsImport = null;
+      state.adsView = 'overview';
+      state.adsImportResult = `${number(result && result.inserted_periods)} dönem kaydedildi · ${money(result && result.spend_total)} Finans giderine yazıldı`
+        + (created ? ` · ${number(created)} yeni kampanya açıldı` : '') + (replaced ? ` · ${number(replaced)} eski kayıt yenisiyle değişti` : '');
+      if (typeof loadTenantAppData === 'function') await loadTenantAppData(tenantId);
+      await reloadAdPeriods();
+    } catch (error) {
+      importState.status = 'READY';
+      importState.saveError = adsImportErrorText(error);
     }
+    render();
+    return form;
   }
 
   function initializeBrowser() {
@@ -1141,6 +1390,18 @@
     }));
     const content = document.getElementById('marketingWorkspaceContent');
     if (content) content.addEventListener('click', event => {
+      const adsViewButton = event.target.closest('[data-ads-view]');
+      if (adsViewButton) {
+        state.adsView = adsViewButton.dataset.adsView;
+        if (state.adsView !== 'overview') state.adsImportResult = null;
+        render();
+        return;
+      }
+      if (event.target.closest('[data-ads-import-reset]')) {
+        state.adsImport = null;
+        render();
+        return;
+      }
       const open = event.target.closest('[data-marketing-open-snapshot]');
       const cancel = event.target.closest('[data-marketing-cancel-snapshot]');
       const openListing = event.target.closest('[data-marketing-open-listing]');
@@ -1238,10 +1499,10 @@
       const adsImport = event.target.closest('[data-ads-import-form]');
       if (adsImport) {
         event.preventDefault();
-        try { handleAdsImportPreview(adsImport); } catch (_) {
+        Promise.resolve().then(() => handleAdsImportPreview(adsImport)).catch(() => {
           const status = document.getElementById('marketingWorkspaceStatus');
-          if (status) status.textContent = 'Reklam verisi okunamadı. Seçilen biçimi ve başlığı kontrol edin.';
-        }
+          if (status) status.textContent = 'Reklam verisi okunamadı. Başlığı kontrol edin.';
+        });
         return;
       }
       const adsForm = event.target.closest('[data-ads-manual-form]');
@@ -1292,17 +1553,46 @@
           : 'Snapshot kaydedilemedi. Alanları kontrol edip yeniden deneyin.';
       });
     });
+    const fileReadFailed = () => {
+      const status = document.getElementById('marketingWorkspaceStatus');
+      if (status) status.textContent = 'Seçilen reklam dosyası okunamadı.';
+    };
     if (content) content.addEventListener('change', event => {
+      const mapSelect = event.target.closest('[data-ads-map-campaign]');
+      if (mapSelect && state.adsImport) {
+        state.adsImport.mapping = { ...(state.adsImport.mapping || {}), [mapSelect.dataset.adsMapCampaign]: mapSelect.value };
+        render();
+        return;
+      }
       const input = event.target.closest('[data-ads-import-file]');
       const file = input && input.files && input.files[0];
-      const form = input && input.closest('[data-ads-import-form]');
-      const textarea = form && form.querySelector('[name="payload"]');
-      if (!file || !textarea || typeof file.text !== 'function') return;
-      file.text().then(text => { textarea.value = text; }).catch(() => {
-        const status = document.getElementById('marketingWorkspaceStatus');
-        if (status) status.textContent = 'Seçilen reklam dosyası okunamadı.';
-      });
+      if (file) handleAdsFile(file).catch(fileReadFailed);
     });
+    if (content) {
+      // Bırakma kutunun dışına düşerse tarayıcı dosyayı açıp uygulamadan çıkar (phase33 dersi).
+      ['dragenter', 'dragover'].forEach(type => content.addEventListener(type, event => {
+        const zone = event.target.closest('[data-ads-dropzone]');
+        if (!zone) return;
+        event.preventDefault();
+        zone.classList.add('dropzone-active');
+      }));
+      ['dragleave', 'dragend'].forEach(type => content.addEventListener(type, event => {
+        const zone = event.target.closest('[data-ads-dropzone]');
+        if (zone && !zone.contains(event.relatedTarget)) zone.classList.remove('dropzone-active');
+      }));
+      content.addEventListener('drop', event => {
+        const zone = event.target.closest('[data-ads-dropzone]');
+        if (!zone) return;
+        event.preventDefault();
+        zone.classList.remove('dropzone-active');
+        const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
+        if (file) handleAdsFile(file).catch(fileReadFailed);
+      });
+      if (typeof window.addEventListener === 'function') ['dragover', 'drop'].forEach(type => window.addEventListener(type, event => {
+        const types = event.dataTransfer && Array.from(event.dataTransfer.types || []);
+        if (types && types.includes('Files') && !(event.target.closest && event.target.closest('[data-ads-dropzone], input[type="file"]'))) event.preventDefault();
+      }));
+    }
     // switchTab() in app.js invokes this global hook. Replacing it prevents the
     // hidden legacy demo from rendering while preserving the existing router.
     window.openMarketingListingManager = function openMarketingListingManager(propertyId) {
@@ -1315,7 +1605,7 @@
     window.renderMarketingModule = function renderMarketingWorkspace() {
       return ensureBrowserDependencies().then(() => {
         render();
-        return hydrateCloudData();
+        return Promise.all([hydrateCloudData(), hydrateAdPeriods()]);
       }).then(render).catch(() => {
         const status = document.getElementById('marketingWorkspaceStatus');
         if (status) status.textContent = 'Pazarlama verisi yüklenemedi. Lütfen yeniden deneyin.';
@@ -1327,5 +1617,5 @@
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') initializeBrowser();
 
-  return { renderSnapshotList, deleteSnapshot, periodFromFilter, scopeBookings, buildWorkspaceModel, getCurrentModel: () => buildWorkspaceModel(browserInput()), buildAdsModel, buildAdsImportPreview, selectLatestSnapshot, selectCurrentBenchmark, renderWorkspaceHtml, renderAds, renderAdsImportPreview, normalizeCustomMetrics, evaluateCustomMetric, campaignBudgetView, renderMarketingHealth, renderBenchmarkPanel, renderBenchmarkForm, renderFindingActions, renderListingForm, renderSnapshotForm, renderExperimentForm, renderExperiments, escapeHtml, setData, render };
+  return { renderSnapshotList, deleteSnapshot, periodFromFilter, adsWindow, scopeBookings, buildWorkspaceModel, getCurrentModel: () => buildWorkspaceModel(browserInput()), buildAdsModel, adsImportPlan, renderAdsImportView, selectLatestSnapshot, selectCurrentBenchmark, renderWorkspaceHtml, renderAds, normalizeCustomMetrics, evaluateCustomMetric, campaignBudgetView, renderMarketingHealth, renderBenchmarkPanel, renderBenchmarkForm, renderFindingActions, renderListingForm, renderSnapshotForm, renderExperimentForm, renderExperiments, escapeHtml, setData, render };
 }));
