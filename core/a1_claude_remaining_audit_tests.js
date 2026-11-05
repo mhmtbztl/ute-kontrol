@@ -20,14 +20,15 @@ function test(name, fn) {
   }
 }
 
-test('A1-G1 menusu dokuz kararli kalemi dogru sirada tasir', () => {
+// Analiz kalemi kullanici karariyla 05.11.2026'da eklendi (10 kalem).
+test('A1-G1 menusu on kararli kalemi dogru sirada tasir', () => {
   const tabs = [...html.matchAll(/<button class="tab-btn[^"]*" data-onclick="switchTab\('([^']+)'\)"/g)]
     .map(match => match[1]);
   assert.deepStrictEqual(tabs, [
     'executive', 'reservations', 'properties', 'operations', 'leads',
-    'pricing', 'finance', 'marketing', 'settings'
+    'pricing', 'finance', 'analytics', 'marketing', 'settings'
   ]);
-  assert.match(html, /Bugün[\s\S]*Rezervasyonlar[\s\S]*Mülkler[\s\S]*Operasyon[\s\S]*Misafirler ve Satış[\s\S]*Fiyatlandırma[\s\S]*Finans[\s\S]*Kanallar ve Pazarlama[\s\S]*Ayarlar/);
+  assert.match(html, /Bugün[\s\S]*Rezervasyonlar[\s\S]*Mülkler[\s\S]*Operasyon[\s\S]*Misafirler ve Satış[\s\S]*Fiyatlandırma[\s\S]*Finans[\s\S]*Analiz[\s\S]*Kanallar ve Pazarlama[\s\S]*Ayarlar/);
 });
 
 test('A1-G1 kaldirilan ekranlar ve eylemler geri gelmez', () => {

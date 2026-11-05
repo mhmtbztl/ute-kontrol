@@ -373,7 +373,12 @@ const allTestFiles = [
 
   // Ice aktarma: tarih sirasi dosyadan (GG/AA - AA/GG), TL ekli tutar, yabanci para reddi
   'import_parsing_tests.js',
-  'property_color_tests.js'
+  'property_color_tests.js',
+
+  // Analiz sekmesi: rezervasyon analizi hesap katmani ve arayuzu (05.11.2026)
+  'booking_analytics_tests.js',
+  'analytics_ui_tests.js',
+  'analytics_integration_tests.js'
 ];
 
 const testEnv = require('./core/test_env.js');

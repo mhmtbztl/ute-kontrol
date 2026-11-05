@@ -909,6 +909,44 @@ async function main() {
         'Gunluk fiyat istegi: ' + JSON.stringify(gunlukPost).slice(0, 400));
       await page.locator('#tab-pricing').screenshot({ path: path.join(__dirname, '..', 'tmp', 'g97-pricing.png') });
       passed.push('32. fiyatlandırma (9.7): bakım aralığı takvimde "Kapalı", bugünü kapatmaz; boş gece sayılır; 3 ay sekmesi, fiyat tablosu ve kural kaynağı görünür; gün tıklanıp öneri onaylanır');
+
+      // Analiz sekmesi (05.11.2026): ekrandaki ciro Bugun/Finans ile ayni
+      // kaynaktan (computeMonthPerformance); kontroller yeniden cizer, odak kalir.
+      // Sekme ice aktarim bagini (finance_import_batch_rows) bir kez okur; fikstur
+      // oturumsuz oldugu icin 401 doner ve konsol kapisini zamanlamaya bagli kirardi.
+      await page.route('**/rest/v1/finance_import_batch_rows**', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+      await page.evaluate(() => { switchTab('analytics'); });
+      await page.waitForSelector('#analyticsRoot .ba-head');
+      const analiz = await page.evaluate(() => {
+        const r = analyticsUi.getReport();
+        const ay = analyticsUi.getState().anchor;
+        const kart = document.querySelector('#analyticsRoot .ba-kpi .ba-kpi-value');
+        return {
+          aktif: document.getElementById('tab-analytics').classList.contains('active'),
+          bos: r.empty,
+          ekran: kart ? kart.textContent : null,
+          rapor: r.kpis.current.revenue,
+          kaynak: Math.round(computeMonthPerformance(ay, 'ALL').roomRevenue),
+          kartSayisi: document.querySelectorAll('#analyticsRoot .ba-kpi').length,
+          svg: document.querySelectorAll('#analyticsRoot svg').length
+        };
+      });
+      assert(analiz.aktif, 'Analiz sekmesi açılmadı');
+      assert.strictEqual(analiz.rapor, analiz.kaynak, 'Analiz cirosu computeMonthPerformance ile ayni olmali');
+      if (!analiz.bos) {
+        assert.strictEqual(analiz.kartSayisi, 8, 'Analiz KPI kartlari');
+        assert.strictEqual(screenNumber(analiz.ekran), analiz.kaynak, `Analiz ekran cirosu ${analiz.ekran}`);
+        assert(analiz.svg > 0, 'Analiz grafikleri cizilmedi (svg yok)');
+      }
+      await page.locator('#analyticsRoot [data-ba-value="12m"]').click();
+      const odak = await page.evaluate(() => ({
+        preset: analyticsUi.getState().preset,
+        odak: document.activeElement && document.activeElement.getAttribute('data-ba-value')
+      }));
+      assert.deepStrictEqual(odak, { preset: '12m', odak: '12m' }, 'Analiz dönem düğmesi / odak');
+      await assertNoHorizontalOverflow(page, 'Analiz masaustu');
+      await page.locator('#tab-analytics').screenshot({ path: path.join(__dirname, '..', 'tmp', 'analiz-desktop.png') });
+      passed.push(`33. Analiz: sekme açılır; ekrandaki ciro computeMonthPerformance ile aynı${analiz.bos ? ' (fikstür boş)' : ''}; dönem düğmesi yeniden çizer ve odağı korur`);
     });
 
     await withPage(browser, baseUrl, 'owner', { width: 390, height: 844 }, async page => {
@@ -920,6 +958,14 @@ async function main() {
       await assertNoHorizontalOverflow(page, 'Fiyatlandirma mobil');
       await page.screenshot({ path: path.join(__dirname, '..', 'tmp', 'g97-pricing-mobile.png'), fullPage: true });
       passed.push('32b. fiyatlandırma 390 px mobilde taşmaz');
+      // Sekme ice aktarim bagini (finance_import_batch_rows) bir kez okur; fikstur
+      // oturumsuz oldugu icin 401 doner ve konsol kapisini zamanlamaya bagli kirardi.
+      await page.route('**/rest/v1/finance_import_batch_rows**', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+      await page.evaluate(() => { switchTab('analytics'); });
+      await page.waitForSelector('#analyticsRoot .ba-head');
+      await assertNoHorizontalOverflow(page, 'Analiz mobil');
+      await page.screenshot({ path: path.join(__dirname, '..', 'tmp', 'analiz-mobile.png'), fullPage: true });
+      passed.push('33b. Analiz 390 px mobilde taşmaz');
       // G9 L-207: teknik metin DSL'si yerine gercek gorsel checklist
       // duzenleyicisi mobilde bolum, onemli madde ve alt kontrolu korur.
       // Ayarlar sekmesi acilinca ekip, sablon ve talep kaynagi okumalari

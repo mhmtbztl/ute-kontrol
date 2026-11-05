@@ -4673,6 +4673,10 @@ function applyGlobalFilterScope(tabId) {
 }
 
 function switchTab(tabId) {
+  if (tabId === 'analytics' && !canReadSalesRole(activeTenant?.role)) {
+    if (typeof showToast === 'function') showToast('Analiz satış verisini okuyabilen rollere açıktır.', 'error');
+    return false;
+  }
   if (tabId === 'settings' && !canManageTenantRole(activeTenant?.role)) {
     if (typeof showToast === 'function') showToast('Ayarlar yalnızca işletme yönetim rollerine açıktır.', 'error');
     return false;
@@ -4720,6 +4724,7 @@ function switchTab(tabId) {
   if (tabId === 'maintenance') renderManageMaintTable();
   if (tabId === 'housekeeping') renderHousekeepingTab();
   if (tabId === 'marketing') renderMarketingModule();
+  if (tabId === 'analytics') renderAnalyticsTab();
 }
 
 function isBookingInFilter(b) {
@@ -5416,7 +5421,8 @@ const ACTIVE_RENDER_PLANS = {
   'tab-leads': ['renderLeadQuickCapture', 'renderLeadSalesWorkspace', 'renderManageLeadsTable', 'renderLeadAnalytics'],
   'tab-maintenance': ['renderManageMaintTable'],
   'tab-housekeeping': ['renderHousekeepingTab'],
-  'tab-settings': ['renderSettingsWorkspace', 'renderTeamManagement']
+  'tab-settings': ['renderSettingsWorkspace', 'renderTeamManagement'],
+  'tab-analytics': ['renderAnalyticsTab']
 };
 
 function getActiveRenderPlan(activeTabId) {
@@ -15537,6 +15543,103 @@ function computeMonthPerformance(monthKey, villa) {
   };
 }
 
+// -------------------------------------------------------------
+// ANALIZ SEKMESI (core/booking_analytics.js + core/analytics_ui.js)
+// -------------------------------------------------------------
+// Rakamlar tek kaynaktan: ay performansi computeMonthPerformance (Bugun ekrani
+// ve Finans aylik KPI tablosuyla ayni), kanal cirosu ve ileriye dolu
+// LedgerContract'tan. Modul her render'da appData'dan yeniden hesaplar.
+let analyticsUi = null;
+let analyticsUiEl = null;
+
+// Ice aktarilan rezervasyonlar (phase35 finance_import_batch_rows): created_at
+// aktarim gunudur, rezervasyonun yapildigi gun degil; 'rezervasyon oncesi
+// sure' ve ileriye dolu kiyasindan cikarilir. Sekme ilk acildiginda bir kez,
+// arka planda yuklenir; okunamazsa sekme yine calisir (modul giristen sonra
+// girilmis kaydi zaten disarida birakir).
+let analyticsImported = { tenantId: null, ids: null };
+async function loadAnalyticsImportedBookingIds(tenantId) {
+  if (!supabaseClient || !isCloudTenant(tenantId)) return;
+  analyticsImported = { tenantId, ids: null };
+  let rows;
+  try {
+    rows = await fetchTenantRowsTolerant(() => supabaseClient
+      .from('finance_import_batch_rows').select('booking_id')
+      .eq('tenant_id', tenantId).not('booking_id', 'is', null));
+  } catch (err) {
+    console.warn('Analiz: ice aktarim bagi okunamadi', err && (err.message || err));
+    return;
+  }
+  // Yukleme surerken isletme degistiyse sonuc baskasina yazilmaz.
+  if (analyticsImported.tenantId !== tenantId) return;
+  analyticsImported = { tenantId, ids: new Set((rows || []).map(r => r.booking_id)) };
+  if (analyticsUi && typeof document !== 'undefined') analyticsUi.render();
+}
+
+function isAnalyticsImportedBooking(b) {
+  const ids = analyticsImported.tenantId === activeTenant?.id ? analyticsImported.ids : null;
+  return !!(ids && b && ids.has(b.dbId || b.id));
+}
+
+function renderAnalyticsTab() {
+  if (typeof document === 'undefined' || typeof AnalyticsUI === 'undefined') return;
+  const el = document.getElementById('analyticsRoot');
+  if (!el) return;
+  // Kap degistiyse (DOM yeniden kuruldu) eski kaba cizmeye devam etmez.
+  if (analyticsUi && analyticsUiEl !== el) {
+    analyticsUi.destroy();
+    analyticsUi = null;
+  }
+  if (!analyticsUi) {
+    analyticsUiEl = el;
+    analyticsUi = AnalyticsUI.mount(el, {
+      getData: () => ({
+        bookings: appData.bookings || [],
+        leads: canReadSalesRole(activeTenant?.role) ? (appData.leads || []) : [],
+        villas: Object.entries(appData.villas || {}).map(([key, v]) => ({ key, name: (v && v.name) || key, id: v && v.id })),
+        today: getTodayStr()
+      }),
+      deps: {
+        monthPerformance: (monthKey, villa) => computeMonthPerformance(monthKey, villa),
+        monthTarget: (monthKey, villa) => analyticsMonthTarget(monthKey, villa),
+        isBulkSummary: isBulkSummaryBooking,
+        channelName: getChannelDisplayName,
+        leadChannelName: leadChannelLabel,
+        isImported: isAnalyticsImportedBooking
+      },
+      monthOptions: () => (typeof ALL_FINANCIAL_MONTHS !== 'undefined' ? ALL_FINANCIAL_MONTHS : []),
+      canReadLeads: () => canReadSalesRole(activeTenant?.role),
+      // Aylik hedefler yalniz finans okuyabilen role yuklenir (loadTenantAppData).
+      canSeeTargets: () => canReadLedgerRole(activeTenant?.role)
+    });
+  }
+  const tenantId = activeTenant?.id;
+  if (tenantId && analyticsImported.tenantId !== tenantId) {
+    loadAnalyticsImportedBookingIds(tenantId);
+  }
+  analyticsUi.render();
+}
+
+// Aylik hedef satiri (monthly_targets). Ciro hedefi Finans'in kullandigi
+// getConfiguredRevenueTarget'tan; doluluk/ADR/RevPAR sutun varsayilani 0
+// 'girilmemis' sayilir (null).
+function analyticsMonthTarget(monthKey, villa) {
+  const [y, m] = String(monthKey).split('-').map(Number);
+  const v = villa || 'ALL';
+  const pid = v !== 'ALL' ? (appData.villas?.[v]?.id || null) : null;
+  const rows = Array.isArray(appData.targets) ? appData.targets : [];
+  const row = rows.find(t => Number(t.year) === y && Number(t.month) === m
+    && ((t.property_id || t.propertyId || null) === pid));
+  const revenue = getConfiguredRevenueTarget({ period: monthKey }, appData.targets, v);
+  if (!row && !revenue) return null;
+  return {
+    revenue: revenue > 0 ? revenue : null,
+    occupancy: Number(row?.occupancy_target) > 0 ? Number(row.occupancy_target) : null,
+    adr: Number(row?.adr_target) > 0 ? Number(row.adr_target) : null,
+    revpar: Number(row?.revpar_target) > 0 ? Number(row.revpar_target) : null
+  };
+}
+
 function getMonthlyKpiDataset() {
   const months = ALL_FINANCIAL_MONTHS.slice();
 
@@ -18509,6 +18612,8 @@ function applyRoleNavigationVisibility() {
   if (!canManageTenantRole(role)) hiddenTabs.add('settings');
   // Finans sekmesi finans okuma iznine gore (L-211: satisa verilebilir, yoneticiden alinabilir).
   if (!canReadLedgerRole(role)) hiddenTabs.add('finance');
+  // Analiz: satis verisini okuyabilen herkes (sales dahil); staff gormez.
+  if (!canReadSalesRole(role)) hiddenTabs.add('analytics');
   document.querySelectorAll('.nav-tabs .tab-btn').forEach(button => {
     const match = String(button.getAttribute('data-onclick') || '').match(/^switchTab\('([^']+)'\)$/);
     button.hidden = !!(match && hiddenTabs.has(match[1]));
@@ -24920,6 +25025,10 @@ if (typeof module !== 'undefined' && module.exports) {
     saveLead,
     setTodayPerformanceVilla,
     computeMonthPerformance,
+    renderAnalyticsTab,
+    analyticsMonthTarget,
+    loadAnalyticsImportedBookingIds,
+    isAnalyticsImportedBooking,
     getCurrentMonthKey,
     getMonthlyKpiDataset,
     renderPropertyProfile,
