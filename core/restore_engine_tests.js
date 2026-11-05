@@ -93,6 +93,18 @@ check(!order.includes('channel_performance_rates'), '6. Gorunum yukleme sirasind
     '10. Yedekte olmayan tablo: davet kuyrugu temizlenir, turetilmis reklam gunleri silinmez', silinen.join(' | ') || 'hic silme yok');
 
   const script = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'run_restore.js'), 'utf8');
+  // A revision's predecessor may fall in a later 500-row batch when IDs are
+  // random. A backup must restore predecessors first, regardless of file order.
+  const revisions = Array.from({length:501}, (_,i) => ({id:String(i),supersedes_id:i ? String(i-1) : null})).reverse();
+  const revisionSpec = {definitions:{airbnb_performance_records:{properties:{id:{description:'<pk/>'},supersedes_id:{description:"<fk table='airbnb_performance_records' column='id'/>"}}}}};
+  const restoredIds = new Set();
+  const revisionClient = {from:() => ({select:() => ({in:async()=>({data:[]})}),insert:async rows => {
+    const batchIds = new Set(rows.map(r=>r.id));
+    if(rows.some(r=>r.supersedes_id && !restoredIds.has(r.supersedes_id) && !batchIds.has(r.supersedes_id))) return {error:{message:'predecessor missing'}};
+    rows.forEach(r=>restoredIds.add(r.id));return {error:null};
+  }})};
+  const revisionReport = await restoreBackup({client:revisionClient,spec:revisionSpec,startedAt:new Date(),readJson:rel=>rel==='manifest.json'?{format:'lexbnb-backup/1',errors:[]}:rel==='tables/airbnb_performance_records.json'?revisions:[]});
+  check(revisionReport.errors.length===0 && restoredIds.size===501,'11. Sürüm geçmişi 500 satırlık paket sınırında ebeveyn önce yüklenir',revisionReport.errors.join(' | '));
   check(/isProductionTarget\(url\)/.test(script) && /RESTORE_GUARD: uretime TUM yedek yuklenemez/.test(script) && /--confirm-production/.test(script),
     '9. Uretime tum yedek yuklenemez; tek isletme icin referans onayi sart', 'koruma yok');
 

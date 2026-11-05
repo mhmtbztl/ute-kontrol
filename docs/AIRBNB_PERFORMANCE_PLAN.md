@@ -69,7 +69,11 @@ kayıt formları açılmaz ve açıklama gösterilir; eski veriler okunmaya deva
 ## Doğrulama sonucu
 - Ayrı test projesinde üç göç uygulandı; kayıt, tekrar gönderim, sürüm geçmişi,
   eşzamanlı düzeltme, viewer/staff, anon ve çapraz kiracı testleri geçti.
-- Tam güvenli koşu 215/215 süit; canlı süitler bu koşudan ayrı çalıştırıldı.
-- Mevcut tarayıcı kapısı 36 akış/4 rol geçti. Yeni ekran 1280 ve 390 px'te
+- Rebase sonrası tam güvenli koşu 222/222 süit; canlı süitler ayrı çalıştırıldı.
+- Mevcut tarayıcı kapısı 38 akış/4 rol geçti. Yeni ekran 1280 ve 390 px'te
   önizleme, kayıt, düzeltme, geçmiş, not, XSS, taşma ve göç eksik durumuyla doğrulandı.
-- Göç zinciri ve varlık damgaları doğrulandı. Üretim göçü/push yapılmadı.
+- Göç zinciri ve varlık damgaları doğrulandı. Kullanıcı üretim göçlerini uyguladı;
+  98/100/102 defter kayıtları ve anon erişim engelleri üretimde salt okunur doğrulandı.
+- Yeni yedek listesine Airbnb tabloları eklendi. Geri yüklemede aynı tablodaki
+  önceki sürüm bağlantıları paket sınırından önce sıralanır (501 satırlık regresyon).
+  Gerçek test projesinde yedekleme/geri yükleme 11/11, işletme yedeği 10/10 geçti.

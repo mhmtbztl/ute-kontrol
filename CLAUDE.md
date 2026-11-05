@@ -13,7 +13,9 @@ Düzeltme eski sürümü korur. Değişiklik notları fotoğraf yüklemeyi gerek
 14+14 günlük gözlemsel karşılaştırma Airbnb'ye yayın veya nedensellik kanıtı değildir.
 
 Göç sırası: phase98 → phase100 → phase102. Üçü ayrı test projesine uygulandı;
-üretime uygulama ayrıca onay gerektirir. Phase100, testte uygulanmış phase98'in
+üretimde de kullanıcı tarafından uygulandı ve 5 Kasım 2026'da `schema_migrations`
+98/100/102 kayıtları, tablo varlığı ve anon tablo/RPC erişim engelleri salt okunur
+sorgularla doğrulandı. Phase100, testte uygulanmış phase98'in
 kiracı kimliği tetikleyicisi/defter eksiklerini yeni göçle onarır. Phase102,
 bilinçli sürüm çakışmasında `40001` yerine `23505` döndürür: canlı RPC testinde
 40001 yanıtı tekrar denemelerle `upstream request timeout` oluyordu; 23505 ile

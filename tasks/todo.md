@@ -7,7 +7,8 @@
 - [x] Tam eşleşen dönem karşılaştırması ve gerçek kayıt grafiği; hesap testleri.
 - [x] Değişiklik notu ve 14+14 gün karşılaştırması; canlı/UI testleri.
 - [x] Tam test, göç zinciri, damga ve tarayıcı kapısı; 215/215 güvenli süit,
-  ayrı canlı süit ve mobil/masaüstü akışları geçti. Üretim göçü/push yapılmadı.
+  ayrı canlı süit ve mobil/masaüstü akışları geçti. Rebase sonrası 222/222 süit;
+  üretim göçleri kullanıcı tarafından uygulandı ve salt okunur doğrulandı.
 - [ ] Sonraki aşama: örnek CSV alındıktan sonra önizlemeli toplu aktarım.
 
 ## Önceki tamamlanmış çalışma

@@ -14,7 +14,7 @@ const executablePath = [process.env.CHROME_PATH, process.env.PROGRAMFILES && pat
     for (const width of [1280,390]) {
       const page = await browser.newPage({ viewport: { width, height: 900 } });
       const errors = []; page.on('pageerror', e => errors.push(e.message));
-      await page.route('**/airbnb-test', route => route.fulfill({ contentType:'text/html', body:'<!doctype html><html lang="tr"><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"></head><body style="padding:16px"><main id="test-root"></main><script src="/core/airbnb_performance_service.js"></script><script src="/core/airbnb_performance_ui.js"></script></body></html>' }));
+      await page.route('**/airbnb-test', route => route.fulfill({ contentType:'text/html', body:'<!doctype html><html lang="tr" class="lx-styles-ready"><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"></head><body style="padding:16px"><main id="test-root"></main><script src="/core/airbnb_performance_service.js"></script><script src="/core/airbnb_performance_ui.js"></script></body></html>' }));
       await page.goto(`http://${HOST}:${server.address().port}/airbnb-test`);
       await page.evaluate(() => {
         const listing = '11111111-1111-4111-8111-111111111111';
