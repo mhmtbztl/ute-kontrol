@@ -6955,8 +6955,63 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent-blue); 
 .form-control { width: 100%; background: var(--bg-surface-elevated); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 8px 10px; color: var(--text-main); font-size: 13px; font-family: inherit; }
 .form-control:focus { outline: none; border-color: var(--border-focus); }
 textarea.form-control { resize: vertical; }
-.ads-ai-card { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 16px; margin-bottom: 14px; border-left: 4px solid var(--accent-purple); }
-.ads-ai-card > div:first-child { flex: 1; min-width: 220px; }
+/* Asama 6: Reklamlar Genel bakis, Analiz sekmesinin tasarim diliyle (analytics.css ba-*).
+   Burada yalniz reklam ekranina ozgu eklemeler durur. */
+.ads-overview { gap: 14px; }
+.ads-overview > .ads-notice { margin: 0; }
+.ba-kpis.ads-kpis { grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); }
+.ads-kpi-tile.is-unmeasured .ba-kpi-value { color: var(--text-muted); }
+.ads-kpi-tile .ba-kpi-label { cursor: help; }
+.ads-spark { display: inline-flex; align-items: flex-end; gap: 1px; height: 28px; width: 84px; flex: none; }
+.ads-spark i { flex: 1 1 0; min-width: 1px; border-radius: 1px; background: var(--ba-s1, #0A84FF); opacity: .85; }
+.ads-spark i.is-gap { height: 2px; background: var(--ba-grid); }
+.is-unmeasured { opacity: .55; }
+.ads-table thead th { cursor: help; }
+.ads-table tbody th, .ads-table tfoot th { position: sticky; left: 0; z-index: 1; background: var(--bg-surface); }
+.ads-table thead th:first-child { position: sticky; left: 0; z-index: 1; background: var(--bg-surface); }
+.ads-campaign-name { display: block; font-weight: 600; }
+.ads-campaign-meta { display: block; margin-top: 2px; font-size: 11.5px; font-weight: 400; color: var(--text-muted); }
+.ads-badge-muted { background: rgba(118, 118, 128, 0.18); color: var(--text-muted); }
+.ads-ai-card .ba-chips { margin-top: -4px; }
+.ads-metric-picker { display: grid; gap: 10px; padding: 12px 14px; border-radius: var(--radius-md, 14px); border: 1px solid var(--border-subtle); background: var(--bg-surface-elevated); }
+.ads-metric-groups { display: grid; gap: 8px; }
+.ads-metric-group { border: 0; margin: 0; padding: 0; min-width: 0; display: grid; grid-template-columns: 118px minmax(0, 1fr); align-items: start; gap: 8px; }
+.ads-metric-group legend { float: left; width: 118px; padding: 6px 0 0; font-size: 11.5px; font-weight: 600; color: var(--text-muted); }
+.ads-metric-chips { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.ads-metric-chip { position: relative; display: inline-flex; cursor: pointer; }
+.ads-metric-chip input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.ads-metric-chip span { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border-radius: var(--radius-pill, 999px); border: 1px solid var(--border-subtle); color: var(--text-muted); font-size: 12.5px; white-space: nowrap; transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease; }
+.ads-metric-chip:hover span { color: var(--text-main); }
+.ads-metric-chip input:checked + span { background: var(--accent-blue-subtle); border-color: var(--ba-s1, #0A84FF); color: var(--text-main); }
+.ads-metric-chip input:focus-visible + span { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.ads-metric-chip.is-unmeasured { opacity: 1; }
+.ads-metric-chip.is-unmeasured span { border-style: dashed; color: var(--text-muted); }
+.ads-metric-chip.is-unmeasured input:checked + span { background: transparent; border-color: var(--ba-s1, #0A84FF); color: var(--text-main); }
+.ads-metric-custom { display: inline-flex; align-items: center; gap: 2px; }
+.ads-metric-remove { border: 0; background: none; color: var(--text-muted); font: inherit; font-size: 11px; padding: 4px; cursor: pointer; border-radius: 6px; }
+.ads-metric-remove:hover { color: var(--accent-rose); }
+.ads-metric-empty { font-size: 12px; color: var(--text-muted); padding-top: 6px; }
+.ads-metric-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding-top: 10px; border-top: 1px solid var(--border-subtle); }
+.ads-metric-actions { display: flex; align-items: center; gap: 8px; }
+.ads-custom-metric > summary { cursor: pointer; font-size: 12.5px; color: var(--accent-blue); list-style: none; width: max-content; }
+.ads-custom-metric > summary::-webkit-details-marker { display: none; }
+.ads-custom-metric[open] > summary { margin-bottom: 8px; }
+.ads-custom-metric-form { display: grid; grid-template-columns: minmax(140px, 1.4fr) minmax(100px, 1fr) 64px minmax(100px, 1fr) auto auto; gap: 6px; align-items: center; }
+.ads-custom-metric-form .form-control { padding: 6px 8px; }
+.ads-custom-metric-pct { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); }
+.ads-custom-metric .ba-footnote { margin-top: 6px; }
+@media (max-width: 560px) {
+  .ads-metric-group { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .ads-metric-group legend { float: none; width: auto; padding: 0; }
+  .ads-custom-metric-form { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .ads-custom-metric-form input[name="name"] { grid-column: 1 / -1; }
+}
+@media (max-width: 480px) {
+  .ba-kpis.ads-kpis { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ads-metric-chip span { transition: none; }
+}
 /* Airbnb performance: period data, readable comparisons and compact mobile forms. */
 .ab-workspace { display: grid; gap: 16px; }
 .ab-heading, .ab-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }

@@ -86,6 +86,14 @@
     return { totals, metrics: Glossary.derive(totals), notes };
   }
 
+  // Seçili aralıkta en az bir kayıtla kapsanan takvim günü sayısı (özel metriklerin
+  // "Gün" alanı). Aynı günü kapsayan iki kampanya o günü bir kez sayar.
+  function coveredDays(parts) {
+    const days = new Set();
+    parts.forEach(part => { for (let t = toTime(part.periodStart); t <= toTime(part.periodEnd); t += DAY) days.add(t); });
+    return days.size || null;
+  }
+
   function priorRangeOf(range) {
     if (!range || !range.start || !range.endExclusive) return null;
     const duration = Math.round((toTime(range.endExclusive) - toTime(range.start)) / DAY);
@@ -143,10 +151,11 @@
     const campaigns = [...groups.entries()].map(([campaignId, list]) => {
       const agg = aggregate(list);
       const first = list[0];
+      const covered = coveredDays(list);
       return {
         campaignId, name: names.get(campaignId) || 'Bilinmeyen kampanya', platform: first.platform,
         resultType: first.resultType, resultMetric: first.resultMetric,
-        metrics: agg.metrics, notes: agg.notes,
+        metrics: agg.metrics, notes: agg.notes, days: covered,
         spendShare: totalSpend > 0 && agg.metrics.spend !== null ? round(agg.metrics.spend / totalSpend * 100) : null
       };
     }).sort((a, b) => (b.metrics.spend || 0) - (a.metrics.spend || 0));
@@ -167,7 +176,7 @@
     const unmeasured = Glossary.METRICS.filter(metric => m[metric.key] === null).map(metric => metric.key);
     return {
       range, priorRange: prior, metrics: m, priorMetrics: previous ? previous.metrics : null,
-      changes, notes: current.notes, campaigns, funnel,
+      changes, notes: current.notes, campaigns, funnel, days: coveredDays(parts),
       series: dailySeries(parts, start, end), unmeasured, periodCount: parts.length
     };
   }

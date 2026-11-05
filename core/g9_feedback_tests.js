@@ -468,7 +468,10 @@ async function asama4Davranisi() {
       allPeriods: [{ id: 'p1', campaignId: 'c1', periodStart: '2031-05-01', periodEnd: '2031-05-10', spend: 4000 }], customMetrics: [], adShare: { pct: null } }, 'campaigns');
   check(/<table class="data-table"><thead><tr><th>Kampanya<\/th><th>Dönem<\/th>/.test(reklamHtml) && /<th[^>]*>Mesaj maliyeti<\/th>/.test(reklamHtml),
     'L-188f Donemler tablo olarak listelenir, ozel metrik sutun olur');
-  check(/Günlük sınır/.test(reklamHtml) && /data-ads-custom-metric-form/.test(reklamHtml), 'L-188g Kampanya listesinde gunluk sinir, metrik ekleme formu var');
+  // Aşama 6: metrik ekleme formu Genel bakış → Sütunları özelleştir panelinin Özel grubunda.
+  const seciciHtml = UI.renderAdsMetricPicker({ customMetrics: [metrik], visibleMetrics: [metrik.id] });
+  check(/Günlük sınır/.test(reklamHtml) && /data-ads-custom-metric-form/.test(seciciHtml) && /data-ads-delete-metric/.test(seciciHtml),
+    'L-188g Kampanya listesinde gunluk sinir; metrik ekleme/silme sutun seciciste');
 
   // L-189 (M19) — sablon ekrani
   sahteDom({});

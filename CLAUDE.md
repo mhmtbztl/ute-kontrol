@@ -854,7 +854,17 @@ Ağı `ads_import_parser_tests` P1–P10, `a4_ads_ui_tests`.
 `core/ads_analytics_engine.js` (toplam harcama `buildAdsModel` ile aynı — `ads_analytics_engine_tests`
 E12). Erişim toplanmaz, farklı sonuç türleri toplanmaz, mesaj başına ücret yalnız mesaj
 kampanyalarının harcamasıyla. ChatGPT istemi `ADS_ANALYSIS` (`buildAdsChatGptContext`): misafir
-verisi yok; `null` istemde "0" olmaz (girilmemiş hedef/talep yazılmaz). Ağı `ads_chatgpt_prompt_tests`. Paketler:
+verisi yok; `null` istemde "0" olmaz (girilmemiş hedef/talep yazılmaz). Ağı `ads_chatgpt_prompt_tests`.
+**Genel bakış tablosu ve sütun seçici (Aşama 6):** KPI şeridi ve kampanya tablosu yalnız
+`analysis` rakamlarını gösterir (eski `campaignMetrics` yalnız durum rozeti). Seçim işletme
+genelidir: `tenant_settings.ads_visible_metrics` (boş = sözlüğün `DEFAULT_VISIBLE`'ı, en fazla
+`MAX_VISIBLE`); özel metrikler `ads_custom_metrics` ile **tek upsert'te** yazılır. Ölçülmeyen sütun
+soluk "—" ve nedenini söyler (`missingInputs` → Meta sütun adı). Talep metrikleri kampanya satırında
+"—", yalnız Toplam'da (kanal düzeyi). İstem seçimden bağımsızdır, yalnız seçili özel metrikler
+eklenir. Ağı `ads_campaign_table_tests`, tarayıcı kapısı 12. **Görünüm Analiz sekmesinin dilidir**
+(`analytics.css` `ba-*`: `ba-kpi`, `ba-delta`, `ba-card`, `ba-table`, `ba-chip`); reklam ekranına özel
+ek yalnız `style.css` `ads-*`. `innerHTML` sınırı `<svg>`'yi sildiği için KPI mini eğrisi CSS
+çubuğudur ve yalnız dönemin tamamı günlük kırılımlıysa çizilir. Paketler:
 `docs/PHASE111_DEPLOY_PACKAGE.md`, `docs/PHASE113_DEPLOY_PACKAGE.md`.
 
 **Bir göçün uygulanıp uygulanmadığı, dosyaya bakarak anlaşılmaz.** Dosya repoda

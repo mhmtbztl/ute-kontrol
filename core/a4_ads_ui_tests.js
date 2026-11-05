@@ -73,5 +73,8 @@ assert.strictEqual(october.channelLeadCost.find(row => row.platform === 'META').
 assert.strictEqual(october.adShare.pct, 1);
 assert.strictEqual(App.isAdsPeriodExpense({ legacyId: 'ADS_PERIOD:abc:2026-10' }), true);
 assert.strictEqual(App.isAdsPeriodExpense({ legacyId: 'IMPORT:abc' }), false);
-assert(UI.renderAds(october).includes('Önceki eş döneme göre'));
+// Aşama 6: harcama ve önceki eş dönem farkı KPI şeridinde, analiz motorundan.
+const octoberHtml = UI.renderAds(october);
+assert(octoberHtml.includes('<span class="ba-delta ba-delta-flat"><span class="ba-delta-val"><span aria-hidden="true" class="ba-delta-arrow">▼</span><span class="ba-sr-only">azaldı </span>%90</span><span class="ba-delta-ctx">önceki eş döneme göre</span>'),
+  'KPI şeridi önceki döneme göre değişimi Analiz biçiminde gösterir (harcamada yön nötr)');
 console.log('[PASS] Reklamlar görünümü ölçülebilir metrikleri atıf iddiası olmadan sunar');

@@ -217,6 +217,26 @@ async function main() {
       await page.waitForSelector('[data-ads-campaign-form]', { timeout: 5000 });
       await page.click('[data-ads-view="import"]');
       await page.waitForSelector('[data-ads-dropzone]', { timeout: 5000 });
+      // Aşama 6: kampanya tablosu + sütun seçici gerçek temizleyiciden (CSP stil sınırı)
+      // geçerek çizilir; 390 px'te tablo kendi kartında kayar, sayfa yatay taşmaz.
+      const adsTable = await page.evaluate(() => {
+        const UI = window.LexBnBMarketingUI;
+        const days = Array.from({ length: 31 }, (_, i) => ({ d: `2026-10-${String(i + 1).padStart(2, '0')}`, s: 100, i: 1000, c: 20, r: 2 }));
+        const model = UI.buildAdsModel({
+          filter: { period: '2026-10' }, canManageAds: true, financeSummary: {},
+          adMetricPeriods: [{ id: 'p1', campaign_id: 'c1', platform: 'META', result_type: 'MESSAGE', period_start: '2026-10-01', period_end: '2026-10-31', spend: 3100, impressions: 31000, clicks: 620, messages: 62, results: 62, daily_metrics: days }],
+          marketingCampaigns: [{ id: 'c1', name: 'Tarayıcı kampanyası çok uzun bir ad ile', platform: 'META' }],
+          visibleMetrics: ['spend', 'results', 'costPerResult', 'impressions', 'ctr', 'cpc', 'cpm', 'messages', 'costPerMessage', 'clicks']
+        });
+        const content = document.getElementById('marketingWorkspaceContent');
+        content.innerHTML = UI.renderAdsKpiStrip(model, UI.adsColumns(model)) + UI.renderAdsCampaignTable(model, UI.adsColumns(model)) + UI.renderAdsMetricPicker(model);
+        return { rows: content.querySelectorAll('.ads-table tbody tr, .ads-table tfoot tr').length, groups: content.querySelectorAll('.ads-metric-group').length };
+      });
+      assert(adsTable.rows === 2 && adsTable.groups === 6, `reklam kampanya tablosu/seçici çizilmedi: ${JSON.stringify(adsTable)}`);
+      await page.setViewportSize({ width: 390, height: 844 });
+      const adsOverflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+      await page.setViewportSize({ width: 1280, height: 900 });
+      assert(adsOverflow <= 1, `reklam tablosu 390 px'te sayfayı ${adsOverflow}px taşırıyor`);
       // Form izinlidir ama hicbir yere gonderemez: gezinme oznitelikleri silinir.
       const stripped = await page.evaluate(() => {
         const box = document.createElement('div');
