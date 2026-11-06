@@ -246,6 +246,25 @@ test('U13. Telefonda dokunus grafik ipucunu acar; parmak kalkinca kapanmaz (emul
   assert.strictEqual(tip.hidden, true, 'fare ayrilinca kapanir');
 });
 
+test('U16. Bos durum "Rezervasyon ekle" yalniz yazma izninde; hata metni ham kod gostermez', () => {
+  let acildi = 0;
+  const izinli = mountWith([], { onAddBooking: () => { acildi++; }, canAddBooking: () => true });
+  const btn = izinli.root.querySelector('[data-ba-add-booking]');
+  assert.ok(btn && btn.textContent === 'Rezervasyon ekle');
+  click(izinli.root, btn);
+  assert.strictEqual(acildi, 1);
+  const izinsiz = mountWith([], { onAddBooking: () => { acildi++; }, canAddBooking: () => false });
+  assert.strictEqual(izinsiz.root.querySelector('[data-ba-add-booking]'), null);
+  // Hesap hatasi: kullaniciya yol gosterilir, INVALID_... kodu yazilmaz
+  const uyari = console.warn; console.warn = () => {};
+  try {
+    const bozuk = mountWith(BOOKINGS, { deps: { monthPerformance: () => { throw new Error('INVALID_SOMETHING'); } } });
+    assert.ok(bozuk.root.textContent.includes('Analiz hesaplanamadı'));
+    assert.ok(/yeniden deneyin/.test(bozuk.root.textContent));
+    assert.ok(!/INVALID_/.test(bozuk.root.textContent));
+  } finally { console.warn = uyari; }
+});
+
 test('U15. Telefonda grafik disina dokunus ipucunu kapatir; grafigin icine dokunus kapatmaz; destroy dinleyiciyi kaldirir', () => {
   const { root, ui } = mountWith(BOOKINGS);
   const hit = root.querySelector('.ba-hit');

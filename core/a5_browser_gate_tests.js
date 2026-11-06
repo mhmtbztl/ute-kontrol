@@ -8,7 +8,8 @@ const workflow = fs.readFileSync(path.join(root, '.github', 'workflows', 'ci.yml
 const pkg = require('../package.json');
 assert.strictEqual(pkg.scripts['test:browser'], 'node scripts/browser_quality_gate.js');
 assert(workflow.includes('npm run test:browser'), 'CI tarayıcı kapısını çalıştırmalı');
-assert(script.includes("['executive', 'reservations', 'properties', 'operations', 'leads', 'pricing', 'finance', 'marketing']"), 'Sekiz sayfalı mobil tur eksik');
+// Analiz sekmesi (05.11.2026) mobil tura eklendi: dokuz sayfa.
+assert(script.includes("['executive', 'reservations', 'properties', 'operations', 'leads', 'pricing', 'finance', 'analytics', 'marketing']"), 'Dokuz sayfalı mobil tur eksik');
 for (const role of ['owner', 'sales', 'staff', 'viewer']) assert(script.includes(`'${role}'`), `${role} tarayıcı turunda yok`);
 assert(script.includes("page.on('pageerror'") && script.includes("message.type() === 'error'"), 'Konsol ve çalışma zamanı hataları kapıyı kırmalı');
 assert(script.includes('document.documentElement.scrollWidth'), 'Yatay taşma ölçümü eksik');

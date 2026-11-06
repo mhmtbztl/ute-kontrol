@@ -483,8 +483,12 @@
     }
 
     function onClick(ev) {
-      const t = ev.target && ev.target.closest ? ev.target.closest('[data-ba-set],[data-ba-toggle],[data-ba-sort],[data-ba-villa]') : null;
+      const t = ev.target && ev.target.closest ? ev.target.closest('[data-ba-set],[data-ba-toggle],[data-ba-sort],[data-ba-villa],[data-ba-add-booking]') : null;
       if (!t || !rootEl.contains(t)) return;
+      if (t.hasAttribute('data-ba-add-booking')) {
+        if (typeof opt.onAddBooking === 'function') opt.onAddBooking();
+        return;
+      }
       if (t.hasAttribute('data-ba-set')) {
         const k = t.getAttribute('data-ba-set');
         const v = t.getAttribute('data-ba-value');
@@ -592,14 +596,17 @@
           period, villa: state.villa, deps: opt.deps || {}
         });
       } catch (err) {
-        rootEl.appendChild(emptyState('Analiz hesaplanamadı', String(err && err.message || err)));
+        // Ham hata kodu kullaniciya gosterilmez; tani icin konsola yazilir.
+        if (typeof console !== 'undefined') console.warn('Analiz hesaplanamadi', err);
+        rootEl.appendChild(emptyState('Analiz hesaplanamadı', 'Dönem ya da mülk seçimini değiştirip yeniden deneyin. Sorun sürerse sayfayı yenileyin.'));
         return;
       }
       lastReport = report;
       rootEl.appendChild(renderHeader(report, d, ayListesi));
       if (report.empty) {
         rootEl.appendChild(emptyState('Henüz rezervasyon yok',
-          'Rezervasyon ekledikçe ciro, doluluk, kanal ve davranış analizleri burada kendiliğinden oluşur.'));
+          'Rezervasyon ekledikçe ciro, doluluk, kanal ve davranış analizleri burada kendiliğinden oluşur.',
+          typeof opt.onAddBooking === 'function' && (typeof opt.canAddBooking !== 'function' || opt.canAddBooking()) ? 'Rezervasyon ekle' : null));
         return;
       }
       rootEl.appendChild(renderKpis(report));
@@ -920,7 +927,7 @@
         h('caption', { class: 'ba-sr-only', text: `Mülk karşılaştırması, ${periodLabel(report.period)}` }),
         h('thead', {}, head), h('tbody', {}, body), tfoot
       ]);
-      const sub = 'Satıra tıklayınca o mülkün analizi açılır · oranlar toplamdan, ortalama mülklerin ortalaması';
+      const sub = 'Mülk adını seçince o mülkün analizi açılır · oranlar toplamdan, ortalama mülklerin ortalaması';
       return card('Mülk karşılaştırması', sub, null, h('div', { class: 'ba-scroll' }, table), 'ba-card-wide');
     }
 
@@ -938,14 +945,14 @@
         return host;
       };
       const ltNote = b.leadTimeSample
-        ? `n = ${nf0.format(b.leadTimeSample)} rezervasyon` + (b.leadTimeExcluded ? ` · ${nf0.format(b.leadTimeExcluded)} kayıt sonradan girildiği için dahil değil` : '')
+        ? `${nf0.format(b.leadTimeSample)} rezervasyondan` + (b.leadTimeExcluded ? ` · ${nf0.format(b.leadTimeExcluded)} kayıt sonradan girildiği için dahil değil` : '')
         : 'Ölçülemedi: kayıtlar sonradan ya da içe aktarımla girilmiş';
       const body = h('div', { class: 'ba-mini-grid' }, [
         b.leadTimeSample
           ? mini('Rezervasyon öncesi süre', ltNote, b.leadTimeBuckets.map(x => ltLabels[x.key]), b.leadTimeBuckets.map(x => x.count))
           : h('div', { class: 'ba-mini' }, [h('h4', { class: 'ba-mini-title', text: 'Rezervasyon öncesi süre' }), h('p', { class: 'ba-mini-note', text: ltNote })]),
-        mini('Konaklama süresi', `n = ${nf0.format(b.sample)} rezervasyon`, b.stayBuckets.map(x => stLabels[x.key]), b.stayBuckets.map(x => x.count)),
-        mini('Giriş günü', `n = ${nf0.format(b.sample)} rezervasyon`, GUNLER, b.weekday)
+        mini('Konaklama süresi', `${nf0.format(b.sample)} rezervasyondan`, b.stayBuckets.map(x => stLabels[x.key]), b.stayBuckets.map(x => x.count)),
+        mini('Giriş günü', `${nf0.format(b.sample)} rezervasyondan`, GUNLER, b.weekday)
       ]);
       return card('Rezervasyon davranışı', 'Girişi bu dönemde olan rezervasyonlar · iptal ve toplu aktarım hariç', null, body, 'ba-card-wide');
     }
@@ -1004,8 +1011,12 @@
       return c;
     }
 
-    function emptyState(title, text) {
-      return h('div', { class: 'ba-empty' }, [h('p', { class: 'ba-empty-title', text: title }), h('p', { class: 'ba-empty-text', text: text })]);
+    function emptyState(title, text, eylem) {
+      return h('div', { class: 'ba-empty' }, [
+        h('p', { class: 'ba-empty-title', text: title }),
+        h('p', { class: 'ba-empty-text', text: text }),
+        eylem ? h('button', { type: 'button', class: 'btn btn-primary ba-empty-btn', 'data-ba-add-booking': '1', text: eylem }) : null
+      ]);
     }
 
     function destroy() {

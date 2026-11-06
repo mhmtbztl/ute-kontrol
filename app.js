@@ -15654,7 +15654,10 @@ function renderAnalyticsTab() {
       monthOptions: () => (typeof ALL_FINANCIAL_MONTHS !== 'undefined' ? ALL_FINANCIAL_MONTHS : []),
       canReadLeads: () => canReadSalesRole(activeTenant?.role),
       // Aylik hedefler yalniz finans okuyabilen role yuklenir (loadTenantAppData).
-      canSeeTargets: () => canReadLedgerRole(activeTenant?.role)
+      canSeeTargets: () => canReadLedgerRole(activeTenant?.role),
+      // Bos durumdaki 'Rezervasyon ekle' (satis yazma izni olan rolde)
+      onAddBooking: () => openBookingModal(),
+      canAddBooking: () => canWriteSalesRole(activeTenant?.role)
     });
   }
   const tenantId = activeTenant?.id;
