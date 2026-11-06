@@ -66,7 +66,10 @@ global.document = {
   createElement: t => new FakeNode(t),
   createElementNS: (ns, t) => new FakeNode(t, ns),
   createTextNode: textNode,
-  body: new FakeNode('body')
+  body: new FakeNode('body'),
+  listeners: {},
+  addEventListener(t, fn) { (this.listeners[t] = this.listeners[t] || []).push(fn); },
+  removeEventListener(t, fn) { this.listeners[t] = (this.listeners[t] || []).filter(f => f !== fn); }
 };
 
 function click(root, el) {
@@ -241,6 +244,22 @@ test('U13. Telefonda dokunus grafik ipucunu acar; parmak kalkinca kapanmaz (emul
   assert.strictEqual(tip.hidden, false, 'parmak kalkinca ipucu acik kalmali');
   ates('pointerleave', { pointerType: 'mouse' });
   assert.strictEqual(tip.hidden, true, 'fare ayrilinca kapanir');
+});
+
+test('U15. Telefonda grafik disina dokunus ipucunu kapatir; grafigin icine dokunus kapatmaz; destroy dinleyiciyi kaldirir', () => {
+  const { root, ui } = mountWith(BOOKINGS);
+  const hit = root.querySelector('.ba-hit');
+  const tip = root.querySelector('.ba-tip');
+  (hit.listeners.pointerdown || []).forEach(fn => fn({ clientX: 0, clientY: 0, pointerType: 'touch' }));
+  assert.strictEqual(tip.hidden, false);
+  const belge = ev => (global.document.listeners.pointerdown || []).forEach(fn => fn(ev));
+  belge({ target: hit });
+  assert.strictEqual(tip.hidden, false, 'grafigin icine dokunus kapatmaz');
+  belge({ target: root.querySelector('.ba-kpi') });
+  assert.strictEqual(tip.hidden, true, 'disari dokunus kapatir');
+  const once = (global.document.listeners.pointerdown || []).length;
+  ui.destroy();
+  assert.strictEqual((global.document.listeners.pointerdown || []).length, once - 1);
 });
 
 test('U14. Kismi hedef: satirda hedefli ay sayisi yazar', () => {

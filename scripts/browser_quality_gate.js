@@ -1052,21 +1052,53 @@ async function main() {
       assert(await page.evaluate(() => !document.getElementById('mobileQuickBookingBtn').hidden));
       assert(await page.evaluate(() => canExportReportPage('BOOKINGS') && !canExportReportPage('FINANCE')));
       await assertNoHorizontalOverflow(page, 'sales başlangıç');
+      // Analiz: satis rolu gorur; hedefler bu role yuklenmedigi icin Hedef cipi yok.
+      await page.route('**/rest/v1/finance_import_batch_rows**', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+      const satisAnaliz = await page.evaluate(() => {
+        const dugme = document.querySelector('.tab-btn[data-onclick="switchTab(\'analytics\')"]');
+        switchTab('analytics');
+        return {
+          gorunur: !!dugme && !dugme.hidden,
+          aktif: document.getElementById('tab-analytics').classList.contains('active'),
+          hedefCipi: !!document.querySelector('#analyticsRoot [data-ba-toggle="target"]')
+        };
+      });
+      assert.deepStrictEqual(satisAnaliz, { gorunur: true, aktif: true, hedefCipi: false }, 'satış Analiz');
+      await assertNoHorizontalOverflow(page, 'sales analiz');
+      passed.push('33c. Analiz satış rolünde açılır, Hedef karşılaştırması gizli');
     });
     await withPage(browser, baseUrl, 'staff', { width: 390, height: 844 }, async page => {
       assert(await page.evaluate(() => document.querySelector('.nav-tabs').hidden));
       assert(await page.evaluate(() => canExportReportPage('OPERATIONS') && !canExportReportPage('BOOKINGS')));
       await assertNoHorizontalOverflow(page, 'staff saha');
+      // Analiz: saha personeli goremez; dogrudan cagri da reddedilir.
+      const personelAnaliz = await page.evaluate(() => {
+        const dugme = document.querySelector('.tab-btn[data-onclick="switchTab(\'analytics\')"]');
+        const sonuc = switchTab('analytics');
+        return { gizli: !dugme || dugme.hidden, sonuc, aktif: document.getElementById('tab-analytics').classList.contains('active'),
+          bos: !document.querySelector('#analyticsRoot .ba-kpi') };
+      });
+      assert.deepStrictEqual(personelAnaliz, { gizli: true, sonuc: false, aktif: false, bos: true }, 'personel Analiz');
+      passed.push('33d. Analiz saha personeline kapalı (menü gizli, doğrudan çağrı reddedilir)');
     });
     await withPage(browser, baseUrl, 'viewer', { width: 390, height: 844 }, async page => {
       assert(await page.evaluate(() => document.getElementById('mobileQuickBookingBtn').hidden));
       assert(await page.evaluate(() => { switchTab('properties'); setPropertyProfileTab('PRICES'); return !document.querySelector('.property-ladder-form'); }), 'İzleyici fiyat basamağı formunu görmemeli');
-      const tabs = ['executive', 'reservations', 'properties', 'operations', 'leads', 'pricing', 'finance', 'marketing'];
+      await page.route('**/rest/v1/finance_import_batch_rows**', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+      const tabs = ['executive', 'reservations', 'properties', 'operations', 'leads', 'pricing', 'finance', 'analytics', 'marketing'];
       for (const tab of tabs) {
         await page.evaluate(value => switchTab(value), tab);
         await page.waitForTimeout(30);
         await assertNoHorizontalOverflow(page, `viewer ${tab}`);
       }
+      // Analiz: izleyici finansi okur; Hedef karsilastirmasi gorunur.
+      const izleyiciAnaliz = await page.evaluate(() => {
+        switchTab('analytics');
+        return { aktif: document.getElementById('tab-analytics').classList.contains('active'),
+          hedefCipi: !!document.querySelector('#analyticsRoot [data-ba-toggle="target"]') };
+      });
+      assert.deepStrictEqual(izleyiciAnaliz, { aktif: true, hedefCipi: true }, 'izleyici Analiz');
+      passed.push('33e. Analiz izleyici rolünde açılır, Hedef karşılaştırması görünür');
     });
     console.log(`[PASS] browser_quality_gate: ${passed.length} akış, 4 rol, 390 px taşma ve konsol kapısı`);
     passed.forEach(item => console.log(`[PASS] ${item}`));

@@ -344,6 +344,8 @@
       else if (ev.key === 'Escape') gizle();
     });
     wrap.addEventListener('blur', gizle);
+    // Grafik disina dokunus ipucunu kapatir (mount'taki belge dinleyicisi cagirir).
+    wrap.__baGizle = gizle;
     return wrap;
   }
 
@@ -515,13 +517,27 @@
       render();
     }
 
+    // Yalniz GENISLIK degisince yeniden ciz: telefonda kaydirirken adres cubugu
+    // gizlenip gorununce yukseklik degisir; o zaman cizmek sayfayi ziplatirdi.
+    let sonGenislik = typeof window !== 'undefined' ? window.innerWidth : 0;
     function onResize() {
+      const w = typeof window !== 'undefined' ? window.innerWidth : 0;
+      if (w === sonGenislik) return;
+      sonGenislik = w;
       if (resizeTimer) clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => { if (lastReport) render(); }, 150);
     }
 
+    // Telefonda acik ipucu, grafigin disina dokununca kapanir.
+    function onDocPointerDown(ev) {
+      Array.from(rootEl.querySelectorAll('.ba-chart')).forEach(c => {
+        if (typeof c.__baGizle === 'function' && !c.contains(ev.target)) c.__baGizle();
+      });
+    }
+
     rootEl.addEventListener('click', onClick);
     rootEl.addEventListener('change', onChange);
+    if (typeof document !== 'undefined' && document.addEventListener) document.addEventListener('pointerdown', onDocPointerDown);
     if (typeof window !== 'undefined' && window.addEventListener) window.addEventListener('resize', onResize);
 
     // Yeniden cizim tum dugumleri degistirir; klavye odagi ayni kontrole
@@ -597,6 +613,22 @@
       const leadsOk = typeof opt.canReadLeads === 'function' ? opt.canReadLeads() : true;
       if (leadsOk) rootEl.appendChild(renderLeads(report));
       if (report.villa !== 'ALL') rootEl.appendChild(renderProperties(report));
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(markOverflow);
+    }
+
+    // Kendi kutusunda yana kayan tablo: ustune ipucu, kenarlarina golge (CSS).
+    function markOverflow() {
+      Array.from(rootEl.querySelectorAll('.ba-scroll')).forEach(el => {
+        const tasar = el.scrollWidth > el.clientWidth + 1;
+        el.classList.toggle('is-overflowing', tasar);
+        const onceki = el.previousElementSibling;
+        const var_ = onceki && onceki.classList && onceki.classList.contains('ba-scroll-note');
+        if (tasar && !var_ && el.parentNode) {
+          el.parentNode.insertBefore(h('p', { class: 'ba-scroll-note', text: 'Tablonun devamı için sağa kaydırın →' }), el);
+        } else if (!tasar && var_) {
+          onceki.parentNode.removeChild(onceki);
+        }
+      });
     }
 
     function width(el, fallback) {
@@ -979,6 +1011,7 @@
     function destroy() {
       rootEl.removeEventListener('click', onClick);
       rootEl.removeEventListener('change', onChange);
+      if (typeof document !== 'undefined' && document.removeEventListener) document.removeEventListener('pointerdown', onDocPointerDown);
       if (typeof window !== 'undefined' && window.removeEventListener) window.removeEventListener('resize', onResize);
       if (resizeTimer) clearTimeout(resizeTimer);
       rootEl.textContent = '';
