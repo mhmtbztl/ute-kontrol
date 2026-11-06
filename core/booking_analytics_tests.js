@@ -377,6 +377,31 @@ test('E1. Bos isletmede hicbir rakam uydurulmaz', () => {
   Object.values(r.kpis.deltas).forEach(d => Object.values(d).forEach(v => assert.strictEqual(v, null)));
 });
 
+// ------------------------------------------------------------- hiz --
+test('H1. Buyuk hesap (6.000 rezervasyon, 15 mulk, 12 ay) 1,5 sn altinda (eskiden 1,5-3,7 sn)', () => {
+  let seed = 7; const r = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const iso = d => d.toISOString().slice(0, 10);
+  const bookings = [];
+  for (let i = 0; i < 6000; i++) {
+    const ci = new Date(Date.UTC(2023, 0, 1) + Math.floor(r() * 1460) * 864e5); const n = 2 + Math.floor(r() * 5);
+    bookings.push({ id: 'h' + i, villa: 'v' + (i % 15), guest: 'G' + i, checkIn: iso(ci), checkOut: iso(new Date(ci.getTime() + n * 864e5)),
+      gross: 10000 * n, status: r() < 0.05 ? 'CANCELLED' : 'CONFIRMED', channel: ['AIRBNB', 'Direct', 'BOOKING', 'WA'][i % 4],
+      createdAt: new Date(ci.getTime() - 30 * 864e5).toISOString() });
+  }
+  const villas = [...Array(15)].map((_, i) => ({ key: 'v' + i, name: 'V' + i, id: 'p' + i }));
+  const monthPerformance = (mk, v) => {
+    const R = LedgerContract.monthRange(mk);
+    const l = LedgerContract.computePeriodLedger({ bookings, bookingInScope: x => v === 'ALL' || x.villa === v,
+      bookingShare: x => LedgerContract.nightShareInRange(x, R.start, R.end) });
+    return { roomRevenue: l.netRoomRevenue, nights: l.soldNights, available: 30 * (v === 'ALL' ? 15 : 1) };
+  };
+  const t = Date.now();
+  const rep = BookingAnalytics.buildReport({ bookings, villas, today: '2026-11-06', period: { start: '2025-11', end: '2026-10' }, deps: { monthPerformance } });
+  const sure = Date.now() - t;
+  assert.ok(rep.kpis.current.revenue > 0);
+  assert.ok(sure < 1500, `${sure} ms`);
+});
+
 console.log('-----------------------------------------------------------------------------');
 console.log(`Sonuc: ${passed}/${total} gecti`);
 if (failed > 0) process.exit(1);

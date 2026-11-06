@@ -15581,6 +15581,50 @@ function isAnalyticsImportedBooking(b) {
   return !!(ids && b && ids.has(b.dbId || b.id));
 }
 
+// Analiz dokunuslari (donem, cip, siralama) ayni veriyle ay performansini
+// yeniden hesaplamaz. Deger computeMonthPerformance'in kendisidir; onbellek
+// verinin imzasina baglidir ve veri degisince bosalir. Dizi kimligi de imzada:
+// loadTenantAppData dizileri yeniden kurar, yerinde duzenleme updatedAt'i degistirir.
+let analyticsPerfCache = { imza: null, degerler: new Map() };
+const analyticsDiziKimligi = new WeakMap();
+let analyticsDiziSayaci = 0;
+function analyticsDiziId(dizi) {
+  if (!dizi || typeof dizi !== 'object') return 0;
+  if (!analyticsDiziKimligi.has(dizi)) analyticsDiziKimligi.set(dizi, ++analyticsDiziSayaci);
+  return analyticsDiziKimligi.get(dizi);
+}
+function analyticsDataSignature() {
+  const bookings = appData.bookings || [];
+  let enSon = '';
+  bookings.forEach(b => {
+    const t = String((b && (b.updatedAt || b.updated_at || b.createdAt || b.created_at)) || '');
+    if (t > enSon) enSon = t;
+  });
+  const villas = appData.villas || {};
+  const villaImza = Object.entries(villas).map(([k, v]) => `${k}:${v && (v.activated_on || v.activatedOn || '')}`).join(',');
+  return [
+    activeTenant?.id || '', analyticsDiziId(bookings), bookings.length, enSon, villaImza,
+    analyticsDiziId(appData.maintenance), (appData.maintenance || []).length,
+    analyticsDiziId(appData.expenses), (appData.expenses || []).length,
+    analyticsDiziId(appData.incomeEntries), (appData.incomeEntries || []).length,
+    analyticsDiziId(appData.cleaningTasks), (appData.cleaningTasks || []).length
+  ].join('|');
+}
+// Imza bir cizim boyunca sabittir: ilk cagrida hesaplanir, cizim senkron
+// oldugu icin ayni turdaki tum cagrilar onu kullanir; tur bitince sifirlanir.
+let analyticsImzaBuTur = null;
+function analyticsMonthPerformance(monthKey, villa) {
+  if (!analyticsImzaBuTur) {
+    analyticsImzaBuTur = analyticsDataSignature();
+    Promise.resolve().then(() => { analyticsImzaBuTur = null; });
+  }
+  const imza = analyticsImzaBuTur;
+  if (analyticsPerfCache.imza !== imza) analyticsPerfCache = { imza, degerler: new Map() };
+  const k = `${monthKey}|${villa || 'ALL'}`;
+  if (!analyticsPerfCache.degerler.has(k)) analyticsPerfCache.degerler.set(k, computeMonthPerformance(monthKey, villa));
+  return analyticsPerfCache.degerler.get(k);
+}
+
 function renderAnalyticsTab() {
   if (typeof document === 'undefined' || typeof AnalyticsUI === 'undefined') return;
   const el = document.getElementById('analyticsRoot');
@@ -15600,7 +15644,7 @@ function renderAnalyticsTab() {
         today: getTodayStr()
       }),
       deps: {
-        monthPerformance: (monthKey, villa) => computeMonthPerformance(monthKey, villa),
+        monthPerformance: analyticsMonthPerformance,
         monthTarget: (monthKey, villa) => analyticsMonthTarget(monthKey, villa),
         isBulkSummary: isBulkSummaryBooking,
         channelName: getChannelDisplayName,
@@ -25991,6 +26035,8 @@ if (typeof module !== 'undefined' && module.exports) {
     computeMonthPerformance,
     renderAnalyticsTab,
     analyticsMonthTarget,
+    analyticsMonthPerformance,
+    analyticsDataSignature,
     loadAnalyticsImportedBookingIds,
     isAnalyticsImportedBooking,
     getCurrentMonthKey,

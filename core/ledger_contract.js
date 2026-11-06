@@ -154,17 +154,57 @@
     const bos = { nights: 0, total: 0, ratio: 0 };
     if (!ci || !co) return bos;
     const gun = 86400000;
-    const bas = Date.parse(ci + 'T00:00:00Z');
-    const bit = Date.parse(co + 'T00:00:00Z');
+    // Gecerli YYYY-MM-DD icin onbellekteki damga Date.parse ile aynidir; digerleri ayristirilir.
+    const basD = gunDamgasi(ci);
+    const bitD = gunDamgasi(co);
+    const bas = basD !== null ? basD : Date.parse(ci + 'T00:00:00Z');
+    const bit = bitD !== null ? bitD : Date.parse(co + 'T00:00:00Z');
     if (!Number.isFinite(bas) || !Number.isFinite(bit)) return bos;
     const toplam = Math.round((bit - bas) / gun);
     if (toplam <= 0) return bos;
+    // Hizli yol: aralik kesisimi aritmetikle (gece gece dongu, Analiz'de 6.000
+    // rezervasyonda surenin %93'uydu). Yalniz uclar gecerli YYYY-MM-DD ve geceler
+    // 1000-9999 yillarindaysa: o zaman metin karsilastirmasi ile sayisal
+    // karsilastirma ayni sonucu verir. Aksi halde asagidaki eski dongu (birebir
+    // ayni sonuc; ledger_contract_tests esdegerlik iddiasi).
+    const s = gunDamgasi(start);
+    const e = gunDamgasi(end);
+    const sonGece = bas + (toplam - 1) * gun;
+    if (s !== null && e !== null && yilAraliginda(bas) && yilAraliginda(sonGece)) {
+      const alt = Math.max(bas, s);
+      const ust = Math.min(sonGece, e);
+      const icerde = ust >= alt ? Math.round((ust - alt) / gun) + 1 : 0;
+      return { nights: icerde, total: toplam, ratio: icerde / toplam };
+    }
     let icerde = 0;
     for (let i = 0; i < toplam; i++) {
       const g = new Date(bas + i * gun).toISOString().slice(0, 10);
       if (g >= start && g <= end) icerde++;
     }
     return { nights: icerde, total: toplam, ratio: icerde / toplam };
+  }
+
+  // 'YYYY-MM-DD' gecerli bir takvim gunu ise UTC gece yarisi damgasi, degilse null
+  // (2026-02-30 gibi metinler yuvarlanmaz: dongu yolu onlari metin olarak karsilastirir).
+  // Donem uclari az ve tekrar eder (ay basi/sonu); sonuc onbellekte tutulur.
+  const DAMGA = new Map();
+  function gunDamgasi(v) {
+    if (typeof v !== 'string') return null;
+    if (DAMGA.has(v)) return DAMGA.get(v);
+    let sonuc = null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+      const t = Date.parse(v + 'T00:00:00Z');
+      if (Number.isFinite(t) && yilAraliginda(t) && new Date(t).toISOString().slice(0, 10) === v) sonuc = t;
+    }
+    if (DAMGA.size > 5000) DAMGA.clear();
+    DAMGA.set(v, sonuc);
+    return sonuc;
+  }
+
+  const YIL_ALT = Date.UTC(1000, 0, 1);
+  const YIL_UST = Date.UTC(9999, 11, 31);
+  function yilAraliginda(t) {
+    return t >= YIL_ALT && t <= YIL_UST;
   }
 
   function monthRange(monthKey) {

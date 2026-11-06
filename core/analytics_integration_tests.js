@@ -146,7 +146,9 @@ test('I6. app.js: switchTab, ACTIVE_RENDER_PLANS ve rol kapisi', () => {
   assert.match(APP, /if \(tabId === 'analytics'\) renderAnalyticsTab\(\);/);
   assert.match(APP, /'tab-analytics': \['renderAnalyticsTab'\]/);
   // Sekme ay performansini Bugun ekraninin fonksiyonundan alir (tek kaynak).
-  assert.match(APP, /monthPerformance: \(monthKey, villa\) => computeMonthPerformance\(monthKey, villa\),/);
+  // Onbellek araya girer ama deger computeMonthPerformance'in kendisidir.
+  assert.match(APP, /monthPerformance: analyticsMonthPerformance,/);
+  assert.match(APP, /degerler\.set\(k, computeMonthPerformance\(monthKey, villa\)\)/);
   assert.match(APP, /isBulkSummary: isBulkSummaryBooking,/);
   assert.match(APP, /leadChannelName: leadChannelLabel,/);
   assert.match(APP, /if \(!canReadSalesRole\(role\)\) hiddenTabs\.add\('analytics'\);/);
@@ -250,6 +252,30 @@ function sahteIstemci(satirlar, sorgular) {
     App.setActiveTenant({ id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', role: 'owner' });
     assert.strictEqual(App.isAnalyticsImportedBooking({ id: 'a1', dbId: 'a1' }), false, 'baska kiracinin bagi kullanilmaz');
     App.setSupabaseClient(null);
+  });
+
+  await testAsync('I11. Ay performansi onbellegi: deger kaynakla ayni; veri degisince yenilenir (bayat deger yok)', async () => {
+    const tur = () => new Promise(r => setImmediate(r));
+    ortamKur();
+    await tur();
+    const ilk = App.analyticsMonthPerformance('2031-05', 'ALL');
+    assert.deepStrictEqual(ilk, App.computeMonthPerformance('2031-05', 'ALL'));
+    await tur();
+    assert.strictEqual(App.analyticsMonthPerformance('2031-05', 'ALL'), ilk, 'ayni veride onbellekten (ayni nesne)');
+    // Yerinde ekleme: dizi ayni, uzunluk degisir
+    App.getAppData().bookings.push(bk('yeni', 'B', '2031-05-20', '2031-05-22', 8000, { createdAt: '2031-05-01T00:00:00Z' }));
+    await tur();
+    const eklendi = App.analyticsMonthPerformance('2031-05', 'ALL');
+    assert.strictEqual(Math.round(eklendi.roomRevenue), Math.round(ilk.roomRevenue) + 8000, 'yeni rezervasyon yansimali');
+    // Yerinde duzenleme: tutar degisir, updatedAt ilerler
+    const b = App.getAppData().bookings.find(x => x.id === 'yeni');
+    b.gross = 10000; b.updatedAt = '2031-06-01T00:00:00Z';
+    await tur();
+    assert.strictEqual(Math.round(App.analyticsMonthPerformance('2031-05', 'ALL').roomRevenue), Math.round(ilk.roomRevenue) + 10000, 'duzenleme yansimali');
+    // Yeniden yukleme: yeni dizi
+    ortamKur();
+    await tur();
+    assert.deepStrictEqual(App.analyticsMonthPerformance('2031-05', 'ALL'), App.computeMonthPerformance('2031-05', 'ALL'));
   });
 
   console.log('-----------------------------------------------------------------------------');
