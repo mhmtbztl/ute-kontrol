@@ -672,8 +672,13 @@
         const deger = k.current[metric];
         const satirlar = aktif.map(c => {
           const dd = k.deltas[metric] && k.deltas[metric][c.key];
-          if (dd) return h('li', {}, deltaChip(dd, def.good, c.short));
-          return null;
+          if (!dd) return null;
+          let ek = c.short;
+          // Kismi hedef: fark yalniz hedefi olan aylarin gerceklesenine gore.
+          const kap = c.key === 'target' && k.compare.target && k.compare.target.coverage
+            ? k.compare.target.coverage[metric] : null;
+          if (kap && kap.months.length < kap.total) ek += ` · hedefli ay ${kap.months.length}/${kap.total}`;
+          return h('li', {}, deltaChip(dd, def.good, ek));
         }).filter(Boolean);
         let neden = null;
         if (deger === null) neden = nullReason(metric, k.current);
@@ -954,8 +959,11 @@
       const reasons = L.lossReasons.length
         ? h('ul', { class: 'ba-reasons' }, L.lossReasons.map(r => h('li', {}, [h('span', { text: r.reason }), h('span', { class: 'num', text: nf0.format(r.count) })])))
         : h('p', { class: 'ba-empty-line', text: 'Kaybedilen talep yok' });
+      const bagsizNot = L.wonUnlinked > 0
+        ? h('p', { class: 'ba-footnote', text: `${nf0.format(L.wonUnlinked)} talep "kazanıldı" işaretli ama bir rezervasyona bağlı değil; dönüşüme sayılmadı, kapanan taleplerde kazanmaya sayıldı.` })
+        : null;
       const body = h('div', { class: 'ba-leads' }, [
-        h('div', {}, [kpis, funnel]),
+        h('div', {}, [kpis, funnel, bagsizNot]),
         h('div', {}, [h('h4', { class: 'ba-mini-title', text: 'Kanala göre' }), h('div', { class: 'ba-scroll' }, chTable),
           h('h4', { class: 'ba-mini-title', text: 'Kayıp nedenleri' }), reasons])
       ]);

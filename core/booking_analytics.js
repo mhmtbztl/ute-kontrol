@@ -294,22 +294,40 @@
     };
   }
 
+  const TARGET_METRICS = ['revenue', 'occupancy', 'adr', 'revpar'];
+
   /**
-   * Donemin hedefi. Her ayda hedef yoksa o metrik icin hedef yoktur (eksik
-   * aylari 0 saymak hedefi oldugundan dusuk gosterirdi). Ciro hedefi aylarin
-   * toplami; doluluk/ADR/RevPAR hedefi aylarin ortalamasi. 0 girilmis
-   * doluluk/ADR/RevPAR hedefi "girilmemis" sayilir (sutun varsayilani 0).
+   * Donemin hedefi, metrik metrik. Hedefi girilmis aylar ayri tutulur
+   * (`coverage[metrik].months`): karsilastirma YALNIZ o aylarin gerceklesenleriyle
+   * yapilir (kismi hedef, 06.11.2026). Eksik aylari 0 saymak hedefi oldugundan
+   * dusuk, tum donemle kiyaslamak da sapmayi oldugundan buyuk gosterirdi.
+   * Ciro hedefi aylarin toplami; doluluk/ADR/RevPAR hedefi aylarin ortalamasi.
+   * 0 girilmis hedef "girilmemis" sayilir (sutun varsayilani 0).
    */
   function periodTarget(ctx, villa, period) {
     const months = monthsBetween(period.start, period.end);
-    const satirlar = months.map(m => ctx.monthTarget(m, villa) || null);
-    const hepsi = alan => satirlar.every(t => t && Number(t[alan]) > 0);
-    return {
-      revenue: hepsi('revenue') ? satirlar.reduce((s, t) => s + Number(t.revenue), 0) : null,
-      occupancy: hepsi('occupancy') ? yuvarla(satirlar.reduce((s, t) => s + Number(t.occupancy), 0) / months.length, 1) : null,
-      adr: hepsi('adr') ? Math.round(satirlar.reduce((s, t) => s + Number(t.adr), 0) / months.length) : null,
-      revpar: hepsi('revpar') ? Math.round(satirlar.reduce((s, t) => s + Number(t.revpar), 0) / months.length) : null
-    };
+    const satirlar = months.map(m => ({ m, t: ctx.monthTarget(m, villa) || null }));
+    const out = { coverage: {} };
+    TARGET_METRICS.forEach(alan => {
+      const dolu = satirlar.filter(x => x.t && Number(x.t[alan]) > 0);
+      out.coverage[alan] = { months: dolu.map(x => x.m), total: months.length };
+      if (!dolu.length) { out[alan] = null; return; }
+      const toplam = dolu.reduce((s, x) => s + Number(x.t[alan]), 0);
+      if (alan === 'revenue') out[alan] = toplam;
+      else if (alan === 'occupancy') out[alan] = yuvarla(toplam / dolu.length, 1);
+      else out[alan] = Math.round(toplam / dolu.length);
+    });
+    return out;
+  }
+
+  /** Hedefi olan aylarin gerceklesenleri (ciro/doluluk/ADR/RevPAR toplamdan). */
+  function targetActuals(ctx, villa, target) {
+    const out = {};
+    TARGET_METRICS.forEach(alan => {
+      const aylar = target.coverage[alan].months;
+      out[alan] = aylar.length ? aggregateMonths(aylar.map(m => ctx.perf(m, villa)))[alan] : null;
+    });
+    return out;
   }
 
   /** Degisim: oranlarda yuzde puan, tutarlarda yuzde. Kiyas yoksa null. */
@@ -344,19 +362,27 @@
       compare.portfolio = portfolioAverage(ctx, period);
     }
     compare.target = periodTarget(ctx, villa, period);
-    if (!Object.values(compare.target).some(v => v !== null)) {
+    if (!TARGET_METRICS.some(m => compare.target[m] !== null)) {
       reasons.target = 'Bu dönem için hedef girilmemiş';
     }
+    // Hedef farki, hedefi olan aylarin gerceklesenine gore (kismi hedef).
+    const hedefGercek = targetActuals(ctx, villa, compare.target);
 
     const deltas = {};
     KPI_METRICS.forEach(metric => {
       deltas[metric] = {};
       COMPARE_KEYS.forEach(k => {
+        if (k === 'target') {
+          deltas[metric].target = TARGET_METRICS.includes(metric)
+            ? delta(metric, hedefGercek[metric], compare.target[metric])
+            : null;
+          return;
+        }
         const base = compare[k] ? compare[k][metric] : null;
         deltas[metric][k] = delta(metric, current[metric], base === undefined ? null : base);
       });
     });
-    return { current, compare, deltas, reasons };
+    return { current, compare, deltas, reasons, targetActual: hedefGercek };
   }
 
   // -------------------------------------------------------------- trend --
@@ -505,7 +531,13 @@
     const total = leads.length;
     const contacted = leads.filter(l => stage(l) !== 'NEW').length;
     const quoted = leads.filter(l => QUOTED_STAGES.includes(stage(l)) || sayi(l.quoteAmount || l.quote) > 0).length;
-    const won = leads.filter(l => stage(l) === 'WON').length;
+    // "Rezervasyona dondu" = kazanildi VE bir rezervasyona bagli (convertLeadToBooking).
+    // Bagsiz WON (ice aktarim, elle durum) gercek bir satis olabilir ama
+    // rezervasyonu defterde yoktur: ayri sayilir, donusume girmez.
+    const bagli = l => !!(l.convertedBookingId || l.converted_booking_id);
+    const wonAll = leads.filter(l => stage(l) === 'WON').length;
+    const won = leads.filter(l => stage(l) === 'WON' && bagli(l)).length;
+    const wonUnlinked = wonAll - won;
     const lost = leads.filter(l => stage(l) === 'LOST').length;
     const kanallar = new Map();
     leads.forEach(l => {
@@ -513,7 +545,7 @@
       if (!kanallar.has(k)) kanallar.set(k, { key: k, label: ctx.leadChannelName(k), total: 0, won: 0 });
       const r = kanallar.get(k);
       r.total += 1;
-      if (stage(l) === 'WON') r.won += 1;
+      if (stage(l) === 'WON' && bagli(l)) r.won += 1;
     });
     const byChannel = Array.from(kanallar.values()).map(r => Object.assign(r, {
       conversion: r.total > 0 ? yuvarla(r.won / r.total * 100, 1) : null
@@ -527,10 +559,11 @@
       .map(([reason, count]) => ({ reason, count }))
       .sort((a, b) => b.count - a.count || a.reason.localeCompare(b.reason, 'tr'));
     return {
-      total, contacted, quoted, won, lost,
-      open: total - won - lost,
+      total, contacted, quoted, won, wonUnlinked, lost,
+      open: total - wonAll - lost,
       conversion: total > 0 ? yuvarla(won / total * 100, 1) : null,
-      closeRate: (won + lost) > 0 ? yuvarla(won / (won + lost) * 100, 1) : null,
+      // Kapanan talepte kazanma: satis ekibinin isaretledigi sonuc (bagsiz WON dahil).
+      closeRate: (wonAll + lost) > 0 ? yuvarla(wonAll / (wonAll + lost) * 100, 1) : null,
       byChannel,
       lossReasons
     };

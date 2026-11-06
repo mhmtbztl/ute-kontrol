@@ -243,6 +243,19 @@ test('U13. Telefonda dokunus grafik ipucunu acar; parmak kalkinca kapanmaz (emul
   assert.strictEqual(tip.hidden, true, 'fare ayrilinca kapanir');
 });
 
+test('U14. Kismi hedef: satirda hedefli ay sayisi yazar', () => {
+  const d = Object.assign(deps(BOOKINGS), { monthTarget: (m, v) => (m === '2026-10' && v === 'ALL' ? { revenue: 50000 } : null) });
+  const { root, ui } = mountWith(BOOKINGS, { deps: d });
+  click(root, root.querySelector('[data-ba-value="3m"]'));
+  assert.strictEqual(ui.getState().preset, '3m');
+  const ciro = root.querySelectorAll('.ba-kpi')[0];
+  assert.ok(/hedefe göre · hedefli ay 1\/3/.test(ciro.textContent), ciro.textContent);
+  // Tek ayda (tam kapsam) not yazilmaz
+  click(root, root.querySelector('[data-ba-value="month"]'));
+  const tek = root.querySelectorAll('.ba-kpi')[0];
+  assert.ok(/hedefe göre/.test(tek.textContent) && !/hedefli ay/.test(tek.textContent), tek.textContent);
+});
+
 test('U12. Hedefleri okuyamayan rolde Hedef kiyasi gosterilmez', () => {
   const { root } = mountWith(BOOKINGS, { canSeeTargets: () => false });
   assert.strictEqual(root.querySelector('[data-ba-toggle="target"]'), null);
