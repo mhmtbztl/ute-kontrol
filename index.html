@@ -14,7 +14,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=422f92ca">
+  <link rel="stylesheet" href="style.css?v=836aa40c">
   <link rel="stylesheet" href="analytics.css?v=3e11f215">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -2099,172 +2099,216 @@
     <!-- TAB: FİYATLANDIRMA (DYNAMIC PRICING & REVENUE)          -->
     <!-- ======================================================= -->
     <div id="tab-pricing" class="tab-content">
-      <section class="card" data-lx-style="margin-bottom: 24px;">
-        <div class="section-title-bar">
-          <div>
-            <h2>🏷️ Gelir yönetimi & dinamik fiyatlandırma</h2>
-            <p class="sub-text">Önerilen fiyat = mülkün baz fiyatı + takvim artışları (hafta sonu, özel gün, talep) − indirimler (son dakika, boş gece). Taban fiyatın altına inmez.</p>
+      <div class="pricing-shell">
+        <header class="pricing-head">
+          <div class="pricing-head-text">
+            <h2>Fiyatlandırma</h2>
+            <p class="sub-text">Önerilen gecelik fiyatları gözden geçirin, onaylayın ya da değiştirin. Öneri, mülkün baz fiyatı ve kurallarınızdan hesaplanır; OTA'ya gönderilmez.</p>
           </div>
-          <div data-lx-style="display: flex; gap: 8px;">
-            <button class="btn btn-secondary btn-sm" data-onclick="openGoalsModal()">🎯 Hedefleri Yönet</button>
+          <div class="pricing-head-tools">
+            <div class="pricing-property">
+              <label class="sr-only" for="pricingPropertySelect">Mülk</label>
+              <select id="pricingPropertySelect" data-onchange="setPricingProperty(this.value)"></select>
+              <span class="pricing-property-meta">Baz <b id="pricingSelectedPropertyVal">—</b> · <span id="pricingSelectedPropertyMeta">Mülk seçin</span></span>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" data-onclick="openGoalsModal()">Hedefleri Yönet</button>
           </div>
+        </header>
+
+        <div class="ads-subnav pricing-subnav" role="tablist" aria-label="Fiyatlandırma bölümleri" data-onkeydown="pricingSubnavKey(event)">
+          <button type="button" role="tab" class="ads-subnav-btn active" id="pricingViewTab_calendar" aria-controls="pricingView_calendar" aria-selected="true" tabindex="0" data-onclick="setPricingView('calendar')">Takvim <span class="pricing-subnav-count" id="pricingPendingBadge"></span></button>
+          <button type="button" role="tab" class="ads-subnav-btn" id="pricingViewTab_rules" aria-controls="pricingView_rules" aria-selected="false" tabindex="-1" data-onclick="setPricingView('rules')">Kurallar</button>
+          <button type="button" role="tab" class="ads-subnav-btn" id="pricingViewTab_target" aria-controls="pricingView_target" aria-selected="false" tabindex="-1" data-onclick="setPricingView('target')">Hedef</button>
+          <button type="button" role="tab" class="ads-subnav-btn" id="pricingViewTab_rivals" aria-controls="pricingView_rivals" aria-selected="false" tabindex="-1" data-onclick="setPricingView('rivals')">Rakipler</button>
         </div>
-        <div class="kpi-cards-grid five-cols" data-lx-style="margin-bottom: 20px;">
-          <div class="kpi-card">
-            <span class="kpi-label">Yıllık hedef ciro</span>
-            <div class="kpi-value" id="pricingAnnualTargetVal" data-lx-style="color: #409CFF;">—</div>
-            <div class="kpi-meta" id="pricingAnnualTargetMeta">Aylık hedeflerin toplamı</div>
+
+        <!-- TAKVIM: gunluk is. KPI seridi, ay izgarasi + ayrinti paneli. -->
+        <section class="pricing-view" id="pricingView_calendar" role="tabpanel" aria-labelledby="pricingViewTab_calendar">
+          <div class="pricing-kpis">
+            <div class="kpi-card">
+              <span class="kpi-label">Ortalama ADR</span>
+              <div class="kpi-value" id="pricingAdrVal">—</div>
+              <div class="kpi-meta">Seçili dönem (Finans ile aynı)</div>
+            </div>
+            <button type="button" class="kpi-card pricing-kpi-action" id="pricingPendingCard" data-onclick="selectPricingDays('PENDING')" disabled>
+              <span class="kpi-label">Onay bekleyen gün</span>
+              <span class="kpi-value" id="pricingPendingVal">—</span>
+              <span class="kpi-meta" id="pricingPendingMeta">Önerisi olup fiyatı kaydedilmemiş günler</span>
+            </button>
+            <div class="kpi-card">
+              <span class="kpi-label">Boş gece</span>
+              <div class="kpi-value" id="pricingGapCountVal">—</div>
+              <div class="kpi-meta" id="pricingGapCountMeta">İki rezervasyon arasında kalan kısa boşluklar</div>
+            </div>
+            <div class="kpi-card">
+              <span class="kpi-label">Yıllık hedef ciro</span>
+              <div class="kpi-value" id="pricingAnnualTargetVal">—</div>
+              <div class="kpi-meta" id="pricingAnnualTargetMeta">Aylık hedeflerin toplamı</div>
+            </div>
           </div>
-          <div class="kpi-card">
-            <span class="kpi-label">Ortalama ADR</span>
-            <div class="kpi-value" id="pricingAdrVal" data-lx-style="color: #30D158;">—</div>
-            <div class="kpi-meta">Seçili dönem (Finans ile aynı)</div>
-          </div>
-          <div class="kpi-card">
-            <span class="kpi-label">Boş gece (gap nights)</span>
-            <div class="kpi-value" id="pricingGapCountVal" data-lx-style="color: #FF6961;">—</div>
-            <div class="kpi-meta" id="pricingGapCountMeta">İki rezervasyon arasında kalan kısa boşluklar</div>
-          </div>
-          <div class="kpi-card">
-            <span class="kpi-label">Fiyat tablosu</span>
-            <div class="kpi-value" id="pricingLadderReadyVal" data-lx-style="color: #A78BFA;">—</div>
-            <div class="kpi-meta" id="pricingLadderReadyMeta">Baz ve taban fiyatı girili mülkler</div>
-          </div>
-          <div class="kpi-card">
-            <span class="kpi-label">Seçili mülk</span>
-            <div class="kpi-value" id="pricingSelectedPropertyVal" data-lx-style="color: #FFB340;">—</div>
-            <div class="kpi-meta" id="pricingSelectedPropertyMeta">Mülk seçin</div>
-          </div>
-        </div>
-        <div class="pricing-scope-bar" aria-label="Fiyatlandırma kapsamı">
-          <div class="form-group"><label for="pricingPropertySelect">Mülk</label><select id="pricingPropertySelect" data-onchange="setPricingProperty(this.value)"></select></div>
-          <div class="form-group"><label>Ay</label><div id="pricingMonthTabs" class="pricing-month-tabs" role="tablist" aria-label="Fiyat takvimi ayı"></div></div>
-        </div>
-        <div class="pricing-config-grid">
-          <section class="pricing-config-card" id="pricingLadderCard" aria-live="polite"></section>
-          <section class="pricing-config-card">
-            <h3>Fiyat kuralları</h3>
-            <p>Her kural için bu mülkte geçerli yüzde ve nereden geldiği. Kayıt yoksa sistem varsayılanı uygulanır.</p>
-            <div id="pricingRulesTable"></div>
-            <div id="pricingManagePanels" class="pricing-rule-form">
-              <div class="form-grid">
-                <div class="form-group"><label for="pricingRuleScope">Kapsam</label><select id="pricingRuleScope" data-onchange="loadPricingRuleDraft()"><option value="PROPERTY">Yalnız bu mülk</option><option value="PORTFOLIO">Tüm portföy</option></select></div>
-                <div class="form-group"><label for="pricingRuleKey">Kural</label><select id="pricingRuleKey" data-onchange="loadPricingRuleDraft()"><option value="weekend">Hafta sonu</option><option value="specialDay">Özel gün</option><option value="demand">Talep</option><option value="lastMinute">Son dakika</option><option value="gapNight">Boş gece</option></select></div>
-                <div class="form-group"><label for="pricingRulePct">Yüzde</label><input id="pricingRulePct" type="number" min="-99" max="1000" step="0.1" placeholder="—"></div>
-                <div class="form-group"><label id="pricingRuleParameterLabel" for="pricingRuleParameter">Ek parametre yok</label><input id="pricingRuleParameter" type="number" min="0" step="1" placeholder="—" disabled></div>
-                <label class="analysis-check"><input id="pricingRuleEnabled" type="checkbox" checked><span>Etkin</span></label>
+
+          <div class="pricing-cal-layout">
+            <section class="pricing-card pricing-calendar" aria-labelledby="pricingCalendarTitle">
+              <div class="pricing-calendar-head">
+                <h3 id="pricingCalendarTitle" class="sr-only">Fiyat takvimi</h3>
+                <div id="pricingMonthTabs" class="pricing-month-tabs" role="tablist" aria-label="Fiyat takvimi ayı"></div>
+                <div class="pricing-legend" aria-label="Lejant">
+                  <span class="is-pending">Öneri</span><span class="is-saved">Onaylı</span><span class="is-gap">Boş gece</span><span class="is-special">Özel gün</span><span class="is-booked">Dolu</span><span class="is-blocked">Kapalı</span>
+                </div>
               </div>
-              <div class="pricing-rule-actions">
-                <button type="button" class="btn btn-primary btn-sm" data-onclick="savePricingRuleSettings()">Kuralı kaydet</button>
-                <button type="button" class="btn btn-secondary btn-sm" id="pricingRuleResetBtn" data-onclick="resetPricingRuleSetting()">Varsayılana dön</button>
+              <div id="pricingManagerContainer">
+                <!-- Fiyat takvimi: ay izgarasi, uyarilar, gecen yil ipucu -->
               </div>
+              <div class="pricing-calendar-foot"><span id="pricingCalendarFoot"></span><span>Shift ile aralık seçin · ok tuşlarıyla gezinin</span></div>
+            </section>
+            <aside class="pricing-card pricing-panel" id="pricingDayEditor" aria-live="polite" aria-label="Seçili gün"></aside>
+          </div>
+        </section>
+
+        <!-- KURALLAR: kurulum. Fiyat tablosu + oneri kurallari, sonra takvim kurallari. -->
+        <section class="pricing-view" id="pricingView_rules" role="tabpanel" aria-labelledby="pricingViewTab_rules" hidden>
+          <div class="pricing-ready">
+            <span class="pricing-ready-label">Fiyat tablosu hazır</span>
+            <b id="pricingLadderReadyVal">—</b>
+            <span id="pricingLadderReadyMeta">Baz ve taban fiyatı girili mülkler</span>
+          </div>
+          <div class="pricing-two">
+            <section class="pricing-card pricing-config-card" id="pricingLadderCard" aria-live="polite"></section>
+            <section class="pricing-card pricing-config-card">
+              <div class="pricing-card-head"><div><h3>Öneri kuralları</h3><p>Değiştirmek için bir kurala tıklayın. Mülk istisnası portföy ayarının, portföy ayarı sistem varsayılanının önüne geçer.</p></div></div>
+              <div id="pricingRulesTable"></div>
+              <div id="pricingManagePanels" class="pricing-rule-form">
+                <h4>Kuralı düzenle</h4>
+                <div class="pricing-form-grid">
+                  <div class="form-group"><label for="pricingRuleKey">Kural</label><select id="pricingRuleKey" data-onchange="loadPricingRuleDraft()"><option value="weekend">Hafta sonu</option><option value="specialDay">Özel gün</option><option value="demand">Talep</option><option value="lastMinute">Son dakika</option><option value="gapNight">Boş gece</option></select></div>
+                  <div class="form-group"><label for="pricingRuleScope">Kapsam</label><select id="pricingRuleScope" data-onchange="loadPricingRuleDraft()"><option value="PROPERTY">Yalnız bu mülk</option><option value="PORTFOLIO">Tüm portföy</option></select></div>
+                  <div class="form-group"><label for="pricingRulePct">Yüzde</label><input id="pricingRulePct" type="number" min="-99" max="1000" step="0.1" placeholder="—"></div>
+                  <div class="form-group"><label id="pricingRuleParameterLabel" for="pricingRuleParameter">Ek parametre yok</label><input id="pricingRuleParameter" type="number" min="0" step="1" placeholder="—" disabled></div>
+                  <label class="analysis-check"><input id="pricingRuleEnabled" type="checkbox" checked><span>Etkin</span></label>
+                </div>
+                <div class="pricing-rule-actions">
+                  <button type="button" class="btn btn-primary btn-sm" data-onclick="savePricingRuleSettings()">Kuralı kaydet</button>
+                  <button type="button" class="btn btn-secondary btn-sm" id="pricingRuleResetBtn" data-onclick="resetPricingRuleSetting()">Varsayılana dön</button>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div class="pricing-rule-cards">
+            <section class="pricing-card pricing-special-card">
+              <div class="pricing-card-head"><div><h3>Sezonlar</h3><p>Varsayılan yok. Bir tarih aralığına yüzde verin (ör. yaz +%30, kış −%10); diğer kurallarla toplanır, taban fiyatın altına inmez. Yıl sonunu aşan ya da her yıl tekrarlayan sezon için "Her yıl"ı seçin.</p></div></div>
+              <div id="pricingSeasonList"></div>
+              <details class="pricing-add" id="pricingSeasonForm">
+                <summary>Sezon ekle</summary>
+                <div class="pricing-form-grid">
+                  <div class="form-group is-wide"><label for="pricingSeasonName">Sezon adı</label><input id="pricingSeasonName" type="text" maxlength="80" placeholder="Örn: Yüksek sezon"></div>
+                  <div class="form-group"><label for="pricingSeasonStart">Başlangıç</label><input id="pricingSeasonStart" type="date"></div>
+                  <div class="form-group"><label for="pricingSeasonEnd">Bitiş</label><input id="pricingSeasonEnd" type="date"></div>
+                  <div class="form-group"><label for="pricingSeasonPct">Yüzde</label><input id="pricingSeasonPct" type="number" min="-90" max="500" step="0.1" placeholder="—"></div>
+                  <div class="form-group"><label for="pricingSeasonScope">Kapsam</label><select id="pricingSeasonScope"><option value="PROPERTY">Yalnız bu mülk</option><option value="PORTFOLIO">Tüm portföy</option></select></div>
+                  <label class="analysis-check"><input id="pricingSeasonRepeat" type="checkbox"><span>Her yıl</span></label>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" data-onclick="savePricingSeason()">Sezon ekle</button>
+              </details>
+            </section>
+            <section class="pricing-card pricing-special-card">
+              <div class="pricing-card-head"><div><h3>Özel günler ve etkinlikler</h3><p>Resmî ve dinî tatiller otomatik gelir. Bölgenizdeki festival, kongre, konser gibi etkinlikleri kendiniz ekleyin; isterseniz kendi yüzdesini verin.</p></div></div>
+              <div id="pricingSpecialDaysList"></div>
+              <details class="pricing-add" id="pricingSpecialDayForm">
+                <summary>Etkinlik ekle</summary>
+                <div class="pricing-form-grid">
+                  <div class="form-group is-wide"><label for="pricingEventName">Etkinlik adı</label><input id="pricingEventName" type="text" maxlength="80" placeholder="Örn: Caz festivali"></div>
+                  <div class="form-group"><label for="pricingEventStart">Başlangıç</label><input id="pricingEventStart" type="date"></div>
+                  <div class="form-group"><label for="pricingEventEnd">Bitiş</label><input id="pricingEventEnd" type="date"></div>
+                  <div class="form-group"><label for="pricingEventPct">Yüzde (boşsa özel gün kuralı)</label><input id="pricingEventPct" type="number" min="-99" max="1000" step="0.1" placeholder="—"></div>
+                  <div class="form-group"><label for="pricingEventScope">Kapsam</label><select id="pricingEventScope"><option value="PROPERTY">Yalnız bu mülk</option><option value="PORTFOLIO">Tüm portföy</option></select></div>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" data-onclick="savePricingSpecialEvent()">Etkinlik ekle</button>
+              </details>
+            </section>
+            <section class="pricing-card pricing-special-card">
+              <div class="pricing-card-head"><div><h3>Minimum gece</h3><p>Satış kısıtıdır, fiyatı değiştirmez. Varsayılan kapalı; kural eklemezseniz her uzunlukta konaklama satılabilir. Kısıt giriş gününe göre uygulanır; daha kısa boşluklar takvimde "satılamaz" görünür. <strong>Kısa konaklama hiçbir rolde kaydedilmez</strong> (form, WhatsApp, talep dönüşümü); istisna gerekiyorsa kuralı geçici olarak değiştirin ya da kaldırın.</p></div></div>
+              <div id="pricingMinStayList"></div>
+              <details class="pricing-add" id="pricingMinStayForm">
+                <summary>Kural ekle</summary>
+                <div class="pricing-form-grid">
+                  <div class="form-group"><label for="pricingMinStayNights">En az gece</label><input id="pricingMinStayNights" type="number" min="2" max="60" step="1" placeholder="—"></div>
+                  <div class="form-group"><label for="pricingMinStayName">Ad (isteğe bağlı)</label><input id="pricingMinStayName" type="text" maxlength="80" placeholder="Örn: Temmuz–Ağustos"></div>
+                  <div class="form-group"><label for="pricingMinStayStart">Başlangıç (boşsa her zaman)</label><input id="pricingMinStayStart" type="date"></div>
+                  <div class="form-group"><label for="pricingMinStayEnd">Bitiş (boşsa açık uçlu)</label><input id="pricingMinStayEnd" type="date"></div>
+                  <div class="form-group"><label for="pricingMinStayScope">Kapsam</label><select id="pricingMinStayScope"><option value="PROPERTY">Yalnız bu mülk</option><option value="PORTFOLIO">Tüm portföy</option></select></div>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" data-onclick="savePricingMinStayRule()">Kural ekle</button>
+              </details>
+            </section>
+            <section class="pricing-card pricing-special-card">
+              <div class="pricing-card-head"><div><h3>Uzun konaklama indirimi</h3><p>Varsayılan yok. Gün fiyatına değil konaklamanın toplamına uygulanır (ör. 7+ gece %10, 28+ gece %20); ulaşılan en yüksek kademe geçerlidir. Her gece taban fiyatın altına inmez. <strong>Yalnız fiyat referansıdır:</strong> rezervasyon formunda önce/sonra tutarı gösterir; rezervasyon tutarını ve teklifleri değiştirmez.</p></div></div>
+              <div id="pricingLongStayList"></div>
+              <details class="pricing-add" id="pricingLongStayForm">
+                <summary>Kademe ekle</summary>
+                <div class="pricing-form-grid">
+                  <div class="form-group"><label for="pricingLongStayNights">En az gece</label><input id="pricingLongStayNights" type="number" min="2" max="365" step="1" placeholder="—"></div>
+                  <div class="form-group"><label for="pricingLongStayPct">İndirim (%)</label><input id="pricingLongStayPct" type="number" min="0.1" max="90" step="0.1" placeholder="—"></div>
+                  <div class="form-group"><label for="pricingLongStayScope">Kapsam</label><select id="pricingLongStayScope"><option value="PROPERTY">Yalnız bu mülk</option><option value="PORTFOLIO">Tüm portföy</option></select></div>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" data-onclick="savePricingLongStayTier()">Kademe ekle</button>
+              </details>
+            </section>
+          </div>
+        </section>
+
+        <!-- HEDEF: hedef ciroya hangi fiyat-doluluk bilesimiyle ulasilir. -->
+        <section class="pricing-view" id="pricingView_target" role="tabpanel" aria-labelledby="pricingViewTab_target" hidden>
+          <section class="pricing-card pricing-target-card">
+            <div class="pricing-card-head"><div><h3 id="pricingTargetTitle">Hedef ciroya hangi fiyatla ulaşılır?</h3><p>Seçili ayın hedefinden bu ay gerçekleşen ciroyu düşer, kalanı ayın açık geceleriyle karşılaştırır. <strong>Tüm mülkler</strong> Hedefleri Yönet'teki işletme hedefini ve Finans'taki ciroyu kullanır. Hedef doluluk boşsa bu ayın kayıtlı doluluk hedefi kullanılır; buraya yazılan oran yalnız bu hesabı değiştirir, takvimdeki talep kuralını değiştirmez.</p></div></div>
+            <div class="pricing-controls">
+              <div class="form-group"><label for="pricingTargetScope">Kapsam</label><select id="pricingTargetScope" data-onchange="setPricingTargetScope(this.value)"><option value="ALL">Tüm mülkler (işletme hedefi)</option><option value="PROPERTY">Seçili mülk</option></select></div>
+              <div class="form-group"><label for="pricingTargetInput">Hedef ciro (₺)</label><input id="pricingTargetInput" type="number" min="0" step="1000" placeholder="—"></div>
+              <div class="form-group"><label for="pricingExpectedOccupancy">Hedef doluluk (%)</label><input id="pricingExpectedOccupancy" type="number" min="1" max="100" step="1" placeholder="—"></div>
+              <div class="form-group"><label for="pricingFocusSelect">Odak</label><select id="pricingFocusSelect"><option value="BALANCED">Dengeli</option><option value="OCCUPANCY">Doluluk</option><option value="REVENUE">Gelir</option></select></div>
+              <button type="button" class="btn btn-primary" data-onclick="recalculatePricingTarget()">Hesapla</button>
+            </div>
+            <div id="pricingTargetResult" aria-live="polite"></div>
+          </section>
+        </section>
+
+        <!-- RAKIPLER: kaynakli rakip fiyati (bilgi), ChatGPT sorusu. -->
+        <section class="pricing-view" id="pricingView_rivals" role="tabpanel" aria-labelledby="pricingViewTab_rivals" hidden>
+          <div class="pricing-two">
+            <section class="pricing-card pricing-config-card" id="pricingResearchPanel">
+              <div class="pricing-card-head"><div><h3>Rakip fiyatı ekle</h3><p>Yalnız tarihli ve bağlantılı kullanıcı onaylı araştırma kaydedilir. Takvimde bilgi olarak görünür; önerilen fiyatı değiştirmez.</p></div></div>
+              <div class="pricing-form-grid">
+                <div class="form-group"><label for="pricingResearchDate">Araştırma tarihi</label><input id="pricingResearchDate" type="date"></div>
+                <div class="form-group"><label for="pricingResearchSource">Kaynak türü</label><select id="pricingResearchSource"><option value="OTA">OTA</option><option value="WEBSITE">Web sitesi</option><option value="CHATGPT">ChatGPT</option><option value="MANUAL">Elle araştırma</option><option value="OTHER">Diğer</option></select></div>
+                <div class="form-group is-full"><label for="pricingResearchUrl">Kaynak bağlantısı</label><input id="pricingResearchUrl" type="url" placeholder="https://…"></div>
+                <div class="form-group"><label for="pricingResearchWeekday">Hafta içi (₺)</label><input id="pricingResearchWeekday" type="number" step="0.01" min="1" placeholder="—"></div>
+                <div class="form-group"><label for="pricingResearchWeekend">Hafta sonu (₺)</label><input id="pricingResearchWeekend" type="number" step="0.01" min="1" placeholder="—"></div>
+                <div class="form-group"><label for="pricingResearchSpecial">Özel gün (₺)</label><input id="pricingResearchSpecial" type="number" step="0.01" min="1" placeholder="—"></div>
+                <div class="form-group is-full"><label for="pricingResearchNote">Ham not</label><textarea id="pricingResearchNote" rows="2" maxlength="10000"></textarea></div>
+              </div>
+              <div class="pricing-rule-actions"><button type="button" id="pricingResearchSaveBtn" class="btn btn-primary btn-sm" data-onclick="saveCompetitorResearch()">Araştırmayı kaydet</button> <button type="button" id="pricingResearchCancelBtn" class="btn btn-secondary btn-sm" data-lx-style="display:none" data-onclick="cancelCompetitorResearchEdit()">Vazgeç</button></div>
+            </section>
+            <section class="pricing-card pricing-research-history">
+              <div class="pricing-card-head"><div><h3>Kaynaklı rakip geçmişi</h3><p>60 günden eski kayıt takvimde "eski" diye işaretlenir.</p></div></div>
+              <div id="pricingResearchList"></div>
+            </section>
+          </div>
+          <section class="pricing-card pricing-context-toolbar">
+            <div class="pricing-card-head"><div><h3>ChatGPT'ye danış</h3><p id="pricingPhase78Status" role="status">Ev kuralları ve rakip araştırması yükleniyor.</p></div></div>
+            <div class="pricing-ask">
+              <label class="sr-only" for="pricingChatGptQuestion">ChatGPT fiyatlandırma sorusu</label>
+              <select id="pricingChatGptQuestion">
+                <option>Önerilen fiyatları ve doluluk hedefini değerlendir.</option>
+                <option>Hafta sonu ve özel gün yüzdelerini karşılaştır.</option>
+                <option>Son dakika ve boş gece indirimlerini değerlendir.</option>
+                <option>Kaynaklı rakip araştırmasına göre hangi soruları sormalıyım?</option>
+                <option>Önümüzdeki 30 günde hangi tarihlerde fiyatı değiştirmeliyim? Her tarih için önerilen fiyatı, gerekçeyi ve riski sırala.</option>
+              </select>
+              <button type="button" class="btn btn-secondary btn-sm" data-onclick="askPricingChatGpt()">ChatGPT'ye sor</button>
             </div>
           </section>
-        </div>
-        <section class="pricing-calendar">
-          <div class="pricing-calendar-head">
-            <h3 id="pricingCalendarTitle">Fiyat takvimi</h3>
-            <div class="pricing-legend"><span class="is-open">Açık</span><span class="is-gap">Boş gece</span><span class="is-special">Özel gün</span><span class="is-booked">Dolu</span><span class="is-blocked">Kapalı</span></div>
-          </div>
-          <div id="pricingManagerContainer">
-            <!-- Fiyat takvimi: gun kartlari, gerekce ve uyarilar -->
-          </div>
-          <div id="pricingDayEditor" aria-live="polite"></div>
         </section>
-        <section class="pricing-config-card pricing-special-card">
-          <h3>Özel günler ve etkinlikler</h3>
-          <p>Resmî ve dinî tatiller otomatik gelir. Bölgenizdeki festival, kongre, konser gibi etkinlikleri kendiniz ekleyin; isterseniz kendi yüzdesini verin.</p>
-          <div id="pricingSpecialDaysList"></div>
-          <div id="pricingSpecialDayForm" class="form-grid pricing-special-form">
-            <div class="form-group"><label for="pricingEventName">Etkinlik adı</label><input id="pricingEventName" type="text" maxlength="80" placeholder="Örn: Caz festivali"></div>
-            <div class="form-group"><label for="pricingEventStart">Başlangıç</label><input id="pricingEventStart" type="date"></div>
-            <div class="form-group"><label for="pricingEventEnd">Bitiş</label><input id="pricingEventEnd" type="date"></div>
-            <div class="form-group"><label for="pricingEventPct">Yüzde (boşsa özel gün kuralı)</label><input id="pricingEventPct" type="number" min="-99" max="1000" step="0.1" placeholder="—"></div>
-            <div class="form-group"><label for="pricingEventScope">Kapsam</label><select id="pricingEventScope"><option value="PROPERTY">Yalnız bu mülk</option><option value="PORTFOLIO">Tüm portföy</option></select></div>
-            <div class="form-group"><label>&nbsp;</label><button type="button" class="btn btn-primary btn-sm" data-onclick="savePricingSpecialEvent()">Etkinlik ekle</button></div>
-          </div>
-        </section>
-        <section class="pricing-config-card pricing-special-card">
-          <h3>Sezonlar</h3>
-          <p>Varsayılan yok. Bir tarih aralığına yüzde verin (ör. yaz +%30, kış −%10); diğer kurallarla toplanır, taban fiyatın altına inmez. Yıl sonunu aşan ya da her yıl tekrarlayan sezon için "Her yıl"ı seçin.</p>
-          <div id="pricingSeasonList"></div>
-          <div id="pricingSeasonForm" class="form-grid pricing-special-form">
-            <div class="form-group"><label for="pricingSeasonName">Sezon adı</label><input id="pricingSeasonName" type="text" maxlength="80" placeholder="Örn: Yüksek sezon"></div>
-            <div class="form-group"><label for="pricingSeasonStart">Başlangıç</label><input id="pricingSeasonStart" type="date"></div>
-            <div class="form-group"><label for="pricingSeasonEnd">Bitiş</label><input id="pricingSeasonEnd" type="date"></div>
-            <div class="form-group"><label for="pricingSeasonPct">Yüzde</label><input id="pricingSeasonPct" type="number" min="-90" max="500" step="0.1" placeholder="—"></div>
-            <div class="form-group"><label for="pricingSeasonScope">Kapsam</label><select id="pricingSeasonScope"><option value="PROPERTY">Yalnız bu mülk</option><option value="PORTFOLIO">Tüm portföy</option></select></div>
-            <label class="analysis-check"><input id="pricingSeasonRepeat" type="checkbox"><span>Her yıl</span></label>
-            <div class="form-group"><label>&nbsp;</label><button type="button" class="btn btn-primary btn-sm" data-onclick="savePricingSeason()">Sezon ekle</button></div>
-          </div>
-        </section>
-        <section class="pricing-config-card pricing-special-card">
-          <h3>Uzun konaklama indirimi</h3>
-          <p>Varsayılan yok. Gün fiyatına değil konaklamanın toplamına uygulanır (ör. 7+ gece %10, 28+ gece %20); ulaşılan en yüksek kademe geçerlidir. Her gece taban fiyatın altına inmez. <strong>Yalnız fiyat referansıdır:</strong> rezervasyon formunda önce/sonra tutarı gösterir; rezervasyon tutarını ve teklifleri değiştirmez.</p>
-          <div id="pricingLongStayList"></div>
-          <div id="pricingLongStayForm" class="form-grid pricing-special-form">
-            <div class="form-group"><label for="pricingLongStayNights">En az gece</label><input id="pricingLongStayNights" type="number" min="2" max="365" step="1" placeholder="—"></div>
-            <div class="form-group"><label for="pricingLongStayPct">İndirim (%)</label><input id="pricingLongStayPct" type="number" min="0.1" max="90" step="0.1" placeholder="—"></div>
-            <div class="form-group"><label for="pricingLongStayScope">Kapsam</label><select id="pricingLongStayScope"><option value="PROPERTY">Yalnız bu mülk</option><option value="PORTFOLIO">Tüm portföy</option></select></div>
-            <div class="form-group"><label>&nbsp;</label><button type="button" class="btn btn-primary btn-sm" data-onclick="savePricingLongStayTier()">Kademe ekle</button></div>
-          </div>
-        </section>
-        <section class="pricing-config-card pricing-special-card">
-          <h3>Minimum gece</h3>
-          <p>Satış kısıtıdır, fiyatı değiştirmez. Varsayılan kapalı; kural eklemezseniz her uzunlukta konaklama satılabilir. Kısıt giriş gününe göre uygulanır; daha kısa boşluklar takvimde "satılamaz" görünür. <strong>Kısa konaklama hiçbir rolde kaydedilmez</strong> (form, WhatsApp, talep dönüşümü); istisna gerekiyorsa kuralı geçici olarak değiştirin ya da kaldırın.</p>
-          <div id="pricingMinStayList"></div>
-          <div id="pricingMinStayForm" class="form-grid pricing-special-form">
-            <div class="form-group"><label for="pricingMinStayNights">En az gece</label><input id="pricingMinStayNights" type="number" min="2" max="60" step="1" placeholder="—"></div>
-            <div class="form-group"><label for="pricingMinStayStart">Başlangıç (boşsa her zaman)</label><input id="pricingMinStayStart" type="date"></div>
-            <div class="form-group"><label for="pricingMinStayEnd">Bitiş (boşsa açık uçlu)</label><input id="pricingMinStayEnd" type="date"></div>
-            <div class="form-group"><label for="pricingMinStayName">Ad (isteğe bağlı)</label><input id="pricingMinStayName" type="text" maxlength="80" placeholder="Örn: Temmuz–Ağustos"></div>
-            <div class="form-group"><label for="pricingMinStayScope">Kapsam</label><select id="pricingMinStayScope"><option value="PROPERTY">Yalnız bu mülk</option><option value="PORTFOLIO">Tüm portföy</option></select></div>
-            <div class="form-group"><label>&nbsp;</label><button type="button" class="btn btn-primary btn-sm" data-onclick="savePricingMinStayRule()">Kural ekle</button></div>
-          </div>
-        </section>
-        <section class="pricing-config-card pricing-target-card">
-          <h3 id="pricingTargetTitle">Hedef ciro hesaplayıcısı</h3>
-          <p>Seçili ayın hedefinden bu ay gerçekleşen ciroyu düşer, kalanı ayın açık geceleriyle karşılaştırır. <strong>Tüm mülkler</strong> Hedefleri Yönet'teki işletme hedefini ve Finans'taki ciroyu kullanır. Hedef doluluk girilirse talep kuralı da bu orana göre çalışır.</p>
-          <div class="pricing-controls">
-            <div class="form-group"><label for="pricingTargetScope">Kapsam</label><select id="pricingTargetScope" data-onchange="setPricingTargetScope(this.value)"><option value="ALL">Tüm mülkler (işletme hedefi)</option><option value="PROPERTY">Seçili mülk</option></select></div>
-            <div class="form-group"><label for="pricingTargetInput">Hedef ciro (₺)</label><input id="pricingTargetInput" type="number" min="0" step="1000" placeholder="—"></div>
-            <div class="form-group"><label for="pricingExpectedOccupancy">Hedef doluluk (%)</label><input id="pricingExpectedOccupancy" type="number" min="1" max="100" step="1" placeholder="—"></div>
-            <div class="form-group"><label for="pricingFocusSelect">Odak</label><select id="pricingFocusSelect"><option value="BALANCED">Dengeli</option><option value="OCCUPANCY">Doluluk</option><option value="REVENUE">Gelir</option></select></div>
-            <button type="button" class="btn btn-primary" data-onclick="recalculatePricingTarget()">Hesapla</button>
-          </div>
-          <div id="pricingTargetResult" aria-live="polite"></div>
-        </section>
-        <div class="pricing-context-toolbar">
-          <span id="pricingPhase78Status" role="status">Ev kuralları ve rakip araştırması yükleniyor.</span>
-          <div>
-            <select id="pricingChatGptQuestion" aria-label="ChatGPT fiyatlandırma sorusu">
-              <option>Önerilen fiyatları ve doluluk hedefini değerlendir.</option>
-              <option>Hafta sonu ve özel gün yüzdelerini karşılaştır.</option>
-              <option>Son dakika ve boş gece indirimlerini değerlendir.</option>
-              <option>Kaynaklı rakip araştırmasına göre hangi soruları sormalıyım?</option>
-              <option>Önümüzdeki 30 günde hangi tarihlerde fiyatı değiştirmeliyim? Her tarih için önerilen fiyatı, gerekçeyi ve riski sırala.</option>
-            </select>
-            <button type="button" class="btn btn-secondary btn-sm" data-onclick="askPricingChatGpt()">ChatGPT'ye sor</button>
-          </div>
-        </div>
-        <div class="pricing-config-grid">
-          <section class="pricing-config-card" id="pricingResearchPanel">
-            <h3>Rakip fiyat araştırması</h3>
-            <p>Yalnız tarihli ve bağlantılı kullanıcı onaylı araştırma kaydedilir; önerilen fiyatı otomatik değiştirmez.</p>
-            <div class="form-grid">
-              <div class="form-group"><label for="pricingResearchDate">Araştırma tarihi</label><input id="pricingResearchDate" type="date"></div>
-              <div class="form-group"><label for="pricingResearchSource">Kaynak türü</label><select id="pricingResearchSource"><option value="OTA">OTA</option><option value="WEBSITE">Web sitesi</option><option value="CHATGPT">ChatGPT</option><option value="MANUAL">Elle araştırma</option><option value="OTHER">Diğer</option></select></div>
-              <div class="form-group" data-lx-style="grid-column:1/-1"><label for="pricingResearchUrl">Kaynak bağlantısı</label><input id="pricingResearchUrl" type="url" placeholder="https://…"></div>
-              <div class="form-group"><label for="pricingResearchWeekday">Hafta içi (₺)</label><input id="pricingResearchWeekday" type="number" step="0.01" min="1" placeholder="—"></div>
-              <div class="form-group"><label for="pricingResearchWeekend">Hafta sonu (₺)</label><input id="pricingResearchWeekend" type="number" step="0.01" min="1" placeholder="—"></div>
-              <div class="form-group"><label for="pricingResearchSpecial">Özel gün (₺)</label><input id="pricingResearchSpecial" type="number" step="0.01" min="1" placeholder="—"></div>
-              <div class="form-group" data-lx-style="grid-column:1/-1"><label for="pricingResearchNote">Ham not</label><textarea id="pricingResearchNote" rows="2" maxlength="10000"></textarea></div>
-            </div>
-            <button type="button" id="pricingResearchSaveBtn" class="btn btn-primary btn-sm" data-onclick="saveCompetitorResearch()">Araştırmayı kaydet</button> <button type="button" id="pricingResearchCancelBtn" class="btn btn-secondary btn-sm" data-lx-style="display:none" data-onclick="cancelCompetitorResearchEdit()">Vazgeç</button>
-          </section>
-          <section class="pricing-research-history"><h3>Kaynaklı rakip geçmişi</h3><div id="pricingResearchList"></div></section>
-        </div>
-      </section>
+      </div>
     </div>
 
     <!-- ======================================================= -->
@@ -4234,7 +4278,7 @@
   <script src="core/marketing_channel_listing_service.js?v=515fe386"></script>
   <script src="core/sales_workflow_service.js?v=0305af5c"></script>
   <script src="core/pricing_research_service.js?v=fb97b560"></script>
-  <script src="core/suggested_price_engine.js?v=c2d35002"></script>
+  <script src="core/suggested_price_engine.js?v=70bcb939"></script>
   <script src="core/target_revenue_calculator.js?v=fe49dcc0"></script>
   <script src="core/monthly_goal_calculator.js?v=245a5fea"></script>
   <script src="core/tr_special_days.js?v=0227d5dd"></script>
@@ -4255,13 +4299,13 @@
   <script src="core/side_panel.js?v=d763b464"></script>
   <script src="core/notification_feed.js?v=941306f6"></script>
   <script src="core/command_search.js?v=89760933"></script>
-  <script src="core/action_dispatch.js?v=cf8b00ff"></script>
+  <script src="core/action_dispatch.js?v=f3d4f8b0"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=ca7b5399"></script>
   <script src="core/permission_matrix.js?v=e3a3cef2"></script>
   <script src="core/tenant_backup_export.js?v=29f9ab53"></script>
   <script src="core/ui_dialog.js?v=d0680970"></script>
-  <script src="app.js?v=f36c5f16"></script>
+  <script src="app.js?v=06cf1d21"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=1fd0e49f"></script>

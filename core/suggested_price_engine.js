@@ -70,7 +70,20 @@
     const warnings = [];
     if (missing(property.basePrice)) warnings.push({ code: 'BASE_PRICE_MISSING', text: 'Baz fiyat girilmemiş' });
     if (missing(property.floorPrice)) warnings.push({ code: 'FLOOR_PRICE_MISSING', text: 'Taban fiyat girilmemiş' });
-    if (rules.demand.enabled && missing(o.occupancyTarget)) warnings.push({ code: 'OCCUPANCY_TARGET_MISSING', text: 'Doluluk hedefi girilmediği için talep kuralı uygulanmadı' });
+    // Doluluk hedefi tek oran (0.6) ya da aya gore harita ({ '2026-11': 0.6 }) olabilir:
+    // ekran Hedefleri Yonet'te kaydedilen aylik hedefi gonderir; hedefi olmayan ay
+    // talep kuralini uygulamaz ve hangi ay oldugu uyariyla soylenir.
+    const targetMap = o.occupancyTarget && typeof o.occupancyTarget === 'object' ? o.occupancyTarget : null;
+    const targetOf = date => {
+      const value = targetMap ? targetMap[date.slice(0, 7)] : o.occupancyTarget;
+      return missing(value) || !(Number(value) > 0) ? null : Number(value);
+    };
+    if (rules.demand.enabled) {
+      const months = [...new Set(dates.map(date => date.slice(0, 7)))];
+      const without = months.filter(key => targetOf(key + '-01') === null);
+      if (without.length === months.length) warnings.push({ code: 'OCCUPANCY_TARGET_MISSING', text: 'Doluluk hedefi girilmediği için talep kuralı uygulanmadı' });
+      else if (without.length) warnings.push({ code: 'OCCUPANCY_TARGET_PARTIAL', months: without, text: 'Doluluk hedefi olmayan aylarda talep kuralı uygulanmadı' });
+    }
     ((o.specialDays && o.specialDays.warnings) || []).forEach(w => warnings.push(w));
     // Isletmenin kendi etkinligi kendi yuzdesini tasiyabilir (L-249); yoksa ozel gun kurali.
     const specialMap = new Map();
@@ -108,7 +121,8 @@
       const reasons = season ? [{ code: 'SEASON', pct: Number(season.pct), text: season.name ? `sezon (${season.name})` : 'sezon', label: season.name || null }] : [];
       if (positive) reasons.push(positive);
       const monthOcc = occupancyOf(date);
-      if (rules.demand.enabled && !missing(o.occupancyTarget) && monthOcc !== null && monthOcc >= Number(o.occupancyTarget)) reasons.push({ code: 'DEMAND', pct: Number(rules.demand.pct), text: 'hedef doluluğa ulaşıldı', occupancy: monthOcc });
+      const monthTarget = targetOf(date);
+      if (rules.demand.enabled && monthTarget !== null && monthOcc !== null && monthOcc >= monthTarget) reasons.push({ code: 'DEMAND', pct: Number(rules.demand.pct), text: 'hedef doluluğa ulaşıldı', occupancy: monthOcc, target: monthTarget });
       const discounts = [];
       const daysAway = Math.round((parse(date) - todayMs) / DAY);
       if (rules.lastMinute.enabled && daysAway <= Number(rules.lastMinute.withinDays)) discounts.push({ code: 'LAST_MINUTE', pct: Number(rules.lastMinute.pct), text: 'son dakika' });

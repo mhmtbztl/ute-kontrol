@@ -23752,42 +23752,142 @@ function pricingMoney(value) {
   return value === null || value === undefined || !Number.isFinite(Number(value)) ? '—' : `₺${Math.round(Number(value)).toLocaleString('tr-TR')}`;
 }
 
-function pricingRuleDetail(rule, occupancyTarget) {
+// Talep kurali kayitli aylik doluluk hedefiyle calisir (kullanici karari
+// 08.11.2026): eskiden yalniz hesaplayiciya o oturumda yazilan oran
+// kullaniliyordu; sayfa yenilenince kural sessizce duruyor, rezervasyon formu
+// ayni gune takvimden farkli fiyat gosteriyordu. Kaynak Hedefleri Yonet:
+// mulk hedefi > isletme hedefi. Girilmemis (bos/0) hedef yoktur (3.6).
+function pricingOccupancyTargetOf(propertyId, monthKey) {
+  const rows = Array.isArray(appData?.targets) ? appData.targets : Object.values(appData?.targets || {});
+  const [year, month] = String(monthKey || '').split('-').map(Number);
+  const rowOf = pid => rows.find(t => t && Number(t.year) === year && Number(t.month) === month && ((t.property_id || t.propertyId || null) === pid));
+  const valueOf = row => {
+    const raw = row ? (row.occupancy_target ?? row.occupancyTarget ?? row.occupancy) : null;
+    const value = raw === null || raw === undefined || raw === '' ? NaN : Number(raw);
+    return Number.isFinite(value) && value > 0 && value <= 100 ? value / 100 : null;
+  };
+  const own = propertyId ? valueOf(rowOf(propertyId)) : null;
+  if (own !== null) return { value: own, source: 'PROPERTY' };
+  const portfolio = valueOf(rowOf(null));
+  return portfolio !== null ? { value: portfolio, source: 'PORTFOLIO' } : null;
+}
+
+function pricingOccupancyTargets(propertyId, months) {
+  const map = {};
+  (months || []).forEach(key => {
+    const target = pricingOccupancyTargetOf(propertyId, key);
+    if (target) map[key] = target.value;
+  });
+  return map;
+}
+
+// Hesaplayicinin beklenen dolulugu: elle girilen taslak, yoksa kayitli hedef.
+function pricingExpectedOccupancyFor(propertyId, monthKey) {
+  if (pricingExpectedOccupancyDraft != null) return pricingExpectedOccupancyDraft;
+  return pricingOccupancyTargetOf(propertyId, monthKey)?.value ?? null;
+}
+
+const PRICING_RULE_SOURCE_TEXT = { PROPERTY: 'Bu mülk', PORTFOLIO: 'Portföy', DEFAULT: 'Sistem varsayılanı' };
+
+function pricingRuleDetail(rule, demandTarget, monthKey) {
   if (rule.key === 'weekend') return 'Cuma ve cumartesi geceleri';
   if (rule.key === 'specialDay') return 'Tatil ve etkinlik günleri; büyük olan artış uygulanır';
-  if (rule.key === 'demand') return occupancyTarget == null ? 'Hedef doluluk girilmedi; uygulanmıyor' : `Ayın doluluğu %${Math.round(occupancyTarget * 100)} hedefini geçince`;
+  if (rule.key === 'demand') {
+    const month = monthKey ? pricingMonthLabel(monthKey) : 'Bu ay';
+    if (!demandTarget) return `${month}: doluluk hedefi yok, uygulanmıyor. Hedefleri Yönet'ten girin.`;
+    return `Ayın doluluğu %${Math.round(demandTarget.value * 100)} hedefine ulaşınca (${month}, ${demandTarget.source === 'PROPERTY' ? 'mülk hedefi' : 'işletme hedefi'})`;
+  }
   if (rule.key === 'lastMinute') return `${Number(rule.withinDays)} gün ve daha az kala`;
   return `Rezervasyonlar arasında en çok ${Number(rule.maxGap)} gecelik boşluk`;
 }
 
-function pricingRulesTableHtml(rules, occupancyTarget) {
-  const sourceText = { PROPERTY: 'Bu mülk', PORTFOLIO: 'Portföy', DEFAULT: 'Sistem varsayılanı' };
-  return `<div class="pricing-rules-table">${rules.map(rule => `<div class="pricing-rule-row${rule.enabled ? '' : ' is-off'}"><strong>${escapeHtml(rule.label)}</strong><b>${rule.enabled ? escapeHtml(pricingPct(rule.pct)) : 'Kapalı'}</b><span>${escapeHtml(pricingRuleDetail(rule, occupancyTarget))}</span><small class="pricing-rule-source is-${escapeHtml(rule.source.toLowerCase())}">${escapeHtml(sourceText[rule.source])}</small></div>`).join('')}</div><p class="sub-text">Artışlardan (hafta sonu / özel gün) büyük olan, indirimlerden (son dakika / boş gece) derin olan uygulanır; talep artışı bunlara eklenir.</p>`;
+// Kural satiri yonetimde dugmedir: tiklaninca alttaki form o kurali yukler.
+function pricingRulesTableHtml(rules, demandTarget, monthKey, canManage = false, editingKey = null) {
+  const rows = rules.map(rule => {
+    const tone = !rule.enabled ? 'is-off' : Number(rule.pct) < 0 ? 'is-down' : 'is-up';
+    const inner = `<span class="pricing-rule-name"><strong>${escapeHtml(rule.label)}</strong><span>${escapeHtml(pricingRuleDetail(rule, demandTarget, monthKey))}</span></span><b class="pricing-rule-pct ${tone}">${rule.enabled ? escapeHtml(pricingPct(rule.pct)) : 'Kapalı'}</b><small class="pricing-rule-source is-${escapeHtml(rule.source.toLowerCase())}">${escapeHtml(PRICING_RULE_SOURCE_TEXT[rule.source])}</small>`;
+    const cls = `pricing-rule-row${rule.enabled ? '' : ' is-off'}${editingKey === rule.key ? ' is-editing' : ''}`;
+    return canManage
+      ? `<button type="button" class="${cls}" aria-controls="pricingManagePanels" aria-pressed="${editingKey === rule.key ? 'true' : 'false'}" data-onclick="editPricingRule(decodeURIComponent('${encodeActionArg(rule.key)}'))">${inner}</button>`
+      : `<div class="${cls}">${inner}</div>`;
+  }).join('');
+  return `<div class="pricing-rules-table">${rows}</div><p class="sub-text">Artışlardan (hafta sonu / özel gün) büyük olan, indirimlerden (son dakika / boş gece) derin olan uygulanır; sezon ve talep artışı bunlara eklenir.</p>`;
 }
 
-function pricingLadderCardHtml(entry, canManage) {
+// Baz fiyati sistem onermez (3.6); karar icin elde olan kanit yan yana durur:
+// gecen yilin ayni ayindaki ADR ve en yeni rakip fiyati. Olculemeyen "—" ve nedeni.
+function pricingBaseEvidenceHtml(entry, history, monthKey, today) {
+  const previous = pricingMonthLabel(`${Number(monthKey.slice(0, 4)) - 1}${monthKey.slice(4)}`);
+  const item = (label, value, note) => `<li class="${value == null ? 'is-missing' : ''}"><span>${escapeHtml(label)}</span><b>${escapeHtml(pricingMoney(value))}</b><small>${escapeHtml(note)}</small></li>`;
+  const adr = (metric, nights, name) => item(`${previous} · ${name} ADR`, metric?.value ?? null,
+    metric?.value != null ? `${nights} satılmış geceden` : `${nights || 0} satılmış gece; en az 8 gerekir`);
+  const rows = appData.competitorPriceResearch || [];
+  const rival = (type, name) => {
+    const found = getPricingResearchService().latestResearchPrice(rows, entry.property.id, type);
+    if (!found) return item(`Rakip · ${name}`, null, 'Rakipler sekmesinden ekleyin');
+    const age = Math.floor((Date.parse(today + 'T00:00:00Z') - Date.parse(found.researchedOn + 'T00:00:00Z')) / 86400000);
+    return item(`Rakip · ${name}`, found.amount, `${formatTrDate(found.researchedOn)}${age > 60 ? ' · eski' : ''}`);
+  };
+  const list = [
+    adr(history?.weekdayAdr, history?.sampleNights?.weekday, 'hafta içi'),
+    adr(history?.weekendAdr, history?.sampleNights?.weekend, 'hafta sonu'),
+    rival('WEEKDAY', 'hafta içi'),
+    rival('WEEKEND', 'hafta sonu')
+  ].join('');
+  return `<div class="pricing-evidence"><strong>Baz fiyatı neye göre seçmeli?</strong><p>Sistem baz fiyat önermez. Hafta sonu ve özel gün artışları baz fiyatın üstüne eklendiği için baz fiyatı normal bir hafta içi gecesine göre seçin.</p><ul>${list}</ul><button type="button" class="btn btn-secondary btn-sm" data-onclick="setPricingView('target')">Hedef için gereken fiyatı hesapla</button></div>`;
+}
+
+function pricingLadderCardHtml(entry, canManage, evidenceHtml = '') {
   const property = entry.property;
   const base = pricingBasePriceOf(property);
-  const fields = [['base', 'Baz fiyat (₺/gece)', base], ...PROPERTY_LADDER_FIELDS.map(([key, label]) => [key, label, key === 'floor' ? (property.floor ?? property.floorPrice) : property[key]])];
   const valueOf = raw => raw === null || raw === undefined || raw === '' || !Number.isFinite(Number(raw)) ? '' : String(Number(raw));
-  const bodyHtml = canManage
-    ? `<div class="pricing-ladder-grid">${fields.map(([key, label, raw]) => `<div class="form-group"><label for="pricingLadder_${key}">${escapeHtml(label)}</label><input id="pricingLadder_${key}" type="number" min="0" step="1" inputmode="numeric" value="${escapeHtml(valueOf(raw))}" placeholder="Girilmedi"></div>`).join('')}</div><button type="button" class="btn btn-primary btn-sm" data-onclick="savePricingPriceTable(decodeURIComponent('${encodeActionArg(entry.key)}'))">Fiyat tablosunu kaydet</button>`
-    : `<div class="pricing-ladder-grid">${fields.map(([, label, raw]) => `<div><small>${escapeHtml(label)}</small><strong>${escapeHtml(pricingMoney(valueOf(raw) === '' ? null : raw))}</strong></div>`).join('')}</div>`;
-  return `<h3>${escapeHtml(property.name || entry.key)} · fiyat tablosu</h3><p><strong>Baz fiyat</strong> normal bir gecenin fiyatıdır; öneri kuralları bunun üstüne uygular. <strong>Taban</strong> önerinin inemeyeceği en düşük fiyattır. Hedef, premium ve yoğun dönem basamakları referanstır; öneriyi değiştirmez.</p>${bodyHtml}`;
+  const floorRaw = property.floor ?? property.floorPrice;
+  const reference = PROPERTY_LADDER_FIELDS.filter(([key]) => key !== 'floor').map(([key, label]) => [key, label, property[key]]);
+  const input = (key, label, raw, main) => `<div class="form-group${main ? ' is-main' : ''}"><label for="pricingLadder_${key}">${escapeHtml(label)}</label><input id="pricingLadder_${key}" type="number" min="0" step="1" inputmode="numeric" value="${escapeHtml(valueOf(raw))}" placeholder="Girilmedi"></div>`;
+  const view = (label, raw, main) => `<div class="pricing-ladder-value${main ? ' is-main' : ''}"><small>${escapeHtml(label)}</small><strong>${escapeHtml(pricingMoney(valueOf(raw) === '' ? null : raw))}</strong></div>`;
+  const cell = canManage ? input : (key, label, raw, main) => view(label, raw, main);
+  const referenceHtml = reference.map(([key, label, raw]) => cell(key, label, raw, false)).join('');
+  const bodyHtml = `<div class="pricing-ladder-grid">${cell('base', 'Baz fiyat (₺/gece)', base, true)}${cell('floor', 'Taban fiyat (₺/gece)', floorRaw, true)}</div>`
+    + `<div class="pricing-ladder-ref"><span>Referans basamaklar · öneriyi değiştirmez</span><div class="pricing-ladder-grid is-ref">${referenceHtml}</div></div>`
+    + (canManage ? `<button type="button" class="btn btn-primary btn-sm" data-onclick="savePricingPriceTable(decodeURIComponent('${encodeActionArg(entry.key)}'))">Fiyat tablosunu kaydet</button>` : '');
+  return `<div class="pricing-card-head"><div><h3>${escapeHtml(property.name || entry.key)} · fiyat tablosu</h3><p><strong>Baz fiyat</strong> normal bir gecenin fiyatıdır; öneri kuralları bunun üstüne uygular. <strong>Taban</strong> önerinin inemeyeceği en düşük fiyattır.</p></div></div>${bodyHtml}${evidenceHtml}`;
 }
 
-function pricingDayCardHtml(day, ctx) {
+// Dar ekranda 7 sutuna sigan kisa tutar: 5.500 -> "5,5b", 120.000 -> "120b".
+function pricingCompactMoney(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '—';
+  if (n < 1000) return String(Math.round(n));
+  const k = n / 1000;
+  return `${(k >= 100 ? Math.round(k) : Math.round(k * 10) / 10).toLocaleString('tr-TR')}b`;
+}
+
+const PRICING_WEEKDAYS = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
+
+// Bir gunun durum ozeti; hucre ve ayrinti paneli ayni kaynaktan okur.
+function pricingDayFacts(day, ctx) {
   const blocks = ctx.blocks.filter(block => day.date >= block.start && day.date <= block.end);
-  const special = ctx.specialByDate.get(day.date);
+  const special = ctx.specialByDate.get(day.date) || null;
   const isGap = ctx.gapSet.has(day.date) && day.status === 'OPEN';
+  const saved = day.status === 'OPEN' ? (ctx.saved?.get(day.date) || null) : null;
+  const minStay = day.status === 'OPEN' ? (ctx.minStay?.get(day.date) || null) : null;
+  const unsellable = !!(minStay && minStay.sellable === false);
+  const shown = saved ? Number(saved.price) : day.price;
+  const status = day.status === 'BOOKED' ? 'Dolu' : day.status === 'BLOCKED' ? `Kapalı · ${blocks[0]?.title || 'bakım'}` : unsellable ? 'Açık · satılamaz boşluk' : (isGap ? 'Açık · boş gece' : 'Açık');
   const cls = day.status === 'BOOKED' ? 'is-booked' : day.status === 'BLOCKED' ? 'is-blocked' : isGap ? 'is-gap' : special ? 'is-special' : 'is-open';
-  const saved = day.status === 'OPEN' ? ctx.saved?.get(day.date) : null;
+  return { blocks, special, isGap, saved, minStay, unsellable, shown, status, cls };
+}
+
+// Takvim hucresi: gorunen yuz kisa (gun, fiyat, durum); tam aciklama ekran
+// okuyucu metnidir ve ayrinti panelinde acik yazilir. Onayli/elle fiyat esastir;
+// oneri "Öneri" etiketlidir (L-264, KF-3). Satisci onaylayamaz.
+function pricingDayCellHtml(day, ctx) {
+  const facts = pricingDayFacts(day, ctx);
+  const { special, saved, minStay, unsellable, shown } = facts;
   const selectable = ctx.canManage && ctx.dailyReady && day.status === 'OPEN';
   const selected = selectable && ctx.selected?.has(day.date);
+  const focused = !selected && ctx.focusDate === day.date;
   const weekday = new Date(day.date + 'T00:00:00Z').toLocaleDateString('tr-TR', { weekday: 'short', timeZone: 'UTC' });
-  const minStay = day.status === 'OPEN' ? ctx.minStay?.get(day.date) : null;
-  const unsellable = minStay && minStay.sellable === false;
-  const status = day.status === 'BOOKED' ? 'Dolu' : day.status === 'BLOCKED' ? `Kapalı · ${blocks[0]?.title || 'bakım'}` : unsellable ? 'Açık · satılamaz boşluk' : (isGap ? 'Açık · boş gece' : 'Açık');
   let explain = '';
   if (day.status === 'OPEN') {
     if (day.price == null) explain = 'Baz fiyat girilmemiş';
@@ -23796,14 +23896,101 @@ function pricingDayCardHtml(day, ctx) {
       explain = `Baz ${pricingMoney(day.basePrice)}${steps.length ? ' · ' + steps.join(' · ') : ' · kural uygulanmadı'}${day.floorApplied ? ' · tabana yükseltildi' : ''}`;
     }
   }
-  const shown = saved ? Number(saved.price) : day.price;
-  // Onayli/elle fiyat esastir; algoritma onerisi acikca "Öneri" etiketlidir
-  // (L-264, kullanici karari KF-3). Satisci onaylayamaz: onay yoksa bekledigini gorur.
   const savedLine = saved ? `${saved.source === 'MANUAL' ? 'Elle fiyat' : 'Onaylı fiyat'}${day.price != null && Number(saved.price) !== day.price ? ` · öneri ${pricingMoney(day.price)}` : ''}${saved.note ? ` · ${saved.note}` : ''}` : '';
   const proposalLine = !saved && day.status === 'OPEN' && day.price != null
     ? `Öneri${ctx.dailyReady ? (ctx.canManage ? ' · onaylanmadı' : ' · yönetici onayı bekleniyor') : ''}` : '';
-  const action = selectable ? ` role="button" tabindex="0" aria-pressed="${selected ? 'true' : 'false'}" data-onclick="togglePricingDay(decodeURIComponent('${encodeActionArg(day.date)}'))"` : '';
-  return `<div class="pricing-day ${cls}${unsellable ? ' is-unsellable' : ''}${saved ? ' is-saved' : ''}${selected ? ' is-selected' : ''}${selectable ? ' is-selectable' : ''}"${action}><strong>${escapeHtml(formatTrDate(day.date))} <em>${escapeHtml(weekday)}</em></strong>${special ? `<span class="pricing-day-special">${escapeHtml(special.name)}</span>` : ''}<span>${escapeHtml(status)}</span><b>${day.status === 'OPEN' && shown != null ? escapeHtml(pricingMoney(shown)) : '—'}</b>${savedLine ? `<span class="pricing-day-saved">${escapeHtml(savedLine)}</span>` : ''}${proposalLine ? `<span class="pricing-day-proposal">${escapeHtml(proposalLine)}</span>` : ''}${minStay && (minStay.minNights || unsellable) ? `<span class="pricing-day-minstay">${escapeHtml(unsellable ? 'Minimum gece kuralı yüzünden bu boşluk satılamaz' : `Giriş için en az ${minStay.minNights} gece`)}</span>` : ''}${explain ? `<small>${escapeHtml(explain)}</small>` : ''}${day.status === 'OPEN' ? pricingRivalLineHtml(day, shown, Boolean(special), ctx) : ''}</div>`;
+  const price = day.status === 'OPEN' && shown != null ? pricingMoney(shown) : '—';
+  const shortState = saved ? (saved.source === 'MANUAL' ? 'Elle' : 'Onaylı') : day.status === 'BOOKED' ? 'Dolu' : day.status === 'BLOCKED' ? 'Kapalı'
+    : unsellable ? 'Satılamaz' : facts.isGap ? 'Boş gece' : day.price == null ? 'Baz yok' : 'Öneri';
+  const marks = `${special ? '<span class="pricing-day-mark is-special" title="Özel gün"></span>' : ''}${minStay?.minNights ? `<span class="pricing-day-mark">${Number(minStay.minNights)}+</span>` : ''}`;
+  const descriptionHtml = `<span class="sr-only"><strong>${escapeHtml(formatTrDate(day.date))} <em>${escapeHtml(weekday)}</em></strong>${special ? `<span class="pricing-day-special">${escapeHtml(special.name)}</span>` : ''}<span>${escapeHtml(facts.status)}</span><b>${escapeHtml(price)}</b>${savedLine ? `<span class="pricing-day-saved">${escapeHtml(savedLine)}</span>` : ''}${proposalLine ? `<span class="pricing-day-proposal">${escapeHtml(proposalLine)}</span>` : ''}${minStay && (minStay.minNights || unsellable) ? `<span class="pricing-day-minstay">${escapeHtml(unsellable ? 'Minimum gece kuralı yüzünden bu boşluk satılamaz' : `Giriş için en az ${minStay.minNights} gece`)}</span>` : ''}${explain ? `<small>${escapeHtml(explain)}</small>` : ''}${day.status === 'OPEN' ? pricingRivalLineHtml(day, shown, Boolean(special), ctx) : ''}</span>`;
+  const visible = `<span class="pricing-day-top" aria-hidden="true"><span class="pricing-day-num">${Number(day.date.slice(8, 10))}</span><span class="pricing-day-marks">${marks}</span></span><span class="pricing-day-price" aria-hidden="true">${day.status === 'OPEN' ? escapeHtml(price) : ''}</span><span class="pricing-day-price-short" aria-hidden="true">${day.status === 'OPEN' && shown != null ? escapeHtml(pricingCompactMoney(shown)) : ''}</span><span class="pricing-day-state" aria-hidden="true">${escapeHtml(shortState)}</span>`;
+  const cls = `pricing-day ${facts.cls}${unsellable ? ' is-unsellable' : ''}${saved ? ' is-saved' : ''}${selected ? ' is-selected' : ''}${focused ? ' is-focused' : ''}${selectable ? ' is-selectable' : ''}${day.date === ctx.today ? ' is-today' : ''}`;
+  const action = selectable
+    ? `data-onclick="togglePricingDay(decodeURIComponent('${encodeActionArg(day.date)}'), event)" aria-pressed="${selected ? 'true' : 'false'}"`
+    : `data-onclick="focusPricingDay(decodeURIComponent('${encodeActionArg(day.date)}'))" aria-pressed="${focused ? 'true' : 'false'}"`;
+  return `<button type="button" class="${cls}" data-date="${escapeHtml(day.date)}" tabindex="-1" ${action}>${visible}${descriptionHtml}</button>`;
+}
+
+// Ay izgarasi: Pazartesi baslangicli 7 sutun; ufuk disindaki (gecmis) gunler soluk.
+function pricingCalendarGridHtml(monthKey, monthDays, ctx) {
+  const [year, month] = monthKey.split('-').map(Number);
+  const count = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const lead = (new Date(Date.UTC(year, month - 1, 1)).getUTCDay() + 6) % 7;
+  const byDate = new Map(monthDays.map(day => [day.date, day]));
+  const blank = '<div class="pricing-day is-out" aria-hidden="true"></div>';
+  const cells = Array.from({ length: lead }, () => blank);
+  for (let index = 1; index <= count; index++) {
+    const date = `${monthKey}-${String(index).padStart(2, '0')}`;
+    const day = byDate.get(date);
+    cells.push(day ? pricingDayCellHtml(day, ctx) : `<div class="pricing-day is-past" aria-hidden="true"><span class="pricing-day-num">${index}</span></div>`);
+  }
+  while (cells.length % 7) cells.push(blank);
+  // Ok tuslariyla gezinmek icin hucrelerden biri sekme sirasindadir.
+  const focusable = ctx.focusDate || [...(ctx.selected || [])].sort()[0] || monthDays.find(day => day.status === 'OPEN')?.date || monthDays[0]?.date;
+  const html = cells.join('').replace(`data-date="${focusable}" tabindex="-1"`, `data-date="${focusable}" tabindex="0"`);
+  return `<div class="pricing-grid-head" aria-hidden="true">${PRICING_WEEKDAYS.map(name => `<span>${escapeHtml(name)}</span>`).join('')}</div><div class="pricing-days pricing-grid" role="group" aria-label="${escapeHtml(pricingMonthLabel(monthKey))} fiyat takvimi" data-onkeydown="pricingGridKey(event)">${html}</div>`;
+}
+
+// "Bu fiyat neden?" basamaklari motorun gerekcelerinden (yeni hesap yok):
+// baz → her kural (kaynagiyla) → yuvarlama / taban → oneri.
+function pricingReasonRowsHtml(day, ctx) {
+  const ruleOf = key => (ctx.rules || []).find(rule => rule.key === key);
+  const source = key => { const rule = ruleOf(key); return rule ? PRICING_RULE_SOURCE_TEXT[rule.source] : ''; };
+  const special = ctx.specialByDate.get(day.date);
+  const row = (label, note, value, tone = '') => `<li class="${tone}"><span>${escapeHtml(label)}${note ? `<small>${escapeHtml(note)}</small>` : ''}</span><b>${escapeHtml(value)}</b></li>`;
+  const rows = [row('Baz fiyat', 'Fiyat tablosu', pricingMoney(day.basePrice))];
+  let total = 0;
+  day.reasons.forEach(reason => {
+    total += Number(reason.pct);
+    const tone = Number(reason.pct) < 0 ? 'is-down' : 'is-up';
+    if (reason.code === 'SEASON') rows.push(row(reason.label ? `Sezon: ${reason.label}` : 'Sezon', 'Sezon kuralı', pricingPct(reason.pct), tone));
+    else if (reason.code === 'WEEKEND') rows.push(row('Hafta sonu', source('weekend'), pricingPct(reason.pct), tone));
+    else if (reason.code === 'SPECIAL_DAY') rows.push(row(reason.label ? `Özel gün: ${reason.label}` : 'Özel gün', special && special.pct != null ? 'Etkinliğin kendi yüzdesi' : source('specialDay'), pricingPct(reason.pct), tone));
+    else if (reason.code === 'DEMAND') rows.push(row('Talep', `${Number.isFinite(reason.occupancy) ? `Ay %${Math.round(reason.occupancy * 100)} dolu` : 'Ay'}${Number.isFinite(reason.target) ? `, hedef %${Math.round(reason.target * 100)}` : ''} · ${source('demand')}`, pricingPct(reason.pct), tone));
+    else if (reason.code === 'LAST_MINUTE') rows.push(row('Son dakika', `${Number(ruleOf('lastMinute')?.withinDays ?? 7)} gün ve daha az kala · ${source('lastMinute')}`, pricingPct(reason.pct), tone));
+    else if (reason.code === 'GAP_NIGHT') rows.push(row('Boş gece aralığı', `İki rezervasyon arası · ${source('gapNight')}`, pricingPct(reason.pct), tone));
+    else rows.push(row(reason.text || reason.code, '', pricingPct(reason.pct), tone));
+  });
+  if (!day.reasons.length) rows.push(row('Bu güne kural uygulanmadı', '', '±%0'));
+  if (day.floorApplied) rows.push(row('Tabana yükseltildi', `Hesaplanan ${pricingMoney(day.basePrice * (1 + total / 100))} tabanın altında`, pricingMoney(day.price)));
+  rows.push(`<li class="is-total"><span>Öneri<small>${day.floorApplied ? 'Taban fiyat' : `${day.reasons.length ? `Toplam ${pricingPct(total)} · ` : ''}₺50'ye yuvarlanır`}</small></span><b>${escapeHtml(pricingMoney(day.price))}</b></li>`);
+  return `<ol class="pricing-steps">${rows.join('')}</ol>`;
+}
+
+function pricingDayDetailHtml(day, ctx, withActions) {
+  const facts = pricingDayFacts(day, ctx);
+  const { special, saved, minStay, unsellable, shown } = facts;
+  const longDate = new Date(day.date + 'T00:00:00Z').toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', weekday: 'long', timeZone: 'UTC' });
+  const badges = [`<span class="badge pricing-badge ${facts.cls}">${escapeHtml(facts.status)}</span>`, special ? `<span class="badge pricing-badge is-special">${escapeHtml(special.name)}</span>` : ''].join('');
+  let hero = '';
+  if (day.status === 'OPEN') {
+    const label = saved ? (saved.source === 'MANUAL' ? 'Elle fiyat' : 'Onaylı fiyat') : (day.price == null ? 'Öneri yok' : 'Öneri');
+    const note = saved
+      ? `${day.price != null && Number(saved.price) !== day.price ? `Öneri ${pricingMoney(day.price)}` : 'Öneriyle aynı'}${saved.note ? ` · ${saved.note}` : ''}`
+      : (day.price == null ? 'Baz fiyat girilmemiş; öneri hesaplanamaz.' : (ctx.dailyReady ? (ctx.canManage ? 'Henüz onaylanmadı' : 'Yönetici onayı bekleniyor') : 'Takvim yalnız öneriyi gösterir'));
+    hero = `<div class="pricing-price-hero"><small>${escapeHtml(label)}</small><strong>${escapeHtml(shown != null ? pricingMoney(shown) : '—')}</strong><span>${escapeHtml(note)}</span></div>`;
+  } else {
+    hero = `<div class="pricing-price-hero is-muted"><small>${day.status === 'BOOKED' ? 'Satıldı' : 'Satışa kapalı'}</small><strong>${day.status === 'BOOKED' ? 'Dolu' : 'Kapalı'}</strong><span>${escapeHtml(day.status === 'BOOKED' ? 'Bu gece için rezervasyon var; fiyat önerilmez.' : `${facts.blocks[0]?.title || 'Bakım'} nedeniyle kapalı.`)}</span></div>`;
+  }
+  const why = day.status === 'OPEN' && day.price != null
+    ? `<div class="pricing-why"><h4>Bu fiyat neden?</h4>${pricingReasonRowsHtml(day, ctx)}<button type="button" class="pricing-link" data-onclick="setPricingView('rules')">Kuralları gör / değiştir</button></div>` : '';
+  const factRows = [];
+  if (minStay && (minStay.minNights || unsellable)) factRows.push(`<li>${escapeHtml(unsellable ? 'Minimum gece kuralı yüzünden bu boşluk satılamaz' : `Giriş için en az ${minStay.minNights} gece`)}</li>`);
+  if (day.status === 'OPEN') {
+    const rival = pricingRivalLineHtml(day, shown, Boolean(special), ctx);
+    if (rival) factRows.push(`<li>${rival}<small>Bilgi; öneriyi değiştirmez</small></li>`);
+    const weekend = [5, 6].includes(new Date(day.date + 'T00:00:00Z').getUTCDay());
+    const metric = weekend ? ctx.history?.weekendAdr : ctx.history?.weekdayAdr;
+    if (metric?.value != null) factRows.push(`<li>Geçen yıl bu ay ${weekend ? 'hafta sonu' : 'hafta içi'} ADR ${escapeHtml(pricingMoney(metric.value))}</li>`);
+  }
+  const factsHtml = factRows.length ? `<ul class="pricing-facts">${factRows.join('')}</ul>` : '';
+  const actions = withActions && day.status === 'OPEN' ? pricingDayActionsHtml(!!saved, day.price != null) : '';
+  return `<div class="pricing-detail-head"><h3>${escapeHtml(longDate)}</h3><div class="pricing-detail-badges">${badges}</div></div>${hero}${why}${factsHtml}${actions}`;
+}
+
+function pricingDayActionsHtml(hasSaved, hasSuggestion) {
+  return `<div class="pricing-day-editor-actions">${hasSuggestion ? `<button type="button" class="btn btn-primary btn-sm" data-onclick="applyPricingDayPrices('APPROVE')">Öneriyi onayla</button>` : ''}<div class="pricing-manual"><label class="sr-only" for="pricingDayManualPrice">Elle fiyat (₺)</label><input id="pricingDayManualPrice" type="number" min="1" step="1" inputmode="numeric" placeholder="Elle fiyat (₺)"><button type="button" class="btn btn-secondary btn-sm" data-onclick="applyPricingDayPrices('MANUAL')">Elle fiyatı uygula</button></div><label class="sr-only" for="pricingDayNote">Not</label><input id="pricingDayNote" type="text" maxlength="500" placeholder="Not (isteğe bağlı)"><div class="pricing-day-editor-row">${hasSaved ? `<button type="button" class="btn btn-secondary btn-sm" data-onclick="applyPricingDayPrices('REMOVE')">Kaydı kaldır</button>` : ''}<button type="button" class="btn btn-secondary btn-sm" data-onclick="clearPricingDaySelection()">Seçimi temizle</button></div></div>`;
 }
 
 // Rakip fiyati gun kartinda yalniz bilgi olarak yazilir (L-260, kullanici
@@ -23872,7 +24059,7 @@ function pricingTargetHtml(result, ctx) {
 }
 
 function setPricingProperty(propertyId) {
-  if ((propertyId || '') !== pricingSelectedPropertyId) pricingSelectedDays.clear();
+  if ((propertyId || '') !== pricingSelectedPropertyId) { pricingSelectedDays.clear(); pricingFocusDate = null; pricingLastToggledDate = null; }
   pricingSelectedPropertyId = propertyId || '';
   renderPricingTab();
 }
@@ -23891,7 +24078,7 @@ function pricingTargetDraftKey(propertyId, monthKey) {
 // defter), acik geceler = her mulkun ayni ayki onerileri. Baz fiyati olmayan
 // mulkun acik gecesi fiyatsizdir; hesaba katilmaz ve adi yazilir (3.6).
 function pricingTargetWorkspace({ entry, entries, calendar, monthKey, today, historySellableDates }) {
-  const common = { expectedOccupancy: pricingExpectedOccupancyDraft, focus: pricingFocusDraft };
+  const common = { expectedOccupancy: pricingExpectedOccupancyFor(pricingTargetScope === 'ALL' ? null : entry.property.id, monthKey), focus: pricingFocusDraft };
   const draftKey = pricingTargetDraftKey(entry.property.id, monthKey);
   const drafted = Object.prototype.hasOwnProperty.call(pricingTargetDrafts, draftKey);
   const portfolioTarget = getConfiguredRevenueTarget({ ...currentFilter, period: monthKey }, appData.targets || [], 'ALL');
@@ -24260,8 +24447,11 @@ function askPricingChatGpt() {
 // hesaptan okur (L-252: kart GapNightService'i imzasina aykiri cagirip hep 0 yaziyordu).
 // rulesTransform: ayni takvimi bir kural degisikligiyle hesaplamak icin
 // (bos gece firsatinin liste fiyati, L-308). Ekranda kullanilmaz.
-function computePricingCalendar(entry, today = getTodayStr(), occupancyTarget = pricingExpectedOccupancyDraft, rulesTransform = null) {
+// occupancyTarget verilmezse (undefined) Hedefleri Yonet'teki aylik doluluk hedefi
+// kullanilir; acikca null "hedef yok" demektir.
+function computePricingCalendar(entry, today = getTodayStr(), occupancyTarget = undefined, rulesTransform = null) {
   const horizon = pricingHorizon(today);
+  const target = occupancyTarget === undefined ? pricingOccupancyTargets(entry.property.id, horizon.months) : occupancyTarget;
   const blocks = pricingMaintenanceBlocks(entry.property, today);
   const specialDays = pricingSpecialDaysFor(entry.property.id, horizon.start, horizon.end);
   const birlesik = getPricingResearchService().mergeRules(appData.tenantSettings?.pricing_rules || {}, appData.propertyPricingRules || [], entry.property.id);
@@ -24269,7 +24459,7 @@ function computePricingCalendar(entry, today = getTodayStr(), occupancyTarget = 
   const suggestions = getSuggestedPriceEngine().suggest({
     property: { id: entry.property.id, basePrice: pricingBasePriceOf(entry.property), floorPrice: entry.property.floor ?? null },
     bookings: pricingPropertyBookings(entry).filter(booking => !isBulkSummaryBooking(booking)), blocks, rules, specialDays,
-    occupancyTarget, today, days: horizon.days, seasons: pricingSeasonsFor(entry.property.id)
+    occupancyTarget: target, today, days: horizon.days, seasons: pricingSeasonsFor(entry.property.id)
   });
   return { horizon, blocks, specialDays, rules, suggestions };
 }
@@ -24285,16 +24475,132 @@ function pricingDailyPriceMap(propertyId) {
   return new Map((appData?.propertyDailyPrices || []).filter(row => row.property_id === propertyId).map(row => [String(row.price_date).slice(0, 10), row]));
 }
 
-function togglePricingDay(date) {
+// Ekranin acik gunleri; aralik secimi ve hizli secim son cizimden okur.
+let pricingLastOpenDays = [];
+let pricingLastToggledDate = null;
+// Salt okunur ayrinti: secim yapamayan rol (ya da dolu/kapali gun) icin.
+let pricingFocusDate = null;
+
+function pricingFocusCell(date) {
+  if (typeof document === 'undefined' || !date) return;
+  const cell = document.querySelector?.(`#pricingManagerContainer [data-date="${date}"]`);
+  if (cell && typeof cell.focus === 'function') cell.focus({ preventScroll: true });
+}
+
+function togglePricingDay(date, event) {
   if (!canManageTenantRole(activeTenant?.role) || !/^\d{4}-\d{2}-\d{2}$/.test(String(date || ''))) return false;
-  if (pricingSelectedDays.has(date)) pricingSelectedDays.delete(date); else pricingSelectedDays.add(date);
+  // Shift + tik: son secilen gunle arasindaki acik gunlerin hepsi secilir.
+  if (event && event.shiftKey && pricingLastToggledDate && pricingLastToggledDate !== date) {
+    const [from, to] = [pricingLastToggledDate, date].sort();
+    pricingLastOpenDays.filter(day => day >= from && day <= to).forEach(day => pricingSelectedDays.add(day));
+  } else if (pricingSelectedDays.has(date)) pricingSelectedDays.delete(date);
+  else pricingSelectedDays.add(date);
+  pricingLastToggledDate = date;
+  pricingFocusDate = null;
   renderPricingTab();
+  pricingFocusCell(date);
+  return true;
+}
+
+function focusPricingDay(date) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ''))) return false;
+  pricingFocusDate = pricingFocusDate === date ? null : date;
+  renderPricingTab();
+  pricingFocusCell(date);
   return true;
 }
 
 function clearPricingDaySelection() {
   pricingSelectedDays.clear();
+  pricingLastToggledDate = null;
   renderPricingTab();
+  return true;
+}
+
+// Hizli secim: secili ayin onay bekleyen ya da bos gece gunleri. Ayda yoksa
+// ufkun bu tur gunu olan ilk ayina gecilir (Onay bekleyen karti tum ufku sayar).
+function selectPricingDays(kind) {
+  if (!canManageTenantRole(activeTenant?.role) || !appData.phase101SchemaReady) return false;
+  const entry = pricingActiveProperties().find(item => item.property.id === pricingSelectedPropertyId);
+  if (!entry) return false;
+  const calendar = computePricingCalendar(entry);
+  const saved = pricingDailyPriceMap(entry.property.id);
+  const gaps = new Set(calendar.suggestions.gapDates || []);
+  const wanted = calendar.suggestions.days.filter(day => day.status === 'OPEN'
+    && (kind === 'GAP' ? gaps.has(day.date) : day.price > 0 && !saved.has(day.date))).map(day => day.date);
+  const months = [pricingSelectedMonth, ...calendar.horizon.months.filter(key => key !== pricingSelectedMonth)];
+  const month = months.find(key => wanted.some(date => date.startsWith(key + '-')));
+  pricingView = 'calendar';
+  if (!month) { renderPricingTab(); return false; }
+  pricingSelectedMonth = month;
+  pricingSelectedDays.clear();
+  wanted.filter(date => date.startsWith(month + '-')).forEach(date => pricingSelectedDays.add(date));
+  pricingFocusDate = null;
+  renderPricingTab();
+  return true;
+}
+
+// Izgarada ok tuslari: sag/sol bir gun, yukari/asagi bir hafta.
+function pricingGridKey(event) {
+  const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[event?.key];
+  const cell = event?.target?.closest?.('.pricing-day[data-date]');
+  if (!step || !cell) return false;
+  const next = new Date(Date.parse(cell.getAttribute('data-date') + 'T00:00:00Z') + step * 86400000).toISOString().slice(0, 10);
+  const target = document.querySelector?.(`#pricingManagerContainer [data-date="${next}"]`);
+  if (!target) return false;
+  event.preventDefault?.();
+  cell.setAttribute('tabindex', '-1');
+  target.setAttribute('tabindex', '0');
+  target.focus();
+  return true;
+}
+
+// Ic sekmeler (kullanici karari 07.11.2026): Takvim gunluk is, Kurallar
+// kurulum, Hedef ve Rakipler analiz. Durum oturumluktur; hesap degismez.
+const PRICING_VIEWS = ['calendar', 'rules', 'target', 'rivals'];
+let pricingView = 'calendar';
+
+function applyPricingView() {
+  if (typeof document === 'undefined') return;
+  PRICING_VIEWS.forEach(id => {
+    const on = id === pricingView;
+    const tab = document.getElementById(`pricingViewTab_${id}`);
+    if (tab) {
+      tab.classList?.toggle?.('active', on);
+      tab.setAttribute?.('aria-selected', on ? 'true' : 'false');
+      tab.setAttribute?.('tabindex', on ? '0' : '-1');
+    }
+    const panel = document.getElementById(`pricingView_${id}`);
+    if (panel) panel.hidden = !on;
+  });
+}
+
+function setPricingView(view) {
+  if (!PRICING_VIEWS.includes(view)) return false;
+  pricingView = view;
+  applyPricingView();
+  return true;
+}
+
+function pricingSubnavKey(event) {
+  const step = { ArrowLeft: -1, ArrowRight: 1, Home: -99, End: 99 }[event?.key];
+  if (!step) return false;
+  const index = PRICING_VIEWS.indexOf(pricingView);
+  const next = PRICING_VIEWS[Math.max(0, Math.min(PRICING_VIEWS.length - 1, step === -99 ? 0 : step === 99 ? PRICING_VIEWS.length - 1 : (index + step + PRICING_VIEWS.length) % PRICING_VIEWS.length))];
+  event.preventDefault?.();
+  setPricingView(next);
+  document.getElementById(`pricingViewTab_${next}`)?.focus?.();
+  return true;
+}
+
+// Kural satirina tiklamak alttaki formu o kurala doldurur.
+function editPricingRule(ruleKey) {
+  if (!canManageTenantRole(activeTenant?.role) || !PRICING_RULE_LABELS[ruleKey]) return false;
+  const select = document.getElementById('pricingRuleKey');
+  if (select) select.value = ruleKey;
+  renderPricingTab();
+  const pct = document.getElementById('pricingRulePct');
+  if (pct && typeof pct.focus === 'function') pct.focus();
   return true;
 }
 
@@ -24356,13 +24662,34 @@ async function applyPricingDayPrices(mode) {
   return true;
 }
 
-function pricingDayEditorHtml(canManage) {
-  if (!canManage) return '';
-  if (!appData.phase101SchemaReady) return '<div class="pricing-day-editor is-muted">Günlük fiyatı onaylamak için phase101 göçü bekleniyor; takvim yalnız öneriyi gösterir.</div>';
+// Ayrinti paneli: tek gun "Bu fiyat neden?", cok gun toplu islem, secim yoksa
+// ne yapilacagini soyler. Eylemler yalniz yonetimde ve phase101 varken.
+function pricingDayEditorHtml(canManage, ctx = null) {
+  const dailyReady = !!appData.phase101SchemaReady;
   const dates = [...pricingSelectedDays].sort();
-  if (!dates.length) return '<div class="pricing-day-editor is-muted">Fiyatı onaylamak ya da değiştirmek için açık günlere tıklayın; birden çok gün seçebilirsiniz. Kaydedilen fiyat referanstır, OTA\'ya gönderilmez.</div>';
-  const list = dates.slice(0, 8).map(date => formatTrDate(date)).join(', ') + (dates.length > 8 ? ` +${dates.length - 8}` : '');
-  return `<div class="pricing-day-editor"><strong>${dates.length} gün seçili</strong><span>${escapeHtml(list)}</span><div class="pricing-day-editor-actions"><button type="button" class="btn btn-primary btn-sm" data-onclick="applyPricingDayPrices('APPROVE')">Öneriyi onayla</button><input id="pricingDayManualPrice" type="number" min="1" step="1" inputmode="numeric" placeholder="Elle fiyat (₺)"><button type="button" class="btn btn-secondary btn-sm" data-onclick="applyPricingDayPrices('MANUAL')">Elle fiyatı uygula</button><input id="pricingDayNote" type="text" maxlength="500" placeholder="Not (isteğe bağlı)"><button type="button" class="btn btn-secondary btn-sm" data-onclick="applyPricingDayPrices('REMOVE')">Kaydı kaldır</button><button type="button" class="btn btn-secondary btn-sm" data-onclick="clearPricingDaySelection()">Seçimi temizle</button></div></div>`;
+  const byDate = new Map((ctx?.days || []).map(day => [day.date, day]));
+  const waiting = '<p class="pricing-panel-note">Günlük fiyatı onaylamak için phase101 göçü bekleniyor; takvim yalnız öneriyi gösterir.</p>';
+  if (canManage && dailyReady && dates.length > 1) {
+    const days = dates.map(date => byDate.get(date)).filter(Boolean);
+    const priced = days.filter(day => day.price > 0);
+    const total = priced.reduce((sum, day) => sum + day.price, 0);
+    const savedCount = days.filter(day => ctx.saved?.has(day.date)).length;
+    const list = dates.slice(0, 8).map(date => formatTrDate(date)).join(', ') + (dates.length > 8 ? ` +${dates.length - 8}` : '');
+    const stats = [`<li><span>Öneri ortalaması</span><b>${escapeHtml(pricingMoney(priced.length ? total / priced.length : null))}</b></li>`, `<li><span>Öneri toplamı</span><b>${escapeHtml(pricingMoney(priced.length ? total : null))}</b></li>`, `<li><span>Kayıtlı fiyatı olan</span><b>${savedCount} gün</b></li>`].join('');
+    return `<div class="pricing-day-editor"><div class="pricing-detail-head"><h3>${dates.length} gün seçili</h3><span class="pricing-detail-list">${escapeHtml(list)}</span></div><ul class="pricing-bulk-stats">${stats}</ul>${pricingDayActionsHtml(savedCount > 0, priced.length > 0)}</div>`;
+  }
+  const date = dates[0] || pricingFocusDate;
+  const day = date ? byDate.get(date) : null;
+  if (day) return `<div class="pricing-day-editor">${pricingDayDetailHtml(day, ctx, canManage && dailyReady && dates.length === 1)}${canManage && !dailyReady ? waiting : ''}</div>`;
+  if (canManage && dailyReady) {
+    const quick = [
+      ['PENDING', 'Onay bekleyenleri seç', ctx?.pendingInMonth || 0],
+      ['GAP', 'Boş geceleri seç', ctx?.gapInMonth || 0]
+    ].map(([kind, label, count]) => `<button type="button" class="btn btn-secondary btn-sm" data-onclick="selectPricingDays('${kind}')"${count ? '' : ' disabled'}><span>${escapeHtml(label)}</span><b>${Number(count)}</b></button>`).join('');
+    return `<div class="pricing-day-editor is-muted"><h3>Gün seçin</h3><p>Fiyatı onaylamak ya da değiştirmek için açık günlere tıklayın; birden çok gün seçebilirsiniz (Shift ile aralık). Kaydedilen fiyat referanstır, OTA'ya gönderilmez.</p><div class="pricing-quick">${quick}</div></div>`;
+  }
+  if (canManage) return `<div class="pricing-day-editor is-muted"><h3>Bir güne tıklayın</h3><p>Fiyatın nasıl hesaplandığı burada görünür.</p>${waiting}</div>`;
+  return '<div class="pricing-day-editor is-muted"><h3>Bir güne tıklayın</h3><p>Fiyatın nasıl hesaplandığı burada görünür. Fiyatları yönetim onaylar.</p></div>';
 }
 
 // Rezervasyon formu: secilen geceler icin onayli fiyat (yoksa oneri) referansi.
@@ -24379,7 +24706,7 @@ function renderBookingPriceCalendarHint() {
   for (let ms = Date.parse(checkIn + 'T00:00:00Z'); Number.isFinite(ms) && ms < Date.parse(checkOut + 'T00:00:00Z') && nights.length < 120; ms += 86400000) nights.push(new Date(ms).toISOString().slice(0, 10));
   if (!property || !nights.length) { hint.style.display = 'none'; hint.innerText = ''; return; }
   const saved = pricingDailyPriceMap(property.id);
-  const suggestions = new Map(computePricingCalendar({ key: villaKey, property }, getTodayStr(), null).suggestions.days.map(day => [day.date, day.price]));
+  const suggestions = new Map(computePricingCalendar({ key: villaKey, property }, getTodayStr()).suggestions.days.map(day => [day.date, day.price]));
   let total = 0, approved = 0, suggested = 0, unknown = 0;
   const nightPrices = [];
   nights.forEach(date => {
@@ -24409,6 +24736,7 @@ function renderPricingTab() {
   if (typeof document === 'undefined') return;
   const container = document.getElementById('pricingManagerContainer');
   if (!container) return;
+  applyPricingView();
   const entries = pricingActiveProperties();
   const entry = entries.find(item => item.property.id === pricingSelectedPropertyId) || entries[0] || null;
   if (entry && pricingSelectedPropertyId !== entry.property.id) pricingSelectedPropertyId = entry.property.id;
@@ -24418,11 +24746,15 @@ function renderPricingTab() {
   ['pricingManagePanels', 'pricingSpecialDayForm', 'pricingResearchPanel', 'pricingMinStayForm', 'pricingSeasonForm', 'pricingLongStayForm'].forEach(id => {
     const element = document.getElementById(id); if (element) element.style.display = canManage ? '' : 'none';
   });
+  const dailyReady = !!appData.phase101SchemaReady;
   if (!entry) {
     container.innerHTML = '<div class="empty-state">Fiyat önerisi hesaplanamadı: mülk kaydı yok.</div>';
-    ['pricingTargetResult', 'pricingLadderCard', 'pricingRulesTable', 'pricingSpecialDaysList', 'pricingMonthTabs'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
+    ['pricingTargetResult', 'pricingLadderCard', 'pricingRulesTable', 'pricingSpecialDaysList', 'pricingMonthTabs', 'pricingDayEditor'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
     setEl('pricingSelectedPropertyVal', '—');
     setEl('pricingSelectedPropertyMeta', 'Mülk kaydı yok');
+    setEl('pricingPendingVal', '—');
+    setEl('pricingPendingMeta', 'Mülk kaydı yok');
+    setEl('pricingPendingBadge', '');
     return;
   }
   const today = getTodayStr();
@@ -24431,19 +24763,20 @@ function renderPricingTab() {
   if (!horizon.months.includes(pricingSelectedMonth)) pricingSelectedMonth = horizon.months[0];
   const monthKey = pricingSelectedMonth;
   const monthDays = suggestions.days.filter(day => day.date.startsWith(monthKey + '-'));
+  const saved = pricingDailyPriceMap(entry.property.id);
+  const gapSet = new Set(suggestions.gapDates || []);
+  const openDates = suggestions.days.filter(day => day.status === 'OPEN').map(day => day.date);
+  pricingLastOpenDays = openDates;
+  // Ufuktan cikan secim ve odak birakilir (gun gecti ya da doldu).
+  [...pricingSelectedDays].forEach(date => { if (!openDates.includes(date)) pricingSelectedDays.delete(date); });
+  if (pricingFocusDate && !suggestions.days.some(day => day.date === pricingFocusDate)) pricingFocusDate = null;
+  const isPending = day => day.status === 'OPEN' && day.price > 0 && !saved.has(day.date);
 
   const tabs = document.getElementById('pricingMonthTabs');
   if (tabs) tabs.innerHTML = horizon.months.map(key => {
     const open = suggestions.days.filter(day => day.date.startsWith(key + '-') && day.status === 'OPEN').length;
-    return `<button type="button" role="tab" aria-selected="${key === monthKey}" class="btn btn-sm ${key === monthKey ? 'btn-primary' : 'btn-secondary'}" data-onclick="setPricingMonth(decodeURIComponent('${encodeActionArg(key)}'))">${escapeHtml(pricingMonthLabel(key))} <small>${open} açık</small></button>`;
+    return `<button type="button" role="tab" aria-selected="${key === monthKey}" class="pricing-month-tab${key === monthKey ? ' active' : ''}" data-onclick="setPricingMonth(decodeURIComponent('${encodeActionArg(key)}'))">${escapeHtml(pricingMonthLabel(key))} <small>${open} açık</small></button>`;
   }).join('');
-
-  const ladder = document.getElementById('pricingLadderCard');
-  if (ladder) ladder.innerHTML = pricingLadderCardHtml(entry, canManage);
-  const rulesTable = document.getElementById('pricingRulesTable');
-  if (rulesTable) rulesTable.innerHTML = pricingRulesTableHtml(pricingEffectiveRules(entry.property.id), pricingExpectedOccupancyDraft);
-  const specialList = document.getElementById('pricingSpecialDaysList');
-  if (specialList) specialList.innerHTML = pricingSpecialListHtml(entry, horizon, canManage);
 
   // Hedef hesaplayici secili ayin kalan gecelerini ve ayni ay defterini kullanir.
   const previousYear = Number(monthKey.slice(0, 4)) - 1;
@@ -24453,30 +24786,52 @@ function renderPricingTab() {
   const result = buildPricingWorkspace({
     property: { id: entry.property.id }, bookings: pricingPropertyBookings(entry), monthKey, historySellableDates,
     suggestions: { ...suggestions, days: monthDays }, specialDays,
-    target: null, soldRevenue: null, expectedOccupancy: pricingExpectedOccupancyDraft, focus: pricingFocusDraft
+    target: null, soldRevenue: null, expectedOccupancy: pricingExpectedOccupancyFor(entry.property.id, monthKey), focus: pricingFocusDraft
   });
+
+  const ladder = document.getElementById('pricingLadderCard');
+  if (ladder) ladder.innerHTML = pricingLadderCardHtml(entry, canManage, pricingBaseEvidenceHtml(entry, result.history, monthKey, today));
+  const rules = pricingEffectiveRules(entry.property.id);
+  const rulesTable = document.getElementById('pricingRulesTable');
+  const editingKey = canManage ? (document.getElementById('pricingRuleKey')?.value || null) : null;
+  if (rulesTable) rulesTable.innerHTML = pricingRulesTableHtml(rules, pricingOccupancyTargetOf(entry.property.id, monthKey), monthKey, canManage, editingKey);
+  const specialList = document.getElementById('pricingSpecialDaysList');
+  if (specialList) specialList.innerHTML = pricingSpecialListHtml(entry, horizon, canManage);
+
   const targetWs = pricingTargetWorkspace({ entry, entries, calendar, monthKey, today, historySellableDates });
   const targetValue = targetWs.targetValue;
   const scopeInput = document.getElementById('pricingTargetScope');
   if (scopeInput) scopeInput.value = pricingTargetScope;
   const targetInput = document.getElementById('pricingTargetInput');
   if (targetInput) targetInput.value = targetValue ?? '';
+  const savedOccupancy = pricingOccupancyTargetOf(pricingTargetScope === 'ALL' ? null : entry.property.id, monthKey);
   const occupancyInput = document.getElementById('pricingExpectedOccupancy');
-  if (occupancyInput) occupancyInput.value = pricingExpectedOccupancyDraft == null ? '' : Math.round(pricingExpectedOccupancyDraft * 100);
+  if (occupancyInput) {
+    occupancyInput.value = pricingExpectedOccupancyDraft == null ? '' : Math.round(pricingExpectedOccupancyDraft * 100);
+    occupancyInput.placeholder = savedOccupancy ? `${Math.round(savedOccupancy.value * 100)} (kayıtlı hedef)` : '—';
+  }
   const focusInput = document.getElementById('pricingFocusSelect');
   if (focusInput) focusInput.value = pricingFocusDraft;
 
-  const warningText = { OCCUPANCY_TARGET_MISSING: 'Talep kuralı çalışmıyor: aşağıdaki hesaplayıcıda hedef doluluk girin.', BASE_PRICE_MISSING: 'Baz fiyat girilmemiş: öneri hesaplanamaz, fiyat tablosundan girin.', FLOOR_PRICE_MISSING: 'Taban fiyat girilmemiş: indirimler için alt sınır yok.', NON_POSITIVE_PRICE: 'İndirimler bazı günlerde fiyatı sıfıra ya da altına indiriyor; o günlere öneri verilmedi. Taban fiyat girin ya da indirimleri azaltın.' };
-  const warnings = suggestions.warnings.map(item => warningText[item.code] || item.text);
+  const warningText = {
+    OCCUPANCY_TARGET_MISSING: 'Talep kuralı çalışmıyor: bu ayların doluluk hedefi yok. Hedefleri Yönet\'ten girin.',
+    BASE_PRICE_MISSING: 'Baz fiyat girilmemiş: öneri hesaplanamaz. Kurallar sekmesindeki fiyat tablosundan girin.',
+    FLOOR_PRICE_MISSING: 'Taban fiyat girilmemiş: indirimler için alt sınır yok.',
+    NON_POSITIVE_PRICE: 'İndirimler bazı günlerde fiyatı sıfıra ya da altına indiriyor; o günlere öneri verilmedi. Taban fiyat girin ya da indirimleri azaltın.'
+  };
+  const warnings = suggestions.warnings.map(item => item.code === 'OCCUPANCY_TARGET_PARTIAL'
+    ? `Talep kuralı ${item.months.map(pricingMonthLabel).join(', ')} için çalışmıyor: o ayın doluluk hedefi yok (Hedefleri Yönet).`
+    : (warningText[item.code] || item.text));
   if (appData.propertyClosuresReady === false) warnings.unshift('Bakımla kapalı günler bu rolde okunamadı (phase103 bekleniyor): "Açık" görünen bir gün bakımda olabilir.');
   const minStay = pricingMinStayMap(entry.property.id, suggestions.days);
   const unsellableNights = monthDays.filter(day => minStay.get(day.date)?.sellable === false).length;
   if (unsellableNights) warnings.push(`${unsellableNights} açık gece minimum gece kuralı yüzünden satılamaz (boşluk kuralın istediğinden kısa).`);
-  const warningHtml = warnings.length ? `<div class="pricing-warnings">${warnings.map(text => `<span>${escapeHtml(text)}</span>`).join('')}</div>` : '';
-  const ctx = { blocks, specialByDate: new Map(specialDays.map(day => [day.date, day])), gapSet: new Set(suggestions.gapDates || []),
-    saved: pricingDailyPriceMap(entry.property.id), canManage, dailyReady: !!appData.phase101SchemaReady, selected: pricingSelectedDays,
+  const warningHtml = warnings.length ? `<div class="pricing-warnings" role="status">${warnings.map(text => `<span>${escapeHtml(text)}</span>`).join('')}</div>` : '';
+  const ctx = { blocks, specialByDate: new Map(specialDays.map(day => [day.date, day])), gapSet,
+    saved, canManage, dailyReady, selected: pricingSelectedDays, focusDate: pricingFocusDate,
     research: appData.competitorPriceResearch || [], propertyId: entry.property.id, today,
-    minStay };
+    minStay, rules, history: result.history, days: suggestions.days,
+    pendingInMonth: monthDays.filter(isPending).length, gapInMonth: monthDays.filter(day => day.status === 'OPEN' && gapSet.has(day.date)).length };
   const minStayList = document.getElementById('pricingMinStayList');
   if (minStayList) minStayList.innerHTML = pricingMinStayListHtml(entry, canManage);
   const longStayList = document.getElementById('pricingLongStayList');
@@ -24484,20 +24839,42 @@ function renderPricingTab() {
   const seasonList = document.getElementById('pricingSeasonList');
   if (seasonList) seasonList.innerHTML = pricingSeasonListHtml(entry, canManage);
   const editor = document.getElementById('pricingDayEditor');
-  if (editor) editor.innerHTML = pricingDayEditorHtml(canManage);
-  setEl('pricingCalendarTitle', `Fiyat takvimi · ${pricingMonthLabel(monthKey)}`);
-  container.innerHTML = `${warningHtml}${pricingHistoryHintHtml(result.history, entry, monthKey)}<div class="pricing-days">${monthDays.map(day => pricingDayCardHtml(day, ctx)).join('')}</div>`;
+  if (editor) editor.innerHTML = pricingDayEditorHtml(canManage, ctx);
+  setEl('pricingCalendarTitle', pricingMonthLabel(monthKey));
+  const counts = { open: monthDays.filter(day => day.status === 'OPEN').length, booked: monthDays.filter(day => day.status === 'BOOKED').length, saved: monthDays.filter(day => day.status === 'OPEN' && saved.has(day.date)).length };
+  setEl('pricingCalendarFoot', `${counts.open} açık · ${counts.saved} kayıtlı fiyat · ${counts.booked} dolu gece`);
+  container.innerHTML = `${warningHtml}${pricingCalendarGridHtml(monthKey, monthDays, ctx)}${pricingHistoryHintHtml(result.history, entry, monthKey)}`;
 
-  setEl('pricingTargetTitle', `Hedef ciro hesaplayıcısı · ${pricingMonthLabel(monthKey)} · ${targetWs.scopeLabel}`);
-  const targetBox = document.getElementById('pricingTargetResult');
-  if (targetBox) targetBox.innerHTML = pricingTargetHtml(targetWs.result, { targetValue, soldRevenue: targetWs.soldRevenue, focus: pricingFocusDraft, expectedOccupancy: pricingExpectedOccupancyDraft, scopeLabel: targetWs.scopeLabel, note: targetWs.note });
-
+  // Onay bekleyen gun: ufuktaki acik, onerisi olan ve kayitli fiyati olmayan gunler.
   const base = pricingBasePriceOf(entry.property);
+  const pending = suggestions.days.filter(isPending).length;
+  const pendingCard = document.getElementById('pricingPendingCard');
+  if (!dailyReady) {
+    setEl('pricingPendingVal', '—');
+    setEl('pricingPendingMeta', 'Günlük fiyat kaydı için phase101 göçü bekleniyor');
+  } else if (base == null) {
+    setEl('pricingPendingVal', '—');
+    setEl('pricingPendingMeta', 'Baz fiyat girilmemiş; öneri yok');
+  } else {
+    setEl('pricingPendingVal', `${pending} gün`);
+    setEl('pricingPendingMeta', pending ? `${entry.property.name || entry.key} · önümüzdeki 3 ay${canManage ? ' · seçmek için tıklayın' : ' · yönetici onayı bekleniyor'}` : 'Önümüzdeki 3 ayın tüm önerileri kayıtlı');
+  }
+  if (pendingCard) {
+    const actionable = canManage && dailyReady && pending > 0;
+    pendingCard.disabled = !actionable;
+    pendingCard.classList?.toggle?.('is-action', actionable);
+  }
+  setEl('pricingPendingBadge', dailyReady && pending > 0 ? String(pending) : '');
+
   const next30 = suggestions.days.slice(0, 30);
   const sold = next30.filter(day => day.status === 'BOOKED').length;
   const sellable = next30.filter(day => day.status !== 'BLOCKED').length;
   setEl('pricingSelectedPropertyVal', base > 0 ? pricingMoney(base) : '—');
-  setEl('pricingSelectedPropertyMeta', `${entry.property.name || entry.key}: baz · taban ${pricingMoney(entry.property.floor ?? null)} · yoğun ${pricingMoney(entry.property.peak ?? null)} · 30 gün doluluk ${sellable > 0 ? '%' + Math.round(sold / sellable * 100) : '—'}`);
+  setEl('pricingSelectedPropertyMeta', `taban ${pricingMoney(entry.property.floor ?? null)} · yoğun ${pricingMoney(entry.property.peak ?? null)} · 30 gün doluluk ${sellable > 0 ? '%' + Math.round(sold / sellable * 100) : '—'}`);
+
+  setEl('pricingTargetTitle', `Hedef ciroya hangi fiyatla ulaşılır? · ${pricingMonthLabel(monthKey)} · ${targetWs.scopeLabel}`);
+  const targetBox = document.getElementById('pricingTargetResult');
+  if (targetBox) targetBox.innerHTML = pricingTargetHtml(targetWs.result, { targetValue, soldRevenue: targetWs.soldRevenue, focus: pricingFocusDraft, expectedOccupancy: pricingExpectedOccupancyFor(pricingTargetScope === 'ALL' ? null : entry.property.id, monthKey), scopeLabel: targetWs.scopeLabel, note: targetWs.note });
 
   const schemaStatus = document.getElementById('pricingPhase78Status');
   if (schemaStatus) schemaStatus.textContent = appData.phase78SchemaReady
@@ -24966,6 +25343,14 @@ if (typeof module !== 'undefined' && module.exports) {
     removePricingSpecialEvent,
     togglePricingHoliday,
     togglePricingDay,
+    focusPricingDay,
+    selectPricingDays,
+    setPricingView,
+    editPricingRule,
+    pricingOccupancyTargetOf,
+    pricingOccupancyTargets,
+    pricingCalendarGridHtml,
+    pricingDayDetailHtml,
     clearPricingDaySelection,
     applyPricingDayPrices,
     renderBookingPriceCalendarHint,
