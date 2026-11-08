@@ -14,7 +14,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="stylesheet" href="style.css?v=836aa40c">
+  <link rel="stylesheet" href="style.css?v=0a84d29e">
   <link rel="stylesheet" href="analytics.css?v=3e11f215">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -2120,15 +2120,33 @@
           <button type="button" role="tab" class="ads-subnav-btn" id="pricingViewTab_rules" aria-controls="pricingView_rules" aria-selected="false" tabindex="-1" data-onclick="setPricingView('rules')">Kurallar</button>
           <button type="button" role="tab" class="ads-subnav-btn" id="pricingViewTab_target" aria-controls="pricingView_target" aria-selected="false" tabindex="-1" data-onclick="setPricingView('target')">Hedef</button>
           <button type="button" role="tab" class="ads-subnav-btn" id="pricingViewTab_rivals" aria-controls="pricingView_rivals" aria-selected="false" tabindex="-1" data-onclick="setPricingView('rivals')">Rakipler</button>
+          <button type="button" role="tab" class="ads-subnav-btn" id="pricingViewTab_results" aria-controls="pricingView_results" aria-selected="false" tabindex="-1" data-onclick="setPricingView('results')">Sonuçlar</button>
         </div>
+
+        <!-- KILAVUZ: ilk ziyarette acik, kapatan kullanicida kapali (tarayici deposu). -->
+        <details class="pricing-guide" id="pricingGuide">
+          <summary data-onclick="rememberPricingGuide()">Fiyatlandırma nasıl çalışır?</summary>
+          <div class="pricing-guide-body">
+            <p>Sistem her gece için bir <strong>öneri</strong> hesaplar: mülkün baz fiyatı, üstüne kurallarınız (hafta sonu, özel gün, sezon, talep, son dakika, boş gece). Öneriyi siz onaylar ya da değiştirirsiniz; kaydedilen fiyat referanstır, OTA'ya kendiliğinden gönderilmez.</p>
+            <ol class="pricing-guide-steps">
+              <li><b>Fiyat tablosu</b><span>Her mülk için baz fiyatı (normal bir hafta içi gecesi) ve tabanı (inilemeyecek en düşük fiyat) girin.</span><button type="button" class="pricing-link" data-onclick="openPricingGuideStep('rules')">Kurallar'a git</button></li>
+              <li><b>Kurallar</b><span>Hafta sonu, özel gün ve sezon artışlarını; son dakika ve boş gece indirimlerini ayarlayın. Talep kuralı için Hedefleri Yönet'ten aylık doluluk hedefi girin.</span><button type="button" class="pricing-link" data-onclick="openPricingGuideStep('rules')">Kurallar'a git</button></li>
+              <li><b>Takvimde onay</b><span>Bir güne tıklayın: "Bu fiyat neden?" hesabı adım adım görünür. Öneriyi onaylayın ya da elle fiyat yazın; Shift ile birden çok gün seçin.</span><button type="button" class="pricing-link" data-onclick="openPricingGuideStep('calendar')">Takvim'e git</button></li>
+              <li><b>OTA'ya girin</b><span>Seçili günleri "CSV indir" ya da "Kopyala" ile alın; Airbnb, Booking gibi kanallara siz girersiniz.</span><button type="button" class="pricing-link" data-onclick="openPricingGuideStep('calendar')">Takvim'e git</button></li>
+              <li><b>Sonucu ölçün</b><span>Gün geçtikçe Sonuçlar sekmesi kaydettiğiniz fiyatla gecenin satılıp satılmadığını ve hangi fiyata satıldığını gösterir.</span><button type="button" class="pricing-link" data-onclick="openPricingGuideStep('results')">Sonuçlar'a git</button></li>
+            </ol>
+            <p class="sub-text">Hedef sekmesi aylık ciro hedefine hangi fiyat–doluluk bileşimiyle ulaşılacağını, Rakipler sekmesi rakip fiyatlarını ve ortalamasını gösterir. İkisi de öneriyi değiştirmez.</p>
+          </div>
+        </details>
 
         <!-- TAKVIM: gunluk is. KPI seridi, ay izgarasi + ayrinti paneli. -->
         <section class="pricing-view" id="pricingView_calendar" role="tabpanel" aria-labelledby="pricingViewTab_calendar">
+          <p class="pricing-view-intro">Günlük iş burada: bir güne tıklayıp fiyatın nasıl hesaplandığını görün, öneriyi onaylayın ya da değiştirin. <b>Öneri</b> henüz onaylanmamış fiyattır, <b>Onaylı</b> ve <b>Elle</b> kaydedilmiş fiyattır; renkler lejantta. Ayları üstteki şeritten seçin (bugünden 12 ay).</p>
           <div class="pricing-kpis">
             <div class="kpi-card">
-              <span class="kpi-label">Ortalama ADR</span>
+              <span class="kpi-label">Ortalama gecelik fiyat (ADR)</span>
               <div class="kpi-value" id="pricingAdrVal">—</div>
-              <div class="kpi-meta">Seçili dönem (Finans ile aynı)</div>
+              <div class="kpi-meta">Satılan gecelerin ortalaması · seçili dönem (Finans ile aynı)</div>
             </div>
             <button type="button" class="kpi-card pricing-kpi-action" id="pricingPendingCard" data-onclick="selectPricingDays('PENDING')" disabled>
               <span class="kpi-label">Onay bekleyen gün</span>
@@ -2167,6 +2185,7 @@
 
         <!-- KURALLAR: kurulum. Fiyat tablosu + oneri kurallari, sonra takvim kurallari. -->
         <section class="pricing-view" id="pricingView_rules" role="tabpanel" aria-labelledby="pricingViewTab_rules" hidden>
+          <p class="pricing-view-intro">Kurulum burada, genelde bir kez yapılır. Öneri = baz fiyat + kuralların yüzdeleri; taban fiyatın altına inmez. Her kuralın yanındaki çip değerin nereden geldiğini söyler: <b>Bu mülk</b> (yalnız bu mülke istisna) &gt; <b>Portföy</b> (tüm mülkler) &gt; <b>Sistem varsayılanı</b>.</p>
           <div class="pricing-ready">
             <span class="pricing-ready-label">Fiyat tablosu hazır</span>
             <b id="pricingLadderReadyVal">—</b>
@@ -2259,6 +2278,7 @@
 
         <!-- HEDEF: hedef ciroya hangi fiyat-doluluk bilesimiyle ulasilir. -->
         <section class="pricing-view" id="pricingView_target" role="tabpanel" aria-labelledby="pricingViewTab_target" hidden>
+          <p class="pricing-view-intro">Aylık ciro hedefine ulaşmak için kalan açık gecelerde hangi ortalama fiyatla kaç gece satmanız gerektiğini gösterir. Her satır farklı bir varsayımdır (önerilen fiyatlar, doluluk hedefiniz, geçen yılki doluluk, son 3 ay, taban/yoğun fiyat, rakip ortalaması); sarı uyarı o satırın gerçekçi olmayabileceğini söyler. Bu sekme fiyatı değiştirmez.</p>
           <section class="pricing-card pricing-target-card">
             <div class="pricing-card-head"><div><h3 id="pricingTargetTitle">Hedef ciroya hangi fiyatla ulaşılır?</h3><p>Seçili ayın hedefinden bu ay gerçekleşen ciroyu düşer, kalanı ayın açık geceleriyle karşılaştırır. <strong>Tüm mülkler</strong> Hedefleri Yönet'teki işletme hedefini ve Finans'taki ciroyu kullanır. Hedef doluluk boşsa bu ayın kayıtlı doluluk hedefi kullanılır; buraya yazılan oran yalnız bu hesabı değiştirir, takvimdeki talep kuralını değiştirmez.</p></div></div>
             <div class="pricing-controls">
@@ -2274,10 +2294,13 @@
 
         <!-- RAKIPLER: kaynakli rakip fiyati (bilgi), ChatGPT sorusu. -->
         <section class="pricing-view" id="pricingView_rivals" role="tabpanel" aria-labelledby="pricingViewTab_rivals" hidden>
+          <p class="pricing-view-intro">Benzer evlerin fiyatlarını kaynağıyla kaydedin. Rakip ortalaması, son 90 günde araştırılmış en fazla 5 farklı rakibin son fiyatından hesaplanır; takvimde ve fiyat tablosunda bilgi olarak görünür, öneriyi değiştirmez.</p>
+          <div id="pricingRivalSummary" aria-live="polite"></div>
           <div class="pricing-two">
             <section class="pricing-card pricing-config-card" id="pricingResearchPanel">
               <div class="pricing-card-head"><div><h3>Rakip fiyatı ekle</h3><p>Yalnız tarihli ve bağlantılı kullanıcı onaylı araştırma kaydedilir. Takvimde bilgi olarak görünür; önerilen fiyatı değiştirmez.</p></div></div>
               <div class="pricing-form-grid">
+                <div class="form-group is-full"><label for="pricingResearchCompetitor">Rakip adı</label><input id="pricingResearchCompetitor" type="text" maxlength="120" list="pricingResearchCompetitorList" autocomplete="off" placeholder="—"><datalist id="pricingResearchCompetitorList"></datalist><small class="sub-text" id="pricingResearchCompetitorNote"></small></div>
                 <div class="form-group"><label for="pricingResearchDate">Araştırma tarihi</label><input id="pricingResearchDate" type="date"></div>
                 <div class="form-group"><label for="pricingResearchSource">Kaynak türü</label><select id="pricingResearchSource"><option value="OTA">OTA</option><option value="WEBSITE">Web sitesi</option><option value="CHATGPT">ChatGPT</option><option value="MANUAL">Elle araştırma</option><option value="OTHER">Diğer</option></select></div>
                 <div class="form-group is-full"><label for="pricingResearchUrl">Kaynak bağlantısı</label><input id="pricingResearchUrl" type="url" placeholder="https://…"></div>
@@ -2289,8 +2312,13 @@
               <div class="pricing-rule-actions"><button type="button" id="pricingResearchSaveBtn" class="btn btn-primary btn-sm" data-onclick="saveCompetitorResearch()">Araştırmayı kaydet</button> <button type="button" id="pricingResearchCancelBtn" class="btn btn-secondary btn-sm" data-lx-style="display:none" data-onclick="cancelCompetitorResearchEdit()">Vazgeç</button></div>
             </section>
             <section class="pricing-card pricing-research-history">
-              <div class="pricing-card-head"><div><h3>Kaynaklı rakip geçmişi</h3><p>60 günden eski kayıt takvimde "eski" diye işaretlenir.</p></div></div>
-              <div id="pricingResearchList"></div>
+              <div class="pricing-card-head"><div><h3>Rakip bazında fiyat</h3><p>Her rakibin son fiyatı ve bir önceki araştırmaya göre değişimi.</p></div></div>
+              <div id="pricingRivalHistory"></div>
+              <details class="pricing-add pricing-research-log" id="pricingResearchLog">
+                <summary>Tüm araştırma kayıtları</summary>
+                <p class="sub-text">60 günden eski kayıt takvimde "eski" diye işaretlenir.</p>
+                <div id="pricingResearchList"></div>
+              </details>
             </section>
           </div>
           <section class="pricing-card pricing-context-toolbar">
@@ -2307,6 +2335,12 @@
               <button type="button" class="btn btn-secondary btn-sm" data-onclick="askPricingChatGpt()">ChatGPT'ye sor</button>
             </div>
           </section>
+        </section>
+
+        <!-- SONUCLAR: kaydedilen fiyat -> gerceklesen (core/pricing_outcome.js). -->
+        <section class="pricing-view" id="pricingView_results" role="tabpanel" aria-labelledby="pricingViewTab_results" hidden>
+          <p class="pricing-view-intro">Kaydettiğiniz fiyatların işe yarayıp yaramadığını ölçer. Yalnız fiyat kaydından <b>sonra</b> yapılan rezervasyonlar karşılaştırılır; daha önce satılmış gece fiyat kararından etkilenmediği için ayrı sayılır. Ölçülemeyen gün nedeniyle yazılır.</p>
+          <section class="pricing-card pricing-results-card" id="pricingResultsRoot" aria-live="polite"></section>
         </section>
       </div>
     </div>
@@ -4270,16 +4304,16 @@
   <script src="core/guest_contact_utils.js?v=84fd6474"></script>
   <script src="core/user_facing_errors.js?v=e4eb0ae5"></script>
   <script src="core/ledger_contract.js?v=533527e0"></script>
-  <script src="core/booking_analytics.js?v=4d2a526e"></script>
+  <script src="core/booking_analytics.js?v=14295346"></script>
   <script src="core/analytics_ui.js?v=0df8b5cf"></script>
   <script src="core/report_engine.js?v=ead1838e"></script>
   <script src="core/property_profile_engine.js?v=9d2f3d03"></script>
   <script src="core/property_owner_service.js?v=5c741a12"></script>
   <script src="core/marketing_channel_listing_service.js?v=515fe386"></script>
   <script src="core/sales_workflow_service.js?v=0305af5c"></script>
-  <script src="core/pricing_research_service.js?v=fb97b560"></script>
+  <script src="core/pricing_research_service.js?v=6ce65ef3"></script>
   <script src="core/suggested_price_engine.js?v=70bcb939"></script>
-  <script src="core/target_revenue_calculator.js?v=fe49dcc0"></script>
+  <script src="core/target_revenue_calculator.js?v=b5c396d8"></script>
   <script src="core/monthly_goal_calculator.js?v=245a5fea"></script>
   <script src="core/tr_special_days.js?v=0227d5dd"></script>
   <script src="core/business_date.js?v=a1518391"></script>
@@ -4299,13 +4333,13 @@
   <script src="core/side_panel.js?v=d763b464"></script>
   <script src="core/notification_feed.js?v=941306f6"></script>
   <script src="core/command_search.js?v=89760933"></script>
-  <script src="core/action_dispatch.js?v=f3d4f8b0"></script>
+  <script src="core/action_dispatch.js?v=c93a8790"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=ca7b5399"></script>
   <script src="core/permission_matrix.js?v=e3a3cef2"></script>
   <script src="core/tenant_backup_export.js?v=29f9ab53"></script>
   <script src="core/ui_dialog.js?v=d0680970"></script>
-  <script src="app.js?v=cba862ff"></script>
+  <script src="app.js?v=c0a08bb2"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=aec50671"></script>

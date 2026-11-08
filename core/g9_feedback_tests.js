@@ -1847,8 +1847,9 @@ async function fiyatEkraniDavranisi() {
 
   // L-248 (M72): takvim kendi 3 aylik ufkunu tasir; ay sekmesi gosterimi secer.
   const ufuk = App.pricingHorizon(BUGUN);
-  check(ufuk.months.length === 3 && ufuk.start === BUGUN && ufuk.end.slice(0, 7) === ufuk.months[2] && (el('pricingMonthTabs').innerHTML.match(/setPricingMonth\(/g) || []).length === 3,
-    'L-248a Fiyat takvimi bugunden 3 takvim ayi; ay sekmeleri ekranin icinde (donem filtresi gerekmez)', el('pricingMonthTabs').innerHTML.slice(0, 300));
+  check(ufuk.months.length === 12 && ufuk.start === BUGUN && ufuk.end.slice(0, 7) === ufuk.months[11] && (el('pricingMonthTabs').innerHTML.match(/setPricingMonth\(/g) || []).length === 12
+    && !/önümüzdeki 3 ay/i.test(read('app.js')),
+    'L-248a Fiyat takvimi bugunden 12 takvim ayi (kullanici 08.11.2026; eskiden 3); ay sekmeleri ekranin icinde, "3 ay" sabit metni kalmadi', el('pricingMonthTabs').innerHTML.slice(0, 300));
   const bosAy = gun(5).slice(0, 7);
   App.setPricingMonth(bosAy);
   const takvim = el('pricingManagerContainer').innerHTML;
@@ -1966,8 +1967,8 @@ async function fiyatEkraniDavranisi() {
   global.document.getElementById('pricingExpectedOccupancy').value = '';
   App.recalculatePricingTarget();
   const hedef = el('pricingTargetResult').innerHTML;
-  check(/Ay hedefi: ₺68\.000/.test(hedef) && /Kalan:/.test(hedef) && /açık gece satılmalı|mümkün değil/.test(hedef) && /önerinin %80/.test(hedef),
-    'L-253c Hedef hesaplayici her satirda gece fiyatini, kac acik gecenin satilmasi gerektigini ve oranini yazar', hedef.slice(0, 600));
+  check(/Ay hedefi: ₺68\.000/.test(hedef) && /Kalan:/.test(hedef) && /açık gece satılmalı|mümkün değil/.test(hedef) && /Önerilen fiyatlarla/.test(hedef) && !/önerinin %80/.test(hedef),
+    'L-253c Hedef hesaplayici her satirda kaynagi, gece fiyatini, kac acik gecenin satilmasi gerektigini ve oranini yazar (sabit %80-%120 yok)', hedef.slice(0, 600));
   App.setPricingMonth(App.pricingHorizon(BUGUN).months[1]);
   check(el('pricingTargetInput').value === '' || el('pricingTargetInput').value === undefined || el('pricingTargetInput').value === null,
     'L-248d Taslak hedef ay ve mulke ozgudur; baska aya gecince o ayin kaydi gelir', String(el('pricingTargetInput').value));
@@ -2146,8 +2147,18 @@ async function fiyatKontrolTuruDavranisi() {
   const doluluk = el('pricingTargetResult').innerHTML;
   check(/%50 dolulukla gereken ortalama: ₺[\d.]+ \/ gece/.test(gelir),
     'L-257a Hedef doluluk girilince gereken ortalama fiyat yazilir (hesaplaniyordu, gosterilmiyordu)', gelir.slice(0, 400));
-  check(/Seçilen \(Gelir\)/.test(gelir) && /Seçilen \(Doluluk\)/.test(doluluk) && gelir.match(/Seçilen \(Gelir\): ortalama (₺[\d.]+)/)[1] !== doluluk.match(/Seçilen \(Doluluk\): ortalama (₺[\d.]+)/)[1] && /pricing-target-badge/.test(gelir),
-    'L-257b Odak degisince secilen secenek basta yazilir ve degisir; satirda "Seçilen" rozeti var');
+  // 08.11.2026: odak yalniz uyarisiz (gercekci) satirlar arasindan secer. Bu
+  // fikstürde %50 doluluk ₺1.304/gece ister (onerilerin cok altinda, uyarili);
+  // tek uyarisiz secenek kalinca odak degistirmez ve bunu yazar.
+  const secilenSatir = html => (html.match(/<div class="pricing-target-row[^"]*is-highlighted[^"]*">/) || [''])[0];
+  check(/Seçilen \(Gelir\)/.test(gelir) && /Seçilen \(Doluluk\)/.test(doluluk) && /pricing-target-badge/.test(gelir)
+    && !/is-flagged/.test(secilenSatir(gelir)) && !/is-flagged/.test(secilenSatir(doluluk)) && /tek uyarısız seçenek; odak seçimi değiştirmez/.test(gelir),
+    'L-257b Odak secimi basta yazilir, satirda "Seçilen" rozeti var; uyarili (gercek disi) satir secilmez, tek uyarisiz secenekte bu soylenir', gelir.replace(/<[^>]+>/g, ' ').slice(0, 1400));
+  const calc = require('./target_revenue_calculator.js');
+  const iki = calc.scenarioRows([{ key: 'A', label: 'a', useSuggested: true }, { key: 'B', label: 'b', avgPrice: 12000 }, { key: 'C', label: 'c', avgPrice: 14000 }],
+    { remaining: 30000, openNightsTotal: 46, weightedAvgPrice: 11335, bounds: { minSuggested: 9000, maxSuggested: 16000 } });
+  check(calc.pickScenario(iki, 'REVENUE').index !== calc.pickScenario(iki, 'OCCUPANCY').index,
+    'L-257c Birden cok uyarisiz secenek varsa Gelir ve Doluluk odagi farkli satiri secer');
   App.setPricingTargetScope('ALL');
   el('pricingExpectedOccupancy').value = ''; el('pricingFocusSelect').value = 'BALANCED'; App.recalculatePricingTarget();
 
@@ -2406,6 +2417,203 @@ async function fiyatEkraniYenidenTasarimDavranisi() {
   check(/Baz fiyatı neye göre seçmeli\?/.test(kanit) && /Rakip · hafta içi<\/span><b>₺11\.500/.test(kanit) && /Rakip · hafta sonu<\/span><b>—/.test(kanit)
     && /hafta içi ADR<\/span><b>—<\/b><small>0 satılmış gece; en az 8 gerekir/.test(kanit) && /Sistem baz fiyat önermez/.test(kanit),
     'F-18 Baz fiyat kaniti rakip ve gecen yil ADR\'sini yazar; olculemeyen "—" ve nedeni', kanit.slice(kanit.indexOf('pricing-evidence'), kanit.indexOf('pricing-evidence') + 700));
+}
+
+async function fiyatEksikleriDavranisi() {
+  // Fiyatlandirma 2. tur (kullanici 08.11.2026): 12 ay, tatil listesi, disa
+  // aktarma/kopyalama, son degistiren, sonuclar, gecen yila gore gidisat, hedef
+  // senaryolari, kilavuz, rakip adi ve rakip ortalamasi (phase115). Oneri degismez.
+  sahteDom({});
+  global.FinancialMetricsService = require('./financial_metrics_service.js');
+  const App = require('../app.js');
+  const el = id => global.document.getElementById(id);
+  const BUGUN = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const gun = n => new Date(Date.parse(BUGUN + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
+  const yilOnce = d => `${Number(d.slice(0, 4)) - 1}${d.slice(4)}`;
+  const P = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000072';
+  const ay = gun(0).slice(0, 7);
+  const kur = (rol, ek = {}) => {
+    App.setActiveTenant({ id: TENANT, role: rol });
+    App.setAppData({
+      villas: { SEYIR: { id: P, slug: 'SEYIR', name: 'Seyir', basePrice: 10000, floor: 9000, peak: 16000, isActive: true, activationDate: '2024-01-01' } },
+      bookings: [{ id: 'b1', villa: 'SEYIR', propertyId: P, checkIn: gun(2), checkOut: gun(5), gross: 30000, status: 'CONFIRMED', channel: 'DIRECT', createdAt: `${gun(-1)}T10:00:00Z` }],
+      expenses: [], maintenanceTickets: [], propertyPricingRules: [], competitorPriceResearch: [], tenantSettings: {}, targets: [],
+      propertyDailyPrices: [], salesMembers: [], phase78SchemaReady: true, phase101SchemaReady: true, propertyClosuresReady: true, ...ek
+    });
+    App.setPricingProperty(P);
+    App.setPricingMonth(ay);
+    return el('pricingManagerContainer').innerHTML;
+  };
+  const entry = () => ({ key: 'SEYIR', property: App.getAppData().villas.SEYIR });
+
+  // F-19 Tatil listesi: ardisik ayni adli gunler tek satir; varsayilan yakin 3 ay.
+  const gruplar = App.pricingHolidayGroups([{ date: '2027-01-25', name: 'Yarıyıl' }, { date: '2027-01-26', name: 'Yarıyıl' }, { date: '2027-01-28', name: 'Yarıyıl' }, { date: '2027-03-20', name: 'Bayram' }]);
+  check(gruplar.length === 3 && gruplar[0].dates.join(',') === '2027-01-25,2027-01-26' && gruplar[1].dates.length === 1,
+    'F-19a Ardisik ayni adli tatil gunleri tek satir olur; arada bosluk varsa ayrilir', JSON.stringify(gruplar));
+  kur('owner');
+  const ufuk = App.pricingHorizon(BUGUN);
+  const tumGruplar = App.pricingHolidayGroups(require('./tr_special_days.js').forRange(ufuk.start, ufuk.end));
+  const [y0, m0] = BUGUN.slice(0, 7).split('-').map(Number);
+  const sinir = new Date(Date.UTC(y0, m0 - 1 + 3, 1)).toISOString().slice(0, 10);
+  const uzak = tumGruplar.filter(g => g.dates[0] >= sinir).length;
+  const liste = el('pricingSpecialDaysList').innerHTML;
+  check(uzak === 0 || (new RegExp(`Tümünü göster \\(${uzak} tatil daha\\)`).test(liste) && !tumGruplar.filter(g => g.dates[0] >= sinir).some(g => liste.includes(g.name + '</span>') && liste.indexOf(g.name) > liste.indexOf('Tümünü'))),
+    'F-19b Tatiller varsayilan olarak yakin 3 ay; kalanlar "Tümünü göster (N)" ile acilir', liste.slice(0, 300));
+  App.togglePricingHolidayList();
+  const acikListe = el('pricingSpecialDaysList').innerHTML;
+  check((acikListe.match(/pricing-special-row/g) || []).length === tumGruplar.length && (uzak === 0 || /Yalnız yakın 3 ayı göster/.test(acikListe))
+    && (!tumGruplar.some(g => g.dates.length > 1) || /togglePricingHolidayGroup\(/.test(acikListe)),
+    'F-19c "Tümünü göster" butun tatilleri satir basina bir grup olarak yazar; cok gunluk grup tek dugmeyle sayilir/sayilmaz');
+  App.togglePricingHolidayList();
+
+  // F-20 Disa aktarma satirlari: kayitli fiyat esas, yoksa oneri; dolu gun "—".
+  kur('owner', { propertyDailyPrices: [{ property_id: P, price_date: gun(1), price: 15000, source: 'APPROVED', suggested_price: 10000 }] });
+  const cal = App.computePricingCalendar(entry(), BUGUN);
+  const ctx = { days: cal.suggestions.days, saved: App.pricingDailyPriceMap(P), minStay: new Map() };
+  const satirlar = App.pricingExportRows(entry(), [gun(1), gun(3), gun(12)], ctx);
+  const acikGun = cal.suggestions.days.find(d => d.date === gun(12));
+  check(satirlar.length === 3 && satirlar[0].price === 15000 && satirlar[0].source === 'Onaylı' && satirlar[1].price === null && satirlar[1].state === 'Dolu'
+    && satirlar[2].source === 'Öneri' && satirlar[2].price === acikGun.price,
+    'F-20 Disa aktarma: kayitli fiyat esas, yoksa oneri; dolu gun fiyatsiz ve durumuyla', JSON.stringify(satirlar));
+  check(/engine\.toCSV\(/.test(functionBody(read('app.js'), 'function exportPricingDays(')) && require('./finance_export_engine.js').toCSV({ headers: ['A'], rows: [['=HYPERLINK("x")']] }).includes("'=HYPERLINK"),
+    'F-21 CSV disa aktarma formul korumali motoru kullanir');
+
+  // F-22 Kopyala: panoya "tarih<TAB>fiyat"; izin yoksa basarisiz der.
+  let pano = null;
+  const eskiNavigator = Object.getOwnPropertyDescriptor(global, 'navigator');
+  Object.defineProperty(global, 'navigator', { value: { clipboard: { writeText: async text => { pano = text; } } }, configurable: true, writable: true });
+  App.togglePricingDay(gun(1));
+  App.togglePricingDay(gun(12));
+  const kopya = await App.copyPricingDays();
+  check(kopya === true && pano.split('\n').length === 2 && pano.split('\n')[0].endsWith('\t15000'),
+    'F-22a Kopyala secili gunleri tarih ve fiyat satirlari olarak panoya yazar', JSON.stringify(pano));
+  Object.defineProperty(global, 'navigator', { value: {}, configurable: true, writable: true });
+  const uyarilar = [];
+  const eskiAlert = global.alert;
+  global.alert = metin => uyarilar.push(metin);
+  check(await App.copyPricingDays() === false && uyarilar.some(m => /Panoya kopyalanamadı/.test(m)),
+    'F-22b Pano izni yoksa sessiz basari yok: kullaniciya soylenir', JSON.stringify(uyarilar));
+  global.alert = eskiAlert;
+  if (eskiNavigator) Object.defineProperty(global, 'navigator', eskiNavigator); else delete global.navigator;
+  check(/exportPricingDays\(\)/.test(el('pricingDayEditor').innerHTML) && /copyPricingDays\(\)/.test(el('pricingDayEditor').innerHTML),
+    'F-22c Toplu panelde "CSV indir" ve "Kopyala" var', el('pricingDayEditor').innerHTML.slice(0, 300));
+  App.clearPricingDaySelection();
+
+  // F-23 Son degistiren: phase101 updated_by + updated_at.
+  kur('owner', {
+    propertyDailyPrices: [{ property_id: P, price_date: gun(1), price: 15000, source: 'MANUAL', suggested_price: 10000, updated_by: 'u1', updated_at: `${BUGUN}T09:30:00Z` },
+      { property_id: P, price_date: gun(12), price: 12000, source: 'APPROVED', suggested_price: 12000, updated_by: 'u-silinen', updated_at: `${BUGUN}T09:30:00Z` }],
+    salesMembers: [{ user_id: 'u1', full_name: 'Ayşe Yılmaz', role: 'manager' }]
+  });
+  App.focusPricingDay(gun(1));
+  const p1 = el('pricingDayEditor').innerHTML;
+  App.focusPricingDay(gun(12));
+  const p2 = el('pricingDayEditor').innerHTML;
+  check(/Son değiştiren: Ayşe Yılmaz · /.test(p1) && /Son değiştiren: Eski üye/.test(p2) && /Fiyatı kopyala/.test(p1),
+    'F-23 Kayitli fiyatin son degistireni ve zamani yazar; ekipte olmayan "Eski üye"', p1.slice(0, 600));
+
+  // F-24 Gecen yila gore gidisat: Analiz'in ileriye dolu hesabi, fiyati degistirmez.
+  const sonrakiAy = App.pricingHorizon(BUGUN).months[1];
+  const ilk = `${sonrakiAy}-05`, ilkCikis = `${sonrakiAy}-08`;
+  kur('owner', { bookings: [
+    { id: 'n1', villa: 'SEYIR', propertyId: P, checkIn: ilk, checkOut: ilkCikis, gross: 30000, status: 'CONFIRMED', createdAt: `${gun(-2)}T10:00:00Z` },
+    { id: 'l1', villa: 'SEYIR', propertyId: P, checkIn: yilOnce(ilk), checkOut: yilOnce(`${sonrakiAy}-10`), gross: 50000, status: 'CONFIRMED', createdAt: `${yilOnce(gun(-20))}T10:00:00Z` }
+  ] });
+  const oncesi = App.computePricingCalendar(entry(), BUGUN).suggestions.days.map(d => d.price).join(',');
+  App.setPricingMonth(sonrakiAy);
+  const serit = el('pricingManagerContainer').innerHTML;
+  check(/pricing-pace is-behind/.test(serit) && /Geçen yıla göre −2 gece/.test(serit) && /3 gece satıldı; geçen yıl aynı tarihte \([^)]+\) 5 geceydi/.test(serit) && /fiyatı değiştirmez/.test(serit)
+    && App.computePricingCalendar(entry(), BUGUN).suggestions.days.map(d => d.price).join(',') === oncesi,
+    'F-24a Gecen yila gore gidisat seridi bugune kadar satilan geceyi gecen yil ayni tarihle karsilastirir; oneri degismez', serit.slice(0, 500));
+  kur('owner', { bookings: [
+    { id: 'l2', villa: 'SEYIR', propertyId: P, checkIn: yilOnce(ilk), checkOut: yilOnce(ilkCikis), gross: 30000, status: 'CONFIRMED', createdAt: `${yilOnce(ilkCikis)}T10:00:00Z` }
+  ] });
+  App.setPricingMonth(sonrakiAy);
+  check(/pricing-pace is-muted/.test(el('pricingManagerContainer').innerHTML) && /sonradan girildiği/.test(el('pricingManagerContainer').innerHTML),
+    'F-24b Gecen yilin kaydi sonradan girildiyse karsilastirma uydurulmaz; neden yazilir');
+
+  // F-25 Hedef senaryolari verinin kendisinden; olculemeyen satir nedeniyle.
+  kur('owner');
+  App.setPricingTargetScope('PROPERTY');
+  App.setPricingMonth(ay);
+  el('pricingTargetInput').value = '200000'; el('pricingExpectedOccupancy').value = '60'; el('pricingFocusSelect').value = 'BALANCED';
+  App.recalculatePricingTarget();
+  const hedef = el('pricingTargetResult').innerHTML;
+  check(/Önerilen fiyatlarla/.test(hedef) && /Doluluk hedefinizle/.test(hedef) && /Taban fiyatla/.test(hedef) && /Yoğun dönem fiyatıyla/.test(hedef)
+    && /Gösterilemeyen: [^<]*Geçen yılki dolulukla \([^)]*yok\)/.test(hedef) && !/önerinin %/.test(hedef) && /pricing-target-sentence/.test(hedef),
+    'F-25a Hedef satirlari kaynakli senaryolardir (oneri, doluluk hedefi, taban, yogun); olculemeyen "Gösterilemeyen"de nedeniyle', hedef.slice(0, 900));
+  el('pricingTargetInput').value = ''; el('pricingExpectedOccupancy').value = ''; App.recalculatePricingTarget();
+  App.setPricingTargetScope('ALL');
+  const calc = require('./target_revenue_calculator.js');
+  const satir = calc.scenarioRows([
+    { key: 'A', label: 'a', useSuggested: true }, { key: 'F', label: 'f', avgPrice: 4000 }, { key: 'P', label: 'p', avgPrice: 30000 }, { key: 'O', label: 'o', occupancy: 0.9 }
+  ], { remaining: 100000, openNightsTotal: 20, weightedAvgPrice: 10000, bounds: { floor: 8000, peak: 20000, maxOccupancy: 0.6 } });
+  const bul = k => satir.find(r => r.key === k);
+  check(satir.map(r => r.avgPrice).join(',') === [...satir.map(r => r.avgPrice)].sort((a, b) => a - b).join(',')
+    && bul('F').flags.includes('BELOW_FLOOR') && bul('F').feasible === false && bul('P').flags.includes('ABOVE_PEAK') && bul('O').flags.includes('ABOVE_SEEN')
+    && satir.filter(r => r.feasible).every(r => r.nightsNeeded * r.avgPrice >= 100000 - 1) && bul('A').nightsNeeded === 10,
+    'F-25b Senaryo satirlari fiyata gore sirali; taban alti, yogun ustu ve "son 12 ayda gorulmedi" isaretlenir; gece x fiyat kalani karsilar', JSON.stringify(satir));
+  const secim = calc.pickScenario(satir, 'REVENUE');
+  check(secim.index !== null && satir[secim.index].flags.length === 0 && satir[secim.index].feasible,
+    'F-25c Odak yalniz uygulanabilir ve uyarisiz satirlardan secer', JSON.stringify(secim));
+
+  // F-26 Sonuclar sekmesi.
+  kur('owner', {
+    propertyDailyPrices: [{ property_id: P, price_date: gun(-5), price: 11000, source: 'APPROVED', suggested_price: 11000, updated_at: `${gun(-20)}T09:00:00Z` }],
+    bookings: [{ id: 's1', villa: 'SEYIR', propertyId: P, checkIn: gun(-6), checkOut: gun(-3), gross: 36000, cleaningFee: 3000, discount: 0, status: 'CONFIRMED', createdAt: `${gun(-10)}T10:00:00Z` }]
+  });
+  check(App.setPricingView('results') === true && el('pricingView_results').hidden === false,
+    'F-26a Sonuclar ic sekmesi acilir');
+  const sonuc = el('pricingResultsRoot').innerHTML;
+  check(/Satıldı ₺11\.000/.test(sonuc) && /\+₺0|—|±/.test(sonuc) && /%100/.test(sonuc) && /temizlik ücreti − indirim/.test(sonuc),
+    'F-26b Gecmis kayitli gun gerceklesen gece fiyatiyla (oda geliri: tutar − temizlik − indirim) / gece karsilastirilir', sonuc.slice(0, 900));
+  kur('owner');
+  check(/geçmiş tarihli kayıtlı fiyat yok/.test(el('pricingResultsRoot').innerHTML), 'F-26c Kayit yoksa sonuc uydurulmaz; ne zaman olculecegi yazar');
+  kur('owner', { phase101SchemaReady: false });
+  check(/phase101/.test(el('pricingResultsRoot').innerHTML), 'F-26d Gunluk fiyat defteri yokken "olculemiyor" ve neden');
+  App.setPricingView('calendar');
+
+  // F-27 Kilavuz: bes adim, her adim ilgili sekmeye goturur; depo okunamazsa acik.
+  const html = read('index.html');
+  const kilavuz = html.slice(html.indexOf('id="pricingGuide"'), html.indexOf('</details>', html.indexOf('id="pricingGuide"')));
+  check((kilavuz.match(/<li>/g) || []).length === 5 && (kilavuz.match(/openPricingGuideStep\('/g) || []).length === 5 && /rememberPricingGuide\(\)/.test(kilavuz)
+    && ['calendar', 'rules', 'target', 'rivals', 'results'].every(v => html.includes(`id="pricingView_${v}"`) && /class="pricing-view-intro"/.test(html.slice(html.indexOf(`id="pricingView_${v}"`), html.indexOf(`id="pricingView_${v}"`) + 400))),
+    'F-27a "Fiyatlandırma nasıl çalışır?" bes adimli; her sekmenin basinda ne ise yaradigi yazar');
+  const eskiDepo = global.localStorage;
+  global.localStorage = { getItem() { throw new Error('engelli'); }, setItem() { throw new Error('engelli'); } };
+  const kutu = el('pricingGuide');
+  kutu.open = false; if (kutu.dataset) delete kutu.dataset.ready;
+  App.applyPricingGuide();
+  check(kutu.open === true && App.rememberPricingGuide() === true && App.openPricingGuideStep('rules') === true && el('pricingView_rules').hidden === false,
+    'F-27b Tarayici deposu okunamazsa kilavuz acik gelir ve hata vermez; adim dugmesi sekmeyi acar');
+  global.localStorage = eskiDepo;
+  App.setPricingView('calendar');
+
+  // F-28 Rakip adi ve ortalamasi (phase115): yalniz gosterim.
+  const arastirma = (id, ad, tarih, haftaIci, haftaSonu) => ({ id, property_id: P, researched_on: tarih, source_kind: 'OTA', source_url: 'https://ornek.test/' + id, competitor_name: ad,
+    prices: [{ type: 'WEEKDAY', amount: haftaIci }, ...(haftaSonu ? [{ type: 'WEEKEND', amount: haftaSonu }] : [])] });
+  const kayitlar = [
+    arastirma('r1', 'Villa Mavi', gun(-40), 9000, 12000), arastirma('r2', 'villa  mavi', gun(-3), 10000, 13000),
+    arastirma('r3', 'Ev B', gun(-10), 11000, 14000), arastirma('r4', 'Ev C', gun(-12), 12000), arastirma('r5', 'Ev D', gun(-14), 8000),
+    arastirma('r6', 'Ev E', gun(-16), 9000), arastirma('r7', 'Ev F', gun(-18), 30000), arastirma('r8', 'Eski Ev', gun(-120), 50000), arastirma('r9', null, gun(-1), 99000)
+  ];
+  kur('owner', { competitorPriceResearch: kayitlar, phase115SchemaReady: true });
+  const oneriOncesi = App.computePricingCalendar(entry(), BUGUN).suggestions.days.map(d => d.price).join(',');
+  App.setPricingView('rivals');
+  const ozet = el('pricingRivalSummary').innerHTML;
+  const kart = el('pricingRivalHistory').innerHTML;
+  check(/Rakip ortalaması · hafta içi<\/span><div class="kpi-value">₺10\.000/.test(ozet) && /5 rakip/.test(ozet) && !/Ev F/.test(ozet.slice(0, ozet.indexOf('hafta sonu'))) && !/Eski Ev/.test(ozet),
+    'F-28a Rakip ortalamasi son 90 gunde en yeni 5 farkli rakibin son fiyati; ayni rakip bir kez, adsiz ve eski kayit girmez', ozet.slice(0, 600));
+  check(/villa {2}mavi|Villa Mavi/i.test(kart) && /2 kayıt/.test(kart) && /\+₺1\.000 \(\+%11,1\)/.test(kart) && /1 kayıtta rakip adı yok/.test(kart),
+    'F-28b Rakip basina son fiyat ve bir onceki kayda gore degisim; adsiz kayit sayilir', kart.slice(0, 600));
+  App.setPricingView('calendar');
+  App.focusPricingDay(App.computePricingCalendar(entry(), BUGUN).suggestions.days.find(d => d.status === 'OPEN' && ![5, 6].includes(new Date(d.date + 'T00:00:00Z').getUTCDay())).date);
+  check(/Rakip ortalaması ₺10\.000 \(5 rakip, hafta içi\)/.test(el('pricingDayEditor').innerHTML) && /öneriyi değiştirmez/.test(el('pricingDayEditor').innerHTML)
+    && App.computePricingCalendar(entry(), BUGUN).suggestions.days.map(d => d.price).join(',') === oneriOncesi,
+    'F-28c Gun panelinde rakip ortalamasi bilgi olarak yazar; oneri degismez', el('pricingDayEditor').innerHTML.slice(0, 900));
+  kur('owner', { competitorPriceResearch: kayitlar, phase115SchemaReady: false });
+  check(/phase115/.test(el('pricingRivalSummary').innerHTML) && el('pricingResearchCompetitor').disabled === true,
+    'F-28d phase115 yokken rakip adi alani kilitli ve ortalama "—" + neden');
 }
 
 async function fiyatKararlariDavranisi() {
@@ -2763,6 +2971,7 @@ try {
   await sezonDavranisi();
   await uzunKonaklamaDavranisi();
   await fiyatEkraniYenidenTasarimDavranisi();
+  await fiyatEksikleriDavranisi();
 } catch (error) {
   failed++;
   console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

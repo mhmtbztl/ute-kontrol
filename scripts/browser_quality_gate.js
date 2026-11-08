@@ -902,7 +902,7 @@ async function main() {
           hazir: getPropertySalesReadiness('test')?.status
         };
       });
-      assert(fiyat97.tabs === 3 && /is-blocked/.test(fiyat97.blocked) && /Kapalı · Boya/.test(fiyat97.blockedText)
+      assert(fiyat97.tabs === 12 && /is-blocked/.test(fiyat97.blocked) && /Kapalı · Boya/.test(fiyat97.blockedText)
         && fiyat97.gap === '1 Gece' && fiyat97.ladder && (!fiyat97.open || /₺\d/.test(fiyat97.open) && /Baz ₺5\.000/.test(fiyat97.open)) && /Sistem varsayılanı/.test(fiyat97.rules) && fiyat97.hazir !== 'BLOCKED_MAINTENANCE',
         'Fiyat takvimi: ' + JSON.stringify(fiyat97).slice(0, 600));
       // Gunluk fiyat (phase101): acik gune tikla, oneriyi onayla; istek upsert
@@ -928,7 +928,7 @@ async function main() {
         && gunlukPost[0].satirlar.length === 1 && gunlukPost[0].satirlar[0].source === 'APPROVED',
         'Gunluk fiyat istegi: ' + JSON.stringify(gunlukPost).slice(0, 400));
       await page.locator('#tab-pricing').screenshot({ path: path.join(__dirname, '..', 'tmp', 'g97-pricing.png') });
-      passed.push('32. fiyatlandırma (9.7): bakım aralığı takvimde "Kapalı", bugünü kapatmaz; boş gece sayılır; 3 ay sekmesi, fiyat tablosu ve kural kaynağı görünür; gün tıklanıp öneri onaylanır');
+      passed.push('32. fiyatlandırma (9.7): bakım aralığı takvimde "Kapalı", bugünü kapatmaz; boş gece sayılır; 12 ay sekmesi, fiyat tablosu ve kural kaynağı görünür; gün tıklanıp öneri onaylanır');
 
       // Analiz sekmesi (05.11.2026): ekrandaki ciro Bugun/Finans ile ayni
       // kaynaktan (computeMonthPerformance); kontroller yeniden cizer, odak kalir.

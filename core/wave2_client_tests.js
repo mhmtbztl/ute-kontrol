@@ -157,10 +157,13 @@ function eleman() {
       const govde = APP.slice(APP.indexOf(imza), APP.indexOf(imza) + 1500);
       assert.match(govde, /retryWithXlsxEngine\(/, `${imza} motor yoksa yükleyip devam etmeli`);
     });
-    // Açılış bütçesi: index.html'in yüklediği yerel JS toplamı.
+    // Açılış bütçesi: index.html'in yüklediği yerel JS toplamı, YAYINDAKİ
+    // haliyle (LF). Windows çalışma kopyası CRLF'tir; disk boyutu her satıra bir
+    // bayt ekleyip aynı kodu yerelde ~40 KB büyük, CI'da (Linux, LF) küçük
+    // ölçüyordu (08.11.2026). Sınır değişmedi.
     const kok = path.join(__dirname, '..');
     const toplam = [...html.matchAll(/<script[^>]*src="([^"?]+)/g)].map(m => m[1]).filter(f => fs.existsSync(path.join(kok, f)))
-      .reduce((t, f) => t + fs.statSync(path.join(kok, f)).size, 0);
+      .reduce((t, f) => t + Buffer.byteLength(fs.readFileSync(path.join(kok, f), 'utf8').replace(/\r\n/g, '\n'), 'utf8'), 0);
     assert.ok(toplam <= 2.2 * 1048576, `açılış JS bütçesi aşıldı: ${(toplam / 1048576).toFixed(2)} MiB > 2,2 MiB`);
   });
 

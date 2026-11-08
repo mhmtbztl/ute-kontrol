@@ -301,6 +301,9 @@ const allTestFiles = [
   'property_owner_service_tests.js',
   'a4_properties_ui_tests.js',
   'pricing_research_service_tests.js',
+  // Fiyat sonucu ve rakip adi/ortalamasi (08.11.2026)
+  'pricing_outcome_tests.js',
+  'pricing_competitor_tests.js',
   'sales_workflow_service_tests.js',
   'phase72_ads_metrics_tests.js',
   'phase72_ads_metrics_live_tests.js',
@@ -338,6 +341,7 @@ const allTestFiles = [
   'phase95_cleaning_import_undo_live_tests.js',
   'phase101_daily_prices_live_tests.js',
   'phase103_property_closures_live_tests.js',
+  'phase115_competitor_name_live_tests.js',
   'phase105_guest_erasure_live_tests.js',
   'phase107_member_permissions_live_tests.js',
   'phase97_income_live_tests.js',

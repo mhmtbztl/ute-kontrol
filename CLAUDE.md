@@ -277,6 +277,27 @@ Hesaplayıcıya yazılan oran yalnız hesaplayıcıyı etkiler. Baz fiyatı sist
 ADR'si ve son rakip fiyatı kanıt olarak durur. İnnerHTML sınırı SVG'yi sildiği için işaretler CSS'tir.
 Göç gerekmedi. Ağı `g9_feedback_tests` F-01…F-18, tarayıcı kapısı 32/32b.
 
+**Fiyatlandırma 2. tur (kullanıcı 08.11.2026):** ufuk **12 ay** (`PRICING_HORIZON_MONTHS`; ay şeridi yatay
+kayar, "3 ay" sabit metni yok). Kurallar'da tatiller varsayılan yakın 3 ay, ardışık aynı adlı günler tek
+satır (`togglePricingHolidayGroup`). Seçili günler **CSV indir / Kopyala** (`pricingExportRows`: kayıtlı fiyat
+esas, yoksa öneri; dolu/kapalı "—"; CSV `FinanceExportEngine.toCSV` formül korumalı). Gün panelinde **son
+değiştiren** (phase101 `updated_by`/`updated_at`; tam geçmiş değil). 5. sekme **Sonuçlar**
+(`core/pricing_outcome.js`, açılışta değil sekme çizilince yüklenir): geçmiş kayıtlı günün gerçekleşen gece
+fiyatı defter tanımıyla (tutar − temizlik ücreti − indirim) / gece; yalnız fiyat kaydından **sonra** oluşturulan
+rezervasyon karşılaştırılır, öncesi ayrı sayılır, `created_at`'siz/içe aktarılmış örneklenmez, örnek yoksa
+`null`. Takvimde **geçen yıla göre** şeridi Analiz'in ileriye dolu hesabıdır (`BookingAnalytics.buildPaceFor`),
+fiyatı değiştirmez. **Hedef** sekmesi sabit %80–%120 yerine kaynaklı senaryolar (`pricingTargetScenarios` →
+`TargetRevenueCalculator.scenarioRows`): öneriler, doluluk hedefi, geçen yılki ve son 3 ayın doluluğu
+(`computeMonthPerformance`), taban/yoğun fiyat, rakip ortalaması; ölçülemeyen satır "Gösterilemeyen"de
+nedeniyle; taban altı/yoğun üstü/öneri dışı/"son 12 ayda görülmedi" uyarılı; odak yalnız uyarısız satırdan
+seçer. **Kılavuz** "Fiyatlandırma nasıl çalışır?" + her sekmede açıklama. **Rakip adı** (phase115) ve **rakip
+ortalaması** (`competitorAverage`: son 90 günde en yeni 5 farklı adlı rakibin son fiyatı, gün türüne göre)
+**yalnız gösterimdir; öneri motoruna girmez** (kullanıcı kararı). phase115 durumu ayrı yoklama isteğiyle
+sorulmaz (göç yokken konsola 400 düşerdi): satırlardan anlaşılır, bilinmiyorsa kayıt adla denenir, sütun
+yoksa adsız tekrarlanır ve söylenir. Açılış JS bütçesi testi artık yayındaki LF boyutunu ölçer (CRLF çalışma
+kopyası ~40 KB fazla gösteriyordu); sınır 2,2 MiB aynı. Ağı `g9_feedback_tests` F-19…F-28,
+`pricing_outcome_tests`, `pricing_competitor_tests`, `phase115_competitor_name_live_tests`, tarayıcı kapısı 32/32b.
+
 **Rezervasyon kayıt sınırları (L-300, kullanıcı kararı 27.10.2026):** 0 TL ve mülk
 kapasitesini aşan kişi sayısı engellenmez, **sorulur** (`bookingSaveWarnings` +
 `confirmBookingWarnings`; düzenlemede yalnız değişen alan). Komisyon brütün en fazla
@@ -878,6 +899,12 @@ eklenir. Ağı `ads_campaign_table_tests`, tarayıcı kapısı 12. **Görünüm 
 ek yalnız `style.css` `ads-*`. `innerHTML` sınırı `<svg>`'yi sildiği için KPI mini eğrisi CSS
 çubuğudur ve yalnız dönemin tamamı günlük kırılımlıysa çizilir. Paketler:
 `docs/PHASE111_DEPLOY_PACKAGE.md`, `docs/PHASE113_DEPLOY_PACKAGE.md`.
+
+**phase115 (`migration_phase115_competitor_name.sql`) 8 Kasım 2026'da test projesine uygulandı;
+üretimde henüz uygulanmadı.** `competitor_price_research.competitor_name` (NULL olabilir, 1–120 karakter,
+baş/son boşluksuz). Canlı süit `phase115_competitor_name_live_tests` 13/13 (göçten önce 9 kırmızı).
+Anon kapısı göçten önce de kapalı olduğundan anon sorgusu ayırt etmez; kanıt `schema_migrations` 115.
+Paket: `docs/PHASE115_DEPLOY_PACKAGE.md`.
 
 **Bir göçün uygulanıp uygulanmadığı, dosyaya bakarak anlaşılmaz.** Dosya repoda
 durur; veritabanı uygulanmamış olabilir. Doğrulamanın yolu üretime sormaktır:
