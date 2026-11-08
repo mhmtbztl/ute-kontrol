@@ -1852,7 +1852,7 @@ async function fiyatEkraniDavranisi() {
   const bosAy = gun(5).slice(0, 7);
   App.setPricingMonth(bosAy);
   const takvim = el('pricingManagerContainer').innerHTML;
-  check(new RegExp(`pricing-day is-gap"><strong>${App.formatTrDate ? '' : ''}`).test(takvim) && /Açık · boş gece/.test(takvim) && /boş gece aralığı/.test(takvim),
+  check(/class="pricing-day is-gap[^"]*"/.test(takvim) && /Açık · boş gece/.test(takvim) && /boş gece aralığı/.test(takvim),
     'L-252a Iki rezervasyon arasindaki tek gece takvimde "boş gece" olarak isaretlenir ve indirim gerekcesi yazar', takvim.slice(0, 600));
   check(/Baz ₺13\.000/.test(takvim) && !/Kural uygulanmadı/.test(takvim),
     'L-250a Gun karti fiyatin nasil olustugunu yazar: baz fiyat + uygulanan kurallar');
@@ -1932,8 +1932,8 @@ async function fiyatEkraniDavranisi() {
     && !talep.warnings.some(w => w.code === 'OCCUPANCY_TARGET_MISSING')
     && !App.computePricingCalendar(entry, BUGUN, null).suggestions.days.some(d => d.reasons.some(r => r.code === 'DEMAND')),
     'L-247a Hedef doluluk girilince talep kurali calisir; girilmeyince uygulanmaz (eskiden hic gonderilmiyordu)');
-  check(app.includes('function computePricingCalendar(entry, today = getTodayStr(), occupancyTarget = pricingExpectedOccupancyDraft'),
-    'L-247b Hesaplayicidaki hedef doluluk fiyat motorunun talep kuralina gider');
+  check(app.includes('function computePricingCalendar(entry, today = getTodayStr(), occupancyTarget = undefined') && app.includes('pricingOccupancyTargets(entry.property.id, horizon.months)'),
+    'L-247b Takvimin talep kurali kayitli aylik doluluk hedefini kullanir (08.11.2026; eskiden oturumluk hesaplayici taslagi)');
 
   // L-249 (M75): isletme kendi etkinligini ekler; tatil kapatilabilir.
   ist = kaydedenIstemci(); App.setSupabaseClient(ist);
@@ -2022,7 +2022,7 @@ async function gunlukFiyatDavranisi() {
 
   kur();
   let takvim = el('pricingManagerContainer').innerHTML;
-  check(takvim.includes(`togglePricingDay(decodeURIComponent('${encodeURIComponent(gun(20))}'))`) && /Fiyatı onaylamak ya da değiştirmek için açık günlere tıklayın/.test(el('pricingDayEditor').innerHTML),
+  check(takvim.includes(`togglePricingDay(decodeURIComponent('${encodeURIComponent(gun(20))}'), event)`) && /Fiyatı onaylamak ya da değiştirmek için açık günlere tıklayın/.test(el('pricingDayEditor').innerHTML),
     'L-255c Yonetici acik gune tiklayarak secer; duzenleyici ne yapilacagini soyler');
   App.togglePricingDay(gun(20)); App.togglePricingDay(gun(21));
   check(/2 gün seçili/.test(el('pricingDayEditor').innerHTML) && /applyPricingDayPrices\('APPROVE'\)/.test(el('pricingDayEditor').innerHTML) && /is-selected/.test(el('pricingManagerContainer').innerHTML),
@@ -2070,7 +2070,7 @@ async function gunlukFiyatDavranisi() {
   check(!/togglePricingDay\(/.test(el('pricingManagerContainer').innerHTML) && /phase101 göçü bekleniyor/.test(el('pricingDayEditor').innerHTML),
     'L-255l Goc uygulanmadan takvim yalniz oneriyi gosterir ve bunu soyler');
   kur({}, 'sales');
-  check(!/togglePricingDay\(/.test(el('pricingManagerContainer').innerHTML) && el('pricingDayEditor').innerHTML === '',
+  check(!/togglePricingDay\(/.test(el('pricingManagerContainer').innerHTML) && !/applyPricingDayPrices/.test(el('pricingDayEditor').innerHTML) && /Fiyatları yönetim onaylar/.test(el('pricingDayEditor').innerHTML),
     'L-255m Satis rolu fiyati gorur ama secemez / yazamaz');
 }
 
@@ -2268,6 +2268,144 @@ async function fiyatKontrolTuruDavranisi() {
     && /VALUES \(103, 'phase103_property_closures_for_sales'\)/.test(sql)
     && read('supabase/migration_manifest.txt').includes('migration_phase103_property_closures_for_sales.sql'),
     'L-262d phase103: yetki kayit aramadan once, ariza ayrintisi donmez, anon kapali, schema_migrations 103, manifestte');
+}
+
+async function fiyatEkraniYenidenTasarimDavranisi() {
+  // Fiyatlandirma yeniden tasarimi (kullanici 07-08.11.2026): ic sekmeler, ay
+  // izgarasi + ayrinti paneli, baz fiyat kaniti; talep kurali kayitli aylik
+  // doluluk hedefiyle calisir. Fiyat hesabi degismedi.
+  sahteDom({});
+  global.FinancialMetricsService = require('./financial_metrics_service.js');
+  const App = require('../app.js');
+  const el = id => global.document.getElementById(id);
+  const BUGUN = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const gun = n => new Date(Date.parse(BUGUN + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
+  const P = 'aaaaaaaa-aaaa-4aaa-8aaa-000000000071';
+  const ay = gun(0).slice(0, 7);
+  const [yil, ayNo] = ay.split('-').map(Number);
+  const talepAy = gun(3).slice(0, 7);
+  const [tYil, tAy] = talepAy.split('-').map(Number);
+  const kur = (rol, ek = {}) => {
+    App.setActiveTenant({ id: TENANT, role: rol });
+    App.setAppData({
+      villas: { SEYIR: { id: P, slug: 'SEYIR', name: 'Seyir', basePrice: 10000, floor: 9000, isActive: true, activationDate: '2025-01-01' } },
+      bookings: [
+        { id: 'b1', villa: 'SEYIR', propertyId: P, checkIn: gun(2), checkOut: gun(5), gross: 30000, status: 'CONFIRMED', channel: 'DIRECT' },
+        { id: 'b2', villa: 'SEYIR', propertyId: P, checkIn: gun(6), checkOut: gun(9), gross: 30000, status: 'CONFIRMED', channel: 'DIRECT' }
+      ],
+      expenses: [], maintenanceTickets: [], propertyPricingRules: [], competitorPriceResearch: [], tenantSettings: { pricing_rules: { weekend: { enabled: false, pct: 25 } } }, targets: [],
+      propertyDailyPrices: [], phase78SchemaReady: true, phase101SchemaReady: true, propertyClosuresReady: true, ...ek
+    });
+    App.setPricingProperty(P);
+    App.setPricingMonth(ay);
+    return el('pricingManagerContainer').innerHTML;
+  };
+  const entry = () => ({ key: 'SEYIR', property: App.getAppData().villas.SEYIR });
+  const talepVar = (takvim, ayAnahtari) => takvim.suggestions.days.some(d => d.date.startsWith(ayAnahtari) && d.reasons.some(r => r.code === 'DEMAND'));
+
+  // Talep kurali kayitli doluluk hedefiyle (Hedefleri Yonet).
+  kur('owner', { targets: [{ year: tYil, month: tAy, property_id: null, occupancy_target: 1 }] });
+  const kayitli = App.computePricingCalendar(entry(), BUGUN);
+  check(talepVar(kayitli, talepAy) && !kayitli.suggestions.warnings.some(w => w.code === 'OCCUPANCY_TARGET_MISSING')
+    && kayitli.suggestions.warnings.some(w => w.code === 'OCCUPANCY_TARGET_PARTIAL' && !w.months.includes(talepAy)),
+    'F-01 Talep kurali Hedefleri Yonet\'teki aylik doluluk hedefiyle calisir; hedefi olmayan ay uyarida adiyla gecer', JSON.stringify(kayitli.suggestions.warnings));
+  kur('owner', { targets: [{ year: yil, month: ayNo, property_id: null, occupancy_target: 5 }, { year: yil, month: ayNo, property_id: P, occupancy_target: 99 }] });
+  check(!talepVar(App.computePricingCalendar(entry(), BUGUN), ay) && App.pricingOccupancyTargetOf(P, ay).source === 'PROPERTY' && App.pricingOccupancyTargetOf(null, ay).value === 0.05,
+    'F-02 Mulk doluluk hedefi isletme hedefinin onune gecer');
+  kur('owner', { targets: [{ year: yil, month: ayNo, property_id: null, occupancy_target: 0 }] });
+  el('pricingExpectedOccupancy').value = '5';
+  App.recalculatePricingTarget();
+  check(!talepVar(App.computePricingCalendar(entry(), BUGUN), ay) && App.pricingOccupancyTargetOf(P, ay) === null,
+    'F-03 Hesaplayiciya yazilan oran ve 0 girilmis hedef talep kuralini calistirmaz (yalniz kayitli, sifirdan buyuk hedef)');
+  el('pricingExpectedOccupancy').value = ''; App.recalculatePricingTarget();
+  const formGovdesi = functionBody(read('app.js'), 'function renderBookingPriceCalendarHint(');
+  check(!/getTodayStr\(\), null\)/.test(formGovdesi) && /computePricingCalendar\(\{ key: villaKey, property \}, getTodayStr\(\)\)/.test(formGovdesi),
+    'F-04 Rezervasyon formunun fiyat ipucu takvimle ayni doluluk hedefini kullanir (eskiden talep kurali hic yoktu)');
+
+  // Ay izgarasi: Pazartesi baslangic, ayin 1'i dogru sutunda, tam haftalar.
+  const takvim = kur('owner');
+  const bas = (new Date(Date.UTC(yil, ayNo - 1, 1)).getUTCDay() + 6) % 7;
+  const gunSayisi = new Date(Date.UTC(yil, ayNo, 0)).getUTCDate();
+  const izgara = takvim.slice(takvim.indexOf('pricing-grid"'));
+  const hucreler = izgara.match(/class="pricing-day [^"]*"/g) || [];
+  const onceBos = hucreler.findIndex(c => !/is-out/.test(c));
+  const ayHucreleri = hucreler.filter(c => !/is-out/.test(c)).length;
+  check(onceBos === bas && ayHucreleri === gunSayisi && hucreler.length % 7 === 0 && /<span>Pzt<\/span>/.test(takvim),
+    'F-05 Ay izgarasi Pazartesi baslar, ayin 1\'i dogru sutunda, hucre sayisi tam hafta', JSON.stringify({ onceBos, bas, ayHucreleri, gunSayisi, toplam: hucreler.length }));
+  check((takvim.match(/is-past/g) || []).length === Number(BUGUN.slice(8, 10)) - 1 && /class="pricing-day [^"]*is-today/.test(takvim),
+    'F-06 Bugunden onceki gunler soluk ve secilemez; bugun isaretli');
+
+  // "Bu fiyat neden?" basamaklari: baz + kurallar = oneri; taban yukseltmesi yazilir.
+  const gunler = App.computePricingCalendar(entry(), BUGUN).suggestions.days;
+  const bosGece = gunler.find(d => d.date === gun(5));
+  App.focusPricingDay(gun(5));
+  const panel = el('pricingDayEditor').innerHTML;
+  check((bosGece.floorApplied ? /Tabana yükseltildi/.test(panel) : true) && /Bu fiyat neden\?/.test(panel) && /Baz fiyat/.test(panel) && /Boş gece aralığı/.test(panel)
+    && panel.includes(`<b>₺${bosGece.price.toLocaleString('tr-TR')}</b></li></ol>`) && /Sistem varsayılanı/.test(panel),
+    'F-07 Ayrinti paneli fiyati basamak basamak yazar: baz, her kural kaynagiyla, taban yukseltmesi, oneri', panel.slice(0, 900));
+  const normal = gunler.find(d => d.status === 'OPEN' && d.reasons.length && !d.floorApplied);
+  App.focusPricingDay(normal.date);
+  const toplam = normal.reasons.reduce((s, r) => s + r.pct, 0);
+  check(Math.round(normal.basePrice * (1 + toplam / 100) / 50) * 50 === normal.price && el('pricingDayEditor').innerHTML.includes(`<b>₺${normal.price.toLocaleString('tr-TR')}</b></li></ol>`),
+    'F-08 Basamaklarin toplami motorun onerisine esit (yeni hesap yok)');
+  App.focusPricingDay(normal.date);
+
+  // Onay bekleyen gun: acik + onerisi var + kayitli fiyati yok.
+  kur('owner', { propertyDailyPrices: [{ property_id: P, price_date: gun(1), price: 15000, source: 'APPROVED', suggested_price: 13000 }] });
+  const bekleyen = App.computePricingCalendar(entry(), BUGUN).suggestions.days.filter(d => d.status === 'OPEN' && d.price > 0 && d.date !== gun(1)).length;
+  check(el('pricingPendingVal').innerText === `${bekleyen} gün` && el('pricingPendingBadge').innerText === String(bekleyen) && el('pricingPendingCard').disabled === false,
+    'F-09 "Onay bekleyen gün" ufuktaki onerisi olup fiyati kaydedilmemis gunleri sayar; yonetimde tiklanir', el('pricingPendingVal').innerText);
+  kur('owner', { phase101SchemaReady: false });
+  check(el('pricingPendingVal').innerText === '—' && /phase101/.test(el('pricingPendingMeta').innerText) && el('pricingPendingCard').disabled === true,
+    'F-10 Gunluk fiyat defteri yokken onay bekleyen sayisi uydurulmaz ("—" ve nedeni)');
+
+  // Hizli secim ve aralik secimi.
+  kur('owner');
+  App.selectPricingDays('GAP');
+  const secim = el('pricingDayEditor').innerHTML;
+  check(/1 gün seçili|Boş gece aralığı/.test(secim) && /applyPricingDayPrices\('APPROVE'\)/.test(secim),
+    'F-11 "Boş geceleri seç" ayin bos gecelerini secer ve onay eylemini acar', secim.slice(0, 300));
+  App.clearPricingDaySelection();
+  const acik = App.computePricingCalendar(entry(), BUGUN).suggestions.days.filter(d => d.status === 'OPEN' && d.date >= gun(10) && d.date <= gun(14)).map(d => d.date);
+  App.togglePricingDay(gun(10));
+  App.togglePricingDay(gun(14), { shiftKey: true });
+  check(new RegExp(`${acik.length} gün seçili`).test(el('pricingDayEditor').innerHTML) && acik.length === 5,
+    'F-12 Shift ile tiklama son secilen gunle arasindaki acik gunleri secer', el('pricingDayEditor').innerHTML.slice(0, 200));
+  App.clearPricingDaySelection();
+
+  // Rol siniri: satisci gunu inceler, secemez, onaylayamaz.
+  const satis = kur('sales');
+  App.focusPricingDay(gun(12));
+  check(!satis.includes('togglePricingDay(') && satis.includes('focusPricingDay(') && /Bu fiyat neden\?/.test(el('pricingDayEditor').innerHTML)
+    && !/applyPricingDayPrices/.test(el('pricingDayEditor').innerHTML) && el('pricingPendingCard').disabled === true,
+    'F-13 Satis rolu gunun gerekcesini gorur; secim, onay ve hizli secim yok');
+  App.focusPricingDay(gun(12));
+
+  // Ic sekmeler.
+  kur('owner');
+  check(App.setPricingView('rules') === true && el('pricingView_rules').hidden === false && el('pricingView_calendar').hidden === true
+    && App.setPricingView('bilinmeyen') === false && el('pricingView_rules').hidden === false,
+    'F-14 Ic sekmeler tek panel gosterir; bilinmeyen sekme reddedilir');
+  App.setPricingView('calendar');
+  check(read('index.html').includes('id="pricingView_target"') && read('index.html').includes('id="pricingView_rivals"') && /data-onclick="setPricingView\('rules'\)"/.test(read('index.html')),
+    'F-15 Takvim, Kurallar, Hedef, Rakipler sekmeleri ekranda');
+
+  // Kurallar: satir tiklaninca form o kurali yukler; satiscida satir dugme degil.
+  el('pricingRuleScope').value = 'PROPERTY';
+  App.editPricingRule('gapNight');
+  check(el('pricingRuleKey').value === 'gapNight' && el('pricingRuleParameterLabel').textContent === 'En çok boş gece' && String(el('pricingRuleParameter').value) === '2'
+    && /editPricingRule\(decodeURIComponent\('gapNight'\)\)/.test(el('pricingRulesTable').innerHTML) && /is-editing/.test(el('pricingRulesTable').innerHTML),
+    'F-16 Kural satirina tiklamak formu o kuralin gecerli degeriyle doldurur');
+  kur('sales');
+  check(!/editPricingRule\(/.test(el('pricingRulesTable').innerHTML) && App.editPricingRule('weekend') === false,
+    'F-17 Satis rolunde kural satiri salt okunur');
+
+  // Baz fiyat kaniti: olculeni yazar, olculemeyeni uydurmaz.
+  kur('owner', { competitorPriceResearch: [{ id: 'r1', property_id: P, researched_on: BUGUN, source_kind: 'OTA', source_url: 'https://ornek.test/ilan', prices: [{ type: 'WEEKDAY', amount: 11500 }] }] });
+  const kanit = el('pricingLadderCard').innerHTML;
+  check(/Baz fiyatı neye göre seçmeli\?/.test(kanit) && /Rakip · hafta içi<\/span><b>₺11\.500/.test(kanit) && /Rakip · hafta sonu<\/span><b>—/.test(kanit)
+    && /hafta içi ADR<\/span><b>—<\/b><small>0 satılmış gece; en az 8 gerekir/.test(kanit) && /Sistem baz fiyat önermez/.test(kanit),
+    'F-18 Baz fiyat kaniti rakip ve gecen yil ADR\'sini yazar; olculemeyen "—" ve nedeni', kanit.slice(kanit.indexOf('pricing-evidence'), kanit.indexOf('pricing-evidence') + 700));
 }
 
 async function fiyatKararlariDavranisi() {
@@ -2624,6 +2762,7 @@ try {
   await minimumGeceDavranisi();
   await sezonDavranisi();
   await uzunKonaklamaDavranisi();
+  await fiyatEkraniYenidenTasarimDavranisi();
 } catch (error) {
   failed++;
   console.error('[FAIL] beklenmeyen hata — ' + (error && error.stack || error));

@@ -265,6 +265,18 @@ kuralı gecenin **ayının** doluluğunu hedef dolulukla karşılaştırır. İ�
 kapatılan tatiller `tenant_settings.pricing_special_days`. Yıllık hedef = aylık portföy
 hedeflerinin toplamı. Göç gerekmedi. Ağı `g9_feedback_tests` L-246…L-254, tarayıcı kapısı 32/32b.
 
+**Fiyatlandırma ekranı (yeniden tasarım, kullanıcı 07–08.11.2026):** iç sekmeler Takvim · Kurallar ·
+Hedef · Rakipler (`pricingView`, `setPricingView`). Takvim Pazartesi başlangıçlı ay ızgarası +
+ayrıntı paneli (`#pricingDayEditor`): tek gün "Bu fiyat neden?" basamakları motorun `reasons`'ından
+(yeni hesap yok), çok gün toplu onay/elle fiyat. Hücrenin tam açıklaması `sr-only` metindir (testler
+ve ekran okuyucu onu okur). Satış rolü `focusPricingDay` ile inceler, seçemez. **Talep kuralı kayıtlı
+aylık doluluk hedefini kullanır** (`pricingOccupancyTargetOf`: mülk > işletme, 0/boş = yok); eskiden
+hesaplayıcının oturumluk taslağına bağlıydı ve rezervasyon formu talep kuralını hiç uygulamıyordu.
+`computePricingCalendar` üçüncü argümanı verilmezse kayıtlı hedef, açık `null` hedef yok demektir.
+Hesaplayıcıya yazılan oran yalnız hesaplayıcıyı etkiler. Baz fiyatı sistem önermez; Kurallar'da geçen yıl
+ADR'si ve son rakip fiyatı kanıt olarak durur. İnnerHTML sınırı SVG'yi sildiği için işaretler CSS'tir.
+Göç gerekmedi. Ağı `g9_feedback_tests` F-01…F-18, tarayıcı kapısı 32/32b.
+
 **Rezervasyon kayıt sınırları (L-300, kullanıcı kararı 27.10.2026):** 0 TL ve mülk
 kapasitesini aşan kişi sayısı engellenmez, **sorulur** (`bookingSaveWarnings` +
 `confirmBookingWarnings`; düzenlemede yalnız değişen alan). Komisyon brütün en fazla
