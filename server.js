@@ -24,7 +24,8 @@ const MIME_TYPES = {
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
   '.svg': 'image/svg+xml',
-  '.ico': 'image/x-icon'
+  '.ico': 'image/x-icon',
+  '.woff2': 'font/woff2'
 };
 
 const ROOT_FILES = new Set(['index.html', 'style.css', 'analytics.css', 'app.js', 'xlsx.full.min.js', 'supabase.umd.js', 'robots.txt', 'favicon.ico']);
@@ -36,6 +37,10 @@ function isAllowed(rel) {
   if (parts.length === 1) return ROOT_FILES.has(parts[0]);
   if (parts.length === 3 && parts[0] === 'assets' && parts[1] === 'brand') {
     return /^(lexbnb-(?:logo|logo-dark|mark)\.svg|lexbnb-logo-email\.png|favicon-32\.png|apple-touch-icon\.png)$/.test(parts[2]);
+  }
+  // Kendi sunucumuzdan verilen yazi tipleri ve lisanslari (Google Fonts yok).
+  if (parts.length === 3 && parts[0] === 'assets' && parts[1] === 'fonts') {
+    return /^[a-z0-9-]+\.woff2$|^[a-z0-9-]+-ofl\.txt$/.test(parts[2]);
   }
   if (parts.length !== 2) return false;
   const [dir, name] = parts;
