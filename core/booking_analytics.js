@@ -552,11 +552,14 @@
    * Gecen yil o tarihte iptal edilmemis olup sonradan iptal edilen kayit da
    * bilinemez (iptal tarihi tutulmuyor); bu yuzden not dusulur.
    */
-  function buildPace(ctx, villa) {
+  function buildPace(ctx, villa, onlyMonths) {
     const today = ctx.today;
     const lyToday = addYearsToDate(today, -1);
     const startMonth = today.slice(0, 7);
-    const months = monthsBetween(startMonth, shiftMonth(startMonth, 2));
+    // Fiyat ekrani tek bir ileri ayi ister (onlyMonths); Analiz onumuzdeki 3 ayi.
+    const months = Array.isArray(onlyMonths) && onlyMonths.length
+      ? onlyMonths.filter(m => isMonthKey(m) && m >= startMonth)
+      : monthsBetween(startMonth, shiftMonth(startMonth, 2));
     const createdOnOrBefore = asOf => b => {
       const c = dateOnly(b.createdAt || b.created_at);
       return !!c && c <= asOf;
@@ -608,6 +611,24 @@
       };
     });
     return { asOf: today, lastYearAsOf: lyToday, rows };
+  }
+
+  /**
+   * Ileriye dolu tek basina (fiyat ekrani, 08.11.2026): ayni kural, ayni
+   * "sonradan girilmis" korumasi. o: { bookings, villas, villa, today, months, isImported }
+   */
+  function buildPaceFor(o) {
+    const opts = o || {};
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(opts.today || ''))) throw new Error('ANALYTICS_TODAY_REQUIRED');
+    const villaIdByKey = {};
+    (opts.villas || []).forEach(v => { if (v && v.key && v.id) villaIdByKey[v.key] = v.id; });
+    const ctx = {
+      bookings: (opts.bookings || []).filter(Boolean),
+      villaIdByKey,
+      today: opts.today,
+      isImported: typeof opts.isImported === 'function' ? opts.isImported : () => false
+    };
+    return buildPace(ctx, opts.villa || 'ALL', opts.months);
   }
 
   // -------------------------------------------------------------- rapor --
@@ -690,6 +711,7 @@
     comparisonPeriods,
     aggregateMonths,
     delta,
-    buildReport
+    buildReport,
+    buildPaceFor
   };
 }));
