@@ -24119,10 +24119,11 @@ function pricingDayDetailHtml(day, ctx, withActions) {
   const factRows = [];
   if (minStay && (minStay.minNights || unsellable)) factRows.push(`<li>${escapeHtml(unsellable ? 'Minimum gece kuralı yüzünden bu boşluk satılamaz' : `Giriş için en az ${minStay.minNights} gece`)}</li>`);
   if (day.status === 'OPEN') {
-    const rival = pricingRivalLineHtml(day, shown, Boolean(special), ctx);
-    if (rival) factRows.push(`<li>${rival}<small>Bilgi; öneriyi değiştirmez</small></li>`);
+    // Rakip ortalamasi varsa tek satir yeter; yoksa son rakip fiyati (tekrar yok, tur bulgusu).
     const rivalAverage = pricingRivalAverageLineHtml(day, shown, Boolean(special), ctx);
+    const rival = rivalAverage ? '' : pricingRivalLineHtml(day, shown, Boolean(special), ctx);
     if (rivalAverage) factRows.push(`<li>${rivalAverage}</li>`);
+    else if (rival) factRows.push(`<li>${rival}<small>Bilgi; öneriyi değiştirmez</small></li>`);
     const weekend = [5, 6].includes(new Date(day.date + 'T00:00:00Z').getUTCDay());
     const metric = weekend ? ctx.history?.weekendAdr : ctx.history?.weekdayAdr;
     if (metric?.value != null) factRows.push(`<li>Geçen yıl bu ay ${weekend ? 'hafta sonu' : 'hafta içi'} ADR ${escapeHtml(pricingMoney(metric.value))}</li>`);
@@ -24163,7 +24164,7 @@ function pricingBookedOutcomeHtml(day, ctx) {
 
 // Sonuc modulu acilista yuklenmez (acilis JS butcesi, L-163): fiyat ekrani
 // ilk cizildiginde istenir, gelince ekran yeniden cizilir. Node'da require.
-const PRICING_OUTCOME_URL = 'core/pricing_outcome.js?v=4fafd994';
+const PRICING_OUTCOME_URL = 'core/pricing_outcome.js?v=c2324769';
 let pricingOutcomeLoading = null;
 function getPricingOutcome() {
   if (typeof PricingOutcome !== 'undefined') return PricingOutcome;
@@ -24278,12 +24279,15 @@ function pricingRivalLineHtml(day, shown, isSpecial, ctx) {
   if (!rival) return '';
   const ageDays = Math.floor((Date.parse((ctx.today || getTodayStr()) + 'T00:00:00Z') - Date.parse(rival.researchedOn + 'T00:00:00Z')) / 86400000);
   const when = `${formatTrDate(rival.researchedOn)}${ageDays > 60 ? ', eski' : ''}`;
+  // Karsilastirilan, gunun gosterilen fiyatidir: kayitliysa "fiyat", degilse "öneri" (tur bulgusu 08.11.2026).
+  const what = day.status === 'OPEN' && ctx.saved?.get?.(day.date) ? 'fiyat' : 'öneri';
   let diff = '';
   if (Number.isFinite(shown) && shown > 0) {
     const pct = Math.round((shown - rival.amount) / rival.amount * 100);
-    diff = pct === 0 ? ' · öneri aynı' : ` · öneri %${Math.abs(pct)} ${pct < 0 ? 'düşük' : 'yüksek'}`;
+    diff = pct === 0 ? ` · ${what} aynı` : ` · ${what} %${Math.abs(pct)} ${pct < 0 ? 'düşük' : 'yüksek'}`;
   }
-  return `<span class="pricing-day-rival">Rakip ${escapeHtml(pricingMoney(rival.amount))} (${escapeHtml(when)})${escapeHtml(diff)}</span>`;
+  const name = rival.competitorName ? `${rival.competitorName} ` : '';
+  return `<span class="pricing-day-rival">Son rakip ${escapeHtml(name)}${escapeHtml(pricingMoney(rival.amount))} (${escapeHtml(when)})${escapeHtml(diff)}</span>`;
 }
 
 function pricingHistoryHintHtml(history, entry, monthKey) {
@@ -24299,8 +24303,9 @@ function pricingHistoryHintHtml(history, entry, monthKey) {
     }
   });
   const part = (metric, nights, name) => metric?.value == null ? `${name}: — (${nights} gece; en az 8 gerekir)` : `${name} ADR ${pricingMoney(metric.value)} (${nights} gece)`;
-  if (!history) return `<div class="pricing-history-hint"><strong>Geçen yıl ${escapeHtml(label)}</strong><span>${sold.size} satılmış gece. ADR ipucu için hafta içi ya da hafta sonu en az 8 satılmış gece gerekir.</span></div>`;
-  return `<div class="pricing-history-hint"><strong>Geçen yıl ${escapeHtml(label)}</strong><span>${escapeHtml(part(history.weekdayAdr, history.sampleNights.weekday, 'Hafta içi'))} · ${escapeHtml(part(history.weekendAdr, history.sampleNights.weekend, 'Hafta sonu'))}</span></div>`;
+  // "Ayın tamamı": ustteki gidisat seridi bugunden sonraki geceleri sayar; ikisi farkli soru (tur bulgusu).
+  if (!history) return `<div class="pricing-history-hint"><strong>Geçen yıl ${escapeHtml(label)} · ayın tamamı</strong><span>${sold.size} satılmış gece. ADR ipucu için hafta içi ya da hafta sonu en az 8 satılmış gece gerekir.</span></div>`;
+  return `<div class="pricing-history-hint"><strong>Geçen yıl ${escapeHtml(label)} · ayın tamamı</strong><span>${sold.size} satılmış gece · ${escapeHtml(part(history.weekdayAdr, history.sampleNights.weekday, 'Hafta içi'))} · ${escapeHtml(part(history.weekendAdr, history.sampleNights.weekend, 'Hafta sonu'))}</span></div>`;
 }
 
 function pricingTargetHtml(result, ctx) {
@@ -24494,6 +24499,9 @@ function pricingOpenNightCounts(days, specialDays) {
 
 function setPricingMonth(monthKey) {
   if (!/^\d{4}-\d{2}$/.test(String(monthKey || ''))) return false;
+  // Ay degisince onceki ayin secimi ve odagi birakilir: panel gorunmeyen bir gunu
+  // gostermesin (tur bulgusu 08.11.2026).
+  if (monthKey !== pricingSelectedMonth) { pricingSelectedDays.clear(); pricingFocusDate = null; pricingLastToggledDate = null; }
   pricingSelectedMonth = monthKey;
   renderPricingTab();
   return true;
@@ -24770,8 +24778,8 @@ function pricingSpecialListHtml(entry, horizon, canManage) {
     const offCount = group.dates.filter(date => disabled.has(date)).length;
     const allOff = offCount === group.dates.length;
     const span = group.dates.length > 1 ? `${formatTrDate(first)} – ${formatTrDate(last)}` : formatTrDate(first);
-    const status = allOff ? 'Özel gün sayılmıyor' : offCount ? `${group.dates.length} günün ${offCount}'i sayılmıyor` : `Resmî / dinî tatil · özel gün kuralı${group.dates.length > 1 ? ` · ${group.dates.length} gün` : ''}`;
-    const labelHtml = allOff ? 'Özel gün say' : 'Sayma';
+    const status = allOff ? 'Hariç tutuldu: özel gün sayılmıyor' : offCount ? `${group.dates.length} günün ${offCount}'i sayılmıyor` : `Resmî / dinî tatil · özel gün kuralı${group.dates.length > 1 ? ` · ${group.dates.length} gün` : ''}`;
+    const labelHtml = allOff ? 'Dahil et' : 'Hariç tut';
     const buttonHtml = !canManage ? ''
       : group.dates.length === 1
         ? `<button type="button" class="btn btn-secondary btn-sm" data-onclick="togglePricingHoliday(decodeURIComponent('${encodeActionArg(first)}'))">${labelHtml}</button>`
@@ -24959,6 +24967,7 @@ function togglePricingDay(date, event) {
   pricingFocusDate = null;
   renderPricingTab();
   pricingFocusCell(date);
+  if (pricingSelectedDays.size === 1 && pricingSelectedDays.has(date)) pricingRevealPanel();
   return true;
 }
 
@@ -24967,6 +24976,18 @@ function focusPricingDay(date) {
   pricingFocusDate = pricingFocusDate === date ? null : date;
   renderPricingTab();
   pricingFocusCell(date);
+  if (pricingFocusDate) pricingRevealPanel();
+  return true;
+}
+
+// Dar ekranda panel takvimin altinda kalir: tek gun secilince panele kaydirilir
+// (tur bulgusu 08.11.2026). Coklu secimde her dokunusta kaydirmaz.
+function pricingRevealPanel() {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function' || !window.matchMedia('(max-width: 900px)').matches) return false;
+  const panel = typeof document !== 'undefined' ? document.getElementById('pricingDayEditor') : null;
+  if (!panel || typeof panel.scrollIntoView !== 'function') return false;
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  panel.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
   return true;
 }
 
@@ -25216,7 +25237,8 @@ function pricingPaceStripHtml(entry, monthKey, today) {
   const month = pricingMonthLabel(monthKey);
   const lyDate = formatTrDate(pace.lastYearAsOf);
   const current = monthKey === String(today).slice(0, 7);
-  const scopeText = current ? `${month} ayının kalan gecelerinden` : `${month} için`;
+  // Bu ay yalniz bugunden sonraki geceler sayilir; alttaki "ayın tamamı" kutusundan farki yazilir.
+  const scopeText = current ? `${month} ayının bugünden sonraki gecelerinden` : `${month} için`;
   if (!row.lastYear) {
     return `<div class="pricing-pace is-muted" role="note"><strong>Geçen yıla göre</strong><span>${escapeHtml(`Bugüne kadar ${scopeText} ${row.nights} gece satıldı. Geçen yılla karşılaştırılamıyor: ${row.lastYearReason || 'veri yok'}.`)}</span></div>`;
   }
@@ -25224,7 +25246,8 @@ function pricingPaceStripHtml(entry, monthKey, today) {
   const tone = diff < 0 ? 'is-behind' : diff > 0 ? 'is-ahead' : '';
   const diffText = diff === 0 ? 'aynı' : `${diff > 0 ? '+' : '−'}${Math.abs(diff)} gece`;
   const hint = diff < 0 ? ' Geride; fiyatları ve boş günleri gözden geçirin.' : diff > 0 ? ' Önde; yoğun günlerde fiyat artışını değerlendirin.' : '';
-  return `<div class="pricing-pace ${tone}" role="note"><strong>Geçen yıla göre ${escapeHtml(diffText)}</strong><span>${escapeHtml(`Bugüne kadar ${scopeText} ${row.nights} gece satıldı; geçen yıl aynı tarihte (${lyDate}) ${row.lastYear.nights} geceydi.${hint} Bu bilgi fiyatı değiştirmez.`)}</span></div>`;
+  const lyText = current ? `geçen yıl aynı tarihte (${lyDate}) aynı gecelerden ${row.lastYear.nights} gece satılmıştı` : `geçen yıl aynı tarihte (${lyDate}) ${row.lastYear.nights} geceydi`;
+  return `<div class="pricing-pace ${tone}" role="note"><strong>Geçen yıla göre ${escapeHtml(diffText)}</strong><span>${escapeHtml(`Bugüne kadar ${scopeText} ${row.nights} gece satıldı; ${lyText}.${hint} Bu bilgi fiyatı değiştirmez.`)}</span></div>`;
 }
 
 // Ayrinti paneli: tek gun "Bu fiyat neden?", cok gun toplu islem, secim yoksa
@@ -25416,6 +25439,9 @@ function renderPricingTab() {
   const targetValue = targetWs.targetValue;
   const scopeInput = document.getElementById('pricingTargetScope');
   if (scopeInput) scopeInput.value = pricingTargetScope;
+  // Hedef sekmesinin kendi ay secicisi (tur bulgusu: ay yalniz takvimden degisiyordu).
+  const targetMonth = document.getElementById('pricingTargetMonth');
+  if (targetMonth) targetMonth.innerHTML = horizon.months.map(key => `<option value="${escapeHtml(key)}"${key === monthKey ? ' selected' : ''}>${escapeHtml(pricingMonthLabel(key))}</option>`).join('');
   const targetInput = document.getElementById('pricingTargetInput');
   if (targetInput) targetInput.value = targetValue ?? '';
   const savedOccupancy = pricingOccupancyTargetOf(pricingTargetScope === 'ALL' ? null : entry.property.id, monthKey);
@@ -25460,15 +25486,24 @@ function renderPricingTab() {
     setEl('pricingPendingVal', '—');
     setEl('pricingPendingMeta', 'Baz fiyat girilmemiş; öneri yok');
   } else {
-    setEl('pricingPendingVal', `${pending} gün`);
-    setEl('pricingPendingMeta', pending ? `${entry.property.name || entry.key} · önümüzdeki ${PRICING_HORIZON_MONTHS} ay${canManage ? ' · bu aydakileri seçmek için tıklayın' : ' · yönetici onayı bekleniyor'}` : `Önümüzdeki ${PRICING_HORIZON_MONTHS} ayın tüm önerileri kayıtlı`);
+    // Kart tiklaninca secilen sayiyi gosterir: bu ayinki; 12 ayin toplami alt satirda
+    // (tur bulgusu 08.11.2026: kart 343 diyor, tik 15 gun seciyordu).
+    const inMonth = ctx.pendingInMonth;
+    const monthName = pricingMonthLabel(monthKey);
+    setEl('pricingPendingVal', `${inMonth} gün`);
+    const action = !canManage ? ' · yönetici onayı bekleniyor'
+      : inMonth ? ' · tıklayınca bu aydakiler seçilir'
+        : pending ? ' · tıklayınca onay bekleyen ilk ay açılır' : '';
+    setEl('pricingPendingMeta', pending
+      ? `${monthName} · ${PRICING_HORIZON_MONTHS} ayın toplamı ${pending} gün${action}`
+      : `Önümüzdeki ${PRICING_HORIZON_MONTHS} ayın tüm önerileri kayıtlı`);
   }
   if (pendingCard) {
     const actionable = canManage && dailyReady && pending > 0;
     pendingCard.disabled = !actionable;
     pendingCard.classList?.toggle?.('is-action', actionable);
   }
-  setEl('pricingPendingBadge', dailyReady && pending > 0 ? String(pending) : '');
+  setEl('pricingPendingBadge', dailyReady && ctx.pendingInMonth > 0 ? String(ctx.pendingInMonth) : '');
 
   const next30 = suggestions.days.slice(0, 30);
   const sold = next30.filter(day => day.status === 'BOOKED').length;
