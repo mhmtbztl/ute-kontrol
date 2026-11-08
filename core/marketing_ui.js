@@ -413,7 +413,7 @@
       ${numeric('searchToViewCtrPercent', 'Arama → görüntüleme CTR (%)', '100')}${numeric('viewToBookingConversionPercent', 'Görüntüleme → rezervasyon (%)', '100')}
       ${numeric('normalizedImpressionsPerListingDay', 'Gösterim / ilan-gün')}${numeric('recommendedActiveMediaCount', 'Önerilen aktif medya', '', '1')}
       ${numeric('maxDistributionCostPercent', 'Azami dağıtım maliyeti (%)', '100')}${numeric('minimumDirectReservationSharePercent', 'Asgari direkt rezervasyon payı (%)', '100')}
-      <label style="display:grid;gap:5px;font-size:12px">Güven (0–1)<input class="form-control" type="number" min="0" max="1" step="0.05" name="confidence" placeholder="Kanıta göre girin" required></label>
+      <label style="display:grid;gap:5px;font-size:12px">Güven (0–1)<input class="form-control" type="number" min="0" max="1" step="0.01" name="confidence" placeholder="Kanıta göre girin" required></label>
       <label style="display:grid;gap:5px;font-size:12px">Kanıt notu<input class="form-control" name="evidenceNote" maxlength="500"></label>
     </div><div class="sub-text" style="margin-top:9px">En az bir sayısal değer gerekir. Kaydedilen referans geçmişi değiştirilemez.</div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button type="button" class="btn btn-secondary btn-sm" data-marketing-cancel-benchmark>Vazgeç</button><button type="submit" class="btn btn-primary btn-sm">Referansı kaydet</button></div></form>`;
   }
