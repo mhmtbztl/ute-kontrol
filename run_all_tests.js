@@ -387,7 +387,8 @@ const allTestFiles = [
   'booking_analytics_tests.js',
   'analytics_ui_tests.js',
   'analytics_integration_tests.js',
-  'self_hosted_fonts_tests.js'
+  'self_hosted_fonts_tests.js',
+  'service_worker_tests.js'
 ];
 
 const testEnv = require('./core/test_env.js');

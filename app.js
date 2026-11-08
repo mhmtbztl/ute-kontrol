@@ -5345,7 +5345,11 @@ async function forceHardRefresh() {
   }
 
   try {
-    // 1. Delete all Service Worker / Browser Cache API items
+    // 1. Service worker kaydi ve Cache API onbellekleri (sw.js)
+    if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
     if ('caches' in window) {
       const keys = await caches.keys();
       await Promise.all(keys.map(k => caches.delete(k)));
@@ -5371,6 +5375,27 @@ async function forceHardRefresh() {
     window.location.reload(true);
   }
 }
+
+// Tekrar girislerde damgali dosyalar sw.js onbelleginden gelir (giris hizi 2. asama).
+// Yerel gelistirme ve tarayici kapisi etkilenmesin diye localhost'ta kapali;
+// olcmek icin ?sw=1. Kayit basarisizsa uygulama aynen calisir.
+function shouldRegisterServiceWorker(loc, nav) {
+  if (!loc || !nav || !nav.serviceWorker) return false;
+  const params = new URLSearchParams(loc.search || '');
+  if (params.get('ci-browser') === '1') return false;
+  const local = ['localhost', '127.0.0.1', '[::1]'].includes(loc.hostname);
+  if (local) return params.get('sw') === '1';
+  return loc.protocol === 'https:';
+}
+
+function registerAppServiceWorker() {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return;
+  if (!shouldRegisterServiceWorker(window.location, navigator)) return;
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(err => console.warn('Service worker kaydedilemedi:', err && err.message));
+  });
+}
+registerAppServiceWorker();
 
 const LARGE_TABLE_PAGE_SIZE = 100;
 const largeTablePageState = { bookings: 1, expenses: 1 };
@@ -25642,6 +25667,7 @@ async function handleQuickActionTrigger(actionType, entityId) {
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
+    shouldRegisterServiceWorker,
     getMenuTabFor,
     TAB_MENU_PARENT,
     registerPageAction,

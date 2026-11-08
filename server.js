@@ -28,7 +28,7 @@ const MIME_TYPES = {
   '.woff2': 'font/woff2'
 };
 
-const ROOT_FILES = new Set(['index.html', 'style.css', 'analytics.css', 'app.js', 'xlsx.full.min.js', 'supabase.umd.js', 'robots.txt', 'favicon.ico']);
+const ROOT_FILES = new Set(['index.html', 'style.css', 'analytics.css', 'app.js', 'xlsx.full.min.js', 'supabase.umd.js', 'robots.txt', 'favicon.ico', 'sw.js']);
 
 /** Istenen yolun izin listesinde olup olmadigi. Goreli, '/' ayracli yol alir. */
 function isAllowed(rel) {
