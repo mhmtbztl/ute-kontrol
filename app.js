@@ -10644,12 +10644,19 @@ function getCurrentMonthKey() {
   return getTodayStr().slice(0, 7);
 }
 
+// Bicimlendirici bir kez kurulur: getTodayStr acilista yuzlerce kez cagriliyor
+// ve her cagrida yeni Intl.DateTimeFormat kurmak acilis profilinde tek basina
+// ~70 ms'ydi (4x CPU, 08.11.2026). Tarih her cagrida yeniden okunur.
+let todayFormatter = null;
 function getTodayStr() {
   const timezone = 'Europe/Istanbul';
   try {
-    const parts = new Intl.DateTimeFormat('en-CA', {
-      timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit'
-    }).formatToParts(new Date()).reduce((result, part) => {
+    if (!todayFormatter) {
+      todayFormatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit'
+      });
+    }
+    const parts = todayFormatter.formatToParts(new Date()).reduce((result, part) => {
       result[part.type] = part.value;
       return result;
     }, {});

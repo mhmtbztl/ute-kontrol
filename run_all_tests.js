@@ -386,7 +386,8 @@ const allTestFiles = [
   // Analiz sekmesi: rezervasyon analizi hesap katmani ve arayuzu (05.11.2026)
   'booking_analytics_tests.js',
   'analytics_ui_tests.js',
-  'analytics_integration_tests.js'
+  'analytics_integration_tests.js',
+  'self_hosted_fonts_tests.js'
 ];
 
 const testEnv = require('./core/test_env.js');

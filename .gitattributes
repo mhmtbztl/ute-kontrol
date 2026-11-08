@@ -2,3 +2,5 @@
 # Satir sonu donusumu ozeti degistirir; bayt bayt korunur.
 xlsx.full.min.js -text
 supabase.umd.js -text
+# Yazi tipi dosyalari ikili; satir sonu donusumu bozar.
+*.woff2 -text

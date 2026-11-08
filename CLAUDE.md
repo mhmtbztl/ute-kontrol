@@ -66,6 +66,12 @@ Firmalara satılacak — kişisel araç veya demo değil. Bu, kalite çıtasın�
   e-posta onayı **kapalıdır**; ikisi de zorunlu, gerekçeleri
   `docs/TEST_PROJECT_SETUP.md` içinde.
 
+- **Yazı tipleri kendi sunucumuzdan (kullanıcı kararı 08.11.2026):** Google Fonts
+  kaldırıldı — ziyaretçinin IP adresi üçüncü tarafa gitmesin (KVKK) ve açılışı
+  engelleyen dış istek kalksın (yerelde bile ~0,5 sn bekletiyordu). Inter ve
+  JetBrains Mono değişken woff2, `assets/fonts/` (OFL lisansı yanında), `@font-face`
+  `style.css` başında; CSP `style-src`/`font-src` yalnız `'self'`. Dış yazı tipi,
+  stil veya CDN bağlantısı eklemeyin; ağı `self_hosted_fonts_tests`.
 - **CAPTCHA:** Cloudflare Turnstile. Site anahtarı `core/captcha_gate.js`
   içinde (herkese açık). **Gizli anahtar yalnız Supabase panelindedir** —
   repoya, `.env`'e, sohbete girmez. Giriş, kayıt ve şifre sıfırlama
