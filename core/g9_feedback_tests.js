@@ -2049,6 +2049,8 @@ async function gunlukFiyatDavranisi() {
   yazma = ist.yazmalar.find(k => k.tablo === 'property_daily_prices' && k.islem === 'upsert');
   check(yazma && yazma.yuk[0].price === 7000 && yazma.yuk[0].source === 'MANUAL' && yazma.yuk[0].suggested_price > 0 && yazma.yuk[0].note === 'Son dakika anlasmasi',
     'L-255h Elle fiyat MANUAL yazilir; oneri ve not yaninda saklanir', JSON.stringify(yazma && yazma.yuk));
+  // gun(22) ay sinirini gecebilir (09.11'de 1 Aralik): kart kendi ayinin izgarasinda aranir.
+  App.setPricingMonth(gun(22).slice(0, 7));
   check(/₺7\.000/.test(el('pricingManagerContainer').innerHTML) && /Elle fiyat · öneri ₺/.test(el('pricingManagerContainer').innerHTML),
     'L-255i Kart kayitli fiyati gosterir ve oneriyi yanina yazar');
 
@@ -2230,7 +2232,7 @@ async function fiyatKontrolTuruDavranisi() {
   const onerili = App.computePricingCalendar({ key: 'SEYIR', property: { id: P, basePrice: 13000, floor: 8000 } }, BUGUN, null).suggestions.days.map(d => d.price);
   App.setPricingProperty(P);
   const kartlar = el('pricingManagerContainer').innerHTML;
-  check(/Rakip ₺14\.000 \([\d.]+\) · öneri %\d+ (düşük|yüksek)|Rakip ₺14\.000 \([\d.]+\) · öneri aynı/.test(kartlar) && /Rakip ₺9\.000/.test(kartlar),
+  check(/Son rakip ₺14\.000 \([\d.]+\) · öneri %\d+ (düşük|yüksek)|Son rakip ₺14\.000 \([\d.]+\) · öneri aynı/.test(kartlar) && /Son rakip ₺9\.000/.test(kartlar),
     'L-260a Gun karti gunun turune gore rakip fiyatini, tarihini ve farki yazar', kartlar.slice(0, 500));
   check(JSON.stringify(onerisiz) === JSON.stringify(onerili),
     'L-260b Rakip arastirmasi onerilen fiyati degistirmez (kullanici karari)');
@@ -2363,9 +2365,17 @@ async function fiyatEkraniYenidenTasarimDavranisi() {
 
   // Onay bekleyen gun: acik + onerisi var + kayitli fiyati yok.
   kur('owner', { propertyDailyPrices: [{ property_id: P, price_date: gun(1), price: 15000, source: 'APPROVED', suggested_price: 13000 }] });
-  const bekleyen = App.computePricingCalendar(entry(), BUGUN).suggestions.days.filter(d => d.status === 'OPEN' && d.price > 0 && d.date !== gun(1)).length;
-  check(el('pricingPendingVal').innerText === `${bekleyen} gün` && el('pricingPendingBadge').innerText === String(bekleyen) && el('pricingPendingCard').disabled === false,
-    'F-09 "Onay bekleyen gün" ufuktaki onerisi olup fiyati kaydedilmemis gunleri sayar; yonetimde tiklanir', el('pricingPendingVal').innerText);
+  // 08.11.2026 tur bulgusu: kart tiklaninca secilecek sayiyi (bu ay) gosterir; 12 ayin toplami alt satirda.
+  const bekleyenler = App.computePricingCalendar(entry(), BUGUN).suggestions.days.filter(d => d.status === 'OPEN' && d.price > 0 && d.date !== gun(1));
+  const bekleyen = bekleyenler.length;
+  const buAy = bekleyenler.filter(d => d.date.startsWith(ay)).length;
+  check(el('pricingPendingVal').innerText === `${buAy} gün` && el('pricingPendingBadge').innerText === String(buAy) && el('pricingPendingCard').disabled === false
+    && el('pricingPendingMeta').innerText.includes(`12 ayın toplamı ${bekleyen} gün`) && /tıklayınca bu aydakiler seçilir/.test(el('pricingPendingMeta').innerText),
+    'F-09 "Onay bekleyen gün" kartı tiklaninca secilecek sayiyi (bu ay) gosterir; 12 ayin toplami alt satirda; yonetimde tiklanir', el('pricingPendingVal').innerText + ' | ' + el('pricingPendingMeta').innerText);
+  App.selectPricingDays('PENDING');
+  check(buAy <= 1 || new RegExp(`${buAy} gün seçili`).test(el('pricingDayEditor').innerHTML),
+    'F-09b Karttaki sayi tiklayinca secilen gun sayisiyla ayni');
+  App.clearPricingDaySelection();
   kur('owner', { phase101SchemaReady: false });
   check(el('pricingPendingVal').innerText === '—' && /phase101/.test(el('pricingPendingMeta').innerText) && el('pricingPendingCard').disabled === true,
     'F-10 Gunluk fiyat defteri yokken onay bekleyen sayisi uydurulmaz ("—" ve nedeni)');
@@ -2630,6 +2640,50 @@ async function fiyatEksikleriDavranisi() {
   const kilavuzUyari = html.slice(html.indexOf('class="pricing-guide-warnings"'), html.indexOf('</dl>', html.indexOf('class="pricing-guide-warnings"')));
   check((kilavuzUyari.match(/<dt>/g) || []).length === 6 && /Takvimdeki uyarılar ne demek\?/.test(kilavuzUyari) && /Onay bekleyen gün<\/dt><dd>Uyarı değil/.test(kilavuzUyari),
     'F-29d Kilavuz takvim uyarilarini ve "onay bekleyen gun" sayacini kisaca aciklar');
+
+  // F-30 Kullanici turu bulgulari (08.11.2026).
+  kur('owner');
+  const ayAnahtarlari = App.pricingHorizon(BUGUN).months;
+  App.togglePricingDay(gun(12));
+  App.setPricingMonth(ayAnahtarlari[1]);
+  check(!/gün seçili|Bu fiyat neden\?/.test(el('pricingDayEditor').innerHTML) && /Gün seçin/.test(el('pricingDayEditor').innerHTML),
+    'F-30a Ay degisince onceki ayin secimi birakilir; panel gorunmeyen bir gunu gostermez', el('pricingDayEditor').innerHTML.slice(0, 200));
+  App.setPricingMonth(ay);
+  check(/Geçen yıl [^<]+ · ayın tamamı/.test(el('pricingManagerContainer').innerHTML) && /bugünden sonraki gecelerinden/.test(el('pricingManagerContainer').innerHTML),
+    'F-30b Iki "geçen yıl" kutusu ne saydigini yazar: serit bugunden sonraki geceler, alt kutu ayin tamami');
+  kur('owner', { competitorPriceResearch: [{ id: 'k1', property_id: P, researched_on: gun(-2), source_kind: 'OTA', source_url: 'https://x.test', competitor_name: null, prices: [{ type: 'WEEKDAY', amount: 8000 }, { type: 'WEEKEND', amount: 8000 }, { type: 'SPECIAL', amount: 8000 }] }],
+    propertyDailyPrices: [{ property_id: P, price_date: gun(12), price: 12000, source: 'MANUAL', suggested_price: 10000 }] });
+  App.focusPricingDay(gun(12));
+  const kayitliPanel = el('pricingDayEditor').innerHTML;
+  check(/Son rakip ₺8\.000 \([^)]+\) · fiyat %50 yüksek/.test(kayitliPanel) && !/· öneri %50/.test(kayitliPanel),
+    'F-30c Kayitli gunde rakip farki "fiyat" diye yazar (karsilastirilan oneri degil kayitli fiyat)', kayitliPanel.slice(0, 900));
+  kur('owner', { phase115SchemaReady: true, competitorPriceResearch: [{ id: 'k2', property_id: P, researched_on: gun(-2), source_kind: 'OTA', source_url: 'https://x.test', competitor_name: 'Ev A', prices: [{ type: 'WEEKDAY', amount: 8000 }, { type: 'WEEKEND', amount: 8000 }, { type: 'SPECIAL', amount: 8000 }] }] });
+  App.focusPricingDay(gun(13));
+  const ortalamaPanel = el('pricingDayEditor').innerHTML;
+  const panelGercekler = ortalamaPanel.slice(ortalamaPanel.indexOf('pricing-facts'));
+  check(/Rakip ortalaması/.test(panelGercekler) && (panelGercekler.match(/class="pricing-day-rival"/g) || []).length === 1,
+    'F-30d Rakip ortalamasi varsa panelde tek rakip satiri (tekrar yok)', ortalamaPanel.slice(0, 900));
+  kur('owner');
+  App.setPricingView('target');
+  const aySecici = el('pricingTargetMonth').innerHTML;
+  check((aySecici.match(/<option/g) || []).length === 12 && new RegExp(`value="${ay}" selected`).test(aySecici) && read('index.html').includes('id="pricingTargetMonth" data-onchange="setPricingMonth(this.value)"'),
+    'F-30e Hedef sekmesinin kendi ay secicisi var (12 ay, secili ay isaretli)');
+  App.setPricingMonth(ayAnahtarlari[2]);
+  check(new RegExp(`value="${ayAnahtarlari[2]}" selected`).test(el('pricingTargetMonth').innerHTML) && el('pricingTargetTitle').innerText.includes(App.pricingMonthLabel ? App.pricingMonthLabel(ayAnahtarlari[2]) : ''),
+    'F-30f Hedef sekmesinde ay degisince baslik ve hesap o aya gecer');
+  App.setPricingView('calendar');
+  App.setPricingMonth(ay);
+  const tatil = el('pricingSpecialDaysList').innerHTML;
+  check(!/>Sayma</.test(tatil) && (!/pricing-special-row/.test(tatil) || />Hariç tut</.test(tatil)),
+    'F-30g Tatil dugmesi "Hariç tut" / "Dahil et" (belirsiz "Sayma" yok)');
+  check(/Kaynağa göre satılma oranı/.test(read('core/pricing_outcome.js')) && /Onaylanan öneri/.test(read('core/pricing_outcome.js')) && /Elle yazılan/.test(read('core/pricing_outcome.js')),
+    'F-30h Sonuclar: onayli ve elle satilma orani iki ayri satir');
+  const goster = functionBody(read('app.js'), 'function pricingRevealPanel(');
+  check(/max-width: 900px/.test(goster) && /scrollIntoView/.test(goster) && /prefers-reduced-motion/.test(goster)
+    && /pricingRevealPanel\(\)/.test(functionBody(read('app.js'), 'function togglePricingDay(')) && /pricingRevealPanel\(\)/.test(functionBody(read('app.js'), 'function focusPricingDay(')),
+    'F-30i Dar ekranda tek gun secilince panele kaydirilir (hareket azaltma tercihine uyar)');
+  check(/\.pricing-day\.is-past, \.pricing-day\.is-out \{ min-height: 0;/.test(read('style.css')),
+    'F-30j Gecmis gunler ve ay disi hucreler bos tam boy satir kaplamaz');
 }
 
 async function fiyatKararlariDavranisi() {

@@ -17,7 +17,7 @@
   <!-- Yazi tipleri kendi sunucumuzdan (dis sunucuya istek yok); style.css @font-face -->
   <link rel="preload" href="assets/fonts/inter-latin-wght.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="assets/fonts/inter-latin-ext-wght.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="style.css?v=c7f0b569">
+  <link rel="stylesheet" href="style.css?v=123d10b4">
   <link rel="stylesheet" href="analytics.css?v=a15e3414">
   <script src="supabase.umd.js?v=3810661a"></script>
   <script src="core/xlsx_import_worker.js?v=b0939d47"></script>
@@ -2294,6 +2294,7 @@
           <section class="pricing-card pricing-target-card">
             <div class="pricing-card-head"><div><h3 id="pricingTargetTitle">Hedef ciroya hangi fiyatla ulaşılır?</h3><p>Seçili ayın hedefinden bu ay gerçekleşen ciroyu düşer, kalanı ayın açık geceleriyle karşılaştırır. <strong>Tüm mülkler</strong> Hedefleri Yönet'teki işletme hedefini ve Finans'taki ciroyu kullanır. Hedef doluluk boşsa bu ayın kayıtlı doluluk hedefi kullanılır; buraya yazılan oran yalnız bu hesabı değiştirir, takvimdeki talep kuralını değiştirmez.</p></div></div>
             <div class="pricing-controls">
+              <div class="form-group"><label for="pricingTargetMonth">Ay</label><select id="pricingTargetMonth" data-onchange="setPricingMonth(this.value)"></select></div>
               <div class="form-group"><label for="pricingTargetScope">Kapsam</label><select id="pricingTargetScope" data-onchange="setPricingTargetScope(this.value)"><option value="ALL">Tüm mülkler (işletme hedefi)</option><option value="PROPERTY">Seçili mülk</option></select></div>
               <div class="form-group"><label for="pricingTargetInput">Hedef ciro (₺)</label><input id="pricingTargetInput" type="number" min="0" step="0.01" placeholder="—"></div>
               <div class="form-group"><label for="pricingExpectedOccupancy">Hedef doluluk (%)</label><input id="pricingExpectedOccupancy" type="number" min="1" max="100" step="0.1" placeholder="—"></div>
@@ -4349,7 +4350,7 @@
   <script src="core/permission_matrix.js?v=e3a3cef2"></script>
   <script src="core/tenant_backup_export.js?v=29f9ab53"></script>
   <script src="core/ui_dialog.js?v=d0680970"></script>
-  <script src="app.js?v=0c5d6874"></script>
+  <script src="app.js?v=0411db5c"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=aec50671"></script>

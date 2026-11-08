@@ -154,13 +154,14 @@
     const signed = value => value == null ? '—' : `${value > 0 ? '+' : value < 0 ? '−' : ''}${money(Math.abs(value))}`;
     const kpi = (label, value, meta) => `<div class="kpi-card"><span class="kpi-label">${escapeHtml(label)}</span><div class="kpi-value">${escapeHtml(value)}</div><div class="kpi-meta">${escapeHtml(meta)}</div></div>`;
     const bySource = key => outcome.bySource[key];
-    const sourceMeta = key => { const item = bySource(key); return item ? `${item.days} gün · satılma ${pct(item.sellRate)}` : 'kayıt yok'; };
+    // Onayli ve elle iki ayri satir (tur bulgusu: "%0 / %100" zor okunuyordu).
+    const sideHtml = (key, label) => { const item = bySource(key); return `<div><small>${escapeHtml(label)}</small><b>${escapeHtml(pct(item ? item.sellRate : null))}</b><small>${escapeHtml(item ? `${item.days} gün kayıtlı` : 'kayıt yok')}</small></div>`; };
+    const splitHtml = `<div class="kpi-card"><span class="kpi-label">Kaynağa göre satılma oranı</span><div class="pricing-split">${sideHtml('APPROVED', 'Onaylanan öneri')}${sideHtml('MANUAL', 'Elle yazılan')}</div></div>`;
     const kpisHtml = `<div class="pricing-kpis">${[
       kpi('Kayıtlı gün', `${s.days} gün`, `Son ${h.windowDays} gün · onaylı ${bySource('APPROVED')?.days || 0}, elle ${bySource('MANUAL')?.days || 0}`),
       kpi('Satılma oranı', pct(s.sellRate), s.sellRate == null ? 'Kararı ölçülebilen gün yok' : `${s.soldAfter} satıldı / ${s.soldAfter + s.unsold} gün (fiyat kaydından sonra)`),
-      kpi('Ortalama fark', signed(s.avgDiff), s.avgDiff == null ? 'Kayıttan sonra satılan gece yok' : `Gerçekleşen − kayıtlı, gece başına (${pct(s.avgDiffPct)})`),
-      kpi('Onaylı / Elle', `${pct(bySource('APPROVED')?.sellRate ?? null)} / ${pct(bySource('MANUAL')?.sellRate ?? null)}`, `Onaylı: ${sourceMeta('APPROVED')} · Elle: ${sourceMeta('MANUAL')}`)
-    ].join('')}</div>`;
+      kpi('Ortalama fark', signed(s.avgDiff), s.avgDiff == null ? 'Kayıttan sonra satılan gece yok' : `Gerçekleşen − kayıtlı, gece başına (${pct(s.avgDiffPct)})`)
+    ].join('')}${splitHtml}</div>`;
     const reasons = { IMPORTED: 'içe aktarılmış kayıt', NO_CREATED_AT: 'rezervasyonun oluşturulma zamanı yok', NO_DECISION_TIME: 'fiyat kaydının zamanı yok' };
     const notes = [];
     if (s.soldBefore) notes.push(`${s.soldBefore} gün fiyat kaydından önce satılmıştı; fiyat kararı bu satışı etkilemediği için orana ve farka girmez.`);
