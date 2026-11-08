@@ -2614,6 +2614,22 @@ async function fiyatEksikleriDavranisi() {
   kur('owner', { competitorPriceResearch: kayitlar, phase115SchemaReady: false });
   check(/phase115/.test(el('pricingRivalSummary').innerHTML) && el('pricingResearchCompetitor').disabled === true,
     'F-28d phase115 yokken rakip adi alani kilitli ve ortalama "—" + neden');
+
+  // F-29 Uyarilar (kullanici 08.11.2026 "daha anlasilir"): baslik + ne etkiliyor + duzeltme dugmesi.
+  const uyari = kur('owner');
+  check(/pricing-warning is-info"><div><strong>Talep artışı kapalı: doluluk hedefi yok<\/strong><span>[^<]*diğer kurallar normal çalışıyor/.test(uyari)
+    && /data-onclick="openGoalsModal\(\)">Doluluk hedefi gir/.test(uyari),
+    'F-29a Doluluk hedefi yok uyarisi neyi etkiledigini ve diger kurallarin calistigini yazar; hedef girme dugmesi var', uyari.slice(0, 600));
+  const bazsizUyari = kur('owner', { villas: { SEYIR: { id: P, slug: 'SEYIR', name: 'Seyir', basePrice: 0, isActive: true, activationDate: '2024-01-01' } } });
+  check(/pricing-warning is-warn"><div><strong>Öneri hesaplanamıyor: baz fiyat yok/.test(bazsizUyari) && /setPricingView\('rules'\)">Fiyat tablosuna git/.test(bazsizUyari)
+    && /Taban fiyat yok/.test(bazsizUyari),
+    'F-29b Baz fiyat yoksa oneriyi bozan uyari (sari) ve fiyat tablosuna goturen dugme; taban yoksa bilgi', bazsizUyari.slice(0, 600));
+  const satisUyari = kur('sales');
+  check(/Talep artışı kapalı/.test(satisUyari) && !/openGoalsModal\(\)/.test(satisUyari.slice(0, satisUyari.indexOf('pricing-grid'))),
+    'F-29c Satis rolu uyariyi okur; duzeltme dugmesi yalniz yonetimde');
+  const kilavuzUyari = html.slice(html.indexOf('class="pricing-guide-warnings"'), html.indexOf('</dl>', html.indexOf('class="pricing-guide-warnings"')));
+  check((kilavuzUyari.match(/<dt>/g) || []).length === 6 && /Takvimdeki uyarılar ne demek\?/.test(kilavuzUyari) && /Onay bekleyen gün<\/dt><dd>Uyarı değil/.test(kilavuzUyari),
+    'F-29d Kilavuz takvim uyarilarini ve "onay bekleyen gun" sayacini kisaca aciklar');
 }
 
 async function fiyatKararlariDavranisi() {
