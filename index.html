@@ -2263,8 +2263,8 @@
             <div class="pricing-card-head"><div><h3 id="pricingTargetTitle">Hedef ciroya hangi fiyatla ulaşılır?</h3><p>Seçili ayın hedefinden bu ay gerçekleşen ciroyu düşer, kalanı ayın açık geceleriyle karşılaştırır. <strong>Tüm mülkler</strong> Hedefleri Yönet'teki işletme hedefini ve Finans'taki ciroyu kullanır. Hedef doluluk boşsa bu ayın kayıtlı doluluk hedefi kullanılır; buraya yazılan oran yalnız bu hesabı değiştirir, takvimdeki talep kuralını değiştirmez.</p></div></div>
             <div class="pricing-controls">
               <div class="form-group"><label for="pricingTargetScope">Kapsam</label><select id="pricingTargetScope" data-onchange="setPricingTargetScope(this.value)"><option value="ALL">Tüm mülkler (işletme hedefi)</option><option value="PROPERTY">Seçili mülk</option></select></div>
-              <div class="form-group"><label for="pricingTargetInput">Hedef ciro (₺)</label><input id="pricingTargetInput" type="number" min="0" step="1000" placeholder="—"></div>
-              <div class="form-group"><label for="pricingExpectedOccupancy">Hedef doluluk (%)</label><input id="pricingExpectedOccupancy" type="number" min="1" max="100" step="1" placeholder="—"></div>
+              <div class="form-group"><label for="pricingTargetInput">Hedef ciro (₺)</label><input id="pricingTargetInput" type="number" min="0" step="0.01" placeholder="—"></div>
+              <div class="form-group"><label for="pricingExpectedOccupancy">Hedef doluluk (%)</label><input id="pricingExpectedOccupancy" type="number" min="1" max="100" step="0.1" placeholder="—"></div>
               <div class="form-group"><label for="pricingFocusSelect">Odak</label><select id="pricingFocusSelect"><option value="BALANCED">Dengeli</option><option value="OCCUPANCY">Doluluk</option><option value="REVENUE">Gelir</option></select></div>
               <button type="button" class="btn btn-primary" data-onclick="recalculatePricingTarget()">Hesapla</button>
             </div>
@@ -2784,7 +2784,7 @@
           <div data-lx-style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
             <div class="form-group">
               <label for="goalMarginPct" data-lx-style="font-size: 12px; font-weight: 600;">📈 Hedef kâr marjı (%)</label>
-              <input type="number" id="goalMarginPct" min="0" max="100" step="1" inputmode="decimal" placeholder="Örn: 35" data-oninput="syncGoalProfitFromMargin()" data-lx-style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
+              <input type="number" id="goalMarginPct" min="0" max="100" step="0.01" inputmode="decimal" placeholder="Örn: 35" data-oninput="syncGoalProfitFromMargin()" data-lx-style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
               <span data-lx-style="font-size: 11px; color: var(--text-muted); margin-top: 3px; display: block;">Ciro hedefinin yüzdesi; tutar kendiliğinden hesaplanır</span>
             </div>
             <div class="form-group">
@@ -3920,7 +3920,7 @@
             <div class="form-group"><label for="propAnalysisCity">Şehir</label><input type="text" id="propAnalysisCity" maxlength="120" placeholder="Örn. Kaş"></div>
             <div class="form-group"><label for="propAnalysisDistrictRegion">İlçe / turizm bölgesi</label><input type="text" id="propAnalysisDistrictRegion" maxlength="160" placeholder="Örn. Kalkan"></div>
             <div class="form-group"><label for="propAnalysisLocality">Köy / mahalle</label><input type="text" id="propAnalysisLocality" maxlength="120" placeholder="Örn. Kirazlı Köyü"></div>
-            <div class="form-group"><label for="propAnalysisRadius">Araştırma yarıçapı (km)</label><input type="number" id="propAnalysisRadius" min="0.5" max="200" step="0.5" placeholder="10"></div>
+            <div class="form-group"><label for="propAnalysisRadius">Araştırma yarıçapı (km)</label><input type="number" id="propAnalysisRadius" min="0.5" max="200" step="0.1" placeholder="10"></div>
           </div>
           <div class="property-analysis-context__grid">
             <div class="form-group"><label for="propMapCoordinatesLink">Konum: Google Haritalar bağlantısı, Plus Code ya da koordinat</label><input type="text" id="propMapCoordinatesLink" autocomplete="off" spellcheck="false" placeholder="Örn. 8G8F6J2V+F6 ya da 36.2012, 29.6431"><small class="sub-text">Kolay yol: Google Haritalar’da evin üzerine basılı tutun (bilgisayarda sağ tıklayın); çıkan “36.2012, 29.6431” sayısını kopyalayıp buraya yapıştırın. Enlem ve boylam kendiliğinden dolar. Elinizde “6J2V+F6 Kaş” gibi kısa kod varsa plus.codes/map sitesinde uzun koda çevirip yapıştırın.</small></div>
@@ -4009,7 +4009,7 @@
           </div>
           <div class="form-group">
             <label>Temizlik Ücreti (TL)</label>
-            <input type="number" id="hkAmount" step="50" min="0" placeholder="1500" required data-lx-style="font-weight: 700; color: #409CFF; font-size: 15px;">
+            <input type="number" id="hkAmount" step="0.01" min="0" placeholder="1500" required data-lx-style="font-weight: 700; color: #409CFF; font-size: 15px;">
           </div>
           <div class="form-group full-width">
             <label>Açıklama / Misafir Çıkışı</label>
@@ -4305,9 +4305,9 @@
   <script src="core/permission_matrix.js?v=e3a3cef2"></script>
   <script src="core/tenant_backup_export.js?v=29f9ab53"></script>
   <script src="core/ui_dialog.js?v=d0680970"></script>
-  <script src="app.js?v=06cf1d21"></script>
+  <script src="app.js?v=cba862ff"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
-  <script src="core/marketing_ui.js?v=1fd0e49f"></script>
+  <script src="core/marketing_ui.js?v=aec50671"></script>
 </body>
 </html>

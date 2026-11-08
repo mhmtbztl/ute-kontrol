@@ -148,6 +148,9 @@ const allTestFiles = [
   // Veri gibi gorunen statik arayuz degerleri denetimi
   'static_ui_value_tests.js',
 
+  // Ondalik tasiyan sayi alanlarinin step degeri (62,5 marj reddediliyordu)
+  'number_step_tests.js',
+
   // Rezervasyon silme atomikligi (Phase 19)
   'booking_delete_atomicity_tests.js',
 

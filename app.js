@@ -21237,7 +21237,7 @@ function propertyPricingLadderFormHtml(villaKey, property) {
   const field = ([key, label]) => {
     const raw = key === 'floor' ? (property.floor ?? property.floorPrice) : property[key];
     const value = raw === null || raw === undefined || raw === '' || !Number.isFinite(Number(raw)) ? '' : String(Number(raw));
-    return `<div class="form-group"><label for="ladder_${key}">${escapeHtml(label)}</label><input id="ladder_${key}" name="${key}" type="number" min="0" step="1" inputmode="numeric" value="${escapeHtml(value)}" placeholder="Girilmedi"></div>`;
+    return `<div class="form-group"><label for="ladder_${key}">${escapeHtml(label)}</label><input id="ladder_${key}" name="${key}" type="number" min="0" step="0.01" inputmode="decimal" value="${escapeHtml(value)}" placeholder="Girilmedi"></div>`;
   };
   // <form> degil: global innerHTML temizleyicisi FORM ogesini siler (L-15).
   return `<div class="property-ladder-form"><h4>Fiyat basamaklarını düzenle</h4><div class="property-profile-grid">${PROPERTY_LADDER_FIELDS.map(field).join('')}</div><p class="sub-text">Boş bırakılan basamak "girilmedi" olarak kalır; tahmin edilmez.</p><button type="button" class="btn btn-primary btn-sm" data-onclick="savePropertyPricingLadder(decodeURIComponent('${encodeActionArg(villaKey)}'))">Basamakları kaydet</button></div>`;
@@ -23843,7 +23843,7 @@ function pricingLadderCardHtml(entry, canManage, evidenceHtml = '') {
   const valueOf = raw => raw === null || raw === undefined || raw === '' || !Number.isFinite(Number(raw)) ? '' : String(Number(raw));
   const floorRaw = property.floor ?? property.floorPrice;
   const reference = PROPERTY_LADDER_FIELDS.filter(([key]) => key !== 'floor').map(([key, label]) => [key, label, property[key]]);
-  const input = (key, label, raw, main) => `<div class="form-group${main ? ' is-main' : ''}"><label for="pricingLadder_${key}">${escapeHtml(label)}</label><input id="pricingLadder_${key}" type="number" min="0" step="1" inputmode="numeric" value="${escapeHtml(valueOf(raw))}" placeholder="Girilmedi"></div>`;
+  const input = (key, label, raw, main) => `<div class="form-group${main ? ' is-main' : ''}"><label for="pricingLadder_${key}">${escapeHtml(label)}</label><input id="pricingLadder_${key}" type="number" min="0" step="0.01" inputmode="decimal" value="${escapeHtml(valueOf(raw))}" placeholder="Girilmedi"></div>`;
   const view = (label, raw, main) => `<div class="pricing-ladder-value${main ? ' is-main' : ''}"><small>${escapeHtml(label)}</small><strong>${escapeHtml(pricingMoney(valueOf(raw) === '' ? null : raw))}</strong></div>`;
   const cell = canManage ? input : (key, label, raw, main) => view(label, raw, main);
   const referenceHtml = reference.map(([key, label, raw]) => cell(key, label, raw, false)).join('');
@@ -23990,7 +23990,7 @@ function pricingDayDetailHtml(day, ctx, withActions) {
 }
 
 function pricingDayActionsHtml(hasSaved, hasSuggestion) {
-  return `<div class="pricing-day-editor-actions">${hasSuggestion ? `<button type="button" class="btn btn-primary btn-sm" data-onclick="applyPricingDayPrices('APPROVE')">Öneriyi onayla</button>` : ''}<div class="pricing-manual"><label class="sr-only" for="pricingDayManualPrice">Elle fiyat (₺)</label><input id="pricingDayManualPrice" type="number" min="1" step="1" inputmode="numeric" placeholder="Elle fiyat (₺)"><button type="button" class="btn btn-secondary btn-sm" data-onclick="applyPricingDayPrices('MANUAL')">Elle fiyatı uygula</button></div><label class="sr-only" for="pricingDayNote">Not</label><input id="pricingDayNote" type="text" maxlength="500" placeholder="Not (isteğe bağlı)"><div class="pricing-day-editor-row">${hasSaved ? `<button type="button" class="btn btn-secondary btn-sm" data-onclick="applyPricingDayPrices('REMOVE')">Kaydı kaldır</button>` : ''}<button type="button" class="btn btn-secondary btn-sm" data-onclick="clearPricingDaySelection()">Seçimi temizle</button></div></div>`;
+  return `<div class="pricing-day-editor-actions">${hasSuggestion ? `<button type="button" class="btn btn-primary btn-sm" data-onclick="applyPricingDayPrices('APPROVE')">Öneriyi onayla</button>` : ''}<div class="pricing-manual"><label class="sr-only" for="pricingDayManualPrice">Elle fiyat (₺)</label><input id="pricingDayManualPrice" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="Elle fiyat (₺)"><button type="button" class="btn btn-secondary btn-sm" data-onclick="applyPricingDayPrices('MANUAL')">Elle fiyatı uygula</button></div><label class="sr-only" for="pricingDayNote">Not</label><input id="pricingDayNote" type="text" maxlength="500" placeholder="Not (isteğe bağlı)"><div class="pricing-day-editor-row">${hasSaved ? `<button type="button" class="btn btn-secondary btn-sm" data-onclick="applyPricingDayPrices('REMOVE')">Kaydı kaldır</button>` : ''}<button type="button" class="btn btn-secondary btn-sm" data-onclick="clearPricingDaySelection()">Seçimi temizle</button></div></div>`;
 }
 
 // Rakip fiyati gun kartinda yalniz bilgi olarak yazilir (L-260, kullanici
