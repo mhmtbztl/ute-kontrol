@@ -49,4 +49,6 @@ durumda kırılmaz.
 
 ## Üretim durumu
 
-Henüz uygulanmadı.
+08.11.2026: kullanıcı SQL Editor'de uyguladı (başarılı). Salt okunur doğrulama:
+ BAŞARILI,  115 mevcut. İstemci aynı gün
+yayına alındı (PR #64).
