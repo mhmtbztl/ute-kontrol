@@ -135,18 +135,20 @@ test('I5. index.html: menu kalemi, sekme kabi, stil ve betik sirasi', () => {
   assert.match(INDEX, /data-onclick="switchTab\('analytics'\)">📊 Analiz</);
   assert.match(INDEX, /<div id="tab-analytics" class="tab-content">\s*<div id="analyticsRoot"><\/div>\s*<\/div>/);
   assert.match(INDEX, /<link rel="stylesheet" href="analytics\.css\?v=[0-9a-f]{8}">/);
-  const ledger = INDEX.indexOf('src="core/ledger_contract.js');
-  const engine = INDEX.indexOf('src="core/booking_analytics.js');
-  const ui = INDEX.indexOf('src="core/analytics_ui.js');
-  const app = INDEX.indexOf('src="app.js');
-  assert.ok(ledger > 0 && ledger < engine && engine < ui && ui < app, 'ledger_contract < booking_analytics < analytics_ui < app.js');
+  // Analiz modulleri acilista yuklenmez (acilis JS butcesi, L-163): <script> etiketi
+  // yok; app.js calisma aninda damgali adresle ister (stamp_assets SATELLITE).
+  assert.ok(!INDEX.includes('src="core/booking_analytics.js') && !INDEX.includes('src="core/analytics_ui.js'), 'analiz modulleri acilista yuklenmemeli');
+  assert.match(APP, /const ANALYTICS_ENGINE_URL = 'core\/booking_analytics\.js\?v=[0-9a-f]{8}';/);
+  assert.match(APP, /const ANALYTICS_UI_URL = 'core\/analytics_ui\.js\?v=[0-9a-f]{8}';/);
 });
 
 test('I6. app.js: switchTab, ACTIVE_RENDER_PLANS ve rol kapisi', () => {
   assert.match(APP, /if \(tabId === 'analytics'\) renderAnalyticsTab\(\);/);
   assert.match(APP, /'tab-analytics': \['renderAnalyticsTab'\]/);
   // Sekme ay performansini Bugun ekraninin fonksiyonundan alir (tek kaynak).
-  assert.match(APP, /monthPerformance: \(monthKey, villa\) => computeMonthPerformance\(monthKey, villa\),/);
+  // Onbellek araya girer ama deger computeMonthPerformance'in kendisidir.
+  assert.match(APP, /monthPerformance: analyticsMonthPerformance,/);
+  assert.match(APP, /degerler\.set\(k, computeMonthPerformance\(monthKey, villa\)\)/);
   assert.match(APP, /isBulkSummary: isBulkSummaryBooking,/);
   assert.match(APP, /leadChannelName: leadChannelLabel,/);
   assert.match(APP, /if \(!canReadSalesRole\(role\)\) hiddenTabs\.add\('analytics'\);/);
@@ -250,6 +252,64 @@ function sahteIstemci(satirlar, sorgular) {
     App.setActiveTenant({ id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', role: 'owner' });
     assert.strictEqual(App.isAnalyticsImportedBooking({ id: 'a1', dbId: 'a1' }), false, 'baska kiracinin bagi kullanilmaz');
     App.setSupabaseClient(null);
+  });
+
+  await testAsync('I11. Ay performansi onbellegi: deger kaynakla ayni; veri degisince yenilenir (bayat deger yok)', async () => {
+    const tur = () => new Promise(r => setImmediate(r));
+    ortamKur();
+    await tur();
+    const ilk = App.analyticsMonthPerformance('2031-05', 'ALL');
+    assert.deepStrictEqual(ilk, App.computeMonthPerformance('2031-05', 'ALL'));
+    await tur();
+    assert.strictEqual(App.analyticsMonthPerformance('2031-05', 'ALL'), ilk, 'ayni veride onbellekten (ayni nesne)');
+    // Yerinde ekleme: dizi ayni, uzunluk degisir
+    App.getAppData().bookings.push(bk('yeni', 'B', '2031-05-20', '2031-05-22', 8000, { createdAt: '2031-05-01T00:00:00Z' }));
+    await tur();
+    const eklendi = App.analyticsMonthPerformance('2031-05', 'ALL');
+    assert.strictEqual(Math.round(eklendi.roomRevenue), Math.round(ilk.roomRevenue) + 8000, 'yeni rezervasyon yansimali');
+    // Yerinde duzenleme: tutar degisir, updatedAt ilerler
+    const b = App.getAppData().bookings.find(x => x.id === 'yeni');
+    b.gross = 10000; b.updatedAt = '2031-06-01T00:00:00Z';
+    await tur();
+    assert.strictEqual(Math.round(App.analyticsMonthPerformance('2031-05', 'ALL').roomRevenue), Math.round(ilk.roomRevenue) + 10000, 'duzenleme yansimali');
+    // Yeniden yukleme: yeni dizi
+    ortamKur();
+    await tur();
+    assert.deepStrictEqual(App.analyticsMonthPerformance('2031-05', 'ALL'), App.computeMonthPerformance('2031-05', 'ALL'));
+  });
+
+  await testAsync('I12. Analiz modulleri gecikmeli yuklenir: once motor, sonra arayuz; hata olursa yeniden denenir', async () => {
+    const tur = () => new Promise(r => setImmediate(r));
+    const eskiUI = global.AnalyticsUI, eskiBA = global.BookingAnalytics;
+    delete global.AnalyticsUI; delete global.BookingAnalytics;
+    const eklenen = [];
+    const kok = { textContent: '', firstChild: null };
+    global.document = { createElement: () => ({}), head: { appendChild: tag => eklenen.push(tag) }, getElementById: id => (id === 'analyticsRoot' ? kok : null) };
+    try {
+      // Hata yolu: motor yuklenemez -> soz reddedilir, sonraki cagri yeniden ister
+      const p1 = App.loadAnalyticsModules();
+      assert.strictEqual(eklenen.length, 1);
+      eklenen[0].onerror();
+      await assert.rejects(p1);
+      await tur();
+      assert.match(kok.textContent, /Analiz yüklenemedi/);
+      const p2 = App.loadAnalyticsModules();
+      assert.strictEqual(eklenen.length, 2, 'hatadan sonra yeniden istenmeli');
+      assert.match(eklenen[1].src, /^core\/booking_analytics\.js\?v=[0-9a-f]{8}$/);
+      assert.strictEqual(App.loadAnalyticsModules(), p2, 'yuklenirken ikinci istek acilmaz');
+      global.BookingAnalytics = BookingAnalytics; eklenen[1].onload();
+      await tur();
+      assert.strictEqual(eklenen.length, 3, 'motor gelince arayuz istenir');
+      assert.match(eklenen[2].src, /^core\/analytics_ui\.js\?v=[0-9a-f]{8}$/);
+      global.AnalyticsUI = require('./analytics_ui.js'); eklenen[2].onload();
+      assert.strictEqual(await p2, true);
+      assert.strictEqual(await App.loadAnalyticsModules(), true);
+      assert.strictEqual(eklenen.length, 3, 'yuklendikten sonra yeni etiket yok');
+    } finally {
+      delete global.document;
+      if (eskiUI) global.AnalyticsUI = eskiUI; else delete global.AnalyticsUI;
+      if (eskiBA) global.BookingAnalytics = eskiBA; else delete global.BookingAnalytics;
+    }
   });
 
   console.log('-----------------------------------------------------------------------------');

@@ -334,13 +334,18 @@
       return Math.max(0, Math.min(months.length - 1, Math.round((px - pad.l) / iw * (months.length - 1))));
     }
     hit.addEventListener('pointermove', ev => goster(indexFromEvent(ev)));
-    hit.addEventListener('pointerleave', gizle);
+    // Telefonda dokunus pointermove uretmez; ipucu dokunulan ayda acilir.
+    // Parmak kalkinca gelen pointerleave ipucunu kapatmasin: yalniz fare.
+    hit.addEventListener('pointerdown', ev => goster(indexFromEvent(ev)));
+    hit.addEventListener('pointerleave', ev => { if (!ev || ev.pointerType === 'mouse') gizle(); });
     wrap.addEventListener('keydown', ev => {
       if (ev.key === 'ArrowRight') { goster(Math.min(months.length - 1, aktif + 1)); ev.preventDefault(); }
       else if (ev.key === 'ArrowLeft') { goster(Math.max(0, aktif < 0 ? months.length - 1 : aktif - 1)); ev.preventDefault(); }
       else if (ev.key === 'Escape') gizle();
     });
     wrap.addEventListener('blur', gizle);
+    // Grafik disina dokunus ipucunu kapatir (mount'taki belge dinleyicisi cagirir).
+    wrap.__baGizle = gizle;
     return wrap;
   }
 
@@ -478,8 +483,12 @@
     }
 
     function onClick(ev) {
-      const t = ev.target && ev.target.closest ? ev.target.closest('[data-ba-set],[data-ba-toggle],[data-ba-sort],[data-ba-villa]') : null;
+      const t = ev.target && ev.target.closest ? ev.target.closest('[data-ba-set],[data-ba-toggle],[data-ba-sort],[data-ba-villa],[data-ba-add-booking]') : null;
       if (!t || !rootEl.contains(t)) return;
+      if (t.hasAttribute('data-ba-add-booking')) {
+        if (typeof opt.onAddBooking === 'function') opt.onAddBooking();
+        return;
+      }
       if (t.hasAttribute('data-ba-set')) {
         const k = t.getAttribute('data-ba-set');
         const v = t.getAttribute('data-ba-value');
@@ -512,13 +521,27 @@
       render();
     }
 
+    // Yalniz GENISLIK degisince yeniden ciz: telefonda kaydirirken adres cubugu
+    // gizlenip gorununce yukseklik degisir; o zaman cizmek sayfayi ziplatirdi.
+    let sonGenislik = typeof window !== 'undefined' ? window.innerWidth : 0;
     function onResize() {
+      const w = typeof window !== 'undefined' ? window.innerWidth : 0;
+      if (w === sonGenislik) return;
+      sonGenislik = w;
       if (resizeTimer) clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => { if (lastReport) render(); }, 150);
     }
 
+    // Telefonda acik ipucu, grafigin disina dokununca kapanir.
+    function onDocPointerDown(ev) {
+      Array.from(rootEl.querySelectorAll('.ba-chart')).forEach(c => {
+        if (typeof c.__baGizle === 'function' && !c.contains(ev.target)) c.__baGizle();
+      });
+    }
+
     rootEl.addEventListener('click', onClick);
     rootEl.addEventListener('change', onChange);
+    if (typeof document !== 'undefined' && document.addEventListener) document.addEventListener('pointerdown', onDocPointerDown);
     if (typeof window !== 'undefined' && window.addEventListener) window.addEventListener('resize', onResize);
 
     // Yeniden cizim tum dugumleri degistirir; klavye odagi ayni kontrole
@@ -573,14 +596,17 @@
           period, villa: state.villa, deps: opt.deps || {}
         });
       } catch (err) {
-        rootEl.appendChild(emptyState('Analiz hesaplanamadı', String(err && err.message || err)));
+        // Ham hata kodu kullaniciya gosterilmez; tani icin konsola yazilir.
+        if (typeof console !== 'undefined') console.warn('Analiz hesaplanamadi', err);
+        rootEl.appendChild(emptyState('Analiz hesaplanamadı', 'Dönem ya da mülk seçimini değiştirip yeniden deneyin. Sorun sürerse sayfayı yenileyin.'));
         return;
       }
       lastReport = report;
       rootEl.appendChild(renderHeader(report, d, ayListesi));
       if (report.empty) {
         rootEl.appendChild(emptyState('Henüz rezervasyon yok',
-          'Rezervasyon ekledikçe ciro, doluluk, kanal ve davranış analizleri burada kendiliğinden oluşur.'));
+          'Rezervasyon ekledikçe ciro, doluluk, kanal ve davranış analizleri burada kendiliğinden oluşur.',
+          typeof opt.onAddBooking === 'function' && (typeof opt.canAddBooking !== 'function' || opt.canAddBooking()) ? 'Rezervasyon ekle' : null));
         return;
       }
       rootEl.appendChild(renderKpis(report));
@@ -594,6 +620,22 @@
       const leadsOk = typeof opt.canReadLeads === 'function' ? opt.canReadLeads() : true;
       if (leadsOk) rootEl.appendChild(renderLeads(report));
       if (report.villa !== 'ALL') rootEl.appendChild(renderProperties(report));
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(markOverflow);
+    }
+
+    // Kendi kutusunda yana kayan tablo: ustune ipucu, kenarlarina golge (CSS).
+    function markOverflow() {
+      Array.from(rootEl.querySelectorAll('.ba-scroll')).forEach(el => {
+        const tasar = el.scrollWidth > el.clientWidth + 1;
+        el.classList.toggle('is-overflowing', tasar);
+        const onceki = el.previousElementSibling;
+        const var_ = onceki && onceki.classList && onceki.classList.contains('ba-scroll-note');
+        if (tasar && !var_ && el.parentNode) {
+          el.parentNode.insertBefore(h('p', { class: 'ba-scroll-note', text: 'Tablonun devamı için sağa kaydırın →' }), el);
+        } else if (!tasar && var_) {
+          onceki.parentNode.removeChild(onceki);
+        }
+      });
     }
 
     function width(el, fallback) {
@@ -669,8 +711,13 @@
         const deger = k.current[metric];
         const satirlar = aktif.map(c => {
           const dd = k.deltas[metric] && k.deltas[metric][c.key];
-          if (dd) return h('li', {}, deltaChip(dd, def.good, c.short));
-          return null;
+          if (!dd) return null;
+          let ek = c.short;
+          // Kismi hedef: fark yalniz hedefi olan aylarin gerceklesenine gore.
+          const kap = c.key === 'target' && k.compare.target && k.compare.target.coverage
+            ? k.compare.target.coverage[metric] : null;
+          if (kap && kap.months.length < kap.total) ek += ` · hedefli ay ${kap.months.length}/${kap.total}`;
+          return h('li', {}, deltaChip(dd, def.good, ek));
         }).filter(Boolean);
         let neden = null;
         if (deger === null) neden = nullReason(metric, k.current);
@@ -880,7 +927,7 @@
         h('caption', { class: 'ba-sr-only', text: `Mülk karşılaştırması, ${periodLabel(report.period)}` }),
         h('thead', {}, head), h('tbody', {}, body), tfoot
       ]);
-      const sub = 'Satıra tıklayınca o mülkün analizi açılır · oranlar toplamdan, ortalama mülklerin ortalaması';
+      const sub = 'Mülk adını seçince o mülkün analizi açılır · oranlar toplamdan, ortalama mülklerin ortalaması';
       return card('Mülk karşılaştırması', sub, null, h('div', { class: 'ba-scroll' }, table), 'ba-card-wide');
     }
 
@@ -898,14 +945,14 @@
         return host;
       };
       const ltNote = b.leadTimeSample
-        ? `n = ${nf0.format(b.leadTimeSample)} rezervasyon` + (b.leadTimeExcluded ? ` · ${nf0.format(b.leadTimeExcluded)} kayıt sonradan girildiği için dahil değil` : '')
+        ? `${nf0.format(b.leadTimeSample)} rezervasyondan` + (b.leadTimeExcluded ? ` · ${nf0.format(b.leadTimeExcluded)} kayıt sonradan girildiği için dahil değil` : '')
         : 'Ölçülemedi: kayıtlar sonradan ya da içe aktarımla girilmiş';
       const body = h('div', { class: 'ba-mini-grid' }, [
         b.leadTimeSample
           ? mini('Rezervasyon öncesi süre', ltNote, b.leadTimeBuckets.map(x => ltLabels[x.key]), b.leadTimeBuckets.map(x => x.count))
           : h('div', { class: 'ba-mini' }, [h('h4', { class: 'ba-mini-title', text: 'Rezervasyon öncesi süre' }), h('p', { class: 'ba-mini-note', text: ltNote })]),
-        mini('Konaklama süresi', `n = ${nf0.format(b.sample)} rezervasyon`, b.stayBuckets.map(x => stLabels[x.key]), b.stayBuckets.map(x => x.count)),
-        mini('Giriş günü', `n = ${nf0.format(b.sample)} rezervasyon`, GUNLER, b.weekday)
+        mini('Konaklama süresi', `${nf0.format(b.sample)} rezervasyondan`, b.stayBuckets.map(x => stLabels[x.key]), b.stayBuckets.map(x => x.count)),
+        mini('Giriş günü', `${nf0.format(b.sample)} rezervasyondan`, GUNLER, b.weekday)
       ]);
       return card('Rezervasyon davranışı', 'Girişi bu dönemde olan rezervasyonlar · iptal ve toplu aktarım hariç', null, body, 'ba-card-wide');
     }
@@ -951,8 +998,11 @@
       const reasons = L.lossReasons.length
         ? h('ul', { class: 'ba-reasons' }, L.lossReasons.map(r => h('li', {}, [h('span', { text: r.reason }), h('span', { class: 'num', text: nf0.format(r.count) })])))
         : h('p', { class: 'ba-empty-line', text: 'Kaybedilen talep yok' });
+      const bagsizNot = L.wonUnlinked > 0
+        ? h('p', { class: 'ba-footnote', text: `${nf0.format(L.wonUnlinked)} talep "kazanıldı" işaretli ama bir rezervasyona bağlı değil; dönüşüme sayılmadı, kapanan taleplerde kazanmaya sayıldı.` })
+        : null;
       const body = h('div', { class: 'ba-leads' }, [
-        h('div', {}, [kpis, funnel]),
+        h('div', {}, [kpis, funnel, bagsizNot]),
         h('div', {}, [h('h4', { class: 'ba-mini-title', text: 'Kanala göre' }), h('div', { class: 'ba-scroll' }, chTable),
           h('h4', { class: 'ba-mini-title', text: 'Kayıp nedenleri' }), reasons])
       ]);
@@ -961,13 +1011,18 @@
       return c;
     }
 
-    function emptyState(title, text) {
-      return h('div', { class: 'ba-empty' }, [h('p', { class: 'ba-empty-title', text: title }), h('p', { class: 'ba-empty-text', text: text })]);
+    function emptyState(title, text, eylem) {
+      return h('div', { class: 'ba-empty' }, [
+        h('p', { class: 'ba-empty-title', text: title }),
+        h('p', { class: 'ba-empty-text', text: text }),
+        eylem ? h('button', { type: 'button', class: 'btn btn-primary ba-empty-btn', 'data-ba-add-booking': '1', text: eylem }) : null
+      ]);
     }
 
     function destroy() {
       rootEl.removeEventListener('click', onClick);
       rootEl.removeEventListener('change', onChange);
+      if (typeof document !== 'undefined' && document.removeEventListener) document.removeEventListener('pointerdown', onDocPointerDown);
       if (typeof window !== 'undefined' && window.removeEventListener) window.removeEventListener('resize', onResize);
       if (resizeTimer) clearTimeout(resizeTimer);
       rootEl.textContent = '';

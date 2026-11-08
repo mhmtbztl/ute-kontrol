@@ -15581,10 +15581,96 @@ function isAnalyticsImportedBooking(b) {
   return !!(ids && b && ids.has(b.dbId || b.id));
 }
 
+// Analiz dokunuslari (donem, cip, siralama) ayni veriyle ay performansini
+// yeniden hesaplamaz. Deger computeMonthPerformance'in kendisidir; onbellek
+// verinin imzasina baglidir ve veri degisince bosalir. Dizi kimligi de imzada:
+// loadTenantAppData dizileri yeniden kurar, yerinde duzenleme updatedAt'i degistirir.
+let analyticsPerfCache = { imza: null, degerler: new Map() };
+const analyticsDiziKimligi = new WeakMap();
+let analyticsDiziSayaci = 0;
+function analyticsDiziId(dizi) {
+  if (!dizi || typeof dizi !== 'object') return 0;
+  if (!analyticsDiziKimligi.has(dizi)) analyticsDiziKimligi.set(dizi, ++analyticsDiziSayaci);
+  return analyticsDiziKimligi.get(dizi);
+}
+function analyticsDataSignature() {
+  const bookings = appData.bookings || [];
+  let enSon = '';
+  bookings.forEach(b => {
+    const t = String((b && (b.updatedAt || b.updated_at || b.createdAt || b.created_at)) || '');
+    if (t > enSon) enSon = t;
+  });
+  const villas = appData.villas || {};
+  const villaImza = Object.entries(villas).map(([k, v]) => `${k}:${v && (v.activated_on || v.activatedOn || '')}`).join(',');
+  return [
+    activeTenant?.id || '', analyticsDiziId(bookings), bookings.length, enSon, villaImza,
+    analyticsDiziId(appData.maintenance), (appData.maintenance || []).length,
+    analyticsDiziId(appData.expenses), (appData.expenses || []).length,
+    analyticsDiziId(appData.incomeEntries), (appData.incomeEntries || []).length,
+    analyticsDiziId(appData.cleaningTasks), (appData.cleaningTasks || []).length
+  ].join('|');
+}
+// Imza bir cizim boyunca sabittir: ilk cagrida hesaplanir, cizim senkron
+// oldugu icin ayni turdaki tum cagrilar onu kullanir; tur bitince sifirlanir.
+let analyticsImzaBuTur = null;
+function analyticsMonthPerformance(monthKey, villa) {
+  if (!analyticsImzaBuTur) {
+    analyticsImzaBuTur = analyticsDataSignature();
+    Promise.resolve().then(() => { analyticsImzaBuTur = null; });
+  }
+  const imza = analyticsImzaBuTur;
+  if (analyticsPerfCache.imza !== imza) analyticsPerfCache = { imza, degerler: new Map() };
+  const k = `${monthKey}|${villa || 'ALL'}`;
+  if (!analyticsPerfCache.degerler.has(k)) analyticsPerfCache.degerler.set(k, computeMonthPerformance(monthKey, villa));
+  return analyticsPerfCache.degerler.get(k);
+}
+
+// Analiz modulleri acilista yuklenmez (acilis JS butcesi, L-163): Analiz ya da
+// fiyat ekrani ilk cizildiginde istenir, gelince acik ekran yeniden cizilir.
+// Sira onemli: analytics_ui yuklenirken BookingAnalytics'i alir.
+const ANALYTICS_ENGINE_URL = 'core/booking_analytics.js?v=c837f939';
+const ANALYTICS_UI_URL = 'core/analytics_ui.js?v=6a59af6d';
+let analyticsModulesLoading = null;
+function loadAnalyticsScript(src) {
+  return new Promise((resolve, reject) => {
+    const tag = document.createElement('script');
+    tag.src = src;
+    tag.onload = () => resolve();
+    tag.onerror = () => reject(new Error('Analiz modülü yüklenemedi'));
+    document.head.appendChild(tag);
+  });
+}
+function loadAnalyticsModules() {
+  if (typeof BookingAnalytics !== 'undefined' && typeof AnalyticsUI !== 'undefined') return Promise.resolve(true);
+  if (typeof document === 'undefined' || typeof document.createElement !== 'function' || !document.head) return Promise.resolve(false);
+  if (!analyticsModulesLoading) {
+    analyticsModulesLoading = (typeof BookingAnalytics !== 'undefined' ? Promise.resolve() : loadAnalyticsScript(ANALYTICS_ENGINE_URL))
+      .then(() => (typeof AnalyticsUI !== 'undefined' ? null : loadAnalyticsScript(ANALYTICS_UI_URL)))
+      .then(() => true);
+    analyticsModulesLoading.then(() => {
+      const active = id => document.getElementById(id)?.classList?.contains('active');
+      if (active('tab-analytics')) renderAnalyticsTab();
+      if (active('tab-pricing')) renderPricingTab();
+    }, () => {
+      analyticsModulesLoading = null;
+      const el = document.getElementById('analyticsRoot');
+      if (el && typeof AnalyticsUI === 'undefined') el.textContent = 'Analiz yüklenemedi. Bağlantınızı kontrol edip sekmeyi yeniden açın.';
+    });
+  }
+  return analyticsModulesLoading;
+}
+
 function renderAnalyticsTab() {
-  if (typeof document === 'undefined' || typeof AnalyticsUI === 'undefined') return;
+  if (typeof document === 'undefined') return;
   const el = document.getElementById('analyticsRoot');
   if (!el) return;
+  if (typeof AnalyticsUI === 'undefined') {
+    if (!el.firstChild) el.textContent = 'Analiz yükleniyor…';
+    loadAnalyticsModules().catch(() => {});
+    return;
+  }
+  // Yukleniyor metni bilesen kurulmadan once temizlenir.
+  if (!analyticsUi && el.firstChild && !el.querySelector('*')) el.textContent = '';
   // Kap degistiyse (DOM yeniden kuruldu) eski kaba cizmeye devam etmez.
   if (analyticsUi && analyticsUiEl !== el) {
     analyticsUi.destroy();
@@ -15600,7 +15686,7 @@ function renderAnalyticsTab() {
         today: getTodayStr()
       }),
       deps: {
-        monthPerformance: (monthKey, villa) => computeMonthPerformance(monthKey, villa),
+        monthPerformance: analyticsMonthPerformance,
         monthTarget: (monthKey, villa) => analyticsMonthTarget(monthKey, villa),
         isBulkSummary: isBulkSummaryBooking,
         channelName: getChannelDisplayName,
@@ -15610,7 +15696,10 @@ function renderAnalyticsTab() {
       monthOptions: () => (typeof ALL_FINANCIAL_MONTHS !== 'undefined' ? ALL_FINANCIAL_MONTHS : []),
       canReadLeads: () => canReadSalesRole(activeTenant?.role),
       // Aylik hedefler yalniz finans okuyabilen role yuklenir (loadTenantAppData).
-      canSeeTargets: () => canReadLedgerRole(activeTenant?.role)
+      canSeeTargets: () => canReadLedgerRole(activeTenant?.role),
+      // Bos durumdaki 'Rezervasyon ekle' (satis yazma izni olan rolde)
+      onAddBooking: () => openBookingModal(),
+      canAddBooking: () => canWriteSalesRole(activeTenant?.role)
     });
   }
   const tenantId = activeTenant?.id;
@@ -25096,6 +25185,8 @@ function pricingResultsHtml(entry, today) {
 function getBookingAnalytics() {
   if (typeof BookingAnalytics !== 'undefined') return BookingAnalytics;
   if (typeof require === 'function') return require('./core/booking_analytics.js');
+  // Tarayicida henuz yuklenmediyse istenir; gelince fiyat ekrani yeniden cizilir.
+  loadAnalyticsModules().catch(() => {});
   return null;
 }
 
@@ -25990,7 +26081,10 @@ if (typeof module !== 'undefined' && module.exports) {
     setTodayPerformanceVilla,
     computeMonthPerformance,
     renderAnalyticsTab,
+    loadAnalyticsModules,
     analyticsMonthTarget,
+    analyticsMonthPerformance,
+    analyticsDataSignature,
     loadAnalyticsImportedBookingIds,
     isAnalyticsImportedBooking,
     getCurrentMonthKey,

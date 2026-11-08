@@ -228,14 +228,30 @@ test('C3. Portfoy ortalamasi yalniz tek mulkte; ciro mulk basina, doluluk portfo
   assert.strictEqual(r.kpis.compare.portfolio.occupancy, tum.kpis.current.occupancy);
 });
 
-test('C4. Hedef: girilmis alanlar; 0 girilmis ADR hedefi yok sayilir; eksik ayda hedef yok', () => {
+test('C4. Hedef: girilmis alanlar; 0 girilmis ADR hedefi yok sayilir', () => {
   const r = report();
   assert.strictEqual(r.kpis.compare.target.revenue, 200000);
   assert.strictEqual(r.kpis.compare.target.occupancy, 60);
   assert.strictEqual(r.kpis.compare.target.adr, null);
   assert.deepStrictEqual(r.kpis.deltas.revenue.target, { kind: 'pct', value: -17.5 });
+  assert.deepStrictEqual(r.kpis.compare.target.coverage.revenue, { months: ['2026-10'], total: 1 });
+  assert.strictEqual(r.kpis.deltas.nights.target, null, 'gece hedefi yok');
+});
+
+test('C5. Kismi hedef: yalniz hedefi olan ayla kiyaslanir; eksik ay 0 sayilmaz, tum donemle de kiyaslanmaz', () => {
+  // Eylul hedefsiz, Ekim 200.000
   const iki = report({ period: { start: '2026-09', end: '2026-10' } });
-  assert.strictEqual(iki.kpis.compare.target.revenue, null, 'Eylul hedefi yok: toplam hedef uydurulmaz');
+  assert.strictEqual(iki.kpis.compare.target.revenue, 200000);
+  assert.deepStrictEqual(iki.kpis.compare.target.coverage.revenue, { months: ['2026-10'], total: 2 });
+  // Gerceklesen yalniz Ekim (165.000), iki ayin toplami degil (165.000 + 16.000)
+  assert.strictEqual(iki.kpis.targetActual.revenue, 165000);
+  assert.deepStrictEqual(iki.kpis.deltas.revenue.target, { kind: 'pct', value: -17.5 });
+  assert.strictEqual(iki.kpis.current.revenue, 181000);
+  // Hic hedef yoksa null + neden
+  const yok = report({ period: { start: '2026-08', end: '2026-09' } });
+  assert.strictEqual(yok.kpis.compare.target.revenue, null);
+  assert.strictEqual(yok.kpis.deltas.revenue.target, null);
+  assert.ok(yok.kpis.reasons.target);
 });
 
 // ------------------------------------------------------------ trend --
@@ -289,7 +305,7 @@ test('K-1. Kanal cirosu tahakkuklu; toplu aktarim ciroda var, adette yok', () =>
 // ------------------------------------------------------------ talep --
 test('L1. Talep hunisi ve kanal donusumu', () => {
   const leads = [
-    { id: 1, date: '2026-10-02', status: 'WON', channel: 'Instagram', villa: 'deniz' },
+    { id: 1, date: '2026-10-02', status: 'WON', channel: 'Instagram', villa: 'deniz', convertedBookingId: 'a' },
     { id: 2, date: '2026-10-05', status: 'LOST', channel: 'Instagram', lostReason: 'Fiyat Yüksek', villa: 'deniz' },
     { id: 3, date: '2026-10-06', status: 'QUOTE_SENT', channel: 'WhatsApp', quoteAmount: 30000, villa: 'orman' },
     { id: 4, date: '2026-10-07', status: 'NEW', channel: 'WhatsApp', villa: 'orman' },
@@ -304,8 +320,17 @@ test('L1. Talep hunisi ve kanal donusumu', () => {
   assert.strictEqual(r.leads.closeRate, 50);
   assert.deepStrictEqual(r.leads.lossReasons, [{ reason: 'Fiyat Yüksek', count: 1 }]);
   assert.strictEqual(r.leads.byChannel.find(c => c.key === 'Instagram').conversion, 50);
+  assert.strictEqual(r.leads.wonUnlinked, 0);
   const d = report({ leads, villa: 'deniz' });
   assert.strictEqual(d.leads.total, 2);
+  // Bagsiz WON: donusume girmez, ayri sayilir; kapanan talepte kazanmaya girer
+  const bagsiz = report({ leads: leads.concat([{ id: 6, date: '2026-10-09', status: 'WON', channel: 'WhatsApp', villa: 'orman' }]) });
+  assert.strictEqual(bagsiz.leads.won, 1);
+  assert.strictEqual(bagsiz.leads.wonUnlinked, 1);
+  assert.strictEqual(bagsiz.leads.conversion, 20);
+  assert.strictEqual(bagsiz.leads.closeRate, Math.round(2 / 3 * 1000) / 10);
+  assert.strictEqual(bagsiz.leads.open, 2);
+  assert.strictEqual(bagsiz.leads.byChannel.find(c => c.key === 'WhatsApp').won, 0);
   // Talep kanali kendi adlandiricisiyla (Other -> Diger)
   const app = makeApp(BOOKINGS, TARGETS);
   const t = BookingAnalytics.buildReport({ bookings: app.bookings, villas: app.villas, today: app.today,
@@ -375,6 +400,31 @@ test('E1. Bos isletmede hicbir rakam uydurulmaz', () => {
   assert.strictEqual(r.leads.conversion, null);
   r.pace.rows.forEach(x => assert.strictEqual(x.lastYear, null));
   Object.values(r.kpis.deltas).forEach(d => Object.values(d).forEach(v => assert.strictEqual(v, null)));
+});
+
+// ------------------------------------------------------------- hiz --
+test('H1. Buyuk hesap (6.000 rezervasyon, 15 mulk, 12 ay) 1,5 sn altinda (eskiden 1,5-3,7 sn)', () => {
+  let seed = 7; const r = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const iso = d => d.toISOString().slice(0, 10);
+  const bookings = [];
+  for (let i = 0; i < 6000; i++) {
+    const ci = new Date(Date.UTC(2023, 0, 1) + Math.floor(r() * 1460) * 864e5); const n = 2 + Math.floor(r() * 5);
+    bookings.push({ id: 'h' + i, villa: 'v' + (i % 15), guest: 'G' + i, checkIn: iso(ci), checkOut: iso(new Date(ci.getTime() + n * 864e5)),
+      gross: 10000 * n, status: r() < 0.05 ? 'CANCELLED' : 'CONFIRMED', channel: ['AIRBNB', 'Direct', 'BOOKING', 'WA'][i % 4],
+      createdAt: new Date(ci.getTime() - 30 * 864e5).toISOString() });
+  }
+  const villas = [...Array(15)].map((_, i) => ({ key: 'v' + i, name: 'V' + i, id: 'p' + i }));
+  const monthPerformance = (mk, v) => {
+    const R = LedgerContract.monthRange(mk);
+    const l = LedgerContract.computePeriodLedger({ bookings, bookingInScope: x => v === 'ALL' || x.villa === v,
+      bookingShare: x => LedgerContract.nightShareInRange(x, R.start, R.end) });
+    return { roomRevenue: l.netRoomRevenue, nights: l.soldNights, available: 30 * (v === 'ALL' ? 15 : 1) };
+  };
+  const t = Date.now();
+  const rep = BookingAnalytics.buildReport({ bookings, villas, today: '2026-11-06', period: { start: '2025-11', end: '2026-10' }, deps: { monthPerformance } });
+  const sure = Date.now() - t;
+  assert.ok(rep.kpis.current.revenue > 0);
+  assert.ok(sure < 1500, `${sure} ms`);
 });
 
 console.log('-----------------------------------------------------------------------------');

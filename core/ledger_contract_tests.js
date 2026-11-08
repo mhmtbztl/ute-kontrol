@@ -139,5 +139,65 @@ test('phase97: gelir kaydi kendi tarihinin donemine yazilir; turu bilinmeyen say
   yakin(ay('2031-03', { incomes: [{ date: '2031-03-02', type: 'BILINMIYOR', amount: 5 }] }).totalRevenue, 0, 'bilinmeyen tur');
 });
 
+// nightShareInRange hizli yolu (Analiz hizi, 06.11.2026): eski gece gece dongunun
+// birebir kopyasina karsi rastgele ve sinir girdilerde AYNI sonuc.
+function eskiGecePayi(b, start, end) {
+  const ci = b && (b.checkIn || b.check_in);
+  const co = b && (b.checkOut || b.check_out);
+  const bos = { nights: 0, total: 0, ratio: 0 };
+  if (!ci || !co) return bos;
+  const gun = 86400000;
+  const bas = Date.parse(ci + 'T00:00:00Z');
+  const bit = Date.parse(co + 'T00:00:00Z');
+  if (!Number.isFinite(bas) || !Number.isFinite(bit)) return bos;
+  const toplam = Math.round((bit - bas) / gun);
+  if (toplam <= 0) return bos;
+  let icerde = 0;
+  for (let i = 0; i < toplam; i++) {
+    const g = new Date(bas + i * gun).toISOString().slice(0, 10);
+    if (g >= start && g <= end) icerde++;
+  }
+  return { nights: icerde, total: toplam, ratio: icerde / toplam };
+}
+
+test('nightShareInRange hizli yol: 20.000 rastgele + sinir girdide eski donguyle birebir ayni', () => {
+  let seed = 11;
+  const r = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const iso = t => new Date(t).toISOString().slice(0, 10);
+  const gun = 86400000;
+  const taban = Date.UTC(1999, 0, 1);
+  const tuhaf = ['2026-02-30', '2026-13-01', '2026-1-5', '', null, undefined, '2026-10', 'abc',
+    '2024-02-29', '2023-02-29', '0999-12-31', '9999-12-31', '10000-01-01', '2026-10-31T10:00'];
+  const vakalar = [];
+  for (let i = 0; i < 20000; i++) {
+    const ci = taban + Math.floor(r() * 12000) * gun;
+    const n = Math.floor(r() * 420) - 5;
+    const s = taban + Math.floor(r() * 12000) * gun;
+    const e = s + (Math.floor(r() * 200) - 20) * gun;
+    vakalar.push([{ checkIn: iso(ci), checkOut: iso(ci + n * gun) }, iso(s), iso(e)]);
+  }
+  // Sinirlar: ay sonu/basi, artik gun, ters aralik, tek gece, tuhaf metinler
+  [['2026-01-31', '2026-02-02'], ['2024-02-28', '2024-03-02'], ['2026-10-30', '2026-11-01'], ['2026-10-31', '2026-11-01']]
+    .forEach(([a, b]) => [['2026-11-01', '2026-11-30'], ['2026-10-01', '2026-10-31'], ['2024-02-29', '2024-02-29'], ['2026-11-30', '2026-11-01']]
+      .forEach(([s, e]) => vakalar.push([{ checkIn: a, checkOut: b }, s, e])));
+  tuhaf.forEach(x => {
+    vakalar.push([{ checkIn: '2026-02-27', checkOut: '2026-03-03' }, x, '2026-03-31']);
+    vakalar.push([{ checkIn: '2026-02-27', checkOut: '2026-03-03' }, '2026-02-01', x]);
+    vakalar.push([{ checkIn: x, checkOut: '2026-03-03' }, '2026-02-01', '2026-03-31']);
+    vakalar.push([{ check_in: '2026-02-27', check_out: x }, '2026-02-01', '2026-03-31']);
+  });
+  vakalar.push([{ checkIn: '9999-12-30', checkOut: '10000-01-02' }, '9999-12-01', '9999-12-31']);
+  vakalar.push([{ checkIn: '0999-12-30', checkOut: '1000-01-02' }, '0999-12-01', '1000-12-31']);
+  let fark = 0; let ilk = null;
+  vakalar.forEach(([b, s, e]) => {
+    const yeni = L.nightShareInRange(b, s, e);
+    const eski = eskiGecePayi(b, s, e);
+    if (yeni.nights !== eski.nights || yeni.total !== eski.total || yeni.ratio !== eski.ratio) {
+      fark++; if (!ilk) ilk = JSON.stringify({ b, s, e, yeni, eski });
+    }
+  });
+  assert.strictEqual(fark, 0, `${fark} farkli sonuc; ilk: ${ilk}`);
+});
+
 console.log(`\n${passed} geçti, ${failed} başarısız`);
 if (failed > 0) process.exit(1);

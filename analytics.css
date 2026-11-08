@@ -135,7 +135,7 @@
   font-size: 24px; line-height: 1.05; font-weight: 700; letter-spacing: -0.02em;
   overflow-wrap: anywhere;
 }
-.ba-kpi-note { margin: 0; font-size: 11.5px; color: var(--text-muted); }
+.ba-kpi-note { margin: 0; font-size: 12px; color: var(--text-muted); }
 .ba-kpi-deltas { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
 .ba-spark { flex: none; overflow: visible; }
 
@@ -222,7 +222,7 @@
 .ba-scroll { min-width: 0; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .ba-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .ba-table th, .ba-table td { padding: 9px 10px; text-align: left; border-bottom: 1px solid var(--ba-grid); white-space: nowrap; }
-.ba-table thead th { font-size: 11.5px; font-weight: 600; color: var(--text-muted); }
+.ba-table thead th { font-size: 12px; font-weight: 600; color: var(--text-muted); }
 .ba-table tbody th { font-weight: 600; }
 .ba-table .num { text-align: right; font-variant-numeric: tabular-nums; }
 .ba-table tbody tr:hover { background: rgba(118, 118, 128, 0.10); }
@@ -276,7 +276,7 @@
 .ba-mini { min-width: 0; display: grid; gap: 4px; align-content: start; }
 .ba-mini-title { margin: 0; font-size: 13px; font-weight: 650; }
 .ba-mini-title + .ba-scroll, .ba-reasons, .ba-scroll + .ba-mini-title { margin-top: 8px; }
-.ba-mini-note { margin: 0 0 6px; font-size: 11.5px; color: var(--text-muted); }
+.ba-mini-note { margin: 0 0 6px; font-size: 12px; color: var(--text-muted); }
 
 /* ------------------------------------------------------------ bos -- */
 .ba-empty {
@@ -288,7 +288,7 @@
 .ba-empty-title { margin: 0; font-size: 16px; font-weight: 650; }
 .ba-empty-text { margin: 6px auto 0; max-width: 46ch; font-size: 13px; color: var(--text-muted); }
 .ba-empty-line { margin: 0; font-size: 13px; color: var(--text-muted); }
-.ba-footnote { margin: 0; font-size: 11.5px; color: var(--text-muted); }
+.ba-footnote { margin: 0; font-size: 12px; color: var(--text-muted); }
 
 /* ------------------------------------------------------------ duyarli -- */
 @media (max-width: 1100px) {
@@ -329,3 +329,20 @@
   font-size: 12px;
 }
 .ba-mini .ba-svg { width: 100%; }
+
+/* Yana kayan tablo: ipucu metni + kenar golgeleri (golge kaydirmayla kayar). */
+.ba-scroll-note { margin: 0 0 6px; font-size: 12px; color: var(--text-muted); }
+.ba-scroll.is-overflowing {
+  background:
+    linear-gradient(to right, var(--bg-surface) 30%, rgba(28, 28, 30, 0)) left center / 28px 100% no-repeat local,
+    linear-gradient(to left, var(--bg-surface) 30%, rgba(28, 28, 30, 0)) right center / 28px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, rgba(235, 235, 245, 0.18), transparent) left center / 12px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, rgba(235, 235, 245, 0.18), transparent) right center / 12px 100% no-repeat scroll;
+}
+
+/* Bos durum dugmesi uygulamanin ana dugmesidir (.btn .btn-primary); burada yalniz bosluk. */
+.ba-empty-btn { margin-top: 16px; }
+.ba-empty-btn:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+
+/* Kisa aciklamalarda son satirda tek kelime kalmasin (tipografi incelemesi). */
+.ba-subtitle, .ba-card-sub, .ba-kpi-note, .ba-mini-note, .ba-footnote, .ba-empty-text, .ba-running { text-wrap: pretty; }

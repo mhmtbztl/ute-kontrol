@@ -327,6 +327,9 @@ finans okuyabilen rolde (hedefler başka role yüklenmez); 0 girilmiş doluluk/A
 RevPAR hedefi "girilmemiş"tir. Sekme `canReadSalesRole`, `staff` görmez. Ekran
 `innerHTML` kullanmaz (güvenlik sınırı `<svg>`'yi siler); grafik paleti koyu
 yüzeyde renk körlüğü doğrulamasından geçti, halka en fazla 3 renk + "Diğer".
+İki modül açılışta yüklenmez (açılış JS bütçesi 2,2 MiB, L-163): Analiz ya da
+fiyat ekranı ilk çizildiğinde `loadAnalyticsModules` önce motoru, sonra arayüzü
+ister; fiyat ekranının gidişat şeridi (`buildPaceFor`) gelene kadar boş kalır.
 Göç gerekmedi. Ağı `booking_analytics_tests`, `analytics_ui_tests`,
 `analytics_integration_tests` (gerçek app.js ile birebir eşitlik).
 

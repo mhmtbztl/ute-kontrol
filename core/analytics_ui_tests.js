@@ -40,6 +40,7 @@ class FakeNode {
   appendChild(c) { c.parentNode = this; this.children.push(c); return c; }
   get isConnected() { let n = this; while (n.parentNode) n = n.parentNode; return n === global.document.body; }
   get clientWidth() { return 0; }
+  getBoundingClientRect() { return { left: 0, top: 0, width: 0, height: 0 }; }
   get textContent() { return this.tagName === '#TEXT' ? this._text : this.children.map(c => c.textContent).join(''); }
   set textContent(v) { this.children = []; if (this.tagName === '#TEXT') this._text = String(v); else if (v !== '') this.appendChild(textNode(v)); }
   set innerHTML(v) { throw new Error('innerHTML kullanildi'); }
@@ -65,7 +66,10 @@ global.document = {
   createElement: t => new FakeNode(t),
   createElementNS: (ns, t) => new FakeNode(t, ns),
   createTextNode: textNode,
-  body: new FakeNode('body')
+  body: new FakeNode('body'),
+  listeners: {},
+  addEventListener(t, fn) { (this.listeners[t] = this.listeners[t] || []).push(fn); },
+  removeEventListener(t, fn) { this.listeners[t] = (this.listeners[t] || []).filter(f => f !== fn); }
 };
 
 function click(root, el) {
@@ -225,6 +229,69 @@ test('U10. Talep bolumu yetki yoksa cizilmez; destroy dinleyicileri kaldirir', (
   ui.destroy();
   assert.strictEqual((root.listeners.click || []).length, 0);
   assert.strictEqual(root.children.length, 0);
+});
+
+test('U13. Telefonda dokunus grafik ipucunu acar; parmak kalkinca kapanmaz (emulatorde bulundu)', () => {
+  const { root } = mountWith(BOOKINGS);
+  const hit = root.querySelector('.ba-hit');
+  const tip = root.querySelector('.ba-tip');
+  assert.ok(hit && tip, 'trend grafigi cizilmeli');
+  const ates = (tur, ev) => (hit.listeners[tur] || []).forEach(fn => fn(ev));
+  ates('pointerdown', { clientX: 0, clientY: 0, pointerType: 'touch' });
+  assert.strictEqual(tip.hidden, false, 'dokununca ipucu acilmali');
+  assert.ok(/₺/.test(tip.textContent), tip.textContent);
+  ates('pointerleave', { pointerType: 'touch' });
+  assert.strictEqual(tip.hidden, false, 'parmak kalkinca ipucu acik kalmali');
+  ates('pointerleave', { pointerType: 'mouse' });
+  assert.strictEqual(tip.hidden, true, 'fare ayrilinca kapanir');
+});
+
+test('U16. Bos durum "Rezervasyon ekle" yalniz yazma izninde; hata metni ham kod gostermez', () => {
+  let acildi = 0;
+  const izinli = mountWith([], { onAddBooking: () => { acildi++; }, canAddBooking: () => true });
+  const btn = izinli.root.querySelector('[data-ba-add-booking]');
+  assert.ok(btn && btn.textContent === 'Rezervasyon ekle');
+  click(izinli.root, btn);
+  assert.strictEqual(acildi, 1);
+  const izinsiz = mountWith([], { onAddBooking: () => { acildi++; }, canAddBooking: () => false });
+  assert.strictEqual(izinsiz.root.querySelector('[data-ba-add-booking]'), null);
+  // Hesap hatasi: kullaniciya yol gosterilir, INVALID_... kodu yazilmaz
+  const uyari = console.warn; console.warn = () => {};
+  try {
+    const bozuk = mountWith(BOOKINGS, { deps: { monthPerformance: () => { throw new Error('INVALID_SOMETHING'); } } });
+    assert.ok(bozuk.root.textContent.includes('Analiz hesaplanamadı'));
+    assert.ok(/yeniden deneyin/.test(bozuk.root.textContent));
+    assert.ok(!/INVALID_/.test(bozuk.root.textContent));
+  } finally { console.warn = uyari; }
+});
+
+test('U15. Telefonda grafik disina dokunus ipucunu kapatir; grafigin icine dokunus kapatmaz; destroy dinleyiciyi kaldirir', () => {
+  const { root, ui } = mountWith(BOOKINGS);
+  const hit = root.querySelector('.ba-hit');
+  const tip = root.querySelector('.ba-tip');
+  (hit.listeners.pointerdown || []).forEach(fn => fn({ clientX: 0, clientY: 0, pointerType: 'touch' }));
+  assert.strictEqual(tip.hidden, false);
+  const belge = ev => (global.document.listeners.pointerdown || []).forEach(fn => fn(ev));
+  belge({ target: hit });
+  assert.strictEqual(tip.hidden, false, 'grafigin icine dokunus kapatmaz');
+  belge({ target: root.querySelector('.ba-kpi') });
+  assert.strictEqual(tip.hidden, true, 'disari dokunus kapatir');
+  const once = (global.document.listeners.pointerdown || []).length;
+  ui.destroy();
+  assert.strictEqual((global.document.listeners.pointerdown || []).length, once - 1);
+});
+
+test('U14. Kismi hedef: satirda hedefli ay sayisi yazar', () => {
+  const d = Object.assign(deps(BOOKINGS), { monthTarget: (m, v) => (m === '2026-10' && v === 'ALL' ? { revenue: 50000 } : null) });
+  const { root, ui } = mountWith(BOOKINGS, { deps: d });
+  click(root, root.querySelector('[data-ba-value="3m"]'));
+  assert.strictEqual(ui.getState().preset, '3m');
+  const ciro = root.querySelectorAll('.ba-kpi')[0];
+  assert.ok(/hedefe göre · hedefli ay 1\/3/.test(ciro.textContent), ciro.textContent);
+  // Tek ayda (tam kapsam) not yazilmaz
+  click(root, root.querySelector('[data-ba-value="month"]'));
+  const tek = root.querySelectorAll('.ba-kpi')[0];
+  assert.ok(/hedefe göre/.test(tek.textContent) && !/hedefli ay/.test(tek.textContent), tek.textContent);
 });
 
 test('U12. Hedefleri okuyamayan rolde Hedef kiyasi gosterilmez', () => {
