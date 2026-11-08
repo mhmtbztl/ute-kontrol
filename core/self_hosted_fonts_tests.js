@@ -27,7 +27,7 @@ const INDEX = read('index.html');
 const CSS = read('style.css');
 
 test('F1. Yayindaki hicbir dosya Google Fonts (ya da baska bir yazi tipi sunucusu) istemez', () => {
-  const files = ['index.html', 'style.css', 'analytics.css', 'app.js']
+  const files = ['index.html', 'style.css', 'analytics.css', 'app.js', 'sw.js']
     .concat(fs.readdirSync(path.join(ROOT, 'core')).filter(f => f.endsWith('.js') && isAllowed('core/' + f)).map(f => 'core/' + f))
     .concat(fs.readdirSync(path.join(ROOT, 'yasal')).filter(f => f.endsWith('.html')).map(f => 'yasal/' + f));
   const bad = files.filter(f => /fonts\.googleapis\.com|fonts\.gstatic\.com|use\.typekit\.net|fonts\.bunny\.net/.test(read(f)));

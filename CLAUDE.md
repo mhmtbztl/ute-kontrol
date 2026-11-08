@@ -535,6 +535,17 @@ Yeni bir çalışma anı yükleyici eklerseniz dosyayı `stamp_assets.js` içind
 `index.html` kendi başına 10 dakika önbelleklenir (GitHub Pages `max-age=600`, başlık
 değiştiremiyoruz). Deploy sonrası eski sürüm görürseniz `Ctrl+Shift+R`.
 
+**Service worker (`sw.js`, giriş hızı 2. aşama, 08.11.2026).** Tekrar girişte damgalı
+(`?v=hash`) dosyalar önbellekten gelir (önce önbellek; yeni damga eskisini siler), giriş
+sayfası **önce ağdan** gelir (yeni yayın bir sonraki açılışta görünür; ağ yoksa önbellekteki),
+yazı tipi/marka dosyaları eskiyken-yenile. Yalnız aynı köken + GET: Supabase, Turnstile ve
+Cloudflare hiç önbelleğe girmez. Ölçüm (yerel, yavaş 4G + 4x CPU): tekrar giriş 24 sn → 2 sn,
+ağ isteği 60 → 0 (giriş sayfası hariç). localhost ve `?ci-browser=1`'de kayıt yapılmaz
+(Playwright `page.route` SW isteklerini görmez); yerelde ölçmek için `?sw=1`. "Önbelleği temizle"
+(`forceHardRefresh`) kaydı da siler. Önbellek sürümü `sw.js` içindeki `CACHE_VERSION`'dır;
+damgalama mantığı değişirse artırın. **Acil kapatma:** `sw.js` başındaki yorumdaki gövdeyi
+yayınlayın (önbellekleri siler, kaydı kaldırır). Ağı `core/service_worker_tests.js`.
+
 **Yedek (L-42, K-01):** `npm run backup` — haftalık, Pro plana geçene kadar.
 Hedef deponun DIŞINDA (`Masaüstülexbnb-yedekler`); geri yükleme `npm run restore`.
 Yedek geri yüklenebilir olduğu için yedektir: canlı tur (`backup_restore_live_tests`)
