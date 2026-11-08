@@ -142,5 +142,47 @@
     return new Date(Date.parse(date + 'T00:00:00Z') - n * DAY).toISOString().slice(0, 10);
   }
 
-  return { computePricingOutcome, bookingForNight, realizedNightPrice, daysBefore };
+  /**
+   * Sonuclar sekmesinin govdesi (KPI, notlar, gun tablosu). app.js'te degil
+   * burada durur: modul fiyat ekrani acilinca yuklenir (acilis JS butcesi, L-163).
+   * h: { windowDays, importsKnown, esc, money, date } — kacis ve bicim app'ten gelir.
+   */
+  function resultsBodyHtml(outcome, h) {
+    const escapeHtml = h.esc, money = h.money;
+    const s = outcome.summary;
+    const pct = value => value == null ? '—' : `%${Number(value).toLocaleString('tr-TR', { maximumFractionDigits: 1 })}`;
+    const signed = value => value == null ? '—' : `${value > 0 ? '+' : value < 0 ? '−' : ''}${money(Math.abs(value))}`;
+    const kpi = (label, value, meta) => `<div class="kpi-card"><span class="kpi-label">${escapeHtml(label)}</span><div class="kpi-value">${escapeHtml(value)}</div><div class="kpi-meta">${escapeHtml(meta)}</div></div>`;
+    const bySource = key => outcome.bySource[key];
+    const sourceMeta = key => { const item = bySource(key); return item ? `${item.days} gün · satılma ${pct(item.sellRate)}` : 'kayıt yok'; };
+    const kpisHtml = `<div class="pricing-kpis">${[
+      kpi('Kayıtlı gün', `${s.days} gün`, `Son ${h.windowDays} gün · onaylı ${bySource('APPROVED')?.days || 0}, elle ${bySource('MANUAL')?.days || 0}`),
+      kpi('Satılma oranı', pct(s.sellRate), s.sellRate == null ? 'Kararı ölçülebilen gün yok' : `${s.soldAfter} satıldı / ${s.soldAfter + s.unsold} gün (fiyat kaydından sonra)`),
+      kpi('Ortalama fark', signed(s.avgDiff), s.avgDiff == null ? 'Kayıttan sonra satılan gece yok' : `Gerçekleşen − kayıtlı, gece başına (${pct(s.avgDiffPct)})`),
+      kpi('Onaylı / Elle', `${pct(bySource('APPROVED')?.sellRate ?? null)} / ${pct(bySource('MANUAL')?.sellRate ?? null)}`, `Onaylı: ${sourceMeta('APPROVED')} · Elle: ${sourceMeta('MANUAL')}`)
+    ].join('')}</div>`;
+    const reasons = { IMPORTED: 'içe aktarılmış kayıt', NO_CREATED_AT: 'rezervasyonun oluşturulma zamanı yok', NO_DECISION_TIME: 'fiyat kaydının zamanı yok' };
+    const notes = [];
+    if (s.soldBefore) notes.push(`${s.soldBefore} gün fiyat kaydından önce satılmıştı; fiyat kararı bu satışı etkilemediği için orana ve farka girmez.`);
+    if (s.unattributed) notes.push(`${s.unattributed} gün ölçülemedi (oluşturulma zamanı yok ya da içe aktarılmış rezervasyon).`);
+    if (!h.importsKnown) notes.push('İçe aktarılan rezervasyonların listesi henüz okunmadı; içe aktarılmış bir kayıt bu sürede ayırt edilemeyebilir.');
+    const notesHtml = notes.length ? `<ul class="pricing-results-notes">${notes.map(text => `<li>${escapeHtml(text)}</li>`).join('')}</ul>` : '';
+    const result = day => {
+      if (day.outcome === 'UNSOLD') return { text: 'Boş kaldı', cls: 'is-unsold' };
+      if (day.outcome === 'SOLD_BEFORE') return { text: `Önceden satılmıştı (${money(day.realized)})`, cls: 'is-muted' };
+      if (day.outcome === 'UNATTRIBUTED') return { text: `Ölçülemedi: ${reasons[day.reason] || 'neden bilinmiyor'}`, cls: 'is-muted' };
+      return { text: `Satıldı ${money(day.realized)}`, cls: 'is-sold' };
+    };
+    const list = outcome.days.slice().reverse();
+    const shown = list.slice(0, 90);
+    const rowsHtml = shown.map(day => {
+      const r = result(day);
+      return `<tr><td>${escapeHtml(h.date(day.date))}</td><td>${day.source === 'MANUAL' ? 'Elle' : 'Onaylı'}</td><td class="num">${escapeHtml(money(day.price))}</td><td class="num">${escapeHtml(money(day.suggested))}</td><td class="${escapeHtml(r.cls)}">${escapeHtml(r.text)}</td><td class="num">${escapeHtml(signed(day.diff))}</td></tr>`;
+    }).join('');
+    const moreHtml = list.length > shown.length ? `<p class="sub-text">En yeni ${shown.length} gün gösteriliyor (toplam ${list.length}).</p>` : '';
+    const tableHtml = `<div class="ba-scroll"><table class="ba-table pricing-results-table"><thead><tr><th scope="col">Tarih</th><th scope="col">Kaynak</th><th scope="col" class="num">Kayıtlı</th><th scope="col" class="num">Öneri</th><th scope="col">Sonuç</th><th scope="col" class="num">Fark</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>${moreHtml}`;
+    return `${kpisHtml}${notesHtml}${tableHtml}<p class="sub-text">Gerçekleşen gece fiyatı Finans'ın konaklama cirosu tanımıdır: tutar − misafirden alınan temizlik ücreti − indirim, gece sayısına bölünür. İptal edilen rezervasyon gece satmaz.</p>`;
+  }
+
+  return { computePricingOutcome, bookingForNight, realizedNightPrice, daysBefore, resultsBodyHtml };
 }));

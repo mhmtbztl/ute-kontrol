@@ -24138,7 +24138,7 @@ function pricingBookedOutcomeHtml(day, ctx) {
 
 // Sonuc modulu acilista yuklenmez (acilis JS butcesi, L-163): fiyat ekrani
 // ilk cizildiginde istenir, gelince ekran yeniden cizilir. Node'da require.
-const PRICING_OUTCOME_URL = 'core/pricing_outcome.js?v=ef1631d8';
+const PRICING_OUTCOME_URL = 'core/pricing_outcome.js?v=4fafd994';
 let pricingOutcomeLoading = null;
 function getPricingOutcome() {
   if (typeof PricingOutcome !== 'undefined') return PricingOutcome;
@@ -25154,39 +25154,8 @@ function pricingResultsHtml(entry, today) {
     isBulkSummary: isBulkSummaryBooking, isImported: isAnalyticsImportedBooking
   });
   if (!outcome.summary) return `${head}<div class="empty-state">Son ${pricingResultsWindow} günde geçmiş tarihli kayıtlı fiyat yok. Takvimde onayladığınız günler geçtikçe sonuçları burada ölçülür.</div>`;
-  const s = outcome.summary;
-  const pct = value => value == null ? '—' : `%${Number(value).toLocaleString('tr-TR', { maximumFractionDigits: 1 })}`;
-  const signed = value => value == null ? '—' : `${value > 0 ? '+' : value < 0 ? '−' : ''}${pricingMoney(Math.abs(value))}`;
-  const kpi = (label, value, meta) => `<div class="kpi-card"><span class="kpi-label">${escapeHtml(label)}</span><div class="kpi-value">${escapeHtml(value)}</div><div class="kpi-meta">${escapeHtml(meta)}</div></div>`;
-  const bySource = key => outcome.bySource[key];
-  const sourceMeta = key => { const item = bySource(key); return item ? `${item.days} gün · satılma ${pct(item.sellRate)}` : 'kayıt yok'; };
-  const kpis = `<div class="pricing-kpis">${[
-    kpi('Kayıtlı gün', `${s.days} gün`, `Son ${pricingResultsWindow} gün · onaylı ${bySource('APPROVED')?.days || 0}, elle ${bySource('MANUAL')?.days || 0}`),
-    kpi('Satılma oranı', pct(s.sellRate), s.sellRate == null ? 'Kararı ölçülebilen gün yok' : `${s.soldAfter} satıldı / ${s.soldAfter + s.unsold} gün (fiyat kaydından sonra)`),
-    kpi('Ortalama fark', signed(s.avgDiff), s.avgDiff == null ? 'Kayıttan sonra satılan gece yok' : `Gerçekleşen − kayıtlı, gece başına (${pct(s.avgDiffPct)})`),
-    kpi('Onaylı / Elle', `${pct(bySource('APPROVED')?.sellRate ?? null)} / ${pct(bySource('MANUAL')?.sellRate ?? null)}`, `Onaylı: ${sourceMeta('APPROVED')} · Elle: ${sourceMeta('MANUAL')}`)
-  ].join('')}</div>`;
-  const reasons = { IMPORTED: 'içe aktarılmış kayıt', NO_CREATED_AT: 'rezervasyonun oluşturulma zamanı yok', NO_DECISION_TIME: 'fiyat kaydının zamanı yok' };
-  const notes = [];
-  if (s.soldBefore) notes.push(`${s.soldBefore} gün fiyat kaydından önce satılmıştı; fiyat kararı bu satışı etkilemediği için orana ve farka girmez.`);
-  if (s.unattributed) notes.push(`${s.unattributed} gün ölçülemedi (oluşturulma zamanı yok ya da içe aktarılmış rezervasyon).`);
-  if (!importsKnown) notes.push('İçe aktarılan rezervasyonların listesi henüz okunmadı; içe aktarılmış bir kayıt bu sürede ayırt edilemeyebilir.');
-  const notesHtml = notes.length ? `<ul class="pricing-results-notes">${notes.map(text => `<li>${escapeHtml(text)}</li>`).join('')}</ul>` : '';
-  const result = day => {
-    if (day.outcome === 'UNSOLD') return { text: 'Boş kaldı', cls: 'is-unsold' };
-    if (day.outcome === 'SOLD_BEFORE') return { text: `Önceden satılmıştı (${pricingMoney(day.realized)})`, cls: 'is-muted' };
-    if (day.outcome === 'UNATTRIBUTED') return { text: `Ölçülemedi: ${reasons[day.reason] || 'neden bilinmiyor'}`, cls: 'is-muted' };
-    return { text: `Satıldı ${pricingMoney(day.realized)}`, cls: 'is-sold' };
-  };
-  const list = outcome.days.slice().reverse();
-  const shown = list.slice(0, 90);
-  const rows = shown.map(day => {
-    const r = result(day);
-    return `<tr><td>${escapeHtml(formatTrDate(day.date))}</td><td>${day.source === 'MANUAL' ? 'Elle' : 'Onaylı'}</td><td class="num">${escapeHtml(pricingMoney(day.price))}</td><td class="num">${escapeHtml(pricingMoney(day.suggested))}</td><td class="${r.cls}">${escapeHtml(r.text)}</td><td class="num">${escapeHtml(signed(day.diff))}</td></tr>`;
-  }).join('');
-  const more = list.length > shown.length ? `<p class="sub-text">En yeni ${shown.length} gün gösteriliyor (toplam ${list.length}).</p>` : '';
-  const table = `<div class="ba-scroll"><table class="ba-table pricing-results-table"><thead><tr><th scope="col">Tarih</th><th scope="col">Kaynak</th><th scope="col" class="num">Kayıtlı</th><th scope="col" class="num">Öneri</th><th scope="col">Sonuç</th><th scope="col" class="num">Fark</th></tr></thead><tbody>${rows}</tbody></table></div>${more}`;
-  return `${head}${kpis}${notesHtml}${table}<p class="sub-text">Gerçekleşen gece fiyatı Finans'ın konaklama cirosu tanımıdır: tutar − misafirden alınan temizlik ücreti − indirim, gece sayısına bölünür. İptal edilen rezervasyon gece satmaz.</p>`;
+  // Cizim de isteğe bagli yuklenen modulde (acilis JS butcesi, L-163).
+  return head + api.resultsBodyHtml(outcome, { windowDays: pricingResultsWindow, importsKnown, esc: escapeHtml, money: pricingMoney, date: formatTrDate });
 }
 
 function getBookingAnalytics() {
@@ -25304,6 +25273,50 @@ function renderBookingPriceCalendarHint() {
   hint.innerText = `Fiyat takvimi: ${nights.length} gece · ${pricingMoney(total)}${unknown ? ' (eksik)' : ''} — ${parts}. Tutar kendiliğinden değişmez.${longStayText}${minStayText}`;
 }
 
+// Takvim uyarilari (kullanici 08.11.2026: "daha anlasilir"): her uyari ne oldu,
+// neyi etkiliyor, ne yapilmali; duzeltme yerine goturen dugme. Dugmeler sabit
+// metindir (eylem dagiticisi ayristirir). warn = oneriyi bozar, info = bilgi.
+const PRICING_WARNING_ACTIONS = {
+  GOALS: '<button type="button" class="btn btn-secondary btn-sm" data-onclick="openGoalsModal()">Doluluk hedefi gir</button>',
+  LADDER: `<button type="button" class="btn btn-secondary btn-sm" data-onclick="setPricingView('rules')">Fiyat tablosuna git</button>`,
+  RULES: `<button type="button" class="btn btn-secondary btn-sm" data-onclick="setPricingView('rules')">Kurallar'a git</button>`
+};
+
+function pricingCalendarWarnings({ suggestions, specialDays, monthDays, minStay, canManage }) {
+  const list = [];
+  const add = (tone, title, body, action = null) => list.push({ tone, title, body, action: canManage ? action : null });
+  if (appData.propertyClosuresReady === false) {
+    add('warn', 'Bakımla kapalı günler bu rolde okunamadı', '"Açık" görünen bir gün aslında bakımda olabilir. Yönetici phase103 göçünü uygulayınca düzelir; o zamana kadar satıştan önce yöneticiye sorun.');
+  }
+  (suggestions.warnings || []).forEach(item => {
+    if (item.code === 'BASE_PRICE_MISSING') add('warn', 'Öneri hesaplanamıyor: baz fiyat yok', 'Takvimde fiyat yerine "—" görünür. Baz fiyat, normal bir hafta içi gecesinin fiyatıdır; tüm kurallar bunun üstüne uygulanır.', 'LADDER');
+    else if (item.code === 'NON_POSITIVE_PRICE') add('warn', 'Bazı günlere öneri verilemedi', 'İndirimlerin toplamı fiyatı sıfıra ya da altına indiriyor. Taban fiyat girin ya da son dakika / boş gece indirimini azaltın.', 'RULES');
+    else if (item.code === 'FLOOR_PRICE_MISSING') add('info', 'Taban fiyat yok', 'İndirimler fiyatı sınırsız düşürebilir. Taban, önerinin inemeyeceği en düşük fiyattır; girmeniz önerilir.', 'LADDER');
+    else if (item.code === 'OCCUPANCY_TARGET_MISSING') add('info', 'Talep artışı kapalı: doluluk hedefi yok', 'Talep kuralı, ayın doluluğu o ayın hedefine ulaşınca fiyatı artırır. Hiçbir aya doluluk hedefi girilmediği için bu artış uygulanmıyor; diğer kurallar normal çalışıyor.', 'GOALS');
+    else if (item.code === 'OCCUPANCY_TARGET_PARTIAL') {
+      const months = item.months || [];
+      const names = months.slice(0, 3).map(pricingMonthLabel).join(', ');
+      const which = months.length > 3 ? `${PRICING_HORIZON_MONTHS} ayın ${months.length}'inde (${names} ve ${months.length - 3} ay daha)` : names;
+      add('info', 'Talep artışı bazı aylarda kapalı', `${which} doluluk hedefi yok; bu aylarda doluluk ne olursa olsun talep artışı uygulanmaz.`, 'GOALS');
+    } else add('info', item.text || item.code, '');
+  });
+  (specialDays?.warnings || []).forEach(item => {
+    if (item.code === 'SPECIAL_DAYS_UNKNOWN_FOR_YEAR') add('info', 'Tatil tablosu bu yılı kapsamıyor', `${item.text}. O yılın resmî ve dinî tatilleri özel gün sayılmıyor; gerekirse etkinlik olarak kendiniz ekleyin.`, 'RULES');
+  });
+  const unsellable = (monthDays || []).filter(day => minStay?.get(day.date)?.sellable === false).length;
+  if (unsellable) add('info', `${unsellable} açık gece satılamıyor`, 'Bu boşluklar minimum gece kuralı yüzünden satılamaz: boşluk, kuralın istediği gece sayısından kısa. İsterseniz kuralı kısaltın ya da kaldırın.', 'RULES');
+  return list;
+}
+
+function pricingWarningsHtml(list) {
+  if (!list.length) return '';
+  const items = list.map(item => {
+    const actionHtml = item.action ? PRICING_WARNING_ACTIONS[item.action] || '' : '';
+    return `<div class="pricing-warning is-${item.tone === 'warn' ? 'warn' : 'info'}"><div><strong>${escapeHtml(item.title)}</strong>${item.body ? `<span>${escapeHtml(item.body)}</span>` : ''}</div>${actionHtml}</div>`;
+  }).join('');
+  return `<div class="pricing-warnings" role="status">${items}</div>`;
+}
+
 function renderPricingTab() {
   if (typeof document === 'undefined') return;
   const container = document.getElementById('pricingManagerContainer');
@@ -25389,27 +25402,9 @@ function renderPricingTab() {
   const focusInput = document.getElementById('pricingFocusSelect');
   if (focusInput) focusInput.value = pricingFocusDraft;
 
-  const warningText = {
-    OCCUPANCY_TARGET_MISSING: 'Talep kuralı çalışmıyor: bu ayların doluluk hedefi yok. Hedefleri Yönet\'ten girin.',
-    BASE_PRICE_MISSING: 'Baz fiyat girilmemiş: öneri hesaplanamaz. Kurallar sekmesindeki fiyat tablosundan girin.',
-    FLOOR_PRICE_MISSING: 'Taban fiyat girilmemiş: indirimler için alt sınır yok.',
-    NON_POSITIVE_PRICE: 'İndirimler bazı günlerde fiyatı sıfıra ya da altına indiriyor; o günlere öneri verilmedi. Taban fiyat girin ya da indirimleri azaltın.'
-  };
-  // 12 aylik ufukta eksik hedefli aylar uzun bir liste olur: sayi + ilk uc ay.
-  const partialText = months => {
-    const names = months.slice(0, 3).map(pricingMonthLabel).join(', ');
-    return months.length > 3
-      ? `Talep kuralı ${PRICING_HORIZON_MONTHS} ayın ${months.length}'inde çalışmıyor (${names} ve ${months.length - 3} ay daha): o ayların doluluk hedefi yok (Hedefleri Yönet).`
-      : `Talep kuralı ${names} için çalışmıyor: o ayın doluluk hedefi yok (Hedefleri Yönet).`;
-  };
-  const warnings = suggestions.warnings.map(item => item.code === 'OCCUPANCY_TARGET_PARTIAL'
-    ? partialText(item.months)
-    : (warningText[item.code] || item.text));
-  if (appData.propertyClosuresReady === false) warnings.unshift('Bakımla kapalı günler bu rolde okunamadı (phase103 bekleniyor): "Açık" görünen bir gün bakımda olabilir.');
   const minStay = pricingMinStayMap(entry.property.id, suggestions.days);
-  const unsellableNights = monthDays.filter(day => minStay.get(day.date)?.sellable === false).length;
-  if (unsellableNights) warnings.push(`${unsellableNights} açık gece minimum gece kuralı yüzünden satılamaz (boşluk kuralın istediğinden kısa).`);
-  const warningHtml = warnings.length ? `<div class="pricing-warnings" role="status">${warnings.map(text => `<span>${escapeHtml(text)}</span>`).join('')}</div>` : '';
+  const warnings = pricingCalendarWarnings({ suggestions, specialDays, monthDays, minStay, canManage });
+  const warningHtml = pricingWarningsHtml(warnings);
   const ctx = { blocks, specialByDate: new Map(specialDays.map(day => [day.date, day])), gapSet,
     saved, canManage, dailyReady, selected: pricingSelectedDays, focusDate: pricingFocusDate,
     research: appData.competitorPriceResearch || [], propertyId: entry.property.id, propertyKey: entry.key, today,

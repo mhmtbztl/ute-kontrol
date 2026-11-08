@@ -17,7 +17,7 @@
   <!-- Yazi tipleri kendi sunucumuzdan (dis sunucuya istek yok); style.css @font-face -->
   <link rel="preload" href="assets/fonts/inter-latin-wght.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="assets/fonts/inter-latin-ext-wght.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="style.css?v=c8384d5f">
+  <link rel="stylesheet" href="style.css?v=c7f0b569">
   <link rel="stylesheet" href="analytics.css?v=a15e3414">
   <script src="supabase.umd.js?v=3810661a"></script>
   <script src="core/xlsx_import_worker.js?v=b0939d47"></script>
@@ -2137,6 +2137,17 @@
               <li><b>Sonucu ölçün</b><span>Gün geçtikçe Sonuçlar sekmesi kaydettiğiniz fiyatla gecenin satılıp satılmadığını ve hangi fiyata satıldığını gösterir.</span><button type="button" class="pricing-link" data-onclick="openPricingGuideStep('results')">Sonuçlar'a git</button></li>
             </ol>
             <p class="sub-text">Hedef sekmesi aylık ciro hedefine hangi fiyat–doluluk bileşimiyle ulaşılacağını, Rakipler sekmesi rakip fiyatlarını ve ortalamasını gösterir. İkisi de öneriyi değiştirmez.</p>
+            <div class="pricing-guide-warnings">
+              <h4>Takvimdeki uyarılar ne demek?</h4>
+              <dl>
+                <div><dt>Talep artışı kapalı: doluluk hedefi yok</dt><dd>Talep kuralı, ayın doluluğu o ayın hedefine ulaşınca fiyatı artırır. Hedefleri Yönet'ten aylık doluluk hedefi girin; girmezseniz yalnız bu artış uygulanmaz, diğer kurallar çalışır.</dd></div>
+                <div><dt>Öneri hesaplanamıyor: baz fiyat yok</dt><dd>Mülkün baz fiyatı girilmemiş; takvimde fiyat yerine "—" görünür. Kurallar sekmesindeki fiyat tablosundan girin.</dd></div>
+                <div><dt>Taban fiyat yok</dt><dd>İndirimler fiyatı sınırsız düşürebilir. Taban, önerinin inemeyeceği en düşük fiyattır.</dd></div>
+                <div><dt>Bazı günlere öneri verilemedi</dt><dd>İndirimlerin toplamı fiyatı sıfıra indiriyor. Taban girin ya da son dakika / boş gece indirimini azaltın.</dd></div>
+                <div><dt>Açık gece satılamıyor</dt><dd>Rezervasyonlar arasındaki boşluk, minimum gece kuralının istediğinden kısa. Kuralı kısaltabilir ya da kaldırabilirsiniz.</dd></div>
+                <div><dt>Onay bekleyen gün</dt><dd>Uyarı değil, yapılacak iş sayacıdır: önerisi olup fiyatı kaydedilmemiş günler. Karta tıklayınca o aydakiler seçilir, hepsini tek seferde onaylayabilirsiniz.</dd></div>
+              </dl>
+            </div>
           </div>
         </details>
 
@@ -4338,7 +4349,7 @@
   <script src="core/permission_matrix.js?v=e3a3cef2"></script>
   <script src="core/tenant_backup_export.js?v=29f9ab53"></script>
   <script src="core/ui_dialog.js?v=d0680970"></script>
-  <script src="app.js?v=0fe1add5"></script>
+  <script src="app.js?v=218f5262"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=aec50671"></script>

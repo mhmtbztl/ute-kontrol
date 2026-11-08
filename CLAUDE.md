@@ -301,7 +301,7 @@ ortalaması** (`competitorAverage`: son 90 günde en yeni 5 farklı adlı rakibi
 **yalnız gösterimdir; öneri motoruna girmez** (kullanıcı kararı). phase115 durumu ayrı yoklama isteğiyle
 sorulmaz (göç yokken konsola 400 düşerdi): satırlardan anlaşılır, bilinmiyorsa kayıt adla denenir, sütun
 yoksa adsız tekrarlanır ve söylenir. Açılış JS bütçesi testi artık yayındaki LF boyutunu ölçer (CRLF çalışma
-kopyası ~40 KB fazla gösteriyordu); sınır 2,2 MiB aynı. Ağı `g9_feedback_tests` F-19…F-28,
+kopyası ~40 KB fazla gösteriyordu); sınır 2,2 MiB aynı. Takvim uyarıları `pricingCalendarWarnings` → başlık + neyi etkilediği + düzeltme düğmesi (yalnız yönetimde; `PRICING_WARNING_ACTIONS` sabit metindir, dağıtıcı ayrıştırır); `warn` öneriyi bozar, `info` bilgidir; kılavuzda "Takvimdeki uyarılar ne demek?". Ağı `g9_feedback_tests` F-19…F-29,
 `pricing_outcome_tests`, `pricing_competitor_tests`, `phase115_competitor_name_live_tests`, tarayıcı kapısı 32/32b.
 
 **Rezervasyon kayıt sınırları (L-300, kullanıcı kararı 27.10.2026):** 0 TL ve mülk
