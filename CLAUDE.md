@@ -901,7 +901,7 @@ ek yalnız `style.css` `ads-*`. `innerHTML` sınırı `<svg>`'yi sildiği için 
 `docs/PHASE111_DEPLOY_PACKAGE.md`, `docs/PHASE113_DEPLOY_PACKAGE.md`.
 
 **phase115 (`migration_phase115_competitor_name.sql`) 8 Kasım 2026'da test projesine ve üretime uygulandı;
-8 Kasım 2026'da üretimde doğrulandı** ( BAŞARILI,  115). `competitor_price_research.competitor_name` (NULL olabilir, 1–120 karakter,
+8 Kasım 2026'da üretimde doğrulandı** (`production:readiness` BAŞARILI, `schema_migrations` 115). `competitor_price_research.competitor_name` (NULL olabilir, 1–120 karakter,
 baş/son boşluksuz). Canlı süit `phase115_competitor_name_live_tests` 13/13 (göçten önce 9 kırmızı).
 Anon kapısı göçten önce de kapalı olduğundan anon sorgusu ayırt etmez; kanıt `schema_migrations` 115.
 Paket: `docs/PHASE115_DEPLOY_PACKAGE.md`.

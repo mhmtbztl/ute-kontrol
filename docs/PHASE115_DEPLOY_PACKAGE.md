@@ -50,5 +50,5 @@ durumda kırılmaz.
 ## Üretim durumu
 
 08.11.2026: kullanıcı SQL Editor'de uyguladı (başarılı). Salt okunur doğrulama:
- BAŞARILI,  115 mevcut. İstemci aynı gün
+`production:readiness` BAŞARILI, `schema_migrations` 115 mevcut. İstemci aynı gün
 yayına alındı (PR #64).
