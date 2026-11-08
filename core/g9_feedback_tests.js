@@ -2049,6 +2049,8 @@ async function gunlukFiyatDavranisi() {
   yazma = ist.yazmalar.find(k => k.tablo === 'property_daily_prices' && k.islem === 'upsert');
   check(yazma && yazma.yuk[0].price === 7000 && yazma.yuk[0].source === 'MANUAL' && yazma.yuk[0].suggested_price > 0 && yazma.yuk[0].note === 'Son dakika anlasmasi',
     'L-255h Elle fiyat MANUAL yazilir; oneri ve not yaninda saklanir', JSON.stringify(yazma && yazma.yuk));
+  // gun(22) ay sinirini gecebilir (09.11'de 1 Aralik): kart kendi ayinin izgarasinda aranir.
+  App.setPricingMonth(gun(22).slice(0, 7));
   check(/₺7\.000/.test(el('pricingManagerContainer').innerHTML) && /Elle fiyat · öneri ₺/.test(el('pricingManagerContainer').innerHTML),
     'L-255i Kart kayitli fiyati gosterir ve oneriyi yanina yazar');
 
