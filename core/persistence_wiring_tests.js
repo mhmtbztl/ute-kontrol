@@ -87,11 +87,11 @@ const KALICI = [
   // AI finans onerisi -> bakim kaydi
   'convertAiActionToTask',
   // phase31 — arayüzü hâlâ canlı olan defterler (ayrıca phase31_persistence_tests)
+  // setOtaPricingStrategy / saveOperatorNote / saveAllSettings temizlikte
+  // (11.11.2026) silindi: hicbir ekrandan cagrilmiyorlardi. Liste yalniz
+  // VAR OLAN fonksiyonlar icin buyur; silinen fonksiyon listeden de cikar.
   'cycleHkStatus',
-  'setPropertySalesReadiness',
-  'setOtaPricingStrategy',
-  'saveOperatorNote',
-  'saveAllSettings'
+  'setPropertySalesReadiness'
 ];
 
 /**

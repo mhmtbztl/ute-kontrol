@@ -21,17 +21,13 @@ function check(condition, label, detail = '') {
 const deadBrowserModules = [
   'operations_priority_engine',
   'operations_sla_service',
-  'property_readiness_service',
-  'recurring_tasks_service',
-  'today_operations_service',
   'message_template_engine',
   'messaging_provider',
   'extension_offer_service',
   'guest_messaging_engine',
   'message_delivery_service',
   'pricing_engine',
-  'revenue_forecast_service',
-  'notification_center_service',
+  'pricing_booking_service',
   // Kullanici karari (ENVANTER 27.09.2026): anahtar kelime eslestirmesi olan
   // "AI Strateji Danismani" kaldirildi (A1-G1). Geri gelirse bu satir kirilir.
   'executive_ai_advisor'

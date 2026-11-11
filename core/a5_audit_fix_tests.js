@@ -129,16 +129,8 @@ try {
   });
 
   // ---------------------------------------------------------------- E (L-148)
-  test('E1. Kontrol listesi metni bolum, onemli ve alt isaretle gidip doner', () => {
-    const ctx = {};
-    vm.runInNewContext(fnSource('checklistItemsToText') + '\n' + fnSource('checklistTextToItems'), ctx);
-    const text = '# Mutfak\n!Ocak temiz > Izgara; Fırın\nBuzdolabı boş\n# Banyo\nHavlu';
-    const items = ctx.checklistTextToItems(text, [{ item: 'Sabun' }]);
-    assert.strictEqual(JSON.stringify(items), JSON.stringify({ sections: [
-      { title: 'Mutfak', items: [{ text: 'Ocak temiz', important: true, subChecks: ['Izgara', 'Fırın'] }, { text: 'Buzdolabı boş', important: false, subChecks: [] }] },
-      { title: 'Banyo', items: [{ text: 'Havlu', important: false, subChecks: [] }] }
-    ], supplies: [{ item: 'Sabun' }] }));
-    assert.strictEqual(ctx.checklistItemsToText(items), text);
+  // Metin <-> madde donusturuculeri hicbir yerden cagrilmiyordu (temizlik 11.11.2026).
+  test('E1. Kontrol listesi maddeleri ayarlarda duzenlenebilir', () => {
     assert(fnSource('editSettingsTemplate').includes("kind === 'checklist'"), 'maddeler duzenlenemiyor');
   });
   test('E2. Ayarlar guncellemeleri 0 satiri basari saymaz', () => {

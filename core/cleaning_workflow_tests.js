@@ -5,7 +5,6 @@
 
 const assert = require('assert');
 const { reconcileBookingOperations, resolveChecklistSnapshot } = require('./operations_engine.js');
-const { computePropertyOperationsHealth } = require('./property_readiness_service.js');
 
 console.log('=============================================================================');
 console.log('🧹 LEXBNB PHASE 9 — CLEANING WORKFLOW & READINESS TEST SUITE');
@@ -93,54 +92,6 @@ function runCleaningWorkflowTests() {
   // Verify previous snapshot was NOT mutated by template change
   assert.strictEqual(snapshotRes.checklist.length, 2, 'Snapshot must not be affected by template changes');
   recordPass('3. Checklist is snapshotted into task and immune to subsequent template changes');
-
-  // TEST 4: Cycle-Aware Property Readiness: Completed Cleaning -> READY
-  console.log('\n--- TEST 4: Cycle-Aware Readiness (Initial Cleaning) ---');
-  const tasksAfterClean1 = [
-    {
-      property_id: prop1.id,
-      task_type: 'CLEANING',
-      task_subtype: 'TURNOVER',
-      status: 'DONE',
-      completed_at: '2026-08-05T13:30:00Z',
-      checklist: [
-        { id: 'c1', text: 'Temizlik', completed: true, required: true }
-      ]
-    }
-  ];
-
-  const health1 = computePropertyOperationsHealth(prop1, tasksAfterClean1, [], [booking1], '2026-08-05T14:00:00Z');
-  assert.strictEqual(health1.readinessState, 'READY');
-  assert.strictEqual(health1.submetrics.cleaningReadiness, 'CLEAN');
-  recordPass('4. Property transitions to READY upon current cycle cleaning completion');
-
-  // TEST 5: Cycle-Aware Property Readiness: Subsequent Checkout Reverts to DIRTY
-  console.log('\n--- TEST 5: Cycle-Aware Readiness (Subsequent Checkout Reverts) ---');
-  // At August 10, 12:00: booking2 has checked out. The cleaning on Aug 5 is from the PREVIOUS cycle!
-  const health2 = computePropertyOperationsHealth(prop1, tasksAfterClean1, [], allBookings, '2026-08-10T12:00:00Z');
-  assert.strictEqual(health2.submetrics.cleaningReadiness, 'DIRTY', 'Past cleaning must not validate new checkout');
-  assert(health2.readinessState !== 'READY', 'Property must NOT be READY after new checkout');
-  recordPass('5. (Correction 8) Cleaning completed before latest checkout does NOT make property READY');
-
-  // TEST 6: Incomplete Required Checklist Prevents READY
-  console.log('\n--- TEST 6: Incomplete Checklist Prevents READY ---');
-  const taskIncomplete = [
-    {
-      property_id: prop1.id,
-      task_type: 'CLEANING',
-      task_subtype: 'TURNOVER',
-      status: 'DONE',
-      completed_at: '2026-08-10T13:30:00Z',
-      checklist: [
-        { id: 'c1', text: 'Zorunlu Madde 1', completed: false, required: true } // REQUIRED BUT INCOMPLETE!
-      ]
-    }
-  ];
-
-  const healthIncomplete = computePropertyOperationsHealth(prop1, taskIncomplete, [], allBookings, '2026-08-10T14:00:00Z');
-  assert.strictEqual(healthIncomplete.readinessState, 'NOT_READY');
-  assert(healthIncomplete.reasons.some(r => r.includes('zorunlu maddeler eksik')));
-  recordPass('6. (Correction 10) Missing required checklist items prevents READY state');
 
   console.log(`\n=============================================================================`);
   console.log(`TEST SUMMARY: ${passedTests} / ${totalTests} TESTS PASSED (0 FAILED)`);

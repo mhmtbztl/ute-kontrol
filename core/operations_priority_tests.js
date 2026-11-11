@@ -6,7 +6,6 @@
 const assert = require('assert');
 const { computeTaskPriority, OPERATIONS_PRIORITY_CONFIG } = require('./operations_priority_engine.js');
 const { calculateSlaDeadline, evaluateTaskSla } = require('./operations_sla_service.js');
-const { getTenantLocalDateStr, buildTodayOperationsDashboard } = require('./today_operations_service.js');
 
 console.log('=============================================================================');
 console.log('⚡ LEXBNB PHASE 9 — PRIORITY, SLA & TIMEZONE TEST SUITE');
@@ -91,35 +90,6 @@ function runPriorityAndSlaTests() {
   assert.strictEqual(slaRes.isSlaBreached, true);
   assert.strictEqual(slaRes.status, 'BREACHED');
   recordPass('6. (Correction 7) Critical maintenance SLA (> 2 hours) detected as BREACHED');
-
-  // TEST 5: Timezone-Safe "Today" Boundary
-  console.log('\n--- TEST 5: Timezone-Safe "Today" Resolution ---');
-  // UTC 2026-09-15 22:30 is 2026-09-16 01:30 in Europe/Istanbul (+3)
-  const boundaryTime = new Date('2026-09-15T22:30:00Z');
-  const utcDate = boundaryTime.toISOString().split('T')[0];
-  const localDate = getTenantLocalDateStr(boundaryTime, 'Europe/Istanbul');
-
-  assert.strictEqual(utcDate, '2026-09-15');
-  assert.strictEqual(localDate, '2026-09-16');
-  recordPass('7. (Correction 17 & 18) Timezone resolution reflects local calendar date across UTC boundary');
-
-  // TEST 6: Today Dashboard Categorization
-  console.log('\n--- TEST 6: Today Dashboard Categorization ---');
-  const mockDashboard = buildTodayOperationsDashboard({
-    tasks: [criticalMaintTask, taskDueToday],
-    tickets: [{ id: 'tk-1', severity: 'CRITICAL', status: 'OPEN', property_id: 'p1' }],
-    bookings: [
-      { id: 'b-in', check_in: '2026-09-15', check_out: '2026-09-18', status: 'CONFIRMED' },
-      { id: 'b-out', check_in: '2026-09-12', check_out: '2026-09-15', status: 'CONFIRMED' }
-    ],
-    referenceDate: '2026-09-15T12:00:00Z',
-    timeZone: 'Europe/Istanbul'
-  });
-
-  assert.strictEqual(mockDashboard.counts.critical, 2, 'Must catch breached task and critical ticket');
-  assert.strictEqual(mockDashboard.counts.checkins, 1, 'Must catch today check-in');
-  assert.strictEqual(mockDashboard.counts.checkouts, 1, 'Must catch today check-out');
-  recordPass('8. Today Operations Dashboard categorizes critical, checkins, and checkouts cleanly');
 
   console.log(`\n=============================================================================`);
   console.log(`TEST SUMMARY: ${passedTests} / ${totalTests} TESTS PASSED (0 FAILED)`);

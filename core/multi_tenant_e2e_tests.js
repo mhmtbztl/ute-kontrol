@@ -7,7 +7,6 @@
 const assert = require('assert');
 const ExecutiveDashboardService = require('./executive_dashboard_service.js');
 const { collapseDuplicateActions, selectTodayCommandCenterActions } = require('./executive_priority_service.js');
-const { buildNotificationEventKey, processCandidateNotification } = require('./notification_center_service.js');
 
 console.log('=============================================================================');
 console.log('🛡️  LEXBNB PHASE 12 — MULTI-TENANT CONCURRENT ISOLATION E2E SUITE');
@@ -104,29 +103,6 @@ function runMultiTenantE2eTests() {
   assert.strictEqual(collapsedB[0].propertyId, 'prop-B1');
   assert.strictEqual(collapsedB[0].isCollapsed, undefined);
   recordPass('2. Duplicate action collapse is strictly scoped per tenant without cross-tenant property conflation');
-
-  // 3. Notification Deduplication Collision Freedom Across Tenants
-  console.log('\n--- TEST 3: Notification Event Key Scoping ---');
-  // Both tenants experience the same event type on the same date
-  const keyA = buildNotificationEventKey(tenantA.id, 'OPERATIONS', 'p1', 'CHECKIN_TODAY', '2026-10-01');
-  const keyB = buildNotificationEventKey(tenantB.id, 'OPERATIONS', 'p1', 'CHECKIN_TODAY', '2026-10-01');
-
-  assert.notStrictEqual(keyA, keyB, 'Keys must differ by tenant ID');
-
-  const notifPool = [];
-  const candA = { tenantId: tenantA.id, domain: 'OPERATIONS', entityId: 'p1', eventType: 'CHECKIN_TODAY', dateStr: '2026-10-01', title: 'Checkin A' };
-  const candB = { tenantId: tenantB.id, domain: 'OPERATIONS', entityId: 'p1', eventType: 'CHECKIN_TODAY', dateStr: '2026-10-01', title: 'Checkin B' };
-
-  const resA = processCandidateNotification(notifPool, candA);
-  notifPool.push(resA.notification);
-
-  const resB = processCandidateNotification(notifPool, candB);
-  notifPool.push(resB.notification);
-
-  assert.strictEqual(resA.shouldCreate, true);
-  assert.strictEqual(resB.shouldCreate, true);
-  assert.strictEqual(notifPool.length, 2);
-  recordPass('3. Identical event types across different tenants generate collision-free deterministic notifications');
 
   // 4. (kaldirildi, A1-G1) "AI Strateji Danismani" baglam izolasyonu: danisman
   // kullanici karariyla silindi. ChatGPT paketinin kiraci izolasyonunu

@@ -4,7 +4,6 @@ const path = require('path');
 
 const BusinessDate = require('./business_date');
 const PricingEngine = require('./pricing_engine');
-const { generateRecurringInstances } = require('./recurring_tasks_service');
 
 let passed = 0;
 let failed = 0;
@@ -38,29 +37,13 @@ test('İş günü kullanan servisler UTC ISO gün varsayımı üretmez', () => {
     'marketing_experiment_worker_service.js',
     'marketing_funnel_worker_service.js',
     'marketing_ui.js',
-    'recurring_tasks_service.js',
-    'revenue_forecast_service.js',
     'seasonal_marketing_worker_service.js',
-    'today_operations_service.js'
   ];
   files.forEach(file => {
     const source = fs.readFileSync(path.join(__dirname, file), 'utf8');
     assert.doesNotMatch(source, /new Date\(\)\.toISOString\(\)\.(?:slice\(0,\s*10\)|split\(['"]T['"]\)\[0\])/,
       `${file} hâlâ UTC tabanlı bugün üretiyor`);
   });
-});
-
-test('Periyodik görev kimliği İstanbul takvim gününü kullanır', () => {
-  const tasks = generateRecurringInstances([{
-    id: 'daily-1',
-    tenant_id: 'tenant-1',
-    property_id: 'property-1',
-    is_active: true,
-    frequency: 'DAILY',
-    title: 'Günlük kontrol'
-  }], new Date('2026-01-01T21:00:00.000Z'));
-  assert.strictEqual(tasks[0].source_event_id, 'recur:daily-1:2026-01-02');
-  assert.strictEqual(tasks[0].metadata.scheduled_date, '2026-01-02');
 });
 
 test('UTC tarih dizisi ve timestamp sözleşmeleri değişmeden kalır', () => {
