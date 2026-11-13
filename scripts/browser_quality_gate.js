@@ -1072,6 +1072,35 @@ async function main() {
       assert(satis.rehber <= satis.kap && satis.etiketsiz === 0, `misafir rehberi kart modunda sığmalı: ${JSON.stringify(satis)}`);
       await assertNoHorizontalOverflow(page, 'Misafirler mobil');
       passed.push('38. Misafirler ve Satış telefonda: aşama panosu alt alta, misafir rehberi kart modunda sığar');
+      // Finans (PR 6): gelir/gider tablolari kart modunda ve etiketli, mulk performansi kartlarda,
+      // aylik KPI tablosu yana kayar ama ay sutunu sabit; kucuk hedef yok.
+      await page.evaluate(() => {
+        switchTab('finance');
+        ['financeIncomeDisclosure', 'financeExpensesDisclosure', 'financeMonthlyDisclosure'].forEach(id => { const d = document.getElementById(id); if (d) d.open = true; });
+      });
+      // Etiketleri tbody gozlemcisi yazar (mikrogorev): olcumden once bir tik beklenir.
+      await page.waitForTimeout(50);
+      const fin = await page.evaluate(() => {
+        const sigar = t => Math.round(t.getBoundingClientRect().width) <= Math.round(t.parentElement.clientWidth);
+        const kartTablolar = [...document.querySelectorAll('#tab-finance table.mobile-cards')];
+        const ilk = document.querySelector('.monthly-kpi-tracker-card .data-table td:first-child, .monthly-kpi-tracker-card .data-table th:first-child');
+        return {
+          kartSayisi: kartTablolar.length,
+          sigmayan: kartTablolar.filter(t => !sigar(t)).length,
+          etiketsiz: kartTablolar.flatMap(t => [...t.querySelectorAll(':scope > tbody > tr > td:not([colspan])')]).filter(td => !td.getAttribute('data-label')).length,
+          mulkTablo: getComputedStyle(document.getElementById('propExecutiveTableContainer')).display,
+          mulkKart: getComputedStyle(document.getElementById('propCardsContainer')).display,
+          ayYapiskan: ilk ? getComputedStyle(ilk).position : null,
+          kucuk: [...document.querySelectorAll('#tab-finance .stepper-arrow-btn, #tab-finance .kpi-info-btn, #tab-finance .trend-btn')]
+            .filter(b => b.getClientRects().length).map(b => Math.round(b.getBoundingClientRect().height)).filter(h => h < 36)
+        };
+      });
+      assert(fin.kartSayisi >= 2 && fin.sigmayan === 0 && fin.etiketsiz === 0, `Finans gelir/gider tabloları kart modunda sığmalı ve etiketli olmalı: ${JSON.stringify(fin)}`);
+      assert(fin.mulkTablo === 'none' && fin.mulkKart === 'grid', `Mülk performansı telefonda kart görünümünde: ${JSON.stringify(fin)}`);
+      assert.strictEqual(fin.ayYapiskan, 'sticky', 'Aylık KPI tablosunda ay sütunu sabit');
+      assert.strictEqual(fin.kucuk.length, 0, `Finans küçük düğme: ${fin.kucuk}`);
+      await assertNoHorizontalOverflow(page, 'Finans mobil');
+      passed.push('39. Finans telefonda: gelir/gider tabloları kart modunda ve etiketli, mülk kartları, aylık tabloda ay sütunu sabit, küçük düğme yok');
       passed.push('25b. Bugün performans kartları 390 px mobilde taşmaz');
       await page.evaluate(() => { switchTab('pricing'); });
       await assertNoHorizontalOverflow(page, 'Fiyatlandirma mobil');

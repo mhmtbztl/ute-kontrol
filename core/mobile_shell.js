@@ -133,7 +133,47 @@
     filtreDugmesiniEsle(belge);
   }
 
-  const api = { CUBUK_SEKMELERI, filtreOzeti, menuSekmeleri, syncMobileShell, openMobileMoreSheet, closeMobileMoreSheet, toggleMobileFilters };
+  // Telefonda kart moduna dönen tablolar (`table.mobile-cards`): her hücreye
+  // sütun adını başlıktan `data-label` olarak yazar; CSS etiketi `td::before`
+  // ile gösterir. Satırları çizen fonksiyonlara dokunmadan çalışır: tbody her
+  // yeniden çizildiğinde gözlemci etiketleri tazeler. Var olan etiket ezilmez.
+  function tabloyuEtiketle(tablo) {
+    if (!tablo || !tablo.querySelectorAll) return 0;
+    const basliklar = Array.from(tablo.querySelectorAll(':scope > thead > tr > th')).map(th => String(th.textContent || '').replace(/\s+/g, ' ').trim());
+    let sayi = 0;
+    Array.from(tablo.querySelectorAll(':scope > tbody > tr')).forEach(tr => {
+      let sutun = 0;
+      Array.from(tr.children).forEach(td => {
+        const genislik = Number(td.getAttribute('colspan')) || 1;
+        if (genislik === 1 && !td.getAttribute('data-label') && basliklar[sutun]) {
+          td.setAttribute('data-label', basliklar[sutun]);
+          sayi += 1;
+        }
+        sutun += genislik;
+      });
+    });
+    return sayi;
+  }
+
+  function mobilTablolariIzle(belge) {
+    belge = belgeAl(belge);
+    if (!belge) return;
+    Array.from(belge.querySelectorAll('table.mobile-cards')).forEach(tablo => {
+      tabloyuEtiketle(tablo);
+      const govde = tablo.querySelector('tbody');
+      if (govde && typeof MutationObserver !== 'undefined' && !govde.__lxEtiketGozlemci) {
+        govde.__lxEtiketGozlemci = new MutationObserver(() => tabloyuEtiketle(tablo));
+        govde.__lxEtiketGozlemci.observe(govde, { childList: true });
+      }
+    });
+  }
+
+  if (typeof document !== 'undefined' && document.addEventListener) {
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => mobilTablolariIzle(document));
+    else mobilTablolariIzle(document);
+  }
+
+  const api = { CUBUK_SEKMELERI, filtreOzeti, menuSekmeleri, syncMobileShell, openMobileMoreSheet, closeMobileMoreSheet, toggleMobileFilters, tabloyuEtiketle, mobilTablolariIzle };
   // Düğmelerin çağırdığı adlar genel olmalı (core/action_dispatch.js EYLEMLER).
   if (typeof window !== 'undefined') {
     window.syncMobileShell = syncMobileShell;

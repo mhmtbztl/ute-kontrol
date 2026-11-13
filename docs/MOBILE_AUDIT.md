@@ -32,7 +32,7 @@ tarayıcı kapısı 34 (üst bar ≤72 px, alt çubuk, Daha fazla, dönem düğm
 | Operasyon | 2,0 | 0 | 0 | **PR 4 tamam (14.11.2026):** alt sayfa seçici 2x2 ızgara (462 px şerit kalktı), özet kartları 2'li, boş grup tek satır, üst düğmeler tam genişlik. Kapı 37 (dört görünüm) |
 | Misafirler ve Satış | Talepler 4,3 · Misafirler 1,8 | 0 | 0 | **PR 5 tamam (14.11.2026):** aşama panosu alt alta (1180 px şerit kalktı; eski 768 kuralı sonraki taban kuralıyla eziliyordu), boş aşama tek satır; WhatsApp ve misafir özet kartları 2'li; misafir rehberi kart modunda (`data-label`), filtreler 2'li ızgara. Ölçüm aracı artık Misafirler alt sayfasını da ölçer. Kapı 38 |
 | Fiyatlandırma | 4,3 | 1 | 22 | Ay sekmeleri 1542 px kayıyor; küçük gün hücreleri |
-| Finans | 4,8 | 4 | 13 | Dört tablo (780–1038 px) kart moduna; sayfa içi ikinci dönem seçici |
+| Finans | 4,0 | 1 | 0 | **PR 6 tamam (14.11.2026):** gelir ve gider tabloları kart modunda (`table.mobile-cards`, etiketleri `core/mobile_shell.js` başlıktan yazar), mülk performansı hazır kart görünümünde, kâr köprüsü adım başına tek satır, özet kartları 2'li, küçük düğmeler büyüdü. Aylık KPI tablosu bilerek yana kayar, ay sütunu sabit. Kapı 39 |
 | Analiz | 5,1 | 2 | 28 | Kanal ve mülk tabloları; küçük çipler |
 | Kanallar ve Pazarlama | 1,9 | 1 | 0 | Kanal tablosu 812 px |
 | Ayarlar | 1,0 | 1 | 1 | Ayar menüsü 1212 px kapsül satırı |
@@ -40,5 +40,8 @@ tarayıcı kapısı 34 (üst bar ≤72 px, alt çubuk, Daha fazla, dönem düğm
 | Saha (personel) | 1,0 | 0 | 0 | — |
 
 Kalıp: tablo kart moduna `td[data-label]` + `td::before` ile döner (`.reservation-list-table`,
-style.css); yeni ekranda aynısı kullanılır. Telefon kuralı yalnız style.css sonundaki
+style.css). Yeni tabloda `table` etiketine `mobile-cards` sınıfı eklemek yeter:
+`core/mobile_shell.js` (`tabloyuEtiketle`) hücrelere sütun adını başlıktan yazar ve tbody yeniden
+çizildikçe tazeler; satır çizen koda dokunulmaz. Karşılaştırma tabloları (aylık KPI) kart olmaz,
+yana kayar ve ilk sütun sabit kalır. Telefon kuralı yalnız style.css sonundaki
 "MOBIL KATMAN" bölümüne, tek kırılım 640 px ile yazılır.

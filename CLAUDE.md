@@ -451,6 +451,10 @@ yapışkan başlık ilk ekranın yarısını alıyordu.
   satır içi `span 2` sıfırlanır; form alanları 16 px'tir (iOS yakınlaştırmaz).
   Rezervasyon formu (`#bookingModal`) kendi tam ekran kuralını korur.
 - Tarayıcı kapısı 34: üst bar ≤72 px, alt çubuk, Daha fazla, dönem düğmesi.
+- **Tablo telefonda kart olur:** `<table class="… mobile-cards">` yeter; `core/mobile_shell.js`
+  hücrelere `data-label`ı başlıktan yazar (yalnız tablonun kendi satırları; iç içe tablo etkilenmez).
+  Karşılaştırma tablosu kart olmaz: yana kayar, ilk sütun sabit. Ekran ekran kapılar 35–39
+  (Bugün, Rezervasyonlar, Operasyon, Misafirler/Satış, Finans).
 
 ### 3.6 Demo yok / uydurma veri yok
 Demo portföyü ve paralel yerel yolu **tamamen kaldırıldı** (2026-09-13).
