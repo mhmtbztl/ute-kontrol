@@ -7612,5 +7612,26 @@ button.pricing-rule-row:focus-visible { outline: 2px solid var(--border-focus); 
   /* Etiket solda, degerler sagda toplu (ciro + "temizlik geliri" notu ortaya kaymaz) */
   .reservation-list-table td { justify-content: flex-end; flex-wrap: wrap; align-items: center; column-gap: 8px; min-height: 36px; }
   .reservation-list-table td::before { margin-right: auto; }
+
+  /* ===== Operasyon (mobil uyum PR 4) — yalniz yerlesim ===== */
+  #tab-operations .section-title-bar > div:last-child { width: 100%; }
+  #tab-operations .section-title-bar > div:last-child .btn { flex: 1 1 0; min-height: 44px; justify-content: center; }
+  /* Alt sayfa secici: yana kayan serit yerine 2x2 izgara */
+  #tab-operations .operations-switch {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    overflow: visible;
+  }
+  #tab-operations .operations-switch button { min-height: 40px; justify-content: center; }
+  /* Ozet kartlari 2'li ve kisa */
+  #tab-operations .kpi-cards-grid.five-cols { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; }
+  #tab-operations .kpi-card { padding: 12px !important; min-height: 0 !important; }
+  #tab-operations .kpi-card .kpi-value { font-size: 20px !important; margin: 4px 0 2px !important; }
+  #tab-operations .kpi-card .kpi-meta { font-size: 11px; }
+  /* Bos grup: baslik ve "yok" notu tek kisa kutu */
+  .ops-group:has(> .empty-state) { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 10px; padding: 10px 14px; }
+  .ops-group:has(> .empty-state) h3 { margin: 0; }
+  .ops-group > .empty-state { padding: 0; }
   .tab-content#tab-reservations .section-title-bar .btn { min-height: 44px; }
 }

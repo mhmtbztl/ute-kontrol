@@ -29,7 +29,7 @@ tarayıcı kapısı 34 (üst bar ≤72 px, alt çubuk, Daha fazla, dönem düğm
 |---|---|---|---|---|
 | Bugün | 2,9 | 0 | 0 | **PR 2 tamam (14.11.2026):** performans kartları kısa 2'li ızgara, boş komuta grubu tek satırlık not, kurulum adımları ≥36 px (önce boy 3,2, küçük 3); tarayıcı kapısı 35 |
 | Rezervasyonlar | 2,0 | 1 | 0 | **PR 3 tamam (14.11.2026):** liste kart modunda sığar (780 px tablo tabanı kalktı), dönem kartı Önceki · aralık · Sonraki tek satır, takvimin mülk sütunu 112 px; takvim bilerek yana kayar. Kapı 36 |
-| Operasyon | 2,5 | 1 | 4 | Alt sayfa geçişi (Temizlik / Arıza / …) 462 px kayıyor |
+| Operasyon | 2,0 | 0 | 0 | **PR 4 tamam (14.11.2026):** alt sayfa seçici 2x2 ızgara (462 px şerit kalktı), özet kartları 2'li, boş grup tek satır, üst düğmeler tam genişlik. Kapı 37 (dört görünüm) |
 | Misafirler ve Satış | 4,1 | 1 | 4 | Kanban 1180 px; telefonda aşama seçici + tek sütun |
 | Fiyatlandırma | 4,3 | 1 | 22 | Ay sekmeleri 1542 px kayıyor; küçük gün hücreleri |
 | Finans | 4,8 | 4 | 13 | Dört tablo (780–1038 px) kart moduna; sayfa içi ikinci dönem seçici |
