@@ -17,7 +17,7 @@
   <!-- Yazi tipleri kendi sunucumuzdan (dis sunucuya istek yok); style.css @font-face -->
   <link rel="preload" href="assets/fonts/inter-latin-wght.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="assets/fonts/inter-latin-ext-wght.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="style.css?v=123d10b4">
+  <link rel="stylesheet" href="style.css?v=dde9f7f3">
   <link rel="stylesheet" href="analytics.css?v=a15e3414">
   <script src="supabase.umd.js?v=3810661a"></script>
   <script src="core/xlsx_import_worker.js?v=b0939d47"></script>
@@ -160,6 +160,14 @@
         <p id="brandSubTitle">Kısa Dönem Kiralama & Finansal Performans Portalı</p>
       </div>
     </div>
+
+    <!-- Telefonda (<=640 px) donem ve mulk secimi bu dugmeye katlanir; dokununca
+         asagidaki filtre paneli acilir. Masaustunde gorunmez. core/mobile_shell.js -->
+    <button type="button" id="mobileFilterChip" class="mobile-filter-chip" data-onclick="toggleMobileFilters()" aria-controls="globalFilterBar" aria-expanded="false" hidden>
+      <span aria-hidden="true">📅</span>
+      <span id="mobileFilterChipText" class="mobile-filter-chip__text">—</span>
+      <span class="header-chevron" aria-hidden="true">▾</span>
+    </button>
 
     <!-- Global Period & Villa Filter. Yalniz okuyan sayfada gorunur ve neyi
          etkiledigini yazar: applyGlobalFilterScope() / GLOBAL_FILTER_SCOPE. -->
@@ -2458,7 +2466,33 @@
 
   </main>
 
-  <button type="button" id="mobileQuickBookingBtn" class="btn btn-primary mobile-quick-booking" data-onclick="openQuickBookingModal()" hidden>＋ Hızlı rezervasyon</button>
+  <button type="button" id="mobileQuickBookingBtn" class="btn btn-primary mobile-quick-booking" data-onclick="openQuickBookingModal()" aria-label="Hızlı rezervasyon" hidden><span aria-hidden="true">＋</span><span class="mobile-quick-booking__text"> Hızlı rezervasyon</span></button>
+
+  <!-- Telefon alt gezinme cubugu (<=640 px). Hangi sekmenin gorunecegine
+       rol kapisinin gizledigi .nav-tabs dugmeleri karar verir; burada ayri
+       rol listesi yok. Esleme: core/mobile_shell.js syncMobileShell(). -->
+  <nav id="mobileTabbar" class="mobile-tabbar" aria-label="Ana menü" hidden>
+    <button type="button" class="mobile-tabbar__btn" data-mobile-tab="executive" data-onclick="switchTab('executive')"><span class="mobile-tabbar__icon" aria-hidden="true">📍</span><span>Bugün</span></button>
+    <button type="button" class="mobile-tabbar__btn" data-mobile-tab="reservations" data-onclick="switchTab('reservations')"><span class="mobile-tabbar__icon" aria-hidden="true">📅</span><span>Rezervasyon</span></button>
+    <button type="button" class="mobile-tabbar__btn" data-mobile-tab="operations" data-onclick="switchTab('operations')"><span class="mobile-tabbar__icon" aria-hidden="true">🧹</span><span>Operasyon</span></button>
+    <button type="button" class="mobile-tabbar__btn" data-mobile-tab="finance" data-onclick="switchTab('finance')"><span class="mobile-tabbar__icon" aria-hidden="true">💰</span><span>Finans</span></button>
+    <button type="button" class="mobile-tabbar__btn" data-mobile-tab="more" data-onclick="openMobileMoreSheet()" aria-haspopup="dialog" aria-controls="mobileMoreSheet"><span class="mobile-tabbar__icon" aria-hidden="true">☰</span><span>Daha fazla</span></button>
+  </nav>
+
+  <div class="modal-backdrop mobile-more-sheet" id="mobileMoreSheet" role="dialog" aria-modal="true" aria-labelledby="mobileMoreTitle">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="mobileMoreTitle">Menü</h3>
+        <button type="button" class="close-btn" data-onclick="closeMobileMoreSheet()" aria-label="Kapat">×</button>
+      </div>
+      <div id="mobileMoreList" class="mobile-more-list"></div>
+      <div class="mobile-more-list mobile-more-list--tools">
+        <button type="button" class="mobile-more-item" data-onclick="closeMobileMoreSheet(); openCommandPalette()">🔍 Ara / komut</button>
+        <button type="button" class="mobile-more-item" data-onclick="closeMobileMoreSheet(); openChatGptQuestionModal()">🧠 ChatGPT'ye sor</button>
+        <button type="button" class="mobile-more-item" data-onclick="closeMobileMoreSheet(); openHelpModal()">❓ Nasıl kullanılır?</button>
+      </div>
+    </div>
+  </div>
 
   <!-- ========================================== -->
   <!-- MODAL: YENİ GİDER / YATIRIM EKLE -->
@@ -4341,15 +4375,16 @@
   <script src="core/captcha_gate.js?v=3ad4a776"></script>
   <script src="core/date_range_picker.js?v=41dc564c"></script>
   <script src="core/side_panel.js?v=d763b464"></script>
+  <script src="core/mobile_shell.js?v=0533f322"></script>
   <script src="core/notification_feed.js?v=941306f6"></script>
   <script src="core/command_search.js?v=89760933"></script>
-  <script src="core/action_dispatch.js?v=b1574f14"></script>
+  <script src="core/action_dispatch.js?v=fb4b281d"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=ca7b5399"></script>
   <script src="core/permission_matrix.js?v=e3a3cef2"></script>
   <script src="core/tenant_backup_export.js?v=5aadcdb1"></script>
   <script src="core/ui_dialog.js?v=d0680970"></script>
-  <script src="app.js?v=49b11c6d"></script>
+  <script src="app.js?v=6b40042f"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=aec50671"></script>

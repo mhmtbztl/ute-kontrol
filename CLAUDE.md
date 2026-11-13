@@ -431,6 +431,27 @@ Kural 6: JS'in yazdığı bir alan sonuç iddia eden kelimeyle (`uçurum`, `krit
 yapılır. Bir blok hangi sekmenin içindeyse render fonksiyonu **o sekmenin**
 `ACTIVE_RENDER_PLANS` satırında olmalıdır.
 
+### 3.5.1 Telefon (mobil uyum, kullanıcı kararı 08.11.2026)
+
+Sıra: **önce bütün ekranlar telefona uyar, en son PWA** (ana ekran simgesi;
+service worker zaten var, PR #69). İş listesi ve ölçüm `docs/MOBILE_AUDIT.md`,
+araç `node scripts/mobile_audit.js` (ilk ekran görüntüsü + kayan kutu, küçük
+hedef, iOS yakınlaştırması). Belge düzeyinde taşma 0 iken ekran kullanışsızdı:
+yapışkan başlık ilk ekranın yarısını alıyordu.
+
+- **Telefon kuralı tek yerde:** style.css sonundaki `MOBIL KATMAN`, tek kırılım
+  **640 px** (`mobile_shell_tests` K12). Eski dağınık 520/768/900 kuralları
+  `:has(#id)` ile id özgüllüğü taşır; ezmek için aynı özgüllük gerekir.
+- **Kabuk `core/mobile_shell.js`:** alt çubuk ve "Daha fazla" listesi rol
+  kapısının gizlediği `.nav-tabs .tab-btn`'den türetilir — **ayrı rol listesi
+  yazılmaz** (K4, §3.3.1). `switchTab`, `applyRoleNavigationVisibility` ve
+  `handleFilterChange` `syncMobileShell()` çağırır. Menüye sekme eklerseniz
+  "Daha fazla"ya kendiliğinden girer.
+- Telefonda pencereler alttan açılan sayfadır; `.form-grid` tek sütundur ve
+  satır içi `span 2` sıfırlanır; form alanları 16 px'tir (iOS yakınlaştırmaz).
+  Rezervasyon formu (`#bookingModal`) kendi tam ekran kuralını korur.
+- Tarayıcı kapısı 34: üst bar ≤72 px, alt çubuk, Daha fazla, dönem düğmesi.
+
 ### 3.6 Demo yok / uydurma veri yok
 Demo portföyü ve paralel yerel yolu **tamamen kaldırıldı** (2026-09-13).
 Yeniden kurulacaksa **Supabase'de gerçek bir tenant** olarak kurulmalı — paralel kod yolu değil.

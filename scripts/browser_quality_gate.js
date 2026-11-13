@@ -971,6 +971,37 @@ async function main() {
 
     await withPage(browser, baseUrl, 'owner', { width: 390, height: 844 }, async page => {
       await assertBookingFinance(page,true); passed.push('16. rezervasyon finansı 390 px mobil görünüm');
+      // Mobil kabuk (PR 1): tek satir ust bar, alt cubuk, Daha fazla, donem dugmesi.
+      const kabuk = await page.evaluate(() => {
+        closeBookingModal(); switchTab('executive');
+        const kutu = el => el.getBoundingClientRect();
+        const cubuk = kutu(document.getElementById('mobileTabbar'));
+        return {
+          ust: Math.round(kutu(document.querySelector('.app-header')).bottom),
+          serit: getComputedStyle(document.querySelector('.nav-tabs')).display,
+          cubukAlt: Math.round(cubuk.bottom), cubukYuksek: Math.round(cubuk.height),
+          dugmeler: [...document.querySelectorAll('.app-header .header-actions .btn')].filter(b => b.offsetParent).map(b => Math.round(b.getBoundingClientRect().width)),
+          cip: getComputedStyle(document.getElementById('mobileFilterChip')).display
+        };
+      });
+      assert(kabuk.ust <= 72, `telefonda üst bar ${kabuk.ust}px (en fazla 72)`);
+      assert.strictEqual(kabuk.serit, 'none', 'alt çubuk varken üst sekme şeridi gizli olmalı');
+      assert(kabuk.cubukYuksek > 0 && kabuk.cubukAlt === 844, `alt çubuk ekranın altında görünmeli: ${JSON.stringify(kabuk)}`);
+      assert(kabuk.dugmeler.length >= 3 && kabuk.dugmeler.every(w => w >= 40), `üst bar düğmeleri en az 40 px: ${kabuk.dugmeler}`);
+      assert.strictEqual(kabuk.cip, 'none', 'Bugün filtreyi okumaz; dönem düğmesi görünmemeli');
+      await page.click('#mobileTabbar [data-mobile-tab="more"]');
+      await page.waitForSelector('#mobileMoreSheet.active');
+      await page.locator('#mobileMoreList .mobile-more-item', { hasText: 'Fiyatlandırma' }).click();
+      assert(await page.evaluate(() => document.getElementById('tab-pricing').classList.contains('active')
+        && !document.getElementById('mobileMoreSheet').classList.contains('active')
+        && document.querySelector('#mobileTabbar [data-mobile-tab="more"]').classList.contains('active')), 'Daha fazla → Fiyatlandırma açılmalı, sayfa kapanmalı');
+      await page.click('#mobileTabbar [data-mobile-tab="finance"]');
+      await page.click('#mobileFilterChip');
+      assert(await page.evaluate(() => getComputedStyle(document.getElementById('globalFilterBar')).display !== 'none'
+        && document.getElementById('mobileFilterChipText').textContent.includes(document.getElementById('globalPeriodFilter').selectedOptions[0].textContent.trim())),
+      'dönem düğmesi filtre panelini açmalı ve seçili dönemi yazmalı');
+      await assertNoHorizontalOverflow(page, 'mobil kabuk finans');
+      passed.push('34. telefon kabuğu: üst bar ≤72 px, alt çubuk, Daha fazla menüsü ve dönem düğmesi');
       await page.evaluate(() => { switchTab('executive'); renderTodayPerformance(); });
       await assertNoHorizontalOverflow(page, 'Bugun performans mobil');
       passed.push('25b. Bugün performans kartları 390 px mobilde taşmaz');
@@ -1069,6 +1100,7 @@ async function main() {
     });
     await withPage(browser, baseUrl, 'staff', { width: 390, height: 844 }, async page => {
       assert(await page.evaluate(() => document.querySelector('.nav-tabs').hidden));
+      assert(await page.evaluate(() => document.getElementById('mobileTabbar').hidden), 'saha personelinde alt çubuk olmamalı');
       assert(await page.evaluate(() => canExportReportPage('OPERATIONS') && !canExportReportPage('BOOKINGS')));
       await assertNoHorizontalOverflow(page, 'staff saha');
       // Analiz: saha personeli goremez; dogrudan cagri da reddedilir.

@@ -9,3 +9,6 @@ supabase/.temp/
 
 # Pages yayin klasoru (scripts/build_pages.js uretir)
 _site/
+
+# Claude Code yerel ayarlari (hesap bilgisi icerir)
+.claude/settings.local.json
