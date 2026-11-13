@@ -108,6 +108,9 @@ async function auditRole(browser, baseUrl, role, width, report) {
       .map(b => (b.getAttribute('data-onclick') || '').match(/switchTab\('([^']+)'\)/)).filter(Boolean).map(m => m[1]);
     const active = document.querySelector('.tab-content.active');
     if (active && !out.includes(active.id.replace('tab-', ''))) out.unshift(active.id.replace('tab-', ''));
+    // Menude ayri dugmesi olmayan alt sayfalar (Misafirler ve Satis: Misafirler)
+    // ust sekmesi gorunurse olculur.
+    if (out.includes('leads') && document.getElementById('tab-guests')) out.splice(out.indexOf('leads') + 1, 0, 'guests');
     return out;
   });
   for (const tab of tabs) {

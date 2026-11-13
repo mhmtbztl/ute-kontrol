@@ -21729,15 +21729,15 @@ function renderGuestsTab() {
       const villaKey = dateBooking?.villa || dateBooking?.propertyId || '';
       const villaName = villaKey ? (appData.villas?.[villaKey]?.name || villaKey) : '';
       return `<tr>
-        <td><strong>${escapeHtml(row.name)}</strong><br><small>${escapeHtml(String(row.language || 'tr').toUpperCase())}</small></td>
-        <td>${contact}</td>
-        <td><strong>${row.stayCount}</strong></td>
-        <td>${row.nights}</td>
-        <td><strong>₺${Number(row.lifetimeRevenue).toLocaleString('tr-TR')}</strong></td>
-        <td>${escapeHtml(dateValue)}${villaName ? `<br><small>${escapeHtml(villaName)}</small>` : ''}</td>
-        <td><span>${escapeHtml(directShare)}</span><br>${consent}</td>
-        <td><span class="badge ${lifecycleClass}">${escapeHtml(row.lifecycle.label)}</span><br>${segment}${opportunity}</td>
-        <td style="text-align:right;"><button class="btn btn-secondary btn-sm" data-onclick="openGuestProfileModal(decodeURIComponent('${encodeActionArg(String(row.id))}'))">Detay</button></td>
+        <td data-label="Misafir"><strong>${escapeHtml(row.name)}</strong><br><small>${escapeHtml(String(row.language || 'tr').toUpperCase())}</small></td>
+        <td data-label="İletişim">${contact}</td>
+        <td data-label="Konaklama"><strong>${row.stayCount}</strong></td>
+        <td data-label="Gece">${row.nights}</td>
+        <td data-label="Yaşam boyu ciro"><strong>₺${Number(row.lifetimeRevenue).toLocaleString('tr-TR')}</strong></td>
+        <td data-label="Sonraki / son">${escapeHtml(dateValue)}${villaName ? `<br><small>${escapeHtml(villaName)}</small>` : ''}</td>
+        <td data-label="Kanal / izin"><span>${escapeHtml(directShare)}</span><br>${consent}</td>
+        <td data-label="Durum"><span class="badge ${lifecycleClass}">${escapeHtml(row.lifecycle.label)}</span><br>${segment}${opportunity}</td>
+        <td data-label="İşlem" style="text-align:right;"><button class="btn btn-secondary btn-sm" data-onclick="openGuestProfileModal(decodeURIComponent('${encodeActionArg(String(row.id))}'))">Detay</button></td>
       </tr>`;
     }).join('');
   }
