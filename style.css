@@ -7583,4 +7583,34 @@ button.pricing-rule-row:focus-visible { outline: 2px solid var(--border-focus); 
     text-align: left;
     font-size: 12px;
   }
+
+  /* ===== Rezervasyonlar (mobil uyum PR 3) — yalniz yerlesim ===== */
+  /* Donem karti: Onceki | aralik | Sonraki tek satir; mulk ve gorunum alt satirda */
+  .reservation-scope-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+  .reservation-scope-title,
+  .reservation-scope-row > div:has(#rezVillaFilter),
+  .reservation-scope-row .calendar-view-switch { grid-column: 1 / -1; min-width: 0; }
+  .reservation-scope-title .sub-text { display: none; }
+  .reservation-scope-row #rezVillaFilter { width: 100%; }
+  .reservation-scope-row .btn,
+  .reservation-range-group > button { min-height: 40px; }
+  .reservation-scope-row .calendar-view-switch { display: flex; gap: 6px; }
+  .reservation-scope-row .calendar-view-switch .btn { flex: 1 1 0; padding: 0 6px; justify-content: center; }
+
+  /* Takvim: zaman cizelgesi yana kayar (bilerek); sabit mulk sutunu dar */
+  .tape-villa-th,
+  .tape-villa-td { min-width: 112px; max-width: 112px; padding: 8px 10px !important; font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
+
+  /* Rezervasyon listesi kart modunda: eski 780 px tablo tabani kalkar */
+  .reservation-list-table { min-width: 0 !important; }
+  .table-responsive:has(> .reservation-list-table) { overflow: visible; }
+  .table-responsive:has(> .reservation-list-table)::after { display: none; }
+  /* Etiket solda, degerler sagda toplu (ciro + "temizlik geliri" notu ortaya kaymaz) */
+  .reservation-list-table td { justify-content: flex-end; flex-wrap: wrap; align-items: center; column-gap: 8px; min-height: 36px; }
+  .reservation-list-table td::before { margin-right: auto; }
+  .tab-content#tab-reservations .section-title-bar .btn { min-height: 44px; }
 }
