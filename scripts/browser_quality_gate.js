@@ -1019,6 +1019,27 @@ async function main() {
       assert.strictEqual(bugun.sutun, 1, 'Bugün performans kartları telefonda 2 sütun (ilk iki kart aynı satırda)');
       assert(bugun.bosGrup === null || bugun.bosGrup <= 90, `boş komuta grubu kısa olmalı: ${bugun.bosGrup}px`);
       passed.push('35. Bugün telefonda: kurulum adımları ≥36 px, performans kartları 2 sütun, boş komuta grubu kısa');
+      // Rezervasyonlar (PR 3): liste kart modunda ekrana sigar, donem dugmeleri tek satir.
+      const rez = await page.evaluate(() => {
+        switchTab('reservations');
+        const tablo = document.querySelector('.reservation-list-table');
+        const satir = el => Math.round(el.getBoundingClientRect().top);
+        const row = document.querySelector('.reservation-scope-row');
+        const onceki = row.querySelector('[data-onclick="stepReservationPeriod(-1)"]');
+        const sonraki = row.querySelector('[data-onclick="stepReservationPeriod(1)"]');
+        return {
+          tablo: Math.round(tablo.getBoundingClientRect().width),
+          kap: Math.round(tablo.parentElement.clientWidth),
+          ayniSatir: satir(onceki) === satir(sonraki),
+          kucuk: [...document.querySelectorAll('#tab-reservations .reservation-scope-row .btn, #tab-reservations .section-title-bar .btn')]
+            .filter(b => b.getClientRects().length).map(b => Math.round(b.getBoundingClientRect().height)).filter(h => h < 36)
+        };
+      });
+      assert(rez.tablo <= rez.kap, `rezervasyon listesi telefonda sığmalı: ${rez.tablo}/${rez.kap}px`);
+      assert(rez.ayniSatir, 'Önceki / Sonraki dönem düğmeleri aynı satırda olmalı');
+      assert.strictEqual(rez.kucuk.length, 0, `Rezervasyonlar küçük düğme: ${rez.kucuk}`);
+      await assertNoHorizontalOverflow(page, 'Rezervasyonlar mobil');
+      passed.push('36. Rezervasyonlar telefonda: liste kart modunda sığar, dönem satırı tek, düğmeler ≥36 px');
       passed.push('25b. Bugün performans kartları 390 px mobilde taşmaz');
       await page.evaluate(() => { switchTab('pricing'); });
       await assertNoHorizontalOverflow(page, 'Fiyatlandirma mobil');
