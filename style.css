@@ -7554,4 +7554,33 @@ button.pricing-rule-row:focus-visible { outline: 2px solid var(--border-focus); 
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
   select,
   textarea { font-size: 16px !important; }
+
+  /* ===== Bugun (mobil uyum PR 2) — yalniz yerlesim, hesap degismez ===== */
+  .today-section__head,
+  .today-performance .section-title-bar { margin-bottom: 12px; }
+  .today-section__head p { font-size: 12px; }
+
+  /* Bu ayin performansi: alti kart 2'li izgarada, kisa */
+  .today-performance__picker {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+  }
+  .today-performance__cards { gap: 8px; }
+  .today-performance__card { padding: 10px 12px; gap: 2px; }
+  .today-performance__card strong { font-size: 20px; }
+  .today-performance__card small { font-size: 11px; line-height: 1.3; }
+
+  /* Kurulum adimlari: dokunulabilir (36 px alti hedef yok) */
+  .onboard-step { min-height: 36px; padding: 0 12px; }
+
+  /* Komuta merkezi: bos grup tek satirlik not olur, 96 px'lik bos kutu degil */
+  .command-center-col { padding: 12px 14px; gap: 8px; }
+  .command-center-col .empty-action-state {
+    min-height: 0;
+    padding: 0 2px;
+    justify-content: flex-start;
+    text-align: left;
+    font-size: 12px;
+  }
 }

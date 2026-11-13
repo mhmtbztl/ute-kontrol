@@ -1004,6 +1004,21 @@ async function main() {
       passed.push('34. telefon kabuğu: üst bar ≤72 px, alt çubuk, Daha fazla menüsü ve dönem düğmesi');
       await page.evaluate(() => { switchTab('executive'); renderTodayPerformance(); });
       await assertNoHorizontalOverflow(page, 'Bugun performans mobil');
+      // Bugun (PR 2): kurulum adimlari dokunulabilir, bos komuta grubu tek satir, kartlar 2'li.
+      const bugun = await page.evaluate(() => {
+        const gorunur = el => el && el.getClientRects().length > 0;
+        const kartlar = [...document.querySelectorAll('#todayPerformanceCards .today-performance__card')].filter(gorunur);
+        const bosGrup = [...document.querySelectorAll('.command-center-col')].find(c => c.querySelector('.empty-action-state'));
+        return {
+          adimlar: [...document.querySelectorAll('#onboardStepsList .onboard-step-btn')].filter(gorunur).map(b => Math.round(b.getBoundingClientRect().height)),
+          sutun: kartlar.length >= 2 ? new Set(kartlar.slice(0, 2).map(k => Math.round(k.getBoundingClientRect().top))).size : 1,
+          bosGrup: bosGrup ? Math.round(bosGrup.getBoundingClientRect().height) : null
+        };
+      });
+      assert(bugun.adimlar.every(h => h >= 36), `Bugün kurulum adımları en az 36 px: ${bugun.adimlar}`);
+      assert.strictEqual(bugun.sutun, 1, 'Bugün performans kartları telefonda 2 sütun (ilk iki kart aynı satırda)');
+      assert(bugun.bosGrup === null || bugun.bosGrup <= 90, `boş komuta grubu kısa olmalı: ${bugun.bosGrup}px`);
+      passed.push('35. Bugün telefonda: kurulum adımları ≥36 px, performans kartları 2 sütun, boş komuta grubu kısa');
       passed.push('25b. Bugün performans kartları 390 px mobilde taşmaz');
       await page.evaluate(() => { switchTab('pricing'); });
       await assertNoHorizontalOverflow(page, 'Fiyatlandirma mobil');

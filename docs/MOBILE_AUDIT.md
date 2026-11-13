@@ -27,7 +27,7 @@ tarayıcı kapısı 34 (üst bar ≤72 px, alt çubuk, Daha fazla, dönem düğm
 
 | Ekran | boy | kayan | küçük | Yapılacak |
 |---|---|---|---|---|
-| Bugün | 3,2 | 0 | 3 | Komuta merkezi 3 sütunu katlanır liste; "Bu ayın performansı" kısaltılır (PR 2) |
+| Bugün | 2,9 | 0 | 0 | **PR 2 tamam (14.11.2026):** performans kartları kısa 2'li ızgara, boş komuta grubu tek satırlık not, kurulum adımları ≥36 px (önce boy 3,2, küçük 3); tarayıcı kapısı 35 |
 | Rezervasyonlar | 2,1 | 2 | 4 | Takvim (980 px) telefonda gün/hafta listesi; liste kart modunda, dönem kartı üst dönem düğmesiyle tekrar |
 | Operasyon | 2,5 | 1 | 4 | Alt sayfa geçişi (Temizlik / Arıza / …) 462 px kayıyor |
 | Misafirler ve Satış | 4,1 | 1 | 4 | Kanban 1180 px; telefonda aşama seçici + tek sütun |
