@@ -1055,6 +1055,23 @@ async function main() {
         await assertNoHorizontalOverflow(page, `Operasyon mobil ${gorunum}`);
       }
       passed.push('37. Operasyon telefonda: alt sayfa seçici 2x2, kaymaz; Temizlik/Arıza/Görevler/Saha ekibi taşmaz');
+      // Misafirler ve Satis (PR 5): asama panosu alt alta, misafir rehberi kart modunda.
+      const satis = await page.evaluate(() => {
+        switchTab('leads');
+        const kanban = document.getElementById('leadKanbanContainer');
+        const kolon = [...kanban.querySelectorAll('.lead-column')].map(c => Math.round(c.getBoundingClientRect().left));
+        const sonuc = { kanbanKayar: kanban.scrollWidth > kanban.clientWidth + 1, tekSutun: new Set(kolon).size <= 1 };
+        switchTab('guests');
+        const tablo = document.querySelector('.guest-directory-table');
+        sonuc.rehber = Math.round(tablo.getBoundingClientRect().width);
+        sonuc.kap = Math.round(tablo.parentElement.clientWidth);
+        sonuc.etiketsiz = [...document.querySelectorAll('#guestsTableBody td:not([colspan])')].filter(td => !td.getAttribute('data-label')).length;
+        return sonuc;
+      });
+      assert(!satis.kanbanKayar && satis.tekSutun, `talep aşamaları telefonda alt alta olmalı: ${JSON.stringify(satis)}`);
+      assert(satis.rehber <= satis.kap && satis.etiketsiz === 0, `misafir rehberi kart modunda sığmalı: ${JSON.stringify(satis)}`);
+      await assertNoHorizontalOverflow(page, 'Misafirler mobil');
+      passed.push('38. Misafirler ve Satış telefonda: aşama panosu alt alta, misafir rehberi kart modunda sığar');
       passed.push('25b. Bugün performans kartları 390 px mobilde taşmaz');
       await page.evaluate(() => { switchTab('pricing'); });
       await assertNoHorizontalOverflow(page, 'Fiyatlandirma mobil');

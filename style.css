@@ -7633,5 +7633,51 @@ button.pricing-rule-row:focus-visible { outline: 2px solid var(--border-focus); 
   .ops-group:has(> .empty-state) { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 10px; padding: 10px 14px; }
   .ops-group:has(> .empty-state) h3 { margin: 0; }
   .ops-group > .empty-state { padding: 0; }
+
+  /* ===== Misafirler ve Satis (mobil uyum PR 5) — yalniz yerlesim ===== */
+  /* Ust alt sayfa secici (Talepler | Misafirler) iki esit dugme */
+  .subpage-switch { display: flex; width: 100%; overflow: visible; }
+  .subpage-switch-btn { flex: 1 1 0; min-height: 40px; }
+  /* Asama panosu: 1180 px yana kayan serit yerine asamalar alt alta;
+     eski 768 kurali sonra gelen taban kuraliyla eziliyordu. */
+  .lead-kanban { grid-template-columns: minmax(0, 1fr); overflow-x: visible; }
+  .lead-column { min-width: 0; }
+  .lead-column:has(.empty-state) { display: flex; align-items: baseline; gap: 10px; }
+  .lead-column:has(.empty-state) h3 { margin: 0; gap: 8px; justify-content: flex-start; }
+  .lead-column .empty-state { padding: 0; }
+  .lead-quick-form .btn,
+  .lead-view-switch .btn,
+  .lead-followup-head .btn { min-height: 40px; }
+  .lead-quick-form input[type="checkbox"] { width: 22px; height: 22px; }
+  /* WhatsApp donusum analizi: dort kart 2'li (satir ici auto-fit 220 px tek sutun yapiyordu) */
+  .kpi-grid:has(#waKpiTotalLeads) { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; }
+  .kpi-grid:has(#waKpiTotalLeads) .kpi-card { padding: 12px !important; }
+  .kpi-grid:has(#waKpiTotalLeads) .kpi-value { font-size: 20px !important; }
+  .kpi-grid:has(#waKpiTotalLeads) .kpi-title,
+  .kpi-grid:has(#waKpiTotalLeads) .kpi-sub { font-size: 11px !important; }
+
+  /* Misafirler alt sayfasi: alti kart 2'li, filtreler duzenli, rehber kart modunda */
+  .kpi-cards-grid:has(#guestKpiTotal) { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; }
+  .kpi-cards-grid:has(#guestKpiTotal) .kpi-card { padding: 12px !important; min-height: 0 !important; }
+  .kpi-cards-grid:has(#guestKpiTotal) .kpi-value { font-size: 20px !important; }
+  .kpi-cards-grid:has(#guestKpiTotal) .kpi-meta { font-size: 11px; }
+  div:has(> #guestDirectorySearch) { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  div:has(> #guestDirectorySearch) > * { min-width: 0 !important; width: 100%; }
+  #guestDirectorySearch,
+  #guestDirectoryDateRange { grid-column: 1 / -1; }
+  #guestDirectorySearch { min-height: 44px; padding: 8px 12px; }
+  .guest-directory-table { min-width: 0 !important; }
+  .table-responsive:has(> .guest-directory-table) { overflow: visible; }
+  .table-responsive:has(> .guest-directory-table)::after { display: none; }
+  .guest-directory-table thead { display: none; }
+  .guest-directory-table,
+  .guest-directory-table tbody,
+  .guest-directory-table tr,
+  .guest-directory-table td { display: block; width: 100%; }
+  .guest-directory-table tr { margin-bottom: 12px; padding: 10px 12px; border: 1px solid var(--border-subtle); border-radius: 10px; background: var(--bg-surface-elevated); }
+  .guest-directory-table td { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; column-gap: 8px; padding: 6px 0; border: 0; text-align: right !important; min-height: 36px; }
+  .guest-directory-table td::before { content: attr(data-label); margin-right: auto; color: var(--text-muted); font-size: 11px; font-weight: 700; text-align: left; }
+  .guest-directory-table td br { display: none; }
+  .guest-directory-table td[colspan] { justify-content: center; text-align: center !important; }
   .tab-content#tab-reservations .section-title-bar .btn { min-height: 44px; }
 }
