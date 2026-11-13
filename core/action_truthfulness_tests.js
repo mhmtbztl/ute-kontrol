@@ -110,36 +110,32 @@ async function test(name, fn) {
     });
   });
 
-  await test('Manual pricing override uses the deployed RPC contract', async () => {
+  // Bos gece indirimi fiyat takviminin okudugu defter (phase101) disinda bir
+  // yere yazarsa "takvime kaydedildi" yalan olur (temizlik 13.11.2026).
+  await test('Gap discount writes every night to the price calendar ledger', async () => {
     const tenantId = '33333333-3333-4333-8333-333333333333';
-    let rpcCall = null;
+    const propertyId = '44444444-4444-4444-8444-444444444444';
+    let upsert = null;
     App.setActiveTenant({ id: tenantId });
+    App.setAppData({ tenantId, villas: { V: { id: propertyId, slug: 'V', floor: 4000 } }, propertyDailyPrices: [], phase101SchemaReady: true });
     App.setSupabaseClient({
-      rpc: async (name, args) => {
-        rpcCall = { name, args };
-        return { data: { success: true }, error: null };
-      }
+      rpc: async () => { throw new Error('RPC beklenmiyordu'); },
+      from: table => ({
+        upsert: (rows, options) => {
+          upsert = { table, rows, options };
+          return { select: async () => ({ data: rows, error: null }) };
+        }
+      })
     });
-    await App.saveManualPricingOverride({
-      propertyId: '44444444-4444-4444-8444-444444444444',
-      startDate: '2027-01-20',
-      endDate: '2027-01-20',
-      rate: 4500,
-      reason: 'Test override'
-    });
-    assert.deepStrictEqual(rpcCall, {
-      name: 'save_manual_pricing_override_atomic',
-      args: {
-        p_tenant_id: tenantId,
-        p_property_id: '44444444-4444-4444-8444-444444444444',
-        p_start_date: '2027-01-20',
-        p_end_date: '2027-01-20',
-        p_rate_override: 4500,
-        p_reason: 'Test override',
-        p_min_stay_override: null,
-        p_bypass_guardrail: false
-      }
-    });
+    await App.saveManualPricingOverride({ propertyId, startDate: '2027-01-20', endDate: '2027-01-21', rate: 4500, reason: 'Test override' });
+    assert.strictEqual(upsert.table, 'property_daily_prices');
+    assert.strictEqual(upsert.options.onConflict, 'property_id,price_date');
+    assert.deepStrictEqual(upsert.rows.map(r => [r.price_date, r.price, r.source, r.tenant_id]), [
+      ['2027-01-20', 4500, 'MANUAL', tenantId], ['2027-01-21', 4500, 'MANUAL', tenantId]
+    ]);
+    assert.strictEqual(App.getAppData().propertyDailyPrices.length, 2, 'takvim yenilemeden yeni fiyati gormeli');
+    // Taban fiyat korumasi eski RPC'deki gibi durur.
+    await assert.rejects(App.saveManualPricingOverride({ propertyId, startDate: '2027-01-20', endDate: '2027-01-20', rate: 3000 }), /taban fiyat/);
   });
 
   await test('Cloud booking deletion refuses a booking without a UUID', async () => {

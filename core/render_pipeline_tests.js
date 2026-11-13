@@ -475,9 +475,10 @@ function run() {
       'A: ' + raporA.slice(0, 500) + '\n       B: ' + raporB.slice(0, 500));
     }
 
-    check(typeof app.renderCoverAbTestLab === 'function',
-      '34. A/B laboratuvarı gerçek mülk anahtarıyla test edilebilir',
-      'renderCoverAbTestLab export edilmemiş');
+    // Kapak A/B laboratuvari hicbir ekrandan cagrilmiyordu (temizlik 11.11.2026).
+    check(typeof app.renderCoverAbTestLab === 'undefined',
+      '34. Ölü kapak A/B laboratuvarı kaldırıldı',
+      'renderCoverAbTestLab geri geldi');
     check(typeof app.renderPricingTab === 'function',
       '35. Fiyatlandırma boş durumu gerçek render testi için dışa aktarılmış',
       'renderPricingTab export edilmemiş');

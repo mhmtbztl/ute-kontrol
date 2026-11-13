@@ -11,7 +11,6 @@
     "test:e2e:live": "node scripts/a5_e2e_flow_tour.js",
     "test:bootstrap": "node scripts/bootstrap_test_project.js",
     "test:bootstrap:check": "node scripts/bootstrap_test_project.js --check",
-    "test:phase11-late": "node scripts/test_phase11_late_apply.js",
     "test:phase42-live": "node scripts/test_phase42_lead_identity.js",
     "verify:migrations": "node scripts/verify_migration_chain.js",
     "templates": "node scripts/build_sample_templates.js",

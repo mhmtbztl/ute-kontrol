@@ -22,7 +22,7 @@ async function run() {
     [
       'properties', 'bookings', 'expenses', 'cleaning_tasks', 'leads',
       'monthly_financial_closes', 'monthly_targets', 'maintenance_tickets',
-      'operational_tasks', 'financial_transactions', 'guests', 'user_notifications'
+      'operational_tasks', 'guests', 'user_notifications'
     ].forEach(table => assert(tables.includes(table), `${table} aboneliği eksik`));
   });
 
@@ -90,7 +90,7 @@ async function run() {
     app.setSupabaseClient(client);
     app.setActiveTenant({ id: '11111111-1111-4111-8111-111111111111' });
     app.subscribeTenantRealtime('11111111-1111-4111-8111-111111111111');
-    assert(subscriptions.length >= 12);
+    assert(subscriptions.length >= 11);
     subscriptions.forEach(({ config }) => {
       assert.strictEqual(config.filter, 'tenant_id=eq.11111111-1111-4111-8111-111111111111');
     });

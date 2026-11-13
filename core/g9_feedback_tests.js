@@ -1341,8 +1341,7 @@ async function rezervasyonOdemeDavranisi() {
   const adimsiz = (html.match(/<input[^>]*type="number"[^>]*>/g) || []).filter(t => !/step=/.test(t))
     .map(t => (t.match(/id="([^"]+)"/) || [])[1]).filter(id => !['goalOccupancyNights', 'waParsedPax'].includes(id));
   const komisyon = (html.match(/<input[^>]*id="resCommission"[^>]*>/) || [''])[0];
-  check(adimsiz.length === 0 && /step="0\.01"/.test(komisyon) && /min="0"/.test(komisyon)
-    && (app.match(/type="number" step="0\.01" min="0" class="tbl-input" id="set_/g) || []).length === 7,
+  check(adimsiz.length === 0 && /step="0\.01"/.test(komisyon) && /min="0"/.test(komisyon),
     'L-226 Tutar alanlari kurus kabul eder (step 0.01); yalniz gece/kisi sayisi tam sayi', adimsiz.join(', '));
 
   sahteDom({});

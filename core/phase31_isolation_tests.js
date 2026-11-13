@@ -103,23 +103,10 @@ async function run() {
   check(!ke && kamp && kamp.id, '1. Sahip kendi kiracisinda kampanya kaydedebiliyor',
     ke && ke.message);
 
-  const { error: ie } = await A.client.from('influencer_collabs').insert({
-    tenant_id: A.tenantId, property_id: A.propertyId,
-    handle: '@gezgin' + stamp, followers: '12,5K', collab_dates: '12-15 Haziran',
-    cost: 5000, discount_code: 'KOD' + stamp.toUpperCase().slice(0, 6),
-    bookings_count: 2, revenue: 40000, status: 'COMPLETED'
-  });
-  check(!ie, '2. Sahip influencer isbirligi kaydedebiliyor', ie && ie.message);
-
   const { error: se } = await A.client.from('tenant_settings').upsert({
     tenant_id: A.tenantId, key: 'ota_pricing_strategy', value: 'ABSORBED'
   }, { onConflict: 'tenant_id, key' });
   check(!se, '3. Sahip kiraci ayari yazabiliyor', se && se.message);
-
-  const { error: ne } = await A.client.from('property_operator_notes').upsert({
-    property_id: A.propertyId, tenant_id: A.tenantId, note: 'Jakuzi filtresi degisecek.'
-  }, { onConflict: 'property_id' });
-  check(!ne, '4. Sahip operator notu yazabiliyor', ne && ne.message);
 
   // Girilmemis basamak NULL: "bilinmiyor" ile "sifir" ayri seylerdir (3.6).
   const { data: merdiven, error: me } = await A.client.from('property_pricing_ladder').upsert({
@@ -178,8 +165,8 @@ async function run() {
   }, { onConflict: 'property_id' });
   check(!!xh, '11. Yabanci kiraci satis hazirligini degistiremiyor', 'RLS gecirdi.');
 
-  for (const tablo of ['marketing_campaigns', 'influencer_collabs', 'tenant_settings',
-    'property_operator_notes', 'property_pricing_ladder', 'housekeeping_status_overrides']) {
+  for (const tablo of ['marketing_campaigns', 'tenant_settings',
+    'property_pricing_ladder', 'housekeeping_status_overrides']) {
     const { data: okunan } = await B.client.from(tablo).select('*').eq('tenant_id', A.tenantId);
     check((okunan || []).length === 0,
       `12. Yabanci kiraci ${tablo} OKUYAMIYOR`,
@@ -190,8 +177,8 @@ async function run() {
   // ---------------------------------------------------------------------
   // 3. ANON KAPISI — tarayicida duran anahtar hicbir seye erisemez
   // ---------------------------------------------------------------------
-  for (const tablo of ['marketing_campaigns', 'influencer_collabs', 'tenant_settings',
-    'property_operator_notes', 'property_pricing_ladder', 'housekeeping_status_overrides']) {
+  for (const tablo of ['marketing_campaigns', 'tenant_settings',
+    'property_pricing_ladder', 'housekeeping_status_overrides']) {
     // `id` DEGIL `tenant_id` sorulur: dort tablonun birincil anahtari
     // (tenant_id, key) ya da property_id'dir, `id` sutunlari yoktur ve
     // PostgREST once 42703 dondurup asil yetki cevabini maskeler.
@@ -224,12 +211,6 @@ async function run() {
     '15. Sifirlama sonrasi kampanya defteri BOS',
     `kalan kampanya: ${(kalanKamp || []).length} — reset_tenant_data tablo ` +
     'listesi guncellenmemis.');
-
-  const { data: kalanInf } = await admin.from('influencer_collabs')
-    .select('id').eq('tenant_id', A.tenantId);
-  check((kalanInf || []).length === 0,
-    '16. Sifirlama sonrasi influencer defteri BOS',
-    `kalan kayit: ${(kalanInf || []).length}`);
 
   // Ayar bir DEFTER degildir: sifirlama isletmeyi, ekibi ve ayarlari korur.
   const { data: kalanAyar } = await admin.from('tenant_settings')

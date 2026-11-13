@@ -86,30 +86,18 @@ test('readiness yalniz salt okunur yetki kanitlarini kabul eder', () => {
   assert(securityLedgerErrors([44]).some(error => error.includes('phase42')));
 });
 
-test('fiyat tablolari ve aktif fiyat RPCleri varlik sozlesmesinden bagimsiz anon kapisinda kalir', () => {
-  const pricingTables = [
-    'pricing_profiles', 'pricing_rules', 'pricing_events', 'pricing_overrides',
-    'daily_rates', 'rate_change_logs', 'booking_quotes'
-  ];
-  const pricingRpcs = ['accept_booking_quote_atomic', 'save_manual_pricing_override_atomic'];
-  for (const name of pricingTables) assert(PROTECTED_TABLES.includes(name), `anon tablo kapisinda yok: ${name}`);
-  for (const name of pricingRpcs) assert(Object.hasOwn(PROTECTED_RPCS, name), `anon RPC kapisinda yok: ${name}`);
-
-  const inspection = {
-    tables: Object.fromEntries(pricingTables.map(name => [name, { columns: {} }])),
-    rpcs: Object.fromEntries(pricingRpcs.map(name => [name, { args: [] }]))
-  };
-  const exposure = anonExposureErrors(inspection);
-  for (const name of [...pricingTables, ...pricingRpcs]) {
-    assert(exposure.some(error => error.includes(name)), `anon acik nesne raporlanmadi: ${name}`);
+test('korunan tablolar anon kapisinda yoklanir; phase119 ile silinen fiyat nesneleri yoklanmaz', () => {
+  // Phase11 fiyat tablolari ve RPC'leri phase119 ile kaldirildi (13.11.2026).
+  const removed = ['pricing_profiles', 'daily_rates', 'booking_quotes',
+    'accept_booking_quote_atomic', 'save_manual_pricing_override_atomic'];
+  for (const name of removed) {
+    assert(!PROTECTED_TABLES.includes(name) && !Object.hasOwn(PROTECTED_RPCS, name), `silinen nesne hala yoklaniyor: ${name}`);
   }
-
+  assert(PROTECTED_TABLES.includes('leads'), 'leads anon kapisindan cikmamali');
+  const exposure = anonExposureErrors({ tables: { leads: { columns: {} } }, rpcs: {} });
+  assert(exposure.some(error => error.includes('leads')), 'anon acik leads raporlanmadi');
   const probes = buildAnonProbeRequests('https://example.supabase.co');
-  for (const name of pricingTables) assert(probes.some(p => p.object === `table:${name}` && p.method === 'GET'));
-  for (const name of pricingRpcs) {
-    const probe = probes.find(p => p.object === `rpc:${name}`);
-    assert(probe && probe.method === 'POST' && probe.body, `guvenli RPC probe yok: ${name}`);
-  }
+  assert(probes.some(p => p.object === 'table:leads' && p.method === 'GET'));
 });
 
 test('test ve üretim drift karşılaştırması nullability, sütun ve RPC farkını bulur', () => {

@@ -73,7 +73,6 @@ async function isletmeGoruntusu(spec, tid, uyeler) {
       channel: 'Airbnb', check_in: p.gun(5), check_out: p.gun(9), gross_amount: 48000, cleaning_fee: 1500, discount: 2000, pax: 4, primary_guest_id: g.id }).select().single(), 'rezervasyon');
     must(await own.client.from('cleaning_tasks').insert({ tenant_id: A, property_id: prop.id, booking_id: bk.id, task_date: p.gun(9), cleaner_name: 'Fatma', amount: 1200, is_paid: false }), 'temizlik');
     must(await own.client.from('expenses').insert({ tenant_id: A, property_id: prop.id, expense_date: p.gun(12), category: 'Bakim', amount: 850.5, description: 'Havuz' }), 'gider');
-    must(await admin.from('financial_transactions').insert({ tenant_id: A, property_id: prop.id, booking_id: bk.id, transaction_type: 'PAYMENT', amount: 48000, occurred_on: p.gun(5), created_by: own.id }), 'finans');
     must(await own.client.from('tenant_settings').insert({ tenant_id: A, key: 'ota_pricing_strategy', value: { mode: 'x' } }), 'ayar');
     must(await own.client.rpc('close_monthly_period_atomic', { p_tenant_id: A, p_year: p.y, p_month: p.m, p_snapshot: {} }), 'ay kapanisi');
 
@@ -82,8 +81,8 @@ async function isletmeGoruntusu(spec, tid, uyeler) {
     const spec = parseSpec(rawSpec);
     const once = await isletmeGoruntusu(spec, A, [own.id, mgr.id]);
     const doluTablo = Object.entries(once).filter(([, r]) => r.length).map(([n]) => n);
-    check(['bookings', 'cleaning_tasks', 'expenses', 'financial_transactions', 'monthly_financial_closes', 'tenant_settings', 'guests', 'audit_logs', 'tenant_invitations', 'invitation_delivery_outbox', 'tenant_booking_channels'].every(t => doluTablo.includes(t)),
-      '1. Kurulum: isletme 11+ tabloda veri tasiyor (davet kuyrugu, sistem kanallari dahil)', doluTablo.join(', '));
+    check(['bookings', 'cleaning_tasks', 'expenses', 'monthly_financial_closes', 'tenant_settings', 'guests', 'audit_logs', 'tenant_invitations', 'invitation_delivery_outbox', 'tenant_booking_channels'].every(t => doluTablo.includes(t)),
+      '1. Kurulum: isletme 10+ tabloda veri tasiyor (davet kuyrugu, sistem kanallari dahil)', doluTablo.join(', '));
 
     // --- YEDEK (bellekte) ---
     const dosya = new Map();
@@ -93,7 +92,6 @@ async function isletmeGoruntusu(spec, tid, uyeler) {
     check(manifest.errors.length === 0, '2. Yedek hatasiz alindi', JSON.stringify(manifest.errors));
 
     // --- FELAKET: isletme ve kullanicilar tamamen gider ---
-    must(await admin.from('financial_transactions').delete().eq('tenant_id', A), 'felaket ft');
     must(await admin.from('tenants').delete().eq('id', A), 'felaket isletme');
     for (const u of [own, mgr]) must(await admin.auth.admin.deleteUser(u.id), 'felaket kullanici');
     const bos = must(await admin.from('bookings').select('id').eq('tenant_id', A), 'bos');
@@ -137,7 +135,6 @@ async function isletmeGoruntusu(spec, tid, uyeler) {
     console.log('\n--- TEMIZLIK ---');
     let hata = false;
     for (const t of createdTenants) {
-      await admin.from('financial_transactions').delete().eq('tenant_id', t);
       const { error } = await admin.from('tenants').delete().eq('id', t);
       if (error) { hata = true; console.error('[FAIL] tenant: ' + error.message); }
     }

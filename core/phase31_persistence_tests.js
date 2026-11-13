@@ -112,8 +112,8 @@ const PROP = '99999999-8888-4777-8666-555555555555';
  * yalnizca "bir sey patladi"yi soyler.
  */
 function eksikExportlar(app) {
-  return ['cloudSaveMarketingCampaign', 'cloudSaveInfluencerCollab',
-    'cloudSaveTenantSetting', 'cloudSaveOperatorNote', 'cloudSavePricingLadder',
+  return ['cloudSaveMarketingCampaign',
+    'cloudSaveTenantSetting', 'cloudSavePricingLadder',
     'cloudSaveHousekeepingOverride', 'fetchTenantRowsTolerant', 'isMissingSchemaError']
     .filter(ad => typeof app[ad] !== 'function');
 }
@@ -172,24 +172,6 @@ async function davranisTestleri(app) {
     '6. Bos tarih NULL gidiyor, bos dizge degil',
     'Bos dizge DATE sutununa 22007 ile duser ve kayit tamamen kaybolur.');
 
-  // --- 3. Influencer -------------------------------------------------------
-  kayit.upserts.length = 0;
-  await app.cloudSaveInfluencerCollab({
-    id: null, handle: '@gezgin', followers: '12,5K', villa: 'VILLA_A',
-    dates: '12-15 Haziran', cost: 5000, code: 'GEZGIN10',
-    bookingsCount: 2, revenue: 40000, status: 'COMPLETED', notes: ''
-  });
-  const inf = kayit.upserts.find(u => u.tablo === 'influencer_collabs');
-  check(!!inf, '7. saveInfluencerCollab yolu influencer_collabs tablosuna yaziyor',
-    'Influencer defteri hala yalnizca bellekte.');
-  check(inf && inf.satir.followers === '12,5K' && inf.satir.collab_dates === '12-15 Haziran',
-    '8. Serbest metin alanlari oldugu gibi tasiniyor',
-    '"12,5K" ve "12-15 Haziran" sayiya zorlanirsa girilen veri bozulur; ' +
-    'uydurulmus bir sayiya cevirmek 3.6 ihlalidir.');
-  check(inf && inf.satir.discount_code === 'GEZGIN10',
-    '9. Indirim kodu discount_code sutununa yaziliyor',
-    'Kod kaybolursa isbirliginin cirosu hicbir zaman eslestirilenemez.');
-
   // --- 4. Fiyat merdiveni: girilmemis basamak NULL -------------------------
   kayit.upserts.length = 0;
   await app.cloudSavePricingLadder('VILLA_A', {
@@ -242,14 +224,6 @@ async function davranisTestleri(app) {
     'Cakisma anahtari yoksa her degisiklik yeni satir acar ve "hangisi ' +
     'guncel" belirsizlesir.');
 
-  // --- 7. Operator notu ----------------------------------------------------
-  kayit.upserts.length = 0;
-  await app.cloudSaveOperatorNote('VILLA_A', 'Jakuzi filtresi degisecek.');
-  const not = kayit.upserts.find(u => u.tablo === 'property_operator_notes');
-  check(not && not.satir.note === 'Jakuzi filtresi degisecek.' && not.satir.property_id === PROP,
-    '18. Operator notu mulke bagli olarak yaziliyor',
-    'saveOperatorNote hala yalnizca appData.airbnbListings icinde tutuyor.');
-
   // --- 8. Sema yoksa yazma SESSIZCE basarili sayilmaz ----------------------
   const semasizSonuc = { data: null, error: { code: 'PGRST205', message: 'no table' } };
   const semasiz = {
@@ -289,10 +263,7 @@ async function davranisTestleri(app) {
 function kaynakTestleri() {
   // Arayüzü canlı kalan kapılar async olmak ve gerçek bir yazma yolundan geçmek zorunda.
   const KAPILAR = {
-    cycleHkStatus: 'setPropertySalesReadiness',
-    setOtaPricingStrategy: 'cloudSaveTenantSetting',
-    saveOperatorNote: 'cloudSaveOperatorNote',
-    saveAllSettings: 'cloudSavePricingLadder'
+    cycleHkStatus: 'setPropertySalesReadiness'
   };
 
   let i = 21;
@@ -329,24 +300,22 @@ function kaynakTestleri() {
   // Yukleme hatti alti tabloyu da okumali; yoksa yazma calissa bile
   // ekran yenilemeden sonra bos kalir ve hata "kaydedilmedi" sanilir.
   const yukle = govde(APP, 'loadTenantAppData') || '';
-  ['marketing_campaigns', 'influencer_collabs', 'tenant_settings',
-   'property_operator_notes', 'property_pricing_ladder',
+  ['marketing_campaigns', 'tenant_settings', 'property_pricing_ladder',
    'housekeeping_status_overrides'].forEach(tablo => {
     check(yukle.includes(tablo),
       `${i++}. loadTenantAppData ${tablo} tablosunu okuyor`,
       'Yazilan kayit geri okunmuyorsa musteri icin hicbir sey degismez: ' +
       'yenilemeden sonra ekran yine bos.');
   });
+  // Ekranda hic gosterilmeyen iki defter her acilista bosuna okunuyordu (temizlik 11.11.2026).
+  ['influencer_collabs', 'property_operator_notes'].forEach(tablo => {
+    check(!yukle.includes(tablo), `${i++}. loadTenantAppData kullanilmayan ${tablo} tablosunu okumuyor`,
+      'Okunan ama hicbir ekranda kullanilmayan tablo her girişte ve her kayittan sonra bosuna istek atar.');
+  });
   check(!/marketingCampaigns:\s*\[\],\s*[\r\n]+\s*influencerCollabs:\s*\[\],/.test(kodu(APP_KAYNAK).replace(/\r/g, ''))
     || !/appData = \{[\s\S]{0,4000}marketingCampaigns: \[\]/.test(yukle),
     `${i++}. Bulut yuklemesi marketingCampaigns'i SABIT bos dizi atamiyor`,
     'Sabit `[]` atamasi, tablodan okunan kaydi her yenilemede siler.');
-
-  // Merdiven artik "alan yok" demiyor.
-  const ayarlar = govde(APP, 'saveAllSettings') || '';
-  check(!/veritabanında henüz alan yok/.test(ayarlar),
-    `${i++}. saveAllSettings artik "veritabaninda alan yok" demiyor`,
-    'Mesaj duruyorsa merdiven hala kaydedilmiyor demektir.');
 
   return i;
 }

@@ -5,10 +5,9 @@ const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 const SUPABASE = path.join(ROOT, 'supabase');
-// Phase11/44 fiyat tablolari 30.09'da 'kapsam disi' diye bu sozlesmeden
-// cikarilmisti; ama Bugun ekranindaki bos gece indirimi
-// save_manual_pricing_override_atomic ile yaziyor. Codex H3-03 (03.10):
-// uretimde ve testte bulunan her nesne karsilastirilir, istisna yok.
+// Codex H3-03 (03.10): uretimde ve testte bulunan her nesne karsilastirilir,
+// istisna yok. Phase11 fiyat nesneleri phase119 ile kaldirildi; bos gece
+// indirimi artik fiyat takviminin property_daily_prices defterine yazar.
 const OUT_OF_SCOPE_TABLES = new Set();
 const OUT_OF_SCOPE_RPCS = new Set();
 
@@ -48,7 +47,6 @@ Object.assign(tableContracts, {
   leads: { columns: {
     id: { nullable: false }, tenant_id: { nullable: false }, guest_name: { nullable: true }, guest_phone: { nullable: true }
   } },
-  financial_transactions: { columns: { id: { nullable: false }, tenant_id: { nullable: false } } },
   invitation_delivery_outbox: { columns: { id: { nullable: false }, tenant_id: { nullable: false } } }
 });
 
@@ -58,11 +56,6 @@ const CONTRACT = {
     convert_lead_to_booking_atomic: {
       args: ['p_lead_id', 'p_tenant_id', 'p_property_id', 'p_booking_code', 'p_check_in', 'p_check_out', 'p_pax', 'p_gross_amount', 'p_ota_commission', 'p_cleaning_fee', 'p_discount', 'p_notes'],
       requiredArgs: ['p_lead_id', 'p_tenant_id']
-    },
-    // Bugun ekranindaki bos gece indirimi (executeCanonicalAiAction) bunu cagirir.
-    save_manual_pricing_override_atomic: {
-      args: ['p_tenant_id', 'p_property_id', 'p_start_date', 'p_end_date', 'p_rate_override', 'p_reason', 'p_bypass_guardrail', 'p_min_stay_override'],
-      requiredArgs: ['p_tenant_id', 'p_property_id', 'p_start_date', 'p_end_date', 'p_rate_override', 'p_reason']
     }
   },
   allowedRpcs: new Set(discovered.rpcs),

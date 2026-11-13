@@ -136,46 +136,11 @@ async function runOperationsSecurityTests() {
       'Cross-tenant property on maintenance ticket must be rejected');
     recordPass('4. (DB Trigger) Cross-tenant property on maintenance ticket blocked by check_maintenance_tenant_isolation');
 
-    // TEST 5: Operation Evidence Single Parent Constraint Enforced
-    console.log('\n--- TEST 5: Evidence Single Parent Constraint ---');
-    // Create a real ticket for Tenant A
-    const { data: ticketA } = await clientA.from('maintenance_tickets').insert({
-      tenant_id: tenantAId,
-      property_id: propAId,
-      category: 'Klima',
-      title: 'Evidence Test Ticket'
-    }).select().single();
-
-    // Try creating evidence with BOTH operational_task_id and maintenance_ticket_id
-    const { error: errBothParents } = await clientA.from('operation_evidence').insert({
-      tenant_id: tenantAId,
-      operational_task_id: taskAId,
-      maintenance_ticket_id: ticketA.id,
-      evidence_type: 'COMPLETION',
-      storage_path: `tenant/${tenantAId}/operations/${taskAId}/evidence.jpg`
-    });
-
-    assert(errBothParents && errBothParents.code === '23514', 'Evidence with dual parents must be rejected by CHECK constraint');
-    recordPass('5. (Correction 4) chk_evidence_single_parent enforces exclusive task or ticket parentage');
-
-    // TEST 6: Cross-Tenant Evidence Upload Blocked
-    console.log('\n--- TEST 6: Cross-Tenant Evidence Blocked ---');
-    // Tenant B tries to attach evidence to Tenant A task
-    const { error: errCrossEvidence } = await clientB.from('operation_evidence').insert({
-      tenant_id: tenantBId,
-      operational_task_id: taskAId, // Task belongs to Tenant A!
-      evidence_type: 'COMPLETION',
-      storage_path: `tenant/${tenantBId}/operations/${taskAId}/hacked.jpg`
-    });
-
-    assert(errCrossEvidence && (errCrossEvidence.code === '42501' || errCrossEvidence.message.includes('CROSS_TENANT_EVIDENCE_VIOLATION')),
-      'Cross-tenant evidence linkage must be rejected');
-    recordPass('6. (Correction 5) Linking evidence to foreign tenant task blocked by check_evidence_tenant_isolation');
+    // TEST 5-6 (operation_evidence) phase119 ile kalkti: tablo kaldirildi (13.11.2026).
 
   } finally {
     console.log('\n--- CLEANUP ---');
     if (tenantAId) {
-      await adminClient.from('operation_evidence').delete().eq('tenant_id', tenantAId);
       await adminClient.from('operational_tasks').delete().eq('tenant_id', tenantAId);
       await adminClient.from('properties').delete().eq('tenant_id', tenantAId);
       await adminClient.from('tenants').delete().eq('id', tenantAId);

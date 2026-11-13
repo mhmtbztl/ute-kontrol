@@ -76,41 +76,8 @@ async function run() {
     r = await staff.client.from('competitor_price_research').select('id').eq('tenant_id', tenantA);
     check((r.data || []).length === 0, '7. Staff rakip arastirmasini goremez', errText(r.error) || `${(r.data || []).length} satir`);
 
-    const template = await owner.client.from('expense_templates').insert({ tenant_id: tenantA, property_id: propertyA.id, name: 'Aylik internet', category: 'Internet', amount: 1500, expense_type: 'OPEX', description: 'Sabit gider' }).select().single();
-    check(!template.error, '8. Yonetim gider sablonu olusturur', errText(template.error));
-    for (const [actor, label, expected] of [[viewer, 'viewer', 1], [sales, 'sales', 0], [staff, 'staff', 0], [outsider, 'yabanci', 0]]) {
-      const q = await actor.client.from('expense_templates').select('id').eq('tenant_id', tenantA);
-      check((q.data || []).length === expected, `9. ${label} gider sablonunda ${expected ? 'defter okuma yetkisini kullanir' : 'veri goremez'}`, errText(q.error) || `${(q.data || []).length} satir`);
-    }
-    const sourceExpense = must(await owner.client.from('expenses').insert({ tenant_id: tenantA, property_id: propertyA.id, expense_date: '2026-09-01', category: 'Internet', amount: 1500, expense_type: 'OPEX' }).select().single(), 'kaynak gider');
-    const generatedExpense = must(await owner.client.from('expenses').insert({ tenant_id: tenantA, property_id: propertyA.id, expense_date: '2026-10-01', category: 'Internet', amount: 1500, expense_type: 'OPEX' }).select().single(), 'uretilen gider');
-    r = await owner.client.from('expense_template_occurrences').insert({ tenant_id: tenantA, template_id: template.data.id, source_expense_id: sourceExpense.id, generated_expense_id: generatedExpense.id, period_month: '2026-10-01' }).select().single();
-    check(!r.error, '10. Kopyalanan gider kaynak sablon ve giderle izlenir', errText(r.error));
-    r = await owner.client.from('expense_template_occurrences').insert({ tenant_id: tenantB, template_id: template.data.id, generated_expense_id: generatedExpense.id, period_month: '2026-11-01' });
-    check(denied(r.error), '11. Gider kopya bagi kiracilar arasinda kurulamiyor', errText(r.error) || 'BAGLANDI');
-
-    r = await owner.client.rpc('generate_expense_from_template', { p_tenant_id: tenantA, p_template_id: template.data.id, p_period_month: '2026-11-01' });
-    const generatedByRpc = r.data;
-    const generatedCheck = generatedByRpc
-      ? await owner.client.from('expense_template_occurrences').select('generated_expense_id').eq('template_id', template.data.id).eq('period_month', '2026-11-01').single()
-      : { data: null, error: r.error };
-    check(!r.error && generatedCheck.data?.generated_expense_id === generatedByRpc,
-      '11b. Sablon aylik gideri ve iz kaydini atomik uretir', errText(r.error || generatedCheck.error));
-    const duplicate = await owner.client.rpc('generate_expense_from_template', { p_tenant_id: tenantA, p_template_id: template.data.id, p_period_month: '2026-11-01' });
-    check(!!duplicate.error && /SABLON_DONEMI_ZATEN_ISLENDI|duplicate/i.test(errText(duplicate.error)),
-      '11c. Ayni sablon ayni aya ikinci kez islenemez', errText(duplicate.error) || 'IKINCI KEZ YAZDI');
-
-    for (const [actor, label] of [[sales, 'sales'], [viewer, 'viewer'], [outsider, 'yabanci']]) {
-      const deniedExisting = await actor.client.rpc('generate_expense_from_template', {
-        p_tenant_id: tenantA, p_template_id: template.data.id, p_period_month: '2026-12-01'
-      });
-      const deniedMissing = await actor.client.rpc('generate_expense_from_template', {
-        p_tenant_id: tenantA, p_template_id: '00000000-0000-4000-8000-000000000086', p_period_month: '2026-12-01'
-      });
-      check(denied(deniedExisting.error) && denied(deniedMissing.error)
-        && errText(deniedExisting.error) === errText(deniedMissing.error),
-      `11d. ${label} sablon UUID varligini ayirt edemez`, `${errText(deniedExisting.error)} | ${errText(deniedMissing.error)}`);
-    }
+    // 8-11d (gider sablonu ve kopya bagi) phase119 ile kalkti: tablolar ve
+    // generate_expense_from_template kaldirildi (13.11.2026).
 
     r = await owner.client.rpc('reset_tenant_data', { p_tenant_id: tenantA, p_confirm: 'VERILERI SIFIRLA' });
     const count = async table => {
@@ -118,11 +85,11 @@ async function run() {
       if (result.error) throw new Error(`${table}: ${errText(result.error)}`);
       return result.count;
     };
-    const [rulesLeft, researchLeft, templatesLeft, occurrencesLeft] = await Promise.all([
-      count('property_pricing_rule_settings'), count('competitor_price_research'), count('expense_templates'), count('expense_template_occurrences')
+    const [rulesLeft, researchLeft] = await Promise.all([
+      count('property_pricing_rule_settings'), count('competitor_price_research')
     ]);
-    check(!r.error && [rulesLeft, researchLeft, templatesLeft, occurrencesLeft].every(value => value === 0),
-      '12. Isletme sifirlama A4 ayar, arastirma ve kopya baglarini temizler', errText(r.error) || JSON.stringify({ rulesLeft, researchLeft, templatesLeft, occurrencesLeft }));
+    check(!r.error && [rulesLeft, researchLeft].every(value => value === 0),
+      '12. Isletme sifirlama A4 ayar ve arastirma kayitlarini temizler', errText(r.error) || JSON.stringify({ rulesLeft, researchLeft }));
   } catch (error) {
     no('Beklenmeyen hata', error.stack || error.message);
   } finally {

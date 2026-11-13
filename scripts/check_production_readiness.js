@@ -6,34 +6,14 @@ const { inspectOpenApi, compareContract } = require('./schema_contract.js');
 
 const PRODUCTION_REF = 'kirpcqklyjlrhvdbgdrq';
 const TEST_REF = 'pdeiorpgxetksyogrmbi';
-// Varlik sozlesmesi ile guvenlik sozlesmesi ayni sey degildir. Phase11 fiyat
-// nesneleri urun karariyla canonical schema karsilastirmasinda opsiyonel
-// kalabilir; uretimde VAR olduklari surece anon erisime kapali olmalari yine
-// zorunludur.
+// Varlik sozlesmesi ile guvenlik sozlesmesi ayni sey degildir: burada anon
+// erisiminin KAPALI oldugu ayrica yoklanir. Phase11 fiyat tablolari ve iki
+// RPC'si phase119 ile kaldirildi (temizlik 13.11.2026); yoklamadan ciktilar.
+// Yeni bir yoklama gerekirse RPC adi -> tip-dogru ama gecersiz govde eklenir.
 const PROTECTED_TABLES = [
-  'leads',
-  'pricing_profiles', 'pricing_rules', 'pricing_events', 'pricing_overrides',
-  'daily_rates', 'rate_change_logs', 'booking_quotes'
+  'leads'
 ];
-const PROTECTED_RPCS = Object.freeze({
-  // Iki RPC de govde icinde auth.uid() kontrolunu kayit aramadan once yapar.
-  // Bu gecersiz ama tip-dogru girdiler, EXECUTE yanlislikla aciksa bile yazma
-  // yapmadan UNAUTHENTICATED ile durur; dogru durumda PostgREST 42501 doner.
-  accept_booking_quote_atomic: {
-    p_tenant_id: '00000000-0000-0000-0000-000000000000',
-    p_quote_id: '00000000-0000-0000-0000-000000000000'
-  },
-  save_manual_pricing_override_atomic: {
-    p_tenant_id: '00000000-0000-0000-0000-000000000000',
-    p_property_id: '00000000-0000-0000-0000-000000000000',
-    p_start_date: '2000-01-01',
-    p_end_date: '2000-01-01',
-    p_rate_override: 0,
-    p_reason: 'readiness-anon-probe',
-    p_bypass_guardrail: false,
-    p_min_stay_override: null
-  }
-});
+const PROTECTED_RPCS = Object.freeze({});
 
 function readEnvironment() {
   const values = {};

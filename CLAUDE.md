@@ -926,6 +926,18 @@ baş/son boşluksuz). Canlı süit `phase115_competitor_name_live_tests` 13/13 (
 Anon kapısı göçten önce de kapalı olduğundan anon sorgusu ayırt etmez; kanıt `schema_migrations` 115.
 Paket: `docs/PHASE115_DEPLOY_PACKAGE.md`.
 
+**phase119 (`migration_phase119_unused_ledgers_cleanup.sql`, temizlik, kullanıcı 13.11.2026) test projesine
+uygulandı; üretimde BEKLİYOR.** Hiçbir ekranın/worker'ın kullanmadığı 20 tablo (phase11 fiyat motoru, phase10
+mesaj otomasyonu, `financial_transactions`, `influencer_collabs`, `property_operator_notes`, gider şablonları …)
+ve yalnız onlara ait 14 fonksiyon kalkar; üretimde hepsi 0 satırdı. Satır varsa göç durur
+(`PHASE119_TABLE_NOT_EMPTY`), `DROP … RESTRICT`. KVKK silme, sıfırlama ve `guard_phase78_links` gövdeleri
+eski göçlerden birebir alınıp daraltıldı (`phase59_context_tests` D5). Bugün'deki boş gece indirimi artık
+fiyat takviminin defterine (`property_daily_prices`, MANUAL) yazar; eskiden okunmayan `daily_rates`'e yazıp
+"takvime kaydedildi" diyordu. **Sıra: önce kod yayına, sonra göç.** Paket: `docs/PHASE119_DEPLOY_PACKAGE.md`.
+Aynı temizlikte (claude/temizlik) yalnız testlerin yaşattığı 14 modül ve app.js'te çağıranı olmayan fonksiyonlar
+silindi (52 fonksiyon; ilk commit mesajındaki "56" yanlış); yukarıdaki `saveAppData()` tablosundaki `setOtaPricingStrategy`, `saveOperatorNote`, `saveAllSettings`
+artık yok (ekranları yoktu).
+
 **Bir göçün uygulanıp uygulanmadığı, dosyaya bakarak anlaşılmaz.** Dosya repoda
 durur; veritabanı uygulanmamış olabilir. Doğrulamanın yolu üretime sormaktır:
 
@@ -956,6 +968,8 @@ ile `index.html` (~265 KB) gibi dev ortak dosyalara dokunuyor.
 Özet — ayrıntı ve gerekçeler `AGENTS.md` içinde:
 
 1. Her araç kendi worktree klasöründe çalışır; ana klasörde tek araç bulunur.
+   (13.11.2026 kullanıcı kararı: dağınık klasörler `Desktop\lexbnb` altında tek klasörde
+   toplandı. Araçlar yeniden paralel çalışacaksa worktree o zaman açılır.)
 2. `git add -A` / `git add .` yasak — kimse başkasının dosyasını commit etmez.
 3. Göç dosyaları değişmezdir; düzeltme **yeni bir göç** olarak eklenir —
    numarası `N+1` olmak zorunda değildir: phase numaraları araçlara ayrılmıştır

@@ -39,12 +39,16 @@ try {
   const contract = read('scripts/schema_contract.js');
   check(/const OUT_OF_SCOPE_TABLES = new Set\(\);/.test(contract) && /const OUT_OF_SCOPE_RPCS = new Set\(\);/.test(contract),
     'H10. Fiyat tablolari ve RPC\'leri drift karsilastirmasindan muaf degil');
-  check(/save_manual_pricing_override_atomic: \{\s*\r?\n\s*args:/.test(contract), 'H11. Bos gece indiriminin RPC argumanlari sozlesmede');
+  // phase119 (13.11.2026): phase11 fiyat nesneleri kaldirildi; bos gece
+  // indirimi fiyat takviminin defterine (property_daily_prices) yazar.
+  check(!/save_manual_pricing_override_atomic/.test(contract), 'H11. Kaldirilan phase11 fiyat RPC\'si sozlesmede beklenmiyor');
   const app = read('app.js');
   for (const dead of ['loadPricingProfiles', 'createPricingRule', 'loadPricingEvents', 'loadDailyRates', 'acceptBookingQuote', 'createBookingQuote']) {
     check(!new RegExp(`\\b${dead}\\b`).test(app), `H12. Hic cagrilmayan ${dead} kaldirildi`);
   }
-  check(/rpc\('save_manual_pricing_override_atomic'/.test(app), 'H13. Kullanilan fiyat RPC\'si korunuyor');
+  const override = (app.match(/async function saveManualPricingOverride\([\s\S]*?\n\}/) || [''])[0];
+  check(!/save_manual_pricing_override_atomic/.test(app) && /cloudSaveDailyPrices\(/.test(override),
+    'H13. Bos gece indirimi fiyat takviminin defterine yaziyor (eski phase11 RPC\'si yok)');
 
   // --- H3-04: kayitta ad uydurulmaz; sunucuda bos ad reddedilir ---
   check(!/'Özel Tatil Evleri'|'İşletme Yöneticisi'/.test(app), 'H14. Kayit formu isletme/yonetici adi uydurmuyor');

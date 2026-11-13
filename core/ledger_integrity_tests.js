@@ -561,7 +561,6 @@ const yazmalar = (istemci, tablo) =>
       ]
     });
     assert.deepStrictEqual(visible.map(item => item.booking.id), ['overlap']);
-    assert.match(kaynak37, /fiyatAlani\(v\.base !== undefined \? v\.base : v\.basePrice\)/);
     // Kart L-216'da baz/taban/hedef uclusune dondu; taban kutusu yine floor ?? floorPrice okur.
     assert.match(kaynak37, /\['Taban fiyat', v\.floor \?\? v\.floorPrice/);
   });

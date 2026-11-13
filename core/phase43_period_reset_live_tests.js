@@ -4,8 +4,8 @@
  *   L-08  Devam eden ay kapatilamaz (gun Europe/Istanbul'a gore).
  *   L-09  Sifirlama kendi denetim kaydini, silmeden SONRA ve dogru sutunlarla
  *         yazar; hata yutulmaz.
- *   L-10  financial_transactions satiri sifirlamayi ve hesap kapatmayi
- *         kilitlemez.
+ *   L-10  Sifirlama ve hesap kapatma kilitlenmez (financial_transactions
+ *         phase119 ile kaldirildi; kalan defterler olculur).
  *   L-11  Kapali donemde rezervasyonun kanal/kisi/misafir alanlari ve
  *         temizlik gorevleri degismez; odeme durumu degisebilir.
  *   L-12  Sahibi kalmamis mulk fotograflari depodan silinir
@@ -61,10 +61,6 @@ async function mulk(tid, s, tag) {
 async function rez(tid, pid, code, ci, co) {
   return must(await admin.from('bookings').insert({ tenant_id: tid, property_id: pid, booking_code: code, guest_name: 'Misafir',
     channel: 'Airbnb', check_in: ci, check_out: co, gross_amount: 20000, pax: 4 }).select().single(), 'rezervasyon ' + code);
-}
-async function ft(tid, pid, bid, by) {
-  return must(await admin.from('financial_transactions').insert({ tenant_id: tid, property_id: pid, booking_id: bid,
-    transaction_type: 'PAYMENT', amount: 1000, occurred_on: bugunIst(), created_by: by }).select().single(), 'financial_transactions');
 }
 async function yukle(pathStr) {
   const body = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46, 0x49, 0x46]);
@@ -135,14 +131,10 @@ async function run() {
 
     // -----------------------------------------------------------------------
     console.log('\n--- 3. L-09 / L-10: SIFIRLAMA ---');
-    await ft(A, pA.id, bkA.id, own.id);
     r = await own.client.rpc('reset_tenant_data', { p_tenant_id: A, p_confirm: 'VERILERI SIFIRLA' });
     const kalanRez = must(await admin.from('bookings').select('id').eq('tenant_id', A), 'rez sayim');
-    const kalanFt = must(await admin.from('financial_transactions').select('id').eq('tenant_id', A), 'ft sayim');
-    check(!r.error && kalanRez.length === 0 && kalanFt.length === 0,
-      '3a. financial_transactions satiri SIFIRLAMAYI KILITLEMEZ', `${hataMetni(r.error) || 'ok'}; rez=${kalanRez.length}, ft=${kalanFt.length}`);
-    check(!r.error && r.data && r.data.deleted && r.data.deleted.financial_transactions === 1,
-      '3b. Sifirlama raporu financial_transactions sayisini iceriyor', JSON.stringify(r.data && r.data.deleted));
+    check(!r.error && kalanRez.length === 0,
+      '3a. Sifirlama rezervasyon defterini bosaltir ve kilitlenmez', `${hataMetni(r.error) || 'ok'}; rez=${kalanRez.length}`);
     const iz = must(await admin.from('audit_logs').select('action,user_id,new_data').eq('tenant_id', A), 'audit okuma');
     const resetIz = iz.filter(x => x.action === 'TENANT_DATA_RESET');
     check(resetIz.length === 1 && resetIz[0].user_id === own.id && resetIz[0].new_data && Number(resetIz[0].new_data.total) > 0,
@@ -153,7 +145,6 @@ async function run() {
     console.log('\n--- 4. L-10: HESAP KAPATMA ---');
     const pS = await mulk(S, s, 's');
     const bkS = await rez(S, pS.id, 'P43S-' + s, prevDay(3), prevDay(5));
-    const ftS = await ft(S, pS.id, bkS.id, mgr.id);
     // Yonetici kendi oturumuyla kayit girer: created_by = mgr (guard_created_by).
     const bkMgr = must(await mgr.client.from('bookings').insert({ tenant_id: S, property_id: pS.id, booking_code: 'P43M-' + s,
       guest_name: 'Misafir M', channel: 'Direct', check_in: prevDay(15), check_out: prevDay(17), gross_amount: 15000, pax: 2 }).select('id,created_by').single(), 'yonetici rezervasyonu');
@@ -172,13 +163,12 @@ async function run() {
     const mgrKaldi = (await admin.auth.admin.getUserById(mgr.id)).data?.user;
     check(!r.error && !mgrKaldi,
       '4a. Ortak isletmede kayit olusturmus/donem kapatmis yonetici HESABINI KAPATABILIR', hataMetni(r.error) || 'kullanici hala var');
-    const ftSKaldi = must(await admin.from('financial_transactions').select('id').eq('id', ftS.id), 'ft ortak');
     const kapS = must(await admin.from('monthly_financial_closes').select('status').eq('tenant_id', S), 'kapanis ortak');
     const exMgrKaldi = must(await admin.from('expenses').select('id,created_by').eq('id', exMgr.id), 'yonetici gider');
     const bkMgrKaldi = must(await admin.from('bookings').select('id,created_by').eq('id', bkMgr.id), 'yonetici rez');
-    check(ftSKaldi.length === 1 && kapS.length === 1 && kapS[0].status === 'CLOSED' && bkMgrKaldi.length === 1 && bkMgrKaldi[0].created_by === null
+    check(kapS.length === 1 && kapS[0].status === 'CLOSED' && bkMgrKaldi.length === 1 && bkMgrKaldi[0].created_by === null
           && exMgrKaldi.length === 1 && exMgrKaldi[0].created_by === null,
-      '4b. Ortak isletmenin finans kaydi, kapanisi, rezervasyonu ve kapali donem gideri YERINDE kalir; created_by bosalir', `ft=${ftSKaldi.length}, kapanis=${JSON.stringify(kapS)}, rez=${JSON.stringify(bkMgrKaldi)}, gider=${JSON.stringify(exMgrKaldi)}`);
+      '4b. Ortak isletmenin kapanisi, rezervasyonu ve kapali donem gideri YERINDE kalir; created_by bosalir', `kapanis=${JSON.stringify(kapS)}, rez=${JSON.stringify(bkMgrKaldi)}, gider=${JSON.stringify(exMgrKaldi)}`);
 
     // Yalniz rezervasyon girmis personel (donem islemi yok): created_by tek basina.
     const bkStf = must(await stf.client.from('bookings').insert({ tenant_id: S, property_id: pS.id, booking_code: 'P43F-' + s,
@@ -192,7 +182,6 @@ async function run() {
 
     const pT = await mulk(T, s, 't');
     const bkT = await rez(T, pT.id, 'P43T-' + s, prevDay(6), prevDay(8));
-    await ft(T, pT.id, bkT.id, solo.id);
     const tDosya = `${T}/${pT.id}/p43/original.jpg`;
     const sDosya = `${S}/${pS.id}/p43/original.jpg`;
     await yukle(tDosya);
@@ -200,7 +189,7 @@ async function run() {
     r = await solo.client.rpc('delete_my_account', { p_confirmation: 'HESABIMI SIL' });
     const tKaldi = must(await admin.from('tenants').select('id').eq('id', T), 'tenant T');
     check(!r.error && tKaldi.length === 0,
-      '4c. financial_transactions olan tek sahipli isletme hesapla birlikte SILINIR', `${hataMetni(r.error) || 'ok'}; tenant=${tKaldi.length}`);
+      '4c. Tek sahipli isletme hesapla birlikte SILINIR', `${hataMetni(r.error) || 'ok'}; tenant=${tKaldi.length}`);
 
     // -----------------------------------------------------------------------
     console.log('\n--- 5. L-12: SAHIPSIZ FOTOGRAF ---');
@@ -244,7 +233,6 @@ async function run() {
       return false;
     }
     for (const t of createdTenants) {
-      await admin.from('financial_transactions').delete().eq('tenant_id', t);
       if (!await retry('Tenant ' + t, () => admin.from('tenants').delete().eq('id', t))) hata = true;
     }
     for (const u of createdUsers) {

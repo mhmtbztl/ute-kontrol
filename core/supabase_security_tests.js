@@ -281,33 +281,21 @@ runTest('Phase 3: Discrete Entity-Based Mutations in place of Monolithic Bulk Sy
   );
 
   // Verify discrete entity mutation functions exist
-  const expectedMutations = [
-    'cloudUpsertProperty',
-    'cloudDeleteProperty',
-    'cloudUpsertBooking',
-    'cloudDeleteBooking',
-    'cloudUpsertExpense',
-    'cloudDeleteExpense',
-    'cloudUpsertCleaningTask',
-    'cloudDeleteCleaningTask',
-    'cloudUpsertLead',
-    'cloudDeleteLead'
-  ];
-
+  // Mulk, rezervasyon, gider ve talep tekil yazmalari create*/update*/delete*
+  // fonksiyonlarindan gecer; cagrilmayan cloudUpsert*/cloudDelete* sarmalayicilari
+  // temizlikte (11.11.2026) kaldirildi ve geri gelmemeli.
+  const expectedMutations = ['cloudUpsertCleaningTask', 'cloudDeleteCleaningTask'];
   expectedMutations.forEach(fn => {
     assert(appContent.includes(`async function ${fn}`), `${fn} must be implemented in app.js`);
   });
-
-  // Verify UI save handlers wire to these entity mutations
-  assert(appContent.includes('cloudUpsertBooking(bookingRecord)'));
-  assert(appContent.includes('cloudDeleteBooking(id)'));
+  ['Property', 'Booking', 'Expense', 'Lead'].forEach(entity => {
+    assert(!appContent.includes(`async function cloudUpsert${entity}(`), `olu cloudUpsert${entity} geri geldi`);
+  });
   // Gider formu createExpense/updateExpense/deleteExpense ile TEK kez yazar;
   // ustune ikinci bir cloudUpsertExpense/cloudDeleteExpense cagrisi her
   // gideri iki satir yapiyordu (L-26). Davranis olcumu: ledger_integrity_tests.
   assert(!appContent.includes('cloudUpsertExpense(expRecord)'), 'saveExpense gideri ikinci kez yazmamali');
   assert(!appContent.includes('cloudDeleteExpense(id)'), 'deleteExpenseUI gideri ikinci kez silmemeli');
-  assert(appContent.includes('cloudUpsertLead(leadRecord)'));
-  assert(appContent.includes('cloudDeleteLead(id)'));
   assert(appContent.includes('result = await persistCleaningTaskDraft(taskRecord)'));
   assert(appContent.includes('const satir = await cloudUpsertCleaningTask(task)'));
   assert(appContent.includes('cloudDeleteCleaningTask(taskId)'));
