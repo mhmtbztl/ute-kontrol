@@ -948,7 +948,13 @@ Anon kapısı göçten önce de kapalı olduğundan anon sorgusu ayırt etmez; k
 Paket: `docs/PHASE115_DEPLOY_PACKAGE.md`.
 
 **phase119 (`migration_phase119_unused_ledgers_cleanup.sql`, temizlik, kullanıcı 13.11.2026) test projesine
-uygulandı; üretimde BEKLİYOR.** Hiçbir ekranın/worker'ın kullanmadığı 20 tablo (phase11 fiyat motoru, phase10
+ve 13 Kasım 2026'da üretime uygulandı; üretimde doğrulandı** (`schema_migrations` 119; anon
+`scheduled_messages`, `financial_transactions`, `pricing_profiles`, `expense_templates` → `404 PGRST205`, önce
+`401 42501`; `production:readiness` BAŞARILI). **Tuzak (yaşandı):** readiness beklenen tabloları göçlerdeki
+`CREATE TABLE`'dan çıkarıyordu ve `DROP TABLE`'ı görmüyordu; uygulanan göçten sonra 20 "eksik tablo" ile
+BAŞARISIZ dedi. `schema_contract.js` artık SQL'i dosya sırasıyla okur (DROP çıkarır, sonraki CREATE geri
+ekler; ağı `production_readiness_tests`). Dinamik `EXECUTE format('DROP FUNCTION …')` görünmez; RPC listesi
+yalnız izin listesi olduğu için bu zararsızdır. Hiçbir ekranın/worker'ın kullanmadığı 20 tablo (phase11 fiyat motoru, phase10
 mesaj otomasyonu, `financial_transactions`, `influencer_collabs`, `property_operator_notes`, gider şablonları …)
 ve yalnız onlara ait 14 fonksiyon kalkar; üretimde hepsi 0 satırdı. Satır varsa göç durur
 (`PHASE119_TABLE_NOT_EMPTY`), `DROP … RESTRICT`. KVKK silme, sıfırlama ve `guard_phase78_links` gövdeleri

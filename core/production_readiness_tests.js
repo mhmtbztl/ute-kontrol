@@ -111,4 +111,11 @@ test('test ve üretim drift karşılaştırması nullability, sütun ve RPC fark
   assert(drift.some(x => x.includes('convert_lead_to_booking_atomic')));
 });
 
-console.log(`TEST SUMMARY: ${passed} / 9 TESTS PASSED (${process.exitCode ? 1 : 0} FAILED)`);
+test('sonraki göçün DROP ettiği tablo beklenen şemadan çıkar (phase119)', () => {
+  for (const table of ['scheduled_messages', 'financial_transactions', 'pricing_profiles', 'expense_templates']) {
+    assert(!CONTRACT.tables[table], table + ' hâlâ bekleniyor; üretim readiness eksik tablo der');
+  }
+  assert(CONTRACT.tables.leads && CONTRACT.tables.bookings && CONTRACT.tables.property_daily_prices, 'canlı tablolar beklenmeli');
+});
+
+console.log(`TEST SUMMARY: ${passed} / 10 TESTS PASSED (${process.exitCode ? 1 : 0} FAILED)`);
