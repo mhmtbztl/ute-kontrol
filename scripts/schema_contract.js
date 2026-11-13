@@ -28,9 +28,13 @@ function discoveredObjects() {
   const sql = canonicalSql();
   const tables = new Set();
   const rpcs = new Set();
-  for (const match of sql.matchAll(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?public\.(\w+)/gi)) tables.add(match[1]);
-  for (const match of sql.matchAll(/CREATE\s+(?:OR\s+REPLACE\s+)?VIEW\s+public\.(\w+)/gi)) tables.add(match[1]);
-  for (const match of sql.matchAll(/CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+public\.(\w+)\s*\(/gi)) rpcs.add(match[1]);
+  // Dosya sirasiyla: sonraki bir goc DROP ettigi nesneyi beklenen listeden
+  // cikarir (phase119), yeniden CREATE edilen nesne geri girer.
+  const pattern = /(CREATE|DROP)\s+(?:OR\s+REPLACE\s+)?(TABLE|VIEW|FUNCTION)\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?public\.(\w+)/gi;
+  for (const [, verb, kind, name] of sql.matchAll(pattern)) {
+    const set = kind.toUpperCase() === 'FUNCTION' ? rpcs : tables;
+    if (verb.toUpperCase() === 'DROP') set.delete(name); else set.add(name);
+  }
   return { tables: [...tables].sort(), rpcs: [...rpcs].sort() };
 }
 
