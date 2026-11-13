@@ -315,6 +315,7 @@ const allTestFiles = [
   'a5_report_ui_tests.js',
   'a5_chatgpt_ui_tests.js',
   'a5_mobile_ui_tests.js',
+  'mobile_shell_tests.js',
   'a5_browser_gate_tests.js',
   'a5_audit_fix_tests.js', 'help_guide_tests.js', 'legal_consent_tests.js', 'pages_build_tests.js', 'mvp_audit_fix_tests.js', 'g9_feedback_tests.js', 'g9_canli_tests.js', 'g9_settings_team_feedback_tests.js', 'h3_audit_fix_tests.js',
   'phase49_activation_live_tests.js',

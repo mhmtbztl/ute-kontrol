@@ -4022,6 +4022,8 @@ function handleFilterChange() {
 
   updateStepperLabels();
   renderAll();
+  // Telefon ust barindaki donem dugmesi secimi yazar (core/mobile_shell.js).
+  if (typeof syncMobileShell === 'function') syncMobileShell();
 }
 
 function stepMonth(delta) {
@@ -4636,6 +4638,9 @@ function switchTab(tabId) {
   if (activeBtn && typeof activeBtn.scrollIntoView === 'function') activeBtn.scrollIntoView({ block: 'nearest', inline: 'center' });
   renderPageActionBar(tabId);
   applyGlobalFilterScope(tabId);
+  // Telefon: alt cubuk ayni aktif sekmeyi gosterir, acik filtre paneli kapanir.
+  if (document.body && document.body.classList) document.body.classList.remove('mobile-filters-open');
+  if (typeof syncMobileShell === 'function') syncMobileShell();
 
   const content = document.getElementById(`tab-${tabId}`);
   if (content) content.classList.add('active');
@@ -17745,6 +17750,8 @@ function applyRoleNavigationVisibility() {
   });
   const quickBooking = document.getElementById('mobileQuickBookingBtn');
   if (quickBooking) quickBooking.hidden = !canWriteSalesRole(role);
+  // Telefon alt cubugu ayni gizli sekmeleri gizler (ayri rol listesi yok).
+  if (typeof syncMobileShell === 'function') syncMobileShell();
 }
 
 // Portfoydeki mulk sayisi. Uygulama 5 villalik demo portfoye gore yazilmisti
