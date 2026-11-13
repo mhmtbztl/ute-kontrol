@@ -7379,8 +7379,10 @@ button.pricing-rule-row:focus-visible { outline: 2px solid var(--border-focus); 
   .app-header .header-palette-btn,
   .app-header .header-chatgpt-btn { display: none !important; }
   .app-header .header-actions .btn {
-    min-width: 40px;
+    /* CI (Linux yazi tipi) 38 px olcuyordu: eski id kurallari ve flex daraltmasi ezmesin. */
+    min-width: 40px !important;
     min-height: 40px;
+    flex-shrink: 0;
     padding: 0 10px !important;
     justify-content: center;
   }
