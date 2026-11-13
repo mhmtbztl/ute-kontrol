@@ -1040,6 +1040,21 @@ async function main() {
       assert.strictEqual(rez.kucuk.length, 0, `Rezervasyonlar küçük düğme: ${rez.kucuk}`);
       await assertNoHorizontalOverflow(page, 'Rezervasyonlar mobil');
       passed.push('36. Rezervasyonlar telefonda: liste kart modunda sığar, dönem satırı tek, düğmeler ≥36 px');
+      // Operasyon (PR 4): alt sayfa secici yana kaymaz, dort gorunum de tasmaz.
+      for (const gorunum of ['cleaning', 'maintenance', 'tasks', 'people']) {
+        const ops = await page.evaluate(v => {
+          switchTab('operations'); setOperationsView(v);
+          const sw = document.querySelector('#tab-operations .operations-switch');
+          return {
+            kayar: sw.scrollWidth > sw.clientWidth + 1,
+            kucuk: [...sw.querySelectorAll('button')].map(b => Math.round(b.getBoundingClientRect().height)).filter(h => h < 36)
+          };
+        }, gorunum);
+        assert(!ops.kayar, `Operasyon alt sayfa seçici yana kaymamalı (${gorunum})`);
+        assert.strictEqual(ops.kucuk.length, 0, `Operasyon seçici düğmeleri ≥36 px (${gorunum}): ${ops.kucuk}`);
+        await assertNoHorizontalOverflow(page, `Operasyon mobil ${gorunum}`);
+      }
+      passed.push('37. Operasyon telefonda: alt sayfa seçici 2x2, kaymaz; Temizlik/Arıza/Görevler/Saha ekibi taşmaz');
       passed.push('25b. Bugün performans kartları 390 px mobilde taşmaz');
       await page.evaluate(() => { switchTab('pricing'); });
       await assertNoHorizontalOverflow(page, 'Fiyatlandirma mobil');
