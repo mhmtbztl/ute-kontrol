@@ -17,7 +17,6 @@ const allTestFiles = [
   'rich_checklist_tests.js',
   'rich_checklist_ui_tests.js',
   'phase96_rich_checklist_execution_tests.js',
-  'extension_offer_tests.js',
   'finance_ai_payload_tests.js',
   'finance_analytics_tests.js',
   'finance_crud_tests.js',
@@ -37,11 +36,6 @@ const allTestFiles = [
   'a4_sales_ui_tests.js',
   'a4_pricing_ui_tests.js',
   'maintenance_tests.js',
-  'message_automation_tests.js',
-  'message_delivery_tests.js',
-  'message_scheduling_tests.js',
-  'message_template_tests.js',
-  'messaging_security_tests.js',
   'monthly_target_tests.js',
   'month_close_tests.js',
   'operations_priority_tests.js',
@@ -54,18 +48,12 @@ const allTestFiles = [
   'tests.js',
 
   // 7 Phase 11 Pricing Suites
-  'pricing_engine_tests.js',
-  'pricing_rules_tests.js',
   'gap_night_tests.js',
-  'pricing_booking_integration_tests.js',
-  'pricing_security_tests.js',
-  'pricing_concurrency_tests.js',
 
   // 7 Phase 12 Executive & Final Product Suites
   'executive_dashboard_tests.js',
   'executive_priority_tests.js',
   'final_security_audit_tests.js',
-  'end_to_end_product_tests.js',
   'multi_tenant_e2e_tests.js',
 
   // Gercek tarayici kayit/giris akisi (anon key) - diger suitler bu yolu atliyor

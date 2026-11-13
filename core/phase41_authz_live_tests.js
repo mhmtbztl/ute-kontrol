@@ -136,66 +136,18 @@ async function run() {
     const p = must(await admin.from('properties').insert({ tenant_id: A, name: 'Villa P41', slug: 'p41' + s, base_price: 10000 }).select().single(), 'mulk');
     const bk = must(await admin.from('bookings').insert({ tenant_id: A, property_id: p.id, booking_code: 'P41-' + s, guest_name: 'Misafir A',
       check_in: '2027-10-10', check_out: '2027-10-14', gross_amount: 40000 }).select().single(), 'rezervasyon');
-    const msg = must(await admin.from('scheduled_messages').insert({ tenant_id: A, booking_id: bk.id, channel: 'WHATSAPP',
-      scheduled_at: new Date(Date.now() - 60000).toISOString(), rendered_body: 'GIZLI MESAJ A', idempotency_key: 'p41a-' + s }).select().single(), 'mesaj');
-    const msg2 = must(await admin.from('scheduled_messages').insert({ tenant_id: A, booking_id: bk.id, channel: 'WHATSAPP',
-      scheduled_at: new Date(Date.now() + 86400000).toISOString(), rendered_body: 'MESAJ 2', idempotency_key: 'p41b-' + s }).select().single(), 'mesaj2');
-    const log = must(await admin.from('message_delivery_logs').insert({ tenant_id: A, scheduled_message_id: msg2.id, channel: 'WHATSAPP',
-      provider: 'x', status: 'SUCCESS' }).select().single(), 'teslim kaydi');
-    const offer = must(await admin.from('extension_offers').insert({ tenant_id: A, booking_id: bk.id, property_id: p.id, target_date: '2027-10-14',
-      base_price: 10000, offered_price: 8000, expires_at: new Date(Date.now() + 86400000).toISOString() }).select().single(), 'teklif');
     const notif = must(await admin.from('user_notifications').insert({ tenant_id: A, user_id: own.id, event_key: 'p41' + s, domain: 'FINANCE',
       severity: 'HIGH', title: 't', message: 'm' }).select().single(), 'bildirim');
     const alert = must(await admin.from('executive_alerts').insert({ tenant_id: A, alert_code: 'P41', severity: 'HIGH', domain: 'FINANCE',
       title: 't', reason: 'r', recommended_action: 'a', deep_link: '#' }).select().single(), 'uyari');
 
     // -----------------------------------------------------------------------
-    console.log('--- 1. L-01: WORKER RPC\'LERI YALNIZ service_role ---');
-    let r = await atk.client.rpc('claim_scheduled_messages_atomic', { p_tenant_id: A, p_worker_id: 'atk', p_batch_size: 10, p_stale_timeout_minutes: 5 });
-    check(yetkiHatasi(r.error) && !(r.data || []).length,
-      '1a. Yabanci kiraci A\'nin mesaj kuyrugunu ALAMAZ', r.error ? hataMetni(r.error) : `aldi: ${JSON.stringify((r.data || []).map(x => x.rendered_body))}`);
-    r = await own.client.rpc('claim_scheduled_messages_atomic', { p_tenant_id: A, p_worker_id: 'own', p_batch_size: 10, p_stale_timeout_minutes: 5 });
-    check(yetkiHatasi(r.error),
-      '1b. Isletmenin kendi sahibi bile kuyrugu tarayicidan alamaz (worker islemi)', r.error ? hataMetni(r.error) : `${(r.data || []).length} satir aldi`);
-    check((await row('scheduled_messages', msg.id, 'status')).status === 'SCHEDULED',
-      '1c. Reddedilen cagrilardan sonra mesaj SCHEDULED kaldi', 'durum degisti');
-
-    r = await atk.client.rpc('record_message_delivery_result_atomic', { p_tenant_id: A, p_message_id: msg.id, p_status: 'SUCCESS', p_recipient_snapshot: 'x', p_provider: 'atk' });
-    check(yetkiHatasi(r.error), '1d. Yabanci kiraci teslim sonucu YAZAMAZ', r.error ? hataMetni(r.error) : JSON.stringify(r.data));
-    check((await row('scheduled_messages', msg.id, 'status')).status === 'SCHEDULED',
-      '1e. Mesaj durumu yabanci tarafindan degistirilmedi', 'durum degisti');
-
-    r = await admin.rpc('claim_scheduled_messages_atomic', { p_tenant_id: A, p_worker_id: 'worker', p_batch_size: 10, p_stale_timeout_minutes: 5 });
-    check(!r.error && (r.data || []).some(x => x.id === msg.id),
-      '1f. service_role (worker) kuyrugu almaya DEVAM EDER', r.error ? hataMetni(r.error) : JSON.stringify(r.data));
-    r = await admin.rpc('record_message_delivery_result_atomic', { p_tenant_id: A, p_message_id: msg.id, p_status: 'SUCCESS', p_recipient_snapshot: 'x', p_provider: 'worker' });
-    check(!r.error && (await row('scheduled_messages', msg.id, 'status')).status === 'SENT',
-      '1g. service_role (worker) teslim sonucunu yazmaya DEVAM EDER', r.error ? hataMetni(r.error) : JSON.stringify(r.data));
-
-    console.log('\n--- 2. L-01: UZATMA TEKLIFI KABULU ---');
-    r = await atk.client.rpc('accept_extension_offer_atomic', { p_tenant_id: A, p_offer_id: offer.id });
-    let o = await row('extension_offers', offer.id, 'status');
-    let b = await row('bookings', bk.id, 'check_out,gross_amount');
-    check(yetkiHatasi(r.error) && o.status === 'OFFERED' && b.check_out === '2027-10-14',
-      '2a. Yabanci kiraci baska isletmenin rezervasyonunu UZATAMAZ',
-      `${hataMetni(r.error) || JSON.stringify(r.data)}; teklif=${o.status}; rez=${JSON.stringify(b)}`);
-    r = await vw.client.rpc('accept_extension_offer_atomic', { p_tenant_id: A, p_offer_id: offer.id });
-    o = await row('extension_offers', offer.id, 'status');
-    check(yetkiHatasi(r.error) && o.status === 'OFFERED',
-      '2b. viewer teklif kabul EDEMEZ (rezervasyon yazar)', `${hataMetni(r.error) || JSON.stringify(r.data)}; teklif=${o.status}`);
-    r = await own.client.rpc('accept_extension_offer_atomic', { p_tenant_id: A, p_offer_id: offer.id });
-    b = await row('bookings', bk.id, 'check_out,gross_amount');
-    check(!r.error && r.data && r.data.success === true && b.check_out === '2027-10-15',
-      '2c. Isletme sahibi teklifi kabul etmeye DEVAM EDER', `${hataMetni(r.error) || JSON.stringify(r.data)}; rez=${JSON.stringify(b)}`);
+    // 1-2 (mesaj kuyrugu worker RPC'leri, uzatma teklifi kabulu) phase119 ile
+    // kalkti: tablolar ve RPC'ler kaldirildi (13.11.2026).
 
     // -----------------------------------------------------------------------
     console.log('\n--- 3. L-02: viewer YAZAMAZ, OKUR ---');
-    r = await vw.client.from('scheduled_messages').update({ rendered_body: 'VIEWER DEGISTIRDI' }).eq('id', msg2.id).select();
-    check((await row('scheduled_messages', msg2.id, 'rendered_body')).rendered_body === 'MESAJ 2',
-      '3a. viewer misafire gidecek mesaj metnini DEGISTIREMEZ', `${hataMetni(r.error)} ${(r.data || []).length} satir`);
-    r = await vw.client.from('message_delivery_logs').delete().eq('id', log.id).select();
-    check(!!(await row('message_delivery_logs', log.id, 'id')),
-      '3b. viewer teslim kaydini SILEMEZ', `${hataMetni(r.error)} ${(r.data || []).length} satir silindi`);
+    let r;
     r = await vw.client.from('executive_alerts').update({ status: 'RESOLVED' }).eq('id', alert.id).select();
     check((await row('executive_alerts', alert.id, 'status')).status === 'OPEN',
       '3c. viewer yonetici uyarisini tablo yolundan COZEMEZ', `${hataMetni(r.error)} ${(r.data || []).length} satir`);
@@ -203,16 +155,9 @@ async function run() {
     check(yetkiHatasi(r.error) && (await row('executive_alerts', alert.id, 'status')).status === 'OPEN',
       '3d. viewer yonetici uyarisini RPC yolundan da COZEMEZ', hataMetni(r.error) || JSON.stringify(r.data));
 
-    r = await vw.client.from('scheduled_messages').select('id').eq('id', msg2.id);
-    check(!r.error && (r.data || []).length === 1, '3e. viewer mesajlari OKUMAYA devam eder', hataMetni(r.error) || '0 satir');
     r = await vw.client.from('executive_alerts').select('id').eq('id', alert.id);
     check(!r.error && (r.data || []).length === 1, '3f. viewer uyarilari OKUMAYA devam eder', hataMetni(r.error) || '0 satir');
 
-    // phase53 (L-107): staff saha personelidir; misafir mesajlari satis/yonetim
-    // isidir. Bu iddia phase41'de "DEVAM EDER" idi; kullanici karari 30.09.2026.
-    r = await st.client.from('scheduled_messages').update({ status: 'CANCELLED', cancelled_at: new Date().toISOString() }).eq('id', msg2.id).select('id');
-    check((await row('scheduled_messages', msg2.id, 'status')).status !== 'CANCELLED',
-      '3g. staff zamanlanmis mesaji iptal EDEMEZ (phase53)', `${hataMetni(r.error)} ${(r.data || []).length} satir`);
     r = await st.client.from('executive_alerts').update({ status: 'ACKNOWLEDGED' }).eq('id', alert.id).select('id');
     check((await row('executive_alerts', alert.id, 'status')).status === 'OPEN',
       '3h. staff yonetici uyarisini DEGISTIREMEZ', `${hataMetni(r.error)} ${(r.data || []).length} satir`);
@@ -255,7 +200,7 @@ async function run() {
     // -----------------------------------------------------------------------
     console.log('\n--- 7. L-05 / L-06 ---');
     const anon = newClient();
-    for (const t of ['guests', 'bookings', 'profiles', 'scheduled_messages']) {
+    for (const t of ['guests', 'bookings', 'profiles']) {
       r = await anon.from(t).select('*').limit(1);
       check(r.error && /permission denied/i.test(String(r.error.message)),
         `7a. anon ${t} tablosuna GIREMEZ (RLS'e kadar bile)`, r.error ? hataMetni(r.error) : `200 ${JSON.stringify(r.data)}`);

@@ -106,9 +106,6 @@ async function run() {
       assigned_to: stf.id }).select().single(), 'ariza');
     must(await admin.from('user_notifications').insert({ tenant_id: A, user_id: null, event_key: 'p53-' + s, domain: 'FINANCE',
       severity: 'INFO', title: 'Aylik kapanis', message: 'Net kar 120.000 TL' }), 'genel bildirim');
-    const quote = must(await admin.from('booking_quotes').insert({ tenant_id: A, property_id: p.id, check_in: '2031-06-01', check_out: '2031-06-03',
-      quoted_total: 20000, nightly_breakdown: [], expires_at: new Date(Date.now() + 86400000).toISOString() }).select().single(), 'teklif');
-
     // -----------------------------------------------------------------------
     console.log('\n--- A. STAFF: SAHA PERSONELI ---');
     for (const [table, filter, ad] of [
@@ -203,14 +200,13 @@ async function run() {
     check(!r.error, 'C7. owner sales rolunde davet gonderir', hataMetni(r.error));
 
     // -----------------------------------------------------------------------
-    console.log('\n--- D. YABANCI KIRACI: phase11 RPC GOVDE KAPISI ---');
-    r = await atk.client.rpc('accept_booking_quote_atomic', { p_tenant_id: A, p_quote_id: quote.id });
-    const teklifSonra = await tekSatir('booking_quotes', quote.id, 'status');
-    check(!!r.error && /FORBIDDEN_ROLE/.test(hataMetni(r.error)) && teklifSonra.status === 'ACTIVE',
-      'D1. yabanci kiraci teklifi kabul edemez — govdede yetki (FORBIDDEN_ROLE)', hataMetni(r.error) || 'KABUL EDILDI');
-    r = await atk.client.rpc('save_manual_pricing_override_atomic', { p_tenant_id: A, p_property_id: p.id, p_start_date: '2031-09-01',
-      p_end_date: '2031-09-02', p_rate_override: 1, p_reason: 'saldiri', p_bypass_guardrail: false, p_min_stay_override: null });
-    check(!!r.error && /FORBIDDEN_ROLE/.test(hataMetni(r.error)), 'D2. yabanci kiraci fiyat yazamaz — govdede yetki (FORBIDDEN_ROLE)', hataMetni(r.error) || 'YAZILDI');
+    console.log('\n--- D. YABANCI KIRACI: FIYAT TAKVIMI KAPISI ---');
+    // phase11 teklif/fiyat RPC'leri phase119 ile kalkti (13.11.2026). Bos gece
+    // indirimi artik fiyat takvimine yazar: yabanci kiraci oraya yazamamali.
+    r = await atk.client.from('property_daily_prices').upsert({ tenant_id: A, property_id: p.id, price_date: '2031-09-01',
+      price: 1, source: 'MANUAL' }, { onConflict: 'property_id,price_date' }).select();
+    const yabanciFiyat = must(await admin.from('property_daily_prices').select('id').eq('property_id', p.id).eq('price_date', '2031-09-01'), 'fiyat oku');
+    check(!!r.error && yabanciFiyat.length === 0, 'D1. yabanci kiraci baska isletmenin fiyat takvimine yazamaz', hataMetni(r.error) || 'YAZILDI');
     g = await gorulen(atk.client, 'bookings', { id: bk.id });
     check(g.n === 0, 'D3. yabanci kiraci rezervasyonu goremez', `${g.n} satir`);
 

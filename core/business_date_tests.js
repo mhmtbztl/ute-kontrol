@@ -3,7 +3,6 @@ const fs = require('fs');
 const path = require('path');
 
 const BusinessDate = require('./business_date');
-const PricingEngine = require('./pricing_engine');
 
 let passed = 0;
 let failed = 0;
@@ -46,14 +45,6 @@ test('İş günü kullanan servisler UTC ISO gün varsayımı üretmez', () => {
   });
 });
 
-test('UTC tarih dizisi ve timestamp sözleşmeleri değişmeden kalır', () => {
-  assert.deepStrictEqual(
-    PricingEngine.getDatesBetween('2026-01-31', '2026-02-02'),
-    ['2026-01-31', '2026-02-01']
-  );
-  const instant = new Date('2026-01-01T23:30:00-05:00');
-  assert.strictEqual(instant.toISOString(), '2026-01-02T04:30:00.000Z');
-});
 
 console.log(`\n${passed} geçti, ${failed} başarısız`);
 if (failed > 0) process.exit(1);

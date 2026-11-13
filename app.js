@@ -17425,7 +17425,7 @@ async function loadTenantAppData(tenantIdOrUserId) {
         : Promise.resolve([]);
       // Independent datasets are loaded concurrently and every list is paged;
       // Supabase's per-response cap must never silently truncate a dashboard.
-      const [villas, bookings, expenses, cleanList, leads, leadSalesContext, closeList, targetList, maintenanceTickets, operationalTasks, guests, guestConsentEvents, bookingChannelCatalog, scheduledMessages, extensionOffers, userNotifications, campaignRows, settingRows, pricingLadderRows, hkOverrideRows, paymentCommissionRows, operationalPeopleRows, cleaningExecutionRows, maintenanceAssignmentRows, taskTemplateRows, checklistTemplateRows, bookingPayments, bookingPaymentBalances, propertyContextRows, propertyOwnerRows, propertyOwnerLinkRows, messageTemplateRows, guestClassificationRows, salesMembers, propertyPricingRuleRows, competitorResearchRows, leadInterestRows, channelListingRows, incomeEntryRows, dailyPriceRows, closureRows] = await Promise.all([
+      const [villas, bookings, expenses, cleanList, leads, leadSalesContext, closeList, targetList, maintenanceTickets, operationalTasks, guests, guestConsentEvents, bookingChannelCatalog, userNotifications, campaignRows, settingRows, pricingLadderRows, hkOverrideRows, paymentCommissionRows, operationalPeopleRows, cleaningExecutionRows, maintenanceAssignmentRows, taskTemplateRows, checklistTemplateRows, bookingPayments, bookingPaymentBalances, propertyContextRows, propertyOwnerRows, propertyOwnerLinkRows, messageTemplateRows, guestClassificationRows, salesMembers, propertyPricingRuleRows, competitorResearchRows, leadInterestRows, channelListingRows, incomeEntryRows, dailyPriceRows, closureRows] = await Promise.all([
         loadProperties(tenantId),
         loadBookings(tenantId),
         mayReadLedger ? loadExpenses(tenantId) : Promise.resolve([]),
@@ -17439,8 +17439,6 @@ async function loadTenantAppData(tenantIdOrUserId) {
         fetchAllCloudRows(() => supabaseClient.from('guests').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false })),
         fetchAllCloudRows(() => supabaseClient.from('guest_consent_events').select('*').eq('tenant_id', tenantId).order('recorded_at', { ascending: false })),
         loadTenantBookingChannels(tenantId),
-        fetchAllCloudRows(() => supabaseClient.from('scheduled_messages').select('*').eq('tenant_id', tenantId).order('scheduled_at', { ascending: true })),
-        fetchAllCloudRows(() => supabaseClient.from('extension_offers').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false })),
         // Bildirim merkezi: `appData.userNotifications` HIC ATANMIYORDU.
         // Zil ikonu, rozet ve cekmece yalnizca bu diziyi okuyor, yani
         // bildirim merkezi musteride HER ZAMAN bos gorunuyordu.
@@ -17549,8 +17547,6 @@ async function loadTenantAppData(tenantIdOrUserId) {
         guestConsentEvents: guestConsentEvents || [],
         bookingChannels: bookingChannelCatalog.rows,
         bookingChannelSchemaReady: bookingChannelCatalog.schemaReady,
-        scheduledMessages: scheduledMessages || [],
-        extensionOffers: extensionOffers || [],
         expenses: expensesWithSlugs,
         cleaningTasks,
         cleaningPayments,
@@ -17643,8 +17639,6 @@ function getBlankTenantData(userId) {
     guestConsentEvents: [],
     bookingChannels: getFallbackBookingChannels(),
     bookingChannelSchemaReady: false,
-    scheduledMessages: [],
-    extensionOffers: [],
     expenses: [],
     cleaningTasks: [],
     leads: [],
@@ -18639,21 +18633,33 @@ async function createMessageTemplate(templateInput) {
   return data;
 }
 
+// Bugun ekranindaki bos gece indirimi fiyat takviminin kendi defterine
+// (phase101 property_daily_prices) MANUAL fiyat olarak yazar. Eskiden phase11
+// daily_rates'e yaziyor ve "takvime kaydedildi" diyordu; takvim o tabloyu hic
+// okumuyordu (temizlik 13.11.2026, phase119 o tabloyu kaldirir).
 async function saveManualPricingOverride(params) {
   const tenantId = getActiveTenantId();
   if (!tenantId || !supabaseClient) throw new Error('Active tenant session required');
-  const { data, error } = await supabaseClient.rpc('save_manual_pricing_override_atomic', {
-    p_tenant_id: tenantId,
-    p_property_id: params.propertyId,
-    p_start_date: params.startDate,
-    p_end_date: params.endDate,
-    p_rate_override: params.rate,
-    p_reason: params.reason || 'Manual override',
-    p_min_stay_override: params.minStay || null,
-    p_bypass_guardrail: params.bypassGuardrail || false
-  });
-  if (error) throw error;
-  return data;
+  if (!appData.phase101SchemaReady) throw new Error(PHASE101_SEMA_YOK);
+  const rate = Number(params.rate);
+  if (!isUUID(params.propertyId) || !Number.isFinite(rate) || rate <= 0) throw new Error('Geçerli mülk ve fiyat gerekli.');
+  const property = Object.values(appData.villas || {}).find(v => v && v.id === params.propertyId);
+  const floor = Number(property?.floor);
+  if (floor > 0 && rate < floor && !params.bypassGuardrail) {
+    throw new Error(`Gecelik ₺${rate.toLocaleString('tr-TR')} taban fiyatın (₺${floor.toLocaleString('tr-TR')}) altında.`);
+  }
+  const dates = [];
+  for (let d = new Date(`${params.startDate}T00:00:00Z`); d <= new Date(`${params.endDate}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + 1)) {
+    dates.push(d.toISOString().slice(0, 10));
+  }
+  if (!dates.length || dates.length > 366) throw new Error('Geçerli bir tarih aralığı gerekli.');
+  const note = String(params.reason || '').trim().slice(0, 500) || null;
+  const saved = await cloudSaveDailyPrices(dates.map(date => ({
+    property_id: params.propertyId, price_date: date, price: rate, source: 'MANUAL', suggested_price: null, note
+  })));
+  const keys = new Set(saved.map(row => `${row.property_id}|${String(row.price_date).slice(0, 10)}`));
+  appData.propertyDailyPrices = [...(appData.propertyDailyPrices || []).filter(row => !keys.has(`${row.property_id}|${String(row.price_date).slice(0, 10)}`)), ...saved];
+  return saved;
 }
 
 async function resolveExecutiveAlert(alertId, userId) {
@@ -21568,8 +21574,6 @@ function getGuestCrmView() {
   return api ? api.buildGuestCrmView({
     guests: appData.guests || [],
     bookings: appData.bookings || [],
-    messages: appData.scheduledMessages || [],
-    offers: appData.extensionOffers || [],
     villas: appData.villas || {},
     today: getTodayStr()
   }) : { rows: [], metrics: {} };

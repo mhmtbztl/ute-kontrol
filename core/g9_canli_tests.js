@@ -449,17 +449,8 @@ async function L272() {
   check(sifirlandi, 'L-272a Kanal kaydedilince form sifirlanir (await sonrasi null currentTarget hatasi yok)');
 }
 
-// ---------------------------------------------------------------------------
-// L-273 kisi sayisinin tek kaynagi pax
-// ---------------------------------------------------------------------------
-async function L273() {
-  const M = require('./guest_messaging_engine.js');
-  // phase10'un guest_count sutunu uygulamaca yazilmaz, varsayilani 2 kalir.
-  const c = M.buildTemplateContext({ guest_name: 'TEST Ayşe', check_in: '2026-11-10', check_out: '2026-11-12', pax: 7, guest_count: 2 });
-  check(String(c.guest_count) === '7', 'L-273a Mesaj sablonundaki kisi sayisi pax\'tan gelir (guest_count varsayilani 2 degil)', String(c.guest_count));
-  const c2 = M.buildTemplateContext({ guest_name: 'TEST', check_in: '2026-11-10', check_out: '2026-11-12' });
-  check(c2.guest_count === '', 'L-273b Kisi sayisi bilinmiyorsa 2 uydurulmaz', JSON.stringify(c2.guest_count));
-}
+// L-273 (mesaj otomasyonu sablonunda kisi sayisi) phase119 ile kalkti: motor
+// (guest_messaging_engine) ve planli mesaj defteri kaldirildi (13.11.2026).
 
 // ---------------------------------------------------------------------------
 // L-274 iptal edilen kaporali rezervasyon tahsilat beklemez, iade/mahsup soylenir
@@ -1580,7 +1571,6 @@ async function main() {
     await L302();
     await L308();
     await L272();
-    await L273();
     await L274();
     await L275();
     await L276();

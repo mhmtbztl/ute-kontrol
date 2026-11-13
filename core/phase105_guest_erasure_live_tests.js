@@ -77,8 +77,6 @@ async function run() {
     const bD = must(await admin.from('bookings').insert(rez({ booking_code: 'P105-D-' + s, guest_name: 'Diğer Misafir', guest_phone: '+905559990105', primary_guest_id: D.id, check_in: '2027-07-10', check_out: '2027-07-12' })).select().single(), 'rezD');
     must(await admin.from('cleaning_tasks').insert({ tenant_id: T, property_id: P.id, booking_id: b1.id, task_date: '2027-05-12', amount: 0, cleaner_name: 'Ekip', status: 'PLANNED', description: 'Ayşe Kvkk Çıkış Temizliği (P105A)' }), 'temizlik');
     const L = must(await admin.from('leads').insert({ tenant_id: T, guest_name: 'Ayşe Kvkk', guest_phone: '05551230105', guest_email: 'ayse.kvkk@example.com', channel: 'WhatsApp', status: 'NEW', notes: 'Ayşe: 4 kişi' }).select().single(), 'talep');
-    must(await admin.from('scheduled_messages').insert({ tenant_id: T, booking_id: b1.id, guest_id: G.id, channel: 'WHATSAPP',
-      scheduled_at: new Date(Date.now() + 86400000).toISOString(), rendered_body: 'Merhaba Ayşe', recipient_snapshot: '+905551230105', idempotency_key: 'p105-' + s }), 'mesaj');
     must(await admin.from('user_notifications').insert({ tenant_id: T, user_id: own.id, event_key: 'collection_due:' + b1.id, domain: 'FINANCE', severity: 'WARNING',
       title: 'Tahsilat bekliyor: Ayşe Kvkk', message: 'x', deep_link: 'booking:' + b1.id, status: 'UNREAD' }), 'bildirim');
     must(await admin.from('user_notifications').insert({ tenant_id: T, user_id: own.id, event_key: 'collection_due:' + bD.id, domain: 'FINANCE', severity: 'WARNING',
@@ -112,8 +110,8 @@ async function run() {
     check(bs.every(b => Number(b.gross_amount) === 20000), '1e. Tutar ve tarih degismedi (raporlar ayni)', JSON.stringify(bs.map(b => b.gross_amount)));
     const l = must(await admin.from('leads').select('guest_name, guest_phone, guest_email, notes').eq('id', L.id).single(), 'talep oku');
     check(l.guest_name === 'Silinmiş misafir' && !l.guest_phone && !l.guest_email && !l.notes, '1f. Talep anonimlesti', JSON.stringify(l));
-    const m = must(await admin.from('scheduled_messages').select('id').eq('tenant_id', T), 'mesaj oku');
-    check(m.length === 0, '1g. Misafire mesajlar silindi');
+    // phase119: planli mesaj defteri kaldirildi; sozlesme ayni kalir, mesaj sayisi 0.
+    check(r.data && r.data.messages === 0, '1g. Silme sonucu mesaj sayisini 0 olarak tasir (defter kaldirildi)', JSON.stringify(r.data));
     const n = must(await admin.from('user_notifications').select('title').eq('tenant_id', T), 'bildirim oku');
     check(n.length === 1 && /Diğer/.test(n[0].title), '1h. Misafirin bildirimleri silindi, digerininki kaldi', JSON.stringify(n));
     const t = must(await admin.from('cleaning_tasks').select('description').eq('booking_id', b1.id).single(), 'temizlik oku');

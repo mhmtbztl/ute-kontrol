@@ -6,7 +6,6 @@
 
 const assert = require('assert');
 const { getAffectedRecomputeWindow, detectGapNights } = require('./gap_night_service.js');
-const PricingEngine = require('./pricing_engine.js');
 
 console.log('=============================================================================');
 console.log('⚡ LEXBNB PHASE 11 — GAP NIGHT & ORPHAN GAP TEST SUITE');
@@ -131,27 +130,6 @@ function runGapNightTests() {
   const sep3Maint = gapMapMaint.get('2026-09-03');
   assert.strictEqual(sep3Maint.isGapNight, true, 'Gap bounded between booking and maintenance block');
   recordPass('6. Gap bounded by maintenance block correctly flagged as gap night');
-
-  // TEST 7: Pricing Engine Integration with Gap Night Rule
-  console.log('\n--- TEST 7: Pricing Engine Integration ---');
-  const gapRule = {
-    id: 'rule-gap-discount',
-    name: 'Gap Night 15% Incentive',
-    rule_type: 'GAP_NIGHT',
-    priority: 30,
-    multiplier: 0.85, // -15%
-    is_active: true
-  };
-  const resEngineGap = PricingEngine.calculateDailyPrice({
-    property: { id: 'p1', base_price: 2000, min_price: 1000, max_price: 5000 },
-    date: '2026-09-03',
-    isGapNight: true,
-    rules: [gapRule]
-  });
-  // 2000 * 0.85 = 1700
-  assert.strictEqual(resEngineGap.finalRate, 1700);
-  assert.ok(resEngineGap.rulesApplied.includes('Gap Night 15% Incentive'));
-  recordPass('7. PricingEngine applies 15% gap night incentive discount specifically when isGapNight is true');
 
   console.log(`\n=============================================================================`);
   console.log(`TEST SUMMARY: ${passedTests} / ${totalTests} TESTS PASSED (0 FAILED)`);

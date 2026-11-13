@@ -125,7 +125,6 @@ async function goruntu(spec, tid, uyeler, yalniz) {
     console.log('\n--- TEMIZLIK ---');
     let hata = false;
     for (const t of createdTenants) {
-      await admin.from('financial_transactions').delete().eq('tenant_id', t);
       const { error } = await admin.from('tenants').delete().eq('id', t);
       if (error) { hata = true; console.error('[FAIL] tenant: ' + error.message); }
     }
