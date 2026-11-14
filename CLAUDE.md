@@ -453,8 +453,8 @@ yapışkan başlık ilk ekranın yarısını alıyordu.
 - Tarayıcı kapısı 34: üst bar ≤72 px, alt çubuk, Daha fazla, dönem düğmesi.
 - **Tablo telefonda kart olur:** `<table class="… mobile-cards">` yeter; `core/mobile_shell.js`
   hücrelere `data-label`ı başlıktan yazar (yalnız tablonun kendi satırları; iç içe tablo etkilenmez).
-  Karşılaştırma tablosu kart olmaz: yana kayar, ilk sütun sabit. Ekran ekran kapılar 35–40
-  (Bugün, Rezervasyonlar, Operasyon, Misafirler/Satış, Finans, Analiz). `analytics.css`
+  Karşılaştırma tablosu kart olmaz: yana kayar, ilk sütun sabit. Ekran ekran kapılar 35–41
+  (Bugün, Rezervasyonlar, Operasyon, Misafirler/Satış, Finans, Analiz, Fiyatlandırma). `analytics.css`
   style.css'ten sonra yüklenir: Analiz kuralları `#tab-analytics` önekiyle yazılır.
 
 ### 3.6 Demo yok / uydurma veri yok

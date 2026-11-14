@@ -1106,6 +1106,23 @@ async function main() {
       await assertNoHorizontalOverflow(page, 'Fiyatlandirma mobil');
       await page.screenshot({ path: path.join(__dirname, '..', 'tmp', 'g97-pricing-mobile.png'), fullPage: true });
       passed.push('32b. fiyatlandırma 390 px mobilde taşmaz');
+      // Fiyatlandirma (PR 8): ic sekmeler tek satir, kilavuz telefonda kapali baslar,
+      // bes gorunumun hicbiri tasmaz, kucuk dugme yok (ay seridi bilerek kayar).
+      for (const v of ['rules', 'target', 'rivals', 'results', 'calendar']) {
+        await page.evaluate(view => setPricingView(view), v);
+        await assertNoHorizontalOverflow(page, `Fiyatlandirma ${v} mobil`);
+      }
+      const fiyat = await page.evaluate(() => {
+        const sekmeler = [...document.querySelectorAll('.pricing-subnav .ads-subnav-btn')].map(b => Math.round(b.getBoundingClientRect().top));
+        return {
+          tekSatir: new Set(sekmeler).size === 1,
+          kilavuzAcik: document.getElementById('pricingGuide').open,
+          kucuk: [...document.querySelectorAll('#tab-pricing .ads-subnav-btn, #tab-pricing .pricing-month-tab, #tab-pricing .pricing-link')]
+            .filter(b => b.getClientRects().length).map(b => Math.round(b.getBoundingClientRect().height)).filter(h => h < 36)
+        };
+      });
+      assert(fiyat.tekSatir && !fiyat.kilavuzAcik && fiyat.kucuk.length === 0, `Fiyatlandırma telefonda: ${JSON.stringify(fiyat)}`);
+      passed.push('41. Fiyatlandırma telefonda: iç sekmeler tek satır, kılavuz kapalı başlar, beş görünüm taşmaz, küçük düğme yok');
       // Sekme ice aktarim bagini (finance_import_batch_rows) bir kez okur; fikstur
       // oturumsuz oldugu icin 401 doner ve konsol kapisini zamanlamaya bagli kirardi.
       await page.route('**/rest/v1/finance_import_batch_rows**', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
