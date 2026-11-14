@@ -219,6 +219,64 @@ function fakeDom() {
     assert.match(App.bookingOverlapMessage({ guest: 'Ali', checkIn: '2026-11-05', checkOut: '2026-11-07' }), /^Bu mülk seçilen tarihlerde başka bir rezervasyonla çakışıyor \(Ali: 05\.11\.2026 – 07\.11\.2026\)\.$/);
   });
 
+  // --- Ikinci dalga ---------------------------------------------------------
+  const CSS = read('style.css');
+  const ACSS = read('analytics.css');
+
+  await test('U-26 Odeme satirinin bes alani gorunur etiketli ve form-control', () => {
+    for (const [id, ad] of [['bookingPaymentAmount', 'Tutar (₺)'], ['bookingPaymentDate', 'Ödeme tarihi'], ['bookingPaymentKind', 'Tür'], ['bookingPaymentMethod', 'Yöntem'], ['bookingPaymentNote', 'Not (isteğe bağlı)']]) {
+      const kalip = new RegExp(`<label class="booking-payment-field[^"]*">${ad.replace(/[()₺]/g, m => '\\' + m)}<(input|select) id="${id}" class="form-control"`);
+      assert.match(APP, kalip, id);
+    }
+    assert.doesNotMatch(APP, /placeholder="Not —"/);
+    assert.match(CSS, /\.booking-payment-field \.form-control \{ width: 100%; min-height: 36px; \}/);
+  });
+
+  await test('U-19 Ust filtreler ve rezervasyon filtrelerinin erisilebilir adi var', () => {
+    for (const [id, ad] of [['globalPeriodFilter', 'Dönem'], ['globalVillaFilter', 'Mülk'], ['rezVillaFilter', 'Mülk filtresi'], ['rezStatusFilter', 'Durum filtresi'], ['rezSearchInput', 'Misafir adı veya villa ara']]) {
+      assert.match(INDEX, new RegExp(`id="${id}" aria-label="${ad}"`), id);
+    }
+  });
+
+  await test('U-20 Kucuk hedefler: renk secici 24 px, siralama basligi 24/36 px, onay kutusu 20/24 px', () => {
+    assert.match(CSS, /\.property-color-swatch \{\n  width: 24px;[^\n]*\n  height: 24px;/);
+    assert.match(CSS, /input\[type="checkbox"\], input\[type="radio"\] \{ min-width: 20px; min-height: 20px;/);
+    assert.match(CSS, /@media \(max-width: 640px\) \{\n  input\[type="checkbox"\], input\[type="radio"\] \{ min-width: 24px; min-height: 24px; \}/);
+    assert.match(ACSS.replace(/\r\n/g, '\n'), /\.ba-sort \{[^}]*min-height: 24px;/);
+    assert.match(ACSS.replace(/\r\n/g, '\n'), /#tab-analytics \.ba-sort \{ min-height: 36px; \}/);
+  });
+
+  await test('U-13/U-14 Telefonda alt bosluk yuzen ＋ dugmesinin ustune kadar; sifir uyari rengi tasimaz (D-09)', () => {
+    const fab = CSS.match(/body:has\(#mobileTabbar:not\(\[hidden\]\)\) \.mobile-quick-booking \{\n    bottom: calc\((\d+)px[^\n]*\n    width: 52px;\n    height: (\d+)px;/);
+    const bosluk = CSS.match(/body:has\(#mobileTabbar:not\(\[hidden\]\)\) main\.container \{ padding-bottom: calc\((\d+)px/);
+    assert.ok(fab && bosluk, 'kurallar bulunamadi');
+    assert.ok(Number(bosluk[1]) >= Number(fab[1]) + Number(fab[2]), `bosluk ${bosluk[1]} < ＋ ust kenari ${Number(fab[1]) + Number(fab[2])}`);
+    const App = require('../app.js');
+    const g = globalThis, eski = g.document;
+    const el = { style: {} };
+    g.document = { getElementById: () => el };
+    try {
+      App.setKpiAlertColor('x', false, '#FF6961');
+      assert.strictEqual(el.style.color, 'var(--text-muted)');
+      App.setKpiAlertColor('x', true, '#FF6961');
+      assert.strictEqual(el.style.color, '#FF6961');
+    } finally { g.document = eski; }
+    assert.match(APP, /setKpiAlertColor\('opsOpenMaintVal', acikP1 > 0, '#FF6961'\);/);
+    assert.match(APP, /setKpiAlertColor\('opsDebtVal', borc > 0, '#FFB340'\);/);
+  });
+
+  await test('D-05 Operasyon ve mulk kartlarinda ikincil isler gri dugme', () => {
+    assert.match(INDEX, /class="btn btn-secondary btn-sm" data-onclick="openMaintModal\(\)">\+ Arıza Bildir</);
+    assert.match(INDEX, /class="btn btn-primary btn-sm" data-onclick="openNewCleaningTaskModal\(\)">\+ Temizlik Görevi Ekle</);
+    assert.match(APP, /class="btn btn-secondary btn-sm" data-onclick="setPropertyProfile\(/);
+  });
+
+  await test('U-08 Iki aylik secici daralabilir; masaustunde gun dugmesi 44 px alt siniri tasimaz', () => {
+    assert.match(CSS, /\.daterange-months \{ display: grid; grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
+    assert.match(CSS, /\.daterange-grid \{ display: grid; grid-template-columns: repeat\(7, minmax\(0, 1fr\)\);/);
+    assert.match(CSS, /@media \(min-width: 641px\) \{\n  #bookingModal \.daterange-day \{ min-height: 0; \}/);
+  });
+
   console.log(`\n${passed} geçti, ${failed} başarısız`);
   if (failed) process.exit(1);
 })();

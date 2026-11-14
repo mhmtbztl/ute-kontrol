@@ -4444,6 +4444,11 @@ body.auth-pending::after {
 #bookingModal summary {
   min-height: 44px;
 }
+/* U-08: 44 px alt sinir aspect-ratio ile gun dugmesinin genisligine de geciyor,
+   iki aylik secici masaustunde pencereden tasiyordu. Telefonda hucreler zaten 46 px. */
+@media (min-width: 641px) {
+  #bookingModal .daterange-day { min-height: 0; }
+}
 
 .daterange-trigger {
   width: 100%;
@@ -4520,7 +4525,7 @@ body.auth-pending::after {
 }
 .daterange-nav:hover { background: rgba(255, 255, 255, 0.12); }
 
-.daterange-months { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.daterange-months { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; } /* U-08: 1fr icerikten dar olamiyordu, masaustu pencereden tasiyordu */
 @media (max-width: 640px) { .daterange-months { grid-template-columns: 1fr; } }
 
 @media (max-width: 640px) {
@@ -5080,7 +5085,7 @@ body.auth-pending::after {
   color: var(--text-muted);
   margin-bottom: 8px;
 }
-.daterange-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.daterange-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
 .daterange-dow {
   font-size: 11px;
   text-align: center;
@@ -5251,6 +5256,10 @@ body.auth-pending::after {
 .booking-payment-row > div { display: grid; gap: 2px; }
 .booking-payment-form { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; margin-top: 12px; }
 .booking-payment-form button { grid-column: 1 / -1; }
+/* U-26: odeme alanlari etiketli; etiket metni ustte, alan tam genislik. */
+.booking-payment-field { display: grid; gap: 4px; font-size: 12px; color: var(--text-muted); min-width: 0; }
+.booking-payment-field .form-control { width: 100%; min-height: 36px; }
+.booking-payment-note { grid-column: 1 / -1; }
 .form-warning { margin-top: 6px; padding: 7px 9px; border-radius: 7px; color: #fde68a; background: rgba(255, 159, 10,.12); border: 1px solid rgba(255, 159, 10,.28); font-size: 11px; line-height: 1.45; }
 @media (max-width: 720px) {
   .ops-cleaning-layout { grid-template-columns: 1fr; }
@@ -6822,8 +6831,8 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--accent-blue); 
 .property-color-picker .sub-text { flex-basis: 100%; font-size: 12px; }
 
 .property-color-swatch {
-  width: 22px;
-  height: 22px;
+  width: 24px; /* U-20: WCAG 2.5.8 alt siniri */
+  height: 24px;
   padding: 0;
   border: 0;
   border-radius: 50%;
@@ -7475,7 +7484,8 @@ button.pricing-rule-row:focus-visible { outline: 2px solid var(--border-focus); 
   .mobile-tabbar__btn > span:last-child { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .mobile-tabbar__icon { font-size: 20px; line-height: 1; }
   .mobile-tabbar__btn.active { color: var(--text-main); background: var(--fill-3); }
-  body:has(#mobileTabbar:not([hidden])) main.container { padding-bottom: calc(96px + env(safe-area-inset-bottom)) !important; }
+  /* U-13/U-14: alt bosluk yuzen ＋ dugmesinin ustune kadar (76 + 52 + 16 px); en alttaki denetim ＋ altinda kalmaz. */
+  body:has(#mobileTabbar:not([hidden])) main.container { padding-bottom: calc(144px + env(safe-area-inset-bottom)) !important; }
   /* Yuzen dugme yazisiyla icerigi ortuyordu; cubuk varken yuvarlak ＋. */
   body:has(#mobileTabbar:not([hidden])) .mobile-quick-booking {
     bottom: calc(76px + env(safe-area-inset-bottom));
@@ -7762,4 +7772,11 @@ button.pricing-rule-row:focus-visible { outline: 2px solid var(--border-focus); 
   #tab-settings .checklist-doc-icon { width: 36px; height: 36px; font-size: 14px; }
   #tab-settings .checklist-doc-add { min-height: 36px; }
   #tab-settings .settings-template-usage-link { min-height: 36px; }
+}
+
+/* U-20: onay kutulari WCAG 2.5.8 (24 px) alt sinirina yakin; telefonda tam 24 px.
+   Asil dokunma alani her yerde onu saran etikettir. */
+input[type="checkbox"], input[type="radio"] { min-width: 20px; min-height: 20px; accent-color: var(--accent-blue); }
+@media (max-width: 640px) {
+  input[type="checkbox"], input[type="radio"] { min-width: 24px; min-height: 24px; }
 }
