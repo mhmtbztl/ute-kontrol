@@ -7679,5 +7679,44 @@ button.pricing-rule-row:focus-visible { outline: 2px solid var(--border-focus); 
   .guest-directory-table td::before { content: attr(data-label); margin-right: auto; color: var(--text-muted); font-size: 11px; font-weight: 700; text-align: left; }
   .guest-directory-table td br { display: none; }
   .guest-directory-table td[colspan] { justify-content: center; text-align: center !important; }
+
+  /* ===== Genel kart modu: table.mobile-cards (etiketleri core/mobile_shell.js yazar) ===== */
+  table.mobile-cards { min-width: 0 !important; }
+  .table-responsive:has(> table.mobile-cards) { overflow: visible; }
+  .table-responsive:has(> table.mobile-cards)::after { display: none; }
+  table.mobile-cards > thead { display: none; }
+  table.mobile-cards,
+  table.mobile-cards > tbody,
+  table.mobile-cards > tbody > tr,
+  table.mobile-cards > tbody > tr > td { display: block; width: 100%; }
+  table.mobile-cards > tbody > tr { margin-bottom: 10px; padding: 8px 12px; border: 1px solid var(--border-subtle); border-radius: 10px; background: var(--bg-surface-elevated); }
+  table.mobile-cards > tbody > tr > td { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; column-gap: 8px; padding: 6px 0; border: 0; text-align: right !important; min-height: 36px; }
+  table.mobile-cards > tbody > tr > td::before { content: attr(data-label); margin-right: auto; color: var(--text-muted); font-size: 11px; font-weight: 700; text-align: left; }
+  table.mobile-cards > tbody > tr > td[colspan] { justify-content: center; text-align: center !important; }
+
+  /* ===== Finans (mobil uyum PR 6) — yalniz yerlesim ===== */
+  .stepper-arrow-btn { min-width: 40px; min-height: 40px; }
+  #tab-finance .kpi-info-btn { min-width: 36px; min-height: 36px; }
+  #tab-finance .btn-text { min-height: 36px; }
+  .trend-btn { min-height: 36px; flex: 1 1 0; }
+  /* Ozet kartlari 2'li ve kisa */
+  #tab-finance .kpi-cards-grid.five-cols { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; }
+  #tab-finance .kpi-cards-grid.five-cols .kpi-card { padding: 12px !important; min-height: 0 !important; }
+  #tab-finance .kpi-cards-grid.five-cols .kpi-value { font-size: 20px !important; }
+  /* Kar koprusu: her adim tek satir (ad solda, tutar sagda), oklar ince */
+  .bridge-step { display: grid !important; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 10px; row-gap: 2px; padding: 10px 12px !important; }
+  .bridge-step .step-label { grid-column: 1; grid-row: 1; }
+  .bridge-step .step-val { grid-column: 2; grid-row: 1 / span 2; font-size: 16px; text-align: right; }
+  .bridge-step .step-sub { grid-column: 1; grid-row: 2; }
+  .bridge-arrow { font-size: 14px !important; padding: 0 !important; line-height: 1; }
+  .profit-bridge-steps { gap: 4px !important; }
+  /* Mulk performansi: telefonda hazir kart gorunumu (tablo 864 px) */
+  .property-finance-section .view-toggle-group { display: none; }
+  #propExecutiveTableContainer { display: none !important; }
+  #propCardsContainer { display: grid !important; grid-template-columns: minmax(0, 1fr) !important; }
+  /* Aylik KPI tablosu karsilastirma tablosudur: yana kayar, ay sutunu sabit */
+  .monthly-kpi-tracker-card .data-table th:first-child,
+  .monthly-kpi-tracker-card .data-table td:first-child { position: sticky; left: 0; z-index: 1; background: var(--bg-surface); }
+  .monthly-kpi-tracker-card .table-responsive::after { display: none; }
   .tab-content#tab-reservations .section-title-bar .btn { min-height: 44px; }
 }

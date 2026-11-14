@@ -189,5 +189,24 @@ check(/body:has\(#mobileTabbar:not\(\[hidden\]\)\) \.nav-tabs \{ display: none !
   check(b.getElementById('mobileFilterChip').getAttribute('aria-expanded') === 'true', 'D13. Açık panel aria-expanded ile söylenir');
 }
 
+{
+  // Kart modu etiketleri (Finans PR 6): sütun adı başlıktan, colspan sütunu kaydırır,
+  // var olan etiket ezilmez, boş satır (colspan) etiketlenmez.
+  const hucre = (metin, ozn = {}) => ({ textContent: metin, ozn: { ...ozn },
+    getAttribute(a) { return this.ozn[a] === undefined ? null : this.ozn[a]; },
+    setAttribute(a, v) { this.ozn[a] = String(v); } });
+  const ths = ['Tarih', 'Tür', 'Tutar', 'İşlem'].map(t => hucre(t));
+  const s1 = [hucre('01.11'), hucre('Gelir'), hucre('500'), hucre('Sil')];
+  const s2 = [hucre('02.11', { colspan: '2' }), hucre('900', { 'data-label': 'Özel' }), hucre('Sil')];
+  const bos = [hucre('Kayıt yok', { colspan: '4' })];
+  const tr = cells => ({ children: cells });
+  const tablo = { querySelectorAll(s) { return s === ':scope > thead > tr > th' ? ths : s === ':scope > tbody > tr' ? [tr(s1), tr(s2), tr(bos)] : []; } };
+  const sayi = Shell.tabloyuEtiketle(tablo);
+  check(s1.map(c => c.getAttribute('data-label')).join(',') === 'Tarih,Tür,Tutar,İşlem', 'D14. Hücre sütun adını başlıktan alır');
+  check(s2[0].getAttribute('data-label') === null && s2[1].getAttribute('data-label') === 'Özel' && s2[2].getAttribute('data-label') === 'İşlem',
+    'D15. colspan sütunu kaydırır, var olan etiket korunur', JSON.stringify(s2.map(c => c.ozn)));
+  check(bos[0].getAttribute('data-label') === null && sayi === 5, 'D16. Boş satır etiketlenmez; yalnız eksikler yazılır', String(sayi));
+}
+
 console.log(`\nmobile_shell_tests: ${gecen} geçti, ${kalan} kaldı`);
 if (kalan) process.exit(1);
