@@ -372,7 +372,8 @@ const allTestFiles = [
   'analytics_ui_tests.js',
   'analytics_integration_tests.js',
   'self_hosted_fonts_tests.js',
-  'service_worker_tests.js'
+  'service_worker_tests.js',
+  'ux_audit_fixes_tests.js'
 ];
 
 const testEnv = require('./core/test_env.js');

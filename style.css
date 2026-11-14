@@ -61,7 +61,7 @@ html:not(.lx-styles-ready) body { visibility: hidden; }
   --text-primary: #F5F5F7;
   --text-muted: rgba(235, 235, 245, 0.62);
   --text-secondary: rgba(235, 235, 245, 0.62);
-  --text-dim: rgba(235, 235, 245, 0.42);
+  --text-dim: rgba(235, 235, 245, 0.55); /* D-04: 0.42 kartta 3,4–3,6:1 idi; 0.55 = 4,7–5,2:1 */
 
   --accent-emerald: #30D158;
   --accent-emerald-subtle: rgba(48, 209, 88, 0.16);
@@ -1729,7 +1729,7 @@ body {
 
 .trend-btn.active {
   background: var(--accent-emerald);
-  color: white;
+  color: #000000; /* U-18: beyaz yesilde 2,02:1 idi */
 }
 
 .trend-chart-container {
@@ -5103,6 +5103,12 @@ body.auth-pending::after {
 .daterange-day:disabled { color: var(--text-dim); cursor: default; opacity: .35; }
 .daterange-day.is-empty { cursor: default; }
 .daterange-day.is-today { box-shadow: inset 0 0 0 1px var(--accent-blue); }
+/* U-03: dolu gece. Dugme acik kalir: dolu gece cikis gunu olabilir. */
+.daterange-day.is-booked:not(.is-start):not(.is-end) {
+  color: var(--text-dim);
+  text-decoration: line-through;
+  background: rgba(255, 69, 58, 0.12);
+}
 .daterange-day.in-range { background: var(--accent-emerald-subtle); border-radius: 0; }
 .daterange-day.is-start,
 .daterange-day.is-end {
@@ -5875,8 +5881,8 @@ code, kbd, pre, samp { font-family: var(--font-code); }
   font-size: 12px;
 }
 
-.btn-primary { background: var(--accent-blue); color: #FFFFFF; }
-.btn-primary:hover { background: #409CFF; }
+.btn-primary { background: #0071E3; color: #FFFFFF; } /* U-17: #0A84FF beyazla 3,65:1 idi; #0071E3 = 4,7:1 */
+.btn-primary:hover { background: #0066D6; }
 
 .btn-secondary {
   background: var(--fill-3);

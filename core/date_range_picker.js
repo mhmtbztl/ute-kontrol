@@ -104,8 +104,12 @@
    * Ay izgarasi modeli: Pazartesi ile baslar. Her gun icin siniflar.
    * @returns {{ title, lead, days: [{ key, day, classes: string[] }] }}
    */
-  function buildMonth(anchor, state, today) {
+  // `options.booked`: dolu gecelerin anahtarlari (Set ya da dizi). Dolu gece
+  // giris olamaz ama cikis gunu olabilir (onceki misafir sabah cikar), bu yuzden
+  // dugme kapatilmaz; yalniz isaretlenir (U-03). `label` ekran okuyucu adidir (U-21).
+  function buildMonth(anchor, state, today, options) {
     const s = state || {};
+    const booked = options && options.booked ? new Set(options.booked) : null;
     const year = anchor.getFullYear();
     const month = anchor.getMonth();
     const lead = (new Date(year, month, 1).getDay() + 6) % 7;
@@ -114,13 +118,29 @@
     for (let day = 1; day <= count; day++) {
       const key = dateKey(year, month, day);
       const classes = ['daterange-day'];
-      if (key === today) classes.push('is-today');
-      if (s.start && key === s.start) classes.push('is-start');
-      if (s.end && key === s.end) classes.push('is-end');
+      const notes = [];
+      if (key === today) { classes.push('is-today'); notes.push('bugün'); }
+      if (booked && booked.has(key)) { classes.push('is-booked'); notes.push('dolu'); }
+      if (s.start && key === s.start) { classes.push('is-start'); notes.push(s.end ? 'başlangıç' : 'seçili'); }
+      if (s.end && key === s.end) { classes.push('is-end'); notes.push('bitiş'); }
       if (s.start && s.end && key > s.start && key < s.end) classes.push('in-range');
-      days.push({ key, day, classes });
+      days.push({ key, day, classes, label: [`${day} ${MONTHS_TR[month]} ${year}`].concat(notes).join(', ') });
     }
     return { title: `${MONTHS_TR[month]} ${year}`, lead, days };
+  }
+
+  /** [start, end) araligindaki ilk dolu gece; yoksa null. */
+  function firstBookedNight(start, end, booked) {
+    if (!booked || !isKey(start) || !isKey(end) || end <= start) return null;
+    const set = booked instanceof Set ? booked : new Set(booked);
+    const d = parseKey(start);
+    for (let i = 0; i < 400; i++) {
+      const key = dateKey(d.getFullYear(), d.getMonth(), d.getDate());
+      if (key >= end) return null;
+      if (set.has(key)) return key;
+      d.setDate(d.getDate() + 1);
+    }
+    return null;
   }
 
   /** Ay izgarasinin HTML'i. `dataAttr` gun dugmesinin veri ozelligi. Icerik kullanici verisi degildir. */
@@ -129,7 +149,7 @@
     let cells = DOW_TR.map(d => `<div class="daterange-dow">${d}</div>`).join('');
     for (let i = 0; i < model.lead; i++) cells += '<span class="daterange-day is-empty"></span>';
     model.days.forEach(d => {
-      cells += `<button type="button" class="${d.classes.join(' ')}" ${escapeHtml(attr)}="${escapeHtml(d.key)}">${escapeHtml(d.day)}</button>`;
+      cells += `<button type="button" class="${d.classes.join(' ')}" ${escapeHtml(attr)}="${escapeHtml(d.key)}" aria-label="${escapeHtml(d.label || d.key)}">${escapeHtml(d.day)}</button>`;
     });
     return `<div><div class="daterange-month-name">${escapeHtml(model.title)}</div><div class="daterange-grid">${cells}</div></div>`;
   }
@@ -283,7 +303,7 @@
   return {
     MONTHS_TR, DOW_TR,
     dateKey, parseKey, isKey, formatHuman, nightsBetween,
-    pick, isComplete, anchorFrom, shiftAnchor, buildMonth, monthHtml, summaryText, eventCameFromRoot,
+    pick, isComplete, anchorFrom, shiftAnchor, buildMonth, firstBookedNight, monthHtml, summaryText, eventCameFromRoot,
     mount
   };
 }));

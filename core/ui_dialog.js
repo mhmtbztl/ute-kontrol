@@ -5,6 +5,8 @@
 // kendi penceresiyle yapar ve Promise dondurur:
 //   askText({ title, label, value, placeholder, inputType }) -> metin | null (vazgecildi)
 //   askConfirm({ title, message, okText, danger })          -> true | false
+//   askChoice({ title, message, choices: [{ value, text, danger }] })
+//                                                           -> secilen value | null (vazgecildi)
 //   notify({ title, message })                              -> undefined (kapaninca)
 // Tarayici DOM'u yoksa (Node testleri) yerel prompt/confirm/alert kullanilir.
 // Esc ve odak tuzagi app.js'teki pencere klavye destegiyle gelir (.close-btn).
@@ -57,9 +59,17 @@
       }
       const footer = el('div', { className: 'modal-footer' });
       const cancel = o.alertOnly ? null : el('button', { type: 'button', className: 'btn btn-secondary' }, o.cancelText || 'Vazgeç');
-      const ok = el('button', { type: 'button', className: o.danger ? 'btn btn-danger' : 'btn btn-primary' }, o.okText || 'Tamam');
+      // Secenekli pencere (U-01): her secenek kendi fiiliyle yazar; "Vazgec"
+      // her zaman ayri ve yikici olmayan dugmedir.
+      const secenekler = Array.isArray(o.choices) ? o.choices : null;
+      const ok = secenekler ? null : el('button', { type: 'button', className: o.danger ? 'btn btn-danger' : 'btn btn-primary' }, o.okText || 'Tamam');
       if (cancel) footer.appendChild(cancel);
-      footer.appendChild(ok);
+      const secimDugmeleri = (secenekler || []).map(c => {
+        const b = el('button', { type: 'button', className: c.danger ? 'btn btn-danger' : 'btn btn-secondary' }, c.text);
+        footer.appendChild(b);
+        return { b, value: c.value };
+      });
+      if (ok) footer.appendChild(ok);
       card.appendChild(header); card.appendChild(body); card.appendChild(footer);
       backdrop.appendChild(card);
       let bitti = false;
@@ -71,14 +81,16 @@
         resolve(value);
       };
       const tamam = () => finish(o.input ? input.value : true);
-      const vazgec = () => finish(o.input ? null : (o.alertOnly ? undefined : false));
-      ok.addEventListener('click', tamam);
+      const vazgec = () => finish(o.input || secenekler ? null : (o.alertOnly ? undefined : false));
+      if (ok) ok.addEventListener('click', tamam);
+      secimDugmeleri.forEach(({ b, value }) => b.addEventListener('click', () => finish(value)));
       if (cancel) cancel.addEventListener('click', vazgec);
       close.addEventListener('click', o.alertOnly ? tamam : vazgec);
       if (input) input.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); tamam(); } });
       root.document.body.appendChild(backdrop);
       backdrop.classList.add('active');
-      setTimeout(() => (input || ok).focus(), 0);
+      // Secenekli pencerede odak Vazgec'te durur: Enter yanlislikla silmesin.
+      setTimeout(() => (input || ok || cancel).focus(), 0);
     });
   }
 
@@ -94,11 +106,18 @@
     return open(opts);
   }
 
+  // DOM yoksa (Node) yikici olmayan yedek doner: null = vazgecildi.
+  function askChoice(o) {
+    const opts = o || {};
+    if (!hasDom()) return Promise.resolve(opts.fallback !== undefined ? opts.fallback : null);
+    return open({ ...opts, input: false, alertOnly: false });
+  }
+
   function notify(o) {
     const opts = typeof o === 'string' ? { message: o } : (o || {});
     if (!hasDom()) { if (typeof root.alert === 'function') root.alert(opts.message || ''); return Promise.resolve(); }
     return open({ ...opts, alertOnly: true });
   }
 
-  return { askText, askConfirm, notify };
+  return { askText, askConfirm, askChoice, notify };
 });
