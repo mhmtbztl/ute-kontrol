@@ -34,7 +34,7 @@ tarayıcı kapısı 34 (üst bar ≤72 px, alt çubuk, Daha fazla, dönem düğm
 | Fiyatlandırma | 2,6 | 1 | 0 | **PR 8 tamam (14.11.2026):** "Fiyatlandırma nasıl çalışır?" kılavuzu telefonda kapalı başlar (ilk ziyarette takvimi bir ekran aşağı itiyordu; masaüstünde davranış aynı), iç sekmeler tek satır, ay düğmeleri ve kılavuz bağlantıları ≥36 px. 12 aylık ay şeridi bilerek yana kayar. Kapı 41 (beş görünüm) |
 | Finans | 4,0 | 1 | 0 | **PR 6 tamam (14.11.2026):** gelir ve gider tabloları kart modunda (`table.mobile-cards`, etiketleri `core/mobile_shell.js` başlıktan yazar), mülk performansı hazır kart görünümünde, kâr köprüsü adım başına tek satır, özet kartları 2'li, küçük düğmeler büyüdü. Aylık KPI tablosu bilerek yana kayar, ay sütunu sabit. Kapı 39 |
 | Analiz | 4,5 | 1 | 0 | **PR 7 tamam (14.11.2026):** KPI kartları 2'li (analytics.css 480 kuralı tek sütun yapıyordu; `#tab-analytics` özgüllüğüyle ezildi), dönem/karşılaştırma düğmeleri ve sıralama başlıkları ≥36 px, kanal tablosu sığar. Mülk karşılaştırması bilerek yana kayar, mülk sütunu sabit. Kapı 40 |
-| Kanallar ve Pazarlama | 1,9 | 1 | 0 | Kanal tablosu 812 px |
+| Kanallar ve Pazarlama | 2,0 | 0 | 0 | **PR 10 tamam (14.11.2026):** kanal tablosu kart modunda (812 px kalktı; tablo sonradan çizildiği için `data-label`ları `core/marketing_ui.js` yazar), özet kartları 2'li. Airbnb ve Reklamlar alt görünümleri taşmaz. Kapı 43 |
 | Ayarlar | 1,0 | 1 | 1 | Ayar menüsü 1212 px kapsül satırı |
 | Mülkler | 1,6 | 0 | 0 | **PR 9 tamam (14.11.2026):** renk seçici 36 px, profil alanları 2'li ızgara; profilin dört sekmesi taşmaz. Kapı 42 |
 | Saha (personel) | 1,0 | 0 | 0 | — |
