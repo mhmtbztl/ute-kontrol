@@ -4944,6 +4944,11 @@ function isCleaningDebt(task) {
 // dolu, bos gece tespiti. Aksi halde tum ay ayin 1'inden itibaren dolu gorunur
 // ve gercek olmayan bosluklar/rezervasyonlar uretilir. Tanim tek yerde:
 // guest_crm_engine (CRM onu zaten boyle disarida tutuyordu).
+function setKpiAlertColor(id, alert, color) {
+  const el = typeof document !== 'undefined' ? document.getElementById(id) : null;
+  if (el && el.style) el.style.color = alert ? color : 'var(--text-muted)';
+}
+
 function isBulkSummaryBooking(booking) {
   const api = typeof getGuestCrmApi === 'function' ? getGuestCrmApi() : null;
   if (api && typeof api.isBulkSummaryBooking === 'function') return api.isBulkSummaryBooking(booking);
@@ -5003,9 +5008,12 @@ function renderOperationsKpiStrip() {
       && (oncelik === 'P1' || oncelik === 'KRITIK' || oncelik === 'CRITICAL');
   }).length;
   setEl('opsOpenMaintVal', `${acikP1} İş`);
+  // U-14/D-09: sifir deger uyari rengi tasimaz; renk yalniz is varken.
+  setKpiAlertColor('opsOpenMaintVal', acikP1 > 0, '#FF6961');
 
   const borc = tasks.filter(isCleaningDebt).reduce((a, t) => a + (Number(t.amount) || 0), 0);
   setEl('opsDebtVal', `₺${Math.round(borc).toLocaleString('tr-TR')}`);
+  setKpiAlertColor('opsDebtVal', borc > 0, '#FFB340');
 
   // SLA gostergesi kalkti (ENVANTER Operasyon 27.09.2026): tamamlanma zamani
   // kaydedilmiyordu; gecikme alani hic yazilmadigi icin tamamlanmis gorev
@@ -8990,7 +8998,7 @@ function openBookingDetailsPanel(bookingId) {
     .map(([v, l]) => `<option value="${v}"${otaKanali && !kaporaAlinir && v === 'OTA' ? ' selected' : ''}>${l}</option>`).join('');
   const kaporaNotu = kaporaAlinir ? '' : '<p class="sub-text">Bu kanalda kapora alınmıyor; ödemeyi platform aktarır. Değiştirmek için Ayarlar → Kanallar → Kapora.</p>';
   const iptal = String(booking.status || '').toUpperCase() === 'CANCELLED';
-  const paymentForm = canWriteSalesRole(activeTenant?.role) && !iptal ? `<div class="booking-payment-form"><input id="bookingPaymentAmount" type="number" min="0.01" step="0.01" placeholder="Tutar"><input id="bookingPaymentDate" type="date" value="${escapeHtml(getTodayStr())}"><select id="bookingPaymentKind">${kindOptions}</select><select id="bookingPaymentMethod">${methodOptions}</select><input id="bookingPaymentNote" maxlength="1000" placeholder="Not —"><button class="btn btn-primary" data-onclick="saveBookingPayment(decodeURIComponent('${encodeActionArg(String(booking.id))}'))">Ödeme ekle</button></div>${kaporaNotu}` : '';
+  const paymentForm = canWriteSalesRole(activeTenant?.role) && !iptal ? `<div class="booking-payment-form"><label class="booking-payment-field">Tutar (₺)<input id="bookingPaymentAmount" class="form-control" type="number" min="0.01" step="0.01" inputmode="decimal"></label><label class="booking-payment-field">Ödeme tarihi<input id="bookingPaymentDate" class="form-control" type="date" value="${escapeHtml(getTodayStr())}"></label><label class="booking-payment-field">Tür<select id="bookingPaymentKind" class="form-control">${kindOptions}</select></label><label class="booking-payment-field">Yöntem<select id="bookingPaymentMethod" class="form-control">${methodOptions}</select></label><label class="booking-payment-field booking-payment-note">Not (isteğe bağlı)<input id="bookingPaymentNote" class="form-control" maxlength="1000"></label><button class="btn btn-primary" data-onclick="saveBookingPayment(decodeURIComponent('${encodeActionArg(String(booking.id))}'))">Ödeme ekle</button></div>${kaporaNotu}` : '';
   // Iptal edilen rezervasyon tahsilat beklemez (L-274): bakiye gorunumu
   // iptali bilmiyor, "Kalan 15.000" diyordu. Alinan para iade ya da mahsup
   // edilmelidir; odeme kaydi silinmez (nakit hareketidir).
@@ -20635,7 +20643,7 @@ function renderPropertiesTab() {
         </div>
         ${canManage ? propertyColorPickerHtml(k) : ''}
         <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px;">
-          <button class="btn btn-primary btn-sm" data-onclick="setPropertyProfile(decodeURIComponent('${encodeActionArg(k)}'))" style="font-size: 11px;">Profili Aç</button>
+          <button class="btn btn-secondary btn-sm" data-onclick="setPropertyProfile(decodeURIComponent('${encodeActionArg(k)}'))" style="font-size: 11px;">Profili Aç</button>
           ${canManage ? `<button class="btn btn-secondary btn-sm" data-onclick="openPropertyModal(decodeURIComponent('${encodeActionArg(k)}'))" style="font-size: 11px;">Düzenle</button>` : ''}
         </div>
       </div>
@@ -24789,6 +24797,7 @@ if (typeof module !== 'undefined' && module.exports) {
     guardUnsavedModalClose,
     villaOptionLabel,
     resBookedNights,
+    setKpiAlertColor,
     bookingOverlapMessage,
     saveMaint,
     resolveMaintenanceFromOperations,

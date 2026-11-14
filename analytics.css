@@ -236,6 +236,7 @@
   display: inline-flex; align-items: center; gap: 4px;
   padding: 0; border: 0; background: none;
   color: inherit; font: inherit; cursor: pointer;
+  min-height: 24px; /* U-20 */
 }
 .ba-sort.is-on { color: var(--text-main); }
 .ba-sort-ico { font-size: 10px; opacity: 0.7; }
@@ -346,3 +347,8 @@
 
 /* Kisa aciklamalarda son satirda tek kelime kalmasin (tipografi incelemesi). */
 .ba-subtitle, .ba-card-sub, .ba-kpi-note, .ba-mini-note, .ba-footnote, .ba-empty-text, .ba-running { text-wrap: pretty; }
+
+/* U-20: telefonda siralama basliklari parmakla secilebilir. */
+@media (max-width: 640px) {
+  #tab-analytics .ba-sort { min-height: 36px; }
+}

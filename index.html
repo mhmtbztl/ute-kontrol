@@ -17,8 +17,8 @@
   <!-- Yazi tipleri kendi sunucumuzdan (dis sunucuya istek yok); style.css @font-face -->
   <link rel="preload" href="assets/fonts/inter-latin-wght.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="assets/fonts/inter-latin-ext-wght.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="style.css?v=643d5603">
-  <link rel="stylesheet" href="analytics.css?v=a15e3414">
+  <link rel="stylesheet" href="style.css?v=5cccf55e">
+  <link rel="stylesheet" href="analytics.css?v=5cea6f26">
   <script src="supabase.umd.js?v=3810661a"></script>
   <script src="core/xlsx_import_worker.js?v=b0939d47"></script>
 </head>
@@ -174,7 +174,7 @@
     <div class="header-filters" id="globalFilterBar">
             <div class="filter-group">
         <label data-lx-style="display: flex; align-items: center; gap: 4px;"><span>📅</span> Dönem / tarih:</label>
-        <select id="globalPeriodFilter" data-onchange="handleFilterChange()">
+        <select id="globalPeriodFilter" aria-label="Dönem" data-onchange="handleFilterChange()">
           <!-- Bu liste refreshPeriodSelectors() tarafindan musterinin kendi
                veri araligindan yeniden kurulur. Asagisi yalnizca yedektir. -->
           <optgroup label="GENEL & TARİH ARALIKLARI">
@@ -192,7 +192,7 @@
       </div>
       <div class="filter-group">
         <label>Portföy:</label>
-        <select id="globalVillaFilter" data-onchange="handleFilterChange()">
+        <select id="globalVillaFilter" aria-label="Mülk" data-onchange="handleFilterChange()">
               <option value="ALL">Tüm Villalar / Portföy</option>
             </select>
       </div>
@@ -1234,7 +1234,7 @@
           </div>
           <button type="button" class="btn btn-secondary btn-sm" data-onclick="stepReservationPeriod(1)" title="Sonraki dönem">Sonraki ›</button>
           <div>
-            <select id="rezVillaFilter" data-onchange="onReservationScopeChange()" data-lx-style="padding: 8px 12px; background: rgba(44, 44, 46,0.9); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px;">
+            <select id="rezVillaFilter" aria-label="Mülk filtresi" data-onchange="onReservationScopeChange()" data-lx-style="padding: 8px 12px; background: rgba(44, 44, 46,0.9); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px;">
               <option value="ALL">Tüm Villalar / Portföy</option>
             </select>
           </div>
@@ -1279,10 +1279,10 @@
         <!-- Rezervasyon Tablosu Filtreleme ve Arama Çubuğu -->
         <div data-lx-style="display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; background: rgba(0,0,0,0.25); padding: 12px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
           <div data-lx-style="flex: 1; min-width: 200px;">
-            <input type="text" id="rezSearchInput" placeholder="🔍 Misafir adı veya villa ara..." data-oninput="renderManageBookingsTable()" data-lx-style="width: 100%; padding: 8px 12px; background: rgba(44, 44, 46,0.8); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff;">
+            <input type="search" id="rezSearchInput" aria-label="Misafir adı veya villa ara" placeholder="🔍 Misafir adı veya villa ara..." data-oninput="renderManageBookingsTable()" data-lx-style="width: 100%; padding: 8px 12px; background: rgba(44, 44, 46,0.8); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff;">
           </div>
           <div>
-            <select id="rezStatusFilter" data-onchange="renderManageBookingsTable()" data-lx-style="padding: 8px 12px; background: rgba(44, 44, 46,0.9); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px;">
+            <select id="rezStatusFilter" aria-label="Durum filtresi" data-onchange="renderManageBookingsTable()" data-lx-style="padding: 8px 12px; background: rgba(44, 44, 46,0.9); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px;">
               <option value="ALL" selected>Tüm Durumlar</option>
               <option value="CONFIRMED">Onaylandı</option>
               <option value="CHECKED_IN">İçeride (Konaklıyor)</option>
@@ -1980,7 +1980,7 @@
           </div>
           <div data-lx-style="display: flex; gap: 8px;">
             <button data-operations-only class="btn btn-primary btn-sm" data-onclick="openNewCleaningTaskModal()">+ Temizlik Görevi Ekle</button>
-            <button data-operations-only class="btn btn-primary btn-sm" data-onclick="openMaintModal()">+ Arıza Bildir</button>
+            <button data-operations-only class="btn btn-secondary btn-sm" data-onclick="openMaintModal()">+ Arıza Bildir</button>
           </div>
         </div>
         <div class="subpage-switch operations-switch" role="tablist" aria-label="Operasyon görünümü">
@@ -4385,7 +4385,7 @@
   <script src="core/permission_matrix.js?v=e3a3cef2"></script>
   <script src="core/tenant_backup_export.js?v=5aadcdb1"></script>
   <script src="core/ui_dialog.js?v=ba104c37"></script>
-  <script src="app.js?v=19fae346"></script>
+  <script src="app.js?v=bbbc7f2c"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=4e04df55"></script>
