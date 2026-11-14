@@ -1112,6 +1112,21 @@ async function main() {
       await page.evaluate(() => { switchTab('analytics'); });
       await page.waitForSelector('#analyticsRoot .ba-head');
       await assertNoHorizontalOverflow(page, 'Analiz mobil');
+      // Analiz (PR 7): KPI kartları 2'li, kanal tablosu sığar, mülk tablosu kayar ama ilk sütun sabit, küçük düğme yok.
+      const analiz = await page.evaluate(() => {
+        const kpi = [...document.querySelectorAll('#analyticsRoot .ba-kpi')].map(k => Math.round(k.getBoundingClientRect().top));
+        const kompakt = document.querySelector('#analyticsRoot .ba-table-compact');
+        const mulkIlk = document.querySelector('#analyticsRoot .ba-table:not(.ba-table-compact) tbody th:first-child');
+        return {
+          yanYana: kpi.length >= 2 && kpi[0] === kpi[1],
+          kanalSigar: kompakt ? kompakt.parentElement.scrollWidth <= kompakt.parentElement.clientWidth + 1 : null,
+          mulkYapiskan: mulkIlk ? getComputedStyle(mulkIlk).position : null,
+          kucuk: [...document.querySelectorAll('#analyticsRoot button')]
+            .filter(b => b.getClientRects().length).map(b => Math.round(b.getBoundingClientRect().height)).filter(h => h < 36)
+        };
+      });
+      assert(analiz.yanYana && analiz.kanalSigar === true && analiz.mulkYapiskan === 'sticky' && analiz.kucuk.length === 0, `Analiz telefonda: ${JSON.stringify(analiz)}`);
+      passed.push('40. Analiz telefonda: KPI kartları 2\'li, kanal tablosu sığar, mülk tablosunda ilk sütun sabit, küçük düğme yok');
       await page.screenshot({ path: path.join(__dirname, '..', 'tmp', 'analiz-mobile.png'), fullPage: true });
       passed.push('33b. Analiz 390 px mobilde taşmaz');
       // G9 L-207: teknik metin DSL'si yerine gercek gorsel checklist

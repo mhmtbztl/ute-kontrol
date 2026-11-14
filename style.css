@@ -7719,4 +7719,14 @@ button.pricing-rule-row:focus-visible { outline: 2px solid var(--border-focus); 
   .monthly-kpi-tracker-card .data-table td:first-child { position: sticky; left: 0; z-index: 1; background: var(--bg-surface); }
   .monthly-kpi-tracker-card .table-responsive::after { display: none; }
   .tab-content#tab-reservations .section-title-bar .btn { min-height: 44px; }
+
+  /* PR 7 — Analiz (analytics.css style.css'ten sonra yüklenir; #tab-analytics özgüllüğü onu ezer) */
+  #tab-analytics .ba-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  #tab-analytics .ba-kpi { padding: 10px 12px; gap: 6px; }
+  #tab-analytics .ba-kpi-value { font-size: 18px; }
+  #tab-analytics .ba-kpi-row .ba-spark { display: none; }
+  #tab-analytics .ba-seg-btn, #tab-analytics .ba-chip { height: 36px; }
+  #tab-analytics .ba-table-compact th, #tab-analytics .ba-table-compact td { padding: 7px 4px; font-size: 12px; }
+  #tab-analytics .ba-sort, #tab-analytics .ba-link { min-height: 36px; }
+  #tab-analytics .ba-table tbody th:first-child, #tab-analytics .ba-table thead th:first-child, #tab-analytics .ba-table tfoot th:first-child { position: sticky; left: 0; z-index: 1; background: var(--bg-surface); }
 }
