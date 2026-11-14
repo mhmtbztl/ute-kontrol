@@ -265,7 +265,7 @@ try {
     'J2. Arıza tablosu başlığı da "Tahmini maliyet"', 'tablo başlığı hâlâ MALİYET');
 
   // --- D. Kanal tablosu hizasi ------------------------------------------------
-  check(/class="mkt-channel-table"/.test(MKT) && /\.mkt-channel-table th,\s*\.mkt-channel-table td\s*\{[^}]*text-align/.test(CSS),
+  check(/class="mkt-channel-table[ "]/.test(MKT) && /\.mkt-channel-table th,\s*\.mkt-channel-table td\s*\{[^}]*text-align/.test(CSS),
     'D1. Kanal ekonomisi tablosunda başlık ve değer aynı hizada', 'mkt-channel-table kuralı yok');
 
   // =========================================================================

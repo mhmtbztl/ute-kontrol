@@ -308,7 +308,7 @@
   }
 
   function kpi(label, value, note) {
-    return `<div class="card" style="padding:16px;min-width:170px;flex:1"><div class="sub-text" style="font-size:11px;text-transform:uppercase">${escapeHtml(label)}</div><div style="font-size:24px;font-weight:800;margin:5px 0">${escapeHtml(value)}</div><div class="sub-text" style="font-size:11px">${escapeHtml(note)}</div></div>`;
+    return `<div class="card mkt-kpi" style="padding:16px;min-width:170px;flex:1"><div class="sub-text" style="font-size:11px;text-transform:uppercase">${escapeHtml(label)}</div><div style="font-size:24px;font-weight:800;margin:5px 0">${escapeHtml(value)}</div><div class="sub-text" style="font-size:11px">${escapeHtml(note)}</div></div>`;
   }
 
   function renderMarketingHealth(model) {
@@ -343,12 +343,12 @@
       const share = totals.roomRevenueBeforeDistribution > 0
         ? (row.roomRevenueBeforeDistribution / totals.roomRevenueBeforeDistribution) * 100 : null;
       return `<tr>
-      <td><strong>${escapeHtml(CHANNEL_LABELS[row.channel] || row.channel)}</strong>${row.rawChannels && row.rawChannels.length && row.channel === 'DIRECT' ? `<div class="sub-text">${escapeHtml(row.rawChannels.map(raw => DIRECT_CHANNEL_LABELS[String(raw).trim().toUpperCase()] || 'Doğrudan').join(', '))}</div>` : ''}${row.channel === 'UNKNOWN' ? '<div class="sub-text">Eşleme gerekli</div>' : ''}</td>
-      <td>${number(row.reservationCount)}</td><td>${number(row.bookedNights)}</td>
-      <td>${money(row.roomRevenueBeforeDistribution, report.currency)}</td>
-      <td>${money(row.distributionCost, report.currency)}</td>
-      <td>${money(row.roomRevenueAfterDistribution, report.currency)}</td>
-      <td>${number(share, '%')}</td>
+      <td data-label="Kanal"><strong>${escapeHtml(CHANNEL_LABELS[row.channel] || row.channel)}</strong>${row.rawChannels && row.rawChannels.length && row.channel === 'DIRECT' ? `<div class="sub-text">${escapeHtml(row.rawChannels.map(raw => DIRECT_CHANNEL_LABELS[String(raw).trim().toUpperCase()] || 'Doğrudan').join(', '))}</div>` : ''}${row.channel === 'UNKNOWN' ? '<div class="sub-text">Eşleme gerekli</div>' : ''}</td>
+      <td data-label="Rezervasyon">${number(row.reservationCount)}</td><td data-label="Gece">${number(row.bookedNights)}</td>
+      <td data-label="Konaklama cirosu">${money(row.roomRevenueBeforeDistribution, report.currency)}</td>
+      <td data-label="Komisyon">${money(row.distributionCost, report.currency)}</td>
+      <td data-label="Size kalan net">${money(row.roomRevenueAfterDistribution, report.currency)}</td>
+      <td data-label="Pay">${number(share, '%')}</td>
     </tr>`;
     }).join('');
     const unknown = report.dataQuality.unknownRawChannels;
@@ -368,8 +368,8 @@
       ${kpi('Doğrudan rezervasyon', number(report.mix.directReservationSharePercent, '%'), 'Rezervasyon adedi payı')}
       ${profitCard}
     </div>
-    <div class="card" style="padding:0;overflow:auto">
-      <table class="mkt-channel-table" style="width:100%;border-collapse:collapse;min-width:780px"><thead><tr>
+    <div class="card mkt-channel-card" style="padding:0;overflow:auto">
+      <table class="mkt-channel-table mobile-cards" style="width:100%;border-collapse:collapse;min-width:780px"><thead><tr>
         <th>Kanal</th><th>Rezervasyon</th><th>Gece</th><th>Konaklama cirosu</th><th>Komisyon</th><th>Size kalan net</th><th>Pay</th>
       </tr></thead><tbody>${rows || '<tr><td colspan="7" style="padding:24px;text-align:center">Bu dönemde rezervasyon yok.</td></tr>'}</tbody></table>
     </div>

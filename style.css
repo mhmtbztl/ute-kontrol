@@ -7740,4 +7740,9 @@ button.pricing-rule-row:focus-visible { outline: 2px solid var(--border-focus); 
   .property-color-swatch { width: 36px; height: 36px; }
   .property-profile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; }
   .property-profile-grid > div { padding: 10px 12px; min-width: 0; overflow-wrap: anywhere; }
+
+  /* PR 10 — Kanallar ve Pazarlama: kanal tablosu kart modunda (etiketleri core/marketing_ui.js yazar) */
+  .mkt-channel-card { padding: 10px 10px 0 !important; overflow: visible !important; }
+  .mkt-kpi { min-width: 0 !important; flex: 1 1 calc(50% - 5px) !important; padding: 12px !important; }
+  .mkt-kpi > div:nth-child(2) { font-size: 20px !important; }
 }

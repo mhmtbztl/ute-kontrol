@@ -1140,6 +1140,29 @@ async function main() {
       assert(mulk.ikili && mulk.kucuk.length === 0, `Mülkler telefonda: ${JSON.stringify(mulk)}`);
       await assertNoHorizontalOverflow(page, 'Mülkler mobil');
       passed.push('42. Mülkler telefonda: renk seçici ≥36 px, profil alanları 2\'li, profil sekmeleri taşmaz');
+      // Kanallar ve Pazarlama (PR 10): kanal tablosu kart modunda ve etiketli, ozet kartlari 2'li;
+      // Airbnb ve Reklamlar alt gorunumleri tasmaz.
+      // Alt gorunumler fikstur oturumsuzken veri okur (401); kontrol suresince bos yanit verilir.
+      const bosVeri = route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+      await page.route('**/rest/v1/**', bosVeri);
+      await page.evaluate(() => { switchTab('marketing'); });
+      for (const v of ['funnel', 'ads', 'economics']) {
+        const var_ = await page.evaluate(view => { const b = document.querySelector(`[data-marketing-view="${view}"]`); if (b) b.click(); return !!b; }, v);
+        if (var_) { await page.waitForTimeout(100); await assertNoHorizontalOverflow(page, `Pazarlama ${v} mobil`); }
+      }
+      await page.waitForSelector('.mkt-channel-table');
+      const pazar = await page.evaluate(() => {
+        const tablo = document.querySelector('.mkt-channel-table');
+        const kpi = [...document.querySelectorAll('.mkt-kpi')].map(k => Math.round(k.getBoundingClientRect().top));
+        return {
+          sigar: Math.round(tablo.getBoundingClientRect().width) <= Math.round(tablo.parentElement.clientWidth),
+          etiketsiz: [...tablo.querySelectorAll(':scope > tbody > tr > td:not([colspan])')].filter(td => !td.getAttribute('data-label')).length,
+          ikili: kpi.length < 2 || kpi[0] === kpi[1]
+        };
+      });
+      await page.unroute('**/rest/v1/**', bosVeri);
+      assert(pazar.sigar && pazar.etiketsiz === 0 && pazar.ikili, `Kanallar ve Pazarlama telefonda: ${JSON.stringify(pazar)}`);
+      passed.push('43. Kanallar ve Pazarlama telefonda: kanal tablosu kart modunda ve etiketli, özet kartları 2\'li, alt görünümler taşmaz');
       await page.evaluate(() => { switchTab('analytics'); });
       await page.waitForSelector('#analyticsRoot .ba-head');
       await assertNoHorizontalOverflow(page, 'Analiz mobil');
