@@ -36,7 +36,7 @@ tarayıcı kapısı 34 (üst bar ≤72 px, alt çubuk, Daha fazla, dönem düğm
 | Analiz | 4,5 | 1 | 0 | **PR 7 tamam (14.11.2026):** KPI kartları 2'li (analytics.css 480 kuralı tek sütun yapıyordu; `#tab-analytics` özgüllüğüyle ezildi), dönem/karşılaştırma düğmeleri ve sıralama başlıkları ≥36 px, kanal tablosu sığar. Mülk karşılaştırması bilerek yana kayar, mülk sütunu sabit. Kapı 40 |
 | Kanallar ve Pazarlama | 1,9 | 1 | 0 | Kanal tablosu 812 px |
 | Ayarlar | 1,0 | 1 | 1 | Ayar menüsü 1212 px kapsül satırı |
-| Mülkler | 1,9 | 0 | 10 | Küçük dokunma hedefleri |
+| Mülkler | 1,6 | 0 | 0 | **PR 9 tamam (14.11.2026):** renk seçici 36 px, profil alanları 2'li ızgara; profilin dört sekmesi taşmaz. Kapı 42 |
 | Saha (personel) | 1,0 | 0 | 0 | — |
 
 Kalıp: tablo kart moduna `td[data-label]` + `td::before` ile döner (`.reservation-list-table`,

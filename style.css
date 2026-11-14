@@ -7735,4 +7735,9 @@ button.pricing-rule-row:focus-visible { outline: 2px solid var(--border-focus); 
   .pricing-subnav .ads-subnav-btn { flex: 1 1 0; min-width: 0; justify-content: center; min-height: 40px; padding: 0 4px; font-size: 12.5px; }
   .pricing-month-tab { min-height: 40px; }
   .pricing-link { min-height: 36px; }
+
+  /* PR 9 — Mülkler: renk seçici ≥36 px, profil alanları 2'li ızgara */
+  .property-color-swatch { width: 36px; height: 36px; }
+  .property-profile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; }
+  .property-profile-grid > div { padding: 10px 12px; min-width: 0; overflow-wrap: anywhere; }
 }

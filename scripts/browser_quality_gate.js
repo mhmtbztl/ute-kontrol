@@ -1123,9 +1123,23 @@ async function main() {
       });
       assert(fiyat.tekSatir && !fiyat.kilavuzAcik && fiyat.kucuk.length === 0, `Fiyatlandırma telefonda: ${JSON.stringify(fiyat)}`);
       passed.push('41. Fiyatlandırma telefonda: iç sekmeler tek satır, kılavuz kapalı başlar, beş görünüm taşmaz, küçük düğme yok');
-      // Sekme ice aktarim bagini (finance_import_batch_rows) bir kez okur; fikstur
-      // oturumsuz oldugu icin 401 doner ve konsol kapisini zamanlamaya bagli kirardi.
-      await page.route('**/rest/v1/finance_import_batch_rows**', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
+      // Mulkler (PR 9): renk secici >=36 px, profilin dort sekmesi tasmaz, profil alanlari 2'li.
+      await page.evaluate(() => { switchTab('properties'); });
+      for (const t of ['PRICES', 'CHANNELS', 'HISTORY', 'GENERAL']) {
+        const var_ = await page.evaluate(code => typeof setPropertyProfileTab === 'function' && !!document.querySelector('.property-profile-card') && (setPropertyProfileTab(code), true), t);
+        if (var_) await assertNoHorizontalOverflow(page, `Mülk profili ${t} mobil`);
+      }
+      const mulk = await page.evaluate(() => {
+        const alan = [...document.querySelectorAll('.property-profile-grid > div')].map(d => Math.round(d.getBoundingClientRect().top));
+        return {
+          ikili: alan.length < 2 || alan[0] === alan[1],
+          kucuk: [...document.querySelectorAll('#tab-properties .property-color-swatch')]
+            .filter(b => b.getClientRects().length).map(b => Math.round(b.getBoundingClientRect().height)).filter(h => h < 36)
+        };
+      });
+      assert(mulk.ikili && mulk.kucuk.length === 0, `Mülkler telefonda: ${JSON.stringify(mulk)}`);
+      await assertNoHorizontalOverflow(page, 'Mülkler mobil');
+      passed.push('42. Mülkler telefonda: renk seçici ≥36 px, profil alanları 2\'li, profil sekmeleri taşmaz');
       await page.evaluate(() => { switchTab('analytics'); });
       await page.waitForSelector('#analyticsRoot .ba-head');
       await assertNoHorizontalOverflow(page, 'Analiz mobil');
