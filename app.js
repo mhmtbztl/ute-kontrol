@@ -141,6 +141,13 @@ function uiAskConfirm(options) {
   const yedek = o.fallback !== undefined ? o.fallback : true;
   return api ? api.askConfirm(o) : Promise.resolve(typeof confirm === 'function' ? confirm(o.message || '') : yedek);
 }
+// Ikiden fazla secenekli soru (U-01): secilen value ya da null (vazgecildi).
+function uiAskChoice(options) {
+  const api = uiDialogApi();
+  const o = options || {};
+  if (api && typeof api.askChoice === 'function') return api.askChoice(o);
+  return Promise.resolve(o.fallback !== undefined ? o.fallback : null);
+}
 // Tarayici alert() yerine (L-287). Kisa mesaj bildirim seridine (toast) gider;
 // cok satirli ya da uzun mesaj uygulama penceresinde acilir ve kapaninca biter.
 // Ardindan sayfa yenilenecekse pencere await edilir.
@@ -1144,7 +1151,7 @@ async function deleteProperty(propIdOrSlug) {
   }
 
   if (typeof confirm === 'function') {
-    if (!(await uiAskConfirm(vName + ' kaydını arşivlemek istediğinize emin misiniz? Geçmiş finans ve rezervasyon kayıtları korunacaktır.'))) {
+    if (!(await uiAskConfirm({ message: vName + ' kaydını arşivlemek istediğinize emin misiniz? Geçmiş finans ve rezervasyon kayıtları korunacaktır.', okText: 'Mülkü arşivle', danger: true }))) {
       return false;
     }
   }
@@ -1410,6 +1417,12 @@ function mapBookingToDb(booking, tenantId) {
   return payload;
 }
 
+// U-03/U-22: cakisma mesajinda tarih Turkce yazilir (eskiden "2026-11-05 - 2026-11-07").
+function bookingOverlapMessage(overlap) {
+  const tr = key => (typeof formatTrDate === 'function' ? formatTrDate(key) : key);
+  return `Bu mülk seçilen tarihlerde başka bir rezervasyonla çakışıyor (${overlap.guest}: ${tr(overlap.checkIn)} – ${tr(overlap.checkOut)}).`;
+}
+
 function checkBookingOverlap(propertyId, checkIn, checkOut, excludeBookingId = null, bookingsList = null) {
   if (!propertyId || !checkIn || !checkOut) return null;
   const currentAppData = (typeof appData !== 'undefined') ? appData : (typeof global !== 'undefined' ? global.appData : null);
@@ -1547,9 +1560,7 @@ async function createBooking(bookingInput) {
 
   // 2. Overbooking overlap validation
   const overlap = checkBookingOverlap(propId, checkIn, checkOut);
-  if (overlap) {
-    throw new Error(`Bu mülk seçilen tarihlerde başka bir rezervasyonla çakışıyor (${overlap.guest}: ${overlap.checkIn} - ${overlap.checkOut}).`);
-  }
+  if (overlap) throw new Error(bookingOverlapMessage(overlap));
 
   // Offline / demo fallback
   if (!isCloud) {
@@ -1761,9 +1772,7 @@ async function updateBooking(bookingId, bookingInput) {
 
   // Overlap validation excluding current booking
   const overlap = checkBookingOverlap(propId, checkIn, checkOut, propBookingId);
-  if (overlap) {
-    throw new Error(`Bu mülk seçilen tarihlerde başka bir rezervasyonla çakışıyor (${overlap.guest}: ${overlap.checkIn} - ${overlap.checkOut}).`);
-  }
+  if (overlap) throw new Error(bookingOverlapMessage(overlap));
 
   // Offline / demo fallback
   if (!isCloud) {
@@ -1944,7 +1953,13 @@ async function deleteBooking(bookingId) {
   if (odemeVar) throw new Error('BOOKING_HAS_PAYMENTS');
 
   if (typeof confirm === 'function') {
-    if (!(await uiAskConfirm(`${guestName} rezervasyonunu silmek istediğinize emin misiniz?`))) {
+    // U-02: onay sonucu soyler ve iptali hatirlatir; silme iptal oranini ve gecmisi yok eder.
+    if (!(await uiAskConfirm({
+      title: 'Rezervasyonu kalıcı olarak sil',
+      message: `${guestName} rezervasyonu ve ödenmemiş temizlik görevi silinecek. Bu işlem geri alınamaz.\nMisafir gelmeyecekse silmek yerine rezervasyonu iptal edin: kayıt ve iptal geçmişi korunur.`,
+      okText: 'Kalıcı olarak sil',
+      danger: true
+    }))) {
       return false;
     }
   }
@@ -2917,7 +2932,7 @@ async function updateExpense(expenseId, expenseInput) {
 async function deleteExpense(expenseId, skipConfirm = false) {
   if (!expenseId) throw new Error('Silinecek gider ID belirtilmedi.');
   if (!skipConfirm && typeof confirm === 'function') {
-    const ok = (await uiAskConfirm('Bu harcamayı silmek istediğinizden emin misiniz?'));
+    const ok = (await uiAskConfirm({ message: 'Bu gider kaydı silinecek. Bu işlem geri alınamaz.', okText: 'Gideri sil', danger: true }));
     if (!ok) return false;
   }
 
@@ -5151,7 +5166,7 @@ async function confirmCopyPreviousExpenses() {
     showToast('Kopyalanacak en az bir gider seçin.', 'warning');
     return false;
   }
-  if (!(await uiAskConfirm(`${copies.length} gider ${currentFilter.period} dönemine yeni kayıt olarak yazılsın mı?`))) return false;
+  if (!(await uiAskConfirm({ message: `${copies.length} gider ${currentFilter.period} dönemine yeni kayıt olarak yazılsın mı?`, okText: 'Giderleri yaz' }))) return false;
   try {
     await createExpensesBatch(copies);
     if (typeof SidePanel !== 'undefined') SidePanel.close();
@@ -5285,7 +5300,7 @@ function getCurrentAppBuildVersion(doc = typeof document !== 'undefined' ? docum
 const CURRENT_APP_BUILD_VERSION = getCurrentAppBuildVersion();
 
 async function forceHardRefresh() {
-  const confirmed = (await uiAskConfirm('Tarayıcı ve mobildeki eski önbellek (cache) ve çerez kalıntıları temizlenip en güncel canlı sürüm yüklensin mi?\n\n(Not: Oturum bilgileriniz korunacaktır.)'));
+  const confirmed = (await uiAskConfirm({ message: 'Tarayıcı ve mobildeki eski önbellek (cache) ve çerez kalıntıları temizlenip en güncel canlı sürüm yüklensin mi?\n\n(Not: Oturum bilgileriniz korunacaktır.)', okText: 'Temizle ve yenile' }));
   if (!confirmed) return;
 
   if (window.showToast) {
@@ -6020,7 +6035,7 @@ async function deleteIncomeEntry(id) {
   try {
     if (!canWriteLedgerRole(activeTenant?.role)) throw new Error('Gelir kaydını silmek için finans kaydı izni gerekir.');
     if (isPeriodClosed(kayit.date)) throw new Error(`Bu kayıt kapatılmış döneme (${kayit.month}) ait; silinemez.`);
-    if (!(await uiAskConfirm('Bu gelir kaydını silmek istediğinizden emin misiniz?'))) return false;
+    if (!(await uiAskConfirm({ message: 'Bu gelir kaydı silinecek. Bu işlem geri alınamaz.', okText: 'Gelir kaydını sil', danger: true }))) return false;
     const tenantId = getActiveTenantId();
     requireCloudForWrite('Gelir', tenantId);
     const { error } = await supabaseClient.from('income_entries').delete().eq('id', id).eq('tenant_id', tenantId);
@@ -7067,7 +7082,7 @@ async function deleteCustomExpenseCategory(name) {
   const soru = adet
     ? `"${name}" kategorisi silinsin mi? ${adet} gider kaydı silinmez; raporda "Diğer" altında kendi adıyla görünür.`
     : `"${name}" kategorisi silinsin mi?`;
-  if (!(await uiAskConfirm(soru))) return false;
+  if (!(await uiAskConfirm({ message: soru, okText: 'Kategoriyi sil', danger: true }))) return false;
   const liste = getCustomExpenseCategories().filter(c => c.name !== name).map(c => ({ name: c.name, type: c.type }));
   try {
     await saveCustomExpenseCategories(liste);
@@ -7219,9 +7234,6 @@ async function deleteExpenseUI(id) {
     if (typeof showToast === 'function') showToast('Bu gider Reklamlar ekranındaki dönemden yönetilir.', 'error');
     return false;
   }
-  if (!(await uiAskConfirm('Bu harcamayı silmek istediğinizden emin misiniz?'))) {
-    return false;
-  }
   // Tekrarlayan giderin sonraki tekrarlari (M67): tekrari durdurmak icin
   // 11 kaydi tek tek silmek gerekmesin. Kapanmis donemdeki tekrar dokunulmaz.
   const seri = expenseSeriesInfo(expense);
@@ -7229,7 +7241,23 @@ async function deleteExpenseUI(id) {
     const s = expenseSeriesInfo(e);
     return e.id !== id && s && s.id === seri.id && s.index > seri.index && !isPeriodClosed(e.date);
   }) : [];
-  const hepsi = sonrakiler.length > 0 && (await uiAskConfirm({ message: `Bu tekrarlayan giderin sonraki ${sonrakiler.length} tekrarı da silinsin mi?\n\nTamam: bu ve sonrakiler silinir · İptal: yalnız bu kayıt silinir`, fallback: false }));
+  // U-01: eskiden ikinci sorunun "Vazgec" dugmesi "yalniz bunu sil" demekti;
+  // vazgecmek isteyen kaydi siliyordu. Artik tek pencere, her dugme fiiliyle.
+  let hepsi = false;
+  if (sonrakiler.length > 0) {
+    const secim = await uiAskChoice({
+      title: 'Tekrarlayan gideri sil',
+      message: `Bu gider tekrarlayan bir serinin parçası; sonrasında ${sonrakiler.length} tekrar daha var.\nSilinen kayıt geri alınamaz.`,
+      choices: [
+        { value: 'one', text: 'Yalnız bunu sil', danger: true },
+        { value: 'all', text: `Bu ve sonraki ${sonrakiler.length} tekrarı sil`, danger: true }
+      ]
+    });
+    if (secim !== 'one' && secim !== 'all') return false;
+    hepsi = secim === 'all';
+  } else if (!(await uiAskConfirm({ title: 'Gideri sil', message: 'Bu gider kaydı silinecek. Bu işlem geri alınamaz.', okText: 'Gideri sil', danger: true }))) {
+    return false;
+  }
   try {
     if (hepsi) {
       await deleteExpensesByIds([id, ...sonrakiler.map(e => e.id)]);
@@ -8042,7 +8070,7 @@ async function undoImportBatch(batchId) {
     `"${parti ? parti.filename : 'Bu dosya'}" aktarımıyla eklenen ${adet} kayıt SİLİNECEK.\n\n` +
     'Aktarımdan sonra elle düzenlediğiniz kayıtlar silinmez, atlanır.\n' +
     'Kapanmış bir döneme düşen kayıt varsa hiçbir şey silinmez.\n\n' +
-    'Devam edilsin mi?', fallback: false }));
+    'Devam edilsin mi?', okText: 'Aktarılan kayıtları sil', danger: true, fallback: false }));
   if (!onay) return;
 
   const { data, error } = await supabaseClient.rpc('undo_finance_import', {
@@ -8458,7 +8486,7 @@ async function applyImportedData() {
       .select('id,filename,imported_at,row_count').eq('tenant_id', tenantId).eq('file_hash', parmakIzi).maybeSingle();
     if (onceki) {
       const t = onceki.imported_at ? new Date(onceki.imported_at).toLocaleString('tr-TR') : '';
-      const devam = (await uiAskConfirm({ message: `Bu dosya daha önce içe aktarılmış (${onceki.filename}, ${t}, ${onceki.row_count} satır).\n\nAynı kayıtları ikinci kez eklemek cironuzu ve giderinizi iki katına çıkarır.\n\nYine de devam etmek istiyor musunuz?`, fallback: false }));
+      const devam = (await uiAskConfirm({ message: `Bu dosya daha önce içe aktarılmış (${onceki.filename}, ${t}, ${onceki.row_count} satır).\n\nAynı kayıtları ikinci kez eklemek cironuzu ve giderinizi iki katına çıkarır.\n\nYine de devam etmek istiyor musunuz?`, okText: 'Yine de aktar', fallback: false }));
       if (!devam) return;
     }
   }
@@ -8919,7 +8947,7 @@ async function saveBookingPayment(bookingId) {
 
 async function deleteBookingPayment(paymentId, bookingId) {
   if (!canManageTenantRole(activeTenant?.role)) return false;
-  if (!(await uiAskConfirm('Bu ödeme kaydı silinsin mi?'))) return false;
+  if (!(await uiAskConfirm({ message: 'Bu ödeme kaydı silinecek ve rezervasyonun bakiyesi yeniden hesaplanacak. Bu işlem geri alınamaz.', okText: 'Ödeme kaydını sil', danger: true }))) return false;
   try {
     const { error } = await supabaseClient.from('booking_payments').delete().eq('id', paymentId);
     if (error) throw error;
@@ -9114,7 +9142,9 @@ function openQuickBookingModal() {
   }
   const select = document.getElementById('quickBookingVilla');
   const properties = Object.entries(appData.villas || {}).filter(([, property]) => property && property.isActive !== false && !property.archivedAt);
-  if (select) select.innerHTML = properties.map(([key, property]) => `<option value="${escapeHtml(key)}">${escapeHtml(property.name || key)}</option>`).join('');
+  // U-04: ilk mulk kendiliginden secili gelmez; "required" bilincli secim ister.
+  if (select) select.innerHTML = (properties.length ? '<option value="" disabled selected>Villa seçin</option>' : '')
+    + properties.map(([key, property]) => `<option value="${escapeHtml(key)}">${escapeHtml(villaOptionLabel(property, key))}</option>`).join('');
   // Kanal listesi tam formla ayni katalogdan gelir: isletmenin ozel kanallari
   // dahil, pasif kanallar haric. Sabit liste pasif kanal sectirip kaydi tam
   // forma dusuruyor, ozel kanallari hic gostermiyordu (L-147a).
@@ -9127,14 +9157,15 @@ function openQuickBookingModal() {
   if (form) form.reset();
   syncQuickBookingDepositVisibility();
   const modal = document.getElementById('quickBookingModal');
-  if (modal) modal.style.display = 'flex';
+  // "active" sinifi: Esc, odak tuzagi ve kaydedilmemis bilgi korumasi (U-06) bu sinifa bakar.
+  if (modal) { modal.style.display = 'flex'; modal.classList.add('active'); }
   document.getElementById('quickBookingGuest')?.focus();
   return true;
 }
 
 function closeQuickBookingModal() {
   const modal = document.getElementById('quickBookingModal');
-  if (modal) modal.style.display = 'none';
+  if (modal) { modal.style.display = 'none'; modal.classList.remove('active'); }
 }
 
 function saveQuickBooking(event) {
@@ -9287,6 +9318,12 @@ function applyBookingFormAccess(editId = null) {
   if (submit) { submit.hidden = !canWrite; submit.disabled = !canWrite; }
   const deleteButton = document.getElementById('resDeleteBtn');
   if (deleteButton) deleteButton.style.display = editId && canManageTenantRole(activeTenant?.role) ? 'inline-block' : 'none';
+  // U-11: iptal gizli "Istege bagli ayrintilar"da kaliyor, Sil gorunur duruyordu.
+  const cancelButton = document.getElementById('resCancelBtn');
+  if (cancelButton) {
+    const durum = String(document.getElementById('resStatus')?.value || '').toUpperCase();
+    cancelButton.hidden = !(editId && canWrite && durum !== 'CANCELLED');
+  }
   const title = document.getElementById('bookingModalTitle');
   if (title && editId && !canWrite) title.innerText = 'Rezervasyon Ayrıntısı';
 }
@@ -9294,6 +9331,24 @@ function applyBookingFormAccess(editId = null) {
 function closeBookingModal() {
   const modal = document.getElementById('bookingModal');
   if (modal) modal.classList.remove('active');
+}
+
+// U-11: iptal normal kayit yolundan gecer (dogrulama, iade notu L-274, temizlik senkronu).
+async function cancelBookingFromModal() {
+  const editId = document.getElementById('resEditId')?.value;
+  const statusEl = document.getElementById('resStatus');
+  const form = document.getElementById('bookingForm');
+  if (!editId || !statusEl || !form) return false;
+  const evet = await uiAskConfirm({
+    title: 'Rezervasyonu iptal et',
+    message: 'Rezervasyon "İptal" olarak işaretlenir. Kayıt ve geçmişi korunur, geceler yeniden satışa açılır; iptal oranı raporlarda görünür.',
+    okText: 'Rezervasyonu iptal et',
+    cancelText: 'Vazgeç'
+  });
+  if (!evet) return false;
+  statusEl.value = 'CANCELLED';
+  if (typeof form.requestSubmit === 'function') form.requestSubmit();
+  return true;
 }
 
 async function handleBookingDeleteFromModal() {
@@ -9601,10 +9656,53 @@ function getDateRangePicker() {
   throw new Error('Tarih secici (core/date_range_picker.js) yuklenmedi.');
 }
 
+// U-03: secili villanin dolu geceleri. Kural checkBookingOverlap ile aynidir
+// (iptal haric, ayni mulk, cikis gunu bos); boylece secicide bos gorunen gece
+// kayitta reddedilmez. Duzenlenen rezervasyonun kendi geceleri dolu sayilmaz.
+function resBookedNights() {
+  if (typeof document === 'undefined') return null;
+  const villa = document.getElementById('resVilla')?.value || '';
+  if (!villa) return null;
+  const editId = document.getElementById('resEditId')?.value || '';
+  const propId = appData?.villas?.[villa]?.id || villa;
+  const nights = new Set();
+  (appData?.bookings || []).forEach(b => {
+    if (b.status === 'CANCELLED') return;
+    if (editId && [b.id, b.code, b.dbId, b.bookingCode].includes(editId)) return;
+    const bPropId = b.propertyId || appData?.villas?.[b.villa]?.id;
+    if (bPropId !== propId && b.villa !== propId && b.villa !== villa) return;
+    const d = resParseKey(b.checkIn);
+    if (!d || !b.checkOut) return;
+    for (let i = 0; i < 400; i++) {
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      if (key >= b.checkOut) break;
+      nights.add(key);
+      d.setDate(d.getDate() + 1);
+    }
+  });
+  return nights;
+}
+
+function setResDateHint(text) {
+  const hint = document.getElementById('resDateHint');
+  if (hint) hint.innerText = text;
+}
+
 function pickResDate(key) {
   // Konaklama kipi: cikis giristen once ya da ayni gun olamaz; oyle bir gun
   // secilirse yeni giris sayilir — gecersiz aralik sessizce uretilmez.
   const next = getDateRangePicker().pick({ start: resRangeStart, end: resRangeEnd }, key, 'stay');
+  const drp = getDateRangePicker();
+  const booked = resBookedNights();
+  if (booked && next.start && !next.end && booked.has(next.start)) {
+    setResDateHint(`${resFormatHuman(next.start)} gecesi bu villada dolu; giriş günü olamaz.`);
+    return;
+  }
+  const clash = booked && next.end ? drp.firstBookedNight(next.start, next.end, booked) : null;
+  if (clash) {
+    setResDateHint(`${resFormatHuman(clash)} gecesi dolu; bu aralık seçilemez. Çıkış en geç ${resFormatHuman(clash)} olabilir.`);
+    return;
+  }
   resRangeStart = next.start;
   resRangeEnd = next.end;
   syncResDateInputs();
@@ -9628,9 +9726,10 @@ function syncResDateInputs() {
   const nights = calculateNightsBetween(resRangeStart, resRangeEnd);
   if (badge) badge.innerText = nights > 0 ? `${nights} gece` : '—';
   if (hint) {
-    hint.innerText = !resRangeStart ? 'Giriş tarihini seçin'
+    const doluVar = !resRangeEnd && (resBookedNights()?.size || 0) > 0;
+    hint.innerText = (!resRangeStart ? 'Giriş tarihini seçin'
       : !resRangeEnd ? 'Çıkış tarihini seçin'
-      : `${nights} gece seçildi`;
+      : `${nights} gece seçildi`) + (doluVar ? ' · çizili geceler dolu' : '');
   }
   calculateLivePreview();
 }
@@ -9646,7 +9745,7 @@ function setResDateRange(checkIn, checkOut) {
 
 function renderResCalendarMonth(anchor) {
   const drp = getDateRangePicker();
-  return drp.monthHtml(drp.buildMonth(anchor, { start: resRangeStart, end: resRangeEnd }, getTodayStr()), 'data-res-date');
+  return drp.monthHtml(drp.buildMonth(anchor, { start: resRangeStart, end: resRangeEnd }, getTodayStr(), { booked: resBookedNights() }), 'data-res-date');
 }
 
 function renderResCalendar() {
@@ -10872,7 +10971,7 @@ async function submitMemberInvite(e) {
     const soru = bekleyen.role !== role
       ? `${email} adresine bekleyen bir "${rolAdi(bekleyen.role)}" daveti var. Rolü "${rolAdi(role)}" olarak güncelleyip daveti yeniden göndermek istiyor musunuz?\n\nÖnceki e-postadaki bağlantı da geçerli kalır; katılan kişi yeni rolle (${rolAdi(role)}) katılır.`
       : `${email} adresine zaten bekleyen bir "${rolAdi(role)}" daveti var. Davet yeniden gönderilsin ve süresi 14 gün uzatılsın mı?`;
-    if (!(await uiAskConfirm(soru))) return;
+    if (!(await uiAskConfirm({ message: soru, okText: 'Daveti yeniden gönder' }))) return;
   }
 
   if (btn) { btn.disabled = true; btn.innerText = '⏳ Gönderiliyor...'; }
@@ -10934,7 +11033,7 @@ async function changeMemberRole(userId, newRole) {
 }
 
 async function removeTeamMember(userId, email) {
-  if (!(await uiAskConfirm(`${email} adlı kullanıcıyı ekipten çıkarmak istediğinize emin misiniz?\n\nBu kişi işletme verilerine anında erişimini kaybeder.`))) return;
+  if (!(await uiAskConfirm({ message: `${email} adlı kullanıcıyı ekipten çıkarmak istediğinize emin misiniz?\n\nBu kişi işletme verilerine anında erişimini kaybeder.`, okText: 'Ekipten çıkar', danger: true }))) return;
 
   const tenantId = getActiveTenantId();
   if (!isCloudTenant(tenantId)) return;
@@ -10953,7 +11052,7 @@ async function removeTeamMember(userId, email) {
 }
 
 async function revokeMemberInvite(invitationId, email) {
-  if (!(await uiAskConfirm(`${email} adresine gönderilen daveti iptal etmek istiyor musunuz?`))) return;
+  if (!(await uiAskConfirm({ message: `${email} adresine gönderilen daveti iptal etmek istiyor musunuz?`, okText: 'Daveti iptal et', danger: true }))) return;
 
   const { error } = await supabaseClient.rpc('revoke_tenant_invitation', { p_invitation_id: invitationId });
   if (error) {
@@ -11056,7 +11155,7 @@ async function saveBookingChannelRow(clickEvent, channelId) {
 async function setBookingChannelActive(channelId, isActive) {
   const channel = (appData.bookingChannels || []).find(item => item.id === channelId);
   if (!channel) return;
-  if (!isActive && !(await uiAskConfirm(`${channel.displayName} yeni rezervasyonlardan kaldırılacak. Eski rezervasyonlar korunur. Devam edilsin mi?`))) return;
+  if (!isActive && !(await uiAskConfirm({ message: `${channel.displayName} yeni rezervasyonlardan kaldırılacak. Eski rezervasyonlar korunur. Devam edilsin mi?`, okText: 'Kanalı kaldır', danger: true }))) return;
   try {
     await saveTenantBookingChannel({ ...channel, isActive });
     await refreshBookingChannelSettings();
@@ -11253,7 +11352,7 @@ async function removeBusinessLogo() {
   const profile = getBusinessProfileSetting();
   const path = profile.logoPath;
   if (!path) return true;
-  if (!(await uiAskConfirm('İşletme logosu kaldırılsın mı? Raporlar varsayılan Lexbnb logosunu kullanacak.'))) return false;
+  if (!(await uiAskConfirm({ message: 'İşletme logosu kaldırılsın mı? Raporlar varsayılan Lexbnb logosunu kullanacak.', okText: 'Logoyu kaldır', danger: true }))) return false;
   const nextProfile = { ...profile };
   delete nextProfile.logoPath;
   const { error: settingError } = await supabaseClient.from('tenant_settings').upsert({
@@ -11454,7 +11553,7 @@ async function importChecklistFromText() {
   const current = readSettingsChecklistBuilder();
   // Bos taslaktaki varsayilan "Genel" basligi icerik sayilmaz.
   const hasContent = current.sections.some(section => section.items.some(item => item.text)) || current.supplies.some(supply => supply.item);
-  if (hasContent && !(await uiAskConfirm('Düzenleyicideki liste yapıştırılan metinle değiştirilsin mi?'))) return false;
+  if (hasContent && !(await uiAskConfirm({ message: 'Düzenleyicideki liste yapıştırılan metinle değiştirilsin mi?', okText: 'Listeyi değiştir' }))) return false;
   const draft = parsed.sections.length ? parsed : { sections: defaultSettingsChecklistDraft().sections, supplies: parsed.supplies };
   renderSettingsChecklistBuilder(draft);
   if (box) box.value = '';
@@ -11830,7 +11929,7 @@ async function archiveSettingsTemplate(kind, id, isActive = false) {
   const confirmation = isActive
     ? 'Bu şablon yeniden etkinleştirilsin mi? Yeni seçimlerde tekrar görünecek.'
     : 'Bu şablon arşivlensin mi? Yeni seçimlerden kaldırılır; geçmiş kayıtlar korunur.';
-  if (!item || !(await uiAskConfirm(confirmation))) return false;
+  if (!item || !(await uiAskConfirm({ message: confirmation, okText: isActive ? 'Şablonu etkinleştir' : 'Şablonu arşivle', danger: !isActive }))) return false;
   const table = kind === 'message' ? 'message_templates' : kind === 'task' ? 'task_templates' : 'property_checklist_templates';
   const failure = await updateSettingsRow(table, id, { is_active: isActive });
   if (failure) {
@@ -12350,7 +12449,7 @@ async function convertLeadAction(leadId) {
     }
   }
 
-  if (!(await uiAskConfirm(`"${l.guest}" talebi ₺${Number(l.quote).toLocaleString('tr-TR')} bedelle kesin rezervasyona dönüştürülecek. Onaylıyor musunuz?`))) {
+  if (!(await uiAskConfirm({ message: `"${l.guest}" talebi ₺${Number(l.quote).toLocaleString('tr-TR')} bedelle kesin rezervasyona dönüştürülecek. Onaylıyor musunuz?`, okText: 'Rezervasyona dönüştür' }))) {
     return false;
   }
 
@@ -12636,7 +12735,7 @@ async function deleteLeadUI(id) {
     uiNotify('⚠️ Bu talep kazanılmış bir satış olup tarihsel ciro ve conversion KPI verilerine bağlıdır. Silinemez.');
     return;
   }
-  if ((await uiAskConfirm('Bu talebi silmek istediğinizden emin misiniz?'))) {
+  if ((await uiAskConfirm({ message: 'Bu talep silinecek. Bu işlem geri alınamaz.', okText: 'Talebi sil', danger: true }))) {
     try {
       await deleteLead(id);
       renderLeadSalesWorkspace();
@@ -12827,7 +12926,7 @@ async function deleteMaint(id) {
     uiNotify('Bu kayıt kapanmış (çözüldü ya da iptal). Çözülmüş onarım iptal edilmez; geçmişte olduğu gibi kalır.');
     return false;
   }
-  if ((await uiAskConfirm('Bu bakım kaydını iptal ederek arşivlemek istediğinize emin misiniz?'))) {
+  if ((await uiAskConfirm({ message: 'Bu bakım kaydını iptal ederek arşivlemek istediğinize emin misiniz?', okText: 'Kaydı iptal et', danger: true }))) {
     const tenantId = getActiveTenantId();
     try {
       const { error } = await supabaseClient.from('maintenance_tickets')
@@ -13260,10 +13359,41 @@ function installModalKeyboardSupport() {
   })).observe(document.body, { attributes: true, attributeFilter: ['class'], attributeOldValue: true, subtree: true });
 }
 
+// U-06: kirli isareti yalniz sayfadan cikista soruluyordu; Esc, × ve Vazgec
+// yarim doldurulmus rezervasyonu uyarisiz siliyordu. Kapatma dugmesine basilinca
+// (Esc de .close-btn'e tiklar) pencere kirliyse once sorulur. Kaydetme yolu
+// pencereyi programla kapatir, bu soruya takilmaz.
+function modalCloseControl(target) {
+  const btn = target && typeof target.closest === 'function' ? target.closest('button') : null;
+  if (!btn) return null;
+  if (btn.classList && btn.classList.contains('close-btn')) return btn;
+  return /^\s*close[A-Za-z]*Modal\s*\(/.test(btn.getAttribute('data-onclick') || '') ? btn : null;
+}
+
+async function guardUnsavedModalClose(event) {
+  const btn = modalCloseControl(event && event.target);
+  const modal = btn && typeof btn.closest === 'function' ? btn.closest('.modal-backdrop, .modal-overlay') : null;
+  if (!modal || !modal.classList.contains('active') || modal.classList.contains('ui-dialog') || modal.dataset.dirty !== '1') return false;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  const kapat = await uiAskConfirm({
+    title: 'Kaydedilmemiş bilgiler',
+    message: 'Bu pencereye girdiğiniz bilgiler kaydedilmedi. Kapatırsanız kaybolacak.',
+    okText: 'Kapat, kaydetme',
+    cancelText: 'Forma dön',
+    danger: true
+  });
+  if (!kapat) return false;
+  delete modal.dataset.dirty;
+  btn.click();
+  return true;
+}
+
 function installUnsavedFormGuard() {
   if (typeof document === 'undefined' || typeof window === 'undefined') return;
   document.addEventListener('input', markModalFormDirty, true);
   document.addEventListener('change', markModalFormDirty, true);
+  document.addEventListener('click', guardUnsavedModalClose, true);
   window.addEventListener('beforeunload', unsavedFormBeforeUnload);
   if (typeof MutationObserver === 'function') {
     new MutationObserver(kayitlar => kayitlar.forEach(kayit => {
@@ -13695,7 +13825,7 @@ async function markCleaningSkipped(taskId) {
     uiNotify('Ödenmiş bir temizlik "gerek kalmadı" yapılamaz. Önce ödemeyi geri alın.');
     return false;
   }
-  if (!(await uiAskConfirm('Bu temizliğe gerek kalmadı olarak işaretlensin mi (misafir gelmedi, iptal, ev kullanılmadı)? Gider ve personel borcu oluşmaz.'))) return false;
+  if (!(await uiAskConfirm({ message: 'Bu temizliğe gerek kalmadı olarak işaretlensin mi (misafir gelmedi, iptal, ev kullanılmadı)? Gider ve personel borcu oluşmaz.', okText: 'Gerek kalmadı' }))) return false;
   task.status = 'SKIPPED';
   renderHousekeepingTab();
   const ok = await reportCleaningPersist(task, '⏭️ Temizliğe gerek kalmadı olarak işaretlendi; gider ve borç oluşmaz.');
@@ -13733,7 +13863,7 @@ async function markSelectedCleaningDone() {
     uiNotify(`${gelecek.length} seçili temizlik henüz gelmemiş bir güne planlı; yalnız geçmiş tarihli olanlar işaretlenebilir.`);
     return false;
   }
-  if (!(await uiAskConfirm(`${gorevler.length} temizlik planlandıkları gün yapılmış olarak işaretlensin mi? Maliyetleri o günlerin ayına gider yazılır.`))) return false;
+  if (!(await uiAskConfirm({ message: `${gorevler.length} temizlik planlandıkları gün yapılmış olarak işaretlensin mi? Maliyetleri o günlerin ayına gider yazılır.`, okText: 'Yapıldı olarak işaretle' }))) return false;
   gorevler.forEach(t => { t.status = 'DONE'; });
   renderHousekeepingTab();
   const ok = await reportCleaningPersist(gorevler, `✅ ${gorevler.length} temizlik yapıldı olarak işaretlendi.`);
@@ -13930,7 +14060,7 @@ async function toggleTaskPaid(taskId) {
   if (newPaid && task.status !== 'DONE') {
     // Odeme yapilmis temizlige yapilir. Planli gorev once "yapildi" olur;
     // gider o anda ve yapildigi gunun ayinda dogar.
-    if (!(await uiAskConfirm('Bu temizlik henüz "yapıldı" işaretlenmemiş. Yapıldı olarak işaretleyip ödensin mi?'))) return;
+    if (!(await uiAskConfirm({ message: 'Bu temizlik henüz "yapıldı" işaretlenmemiş. Yapıldı olarak işaretleyip ödensin mi?', okText: 'Yapıldı ve ödendi' }))) return;
     const girilen = (await uiAskText({ label: 'Temizlik hangi gün yapıldı? (YYYY-AA-GG)', value: task.date || getTodayStr() }));
     if (girilen === null) return;
     const gun = String(girilen).trim();
@@ -13969,7 +14099,7 @@ async function payAllPendingCleaning() {
   }
 
   const totalDebt = pending.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
-  const confirmPay = (await uiAskConfirm(`Yapılmış ${pending.length} temizliğin borcu (₺${totalDebt.toLocaleString('tr-TR')}) ödendi olarak kapatılsın mı?`));
+  const confirmPay = (await uiAskConfirm({ message: `Yapılmış ${pending.length} temizliğin borcu (₺${totalDebt.toLocaleString('tr-TR')}) ödendi olarak kapatılsın mı?`, okText: 'Ödendi olarak kapat' }));
   if (!confirmPay) return;
 
   const todayStr = getTodayStr();
@@ -14133,7 +14263,7 @@ async function saveCleaningTask(e) {
 }
 
 async function deleteCleaningTask(taskId) {
-  if (!(await uiAskConfirm('Bu temizlik kaydını silmek istediğinize emin misiniz?'))) return false;
+  if (!(await uiAskConfirm({ message: 'Bu temizlik kaydı silinecek. Bu işlem geri alınamaz.', okText: 'Temizlik kaydını sil', danger: true }))) return false;
   const task = findCleaningTask(taskId);
   if (!task) return false;
 
@@ -17177,8 +17307,10 @@ async function handleSaaSRegister(e) {
   }
 }
 
+// Fonksiyon disinda: supabase_security_tests govdeyi ilk '}' karakterine kadar okur.
+const LOGOUT_CONFIRM = { message: 'Oturumunuzu kapatmak istediğinize emin misiniz?', okText: 'Çıkış yap' };
 async function logoutSaaSUser() {
-  if (!(await uiAskConfirm('Oturumunuzu kapatmak istediğinize emin misiniz?'))) return;
+  if (!(await uiAskConfirm(LOGOUT_CONFIRM))) return;
 
   unsubscribeTenantRealtime();
   if (supabaseClient) {
@@ -17777,6 +17909,23 @@ function refreshPortfolioCountLabels() {
   if (hkMeta) hkMeta.innerText = portfolioLabel(' Toplamı');
 }
 
+const BOOKING_VILLA_SELECTS = ['resVilla', 'quickBookingVilla'];
+// Kapasite yalniz misafir sayisi girilen formlarda anlamlidir; filtrelerde gurultudur.
+const VILLA_CAPACITY_SELECTS = [...BOOKING_VILLA_SELECTS, 'leadVilla', 'waParsedVilla'];
+function bookingVillaPlaceholderOption() {
+  const opt = document.createElement('option');
+  opt.value = '';
+  opt.innerText = 'Villa seçin';
+  opt.disabled = true;
+  opt.defaultSelected = true;
+  return opt;
+}
+// U-10: "SEYİR (8)" sayisinin ne oldugu yazmiyordu; kapasite kisi olarak yazilir.
+function villaOptionLabel(v, key) {
+  if (!v || !v.name) return key;
+  return v.capacity ? `${v.name} · ${v.capacity} kişi` : v.name;
+}
+
 function updateAllVillaDropdowns() {
   if (!appData || !appData.villas) return;
 
@@ -17852,6 +18001,11 @@ function updateAllVillaDropdowns() {
       el.appendChild(optUnknown);
     }
 
+    // U-04: rezervasyon formlari ilk mulkle aciliyor, baska villanin kaydi
+    // fark edilmeden ona yaziliyordu. Bos ve secilemez ilk secenek "required"
+    // ile birlikte bilincli secim ister; form.reset() de buna doner.
+    if (villaKeys.length > 0 && BOOKING_VILLA_SELECTS.includes(selectId)) el.appendChild(bookingVillaPlaceholderOption());
+
     if (villaKeys.length === 0) {
       const bos = document.createElement('option');
       bos.value = '';
@@ -17861,10 +18015,11 @@ function updateAllVillaDropdowns() {
     }
 
     villaKeys.forEach(vKey => {
-      const v = appData.villas[vKey];
       const opt = document.createElement('option');
       opt.value = vKey;
-      opt.innerText = (v && v.name) ? v.name + (v.capacity ? ' (' + v.capacity + ')' : '') : vKey;
+      opt.innerText = VILLA_CAPACITY_SELECTS.includes(selectId)
+        ? villaOptionLabel(appData.villas[vKey], vKey)
+        : ((appData.villas[vKey] && appData.villas[vKey].name) || vKey);
       el.appendChild(opt);
     });
 
@@ -19036,7 +19191,7 @@ async function confirmEarlyCheckout(checkIn, checkOut, status, previous = null, 
   if (String(previous?.status || '').toUpperCase() === 'CHECKED_OUT') return true;
   if (today < checkIn) throw new Error('Giriş tarihi gelmemiş bir rezervasyon "Çıkış yaptı" olarak işaretlenemez.');
   if (typeof confirm !== 'function') return true;
-  return (await uiAskConfirm(`Çıkış tarihi ${formatTrDate(checkOut)}. Misafir bugün erken çıkmış olarak işaretlenecek; temizlik bugüne alınır. Geceler ve tutar değişmez (gerekirse çıkış tarihini ayrıca düzeltin). Devam edilsin mi?`));
+  return (await uiAskConfirm({ message: `Çıkış tarihi ${formatTrDate(checkOut)}. Misafir bugün erken çıkmış olarak işaretlenecek; temizlik bugüne alınır. Geceler ve tutar değişmez (gerekirse çıkış tarihini ayrıca düzeltin). Devam edilsin mi?`, okText: 'Erken çıkış olarak işaretle' }));
 }
 
 function renderTodayDateStrip(bookings, tasks) {
@@ -20321,7 +20476,7 @@ async function savePropertyChannelListing(villaKey) {
 async function archivePropertyChannelListing(villaKey, listingId) {
   const api = channelListingApi();
   if (!api || !canManageTenantRole(activeTenant?.role)) return false;
-  if (!(await uiAskConfirm('Bu kanal ilanı arşivlensin mi? Geçmiş ölçümler korunur; aynı ilanı yeniden ekleyebilirsiniz.'))) return false;
+  if (!(await uiAskConfirm({ message: 'Bu kanal ilanı arşivlensin mi? Geçmiş ölçümler korunur; aynı ilanı yeniden ekleyebilirsiniz.', okText: 'İlanı arşivle', danger: true }))) return false;
   try {
     requireCloudForWrite('Kanal ilanı arşivleme', getActiveTenantId());
     await api.archiveChannelListing(supabaseClient, { tenantId: getActiveTenantId(), listingId });
@@ -20570,7 +20725,7 @@ async function signStaffCleaningDone(executionId) {
     if (typeof showToast === 'function') showToast('⚠️ Temizlik tamamlanamaz: ' + detail, 'error');
     return false;
   }
-  if (!(await uiAskConfirm('Temizliği tamamladığınızı imzalıyor musunuz? Yönetici denetiminden sonra kapanır.'))) return false;
+  if (!(await uiAskConfirm({ message: 'Temizliği tamamladığınızı imzalıyor musunuz? Yönetici denetiminden sonra kapanır.', okText: 'İmzala' }))) return false;
   if (!await saveStaffCleaningProgress(executionId)) return false;
   const { error } = await supabaseClient.rpc('sign_cleaning_done', { p_execution_id: executionId });
   if (error) {
@@ -20893,7 +21048,7 @@ async function toggleOperationalPersonActive(personId) {
   const person = (appData?.operationalPeople || []).find(item => item.id === personId);
   if (!person) return false;
   const nextActive = person.is_active === false;
-  if (!nextActive && !(await uiAskConfirm(`${person.full_name} pasifleştirilsin mi? Geçmiş kayıtları korunur, yeni işe atanamaz.`))) return false;
+  if (!nextActive && !(await uiAskConfirm({ message: `${person.full_name} pasifleştirilsin mi? Geçmiş kayıtları korunur, yeni işe atanamaz.`, okText: 'Pasifleştir', danger: true }))) return false;
   try {
     requireCloudForWrite('Saha ekibi', tenantId);
     const { error } = await supabaseClient.from('operational_people')
@@ -21003,9 +21158,9 @@ async function inspectCleaningExecution(executionId, approve) {
   const execution = (appData?.cleaningExecutions || []).find(item => item.id === executionId);
   const note = approve ? null : (await uiAskText({ label: 'Yeniden açma notu (temizlikçi neyi düzeltmeli?):', value: '' }));
   if (!approve && note === null) return false;
-  if (!(await uiAskConfirm(approve
+  if (!(await uiAskConfirm({ message: approve
     ? 'Temizlik denetlendi ve onaylandı olarak işaretlensin mi? Gider bu onayla doğar.'
-    : 'Eksik maddeler temizlikçiye yeniden açılsın mı?'))) return false;
+    : 'Eksik maddeler temizlikçiye yeniden açılsın mı?', okText: approve ? 'Onayla' : 'Yeniden aç' }))) return false;
   const { error } = await supabaseClient.rpc('inspect_cleaning', {
     p_execution_id: executionId,
     p_approve: !!approve,
@@ -21028,7 +21183,7 @@ async function payCleanerDebt(cleanerName) {
     && String(task.cleaner || task.cleaner_name || 'Personel belirtilmedi').trim() === cleanerName);
   if (!pending.length) return false;
   const total = pending.reduce((sum, task) => sum + (Number(task.amount) || 0), 0);
-  if (!(await uiAskConfirm(`${cleanerName}: ${pending.length} temizlik, ₺${total.toLocaleString('tr-TR')} ödendi olarak kapatılsın mı?`))) return false;
+  if (!(await uiAskConfirm({ message: `${cleanerName}: ${pending.length} temizlik, ₺${total.toLocaleString('tr-TR')} ödendi olarak kapatılsın mı?`, okText: 'Ödendi olarak kapat' }))) return false;
   const paidDate = getTodayStr();
   pending.forEach(task => { task.paid = true; task.paidDate = paidDate; });
   const ok = await reportCleaningPersist(pending, `✅ ${cleanerName} için ₺${total.toLocaleString('tr-TR')} temizlik borcu kapandı.`);
@@ -21148,7 +21303,7 @@ async function setOperationalTaskStatus(taskId, status) {
   if (!['DONE', 'CANCELLED'].includes(status)) return false;
   // Iptal geri alinamaz; onay ister (L-281).
   if (status === 'CANCELLED' && typeof confirm === 'function'
-    && !(await uiAskConfirm('Görev iptal edilsin mi? İptal edilen görev aktif listeden çıkar; "Kapanan görevler" bölümünde görünmeye devam eder.'))) return false;
+    && !(await uiAskConfirm({ message: 'Görev iptal edilsin mi? İptal edilen görev aktif listeden çıkar; "Kapanan görevler" bölümünde görünmeye devam eder.', okText: 'Görevi iptal et', danger: true }))) return false;
   // Tamamlanma zamani ve kim tamamladi yazilir (L-295): completed_at bos kaliyordu.
   const patch = status === 'DONE'
     ? { status, completed_at: new Date().toISOString(), completed_by: isUUID(activeSaaSUser?.id) ? activeSaaSUser.id : null }
@@ -21345,7 +21500,7 @@ async function saveOperationalTask(event) {
 async function deleteOperationalTaskFromModal() {
   const taskId = typeof document !== 'undefined' ? document.getElementById('opTaskEditId')?.value : '';
   if (!taskId) return false;
-  if (!(await uiAskConfirm('Görev kalıcı olarak silinsin mi? İz bırakmak istiyorsanız silmek yerine iptal edin.'))) return false;
+  if (!(await uiAskConfirm({ message: 'Görev kalıcı olarak silinsin mi? İz bırakmak istiyorsanız silmek yerine iptal edin.', okText: 'Görevi kalıcı olarak sil', danger: true }))) return false;
   try {
     await deleteOperationalTask(taskId);
   } catch (error) {
@@ -23611,7 +23766,7 @@ async function deleteCompetitorResearch(id) {
   if (!canManageTenantRole(activeTenant?.role)) return false;
   const row = (appData.competitorPriceResearch || []).find(item => String(item.id) === String(id));
   if (!row) return false;
-  if (!(await uiAskConfirm(`${formatTrDate(row.researched_on)} tarihli rakip araştırması silinsin mi?`))) return false;
+  if (!(await uiAskConfirm({ message: `${formatTrDate(row.researched_on)} tarihli rakip araştırması silinsin mi?`, okText: 'Araştırmayı sil', danger: true }))) return false;
   try {
     await getPricingResearchService().deleteResearch(supabaseClient, { tenantId: getActiveTenantId(), id: row.id });
     appData.competitorPriceResearch = (appData.competitorPriceResearch || []).filter(item => item.id !== row.id);
@@ -23921,7 +24076,7 @@ async function applyPricingDayPrices(mode) {
         manual = Number(document.getElementById('pricingDayManualPrice')?.value);
         if (!Number.isFinite(manual) || manual <= 0) { uiNotify('Elle fiyat sıfırdan büyük bir tutar olmalıdır.'); return false; }
         const floor = Number(entry.property.floor);
-        if (floor > 0 && manual < floor && !(await uiAskConfirm(`₺${manual.toLocaleString('tr-TR')} taban fiyatın (₺${floor.toLocaleString('tr-TR')}) altında. Yine de kaydedilsin mi?`))) return false;
+        if (floor > 0 && manual < floor && !(await uiAskConfirm({ message: `₺${manual.toLocaleString('tr-TR')} taban fiyatın (₺${floor.toLocaleString('tr-TR')}) altında. Yine de kaydedilsin mi?`, okText: 'Yine de kaydet' }))) return false;
       }
       const rows = dates.map(date => {
         const suggested = suggestions.get(date)?.price ?? null;
@@ -24606,6 +24761,7 @@ if (typeof module !== 'undefined' && module.exports) {
     buildLeadSuggestedMessage,
     renderLeadTemplateBody,
     uiAskConfirm,
+    uiAskChoice,
     uiAskText,
     uiNotify,
     bookingCommissionError,
@@ -24629,6 +24785,11 @@ if (typeof module !== 'undefined' && module.exports) {
     submitMemberInvite,
     openResetModal,
     deleteBookingUI,
+    cancelBookingFromModal,
+    guardUnsavedModalClose,
+    villaOptionLabel,
+    resBookedNights,
+    bookingOverlapMessage,
     saveMaint,
     resolveMaintenanceFromOperations,
     setReservationScopeRange,

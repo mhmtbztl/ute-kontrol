@@ -17,7 +17,7 @@
   <!-- Yazi tipleri kendi sunucumuzdan (dis sunucuya istek yok); style.css @font-face -->
   <link rel="preload" href="assets/fonts/inter-latin-wght.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="assets/fonts/inter-latin-ext-wght.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="style.css?v=0688fbf6">
+  <link rel="stylesheet" href="style.css?v=643d5603">
   <link rel="stylesheet" href="analytics.css?v=a15e3414">
   <script src="supabase.umd.js?v=3810661a"></script>
   <script src="core/xlsx_import_worker.js?v=b0939d47"></script>
@@ -3164,7 +3164,7 @@
               </div>
               <div class="daterange-months" id="resCalMonths"></div>
               <div class="daterange-foot">
-                <span id="resDateHint">Giriş tarihini seçin</span>
+                <span id="resDateHint" role="status" aria-live="polite">Giriş tarihini seçin</span>
                 <button type="button" class="daterange-clear" data-onclick="clearResDateRange()">Temizle</button>
               </div>
             </div>
@@ -3313,8 +3313,9 @@
           <div id="resPostExpenses" hidden><label for="resExpensePostDate">Gerçekleşen gider tarihi</label><input type="date" id="resExpensePostDate"><button type="button" class="btn btn-secondary" data-onclick="postBookingExtraExpenses()">Kaydedilmiş giderleri deftere aktar</button><p class="field-note">Önce rezervasyonu kaydedin. Tekrar aktarım yeni kopya oluşturmaz; mevcut gider tarihini değiştirmez.</p></div>
         </div>
 
-        <div class="modal-footer" data-lx-style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="modal-footer" data-lx-style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
           <button type="button" id="resDeleteBtn" class="btn btn-danger" data-lx-style="display: none; background: #FF453A; border: none; font-size: 12px; padding: 8px 14px; border-radius: 6px; color: #fff; cursor: pointer;" data-onclick="handleBookingDeleteFromModal()">🗑️ Rezervasyonu Sil</button>
+          <button type="button" id="resCancelBtn" class="btn btn-secondary" hidden data-onclick="cancelBookingFromModal()">Rezervasyonu iptal et</button>
           <div data-lx-style="display: flex; gap: 10px; margin-left: auto;">
             <button type="button" class="btn btn-secondary" data-onclick="closeBookingModal()">Vazgeç</button>
             <button type="submit" class="btn btn-primary" id="saveBookingBtn">Kaydet</button>
@@ -4373,18 +4374,18 @@
   <script src="core/ads_period_service.js?v=1b4f5123"></script>
   <script src="core/ads_import_parser.js?v=ceff62b1"></script>
   <script src="core/captcha_gate.js?v=3ad4a776"></script>
-  <script src="core/date_range_picker.js?v=41dc564c"></script>
+  <script src="core/date_range_picker.js?v=2bbb5db1"></script>
   <script src="core/side_panel.js?v=d763b464"></script>
   <script src="core/mobile_shell.js?v=8979ea0a"></script>
   <script src="core/notification_feed.js?v=941306f6"></script>
   <script src="core/command_search.js?v=89760933"></script>
-  <script src="core/action_dispatch.js?v=fb4b281d"></script>
+  <script src="core/action_dispatch.js?v=d58f2307"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
-  <script src="core/booking_finance_ui.js?v=ca7b5399"></script>
+  <script src="core/booking_finance_ui.js?v=45c6676a"></script>
   <script src="core/permission_matrix.js?v=e3a3cef2"></script>
   <script src="core/tenant_backup_export.js?v=5aadcdb1"></script>
-  <script src="core/ui_dialog.js?v=d0680970"></script>
-  <script src="app.js?v=63a3baee"></script>
+  <script src="core/ui_dialog.js?v=ba104c37"></script>
+  <script src="app.js?v=19fae346"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/analysis_center_ui.js?v=c85cd258"></script>
   <script src="core/marketing_ui.js?v=4e04df55"></script>

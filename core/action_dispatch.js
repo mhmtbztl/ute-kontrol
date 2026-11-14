@@ -56,7 +56,7 @@
     'downloadSampleTemplate', 'downloadCurrentReportCsv', 'downloadCurrentReportXlsx', 'editBooking', 'editExpense', 'editLead', 'editSettingsTemplate', 'archiveSettingsTemplate',
     'editMaint', 'exportIncomeStatement', 'exportLedger', 'filterByPeriod', 'filterByVilla',
     'filterExpensesByCategory', 'filterHelpGlossary', 'generateAnalysisExport',
-    'handleBookingChannelChange', 'handleBookingDeleteFromModal', 'handleBookingPropertyFinanceChange',
+    'handleBookingChannelChange', 'handleBookingDeleteFromModal', 'cancelBookingFromModal', 'handleBookingPropertyFinanceChange',
     'markBookingCleaningManual', 'handleBookingGrossFinanceInput', 'toggleBookingFinanceSections', 'addBookingExtraExpense', 'removeBookingExtraExpense',
     'saveBookingTaxProfile', 'saveBookingCommissionBases', 'postBookingExtraExpenses',
     'openBookingTaxProfileCreator', 'closeBookingTaxProfileCreator', 'saveBookingTaxProfileInline', 'handleBookingTaxProfileCreatorKey', 'editBookingTaxProfile', 'cancelBookingTaxProfileEdit', 'deleteBookingTaxProfile', 'saveBookingDepositChannels', 'saveBookingCollectionSchedule',

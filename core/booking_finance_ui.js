@@ -139,6 +139,8 @@ function handleBookingPropertyFinanceChange() {
     const p = appData.villas?.[key] || Object.values(appData.villas || {}).find(x => x.id === key);
     financeSet('resCleanCost', p?.cleanCost ?? '');
   }
+  // U-03: dolu geceler secili villaya gore cizilir.
+  if (typeof renderResCalendar === 'function') renderResCalendar();
   calculateLivePreview();
 }
 function toggleBookingFinanceSections() {
@@ -195,6 +197,17 @@ function readExtendedBookingEconomics() {
 
 function renderBookingFinancePreview() {
   const ids = ['prevNights','prevRoomRevenue','prevCleanRevenue','prevGrossTotal','prevCommissionRate','prevCommission','prevPaymentCommission','prevNetAfterCommission','prevCleanCost','prevNetToUs','prevNetRevenue','prevNightlyNet','prevPlatformTax','prevBusinessTax','prevTaxTotal','prevAfterTax','prevAfterCleaning','prevOtherExpenses','prevAfterExtras'];
+  // U-07: bos formda temizlik maliyeti hazir dolu oldugu icin onizleme
+  // kirmizi "−₺2.500 kalan" gosteriyordu; tutar yokken kalan hesaplanmaz.
+  if (String(financeValue('resGross')).trim() === '') {
+    ids.forEach(id => financeText(id, '—'));
+    const geceler = calculateNightsBetween(financeValue('resCheckIn'), financeValue('resCheckOut'));
+    if (geceler > 0) financeText('prevNights', geceler + ' gece');
+    financeText('resFinanceError', '');
+    if (financeEl('prevNetToUs')) financeEl('prevNetToUs').className = '';
+    financeText('resFinanceCompleteness', 'Rezervasyon tutarını girince kalan tutar hesaplanır.');
+    return;
+  }
   try {
     const e = readExtendedBookingEconomics(), r = e.financeResult;
     const cash = n => n === null ? '—' : Number(n).toLocaleString('tr-TR',{style:'currency',currency:'TRY'});

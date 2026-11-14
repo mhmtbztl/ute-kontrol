@@ -1570,7 +1570,19 @@ async function giderAsamasiDavranisi() {
   sahteDom({});
   global.confirm = () => true;
   const ilk = App.getAppData().expenses.find(e => App.expenseSeriesInfo(e) && App.expenseSeriesInfo(e).index === 1);
+  // U-01: seri silme tek pencerede uc secenekle sorulur; "Vazgec" (null) hicbir sey silmez.
+  const eskiPencere = global.LexbnbDialog;
+  const sorulanlar = [];
+  let cevap = null;
+  global.LexbnbDialog = { ...(eskiPencere || {}), askChoice: async o => { sorulanlar.push(o); return cevap; } };
+  const vazgecSonuc = await App.deleteExpenseUI(ilk.id);
+  check(vazgecSonuc === false && silinenler.length === 0 && App.getAppData().expenses.filter(e => App.expenseSeriesInfo(e)).length === 3
+    && sorulanlar.length === 1 && sorulanlar[0].choices.map(c => c.value).join(',') === 'one,all'
+    && /sonraki 2 tekrarı sil/.test(sorulanlar[0].choices[1].text) && !/Vazgeç|İptal/.test(sorulanlar[0].choices.map(c => c.text).join(' ')),
+    'U-01a Tekrarlayan gider silmede Vazgec hicbir kaydi silmez; secenekler fiiliyle yazar', JSON.stringify(sorulanlar));
+  cevap = 'all';
   await App.deleteExpenseUI(ilk.id);
+  global.LexbnbDialog = eskiPencere;
   check(silinenler.length === 1 && silinenler[0].ids.length === 3 && App.getAppData().expenses.filter(e => App.expenseSeriesInfo(e)).length === 0,
     'L-242e Tekrarin ilk kaydi silinirken "sonrakiler de" secilirse seri tek ifadeyle silinir', JSON.stringify(silinenler));
   check(/id="expRecurFreq"/.test(html) && /<option value="MONTHLY">Her ay<\/option>/.test(html) && /<option value="WEEKLY">Her hafta<\/option>/.test(html)
