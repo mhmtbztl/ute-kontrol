@@ -33,7 +33,7 @@ tarayıcı kapısı 34 (üst bar ≤72 px, alt çubuk, Daha fazla, dönem düğm
 | Misafirler ve Satış | Talepler 4,3 · Misafirler 1,8 | 0 | 0 | **PR 5 tamam (14.11.2026):** aşama panosu alt alta (1180 px şerit kalktı; eski 768 kuralı sonraki taban kuralıyla eziliyordu), boş aşama tek satır; WhatsApp ve misafir özet kartları 2'li; misafir rehberi kart modunda (`data-label`), filtreler 2'li ızgara. Ölçüm aracı artık Misafirler alt sayfasını da ölçer. Kapı 38 |
 | Fiyatlandırma | 4,3 | 1 | 22 | Ay sekmeleri 1542 px kayıyor; küçük gün hücreleri |
 | Finans | 4,0 | 1 | 0 | **PR 6 tamam (14.11.2026):** gelir ve gider tabloları kart modunda (`table.mobile-cards`, etiketleri `core/mobile_shell.js` başlıktan yazar), mülk performansı hazır kart görünümünde, kâr köprüsü adım başına tek satır, özet kartları 2'li, küçük düğmeler büyüdü. Aylık KPI tablosu bilerek yana kayar, ay sütunu sabit. Kapı 39 |
-| Analiz | 5,1 | 2 | 28 | Kanal ve mülk tabloları; küçük çipler |
+| Analiz | 4,5 | 1 | 0 | **PR 7 tamam (14.11.2026):** KPI kartları 2'li (analytics.css 480 kuralı tek sütun yapıyordu; `#tab-analytics` özgüllüğüyle ezildi), dönem/karşılaştırma düğmeleri ve sıralama başlıkları ≥36 px, kanal tablosu sığar. Mülk karşılaştırması bilerek yana kayar, mülk sütunu sabit. Kapı 40 |
 | Kanallar ve Pazarlama | 1,9 | 1 | 0 | Kanal tablosu 812 px |
 | Ayarlar | 1,0 | 1 | 1 | Ayar menüsü 1212 px kapsül satırı |
 | Mülkler | 1,9 | 0 | 10 | Küçük dokunma hedefleri |
