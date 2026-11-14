@@ -1163,6 +1163,31 @@ async function main() {
       await page.unroute('**/rest/v1/**', bosVeri);
       assert(pazar.sigar && pazar.etiketsiz === 0 && pazar.ikili, `Kanallar ve Pazarlama telefonda: ${JSON.stringify(pazar)}`);
       passed.push('43. Kanallar ve Pazarlama telefonda: kanal tablosu kart modunda ve etiketli, özet kartları 2\'li, alt görünümler taşmaz');
+      // Ayarlar (PR 11): bolum menusu yana kaymaz, sekiz bolumun hepsi ekranda; hicbir bolum tasmaz, kucuk dugme yok.
+      // Bolumler acilinca ekip/kanal/sablon kayitlarini okur; fikstur oturumsuz oldugu icin 401 doner.
+      const ayarBosVeri = route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+      await page.route('**/rest/v1/**', ayarBosVeri);
+      await page.evaluate(() => { switchTab('settings'); });
+      const ayarKucuk = [];
+      for (const s of ['business', 'team', 'channels', 'lead-sources', 'templates', 'checklists', 'expense-categories', 'danger']) {
+        await page.evaluate(name => selectSettingsSection(name), s);
+        await assertNoHorizontalOverflow(page, `Ayarlar ${s} mobil`);
+        ayarKucuk.push(...await page.evaluate(name => [...document.querySelectorAll('#tab-settings .settings-section.is-active button, #tab-settings [data-settings-section].is-active button')]
+          .filter(b => b.getClientRects().length && !b.closest('table')).map(b => ({ b: (b.id || b.textContent.trim()).slice(0, 30), h: Math.round(b.getBoundingClientRect().height) })).filter(x => x.h < 36).map(x => `${name}:${x.b}:${x.h}`), s));
+      }
+      const ayar = await page.evaluate(() => {
+        const nav = document.getElementById('settingsNav');
+        const ogeler = [...nav.querySelectorAll('.settings-nav__item')].filter(b => b.getClientRects().length);
+        return {
+          kaymaz: nav.scrollWidth <= nav.clientWidth + 1,
+          hepsiEkranda: ogeler.every(b => { const r = b.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth; }),
+          kucuk: ogeler.map(b => Math.round(b.getBoundingClientRect().height)).filter(h => h < 40)
+        };
+      });
+      assert(ayar.kaymaz && ayar.hepsiEkranda && ayar.kucuk.length === 0 && ayarKucuk.length === 0, `Ayarlar telefonda: ${JSON.stringify({ ...ayar, ayarKucuk: [...new Set(ayarKucuk)] })}`);
+      await page.evaluate(() => selectSettingsSection('business'));
+      await page.unroute('**/rest/v1/**', ayarBosVeri);
+      passed.push('44. Ayarlar telefonda: bölüm menüsü 2\'li ızgara (yana kaymaz), sekiz bölüm taşmaz, küçük düğme yok');
       await page.evaluate(() => { switchTab('analytics'); });
       await page.waitForSelector('#analyticsRoot .ba-head');
       await assertNoHorizontalOverflow(page, 'Analiz mobil');
