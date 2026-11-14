@@ -7729,4 +7729,10 @@ button.pricing-rule-row:focus-visible { outline: 2px solid var(--border-focus); 
   #tab-analytics .ba-table-compact th, #tab-analytics .ba-table-compact td { padding: 7px 4px; font-size: 12px; }
   #tab-analytics .ba-sort, #tab-analytics .ba-link { min-height: 36px; }
   #tab-analytics .ba-table tbody th:first-child, #tab-analytics .ba-table thead th:first-child, #tab-analytics .ba-table tfoot th:first-child { position: sticky; left: 0; z-index: 1; background: var(--bg-surface); }
+
+  /* PR 8 — Fiyatlandırma: iç sekmeler tek satır, ay şeridi bilerek yana kayar (12 ay), dokunma hedefleri ≥36 px */
+  .pricing-subnav { display: flex; flex-wrap: nowrap; width: 100%; }
+  .pricing-subnav .ads-subnav-btn { flex: 1 1 0; min-width: 0; justify-content: center; min-height: 40px; padding: 0 4px; font-size: 12.5px; }
+  .pricing-month-tab { min-height: 40px; }
+  .pricing-link { min-height: 36px; }
 }

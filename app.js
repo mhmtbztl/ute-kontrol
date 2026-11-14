@@ -23820,7 +23820,9 @@ function applyPricingGuide() {
   if (typeof document === 'undefined') return;
   const guide = document.getElementById('pricingGuide');
   if (!guide || guide.dataset?.ready === '1') return;
-  guide.open = !pricingGuideClosed();
+  // Telefonda (<=640 px) kilavuz takvimi bir ekran asagi itiyordu: orada kapali baslar, ozet tek dokunusla acar.
+  const telefon = typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 640px)').matches;
+  guide.open = !telefon && !pricingGuideClosed();
   if (guide.dataset) guide.dataset.ready = '1';
 }
 
