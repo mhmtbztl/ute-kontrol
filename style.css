@@ -7745,4 +7745,15 @@ button.pricing-rule-row:focus-visible { outline: 2px solid var(--border-focus); 
   .mkt-channel-card { padding: 10px 10px 0 !important; overflow: visible !important; }
   .mkt-kpi { min-width: 0 !important; flex: 1 1 calc(50% - 5px) !important; padding: 12px !important; }
   .mkt-kpi > div:nth-child(2) { font-size: 20px !important; }
+
+  /* PR 11 — Ayarlar: bölüm menüsü yana kayan şerit yerine 2'li ızgara (8 bölümün hepsi görünür), düğmeler ≥40 px */
+  .settings-nav { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; overflow: visible; }
+  .settings-nav__item { width: 100%; min-width: 0; min-height: 40px; padding: 6px 10px 6px 6px; white-space: normal; line-height: 1.2; text-align: left; }
+  .settings-nav__item > span:last-child { min-width: 0; overflow-wrap: anywhere; }
+  #tab-settings .settings-section .btn { min-height: 40px; }
+  /* Kontrol listesi düzenleyicisi: telefonda üzerine gelme yok, taşı/sil düğmeleri hep görünür ve ≥36 px */
+  #tab-settings .checklist-builder-actions { opacity: 1; }
+  #tab-settings .checklist-doc-icon { width: 36px; height: 36px; font-size: 14px; }
+  #tab-settings .checklist-doc-add { min-height: 36px; }
+  #tab-settings .settings-template-usage-link { min-height: 36px; }
 }
