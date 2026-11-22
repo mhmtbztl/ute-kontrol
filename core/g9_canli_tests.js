@@ -1411,7 +1411,8 @@ async function L281b() {
 // ---------------------------------------------------------------------------
 async function L277() {
   const GUEST = '77777777-7777-4777-8777-777777777772';
-  check(/<select name="message_type"[^>]*>[\s\S]{0,300}value="MARKETING"/.test(read('index.html')), 'L-277a Sablon formunda tur (islemsel/pazarlama) secilir');
+  // Sablon sayfasi (Notion, 22.11.2026) JS ile cizilir.
+  check(/<select name="message_type"[^>]*>[\s\S]{0,300}value="MARKETING"/.test(read('app.js')), 'L-277a Sablon sayfasinda tur (islemsel/pazarlama) secilir');
   const App = require('../app.js');
   const form = { elements: { name: { value: 'TEST Kampanya' }, body: { value: 'Merhaba {{guest_name}}' }, message_type: { value: 'MARKETING' } }, reset() {} };
   sahteDom();

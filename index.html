@@ -16,7 +16,7 @@
   <meta http-equiv="Expires" content="0">
   <!-- Gece/Gunduz: tema stil sayfasindan once secilir (yanip sonme olmaz); yazi tipi sistemindir -->
   <script src="core/theme.js?v=81e24fd9"></script>
-  <link rel="stylesheet" href="style.css?v=f0b0bd5a">
+  <link rel="stylesheet" href="style.css?v=afcd5935">
   <link rel="stylesheet" href="analytics.css?v=35127907">
   <script src="supabase.umd.js?v=3810661a"></script>
   <script src="core/xlsx_import_worker.js?v=b0939d47"></script>
@@ -1111,37 +1111,23 @@
             <p class="sub-text">Sık kullandığınız metinleri ve işleri bir kez yazın, sonra tek tıkla kullanın. Her bölmenin altında nerede çıktığı yazar.</p>
           </div>
         </div>
-        <div class="settings-template-grid">
+        <!-- Notion tarzi (22.11.2026): sayfa listesi; satira dokununca sayfa acilir, "+ Yeni" bos sayfa. -->
+        <div class="settings-template-grid" id="settingsTemplatesHome">
           <section class="settings-template-pane">
-            <h3>Mesaj şablonları</h3>
-            <p class="sub-text settings-template-help">Misafire gönderdiğiniz hazır WhatsApp metinleri. <strong>Talepler</strong>de bir talebi düzenlerken seçip kopyalarsınız.</p>
-            <button type="button" class="settings-template-usage-link" data-onclick="switchTab('leads')">Taleplerde kullan →</button>
-            <form data-onsubmit="createSettingsMessageTemplate(event)" class="settings-inline-form">
-              <input name="name" maxlength="150" required placeholder="Şablon adı">
-              <textarea name="body" maxlength="4000" required placeholder="Örn: Merhaba, villamız için teklifimiz ektedir. Sorunuz olursa yazabilirsiniz."></textarea>
-              <select name="message_type" aria-label="Mesaj türü">
-                <option value="TRANSACTIONAL">İşlemsel — teklif, rezervasyon, giriş bilgisi</option>
-                <option value="MARKETING">Pazarlama — kampanya, indirim (misafirin kampanya izni gerekir)</option>
-              </select>
-              <button type="submit" class="btn btn-secondary btn-sm">+ Mesaj şablonu</button>
-            </form>
-            <div id="settingsMessageTemplatesList" class="settings-template-list"></div>
+            <div class="tp-pane-head"><h3>Mesaj şablonları</h3><button type="button" class="fox-add" data-onclick="openSettingsTemplatePage('message')">+ Yeni</button></div>
+            <p class="sub-text settings-template-help">Misafire gönderdiğiniz hazır WhatsApp metinleri. <button type="button" class="lex-link-inline" data-onclick="goTo('leads')">Talepler</button>de bir talebi düzenlerken seçip kopyalarsınız.</p>
+            <div id="settingsMessageTemplatesList" class="settings-template-list tp-list"></div>
           </section>
           <section class="settings-template-pane">
-            <h3>Görev şablonları</h3>
-            <p class="sub-text settings-template-help">Tekrarlayan işler (örn. havuz kontrolü). <strong>Operasyon → Görevler</strong>deki <strong>Hazır görev kütüphanesi</strong>nden tek tıkla göreve dönüşür.</p>
-            <button type="button" class="settings-template-usage-link" data-onclick="switchTab('operations'); setOperationsView('tasks')">Görevlerde kullan →</button>
-            <form data-onsubmit="createSettingsTaskTemplate(event)" class="settings-inline-form">
-              <input name="title" maxlength="200" required placeholder="Görev başlığı">
-              <select name="task_type"><option value="GENERAL">Genel</option><option value="CLEANING">Temizlik</option><option value="INSPECTION">Kontrol</option><option value="MAINTENANCE">Bakım</option></select>
-              <button type="submit" class="btn btn-secondary btn-sm">+ Görev şablonu</button>
-            </form>
-            <div id="settingsTaskTemplatesList" class="settings-template-list"></div>
+            <div class="tp-pane-head"><h3>Görev şablonları</h3><button type="button" class="fox-add" data-onclick="openSettingsTemplatePage('task')">+ Yeni</button></div>
+            <p class="sub-text settings-template-help">Tekrarlayan işler (örn. havuz kontrolü): başlıklar, yapılacaklar ve alt yapılacaklarla. <button type="button" class="lex-link-inline" data-onclick="goTo('operations:tasks')">Operasyon → Görevler</button>'de "Şablondan başla" ile tek tıkla sayfaya dönüşür.</p>
+            <div id="settingsTaskTemplatesList" class="settings-template-list tp-list"></div>
           </section>
         </div>
+        <div id="settingsTemplatePage" class="fox-subpage settings-template-page" hidden></div>
       </section>
 
-      <!-- Kontrol listeleri kendi bolumunde (M60, 9.5.3): Sablonlar kartinin ucte
+            <!-- Kontrol listeleri kendi bolumunde (M60, 9.5.3): Sablonlar kartinin ucte
            birlik bolmesinde sikisiyor, cizgiler alanlarin ustune biniyordu. -->
       <section class="card settings-section" data-settings-section="checklists" id="settingsChecklistsCard" data-lx-style="margin-bottom: 24px;">
         <div class="section-title-bar">
@@ -1149,11 +1135,12 @@
             <h2>Kontrol listeleri</h2>
             <p class="sub-text">Temizlik ve misafir öncesi son kontrol listesi. Bir kâğıt liste gibi yazın: bölüm başlığı, altında maddeler, maddenin altında alt kontroller. <strong>Zorunlu</strong> işaretli madde ve alt kontrolleri tamamlanmadan iş kapatılamaz.</p>
           </div>
-          <button type="button" class="btn btn-secondary btn-sm" data-onclick="switchTab('operations'); setOperationsView('cleaning')">Temizlikte kullan →</button>
+          <button type="button" class="fox-add" id="settingsChecklistNewButton" data-onclick="openSettingsChecklistPage()">+ Yeni liste</button>
         </div>
-        <form id="settingsChecklistTemplateForm" data-onsubmit="createSettingsChecklistTemplate(event)" class="checklist-builder-form">
+        <form id="settingsChecklistTemplateForm" data-onsubmit="createSettingsChecklistTemplate(event)" class="checklist-builder-form fox-subpage" hidden>
+          <button type="button" class="fox-back" data-onclick="cancelSettingsChecklistEdit()">← Kontrol listeleri</button>
           <div class="checklist-builder-meta">
-            <div class="form-group"><label for="settingsChecklistName">Liste adı</label><input id="settingsChecklistName" name="template_name" maxlength="150" required placeholder="Örn. Standart temizlik"></div>
+            <div class="form-group checklist-title-field"><label for="settingsChecklistName" class="sr-only">Liste adı</label><input id="settingsChecklistName" class="tp-title" name="template_name" maxlength="150" required placeholder="Liste adı (örn. Standart temizlik)"></div>
             <div class="form-group"><label for="settingsChecklistType">Kullanım</label><select id="settingsChecklistType" name="task_type" data-onchange="toggleSettingsChecklistSupplyVisibility(); renderSettingsChecklistMergePreview()"><option value="CLEANING">Temizlik</option><option value="CHECKIN_PREP">Misafir öncesi son kontrol</option></select></div>
             <div class="form-group"><label for="settingsChecklistProperty">Kapsam</label><select id="settingsChecklistProperty" name="property_id" data-onchange="renderSettingsChecklistMergePreview()"><option value="">Tüm mülkler</option></select></div>
           </div>
@@ -1175,10 +1162,13 @@
               <button type="button" class="checklist-doc-add" data-onclick="addChecklistBuilderSupply()">+ Malzeme ekle</button>
             </section>
           </div>
-          <div class="checklist-builder-submit"><button id="settingsChecklistSubmitButton" type="submit" class="btn btn-primary btn-sm">Kontrol listesini kaydet</button><button id="settingsChecklistCancelButton" type="button" class="btn btn-secondary btn-sm" data-onclick="cancelSettingsChecklistEdit()" hidden>Vazgeç</button></div>
+          <div class="checklist-builder-submit"><button id="settingsChecklistSubmitButton" type="submit" class="btn btn-primary btn-sm">Kontrol listesini kaydet</button><button id="settingsChecklistCancelButton" type="button" class="btn btn-secondary btn-sm" data-onclick="cancelSettingsChecklistEdit()" hidden>Vazgeç</button><button id="settingsChecklistArchiveButton" type="button" class="btn btn-secondary btn-sm" data-onclick="archiveOpenSettingsChecklist()" hidden>Arşivle</button></div>
         </form>
-        <h3 class="checklist-saved-title">Kayıtlı listeler</h3>
-        <div id="settingsChecklistTemplatesList" class="settings-template-list"></div>
+        <div id="settingsChecklistHome">
+          <h3 class="checklist-saved-title">Kayıtlı listeler</h3>
+          <p class="sub-text">Bir listeye dokununca sayfası açılır. Temizlik listesi, o eve temizlikçi atanınca göreve kendiliğinden eklenir. <button type="button" class="lex-link-inline" data-onclick="goTo('operations:cleaning')">Temizlikte kullan</button></p>
+          <div id="settingsChecklistTemplatesList" class="settings-template-list tp-list"></div>
+        </div>
       </section>
 
       <section class="card settings-section" data-settings-section="expense-categories" id="settingsExpenseCategoriesCard" data-lx-style="margin-bottom:24px;">
@@ -3549,7 +3539,7 @@
   <script src="core/mobile_shell.js?v=8979ea0a"></script>
   <script src="core/notification_feed.js?v=941306f6"></script>
   <script src="core/command_search.js?v=1b9dbcc9"></script>
-  <script src="core/action_dispatch.js?v=e873025c"></script>
+  <script src="core/action_dispatch.js?v=017a1d85"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=9b3127c9"></script>
   <script src="core/permission_matrix.js?v=e3a3cef2"></script>
@@ -3559,7 +3549,7 @@
   <script src="core/lex_ui.js?v=950d5fdd"></script>
   <script src="core/color_picker.js?v=8457ca4c"></script>
   <script src="core/task_page.js?v=83a423dc"></script>
-  <script src="app.js?v=f26e9228"></script>
+  <script src="app.js?v=d56fa608"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/marketing_ui.js?v=26927afc"></script>
 </body>

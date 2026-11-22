@@ -38,7 +38,7 @@
   // fonksiyonu buraya ekleyin; html_injection_tests listede olmayan, tanimsiz
   // ya da artik kullanilmayan adi yakalar.
   const EYLEMLER = new Set([
-    'goTo', 'openCleaningPage', 'closeCleaningPage', 'renderCleaningChecklistPreview', 'setFinanceView', 'openExpenseForFinanceCategory', 'applyImportedData', 'askPricingChatGpt', 'assignCleaningTaskFromSelect', 'assignMaintenanceFromSelect', 'autoCalculateGoalAdr', 'autoCalculateGoalNights',
+    'goTo', 'openSettingsTemplatePage', 'closeSettingsTemplatePage', 'openSettingsChecklistPage', 'archiveOpenSettingsChecklist', 'openCleaningPage', 'closeCleaningPage', 'renderCleaningChecklistPreview', 'setFinanceView', 'openExpenseForFinanceCategory', 'applyImportedData', 'askPricingChatGpt', 'assignCleaningTaskFromSelect', 'assignMaintenanceFromSelect', 'autoCalculateGoalAdr', 'autoCalculateGoalNights',
     'autoCalculateGoalSubmetrics', 'calculateLivePreview', 'changeImportMode', 'cleanResetAll',
     'buildChatGptQuestionPrompt', 'clearResDateRange', 'closeAiActionConfirmModal', 'closeAllHeaderDropdowns',
     'closeBookingModal', 'closeChatGptQuestionModal', 'closeCleaningTaskModal', 'closeDeleteAccountModal', 'closeExpenseModal', 'closePageReportModal', 'closeQuickBookingModal',

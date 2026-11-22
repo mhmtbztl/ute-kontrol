@@ -11172,10 +11172,33 @@ function renderSettingsChecklistMergePreview() {
   return true;
 }
 
+// Kontrol listesi sayfasi: liste ve duzenleyici ayni anda gorunmez (Notion gibi sayfa).
+function showSettingsChecklistPage(open) {
+  if (typeof document === 'undefined') return false;
+  const form = document.getElementById('settingsChecklistTemplateForm');
+  const home = document.getElementById('settingsChecklistHome');
+  const yeni = document.getElementById('settingsChecklistNewButton');
+  if (form) form.hidden = !open;
+  if (home) home.hidden = !!open;
+  if (yeni) yeni.hidden = !!open;
+  const arsiv = document.getElementById('settingsChecklistArchiveButton');
+  if (arsiv && !open) arsiv.hidden = true;
+  return true;
+}
+
+function openSettingsChecklistPage() {
+  cancelSettingsChecklistEdit();
+  showSettingsChecklistPage(true);
+  const ad = typeof document !== 'undefined' ? document.getElementById('settingsChecklistName') : null;
+  if (ad && ad.focus) ad.focus();
+  return true;
+}
+
 function cancelSettingsChecklistEdit() {
   settingsChecklistEditorId = null;
   const form = typeof document !== 'undefined' ? document.getElementById('settingsChecklistTemplateForm') : null;
   if (!form) return false;
+  showSettingsChecklistPage(false);
   form.reset();
   renderSettingsChecklistPropertyOptions('');
   renderSettingsChecklistBuilder(defaultSettingsChecklistDraft());
@@ -11195,6 +11218,7 @@ function startEditingSettingsChecklist(id) {
   }
   const form = document.getElementById('settingsChecklistTemplateForm');
   if (!form) return false;
+  showSettingsChecklistPage(true);
   settingsChecklistEditorId = id;
   form.elements.template_name.value = item.template_name || '';
   form.elements.task_type.value = item.task_type === 'CHECKIN_PREP' ? 'CHECKIN_PREP' : 'CLEANING';
@@ -11205,8 +11229,16 @@ function startEditingSettingsChecklist(id) {
   const cancel = document.getElementById('settingsChecklistCancelButton');
   if (submit) submit.textContent = 'Değişiklikleri kaydet';
   if (cancel) cancel.hidden = false;
+  const arsiv = document.getElementById('settingsChecklistArchiveButton');
+  if (arsiv) { arsiv.hidden = false; arsiv.textContent = item.is_active === false ? 'Yeniden etkinleştir' : 'Arşivle'; }
   form.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
   return true;
+}
+
+function archiveOpenSettingsChecklist() {
+  const item = settingsChecklistEditorId ? getSettingsTemplate('checklist', settingsChecklistEditorId) : null;
+  if (!item) return false;
+  return archiveSettingsTemplate('checklist', item.id, item.is_active === false);
 }
 
 async function loadSettingsCatalogs() {
@@ -11224,6 +11256,12 @@ async function loadSettingsCatalogs() {
   appData.settingsLeadSources = sources || [];
   settingsCatalogsLoadedFor = { tenantId, at: Date.now() };
   return true;
+}
+
+// Notion tarzi satir: dokununca sayfa acilir; arsivleme sayfanin icinde.
+function settingsTemplatePageRowHtml(kind, item, title, meta) {
+  const kapali = item.is_active === false;
+  return `<button type="button" class="tp-list__row${kapali ? ' is-archived' : ''}" data-onclick="editSettingsTemplate(decodeURIComponent('${encodeActionArg(kind)}'), decodeURIComponent('${encodeActionArg(item.id)}'))"><span class="tp-list__title">${escapeHtml(title || 'Adsız şablon')}</span><span class="tp-list__meta">${escapeHtml(meta || '')}</span></button>`;
 }
 
 function settingsTemplateRowHtml(kind, item, title, meta) {
@@ -11251,19 +11289,79 @@ function renderSettingsTemplates() {
   const checklistBuilder = document.getElementById('settingsChecklistBuilder');
   if (checklistBuilder && checklistBuilder.dataset.ready !== 'true') renderSettingsChecklistBuilder(defaultSettingsChecklistDraft());
   if (messageList) messageList.innerHTML = messages.length
-    ? messages.map(item => settingsTemplateRowHtml('message', item, item.name, `${String(item.channel || 'WHATSAPP').toUpperCase() === 'WHATSAPP' ? 'WhatsApp' : (item.channel || '—')} · ${String(item.lifecycle_stage || 'MANUAL').toUpperCase() === 'MANUAL' ? 'elle gönderilir' : 'otomatik'} · ${String(item.message_type || '').toUpperCase() === 'MARKETING' ? 'pazarlama (kampanya izni gerekir)' : 'işlemsel'}${item.is_active === false ? ' · Kapalı' : ''}`)).join('')
+    ? messages.map(item => settingsTemplatePageRowHtml('message', item, item.name, `${String(item.channel || 'WHATSAPP').toUpperCase() === 'WHATSAPP' ? 'WhatsApp' : (item.channel || '—')} · ${String(item.lifecycle_stage || 'MANUAL').toUpperCase() === 'MANUAL' ? 'elle gönderilir' : 'otomatik'} · ${String(item.message_type || '').toUpperCase() === 'MARKETING' ? 'pazarlama (kampanya izni gerekir)' : 'işlemsel'}${item.is_active === false ? ' · Kapalı' : ''}`)).join('')
     : '<div class="empty-state">Mesaj şablonu yok.</div>';
   if (taskList) taskList.innerHTML = tasks.length
-    ? tasks.map(item => settingsTemplateRowHtml('task', item, item.title, `${TEMPLATE_TASK_TYPE_LABELS[item.task_type] || 'Genel'} · ${TEMPLATE_PRIORITY_LABELS[item.priority] || 'orta öncelik'}${item.is_active === false ? ' · Kapalı' : ''}`)).join('')
+    ? tasks.map(item => {
+      const madde = (getTaskPageApi()?.storedProgress(item.default_checklist) || { total: 0 }).total;
+      return settingsTemplatePageRowHtml('task', item, item.title, `${TEMPLATE_TASK_TYPE_LABELS[item.task_type] || 'Genel'} · ${TEMPLATE_PRIORITY_LABELS[item.priority] || 'orta öncelik'}${madde ? ` · ${madde} madde` : ''}${item.is_active === false ? ' · Kapalı' : ''}`);
+    }).join('')
     : '<div class="empty-state">Görev şablonu yok.</div>';
   if (checklistList) checklistList.innerHTML = checklists.length
     ? checklists.map(item => {
       const property = Object.values(appData?.villas || {}).find(candidate => candidate?.id === item.property_id);
       const typeLabel = item.task_type === 'CHECKIN_PREP' ? 'Misafir öncesi' : 'Temizlik';
       const scopeLabel = item.property_id ? (property?.name || 'Mülke özel') : 'Tüm mülkler';
-      return settingsTemplateRowHtml('checklist', item, item.template_name, `${typeLabel} · ${scopeLabel}${item.is_active === false ? ' · Kapalı' : ''}`);
+      const madde = (getTaskPageApi()?.storedProgress(item.items) || { total: 0 }).total;
+      return settingsTemplatePageRowHtml('checklist', item, item.template_name, `${typeLabel} · ${scopeLabel}${madde ? ` · ${madde} madde` : ''}${item.is_active === false ? ' · Kapalı' : ''}`);
     }).join('')
-    : '<div class="empty-state">Kontrol listesi şablonu yok.</div>';
+    : '<div class="empty-state">Kontrol listesi yok. "+ Yeni liste" ile başlayın.</div>';
+  // Acik sablon sayfasi yeniden cizimde kapanmaz (yazilanlar taslakta durur).
+  const sayfa = typeof document !== 'undefined' ? document.getElementById('settingsTemplatePage') : null;
+  if (sayfa && (!!settingsTemplatePage) === sayfa.hidden) renderSettingsTemplatePage();
+}
+
+let settingsTemplatePage = null; // { kind: 'message'|'task', id: string|null, draft? }
+
+function openSettingsTemplatePage(kind, id = null) {
+  if (!['message', 'task'].includes(kind)) return false;
+  const item = id ? getSettingsTemplate(kind, id) : null;
+  if (id && !item) return false;
+  const api = getTaskPageApi();
+  settingsTemplatePage = { kind, id: item ? item.id : null, sections: kind === 'task' && api ? api.fromStored(item?.default_checklist || {}) : [] };
+  renderSettingsTemplatePage();
+  return true;
+}
+
+function closeSettingsTemplatePage() {
+  settingsTemplatePage = null;
+  renderSettingsTemplatePage();
+  return true;
+}
+
+function renderSettingsTemplatePage() {
+  if (typeof document === 'undefined') return;
+  const home = document.getElementById('settingsTemplatesHome');
+  const page = document.getElementById('settingsTemplatePage');
+  if (!home || !page) return;
+  const p = settingsTemplatePage;
+  home.hidden = !!p;
+  page.hidden = !p;
+  if (!p) { page.innerHTML = ''; return; }
+  const item = p.id ? getSettingsTemplate(p.kind, p.id) : null;
+  const geri = '<button type="button" class="fox-back" data-onclick="closeSettingsTemplatePage()">← Şablonlar</button>';
+  const arsiv = item ? `<button type="button" class="lex-btn" data-onclick="archiveSettingsTemplate(decodeURIComponent('${encodeActionArg(p.kind)}'), decodeURIComponent('${encodeActionArg(item.id)}'), ${item.is_active === false ? 'true' : 'false'})">${item.is_active === false ? 'Yeniden etkinleştir' : 'Arşivle'}</button>` : '';
+  if (p.kind === 'message') {
+    const tur = String(item?.message_type || 'TRANSACTIONAL').toUpperCase();
+    page.innerHTML = `${geri}<form data-onsubmit="createSettingsMessageTemplate(event)" class="tp-page settings-template-form">
+      <input name="name" class="tp-title" maxlength="150" required placeholder="Şablon adı" aria-label="Şablon adı" value="${escapeHtml(item?.name || '')}">
+      <div class="tp-props"><label class="tp-prop"><span class="tp-prop__label">Tür</span><select name="message_type" class="lex-select" aria-label="Mesaj türü"><option value="TRANSACTIONAL"${tur !== 'MARKETING' ? ' selected' : ''}>İşlemsel — teklif, rezervasyon, giriş bilgisi</option><option value="MARKETING"${tur === 'MARKETING' ? ' selected' : ''}>Pazarlama — kampanya izni gerekir</option></select></label></div>
+      <textarea name="body" class="tp-doc" maxlength="4000" required rows="10" aria-label="Mesaj metni" placeholder="Örn: Merhaba, villamız için teklifimiz ektedir. Sorunuz olursa yazabilirsiniz.">${escapeHtml(item?.body || '')}</textarea>
+      <div class="fox-add-row"><button type="submit" class="lex-btn lex-btn--primary">${item ? 'Değişiklikleri kaydet' : 'Şablonu kaydet'}</button>${arsiv}</div>
+    </form>`;
+    return;
+  }
+  const tipler = Object.entries(TEMPLATE_TASK_TYPE_LABELS).map(([k, v]) => `<option value="${k}"${k === (item?.task_type || 'GENERAL') ? ' selected' : ''}>${escapeHtml(v)}</option>`).join('');
+  const oncelik = Object.entries(OPERATIONAL_TASK_PRIORITY_LABELS).map(([k, v]) => `<option value="${k}"${k === (item?.priority || 'MEDIUM') ? ' selected' : ''}>${escapeHtml(v)}</option>`).join('');
+  page.innerHTML = `${geri}<form data-onsubmit="createSettingsTaskTemplate(event)" class="tp-page settings-template-form">
+    <input name="title" class="tp-title" maxlength="200" required placeholder="Görev şablonu adı (örn. Havuz kontrolü)" aria-label="Görev şablonu adı" value="${escapeHtml(item?.title || '')}">
+    <div class="tp-props"><label class="tp-prop"><span class="tp-prop__label">Tür</span><select name="task_type" class="lex-select">${tipler}</select></label><label class="tp-prop"><span class="tp-prop__label">Öncelik</span><select name="priority" class="lex-select">${oncelik}</select></label></div>
+    <div id="settingsTaskTemplateBody" class="tp-body"></div>
+    <div class="fox-add-row"><button type="submit" class="lex-btn lex-btn--primary">${item ? 'Değişiklikleri kaydet' : 'Şablonu kaydet'}</button>${arsiv}</div>
+  </form>`;
+  const api = getTaskPageApi();
+  const body = document.getElementById('settingsTaskTemplateBody');
+  if (api && body && body.addEventListener) api.mount(body, { draft: p.sections, canEdit: true, onChange: () => {} });
 }
 
 async function createSettingsMessageTemplate(event) {
@@ -11273,11 +11371,17 @@ async function createSettingsMessageTemplate(event) {
     // Tur secilir (L-277): pazarlama sablonu yalniz kampanya izni olan
     // misafire gider; hep TRANSACTIONAL yazildigi icin izin kapisi hic calismiyordu.
     const tur = String(form.elements.message_type?.value || 'TRANSACTIONAL').toUpperCase() === 'MARKETING' ? 'MARKETING' : 'TRANSACTIONAL';
-    await createMessageTemplate({
-      name: String(form.elements.name.value || '').trim(), body: String(form.elements.body.value || '').trim(),
-      channel: 'WHATSAPP', lifecycle_stage: 'MANUAL', message_type: tur, language: 'tr', is_active: true
-    });
+    const name = String(form.elements.name.value || '').trim();
+    const body = String(form.elements.body.value || '').trim();
+    const duzenlenen = settingsTemplatePage?.kind === 'message' ? settingsTemplatePage.id : null;
+    if (duzenlenen) {
+      const failure = await updateSettingsRow('message_templates', duzenlenen, { name, body, message_type: tur });
+      if (failure) throw new Error(failure);
+    } else {
+      await createMessageTemplate({ name, body, channel: 'WHATSAPP', lifecycle_stage: 'MANUAL', message_type: tur, language: 'tr', is_active: true });
+    }
     form.reset();
+    settingsTemplatePage = null;
     await loadSettingsCatalogs();
     // Yeni sablon talep ve misafir penceresinde esitleme beklemeden gorunur (L-277).
     appData.messageTemplates = (appData.settingsMessageTemplates || []).filter(item => item.is_active !== false);
@@ -11293,16 +11397,25 @@ async function createSettingsMessageTemplate(event) {
 async function createSettingsTaskTemplate(event) {
   event.preventDefault();
   const form = event.currentTarget;
+  const api = getTaskPageApi();
+  const sayfa = settingsTemplatePage?.kind === 'task' ? settingsTemplatePage : null;
+  const onceki = sayfa?.id ? getSettingsTemplate('task', sayfa.id)?.default_checklist : null;
+  const liste = sayfa && api ? api.toStored(sayfa.sections, onceki) : {};
+  const priority = OPERATIONAL_TASK_PRIORITY_LABELS[form.elements.priority?.value] ? form.elements.priority.value : 'MEDIUM';
   const payload = {
     tenant_id: getActiveTenantId(), title: String(form.elements.title.value || '').trim(),
-    task_type: form.elements.task_type.value || 'GENERAL', priority: 'MEDIUM', is_active: true
+    task_type: form.elements.task_type.value || 'GENERAL', priority, is_active: true,
+    default_checklist: { sections: liste.sections || [], supplies: liste.supplies || [] }
   };
-  const { error } = await supabaseClient.from('task_templates').insert(payload);
-  if (error) {
-    showToast('Görev şablonu kaydedilemedi: ' + kullaniciMesaji(error.message), 'error');
+  const failure = sayfa?.id
+    ? await updateSettingsRow('task_templates', sayfa.id, { title: payload.title, task_type: payload.task_type, priority, default_checklist: payload.default_checklist })
+    : (await supabaseClient.from('task_templates').insert(payload)).error?.message;
+  if (failure) {
+    showToast('Görev şablonu kaydedilemedi: ' + kullaniciMesaji(failure), 'error');
     return false;
   }
   form.reset();
+  settingsTemplatePage = null;
   await loadSettingsCatalogs();
   renderSettingsTemplates();
   showToast('Görev şablonu kaydedildi.', 'success');
@@ -11370,6 +11483,7 @@ async function editSettingsTemplate(kind, id) {
   const item = getSettingsTemplate(kind, id);
   if (!item) return false;
   if (kind === 'checklist') return startEditingSettingsChecklist(id);
+  if (kind === 'message' || kind === 'task') return openSettingsTemplatePage(kind, id);
   const table = kind === 'message' ? 'message_templates' : kind === 'task' ? 'task_templates' : 'property_checklist_templates';
   const nameField = kind === 'message' ? 'name' : kind === 'task' ? 'title' : 'template_name';
   const nextName = (await uiAskText({ label: 'Şablon adı:', value: item[nameField] || '' }));
@@ -11411,6 +11525,8 @@ async function archiveSettingsTemplate(kind, id, isActive = false) {
     showToast(`Şablon ${isActive ? 'etkinleştirilemedi' : 'arşivlenemedi'}: ` + kullaniciMesaji(failure), 'error');
     return false;
   }
+  if (settingsTemplatePage && settingsTemplatePage.id === id) settingsTemplatePage = null;
+  if (kind === 'checklist' && settingsChecklistEditorId === id) cancelSettingsChecklistEdit();
   await loadSettingsCatalogs();
   renderSettingsTemplates();
   if (kind === 'checklist' && item.task_type === 'CLEANING') await refreshUnstartedCleaningChecklists();
@@ -23600,6 +23716,10 @@ async function handleQuickActionTrigger(actionType, entityId) {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     goTo,
+    openSettingsTemplatePage,
+    closeSettingsTemplatePage,
+    openSettingsChecklistPage,
+    archiveOpenSettingsChecklist,
     openCleaningPage,
     closeCleaningPage,
     renderCleaningChecklistPreview,

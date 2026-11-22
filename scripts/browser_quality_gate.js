@@ -805,7 +805,7 @@ async function main() {
       // Word listesi yapistirilir, Enter yeni madde acar. Personel karti
       // onaylanan isi gostermez, bos listede Z'yi kilitlemez, giris bilgisini
       // gosterir. Menudeki Operasyon sayisi bugunun acik isi.
-      await page.evaluate(() => { appData.settingsChecklistTemplates = []; openSettingsSection('checklists'); renderSettingsTemplates(); });
+      await page.evaluate(() => { appData.settingsChecklistTemplates = []; openSettingsSection('checklists'); renderSettingsTemplates(); openSettingsChecklistPage(); });
       await page.waitForSelector('#settingsChecklistsCard #settingsChecklistTemplateForm', { state: 'visible' });
       await page.click('#settingsChecklistsCard .checklist-paste summary');
       await page.fill('#settingsChecklistPaste', 'Mutfak\n    Bulaşıklar yıkandı mı\n        Kireç kontrol edildi mi\n    Süpürüldü mü\nYatak odası\n    !Çarşaf yıkandı mı?\nMalzeme listesi\n    Çay\n    Kahve\n    Bulaşık deterjanı');
@@ -1207,6 +1207,8 @@ async function main() {
         appData.settingsChecklistTemplates = [];
         renderSettingsTemplates();
       });
+      // Notion sayfasi (22.11.2026): liste once, "+ Yeni liste" duzenleyiciyi acar.
+      await page.click('#settingsChecklistNewButton');
       await page.waitForSelector('#settingsChecklistTemplateForm', { state: 'visible' });
       await page.fill('#settingsChecklistName', 'Misafir öncesi tarayıcı kontrolü');
       await page.selectOption('#settingsChecklistType', 'CHECKIN_PREP');

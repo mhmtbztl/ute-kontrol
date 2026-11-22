@@ -54,9 +54,10 @@ test('M32: kanban kartından erişilebilir durum değişikliği yapılır', () =
 });
 
 test('M35/M37: şablon türleri kullanım ekranına gider ve arşiv yaşam döngüsünü açık söyler', () => {
-  assert.match(html, /Taleplerde kullan →/);
-  assert.match(html, /Görevlerde kullan →/);
-  assert.match(html, /Temizlikte kullan →/);
+  // Notion sayfasi (22.11.2026): kullanim yeri tek tik goTo baglantisi.
+  assert.match(html, /data-onclick="goTo\('leads'\)">Talepler</);
+  assert.match(html, /data-onclick="goTo\('operations:tasks'\)">Operasyon → Görevler</);
+  assert.match(html, /data-onclick="goTo\('operations:cleaning'\)">Temizlikte kullan</);
   assert.match(app, /Arşivle/);
   assert.match(app, /Yeniden etkinleştir/);
   assert.match(app, /patch\.task_type/);
