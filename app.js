@@ -4691,7 +4691,7 @@ function renderScreenTeamTasks(tabId) {
   const more = shown.length > SCREEN_TASK_LIMIT
     ? `<button type="button" class="lex-btn lex-btn--inline" data-onclick="switchTab('executive')">Tüm işler (${shown.length}) Bugün'de</button>` : '';
   box.innerHTML = `<p class="lex-summary">${L.summaryHtml(T.summaryParts(shown, { stays: false }))}</p>`
-    + L.tableHtml({ head: ['Gün · ekip', 'İş', 'Talimat'], rows: todayTaskRows(shown.slice(0, SCREEN_TASK_LIMIT)), caption: 'Ekip görevleri' })
+    + L.tableHtml({ head: TODAY_TASK_HEAD, rows: todayTaskRows(shown.slice(0, SCREEN_TASK_LIMIT), { grouped: false }), caption: 'Ekip görevleri' })
     + more;
 }
 
@@ -8349,10 +8349,27 @@ function openBookingDetailsPanel(bookingId) {
   return true;
 }
 
+// Kanal suzgeci: secili tarih araliginda gecen kanallardan kurulur (sabit liste yok).
+function refreshReservationChannelFilter() {
+  const sel = typeof document !== 'undefined' ? document.getElementById('rezChannelFilter') : null;
+  if (!sel) return;
+  const once = sel.value || 'ALL';
+  const rows = buildReservationListView({
+    bookings: appData.bookings || [], cleaningTasks: appData.cleaningTasks || [], today: getTodayStr(),
+    rangeStart: reservationListRange.start, rangeEnd: reservationListRange.end
+  });
+  const kanallar = [...new Set(rows.map(({ booking: b }) => String(b.channel || '')).filter(Boolean))]
+    .sort((a, b) => getChannelDisplayName(a).localeCompare(getChannelDisplayName(b), 'tr'));
+  sel.innerHTML = '<option value="ALL">Tüm kanallar</option>'
+    + kanallar.map(k => `<option value="${escapeHtml(k)}">${escapeHtml(getChannelDisplayName(k))}</option>`).join('');
+  sel.value = once === 'ALL' || kanallar.includes(once) ? once : 'ALL';
+}
+
 function getFilteredReservationListRows() {
   const search = (document.getElementById('rezSearchInput')?.value || '').trim();
   const villaFilter = document.getElementById('rezVillaFilter')?.value || 'ALL';
   const statusFilter = document.getElementById('rezStatusFilter')?.value || 'ALL';
+  const channelFilter = document.getElementById('rezChannelFilter')?.value || 'ALL';
   const todayStr = getTodayStr();
   const visibleRows = buildReservationListView({
     bookings: appData.bookings || [], cleaningTasks: appData.cleaningTasks || [], today: todayStr,
@@ -8364,6 +8381,9 @@ function getFilteredReservationListRows() {
     
     // Status Filter
     if (statusFilter !== 'ALL' && b.status !== statusFilter) return false;
+
+    // Kanal (sadelik 4. tur)
+    if (channelFilter !== 'ALL' && String(b.channel || '') !== channelFilter) return false;
 
     // Search
     if (search && !reservationSearchMatches(b, search)) return false;
@@ -8382,7 +8402,7 @@ function renderManageBookingsTable() {
   const collectionTotal = paymentEngine
     ? paymentEngine.totalCollections(appData.bookingPayments || [], reservationListRange.start, reservationListRange.end)
     : null;
-  setEl('rezCollectionsMetric', `Toplam tahsilat: ${collectionTotal == null ? '—' : `₺${Number(collectionTotal).toLocaleString('tr-TR')}`}`);
+  refreshReservationChannelFilter();
   const filteredRows = getFilteredReservationListRows();
   const listSummary = computeReservationListSummary({
     rows: filteredRows,
@@ -8399,9 +8419,17 @@ function renderManageBookingsTable() {
     const ozetSayisi = filteredRows.filter(row => !iptalMi(row) && isBulkSummaryBooking(row.booking)).length;
     const rezSayisi = filteredRows.length - ozetSayisi - iptalSayisi;
     const tl = n => `${Math.round(n).toLocaleString('tr-TR')} TL`;
-    summaryPill.innerHTML = `Gösterilen: <strong>${rezSayisi} Rezervasyon</strong>${ozetSayisi ? ` + ${ozetSayisi} toplu aktarım özeti` : ''}${iptalSayisi ? ` (+ ${iptalSayisi} iptal, hesaba girmez)` : ''} | 🌙 ${listSummary.soldNights} Gece`
-      + ` | Brüt (bu döneme düşen): ${tl(listSummary.gross)} | 💰 Ciro (oda geliri, indirim sonrası): <strong>${tl(listSummary.netRoomRevenue)}</strong>`
-      + ` | Kesintiler: −${tl(listSummary.deductions)} | Kalan (tahmini): ${tl(listSummary.remaining)}`;
+    // Sadelik 4. tur: uzun cumle yerine bes sade rakam; ayrinti rakamin altinda.
+    // Tahsilat tarih araligina baglidir (mulk/durum/kanal suzgecine degil): altinda yazar.
+    const ek = [ozetSayisi ? `+ ${ozetSayisi} toplu aktarım özeti` : '', iptalSayisi ? `${iptalSayisi} iptal hesaba girmez` : ''].filter(Boolean).join(' · ');
+    const kpi = (etiket, deger, alt = '') => `<div class="lex-kpi"><dt>${escapeHtml(etiket)}</dt><dd class="lex-kpi__value">${deger}</dd>${alt ? `<dd class="lex-kpi__sub">${escapeHtml(alt)}</dd>` : ''}</div>`;
+    summaryPill.innerHTML = `<dl class="lex-kpis">`
+      + kpi('Rezervasyon', `<strong>${rezSayisi}</strong>`, ek)
+      + kpi('Satılan gece', escapeHtml(`${listSummary.soldNights} gece`))
+      + kpi('Ciro', escapeHtml(tl(listSummary.netRoomRevenue)), `Brüt ${tl(listSummary.gross)} · indirim sonrası oda geliri`)
+      + kpi('Kalan (tahmini)', escapeHtml(tl(listSummary.remaining)), `Kesintiler −${tl(listSummary.deductions)}`)
+      + kpi('Tahsilat', escapeHtml(collectionTotal == null ? '—' : tl(collectionTotal)), 'Tarih aralığındaki tüm ödemeler')
+      + '</dl>';
   }
 
   if (filteredRows.length === 0) {
@@ -17561,8 +17589,10 @@ function renderTodayNextArrival(bookings, today, todayArrivals) {
 // isTicketBlockingOn, isProfitUnmeasured, detectGapNights.
 // =============================================================
 let todayVilla = 'ALL';
-let todayTeam = 'ALL';
+// Isaretli ekipler; null = tum ekipler (sadelik 4. tur: cip seridi yerine acilir liste).
+let todayTeams = null;
 let todayLastTasks = [];
+const TODAY_TASK_HEAD = Object.freeze(['İş', 'Ne zaman', 'Talimat']);
 
 function getTeamTasksApi() {
   if (typeof TeamTasks !== 'undefined') return TeamTasks;
@@ -17683,9 +17713,35 @@ function setTodayVilla(villa) {
 
 function setTodayTeam(team) {
   const T = getTeamTasksApi();
-  todayTeam = team === 'ALL' || (T && T.TEAM_KEYS.includes(team)) ? team : 'ALL';
+  todayTeams = team !== 'ALL' && T && T.TEAM_KEYS.includes(team) ? [team] : null;
   renderTodayLex();
   return true;
+}
+
+// Ekip listesinde bir onay kutusu: isaretliyse ekler, degilse cikarir. Hepsi
+// isaretli ya da hicbiri kalmazsa "Tum ekipler"e doner.
+function toggleTodayTeam(team, on) {
+  const T = getTeamTasksApi();
+  if (!T) return false;
+  const visible = T.visibleTeams(teamTaskPermissions(), teamTaskRouting()).map(t => t.key);
+  if (team === 'ALL') { todayTeams = null; renderTodayLex(); return true; }
+  if (!visible.includes(team)) return false;
+  const set = new Set(todayTeams || []);
+  if (on) set.add(team); else set.delete(team);
+  todayTeams = set.size === 0 || set.size === visible.length ? null : visible.filter(k => set.has(k));
+  renderTodayLex();
+  return true;
+}
+
+// Acik isaretli liste disari tiklaninca kapanir (bir kez kurulur).
+if (typeof document !== 'undefined' && document.addEventListener) {
+  document.addEventListener('click', event => {
+    document.querySelectorAll('details.lex-picker[open]').forEach(d => { if (!d.contains(event.target)) d.open = false; });
+  });
+}
+
+function todayTeamFilter() {
+  return todayTeams ? { teams: todayTeams } : {};
 }
 
 // Gorev satiri: ilgili ekrana, mumkunse ilgili kayda gider. Bos gece satirinda
@@ -17701,26 +17757,40 @@ function openTeamTask(taskId) {
   return true;
 }
 
-function todayTaskRows(tasks) {
+// Gorev satiri: Is (tiklaninca ilgili kayit) · Ne zaman · Talimat. Bugun'de satirlar
+// ekibe gore gruplanir (ekip basligi + is sayisi); ekip artik hucrede tekrar etmez.
+function todayTaskRows(tasks, { grouped = true } = {}) {
   const T = getTeamTasksApi();
   const L = getLexUiApi();
+  const today = getTodayStr();
   const teamLabel = key => (T.TEAMS.find(t => t.key === key) || {}).label || key;
-  return tasks.map(task => {
+  const satir = task => {
     const gun = L.dayLabel(task.date);
     const tag = T.TAGS[task.tag] || T.TAGS.DO;
+    const bugun = task.date === today;
     return {
       id: task.id,
-      date: task.date,
-      c1: gun.day,
-      c1sub: `${gun.weekday} · ${teamLabel(task.team)}`,
-      c2: task.value,
-      c2Attr: `data-onclick="openTeamTask(decodeURIComponent('${encodeActionArg(task.id)}'))"`,
-      c2sub: T.TASK_TYPES[task.type]?.label || '',
+      team: teamLabel(task.team),
+      c1: task.value,
+      c1Attr: `data-onclick="openTeamTask(decodeURIComponent('${encodeActionArg(task.id)}'))"`,
+      c1sub: T.TASK_TYPES[task.type]?.label || '',
+      c2: bugun ? 'Bugün' : gun.day,
+      c2sub: bugun ? '' : (task.date < today ? `${gun.weekday} · geçti` : gun.weekday),
       tone: tag.tone,
       tag: tag.label,
       reason: task.reason
     };
+  };
+  if (!grouped) return tasks.map(satir);
+  const out = [];
+  const sira = T.TEAMS.map(t => t.key).concat([...new Set(tasks.map(t => t.team))].filter(k => !T.TEAMS.some(t => t.key === k)));
+  sira.forEach(key => {
+    const grup = tasks.filter(t => t.team === key);
+    if (!grup.length) return;
+    out.push({ group: teamLabel(key), groupSub: `${grup.length} iş` });
+    grup.forEach(t => out.push(satir(t)));
   });
+  return out;
 }
 
 function renderTodayLex() {
@@ -17736,27 +17806,51 @@ function renderTodayLex() {
   const can = teamTaskPermissions();
   const routing = teamTaskRouting();
   const visible = T.visibleTeams(can, routing);
-  if (todayTeam !== 'ALL' && !visible.some(t => t.key === todayTeam)) todayTeam = 'ALL';
+  if (todayTeams) {
+    todayTeams = todayTeams.filter(k => visible.some(t => t.key === k));
+    if (!todayTeams.length) todayTeams = null;
+  }
 
   const all = buildTodayTeamTasks(today);
   const inVilla = T.filterTasks(all, { villa: todayVilla });
-  const shown = T.filterTasks(inVilla, { team: todayTeam });
+  const shown = T.filterTasks(inVilla, todayTeamFilter());
   todayLastTasks = all;
 
+  // Mulk ve ekip: acilir isaretli liste (sadelik 4. tur; eski cip seritleri yer kapliyordu).
+  // Mulk tek secimdir: performans ve hafta seridi tek mulk ya da portfoy gosterir.
   const villaTabs = document.getElementById('todayVillaTabs');
   if (villaTabs) {
     villaTabs.hidden = villaKeys.length < 2;
-    villaTabs.innerHTML = villaKeys.length < 2 ? '' : L.tabsHtml(
-      ['ALL'].concat(villaKeys).map(k => ({ key: k, label: k === 'ALL' ? 'Tümü' : (appData.villas[k].name || k), attr: `data-onclick="setTodayVilla(decodeURIComponent('${encodeActionArg(k)}'))"` })),
-      todayVilla, { label: 'Mülk' });
+    const sayacV = {};
+    all.forEach(t => { if (t.villa && t.tag !== 'DONE') sayacV[t.villa] = (sayacV[t.villa] || 0) + 1; });
+    villaTabs.innerHTML = villaKeys.length < 2 ? '' : L.pickerHtml({
+      label: 'Mülk',
+      summary: todayVilla === 'ALL' ? 'Tümü' : (appData.villas[todayVilla]?.name || todayVilla),
+      type: 'radio',
+      name: 'todayVillaPick',
+      items: ['ALL'].concat(villaKeys).map(k => ({
+        key: k, label: k === 'ALL' ? 'Tümü' : (appData.villas[k].name || k), count: k === 'ALL' ? 0 : (sayacV[k] || 0), checked: k === todayVilla,
+        attr: `data-onchange="setTodayVilla(decodeURIComponent('${encodeActionArg(k)}'))"`
+      }))
+    });
   }
   const teamTabs = document.getElementById('todayTeamTabs');
   if (teamTabs) {
+    // Coklu secimde liste her isaretten sonra yeniden cizilir; acik kalsin.
+    const acikti = typeof teamTabs.querySelector === 'function' && !!teamTabs.querySelector('details[open]');
     const sayac = T.countByTeam(inVilla);
-    teamTabs.innerHTML = L.tabsHtml(
-      [{ key: 'ALL', label: 'Tüm ekipler' }].concat(visible.map(t => ({ key: t.key, label: t.label, count: sayac[t.key] || 0 })))
-        .map(it => Object.assign(it, { attr: `data-onclick="setTodayTeam(decodeURIComponent('${encodeActionArg(it.key)}'))"` })),
-      todayTeam, { label: 'Ekip', variant: 'chips' });
+    const secili = todayTeams ? visible.filter(t => todayTeams.includes(t.key)).map(t => t.label) : [];
+    teamTabs.innerHTML = L.pickerHtml({
+      label: 'Ekip',
+      summary: !todayTeams ? 'Tümü' : (secili.length <= 2 ? secili.join(', ') : `${secili.length} ekip`),
+      name: 'todayTeamPick',
+      items: [{ key: 'ALL', label: 'Tüm ekipler', checked: !todayTeams, attr: `data-onchange="toggleTodayTeam('ALL', this.checked)"` }]
+        .concat(visible.map(t => ({
+          key: t.key, label: t.label, count: sayac[t.key] || 0, checked: !!todayTeams && todayTeams.includes(t.key),
+          attr: `data-onchange="toggleTodayTeam(decodeURIComponent('${encodeActionArg(t.key)}'), this.checked)"`
+        })))
+    });
+    if (acikti) { const d = teamTabs.querySelector('details'); if (d) d.open = true; }
   }
 
   // Ozet: secili villanin bugunku giris/cikisi (rezervasyonu gorebilen rol).
@@ -17782,16 +17876,16 @@ function renderTodayLex() {
   const table = document.getElementById('todayTaskTable');
   if (table) {
     table.innerHTML = L.tableHtml({
-      head: ['Gün · ekip', 'İş', 'Talimat'],
+      head: TODAY_TASK_HEAD,
       rows: todayTaskRows(shown),
-      empty: todayTeam === 'ALL' ? 'Bugüne ait açık iş yok.' : 'Bu ekibin bugüne ait açık işi yok.',
+      empty: !todayTeams ? 'Bugüne ait açık iş yok.' : 'Seçili ekiplerin bugüne ait açık işi yok.',
       caption: 'Ekip görevleri'
     });
   }
   const footer = document.getElementById('todayFooter');
   if (footer) {
     footer.innerHTML = L.footerHtml({
-      legend: [{ tone: 'down', label: 'Acil' }, { tone: 'up', label: 'Yap' }, { tone: 'keep', label: 'Tamam' }, { tone: 'weekend', label: 'Hafta sonu' }],
+      legend: [{ tone: 'down', label: 'Acil' }, { tone: 'up', label: 'Yap' }, { tone: 'keep', label: 'Tamam' }],
       pdfAttr: 'data-onclick="printTodayPdf()"',
       excelAttr: 'data-onclick="downloadTodayExcel()"'
     });
@@ -17819,7 +17913,7 @@ function todayWeekRows(today) {
       const hareket = girisler.length + cikislar.length;
       rows.push({
         date: gun, c1: etiket.day, c1sub: etiket.weekday,
-        c2: `${dolu} / ${keys.length} dolu`,
+        c2: `${dolu}/${keys.length} dolu`,
         c2sub: hareket ? `${girisler.length} giriş · ${cikislar.length} çıkış` : '',
         tone: ayniGun.length ? 'down' : (hareket ? 'up' : 'keep'),
         tag: ayniGun.length ? 'Acil' : (hareket ? 'Yap' : 'Tamam'),
@@ -17852,7 +17946,25 @@ function renderTodayWeek(can, today) {
   if (box.hidden) return;
   const L = getLexUiApi();
   const table = document.getElementById('todayWeekTable');
-  if (table) table.innerHTML = L.tableHtml({ head: ['Gün', 'Durum', 'Talimat'], rows: todayWeekRows(today), caption: 'Bu hafta' });
+  if (table) table.innerHTML = todayWeekStripHtml(todayWeekRows(today), today);
+}
+
+// Bu hafta tek satir serit (sadelik 4. tur): 7 gun yan yana; hareket olmayan gun soluk,
+// ayni gun cikis+giris kirmizi kenar. Hesap todayWeekRows'tadir, burasi yalniz cizer.
+const TODAY_WEEKDAY_SHORT = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
+function todayWeekStripHtml(rows, today) {
+  const L = getLexUiApi();
+  const gunler = rows.map(r => {
+    const d = new Date(`${r.date}T12:00:00Z`);
+    const cls = ['lex-week__day', `is-${r.tone || 'keep'}`];
+    if (L.isWeekendNight(r.date)) cls.push('is-weekend');
+    if (r.date === today) cls.push('is-today');
+    const tarih = `${r.date === today ? 'Bugün' : TODAY_WEEKDAY_SHORT[d.getUTCDay()]} ${d.getUTCDate()}`;
+    const hareket = r.c2sub ? `<span class="lex-week__move" aria-hidden="true">${escapeHtml(r.c2sub)}</span>` : '';
+    const aciklama = `${r.c1} ${r.c1sub}: ${r.c2}${r.c2sub ? `, ${r.c2sub}` : ''}. ${r.tag} — ${r.reason}`;
+    return `<li class="${cls.join(' ')}" title="${escapeHtml(aciklama)}"><span class="lex-week__date" aria-hidden="true">${escapeHtml(tarih)}</span><span class="lex-week__val" aria-hidden="true">${escapeHtml(r.c2)}</span>${hareket}<span class="sr-only">${escapeHtml(aciklama)}</span></li>`;
+  }).join('');
+  return `<ol class="lex-week" aria-label="Bu hafta">${gunler}</ol>`;
 }
 
 // Bu ayin performansi: Finans'in aylik tablosuyla ayni fonksiyon. Hedef varsa
@@ -17947,8 +18059,9 @@ function todayReadinessJumpHtml(card) {
   return '';
 }
 
-function todayReadinessEditorHtml(card, api) {
-  if (!canManagePropertyReadiness()) return `${todayReadinessJumpHtml(card)}<span class="lex-cell__sub">Salt okunur · değiştirme yetkiniz yok</span>`;
+function todayReadinessEditorHtml(card, api, { jump = true } = {}) {
+  const git = jump ? todayReadinessJumpHtml(card) : '';
+  if (!canManagePropertyReadiness()) return `${git}<span class="lex-cell__sub">Salt okunur · değiştirme yetkiniz yok</span>`;
   const blocked = (card.blockingIssueCount || 0) > 0;
   const cleaningPending = !blocked && (card.pendingCleaningTaskIds || []).length > 0;
   const lockReason = blocked ? 'önce arızayı kapatın' : (cleaningPending ? 'önce temizliği tamamlayın' : '');
@@ -17957,7 +18070,7 @@ function todayReadinessEditorHtml(card, api) {
     const disabled = lockReason && SALEABLE_READINESS_STATUSES.includes(status);
     return `<option value="${escapeHtml(status)}"${card.manualStatus === status ? ' selected' : ''}${disabled ? ' disabled' : ''}>${escapeHtml(label)}${disabled ? ` — ${escapeHtml(lockReason)}` : ''}</option>`;
   }).join('');
-  return `<select class="lex-select property-readiness-select" aria-label="${escapeHtml(`${card.propertyName} satış durumu`)}" data-property-readiness-key="${escapeHtml(card.propertyKey)}" data-onchange="setPropertySalesReadiness(decodeURIComponent('${encodeActionArg(String(card.propertyKey))}'), this.value)"><option value="" disabled${card.manualStatus === 'UNSET' ? ' selected' : ''}>Durum seçin</option>${options}</select>${todayReadinessJumpHtml(card)}`;
+  return `<select class="lex-select property-readiness-select" aria-label="${escapeHtml(`${card.propertyName} satış durumu`)}" data-property-readiness-key="${escapeHtml(card.propertyKey)}" data-onchange="setPropertySalesReadiness(decodeURIComponent('${encodeActionArg(String(card.propertyKey))}'), this.value)"><option value="" disabled${card.manualStatus === 'UNSET' ? ' selected' : ''}>Durum seçin</option>${options}</select>${git}`;
 }
 
 function renderTodayReadiness(can) {
@@ -17968,19 +18081,32 @@ function renderTodayReadiness(can) {
   box.hidden = !api || !(can.operations || can.sales) || activeTodayVillaKeys().length === 0;
   if (box.hidden) return;
   const L = getLexUiApi();
-  const rows = todayReadinessCards().map(card => {
+  // Sadelik 4. tur: satisa hazir mulkler tek satirda; yalniz hazir olmayanlar satir olur.
+  // Durum secici varsayilan kapali "Durumu değiştir" altindadir (her mulk icin).
+  const cards = todayReadinessCards();
+  const hazir = cards.filter(c => c.status === 'SALES_READY');
+  const sorunlu = cards.filter(c => c.status !== 'SALES_READY');
+  const ozet = hazir.length
+    ? `<p class="lex-ready-line"><span class="lex-tag lex-tag--keep">Tamam</span> ${hazir.length === cards.length ? 'Tüm mülkler' : `${hazir.length} mülk`} satışa hazır: ${hazir.map(c => `<button type="button" class="lex-link-inline" data-onclick="goTo(decodeURIComponent('${encodeActionArg('property:' + c.propertyKey)}'))">${propertyNameHtml(c.propertyKey, c.propertyName)}</button>`).join(', ')}</p>`
+    : '';
+  const rows = sorunlu.map(card => {
     const meta = card.meta || api.STATUS_META.UNSET;
     const t = TODAY_READINESS_TAGS[card.status] || TODAY_READINESS_TAGS.UNSET;
+    const acik = card.openIssueCount || 0;
     return {
       c1: card.propertyName, c1Html: propertyNameHtml(card.propertyKey, card.propertyName),
-      c1sub: `${card.openIssueCount || 0} açık iş / arıza`,
+      c1sub: acik ? `${acik} açık iş / arıza` : '',
       c2: meta.label, c2sub: card.reason,
       c2Attr: `data-onclick="goTo(decodeURIComponent('${encodeActionArg('property:' + card.propertyKey)}'))"`,
       tone: t.tone, tag: t.tag, reason: t.reason,
-      c3extraHtml: todayReadinessEditorHtml(card, api)
+      c3extraHtml: todayReadinessJumpHtml(card)
     };
   });
-  grid.innerHTML = L.tableHtml({ head: ['Mülk', 'Durum', 'Talimat'], rows, caption: 'Mülk satış hazırlığı' });
+  const tablo = rows.length ? L.tableHtml({ head: ['Mülk', 'Durum', 'Ne yapılmalı'], rows, caption: 'Mülk satış hazırlığı' }) : '';
+  const duzenle = cards.length && canManagePropertyReadiness()
+    ? `<details class="lex-inline-edit"><summary>Durumu değiştir</summary><ul class="lex-ready-edit">${cards.map(card => `<li><span class="lex-ready-edit__name">${propertyNameHtml(card.propertyKey, card.propertyName)}</span>${todayReadinessEditorHtml(card, api, { jump: false })}</li>`).join('')}</ul></details>`
+    : '';
+  grid.innerHTML = ozet + tablo + duzenle;
 }
 
 // GOREV DAGITIMI (Ayarlar > Ekip). Her gorev turunun ekibi
@@ -18055,8 +18181,8 @@ function todayExportPages() {
   const keys = activeTodayVillaKeys();
   const pages = [];
   const yap = (villa, title) => {
-    const tasks = T.filterTasks(todayLastTasks, { villa, team: todayTeam });
-    pages.push({ title, summary: T.summaryParts(tasks, { stays: false }), rows: todayTaskRows(tasks), head: ['Gün · ekip', 'İş', 'Talimat'] });
+    const tasks = T.filterTasks(todayLastTasks, Object.assign({ villa }, todayTeamFilter()));
+    pages.push({ title, summary: T.summaryParts(tasks, { stays: false }), rows: todayTaskRows(tasks), head: TODAY_TASK_HEAD });
   };
   if (todayVilla === 'ALL') {
     yap('ALL', 'Bugün · Tüm mülkler');
@@ -18070,11 +18196,11 @@ function downloadTodayExcel() {
   const L = getLexUiApi();
   const sheets = todayExportPages().map(pg => ({
     name: pg.title.replace(/^Bugün · /, ''),
-    head: ['Gün', 'Ekip / tür', 'İş', 'Talimat', 'Gerekçe'],
-    rows: pg.rows.map(r => [r.c1, `${r.c1sub} · ${r.c2sub}`, r.c2, r.tag, r.reason || ''])
+    head: ['Ekip', 'İş', 'Tür', 'Ne zaman', 'Talimat', 'Gerekçe'],
+    rows: pg.rows.filter(r => !r.group).map(r => [r.team || '', r.c1, r.c1sub || '', [r.c2, r.c2sub].filter(Boolean).join(' · '), r.tag, r.reason || ''])
   }));
   const wb = L.buildWorkbook(XLSX, sheets);
-  wb.SheetNames.forEach(n => { wb.Sheets[n]['!cols'] = [{ wch: 10 }, { wch: 34 }, { wch: 34 }, { wch: 10 }, { wch: 48 }]; });
+  wb.SheetNames.forEach(n => { wb.Sheets[n]['!cols'] = [{ wch: 12 }, { wch: 34 }, { wch: 24 }, { wch: 16 }, { wch: 10 }, { wch: 48 }]; });
   XLSX.writeFile(wb, `Lexbnb_Bugun_${getTodayStr()}.xlsx`);
   return true;
 }
@@ -18991,16 +19117,40 @@ function propertyNameHtml(villaKey, name) {
   return `<span class="property-name"><span class="property-color-dot" data-lx-literal-color style="background:${escapeHtml(getPropertyColor(villaKey))}" aria-hidden="true"></span>${escapeHtml(name)}</span>`;
 }
 
+// Sadelik 4. tur (kullanici 22.11.2026): 10 renk kutusu yerine tek nokta; tiklayinca
+// acilir secici (core/color_picker.js): renk alani, ton, parlaklik, son kullanilanlar.
 function propertyColorPickerHtml(villaKey) {
   const current = getPropertyColor(villaKey);
-  return `<div class="property-color-picker" role="group" aria-label="Mülk rengi"><span class="sub-text">Renk</span>${PROPERTY_COLOR_PALETTE.map(([color, label]) => `<button type="button" class="property-color-swatch${color === current ? ' is-selected' : ''}" data-lx-literal-color style="background:${escapeHtml(color)}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}" aria-pressed="${color === current}" data-onclick="setPropertyColor(decodeURIComponent('${encodeActionArg(villaKey)}'), decodeURIComponent('${encodeActionArg(color)}'))"></button>`).join('')}</div>`;
+  const ad = appData?.villas?.[villaKey]?.name || villaKey;
+  return `<button type="button" class="property-color-btn" data-lx-literal-color style="background:${escapeHtml(current)}" title="Rengi değiştir" aria-label="${escapeHtml(`${ad} rengi ${current}; değiştir`)}" data-onclick="openPropertyColorPicker(decodeURIComponent('${encodeActionArg(villaKey)}'), this)"></button>`;
+}
+
+// Son kullanilanlar: isletmenin mulk renkleri, sonra hazir palet.
+function propertyRecentColors() {
+  const villas = appData?.villas || {};
+  const kayitli = Object.keys(villas).map(k => getPropertyColor(k));
+  return kayitli.concat(PROPERTY_COLOR_PALETTE.map(([c]) => c));
+}
+
+function openPropertyColorPicker(villaKey, anchor) {
+  if (!canManageTenantRole(activeTenant?.role)) return false;
+  const picker = typeof window !== 'undefined' ? window.LexColorPicker : null;
+  if (!picker) return false;
+  return picker.open({
+    anchor,
+    value: getPropertyColor(villaKey),
+    recent: propertyRecentColors(),
+    title: `${appData?.villas?.[villaKey]?.name || 'Mülk'} rengi`,
+    onSelect: color => setPropertyColor(villaKey, color)
+  });
 }
 
 async function setPropertyColor(villaKey, color) {
   if (!canManageTenantRole(activeTenant?.role)) return false;
   const propertyId = appData?.villas?.[villaKey]?.id;
   const next = String(color || '').toUpperCase();
-  if (!propertyId || !PROPERTY_COLOR_PALETTE.some(([value]) => value === next)) return false;
+  // Serbest renk (secici): yalniz #RRGGBB; style ozniteligine baska bir sey girmez.
+  if (!propertyId || !/^#[0-9A-F]{6}$/.test(next)) return false;
   const colors = { ...(appData?.tenantSettings?.property_colors || {}), [propertyId]: next };
   try {
     await cloudSaveTenantSetting('property_colors', colors);
@@ -19032,11 +19182,12 @@ function renderPropertiesTab() {
 
   grid.innerHTML = propKeys.map(k => {
     const v = villas[k];
+    const adHtml = canManage ? `<span class="property-name">${propertyColorPickerHtml(k)}${escapeHtml(v.name || 'Adsız mülk')}</span>` : propertyNameHtml(k, v.name || 'Adsız mülk');
     return `
       <div class="property-health-card status-HEALTHY">
         <div style="display: flex; justify-content: space-between; align-items: flex-start;">
           <div>
-            <strong style="font-size: 15px; color: #FFFFFF;">${propertyNameHtml(k, v.name || 'Adsız mülk')}</strong>
+            <strong style="font-size: 15px; color: #FFFFFF;">${adHtml}</strong>
             <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Kod: ${escapeHtml(k)} • Kapasite: ${escapeHtml(v.capacity || 'Belirtilmedi')}</div>
           </div>
           <span class="badge badge-green">Aktif</span>
@@ -19047,7 +19198,6 @@ function renderPropertiesTab() {
             <strong style="color: ${color}; font-size: 12px;">${propertyMoney(value === '' ? null : value)}</strong>
           </div>`).join('')}
         </div>
-        ${canManage ? propertyColorPickerHtml(k) : ''}
         <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px;">
           <button class="btn btn-secondary btn-sm" data-onclick="setPropertyProfile(decodeURIComponent('${encodeActionArg(k)}'))" style="font-size: 11px;">Profili Aç</button>
           ${canManage ? `<button class="btn btn-secondary btn-sm" data-onclick="openPropertyModal(decodeURIComponent('${encodeActionArg(k)}'))" style="font-size: 11px;">Düzenle</button>` : ''}
@@ -19664,12 +19814,16 @@ async function resolveMaintenanceFromOperations(ticketId) {
   }
 }
 
-async function createGeneralOperationalTask(templateId = null) {
+async function createGeneralOperationalTask(templateId = null, options) {
+  const { askTitle = true, openPage = false } = options || {};
   const template = templateId ? (appData?.taskTemplates || []).find(item => item.id === templateId) : null;
-  const title = template?.title || await uiAskText({ title: 'Yeni genel görev', label: 'Görev başlığı', placeholder: 'Örn: Bahçe sulama sistemini kontrol et' });
+  // Notion tarzi sayfa (sadelik 4. tur): yeni sayfa "Adsız sayfa" adiyla acilir, baslik sayfada yazilir.
+  const title = template?.title || (askTitle
+    ? await uiAskText({ title: 'Yeni genel görev', label: 'Görev başlığı', placeholder: 'Örn: Bahçe sulama sistemini kontrol et' })
+    : OPERATIONAL_TASK_PAGE_UNTITLED);
   if (!String(title || '').trim()) return false;
   try {
-    await createOperationalTask({
+    const row = await createOperationalTask({
       property_id: null,
       task_type: template?.task_type || 'GENERAL',
       title: String(title).trim(),
@@ -19679,6 +19833,12 @@ async function createGeneralOperationalTask(templateId = null) {
       checklist: template?.default_checklist || {},
       source: 'MANUAL'
     });
+    if (openPage && row?.id) {
+      if (!Array.isArray(appData.operationalTasks)) appData.operationalTasks = [];
+      appData.operationalTasks.unshift(row);
+      openOperationalTaskPage(row.id, { focusTitle: !template });
+      return true;
+    }
     await loadTenantAppData(getActiveTenantId());
     if (typeof showToast === 'function') showToast('✅ Genel görev oluşturuldu.');
     return true;
@@ -19689,7 +19849,12 @@ async function createGeneralOperationalTask(templateId = null) {
 }
 
 function createTaskFromTemplate(templateId) {
-  return createGeneralOperationalTask(templateId);
+  return createGeneralOperationalTask(templateId, { openPage: true });
+}
+
+function createOperationalTaskPage() {
+  if (!canManageOperationsRole(activeTenant?.role)) return false;
+  return createGeneralOperationalTask(null, { askTitle: false, openPage: true });
 }
 
 async function assignOperationalTask(taskId, userId) {
@@ -19706,10 +19871,6 @@ async function assignOperationalTask(taskId, userId) {
   }
 }
 
-function assignOperationalTaskFromSelect(taskId) {
-  const select = document.getElementById(`opsTaskPerson-${taskId}`);
-  return assignOperationalTask(taskId, select?.value || '');
-}
 
 async function setOperationalTaskStatus(taskId, status) {
   if (!['DONE', 'CANCELLED'].includes(status)) return false;
@@ -19925,6 +20086,255 @@ async function deleteOperationalTaskFromModal() {
   return true;
 }
 
+// =============================================================
+// GOREV SAYFASI (Notion tarzi, sadelik 4. tur, kullanici 22.11.2026).
+// Sayfa = operational_tasks satiri. Govde core/task_page.js'te (basliklar = alanlar,
+// yapilacak + alt yapilacak, isaretleme). Yazim 600 ms sonra, isaret ve yapi hemen
+// kaydedilir; kendi kaydimizdan sonra ekran yeniden yuklenmez (odak kaybolmaz).
+// Yazma dusunce ekran gercege geri cekilir (3.3). Goc yok: bicim phase55/96 ile ayni.
+// =============================================================
+const OPERATIONAL_TASK_PAGE_UNTITLED = 'Adsız sayfa';
+let opsTaskPageId = null;
+let opsTaskPageDraft = null; // { id, sections }
+let opsTaskPagePending = {};
+let opsTaskPageTimer = null;
+let opsTaskPageFocusTitle = false;
+
+function getTaskPageApi() {
+  if (typeof TaskPage !== 'undefined') return TaskPage;
+  if (typeof window !== 'undefined' && window.TaskPage) return window.TaskPage;
+  if (typeof require === 'function') return require('./core/task_page.js');
+  return null;
+}
+
+function openOperationalTaskPage(taskId, { focusTitle = false } = {}) {
+  const task = (appData?.operationalTasks || []).find(item => item.id === taskId);
+  if (!task) return false;
+  if (opsTaskPageId && opsTaskPageId !== taskId) flushOperationalTaskPage();
+  opsTaskPageId = taskId;
+  if (!opsTaskPageDraft || opsTaskPageDraft.id !== taskId) opsTaskPageDraft = null;
+  opsTaskPageFocusTitle = !!focusTitle;
+  operationsViewState = 'tasks';
+  renderOperationsTab();
+  return true;
+}
+
+function closeOperationalTaskPage() {
+  flushOperationalTaskPage();
+  opsTaskPageId = null;
+  opsTaskPageDraft = null;
+  renderOperationsTab();
+  return true;
+}
+
+function operationalTaskPageDraft(task) {
+  const api = getTaskPageApi();
+  if (!opsTaskPageDraft || opsTaskPageDraft.id !== task.id) {
+    opsTaskPageDraft = { id: task.id, sections: api ? api.fromStored(task.checklist) : [] };
+  }
+  return opsTaskPageDraft.sections;
+}
+
+function operationalTaskPageEditable(task) {
+  return canManageOperationsRole(activeTenant?.role) && !['DONE', 'CANCELLED'].includes(String(task?.status || '').toUpperCase());
+}
+
+// Sayfa alani: baslik, yer (mulk), kisi, son tarih, oncelik. Gecersiz deger yazilmaz.
+function setOperationalTaskPageField(field, value) {
+  const task = (appData?.operationalTasks || []).find(item => item.id === opsTaskPageId);
+  if (!task || !operationalTaskPageEditable(task)) return false;
+  const v = String(value ?? '');
+  if (field === 'title') {
+    const title = v.trim();
+    if (!title || title.length > 255) return false;
+    opsTaskPagePending.title = title;
+    task.title = title;
+    scheduleOperationalTaskPageSave(600);
+    return true;
+  }
+  if (field === 'property') {
+    const id = v ? appData?.villas?.[v]?.id : null;
+    if (v && !isUUID(id)) return false;
+    opsTaskPagePending.property_id = id || null;
+  } else if (field === 'person') {
+    if (v && !(appData?.operationalPeople || []).some(person => person.user_id === v)) return false;
+    opsTaskPagePending.assigned_to = v || null;
+  } else if (field === 'due') {
+    if (v && !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+    opsTaskPagePending.due_at = buildOperationalTaskDueAt(v, '');
+  } else if (field === 'priority') {
+    if (!OPERATIONAL_TASK_PRIORITY_LABELS[v]) return false;
+    opsTaskPagePending.priority = v;
+  } else return false;
+  Object.assign(task, opsTaskPagePending);
+  scheduleOperationalTaskPageSave(0);
+  return true;
+}
+
+function scheduleOperationalTaskPageSave(delay) {
+  if (opsTaskPageTimer) clearTimeout(opsTaskPageTimer);
+  opsTaskPageTimer = setTimeout(() => { flushOperationalTaskPage(); }, delay);
+}
+
+function onOperationalTaskPageChange(kind) {
+  opsTaskPagePending.checklist = true;
+  refreshOperationalTaskPageFooter();
+  scheduleOperationalTaskPageSave(kind === 'text' ? 600 : 0);
+}
+
+async function flushOperationalTaskPage() {
+  if (opsTaskPageTimer) { clearTimeout(opsTaskPageTimer); opsTaskPageTimer = null; }
+  const taskId = opsTaskPageId;
+  const pending = opsTaskPagePending;
+  opsTaskPagePending = {};
+  if (!taskId || !Object.keys(pending).length) return true;
+  const task = (appData?.operationalTasks || []).find(item => item.id === taskId);
+  if (!task) return false;
+  const patch = { ...pending };
+  if (patch.checklist) {
+    const api = getTaskPageApi();
+    patch.checklist = api.toStored(operationalTaskPageDraft(task), task.checklist);
+  }
+  const tenantId = getActiveTenantId();
+  try {
+    requireCloudForWrite('Görev sayfası', tenantId);
+    const row = await updateOperationalTask(taskId, patch);
+    if (row) Object.assign(task, row);
+    else Object.assign(task, patch);
+    renderOperationalTaskList();
+    return true;
+  } catch (error) {
+    if (typeof showToast === 'function') showToast('⚠️ Görev sayfası kaydedilemedi: ' + getFriendlyAuthErrorMessage(error), 'error');
+    opsTaskPageDraft = null;
+    if (isCloudTenant(tenantId)) await loadTenantAppData(tenantId);
+    renderOperationsTab();
+    return false;
+  }
+}
+
+async function completeOperationalTaskPage() {
+  const task = (appData?.operationalTasks || []).find(item => item.id === opsTaskPageId);
+  if (!task) return false;
+  const api = getTaskPageApi();
+  const durum = api.progress(operationalTaskPageDraft(task));
+  if (!durum.canComplete) {
+    if (typeof showToast === 'function') showToast(`⚠️ Önce önemli maddeleri işaretleyin: ${durum.missing.slice(0, 3).join(', ')}`, 'error');
+    return false;
+  }
+  await flushOperationalTaskPage();
+  return setOperationalTaskStatus(task.id, 'DONE');
+}
+
+function operationalTaskPropertyName(task) {
+  if (!task?.property_id) return 'Genel';
+  const villa = Object.values(appData?.villas || {}).find(item => item.id === task.property_id);
+  return villa?.name || 'Mülke bağlı';
+}
+
+// Sayfa listesi: baslik · yer · kisi · son tarih · ilerleme.
+function operationalTaskListHtml() {
+  const api = getTaskPageApi();
+  const today = getTodayStr();
+  const priorityRank = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+  const dueKey = task => operationalTaskDueParts(task.due_at).date || '9999-99-99';
+  const tasks = appData?.operationalTasks || [];
+  const acik = tasks.filter(task => !['DONE', 'CANCELLED'].includes(String(task.status || '').toUpperCase()))
+    .sort((a, b) => (dueKey(a) < today ? 0 : 1) - (dueKey(b) < today ? 0 : 1)
+      || (priorityRank[a.priority] ?? 2) - (priorityRank[b.priority] ?? 2)
+      || dueKey(a).localeCompare(dueKey(b)));
+  // Kapanan gorevlerin izi arayuzde kalir (L-281).
+  const kapali = tasks.filter(task => ['DONE', 'CANCELLED'].includes(String(task.status || '').toUpperCase()))
+    .sort((a, b) => String(b.updated_at || b.completed_at || '').localeCompare(String(a.updated_at || a.completed_at || ''))).slice(0, 20);
+  const satir = task => {
+    const p = api ? api.storedProgress(task.checklist) : { total: 0, done: 0 };
+    const yuzde = p.total ? Math.round((p.done / p.total) * 100) : 0;
+    const meta = [operationalTaskPropertyName(task), operationalTaskAssigneeName(task), operationalTaskDueLabel(task, today)].filter(Boolean).join(' · ');
+    const kapaliMi = ['DONE', 'CANCELLED'].includes(String(task.status || '').toUpperCase());
+    const onemli = ['HIGH', 'CRITICAL'].includes(task.priority) && !kapaliMi ? `<span class="lex-tag lex-tag--${task.priority === 'CRITICAL' ? 'down' : 'up'}">${escapeHtml(OPERATIONAL_TASK_PRIORITY_LABELS[task.priority])}</span>` : '';
+    return `<button type="button" class="tp-list__row${task.id === opsTaskPageId ? ' is-active' : ''}" data-operational-task-id="${escapeHtml(task.id)}" data-onclick="openOperationalTaskPage(decodeURIComponent('${encodeActionArg(task.id)}'))">`
+      + `<span class="tp-list__title">${escapeHtml(task.title || OPERATIONAL_TASK_PAGE_UNTITLED)}${onemli}</span>`
+      + `<span class="tp-list__meta">${escapeHtml(kapaliMi ? (String(task.status).toUpperCase() === 'DONE' ? 'Tamamlandı' : 'İptal edildi') : meta)}</span>`
+      + (p.total ? `<span class="tp-list__progress"><span class="tp-bar"><span class="tp-bar__fill" style="width:${yuzde}%"></span></span>${p.done}/${p.total}</span>` : '')
+      + '</button>';
+  };
+  const kapaliHtml = kapali.length ? `<details class="tp-list__closed"><summary>Kapanan sayfalar (${kapali.length})</summary>${kapali.map(satir).join('')}</details>` : '';
+  return (acik.length ? acik.map(satir).join('') : '<p class="tp-empty">Açık görev sayfası yok.</p>') + kapaliHtml;
+}
+
+function renderOperationalTaskList() {
+  const list = typeof document !== 'undefined' ? document.getElementById('tpList') : null;
+  if (list) list.innerHTML = operationalTaskListHtml();
+}
+
+function refreshOperationalTaskPageFooter() {
+  const box = typeof document !== 'undefined' ? document.getElementById('tpFooter') : null;
+  const task = (appData?.operationalTasks || []).find(item => item.id === opsTaskPageId);
+  if (!box || !task) return;
+  box.innerHTML = operationalTaskPageFooterHtml(task);
+}
+
+function operationalTaskPageFooterHtml(task) {
+  const api = getTaskPageApi();
+  const p = api.progress(operationalTaskPageDraft(task));
+  const kapali = ['DONE', 'CANCELLED'].includes(String(task.status || '').toUpperCase());
+  const yonetir = canManageOperationsRole(activeTenant?.role);
+  const durum = p.total ? `${p.done}/${p.total} tamamlandı` : 'Henüz yapılacak yok';
+  const neden = !kapali && !p.canComplete ? `<span class="tp-footer__why">Tamamlamak için önemli (★) maddeler işaretlenmeli: ${escapeHtml(p.missing.slice(0, 2).join(', '))}${p.missing.length > 2 ? '…' : ''}</span>` : '';
+  const dugmeler = yonetir ? (kapali
+    ? `<button type="button" class="lex-btn" data-onclick="openOperationalTaskModal(decodeURIComponent('${encodeActionArg(task.id)}'))">Ayrıntılar / yeniden aç</button>`
+    : `<button type="button" class="lex-btn" data-onclick="openOperationalTaskModal(decodeURIComponent('${encodeActionArg(task.id)}'))">Ayrıntılar</button><button type="button" class="lex-btn" data-onclick="setOperationalTaskStatus(decodeURIComponent('${encodeActionArg(task.id)}'), 'CANCELLED')">İptal et</button><button type="button" class="lex-btn lex-btn--primary" data-onclick="completeOperationalTaskPage()"${p.canComplete ? '' : ' disabled'}>Tamamla</button>`) : '';
+  return `<span class="tp-footer__status">${escapeHtml(kapali ? OPERATIONAL_TASK_STATUS_LABELS[String(task.status).toUpperCase()] : durum)}</span>${neden}<span class="tp-footer__actions">${dugmeler}</span>`;
+}
+
+function operationalTaskPageHtml(task) {
+  const edit = operationalTaskPageEditable(task);
+  const dis = edit ? '' : ' disabled';
+  const villaKey = task.property_id ? (Object.keys(appData?.villas || {}).find(key => appData.villas[key]?.id === task.property_id) || '') : '';
+  const villaOptions = ['<option value="">Genel (mülk yok)</option>'].concat(Object.keys(appData?.villas || {})
+    .filter(key => appData.villas[key] && appData.villas[key].isActive !== false && !appData.villas[key].archivedAt)
+    .map(key => `<option value="${escapeHtml(key)}"${key === villaKey ? ' selected' : ''}>${escapeHtml(appData.villas[key].name || key)}</option>`)).join('');
+  const people = (appData?.operationalPeople || []).filter(person => person.user_id && (person.is_active !== false || person.user_id === task.assigned_to));
+  const personOptions = ['<option value="">Atanmadı</option>'].concat(people.map(person => `<option value="${escapeHtml(person.user_id)}"${person.user_id === task.assigned_to ? ' selected' : ''}>${escapeHtml(person.full_name || '—')}</option>`)).join('');
+  const priorityOptions = Object.entries(OPERATIONAL_TASK_PRIORITY_LABELS).map(([key, label]) => `<option value="${key}"${key === (task.priority || 'MEDIUM') ? ' selected' : ''}>${escapeHtml(label)}</option>`).join('');
+  const due = operationalTaskDueParts(task.due_at).date;
+  const prop = (label, fieldHtml) => `<label class="tp-prop"><span class="tp-prop__label">${escapeHtml(label)}</span>${fieldHtml}</label>`;
+  return `<button type="button" class="tp-back" data-onclick="closeOperationalTaskPage()">← Sayfalar</button>`
+    + `<input type="text" id="tpTitle" class="tp-title" value="${escapeHtml(task.title || '')}" placeholder="${OPERATIONAL_TASK_PAGE_UNTITLED}" maxlength="255" aria-label="Sayfa adı" data-oninput="setOperationalTaskPageField('title', this.value)"${edit ? '' : ' readonly'}>`
+    + `<div class="tp-props">`
+    + prop('Yer', `<select class="lex-select" data-onchange="setOperationalTaskPageField('property', this.value)"${dis}>${villaOptions}</select>`)
+    + prop('Kişi', `<select class="lex-select" data-onchange="setOperationalTaskPageField('person', this.value)"${dis}>${personOptions}</select>`)
+    + prop('Son tarih', `<input type="date" class="lex-input" value="${escapeHtml(due)}" data-onchange="setOperationalTaskPageField('due', this.value)"${dis}>`)
+    + prop('Öncelik', `<select class="lex-select" data-onchange="setOperationalTaskPageField('priority', this.value)"${dis}>${priorityOptions}</select>`)
+    + `</div>`
+    + (task.description ? `<p class="tp-desc">${escapeHtml(task.description)}</p>` : '')
+    + `<div id="tpBody" class="tp-body"></div>`
+    + `<div id="tpFooter" class="tp-footer">${operationalTaskPageFooterHtml(task)}</div>`;
+}
+
+function renderOperationalTaskPages(container) {
+  const api = getTaskPageApi();
+  const canEdit = canManageOperationsRole(activeTenant?.role);
+  const task = opsTaskPageId ? (appData?.operationalTasks || []).find(item => item.id === opsTaskPageId) : null;
+  if (!task) { opsTaskPageId = null; opsTaskPageDraft = null; }
+  const templates = appData?.taskTemplates || [];
+  const sablonDuzenleHtml = canManageTenantRole(activeTenant?.role) ? `<button type="button" class="tp-template tp-template--edit" data-onclick="openSettingsSection(decodeURIComponent('${encodeActionArg('templates')}'))">Şablonları düzenle →</button>` : '';
+  const sablonlar = canEdit && templates.length
+    ? `<details class="lex-picker tp-templates"><summary class="lex-picker__btn">Şablondan başla</summary><div class="lex-picker__list">${templates.map(template => `<button type="button" class="tp-template" data-onclick="createTaskFromTemplate(decodeURIComponent('${encodeActionArg(template.id)}'))">${escapeHtml(template.title)}<span>${escapeHtml(TEMPLATE_TASK_TYPE_LABELS[template.task_type] || 'Genel')}</span></button>`).join('')}${sablonDuzenleHtml}</div></details>`
+    : '';
+  const arac = canEdit ? `<div class="tp-toolbar"><button type="button" class="lex-btn lex-btn--primary" data-onclick="createOperationalTaskPage()">+ Yeni sayfa</button>${sablonlar}</div>` : '';
+  container.innerHTML = `<div class="tp-layout${task ? ' has-page' : ''}"><section class="tp-side" aria-label="Görev sayfaları">${arac}<div id="tpList" class="tp-list">${operationalTaskListHtml()}</div></section>`
+    + (task ? `<article class="tp-page" aria-label="${escapeHtml(task.title || OPERATIONAL_TASK_PAGE_UNTITLED)}">${operationalTaskPageHtml(task)}</article>` : `<p class="tp-hint">Bir sayfa seçin ya da yeni sayfa açın. Sayfa = görev; başlıklar alanlardır (Mutfak, Oda 1), altına yapılacakları ve alt yapılacakları yazın.</p>`)
+    + '</div>';
+  if (!task || !api || typeof document === 'undefined') return;
+  const body = document.getElementById('tpBody');
+  if (body && body.addEventListener) api.mount(body, { draft: operationalTaskPageDraft(task), canEdit: operationalTaskPageEditable(task), onChange: onOperationalTaskPageChange });
+  if (opsTaskPageFocusTitle) {
+    opsTaskPageFocusTitle = false;
+    const title = document.getElementById('tpTitle');
+    if (title && title.focus) { title.focus(); if (title.select) title.select(); }
+  }
+}
+
 function renderCleaningExecutionFlags(execution) {
   if (!execution) return '';
   const snapshot = Array.isArray(execution.supplies_snapshot) ? execution.supplies_snapshot : [];
@@ -20053,46 +20463,7 @@ function renderOperationsTab() {
     }).join('') : '<div class="empty-state">Açık arıza veya bakım kaydı yok.</div>';
     if (open.length && !technicians.length) container.innerHTML = fieldTeamHintHtml('TECHNICIAN') + container.innerHTML;
   } else {
-    const operational = (appData?.operationalTasks || []).filter(task => !['DONE', 'CANCELLED'].includes(String(task.status || '').toUpperCase()));
-    // Kapanan gorevlerin izi arayuzde kalir (L-281): iptal edilen gorev
-    // hicbir listede gorunmuyordu, iz yalniz veritabanindaydi.
-    const kapananlar = (appData?.operationalTasks || []).filter(task => ['DONE', 'CANCELLED'].includes(String(task.status || '').toUpperCase()))
-      .sort((a, b) => String(b.updated_at || b.completed_at || '').localeCompare(String(a.updated_at || a.completed_at || ''))).slice(0, 20);
-    const canEditTasks = canManageOperationsRole(activeTenant?.role);
-    const editTaskButton = task => canEditTasks
-      ? `<button class="btn btn-secondary btn-sm" title="Ayrıntı / Düzenle" data-onclick="openOperationalTaskModal(decodeURIComponent('${encodeActionArg(task.id)}'))">Düzenle</button>`
-      : '';
-    const kapananHtml = kapananlar.length
-      ? `<section class="ops-group" style="margin-top:12px"><details><summary><strong>Kapanan görevler</strong> <span class="badge">${kapananlar.length}</span></summary>${kapananlar.map(task => `<article class="ops-row"><div class="ops-row-main"><strong>${escapeHtml(task.title || '—')}</strong><span>${String(task.status).toUpperCase() === 'DONE' ? 'Tamamlandı' : 'İptal edildi'}${task.completed_at || task.updated_at ? ' · ' + escapeHtml(formatTrDate(String(task.completed_at || task.updated_at).slice(0, 10))) : ''}</span></div><div class="ops-row-actions">${editTaskButton(task)}</div></article>`).join('')}</details></section>`
-      : '';
-    // Geciken once, sonra oncelik, sonra son tarih; tarihsiz gorev en sonda.
-    const priorityRank = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
-    const today = getTodayStr();
-    const dueKey = task => operationalTaskDueParts(task.due_at).date || '9999-99-99';
-    operational.sort((a, b) => (dueKey(a) < today ? 0 : 1) - (dueKey(b) < today ? 0 : 1)
-      || (priorityRank[a.priority] ?? 2) - (priorityRank[b.priority] ?? 2)
-      || dueKey(a).localeCompare(dueKey(b)));
-    const taskLine = task => {
-      const property = task.property_id ? Object.values(appData?.villas || {}).find(villa => villa.id === task.property_id) : null;
-      const parts = [
-        property ? property.name : (task.property_id ? 'Mülke bağlı' : 'Genel görev'),
-        OPERATIONAL_TASK_STATUS_LABELS[String(task.status || 'TODO').toUpperCase()] || task.status || 'Yapılacak'
-      ];
-      const due = operationalTaskDueLabel(task, today);
-      if (due) parts.push(due);
-      const assignee = operationalTaskAssigneeName(task);
-      if (assignee) parts.push('Görevli: ' + assignee);
-      return parts.map(escapeHtml).join(' · ');
-    };
-    const priorityBadge = task => ['HIGH', 'CRITICAL'].includes(task.priority)
-      ? `<span class="badge ${task.priority === 'CRITICAL' ? 'badge-red' : 'badge-amber'}">${escapeHtml(OPERATIONAL_TASK_PRIORITY_LABELS[task.priority])}</span>`
-      : '';
-    const templates = appData?.taskTemplates || [];
-    const assignees = (appData?.operationalPeople || []).filter(person => person.user_id && person.is_active !== false);
-    const editTemplatesLink = canManageTenantRole(activeTenant?.role)
-      ? `<button class="btn btn-secondary btn-sm" data-onclick="openSettingsSection(decodeURIComponent('${encodeActionArg('templates')}'))">Şablonu düzenle →</button>`
-      : '';
-    container.innerHTML = `<div class="ops-cleaning-layout"><section class="ops-group"><div class="section-title-bar"><h3>Aktif görevler <span class="badge">${operational.length}</span></h3>${canEditTasks ? '<button class="btn btn-primary btn-sm" data-onclick="openOperationalTaskModal()">+ Yeni görev</button>' : ''}</div>${operational.length ? operational.map(task => { const options = assignees.map(person => `<option value="${escapeHtml(person.user_id)}"${person.user_id === task.assigned_to ? ' selected' : ''}>${escapeHtml(person.full_name)}</option>`).join(''); return `<article class="ops-row" data-operational-task-id="${escapeHtml(task.id)}"><div class="ops-row-main"><strong>${escapeHtml(task.title || '—')}</strong><span>${taskLine(task)}</span>${task.description ? `<span>${escapeHtml(task.description)}</span>` : ''}</div>${priorityBadge(task)}<div class="ops-row-actions">${editTaskButton(task)}<select id="opsTaskPerson-${escapeHtml(task.id)}" aria-label="Görevli seç"><option value="">Ekip üyesi seç…</option>${options}</select><button class="btn btn-secondary btn-sm" data-onclick="assignOperationalTaskFromSelect(decodeURIComponent('${encodeActionArg(task.id)}'))">Ata</button><button class="btn btn-primary btn-sm" data-onclick="setOperationalTaskStatus(decodeURIComponent('${encodeActionArg(task.id)}'), 'DONE')">Tamamla</button><button class="btn btn-secondary btn-sm" data-onclick="setOperationalTaskStatus(decodeURIComponent('${encodeActionArg(task.id)}'), 'CANCELLED')">İptal</button></div></article>`; }).join('') : '<div class="empty-state">Aktif görev yok.</div>'}${kapananHtml}</section><aside class="ops-debt-panel"><h3>Hazır görev kütüphanesi</h3>${editTemplatesLink}${templates.length ? templates.map(template => `<div class="ops-debt-row"><div><strong>${escapeHtml(template.title)}</strong><span>${escapeHtml(TEMPLATE_TASK_TYPE_LABELS[template.task_type] || 'Genel')}</span></div><button class="btn btn-secondary btn-sm" data-onclick="createTaskFromTemplate(decodeURIComponent('${encodeActionArg(template.id)}'))">Görev oluştur</button></div>`).join('') : '<div class="empty-state">Henüz görev şablonu yok.</div>'}</aside></div>`;
+    renderOperationalTaskPages(container);
   }
 }
 
@@ -23035,6 +23406,7 @@ if (typeof module !== 'undefined' && module.exports) {
     todayWeekRows,
     setTodayVilla,
     setTodayTeam,
+    toggleTodayTeam,
     teamTaskPermissions,
     parseWhatsAppMessageText,
     buildWhatsAppLeadSaveMessage,
@@ -23130,6 +23502,7 @@ if (typeof module !== 'undefined' && module.exports) {
     getPropertyColor,
     propertyNameHtml,
     propertyColorPickerHtml,
+    openPropertyColorPicker,
     setPropertyColor,
     PROPERTY_COLOR_PALETTE,
     getSupabaseClient,
@@ -23495,6 +23868,13 @@ if (typeof module !== 'undefined' && module.exports) {
     resolveMaintenanceFromOperations,
     getStaffFieldWorkRange,
     createGeneralOperationalTask,
+    createOperationalTaskPage,
+    openOperationalTaskPage,
+    closeOperationalTaskPage,
+    setOperationalTaskPageField,
+    flushOperationalTaskPage,
+    completeOperationalTaskPage,
+    renderOperationalTaskPages,
     assignOperationalTask,
     renderTapeChart,
     renderPricingTab,

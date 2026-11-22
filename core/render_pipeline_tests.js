@@ -356,7 +356,9 @@ function run() {
       '23. Yetkili kullanici her mulkun durumunu anasayfadan degistirebiliyor',
       grid.slice(0, 1200));
     // Satisa engel ariza varken satilabilir secenekler kapalidir (L-179).
-    const kirmiziSatir = grid.slice(grid.indexOf('Kırmızı Ev'));
+    // Sadelik 4. tur: secici "Durumu değiştir" listesindedir.
+    const duzenleListesi = grid.slice(grid.indexOf('lex-ready-edit'));
+    const kirmiziSatir = duzenleListesi.slice(duzenleListesi.indexOf('Kırmızı Ev'));
     check(/<option value="SALES_READY"[^>]*disabled/.test(kirmiziSatir.slice(0, kirmiziSatir.indexOf('</select>'))),
     '24. Satisa engel arizali mulkte "satisa hazir" secilemez (ayni normalize sonuc)');
 
@@ -364,7 +366,7 @@ function run() {
     app.renderExecutiveControlCenter();
     const viewerGrid = global.document.getElementById('portfolioHealthCardsGrid').innerHTML;
     check(!viewerGrid.includes('property-readiness-select')
-      && viewerGrid.includes('Salt okunur'),
+      && !viewerGrid.includes('Durumu değiştir') && viewerGrid.includes('Kırmızı Ev'),
     '25. Yetkisiz kullanici durumu goruyor ama degistirme kontrolu gormuyor',
     viewerGrid.slice(0, 1200));
   } catch (e) {

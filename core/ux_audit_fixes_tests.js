@@ -239,7 +239,9 @@ function fakeDom() {
   });
 
   await test('U-20 Kucuk hedefler: renk secici 24 px, siralama basligi 24/36 px, onay kutusu 20/24 px', () => {
-    assert.match(CSS, /\.property-color-swatch \{\n  width: 24px;[^\n]*\n  height: 24px;/);
+    // Sadelik 4. tur: renk secici acilir pencere; hazir renkler 24 px, mulk noktasinin dokunma alani genis.
+    assert.match(CSS, /\.lex-cp__swatch \{ width: 24px; height: 24px;/);
+    assert.match(CSS, /\.property-color-btn::before \{ content: ""; position: absolute; inset: -12px; \}/);
     assert.match(CSS, /input\[type="checkbox"\], input\[type="radio"\] \{ min-width: 20px; min-height: 20px;/);
     assert.match(CSS, /@media \(max-width: 640px\) \{\n  input\[type="checkbox"\], input\[type="radio"\] \{ min-width: 24px; min-height: 24px; \}/);
     assert.match(ACSS.replace(/\r\n/g, '\n'), /\.ba-sort \{[^}]*min-height: 24px;/);

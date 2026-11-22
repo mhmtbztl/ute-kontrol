@@ -95,6 +95,24 @@ Firmalara satılacak — kişisel araç veya demo değil. Bu, kalite çıtasın�
   Analiz'de "2 yıl önce" karşılaştırması ve "Giriş günü" grafiği kalktı. Mülk kartındaki fiyatlar
   **bilerek kalır** (kullanıcı isteği L-216, g9_feedback L-216b). Bugün'deki "Bu ayın performansı" da
   bilerek kalır (kullanıcı 21.11.2026: "bugündeki performans kalkmasın").
+- **Sadelik 4. tur (kullanıcı 22.11.2026, göç yok):** Bugün'de mülk ve ekip seçimi çip şeridi değil **açılır
+  işaretli liste** (`LexUi.pickerHtml`; mülk tek seçim çünkü performans ve hafta şeridi tek mülk/portföy gösterir,
+  ekip çoklu `todayTeams`/`toggleTodayTeam`); görev tablosu **ekibe göre gruplu** (`tableHtml` `{group}` satırı),
+  sütunlar İş · Ne zaman · Talimat (`TODAY_TASK_HEAD`). "Bu hafta" 7 satırlık tablo değil tek satır şerit
+  (`todayWeekStripHtml`, hesap yine `todayWeekRows`). Satış hazırlığında hazır mülkler tek satır, yalnız sorunlu
+  mülk satır olur; durum seçici kapalı "Durumu değiştir" altında (yalnız yetkili). Rezervasyonlar: uzun özet cümlesi
+  yerine 5 rakam (Rezervasyon · Satılan gece · Ciro · Kalan · Tahsilat; tahsilat yalnız tarih aralığına bağlı,
+  altında yazar) + **kanal filtresi** (`rezChannelFilter`, aralıktaki kanallardan). **Mülk rengi** kartta tek nokta,
+  tıklayınca açılır seçici (`core/color_picker.js`: renk alanı, ton, parlaklık, son kullanılanlar, kod); serbest
+  `#RRGGBB` kaydedilir, palet yalnız öneri. **Operasyon → Görevler Notion tarzı sayfa** (`core/task_page.js`):
+  sayfa = görev, Yer = mülk, başlıklar = alanlar (Mutfak, Oda 1), yapılacak + alt yapılacak, ★ önemli; Enter yeni
+  satır, Tab alt madde, Shift+Tab geri, boş satırda Backspace siler. Biçim phase55/96 `checklist` ile aynı (saha
+  ekranı aynısını okur); taslakta yerel kimlik, kayıtta konum anahtarı (`s0.i1.sub0`) yeniden üretilir → silmede
+  işaret kaymaz; boş madde ve maddesiz başlık kaydedilmez. Yazım 600 ms sonra, işaret/yapı hemen
+  (`flushOperationalTaskPage`, `requireCloudForWrite`, hata olursa gerçeğe geri çekilir); kendi kaydımızdan sonra
+  ekran yeniden yüklenmez (odak kalır). "Tamamla" önemli maddeler bitmeden kapalı (sunucu tetikleyicisiyle aynı
+  kural). Açıklama/tür/durum için eski pencere "Ayrıntılar" olarak kalır. Ağı `task_page_tests`, `property_color_tests`
+  C1–C11, `render_pipeline` 21–25, `g9_canli` GD-l/m. Lex kuralı: açılır pencerelerde gölge yok (X8), kenar çizgisi.
 - **Tek tık bağlantı (kullanıcı 21.11.2026: "her gerekli şeyi birbirine tek tıkla bağla"):** ekranlar arası
   her yönlendirme `goTo(spec)` düğmesidir, düz yazı değil: `'finance'`, `'settings:channels'`,
   `'operations:people'`, `'pricing:rules'`, `'marketing:import'`, `'property:KEY:CHANNELS'`, `'goals'`,

@@ -38,7 +38,7 @@ assert.match(app, /function renderSettingsTemplates\(/);
 for (const table of ['message_templates', 'task_templates', 'property_checklist_templates']) {
   assert(app.includes(`from('${table}')`), `${table} Ayarlar şablon merkezine bağlı olmalı`);
 }
-assert.match(app, /Şablonu düzenle →/);
+assert.match(app, /Şablonları düzenle →/);
 
 assert.match(app, /function renderSettingsLeadSources\(/);
 assert.match(app, /source\.code === 'UNKNOWN'/);

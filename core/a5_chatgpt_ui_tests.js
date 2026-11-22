@@ -6,7 +6,7 @@ const root = path.join(__dirname, '..');
 const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 assert(html.includes('id="chatGptQuestionModal"') && html.includes('id="chatGptPrivacyNotice"'), 'Tek ChatGPT penceresi ve gizlilik kutusu gerekli');
-assert(/id="askChatGptBtn"[^>]*data-onclick="openChatGptQuestionModal\(\);/.test(html), 'Hesap menüsündeki ChatGPT öğesi tek ChatGPT penceresini açmalı');
+assert(/id="askChatGptBtn"[^>]*data-onclick="openChatGptQuestionModal\(\);/.test(html), 'Üst çubuktaki ChatGPT düğmesi tek ChatGPT penceresini açmalı');
 assert(app.includes('CHATGPT_PAGE_CONFIG') && !app.includes('page-chatgpt'), 'Sayfaya göre hazır sorular tek ChatGPT penceresinden (sayfa çubuğunda kopya yok)');
 assert(app.includes('Değişiklik işe yaradı mı, sırada ne var?'), 'Huni testi sorusu ortak pencereye taşınmalı');
 const built = Engine.buildPrompt({ kind: 'PAGE_REPORT', today: '2026-10-02', question: 'Bu raporu yorumla', context: { report: { title: 'Satış', subtitle: 'Ekim', summary: { total: 4, guestName: 'GİZLİ', phone: '0555', email: 'x@y.z' } } } });

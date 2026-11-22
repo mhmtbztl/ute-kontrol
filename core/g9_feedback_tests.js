@@ -1387,7 +1387,7 @@ async function rezervasyonOdemeDavranisi() {
   check(/data-label="Ciro"/.test(satir) && /data-label="Kesintiler"/.test(satir) && /İndirim −2\.500 ₺/.test(satir) && /Komisyon −5\.812,5 ₺/.test(satir)
     && /Temizlik −2\.500 ₺ \(planlı\)/.test(satir) && /29\.187,5 ₺/.test(satir),
     'L-227f Liste satiri ciro, indirim, komisyon, planli temizlik ve kalani gosterir', satir.slice(0, 600));
-  check(/Ciro \(oda geliri, indirim sonrası\): <strong>37\.500 TL<\/strong>/.test(pill) && /Brüt \(bu döneme düşen\): 40\.000 TL/.test(pill) && /Kalan \(tahmini\)/.test(pill),
+  check(/Ciro<\/dt><dd class="lex-kpi__value">37\.500 TL/.test(pill) && /Brüt 40\.000 TL/.test(pill) && /Kalan \(tahmini\)/.test(pill),
     'L-227g Ozet cubugu brut, ciro (indirim sonrasi), kesinti ve kalani ayri yazar', pill);
   check((html.match(/<th[^>]*>(Brüt \(₺\)|Ciro \(₺\)|Kesintiler|Kalan \(₺\))<\/th>/g) || []).length === 4 && /colspan="9"/.test(app),
     'L-227h Tablo basliklari ve bos durum yeni sutun sayisiyla uyumlu');

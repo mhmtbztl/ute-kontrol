@@ -93,7 +93,9 @@
       if (r.date && isWeekendNight(r.date)) cls.push('is-weekend');
       if (r.date && onceki && r.date !== onceki && isMonday(r.date)) cls.push('is-new-week');
       if (r.date) onceki = r.date;
-      const c1 = `<span class="lex-cell__main">${r.c1Html || escapeHtml(r.c1)}</span>${r.c1sub ? `<span class="lex-cell__sub">${escapeHtml(r.c1sub)}</span>` : ''}`;
+      if (r.group) return `<tr class="lex-group"><th colspan="3" scope="colgroup">${escapeHtml(r.group)}${r.groupSub ? ` <span class="lex-group__sub">${escapeHtml(r.groupSub)}</span>` : ''}</th></tr>`;
+      const c1main = r.c1Attr ? `<button type="button" class="lex-link" ${r.c1Attr}>${r.c1Html || escapeHtml(r.c1)}</button>` : (r.c1Html || escapeHtml(r.c1));
+      const c1 = `<span class="lex-cell__main">${c1main}</span>${r.c1sub ? `<span class="lex-cell__sub">${escapeHtml(r.c1sub)}</span>` : ''}`;
       const deger = markHtml(r.c2, r.mark);
       const c2main = r.c2Attr
         ? `<button type="button" class="lex-link" ${r.c2Attr}>${deger}</button>`
@@ -117,6 +119,17 @@
       const sayi = Number.isFinite(it.count) && it.count > 0 ? ` <span class="lex-tabs__count">${Number(it.count)}</span>` : '';
       return `<button type="button" role="tab" class="lex-tab${on ? ' is-selected' : ''}" aria-selected="${on ? 'true' : 'false'}" ${it.attr || ''}>${escapeHtml(it.label)}${sayi}</button>`;
     }).join('')}</div>`;
+  }
+
+  // Acilir isaretli liste (Bugun: mulk ve ekip). type 'radio' tek secim, 'checkbox' coklu.
+  // Her ogenin attr'i cagiranin kurdugu hazir eylem ozniteligidir (data-onchange).
+  function pickerHtml({ label = '', summary = '', items = [], type = 'checkbox', name = 'lex-picker' } = {}) {
+    const tip = type === 'radio' ? 'radio' : 'checkbox';
+    const satirlar = (items || []).map(it => {
+      const sayi = Number.isFinite(it.count) && it.count > 0 ? `<span class="lex-picker__count">${Number(it.count)}</span>` : '';
+      return `<label class="lex-picker__item"><input type="${tip}" name="${escapeHtml(name)}" value="${escapeHtml(it.key)}"${it.checked ? ' checked' : ''} ${it.attr || ''}><span>${escapeHtml(it.label)}</span>${sayi}</label>`;
+    }).join('');
+    return `<details class="lex-picker"><summary class="lex-picker__btn"><span class="lex-picker__label">${escapeHtml(label)}</span> ${escapeHtml(summary)}</summary><div class="lex-picker__list" role="group" aria-label="${escapeHtml(label)}">${satirlar}</div></details>`;
   }
 
   function footerHtml({ legend = [], pdfAttr = '', excelAttr = '' } = {}) {
@@ -150,6 +163,7 @@
     'h1{font-size:17px;font-weight:500;margin:0 0 6px}p.ozet{font-size:16px;margin:0 0 14px}p.ozet strong{font-weight:500}',
     'table{width:100%;border-collapse:collapse}th{font-size:13px;font-weight:400;color:#5F5E5A;text-align:left;padding:8px 6px;border-bottom:1px solid #D3D1C7}',
     'td{padding:14px 6px;border-bottom:1px solid #D3D1C7;vertical-align:top}col.c1{width:36.4%}col.c2{width:30.3%}col.c3{width:33.3%}',
+    'tr.grp th{padding-top:16px;font-size:14px;font-weight:500;color:#2C2C2A}',
     'tr.is-weekend td{background:#F4F8FD}tr.is-new-week td{border-top:2px solid #2C2C2A}',
     '.sub{display:block;font-size:12px;color:#5F5E5A;margin-top:2px}.v{font-size:16px;font-weight:500}.d{font-size:15px}',
     '.tag{display:inline-block;font-size:13px;padding:2px 8px;border-radius:6px}',
@@ -161,6 +175,7 @@
     const sayfalar = pages.map(pg => {
       let onceki = null;
       const satirlar = (pg.rows || []).map(r => {
+        if (r.group) return `<tr class="grp"><th colspan="3">${escapeHtml(r.group)}${r.groupSub ? ` · ${escapeHtml(r.groupSub)}` : ''}</th></tr>`;
         const cls = [];
         if (r.date && isWeekendNight(r.date)) cls.push('is-weekend');
         if (r.date && onceki && r.date !== onceki && isMonday(r.date)) cls.push('is-new-week');
@@ -175,7 +190,7 @@
 
   const api = {
     escapeHtml, dayLabel, isWeekendNight, isMonday, roundPrice50, formatTl, markLevel, markHtml,
-    tagHtml, tableHtml, summaryHtml, tabsHtml, footerHtml, buildWorkbook, printDocumentHtml, PRINT_CSS, TAG_TONES
+    tagHtml, tableHtml, summaryHtml, tabsHtml, pickerHtml, footerHtml, buildWorkbook, printDocumentHtml, PRINT_CSS, TAG_TONES
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.LexUi = api;
