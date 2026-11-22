@@ -30,7 +30,7 @@
   }
 }(typeof self !== 'undefined' ? self : this, function (LedgerContract) {
   const METRICS = ['revenue', 'occupancy', 'adr', 'revpar', 'nights', 'bookings'];
-  const COMPARE_KEYS = ['prev', 'yoy1', 'yoy2', 'portfolio', 'target'];
+  const COMPARE_KEYS = ['prev', 'yoy1', 'yoy2', 'yoy3', 'portfolio', 'target'];
   const LEAD_TIME_BUCKETS = [
     { key: '0-7', min: 0, max: 7 },
     { key: '8-30', min: 8, max: 30 },
@@ -104,7 +104,8 @@
     return {
       prev: shiftPeriod(p, -n),
       yoy1: shiftPeriod(p, -12),
-      yoy2: shiftPeriod(p, -24)
+      yoy2: shiftPeriod(p, -24),
+      yoy3: shiftPeriod(p, -36)
     };
   }
 
@@ -349,12 +350,15 @@
     const prev = scopeMetrics(ctx, villa, cmp.prev);
     const yoy1 = scopeMetrics(ctx, villa, cmp.yoy1);
     const yoy2 = scopeMetrics(ctx, villa, cmp.yoy2);
+    const yoy3 = scopeMetrics(ctx, villa, cmp.yoy3);
     compare.prev = hasActivity(prev) ? prev : null;
     compare.yoy1 = hasActivity(yoy1) ? yoy1 : null;
     compare.yoy2 = hasActivity(yoy2) ? yoy2 : null;
+    compare.yoy3 = hasActivity(yoy3) ? yoy3 : null;
     if (!compare.prev) reasons.prev = 'Önceki dönemde kayıt yok';
     if (!compare.yoy1) reasons.yoy1 = 'Geçen yıl aynı dönemde kayıt yok';
     if (!compare.yoy2) reasons.yoy2 = '2 yıl önce aynı dönemde kayıt yok';
+    if (!compare.yoy3) reasons.yoy3 = '3 yıl önce aynı dönemde kayıt yok';
     if (villa === 'ALL') {
       compare.portfolio = null;
       reasons.portfolio = 'Portföy ortalaması tek mülk seçildiğinde karşılaştırılır';
@@ -421,6 +425,7 @@
         prev: kaydir(-L),
         yoy1: kaydir(-12),
         yoy2: kaydir(-24),
+        yoy3: kaydir(-36),
         portfolio: villa === 'ALL' ? null : months.map(m => portfolioAverage(ctx, { start: m, end: m })[metric]),
         target: null
       };
@@ -428,7 +433,7 @@
         const t = months.map(m => periodTarget(ctx, villa, { start: m, end: m })[metric]);
         s.target = t.some(v => v !== null) ? t : null;
       }
-      ['prev', 'yoy1', 'yoy2'].forEach(k => {
+      ['prev', 'yoy1', 'yoy2', 'yoy3'].forEach(k => {
         if (s[k] && s[k].every(v => v === null)) s[k] = null;
       });
       series[metric] = s;

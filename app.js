@@ -14642,8 +14642,8 @@ function analyticsMonthPerformance(monthKey, villa) {
 // Analiz modulleri acilista yuklenmez (acilis JS butcesi, L-163): Analiz ya da
 // fiyat ekrani ilk cizildiginde istenir, gelince acik ekran yeniden cizilir.
 // Sira onemli: analytics_ui yuklenirken BookingAnalytics'i alir.
-const ANALYTICS_ENGINE_URL = 'core/booking_analytics.js?v=c837f939';
-const ANALYTICS_UI_URL = 'core/analytics_ui.js?v=76af58bd';
+const ANALYTICS_ENGINE_URL = 'core/booking_analytics.js?v=619c6e43';
+const ANALYTICS_UI_URL = 'core/analytics_ui.js?v=39d5a762';
 let analyticsModulesLoading = null;
 function loadAnalyticsScript(src) {
   return new Promise((resolve, reject) => {
