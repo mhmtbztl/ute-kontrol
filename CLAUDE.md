@@ -95,6 +95,23 @@ Firmalara satılacak — kişisel araç veya demo değil. Bu, kalite çıtasın�
   Analiz'de "2 yıl önce" karşılaştırması ve "Giriş günü" grafiği kalktı. Mülk kartındaki fiyatlar
   **bilerek kalır** (kullanıcı isteği L-216, g9_feedback L-216b). Bugün'deki "Bu ayın performansı" da
   bilerek kalır (kullanıcı 21.11.2026: "bugündeki performans kalkmasın").
+- **Fox Tasarımı ve alt sayfalar (kullanıcı 22.11.2026, `docs/FOX_TASARIMI.md`):** Lex'in üstüne renk katmanı;
+  her rakam anlam rengini taşır (`--fox-revenue` mavi, `--fox-income` yeşil, `--fox-expense` kırmızı, `--fox-capex`
+  turuncu, `--fox-info` mor; gece/gündüz değişkenleri `style.css` başında). Sabit hex yazmayın, değişken kullanın.
+  **Alt sayfa kuralı:** rakam/kayıt listesine dokununca ekranın içinde sayfa açılır (`.fox-subpage`, `← Geri`),
+  ekleme düğmesi sayfanın **altında** (`.fox-add`). Finans: `setFinanceView('main'|'income'|'expenses'|'category')`,
+  başlıkta yalnız hedef; Mülkler: `setPropertyProfile` profili sayfa açar (`closePropertyPage`); Operasyon temizlik
+  sayfası `openCleaningPage`; Ayarlar şablon sayfası `openSettingsTemplatePage`, kontrol listesi `openSettingsChecklistPage`.
+  **Analiz:** başlangıç/bitiş ayı (gelecek dahil), bu ayla açılır; 1/2/3 yıl önce kıyası (`yoy3` motorda). **ChatGPT
+  düğmesi üst çubukta** (kullanıcı kararı; hesap menüsünde kopyası yok). **Temizlik (phase123):** satır = ev · tarih ·
+  temizlikçi · ilerleme; sayfada iki sütun: Temizlikçi (Z, yalnız atanan kişi, phase68 sınırı) ve Kontrol (M, yönetici
+  her an `set_cleaning_manager_marks`; onay değildir, gider yine `inspect_cleaning` onayıyla). `cleaning_task_executions`
+  canlı yayında; yönetici kanalı ve personel kanalı (`subscribeStaffRealtime`) dinler, personel işareti anında kaydeder.
+  Formda ev seçilince listesi görünür; hesabı olan temizlikçi seçilirse kayıtta atanır (liste eklenir). **Gelir
+  kategorileri (phase125):** `tenant_settings.income_categories` + `income_entries.category` (NULL olabilir, 1–60);
+  göç yokken kategorisiz kaydedilir ve söylenir. **Pazarlama:** Fox özet şeridi (karışık sonuçta mesaj/arama ayrı,
+  ölçülmeyen talep kartı yok) + kampanyaya göre harcama çubukları. Ağı `a2_finance_ui`, `analytics_ui` U2/U6,
+  `phase123_cleaning_live_checklist_live_tests`, `phase125_income_category_live_tests`, `a4_ads_ui`, `task_page_tests`.
 - **Sadelik 4. tur (kullanıcı 22.11.2026, göç yok):** Bugün'de mülk ve ekip seçimi çip şeridi değil **açılır
   işaretli liste** (`LexUi.pickerHtml`; mülk tek seçim çünkü performans ve hafta şeridi tek mülk/portföy gösterir,
   ekip çoklu `todayTeams`/`toggleTodayTeam`); görev tablosu **ekibe göre gruplu** (`tableHtml` `{group}` satırı),
@@ -1032,6 +1049,11 @@ ek yalnız `style.css` `ads-*`. `innerHTML` sınırı `<svg>`'yi sildiği için 
 baş/son boşluksuz). Canlı süit `phase115_competitor_name_live_tests` 13/13 (göçten önce 9 kırmızı).
 Anon kapısı göçten önce de kapalı olduğundan anon sorgusu ayırt etmez; kanıt `schema_migrations` 115.
 Paket: `docs/PHASE115_DEPLOY_PACKAGE.md`.
+
+**phase123 (`migration_phase123_cleaning_live_checklist.sql`) ve phase125 (`migration_phase125_income_categories.sql`)
+22 Kasım 2026'da test projesine uygulandı; üretim kullanıcı onayı bekliyor.** phase123: yönetici Kontrol (M)
+işaretini temizlik sürerken yazar (`set_cleaning_manager_marks`, Z'ye dokunmaz) ve `cleaning_task_executions` canlı
+yayına eklenir; phase125: `income_entries.category`. İkisi de göç yokken istemciyi kırmaz. Canlı süitler 16/16 ve 7/7.
 
 **phase121 (`migration_phase121_ads_more_platforms.sql`) 21 Kasım 2026'da test projesine, 22 Kasım 2026'da kullanıcı tarafından üretime
 uygulandı; üretimde doğrulandı** (`production:readiness` BAŞARILI, `schema_migrations` 121). Reklam dönemlerinde TikTok ve "Diğer" (OTHER): `ad_metric_periods.platform`
