@@ -19098,9 +19098,18 @@ async function markAllNotificationsAsRead() {
 
 let selectedPropertyProfileKey = null;
 let selectedPropertyProfileTab = 'GENERAL';
+// Alt sayfa (kullanici 22.11.2026): mulk listesi; mulke dokununca profil kendi sayfasinda acilir.
+let propertyPageOpen = false;
+
+function closePropertyPage() {
+  propertyPageOpen = false;
+  renderPropertiesTab();
+  return true;
+}
 
 function setPropertyProfile(villaKey) {
   if (!appData?.villas?.[villaKey]) return false;
+  propertyPageOpen = true;
   selectedPropertyProfileKey = villaKey;
   selectedPropertyProfileTab = 'GENERAL';
   propertyChannelForm = null;
@@ -19111,6 +19120,7 @@ function setPropertyProfile(villaKey) {
 function setPropertyProfileTab(tab) {
   if (!['GENERAL', 'PRICES', 'CHANNELS', 'HISTORY'].includes(tab)) return false;
   selectedPropertyProfileTab = tab;
+  propertyPageOpen = true; // profil sekmesi secmek profili acmaktir
   renderPropertiesTab();
   return true;
 }
@@ -19520,7 +19530,15 @@ function renderPropertiesTab() {
     `;
   }).join('');
   const profile = document.getElementById('propertyProfileWorkspace');
-  if (profile) profile.innerHTML = selectedPropertyProfileKey ? renderPropertyProfile(selectedPropertyProfileKey) : '<p class="empty-state">Henüz aktif mülk yok.</p>';
+  const acik = propertyPageOpen && !!selectedPropertyProfileKey;
+  grid.hidden = acik;
+  if (newButton) newButton.hidden = !canManage || acik;
+  if (profile) {
+    profile.hidden = !acik && propKeys.length > 0;
+    profile.innerHTML = acik
+      ? `<button type="button" class="fox-back" data-onclick="closePropertyPage()">← Mülkler</button>${renderPropertyProfile(selectedPropertyProfileKey)}`
+      : (propKeys.length ? '' : '<p class="empty-state">Henüz aktif mülk yok.</p>');
+  }
 }
 
 function getOperationsApi() {
@@ -23825,6 +23843,7 @@ async function handleQuickActionTrigger(actionType, entityId) {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     goTo,
+    closePropertyPage,
     getIncomeCategories,
     renderSettingsIncomeCategories,
     createSettingsIncomeCategory,
