@@ -1,10 +1,11 @@
 /**
- * LEXBNB — YAZI TIPLERI KENDI SUNUCUMUZDAN (kullanici karari 08.11.2026)
+ * LEXBNB — YAZI TIPI: SISTEM SANS-SERIF (Lex Tasarimi, kullanici karari 21.11.2026)
  *
- * Google Fonts'a istek gitmez: tarayicinin IP adresi ucuncu tarafa aktarilmaz
- * (KVKK) ve acilisi engelleyen dis istek kalkar. Bu suit uc seyi olcer:
- * dis yazi tipi baglantisi yok, CSP yalniz 'self', ve style.css'in istedigi her
- * dosya diskte gercek bir woff2 olarak durur ve yayina (isAllowed) girer.
+ * 08.11.2026'da Inter kendi sunucumuzdan veriliyordu (Google Fonts KVKK ve hiz
+ * nedeniyle kalkmisti). Lex "sistem yazi tipi, yalniz iki kalinlik" dedigi icin
+ * dosyalar da kalkti: acilista yazi tipi indirilmez. Bu suit sunlari olcer:
+ * dis yazi tipi baglantisi yok, CSP yalniz 'self', @font-face/preload yok,
+ * yazi yigini sistem yazisiyla baslar ve yalniz 400/500 kalinlik kullanilir.
  *
  * Dis sisteme baglanmaz.
  */
@@ -41,42 +42,25 @@ test("F2. CSP: style-src ve font-src yalniz 'self'", () => {
   assert.match(csp, /(^|; )font-src 'self';/);
 });
 
-const faces = [...CSS.matchAll(/@font-face\s*\{([^}]*)\}/g)].map(m => ({
-  family: (m[1].match(/font-family:\s*'([^']+)'/) || [])[1],
-  url: (m[1].match(/url\(([^)]+)\)/) || [])[1],
-  range: (m[1].match(/unicode-range:\s*([^;]+);/) || [])[1] || ''
-}));
-
-test('F3. @font-face dosyalari diskte gercek woff2, yayina giriyor; lisanslar yaninda', () => {
-  assert.ok(faces.length >= 4, 'Inter + JetBrains Mono, latin + latin-ext');
-  for (const f of faces) {
-    assert.ok(f.url && !/^https?:/.test(f.url), `yerel olmali: ${f.url}`);
-    const buf = fs.readFileSync(path.join(ROOT, f.url));
-    assert.strictEqual(buf.slice(0, 4).toString('latin1'), 'wOF2', `${f.url} woff2 degil`);
-    assert.ok(isAllowed(f.url), `${f.url} yayina girmiyor (server.js isAllowed)`);
-  }
-  ['assets/fonts/inter-ofl.txt', 'assets/fonts/jetbrains-mono-ofl.txt'].forEach(rel => {
-    assert.match(read(rel), /SIL Open Font License/);
-    assert.ok(isAllowed(rel), rel);
-  });
-  assert.ok(!isAllowed('assets/fonts/../../.env') && !isAllowed('assets/fonts/x.ttf'));
+test('F3. Yazi tipi dosyasi indirilmez: @font-face ve font preload yok', () => {
+  assert.ok(!/@font-face/.test(CSS) && !/@font-face/.test(read('analytics.css')), '@font-face kaldi');
+  assert.ok(!/rel="preload"[^>]*as="font"/.test(INDEX), 'yazi tipi preload kaldi');
+  assert.ok(!fs.existsSync(path.join(ROOT, 'assets', 'fonts')) || fs.readdirSync(path.join(ROOT, 'assets', 'fonts')).length === 0, 'assets/fonts dosyalari kaldi');
 });
 
-test('F4. Turkce harfler ve TL isareti Inter dosyalarindan biriyle kapsanir', () => {
-  const inRange = (cp, range) => range.split(',').some(part => {
-    const [a, b] = part.trim().replace(/^U\+/i, '').split('-').map(h => parseInt(h, 16));
-    return cp >= a && cp <= (Number.isFinite(b) ? b : a);
-  });
-  const inter = faces.filter(f => f.family === 'Inter');
-  for (const ch of 'çÇğĞıİöÖşŞüÜ₺') {
-    assert.ok(inter.some(f => inRange(ch.codePointAt(0), f.range)), `${ch} kapsanmiyor`);
-  }
+test('F4. Yazi yigini sistem sans-serif ile baslar; Inter adi yok', () => {
+  const sans = (CSS.match(/--font-sans:\s*([^;]+);/) || [])[1] || '';
+  assert.match(sans, /^system-ui,/);
+  assert.match(sans, /sans-serif$/);
+  assert.ok(!/['"](?:Inter|JetBrains Mono)['"]/.test(CSS), 'eski aile adi kaldi');
 });
 
-test('F5. Onden yuklenen (preload) yazi tipleri style.css ile ayni dosyalar; crossorigin var', () => {
-  const pre = [...INDEX.matchAll(/<link rel="preload" href="([^"]+)" as="font" type="font\/woff2" crossorigin>/g)].map(m => m[1]);
-  assert.ok(pre.length >= 1, 'en az Inter latin onden yuklenmeli');
-  pre.forEach(u => assert.ok(faces.some(f => f.url === u), `${u} @font-face'te yok`));
+test('F5. Yalniz iki kalinlik (400/500): stil dosyalarinda 500 ustu yok', () => {
+  ['style.css', 'analytics.css'].forEach(f => {
+    const kalin = read(f).match(/font-weight:\s*(?:[6-9]00|bold|bolder)/gi) || [];
+    assert.deepStrictEqual(kalin, [], f);
+  });
+  assert.match(CSS, /b, strong, th, h1, h2, h3, h4, h5, h6, dt, legend, optgroup \{ font-weight: 500; \}/);
 });
 
 console.log('-----------------------------------------------------------------------------');

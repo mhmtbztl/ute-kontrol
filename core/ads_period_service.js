@@ -95,6 +95,14 @@
         missing.code = 'PHASE111_NOT_APPLIED';
         throw missing;
       }
+      // TikTok / Diger platformu phase121 ister; goc yoksa sunucu kisit ya da platform kapisiyla reddeder.
+      const platforms = rows.map(row => row.platform);
+      if ((platforms.includes('TIKTOK') || platforms.includes('OTHER'))
+        && (/ad_metric_periods_platform_check|META veya GOOGLE/i.test(String(error.message || '')) || error.code === '23514')) {
+        const missing = new Error('PHASE121_NOT_APPLIED: TikTok ve diğer platformlar için veritabanı güncellemesi (phase121) henüz uygulanmadı. Meta ve Google kaydı çalışır.');
+        missing.code = 'PHASE121_NOT_APPLIED';
+        throw missing;
+      }
       throw error;
     }
     return data;

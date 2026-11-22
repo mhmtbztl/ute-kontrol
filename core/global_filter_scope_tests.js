@@ -65,27 +65,28 @@ try {
   // --- A. Isaretleme ----------------------------------------------------------
   check(/<div class="header-filters" id="globalFilterBar">/.test(INDEX),
     'A1. Ust filtre cubugunun gorunurlugu JS ile yonetilebilir (id)', 'globalFilterBar yok');
-  check(/<p id="globalFilterScopeHint" class="filter-scope-hint"><\/p>/.test(INDEX),
-    'A2. Filtrenin neyi etkiledigini yazan bos baslangicli satir var', 'globalFilterScopeHint yok');
+  // Sadelik (21.11.2026): filtrenin altindaki aciklama cumlesi kalkti; filtre
+  // yalniz onu okuyan sayfada gorunur, baska sayfada gizli kalir (B).
+  check(!/globalFilterScopeHint/.test(INDEX),
+    'A2. Filtrenin altinda her sayfada ayri aciklama cumlesi yok', 'globalFilterScopeHint duruyor');
   const bitis = (INDEX.match(/<input[^>]*id="customFilterEnd"[^>]*>/) || [''])[0];
   check(bitis && !/value="/.test(bitis),
     'A3. Ozel aralik bitis kutusunda sabit tarih yok (CLAUDE.md 3.5)', bitis);
-  check(/<div id="execSnapshotStatus" hidden/.test(INDEX),
-    'A4. Gizli KPI seridinin durum satiri da gizli (Bugun filtre metni gostermez)', 'execSnapshotStatus gorunur');
+  check(!/id="execSnapshotStatus"/.test(INDEX),
+    'A4. Gizli KPI seridi ve durum satiri yok (sadelik 21.11.2026)', 'execSnapshotStatus duruyor');
 
   // --- B. Kapsam tablosu -------------------------------------------------------
   const kapsam = app.GLOBAL_FILTER_SCOPE;
-  ['executive', 'reservations', 'properties', 'leads', 'guests', 'settings', 'maintenance', 'staff-field', 'analysis']
+  ['executive', 'reservations', 'properties', 'leads', 'guests', 'settings', 'staff-field', 'pricing']
     .forEach(tab => {
       app.applyGlobalFilterScope(tab);
-      check(g('globalFilterBar').hidden === true && g('globalFilterScopeHint').innerText === '',
+      check(g('globalFilterBar').hidden === true,
         `B1. Filtreyi okumayan "${tab}" sayfasinda ust filtre gizli`, `hidden=${g('globalFilterBar').hidden}`);
     });
   Object.keys(kapsam).forEach(tab => {
     app.applyGlobalFilterScope(tab);
-    check(g('globalFilterBar').hidden === false && g('globalFilterScopeHint').innerText === kapsam[tab]
-      && kapsam[tab].length > 20,
-      `B2. "${tab}" sayfasinda filtre gorunur ve neyi etkiledigini yazar`, g('globalFilterScopeHint').innerText);
+    check(g('globalFilterBar').hidden === false && kapsam[tab].length > 20,
+      `B2. "${tab}" sayfasinda filtre gorunur`, String(g('globalFilterBar').hidden));
   });
 
   // Kapsamdaki her sayfanin render plani filtreyi gercekten okumali: yoksa
@@ -97,8 +98,8 @@ try {
     const son = APP.indexOf('\nfunction ', bas + 1);
     return APP.slice(bas, son);
   };
-  const plan = { finance: ['renderFinanceModule'], expenses: ['renderExpensesTable'], pricing: ['renderPricingTab', 'renderPricingKpiStrip'],
-    operations: ['renderOperationsCleaningView'], housekeeping: ['renderHousekeepingTab'], marketing: ['collectMarketingFacts', 'isCampaignInFilter'] };
+  const plan = { finance: ['renderFinanceModule'], expenses: ['renderExpensesTable'],
+    operations: ['renderOperationsCleaningView'], marketing: ['collectMarketingFacts', 'isCampaignInFilter'] };
   Object.keys(kapsam).forEach(tab => {
     const adlar = plan[tab] || [];
     check(adlar.length && adlar.some(ad => okur.test(govde(ad))),
@@ -133,14 +134,17 @@ try {
   // Ustteki filtre baska bir sayfada V2 + 2025-03'e ayarlanmis olsun.
   app.setCurrentFilter({ period: '2025-03', villa: 'V2', startDate: '2025-03-01', endDate: '2025-03-31' });
   app.renderAll();
-  check(String(g('rezCountBadge').innerText) === '2',
-    'C1. Menudeki rezervasyon sayisi gorunmeyen donem/mulk secimine bagli degil (iptal haric tumu)',
-    `sayac=${g('rezCountBadge').innerText}`);
+  // C1 (menudeki rezervasyon sayaci) kalkti: menude sayi yok (sadelik 21.11.2026).
+  check(!/rezCountBadge/.test(INDEX), 'C1. Menude ikinci bir sayac yok', 'rezCountBadge duruyor');
 
-  g('todayMonthSummary').textContent = '';
-  app.renderTodayMonthSummary(app.getAppData().bookings);
-  check(/^Bu ay · 1 rezervasyon/.test(g('todayMonthSummary').textContent),
-    'C2. Bugun "Bu ay" satiri baska sayfada secilen mulke gore daralmaz', g('todayMonthSummary').textContent);
+  // Bugun (Lex) kendi villa sekmesini kullanir; gorunmeyen ust filtre ayi ve mulku daraltmaz.
+  const bugunPerf = app.todayPerformanceRows(buAy, 'ALL').perf;
+  check(bugunPerf.nights === app.computeMonthPerformance(buAy, 'ALL').nights && bugunPerf.nights > 0,
+    'C2. Bugun performansi baska sayfada secilen mulke/doneme gore daralmaz', JSON.stringify({ nights: bugunPerf.nights }));
+  const APP_SRC = fs.readFileSync(path.join(KOK, 'app.js'), 'utf8').replace(/\r\n?/g, '\n');
+  const bugunGovde = ['function renderTodayLex(', 'function todayPerformanceRows(', 'function buildTodayTeamTasks(', 'function todayWeekRows(']
+    .map(bas => { const i = APP_SRC.indexOf(bas); return APP_SRC.slice(i, APP_SRC.indexOf('\nfunction ', i + 10)); }).join('');
+  check(bugunGovde.length > 500 && !/currentFilter/.test(bugunGovde), 'C3. Bugun cizicileri ust filtreyi okumaz', 'currentFilter okunuyor');
 
   app.setCurrentFilter({ period: buAy, villa: 'ALL' });
 } catch (error) {

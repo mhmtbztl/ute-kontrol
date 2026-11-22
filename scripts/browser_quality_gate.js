@@ -194,7 +194,7 @@ async function main() {
       // referans, dort reklam formu) hic acilmiyordu. Fikstur bulut okumalari
       // bos dondurulur ki konsol kapisi ag hatasi gormesin.
       await page.route('**/rest/v1/**', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
-      await page.evaluate(() => { switchTab('marketing'); document.querySelector('[data-marketing-view="funnel"]').click(); });
+      await page.evaluate(() => switchTab('marketing'));
       await page.waitForSelector('#airbnbPerformanceWorkspace');
       // Listing creation remains available from the property profile manager.
       await page.evaluate(() => window.openMarketingListingManager(null));
@@ -204,18 +204,21 @@ async function main() {
         currentFilter.villa = 'ALL';
         LexBnBMarketingUI.setData({ listings: [{ id:'11111111-1111-4111-8111-111111111111',property_id:Object.values(appData.villas)[0].id,channel_code:'AIRBNB',display_name:'Airbnb browser fixture' }] });
       });
-      await page.locator('#airbnbPerformanceWorkspace [data-ab-action="new"]').click();
+      await page.locator('#airbnbPerformanceWorkspace [data-ab-action="new"]').first().click();
       await page.locator('[data-ab-form="record"] [name="start"]').fill('2026-10-04');
       await page.locator('[data-ab-form="record"] [name="end"]').fill('2026-11-03');
       await page.locator('[data-ab-form="record"] [name="bookingConversion"]').fill('0,16');
       await page.locator('[data-ab-form="record"] [type="submit"]').click();
-      assert(await page.getByText('Kaydetmeden önce kontrol et',{exact:true}).isVisible(), 'Airbnb formu gerçek uygulama temizleyicisinden sonra çalışmalı');
-      await page.evaluate(() => document.querySelector('[data-marketing-view="ads"]').click());
-      // Aşama 3 (05.11.2026): reklam formları iç sekmelerde.
-      await page.waitForSelector('[data-ads-view="campaigns"]', { timeout: 5000 });
-      await page.click('[data-ads-view="campaigns"]');
+      // Fikstürde kayıt tablosu yok: kaydetme denenir ve anlaşılır hata ya da kayıt mesajı çıkar (form temizleyiciden geçti).
+      await page.waitForFunction(() => /kaydedildi|güncellemesi gerekiyor|alınamadı|yetkisi/i.test(document.getElementById('airbnbPerformanceWorkspace').textContent), null, { timeout: 5000 });
+      // Sadelik (21.11.2026): Pazarlama tek sayfa; reklam araçları ayrı sayfada, "← Pazarlama" ile dönülür.
+      await page.locator('#airbnbPerformanceWorkspace [data-ab-action="cancel"]').first().click().catch(() => {});
+      await page.waitForSelector('#marketingWorkspaceContent [data-ads-view="campaigns"]', { timeout: 5000 });
+      await page.click('#marketingWorkspaceContent [data-ads-view="campaigns"]');
       await page.waitForSelector('[data-ads-campaign-form]', { timeout: 5000 });
-      await page.click('[data-ads-view="import"]');
+      await page.click('[data-marketing-home]');
+      await page.waitForSelector('#mkAdsTitle', { timeout: 5000 });
+      await page.click('#marketingWorkspaceContent [data-ads-view="import"]');
       await page.waitForSelector('[data-ads-dropzone]', { timeout: 5000 });
       // Aşama 6: kampanya tablosu + sütun seçici gerçek temizleyiciden (CSP stil sınırı)
       // geçerek çizilir; 390 px'te tablo kendi kartında kayar, sayfa yatay taşmaz.
@@ -230,9 +233,13 @@ async function main() {
         });
         const content = document.getElementById('marketingWorkspaceContent');
         content.innerHTML = UI.renderAdsKpiStrip(model, UI.adsColumns(model)) + UI.renderAdsCampaignTable(model, UI.adsColumns(model)) + UI.renderAdsMetricPicker(model);
-        return { rows: content.querySelectorAll('.ads-table tbody tr, .ads-table tfoot tr').length, groups: content.querySelectorAll('.ads-metric-group').length };
+        const rows = content.querySelectorAll('.ads-table tbody tr, .ads-table tfoot tr').length;
+        const groups = content.querySelectorAll('.ads-metric-group').length;
+        content.innerHTML = UI.renderMarketingHome(model);
+        return { rows, groups, home: content.querySelectorAll('.lex-table tbody tr').length, summary: document.getElementById('marketingSummary').textContent };
       });
       assert(adsTable.rows === 2 && adsTable.groups === 6, `reklam kampanya tablosu/seçici çizilmedi: ${JSON.stringify(adsTable)}`);
+      assert(adsTable.home === 1 && /3\.100/.test(adsTable.summary) && /62 mesaj/.test(adsTable.summary), `Pazarlama ana sayfası özet ve 3 sütunlu tabloyu çizmedi: ${JSON.stringify(adsTable)}`);
       await page.setViewportSize({ width: 390, height: 844 });
       const adsOverflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
       await page.setViewportSize({ width: 1280, height: 900 });
@@ -245,7 +252,7 @@ async function main() {
         return !!form && ['action', 'method', 'target'].every(a => !form.hasAttribute(a)) && !box.querySelector('button').hasAttribute('formaction');
       });
       assert(stripped, 'innerHTML formu gezinme öznitelikleriyle bırakıyor');
-      passed.push('12. pazarlama formları açılır (kanal ilanı, reklam); form dışarı gönderemez');
+      passed.push('12. pazarlama tek sayfa: özet + 3 sütun tablo; formlar açılır (kanal ilanı, reklam); form dışarı gönderemez');
       // M3: mulk formunda konum alanina yapistirilan Plus Code / koordinat
       // enlem ve boylami kendiliginden doldurur.
       await page.evaluate(() => openPropertyModal());
@@ -361,9 +368,9 @@ async function main() {
       await page.evaluate(() => openCommandPalette());
       await page.fill('#commandPaletteInput', 'airbnb');
       const airbnbText = await page.textContent('#commandPaletteResults');
-      assert(/Kanallar ve Pazarlama/.test(airbnbText), `"airbnb" kanal ekranini bulmadi: ${airbnbText}`);
+      assert(/Pazarlama/.test(airbnbText), `"airbnb" pazarlama ekranini bulmadi: ${airbnbText}`);
       await page.evaluate(() => closeCommandPalette());
-      passed.push('16. Ara / Komut ekrana ve alt görünüme götürür; "airbnb" kanal ekranını bulur');
+      passed.push('16. Ara / Komut (Ctrl+K) ekrana ve alt görünüme götürür; "airbnb" pazarlama ekranını bulur');
       // L-192 (M22): zil gercek olaydan bildirim gosterir, ne zaman bildirim
       // gelecegini anlatir ve "Git" kaydin ekranina goturur.
       const syncPayloads = [];
@@ -604,15 +611,17 @@ async function main() {
         && /Airbnb/.test(channelText) && /Ödeme: EUR/.test(channelText) && /İlanı aç/.test(channelText),
         `Kanal ilani: ${JSON.stringify({ listingRpc, channelText: channelText.slice(0, 300) })}`);
       passed.push('24. mülkler: uzun koordinat formu durdurmaz; kanal ilanı bağlantıdan ID okunarak kaydedilir ve profilde listelenir');
-      // L-217 (M46): Bugun ekraninda doluluk / ADR / RevPAR, ev ev secilebilir.
-      await page.evaluate(() => { updateAllVillaDropdowns(); switchTab('executive'); renderTodayPerformance(); });
-      const perfAll = await page.evaluate(() => ({ visible: !document.getElementById('todayPerformance').hidden && document.getElementById('todayPerformance').offsetHeight > 0, cards: document.querySelectorAll('#todayPerformanceCards .today-performance__card').length, options: [...document.getElementById('todayPerfVilla').options].map(o => o.value) }));
-      assert(perfAll.visible && perfAll.cards === 6 && perfAll.options.includes('ALL') && perfAll.options.includes('test'), 'Bugun performans: ' + JSON.stringify(perfAll));
-      await page.selectOption('#todayPerfVilla', 'test');
+      // L-217 (M46) + Lex (21.11.2026): Bugun performansi 3 sutunlu tablo; mulk villa sekmesiyle secilir.
+      await page.evaluate(() => { switchTab('executive'); setTodayVilla('ALL'); });
+      const perfAll = await page.evaluate(() => ({ visible: !document.getElementById('todayPerformance').hidden && document.getElementById('todayPerformance').offsetHeight > 0,
+        rows: document.querySelectorAll('#todayPerformanceTable .lex-table tbody tr').length,
+        cols: document.querySelectorAll('#todayPerformanceTable .lex-table thead th').length }));
+      assert(perfAll.visible && perfAll.rows === 5 && perfAll.cols === 3, 'Bugun performans: ' + JSON.stringify(perfAll));
+      await page.evaluate(() => setTodayVilla('test'));
       const perfOne = await page.evaluate(() => document.getElementById('todayPerformancePeriod').textContent);
       assert(/Test Villası/.test(perfOne), 'Bugun mulk secimi: ' + perfOne);
-      await page.selectOption('#todayPerfVilla', 'ALL');
-      passed.push('25. Bugün: doluluk, ADR, RevPAR kartları; mülk seçici ev ev değiştirir');
+      await page.evaluate(() => setTodayVilla('ALL'));
+      passed.push('25. Bugün: ciro, doluluk, ADR, RevPAR, net kâr 3 sütunlu tabloda; mülk sekmesi ev ev değiştirir');
       // G9 M47–M49 (L-218…L-220): talep ekrani — ek mulk adi okunur, hizli talep
       // pencerede kaydedilebilir (form gecerli), liste kanbanin yerinde acilir.
       await page.evaluate(() => {
@@ -692,10 +701,10 @@ async function main() {
         handleFilterChange();
         document.getElementById('financeIncomeDisclosure').open = true;
       });
-      await page.selectOption('#finTopVillaFilter', 'test');
+      await page.selectOption('#globalVillaFilter', 'test');
       const portfoy = await page.evaluate(() => ({ villa: currentFilter.villa, global: document.getElementById('globalVillaFilter').value }));
       assert(portfoy.villa === 'test' && portfoy.global === 'test', 'Finans portfoy secici: ' + JSON.stringify(portfoy));
-      await page.selectOption('#finTopVillaFilter', 'ALL');
+      await page.selectOption('#globalVillaFilter', 'ALL');
       await page.click('[data-onclick="toggleIncomeAddMenu(event)"]');
       await page.click('#incomeAddMenu [data-onclick="startIncomeEntry(\'BOOKING\')"]');
       assert(await page.evaluate(() => document.getElementById('bookingModal').classList.contains('active')), 'Rezervasyon secenegi rezervasyon formunu acmadi');
@@ -708,15 +717,13 @@ async function main() {
       await page.waitForFunction(() => (appData.incomeEntries || []).length === 1, null, { timeout: 10000 });
       const gelir = await page.evaluate(() => ({
         other: document.getElementById('incomeOtherVal').textContent,
-        bridge: document.getElementById('brOtherIncome').textContent,
-        stepVisible: !document.getElementById('brOtherIncomeStep').hidden,
         rows: document.querySelectorAll('#incomeEntriesBody [data-onclick^="deleteIncomeEntry("]').length,
         modalOpen: document.getElementById('incomeModal').classList.contains('active')
       }));
       assert(incomePosts.length === 1 && incomePosts[0].income_type === 'OTHER_INCOME' && incomePosts[0].description === 'Havalimanı transferi'
-        && incomePosts[0].amount === 2500 && /2\.500 TL/.test(gelir.other) && /\+2\.500 TL/.test(gelir.bridge) && gelir.stepVisible
+        && incomePosts[0].amount === 2500 && /2\.500 TL/.test(gelir.other)
         && gelir.rows === 1 && !gelir.modalOpen, 'Gelir ekleme: ' + JSON.stringify({ incomePosts, gelir }));
-      passed.push('28. finans: portföy seçilir; "+ Gelir Ekle" rezervasyon formunu ya da açıklamalı diğer gelir formunu açar, kâr köprüsüne girer');
+      passed.push('28. finans: portföy seçilir; "+ Gelir Ekle" rezervasyon formunu ya da açıklamalı diğer gelir formunu açar, Gelirler bölümüne girer');
 
       // Kullanici 19.10.2026 (Gorev 9.4): kesirli komisyon gecerli, vergi profili
       // formdan cikmadan eklenir, OTA'da kapora sorulmaz, listede donem payi ve
@@ -777,11 +784,6 @@ async function main() {
       }));
       assert(/29\.187,5 ₺/.test(liste.rows) && /Komisyon −5\.812,5 ₺/.test(liste.rows) && /Toplam 40\.000 ₺ · 2\/4 gece bu dönemde/.test(liste.rows)
         && /20\.000 ₺/.test(liste.rows) && /57\.500 TL/.test(liste.pill), 'Liste donem payi / kesintiler: ' + JSON.stringify(liste).slice(0, 700));
-      const once = await page.evaluate(() => document.querySelector('#tapeChartContainer .tape-cell').getBoundingClientRect().height);
-      await page.click('#tapeZoomBtn');
-      const sonra = await page.evaluate(() => document.querySelector('#tapeChartContainer .tape-cell').getBoundingClientRect().height);
-      await page.click('#tapeZoomBtn');
-      assert(sonra >= 55 && sonra > once, `Takvim buyutme: ${once} -> ${sonra}`);
       await page.evaluate(() => openBookingDetailsPanel('g94-ayse'));
       const odeme = await page.evaluate(() => ({
         kinds: Array.from(document.querySelectorAll('#bookingPaymentKind option')).map(o => o.value),
@@ -831,14 +833,8 @@ async function main() {
       });
       assert(/Açık Ev/.test(saha95.text) && !/Onaylı Ev/.test(saha95.text) && /4321/.test(saha95.text) && /şifre: sifre1/.test(saha95.text)
         && saha95.z && saha95.canSign, 'Personel karti: ' + JSON.stringify(saha95).slice(0, 500));
-      const rozet95 = await page.evaluate(() => {
-        appData.cleaningTasks = [{ id: 'g95-t', villa: 'test', date: getTodayStr(), amount: 2500, status: 'PLANNED' }];
-        appData.maintenanceTickets = [];
-        renderAll();
-        return document.getElementById('opsTaskCountBadge').textContent;
-      });
-      assert(rozet95 === '1', 'Operasyon rozeti: ' + rozet95);
-      passed.push('30. temizlik (9.5): kontrol listesi kendi bölümünde, Word listesi yapıştırılır, Enter yeni madde; personel kartı onaylı işi göstermez, giriş bilgisini gösterir, boş listede Z açık; Operasyon rozeti bugünün işi');
+      assert(await page.evaluate(() => !document.getElementById('opsTaskCountBadge')), 'Menude sayac kalmamali');
+      passed.push('30. temizlik (9.5): kontrol listesi kendi bölümünde, Word listesi yapıştırılır, Enter yeni madde; personel kartı onaylı işi göstermez, giriş bilgisini gösterir, boş listede Z açık; menüde sayaç yok');
 
       // 9.6 Gider (M66-M68): kategori turu doldurur, formdan ozel kategori
       // eklenir, "her ay x3" tek istekte uc kayit yazar; Bugun'de net kar.
@@ -874,7 +870,7 @@ async function main() {
       await page.waitForFunction(() => !document.getElementById('expenseModal').classList.contains('active'), null, { timeout: 10000 });
       assert(giderPost96.length === 1 && giderPost96[0].length === 3 && giderPost96[0].every(r => r.category === 'Havuz bakımı' && r.amount === 800 && /^RECUR:/.test(r.legacy_id)),
         'Tekrarlayan gider istegi: ' + JSON.stringify(giderPost96).slice(0, 500));
-      const kar96 = await page.evaluate(() => { switchTab('executive'); renderTodayPerformance(); return document.getElementById('todayPerformanceCards').textContent; });
+      const kar96 = await page.evaluate(() => { switchTab('executive'); renderTodayLex(); return document.getElementById('todayPerformanceTable').textContent; });
       assert(/Net kâr/.test(kar96), 'Bugun net kar: ' + kar96.slice(0, 300));
       passed.push('31. gider (9.6): kategori OPEX/CAPEX türünü doldurur, formdan özel kategori eklenir, "her ay ×3" tek istekte 3 kayıt; Bugün\'de net kâr');
 
@@ -999,23 +995,25 @@ async function main() {
       'dönem düğmesi filtre panelini açmalı ve seçili dönemi yazmalı');
       await assertNoHorizontalOverflow(page, 'mobil kabuk finans');
       passed.push('34. telefon kabuğu: üst bar ≤72 px, alt çubuk, Daha fazla menüsü ve dönem düğmesi');
-      await page.evaluate(() => { switchTab('executive'); renderTodayPerformance(); });
-      await assertNoHorizontalOverflow(page, 'Bugun performans mobil');
-      // Bugun (PR 2): kurulum adimlari dokunulabilir, bos komuta grubu tek satir, kartlar 2'li.
+      await page.evaluate(() => { switchTab('executive'); renderTodayLex(); });
+      await assertNoHorizontalOverflow(page, 'Bugun Lex mobil');
+      // Bugun (Lex): kurulum adimlari dokunulabilir; tablo telefonda da 3 sutun ve ekrana sigar; sekmeler >=44 px.
       const bugun = await page.evaluate(() => {
         const gorunur = el => el && el.getClientRects().length > 0;
-        const kartlar = [...document.querySelectorAll('#todayPerformanceCards .today-performance__card')].filter(gorunur);
-        const bosGrup = [...document.querySelectorAll('.command-center-col')].find(c => c.querySelector('.empty-action-state'));
+        const tablo = document.querySelector('#todayTaskTable .lex-table');
+        const ilkSatir = tablo && tablo.querySelector('tbody tr');
         return {
           adimlar: [...document.querySelectorAll('#onboardStepsList .onboard-step-btn')].filter(gorunur).map(b => Math.round(b.getBoundingClientRect().height)),
-          sutun: kartlar.length >= 2 ? new Set(kartlar.slice(0, 2).map(k => Math.round(k.getBoundingClientRect().top))).size : 1,
-          bosGrup: bosGrup ? Math.round(bosGrup.getBoundingClientRect().height) : null
+          sutun: ilkSatir ? new Set([...ilkSatir.children].map(td => Math.round(td.getBoundingClientRect().top))).size : 1,
+          genis: tablo ? Math.round(tablo.getBoundingClientRect().width) <= Math.round(tablo.parentElement.clientWidth) + 1 : true,
+          sekme: [...document.querySelectorAll('#todayVillaTabs .lex-tab')].filter(gorunur).map(b => Math.round(b.getBoundingClientRect().height))
         };
       });
       assert(bugun.adimlar.every(h => h >= 36), `Bugün kurulum adımları en az 36 px: ${bugun.adimlar}`);
-      assert.strictEqual(bugun.sutun, 1, 'Bugün performans kartları telefonda 2 sütun (ilk iki kart aynı satırda)');
-      assert(bugun.bosGrup === null || bugun.bosGrup <= 90, `boş komuta grubu kısa olmalı: ${bugun.bosGrup}px`);
-      passed.push('35. Bugün telefonda: kurulum adımları ≥36 px, performans kartları 2 sütun, boş komuta grubu kısa');
+      assert.strictEqual(bugun.sutun, 1, 'Bugün görev tablosu telefonda 3 sütun yan yana (kart olmaz)');
+      assert(bugun.genis, 'Bugün tablosu telefonda yatay taşmamalı');
+      assert(bugun.sekme.every(h => h >= 44), `Bugün villa sekmeleri en az 44 px: ${bugun.sekme}`);
+      passed.push('35. Bugün telefonda: kurulum adımları ≥36 px, görev tablosu 3 sütun ve sığar, villa sekmeleri ≥44 px');
       // Rezervasyonlar (PR 3): liste kart modunda ekrana sigar, donem dugmeleri tek satir.
       const rez = await page.evaluate(() => {
         switchTab('reservations');
@@ -1085,19 +1083,15 @@ async function main() {
           kartSayisi: kartTablolar.length,
           sigmayan: kartTablolar.filter(t => !sigar(t)).length,
           etiketsiz: kartTablolar.flatMap(t => [...t.querySelectorAll(':scope > tbody > tr > td:not([colspan])')]).filter(td => !td.getAttribute('data-label')).length,
-          mulkTablo: getComputedStyle(document.getElementById('propExecutiveTableContainer')).display,
-          mulkKart: getComputedStyle(document.getElementById('propCardsContainer')).display,
-          ayYapiskan: ilk ? getComputedStyle(ilk).position : null,
           kucuk: [...document.querySelectorAll('#tab-finance .stepper-arrow-btn, #tab-finance .kpi-info-btn, #tab-finance .trend-btn')]
             .filter(b => b.getClientRects().length).map(b => Math.round(b.getBoundingClientRect().height)).filter(h => h < 36)
         };
       });
       assert(fin.kartSayisi >= 2 && fin.sigmayan === 0 && fin.etiketsiz === 0, `Finans gelir/gider tabloları kart modunda sığmalı ve etiketli olmalı: ${JSON.stringify(fin)}`);
-      assert(fin.mulkTablo === 'none' && fin.mulkKart === 'grid', `Mülk performansı telefonda kart görünümünde: ${JSON.stringify(fin)}`);
-      assert.strictEqual(fin.ayYapiskan, 'sticky', 'Aylık KPI tablosunda ay sütunu sabit');
+      assert(await page.evaluate(() => document.querySelector('#propExecTableBody tr td[data-label="Ciro ve pay"]') !== null), 'Mülk tablosu telefonda kart modunda ve etiketli');
       assert.strictEqual(fin.kucuk.length, 0, `Finans küçük düğme: ${fin.kucuk}`);
       await assertNoHorizontalOverflow(page, 'Finans mobil');
-      passed.push('39. Finans telefonda: gelir/gider tabloları kart modunda ve etiketli, mülk kartları, aylık tabloda ay sütunu sabit, küçük düğme yok');
+      passed.push('39. Finans telefonda: gelir/gider ve mülk tabloları kart modunda ve etiketli, küçük düğme yok');
       passed.push('25b. Bugün performans kartları 390 px mobilde taşmaz');
       // Analiz ve fiyat gidisat seridi ice aktarim bagini (finance_import_batch_rows) okur; fikstur
       // oturumsuz oldugu icin 401 doner ve konsol kapisini zamanlamaya bagli kirardi.
@@ -1146,23 +1140,15 @@ async function main() {
       const bosVeri = route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
       await page.route('**/rest/v1/**', bosVeri);
       await page.evaluate(() => { switchTab('marketing'); });
-      for (const v of ['funnel', 'ads', 'economics']) {
-        const var_ = await page.evaluate(view => { const b = document.querySelector(`[data-marketing-view="${view}"]`); if (b) b.click(); return !!b; }, v);
-        if (var_) { await page.waitForTimeout(100); await assertNoHorizontalOverflow(page, `Pazarlama ${v} mobil`); }
-      }
-      await page.waitForSelector('.mkt-channel-table');
-      const pazar = await page.evaluate(() => {
-        const tablo = document.querySelector('.mkt-channel-table');
-        const kpi = [...document.querySelectorAll('.mkt-kpi')].map(k => Math.round(k.getBoundingClientRect().top));
-        return {
-          sigar: Math.round(tablo.getBoundingClientRect().width) <= Math.round(tablo.parentElement.clientWidth),
-          etiketsiz: [...tablo.querySelectorAll(':scope > tbody > tr > td:not([colspan])')].filter(td => !td.getAttribute('data-label')).length,
-          ikili: kpi.length < 2 || kpi[0] === kpi[1]
-        };
-      });
+      await page.evaluate(() => switchTab('marketing'));
+      await page.waitForSelector('#mkAdsTitle', { timeout: 5000 });
+      await assertNoHorizontalOverflow(page, 'Pazarlama ana sayfa mobil');
+      await page.click('#marketingWorkspaceContent [data-ads-view="campaigns"]');
+      await page.waitForTimeout(100); await assertNoHorizontalOverflow(page, 'Pazarlama kampanya sayfası mobil');
+      await page.click('[data-marketing-home]');
       await page.unroute('**/rest/v1/**', bosVeri);
-      assert(pazar.sigar && pazar.etiketsiz === 0 && pazar.ikili, `Kanallar ve Pazarlama telefonda: ${JSON.stringify(pazar)}`);
-      passed.push('43. Kanallar ve Pazarlama telefonda: kanal tablosu kart modunda ve etiketli, özet kartları 2\'li, alt görünümler taşmaz');
+      assert(await page.evaluate(() => !document.querySelector('[data-marketing-view]') && !document.querySelector('.ads-subnav:not(.pricing-subnav)')), 'Pazarlamada üst/alt sekme kalmamali');
+      passed.push('43. Pazarlama telefonda: tek sayfa ve kampanya sayfası taşmaz; sekme şeridi yok');
       // Ayarlar (PR 11): bolum menusu yana kaymaz, sekiz bolumun hepsi ekranda; hicbir bolum tasmaz, kucuk dugme yok.
       // Bolumler acilinca ekip/kanal/sablon kayitlarini okur; fikstur oturumsuz oldugu icin 401 doner.
       const ayarBosVeri = route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });

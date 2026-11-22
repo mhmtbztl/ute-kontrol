@@ -27,12 +27,9 @@ function functionSource(name, nextName) {
   return actualStart >= 0 ? source.slice(actualStart, end >= 0 ? end : source.length) : '';
 }
 
-test('Yönetici snapshot önbelleği veri değişince geçersizleşir ve hata sonrası yeniden denenebilir', () => {
-  assert.strictEqual(typeof app.invalidateExecutiveSnapshotCache, 'function');
-  assert.strictEqual(typeof app.shouldRefreshExecutiveSnapshot, 'function');
-  assert.strictEqual(app.shouldRefreshExecutiveSnapshot({ key: 'k', status: 'error', retryAt: 50 }, 'k', 49), false);
-  assert.strictEqual(app.shouldRefreshExecutiveSnapshot({ key: 'k', status: 'error', retryAt: 50 }, 'k', 50), true);
-  assert.match(functionSource('saveAppData', 'isUUID'), /invalidateExecutiveSnapshotCache\(\)/);
+test('Bugün sunucu anlık görüntüsü önbelleği tutmaz (sadelik 21.11.2026)', () => {
+  assert.strictEqual(typeof app.invalidateExecutiveSnapshotCache, 'undefined');
+  assert.strictEqual(typeof app.shouldRefreshExecutiveSnapshot, 'undefined');
 });
 
 test('Realtime temizlik olayı sınırsız tablo sorgusu yapmaz', () => {

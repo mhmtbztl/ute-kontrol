@@ -182,8 +182,9 @@ test('U6. Kontroller: donem, karsilastirma, siralama, mulk', () => {
   click(root, root.querySelector('[data-ba-value="6m"]'));
   assert.strictEqual(ui.getState().preset, '6m');
   assert.ok(root.querySelector('.ba-subtitle').textContent.startsWith('Mayıs – Ekim 2026'));
-  click(root, root.querySelector('[data-ba-toggle="yoy2"]'));
-  assert.strictEqual(ui.getState().compare.yoy2, true);
+  assert.strictEqual(root.querySelector('[data-ba-toggle="yoy2"]'), null, '"2 yıl önce" karşılaştırması kalktı (sadelik 3. tur)');
+  click(root, root.querySelector('[data-ba-toggle="yoy1"]'));
+  assert.strictEqual(ui.getState().compare.yoy1, false);
   click(root, root.querySelector('[data-ba-sort="name"]'));
   assert.deepStrictEqual(ui.getState().sort, { key: 'name', dir: 'asc' });
   const once = root.querySelector('[data-ba-sort="name"]').parentNode.getAttribute('aria-sort');

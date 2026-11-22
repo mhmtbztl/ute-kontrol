@@ -369,8 +369,10 @@ function kaynakTestleri(app) {
     'yuklenemedi" der.');
 
   const cagrilar = (HTML.match(/exportLedger\('(BOOKINGS|EXPENSES)','(xlsx|csv)'\)/g) || []);
-  check(cagrilar.length >= 4,
-    'D9. Arayuz her iki defteri ve her iki bicimi sunuyor',
+  // Sadelik (21.11.2026): defterler tek yerden (Veri menusu) Excel olarak
+  // iner; geri yuklenebilir bicim odur. Finans'taki ikinci menu kalkti.
+  check(cagrilar.includes("exportLedger('BOOKINGS','xlsx')") && cagrilar.includes("exportLedger('EXPENSES','xlsx')"),
+    'D9. Arayuz her iki defteri geri yuklenebilir Excel olarak sunuyor',
     'Bulunan: ' + JSON.stringify(cagrilar));
 
   check((govde(APP, 'triggerFileDownload') || '').includes('revokeObjectURL'),

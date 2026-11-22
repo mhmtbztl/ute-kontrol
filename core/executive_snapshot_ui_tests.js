@@ -127,15 +127,11 @@ test('Eksik snapshot acik hata verir', () => {
   );
 });
 
-test('Arayuz mevcut ve onceki ayi RPC uzerinden yukler', () => {
-  assert.match(app, /Promise\.all\([\s\S]*getExecutiveDashboardSnapshot\(context\.period, context\.propertyId\)[\s\S]*getExecutiveDashboardSnapshot\(context\.priorPeriod, context\.propertyId\)/);
-  assert.match(app, /snapshotOwnsTopKpis[\s\S]*!snapshotOwnsTopKpis[\s\S]*computeExecutiveTopKpis/);
-  assert.match(app, /finansal göstergeler gösterilmiyor/);
-});
-
-test('Yenile dugmesi gercek snapshot yenilemesini zorlar', () => {
-  assert.match(html, /onclick="refreshExecutiveDashboardSnapshot\(true\)"/);
-  assert.match(html, /id="execSnapshotStatus"/);
+// Sadelik (21.11.2026): Bugun'deki gizli KPI seridi ve istemcinin sunucu anlik
+// goruntusu cagrisi kalkti. Sunucu fonksiyonu ay kapanisi karsilastirmasi icin durur.
+test('Bugun gizli KPI seridi ve istemci anlik goruntu cagrisi yok', () => {
+  assert.doesNotMatch(app, /get_executive_dashboard_snapshot|refreshExecutiveDashboardSnapshot|executiveSnapshotState/);
+  assert.doesNotMatch(html, /executive-kpi-grid|id="execKpi|id="execSnapshotStatus"/);
   assert.doesNotMatch(html, />AI MODEL</);
 });
 
@@ -157,82 +153,8 @@ test('Phase38 snapshot OPEX ve CAPEX siniflarini ayirir', () => {
   assert.match(phase38Migration, /REVOKE ALL ON FUNCTION public\.get_executive_dashboard_snapshot\(UUID, TEXT, UUID\) FROM anon/);
 });
 
-async function runAsyncTests() {
-  const elements = {};
-  const calls = [];
-  global.ExecutiveDashboardService = ExecutiveDashboardService;
-  global.document = {
-    getElementById(id) {
-      if (id === 'tab-executive') return null;
-      if (!elements[id]) elements[id] = { innerText: '', className: '', style: {} };
-      return elements[id];
-    }
-  };
-  App.setActiveTenant({ id: '11111111-1111-4111-8111-111111111111', role: 'owner' });
-  App.setCurrentFilter({ period: '2026-04', villa: 'ALL' });
-  App.setAppData({ targets: { '2026-04': { revenue_target: 60000 } }, villas: {} });
-  App.setSupabaseClient({
-    async rpc(name, args) {
-      calls.push({ name, args });
-      const prior = args.p_target_month === '2026-03';
-      return {
-        data: {
-          total_revenue: prior ? 40000 : 50000,
-          room_revenue: prior ? 36000 : 42000,
-          manual_opex: prior ? 7000 : 8000,
-          ota_commission: prior ? 3000 : 4000,
-          operating_expenses: prior ? 10000 : 12000,
-          capex: prior ? 2000 : 3000,
-          total_expenses: prior ? 12000 : 15000,
-          operating_profit: prior ? 30000 : 38000,
-          net_profit: prior ? 28000 : 35000,
-          booked_nights: prior ? 9 : 10,
-          available_nights: prior ? 30 : 40,
-          occupancy: prior ? 30 : 25
-        },
-        error: null
-      };
-    }
-  });
-
-  await App.refreshExecutiveDashboardSnapshot(true);
-  App.renderExecutiveSnapshotKpis();
-  assert.deepStrictEqual(calls.map(call => call.args.p_target_month), ['2026-04', '2026-03']);
-  assert.ok(calls.every(call => call.name === 'get_executive_dashboard_snapshot'));
-  // Kart ciroyu (net konaklama geliri) gosterir; kar ve marj toplam gelir
-  // (50.000) uzerinden: 35.000 / 50.000 = %70 (ENVANTER Finans 1).
-  assert.strictEqual(elements.execKpiRevenue.innerText, '₺42.000');
-  assert.strictEqual(elements.execProfitMargin.innerText, '%70 Marj');
-  assert.strictEqual(elements.execOpexRatio.innerText, '%24 Toplam gelir');
-  assert.strictEqual(elements.execKpiOpex.innerText, '₺12.000');
-  assert.strictEqual(elements.execKpiCapex.innerText, '₺3.000');
-  assert.strictEqual(elements.execKpiOperatingProfit.innerText, '₺38.000');
-  assert.strictEqual(elements.execKpiProfit.innerText, '₺35.000');
-  assert.strictEqual(elements.execKpiOccupancy.innerText, '%25');
-  assert.strictEqual(elements.execSoldNightsLabel.innerText, '10 / 40 Gece');
-  assert.strictEqual(elements.execKpiAdr.innerText, '₺4.200');
-  assert.strictEqual(elements.execKpiRevpar.innerText, '₺1.050');
-  assert.match(elements.execSnapshotStatus.innerText, /sunucudaki kayıtlarınızdan hesaplandı$/);
-  passed++;
-  console.log('[PASS] Gercek istemci akisi mevcut ve onceki snapshot ile DOM KPI degerlerini gunceller');
-
-  for (const [value, expected] of [[30000, '+%17 Hedef'], [0, 'Hedef: ₺0'], [null, 'Hedef belirlenmemiş']]) {
-    App.setAppData({ villas: {}, targets: [
-      { id: 'other-month', year: 2026, month: 3, property_id: null, net_profit_target: 90000 },
-      { id: 'property-target', year: 2026, month: 4, property_id: 'property-1', net_profit_target: 80000 },
-      { id: 'finance-target', year: 2026, month: 4, property_id: null, net_profit_target: value }
-    ] });
-    App.renderExecutiveSnapshotKpis();
-    assert.strictEqual(elements.execProfitVariance.innerText, expected);
-  }
-  passed++;
-  console.log('[PASS] Bugun dogru ayin portfoy net kar hedefini gosterir; sifir ile eksik ayrilir');
-
-  App.setSupabaseClient(null);
-  App.setActiveTenant(null);
-  delete global.document;
-  delete global.ExecutiveDashboardService;
-}
+// Istemci akisi (refresh + KPI seridi) sadelik turunda kalkti (21.11.2026).
+async function runAsyncTests() {}
 
 runAsyncTests().then(() => {
   console.log(`\nExecutive snapshot UI: ${passed}/${passed} tests passed.`);

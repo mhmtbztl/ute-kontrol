@@ -28,7 +28,7 @@ test('A1-G1 menusu on kararli kalemi dogru sirada tasir', () => {
     'executive', 'reservations', 'properties', 'operations', 'leads',
     'pricing', 'finance', 'analytics', 'marketing', 'settings'
   ]);
-  assert.match(html, /Bugün[\s\S]*Rezervasyonlar[\s\S]*Mülkler[\s\S]*Operasyon[\s\S]*Misafirler ve Satış[\s\S]*Fiyatlandırma[\s\S]*Finans[\s\S]*Analiz[\s\S]*Kanallar ve Pazarlama[\s\S]*Ayarlar/);
+  assert.match(html, /Bugün[\s\S]*Rezervasyonlar[\s\S]*Mülkler[\s\S]*Operasyon[\s\S]*Misafirler ve Satış[\s\S]*Fiyatlandırma[\s\S]*Finans[\s\S]*Analiz[\s\S]*Pazarlama[\s\S]*Ayarlar/);
 });
 
 test('A1-G1 kaldirilan ekranlar ve eylemler geri gelmez', () => {
@@ -57,13 +57,8 @@ test('Ay kapatma ozeti brut tutari degil net konaklama cirosunu gosterir', () =>
   delete global.document;
 });
 
-test('Finans icgorusu gider oranini ciroya degil toplam gelire boler', () => {
-  assert.strictEqual(typeof App.computeFinanceInsightRatios, 'function');
-  assert.deepStrictEqual(
-    App.computeFinanceInsightRatios({ ciro: 7000, totalIncome: 10000, opex: 2000, capex: 1000 }),
-    { expenseRatio: 30 }
-  );
-});
+// "Finans icgorusu" (Donem ozeti) sadelikte kalkti (21.11.2026); gider orani
+// Finans gider kartinda toplam gelire bolunur (renderFinanceModule, expenseRatio).
 
 test('Finans sozlugu ciroyu brut gelir veya kar tabani diye tanimlamaz', () => {
   assert.doesNotMatch(html, /Fiili Ciro \(Brüt Gelir\)|Ciro - \(OPEX \+ CAPEX\)|Gerçekleşen Ciro − OPEX/);

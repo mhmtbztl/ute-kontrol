@@ -26,7 +26,7 @@ try {
   const meta = P.parseCsv('\uFEFF"Rapor Başlangıcı","Rapor Sonu","Kampanya Adı",Sonuçlar,"Sonuç Göstergesi",Erişim,"Harcanan Tutar (TRY)",Gösterim,"Bağlantı Tıklamaları"\n2026-10-01,2026-10-07,"Mesaj",12,actions:onsite_conversion.messaging_conversation_started_7d,1000,600.50,2000,80', 'META');
   check(meta.errors.length === 0 && meta.rows[0].resultType === 'MESSAGE' && meta.rows[0].messages === 12, 'B4. Meta gercek sutunlari ve makine gostergesi okunur', JSON.stringify(meta));
   const google = P.parseCsv('Day,Impressions,Cost\n2026-10-01,10,2', 'GOOGLE');
-  check(google.errors.some(e => e.code === 'GOOGLE_SAMPLE_REQUIRED'), 'B5. Google ornegi gelmeden sessiz tahmin yok', JSON.stringify(google));
+  check(google.errors.some(e => e.code === 'INVALID_HEADER'), 'B5. Kampanya/Maliyet sutunu olmayan Google dosyasi tahminle okunmaz', JSON.stringify(google));
 } catch (error) { failed++; console.error(error.stack); }
 console.log(`\nTEST SUMMARY: ${passed} / ${passed + failed} TESTS PASSED (${failed} FAILED)`);
 if (failed) process.exit(1);

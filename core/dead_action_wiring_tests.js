@@ -39,10 +39,6 @@ check(
   !/l\.stage\s*===\s*'PROPOSAL'|l\.stage\s*===\s*'QUALIFIED'/.test(appSource),
   'Komuta merkezi veri modelinde bulunmayan PROPOSAL/QUALIFIED asamalarini kullanmamali'
 );
-check(
-  /leads\.filter\(l\s*=>\s*l\.status\s*===\s*'FOLLOW_UP'\s*\|\|\s*l\.status\s*===\s*'QUOTE_SENT'\)/.test(appSource),
-  'Komuta merkezi gercek talep durumlariyla sicak talepleri secmeli'
-);
 
 check(
   /onclick="deleteExpenseUI\(/.test(appSource),

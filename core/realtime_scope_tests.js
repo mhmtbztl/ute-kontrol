@@ -49,7 +49,6 @@ async function run() {
     assert(app.getActiveRenderPlan('tab-properties').includes('renderPropertiesTab'));
     assert(app.getActiveRenderPlan('tab-operations').includes('renderOperationsTab'));
     assert(app.getActiveRenderPlan('tab-guests').includes('renderGuestsTab'));
-    assert(app.getActiveRenderPlan('tab-maintenance').includes('renderManageMaintTable'));
   });
 
   await test('Arıza olayı hem defter görünümünü hem yönetici ham biletlerini günceller', () => {

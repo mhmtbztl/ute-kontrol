@@ -64,7 +64,7 @@
     { icon: '🏷️', title: 'Fiyatlandırma', words: 'fiyat fiyatlandirma adr gecelik indirim bosluk gecesi', target: { kind: 'tab', tab: 'pricing' } },
     { icon: '💰', title: 'Finans', words: 'finans gelir ciro kar zarar net kar ay kapanisi defter', target: { kind: 'tab', tab: 'finance' }, need: 'ledger' },
     { icon: '💸', title: 'Giderler', words: 'gider harcama masraf opex capex fatura', target: { kind: 'tab', tab: 'expenses' }, need: 'ledger' },
-    { icon: '📈', title: 'Kanallar ve Pazarlama', words: 'kanal pazarlama ota airbnb booking.com booking reklam kampanya instagram meta google', target: { kind: 'tab', tab: 'marketing' } },
+    { icon: '📈', title: 'Pazarlama', words: 'kanal pazarlama ota airbnb booking.com booking reklam kampanya instagram meta google', target: { kind: 'tab', tab: 'marketing' } },
     { icon: '⚙️', title: 'Ayarlar › İşletme', words: 'ayar ayarlar isletme logo', target: { kind: 'settings', section: 'business' }, need: 'manage' },
     { icon: '👤', title: 'Ayarlar › Ekip ve davet', words: 'ekip kullanici davet rol yetki', target: { kind: 'settings', section: 'team' }, need: 'manage' },
     { icon: '🔗', title: 'Ayarlar › Rezervasyon kanalları', words: 'kanal komisyon ota airbnb booking.com', target: { kind: 'settings', section: 'channels' }, need: 'manage' },

@@ -261,8 +261,6 @@ function fakeDom() {
       App.setKpiAlertColor('x', true, '#FF6961');
       assert.strictEqual(el.style.color, '#FF6961');
     } finally { g.document = eski; }
-    assert.match(APP, /setKpiAlertColor\('opsOpenMaintVal', acikP1 > 0, '#FF6961'\);/);
-    assert.match(APP, /setKpiAlertColor\('opsDebtVal', borc > 0, '#FFB340'\);/);
   });
 
   await test('D-05 Operasyon ve mulk kartlarinda ikincil isler gri dugme', () => {
@@ -275,6 +273,79 @@ function fakeDom() {
     assert.match(CSS, /\.daterange-months \{ display: grid; grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
     assert.match(CSS, /\.daterange-grid \{ display: grid; grid-template-columns: repeat\(7, minmax\(0, 1fr\)\);/);
     assert.match(CSS, /@media \(min-width: 641px\) \{\n  #bookingModal \.daterange-day \{ min-height: 0; \}/);
+  });
+
+  // --- Ucuncu dalga ---------------------------------------------------------
+  await test('U-09a Zorunlu alanlar birlikte denetlenir; tarayici balonu yok (novalidate)', () => {
+    const App = require('../app.js');
+    const alanlar = { resVilla: '', resGuest: ' ', resCheckIn: '', resCheckOut: '', resGross: '', resPax: '0' };
+    const g = globalThis, eski = g.document;
+    g.document = { getElementById: id => (id in alanlar ? { value: alanlar[id] } : null) };
+    try {
+      assert.deepStrictEqual(App.collectBookingRequiredErrors().map(h => h.field), ['resVilla', 'resGuest', 'resCheckIn', 'resGross', 'resPax']);
+      Object.assign(alanlar, { resVilla: 'seyir', resGuest: 'Ali', resCheckIn: '2026-11-01', resCheckOut: '2026-11-03', resGross: '0', resPax: '2' });
+      assert.deepStrictEqual(App.collectBookingRequiredErrors(), [], 'ucretsiz (0) tutar gecerli');
+    } finally { g.document = eski; }
+    assert.match(INDEX, /<form id="bookingForm" novalidate data-onsubmit="saveBooking\(event\)">/);
+  });
+
+  await test('U-09b Kod hatalari alana baglanir; vazgecmek hata degil; cakisma tarih alaninda', () => {
+    const govde = functionBody(APP, 'async function saveBooking(e)');
+    assert.ok(govde.indexOf('showBookingFieldErrors(collectBookingRequiredErrors())') < govde.indexOf("const editId = document.getElementById('resEditId').value;"), 'once zorunlu alanlar');
+    for (const alan of ['resPax', 'resCheckIn', 'resCleanFee', 'resDeposit']) assert.match(govde, new RegExp(`bookingFieldError\\('${alan}'`));
+    assert.doesNotMatch(govde, /throw new Error\('Kayıt yapılmadı\.'\)/);
+    assert.match(govde, /if \(err && err\.message === BOOKING_CANCELLED\) return;/);
+    assert.match(govde, /\^Bu mülk seçilen tarihlerde/);
+    const goster = functionBody(APP, 'function showBookingFieldErrors(');
+    assert.match(goster, /setAttribute\('aria-invalid', 'true'\)/);
+    assert.match(goster, /aria-describedby/);
+    assert.match(goster, /ilk\.focus\(\)/);
+  });
+
+  await test('U-12 Bugun sayaclari listeyi acar; bugun giris yoksa siradaki giris (iptal haric)', () => {
+    const App = require('../app.js');
+    const bs = [
+      { id: 'a', villa: 'x', checkIn: '2026-11-20', checkOut: '2026-11-22', status: 'CANCELLED' },
+      { id: 'b', villa: 'x', checkIn: '2026-11-21', checkOut: '2026-11-23', status: 'CONFIRMED' },
+      { id: 'c', villa: 'x', checkIn: '2026-11-14', checkOut: '2026-11-16', status: 'CONFIRMED' },
+      { id: 'd', villa: 'x', checkIn: '2026-12-01', checkOut: '2026-12-03', status: 'CONFIRMED' }
+    ];
+    assert.strictEqual(App.nextArrivalAfter(bs, '2026-11-14').id, 'b');
+    assert.strictEqual(App.nextArrivalAfter([], '2026-11-14'), null);
+    // Lex Bugun (21.11.2026): sayaclar ozet cumlesinde; her giris/cikis gorev
+    // tablosunda satirdir ve satir Rezervasyonlar'a gider (TASK_TYPES.ARRIVAL.target).
+    const govde = functionBody(APP, 'function renderTodayLex(');
+    assert.match(govde, /renderTodayNextArrival\(bookings, today, sayim\.arrivalsPending \+ sayim\.arrivalsDone\)/);
+    assert.match(govde, /stays: !!sayim/);
+    const T = require('./team_tasks.js');
+    assert.strictEqual(T.TASK_TYPES.ARRIVAL.target, 'reservations');
+    assert.strictEqual(T.TASK_TYPES.DEPARTURE.target, 'reservations');
+    assert.match(INDEX, /<p class="lex-note" id="todayNextArrival" hidden><\/p>/);
+  });
+
+  await test('U-16 Iki rezervasyon formu ayni etiketleri kullanir; hizli form neyin sonra girilecegini soyler', () => {
+    const hizli = INDEX.slice(INDEX.indexOf('id="quickBookingForm"'), INDEX.indexOf('</form>', INDEX.indexOf('id="quickBookingForm"')));
+    for (const [tam, hiz] of [['resVilla', 'quickBookingVilla'], ['resGross', 'quickBookingGross'], ['resPax', 'quickBookingPax'], ['resChannel', 'quickBookingChannel'], ['resGuest', 'quickBookingGuest'], ['resDeposit', 'quickBookingDeposit']]) {
+      const ad = (INDEX.match(new RegExp(`<label for="${tam}">([^<]+)</label>`)) || [])[1];
+      assert.ok(ad, tam);
+      assert.ok(new RegExp(`<label>${ad.replace(/[()₺]/g, m => '\\' + m)}<(input|select) id="${hiz}"`).test(hizli), `${hiz} etiketi "${ad}" olmali`);
+    }
+    assert.match(hizli, /Temizlik ücreti ve maliyeti, komisyon ve vergi sonra eklenir/);
+  });
+
+  await test('D-06 Telefonda rapor/ChatGPT eylemleri tek "Rapor ⋯" dugmesinin arkasinda', () => {
+    const govde = functionBody(APP, 'function renderPageActionBar(');
+    assert.match(govde, /page-action-bar__more" aria-expanded="false" aria-controls="pageActionItems" data-onclick="togglePageActionMenu\(\)"/);
+    assert.match(govde, /eylemler\.length\n?\s*\?/);
+    assert.match(read('core/action_dispatch.js'), /'togglePageActionMenu'/);
+    assert.match(CSS, /@media \(max-width: 640px\) \{\n  \.page-action-bar \{ margin: 0 0 8px; \}\n  \.page-action-bar__more \{ display: inline-flex; min-height: 36px; \}\n  \.page-action-bar__items \{ display: none; \}/);
+    assert.match(CSS, /\.page-action-bar__more \{ display: none; \}/);
+  });
+
+  await test('D-07 Analiz son tamamlanan ayla acildiginda bunu baslikta soyler', () => {
+    const ui = read('core/analytics_ui.js');
+    assert.match(ui, /class: 'ba-period-note', text: `Son tamamlanan ay gösteriliyor/);
+    assert.match(ui, /report\.period\.end === BookingAnalytics\.shiftMonth\(bugunAy, -1\)/);
   });
 
   console.log(`\n${passed} geçti, ${failed} başarısız`);

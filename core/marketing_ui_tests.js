@@ -55,81 +55,17 @@ runTest('Workspace model exposes recorded commission without fallback estimates'
   assert.strictEqual(model.economics.totals.roomRevenueAfterDistribution, 18000);
 });
 
-runTest('Unknown channels remain visible in the rendered economics table', () => {
-  const model = MarketingUI.buildWorkspaceModel({
-    filter: { period: 'ALL', villa: 'ALL' },
-    bookings: [{ id: 'U1', channel: 'Agency X', checkIn: '2026-09-01', checkOut: '2026-09-02', grossAmount: 1000 }]
-  });
-  const html = MarketingUI.renderWorkspaceHtml(model, 'economics');
-  assert.match(html, /Bilinmeyen/);
-  assert.match(html, /Agency X/);
-  assert.match(html, /Eşleme gerekli/);
-});
+// Kanallar gorunumu (kanal tablosu, saglik skoru, referans) sadelikte kalkti (21.11.2026).
 
-runTest('Economics renders only a reportable backend health snapshot', () => {
-  const propertyId = '22222222-2222-4222-8222-222222222222';
-  const model = MarketingUI.buildWorkspaceModel({
-    filter: { period: 'ALL', villa: 'AZURE' }, bookings: [],
-    villas: { AZURE: { id: propertyId, name: 'Villa Azure' } },
-    healthSnapshots: [{
-      id: 'H1', property_id: propertyId, as_of: '2026-09-13T08:00:00Z',
-      scoring_version: 'health-v1', status: 'REPORTABLE', score: 82.5,
-      coverage_percent: 75, confidence_index: 0.73, confidence_tier: 'MEDIUM',
-      components: [], missing_components: [],
-      scoring_method: 'RENORMALIZED_AVAILABLE_COMPONENTS', missing_data_imputed: false
-    }]
-  });
-  const html = MarketingUI.renderWorkspaceHtml(model, 'economics');
-  assert.match(html, /Pazarlama sağlık skoru/);
-  assert.match(html, /82,5\/100/);
-  assert.match(html, /Eksik veri puanlanmadı/);
-  assert.match(html, /health-v1/);
-});
 
-runTest('Economics exposes source-attributed benchmark history without invented defaults', () => {
-  const propertyId = '22222222-2222-4222-8222-222222222222';
-  const model = MarketingUI.buildWorkspaceModel({ filter: { period: 'ALL', villa: 'AZURE' }, bookings: [],
-    villas: { AZURE: { id: propertyId, name: 'Villa Azure' } }, benchmarks: [{ property_id: propertyId,
-      source_kind: 'MANUAL_RESEARCH', effective_from: '2026-09-01', confidence: 0.8,
-      max_distribution_cost_percent: 15, minimum_direct_reservation_share_percent: 20 }] });
-  const html = MarketingUI.renderWorkspaceHtml(model, 'economics');
-  assert.match(html, /Geçerli pazarlama referansı/); assert.match(html, /MANUAL_RESEARCH/);
-  assert.match(html, /Azami dağıtım maliyeti: 15%/); assert.match(html, /Asgari direkt pay: 20%/);
-  assert.match(MarketingUI.renderBenchmarkForm(model), /Kaydedilen referans geçmişi değiştirilemez/);
-});
-
-runTest('Future and expired benchmarks are not presented as current', () => {
-  const propertyId = 'P1'; const rows = [
-    { property_id: propertyId, id: 'expired', effective_from: '2026-01-01', effective_to_exclusive: '2026-02-01' },
-    { property_id: propertyId, id: 'current', effective_from: '2026-08-01', effective_to_exclusive: null },
-    { property_id: propertyId, id: 'future', effective_from: '2026-10-01', effective_to_exclusive: null }
-  ];
-  assert.strictEqual(MarketingUI.selectCurrentBenchmark(rows, propertyId, '2026-09-13').id, 'current');
-});
-
-runTest('Insufficient health evidence remains scoreless in the UI', () => {
-  const propertyId = '22222222-2222-4222-8222-222222222222';
-  const model = MarketingUI.buildWorkspaceModel({
-    filter: { period: 'ALL', villa: 'AZURE' }, bookings: [],
-    villas: { AZURE: { id: propertyId, name: 'Villa Azure' } },
-    healthSnapshots: [{
-      id: 'H1', property_id: propertyId, as_of: '2026-09-13T08:00:00Z',
-      status: 'INSUFFICIENT_DATA', score: null, coverage_percent: 35,
-      confidence_index: 0.3, confidence_tier: 'INSUFFICIENT', components: [],
-      missing_components: [{ key: 'PHOTO_QUALITY', reason: '<missing>' }],
-      scoring_method: 'RENORMALIZED_AVAILABLE_COMPONENTS', missing_data_imputed: false
-    }]
-  });
-  const html = MarketingUI.renderWorkspaceHtml(model, 'economics');
-  assert.match(html, /Pazarlama sağlığı hesaplanamadı/);
-  assert.match(html, /veri kapsamı yetersiz \(35%\)/);
-  assert.doesNotMatch(html, />70</);
-});
-
-runTest('Airbnb view mounts the dedicated period-based workspace', () => {
+runTest('Pazarlama tek sayfa: özet, reklam tablosu ve Airbnb bölümü birlikte', () => {
   const model = MarketingUI.buildWorkspaceModel({ filter: { period: 'ALL', villa: 'ALL' }, bookings: [] });
-  assert.match(MarketingUI.renderWorkspaceHtml(model, 'funnel'), /Airbnb İlan Performansı/);
-  assert.match(MarketingUI.renderWorkspaceHtml(model, 'funnel'), /id="airbnbPerformanceWorkspace"/);
+  const html = MarketingUI.renderWorkspaceHtml(model, 'home');
+  assert.match(html, /id="marketingSummary"/);
+  assert.match(html, /Reklamlarınız/);
+  assert.match(html, /Airbnb ilanınız/);
+  assert.match(html, /id="airbnbPerformanceWorkspace"/);
+  assert.doesNotMatch(html, /ads-subnav/);
 });
 
 runTest('Airbnb workspace loads every listing even when the global property filter selects one home', () => {
@@ -156,41 +92,9 @@ runTest('Injected markup is escaped in finding output', () => {
   assert.doesNotMatch(html, /<script>x<\/script>/);
 });
 
-runTest('Physical findings expose explicit task opt-in while digital findings do not', () => {
-  const physical = MarketingUI.renderFindingActions({ id: 'F1', status: 'OPEN', action_kind: 'RESHOOT' });
-  const digital = MarketingUI.renderFindingActions({ id: 'F2', status: 'OPEN', action_kind: 'PRICE_REVIEW' });
-  assert.match(physical, /data-marketing-action="ACCEPT_TASK"/);
-  assert.doesNotMatch(digital, /data-marketing-action="ACCEPT_TASK"/);
-  assert.match(digital, /data-marketing-action="ACKNOWLEDGE"/);
-});
 
-runTest('Terminal findings expose no lifecycle buttons', () => {
-  assert.strictEqual(MarketingUI.renderFindingActions({ id: 'F1', status: 'RESOLVED', action_kind: 'RESHOOT' }), '');
-  assert.strictEqual(MarketingUI.renderFindingActions({ id: 'F2', status: 'DISMISSED', action_kind: 'RESHOOT' }), '');
-});
 
-runTest('Manual snapshot form uses scoped listings and leaves unknown counters blank', () => {
-  const model = MarketingUI.buildWorkspaceModel({
-    filter: { period: '2026-09', villa: 'ALL' }, bookings: [],
-    listings: [
-      { id: 'L1', channel_code: 'AIRBNB', display_name: 'Airbnb Ana İlan', status: 'ACTIVE' },
-      { id: 'L2', channel_code: 'VRBO', status: 'ARCHIVED' }
-    ]
-  });
-  const html = MarketingUI.renderSnapshotForm(model);
-  assert.match(html, /value="L1"/);
-  assert.doesNotMatch(html, /value="L2"/);
-  assert.match(html, /name="periodEndExclusive" value="2026-10-01"/);
-  assert.match(html, /name="listingViews" placeholder="Bilinmiyorsa boş bırakın"/);
-});
 
-runTest('Funnel selects the newest snapshot regardless of query array order', () => {
-  const latest = MarketingUI.selectLatestSnapshot([
-    { id: 'new', period_end_exclusive: '2026-10-01' },
-    { id: 'old', period_end_exclusive: '2026-09-01' }
-  ]);
-  assert.strictEqual(latest.id, 'new');
-});
 
 runTest('Channel listing form preserves property scope and constrained channel vocabulary', () => {
   const model = MarketingUI.buildWorkspaceModel({
@@ -204,41 +108,8 @@ runTest('Channel listing form preserves property scope and constrained channel v
   assert.match(html, /&lt;Eski&gt;/);
 });
 
-runTest('Cover-change form uses the recorded cover and creates fixed observational windows atomically', () => {
-  const propertyId = '22222222-2222-4222-8222-222222222222';
-  const model = MarketingUI.buildWorkspaceModel({
-    filter: { period: 'ALL', villa: 'AZURE' }, bookings: [],
-    villas: { AZURE: { id: propertyId, name: 'Villa Azure' } },
-    listings: [{ id: 'L1', property_id: propertyId, channel_code: 'AIRBNB' }],
-    media: [
-      { id: 'M1', property_id: propertyId, media_status: 'ACTIVE', room_category: 'POOL' },
-      { id: 'M2', property_id: propertyId, media_status: 'ACTIVE', room_category: 'EXTERIOR' }
-    ],
-    placements: [
-      { channel_listing_id: 'L1', media_id: 'M1', is_active: true, is_cover: true },
-      { channel_listing_id: 'L1', media_id: 'M2', is_active: true, is_cover: false }
-    ]
-  });
-  const html = MarketingUI.renderExperimentForm(model);
-  assert.match(html, /name="expectedOldMediaId" value="M1"/);
-  assert.match(html, /name="newMediaId" required/);
-  assert.match(html, /14\+14 gün/);
-  assert.match(html, /OTA’ya yayın yapılmaz/);
-});
 
-runTest('Evaluated experiments retain the non-causal disclosure', () => {
-  const html = MarketingUI.renderExperiments([{
-    status: 'EVALUATED', verdict: 'POSITIVE_ASSOCIATION', change_date: '2026-08-15',
-    primary_metric: 'SEARCH_TO_VIEW_CTR_PERCENT'
-  }], null);
-  assert.match(html, /Pozitif ilişki/);
-  assert.match(html, /nedensellik kanıtı olarak sunulmaz/);
-});
 
-runTest('Experiment worker lifecycle states remain visible', () => {
-  assert.match(MarketingUI.renderExperiments([{ status: 'PROCESSING' }], null), /Değerlendiriliyor/);
-  assert.match(MarketingUI.renderExperiments([{ status: 'FAILED' }], null), /Değerlendirme başarısız/);
-});
 
 runTest('Index integrates one independent marketing entry without app.js edits', () => {
   const index = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
@@ -246,7 +117,7 @@ runTest('Index integrates one independent marketing entry without app.js edits',
   assert.strictEqual((index.match(/src="core\/marketing_ui\.js(?:\?v=[a-f0-9]{8})?"/g) || []).length, 1);
   assert.doesNotMatch(index, /id="tab-marketing-legacy"/);
   // Menu etiketi kullanici karariyla degisti (ENVANTER 30.09.2026).
-  assert.match(index, /onclick="switchTab\('marketing'\)"[^>]*>📈 Kanallar ve Pazarlama/);
+  assert.match(index, /onclick="switchTab\('marketing'\)"[^>]*>Pazarlama</);
 });
 
 runTest('Marketing bootstrap and lazy dependencies carry current content hashes', () => {
@@ -257,7 +128,7 @@ runTest('Marketing bootstrap and lazy dependencies carry current content hashes'
     .update(fs.readFileSync(file, 'utf8').replace(/\r\n?/g, '\n'), 'utf8')
     .digest('hex').slice(0, 8);
   assert.match(index, new RegExp(`core/marketing_ui\\.js\\?v=${hash(path.join(__dirname, 'marketing_ui.js'))}`));
-  ['marketing_engine.js', 'marketing_funnel_service.js', 'marketing_priority_service.js', 'marketing_benchmark_service.js', 'marketing_cover_change_service.js', 'marketing_data_service.js', 'marketing_review_service.js', 'marketing_snapshot_service.js', 'marketing_channel_listing_service.js', 'marketing_experiment_service.js', 'marketing_health_results_service.js'].forEach(file => {
+  ['marketing_engine.js', 'marketing_data_service.js', 'marketing_channel_listing_service.js'].forEach(file => {
     assert.match(uiSource, new RegExp(`${file.replace('.', '\\.') }\\?v=${hash(path.join(__dirname, file))}`));
   });
 });

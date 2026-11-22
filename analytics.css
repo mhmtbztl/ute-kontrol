@@ -45,7 +45,7 @@
 }
 .ba-title {
   margin: 0; font-family: var(--font-display);
-  font-size: 22px; font-weight: 700; letter-spacing: -0.02em;
+  font-size: 22px; font-weight: 500; letter-spacing: -0.02em;
 }
 .ba-subtitle { margin: 4px 0 0; font-size: 13px; color: var(--text-muted); }
 .ba-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -70,7 +70,7 @@
   height: 30px; padding: 0 11px;
   border: 0; border-radius: 8px;
   background: transparent; color: var(--text-muted);
-  font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+  font: inherit; font-size: 12.5px; font-weight: 500; cursor: pointer;
   transition: background-color 120ms ease, color 120ms ease;
 }
 .ba-seg-btn:hover { color: var(--text-main); }
@@ -128,11 +128,11 @@
   border: 1px solid var(--border-subtle);
   background: var(--bg-surface);
 }
-.ba-kpi-label { margin: 0; font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.ba-kpi-label { margin: 0; font-size: 12px; font-weight: 500; color: var(--text-muted); }
 .ba-kpi-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
 .ba-kpi-value {
   margin: 0; font-family: var(--font-display);
-  font-size: 24px; line-height: 1.05; font-weight: 700; letter-spacing: -0.02em;
+  font-size: 24px; line-height: 1.05; font-weight: 500; letter-spacing: -0.02em;
   overflow-wrap: anywhere;
 }
 .ba-kpi-note { margin: 0; font-size: 12px; color: var(--text-muted); }
@@ -198,7 +198,7 @@
 .ba-tip-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .ba-tip-list li { display: flex; justify-content: space-between; gap: 14px; }
 .ba-tip-key { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); }
-.ba-tip-val { font-weight: 600; font-variant-numeric: tabular-nums; }
+.ba-tip-val { font-weight: 500; font-variant-numeric: tabular-nums; }
 
 .ba-bar.ba-s1 { fill: var(--ba-s1); }
 .ba-bar-label { fill: var(--text-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
@@ -215,15 +215,15 @@
 .ba-slice.ba-s-other { fill: var(--ba-other); }
 .ba-donut-empty { fill: none; stroke: var(--ba-grid); stroke-width: 24; }
 .ba-donut-k { fill: var(--text-muted); font-size: 11px; }
-.ba-donut-v { fill: var(--text-main); font-size: 16px; font-weight: 700; }
+.ba-donut-v { fill: var(--text-main); font-size: 16px; font-weight: 500; }
 .ba-donut-wrap > .ba-scroll { flex: 1 1 260px; }
 
 /* -------------------------------------------------------------- tablo -- */
 .ba-scroll { min-width: 0; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .ba-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .ba-table th, .ba-table td { padding: 9px 10px; text-align: left; border-bottom: 1px solid var(--ba-grid); white-space: nowrap; }
-.ba-table thead th { font-size: 12px; font-weight: 600; color: var(--text-muted); }
-.ba-table tbody th { font-weight: 600; }
+.ba-table thead th { font-size: 12px; font-weight: 500; color: var(--text-muted); }
+.ba-table tbody th { font-weight: 500; }
 .ba-table .num { text-align: right; font-variant-numeric: tabular-nums; }
 .ba-table tbody tr:hover { background: rgba(118, 118, 128, 0.10); }
 .ba-table tr.is-selected { background: var(--accent-blue-subtle); }
@@ -243,7 +243,7 @@
 .ba-sort:focus-visible, .ba-link:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; border-radius: 4px; }
 .ba-link {
   padding: 0; border: 0; background: none;
-  color: var(--text-main); font: inherit; font-weight: 600;
+  color: var(--text-main); font: inherit; font-weight: 500;
   cursor: pointer; text-align: left;
 }
 .ba-link:hover { color: var(--accent-blue); text-decoration: underline; text-underline-offset: 3px; }
@@ -267,7 +267,7 @@
 .ba-funnel-step { display: grid; gap: 5px; }
 .ba-funnel-head { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; }
 .ba-funnel-label { color: var(--text-muted); }
-.ba-funnel-val { font-variant-numeric: tabular-nums; font-weight: 600; }
+.ba-funnel-val { font-variant-numeric: tabular-nums; font-weight: 500; }
 .ba-reasons { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 13px; }
 .ba-reasons li { display: flex; justify-content: space-between; gap: 10px; padding-bottom: 6px; border-bottom: 1px solid var(--ba-grid); }
 .ba-reasons .num { font-variant-numeric: tabular-nums; color: var(--text-muted); }
@@ -323,7 +323,7 @@
 }
 
 /* Suren ay uyarisi ve tam genislikte kucuk grafikler */
-.ba-running {
+.ba-running, .ba-period-note {
   margin: 8px 0 0; padding: 6px 10px; display: inline-block;
   border-radius: var(--radius-sm, 10px);
   background: var(--accent-amber-subtle); color: var(--text-main);
@@ -335,8 +335,8 @@
 .ba-scroll-note { margin: 0 0 6px; font-size: 12px; color: var(--text-muted); }
 .ba-scroll.is-overflowing {
   background:
-    linear-gradient(to right, var(--bg-surface) 30%, rgba(28, 28, 30, 0)) left center / 28px 100% no-repeat local,
-    linear-gradient(to left, var(--bg-surface) 30%, rgba(28, 28, 30, 0)) right center / 28px 100% no-repeat local,
+    linear-gradient(to right, var(--bg-surface) 30%, rgb(var(--rgb-surface) / 0)) left center / 28px 100% no-repeat local,
+    linear-gradient(to left, var(--bg-surface) 30%, rgb(var(--rgb-surface) / 0)) right center / 28px 100% no-repeat local,
     radial-gradient(farthest-side at 0 50%, rgba(235, 235, 245, 0.18), transparent) left center / 12px 100% no-repeat scroll,
     radial-gradient(farthest-side at 100% 50%, rgba(235, 235, 245, 0.18), transparent) right center / 12px 100% no-repeat scroll;
 }
@@ -346,7 +346,7 @@
 .ba-empty-btn:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
 
 /* Kisa aciklamalarda son satirda tek kelime kalmasin (tipografi incelemesi). */
-.ba-subtitle, .ba-card-sub, .ba-kpi-note, .ba-mini-note, .ba-footnote, .ba-empty-text, .ba-running { text-wrap: pretty; }
+.ba-subtitle, .ba-card-sub, .ba-kpi-note, .ba-mini-note, .ba-footnote, .ba-empty-text, .ba-running, .ba-period-note { text-wrap: pretty; }
 
 /* U-20: telefonda siralama basliklari parmakla secilebilir. */
 @media (max-width: 640px) {

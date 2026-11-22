@@ -14,11 +14,10 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- Yazi tipleri kendi sunucumuzdan (dis sunucuya istek yok); style.css @font-face -->
-  <link rel="preload" href="assets/fonts/inter-latin-wght.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="assets/fonts/inter-latin-ext-wght.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="style.css?v=5cccf55e">
-  <link rel="stylesheet" href="analytics.css?v=5cea6f26">
+  <!-- Gece/Gunduz: tema stil sayfasindan once secilir (yanip sonme olmaz); yazi tipi sistemindir -->
+  <script src="core/theme.js?v=81e24fd9"></script>
+  <link rel="stylesheet" href="style.css?v=1d5d28a2">
+  <link rel="stylesheet" href="analytics.css?v=22c2a3d0">
   <script src="supabase.umd.js?v=3810661a"></script>
   <script src="core/xlsx_import_worker.js?v=b0939d47"></script>
 </head>
@@ -42,10 +41,10 @@
       <!-- SaaS Auth Tabs -->
       <div class="saas-auth-tabs" data-lx-style="display: flex; background: rgba(0,0,0,0.4); padding: 4px; border-radius: 8px; margin-bottom: 18px; border: 1px solid rgba(255,255,255,0.1);">
         <button type="button" id="tabBtnLogin" class="saas-tab-btn active" data-onclick="switchAuthTab('login')" data-lx-style="flex: 1; padding: 8px; border: none; background: #BF5AF2; color: #fff; font-weight: 700; border-radius: 6px; cursor: pointer; font-size: 13px;">
-          🔑 Giriş Yap
+          Giriş Yap
         </button>
         <button type="button" id="tabBtnRegister" class="saas-tab-btn" data-onclick="switchAuthTab('register')" data-lx-style="flex: 1; padding: 8px; border: none; background: transparent; color: #98989D; font-weight: 600; border-radius: 6px; cursor: pointer; font-size: 13px;">
-          ✨ Yeni Hesap Aç
+          Yeni Hesap Aç
         </button>
       </div>
 
@@ -62,7 +61,7 @@
 
         <div id="captchaLogin" class="auth-captcha"></div>
         <button type="submit" id="saasLoginSubmitBtn" class="btn btn-primary" data-lx-style="width: 100%; padding: 12px; font-weight: 800; font-size: 14px; background: linear-gradient(135deg, #BF5AF2, #6D28D9); border: none; border-radius: 8px;">
-          🔓 Hesabıma Giriş Yap
+          Hesabıma Giriş Yap
         </button>
 
 
@@ -103,7 +102,7 @@
         </label>
         <div id="captchaRegister" class="auth-captcha"></div>
         <button type="submit" id="saasRegSubmitBtn" class="btn btn-primary" data-lx-style="width: 100%; padding: 12px; font-weight: 800; font-size: 14px; background: linear-gradient(135deg, #30D158, #059669); border: none; border-radius: 8px;">
-          ✨ Hesabımı Oluştur ve Başla
+          Hesabımı Oluştur ve Başla
         </button>
       </form>
 
@@ -118,10 +117,10 @@
         </div>
         <div id="captchaForgot" class="auth-captcha"></div>
         <button type="submit" id="saasForgotSubmitBtn" class="btn btn-primary" data-lx-style="width: 100%;">
-          📧 Sıfırlama Bağlantısı Gönder
+          Sıfırlama Bağlantısı Gönder
         </button>
         <div data-lx-style="text-align: center; margin-top: 10px;">
-          <a href="#" data-onclick="switchAuthTab('login'); return false;" data-lx-style="color: #98989D; font-size: 12px; text-decoration: underline;">← Girişe dön</a>
+          <a href="#" data-onclick="switchAuthTab('login'); return false;" data-lx-style="color: #98989D; font-size: 12px; text-decoration: underline;">Girişe dön</a>
         </div>
       </form>
 
@@ -139,13 +138,13 @@
           <input type="password" id="saasNewPass2" placeholder="Şifrenizi tekrar girin" required minlength="10" autocomplete="new-password" data-lx-style="width: 100%; padding: 10px 12px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 13px;">
         </div>
         <button type="submit" id="saasNewPassSubmitBtn" class="btn btn-primary" data-lx-style="width: 100%;">
-          🔒 Şifremi Güncelle
+          Şifremi Güncelle
         </button>
       </form>
 
       <!-- Tüm auth formlarının paylaştığı mesaj alanı -->
       <div id="authErrorMessage" class="auth-error-msg" data-lx-style="display: none; margin-top: 12px;">
-        ⚠️ Hatalı e-posta veya şifre! Lütfen tekrar deneyin.
+        Hatalı e-posta veya şifre! Lütfen tekrar deneyin.
       </div>
 
     </div>
@@ -155,16 +154,11 @@
   <header class="app-header">
     <div class="brand-area">
       <div class="brand-logo"><img id="headerBusinessLogo" src="assets/brand/lexbnb-logo-dark.svg" alt="Lexbnb"></div>
-      <div class="brand-meta">
-        <h1>Kontrol Merkezi</h1>
-        <p id="brandSubTitle">Kısa Dönem Kiralama & Finansal Performans Portalı</p>
-      </div>
     </div>
 
     <!-- Telefonda (<=640 px) donem ve mulk secimi bu dugmeye katlanir; dokununca
          asagidaki filtre paneli acilir. Masaustunde gorunmez. core/mobile_shell.js -->
     <button type="button" id="mobileFilterChip" class="mobile-filter-chip" data-onclick="toggleMobileFilters()" aria-controls="globalFilterBar" aria-expanded="false" hidden>
-      <span aria-hidden="true">📅</span>
       <span id="mobileFilterChipText" class="mobile-filter-chip__text">—</span>
       <span class="header-chevron" aria-hidden="true">▾</span>
     </button>
@@ -173,7 +167,7 @@
          etkiledigini yazar: applyGlobalFilterScope() / GLOBAL_FILTER_SCOPE. -->
     <div class="header-filters" id="globalFilterBar">
             <div class="filter-group">
-        <label data-lx-style="display: flex; align-items: center; gap: 4px;"><span>📅</span> Dönem / tarih:</label>
+        <label data-lx-style="display: flex; align-items: center; gap: 4px;">Dönem / tarih:</label>
         <select id="globalPeriodFilter" aria-label="Dönem" data-onchange="handleFilterChange()">
           <!-- Bu liste refreshPeriodSelectors() tarafindan musterinin kendi
                veri araligindan yeniden kurulur. Asagisi yalnizca yedektir. -->
@@ -196,22 +190,10 @@
               <option value="ALL">Tüm Villalar / Portföy</option>
             </select>
       </div>
-      <p id="globalFilterScopeHint" class="filter-scope-hint"></p>
     </div>
 
         <div class="header-actions">
-      <!-- Komuta Paleti Butonu (Ctrl+K) -->
-      <button type="button" class="btn btn-secondary header-palette-btn" data-onclick="openCommandPalette()" title="Komuta Paleti (Kısayol: Ctrl+K)">
-        <span>🔍</span>
-        <span class="palette-btn-text">Ara / Komut</span>
-        <kbd class="header-kbd">Ctrl+K</kbd>
-      </button>
 
-      <!-- Tek ChatGPT kapısı: açılan sayfanın güvenli bağlamını ve hazır sorularını kullanır. -->
-      <button type="button" id="askChatGptBtn" class="btn btn-secondary header-chatgpt-btn" data-onclick="openChatGptQuestionModal()" title="Verilerinizden ChatGPT için hazır, kişisel veri içermeyen bir analiz komutu üretir">
-        <span>🧠</span>
-        <span class="chatgpt-btn-text">ChatGPT'ye sor</span>
-      </button>
       <!-- Bildirim Merkezi (Notification Bell & Drawer) -->
       <div class="header-dropdown-wrap">
         <button type="button" class="btn btn-secondary header-bell-btn" data-onclick="toggleNotificationDrawer()" id="notificationBellBtn" title="Bildirim Merkezi">
@@ -229,122 +211,43 @@
         </div>
       </div>
 
-      <!-- Dropdown 2: Veri ve yardım (eski adı Araçlar) -->
-      <div class="header-dropdown-wrap">
-        <button type="button" class="btn btn-secondary" data-onclick="toggleHeaderDropdown('toolsMenu')" id="toolsBtn">
-          <span>🗂️</span> <span class="header-btn-text">Veri ve yardım</span> <span class="header-chevron" aria-hidden="true">▾</span>
-        </button>
-        <div class="header-dropdown-menu" id="toolsMenu">
-          <div class="dropdown-section-label">Veri</div>
-          <button type="button" id="dataSyncBtn" class="dropdown-item header-cache-btn" data-onclick="resyncTenantData()" title="Verileri sunucudan yeniden okur; hiçbir kaydı değiştirmez">
-            <span class="dropdown-icon">🔄</span>
-            <div>
-              <strong id="dataSyncBtnText">Verileri eşitle</strong>
-              <small>Sunucudan yeniden okur; hiçbir kaydı değiştirmez</small>
-            </div>
-          </button>
-          <button type="button" class="dropdown-item" data-onclick="openImportModal(); closeAllHeaderDropdowns();">
-            <span class="dropdown-icon">📥</span>
-            <div>
-              <strong>Excel / CSV Rapor Yükle</strong>
-              <small>Finansal verileri sisteme aktarın</small>
-            </div>
-          </button>
-          <!-- Burada "Veri Tabanı Yedeği İndir — Tüm kayıtları JSON olarak
-               indirin" vardı. Etiketi dürüsttü ama YEDEK DEGILDI: JSON'u
-               geri okuyan hicbir kod yok, yani geri yuklenemeyen bir
-               dosyaydi. Yerine gelen defterler ice aktarma sablonuyla ayni
-               sutunlari tasir ve GERCEKTEN geri yuklenebilir. -->
-          <button type="button" class="dropdown-item" data-onclick="exportLedger('BOOKINGS','xlsx'); closeAllHeaderDropdowns();">
-            <span class="dropdown-icon">📗</span>
-            <div>
-              <strong>Rezervasyon Defterini İndir</strong>
-              <small>Seçili dönem, Excel — düzenleyip geri yükleyebilirsiniz</small>
-            </div>
-          </button>
-          <button type="button" class="dropdown-item" data-ledger-only data-onclick="exportLedger('EXPENSES','xlsx'); closeAllHeaderDropdowns();">
-            <span class="dropdown-icon">📕</span>
-            <div>
-              <strong>Gider Defterini İndir</strong>
-              <small>Seçili dönem, Excel — düzenleyip geri yükleyebilirsiniz</small>
-            </div>
-          </button>
-          <button type="button" class="dropdown-item" data-ledger-only data-onclick="exportIncomeStatement(); closeAllHeaderDropdowns();">
-            <span class="dropdown-icon">📘</span>
-            <div>
-              <strong>Gelir Tablosunu İndir</strong>
-              <small>Seçili dönem ve mülk — aylık kâr-zarar, Finans ekranıyla aynı rakamlar</small>
-            </div>
-          </button>
-          <div class="dropdown-divider"></div>
-          <div class="dropdown-section-label">Yardım</div>
-          <button type="button" class="dropdown-item header-guide-btn" data-onclick="openHelpModal('setup')">
-            <span class="dropdown-icon">🎓</span>
-            <div>
-              <strong>Başlangıç Rehberi</strong>
-              <small>İlk kurulum adımları ve terimler sözlüğü</small>
-            </div>
-          </button>
-          <button type="button" class="dropdown-item" data-onclick="openHelpModal(); closeAllHeaderDropdowns();">
-            <span class="dropdown-icon">❓</span>
-            <div>
-              <strong>Nasıl Kullanılır?</strong>
-              <small>Günlük işletmeci rutini ve terimler</small>
-            </div>
-          </button>
-        </div>
-      </div>
-
       <!-- Dropdown 1: Hızlı Ekle -->
       <div class="header-dropdown-wrap">
         <button type="button" class="btn btn-primary" data-onclick="toggleHeaderDropdown('quickAddMenu')" id="quickAddBtn" data-write-action>
-          <span>＋</span> <span class="header-btn-text">Hızlı Ekle</span> <span class="header-chevron" aria-hidden="true">▾</span>
+          <span class="header-btn-icon" aria-hidden="true">＋</span> <span class="header-btn-text">Hızlı Ekle</span> <span class="header-chevron" aria-hidden="true">▾</span>
         </button>
         <div class="header-dropdown-menu" id="quickAddMenu">
           <button type="button" class="dropdown-item" data-onclick="openBookingModal(); closeAllHeaderDropdowns();">
-            <span class="dropdown-icon">📅</span>
             <div>
               <strong>Yeni Rezervasyon Girişi</strong>
               <small>Giriş, çıkış, misafir ve fiyat kaydı</small>
             </div>
           </button>
           <button data-operations-only type="button" class="dropdown-item" data-onclick="openNewCleaningTaskModal(); closeAllHeaderDropdowns();">
-            <span class="dropdown-icon">🧹</span>
             <div>
               <strong>Temizlik & Borç Kaydı Ekle</strong>
               <small>Personel temizlik hakedişi ve ödeme takibi</small>
             </div>
           </button>
           <button data-ledger-write-only type="button" class="dropdown-item" data-onclick="openExpenseModal(); closeAllHeaderDropdowns();">
-            <span class="dropdown-icon">💸</span>
             <div>
               <strong>Gider / Yatırım Ekle</strong>
               <small>Opex veya Capex harcaması kaydedin</small>
             </div>
           </button>
           <button type="button" class="dropdown-item highlight-green" data-onclick="openWhatsAppModal('parser'); closeAllHeaderDropdowns();">
-            <span class="dropdown-icon">💬</span>
             <div>
               <strong>WhatsApp'tan Mesaj Ayrıştır</strong>
               <small>Mesajı yapıştırın, 2 saniyede çözülsün</small>
             </div>
           </button>
-          <button type="button" class="dropdown-item" data-onclick="openGoalsModal(); closeAllHeaderDropdowns();">
-            <span class="dropdown-icon">🎯</span>
-            <div>
-              <strong>Aylık Hedef Belirle</strong>
-              <small>Ciro, net kâr ve doluluk hedefleri</small>
-            </div>
-          </button>
           <button type="button" class="dropdown-item" data-onclick="openQuickLeadCapture(); closeAllHeaderDropdowns();">
-            <span class="dropdown-icon">🎯</span>
             <div>
               <strong>Yeni Lead / Müşteri Talebi</strong>
               <small>Telefon ve kaynakla hızlı talep kaydı</small>
             </div>
           </button>
           <button data-operations-only type="button" class="dropdown-item" data-onclick="openMaintModal(); closeAllHeaderDropdowns();">
-            <span class="dropdown-icon">🛠️</span>
             <div>
               <strong>Arıza / Bakım İşi Bildir</strong>
               <small>P1 kritik veya rutin arıza kaydı</small>
@@ -362,23 +265,67 @@
           <div data-lx-style="padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,0.08); background: rgba(191, 90, 242, 0.1);">
             <div data-lx-style="font-size: 13px; font-weight: 800; color: #F5F5F7;" id="menuCompanyTitle">LexBnB Portföyü</div>
             <div data-lx-style="font-size: 11px; color: var(--text-muted); margin-top: 2px;" id="menuUserEmail">Hesap bilgisi yükleniyor…</div>
-            <span class="badge badge-purple" id="menuPlanBadge" data-lx-style="margin-top: 6px; font-size: 11px;">Enterprise Plan 🚀</span>
+            <span class="badge badge-purple" id="menuPlanBadge" data-lx-style="margin-top: 6px; font-size: 11px;" hidden>—</span>
           </div>
           <div id="tenantSwitcherContainer" data-lx-style="display: none; padding: 8px 14px; border-bottom: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.25);">
             <label data-lx-style="font-size: 11px; color: #A78BFA; text-transform: uppercase; font-weight: 700; display: block; margin-bottom: 4px;">Aktif İşletme:</label>
             <select id="tenantSelectDropdown" data-onchange="switchActiveTenant(this.value); closeAllHeaderDropdowns();" data-lx-style="width: 100%; padding: 6px 8px; font-size: 12px; border-radius: 6px; background: #2C2C2E; color: #EDE9FE; border: 1px solid #6366F1; outline: none; cursor: pointer;">
             </select>
           </div>
-          <button type="button" class="dropdown-item" data-onclick="openPropertyModal(); closeAllHeaderDropdowns();">
-            <span class="dropdown-icon">🏡</span>
+          <!-- Ust cubukta ayri duran ChatGPT, Gece/Gunduz ve "Veri ve yardim" burada (sadelik 21.11.2026). -->
+          <button type="button" class="dropdown-item" id="askChatGptBtn" data-onclick="openChatGptQuestionModal(); closeAllHeaderDropdowns();">
             <div>
-              <strong>Yeni Villa / Mülk Ekle</strong>
-              <small>Portföyünüze yeni ev ekleyin</small>
+              <strong>ChatGPT'ye sor</strong>
+              <small>Bu sayfanın rakamlarıyla hazır soru; kişisel veri gitmez</small>
+            </div>
+          </button>
+          <button type="button" class="dropdown-item" data-theme-toggle data-onclick="toggleTheme()" aria-pressed="false">
+            <div>
+              <strong>Görünüm: <span data-theme-label>—</span></strong>
+              <small>Gece ve gündüz arasında geçer</small>
+            </div>
+          </button>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-section-label">Veri</div>
+          <button type="button" class="dropdown-item" data-onclick="openImportModal(); closeAllHeaderDropdowns();">
+            <div>
+              <strong>Excel / CSV Rapor Yükle</strong>
+              <small>Finansal verileri sisteme aktarın</small>
+            </div>
+          </button>
+          <!-- Burada "Veri Tabanı Yedeği İndir — Tüm kayıtları JSON olarak
+               indirin" vardı. Etiketi dürüsttü ama YEDEK DEGILDI: JSON'u
+               geri okuyan hicbir kod yok, yani geri yuklenemeyen bir
+               dosyaydi. Yerine gelen defterler ice aktarma sablonuyla ayni
+               sutunlari tasir ve GERCEKTEN geri yuklenebilir. -->
+          <button type="button" class="dropdown-item" data-onclick="exportLedger('BOOKINGS','xlsx'); closeAllHeaderDropdowns();">
+            <div>
+              <strong>Rezervasyon Defterini İndir</strong>
+              <small>Seçili dönem, Excel — düzenleyip geri yükleyebilirsiniz</small>
+            </div>
+          </button>
+          <button type="button" class="dropdown-item" data-ledger-only data-onclick="exportLedger('EXPENSES','xlsx'); closeAllHeaderDropdowns();">
+            <div>
+              <strong>Gider Defterini İndir</strong>
+              <small>Seçili dönem, Excel — düzenleyip geri yükleyebilirsiniz</small>
+            </div>
+          </button>
+          <button type="button" class="dropdown-item" data-ledger-only data-onclick="exportIncomeStatement(); closeAllHeaderDropdowns();">
+            <div>
+              <strong>Gelir Tablosunu İndir</strong>
+              <small>Seçili dönem ve mülk — aylık kâr-zarar, Finans ekranıyla aynı rakamlar</small>
+            </div>
+          </button>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-section-label">Yardım</div>
+          <button type="button" class="dropdown-item header-guide-btn" data-onclick="openHelpModal('setup')">
+            <div>
+              <strong>Yardım</strong>
+              <small>Kurulum adımları, günlük kullanım ve terimler</small>
             </div>
           </button>
           <div class="dropdown-divider"></div>
           <button type="button" class="dropdown-item text-danger" data-onclick="logoutSaaSUser(); closeAllHeaderDropdowns();">
-            <span class="dropdown-icon">🚪</span>
             <div>
               <strong data-lx-style="color: #FF6961;">Oturumu Kapat</strong>
               <small>Güvenli çıkış yapın</small>
@@ -393,19 +340,19 @@
   <!-- Navigation Tabs: Canonical Sections -->
   <nav class="nav-tabs">
     <!-- Menu 10 kalem (ENVANTER, 30.09.2026; Analiz 05.11.2026). Raporlar sekmesi kalkti: disa
-         aktarim Finans basliginda, kanal dagilimi Kanallar ve Pazarlama'da.
+         aktarim Finans basliginda, kanal dagilimi Pazarlama'da.
          Analiz Merkezi ust cubuktaki "ChatGPT'ye sor" dugmesiyle acilir.
          Misafirler ile Satis tek menu kalemi; sayfa icinde Talepler | Misafirler. -->
-    <button class="tab-btn active" data-onclick="switchTab('executive')">📍 Bugün</button>
-    <button class="tab-btn" data-onclick="switchTab('reservations')">📅 Rezervasyonlar (<span id="rezCountBadge">0</span>)</button>
-    <button class="tab-btn" data-onclick="switchTab('properties')">🏡 Mülkler (<span id="propCountBadge">0</span>)</button>
-    <button class="tab-btn" data-onclick="switchTab('operations')">🧹 Operasyon (<span id="opsTaskCountBadge">0</span>)</button>
-    <button class="tab-btn" data-onclick="switchTab('leads')">🤝 Misafirler ve Satış (<span id="leadCountBadge">0</span>)</button>
-    <button class="tab-btn" data-onclick="switchTab('pricing')">🏷️ Fiyatlandırma</button>
-    <button class="tab-btn" data-onclick="switchTab('finance')">💰 Finans</button>
-    <button class="tab-btn" data-onclick="switchTab('analytics')">📊 Analiz</button>
-    <button class="tab-btn" data-onclick="switchTab('marketing')">📈 Kanallar ve Pazarlama</button>
-    <button class="tab-btn" data-onclick="switchTab('settings')">⚙️ Ayarlar</button>
+    <button class="tab-btn active" data-onclick="switchTab('executive')">Bugün</button>
+    <button class="tab-btn" data-onclick="switchTab('reservations')">Rezervasyonlar</button>
+    <button class="tab-btn" data-onclick="switchTab('properties')">Mülkler</button>
+    <button class="tab-btn" data-onclick="switchTab('operations')">Operasyon</button>
+    <button class="tab-btn" data-onclick="switchTab('leads')">Misafirler ve Satış</button>
+    <button class="tab-btn" data-onclick="switchTab('pricing')">Fiyatlandırma</button>
+    <button class="tab-btn" data-onclick="switchTab('finance')">Finans</button>
+    <button class="tab-btn" data-onclick="switchTab('analytics')">Analiz</button>
+    <button class="tab-btn" data-onclick="switchTab('marketing')">Pazarlama</button>
+    <button class="tab-btn" data-onclick="switchTab('settings')">Ayarlar</button>
   </nav>
 
   <!-- Main Container -->
@@ -424,35 +371,38 @@
     <!-- ======================================================= -->
     <!-- TAB: EXECUTIVE CONTROL CENTER (KONTROL MERKEZİ)         -->
     <!-- ======================================================= -->
-    <div id="tab-executive" class="tab-content active">
-
-      <!-- Buyuk baslik (Apple "Today" duzeni): tarih ust satirda, sag tarafta
-           gunun hareketleri. Sayilar renderTodayDateStrip'ten gelir. -->
-      <section id="todayDateStrip" class="today-hero" aria-label="Bugün özeti">
-        <div class="today-hero__title">
-          <span class="today-hero__eyebrow" id="todayDateLabel">—</span>
-          <h2>Bugün</h2>
-          <span class="today-hero__role" id="todayRoleLabel">—</span>
+    <div id="tab-executive" class="tab-content active lex-screen">
+      <!-- BUGUN (Lex Tasarimi, Otomasyon #1, 21.11.2026). Sayfa 1 karar: villa
+           sekmeleri, ekip suzgeci, ozet cumlesi, ekip gorevleri tablosu. Sayfa 2
+           detay: bu hafta ve bu ayin performansi. Gorevler core/team_tasks.js,
+           cizim core/lex_ui.js; sayilar JS yazar, baslangic notr (3.5). -->
+      <section class="lex-page" aria-labelledby="todayTitle">
+        <div class="lex-headrow">
+          <h1 class="lex-title" id="todayTitle">Bugün</h1>
+          <span class="lex-headrow__meta" id="todayDateLabel">—</span>
         </div>
-        <div class="today-hero__stats" id="todayShiftSummary" aria-label="Bugünün hareketleri">—</div>
+        <div id="todayVillaTabs"></div>
+        <div id="todayTeamTabs"></div>
+        <p class="lex-summary" id="todaySummary" aria-live="polite">—</p>
+        <p class="lex-note" id="todayNextArrival" hidden></p>
+        <div id="todayTaskTable"></div>
+        <div id="todayFooter"></div>
       </section>
 
-      <!-- BU AYIN PERFORMANSI — doluluk, ADR, RevPAR; ev ev secilebilir (Finans ile ayni hesap) -->
-      <section class="card today-performance" id="todayPerformance" hidden aria-labelledby="todayPerformanceTitle">
-        <div class="section-title-bar">
-          <div>
-            <h3 id="todayPerformanceTitle">Bu ayın performansı</h3>
-            <p class="sub-text" id="todayPerformancePeriod">—</p>
-          </div>
-          <label class="today-performance__picker">
-            <span class="sub-text">Mülk</span>
-            <select id="todayPerfVilla" data-onchange="setTodayPerformanceVilla(this.value)">
-              <option value="ALL">Tüm Villalar / Portföy</option>
-            </select>
-          </label>
+      <section class="lex-page lex-page--detail" aria-label="Ayrıntı">
+        <div id="todayWeek" hidden>
+          <h2 class="lex-subtitle">Bu hafta</h2>
+          <div id="todayWeekTable"></div>
         </div>
-        <div class="today-performance__cards" id="todayPerformanceCards"></div>
-        <div class="today-performance__list" id="todayPerformanceList"></div>
+        <div id="todayReadiness" hidden>
+          <h2 class="lex-subtitle">Mülk satış hazırlığı</h2>
+          <div id="portfolioHealthCardsGrid"></div>
+        </div>
+        <div id="todayPerformance" hidden>
+          <h2 class="lex-subtitle" id="todayPerformanceTitle">Bu ayın performansı</h2>
+          <p class="lex-note" id="todayPerformancePeriod">—</p>
+          <div id="todayPerformanceTable"></div>
+        </div>
       </section>
 
       <!-- 1. TENANT ONBOARDING PROGRESS BANNER -->
@@ -469,247 +419,25 @@
             <!-- JS ile doldurulur: renderExecutiveControlCenter -->
           </div>
         </div>
-        <button class="btn btn-secondary btn-sm" data-onclick="openGoalsModal()">Hedefleri düzenle</button>
       </section>
 
-      <div id="execSnapshotStatus" hidden role="status" aria-live="polite" data-lx-style="margin: -8px 0 12px; color: #98989D; font-size: 11px;">
-        Güncel rakamlar hazırlanıyor…
-      </div>
-
-      <!-- 2. TOP EXECUTIVE KPI STRIP (PHASE 38 — 8 CARDS) -->
-      <section class="executive-kpi-grid" hidden aria-hidden="true">
-        <!-- 1. Realized Revenue -->
-        <div class="executive-kpi-card" id="execCardRevenue">
-          <div class="kpi-card-header">
-            <span class="kpi-label">Ciro (net konaklama geliri)</span>
-            <button class="kpi-info-btn" data-onclick="showKpiExplanation('REVENUE')">ℹ️</button>
-          </div>
-          <div class="kpi-val" id="execKpiRevenue">—</div>
-          <div class="kpi-meta">
-            <span class="badge badge-green" id="execRevVariance">—</span>
-            <span id="execRevMoM" data-lx-style="color: #98989D;">—</span>
-          </div>
-        </div>
-
-        <!-- 2. Operating Expenses -->
-        <div class="executive-kpi-card" id="execCardOpex">
-          <div class="kpi-card-header">
-            <span class="kpi-label">OPEX (faaliyet gideri)</span>
-            <button class="kpi-info-btn" data-onclick="showKpiExplanation('OPEX')">ℹ️</button>
-          </div>
-          <div class="kpi-val" id="execKpiOpex" data-lx-style="color: #FFB340;">—</div>
-          <div class="kpi-meta">
-            <span class="badge badge-yellow" id="execOpexRatio">—</span>
-            <span id="execOtaCost" data-lx-style="color: #98989D;">—</span>
-          </div>
-        </div>
-
-        <!-- 3. Capital Expenses -->
-        <div class="executive-kpi-card" id="execCardCapex">
-          <div class="kpi-card-header">
-            <span class="kpi-label">CAPEX (yatırım gideri)</span>
-            <button class="kpi-info-btn" data-onclick="showKpiExplanation('CAPEX')">ℹ️</button>
-          </div>
-          <div class="kpi-val" id="execKpiCapex" data-lx-style="color: #FB7185;">—</div>
-          <div class="kpi-meta">
-            <span class="badge badge-purple" id="execCapexRatio">—</span>
-            <span id="execCapexTrend" data-lx-style="color: #98989D;">—</span>
-          </div>
-        </div>
-
-        <!-- 4. Operating Profit -->
-        <div class="executive-kpi-card" id="execCardOperatingProfit">
-          <div class="kpi-card-header">
-            <span class="kpi-label">Faaliyet kârı</span>
-            <button class="kpi-info-btn" data-onclick="showKpiExplanation('OPERATING_PROFIT')">ℹ️</button>
-          </div>
-          <div class="kpi-val" id="execKpiOperatingProfit">—</div>
-          <div class="kpi-meta">
-            <span class="badge badge-blue" id="execOperatingMargin">—</span>
-            <span id="execOperatingTrend" data-lx-style="color: #98989D;">—</span>
-          </div>
-        </div>
-
-        <!-- 5. Net Cash Profit -->
-        <div class="executive-kpi-card highlight-profit" id="execCardProfit">
-          <div class="kpi-card-header">
-            <span class="kpi-label">Net nakit kârı</span>
-            <button class="kpi-info-btn" data-onclick="showKpiExplanation('NET_PROFIT')">ℹ️</button>
-          </div>
-          <div class="kpi-val" id="execKpiProfit" data-lx-style="color: #30D158;">—</div>
-          <div class="kpi-meta">
-            <span class="badge badge-green" id="execProfitMargin">—</span>
-            <span id="execProfitVariance" data-lx-style="color: #98989D;">—</span>
-          </div>
-        </div>
-
-        <!-- 6. Occupancy -->
-        <div class="executive-kpi-card" id="execCardOccupancy">
-          <div class="kpi-card-header">
-            <span class="kpi-label">Doluluk oranı</span>
-            <button class="kpi-info-btn" data-onclick="showKpiExplanation('OCCUPANCY')">ℹ️</button>
-          </div>
-          <div class="kpi-val" id="execKpiOccupancy">—</div>
-          <div class="kpi-meta">
-            <span class="badge badge-blue" id="execOccVariance">—</span>
-            <span id="execSoldNightsLabel" data-lx-style="color: #98989D;">—</span>
-          </div>
-        </div>
-
-        <!-- 7. ADR -->
-        <div class="executive-kpi-card" id="execCardAdr">
-          <div class="kpi-card-header">
-            <span class="kpi-label">ADR (ort. günlük fiyat)</span>
-            <button class="kpi-info-btn" data-onclick="showKpiExplanation('ADR')">ℹ️</button>
-          </div>
-          <div class="kpi-val" id="execKpiAdr">—</div>
-          <div class="kpi-meta">
-            <span data-lx-style="color: #98989D;">Satılan Gece Başına</span>
-            <span id="execAdrTrend" data-lx-style="color: #A78BFA;">—</span>
-          </div>
-        </div>
-
-        <!-- 8. RevPAR -->
-        <div class="executive-kpi-card" id="execCardRevpar">
-          <div class="kpi-card-header">
-            <span class="kpi-label">RevPAR (oda başı gelir)</span>
-            <button class="kpi-info-btn" data-onclick="showKpiExplanation('REVPAR')">ℹ️</button>
-          </div>
-          <div class="kpi-val" id="execKpiRevpar">—</div>
-          <div class="kpi-meta">
-            <span data-lx-style="color: #98989D;">Mevcut Kapasite Başına</span>
-            <span id="execRevparTrend" data-lx-style="color: #A78BFA;">—</span>
-          </div>
-        </div>
-      </section>
-
-      <!-- 3. TODAY COMMAND CENTER (ÖNCELİK SIRALI KOMUTA MERKEZİ - 3+2+1) -->
-      <section class="card today-section">
-        <div class="today-section__head">
-          <div>
-            <h3>Komuta merkezi</h3>
-            <p>Bugün yapılması gereken işler, önem sırasına göre. Yalnız kayıtlarınızdan çıkan işler gösterilir.</p>
-          </div>
-          <button class="btn btn-secondary btn-sm" data-onclick="refreshExecutiveDashboardSnapshot(true)">Yenile</button>
-        </div>
-
-        <div class="command-center-container">
-          <!-- Column 1: Critical Actions (Max 3) -->
-          <div class="command-center-col command-center-col--critical">
-            <div class="command-center-col-header">
-              <div class="command-col-title"><span class="command-col-dot" aria-hidden="true"></span>Kritik eylemler</div>
-              <span class="command-col-badge" id="criticalActionsCountBadge">—</span>
-            </div>
-            <div id="todayCriticalActionsList">
-              <div class="empty-action-state">Açık kritik uyarı yok.</div>
-            </div>
-          </div>
-
-          <!-- Column 2: Operations Tasks (Max 2) -->
-          <div class="command-center-col command-center-col--operations">
-            <div class="command-center-col-header">
-              <div class="command-col-title"><span class="command-col-dot" aria-hidden="true"></span>Operasyon görevleri</div>
-              <span class="command-col-badge" id="operationsActionsCountBadge">—</span>
-            </div>
-            <div id="todayOperationsActionsList">
-              <div class="empty-action-state">Kayıtlı bekleyen turnover veya arıza görevi yok.</div>
-            </div>
-          </div>
-
-          <!-- Column 3: Revenue Opportunities (Max 1) -->
-          <div class="command-center-col command-center-col--revenue">
-            <div class="command-center-col-header">
-              <div class="command-col-title"><span class="command-col-dot" aria-hidden="true"></span>Gelir fırsatları</div>
-              <span class="command-col-badge" id="revenueActionsCountBadge">—</span>
-            </div>
-            <div id="todayRevenueActionsList">
-              <div class="empty-action-state">Kayıtlarınızda şu an önerilecek bir gelir fırsatı yok.</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- 4. MÜLK SATIŞ HAZIRLIĞI -->
-      <section class="card today-section">
-        <div class="today-section__head">
-          <div>
-            <h3>Mülk satış hazırlığı</h3>
-            <p>Satışa hazır, temizlik bekleyen ve arıza nedeniyle açık veya kapalı mülkler.</p>
-          </div>
-          <div class="today-health-pills">
-            <span class="badge badge-green" id="healthPillReady">—</span>
-            <span class="badge badge-yellow" id="healthPillCleaning">—</span>
-            <span class="badge badge-blue" id="healthPillMinorIssue">—</span>
-            <span class="badge badge-red" id="healthPillBlocked">—</span>
-          </div>
-        </div>
-
-        <div class="portfolio-health-grid" id="portfolioHealthCardsGrid">
-          <!-- Dinamik olarak mülk satış hazırlığı kartları eklenecek -->
-        </div>
-      </section>
-
-      <section class="card today-section today-todo-card">
-        <div class="today-section__head"><div><h3>Yapılacaklar</h3><p>Bugüne ait açık operasyon ve satış işleri.</p></div></div>
-        <div id="todayTodoList"></div>
-      </section>
-
-      <section id="todayMonthSummary" class="today-month-summary" aria-label="Bu ay özeti">—</section>
 
     </div>
 
     <!-- ======================================================= -->
     <!-- TAB: FINANSAL PERFORMANS (FINANS)                       -->
     <!-- ======================================================= -->
-    <div id="tab-finance" class="tab-content">
+    <div id="tab-finance" class="tab-content lex-screen">
+      <div class="lex-headrow">
+        <h1 class="lex-title">Finans</h1>
+        <span class="lex-headrow__meta" data-lex-period>—</span>
+        <span class="lex-headrow__actions">
+          <button class="btn btn-secondary btn-sm" data-onclick="openGoalsModal()">Hedefleri düzenle</button>
+          <button data-ledger-write-only class="btn btn-secondary btn-sm" data-onclick="openExpenseModal()">+ Gider</button>
+        </span>
+      </div>
+      <section class="lex-screen-tasks" id="screenTasks_finance" aria-label="Ekip görevleri" hidden></section>
 
-      <!-- 1. MONTH STEPPER & PORTFOLIO BANNER -->
-      <section class="card finance-top-bar">
-        <div class="month-stepper">
-          <button class="stepper-arrow-btn" data-onclick="stepMonth(-1)" title="Önceki Ay">‹</button>
-          <div class="month-stepper-display">
-            <span class="stepper-sub-prev" id="stepperPrevLabel">—</span>
-            <strong class="stepper-current" id="stepperCurrentLabel">—</strong>
-            <span class="stepper-sub-next" id="stepperNextLabel">—</span>
-          </div>
-          <button class="stepper-arrow-btn" data-onclick="stepMonth(1)" title="Sonraki Ay">›</button>
-        </div>
-
-        <div class="finance-top-meta">
-          <!-- Ustteki PORTFOY seciciyle ayni filtre (filterByVilla); secenekleri
-               updateAllVillaDropdowns kurar, degeri updateStepperLabels esitler. -->
-          <label class="meta-pill meta-pill-select">
-            <span>Portföy:</span>
-            <select id="finTopVillaFilter" data-onchange="filterByVilla(this.value)" aria-label="Portföy / mülk seçimi">
-              <option value="ALL">Tüm Villalar / Portföy</option>
-            </select>
-          </label>
-          <!-- (Raporlar sekmesinden tasindi, 30.09.2026 — A5'te "Rapor al" olur.)
-               Defter disa aktarma: sutunlar ice aktarma sablonuyla ayni,
-               yani indirilen dosya duzeltilip geri yuklenebilir. Burada
-               bir zamanlar "Raporu Indir (JSON)" vardi; appData'nin
-               tamamini ham dokuyor, donem filtresini yok sayiyordu. -->
-          <div class="dropdown" data-lx-style="position: relative;">
-            <button type="button" class="btn btn-secondary btn-sm" data-onclick="toggleExportMenu(event)">⬇️ Defteri Dışa Aktar</button>
-            <div id="ledgerExportMenu" class="dropdown-menu" data-lx-style="display: none; position: absolute; right: 0; top: calc(100% + 6px); z-index: 60; min-width: 250px; background: #111C2E; border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; padding: 6px; box-shadow: 0 12px 32px rgba(0,0,0,0.45);">
-              <div data-lx-style="font-size: 11px; color: #6E6E73; padding: 6px 10px 4px; line-height: 1.5;">
-                Seçili dönem ve mülk filtresine göre. Sütunlar içe aktarma
-                şablonuyla aynıdır: düzenleyip geri yükleyebilirsiniz.
-              </div>
-              <button type="button" class="dropdown-item" data-onclick="exportLedger('BOOKINGS','xlsx'); toggleExportMenu(event);">📗 Rezervasyon Defteri (.xlsx)</button>
-              <button type="button" class="dropdown-item" data-onclick="exportLedger('BOOKINGS','csv'); toggleExportMenu(event);">📄 Rezervasyon Defteri (.csv)</button>
-              <button type="button" class="dropdown-item" data-onclick="exportLedger('EXPENSES','xlsx'); toggleExportMenu(event);">📕 Gider Defteri (.xlsx)</button>
-              <button type="button" class="dropdown-item" data-onclick="exportLedger('EXPENSES','csv'); toggleExportMenu(event);">📄 Gider Defteri (.csv)</button>
-              <div data-lx-style="font-size: 11px; color: #6E6E73; padding: 6px 10px 4px; border-top: 1px solid rgba(255,255,255,0.08); margin-top: 4px; line-height: 1.5;">
-                Ay sınırını kesen bir rezervasyon dosyada <strong>tam tutarıyla</strong>
-                görünür; ekrandaki aylık ciro ise gecelere bölünmüş payı gösterir.
-              </div>
-            </div>
-          </div>
-          <button class="btn btn-secondary btn-sm" data-onclick="openGoalsModal()">⚙️ Hedefleri Düzenle</button>
-          <button data-ledger-write-only class="btn btn-secondary btn-sm" data-onclick="openExpenseModal()">+ Gider Girişi</button>
-        </div>
-      </section>
 
       <!-- 1b. AY KAPANIŞI -->
       <section class="card" id="monthCloseCard" data-lx-style="border-left: 3px solid #636366;">
@@ -722,51 +450,25 @@
             <p class="sub-text" id="monthCloseDetail" data-lx-style="margin:4px 0 0; font-size:11px;">—</p>
           </div>
           <div data-lx-style="display:flex; gap:8px; flex-wrap:wrap;">
-            <button type="button" class="btn btn-secondary btn-sm" id="monthCloseBtn" data-onclick="openMonthCloseModal()">🔒 Bu Ayı Kapat</button>
-            <button type="button" class="btn btn-secondary btn-sm" id="monthReopenBtn" data-onclick="openMonthReopenModal()" hidden>🔓 Dönemi Yeniden Aç</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="monthCloseBtn" data-onclick="openMonthCloseModal()">Bu Ayı Kapat</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="monthReopenBtn" data-onclick="openMonthReopenModal()" hidden>Dönemi Yeniden Aç</button>
           </div>
         </div>
         <div id="monthCloseHistory" class="sub-text" data-lx-style="font-size:11px; margin-top:8px; color:#98989D;"></div>
       </section>
 
       <!-- 2. ANA KPI KARTLARI (5 SANİYEDE ANLAŞILIR) -->
-      <section class="kpi-cards-grid five-cols">
+      <section class="kpi-cards-grid four-cols">
         <!-- Gerçekleşen Ciro -->
         <div class="kpi-card fin-kpi-card">
           <div class="kpi-card-header">
             <span class="kpi-label">Ciro (net konaklama geliri)</span>
-            <button class="kpi-info-btn" data-onclick="showKpiExplanation('REVENUE')">ℹ️</button>
           </div>
           <div class="kpi-value" id="finActualRevenue">—</div>
           <div class="kpi-meta">
             <span class="kpi-trend positive" id="finRevTargetDelta">—</span>
+            <button type="button" class="lex-link-inline" id="finGoalLink" data-ledger-write-only data-onclick="goTo('goals')" hidden>Hedef gir</button>
             <span id="finRevMoM">—</span>
-          </div>
-        </div>
-
-        <!-- Hedef Ciro (Doğrudan Tıklanabilir & Düzenlenebilir) -->
-        <div class="kpi-card fin-kpi-card" data-onclick="openGoalsModal()" data-lx-style="cursor: pointer;" title="Hedefi değiştirmek için tıklayın">
-          <div class="kpi-card-header">
-            <span class="kpi-label">Hedef ciro</span>
-            <div data-lx-style="display: flex; gap: 4px;">
-              <button class="kpi-info-btn" data-onclick="event.stopPropagation(); openGoalsModal()" title="Hedefi Hızlı Değiştir">✏️</button>
-              <button class="kpi-info-btn" data-onclick="event.stopPropagation(); showKpiExplanation('TARGET')">ℹ️</button>
-            </div>
-          </div>
-          <div class="kpi-value" id="finTargetRevenue">—</div>
-          <div class="kpi-meta">
-            <span class="kpi-trend positive" id="finTargetDiff">—</span>
-            <span data-lx-style="color: #409CFF; font-weight: 600;">✏️ Hedefi Değiştir ›</span>
-          </div>
-          <div class="target-progress-wrapper compact-target-progress">
-            <div class="target-progress-header">
-              <span id="finTargetStatusBadge" class="badge badge-emerald">—</span>
-              <span id="targetBarRatioText">—</span>
-            </div>
-            <div class="progress-bar-bg target-bar-large">
-              <div class="progress-bar-fill target-bar-fill" id="targetBarFill" data-lx-style="width: 0%;"></div>
-              <div class="target-threshold-marker" id="targetBarMarker" title="Hedef Noktası (%100)" hidden></div>
-            </div>
           </div>
         </div>
 
@@ -774,11 +476,11 @@
         <div class="kpi-card fin-kpi-card highlight-profit">
           <div class="kpi-card-header">
             <span class="kpi-label">Net kâr (cash profit)</span>
-            <button class="kpi-info-btn" data-onclick="showKpiExplanation('NET_PROFIT')">ℹ️</button>
           </div>
           <div class="kpi-value" id="finNetProfit">—</div>
           <div class="kpi-meta">
             <span class="kpi-trend positive" id="finNetMarginLabel">—</span>
+            <button type="button" class="lex-link-inline" id="finExpenseLink" data-ledger-write-only data-onclick="goTo('expense')" hidden>Gider ekle</button>
             <span id="finNetProfitMoM">—</span>
           </div>
         </div>
@@ -787,7 +489,6 @@
         <div class="kpi-card fin-kpi-card">
           <div class="kpi-card-header">
             <span class="kpi-label">Toplam gider (OPEX+CAPEX)</span>
-            <button class="kpi-info-btn" data-onclick="showKpiExplanation('TOTAL_EXPENSE')">ℹ️</button>
           </div>
           <div class="kpi-value" id="finTotalExpense">—</div>
           <div class="kpi-meta">
@@ -801,86 +502,11 @@
         <div class="kpi-card fin-kpi-card">
           <div class="kpi-card-header">
             <span class="kpi-label">Satılan gece</span>
-            <button class="kpi-info-btn" data-onclick="showKpiExplanation('SOLD_NIGHTS')">ℹ️</button>
           </div>
           <div class="kpi-value" id="finSoldNights">—</div>
           <div class="kpi-meta">
             <span class="kpi-trend positive" id="finAvgRevPerNight">—</span>
             <span id="finNightsMoM">—</span>
-          </div>
-        </div>
-      </section>
-
-      <!-- 4. KÂR KÖPRÜSÜ (PROFIT WATERFALL BRIDGE) -->
-      <section class="card profit-bridge-card">
-        <div class="section-title-bar">
-          <div>
-            <h2>🌉 Kâr köprüsü (profit waterfall)</h2>
-            <p class="sub-text">Cirodan başlayarak operasyonel kâra ve yatırımlar sonrası net nakit kârına adım adım geçiş</p>
-          </div>
-          <div class="bridge-tag">Operasyonel Kâr vs Yatırımlar Ayrıştırılmıştır</div>
-        </div>
-
-        <div class="profit-bridge-steps" id="profitBridgeContainer">
-          <!-- Step 1: Ciro -->
-          <div class="bridge-step ciro">
-            <span class="step-label">Konaklama Cirosu</span>
-            <strong class="step-val" id="brCiro">—</strong>
-            <span class="step-sub">Net oda geliri (indirim düşülmüş, temizlik hariç)</span>
-          </div>
-          <!-- Misafirden ayri temizlik ucreti alinmiyorsa (cogu isletme) bu iki
-               adim hic gorunmez; JS temizlik geliri > 0 ise acar. -->
-          <div id="brCleaningGroup" class="bridge-optional-group" data-lx-style="display: none;">
-            <div class="bridge-arrow">+</div>
-            <div class="bridge-step ciro" id="brCleaningStep">
-              <span class="step-label">Temizlik Geliri</span>
-              <strong class="step-val" id="brCleaningRevenue">—</strong>
-              <span class="step-sub">Misafirden alınan temizlik ücreti</span>
-            </div>
-            <!-- Elle girilen diger gelir (phase97); 0 ise gizli. Sermaye burada yok: gelir degildir. -->
-            <div class="bridge-step ciro" id="brOtherIncomeStep" hidden>
-              <span class="step-label">Diğer Gelir</span>
-              <strong class="step-val" id="brOtherIncome">—</strong>
-              <span class="step-sub">Rezervasyon dışı gelir kayıtları</span>
-            </div>
-            <div class="bridge-arrow">=</div>
-            <div class="bridge-step ciro">
-              <span class="step-label">Toplam Gelir</span>
-              <strong class="step-val" id="brTotalIncome">—</strong>
-              <span class="step-sub">Kâr bu tutar üzerinden hesaplanır</span>
-            </div>
-          </div>
-          <div class="bridge-arrow">↓</div>
-
-          <!-- Step 2: Opex -->
-          <div class="bridge-step minus opex">
-            <span class="step-label">Operasyonel Giderler</span>
-            <strong class="step-val" id="brOpex">—</strong>
-            <span class="step-sub">Maaş, temizlik, komisyon, fatura</span>
-          </div>
-          <div class="bridge-arrow">↓</div>
-
-          <!-- Step 3: Operating Profit -->
-          <div class="bridge-step op-profit">
-            <span class="step-label">Operasyonel Kâr</span>
-            <strong class="step-val" id="brOpProfit">—</strong>
-            <span class="step-sub" id="brOpMargin">Marj: — (Yatırımlar Öncesi)</span>
-          </div>
-          <div class="bridge-arrow">↓</div>
-
-          <!-- Step 4: Capex / Yatırımlar -->
-          <div class="bridge-step minus capex">
-            <span class="step-label">Yatırımlar (Capex)</span>
-            <strong class="step-val" id="brCapex">—</strong>
-            <span class="step-sub">Jakuzi, dekorasyon, ekipman alımı</span>
-          </div>
-          <div class="bridge-arrow">↓</div>
-
-          <!-- Step 5: Net Profit -->
-          <div class="bridge-step final-profit">
-            <span class="step-label">Net Kâr (Elde Kalan)</span>
-            <strong class="step-val" id="brNetProfit">—</strong>
-            <span class="step-sub" id="brNetMargin">—</span>
           </div>
         </div>
       </section>
@@ -891,14 +517,14 @@
         <summary><strong>Gelirler</strong><span>Konaklama, temizlik, diğer gelir ve sermaye</span></summary>
         <div class="section-title-bar">
           <div>
-            <h2>💰 Gelirler</h2>
+            <h2>Gelirler</h2>
             <p class="sub-text">Rezervasyon gelirleri otomatik gelir; rezervasyon dışı gelir ve sermaye girişi buradan eklenir</p>
           </div>
           <div class="income-add-wrap">
             <button type="button" class="btn btn-primary btn-sm" data-onclick="toggleIncomeAddMenu(event)">+ Gelir Ekle</button>
             <div id="incomeAddMenu" class="income-add-menu" hidden>
-              <button type="button" class="dropdown-item" data-onclick="startIncomeEntry('BOOKING')">🛏️ Rezervasyon</button>
-              <button type="button" class="dropdown-item" data-onclick="startIncomeEntry('OTHER')">💵 Diğer gelirler / sermaye</button>
+              <button type="button" class="dropdown-item" data-onclick="startIncomeEntry('BOOKING')">Rezervasyon</button>
+              <button type="button" class="dropdown-item" data-onclick="startIncomeEntry('OTHER')">Diğer gelirler / sermaye</button>
             </div>
           </div>
         </div>
@@ -935,12 +561,11 @@
         <summary><strong>Giderler</strong><span>Yalnız tutarı olan kategoriler</span></summary>
         <div class="section-title-bar">
           <div>
-            <h2>📊 Gider analizi (kategori bazlı dağılım)</h2>
+            <h2>Gider analizi (kategori bazlı dağılım)</h2>
             <p class="sub-text">Gider kalemlerinin toplam bütçe ve ciro içindeki payları ile geçen aya göre değişimleri</p>
           </div>
           <div data-lx-style="display:flex;gap:8px;flex-wrap:wrap;">
             <button data-ledger-write-only class="btn btn-secondary btn-sm" data-onclick="openCopyPreviousExpensesPanel()">Geçen ayın giderlerini kopyala</button>
-            <button data-ledger-write-only class="btn btn-primary btn-sm" data-onclick="openExpenseModal()">+ Yeni Gider / Harcama Ekle</button>
           </div>
         </div>
 
@@ -987,28 +612,16 @@
       <section class="card property-finance-section">
         <div class="section-title-bar">
           <div>
-            <h2>🏡 Mülk bazlı finansal performans</h2>
-            <p class="sub-text">Ciro üretimi, doluluk oranları, gecelik fiyat savunması ve net kâr katkısı</p>
-          </div>
-          <div class="prop-header-actions">
-            <div class="view-toggle-group">
-              <button class="view-toggle-btn active" id="propViewTableBtn" data-onclick="setPropViewMode('table')">
-                📋 Yönetici Sıralama Tablosu
-              </button>
-              <button class="view-toggle-btn" id="propViewCardsBtn" data-onclick="setPropViewMode('cards')">
-                🎴 Kart Görünümü
-              </button>
-            </div>
+            <h2>Mülk bazlı finansal performans</h2>
           </div>
         </div>
 
         <!-- Görünüm 1: Yönetici Sıralama Tablosu (Varsayılan - Tek Bakışta Net) -->
         <div id="propExecutiveTableContainer" class="table-responsive">
-          <table class="prop-exec-table">
+          <table class="prop-exec-table mobile-cards">
             <thead>
               <tr>
-                <th>🏆 Sıra & mülk</th>
-                <th>Stratejik durum</th>
+                <th>Mülk</th>
                 <th>Ciro & portföy payı</th>
                 <th>Doluluk & satılan gece</th>
                 <th>Ort. günlük (ADR)</th>
@@ -1023,184 +636,27 @@
           </table>
         </div>
 
-        <!-- Görünüm 2: Yenilenen Premium Kartlar Grid -->
-        <div id="propCardsContainer" class="prop-cards-grid-new" data-lx-style="display: none;">
-          <!-- Injected via JS -->
-        </div>
       </section>
 
-            <!-- ======================================================= -->
-      <!-- AYLARA GÖRE KPI TAKİP VE GELİŞİM MATRİSİ (14+ AY)      -->
-      <!-- ======================================================= -->
-      <details class="finance-disclosure" id="financeMonthlyDisclosure">
-        <summary><strong>Aylık gelişim</strong><span>KPI tablosu, trend ve geçen yıl karşılaştırması</span></summary>
-      <section class="card monthly-kpi-tracker-card">
-        <div class="section-title-bar">
-          <div>
-            <div class="title-with-badge">
-              <span data-lx-style="font-size: 20px;">📊</span>
-              <h2>Aylara göre KPI takip & gelişim matrisi (14+ ay)</h2>
-              <span class="badge badge-blue">Tarihsel Performans</span>
-            </div>
-            <p class="sub-text">Şirketin kuruluşundan bugüne tüm aylık metrikleri: Ciro, Net Kâr, ADR, Doluluk ve Hedef başarıları.</p>
           </div>
-
-          <!-- Metric Selector for Visual Chart -->
-          <div data-lx-style="display: flex; gap: 6px; flex-wrap: wrap;">
-            <button type="button" class="btn btn-secondary btn-sm" id="kpiTrackBtn-ciro" data-onclick="setKpiTrackerMetric('ciro')" data-lx-style="background: rgba(10, 132, 255,0.2); border-color: #0A84FF; color: #93C5FD; font-weight: 700;">💰 Ciro</button>
-            <button type="button" class="btn btn-secondary btn-sm" id="kpiTrackBtn-netProfit" data-onclick="setKpiTrackerMetric('netProfit')">💵 Net Kâr</button>
-            <button type="button" class="btn btn-secondary btn-sm" id="kpiTrackBtn-adr" data-onclick="setKpiTrackerMetric('adr')">🏷️ ADR</button>
-            <button type="button" class="btn btn-secondary btn-sm" id="kpiTrackBtn-occupancy" data-onclick="setKpiTrackerMetric('occupancy')">🌙 Doluluk %</button>
-            <button type="button" class="btn btn-secondary btn-sm" id="kpiTrackBtn-opex" data-onclick="setKpiTrackerMetric('opex')">💸 Giderler</button>
-          </div>
-        </div>
-
-        <!-- 4 Historical Peak Metric Pills -->
-        <div data-lx-style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 18px;">
-          <div data-lx-style="background: rgba(48, 209, 88, 0.08); border: 1px solid rgba(48, 209, 88, 0.25); border-radius: 10px; padding: 12px 14px;">
-            <div data-lx-style="font-size: 11px; color: #A7F3D0; font-weight: 700; text-transform: uppercase;">🏆 Ciro Şampiyonu Ay</div>
-            <div data-lx-style="font-size: 17px; font-weight: 800; color: #30D158; margin: 4px 0;" id="kpiPeakRev">—</div>
-            <div data-lx-style="font-size: 11px; color: var(--text-muted);">Kayıtlı aylar içinde en yüksek ciro</div>
-          </div>
-
-          <div data-lx-style="background: rgba(10, 132, 255, 0.08); border: 1px solid rgba(10, 132, 255, 0.25); border-radius: 10px; padding: 12px 14px;">
-            <div data-lx-style="font-size: 11px; color: #93C5FD; font-weight: 700; text-transform: uppercase;">💎 En Yüksek ADR (Gecelik)</div>
-            <div data-lx-style="font-size: 17px; font-weight: 800; color: #409CFF; margin: 4px 0;" id="kpiPeakAdr">—</div>
-            <div data-lx-style="font-size: 11px; color: var(--text-muted);">Net oda geliri / satılan gece</div>
-          </div>
-
-          <div data-lx-style="background: rgba(255, 159, 10, 0.08); border: 1px solid rgba(255, 159, 10, 0.25); border-radius: 10px; padding: 12px 14px;">
-            <div data-lx-style="font-size: 11px; color: #FDE68A; font-weight: 700; text-transform: uppercase;">📈 En Çok Gece Satılan Ay</div>
-            <div data-lx-style="font-size: 17px; font-weight: 800; color: #FFB340; margin: 4px 0;" id="kpiPeakNights">—</div>
-            <div data-lx-style="font-size: 11px; color: var(--text-muted);">Kayıtlı aylar içinde en çok satılan gece</div>
-          </div>
-
-          <div data-lx-style="background: rgba(191, 90, 242, 0.08); border: 1px solid rgba(191, 90, 242, 0.25); border-radius: 10px; padding: 12px 14px;">
-            <div data-lx-style="font-size: 11px; color: #DDD6FE; font-weight: 700; text-transform: uppercase;">💵 En Kârlı Ay (Net Kâr)</div>
-            <div data-lx-style="font-size: 17px; font-weight: 800; color: #A78BFA; margin: 4px 0;" id="kpiPeakProfit">—</div>
-            <div data-lx-style="font-size: 11px; color: var(--text-muted);">Kârı ölçülebilen aylar arasından</div>
-          </div>
-        </div>
-
-        <!-- Visual Monthly Bar Trend Chart -->
-        <div data-lx-style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 16px; margin-bottom: 20px;">
-          <div data-lx-style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
-            <strong data-lx-style="font-size: 13px; color: #FFFFFF;" id="kpiChartActiveTitle">💰 Aylara Göre Ciro Evrimi (TL)</strong>
-            <span data-lx-style="font-size: 11px; color: #93C5FD;">💡 Çubuklara tıklayarak doğrudan o ayın raporuna gidebilirsiniz</span>
-          </div>
-          <div id="kpiTrackerVisualBars" data-lx-style="display: flex; align-items: flex-end; gap: 8px; height: 160px; padding-top: 24px; padding-bottom: 6px; overflow-x: auto; -webkit-overflow-scrolling: touch;">
-            <!-- Injected via JS -->
-          </div>
-        </div>
-
-        <!-- Comprehensive Monthly Matrix Table -->
-        <div class="table-responsive">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Dönem / ay</th>
-                <th>Ciro (TL)</th>
-                <th>Geçen yıl cirosu</th>
-                <th>Hedef ciro</th>
-                <th>Hedef başarısı</th>
-                <th>Net kâr (TL)</th>
-                <th>Marj (%)</th>
-                <th>Satılan gece</th>
-                <th>Doluluk (%)</th>
-                <th>ADR (₺/gece)</th>
-                <th>RevPAR (₺)</th>
-                <th>Gider (TL)</th>
-                <th data-lx-style="text-align: right;">İşlem</th>
-              </tr>
-            </thead>
-            <tbody id="monthlyKpiTableBody">
-              <!-- Injected via JS -->
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- 8. AYLIK TREND VE GEÇEN YIL KARŞILAŞTIRMASI -->
-      <div class="grid-2col">
-        <!-- Monthly Trend Chart -->
-        <section class="card trend-card">
-          <div class="section-title-bar">
-            <div>
-              <h2>📈 Aylık finansal trend</h2>
-              <span class="sub-text">Ciro, Gider ve Net Kâr Evrimi</span>
-            </div>
-            <div class="trend-range-selector">
-              <button class="trend-btn active" data-onclick="setTrendRange('3M')">3 Ay</button>
-              <button class="trend-btn" data-onclick="setTrendRange('6M')">6 Ay</button>
-              <button class="trend-btn" data-onclick="setTrendRange('12M')">12 Ay</button>
-              <button class="trend-btn" data-onclick="setTrendRange('YTD')">YTD</button>
-            </div>
-          </div>
-          <div class="trend-chart-container" id="trendChartContainer">
-            <!-- Injected via JS (SVG Multi-Bar/Line Chart) -->
-          </div>
-          <div class="trend-legend">
-            <span class="legend-item"><span class="legend-dot ciro-dot"></span> Ciro</span>
-            <span class="legend-item"><span class="legend-dot opex-dot"></span> Giderler</span>
-            <span class="legend-item"><span class="legend-dot profit-dot"></span> Net Kâr</span>
-          </div>
-        </section>
-
-        <!-- YoY Comparison -->
-        <section class="card yoy-card">
-          <div class="section-title-bar">
-            <div>
-              <h2>📅 Geçen yıl karşılaştırması (YOY)</h2>
-              <span class="sub-text" id="yoySubText">—</span>
-            </div>
-            <span class="badge badge-emerald" id="yoyBadge">—</span>
-          </div>
-
-          <div class="yoy-comparison-boxes" id="yoyBoxesContainer">
-            <!-- Injected via JS -->
-          </div>
-        </section>
-      </div>
-      </details>
-
-      <!-- 9. KURAL BAZLI DÖNEM ÖZETİ -->
-      <section class="card ai-analyst-card">
-        <div class="section-title-bar">
-          <div class="title-with-badge">
-            <span class="ai-sparkle-icon">📌</span>
-            <h2>Dönem özeti</h2>
-            <span class="badge badge-purple">Kural bazlı</span>
-          </div>
-          <span class="sub-text">Defterde ölçülen rakamlardan en fazla dört kısa içgörü</span>
-        </div>
-        <div class="period-summary-grid" id="periodSummaryContent">—</div>
-      </section>
-
-    </div>
 
     <!-- ======================================================= -->
     <!-- TAB: ANALIZ (core/analytics_ui.js cizer; sabit deger yok) -->
     <!-- ======================================================= -->
-    <div id="tab-analytics" class="tab-content">
+    <div id="tab-analytics" class="tab-content lex-screen">
       <div id="analyticsRoot"></div>
     </div>
 
     <!-- ======================================================= -->
     <!-- TAB: KANALLAR VE PAZARLAMA                              -->
     <!-- ======================================================= -->
-    <div id="tab-marketing" class="tab-content">
-      <div class="section-title-bar" data-lx-style="align-items: flex-start; gap: 16px; flex-wrap: wrap;">
-        <div>
-          <h2 data-lx-style="margin: 0;">📈 Kanallar ve pazarlama</h2>
-          <p class="sub-text" data-lx-style="margin: 5px 0 0;">Kanal ekonomisi ile ölçülebilir huni değişiklikleri.</p>
-        </div>
-        <span id="marketingDataQualityBadge" class="badge badge-secondary">Veri kontrol ediliyor</span>
-      </div>
-
-      <div role="tablist" aria-label="Pazarlama çalışma alanları" data-lx-style="display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0;">
-        <button type="button" class="btn btn-primary btn-sm" data-marketing-view="economics">Kanallar</button>
-        <button type="button" class="btn btn-secondary btn-sm" data-marketing-view="funnel">Airbnb İlan Performansı</button>
-        <button type="button" class="btn btn-secondary btn-sm" data-marketing-view="ads">Reklamlar</button>
+    <div id="tab-marketing" class="tab-content lex-screen">
+      <section class="lex-screen-tasks" id="screenTasks_marketing" aria-label="Ekip görevleri" hidden></section>
+      <!-- PAZARLAMA (Lex + sadelik, 21.11.2026): tek sayfa; reklam ve Airbnb tablolari
+           core/marketing_ui.js renderMarketingHome. Ayrinti sayfalari "← Pazarlama" ile doner. -->
+      <div class="lex-headrow">
+        <h1 class="lex-title">Pazarlama</h1>
+        <span class="lex-headrow__meta" id="marketingPeriodLabel">—</span>
       </div>
 
       <div id="marketingWorkspaceStatus" class="card" data-lx-style="padding: 14px; margin-bottom: 14px;">Pazarlama motoru hazırlanıyor…</div>
@@ -1210,13 +666,18 @@
     <!-- ========================================== -->
     <!-- TAB: REZERVASYONLAR (FULL CRUD) -->
     <!-- ========================================== -->
-    <div id="tab-reservations" class="tab-content">
+    <div id="tab-reservations" class="tab-content lex-screen">
+      <div class="lex-headrow">
+        <h1 class="lex-title">Rezervasyonlar</h1>
+        <span class="lex-headrow__meta" data-lex-period>—</span>
+      </div>
+      <section class="lex-screen-tasks" id="screenTasks_reservations" aria-label="Ekip görevleri" hidden></section>
       <!-- Donem ve mulk (L-197, kullanici M27): takvim ve liste ayni secimi
            kullanir. Eskiden takvimin ay secicisi, listenin tarih araligi ve
            mulk filtresi ayri ayriydi; biri degisince digeri eski donemde kaliyordu. -->
       <section class="card reservation-scope-bar" aria-label="Takvim ve rezervasyon listesi dönemi">
         <div class="reservation-scope-row">
-          <div class="reservation-scope-title"><strong>Dönem ve mülk</strong><span class="sub-text">Üstteki dönem ve mülk seçimiyle aynıdır; burada değiştirirseniz Finans ve diğer sayfalar da değişir.</span></div>
+          
           <button type="button" class="btn btn-secondary btn-sm" data-onclick="stepReservationPeriod(-1)" title="Önceki dönem">‹ Önceki</button>
           <div class="reservation-range-group">
             <button type="button" id="reservationRangeTrigger" class="btn btn-secondary" data-onclick="toggleReservationRangePicker()" aria-expanded="false">
@@ -1242,7 +703,6 @@
             <button type="button" class="btn btn-secondary btn-sm" data-onclick="setTapeChartView('WEEK_1')">1 hafta</button>
             <button type="button" class="btn btn-secondary btn-sm" data-onclick="setTapeChartView('WEEK_2')">2 hafta</button>
             <button type="button" class="btn btn-secondary btn-sm" data-onclick="setTapeChartView('MONTH')">Ay</button>
-            <button type="button" class="btn btn-secondary btn-sm" id="tapeZoomBtn" aria-pressed="false" title="Takvimi büyütür: daha uzun satırlar ve okunur adlar" data-onclick="toggleTapeChartZoom()">🔍 Büyüt</button>
           </div>
         </div>
       </section>
@@ -1250,7 +710,7 @@
       <section class="card tape-chart-card">
         <div class="section-title-bar">
           <div>
-            <h2>📅 Doluluk ve rezervasyon takvimi</h2>
+            <h2>Doluluk ve rezervasyon takvimi</h2>
             <p class="sub-text">Portföyünüzdeki gerçek mülklerin gün gün doluluk durumu. Boş günlere tıklayarak doğrudan rezervasyon girebilirsiniz.</p>
           </div>
           <div data-lx-style="display: flex; gap: 12px; align-items: center; font-size: 11px;">
@@ -1267,7 +727,7 @@
       <section class="card">
         <div class="section-title-bar">
           <div>
-            <h2>📋 Rezervasyonlar</h2>
+            <h2>Rezervasyonlar</h2>
             <p class="sub-text">Seçili dönemin rezervasyonları; operasyon önceliğine göre sıralanır. Tutarlar seçili döneme düşen gecelerin payıdır.</p>
           </div>
           <div data-lx-style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -1277,7 +737,7 @@
         </div>
 
         <!-- Rezervasyon Tablosu Filtreleme ve Arama Çubuğu -->
-        <div data-lx-style="display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; background: rgba(0,0,0,0.25); padding: 12px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
+        <div data-lx-style="display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; padding: 0;">
           <div data-lx-style="flex: 1; min-width: 200px;">
             <input type="search" id="rezSearchInput" aria-label="Misafir adı veya villa ara" placeholder="🔍 Misafir adı veya villa ara..." data-oninput="renderManageBookingsTable()" data-lx-style="width: 100%; padding: 8px 12px; background: rgba(44, 44, 46,0.8); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff;">
           </div>
@@ -1321,10 +781,14 @@
     <!-- ========================================== -->
     <!-- TAB: GİDER DEFTERİ (FULL CRUD) -->
     <!-- ========================================== -->
-    <div id="tab-expenses" class="tab-content">
+    <div id="tab-expenses" class="tab-content lex-screen">
+      <div class="lex-headrow">
+        <h1 class="lex-title">Giderler</h1>
+        <span class="lex-headrow__meta" data-lex-period>—</span>
+      </div>
       <section class="card">
         <div class="section-title-bar">
-          <div><h2>💸 Gider ve yatırım defteri</h2><p class="sub-text">Tüm operasyonel (Opex) ve yatırım (Capex) harcamaları.</p></div>
+          <div></div>
           <div class="table-actions">
             <input type="text" id="expSearchInput" placeholder="🔍 Açıklama veya Kategori ara..." data-oninput="renderExpensesTable()">
             <button data-ledger-write-only class="btn btn-primary" data-onclick="openExpenseModal()">+ Yeni Gider Ekle</button>
@@ -1343,102 +807,25 @@
     </div>
 
     <!-- ========================================== -->
-    <!-- TAB: TEMİZLİK & OPERASYON BORÇ DEFTERİ -->
-    <!-- ========================================== -->
-    <div id="tab-housekeeping" class="tab-content">
-      <!-- 1. KPI Kartları -->
-      <section class="kpi-cards-grid" data-lx-style="margin-bottom: 20px;">
-        <div class="kpi-card" data-lx-style="border-top: 3px solid #FF9F0A;">
-          <div class="kpi-card-header">
-            <span class="kpi-label">Bekleyen temizlik borcu</span>
-          </div>
-          <div class="kpi-value" id="hkKpiPendingDebt" data-lx-style="color: #FFB340;">₺0</div>
-          <div class="kpi-meta">
-            <span id="hkKpiPendingCount" data-lx-style="color: #FFB340; font-weight: 600;">—</span>
-          </div>
-        </div>
-
-        <div class="kpi-card" data-lx-style="border-top: 3px solid #30D158;">
-          <div class="kpi-card-header">
-            <span class="kpi-label">Ödenen temizlik bedeli</span>
-          </div>
-          <div class="kpi-value" id="hkKpiPaidAmount" data-lx-style="color: #30D158;">₺0</div>
-          <div class="kpi-meta">
-            <span id="hkKpiPaidCount" data-lx-style="color: #30D158; font-weight: 600;">—</span>
-          </div>
-        </div>
-
-        <div class="kpi-card" data-lx-style="border-top: 3px solid #0A84FF;">
-          <div class="kpi-card-header">
-            <span class="kpi-label">Toplam operasyon</span>
-          </div>
-          <div class="kpi-value" id="hkKpiTotalOps" data-lx-style="color: #409CFF;">0</div>
-          <div class="kpi-meta">
-            <span id="hkKpiTotalOpsMeta">—</span>
-          </div>
-        </div>
-      </section>
-
-      <!-- 2. Temizlik & Borç Defteri Tablosu -->
-      <section class="card">
-        <div class="section-title-bar">
-          <div>
-            <h2>🧹 Temizlik & operasyon borç defteri</h2>
-            <p class="sub-text">Rezervasyonlardan gelen temizlikler. Maliyet temizlik <strong>yapıldı</strong> işaretlendiği günün ayına gider yazılır; ödeme ayrı bir adımdır. Yapılmayan temizlik (gelmeyen misafir) ne gider ne borç olur.</p>
-          </div>
-          <div class="table-actions" data-lx-style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <select id="hkStatusFilter" class="form-control" data-lx-style="width: auto; font-size: 12px; padding: 6px 10px; background: rgba(0,0,0,0.4); color: #fff; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px;" data-onchange="renderHousekeepingTab()">
-              <option value="ALL">Tüm Durumlar (Tümü)</option>
-              <option value="UNCONFIRMED">❓ Yapıldı mı? (geçmiş tarihli planlı)</option>
-              <option value="PLANNED">🗓️ Planlananlar</option>
-              <option value="DEBT">⏳ Borç (yapıldı, ödenmedi)</option>
-              <option value="PAID">✅ Ödenenler</option>
-              <option value="SKIPPED">✖ Yapılmayanlar</option>
-            </select>
-            <input type="text" id="hkSearchInput" placeholder="🔍 Ev, misafir, personel ara..." data-oninput="renderHousekeepingTab()" data-lx-style="width: 220px; font-size: 12px; padding: 6px 12px; background: rgba(0,0,0,0.4); color: #fff; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px;">
-            <button class="btn btn-secondary btn-sm" data-onclick="markSelectedCleaningDone()" data-lx-style="font-size: 12px; font-weight: 700;" title="Listede işaretlediğiniz planlı temizlikleri planlandıkları gün yapılmış sayar">✔ Seçilenler Yapıldı</button>
-            <button class="btn btn-warning btn-sm" data-onclick="payAllPendingCleaning()" data-lx-style="font-size: 12px; font-weight: 700; background: #FF9F0A; color: #000;">💳 Tüm Borcu Öde</button>
-            <button data-operations-only class="btn btn-primary btn-sm" data-onclick="openNewCleaningTaskModal()" data-lx-style="font-size: 12px; font-weight: 700;">+ Yeni Temizlik Ekle</button>
-          </div>
-        </div>
-        <div class="table-responsive">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Temizlik tarihi</th>
-                <th>Villa (ev)</th>
-                <th>Misafir / görev</th>
-                <th>Personel / ekip</th>
-                <th>Maliyet (TL)</th>
-                <th>Durum</th>
-                <th>Ödeme</th>
-                <th data-lx-style="text-align: right;">İşlem</th>
-              </tr>
-            </thead>
-            <tbody id="hkTableBody"></tbody>
-          </table>
-        </div>
-      </section>
-    </div>
-
-    <!-- ========================================== -->
     <!-- TAB: LEAD CRM & WHATSAPP SATIŞ RADARI -->
     <!-- ========================================== -->
-    <div id="tab-leads" class="tab-content">
+    <div id="tab-leads" class="tab-content lex-screen">
+      <div class="lex-headrow">
+        <h1 class="lex-title">Misafirler ve Satış</h1>
+      </div>
+      <section class="lex-screen-tasks" id="screenTasks_leads" aria-label="Ekip görevleri" hidden></section>
       <!-- Misafirler ve Satis tek menu kalemi (ENVANTER 27.09): iki alt gorunum. -->
       <div class="subpage-switch" role="tablist" aria-label="Misafirler ve Satış">
-        <button type="button" role="tab" class="subpage-switch-btn active" aria-selected="true" data-onclick="switchTab('leads')">🎯 Talepler</button>
-        <button type="button" role="tab" class="subpage-switch-btn" aria-selected="false" data-onclick="switchTab('guests')">👥 Misafirler</button>
+        <button type="button" role="tab" class="subpage-switch-btn active" aria-selected="true" data-onclick="switchTab('leads')">Talepler</button>
+        <button type="button" role="tab" class="subpage-switch-btn" aria-selected="false" data-onclick="switchTab('guests')">Misafirler</button>
       </div>
 
       <section class="card lead-quick-card" aria-labelledby="leadQuickTitle">
         <div class="section-title-bar">
           <div>
             <h2 id="leadQuickTitle">Hızlı talep kaydı</h2>
-            <p class="sub-text">Telefon ve “nereden geldi” bilgisiyle yaklaşık 10 saniyede kaydedin. Aynı telefonun açık talebi varsa yeni kayıt açılmaz.</p>
           </div>
           <div data-lx-style="display:flex;gap:8px;flex-wrap:wrap">
-            <button type="button" id="leadAddSourceBtn" class="btn btn-secondary btn-sm" data-onclick="addLeadSource()">+ Kaynak ekle</button>
             <button type="button" class="btn btn-secondary btn-sm" data-onclick="bumpLeadInterestFromQuick(1)">+1 yalnız fiyat sorusu</button>
             <button type="button" class="btn btn-secondary btn-sm" data-onclick="bumpLeadInterestFromQuick(-1)">Geri al</button>
             <span class="badge">Bugün yalnız fiyat: <strong id="leadInterestToday">0</strong></span>
@@ -1471,6 +858,9 @@
             <label for="leadQuickProperty">İlgilendiği mülk</label>
             <select id="leadQuickProperty"><option value="">Henüz belli değil</option></select>
           </div>
+          <details class="lead-quick-more">
+            <summary>Ayrıntı ekle</summary>
+            <div class="lead-quick-more__grid">
           <div class="form-group lead-extra-properties-group">
             <label>Başka baktığı mülkler</label>
             <div id="leadQuickExtraProperties" class="lead-extra-properties"></div>
@@ -1491,6 +881,8 @@
             <label for="leadQuickNote">Kısa not</label>
             <input id="leadQuickNote" type="text" maxlength="1000" placeholder="Örn. akşam aranacak">
           </div>
+            </div>
+          </details>
           <button id="leadQuickSubmit" type="submit" class="btn btn-primary">Talebi kaydet</button>
         </form>
         <p id="leadQuickMessage" class="lead-quick-message" role="status" aria-live="polite"></p>
@@ -1537,105 +929,15 @@
         </div>
       </section>
 
-      <!-- 1. WHATSAPP & SATIŞ TALEP ANALİZİ (EXECUTIVE RADAR) -->
-      <section class="card" data-lx-style="margin-bottom: 24px;">
-        <div class="section-title-bar">
-          <div>
-            <h2>📊 WhatsApp talep & dönüşüm analitiği (satış radarı)</h2>
-            <p class="sub-text">Gelen mesajların rezervasyona dönüşüm oranı, kayıp analizleri ve misafir talepleri.</p>
-          </div>
-          <div data-lx-style="display: flex; gap: 8px;">
-            <button class="btn btn-secondary btn-sm" data-onclick="openWhatsAppModal('lead')" data-lx-style="background: rgba(37,211,102,0.15); border-color: #25D366; color: #4ADE80;">
-              <span>💬</span> Mesaj Ayrıştır
-            </button>
-          </div>
-        </div>
-
-        <!-- 4 Ana Metrik KPI Kartları -->
-        <div class="kpi-grid" data-lx-style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 20px;">
-          <div class="kpi-card" data-lx-style="border-left: 4px solid #25D366;">
-            <div class="kpi-title">💬 Toplam WhatsApp talebi</div>
-            <div class="kpi-value" id="waKpiTotalLeads">0</div>
-            <div class="kpi-sub" id="waKpiTotalLeadsSub">Kayıtlı tüm talepler (dönem filtresi uygulanmaz)</div>
-          </div>
-          <div class="kpi-card" data-lx-style="border-left: 4px solid #0A84FF;">
-            <div class="kpi-title">🎯 Dönüşüm oranı (conversion)</div>
-            <div class="kpi-value" id="waKpiConvRate">%0</div>
-            <div class="kpi-sub" id="waKpiConvRateSub">Rezervasyona dönen oran</div>
-          </div>
-          <div class="kpi-card" data-lx-style="border-left: 4px solid #30D158;">
-            <div class="kpi-title">💰 Kazanılan direkt ciro</div>
-            <div class="kpi-value" id="waKpiWonRevenue">—</div>
-            <div class="kpi-sub" data-lx-style="color: #30D158;">%0 OTA Komisyonu (Net Kâr)</div>
-          </div>
-          <div class="kpi-card" data-lx-style="border-left: 4px solid #FF453A;">
-            <div class="kpi-title">📉 Kaçan potansiyel ciro</div>
-            <div class="kpi-value" id="waKpiLostRevenue">—</div>
-            <div class="kpi-sub" id="waKpiLostCountSub">—</div>
-          </div>
-        </div>
-
-        <!-- Görsel Dağılım Kartları: Kayıp Nedenleri & Villa Talep Dağılımı -->
-        <div data-lx-style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 20px;">
-          <!-- Kayıp Nedenleri -->
-          <div data-lx-style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 16px;">
-            <div data-lx-style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-              <strong data-lx-style="color: #FF6961; font-size: 13px;">❌ Müşteri Neden Kaçtı? (Kayıp Nedenleri)</strong>
-              <span data-lx-style="font-size: 11px; color: var(--text-muted);">Kaçan Fırsat Dağılımı</span>
-            </div>
-            <div id="waLossReasonsList" data-lx-style="display: flex; flex-direction: column; gap: 10px;">
-              <!-- Rendered dynamically -->
-            </div>
-          </div>
-
-          <!-- Villa Talep Yoğunluğu -->
-          <div data-lx-style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 16px;">
-            <div data-lx-style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-              <strong data-lx-style="color: #409CFF; font-size: 13px;">🏡 Hangi Villa Ne Kadar Soruluyor?</strong>
-              <span data-lx-style="font-size: 11px; color: var(--text-muted);">Talep Popülaritesi</span>
-            </div>
-            <div id="waVillaDemandList" data-lx-style="display: flex; flex-direction: column; gap: 10px;">
-              <!-- Rendered dynamically -->
-            </div>
-          </div>
-        </div>
-
-        <!-- Yapay Zeka Stratejik Satış Teşhisleri -->
-        <div data-lx-style="background: linear-gradient(135deg, rgba(37, 211, 102, 0.08), rgba(10, 132, 255, 0.08)); border: 1px solid rgba(37, 211, 102, 0.25); border-radius: 10px; padding: 16px;">
-          <div data-lx-style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-            <span data-lx-style="font-size: 18px;">💡</span>
-            <strong data-lx-style="color: #4ADE80; font-size: 14px;">WhatsApp Satış Optimizasyonu & Aksiyon Tavsiyeleri</strong>
-          </div>
-          <div id="waActionableInsights" data-lx-style="font-size: 13px; color: var(--text-secondary); line-height: 1.6;">
-            <!-- Rendered dynamically -->
-          </div>
-        </div>
-      </section>
-
-    </div>
-
-    <!-- ========================================== -->
-    <!-- TAB: BAKIM & P1 -->
-    <!-- ========================================== -->
-    <div id="tab-maintenance" class="tab-content">
-      <section class="card">
-        <div class="section-title-bar">
-          <div><h2>🛠️ Bakım, onarım ve arıza defteri</h2><p class="sub-text">P1, P2 ve P3 arıza kayıtları.</p></div>
-          <button data-operations-only class="btn btn-primary" data-onclick="openMaintModal()">+ Yeni Arıza Ekle</button>
-        </div>
-        <div class="table-responsive">
-          <table class="data-table">
-            <thead><tr><th>Öncelik</th><th>Villa</th><th>Yapılacak iş / sorun</th><th>Sorumlu</th><th>Tahmini maliyet (₺)</th><th>Downtime (gece)</th><th>Durum</th><th data-lx-style="text-align: right;">İşlem</th></tr></thead>
-            <tbody id="manageMaintTableBody"></tbody>
-          </table>
-        </div>
-      </section>
     </div>
 
     <!-- ========================================== -->
     <!-- TAB: AYARLAR & HEDEFLER -->
     <!-- ========================================== -->
-    <div id="tab-settings" class="tab-content">
+    <div id="tab-settings" class="tab-content lex-screen">
+      <div class="lex-headrow">
+        <h1 class="lex-title">Ayarlar</h1>
+      </div>
       <div id="settingsAccessDenied" class="empty-state" hidden>Bu sayfa yalnızca işletme yönetim rollerine açıktır.</div>
 
       <!-- Bolum menusu (macOS Sistem Ayarlari): bir anda tek bolum gorunur.
@@ -1643,25 +945,25 @@
       <div class="settings-layout" id="settingsLayout">
       <nav class="settings-nav" id="settingsNav" aria-label="Ayar bölümleri">
         <div class="settings-nav__group">İşletme</div>
-        <button type="button" class="settings-nav__item" data-settings-target="business" data-onclick="selectSettingsSection('business')"><span class="settings-nav__icon" aria-hidden="true">🏢</span><span>İşletme bilgileri</span></button>
-        <button type="button" class="settings-nav__item" data-settings-target="team" data-onclick="selectSettingsSection('team')"><span class="settings-nav__icon" aria-hidden="true">👥</span><span>Ekip ve roller</span></button>
+        <button type="button" class="settings-nav__item" data-settings-target="business" data-onclick="selectSettingsSection('business')"><span>İşletme bilgileri</span></button>
+        <button type="button" class="settings-nav__item" data-settings-target="team" data-onclick="selectSettingsSection('team')"><span>Ekip ve roller</span></button>
         <div class="settings-nav__group">Satış</div>
-        <button type="button" class="settings-nav__item" data-settings-target="channels" data-onclick="selectSettingsSection('channels')"><span class="settings-nav__icon" aria-hidden="true">🌐</span><span>Rezervasyon kanalları</span></button>
-        <button type="button" class="settings-nav__item" data-settings-target="lead-sources" data-onclick="selectSettingsSection('lead-sources')"><span class="settings-nav__icon" aria-hidden="true">🧭</span><span>Talep kaynakları</span></button>
-        <button type="button" class="settings-nav__item" data-settings-target="templates" data-onclick="selectSettingsSection('templates')"><span class="settings-nav__icon" aria-hidden="true">🧩</span><span>Şablonlar</span></button>
+        <button type="button" class="settings-nav__item" data-settings-target="channels" data-onclick="selectSettingsSection('channels')"><span>Rezervasyon kanalları</span></button>
+        <button type="button" class="settings-nav__item" data-settings-target="lead-sources" data-onclick="selectSettingsSection('lead-sources')"><span>Talep kaynakları</span></button>
+        <button type="button" class="settings-nav__item" data-settings-target="templates" data-onclick="selectSettingsSection('templates')"><span>Şablonlar</span></button>
         <div class="settings-nav__group">Operasyon</div>
-        <button type="button" class="settings-nav__item" data-settings-target="checklists" data-onclick="selectSettingsSection('checklists')"><span class="settings-nav__icon" aria-hidden="true">🧹</span><span>Kontrol listeleri</span></button>
+        <button type="button" class="settings-nav__item" data-settings-target="checklists" data-onclick="selectSettingsSection('checklists')"><span>Kontrol listeleri</span></button>
         <div class="settings-nav__group">Finans</div>
-        <button type="button" class="settings-nav__item" data-settings-target="expense-categories" data-onclick="selectSettingsSection('expense-categories')"><span class="settings-nav__icon" aria-hidden="true">🏷️</span><span>Gider kategorileri</span></button>
+        <button type="button" class="settings-nav__item" data-settings-target="expense-categories" data-onclick="selectSettingsSection('expense-categories')"><span>Gider kategorileri</span></button>
         <div class="settings-nav__group">Hesap</div>
-        <button type="button" class="settings-nav__item" data-settings-target="danger" data-onclick="selectSettingsSection('danger')"><span class="settings-nav__icon" aria-hidden="true">⚠️</span><span>Veri ve hesap</span></button>
+        <button type="button" class="settings-nav__item" data-settings-target="danger" data-onclick="selectSettingsSection('danger')"><span>Veri ve hesap</span></button>
       </nav>
       <div class="settings-panes">
 
       <section class="card settings-section" data-settings-section="business" data-lx-style="margin-bottom: 24px;">
         <div class="section-title-bar">
           <div>
-            <h2>🏢 İşletme</h2>
+            <h2>İşletme</h2>
             <p class="sub-text">İşletme adını ve raporlarda kullanılacak logoyu yönetin.</p>
           </div>
         </div>
@@ -1691,7 +993,7 @@
       <section class="card settings-section" data-settings-section="team" data-lx-style="margin-bottom: 24px;">
         <div class="section-title-bar">
           <div>
-            <h2>👥 Ekip ve rol yönetimi</h2>
+            <h2>Ekip ve rol yönetimi</h2>
             <p class="sub-text">İşletmenize kullanıcı davet edin ve her birinin yetki seviyesini belirleyin.</p>
           </div>
           <button class="btn btn-primary btn-sm" id="inviteMemberBtn" data-onclick="openInviteMemberModal()">+ Ekibe Üye Davet Et</button>
@@ -1726,7 +1028,7 @@
         <div id="pendingInvitationsWrap" data-lx-style="display: none; margin-top: 22px;">
           <div class="section-title-bar" data-lx-style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 16px;">
             <div>
-              <h2 data-lx-style="font-size: 15px;">✉️ Bekleyen davetler</h2>
+              <h2 data-lx-style="font-size: 15px;">Bekleyen davetler</h2>
               <p class="sub-text">Davet edilen kişi bu e-posta ile kayıt olup giriş yaptığında ekibinize otomatik katılır.</p>
             </div>
           </div>
@@ -1745,13 +1047,24 @@
             </table>
           </div>
         </div>
+
+        <!-- GOREV DAGITIMI (Lex, kullanici karari 21.11.2026): her gorev turunun hangi ekibe
+             dustugu. tenant_settings.team_task_routing; gorme hakki yine rol/izinden gelir. -->
+        <div id="teamTaskRoutingWrap" class="lex-screen" hidden>
+          <div class="lex-headrow" data-lx-style="margin-top: 22px;">
+            <h2 class="lex-title">Görev dağıtımı</h2>
+            <button type="button" class="lex-btn" data-onclick="resetTeamTaskRouting()">Ön tanımlıya dön</button>
+          </div>
+          <p class="lex-note">Her iş türünün hangi ekibin listesine düşeceğini seçin. Bir işi kimin görebileceği değişmez: o işin verisini okuma izni olan görür.</p>
+          <div id="teamTaskRoutingTable"></div>
+        </div>
       </section>
 
       <!-- REZERVASYON KANALLARI VE OTA KOMISYONLARI -->
       <section class="card settings-section" data-settings-section="channels" id="bookingChannelSettingsCard" data-lx-style="margin-bottom: 24px;">
         <div class="section-title-bar">
           <div>
-            <h2>🌐 Rezervasyon kanalları ve OTA komisyonları</h2>
+            <h2>Rezervasyon kanalları ve OTA komisyonları</h2>
             <p class="sub-text">Rezervasyon formunda kullanılacak kanalları ve varsayılan komisyon oranlarını yönetin.</p>
           </div>
         </div>
@@ -1769,14 +1082,14 @@
             <tbody id="bookingChannelSettingsBody"></tbody>
           </table>
         </div>
-        <p class="sub-text" data-lx-style="margin:12px 0 0;">Mülk bazlı Airbnb/Booking ilan bağlantıları ve performans verileri <strong>Kanallar ve Pazarlama</strong> ekranından yönetilir.</p>
+        <p class="sub-text" data-lx-style="margin:12px 0 0;">Mülk bazlı Airbnb/Booking ilan bağlantıları ve performans verileri <button type="button" class="lex-link-inline" data-onclick="goTo('marketing')">Pazarlama</button> ekranından yönetilir.</p>
         <div id="bookingFinanceSettings"></div>
       </section>
 
       <section class="card settings-section" data-settings-section="templates" id="settingsTemplatesCard" data-lx-style="margin-bottom: 24px;">
         <div class="section-title-bar">
           <div>
-            <h2>🧩 Şablonlar</h2>
+            <h2>Şablonlar</h2>
             <p class="sub-text">Sık kullandığınız metinleri ve işleri bir kez yazın, sonra tek tıkla kullanın. Her bölmenin altında nerede çıktığı yazar.</p>
           </div>
         </div>
@@ -1815,7 +1128,7 @@
       <section class="card settings-section" data-settings-section="checklists" id="settingsChecklistsCard" data-lx-style="margin-bottom: 24px;">
         <div class="section-title-bar">
           <div>
-            <h2>🧹 Kontrol listeleri</h2>
+            <h2>Kontrol listeleri</h2>
             <p class="sub-text">Temizlik ve misafir öncesi son kontrol listesi. Bir kâğıt liste gibi yazın: bölüm başlığı, altında maddeler, maddenin altında alt kontroller. <strong>Zorunlu</strong> işaretli madde ve alt kontrolleri tamamlanmadan iş kapatılamaz.</p>
           </div>
           <button type="button" class="btn btn-secondary btn-sm" data-onclick="switchTab('operations'); setOperationsView('cleaning')">Temizlikte kullan →</button>
@@ -1828,7 +1141,7 @@
           </div>
           <div id="settingsChecklistMergePreview" class="sub-text checklist-merge-preview" aria-live="polite"></div>
           <details class="checklist-paste">
-            <summary>📋 Word'den ya da metinden yapıştır</summary>
+            <summary>Word'den ya da metinden yapıştır</summary>
             <p class="sub-text">Her satır bir madde. Girintisiz satır bölüm başlığı, bir kez girintili satır madde, iki kez girintili satır alt kontrol olur. "Malzeme" ile başlayan başlığın altındakiler malzeme listesine gider. Başına <strong>!</strong> koyduğunuz madde zorunlu olur.</p>
             <label for="settingsChecklistPaste" class="sr-only">Yapıştırılacak liste</label>
             <textarea id="settingsChecklistPaste" rows="8" placeholder="Mutfak&#10;    Bulaşıklar yıkandı mı&#10;        Kireç kontrol edildi mi&#10;    Yerler süpürüldü mü&#10;Yatak odası&#10;    !Çarşaflar değişti mi&#10;Malzeme listesi&#10;    Çay&#10;    Kahve"></textarea>
@@ -1852,7 +1165,7 @@
 
       <section class="card settings-section" data-settings-section="expense-categories" id="settingsExpenseCategoriesCard" data-lx-style="margin-bottom:24px;">
         <div class="section-title-bar">
-          <div><h2>🏷️ Gider kategorileri</h2><p class="sub-text">Her kategori bir türe bağlıdır. <strong>OPEX</strong>: işin süregelen gideri (fatura, maaş, bakım). <strong>CAPEX</strong>: yıllarca kullanılan yatırım (klima, mobilya, tadilat). Gider formu kategori seçilince türü buna göre doldurur; ikisi de net kârdan düşer.</p></div>
+          <div><h2>Gider kategorileri</h2><p class="sub-text">Her kategori bir türe bağlıdır. <strong>OPEX</strong>: işin süregelen gideri (fatura, maaş, bakım). <strong>CAPEX</strong>: yıllarca kullanılan yatırım (klima, mobilya, tadilat). Gider formu kategori seçilince türü buna göre doldurur; ikisi de net kârdan düşer.</p></div>
         </div>
         <form data-onsubmit="createSettingsExpenseCategory(event)" class="settings-source-form">
           <div class="form-group"><label for="settingsExpenseCategoryName">Yeni kategori</label><input id="settingsExpenseCategoryName" maxlength="60" required placeholder="Örn: Havuz bakımı"></div>
@@ -1869,7 +1182,7 @@
 
       <section class="card settings-section" data-settings-section="lead-sources" id="settingsLeadSourcesCard" data-lx-style="margin-bottom:24px;">
         <div class="section-title-bar">
-          <div><h2>🧭 Talep kaynakları</h2><p class="sub-text">“Nereden geldi?” seçeneklerini yönetin. Bilinmiyor sistem kaynağı silinemez ve kapatılamaz.</p></div>
+          <div><h2>Talep kaynakları</h2><p class="sub-text">“Nereden geldi?” seçeneklerini yönetin. Bilinmiyor sistem kaynağı silinemez ve kapatılamaz.</p></div>
         </div>
         <form data-onsubmit="createSettingsLeadSource(event)" class="settings-source-form">
           <div class="form-group"><label for="settingsLeadSourceName">Yeni kaynak</label><input id="settingsLeadSourceName" name="label" maxlength="100" required placeholder="Örn: TikTok"></div>
@@ -1888,7 +1201,7 @@
       <section class="card" id="tenantBackupCard" data-lx-style="margin-top: 24px;">
         <div class="section-title-bar">
           <div>
-            <h2>💾 İşletme Yedeği</h2>
+            <h2>İşletme Yedeği</h2>
             <p class="sub-text">İşletmenizin bütün kayıtlarını tek dosya olarak indirin.</p>
           </div>
         </div>
@@ -1900,7 +1213,7 @@
             yalnız eksik kayıtlar eklenir. Kullanıcı şifreleri yedekte yoktur.
           </p>
           <button type="button" class="btn btn-secondary" id="tenantBackupBtn" data-owner-only data-onclick="downloadTenantBackup()">
-            💾 İşletme yedeğini indir (.json)
+            İşletme yedeğini indir (.json)
           </button>
           <p class="sub-text" data-owner-only-note hidden>İşletme yedeğini yalnız işletme sahibi indirebilir.</p>
         </div>
@@ -1910,7 +1223,7 @@
       <section class="card" id="dataResetCard" data-lx-style="margin-top: 24px; border: 1px solid rgba(255, 159, 10, 0.35);">
         <div class="section-title-bar">
           <div>
-            <h2 data-lx-style="color: #FCD34D;">🗑️ Veri Sıfırlama</h2>
+            <h2 data-lx-style="color: #FCD34D;">Veri Sıfırlama</h2>
             <p class="sub-text">Tüm kayıtlarınızı silip sıfırdan başlayın. İşletmeniz ve ekibiniz kalır.</p>
           </div>
         </div>
@@ -1921,7 +1234,7 @@
             Deneme verisi yükleyip temizlemek için bunu kullanın.
           </p>
           <button type="button" class="btn btn-secondary" data-owner-only data-onclick="openResetModal()">
-            🗑️ Veri Sıfırlama Menüsünü Aç
+            Veri Sıfırlama Menüsünü Aç
           </button>
           <p class="sub-text" data-owner-only-note hidden>Veri sıfırlamayı yalnız işletme sahibi yapabilir.</p>
         </div>
@@ -1931,7 +1244,7 @@
       <section class="card" id="dangerZoneCard" data-lx-style="margin-top: 24px; border: 1px solid rgba(255, 69, 58, 0.35);">
         <div class="section-title-bar">
           <div>
-            <h2 data-lx-style="color: #FCA5A5;">⚠️ Tehlikeli bölge</h2>
+            <h2 data-lx-style="color: #FCA5A5;">Tehlikeli bölge</h2>
             <p class="sub-text">Hesabınızı kalıcı olarak kapatın. Bu işlem geri alınamaz.</p>
           </div>
         </div>
@@ -1952,12 +1265,11 @@
     <!-- ======================================================= -->
     <!-- TAB: MÜLKLER (PORTFÖY YÖNETİMİ)                         -->
     <!-- ======================================================= -->
-    <div id="tab-properties" class="tab-content">
+    <div id="tab-properties" class="tab-content lex-screen">
       <section class="card" data-lx-style="margin-bottom: 24px;">
         <div class="section-title-bar">
           <div>
-            <h2>🏡 Portföy & mülk yönetimi</h2>
-            <p class="sub-text">Sistemdeki tüm villalar, operasyonel hazırlık durumları, baz fiyatlar ve koruma sınırları.</p>
+            <h1 class="lex-title">Mülkler</h1>
           </div>
           <button class="btn btn-primary btn-sm" id="newPropertyBtn" data-onclick="openPropertyModal()">+ Yeni Villa / Mülk Ekle</button>
         </div>
@@ -1971,12 +1283,12 @@
     <!-- ======================================================= -->
     <!-- TAB: OPERASYON (HOUSEKEEPING & MAINTENANCE BİRLEŞİK)   -->
     <!-- ======================================================= -->
-    <div id="tab-operations" class="tab-content">
+    <div id="tab-operations" class="tab-content lex-screen">
+      <section class="lex-screen-tasks" id="screenTasks_operations" aria-label="Ekip görevleri" hidden></section>
       <section class="card" data-lx-style="margin-bottom: 20px;">
         <div class="section-title-bar">
           <div>
-            <h2>🧹 Operasyon</h2>
-            <p class="sub-text">Temizlik, arıza ve ekip görevlerini tek yerden yönetin.</p>
+            <h1 class="lex-title">Operasyon</h1>
           </div>
           <div data-lx-style="display: flex; gap: 8px;">
             <button data-operations-only class="btn btn-primary btn-sm" data-onclick="openNewCleaningTaskModal()">+ Temizlik Görevi Ekle</button>
@@ -1984,32 +1296,10 @@
           </div>
         </div>
         <div class="subpage-switch operations-switch" role="tablist" aria-label="Operasyon görünümü">
-          <button type="button" class="active" data-operations-view="cleaning" data-onclick="setOperationsView('cleaning')" role="tab">🧹 Temizlik</button>
-          <button type="button" data-operations-view="maintenance" data-onclick="setOperationsView('maintenance')" role="tab">🛠️ Arıza &amp; Bakım</button>
-          <button type="button" data-operations-view="tasks" data-onclick="setOperationsView('tasks')" role="tab">✅ Görevler</button>
-          <button type="button" data-operations-view="people" data-onclick="setOperationsView('people')" role="tab">👷 Saha ekibi</button>
-        </div>
-        <div class="kpi-cards-grid five-cols" data-lx-style="margin-bottom: 20px;">
-          <div class="kpi-card">
-            <span class="kpi-label">Hazır mülkler</span>
-            <div class="kpi-value" id="opsReadyPropsVal" data-lx-style="color: #30D158;">—</div>
-            <div class="kpi-meta">Misafir kabulüne hazır</div>
-          </div>
-          <div class="kpi-card">
-            <span class="kpi-label">Bugünkü turnover</span>
-            <div class="kpi-value" id="opsTurnoverVal" data-lx-style="color: #409CFF;">0 Görev</div>
-            <div class="kpi-meta">Giriş / Çıkış temizliği</div>
-          </div>
-          <div class="kpi-card">
-            <span class="kpi-label">Açık arızalar (P1)</span>
-            <div class="kpi-value" id="opsOpenMaintVal" data-lx-style="color: #FF6961;">0 İş</div>
-            <div class="kpi-meta">Kritik müdahale</div>
-          </div>
-          <div class="kpi-card">
-            <span class="kpi-label">Temizlik borcu</span>
-            <div class="kpi-value" id="opsDebtVal" data-lx-style="color: #FFB340;">₺0</div>
-            <div class="kpi-meta">Personele ödenecek</div>
-          </div>
+          <button type="button" class="active" data-operations-view="cleaning" data-onclick="setOperationsView('cleaning')" role="tab">Temizlik</button>
+          <button type="button" data-operations-view="maintenance" data-onclick="setOperationsView('maintenance')" role="tab">Arıza &amp; Bakım</button>
+          <button type="button" data-operations-view="tasks" data-onclick="setOperationsView('tasks')" role="tab">Görevler</button>
+          <button type="button" data-operations-view="people" data-onclick="setOperationsView('people')" role="tab">Saha ekibi</button>
         </div>
         <div id="opsCombinedContainer">
           <!-- Operasyon görevleri ve bakım listesi -->
@@ -2020,20 +1310,24 @@
     <!-- ======================================================= -->
     <!-- TAB: MİSAFİRLER (LIFECYCLE & İLETİŞİM)                  -->
     <!-- ======================================================= -->
-    <div id="tab-guests" class="tab-content">
+    <div id="tab-guests" class="tab-content lex-screen">
+      <div class="lex-headrow">
+        <h1 class="lex-title">Misafirler ve Satış</h1>
+      </div>
+      <section class="lex-screen-tasks" id="screenTasks_guests" aria-label="Ekip görevleri" hidden></section>
       <!-- Misafirler ve Satis tek menu kalemi (ENVANTER 27.09): iki alt gorunum. -->
       <div class="subpage-switch" role="tablist" aria-label="Misafirler ve Satış">
-        <button type="button" role="tab" class="subpage-switch-btn" aria-selected="false" data-onclick="switchTab('leads')">🎯 Talepler</button>
-        <button type="button" role="tab" class="subpage-switch-btn active" aria-selected="true" data-onclick="switchTab('guests')">👥 Misafirler (<span id="guestCountBadge">—</span>)</button>
+        <button type="button" role="tab" class="subpage-switch-btn" aria-selected="false" data-onclick="switchTab('leads')">Talepler</button>
+        <button type="button" role="tab" class="subpage-switch-btn active" aria-selected="true" data-onclick="switchTab('guests')">Misafirler (<span id="guestCountBadge">—</span>)</button>
       </div>
       <section class="card" data-lx-style="margin-bottom: 24px;">
         <div class="section-title-bar">
           <div>
-            <h2>👥 Misafir rehberi & yaşam döngüsü</h2>
+            <h2>Misafir rehberi & yaşam döngüsü</h2>
             <p class="sub-text">Kanonik misafir profilleri, tekrar konaklama değeri ve izinli doğrudan satış takibi.</p>
           </div>
           <div data-lx-style="display: flex; gap: 8px;">
-            <button class="btn btn-secondary btn-sm" data-onclick="openWhatsAppModal('parser')">💬 WhatsApp Ayrıştır</button>
+            <button class="btn btn-secondary btn-sm" data-onclick="openWhatsAppModal('parser')">WhatsApp Ayrıştır</button>
             <button class="btn btn-primary btn-sm" id="newGuestProfileBtn" data-onclick="openGuestProfileModal()">+ Yeni Misafir</button>
           </div>
         </div>
@@ -2107,12 +1401,12 @@
     <!-- ======================================================= -->
     <!-- TAB: FİYATLANDIRMA (DYNAMIC PRICING & REVENUE)          -->
     <!-- ======================================================= -->
-    <div id="tab-pricing" class="tab-content">
+    <div id="tab-pricing" class="tab-content lex-screen">
+      <section class="lex-screen-tasks" id="screenTasks_pricing" aria-label="Ekip görevleri" hidden></section>
       <div class="pricing-shell">
         <header class="pricing-head">
           <div class="pricing-head-text">
-            <h2>Fiyatlandırma</h2>
-            <p class="sub-text">Önerilen gecelik fiyatları gözden geçirin, onaylayın ya da değiştirin. Öneri, mülkün baz fiyatı ve kurallarınızdan hesaplanır; OTA'ya gönderilmez.</p>
+            <h1 class="lex-title">Fiyatlandırma</h1>
           </div>
           <div class="pricing-head-tools">
             <div class="pricing-property">
@@ -2132,9 +1426,9 @@
           <button type="button" role="tab" class="ads-subnav-btn" id="pricingViewTab_results" aria-controls="pricingView_results" aria-selected="false" tabindex="-1" data-onclick="setPricingView('results')">Sonuçlar</button>
         </div>
 
-        <!-- KILAVUZ: ilk ziyarette acik, kapatan kullanicida kapali (tarayici deposu). -->
+        <!-- KILAVUZ: hep kapali baslar (sadelik 21.11.2026). -->
         <details class="pricing-guide" id="pricingGuide">
-          <summary data-onclick="rememberPricingGuide()">Fiyatlandırma nasıl çalışır?</summary>
+          <summary>Fiyatlandırma nasıl çalışır?</summary>
           <div class="pricing-guide-body">
             <p>Sistem her gece için bir <strong>öneri</strong> hesaplar: mülkün baz fiyatı, üstüne kurallarınız (hafta sonu, özel gün, sezon, talep, son dakika, boş gece). Öneriyi siz onaylar ya da değiştirirsiniz; kaydedilen fiyat referanstır, OTA'ya kendiliğinden gönderilmez.</p>
             <ol class="pricing-guide-steps">
@@ -2161,13 +1455,7 @@
 
         <!-- TAKVIM: gunluk is. KPI seridi, ay izgarasi + ayrinti paneli. -->
         <section class="pricing-view" id="pricingView_calendar" role="tabpanel" aria-labelledby="pricingViewTab_calendar">
-          <p class="pricing-view-intro">Günlük iş burada: bir güne tıklayıp fiyatın nasıl hesaplandığını görün, öneriyi onaylayın ya da değiştirin. <b>Öneri</b> henüz onaylanmamış fiyattır, <b>Onaylı</b> ve <b>Elle</b> kaydedilmiş fiyattır; renkler lejantta. Ayları üstteki şeritten seçin (bugünden 12 ay).</p>
           <div class="pricing-kpis">
-            <div class="kpi-card">
-              <span class="kpi-label">Ortalama gecelik fiyat (ADR)</span>
-              <div class="kpi-value" id="pricingAdrVal">—</div>
-              <div class="kpi-meta">Satılan gecelerin ortalaması · seçili dönem (Finans ile aynı)</div>
-            </div>
             <button type="button" class="kpi-card pricing-kpi-action" id="pricingPendingCard" data-onclick="selectPricingDays('PENDING')" disabled>
               <span class="kpi-label">Onay bekleyen gün</span>
               <span class="kpi-value" id="pricingPendingVal">—</span>
@@ -2177,11 +1465,6 @@
               <span class="kpi-label">Boş gece</span>
               <div class="kpi-value" id="pricingGapCountVal">—</div>
               <div class="kpi-meta" id="pricingGapCountMeta">İki rezervasyon arasında kalan kısa boşluklar</div>
-            </div>
-            <div class="kpi-card">
-              <span class="kpi-label">Yıllık hedef ciro</span>
-              <div class="kpi-value" id="pricingAnnualTargetVal">—</div>
-              <div class="kpi-meta" id="pricingAnnualTargetMeta">Aylık hedeflerin toplamı</div>
             </div>
           </div>
 
@@ -2366,104 +1649,6 @@
       </div>
     </div>
 
-    <!-- ======================================================= -->
-    <!-- TAB: ANALİZ MERKEZİ (CHATGPT EXPORT / PROMPT BUILDER)   -->
-    <!-- ======================================================= -->
-    <div id="tab-analysis" class="tab-content">
-      <section class="card analysis-hero" aria-labelledby="analysisTitle">
-        <div>
-          <span class="analysis-eyebrow">Karar destek paketi</span>
-          <h2 id="analysisTitle">🧠 ChatGPT Analiz Merkezi</h2>
-          <p>Seçtiğiniz dönem ve mülkler için kişisel veri içermeyen finans, rezervasyon ve kanal özetini üretin.</p>
-        </div>
-        <div class="analysis-privacy-note">
-          <strong>Gizlilik sınırı</strong>
-          <span>Misafir adı, telefon, e-posta, notlar ve sistem kimlikleri dışa aktarılmaz.</span>
-        </div>
-      </section>
-
-      <div class="analysis-layout">
-        <section class="card analysis-builder" aria-labelledby="analysisBuilderTitle">
-          <div class="section-title-bar">
-            <div>
-              <h2 id="analysisBuilderTitle">Analiz kapsamı</h2>
-              <p class="sub-text">Dönemi, karşılaştırmayı, mülkleri ve veri bölümlerini seçin.</p>
-            </div>
-          </div>
-
-          <div class="analysis-date-grid">
-            <div class="analysis-control">
-              <label for="analysisStartDate">Başlangıç tarihi</label>
-              <input class="analysis-field" type="date" id="analysisStartDate">
-            </div>
-            <div class="analysis-control">
-              <label for="analysisEndDate">Bitiş tarihi</label>
-              <input class="analysis-field" type="date" id="analysisEndDate">
-            </div>
-            <div class="analysis-control analysis-control-wide">
-              <label for="analysisComparison">Karşılaştırma</label>
-              <select class="analysis-field" id="analysisComparison">
-                <option value="PRIOR_YEAR">Geçen yılın aynı dönemi</option>
-                <option value="PREVIOUS_PERIOD">Önceki eşit dönem</option>
-                <option value="NONE">Karşılaştırma yok</option>
-              </select>
-            </div>
-          </div>
-
-          <fieldset class="analysis-choice-group">
-            <legend>Mülkler</legend>
-            <label class="analysis-check analysis-check-all">
-              <input type="checkbox" id="analysisAllProperties" checked data-onchange="toggleAnalysisProperties(this.checked)">
-              <span>Tüm aktif portföy</span>
-            </label>
-            <div id="analysisPropertyList" class="analysis-check-grid"></div>
-          </fieldset>
-
-          <fieldset class="analysis-choice-group">
-            <legend>Analiz bölümleri</legend>
-            <div id="analysisSectionList" class="analysis-check-grid">
-              <label class="analysis-check"><input type="checkbox" name="analysisSection" value="FINANCE" checked><span>Finansal performans</span></label>
-              <label class="analysis-check"><input type="checkbox" name="analysisSection" value="BOOKING_KPIS" checked><span>Rezervasyon KPI'ları</span></label>
-              <label class="analysis-check"><input type="checkbox" name="analysisSection" value="CHANNELS" checked><span>Kanal performansı</span></label>
-              <label class="analysis-check"><input type="checkbox" name="analysisSection" value="PROPERTIES" checked><span>Mülk bazlı performans</span></label>
-              <label class="analysis-check"><input type="checkbox" name="analysisSection" value="EXPENSES" checked><span>Giderler</span></label>
-              <label class="analysis-check"><input type="checkbox" name="analysisSection" value="INVESTMENTS" checked><span>Yatırımlar</span></label>
-            </div>
-          </fieldset>
-
-          <div id="analysisError" role="alert" hidden></div>
-          <button type="button" class="btn btn-primary analysis-generate-btn" id="analysisGenerateBtn" data-onclick="generateAnalysisExport()">
-            🧠 Analiz Paketini Oluştur
-          </button>
-          <p id="analysisStatus" role="status" aria-live="polite">Henüz analiz paketi oluşturulmadı.</p>
-        </section>
-
-        <section class="card analysis-output" aria-labelledby="analysisOutputTitle">
-          <div class="section-title-bar">
-            <div>
-              <h2 id="analysisOutputTitle">ChatGPT prompt önizlemesi</h2>
-              <p class="sub-text" id="analysisOutputMeta">Seçimlerinizden üretilecek güvenli metin burada görünür.</p>
-            </div>
-          </div>
-          <div class="analysis-summary" id="analysisSummary" hidden aria-label="Analiz paketi özeti">
-            <div><strong id="analysisSummaryProperties">0</strong><span>Mülk</span></div>
-            <div><strong id="analysisSummaryReservations">0</strong><span>Rezervasyon</span></div>
-            <div><strong id="analysisSummaryNights">0</strong><span>Satılan gece</span></div>
-            <div><strong id="analysisSummaryMetrics">0</strong><span>Finansal metrik</span></div>
-          </div>
-          <div class="analysis-empty-state" id="analysisEmptyState">
-            <span aria-hidden="true">✦</span>
-            <strong>Analize hazır</strong>
-            <p>Sol taraftan kapsamı seçip paketi oluşturun.</p>
-          </div>
-          <textarea class="analysis-prompt-preview" id="analysisPromptPreview" readonly hidden aria-label="ChatGPT analiz prompt önizlemesi"></textarea>
-          <div class="analysis-output-actions" id="analysisOutputActions" hidden>
-            <button type="button" class="btn btn-primary" id="analysisCopyBtn" data-onclick="copyAnalysisPrompt()">📋 Promptu Kopyala</button>
-          </div>
-        </section>
-      </div>
-    </div>
-
   </main>
 
   <button type="button" id="mobileQuickBookingBtn" class="btn btn-primary mobile-quick-booking" data-onclick="openQuickBookingModal()" aria-label="Hızlı rezervasyon" hidden><span aria-hidden="true">＋</span><span class="mobile-quick-booking__text"> Hızlı rezervasyon</span></button>
@@ -2487,9 +1672,9 @@
       </div>
       <div id="mobileMoreList" class="mobile-more-list"></div>
       <div class="mobile-more-list mobile-more-list--tools">
-        <button type="button" class="mobile-more-item" data-onclick="closeMobileMoreSheet(); openCommandPalette()">🔍 Ara / komut</button>
-        <button type="button" class="mobile-more-item" data-onclick="closeMobileMoreSheet(); openChatGptQuestionModal()">🧠 ChatGPT'ye sor</button>
-        <button type="button" class="mobile-more-item" data-onclick="closeMobileMoreSheet(); openHelpModal()">❓ Nasıl kullanılır?</button>
+        <button type="button" class="mobile-more-item" data-onclick="closeMobileMoreSheet(); openCommandPalette()">Ara / komut</button>
+        <button type="button" class="mobile-more-item" data-onclick="closeMobileMoreSheet(); openChatGptQuestionModal()">ChatGPT'ye sor</button>
+        <button type="button" class="mobile-more-item" data-onclick="closeMobileMoreSheet(); openHelpModal()">Nasıl kullanılır?</button>
       </div>
     </div>
   </div>
@@ -2501,7 +1686,7 @@
   <div class="modal-backdrop" id="bulkSummaryModal" role="dialog" aria-modal="true" aria-labelledby="bulkSummaryTitle">
     <div class="modal-card">
       <div class="modal-header">
-        <h3 id="bulkSummaryTitle">📦 Geçmiş ay toplu girişi</h3>
+        <h3 id="bulkSummaryTitle">Geçmiş ay toplu girişi</h3>
         <button class="close-btn" data-onclick="closeBulkSummaryModal()">&times;</button>
       </div>
       <form id="bulkSummaryForm" data-onsubmit="saveBulkSummary(event)">
@@ -2527,7 +1712,7 @@
   <div class="modal-backdrop" id="incomeModal">
     <div class="modal-card">
       <div class="modal-header">
-        <h3 id="incomeModalTitle">💰 Yeni Gelir Girişi</h3>
+        <h3 id="incomeModalTitle">Yeni Gelir Girişi</h3>
         <button class="close-btn" data-onclick="closeIncomeModal()">&times;</button>
       </div>
       <form id="incomeForm" data-onsubmit="saveIncomeEntry(event)">
@@ -2571,7 +1756,7 @@
   <div class="modal-backdrop" id="expenseModal">
     <div class="modal-card">
       <div class="modal-header">
-        <h3 id="expenseModalTitle">💸 Yeni Gider / Yatırım Girişi</h3>
+        <h3 id="expenseModalTitle">Yeni Gider / Yatırım Girişi</h3>
         <button class="close-btn" data-onclick="closeExpenseModal()">&times;</button>
       </div>
       <form id="expenseForm" data-onsubmit="saveExpense(event)">
@@ -2613,7 +1798,7 @@
               </select>
               <button type="button" class="btn btn-secondary btn-sm" data-onclick="createExpenseCategoryFromForm()">Ekle</button>
             </div>
-            <div id="expenseAdCategoryWarning" class="form-warning" hidden>Reklam harcamasını Kanallar ve Pazarlama’dan girin. Buraya da girerseniz gider iki kez sayılır.</div>
+            <div id="expenseAdCategoryWarning" class="form-warning" hidden>Reklam harcamasını Pazarlama’dan girin. Buraya da girerseniz gider iki kez sayılır.</div>
           </div>
           <div class="form-group">
             <label>İlgili Mülk / Kapsam</label>
@@ -2669,7 +1854,7 @@
   <div class="modal-backdrop" id="monthCloseModal">
     <div class="modal-card" data-lx-style="max-width: 560px;">
       <div class="modal-header">
-        <h3>🔒 Dönemi Kapat</h3>
+        <h3>Dönemi Kapat</h3>
         <button class="close-btn" data-onclick="closeMonthCloseModal()">&times;</button>
       </div>
       <form id="monthCloseForm" data-onsubmit="submitMonthClose(event)">
@@ -2700,7 +1885,7 @@
   <div class="modal-backdrop" id="monthReopenModal">
     <div class="modal-card" data-lx-style="max-width: 560px; border: 1px solid rgba(255, 159, 10, 0.45);">
       <div class="modal-header" data-lx-style="background: linear-gradient(135deg, rgba(255, 159, 10,0.18), rgba(120,53,15,0.1));">
-        <h3 data-lx-style="color:#FCD34D;">🔓 Dönemi Yeniden Aç</h3>
+        <h3 data-lx-style="color:#FCD34D;">Dönemi Yeniden Aç</h3>
         <button class="close-btn" data-onclick="closeMonthReopenModal()">&times;</button>
       </div>
       <form id="monthReopenForm" data-onsubmit="submitMonthReopen(event)">
@@ -2733,7 +1918,7 @@
   <div class="modal-backdrop" id="deleteAccountModal">
     <div class="modal-card" data-lx-style="max-width: 560px; border: 1px solid rgba(255, 69, 58, 0.45);">
       <div class="modal-header" data-lx-style="background: linear-gradient(135deg, rgba(255, 69, 58, 0.18), rgba(153, 27, 27, 0.1));">
-        <h3 data-lx-style="color: #FCA5A5;">⚠️ Hesabınızı Kalıcı Olarak Kapatın</h3>
+        <h3 data-lx-style="color: #FCA5A5;">Hesabınızı Kalıcı Olarak Kapatın</h3>
         <button class="close-btn" data-onclick="closeDeleteAccountModal()">&times;</button>
       </div>
       <form id="deleteAccountForm" data-onsubmit="submitAccountDeletion(event)">
@@ -2744,7 +1929,7 @@
 
           <div data-lx-style="background: rgba(255, 69, 58, 0.12); border: 1px dashed rgba(255, 69, 58, 0.4); border-radius: 6px; padding: 10px 12px; font-size: 11px; color: #FCA5A5; margin-bottom: 16px;">
             Bu işlem <strong>geri alınamaz</strong>. Silinen işletmelerin mülkleri, rezervasyonları, giderleri ve tüm geçmişi kalıcı olarak kaybolur.
-            İşletmenizi başkasına devretmek istiyorsanız, önce <strong>Ekip ve Rol Yönetimi</strong> bölümünden bir üyeyi <strong>Sahip</strong> yapın; o zaman işletme silinmez.
+            İşletmenizi başkasına devretmek istiyorsanız, önce <button type="button" class="lex-link-inline" data-onclick="selectSettingsSection('team')">Ekip ve roller</button> bölümünden bir üyeyi <strong>Sahip</strong> yapın; o zaman işletme silinmez.
           </div>
 
           <div class="form-group">
@@ -2769,7 +1954,7 @@
   <div class="modal-backdrop" id="memberPermissionsModal">
     <div class="modal-card" data-lx-style="max-width: 520px;">
       <div class="modal-header">
-        <h3 id="memberPermissionsTitle">🔐 İzinler</h3>
+        <h3 id="memberPermissionsTitle">İzinler</h3>
         <button class="close-btn" data-onclick="closeMemberPermissionsModal()">&times;</button>
       </div>
       <div data-lx-style="padding: 20px;">
@@ -2788,7 +1973,7 @@
   <div class="modal-backdrop" id="inviteMemberModal">
     <div class="modal-card" data-lx-style="max-width: 520px;">
       <div class="modal-header">
-        <h3>👥 Ekibe Üye Davet Et</h3>
+        <h3>Ekibe Üye Davet Et</h3>
         <button class="close-btn" data-onclick="closeInviteMemberModal()">&times;</button>
       </div>
       <form id="inviteMemberForm" data-onsubmit="submitMemberInvite(event)">
@@ -2818,7 +2003,7 @@
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-onclick="closeInviteMemberModal()">Vazgeç</button>
-          <button type="submit" class="btn btn-primary" id="inviteMemberSubmitBtn">✉️ Daveti Gönder</button>
+          <button type="submit" class="btn btn-primary" id="inviteMemberSubmitBtn">Daveti Gönder</button>
         </div>
       </form>
     </div>
@@ -2827,7 +2012,7 @@
   <div class="modal-backdrop" id="goalsModal">
     <div class="modal-card" data-lx-style="max-width: 540px;">
       <div class="modal-header">
-        <h3>🎯 Finansal Hedef Belirleme & Düzenleme</h3>
+        <h3>Finansal Hedef Belirleme & Düzenleme</h3>
         <button class="close-btn" data-onclick="closeGoalsModal()">&times;</button>
       </div>
       <form id="goalsForm" data-onsubmit="saveMonthlyGoals(event)">
@@ -2841,7 +2026,7 @@
 
           <div class="form-group" data-lx-style="margin-bottom: 16px;">
             <div data-lx-style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-              <label data-lx-style="font-weight: 700; color: #FFFFFF; font-size: 13px;">🎯 Aylık Hedef Ciro (TL)</label>
+              <label data-lx-style="font-weight: 700; color: #FFFFFF; font-size: 13px;">Aylık Hedef Ciro (TL)</label>
               <span id="goalRevenueHint" data-lx-style="font-size: 11px; color: #93C5FD;"></span>
             </div>
             <input type="number" id="goalRevenue" min="0.01" step="0.01" required data-oninput="autoCalculateGoalSubmetrics()" data-lx-style="font-size: 16px; font-weight: 700; padding: 12px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff;">
@@ -2850,13 +2035,13 @@
 
           <div data-lx-style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
             <div class="form-group">
-              <label data-lx-style="font-size: 12px; font-weight: 600;">🌙 Hedef Gece Sayısı</label>
+              <label data-lx-style="font-size: 12px; font-weight: 600;">Hedef Gece Sayısı</label>
               <input type="number" id="goalOccupancyNights" min="1" step="1" placeholder="Örn: 75" data-oninput="autoCalculateGoalAdr()" data-lx-style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
               <span data-lx-style="font-size: 11px; color: var(--text-muted); margin-top: 3px; display: block;">Tahmini doluluk: <strong id="goalCalcOccLabel" data-lx-style="color:#409CFF;">—</strong></span>
               <span id="goalCapacityWarning" role="alert" data-lx-style="display:none; font-size: 11px; color: #FCA5A5; margin-top: 3px;"></span>
             </div>
             <div class="form-group">
-              <label data-lx-style="font-size: 12px; font-weight: 600;">🏷️ Hedef Ortalama ADR</label>
+              <label data-lx-style="font-size: 12px; font-weight: 600;">Hedef Ortalama ADR</label>
               <input type="number" id="goalADR" min="0.01" step="0.01" placeholder="Örn: 6.000" data-oninput="autoCalculateGoalNights()" data-lx-style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
               <span data-lx-style="font-size: 11px; color: var(--text-muted); margin-top: 3px; display: block;">Gecelik ortalama fiyat</span>
             </div>
@@ -2864,19 +2049,19 @@
 
           <div data-lx-style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
             <div class="form-group">
-              <label for="goalMarginPct" data-lx-style="font-size: 12px; font-weight: 600;">📈 Hedef kâr marjı (%)</label>
+              <label for="goalMarginPct" data-lx-style="font-size: 12px; font-weight: 600;">Hedef kâr marjı (%)</label>
               <input type="number" id="goalMarginPct" min="0" max="100" step="0.01" inputmode="decimal" placeholder="Örn: 35" data-oninput="syncGoalProfitFromMargin()" data-lx-style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
               <span data-lx-style="font-size: 11px; color: var(--text-muted); margin-top: 3px; display: block;">Ciro hedefinin yüzdesi; tutar kendiliğinden hesaplanır</span>
             </div>
             <div class="form-group">
-              <label for="goalNetProfit" data-lx-style="font-size: 12px; font-weight: 600;">💵 Hedef Net Kâr (TL)</label>
+              <label for="goalNetProfit" data-lx-style="font-size: 12px; font-weight: 600;">Hedef Net Kâr (TL)</label>
               <input type="number" id="goalNetProfit" min="0" step="0.01" data-oninput="syncGoalMarginFromProfit()" data-lx-style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
               <span id="goalNetProfitHint" data-lx-style="font-size: 11px; color: #30D158; margin-top: 3px; display: block;">—</span>
             </div>
           </div>
           <div data-lx-style="display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 8px;">
             <div class="form-group">
-              <label data-lx-style="font-size: 12px; font-weight: 600;">💸 Hedef Gider Bütçesi Tavanı (TL)</label>
+              <label data-lx-style="font-size: 12px; font-weight: 600;">Hedef Gider Bütçesi Tavanı (TL)</label>
               <input type="number" id="goalMaxExpense" min="0" step="0.01" readonly aria-readonly="true" data-lx-style="padding: 10px; width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff;">
               <span data-lx-style="font-size: 11px; color: #FCA5A5; margin-top: 3px; display: block;">Hedef ciro − hedef net kâr. Planlama değeridir; gerçekleşen muhasebe gideri değildir.</span>
             </div>
@@ -2885,7 +2070,7 @@
 
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-onclick="closeGoalsModal()">Vazgeç</button>
-          <button type="submit" class="btn btn-primary" data-lx-style="padding: 10px 24px;">💾 Hedefleri Kaydet</button>
+          <button type="submit" class="btn btn-primary" data-lx-style="padding: 10px 24px;">Hedefleri Kaydet</button>
         </div>
       </form>
     </div>
@@ -2913,26 +2098,26 @@
         <div data-lx-style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
           <div data-lx-style="width: 100%;">
             <span data-lx-style="font-size: 11px; color: #C7C7CC; font-weight: 600; display: block; margin-bottom: 6px;">
-              📋 Kendi mülk kodlarınızla hazır şablon:
+              Kendi mülk kodlarınızla hazır şablon:
             </span>
             <div data-lx-style="display: flex; gap: 6px; flex-wrap: wrap;">
               <button type="button" class="btn btn-secondary btn-sm" data-onclick="downloadSampleTemplate('BOOKINGS')" data-lx-style="font-size: 11px; padding: 4px 8px; border-color: #0A84FF; color: #93C5FD;">
-                📥 Rezervasyon Şablonu (.xlsx)
+                Rezervasyon Şablonu (.xlsx)
               </button>
               <button type="button" class="btn btn-secondary btn-sm" data-onclick="downloadSampleTemplate('EXPENSES')" data-lx-style="font-size: 11px; padding: 4px 8px; border-color: #FF453A; color: #FCA5A5;">
-                📥 Gider Şablonu (.xlsx)
+                Gider Şablonu (.xlsx)
               </button>
               <button type="button" class="btn btn-secondary btn-sm" data-onclick="downloadSampleTemplate('CLEANING')" data-lx-style="font-size: 11px; padding: 4px 8px; border-color: #30D158; color: #6EE7B7;" title="Lexbnb'ye geçmeden önceki temizliklerin personel maliyeti">
-                📥 Geçmiş Temizlik Şablonu (.xlsx)
+                Geçmiş Temizlik Şablonu (.xlsx)
               </button>
             </div>
             <!-- L-194 (M24): dogru degerleri gormek ve kendi tablosunu sablona cevirmek. -->
             <div data-lx-style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px;">
-              <button type="button" class="btn btn-secondary btn-sm" data-onclick="openImportConvertPrompt('BOOKINGS')" data-lx-style="font-size: 11px; padding: 4px 8px;">🧠 Rezervasyon tablomu şablona çevir (ChatGPT)</button>
-              <button type="button" class="btn btn-secondary btn-sm" data-onclick="openImportConvertPrompt('EXPENSES')" data-lx-style="font-size: 11px; padding: 4px 8px;">🧠 Gider tablomu şablona çevir (ChatGPT)</button>
+              <button type="button" class="btn btn-secondary btn-sm" data-onclick="openImportConvertPrompt('BOOKINGS')" data-lx-style="font-size: 11px; padding: 4px 8px;">Rezervasyon tablomu şablona çevir (ChatGPT)</button>
+              <button type="button" class="btn btn-secondary btn-sm" data-onclick="openImportConvertPrompt('EXPENSES')" data-lx-style="font-size: 11px; padding: 4px 8px;">Gider tablomu şablona çevir (ChatGPT)</button>
             </div>
             <details id="importValidValuesBox" data-lx-style="margin-top: 8px; font-size: 11px; color: #C7C7CC;">
-              <summary data-lx-style="cursor: pointer; font-weight: 600;">📋 Geçerli değerler — mülk kodları, kanallar, gider kategorileri (yanlış yazılan satır kaydedilmez)</summary>
+              <summary data-lx-style="cursor: pointer; font-weight: 600;">Geçerli değerler — mülk kodları, kanallar, gider kategorileri (yanlış yazılan satır kaydedilmez)</summary>
               <div id="importValidValues" data-lx-style="margin-top: 6px;"></div>
               <button type="button" class="btn btn-secondary btn-sm" data-onclick="copyImportValidValues()" data-lx-style="font-size: 11px; padding: 4px 8px; margin-top: 6px;">Listeyi kopyala</button>
             </details>
@@ -2944,7 +2129,7 @@
                tasidigi icin daha kolaydir. -->
           <div data-lx-style="width: 100%; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 8px; margin-top: 2px;">
             <span data-lx-style="font-size: 11px; color: #98989D; font-weight: 600; display: block; margin-bottom: 6px;">
-              🔗 Boş örnek şablon (paylaşılabilir — giriş gerektirmez):
+              Boş örnek şablon (paylaşılabilir — giriş gerektirmez):
             </span>
             <div data-lx-style="display: flex; gap: 12px; flex-wrap: wrap; font-size: 11px;">
               <span data-lx-style="color: #6E6E73;">Rezervasyon:
@@ -2991,11 +2176,11 @@
             <div data-lx-style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px;">
               <label data-lx-style="font-size: 12px; color: #C7C7CC; font-weight: 600;">Veri Türü:</label>
               <select id="importModeSelect" data-onchange="changeImportMode(this.value)" data-lx-style="padding: 6px 10px; background: #2C2C2E; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #fff; font-size: 12px; font-weight: 700;">
-                <option value="AUTO">🤖 Otomatik Algıla</option>
-                <option value="COMPANY_REPORT">🏆 Şirket Genel Raporu (GENEL / GDR / RPR / HDF)</option>
-                <option value="BOOKINGS">📋 Rezervasyon Defteri (Ciro & Geceleme)</option>
-                <option value="EXPENSES">💸 Gider Defteri (Harcama & Masraflar)</option>
-                <option value="CLEANING">🧹 Geçmiş Temizlikler (personel maliyeti)</option>
+                <option value="AUTO">Otomatik Algıla</option>
+                <option value="COMPANY_REPORT">Şirket Genel Raporu (GENEL / GDR / RPR / HDF)</option>
+                <option value="BOOKINGS">Rezervasyon Defteri (Ciro & Geceleme)</option>
+                <option value="EXPENSES">Gider Defteri (Harcama & Masraflar)</option>
+                <option value="CLEANING">Geçmiş Temizlikler (personel maliyeti)</option>
               </select>
 
             </div>
@@ -3029,7 +2214,7 @@
                olarak bu ekranda fark ediyor. Bicim kontrolleri bozuk BICIMI
                yakalar; yanlis DOSYA hicbir kapiya takilmaz. -->
           <div id="importHistoryBox" data-lx-style="display: none; margin-top: 18px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 12px;">
-            <div data-lx-style="font-size: 11px; color: #C7C7CC; font-weight: 700; margin-bottom: 6px;">🕘 Son İçe Aktarımlar</div>
+            <div data-lx-style="font-size: 11px; color: #C7C7CC; font-weight: 700; margin-bottom: 6px;">Son İçe Aktarımlar</div>
             <p id="importHistoryMessage" role="status" hidden data-lx-style="font-size: 12px; margin: 0 0 6px;"></p>
             <div id="importHistoryList"></div>
             <div data-lx-style="font-size: 11px; color: #6E6E73; margin-top: 6px; line-height: 1.5;">
@@ -3042,7 +2227,7 @@
       </div>
 
       <div class="modal-footer" data-lx-style="display: flex; justify-content: space-between; align-items: center;">
-        <span data-lx-style="font-size: 11px; color: var(--text-muted);">💡 Excel başlıklarınız farklı olsa dahi sistem akıllı eşleştirme yapar.</span>
+        <span data-lx-style="font-size: 11px; color: var(--text-muted);">Excel başlıklarınız farklı olsa dahi sistem akıllı eşleştirme yapar.</span>
         <button type="button" class="btn btn-secondary" data-onclick="closeImportModal()">Kapat</button>
       </div>
     </div>
@@ -3054,7 +2239,7 @@
   <div class="modal-backdrop" id="guestProfileModal">
     <div class="modal-card guest-side-panel" data-lx-style="max-width:760px;">
       <div class="modal-header">
-        <h3 id="guestProfileModalTitle">👤 Misafir Profili</h3>
+        <h3 id="guestProfileModalTitle">Misafir Profili</h3>
         <button class="close-btn" data-onclick="closeGuestProfileModal()" aria-label="Kapat">&times;</button>
       </div>
       <form id="guestProfileForm" data-onsubmit="saveGuestProfile(event)">
@@ -3094,13 +2279,13 @@
         <div id="guestProfileInsights" data-lx-style="display:none; margin-top:14px; padding-top:14px; border-top:1px solid rgba(255,255,255,.08);"></div>
         <div id="guestRebookingAction" data-lx-style="display:none; margin-top:14px; padding:12px; border-radius:10px; background:rgba(48, 209, 88,.08); border:1px solid rgba(48, 209, 88,.25);"></div>
         <div class="form-group" id="guestMarketingRow" hidden data-lx-style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:0 16px 12px;">
-          <label for="guestMarketingTemplate" data-lx-style="margin:0;">📣 Kampanya mesajı</label>
+          <label for="guestMarketingTemplate" data-lx-style="margin:0;">Kampanya mesajı</label>
           <select id="guestMarketingTemplate" data-lx-style="flex:1; min-width:180px;"></select>
           <button type="button" class="btn btn-secondary btn-sm" data-onclick="sendGuestMarketingMessage()">WhatsApp'ta aç</button>
           <span class="sub-text" data-lx-style="flex-basis:100%;">Yalnız kampanya izni ve WhatsApp izni olan misafire gönderilir.</span>
         </div>
         <div class="modal-footer" data-lx-style="display:flex; justify-content:flex-end; gap:10px;">
-          <button type="button" class="btn btn-danger" id="guestProfileEraseBtn" hidden data-lx-style="margin-right:auto;" data-onclick="eraseGuestPersonalData()">🗑️ Kalıcı sil (KVKK)</button>
+          <button type="button" class="btn btn-danger" id="guestProfileEraseBtn" hidden data-lx-style="margin-right:auto;" data-onclick="eraseGuestPersonalData()">Kalıcı sil (KVKK)</button>
           <button type="button" class="btn btn-secondary" data-onclick="closeGuestProfileModal()">Vazgeç</button>
           <button type="submit" class="btn btn-primary">Misafiri Kaydet</button>
         </div>
@@ -3114,36 +2299,36 @@
   <div class="modal-backdrop" id="bookingModal" role="dialog" aria-modal="true" aria-labelledby="bookingModalTitle">
     <div class="modal-card">
       <div class="modal-header">
-        <h3 id="bookingModalTitle">➕ Rezervasyon Girişi</h3>
+        <h3 id="bookingModalTitle">Rezervasyon Girişi</h3>
         <button type="button" class="close-btn" aria-label="Rezervasyon penceresini kapat" data-onclick="closeBookingModal()">&times;</button>
       </div>
-      <form id="bookingForm" data-onsubmit="saveBooking(event)">
+      <form id="bookingForm" novalidate data-onsubmit="saveBooking(event)">
         <input type="hidden" id="resEditId">
         <input type="hidden" id="resGuestId">
         <div class="booking-essential-grid">
           <div class="form-group">
-            <label for="resVilla">Villa Seçin</label>
+            <label for="resVilla">Villa</label>
             <select id="resVilla" required data-onchange="handleBookingPropertyFinanceChange()">
               <!-- updateAllVillaDropdowns() musterinin mulkleriyle doldurur -->
             </select>
           </div>
           <div class="form-group">
-            <label for="resGuest">Misafir Adı</label>
+            <label for="resGuest">Misafir adı</label>
             <input type="text" id="resGuest" placeholder="Örn: Ahmet Yılmaz" required autocomplete="name">
           </div>
           <!-- Misafir defteri kisiyi telefon/e-postayla tanir (phase27); alanlar
                "Istege bagli ayrintilar" icinde saklıydi, profil hic olusmuyordu (G9 M50). -->
           <div class="form-group">
-            <label for="resGuestPhone">Misafir Telefonu</label>
+            <label for="resGuestPhone">Misafir telefonu</label>
             <input type="tel" inputmode="tel" id="resGuestPhone" placeholder="Örn: 0532 123 45 67" autocomplete="tel">
             <small class="field-note">Telefon veya e-posta girilirse misafir, Misafirler defterine eklenir; tekrar gelişleri tanınır.</small>
           </div>
           <div class="form-group">
-            <label for="resGuestEmail">Misafir E-postası</label>
+            <label for="resGuestEmail">Misafir e-postası</label>
             <input type="email" inputmode="email" id="resGuestEmail" placeholder="ornek@email.com" autocomplete="email">
           </div>
           <div class="form-group daterange-group">
-            <label for="resDateRangeBtn">Konaklama Tarihleri</label>
+            <label for="resDateRangeBtn">Konaklama tarihleri</label>
             <button type="button" id="resDateRangeBtn" class="daterange-trigger" data-onclick="toggleResDatePicker()" aria-haspopup="dialog" aria-expanded="false">
               <span class="daterange-leg">
                 <span class="daterange-cap">Giriş</span>
@@ -3172,15 +2357,15 @@
             <input type="hidden" id="resCheckOut">
           </div>
           <div class="form-group">
-            <label for="resGross">Brüt Tutar (₺)</label>
+            <label for="resGross">Brüt tutar (₺)</label>
             <input type="number" step="0.01" inputmode="decimal" id="resGross" placeholder="Örn: 40000" required data-oninput="handleBookingGrossFinanceInput()">
             <small id="resGrossExplanation" class="field-note">Temizlik geliri bu tutara dahildir. İndirim ayrıca düşülür.</small>
             <small id="resPriceCalendarHint" class="field-note" data-lx-style="display:none"></small>
           </div>
           <div class="form-group" id="resDepositGroup">
-            <label for="resDeposit">Alınan Kapora (₺)</label>
+            <label for="resDeposit">Alınan kapora (₺)</label>
             <div data-lx-style="display:flex; gap:6px;">
-              <input type="number" inputmode="decimal" id="resDeposit" min="0" step="0.01" placeholder="Alınmadıysa boş bırakın" data-lx-style="flex:1;">
+              <input type="number" inputmode="decimal" id="resDeposit" min="0" step="0.01" placeholder="Alınmadıysa boş" data-lx-style="flex:1;">
               <select id="resDepositMethod" aria-label="Kapora ödeme yöntemi" data-lx-style="max-width:130px;">
                 <option value="">Yöntem —</option>
                 <option value="BANK_TRANSFER">Havale/EFT</option>
@@ -3193,11 +2378,11 @@
             <small class="field-note">Ödeme takibine "Kapora" olarak yazılır; ciroyu değiştirmez. Sonraki ödemeler rezervasyon ayrıntısındaki <strong>Ödeme takibi</strong>nden girilir.</small>
           </div>
           <div class="form-group">
-            <label for="resPax">Kişi Sayısı</label>
+            <label for="resPax">Kişi sayısı</label>
             <input type="number" inputmode="numeric" id="resPax" min="1" step="1" required placeholder="Kişi sayısını girin">
           </div>
           <div class="form-group">
-            <label for="resChannel">Rezervasyon Kanalı</label>
+            <label for="resChannel">Rezervasyon kanalı</label>
             <select id="resChannel" required data-onchange="handleBookingChannelChange()">
               <option value="WHATSAPP">WhatsApp (Direkt - %0)</option>
               <option value="AIRBNB">Airbnb (OTA)</option>
@@ -3314,7 +2499,7 @@
         </div>
 
         <div class="modal-footer" data-lx-style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-          <button type="button" id="resDeleteBtn" class="btn btn-danger" data-lx-style="display: none; background: #FF453A; border: none; font-size: 12px; padding: 8px 14px; border-radius: 6px; color: #fff; cursor: pointer;" data-onclick="handleBookingDeleteFromModal()">🗑️ Rezervasyonu Sil</button>
+          <button type="button" id="resDeleteBtn" class="btn btn-danger" data-lx-style="display: none; background: #FF453A; border: none; font-size: 12px; padding: 8px 14px; border-radius: 6px; color: #fff; cursor: pointer;" data-onclick="handleBookingDeleteFromModal()">Rezervasyonu Sil</button>
           <button type="button" id="resCancelBtn" class="btn btn-secondary" hidden data-onclick="cancelBookingFromModal()">Rezervasyonu iptal et</button>
           <div data-lx-style="display: flex; gap: 10px; margin-left: auto;">
             <button type="button" class="btn btn-secondary" data-onclick="closeBookingModal()">Vazgeç</button>
@@ -3331,7 +2516,7 @@
   <div class="modal-backdrop" id="leadModal">
     <div class="modal-card">
       <div class="modal-header">
-        <h3 id="leadModalTitle">✏️ Talebi düzenle</h3>
+        <h3 id="leadModalTitle">Talebi düzenle</h3>
         <button class="close-btn" data-onclick="closeLeadModal()">&times;</button>
       </div>
       <form id="leadForm" data-onsubmit="saveLead(event)">
@@ -3432,7 +2617,7 @@
   <div class="modal-backdrop" id="maintModal">
     <div class="modal-card">
       <div class="modal-header">
-        <h3 id="maintModalTitle">🛠️ Arıza / Bakım İşi</h3>
+        <h3 id="maintModalTitle">Arıza / Bakım İşi</h3>
         <button class="close-btn" data-onclick="closeMaintModal()">&times;</button>
       </div>
       <form id="maintForm" data-onsubmit="saveMaint(event)">
@@ -3515,13 +2700,13 @@
       </div>
 
       <div class="help-tabs-nav" data-lx-style="display: flex; overflow-x: auto; gap: 6px; padding: 10px 16px; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.08);">
-        <button class="help-tab-btn active" id="helpTabBtn-setup" data-onclick="switchHelpTab('setup')">🚀 İlk kurulum</button>
-        <button class="help-tab-btn" id="helpTabBtn-daily" data-onclick="switchHelpTab('daily')">📍 Günlük kullanım</button>
-        <button class="help-tab-btn" id="helpTabBtn-ops" data-onclick="switchHelpTab('ops')">🧹 Operasyon ve temizlik</button>
-        <button class="help-tab-btn" id="helpTabBtn-money" data-onclick="switchHelpTab('money')">💰 Para ve ay sonu</button>
-        <button class="help-tab-btn" id="helpTabBtn-reports" data-onclick="switchHelpTab('reports')">📄 Raporlar ve ChatGPT</button>
-        <button class="help-tab-btn" id="helpTabBtn-terms" data-onclick="switchHelpTab('terms')">📖 Terimler</button>
-        <button class="help-tab-btn" id="helpTabBtn-data" data-onclick="switchHelpTab('data')">🔄 Veri ve sıfırlama</button>
+        <button class="help-tab-btn active" id="helpTabBtn-setup" data-onclick="switchHelpTab('setup')">İlk kurulum</button>
+        <button class="help-tab-btn" id="helpTabBtn-daily" data-onclick="switchHelpTab('daily')">Günlük kullanım</button>
+        <button class="help-tab-btn" id="helpTabBtn-ops" data-onclick="switchHelpTab('ops')">Operasyon ve temizlik</button>
+        <button class="help-tab-btn" id="helpTabBtn-money" data-onclick="switchHelpTab('money')">Para ve ay sonu</button>
+        <button class="help-tab-btn" id="helpTabBtn-reports" data-onclick="switchHelpTab('reports')">Raporlar ve ChatGPT</button>
+        <button class="help-tab-btn" id="helpTabBtn-terms" data-onclick="switchHelpTab('terms')">Terimler</button>
+        <button class="help-tab-btn" id="helpTabBtn-data" data-onclick="switchHelpTab('data')">Veri ve sıfırlama</button>
       </div>
 
       <div data-lx-style="padding: 20px; overflow-y: auto; flex: 1;">
@@ -3534,36 +2719,36 @@
             <div class="step-num-icon">1</div>
             <div class="step-body">
               <h4>İşletme bilgileri ve logo</h4>
-              <p><strong>⚙️ Ayarlar → İşletme</strong> bölümünde işletme adını yazın ve logonuzu yükleyin. Logo üst çubukta ve indirdiğiniz raporlarda görünür.</p>
+              <p><strong>Ayarlar → İşletme</strong> bölümünde işletme adını yazın ve logonuzu yükleyin. Logo üst çubukta ve indirdiğiniz raporlarda görünür.</p>
             </div>
           </div>
           <div class="help-step-item">
             <div class="step-num-icon">2</div>
             <div class="step-body">
               <h4>Mülkler</h4>
-              <p><strong>🏡 Mülkler</strong> sekmesinden her mülkü ekleyin. <strong>Faaliyete başlama tarihi</strong> önemlidir: doluluk ve RevPAR bu tarihten itibaren hesaplanır. Mülk profilinde <strong>Fiyat basamaklarını düzenle</strong> ile fiyatlarınızı girin; boş bıraktığınız basamak "girilmedi" sayılır, uygulama yerine fiyat uydurmaz.</p>
+              <p><strong>Mülkler</strong> sekmesinden her mülkü ekleyin. <strong>Faaliyete başlama tarihi</strong> önemlidir: doluluk ve RevPAR bu tarihten itibaren hesaplanır. Mülk profilinde <strong>Fiyat basamaklarını düzenle</strong> ile fiyatlarınızı girin; boş bıraktığınız basamak "girilmedi" sayılır, uygulama yerine fiyat uydurmaz.</p>
             </div>
           </div>
           <div class="help-step-item">
             <div class="step-num-icon">3</div>
             <div class="step-body">
               <h4>Rezervasyon kanalları ve komisyonlar</h4>
-              <p><strong>⚙️ Ayarlar → Rezervasyon Kanalları ve OTA Komisyonları</strong> bölümünde çalıştığınız kanalları ve komisyon oranlarını tanımlayın. Komisyonlar ciroyu azaltmaz, gider olarak yazılır.</p>
+              <p><strong>Ayarlar → Rezervasyon Kanalları ve OTA Komisyonları</strong> bölümünde çalıştığınız kanalları ve komisyon oranlarını tanımlayın. Komisyonlar ciroyu azaltmaz, gider olarak yazılır.</p>
             </div>
           </div>
           <div class="help-step-item">
             <div class="step-num-icon">4</div>
             <div class="step-body">
               <h4>Ekip ve roller</h4>
-              <p><strong>⚙️ Ayarlar → Ekip ve Rol Yönetimi</strong> bölümünden ekip arkadaşlarınızı e-postayla davet edin. Roller: <strong>Yönetici</strong> her şeyi görür; <strong>Satış</strong> talepleri ve rezervasyonları yönetir, finansı görmez; <strong>Saha personeli</strong> yalnızca kendisine atanan işleri görür; <strong>İzleyici</strong> okur ama değiştiremez.</p>
-              <span class="step-tip">💡 Temizlikçi ve ustalar <strong>🧹 Operasyon → 👷 Saha ekibi</strong> bölümünden eklenir. Temizlikçiye görev atamak için: (1) onu <strong>Personel</strong> rolüyle davet edin, (2) daveti kabul edince ekip listesinde <strong>Saha ekibine ekle</strong>'ye basın, (3) Operasyon → Temizlik'te görevin yanındaki <strong>Temizlikçi seç → Ata</strong> ile işi verin. Temizlikçi kontrol listesini telefonundan işaretleyip imzalar (Z), siz denetleyip onaylarsınız (M). Hesabı olmayan personelin işini doğrudan "Kontrol ettim, yapıldı" ile kapatırsınız. Ustanın hesabı gerekmez; arızada <strong>Usta seç → Usta ata</strong> ile atanır.</span>
+              <p><strong>Ayarlar → Ekip ve Rol Yönetimi</strong> bölümünden ekip arkadaşlarınızı e-postayla davet edin. Roller: <strong>Yönetici</strong> her şeyi görür; <strong>Satış</strong> talepleri ve rezervasyonları yönetir, finansı görmez; <strong>Saha personeli</strong> yalnızca kendisine atanan işleri görür; <strong>İzleyici</strong> okur ama değiştiremez.</p>
+              <span class="step-tip">Temizlikçi ve ustalar <strong>Operasyon → 👷 Saha ekibi</strong> bölümünden eklenir. Temizlikçiye görev atamak için: (1) onu <strong>Personel</strong> rolüyle davet edin, (2) daveti kabul edince ekip listesinde <strong>Saha ekibine ekle</strong>'ye basın, (3) Operasyon → Temizlik'te görevin yanındaki <strong>Temizlikçi seç → Ata</strong> ile işi verin. Temizlikçi kontrol listesini telefonundan işaretleyip imzalar (Z), siz denetleyip onaylarsınız (M). Hesabı olmayan personelin işini doğrudan "Kontrol ettim, yapıldı" ile kapatırsınız. Ustanın hesabı gerekmez; arızada <strong>Usta seç → Usta ata</strong> ile atanır.</span>
             </div>
           </div>
           <div class="help-step-item">
             <div class="step-num-icon">5</div>
             <div class="step-body">
               <h4>Şablonlar ve talep kaynakları</h4>
-              <p><strong>⚙️ Ayarlar → Şablonlar</strong> bölümünde mesaj şablonlarını, görev şablonlarını ve temizlik kontrol listelerini hazırlayın. <strong>Talep Kaynakları</strong> bölümünde müşterilerin size nereden ulaştığını (Instagram, tavsiye…) tanımlayın.</p>
+              <p><strong>Ayarlar → Şablonlar</strong> bölümünde mesaj şablonlarını, görev şablonlarını ve temizlik kontrol listelerini hazırlayın. <strong>Talep Kaynakları</strong> bölümünde müşterilerin size nereden ulaştığını (Instagram, tavsiye…) tanımlayın.</p>
             </div>
           </div>
         </div>
@@ -3573,7 +2758,7 @@
           <div class="help-step-item">
             <div class="step-num-icon">1</div>
             <div class="step-body">
-              <h4>Güne 📍 Bugün ile başlayın</h4>
+              <h4>Güne Bugün ile başlayın</h4>
               <p>Bugün sekmesi bugünkü girişleri, çıkışları, planlı temizlikleri, açık arızaları ve aranacak talepleri tek ekranda gösterir. Önce ilk sıradaki eylemleri bitirin.</p>
             </div>
           </div>
@@ -3581,21 +2766,21 @@
             <div class="step-num-icon">2</div>
             <div class="step-body">
               <h4>Rezervasyon eklemek</h4>
-              <p>Bilgisayarda üstteki <strong>Hızlı Ekle</strong> menüsünü, telefonda ekranın altındaki <strong>＋ Hızlı rezervasyon</strong> düğmesini kullanın. Kayıt sırasında çıkış temizliği otomatik olarak <strong>planlanır</strong>.</p>
+              <p>Bilgisayarda üstteki <strong>Hızlı Ekle</strong> menüsünü, telefonda ekranın altındaki <strong>Hızlı rezervasyon</strong> düğmesini kullanın. Kayıt sırasında çıkış temizliği otomatik olarak <strong>planlanır</strong>.</p>
             </div>
           </div>
           <div class="help-step-item">
             <div class="step-num-icon">3</div>
             <div class="step-body">
               <h4>WhatsApp mesajından kayıt</h4>
-              <p><strong>💬 WhatsApp Ayrıştır</strong> penceresine misafirin mesajını yapıştırın. Ad, telefon ve tarihler ayrıştırılır; kontrol edip <strong>talep</strong> ya da <strong>rezervasyon</strong> olarak kaydedersiniz.</p>
+              <p><strong>WhatsApp Ayrıştır</strong> penceresine misafirin mesajını yapıştırın. Ad, telefon ve tarihler ayrıştırılır; kontrol edip <strong>talep</strong> ya da <strong>rezervasyon</strong> olarak kaydedersiniz.</p>
             </div>
           </div>
           <div class="help-step-item">
             <div class="step-num-icon">4</div>
             <div class="step-body">
               <h4>Talepleri satışa çevirmek</h4>
-              <p><strong>🤝 Misafirler ve Satış</strong> sekmesinde her talebin bir sonraki arama zamanını girin; zamanı gelenler Bugün ekranına düşer. Satış gerçekleşince talebi rezervasyona dönüştürün; kaybedilen talepte nedeni seçin.</p>
+              <p><strong>Misafirler ve Satış</strong> sekmesinde her talebin bir sonraki arama zamanını girin; zamanı gelenler Bugün ekranına düşer. Satış gerçekleşince talebi rezervasyona dönüştürün; kaybedilen talepte nedeni seçin.</p>
             </div>
           </div>
         </div>
@@ -3607,7 +2792,7 @@
             <div class="step-num-icon">1</div>
             <div class="step-body">
               <h4>Planlı</h4>
-              <p>Rezervasyon kaydedilince çıkış günü için temizlik görevi açılır. <strong>🧹 Operasyon</strong> sekmesinde görevi bir personele atayın. Planlı görev henüz gider ya da borç değildir.</p>
+              <p>Rezervasyon kaydedilince çıkış günü için temizlik görevi açılır. <strong>Operasyon</strong> sekmesinde görevi bir personele atayın. Planlı görev henüz gider ya da borç değildir.</p>
             </div>
           </div>
           <div class="help-step-item">
@@ -3629,7 +2814,7 @@
             <div class="step-body">
               <h4>Ödeme ayrı bir adımdır</h4>
               <p>Personele ödeme yaptığınızda <strong>Ödendi</strong> olarak işaretleyin. Bu yalnızca borcu kapatır; gideri ikinci kez yazmaz.</p>
-              <span class="step-tip">💡 Tarihi geçmiş ya da kontrol bekleyen işler Operasyon ekranının en üstünde ayrı listelenir. Kontrol bekleyen iş varken o ay kapatılamaz.</span>
+              <span class="step-tip">Tarihi geçmiş ya da kontrol bekleyen işler Operasyon ekranının en üstünde ayrı listelenir. Kontrol bekleyen iş varken o ay kapatılamaz.</span>
             </div>
           </div>
           <p data-lx-style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 14px;">
@@ -3642,19 +2827,19 @@
           <ul data-lx-style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.7; padding-left: 20px;">
             <li><strong>Ciro</strong> = net konaklama geliri: brüt tutardan misafirden alınan temizlik ücreti ve indirim çıkarılır. Temizlik ücreti ayrı bir gelir kalemidir.</li>
             <li>Ay sınırını geçen bir rezervasyonun geliri <strong>gecelere bölünür</strong>; her ay yalnızca kendi gecelerinin payını alır.</li>
-            <li><strong>Giderler:</strong> elle girdiğiniz giderler, OTA ve ödeme komisyonları ve onaylanmış temizlik maliyetleri. Kira, aidat gibi her ay tekrarlayan giderleri <strong>💰 Finans → Gider Şablonları</strong> ile tek tıkla oluşturun.</li>
-            <li><strong>Reklam harcaması:</strong> <strong>📈 Kanallar ve Pazarlama → Reklamlar</strong> bölümünde iki adımda girilir: (1) <strong>Kampanya oluştur</strong> — adı, platformu ve isterseniz <strong>günlük bütçe sınırını</strong> yazın (üst sınırdır, her gün o kadar harcamak zorunda değilsiniz); (2) <strong>Reklam dönemi ekle</strong> — reklam panelindeki harcama, gösterim, tıklama ve mesaj rakamlarını girin. Gider Finans'a ilgili aylara bölünerek yazılır. Dönemler tabloda görünür; <strong>Kendi metriğini ekle</strong> ile iki alanı bölüp çarparak kendi sütununuzu oluşturabilirsiniz.</li>
+            <li><strong>Giderler:</strong> elle girdiğiniz giderler, OTA ve ödeme komisyonları ve onaylanmış temizlik maliyetleri. Kira, aidat gibi her ay tekrarlayan giderleri <strong>Finans → Gider Şablonları</strong> ile tek tıkla oluşturun.</li>
+            <li><strong>Reklam harcaması:</strong> <strong>Pazarlama → Reklam raporu yükle</strong>: Meta (Instagram/Facebook) ya da Google Ads'ten indirdiğiniz kampanya raporunu kutuya bırakın; hangi platform olduğu dosyadan anlaşılır, kampanyalar kendiliğinden açılır. Dosyanız yoksa aynı sayfada <strong>Elle girin</strong>: platform, kampanya adı, tarih, harcama ve gelen mesaj/arama sayısı yeter. Kaydetmeden önce özet gösterilir; gider Finans'a ilgili aylara bölünerek yazılır.</li>
             <li>Bir ayda gelir var ama hiç gider girilmemişse net kâr <strong>"—"</strong> görünür ve "kâr ölçülemedi" yazar. Bu bir hata değildir: giderler girilmeden kâr gösterilmez.</li>
-            <li><strong>Ay kapanışı:</strong> Ay bittikten sonra Finans'taki <strong>🔒 Bu Ayı Kapat</strong> ile dönemi mühürleyin. Kapalı aya kayıt eklenemez ve değiştirilemez. Gerekirse işletme sahibi gerekçe yazarak dönemi yeniden açabilir.</li>
+            <li><strong>Ay kapanışı:</strong> Ay bittikten sonra Finans'taki <strong>Bu Ayı Kapat</strong> ile dönemi mühürleyin. Kapalı aya kayıt eklenemez ve değiştirilemez. Gerekirse işletme sahibi gerekçe yazarak dönemi yeniden açabilir.</li>
           </ul>
         </div>
 
         <!-- RAPORLAR VE CHATGPT -->
         <div id="helpTab-reports" class="help-tab-pane" data-lx-style="display: none;">
           <ul data-lx-style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.7; padding-left: 20px;">
-            <li>Her sayfadaki <strong>📄 Rapor al</strong> düğmesi o sayfanın ekranda gördüğünüz dönem ve filtreyle raporunu hazırlar. Rapordaki rakamlar ekrandakilerle aynı kaynaktan gelir.</li>
+            <li>Her sayfadaki <strong>Rapor al</strong> düğmesi o sayfanın ekranda gördüğünüz dönem ve filtreyle raporunu hazırlar. Rapordaki rakamlar ekrandakilerle aynı kaynaktan gelir.</li>
             <li>Raporu <strong>Excel / CSV</strong> olarak indirebilir ya da logonuzla <strong>Yazdır / PDF</strong> alabilirsiniz.</li>
-            <li><strong>🧠 ChatGPT'ye sor</strong>, verilerinizden hazır bir analiz sorusu üretir. Misafir adı ve telefonu gibi kişisel veriler bu metne <strong>eklenmez</strong>; hesaplanamayan değerler de gönderilmez.</li>
+            <li><strong>ChatGPT'ye sor</strong>, verilerinizden hazır bir analiz sorusu üretir. Misafir adı ve telefonu gibi kişisel veriler bu metne <strong>eklenmez</strong>; hesaplanamayan değerler de gönderilmez.</li>
             <li>Rezervasyon ve gider defterlerini Excel/CSV olarak dışa aktarabilir, aynı dosyayı düzenleyip geri yükleyebilirsiniz. Yanlış dosya yüklerseniz içe aktarımı geri alabilirsiniz.</li>
           </ul>
         </div>
@@ -3663,7 +2848,7 @@
         <div id="helpTab-terms" class="help-tab-pane" data-lx-style="display: none;">
           <div data-lx-style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; gap: 12px; flex-wrap: wrap;">
             <div>
-              <h4 data-lx-style="margin: 0; color: #FFFFFF; font-size: 15px;">🔍 Ekranlarda gördüğünüz terimler</h4>
+              <h4 data-lx-style="margin: 0; color: #FFFFFF; font-size: 15px;">Ekranlarda gördüğünüz terimler</h4>
               <p data-lx-style="margin: 2px 0 0 0; font-size: 12px; color: var(--text-muted);">Aramak istediğiniz kelimeyi yazın.</p>
             </div>
             <div data-lx-style="flex: 1; max-width: 280px; min-width: 180px;">
@@ -3673,40 +2858,40 @@
 
           <div data-lx-style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px;" id="glossaryGridContainer">
             <div class="glossary-card-item" data-keywords="ciro net konaklama geliri gelir indirim temizlik ücreti">
-              <strong data-lx-style="color:#409CFF; font-size:14px;">💰 Ciro (Net Konaklama Geliri)</strong>
+              <strong data-lx-style="color:#409CFF; font-size:14px;">Ciro (Net Konaklama Geliri)</strong>
               <p data-lx-style="font-size:12px; color:#E5E5EA; margin:6px 0;">Konaklamadan kalan gelir. Ciro kâr değildir; giderler ayrıca düşülür.</p>
               <div data-lx-style="font-size:11px; background:rgba(0,0,0,0.25); padding:6px 8px; border-radius:6px; color:#98989D;">📐 <code>Brüt tutar − misafirden alınan temizlik ücreti − indirim</code></div>
             </div>
             <div class="glossary-card-item" data-keywords="adr ortalama günlük fiyat gecelik">
-              <strong data-lx-style="color:#FFB340; font-size:14px;">🏷️ ADR (Ortalama Gecelik Fiyat)</strong>
+              <strong data-lx-style="color:#FFB340; font-size:14px;">ADR (Ortalama Gecelik Fiyat)</strong>
               <p data-lx-style="font-size:12px; color:#E5E5EA; margin:6px 0;">Sattığınız bir gecenin ortalama fiyatı.</p>
               <div data-lx-style="font-size:11px; background:rgba(0,0,0,0.25); padding:6px 8px; border-radius:6px; color:#98989D;">📐 <code>Ciro ÷ satılan gece</code></div>
             </div>
             <div class="glossary-card-item" data-keywords="doluluk oranı occupancy gece kapasite">
-              <strong data-lx-style="color:#38BDF8; font-size:14px;">🌙 Doluluk</strong>
+              <strong data-lx-style="color:#38BDF8; font-size:14px;">Doluluk</strong>
               <p data-lx-style="font-size:12px; color:#E5E5EA; margin:6px 0;">Satılabilir gecelerin ne kadarının satıldığı. Satılabilir gece; mülkün faaliyete başlama tarihinden itibaren, ayın gerçek gün sayısıyla ve takvimi kapatan arıza geceleri düşülerek hesaplanır.</p>
               <div data-lx-style="font-size:11px; background:rgba(0,0,0,0.25); padding:6px 8px; border-radius:6px; color:#98989D;">📐 <code>Satılan gece ÷ satılabilir gece</code></div>
             </div>
             <div class="glossary-card-item" data-keywords="revpar oda başına gelir kapasite">
-              <strong data-lx-style="color:#A78BFA; font-size:14px;">📈 RevPAR</strong>
+              <strong data-lx-style="color:#A78BFA; font-size:14px;">RevPAR</strong>
               <p data-lx-style="font-size:12px; color:#E5E5EA; margin:6px 0;">Satılabilir her geceye düşen ciro. Fiyatı ve doluluğu birlikte ölçer.</p>
               <div data-lx-style="font-size:11px; background:rgba(0,0,0,0.25); padding:6px 8px; border-radius:6px; color:#98989D;">📐 <code>Ciro ÷ satılabilir gece</code></div>
             </div>
             <div class="glossary-card-item" data-keywords="opex capex gider yatırım masraf">
-              <strong data-lx-style="color:#F472B6; font-size:14px;">⚡ OPEX ve 🏗️ CAPEX</strong>
+              <strong data-lx-style="color:#F472B6; font-size:14px;">OPEX ve 🏗️ CAPEX</strong>
               <p data-lx-style="font-size:12px; color:#E5E5EA; margin:6px 0;"><strong>OPEX:</strong> işletme giderleri (fatura, komisyon, temizlik, reklam…). <strong>CAPEX:</strong> mülke yapılan yatırım harcamaları (ekipman, tadilat…).</p>
             </div>
             <div class="glossary-card-item" data-keywords="net kâr kar marj toplam gelir">
-              <strong data-lx-style="color:#30D158; font-size:14px;">💵 Net kâr</strong>
+              <strong data-lx-style="color:#30D158; font-size:14px;">Net kâr</strong>
               <p data-lx-style="font-size:12px; color:#E5E5EA; margin:6px 0;">Toplam gelirden (ciro + temizlik geliri) bütün giderler ve yatırımlar düşüldükten sonra kalan tutar. Hiç gider girilmemiş açık ayda "—" görünür.</p>
               <div data-lx-style="font-size:11px; background:rgba(0,0,0,0.25); padding:6px 8px; border-radius:6px; color:#98989D;">📐 <code>Toplam gelir − OPEX − CAPEX</code></div>
             </div>
             <div class="glossary-card-item" data-keywords="boşluk gecesi gap nights fırsat indirim">
-              <strong data-lx-style="color:#FB923C; font-size:14px;">🧩 Boşluk gecesi</strong>
+              <strong data-lx-style="color:#FB923C; font-size:14px;">Boşluk gecesi</strong>
               <p data-lx-style="font-size:12px; color:#E5E5EA; margin:6px 0;">Aynı mülkte iki rezervasyon arasında kalan 1–4 gecelik, satılması zor boşluk. Ana sayfada (<strong>Bugün</strong>) <strong>Gelir fırsatı</strong> sütununda en yakın boşluk görünür; boşluk yoksa orada "boşluk gecesi yok" yazar. Mülkün liste fiyatı girilmişse uygulama liste fiyatının altında bir gecelik fiyat önerir; <strong>Uygula</strong>ya basınca önerilen fiyatı görürsünüz, onaylarsanız o gecelerin fiyatı takvime yazılır. Liste fiyatı girilmemiş mülkte fiyat önerilmez.</p>
             </div>
             <div class="glossary-card-item" data-keywords="ota komisyon airbnb booking doğrudan kanal">
-              <strong data-lx-style="color:#4ADE80; font-size:14px;">🌐 Kanal ve komisyon</strong>
+              <strong data-lx-style="color:#4ADE80; font-size:14px;">Kanal ve komisyon</strong>
               <p data-lx-style="font-size:12px; color:#E5E5EA; margin:6px 0;">Rezervasyonun geldiği yer (Airbnb, Booking, doğrudan…). Komisyon, Ayarlar'da tanımladığınız orana göre gider yazılır.</p>
             </div>
           </div>
@@ -3714,25 +2899,25 @@
 
         <!-- VERİ VE SIFIRLAMA -->
         <div id="helpTab-data" class="help-tab-pane" data-lx-style="display: none;">
-          <h4 data-lx-style="color: #FFFFFF; margin-top: 0;">🔄 Verileriniz ve sıfırlama</h4>
+          <h4 data-lx-style="color: #FFFFFF; margin-top: 0;">Verileriniz ve sıfırlama</h4>
           <div data-lx-style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px;">
             <p data-lx-style="font-size: 0.85rem; color: var(--text-muted); margin: 0 0 10px 0;">
-              • Kayıtlarınız tarayıcıda değil, güvenli bulut veritabanında saklanır. Üstteki <strong>🔄 Verileri eşitle</strong> düğmesi ekranı sunucudaki son hale getirir; hiçbir kaydı değiştirmez.<br>
+              • Kayıtlarınız tarayıcıda değil, güvenli bulut veritabanında saklanır. Üstteki <strong>Verileri eşitle</strong> düğmesi ekranı sunucudaki son hale getirir; hiçbir kaydı değiştirmez.<br>
               • <strong>Tüm Verilerinizi Sıfırlayın:</strong> Mülkler, rezervasyonlar, giderler, temizlik görevleri,
               talepler, hedefler ve ay kapanışları dahil bütün kayıtlarınız kalıcı olarak silinir. Kapatılmış
               dönemler de dahildir. <strong>İşletmeniz ve ekip üyeleriniz kalır</strong> — hesap kapanmaz.<br>
               • Onaylamak için <code>VERILERI SIFIRLA</code> yazmanız gerekir; işlemi yalnızca işletme sahibi yapabilir.<br>
-              • Aynı ekrana <strong>⚙️ Ayarlar → Veri Sıfırlama</strong> bölümünden de ulaşabilirsiniz.
+              • Aynı ekrana <strong>Ayarlar → Veri Sıfırlama</strong> bölümünden de ulaşabilirsiniz.
             </p>
             <button type="button" class="btn btn-secondary btn-sm" data-owner-only data-onclick="closeHelpModal(); openResetModal();">
-              🗑️ Sıfırlama Menüsünü Aç
+              Sıfırlama Menüsünü Aç
             </button>
           </div>
         </div>
       </div>
 
       <div class="modal-footer" data-lx-style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
-        <span data-lx-style="font-size: 11px; color: var(--text-muted);">💡 Kartlardaki ℹ️ düğmesi o rakamın nasıl hesaplandığını gösterir.</span>
+        <span data-lx-style="font-size: 11px; color: var(--text-muted);">Kartlardaki ℹ️ düğmesi o rakamın nasıl hesaplandığını gösterir.</span>
         <button type="button" class="btn btn-primary" data-onclick="closeHelpModal()">Anladım, Kapat</button>
       </div>
     </div>
@@ -3741,7 +2926,7 @@
 <div class="modal-backdrop" id="resetModal">
     <div class="modal-card" data-lx-style="max-width: 580px;">
       <div class="modal-header">
-        <h3>🗑️ Veri Sıfırlama ve Yönetim</h3>
+        <h3>Veri Sıfırlama ve Yönetim</h3>
         <button class="close-btn" data-onclick="closeResetModal()">&times;</button>
       </div>
       <div data-lx-style="padding: 20px;">
@@ -3752,7 +2937,7 @@
         <div data-lx-style="display: flex; flex-direction: column; gap: 15px;">
           <div data-lx-style="border: 1px solid rgba(255, 69, 58, 0.4); background: rgba(255, 69, 58, 0.08); border-radius: 10px; padding: 16px;">
             <div data-lx-style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
-              <strong data-lx-style="color: #fca5a5; font-size: 1rem;">🧹 Tüm İşletme Verilerini Sıfırla</strong>
+              <strong data-lx-style="color: #fca5a5; font-size: 1rem;">Tüm İşletme Verilerini Sıfırla</strong>
             </div>
             <p data-lx-style="color: var(--color-slate-300); font-size: 0.85rem; line-height: 1.4; margin-bottom: 10px;">
               Mülkler, rezervasyonlar, giderler, temizlik görevleri, talepler, misafirler, fiyat kuralları,
@@ -3774,7 +2959,7 @@
             <div id="resetError" class="auth-error-msg" data-lx-style="display: none; margin-bottom: 12px;"></div>
 
             <button class="btn btn-danger" id="resetSubmitBtn" data-onclick="cleanResetAll()" data-lx-style="width: 100%;" disabled>
-              🗑️ Tüm Verileri Kalıcı Olarak Sıfırla
+              Tüm Verileri Kalıcı Olarak Sıfırla
             </button>
           </div>
 
@@ -3794,7 +2979,7 @@
   <script src="core/finance_import_engine.js?v=0bcb5258"></script>
   <script src="core/bulk_summary.js?v=48f72010"></script>
   <script src="core/income_statement.js?v=3c2e9daf"></script>
-  <script src="core/import_template_guide.js?v=3a7e4d66"></script>
+  <script src="core/import_template_guide.js?v=840297d3"></script>
   <script src="core/finance_export_engine.js?v=86f92e3f"></script>
 
   <!-- ======================================================= -->
@@ -3816,7 +3001,7 @@
       <!-- Tab Buttons Inside Modal -->
       <div data-lx-style="display: flex; gap: 4px; padding: 12px 20px 0 20px; border-bottom: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.2);">
         <button type="button" class="btn btn-secondary btn-sm" id="waTabBtnParser" data-onclick="switchWaModalTab('parser')" data-lx-style="font-weight: 700; border-bottom: 2px solid #25D366; border-radius: 6px 6px 0 0;">
-          ⚡ Akıllı Mesaj Ayrıştırıcı
+          Akıllı Mesaj Ayrıştırıcı
         </button>
       </div>
 
@@ -3826,21 +3011,21 @@
           <div class="form-group" data-lx-style="margin-bottom: 14px;">
             <div data-lx-style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
               <label data-lx-style="font-weight: 700; color: #FFFFFF; font-size: 13px;">WhatsApp Mesaj Metnini Buraya Yapıştırın:</label>
-              <button type="button" class="btn btn-secondary btn-sm" data-onclick="loadSampleWhatsAppMsg()" data-lx-style="font-size: 11px; padding: 3px 8px;">📋 Örnek Mesaj Doldur</button>
+              <button type="button" class="btn btn-secondary btn-sm" data-onclick="loadSampleWhatsAppMsg()" data-lx-style="font-size: 11px; padding: 3px 8px;">Örnek Mesaj Doldur</button>
             </div>
             <textarea id="waRawInput" rows="3" placeholder="Örnek: 'Ahmet Yılmaz: 18-23 Eylül arası 5 gece için 85.000 TL konuştuk, 8 kişiyiz onaylıyoruz. Tel: +90 532 555 1234'" data-lx-style="width: 100%; padding: 12px; background: rgba(0,0,0,0.4); border: 1px solid rgba(37, 211, 102, 0.3); border-radius: 8px; color: #fff; font-size: 13px; font-family: monospace;" data-oninput="parseWhatsAppMessage()"></textarea>
-            <span data-lx-style="font-size: 11px; color: var(--text-muted); margin-top: 4px; display: block;">💡 İpucu: Misafirin yazdığı mesajı olduğu gibi yapıştırın; yapay zeka isim, villa, tarih ve tutarı saniyesinde ayıklar.</span>
+            <span data-lx-style="font-size: 11px; color: var(--text-muted); margin-top: 4px; display: block;">İpucu: Misafirin yazdığı mesajı olduğu gibi yapıştırın; yapay zeka isim, villa, tarih ve tutarı saniyesinde ayıklar.</span>
           </div>
 
           <div data-lx-style="text-align: right; margin-bottom: 14px;">
-            <button type="button" class="btn btn-secondary" data-onclick="parseWhatsAppMessage()" data-lx-style="padding: 5px 14px; font-size: 12px;">⚡ Yeniden Ayrıştır / Çözümle</button>
+            <button type="button" class="btn btn-secondary" data-onclick="parseWhatsAppMessage()" data-lx-style="padding: 5px 14px; font-size: 12px;">Yeniden Ayrıştır / Çözümle</button>
           </div>
 
           <!-- Parsed Preview Form -->
           <div id="waParsedResultBox" data-lx-style="background: rgba(28, 28, 30, 0.7); border: 1px solid rgba(10, 132, 255, 0.3); border-radius: 10px; padding: 16px; margin-bottom: 14px;">
             <div data-lx-style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 8px;">
               <strong data-lx-style="color: #409CFF; font-size: 13px; display: flex; align-items: center; gap: 6px;">
-                <span>🔍</span> Algılanan Bilgiler:
+                Algılanan Bilgiler:
               </strong>
               <span id="waConfidenceBadge" class="badge badge-emerald" data-lx-style="font-size: 11px;">Otomatik Algılandı</span>
             </div>
@@ -3898,10 +3083,10 @@
         <button type="button" class="btn btn-secondary" data-onclick="closeWhatsAppModal()">Kapat</button>
         <div data-lx-style="display: flex; gap: 10px;">
           <button type="button" class="btn btn-secondary" data-onclick="saveWaAsLead()" data-lx-style="border-color: #FF9F0A; color: #FFB340; font-weight: 700;">
-            🎯 Sıcak Lead Olarak Kaydet
+            Sıcak Lead Olarak Kaydet
           </button>
           <button type="button" class="btn btn-primary" data-onclick="saveWaAsBooking()" data-lx-style="background: #059669; border-color: #30D158; font-weight: 700;">
-            📅 Kesin Rezervasyona Dönüştür
+            Kesin Rezervasyona Dönüştür
           </button>
         </div>
       </div>
@@ -3913,44 +3098,10 @@
   <!-- ======================================================= -->
   <!-- MODAL: METRİK AÇIKLAMALARI VE AKILLI İPUCU DANIŞMANI     -->
   <!-- ======================================================= -->
-  <div class="modal-backdrop" id="kpiExplanationModal">
-    <div class="modal-card" data-lx-style="max-width: 580px; border: 1px solid rgba(10, 132, 255, 0.35); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.75);">
-      <div class="modal-header" data-lx-style="background: linear-gradient(135deg, rgba(10, 132, 255, 0.15), rgba(28, 28, 30, 0.9)); border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
-        <div data-lx-style="display: flex; align-items: center; gap: 12px;">
-          <span id="kpiExplIcon" data-lx-style="font-size: 26px; background: rgba(10, 132, 255, 0.2); padding: 6px; border-radius: 8px; border: 1px solid rgba(10, 132, 255, 0.4);">📊</span>
-          <div>
-            <h3 id="kpiExplTitle" data-lx-style="margin: 0; font-size: 17px; color: #FFFFFF; font-weight: 800;">Metrik Açıklaması</h3>
-            <span id="kpiExplCategory" class="badge badge-blue" data-lx-style="font-size: 11px; margin-top: 4px; display: inline-block;">Finans & gelir yönetimi</span>
-          </div>
-        </div>
-        <button class="close-btn" data-onclick="closeKpiExplanationModal()">&times;</button>
-      </div>
-
-      <div data-lx-style="padding: 22px; max-height: 65vh; overflow-y: auto;" id="kpiExplBody">
-        <!-- Injected dynamically via JS -->
-      </div>
-
-      <div class="modal-footer" data-lx-style="display: flex; justify-content: space-between; align-items: center; background: rgba(28, 28, 30, 0.5);">
-        <button type="button" class="btn btn-secondary btn-sm" data-onclick="closeKpiExplanationModal(); openHelpModal('terms');">
-          🎓 Tüm Sözlüğü Aç
-        </button>
-        <button type="button" class="btn btn-primary btn-sm" data-onclick="closeKpiExplanationModal()">
-          Anladım, Kapat
-        </button>
-      </div>
-    </div>
-  </div>
-
-
-
-
-  <!-- ========================================== -->
-  <!-- MODAL: DİNAMİK VİLLA / MÜLK EKLE & DÜZENLE -->
-  <!-- ========================================== -->
   <div class="modal-backdrop" id="propertyModal">
     <div class="modal-card" data-lx-style="max-width: 760px;">
       <div class="modal-header">
-        <h3 id="propertyModalTitle">🏡 Yeni Villa / Mülk Ekle</h3>
+        <h3 id="propertyModalTitle">Yeni Villa / Mülk Ekle</h3>
         <button class="close-btn" data-onclick="closePropertyModal()">&times;</button>
       </div>
       <form id="propertyForm" data-onsubmit="saveProperty(event)">
@@ -4051,11 +3202,11 @@
           <span id="propAccessStatus" class="sub-text" role="status" aria-live="polite"></span>
         </fieldset>
         <div class="modal-footer" data-lx-style="display: flex; justify-content: space-between; align-items: center;">
-          <button type="button" id="propDeleteBtn" class="btn btn-danger" data-lx-style="display: none; background: #FF453A; border: none; font-size: 12px; padding: 8px 14px; border-radius: 6px; color: #fff; cursor: pointer;" data-onclick="handlePropertyDeleteFromModal()">📦 Satıştan Çek / Arşivle</button>
+          <button type="button" id="propDeleteBtn" class="btn btn-danger" data-lx-style="display: none; background: #FF453A; border: none; font-size: 12px; padding: 8px 14px; border-radius: 6px; color: #fff; cursor: pointer;" data-onclick="handlePropertyDeleteFromModal()">Satıştan Çek / Arşivle</button>
           <div data-lx-style="display: flex; gap: 10px; margin-left: auto;">
             <button type="button" class="btn btn-secondary" data-onclick="closePropertyModal()">İptal</button>
             <button type="submit" id="propSubmitBtn" class="btn btn-primary" data-lx-style="background: linear-gradient(135deg, #BF5AF2, #6D28D9); border: none; font-weight: 700;">
-              💾 Mülkü Kaydet
+              Mülkü Kaydet
             </button>
           </div>
         </div>
@@ -4068,7 +3219,7 @@
   <div class="modal-backdrop" id="cleaningTaskModal">
     <div class="modal-card" data-lx-style="max-width: 500px;">
       <div class="modal-header">
-        <h3 id="cleaningTaskModalTitle">🧹 Temizlik & Personel Hakediş Kaydı</h3>
+        <h3 id="cleaningTaskModalTitle">Temizlik & Personel Hakediş Kaydı</h3>
         <button class="close-btn" data-onclick="closeCleaningTaskModal()">&times;</button>
       </div>
       <form id="cleaningTaskForm" data-onsubmit="saveCleaningTask(event)">
@@ -4100,15 +3251,15 @@
           <div class="form-group full-width">
             <label for="hkPaidStatus">Durum</label>
             <select id="hkPaidStatus" required>
-              <option value="PLANNED">🗓️ Planlandı (henüz yapılmadı)</option>
-              <option value="PENDING">⏳ Yapıldı — ödenecek (personele borç)</option>
-              <option value="PAID">✅ Yapıldı — ödendi</option>
-              <option value="SKIPPED">✖ Gerek kalmadı (gider ve borç yok)</option>
+              <option value="PLANNED">Planlandı (henüz yapılmadı)</option>
+              <option value="PENDING">Yapıldı — ödenecek (personele borç)</option>
+              <option value="PAID">Yapıldı — ödendi</option>
+              <option value="SKIPPED">Gerek kalmadı (gider ve borç yok)</option>
             </select>
           </div>
         </div>
         <div class="modal-footer" data-lx-style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px;">
-          <button type="button" class="btn btn-danger btn-sm" id="hkDeleteBtn" data-onclick="deleteCleaningTaskFromModal()" data-lx-style="display: none;">🗑️ Sil</button>
+          <button type="button" class="btn btn-danger btn-sm" id="hkDeleteBtn" data-onclick="deleteCleaningTaskFromModal()" data-lx-style="display: none;">Sil</button>
           <div data-lx-style="display: flex; gap: 8px; margin-left: auto;">
             <button type="button" class="btn btn-secondary" data-onclick="closeCleaningTaskModal()">Vazgeç</button>
             <button type="submit" class="btn btn-primary" id="hkSaveBtn">Kaydet</button>
@@ -4124,7 +3275,7 @@
   <div class="modal-backdrop" id="operationalTaskModal">
     <div class="modal-card" data-lx-style="max-width: 560px;">
       <div class="modal-header">
-        <h3 id="opTaskModalTitle">✅ Görev</h3>
+        <h3 id="opTaskModalTitle">Görev</h3>
         <button class="close-btn" data-onclick="closeOperationalTaskModal()">&times;</button>
       </div>
       <form id="operationalTaskForm" data-onsubmit="saveOperationalTask(event)">
@@ -4189,7 +3340,7 @@
         <p class="sub-text" id="opTaskMeta" data-lx-style="display: none; margin-top: 8px;"></p>
         <p class="sub-text" data-lx-style="margin-top: 8px;">Tamamlamak için listedeki <strong>Tamamla</strong> düğmesini kullanın; kontrol listesindeki önemli maddeler orada denetlenir.</p>
         <div class="modal-footer" data-lx-style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px;">
-          <button type="button" class="btn btn-danger btn-sm" id="opTaskDeleteBtn" data-onclick="deleteOperationalTaskFromModal()" data-lx-style="display: none;">🗑️ Sil</button>
+          <button type="button" class="btn btn-danger btn-sm" id="opTaskDeleteBtn" data-onclick="deleteOperationalTaskFromModal()" data-lx-style="display: none;">Sil</button>
           <div data-lx-style="display: flex; gap: 8px; margin-left: auto;">
             <button type="button" class="btn btn-secondary" data-onclick="closeOperationalTaskModal()">Vazgeç</button>
             <button type="submit" class="btn btn-primary" id="opTaskSaveBtn">Kaydet</button>
@@ -4206,7 +3357,7 @@
     <div class="modal-card" data-lx-style="max-width: 540px; border: 1px solid rgba(191, 90, 242, 0.4); box-shadow: 0 20px 50px rgba(0,0,0,0.8);">
       <div class="modal-header" data-lx-style="background: linear-gradient(135deg, rgba(191, 90, 242, 0.2), rgba(109, 40, 217, 0.1));">
         <div>
-          <h3 id="onboardingModalTitle" data-lx-style="margin: 0; color: #F5F5F7;">🎉 Hoş Geldiniz! İlk Mülkünüzü Tanımlayın</h3>
+          <h3 id="onboardingModalTitle" data-lx-style="margin: 0; color: #F5F5F7;">Hoş Geldiniz! İlk Mülkünüzü Tanımlayın</h3>
           <p data-lx-style="margin: 4px 0 0 0; font-size: 12px; color: #C7C7CC;">İşletmeniz başarıyla oluşturuldu. Portföyünüzdeki ilk villayı veya daireyi ekleyin.</p>
         </div>
         <button type="button" class="close-btn" data-onclick="closeOnboardingModal()" aria-label="Kapat" title="Şimdilik atla">&times;</button>
@@ -4243,7 +3394,7 @@
         <div class="modal-footer" data-lx-style="display: flex; justify-content: space-between; align-items: center;">
           <button type="button" class="btn btn-secondary" data-onclick="closeOnboardingModal()">Şimdilik Atla</button>
           <button type="submit" class="btn btn-primary" data-lx-style="background: linear-gradient(135deg, #30D158, #059669); border: none; font-weight: 700; padding: 10px 20px;">
-            🚀 Kaydet ve Başla
+            Kaydet ve Başla
           </button>
         </div>
       </form>
@@ -4272,7 +3423,7 @@
   <div class="modal-backdrop" id="aiActionConfirmModal" data-lx-style="display: none;">
     <div class="modal-card" data-lx-style="max-width: 480px; border: 1px solid rgba(48, 209, 88, 0.4);">
       <div class="modal-header" data-lx-style="background: rgba(48, 209, 88, 0.1);">
-        <h3 data-lx-style="color: #30D158; margin: 0; font-size: 15px;">🤖 AI Önerisini Uygula</h3>
+        <h3 data-lx-style="color: #30D158; margin: 0; font-size: 15px;">AI Önerisini Uygula</h3>
         <button class="close-btn" data-onclick="closeAiActionConfirmModal()">&times;</button>
       </div>
       <div data-lx-style="padding: 16px 20px;">
@@ -4306,7 +3457,7 @@
         <button type="button" class="btn btn-secondary" data-onclick="downloadCurrentReportCsv()">CSV</button>
         <button type="button" class="btn btn-secondary" data-onclick="downloadCurrentReportXlsx()">Excel</button>
         <button type="button" class="btn btn-secondary" data-onclick="printCurrentReport()">Yazdır / PDF</button>
-        <button type="button" class="btn btn-primary" data-onclick="askChatGptFromCurrentReport()">🧠 ChatGPT'ye sor</button>
+        <button type="button" class="btn btn-primary" data-onclick="askChatGptFromCurrentReport()">ChatGPT'ye sor</button>
       </div>
     </div>
   </div>
@@ -4316,15 +3467,15 @@
       <div class="modal-header"><h3 id="quickBookingTitle">Hızlı rezervasyon</h3><button type="button" class="close-btn" data-onclick="closeQuickBookingModal()" aria-label="Kapat">&times;</button></div>
       <form id="quickBookingForm" data-onsubmit="saveQuickBooking(event)">
         <div class="quick-booking-fields">
-          <label>Mülk<select id="quickBookingVilla" required></select></label>
+          <label>Villa<select id="quickBookingVilla" required></select></label>
           <label>Misafir adı<input id="quickBookingGuest" required autocomplete="name"></label>
-          <div class="quick-booking-dates"><label>Giriş<input id="quickBookingCheckIn" type="date" required></label><label>Çıkış<input id="quickBookingCheckOut" type="date" required></label></div>
+          <div class="quick-booking-dates"><label>Giriş tarihi<input id="quickBookingCheckIn" type="date" required></label><label>Çıkış tarihi<input id="quickBookingCheckOut" type="date" required></label></div>
           <label>Brüt tutar (₺)<input id="quickBookingGross" type="number" inputmode="decimal" min="0" step="0.01" required></label>
           <label>Alınan kapora (₺)<input id="quickBookingDeposit" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Alınmadıysa boş"></label>
           <label>Kişi sayısı<input id="quickBookingPax" type="number" inputmode="numeric" min="1" step="1" required></label>
-          <label>Kanal<select id="quickBookingChannel" required data-onchange="syncQuickBookingDepositVisibility()"><option value="WHATSAPP">WhatsApp</option><option value="AIRBNB">Airbnb</option><option value="BOOKING">Booking.com</option><option value="INSTAGRAM">Instagram</option><option value="WEBSITE">Web sitesi</option><option value="REPEAT">Tekrar misafir</option><option value="PHONE">Telefon</option></select></label>
+          <label>Rezervasyon kanalı<select id="quickBookingChannel" required data-onchange="syncQuickBookingDepositVisibility()"><option value="WHATSAPP">WhatsApp</option><option value="AIRBNB">Airbnb</option><option value="BOOKING">Booking.com</option><option value="INSTAGRAM">Instagram</option><option value="WEBSITE">Web sitesi</option><option value="REPEAT">Tekrar misafir</option><option value="PHONE">Telefon</option></select></label>
         </div>
-        <p class="sub-text">Temel bilgilerle doğrudan kaydeder. Komisyon ve temizlik ayrıntıları daha sonra rezervasyon detayından eklenebilir.</p>
+        <p class="sub-text">Bu form temel bilgileri kaydeder. Temizlik ücreti ve maliyeti, komisyon ve vergi sonra eklenir: rezervasyon ayrıntısında «Düzenle».</p>
         <div class="modal-footer"><button type="button" class="btn btn-secondary" data-onclick="closeQuickBookingModal()">Vazgeç</button><button type="submit" class="btn btn-primary">Rezervasyonu kaydet</button></div>
       </form>
     </div>
@@ -4333,7 +3484,7 @@
   <div class="modal-backdrop" id="chatGptQuestionModal" data-lx-style="display:none;">
     <div class="modal-card chatgpt-question-card" role="dialog" aria-modal="true" aria-labelledby="chatGptQuestionTitle">
       <div class="modal-header">
-        <div><h3 id="chatGptQuestionTitle">🧠 ChatGPT'ye sor</h3><p id="chatGptQuestionScope" class="sub-text">—</p></div>
+        <div><h3 id="chatGptQuestionTitle">ChatGPT'ye sor</h3><p id="chatGptQuestionScope" class="sub-text">—</p></div>
         <button type="button" class="close-btn" data-onclick="closeChatGptQuestionModal()" aria-label="ChatGPT penceresini kapat">&times;</button>
       </div>
       <div class="chatgpt-question-body">
@@ -4344,7 +3495,7 @@
         <textarea id="chatGptQuestionPrompt" class="analysis-prompt-preview" rows="14" readonly></textarea>
         <p id="chatGptQuestionMeta" class="sub-text">—</p>
       </div>
-      <div class="modal-footer"><button type="button" class="btn btn-secondary" data-onclick="closeChatGptQuestionModal()">Kapat</button><button type="button" class="btn btn-primary" data-onclick="copyChatGptQuestionPrompt()">📋 Promptu kopyala</button></div>
+      <div class="modal-footer"><button type="button" class="btn btn-secondary" data-onclick="closeChatGptQuestionModal()">Kapat</button><button type="button" class="btn btn-primary" data-onclick="copyChatGptQuestionPrompt()">Promptu kopyala</button></div>
     </div>
   </div>
 
@@ -4352,7 +3503,7 @@
   <script src="core/guest_contact_utils.js?v=84fd6474"></script>
   <script src="core/user_facing_errors.js?v=e4eb0ae5"></script>
   <script src="core/ledger_contract.js?v=eebf7d3e"></script>
-  <script src="core/report_engine.js?v=ead1838e"></script>
+  <script src="core/report_engine.js?v=82f1123b"></script>
   <script src="core/property_profile_engine.js?v=9d2f3d03"></script>
   <script src="core/property_owner_service.js?v=5c741a12"></script>
   <script src="core/marketing_channel_listing_service.js?v=515fe386"></script>
@@ -4371,23 +3522,24 @@
   <script src="core/operations_engine.js?v=8dd8c501"></script>
   <script src="core/booking_payment_engine.js?v=91111565"></script>
   <script src="core/ads_metrics_engine.js?v=d8dd5962"></script>
-  <script src="core/ads_period_service.js?v=1b4f5123"></script>
-  <script src="core/ads_import_parser.js?v=ceff62b1"></script>
+  <script src="core/ads_period_service.js?v=2eaac0e3"></script>
+  <script src="core/ads_import_parser.js?v=9656ffe3"></script>
   <script src="core/captcha_gate.js?v=3ad4a776"></script>
   <script src="core/date_range_picker.js?v=2bbb5db1"></script>
   <script src="core/side_panel.js?v=d763b464"></script>
   <script src="core/mobile_shell.js?v=8979ea0a"></script>
   <script src="core/notification_feed.js?v=941306f6"></script>
-  <script src="core/command_search.js?v=89760933"></script>
-  <script src="core/action_dispatch.js?v=d58f2307"></script>
+  <script src="core/command_search.js?v=1b9dbcc9"></script>
+  <script src="core/action_dispatch.js?v=252ca032"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
-  <script src="core/booking_finance_ui.js?v=45c6676a"></script>
+  <script src="core/booking_finance_ui.js?v=9b3127c9"></script>
   <script src="core/permission_matrix.js?v=e3a3cef2"></script>
   <script src="core/tenant_backup_export.js?v=5aadcdb1"></script>
   <script src="core/ui_dialog.js?v=ba104c37"></script>
-  <script src="app.js?v=bbbc7f2c"></script>
+  <script src="core/team_tasks.js?v=e92498bb"></script>
+  <script src="core/lex_ui.js?v=ac9df131"></script>
+  <script src="app.js?v=f27a0bea"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
-  <script src="core/analysis_center_ui.js?v=c85cd258"></script>
-  <script src="core/marketing_ui.js?v=4e04df55"></script>
+  <script src="core/marketing_ui.js?v=26927afc"></script>
 </body>
 </html>

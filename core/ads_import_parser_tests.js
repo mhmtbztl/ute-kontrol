@@ -125,6 +125,47 @@ try {
   const gunluk = P.planImport({ rows: dailyFile.rows, campaigns: [] });
   check(gunluk.summary.fileRowCount === 35 && gunluk.summary.periodCount === 3 && gunluk.rows.every(row => row.campaignKey),
     'P10. Gunluk dosya planda kampanya x ay satirina iner (phase113)', JSON.stringify(gunluk.summary));
+  // --- G. Google Ads kampanya raporu + platform tanima (21.11.2026) ---
+  const googleEn = 'Campaign performance report\n"November 1, 2026 - November 30, 2026"\nCampaign status,Campaign,Currency code,Impr.,Clicks,Cost,Conversions,Phone calls\nEnabled,Villa arama,TRY,"12,345","1,020","3,456.78",12.00,7\nTotal: Campaigns,--,TRY,"12,345","1,020","3,456.78",12.00,7';
+  const gEn = P.parseCsv(googleEn, 'GOOGLE');
+  check(P.detectPlatform(googleEn) === 'GOOGLE' && gEn.errors.length === 0 && gEn.rows.length === 1,
+    'G1. Ingilizce Google raporu taninir; baslik ve toplam satirlari atlanir', JSON.stringify(gEn));
+  const g = gEn.rows[0] || {};
+  check(g.spend === 3456.78 && g.impressions === 12345 && g.clicks === 1020 && g.calls === 7 && g.resultType === 'CALL' && g.periodStart === '2026-11-01' && g.periodEnd === '2026-11-30',
+    'G2. Binlik/ondalik ayiraci, telefon aramasi sonucu ve tarih araligi dogru', JSON.stringify(g));
+  const googleTr = 'Kampanya raporu\n1 Kasım 2026 - 30 Kasım 2026\nKampanya durumu;Kampanya;Para birimi kodu;Gösterim;Tıklama;Maliyet;Dönüşümler\nEtkin;Villa arama;TRY;12.345;1.020;3.456,78;12,00\nToplam: Kampanyalar;--;TRY;12.345;1.020;3.456,78;12,00';
+  const gTr = P.parseCsv(googleTr, 'GOOGLE');
+  check(P.detectPlatform(googleTr) === 'GOOGLE' && gTr.rows.length === 1 && gTr.rows[0].spend === 3456.78 && gTr.rows[0].resultType === 'OTHER' && gTr.rows[0].results === 12 && gTr.rows[0].calls === null,
+    'G3. Turkce Google raporu: arama sutunu yoksa sonuc donusum (OTHER), arama uydurulmaz', JSON.stringify(gTr));
+  const gUsd = P.parseCsv(googleEn.replace(/TRY/g, 'USD'), 'GOOGLE');
+  check(gUsd.rows.length === 0 && gUsd.errors.some(e => e.code === 'CURRENCY_NOT_TRY'), 'G4. TL olmayan Google hesabi reddedilir', JSON.stringify(gUsd.errors));
+  const gNoDate = P.parseCsv('Campaign,Cost\nA,10.00', 'GOOGLE');
+  check(gNoDate.errors.some(e => e.code === 'PERIOD_MISSING'), 'G5. Tarih araligi ya da Gun sutunu yoksa donem uydurulmaz', JSON.stringify(gNoDate.errors));
+  const gDaily = P.parseCsv('Campaign,Day,Cost,Impressions,Clicks\nA,2026-11-01,10.00,100,5\nA,2026-11-02,12.50,90,4', 'GOOGLE');
+  check(gDaily.rows.length === 2 && gDaily.rows[1].periodStart === '2026-11-02' && gDaily.rows[1].spend === 12.5 && gDaily.warnings.some(w => w.code === 'CURRENCY_ASSUMED'),
+    'G6. Gunluk Google dosyasi gun gun okunur; para birimi sutunu yoksa uyarilir', JSON.stringify(gDaily));
+  check(P.detectPlatform('Rapor Başlangıcı,Rapor Sonu,Kampanya Adı,Harcanan Tutar (TRY)\n2026-11-01,2026-11-20,X,1') === 'META' && P.detectPlatform('a,b\n1,2') === null,
+    'G7. Meta dosyasi Meta olarak taninir; taninmayan dosya null (tahmin yok)');
+  // --- T. TikTok raporu (phase121, 21.11.2026) ---
+  const tiktok = 'Campaign name,Cost,Impressions,Clicks (destination),Results,Currency\nVilla TikTok,1250.40,54000,820,31,TRY\nTotal of 1 campaign,1250.40,54000,820,31,TRY';
+  const tk = P.parseCsv(tiktok, 'TIKTOK', 'Campaign Report(2026-10-01 to 2026-10-31).csv');
+  check(P.detectPlatform(tiktok) === 'TIKTOK' && tk.errors.length === 0 && tk.rows.length === 1 && tk.rows[0].platform === 'TIKTOK',
+    'T1. TikTok raporu tanınır; toplam satiri atlanir', JSON.stringify(tk));
+  const r = tk.rows[0] || {};
+  check(r.spend === 1250.4 && r.impressions === 54000 && r.clicks === 820 && r.results === 31 && r.resultType === 'OTHER' && r.messages === null && r.calls === null && r.periodStart === '2026-10-01' && r.periodEnd === '2026-10-31',
+    'T2. Harcama, gosterim, tiklama ve sonuc; tarih araligi dosya adindan; mesaj/arama uydurulmaz', JSON.stringify(r));
+  const tkDaily = P.parseCsv('By Day,Campaign name,Spend,Impressions,Clicks\n2026-10-01,A,10,100,5\n2026-10-02,A,12.5,90,4', 'TIKTOK');
+  check(tkDaily.rows.length === 2 && tkDaily.rows[1].spend === 12.5 && tkDaily.warnings.some(w => w.code === 'RESULTS_COLUMN_MISSING'),
+    'T3. Gunluk TikTok dosyasi ("Spend" adiyla) okunur; sonuc sutunu yoksa soylenir', JSON.stringify(tkDaily));
+  const tkNoDate = P.parseCsv(tiktok, 'TIKTOK', 'rapor.csv');
+  check(tkNoDate.errors.some(e => e.code === 'PERIOD_MISSING'), 'T4. Tarih ne dosyada ne adinda yoksa donem uydurulmaz', JSON.stringify(tkNoDate.errors));
+  const tkTr = P.parseCsv('Kampanya adı;Maliyet;Gösterimler;Tıklamalar (hedef);Sonuçlar;Para birimi\nVilla;1.250,40;54.000;820;31;TRY', 'TIKTOK', 'rapor_20261001-20261031.csv');
+  check(P.detectPlatform('Kampanya adı;Maliyet\nA;1') === 'TIKTOK' && tkTr.rows.length === 1 && tkTr.rows[0].spend === 1250.4 && tkTr.rows[0].impressions === 54000 && tkTr.rows[0].periodEnd === '2026-10-31',
+    'T5. Turkce TikTok arayuzu ve dosya adindaki 20261001-20261031 araligi', JSON.stringify(tkTr));
+  check(P.detectPlatform('Campaign,Cost\nA,1') === 'GOOGLE' && P.detectPlatform('Kampanya Adı,Harcanan Tutar (TRY)\nA,1') === 'META',
+    'T6. "Campaign" Google, "Campaign name" TikTok, harcama-para birimi basligi Meta');
+  check(P.parsePasted('LEXBNB_REKLAM_V2\nplatform;kampanya;baslangic;bitis;sonuc_turu;harcama;gosterim;tiklama;mesaj;arama\nTIKTOK;Villa;2026-10-01;2026-10-31;OTHER;100;;;;').errors.length === 0,
+    'T7. ChatGPT yapistirma yolu TikTok kabul eder');
 } catch (error) { failed++; console.error(error.stack); }
 console.log(`\nTEST SUMMARY: ${passed} / ${passed + failed} TESTS PASSED (${failed} FAILED)`);
 if (failed) process.exit(1);

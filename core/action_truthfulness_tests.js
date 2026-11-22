@@ -69,11 +69,14 @@ async function test(name, fn) {
     );
   });
 
-  await test('Unsupported cleaning completion is not rendered as an Apply button', async () => {
-    const source = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
-    const cleaningCandidate = source.match(/\/\/ Cleaning \/ Turnover tasks[\s\S]*?\/\/ Maintenance tickets/)?.[0] || '';
-    assert.match(cleaningCandidate, /quickAction: null/);
-    assert.doesNotMatch(cleaningCandidate, /['"]BELLA['"]/);
+  await test('Bugun gorev satiri yalniz bos gecede ve yazma yetkisiyle uygulama acar; digerleri ilgili ekrana gider', async () => {
+    const source = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8').replace(/\r\n?/g, '\n');
+    const i = source.indexOf('function openTeamTask(');
+    const govde = source.slice(i, source.indexOf('\nfunction ', i + 10));
+    assert.match(govde, /task\.type === 'GAP_NIGHT' && canWriteSalesRole\(/);
+    assert.strictEqual((govde.match(/handleQuickActionTrigger\(/g) || []).length, 1);
+    assert.match(govde, /openTabFromDeepLink\(task\.target/);
+    assert.doesNotMatch(govde, /['"]BELLA['"]/);
   });
 
   await test('Confirmed gap discount persists a real dated override', async () => {

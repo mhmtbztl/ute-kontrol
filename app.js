@@ -72,9 +72,21 @@ function deferInlineStyleAttributes(html) {
 }
 
 // data-lx-style -> el.style.cssText (CSSOM; CSP satir ici stili engeller, bunu engellemez).
+// Koyu tema icin yazilmis sabit renkler burada tema degiskenine doner
+// (core/theme.js, Gece/Gunduz): ayni HTML iki temada da okunur.
+function themeizeInlineCss(cssText) {
+  const tema = typeof window !== 'undefined' ? window.LexTheme : null;
+  return tema && typeof tema.themeizeCss === 'function' ? tema.themeizeCss(cssText) : cssText;
+}
+
 function applyDeferredInlineStyles(root) {
   if (!root || typeof root.querySelectorAll !== 'function') return;
-  const uygula = el => { el.style.cssText = el.getAttribute('data-lx-style') || ''; el.removeAttribute('data-lx-style'); };
+  // Kullanicinin sectigi renk (mulk rengi) temaya cevrilmez: data-lx-literal-color.
+  const uygula = el => {
+    const css = el.getAttribute('data-lx-style') || '';
+    el.style.cssText = el.hasAttribute('data-lx-literal-color') ? css : themeizeInlineCss(css);
+    el.removeAttribute('data-lx-style');
+  };
   if (typeof root.hasAttribute === 'function' && root.hasAttribute('data-lx-style')) uygula(root);
   root.querySelectorAll('[data-lx-style]').forEach(uygula);
 }
@@ -604,7 +616,6 @@ async function saveBookingPaymentCommission(booking, amount) {
     booking.paymentCommission = tutar;
     const bellek = (appData.bookings || []).find(b => b.id === booking.id);
     if (bellek) bellek.paymentCommission = tutar;
-    invalidateExecutiveSnapshotCache(); // ana sayfa bayat kalmasin (ui_consistency_tests F)
     return '';
   } catch (err) {
     return '\n\nRezervasyon kaydedildi; ancak ödeme komisyonu yazılamadı: ' + (err?.message || 'veritabanı hatası');
@@ -691,7 +702,6 @@ async function syncBookingCleaningTaskToCloud(booking, cleanCost) {
 }
 
 function saveAppData() {
-  invalidateExecutiveSnapshotCache();
   if (typeof localStorage === 'undefined') return;
   const uId = (activeSaaSUser && activeSaaSUser.id) ? activeSaaSUser.id : 'usr_ute_master';
   try {
@@ -2369,7 +2379,6 @@ async function saveMonthlyTarget(targetInput) {
     throw new Error('Hedef kaydedilemedi: ' + (error.message || 'Veritabanı hatası'));
   }
   await loadMonthlyTargets();
-  invalidateExecutiveSnapshotCache();
   if (typeof renderAll === 'function') renderAll();
   return data;
 }
@@ -2722,7 +2731,6 @@ async function createExpense(expenseInput) {
     if (typeof renderFinance === 'function') renderFinance();
   }
 
-  invalidateExecutiveSnapshotCache(); // ana sayfa bayat kalmasin (ui_consistency_tests F)
   return mapped;
 }
 
@@ -2796,7 +2804,6 @@ async function createExpensesBatch(expenseInputs, islem = 'kopyalanamadı') {
     if (typeof saveAppData === 'function') saveAppData();
     if (typeof renderAll === 'function') renderAll();
   }
-  invalidateExecutiveSnapshotCache();
   return created;
 }
 
@@ -2925,7 +2932,6 @@ async function updateExpense(expenseId, expenseInput) {
     if (typeof renderFinance === 'function') renderFinance();
   }
 
-  invalidateExecutiveSnapshotCache(); // ana sayfa bayat kalmasin (ui_consistency_tests F)
   return mapped;
 }
 
@@ -2979,7 +2985,6 @@ async function deleteExpense(expenseId, skipConfirm = false) {
     if (typeof window !== 'undefined' && window.showToast) window.showToast('🗑️ Harcama başarıyla silindi.');
   }
 
-  invalidateExecutiveSnapshotCache(); // ana sayfa bayat kalmasin (ui_consistency_tests F)
   return true;
 }
 
@@ -3004,7 +3009,6 @@ async function deleteExpensesByIds(ids) {
     }
   }
   appData.expenses = (appData.expenses || []).filter(e => !liste.includes(String(e.id)));
-  invalidateExecutiveSnapshotCache(); // ana sayfa bayat kalmasin (ui_consistency_tests F)
   if (typeof renderAll === 'function') renderAll();
   if (typeof renderExpensesTable === 'function') renderExpensesTable();
   return liste.length;
@@ -3075,7 +3079,6 @@ async function cloudUpsertCleaningTask(task) {
     }
     throw new Error('Temizlik görevi kaydedilemedi: ' + (error.message || 'veritabanı hatası'));
   }
-  invalidateExecutiveSnapshotCache(); // ana sayfa bayat kalmasin (ui_consistency_tests F)
   return data;
 }
 
@@ -3090,7 +3093,6 @@ async function cloudDeleteCleaningTask(taskId) {
   if (error) {
     throw new Error('Temizlik görevi silinemedi: ' + (error.message || 'veritabanı hatası'));
   }
-  invalidateExecutiveSnapshotCache(); // ana sayfa bayat kalmasin (ui_consistency_tests F)
 }
 
 // -------------------------------------------------------------
@@ -3129,7 +3131,6 @@ async function cloudDeleteCleaningExpense(legacyId) {
   if (error) {
     throw new Error('Temizlik gideri silinemedi: ' + (error.message || 'veritabanı hatası'));
   }
-  invalidateExecutiveSnapshotCache(); // ana sayfa bayat kalmasin (ui_consistency_tests F)
 }
 
 /**
@@ -4041,18 +4042,6 @@ function handleFilterChange() {
   if (typeof syncMobileShell === 'function') syncMobileShell();
 }
 
-function stepMonth(delta) {
-  let idx = ALL_FINANCIAL_MONTHS.indexOf(currentFilter.period);
-  if (idx === -1) idx = ALL_FINANCIAL_MONTHS.indexOf(getTodayStr().slice(0, 7));
-
-  let newIdx = idx + delta;
-  if (newIdx >= 0 && newIdx < ALL_FINANCIAL_MONTHS.length) {
-    currentFilter.period = ALL_FINANCIAL_MONTHS[newIdx];
-    const select = document.getElementById('globalPeriodFilter');
-    if (select) select.value = currentFilter.period;
-    handleFilterChange();
-  }
-}
 
 function updateStepperLabels() {
   const curIdx = ALL_FINANCIAL_MONTHS.indexOf(currentFilter.period);
@@ -4104,20 +4093,12 @@ function registerPageAction(tabId, action) {
   if (i >= 0) liste[i] = action; else liste.push(action);
 }
 
-registerPageAction('marketing', {
-  id: 'funnel-test-question',
-  label: "🧪 Önceki kapak testini sor",
-  title: 'Önceki kapak testi kayıtlarını değerlendirir; yeni Airbnb performans kayıtlarını içermez',
-  kind: 'FUNNEL_TEST_QUESTION',
-  run: () => openFunnelTestQuestion()
-});
-
 [
   ['finance', 'FINANCE'], ['properties', 'PROPERTY'], ['reservations', 'BOOKINGS'],
   ['operations', 'OPERATIONS'], ['leads', 'SALES'], ['marketing', 'CHANNELS_MARKETING']
 ].forEach(([tabId, page]) => registerPageAction(tabId, {
   id: 'page-report',
-  label: '📄 Rapor al',
+  label: 'Rapor al',
   title: 'Ekrandaki dönem ve filtrelerle rapor oluştur',
   run: () => openPageReport(page)
 }));
@@ -4130,15 +4111,10 @@ const CHATGPT_PAGE_CONFIG = Object.freeze({
   leads: { page: 'SALES', scope: 'Misafirler ve Satış', questions: ['Satış hunisini yorumla.', 'Dönüşümü artırmak için sıradaki üç adım nedir?'] },
   pricing: { kind: 'PRICE_RULE_QUESTION', scope: 'Fiyatlandırma', questions: ['Hafta sonu fiyat kuralını değerlendir.', 'Son dakika ve boş gece indirimlerini değerlendir.'] },
   finance: { page: 'FINANCE', scope: 'Finans', questions: ['Bu finans raporunu yorumla.', 'Kârlılığı etkileyen ölçülmüş kalemleri önceliklendir.'] },
-  marketing: { page: 'CHANNELS_MARKETING', scope: 'Kanallar ve Pazarlama', questions: ['Kanal ekonomisini yorumla.', 'Değişiklik işe yaradı mı, sırada ne var?'] },
+  marketing: { page: 'CHANNELS_MARKETING', scope: 'Pazarlama', questions: ['Kanal ekonomisini yorumla.', 'Değişiklik işe yaradı mı, sırada ne var?'] },
   settings: { scope: 'Ayarlar', questions: ['İşletme kurulumunda eksik olabilecek noktaları kontrol listesi olarak yaz.'] }
 });
 let currentChatGptRequest = null;
-
-['finance', 'properties', 'reservations', 'operations', 'leads', 'marketing'].forEach(tabId => registerPageAction(tabId, {
-  id: 'page-chatgpt', label: "🧠 ChatGPT'ye sor", title: 'Bu sayfanın güvenli özetiyle soru sor',
-  run: () => openChatGptQuestionModal({ tabId })
-}));
 
 function activePageTabId() {
   const active = document.querySelector('.tab-content.active');
@@ -4562,33 +4538,9 @@ function printCurrentReport() {
 function askChatGptFromCurrentReport() {
   if (!currentPageReport) return false;
   closePageReportModal();
-  if (typeof openChatGptQuestionForReport === 'function') return openChatGptQuestionForReport(currentPageReport);
-  switchTab('analysis');
-  return true;
+  return openChatGptQuestionForReport(currentPageReport);
 }
 
-function openFunnelTestQuestion() {
-  const model = typeof LexBnBMarketingUI !== 'undefined' && LexBnBMarketingUI.getCurrentModel ? LexBnBMarketingUI.getCurrentModel() : null;
-  const experiment = model?.experiments?.[0] || {};
-  // Gercek huni verisi gider (L-285): deney alan adlari tutmuyordu, metin bostu.
-  const huni = typeof MarketingFunnelService !== 'undefined' ? MarketingFunnelService : null;
-  const ilanAdi = id => { const ilan = (model?.listings || []).find(item => item.id === id); return ilan ? (ilan.title || ilan.listing_title || ilan.channel || 'İlan') : 'İlan'; };
-  const snapshots = (model?.snapshots || []).slice(0, 6).map(s => {
-    const sayac = k => (s[k] ?? s[k.replace(/[A-Z]/g, ch => '_' + ch.toLowerCase())]);
-    const oran = huni ? huni.deriveFunnelMetrics(s).rates : null;
-    return {
-      label: `${ilanAdi(s.channel_listing_id || s.channelListingId)} · ${s.period_start || s.periodStart || '?'} → ${s.period_end_exclusive || s.periodEndExclusive || '?'}`,
-      impressions: sayac('impressions'), listingViews: sayac('listingViews'), bookings: sayac('platformReportedBookings'),
-      ctr: oran ? oran.searchToViewCtrPercent : null, conversion: oran ? oran.viewToBookingConversionPercent : null
-    };
-  });
-  return openChatGptQuestionModal({
-    tabId: 'marketing', kind: 'FUNNEL_TEST_QUESTION', scope: 'Kanallar ve Pazarlama',
-    selectedQuestion: 'Değişiklik işe yaradı mı, sırada ne var?',
-    questions: ['Değişiklik işe yaradı mı, sırada ne var?'],
-    context: { testName: experiment.primary_metric || experiment.primaryMetric || experiment.name || null, changedOn: experiment.change_date || experiment.changeDate || null, verdict: experiment.verdict || experiment.status || null, snapshots }
-  });
-}
 
 function runPageAction(id) {
   const aktif = typeof document !== 'undefined' && document.querySelector
@@ -4606,7 +4558,21 @@ function renderPageActionBar(tabId) {
   if (!bar) return;
   const eylemler = PAGE_ACTIONS[getMenuTabFor(tabId)] || [];
   bar.hidden = eylemler.length === 0;
-  bar.innerHTML = eylemler.map(e => `<button type="button" class="btn btn-secondary btn-sm" data-onclick="runPageAction(decodeURIComponent('${encodeActionArg(e.id)}'))"${e.title ? ` title="${escapeHtml(e.title)}"` : ''}>${escapeHtml(e.label)}</button>`).join('');
+  if (bar.classList) bar.classList.remove('is-open');
+  const dugmeler = eylemler.map(e => `<button type="button" class="btn btn-secondary btn-sm" data-onclick="runPageAction(decodeURIComponent('${encodeActionArg(e.id)}'))"${e.title ? ` title="${escapeHtml(e.title)}"` : ''}>${escapeHtml(e.label)}</button>`).join('');
+  // D-06: telefonda bu satir her sekmenin ilk ekraninin ~130 px'ini aliyordu.
+  // Orada tek "Rapor ⋯" dugmesi gorunur; eylemler dokununca acilir (CSS 640 px).
+  bar.innerHTML = eylemler.length
+    ? `<button type="button" class="btn btn-secondary btn-sm page-action-bar__more" aria-expanded="false" aria-controls="pageActionItems" data-onclick="togglePageActionMenu()">Rapor ⋯</button><div class="page-action-bar__items" id="pageActionItems">${dugmeler}</div>`
+    : '';
+}
+
+function togglePageActionMenu() {
+  const bar = typeof document !== 'undefined' ? document.getElementById('pageActionBar') : null;
+  if (!bar || !bar.classList) return false;
+  const acik = bar.classList.toggle('is-open');
+  bar.querySelector('.page-action-bar__more')?.setAttribute('aria-expanded', String(acik));
+  return acik;
 }
 
 // Ustteki DONEM / PORTFOY filtresi yalniz onu okuyan sayfada gorunur ve orada
@@ -4617,9 +4583,7 @@ function renderPageActionBar(tabId) {
 const GLOBAL_FILTER_SCOPE = {
   finance: 'Bu sayfadaki tüm rakamlar, tablolar ve dışa aktarım bu döneme ve mülke göre hesaplanır.',
   expenses: 'Gider listesi ve şablondan işlenecek ay bu döneme ve mülke göre.',
-  pricing: 'Yalnız üstteki ADR kartı bu döneme göre. Fiyat takvimi, boş gece ve hedef hesaplayıcı bugünden 12 aylık takvimi kullanır; ayı takvimin sekmesinden seçin.',
   operations: 'Geçmiş temizlik listesi bu döneme ve mülke göre. Bugünün işleri filtreden bağımsız.',
-  housekeeping: 'Temizlik görevleri ve borç özeti bu döneme ve mülke göre.',
   marketing: 'Kampanyalar ve kanal dağılımı bu döneme ve mülke göre.'
 };
 
@@ -4629,7 +4593,6 @@ function applyGlobalFilterScope(tabId) {
   if (!bar) return;
   const scope = GLOBAL_FILTER_SCOPE[tabId] || '';
   bar.hidden = !scope;
-  setEl('globalFilterScopeHint', scope);
 }
 
 function switchTab(tabId) {
@@ -4667,7 +4630,6 @@ function switchTab(tabId) {
   if (tabId === 'guests') renderGuestsTab();
   if (tabId === 'pricing') renderPricingTab();
   if (tabId === 'pricing') renderPricingKpiStrip();
-  if (tabId === 'analysis') renderAnalysisCenter();
   if (tabId === 'settings') renderSettingsWorkspace();
   if (tabId === 'settings') renderTeamManagement();
   if (tabId === 'settings') loadDeletionImpact();
@@ -4682,12 +4644,74 @@ function switchTab(tabId) {
     renderLeadQuickCapture();
     renderLeadSalesWorkspace();
     renderManageLeadsTable();
-    renderLeadAnalytics();
   }
-  if (tabId === 'maintenance') renderManageMaintTable();
-  if (tabId === 'housekeeping') renderHousekeepingTab();
   if (tabId === 'marketing') renderMarketingModule();
   if (tabId === 'analytics') renderAnalyticsTab();
+  renderLexScreenChrome(tabId);
+}
+
+// Lex duzeni (21.11.2026): her ekranin basligi ayni satirdadir (baslik solda,
+// donem ve "Rapor al" sagda) ve ustunde o ekranin ekiplerine dusen acik isler
+// durur. Is yoksa bolum gizlidir (sadelik). Gorevler Bugun ile ayni motordan
+// (buildTodayTeamTasks); ekip ekranla eslesir, gorme hakki rol kapisindan.
+// Sadelik 3. tur: ayni is bes ekranda tekrar ediyordu. Is artik yalniz acildigi ekranda
+// (gorev turunun hedefi) ve Bugun'de gorunur; Mulkler ve Analiz'de gorev bolumu yok.
+const SCREEN_TASK_TARGETS = Object.freeze({
+  reservations: ['reservations'],
+  operations: ['housekeeping', 'maintenance'],
+  leads: ['leads'],
+  guests: ['leads'],
+  pricing: ['pricing'],
+  finance: ['finance'],
+  marketing: ['marketing']
+});
+const SCREEN_TASK_LIMIT = 3;
+let lexBarHome = null;
+
+function screenTeamTasks(tabId, today = getTodayStr()) {
+  const T = getTeamTasksApi();
+  const targets = SCREEN_TASK_TARGETS[tabId];
+  if (!T || !targets) return [];
+  // Temizlik borcu Finans ekibinindir; odemesi Finans'tan yapilir (hedefi temizlik defteri olsa da).
+  const targetOf = t => (t.type === 'CLEANING_DEBT' ? 'finance' : (T.TASK_TYPES[t.type] || {}).target);
+  const all = buildTodayTeamTasks(today);
+  todayLastTasks = all; // openTeamTask satiri bulsun (Bugun hic acilmamis olabilir)
+  return all.filter(t => t.tag !== 'DONE' && targets.includes(targetOf(t)));
+}
+
+function renderScreenTeamTasks(tabId) {
+  if (typeof document === 'undefined') return;
+  const box = document.getElementById(`screenTasks_${tabId}`);
+  if (!box) return;
+  const T = getTeamTasksApi();
+  const L = getLexUiApi();
+  const shown = T && L ? screenTeamTasks(tabId) : [];
+  box.hidden = shown.length === 0;
+  if (!shown.length) { box.innerHTML = ''; return; }
+  const more = shown.length > SCREEN_TASK_LIMIT
+    ? `<button type="button" class="lex-btn lex-btn--inline" data-onclick="switchTab('executive')">Tüm işler (${shown.length}) Bugün'de</button>` : '';
+  box.innerHTML = `<p class="lex-summary">${L.summaryHtml(T.summaryParts(shown, { stays: false }))}</p>`
+    + L.tableHtml({ head: ['Gün · ekip', 'İş', 'Talimat'], rows: todayTaskRows(shown.slice(0, SCREEN_TASK_LIMIT)), caption: 'Ekip görevleri' })
+    + more;
+}
+
+function renderLexScreenChrome(tabId) {
+  if (typeof document === 'undefined') return;
+  const label = formatPeriodLabel(currentFilter && currentFilter.period);
+  const villa = currentFilter && currentFilter.villa && currentFilter.villa !== 'ALL'
+    ? (appData?.villas?.[currentFilter.villa]?.name || currentFilter.villa) : '';
+  document.querySelectorAll('[data-lex-period]').forEach(el => { el.textContent = villa ? `${label} · ${villa}` : label; });
+  // "Rapor al" basligin sagina tasinir; ayri satir kaplamaz.
+  const content = document.getElementById(`tab-${tabId}`);
+  const bar = document.getElementById('pageActionBar');
+  const headRow = content && content.querySelector('.lex-headrow, .section-title-bar, .pricing-head');
+  if (bar && !lexBarHome) lexBarHome = { parent: bar.parentElement, next: bar.nextSibling };
+  if (bar && headRow && bar.parentElement !== headRow) headRow.appendChild(bar);
+  // Ekip gorevleri ekran basliginin hemen altinda (baslik bir kartin icindeyse kartin altinda degil).
+  const box = document.getElementById(`screenTasks_${tabId}`);
+  if (box && headRow && headRow.nextElementSibling !== box) headRow.after(box);
+  else if (bar && !headRow && lexBarHome && bar.parentElement !== lexBarHome.parent) lexBarHome.parent.insertBefore(bar, lexBarHome.next);
+  renderScreenTeamTasks(tabId);
 }
 
 function isBookingInFilter(b) {
@@ -4983,51 +5007,9 @@ function isMaintenanceTicketOpen(ticket) {
   return !KAPALI_ARIZA_DURUMLARI.includes(durum);
 }
 
-function renderOperationsKpiStrip() {
-  if (typeof document === 'undefined' || !appData) return;
-  const villas = appData.villas || {};
-  const villaKeys = Object.keys(villas);
-  const tasks = appData.cleaningTasks || [];
-  const tickets = appData.maintenance || [];
-
-  const hazir = villaKeys.filter(k => {
-    const readiness = getPropertySalesReadiness(k);
-    return readiness && ['SALES_READY', 'NON_BLOCKING_ISSUE'].includes(readiness.status);
-  }).length;
-  setEl('opsReadyPropsVal', `${hazir} / ${villaKeys.length}`);
-
-  const bugun = getTodayStr();
-  const bugunkuTurnover = tasks.filter(t => (t.date || '').slice(0, 10) === bugun).length;
-  setEl('opsTurnoverVal', `${bugunkuTurnover} Görev`);
-
-  // Eskiden yalniz DONE/CLOSED/TAMAMLANDI kapali sayiliyordu: cozulen ariza
-  // kartta acik kaliyordu. Tek tanim isMaintenanceTicketOpen.
-  const acikP1 = tickets.filter(t => {
-    const oncelik = String(t.priority || t.oncelik || '').toUpperCase();
-    return isMaintenanceTicketOpen(t)
-      && (oncelik === 'P1' || oncelik === 'KRITIK' || oncelik === 'CRITICAL');
-  }).length;
-  setEl('opsOpenMaintVal', `${acikP1} İş`);
-  // U-14/D-09: sifir deger uyari rengi tasimaz; renk yalniz is varken.
-  setKpiAlertColor('opsOpenMaintVal', acikP1 > 0, '#FF6961');
-
-  const borc = tasks.filter(isCleaningDebt).reduce((a, t) => a + (Number(t.amount) || 0), 0);
-  setEl('opsDebtVal', `₺${Math.round(borc).toLocaleString('tr-TR')}`);
-  setKpiAlertColor('opsDebtVal', borc > 0, '#FFB340');
-
-  // SLA gostergesi kalkti (ENVANTER Operasyon 27.09.2026): tamamlanma zamani
-  // kaydedilmiyordu; gecikme alani hic yazilmadigi icin tamamlanmis gorev
-  // oldugu an gosterge her zaman %100'du.
-}
 
 function renderPricingKpiStrip() {
   if (typeof document === 'undefined' || !appData) return;
-  // ADR tek tanimdan: net oda geliri / satilan gece (K-04, L-37). Burada
-  // eskiden brut / gece hesaplaniyordu; temizlik ucreti ve indirim ADR'yi
-  // ayni ay icin Finans ekranindan farkli gosteriyordu.
-  const defter = computeFilterLedger();
-  setEl('pricingAdrVal', defter.adr === null ? '—' : `₺${Math.round(defter.adr).toLocaleString('tr-TR')}`);
-
   // Bos gece fiyat takviminin kendi hesabindan (L-252). Eskiden
   // GapNightService imzasina aykiri cagriliyor ve her zaman 0 yaziyordu.
   const today = getTodayStr();
@@ -5043,27 +5025,6 @@ function renderPricingKpiStrip() {
     setEl('pricingGapCountMeta', total
       ? `${gaps.map(item => `${item.entry.property.name || item.entry.key} (${item.dates.length})`).join(', ')} · önümüzdeki ${PRICING_HORIZON_MONTHS} ay`
       : `Önümüzdeki ${PRICING_HORIZON_MONTHS} ayda rezervasyonlar arasında kısa boşluk yok`);
-  }
-
-  // Yillik hedef = secili yilin aylik portfoy hedeflerinin toplami (L-253).
-  // Hedef aylik girilir; kart eskiden "yillik" turlu bir kayit ariyordu ve
-  // boyle bir kayit hic olmadigi icin her zaman "—" yaziyordu.
-  const year = Number((pricingSelectedMonth || today).slice(0, 4));
-  const hedefler = (Array.isArray(appData.targets) ? appData.targets : Object.values(appData.targets || {}))
-    .filter(t => !(t.property_id || t.propertyId) && Number(t.year) === year);
-  const ayHedefi = t => hedefDegeri(t.revenue_target, t.revenue);
-  const hedefliAylar = hedefler.filter(t => ayHedefi(t) !== null);
-  const hedefTutar = hedefliAylar.reduce((sum, t) => sum + ayHedefi(t), 0);
-  setEl('pricingAnnualTargetVal', hedefliAylar.length ? `₺${Math.round(hedefTutar).toLocaleString('tr-TR')}` : '—');
-  if (!hedefliAylar.length) {
-    setEl('pricingAnnualTargetMeta', `${year} için aylık hedef yok; Hedefleri Yönet'ten her ay girilir, toplamı burada görünür`);
-  } else {
-    // Gerceklesme yalniz HEDEFI GIRILMIS aylarin cirosudur (L-310): eskiden
-    // 12 ayin cirosu tek ayin hedefine oranlaniyor, %1315 cikiyordu.
-    const kayitli = canReadLedgerRole()
-      ? hedefliAylar.map(t => computeMonthLedger(`${year}-${String(t.month).padStart(2, '0')}`, 'ALL')?.netRoomRevenue || 0).reduce((a, b) => a + b, 0)
-      : null;
-    setEl('pricingAnnualTargetMeta', `${year}: ${hedefliAylar.length}/12 ayda hedef${kayitli === null ? '' : ` · hedefli aylarda ciro ₺${Math.round(kayitli).toLocaleString('tr-TR')}${hedefTutar > 0 ? ` (%${Math.round(kayitli / hedefTutar * 100)})` : ''}`}`);
   }
 
   // Koruma limitleri karti hic yuklenmeyen eski fiyat profillerine bakiyordu
@@ -5390,7 +5351,7 @@ function renderTablePagination(containerId, tableKey, pageInfo, renderFunctionNa
   }
   container.innerHTML = `
     <button type="button" class="btn btn-secondary btn-sm" ${pageInfo.page <= 1 ? 'disabled' : ''}
-            data-onclick="setLargeTablePage(decodeURIComponent('${encodeActionArg(tableKey)}'), ${pageInfo.page - 1}, decodeURIComponent('${encodeActionArg(renderFunctionName)}'))">← Önceki</button>
+            data-onclick="setLargeTablePage(decodeURIComponent('${encodeActionArg(tableKey)}'), ${pageInfo.page - 1}, decodeURIComponent('${encodeActionArg(renderFunctionName)}'))">Önceki</button>
     <span>${pageInfo.totalRows.toLocaleString('tr-TR')} kayıt · ${pageInfo.page}/${pageInfo.totalPages}. sayfa</span>
     <button type="button" class="btn btn-secondary btn-sm" ${pageInfo.page >= pageInfo.totalPages ? 'disabled' : ''}
             data-onclick="setLargeTablePage(decodeURIComponent('${encodeActionArg(tableKey)}'), ${pageInfo.page + 1}, decodeURIComponent('${encodeActionArg(renderFunctionName)}'))">Sonraki →</button>`;
@@ -5405,7 +5366,7 @@ function setLargeTablePage(tableKey, page, renderFunctionName) {
 const ACTIVE_RENDER_PLANS = {
   'tab-executive': ['renderExecutiveControlCenter'],
   'tab-properties': ['renderPropertiesTab'],
-  'tab-operations': ['renderOperationsTab', 'renderOperationsKpiStrip'],
+  'tab-operations': ['renderOperationsTab'],
   'tab-staff-field': ['renderStaffFieldWork'],
   'tab-guests': ['renderGuestsTab'],
   'tab-pricing': ['renderPricingTab', 'renderPricingKpiStrip'],
@@ -5414,10 +5375,8 @@ const ACTIVE_RENDER_PLANS = {
   'tab-finance': ['renderFinanceModule'],
   'tab-reservations': ['renderManageBookingsTable', 'renderTapeChart'],
   'tab-expenses': ['renderExpensesTable'],
-  'tab-leads': ['renderLeadQuickCapture', 'renderLeadSalesWorkspace', 'renderManageLeadsTable', 'renderLeadAnalytics'],
-  'tab-maintenance': ['renderManageMaintTable'],
-  'tab-housekeeping': ['renderHousekeepingTab'],
-  'tab-settings': ['renderSettingsWorkspace', 'renderTeamManagement'],
+  'tab-leads': ['renderLeadQuickCapture', 'renderLeadSalesWorkspace', 'renderManageLeadsTable'],
+  'tab-settings': ['renderSettingsWorkspace', 'renderTeamManagement', 'renderTeamTaskRouting'],
   'tab-analytics': ['renderAnalyticsTab']
 };
 
@@ -5442,7 +5401,6 @@ function renderAll() {
     renderExecutiveControlCenter,
     renderPropertiesTab,
     renderOperationsTab,
-    renderOperationsKpiStrip,
     renderStaffFieldWork,
     renderGuestsTab,
     renderPricingTab,
@@ -5453,45 +5411,20 @@ function renderAll() {
     renderLeadQuickCapture,
     renderLeadSalesWorkspace,
     renderManageLeadsTable,
-    renderLeadAnalytics,
-    renderManageMaintTable,
     renderDailyOps,
     renderTapeChart,
-    renderHousekeepingTab,
     renderSettingsWorkspace,
-    renderTeamManagement
+    renderTeamManagement,
+    renderTeamTaskRouting
   };
   const fallbackPlan = Object.keys(renderers);
   const plan = activePlan.length ? activePlan : (activeTabId ? [] : fallbackPlan);
   plan.forEach(name => renderers[name]());
+  if (activeTabId) renderLexScreenChrome(activeTabId.replace(/^tab-/, ''));
 
   renderDataSyncStamp();
-
-  // Badges
-  const rBadge = document.getElementById('rezCountBadge');
-  if (rBadge) {
-    // Iptal edilmemis GERCEK rezervasyonlarin tamami. Eskiden ustteki donem
-    // filtresine gore sayiyordu; ama Rezervasyonlar sayfasinda o filtre yok
-    // (liste kendi filtresine bakar), menudeki sayi gorunmeyen bir secime
-    // bagli kaliyordu. Toplu aktarim ozeti rezervasyon degildir (L-103).
-    const activeBookings = (appData.bookings || [])
-      .filter(b => b.status !== 'CANCELLED' && !isBulkSummaryBooking(b));
-    rBadge.innerText = activeBookings.length;
-    const aciklama = `İptal edilmemiş ${activeBookings.length} rezervasyon (tüm dönemler)`;
-    if (typeof rBadge.setAttribute === 'function') rBadge.setAttribute('title', aciklama);
-    const dugme = rBadge.parentNode;
-    if (dugme && typeof dugme.setAttribute === 'function') dugme.setAttribute('title', aciklama);
-  }
-  const eBadge = document.getElementById('expenseCountBadge');
-  if (eBadge) {
-    const activeExpenses = (appData.expenses || []).filter(exp => isExpenseInFilter(exp));
-    eBadge.innerText = activeExpenses.length;
-  }
-  const lBadge = document.getElementById('leadCountBadge');
-  if (lBadge) lBadge.innerText = appData.leads.length;
-  const mBadge = document.getElementById('maintCountBadge');
-  if (mBadge) mBadge.innerText = appData.maintenance.filter(m => m.status === 'OPEN').length;
-  renderOperationsTabBadge();
+  // Menu sayaclari kalkti (sadelik, 21.11.2026): bekleyen isi Bugun'deki
+  // ekip gorevleri tablosu soyler; menude ikinci bir sayi yazilmaz.
 }
 
 // =============================================================
@@ -5698,61 +5631,18 @@ function renderFinanceModule() {
 
   setEl('finNetProfit', karOlculemez ? '—' : `${Math.round(netCashProfit).toLocaleString('tr-TR')} TL`);
   setEl('finNetMarginLabel', karOlculemez ? OLCULEMEYEN_KAR_NOTU : `%${netMargin.toFixed(1)} net kâr marjı`);
+  if (typeof document !== 'undefined') {
+    const goalLink = document.getElementById('finGoalLink');
+    if (goalLink) goalLink.hidden = !!hasTarget;
+    const expenseLink = document.getElementById('finExpenseLink');
+    if (expenseLink) expenseLink.hidden = !karOlculemez;
+  }
 
   setEl('finTotalExpense', `${Math.round(totalExpense).toLocaleString('tr-TR')} TL`);
   setEl('finExpenseRatio', karOlculemez ? 'Bu dönem için gider kaydı yok' : `Toplam gelirin %${expenseRatio.toFixed(1)}'i`);
 
   setEl('finSoldNights', `${totalSoldNights} gece`);
   setEl('finAvgRevPerNight', avgRevPerNight === null ? 'ADR: — (satılan gece yok)' : `ADR ${avgRevPerNight.toLocaleString('tr-TR')} TL (net oda geliri / satılan gece)`);
-
-  // Target Analysis Box
-  setEl('tgtBoxTarget', hasTarget ? `${Math.round(targetRev).toLocaleString('tr-TR')} TL` : '—');
-  setEl('tgtBoxActual', `${Math.round(ciro).toLocaleString('tr-TR')} TL`);
-  setEl('tgtBoxDiff', hasTarget ? `${targetDiff >= 0 ? '+' : ''}${Math.round(targetDiff).toLocaleString('tr-TR')} TL` : '—');
-  setEl('tgtBoxPct', hasTarget ? `%${targetPct.toFixed(1)}` : '—');
-  setEl('finTargetStatusBadge', hasTarget ? `%${targetPct.toFixed(1)} Hedef Başarısı` : 'Hedef belirlenmedi');
-  setEl('targetBarRatioText', hasTarget ? `${Math.round(ciro).toLocaleString('tr-TR')} TL / ${Math.round(targetRev).toLocaleString('tr-TR')} TL (%${targetPct.toFixed(1)})` : `${Math.round(ciro).toLocaleString('tr-TR')} TL / —`);
-
-  // Olcek gerceklesen ile hedefin buyugu: dolgu gerceklesen, isaret hedef.
-  // Hedef asildiginda dolgu tam, isaret geride kalir — asim gorunur. Isaret
-  // eskiden HTML'de sabit %62'deydi ve hic guncellenmiyordu.
-  const fillEl = document.getElementById('targetBarFill');
-  const markerEl = document.getElementById('targetBarMarker');
-  const olcek = hasTarget ? Math.max(targetRev, ciro) : 0;
-  const yuzde = v => `${Math.round(Math.min(100, Math.max(0, (v / olcek) * 100)))}%`;
-  if (fillEl) fillEl.style.width = hasTarget && olcek > 0 ? yuzde(ciro) : '0%';
-  if (markerEl) {
-    markerEl.hidden = !(hasTarget && olcek > 0);
-    markerEl.style.left = markerEl.hidden ? '' : yuzde(targetRev);
-  }
-
-  // Profit Waterfall Bridge
-  // Kar koprusu: Konaklama cirosu (+ Temizlik geliri = Toplam gelir) → giderler.
-  // Cogu isletme ayri temizlik ucreti almaz: 0 ise iki adim hic gorunmez.
-  setEl('brCiro', `${Math.round(ciro).toLocaleString('tr-TR')} TL`);
-  // Diger gelir (phase97) ayni grupta ayri adimdir; ikisi de 0 ise grup gizli.
-  const temizlikGeliri = ledger.cleaningRevenue;
-  const digerGelir = ledger.otherIncome;
-  const temizlikAdimi = document.getElementById('brCleaningGroup');
-  if (temizlikAdimi) temizlikAdimi.style.display = (temizlikGeliri > 0 || digerGelir > 0) ? '' : 'none';
-  const temizlikKutusu = document.getElementById('brCleaningStep');
-  if (temizlikKutusu) temizlikKutusu.hidden = !(temizlikGeliri > 0);
-  const digerKutusu = document.getElementById('brOtherIncomeStep');
-  if (digerKutusu) digerKutusu.hidden = !(digerGelir > 0);
-  setEl('brCleaningRevenue', temizlikGeliri > 0 ? `+${Math.round(temizlikGeliri).toLocaleString('tr-TR')} TL` : '—');
-  setEl('brOtherIncome', digerGelir > 0 ? `+${Math.round(digerGelir).toLocaleString('tr-TR')} TL` : '—');
-  setEl('brTotalIncome', `${Math.round(totalRevenue).toLocaleString('tr-TR')} TL`);
-  setEl('brOpex', formatDeductionTl(totalOpex));
-  setEl('brOpProfit', karOlculemez ? '—' : `${Math.round(operatingProfit).toLocaleString('tr-TR')} TL`);
-  setEl('brCapex', formatDeductionTl(totalCapex));
-  setEl('brNetProfit', karOlculemez ? '—' : `${Math.round(netCashProfit).toLocaleString('tr-TR')} TL`);
-  setEl('brNetMargin', karOlculemez ? OLCULEMEYEN_KAR_NOTU : `%${netMargin.toFixed(1)} Net Kâr Marjı`);
-
-  // Operasyonel kar marji index.html'de "%30,3" olarak KODA GOMULUYDU ve hicbir
-  // zaman guncellenmiyordu; hemen altindaki net marj dogru hesaplanirken bu
-  // sabit kaliyordu, yani iki satir birbirini yalanliyordu.
-  const opMargin = totalRevenue > 0 ? (operatingProfit / totalRevenue) * 100 : 0;
-  setEl('brOpMargin', karOlculemez ? OLCULEMEYEN_KAR_NOTU : `Marj: %${opMargin.toFixed(1)} (Yatırımlar Öncesi)`);
 
   // "geçen aya göre" rozetleri de statik HTML'di.
   const prevTotals = computePreviousPeriodTotals();
@@ -5770,20 +5660,6 @@ function renderFinanceModule() {
   // Render Property Finance Scorecards
   renderPropertyFinanceCards(propStats, ciro);
 
-  // Render Property Comparison Chart
-  renderPropertyComparisonChart(propStats);
-
-  // Render Monthly KPI Tracker
-  renderMonthlyKpiTracker();
-
-  // Render Monthly Trend Chart
-  renderMonthlyTrendChart();
-
-  // Render YoY Comparison
-  renderYoYComparison(ciro, totalOpex, netCashProfit, totalSoldNights);
-
-  // Render AI Financial Analyst
-  renderAIFinancialAnalyst(ciro, totalRevenue, targetRev, targetPct, totalOpex, totalCapex, netCashProfit, netMargin, propStats, karOlculemez, categoryTotals);
 }
 
 // -------------------------------------------------------------
@@ -5900,7 +5776,7 @@ function expenseCategoryRowsHtml(catName) {
          <button class="btn btn-danger btn-sm" data-onclick="deleteExpenseUI(decodeURIComponent('${encodeActionArg(String(exp.id))}'))" title="Sil">🗑️</button>` : '');
     const kategori = exp.category && exp.category !== catName ? ` <small>(${escapeHtml(exp.category)})</small>` : '';
     const seri = expenseSeriesInfo(exp);
-    const tekrar = seri ? ` <span class="badge badge-blue" title="Tekrarlayan gider">🔁 ${seri.index}/${seri.total}</span>` : '';
+    const tekrar = seri ? ` <span class="badge badge-blue" title="Tekrarlayan gider">${seri.index}/${seri.total}</span>` : '';
     return `<tr>
       <td>${formatTrDate(exp.date)}</td>
       <td>${escapeHtml(exp.description || exp.desc || '-')}${kategori}${tekrar}</td>
@@ -6024,7 +5900,6 @@ async function saveIncomeEntry(event) {
     if (error) throw error;
     const kayit = mapIncomeEntryFromDb(data);
     appData.incomeEntries = [kayit, ...(appData.incomeEntries || []).filter(i => i.id !== kayit.id)];
-    invalidateExecutiveSnapshotCache(); // ana sayfa bayat kalmasin (ui_consistency_tests F)
     closeIncomeModal();
     renderAll();
     if (typeof showToast === 'function') showToast(editId ? '✅ Gelir kaydı güncellendi.' : '✅ Gelir kaydedildi.', 'success');
@@ -6049,7 +5924,6 @@ async function deleteIncomeEntry(id) {
     const { error } = await supabaseClient.from('income_entries').delete().eq('id', id).eq('tenant_id', tenantId);
     if (error) throw error;
     appData.incomeEntries = (appData.incomeEntries || []).filter(i => i.id !== id);
-    invalidateExecutiveSnapshotCache();
     renderAll();
     if (typeof showToast === 'function') showToast('🗑️ Gelir kaydı silindi.');
     return true;
@@ -6113,28 +5987,6 @@ function filterExpensesByCategory(catName, clickEvent) {
   document.getElementById('expensesTableBody')?.closest('section, .card')?.scrollIntoView({ block: 'start' });
 }
 
-// -------------------------------------------------------------
-// MÜLK BAZLI FİNANSAL KARTLAR (5 VİLLA DETAYI - EXCEL VERİTABANINDAN)
-// -------------------------------------------------------------
-function setPropViewMode(mode) {
-  propertyViewMode = mode;
-  const tableBtn = document.getElementById('propViewTableBtn');
-  const cardsBtn = document.getElementById('propViewCardsBtn');
-  const tableWrap = document.getElementById('propExecutiveTableContainer');
-  const cardsWrap = document.getElementById('propCardsContainer');
-
-  if (mode === 'table') {
-    if (tableBtn) tableBtn.classList.add('active');
-    if (cardsBtn) cardsBtn.classList.remove('active');
-    if (tableWrap) tableWrap.style.display = 'block';
-    if (cardsWrap) cardsWrap.style.display = 'none';
-  } else {
-    if (tableBtn) tableBtn.classList.remove('active');
-    if (cardsBtn) cardsBtn.classList.add('active');
-    if (tableWrap) tableWrap.style.display = 'none';
-    if (cardsWrap) cardsWrap.style.display = 'grid';
-  }
-}
 
 function filterByVilla(vKey) {
   const select = document.getElementById('globalVillaFilter');
@@ -6181,8 +6033,7 @@ function propertyProfitView(villaKey) {
 
 function renderPropertyFinanceCards(propStats, totalRevenue) {
   const tableBody = document.getElementById('propExecTableBody');
-  const cardsContainer = document.getElementById('propCardsContainer');
-  if (!tableBody && !cardsContainer) return;
+  if (!tableBody) return;
 
   const vKeys = Object.keys(appData.villas || {}).filter(k => propStats && propStats[k]);
   
@@ -6200,7 +6051,6 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
     sortedVillas.forEach((item, idx) => {
       const s = item.stats;
       const rank = idx + 1;
-      const rankClass = rank === 1 ? 'rank-1' : (rank === 2 ? 'rank-2' : (rank === 3 ? 'rank-3' : ''));
       const ciroShare = totalRevenue > 0 ? (s.revenue / totalRevenue) * 100 : 0;
       const occVal = s.occupancy === null || s.occupancy === undefined ? null : Number(s.occupancy);
       const occText = occVal === null ? '—' : `%${occVal}`;
@@ -6208,29 +6058,17 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
       const adrVal = Math.round(s.adr || (s.nights > 0 ? s.revenue / s.nights : 0));
       const profit = propertyProfitView(item.key);
 
-      // Determine Strategic Diagnosis
-      // Satisi olmayan mulk "Dengeli" degildir; olculecek bir dagilim yok (L-102).
-      // Eskiden varsayilan etiket buydu: donemde tek gece satmayan dort mulk
-      // "Dengeli" gorunurken hemen alttaki kutu "hic satilmayan mulk" diyordu.
-      let diagBadge = '<span class="badge badge-emerald">🟢 Dengeli</span>';
-      if (!(s.revenue > 0) && !(s.nights > 0)) diagBadge = '<span class="badge badge-slate">⚪ Bu dönem satış yok</span>';
-      else if (rank === 1 && s.revenue > 0) diagBadge = '<span class="badge badge-emerald">👑 Ciro Şampiyonu</span>';
-      else if (occVal !== null && occVal < 40 && s.revenue > 0) diagBadge = '<span class="badge badge-rose">📉 Boşluk Riski</span>';
-
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td>
+        <td data-label="Mülk">
           <div class="prop-name-col">
-            <span class="rank-badge ${rankClass}">#${rank}</span>
-            <div class="villa-icon-avatar">${item.meta.icon || '🏡'}</div>
             <div class="villa-text-meta">
               <h4>${propertyNameHtml(item.key, item.conf.name)}</h4>
               <span>${item.meta.spec}</span>
             </div>
           </div>
         </td>
-        <td>${diagBadge}</td>
-        <td>
+        <td data-label="Ciro ve pay">
           <strong style="font-size:14px; color:#FFFFFF;">${Math.round(s.revenue).toLocaleString('tr-TR')} TL</strong>
           <div class="table-bar-wrapper" style="margin-top:4px;">
             <div class="table-bar-track">
@@ -6239,7 +6077,7 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
             <span style="font-size:11px; color:var(--text-muted);">Portföy Payı: %${ciroShare.toFixed(1)}</span>
           </div>
         </td>
-        <td>
+        <td data-label="Doluluk">
           <strong style="color:var(--text-primary);">${s.nights} Gece</strong>
           <div class="table-bar-wrapper" style="margin-top:4px;">
             <div class="table-bar-track">
@@ -6248,302 +6086,24 @@ function renderPropertyFinanceCards(propStats, totalRevenue) {
             <span style="font-size:11px; color:var(--text-muted);" title="${occVal === null ? 'Mülk bu dönemde faaliyette görünmüyor (faaliyete başlama tarihi)' : ''}">Doluluk: ${occText}</span>
           </div>
         </td>
-        <td><strong>${adrVal.toLocaleString('tr-TR')} TL</strong></td>
-        <td>${revparText}</td>
-        <td>
+        <td data-label="ADR"><strong>${adrVal.toLocaleString('tr-TR')} TL</strong></td>
+        <td data-label="RevPAR">${revparText}</td>
+        <td data-label="Net kâr">
           <strong class="${profit.tone}">${profit.valueHtml}</strong>
           <span style="display:block; font-size:11px; color:var(--text-muted);">${escapeHtml(profit.note)}</span>
         </td>
-        <td style="text-align: right; white-space: nowrap;">
-          <button class="btn btn-secondary btn-sm" data-onclick="filterByVilla(decodeURIComponent('${encodeActionArg(item.key)}'))">🔍 Odaklan</button>
+        <td data-label="" style="text-align: right; white-space: nowrap;">
+          <button class="btn btn-secondary btn-sm" data-onclick="filterByVilla(decodeURIComponent('${encodeActionArg(item.key)}'))">Odaklan</button>
         </td>
       `;
       tableBody.appendChild(tr);
     });
   }
 
-  // 2. Render Redesigned Premium Cards
-  if (cardsContainer) {
-    cardsContainer.innerHTML = '';
-    sortedVillas.forEach((item, idx) => {
-      const s = item.stats;
-      const rank = idx + 1;
-      const ciroShare = totalRevenue > 0 ? (s.revenue / totalRevenue) * 100 : 0;
-      const occVal = s.occupancy === null || s.occupancy === undefined ? null : Number(s.occupancy);
-      const occText = occVal === null ? '—' : `%${occVal}`;
-      const revparText = s.revpar === null || s.revpar === undefined ? '—' : `₺${Math.round(s.revpar).toLocaleString('tr-TR')}`;
-      const adrVal = Math.round(s.adr || (s.nights > 0 ? s.revenue / s.nights : 0));
-      const profit = propertyProfitView(item.key);
-
-      const card = document.createElement('div');
-      card.className = `prop-card-premium ${rank === 1 ? 'leader-card' : ''}`;
-      card.onclick = () => filterByVilla(item.key);
-
-      card.innerHTML = `
-        <div class="prop-card-head">
-          <div style="display:flex; align-items:center; gap:10px;">
-            <div class="villa-icon-avatar">${item.meta.icon || '🏡'}</div>
-            <div>
-              <h3 style="margin:0; font-size:15px; font-weight:700;">${escapeHtml(item.conf.name)}</h3>
-              <span style="font-size:11px; color:var(--text-muted);">${item.meta.spec}</span>
-            </div>
-          </div>
-          <span class="badge ${rank === 1 ? 'badge-amber' : 'badge-blue'}">#${rank} Sıra</span>
-        </div>
-
-        <div class="prop-hero-ciro-box">
-          <div>
-            <span style="font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Aylık fiili ciro</span>
-            <div class="hero-ciro-val">${Math.round(s.revenue).toLocaleString('tr-TR')} TL</div>
-          </div>
-          <span class="badge badge-emerald">%${ciroShare.toFixed(1)} Pay</span>
-        </div>
-
-        <div style="display:flex; flex-direction:column; gap:4px;">
-          <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-muted);">
-            <span>Doluluk Oranı (${s.nights} Gece)</span>
-            <strong style="color:#FFFFFF;">${occText}</strong>
-          </div>
-          <div class="table-bar-track" style="height:8px;">
-            <div class="table-bar-fill ${occVal >= 75 ? 'bar-emerald' : (occVal >= 45 ? 'bar-blue' : 'bar-amber')}" style="width: ${Math.min(100, Math.max(0, occVal || 0))}%;"></div>
-          </div>
-        </div>
-
-        <div class="prop-submetrics-2x2">
-          <div class="subm-box">
-            <span class="s-lbl">Ort. günlük (ADR)</span>
-            <span class="s-val">${adrVal.toLocaleString('tr-TR')} TL</span>
-          </div>
-          <div class="subm-box">
-            <span class="s-lbl">RevPAR (VERİM)</span>
-            <span class="s-val">${revparText}</span>
-          </div>
-          <div class="subm-box">
-            <span class="s-lbl">Net kâr</span>
-            <span class="s-val ${profit.tone}" title="${escapeHtml(profit.note)}">${profit.valueHtml}</span>
-          </div>
-          <div class="subm-box">
-            <span class="s-lbl">Kâr marjı</span>
-            <span class="s-val" title="${escapeHtml(profit.note)}">${profit.margin}</span>
-          </div>
-        </div>
-
-        <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid rgba(255,255,255,0.06); padding-top:10px; font-size:11px; color:#409CFF;">
-          <span>🔍 Villaya Göre Filtrele</span>
-          <span>Detayı Gör ›</span>
-        </div>
-      `;
-      cardsContainer.appendChild(card);
-    });
-  }
 }
 
-// -------------------------------------------------------------
-// MÜLK KARŞILAŞTIRMA VE ANOMALİ TESPİTİ
-// -------------------------------------------------------------
-function renderPropertyComparisonChart(propStats) {
-  const metric = document.getElementById('compMetricSelect')?.value || 'ciro';
-  const container = document.getElementById('comparisonBarsContainer');
-  if (!container) return;
-  container.innerHTML = '';
 
-  // Musterinin GERCEK mulkleri. Sabit ['BELLA','OLIVE','AZURE','SUNSET','PALM']
-  // yaziliydi: ilk musterinin villalari. Baska herkes kendi villalarini hic
-  // gormuyor, bunun yerine sahibi olmadigi bes bos cubuk goruyordu.
-  const vKeys = Object.keys(propStats || {}).filter(k => propStats[k]);
-  const values = [];
 
-  vKeys.forEach(vKey => {
-    const s = propStats[vKey] || { revenue: 0, nights: 0, adr: 0, occupancy: 0, revpar: 0 };
-    let val = 0;
-    if (metric === 'ciro') val = s.revenue;
-    if (metric === 'netKar') val = null;
-    if (metric === 'adr') val = s.adr || (s.nights > 0 ? Math.round(s.revenue / s.nights) : 0);
-    // Kapasite yoksa olculemez (null -> "—"); ayin gun sayisina dusulmez.
-    if (metric === 'revpar') val = s.revpar === undefined ? null : s.revpar;
-    if (metric === 'doluluk') val = s.occupancy === undefined ? null : s.occupancy;
-    if (metric === 'satilanGece') val = s.nights;
-    values.push({ key: vKey, name: ((appData.villas && appData.villas[vKey] && appData.villas[vKey].name) || vKey), val });
-  });
-
-  const maxVal = Math.max(1, ...values.map(v => Number(v.val) || 0));
-
-  values.forEach(item => {
-    const barPct = item.val === null ? 0 : (item.val / maxVal) * 100;
-    const row = document.createElement('div');
-    row.className = 'comp-bar-row';
-    row.innerHTML = `
-      <div class="comp-bar-label"><strong>${escapeHtml(item.name)}</strong></div>
-      <div class="comp-bar-track">
-        <div class="comp-bar-fill" style="width: ${barPct}%;"></div>
-      </div>
-      <div class="comp-bar-value"><strong title="${item.val === null ? (metric === 'netKar' ? 'Mülk bazında gider dağılımı bulunmadığı için hesaplanamadı' : 'Kapasite yok: mülk bu dönemde faaliyette görünmüyor (faaliyete başlama tarihi)') : ''}">${item.val === null ? '—' : item.val.toLocaleString('tr-TR')}</strong></div>
-    `;
-    container.appendChild(row);
-  });
-
-  // Anomaly Badges Detection
-  const anomContainer = document.getElementById('anomaliesListContainer');
-  if (anomContainer) {
-    anomContainer.innerHTML = '';
-
-    // Anomaliler MUSTERININ KENDI verisinden cikarilir.
-    //
-    // Burada uc sabit metin vardi ve secili doneme gore diziliyordu: Agustos
-    // 2026'da "VILLA SUNSET HORIZON %96,8 doluluk, 2.826 TL ADR", Ocak
-    // 2026'da "Temmuz 2025'te 320.000 TL ciro rekoru", diger her ayda ise
-    // "resmi sirket raporu verileri basariyla incelendi". Hicbiri hesaplanmis
-    // degildi; hepsi ilk musterinin rakamlariydi ve bos bir hesapta bile
-    // gorunuyordu.
-    const anomalies = [];
-    const aktif = vKeys
-      .map(k => ({ key: k, s: propStats[k], ad: ((appData.villas && appData.villas[k] && appData.villas[k].name) || k) }))
-      .filter(v => v.s && Number(v.s.nights) > 0);
-
-    if (aktif.length === 0) {
-      anomalies.push({ type: 'info', text: 'Bu dönemde satılan gece bulunmuyor; karşılaştırılacak veri yok.' });
-    } else {
-      const adrOf = v => Number(v.s.adr) || (v.s.nights > 0 ? v.s.revenue / v.s.nights : 0);
-      const ortAdr = aktif.reduce((a, v) => a + adrOf(v), 0) / aktif.length;
-      // Yalniz dolulugu olculebilen mulkler ortalamaya girer.
-      const olculen = aktif.filter(v => v.s.occupancy !== null && v.s.occupancy !== undefined);
-      const ortDoluluk = olculen.length ? olculen.reduce((a, v) => a + Number(v.s.occupancy), 0) / olculen.length : null;
-      const tl = n => Math.round(n).toLocaleString('tr-TR');
-
-      const enIyi = aktif.slice().sort((a, b) => adrOf(b) - adrOf(a))[0];
-      anomalies.push({
-        type: 'success',
-        text: `💎 ${enIyi.ad}: dönemin en yüksek gecelik fiyatı — ${tl(adrOf(enIyi))} TL/gece (${enIyi.s.nights} gece, ${tl(enIyi.s.revenue)} TL).`
-      });
-
-      // Talep var ama fiyat dusuk: doluluk ortalamanin ustunde, ADR altinda.
-      olculen
-        .filter(v => ortDoluluk !== null && Number(v.s.occupancy) > ortDoluluk && adrOf(v) < ortAdr)
-        .slice(0, 2)
-        .forEach(v => anomalies.push({
-          type: 'warning',
-          text: `⚠️ ${v.ad}: doluluk portföy ortalamasının üstünde (%${(Number(v.s.occupancy) || 0).toFixed(1)}) ama gecelik fiyat altında (${tl(adrOf(v))} TL, ortalama ${tl(ortAdr)} TL). Talep varken taban fiyat gözden geçirilmeli.`
-        }));
-
-      // Hic satmayan mulkler
-      const bos = vKeys.filter(k => propStats[k] && !(Number(propStats[k].nights) > 0));
-      if (bos.length) {
-        const adlar = bos.map(k => ((appData.villas && appData.villas[k] && appData.villas[k].name) || k)).join(', ');
-        anomalies.push({ type: 'warning', text: `⚠️ Bu dönemde hiç satılmayan mülk: ${adlar}.` });
-      }
-    }
-
-    anomalies.forEach(anom => {
-      const div = document.createElement('div');
-      div.className = `anomaly-alert ${anom.type}`;
-      div.innerText = anom.text;
-      anomContainer.appendChild(div);
-    });
-  }
-}
-
-// -------------------------------------------------------------
-// AYLIK TREND VE GEÇEN YIL KARŞILAŞTIRMASI (RESMİ EXCEL VERİLERİ)
-// -------------------------------------------------------------
-function setTrendRange(range) {
-  activeTrendRange = range;
-  document.querySelectorAll('.trend-btn').forEach(b => b.classList.remove('active'));
-  if (event && event.target) event.target.classList.add('active');
-  renderMonthlyTrendChart();
-}
-
-function renderMonthlyTrendChart() {
-  const container = document.getElementById('trendChartContainer');
-  if (!container) return;
-  container.innerHTML = '';
-
-  const allTrendData = getMonthlyKpiDataset().filter(d => d.ciro !== 0 || d.totalExp !== 0 || d.nights !== 0);
-  if (!allTrendData.length) {
-    container.innerHTML = `
-      <div style="text-align:center; padding: 45px 20px; color: var(--color-slate-400);">
-        <div style="font-size: 2.2rem; margin-bottom: 8px;">📊</div>
-        <strong style="color:var(--color-slate-200); font-size:1.05rem;">Henüz aylık finans verisi yok</strong>
-        <p style="font-size: 0.85rem; margin-top: 6px;">Yeni rezervasyonlar ve harcamalar eklendikçe aylık trend sütunları burada otomatik oluşacaktır.</p>
-      </div>
-    `;
-    return;
-  }
-
-  let selectedTrendData = allTrendData;
-  if (activeTrendRange === '3M') selectedTrendData = allTrendData.slice(-3);
-  if (activeTrendRange === '6M') selectedTrendData = allTrendData.slice(-6);
-  if (activeTrendRange === '12M') selectedTrendData = allTrendData.slice(-12);
-  if (activeTrendRange === 'YTD') selectedTrendData = allTrendData.filter(d => d.key.startsWith(String(new Date().getFullYear())));
-  const displayData = selectedTrendData.map(d => ({
-    key: d.key, month: d.monthName, ciro: d.ciro, opex: d.opex,
-    // L-101: gider kaydi olmayan ayin net kar cubugu cizilmez (ciro ile ayni boyda yesil cubuk).
-    profit: d.profitUnmeasured ? 0 : Math.max(0, d.netProfit),
-    profitUnmeasured: d.profitUnmeasured
-  }));
-
-  const maxVal = Math.max(100000, ...displayData.map(d => Math.max(d.ciro, d.opex)));
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', '0 0 500 210');
-  svg.setAttribute('class', 'trend-svg');
-
-  const stepX = 500 / displayData.length;
-  const barW = Math.max(8, Math.min(22, stepX / 4));
-
-  displayData.forEach((d, idx) => {
-    const baseX = idx * stepX + (stepX / 2) - (barW * 1.6);
-    const hCiro = Math.max(2, (d.ciro / maxVal) * 155);
-    const hOpex = Math.max(2, (d.opex / maxVal) * 155);
-    const hProfit = Math.max(2, (d.profit / maxVal) * 155);
-
-    // Ciro bar
-    const rCiro = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    rCiro.setAttribute('x', baseX);
-    rCiro.setAttribute('y', 175 - hCiro);
-    rCiro.setAttribute('width', barW);
-    rCiro.setAttribute('height', hCiro);
-    rCiro.setAttribute('fill', '#0A84FF');
-    rCiro.setAttribute('rx', '3');
-    rCiro.innerHTML = `<title>${d.key} Ciro: ${d.ciro.toLocaleString('tr-TR')} TL</title>`;
-    svg.appendChild(rCiro);
-
-    // Opex bar
-    const rOpex = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    rOpex.setAttribute('x', baseX + barW + 2);
-    rOpex.setAttribute('y', 175 - hOpex);
-    rOpex.setAttribute('width', barW);
-    rOpex.setAttribute('height', hOpex);
-    rOpex.setAttribute('fill', '#FF453A');
-    rOpex.setAttribute('rx', '3');
-    rOpex.innerHTML = `<title>${d.key} Gider: ${d.opex.toLocaleString('tr-TR')} TL</title>`;
-    svg.appendChild(rOpex);
-
-    // Profit bar
-    const rProfit = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    rProfit.setAttribute('x', baseX + (barW * 2) + 4);
-    rProfit.setAttribute('y', 175 - hProfit);
-    rProfit.setAttribute('width', barW);
-    rProfit.setAttribute('height', hProfit);
-    rProfit.setAttribute('fill', '#30D158');
-    rProfit.setAttribute('rx', '3');
-    if (d.profitUnmeasured) rProfit.setAttribute('opacity', '0.25');
-    rProfit.innerHTML = d.profitUnmeasured
-      ? `<title>${d.key} Net Kâr: — (${OLCULEMEYEN_KAR_NOTU})</title>`
-      : `<title>${d.key} Net Kâr: ${d.profit.toLocaleString('tr-TR')} TL</title>`;
-    svg.appendChild(rProfit);
-
-    // Label
-    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    text.setAttribute('x', baseX + (barW * 1.5));
-    text.setAttribute('y', 198);
-    text.setAttribute('fill', '#9CA3AF');
-    text.setAttribute('font-size', '10');
-    text.setAttribute('text-anchor', 'middle');
-    text.textContent = d.month;
-    svg.appendChild(text);
-  });
-
-  container.appendChild(svg);
-}
 
 /**
  * Gecen yilin AYNI ayi ile karsilastirma.
@@ -6558,256 +6118,9 @@ function renderMonthlyTrendChart() {
  * Artik taban `computeMonthActuals()` — KPI izleyicinin kullandigi tabanin
  * ayni. Gecen yil veri YOKSA rakam uydurulmaz, durum soylenir (3.6).
  */
-function renderYoYComparison(actualRevenue, actualOpex, actualNetProfit, actualNights) {
-  const subEl = document.getElementById('yoySubText');
-  const badgeEl = document.getElementById('yoyBadge');
-  const container = document.getElementById('yoyBoxesContainer');
 
-  // Yalnizca tek bir ay secilmisken anlamlidir; 'ALL', 'CUSTOM' ve
-  // '2026-YEAR' gibi donemlerin "gecen yilin ayni ayi" karsiligi yoktur.
-  const donem = currentFilter.period || '';
-  const ayMi = /^\d{4}-(0[1-9]|1[0-2])$/.test(donem);
-  const prevKey = ayMi ? (Number(donem.slice(0, 4)) - 1) + donem.slice(4) : null;
 
-  const bosluk = (baslik, mesaj) => {
-    if (subEl) subEl.innerText = baslik;
-    if (badgeEl) badgeEl.innerText = '—';
-    if (container) {
-      container.innerHTML = `
-        <div style="text-align:center; padding: 25px; color: var(--color-slate-400); grid-column: span 3;">
-          ${mesaj}
-        </div>
-      `;
-    }
-  };
 
-  if (!ayMi) {
-    bosluk('Aylık karşılaştırma', 'Geçen yılla karşılaştırma için tek bir ay seçin.');
-    return;
-  }
-
-  const gecen = computeMonthActuals(prevKey, currentFilter ? currentFilter.villa : 'ALL');
-  const prevRevenue = gecen.ciro;
-  const prevNights = gecen.nights;
-  const prevNetProfit = gecen.netProfit;
-
-  if (prevRevenue === 0 && prevNights === 0) {
-    bosluk(
-      `${getPeriodDisplayName(prevKey)} vs ${getPeriodDisplayName(donem)}`,
-      `${getPeriodDisplayName(prevKey)} dönemine ait kayıt yok; karşılaştırma yapılamıyor.`
-    );
-    return;
-  }
-
-  const revDeltaNominal = actualRevenue - prevRevenue;
-  const revDeltaPct = prevRevenue > 0 ? (revDeltaNominal / prevRevenue) * 100 : 0;
-  const profitDeltaNominal = actualNetProfit - prevNetProfit;
-  const profitDeltaPct = prevNetProfit > 0 ? (profitDeltaNominal / prevNetProfit) * 100 : 0;
-  const nightsDelta = actualNights - prevNights;
-  const nightsDeltaPct = prevNights > 0 ? (nightsDelta / prevNights) * 100 : 0;
-
-  if (subEl) subEl.innerText = `${getPeriodDisplayName(prevKey)} vs ${getPeriodDisplayName(donem)}`;
-  // Gecen yil ciro 0 ise yuzde artis tanimsizdir; %0 yazmak "buyume yok"
-  // demektir ve yaniltir.
-  if (badgeEl) {
-    badgeEl.innerText = prevRevenue > 0
-      ? `Nominal Büyüme: %${revDeltaPct >= 0 ? '+' : ''}${revDeltaPct.toFixed(1)}`
-      : 'Nominal Büyüme: —';
-  }
-
-  if (!container) return;
-  container.innerHTML = `
-    <div class="yoy-row">
-      <div class="yoy-metric">Ciro</div>
-      <div class="yoy-val-prev">${prevRevenue.toLocaleString('tr-TR')} TL</div>
-      <div class="yoy-val-cur"><strong>${Math.round(actualRevenue).toLocaleString('tr-TR')} TL</strong></div>
-      <div class="yoy-delta ${revDeltaNominal >= 0 ? 'text-emerald' : 'text-rose'}">${revDeltaNominal >= 0 ? '+' : ''}${Math.round(revDeltaNominal).toLocaleString('tr-TR')} TL (%${revDeltaPct.toFixed(1)})</div>
-    </div>
-    <div class="yoy-row">
-      <div class="yoy-metric">Net Kâr</div>
-      <div class="yoy-val-prev">${prevNetProfit.toLocaleString('tr-TR')} TL</div>
-      <div class="yoy-val-cur"><strong>${Math.round(actualNetProfit).toLocaleString('tr-TR')} TL</strong></div>
-      <div class="yoy-delta ${profitDeltaNominal >= 0 ? 'text-emerald' : 'text-rose'}">${profitDeltaNominal >= 0 ? '+' : ''}${Math.round(profitDeltaNominal).toLocaleString('tr-TR')} TL (%${profitDeltaPct.toFixed(1)})</div>
-    </div>
-    <div class="yoy-row">
-      <div class="yoy-metric">Satılan Gece</div>
-      <div class="yoy-val-prev">${prevNights} Gece</div>
-      <div class="yoy-val-cur"><strong>${actualNights} Gece</strong></div>
-      <div class="yoy-delta ${nightsDelta >= 0 ? 'text-emerald' : 'text-rose'}">${nightsDelta >= 0 ? '+' : ''}${nightsDelta} Gece (%${nightsDeltaPct.toFixed(1)})</div>
-    </div>
-  `;
-}
-
-// -------------------------------------------------------------
-// LEXBNB AI FİNANS ANALİSTİ (GERÇEK VERİ KORELASYON MOTORU)
-// -------------------------------------------------------------
-function computeFinanceInsightRatios({ totalIncome, opex, capex }) {
-  const income = Number(totalIncome);
-  const expense = Number(opex) + Number(capex);
-  return { expenseRatio: income > 0 ? Number(((expense / income) * 100).toFixed(1)) : null };
-}
-
-function getTopExpenseCategory(categoryTotals) {
-  return Object.entries(categoryTotals || {})
-    .filter(([, amount]) => Number(amount) > 0)
-    .sort((left, right) => Number(right[1]) - Number(left[1]))[0] || null;
-}
-
-function renderAIFinancialAnalyst(revenue, totalIncome, targetRev, targetPct, opex, capex, netProfit, netMargin, propStats, karOlculemez = false, categoryTotals = {}) {
-  const summary = document.getElementById('periodSummaryContent');
-  if (summary) {
-    const tl = value => Math.round(Number(value) || 0).toLocaleString('tr-TR');
-    const insights = [];
-    if (targetRev > 0) insights.push({ title: 'Hedef ilerlemesi', text: `${tl(targetRev)} TL hedefin %${Number(targetPct || 0).toFixed(1)}'i gerçekleşti.` });
-    else if (revenue > 0) insights.push({ title: 'Konaklama cirosu', text: `${tl(revenue)} TL; bu dönem için hedef girilmemiş.` });
-    if (karOlculemez) insights.push({ title: 'Kâr ölçülemiyor', text: 'Gider kaydı yok. Giderleri girin veya ayı kapatarak sıfır gideri onaylayın.' });
-    else insights.push({ title: 'Net kâr', text: `${tl(netProfit)} TL${Number.isFinite(Number(netMargin)) ? ` · marj %${Number(netMargin).toFixed(1)}` : ''}.` });
-    const topExpense = getTopExpenseCategory(categoryTotals);
-    if (topExpense) insights.push({ title: 'En büyük gider', text: `${topExpense[0]} · ${tl(topExpense[1])} TL.` });
-    const strongest = Object.values(propStats || {}).filter(item => Number(item.revenue) > 0).sort((a, b) => b.revenue - a.revenue)[0];
-    if (strongest) insights.push({ title: 'En güçlü mülk', text: `${strongest.name} · ${tl(strongest.revenue)} TL ciro.` });
-    if (!insights.length) insights.push({ title: 'Henüz ölçüm yok', text: 'Rezervasyon ve gider kaydı geldikçe dönem özeti oluşur.' });
-    summary.innerHTML = insights.slice(0, 4).map(item => `<article class="period-summary-item"><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.text)}</p></article>`).join('');
-    return;
-  }
-  const goodBox = document.getElementById('aiGoodContent');
-  const badBox = document.getElementById('aiBadContent');
-  const whyBox = document.getElementById('aiWhyContent');
-  const actionBox = document.getElementById('aiActionContent');
-
-  if (totalIncome === 0) {
-    if (goodBox) goodBox.innerHTML = '<p>• <strong>Temiz Başlangıç:</strong> Sistem verileri sıfırlandı. Yeni rezervasyonlar girildikçe finansal analizler burada anlık oluşturulacaktır.</p>';
-    if (badBox) badBox.innerHTML = '<p>• <strong>Kaçak Yok:</strong> Şu anda kayıtlı maliyet kaçağı veya düşük fiyat anomalisi bulunmuyor.</p>';
-    if (whyBox) whyBox.innerHTML = '<p>• <strong>Korelasyon:</strong> Rezervasyon ve harcama girişi yapıldıkça maliyet korelasyonları tespit edilecektir.</p>';
-    if (actionBox) actionBox.innerHTML = '<div style="padding: 15px; color: var(--color-slate-400); text-align:center;">Yeni rezervasyon veya harcama kaydı bekleniyor.</div>';
-    return;
-  }
-  // BURADA UYDURMA METIN VARDI. Geliri sifirdan buyuk olan HER musteri, kendi
-  // rakamlarindan bagimsiz olarak su sabit cumleleri goruyordu:
-  //   "Villa Azure Bay Liderligi", "5.004.165 TL tarihsel ciro / 457 gece",
-  //   "Villa Sunset Horizon 30 gece satti, ADR 2.826 TL'de kaldi",
-  //   "OTA komisyonlari 75.519 TL kesintiye yol acti",
-  //   "Camasirhane gideri 47.000 TL'ye ulasti".
-  // Hicbiri hesaplanmiyordu. Artik her cumle musterinin kendi verisinden
-  // uretiliyor; uretilemiyorsa yazilmiyor.
-  const tl = n => Math.round(Number(n) || 0).toLocaleString('tr-TR');
-  const donemAdi = getPeriodDisplayName(currentFilter.period);
-
-  const donemBk = (appData.bookings || []).filter(b => b.status !== 'CANCELLED' && isBookingInFilter(b));
-  const paylar = donemBk.map(b => ({ b, p: getBookingFilterShare(b) }));
-  const donemGece = paylar.reduce((a, x) => a + x.p.nights, 0);
-  const komisyon = paylar.reduce((a, x) => a + (Number(x.b.otaCommission) || 0) * x.p.ratio, 0);
-
-  // Mulk bazinda: en iyi ve en zayif gecelik fiyat
-  const mulkStat = Object.keys(propStats || {})
-    .map(k => ({ k, s: propStats[k], ad: (propStats[k] && propStats[k].name) || k }))
-    .filter(v => v.s && Number(v.s.nights) > 0)
-    .map(v => ({ ...v, adr: Number(v.s.adr) || (v.s.revenue / v.s.nights) }))
-    .sort((a, b) => b.adr - a.adr);
-
-  // Gider kategorisi liderligi
-  const donemGid = (appData.expenses || []).filter(e => isExpenseInFilter(e));
-  const katTop = {};
-  donemGid.forEach(e => { katTop[e.category || 'Diğer'] = (katTop[e.category || 'Diğer'] || 0) + (Number(e.amount) || 0); });
-  const enBuyukKat = Object.entries(katTop).sort((a, b) => b[1] - a[1])[0];
-
-  if (goodBox) {
-    const satirlar = [];
-    if (targetRev > 0) {
-      satirlar.push(`<p>• <strong>Hedef Gerçekleşmesi:</strong> ${tl(targetRev)} TL hedefe karşılık ${tl(revenue)} TL gerçekleşti — <strong>%${targetPct.toFixed(1)}</strong>.</p>`);
-    } else {
-      satirlar.push(`<p>• <strong>Ciro:</strong> ${donemAdi} döneminde ${tl(revenue)} TL ciro, ${donemGece} satılan gece. (Bu dönem için hedef girilmemiş.)</p>`);
-    }
-    if (mulkStat.length) {
-      const en = mulkStat[0];
-      satirlar.push(`<p>• <strong>En Güçlü Mülk:</strong> ${escapeHtml(en.ad)} — ${tl(en.adr)} TL/gece ile dönemin en yüksek gecelik fiyatı (${en.s.nights} gece, ${tl(en.s.revenue)} TL).</p>`);
-    }
-    if (netProfit > 0 && !karOlculemez) {
-      satirlar.push(`<p>• <strong>Net Kâr:</strong> ${tl(netProfit)} TL${netMargin ? ` (marj %${Number(netMargin).toFixed(1)})` : ''}.</p>`);
-    }
-    goodBox.innerHTML = satirlar.join('') || '<p>• Bu dönem için öne çıkarılacak bir sonuç yok.</p>';
-  }
-
-  if (badBox) {
-    const satirlar = [];
-    if (karOlculemez) {
-      // L-101: gider hic girilmemisken "%0 gider" iyi haber gibi okunur.
-      satirlar.push('<p>• <strong>Gider kaydı yok:</strong> Bu dönem için hiç gider girilmemiş; kâr ve marj ölçülemiyor. Giderleri girin ya da ayı kapatarak defteri onaylayın.</p>');
-    } else if (totalIncome > 0) {
-      const { expenseRatio } = computeFinanceInsightRatios({ totalIncome, opex, capex });
-      satirlar.push(`<p>• <strong>Gider / Toplam Gelir Oranı:</strong> Toplam giderler toplam gelirin <strong>%${expenseRatio.toFixed(1)}</strong>'i seviyesinde.</p>`);
-    }
-    if (mulkStat.length > 1) {
-      const ortAdr = mulkStat.reduce((a, v) => a + v.adr, 0) / mulkStat.length;
-      const zayif = mulkStat[mulkStat.length - 1];
-      if (zayif.adr < ortAdr) {
-        satirlar.push(`<p>• <strong>Düşük Gecelik Fiyat:</strong> ${escapeHtml(zayif.ad)} ${zayif.s.nights} gece sattı ama gecelik ${tl(zayif.adr)} TL'de kaldı; portföy ortalaması ${tl(ortAdr)} TL.</p>`);
-      }
-    }
-    if (enBuyukKat) {
-      satirlar.push(`<p>• <strong>En Büyük Gider Kalemi:</strong> ${escapeHtml(enBuyukKat[0])} — ${tl(enBuyukKat[1])} TL.</p>`);
-    }
-    badBox.innerHTML = satirlar.join('') || '<p>• Bu dönemde öne çıkan bir maliyet anomalisi yok.</p>';
-  }
-
-  if (whyBox) {
-    const satirlar = [];
-    if (komisyon > 0) {
-      const oran = revenue > 0 ? ((komisyon / revenue) * 100).toFixed(1) : null;
-      satirlar.push(`<p>• <strong>OTA Komisyonu:</strong> ${tl(komisyon)} TL${oran ? ` (cironun %${oran}'i)` : ''}. Doğrudan satışa kayan her rezervasyon bu kalemi düşürür.</p>`);
-    }
-    if (capex > 0) {
-      satirlar.push(`<p>• <strong>Yatırım (CAPEX):</strong> ${tl(capex)} TL. Bu tutar işletme kârını değil nakit akışını etkiler.</p>`);
-    }
-    whyBox.innerHTML = satirlar.join('') || '<p>• Bu dönemde açıklanacak belirgin bir maliyet korelasyonu yok.</p>';
-  }
-
-  if (actionBox) {
-    const oneriler = [];
-    if (mulkStat.length > 1) {
-      const ortAdr = mulkStat.reduce((a, v) => a + v.adr, 0) / mulkStat.length;
-      const zayif = mulkStat[mulkStat.length - 1];
-      if (zayif.adr < ortAdr * 0.85) {
-        const hedef = Math.round(ortAdr / 100) * 100;
-        oneriler.push({
-          baslik: `${zayif.ad} taban fiyatını gözden geçirin`,
-          metin: `Gecelik ${tl(zayif.adr)} TL ile portföy ortalamasının (${tl(ortAdr)} TL) altında. Doluluk korunuyorsa taban fiyat ${tl(hedef)} TL bandına çekilebilir.`,
-          gorev: `${zayif.ad} taban fiyatını gözden geçir`
-        });
-      }
-    }
-    if (komisyon > 0) {
-      oneriler.push({
-        baslik: 'Doğrudan satış payını artırın',
-        metin: `Bu dönem ${tl(komisyon)} TL OTA komisyonu ödendi. Tekrar gelen misafirlere doğrudan kanaldan teklif götürmek bu kalemi doğrudan azaltır.`,
-        gorev: 'Doğrudan rezervasyon kampanyası planla'
-      });
-    }
-    if (enBuyukKat && revenue > 0 && enBuyukKat[1] > revenue * 0.15) {
-      oneriler.push({
-        baslik: `${enBuyukKat[0]} giderini inceleyin`,
-        metin: `${tl(enBuyukKat[1])} TL ile cironun %${((enBuyukKat[1] / revenue) * 100).toFixed(1)}'ini oluşturuyor. Tedarikçi veya sözleşme koşulları gözden geçirilmeli.`,
-        gorev: `${enBuyukKat[0]} gideri için tedarikçi görüşmesi`
-      });
-    }
-
-    actionBox.innerHTML = oneriler.length
-      ? oneriler.map((o, i) => `
-      <div class="ai-action-item">
-        <div class="action-text">
-          <strong>${i + 1}. ${escapeHtml(o.baslik)}</strong>
-          <p>${escapeHtml(o.metin)}</p>
-        </div>
-        <button class="btn btn-primary btn-sm" data-ai-task="${escapeHtml(o.gorev)}">⚡ Görev Oluştur</button>
-      </div>`).join('')
-      : '<div style="padding: 15px; color: var(--color-slate-400); text-align:center;">Bu dönem verisinden çıkarılabilecek somut bir aksiyon önerisi yok.</div>';
-
-    // Inline onclick yerine delegasyon: mulk adinda tirnak olabilir.
-    actionBox.querySelectorAll('[data-ai-task]').forEach(btn => {
-      btn.addEventListener('click', () => createTaskFromAI(btn.getAttribute('data-ai-task'), 'P2', ''));
-    });
-  }
-}
 
 async function createTaskFromAI(title, priority, notes) {
   const propertyId = currentFilter.villa === 'ALL' ? null : currentFilter.villa;
@@ -6886,7 +6199,7 @@ function renderExpensesTable() {
       <td><span class="badge ${exp.type === 'CAPEX' ? 'badge-amber' : 'badge-blue'}">${exp.type === 'CAPEX' ? 'Yatırım (Capex)' : 'Operasyonel (Opex)'}</span></td>
       <td><strong>${escapeHtml(exp.category)}</strong></td>
       <td>${escapeHtml(exp.villa === 'ALL' ? 'Tüm Portföy' : (appData.villas[exp.villa]?.name || exp.villa))}</td>
-      <td>${escapeHtml(exp.description || exp.desc || "-")}${expenseSeriesInfo(exp) ? ` <span class="badge badge-blue" title="Tekrarlayan gider">🔁 ${expenseSeriesInfo(exp).index}/${expenseSeriesInfo(exp).total}</span>` : ''}</td>
+      <td>${escapeHtml(exp.description || exp.desc || "-")}${expenseSeriesInfo(exp) ? ` <span class="badge badge-blue" title="Tekrarlayan gider">${expenseSeriesInfo(exp).index}/${expenseSeriesInfo(exp).total}</span>` : ''}</td>
       <td><strong>${Number(exp.amount).toLocaleString('tr-TR')} TL</strong></td>
       <td style="text-align: right; white-space: nowrap;">
         ${adsManaged ? '<span class="badge badge-blue">Reklamlar’dan yönetin</span>' : `<button class="btn btn-secondary btn-sm" data-onclick="editExpense(decodeURIComponent('${encodeActionArg(String(exp.id))}'))">✏️</button>
@@ -7530,7 +6843,7 @@ async function saveMonthlyGoals(e) {
     // Show friendly notification toast
     const toast = document.createElement('div');
     toast.style.cssText = 'position:fixed; bottom:24px; right:24px; background:#30D158; color:#fff; padding:14px 20px; border-radius:10px; font-weight:700; font-size:14px; box-shadow:0 10px 25px rgba(0,0,0,0.5); z-index:99999; display:flex; align-items:center; gap:8px;';
-    toast.innerHTML = `<span>✓</span> <strong>${period}</strong> hedefi ${revenue.toLocaleString('tr-TR')} TL olarak güncellendi!`;
+    toast.innerHTML = `<strong>${period}</strong> hedefi ${revenue.toLocaleString('tr-TR')} TL olarak güncellendi!`;
     document.body.appendChild(toast);
     setTimeout(() => { toast.remove(); }, 3500);
   } catch (err) {
@@ -8996,7 +8309,7 @@ function openBookingDetailsPanel(bookingId) {
     + `<option value="INTERIM">Ara ödeme</option><option value="BALANCE"${kaporaAlinir ? '' : ' selected'}>Kalan</option>`;
   const methodOptions = [['', 'Yöntem —'], ['CASH', 'Nakit'], ['BANK_TRANSFER', 'Havale/EFT'], ['CARD', 'Kart'], ['OTA', 'OTA'], ['OTHER', 'Diğer']]
     .map(([v, l]) => `<option value="${v}"${otaKanali && !kaporaAlinir && v === 'OTA' ? ' selected' : ''}>${l}</option>`).join('');
-  const kaporaNotu = kaporaAlinir ? '' : '<p class="sub-text">Bu kanalda kapora alınmıyor; ödemeyi platform aktarır. Değiştirmek için Ayarlar → Kanallar → Kapora.</p>';
+  const kaporaNotu = kaporaAlinir ? '' : `<p class="sub-text">Bu kanalda kapora alınmıyor; ödemeyi platform aktarır. <button type="button" class="lex-link-inline" data-onclick="goTo('settings:channels')">Ayarlar → Kanallar</button>’dan değiştirebilirsiniz.</p>`;
   const iptal = String(booking.status || '').toUpperCase() === 'CANCELLED';
   const paymentForm = canWriteSalesRole(activeTenant?.role) && !iptal ? `<div class="booking-payment-form"><label class="booking-payment-field">Tutar (₺)<input id="bookingPaymentAmount" class="form-control" type="number" min="0.01" step="0.01" inputmode="decimal"></label><label class="booking-payment-field">Ödeme tarihi<input id="bookingPaymentDate" class="form-control" type="date" value="${escapeHtml(getTodayStr())}"></label><label class="booking-payment-field">Tür<select id="bookingPaymentKind" class="form-control">${kindOptions}</select></label><label class="booking-payment-field">Yöntem<select id="bookingPaymentMethod" class="form-control">${methodOptions}</select></label><label class="booking-payment-field booking-payment-note">Not (isteğe bağlı)<input id="bookingPaymentNote" class="form-control" maxlength="1000"></label><button class="btn btn-primary" data-onclick="saveBookingPayment(decodeURIComponent('${encodeActionArg(String(booking.id))}'))">Ödeme ekle</button></div>${kaporaNotu}` : '';
   // Iptal edilen rezervasyon tahsilat beklemez (L-274): bakiye gorunumu
@@ -9086,7 +8399,7 @@ function renderManageBookingsTable() {
     const ozetSayisi = filteredRows.filter(row => !iptalMi(row) && isBulkSummaryBooking(row.booking)).length;
     const rezSayisi = filteredRows.length - ozetSayisi - iptalSayisi;
     const tl = n => `${Math.round(n).toLocaleString('tr-TR')} TL`;
-    summaryPill.innerHTML = `📊 Gösterilen: <strong>${rezSayisi} Rezervasyon</strong>${ozetSayisi ? ` + ${ozetSayisi} toplu aktarım özeti` : ''}${iptalSayisi ? ` (+ ${iptalSayisi} iptal, hesaba girmez)` : ''} | 🌙 ${listSummary.soldNights} Gece`
+    summaryPill.innerHTML = `Gösterilen: <strong>${rezSayisi} Rezervasyon</strong>${ozetSayisi ? ` + ${ozetSayisi} toplu aktarım özeti` : ''}${iptalSayisi ? ` (+ ${iptalSayisi} iptal, hesaba girmez)` : ''} | 🌙 ${listSummary.soldNights} Gece`
       + ` | Brüt (bu döneme düşen): ${tl(listSummary.gross)} | 💰 Ciro (oda geliri, indirim sonrası): <strong>${tl(listSummary.netRoomRevenue)}</strong>`
       + ` | Kesintiler: −${tl(listSummary.deductions)} | Kalan (tahmini): ${tl(listSummary.remaining)}`;
   }
@@ -9733,6 +9046,11 @@ function syncResDateInputs() {
 
   const nights = calculateNightsBetween(resRangeStart, resRangeEnd);
   if (badge) badge.innerText = nights > 0 ? `${nights} gece` : '—';
+  // U-09: tarih secilince tarih hatasi kalkar.
+  if (resRangeStart && resRangeEnd) {
+    document.getElementById('resDateRangeBtnFieldError')?.remove();
+    document.getElementById('resDateRangeBtn')?.removeAttribute('aria-invalid');
+  }
   if (hint) {
     const doluVar = !resRangeEnd && (resBookedNights()?.size || 0) > 0;
     hint.innerText = (!resRangeStart ? 'Giriş tarihini seçin'
@@ -9822,6 +9140,8 @@ async function saveBooking(e) {
   }
 
   try {
+    clearBookingFieldErrors();
+    if (showBookingFieldErrors(collectBookingRequiredErrors())) return;
     const editId = document.getElementById('resEditId').value;
     const villa = document.getElementById('resVilla').value;
     const guest = document.getElementById('resGuest').value.trim();
@@ -9836,25 +9156,25 @@ async function saveBooking(e) {
     const pax = normalizePositiveInteger(document.getElementById('resPax').value);
 
     if (pax === null) {
-      throw new Error('Kişi sayısı pozitif bir tam sayı olmalıdır.');
+      throw bookingFieldError('resPax', 'Kişi sayısı pozitif bir tam sayı olmalıdır.');
     }
 
     // Tarihler artik gizli input; tarayici "required" dogrulamasi gizli
     // alanlara uygulanmaz, bu yuzden burada acikca kontrol edilir.
     if (!checkIn || !checkOut) {
-      throw new Error('Konaklama tarihlerini seçin.');
+      throw bookingFieldError('resCheckIn', 'Konaklama tarihlerini seçin.');
     }
     if (calculateNightsBetween(checkIn, checkOut) <= 0) {
-      throw new Error('Çıkış tarihi giriş tarihinden sonra olmalıdır.');
+      throw bookingFieldError('resCheckIn', 'Çıkış tarihi giriş tarihinden sonra olmalıdır.');
     }
     // Minimum gece satis kisitidir (L-265): kisa konaklama hicbir rolde kaydedilmez;
     // tarihi ve mulku degismeyen eski kayit duzenlenirken olculmez.
     const eskiKayit = editId ? (appData.bookings || []).find(b => String(b.id) === String(editId)) : null;
     const tarihDegisti = !eskiKayit || eskiKayit.checkIn !== checkIn || eskiKayit.checkOut !== checkOut || eskiKayit.villa !== villa;
     const minStayEngeli = tarihDegisti ? minStayBlockMessage(villa, checkIn, checkOut, { status }) : null;
-    if (minStayEngeli) throw new Error(minStayEngeli);
+    if (minStayEngeli) throw bookingFieldError('resCheckIn', minStayEngeli);
     // Cikis tarihinden once "Cikis yapti" (L-280): uyarisiz kabul ediliyordu.
-    if (!(await confirmEarlyCheckout(checkIn, checkOut, status, eskiKayit))) throw new Error('Kayıt yapılmadı.');
+    if (!(await confirmEarlyCheckout(checkIn, checkOut, status, eskiKayit))) throw new Error(BOOKING_CANCELLED);
 
     const economics = readBookingFormEconomics();
     const cleanFee = economics.cleanFee;
@@ -9866,12 +9186,12 @@ async function saveBooking(e) {
     const otaComm = economics.otaComm;
 
     if (cleanFee > gross) {
-      throw new Error('Temizlik ücreti brüt tutardan büyük olamaz; brüt tutara dâhildir.');
+      throw bookingFieldError('resCleanFee', 'Temizlik ücreti brüt tutardan büyük olamaz; brüt tutara dâhildir.');
     }
 
     const deposit = editId ? 0 : readBookingDepositInput('resDeposit');
-    if (deposit === null) throw new Error('Kapora tutarı geçerli bir sayı olmalıdır.');
-    if (deposit > gross) throw new Error('Alınan kapora brüt tutardan büyük olamaz.');
+    if (deposit === null) throw bookingFieldError('resDeposit', 'Kapora tutarı geçerli bir sayı olmalıdır.');
+    if (deposit > gross) throw bookingFieldError('resDeposit', 'Alınan kapora brüt tutardan büyük olamaz.');
     const depositMethod = document.getElementById('resDepositMethod')?.value || null;
 
     const net = economics.netRoomRevenue;
@@ -9882,7 +9202,7 @@ async function saveBooking(e) {
       const sifirMi = /^Toplam tutar 0 TL/.test(liste[i]);
       return sifirMi ? Number(eskiKayit.gross) !== gross : (Number(eskiKayit.pax) !== pax || eskiKayit.villa !== villa);
     });
-    if (!(await confirmBookingWarnings(uyarilar))) throw new Error('Kayıt yapılmadı.');
+    if (!(await confirmBookingWarnings(uyarilar))) throw new Error(BOOKING_CANCELLED);
 
     const bookingInput = {
       villa,
@@ -9942,7 +9262,12 @@ async function saveBooking(e) {
     else if (guestProfileWarning && typeof alert === 'function') uiNotify('Rezervasyon kaydedildi.' + guestProfileWarning);
     if (typeof showToast === 'function') showToast('✅ Rezervasyon kaydedildi.', 'success');
   } catch (err) {
+    // Kullanici uyari penceresinde vazgecti: hata degildir (U-09).
+    if (err && err.message === BOOKING_CANCELLED) return;
     console.error('saveBooking error:', err);
+    // Cakisma kayit katmanindan gelir; tarih alaninin altina yazilir.
+    const alan = err && (err.field || (/^Bu mülk seçilen tarihlerde/.test(String(err.message)) ? 'resCheckIn' : null));
+    if (alan && showBookingFieldErrors([{ field: alan, message: err.message }])) return;
     uiNotify('Rezervasyon kaydedilemedi: ' + (err.message || 'Lütfen bilgileri kontrol edin.'));
   } finally {
     if (submitBtn) {
@@ -9953,6 +9278,81 @@ async function saveBooking(e) {
 }
 
 function editBooking(id) { openBookingModal(id); }
+
+/* U-09: alan hatalari alanin altinda. Tarayici balonu her seferinde tek alani
+   gosteriyordu; kod hatalari "Rezervasyon kaydedilemedi: ..." bildirimine
+   gidiyordu ve kullanicinin vazgecmesi de hata gibi gorunuyordu. */
+const BOOKING_CANCELLED = 'BOOKING_SAVE_CANCELLED';
+// Tarih gizli inputtadir; hata gorunen secici dugmesinin altina yazilir.
+const BOOKING_ERROR_ANCHOR = { resCheckIn: 'resDateRangeBtn', resCheckOut: 'resDateRangeBtn' };
+
+function bookingFieldError(fieldId, message) {
+  const err = new Error(message);
+  err.field = fieldId;
+  return err;
+}
+
+function clearBookingFieldErrors() {
+  if (typeof document === 'undefined' || typeof document.querySelectorAll !== 'function') return;
+  document.querySelectorAll('#bookingForm .field-error').forEach(p => p.remove());
+  document.querySelectorAll('#bookingForm [aria-invalid="true"]').forEach(el => {
+    el.removeAttribute('aria-invalid');
+    const ids = String(el.getAttribute('aria-describedby') || '').split(/\s+/).filter(id => id && !id.endsWith('FieldError'));
+    if (ids.length) el.setAttribute('aria-describedby', ids.join(' ')); else el.removeAttribute('aria-describedby');
+  });
+}
+
+function showBookingFieldErrors(errors) {
+  if (typeof document === 'undefined' || typeof document.createElement !== 'function' || !errors.length) return false;
+  let ilk = null;
+  errors.forEach(({ field, message }) => {
+    const el = document.getElementById(BOOKING_ERROR_ANCHOR[field] || field);
+    if (!el) return;
+    const errId = `${el.id}FieldError`;
+    if (document.getElementById(errId)) return;
+    const p = document.createElement('p');
+    p.id = errId;
+    p.className = 'field-error';
+    p.textContent = message;
+    const host = el.closest('.form-group') || el.parentElement;
+    host.appendChild(p);
+    el.setAttribute('aria-invalid', 'true');
+    el.setAttribute('aria-describedby', [el.getAttribute('aria-describedby'), errId].filter(Boolean).join(' '));
+    ilk = ilk || el;
+  });
+  if (ilk) {
+    // Hatali alan "Istege bagli ayrintilar" icindeyse acilir.
+    const details = ilk.closest('details');
+    if (details) details.open = true;
+    if (typeof ilk.focus === 'function') ilk.focus();
+    if (typeof ilk.scrollIntoView === 'function') ilk.scrollIntoView({ block: 'center' });
+  }
+  return !!ilk;
+}
+
+// Kaydetmeden once butun zorunlu alanlar birlikte denetlenir.
+function collectBookingRequiredErrors() {
+  const val = id => String(document.getElementById(id)?.value ?? '').trim();
+  const hatalar = [];
+  if (!val('resVilla')) hatalar.push({ field: 'resVilla', message: 'Villa seçin.' });
+  if (!val('resGuest')) hatalar.push({ field: 'resGuest', message: 'Misafir adını yazın.' });
+  if (!val('resCheckIn') || !val('resCheckOut')) hatalar.push({ field: 'resCheckIn', message: 'Giriş ve çıkış tarihlerini seçin.' });
+  if (val('resGross') === '') hatalar.push({ field: 'resGross', message: 'Rezervasyon tutarını yazın (ücretsizse 0).' });
+  if (normalizePositiveInteger(val('resPax')) === null) hatalar.push({ field: 'resPax', message: 'Kişi sayısını tam sayı olarak yazın (en az 1).' });
+  return hatalar;
+}
+
+function handleBookingFieldInput(event) {
+  const el = event && event.target;
+  if (!el || el.getAttribute('aria-invalid') !== 'true') return;
+  document.getElementById(`${el.id}FieldError`)?.remove();
+  el.removeAttribute('aria-invalid');
+}
+
+if (typeof document !== 'undefined' && document.addEventListener) {
+  document.addEventListener('input', handleBookingFieldInput, true);
+  document.addEventListener('change', handleBookingFieldInput, true);
+}
 
 // -------------------------------------------------------------
 // SETTINGS TABLE (PRICING TIERS)
@@ -10005,7 +9405,7 @@ function renderSettingsGoalsTable() {
       </td>
       <td style="text-align: right;">
         <button class="btn btn-secondary btn-sm" data-onclick="openGoalsModal(decodeURIComponent('${encodeActionArg(period)}'))" style="padding: 4px 10px; font-size: 11px;">
-          ✏️ Düzenle
+          Düzenle
         </button>
       </td>
     `;
@@ -10322,14 +9722,14 @@ async function renderTeamManagement() {
     // Kisi bazinda izin (L-211): yalniz sahip, sahip olmayan uyeye verir.
     const ozel = Object.keys(teamPermissionOverrides[m.user_id] || {}).length;
     const izinDugmesi = canManageRoles && m.role !== 'owner'
-      ? `<button class="btn btn-secondary btn-sm" data-action="permissions" data-user="${escapeHtml(m.user_id)}">🔐 İzinler${ozel ? ' · özel' : ''}</button> `
+      ? `<button class="btn btn-secondary btn-sm" data-action="permissions" data-user="${escapeHtml(m.user_id)}">İzinler${ozel ? ' · özel' : ''}</button> `
       : '';
     // Personel hesabı saha ekibine bağlanmadan temizliğe atanamaz (L-176).
     const inFieldTeam = (appData?.operationalPeople || []).some(person => person.user_id === m.user_id);
     const fieldCell = m.role === 'staff' && canManageTenantRole(myRole)
       ? (inFieldTeam
         ? '<span class="sub-text" style="font-size:11px;">Saha ekibinde</span> '
-        : `<button class="btn btn-secondary btn-sm" data-action="field" data-user="${escapeHtml(m.user_id)}">👷 Saha ekibine ekle</button> `)
+        : `<button class="btn btn-secondary btn-sm" data-action="field" data-user="${escapeHtml(m.user_id)}">Saha ekibine ekle</button> `)
       : '';
     const actionCell = izinDugmesi + fieldCell + (canRemove
       ? `<button class="btn btn-secondary btn-sm" data-action="remove"
@@ -12165,7 +11565,6 @@ async function updateLeadStatusFromKanban(leadId, nextStatus) {
     await loadLeads(getActiveTenantId());
     renderLeadSalesWorkspace();
     renderManageLeadsTable();
-    renderLeadAnalytics();
     showToast('Talep durumu güncellendi.', 'success');
     return true;
   } catch (error) {
@@ -12228,8 +11627,6 @@ function renderLeadQuickCapture() {
     .reduce((sum, row) => sum + (Number(row.count) || 0), 0);
   const interestElement = document.getElementById('leadInterestToday');
   if (interestElement) interestElement.textContent = String(interestToday);
-  const addSourceButton = document.getElementById('leadAddSourceBtn');
-  if (addSourceButton) addSourceButton.hidden = !canManageTenantRole(activeTenant?.role);
   const sources = Array.isArray(appData.leadSources) ? appData.leadSources : [];
   const sortedSources = sources.slice().sort((a, b) => {
     if (a.id === lastLeadSourceId) return -1;
@@ -12280,21 +11677,6 @@ async function refreshLeadSalesContext() {
   return context;
 }
 
-async function addLeadSource() {
-  if (!canManageTenantRole(activeTenant?.role)) return false;
-  const label = await uiAskText({ title: 'Yeni talep kaynağı', label: 'Kaynağın adı', placeholder: 'Örn: Google Haritalar' });
-  if (!String(label || '').trim()) return false;
-  try {
-    const source = await SalesWorkflowService.createSource(supabaseClient, { tenantId: getActiveTenantId(), label });
-    lastLeadSourceId = source.id;
-    await refreshLeadSalesContext();
-    if (window.showToast) window.showToast('✅ Talep kaynağı eklendi.');
-    return true;
-  } catch (error) {
-    if (window.showToast) window.showToast('Kaynak eklenemedi: ' + kullaniciMesaji(error?.message), 'error');
-    return false;
-  }
-}
 
 async function bumpLeadInterestFromQuick(delta) {
   if (!canWriteSalesRole(activeTenant?.role)) return false;
@@ -12359,7 +11741,6 @@ async function submitQuickLead(event) {
     renderLeadExtraPropertyPicker('leadQuickExtraProperties', []);
     renderLeadQuickCapture();
     renderManageLeadsTable();
-    renderLeadAnalytics();
     setLeadQuickMessage(parts.join(' '), result.classification === 'BLACK' ? 'warning' : 'success');
   } catch (error) {
     setLeadQuickMessage(kullaniciMesaji(error?.message || 'Talep kaydedilemedi.'), 'error');
@@ -12394,9 +11775,9 @@ function renderManageLeadsTable() {
 
     let convertAction = '';
     if (l.status === 'WON' || l.stage === 'WON' || l.convertedBookingId) {
-      convertAction = `<span class="badge badge-green" style="font-size: 11px;" title="Dönüşen Rezervasyon">✅ Rezervasyona Dönüştü</span>`;
+      convertAction = `<span class="badge badge-green" style="font-size: 11px;" title="Dönüşen Rezervasyon">Rezervasyona Dönüştü</span>`;
     } else if (canConvertLeadToBooking(l)) {
-      convertAction = `<button class="btn btn-primary btn-sm" data-onclick="convertLeadAction(decodeURIComponent('${encodeActionArg(l.id)}'))" title="Kesin Rezervasyona Dönüştür">📅 Rezervasyona Dönüştür</button>`;
+      convertAction = `<button class="btn btn-primary btn-sm" data-onclick="convertLeadAction(decodeURIComponent('${encodeActionArg(l.id)}'))" title="Kesin Rezervasyona Dönüştür">Rezervasyona Dönüştür</button>`;
     } else {
       convertAction = '<span class="sub-text">—</span>';
     }
@@ -12473,7 +11854,6 @@ async function convertLeadAction(leadId) {
     if (window.showToast) window.showToast('🎉 Talep başarıyla rezervasyona dönüştürüldü ve takvime eklendi!');
     else uiNotify('🎉 Talep başarıyla rezervasyona dönüştürüldü ve takvime eklendi!');
     renderManageLeadsTable();
-    renderLeadAnalytics();
     return true;
   } catch (err) {
     uiNotify('Dönüştürme Hatası: ' + err.message);
@@ -12714,7 +12094,6 @@ async function saveLead(e) {
         await refreshLeadSalesContext();
       } catch (workflowError) {
         renderManageLeadsTable();
-        renderLeadAnalytics();
         uiNotify('Talep bilgileri kaydedildi; ancak atama/takip bilgisi kaydedilemedi: ' + workflowError.message);
         return;
       }
@@ -12725,7 +12104,6 @@ async function saveLead(e) {
     }
     closeLeadModal();
     renderManageLeadsTable();
-    renderLeadAnalytics();
   } catch (err) {
     uiNotify('Hata: ' + err.message);
   }
@@ -12748,7 +12126,6 @@ async function deleteLeadUI(id) {
       await deleteLead(id);
       renderLeadSalesWorkspace();
       renderManageLeadsTable();
-      renderLeadAnalytics();
       if (window.showToast) window.showToast('🗑️ Talep başarıyla silindi.');
     } catch (err) {
       uiNotify('Silme Hatası: ' + err.message);
@@ -12802,34 +12179,6 @@ function mapMaintenanceTicketFromDb(ticket, propertyIdMap = {}) {
   };
 }
 
-function renderManageMaintTable() {
-  const tbody = document.getElementById('manageMaintTableBody');
-  if (!tbody) return;
-  tbody.innerHTML = '';
-
-  appData.maintenance.forEach(m => {
-    let priBadge = '<span class="badge badge-rose">P1 Kritik</span>';
-    if (m.priority === 'P2') priBadge = '<span class="badge badge-amber">P2 Önemli</span>';
-    if (m.priority === 'P3') priBadge = '<span class="badge badge-blue">P3 Rutin</span>';
-
-    const statusPresentation = getMaintenanceStatusPresentation(m.statusRaw || m.status);
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${priBadge}</td>
-      <td><strong>${escapeHtml(appData.villas[m.villa]?.name || m.villa)}</strong></td>
-      <td>${escapeHtml(m.title || '')}</td>
-      <td>${escapeHtml(m.assignee || 'Atanmadı')}</td>
-      <td>${Number(m.cost) > 0 ? '₺' + Number(m.cost).toLocaleString('tr-TR') : '—'}</td>
-      <td>${m.downtime || 0} Gece</td>
-      <td><span class="badge ${statusPresentation.badgeClass}">${escapeHtml(statusPresentation.label)}</span></td>
-      <td style="text-align: right; white-space: nowrap;">
-        ${statusPresentation.archived ? '' : `<button class="btn btn-secondary btn-sm" data-onclick="editMaint(decodeURIComponent('${encodeActionArg(String(m.id))}'))">✏️</button>
-        ${isMaintenanceTicketOpen(m) ? `<button class="btn btn-danger btn-sm" data-onclick="deleteMaint(decodeURIComponent('${encodeActionArg(String(m.id))}'))">Arşivle</button>` : ''}`}
-      </td>
-    `;
-    tbody.appendChild(tr);
-  });
-}
 
 function openMaintModal(editId = null) {
   const modal = document.getElementById('maintModal');
@@ -13070,22 +12419,6 @@ async function cleanResetAll() {
 // ekranin sorusudur, bicimlendirme motorun.
 
 /** Dısa aktarma menusunu acar/kapatir. Disariya tiklayinca da kapanir. */
-function toggleExportMenu(olay) {
-  if (olay) olay.stopPropagation();
-  const menu = document.getElementById('ledgerExportMenu');
-  if (!menu) return;
-  const acik = menu.style.display !== 'none';
-  menu.style.display = acik ? 'none' : 'block';
-
-  if (!acik && !menu.dataset.disKapatmaHazir) {
-    menu.dataset.disKapatmaHazir = '1';
-    document.addEventListener('click', (e) => {
-      if (!e.target.closest('#ledgerExportMenu') && !e.target.closest('[data-onclick*="toggleExportMenu"]')) {
-        menu.style.display = 'none';
-      }
-    });
-  }
-}
 
 function getExportEngine() {
   if (typeof FinanceExportEngine !== 'undefined') return FinanceExportEngine;
@@ -13484,7 +12817,7 @@ function renderDailyOps() {
     if (upcoming.length > 0) {
       upcomingHtml = `
         <div class="ops-upcoming-box">
-          <div style="font-size: 11px; color: #409CFF; font-weight: 600; margin-bottom: 4px;">📅 Yaklaşan İlk Girişler:</div>
+          <div style="font-size: 11px; color: #409CFF; font-weight: 600; margin-bottom: 4px;">Yaklaşan İlk Girişler:</div>
           ${upcoming.map(u => `
             <div style="font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between; padding: 2px 0;">
               <span><strong>${formatShortDate(u.checkIn)}</strong> - ${escapeHtml(u.guest)}</span>
@@ -13516,7 +12849,7 @@ function renderDailyOps() {
           <div style="font-size: 11px; color: #30D158; margin-top: 2px;">Net Gelir: ₺${Number(b.net || 0).toLocaleString('tr-TR')}</div>
         </div>
         <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
-          <span class="badge badge-green" style="font-weight: 700;">🟢 ${checkInTime ? escapeHtml(checkInTime) + ' Giriş' : 'Giriş saati kayıtlı değil'}</span>
+          <span class="badge badge-green" style="font-weight: 700;">${checkInTime ? escapeHtml(checkInTime) + ' Giriş' : 'Giriş saati kayıtlı değil'}</span>
           <button class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 2px 6px;" data-onclick="openBookingModal(decodeURIComponent('${encodeActionArg(b.id)}'))">Detay</button>
         </div>
       `;
@@ -13538,7 +12871,7 @@ function renderDailyOps() {
     if (upcomingOut.length > 0) {
       upcomingOutHtml = `
         <div class="ops-upcoming-box">
-          <div style="font-size: 11px; color: #93C5FD; font-weight: 600; margin-bottom: 4px;">📅 Yaklaşan İlk Çıkışlar:</div>
+          <div style="font-size: 11px; color: #93C5FD; font-weight: 600; margin-bottom: 4px;">Yaklaşan İlk Çıkışlar:</div>
           ${upcomingOut.map(u => `
             <div style="font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between; padding: 2px 0;">
               <span><strong>${formatShortDate(u.checkOut)}</strong> - ${escapeHtml(u.guest)}</span>
@@ -13567,10 +12900,10 @@ function renderDailyOps() {
           <div class="ops-guest-meta" style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
             ${escapeHtml(vName)} • ${escapeHtml(b.channel)} • Çıkış Günü
           </div>
-          <div style="font-size: 11px; color: #FFB340; margin-top: 2px;">🧹 Temizlik Planına Alındı</div>
+          <div style="font-size: 11px; color: #FFB340; margin-top: 2px;">Temizlik Planına Alındı</div>
         </div>
         <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
-          <span class="badge badge-blue" style="font-weight: 700;">🔵 ${checkOutTime ? escapeHtml(checkOutTime) + ' Çıkış' : 'Çıkış saati kayıtlı değil'}</span>
+          <span class="badge badge-blue" style="font-weight: 700;">${checkOutTime ? escapeHtml(checkOutTime) + ' Çıkış' : 'Çıkış saati kayıtlı değil'}</span>
           <button class="btn btn-secondary btn-sm" style="font-size: 11px; padding: 2px 6px;" data-onclick="openBookingModal(decodeURIComponent('${encodeActionArg(b.id)}'))">Detay</button>
         </div>
       `;
@@ -13621,7 +12954,7 @@ function renderDailyOps() {
 
   villaBar.innerHTML = `
     <div style="font-size: 11px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
-      <span>🏡 Mülk Satış Hazırlığı</span>
+      <span>Mülk Satış Hazırlığı</span>
       <span style="color: #93C5FD; font-size: 11px;">${canManagePropertyReadiness() ? 'Durum Değiştir 🔄' : 'Salt Okunur'}</span>
     </div>
     <div style="display: flex; flex-wrap: wrap; gap: 2px;">
@@ -13640,7 +12973,7 @@ function renderDailyOps() {
   taskListHeader.style.justifyContent = 'space-between';
   taskListHeader.style.alignItems = 'center';
   taskListHeader.innerHTML = `
-    <span>📅 Planlanan Temizlik & Borçlar (Tarih Sıralı):</span>
+    <span>Planlanan Temizlik & Borçlar (Tarih Sıralı):</span>
     <span style="font-size: 11px; color: var(--text-muted);">Tarihe Göre</span>
   `;
   hkList.appendChild(taskListHeader);
@@ -13676,14 +13009,14 @@ function renderDailyOps() {
       const isToday = (task.date === todayStr);
       const isPast = (task.date && task.date < todayStr);
 
-      let dateBadge = `<span class="badge badge-blue" style="font-size: 11px; font-weight: 700;">📅 ${formatTrDate(task.date)}</span>`;
+      let dateBadge = `<span class="badge badge-blue" style="font-size: 11px; font-weight: 700;">${formatTrDate(task.date)}</span>`;
       let borderColor = 'rgba(10, 132, 255, 0.4)';
 
       if (isToday) {
-        dateBadge = `<span class="badge badge-amber" style="font-size: 11px; font-weight: 800; background: rgba(255, 159, 10, 0.25); border: 1px solid #FF9F0A;">⚡ BUGÜN (${formatShortDate(task.date)})</span>`;
+        dateBadge = `<span class="badge badge-amber" style="font-size: 11px; font-weight: 800; background: rgba(255, 159, 10, 0.25); border: 1px solid #FF9F0A;">BUGÜN (${formatShortDate(task.date)})</span>`;
         borderColor = 'rgba(255, 159, 10, 0.8)';
       } else if (isPast) {
-        dateBadge = `<span class="badge" style="font-size: 11px; font-weight: 600; background: rgba(148, 163, 184, 0.15); color: #98989D;">🕒 ${formatTrDate(task.date)}</span>`;
+        dateBadge = `<span class="badge" style="font-size: 11px; font-weight: 600; background: rgba(148, 163, 184, 0.15); color: #98989D;">${formatTrDate(task.date)}</span>`;
         borderColor = 'rgba(148, 163, 184, 0.3)';
       }
 
@@ -13716,7 +13049,7 @@ function renderDailyOps() {
 
         <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 6px; border-top: 1px dashed rgba(255, 255, 255, 0.1); font-size: 11px;">
           <span style="color: var(--text-muted); display: flex; align-items: center; gap: 4px;">
-            🧹 Bedel: 
+            Bedel: 
             <b style="color: #409CFF; cursor: pointer; text-decoration: underline dashed; font-size: 12px;" 
                data-onclick="promptEditTaskAmount(decodeURIComponent('${encodeActionArg(task.id)}'))" 
                title="Maliyeti değiştirmek için tıklayın">
@@ -13783,7 +13116,6 @@ async function promptEditTaskAmount(taskId) {
   }
 
   task.amount = newAmount;
-  renderHousekeepingTab();
   renderDailyOps();
 
   await reportCleaningPersist(task, `✅ Temizlik maliyeti ₺${newAmount.toLocaleString('tr-TR')} olarak güncellendi.`);
@@ -13817,7 +13149,6 @@ async function markCleaningDone(taskId) {
   }
   task.status = 'DONE';
   task.date = gun;
-  renderHousekeepingTab();
   const ok = await reportCleaningPersist(task, `✅ Temizlik yapıldı olarak işaretlendi (${formatTrDate(gun)}). Maliyeti bu günün ayına gider yazıldı.`);
   if (typeof renderFinanceModule === 'function') renderFinanceModule();
   return ok;
@@ -13835,7 +13166,6 @@ async function markCleaningSkipped(taskId) {
   }
   if (!(await uiAskConfirm({ message: 'Bu temizliğe gerek kalmadı olarak işaretlensin mi (misafir gelmedi, iptal, ev kullanılmadı)? Gider ve personel borcu oluşmaz.', okText: 'Gerek kalmadı' }))) return false;
   task.status = 'SKIPPED';
-  renderHousekeepingTab();
   const ok = await reportCleaningPersist(task, '⏭️ Temizliğe gerek kalmadı olarak işaretlendi; gider ve borç oluşmaz.');
   if (typeof renderFinanceModule === 'function') renderFinanceModule();
   return ok;
@@ -13850,7 +13180,6 @@ async function markCleaningPlanned(taskId) {
     return false;
   }
   task.status = 'PLANNED';
-  renderHousekeepingTab();
   const ok = await reportCleaningPersist(task, '↩️ Temizlik yeniden planlı duruma alındı.');
   if (typeof renderFinanceModule === 'function') renderFinanceModule();
   return ok;
@@ -13873,7 +13202,6 @@ async function markSelectedCleaningDone() {
   }
   if (!(await uiAskConfirm({ message: `${gorevler.length} temizlik planlandıkları gün yapılmış olarak işaretlensin mi? Maliyetleri o günlerin ayına gider yazılır.`, okText: 'Yapıldı olarak işaretle' }))) return false;
   gorevler.forEach(t => { t.status = 'DONE'; });
-  renderHousekeepingTab();
   const ok = await reportCleaningPersist(gorevler, `✅ ${gorevler.length} temizlik yapıldı olarak işaretlendi.`);
   if (typeof renderFinanceModule === 'function') renderFinanceModule();
   return ok;
@@ -13927,134 +13255,9 @@ async function setPropertySalesReadiness(vKey, status) {
   appData.housekeepingOverrides[vKey] = status;
   renderExecutiveControlCenter();
   renderDailyOps();
-  renderOperationsKpiStrip();
   return true;
 }
 
-// -------------------------------------------------------------
-// 🧹 DEDİKATED TAB: TEMİZLİK & OPERASYON BORÇ DEFTERİ MOTORU
-// -------------------------------------------------------------
-function renderHousekeepingTab() {
-  const tbody = document.getElementById('hkTableBody');
-  if (!tbody) return;
-
-  if (!appData.cleaningTasks) {
-    appData.cleaningTasks = [];
-  }
-
-  const statusFilter = document.getElementById('hkStatusFilter')?.value || 'ALL';
-  const searchTerm = (document.getElementById('hkSearchInput')?.value || '').trim();
-  const bugun = getTodayStr();
-
-  // Kapsam: secili mulk ve donem. Gorev tarihi = temizligin yapildigi (ya da
-  // planlandigi) gun; gider de bu gunun ayina yazilir (K-04).
-  const allInScope = appData.cleaningTasks.filter(t => {
-    if (!taskMatchesVilla(t, currentFilter.villa)) return false;
-    if (currentFilter.period === 'ALL') return true;
-    return isDateInFilter(t.date || '');
-  });
-
-  let filtered = allInScope.slice();
-  // PENDING eski deger: "borc" ile ayni anlam.
-  if (statusFilter === 'DEBT' || statusFilter === 'PENDING') {
-    filtered = filtered.filter(t => t.status === 'DONE' && !t.paid);
-  } else if (statusFilter === 'PAID') {
-    filtered = filtered.filter(t => t.paid);
-  } else if (statusFilter === 'UNCONFIRMED') {
-    filtered = filtered.filter(t => t.status === 'PLANNED' && (t.date || '') <= bugun);
-  } else if (statusFilter === 'PLANNED') {
-    filtered = filtered.filter(t => t.status === 'PLANNED');
-  } else if (statusFilter === 'SKIPPED') {
-    filtered = filtered.filter(t => t.status === 'SKIPPED');
-  }
-
-  if (searchTerm) {
-    filtered = filtered.filter(t => cleaningTaskSearchMatches(t, searchTerm));
-  }
-
-  // KPI'lar. Borc = YAPILMIS ve odenmemis temizlik; planli gorev borc degil.
-  const debtList = allInScope.filter(t => t.status === 'DONE' && !t.paid);
-  const paidList = allInScope.filter(t => t.paid);
-  const unconfirmed = allInScope.filter(t => t.status === 'PLANNED' && (t.date || '') <= bugun);
-  const pendingDebt = debtList.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
-  const paidAmount = paidList.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
-
-  setEl('hkKpiPendingDebt', '₺' + pendingDebt.toLocaleString('tr-TR'));
-  setEl('hkKpiPendingCount', debtList.length + ' yapılmış temizlik ödeme bekliyor');
-  setEl('hkKpiPaidAmount', '₺' + paidAmount.toLocaleString('tr-TR'));
-  setEl('hkKpiPaidCount', paidList.length + ' Temizlik Ödendi');
-  setEl('hkKpiTotalOps', allInScope.length);
-  setEl('hkKpiTotalOpsMeta', unconfirmed.length > 0
-    ? `${unconfirmed.length} geçmiş temizlik "yapıldı mı?" bekliyor`
-    : (currentFilter.villa === 'ALL' ? portfolioLabel(' Toplamı') : (appData.villas[currentFilter.villa]?.name || currentFilter.villa)));
-
-  tbody.innerHTML = '';
-
-  if (filtered.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 24px;">Kriterlere uygun temizlik / borç kaydı bulunamadı.</td></tr>';
-    return;
-  }
-
-  const kod = encodeActionArg; // checkbox degeri de ayni kodla
-  filtered.sort((a, b) => (b.date || '').localeCompare(a.date || '')).forEach(task => {
-    const vName = appData.villas[task.villa]?.name || task.villa;
-    const isPaid = !!task.paid;
-    const amount = Number(task.amount) || 0;
-    const id = kod(task.id);
-    const gecmisPlanli = task.status === 'PLANNED' && (task.date || '') <= bugun;
-
-    let durum;
-    if (task.status === 'DONE') {
-      durum = `<span class="badge badge-emerald">✔ Yapıldı</span>`
-        + (isPaid ? '' : ` <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:11px;" data-onclick="markCleaningPlanned(decodeURIComponent('${encodeActionArg(task.id)}'))" title="Yanlışlıkla işaretlendiyse geri al">↩︎</button>`);
-    } else if (task.status === 'SKIPPED') {
-      durum = `<span class="badge">Gerek kalmadı</span> <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:11px;" data-onclick="markCleaningPlanned(decodeURIComponent('${encodeActionArg(task.id)}'))" title="Geri al">↩︎</button>`;
-    } else {
-      durum = `<span class="badge ${gecmisPlanli ? 'badge-amber' : 'badge-blue'}">${gecmisPlanli ? 'Yapıldı mı?' : 'Planlandı'}</span>
-        <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:11px; margin-left:4px;" data-onclick="markCleaningDone(decodeURIComponent('${encodeActionArg(task.id)}'))">✔ Yapıldı</button>
-        <button class="btn btn-secondary btn-sm" style="padding:2px 6px; font-size:11px;" data-onclick="markCleaningSkipped(decodeURIComponent('${encodeActionArg(task.id)}'))" title="Misafir gelmedi, iptal ya da ev kullanılmadı: gider ve borç oluşmaz">✖ Gerek kalmadı</button>`;
-    }
-
-    let odeme;
-    if (task.status === 'DONE') {
-      odeme = `<button class="${isPaid ? 'btn-clean-paid' : 'btn-clean-pending'}"
-                data-onclick="toggleTaskPaid(decodeURIComponent('${encodeActionArg(task.id)}'))"
-                title="${isPaid ? 'Ödenmedi olarak değiştir' : 'Ödendi olarak işaretle'}">
-          ${isPaid ? '✅ ÖDENDİ' : '⏳ ÖDENECEK'}
-        </button>
-        <div style="color: var(--text-muted); font-size: 11px; margin-top: 2px;">${isPaid ? (task.paidDate ? formatTrDate(task.paidDate) : 'Ödendi') : '<span style="color: #FF6961;">Borç</span>'}</div>`;
-    } else {
-      odeme = `<span style="color: var(--text-muted); font-size: 11px;">${task.status === 'SKIPPED' ? 'Gider ve borç yok' : 'Yapılınca borç olur'}</span>`;
-    }
-
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${task.status === 'PLANNED' ? `<input type="checkbox" class="hk-select" value="${id}" aria-label="Seç" style="margin-right:6px;">` : ''}<strong>${formatTrDate(task.date)}</strong></td>
-      <td><span class="villa-badge">${escapeHtml(vName)}</span></td>
-      <td>
-        <strong style="color: #FFFFFF;">${escapeHtml(task.guest ? task.guest + ' Çıkışı' : (task.notes || 'Temizlik'))}</strong>
-        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">${escapeHtml(task.notes || '-')}</div>
-      </td>
-      <td>
-        <span style="color: #93C5FD; font-weight: 500;">👤 ${escapeHtml(task.cleaner || 'Temizlik personeli belirtilmedi')}</span>
-      </td>
-      <td>
-        <b style="color: #409CFF; cursor: pointer; text-decoration: underline dashed; font-size: 13px;"
-           data-onclick="promptEditTaskAmount(decodeURIComponent('${encodeActionArg(task.id)}'))"
-           title="Tıklayarak maliyeti değiştirin">
-          ${amount > 0 ? '₺' + amount.toLocaleString('tr-TR') : 'Tutar girilmedi'} ✏️
-        </b>
-      </td>
-      <td>${durum}</td>
-      <td>${odeme}</td>
-      <td style="text-align: right;">
-        <button class="btn btn-secondary btn-sm" data-onclick="openEditCleaningTaskModal(decodeURIComponent('${encodeActionArg(task.id)}'))" style="padding: 3px 7px; font-size: 11px;" title="Detaylı Düzenle">✏️</button>
-        <button class="btn btn-danger btn-sm" data-onclick="deleteCleaningTask(decodeURIComponent('${encodeActionArg(task.id)}'))" style="padding: 3px 7px; font-size: 11px; margin-left: 4px;" title="Sil">🗑️</button>
-      </td>
-    `;
-    tbody.appendChild(tr);
-  });
-}
 
 async function toggleTaskPaid(taskId) {
   const task = findCleaningTask(taskId);
@@ -14083,7 +13286,6 @@ async function toggleTaskPaid(taskId) {
   task.paidDate = newPaid ? getTodayStr() : null;
 
   const vName = (appData.villas && appData.villas[task.villa]?.name) ? appData.villas[task.villa].name : task.villa;
-  renderHousekeepingTab();
   renderDailyOps();
 
   // "Odendi" gider YAZMAZ (K-04): gider temizlik yapildiginda dogdu.
@@ -14116,7 +13318,6 @@ async function payAllPendingCleaning() {
     t.paidDate = todayStr;
   });
 
-  renderHousekeepingTab();
   renderDailyOps();
 
   await reportCleaningPersist(
@@ -14262,7 +13463,6 @@ async function saveCleaningTask(e) {
 
   closeCleaningTaskModal();
   saveAppData();
-  renderHousekeepingTab();
   renderDailyOps();
   renderExpensesTable();
   renderOperationsTab();
@@ -14297,7 +13497,6 @@ async function deleteCleaningTask(taskId) {
     return false;
   }
 
-  renderHousekeepingTab();
   // Silme Operasyon ekranindan yapiliyor; satir orada da hemen kalkmali.
   renderOperationsTab();
   renderDailyOps();
@@ -14350,16 +13549,7 @@ function onReservationScopeChange() {
 
 // Takvim yakinlastirma (M53): gorunum tercihi tarayicida kalir (yalniz izleyen
 // kisinin kolayligi; is verisi degil). Depolama kapaliysa normal boyut.
-let tapeChartZoom = (() => {
-  try { return typeof localStorage !== 'undefined' && localStorage.getItem('lexbnb.tapeChartZoom') === '1'; } catch (_) { return false; }
-})();
 
-function toggleTapeChartZoom() {
-  tapeChartZoom = !tapeChartZoom;
-  try { if (typeof localStorage !== 'undefined') localStorage.setItem('lexbnb.tapeChartZoom', tapeChartZoom ? '1' : '0'); } catch (_) { /* tercih saklanamadi */ }
-  renderTapeChart();
-  return true;
-}
 
 function setTapeChartView(view) {
   if (!['WEEK_1', 'WEEK_2', 'MONTH'].includes(view)) return false;
@@ -14507,7 +13697,7 @@ function renderTapeChart() {
       calendarDates[0], calendarDates[calendarDates.length - 1]);
     const ad = b => appData.villas?.[b.villa]?.name || Object.values(appData.villas || {}).find(v => v.id === b.propertyId)?.name || b.villa || '—';
     const gece = b => Math.max(0, Math.round((Date.parse(b.checkOut + 'T00:00:00Z') - Date.parse(b.checkIn + 'T00:00:00Z')) / 86400000));
-    const rozetler = ozetler.map(b => `<span class="badge badge-slate" style="font-size:11px;">📦 ${escapeHtml(ad(b))} · ${gece(b)} gece · ₺${Math.round(Number(b.gross) || 0).toLocaleString('tr-TR')}</span>`).join(' ');
+    const rozetler = ozetler.map(b => `<span class="badge badge-slate" style="font-size:11px;">${escapeHtml(ad(b))} · ${gece(b)} gece · ₺${Math.round(Number(b.gross) || 0).toLocaleString('tr-TR')}</span>`).join(' ');
     tableHtml += `<div class="tape-chart-note" style="font-size:11px; color:var(--text-muted); margin-top:8px; display:flex; flex-wrap:wrap; gap:6px; align-items:center;"><strong>Toplu aktarım (günlere dağılmamış):</strong> ${rozetler} <span>Ciro ve gece toplamlarına dahil; hangi günlerde konaklandığı bilinmediği için takvime çizilmez.</span></div>`;
   }
   // Ay gorunumu donemin ilk ayini gosterir; donem daha uzunsa liste kalanini kapsar.
@@ -14516,14 +13706,7 @@ function renderTapeChart() {
     tableHtml += `<div class="tape-chart-note" style="font-size:11px; color:var(--text-muted); margin-top:6px;">Takvim ${formatTrDate(calendarDates[0])} – ${formatTrDate(gosterilenSon)} arasını gösteriyor; aşağıdaki liste seçili dönemin tamamını (${formatTrDate(reservationListRange.start)} – ${formatTrDate(reservationListRange.end)}) kapsar.</div>`;
   }
   container.innerHTML = tableHtml;
-  container.classList.toggle('tape-zoom', tapeChartZoom);
   container.classList.toggle('tape-week', tapeChartView !== 'MONTH');
-  const zoomBtn = document.getElementById('tapeZoomBtn');
-  if (zoomBtn) {
-    zoomBtn.setAttribute('aria-pressed', tapeChartZoom ? 'true' : 'false');
-    zoomBtn.classList.toggle('active', tapeChartZoom);
-    zoomBtn.textContent = tapeChartZoom ? '🔍 Küçült' : '🔍 Büyüt';
-  }
 }
 
 // Gecmis ay toplu girisi (L-198, kullanici M28). Kurallar core/bulk_summary.js:
@@ -14610,7 +13793,6 @@ async function saveBulkSummary(event) {
     return false;
   }
   closeBulkSummaryModal();
-  invalidateExecutiveSnapshotCache();
   showToast(`${plan.booking.guest} kaydedildi: ${plan.booking.nights} gece · ₺${Math.round(plan.booking.gross).toLocaleString('tr-TR')}.`, 'success');
   if (typeof renderManageBookingsTable === 'function') renderManageBookingsTable();
   if (typeof renderTapeChart === 'function') renderTapeChart();
@@ -15166,162 +14348,7 @@ const KAYIP_NEDENI_ONERILERI = {
   'Cevap Vermedi': 'Teklif gönderildikten sonra takip mesajı planlayın.',
   'Başka Yer Seçti': 'Kaybedilen tekliflerde misafire neyi karşılaştırdığını sorun.'
 };
-function summarizeLeadLossReasons(lostLeads) {
-  const counts = { 'Fiyat Yüksek': 0, 'Tarih Dolu': 0, 'Cevap Vermedi': 0, 'Başka Yer Seçti': 0, 'Diğer': 0 };
-  let secilmemis = 0;
-  (lostLeads || []).forEach(l => {
-    const reason = l && l.lostReason;
-    if (!reason) secilmemis++;
-    if (reason && counts[reason] !== undefined) counts[reason]++;
-    else counts['Diğer']++;
-  });
-  const toplam = (lostLeads || []).length;
-  if (toplam === 0) {
-    return { counts, total: 0, topReasons: [], adviceHtml: 'Henüz kaybedilmiş talep yok; kayıp nedeni analizi yapılamaz.' };
-  }
-  const bilinen = Object.keys(KAYIP_NEDENI_ONERILERI).filter(k => counts[k] > 0);
-  if (bilinen.length === 0) {
-    return { counts, total: toplam, topReasons: [],
-      adviceHtml: `${toplam} kayıp talebin nedeni "Diğer" ya da boş; baskın bir neden belirlenemez. Talebi "Kaybedildi" yaparken nedenini seçin.` };
-  }
-  const enCok = Math.max(...bilinen.map(k => counts[k]));
-  const top = bilinen.filter(k => counts[k] === enCok);
-  const adlar = top.map(k => `<em>"${escapeHtml(k)}"</em>`).join(' ve ');
-  const oneri = top.map(k => KAYIP_NEDENI_ONERILERI[k]).join(' ');
-  const bas = top.length === 1
-    ? `${toplam} kayıp talebin en sık nedeni ${adlar} (${enCok} talep).`
-    : `${toplam} kayıp talepte ${adlar} eşit sıklıkta (${enCok}'er talep); tek bir baskın neden yok.`;
-  const eksik = secilmemis > 0 ? ` ${secilmemis} talepte neden seçilmemiş.` : '';
-  return { counts, total: toplam, topReasons: top, adviceHtml: `${bas} ${oneri}${eksik}` };
-}
 
-function renderLeadAnalytics() {
-  const leads = appData.leads || [];
-  const totalLeads = leads.length;
-
-  const wonLeads = leads.filter(l => l.status === 'WON');
-  const lostLeads = leads.filter(l => l.status === 'LOST');
-  const activeLeads = leads.filter(l => l.status === 'FOLLOW_UP' || l.status === 'QUOTE_SENT');
-
-  const convRate = totalLeads > 0 ? ((wonLeads.length / totalLeads) * 100).toFixed(1) : 0;
-  const wonRevenue = wonLeads.reduce((sum, l) => sum + (Number(l.quote) || 0), 0);
-  const lostRevenue = lostLeads.reduce((sum, l) => sum + (Number(l.quote) || 0), 0);
-
-  // Update KPI Cards
-  const kTotal = document.getElementById('waKpiTotalLeads');
-  const kConv = document.getElementById('waKpiConvRate');
-  const kWon = document.getElementById('waKpiWonRevenue');
-  const kLost = document.getElementById('waKpiLostRevenue');
-  const kLostSub = document.getElementById('waKpiLostCountSub');
-
-  if (kTotal) kTotal.innerText = totalLeads;
-  if (kConv) kConv.innerText = `%${convRate}`;
-  if (kWon) kWon.innerText = `${wonRevenue.toLocaleString('tr-TR')} ₺`;
-  if (kLost) kLost.innerText = `${lostRevenue.toLocaleString('tr-TR')} ₺`;
-  if (kLostSub) kLostSub.innerText = `${lostLeads.length} kaçan talep | ${activeLeads.length} sıcak takip`;
-
-  // Loss Reasons Breakdown — tek kaynak summarizeLeadLossReasons (L-99).
-  const kayipOzeti = summarizeLeadLossReasons(lostLeads);
-  const lossReasonsCount = kayipOzeti.counts;
-
-  const lossBox = document.getElementById('waLossReasonsList');
-  if (lossBox) {
-    lossBox.innerHTML = '';
-    const totalLostCount = lostLeads.length || 1;
-    const reasonsKeys = [
-      { key: 'Fiyat Yüksek', color: '#FF453A', label: 'Bütçe / Fiyat Yüksek Geldi' },
-      { key: 'Tarih Dolu', color: '#FF9F0A', label: 'İstenen Tarih Doluydu' },
-      { key: 'Cevap Vermedi', color: '#6E6E73', label: 'Geri Dönüş Yapmadı' },
-      { key: 'Başka Yer Seçti', color: '#0EA5E9', label: 'Başka Yer Seçti' },
-      { key: 'Diğer', color: '#BF5AF2', label: 'Diğer Nedenler' }
-    ];
-
-    reasonsKeys.forEach(r => {
-      const cnt = lossReasonsCount[r.key] || 0;
-      const pct = Math.round((cnt / totalLostCount) * 100);
-      lossBox.innerHTML += `
-        <div>
-          <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px;">
-            <span>${escapeHtml(r.label)}</span>
-            <strong style="color:${r.color};">${cnt} Kişi (%${pct})</strong>
-          </div>
-          <div style="height:6px; background:rgba(255,255,255,0.06); border-radius:3px; overflow:hidden;">
-            <div style="width:${pct}%; height:100%; background:${r.color}; border-radius:3px;"></div>
-          </div>
-        </div>
-      `;
-    });
-  }
-
-  // Villa Demand Share Breakdown
-  const villaCounts = Object.fromEntries(Object.keys(appData.villas || {}).map(k => [k, 0]));
-  leads.forEach(l => {
-    const key = l.villa || l.propertyId;
-    if (Object.prototype.hasOwnProperty.call(villaCounts, key)) villaCounts[key]++;
-  });
-
-  const villaBox = document.getElementById('waVillaDemandList');
-  if (villaBox) {
-    villaBox.innerHTML = '';
-    const totalVCounts = totalLeads || 1;
-    // Musterinin kendi mulkleri. Bes uydurma villa sabit yaziliydi ve talep
-    // grafigi herkese ayni bes ismi gosteriyordu.
-    const RENKLER = ['#0A84FF', '#30D158', '#FF9F0A', '#EC4899', '#BF5AF2', '#F97316', '#14B8A6'];
-    const villaMeta = Object.keys(appData.villas || {}).map((k, i) => ({
-      key: k,
-      name: (appData.villas[k] && appData.villas[k].name) || k,
-      color: RENKLER[i % RENKLER.length]
-    }));
-
-    if (villaMeta.length === 0) {
-      villaBox.innerHTML = '<div style="font-size:12px; color:var(--text-muted);">Henüz mülk eklenmemiş.</div>';
-    }
-
-    villaMeta.forEach(v => {
-      const cnt = villaCounts[v.key] || 0;
-      const pct = Math.round((cnt / totalVCounts) * 100);
-      villaBox.innerHTML += `
-        <div>
-          <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px;">
-            <span>${escapeHtml(v.name)}</span>
-            <strong>${cnt} Talep (%${pct})</strong>
-          </div>
-          <div style="height:6px; background:rgba(255,255,255,0.06); border-radius:3px; overflow:hidden;">
-            <div style="width:${pct}%; height:100%; background:${v.color}; border-radius:3px;"></div>
-          </div>
-        </div>
-      `;
-    });
-  }
-
-  // AI Actionable Insights
-  const insightsBox = document.getElementById('waActionableInsights');
-  if (insightsBox) {
-    insightsBox.innerHTML = `
-      <div style="margin-bottom: 8px;">
-        • <strong>Dönüşüm Verimliliği:</strong> ${totalLeads > 0 ? `${totalLeads} talebin ${wonLeads.length} tanesi rezervasyona dönüştü (%${convRate}). Kayıtlı teklif toplamı <strong>${wonRevenue.toLocaleString('tr-TR')} TL</strong>.` : 'Henüz talep kaydı yok; dönüşüm oranı hesaplanamadı.'}
-      </div>
-      <div style="margin-bottom: 8px;">
-        • <strong>Kaçan Satış Aksiyonu:</strong> ${kayipOzeti.adviceHtml}
-      </div>
-      ${(() => {
-        // Bu cumle sabitti: "Taleplerin %60'indan fazlasi Villa Azure Bay ve
-        // Villa Olive Garden icin geliyor" — hicbir hesaba dayanmiyordu.
-        const siralı = Object.entries(villaCounts)
-          .filter(([, n]) => n > 0)
-          .sort((a, b) => b[1] - a[1]);
-        if (!siralı.length) return '';
-        const guvenliAd = k => escapeHtml((appData.villas && appData.villas[k] && appData.villas[k].name) || k);
-        const top = siralı[0];
-        const pay = totalLeads > 0 ? Math.round((top[1] / totalLeads) * 100) : 0;
-        const zayif = siralı.length > 1 ? siralı[siralı.length - 1] : null;
-        return `<div>
-        • <strong>Talep Yoğunluğu:</strong> Taleplerin %${pay}'i <strong>${guvenliAd(top[0])}</strong> için geliyor (${top[1]} talep). Bu mülkte taban fiyatı savunun${zayif ? `; en az talep gören <strong>${guvenliAd(zayif[0])}</strong> için hafta içi paket teklifi deneyin` : ''}.
-      </div>`;
-      })()}
-    `;
-  }
-}
 
 
 // =============================================================
@@ -15371,7 +14398,7 @@ function renderDataSyncStamp() {
   const btn = document.getElementById('dataSyncBtn');
   const durum = (typeof appData !== 'undefined' && appData && appData.loadState) || null;
   // Esitleme dugmesi Araclar menusunde durur; hata menu kapaliyken de gorunsun.
-  document.getElementById('toolsBtn')?.classList.toggle('has-alert', !!(durum && durum.status === 'ERROR'));
+  document.getElementById('userProfileBtn')?.classList.toggle('has-alert', !!(durum && durum.status === 'ERROR'));
   if (durum && durum.status === 'ERROR') {
     setEl('dataSyncBtnText', 'Eşitlenemedi — tekrar dene');
     if (btn) btn.title = 'Son eşitleme başarısız; ekranda son doğrulanmış veri duruyor. Tekrar denemek için tıklayın.';
@@ -15405,26 +14432,8 @@ if (typeof document !== 'undefined') {
 // =============================================================
 // AYLARA GÖRE KPI TAKİP VE GELİŞİM MATRİSİ (14+ AY MOTORU)
 // =============================================================
-let activeKpiTrackerMetric = 'ciro'; // 'ciro', 'netProfit', 'adr', 'occupancy', 'opex'
 
-function setKpiTrackerMetric(metric) {
-  activeKpiTrackerMetric = metric;
-  renderMonthlyKpiTracker();
-}
 
-function filterByPeriod(period) {
-  currentFilter.period = period;
-  const select = document.getElementById('globalPeriodFilter');
-  if (select) select.value = period;
-  updateStepperLabels();
-  renderAll();
-
-  // Smooth scroll to finance or tracker
-  const target = document.querySelector('.monthly-kpi-tracker-card') || document.getElementById('globalPeriodFilter');
-  if (target) {
-    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-}
 
 /**
  * Bir ayin GERCEK rakamlari: ciro, OPEX, CAPEX, satilan gece.
@@ -15567,7 +14576,7 @@ function analyticsMonthPerformance(monthKey, villa) {
 // fiyat ekrani ilk cizildiginde istenir, gelince acik ekran yeniden cizilir.
 // Sira onemli: analytics_ui yuklenirken BookingAnalytics'i alir.
 const ANALYTICS_ENGINE_URL = 'core/booking_analytics.js?v=c837f939';
-const ANALYTICS_UI_URL = 'core/analytics_ui.js?v=6a59af6d';
+const ANALYTICS_UI_URL = 'core/analytics_ui.js?v=76af58bd';
 let analyticsModulesLoading = null;
 function loadAnalyticsScript(src) {
   return new Promise((resolve, reject) => {
@@ -15667,468 +14676,15 @@ function analyticsMonthTarget(monthKey, villa) {
   };
 }
 
-function getMonthlyKpiDataset() {
-  const months = ALL_FINANCIAL_MONTHS.slice();
 
-  const dataset = [];
-
-  months.forEach(m => {
-    const [metricYear, metricMonth] = m.split('-').map(Number);
-    const targetFilter = { period: m };
-    const secili = (typeof currentFilter !== 'undefined' && currentFilter && currentFilter.villa) || 'ALL';
-    const target = getConfiguredRevenueTarget(targetFilter, appData.targets, secili) || 0;
-    const monthName = getPeriodDisplayName(m);
-
-    // ADR ve RevPAR NET ODA GELIRINDEN (K-04). Marj, kar gibi TOPLAM GELIR
-    // uzerinden (temizlik geliri karin icinde kalir). Doluluk/ADR/RevPAR
-    // Bugun ekraniyla ayni fonksiyondan (computeMonthPerformance).
-    const perf = computeMonthPerformance(m, secili);
-    const { ciro, totalIncome, opex, capex, nights, netProfit, occupancy, revpar } = perf;
-    const adr = perf.adr ?? 0;
-    const margin = totalIncome > 0 ? Number(((netProfit / totalIncome) * 100).toFixed(1)) : 0;
-    // L-101: hic gider yoksa o ayin kari/marji olculmemistir.
-    const profitUnmeasured = isProfitUnmeasured(totalIncome, opex, capex, m);
-
-    const totalExp = opex + capex;
-    const targetPct = target > 0 ? Number(((ciro / target) * 100).toFixed(1)) : null;
-    const previousYearKey = `${metricYear - 1}-${String(metricMonth).padStart(2, '0')}`;
-    const previousYearCiro = computeMonthActuals(previousYearKey, secili).ciro;
-
-    dataset.push({
-      key: m,
-      monthName,
-      ciro,
-      previousYearCiro,
-      opex,
-      capex,
-      totalExp,
-      netProfit,
-      nights,
-      adr,
-      occupancy,
-      revpar,
-      margin,
-      profitUnmeasured,
-      target,
-      targetPct,
-      isCurrentMonth: (m === getCurrentMonthKey()),
-      isSelected: (currentFilter.period === m)
-    });
-  });
-
-  const currentMonthKey = getCurrentMonthKey();
-  return dataset.filter(d => d.key <= currentMonthKey || d.ciro !== 0 || d.totalExp !== 0 || d.nights !== 0 || d.target > 0);
-}
-
-function renderMonthlyKpiTracker() {
-  const tableBody = document.getElementById('monthlyKpiTableBody');
-  const barsContainer = document.getElementById('kpiTrackerVisualBars');
-  if (!tableBody && !barsContainer) return;
-
-  const dataset = getMonthlyKpiDataset();
-
-  // 1. Update Historical Peak Cards
-  let maxRevItem = dataset[0], maxAdrItem = dataset[0], maxNightsItem = dataset[0], maxProfitItem = null;
-  dataset.forEach(d => {
-    if (d.ciro > maxRevItem.ciro) maxRevItem = d;
-    if (d.adr > maxAdrItem.adr) maxAdrItem = d;
-    if (d.nights > maxNightsItem.nights) maxNightsItem = d;
-    if (!d.profitUnmeasured && d.ciro > 0 && (!maxProfitItem || d.netProfit > maxProfitItem.netProfit)) maxProfitItem = d;
-  });
-
-  const pRev = document.getElementById('kpiPeakRev');
-  if (pRev && maxRevItem) pRev.innerText = `${maxRevItem.monthName.split(' ')[0]} ${maxRevItem.key.split('-')[0]} (${Math.round(maxRevItem.ciro).toLocaleString('tr-TR')} TL)`;
-
-  const pAdr = document.getElementById('kpiPeakAdr');
-  if (pAdr && maxAdrItem) pAdr.innerText = `${maxAdrItem.monthName.split(' ')[0]} ${maxAdrItem.key.split('-')[0]} (${Math.round(maxAdrItem.adr).toLocaleString('tr-TR')} TL)`;
-
-  const pNights = document.getElementById('kpiPeakNights');
-  if (pNights && maxNightsItem) pNights.innerText = `${maxNightsItem.monthName.split(' ')[0]} ${maxNightsItem.key.split('-')[0]} (${maxNightsItem.nights} Gece)`;
-
-  const pProfit = document.getElementById('kpiPeakProfit');
-  if (pProfit && !maxProfitItem) pProfit.innerText = '— (gider kaydı olan ay yok)';
-  if (pProfit && maxProfitItem) pProfit.innerText = `${maxProfitItem.monthName.split(' ')[0]} ${maxProfitItem.key.split('-')[0]} (${Math.round(maxProfitItem.netProfit).toLocaleString('tr-TR')} TL)`;
-
-  // 2. Metric Buttons State & Chart Title
-  const metricConfigs = {
-    ciro: {
-      title: '💰 Aylara Göre Ciro Evrimi (TL)',
-      color: '#0A84FF',
-      activeBtnStyle: 'background: rgba(10, 132, 255,0.25); border-color: #0A84FF; color: #93C5FD; font-weight: 700;',
-      format: (val) => Math.round(val).toLocaleString('tr-TR') + ' ₺'
-    },
-    netProfit: {
-      title: '💵 Aylara Göre Net Nakit Kâr Dağılımı (TL)',
-      color: '#30D158',
-      activeBtnStyle: 'background: rgba(48, 209, 88,0.25); border-color: #30D158; color: #A7F3D0; font-weight: 700;',
-      format: (val) => Math.round(val).toLocaleString('tr-TR') + ' ₺'
-    },
-    adr: {
-      title: '🏷️ Aylara Göre Ortalama Günlük Satış Fiyatı - ADR (₺/Gece)',
-      color: '#FF9F0A',
-      activeBtnStyle: 'background: rgba(255, 159, 10,0.25); border-color: #FF9F0A; color: #FDE68A; font-weight: 700;',
-      format: (val) => Math.round(val).toLocaleString('tr-TR') + ' ₺'
-    },
-    occupancy: {
-      title: '🌙 Aylara Göre Doluluk Oranı Dağılımı (%)',
-      color: '#BF5AF2',
-      activeBtnStyle: 'background: rgba(191, 90, 242,0.25); border-color: #BF5AF2; color: #DDD6FE; font-weight: 700;',
-      format: (val) => '%' + Number(val).toFixed(1)
-    },
-    opex: {
-      title: '💸 Aylara Göre Toplam Giderler (OPEX + CAPEX) (TL)',
-      color: '#EC4899',
-      activeBtnStyle: 'background: rgba(236,72,153,0.25); border-color: #EC4899; color: #FBCFE8; font-weight: 700;',
-      format: (val) => Math.round(val).toLocaleString('tr-TR') + ' ₺'
-    }
-  };
-
-  const activeConf = metricConfigs[activeKpiTrackerMetric] || metricConfigs.ciro;
-  const titleEl = document.getElementById('kpiChartActiveTitle');
-  if (titleEl) titleEl.innerText = activeConf.title;
-
-  ['ciro', 'netProfit', 'adr', 'occupancy', 'opex'].forEach(mKey => {
-    const btn = document.getElementById('kpiTrackBtn-' + mKey);
-    if (btn) {
-      if (mKey === activeKpiTrackerMetric) {
-        btn.style.cssText = activeConf.activeBtnStyle;
-      } else {
-        btn.style.cssText = 'background: transparent; border-color: var(--border-color); color: var(--text-muted); font-weight: 500;';
-      }
-    }
-  });
-
-  // 3. Render Visual Monthly Bars
-  if (barsContainer) {
-    barsContainer.innerHTML = '';
-    
-    // Find max value for scaling
-    let maxVal = 1;
-    dataset.forEach(d => {
-      let val = 0;
-      if (activeKpiTrackerMetric === 'ciro') val = d.ciro;
-      else if (activeKpiTrackerMetric === 'netProfit') val = d.profitUnmeasured ? 0 : Math.max(0, d.netProfit);
-      else if (activeKpiTrackerMetric === 'adr') val = d.adr;
-      else if (activeKpiTrackerMetric === 'occupancy') val = d.occupancy;
-      else if (activeKpiTrackerMetric === 'opex') val = d.totalExp;
-      if (val > maxVal) maxVal = val;
-    });
-
-    dataset.forEach(d => {
-      let val = 0;
-      if (activeKpiTrackerMetric === 'ciro') val = d.ciro;
-      else if (activeKpiTrackerMetric === 'netProfit') val = d.profitUnmeasured ? 0 : d.netProfit;
-      else if (activeKpiTrackerMetric === 'adr') val = d.adr;
-      else if (activeKpiTrackerMetric === 'occupancy') val = d.occupancy;
-      else if (activeKpiTrackerMetric === 'opex') val = d.totalExp;
-      const olculmedi = activeKpiTrackerMetric === 'netProfit' && d.profitUnmeasured;
-
-      const pctOfMax = maxVal > 0 ? Math.max(6, Math.min(100, Math.round((Math.max(0, val) / maxVal) * 100))) : 6;
-      const barHeightPx = Math.round((pctOfMax / 100) * 95);
-
-      const parts = d.key.split('-');
-      const shortMonth = getPeriodDisplayName(d.key) ? getPeriodDisplayName(d.key).split(' ')[0].substring(0, 3) : parts[1];
-      const shortYear = parts[0].substring(2);
-      const isCurrentFilter = (currentFilter.period === d.key);
-
-      const barColor = (val < 0 && activeKpiTrackerMetric === 'netProfit') ? '#FF453A' : activeConf.color;
-      const borderStyle = isCurrentFilter ? 'border: 2px solid #FFFFFF; box-shadow: 0 0 12px ' + activeConf.color + ';' : 'border: 1px solid rgba(255,255,255,0.15);';
-
-      const barEl = document.createElement('div');
-      barEl.className = 'kpi-tracker-bar-col' + (isCurrentFilter ? ' active' : '');
-      barEl.style.cssText = 'flex: 1; min-width: 44px; max-width: 58px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; cursor: pointer; position: relative; transition: all 0.2s ease;';
-      barEl.title = `${d.monthName}\n${activeConf.title.split('(')[0].trim()}: ${activeConf.format(val)}\n(Bu ayın raporunu açmak için tıklayın)`;
-      barEl.onclick = () => filterByPeriod(d.key);
-
-      barEl.innerHTML = `
-        <div style="font-size: 11px; font-weight: 700; color: ${isCurrentFilter ? '#FFFFFF' : '#98989D'}; margin-bottom: 4px; white-space: nowrap; text-align: center;">
-          ${olculmedi ? '—' : (activeKpiTrackerMetric === 'occupancy' ? ('%' + Number(val).toFixed(0)) : (val >= 1000 ? Math.round(val / 1000) + 'k' : Math.round(val)))}
-        </div>
-        <div class="kpi-bar-fill" style="width: 100%; height: ${barHeightPx}px; background: ${barColor}; opacity: ${isCurrentFilter ? '1' : '0.8'}; border-radius: 4px 4px 1px 1px; ${borderStyle}"></div>
-        <div style="font-size: 11px; color: ${isCurrentFilter ? '#409CFF' : 'var(--text-muted)'}; font-weight: ${isCurrentFilter ? '800' : '500'}; margin-top: 6px; white-space: nowrap;">
-          ${shortMonth} ${shortYear}
-        </div>
-      `;
-
-      barsContainer.appendChild(barEl);
-    });
-  }
-
-  // 4. Render Table Body
-  if (tableBody) {
-    tableBody.innerHTML = '';
-
-    dataset.forEach(d => {
-      const isSelected = (currentFilter.period === d.key);
-      const rowStyle = isSelected 
-        ? 'background: rgba(10, 132, 255, 0.12); border-left: 4px solid #0A84FF;' 
-        : (d.isCurrentMonth ? 'background: rgba(48, 209, 88, 0.05);' : '');
-
-      let targetBadge = '<span style="color: var(--text-muted);">-</span>';
-      if (d.target > 0 && d.targetPct !== null) {
-        const isTargetWon = d.targetPct >= 100;
-        const color = isTargetWon ? '#30D158' : (d.targetPct >= 75 ? '#FFB340' : '#FF6961');
-        targetBadge = `
-          <div>
-            <span style="font-weight: 800; color: ${color};">%${d.targetPct}</span>
-            <div style="height: 4px; width: 60px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; margin-top: 2px;">
-              <div style="width: ${Math.min(100, d.targetPct)}%; height: 100%; background: ${color};"></div>
-            </div>
-          </div>
-        `;
-      }
-
-      const profitColor = d.netProfit >= 0 ? '#30D158' : '#FF6961';
-      const marginBadge = d.margin >= 40 ? 'badge-green' : (d.margin >= 20 ? 'badge-blue' : (d.margin > 0 ? 'badge-yellow' : 'badge-red'));
-
-      let periodLabel = d.monthName;
-      if (d.isCurrentMonth) periodLabel += ' <span class="badge badge-green" style="font-size:11px; margin-left:4px;">Güncel ay</span>';
-
-      const tr = document.createElement('tr');
-      if (rowStyle) tr.style.cssText = rowStyle;
-
-      tr.innerHTML = `
-        <td style="font-weight: 700; white-space: nowrap;">${periodLabel}</td>
-        <td style="font-weight: 800; color: #409CFF; white-space: nowrap;">${Math.round(d.ciro).toLocaleString('tr-TR')} ₺</td>
-        <td style="font-weight: 700; color: var(--text-secondary); white-space: nowrap;">${d.previousYearCiro > 0 ? Math.round(d.previousYearCiro).toLocaleString('tr-TR') + ' ₺' : '—'}</td>
-        <td style="color: var(--text-muted); white-space: nowrap;">${d.target > 0 ? (Math.round(d.target).toLocaleString('tr-TR') + ' ₺') : '-'}</td>
-        <td style="white-space: nowrap;">${targetBadge}</td>
-        ${d.profitUnmeasured
-          ? `<td style="color: var(--text-muted); white-space: nowrap;" title="${OLCULEMEYEN_KAR_NOTU}">—</td>
-        <td style="white-space: nowrap;"><span class="badge badge-slate" title="${OLCULEMEYEN_KAR_NOTU}">Gider yok</span></td>`
-          : `<td style="font-weight: 800; color: ${profitColor}; white-space: nowrap;">${Math.round(d.netProfit).toLocaleString('tr-TR')} ₺</td>
-        <td style="white-space: nowrap;"><span class="badge ${marginBadge}">%${d.margin}</span></td>`}
-        <td style="font-weight: 700; white-space: nowrap;">${d.nights} Gece</td>
-        <td style="font-weight: 700; white-space: nowrap;">${d.occupancy === null ? '—' : '%' + d.occupancy}</td>
-        <td style="font-weight: 700; color: #FFB340; white-space: nowrap;">${d.adr > 0 ? (Math.round(d.adr).toLocaleString('tr-TR') + ' ₺') : '-'}</td>
-        <td style="font-weight: 600; color: #DDD6FE; white-space: nowrap;">${d.revpar > 0 ? (Math.round(d.revpar).toLocaleString('tr-TR') + ' ₺') : '-'}</td>
-        <td style="color: #FF6961; font-weight: 600; white-space: nowrap;">${Math.round(d.totalExp).toLocaleString('tr-TR')} ₺</td>
-        <td style="text-align: right; white-space: nowrap;">
-          <button type="button" class="btn btn-secondary btn-sm" data-onclick="filterByPeriod(decodeURIComponent('${encodeActionArg(d.key)}'))" style="padding: 4px 8px; font-size: 11px;">
-            🔍 ${isSelected ? 'Seçili' : 'Aya Git'}
-          </button>
-        </td>
-      `;
-
-      tableBody.appendChild(tr);
-    });
-  }
-}
 
 
 
 // =============================================================
 // ❓ METRİK AÇIKLAMALARI VE AKILLI İPUCU DANIŞMANI (BAŞLANGIÇ REHBERİ)
 // =============================================================
-const KPI_EXPLANATION_GUIDES = {
-  'REVENUE': {
-    title: 'Ciro (Net Konaklama Geliri)',
-    icon: '💰',
-    category: 'TEMEL FİNANS',
-    badgeClass: 'badge-blue',
-    summary: 'Seçili döneme düşen konaklama gecelerinin geliridir: misafirden alınan temizlik ücreti hariç, indirimler düşülmüş oda geliri. Hedef, ADR ve RevPAR aynı rakamı kullanır.',
-    warning: '⚠️ Misafirden ayrıca temizlik ücreti alıyorsanız o tutar ciroya girmez; "Temizlik geliri" olarak ayrı yazılır ve kârın içinde kalır. OTA ve ödeme komisyonu ciroyu azaltmaz; gider olarak düşülür. Ciro kâr demek değildir.',
-    formula: 'Ciro = Brüt − Temizlik Ücreti − İndirim · Toplam Gelir = Ciro + Temizlik Geliri (kâr bunun üzerinden hesaplanır)',
-    example: 'Ay sınırını aşan rezervasyonun yalnız bu döneme düşen gecelerinin payı sayılır.',
-    actionRule: 'Ciro hacminizi gösterir ama asıl odaklanmanız gereken rakam cebinizde kalan Net Kâr\'dır.'
-  },
-  'TARGET': {
-    title: 'Hedef Ciro & Bütçe Planlaması',
-    icon: '🎯',
-    category: 'STRATEJİ & HEDEF',
-    badgeClass: 'badge-amber',
-    summary: 'O ay için ulaşmayı planladığınız gelir eşiğidir. İşletmenizin rotasını ve başarı çıtasını belirler.',
-    warning: '💡 Hedefi kendi kapasiteniz, geçmiş kayıtlarınız ve sezonsal talebinizle belirleyin.',
-    formula: 'Tahmini Satılabilir Gece × Hedeflenen ADR',
-    example: 'Kayıtlı hedef ile aynı dönemin gerçekleşen cirosu karşılaştırılır.',
-    actionRule: 'Hedefe ayın ortasında ulaştıysanız hemen kalan günlerin fiyatını artırın (yield management). Geride kaldıysanız gap gecelerine indirim uygulayın.'
-  },
-  'NET_PROFIT': {
-    title: 'Net Nakit Kâr (Net Cash Profit)',
-    icon: '💵',
-    category: 'KASADA KALAN SERBEST NAKİT',
-    badgeClass: 'badge-green',
-    summary: 'Toplam gelirden tüm operasyonel harcamalar (Opex) ve mülk yatırımları (Capex) düşüldükten sonra işletme sahibinin cebinde kalan net nakittir.',
-    warning: '🌟 Yüksek ciro tek başına yüksek kâr anlamına gelmez; kayıtlı gider ve yatırımları birlikte değerlendirin.',
-    formula: 'Net Kâr = Toplam Gelir − OPEX − CAPEX · OPEX = elle giderler + OTA komisyonu + ödeme komisyonu + yapılmış temizlik maliyeti',
-    example: 'Temizlik maliyeti temizlik "yapıldı" işaretlendiği günün ayına yazılır; ödeme ayrı bir durumdur.',
-    actionRule: 'Net marjınızın (Net Kâr / Toplam Gelir) %30\'un altına düşmemesine dikkat edin.'
-  },
-  'TOTAL_EXPENSE': {
-    title: 'Toplam Giderler (OPEX + CAPEX)',
-    icon: '💸',
-    category: 'GİDER YÖNETİMİ',
-    badgeClass: 'badge-rose',
-    summary: 'İşletmenin dönmesi ve villaların kalitesini koruması için harcanan her kuruşun toplamıdır.',
-    warning: 'Giderler ikiye ayrılır: 1) Yaşamsal rutin giderler (OPEX), 2) Mülkün değerini kalıcı artıran yatırımlar (CAPEX).',
-    formula: 'Toplam Gider = Operasyonel Giderler + Yatırımlar',
-    example: 'Seçili dönemdeki OPEX ve CAPEX kayıtları ayrı toplanıp birlikte gösterilir.',
-    actionRule: 'Giderlerin ciroya oranı %70\'i aşıyorsa harcama kalemlerini (özellikle komisyon ve sarfiyatları) denetleyin.'
-  },
-  'SOLD_NIGHTS': {
-    title: 'Satılan Gece Sayısı (Oda-Gece Hacmi)',
-    icon: '🌙',
-    category: 'KAPASİTE & HACİM',
-    badgeClass: 'badge-blue',
-    summary: 'O ay boyunca villalarınızda misafirlerin fiilen konakladığı toplam gece sayısıdır.',
-    warning: 'Kapasite, seçili dönemin gerçek gün sayısı ile aktif mülk sayısından hesaplanır.',
-    formula: 'Tüm villaların ay içindeki rezerve gece toplamı.',
-    example: 'Seçili döneme düşen rezervasyon geceleri çakışmalar giderilerek toplanır.',
-    actionRule: 'Yüksek sezonda satılan geceyi 70\'in üzerine çıkarmak doluluk başarısıdır.'
-  },
-  'ADR': {
-    title: 'ADR (Ortalama Günlük Satış Fiyatı)',
-    icon: '🏷️',
-    category: 'FİYATLANDIRMA GÜCÜ',
-    badgeClass: 'badge-amber',
-    summary: 'Villalarınızı bir geceliğine ortalama kaça sattığınızı gösteren fiyattır. (Average Daily Rate).',
-    warning: '🌟 Başlangıç Seviyesi Altın Kural: Tüm evleriniz doluyorsa ama ADR çok düşükse, evlerinizi ucuza satıyorsunuz demektir! Fiyatı hemen artırın.',
-    formula: 'ADR = Net Oda Geliri ÷ Satılan Gece Sayısı',
-    example: 'Seçili dönemin oda geliri, aynı dönemde satılan geceye bölünür.',
-    actionRule: 'Hafta sonu yüksek ADR, hafta içi doluluk odaklı dengeli ADR uygulayın.'
-  },
-  'REVPAR': {
-    title: 'RevPAR (Oda Başına Düşen Gelir)',
-    icon: '📈',
-    category: 'OTELCİLİĞİN ALTIN KARNESİ',
-    badgeClass: 'badge-purple',
-    summary: 'Villanız boş ya da dolu fark etmeksizin, takvimdeki her gün için size kaç TL kazandırdığını gösteren en dürüst başarı karnesidir.',
-    warning: 'RevPAR, fiyat ile kullanılabilir kapasitenin ne kadarının satıldığını aynı ölçüde birleştirir.',
-    formula: 'RevPAR = Net Oda Geliri ÷ Kullanılabilir Gece (= ADR × Doluluk %)',
-    example: 'Seçili dönemin oda geliri, kullanılabilir mülk-gece kapasitesine bölünür.',
-    actionRule: 'RevPAR\'ı artırmanın yolu: Doluluk %70\'i aştığında fiyatı yükseltmektir.'
-  },
-  'OCCUPANCY': {
-    title: 'Doluluk Oranı (%)',
-    icon: '📊',
-    category: 'KAPASİTE VERİMLİLİĞİ',
-    badgeClass: 'badge-blue',
-    summary: 'Villalarınızın ayın yüzde kaçında misafirle dolu olduğunu gösterir.',
-    warning: 'Doluluk tek başına yorumlanmaz; ADR, RevPAR ve kârlılıkla birlikte değerlendirilir.',
-    formula: '(Satılan Gece Sayısı ÷ Kullanılabilir Gece Sayısı) × 100',
-    example: 'Satılan mülk-gece sayısı, seçili dönemin kullanılabilir mülk-gece kapasitesine bölünür.',
-    actionRule: '%100 doluluk her zaman iyi değildir! %100 doluluk genellikle \'fiyatı çok ucuz tuttunuz\' anlamına gelir.'
-  },
-  'OPEX': {
-    title: 'OPEX (Operasyonel İşletme Giderleri)',
-    icon: '⚡',
-    category: 'RUTİN GİDERLER',
-    badgeClass: 'badge-rose',
-    summary: 'Tesisin günlük olarak çalışmaya devam etmesi için yapılan düzenli, tekrarlayan harcamalardır.',
-    warning: 'Gerçek temizlik maliyeti, elektrik/su/internet faturası, sarfiyat ve OTA komisyonları OPEX’tir. Misafirden alınan temizlik bedeli gelir bileşenidir.',
-    formula: 'Tüm operasyonel cari fatura ve sarfiyat toplamı.',
-    example: 'Seçili dönemde OPEX olarak sınıflandırılmış gider kayıtları toplanır.',
-    actionRule: 'OPEX\'i kısmak zordur ama toplu alım (örneğin odunu yazdan almak) maliyeti %30 düşürür.'
-  },
-  'CAPEX': {
-    title: 'CAPEX (Sermaye & Yatırım Harcamaları)',
-    icon: '🏗️',
-    category: 'MÜLK DEĞER ARTIRMA',
-    badgeClass: 'badge-purple',
-    summary: 'Villanın değerini ve kalitesini kalıcı olarak artıran büyük, tek seferlik demirbaş yatırımlarıdır.',
-    warning: 'Bahçeye jakuzi yaptırmak, sauna eklemek, klima taktırmak CAPEX\'tir. Bu bir masraf değil, villanın gecelik fiyatını artıracak yatırımdır.',
-    formula: 'Demirbaş ve kalıcı renovasyon harcamaları toplamı.',
-    example: 'Seçili dönemde CAPEX olarak sınıflandırılmış yatırım kayıtları toplanır.',
-    actionRule: 'Doğru bir CAPEX yatırımı (örn: ısıtmalı jakuzi), kendini 2-3 ayda gecelik fiyat artışıyla geri öder.'
-  },
-  'OPERATING_PROFIT': {
-    title: 'Faaliyet Kârı',
-    icon: '📉',
-    category: 'OPERASYON VERİMLİLİĞİ',
-    badgeClass: 'badge-blue',
-    summary: 'Toplam gelirden OPEX düşüldükten sonra, yatırım harcamaları düşülmeden önce kalan işletme sonucudur.',
-    warning: 'Faaliyet kârı CAPEX’i içermez; sahibin cebinde kalan nihai nakit için Net Nakit Kârı izleyin.',
-    formula: 'Faaliyet Kârı = Toplam Gelir − OPEX',
-    example: 'Seçili dönemin gerçekleşen cirosundan aynı dönemin OPEX toplamı düşülür.',
-    actionRule: 'Faaliyet marjı düşüyorsa önce komisyon, enerji, temizlik ve sarf giderlerini inceleyin.'
-  },
-  'GAP_NIGHTS': {
-    title: 'Boşluk Geceleri (Gap Nights & Yetim Geceler)',
-    icon: '🧩',
-    category: 'KAYIP KAZANÇ FIRSATI',
-    badgeClass: 'badge-amber',
-    summary: 'İki rezervasyon arasında sıkışıp kalan 1 veya 2 günlük boş günlerdir.',
-    warning: 'O gün boş kalırsa size maliyeti 0 TL değil, kayıp bir cirodur! O günü fırsat paketiyle satmak saf kârdır.',
-    formula: 'İki rezervasyon arasındaki satılmamış 1-2 günlük boşluklar.',
-    example: 'Sistem, ardışık rezervasyonlar arasındaki kısa boşlukları gerçek takvimden bulur.',
-    actionRule: 'Gap gecesini boş bırakmaktansa normal fiyatın %30 altına \'Son Dakika Fırsatı\' ile satın.'
-  },
-  'OTA_COMMISSION': {
-    title: 'OTA Komisyonları vs Doğrudan Satış',
-    icon: '🌐',
-    category: 'KOMİSYON TASARRUFU',
-    badgeClass: 'badge-green',
-    summary: 'OTA platformlarının rezervasyon başına kestiği, kanal ayarınızda veya rezervasyonda kayıtlı aracılık ücretidir.',
-    warning: 'Komisyon oranı kanal ve sözleşmeye göre değişir; kayıt yoksa oran veya tasarruf varsayılmaz.',
-    formula: 'Kayıtlı OTA Satış Tutarı × Kayıtlı Komisyon Oranı',
-    example: 'Kayıtlı OTA komisyonları ile doğrudan kanal satışları ayrı raporlanır.',
-    actionRule: 'OTA\'ları vitrin olarak kullanın; gelen misafire kartınızı vererek bir sonraki gelişinde doğrudan sizden rezerve etmesini sağlayın.'
-  }
-};
 
-function showKpiExplanation(code) {
-  const guide = KPI_EXPLANATION_GUIDES[code] || {
-    title: 'Metrik Bilgisi',
-    icon: 'ℹ️',
-    category: 'GENEL GÖSTERGE',
-    badgeClass: 'badge-blue',
-    summary: 'Bu metrik işletmenizin performansını takip etmenize yardımcı olur.',
-    warning: 'Detaylı bilgi için başlangıç rehberimizi inceleyebilirsiniz.',
-    formula: 'Veri tabanı hesaplaması',
-    example: 'Güncel dönem verisi',
-    actionRule: 'Düzenli takip ile gelirinizi optimize edin.'
-  };
 
-  const modal = document.getElementById('kpiExplanationModal');
-  const iconEl = document.getElementById('kpiExplIcon');
-  const titleEl = document.getElementById('kpiExplTitle');
-  const catEl = document.getElementById('kpiExplCategory');
-  const bodyEl = document.getElementById('kpiExplBody');
-
-  if (iconEl) iconEl.innerText = guide.icon;
-  if (titleEl) titleEl.innerText = guide.title;
-  if (catEl) {
-    catEl.innerText = guide.category;
-    catEl.className = 'badge ' + guide.badgeClass;
-  }
-
-  if (bodyEl) {
-    bodyEl.innerHTML = `
-      <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px; margin-bottom: 14px;">
-        <div style="font-size: 11px; color: #93C5FD; font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">👶 1 Cümlede Basitçe Nedir?</div>
-        <div style="font-size: 13px; color: #FFFFFF; font-weight: 600; line-height: 1.5;">${guide.summary}</div>
-      </div>
-
-      <div style="background: rgba(255, 159, 10, 0.08); border: 1px solid rgba(255, 159, 10, 0.25); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px;">
-        <div style="font-size: 11px; color: #FDE68A; font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">💡 Başlangıç Seviyesi İpucu</div>
-        <div style="font-size: 12px; color: #E5E5EA; line-height: 1.4;">${guide.warning}</div>
-      </div>
-
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px;">
-        <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 10px;">
-          <div style="font-size: 11px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">📐 Nasıl Hesaplanır?</div>
-          <div style="font-size: 11px; color: #409CFF; font-family: var(--font-mono); margin-top: 4px; font-weight: 600;">${guide.formula}</div>
-        </div>
-        <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 10px;">
-          <div style="font-size: 11px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">📊 Pratik Örnek</div>
-          <div style="font-size: 11px; color: #30D158; margin-top: 4px;">${guide.example}</div>
-        </div>
-      </div>
-
-      <div style="background: rgba(48, 209, 88, 0.08); border: 1px solid rgba(48, 209, 88, 0.25); border-radius: 10px; padding: 12px 14px;">
-        <div style="font-size: 11px; color: #A7F3D0; font-weight: 700; text-transform: uppercase; margin-bottom: 4px;">🚀 Ne Zaman Aksiyon Almalısın?</div>
-        <div style="font-size: 12px; color: #E5E5EA; line-height: 1.4;">${guide.actionRule}</div>
-      </div>
-    `;
-  }
-
-  if (modal) modal.classList.add('active');
-}
-
-function closeKpiExplanationModal() {
-  const modal = document.getElementById('kpiExplanationModal');
-  if (modal) modal.classList.remove('active');
-}
 
 function openHelpModal(targetTab = 'setup') {
   // Rehber artik Araclar menusunden de acilir; menu pencerenin arkasinda acik kalmasin.
@@ -17749,7 +16305,6 @@ async function loadTenantAppData(tenantIdOrUserId) {
       // rezervasyonun maliyeti bilinmiyor gorunuyor, duzenleme formu bos
       // geliyordu.
       syncBookingCleaningTasks();
-      invalidateExecutiveSnapshotCache();
       updateAllVillaDropdowns();
       renderAll();
       syncNotificationFeed().catch(err => console.error('Bildirimler eslenemedi:', err));
@@ -17768,7 +16323,6 @@ async function loadTenantAppData(tenantIdOrUserId) {
 
   // Demo / yerel boş state
   appData = getBlankTenantData(targetId);
-  invalidateExecutiveSnapshotCache();
   updateAllVillaDropdowns();
   renderAll();
 }
@@ -17840,7 +16394,7 @@ function updateSaaSUi() {
   if (menuEmail) menuEmail.innerText = (user.fullName || user.managerName ? (user.fullName || user.managerName) + ' • ' : '') + user.email;
 
   const menuPlan = document.getElementById('menuPlanBadge');
-  if (menuPlan) menuPlan.innerText = user.plan ? user.plan + ' 🚀' : 'Plan bilgisi yok';
+  if (menuPlan) { menuPlan.innerText = user.plan || '—'; menuPlan.hidden = !user.plan; }
 
   applyRoleNavigationVisibility();
   if (activeTenant?.role === 'staff') switchTab('staff-field');
@@ -17965,8 +16519,8 @@ function updateAllVillaDropdowns() {
     // Bu ikisi listede yoktu: markup'taki bes uydurma villa hicbir zaman
     // yenilenmiyor, musteri kendi mulklerini burada goremiyordu.
     'rezVillaFilter',
-    'waParsedVilla',
-    'todayPerfVilla'
+    'waParsedVilla'
+    // Bugun (Lex) mulku secici degil sekmeyle secer (todayVillaTabs).
   ];
 
   dropdownIds.forEach(selectId => {
@@ -17980,7 +16534,7 @@ function updateAllVillaDropdowns() {
     // markup'ta bu secenege sahipti ama listeye alinmadigi icin JS onlari
     // yeniden kurarken secenek kayboluyordu.
     const TUMU_OLANLAR = ['globalVillaFilter', 'finTopVillaFilter', 'mktVilla', 'expVilla', 'incVilla', 'rezVillaFilter',
-                          'calendarVillaFilter', 'pricingVillaFilter', 'opsVillaFilter', 'todayPerfVilla'];
+                          'calendarVillaFilter', 'pricingVillaFilter', 'opsVillaFilter'];
     if (TUMU_OLANLAR.includes(selectId)) {
       const optAll = document.createElement('option');
       optAll.value = 'ALL';
@@ -18526,7 +17080,6 @@ function applyTenantRealtimePayload(table, payload) {
 
 function renderTenantRealtimeChange(table) {
   if (typeof document === 'undefined') return;
-  invalidateExecutiveSnapshotCache();
   if (table === 'properties') updateAllVillaDropdowns();
   if (table === 'bookings' && typeof syncBookingCleaningTasks === 'function') syncBookingCleaningTasks();
   renderAll();
@@ -18898,239 +17451,15 @@ async function markUserNotificationsRead(notifIds) {
   return { updated: (data || []).length };
 }
 
-async function getExecutiveDashboardSnapshot(targetMonth, propertyId = null) {
-  if (!supabaseClient) throw new Error('Active supabase client required');
-  const tenantId = getActiveTenantId();
-  if (!isCloudTenant(tenantId)) throw new Error('Active tenant session required');
-  const { data, error } = await supabaseClient.rpc('get_executive_dashboard_snapshot', {
-    p_tenant_id: tenantId,
-    p_target_month: targetMonth,
-    p_property_id: propertyId
-  });
-  if (error) throw error;
-  return data;
-}
 
-let executiveSnapshotState = {
-  key: null,
-  status: 'idle',
-  current: null,
-  prior: null,
-  error: null,
-  retryAt: 0,
-  requestId: 0
-};
 
-function shouldRefreshExecutiveSnapshot(state, contextKey, now = Date.now()) {
-  if (!state || state.key !== contextKey) return true;
-  return state.status === 'error' && Number(state.retryAt || 0) <= now;
-}
 
-function invalidateExecutiveSnapshotCache() {
-  executiveSnapshotState = {
-    ...executiveSnapshotState,
-    key: null,
-    status: 'idle',
-    current: null,
-    prior: null,
-    error: null,
-    retryAt: 0,
-    requestId: Number(executiveSnapshotState?.requestId || 0) + 1
-  };
-}
 
-function getExecutiveSnapshotContext() {
-  const tenantId = getActiveTenantId();
-  const period = currentFilter && currentFilter.period;
-  if (!canReadLedgerRole(activeTenant?.role)) {
-    return { supported: false, reason: 'Bu rolde finans özeti gösterilmez.' };
-  }
-  if (!isCloudTenant(tenantId) || !supabaseClient) return { supported: false, reason: 'Bulut oturumu gerekli.' };
-  if (!/^\d{4}-\d{2}$/.test(period || '')) {
-    return { supported: false, reason: 'Güncel rakamlar yalnız aylık dönemde gösterilebilir.' };
-  }
 
-  let propertyId = null;
-  if (currentFilter.villa && currentFilter.villa !== 'ALL') {
-    const villa = appData && appData.villas ? appData.villas[currentFilter.villa] : null;
-    propertyId = (villa && (villa.id || villa.dbId || villa.property_id)) || currentFilter.villa;
-  }
-  return {
-    supported: true,
-    tenantId,
-    period,
-    priorPeriod: getPreviousPeriodKey(period),
-    propertyId,
-    key: [tenantId, period, propertyId || 'ALL'].join('|')
-  };
-}
 
-function setExecutiveSnapshotPlaceholder(message) {
-  ['execKpiRevenue', 'execKpiOpex', 'execKpiCapex', 'execKpiOperatingProfit',
-    'execKpiProfit', 'execKpiOccupancy', 'execKpiAdr', 'execKpiRevpar']
-    .forEach(id => setEl(id, '—'));
-  ['execRevVariance', 'execRevMoM', 'execOpexRatio', 'execOtaCost', 'execCapexRatio',
-    'execCapexTrend', 'execOperatingMargin', 'execOperatingTrend', 'execProfitMargin',
-    'execProfitVariance', 'execOccVariance', 'execSoldNightsLabel', 'execAdrTrend',
-    'execRevparTrend'].forEach(id => setEl(id, '—'));
-  setEl('execSnapshotStatus', message);
-}
 
-// "satilan / kapasite Gece". Kapasite 0 ya da bilinmiyorsa kesir yazilmaz
-// ("79 / 0 Gece" yaziyordu): satilan gece ve olculememe nedeni yazilir.
-function formatSoldNightsLabel(soldNights, availableNights) {
-  const satilan = Number(soldNights) || 0;
-  const kapasite = Number(availableNights);
-  if (availableNights === null || availableNights === undefined || !Number.isFinite(kapasite)) {
-    return `${satilan} Gece satıldı · kapasite bilinmiyor`;
-  }
-  if (kapasite <= 0) {
-    return `${satilan} Gece satıldı · kapasite yok (mülklerin faaliyete başlama tarihine bakın)`;
-  }
-  return `${satilan} / ${kapasite} Gece`;
-}
 
-function renderExecutiveKpiValues(kpis) {
-  const money = value => value === null || value === undefined || !Number.isFinite(Number(value))
-    ? '—' : `₺${Number(value).toLocaleString('tr-TR')}`;
-  const ratio = (value, revenue) => value === null || value === undefined || !(Number(revenue) > 0)
-    ? '—' : `%${Math.round((Number(value) / Number(revenue)) * 100)}`;
-  const trend = metric => !metric || metric.prior === null || metric.prior === undefined
-    ? 'geçen ay veri yok' : `${formatMoMDelta(metric.current, metric.prior)} Geçen Ay`;
 
-  // Ciro = net konaklama geliri; kar, marj ve gider oranlari TOPLAM GELIR
-  // uzerinden (temizlik geliri karin icinde kalir — Finans ile ayni kural).
-  const gelir = kpis.totalIncome ? kpis.totalIncome.current : kpis.revenue.current;
-  setEl('execKpiRevenue', money(kpis.revenue.current));
-  setEl('execKpiOpex', money(kpis.opex.current));
-  setEl('execKpiCapex', money(kpis.capex.current));
-  // L-101: gider hic yoksa kar ve marj olculmus gibi gosterilmez.
-  const karOlculemez = isProfitUnmeasured(gelir, kpis.opex.current, kpis.capex.current,
-    currentFilter && currentFilter.period);
-  setEl('execKpiOperatingProfit', karOlculemez ? '—' : money(kpis.operatingProfit.current));
-  setEl('execKpiProfit', karOlculemez ? '—' : money(kpis.netProfit.current));
-  setEl('execKpiOccupancy', kpis.occupancy.current === null ? '—' : `%${kpis.occupancy.current}`);
-  setEl('execKpiAdr', money(kpis.adr.current));
-  setEl('execKpiRevpar', money(kpis.revpar.current));
-
-  setEl('execRevMoM', trend(kpis.revenue));
-  setEl('execOpexRatio', kpis.opex.current === null ? '—' : `${ratio(kpis.opex.current, gelir)} Toplam gelir`);
-  // OPEX'in otomatik kalemleri. Sunucu bir kalemi vermiyorsa (phase45
-  // oncesi) o kalem "—" yazilir, 0 degil.
-  const kalem = (ad, v) => `${ad}: ${v === null || v === undefined ? '—' : money(v)}`;
-  setEl('execOtaCost', [
-    kalem('OTA', kpis.opex.otaCommission),
-    kalem('Ödeme kom.', kpis.opex.paymentCommission),
-    kalem('Temizlik', kpis.opex.cleaningCost)
-  ].join(' · '));
-  setEl('execCapexRatio', kpis.capex.current === null ? '—' : `${ratio(kpis.capex.current, gelir)} Toplam gelir`);
-  setEl('execCapexTrend', trend(kpis.capex));
-  const operatingMargin = ratio(kpis.operatingProfit.current, gelir);
-  const netMargin = ratio(kpis.netProfit.current, gelir);
-  setEl('execOperatingMargin', karOlculemez ? OLCULEMEYEN_KAR_NOTU : (operatingMargin === '—' ? '—' : `${operatingMargin} Marj`));
-  setEl('execOperatingTrend', karOlculemez ? '—' : trend(kpis.operatingProfit));
-  setEl('execProfitMargin', karOlculemez ? OLCULEMEYEN_KAR_NOTU : (netMargin === '—' ? '—' : `${netMargin} Marj`));
-  setEl('execAdrTrend', trend(kpis.adr));
-  setEl('execRevparTrend', trend(kpis.revpar));
-  setEl('execSoldNightsLabel', formatSoldNightsLabel(kpis.bookedNights, kpis.availableNights));
-
-  const revVariance = document.getElementById('execRevVariance');
-  if (revVariance) {
-    revVariance.className = kpis.revenue.variance.varianceAmount >= 0 ? 'badge badge-green' : 'badge badge-red';
-    revVariance.innerText = kpis.revenue.target > 0
-      ? `${kpis.revenue.variance.varianceAmount >= 0 ? '+' : ''}%${kpis.revenue.variance.variancePercent} Hedef`
-      : 'Hedef belirlenmemiş';
-  }
-  setEl('execProfitVariance', kpis.netProfit.target > 0
-    ? `${kpis.netProfit.variance.varianceAmount >= 0 ? '+' : ''}%${kpis.netProfit.variance.variancePercent} Hedef`
-    : (kpis.netProfit.target === 0 ? 'Hedef: ₺0' : 'Hedef belirlenmemiş'));
-  const occVariance = document.getElementById('execOccVariance');
-  if (occVariance) {
-    occVariance.className = kpis.occupancy.variance.varianceAmount >= 0 ? 'badge badge-green' : 'badge badge-yellow';
-    occVariance.innerText = kpis.occupancy.target > 0 ? `Hedef: %${kpis.occupancy.target}` : 'Hedef belirlenmemiş';
-  }
-}
-
-function renderExecutiveSnapshotKpis() {
-  const context = getExecutiveSnapshotContext();
-  if (!context.supported) {
-    setExecutiveSnapshotPlaceholder(context.reason);
-    return false;
-  }
-
-  if (shouldRefreshExecutiveSnapshot(executiveSnapshotState, context.key)) {
-    setExecutiveSnapshotPlaceholder('Güncel rakamlar yükleniyor…');
-    void refreshExecutiveDashboardSnapshot(false);
-    return true;
-  }
-  if (executiveSnapshotState.status === 'loading') {
-    setExecutiveSnapshotPlaceholder('Güncel rakamlar yükleniyor…');
-    return true;
-  }
-  if (executiveSnapshotState.status === 'error') {
-    setExecutiveSnapshotPlaceholder('Güncel rakamlar alınamadı; finansal göstergeler gösterilmiyor.');
-    return true;
-  }
-  if (executiveSnapshotState.status !== 'ready' || !executiveSnapshotState.current) {
-    setExecutiveSnapshotPlaceholder('Güncel rakamlar hazır değil.');
-    return true;
-  }
-  if (typeof ExecutiveDashboardService === 'undefined' || !ExecutiveDashboardService.computeExecutiveTopKpisFromSnapshot) {
-    setExecutiveSnapshotPlaceholder('Güncel rakamlar işlenemedi.');
-    return true;
-  }
-
-  const periodTarget = getTargetRecordForPeriod(context.period) || {};
-  const kpis = ExecutiveDashboardService.computeExecutiveTopKpisFromSnapshot(
-    executiveSnapshotState.current,
-    { targets: periodTarget, priorSnapshot: executiveSnapshotState.prior }
-  );
-  renderExecutiveKpiValues(kpis);
-
-  const phase32Ready = executiveSnapshotState.current.room_revenue !== undefined;
-  setEl('execSnapshotStatus', !phase32Ready
-    ? 'Rakamlar sunucudaki kayıtlarınızdan hesaplandı • ADR ve RevPAR şu an hesaplanamıyor'
-    : kpis.hasExpenseBreakdown
-      ? 'Rakamlar sunucudaki kayıtlarınızdan hesaplandı'
-      : 'Rakamlar sunucudaki kayıtlarınızdan hesaplandı • OPEX/CAPEX ayrımı şu an gösterilemiyor');
-  return true;
-}
-
-async function refreshExecutiveDashboardSnapshot(force = false) {
-  if (isBrowserQualityFixture()) {
-    executiveSnapshotState = { ...executiveSnapshotState, key: null, status: 'unsupported', current: null, prior: null, error: null, retryAt: 0 };
-    return null;
-  }
-  const context = getExecutiveSnapshotContext();
-  if (!context.supported) {
-    executiveSnapshotState = { ...executiveSnapshotState, key: null, status: 'unsupported', current: null, prior: null, error: null, retryAt: 0 };
-    if (typeof document !== 'undefined') renderExecutiveSnapshotKpis();
-    return null;
-  }
-  if (!force && executiveSnapshotState.key === context.key && ['loading', 'ready'].includes(executiveSnapshotState.status)) {
-    return executiveSnapshotState.current;
-  }
-
-  const requestId = executiveSnapshotState.requestId + 1;
-  executiveSnapshotState = { key: context.key, status: 'loading', current: null, prior: null, error: null, retryAt: 0, requestId };
-  if (typeof document !== 'undefined') setExecutiveSnapshotPlaceholder('Güncel rakamlar yükleniyor…');
-  try {
-    const [current, prior] = await Promise.all([
-      getExecutiveDashboardSnapshot(context.period, context.propertyId),
-      context.priorPeriod ? getExecutiveDashboardSnapshot(context.priorPeriod, context.propertyId) : Promise.resolve(null)
-    ]);
-    if (executiveSnapshotState.requestId !== requestId || executiveSnapshotState.key !== context.key) return null;
-    executiveSnapshotState = { key: context.key, status: 'ready', current, prior, error: null, retryAt: 0, requestId };
-    if (typeof document !== 'undefined') renderExecutiveControlCenter();
-    return current;
-  } catch (error) {
-    if (executiveSnapshotState.requestId !== requestId) return null;
-    console.error('Executive snapshot load failed:', error);
-    executiveSnapshotState = { key: context.key, status: 'error', current: null, prior: null, error, retryAt: Date.now() + 5000, requestId };
-    if (typeof document !== 'undefined') renderExecutiveControlCenter();
-    return null;
-  }
-}
 
 const setAppData = function (data) {
   if (typeof appData !== 'undefined') {
@@ -19202,135 +17531,570 @@ async function confirmEarlyCheckout(checkIn, checkOut, status, previous = null, 
   return (await uiAskConfirm({ message: `Çıkış tarihi ${formatTrDate(checkOut)}. Misafir bugün erken çıkmış olarak işaretlenecek; temizlik bugüne alınır. Geceler ve tutar değişmez (gerekirse çıkış tarihini ayrıca düzeltin). Devam edilsin mi?`, okText: 'Erken çıkış olarak işaretle' }));
 }
 
-function renderTodayDateStrip(bookings, tasks) {
-  const today = getTodayStr();
-  const role = TEAM_ROLES[activeTenant?.role]?.label || activeTenant?.role || '—';
-  const sayim = todayStayCounts(bookings, today);
-  const arrivals = sayim.arrivalsPending;
-  const departures = sayim.departuresPending;
-  const cleanings = tasks.filter(item => item.status === 'PLANNED' && String(item.date || '').slice(0, 10) === today).length;
-  setEl('todayDateLabel', new Intl.DateTimeFormat('tr-TR', { dateStyle: 'full', timeZone: 'Europe/Istanbul' }).format(new Date(`${today}T12:00:00+03:00`)));
-  setEl('todayRoleLabel', `${role} görünümü`);
-  const summary = document.getElementById('todayShiftSummary');
-  if (summary) {
-    summary.setAttribute('aria-label', `${arrivals} giriş · ${departures} çıkış · ${cleanings} temizlik`);
-    summary.innerHTML = [[arrivals, 'Giriş', sayim.arrivalsDone], [departures, 'Çıkış', sayim.departuresDone], [cleanings, 'Temizlik', 0]]
-      .map(([count, label, done]) => `<div class="today-hero__stat"><strong>${Number(count)}</strong><span>${escapeHtml(label)}</span>${done ? `<small>${Number(done)} yapıldı</small>` : ''}</div>`).join('');
-  }
+// U-12: bugun giris yoksa "Bu hafta kim geliyor?" sorusu icin Rezervasyonlar'a
+// gitmek gerekiyordu. Siradaki giris (iptal ve toplu aktarim ozeti haric).
+function nextArrivalAfter(bookings, today = getTodayStr()) {
+  return (bookings || [])
+    .filter(b => b && String(b.status || '').toUpperCase() !== 'CANCELLED' && b.checkIn > today && !isBulkSummaryBooking(b))
+    .sort((a, b) => String(a.checkIn).localeCompare(String(b.checkIn)))[0] || null;
 }
 
-function renderTodayTodoList(tasks, tickets, leads) {
-  const container = document.getElementById('todayTodoList');
-  if (!container) return;
-  const today = getTodayStr();
-  const items = [];
-  tasks.filter(item => item.status === 'PLANNED' && String(item.date || '').slice(0, 10) <= today)
-    .forEach(item => items.push({ label: `Temizlik · ${item.propertyName || appData?.villas?.[item.villa]?.name || '—'}`, tab: 'operations' }));
-  tickets.filter(isMaintenanceTicketOpen)
-    .forEach(item => items.push({ label: `Arıza · ${item.title || 'Başlık girilmemiş'}`, tab: 'operations' }));
-  if (canReadSalesRole(activeTenant?.role)) {
-    leads.filter(item => item.status === 'FOLLOW_UP' || item.status === 'QUOTE_SENT')
-      .forEach(item => items.push({ label: `Satış takibi · ${item.guest || 'Ad belirtilmedi'}`, tab: 'leads' }));
-  }
-  container.className = 'today-todo-list';
-  container.innerHTML = items.length ? items.slice(0, 8).map(item => `<div class="today-todo-item"><span>${escapeHtml(item.label)}</span><button class="btn btn-secondary btn-sm" data-onclick="switchTab(decodeURIComponent('${encodeActionArg(item.tab)}'))">Aç</button></div>`).join('') : '<div class="empty-state">Bugüne ait açık iş yok.</div>';
+function renderTodayNextArrival(bookings, today, todayArrivals) {
+  const el = typeof document !== 'undefined' ? document.getElementById('todayNextArrival') : null;
+  if (!el) return;
+  const sonraki = todayArrivals > 0 ? null : nextArrivalAfter(bookings, today);
+  el.hidden = !sonraki;
+  if (!sonraki) { el.textContent = ''; return; }
+  const gun = calculateNightsBetween(today, sonraki.checkIn);
+  const tarih = new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', timeZone: 'Europe/Istanbul' }).format(new Date(`${sonraki.checkIn}T12:00:00+03:00`));
+  const villa = appData?.villas?.[sonraki.villa]?.name || sonraki.villa || '';
+  el.textContent = `Sıradaki giriş: ${tarih}${villa ? ' · ' + villa : ''} (${gun === 1 ? 'yarın' : gun + ' gün sonra'})`;
 }
 
-// Bugun > "Bu ayin performansi": Finans'taki doluluk / ADR / RevPAR kartlari,
-// ev ev secilebilir. Rakamlar Finans'in aylik tablosuyla ayni fonksiyondan
-// (computeMonthPerformance); ustteki global filtreden bagimsiz, her zaman bu ay.
-let todayPerformanceVilla = 'ALL';
+// =============================================================
+// BUGUN — LEX TASARIMI (Otomasyon #1, kullanici karari 21.11.2026)
+// Sayfa 1 (karar): villa sekmeleri, ekip suzgeci, ozet cumlesi, ekip gorevleri.
+// Sayfa 2 (detay): bu hafta (7 gece) ve bu ayin performansi.
+// Gorevler core/team_tasks.js'ten (tek kaynak; diger ekranlar da onu kullanir),
+// cizim core/lex_ui.js'ten. Rakamlar mevcut tek kaynaklardan gelir:
+// computeMonthPerformance (Finans ile ayni), isCleaningDebt, isMaintenanceTicketOpen,
+// isTicketBlockingOn, isProfitUnmeasured, detectGapNights.
+// =============================================================
+let todayVilla = 'ALL';
+let todayTeam = 'ALL';
+let todayLastTasks = [];
 
-function setTodayPerformanceVilla(villa) {
-  todayPerformanceVilla = villa && (villa === 'ALL' || appData?.villas?.[villa]) ? villa : 'ALL';
-  renderTodayPerformance();
+function getTeamTasksApi() {
+  if (typeof TeamTasks !== 'undefined') return TeamTasks;
+  if (typeof window !== 'undefined' && window.TeamTasks) return window.TeamTasks;
+  if (typeof require === 'function') return require('./core/team_tasks.js');
+  return null;
+}
+
+function getLexUiApi() {
+  if (typeof LexUi !== 'undefined') return LexUi;
+  if (typeof window !== 'undefined' && window.LexUi) return window.LexUi;
+  if (typeof require === 'function') return require('./core/lex_ui.js');
+  return null;
+}
+
+function toggleTheme() {
+  const tema = typeof window !== 'undefined' ? window.LexTheme : null;
+  if (!tema) return false;
+  tema.toggle();
   return true;
 }
 
-function todayPerformanceMoney(value) {
-  return value === null || value === undefined || !Number.isFinite(Number(value)) ? '—' : `₺${Math.round(Number(value)).toLocaleString('tr-TR')}`;
+// Rol kapisi (3.3.1): ekip dagitimi bunu degistirmez.
+function teamTaskPermissions(role = activeTenant?.role) {
+  // activeTenant yoksa (yerel/test gorunumu) her sey gorunur; gercek oturumda rol zorunludur.
+  if (!activeTenant) return { operations: true, sales: true, ledger: true, manage: true };
+  return {
+    operations: canManageOperationsRole(role),
+    sales: canReadSalesRole(role),
+    ledger: canReadLedgerRole(role),
+    manage: canManageTenantRole(role)
+  };
 }
 
-function todayPerformanceCardHtml(label, value, note) {
-  return `<div class="today-performance__card"><span class="sub-text">${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong>${note ? `<small>${escapeHtml(note)}</small>` : ''}</div>`;
+function teamTaskRouting() {
+  return appData?.tenantSettings?.team_task_routing || {};
 }
 
-// Net kar (M68, 9.6.5): Finans'in net kari ile ayni defter (computeMonthLedger,
-// K-04). Gider hic yoksa kar olculmemistir (L-101): "—" ve nedeni.
-function todayPerformanceProfitCardHtml(perf, month) {
-  if (isProfitUnmeasured(perf.totalIncome, perf.opex, perf.capex, month)) {
-    return todayPerformanceCardHtml('Net kâr', '—', 'Gider kaydı yok; kâr ölçülemedi');
+function activeTodayVillaKeys() {
+  return Object.keys(appData?.villas || {}).filter(key => {
+    const v = appData.villas[key];
+    return v && v.isActive !== false && !v.archivedAt;
+  });
+}
+
+function previousMonthKey(ym) {
+  const [y, m] = String(ym).split('-').map(Number);
+  return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
+}
+
+// Biten ay kapatilmamis mi: o aya dusen iptal edilmemis bir gece varsa ve kapanis yoksa.
+function monthNeedsClose(ym) {
+  if (isPeriodClosed(ym)) return false;
+  const start = `${ym}-01`;
+  const end = getLedgerContract().monthRange(ym)?.end;
+  return (appData?.bookings || []).some(b => b && String(b.status || '').toUpperCase() !== 'CANCELLED'
+    && String(b.checkIn || '') <= end && String(b.checkOut || '') > start);
+}
+
+// Ariza listesi: ana sayfa ve hazirlik tablosu ham maintenanceTickets satirini okur;
+// gorev motoru icin ayni satirlar mulk anahtari ve oncelikle eslenir (tek kaynak).
+function todayMaintenanceTickets() {
+  const propIdMap = {};
+  Object.keys(appData?.villas || {}).forEach(k => { propIdMap[appData.villas[k].id || k] = k; });
+  return (appData?.maintenanceTickets || []).map(t => mapMaintenanceTicketFromDb(t, propIdMap));
+}
+
+function buildTodayTeamTasks(today = getTodayStr()) {
+  const T = getTeamTasksApi();
+  if (!T) return [];
+  const can = teamTaskPermissions();
+  const ops = getOperationsApi();
+  const cleaning = (appData?.cleaningTasks || []).map(task => normalizeCleaningTask(task, appData.villas || {}));
+  const cleaningTasks = ops ? ops.attachExecutions(cleaning, appData?.cleaningExecutions || []) : cleaning;
+  const month = today.slice(0, 7);
+  const finance = {};
+  if (can.ledger) {
+    finance.cleaningDebts = ops ? ops.cleanerDebtSummary(cleaningTasks) : [];
+    finance.prevMonthNeedsClose = monthNeedsClose(previousMonthKey(month));
+    const perf = computeMonthPerformance(month, 'ALL');
+    finance.expensesMissing = isProfitUnmeasured(perf.totalIncome, perf.opex, perf.capex, month);
+    const hedef = getTargetRecordForPeriod(month);
+    // Mulku olmayan isletmeye hedef gorevi gurultudur: once mulk eklenir (kurulum seridi).
+    finance.goalMissing = activeTodayVillaKeys().length > 0 && !(Number(hedef?.revenue_target ?? hedef?.revenue) > 0);
   }
-  const kar = Math.round(Number(perf.netProfit) || 0);
-  const deger = `${kar < 0 ? '−' : ''}₺${Math.abs(kar).toLocaleString('tr-TR')}`;
-  return todayPerformanceCardHtml('Net kâr', deger, 'Toplam gelir − OPEX − CAPEX (Finans ile aynı)');
+  let gapNights = [];
+  if (can.sales) {
+    try { gapNights = detectGapNights(); } catch (e) { gapNights = []; }
+  }
+  const readiness = getPropertySalesReadinessApi();
+  return T.buildTeamTasks({
+    today,
+    villas: appData?.villas || {},
+    bookings: appData?.bookings || [],
+    cleaningTasks,
+    tickets: todayMaintenanceTickets(),
+    leads: appData?.leads || [],
+    gapNights,
+    campaigns: appData?.marketingCampaigns || [],
+    dailyPrices: appData?.propertyDailyPrices || [],
+    finance,
+    can,
+    routing: teamTaskRouting(),
+    helpers: {
+      isTicketOpen: isMaintenanceTicketOpen,
+      isTicketBlockingToday: ticket => !!(readiness && readiness.isTicketBlockingOn(ticket, today, today)),
+      isBulkSummary: isBulkSummaryBooking,
+      leadStatusLabel: s => LEAD_STATUS_LABELS[s] || s
+    }
+  });
 }
 
-function renderTodayPerformance() {
+function setTodayVilla(villa) {
+  todayVilla = villa === 'ALL' || activeTodayVillaKeys().includes(villa) ? villa : 'ALL';
+  renderTodayLex();
+  return true;
+}
+
+function setTodayTeam(team) {
+  const T = getTeamTasksApi();
+  todayTeam = team === 'ALL' || (T && T.TEAM_KEYS.includes(team)) ? team : 'ALL';
+  renderTodayLex();
+  return true;
+}
+
+// Gorev satiri: ilgili ekrana, mumkunse ilgili kayda gider. Bos gece satirinda
+// satis yazabilen rol icin mevcut "bos gece fiyati" onayi acilir (takvime yazar).
+function openTeamTask(taskId) {
+  const task = todayLastTasks.find(t => t.id === taskId);
+  if (!task) return false;
+  if (task.type === 'GAP_NIGHT' && canWriteSalesRole(activeTenant?.role) && canManageTenantRole(activeTenant?.role)) {
+    handleQuickActionTrigger('APPLY_GAP_DISCOUNT', task.entity);
+    return true;
+  }
+  openTabFromDeepLink(task.target, task.entity || null);
+  return true;
+}
+
+function todayTaskRows(tasks) {
+  const T = getTeamTasksApi();
+  const L = getLexUiApi();
+  const teamLabel = key => (T.TEAMS.find(t => t.key === key) || {}).label || key;
+  return tasks.map(task => {
+    const gun = L.dayLabel(task.date);
+    const tag = T.TAGS[task.tag] || T.TAGS.DO;
+    return {
+      id: task.id,
+      date: task.date,
+      c1: gun.day,
+      c1sub: `${gun.weekday} · ${teamLabel(task.team)}`,
+      c2: task.value,
+      c2Attr: `data-onclick="openTeamTask(decodeURIComponent('${encodeActionArg(task.id)}'))"`,
+      c2sub: T.TASK_TYPES[task.type]?.label || '',
+      tone: tag.tone,
+      tag: tag.label,
+      reason: task.reason
+    };
+  });
+}
+
+function renderTodayLex() {
+  if (typeof document === 'undefined') return;
+  const T = getTeamTasksApi();
+  const L = getLexUiApi();
+  if (!T || !L) return;
+  const today = getTodayStr();
+  setEl('todayDateLabel', new Intl.DateTimeFormat('tr-TR', { dateStyle: 'full', timeZone: 'Europe/Istanbul' }).format(new Date(`${today}T12:00:00+03:00`)));
+
+  const villaKeys = activeTodayVillaKeys();
+  if (todayVilla !== 'ALL' && !villaKeys.includes(todayVilla)) todayVilla = 'ALL';
+  const can = teamTaskPermissions();
+  const routing = teamTaskRouting();
+  const visible = T.visibleTeams(can, routing);
+  if (todayTeam !== 'ALL' && !visible.some(t => t.key === todayTeam)) todayTeam = 'ALL';
+
+  const all = buildTodayTeamTasks(today);
+  const inVilla = T.filterTasks(all, { villa: todayVilla });
+  const shown = T.filterTasks(inVilla, { team: todayTeam });
+  todayLastTasks = all;
+
+  const villaTabs = document.getElementById('todayVillaTabs');
+  if (villaTabs) {
+    villaTabs.hidden = villaKeys.length < 2;
+    villaTabs.innerHTML = villaKeys.length < 2 ? '' : L.tabsHtml(
+      ['ALL'].concat(villaKeys).map(k => ({ key: k, label: k === 'ALL' ? 'Tümü' : (appData.villas[k].name || k), attr: `data-onclick="setTodayVilla(decodeURIComponent('${encodeActionArg(k)}'))"` })),
+      todayVilla, { label: 'Mülk' });
+  }
+  const teamTabs = document.getElementById('todayTeamTabs');
+  if (teamTabs) {
+    const sayac = T.countByTeam(inVilla);
+    teamTabs.innerHTML = L.tabsHtml(
+      [{ key: 'ALL', label: 'Tüm ekipler' }].concat(visible.map(t => ({ key: t.key, label: t.label, count: sayac[t.key] || 0 })))
+        .map(it => Object.assign(it, { attr: `data-onclick="setTodayTeam(decodeURIComponent('${encodeActionArg(it.key)}'))"` })),
+      todayTeam, { label: 'Ekip', variant: 'chips' });
+  }
+
+  // Ozet: secili villanin bugunku giris/cikisi (rezervasyonu gorebilen rol).
+  const bookings = (appData?.bookings || []).filter(b => todayVilla === 'ALL' || b.villa === todayVilla);
+  const summary = document.getElementById('todaySummary');
+  if (summary) {
+    const sayim = can.sales ? todayStayCounts(bookings, today) : null;
+    summary.innerHTML = L.summaryHtml(T.summaryParts(shown, {
+      stays: !!sayim,
+      // L-280: yapilmis giris/cikis bekleyen sayilmaz; tabloda "Tamam" satiridir.
+      arrivals: sayim ? sayim.arrivalsPending : 0,
+      departures: sayim ? sayim.departuresPending : 0
+    }));
+  }
+  if (can.sales) {
+    const sayim = todayStayCounts(bookings, today);
+    renderTodayNextArrival(bookings, today, sayim.arrivalsPending + sayim.arrivalsDone);
+  } else {
+    const el = document.getElementById('todayNextArrival');
+    if (el) el.hidden = true;
+  }
+
+  const table = document.getElementById('todayTaskTable');
+  if (table) {
+    table.innerHTML = L.tableHtml({
+      head: ['Gün · ekip', 'İş', 'Talimat'],
+      rows: todayTaskRows(shown),
+      empty: todayTeam === 'ALL' ? 'Bugüne ait açık iş yok.' : 'Bu ekibin bugüne ait açık işi yok.',
+      caption: 'Ekip görevleri'
+    });
+  }
+  const footer = document.getElementById('todayFooter');
+  if (footer) {
+    footer.innerHTML = L.footerHtml({
+      legend: [{ tone: 'down', label: 'Acil' }, { tone: 'up', label: 'Yap' }, { tone: 'keep', label: 'Tamam' }, { tone: 'weekend', label: 'Hafta sonu' }],
+      pdfAttr: 'data-onclick="printTodayPdf()"',
+      excelAttr: 'data-onclick="downloadTodayExcel()"'
+    });
+  }
+  renderTodayWeek(can, today);
+  renderTodayReadiness(can);
+  renderTodayPerformance(can, today);
+}
+
+// Bu hafta: bugunden itibaren 7 gece. Villa seciliyse gece gece durum,
+// Tumu'de dolu mulk sayisi ve hareket.
+function todayWeekRows(today) {
+  const L = getLexUiApi();
+  const keys = todayVilla === 'ALL' ? activeTodayVillaKeys() : [todayVilla];
+  const aktif = (appData?.bookings || []).filter(b => b && String(b.status || '').toUpperCase() !== 'CANCELLED' && !isBulkSummaryBooking(b) && keys.includes(b.villa));
+  const rows = [];
+  for (let i = 0; i < 7; i++) {
+    const gun = addDaysToDateKey(today, i);
+    const etiket = L.dayLabel(gun);
+    const girisler = aktif.filter(b => b.checkIn === gun);
+    const cikislar = aktif.filter(b => b.checkOut === gun);
+    const ayniGun = girisler.filter(g => cikislar.some(c => c.villa === g.villa));
+    if (todayVilla === 'ALL') {
+      const dolu = keys.filter(k => aktif.some(b => b.villa === k && b.checkIn <= gun && b.checkOut > gun)).length;
+      const hareket = girisler.length + cikislar.length;
+      rows.push({
+        date: gun, c1: etiket.day, c1sub: etiket.weekday,
+        c2: `${dolu} / ${keys.length} dolu`,
+        c2sub: hareket ? `${girisler.length} giriş · ${cikislar.length} çıkış` : '',
+        tone: ayniGun.length ? 'down' : (hareket ? 'up' : 'keep'),
+        tag: ayniGun.length ? 'Acil' : (hareket ? 'Yap' : 'Tamam'),
+        reason: ayniGun.length ? `${ayniGun.length} mülkte aynı gün çıkış ve giriş` : (hareket ? 'Giriş/çıkış hazırlığı' : 'Hareket yok')
+      });
+      continue;
+    }
+    const kalan = aktif.find(b => b.checkIn <= gun && b.checkOut > gun);
+    const giris = girisler[0];
+    const cikis = cikislar[0];
+    let tone = 'keep'; let tag = 'Tamam'; let reason = kalan ? 'Dolu' : 'Boş gece';
+    if (giris && cikis) { tone = 'down'; tag = 'Acil'; reason = `Aynı gün çıkış (${cikis.guest || '—'}) ve giriş`; }
+    else if (giris) { tone = 'up'; tag = 'Yap'; reason = 'Giriş; ev hazır olmalı'; }
+    else if (cikis) { tone = 'up'; tag = 'Yap'; reason = `Çıkış (${cikis.guest || '—'}); temizlik`; }
+    else if (!kalan) { tone = 'up'; tag = 'Yap'; reason = 'Boş gece; satışa açık'; }
+    rows.push({
+      date: gun, c1: etiket.day, c1sub: etiket.weekday,
+      c2: kalan ? (kalan.guest || 'Misafir adı girilmedi') : 'Boş',
+      c2sub: giris ? `Giriş · ${Number(giris.nights) || calculateNightsBetween(giris.checkIn, giris.checkOut) || '—'} gece` : '',
+      tone, tag, reason
+    });
+  }
+  return rows;
+}
+
+function renderTodayWeek(can, today) {
+  const box = document.getElementById('todayWeek');
+  if (!box) return;
+  box.hidden = !can.sales || activeTodayVillaKeys().length === 0;
+  if (box.hidden) return;
+  const L = getLexUiApi();
+  const table = document.getElementById('todayWeekTable');
+  if (table) table.innerHTML = L.tableHtml({ head: ['Gün', 'Durum', 'Talimat'], rows: todayWeekRows(today), caption: 'Bu hafta' });
+}
+
+// Bu ayin performansi: Finans'in aylik tablosuyla ayni fonksiyon. Hedef varsa
+// talimat Koru (hedefte/ustunde) ya da Artir (altinda); hedef yoksa etiket yok.
+// 0 girilmis hedef "girilmemis"tir (Analiz kurali). Kar olculemiyorsa "—" (L-101).
+function todayTargetFor(month, villa) {
+  if (villa === 'ALL') return getTargetRecordForPeriod(month);
+  const id = appData?.villas?.[villa]?.id;
+  const [y, m] = month.split('-').map(Number);
+  return (Array.isArray(appData?.targets) ? appData.targets : []).find(t => Number(t.year) === y && Number(t.month) === m && t.property_id && t.property_id === id) || null;
+}
+
+function todayPerformanceRows(month, villa) {
+  const L = getLexUiApi();
+  const perf = computeMonthPerformance(month, villa);
+  const prev = computeMonthPerformance(previousMonthKey(month), villa);
+  const hedef = todayTargetFor(month, villa) || {};
+  const h = v => (Number(v) > 0 ? Number(v) : null);
+  const pct = v => (v === null || v === undefined ? '—' : `%${Number(v).toLocaleString('tr-TR')}`);
+  const tl = v => L.formatTl(v);
+  const yazabilir = !activeTenant || canWriteLedgerRole(activeTenant?.role);
+  const satir = (ad, deger, metin, onceki, hedefDeger, hedefMetin) => {
+    const r = { c1: ad, c1sub: hedefDeger === null ? 'Hedef girilmedi' : `Hedef ${hedefMetin}`, c2: metin, c2sub: onceki ? `Geçen ay ${onceki}` : '', c2Attr: `data-onclick="goTo('finance')"` };
+    if (hedefDeger === null || deger === null || deger === undefined) return Object.assign(r, { tone: null, tag: '', reason: deger === null ? 'Ölçülemedi' : '', c3extraHtml: hedefDeger === null && yazabilir ? `<button type="button" class="lex-btn lex-btn--inline" data-onclick="goTo('goals')">Hedef gir</button>` : '' });
+    const fark = deger - hedefDeger;
+    return Object.assign(r, fark >= 0
+      ? { tone: 'keep', tag: 'Koru', reason: 'Hedefte ya da üstünde' }
+      : { tone: 'up', tag: 'Artır', reason: `Hedefe ${ad === 'Doluluk' ? `${Math.abs(fark).toLocaleString('tr-TR', { maximumFractionDigits: 1 })} puan` : tl(Math.abs(fark))} var` });
+  };
+  const rows = [
+    satir('Ciro', perf.ciro, tl(perf.ciro), prev.ciro ? tl(prev.ciro) : '', h(hedef.revenue_target ?? hedef.revenue), tl(h(hedef.revenue_target ?? hedef.revenue))),
+    satir('Doluluk', perf.occupancy, pct(perf.occupancy), prev.occupancy === null ? '' : pct(prev.occupancy), h(hedef.occupancy_target ?? hedef.occupancy), pct(h(hedef.occupancy_target ?? hedef.occupancy))),
+    satir('ADR (ort. gecelik)', perf.adr, tl(perf.adr), prev.adr === null ? '' : tl(prev.adr), h(hedef.adr_target ?? hedef.adr), tl(h(hedef.adr_target ?? hedef.adr))),
+    satir('RevPAR', perf.revpar, tl(perf.revpar), prev.revpar === null ? '' : tl(prev.revpar), h(hedef.revpar_target ?? hedef.revpar), tl(h(hedef.revpar_target ?? hedef.revpar)))
+  ];
+  const olculemez = isProfitUnmeasured(perf.totalIncome, perf.opex, perf.capex, month);
+  rows.push(olculemez
+    ? { c1: 'Net kâr', c1sub: 'Toplam gelir − OPEX − CAPEX', c2: '—', c2sub: '', tone: null, tag: '', reason: OLCULEMEYEN_KAR_NOTU, c3extraHtml: yazabilir ? `<button type="button" class="lex-btn lex-btn--inline" data-onclick="goTo('expense')">Gider ekle</button>` : '' }
+    : satir('Net kâr', perf.netProfit, tl(perf.netProfit), '', h(hedef.net_profit_target ?? hedef.netProfit), tl(h(hedef.net_profit_target ?? hedef.netProfit))));
+  return { rows, perf };
+}
+
+function renderTodayPerformance(can = teamTaskPermissions(), today = getTodayStr()) {
   if (typeof document === 'undefined') return;
   const section = document.getElementById('todayPerformance');
   if (!section) return;
-  // Ciro, ADR ve RevPAR finans defteridir (§3.3.1): yalniz defteri okuyan roller.
-  const mayReadLedger = !activeTenant || canReadLedgerRole(activeTenant?.role);
-  section.hidden = !mayReadLedger;
-  if (!mayReadLedger) return;
-  const active = Object.keys(appData?.villas || {}).filter(key => {
-    const villa = appData.villas[key];
-    return villa && villa.isActive !== false && !villa.archivedAt;
-  });
-  if (todayPerformanceVilla !== 'ALL' && !active.includes(todayPerformanceVilla)) todayPerformanceVilla = 'ALL';
-  const picker = document.getElementById('todayPerfVilla');
-  if (picker) picker.value = todayPerformanceVilla;
-  const month = getCurrentMonthKey();
-  const perf = computeMonthPerformance(month, todayPerformanceVilla);
-  const scopeName = todayPerformanceVilla === 'ALL' ? 'Tüm mülkler' : (appData.villas[todayPerformanceVilla]?.name || todayPerformanceVilla);
-  setEl('todayPerformancePeriod', `${getPeriodDisplayName(month)} · ${scopeName} · Finans ekranıyla aynı hesap`);
-  const capacityNote = perf.available > 0 ? `${perf.nights} / ${perf.available} gece` : 'Kapasite yok: bu ay faaliyette görünmüyor (faaliyete başlama tarihi)';
-  const cards = document.getElementById('todayPerformanceCards');
-  if (cards) {
-    cards.innerHTML = [
-      todayPerformanceCardHtml('Ciro (net konaklama)', todayPerformanceMoney(perf.ciro), 'Bu aya düşen gecelerin payı'),
-      todayPerformanceCardHtml('Satılan gece', String(perf.nights), ''),
-      todayPerformanceCardHtml('Doluluk', perf.occupancy === null ? '—' : `%${perf.occupancy.toLocaleString('tr-TR')}`, capacityNote),
-      todayPerformanceCardHtml('ADR (ort. gecelik)', todayPerformanceMoney(perf.adr), perf.adr === null ? 'Bu ay satılmış gece yok' : 'Ciro ÷ satılan gece'),
-      todayPerformanceCardHtml('RevPAR', todayPerformanceMoney(perf.revpar), perf.revpar === null ? 'Kapasite yok' : 'Ciro ÷ satılabilir gece'),
-      todayPerformanceProfitCardHtml(perf, month)
-    ].join('');
-  }
-  const list = document.getElementById('todayPerformanceList');
-  if (!list) return;
-  if (todayPerformanceVilla !== 'ALL' || active.length < 2) { list.innerHTML = ''; return; }
-  const rows = active.map(key => ({ key, name: appData.villas[key].name || key, perf: computeMonthPerformance(month, key) }))
-    .sort((a, b) => (b.perf.ciro || 0) - (a.perf.ciro || 0));
-  list.innerHTML = `<div class="today-performance__row today-performance__row--head"><span>Mülk</span><span>Doluluk</span><span>ADR</span><span>RevPAR</span><span></span></div>`
-    + rows.map(row => `<div class="today-performance__row"><strong>${propertyNameHtml(row.key, row.name)}</strong><span>${row.perf.occupancy === null ? '—' : `%${escapeHtml(row.perf.occupancy.toLocaleString('tr-TR'))}`}</span><span>${escapeHtml(todayPerformanceMoney(row.perf.adr))}</span><span>${escapeHtml(todayPerformanceMoney(row.perf.revpar))}</span><button type="button" class="btn btn-secondary btn-sm" data-onclick="setTodayPerformanceVilla(decodeURIComponent('${encodeActionArg(row.key)}'))">Seç</button></div>`).join('');
+  // Ciro, ADR ve RevPAR finans defteridir (3.3.1): yalniz defteri okuyan roller.
+  section.hidden = !can.ledger;
+  if (section.hidden) return;
+  const L = getLexUiApi();
+  const month = today.slice(0, 7);
+  const { rows, perf } = todayPerformanceRows(month, todayVilla);
+  const kapsam = todayVilla === 'ALL' ? 'Tüm mülkler' : (appData.villas[todayVilla]?.name || todayVilla);
+  const kapasite = perf.available > 0 ? `${perf.nights} / ${perf.available} gece satıldı` : 'Kapasite yok: bu ay faaliyette görünmüyor';
+  setEl('todayPerformancePeriod', `${getPeriodDisplayName(month)} · ${kapsam} · ${kapasite} · Finans ekranıyla aynı hesap`);
+  const table = document.getElementById('todayPerformanceTable');
+  if (table) table.innerHTML = L.tableHtml({ head: ['Ölçü', 'Bu ay', 'Talimat'], rows, caption: 'Bu ayın performansı' });
 }
 
-function renderTodayMonthSummary(bookings) {
-  const element = document.getElementById('todayMonthSummary');
-  if (!element) return;
-  const month = getTodayStr().slice(0, 7);
-  // Bugun'de ustteki filtre gorunmez (GLOBAL_FILTER_SCOPE); baska sayfada
-  // secilen mulk burada gorunmeden satiri daraltmasin: her zaman portfoy.
-  const villa = 'ALL';
-  const propertyId = villa === 'ALL' ? null : appData?.villas?.[villa]?.id;
-  const monthEnd = getLedgerContract().monthRange(month)?.end;
-  const monthly = bookings.filter(item => item.status !== 'CANCELLED' && !isBulkSummaryBooking(item)
-    && (villa === 'ALL' || item.villa === villa || (propertyId && item.propertyId === propertyId))
-    && String(item.checkIn || '') <= monthEnd && String(item.checkOut || '') > `${month}-01`);
-  if (!canReadLedgerRole(activeTenant?.role)) {
-    element.textContent = `Bu ay · ${monthly.length} rezervasyon · finans özeti bu rolde gösterilmez`;
-    return;
+// Mulk satis hazirligi (Bugun sayfa 2). Durum yalniz buradan degistirilir
+// (Operasyon'daki eski serit cizilmiyor). Kurallar onceki kartlarla ayni: acik
+// satisa engel ariza ya da bekleyen temizlik varken satilabilir durum secilemez
+// (L-179, L-183); `paid` hazirlik kaniti degildir.
+const TODAY_READINESS_TAGS = {
+  SALES_READY: { tone: 'keep', tag: 'Tamam', reason: 'Satışa açık' },
+  NEEDS_CLEANING: { tone: 'up', tag: 'Yap', reason: 'Temizlik bekliyor' },
+  NON_BLOCKING_ISSUE: { tone: 'up', tag: 'Yap', reason: 'Küçük arıza; satış açık' },
+  BLOCKED_MAINTENANCE: { tone: 'down', tag: 'Acil', reason: 'Arıza nedeniyle satışa kapalı' },
+  UNSET: { tone: 'up', tag: 'Yap', reason: 'Durum seçilmedi' }
+};
+
+function todayReadinessCards() {
+  const api = getPropertySalesReadinessApi();
+  if (!api) return [];
+  const villas = appData?.villas || {};
+  const keys = todayVilla === 'ALL' ? activeTodayVillaKeys() : [todayVilla];
+  return keys.map(k => api.buildPropertyReadiness({
+    id: villas[k].id || k, key: k, name: villas[k].name || k, readinessStatus: villas[k].readinessStatus || 'UNKNOWN'
+  }, {
+    overrideStatus: appData?.housekeepingOverrides?.[k],
+    maintenanceTickets: appData?.maintenanceTickets || [],
+    cleaningTasks: readinessCleaningTasks(),
+    today: getTodayStr()
+  }));
+}
+
+// Satisa acmanin yolu arizayi kapatmak ya da temizligi bitirmektir: dugme oraya goturur.
+function todayReadinessJumpHtml(card) {
+  const blocked = (card.blockingIssueCount || 0) > 0;
+  if (blocked) return `<button type="button" class="lex-btn lex-btn--inline" data-onclick="openTabFromDeepLink('maintenance', decodeURIComponent('${encodeActionArg(String((card.blockingTicketIds || [])[0] || ''))}'))">Arızayı gör</button>`;
+  if ((card.pendingCleaningTaskIds || []).length > 0) return `<button type="button" class="lex-btn lex-btn--inline" data-onclick="openTabFromDeepLink('housekeeping', decodeURIComponent('${encodeActionArg(String((card.pendingCleaningTaskIds || [])[0] || ''))}'))">Temizliğe git</button>`;
+  return '';
+}
+
+function todayReadinessEditorHtml(card, api) {
+  if (!canManagePropertyReadiness()) return `${todayReadinessJumpHtml(card)}<span class="lex-cell__sub">Salt okunur · değiştirme yetkiniz yok</span>`;
+  const blocked = (card.blockingIssueCount || 0) > 0;
+  const cleaningPending = !blocked && (card.pendingCleaningTaskIds || []).length > 0;
+  const lockReason = blocked ? 'önce arızayı kapatın' : (cleaningPending ? 'önce temizliği tamamlayın' : '');
+  const options = api.SELECTABLE_STATUSES.map(status => {
+    const label = api.STATUS_META[status].label;
+    const disabled = lockReason && SALEABLE_READINESS_STATUSES.includes(status);
+    return `<option value="${escapeHtml(status)}"${card.manualStatus === status ? ' selected' : ''}${disabled ? ' disabled' : ''}>${escapeHtml(label)}${disabled ? ` — ${escapeHtml(lockReason)}` : ''}</option>`;
+  }).join('');
+  return `<select class="lex-select property-readiness-select" aria-label="${escapeHtml(`${card.propertyName} satış durumu`)}" data-property-readiness-key="${escapeHtml(card.propertyKey)}" data-onchange="setPropertySalesReadiness(decodeURIComponent('${encodeActionArg(String(card.propertyKey))}'), this.value)"><option value="" disabled${card.manualStatus === 'UNSET' ? ' selected' : ''}>Durum seçin</option>${options}</select>${todayReadinessJumpHtml(card)}`;
+}
+
+function renderTodayReadiness(can) {
+  const box = document.getElementById('todayReadiness');
+  const grid = document.getElementById('portfolioHealthCardsGrid');
+  if (!box || !grid) return;
+  const api = getPropertySalesReadinessApi();
+  box.hidden = !api || !(can.operations || can.sales) || activeTodayVillaKeys().length === 0;
+  if (box.hidden) return;
+  const L = getLexUiApi();
+  const rows = todayReadinessCards().map(card => {
+    const meta = card.meta || api.STATUS_META.UNSET;
+    const t = TODAY_READINESS_TAGS[card.status] || TODAY_READINESS_TAGS.UNSET;
+    return {
+      c1: card.propertyName, c1Html: propertyNameHtml(card.propertyKey, card.propertyName),
+      c1sub: `${card.openIssueCount || 0} açık iş / arıza`,
+      c2: meta.label, c2sub: card.reason,
+      c2Attr: `data-onclick="goTo(decodeURIComponent('${encodeActionArg('property:' + card.propertyKey)}'))"`,
+      tone: t.tone, tag: t.tag, reason: t.reason,
+      c3extraHtml: todayReadinessEditorHtml(card, api)
+    };
+  });
+  grid.innerHTML = L.tableHtml({ head: ['Mülk', 'Durum', 'Talimat'], rows, caption: 'Mülk satış hazırlığı' });
+}
+
+// GOREV DAGITIMI (Ayarlar > Ekip). Her gorev turunun ekibi
+// tenant_settings.team_task_routing'te durur; bos = on tanimli (core/team_tasks.js).
+// Yalniz yonetim degistirir. Gorme hakki rol/izinden gelir, burada degismez.
+function renderTeamTaskRouting() {
+  if (typeof document === 'undefined') return;
+  const wrap = document.getElementById('teamTaskRoutingWrap');
+  const box = document.getElementById('teamTaskRoutingTable');
+  const T = getTeamTasksApi();
+  const L = getLexUiApi();
+  if (!wrap || !box || !T || !L) return;
+  wrap.hidden = !canManageTenantRole(activeTenant?.role);
+  if (wrap.hidden) return;
+  const routing = T.normalizeRouting(teamTaskRouting());
+  const kapi = { operations: 'operasyon yönetme izni', sales: 'satış verisi okuma izni', ledger: 'finans defteri okuma izni', manage: 'yönetim rolü' };
+  const rows = T.TASK_TYPE_KEYS.map(type => {
+    const def = T.TASK_TYPES[type];
+    const team = routing[type] || def.team;
+    const degisti = !!routing[type];
+    const secenekler = T.TEAMS.map(t => `<option value="${escapeHtml(t.key)}"${t.key === team ? ' selected' : ''}>${escapeHtml(t.label)}</option>`).join('');
+    return {
+      c1: def.label,
+      c1sub: `Görür: ${kapi[def.gate]}`,
+      c2: (T.TEAMS.find(t => t.key === team) || {}).label || team,
+      c2sub: degisti ? `Ön tanımlı: ${(T.TEAMS.find(t => t.key === def.team) || {}).label}` : '',
+      tone: degisti ? 'up' : 'keep',
+      tag: degisti ? 'Değiştirildi' : 'Ön tanımlı',
+      reason: '',
+      c3extraHtml: `<select class="lex-select" aria-label="${escapeHtml(`${def.label}: ekip`)}" data-onchange="setTeamTaskRouting(decodeURIComponent('${encodeActionArg(type)}'), this.value)">${secenekler}</select>`
+    };
+  });
+  box.innerHTML = L.tableHtml({ head: ['İş türü', 'Ekip', 'Değiştir'], rows, caption: 'Görev dağıtımı' });
+}
+
+async function saveTeamTaskRouting(next) {
+  const T = getTeamTasksApi();
+  const temiz = T.normalizeRouting(next);
+  const onceki = appData?.tenantSettings?.team_task_routing;
+  if (!appData.tenantSettings) appData.tenantSettings = {};
+  appData.tenantSettings.team_task_routing = temiz;
+  try {
+    await cloudSaveTenantSetting('team_task_routing', temiz);
+    showToast('Görev dağıtımı kaydedildi.', 'success');
+    return true;
+  } catch (error) {
+    // Kayit dusunce ekran bellekteki degisikligi "kaydedilmis" gibi gostermez (3.3).
+    appData.tenantSettings.team_task_routing = onceki;
+    showToast(`Görev dağıtımı kaydedilemedi: ${error?.message || 'bilinmeyen hata'}`, 'error');
+    return false;
+  } finally {
+    renderTeamTaskRouting();
+    if (typeof renderTodayLex === 'function') renderTodayLex();
   }
-  const actuals = computeMonthActuals(month, villa);
-  const revenue = actuals.ciro;
-  const [year, monthNumber] = month.split('-').map(Number);
-  const properties = villa === 'ALL' ? Object.values(appData?.villas || {}) : [appData?.villas?.[villa]].filter(Boolean);
-  const available = typeof FinancialMetricsService !== 'undefined'
-    ? FinancialMetricsService.calculateAvailableNights(properties, year, monthNumber, appData?.maintenance || [])
-    : null;
-  const occupancy = available > 0 ? Number(((actuals.nights / available) * 100).toFixed(1)) : null;
-  element.textContent = `Bu ay · ${monthly.length} rezervasyon · Ciro ${revenue == null ? '—' : `₺${Number(revenue).toLocaleString('tr-TR')}`} · Doluluk ${occupancy == null ? '—' : `%${Number(occupancy).toLocaleString('tr-TR')}`}`;
+}
+
+async function setTeamTaskRouting(type, team) {
+  if (!canManageTenantRole(activeTenant?.role)) return false;
+  const T = getTeamTasksApi();
+  if (!T || !T.TASK_TYPES[type] || !T.TEAM_KEYS.includes(team)) return false;
+  const next = Object.assign({}, T.normalizeRouting(teamTaskRouting()), { [type]: team });
+  return saveTeamTaskRouting(next);
+}
+
+async function resetTeamTaskRouting() {
+  if (!canManageTenantRole(activeTenant?.role)) return false;
+  return saveTeamTaskRouting({});
+}
+
+function todayExportPages() {
+  const T = getTeamTasksApi();
+  const keys = activeTodayVillaKeys();
+  const pages = [];
+  const yap = (villa, title) => {
+    const tasks = T.filterTasks(todayLastTasks, { villa, team: todayTeam });
+    pages.push({ title, summary: T.summaryParts(tasks, { stays: false }), rows: todayTaskRows(tasks), head: ['Gün · ekip', 'İş', 'Talimat'] });
+  };
+  if (todayVilla === 'ALL') {
+    yap('ALL', 'Bugün · Tüm mülkler');
+    keys.forEach(k => yap(k, `Bugün · ${appData.villas[k].name || k}`));
+  } else yap(todayVilla, `Bugün · ${appData.villas[todayVilla]?.name || todayVilla}`);
+  return pages;
+}
+
+function downloadTodayExcel() {
+  if (typeof XLSX === 'undefined') return retryWithXlsxEngine(() => downloadTodayExcel()) && false;
+  const L = getLexUiApi();
+  const sheets = todayExportPages().map(pg => ({
+    name: pg.title.replace(/^Bugün · /, ''),
+    head: ['Gün', 'Ekip / tür', 'İş', 'Talimat', 'Gerekçe'],
+    rows: pg.rows.map(r => [r.c1, `${r.c1sub} · ${r.c2sub}`, r.c2, r.tag, r.reason || ''])
+  }));
+  const wb = L.buildWorkbook(XLSX, sheets);
+  wb.SheetNames.forEach(n => { wb.Sheets[n]['!cols'] = [{ wch: 10 }, { wch: 34 }, { wch: 34 }, { wch: 10 }, { wch: 48 }]; });
+  XLSX.writeFile(wb, `Lexbnb_Bugun_${getTodayStr()}.xlsx`);
+  return true;
+}
+
+function printTodayPdf() {
+  const L = getLexUiApi();
+  const popup = window.open('', '_blank');
+  if (!popup) { showToast('Yazdırma penceresi engellendi. Tarayıcıda açılır pencerelere izin verin.', 'error'); return false; }
+  popup.document.write(L.printDocumentHtml({ title: `Bugün · ${getTodayStr()}`, pages: todayExportPages() }));
+  popup.document.close();
+  try {
+    const sayfa = new popup.CSSStyleSheet();
+    sayfa.replaceSync(L.PRINT_CSS);
+    popup.document.adoptedStyleSheets = [sayfa];
+  } catch (e) { /* eski tarayici: stilsiz yazdirilir */ }
+  popup.opener = null;
+  popup.addEventListener('afterprint', () => popup.close(), { once: true });
+  popup.focus();
+  popup.print();
+  return true;
 }
 
 function renderExecutiveControlCenter() {
@@ -19358,74 +18122,7 @@ function renderExecutiveControlCenter() {
     readinessStatus: villas[k].readinessStatus || 'UNKNOWN'
   }));
 
-  renderTodayDateStrip(bookings, tasks);
-  renderTodayTodoList(tasks, tickets, leads);
-  renderTodayMonthSummary(bookings);
-  renderTodayPerformance();
-
-  // activeTenant bulunmayan yerel/test gorunumunde eski cevrimdisi hesap
-  // calisir; gercek oturumda rol kapisi zorunludur.
-  const mayReadLedger = !activeTenant || canReadLedgerRole(activeTenant?.role);
-  const snapshotOwnsTopKpis = mayReadLedger && isCloudTenant(getActiveTenantId()) && !!supabaseClient;
-  if (snapshotOwnsTopKpis) renderExecutiveSnapshotKpis();
-
-  // 1. Top Executive KPIs
-  if (mayReadLedger && !snapshotOwnsTopKpis && typeof ExecutiveDashboardService !== 'undefined' && ExecutiveDashboardService.computeExecutiveTopKpis) {
-    const curPeriod = (typeof currentFilter !== 'undefined' && currentFilter.period) || 'ALL';
-    const periodTarget = getTargetRecordForPeriod(curPeriod) || {};
-    const scopedBookings = bookings
-      .filter(b => typeof isBookingInFilter === 'function' ? isBookingInFilter(b) : true)
-      .map(b => {
-        const share = getBookingFilterShare(b);
-        return {
-          ...b,
-          financialDetails: b.financialDetails ? { ...b.financialDetails, result: {
-            ...b.financialDetails.result,
-            taxTotal: b.financialDetails.result.taxTotal * share.ratio,
-            cleaningTax: b.financialDetails.result.cleaningTax * share.ratio
-          } } : null,
-          gross_amount: Number(b.gross ?? b.grossAmount ?? b.gross_amount ?? 0) * share.ratio,
-          cleaning_fee: Number(b.cleaningFee ?? b.cleaning_fee ?? 0) * share.ratio,
-          discount: Number(b.discount || 0) * share.ratio,
-          ota_commission: Number(b.otaCommission ?? b.otaComm ?? b.ota_commission ?? 0) * share.ratio,
-          payment_commission: Number(b.paymentCommission ?? b.payment_commission ?? 0) * share.ratio,
-          nights: share.nights
-        };
-      });
-    const exactAvailableNights = getAvailableNightsForMonth(curPeriod);
-
-    const kpis = ExecutiveDashboardService.computeExecutiveTopKpis({
-      bookings: scopedBookings,
-      expenses: expenses.filter(e => typeof isExpenseInFilter === 'function' ? isExpenseInFilter(e) : true),
-      targets: periodTarget,
-      cleaningCost: computeFilterLedger().cleaningCost,
-      propertiesCount: propertiesList.filter(p => villas[p.key]?.isActive !== false && !villas[p.key]?.archivedAt).length,
-      daysInMonth: getPeriodDayCount(),
-      availableNights: exactAvailableNights,
-      // Servis prior alanlarini destekliyordu ama beslenmiyordu; bu yuzden
-      // "Gecen Ay" etiketleri index.html'de sabit kalmisti.
-      priorPeriodMetrics: (function () {
-        const p = computePreviousPeriodTotals();
-        if (!p.hasData) return null;
-        const gunler = getPeriodDayCount(getPreviousPeriodKey(currentFilter && currentFilter.period));
-        const kapasite = Math.max(1, propertiesList.length * gunler);
-        return {
-          revenue: p.roomRevenue,
-          roomRevenue: p.roomRevenue,
-          totalIncome: p.revenue,
-          opex: p.opex,
-          capex: p.capex,
-          operatingProfit: p.operatingProfit,
-          netProfit: p.netProfit,
-          occupancy: Number(((p.nights / kapasite) * 100).toFixed(2)),
-          adr: p.nights > 0 ? Math.round(p.roomRevenue / p.nights) : 0,
-          revpar: Math.round(p.roomRevenue / kapasite)
-        };
-      })()
-    });
-    renderExecutiveKpiValues(kpis);
-    setEl('execSnapshotStatus', 'Rakamlar bu cihazdaki son yüklemeden hesaplandı');
-  }
+  renderTodayLex();
 
   // 2. Onboarding Progress
   if (typeof ExecutiveDashboardService !== 'undefined' && ExecutiveDashboardService.computeTenantOnboardingProgress) {
@@ -19466,295 +18163,7 @@ function renderExecutiveControlCenter() {
     if (barEl) barEl.style.width = `${onboarding.progressPercent}%`;
   }
 
-  // 3. Today Command Center (3+2+1 Priority Scoring)
-  if (typeof ExecutivePriorityService !== 'undefined' && ExecutivePriorityService.selectTodayCommandCenterActions) {
-    const candidates = [];
-    // Kartta mulkun ADI yazar; ham UUID musteriye anlamsizdir (L-104).
-    const mulkAdi = (ref) => {
-      if (!ref) return null;
-      const p = propertiesList.find(x => x.id === ref || x.key === ref);
-      return p ? p.name : null;
-    };
-
-    // Cleaning / Turnover tasks
-    // Temizlik: yalniz BUGUN planli gorev (L-98). Operasyon karti "Bugünkü
-    // turnover"u ayni kuralla sayar. Eskiden DONE olmayan her gorev -
-    // gecmis, gelecek, "yapilmadi" - tarihine bakilmadan `isCheckInToday:
-    // true` damgasiyla "bugun" diye sunuluyordu; iki ekran celisiyordu.
-    const bugunStr = getTodayStr();
-    tasks.forEach(t => {
-      if (t.status !== 'PLANNED') return;
-      if (String(t.date || '').slice(0, 10) !== bugunStr) return;
-      const isCritical = t.priority === 'CRITICAL' || t.isSlaBreached;
-      const ad = mulkAdi(t.villa || t.propertyId || t.property_id);
-      candidates.push({
-        id: t.id,
-        domain: 'OPERATIONS',
-        propertyId: t.villa || t.propertyId || t.property_id || null,
-        propertyName: ad,
-        title: ad ? `Bugünkü temizlik: ${ad}` : 'Bugünkü temizlik',
-        severity: isCritical ? 'CRITICAL' : 'MEDIUM',
-        guestImpact: isCritical ? 'HIGH' : 'MEDIUM',
-        urgencyDueTime: isCritical ? 30 : 18,
-        isSlaBreached: !!t.isSlaBreached,
-        isCheckInToday: true,
-        confidence: 'HIGH',
-        rationale: 'Bugün planlı temizlik henüz "yapıldı" işaretlenmedi.',
-        sourceMetrics: [`Tarih: ${formatTrDate(bugunStr)}`, 'Kategori: Temizlik'],
-        deepLink: 'housekeeping',
-        quickAction: null
-      });
-    });
-
-    // Maintenance tickets
-    // Arizalar: yalniz ACIK olanlar ve kartta GERCEK oncelik/durum (L-98).
-    // Eskiden her karta sabit "Öncelik: P1 • Durum: Açık" ve "kritik teknik
-    // donanım arızası" yaziliyordu; iptal edilmis ariza bile.
-    tickets.forEach(tk => {
-      if (!isMaintenanceTicketOpen(tk)) return;
-      candidates.push(maintenanceTicketPriorityCandidate(tk, getTodayStr(), mulkAdi(tk.villa || tk.propertyId || tk.property_id)));
-    });
-
-    // Executive alerts
-    alerts.forEach(al => {
-      if (al.status === 'OPEN') {
-        candidates.push({
-          id: al.id,
-          domain: al.domain || 'SYSTEM',
-          propertyId: al.property_id || al.propertyId,
-          title: al.title,
-          severity: al.severity,
-          guestImpact: al.severity === 'CRITICAL' ? 'HIGH' : 'MEDIUM',
-          urgencyDueTime: 28,
-          confidence: 'HIGH',
-          rationale: al.reason || 'Sistem eşik aşımı veya operasyonel bildirim.',
-          sourceMetrics: al.source_metrics || ['Eşik Değeri: Kritik'],
-          deepLink: al.deep_link || 'finance',
-          quickAction: 'RESOLVE_ALERT'
-        });
-      }
-    });
-
-    // Gap nights (Revenue opportunity)
-    const gapNights = typeof detectGapNights === 'function' ? detectGapNights() : [];
-    if (gapNights.length > 0) {
-      const gap = gapNights[0];
-      candidates.push({
-        id: `gap-${gap.checkIn}-${gap.villaKey}`,
-        domain: 'REVENUE',
-        propertyId: gap.villaKey,
-        propertyName: gap.villaName,
-        title: `Boş Gece: ${gap.checkIn} - ${gap.villaName}`,
-        revenueImpact: 'HIGH',
-        guestImpact: 'LOW',
-        urgencyDueTime: 20,
-        confidence: 'HIGH',
-        rationale: 'İki rezervasyon arasında kalan boşluk; yalnız kayıtlı fiyat kuralı varsa teklif üretilebilir.',
-        // Onerilen fiyat hesaplanmamissa satir hic yazilmaz; 12.500 TL
-        // uydurulmaz (3.6).
-        sourceMetrics: [`Tarih: ${gap.checkIn}–${gap.checkOut}`].concat(
-          Number(gap.discountPrice) > 0
-            ? [`Öneri: ₺${Number(gap.discountPrice).toLocaleString('tr-TR')}`]
-            : ['Öneri fiyatı hesaplanamadı (mülkün liste fiyatı girilmemiş)']
-        ),
-        deepLink: 'pricing',
-        quickAction: 'APPLY_GAP_DISCOUNT'
-      });
-    }
-
-    // High value leads
-    const hotLeads = leads.filter(l => l.status === 'FOLLOW_UP' || l.status === 'QUOTE_SENT');
-    if (hotLeads.length > 0) {
-      const l = hotLeads[0];
-      candidates.push({
-        id: l.id,
-        domain: 'LEADS',
-        propertyId: l.villa,
-        title: `Sıcak Müşteri Teklifi: ${l.guest || 'Ad belirtilmedi'} (₺${Number(l.quote || 0).toLocaleString('tr-TR')})`,
-        revenueImpact: 'HIGH',
-        confidence: 'HIGH',
-        rationale: 'Rezervasyona dönüşme olasılığı yüksek müşteri teklifi bekliyor.',
-        sourceMetrics: [`Durum: ${LEAD_STATUS_LABELS[String(l.status || '').toUpperCase()] || l.status}`, Number(l.quote) > 0 ? `Değer: ₺${Number(l.quote).toLocaleString('tr-TR')}` : 'Değer: teklif girilmedi'],
-        deepLink: 'leads',
-        quickAction: 'CONVERT_LEAD'
-      });
-    }
-
-    const commandResult = ExecutivePriorityService.selectTodayCommandCenterActions(candidates, {
-      currentFilter,
-      propertiesCount: propertiesList.length
-    });
-
-    renderTodayCommandCenter(commandResult);
-  }
-
-  // 4. Property sales readiness. Payment status is deliberately not used:
-  // `paid` is a financial flag, not evidence that cleaning was completed.
-  const readinessApi = getPropertySalesReadinessApi();
-  if (readinessApi) {
-    const healthCards = propertiesList.map(property => readinessApi.buildPropertyReadiness(property, {
-      overrideStatus: appData?.housekeepingOverrides?.[property.key],
-      maintenanceTickets: tickets,
-      cleaningTasks: readinessCleaningTasks(),
-      today: getTodayStr()
-    }));
-    renderPortfolioHealth(healthCards);
-  }
 }
-
-function renderTodayCommandCenter(actionsResult) {
-  if (typeof document === 'undefined') return;
-
-  const critList = document.getElementById('todayCriticalActionsList');
-  const critBadge = document.getElementById('criticalActionsCountBadge');
-  const opsList = document.getElementById('todayOperationsActionsList');
-  const opsBadge = document.getElementById('operationsActionsCountBadge');
-  const revList = document.getElementById('todayRevenueActionsList');
-  const revBadge = document.getElementById('revenueActionsCountBadge');
-
-  // Helper renderer
-  function renderActionCards(listEl, badgeEl, actions, typeClass, emptyMsg) {
-    // Rozet yalniz is sayisini yazar. Eskiden paydaya bir onceki cizimin
-    // sayisini koyuyordu: 0'dan 1 ise geciste '1 / 0' gorunuyordu (L-178).
-    if (badgeEl) badgeEl.innerText = String((actions || []).length);
-    if (!listEl) return;
-
-    if (!actions || actions.length === 0) {
-      listEl.innerHTML = `<div class="empty-action-state">${emptyMsg}</div>`;
-      return;
-    }
-
-    listEl.innerHTML = actions.map(act => {
-      // Birlesik kartta isler tek tek listelenir; birden cok kaydin olcutlerini
-      // tek satira dokmek "Durum: Devam Ediyor • Durum: Açık" gibi celiskili
-      // bir satir uretiyordu (L-178).
-      const causes = act.isCollapsed ? (act.rootCauses || []).filter(Boolean) : [];
-      const metricsText = act.isCollapsed ? '' : (act.sourceMetrics || []).join(' • ');
-      const rationaleHtml = causes.length
-        ? `<ul class="action-root-causes">${causes.map(cause => `<li>${escapeHtml(cause)}</li>`).join('')}</ul>`
-        : escapeHtml(act.rationale || act.reason || '');
-      // Ham kimlik (UUID) musteriye gosterilmez; ad bulunamazsa bos kalir (L-104).
-      const mulkEtiketi = act.propertyName
-        || (typeof appData !== 'undefined' && appData.villas && appData.villas[act.propertyId]?.name)
-        || '';
-
-      return `
-        <div class="command-action-card ${typeClass}">
-          <div class="action-card-top">
-            <span class="action-card-domain">${escapeHtml(act.domain === 'REVENUE' ? 'Gelir fırsatı' : act.domain === 'OPERATIONS' ? 'Operasyon' : 'Kritik')}</span>
-            <span class="action-card-property">${escapeHtml(mulkEtiketi)}</span>
-          </div>
-          <div class="action-card-title">${escapeHtml(act.title)}</div>
-          <div class="action-card-rationale">${rationaleHtml}</div>
-          ${metricsText ? `<div class="action-source-metrics">${escapeHtml(metricsText)}</div>` : ''}
-          <div class="action-card-footer">
-            <button type="button" class="btn btn-secondary btn-sm" data-onclick="openTabFromDeepLink(decodeURIComponent('${encodeActionArg(act.deepLink || 'executive')}'), decodeURIComponent('${encodeActionArg(act.focusId || act.id)}'))">İncele</button>
-            ${act.quickAction
-              ? `<button type="button" class="btn btn-primary btn-sm" data-onclick="handleQuickActionTrigger(decodeURIComponent('${encodeActionArg(act.quickAction)}'), decodeURIComponent('${encodeActionArg(act.id)}'))">Uygula</button>`
-              : ''}
-          </div>
-        </div>
-      `;
-    }).join('');
-  }
-
-  renderActionCards(critList, critBadge, actionsResult.critical || [], 'critical', 'Açık kritik uyarı yok.');
-  renderActionCards(opsList, opsBadge, actionsResult.operations || [], 'operations', 'Kayıtlı bekleyen turnover veya arıza görevi yok.');
-  renderActionCards(revList, revBadge, actionsResult.revenueOpportunities || [], 'revenue', 'Önümüzdeki günlerde boşluk gecesi (iki rezervasyon arasında 1–4 gece) ya da teklif bekleyen sıcak talep yok.');
-}
-
-function renderPortfolioHealth(healthCards) {
-  if (typeof document === 'undefined') return;
-  const grid = document.getElementById('portfolioHealthCardsGrid');
-  if (!grid) return;
-
-  const counts = {
-    SALES_READY: 0,
-    NEEDS_CLEANING: 0,
-    NON_BLOCKING_ISSUE: 0,
-    BLOCKED_MAINTENANCE: 0,
-    UNSET: 0
-  };
-  const readinessApi = getPropertySalesReadinessApi();
-  const canEdit = canManagePropertyReadiness();
-
-  grid.innerHTML = healthCards.map(c => {
-    counts[c.status] = (counts[c.status] || 0) + 1;
-    const meta = c.meta || readinessApi?.STATUS_META?.UNSET || {
-      icon: '⚪', label: 'Durum seçilmedi', tone: 'neutral'
-    };
-    const badgeClass = meta.tone === 'green' ? 'badge-green'
-      : meta.tone === 'yellow' ? 'badge-yellow'
-        : meta.tone === 'red' ? 'badge-red'
-          : meta.tone === 'blue' ? 'badge-blue' : '';
-    const cardStatus = c.status === 'SALES_READY' ? 'HEALTHY'
-      : c.status === 'BLOCKED_MAINTENANCE' ? 'CRITICAL'
-        : c.status === 'NON_BLOCKING_ISSUE' ? 'INFO' : 'WARNING';
-    // Satisa engel acik ariza varken mulk elle satisa acilamaz (L-179): satisa
-    // acmanin yolu arizayi kapatmaktir. Eskiden secenek seciliyor, kaydediliyor
-    // ama kart yine "kapali" gosteriyordu.
-    const blocked = (c.blockingIssueCount || 0) > 0;
-    // Bekleyen temizlik de satisi tutar (L-183): secim kaydedilip kart sari
-    // kalmasin diye satilabilir secenekler kapanir; temizlik yapilinca hazir olur.
-    const cleaningPending = !blocked && (c.pendingCleaningTaskIds || []).length > 0;
-    const lockReason = blocked ? 'önce arızayı kapatın' : (cleaningPending ? 'önce temizliği tamamlayın' : '');
-    const options = readinessApi.SELECTABLE_STATUSES.map(status => {
-      const optionMeta = readinessApi.STATUS_META[status];
-      const selected = c.manualStatus === status ? ' selected' : '';
-      const disabled = lockReason && SALEABLE_READINESS_STATUSES.includes(status) ? ' disabled' : '';
-      return `<option value="${escapeHtml(status)}"${selected}${disabled}>${optionMeta.icon} ${escapeHtml(optionMeta.label)}${disabled ? ` — ${lockReason}` : ''}</option>`;
-    }).join('');
-    const blockedHtml = blocked
-      ? `<div class="health-card-note is-blocked">Satışa açmak için arızayı kapatın.
-           <button type="button" class="btn btn-secondary btn-sm"
-             data-onclick="openTabFromDeepLink('maintenance', decodeURIComponent('${encodeActionArg(String((c.blockingTicketIds || [])[0] || ''))}'))">Arızayı gör</button></div>`
-      : (cleaningPending
-        ? `<div class="health-card-note is-cleaning">Temizlik yapıldı işaretlenince hazır olur.
-           <button type="button" class="btn btn-secondary btn-sm"
-             data-onclick="openTabFromDeepLink('housekeeping', decodeURIComponent('${encodeActionArg(String((c.pendingCleaningTaskIds || [])[0] || ''))}'))">Temizliğe git</button></div>`
-        : '');
-    const editor = canEdit
-      ? `<label class="health-card-editor">
-           Durumu değiştir
-           <select class="property-readiness-select" data-property-readiness-key="${escapeHtml(c.propertyKey)}"
-             data-onchange="setPropertySalesReadiness(decodeURIComponent('${encodeActionArg(String(c.propertyKey))}'), this.value)">
-             <option value="" disabled${c.manualStatus === 'UNSET' ? ' selected' : ''}>⚪ Durum seçin</option>
-             ${options}
-           </select>
-         </label>`
-      : '<div class="health-card-editor is-readonly">Salt okunur · değiştirme yetkiniz yok</div>';
-
-    return `
-      <div class="property-health-card status-${cardStatus}" data-readiness-status="${escapeHtml(c.status)}" data-property-key="${escapeHtml(c.propertyKey)}">
-        <div class="health-card-head">
-          <div>
-            <strong class="health-card-name">${propertyNameHtml(c.propertyKey, c.propertyName)}</strong>
-            <div class="health-card-reason">${escapeHtml(c.reason)}</div>
-          </div>
-          <span class="badge ${badgeClass}">${meta.icon} ${escapeHtml(meta.label)}</span>
-        </div>
-        <div class="health-card-stats">
-          <div>
-            <span>Satış durumu</span>
-            <strong>${c.status === 'BLOCKED_MAINTENANCE' ? 'Kapalı' : (c.status === 'UNSET' ? 'Belirsiz' : 'Açık')}</strong>
-          </div>
-          <div>
-            <span>Açık iş / arıza</span>
-            <strong class="${c.openIssueCount > 0 ? 'is-negative' : 'is-positive'}">${c.openIssueCount || 0} kayıt</strong>
-          </div>
-        </div>
-        ${blockedHtml}
-        ${editor}
-      </div>
-    `;
-  }).join('');
-
-  setEl('healthPillReady', `🟢 Hazır: ${counts.SALES_READY}`);
-  setEl('healthPillCleaning', `🟡 Temizlik: ${counts.NEEDS_CLEANING}`);
-  setEl('healthPillMinorIssue', `🔵 Küçük Arıza: ${counts.NON_BLOCKING_ISSUE}`);
-  setEl('healthPillBlocked', `🔴 Kapalı: ${counts.BLOCKED_MAINTENANCE}`);
-}
-
 
 function openAiActionConfirmModal(action) {
   // Isleyiciden JSON metni olarak gelir (L-15: nesne satir ici isleyiciye
@@ -20557,7 +18966,7 @@ function renderPropertyProfile(villaKey) {
     body = `<div class="property-profile-grid"><div><span class="sub-text">Net konaklama cirosu</span><strong>${propertyMoney(report.netRoomRevenue)}</strong></div>${ledgerHtml}<div><span class="sub-text">Satılan gece</span><strong>${escapeHtml(report.soldNights)}</strong></div><div><span class="sub-text">ADR</span><strong>${propertyMoney(report.adr)}</strong></div></div>${financial.showLedger ? '' : `<p class="sub-text">${escapeHtml(financial.reason)}</p>`}<div style="margin-top:12px">${history.length ? history.map(row => `<div class="lead-followup-row"><strong>${escapeHtml(row.guest || 'Misafir')}</strong><span>${escapeHtml(row.checkIn || '—')} → ${escapeHtml(row.checkOut || '—')}</span></div>`).join('') : '<p class="empty-state">Henüz konaklama geçmişi yok.</p>'}</div><p class="sub-text">Rapor LedgerContract tek defterinden, tüm zamanlar ve yalnız bu mülk kapsamında üretilir.</p>`;
   }
   const editButton = canManageTenantRole(activeTenant?.role) ? `<button class="btn btn-secondary btn-sm" data-onclick="openPropertyModal(decodeURIComponent('${encodeActionArg(villaKey)}'))">Düzenle</button>` : '';
-  return `<section class="card property-profile-card"><div class="section-title-bar"><div><h2>${escapeHtml(property.name)}</h2><p class="sub-text">Sekmeli mülk profili</p></div>${editButton}</div><div class="subpage-switch" role="tablist" aria-label="Mülk profili">${tabButtons}</div><div style="margin-top:14px">${propertyProfileBodyHtml(body)}</div></section>`;
+  return `<section class="card property-profile-card"><div class="section-title-bar"><div><h2>${escapeHtml(property.name)}</h2></div>${editButton}</div><div class="subpage-switch" role="tablist" aria-label="Mülk profili">${tabButtons}</div><div style="margin-top:14px">${propertyProfileBodyHtml(body)}</div></section>`;
 }
 
 // Mulk rengi: ad gecen her yerde (takvim, listeler, kartlar) ayni nokta.
@@ -20579,12 +18988,12 @@ function getPropertyColor(villaKey) {
 }
 
 function propertyNameHtml(villaKey, name) {
-  return `<span class="property-name"><span class="property-color-dot" style="background:${escapeHtml(getPropertyColor(villaKey))}" aria-hidden="true"></span>${escapeHtml(name)}</span>`;
+  return `<span class="property-name"><span class="property-color-dot" data-lx-literal-color style="background:${escapeHtml(getPropertyColor(villaKey))}" aria-hidden="true"></span>${escapeHtml(name)}</span>`;
 }
 
 function propertyColorPickerHtml(villaKey) {
   const current = getPropertyColor(villaKey);
-  return `<div class="property-color-picker" role="group" aria-label="Mülk rengi"><span class="sub-text">Renk</span>${PROPERTY_COLOR_PALETTE.map(([color, label]) => `<button type="button" class="property-color-swatch${color === current ? ' is-selected' : ''}" style="background:${escapeHtml(color)}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}" aria-pressed="${color === current}" data-onclick="setPropertyColor(decodeURIComponent('${encodeActionArg(villaKey)}'), decodeURIComponent('${encodeActionArg(color)}'))"></button>`).join('')}</div>`;
+  return `<div class="property-color-picker" role="group" aria-label="Mülk rengi"><span class="sub-text">Renk</span>${PROPERTY_COLOR_PALETTE.map(([color, label]) => `<button type="button" class="property-color-swatch${color === current ? ' is-selected' : ''}" data-lx-literal-color style="background:${escapeHtml(color)}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}" aria-pressed="${color === current}" data-onclick="setPropertyColor(decodeURIComponent('${encodeActionArg(villaKey)}'), decodeURIComponent('${encodeActionArg(color)}'))"></button>`).join('')}</div>`;
 }
 
 async function setPropertyColor(villaKey, color) {
@@ -20637,9 +19046,6 @@ function renderPropertiesTab() {
             <span style="color: #98989D; display: block;">${escapeHtml(label)}</span>
             <strong style="color: ${color}; font-size: 12px;">${propertyMoney(value === '' ? null : value)}</strong>
           </div>`).join('')}
-        </div>
-        <div style="font-size: 11px; color: #C7C7CC;">
-          <strong>Olanaklar:</strong> ${escapeHtml(v.amenities || 'Belirtilmedi')}
         </div>
         ${canManage ? propertyColorPickerHtml(k) : ''}
         <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px;">
@@ -20885,7 +19291,7 @@ function renderStaffFieldWork() {
       return `<label class="staff-supply"><span>${item.area ? `<small>${escapeHtml(item.area)}</small> ` : ''}${escapeHtml(item.item || '—')}</span><select ${locked ? 'disabled' : ''} data-onchange="setStaffSupplyStatus(decodeURIComponent('${encodeActionArg(row.execution_id)}'), '${index}', this.value)"><option value="">Seçin…</option><option value="OK"${current === 'OK' ? ' selected' : ''}>Var</option><option value="LOW"${current === 'LOW' ? ' selected' : ''}>Az var</option><option value="OUT"${current === 'OUT' ? ' selected' : ''}>Yok</option></select></label>`;
     }).join('');
     const reopened = row.status === 'REOPENED'
-      ? `<div class="staff-reopened" role="status">↩️ Yöneticiniz bu temizliği yeniden açtı${row.inspector_note ? `: <strong>${escapeHtml(row.inspector_note)}</strong>` : '.'} Eksikleri tamamlayıp yeniden <strong>Yaptım (Z)</strong> deyin.</div>`
+      ? `<div class="staff-reopened" role="status">Yöneticiniz bu temizliği yeniden açtı${row.inspector_note ? `: <strong>${escapeHtml(row.inspector_note)}</strong>` : '.'} Eksikleri tamamlayıp yeniden <strong>Yaptım (Z)</strong> deyin.</div>`
       : '';
     const checklistHtml = sections
       ? `<div class="staff-checklist">${sections}</div>`
@@ -20927,9 +19333,9 @@ let operationalPersonEditId = null;
 function fieldTeamHintHtml(kind) {
   const isCleaner = kind === 'CLEANER';
   const messageHtml = isCleaner
-    ? 'Atanabilecek temizlikçi yok. Temizlikçiyi <strong>Saha ekibi</strong> bölümünden ekleyip Personel rolündeki giriş hesabına bağlayın; o zaman görev atanır ve kontrol listesini telefonundan imzalar.'
-    : 'Kayıtlı usta yok. Ustayı <strong>Saha ekibi</strong> bölümünden ekleyin; giriş hesabı gerekmez.';
-  return `<div class="ops-field-team-hint sub-text" style="margin-bottom:12px">${messageHtml} <button class="btn btn-secondary btn-sm" data-onclick="setOperationsView('people')">👷 Saha ekibi</button></div>`;
+    ? `Atanabilecek temizlikçi yok. Temizlikçiyi <button type="button" class="lex-link-inline" data-onclick="goTo('operations:people')">Saha ekibi</button> bölümünden ekleyip Personel rolündeki giriş hesabına bağlayın; o zaman görev atanır ve kontrol listesini telefonundan imzalar.`
+    : `Kayıtlı usta yok. Ustayı <button type="button" class="lex-link-inline" data-onclick="goTo('operations:people')">Saha ekibi</button> bölümünden ekleyin; giriş hesabı gerekmez.`;
+  return `<div class="ops-field-team-hint sub-text" style="margin-bottom:12px">${messageHtml} <button class="btn btn-secondary btn-sm" data-onclick="setOperationsView('people')">Saha ekibi</button></div>`;
 }
 
 function linkableFieldMembers(currentUserId) {
@@ -20952,7 +19358,7 @@ function renderOperationsPeopleView() {
       <h3>${editing ? 'Kişiyi düzenle' : 'Saha ekibine kişi ekle'}</h3>
       <p class="sub-text">
         <strong>Temizlikçi:</strong> göreve atanması ve kontrol listesini telefonundan imzalaması (Z) için önce
-        Ayarlar → Ekip ve Rol Yönetimi'nden <strong>Personel</strong> rolüyle davet edin, sonra burada hesabına bağlayın.
+        <button type="button" class="lex-link-inline" data-onclick="goTo('settings:team')">Ayarlar → Ekip</button> bölümünden <strong>Personel</strong> rolüyle davet edin, sonra burada hesabına bağlayın.
         Hesabı olmayan temizlikçinin işini siz "Kontrol ettim, yapıldı" ile kapatırsınız.
         <strong>Usta:</strong> hesap gerekmez; arızaya atanır ve telefonundan aranır.
       </p>
@@ -20978,7 +19384,7 @@ function renderOperationsPeopleView() {
       ? (person.user_id ? 'Temizlik atanabilir' : 'Atanamaz — hesap bağlanmalı')
       : 'Arızaya atanabilir';
     const actions = canManage ? `<div class="ops-row-actions">
-        <button class="btn btn-secondary btn-sm" data-onclick="editOperationalPerson(decodeURIComponent('${encodeActionArg(person.id)}'))">✏️ Düzenle</button>
+        <button class="btn btn-secondary btn-sm" data-onclick="editOperationalPerson(decodeURIComponent('${encodeActionArg(person.id)}'))">Düzenle</button>
         <button class="btn btn-secondary btn-sm" data-onclick="toggleOperationalPersonActive(decodeURIComponent('${encodeActionArg(person.id)}'))">${active ? 'Pasifleştir' : 'Yeniden etkinleştir'}</button>
       </div>` : '';
     return `<article class="ops-row" data-operational-person-id="${escapeHtml(person.id)}"${active ? '' : ' style="opacity:.55"'}>
@@ -21179,7 +19585,6 @@ async function inspectCleaningExecution(executionId, approve) {
     if (typeof showToast === 'function') showToast('⚠️ Denetim kaydedilemedi: ' + (error.message || 'Veritabanı hatası'), 'error');
     return false;
   }
-  invalidateExecutiveSnapshotCache();
   await loadTenantAppData(getActiveTenantId());
   if (typeof showToast === 'function') showToast(approve ? '✅ Denetim onaylandı; temizlik gideri oluştu.' : '↩️ Temizlik yeniden açıldı.');
   return true;
@@ -21241,7 +19646,6 @@ async function resolveMaintenanceFromOperations(ticketId) {
   try {
     if (createExpense) {
       await resolveMaintenanceTicket(ticketId, actualCost, 'Bakım', `Arıza onarımı: ${ticket.title || 'başlıksız arıza'}`);
-      invalidateExecutiveSnapshotCache();
     } else {
       const { error } = await supabaseClient.from('maintenance_tickets').update({
         status: 'RESOLVED',
@@ -21555,40 +19959,9 @@ function cleaningExecutionChecklistHintHtml(execution) {
   if (!execution || !['ASSIGNED', 'IN_PROGRESS', 'REOPENED'].includes(execution.status)) return '';
   if ((execution.checklist_snapshot?.sections || []).length) return '';
   const button = isCleaningExecutionRefreshable(execution)
-    ? ` <button class="btn btn-secondary btn-sm" data-onclick="refreshCleaningExecutionChecklist(decodeURIComponent('${encodeActionArg(execution.id)}'))">↻ Listeyi güncelle</button>`
+    ? ` <button class="btn btn-secondary btn-sm" data-onclick="refreshCleaningExecutionChecklist(decodeURIComponent('${encodeActionArg(execution.id)}'))">Listeyi güncelle</button>`
     : '';
   return `<span class="ops-checklist-hint">Kontrol listesi yok: atama, liste kaydedilmeden önce yapılmış.${button}</span>`;
-}
-
-// Menudeki "Operasyon (N)": bugun ve geciken acik temizlik (denetim bekleyen
-// dahil) + acik ariza. Eskiden yalniz Operasyon sekmesi cizilince
-// guncelleniyor ve yapilmis-odenmemis temizligi sayiyordu: ana sayfada
-// bugunku temizlik varken menu "Operasyon (0)" diyordu (M65, 9.5.11).
-function getOperationsAttentionCount() {
-  const today = getTodayStr();
-  const api = getOperationsApi();
-  const tasks = (appData?.cleaningTasks || []).map(task => normalizeCleaningTask(task, appData.villas || {}));
-  const withExecutions = api ? api.attachExecutions(tasks, appData?.cleaningExecutions || []) : tasks;
-  const cleanings = withExecutions.filter(task => {
-    const date = String(task.date || '').slice(0, 10);
-    const status = String(task.status || '').toUpperCase();
-    const open = !['DONE', 'SKIPPED', 'CANCELLED'].includes(status) || task.workflowState === 'AWAITING_INSPECTION';
-    return open && !!date && date <= today;
-  }).length;
-  const tickets = (appData?.maintenanceTickets || []).filter(isMaintenanceTicketOpen).length;
-  return { cleanings, tickets, total: cleanings + tickets };
-}
-
-function renderOperationsTabBadge() {
-  if (typeof document === 'undefined') return false;
-  const badge = document.getElementById('opsTaskCountBadge');
-  if (!badge) return false;
-  const count = getOperationsAttentionCount();
-  badge.innerText = String(count.total);
-  const title = `Bugün ve geciken açık temizlik: ${count.cleanings} · açık arıza: ${count.tickets}`;
-  badge.setAttribute?.('title', title);
-  badge.parentNode?.setAttribute?.('title', title);
-  return true;
 }
 
 function renderOperationsCleaningView(tasks) {
@@ -21607,7 +19980,7 @@ function renderOperationsCleaningView(tasks) {
     .filter(task => !listed.has(task.id) && (task.date || '') <= getTodayStr())
     .filter(task => taskMatchesVilla(task, currentFilter.villa) && (currentFilter.period === 'ALL' || isDateInFilter(task.date || '')))
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-  const groupHtml = (label, rows, id) => `
+  const groupHtml = (label, rows, id) => !rows.length ? '' : `
     <section class="ops-group"${id ? ` id="${id}"` : ''}>
       <h3>${escapeHtml(label)} <span class="badge">${rows.length}</span></h3>
       ${rows.length ? rows.map(task => {
@@ -21625,23 +19998,20 @@ function renderOperationsCleaningView(tasks) {
           <div class="ops-row-actions">
             ${waiting ? `<button class="btn btn-primary btn-sm" data-onclick="inspectCleaningExecution(decodeURIComponent('${encodeActionArg(execution.id)}'), true)">M Onayla</button><button class="btn btn-secondary btn-sm" data-onclick="inspectCleaningExecution(decodeURIComponent('${encodeActionArg(execution.id)}'), false)">Yeniden aç</button>` : task.status !== 'DONE' && task.status !== 'SKIPPED' ? `
               ${assignHtml}
-              ${!execution ? `<button class="btn btn-primary btn-sm" data-onclick="markCleaningDone(decodeURIComponent('${encodeActionArg(task.id)}'))">✔ Kontrol ettim, yapıldı</button>` : ''}
-              <button class="btn btn-secondary btn-sm" data-onclick="markCleaningSkipped(decodeURIComponent('${encodeActionArg(task.id)}'))" title="Misafir gelmedi, iptal ya da ev kullanılmadı: gider ve borç oluşmaz">✖ Gerek kalmadı</button>` : ''}
-            <button class="btn btn-secondary btn-sm" title="Ayrıntı / Düzenle" data-onclick="openEditCleaningTaskModal(decodeURIComponent('${encodeActionArg(task.id || task.dbId)}'))">✏️ Düzenle</button>
-            <button class="btn btn-danger btn-sm" title="Temizliği ve ona bağlı gideri sil" data-onclick="deleteCleaningTask(decodeURIComponent('${encodeActionArg(task.id || task.dbId)}'))">🗑️ Sil</button>
+              ${!execution ? `<button class="btn btn-primary btn-sm" data-onclick="markCleaningDone(decodeURIComponent('${encodeActionArg(task.id)}'))">Kontrol ettim, yapıldı</button>` : ''}
+              <button class="btn btn-secondary btn-sm" data-onclick="markCleaningSkipped(decodeURIComponent('${encodeActionArg(task.id)}'))" title="Misafir gelmedi, iptal ya da ev kullanılmadı: gider ve borç oluşmaz">Gerek kalmadı</button>` : ''}
+            <button class="btn btn-secondary btn-sm" title="Ayrıntı / Düzenle" data-onclick="openEditCleaningTaskModal(decodeURIComponent('${encodeActionArg(task.id || task.dbId)}'))">Düzenle</button>
+            <button class="btn btn-danger btn-sm" title="Temizliği ve ona bağlı gideri sil" data-onclick="deleteCleaningTask(decodeURIComponent('${encodeActionArg(task.id || task.dbId)}'))">Sil</button>
           </div>
         </article>`;
-      }).join('') : '<div class="empty-state">Bu aralıkta temizlik yok.</div>'}
+      }).join('') : ''}
     </section>`;
-  const checklistLink = canManageTenantRole(activeTenant?.role)
-    ? `<div class="ops-checklist-link"><button class="btn btn-secondary btn-sm" data-onclick="openSettingsSection(decodeURIComponent('${encodeActionArg('checklists')}'))">📋 Kontrol listelerini düzenle →</button></div>`
-    : '';
+
   return `
     ${eligible.length ? '' : fieldTeamHintHtml('CLEANER')}
-    ${checklistLink}
     <div class="ops-cleaning-layout">
-      <div>${groupHtml('Geciken / denetim bekleyen', grouped.overdue)}${groupHtml('Bugün', grouped.today)}${groupHtml('Yarın', grouped.tomorrow)}${groupHtml('Bu hafta', grouped.week)}${groupHtml('Geçmiş temizlikler (seçili dönem)', history, 'opsCleaningHistory')}</div>
-      <aside class="ops-debt-panel"><h3>Bekleyen Temizlik Borçları (${debt.reduce((sum, item) => sum + item.count, 0)})</h3>
+      <div>${groupHtml('Geciken / denetim bekleyen', grouped.overdue)}${groupHtml('Bugün', grouped.today)}${groupHtml('Yarın', grouped.tomorrow)}${groupHtml('Bu hafta', grouped.week)}${groupHtml('Geçmiş temizlikler (seçili dönem)', history, 'opsCleaningHistory')}${[grouped.overdue, grouped.today, grouped.tomorrow, grouped.week, history].some(r => r.length) ? '' : '<div class="empty-state">Bu dönemde temizlik yok.</div>'}</div>
+      <aside class="ops-debt-panel"${debt.length ? '' : ' hidden'}><h3>Bekleyen Temizlik Borçları (${debt.reduce((sum, item) => sum + item.count, 0)})</h3>
         ${debt.length ? debt.map(item => `<div class="ops-debt-row"><div><strong>${escapeHtml(item.cleaner)}</strong><span>${item.count} temizlik</span></div><strong>₺${item.amount.toLocaleString('tr-TR')}</strong>${item.taskIds.map(id => {
           const task = tasks.find(candidate => (candidate.id || candidate.dbId) === id);
           if (!task) return '';
@@ -21655,15 +20025,10 @@ function renderOperationsTab() {
   if (typeof document === 'undefined') return;
   const container = document.getElementById('opsCombinedContainer');
   if (!container) return;
-  // Ust kartlar listeyle ayni anda cizilir (L-177): kart yalniz sekmeye
-  // geciste ciziliyordu; kayit/esitleme sonrasi liste guncel, "Temizlik borcu"
-  // karti sayfa yenilenene kadar eski kaliyordu.
-  renderOperationsKpiStrip();
 
   const tasks = ((typeof appData !== 'undefined' && appData.cleaningTasks) || [])
     .map(task => normalizeCleaningTask(task, appData.villas || {}));
   const tickets = (typeof appData !== 'undefined' && appData.maintenanceTickets) || [];
-  renderOperationsTabBadge();
 
   document.querySelectorAll('[data-operations-view]').forEach(button => {
     button.classList.toggle('active', button.dataset.operationsView === operationsViewState);
@@ -21695,7 +20060,7 @@ function renderOperationsTab() {
       .sort((a, b) => String(b.updated_at || b.completed_at || '').localeCompare(String(a.updated_at || a.completed_at || ''))).slice(0, 20);
     const canEditTasks = canManageOperationsRole(activeTenant?.role);
     const editTaskButton = task => canEditTasks
-      ? `<button class="btn btn-secondary btn-sm" title="Ayrıntı / Düzenle" data-onclick="openOperationalTaskModal(decodeURIComponent('${encodeActionArg(task.id)}'))">✏️ Düzenle</button>`
+      ? `<button class="btn btn-secondary btn-sm" title="Ayrıntı / Düzenle" data-onclick="openOperationalTaskModal(decodeURIComponent('${encodeActionArg(task.id)}'))">Düzenle</button>`
       : '';
     const kapananHtml = kapananlar.length
       ? `<section class="ops-group" style="margin-top:12px"><details><summary><strong>Kapanan görevler</strong> <span class="badge">${kapananlar.length}</span></summary>${kapananlar.map(task => `<article class="ops-row"><div class="ops-row-main"><strong>${escapeHtml(task.title || '—')}</strong><span>${String(task.status).toUpperCase() === 'DONE' ? 'Tamamlandı' : 'İptal edildi'}${task.completed_at || task.updated_at ? ' · ' + escapeHtml(formatTrDate(String(task.completed_at || task.updated_at).slice(0, 10))) : ''}</span></div><div class="ops-row-actions">${editTaskButton(task)}</div></article>`).join('')}</details></section>`
@@ -21829,7 +20194,7 @@ function renderGuestsTab() {
   if (opportunityNotice) {
     const count = Number(metrics.rebookingOpportunityCount || 0);
     opportunityNotice.innerHTML = count
-      ? `<strong>🎯 ${count} yeniden rezervasyon fırsatı:</strong> Konaklaması tamamlanmış, gelecekte rezervasyonu olmayan ve kampanya iletişimine açık onay vermiş misafir. <button type="button" class="btn btn-secondary btn-sm" style="margin-left:8px;" data-onclick="setGuestDirectorySegment('REBOOKING', true)">Fırsatları göster</button>`
+      ? `<strong>${count} yeniden rezervasyon fırsatı:</strong> Konaklaması tamamlanmış, gelecekte rezervasyonu olmayan ve kampanya iletişimine açık onay vermiş misafir. <button type="button" class="btn btn-secondary btn-sm" style="margin-left:8px;" data-onclick="setGuestDirectorySegment('REBOOKING', true)">Fırsatları göster</button>`
       : '';
     opportunityNotice.style.display = count ? 'block' : 'none';
   }
@@ -22102,7 +20467,7 @@ function openGuestProfileModal(guestId = null) {
     insights.style.display = 'block';
     if (rebookingAction) {
       rebookingAction.innerHTML = row.rebookingEligible
-        ? `<strong>🎯 Yeniden rezervasyon fırsatı</strong><br><span style="font-size:12px; color:var(--text-muted);">Son çıkışın üzerinden ${row.daysSinceLastStay ?? '—'} gün geçti; gelecekte rezervasyon yok ve kampanya izni mevcut.</span><button type="button" class="btn btn-primary btn-sm" style="float:right; margin-top:-8px;" data-onclick="openGuestRebookingWhatsApp(decodeURIComponent('${encodeActionArg(String(row.id))}'))">WhatsApp'ta davet hazırla</button>`
+        ? `<strong>Yeniden rezervasyon fırsatı</strong><br><span style="font-size:12px; color:var(--text-muted);">Son çıkışın üzerinden ${row.daysSinceLastStay ?? '—'} gün geçti; gelecekte rezervasyon yok ve kampanya izni mevcut.</span><button type="button" class="btn btn-primary btn-sm" style="float:right; margin-top:-8px;" data-onclick="openGuestRebookingWhatsApp(decodeURIComponent('${encodeActionArg(String(row.id))}'))">WhatsApp'ta davet hazırla</button>`
         : '';
       rebookingAction.style.display = row.rebookingEligible ? 'block' : 'none';
     }
@@ -23972,30 +22337,17 @@ function pricingGridKey(event) {
 const PRICING_VIEWS = ['calendar', 'rules', 'target', 'rivals', 'results'];
 let pricingView = 'calendar';
 
-// Kullanim kilavuzu (kullanici 08.11.2026): ilk ziyarette acik; kapatan
-// kullanicida kapali hatirlanir. Tarayici deposu kisisel kolayliktir; okunamazsa acik.
-const PRICING_GUIDE_KEY = 'lexbnb.pricingGuideClosed';
-function pricingGuideClosed() {
-  try { return typeof localStorage !== 'undefined' && localStorage.getItem(PRICING_GUIDE_KEY) === '1'; } catch (_) { return false; }
-}
-
+// Kullanim kilavuzu (kullanici 08.11.2026; sadelik 21.11.2026): hep kapali
+// baslar, takvim ilk ekranda kalir; ozet tek dokunusla acar. Hatirlanacak secim yok.
 function applyPricingGuide() {
   if (typeof document === 'undefined') return;
   const guide = document.getElementById('pricingGuide');
   if (!guide || guide.dataset?.ready === '1') return;
-  // Telefonda (<=640 px) kilavuz takvimi bir ekran asagi itiyordu: orada kapali baslar, ozet tek dokunusla acar.
-  const telefon = typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 640px)').matches;
-  guide.open = !telefon && !pricingGuideClosed();
+  // Sadelik (21.11.2026): kilavuz hep kapali baslar; takvim ilk ekranda.
+  guide.open = false;
   if (guide.dataset) guide.dataset.ready = '1';
 }
 
-// Ozetin tiklamasi kutu acilip kapanmadan once calisir: acik kutu kapanacak demektir.
-function rememberPricingGuide() {
-  const guide = typeof document !== 'undefined' ? document.getElementById('pricingGuide') : null;
-  const closing = !!guide?.open;
-  try { if (typeof localStorage !== 'undefined') localStorage.setItem(PRICING_GUIDE_KEY, closing ? '1' : '0'); } catch (_) { /* yalniz kolaylik */ }
-  return true;
-}
 
 function openPricingGuideStep(view) {
   if (!setPricingView(view)) return false;
@@ -24540,6 +22892,27 @@ function pricingRivalHistoryHtml(entry) {
 // one cikarilarak acilir.
 const OPERATIONS_DEEP_LINK_VIEWS = { maintenance: 'maintenance', housekeeping: 'cleaning', operations: 'cleaning' };
 
+// Ekranlar arasi tek tik baglanti. Duz yazidaki "Ayarlar → Kanallar" gibi yonlendirmeler
+// bu kapiya bagli dugmedir; yeni yonlendirme yazarken buraya hedef ekleyin.
+function goTo(spec) {
+  const [where, a, b] = String(spec || '').split(':');
+  if (typeof closeAllHeaderDropdowns === 'function') closeAllHeaderDropdowns();
+  if (where === 'goals') { openGoalsModal(a || undefined); return true; }
+  if (where === 'expense') { openExpenseModal(); return true; }
+  if (where === 'settings') return openSettingsSection(a || 'business');
+  if (where === 'property') {
+    if (switchTab('properties') === false) return false;
+    if (a) setPropertyProfile(a);
+    if (b) setPropertyProfileTab(b);
+    return true;
+  }
+  if (switchTab(where) === false) return false;
+  if (where === 'operations' && a) setOperationsView(a);
+  if (where === 'pricing' && a) setPricingView(a);
+  if (where === 'marketing' && a && typeof LexBnBMarketingUI !== 'undefined' && LexBnBMarketingUI.openView) LexBnBMarketingUI.openView(a);
+  return true;
+}
+
 function openTabFromDeepLink(tabId, entityId) {
   const view = OPERATIONS_DEEP_LINK_VIEWS[tabId];
   if (!view) { switchTab(tabId); return; }
@@ -24635,6 +23008,7 @@ async function handleQuickActionTrigger(actionType, entityId) {
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
+    goTo,
     shouldRegisterServiceWorker,
     getMenuTabFor,
     TAB_MENU_PARENT,
@@ -24649,7 +23023,19 @@ if (typeof module !== 'undefined' && module.exports) {
     switchTab,
     applyGlobalFilterScope,
     GLOBAL_FILTER_SCOPE,
-    renderTodayMonthSummary,
+    renderTodayLex,
+    renderTodayReadiness,
+    todayReadinessEditorHtml,
+    openTeamTask,
+    renderTeamTaskRouting,
+    setTeamTaskRouting,
+    resetTeamTaskRouting,
+    buildTodayTeamTasks,
+    todayPerformanceRows,
+    todayWeekRows,
+    setTodayVilla,
+    setTodayTeam,
+    teamTaskPermissions,
     parseWhatsAppMessageText,
     buildWhatsAppLeadSaveMessage,
     canConvertLeadToBooking,
@@ -24703,7 +23089,6 @@ if (typeof module !== 'undefined' && module.exports) {
     createExpense,
     createExpensesBatch,
     buildPreviousMonthExpenseCopies,
-    getTopExpenseCategory,
     updateExpense,
     deleteExpense,
     saveExpense,
@@ -24718,7 +23103,6 @@ if (typeof module !== 'undefined' && module.exports) {
     renderSettingsExpenseCategories,
     buildRecurringExpenseDates,
     expenseSeriesInfo,
-    todayPerformanceProfitCardHtml,
     getUnpaidDirectBookings,
     channelCollectionRule,
     getBookingCollectionDueDate,
@@ -24798,6 +23182,8 @@ if (typeof module !== 'undefined' && module.exports) {
     villaOptionLabel,
     resBookedNights,
     setKpiAlertColor,
+    collectBookingRequiredErrors,
+    nextArrivalAfter,
     bookingOverlapMessage,
     saveMaint,
     resolveMaintenanceFromOperations,
@@ -24814,7 +23200,6 @@ if (typeof module !== 'undefined' && module.exports) {
     deleteOperationalTaskFromModal,
     buildOperationalTaskPatch,
     operationalTaskDueParts,
-    renderTodayDateStrip,
     todayStayCounts,
     bookingCleaningDate,
     confirmEarlyCheckout,
@@ -24864,7 +23249,6 @@ if (typeof module !== 'undefined' && module.exports) {
     channelTakesDeposit,
     syncBookingDepositVisibility,
     bookingPaymentCommissionFromFinance,
-    toggleTapeChartZoom,
     openBookingDetailsPanel,
     saveBookingPayment,
     deleteBookingPayment,
@@ -24872,10 +23256,8 @@ if (typeof module !== 'undefined' && module.exports) {
     shiftReservationRangeCalendar,
     resetReservationRange,
     setTapeChartView,
-    renderOperationsKpiStrip,
     renderDailyOps,
     loadTenantAppData,
-    formatSoldNightsLabel,
     computeFilterLedger,
     computeMonthLedger,
     computeMonthActuals,
@@ -24927,8 +23309,6 @@ if (typeof module !== 'undefined' && module.exports) {
     resolveExecutiveAlert,
     loadUserNotifications,
     acknowledgeUserNotification,
-    getExecutiveDashboardSnapshot,
-    getExecutiveSnapshotContext,
     canManageTenantRole,
     canReadLedgerRole,
     canReadSalesRole,
@@ -24999,7 +23379,6 @@ if (typeof module !== 'undefined' && module.exports) {
     pricingLastChangeHtml,
     pricingMemberName,
     pricingMonthShortLabel,
-    rememberPricingGuide,
     openPricingGuideStep,
     applyPricingGuide,
     pricingOccupancyTargetOf,
@@ -25011,16 +23390,9 @@ if (typeof module !== 'undefined' && module.exports) {
     renderBookingPriceCalendarHint,
     buildPropertyHistoryView,
     applyRoleNavigationVisibility,
-    invalidateExecutiveSnapshotCache,
-    shouldRefreshExecutiveSnapshot,
-    refreshExecutiveDashboardSnapshot,
-    renderExecutiveSnapshotKpis,
     renderExecutiveControlCenter,
-    renderPortfolioHealth,
     // 27.09 guven turu (L-98..L-106)
     isMaintenanceTicketOpen,
-    summarizeLeadLossReasons,
-    renderLeadAnalytics,
     isProfitUnmeasured,
     formatDeductionTl,
     isBulkSummaryBooking,
@@ -25063,7 +23435,6 @@ if (typeof module !== 'undefined' && module.exports) {
     linkAllUnlinkedBookingsWithPhone,
     openLeadModal,
     saveLead,
-    setTodayPerformanceVilla,
     computeMonthPerformance,
     renderAnalyticsTab,
     loadAnalyticsModules,
@@ -25073,7 +23444,6 @@ if (typeof module !== 'undefined' && module.exports) {
     loadAnalyticsImportedBookingIds,
     isAnalyticsImportedBooking,
     getCurrentMonthKey,
-    getMonthlyKpiDataset,
     renderPropertyProfile,
     renderPropertiesTab,
     setPropertyProfileTab,
@@ -25083,7 +23453,6 @@ if (typeof module !== 'undefined' && module.exports) {
     savePropertyOwnerFromForm,
     saveProperty,
     renderLeadQuickCapture,
-    renderTodayCommandCenter,
     readEmailTokenHashLink,
     attachLeadInterestProperties,
     renderLeadExtraPropertyPicker,
@@ -25111,8 +23480,6 @@ if (typeof module !== 'undefined' && module.exports) {
     isCleaningExecutionRefreshable,
     refreshUnstartedCleaningChecklists,
     cleaningExecutionChecklistHintHtml,
-    getOperationsAttentionCount,
-    renderOperationsTabBadge,
     checklistIndentedTextToItems,
     settingsChecklistSectionHtml,
     readPropertyAccessForm,
@@ -25142,7 +23509,6 @@ if (typeof module !== 'undefined' && module.exports) {
     createAuthSessionStorage,
     renderMonthCloseCard,
     openMonthCloseModal,
-    computeFinanceInsightRatios,
     getFriendlyAuthErrorMessage,
     handleAuthenticatedSession,
     setRememberDevicePreference,

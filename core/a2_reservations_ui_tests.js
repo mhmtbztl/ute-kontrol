@@ -63,7 +63,7 @@ test('Takvim ay, bir hafta ve iki hafta görünümlerine sahiptir', () => {
   assert.match(html, /data-onclick="setTapeChartView\('WEEK_1'\)"/);
   assert.match(html, /data-onclick="setTapeChartView\('WEEK_2'\)"/);
   assert.match(html, /data-onclick="setTapeChartView\('MONTH'\)"/);
-  assert.match(css, /tape-property-dot/);
+  assert.match(css, /property-color-dot/); // mülk rengi ortak noktadan (tape-property-dot kullanılmıyordu, 21.11.2026)
   assert.match(css, /tape-chart-table tbody tr:nth-child\(even\)/);
 });
 

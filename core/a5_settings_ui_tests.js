@@ -26,7 +26,7 @@ assert.match(settings, /Saha personeli/);
 assert.match(app, /function renderSettingsWorkspace\(/);
 assert.match(app, /tabId === 'settings'\s*&&\s*!canManageTenantRole\(activeTenant\?\.role\)/);
 assert.match(app, /hiddenTabs[\s\S]*settings/);
-assert.match(app, /'tab-settings': \['renderSettingsWorkspace', 'renderTeamManagement'\]/);
+assert.match(app, /'tab-settings': \['renderSettingsWorkspace', 'renderTeamManagement', 'renderTeamTaskRouting'\]/);
 
 assert.match(app, /tenant-assets/);
 assert.match(app, /business_profile/);

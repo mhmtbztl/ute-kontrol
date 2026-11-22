@@ -23,7 +23,6 @@ const allTestFiles = [
   'finance_import_tests.js',
   'financial_metrics_tests.js',
   'analysis_export_service_tests.js',
-  'analysis_center_ui_tests.js',
   'property_analysis_context_service_tests.js',
   'phase40_property_analysis_context_tests.js',
   'guest_domain_tests.js',
@@ -75,17 +74,13 @@ const allTestFiles = [
   'marketing_impact_schema_tests.js',
   'photo_intelligence_tests.js',
   'marketing_health_tests.js',
-  'marketing_priority_tests.js',
   'seasonal_marketing_tests.js',
   'marketing_ui_tests.js',
   'marketing_data_service_tests.js',
-  'marketing_review_service_tests.js',
   'marketing_manual_snapshot_schema_tests.js',
-  'marketing_snapshot_service_tests.js',
   'marketing_channel_listing_schema_tests.js',
   'marketing_channel_listing_service_tests.js',
   'marketing_photo_analysis_service_tests.js',
-  'marketing_experiment_service_tests.js',
   'marketing_finding_orchestrator_tests.js',
   'photo_analysis_worker_tests.js',
   'photo_analysis_worker_schema_tests.js',
@@ -93,7 +88,6 @@ const allTestFiles = [
   'gemini_photo_analysis_provider_tests.js',
   'photo_analysis_worker_entrypoint_tests.js',
   'marketing_photo_results_service_tests.js',
-  'marketing_health_results_service_tests.js',
   'marketing_experiment_worker_tests.js',
   'marketing_experiment_worker_repository_tests.js',
   'marketing_experiment_worker_schema_tests.js',
@@ -106,7 +100,6 @@ const allTestFiles = [
   'marketing_health_worker_repository_tests.js',
   'marketing_health_worker_schema_tests.js',
   'marketing_health_worker_entrypoint_tests.js',
-  'marketing_benchmark_service_tests.js',
   'marketing_health_source_collector_tests.js',
   'marketing_health_source_repository_tests.js',
   'marketing_health_source_entrypoint_tests.js',
@@ -116,7 +109,6 @@ const allTestFiles = [
   'marketing_economics_worker_repository_tests.js',
   'marketing_economics_worker_tests.js',
   'marketing_economics_worker_entrypoint_tests.js',
-  'marketing_cover_change_service_tests.js',
   'marketing_scheduler_tests.js',
 
   // Hesap kapatma / KVKK silme (Phase 18)
@@ -301,6 +293,7 @@ const allTestFiles = [
   'phase82_ads_atomic_import_live_tests.js',
   'phase111_ads_import_live_tests.js',
   'phase113_ads_daily_compact_live_tests.js',
+  'phase121_ads_platforms_live_tests.js',
   'phase84_expense_template_generation_tests.js',
   'phase86_expense_template_authz_tests.js',
   'phase88_ads_trigger_cleanup_tests.js',
@@ -373,7 +366,10 @@ const allTestFiles = [
   'analytics_integration_tests.js',
   'self_hosted_fonts_tests.js',
   'service_worker_tests.js',
-  'ux_audit_fixes_tests.js'
+  'ux_audit_fixes_tests.js',
+  // Lex Tasarimi (21.11.2026): ekip gorevleri motoru, ortak bilesenler ve Gece/Gunduz
+  'team_tasks_tests.js',
+  'lex_ui_tests.js'
 ];
 
 const testEnv = require('./core/test_env.js');

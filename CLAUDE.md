@@ -66,12 +66,65 @@ Firmalara satılacak — kişisel araç veya demo değil. Bu, kalite çıtasın�
   e-posta onayı **kapalıdır**; ikisi de zorunlu, gerekçeleri
   `docs/TEST_PROJECT_SETUP.md` içinde.
 
-- **Yazı tipleri kendi sunucumuzdan (kullanıcı kararı 08.11.2026):** Google Fonts
-  kaldırıldı — ziyaretçinin IP adresi üçüncü tarafa gitmesin (KVKK) ve açılışı
-  engelleyen dış istek kalksın (yerelde bile ~0,5 sn bekletiyordu). Inter ve
-  JetBrains Mono değişken woff2, `assets/fonts/` (OFL lisansı yanında), `@font-face`
-  `style.css` başında; CSP `style-src`/`font-src` yalnız `'self'`. Dış yazı tipi,
+- **Az çoktur — sadelik turu (kullanıcı kararı 21.11.2026, "acımasız ol"):** her rakamın tek
+  evi vardır; başka ekran bağlantı verir, kopyalamaz. Kalkanlar: menü simgeleri ve sayaçları
+  (Bugün görev tablosu söyler), "Kontrol Merkezi" başlığı, filtre açıklama cümlesi, üst çubukta
+  Ara/Komut düğmesi (Ctrl+K kalır) ve "Verileri eşitle", sayfa çubuğunda ikinci ChatGPT ve eski
+  kapak testi, Hızlı Ekle'de hedef, hesap menüsünde mülk ekle; Finans'ta ay gezgini + ikinci
+  portföy seçici + defter menüsü (defterler Veri menüsünde, Excel), hedef ciro kartı, kâr köprüsü,
+  aylık gelişim (Analiz'de), dönem özeti, mülk kart görünümü ve hüküm etiketleri; Satış'ta "satış
+  radarı" (Analiz'in talep dönüşümü); Operasyon üst kartları, boş grup kutuları; Fiyat'ta ADR ve
+  yıllık hedef kartları, tekrar eden giriş cümleleri (kılavuz hep kapalı başlar); Pazarlama'da
+  "Kanallar" görünümü (menü adı "Pazarlama"); gizli eski ekranlar `tab-analysis` (ChatGPT Analiz
+  Merkezi, modülüyle), `tab-housekeeping`, `tab-maintenance`. Hızlı talepte zorunlu olmayan alanlar
+  "Ayrıntı ekle" altında. **Geri getirmeden önce** rakamın zaten başka ekranda olup olmadığına
+  bakın. Testler kalkan öğenin **yokluğunu** ölçer (a2_finance_ui, navigation_menu).
+  **2. tur (aynı gün):** Bugün'deki gizli KPI şeridi, istemcinin `get_executive_dashboard_snapshot`
+  çağrısı, önbelleği ve `invalidateExecutiveSnapshotCache` çağrıları, KPI açıklama penceresi kalktı
+  (sunucu fonksiyonu ay kapanışı/canlı karşılaştırma için durur). Pazarlama'nın ölü huni arayüzü
+  (snapshot, bulgu, deney, referans formları) ve yalnız onu besleyen 7 modül
+  (`marketing_{priority,benchmark,cover_change,health_results,review,snapshot,experiment}_service`)
+  silindi; `marketing_funnel_service` worker'lar için kalır. style.css'ten sınıfı hiçbir kaynakta
+  geçmeyen 586 kural silindi (dinamik önekler `lex-`, `status-`, `badge-`… korunur).
+  **Üst çubuk 3 öğe (aynı gün):** Hızlı Ekle · bildirim · hesap menüsü. ChatGPT'ye sor (`askChatGptBtn`),
+  Gece/Gündüz ve Veri/Yardım hesap menüsündedir; üst çubuğa ayrı düğme eklemeyin (navigation_menu B1b).
+  Telefonda üst çubuğun backdrop-filter'ı sabit menünün kapsayıcısı olur: menüye `bottom` verilmez.
+  **3. tur (aynı gün):** Bugün kurulum şeridindeki ikinci "Hedefleri düzenle", Finans Giderler'deki ikinci
+  gider ekle, Satış'taki "+ Kaynak ekle" (Ayarlar → Talep kaynakları), Rezervasyonlar'da tekrar eden
+  açıklama ve "Büyüt" (1-2 hafta görünümü yeter), mülk kartında "Olanaklar", Ayarlar menüsü emojileri,
+  Analiz'de "2 yıl önce" karşılaştırması ve "Giriş günü" grafiği kalktı. Mülk kartındaki fiyatlar
+  **bilerek kalır** (kullanıcı isteği L-216, g9_feedback L-216b). Bugün'deki "Bu ayın performansı" da
+  bilerek kalır (kullanıcı 21.11.2026: "bugündeki performans kalkmasın").
+- **Tek tık bağlantı (kullanıcı 21.11.2026: "her gerekli şeyi birbirine tek tıkla bağla"):** ekranlar arası
+  her yönlendirme `goTo(spec)` düğmesidir, düz yazı değil: `'finance'`, `'settings:channels'`,
+  `'operations:people'`, `'pricing:rules'`, `'marketing:import'`, `'property:KEY:CHANNELS'`, `'goals'`,
+  `'expense'`. Metin içi bağlantı sınıfı `lex-link-inline` (telefonda ≥36 px). Bugün performans satırı
+  Finans'ı, "Hedef gir"/"Gider ekle" pencereyi, satış hazırlığı satırı mülk profilini açar; Pazarlama'da
+  "Hedef gir", Airbnb satırında "Rakamları gir" / "Airbnb ilanını ekle", Rapor yükle'de Meta/Google/TikTok
+  panelleri yeni sekmede. Yeni yönlendirme yazarken "Ayarlar → X'ten girin" yazmayın, `goTo` düğmesi
+  koyun. Hata mesajları (toast) bağlantı taşımaz. Ağı `scripts/one_click_links_browser_test.js`
+  (`npm run test:browser:links`).
+- **Yazı tipi sistem sans-serif (Lex Tasarımı, kullanıcı kararı 21.11.2026):** 08.11'deki
+  kendi sunucumuzdan Inter kararının yerine geçti; `assets/fonts/` ve `@font-face` kalktı,
+  yalnız iki kalınlık (400/500). CSP `style-src`/`font-src` yalnız `'self'`. Dış yazı tipi,
   stil veya CDN bağlantısı eklemeyin; ağı `self_hosted_fonts_tests`.
+- **Lex Tasarımı + Gece/Gündüz (kullanıcı kararı 21.11.2026):** her ekran Lex düzenindedir
+  ("her ekran lex düzen olsun"): sekme kabı `lex-screen` (düz yüzey, gölge/gradyan yok, kutu yerine
+  ince çizgi, 400/500), başlık satırı `lex-headrow` (başlık · dönem `data-lex-period` · "Rapor al"
+  oraya taşınır), üstte o ekranda açılan açık işler (`screenTasks_<sekme>`, `SCREEN_TASK_TARGETS`:
+  iş yalnız görev türünün hedef ekranında ve Bugün'de görünür, aynı iş beş ekranda tekrar etmez;
+  Mülkler ve Analiz'de bölüm yok; en fazla 3 satır; iş yoksa gizli) — hepsi `renderLexScreenChrome`. Koyu
+  temadan kalma `rgba(0,0,0,a)` zeminler gündüzde `--shade-k` ile hafifler (themeize). Fiyat
+  takviminin 3 sütun tabloya geçişi ayrı iştir (Otomasyon #2). Tema `core/theme.js` (head'de, stilden önce; cihaz ayarı, düğmeyle
+  değişir, kişisel tercih localStorage'da). Koyu tema için yazılmış sabit renkler `themeizeCss`
+  ile değişkene döner: satır içi stil kapısında (`applyDeferredInlineStyles`) ve `style.css`'te
+  (`node scripts/themeize_css.js style.css analytics.css`; `lex_ui_tests` X8 denetler). Kullanıcının
+  seçtiği renk (mülk rengi) `data-lx-literal-color` ile dönüşmez. Ortak parçalar `core/lex_ui.js`
+  (3 sütun tablo, Acil/Yap/Tamam ve Koru/Artır/Düşür etiketleri, marker, PDF/Excel); eylem özniteliği
+  app.js'te sabit adla kurulur (`action_dispatch_tests` onu orada ayrıştırır). **Ekip görevleri**
+  tek motor `core/team_tasks.js`: görev yalnız kayıttan türer; ekip `tenant_settings.team_task_routing`
+  (Ayarlar → Ekip → Görev dağıtımı) ile değişir, **görme hakkı rol/izin kapısından gelir, dağıtımla
+  değişmez**. SheetJS topluluk sürümü hücre rengi yazamaz; Excel'de talimat metin olarak durur.
 - **CAPTCHA:** Cloudflare Turnstile. Site anahtarı `core/captcha_gate.js`
   içinde (herkese açık). **Gizli anahtar yalnız Supabase panelindedir** —
   repoya, `.env`'e, sohbete girmez. Giriş, kayıt ve şifre sıfırlama
@@ -194,11 +247,11 @@ hesaplamaz; yalnız kullanıcı girdisi bağımlı alanı değiştirir. Kapasite
 %100'e sıkıştırılmaz ve kayıt reddedilir. Ağı `monthly_goal_calculator_tests`
 ve `monthly_goal_ui_tests`.
 
-**Bugün net kâr hedefi (19.10.2026):** `net_profit_target` önceliklidir;
+**Net kâr hedefi (19.10.2026):** `net_profit_target` önceliklidir;
 eski `profit_target` / `profitTarget` alanları yedektir. Eksik hedef `null`,
 gerçek sıfır hedef `0` kalır; sıfır hedefte yüzde sapma hesaplanmaz.
-Ağı `executive_snapshot_ui_tests`; gerçek Chrome + ayrı test projesi turu
-`scripts/monthly_goal_integration_tour.js` (9.7.1–9.7.3).
+Ağı `executive_snapshot_ui_tests` (servis); gerçek Chrome + ayrı test projesi turu
+`scripts/monthly_goal_integration_tour.js` (9.7.1–9.7.3). Bugün'deki sunucu KPI şeridi 21.11.2026'da kalktı.
 
 **Temizlik iki ayrı kalemdir; asla tek sayıya indirgenmez (2026-09-14 kararı).**
 
@@ -339,14 +392,10 @@ ister; fiyat ekranının gidişat şeridi (`buildPaceFor`) gelene kadar boş kal
 Göç gerekmedi. Ağı `booking_analytics_tests`, `analytics_ui_tests`,
 `analytics_integration_tests` (gerçek app.js ile birebir eşitlik).
 
-**Ana sayfa sunucu anlık görüntüsünü önbellekte tutar; deftere yazan her
-fonksiyon başarılı yazmadan sonra `invalidateExecutiveSnapshotCache()` çağırır.**
-Kural düğmede değil **tabloya yazan fonksiyondadır** (`createExpense`,
-`cloudUpsertCleaningTask`, …): temizlik "yapıldı" ve gider kaydı önbelleği
-temizlemiyordu; sunucu doğru hesaplarken ana sayfa sayfa yenilenene kadar
-eski kârı gösteriyordu. Rezervasyon yolları tam yeniden yükleme yaptığı için
-etkilenmiyordu. Deftere yazan yeni bir fonksiyon eklerseniz
-`ui_consistency_tests` F listesine ekleyin.
+**Ana sayfa sunucu anlık görüntüsü tutmaz (21.11.2026).** Eskiden gizli KPI şeridi için
+önbellek vardı ve deftere yazan her fonksiyon onu temizliyordu; şerit kalkınca önbellek ve
+`invalidateExecutiveSnapshotCache` de kalktı (`ui_consistency_tests` F1 yokluğu ölçer). Bugün'ün
+rakamları istemci defterinden (`computeMonthPerformance`), Finans ile aynı hesap.
 
 Doluluk/RevPAR paydası: `getPeriodDayCount()` — **ayın gerçek gün sayısı**.
 Bir zamanlar bir ekranda 30, diğerinde 31, bir başkasında 90 kullanılıyordu.
@@ -923,8 +972,21 @@ ve her yazmadan sonra çalışır); `marketing_ui` `hydrateAdPeriods` Pazarlama 
 seçili dönem + önceki eş dönemi (`adsWindow`), açık sütun listesiyle (`PERIOD_COLUMNS`, `*`
 değil) çeker ve aralığı önbellekte tutar; dönem yazan işleyici `reloadAdPeriods()` çağırır.
 Ağı `ads_period_service_tests`.
-**Reklamlar ekranı (Aşama 3, 05.11.2026):** iç sekmeler Genel bakış · İçe aktar · Kampanyalar ve
-hedefler · Kayıtlar (`state.adsView`). İçe aktarma planı saf: `AdsImportParser.planImport`
+**Pazarlama tek sayfa (sadelik + Lex, 21.11.2026; kullanıcı: "ilk defa Airbnb kullanan biri bile
+anlamalı"):** özet cümlesi · "Reklamlarınız" (kampanya · harcama → sonuç · talimat; talimat yalnız
+kayıtlı hedefe göre: Koru/Düşür/Bekle, hedef yoksa nedeni) · "Airbnb ilanınız" (ilan · son dönem ·
+talimat; kayıt yoksa "Yap", önceki eşit dönemle görüntülenme farkı). Üst ve alt sekme şeridi yok;
+ayrıntılı tablo, rapor yükleme, kampanya/hedef ve kayıtlar ayrı sayfadır (`state.view = 'ads'`,
+"← Pazarlama" ile dönülür). **Reklam verisi tek kutudan (21.11.2026):** Meta ve Google Ads kampanya
+raporu aynı alana bırakılır, platform başlıktan anlaşılır (`AdsImportParser.detectPlatform`; tanınmazsa
+tahmin yok, elle girişe yönlendirilir). Google: başlık satırları ve Toplam satırı atlanır, "Telefon
+aramaları" varsa sonuç aramadır, yoksa dönüşüm (OTHER); TL dışı hesap reddedilir, para birimi sütunu
+yoksa uyarılır. Elle giriş (`data-ads-quick-form`) kampanya açmadan aynı plan/onay yolundan geçer
+(`source: MANUAL`). DB yalnız META/GOOGLE kabul eder (phase72): TikTok vb. yeni göç ister. Ağı
+`ads_import_parser_tests` G1–G7, `scripts/ads_import_browser_test.js` (`npm run test:browser:ads`).
+Airbnb rakam girişi: 3 ana alan (görüntülenme, favori, rezervasyona dönüşüm), diğerleri katlı; yeni
+dönem tek adımda kaydedilir, var olan dönem onayla değişir. **Reklamlar ayrıntı sayfaları (Aşama 3, 05.11.2026):** Ayrıntılı tablo ·
+Rapor yükle · Kampanyalar ve hedefler · Kayıtlı dönemler (`state.adsView`). İçe aktarma planı saf: `AdsImportParser.planImport`
 (eşleştirme, yeni kampanya, değişecek kayıt, kısmi kapsama, kapalı ay) — onay düğmesi sunucunun
 reddedeceği planda kapalıdır, sunucu yine hakemdir. Görsel referans 21st.dev, kod değil (CSP);
 sınıflar uygulamanın kendi dilinden (`card`, `badge-*`, `btn-*`, `upload-dropzone`, `.form-control`).
@@ -952,6 +1014,16 @@ ek yalnız `style.css` `ads-*`. `innerHTML` sınırı `<svg>`'yi sildiği için 
 baş/son boşluksuz). Canlı süit `phase115_competitor_name_live_tests` 13/13 (göçten önce 9 kırmızı).
 Anon kapısı göçten önce de kapalı olduğundan anon sorgusu ayırt etmez; kanıt `schema_migrations` 115.
 Paket: `docs/PHASE115_DEPLOY_PACKAGE.md`.
+
+**phase121 (`migration_phase121_ads_more_platforms.sql`) 21 Kasım 2026'da test projesine, 22 Kasım 2026'da kullanıcı tarafından üretime
+uygulandı; üretimde doğrulandı** (`production:readiness` BAŞARILI, `schema_migrations` 121). Reklam dönemlerinde TikTok ve "Diğer" (OTHER): `ad_metric_periods.platform`
+kısıtı ve `save_ad_metric_period` / `import_ad_metric_batch` platform kapısı genişler. Fonksiyon gövdeleri
+dosyaya kopyalanmaz; göç veritabanındaki gövdede yalnız platform listesini değiştirir, desen yoksa durur.
+Göç yokken TikTok/Diğer kaydı "phase121 uygulanmadı" der, Meta/Google çalışır. TikTok raporu Google ile aynı
+tablo motorundan okunur (`TIKTOK_COLUMNS`; resmi sayfa sütun adlarını listelemediği için "Cost"/"Spend",
+"Clicks (destination)"/"Clicks" ve Türkçe karşılıklar kabul edilir; tarih "By Day" sütunundan ya da dosya
+adındaki aralıktan). Canlı süit `phase121_ads_platforms_live_tests` 7/7; phase111 20/20, phase113 12/12
+göçten sonra yeşil. Paket: `docs/PHASE121_DEPLOY_PACKAGE.md`.
 
 **phase119 (`migration_phase119_unused_ledgers_cleanup.sql`, temizlik, kullanıcı 13.11.2026) test projesine
 ve 13 Kasım 2026'da üretime uygulandı; üretimde doğrulandı** (`schema_migrations` 119; anon

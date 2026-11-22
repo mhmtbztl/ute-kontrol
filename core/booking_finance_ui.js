@@ -387,7 +387,6 @@ async function postBookingExtraExpenses() {
     if (JSON.stringify(normalize(saved)) !== JSON.stringify(normalize(current))) throw new Error('Gider değişikliklerini önce rezervasyona kaydedin, sonra deftere aktarın.');
     const { data,error } = await supabaseClient.rpc('post_booking_extra_expenses',{ p_booking_id:id,p_tenant_id:getActiveTenantId(),p_date:date });
     if (error) throw error;
-    invalidateExecutiveSnapshotCache();
     await loadTenantAppData();
     uiNotify(`${data} gider deftere aktarıldı. Mevcut satırlar tekrar oluşturulmadı.`);
     closeBookingModal();

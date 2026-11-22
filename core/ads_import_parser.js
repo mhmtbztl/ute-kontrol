@@ -28,7 +28,7 @@
       errors.push({ line, code: 'INVALID_PERIOD', text: 'Başlangıç/bitiş tarihi geçersiz.' }); return false;
     }
     if (dayCount(start, end) > 31) {
-      errors.push({ line, code: 'PERIOD_TOO_LONG', text: 'Dönem 31 günden uzun. Meta\'da tarih aralığını en fazla 31 gün seçin ya da Döküm → Zaman → Gün ile günlük indirin.' }); return false;
+      errors.push({ line, code: 'PERIOD_TOO_LONG', text: 'Dönem 31 günden uzun. Raporu en fazla 31 günlük (ör. bir aylık) seçin ya da günlük indirin: Meta\'da Döküm → Zaman → Gün, Google Ads\'te Gün sütunu.' }); return false;
     }
     return true;
   }
@@ -49,7 +49,7 @@
       const typeMap = { MESAJ: 'MESSAGE', ARAMA: 'CALL', DIGER: 'OTHER', DİĞER: 'OTHER', OTHER: 'OTHER' };
       const row = { campaignId: null, campaignName, platform, periodStart, periodEnd, resultType: typeMap[String(typeRaw).toUpperCase()] || null, resultMetric: null, spend: numberOrNull(spend), impressions: numberOrNull(impressions), reach: null, clicks: numberOrNull(clicks), messages: numberOrNull(messages), calls: numberOrNull(calls), source: 'SCREENSHOT_CHATGPT' };
       if (!String(campaignName || '').trim()) errors.push({ line, code: 'CAMPAIGN_REQUIRED', text: 'Kampanya adı zorunlu.' });
-      if (!['META', 'GOOGLE'].includes(platform)) errors.push({ line, code: 'INVALID_PLATFORM', text: 'Platform META veya GOOGLE olmalı.' });
+      if (!['META', 'GOOGLE', 'TIKTOK', 'OTHER'].includes(platform)) errors.push({ line, code: 'INVALID_PLATFORM', text: 'Platform META, GOOGLE, TIKTOK veya OTHER olmalı.' });
       if (!row.resultType) errors.push({ line, code: 'INVALID_RESULT_TYPE', text: 'Sonuç türü MESAJ, ARAMA veya DIGER olmalı.' });
       validatePeriod(periodStart, periodEnd, line, errors); validateNumbers(row, line, errors); rows.push(row);
     });
@@ -133,8 +133,9 @@
       else if (key !== 'spend' && !Number.isInteger(value)) errors.push({ line, code: 'INVALID_NUMBER', text: `${row.campaignName}: ${key} tam sayı olmalı.` });
     });
   }
-  function parseCsv(text, platform) {
-    if (platform === 'GOOGLE') return { rows: [], errors: [{ line: 1, code: 'GOOGLE_SAMPLE_REQUIRED', text: 'Google Ads Kampanyalar raporu örneği bekleniyor.' }], warnings: [] };
+  function parseCsv(text, platform, fileName) {
+    if (platform === 'GOOGLE') return parseGoogleCsv(text);
+    if (platform === 'TIKTOK') return parseTikTokCsv(text, fileName);
     if (platform !== 'META') return { rows: [], errors: [{ line: 1, code: 'INVALID_PLATFORM', text: 'Yalnız META CSV destekleniyor.' }], warnings: [] };
     const source = String(text || '').replace(/^﻿/, '');
     const parsed = finance().parseCSV(source), errors = [], warnings = [];
@@ -204,6 +205,152 @@
     if (blankResults.length) warnings.push({ code: 'RESULTS_BLANK', text: `Harcaması olup sonuç hücresi boş: ${[...new Set(blankResults)].join(', ')}. Sonuç ölçülmedi sayıldı, 0 yazılmadı.` });
     if (!columns.clicks) warnings.push({ code: 'CLICKS_COLUMN_MISSING', text: 'Dosyada "Bağlantı Tıklamaları" sütunu yok; tıklama, CTR ve tıklama maliyeti ölçülmedi olarak kalır. Meta\'da Sütunlar → Özelleştir ile ekleyebilirsiniz.' });
     return { rows, errors, warnings };
+  }
+  // Google Ads "Kampanyalar" raporu (Raporlar ya da kampanya tablosu → İndir → CSV).
+  // Dosya 1-2 satir baslikla (rapor adi, tarih araligi) baslar, sonra sutun satiri gelir;
+  // sonda "Toplam"/"Total" satirlari olur. Turkce ve Ingilizce arayuz adlari kabul edilir.
+  // Burada olmayan sutun tahmin edilmez: mesaj sonucu yoktur, arama sutunu varsa sonuc aramadir.
+  const GOOGLE_COLUMNS = {
+    campaign: ['Kampanya', 'Campaign'],
+    day: ['Gün', 'Day', 'Tarih', 'Date'],
+    cost: ['Maliyet', 'Cost'],
+    impressions: ['Gösterim', 'Gösterimler', 'Göst.', 'Impr.', 'Impressions'],
+    clicks: ['Tıklama', 'Tıklamalar', 'Clicks'],
+    conversions: ['Dönüşümler', 'Dönüşüm', 'Conversions'],
+    calls: ['Telefon aramaları', 'Aramalar', 'Phone calls', 'Calls'],
+    currency: ['Para birimi kodu', 'Para birimi', 'Currency code', 'Currency']
+  };
+  const GOOGLE_MONTHS = { ocak: 1, subat: 2, mart: 3, nisan: 4, mayis: 5, haziran: 6, temmuz: 7, agustos: 8, eylul: 9, ekim: 10, kasim: 11, aralik: 12,
+    january: 1, february: 2, march: 3, april: 4, may: 5, june: 6, july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
+    jan: 1, feb: 2, mar: 3, apr: 4, jun: 6, jul: 7, aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12, oca: 1, sub: 2, nis: 4, haz: 6, tem: 7, agu: 8, eyl: 9, eki: 10, kas: 11, ara: 12 };
+  const pad2 = n => String(n).padStart(2, '0');
+  // "1 Kasım 2026", "November 1, 2026", "Nov 1, 2026", "2026-11-01", "01.11.2026"
+  function googleDate(raw) {
+    const text = headerKey(raw).replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
+    let m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+    if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+    m = /^(\d{1,2})[./](\d{1,2})[./](\d{4})$/.exec(text);
+    if (m) return `${m[3]}-${pad2(m[2])}-${pad2(m[1])}`;
+    m = /^(\d{1,2}) ([a-z]+) (\d{4})$/.exec(text);
+    if (m && GOOGLE_MONTHS[m[2]]) return `${m[3]}-${pad2(GOOGLE_MONTHS[m[2]])}-${pad2(m[1])}`;
+    m = /^([a-z]+) (\d{1,2}) (\d{4})$/.exec(text);
+    if (m && GOOGLE_MONTHS[m[1]]) return `${m[3]}-${pad2(GOOGLE_MONTHS[m[1]])}-${pad2(m[2])}`;
+    return null;
+  }
+  function googleRange(line) {
+    const parts = String(line || '').replace(/^"|"$/g, '').split(/\s+[-–]\s+/);
+    if (parts.length !== 2) return null;
+    const start = googleDate(parts[0]), end = googleDate(parts[1]);
+    return start && end ? { start, end } : null;
+  }
+  // Google sayiyi arayuz diliyle yazar: "1,234.56" ya da "1.234,56"; bos hucre "--".
+  // Tek ayirac ve ardindan tam 3 rakamli gruplar binliktir; aksi ondalik.
+  function googleNumber(value) {
+    let raw = String(value ?? '').trim().replace(/[^\d.,-]/g, '');
+    if (raw === '' || raw === '-' || /^-+$/.test(raw)) return null;
+    const lastDot = raw.lastIndexOf('.'), lastComma = raw.lastIndexOf(',');
+    if (lastDot >= 0 && lastComma >= 0) {
+      const dec = lastDot > lastComma ? '.' : ',';
+      raw = raw.split(dec === '.' ? ',' : '.').join('').replace(dec, '.');
+    } else if (lastDot >= 0 || lastComma >= 0) {
+      const sep = lastDot >= 0 ? '.' : ',';
+      raw = new RegExp(`^-?\\d{1,3}(\\${sep}\\d{3})+$`).test(raw) ? raw.split(sep).join('') : raw.replace(sep, '.');
+    }
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : NaN;
+  }
+  // TikTok Reklam Yoneticisi kampanya raporu (Kampanyalar → Dışa aktar ya da Analiz → Özel rapor,
+  // CSV). Resmi yardim sayfalari disa aktarim sutunlarini birebir listelemiyor; bu yuzden
+  // arayuzde gorulen Ingilizce ve Turkce adlarin hepsi kabul edilir ("Cost"/"Spend",
+  // "Clicks (destination)"/"Clicks"). Tarih: "Date"/"By Day" sutunu, ust satirdaki aralik ya da
+  // dosya adindaki "2026-10-01 to 2026-10-31". Sonuc "Results"/"Conversions" (OTHER).
+  const TIKTOK_COLUMNS = {
+    campaign: ['Campaign name', 'Campaign Name', 'Kampanya adı', 'Kampanya Adı'],
+    day: ['Date', 'By Day', 'Day', 'Stat time', 'Tarih', 'Gün'],
+    cost: ['Cost', 'Spend', 'Total cost', 'Maliyet', 'Harcama', 'Toplam maliyet'],
+    impressions: ['Impressions', 'Gösterimler', 'Gösterim'],
+    clicks: ['Clicks (destination)', 'Clicks (Destination)', 'Clicks', 'Clicks (all)', 'Tıklamalar (hedef)', 'Tıklama (hedef)', 'Tıklamalar', 'Tıklama'],
+    conversions: ['Results', 'Conversions', 'Sonuçlar', 'Dönüşümler'],
+    calls: [],
+    currency: ['Currency', 'Para birimi', 'Para birimi kodu']
+  };
+  const REPORTS = {
+    GOOGLE: { platform: 'GOOGLE', columns: null, name: 'Google Ads', headerHelp: 'Google Ads dosyasında "Kampanya" ve "Maliyet" sütunları bulunamadı. Google Ads → Kampanyalar → İndir → CSV ile indirin.',
+      periodHelp: 'Dosyada tarih aralığı yok. Google Ads\'te raporu tarih aralığı seçili olarak indirin ya da "Gün" sütununu ekleyin.', resultLabel: 'Dönüşüm' },
+    TIKTOK: { platform: 'TIKTOK', columns: null, name: 'TikTok', headerHelp: 'TikTok dosyasında "Kampanya adı" ve "Maliyet" sütunları bulunamadı. TikTok Reklam Yöneticisi → Kampanyalar → Dışa aktar → CSV ile indirin.',
+      periodHelp: 'Dosyada tarih bulunamadı. TikTok\'ta raporu "Gün" kırılımıyla indirin ya da dosya adını değiştirmeden yükleyin (tarih aralığı adında yazar).', resultLabel: 'Sonuç' }
+  };
+  // Dosya adindaki aralik: "Campaign Report(2026-10-01 to 2026-10-31).csv", "..._20261001-20261031.csv"
+  function fileNameRange(name) {
+    const text = String(name || '');
+    let m = /(\d{4}-\d{2}-\d{2})\s*(?:to|-|~|_|–)\s*(\d{4}-\d{2}-\d{2})/i.exec(text);
+    if (m) return { start: m[1], end: m[2] };
+    m = /(\d{4})(\d{2})(\d{2})\s*[-_~]\s*(\d{4})(\d{2})(\d{2})/.exec(text);
+    return m ? { start: `${m[1]}-${m[2]}-${m[3]}`, end: `${m[4]}-${m[5]}-${m[6]}` } : null;
+  }
+  function parseGoogleCsv(text) { return parseTableReport(text, REPORTS.GOOGLE, GOOGLE_COLUMNS); }
+  function parseTikTokCsv(text, fileName) { return parseTableReport(text, REPORTS.TIKTOK, TIKTOK_COLUMNS, fileName); }
+  function parseTableReport(text, cfg, COLUMNS, fileName) {
+    const errors = [], warnings = [];
+    const lines = String(text || '').replace(/^\uFEFF/, '').split(/\r?\n/);
+    const keysOf = line => finance().parseCSV(line).headers.map(headerKey);
+    const has = (keys, names) => names.some(name => keys.includes(headerKey(name)));
+    const headerIndex = lines.slice(0, 8).findIndex(line => { const keys = keysOf(line); return has(keys, COLUMNS.campaign) && has(keys, COLUMNS.cost); });
+    if (headerIndex < 0) return { rows: [], errors: [{ line: 1, code: 'INVALID_HEADER', text: cfg.headerHelp }], warnings };
+    const range = lines.slice(0, headerIndex).map(googleRange).find(Boolean) || fileNameRange(fileName) || null;
+    const parsed = finance().parseCSV(lines.slice(headerIndex).join('\n'));
+    const byKey = new Map(parsed.headers.map(header => [headerKey(header), header]));
+    const col = field => { const hit = COLUMNS[field].map(headerKey).find(key => byKey.has(key)); return hit ? byKey.get(hit) : null; };
+    const columns = Object.fromEntries(Object.keys(COLUMNS).map(field => [field, col(field)]));
+    if (!columns.day && !range) return { rows: [], errors: [{ line: 1, code: 'PERIOD_MISSING', text: cfg.periodHelp }], warnings };
+    const merged = new Map(), order = [];
+    let currencies = new Set(), skipped = 0;
+    parsed.rows.forEach((raw, index) => {
+      const line = headerIndex + index + 2;
+      const campaignName = String(raw[columns.campaign] || '').trim();
+      const firstCell = String(Object.values(raw)[0] || '').trim();
+      if (!campaignName || campaignName === '--' || /^(toplam|total)\b/i.test(campaignName) || /^(toplam|total)\b/i.test(firstCell)) { skipped++; return; }
+      if (columns.currency && raw[columns.currency]) currencies.add(String(raw[columns.currency]).trim().toUpperCase());
+      const day = columns.day ? googleDate(raw[columns.day]) : null;
+      const periodStart = day || (range && range.start), periodEnd = day || (range && range.end);
+      const calls = columns.calls ? googleNumber(raw[columns.calls]) : null;
+      const conversions = columns.conversions ? googleNumber(raw[columns.conversions]) : null;
+      const isCall = !!columns.calls;
+      const row = {
+        campaignId: null, campaignName, platform: cfg.platform, periodStart, periodEnd,
+        resultType: isCall ? 'CALL' : 'OTHER', resultMetric: isCall ? 'phone_calls' : (columns.conversions ? 'conversions' : null),
+        resultLabel: isCall ? 'Arama' : (columns.conversions ? cfg.resultLabel : null),
+        spend: googleNumber(raw[columns.cost]), impressions: columns.impressions ? googleNumber(raw[columns.impressions]) : null,
+        reach: null, clicks: columns.clicks ? googleNumber(raw[columns.clicks]) : null,
+        results: isCall ? calls : conversions, messages: null, calls: isCall ? calls : null,
+        dailyBudget: null, delivery: null, source: 'CSV', line
+      };
+      if (!validatePeriod(periodStart, periodEnd, line, errors)) return;
+      ['spend', 'impressions', 'clicks'].forEach(key => {
+        if (row[key] !== null && (!Number.isFinite(row[key]) || row[key] < 0)) errors.push({ line, code: 'INVALID_NUMBER', text: `${campaignName}: ${key} negatif ya da okunamadı.` });
+      });
+      const key = `${campaignName}|${periodStart}|${periodEnd}`;
+      const previous = merged.get(key);
+      if (!previous) { merged.set(key, row); order.push(key); return; }
+      ['spend', 'impressions', 'clicks', 'results', 'calls'].forEach(field => { previous[field] = addMeasured(previous[field], row[field]); });
+    });
+    const foreign = [...currencies].filter(code => code !== 'TRY');
+    if (foreign.length) return { rows: [], errors: [{ line: 1, code: 'CURRENCY_NOT_TRY', text: `Maliyet ${foreign.join(', ')} cinsinden. Lexbnb reklam giderini TL olarak deftere yazar; ${cfg.name} hesabının para birimi TRY olmalı.` }], warnings };
+    if (!columns.currency) warnings.push({ code: 'CURRENCY_ASSUMED', text: 'Dosyada para birimi sütunu yok; maliyet TL kabul edildi. Hesabınız TL değilse kaydetmeyin.' });
+    if (skipped) warnings.push({ code: 'TOTAL_ROWS_SKIPPED', text: `Toplam ve boş ${skipped} satır atlandı.` });
+    if (cfg.platform === 'GOOGLE' && !columns.calls) warnings.push({ code: 'GOOGLE_NO_CALLS', text: columns.conversions ? 'Telefon araması sütunu yok; sonuç olarak dönüşümler alındı.' : 'Arama ve dönüşüm sütunu yok; sonuç ölçülmedi.' });
+    if (cfg.platform !== 'GOOGLE' && !columns.conversions) warnings.push({ code: 'RESULTS_COLUMN_MISSING', text: 'Sonuç sütunu yok; sonuç ölçülmedi sayıldı.' });
+    return { rows: order.map(key => merged.get(key)), errors, warnings };
+  }
+  // Dosyanin hangi platformdan geldigi basliktan anlasilir; kullaniciya sorulmaz.
+  function detectPlatform(text) {
+    const head = String(text || '').replace(/^\uFEFF/, '').split(/\r?\n/).slice(0, 8);
+    const keys = head.map(line => finance().parseCSV(line).headers.map(headerKey));
+    if (keys.some(k => k.some(key => SPEND_HEADER.test(key)))) return 'META';
+    const any = (k, names) => names.map(headerKey).some(c => k.includes(c));
+    if (keys.some(k => any(k, TIKTOK_COLUMNS.campaign) && any(k, TIKTOK_COLUMNS.cost))) return 'TIKTOK';
+    if (keys.some(k => any(k, GOOGLE_COLUMNS.campaign) && any(k, GOOGLE_COLUMNS.cost))) return 'GOOGLE';
+    return null;
   }
   const normalize = value => String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('tr-TR').replace(/[^a-z0-9]+/g, ' ').trim();
   function matchCampaigns(rows, campaigns) {
@@ -360,5 +507,5 @@
     };
   }
 
-  return { FORMAT_SPEC, META_COLUMNS, NEW_CAMPAIGN, parsePasted, parseCsv, matchCampaigns, compactDaily, planImport, resultType, resultLabel };
+  return { FORMAT_SPEC, META_COLUMNS, GOOGLE_COLUMNS, TIKTOK_COLUMNS, fileNameRange, NEW_CAMPAIGN, parsePasted, parseCsv, detectPlatform, matchCampaigns, compactDaily, planImport, resultType, resultLabel };
 });
