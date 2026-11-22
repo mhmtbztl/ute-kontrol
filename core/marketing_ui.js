@@ -933,6 +933,51 @@
     return `${escapeHtml(label)}: reklama <strong>${money(model.totalSpend)}</strong> harcadınız${results.length ? `, ${results.join(' ve ')} geldi` : ''}.`;
   }
 
+  // Fox seridi: 4 rakam, anlam rengiyle (harcama kirmizi, sonuc mavi, sonuc basi turuncu,
+  // talep mor). Olculmeyen rakam "—" ve nedeni; kucuk egri yalniz gunluk kirilim varsa
+  // (adsDailyValues: yayilmis/uydurma egri yok).
+  function marketingFoxStripHtml(model) {
+    const analysis = model.analysis;
+    if (!analysis || !analysis.periodCount) return '';
+    const G = services.AdsMetricGlossary;
+    const f = (key, value) => (value === null || value === undefined ? '—' : G.format(key, value));
+    const kart = (renk, etiket, key, value, not) => {
+      const ch = analysis.changes && analysis.changes[key];
+      return `<article class="fox-card fox-card--${renk} mk-fox"><p class="mk-fox__label">${escapeHtml(etiket)}</p><div class="mk-fox__row"><p class="mk-fox__value">${escapeHtml(f(key, value))}</p>${value === null || value === undefined ? '' : adsSparkHtml(adsDailyValues(key, analysis))}</div>${adsDeltaHtml(ch)}${not ? `<p class="mk-fox__note">${escapeHtml(not)}</p>` : ''}</article>`;
+    };
+    const mt = analysis.metrics || {};
+    const karisik = (analysis.notes || []).includes('RESULT_TYPES_MIXED');
+    const var_ = v => v !== null && v !== undefined;
+    // Farkli sonuc turleri toplanmaz: karisikta mesaj ve arama ayri kartta, kendi birim maliyetiyle.
+    const sonucKartlari = karisik
+      ? [var_(mt.messages) ? kart('revenue', 'Mesaj', 'messages', mt.messages, var_(mt.costPerMessage) ? `Mesaj başı ${f('costPerMessage', mt.costPerMessage)}` : '') : '',
+         var_(mt.calls) ? kart('capex', 'Arama', 'calls', mt.calls, var_(mt.costPerCall) ? `Arama başı ${f('costPerCall', mt.costPerCall)}` : '') : ''].join('')
+      : kart('revenue', 'Sonuç', 'results', mt.results, 'Mesaj, arama ya da dönüşüm') + kart('capex', 'Sonuç başına', 'costPerResult', mt.costPerResult, '');
+    // Talep yalniz olculuyorsa (kaynagi reklam olan talep varsa) gorunur; bos kart gurultudur.
+    const talep = var_(mt.leads) ? kart('info', 'Talep (Lexbnb)', 'leads', mt.leads, 'Reklamdan gelen talep') : '';
+    return `<div class="mk-fox-grid" role="group" aria-label="Reklam özeti">`
+      + kart('expense', 'Harcama', 'spend', mt.spend, 'Finans\'a gider olarak yazılır')
+      + sonucKartlari + talep
+      + '</div>';
+  }
+
+  // Kampanya basina harcama cubugu (Analiz dili): en cok harcayan 6 kampanya. Sonucu olan
+  // kampanyada sonuc sayisi yaninda yazar; tutar Finans'taki gider kaydiyla aynidir.
+  function marketingSpendChartHtml(model) {
+    const rows = (model.metrics || []).filter(r => Number(r.spend) > 0).sort((a, b) => b.spend - a.spend);
+    if (rows.length < 2) return '';
+    const ilk = rows.slice(0, 6);
+    const max = Math.max(...ilk.map(r => Number(r.spend)));
+    const satir = r => {
+      const isCall = r.resultType === 'CALL';
+      const sonuc = r.resultType === 'OTHER' ? null : (isCall ? r.calls : r.messages);
+      const yuzde = Math.max(2, Math.round((Number(r.spend) / max) * 100));
+      return `<li class="mk-bar"><span class="mk-bar__name">${escapeHtml(r.campaignName)}</span><span class="mk-bar__track"><span class="mk-bar__fill" style="width:${yuzde}%"></span></span><span class="mk-bar__val">${money(r.spend)}${sonuc === null || sonuc === undefined ? '' : ` · ${number(sonuc)} ${isCall ? 'arama' : 'mesaj'}`}</span></li>`;
+    };
+    const kalan = rows.length - ilk.length;
+    return `<figure class="mk-chart"><figcaption class="mk-chart__title">Kampanyaya göre harcama</figcaption><ol class="mk-bars">${ilk.map(satir).join('')}</ol>${kalan > 0 ? `<p class="mk-fox__note">+${kalan} kampanya daha: Ayrıntılı tablo</p>` : ''}</figure>`;
+  }
+
   function renderMarketingHome(model) {
     const rows = adsHomeRows(model);
     // Kayit yokken yalniz kampanya/hedef baglantisi (hedef once girilebilir); tablo ve kayitlar bos olurdu.
@@ -943,7 +988,9 @@
     return `<p class="lex-summary" id="marketingSummary">${adsHomeSummary(model)}</p>${savedNoteHtml}
       <section class="mk-section" aria-labelledby="mkAdsTitle">
         <div class="mk-section-head"><h2 class="lex-subtitle" id="mkAdsTitle">Reklamlarınız</h2>${model.canManage ? '<button type="button" class="lex-btn" data-ads-view="import">Reklam raporu yükle</button>' : ''}</div>
-        <p class="lex-note">Instagram, Facebook ve Google reklamlarına ne harcadığınız ve karşılığında kaç mesaj geldiği. Rakamlar reklam panelinden indirdiğiniz rapordan gelir; harcama Finans'a gider olarak yazılır.</p>
+        <p class="lex-note">Instagram, Facebook, Google ve TikTok reklamlarına ne harcadığınız ve karşılığında kaç mesaj geldiği. Rakamlar reklam panelinden indirdiğiniz rapordan gelir; harcama Finans'a gider olarak yazılır.</p>
+        ${marketingFoxStripHtml(model)}
+        ${marketingSpendChartHtml(model)}
         <table class="lex-table"><caption class="sr-only">Reklamlarınız</caption><thead><tr><th scope="col">Kampanya</th><th scope="col">Harcama → sonuç</th><th scope="col">Talimat</th></tr></thead><tbody>${rows || '<tr class="lex-table__empty"><td colspan="3">Bu dönemde reklam yok. Reklam vermiyorsanız bu bölümü geçebilirsiniz.</td></tr>'}</tbody></table>
         <div class="mk-links">${links}</div>
       </section>
