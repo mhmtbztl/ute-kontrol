@@ -145,7 +145,7 @@ async function test(name, fn) {
     assert.match(app, /async function submitQuickLead\(/);
     assert.match(actions, /'submitQuickLead'/);
     assert.match(html, /id="leadInterestToday"/);
-    assert.match(html, /data-onclick="addLeadSource\(\)"/);
+    assert.doesNotMatch(html, /data-onclick="addLeadSource\(\)"/); // kaynak Ayarlar → Talep kaynakları (sadelik 3. tur)
     assert.match(html, /id="leadAssignedTo"/);
     assert.match(html, /id="leadNextFollowUp"/);
     assert.match(html, /id="leadMessageTemplate"/);

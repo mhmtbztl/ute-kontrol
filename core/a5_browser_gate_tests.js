@@ -14,5 +14,4 @@ for (const role of ['owner', 'sales', 'staff', 'viewer']) assert(script.includes
 assert(script.includes("page.on('pageerror'") && script.includes("message.type() === 'error'"), 'Konsol ve çalışma zamanı hataları kapıyı kırmalı');
 assert(script.includes('document.documentElement.scrollWidth'), 'Yatay taşma ölçümü eksik');
 assert(app.includes("['localhost', '127.0.0.1'].includes(window.location.hostname)") && app.includes("get('ci-browser') === '1'"), 'Fixture yalnız yerel sunucuda ve açık bayrakla çalışmalı');
-assert(/async function refreshExecutiveDashboardSnapshot[\s\S]*?if \(isBrowserQualityFixture\(\)\)/.test(app), 'Yerel tarayıcı fixture dış ağa anlık görüntü isteği atmamalı');
 console.log('[PASS] A5-G6/G7 sekiz akış, dört rol ve CI tarayıcı kalite kapısı sözleşmesi');

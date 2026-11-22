@@ -12,21 +12,19 @@ function test(name, fn) {
   catch (error) { failed++; console.error(`[FAIL] ${name}\n       ${error.stack || error.message}`); }
 }
 
-test('Finans hedef ilerlemesi üst hedef kartındadır; ayrı hedef analizi bölümü yoktur', () => {
-  assert.doesNotMatch(html, /CİRO HEDEFİ ANALİZİ/);
-  assert.match(html, /id="finTargetRevenue"[\s\S]{0,1200}id="targetBarFill"/);
+// Sadelik (21.11.2026): Finans her rakami bir kez gosterir. Hedef ciro karti,
+// kar koprusu, donem ozeti, aylik gelisim (Analiz'de) ve kart gorunumu kalkti.
+test('Finans kopya bölümleri yok: hedef kartı, kâr köprüsü, dönem özeti, aylık gelişim, kart görünümü', () => {
+  ['finTargetRevenue', 'targetBarFill', 'brCiro', 'periodSummaryContent', 'financeMonthlyDisclosure',
+    'monthlyKpiTableBody', 'propCardsContainer', 'propViewCardsBtn', 'stepperCurrentLabel', 'ledgerExportMenu']
+    .forEach(id => assert.doesNotMatch(html, new RegExp(`id="${id}"`), id));
+  assert.doesNotMatch(html, /AI FİNANS ANALİSTİ|Stratejik durum/i);
 });
 
-test('Giderler ve aylık gelişim iki açılır bölümde sadeleşir', () => {
+test('Gelirler, giderler ve mülk tablosu duruyor; giderler açılır bölümde', () => {
   assert.match(html, /<details[^>]+id="financeExpensesDisclosure"/);
-  assert.match(html, /<details[^>]+id="financeMonthlyDisclosure"/);
-  assert.doesNotMatch(html, /MÜLK KARŞILAŞTIRMA VE STRATEJİK ANOMALİ TESPİTİ/);
-});
-
-test('Dönem özeti kendini AI diye tanıtmaz ve kural bazlı olduğunu söyler', () => {
-  assert.doesNotMatch(html, /AI FİNANS ANALİSTİ/i);
-  assert.match(html, /DÖNEM ÖZETİ/);
-  assert.match(html, /Kural bazlı/);
+  assert.match(html, /<details[^>]+id="financeIncomeDisclosure"/);
+  assert.match(html, /id="propExecTableBody"/);
 });
 
 test('Önceki ay gider kopyaları seçili aya taşınır ve kaynak ayı notta korunur', () => {
@@ -59,16 +57,6 @@ test('Gider kopyalama tek atomik çoklu yazı kullanır', () => {
   assert.doesNotMatch(source.match(/async function confirmCopyPreviousExpenses[\s\S]*?\n}/)?.[0] || '', /for\s*\([^)]*copies[^)]*\)[\s\S]*createExpense/);
 });
 
-test('Dönem özeti otomatik komisyon ve temizliği içeren ortak kategori toplamından en büyük gideri seçer', () => {
-  assert.strictEqual(typeof App.getTopExpenseCategory, 'function');
-  assert.deepStrictEqual(App.getTopExpenseCategory({ Elektrik: 950, Temizlik: 3000, 'Kredi Kartı / Komisyon': 4500 }), ['Kredi Kartı / Komisyon', 4500]);
-});
-
-test('Aylık gelişim gelecek boş ayları gizler ve geçen yıl cirosunu tek sütunda taşır', () => {
-  assert.match(source, /previousYearCiro/);
-  assert.match(source, /d\.key <= currentMonthKey/);
-  assert.match(html, /Geçen yıl cirosu/);
-});
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed) process.exit(1);

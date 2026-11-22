@@ -42,22 +42,29 @@ try {
   const etiket = t => (kalemler.find(k => k.tab === t) || {}).etiket || '';
   check(/Bugün$/.test(etiket('executive')), 'A3. Ana sayfanın adı "Bugün"', etiket('executive'));
   check(/Misafirler ve Satış$/.test(etiket('leads')), 'A4. Satış kalemi "Misafirler ve Satış"', etiket('leads'));
-  check(/Kanallar ve Pazarlama$/.test(etiket('marketing')), 'A5. Pazarlama kalemi "Kanallar ve Pazarlama"', etiket('marketing'));
+  // Kanallar gorunumu kalkti (sadelik 21.11.2026): kanal dagilimi Analiz'de.
+  check(etiket('marketing') === 'Pazarlama', 'A5. Pazarlama kalemi "Pazarlama"', etiket('marketing'));
+  check(kalemler.every(k => !/[\u{1F300}-\u{1FAFF}☀-➿]|\(/u.test(k.etiket)),
+    'A5b. Menüde simge ve sayaç yok (Lex)', kalemler.map(k => k.etiket).join(' | '));
   check(!/switchTab\('(reports|analysis|guests)'\)/.test(nav),
     'A6. Raporlar, Analiz Merkezi ve ayrı Misafirler menüde yok', nav.match(/switchTab\('(reports|analysis|guests)'\)/g));
 
   // --- B. Tasinan yuzeyler ---------------------------------------------------
-  check(/id="askChatGptBtn"[^>]*data-onclick="openChatGptQuestionModal\(\)"/.test(INDEX),
-    'B1. Üst çubukta "ChatGPT\'ye sor" düğmesi ortak soru penceresini açar', 'askChatGptBtn ortak pencereye bağlı değil');
+  const hesap = (INDEX.match(/id="userProfileMenu"[\s\S]*?logoutSaaSUser/) || [''])[0];
+  check(/id="askChatGptBtn"[^>]*data-onclick="openChatGptQuestionModal\(\);/.test(hesap) && /data-theme-toggle/.test(hesap) && /openImportModal\(\)/.test(hesap),
+    'B1. ChatGPT, Gece/Gündüz ve Veri/Yardım hesap menüsünde (üst çubuk 3 öğe)', 'hesap menüsünde eksik');
+  const ustCubuk = (INDEX.match(/<div class="header-actions">([\s\S]*?)<\/header>/) || ['', ''])[1];
+  check(!/id="toolsBtn"/.test(ustCubuk) && !/class="btn btn-secondary header-chatgpt-btn"/.test(ustCubuk) && !/class="btn btn-secondary lex-theme-btn"/.test(ustCubuk),
+    'B1b. Üst çubukta ayrı ChatGPT, Gece/Gündüz ve "Veri ve yardım" düğmesi yok', 'fazla düğme duruyor');
   const finansBas = INDEX.indexOf('id="tab-finance"');
   const finansSon = INDEX.indexOf('class="tab-content', finansBas + 20);
   const finans = finansBas >= 0 ? INDEX.slice(finansBas, finansSon > 0 ? finansSon : undefined) : '';
-  check(/id="ledgerExportMenu"/.test(finans), 'B2. Defter dışa aktarımı Finans sayfasında', 'Finans içinde ledgerExportMenu yok');
-  check((INDEX.match(/id="ledgerExportMenu"/g) || []).length === 1, 'B3. Dışa aktarım menüsü tek (id benzersiz)',
-    `${(INDEX.match(/id="ledgerExportMenu"/g) || []).length} adet`);
+  // Defter disa aktarimi tek yerde: ust cubuktaki Veri menusu (Finans'taki kopya kalkti).
+  check(!/id="ledgerExportMenu"/.test(finans) && (INDEX.match(/exportLedger\('BOOKINGS','xlsx'\)/g) || []).length === 1,
+    'B2. Defter dışa aktarımı tek yerde (Veri menüsü)', `finans=${/ledgerExportMenu/.test(finans)}`);
   check((INDEX.match(/data-onclick="openImportModal\(\)/g) || []).length === 1,
     'B4. "İçe aktar" iki menüde tekrar etmiyor', `${(INDEX.match(/data-onclick="openImportModal\(\)/g) || []).length} adet`);
-  const araclar = (INDEX.match(/id="toolsMenu">([\s\S]*?)<!-- Dropdown 3/) || ['', ''])[1];
+  const araclar = hesap;
   check(!/switchTab\('housekeeping'\)/.test(araclar), 'B5. Araçlar menüsünde temizlik defteri kısayolu yok (Operasyon\'da)',
     'Araçlar hâlâ housekeeping açıyor');
 

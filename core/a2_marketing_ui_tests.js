@@ -10,42 +10,30 @@ const marketingSource = fs.readFileSync(path.join(__dirname, 'marketing_ui.js'),
 let passed = 0, failed = 0;
 function test(name, fn) { try { fn(); passed++; console.log(`[PASS] ${name}`); } catch (e) { failed++; console.error(`[FAIL] ${name}\n       ${e.stack || e.message}`); } }
 
-test('Kanallar ve Pazarlama A4 reklam çalışma alanıyla üç canlı alt sekme gösterir', () => {
-  assert.match(html, /data-marketing-view="economics"[^>]*>[^<]*Kanallar/);
-  assert.match(html, /data-marketing-view="funnel"[^>]*>[^<]*Airbnb İlan Performansı/);
-  assert.match(html, /data-marketing-view="ads"[^>]*>[^<]*Reklamlar/);
+// Sadelik (21.11.2026): "Kanallar" gorunumu kalkti; kanal cirosu Analiz'de
+// (Kanal dagilimi), net kar Finans'ta. Pazarlama iki sekme: Reklamlar, Airbnb.
+test('Pazarlama iki canlı alt sekme gösterir: Reklamlar ve Airbnb ilan performansı', () => {
+  assert.doesNotMatch(html, /data-marketing-view="economics"/);
+  // Sadelik (21.11.2026): tek sayfa, sekme yok.
+  assert.doesNotMatch(html, /data-marketing-view=/);
+  assert.match(html, /id="tab-marketing" class="tab-content lex-screen"/);
 });
 
-test('Kanal ekonomisi karar sütunlarını ve net payı gösterir', () => {
-  const model = MarketingUI.buildWorkspaceModel({
-    filter: { period: '2026-09', villa: 'ALL' },
-    bookings: [{ id: 'b1', channel: 'AIRBNB', checkIn: '2026-09-01', checkOut: '2026-09-03', grossAmount: 22000, cleaningFee: 2000, otaCommission: 3000, status: 'CONFIRMED' }]
-  });
-  const output = MarketingUI.renderWorkspaceHtml(model, 'economics');
-  assert.match(output, /Konaklama cirosu/);
-  assert.match(output, /Size kalan net/);
-  assert.match(output, /Pay/);
-  assert.doesNotMatch(output, /Brüt toplam/);
-  assert.match(output, /Size kalan net \(komisyon sonrası\)/);
-  assert.doesNotMatch(output, />Net oda geliri</);
+test('Ayrıntılı reklam araçları ayrı sayfa; ana sayfaya geri dönülür', () => {
+  const model = MarketingUI.buildWorkspaceModel({ filter: { period: '2026-09', villa: 'ALL' }, bookings: [] });
+  const detail = MarketingUI.renderWorkspaceHtml(model, 'ads');
+  assert.match(detail, /data-marketing-home/);
+  assert.doesNotMatch(detail, /ads-subnav/);
+  assert.match(MarketingUI.renderWorkspaceHtml(model, 'home'), /data-ads-view="import"/);
 });
 
 test('Airbnb workspace replaces the generic funnel without mixing Booking data', () => {
   const model = MarketingUI.buildWorkspaceModel({ filter: { period: 'ALL', villa: 'ALL' }, bookings: [], listings: [{ id: 'l1', channel_code: 'BOOKING_COM' }] });
-  const output = MarketingUI.renderWorkspaceHtml(model, 'funnel');
-  assert.match(output, /Airbnb İlan Performansı/i);
+  const output = MarketingUI.renderWorkspaceHtml(model, 'home');
+  assert.match(output, /Airbnb ilanınız/i);
   assert.doesNotMatch(output, /Booking\.com Extranet/i);
 });
 
-test('Değişiklik ölçümü olası etki diye sunulur ve veri/karıştırıcı uyarılarını taşır', () => {
-  const output = MarketingUI.renderExperiments([
-    { id: 'e1', change_date: '2026-09-01', primary_metric: 'CTR', verdict: 'INSUFFICIENT_DATA', confounders: ['PRICE_CHANGE'] }
-  ], null);
-  assert.match(output, /gerçek A\/B değil/i);
-  assert.match(output, /olası etki/i);
-  assert.match(output, /karar için yetersiz/i);
-  assert.match(output, /fiyat|sezon/i);
-});
 
 test('Galeri ve eski Raporlar yüzeyi geri gelmeyecek şekilde kaldırılır', () => {
   assert.doesNotMatch(marketingSource, /function renderGallery/);
@@ -54,10 +42,8 @@ test('Galeri ve eski Raporlar yüzeyi geri gelmeyecek şekilde kaldırılır', (
   assert.doesNotMatch(appSource, /function renderReportsTab/);
 });
 
-test('Huni sayfası FUNNEL_TEST_QUESTION eylemini sayfa çubuğuna kaydeder', () => {
-  assert.match(appSource, /registerPageAction\(['"]marketing['"][\s\S]{0,500}FUNNEL_TEST_QUESTION/);
-  assert.match(appSource, /function openFunnelTestQuestion\(\)/);
-  assert.doesNotMatch(appSource, /title:\s*['"]FUNNEL_TEST_QUESTION/);
+test('Sayfa çubuğunda eski kapak testi ve ikinci ChatGPT düğmesi yok (sadelik 21.11.2026)', () => {
+  assert.doesNotMatch(appSource, /FUNNEL_TEST_QUESTION|id: 'page-chatgpt'/);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

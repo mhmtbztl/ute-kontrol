@@ -36,7 +36,7 @@ const executablePath = [process.env.CHROME_PATH, process.env.PROGRAMFILES && pat
         window.remount=(canManage=true,fail=false)=>AirbnbPerformanceUI.mount(document.getElementById('test-root'),{model,client:fail?{from(){throw {code:'42P01'};}}:client,tenantId:tenant,canManage});
         window.remount();
       });
-      await page.getByRole('button',{name:'＋ Veri ekle',exact:true}).click();
+      await page.locator('.ab-actions [data-ab-action="new"]').click();
       const form = page.locator('[data-ab-form="record"]');
       assert.deepEqual(await form.locator('[name=listingId] option').allTextContents(), ['Zirve <img src=x> · Zirve Airbnb', 'Villa Seyir · Seyir Airbnb']);
       await form.locator('[name=start]').fill('2026-10-04');
@@ -44,10 +44,9 @@ const executablePath = [process.env.CHROME_PATH, process.env.PROGRAMFILES && pat
       await form.locator('[name=views]').fill('436');
       await form.locator('[name=favorites]').fill('30');
       await form.locator('[name=bookingConversion]').fill('0,16');
-      await form.getByRole('button',{name:'Önizle',exact:true}).click();
-      assert(await page.getByText('Kaydetmeden önce kontrol et',{exact:true}).isVisible());
-      assert.equal(await page.evaluate(()=>window.fixture.calls.length),0);
-      await page.getByRole('button',{name:'Onayla ve kaydet',exact:true}).click();
+      // Yeni donem tek adimda kaydedilir (onizleme yalniz var olan donemi degistirirken).
+      assert(await form.locator('details.ab-more [name=impressions]').count() === 1, 'Ikincil rakamlar katli bolumde');
+      await form.getByRole('button',{name:'Kaydet',exact:true}).click();
       await page.getByText('Dönem verisi kaydedildi.',{exact:true}).waitFor();
       assert(await page.getByText('43 artmış',{exact:true}).first().isVisible());
       assert.equal(await page.evaluate(()=>window.fixture.calls[0].args.p_metrics.bookingConversion),0.16);
@@ -57,13 +56,14 @@ const executablePath = [process.env.CHROME_PATH, process.env.PROGRAMFILES && pat
       await page.getByText('Kayıt geçmişi (2)',{exact:true}).click();
       await page.getByRole('button',{name:'Düzelt',exact:true}).first().click();
       await page.locator('[data-ab-form="record"] [name=views]').fill('440');
-      await page.getByRole('button',{name:'Önizle',exact:true}).click();
+      await page.getByRole('button',{name:'Kaydet',exact:true}).click();
+      assert(await page.getByText('Bu dönemin kaydı var — değiştirilsin mi?',{exact:true}).isVisible());
       assert(await page.getByText('Bu dönemin kaydı güncellenecek.',{exact:false}).isVisible());
       await page.getByRole('button',{name:'Onayla ve kaydet',exact:true}).click();
       await page.getByText('Dönem verisi kaydedildi.',{exact:true}).waitFor();
       assert.equal(await page.evaluate(()=>window.fixture.db.airbnb_performance_records.length),3);
-      await page.getByRole('button',{name:'Değişiklik takibi',exact:true}).click();
-      await page.getByRole('button',{name:'＋ Değişiklik ekle',exact:true}).click();
+      await page.getByRole('button',{name:'Değişiklik notları',exact:true}).click();
+      await page.getByRole('button',{name:'Not ekle',exact:true}).click();
       await page.locator('[name=date]').fill('2026-11-05');
       await page.locator('[name=kind]').selectOption('TITLE');
       await page.locator('[name=notes]').fill('Başlığı değiştirdim');
@@ -74,11 +74,11 @@ const executablePath = [process.env.CHROME_PATH, process.env.PROGRAMFILES && pat
       await page.screenshot({path:path.join(screenshotDir,`airbnb-preview-${width}.png`),fullPage:true});
       // Replace root so the test mimics the application's remount lifecycle.
       await page.evaluate(()=>{document.getElementById('test-root').outerHTML='<main id="test-root"></main>';window.remount(false);});
-      await page.getByText('Airbnb İlan Performansı',{exact:true}).waitFor();
-      assert.equal(await page.getByRole('button',{name:'＋ Veri ekle',exact:true}).count(),0);
+      await page.getByText('Airbnb’de ilanınızı kaç kişinin açtığı',{exact:false}).waitFor();
+      assert.equal(await page.getByRole('button',{name:'Rakamları gir',exact:true}).count(),0);
       await page.evaluate(()=>{document.getElementById('test-root').outerHTML='<main id="test-root"></main>';window.remount(true,true);});
       await page.getByText('Veritabanı güncellemesi gerekiyor.',{exact:false}).waitFor();
-      assert.equal(await page.getByRole('button',{name:'＋ Veri ekle',exact:true}).count(),0);
+      assert.equal(await page.getByRole('button',{name:'Rakamları gir',exact:true}).count(),0);
       assert.deepEqual(errors,[]);
       console.log(`PASS Airbnb browser ${width}px: preview/save/edit/history/change notes, permissions, schema fallback, XSS and overflow`);
       await page.close();

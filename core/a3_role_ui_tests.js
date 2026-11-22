@@ -41,13 +41,6 @@ try {
   check(/\['owner', 'admin', 'manager', 'sales'\]/.test(guests),
     'A4. Misafir duzenleme kapisi staff yerine sales kullanir', guests.slice(0, 300));
 
-  const context = body('getExecutiveSnapshotContext');
-  check(/canReadLedgerRole\(/.test(context),
-    'B1. Finans anlik goruntusu rol kapisini RPC oncesi denetler', context.slice(0, 400));
-  const refresh = body('refreshExecutiveDashboardSnapshot');
-  check(/if \(!context\.supported\)/.test(refresh) && /getExecutiveDashboardSnapshot/.test(refresh),
-    'B2. Desteklenmeyen rolde refresh RPC yoluna girmeden doner', refresh.slice(0, 500));
-
   const session = body('handleAuthenticatedSession');
   check(/propCount === 0 && canManageTenantRole\(/.test(session),
     'C1. Bos portfoy karsilamasi yalniz tenant yonetebilen role acilir', session.slice(-700));

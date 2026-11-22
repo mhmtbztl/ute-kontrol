@@ -18,7 +18,7 @@ assert.strictEqual(model.adShare.pct, 1);
 // Aşama 3: formlar iç sekmelerde; her sekme ayrı çizilir.
 const html = ['overview', 'import', 'campaigns', 'records'].map(view => UI.renderAds(model, view)).join('');
 assert(html.includes('hangi reklamın rezervasyon getirdiği ölçülemez'));
-assert(html.includes('data-ads-manual-form'));
+assert(html.includes('data-ads-quick-form')); // elle giris kampanya acmadan ayni onizlemeden gecer
 assert(html.includes('data-ads-import-form'));
 assert(html.includes('data-ads-campaign-form'));
 assert(html.includes('data-ads-target-form'));

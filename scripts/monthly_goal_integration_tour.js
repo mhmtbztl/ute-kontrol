@@ -80,20 +80,8 @@ let uid, tid, browser, server;
     assert.strictEqual(await page.textContent('#finActualRevenue'), '19.000 TL');
     assert.strictEqual(await page.textContent('#finTargetRevenue'), '100.000 TL');
     assert.match(await page.textContent('#finTargetStatusBadge'), /19.0/);
-    await tab('executive');
-    await page.evaluate(() => refreshExecutiveDashboardSnapshot(true));
-    assert.strictEqual(await page.textContent('#execKpiRevenue'), '₺19.000');
-    assert.strictEqual(await page.textContent('#execRevVariance'), '%-81 Hedef');
-    assert.strictEqual(await page.textContent('#execProfitVariance'), '%-37 Hedef');
     assert.strictEqual(await page.evaluate(() => getTargetRecordForPeriod('2026-10').id), first[0].id);
-    await page.screenshot({ path: path.join(os.tmpdir(), 'lexbnb-goal97-today.png'), fullPage: false });
-    // The actual UI also distinguishes zero from a missing goal.
-    for (const [value, expected] of [[0, 'Hedef: ₺0'], [null, 'Hedef belirlenmemiş'], [30000, '%-37 Hedef']]) {
-      must(await admin.from('monthly_targets').update({ net_profit_target: value }).eq('id', first[0].id).eq('tenant_id', tid));
-      await page.evaluate(async () => { await resyncTenantData(); await refreshExecutiveDashboardSnapshot(true); });
-      assert.strictEqual(await page.textContent('#execProfitVariance'), expected);
-    }
-    console.log('[PASS] 9.7.1 Finance/Today: same October row, revenue 19000, profit target 30000, variance -37%; zero/missing distinct');
+    console.log('[PASS] 9.7.1 Finance: October row, revenue 19000 against target 100000');
     await tab('pricing');
     await page.locator('#tab-pricing [data-onclick="openGoalsModal()"]').click();
     assert.strictEqual(await page.inputValue('#goalPeriodSelect'), '2026-10');

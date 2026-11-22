@@ -470,14 +470,8 @@ const yazmalar = (istemci, tablo) =>
   });
   const kaynak37 = require('fs').readFileSync(require('path').join(__dirname, '..', 'app.js'), 'utf8');
 
-  await test('L-37 Fiyatlandırma şeridi ADR\'yi tek tanımdan gösterir (net oda geliri / gece)', async () => {
-    ortamKur(L37(), kaydedenIstemci());
-    formKur({});
-    App.setCurrentFilter({ period: '2031-05', villa: 'ALL' });
-    App.renderPricingKpiStrip();
-    // (18.000 + 10.000) / 4 gece = 7.000 — brüt/gece olsaydı 7.500
-    assert.match(global.document.getElementById('pricingAdrVal').innerText, /7\.000/);
-  });
+  // L-37 fiyat seridindeki ADR karti sadelikte kalkti (21.11.2026): ADR Finans
+  // ve Analiz'de, ikisi de computeFilterLedger/computeMonthPerformance'tan.
 
   await test('L-37 İşletmenin tanımladığı özel doğrudan kanal DOĞRUDAN sayılır', async () => {
     const kanallar = L37().bookingChannels;
@@ -508,9 +502,8 @@ const yazmalar = (istemci, tablo) =>
     // Ciro temizlik ucretini (A'da 2.000) icermez.
     yakin(App.computeMonthActuals('2031-05', 'A').ciro, 28000, 'A ciro');
     yakin(App.computeMonthActuals('2031-05').ciro, 33000, 'portföy ciro');
-    // Tablo L-217'den beri computeMonthPerformance(m, secili) uzerinden okur;
-    // o da ayni secili mulkle computeMonthActuals'i cagirir.
-    assert.match(kaynak37, /computeMonthPerformance\(m, secili\)/);
+    // Aylik KPI tablosu sadelikte kalkti (Analiz'de); performans ayni secili
+    // mulkle computeMonthActuals'i cagirir.
     assert.match(kaynak37, /const actuals = computeMonthActuals\(monthKey, secili\)/);
     yakin(App.computeMonthPerformance('2031-05', 'A').ciro, 28000, 'A ciro (performans)');
   });

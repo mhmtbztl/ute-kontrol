@@ -189,10 +189,11 @@ async function operasyonKartiDavranisi() {
   });
   // Kayit/silme yollari yalniz listeyi (renderOperationsTab) ciziyor; kart da
   // ayni cagride guncellenmeli (L-177).
-  global.document.getElementById('opsCombinedContainer');
-  App.renderOperationsTab();
-  const kart = global.document.getElementById('opsDebtVal').innerText;
-  check(/2\.500/.test(kart), 'L-177 Operasyon listesi cizilince Temizlik borcu karti da guncellenir', kart);
+  // Ust kartlar sadelikte kalkti (21.11.2026); borc listenin yanindaki panelde,
+  // ayni cizimde (renderOperationsCleaningView) ayni gorevlerden hesaplanir.
+  const govde = require('fs').readFileSync(require('path').join(__dirname, '..', 'app.js'), 'utf8');
+  const cizim = govde.slice(govde.indexOf('function renderOperationsCleaningView('), govde.indexOf('function renderOperationsTab('));
+  check(/cleanerDebtSummary\(tasks\)/.test(cizim) && /Bekleyen Temizlik Borçları/.test(cizim), 'L-177 Operasyon listesi cizilince temizlik borcu da ayni cizimde guncellenir');
 }
 
 async function kritikEylemKartiDavranisi() {
@@ -206,16 +207,23 @@ async function kritikEylemKartiDavranisi() {
   check(birlesik.title === 'DOĞUŞ: 2 açık iş' && !/Zirve/.test(birlesik.title), 'L-178a Birlesik kart basligi isi adlandirir', birlesik.title);
   check(birlesik.focusId === 'tk-1', 'L-178b Birlesik kart en oncelikli kayda gider', birlesik.focusId);
 
+  // Lex Bugun (21.11.2026): ayni mulkteki isler birlesik kart degil, her biri
+  // ekip gorevleri tablosunda ayri satirdir; satir arizanin kendisine gider.
   sahteDom({});
   const App = require('../app.js');
-  App.renderTodayCommandCenter({ critical: [birlesik], operations: [], revenue: [] });
-  const kart = global.document.getElementById('todayCriticalActionsList').innerHTML;
-  check(/<li>P1 Arıza: beton dökümü<\/li>/.test(kart) && /<li>Arıza: &lt;b&gt;musluk&lt;\/b&gt;<\/li>/.test(kart),
-    'L-178c Birlesik kart isleri tek tek (kacislanmis) listeler', kart);
+  App.setActiveTenant({ id: TENANT, role: 'owner' });
+  App.setAppData({ villas: { DOGUS: { id: 'p1', slug: 'DOGUS', name: 'DOĞUŞ' } }, bookings: [], cleaningTasks: [], operationalPeople: [], maintenance: [],
+    maintenanceTickets: [
+      { id: 'tk-1', property_id: 'p1', title: 'P1 Arıza: beton dökümü', status: 'IN_PROGRESS', severity: 'CRITICAL' },
+      { id: 'tk-2', property_id: 'p1', title: 'Arıza: <b>musluk</b>', status: 'OPEN', severity: 'MEDIUM' }
+    ] });
+  App.renderTodayLex();
+  const kart = global.document.getElementById('todayTaskTable').innerHTML;
+  check(/P1 Arıza: beton dökümü · DOĞUŞ/.test(kart) && kart.includes('Arıza: &lt;b&gt;musluk&lt;/b&gt; · DOĞUŞ'),
+    'L-178c Ayni mulkteki isler tek tek (kacislanmis) satirlarda', kart.slice(0, 600));
   check(!/Durum: Devam Ediyor • Durum: Açık/.test(kart), 'L-178d Celiskili "Durum • Durum" satiri yok');
-  check(/openTabFromDeepLink\(decodeURIComponent\('maintenance'\), decodeURIComponent\('tk-1'\)\)/.test(kart), 'L-178e Incele arizanin kendisine gider');
-  check(global.document.getElementById('criticalActionsCountBadge').innerText === '1', 'L-178f Rozet yalniz is sayisini yazar',
-    global.document.getElementById('criticalActionsCountBadge').innerText);
+  check(/openTeamTask\(decodeURIComponent\(&#39;ticket(?::|%3A)tk-1&#39;\)\)|openTeamTask\(decodeURIComponent\('ticket(?::|%3A)tk-1'\)\)/.test(kart), 'L-178e Satir arizanin kendisine gider', kart.slice(0, 400));
+  check((kart.match(/lex-tag--down">Acil</g) || []).length === 1, 'L-178f Yalniz kritik ariza Acil', kart.slice(0, 300));
 
   // Incele: menude olmayan eski sayfa yerine Operasyon -> Ariza gorunumu.
   App.setActiveTenant({ id: TENANT, role: 'owner' });
@@ -242,12 +250,11 @@ async function satisaHazirlikDavranisi() {
   App.setAppData({ villas: { DOGUS: { id: 'p1', slug: 'DOGUS', name: 'DOĞUŞ' } }, bookings: [], cleaningTasks: [],
     operationalPeople: [], maintenance: [], maintenanceTickets: [{ id: 'tk-1', propertyId: 'p1', status: 'IN_PROGRESS', severity: 'CRITICAL' }],
     housekeepingOverrides: {} });
-  App.renderPortfolioHealth([acik]);
-  const kart = global.document.getElementById('portfolioHealthCardsGrid').innerHTML;
+  const kart = App.todayReadinessEditorHtml(acik, Readiness);
   check(/<option value="SALES_READY"[^>]*disabled/.test(kart) && /<option value="NON_BLOCKING_ISSUE"[^>]*disabled/.test(kart),
     'L-179c Acik arizada satilabilir durumlar secilemez');
   check(!/<option value="NEEDS_CLEANING"[^>]*disabled/.test(kart), 'L-179d Temizlik bekliyor secilebilir kalir');
-  check(/openTabFromDeepLink\('maintenance', decodeURIComponent\('tk-1'\)\)/.test(kart), 'L-179e Kart arizaya goturen dugme gosterir');
+  check(/openTabFromDeepLink\('maintenance', decodeURIComponent\('tk-1'\)\)/.test(kart), 'L-179e Satir arizaya goturen dugme gosterir');
 
   const ist = kaydedenIstemci();
   App.setSupabaseClient(ist);
@@ -383,8 +390,7 @@ async function temizlikHazirlikDavranisi() {
     cleaningTasks: [{ id: 'c1', villa: 'SEYIR', date: '2020-01-01', status: 'PLANNED', amount: 0 }] });
   const durum = App.getPropertySalesReadiness('SEYIR');
   check(durum && durum.status === 'NEEDS_CLEANING', 'L-183g Uygulama hazirlik hesabina temizlik gorevlerini verir', JSON.stringify(durum && durum.status));
-  App.renderPortfolioHealth([durum]);
-  const kart = global.document.getElementById('portfolioHealthCardsGrid').innerHTML;
+  const kart = App.todayReadinessEditorHtml(durum, R);
   check(/<option value="SALES_READY"[^>]*disabled/.test(kart) && /Temizliğe git/.test(kart), 'L-183h Bekleyen temizlikte "hazir" secilemez; kart temizlige goturur');
   const ist = kaydedenIstemci();
   App.setSupabaseClient(ist);
@@ -941,8 +947,8 @@ async function topluGirisDavranisi() {
 
   const app = read('app.js');
   const kaydet = functionBody(app, 'async function saveBulkSummary(');
-  check(/planBulkSummary/.test(kaydet) && /from\('bookings'\)\.insert/.test(kaydet) && !/syncBookingCleaningTask/.test(kaydet) && /invalidateExecutiveSnapshotCache/.test(kaydet),
-    'L-198g Kayit kurallardan gecer, temizlik gorevi acmaz, ana sayfa onbellegini tazeler');
+  check(/planBulkSummary/.test(kaydet) && /from\('bookings'\)\.insert/.test(kaydet) && !/syncBookingCleaningTask/.test(kaydet),
+    'L-198g Kayit kurallardan gecer, temizlik gorevi acmaz');
   const html = read('index.html');
   check(/openBulkSummaryModal\(\)/.test(html) && /id="bulkSummaryModal"/.test(html) && /bulk_summary\.js\?v=/.test(html) && /'bulkVilla'/.test(app),
     'L-198h Rezervasyonlar ekraninda "Gecmis ay toplu girisi"; mulk listesi ortak kaynaktan');
@@ -1278,33 +1284,34 @@ async function bugunPerformansDavranisi() {
   // Ekran: Bugun, bu ay; secici ev ev degistirir; Finans defterini okumayan rolde gizli.
   const buAy = App.getCurrentMonthKey();
   kur('owner', [{ id: 'r4', villa: 'DENIZ', propertyId: A, guest: 'Bu ay', checkIn: `${buAy}-02`, checkOut: `${buAy}-05`, gross: 30000, cleanFee: 0, otaComm: 0, discount: 0, status: 'CONFIRMED' }]);
-  App.setTodayPerformanceVilla('ALL');
-  const kartlar = () => global.document.getElementById('todayPerformanceCards').innerHTML;
-  const liste = () => global.document.getElementById('todayPerformanceList').innerHTML;
+  // Lex Bugun (21.11.2026): performans 3 sutunlu tablo; mulk villa sekmesiyle secilir.
+  App.setTodayVilla('ALL');
+  const tablo = () => global.document.getElementById('todayPerformanceTable').innerHTML;
   const portfoy = App.computeMonthPerformance(buAy, 'ALL');
-  check(global.document.getElementById('todayPerformance').hidden === false && /Doluluk/.test(kartlar()) && /ADR/.test(kartlar()) && /RevPAR/.test(kartlar())
-    && kartlar().includes(`%${portfoy.occupancy.toLocaleString('tr-TR')}`) && /Deniz Evi/.test(liste()) && /Orman Evi/.test(liste()),
-    'L-217e Bugun: "Tum mulkler" portfoy kartlari ve ev ev liste', kartlar().slice(0, 300));
-  App.setTodayPerformanceVilla('DENIZ');
+  check(global.document.getElementById('todayPerformance').hidden === false && /Doluluk/.test(tablo()) && /ADR/.test(tablo()) && /RevPAR/.test(tablo())
+    && tablo().includes(`%${portfoy.occupancy.toLocaleString('tr-TR')}`)
+    && /Deniz Evi/.test(global.document.getElementById('todayVillaTabs').innerHTML) && /Orman Evi/.test(global.document.getElementById('todayVillaTabs').innerHTML),
+    'L-217e Bugun: "Tumu" portfoy satirlari; mulkler sekme olarak secilebilir', tablo().slice(0, 300));
+  App.setTodayVilla('DENIZ');
   const tek = App.computeMonthPerformance(buAy, 'DENIZ');
-  check(kartlar().includes('₺10.000') && kartlar().includes(`%${tek.occupancy.toLocaleString('tr-TR')}`) && liste() === ''
+  check(tablo().includes('10.000 TL') && tablo().includes(`%${tek.occupancy.toLocaleString('tr-TR')}`)
     && /Deniz Evi/.test(global.document.getElementById('todayPerformancePeriod').textContent || global.document.getElementById('todayPerformancePeriod').innerText || ''),
-    'L-217f Ev secilince kartlar o evin rakamlarini gosterir (ADR 30.000 / 3 gece)', kartlar().slice(0, 300));
+    'L-217f Ev secilince satirlar o evin rakamlarini gosterir (ADR 30.000 / 3 gece)', tablo().slice(0, 300));
+  App.setTodayVilla('ALL');
   for (const rol of ['sales', 'staff']) {
     kur(rol);
-    App.renderTodayPerformance();
-    check(global.document.getElementById('todayPerformance').hidden === true, `L-217g ${rol} rolunde finans kartlari gizli (§3.3.1)`);
+    App.renderTodayLex();
+    check(global.document.getElementById('todayPerformance').hidden === true, `L-217g ${rol} rolunde finans satirlari gizli (§3.3.1)`);
   }
   const app = read('app.js');
   const html = read('index.html');
-  check(/computeMonthPerformance\(m, secili\)/.test(functionBody(app, 'function getMonthlyKpiDataset(')) && /'todayPerfVilla'/.test(functionBody(app, 'function updateAllVillaDropdowns('))
-    && /renderTodayPerformance\(\)/.test(functionBody(app, 'function renderExecutiveControlCenter(')) && /id="todayPerfVilla"[^>]*setTodayPerformanceVilla/.test(html),
-    'L-217h Finans aylik tablosu ve Bugun ayni fonksiyondan; mulk listesi ortak doldurucudan');
-  // Finans ust seridindeki Portfoy etiketi secilebilir olmali (kullanici, 19.10.2026)
-  check(/<select id="finTopVillaFilter" data-onchange="filterByVilla\(this\.value\)"/.test(html)
-    && /'finTopVillaFilter'/.test(functionBody(app, 'function updateAllVillaDropdowns('))
-    && /finTopVillaFilter[\s\S]{0,80}currentFilter\.villa/.test(functionBody(app, 'function updateStepperLabels(')),
-    'L-223 Finans Portfoy secicisi ortak filtreye bagli; listesi ortak doldurucudan, degeri filtreyle esit');
+  check(/computeMonthPerformance\(month, villa\)/.test(functionBody(app, 'function todayPerformanceRows('))
+    && /renderTodayLex\(\)/.test(functionBody(app, 'function renderExecutiveControlCenter(')) && /id="todayVillaTabs"/.test(html),
+    'L-217h Bugun performansi Finans/Analiz ile ayni fonksiyondan; mulk listesi ortak doldurucudan');
+  // L-223: Finans'taki ikinci Portfoy secicisi sadelikte kalkti (21.11.2026);
+  // Finans ust cubuktaki tek secici kullanir.
+  check(!/finTopVillaFilter/.test(html) && /id="globalVillaFilter"/.test(html),
+    'L-223 Finans tek portfoy secicisini (ust cubuk) kullanir');
   // "Diger > Detay" bos liste aciyordu: grafik eslemeyle topluyor, arama ham metne bakiyordu
   // L-302: arama ortak katlamadan gecer; esleme expenseSearchMatches icinde kaldi.
   check(/eslesenGiderKategorisi\(exp\.category\)/.test(functionBody(app, 'function expenseSearchMatches('))
@@ -1390,9 +1397,9 @@ async function rezervasyonOdemeDavranisi() {
 
   // L-228 (M53): takvim kucuk kaliyordu.
   const ciz = functionBody(app, 'function renderTapeChart(');
-  check(/id="tapeZoomBtn"[^>]*data-onclick="toggleTapeChartZoom\(\)"/.test(html) && /classList\.toggle\('tape-zoom', tapeChartZoom\)/.test(ciz)
-    && /\.tape-zoom \.tape-cell \{ height: 58px; \}/.test(read('style.css')) && read('core/action_dispatch.js').includes("'toggleTapeChartZoom'"),
-    'L-228 Takvim "Büyüt" dugmesiyle yakinlasir; tercih tarayicida kalir');
+  // Sadelik 3. tur (21.11.2026): "Büyüt" kalkti; takvim 1 hafta / 2 hafta gorunumuyle buyur.
+  check(!/id="tapeZoomBtn"/.test(html) && !/tapeChartZoom/.test(ciz) && /setTapeChartView\('WEEK_1'\)/.test(html),
+    'L-228 Takvim 1-2 haftalik gorunumle yakinlasir; ayri "Büyüt" dugmesi yok');
 
   // L-229 (M54): OTA'da kapora sorulmamali; kanal bazli ayar.
   App.setAppData({ villas: {}, bookings: [], bookingChannels: [], tenantSettings: {} });
@@ -1587,9 +1594,8 @@ async function giderAsamasiDavranisi() {
     'L-242e Tekrarin ilk kaydi silinirken "sonrakiler de" secilirse seri tek ifadeyle silinir', JSON.stringify(silinenler));
   check(/id="expRecurFreq"/.test(html) && /<option value="MONTHLY">Her ay<\/option>/.test(html) && /<option value="WEEKLY">Her hafta<\/option>/.test(html)
     && /<option value="DAILY">Her gün<\/option>/.test(html) && /id="expRecurCount"/.test(html)
-    && ['updateExpenseRecurrencePreview', 'onExpenseCategoryChange', 'createExpenseCategoryFromForm', 'createSettingsExpenseCategory', 'deleteCustomExpenseCategory', 'setCustomExpenseCategoryType'].every(ad => eylemler.includes(`'${ad}'`))
-    && /invalidateExecutiveSnapshotCache\(\)/.test(functionBody(app, 'async function deleteExpensesByIds(')),
-    'L-242f Formda Tekrar secenekleri; yeni eylemler izin listesinde; toplu silme ana sayfa onbellegini temizler');
+    && ['updateExpenseRecurrencePreview', 'onExpenseCategoryChange', 'createExpenseCategoryFromForm', 'createSettingsExpenseCategory', 'deleteCustomExpenseCategory', 'setCustomExpenseCategoryType'].every(ad => eylemler.includes(`'${ad}'`)),
+    'L-242f Formda Tekrar secenekleri; yeni eylemler izin listesinde');
 
   // L-243 (M68): Bugun kartinda net kar, Finans ile ayni defterden.
   const buAy = App.getCurrentMonthKey();
@@ -1597,19 +1603,19 @@ async function giderAsamasiDavranisi() {
     bookings: [{ id: 'r1', villa: 'DENIZ', propertyId: A, guest: 'Ali', checkIn: `${buAy}-02`, checkOut: `${buAy}-05`, gross: 30000, cleanFee: 0, otaComm: 0, discount: 0, status: 'CONFIRMED', channel: 'WHATSAPP' }],
     expenses: [], cleaningTasks: [], maintenance: [], closedPeriods: [] });
   let perf = App.computeMonthPerformance(buAy, 'ALL');
-  check(/Net kâr<\/span><strong>—<\/strong><small>Gider kaydı yok; kâr ölçülemedi/.test(App.todayPerformanceProfitCardHtml(perf, buAy)),
-    'L-243a Gider yokken net kar uydurulmaz ("—", L-101)');
+  const karSatiri = () => App.todayPerformanceRows(buAy, 'ALL').rows.find(r => r.c1 === 'Net kâr');
+  check(karSatiri().c2 === '—' && karSatiri().reason === 'Gider kaydı yok; kâr ölçülemedi',
+    'L-243a Gider yokken net kar uydurulmaz ("—", L-101)', JSON.stringify(karSatiri()));
   App.setAppData({ ...App.getAppData(), expenses: [
     { id: 'x1', villa: 'ALL', date: `${buAy}-03`, month: buAy, category: 'Fatura', type: 'OPEX', amount: 2500, description: 'e' },
     { id: 'x2', villa: 'ALL', date: `${buAy}-03`, month: buAy, category: 'Demirbaş', type: 'CAPEX', amount: 20000, description: 'k' }] });
   perf = App.computeMonthPerformance(buAy, 'ALL');
-  check(perf.netProfit === 30000 - 2500 - 20000 && App.todayPerformanceProfitCardHtml(perf, buAy).includes('₺7.500'),
-    'L-243b Net kar = toplam gelir − OPEX − CAPEX (Finans defteri, computeMonthLedger)', JSON.stringify(perf));
+  check(perf.netProfit === 30000 - 2500 - 20000 && karSatiri().c2 === '7.500 TL',
+    'L-243b Net kar = toplam gelir − OPEX − CAPEX (Finans defteri, computeMonthLedger)', JSON.stringify(karSatiri()));
   App.setAppData({ ...App.getAppData(), expenses: [{ id: 'x3', villa: 'ALL', date: `${buAy}-03`, month: buAy, category: 'Demirbaş', type: 'CAPEX', amount: 40000, description: 'k' }] });
-  check(App.todayPerformanceProfitCardHtml(App.computeMonthPerformance(buAy, 'ALL'), buAy).includes('−₺10.000'),
-    'L-243c Zarar eksi isaretiyle yazilir');
-  check(/todayPerformanceProfitCardHtml\(perf, month\)/.test(functionBody(app, 'function renderTodayPerformance(')),
-    'L-243d Bugun kartlari net kari cizer (finans rolune kapili blok icinde)');
+  check(karSatiri().c2 === '−10.000 TL', 'L-243c Zarar eksi isaretiyle yazilir', karSatiri().c2);
+  check(/isProfitUnmeasured\(perf\.totalIncome, perf\.opex, perf\.capex, month\)/.test(functionBody(app, 'function todayPerformanceRows(')),
+    'L-243d Bugun performans tablosu net kari ayni olculemez kuraliyla cizer');
 
   // L-244 (M69): OTA disi rezervasyonda cikis gunu gecti, tahsilat eksik -> bildirim.
   const bugun = '2026-10-19';
@@ -1780,14 +1786,9 @@ async function temizlikIkiImzaDavranisi() {
   check(!/Yapılmadı/.test(app) && !/Yapılmadı/.test(html) && /✖ Gerek kalmadı/.test(app),
     'L-238 Temizlik "Yapilmadi" yerine "Gerek kalmadi" (durum kodu SKIPPED ayni)');
 
-  // L-240 (M65): menudeki Operasyon sayisi bugunun acik isi.
-  const bugun = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Istanbul' });
-  App.setAppData({ villas: {}, bookings: [], expenses: [], operationalPeople: [], cleaningExecutions: [],
-    cleaningTasks: [{ id: 'a', date: bugun, status: 'PLANNED' }, { id: 'b', date: bugun, status: 'DONE', paid: false }, { id: 'c', date: '2999-01-01', status: 'PLANNED' }],
-    maintenanceTickets: [{ id: 't', status: 'OPEN' }, { id: 'u', status: 'RESOLVED' }] });
-  const sayi = App.getOperationsAttentionCount();
-  check(sayi.cleanings === 1 && sayi.tickets === 1 && sayi.total === 2, 'L-240a Bugunku acik temizlik + acik ariza sayilir; yapilmis ve gelecek is sayilmaz', JSON.stringify(sayi));
-  check(/renderOperationsTabBadge\(\);\s*\}/.test(functionBody(app, 'function renderAll(')), 'L-240b Rozet her cizimde guncellenir, yalniz Operasyon sekmesinde degil');
+  // L-240 (M65): menudeki Operasyon sayaci sadelikte kalkti (21.11.2026);
+  // bugunun acik isi Bugun'deki ekip gorevleri tablosunda.
+  check(!/opsTaskCountBadge/.test(html) && typeof App.getOperationsAttentionCount === 'undefined', 'L-240 Menude ikinci sayac yok');
 }
 
 async function fiyatBakimDavranisi() {
@@ -1879,9 +1880,7 @@ async function fiyatEkraniDavranisi() {
   check(el('pricingGapCountVal').innerText === '1 Gece' && /Seyir \(1\)/.test(el('pricingGapCountMeta').innerText),
     'L-252b Bos gece karti birakilan bosluklari sayar ve mulku adlandirir', el('pricingGapCountVal').innerText + ' | ' + el('pricingGapCountMeta').innerText);
 
-  // L-253 (F.1.1): yillik hedef = aylik portfoy hedeflerinin toplami.
-  check(el('pricingAnnualTargetVal').innerText === '₺100.000' && new RegExp(`${yil}: 2/12 ayda hedef`).test(el('pricingAnnualTargetMeta').innerText),
-    'L-253a Yillik hedef aylik portfoy hedeflerinin toplamidir; mulk hedefi karismaz, hedefli ay sayisi yazar', el('pricingAnnualTargetVal').innerText + ' | ' + el('pricingAnnualTargetMeta').innerText);
+  // L-253: fiyat ekranindaki yillik hedef karti sadelikte kalkti (21.11.2026).
 
   // L-254 (F.1.4/F.1.5): koruma limitleri yerine fiyat tablosu durumu; uzatma karti kalkti.
   check(el('pricingLadderReadyVal').innerText === '1 / 2' && /Koy Evi/.test(el('pricingLadderReadyMeta').innerText),
@@ -2597,16 +2596,16 @@ async function fiyatEksikleriDavranisi() {
   // F-27 Kilavuz: bes adim, her adim ilgili sekmeye goturur; depo okunamazsa acik.
   const html = read('index.html');
   const kilavuz = html.slice(html.indexOf('id="pricingGuide"'), html.indexOf('</details>', html.indexOf('id="pricingGuide"')));
-  check((kilavuz.match(/<li>/g) || []).length === 5 && (kilavuz.match(/openPricingGuideStep\('/g) || []).length === 5 && /rememberPricingGuide\(\)/.test(kilavuz)
-    && ['calendar', 'rules', 'target', 'rivals', 'results'].every(v => html.includes(`id="pricingView_${v}"`) && /class="pricing-view-intro"/.test(html.slice(html.indexOf(`id="pricingView_${v}"`), html.indexOf(`id="pricingView_${v}"`) + 400))),
-    'F-27a "Fiyatlandırma nasıl çalışır?" bes adimli; her sekmenin basinda ne ise yaradigi yazar');
+  check((kilavuz.match(/<li>/g) || []).length === 5 && (kilavuz.match(/openPricingGuideStep\('/g) || []).length === 5
+    && ['rules', 'target', 'rivals', 'results'].every(v => html.includes(`id="pricingView_${v}"`) && /class="pricing-view-intro"/.test(html.slice(html.indexOf(`id="pricingView_${v}"`), html.indexOf(`id="pricingView_${v}"`) + 400))),
+    'F-27a "Fiyatlandırma nasıl çalışır?" bes adimli; takvim disindaki her sekmenin basinda ne ise yaradigi yazar');
   const eskiDepo = global.localStorage;
   global.localStorage = { getItem() { throw new Error('engelli'); }, setItem() { throw new Error('engelli'); } };
   const kutu = el('pricingGuide');
   kutu.open = false; if (kutu.dataset) delete kutu.dataset.ready;
   App.applyPricingGuide();
-  check(kutu.open === true && App.rememberPricingGuide() === true && App.openPricingGuideStep('rules') === true && el('pricingView_rules').hidden === false,
-    'F-27b Tarayici deposu okunamazsa kilavuz acik gelir ve hata vermez; adim dugmesi sekmeyi acar');
+  check(kutu.open === false && App.openPricingGuideStep('rules') === true && el('pricingView_rules').hidden === false,
+    'F-27b Kilavuz kapali baslar (takvim ilk ekranda), depo okunamasa da hata vermez; adim dugmesi sekmeyi acar');
   global.localStorage = eskiDepo;
   App.setPricingView('calendar');
 

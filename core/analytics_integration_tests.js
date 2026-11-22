@@ -132,8 +132,8 @@ const INDEX = fs.readFileSync(path.join(KOK, 'index.html'), 'utf8');
 const APP = fs.readFileSync(path.join(KOK, 'app.js'), 'utf8');
 
 test('I5. index.html: menu kalemi, sekme kabi, stil ve betik sirasi', () => {
-  assert.match(INDEX, /data-onclick="switchTab\('analytics'\)">📊 Analiz</);
-  assert.match(INDEX, /<div id="tab-analytics" class="tab-content">\s*<div id="analyticsRoot"><\/div>\s*<\/div>/);
+  assert.match(INDEX, /data-onclick="switchTab\('analytics'\)">Analiz</);
+  assert.match(INDEX, /<div id="tab-analytics" class="tab-content lex-screen">\s*<div id="analyticsRoot"><\/div>\s*<\/div>/);
   assert.match(INDEX, /<link rel="stylesheet" href="analytics\.css\?v=[0-9a-f]{8}">/);
   // Analiz modulleri acilista yuklenmez (acilis JS butcesi, L-163): <script> etiketi
   // yok; app.js calisma aninda damgali adresle ister (stamp_assets SATELLITE).

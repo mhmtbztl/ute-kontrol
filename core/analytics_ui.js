@@ -52,7 +52,6 @@
   // degismez. Sira koyu yuzeyde (#1C1C1E) renk korlugu dogrulamasindan gecti.
   const COMPARES = [
     { key: 'yoy1', label: 'Geçen yıl', short: 'geçen yıla göre', slot: 2 },
-    { key: 'yoy2', label: '2 yıl önce', short: '2 yıl öncesine göre', slot: 3 },
     { key: 'prev', label: 'Önceki dönem', short: 'önceki döneme göre', slot: 4 },
     { key: 'portfolio', label: 'Portföy ortalaması', short: 'portföy ortalamasına göre', slot: 5 },
     { key: 'target', label: 'Hedef', short: 'hedefe göre', slot: 'target' }
@@ -681,7 +680,12 @@
           h('div', {}, [
             h('h2', { class: 'ba-title', text: 'Analiz' }),
             h('p', { class: 'ba-subtitle', text: ozet.join(' · ') }),
-            suruyor ? h('p', { class: 'ba-running', text: `${monthLong(bugunAy)} sürüyor: rakamlar bugüne kadar girilmiş rezervasyonlardır, karşılaştırmalar tamamlanmış dönemlerle yapılır.` }) : null
+            suruyor ? h('p', { class: 'ba-running', text: `${monthLong(bugunAy)} sürüyor: rakamlar bugüne kadar girilmiş rezervasyonlardır, karşılaştırmalar tamamlanmış dönemlerle yapılır.` }) : null,
+            // D-07: diger sekmeler suren ayi gosterirken Analiz son tamamlanan ayla
+            // acilir; kullanici neden farkli ay gordugunu bilsin.
+            (!suruyor && bugunAy && report.period.end === BookingAnalytics.shiftMonth(bugunAy, -1))
+              ? h('p', { class: 'ba-period-note', text: `Son tamamlanan ay gösteriliyor (${monthLong(report.period.end)}). ${monthLong(bugunAy)} sürüyor; görmek için "Dönemin son ayı" seçicisinden seçin.` })
+              : null
           ]),
           h('div', { class: 'ba-filters' }, [villaSel, anchorSel, segmented('preset', PRESETS, state.preset, 'Dönem uzunluğu')])
         ]),
@@ -951,8 +955,7 @@
         b.leadTimeSample
           ? mini('Rezervasyon öncesi süre', ltNote, b.leadTimeBuckets.map(x => ltLabels[x.key]), b.leadTimeBuckets.map(x => x.count))
           : h('div', { class: 'ba-mini' }, [h('h4', { class: 'ba-mini-title', text: 'Rezervasyon öncesi süre' }), h('p', { class: 'ba-mini-note', text: ltNote })]),
-        mini('Konaklama süresi', `${nf0.format(b.sample)} rezervasyondan`, b.stayBuckets.map(x => stLabels[x.key]), b.stayBuckets.map(x => x.count)),
-        mini('Giriş günü', `${nf0.format(b.sample)} rezervasyondan`, GUNLER, b.weekday)
+        mini('Konaklama süresi', `${nf0.format(b.sample)} rezervasyondan`, b.stayBuckets.map(x => stLabels[x.key]), b.stayBuckets.map(x => x.count))
       ]);
       return card('Rezervasyon davranışı', 'Girişi bu dönemde olan rezervasyonlar · iptal ve toplu aktarım hariç', null, body, 'ba-card-wide');
     }
@@ -962,7 +965,7 @@
       const L = report.leads;
       if (!L.total) {
         return card('Talep → rezervasyon dönüşümü', null, null,
-          h('p', { class: 'ba-empty-line', text: 'Bu dönemde talep kaydı yok. Talepler Misafirler ve Satış sayfasından girilir.' }), 'ba-card-wide');
+          h('p', { class: 'ba-empty-line' }, ['Bu dönemde talep kaydı yok. Talepler ', h('button', { type: 'button', class: 'lex-link-inline', 'data-onclick': "goTo('leads')", text: 'Misafirler ve Satış' }), ' ekranından girilir.']), 'ba-card-wide');
       }
       const steps = [
         { label: 'Gelen talep', value: L.total },

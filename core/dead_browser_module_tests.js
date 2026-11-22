@@ -55,7 +55,6 @@ const requiredBrowserModules = [
   'operations_engine',
   'captcha_gate',
   'property_analysis_context_ui',
-  'analysis_center_ui',
   'marketing_ui'
 ];
 
@@ -66,10 +65,6 @@ for (const moduleName of requiredBrowserModules) {
   );
 }
 
-check(
-  html.indexOf('core/financial_metrics_service.js') < html.indexOf('core/analysis_center_ui.js'),
-  'Analiz Merkezi finans servisi UI modülünden önce yükleniyor'
-);
 check(
   html.indexOf('core/property_analysis_context_service.js') < html.indexOf('core/property_analysis_context_ui.js'),
   'Analiz bağlam servisi UI modülünden önce yükleniyor'

@@ -104,14 +104,14 @@ async function main() {
   // --- B. Ad gecen her yerde ayni nokta ----------------------------------------
   kur({ property_colors: { [ID_A]: '#30D158' } });
   const ad = App.propertyNameHtml('a', '<b>Zirve</b>');
-  check(/property-color-dot" style="background:#30D158"/.test(ad) && ad.includes('&lt;b&gt;Zirve&lt;/b&gt;'),
+  check(/property-color-dot" data-lx-literal-color style="background:#30D158"/.test(ad) && ad.includes('&lt;b&gt;Zirve&lt;/b&gt;'),
     'B1. Ad noktasi kayitli rengi tasir, ad kacislanir', ad);
   const app = read('app.js');
   for (const [yer, kalip] of [
     ['takvim', /tape-villa-td"><strong>\$\{propertyNameHtml\(vKey, vName\)\}/],
     ['rezervasyon listesi', /data-label="Mülk"[^\n]*propertyNameHtml\(b\.villa, vName\)/],
-    ['Bugün performans listesi', /today-performance__row"><strong>\$\{propertyNameHtml\(row\.key, row\.name\)\}/],
-    ['satış hazırlığı kartı', /health-card-name">\$\{propertyNameHtml\(c\.propertyKey, c\.propertyName\)\}/],
+    // Lex Bugun (21.11.2026): performans villa sekmesiyle secilir; hazirlik tablosunda mulk adi noktali.
+    ['Bugün satış hazırlığı tablosu', /c1Html: propertyNameHtml\(card\.propertyKey, card\.propertyName\)/],
     ['Finans mülk tablosu', /<h4>\$\{propertyNameHtml\(item\.key, item\.conf\.name\)\}<\/h4>/]
   ]) check(kalip.test(app), `B2. ${yer} mülk adını renkli noktayla yazar`);
   check(!/\['#38BDF8', '#A78BFA', '#30D158', '#FFB340', '#FB7185'\]\[villaIndex % 5\]/.test(app),

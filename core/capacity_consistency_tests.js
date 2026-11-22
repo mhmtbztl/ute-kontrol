@@ -153,16 +153,6 @@ try {
     'B3. Kapasitesi olmayan ayda doluluk "—"; ayın gün sayısına düşülüp uydurulmaz', `tablo=${satirDolulugu('Geç Eklenen')}`);
   check(!/\/\^d\{4\}-d\{2\}\$\//.test(APP_SRC), 'B4. Ters bölüsünü kaybetmiş ay regex\'i kalmadı', '/^d{4}-d{2}$/ hâlâ app.js\'te');
 
-  // --- C. Satilan gece etiketi --------------------------------------------------
-  const etiket = app.formatSoldNightsLabel;
-  check(typeof etiket === 'function' && etiket(2, 150) === '2 / 150 Gece',
-    'C1. Kapasite varken "satılan / kapasite Gece"', typeof etiket === 'function' ? etiket(2, 150) : 'formatSoldNightsLabel yok');
-  const sifir = typeof etiket === 'function' ? etiket(79, 0) : '';
-  check(typeof etiket === 'function' && !/\/\s*0\b/.test(sifir) && /kapasite/i.test(sifir) && /79/.test(sifir),
-    'C2. Kapasite 0 iken "79 / 0 Gece" yazılmaz; satılan gece ve nedeni yazılır', sifir);
-  check(/setEl\('execSoldNightsLabel', formatSoldNightsLabel\(/.test(APP_SRC),
-    'C3. Ana sayfa kartı etiketi bu yardımcıyla yazar', 'execSoldNightsLabel doğrudan şablonla yazılıyor');
-
   // --- D. Istemci kapasitesi sunucuyla ayni ------------------------------------
   const eskiKayit = [{ villa: 'ESKI', property_id: 'pb', priority: 'P1', status: 'OPEN', downtime: 3 }];
   const kap = FMS.calculateAvailableNights([veri().villas.ESKI], 2026, 8, eskiKayit);

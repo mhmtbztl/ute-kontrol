@@ -340,9 +340,10 @@ async function main() {
         select.value = month;
         handleFilterChange();
         switchTab('finance');
-        await refreshExecutiveDashboardSnapshot(true);
+        const { data: server, error } = await supabaseClient.rpc('get_executive_dashboard_snapshot', { p_tenant_id: getActiveTenantId(), p_target_month: month, p_property_id: null });
+        if (error) throw error;
         renderFinanceModule();
-        return { screen: document.getElementById('finActualRevenue').textContent, server: executiveSnapshotState.current, period: currentFilter.period };
+        return { screen: document.getElementById('finActualRevenue').textContent, server, period: currentFilter.period };
       }, lastMonth);
       assert.strictEqual(result.period, lastMonth);
       assert(result.server, 'Sunucu anlık görüntüsü gelmedi');

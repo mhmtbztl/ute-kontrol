@@ -4,7 +4,7 @@
 }(typeof self !== 'undefined' ? self : this, function (FinanceExportEngine) {
   'use strict';
   const PAGES = ['FINANCE','PROPERTY','BOOKINGS','OPERATIONS','SALES','CHANNELS_MARKETING'];
-  const PAGE_NAMES = { FINANCE: 'Finans', PROPERTY: 'Mülk', BOOKINGS: 'Rezervasyonlar', OPERATIONS: 'Operasyon', SALES: 'Misafirler ve Satış', CHANNELS_MARKETING: 'Kanallar ve Pazarlama' };
+  const PAGE_NAMES = { FINANCE: 'Finans', PROPERTY: 'Mülk', BOOKINGS: 'Rezervasyonlar', OPERATIONS: 'Operasyon', SALES: 'Misafirler ve Satış', CHANNELS_MARKETING: 'Pazarlama' };
   const absent = value => value === undefined || value === null || value === '';
   // Ekranda ve dosyada iç alan adı görünmez (L-146). Bilinmeyen anahtar adıyla
   // kalır; yeni bir özet alanı eklerken etiketini buraya yazın.

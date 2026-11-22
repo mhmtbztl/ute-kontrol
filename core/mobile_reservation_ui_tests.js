@@ -50,12 +50,12 @@ check(
 );
 
 for (const [id, label] of [
-  ['resVilla', 'Villa Seçin'],
-  ['resGuest', 'Misafir Adı'],
-  ['resDateRangeBtn', 'Konaklama Tarihleri'],
-  ['resGross', 'Brüt Tutar'],
-  ['resPax', 'Kişi Sayısı'],
-  ['resChannel', 'Rezervasyon Kanalı']
+  ['resVilla', 'Villa'],
+  ['resGuest', 'Misafir adı'],
+  ['resDateRangeBtn', 'Konaklama tarihleri'],
+  ['resGross', 'Brüt tutar'],
+  ['resPax', 'Kişi sayısı'],
+  ['resChannel', 'Rezervasyon kanalı']
 ]) {
   check(new RegExp(`<label[^>]*for="${id}"[^>]*>[^<]*${label}`).test(html), `${label} kontrolu etiketiyle baglanmali`);
 }

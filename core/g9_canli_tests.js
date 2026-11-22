@@ -597,10 +597,12 @@ async function L280() {
   const ileri = n => { const d = new Date(bugun + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
   const r = (id, g, c, durum) => ({ id, villa: 'DENE', propertyId: PROP_A, guest: 'TEST ' + id, checkIn: g, checkOut: c, gross: 1000, pax: 2, status: durum });
   kur(App, { bookings: [r('a', bugun, ileri(3), 'CHECKED_IN'), r('b', bugun, ileri(2), 'CONFIRMED'), r('c', ileri(-2), bugun, 'CHECKED_OUT')] });
-  App.renderTodayDateStrip(App.getAppData().bookings, []);
-  const ozet = dom.getElementById('todayShiftSummary').innerHTML;
-  check(/<strong>1<\/strong><span>Giriş<\/span>/.test(ozet) && /1 yapıldı/.test(ozet) && /<strong>0<\/strong><span>Çıkış<\/span>/.test(ozet),
-    'L-280a Bugun seridi giris/cikis yapilanlari bekleyenlerden ayirir', ozet);
+  App.renderTodayLex();
+  const ozet = dom.getElementById('todaySummary').innerHTML;
+  const tablo = dom.getElementById('todayTaskTable').innerHTML;
+  const yapildi = (tablo.match(/Giriş yapıldı|Çıkış yapıldı/g) || []).length;
+  check(ozet.includes('<strong>1 giriş</strong>') && ozet.includes('<strong>0 çıkış</strong>') && yapildi === 2,
+    'L-280a Bugun ozeti giris/cikis yapilanlari bekleyenlerden ayirir; yapilanlar tabloda Tamam', ozet + ' | ' + yapildi);
   // Erken cikis: temizlik bugune alinir.
   const erken = r('d', ileri(-1), ileri(3), 'CHECKED_OUT');
   check(App.bookingCleaningDate(erken, ileri(3), bugun) === bugun, 'L-280b Erken cikista temizlik bugune alinir');
@@ -887,12 +889,8 @@ async function L309() {
 // L-310 yillik hedef karti hedefli aylarin cirosunu hedefle karsilastirir
 // ---------------------------------------------------------------------------
 async function L310() {
-  const src = read('app.js');
-  const i = src.indexOf("// Yillik hedef = secili yilin aylik portfoy hedeflerinin toplami (L-253).");
-  const blok = i >= 0 ? src.slice(i, i + 2600) : '';
-  check(/hedefliAylar\.map\(/.test(blok) && !/Array\.from\(\{ length: 12 \}, \(_, i\) => computeMonthLedger/.test(blok),
-    'L-310a Gerceklesme yalniz hedef girilmis aylarin cirosundan hesaplanir (12 ayin cirosu tek ayin hedefine oranlanmaz)');
-  check(/hedefli aylarda ciro/.test(blok), 'L-310b Kart neyin neyle karsilastirildigini yazar');
+  // Fiyat ekranindaki yillik hedef karti sadelikte kalkti (21.11.2026); hedefler Hedef sekmesinde.
+  check(!/pricingAnnualTargetVal/.test(read('index.html')), 'L-310 Fiyat ekraninda tekrar eden yillik hedef karti yok');
 }
 
 // ---------------------------------------------------------------------------
@@ -902,17 +900,7 @@ async function L299() {
   const src = read('app.js');
   check(/finRevTargetDelta[\s\S]{0,400}className = `kpi-trend \$\{/.test(src) || /hedefRengi/.test(src), 'L-299a "Hedefin altinda" yesil degil; rozet rengi hedefe gore');
   check(/\.kpi-trend\.negative\s*\{/.test(read('style.css')), 'L-299b Olumsuz rozet stili var');
-  const ui = read('core/marketing_ui.js');
-  check(!/`Kapsama: \$\{number\(derived\.validation\.coveragePercent, '%'\)\}`/.test(ui) && /sayaçtan/.test(ui), 'L-299c Huni karti kapsamayi "N sayactan M tanesi girildi" diye aciklar');
-  const S = require('./marketing_snapshot_service.js');
-  let hata = null;
-  try {
-    S.validateInput({ tenantId: TENANT, channelListingId: PROP_A, periodStart: '2026-10-01', periodEndExclusive: '2026-11-02', listingViews: 100, today: '2026-10-26' });
-  } catch (e) { hata = e; }
-  check(hata && /FUTURE/.test(hata.message), 'L-299d Gelecek gunleri kapsayan huni donemi reddedilir', hata ? hata.message : 'hata yok');
-  let hata2 = null;
-  try { S.validateInput({ tenantId: TENANT, channelListingId: PROP_A, periodStart: '2026-10-01', periodEndExclusive: '2026-10-27', listingViews: 100, today: '2026-10-26' }); } catch (e) { hata2 = e; }
-  check(!hata2, 'L-299e Bugunu kapsayan donem kabul edilir', hata2 && hata2.message);
+  // L-299c-e: eski huni karti ve snapshot servisi sadelik turunda kalkti (21.11.2026).
 }
 
 // ---------------------------------------------------------------------------
@@ -1167,7 +1155,9 @@ async function L285() {
     testName: 'Kapak fotoğrafı', changedOn: '2026-10-10', verdict: 'Yetersiz veri',
     snapshots: [{ label: 'Airbnb · aaa · 01.10–10.10', impressions: 1000, listingViews: 100, bookings: 2, ctr: 10, conversion: 2 }] } }).prompt;
   check(/Gösterim 1\.000/.test(f) && /tıklama %10/.test(f) && /Kapak fotoğrafı/.test(f), 'L-285c Huni sorusu deney ve snapshot verisini tasir', f);
-  check(/verdict: [^,]+, snapshots }/.test(functionBody(read('app.js'), 'function openFunnelTestQuestion(')), 'L-285d Huni sorusu uygulamadan snapshot verisiyle acilir');
+  // L-285d: "Onceki kapak testini sor" dugmesi sadelikte kalkti (21.11.2026);
+  // yeni Airbnb performans kayitlarini gormuyordu. Istem turu motorda durur.
+  check(!/function openFunnelTestQuestion\(/.test(read('app.js')), 'L-285d Eski kapak testi dugmesi ve fonksiyonu yok');
 }
 
 // ---------------------------------------------------------------------------
@@ -1271,7 +1261,7 @@ async function GorevDuzenle() {
 // ---------------------------------------------------------------------------
 async function L287() {
   const src = read('app.js');
-  const akislar = ['async function addLeadSource(', 'async function createGeneralOperationalTask(', 'async function resolveMaintenanceFromOperations('];
+  const akislar = ['async function createGeneralOperationalTask(', 'async function resolveMaintenanceFromOperations('];
   akislar.forEach(imza => {
     const govde = functionBody(src, imza);
     check(govde && !/[^.\w]prompt\(|[^.\w]confirm\(/.test(govde) && /uiAskText|uiAskConfirm/.test(govde), `L-287 ${imza.replace('async function ', '').replace('(', '')} uygulama penceresi kullanir`);
@@ -1404,11 +1394,8 @@ async function L271() {
 // L-281 (devam) huni snapshot'i yonetimce silinir (phase105)
 // ---------------------------------------------------------------------------
 async function L281b() {
-  const UI = require('./marketing_ui.js');
-  const snap = [{ id: 's1', period_start: '2026-10-01', period_end_exclusive: '2026-10-10', impressions: 100 }];
-  check(/data-marketing-delete-snapshot="s1"/.test(UI.renderSnapshotList({ snapshots: snap, ads: { canManage: true } })), 'L-281d Yonetim snapshot satirinda Sil gorur');
-  check(!/data-marketing-delete-snapshot/.test(UI.renderSnapshotList({ snapshots: snap, ads: { canManage: false } })), 'L-281e Yonetim disi rol Sil gormez');
-  check(/phase105/.test(read('core/marketing_ui.js')) && /23503/.test(read('core/marketing_ui.js')), 'L-281f Goc yoksa ya da olcumde kullaniliyorsa nedeni soylenir');
+  // Huni snapshot listesi sadelik turunda kalkti (21.11.2026); silme dugmesi de yok.
+  check(!/data-marketing-delete-snapshot/.test(read('core/marketing_ui.js')), 'L-281d Eski snapshot listesi ve silme yolu kalmadi');
 }
 
 // ---------------------------------------------------------------------------

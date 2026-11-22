@@ -256,7 +256,6 @@ function run() {
     app.setAppData(operasyonVeri);
     app.renderOperationsTab();
     const operationsHtml = global.document.getElementById('opsCombinedContainer').innerHTML;
-    const operationsCount = global.document.getElementById('opsTaskCountBadge').innerText;
     // Gecmis bolumu (odenmis/yapilmis isler) bilerek ayri; 19 aktif listeleri olcer.
     const aktifHtml = operationsHtml.replace(/<section class="ops-group" id="opsCleaningHistory">[\s\S]*?<\/section>/, '');
     const rowCount = (aktifHtml.match(/data-cleaning-task-id=/g) || []).length;
@@ -274,10 +273,10 @@ function run() {
       operationsHtml.slice(0, 1000)
     );
     check(
-      !operationsHtml.includes('ODENMIS-GOREV-GIZLI') && operationsHtml.includes('data-cleaning-task-id="planned-1"') && operationsCount === '1'
+      !operationsHtml.includes('ODENMIS-GOREV-GIZLI') && operationsHtml.includes('data-cleaning-task-id="planned-1"')
         && operationsHtml.includes('Bekleyen Temizlik Borçları (1)') && rowCount === 2,
       '19. Odenmis gorev gizli, geciken planli gorev gorunur; borc listesi yalniz yapilmis ve odenmemis kaydi sayiyor',
-      `badge=${operationsCount}, satir=${rowCount}, html=${operationsHtml.slice(0, 700)}`
+      `satir=${rowCount}, html=${operationsHtml.slice(0, 700)}`
     );
     check(
       operationsHtml.includes("openEditCleaningTaskModal(decodeURIComponent('pending-1'))")
@@ -346,67 +345,30 @@ function run() {
       && grid.includes('Kırmızı Ev') && grid.includes('Satışa kapalı · büyük arıza/tadilat'),
     '21. Anasayfa dort mulk durumunu gercek adlari ve acik etiketleriyle gosteriyor',
     grid.slice(0, 1800));
-    check(grid.includes('status-HEALTHY') && grid.includes('status-WARNING')
-      && grid.includes('status-INFO') && grid.includes('status-CRITICAL'),
-    '22. Hazirlik kartlari yesil, sari, mavi ve kirmizi gorsel siniflari tasiyor',
+    // Lex tablosu (21.11.2026): durum talimat etiketine doner. Hazir = Tamam
+    // (yesil), temizlik ve kucuk ariza = Yap (mavi), kapali = Acil (kirmizi).
+    const etiketler = (grid.match(/lex-tag lex-tag--(keep|up|down)/g) || []).map(m => m.slice(-4).replace('-', ''));
+    check(grid.includes('lex-tag--keep') && grid.includes('lex-tag--down')
+      && (grid.match(/lex-tag--up/g) || []).length === 2 && etiketler.length === 4,
+    '22. Hazirlik satirlari Tamam / Yap / Acil talimat etiketleri tasiyor',
     grid.slice(0, 1400));
-    check((grid.match(/class="property-readiness-select"/g) || []).length === 4,
+    check((grid.match(/class="lex-select property-readiness-select"/g) || []).length === 4,
       '23. Yetkili kullanici her mulkun durumunu anasayfadan degistirebiliyor',
       grid.slice(0, 1200));
-    check(global.document.getElementById('healthPillReady').innerText.includes('1')
-      && global.document.getElementById('healthPillCleaning').innerText.includes('1')
-      && global.document.getElementById('healthPillMinorIssue').innerText.includes('1')
-      && global.document.getElementById('healthPillBlocked').innerText.includes('1'),
-    '24. Dort anasayfa sayaci kartlarla ayni normalize sonucu kullaniyor');
+    // Satisa engel ariza varken satilabilir secenekler kapalidir (L-179).
+    const kirmiziSatir = grid.slice(grid.indexOf('Kırmızı Ev'));
+    check(/<option value="SALES_READY"[^>]*disabled/.test(kirmiziSatir.slice(0, kirmiziSatir.indexOf('</select>'))),
+    '24. Satisa engel arizali mulkte "satisa hazir" secilemez (ayni normalize sonuc)');
 
     app.setActiveTenantForTests({ id: hazirlikVeri.tenantId, name: 'Test', role: 'viewer' });
     app.renderExecutiveControlCenter();
     const viewerGrid = global.document.getElementById('portfolioHealthCardsGrid').innerHTML;
     check(!viewerGrid.includes('property-readiness-select')
-      && viewerGrid.includes('değiştirme yetkiniz yok'),
+      && viewerGrid.includes('Salt okunur'),
     '25. Yetkisiz kullanici durumu goruyor ama degistirme kontrolu gormuyor',
     viewerGrid.slice(0, 1200));
   } catch (e) {
     no('21-25. Phase 36 anasayfa hazirlik render testi', hataOzeti(e));
-  }
-
-  // --- Phase 38: finansal KPI'lar ayni anasayfa sozlesmesinde ------------
-  try {
-    domKur();
-    const kpiVeri = bosVeri();
-    kpiVeri.villas = {
-      V1: { id: 'p1', slug: 'V1', name: 'KPI Evi', activatedOn: '2026-01-01', isActive: true }
-    };
-    kpiVeri.bookings = [{
-      id: 'kpi-b1', villa: 'V1', propertyId: 'p1', checkIn: '2026-09-01', checkOut: '2026-09-11',
-      nights: 10, gross: 100000, cleaningFee: 10000, otaCommission: 10000, discount: 0,
-      status: 'CONFIRMED'
-    }];
-    kpiVeri.expenses = [
-      { id: 'kpi-o', date: '2026-09-05', amount: 20000, type: 'OPEX', villa: 'ALL', category: 'Enerji' },
-      { id: 'kpi-c', date: '2026-09-06', amount: 15000, type: 'CAPEX', villa: 'ALL', category: 'Yatırım' }
-    ];
-    app.setAppData(kpiVeri);
-    app.setActiveTenantForTests(null);
-    app.setCurrentFilter({ period: '2026-09', villa: 'ALL', startDate: null, endDate: null });
-    app.renderExecutiveControlCenter();
-
-    const get = id => global.document.getElementById(id).innerText;
-    check(get('execKpiRevenue') === '₺90.000'
-      && get('execKpiOpex') === '₺30.000'
-      && get('execKpiCapex') === '₺15.000'
-      && get('execKpiOperatingProfit') === '₺70.000'
-      && get('execKpiProfit') === '₺55.000',
-    '26. Anasayfa net konaklama cirosunu; kârda toplam geliri, OPEX ve CAPEX ile birlikte kullanıyor',
-    JSON.stringify({ revenue: get('execKpiRevenue'), opex: get('execKpiOpex'), capex: get('execKpiCapex'),
-      operatingProfit: get('execKpiOperatingProfit'), netProfit: get('execKpiProfit') }));
-    check(get('execKpiOccupancy') === '%33.33' && get('execSoldNightsLabel') === '10 / 30 Gece'
-      && get('execKpiAdr') === '₺9.000' && get('execKpiRevpar') === '₺3.000',
-    '27. Doluluk, satilan/kullanilabilir gece, ADR ve RevPAR ayni filtreyle entegre',
-    JSON.stringify({ occupancy: get('execKpiOccupancy'), nights: get('execSoldNightsLabel'),
-      adr: get('execKpiAdr'), revpar: get('execKpiRevpar') }));
-  } catch (e) {
-    no('26-27. Phase 38 anasayfa KPI render testi', hataOzeti(e));
   }
 
   // L-67: Takvim boş işletmede sahte villa üretmemeli; dolu işletmede de
@@ -451,24 +413,27 @@ function run() {
       '31. Kanal ekonomisi gerçek render testi için dışa aktarılmış',
       'renderWorkspaceHtml export edilmemiş');
     if (typeof MarketingUI.renderWorkspaceHtml === 'function') {
-      const bosRapor = MarketingUI.renderWorkspaceHtml(MarketingUI.buildWorkspaceModel({ filter: { period: '2026-09', villa: 'ALL' }, bookings: [] }), 'economics');
-      check(/rezervasyon yok|hesaplanamadı/i.test(bosRapor)
+      // Kanallar gorunumu sadelikte kalkti (21.11.2026); kanal ekonomisi modeli
+      // rapor ve ChatGPT baglami icin hesaplanmaya devam eder.
+      const bosModel = MarketingUI.buildWorkspaceModel({ filter: { period: '2026-09', villa: 'ALL' }, bookings: [] });
+      const bosRapor = JSON.stringify(bosModel.economics.totals) + MarketingUI.renderWorkspaceHtml(bosModel, 'ads');
+      check(bosModel.economics.totals.roomRevenueBeforeDistribution === 0
         && !/483[.]965|251[.]661|142[.]793/.test(bosRapor),
-      '32. Boş işletme kanal ekonomisi açıklamalı boş durum gösteriyor', bosRapor.slice(0, 900));
+      '32. Boş işletmenin kanal ekonomisi sıfır; uydurma rakam yok', bosRapor.slice(0, 900));
 
       const kiraciA = bosVeri();
       kiraciA.villas = { KIYI_01: { id: 'pa', slug: 'KIYI_01', name: 'Kıyı Evi' } };
       kiraciA.bookings = [{ id: 'ba', villa: 'KIYI_01', propertyId: 'pa', checkIn: '2026-09-01',
         checkOut: '2026-09-03', nights: 2, gross: 11000, otaCommission: 1100,
         channel: 'AIRBNB', status: 'CONFIRMED', pax: 2 }];
-      const raporA = MarketingUI.renderWorkspaceHtml(MarketingUI.buildWorkspaceModel({ filter: { period: '2026-09', villa: 'ALL' }, bookings: kiraciA.bookings, villas: kiraciA.villas }), 'economics');
+      const raporA = JSON.stringify(MarketingUI.buildWorkspaceModel({ filter: { period: '2026-09', villa: 'ALL' }, bookings: kiraciA.bookings, villas: kiraciA.villas }).economics).replace(/(\d)(\d{3})(?!\d)/g, '$1.$2');
 
       const kiraciB = bosVeri();
       kiraciB.villas = { DAG_99: { id: 'pb', slug: 'DAG_99', name: 'Dağ Evi' } };
       kiraciB.bookings = [{ id: 'bb', villa: 'DAG_99', propertyId: 'pb', checkIn: '2026-09-05',
         checkOut: '2026-09-08', nights: 3, gross: 27000, otaCommission: 0,
         channel: 'WHATSAPP', status: 'CONFIRMED', pax: 4 }];
-      const raporB = MarketingUI.renderWorkspaceHtml(MarketingUI.buildWorkspaceModel({ filter: { period: '2026-09', villa: 'ALL' }, bookings: kiraciB.bookings, villas: kiraciB.villas }), 'economics');
+      const raporB = JSON.stringify(MarketingUI.buildWorkspaceModel({ filter: { period: '2026-09', villa: 'ALL' }, bookings: kiraciB.bookings, villas: kiraciB.villas }).economics).replace(/(\d)(\d{3})(?!\d)/g, '$1.$2');
       check(/11[.]000/.test(raporA) && !/27[.]000|DAG_99/.test(raporA)
         && /27[.]000/.test(raporB) && !/11[.]000|KIYI_01/.test(raporB),
       '33. İki kiracının kanal ekonomisi rakamları birbirine sızmıyor',

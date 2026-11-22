@@ -59,14 +59,18 @@ try {
   // yazisini miras alan secenekler beyaz zemin uzerinde gorunmuyordu (mulk
   // formunda ulke listesi). Kural tek bir kutuya degil tum sayfaya konur.
   const css = read('style.css');
-  check(/:root\s*\{[^}]*color-scheme:\s*dark/.test(css), 'M14. Sayfa koyu renk semasini tarayiciya bildirir (:root color-scheme: dark)');
+  // Gece/Gunduz (Lex, 21.11.2026): sema temaya gore bildirilir; tarayicinin cizdigi
+  // listeler, takvim ve kaydirma cubugu secili temayla cizilir.
+  check(/:root\[data-theme="dark"\]\s*\{[^}]*color-scheme:\s*dark/.test(css) && /:root\[data-theme="light"\]\s*\{[^}]*color-scheme:\s*light/.test(css),
+    'M14. Sayfa renk semasini temaya gore tarayiciya bildirir (gece dark, gunduz light)');
   const optKural = css.match(/^select option[^{]*\{([^}]*)\}/m);
   check(!!optKural && /background(?:-color)?:/.test(optKural[1]) && /color:/.test(optKural[1]), 'M15. Tum secim kutularinin secenekleri koyu zemin ve acik yazi alir', optKural ? optKural[0].trim() : 'kural yok');
 
   // Pazarlama sayfa cubugunda iki eylem ayni "ChatGPT'ye sor" etiketini
   // tasiyordu (kullanici ekran goruntusu, 04.10); huni testi kendi adini alir.
-  const funnelLabel = (app.match(/id: 'funnel-test-question',\s*label: "([^"]+)"/) || [])[1] || '';
-  check(!!funnelLabel && !/^(?:🧠 )?ChatGPT'ye sor$/.test(funnelLabel), 'M16. Huni testi eylemi genel ChatGPT dugmesinden ayirt edilir', funnelLabel);
+  // Sadelik (21.11.2026): sayfa cubugundaki ikinci ChatGPT dugmesi ve eski
+  // kapak testi eylemi kalkti; cubukta yalniz "Rapor al" kalir.
+  check(!/id: 'funnel-test-question'|id: 'page-chatgpt'/.test(app), 'M16. Sayfa cubugunda tekrar eden ChatGPT eylemi yok');
 
   // Yeni kayit Supabase'de kapaliyken (L-157) kullanici nedenini gorur.
   const App = require('../app.js');

@@ -27,7 +27,9 @@
     "marketing:health-worker": "node scripts/run_marketing_health_worker.js",
     "marketing:health-source-collector": "node scripts/run_marketing_health_source_collector.js",
     "marketing:funnel-worker": "node scripts/run_marketing_funnel_worker.js",
-    "marketing:economics-worker": "node scripts/run_marketing_economics_worker.js"
+    "marketing:economics-worker": "node scripts/run_marketing_economics_worker.js",
+    "test:browser:ads": "node scripts/ads_import_browser_test.js",
+    "test:browser:links": "node scripts/one_click_links_browser_test.js"
   },
   "keywords": [],
   "author": "",

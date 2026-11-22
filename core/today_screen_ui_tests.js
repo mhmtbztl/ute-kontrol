@@ -1,4 +1,9 @@
-/** A3-G3 — Bugün ekranı rol sınırları ve tek kaynaklar. */
+/**
+ * BUGUN EKRANI — Lex Tasarimi (Otomasyon #1, kullanici karari 21.11.2026).
+ * Sayfa 1 karar: villa sekmeleri, ekip suzgeci, ozet cumlesi, ekip gorevleri,
+ * alt satir (renk aciklamasi + PDF/Excel). Sayfa 2 detay: bu hafta, satis
+ * hazirligi, bu ayin performansi. Rol sinirlari ve tek kaynaklar.
+ */
 const fs = require('fs');
 const path = require('path');
 const ROOT = path.join(__dirname, '..');
@@ -8,28 +13,60 @@ let passed = 0, failed = 0;
 const check = (condition, name, detail) => condition
   ? (passed++, console.log(`[PASS] ${name}`))
   : (failed++, console.error(`[FAIL] ${name}\n       ${detail}`));
-const between = (start, end) => APP.slice(APP.indexOf(start), APP.indexOf(end, APP.indexOf(start)));
+const body = sig => { const i = APP.indexOf(sig); return i < 0 ? '' : APP.slice(i, APP.indexOf('\nfunction ', i + 10)); };
+
+// Sahte DOM: yalniz Bugun'un yazdigi kutular.
+function sahteDom() {
+  const els = {};
+  const el = id => els[id] || (els[id] = { id, hidden: false, innerHTML: '', textContent: '', innerText: '', style: {},
+    setAttribute() {}, getAttribute() { return null; }, hasAttribute() { return false }, removeAttribute() {}, querySelectorAll() { return []; }, classList: { add() {}, remove() {}, contains() { return false; } } });
+  global.window = undefined;
+  global.document = { getElementById: el, querySelectorAll: () => [], querySelector: () => null, documentElement: null, addEventListener() {}, createElement: () => el('x' + Math.random()) };
+  return el;
+}
 
 try {
-  check(/id="todayDateStrip"/.test(INDEX), 'A1. Bugün tarih seridi var', 'todayDateStrip yok');
-  check(/id="todayTodoList"/.test(INDEX), 'A2. Yapilacaklar alani var', 'todayTodoList yok');
-  check(/id="todayMonthSummary"/.test(INDEX), 'A3. Aylik ozet tek satir alani var', 'todayMonthSummary yok');
-  check(/class="executive-kpi-grid"[^>]*hidden/.test(INDEX), 'A4. Eski sekiz KPI seridi ekrandan kaldirildi', 'KPI seridi hidden degil');
+  check(/id="todayVillaTabs"/.test(INDEX) && /id="todayTeamTabs"/.test(INDEX) && /id="todaySummary"/.test(INDEX)
+    && /id="todayTaskTable"/.test(INDEX) && /id="todayFooter"/.test(INDEX),
+  'A1. Sayfa 1: villa sekmeleri, ekip suzgeci, ozet, gorev tablosu, alt satir', 'eksik kutu');
+  check(/id="todayWeek"/.test(INDEX) && /id="todayReadiness"/.test(INDEX) && /id="todayPerformance"/.test(INDEX),
+    'A2. Sayfa 2: bu hafta, satis hazirligi, bu ayin performansi', 'eksik bolum');
+  check(!/id="todayCriticalActionsList"|id="todayTodoList"|id="todayMonthSummary"|id="todayShiftSummary"/.test(INDEX),
+    'A3. Eski komuta merkezi, yapilacaklar, ay ozeti ve sayac seridi kalkti', 'eski kutu duruyor');
+  check(!/executive-kpi-grid/.test(INDEX), 'A4. Gizli KPI seridi kalkti (sadelik 21.11.2026)', 'KPI seridi duruyor');
+  check(/<h1 class="lex-title" id="todayTitle">Bugün<\/h1>/.test(INDEX) && /data-theme-toggle/.test(INDEX),
+    'A5. Baslik satiri: ad + Gece/Gunduz dugmesi', 'baslik/dugme yok');
 
-  const render = between('function renderExecutiveControlCenter()', 'function renderTodayCommandCenter');
-  check(/canReadLedgerRole\(activeTenant\?\.role\)/.test(render),
-    'B1. Finans hesabi role gore kapili', render.slice(0, 1500));
-  check(/detectGapNights\(\)/.test(render) && !/appData\.gapNights\[0\]/.test(render),
-    'B2. Bos gece eylemi fiyatlandirma ile ayni kaynaktan gelir', 'detectGapNights tek kaynak degil');
-  check(/renderTodayDateStrip/.test(render) && /renderTodayTodoList/.test(render) && /renderTodayMonthSummary/.test(render),
-    'B3. Yeni Bugün bolumleri ana render planina bagli', 'yeni bolum renderlari eksik');
-  const monthSummary = between('function renderTodayMonthSummary', 'function renderExecutiveControlCenter');
-  check(/computeMonthActuals\(month/.test(monthSummary) && !/executiveSnapshotState/.test(monthSummary),
-    'B4. Bu ay satiri secili filtre snapshotindan degil gercek takvim ayindan beslenir', monthSummary);
+  const render = body('function renderExecutiveControlCenter(');
+  check(/renderTodayLex\(\)/.test(render), 'B1. Bugun Lex cizici ana render planina bagli', render.slice(0, 400));
+  const tasks = body('function buildTodayTeamTasks(');
+  check(/detectGapNights\(\)/.test(tasks) && /isProfitUnmeasured\(/.test(tasks) && /cleanerDebtSummary\(/.test(tasks) && /attachExecutions\(/.test(tasks),
+    'B2. Gorevler tek tanimlardan (bos gece, olculemeyen kar, temizlik borcu, kontrol bekleyen)', tasks.slice(0, 600));
+  check(/if \(can\.ledger\)/.test(tasks) && /if \(can\.sales\)/.test(tasks),
+    'B3. Finans ve satis gorevleri yalniz o veriyi okuyan rolde hesaplanir (3.3.1)', 'kapi yok');
+  const perms = body('function teamTaskPermissions(');
+  check(/canManageOperationsRole\(role\)/.test(perms) && /canReadSalesRole\(role\)/.test(perms) && /canReadLedgerRole\(role\)/.test(perms) && /canManageTenantRole\(role\)/.test(perms)
+    && !/\['owner'/.test(perms), 'B4. Rol kapisi 3.3.1 fonksiyonlarindan; ayri rol listesi yok', perms);
 
-  const cards = between('function renderTodayCommandCenter', 'function renderPortfolioHealth');
-  check(!/Puan:/.test(cards) && !/action-score-pill/.test(cards),
-    'C1. Eylem kartlarinda puan rozeti yok', cards.match(/Puan:|action-score-pill/g));
+  // Davranis: bos isletme -> uydurma yok; rol gizler.
+  sahteDom();
+  const App = require('../app.js');
+  App.setActiveTenant({ id: '00000000-0000-4000-8000-0000000000aa', role: 'owner' });
+  App.setAppData({ villas: {}, bookings: [], cleaningTasks: [], maintenance: [], maintenanceTickets: [], leads: [], expenses: [], targets: [], closedPeriods: [], marketingCampaigns: [], propertyDailyPrices: [] });
+  App.renderTodayLex();
+  const d = global.document.getElementById;
+  check(/açık iş yok/.test(d('todaySummary').innerHTML) && /Bugüne ait açık iş yok/.test(d('todayTaskTable').innerHTML),
+    'C1. Bos isletmede gorev uydurulmaz; ozet durumu soyler', d('todaySummary').innerHTML);
+  check(/printTodayPdf\(\)/.test(d('todayFooter').innerHTML) && /downloadTodayExcel\(\)/.test(d('todayFooter').innerHTML) && /Hafta sonu/.test(d('todayFooter').innerHTML),
+    'C2. Alt satir: renk aciklamasi + PDF + Excel', d('todayFooter').innerHTML);
+
+  App.setActiveTenant({ id: '00000000-0000-4000-8000-0000000000aa', role: 'staff' });
+  App.setAppData({ villas: { A: { id: 'p1', name: 'Seyir' }, B: { id: 'p2', name: 'Doğuş' } }, bookings: [], cleaningTasks: [], maintenance: [], maintenanceTickets: [], leads: [], expenses: [], targets: [], closedPeriods: [], marketingCampaigns: [], propertyDailyPrices: [] });
+  App.renderTodayLex();
+  check(d('todayPerformance').hidden === true && d('todayWeek').hidden === true && !/giriş/.test(d('todaySummary').innerHTML),
+    'C3. Saha personeli finans/rezervasyon gormez; ozet giris/cikis yazmaz', d('todaySummary').innerHTML);
+  check(/Seyir/.test(d('todayVillaTabs').innerHTML) && /Doğuş/.test(d('todayVillaTabs').innerHTML) && !/Zirve|Nefes/.test(d('todayVillaTabs').innerHTML),
+    'C4. Villa sekmeleri isletmenin kendi mulklerinden (sabit villa adi yok, 3.6)', d('todayVillaTabs').innerHTML.slice(0, 300));
 } catch (error) {
   failed++;
   console.error(`[FAIL] Beklenmeyen hata\n       ${error && error.stack}`);

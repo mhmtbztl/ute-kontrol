@@ -67,8 +67,8 @@ try {
   check(/canAssignCleaner/.test(assignBody) && /assign_cleaning_task/.test(assignBody),
     'D1. Istemci atama RPCsinden once L-129 kapisini yeniden denetler', assignBody.slice(0, 500));
   const inspectBody = (app.match(/async function inspectCleaningExecution[\s\S]*?\n}\n/) || [''])[0];
-  check(/inspect_cleaning/.test(inspectBody) && /invalidateExecutiveSnapshotCache\(\)/.test(inspectBody),
-    'D2. M denetimi defter onbellegini temizler', inspectBody.slice(0, 500));
+  check(/inspect_cleaning/.test(inspectBody) && /loadTenantAppData|renderAll/.test(inspectBody),
+    'D2. M denetimi sonrasi ekran gercek kayda gore yenilenir', inspectBody.slice(0, 500));
   const assignMaintenance = (app.match(/async function assignMaintenanceTechnician[\s\S]*?\n}\n/) || [''])[0];
   check(/maintenance_assignments/.test(assignMaintenance) && /upsert/.test(assignMaintenance),
     'D3. Ariza ustasi maintenance_assignments defterine yazilir', assignMaintenance.slice(0, 500));

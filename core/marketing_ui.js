@@ -7,14 +7,9 @@
   if (typeof module === 'object' && module.exports) {
     module.exports = factory({
       MarketingEngine: require('./marketing_engine'),
-      MarketingFunnelService: require('./marketing_funnel_service'),
-      MarketingPriorityService: require('./marketing_priority_service'),
       LexbnbBusinessDate: require('./business_date'),
       LexbnbGuestCrm: require('./guest_crm_engine'),
-      MarketingBenchmarkService: require('./marketing_benchmark_service'),
-      MarketingCoverChangeService: require('./marketing_cover_change_service'),
       MarketingDataService: require('./marketing_data_service'),
-      MarketingHealthResultsService: require('./marketing_health_results_service'),
       AdsMetricsEngine: require('./ads_metrics_engine'),
       AdsImportParser: require('./ads_import_parser'),
       AdsMetricGlossary: require('./ads_metric_glossary'),
@@ -28,12 +23,9 @@
   'use strict';
 
   const state = {
-    view: 'economics',
-    snapshotFormOpen: false,
+    view: 'home',
     listingFormOpen: false,
     listingPropertyId: null,
-    experimentFormOpen: false,
-    benchmarkFormOpen: false,
     listings: [],
     snapshots: [],
     findings: [],
@@ -68,24 +60,16 @@
 
   const BROWSER_DEPENDENCIES = Object.freeze([
     ['AirbnbPerformanceService', 'core/airbnb_performance_service.js?v=324a48bb'],
-    ['AirbnbPerformanceUI', 'core/airbnb_performance_ui.js?v=42eb6e0f'],
+    ['AirbnbPerformanceUI', 'core/airbnb_performance_ui.js?v=2c6bc8a4'],
     ['LexbnbBusinessDate', 'core/business_date.js?v=a1518391'],
     ['MarketingEngine', 'core/marketing_engine.js?v=2756f4ec'],
-    ['MarketingFunnelService', 'core/marketing_funnel_service.js?v=a5ecbdaa'],
-    ['MarketingPriorityService', 'core/marketing_priority_service.js?v=f6e216ff'],
-    ['MarketingBenchmarkService', 'core/marketing_benchmark_service.js?v=05187d46'],
-    ['MarketingCoverChangeService', 'core/marketing_cover_change_service.js?v=81211a39'],
     ['MarketingDataService', 'core/marketing_data_service.js?v=0c6b8c4f'],
-    ['MarketingReviewService', 'core/marketing_review_service.js?v=9207dee5'],
-    ['MarketingSnapshotService', 'core/marketing_snapshot_service.js?v=04136be1'],
     ['MarketingChannelListingService', 'core/marketing_channel_listing_service.js?v=515fe386'],
-    ['MarketingExperimentService', 'core/marketing_experiment_service.js?v=4a2ffb14'],
-    ['MarketingHealthResultsService', 'core/marketing_health_results_service.js?v=662edeea'],
     ['AdsMetricsEngine', 'core/ads_metrics_engine.js?v=d8dd5962'],
     ['AdsMetricGlossary', 'core/ads_metric_glossary.js?v=cc78ebd3'],
     ['AdsAnalyticsEngine', 'core/ads_analytics_engine.js?v=4250b14d'],
-    ['AdsImportParser', 'core/ads_import_parser.js?v=ceff62b1'],
-    ['AdsPeriodService', 'core/ads_period_service.js?v=1b4f5123']
+    ['AdsImportParser', 'core/ads_import_parser.js?v=9656ffe3'],
+    ['AdsPeriodService', 'core/ads_period_service.js?v=2eaac0e3']
   ]);
   let dependencyPromise = null;
 
@@ -311,194 +295,8 @@
     return `<div class="card mkt-kpi" style="padding:16px;min-width:170px;flex:1"><div class="sub-text" style="font-size:11px;text-transform:uppercase">${escapeHtml(label)}</div><div style="font-size:24px;font-weight:800;margin:5px 0">${escapeHtml(value)}</div><div class="sub-text" style="font-size:11px">${escapeHtml(note)}</div></div>`;
   }
 
-  function renderMarketingHealth(model) {
-    if (!services.MarketingHealthResultsService) return '';
-    if (model.selectedProperty === 'ALL') {
-      return `<div class="card" style="padding:14px;margin-bottom:12px"><strong>Pazarlama sağlığı</strong><div class="sub-text" style="margin-top:5px">Birleştirilmiş skor üretilmez. Sağlık snapshot’ını görmek için tek bir mülk seçin.</div></div>`;
-    }
-    const selected = model.properties.find(item => item.slug === model.selectedProperty);
-    const view = services.MarketingHealthResultsService.buildHealthView({
-      snapshots: model.healthSnapshots, propertyId: selected && selected.id
-    });
-    if (!view.available) {
-      const detail = view.reason === 'INSUFFICIENT_DATA'
-        ? `Raporlanabilir skor için veri kapsamı yetersiz (${number(view.coveragePercent, '%')}). Eksik veri puanla doldurulmadı.`
-        : view.reason === 'NO_SNAPSHOT'
-          ? 'Bu mülk için backend tarafından üretilmiş sağlık snapshot’ı henüz yok.'
-          : 'Sağlık snapshot’ı doğrulanamadığı için skor gösterilmiyor.';
-      const missing = Array.isArray(view.missingComponents) && view.missingComponents.length
-        ? `<div class="sub-text" style="margin-top:6px">Eksik bileşenler: ${escapeHtml(view.missingComponents.map(item => item.key).join(', '))}</div>` : '';
-      return `<div class="card" style="padding:14px;margin-bottom:12px"><strong>Pazarlama sağlığı hesaplanamadı</strong><div class="sub-text" style="margin-top:5px">${detail}</div>${missing}</div>`;
-    }
-    const tier = { HIGH: 'Yüksek', MEDIUM: 'Orta' }[view.confidenceTier] || view.confidenceTier;
-    const missing = view.missingComponents.length
-      ? `Eksik: ${view.missingComponents.map(item => item.key).join(', ')}` : 'Tüm bileşenler mevcut';
-    return `<div class="card" style="padding:14px;margin-bottom:12px"><div style="display:flex;gap:10px;flex-wrap:wrap">${kpi('Pazarlama sağlık skoru', number(view.score, '/100'), 'Değişmez backend snapshot’ı')}${kpi('Veri kapsamı', number(view.coveragePercent, '%'), 'Eksik veri puanlanmadı')}${kpi('Güven', `${escapeHtml(tier)} · ${number(view.confidenceIndex * 100, '%')}`, 'İstatistiksel kesinlik değildir')}</div><div class="sub-text" style="margin-top:8px">${escapeHtml(missing)} · Ölçüm zamanı: ${escapeHtml(view.asOf || 'belirtilmedi')} · Sürüm: ${escapeHtml(view.scoringVersion || 'belirtilmedi')}</div></div>`;
-  }
 
-  function renderEconomics(model) {
-    const report = model.economics;
-    const totals = report.totals;
-    const rows = report.channels.map(row => {
-      const share = totals.roomRevenueBeforeDistribution > 0
-        ? (row.roomRevenueBeforeDistribution / totals.roomRevenueBeforeDistribution) * 100 : null;
-      return `<tr>
-      <td data-label="Kanal"><strong>${escapeHtml(CHANNEL_LABELS[row.channel] || row.channel)}</strong>${row.rawChannels && row.rawChannels.length && row.channel === 'DIRECT' ? `<div class="sub-text">${escapeHtml(row.rawChannels.map(raw => DIRECT_CHANNEL_LABELS[String(raw).trim().toUpperCase()] || 'Doğrudan').join(', '))}</div>` : ''}${row.channel === 'UNKNOWN' ? '<div class="sub-text">Eşleme gerekli</div>' : ''}</td>
-      <td data-label="Rezervasyon">${number(row.reservationCount)}</td><td data-label="Gece">${number(row.bookedNights)}</td>
-      <td data-label="Konaklama cirosu">${money(row.roomRevenueBeforeDistribution, report.currency)}</td>
-      <td data-label="Komisyon">${money(row.distributionCost, report.currency)}</td>
-      <td data-label="Size kalan net">${money(row.roomRevenueAfterDistribution, report.currency)}</td>
-      <td data-label="Pay">${number(share, '%')}</td>
-    </tr>`;
-    }).join('');
-    const unknown = report.dataQuality.unknownRawChannels;
-    const warnings = [];
-    if (unknown.length) warnings.push(`Eşlenmemiş kanal: ${unknown.join(', ')}`);
-    if (report.dataQuality.assumedCurrencyReservationCount) warnings.push(`${report.dataQuality.assumedCurrencyReservationCount} rezervasyonda para birimi TRY varsayıldı.`);
-    warnings.push('Kanal bazlı müsait gece verilmediği için RevPAR gösterilmiyor.');
 
-    const profitCard = model.financeSummary && Number.isFinite(Number(model.financeSummary.netProfit))
-      ? kpi('Net kâr', money(model.financeSummary.netProfit, report.currency), 'Finans defteriyle aynı hesap') : '';
-    const bulkNote = model.bulkSummaryCount ? `<div class="card" style="padding:12px;margin-bottom:12px">${number(model.bulkSummaryCount)} toplu aktarım özeti gelir ve geceye dahil, rezervasyon adedine dahil değildir.</div>` : '';
-    return `${renderMarketingHealth(model)}${renderBenchmarkPanel(model)}${bulkNote}<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
-      ${kpi('Oda geliri', money(totals.roomRevenueBeforeDistribution, report.currency), 'Temizlik hariç, komisyon öncesi')}
-      ${kpi('Dağıtım maliyeti', money(totals.distributionCost, report.currency), 'Yalnızca kaydedilmiş komisyon')}
-      ${kpi('Size kalan net (komisyon sonrası)', money(totals.roomRevenueAfterDistribution, report.currency), 'Konaklama cirosu eksi dağıtım maliyeti')}
-      ${kpi('Net ADR', money(totals.netRoomAdr, report.currency), `${number(totals.bookedNights)} satılmış gece`)}
-      ${kpi('Doğrudan rezervasyon', number(report.mix.directReservationSharePercent, '%'), 'Rezervasyon adedi payı')}
-      ${profitCard}
-    </div>
-    <div class="card mkt-channel-card" style="padding:0;overflow:auto">
-      <table class="mkt-channel-table mobile-cards" style="width:100%;border-collapse:collapse;min-width:780px"><thead><tr>
-        <th>Kanal</th><th>Rezervasyon</th><th>Gece</th><th>Konaklama cirosu</th><th>Komisyon</th><th>Size kalan net</th><th>Pay</th>
-      </tr></thead><tbody>${rows || '<tr><td colspan="7" style="padding:24px;text-align:center">Bu dönemde rezervasyon yok.</td></tr>'}</tbody></table>
-    </div>
-    <div class="card" style="padding:14px;margin-top:12px"><strong>Veri notları</strong><ul style="margin:8px 0 0;padding-left:20px">${warnings.map(item => `<li>${escapeHtml(item)}</li>`).join('')}</ul></div>`;
-  }
-
-  function renderBenchmarkPanel(model) {
-    const selected = model.selectedProperty === 'ALL' ? null : model.properties.find(item => item.slug === model.selectedProperty);
-    const propertyId = selected && selected.id;
-    const current = selectCurrentBenchmark(model.benchmarks, propertyId, services.LexbnbBusinessDate.getBusinessDate());
-    const button = `<button type="button" class="btn btn-secondary btn-sm" data-marketing-open-benchmark${propertyId ? '' : ' disabled'}>＋ Referans ekle</button>`;
-    const form = state.benchmarkFormOpen ? renderBenchmarkForm(model) : '';
-    if (!current) return `<div class="card" style="padding:14px;margin-bottom:12px"><div style="display:flex;justify-content:space-between;gap:12px;align-items:center"><div><strong>Pazarlama referansı yok</strong><div class="sub-text">Karşılaştırma bulguları, kaynağı ve geçerlilik tarihi belirtilmiş bir referans olmadan üretilmez.</div></div>${button}</div>${form}</div>`;
-    const values = [
-      ['CTR', current.searchToViewCtrPercent ?? current.search_to_view_ctr_percent, '%'],
-      ['Dönüşüm', current.viewToBookingConversionPercent ?? current.view_to_booking_conversion_percent, '%'],
-      ['Gösterim / ilan-gün', current.normalizedImpressionsPerListingDay ?? current.normalized_impressions_per_listing_day, ''],
-      ['Aktif medya', current.recommendedActiveMediaCount ?? current.recommended_active_media_count, ''],
-      ['Azami dağıtım maliyeti', current.maxDistributionCostPercent ?? current.max_distribution_cost_percent, '%'],
-      ['Asgari direkt pay', current.minimumDirectReservationSharePercent ?? current.minimum_direct_reservation_share_percent, '%']
-    ].filter(([, value]) => value !== null && value !== undefined).map(([label, value, suffix]) => `${label}: ${number(value, suffix)}`).join(' · ');
-    return `<div class="card" style="padding:14px;margin-bottom:12px"><div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start"><div><strong>Geçerli pazarlama referansı</strong><div class="sub-text">${escapeHtml(current.sourceKind || current.source_kind || 'Kaynak belirtilmedi')} · ${escapeHtml(current.effectiveFrom || current.effective_from || 'Tarih yok')} · güven ${number(Number(current.confidence) * 100, '%')}</div><div style="margin-top:7px;font-size:12px">${escapeHtml(values || 'Sayısal değer yok')}</div></div>${button}</div>${form}</div>`;
-  }
-
-  function selectCurrentBenchmark(benchmarks = [], propertyId, asOfDate) {
-    return benchmarks.filter(item => (!propertyId || (item.propertyId || item.property_id) === propertyId)
-      && String(item.effectiveFrom || item.effective_from || '') <= asOfDate
-      && (!(item.effectiveToExclusive || item.effective_to_exclusive) || String(item.effectiveToExclusive || item.effective_to_exclusive) > asOfDate))
-      .sort((a, b) => String(b.effectiveFrom || b.effective_from || '').localeCompare(String(a.effectiveFrom || a.effective_from || '')))[0] || null;
-  }
-
-  function renderBenchmarkForm(model) {
-    const selected = model.properties.find(item => item.slug === model.selectedProperty);
-    if (!selected || !selected.id) return '';
-    const numeric = (name, label, max = '', step = '0.001') => `<label style="display:grid;gap:5px;font-size:12px">${escapeHtml(label)}<input class="form-control" type="number" min="0"${max ? ` max="${max}"` : ''} step="${step}" name="${escapeHtml(name)}" placeholder="Boş bırakılabilir"></label>`;
-    return `<form data-marketing-benchmark-form style="margin-top:14px;border-top:1px solid rgba(148,163,184,.2);padding-top:14px"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px">
-      <label style="display:grid;gap:5px;font-size:12px">Kaynak türü<select class="form-control" name="sourceKind" required><option value="PORTFOLIO_HISTORY">Portföy geçmişi</option><option value="MARKET_PROVIDER">Pazar veri sağlayıcısı</option><option value="MANUAL_RESEARCH">Manuel araştırma</option></select></label>
-      <label style="display:grid;gap:5px;font-size:12px">Kaynak kaydı<input class="form-control" name="sourceRecordId" maxlength="300" placeholder="Rapor/dosya/sorgu referansı"></label>
-      <label style="display:grid;gap:5px;font-size:12px">Geçerlilik başlangıcı<input class="form-control" type="date" name="effectiveFrom" value="${services.LexbnbBusinessDate.getBusinessDate()}" required></label>
-      <label style="display:grid;gap:5px;font-size:12px">Geçerlilik bitişi (hariç)<input class="form-control" type="date" name="effectiveToExclusive"></label>
-      ${numeric('searchToViewCtrPercent', 'Arama → görüntüleme CTR (%)', '100')}${numeric('viewToBookingConversionPercent', 'Görüntüleme → rezervasyon (%)', '100')}
-      ${numeric('normalizedImpressionsPerListingDay', 'Gösterim / ilan-gün')}${numeric('recommendedActiveMediaCount', 'Önerilen aktif medya', '', '1')}
-      ${numeric('maxDistributionCostPercent', 'Azami dağıtım maliyeti (%)', '100')}${numeric('minimumDirectReservationSharePercent', 'Asgari direkt rezervasyon payı (%)', '100')}
-      <label style="display:grid;gap:5px;font-size:12px">Güven (0–1)<input class="form-control" type="number" min="0" max="1" step="0.01" name="confidence" placeholder="Kanıta göre girin" required></label>
-      <label style="display:grid;gap:5px;font-size:12px">Kanıt notu<input class="form-control" name="evidenceNote" maxlength="500"></label>
-    </div><div class="sub-text" style="margin-top:9px">En az bir sayısal değer gerekir. Kaydedilen referans geçmişi değiştirilemez.</div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button type="button" class="btn btn-secondary btn-sm" data-marketing-cancel-benchmark>Vazgeç</button><button type="submit" class="btn btn-primary btn-sm">Referansı kaydet</button></div></form>`;
-  }
-
-  function renderFunnel(model) {
-    const selected = model.selectedProperty === 'ALL' ? null : model.properties.find(item => item.slug === model.selectedProperty);
-    const selectedId = selected && selected.id;
-    const scopedListings = model.listings.filter(item => !selectedId || (item.propertyId || item.property_id) === selectedId);
-    const activeMedia = model.media.filter(item => (!selectedId || (item.propertyId || item.property_id) === selectedId)
-      && String(item.mediaStatus || item.media_status || '').toUpperCase() === 'ACTIVE');
-    const experimentDisabled = !selectedId || !scopedListings.length || activeMedia.length < 2;
-    const toolbar = `<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-bottom:12px"><button type="button" class="btn btn-secondary btn-sm" data-marketing-open-listing>＋ Kanal ilanı ekle</button><button type="button" class="btn btn-secondary btn-sm" data-marketing-open-experiment${experimentDisabled ? ' disabled' : ''}>Değişikliği ölç</button><button type="button" class="btn btn-primary btn-sm" data-marketing-open-snapshot>＋ Manuel snapshot ekle</button></div>`;
-    const listingApi = services.MarketingChannelListingService;
-    const listingNote = scopedListings.length
-      ? `<div class="sub-text" style="margin-bottom:10px">Kayıtlı kanal ilanları: ${escapeHtml(scopedListings.map(item => listingApi && listingApi.channelName ? listingApi.channelName(item) : (item.channel_code || item.channelCode)).join(', '))} — Mülkler › profil › Kanallar sekmesinde düzenlenir.</div>` : '';
-    const listingForm = (state.listingFormOpen ? renderListingForm(model) : '') + listingNote;
-    const form = state.snapshotFormOpen ? renderSnapshotForm(model) : '';
-    const experimentForm = state.experimentFormOpen ? renderExperimentForm(model) : '';
-    const experimentResults = renderExperiments(model.experiments, selectedId);
-    if (!model.snapshots.length) {
-      const channel = String((model.listings[0] || {}).channelCode || (model.listings[0] || {}).channel_code || '').toUpperCase();
-      const platformNote = channel === 'BOOKING_COM'
-        ? 'Booking.com Extranet’te kaydı bulunan aşamalar gösterilir; boş alanlar ölçülmedi sayılır.'
-        : 'Airbnb için ilk sayfa görünme → ilan görüntüleme → rezervasyon aşamaları kullanılır; boş alanlar ölçülmedi sayılır.';
-      return `${toolbar}${listingForm}${form}${experimentForm}${emptyState('Huni verisi henüz yok', platformNote)}${experimentResults}`;
-    }
-    const funnel = services.MarketingFunnelService;
-    const latest = selectLatestSnapshot(model.snapshots);
-    const derived = funnel && funnel.deriveFunnelMetrics ? funnel.deriveFunnelMetrics(latest) : null;
-    if (!derived || !derived.validation.valid) {
-      return `${toolbar}${listingForm}${form}${experimentForm}${emptyState('Huni snapshot’ı doğrulanamadı', 'Sayaç sıralamasını ve negatif/eksik değerleri kontrol edin.')}${experimentResults}`;
-    }
-    const c = derived.validation.counters;
-    const r = derived.rates;
-    const findings = rankFindings(model.findings);
-    return `${toolbar}${listingForm}${form}${experimentForm}<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
-      ${kpi('Gösterim', number(c.impressions), `Veri tamlığı: 5 sayaçtan ${number(Math.round((derived.validation.coveragePercent || 0) * 5 / 100))} tanesi girildi (${number(derived.validation.coveragePercent, '%')})`)}
-      ${kpi('İlan görüntüleme', number(c.listingViews), `Arama → görüntüleme: ${number(r.searchToViewCtrPercent, '%')}`)}
-      ${kpi('Rezervasyon denemesi', number(c.bookingAttempts), `Görüntüleme → deneme: ${number(r.viewToAttemptConversionPercent, '%')}`)}
-      ${kpi('Platform rezervasyonu', number(c.platformReportedBookings), `Görüntüleme → rezervasyon: ${number(r.viewToBookingConversionPercent, '%')}`)}
-    </div>${renderSnapshotList(model)}${renderFindings(findings)}${experimentResults}`;
-  }
-
-  // Huni snapshot'lari ve yonetim icin silme (L-281, phase105 DELETE politikasi).
-  function renderSnapshotList(model) {
-    const rows = (model.snapshots || []).slice(0, 10);
-    if (!rows.length) return '';
-    const canManage = !!(model.ads && model.ads.canManage);
-    return `<div class="card" style="padding:14px;margin-bottom:12px"><strong>Kayıtlı snapshot'lar</strong><div style="display:grid;gap:6px;margin-top:8px">${rows.map(row => `<div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><span>${escapeHtml(row.period_start || row.periodStart || '?')} → ${escapeHtml(row.period_end_exclusive || row.periodEndExclusive || '?')} · gösterim ${number(row.impressions)}${row.notes ? ' · ' + escapeHtml(row.notes) : ''}</span>${canManage ? `<button type="button" class="btn btn-danger btn-sm" data-marketing-delete-snapshot="${escapeHtml(row.id)}">Sil</button>` : ''}</div>`).join('')}</div></div>`;
-  }
-
-  async function deleteSnapshot(snapshotId) {
-    const client = typeof supabaseClient !== 'undefined' ? supabaseClient : null;
-    const scope = cloudScope();
-    if (!client || !scope || !snapshotId) throw new Error('SNAPSHOT_DELETE_UNAVAILABLE');
-    if (typeof window !== 'undefined' && !window.confirm('Bu huni snapshot\'ı silinsin mi?')) return false;
-    const status = document.getElementById('marketingWorkspaceStatus');
-    const { data, error } = await client.from('channel_performance_snapshots').delete()
-      .eq('id', snapshotId).eq('tenant_id', scope.tenantId).select('id');
-    if (error) {
-      if (status) status.textContent = String(error.code) === '23503'
-        ? 'Bu snapshot bir değişiklik ölçümünde kullanılıyor; silinemez.'
-        : 'Snapshot silinemedi. Lütfen yeniden deneyin.';
-      return false;
-    }
-    if (!data || !data.length) {
-      // Politika yoksa satir sessizce filtrelenir (RLS).
-      if (status) status.textContent = 'Snapshot silinemedi: veritabanı göçü (phase105) henüz uygulanmadı ya da bu rolün silme yetkisi yok.';
-      return false;
-    }
-    state.remoteStatus = 'LOADING';
-    render();
-    await hydrateCloudData();
-    render();
-    if (status) status.textContent = 'Snapshot silindi.';
-    return true;
-  }
-
-  function selectLatestSnapshot(snapshots = []) {
-    return snapshots.slice().sort((a, b) => {
-      const aKey = String(a.periodEndExclusive || a.period_end_exclusive || a.createdAt || a.created_at || '');
-      const bKey = String(b.periodEndExclusive || b.period_end_exclusive || b.createdAt || b.created_at || '');
-      return bKey.localeCompare(aKey);
-    })[0] || null;
-  }
 
   function renderListingForm(model) {
     const properties = model.properties.filter(item => item.id);
@@ -523,88 +321,6 @@
       <div class="sub-text" style="margin-top:10px">ETS Tur gibi listede olmayan bir kanal için “Diğer OTA” seçin ve platform adını yazın. İlan bağlantısını yapıştırmanız yeterli; ID bağlantıdan okunur. Kaydedilen ilanlar Mülkler › profil › Kanallar sekmesinde listelenir ve ChatGPT analizine bağlantı olarak gider. Aynı ilan tekrar kaydedilirse mevcut kayıt güncellenir.</div>
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button type="button" class="btn btn-secondary btn-sm" data-marketing-cancel-listing>Vazgeç</button><button type="submit" class="btn btn-primary btn-sm">Kanal ilanını kaydet</button></div>
     </form>`;
-  }
-
-  function renderSnapshotForm(model) {
-    if (!model.listings.length) return emptyState('Kanal ilanı bulunamadı', 'Snapshot kaydetmeden önce bu mülk için aktif bir kanal ilanı tanımlanmalıdır.');
-    const start = model.period.start || '';
-    const end = model.period.endExclusive || '';
-    const options = model.listings.map(item => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.display_name || item.displayName || item.channel_code || item.channelCode || item.id)}</option>`).join('');
-    const field = (name, label) => `<label style="display:grid;gap:5px;font-size:12px">${escapeHtml(label)}<input class="form-control" type="number" min="0" step="1" name="${escapeHtml(name)}" placeholder="Bilinmiyorsa boş bırakın"></label>`;
-    return `<form data-marketing-snapshot-form class="card" style="padding:16px;margin-bottom:14px">
-      <h3 style="margin:0 0 12px">Manuel huni snapshot’ı</h3>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
-        <label style="display:grid;gap:5px;font-size:12px">Kanal ilanı<select class="form-control" name="channelListingId" required>${options}</select></label>
-        <label style="display:grid;gap:5px;font-size:12px">Başlangıç<input class="form-control" type="date" name="periodStart" value="${escapeHtml(start)}" required></label>
-        <label style="display:grid;gap:5px;font-size:12px">Bitiş (hariç)<input class="form-control" type="date" name="periodEndExclusive" value="${escapeHtml(end)}" required></label>
-        ${field('impressions', 'Gösterim')}${field('listingViews', 'İlan görüntüleme')}${field('bookingAttempts', 'Rezervasyon denemesi')}${field('platformReportedBookings', 'Platform rezervasyonu')}${field('wishlistSaves', 'Favoriye kaydetme')}
-      </div>
-      <label style="display:grid;gap:5px;font-size:12px;margin-top:10px">Not<input class="form-control" type="text" name="notes" maxlength="500"></label>
-      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button type="button" class="btn btn-secondary btn-sm" data-marketing-cancel-snapshot>Vazgeç</button><button type="submit" class="btn btn-primary btn-sm">Snapshot’ı kaydet</button></div>
-    </form>`;
-  }
-
-  function rankFindings(findings) {
-    const priority = services.MarketingPriorityService;
-    if (!findings.length || !priority || !priority.selectTopMarketingActions) return findings.slice(0, 3);
-    try { return priority.selectTopMarketingActions(findings); } catch (_) { return findings.slice(0, 3); }
-  }
-
-  function renderFindings(findings) {
-    if (!findings.length) return emptyState('Açık pazarlama bulgusu yok', 'Yeterli örneklem oluştuğunda kanıta dayalı bulgular burada listelenecek.');
-    return `<div class="card" style="padding:16px"><h3 style="margin-top:0">Öncelikli bulgular</h3>${findings.map(item => `<div style="padding:12px 0;border-top:1px solid rgba(148,163,184,.2)"><strong>${escapeHtml(item.title || item.findingCode || item.finding_code || 'Pazarlama bulgusu')}</strong><div class="sub-text">${escapeHtml(item.evidenceText || item.evidence_text || item.observation || 'Kanıt açıklaması bekleniyor.')}</div><div style="margin-top:6px;font-size:12px">Güven: ${escapeHtml(item.confidenceTier || item.confidence_tier || 'BELİRSİZ')}${item.priority ? ` · Öncelik: ${number(item.priority.score)}` : ''}</div>${renderFindingActions(item)}</div>`).join('')}</div>`;
-  }
-
-  function renderFindingActions(item) {
-    const id = item.id;
-    const status = String(item.status || 'OPEN').toUpperCase();
-    if (!id || !['OPEN', 'ACKNOWLEDGED'].includes(status)) return '';
-    const actionKind = String(item.actionKind || item.action_kind || '').toUpperCase();
-    const button = (action, label, className = 'btn-secondary') => `<button type="button" class="btn btn-sm ${className}" data-marketing-action="${action}" data-finding-id="${escapeHtml(id)}">${escapeHtml(label)}</button>`;
-    const actions = [];
-    if (status === 'OPEN') actions.push(button('ACKNOWLEDGE', 'İncelendi'));
-    if (['RESHOOT', 'ON_SITE_CONTENT'].includes(actionKind) && !item.acceptedForTask && !item.accepted_for_task) {
-      actions.push(button('ACCEPT_TASK', 'Operasyon görevi oluştur', 'btn-primary'));
-    }
-    actions.push(button('RESOLVE', 'Çözüldü'));
-    actions.push(button('DISMISS', 'Reddet'));
-    return `<div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:10px">${actions.join('')}</div>`;
-  }
-
-  function renderExperimentForm(model) {
-    const selected = model.selectedProperty === 'ALL' ? null : model.properties.find(item => item.slug === model.selectedProperty);
-    const propertyId = selected && selected.id;
-    const listings = model.listings.filter(item => (item.propertyId || item.property_id) === propertyId);
-    const media = model.media.filter(item => (item.propertyId || item.property_id) === propertyId
-      && String(item.mediaStatus || item.media_status || '').toUpperCase() === 'ACTIVE');
-    if (!propertyId || !listings.length || media.length < 2) return emptyState('Kapak değişimi hazır değil', 'Tek bir mülk, kanal ilanı ve en az iki aktif fotoğraf gerekir.');
-    const forms = listings.map(listing => {
-      const cover = services.MarketingCoverChangeService && services.MarketingCoverChangeService.currentCover(model.placements, listing.id);
-      if (!cover) return `<div class="sub-text">${escapeHtml(listing.displayName || listing.display_name || listing.channelCode || listing.channel_code)}: ölçülebilir değişim için önce mevcut kapak yerleşimi tanımlanmalıdır.</div>`;
-      const oldMediaId = cover.mediaId || cover.media_id;
-      const placedIds = new Set(model.placements.filter(row => (row.channelListingId || row.channel_listing_id) === listing.id && (row.isActive !== undefined ? row.isActive : row.is_active) !== false).map(row => row.mediaId || row.media_id));
-      const candidates = media.filter(item => item.id !== oldMediaId && placedIds.has(item.id));
-      if (!candidates.length) return `<div class="sub-text">${escapeHtml(listing.displayName || listing.display_name || listing.channelCode || listing.channel_code)}: aktif yerleşimde alternatif kapak yok.</div>`;
-      const options = candidates.map(item => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.roomCategory || item.room_category || 'Fotoğraf')} · ${escapeHtml(String(item.id).slice(0, 8))}</option>`).join('');
-      return `<form data-marketing-experiment-form style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;align-items:end"><input type="hidden" name="channelListingId" value="${escapeHtml(listing.id)}"><input type="hidden" name="expectedOldMediaId" value="${escapeHtml(oldMediaId)}"><label style="display:grid;gap:5px;font-size:12px">Yeni kapak<select class="form-control" name="newMediaId" required>${options}</select></label><label style="display:grid;gap:5px;font-size:12px">İzlenecek metrik<select class="form-control" name="primaryMetric"><option value="SEARCH_TO_VIEW_CTR_PERCENT">Arama → görüntüleme CTR</option><option value="VIEW_TO_BOOKING_CONVERSION_PERCENT">Görüntüleme → rezervasyon</option></select></label><button type="submit" class="btn btn-primary btn-sm">Değiştir ve 14+14 gün izle</button></form>`;
-    }).join('<hr style="border:0;border-top:1px solid rgba(148,163,184,.2);margin:12px 0">');
-    return `<div class="card" style="padding:16px;margin-bottom:14px"><h3 style="margin:0 0 6px">Kayıtlı kanal kapağını değiştir</h3><div class="sub-text" style="margin-bottom:12px">Yalnızca Lexbnb yerleşimi değişir; OTA’ya yayın yapılmaz. Eski kapak eşleşmezse işlem durur ve 14+14 günlük gözlemsel ölçüm atomik olarak açılır.</div>${forms}<div style="display:flex;justify-content:flex-end;margin-top:12px"><button type="button" class="btn btn-secondary btn-sm" data-marketing-cancel-experiment>Vazgeç</button></div></div>`;
-  }
-
-  function renderExperiments(experiments, propertyId) {
-    const scoped = experiments.filter(item => !propertyId || (item.propertyId || item.property_id) === propertyId).slice(0, 5);
-    if (!scoped.length) return '';
-    const statusLabels = { COLLECTING: 'Veri toplanıyor', READY: 'Değerlendirmeye hazır', PROCESSING: 'Değerlendiriliyor', EVALUATED: 'Değerlendirildi', FAILED: 'Değerlendirme başarısız', CANCELLED: 'İptal' };
-    const verdictLabels = { POSITIVE_ASSOCIATION: 'Pozitif ilişki', NEGATIVE_ASSOCIATION: 'Negatif ilişki', NO_CLEAR_CHANGE: 'Belirgin değişim yok', CONFOUNDED: 'Karıştırıcı etken var', INSUFFICIENT_DATA: 'Yetersiz veri' };
-    return `<div class="card" style="padding:14px;margin-top:12px"><strong>Gözlemsel değişiklik ölçümleri</strong><div style="display:grid;gap:8px;margin-top:10px">${scoped.map(item => {
-      const status = String(item.status || '').toUpperCase();
-      const verdict = String(item.verdict || '').toUpperCase();
-      const insufficient = verdict === 'INSUFFICIENT_DATA' ? ' · Karar için yetersiz' : '';
-      const confounders = item.confounders || item.confounding_factors || [];
-      const confounded = (Array.isArray(confounders) && confounders.length) || verdict === 'CONFOUNDED'
-        ? '<div class="sub-text">⚠ Aynı dönemde fiyat veya sezon etkisi olabilir.</div>' : '';
-      return `<div style="display:flex;justify-content:space-between;gap:12px"><span>${escapeHtml(item.change_date || item.changeDate || 'Tarih yok')} · ${escapeHtml(item.primary_metric || item.primaryMetric || '')}</span><strong>${escapeHtml((verdictLabels[verdict] || statusLabels[status] || status || 'Bilinmiyor') + insufficient)}</strong></div>${confounded}`;
-    }).join('')}</div><div class="sub-text" style="margin-top:8px">Bu gerçek A/B değil; yalnız olası etkiyi gösteren gözlemsel önce/sonra ölçümüdür. Sonuç nedensellik kanıtı olarak sunulmaz.</div></div>`;
   }
 
   function buildAdsModel(input = {}) {
@@ -692,7 +408,7 @@
     const glossary = services.AdsMetricGlossary;
     return {
       metrics,
-      campaigns: campaigns.filter(item => ['META', 'GOOGLE'].includes(String(item.platform || '').toUpperCase())),
+      campaigns: campaigns.filter(item => ['META', 'GOOGLE', 'TIKTOK', 'OTHER'].includes(String(item.platform || '').toUpperCase())),
       allCampaigns: campaigns,
       periods,
       allPeriods,
@@ -719,10 +435,10 @@
   // (micka_design), Import Patchbay (n1m4mz: emin olunmayan eşleşme ayrı işaretlenir).
   // Sınıflar uygulamanın kendi tasarım dilinden: card, badge-*, btn-*, upload-dropzone.
   const ADS_VIEWS = [
-    { id: 'overview', label: 'Genel bakış', manage: false },
-    { id: 'import', label: 'İçe aktar', manage: true },
-    { id: 'campaigns', label: 'Kampanyalar ve hedefler', manage: true },
-    { id: 'records', label: 'Kayıtlar', manage: false }
+    { id: 'overview', label: 'Ayrıntılı tablo', title: 'Ayrıntılı reklam tablosu', manage: false },
+    { id: 'import', label: 'Reklam raporu yükle', title: 'Reklam raporu yükle', manage: true },
+    { id: 'campaigns', label: 'Kampanyalar ve hedefler', title: 'Kampanyalar ve hedefler', manage: true },
+    { id: 'records', label: 'Kayıtlı dönemler', title: 'Kayıtlı reklam dönemleri', manage: false }
   ];
   const META_RECOMMENDED_COLUMNS = ['Kampanya adı', 'Kampanya yayını', 'Sonuçlar', 'Sonuç göstergesi', 'Harcanan tutar (TRY)', 'Gösterim', 'Erişim', 'Bağlantı tıklamaları', 'Reklam seti bütçesi'];
 
@@ -975,11 +691,6 @@
     return `<form data-ads-custom-metric-form class="ads-custom-metric-form"><input class="form-control" name="name" required maxlength="40" placeholder="Ad (örn. Günlük harcama)" aria-label="Metrik adı"><select class="form-control" name="num" aria-label="Pay">${fieldOptions}</select><select class="form-control" name="op" aria-label="İşlem"><option value="/">÷</option><option value="*">×</option></select><select class="form-control" name="den" aria-label="Payda">${fieldOptions}</select><label class="ads-custom-metric-pct"><input type="checkbox" name="percent" value="1"> %</label><button class="btn btn-secondary btn-sm" type="submit"${full ? ' disabled' : ''}>Ekle</button></form><p class="ba-footnote">İki alanı bölün ya da çarpın (örn. Harcama ÷ Gün = günlük ortalama). En fazla ${MAX_CUSTOM_METRICS}; eklenen tabloya da eklenir.</p>`;
   }
 
-  function renderAdsSubnav(active, canManage) {
-    return `<div class="ads-subnav" role="tablist" aria-label="Reklamlar bölümleri">${ADS_VIEWS.filter(view => canManage || !view.manage).map(view =>
-      `<button type="button" role="tab" class="ads-subnav-btn${view.id === active ? ' active' : ''}" aria-selected="${view.id === active ? 'true' : 'false'}" data-ads-view="${view.id}">${escapeHtml(view.label)}</button>`).join('')}</div>`;
-  }
-
   function renderAdsStepper(step) {
     const steps = ['Dosyayı yükle', 'Kampanyaları eşleştir', 'Kontrol et ve kaydet'];
     return `<ol class="ads-stepper" aria-label="İçe aktarma adımları">${steps.map((label, index) => {
@@ -989,7 +700,7 @@
   }
 
   function renderMetaRecipe(open) {
-    return `<details class="card ads-recipe"${open ? ' open' : ''}><summary><strong>Meta'dan dosya nasıl indirilir?</strong> <span class="sub-text">2 dakika</span></summary>
+    return `<details class="card ads-recipe"${open ? ' open' : ''}><summary><strong>Meta (Instagram/Facebook) raporu nasıl indirilir?</strong> <span class="sub-text">2 dakika</span></summary>
       <ol>
         <li>Reklam Yöneticisi'nde <strong>Kampanyalar</strong> sekmesini açın.</li>
         <li>Sağ üstten tarih aralığını seçin (ör. <em>Geçen ay</em>).</li>
@@ -1002,12 +713,41 @@
     </details>`;
   }
 
+  const AD_PANELS = Object.freeze([
+    { name: 'Meta Reklam Yöneticisi', url: 'https://adsmanager.facebook.com/adsmanager/manage/campaigns' },
+    { name: 'Google Ads', url: 'https://ads.google.com/aw/campaigns' },
+    { name: 'TikTok Ads', url: 'https://ads.tiktok.com/' }
+  ]);
+
+  function renderGoogleRecipe() {
+    return `<details class="card ads-recipe"><summary><strong>Google Ads raporu nasıl indirilir?</strong> <span class="sub-text">1 dakika</span></summary>
+      <ol>
+        <li>Google Ads'te sol menüden <strong>Kampanyalar</strong>'ı açın.</li>
+        <li>Sağ üstten tarih aralığını seçin (en fazla 31 gün, ör. <em>Geçen ay</em>).</li>
+        <li>Tablonun üstündeki <strong>İndir</strong> simgesine basıp <strong>.csv</strong> seçin.</li>
+        <li>Dosyayı yukarıdaki alana bırakın. Toplam satırları kendiliğinden atlanır.</li>
+      </ol>
+      <div class="sub-text">Tabloda <strong>Telefon aramaları</strong> sütunu varsa sonuç arama sayılır; yoksa dönüşümler alınır. Hesabın para birimi TRY olmalı.</div>
+    </details>`;
+  }
+
+  function renderTikTokRecipe() {
+    return `<details class="card ads-recipe"><summary><strong>TikTok raporu nasıl indirilir?</strong> <span class="sub-text">1 dakika</span></summary>
+      <ol>
+        <li>TikTok Reklam Yöneticisi'nde <strong>Kampanya</strong> sekmesini açın, tarih aralığını seçin (en fazla 31 gün).</li>
+        <li>Tablonun üstündeki <strong>Dışa aktar</strong> düğmesiyle <strong>CSV</strong> indirin.</li>
+        <li>Dosyayı adını değiştirmeden yukarıdaki alana bırakın; tarih aralığı dosya adında yazar. Günlük kırılımlı (Gün) rapor da okunur.</li>
+      </ol>
+      <div class="sub-text">Harcama sütunu "Maliyet/Cost", sonuç "Sonuçlar/Results" olarak okunur. Hesabın para birimi TRY olmalı.</div>
+    </details>`;
+  }
+
   function renderAdsDropzone() {
     return `<label class="upload-dropzone ads-dropzone" data-ads-dropzone>
       <input type="file" accept=".csv,.txt,text/csv" class="ads-file-input" data-ads-import-file>
       <span class="dropzone-icon" aria-hidden="true">📄</span>
-      <strong>Meta CSV dosyasını buraya bırakın</strong>
-      <span class="dropzone-hint">ya da tıklayıp seçin · Kampanyalar düzeyi · TRY · en fazla 5 MB</span>
+      <strong>Reklam raporunu buraya bırakın</strong>
+      <span class="dropzone-hint">ya da tıklayıp seçin · Meta, Google Ads, TikTok · CSV · TL · en fazla 5 MB</span>
     </label>`;
   }
 
@@ -1029,14 +769,14 @@
   }
 
   function renderAdsImportView(importState, campaigns, closedMonths) {
-    const head = `<div class="card" style="padding:16px;margin-bottom:14px"><h3 style="margin:0 0 4px">Meta reklam verisini içe aktar</h3><p class="sub-text" style="margin:0 0 12px">Kampanya başına harcama, gösterim, tıklama ve sonuç Finans giderine aynı işlemde bağlanır.</p>`;
+    const head = `<div class="card" style="padding:16px;margin-bottom:14px"><ol class="mk-steps"><li>Reklam panelini açın: ${AD_PANELS.map(p => `<a class="lex-link-inline" href="${p.url}" target="_blank" rel="noopener noreferrer">${escapeHtml(p.name)} ↗</a>`).join(' · ')}</li><li>Kampanyalar tablosunda tarih aralığını seçip <strong>CSV</strong> indirin (en fazla 31 gün).</li><li>Dosyayı aşağıya bırakın; gerisini Lexbnb yapar.</li></ol><p class="lex-note" style="margin:0 0 12px">Meta (Instagram/Facebook), Google Ads ya da TikTok'tan indirdiğiniz kampanya raporunu bırakın; hangi platform olduğunu Lexbnb dosyadan anlar. Harcama Finans'a gider olarak aynı işlemde yazılır.</p>`;
     if (!importState) {
-      return `${head}${renderAdsStepper(1)}${renderAdsDropzone()}</div>${renderMetaRecipe(true)}`;
+      return `${head}${renderAdsDropzone()}</div>${renderMetaRecipe(false)}${renderGoogleRecipe()}${renderTikTokRecipe()}`;
     }
-    const fileCard = `<div class="ads-file-card"><span aria-hidden="true">📄</span><div><strong>${escapeHtml(importState.fileName || 'Yapıştırılan veri')}</strong><div class="sub-text">${number((importState.rows || []).length)} satır okundu</div></div><button type="button" class="btn btn-secondary btn-sm" data-ads-import-reset>Başka dosya seç</button></div>`;
+    const fileCard = `<div class="ads-file-card"><div><strong>${escapeHtml(importState.fileName || 'Yapıştırılan veri')}</strong><div class="sub-text">${number((importState.rows || []).length)} satır okundu</div></div><button type="button" class="btn btn-secondary btn-sm" data-ads-import-reset>Başka dosya seç</button></div>`;
     const list = (title, tone, items) => items.length ? `<div class="card ads-notice ads-notice-${tone}"><strong>${escapeHtml(title)}</strong><ul>${items.map(item => `<li>${escapeHtml(item.text)}</li>`).join('')}</ul></div>` : '';
     if ((importState.parseErrors || []).length) {
-      return `${head}${renderAdsStepper(1)}${fileCard}${list('Dosya okunamadı', 'rose', importState.parseErrors)}</div>${renderMetaRecipe(true)}`;
+      return `${head}${renderAdsStepper(1)}${fileCard}${list('Düzeltilmesi gerekenler', 'rose', importState.parseErrors)}</div>${renderMetaRecipe(false)}${renderGoogleRecipe()}${renderTikTokRecipe()}`;
     }
     const plan = adsImportPlan(importState, campaigns, closedMonths);
     const loading = importState.status === 'LOADING';
@@ -1073,15 +813,28 @@
       </div>`;
   }
 
-  function renderAdsAlternativeImports(campaignOptions, manualForm) {
-    return `<details class="card ads-recipe"><summary><strong>Diğer yollar</strong> <span class="sub-text">ChatGPT çıktısı yapıştır · elle dönem ekle</span></summary>
+  function renderAdsAlternativeImports(campaigns) {
+    const names = [...new Set((campaigns || []).map(item => item.name).filter(Boolean))];
+    return `<details class="card ads-recipe" open><summary><strong>Dosyanız yok mu? Elle girin</strong> <span class="sub-text">reklam panelinde gördüğünüz toplamları yazın</span></summary>
+      <form data-ads-quick-form style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;align-items:end">
+        <label style="display:grid;gap:5px;font-size:12px">Platform<select class="form-control" name="platform" required><option value="META">Instagram / Facebook (Meta)</option><option value="GOOGLE">Google</option><option value="TIKTOK">TikTok</option><option value="OTHER">Diğer (Pinterest, Yandex…)</option></select></label>
+        <label style="display:grid;gap:5px;font-size:12px">Kampanya adı<input class="form-control" name="campaignName" required maxlength="160" list="adsCampaignNames" placeholder="Örn: Yaz mesaj kampanyası"></label>
+        <datalist id="adsCampaignNames">${names.map(name => `<option value="${escapeHtml(name)}"></option>`).join('')}</datalist>
+        <label style="display:grid;gap:5px;font-size:12px">Başlangıç<input class="form-control" type="date" name="periodStart" required></label>
+        <label style="display:grid;gap:5px;font-size:12px">Bitiş<input class="form-control" type="date" name="periodEnd" required></label>
+        <label style="display:grid;gap:5px;font-size:12px">Harcama (₺)<input class="form-control" type="text" inputmode="decimal" name="spend" required placeholder="Örn: 2.500"></label>
+        <label style="display:grid;gap:5px;font-size:12px">Ne geldi?<select class="form-control" name="resultType"><option value="MESSAGE">Mesaj</option><option value="CALL">Arama</option><option value="OTHER">Diğer</option></select></label>
+        <label style="display:grid;gap:5px;font-size:12px">Kaç tane?<input class="form-control" type="text" inputmode="numeric" name="results" placeholder="Bilmiyorsanız boş bırakın"></label>
+        <button type="submit" class="btn btn-primary btn-sm">Önizle</button>
+      </form>
+    </details>
+    <details class="card ads-recipe"><summary><strong>Ekran görüntüsünden (ChatGPT ile)</strong> <span class="sub-text">dosya indiremiyorsanız</span></summary>
       <form data-ads-import-form style="margin-top:10px">
         <p class="sub-text" style="margin:0 0 8px">Reklam ekran görüntüsünü ChatGPT'ye okutun, çıktıyı bu kesin biçimde yapıştırın. Kaydetmeden önce aynı eşleştirme ekranı açılır.</p>
         <code style="display:block;white-space:pre-wrap;margin-bottom:8px">LEXBNB_REKLAM_V2\nplatform;kampanya;baslangic;bitis;sonuc_turu;harcama;gosterim;tiklama;mesaj;arama</code>
         <textarea class="form-control" name="payload" rows="5" required aria-label="ChatGPT çıktısı"></textarea>
         <div style="display:flex;justify-content:flex-end;margin-top:8px"><button type="submit" class="btn btn-secondary btn-sm">Önizle</button></div>
       </form>
-      ${campaignOptions ? manualForm : '<p class="sub-text">Elle dönem eklemek için önce Kampanyalar ve hedefler bölümünde kampanya oluşturun.</p>'}
     </details>`;
   }
 
@@ -1127,45 +880,83 @@
     }).join('');
     const customHeaders = customMetrics.map(metric => `<th title="${escapeHtml(AD_METRIC_FIELDS[metric.num])} ${metric.op === '*' ? '×' : '÷'} ${escapeHtml(AD_METRIC_FIELDS[metric.den])}${metric.percent ? ' × 100' : ''}">${escapeHtml(metric.name)}</th>`).join('');
     const periodList = `<div class="card" style="padding:14px;margin-bottom:14px;overflow:auto"><h3 style="margin:0 0 10px">Kayıtlı reklam dönemleri</h3>${model.periods.length ? `<table class="data-table"><thead><tr><th>Kampanya</th><th>Dönem</th><th>Gün</th><th>Harcama</th><th>Günlük ort.</th><th>Gösterim</th><th>Tıklama</th><th>CTR</th><th>Mesaj</th><th>Arama</th>${customHeaders}<th></th></tr></thead><tbody>${periodRows}</tbody></table>` : '<p class="empty-state">Henüz reklam dönemi yok.</p>'}</div>`;
-    const manualForm = `
-      <form data-ads-manual-form class="card" style="padding:16px;margin-bottom:14px">
-        <h3 style="margin:0 0 6px">Reklam dönemi ekle</h3>
-        <p class="sub-text" style="margin:0 0 12px">Kaydetme işlemi reklam giderini Finans'a aynı işlem içinde bağlar.</p>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;align-items:end">
-          <label style="display:grid;gap:5px;font-size:12px">Kampanya<select class="form-control" name="campaignId" required>${campaignOptions}</select></label>
-          <label style="display:grid;gap:5px;font-size:12px">Platform<select class="form-control" name="platform" required><option value="META">Meta</option><option value="GOOGLE">Google</option></select></label>
-          <label style="display:grid;gap:5px;font-size:12px">Başlangıç<input class="form-control" type="date" name="periodStart" required></label>
-          <label style="display:grid;gap:5px;font-size:12px">Bitiş<input class="form-control" type="date" name="periodEnd" required></label>
-          <label style="display:grid;gap:5px;font-size:12px">Sonuç türü<select class="form-control" name="resultType" required><option value="MESSAGE">Mesaj</option><option value="CALL">Arama</option><option value="OTHER">Diğer</option></select></label>
-          <label style="display:grid;gap:5px;font-size:12px">Harcama<input class="form-control" type="number" name="spend" min="0" step="0.01"></label>
-          <label style="display:grid;gap:5px;font-size:12px">Gösterim<input class="form-control" type="number" name="impressions" min="0" step="1"></label>
-          <label style="display:grid;gap:5px;font-size:12px">Tıklama<input class="form-control" type="number" name="clicks" min="0" step="1"></label>
-          <label style="display:grid;gap:5px;font-size:12px">Mesaj<input class="form-control" type="number" name="messages" min="0" step="1"></label>
-          <label style="display:grid;gap:5px;font-size:12px">Arama<input class="form-control" type="number" name="calls" min="0" step="1"></label>
-          <button class="btn btn-primary btn-sm" type="submit">Dönemi kaydet</button>
-        </div>
-      </form>`;
-    const emptyCta = !(model.analysis && model.analysis.periodCount) && model.loadStatus !== 'LOADING' && model.canManage
-      ? '<div style="display:flex;justify-content:center"><button type="button" class="btn btn-primary btn-sm" data-ads-view="import">Meta CSV yükle</button></div>' : '';
-    const resultNote = state.adsImportResult ? `<div class="card ads-notice ads-notice-emerald"><strong>Kaydedildi</strong><div class="sub-text">${escapeHtml(state.adsImportResult)}</div></div>` : '';
     const sections = {
-      overview: `<div class="ba-root ads-overview">${resultNote}
-      ${overviewBody}${emptyCta}
+      overview: `<div class="ba-root ads-overview">
+      ${overviewBody}
       ${renderAdsChatGptCard(model)}
       <section class="ba-card"><div class="ba-card-head"><div><h3 class="ba-card-title">Kanal → talep maliyeti</h3><p class="ba-card-sub">Toplam reklam harcaması ${money(model.totalSpend)} · net konaklama cirosundaki pay ${number(model.adShare.pct, '%')}</p></div></div>
         <div class="ba-scroll"><table class="ba-table"><thead><tr><th scope="col">Kanal</th><th scope="col" class="num">Harcama</th><th scope="col" class="num">Talep</th><th scope="col" class="num">Talep maliyeti</th><th scope="col" class="num">Mesaj→talep</th></tr></thead><tbody>${channelRows}</tbody></table></div>
         <p class="ba-footnote"><strong>Atıf sınırı:</strong> talep kaynağı kanal düzeyinde ölçülür; hangi reklamın rezervasyon getirdiği ölçülemez. Kampanya ROAS'ı gösterilmez.</p></section></div>`,
-      import: renderAdsImportView(state.adsImport, model.allCampaigns, model.closedMonths || []) + renderAdsAlternativeImports(campaignOptions, manualForm),
+      import: renderAdsImportView(state.adsImport, model.allCampaigns, model.closedMonths || []) + renderAdsAlternativeImports(model.allCampaigns),
       campaigns: campaignAdmin,
-      records: `${model.canManage ? '<p class="sub-text" style="margin:0 0 10px">Tabloda görünen metrikleri ve kendi metriklerinizi Genel bakış → <strong>Sütunları özelleştir</strong> bölümünden yönetin.</p>' : ''}${periodList}`
+      records: `${model.canManage ? '<p class="sub-text" style="margin:0 0 10px">Tabloda görünen metrikleri ve kendi metriklerinizi <button type="button" class="lex-link-inline" data-ads-view="overview">Ayrıntılı tablo</button>’daki <strong>Sütunları özelleştir</strong> ile yönetin.</p>' : ''}${periodList}`
     };
-    return `${renderAdsSubnav(active, model.canManage)}<div role="tabpanel" data-ads-panel="${active}">${sections[active]}</div>`;
+    const title = (ADS_VIEWS.find(item => item.id === active) || ADS_VIEWS[0]).title;
+    return `<div class="mk-detail-head"><button type="button" class="lex-btn" data-marketing-home>← Pazarlama</button><h2 class="lex-subtitle">${escapeHtml(title)}</h2></div><div role="region" aria-label="${escapeHtml(title)}" data-ads-panel="${active}">${sections[active]}</div>`;
+  }
+
+  // Talimat yalniz kayitli hedefe gore (AdsMetricsEngine durumu); hedef yoksa
+  // etiket yok, nedeni yazar. Uydurma oneri yok.
+  const ADS_TAGS = Object.freeze({ VERIMLI: ['keep', 'Koru'], PAHALI: ['down', 'Düşür'], IZLE: ['up', 'Bekle'] });
+  const ADS_TAG_REASON = Object.freeze({ VERIMLI: 'Hedefin altında; bütçeyi koruyun.', PAHALI: 'Bütçeyi düşürün ya da reklamı değiştirin.' });
+
+  function adsHomeRows(model) {
+    const platform = { META: 'Instagram / Facebook', GOOGLE: 'Google', TIKTOK: 'TikTok', OTHER: 'Diğer' };
+    return (model.metrics || []).slice().sort((a, b) => (b.spend || 0) - (a.spend || 0)).map(row => {
+      const isCall = row.resultType === 'CALL';
+      const result = row.resultType === 'OTHER' ? null : (isCall ? row.calls : row.messages);
+      const unit = isCall ? 'arama' : 'mesaj';
+      const each = isCall ? row.costPerCall : row.costPerMessage;
+      const tag = ADS_TAGS[row.status];
+      const target = Number(isCall ? (model.targets || {}).costPerCall : (model.targets || {}).costPerMessage);
+      const code = row.statusReason && row.statusReason.code;
+      const Unit = unit.charAt(0).toLocaleUpperCase('tr') + unit.slice(1);
+      const reason = code === 'ZERO_RESULT' ? `${money(row.spend)} harcandı, hiç ${unit} gelmedi. ${ADS_TAG_REASON.PAHALI}`
+        : row.status === 'VERIMLI' || row.status === 'PAHALI' ? `${Unit} başı ${money(each)}, hedef ${money(target)}. ${ADS_TAG_REASON[row.status]}`
+          : row.status === 'IZLE' ? `${number(result)} ${unit} geldi; karar için en az 10 gerekir.`
+            : code === 'TARGET_MISSING' ? `${Unit} başı hedef girilmedi; girilince talimat çıkar.`
+              : (row.statusReason && row.statusReason.text) || '';
+      return `<tr><td data-label="Kampanya"><span class="lex-cell__main">${escapeHtml(row.campaignName)}</span><span class="lex-cell__sub">${escapeHtml(platform[String(row.platform || '').toUpperCase()] || row.platform || '—')}</span></td>`
+        + `<td data-label="Harcama → sonuç"><span class="lex-cell__value">${money(row.spend)}</span><span class="lex-cell__sub">${result === null || result === undefined ? 'Sonuç ölçülmedi' : `${number(result)} ${unit}${each === null || each === undefined ? '' : ` · ${unit} başı ${money(each)}`}`}</span></td>`
+        + `<td data-label="Talimat">${tag ? `<span class="lex-tag lex-tag--${tag[0]}">${tag[1]}</span>` : ''}${reason ? `<span class="lex-cell__sub">${escapeHtml(reason)}</span>` : ''}${code === 'TARGET_MISSING' && model.canManage ? '<button type="button" class="lex-btn lex-btn--inline" data-ads-view="campaigns">Hedef gir</button>' : ''}</td></tr>`;
+    }).join('');
+  }
+
+  function adsHomeSummary(model) {
+    const label = model.periodLabel || 'Bu dönem';
+    if (model.loadStatus === 'LOADING') return 'Reklam kayıtları yükleniyor…';
+    if (model.loadStatus === 'ERROR') return 'Reklam kayıtları okunamadı; bağlantıyı kontrol edip sayfayı yenileyin.';
+    if (model.totalSpend === null || model.totalSpend === undefined) return `${escapeHtml(label)} için reklam kaydı yok.`;
+    const sum = key => (model.metrics || []).some(row => row[key] !== null && row[key] !== undefined) ? (model.metrics || []).reduce((s, row) => s + (Number(row[key]) || 0), 0) : null;
+    const messages = sum('messages'), calls = sum('calls');
+    const results = [messages ? `<strong>${number(messages)} mesaj</strong>` : null, calls ? `<strong>${number(calls)} arama</strong>` : null].filter(Boolean);
+    return `${escapeHtml(label)}: reklama <strong>${money(model.totalSpend)}</strong> harcadınız${results.length ? `, ${results.join(' ve ')} geldi` : ''}.`;
+  }
+
+  function renderMarketingHome(model) {
+    const rows = adsHomeRows(model);
+    // Kayit yokken yalniz kampanya/hedef baglantisi (hedef once girilebilir); tablo ve kayitlar bos olurdu.
+    const hasPeriods = (model.allPeriods || []).length > 0;
+    const links = ADS_VIEWS.filter(view => view.id !== 'import' && (model.canManage || !view.manage) && (hasPeriods || view.id === 'campaigns'))
+      .map(view => `<button type="button" class="lex-btn lex-btn--inline" data-ads-view="${view.id}">${escapeHtml(view.label)}</button>`).join('');
+    const savedNoteHtml = state.adsImportResult ? `<p class="lex-note mk-saved" role="status">Kaydedildi · ${escapeHtml(state.adsImportResult)}</p>` : '';
+    return `<p class="lex-summary" id="marketingSummary">${adsHomeSummary(model)}</p>${savedNoteHtml}
+      <section class="mk-section" aria-labelledby="mkAdsTitle">
+        <div class="mk-section-head"><h2 class="lex-subtitle" id="mkAdsTitle">Reklamlarınız</h2>${model.canManage ? '<button type="button" class="lex-btn" data-ads-view="import">Reklam raporu yükle</button>' : ''}</div>
+        <p class="lex-note">Instagram, Facebook ve Google reklamlarına ne harcadığınız ve karşılığında kaç mesaj geldiği. Rakamlar reklam panelinden indirdiğiniz rapordan gelir; harcama Finans'a gider olarak yazılır.</p>
+        <table class="lex-table"><caption class="sr-only">Reklamlarınız</caption><thead><tr><th scope="col">Kampanya</th><th scope="col">Harcama → sonuç</th><th scope="col">Talimat</th></tr></thead><tbody>${rows || '<tr class="lex-table__empty"><td colspan="3">Bu dönemde reklam yok. Reklam vermiyorsanız bu bölümü geçebilirsiniz.</td></tr>'}</tbody></table>
+        <div class="mk-links">${links}</div>
+      </section>
+      <section class="mk-section" aria-labelledby="mkAirbnbTitle">
+        <div class="mk-section-head"><h2 class="lex-subtitle" id="mkAirbnbTitle">Airbnb ilanınız</h2></div>
+        <div id="airbnbPerformanceWorkspace"><p class="lex-note">Airbnb kayıtları yükleniyor…</p></div>
+      </section>`;
   }
 
   function renderWorkspaceHtml(model, view) {
-    if (view === 'funnel') return (state.listingFormOpen ? renderListingForm(model) : '') + '<div id="airbnbPerformanceWorkspace">Airbnb İlan Performansı yükleniyor…</div>';
-    if (view === 'ads') return renderAds(model.ads || buildAdsModel(model), state.adsView);
-    return renderEconomics(model);
+    const ads = model.ads || buildAdsModel(model);
+    if (view === 'ads') return renderAds(ads, state.adsView);
+    return (state.listingFormOpen ? renderListingForm(model) : '') + renderMarketingHome(ads);
   }
 
   function browserInput() {
@@ -1187,7 +978,7 @@
 
   function cloudScopeForView(tenantId, data = {}, filter = {}, view = state.view) {
     if (!services.MarketingDataService || !services.MarketingDataService.UUID_RE.test(String(tenantId || ''))) return null;
-    if (view === 'funnel') return { tenantId, propertyId: null };
+    if (view !== 'ads') return { tenantId, propertyId: null };
     const selectedProperty = filter.villa || 'ALL';
     if (selectedProperty === 'ALL') return { tenantId, propertyId: null };
     const propertyId = data.villas && data.villas[selectedProperty] && data.villas[selectedProperty].id;
@@ -1278,7 +1069,7 @@
     try {
       const model = buildWorkspaceModel(browserInput());
       content.innerHTML = renderWorkspaceHtml(model, state.view);
-      if (state.view === 'funnel' && services.AirbnbPerformanceUI) {
+      if (state.view !== 'ads' && services.AirbnbPerformanceUI) {
         services.AirbnbPerformanceUI.mount(document.getElementById('airbnbPerformanceWorkspace'), {
           model,
           client: typeof supabaseClient !== 'undefined' ? supabaseClient : null,
@@ -1290,27 +1081,23 @@
         : model.remoteStatus === 'OK' ? 'Bulut verisi güncel'
           : model.remoteStatus === 'PARTIAL' ? `Kısmi bulut verisi (${model.remoteErrors.length} kaynak kullanılamıyor)`
             : model.remoteStatus === 'UNAVAILABLE' ? 'Bulut pazarlama verisi kullanılamıyor' : 'Yerel rezervasyon verisi';
-      status.innerHTML = `<strong>${escapeHtml(model.period.label)}</strong> · ${model.selectedProperty === 'ALL' ? 'Tüm mülkler' : escapeHtml(model.selectedProperty)} · ${state.view === 'funnel' ? 'Airbnb rapor dönemine göre' : 'Kalış tarihine göre'} · ${escapeHtml(sourceLabel)}`;
-      status.style.display = '';
-      const badge = document.getElementById('marketingDataQualityBadge');
-      if (badge) {
-        const needsReview = model.economics.dataQuality.status !== 'OK'
-          || model.economics.dataQuality.assumedCurrencyReservationCount > 0;
-        badge.textContent = needsReview ? 'Veri kontrolü gerekli' : 'Veri kontrolü: uygun';
-        badge.className = `badge ${needsReview ? 'badge-amber' : 'badge-emerald'}`;
-      }
-      document.querySelectorAll('[data-marketing-view]').forEach(button => {
-        const active = button.dataset.marketingView === state.view;
-        button.classList.toggle('btn-primary', active);
-        button.classList.toggle('btn-secondary', !active);
-        button.setAttribute('aria-selected', String(active));
-      });
+      status.innerHTML = `<strong>${escapeHtml(model.period.label)}</strong> · ${model.selectedProperty === 'ALL' ? 'Tüm mülkler' : escapeHtml(model.selectedProperty)} · Kalış tarihine göre · ${escapeHtml(sourceLabel)}`;
+      status.style.display = 'none';
+      const periodLabel = document.getElementById('marketingPeriodLabel');
+      if (periodLabel) periodLabel.textContent = model.period.label || '—';
       return model;
     } catch (_) {
       status.textContent = 'Pazarlama çalışma alanı açılamadı. Lütfen yeniden deneyin.';
       content.innerHTML = '';
       return null;
     }
+  }
+
+  function openView(view) {
+    if (view === 'home') state.view = 'home';
+    else if (ADS_VIEWS.some(item => item.id === view)) { state.view = 'ads'; state.adsView = view; }
+    render();
+    return true;
   }
 
   function setData(next = {}) {
@@ -1321,72 +1108,6 @@
       return window.renderMarketingModule();
     }
     return render();
-  }
-
-  async function handleFindingAction(button) {
-    const client = typeof supabaseClient !== 'undefined' ? supabaseClient : null;
-    const finding = state.findings.find(item => String(item.id) === String(button.dataset.findingId));
-    if (!client || !finding || !services.MarketingReviewService) throw new Error('FINDING_REVIEW_UNAVAILABLE');
-    const action = button.dataset.marketingAction;
-    let reason = null;
-    if (action === 'DISMISS') {
-      reason = window.prompt('Bu bulguyu neden reddediyorsunuz?');
-      if (reason === null) return null;
-    }
-    button.disabled = true;
-    try {
-      const result = await services.MarketingReviewService.reviewFinding(client, {
-        findingId: finding.id, action, reason, finding
-      });
-      state.remoteStatus = 'LOADING';
-      render();
-      await hydrateCloudData();
-      render();
-      return result;
-    } finally {
-      button.disabled = false;
-    }
-  }
-
-  async function handleSnapshotSubmit(form) {
-    const client = typeof supabaseClient !== 'undefined' ? supabaseClient : null;
-    const scope = cloudScope();
-    if (!client || !scope || !services.MarketingSnapshotService) throw new Error('MANUAL_SNAPSHOT_UNAVAILABLE');
-    const values = Object.fromEntries(new FormData(form).entries());
-    const submit = form.querySelector('[type="submit"]');
-    if (submit) submit.disabled = true;
-    try {
-      // Gelecek gunleri kapsayan donem kaydedilmez (L-299): sayac henuz olusmadi.
-      const result = await services.MarketingSnapshotService.recordManualSnapshot(client, {
-        ...values, tenantId: scope.tenantId, today: services.LexbnbBusinessDate.getBusinessDate()
-      });
-      state.snapshotFormOpen = false;
-      state.remoteStatus = 'LOADING';
-      render();
-      await hydrateCloudData();
-      render();
-      return result;
-    } finally {
-      if (submit) submit.disabled = false;
-    }
-  }
-
-  async function handleBenchmarkSubmit(form) {
-    const client = typeof supabaseClient !== 'undefined' ? supabaseClient : null;
-    const scope = cloudScope();
-    if (!client || !scope || !scope.propertyId || !services.MarketingBenchmarkService) throw new Error('MARKETING_BENCHMARK_UNAVAILABLE');
-    const values = Object.fromEntries(new FormData(form).entries());
-    const submit = form.querySelector('[type="submit"]');
-    if (submit) submit.disabled = true;
-    try {
-      const result = await services.MarketingBenchmarkService.recordBenchmark(client, {
-        ...values, tenantId: scope.tenantId, propertyId: scope.propertyId,
-        evidence: values.evidenceNote ? { note: values.evidenceNote } : {}
-      });
-      state.benchmarkFormOpen = false;
-      state.remoteStatus = 'LOADING'; render(); await hydrateCloudData(); render();
-      return result;
-    } finally { if (submit) submit.disabled = false; }
   }
 
   async function handleListingSubmit(form) {
@@ -1409,48 +1130,6 @@
       render();
       const status = document.getElementById('marketingWorkspaceStatus');
       if (status) status.textContent = 'Kanal ilanı kaydedildi. Mülkler › profil › Kanallar sekmesinde listelenir.';
-      return result;
-    } finally {
-      if (submit) submit.disabled = false;
-    }
-  }
-
-  async function handleExperimentSubmit(form) {
-    const client = typeof supabaseClient !== 'undefined' ? supabaseClient : null;
-    const scope = cloudScope();
-    if (!client || !scope || !scope.propertyId || !services.MarketingCoverChangeService) throw new Error('COVER_CHANGE_UNAVAILABLE');
-    const values = Object.fromEntries(new FormData(form).entries());
-    const submit = form.querySelector('[type="submit"]');
-    if (submit) submit.disabled = true;
-    try {
-      const result = await services.MarketingCoverChangeService.changeCoverAndMeasure(client, {
-        ...values, tenantId: scope.tenantId, propertyId: scope.propertyId
-      });
-      state.experimentFormOpen = false;
-      state.remoteStatus = 'LOADING';
-      render();
-      await hydrateCloudData();
-      render();
-      return result;
-    } finally {
-      if (submit) submit.disabled = false;
-    }
-  }
-
-  async function handleAdsPeriodSubmit(form) {
-    const client = typeof supabaseClient !== 'undefined' ? supabaseClient : null;
-    const scope = cloudScope();
-    if (!client || !scope || !services.AdsPeriodService) throw new Error('ADS_PERIOD_UNAVAILABLE');
-    const values = Object.fromEntries(new FormData(form).entries());
-    const submit = form.querySelector('[type="submit"]');
-    if (submit) submit.disabled = true;
-    try {
-      const result = await services.AdsPeriodService.savePeriod(client, {
-        ...values, tenantId: scope.tenantId, source: 'MANUAL'
-      });
-      if (typeof loadTenantAppData === 'function') await loadTenantAppData(scope.tenantId);
-      await reloadAdPeriods();
-      render();
       return result;
     } finally {
       if (submit) submit.disabled = false;
@@ -1598,6 +1277,7 @@
   async function startAdsImport(importState) {
     state.adsImport = importState;
     state.adsImportResult = null;
+    state.view = 'ads';
     state.adsView = 'import';
     render();
     await loadAdsImportContext(importState);
@@ -1608,7 +1288,7 @@
   async function handleAdsFile(file) {
     const parser = services.AdsImportParser;
     if (!file || !parser) return null;
-    const base = { mode: 'CSV_META', fileName: file.name, rows: [], parseWarnings: [], existing: [], mapping: {}, status: 'LOADING' };
+    const base = { mode: 'CSV', fileName: file.name, rows: [], parseWarnings: [], existing: [], mapping: {}, status: 'LOADING' };
     if (file.size > ADS_MAX_FILE_BYTES) {
       return startAdsImport({ ...base, parseErrors: [{ text: 'Dosya 5 MB\'tan büyük. Meta\'da kampanyalar düzeyinde ve en fazla birkaç aylık dönem seçerek indirin.' }] });
     }
@@ -1617,8 +1297,38 @@
     const buffer = await file.arrayBuffer();
     const engine = typeof FinanceImportEngine !== 'undefined' ? FinanceImportEngine : null;
     const text = engine ? engine.decodeImportText(new Uint8Array(buffer)) : new TextDecoder('utf-8').decode(buffer);
-    const parsed = parser.parseCsv(text, 'META');
+    const platform = parser.detectPlatform ? parser.detectPlatform(text) : 'META';
+    if (!platform) {
+      return startAdsImport({ ...base, parseErrors: [{ text: 'Bu dosyanın hangi reklam platformundan geldiği anlaşılamadı. Meta, Google Ads ve TikTok kampanya raporları okunur; diğerleri için "Elle girin" bölümünü kullanın.' }] });
+    }
+    const parsed = parser.parseCsv(text, platform, file.name);
     return startAdsImport({ ...base, rows: parsed.rows, parseErrors: parsed.errors, parseWarnings: parsed.warnings || [] });
+  }
+
+  function handleAdsQuickEntry(form) {
+    const values = Object.fromEntries(new FormData(form).entries());
+    const engine = typeof FinanceImportEngine !== 'undefined' ? FinanceImportEngine : null;
+    const amount = raw => String(raw || '').trim() === '' ? null : (engine ? engine.normalizeAmount(String(raw)) : Number(String(raw).replace(',', '.')));
+    const errors = [];
+    const campaignName = String(values.campaignName || '').trim();
+    const spend = amount(values.spend);
+    const results = amount(values.results);
+    const start = values.periodStart, end = values.periodEnd;
+    const days = start && end ? Math.floor((Date.parse(end + 'T00:00:00Z') - Date.parse(start + 'T00:00:00Z')) / 86400000) + 1 : 0;
+    if (!campaignName) errors.push({ text: 'Kampanya adını yazın.' });
+    if (!(days > 0)) errors.push({ text: 'Bitiş tarihi başlangıçtan önce olamaz.' });
+    else if (days > 31) errors.push({ text: 'Dönem en fazla 31 gün olabilir; daha uzun süreyi ay ay girin.' });
+    if (spend === null || !Number.isFinite(spend) || spend < 0) errors.push({ text: 'Harcamayı sayı olarak yazın (ör. 2.500).' });
+    if (results !== null && (!Number.isInteger(results) || results < 0)) errors.push({ text: 'Gelen mesaj/arama sayısı tam sayı olmalı.' });
+    const type = ['MESSAGE', 'CALL', 'OTHER'].includes(values.resultType) ? values.resultType : 'OTHER';
+    const row = {
+      campaignId: null, campaignName, platform: ['GOOGLE', 'TIKTOK', 'OTHER'].includes(values.platform) ? values.platform : 'META', periodStart: start, periodEnd: end,
+      resultType: type, resultMetric: null, resultLabel: { MESSAGE: 'Mesaj', CALL: 'Arama', OTHER: 'Diğer' }[type],
+      spend, impressions: null, reach: null, clicks: null, results,
+      messages: type === 'MESSAGE' ? results : null, calls: type === 'CALL' ? results : null, source: 'MANUAL', line: 1
+    };
+    return startAdsImport({ mode: 'MANUAL', fileName: 'Elle giriş', rows: errors.length ? [] : [row], parseErrors: errors,
+      parseWarnings: [], existing: [], mapping: {}, status: 'LOADING' });
   }
 
   function handleAdsImportPreview(form) {
@@ -1633,6 +1343,7 @@
   function adsImportErrorText(error) {
     const message = String(error && error.message || '');
     if (error && error.code === 'PHASE111_NOT_APPLIED') return message.replace(/^PHASE111_NOT_APPLIED:\s*/, '');
+    if (error && error.code === 'PHASE121_NOT_APPLIED') return message.replace(/^PHASE121_NOT_APPLIED:\s*/, '');
     if (/ADS_PARTIAL_OVERLAP/.test(message)) return message.replace(/^.*?ADS_PARTIAL_OVERLAP:\s*/, '');
     if (/CLOSED_PERIOD/.test(message)) return 'Dosya kapatılmış bir aya dokunuyor; reklam gideri o aya yazılamaz. Ayı yeniden açın ya da o günleri çıkarın.';
     if (error && error.code === '42501' || /FORBIDDEN_ROLE/.test(message)) return 'Bu işlem için yönetim ve finans yazma izni gerekir (Ayarlar → Ekip → İzinler).';
@@ -1651,11 +1362,12 @@
     importState.saveError = null;
     render();
     try {
-      const source = importState.mode === 'CSV_META' ? 'CSV' : 'SCREENSHOT_CHATGPT';
+      const source = importState.mode === 'CSV' ? 'CSV' : importState.mode === 'MANUAL' ? 'MANUAL' : 'SCREENSHOT_CHATGPT';
       const result = await services.AdsPeriodService.importBatch(client, tenantId, plan.newCampaigns, plan.rows.map(row => ({ ...row, source })));
       const created = (result && result.created_campaigns || []).length;
       const replaced = result && result.replaced_periods || 0;
       state.adsImport = null;
+      state.view = 'home';
       state.adsView = 'overview';
       state.adsImportResult = `${number(result && result.inserted_periods)} dönem kaydedildi · ${money(result && result.spend_total)} Finans giderine yazıldı`
         + (created ? ` · ${number(created)} yeni kampanya açıldı` : '') + (replaced ? ` · ${number(replaced)} eski kayıt yenisiyle değişti` : '');
@@ -1671,14 +1383,6 @@
 
   function initializeBrowser() {
     if (typeof document === 'undefined') return;
-    document.querySelectorAll('[data-marketing-view]').forEach(button => button.addEventListener('click', () => {
-      state.view = button.dataset.marketingView;
-      render();
-      hydrateCloudData().then(render).catch(() => {
-        const status = document.getElementById('marketingWorkspaceStatus');
-        if (status) status.textContent = 'Pazarlama verisi yüklenemedi. Lütfen yeniden deneyin.';
-      });
-    }));
     const content = document.getElementById('marketingWorkspaceContent');
     if (content) content.addEventListener('click', event => {
       const adsChatGpt = event.target.closest('[data-ads-chatgpt]');
@@ -1689,8 +1393,15 @@
         }
         return;
       }
+      if (event.target.closest('[data-marketing-home]')) {
+        state.view = 'home';
+        state.adsImport = null;
+        render();
+        return;
+      }
       const adsViewButton = event.target.closest('[data-ads-view]');
       if (adsViewButton) {
+        state.view = 'ads';
         state.adsView = adsViewButton.dataset.adsView;
         if (state.adsView !== 'overview') state.adsImportResult = null;
         render();
@@ -1713,35 +1424,15 @@
         });
         return;
       }
-      const open = event.target.closest('[data-marketing-open-snapshot]');
-      const cancel = event.target.closest('[data-marketing-cancel-snapshot]');
       const openListing = event.target.closest('[data-marketing-open-listing]');
       const cancelListing = event.target.closest('[data-marketing-cancel-listing]');
-      const openExperiment = event.target.closest('[data-marketing-open-experiment]');
-      const cancelExperiment = event.target.closest('[data-marketing-cancel-experiment]');
-      const openBenchmark = event.target.closest('[data-marketing-open-benchmark]');
-      const cancelBenchmark = event.target.closest('[data-marketing-cancel-benchmark]');
-      if (open) { state.snapshotFormOpen = true; state.listingFormOpen = false; render(); return; }
-      if (cancel) { state.snapshotFormOpen = false; render(); return; }
-      if (openListing) { state.listingFormOpen = true; state.snapshotFormOpen = false; render(); return; }
+      if (openListing) { state.listingFormOpen = true; render(); return; }
       if (cancelListing) { state.listingFormOpen = false; render(); return; }
-      if (openExperiment) { state.experimentFormOpen = true; render(); return; }
-      if (cancelExperiment) { state.experimentFormOpen = false; render(); return; }
-      if (openBenchmark) { state.benchmarkFormOpen = true; render(); return; }
-      if (cancelBenchmark) { state.benchmarkFormOpen = false; render(); return; }
       const deleteMetricButton = event.target.closest('[data-ads-delete-metric]');
       if (deleteMetricButton) {
         deleteAdsCustomMetric(deleteMetricButton.dataset.adsDeleteMetric).catch(() => {
           const status = document.getElementById('marketingWorkspaceStatus');
           if (status) status.textContent = 'Metrik silinemedi. Yetkiyi kontrol edin.';
-        });
-        return;
-      }
-      const deleteSnapshotButton = event.target.closest('[data-marketing-delete-snapshot]');
-      if (deleteSnapshotButton) {
-        deleteSnapshot(deleteSnapshotButton.dataset.marketingDeleteSnapshot).catch(() => {
-          const status = document.getElementById('marketingWorkspaceStatus');
-          if (status) status.textContent = 'Snapshot silinemedi. Lütfen yeniden deneyin.';
         });
         return;
       }
@@ -1761,12 +1452,6 @@
         });
         return;
       }
-      const actionButton = event.target.closest('[data-marketing-action][data-finding-id]');
-      if (!actionButton) return;
-      handleFindingAction(actionButton).catch(() => {
-        const status = document.getElementById('marketingWorkspaceStatus');
-        if (status) status.textContent = 'Bulgu güncellenemedi. Lütfen yeniden deneyin.';
-      });
     });
     if (content) content.addEventListener('submit', event => {
       const campaignForm = event.target.closest('[data-ads-campaign-form]');
@@ -1828,30 +1513,12 @@
         });
         return;
       }
-      const adsForm = event.target.closest('[data-ads-manual-form]');
-      if (adsForm) {
+      const quickForm = event.target.closest('[data-ads-quick-form]');
+      if (quickForm) {
         event.preventDefault();
-        handleAdsPeriodSubmit(adsForm).catch(() => {
+        handleAdsQuickEntry(quickForm).catch(() => {
           const status = document.getElementById('marketingWorkspaceStatus');
-          if (status) status.textContent = 'Reklam dönemi kaydedilemedi. Yetkiyi, kampanyayı ve tarih aralığını kontrol edin.';
-        });
-        return;
-      }
-      const benchmarkForm = event.target.closest('[data-marketing-benchmark-form]');
-      if (benchmarkForm) {
-        event.preventDefault();
-        handleBenchmarkSubmit(benchmarkForm).catch(() => {
-          const status = document.getElementById('marketingWorkspaceStatus');
-          if (status) status.textContent = 'Pazarlama referansı kaydedilemedi. Alanları kontrol edip yeniden deneyin.';
-        });
-        return;
-      }
-      const experimentForm = event.target.closest('[data-marketing-experiment-form]');
-      if (experimentForm) {
-        event.preventDefault();
-        handleExperimentSubmit(experimentForm).catch(() => {
-          const status = document.getElementById('marketingWorkspaceStatus');
-          if (status) status.textContent = 'Değişiklik ölçümü başlatılamadı. Lütfen yeniden deneyin.';
+          if (status) status.textContent = 'Elle girilen reklam önizlenemedi.';
         });
         return;
       }
@@ -1865,16 +1532,6 @@
         });
         return;
       }
-      const form = event.target.closest('[data-marketing-snapshot-form]');
-      if (!form) return;
-      event.preventDefault();
-      handleSnapshotSubmit(form).catch(error => {
-        const status = document.getElementById('marketingWorkspaceStatus');
-        const gelecek = /SNAPSHOT_PERIOD_IN_FUTURE/.test(String(error && error.message || ''));
-        if (status) status.textContent = gelecek
-          ? 'Snapshot dönemi bugünü geçemez: bitiş (hariç) en geç yarın olabilir. Gelecek günlerin sayacı henüz oluşmadı.'
-          : 'Snapshot kaydedilemedi. Alanları kontrol edip yeniden deneyin.';
-      });
     });
     const fileReadFailed = () => {
       const status = document.getElementById('marketingWorkspaceStatus');
@@ -1919,7 +1576,7 @@
     // switchTab() in app.js invokes this global hook. Replacing it prevents the
     // hidden legacy demo from rendering while preserving the existing router.
     window.openMarketingListingManager = function openMarketingListingManager(propertyId) {
-      state.view = 'funnel';
+      state.view = 'home';
       state.listingFormOpen = true;
       state.listingPropertyId = propertyId || null;
       if (typeof switchTab === 'function') switchTab('marketing');
@@ -1940,5 +1597,5 @@
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') initializeBrowser();
 
-  return { renderSnapshotList, deleteSnapshot, periodFromFilter, adsWindow, scopeBookings, cloudScopeForView, buildWorkspaceModel, getCurrentModel: () => buildWorkspaceModel(browserInput()), buildAdsModel, buildAdsChatGptContext, renderAdsChatGptCard, adsColumns, renderAdsKpiStrip, renderAdsCampaignTable, renderAdsMetricPicker, adsImportPlan, renderAdsImportView, selectLatestSnapshot, selectCurrentBenchmark, renderWorkspaceHtml, renderAds, normalizeCustomMetrics, evaluateCustomMetric, campaignBudgetView, renderMarketingHealth, renderBenchmarkPanel, renderBenchmarkForm, renderFindingActions, renderListingForm, renderSnapshotForm, renderExperimentForm, renderExperiments, escapeHtml, setData, render };
+  return { periodFromFilter, adsWindow, scopeBookings, cloudScopeForView, buildWorkspaceModel, getCurrentModel: () => buildWorkspaceModel(browserInput()), buildAdsModel, buildAdsChatGptContext, renderAdsChatGptCard, adsColumns, renderAdsKpiStrip, renderAdsCampaignTable, renderAdsMetricPicker, adsImportPlan, renderAdsImportView, renderWorkspaceHtml, renderAds, renderMarketingHome, openView, adsHomeRows, normalizeCustomMetrics, evaluateCustomMetric, campaignBudgetView, renderListingForm, escapeHtml, setData, render };
 }));

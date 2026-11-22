@@ -19,7 +19,7 @@ function check(value, message) {
 check(!/data-marketing-request-analysis|AI ile analiz et|Analiz sürüyor/.test(ui), 'Fotoğraf AI analiz düğmesi kaldırılmalı');
 check(!/renderPhotoAnalysisResult|renderAnalysisRuns|handleAnalysisRequest/.test(ui), 'Fotoğraf AI sonuç ve kuyruk UI kodu kaldırılmalı');
 check(!/marketing:photo-worker|GEMINI_API_KEY|AI_DATA_PROCESSING_APPROVED/.test(workflow), 'Atlanan Gemini worker adımı ve sırları Actions işinden kaldırılmalı');
-check(/tab-analysis/.test(index) && /analysis_center_ui\.js/.test(index), 'ChatGPT Analiz Merkezi korunmalı');
+check(!/tab-analysis/.test(index) && !/analysis_center_ui\.js/.test(index), 'Menüden açılmayan ChatGPT Analiz Merkezi kalktı (sadelik 21.11.2026); ChatGPT üst çubuktan açılır');
 check(!/name="confidence" value="0\.7"/.test(ui), 'Güven alanı kanıtsız 0,7 varsayımıyla gelmemeli');
 check(!/Villa Azure/.test(ui), 'Örnek mülk adı kullanıcı formunda yer tutucu olmamalı');
 check(!/\$\{error\.message\}/.test(ui), 'İngilizce hata kodları doğrudan kullanıcıya gösterilmemeli');

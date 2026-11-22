@@ -94,7 +94,7 @@
         : 'ADIM 4 — "Villa": boş ya da ALL ise gider tüm portföye yazılır. Tek mülke yazmak için GEÇERLİ DEĞERLER sayfasındaki mülk kodunu ya da adını yazın.',
       'ADIM 5 — "Tür": OPEX (işletme gideri) ya da CAPEX (yatırım). Boşsa OPEX.',
       'ADIM 6 — Tarih: 2026-07-03 ya da 03.07.2026. Tutar: 18000 ya da 18.000,50.',
-      'ADIM 7 — Temizlik personeline ödenen tutar buraya GİRİLMEZ: yeni temizlikler görevden gider yazılır, GEÇMİŞ temizlikler için Geçmiş Temizlik şablonunu kullanın. Reklam harcamasını Kanallar ve Pazarlama ekranından girin; burada da girilirse iki kez sayılır.',
+      'ADIM 7 — Temizlik personeline ödenen tutar buraya GİRİLMEZ: yeni temizlikler görevden gider yazılır, GEÇMİŞ temizlikler için Geçmiş Temizlik şablonunu kullanın. Reklam harcamasını Pazarlama ekranından girin; burada da girilirse iki kez sayılır.',
       'ADIM 8 — Kaydedip Veri ve yardım › Excel / CSV yükle ekranına bırakın. Önizlemede hatalı satırları ve nedenini görürsünüz; onaylamadan hiçbir şey kaydedilmez.'
     ];
   }

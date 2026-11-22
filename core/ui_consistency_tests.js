@@ -88,10 +88,11 @@ try {
   app.setAppData(veri());
   app.setCurrentFilter({ period: '2026-09', villa: 'ALL', startDate: '2026-09-01', endDate: '2026-09-30' });
   let hata = null;
-  try { app.renderOperationsKpiStrip(); } catch (e) { hata = e; }
-  check(!hata && g('opsDebtVal').innerText === '₺1.000',
-    'A1. Operasyon borç kartı yalnız YAPILMIŞ ve ödenmemiş temizliği sayar (planlı/yapılmadı borç değil)',
-    hata ? hata.message : `kart=${g('opsDebtVal').innerText} beklenen=₺1.000`);
+  try { app.renderOperationsTab(); } catch (e) { hata = e; }
+  const borcPaneli = g('opsCombinedContainer').innerHTML;
+  check(!hata && /Bekleyen Temizlik Borçları \(1\)/.test(borcPaneli) && /₺1\.000/.test(borcPaneli),
+    'A1. Operasyon borç paneli yalnız YAPILMIŞ ve ödenmemiş temizliği sayar (planlı/yapılmadı borç değil)',
+    hata ? hata.message : borcPaneli.slice(0, 300));
   hata = null;
   try { app.renderDailyOps(); } catch (e) { hata = e; }
   check(!hata && /^1 Ödenecek/.test(g('todayHousekeepingBadge').innerText),
@@ -105,24 +106,6 @@ try {
   // Genel kural olmali (.daterange-panel[hidden] gibi tek tek korumalar yetmez).
   check(/(^|\n)\s*\[hidden\]\s*\{[^}]*display\s*:\s*none\s*!important/.test(CSS),
     'B1. [hidden] her zaman gizler (.btn gibi display kuralları ezemez)', 'style.css kuralı yok');
-
-  // --- C. Hedef isareti -------------------------------------------------------
-  check(!/target-threshold-marker"[^>]*style="left:\s*\d+%/.test(INDEX) && /id="targetBarMarker"/.test(INDEX),
-    'C1. İşaretin konumu HTML\'de sabit değil; JS\'in yazdığı bir id taşıyor', 'sabit left:% hâlâ index.html\'de');
-  const rez = (brut) => ({ id: 'b' + brut, villa: 'V1', propertyId: 'p1', code: 'R', guest: 'X', checkIn: '2026-09-03', checkOut: '2026-09-05',
-    nights: 2, gross: brut, net: brut, otaCommission: 0, cleaningFee: 0, channel: 'DIRECT', status: 'CONFIRMED', pax: 2 });
-  const olc = (brut, hedef) => {
-    app.setAppData(veri({ bookings: [rez(brut)], cleaningTasks: [], targets: hedef ? [{ year: 2026, month: 9, revenue_target: hedef }] : [] }));
-    app.setCurrentFilter({ period: '2026-09', villa: 'ALL', startDate: '2026-09-01', endDate: '2026-09-30' });
-    app.renderFinanceModule();
-    return { dolgu: g('targetBarFill').style.width, isaret: g('targetBarMarker').style.left, gizli: g('targetBarMarker').hidden };
-  };
-  let r = olc(50000, 100000);
-  check(r.dolgu === '50%' && r.isaret === '100%' && !r.gizli, 'C2. Hedefin yarısı: dolgu %50, hedef işareti sonda', JSON.stringify(r));
-  r = olc(125000, 100000);
-  check(r.dolgu === '100%' && r.isaret === '80%' && !r.gizli, 'C3. Hedef aşıldı (%125): dolgu tam, hedef işareti %80 — aşım görünür', JSON.stringify(r));
-  r = olc(50000, null);
-  check(r.gizli === true && r.dolgu === '0%', 'C4. Hedef yoksa işaret gizli (anlamsız konum gösterilmez)', JSON.stringify(r));
 
   // --- E. Ilk yuklemede temizlik maliyeti ---------------------------------------
   // Duzenleme formu maliyeti b.cleanCost'tan doldurur; o deger bagli gorevden
@@ -187,12 +170,8 @@ try {
     const son = APP2.indexOf('\n}\n', bas);
     return APP2.slice(bas, son > 0 ? son : bas + 4000);
   };
-  const yazicilar = ['createExpense', 'updateExpense', 'deleteExpense', 'cloudUpsertCleaningTask',
-    'cloudDeleteCleaningTask', 'cloudDeleteCleaningExpense', 'saveBookingPaymentCommission', 'inspectCleaningExecution',
-    'createExpensesBatch', 'deleteExpensesByIds', 'saveIncomeEntry', 'deleteIncomeEntry'];
-  const eksik = yazicilar.filter(ad => { const g = govde(ad); return !g || !g.includes('invalidateExecutiveSnapshotCache()'); });
-  check(eksik.length === 0, `F1. Ana sayfa rakamını etkileyen ${yazicilar.length} yazıcı, başarılı yazmadan sonra anlık görüntü önbelleğini temizler`,
-    'temizlemeyenler: ' + eksik.join(', '));
+  // F (anlik goruntu onbellegi) kalkti: Bugun artik sunucu anlik goruntusu tutmuyor (sadelik 21.11.2026).
+  check(!/invalidateExecutiveSnapshotCache/.test(APP2), 'F1. Önbelleği olmayan ana sayfa için temizleme çağrısı kalmadı', 'çağrı duruyor');
 
   // --- G. Her kesin rezervasyon yolu cikis temizligini planlar ---------------
   // Gorev yalniz rezervasyon formunda (saveBooking) aciliyordu. Talebi
@@ -246,9 +225,9 @@ try {
     { id: 'm4', villa: 'V1', priority: 'P2', status: 'OPEN', statusRaw: 'OPEN' },
     { id: 'm5', villa: 'V1', priority: 'P1', status: 'IN_PROGRESS', statusRaw: 'IN_PROGRESS' }
   ] }));
-  app.renderOperationsKpiStrip();
-  check(g('opsOpenMaintVal').innerText === '2 İş',
-    'I1. Çözülen ve iptal edilen P1 arıza "açık" sayılmaz (açık + işlemde = 2)', `kart=${g('opsOpenMaintVal').innerText}`);
+  const acikP1 = app.getAppData().maintenance.filter(t => t.priority === 'P1' && app.isMaintenanceTicketOpen(t)).length;
+  check(acikP1 === 2,
+    'I1. Çözülen ve iptal edilen P1 arıza "açık" sayılmaz (açık + işlemde = 2)', `sayi=${acikP1}`);
   const bakim = govde('saveMaint') || '';
   check(/resolved_at:/.test(bakim), 'I2. Arıza çözülünce çözülme zamanı (resolved_at) yazılır', 'saveMaint resolved_at yazmıyor');
 
@@ -261,12 +240,11 @@ try {
   const formEtiket = (INDEX2.match(/<label[^>]*>([^<]*)<\/label>\s*<input[^>]*id="maintCost"/) || [])[1] || '';
   check(/Tahmini/i.test(formEtiket) && /gider defterine yazılmaz/i.test(INDEX2),
     'J1. Arıza maliyeti "Tahmini" diye etiketli ve gider olmadığı formda söyleniyor', `etiket="${formEtiket}"`);
-  check(/<th>Tahmini maliyet \(₺\)<\/th>/.test(INDEX2) && !/<th>(MALİYET|Maliyet) \(₺\)<\/th>/.test(INDEX2),
-    'J2. Arıza tablosu başlığı da "Tahmini maliyet"', 'tablo başlığı hâlâ MALİYET');
+  // J2: eski gizli ariza tablosu (tab-maintenance) sadelikte kalkti (21.11.2026).
+  check(!/<th>(MALİYET|Maliyet) \(₺\)<\/th>/.test(INDEX2),
+    'J2. Arıza maliyeti hiçbir tabloda "Maliyet" diye (tahmini olduğunu söylemeden) yazılmaz', 'tablo başlığı hâlâ MALİYET');
 
-  // --- D. Kanal tablosu hizasi ------------------------------------------------
-  check(/class="mkt-channel-table[ "]/.test(MKT) && /\.mkt-channel-table th,\s*\.mkt-channel-table td\s*\{[^}]*text-align/.test(CSS),
-    'D1. Kanal ekonomisi tablosunda başlık ve değer aynı hizada', 'mkt-channel-table kuralı yok');
+  // --- D. Kanal tablosu (Kanallar gorunumu) sadelikte kalkti (21.11.2026) -----
 
   // =========================================================================
   // 27.09 guven turu — 26.09'da kullanicinin gercek hesabinda tarayicida
@@ -282,8 +260,7 @@ try {
     app.setCurrentFilter({ period: buAy, villa: 'ALL', startDate: `${buAy}-01`, endDate: `${buAy}-${String(son).padStart(2, '0')}` });
   };
   global.ExecutivePriorityService = require('./executive_priority_service.js');
-  const komutaHtml = () => ['todayCriticalActionsList', 'todayOperationsActionsList', 'todayRevenueActionsList']
-    .map(id => g(id).innerHTML).join('\n');
+  const komutaHtml = () => g('todayTaskTable').innerHTML;
 
   // --- K. Ana sayfa oncelik motoru (L-98) ------------------------------------
   // Canlida: iptal edilmis "DEMO Claude arıza" ana sayfada "Durum: Açık" +
@@ -310,7 +287,7 @@ try {
   hata = null;
   try { app.renderExecutiveControlCenter(); } catch (e) { hata = e; }
   let html = komutaHtml();
-  check(!hata && !/Arıza:/.test(html),
+  check(!hata && !/Iptal edilen ariza|Cozulen ariza/.test(html) && !/Açık arıza/.test(html),
     'K1. İptal edilen ve çözülen arıza ana sayfada kritik eylem olarak görünmez',
     hata ? hata.stack.split('\n').slice(0, 3).join(' | ') : html.slice(0, 300));
   app.setAppData(veri({
@@ -324,15 +301,14 @@ try {
   }));
   app.renderExecutiveControlCenter();
   html = komutaHtml();
-  check(/Musluk damlatiyor/.test(html) && /Öncelik: P3/.test(html) && !/Öncelik: P1/.test(html),
-    'K2. Açık arıza kartı GERÇEK önceliği yazar (düşük önem → P3; sabit "P1" yok)', html.slice(0, 300));
+  // Dusuk onemli acik ariza "Yap"tir; sabit "Acil"/P1 yazilmaz.
+  const muslukSatiri = html.slice(html.lastIndexOf('<tr', html.indexOf('Musluk damlatiyor')), html.indexOf('</tr>', html.indexOf('Musluk damlatiyor')));
+  check(/Musluk damlatiyor/.test(html) && /lex-tag--up">Yap</.test(muslukSatiri) && !/Acil|P1/.test(muslukSatiri),
+    'K2. Açık arıza satırı GERÇEK önceliği yansıtır (düşük önem → Yap; sabit "Acil/P1" yok)', muslukSatiri.slice(0, 400));
   check(!/Turnover Temizlik Görevi|Bugünkü temizlik/.test(html),
     'K3. Dünkü/yarınki planlı ve "yapılmadı" temizlik ana sayfada "bugün" diye sunulmaz', html.slice(0, 300));
   check(!html.includes(PROP_UUID) && /Deniz Evi/.test(html),
     'K4. Kartta mülkün ham kimliği (UUID) değil adı yazar (L-104)', 'UUID kartta görünüyor');
-  app.renderOperationsKpiStrip();
-  check(g('opsTurnoverVal').innerText === '1 Görev' ,
-    'K5. Operasyon kartı bugünkü görevi sayar (yapılmadı dahil) — referans', `kart=${g('opsTurnoverVal').innerText}`);
   const appData0 = app.getAppData();
   appData0.cleaningTasks.push({ id: 'ct-bugun', villa: 'V1', date: bugun, amount: 500, paid: false, status: 'PLANNED' });
   app.renderExecutiveControlCenter();
@@ -340,27 +316,9 @@ try {
   check((html.match(/Bugünkü temizlik/g) || []).length === 1,
     'K6. Bugün planlı temizlik ana sayfada tek kart olarak görünür', html.slice(0, 300));
 
-  // --- L. CRM kayip nedeni tavsiyesi (L-99) -----------------------------------
-  const kayip = (reason) => ({ status: 'LOST', lostReason: reason });
-  let oz = app.summarizeLeadLossReasons([]);
-  check(oz.topReasons.length === 0 && !/Tarih Dolu|Fiyat Yüksek/.test(oz.adviceHtml),
-    'L1. Kayıp talep yokken kayıp nedeni ilan edilmez', oz.adviceHtml);
-  oz = app.summarizeLeadLossReasons([kayip('Cevap Vermedi'), kayip('Cevap Vermedi')]);
-  check(oz.topReasons.join() === 'Cevap Vermedi' && !/Tarih Dolu|Fiyat Yüksek/.test(oz.adviceHtml),
-    'L2. Veride yalnız "Cevap Vermedi" varsa tavsiye onu söyler; "Tarih Dolu/Fiyat Yüksek" demez', oz.adviceHtml);
-  oz = app.summarizeLeadLossReasons([kayip('Tarih Dolu'), kayip('Fiyat Yüksek')]);
-  check(oz.topReasons.length === 2 && /eşit/.test(oz.adviceHtml) && /tek bir baskın neden yok/.test(oz.adviceHtml),
-    'L3. Eşitlikte tek kazanan ilan edilmez', oz.adviceHtml);
-  oz = app.summarizeLeadLossReasons([kayip(null), kayip('Diğer')]);
-  check(oz.topReasons.length === 0 && /1 talepte neden seçilmemiş|belirlenemez/.test(oz.adviceHtml),
-    'L4. Nedeni seçilmemiş kayıp "neden" sayılmaz', oz.adviceHtml);
-  oz = app.summarizeLeadLossReasons([kayip('Başka Yer Seçti')]);
-  check(oz.counts['Başka Yer Seçti'] === 1 && oz.counts['Diğer'] === 0,
-    'L5. "Başka Yer Seçti" kendi satırında sayılır ("Diğer"e düşmez)', JSON.stringify(oz.counts));
-  app.setAppData(veri({ leads: [], cleaningTasks: [] }));
-  app.renderLeadAnalytics();
-  check(!/Tarih Dolu|Fiyat Yüksek/.test(g('waActionableInsights').innerHTML),
-    'L6. Boş işletmede CRM ekranı sabit kayıp nedeni yazmaz (canlıda görülen)', g('waActionableInsights').innerHTML.slice(0, 200));
+  // --- L. CRM kayip nedeni tavsiyesi (L-99): Satis'taki radar sadelikte kalkti
+  // (21.11.2026); kayip nedenleri Analiz'de (analytics_ui, ayni veri).
+  check(typeof app.renderLeadAnalytics === 'undefined', 'L1. Satış radarı (Analiz kopyası) yok', 'duruyor');
 
   // --- M. Gidisat radari, projeksiyon ve simulator KALDIRILDI (A1-G1) ------------
   // L-100: radar Finans'ta hic cizilmiyordu, sabit hukum yaziyordu. Kullanici
@@ -387,11 +345,9 @@ try {
   ayFiltresi();
   app.renderFinanceModule();
   check(g('finNetProfit').innerText === '—' && /ölçülemedi/.test(g('finNetMarginLabel').innerText)
-    && g('brNetProfit').innerText === '—' && !/%100/.test(g('brNetMargin').innerText),
+    && !/%100/.test(g('finNetMarginLabel').innerText),
     'N2. Gider kaydı olmayan açık ayda Finans "%100 marj" göstermez; "ölçülemedi" der',
-    `net=${g('finNetProfit').innerText} marj=${g('finNetMarginLabel').innerText} kopru=${g('brNetMargin').innerText}`);
-  check(g('brOpex').innerText === '0 TL' && g('brCapex').innerText === '0 TL',
-    'N3. Kâr köprüsünde düşülecek tutar yoksa "-0 TL" yazılmaz (L-104)', `opex=${g('brOpex').innerText}`);
+    `net=${g('finNetProfit').innerText} marj=${g('finNetMarginLabel').innerText}`);
   const [ky, km] = buAy.split('-').map(Number);
   app.setAppData(veri({ bookings: [rezB('r1', 12000)], cleaningTasks: [], closedPeriods: [{ year: ky, month: km, status: 'CLOSED' }] }));
   ayFiltresi();
@@ -418,8 +374,8 @@ try {
   app.renderFinanceModule();
   const satirlar = g('propExecTableBody').children.map(tr => tr.innerHTML);
   const orman = satirlar.find(h => /Orman Evi/.test(h)) || '';
-  check(orman && !/Dengeli/.test(orman) && /satış yok/.test(orman),
-    'O1. Dönemde satışı olmayan mülk "Dengeli" değil "Bu dönem satış yok" etiketi alır', orman.slice(0, 200) || 'satır yok');
+  check(orman && !/Dengeli|Şampiyon|Boşluk Riski/.test(orman),
+    'O1. Mülk tablosu hüküm etiketi yazmaz (Dengeli/Şampiyon); yalnız ölçülen rakam', orman.slice(0, 200) || 'satır yok');
 
   // --- P. Toplu aktarim ozeti kayit basi metriklere girmez (L-103) ------------
   const ozet = rezB('toplu', 90000, { guest: 'TOPLU AKTARIM — Ocak 2026', checkIn: `${buAy}-01`, checkOut: `${buAy}-10`, nights: 9, channel: 'DIRECT' });
@@ -432,9 +388,6 @@ try {
   app.renderManageBookingsTable();
   check(/<strong>1 Rezervasyon<\/strong> \+ 1 toplu aktarım özeti/.test(g('rezTableSummaryPill').innerHTML),
     'P2. Rezervasyon listesi özeti rezervasyon saymaz, ayrı yazar', g('rezTableSummaryPill').innerHTML);
-  app.renderAll();
-  check(g('rezCountBadge').innerText === 1 || g('rezCountBadge').innerText === '1',
-    'P3. Sekme sayacı özeti rezervasyon saymaz', `sayac=${g('rezCountBadge').innerText}`);
   app.renderTapeChart();
   const takvim = g('tapeChartContainer').innerHTML;
   // L-198: not, ozetin gecesini ve tutarini rozetle soyler; hucrelere yine cizilmez.
@@ -444,13 +397,8 @@ try {
     filter: { period: buAy, villa: 'ALL' }, bookings: app.getAppData().bookings,
     villas: app.getAppData().villas, financeSummary: app.computeFilterLedger()
   });
-  const rapor = MarketingUI.renderWorkspaceHtml(raporModel, 'economics');
-  check(/WhatsApp/.test(rapor) && /1 toplu aktarım özeti/.test(rapor) && />1<\/td>/.test(rapor),
-    'P5. Kanal ekonomisi görünen kanal adını yazar ve özeti rezervasyon saymaz (L-105)', rapor.slice(0, 800));
-  check(!/WHATSAPP/.test(rapor),
-    'P5b. Kanal ekonomisi müşteriye ham kanal kodu göstermez', rapor.slice(0, 800));
-  check(/Net kâr/.test(rapor) && /₺100\.000/.test(rapor),
-    'P6. Kanal ekonomisi net kârı Finans ile aynı defter formülünden yazar', rapor.slice(0, 800));
+  check(raporModel.economics.totals.reservationCount === 1,
+    'P5. Kanal ekonomisi modeli toplu aktarım özetini rezervasyon saymaz (L-105)', JSON.stringify(raporModel.economics.totals));
 
   // --- Q. Etiketler (L-104, L-105) -----------------------------------------
   check(app.formatDeductionTl(0) === '0 TL' && app.formatDeductionTl(-0) === '0 TL' && app.formatDeductionTl(1500) === '−1.500 TL',
@@ -460,11 +408,8 @@ try {
     'Q2. Kanal kodu müşteriye görünen adla yazılır', app.getChannelDisplayName('Direct'));
   check(!/KONTROL MERKEZİ V5/.test(INDEX2), 'Q3. Başlıkta müşteriye sürüm numarası ("V5") gösterilmez', 'V5 hâlâ başlıkta');
 
-  // --- R. Veri esitleme dugmesi (L-106) --------------------------------------
-  check(/data-onclick="resyncTenantData\(\)"/.test(INDEX2) && !/Sayfayı Yenile/.test(INDEX2),
-    'R1. Üst çubuktaki düğme sayfayı değil veriyi yeniden okur ve adı bunu söyler', 'düğme hâlâ reloadPage');
-  check(/Eşitlendi \$\{saat\}/.test(APP2) && /renderDataSyncStamp\(\);\n\n  \/\/ Badges/.test(APP2),
-    'R2. Son eşitleme zamanı her çizimde düğmede görünür', 'renderDataSyncStamp renderAll\'da yok');
+  // --- R. Veri esitleme dugmesi sadelikte kalkti (21.11.2026) ---------------
+  check(!/id="dataSyncBtn"/.test(INDEX2), 'R1. Üst çubukta ayrı "Verileri eşitle" düğmesi yok', 'duruyor');
 
   // --- S. Ciro = net konaklama geliri (ENVANTER Finans 1, A1-G3) --------------
   // Temizlik ucreti ciroya girmez; ayri gelir kalemi olarak karin icinde kalir.
@@ -474,27 +419,24 @@ try {
     expenses: [{ id: 'e1', villa: 'V1', date: `${buAy}-04`, amount: 1000, category: 'Bakım', type: 'OPEX' }] }));
   ayFiltresi();
   app.renderFinanceModule();
-  check(g('finActualRevenue').innerText === '10.000 TL' && g('brCiro').innerText === '10.000 TL',
-    'S1. Ciro kartı ve köprünün ilk adımı temizlik ücreti hariç net konaklama geliri',
-    `kart=${g('finActualRevenue').innerText} kopru=${g('brCiro').innerText}`);
-  check(g('brCleaningGroup').style.display === '' && g('brCleaningRevenue').innerText === '+1.500 TL'
-    && g('brTotalIncome').innerText === '11.500 TL',
-    'S2. Temizlik geliri varsa köprüde ayrı adım: + temizlik geliri = toplam gelir',
-    `grup=${g('brCleaningGroup').style.display} temizlik=${g('brCleaningRevenue').innerText} toplam=${g('brTotalIncome').innerText}`);
+  check(g('finActualRevenue').innerText === '10.000 TL',
+    'S1. Ciro kartı temizlik ücreti hariç net konaklama geliri', `kart=${g('finActualRevenue').innerText}`);
+  const defterS = app.computeFilterLedger();
+  check(Math.round(defterS.cleaningRevenue) === 1500 && Math.round(defterS.totalRevenue) === 11500,
+    'S2. Temizlik geliri ayrı kalem: ciro + temizlik geliri = toplam gelir', JSON.stringify({ t: defterS.cleaningRevenue, g: defterS.totalRevenue }));
   check(g('finNetProfit').innerText === '10.500 TL' && /%91[.,]3/.test(g('finNetMarginLabel').innerText),
     'S3. Kâr ve marj toplam gelirden: 11.500 − 1.000 = 10.500, marj %91,3 (temizlik geliri kârda kalır)',
     `net=${g('finNetProfit').innerText} marj=${g('finNetMarginLabel').innerText}`);
-  check(g('tgtBoxPct').innerText === '%100.0',
-    'S4. Hedef ciroyla karşılaştırılır (10.000 / 10.000), toplam gelirle değil (%115)', g('tgtBoxPct').innerText);
+  check(/%0 üzerinde/.test(g('finRevTargetDelta').innerText),
+    'S4. Hedef ciroyla karşılaştırılır (10.000 / 10.000), toplam gelirle değil (%115)', g('finRevTargetDelta').innerText);
   app.setAppData(veri({ bookings: [rezB('r1', 12000)], cleaningTasks: [] }));
   ayFiltresi();
   app.renderFinanceModule();
-  check(g('brCleaningGroup').style.display === 'none' && g('finActualRevenue').innerText === '12.000 TL',
-    'S5. Temizlik ücreti alınmıyorsa köprüde temizlik adımları hiç görünmez', `grup=${g('brCleaningGroup').style.display}`);
+  check(g('finActualRevenue').innerText === '12.000 TL',
+    'S5. Temizlik ücreti alınmıyorsa ciro brüt tutara eşit', g('finActualRevenue').innerText);
   check(/<span class="kpi-label">Ciro \(net konaklama geliri\)<\/span>[\s\S]{0,200}id="finActualRevenue"/.test(INDEX2)
-    && /<span class="kpi-label">Ciro \(net konaklama geliri\)<\/span>[\s\S]{0,200}id="execKpiRevenue"/.test(INDEX2)
     && !/(TOPLAM GELİR|Toplam gelir) \((NET ODA|net oda) \+ (TEMİZLİK|temizlik)\)/.test(INDEX2),
-    'S6. Finans ve Bugün kartlarının etiketi aynı: "Ciro (net konaklama geliri)"', 'etiket eski ya da farklı');
+    'S6. Finans kartının etiketi "Ciro (net konaklama geliri)"', 'etiket eski ya da farklı');
 } finally {
   console.log(`\nTEST SUMMARY: ${passed} / ${passed + failed} TESTS PASSED (${failed} FAILED)`);
   if (failed > 0) process.exit(1);

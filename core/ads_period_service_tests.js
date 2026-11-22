@@ -75,7 +75,7 @@ function query(rows, log = []) {
   const appSource = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
   assert(!/from('ad_metric_periods')/.test(appSource), 'app.js her yüklemede reklam dönemi çekmez (Pazarlama açılınca, seçili dönem için)');
   const uiSource = fs.readFileSync(path.join(__dirname, 'marketing_ui.js'), 'utf8');
-  assert((uiSource.match(/await reloadAdPeriods()/g) || []).length >= 4, 'dönem yazan her işleyici önbelleği düşürür');
+  assert((uiSource.match(/await reloadAdPeriods()/g) || []).length >= 3, 'dönem yazan her işleyici önbelleği düşürür (içe aktarma/elle giriş, dönem ve kampanya silme)');
   console.log('[PASS] Reklam dönemleri tembel ve aralıklı yüklenir; yazmadan sonra yenilenir');
 
   const missingRpc = { async rpc() { return { data: null, error: { code: 'PGRST202', message: 'Could not find the function public.import_ad_metric_batch' } }; } };
