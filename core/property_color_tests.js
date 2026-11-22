@@ -120,8 +120,10 @@ async function main() {
   // --- C. Secim Postgres'e yazilir -------------------------------------------------
   let ist = kur({ property_colors: { [ID_B]: '#FFD60A' } });
   const html = App.propertyColorPickerHtml('a');
-  check((html.match(/class="property-color-swatch/g) || []).length === App.PROPERTY_COLOR_PALETTE.length
-    && /data-onclick="setPropertyColor\(/.test(html), 'C1. Renk secici paletin her rengini sunar', html.slice(0, 300));
+  // Sadelik 4. tur: kartta tek renk noktasi; tiklayinca acilir secici (core/color_picker.js).
+  check((html.match(/class="property-color-btn"/g) || []).length === 1 && /data-lx-literal-color style="background:#/.test(html)
+    && /data-onclick="openPropertyColorPicker\(/.test(html) && !/property-color-swatch/.test(html),
+  'C1. Kartta tek renk noktasi; tiklayinca secici acilir (10 kutu yok)', html.slice(0, 300));
   check(await App.setPropertyColor('a', '#5e5cE6') === true, 'C2. Yonetici renk secebilir');
   const yazma = ist.yazmalar.find(k => k.tablo === 'tenant_settings');
   check(yazma && yazma.islem === 'upsert' && yazma.yuk.key === 'property_colors'
@@ -131,7 +133,11 @@ async function main() {
 
   ist = kur({});
   check(await App.setPropertyColor('a', 'url(javascript:1)') === false && ist.yazmalar.length === 0,
-    'C5. Palet disi deger yazilmaz');
+    'C5. Gecersiz deger (#RRGGBB degil) yazilmaz');
+  ist = kur({});
+  check(await App.setPropertyColor('a', '#12ab9C') === true && ist.yazmalar.length === 1
+    && App.getAppData().tenantSettings.property_colors[ID_A] === '#12AB9C',
+  'C5b. Secicideki serbest renk (#RRGGBB) kaydedilir, buyuk harfe cevrilir');
 
   ist = kur({}, 'sales');
   check(await App.setPropertyColor('a', '#0A84FF') === false && ist.yazmalar.length === 0,
@@ -141,7 +147,15 @@ async function main() {
   check(await App.setPropertyColor('a', '#0A84FF') === false && !App.getAppData().tenantSettings.property_colors,
     'C7. Yazma duserse bellekteki renk degismez (kaydedildi gibi gorunmez)');
 
-  check(read('core/action_dispatch.js').includes("'setPropertyColor'"), 'C8. Renk dugmesi eylem izin listesinde');
+  check(read('core/action_dispatch.js').includes("'openPropertyColorPicker'"), 'C8. Renk noktasi eylem izin listesinde');
+  const CP = require('./color_picker.js');
+  check(CP.hsvToHex(0, 1, 1) === '#FF0000' && CP.hsvToHex(120, 1, 1) === '#00FF00' && CP.hsvToHex(240, 1, 0.5) === '#000080'
+    && CP.hsvToHex(0, 0, 1) === '#FFFFFF' && CP.hsvToHex(0, 0, 0) === '#000000', 'C9. HSV -> #RRGGBB dogru');
+  const geri = ['#0A84FF', '#30D158', '#AC8E68', '#5E5CE6', '#FFFFFF', '#000000'].every(c => { const x = CP.hexToHsv(c); return CP.hsvToHex(x.h, x.s, x.v) === c; });
+  check(geri && CP.hexToHsv('kirmizi') === null && CP.hexToHsv('#12345') === null, 'C10. #RRGGBB -> HSV -> #RRGGBB birebir; gecersiz kod null');
+  check(JSON.stringify(CP.recentColors(['#0a84ff', '#0A84FF', 'x', '#30D158'], 8)) === '["#0A84FF","#30D158"]'
+    && CP.recentColors(Array(20).fill(0).map((_, i) => '#0000' + String(i).padStart(2, '0'))).length === 8,
+  'C11. Son kullanilanlar tekrarsiz, gecerli, en fazla 8');
 }
 
 main().catch(error => {

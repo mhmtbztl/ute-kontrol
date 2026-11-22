@@ -51,11 +51,13 @@ try {
 
   // --- B. Tasinan yuzeyler ---------------------------------------------------
   const hesap = (INDEX.match(/id="userProfileMenu"[\s\S]*?logoutSaaSUser/) || [''])[0];
-  check(/id="askChatGptBtn"[^>]*data-onclick="openChatGptQuestionModal\(\);/.test(hesap) && /data-theme-toggle/.test(hesap) && /openImportModal\(\)/.test(hesap),
-    'B1. ChatGPT, Gece/Gündüz ve Veri/Yardım hesap menüsünde (üst çubuk 3 öğe)', 'hesap menüsünde eksik');
+  check(/data-theme-toggle/.test(hesap) && /openImportModal\(\)/.test(hesap),
+    'B1. Gece/Gündüz ve Veri/Yardım hesap menüsünde', 'hesap menüsünde eksik');
   const ustCubuk = (INDEX.match(/<div class="header-actions">([\s\S]*?)<\/header>/) || ['', ''])[1];
-  check(!/id="toolsBtn"/.test(ustCubuk) && !/class="btn btn-secondary header-chatgpt-btn"/.test(ustCubuk) && !/class="btn btn-secondary lex-theme-btn"/.test(ustCubuk),
-    'B1b. Üst çubukta ayrı ChatGPT, Gece/Gündüz ve "Veri ve yardım" düğmesi yok', 'fazla düğme duruyor');
+  // ChatGPT 22.11.2026'da ust cubuga dondu (kullanici: "sag uste, kolay erisilen yere"); hesap menusunde kopyasi yok.
+  check(!/id="toolsBtn"/.test(ustCubuk) && /id="askChatGptBtn"[^>]*data-onclick="openChatGptQuestionModal\(\);/.test(ustCubuk)
+    && !/askChatGptBtn/.test(hesap) && !/class="btn btn-secondary lex-theme-btn"/.test(ustCubuk),
+  'B1b. Üst çubuk: ChatGPT\'ye sor · bildirim · Hızlı Ekle · hesap; Gece/Gündüz ve Veri/Yardım hesap menüsünde', 'düğme yeri yanlış');
   const finansBas = INDEX.indexOf('id="tab-finance"');
   const finansSon = INDEX.indexOf('class="tab-content', finansBas + 20);
   const finans = finansBas >= 0 ? INDEX.slice(finansBas, finansSon > 0 ? finansSon : undefined) : '';

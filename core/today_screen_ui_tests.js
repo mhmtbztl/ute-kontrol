@@ -57,7 +57,7 @@ try {
   const d = global.document.getElementById;
   check(/açık iş yok/.test(d('todaySummary').innerHTML) && /Bugüne ait açık iş yok/.test(d('todayTaskTable').innerHTML),
     'C1. Bos isletmede gorev uydurulmaz; ozet durumu soyler', d('todaySummary').innerHTML);
-  check(/printTodayPdf\(\)/.test(d('todayFooter').innerHTML) && /downloadTodayExcel\(\)/.test(d('todayFooter').innerHTML) && /Hafta sonu/.test(d('todayFooter').innerHTML),
+  check(/printTodayPdf\(\)/.test(d('todayFooter').innerHTML) && /downloadTodayExcel\(\)/.test(d('todayFooter').innerHTML) && /Acil/.test(d('todayFooter').innerHTML),
     'C2. Alt satir: renk aciklamasi + PDF + Excel', d('todayFooter').innerHTML);
 
   App.setActiveTenant({ id: '00000000-0000-4000-8000-0000000000aa', role: 'staff' });

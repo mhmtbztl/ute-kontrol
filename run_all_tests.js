@@ -369,7 +369,9 @@ const allTestFiles = [
   'ux_audit_fixes_tests.js',
   // Lex Tasarimi (21.11.2026): ekip gorevleri motoru, ortak bilesenler ve Gece/Gunduz
   'team_tasks_tests.js',
-  'lex_ui_tests.js'
+  'lex_ui_tests.js',
+  // Sadelik 4. tur (22.11.2026): Notion tarzi gorev sayfasi
+  'task_page_tests.js'
 ];
 
 const testEnv = require('./core/test_env.js');

@@ -386,7 +386,7 @@ try {
   ayFiltresi();
   ['rezSearchInput', 'rezVillaFilter', 'rezStatusFilter'].forEach(id => { g(id).value = id === 'rezSearchInput' ? '' : 'ALL'; });
   app.renderManageBookingsTable();
-  check(/<strong>1 Rezervasyon<\/strong> \+ 1 toplu aktarım özeti/.test(g('rezTableSummaryPill').innerHTML),
+  check(/Rezervasyon<\/dt><dd class="lex-kpi__value"><strong>1<\/strong><\/dd><dd class="lex-kpi__sub">\+ 1 toplu aktarım özeti/.test(g('rezTableSummaryPill').innerHTML),
     'P2. Rezervasyon listesi özeti rezervasyon saymaz, ayrı yazar', g('rezTableSummaryPill').innerHTML);
   app.renderTapeChart();
   const takvim = g('tapeChartContainer').innerHTML;

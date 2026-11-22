@@ -704,7 +704,7 @@ async function L284() {
   App.setReservationScopeRange('2026-11-01', '2026-11-30');
   App.renderManageBookingsTable();
   const ozet = dom.getElementById('rezTableSummaryPill').innerHTML;
-  check(/<strong>2 Rezervasyon<\/strong>/.test(ozet) && /2 iptal/.test(ozet), 'L-284a Ozet iptalleri rezervasyon saymaz, ayrica yazar', ozet.slice(0, 160));
+  check(/Rezervasyon<\/dt><dd class="lex-kpi__value"><strong>2<\/strong>/.test(ozet) && /2 iptal/.test(ozet), 'L-284a Ozet iptalleri rezervasyon saymaz, ayrica yazar', ozet.slice(0, 160));
 }
 
 // ---------------------------------------------------------------------------
@@ -1244,14 +1244,22 @@ async function GorevDuzenle() {
   dom = sahteDom();
   kur(App, temel());
   App.setOperationsView('tasks');
+  // Sadelik 4. tur: gorev Notion tarzi sayfadir; liste satiri sayfayi acar, ayrintilar sayfanin altinda.
+  const listeHtml = dom.getElementById('opsCombinedContainer').innerHTML;
+  App.openOperationalTaskPage(GOREV);
   const sahipHtml = dom.getElementById('opsCombinedContainer').innerHTML;
-  check(/openOperationalTaskModal\(decodeURIComponent/.test(sahipHtml) && /\+ Yeni görev/.test(sahipHtml),
-    'GD-l Gorev listesinde Duzenle ve Yeni gorev dugmesi var');
+  check(/openOperationalTaskPage\(decodeURIComponent/.test(listeHtml) && /\+ Yeni sayfa/.test(listeHtml)
+    && /openOperationalTaskModal\(decodeURIComponent/.test(sahipHtml) && /id="tpTitle"/.test(sahipHtml),
+  'GD-l Gorev listesi sayfa acar; Yeni sayfa ve Ayrintilar dugmesi var');
+  App.closeOperationalTaskPage();
   dom = sahteDom();
   kur(App, temel(), 'sales');
   App.setOperationsView('tasks');
+  App.openOperationalTaskPage(GOREV);
   const satisHtml = dom.getElementById('opsCombinedContainer').innerHTML;
-  check(!/openOperationalTaskModal/.test(satisHtml), 'GD-m Operasyon yetkisi olmayan rol duzenleme dugmesini gormez');
+  App.closeOperationalTaskPage();
+  check(!/openOperationalTaskModal/.test(satisHtml) && !/\+ Yeni sayfa/.test(satisHtml) && /id="tpTitle"[^>]*readonly/.test(satisHtml),
+    'GD-m Operasyon yetkisi olmayan rol sayfayi salt okunur gorur, duzenleme dugmesi yok');
   check(App.openOperationalTaskModal(GOREV) === false, 'GD-n Yetkisiz rol formu acamaz');
   App.setOperationsView('cleaning');
 }
@@ -1309,7 +1317,7 @@ async function L288() {
   const blok = (css.match(/\/\* L-288[\s\S]*?\/\* \/L-288 \*\//) || [''])[0];
   check(/\.btn-sm[^{]*\{[^}]*min-height:\s*(3[6-9]|4\d)px/.test(blok) && /select[^{]*\{[^}]*min-height:\s*(3[6-9]|4\d)px/.test(blok),
     'L-288a Telefonda kucuk dugme ve donem/portfoy secicileri en az 36 px');
-  check(/\.property-color-swatch\s*\{[^}]*width:\s*(2[8-9]|3\d)px/.test(blok), 'L-288b Mulk renk kutucugu telefonda en az 28 px (WCAG 24 ustu)');
+  check(/\.lex-cp__swatch\s*\{[^}]*width:\s*(2[8-9]|3\d)px/.test(blok), 'L-288b Renk secicideki hazir renk telefonda en az 28 px (WCAG 24 ustu)');
   check(/padding-bottom:[^;]*(7\d|8\d|9\d)px/.test(blok), 'L-288c Hizli rezervasyon dugmesi alttaki karti ortmez (alt bosluk)');
   check(/help-tabs-nav[\s\S]{0,200}mask-image/.test(blok), 'L-288d Rehber sekmeleri kaydirilabilir oldugunu gosterir');
   const src = read('app.js');

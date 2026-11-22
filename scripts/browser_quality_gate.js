@@ -80,7 +80,7 @@ async function assertReportMatchesScreen(page) {
   assert.strictEqual(screenNumber(result.finance.revenue), Math.round(result.items.netRoomRevenue), 'Finans cirosu ekran ≠ rapor');
   assert.strictEqual(result.finance.profit.trim() === '—' ? null : screenNumber(result.finance.profit), result.items.netProfit === null ? null : Math.round(result.items.netProfit), 'Finans net kârı ekran ≠ rapor');
   assert.strictEqual(screenNumber(result.finance.nights), result.items.soldNights, 'Finans satılan gece ekran ≠ rapor');
-  assert(result.pill.includes(`${result.bookings.soldNights} Gece`), `Rezervasyon geceleri ekran ≠ rapor: ${result.pill}`);
+  assert(result.pill.includes(`${result.bookings.soldNights} gece`), `Rezervasyon geceleri ekran ≠ rapor: ${result.pill}`);
   assert(result.pill.includes(`${Math.round(result.bookings.netRoomRevenue).toLocaleString('tr-TR')} TL`), `Rezervasyon cirosu ekran ≠ rapor: ${result.pill}`);
 }
 
@@ -1127,8 +1127,9 @@ async function main() {
         const alan = [...document.querySelectorAll('.property-profile-grid > div')].map(d => Math.round(d.getBoundingClientRect().top));
         return {
           ikili: alan.length < 2 || alan[0] === alan[1],
-          kucuk: [...document.querySelectorAll('#tab-properties .property-color-swatch')]
-            .filter(b => b.getClientRects().length).map(b => Math.round(b.getBoundingClientRect().height)).filter(h => h < 36)
+          // Renk noktasi 16 px gorunur; dokunma alani ::before ile her yone 14 px genisler (>=44 px).
+          kucuk: [...document.querySelectorAll('#tab-properties .property-color-btn')]
+            .filter(b => b.getClientRects().length).map(b => Math.round(b.getBoundingClientRect().height - 2 * parseFloat(getComputedStyle(b, '::before').top || '0'))).filter(h => h < 36)
         };
       });
       assert(mulk.ikili && mulk.kucuk.length === 0, `Mülkler telefonda: ${JSON.stringify(mulk)}`);

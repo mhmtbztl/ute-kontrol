@@ -16,7 +16,7 @@
   <meta http-equiv="Expires" content="0">
   <!-- Gece/Gunduz: tema stil sayfasindan once secilir (yanip sonme olmaz); yazi tipi sistemindir -->
   <script src="core/theme.js?v=81e24fd9"></script>
-  <link rel="stylesheet" href="style.css?v=1d5d28a2">
+  <link rel="stylesheet" href="style.css?v=0c46a4e6">
   <link rel="stylesheet" href="analytics.css?v=22c2a3d0">
   <script src="supabase.umd.js?v=3810661a"></script>
   <script src="core/xlsx_import_worker.js?v=b0939d47"></script>
@@ -193,6 +193,10 @@
     </div>
 
         <div class="header-actions">
+      <!-- ChatGPT'ye sor: sag ustte tek tik (kullanici 22.11.2026). -->
+      <button type="button" class="btn btn-secondary header-chatgpt-btn" id="askChatGptBtn" data-onclick="openChatGptQuestionModal(); closeAllHeaderDropdowns();" title="Bu sayfanın rakamlarıyla hazır soru; kişisel veri gitmez">
+        <span class="header-btn-icon" aria-hidden="true">✦</span> <span class="header-btn-text">ChatGPT'ye sor</span>
+      </button>
 
       <!-- Bildirim Merkezi (Notification Bell & Drawer) -->
       <div class="header-dropdown-wrap">
@@ -272,13 +276,7 @@
             <select id="tenantSelectDropdown" data-onchange="switchActiveTenant(this.value); closeAllHeaderDropdowns();" data-lx-style="width: 100%; padding: 6px 8px; font-size: 12px; border-radius: 6px; background: #2C2C2E; color: #EDE9FE; border: 1px solid #6366F1; outline: none; cursor: pointer;">
             </select>
           </div>
-          <!-- Ust cubukta ayri duran ChatGPT, Gece/Gunduz ve "Veri ve yardim" burada (sadelik 21.11.2026). -->
-          <button type="button" class="dropdown-item" id="askChatGptBtn" data-onclick="openChatGptQuestionModal(); closeAllHeaderDropdowns();">
-            <div>
-              <strong>ChatGPT'ye sor</strong>
-              <small>Bu sayfanın rakamlarıyla hazır soru; kişisel veri gitmez</small>
-            </div>
-          </button>
+          <!-- Gece/Gunduz ve "Veri ve yardim" burada (sadelik 21.11.2026). ChatGPT 22.11.2026'da ust cubuga dondu (kullanici: "kolay erisilen yere"). -->
           <button type="button" class="dropdown-item" data-theme-toggle data-onclick="toggleTheme()" aria-pressed="false">
             <div>
               <strong>Görünüm: <span data-theme-label>—</span></strong>
@@ -381,8 +379,10 @@
           <h1 class="lex-title" id="todayTitle">Bugün</h1>
           <span class="lex-headrow__meta" id="todayDateLabel">—</span>
         </div>
-        <div id="todayVillaTabs"></div>
-        <div id="todayTeamTabs"></div>
+        <div class="lex-filterbar">
+          <div id="todayVillaTabs"></div>
+          <div id="todayTeamTabs"></div>
+        </div>
         <p class="lex-summary" id="todaySummary" aria-live="polite">—</p>
         <p class="lex-note" id="todayNextArrival" hidden></p>
         <div id="todayTaskTable"></div>
@@ -736,25 +736,21 @@
           </div>
         </div>
 
-        <!-- Rezervasyon Tablosu Filtreleme ve Arama Çubuğu -->
-        <div data-lx-style="display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; padding: 0;">
-          <div data-lx-style="flex: 1; min-width: 200px;">
-            <input type="search" id="rezSearchInput" aria-label="Misafir adı veya villa ara" placeholder="🔍 Misafir adı veya villa ara..." data-oninput="renderManageBookingsTable()" data-lx-style="width: 100%; padding: 8px 12px; background: rgba(44, 44, 46,0.8); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff;">
-          </div>
-          <div>
-            <select id="rezStatusFilter" aria-label="Durum filtresi" data-onchange="renderManageBookingsTable()" data-lx-style="padding: 8px 12px; background: rgba(44, 44, 46,0.9); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 13px;">
-              <option value="ALL" selected>Tüm Durumlar</option>
-              <option value="CONFIRMED">Onaylandı</option>
-              <option value="CHECKED_IN">İçeride (Konaklıyor)</option>
-              <option value="CHECKED_OUT">Tamamlandı</option>
-              <option value="CANCELLED">İptal</option>
-            </select>
-          </div>
-          <div id="rezTableSummaryPill" data-lx-style="font-size: 12px; color: #93C5FD; font-weight: 700; padding: 4px 8px; background: rgba(10, 132, 255,0.15); border-radius: 6px;">
-            <!-- Rendered dynamically -->
-          </div>
-          <div id="rezCollectionsMetric" class="badge badge-green">Toplam tahsilat: —</div>
+        <!-- Rezervasyon filtreleri ve ozet (sadelik 4. tur): tek filtre satiri, alti bes sade rakam. -->
+        <div class="lex-filterbar rez-filterbar">
+          <input type="search" id="rezSearchInput" aria-label="Misafir adı veya villa ara" class="lex-input" placeholder="Misafir veya villa ara" data-oninput="renderManageBookingsTable()">
+          <select id="rezStatusFilter" aria-label="Durum filtresi" class="lex-select" data-onchange="renderManageBookingsTable()">
+            <option value="ALL" selected>Tüm durumlar</option>
+            <option value="CONFIRMED">Onaylandı</option>
+            <option value="CHECKED_IN">İçeride (Konaklıyor)</option>
+            <option value="CHECKED_OUT">Tamamlandı</option>
+            <option value="CANCELLED">İptal</option>
+          </select>
+          <select id="rezChannelFilter" aria-label="Kanal filtresi" class="lex-select" data-onchange="renderManageBookingsTable()">
+            <option value="ALL" selected>Tüm kanallar</option>
+          </select>
         </div>
+        <div id="rezTableSummaryPill" class="rez-summary" aria-live="polite"></div>
 
         <div class="table-responsive">
           <table class="data-table reservation-list-table">
@@ -3530,15 +3526,17 @@
   <script src="core/mobile_shell.js?v=8979ea0a"></script>
   <script src="core/notification_feed.js?v=941306f6"></script>
   <script src="core/command_search.js?v=1b9dbcc9"></script>
-  <script src="core/action_dispatch.js?v=252ca032"></script>
+  <script src="core/action_dispatch.js?v=eb0172ac"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=9b3127c9"></script>
   <script src="core/permission_matrix.js?v=e3a3cef2"></script>
   <script src="core/tenant_backup_export.js?v=5aadcdb1"></script>
   <script src="core/ui_dialog.js?v=ba104c37"></script>
   <script src="core/team_tasks.js?v=e92498bb"></script>
-  <script src="core/lex_ui.js?v=ac9df131"></script>
-  <script src="app.js?v=f27a0bea"></script>
+  <script src="core/lex_ui.js?v=950d5fdd"></script>
+  <script src="core/color_picker.js?v=8457ca4c"></script>
+  <script src="core/task_page.js?v=83a423dc"></script>
+  <script src="app.js?v=9d5f96fd"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/marketing_ui.js?v=26927afc"></script>
 </body>

@@ -38,7 +38,7 @@
   // fonksiyonu buraya ekleyin; html_injection_tests listede olmayan, tanimsiz
   // ya da artik kullanilmayan adi yakalar.
   const EYLEMLER = new Set([
-    'goTo', 'applyImportedData', 'askPricingChatGpt', 'assignCleaningTaskFromSelect', 'assignMaintenanceFromSelect', 'assignOperationalTaskFromSelect', 'autoCalculateGoalAdr', 'autoCalculateGoalNights',
+    'goTo', 'applyImportedData', 'askPricingChatGpt', 'assignCleaningTaskFromSelect', 'assignMaintenanceFromSelect', 'autoCalculateGoalAdr', 'autoCalculateGoalNights',
     'autoCalculateGoalSubmetrics', 'calculateLivePreview', 'changeImportMode', 'cleanResetAll',
     'buildChatGptQuestionPrompt', 'clearResDateRange', 'closeAiActionConfirmModal', 'closeAllHeaderDropdowns',
     'closeBookingModal', 'closeChatGptQuestionModal', 'closeCleaningTaskModal', 'closeDeleteAccountModal', 'closeExpenseModal', 'closePageReportModal', 'closeQuickBookingModal',
@@ -74,7 +74,7 @@
     'openInviteMemberModal', 'openQuickLeadCapture', 'syncGoalProfitFromMargin', 'syncGoalMarginFromProfit', 'refreshPropertyReport', 'saveOperationalPerson', 'editOperationalPerson', 'cancelOperationalPersonEdit', 'toggleOperationalPersonActive', 'openMaintModal', 'openChatGptQuestionModal', 'openQuickBookingModal',
     'openMonthCloseModal', 'openMonthReopenModal', 'openLeadWhatsApp', 'inspectCleaningExecution',
     'openNewCleaningTaskModal', 'openCopyPreviousExpensesPanel', 'openPropertyModal', 'openPropertyOtaManager', 'openPropertyChannelForm', 'closePropertyChannelForm', 'updateChannelListingHelp', 'savePropertyChannelListing', 'archivePropertyChannelListing', 'copyPropertyChannelLinks', 'openResetModal', 'downloadTenantBackup', 'saveMemberPermissionsFromModal', 'closeMemberPermissionsModal', 'resetMemberPermissionsToRole', 'onMemberPermissionToggle',
-    'openSettingsSection', 'setPropertyColor', 'selectSettingsSection', 'openImportConvertPrompt',  'openUserNotification', 'openWhatsAppModal', 'parseWhatsAppMessage', 'payCleanerDebt', 'printCurrentReport', 'askChatGptFromCurrentReport',
+    'openSettingsSection', 'openPropertyColorPicker', 'selectSettingsSection', 'openImportConvertPrompt',  'openUserNotification', 'openWhatsAppModal', 'parseWhatsAppMessage', 'payCleanerDebt', 'printCurrentReport', 'askChatGptFromCurrentReport',
     'promptEditTaskAmount',  'renderExpensesTable', 'renderManageBookingsTable',
     'renderManageLeadsTable', 'recalculatePricingTarget', 'resetGuestDirectoryDateRange',
     'resetImportPreview', 'resolveMaintenanceFromOperations', 'runPageAction', 'togglePageActionMenu',
@@ -85,12 +85,12 @@
     'setGuestDirectoryPage', 'setGuestDirectoryProperty',
     'setGuestDirectoryQuery', 'setGuestDirectorySegment', 'setGuestDirectorySort',
     'setGuestDirectorySortDirection', 'setLargeTablePage',
-    'setOperationsView', 'openOperationalTaskModal', 'saveOperationalTask', 'setOperationalTaskStatus', 'setMyOperationalTaskStatus', 'setManagerChecklistMark', 'setPricingProperty', 'setPropertyProfile', 'setPropertyProfileTab', 'setPropertySalesReadiness', 'setStaffChecklistMark', 'setStaffTaskChecklistMark', 'setStaffSupplyStatus', 'setTapeChartView',
+    'setOperationsView', 'openOperationalTaskModal', 'createOperationalTaskPage', 'openOperationalTaskPage', 'closeOperationalTaskPage', 'setOperationalTaskPageField', 'completeOperationalTaskPage', 'saveOperationalTask', 'setOperationalTaskStatus', 'setMyOperationalTaskStatus', 'setManagerChecklistMark', 'setPricingProperty', 'setPropertyProfile', 'setPropertyProfileTab', 'setPropertySalesReadiness', 'setStaffChecklistMark', 'setStaffTaskChecklistMark', 'setStaffSupplyStatus', 'setTapeChartView',
     'shiftResCalendar', 'showForgotPasswordForm',
     'stepReservationPeriod', 'onReservationScopeChange', 'submitAccountDeletion', 'submitMemberInvite',
     'submitMonthClose', 'submitMonthReopen', 'submitQuickLead', 'switchActiveTenant', 'switchAuthTab',
     'switchHelpTab', 'switchTab', 'switchWaModalTab', 'syncCommissionFromRate',
-    'toggleTheme', 'openTabFromDeepLink', 'setTodayVilla', 'setTodayTeam', 'openTeamTask', 'downloadTodayExcel', 'printTodayPdf', 'setTeamTaskRouting', 'resetTeamTaskRouting',
+    'toggleTheme', 'openTabFromDeepLink', 'setTodayVilla', 'toggleTodayTeam', 'openTeamTask', 'downloadTodayExcel', 'printTodayPdf', 'setTeamTaskRouting', 'resetTeamTaskRouting',
     'removeBusinessLogo', 'syncRateFromCommission', 'toggleSettingsLeadSource', 'uploadBusinessLogo',
     'toggleBookingChannelRowRate', 'toggleHeaderDropdown', 'toggleMobileFilters', 'toggleReservationRangePicker',
     'toggleNewBookingChannelRate', 'toggleNotificationDrawer', 'toggleResDatePicker',
