@@ -451,6 +451,25 @@ function getCustomExpenseCategories() {
   }));
 }
 
+// Gelir kategorileri (phase125): tenant_settings 'income_categories' = [{ name }]. Standart
+// adlar gorunum varsayilanidir; gelir satiri adi metin olarak tasir (silinse de kayit korur).
+const STANDARD_INCOME_CATEGORIES = ['Ekstra hizmet', 'Transfer', 'Hasar bedeli', 'Erken giriş / geç çıkış'];
+
+function getIncomeCategories() {
+  const raw = (typeof appData !== 'undefined' && appData && appData.tenantSettings) ? appData.tenantSettings.income_categories : null;
+  const gorulen = new Set();
+  const liste = [];
+  STANDARD_INCOME_CATEGORIES.forEach(ad => { gorulen.add(expenseCategoryKey(ad)); liste.push({ name: ad, custom: false }); });
+  (Array.isArray(raw) ? raw : []).forEach(c => {
+    const ad = String(c && c.name || '').trim();
+    const k = expenseCategoryKey(ad);
+    if (!ad || !k || gorulen.has(k)) return;
+    gorulen.add(k);
+    liste.push({ name: ad, custom: true });
+  });
+  return liste;
+}
+
 function getExpenseCategories() {
   const diger = EXPENSE_CATEGORIES[EXPENSE_CATEGORIES.length - 1];
   return [...EXPENSE_CATEGORIES.slice(0, -1), ...getCustomExpenseCategories(), diger];
@@ -5866,7 +5885,8 @@ function mapIncomeEntryFromDb(row, villas) {
     date,
     month: date.slice(0, 7),
     amount: roundMoney(row.amount),
-    description: row.description || ''
+    description: row.description || '',
+    category: row.income_type === 'CAPITAL' ? null : (row.category || null)
   };
 }
 
@@ -5910,12 +5930,16 @@ function openIncomeModal(editId = null) {
   document.getElementById('incDate').value = kayit ? kayit.date : getTodayStr();
   document.getElementById('incAmount').value = kayit ? kayit.amount : '';
   document.getElementById('incDesc').value = kayit ? kayit.description : '';
+  renderIncomeCategoryOptions(kayit ? (kayit.category || '') : '');
   updateIncomeTypeHint(document.getElementById('incType').value);
   modal.classList.add('active');
   return true;
 }
 
 function updateIncomeTypeHint(type) {
+  // Sermaye gelir degildir: kategorisi yoktur.
+  const grup = typeof document !== 'undefined' ? document.getElementById('incCategoryGroup') : null;
+  if (grup) grup.hidden = type === 'CAPITAL';
   setEl('incomeTypeHint', type === 'CAPITAL'
     ? 'Sermaye gelir değildir: kâra ve ciroya girmez, ayrı "sermaye girişi" olarak görünür.'
     : 'Toplam gelire ve kâra girer; ciroya (konaklama geliri) girmez.');
@@ -5940,6 +5964,8 @@ async function saveIncomeEntry(event) {
       amount: roundMoney(document.getElementById('incAmount')?.value),
       description: (document.getElementById('incDesc')?.value || '').trim()
     };
+    const kategori = String(document.getElementById('incCategory')?.value || '').trim();
+    if (payload.income_type === 'OTHER_INCOME' && kategori) payload.category = kategori.slice(0, 60);
     if (villa !== 'ALL' && !payload.property_id) throw new Error('Seçilen mülk bulunamadı.');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(payload.income_date)) throw new Error('Geçerli bir tarih girin.');
     if (!(payload.amount > 0)) throw new Error('Tutar sıfırdan büyük olmalı.');
@@ -5948,11 +5974,19 @@ async function saveIncomeEntry(event) {
     const eski = editId ? (appData.incomeEntries || []).find(i => i.id === editId) : null;
     if (eski && isPeriodClosed(eski.date)) throw new Error(`Bu kayıt kapatılmış döneme (${eski.month}) ait; değiştirilemez.`);
 
-    const sorgu = editId
-      ? supabaseClient.from('income_entries').update(payload).eq('id', editId).eq('tenant_id', tenantId)
-      : supabaseClient.from('income_entries').insert({ ...payload, tenant_id: tenantId });
-    const { data, error } = await sorgu.select().single();
+    const yaz = body => (editId
+      ? supabaseClient.from('income_entries').update(body).eq('id', editId).eq('tenant_id', tenantId)
+      : supabaseClient.from('income_entries').insert({ ...body, tenant_id: tenantId })).select().single();
+    let { data, error } = await yaz(payload);
+    // phase125 yoksa (category sutunu yok) kayit kategorisiz yapilir ve soylenir; gelir kaydi kirilmaz.
+    let kategoriYok = false;
+    if (error && 'category' in payload && /category|42703|PGRST204/i.test(`${error.code || ''} ${error.message || ''}`)) {
+      const { category, ...kategorisiz } = payload;
+      ({ data, error } = await yaz(kategorisiz));
+      kategoriYok = !error;
+    }
     if (error) throw error;
+    if (kategoriYok && typeof showToast === 'function') showToast('Gelir kaydedildi; kategori için veritabanı güncellemesi (phase125) henüz uygulanmadı, kategori kaydedilmedi.', 'info');
     const kayit = mapIncomeEntryFromDb(data);
     appData.incomeEntries = [kayit, ...(appData.incomeEntries || []).filter(i => i.id !== kayit.id)];
     closeIncomeModal();
@@ -5998,6 +6032,13 @@ function renderIncomeSection(ledger) {
   if (temizlikSatiri) temizlikSatiri.hidden = !(ledger.cleaningRevenue > 0);
   setEl('incomeCleaningVal', tl(ledger.cleaningRevenue));
   setEl('incomeOtherVal', tl(ledger.otherIncome));
+  const kategoriToplam = {};
+  (appData.incomeEntries || []).filter(i => i.type === 'OTHER_INCOME' && isExpenseInFilter(i)).forEach(i => {
+    const ad = i.category || 'Kategorisiz';
+    kategoriToplam[ad] = (kategoriToplam[ad] || 0) + (Number(i.amount) || 0);
+  });
+  const dagilim = Object.entries(kategoriToplam).sort((x, y) => y[1] - x[1]).map(([ad, t]) => `${ad} ${tl(t)}`).join(' · ');
+  setEl('incomeOtherBreakdown', dagilim || 'Elle girilen');
   setEl('incomeTotalVal', tl(ledger.totalRevenue));
   setEl('incomeCapitalVal', tl(ledger.capitalIn));
 
@@ -6016,7 +6057,7 @@ function renderIncomeSection(ledger) {
   const yonetir = canWriteLedgerRole(activeTenant?.role);
   govde.innerHTML = satirlar.map(i => `<tr>
       <td>${formatTrDate(i.date)}</td>
-      <td><span class="badge ${i.type === 'CAPITAL' ? 'badge-amber' : 'badge-green'}">${escapeHtml(INCOME_TYPE_LABELS[i.type])}</span></td>
+      <td><span class="badge ${i.type === 'CAPITAL' ? 'badge-amber' : 'badge-green'}">${escapeHtml(INCOME_TYPE_LABELS[i.type])}</span>${i.category ? `<small class="income-category-label">${escapeHtml(i.category)}</small>` : ''}</td>
       <td>${escapeHtml(i.villa === 'ALL' ? 'Tüm Portföy' : (appData.villas[i.villa]?.name || i.villa))}</td>
       <td>${escapeHtml(i.description || '-')}</td>
       <td><strong>${Number(i.amount).toLocaleString('tr-TR')} TL</strong></td>
@@ -6390,6 +6431,73 @@ async function saveCustomExpenseCategories(liste) {
   if (!appData.tenantSettings) appData.tenantSettings = {};
   appData.tenantSettings.expense_categories = liste;
   renderSettingsExpenseCategories();
+}
+
+function renderSettingsIncomeCategories() {
+  const body = typeof document !== 'undefined' ? document.getElementById('settingsIncomeCategoriesBody') : null;
+  if (!body) return;
+  const kullanim = {};
+  (appData?.incomeEntries || []).forEach(i => { if (i.category) { const k = expenseCategoryKey(i.category); kullanim[k] = (kullanim[k] || 0) + 1; } });
+  body.innerHTML = getIncomeCategories().map(cat => {
+    const adet = kullanim[expenseCategoryKey(cat.name)] || 0;
+    const islem = cat.custom
+      ? `<button type="button" class="btn btn-danger btn-sm" data-onclick="deleteCustomIncomeCategory(decodeURIComponent('${encodeActionArg(cat.name)}'))">Sil</button>`
+      : '<span class="sub-text">Standart</span>';
+    return `<tr><td><strong>${escapeHtml(cat.name)}</strong></td><td>${adet ? `${adet} kayıt` : '—'}</td><td style="text-align:right">${islem}</td></tr>`;
+  }).join('');
+}
+
+async function saveCustomIncomeCategories(liste) {
+  await cloudSaveTenantSetting('income_categories', liste);
+  if (!appData.tenantSettings) appData.tenantSettings = {};
+  appData.tenantSettings.income_categories = liste;
+  renderSettingsIncomeCategories();
+  renderIncomeCategoryOptions();
+}
+
+async function createSettingsIncomeCategory(event) {
+  if (event && typeof event.preventDefault === 'function') event.preventDefault();
+  const input = typeof document !== 'undefined' ? document.getElementById('settingsIncomeCategoryName') : null;
+  const ad = String(input?.value || '').trim().replace(/\s+/g, ' ');
+  if (!ad) { showToast('Kategori adı girin.', 'error'); return false; }
+  if (ad.length > 60) { showToast('Kategori adı en fazla 60 karakter olabilir.', 'error'); return false; }
+  const k = expenseCategoryKey(ad);
+  if (!k) { showToast('Kategori adı harf ya da rakam içermeli.', 'error'); return false; }
+  const mevcut = getIncomeCategories().find(c => expenseCategoryKey(c.name) === k);
+  if (mevcut) { showToast(`"${mevcut.name}" kategorisi zaten var.`, 'error'); return false; }
+  const liste = getIncomeCategories().filter(c => c.custom).map(c => ({ name: c.name })).concat({ name: ad });
+  if (liste.length > 40) { showToast('En fazla 40 özel kategori eklenebilir.', 'error'); return false; }
+  try {
+    await saveCustomIncomeCategories(liste);
+  } catch (error) {
+    showToast('Kategori kaydedilemedi: ' + kullaniciMesaji(error?.message || ''), 'error');
+    return false;
+  }
+  if (input) input.value = '';
+  showToast(`"${ad}" gelir kategorisi eklendi.`, 'success');
+  return true;
+}
+
+async function deleteCustomIncomeCategory(name) {
+  if (!(await uiAskConfirm({ message: `"${name}" kategorisi silinsin mi? Eski gelir kayıtları adını korur.`, okText: 'Kategoriyi sil', danger: true }))) return false;
+  const liste = getIncomeCategories().filter(c => c.custom && c.name !== name).map(c => ({ name: c.name }));
+  try {
+    await saveCustomIncomeCategories(liste);
+    showToast(`"${name}" kategorisi silindi.`, 'success');
+    return true;
+  } catch (error) {
+    showToast('Kategori silinemedi: ' + kullaniciMesaji(error?.message || ''), 'error');
+    return false;
+  }
+}
+
+function renderIncomeCategoryOptions(selected = null) {
+  const select = typeof document !== 'undefined' ? document.getElementById('incCategory') : null;
+  if (!select) return;
+  const secili = selected === null ? select.value : String(selected || '');
+  const adlar = getIncomeCategories().map(c => c.name);
+  if (secili && !adlar.includes(secili)) adlar.push(secili); // silinmis kategoriyi tasiyan eski kayit
+  select.innerHTML = '<option value="">Kategori seçin (isteğe bağlı)</option>' + adlar.map(ad => `<option value="${escapeHtml(ad)}"${ad === secili ? ' selected' : ''}>${escapeHtml(ad)}</option>`).join('');
 }
 
 function renderSettingsExpenseCategories() {
@@ -10863,6 +10971,7 @@ async function renderSettingsWorkspace() {
   renderBookingChannelSettings();
   renderSettingsTemplates();
   renderSettingsExpenseCategories();
+  renderSettingsIncomeCategories();
   renderSettingsLeadSources();
   // renderAll her cagrida 4 katalog istiyordu (L-148d). Yazmalar ve sekme
   // acilisi kendi yuklemesini yapar; burada 60 sn onbellek yeter.
@@ -23716,6 +23825,11 @@ async function handleQuickActionTrigger(actionType, entityId) {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     goTo,
+    getIncomeCategories,
+    renderSettingsIncomeCategories,
+    createSettingsIncomeCategory,
+    deleteCustomIncomeCategory,
+    renderIncomeCategoryOptions,
     openSettingsTemplatePage,
     closeSettingsTemplatePage,
     openSettingsChecklistPage,

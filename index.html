@@ -16,7 +16,7 @@
   <meta http-equiv="Expires" content="0">
   <!-- Gece/Gunduz: tema stil sayfasindan once secilir (yanip sonme olmaz); yazi tipi sistemindir -->
   <script src="core/theme.js?v=81e24fd9"></script>
-  <link rel="stylesheet" href="style.css?v=afcd5935">
+  <link rel="stylesheet" href="style.css?v=769ef092">
   <link rel="stylesheet" href="analytics.css?v=35127907">
   <script src="supabase.umd.js?v=3810661a"></script>
   <script src="core/xlsx_import_worker.js?v=b0939d47"></script>
@@ -538,7 +538,7 @@
         <div class="income-summary-grid fox-grid">
           <button type="button" class="income-summary-item fox-card fox-card--revenue fox-card--link" data-onclick="goTo('reservations')" title="Rezervasyonları aç"><span>Konaklama cirosu</span><strong id="incomeRoomVal">—</strong><small>Rezervasyonlardan ›</small></button>
           <div class="income-summary-item fox-card fox-card--income" id="incomeCleaningRow" hidden><span>Temizlik geliri</span><strong id="incomeCleaningVal">—</strong><small>Misafirden alınan</small></div>
-          <div class="income-summary-item fox-card fox-card--income"><span>Diğer gelir</span><strong id="incomeOtherVal">—</strong><small>Elle girilen</small></div>
+          <div class="income-summary-item fox-card fox-card--income"><span>Diğer gelir</span><strong id="incomeOtherVal">—</strong><small id="incomeOtherBreakdown">—</small></div>
           <div class="income-summary-item income-summary-total fox-card fox-card--revenue"><span>Toplam gelir (kârın tabanı)</span><strong id="incomeTotalVal">—</strong></div>
           <div class="income-summary-item income-summary-capital fox-card fox-card--neutral"><span>Sermaye / ortak girişi <small>kâra dahil değil</small></span><strong id="incomeCapitalVal">—</strong></div>
         </div>
@@ -972,6 +972,7 @@
         <div class="settings-nav__group">Operasyon</div>
         <button type="button" class="settings-nav__item" data-settings-target="checklists" data-onclick="selectSettingsSection('checklists')"><span>Kontrol listeleri</span></button>
         <div class="settings-nav__group">Finans</div>
+        <button type="button" class="settings-nav__item" data-settings-target="income-categories" data-onclick="selectSettingsSection('income-categories')"><span>Gelir kategorileri</span></button>
         <button type="button" class="settings-nav__item" data-settings-target="expense-categories" data-onclick="selectSettingsSection('expense-categories')"><span>Gider kategorileri</span></button>
         <div class="settings-nav__group">Hesap</div>
         <button type="button" class="settings-nav__item" data-settings-target="danger" data-onclick="selectSettingsSection('danger')"><span>Veri ve hesap</span></button>
@@ -1168,6 +1169,23 @@
           <h3 class="checklist-saved-title">Kayıtlı listeler</h3>
           <p class="sub-text">Bir listeye dokununca sayfası açılır. Temizlik listesi, o eve temizlikçi atanınca göreve kendiliğinden eklenir. <button type="button" class="lex-link-inline" data-onclick="goTo('operations:cleaning')">Temizlikte kullan</button></p>
           <div id="settingsChecklistTemplatesList" class="settings-template-list tp-list"></div>
+        </div>
+      </section>
+
+      <!-- Gelir kategorileri (22.11.2026, phase125): yalniz "Diger gelir" kayitlari icin; sermaye girisi gelir degildir. -->
+      <section class="card settings-section" data-settings-section="income-categories" id="settingsIncomeCategoriesCard" data-lx-style="margin-bottom:24px;">
+        <div class="section-title-bar">
+          <div><h2>Gelir kategorileri</h2><p class="sub-text">Rezervasyon dışı gelirin türü (transfer, ekstra hizmet, hasar bedeli…). Finans → Gelirler'de kategoriye göre toplanır. Konaklama geliri rezervasyondan gelir; sermaye girişi gelir değildir, kategorisi yoktur.</p></div>
+        </div>
+        <form data-onsubmit="createSettingsIncomeCategory(event)" class="settings-source-form">
+          <div class="form-group"><label for="settingsIncomeCategoryName">Yeni kategori</label><input id="settingsIncomeCategoryName" maxlength="60" required placeholder="Örn: Tekne turu"></div>
+          <button type="submit" class="btn btn-primary btn-sm">+ Kategori ekle</button>
+        </form>
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead><tr><th>Kategori</th><th>Kullanım</th><th data-lx-style="text-align:right;">İşlem</th></tr></thead>
+            <tbody id="settingsIncomeCategoriesBody"></tbody>
+          </table>
         </div>
       </section>
 
@@ -1733,6 +1751,10 @@
               <option value="CAPITAL">Sermaye / ortak girişi (yatırım, nakit dengeleme)</option>
             </select>
             <div id="incomeTypeHint" class="form-hint"></div>
+          </div>
+          <div class="form-group" id="incCategoryGroup">
+            <label for="incCategory">Kategori</label>
+            <select id="incCategory"><option value="">Kategori seçin (isteğe bağlı)</option></select>
           </div>
           <div class="form-group">
             <label for="incVilla">İlgili Mülk / Kapsam</label>
@@ -3539,7 +3561,7 @@
   <script src="core/mobile_shell.js?v=8979ea0a"></script>
   <script src="core/notification_feed.js?v=941306f6"></script>
   <script src="core/command_search.js?v=1b9dbcc9"></script>
-  <script src="core/action_dispatch.js?v=017a1d85"></script>
+  <script src="core/action_dispatch.js?v=a343d238"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=9b3127c9"></script>
   <script src="core/permission_matrix.js?v=e3a3cef2"></script>
@@ -3549,7 +3571,7 @@
   <script src="core/lex_ui.js?v=950d5fdd"></script>
   <script src="core/color_picker.js?v=8457ca4c"></script>
   <script src="core/task_page.js?v=83a423dc"></script>
-  <script src="app.js?v=d56fa608"></script>
+  <script src="app.js?v=c48d4604"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/marketing_ui.js?v=26927afc"></script>
 </body>
