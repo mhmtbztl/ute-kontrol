@@ -21,10 +21,43 @@ test('Finans kopya bölümleri yok: hedef kartı, kâr köprüsü, dönem özeti
   assert.doesNotMatch(html, /AI FİNANS ANALİSTİ|Stratejik durum/i);
 });
 
-test('Gelirler, giderler ve mülk tablosu duruyor; giderler açılır bölümde', () => {
-  assert.match(html, /<details[^>]+id="financeExpensesDisclosure"/);
-  assert.match(html, /<details[^>]+id="financeIncomeDisclosure"/);
+// Fox (kullanici 22.11.2026): Gelirler ve Giderler ana ekranda sayfa satiri; tiklaninca alt sayfa.
+// Ekleme dugmeleri alt sayfanin altinda; baslikta yalniz hedef kalir.
+test('Gelirler ve giderler alt sayfadır; ekleme sayfanın altında, başlıkta yalnız hedef', () => {
+  assert.match(html, /<section[^>]+id="finSubIncome"[^>]*hidden/);
+  assert.match(html, /<section[^>]+id="finSubExpenses"[^>]*hidden/);
+  assert.match(html, /<section[^>]+id="finSubCategory"[^>]*hidden/);
+  assert.match(html, /id="finIncomeLink"[^>]*data-onclick="setFinanceView\('income'\)"/);
+  assert.match(html, /id="finExpensesLink"[^>]*data-onclick="setFinanceView\('expenses'\)"/);
   assert.match(html, /id="propExecTableBody"/);
+  const fin = html.slice(html.indexOf('id="tab-finance"'), html.indexOf('id="tab-analytics"'));
+  const bas = fin.slice(0, fin.indexOf('</div>'));
+  assert.match(bas, /openGoalsModal\(\)/);
+  assert.doesNotMatch(bas, /openExpenseModal\(\)/);
+  const giderSayfasi = fin.slice(fin.indexOf('id="finSubExpenses"'), fin.indexOf('id="finSubCategory"'));
+  assert.match(giderSayfasi, /class="fox-add"[^>]*data-onclick="openExpenseModal\(\)">\+ Gider ekle/);
+  const gelirSayfasi = fin.slice(fin.indexOf('id="finSubIncome"'), fin.indexOf('id="finSubExpenses"'));
+  assert.match(gelirSayfasi, /\+ Gelir ekle/);
+});
+
+test('Alt sayfa geçişi: ana görünüm gizlenir, kategori sayfası kayıtları çizer', () => {
+  const elems = {};
+  const el = id => (elems[id] = elems[id] || { id, hidden: false, innerHTML: '', innerText: '', textContent: '' });
+  const eskiDoc = global.document;
+  global.document = Object.assign({}, eskiDoc || {}, { getElementById: el });
+  try {
+    assert.strictEqual(App.setFinanceView('nope'), false);
+    assert.strictEqual(App.setFinanceView('expenses'), true);
+    assert.strictEqual(el('finMain').hidden, true);
+    assert.strictEqual(el('finPropertySection').hidden, true);
+    assert.strictEqual(el('finSubExpenses').hidden, false);
+    assert.strictEqual(App.setFinanceView('category', 'Var olmayan kategori'), false);
+    App.setFinanceView('main');
+    assert.strictEqual(el('finMain').hidden, false);
+    assert.strictEqual(el('finSubExpenses').hidden, true);
+  } finally {
+    global.document = eskiDoc;
+  }
 });
 
 test('Önceki ay gider kopyaları seçili aya taşınır ve kaynak ayı notta korunur', () => {

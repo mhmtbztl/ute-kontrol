@@ -38,7 +38,7 @@
   // fonksiyonu buraya ekleyin; html_injection_tests listede olmayan, tanimsiz
   // ya da artik kullanilmayan adi yakalar.
   const EYLEMLER = new Set([
-    'goTo', 'applyImportedData', 'askPricingChatGpt', 'assignCleaningTaskFromSelect', 'assignMaintenanceFromSelect', 'autoCalculateGoalAdr', 'autoCalculateGoalNights',
+    'goTo', 'setFinanceView', 'openExpenseForFinanceCategory', 'applyImportedData', 'askPricingChatGpt', 'assignCleaningTaskFromSelect', 'assignMaintenanceFromSelect', 'autoCalculateGoalAdr', 'autoCalculateGoalNights',
     'autoCalculateGoalSubmetrics', 'calculateLivePreview', 'changeImportMode', 'cleanResetAll',
     'buildChatGptQuestionPrompt', 'clearResDateRange', 'closeAiActionConfirmModal', 'closeAllHeaderDropdowns',
     'closeBookingModal', 'closeChatGptQuestionModal', 'closeCleaningTaskModal', 'closeDeleteAccountModal', 'closeExpenseModal', 'closePageReportModal', 'closeQuickBookingModal',
@@ -55,7 +55,7 @@
     'deleteLeadUI',
     'downloadSampleTemplate', 'downloadCurrentReportCsv', 'downloadCurrentReportXlsx', 'editBooking', 'editExpense', 'editLead', 'editSettingsTemplate', 'archiveSettingsTemplate',
     'editMaint', 'exportIncomeStatement', 'exportLedger', 'filterByVilla',
-    'filterExpensesByCategory', 'filterHelpGlossary',
+    'filterHelpGlossary',
     'handleBookingChannelChange', 'handleBookingDeleteFromModal', 'cancelBookingFromModal', 'handleBookingPropertyFinanceChange',
     'markBookingCleaningManual', 'handleBookingGrossFinanceInput', 'toggleBookingFinanceSections', 'addBookingExtraExpense', 'removeBookingExtraExpense',
     'saveBookingTaxProfile', 'saveBookingCommissionBases', 'postBookingExtraExpenses',

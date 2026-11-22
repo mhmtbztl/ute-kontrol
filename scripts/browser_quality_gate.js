@@ -699,7 +699,7 @@ async function main() {
         currentFilter.period = getTodayStr().slice(0, 7);
         switchTab('finance');
         handleFilterChange();
-        document.getElementById('financeIncomeDisclosure').open = true;
+        setFinanceView('income'); // Fox: gelirler alt sayfasi
       });
       await page.selectOption('#globalVillaFilter', 'test');
       const portfoy = await page.evaluate(() => ({ villa: currentFilter.villa, global: document.getElementById('globalVillaFilter').value }));
@@ -1071,7 +1071,7 @@ async function main() {
       // aylik KPI tablosu yana kayar ama ay sutunu sabit; kucuk hedef yok.
       await page.evaluate(() => {
         switchTab('finance');
-        ['financeIncomeDisclosure', 'financeExpensesDisclosure', 'financeMonthlyDisclosure'].forEach(id => { const d = document.getElementById(id); if (d) d.open = true; });
+        setFinanceView('main');
       });
       // Etiketleri tbody gozlemcisi yazar (mikrogorev): olcumden once bir tik beklenir.
       await page.waitForTimeout(50);

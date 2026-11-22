@@ -16,7 +16,7 @@
   <meta http-equiv="Expires" content="0">
   <!-- Gece/Gunduz: tema stil sayfasindan once secilir (yanip sonme olmaz); yazi tipi sistemindir -->
   <script src="core/theme.js?v=81e24fd9"></script>
-  <link rel="stylesheet" href="style.css?v=0c46a4e6">
+  <link rel="stylesheet" href="style.css?v=6ac3461c">
   <link rel="stylesheet" href="analytics.css?v=22c2a3d0">
   <script src="supabase.umd.js?v=3810661a"></script>
   <script src="core/xlsx_import_worker.js?v=b0939d47"></script>
@@ -194,8 +194,8 @@
 
         <div class="header-actions">
       <!-- ChatGPT'ye sor: sag ustte tek tik (kullanici 22.11.2026). -->
-      <button type="button" class="btn btn-secondary header-chatgpt-btn" id="askChatGptBtn" data-onclick="openChatGptQuestionModal(); closeAllHeaderDropdowns();" title="Bu sayfanın rakamlarıyla hazır soru; kişisel veri gitmez">
-        <span class="header-btn-icon" aria-hidden="true">✦</span> <span class="header-btn-text">ChatGPT'ye sor</span>
+      <button type="button" class="btn btn-secondary header-chatgpt-btn" id="askChatGptBtn" aria-label="ChatGPT'ye sor" data-onclick="openChatGptQuestionModal(); closeAllHeaderDropdowns();" title="ChatGPT'ye sor: Bu sayfanın rakamlarıyla hazır soru; kişisel veri gitmez">
+        <span class="header-chatgpt-icon" aria-hidden="true">✦</span><span class="header-btn-text">ChatGPT</span>
       </button>
 
       <!-- Bildirim Merkezi (Notification Bell & Drawer) -->
@@ -433,12 +433,14 @@
         <span class="lex-headrow__meta" data-lex-period>—</span>
         <span class="lex-headrow__actions">
           <button class="btn btn-secondary btn-sm" data-onclick="openGoalsModal()">Hedefleri düzenle</button>
-          <button data-ledger-write-only class="btn btn-secondary btn-sm" data-onclick="openExpenseModal()">+ Gider</button>
         </span>
       </div>
       <section class="lex-screen-tasks" id="screenTasks_finance" aria-label="Ekip görevleri" hidden></section>
 
 
+      <!-- Fox Tasarimi (docs/FOX_TASARIMI.md, 22.11.2026): ana gorunum; Gelirler ve Giderler
+           tiklaninca alt sayfa olarak acilir (setFinanceView). -->
+      <div id="finMain">
       <!-- 1b. AY KAPANIŞI -->
       <section class="card" id="monthCloseCard" data-lx-style="border-left: 3px solid #636366;">
         <div data-lx-style="display:flex; flex-wrap:wrap; align-items:center; gap:14px; justify-content:space-between;">
@@ -458,9 +460,9 @@
       </section>
 
       <!-- 2. ANA KPI KARTLARI (5 SANİYEDE ANLAŞILIR) -->
-      <section class="kpi-cards-grid four-cols">
+      <section class="kpi-cards-grid four-cols fox-grid">
         <!-- Gerçekleşen Ciro -->
-        <div class="kpi-card fin-kpi-card">
+        <div class="kpi-card fin-kpi-card fox-card fox-card--revenue">
           <div class="kpi-card-header">
             <span class="kpi-label">Ciro (net konaklama geliri)</span>
           </div>
@@ -473,7 +475,7 @@
         </div>
 
         <!-- Net Kâr (Ciro - Opex - Capex) -->
-        <div class="kpi-card fin-kpi-card highlight-profit">
+        <div class="kpi-card fin-kpi-card highlight-profit fox-card fox-card--income" id="finProfitCard">
           <div class="kpi-card-header">
             <span class="kpi-label">Net kâr (cash profit)</span>
           </div>
@@ -486,7 +488,7 @@
         </div>
 
         <!-- Toplam Gider (Opex + Capex) -->
-        <div class="kpi-card fin-kpi-card">
+        <div class="kpi-card fin-kpi-card fox-card fox-card--expense">
           <div class="kpi-card-header">
             <span class="kpi-label">Toplam gider (OPEX+CAPEX)</span>
           </div>
@@ -499,7 +501,7 @@
         </div>
 
         <!-- Satılan Gece & Ortalama Gelir -->
-        <div class="kpi-card fin-kpi-card">
+        <div class="kpi-card fin-kpi-card fox-card fox-card--info">
           <div class="kpi-card-header">
             <span class="kpi-label">Satılan gece</span>
           </div>
@@ -511,30 +513,34 @@
         </div>
       </section>
 
-      <!-- 4b. GELİRLER (phase97). Rakamlar defter sozlesmesinden (renderIncomeSection);
-           "+ Gelir Ekle" rezervasyon formunu ya da diger gelir/sermaye formunu acar. -->
-      <details class="card expense-analysis-card finance-disclosure" id="financeIncomeDisclosure">
-        <summary><strong>Gelirler</strong><span>Konaklama, temizlik, diğer gelir ve sermaye</span></summary>
-        <div class="section-title-bar">
-          <div>
-            <h2>Gelirler</h2>
-            <p class="sub-text">Rezervasyon gelirleri otomatik gelir; rezervasyon dışı gelir ve sermaye girişi buradan eklenir</p>
-          </div>
-          <div class="income-add-wrap">
-            <button type="button" class="btn btn-primary btn-sm" data-onclick="toggleIncomeAddMenu(event)">+ Gelir Ekle</button>
-            <div id="incomeAddMenu" class="income-add-menu" hidden>
-              <button type="button" class="dropdown-item" data-onclick="startIncomeEntry('BOOKING')">Rezervasyon</button>
-              <button type="button" class="dropdown-item" data-onclick="startIncomeEntry('OTHER')">Diğer gelirler / sermaye</button>
-            </div>
-          </div>
-        </div>
+      <!-- Sayfalar: Gelirler ve Giderler tiklaninca alt sayfa acar. -->
+      <nav class="fox-pages" aria-label="Finans sayfaları">
+        <button type="button" class="fox-page-link fox-page-link--revenue" id="finIncomeLink" data-onclick="setFinanceView('income')">
+          <span class="fox-page-link__title">Gelirler</span>
+          <span class="fox-page-link__value" id="finIncomeLinkVal">—</span>
+          <span class="fox-page-link__sub" id="finIncomeLinkSub">—</span>
+        </button>
+        <button type="button" class="fox-page-link fox-page-link--expense" id="finExpensesLink" data-onclick="setFinanceView('expenses')">
+          <span class="fox-page-link__title">Giderler</span>
+          <span class="fox-page-link__value" id="finExpensesLinkVal">—</span>
+          <span class="fox-page-link__sub" id="finExpensesLinkSub">—</span>
+        </button>
+      </nav>
+      </div>
 
-        <div class="income-summary-grid">
-          <div class="income-summary-item"><span>Konaklama cirosu</span><strong id="incomeRoomVal">—</strong></div>
-          <div class="income-summary-item" id="incomeCleaningRow" hidden><span>Temizlik geliri</span><strong id="incomeCleaningVal">—</strong></div>
-          <div class="income-summary-item"><span>Diğer gelir</span><strong id="incomeOtherVal">—</strong></div>
-          <div class="income-summary-item income-summary-total"><span>Toplam gelir (kârın tabanı)</span><strong id="incomeTotalVal">—</strong></div>
-          <div class="income-summary-item income-summary-capital"><span>Sermaye / ortak girişi <small>kâra dahil değil</small></span><strong id="incomeCapitalVal">—</strong></div>
+      <!-- ALT SAYFA: GELİRLER (phase97). Rakamlar defter sozlesmesinden (renderIncomeSection).
+           En altta "+ Gelir ekle": rezervasyon formu ya da diger gelir/sermaye formu. -->
+      <section class="fox-subpage fox-subpage--revenue" id="finSubIncome" hidden aria-labelledby="finSubIncomeTitle">
+        <button type="button" class="fox-back" data-onclick="setFinanceView('main')">← Finans</button>
+        <h2 class="fox-subpage__title" id="finSubIncomeTitle">Gelirler</h2>
+        <p class="lex-note">Rezervasyon gelirleri rezervasyondan otomatik gelir. Rezervasyon dışı gelir ve sermaye girişi bu sayfadan eklenir; bir satıra dokununca düzenlenir.</p>
+
+        <div class="income-summary-grid fox-grid">
+          <button type="button" class="income-summary-item fox-card fox-card--revenue fox-card--link" data-onclick="goTo('reservations')" title="Rezervasyonları aç"><span>Konaklama cirosu</span><strong id="incomeRoomVal">—</strong><small>Rezervasyonlardan ›</small></button>
+          <div class="income-summary-item fox-card fox-card--income" id="incomeCleaningRow" hidden><span>Temizlik geliri</span><strong id="incomeCleaningVal">—</strong><small>Misafirden alınan</small></div>
+          <div class="income-summary-item fox-card fox-card--income"><span>Diğer gelir</span><strong id="incomeOtherVal">—</strong><small>Elle girilen</small></div>
+          <div class="income-summary-item income-summary-total fox-card fox-card--revenue"><span>Toplam gelir (kârın tabanı)</span><strong id="incomeTotalVal">—</strong></div>
+          <div class="income-summary-item income-summary-capital fox-card fox-card--neutral"><span>Sermaye / ortak girişi <small>kâra dahil değil</small></span><strong id="incomeCapitalVal">—</strong></div>
         </div>
 
         <div class="table-responsive">
@@ -554,20 +560,21 @@
             </tbody>
           </table>
         </div>
-      </details>
-
-      <!-- 5. GİDER ANALİZİ (DONUT CHART & 10 KATEGORİ DETAYI) -->
-      <details class="card expense-analysis-card finance-disclosure" id="financeExpensesDisclosure">
-        <summary><strong>Giderler</strong><span>Yalnız tutarı olan kategoriler</span></summary>
-        <div class="section-title-bar">
-          <div>
-            <h2>Gider analizi (kategori bazlı dağılım)</h2>
-            <p class="sub-text">Gider kalemlerinin toplam bütçe ve ciro içindeki payları ile geçen aya göre değişimleri</p>
-          </div>
-          <div data-lx-style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button data-ledger-write-only class="btn btn-secondary btn-sm" data-onclick="openCopyPreviousExpensesPanel()">Geçen ayın giderlerini kopyala</button>
+        <div class="fox-add-row income-add-wrap" data-ledger-write-only>
+          <button type="button" class="fox-add" data-onclick="toggleIncomeAddMenu(event)">+ Gelir ekle</button>
+          <div id="incomeAddMenu" class="income-add-menu" hidden>
+            <button type="button" class="dropdown-item" data-onclick="startIncomeEntry('BOOKING')">Rezervasyon</button>
+            <button type="button" class="dropdown-item" data-onclick="startIncomeEntry('OTHER')">Diğer gelirler / sermaye</button>
           </div>
         </div>
+      </section>
+
+      <!-- 5. GİDER ANALİZİ (DONUT CHART & 10 KATEGORİ DETAYI) -->
+      <!-- ALT SAYFA: GİDERLER. Kategoriye dokununca o kategorinin sayfasi acilir. -->
+      <section class="fox-subpage fox-subpage--expense" id="finSubExpenses" hidden aria-labelledby="finSubExpensesTitle">
+        <button type="button" class="fox-back" data-onclick="setFinanceView('main')">← Finans</button>
+        <h2 class="fox-subpage__title" id="finSubExpensesTitle">Giderler</h2>
+        <p class="lex-note">Yalnız tutarı olan kategoriler. Bir kategoriye dokununca kayıtları açılır ve orada düzenlenir.</p>
 
         <div class="expense-breakdown-grid">
           <!-- Left: SVG Donut Chart -->
@@ -606,10 +613,25 @@
             </table>
           </div>
         </div>
-      </details>
+        <div class="fox-add-row" data-ledger-write-only>
+          <button type="button" class="fox-add" data-ledger-write-only data-onclick="openExpenseModal()">+ Gider ekle</button>
+          <button type="button" class="fox-add fox-add--quiet" data-ledger-write-only data-onclick="openCopyPreviousExpensesPanel()">Geçen ayın giderlerini kopyala</button>
+        </div>
+      </section>
+
+      <!-- ALT SAYFA: tek gider kategorisi (JS cizer). -->
+      <section class="fox-subpage fox-subpage--expense" id="finSubCategory" hidden aria-labelledby="finSubCategoryTitle">
+        <button type="button" class="fox-back" data-onclick="setFinanceView('expenses')">← Giderler</button>
+        <h2 class="fox-subpage__title" id="finSubCategoryTitle">—</h2>
+        <p class="lex-note" id="finSubCategoryNote">—</p>
+        <div id="finSubCategoryBody"></div>
+        <div class="fox-add-row" data-ledger-write-only>
+          <button type="button" class="fox-add" data-onclick="openExpenseForFinanceCategory()">+ Gider ekle</button>
+        </div>
+      </section>
 
       <!-- 6. MÜLK BAZLI FİNANSAL PERFORMANS (YÖNETİCİ SIRALAMA TABLOSU & PREMİUM KARTLAR) -->
-      <section class="card property-finance-section">
+      <section class="card property-finance-section" id="finPropertySection">
         <div class="section-title-bar">
           <div>
             <h2>Mülk bazlı finansal performans</h2>
@@ -3526,7 +3548,7 @@
   <script src="core/mobile_shell.js?v=8979ea0a"></script>
   <script src="core/notification_feed.js?v=941306f6"></script>
   <script src="core/command_search.js?v=1b9dbcc9"></script>
-  <script src="core/action_dispatch.js?v=eb0172ac"></script>
+  <script src="core/action_dispatch.js?v=c9a2591e"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=9b3127c9"></script>
   <script src="core/permission_matrix.js?v=e3a3cef2"></script>
@@ -3536,7 +3558,7 @@
   <script src="core/lex_ui.js?v=950d5fdd"></script>
   <script src="core/color_picker.js?v=8457ca4c"></script>
   <script src="core/task_page.js?v=83a423dc"></script>
-  <script src="app.js?v=9d5f96fd"></script>
+  <script src="app.js?v=609c478d"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/marketing_ui.js?v=26927afc"></script>
 </body>

@@ -51,6 +51,13 @@ html:not(.lx-styles-ready) body { visibility: hidden; }
   --lx-keep-bg: #EAF3DE; --lx-keep-fg: #27500A;
   --lx-up-bg: #E6F1FB;   --lx-up-fg: #0C447C;
   --lx-down-bg: #FCEBEB; --lx-down-fg: #791F1F;
+  /* Fox Tasarimi (docs/FOX_TASARIMI.md): anlam renkleri, kenar + acik zemin */
+  --fox-revenue: #1F6FEB; --fox-revenue-bg: #EEF4FE;
+  --fox-income: #1A7F37;  --fox-income-bg: #EEF8F0;
+  --fox-expense: #CF222E; --fox-expense-bg: #FDEEEF;
+  --fox-capex: #BC4C00;   --fox-capex-bg: #FFF3E8;
+  --fox-info: #6E40C9;    --fox-info-bg: #F4F0FC;
+  --fox-neutral: #D3D1C7; --fox-neutral-bg: #FFFFFF;
 
   --bg-main: #FFFFFF;
   --bg-surface: #FFFFFF;
@@ -107,6 +114,12 @@ html:not(.lx-styles-ready) body { visibility: hidden; }
   --lx-keep-bg: #27500A; --lx-keep-fg: #C0DD97;
   --lx-up-bg: #0C447C;   --lx-up-fg: #B5D4F4;
   --lx-down-bg: #791F1F; --lx-down-fg: #F7C1C1;
+  --fox-revenue: #58A6FF; --fox-revenue-bg: #14263F;
+  --fox-income: #3FB950;  --fox-income-bg: #13301C;
+  --fox-expense: #F85149; --fox-expense-bg: #3A1618;
+  --fox-capex: #F0883E;   --fox-capex-bg: #3A2312;
+  --fox-info: #A371F7;    --fox-info-bg: #2A1F45;
+  --fox-neutral: #5F5E5A; --fox-neutral-bg: #2C2C2A;
 
   --bg-main: #2C2C2A;
   --bg-surface: #2C2C2A;
@@ -5201,3 +5214,64 @@ th,
 @media (max-width: 640px) {
   .lex-link-inline { display: inline-flex; align-items: center; min-height: 36px; }
 }
+
+/* =====================================================================
+   FOX TASARIMI (kullanici 22.11.2026, docs/FOX_TASARIMI.md). Lex duzeninin
+   ustune renk katmani: kartin ust kenari ve acik zemini anlam rengini tasir,
+   rakam koyu kalir. Golge yok, iki kalinlik.
+   ===================================================================== */
+.fox-grid { gap: 12px; }
+.lex-screen .fox-card,
+.fox-card { --fox-c: var(--fox-neutral); --fox-bg: var(--fox-neutral-bg); background: var(--fox-bg); border: 1px solid var(--lx-line); border-top: 3px solid var(--fox-c); border-radius: 12px; padding: 14px 16px; color: var(--lx-text); text-align: left; }
+.lex-screen .fox-card--revenue, .fox-card--revenue { --fox-c: var(--fox-revenue); --fox-bg: var(--fox-revenue-bg); }
+.lex-screen .fox-card--income, .fox-card--income { --fox-c: var(--fox-income); --fox-bg: var(--fox-income-bg); }
+.lex-screen .fox-card--expense, .fox-card--expense { --fox-c: var(--fox-expense); --fox-bg: var(--fox-expense-bg); }
+.lex-screen .fox-card--capex, .fox-card--capex { --fox-c: var(--fox-capex); --fox-bg: var(--fox-capex-bg); }
+.lex-screen .fox-card--info, .fox-card--info { --fox-c: var(--fox-info); --fox-bg: var(--fox-info-bg); }
+.lex-screen .fox-card--neutral, .fox-card--neutral { --fox-c: var(--fox-neutral); --fox-bg: var(--fox-neutral-bg); }
+.lex-screen .fox-card .kpi-label, .fox-card .kpi-label { color: var(--lx-text-2); font-size: 13px; }
+.lex-screen .fox-card .kpi-value, .fox-card .kpi-value { color: var(--lx-text); font-size: 26px; font-weight: 500; }
+.lex-screen .fox-card .kpi-trend.positive, .fox-card .kpi-trend.positive { color: var(--fox-income); }
+.lex-screen .fox-card .kpi-trend.negative, .fox-card .kpi-trend.negative { color: var(--fox-expense); }
+.fox-card--link { cursor: pointer; font: inherit; }
+.fox-card--link:hover { border-color: var(--fox-c); }
+.fox-card small { display: block; font-size: 12px; color: var(--lx-text-2); margin-top: 2px; }
+
+.fox-pages { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 16px 0 8px; }
+.fox-page-link { --fox-c: var(--fox-neutral); --fox-bg: var(--fox-neutral-bg); position: relative; display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 2px 12px; width: 100%; font: inherit; text-align: left; color: var(--lx-text); background: var(--fox-bg); border: 1px solid var(--lx-line); border-left: 4px solid var(--fox-c); border-radius: 12px; padding: 14px 36px 14px 16px; cursor: pointer; }
+.fox-page-link::after { content: "\203A"; position: absolute; right: 14px; top: 50%; transform: translateY(-50%); font-size: 22px; color: var(--fox-c); }
+.fox-page-link:hover { border-color: var(--fox-c); }
+.fox-page-link:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.fox-page-link--revenue { --fox-c: var(--fox-revenue); --fox-bg: var(--fox-revenue-bg); }
+.fox-page-link--expense { --fox-c: var(--fox-expense); --fox-bg: var(--fox-expense-bg); }
+.fox-page-link__title { font-size: 16px; font-weight: 500; }
+.fox-page-link__value { font-size: 18px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.fox-page-link__sub { grid-column: 1 / -1; font-size: 12px; color: var(--lx-text-2); }
+
+.fox-subpage { --fox-c: var(--fox-neutral); padding: 4px 0 24px; }
+.fox-subpage--revenue { --fox-c: var(--fox-revenue); }
+.fox-subpage--expense { --fox-c: var(--fox-expense); }
+.fox-back { font: inherit; font-size: 14px; color: var(--lx-text-2); background: none; border: 0; padding: 6px 0; cursor: pointer; min-height: 36px; }
+.fox-back:hover { color: var(--lx-text); }
+.fox-subpage__title { font-size: 22px; font-weight: 500; margin: 4px 0 8px; padding-bottom: 8px; border-bottom: 3px solid var(--fox-c); color: var(--lx-text); }
+.fox-subpage .income-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin: 12px 0 16px; }
+.fox-subpage .income-summary-item { display: flex; flex-direction: column; gap: 4px; }
+.fox-subpage .income-summary-item strong { font-size: 20px; font-weight: 500; }
+.fox-add-row { position: relative; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--lx-line); }
+.fox-add { font: inherit; font-size: 15px; font-weight: 500; color: var(--fox-c, var(--lx-text)); background: none; border: 1px dashed var(--fox-c, var(--lx-line)); border-radius: 10px; padding: 10px 16px; cursor: pointer; min-height: 44px; }
+.fox-add:hover { background: var(--lx-weekend); }
+.fox-add--quiet { color: var(--lx-text-2); border-color: var(--lx-line); font-weight: 400; }
+.fox-add-row .income-add-menu { bottom: calc(100% + 4px); top: auto; left: 0; right: auto; }
+.fox-chevron { font-size: 18px; color: var(--lx-text-2); }
+#finSubExpenses .clickable-row { cursor: pointer; }
+#finSubExpenses .clickable-row:hover td { background: var(--lx-weekend); }
+@media (max-width: 640px) {
+  .fox-pages { grid-template-columns: 1fr; }
+  .lex-screen .fox-card .kpi-value, .fox-card .kpi-value { font-size: 22px; }
+  .fox-subpage .income-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ChatGPT'ye sor (ust cubuk, 22.11.2026): kisa etiket + isaret; ust cubuk tek satirda kalir. */
+.header-chatgpt-btn { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.header-chatgpt-icon { color: var(--fox-info); font-size: 15px; line-height: 1; }
+@media (max-width: 640px) { .app-header .header-actions .header-chatgpt-btn .header-btn-text { display: none; } .header-chatgpt-icon { font-size: 18px; } }

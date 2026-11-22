@@ -300,7 +300,7 @@ function run() {
       gecmisBolum.slice(0, 600)
     );
     check(
-      /if \(catName === 'Temizlik'\) \{[\s\S]{0,200}switchTab\('operations'\)/.test(require('fs').readFileSync(require('path').join(__dirname, '..', 'app.js'), 'utf8')),
+      /catName === 'Temizlik'\s*\?[^:]{0,200}goTo\('operations:cleaning'\)/.test(require('fs').readFileSync(require('path').join(__dirname, '..', 'app.js'), 'utf8')),
       '20c. Finans gider kategorisi "Temizlik" Detay, gider defterine degil temizlik gecmisine gider'
     );
     // Kullanici 04.10: "Yonetici yapti" belirsizdi, silmek pencere acmayi gerektiriyordu.

@@ -5657,6 +5657,23 @@ function renderFinanceModule() {
   // Gelirler karti (phase97): ayni defterden
   renderIncomeSection(ledger);
 
+  // Fox: sayfa satirlari ayni rakamlari tasir (tek kaynak: defter). Zarar kirmizi kartta.
+  const tlFox = v => `${Math.round(v || 0).toLocaleString('tr-TR')} TL`;
+  setEl('finIncomeLinkVal', tlFox(ledger.totalRevenue));
+  setEl('finIncomeLinkSub', [`Konaklama ${tlFox(ledger.netRoomRevenue)}`, ledger.cleaningRevenue > 0 ? `Temizlik ${tlFox(ledger.cleaningRevenue)}` : '', ledger.otherIncome > 0 ? `Diğer ${tlFox(ledger.otherIncome)}` : ''].filter(Boolean).join(' · '));
+  setEl('finExpensesLinkVal', tlFox(totalExpense));
+  setEl('finExpensesLinkSub', karOlculemez ? 'Bu dönem için gider kaydı yok' : `Operasyonel ${tlFox(totalOpex)} · Yatırım ${tlFox(totalCapex)}`);
+  if (typeof document !== 'undefined') {
+    const karKarti = document.getElementById('finProfitCard');
+    if (karKarti && karKarti.classList) {
+      const zarar = !karOlculemez && netCashProfit < 0;
+      karKarti.classList.toggle('fox-card--expense', zarar);
+      karKarti.classList.toggle('fox-card--income', !zarar && !karOlculemez);
+      karKarti.classList.toggle('fox-card--neutral', !!karOlculemez);
+    }
+  }
+  renderFinanceView();
+
   // Render Property Finance Scorecards
   renderPropertyFinanceCards(propStats, ciro);
 
@@ -5694,7 +5711,7 @@ function renderExpenseDonutAndTable(categoryTotals, totalExpense, totalRevenue, 
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     path.setAttribute('d', pathData);
     path.setAttribute('fill', cat.color);
-    path.setAttribute('stroke', '#1C1C1E');
+    path.style.stroke = 'var(--lx-bg)';
     path.setAttribute('stroke-width', '2');
     path.innerHTML = `<title>${escapeHtml(cat.name)}: ${amt.toLocaleString('tr-TR')} TL (%${((amt/totalExpense)*100).toFixed(1)})</title>`;
     svg.appendChild(path);
@@ -5707,7 +5724,7 @@ function renderExpenseDonutAndTable(categoryTotals, totalExpense, totalRevenue, 
   innerCircle.setAttribute('cx', cx);
   innerCircle.setAttribute('cy', cy);
   innerCircle.setAttribute('r', '50');
-  innerCircle.setAttribute('fill', '#1C1C1E');
+  innerCircle.style.fill = 'var(--lx-bg)';
   svg.appendChild(innerCircle);
 
   // Category Table
@@ -5726,39 +5743,73 @@ function renderExpenseDonutAndTable(categoryTotals, totalExpense, totalRevenue, 
     const shareRev = totalRevenue > 0 ? (amt / totalRevenue) * 100 : 0;
     const deltaStr = formatMoMDelta(amt, prevCategoryTotals[cat.name] || 0);
 
-    const acik = expandedExpenseCategory === cat.name;
     const tr = document.createElement('tr');
     tr.className = 'clickable-row';
-    tr.onclick = () => toggleExpenseCategoryRows(cat.name);
+    tr.setAttribute('data-onclick', `setFinanceView('category', decodeURIComponent('${encodeActionArg(cat.name)}'))`);
     tr.innerHTML = `
-      <td><span class="cat-dot" style="background:${cat.color};"></span> <strong>${escapeHtml(cat.name)}</strong> <span style="color: var(--text-muted); font-size: 11px;">${acik ? '▾' : '▸'}</span></td>
+      <td><span class="cat-dot" style="background:${cat.color};"></span> <strong>${escapeHtml(cat.name)}</strong></td>
       <td><strong>${Math.round(amt).toLocaleString('tr-TR')} TL</strong></td>
       <td>%${shareExpense.toFixed(1)}</td>
       <td>%${shareRev.toFixed(1)}</td>
       <td><span class="${deltaStr.includes('↑') ? 'text-rose' : 'text-emerald'}">${deltaStr}</span></td>
-      <td style="text-align: right;"><button class="btn-text" data-onclick="filterExpensesByCategory(decodeURIComponent('${encodeActionArg(cat.name)}'), event)">Detay ›</button></td>
+      <td style="text-align: right;"><span class="fox-chevron" aria-hidden="true">›</span></td>
     `;
     tbody.appendChild(tr);
-    if (acik) {
-      const detay = document.createElement('tr');
-      detay.className = 'expense-category-detail-row';
-      detay.innerHTML = `<td colspan="6">${expenseCategoryRowsHtml(cat.name)}</td>`;
-      tbody.appendChild(detay);
-    }
   });
 }
 
-// Gider analizinde kategori satiri yerinde acilir: kayitlar Giderler sayfasina
-// gitmeden duzenlenir/silinir (kullanici, 19.10.2026). Esleme grafikle ayni
-// (eslesenGiderKategorisi); otomatik kalemler (komisyon, temizlik maliyeti)
-// gider defterinde satir degildir, burada yalniz not olarak gecer.
-let expandedExpenseCategory = null;
+// =============================================================
+// FINANS ALT SAYFALARI (Fox, kullanici 22.11.2026): ana gorunum · Gelirler · Giderler ·
+// tek gider kategorisi. Her rakamin kayitlari kendi sayfasinda duzenlenir; ekleme
+// dugmesi sayfanin altindadir. Rakamlar yine renderFinanceModule'dan (tek defter).
+// =============================================================
+const FINANCE_VIEWS = ['main', 'income', 'expenses', 'category'];
+let financeView = 'main';
+let financeCategory = null;
 
-function toggleExpenseCategoryRows(catName) {
-  expandedExpenseCategory = expandedExpenseCategory === catName ? null : catName;
-  renderFinanceModule();
+function setFinanceView(view, key = null) {
+  if (!FINANCE_VIEWS.includes(view)) return false;
+  if (view === 'category' && !getExpenseCategories().some(c => c.name === key)) return false;
+  financeView = view;
+  financeCategory = view === 'category' ? key : null;
+  renderFinanceView();
+  if (typeof window !== 'undefined' && window.scrollTo) {
+    try { window.scrollTo({ top: 0 }); } catch (e) { /* eski tarayici */ }
+  }
+  return true;
 }
 
+function renderFinanceView() {
+  if (typeof document === 'undefined') return;
+  const goster = (id, acik) => { const el = document.getElementById(id); if (el) el.hidden = !acik; };
+  goster('finMain', financeView === 'main');
+  goster('finPropertySection', financeView === 'main');
+  goster('screenTasks_finance', financeView === 'main' && !!document.getElementById('screenTasks_finance')?.innerHTML);
+  goster('finSubIncome', financeView === 'income');
+  goster('finSubExpenses', financeView === 'expenses');
+  goster('finSubCategory', financeView === 'category');
+  if (financeView !== 'category' || !financeCategory) return;
+  const cat = getExpenseCategories().find(c => c.name === financeCategory);
+  setEl('finSubCategoryTitle', financeCategory);
+  setEl('finSubCategoryNote', cat ? `${cat.type === 'CAPEX' ? 'Yatırım (CAPEX)' : 'Operasyonel (OPEX)'} · seçili dönemin kayıtları. Bir kaydı düzenlemek için ✏️, silmek için 🗑️.` : '—');
+  const govde = document.getElementById('finSubCategoryBody');
+  if (govde) govde.innerHTML = expenseCategoryRowsHtml(financeCategory);
+}
+
+// Kategori sayfasindan "+ Gider ekle": form acilir, kategori secili gelir.
+function openExpenseForFinanceCategory() {
+  openExpenseModal();
+  const secici = typeof document !== 'undefined' ? document.getElementById('expCategory') : null;
+  if (secici && financeCategory && [...(secici.options || [])].some(o => o.value === financeCategory)) {
+    secici.value = financeCategory;
+    if (typeof secici.dispatchEvent === 'function' && typeof Event === 'function') secici.dispatchEvent(new Event('change'));
+  }
+  return true;
+}
+
+// Kategori sayfasi kayitlari: gider defterinden duzenlenir/silinir (kullanici, 19.10.2026).
+// Esleme grafikle ayni (eslesenGiderKategorisi); otomatik kalemler (komisyon, temizlik
+// maliyeti) gider defterinde satir degildir, burada yalniz not olarak gecer.
 function expenseCategoryRowsHtml(catName) {
   const rows = (appData.expenses || [])
     .filter(exp => isExpenseInFilter(exp) && eslesenGiderKategorisi(exp.category) === catName)
@@ -5766,7 +5817,11 @@ function expenseCategoryRowsHtml(catName) {
   const otomatik = catName === 'Temizlik'
     ? 'Yapılmış temizliklerin maliyeti Operasyon’dan gelir; burada düzenlenmez.'
     : (catName === 'Kredi Kartı / Komisyon' ? 'Rezervasyon ve ödeme komisyonları rezervasyondan gelir; burada düzenlenmez.' : '');
-  const not = otomatik ? `<p class="expense-category-detail-note">${escapeHtml(otomatik)}</p>` : '';
+  // Temizlik maliyeti gider defterinde durmaz (K-04): sayfa temizlik gecmisine baglanir.
+  const git = catName === 'Temizlik'
+    ? ` <button type="button" class="lex-link-inline" data-onclick="goTo('operations:cleaning')">Temizlik geçmişini aç</button>`
+    : (catName === 'Kredi Kartı / Komisyon' ? ` <button type="button" class="lex-link-inline" data-onclick="goTo('reservations')">Rezervasyonları aç</button>` : '');
+  const not = otomatik ? `<p class="expense-category-detail-note">${escapeHtml(otomatik)}${git}</p>` : '';
   if (!rows.length) return `${not}<p class="expense-category-detail-note">Bu kategoride elle girilmiş gider kaydı yok.</p>`;
   const yonetir = canManageTenantRole(activeTenant?.role);
   const satirlar = rows.map(exp => {
@@ -5970,22 +6025,6 @@ function renderIncomeSection(ledger) {
     </tr>`).join('');
 }
 
-function filterExpensesByCategory(catName, clickEvent) {
-  if (clickEvent && typeof clickEvent.stopPropagation === 'function') clickEvent.stopPropagation();
-  // Temizlik maliyeti gider defterinde durmaz; yapilmis temizlik gorevlerinden
-  // gelir (K-04). Eskiden bu satir gider defterine gidiyordu: orada silinecek
-  // satir yoktu ve ekranin ustunde sablon formu duruyordu.
-  if (catName === 'Temizlik') {
-    switchTab('operations');
-    setOperationsView('cleaning');
-    document.getElementById('opsCleaningHistory')?.scrollIntoView({ block: 'start' });
-    return;
-  }
-  switchTab('expenses');
-  document.getElementById('expSearchInput').value = catName;
-  renderExpensesTable();
-  document.getElementById('expensesTableBody')?.closest('section, .card')?.scrollIntoView({ block: 'start' });
-}
 
 
 function filterByVilla(vKey) {
@@ -23277,7 +23316,9 @@ function goTo(spec) {
     if (b) setPropertyProfileTab(b);
     return true;
   }
+  if (where === 'finance') financeView = 'main';
   if (switchTab(where) === false) return false;
+  if (where === 'finance' && a) setFinanceView(a);
   if (where === 'operations' && a) setOperationsView(a);
   if (where === 'pricing' && a) setPricingView(a);
   if (where === 'marketing' && a && typeof LexBnBMarketingUI !== 'undefined' && LexBnBMarketingUI.openView) LexBnBMarketingUI.openView(a);
@@ -23380,6 +23421,9 @@ async function handleQuickActionTrigger(actionType, entityId) {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     goTo,
+    setFinanceView,
+    renderFinanceView,
+    openExpenseForFinanceCategory,
     shouldRegisterServiceWorker,
     getMenuTabFor,
     TAB_MENU_PARENT,
