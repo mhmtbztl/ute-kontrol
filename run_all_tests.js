@@ -294,6 +294,7 @@ const allTestFiles = [
   'phase111_ads_import_live_tests.js',
   'phase113_ads_daily_compact_live_tests.js',
   'phase121_ads_platforms_live_tests.js',
+  'phase123_cleaning_live_checklist_live_tests.js',
   'phase84_expense_template_generation_tests.js',
   'phase86_expense_template_authz_tests.js',
   'phase88_ads_trigger_cleanup_tests.js',

@@ -257,7 +257,7 @@ function run() {
     app.renderOperationsTab();
     const operationsHtml = global.document.getElementById('opsCombinedContainer').innerHTML;
     // Gecmis bolumu (odenmis/yapilmis isler) bilerek ayri; 19 aktif listeleri olcer.
-    const aktifHtml = operationsHtml.replace(/<section class="ops-group" id="opsCleaningHistory">[\s\S]*?<\/section>/, '');
+    const aktifHtml = operationsHtml.replace(/<section class="cl-group" id="opsCleaningHistory">[\s\S]*?<\/section>/, '');
     const rowCount = (aktifHtml.match(/data-cleaning-task-id=/g) || []).length;
 
     check(
@@ -274,7 +274,7 @@ function run() {
     );
     check(
       !operationsHtml.includes('ODENMIS-GOREV-GIZLI') && operationsHtml.includes('data-cleaning-task-id="planned-1"')
-        && operationsHtml.includes('Bekleyen Temizlik Borçları (1)') && rowCount === 2,
+        && operationsHtml.includes('Temizlik borcu <span class="lex-group__sub">1 temizlik') && rowCount === 2,
       '19. Odenmis gorev gizli, geciken planli gorev gorunur; borc listesi yalniz yapilmis ve odenmemis kaydi sayiyor',
       `satir=${rowCount}, html=${operationsHtml.slice(0, 700)}`
     );
@@ -294,8 +294,8 @@ function run() {
     app.setCurrentFilter(eskiFiltre);
     check(
       gecmisHtml.includes('id="opsCleaningHistory"')
-        && gecmisBolum.includes("openEditCleaningTaskModal(decodeURIComponent('paid-1'))")
-        && gecmisBolum.includes("openEditCleaningTaskModal(decodeURIComponent('pending-1'))"),
+        && gecmisBolum.includes("openCleaningPage(decodeURIComponent('paid-1'))")
+        && gecmisBolum.includes("openCleaningPage(decodeURIComponent('pending-1'))"),
       '20b. Odenmis ve yapilmis gecmis temizlik "Gecmis" bolumunde duzenlenip silinebilir',
       gecmisBolum.slice(0, 600)
     );
@@ -304,11 +304,15 @@ function run() {
       '20c. Finans gider kategorisi "Temizlik" Detay, gider defterine degil temizlik gecmisine gider'
     );
     // Kullanici 04.10: "Yonetici yapti" belirsizdi, silmek pencere acmayi gerektiriyordu.
+    // Sade temizlik (22.11.2026): eylemler temizlik sayfasinda (satira dokununca acilir).
+    app.openCleaningPage('planned-1');
+    const sayfaHtml = global.document.getElementById('opsCombinedContainer').innerHTML;
+    app.closeCleaningPage();
     check(
-      operationsHtml.includes("deleteCleaningTask(decodeURIComponent('planned-1'))")
-        && !operationsHtml.includes('Yönetici yaptı') && operationsHtml.includes('Kontrol ettim, yapıldı'),
-      '20d. Temizlik satirinda tek tikla Sil var; "Yonetici yapti" yerine anlasilir onay',
-      operationsHtml.slice(0, 900)
+      sayfaHtml.includes("deleteCleaningTask(decodeURIComponent('planned-1'))") && sayfaHtml.includes("openEditCleaningTaskModal(decodeURIComponent('planned-1'))")
+        && !sayfaHtml.includes('Yönetici yaptı') && sayfaHtml.includes('Kontrol ettim, yapıldı'),
+      '20d. Temizlik sayfasinda Sil ve Duzenle var; "Yonetici yapti" yerine anlasilir onay',
+      sayfaHtml.slice(0, 900)
     );
     const appKaynak = require('fs').readFileSync(require('path').join(__dirname, '..', 'app.js'), 'utf8');
     const silGovde = appKaynak.slice(appKaynak.indexOf('async function deleteCleaningTask'), appKaynak.indexOf('function deleteCleaningTaskFromModal'));

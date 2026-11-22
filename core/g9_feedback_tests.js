@@ -193,7 +193,7 @@ async function operasyonKartiDavranisi() {
   // ayni cizimde (renderOperationsCleaningView) ayni gorevlerden hesaplanir.
   const govde = require('fs').readFileSync(require('path').join(__dirname, '..', 'app.js'), 'utf8');
   const cizim = govde.slice(govde.indexOf('function renderOperationsCleaningView('), govde.indexOf('function renderOperationsTab('));
-  check(/cleanerDebtSummary\(tasks\)/.test(cizim) && /Bekleyen Temizlik Borçları/.test(cizim), 'L-177 Operasyon listesi cizilince temizlik borcu da ayni cizimde guncellenir');
+  check(/cleanerDebtSummary\(tasks\)/.test(cizim) && /Temizlik borcu/.test(cizim), 'L-177 Operasyon listesi cizilince temizlik borcu da ayni cizimde guncellenir');
 }
 
 async function kritikEylemKartiDavranisi() {

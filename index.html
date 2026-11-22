@@ -16,7 +16,7 @@
   <meta http-equiv="Expires" content="0">
   <!-- Gece/Gunduz: tema stil sayfasindan once secilir (yanip sonme olmaz); yazi tipi sistemindir -->
   <script src="core/theme.js?v=81e24fd9"></script>
-  <link rel="stylesheet" href="style.css?v=6ac3461c">
+  <link rel="stylesheet" href="style.css?v=f0b0bd5a">
   <link rel="stylesheet" href="analytics.css?v=35127907">
   <script src="supabase.umd.js?v=3810661a"></script>
   <script src="core/xlsx_import_worker.js?v=b0939d47"></script>
@@ -2824,7 +2824,7 @@
             <div class="step-num-icon">3</div>
             <div class="step-body">
               <h4>Yönetici kontrolü (M)</h4>
-              <p>Yönetici işi kontrol edip <strong>M Onayla</strong> der. Temizlik maliyeti ancak bu anda gider ve personele borç olur; tarihi temizliğin yapıldığı gündür.</p>
+              <p>Temizlik sayfasında her maddede iki kutu vardır: <strong>Temizlikçi</strong> (yaptım) ve <strong>Kontrol</strong> (sizin kontrolünüz); ikiniz de aynı anda işaretlersiniz, işaret karşı ekranda hemen görünür. Temizlikçi bitirince siz <strong>Onayla (gider oluşur)</strong> dersiniz. Temizlik maliyeti ancak bu anda gider ve personele borç olur; tarihi temizliğin yapıldığı gündür.</p>
             </div>
           </div>
           <div class="help-step-item">
@@ -3245,7 +3245,7 @@
         <div class="form-grid">
           <div class="form-group">
             <label>Villa / Mülk</label>
-            <select id="hkVilla" required>
+            <select id="hkVilla" required data-onchange="renderCleaningChecklistPreview()">
               <!-- updateAllVillaDropdowns() musterinin mulkleriyle doldurur -->
             </select>
           </div>
@@ -3255,13 +3255,14 @@
           </div>
           <div class="form-group">
             <label>Temizlik Personeli / Ekip</label>
-            <input type="text" id="hkCleaner" list="hkCleanerOptions" placeholder="Listeden seçin ya da adı yazın" required>
+            <input type="text" id="hkCleaner" list="hkCleanerOptions" placeholder="Listeden seçin ya da adı yazın" required data-onchange="renderCleaningChecklistPreview()">
             <datalist id="hkCleanerOptions"></datalist>
           </div>
           <div class="form-group">
             <label>Temizlik Ücreti (TL)</label>
             <input type="number" id="hkAmount" step="0.01" min="0" placeholder="1500" required data-lx-style="font-weight: 700; color: #409CFF; font-size: 15px;">
           </div>
+          <div class="form-group full-width cleaning-checklist-preview" id="hkChecklistPreview" aria-live="polite"></div>
           <div class="form-group full-width">
             <label>Açıklama / Misafir Çıkışı</label>
             <input type="text" id="hkDesc" placeholder="Örn: Hakan Demir çıkışı sonrası rutin temizlik ve nevresim">
@@ -3548,7 +3549,7 @@
   <script src="core/mobile_shell.js?v=8979ea0a"></script>
   <script src="core/notification_feed.js?v=941306f6"></script>
   <script src="core/command_search.js?v=1b9dbcc9"></script>
-  <script src="core/action_dispatch.js?v=c9a2591e"></script>
+  <script src="core/action_dispatch.js?v=e873025c"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=9b3127c9"></script>
   <script src="core/permission_matrix.js?v=e3a3cef2"></script>
@@ -3558,7 +3559,7 @@
   <script src="core/lex_ui.js?v=950d5fdd"></script>
   <script src="core/color_picker.js?v=8457ca4c"></script>
   <script src="core/task_page.js?v=83a423dc"></script>
-  <script src="app.js?v=abc7b4e9"></script>
+  <script src="app.js?v=f26e9228"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/marketing_ui.js?v=26927afc"></script>
 </body>

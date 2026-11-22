@@ -90,7 +90,7 @@ try {
   let hata = null;
   try { app.renderOperationsTab(); } catch (e) { hata = e; }
   const borcPaneli = g('opsCombinedContainer').innerHTML;
-  check(!hata && /Bekleyen Temizlik Borçları \(1\)/.test(borcPaneli) && /₺1\.000/.test(borcPaneli),
+  check(!hata && /Temizlik borcu <span class="lex-group__sub">1 temizlik/.test(borcPaneli) && /₺1\.000/.test(borcPaneli),
     'A1. Operasyon borç paneli yalnız YAPILMIŞ ve ödenmemiş temizliği sayar (planlı/yapılmadı borç değil)',
     hata ? hata.message : borcPaneli.slice(0, 300));
   hata = null;

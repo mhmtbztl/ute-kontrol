@@ -13405,6 +13405,42 @@ function fillCleanerNameOptions() {
     .map(person => `<option value="${escapeHtml(person.full_name || '')}"></option>`).join('');
 }
 
+// Ev secilince o evin temizlik kontrol listesi gorunur (kullanici 22.11.2026). Liste
+// goreve atamayla eklenir (assign_cleaning_task: genel liste + eve ozel liste); giris
+// hesabi olan temizlikci secilirse kayitta otomatik atanir.
+function cleaningTemplatesFor(villaKey) {
+  const id = appData?.villas?.[villaKey]?.id;
+  const rows = (appData?.checklistTemplates || appData?.settingsChecklistTemplates || [])
+    .filter(t => t && t.is_active !== false && String(t.task_type || 'CLEANING').toUpperCase() === 'CLEANING');
+  const newest = list => list.slice().sort((x, y) => (Number(y.version) || 0) - (Number(x.version) || 0) || String(y.updated_at || '').localeCompare(String(x.updated_at || '')))[0] || null;
+  return [newest(rows.filter(t => !t.property_id)), newest(rows.filter(t => id && t.property_id === id))].filter(Boolean);
+}
+
+function cleaningPersonByName(name) {
+  const api = getOperationsApi();
+  const n = String(name || '').trim().toLocaleLowerCase('tr');
+  if (!api || !n) return null;
+  return api.eligibleCleaners(appData?.operationalPeople || []).find(p => String(p.full_name || '').trim().toLocaleLowerCase('tr') === n) || null;
+}
+
+function renderCleaningChecklistPreview() {
+  const box = typeof document !== 'undefined' ? document.getElementById('hkChecklistPreview') : null;
+  if (!box) return;
+  const villa = document.getElementById('hkVilla')?.value || '';
+  const sablonlar = cleaningTemplatesFor(villa);
+  const bolumler = sablonlar.flatMap(t => (t.items && t.items.sections) || []);
+  const madde = bolumler.reduce((n, s) => n + ((s.items || []).length), 0);
+  const kisi = cleaningPersonByName(document.getElementById('hkCleaner')?.value);
+  if (!sablonlar.length) {
+    box.innerHTML = `<p class="cleaning-preview__line">Bu ev için temizlik listesi yok. <button type="button" class="lex-link-inline" data-onclick="openSettingsSection('templates')">Liste oluştur</button></p>`;
+    return;
+  }
+  const ad = sablonlar.map(t => t.template_name || 'Liste').join(' + ');
+  const basliklar = bolumler.map(s => s.title).filter(Boolean).slice(0, 5).join(', ');
+  box.innerHTML = `<p class="cleaning-preview__line"><strong>Temizlik listesi:</strong> ${escapeHtml(ad)} · ${madde} madde${basliklar ? ` (${escapeHtml(basliklar)})` : ''}</p>`
+    + `<p class="cleaning-preview__sub">${kisi ? `Kaydedince ${escapeHtml(kisi.full_name)} kişisine atanır; liste ikinizin ekranında aynı anda işaretlenir.` : 'Giriş hesabı olan bir temizlikçi seçerseniz liste ona atanır ve ikinizin ekranında aynı anda işaretlenir.'}</p>`;
+}
+
 function openNewCleaningTaskModal() {
   fillCleanerNameOptions();
   document.getElementById('cleaningTaskModalTitle').innerText = '🧹 Yeni Temizlik / Borç Girişi';
@@ -13425,6 +13461,7 @@ function openNewCleaningTaskModal() {
   document.getElementById('hkDesc').value = '';
   document.getElementById('hkPaidStatus').value = 'PLANNED';
   document.getElementById('hkDeleteBtn').style.display = 'none';
+  renderCleaningChecklistPreview();
 
   document.getElementById('cleaningTaskModal').classList.add('active');
 }
@@ -13446,6 +13483,7 @@ function openEditCleaningTaskModal(taskId) {
   document.getElementById('hkPaidStatus').value = task.paid ? 'PAID'
     : (task.status === 'DONE' ? 'PENDING' : (task.status === 'SKIPPED' ? 'SKIPPED' : 'PLANNED'));
   document.getElementById('hkDeleteBtn').style.display = 'inline-block';
+  renderCleaningChecklistPreview();
 
   document.getElementById('cleaningTaskModal').classList.add('active');
 }
@@ -13527,6 +13565,13 @@ async function saveCleaningTask(e) {
 
   taskRecord = result.task;
   upsertCleaningTaskInMemory(taskRecord, editId);
+
+  // Planli temizlikte giris hesabi olan temizlikci secildiyse listeyle birlikte atanir.
+  const kisi = status === 'PLANNED' ? cleaningPersonByName(cleaner) : null;
+  const mevcut = (appData?.cleaningExecutions || []).find(x => x.cleaning_task_id === (taskRecord.dbId || taskRecord.id));
+  if (kisi && isCloudTenant(getActiveTenantId()) && (!mevcut || mevcut.person_id !== kisi.id)) {
+    await assignCleaningTask(taskRecord.id, kisi.id);
+  }
 
   closeCleaningTaskModal();
   saveAppData();
@@ -15579,6 +15624,7 @@ async function handleAuthenticatedSession(u) {
     if (activeTenant?.role === 'staff') {
       appData = getBlankTenantData(activeTenantId);
       await loadStaffFieldWork();
+      subscribeStaffRealtime(activeTenantId);
       switchTab('staff-field');
     } else {
       await loadTenantAppData(activeTenantId);
@@ -17073,7 +17119,9 @@ const TENANT_REALTIME_TABLES = [
   'maintenance_tickets',
   'operational_tasks',
   'guests',
-  'user_notifications'
+  'user_notifications',
+  // phase123: temizlikci isaretledikce yonetici ekraninda aninda gorunur.
+  'cleaning_task_executions'
 ];
 
 function getTenantRealtimeTables() {
@@ -17135,6 +17183,7 @@ function applyTenantRealtimePayload(table, payload) {
     monthly_targets: ['targets', row => row],
     maintenance_tickets: ['maintenance', row => mapMaintenanceTicketFromDb(row, propertyIdMap)],
     operational_tasks: ['operationalTasks', row => row],
+    cleaning_task_executions: ['cleaningExecutions', row => row],
     guests: ['guests', row => row],
     user_notifications: ['userNotifications', row => row]
   };
@@ -17147,6 +17196,7 @@ function applyTenantRealtimePayload(table, payload) {
 
 function renderTenantRealtimeChange(table) {
   if (typeof document === 'undefined') return;
+  if (table === 'cleaning_task_executions') { renderOperationsTab(); return; }
   if (table === 'properties') updateAllVillaDropdowns();
   if (table === 'bookings' && typeof syncBookingCleaningTasks === 'function') syncBookingCleaningTasks();
   renderAll();
@@ -19287,11 +19337,43 @@ async function loadStaffFieldWork() {
   return staffFieldWork;
 }
 
+let staffSaveTimers = {};
 function setStaffChecklistMark(executionId, key, checked) {
   const row = staffFieldWork.cleanings.find(item => item.execution_id === executionId);
   if (!row) return false;
   row.checklist_result = { ...(row.checklist_result || {}), [key]: { ...((row.checklist_result || {})[key] || {}), z: !!checked } };
+  // Ayni anda isaretleme (phase123): isaret yoneticinin ekranina aninda gitsin diye kaydedilir.
+  if (typeof setTimeout === 'function' && supabaseClient) {
+    clearTimeout(staffSaveTimers[executionId]);
+    staffSaveTimers[executionId] = setTimeout(() => { saveStaffCleaningProgress(executionId, { quiet: true }); }, 400);
+  }
   return true;
+}
+
+// Personelin canli kanali: kendi temizliklerindeki Kontrol isaretleri (RLS yalniz kendi
+// isini gosterir). Yayin yoksa (phase123 uygulanmamis) sessizce olay gelmez.
+let staffRealtimeChannel = null;
+function subscribeStaffRealtime(tenantId) {
+  if (staffRealtimeChannel && supabaseClient) { try { supabaseClient.removeChannel(staffRealtimeChannel); } catch (e) { /* yok */ } }
+  staffRealtimeChannel = null;
+  if (!isCloudTenant(tenantId) || !supabaseClient?.channel) return;
+  try {
+    staffRealtimeChannel = supabaseClient.channel(`staff-${tenantId}-cleaning`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'cleaning_task_executions', filter: `tenant_id=eq.${tenantId}` }, payload => {
+        const yeni = payload?.new;
+        const row = yeni && staffFieldWork.cleanings.find(item => item.execution_id === yeni.id);
+        if (!row) return;
+        const sunucu = yeni.checklist_result || {};
+        const birlesik = { ...(row.checklist_result || {}) };
+        Object.keys(sunucu).forEach(key => { birlesik[key] = { z: birlesik[key]?.z ?? sunucu[key]?.z ?? null, m: sunucu[key]?.m ?? null }; });
+        row.checklist_result = birlesik;
+        if (yeni.status) row.status = yeni.status;
+        renderStaffFieldWork();
+      })
+      .subscribe();
+  } catch (e) {
+    console.warn('Staff realtime:', e);
+  }
 }
 
 function setStaffSupplyStatus(executionId, key, value) {
@@ -19302,9 +19384,10 @@ function setStaffSupplyStatus(executionId, key, value) {
   return true;
 }
 
-async function saveStaffCleaningProgress(executionId) {
+async function saveStaffCleaningProgress(executionId, { quiet = false } = {}) {
   const row = staffFieldWork.cleanings.find(item => item.execution_id === executionId);
   if (!row) return false;
+  if (!['ASSIGNED', 'IN_PROGRESS', 'REOPENED'].includes(row.status || 'ASSIGNED')) return false;
   const note = document.getElementById(`staffNote-${executionId}`)?.value || '';
   const { error } = await supabaseClient.rpc('save_cleaning_progress', {
     p_execution_id: executionId,
@@ -19316,7 +19399,7 @@ async function saveStaffCleaningProgress(executionId) {
     if (typeof showToast === 'function') showToast('⚠️ İlerleme kaydedilemedi: ' + getFriendlyAuthErrorMessage(error), 'error');
     return false;
   }
-  if (typeof showToast === 'function') showToast('✅ Kontrol listesi kaydedildi.');
+  if (!quiet && typeof showToast === 'function') showToast('✅ Kontrol listesi kaydedildi.');
   return true;
 }
 
@@ -19462,6 +19545,10 @@ function renderStaffFieldWork() {
     return;
   }
   const rows = (staffFieldWork.cleanings || []).filter(isStaffCleaningVisible);
+  rows.forEach(row => {
+    const alan = document.getElementById(`staffNote-${row.execution_id}`);
+    if (alan && typeof alan.value === 'string') row.note = alan.value;
+  });
   container.innerHTML = rows.length ? rows.map(row => {
     const locked = row.status === 'CLEANED';
     const statusLabel = STAFF_CLEANING_STATUS_LABELS[row.status] || 'Açık';
@@ -19473,7 +19560,8 @@ function renderStaffFieldWork() {
         const subChecked = row.checklist_result?.[subKey]?.z === true;
         return `<label class="staff-check-item staff-check-sub"><input type="checkbox" ${subChecked ? 'checked' : ''} ${locked ? 'disabled' : ''} data-onchange="setStaffChecklistMark(decodeURIComponent('${encodeActionArg(row.execution_id)}'), decodeURIComponent('${encodeActionArg(subKey)}'), this.checked)"><span>${escapeHtml(subCheck)}</span></label>`;
       }).join('');
-      return `<label class="staff-check-item"><input type="checkbox" ${checked ? 'checked' : ''} ${locked ? 'disabled' : ''} data-onchange="setStaffChecklistMark(decodeURIComponent('${encodeActionArg(row.execution_id)}'), decodeURIComponent('${encodeActionArg(key)}'), this.checked)"><span>${escapeHtml(item.text || '—')}</span>${item.important ? '<em class="staff-check-required">zorunlu</em>' : ''}</label>${subChecks}`;
+      const kontrol = row.checklist_result?.[key]?.m === true ? '<span class="staff-check-m" title="Yönetici kontrol etti">Kontrol ✓</span>' : '';
+      return `<label class="staff-check-item"><input type="checkbox" ${checked ? 'checked' : ''} ${locked ? 'disabled' : ''} data-onchange="setStaffChecklistMark(decodeURIComponent('${encodeActionArg(row.execution_id)}'), decodeURIComponent('${encodeActionArg(key)}'), this.checked)"><span>${escapeHtml(item.text || '—')}</span>${item.important ? '<em class="staff-check-required">zorunlu</em>' : ''}${kontrol}</label>${subChecks}`;
     }).join('')}</fieldset>`).join('');
     const supplies = (row.checklist?.supplies || []).map((item, index) => {
       const current = row.supplies_result?.[String(index)] || '';
@@ -19767,7 +19855,7 @@ async function inspectCleaningExecution(executionId, approve) {
   const { error } = await supabaseClient.rpc('inspect_cleaning', {
     p_execution_id: executionId,
     p_approve: !!approve,
-    p_m_marks: execution?.manager_marks || {},
+    p_m_marks: execution?.manager_marks || {}, // phase123 varsa bos: isaretler aninda yazildi
     p_inspector_note: note || null
   });
   if (error) {
@@ -20389,11 +20477,57 @@ function renderCleaningExecutionFlags(execution) {
   return `<div class="ops-execution-flags">${flagged.length ? `<span><strong>Malzeme:</strong> ${escapeHtml(flagged.join(' · '))}</span>` : ''}${execution.note ? `<span><strong>Personel notu:</strong> ${escapeHtml(execution.note)}</span>` : ''}</div>`;
 }
 
-function setManagerChecklistMark(executionId, key, checked) {
+const PHASE123_SEMA_YOK = 'Kontrol işaretini anında kaydetmek için veritabanı güncellemesi (phase123) henüz uygulanmadı; işaret onayla birlikte kaydedilir.';
+
+async function setManagerChecklistMark(executionId, key, checked) {
   const execution = (appData?.cleaningExecutions || []).find(item => item.id === executionId);
   if (!execution) return false;
   execution.manager_marks = { ...(execution.manager_marks || {}), [key]: !!checked };
+  const onceki = execution.checklist_result?.[key];
+  execution.checklist_result = { ...(execution.checklist_result || {}), [key]: { z: onceki?.z ?? null, m: !!checked } };
+  if (!isCloudTenant(getActiveTenantId()) || !supabaseClient) return true;
+  const { data, error } = await supabaseClient.rpc('set_cleaning_manager_marks', { p_execution_id: executionId, p_marks: { [key]: !!checked } });
+  if (error) {
+    const yok = /PGRST202|Could not find the function/i.test(`${error.code || ''} ${error.message || ''}`);
+    if (typeof showToast === 'function') showToast(yok ? PHASE123_SEMA_YOK : '⚠️ Kontrol işareti kaydedilemedi: ' + getFriendlyAuthErrorMessage(error), yok ? 'info' : 'error');
+    if (!yok) await loadTenantAppData(getActiveTenantId());
+    return false;
+  }
+  if (data?.checklist_result) execution.checklist_result = data.checklist_result;
+  delete execution.manager_marks[key];
   return true;
+}
+
+function cleaningChecklistProgress(execution) {
+  const sections = execution?.checklist_snapshot?.sections || [];
+  const r = execution?.checklist_result || {};
+  let total = 0; let z = 0; let m = 0;
+  sections.forEach((section, si) => (section.items || []).forEach((item, ii) => {
+    const keys = [`s${si}.i${ii}`].concat((item.subChecks || []).map((_, k) => `s${si}.i${ii}.sub${k}`));
+    keys.forEach(key => { total += 1; if (r[key]?.z === true) z += 1; if (r[key]?.m === true) m += 1; });
+  }));
+  return { total, z, m };
+}
+
+// Temizlik sayfasi listesi: her satirda iki kutu. Temizlikcinin kutusu (Z) yonetici
+// ekraninda salt okunurdur (phase68); Kontrol (M) her an isaretlenir ve aninda yazilir.
+function renderCleaningTwoColumnChecklist(execution, { canMark = true } = {}) {
+  const sections = execution?.checklist_snapshot?.sections || [];
+  if (!sections.length) return '';
+  const r = execution.checklist_result || {};
+  const kilitli = execution.status === 'INSPECTED' || !canMark;
+  const satir = (key, text, important, sub) => {
+    const z = r[key]?.z === true;
+    const m = execution.manager_marks?.[key] ?? r[key]?.m;
+    return `<div class="cl2-row${sub ? ' cl2-row--sub' : ''}" data-cl-key="${escapeHtml(key)}">`
+      + `<span class="cl2-text">${escapeHtml(text || '—')}${important ? ' <span class="cl2-star" title="Zorunlu">★</span>' : ''}</span>`
+      + `<span class="cl2-cell${z ? ' is-on' : ''}" aria-label="Temizlikçi ${z ? 'işaretledi' : 'işaretlemedi'}">${z ? '✓' : ''}</span>`
+      + `<label class="cl2-cell cl2-cell--m"><input type="checkbox" aria-label="Kontrol: ${escapeHtml(text || '')}" ${m === true ? 'checked' : ''} ${kilitli ? 'disabled' : ''} data-onchange="setManagerChecklistMark(decodeURIComponent('${encodeActionArg(execution.id)}'), decodeURIComponent('${encodeActionArg(key)}'), this.checked)"></label></div>`;
+  };
+  return `<div class="cl2" role="table" aria-label="Temizlik kontrol listesi"><div class="cl2-head" role="row"><span>Madde</span><span>Temizlikçi</span><span>Kontrol</span></div>${sections.map((section, si) => `<div class="cl2-section"><h4>${escapeHtml(section.title || 'Kontrol')}</h4>${(section.items || []).map((item, ii) => {
+    const key = `s${si}.i${ii}`;
+    return satir(key, item.text, item.important, false) + (item.subChecks || []).map((sub, k) => satir(`${key}.sub${k}`, sub, false, true)).join('');
+  }).join('')}</div>`).join('')}</div>`;
 }
 
 function renderManagerChecklist(execution) {
@@ -20413,6 +20547,55 @@ function cleaningExecutionChecklistHintHtml(execution) {
   return `<span class="ops-checklist-hint">Kontrol listesi yok: atama, liste kaydedilmeden önce yapılmış.${button}</span>`;
 }
 
+// Sade temizlik ekrani (kullanici 22.11.2026: "cok daha minimal ve basit"): satir = ev ·
+// tarih · temizlikci · ilerleme · durum. Satira dokununca temizlik sayfasi acilir: iki
+// sutunlu liste, atama ve tum eylemler orada.
+let opsCleaningPageId = null;
+
+function openCleaningPage(taskId) {
+  opsCleaningPageId = taskId || null;
+  operationsViewState = 'cleaning';
+  renderOperationsTab();
+  return true;
+}
+
+function closeCleaningPage() {
+  opsCleaningPageId = null;
+  renderOperationsTab();
+  return true;
+}
+
+function cleaningPageHtml(task, eligible) {
+  const execution = task.execution;
+  const waiting = task.workflowState === 'AWAITING_INSPECTION';
+  const property = task.propertyName || appData?.villas?.[task.villa]?.name || task.villa || '—';
+  const acik = task.status !== 'DONE' && task.status !== 'SKIPPED';
+  const p = cleaningChecklistProgress(execution);
+  const options = eligible.map(person => `<option value="${escapeHtml(person.id)}"${execution?.person_id === person.id ? ' selected' : ''}>${escapeHtml(person.full_name)}</option>`).join('');
+  const ata = acik && !waiting && eligible.length
+    ? `<div class="cl-assign"><select id="opsCleaner-${escapeHtml(task.id)}" aria-label="Temizlikçi seç"><option value="">Temizlikçi seç…</option>${options}</select><button class="lex-btn" data-onclick="assignCleaningTaskFromSelect(decodeURIComponent('${encodeActionArg(task.id || task.dbId)}'))">${execution ? 'Yeniden ata' : 'Ata ve listeyi ekle'}</button></div>`
+    : '';
+  const liste = execution
+    ? (renderCleaningTwoColumnChecklist(execution, { canMark: canManageOperationsRole(activeTenant?.role) }) || cleaningExecutionChecklistHintHtml(execution) || '<p class="lex-note">Bu temizlik için kontrol listesi yok.</p>')
+    : `<p class="lex-note">Liste, giriş hesabı olan bir temizlikçiye atanınca eklenir (bu evin listesi + genel liste).</p>`;
+  const eylem = [
+    waiting ? `<button class="lex-btn lex-btn--primary" data-onclick="inspectCleaningExecution(decodeURIComponent('${encodeActionArg(execution.id)}'), true)">Onayla (gider oluşur)</button><button class="lex-btn" data-onclick="inspectCleaningExecution(decodeURIComponent('${encodeActionArg(execution.id)}'), false)">Yeniden aç</button>` : '',
+    acik && !waiting && !execution ? `<button class="lex-btn lex-btn--primary" data-onclick="markCleaningDone(decodeURIComponent('${encodeActionArg(task.id || task.dbId)}'))">Kontrol ettim, yapıldı</button>` : '',
+    acik && !waiting ? `<button class="lex-btn" data-onclick="markCleaningSkipped(decodeURIComponent('${encodeActionArg(task.id || task.dbId)}'))" title="Misafir gelmedi, iptal ya da ev kullanılmadı: gider ve borç oluşmaz">Gerek kalmadı</button>` : '',
+    `<button class="lex-btn" data-onclick="openEditCleaningTaskModal(decodeURIComponent('${encodeActionArg(task.id || task.dbId)}'))">Düzenle</button>`,
+    `<button class="lex-btn lex-btn--danger" data-onclick="deleteCleaningTask(decodeURIComponent('${encodeActionArg(task.id || task.dbId)}'))">Sil</button>`
+  ].join('');
+  return `<article class="fox-subpage cl-page" data-cleaning-task-id="${escapeHtml(task.id)}">
+    <button type="button" class="fox-back" data-onclick="closeCleaningPage()">← Temizlikler</button>
+    <h2 class="fox-subpage__title">${escapeHtml(property)} temizliği</h2>
+    <p class="cl-meta">${escapeHtml(task.date ? formatTrDate(task.date) : '—')} · ${escapeHtml(task.cleaner || 'Personel belirtilmedi')}${p.total ? ` · Temizlikçi ${p.z}/${p.total} · Kontrol ${p.m}/${p.total}` : ''}</p>
+    ${waiting ? renderCleaningExecutionFlags(execution) : ''}
+    ${ata}
+    ${liste}
+    <div class="fox-add-row cl-actions">${eylem}</div>
+  </article>`;
+}
+
 function renderOperationsCleaningView(tasks) {
   const api = getOperationsApi();
   if (!api) return '<div class="empty-state">Operasyon motoru yüklenemedi.</div>';
@@ -20429,43 +20612,39 @@ function renderOperationsCleaningView(tasks) {
     .filter(task => !listed.has(task.id) && (task.date || '') <= getTodayStr())
     .filter(task => taskMatchesVilla(task, currentFilter.villa) && (currentFilter.period === 'ALL' || isDateInFilter(task.date || '')))
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const sayfa = opsCleaningPageId ? withExecutions.find(t => t.id === opsCleaningPageId || t.dbId === opsCleaningPageId) : null;
+  if (opsCleaningPageId && !sayfa) opsCleaningPageId = null;
+  if (sayfa) return cleaningPageHtml(sayfa, eligible);
+  const satirHtml = task => {
+    const execution = task.execution;
+    const waiting = task.workflowState === 'AWAITING_INSPECTION';
+    const property = task.propertyName || appData?.villas?.[task.villa]?.name || task.villa || '—';
+    const status = waiting ? 'Denetim bekliyor' : task.status === 'DONE' ? (task.paid ? 'Ödendi' : 'Borç') : task.status === 'SKIPPED' ? 'Gerek kalmadı' : execution ? 'Atandı' : 'Planlı';
+    const tone = waiting ? 'up' : (isCleaningDebt(task) ? 'down' : (task.status === 'DONE' || task.status === 'SKIPPED' ? 'keep' : 'up'));
+    const p = cleaningChecklistProgress(execution);
+    const yuzde = p.total ? Math.round((p.z / p.total) * 100) : 0;
+    return `<button type="button" class="cl-row" data-cleaning-task-id="${escapeHtml(task.id)}" data-onclick="openCleaningPage(decodeURIComponent('${encodeActionArg(task.id || task.dbId)}'))">
+      <span class="cl-row__main"><span class="cl-row__title">${propertyNameHtml(task.villa, property)}</span><span class="cl-row__meta">${escapeHtml(task.date ? formatTrDate(task.date) : '—')} · ${escapeHtml(task.cleaner || 'Personel belirtilmedi')}</span></span>
+      ${p.total ? `<span class="cl-row__progress" title="Temizlikçi ${p.z}/${p.total} · Kontrol ${p.m}/${p.total}"><span class="tp-bar"><span class="tp-bar__fill" style="width:${yuzde}%"></span></span>${p.z}/${p.total}</span>` : '<span class="cl-row__progress"></span>'}
+      <span class="lex-tag lex-tag--${tone}">${escapeHtml(status)}</span>
+    </button>`;
+  };
   const groupHtml = (label, rows, id) => !rows.length ? '' : `
-    <section class="ops-group"${id ? ` id="${id}"` : ''}>
-      <h3>${escapeHtml(label)} <span class="badge">${rows.length}</span></h3>
-      ${rows.length ? rows.map(task => {
-        const execution = task.execution;
-        const waiting = task.workflowState === 'AWAITING_INSPECTION';
-        const property = task.propertyName || appData?.villas?.[task.villa]?.name || task.villa || '—';
-        const optionsHtml = eligible.map(person => `<option value="${escapeHtml(person.id)}"${execution?.person_id === person.id ? ' selected' : ''}>${escapeHtml(person.full_name)}</option>`).join('');
-        // Atama yalniz giris hesabi olan temizlikci varsa gosterilir.
-        const assignHtml = eligible.length ? `<select id="opsCleaner-${escapeHtml(task.id)}" aria-label="Temizlikçi seç" title="Yalnız uygulamaya giriş hesabı olan temizlikçiler listelenir"><option value="">Temizlikçi seç…</option>${optionsHtml}</select>
-              <button class="btn btn-secondary btn-sm" data-onclick="assignCleaningTaskFromSelect(decodeURIComponent('${encodeActionArg(task.id)}'))">Ata</button>` : '';
-        const status = waiting ? 'Denetim bekliyor' : task.status === 'DONE' ? (task.paid ? 'Ödendi' : 'Borç') : task.status === 'SKIPPED' ? 'Gerek kalmadı' : execution ? 'Atandı' : 'Planlı';
-        return `<article class="ops-row" data-cleaning-task-id="${escapeHtml(task.id)}">
-          <div class="ops-row-main"><strong>${escapeHtml(property)}</strong><span>${escapeHtml(task.date || '—')} · ${escapeHtml(task.cleaner || 'Personel belirtilmedi')}</span>${waiting ? renderCleaningExecutionFlags(execution) + renderManagerChecklist(execution) : ''}${cleaningExecutionChecklistHintHtml(execution)}</div>
-          <span class="badge ${waiting ? 'badge-blue' : (isCleaningDebt(task) ? 'badge-amber' : '')}">${escapeHtml(status)}</span>
-          <div class="ops-row-actions">
-            ${waiting ? `<button class="btn btn-primary btn-sm" data-onclick="inspectCleaningExecution(decodeURIComponent('${encodeActionArg(execution.id)}'), true)">M Onayla</button><button class="btn btn-secondary btn-sm" data-onclick="inspectCleaningExecution(decodeURIComponent('${encodeActionArg(execution.id)}'), false)">Yeniden aç</button>` : task.status !== 'DONE' && task.status !== 'SKIPPED' ? `
-              ${assignHtml}
-              ${!execution ? `<button class="btn btn-primary btn-sm" data-onclick="markCleaningDone(decodeURIComponent('${encodeActionArg(task.id)}'))">Kontrol ettim, yapıldı</button>` : ''}
-              <button class="btn btn-secondary btn-sm" data-onclick="markCleaningSkipped(decodeURIComponent('${encodeActionArg(task.id)}'))" title="Misafir gelmedi, iptal ya da ev kullanılmadı: gider ve borç oluşmaz">Gerek kalmadı</button>` : ''}
-            <button class="btn btn-secondary btn-sm" title="Ayrıntı / Düzenle" data-onclick="openEditCleaningTaskModal(decodeURIComponent('${encodeActionArg(task.id || task.dbId)}'))">Düzenle</button>
-            <button class="btn btn-danger btn-sm" title="Temizliği ve ona bağlı gideri sil" data-onclick="deleteCleaningTask(decodeURIComponent('${encodeActionArg(task.id || task.dbId)}'))">Sil</button>
-          </div>
-        </article>`;
-      }).join('') : ''}
+    <section class="cl-group"${id ? ` id="${id}"` : ''}>
+      <h3 class="cl-group__title">${escapeHtml(label)} <span class="lex-group__sub">${rows.length}</span></h3>
+      ${rows.map(satirHtml).join('')}
     </section>`;
 
   return `
     ${eligible.length ? '' : fieldTeamHintHtml('CLEANER')}
     <div class="ops-cleaning-layout">
       <div>${groupHtml('Geciken / denetim bekleyen', grouped.overdue)}${groupHtml('Bugün', grouped.today)}${groupHtml('Yarın', grouped.tomorrow)}${groupHtml('Bu hafta', grouped.week)}${groupHtml('Geçmiş temizlikler (seçili dönem)', history, 'opsCleaningHistory')}${[grouped.overdue, grouped.today, grouped.tomorrow, grouped.week, history].some(r => r.length) ? '' : '<div class="empty-state">Bu dönemde temizlik yok.</div>'}</div>
-      <aside class="ops-debt-panel"${debt.length ? '' : ' hidden'}><h3>Bekleyen Temizlik Borçları (${debt.reduce((sum, item) => sum + item.count, 0)})</h3>
-        ${debt.length ? debt.map(item => `<div class="ops-debt-row"><div><strong>${escapeHtml(item.cleaner)}</strong><span>${item.count} temizlik</span></div><strong>₺${item.amount.toLocaleString('tr-TR')}</strong>${item.taskIds.map(id => {
+      <aside class="ops-debt-panel cl-debt"${debt.length ? '' : ' hidden'}><h3 class="cl-group__title">Temizlik borcu <span class="lex-group__sub">${debt.reduce((sum, item) => sum + item.count, 0)} temizlik</span></h3>
+        ${debt.length ? debt.map(item => `<details class="ops-debt-row"><summary><strong>${escapeHtml(item.cleaner)}</strong><span>${item.count} temizlik</span><strong>₺${item.amount.toLocaleString('tr-TR')}</strong></summary>${item.taskIds.map(id => {
           const task = tasks.find(candidate => (candidate.id || candidate.dbId) === id);
           if (!task) return '';
           return `<div data-cleaning-task-id="${escapeHtml(task.id || task.dbId)}" class="ops-debt-detail"><strong>${escapeHtml(task.propertyName || appData?.villas?.[task.villa]?.name || task.villa || '—')}</strong><span>${escapeHtml(task.date ? formatTrDate(task.date) : '—')} · ${escapeHtml(task.cleaner || item.cleaner)} · ₺${Number(task.amount || 0).toLocaleString('tr-TR')} Ödenecek</span>${task.notes ? `<span>${escapeHtml(task.notes)}</span>` : ''}<button class="btn btn-secondary btn-sm" data-onclick="openEditCleaningTaskModal(decodeURIComponent('${encodeActionArg(task.id || task.dbId)}'))">Ayrıntı / Düzenle</button></div>`;
-        }).join('')}<button class="btn btn-secondary btn-sm" data-onclick="payCleanerDebt(decodeURIComponent('${encodeActionArg(item.cleaner)}'))">Toplu öde</button></div>`).join('') : '<div class="empty-state">Temizlik borcu yok.</div>'}
+        }).join('')}<button class="btn btn-secondary btn-sm" data-onclick="payCleanerDebt(decodeURIComponent('${encodeActionArg(item.cleaner)}'))">Toplu öde</button></details>`).join('') : '<div class="empty-state">Temizlik borcu yok.</div>'}
       </aside>
     </div>`;
 }
@@ -23421,6 +23600,13 @@ async function handleQuickActionTrigger(actionType, entityId) {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     goTo,
+    openCleaningPage,
+    closeCleaningPage,
+    renderCleaningChecklistPreview,
+    cleaningTemplatesFor,
+    cleaningChecklistProgress,
+    renderCleaningTwoColumnChecklist,
+    subscribeStaffRealtime,
     setFinanceView,
     renderFinanceView,
     openExpenseForFinanceCategory,
