@@ -22357,6 +22357,111 @@ function pricingExportContext() {
   return { entry, ctx: { days: calendar.suggestions.days, saved: pricingDailyPriceMap(entry.property.id), minStay: pricingMinStayMap(entry.property.id, calendar.suggestions.days) } };
 }
 
+// ---- Liste gorunumu (Lex 3 sutun) -------------------------------------------
+let pricingCalendarMode = 'grid';
+
+function setPricingCalendarMode(mode) {
+  if (!['grid', 'list'].includes(mode)) return false;
+  pricingCalendarMode = mode;
+  renderPricingTab();
+  return true;
+}
+
+function pricingRivalAverageFor(day, isSpecial, ctx) {
+  if (appData.phase115SchemaReady === false || !ctx.propertyId) return null;
+  const svc = getPricingResearchService();
+  const dow = new Date(day.date + 'T00:00:00Z').getUTCDay();
+  const type = isSpecial ? 'SPECIAL' : ([5, 6].includes(dow) ? 'WEEKEND' : 'WEEKDAY');
+  return svc.competitorAverage(ctx.research || [], ctx.propertyId, type, ctx.today) || null;
+}
+
+// Talimat: kayitli fiyat oneriden farkliysa Artir/Dusur ("kayitli → oneri", 50 TL'ye yuvarli);
+// esitse Koru; kayit yoksa Yap (oneri onay bekliyor). Dolu ve kapali gun Tamam / Kapali.
+function pricingListRows(monthDays, ctx) {
+  const L = getLexUiApi();
+  return monthDays.map(day => {
+    const facts = pricingDayFacts(day, ctx);
+    const gun = L.dayLabel(day.date);
+    const base = { date: day.date, c1: gun.day, c1sub: `${gun.weekday}${facts.special ? ` · ${facts.special.name}` : ''}` };
+    if (day.status !== 'OPEN') {
+      return Object.assign(base, { c2: day.status === 'BOOKED' ? 'Dolu' : 'Kapalı', c2sub: day.status === 'BOOKED' ? 'Satıldı' : (facts.blocks[0]?.title || 'Bakım'),
+        tone: 'keep', tag: day.status === 'BOOKED' ? 'Tamam' : 'Kapalı', reason: day.status === 'BOOKED' ? 'Rezervasyon var' : 'Satışa kapalı' });
+    }
+    const shown = facts.shown;
+    const rival = pricingRivalAverageFor(day, Boolean(facts.special), ctx);
+    const kaynak = facts.saved ? (facts.saved.source === 'MANUAL' ? 'Elle fiyat' : 'Onaylı') : (day.price == null ? 'Baz fiyat yok' : 'Öneri');
+    const row = Object.assign(base, {
+      c2: shown != null ? pricingMoney(shown) : '—',
+      c2sub: `${kaynak}${rival ? ` · rakip ort. ${pricingMoney(rival.amount)}` : ''}`,
+      mark: shown != null && rival ? L.markLevel(shown, rival.amount) : null,
+      c2Attr: `data-onclick="focusPricingDay(decodeURIComponent('${encodeActionArg(day.date)}'))"`
+    });
+    if (day.price == null) return Object.assign(row, { tone: 'up', tag: 'Yap', reason: 'Baz fiyat girin; öneri hesaplanamıyor' });
+    if (!facts.saved) return Object.assign(row, ctx.dailyReady === false
+      ? { tone: 'up', tag: 'Öneri', reason: 'Günlük fiyat kaydı açılınca onaylanır' }
+      : { tone: 'up', tag: 'Yap', reason: `Öneri ${pricingMoney(day.price)} onay bekliyor` });
+    const kayitli = Number(facts.saved.price);
+    const oneri = L.roundPrice50(day.price);
+    if (kayitli === oneri) return Object.assign(row, { tone: 'keep', tag: 'Koru', reason: 'Kayıtlı fiyat öneriyle aynı' });
+    return Object.assign(row, oneri > kayitli
+      ? { tone: 'up', tag: 'Artır', reason: `${pricingMoney(kayitli)} → ${pricingMoney(oneri)}` }
+      : { tone: 'down', tag: 'Düşür', reason: `${pricingMoney(kayitli)} → ${pricingMoney(oneri)}` });
+  });
+}
+
+function pricingListHtml(monthKey, monthDays, ctx) {
+  const L = getLexUiApi();
+  const sayac = { Artır: 0, Düşür: 0, Koru: 0, Yap: 0 };
+  const rows = pricingListRows(monthDays, ctx);
+  rows.forEach(r => { if (sayac[r.tag] !== undefined) sayac[r.tag] += 1; });
+  const ozet = [sayac.Yap ? `<strong>${sayac.Yap} gün</strong> onay bekliyor` : '', sayac.Artır ? `<strong>${sayac.Artır}</strong> artır` : '', sayac.Düşür ? `<strong>${sayac.Düşür}</strong> düşür` : '', sayac.Koru ? `${sayac.Koru} koru` : ''].filter(Boolean).join(' · ');
+  return `<p class="lex-summary">${escapeHtml(pricingMonthLabel(monthKey))}: ${ozet || 'açık gün yok'}.</p>`
+    + L.tableHtml({ head: ['Gün', 'Fiyat', 'Talimat'], rows, empty: 'Bu ayda gün yok.', caption: `${pricingMonthLabel(monthKey)} fiyat listesi` })
+    + L.footerHtml({
+      legend: [{ tone: 'keep', label: 'Koru' }, { tone: 'up', label: 'Artır / Yap' }, { tone: 'down', label: 'Düşür' }, { tone: 'weekend', label: 'Hafta sonu' }],
+      pdfAttr: 'data-onclick="printPricingListPdf()"', excelAttr: 'data-onclick="downloadPricingListExcel()"'
+    })
+    + '<p class="lex-note">Sarı/kırmızı fiyat: rakip ortalamasının %5 / %15 üstünde. Fiyatlar ₺50\'ye yuvarlıdır; liste OTA\'ya gönderilmez.</p>';
+}
+
+// PDF/Excel: her mulk ayri sayfa, secili ay.
+function pricingListPages() {
+  const today = getTodayStr();
+  return pricingActiveProperties().map(entry => {
+    const calendar = computePricingCalendar(entry, today);
+    const monthDays = calendar.suggestions.days.filter(day => day.date.startsWith(pricingSelectedMonth + '-'));
+    const ctx = { blocks: calendar.blocks, specialByDate: new Map(calendar.specialDays.map(day => [day.date, day])), gapSet: new Set(calendar.suggestions.gapDates || []),
+      saved: pricingDailyPriceMap(entry.property.id), research: appData.competitorPriceResearch || [], propertyId: entry.property.id, today, dailyReady: !!appData.phase101SchemaReady,
+      minStay: pricingMinStayMap(entry.property.id, calendar.suggestions.days) };
+    const rows = pricingListRows(monthDays, ctx).map(r => { const { c2Attr, ...rest } = r; return rest; });
+    return { title: `${entry.property.name || entry.key} · ${pricingMonthLabel(pricingSelectedMonth)}`, summary: [{ text: 'Gün · fiyat · talimat (Koru / Artır / Düşür)' }], rows, head: ['Gün', 'Fiyat', 'Talimat'] };
+  });
+}
+
+function downloadPricingListExcel() {
+  if (typeof XLSX === 'undefined') return retryWithXlsxEngine(() => downloadPricingListExcel()) && false;
+  const L = getLexUiApi();
+  const sheets = pricingListPages().map(pg => ({ name: pg.title.split(' · ')[0], head: ['Gün', 'Hafta günü', 'Fiyat', 'Durum', 'Talimat', 'Gerekçe'],
+    rows: pg.rows.map(r => [r.c1, r.c1sub, r.c2, r.c2sub || '', r.tag, r.reason || '']) }));
+  const wb = L.buildWorkbook(XLSX, sheets);
+  XLSX.writeFile(wb, `Lexbnb_Fiyat_${pricingSelectedMonth}.xlsx`);
+  return true;
+}
+
+function printPricingListPdf() {
+  const L = getLexUiApi();
+  const popup = window.open('', '_blank');
+  if (!popup) { showToast('Yazdırma penceresi engellendi. Tarayıcıda açılır pencerelere izin verin.', 'error'); return false; }
+  popup.document.write(L.printDocumentHtml({ title: `Fiyat · ${pricingMonthLabel(pricingSelectedMonth)}`, pages: pricingListPages() }));
+  popup.document.close();
+  try { const sayfa = new popup.CSSStyleSheet(); sayfa.replaceSync(L.PRINT_CSS); popup.document.adoptedStyleSheets = [sayfa]; } catch (e) { /* eski tarayici */ }
+  popup.opener = null;
+  popup.addEventListener('afterprint', () => popup.close(), { once: true });
+  popup.focus();
+  popup.print();
+  return true;
+}
+
 function exportPricingDays() {
   const found = pricingExportContext();
   const dates = [...pricingSelectedDays].sort();
@@ -23589,7 +23694,13 @@ function renderPricingTab() {
   setEl('pricingCalendarTitle', pricingMonthLabel(monthKey));
   const counts = { open: monthDays.filter(day => day.status === 'OPEN').length, booked: monthDays.filter(day => day.status === 'BOOKED').length, saved: monthDays.filter(day => day.status === 'OPEN' && saved.has(day.date)).length };
   setEl('pricingCalendarFoot', `${counts.open} açık · ${counts.saved} kayıtlı fiyat · ${counts.booked} dolu gece`);
-  container.innerHTML = `${warningHtml}${pricingPaceStripHtml(entry, monthKey, today)}${pricingCalendarGridHtml(monthKey, monthDays, ctx)}${pricingHistoryHintHtml(result.history, entry, monthKey)}`;
+  const modeTabs = document.getElementById('pricingModeTabs');
+  if (modeTabs) modeTabs.innerHTML = getLexUiApi().tabsHtml([
+    { key: 'grid', label: 'Takvim', attr: `data-onclick="setPricingCalendarMode('grid')"` },
+    { key: 'list', label: 'Liste', attr: `data-onclick="setPricingCalendarMode('list')"` }
+  ], pricingCalendarMode, { label: 'Görünüm', variant: 'chips' });
+  const govde = pricingCalendarMode === 'list' ? pricingListHtml(monthKey, monthDays, ctx) : pricingCalendarGridHtml(monthKey, monthDays, ctx);
+  container.innerHTML = `${warningHtml}${pricingPaceStripHtml(entry, monthKey, today)}${govde}${pricingHistoryHintHtml(result.history, entry, monthKey)}`;
   if (pricingView === 'results') ensurePricingImportedIds();
 
   // Onay bekleyen gun: ufuktaki acik, onerisi olan ve kayitli fiyati olmayan gunler.
@@ -23843,6 +23954,9 @@ async function handleQuickActionTrigger(actionType, entityId) {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     goTo,
+    setPricingCalendarMode,
+    pricingListRows,
+    pricingListPages,
     closePropertyPage,
     getIncomeCategories,
     renderSettingsIncomeCategories,

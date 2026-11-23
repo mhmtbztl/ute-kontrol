@@ -371,6 +371,12 @@ Hesaplayıcıya yazılan oran yalnız hesaplayıcıyı etkiler. Baz fiyatı sist
 ADR'si ve son rakip fiyatı kanıt olarak durur. İnnerHTML sınırı SVG'yi sildiği için işaretler CSS'tir.
 Göç gerekmedi. Ağı `g9_feedback_tests` F-01…F-18, tarayıcı kapısı 32/32b.
 
+**Fiyat listesi (Otomasyon #2, Lex + Fox, 22.11.2026):** Takvim sekmesinde `Takvim · Liste` seçimi
+(`setPricingCalendarMode`). Liste 3 sütun Lex tablosu: gün · fiyat (kayıtlı, yoksa öneri; rakip ortalamasının
+%5/%15 üstü sarı/kırmızı işaret) · talimat (`pricingListRows`: kayıtlı ≠ öneri ise Artır/Düşür "kayıtlı → öneri",
+eşitse Koru, kayıt yoksa Yap; phase101 yoksa "Öneri"). Yeni hesap yok. PDF/Excel her mülk ayrı sayfa
+(`pricingListPages`). Dolu gün açık mor (Fox bilgi). Ağı `pricing_list_tests`.
+
 **Fiyatlandırma 2. tur (kullanıcı 08.11.2026):** ufuk **12 ay** (`PRICING_HORIZON_MONTHS`; ay şeridi yatay
 kayar, "3 ay" sabit metni yok). Kurallar'da tatiller varsayılan yakın 3 ay, ardışık aynı adlı günler tek
 satır (`togglePricingHolidayGroup`). Seçili günler **CSV indir / Kopyala** (`pricingExportRows`: kayıtlı fiyat

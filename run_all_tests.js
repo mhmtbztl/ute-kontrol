@@ -373,7 +373,9 @@ const allTestFiles = [
   'team_tasks_tests.js',
   'lex_ui_tests.js',
   // Sadelik 4. tur (22.11.2026): Notion tarzi gorev sayfasi
-  'task_page_tests.js'
+  'task_page_tests.js',
+  // Fiyat listesi (Otomasyon #2, 22.11.2026)
+  'pricing_list_tests.js'
 ];
 
 const testEnv = require('./core/test_env.js');
