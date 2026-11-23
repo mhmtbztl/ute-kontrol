@@ -344,10 +344,13 @@ function fakeDom() {
     assert.match(CSS, /\.page-action-bar__more \{ display: none; \}/);
   });
 
-  await test('D-07 Analiz son tamamlanan ayla acildiginda bunu baslikta soyler', () => {
+  // Kullanici 22.11.2026: Analiz icinde bulunulan ayla (bugun dahil) acilir; aralik
+  // baslangic/bitis ayi ile secilir, gelecek aylar dahil ve bunu baslikta soyler.
+  await test('D-07 Analiz bu ayla acilir; gelecek ay secilince baslikta soyler', () => {
     const ui = read('core/analytics_ui.js');
-    assert.match(ui, /class: 'ba-period-note', text: `Son tamamlanan ay gösteriliyor/);
-    assert.match(ui, /report\.period\.end === BookingAnalytics\.shiftMonth\(bugunAy, -1\)/);
+    assert.match(ui, /ayListesi\.includes\(bugunAy\) \? bugunAy/);
+    assert.match(ui, /'data-ba-select': 'start'/);
+    assert.match(ui, /class: 'ba-period-note', text: `Aralık gelecek ayları içeriyor/);
   });
 
   console.log(`\n${passed} geçti, ${failed} başarısız`);

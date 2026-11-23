@@ -63,7 +63,7 @@ try {
   for (const label of navLabels) {
     if (text.includes(label)) check(outside.includes(label), `H15. Rehberdeki "${label}" gercek bir ekran adi`);
   }
-  const uiLabels = ['Yaptım (Z)', 'M Onayla', 'Bu Ayı Kapat', 'Rapor al', 'Yazdır / PDF', 'Reklam raporu yükle', 'Fiyat basamaklarını düzenle',
+  const uiLabels = ['Yaptım (Z)', 'Onayla (gider oluşur)', 'Bu Ayı Kapat', 'Rapor al', 'Yazdır / PDF', 'Reklam raporu yükle', 'Fiyat basamaklarını düzenle',
     'Hızlı rezervasyon', 'WhatsApp Ayrıştır', 'Takvimi kapatır', 'Bugünkü saha işlerim', 'Verileri eşitle'];
   const appSources = outside + app + fs.readFileSync(path.join(__dirname, 'marketing_ui.js'), 'utf8');
   for (const label of uiLabels) {

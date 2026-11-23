@@ -78,3 +78,22 @@ const octoberHtml = UI.renderAds(october);
 assert(octoberHtml.includes('<span class="ba-delta ba-delta-flat"><span class="ba-delta-val"><span aria-hidden="true" class="ba-delta-arrow">▼</span><span class="ba-sr-only">azaldı </span>%90</span><span class="ba-delta-ctx">önceki eş döneme göre</span>'),
   'KPI şeridi önceki döneme göre değişimi Analiz biçiminde gösterir (harcamada yön nötr)');
 console.log('[PASS] Reklamlar görünümü ölçülebilir metrikleri atıf iddiası olmadan sunar');
+
+// Fox (22.11.2026): ana sayfa ozet seridi renkli; farkli sonuc turleri toplanmaz (mesaj ve arama
+// ayri kart); olculmeyen talep karti gosterilmez; iki kampanyadan azsa grafik yok.
+const karisik = UI.buildAdsModel({
+  filter: { period: '2026-10' },
+  adMetricPeriods: [
+    { campaign_id: 'c1', platform: 'META', result_type: 'MESSAGE', period_start: '2026-10-01', period_end: '2026-10-20', spend: 8400, messages: 70 },
+    { campaign_id: 'c2', platform: 'GOOGLE', result_type: 'CALL', period_start: '2026-10-01', period_end: '2026-10-20', spend: 3840, calls: 30 }
+  ],
+  marketingCampaigns: [{ id: 'c1', name: 'Villa Instagram', platform: 'META' }, { id: 'c2', name: 'Google arama', platform: 'GOOGLE' }],
+  leadSources: [], leadAcquisitions: [], financeSummary: { netRoomRevenue: 100000 }, targets: { costPerMessage: 120 }
+});
+const evHtml = UI.renderMarketingHome(karisik);
+assert(/fox-card--expense[^"]*mk-fox"><p class="mk-fox__label">Harcama/.test(evHtml) && />Mesaj<\/p>/.test(evHtml) && />Arama<\/p>/.test(evHtml),
+  'Fox şeridi: harcama kırmızı, karışık sonuçta mesaj ve arama ayrı kart');
+assert(!/>Sonuç<\/p>/.test(evHtml) && !/Talep \(Lexbnb\)/.test(evHtml), 'Karışıkta toplanmış "Sonuç" ve ölçülmeyen talep kartı yok');
+assert(/Kampanyaya göre harcama/.test(evHtml) && (evHtml.match(/class="mk-bar"/g) || []).length === 2, 'Kampanya harcama grafiği iki kampanyayı çizer');
+assert(!/mk-fox-grid/.test(UI.renderMarketingHome(UI.buildAdsModel({ filter: { period: '2026-10' }, adMetricPeriods: [] }))), 'Reklam kaydı yoksa Fox şeridi yok');
+console.log('[PASS] Pazarlama ana sayfası Fox renkli özet ve harcama grafiği gösterir (uydurma yok)');

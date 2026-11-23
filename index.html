@@ -16,8 +16,8 @@
   <meta http-equiv="Expires" content="0">
   <!-- Gece/Gunduz: tema stil sayfasindan once secilir (yanip sonme olmaz); yazi tipi sistemindir -->
   <script src="core/theme.js?v=81e24fd9"></script>
-  <link rel="stylesheet" href="style.css?v=0c46a4e6">
-  <link rel="stylesheet" href="analytics.css?v=22c2a3d0">
+  <link rel="stylesheet" href="style.css?v=bc59f80f">
+  <link rel="stylesheet" href="analytics.css?v=35127907">
   <script src="supabase.umd.js?v=3810661a"></script>
   <script src="core/xlsx_import_worker.js?v=b0939d47"></script>
 </head>
@@ -194,8 +194,8 @@
 
         <div class="header-actions">
       <!-- ChatGPT'ye sor: sag ustte tek tik (kullanici 22.11.2026). -->
-      <button type="button" class="btn btn-secondary header-chatgpt-btn" id="askChatGptBtn" data-onclick="openChatGptQuestionModal(); closeAllHeaderDropdowns();" title="Bu sayfanın rakamlarıyla hazır soru; kişisel veri gitmez">
-        <span class="header-btn-icon" aria-hidden="true">✦</span> <span class="header-btn-text">ChatGPT'ye sor</span>
+      <button type="button" class="btn btn-secondary header-chatgpt-btn" id="askChatGptBtn" aria-label="ChatGPT'ye sor" data-onclick="openChatGptQuestionModal(); closeAllHeaderDropdowns();" title="ChatGPT'ye sor: Bu sayfanın rakamlarıyla hazır soru; kişisel veri gitmez">
+        <span class="header-chatgpt-icon" aria-hidden="true">✦</span><span class="header-btn-text">ChatGPT</span>
       </button>
 
       <!-- Bildirim Merkezi (Notification Bell & Drawer) -->
@@ -433,12 +433,14 @@
         <span class="lex-headrow__meta" data-lex-period>—</span>
         <span class="lex-headrow__actions">
           <button class="btn btn-secondary btn-sm" data-onclick="openGoalsModal()">Hedefleri düzenle</button>
-          <button data-ledger-write-only class="btn btn-secondary btn-sm" data-onclick="openExpenseModal()">+ Gider</button>
         </span>
       </div>
       <section class="lex-screen-tasks" id="screenTasks_finance" aria-label="Ekip görevleri" hidden></section>
 
 
+      <!-- Fox Tasarimi (docs/FOX_TASARIMI.md, 22.11.2026): ana gorunum; Gelirler ve Giderler
+           tiklaninca alt sayfa olarak acilir (setFinanceView). -->
+      <div id="finMain">
       <!-- 1b. AY KAPANIŞI -->
       <section class="card" id="monthCloseCard" data-lx-style="border-left: 3px solid #636366;">
         <div data-lx-style="display:flex; flex-wrap:wrap; align-items:center; gap:14px; justify-content:space-between;">
@@ -458,9 +460,9 @@
       </section>
 
       <!-- 2. ANA KPI KARTLARI (5 SANİYEDE ANLAŞILIR) -->
-      <section class="kpi-cards-grid four-cols">
+      <section class="kpi-cards-grid four-cols fox-grid">
         <!-- Gerçekleşen Ciro -->
-        <div class="kpi-card fin-kpi-card">
+        <div class="kpi-card fin-kpi-card fox-card fox-card--revenue">
           <div class="kpi-card-header">
             <span class="kpi-label">Ciro (net konaklama geliri)</span>
           </div>
@@ -473,7 +475,7 @@
         </div>
 
         <!-- Net Kâr (Ciro - Opex - Capex) -->
-        <div class="kpi-card fin-kpi-card highlight-profit">
+        <div class="kpi-card fin-kpi-card highlight-profit fox-card fox-card--income" id="finProfitCard">
           <div class="kpi-card-header">
             <span class="kpi-label">Net kâr (cash profit)</span>
           </div>
@@ -486,7 +488,7 @@
         </div>
 
         <!-- Toplam Gider (Opex + Capex) -->
-        <div class="kpi-card fin-kpi-card">
+        <div class="kpi-card fin-kpi-card fox-card fox-card--expense">
           <div class="kpi-card-header">
             <span class="kpi-label">Toplam gider (OPEX+CAPEX)</span>
           </div>
@@ -499,7 +501,7 @@
         </div>
 
         <!-- Satılan Gece & Ortalama Gelir -->
-        <div class="kpi-card fin-kpi-card">
+        <div class="kpi-card fin-kpi-card fox-card fox-card--info">
           <div class="kpi-card-header">
             <span class="kpi-label">Satılan gece</span>
           </div>
@@ -511,30 +513,34 @@
         </div>
       </section>
 
-      <!-- 4b. GELİRLER (phase97). Rakamlar defter sozlesmesinden (renderIncomeSection);
-           "+ Gelir Ekle" rezervasyon formunu ya da diger gelir/sermaye formunu acar. -->
-      <details class="card expense-analysis-card finance-disclosure" id="financeIncomeDisclosure">
-        <summary><strong>Gelirler</strong><span>Konaklama, temizlik, diğer gelir ve sermaye</span></summary>
-        <div class="section-title-bar">
-          <div>
-            <h2>Gelirler</h2>
-            <p class="sub-text">Rezervasyon gelirleri otomatik gelir; rezervasyon dışı gelir ve sermaye girişi buradan eklenir</p>
-          </div>
-          <div class="income-add-wrap">
-            <button type="button" class="btn btn-primary btn-sm" data-onclick="toggleIncomeAddMenu(event)">+ Gelir Ekle</button>
-            <div id="incomeAddMenu" class="income-add-menu" hidden>
-              <button type="button" class="dropdown-item" data-onclick="startIncomeEntry('BOOKING')">Rezervasyon</button>
-              <button type="button" class="dropdown-item" data-onclick="startIncomeEntry('OTHER')">Diğer gelirler / sermaye</button>
-            </div>
-          </div>
-        </div>
+      <!-- Sayfalar: Gelirler ve Giderler tiklaninca alt sayfa acar. -->
+      <nav class="fox-pages" aria-label="Finans sayfaları">
+        <button type="button" class="fox-page-link fox-page-link--revenue" id="finIncomeLink" data-onclick="setFinanceView('income')">
+          <span class="fox-page-link__title">Gelirler</span>
+          <span class="fox-page-link__value" id="finIncomeLinkVal">—</span>
+          <span class="fox-page-link__sub" id="finIncomeLinkSub">—</span>
+        </button>
+        <button type="button" class="fox-page-link fox-page-link--expense" id="finExpensesLink" data-onclick="setFinanceView('expenses')">
+          <span class="fox-page-link__title">Giderler</span>
+          <span class="fox-page-link__value" id="finExpensesLinkVal">—</span>
+          <span class="fox-page-link__sub" id="finExpensesLinkSub">—</span>
+        </button>
+      </nav>
+      </div>
 
-        <div class="income-summary-grid">
-          <div class="income-summary-item"><span>Konaklama cirosu</span><strong id="incomeRoomVal">—</strong></div>
-          <div class="income-summary-item" id="incomeCleaningRow" hidden><span>Temizlik geliri</span><strong id="incomeCleaningVal">—</strong></div>
-          <div class="income-summary-item"><span>Diğer gelir</span><strong id="incomeOtherVal">—</strong></div>
-          <div class="income-summary-item income-summary-total"><span>Toplam gelir (kârın tabanı)</span><strong id="incomeTotalVal">—</strong></div>
-          <div class="income-summary-item income-summary-capital"><span>Sermaye / ortak girişi <small>kâra dahil değil</small></span><strong id="incomeCapitalVal">—</strong></div>
+      <!-- ALT SAYFA: GELİRLER (phase97). Rakamlar defter sozlesmesinden (renderIncomeSection).
+           En altta "+ Gelir ekle": rezervasyon formu ya da diger gelir/sermaye formu. -->
+      <section class="fox-subpage fox-subpage--revenue" id="finSubIncome" hidden aria-labelledby="finSubIncomeTitle">
+        <button type="button" class="fox-back" data-onclick="setFinanceView('main')">← Finans</button>
+        <h2 class="fox-subpage__title" id="finSubIncomeTitle">Gelirler</h2>
+        <p class="lex-note">Rezervasyon gelirleri rezervasyondan otomatik gelir. Rezervasyon dışı gelir ve sermaye girişi bu sayfadan eklenir; bir satıra dokununca düzenlenir.</p>
+
+        <div class="income-summary-grid fox-grid">
+          <button type="button" class="income-summary-item fox-card fox-card--revenue fox-card--link" data-onclick="goTo('reservations')" title="Rezervasyonları aç"><span>Konaklama cirosu</span><strong id="incomeRoomVal">—</strong><small>Rezervasyonlardan ›</small></button>
+          <div class="income-summary-item fox-card fox-card--income" id="incomeCleaningRow" hidden><span>Temizlik geliri</span><strong id="incomeCleaningVal">—</strong><small>Misafirden alınan</small></div>
+          <div class="income-summary-item fox-card fox-card--income"><span>Diğer gelir</span><strong id="incomeOtherVal">—</strong><small id="incomeOtherBreakdown">—</small></div>
+          <div class="income-summary-item income-summary-total fox-card fox-card--revenue"><span>Toplam gelir (kârın tabanı)</span><strong id="incomeTotalVal">—</strong></div>
+          <div class="income-summary-item income-summary-capital fox-card fox-card--neutral"><span>Sermaye / ortak girişi <small>kâra dahil değil</small></span><strong id="incomeCapitalVal">—</strong></div>
         </div>
 
         <div class="table-responsive">
@@ -554,20 +560,21 @@
             </tbody>
           </table>
         </div>
-      </details>
-
-      <!-- 5. GİDER ANALİZİ (DONUT CHART & 10 KATEGORİ DETAYI) -->
-      <details class="card expense-analysis-card finance-disclosure" id="financeExpensesDisclosure">
-        <summary><strong>Giderler</strong><span>Yalnız tutarı olan kategoriler</span></summary>
-        <div class="section-title-bar">
-          <div>
-            <h2>Gider analizi (kategori bazlı dağılım)</h2>
-            <p class="sub-text">Gider kalemlerinin toplam bütçe ve ciro içindeki payları ile geçen aya göre değişimleri</p>
-          </div>
-          <div data-lx-style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button data-ledger-write-only class="btn btn-secondary btn-sm" data-onclick="openCopyPreviousExpensesPanel()">Geçen ayın giderlerini kopyala</button>
+        <div class="fox-add-row income-add-wrap" data-ledger-write-only>
+          <button type="button" class="fox-add" data-onclick="toggleIncomeAddMenu(event)">+ Gelir ekle</button>
+          <div id="incomeAddMenu" class="income-add-menu" hidden>
+            <button type="button" class="dropdown-item" data-onclick="startIncomeEntry('BOOKING')">Rezervasyon</button>
+            <button type="button" class="dropdown-item" data-onclick="startIncomeEntry('OTHER')">Diğer gelirler / sermaye</button>
           </div>
         </div>
+      </section>
+
+      <!-- 5. GİDER ANALİZİ (DONUT CHART & 10 KATEGORİ DETAYI) -->
+      <!-- ALT SAYFA: GİDERLER. Kategoriye dokununca o kategorinin sayfasi acilir. -->
+      <section class="fox-subpage fox-subpage--expense" id="finSubExpenses" hidden aria-labelledby="finSubExpensesTitle">
+        <button type="button" class="fox-back" data-onclick="setFinanceView('main')">← Finans</button>
+        <h2 class="fox-subpage__title" id="finSubExpensesTitle">Giderler</h2>
+        <p class="lex-note">Yalnız tutarı olan kategoriler. Bir kategoriye dokununca kayıtları açılır ve orada düzenlenir.</p>
 
         <div class="expense-breakdown-grid">
           <!-- Left: SVG Donut Chart -->
@@ -606,10 +613,25 @@
             </table>
           </div>
         </div>
-      </details>
+        <div class="fox-add-row" data-ledger-write-only>
+          <button type="button" class="fox-add" data-ledger-write-only data-onclick="openExpenseModal()">+ Gider ekle</button>
+          <button type="button" class="fox-add fox-add--quiet" data-ledger-write-only data-onclick="openCopyPreviousExpensesPanel()">Geçen ayın giderlerini kopyala</button>
+        </div>
+      </section>
+
+      <!-- ALT SAYFA: tek gider kategorisi (JS cizer). -->
+      <section class="fox-subpage fox-subpage--expense" id="finSubCategory" hidden aria-labelledby="finSubCategoryTitle">
+        <button type="button" class="fox-back" data-onclick="setFinanceView('expenses')">← Giderler</button>
+        <h2 class="fox-subpage__title" id="finSubCategoryTitle">—</h2>
+        <p class="lex-note" id="finSubCategoryNote">—</p>
+        <div id="finSubCategoryBody"></div>
+        <div class="fox-add-row" data-ledger-write-only>
+          <button type="button" class="fox-add" data-onclick="openExpenseForFinanceCategory()">+ Gider ekle</button>
+        </div>
+      </section>
 
       <!-- 6. MÜLK BAZLI FİNANSAL PERFORMANS (YÖNETİCİ SIRALAMA TABLOSU & PREMİUM KARTLAR) -->
-      <section class="card property-finance-section">
+      <section class="card property-finance-section" id="finPropertySection">
         <div class="section-title-bar">
           <div>
             <h2>Mülk bazlı finansal performans</h2>
@@ -950,6 +972,7 @@
         <div class="settings-nav__group">Operasyon</div>
         <button type="button" class="settings-nav__item" data-settings-target="checklists" data-onclick="selectSettingsSection('checklists')"><span>Kontrol listeleri</span></button>
         <div class="settings-nav__group">Finans</div>
+        <button type="button" class="settings-nav__item" data-settings-target="income-categories" data-onclick="selectSettingsSection('income-categories')"><span>Gelir kategorileri</span></button>
         <button type="button" class="settings-nav__item" data-settings-target="expense-categories" data-onclick="selectSettingsSection('expense-categories')"><span>Gider kategorileri</span></button>
         <div class="settings-nav__group">Hesap</div>
         <button type="button" class="settings-nav__item" data-settings-target="danger" data-onclick="selectSettingsSection('danger')"><span>Veri ve hesap</span></button>
@@ -1089,37 +1112,23 @@
             <p class="sub-text">Sık kullandığınız metinleri ve işleri bir kez yazın, sonra tek tıkla kullanın. Her bölmenin altında nerede çıktığı yazar.</p>
           </div>
         </div>
-        <div class="settings-template-grid">
+        <!-- Notion tarzi (22.11.2026): sayfa listesi; satira dokununca sayfa acilir, "+ Yeni" bos sayfa. -->
+        <div class="settings-template-grid" id="settingsTemplatesHome">
           <section class="settings-template-pane">
-            <h3>Mesaj şablonları</h3>
-            <p class="sub-text settings-template-help">Misafire gönderdiğiniz hazır WhatsApp metinleri. <strong>Talepler</strong>de bir talebi düzenlerken seçip kopyalarsınız.</p>
-            <button type="button" class="settings-template-usage-link" data-onclick="switchTab('leads')">Taleplerde kullan →</button>
-            <form data-onsubmit="createSettingsMessageTemplate(event)" class="settings-inline-form">
-              <input name="name" maxlength="150" required placeholder="Şablon adı">
-              <textarea name="body" maxlength="4000" required placeholder="Örn: Merhaba, villamız için teklifimiz ektedir. Sorunuz olursa yazabilirsiniz."></textarea>
-              <select name="message_type" aria-label="Mesaj türü">
-                <option value="TRANSACTIONAL">İşlemsel — teklif, rezervasyon, giriş bilgisi</option>
-                <option value="MARKETING">Pazarlama — kampanya, indirim (misafirin kampanya izni gerekir)</option>
-              </select>
-              <button type="submit" class="btn btn-secondary btn-sm">+ Mesaj şablonu</button>
-            </form>
-            <div id="settingsMessageTemplatesList" class="settings-template-list"></div>
+            <div class="tp-pane-head"><h3>Mesaj şablonları</h3><button type="button" class="fox-add" data-onclick="openSettingsTemplatePage('message')">+ Yeni</button></div>
+            <p class="sub-text settings-template-help">Misafire gönderdiğiniz hazır WhatsApp metinleri. <button type="button" class="lex-link-inline" data-onclick="goTo('leads')">Talepler</button>de bir talebi düzenlerken seçip kopyalarsınız.</p>
+            <div id="settingsMessageTemplatesList" class="settings-template-list tp-list"></div>
           </section>
           <section class="settings-template-pane">
-            <h3>Görev şablonları</h3>
-            <p class="sub-text settings-template-help">Tekrarlayan işler (örn. havuz kontrolü). <strong>Operasyon → Görevler</strong>deki <strong>Hazır görev kütüphanesi</strong>nden tek tıkla göreve dönüşür.</p>
-            <button type="button" class="settings-template-usage-link" data-onclick="switchTab('operations'); setOperationsView('tasks')">Görevlerde kullan →</button>
-            <form data-onsubmit="createSettingsTaskTemplate(event)" class="settings-inline-form">
-              <input name="title" maxlength="200" required placeholder="Görev başlığı">
-              <select name="task_type"><option value="GENERAL">Genel</option><option value="CLEANING">Temizlik</option><option value="INSPECTION">Kontrol</option><option value="MAINTENANCE">Bakım</option></select>
-              <button type="submit" class="btn btn-secondary btn-sm">+ Görev şablonu</button>
-            </form>
-            <div id="settingsTaskTemplatesList" class="settings-template-list"></div>
+            <div class="tp-pane-head"><h3>Görev şablonları</h3><button type="button" class="fox-add" data-onclick="openSettingsTemplatePage('task')">+ Yeni</button></div>
+            <p class="sub-text settings-template-help">Tekrarlayan işler (örn. havuz kontrolü): başlıklar, yapılacaklar ve alt yapılacaklarla. <button type="button" class="lex-link-inline" data-onclick="goTo('operations:tasks')">Operasyon → Görevler</button>'de "Şablondan başla" ile tek tıkla sayfaya dönüşür.</p>
+            <div id="settingsTaskTemplatesList" class="settings-template-list tp-list"></div>
           </section>
         </div>
+        <div id="settingsTemplatePage" class="fox-subpage settings-template-page" hidden></div>
       </section>
 
-      <!-- Kontrol listeleri kendi bolumunde (M60, 9.5.3): Sablonlar kartinin ucte
+            <!-- Kontrol listeleri kendi bolumunde (M60, 9.5.3): Sablonlar kartinin ucte
            birlik bolmesinde sikisiyor, cizgiler alanlarin ustune biniyordu. -->
       <section class="card settings-section" data-settings-section="checklists" id="settingsChecklistsCard" data-lx-style="margin-bottom: 24px;">
         <div class="section-title-bar">
@@ -1127,11 +1136,12 @@
             <h2>Kontrol listeleri</h2>
             <p class="sub-text">Temizlik ve misafir öncesi son kontrol listesi. Bir kâğıt liste gibi yazın: bölüm başlığı, altında maddeler, maddenin altında alt kontroller. <strong>Zorunlu</strong> işaretli madde ve alt kontrolleri tamamlanmadan iş kapatılamaz.</p>
           </div>
-          <button type="button" class="btn btn-secondary btn-sm" data-onclick="switchTab('operations'); setOperationsView('cleaning')">Temizlikte kullan →</button>
+          <button type="button" class="fox-add" id="settingsChecklistNewButton" data-onclick="openSettingsChecklistPage()">+ Yeni liste</button>
         </div>
-        <form id="settingsChecklistTemplateForm" data-onsubmit="createSettingsChecklistTemplate(event)" class="checklist-builder-form">
+        <form id="settingsChecklistTemplateForm" data-onsubmit="createSettingsChecklistTemplate(event)" class="checklist-builder-form fox-subpage" hidden>
+          <button type="button" class="fox-back" data-onclick="cancelSettingsChecklistEdit()">← Kontrol listeleri</button>
           <div class="checklist-builder-meta">
-            <div class="form-group"><label for="settingsChecklistName">Liste adı</label><input id="settingsChecklistName" name="template_name" maxlength="150" required placeholder="Örn. Standart temizlik"></div>
+            <div class="form-group checklist-title-field"><label for="settingsChecklistName" class="sr-only">Liste adı</label><input id="settingsChecklistName" class="tp-title" name="template_name" maxlength="150" required placeholder="Liste adı (örn. Standart temizlik)"></div>
             <div class="form-group"><label for="settingsChecklistType">Kullanım</label><select id="settingsChecklistType" name="task_type" data-onchange="toggleSettingsChecklistSupplyVisibility(); renderSettingsChecklistMergePreview()"><option value="CLEANING">Temizlik</option><option value="CHECKIN_PREP">Misafir öncesi son kontrol</option></select></div>
             <div class="form-group"><label for="settingsChecklistProperty">Kapsam</label><select id="settingsChecklistProperty" name="property_id" data-onchange="renderSettingsChecklistMergePreview()"><option value="">Tüm mülkler</option></select></div>
           </div>
@@ -1153,10 +1163,30 @@
               <button type="button" class="checklist-doc-add" data-onclick="addChecklistBuilderSupply()">+ Malzeme ekle</button>
             </section>
           </div>
-          <div class="checklist-builder-submit"><button id="settingsChecklistSubmitButton" type="submit" class="btn btn-primary btn-sm">Kontrol listesini kaydet</button><button id="settingsChecklistCancelButton" type="button" class="btn btn-secondary btn-sm" data-onclick="cancelSettingsChecklistEdit()" hidden>Vazgeç</button></div>
+          <div class="checklist-builder-submit"><button id="settingsChecklistSubmitButton" type="submit" class="btn btn-primary btn-sm">Kontrol listesini kaydet</button><button id="settingsChecklistCancelButton" type="button" class="btn btn-secondary btn-sm" data-onclick="cancelSettingsChecklistEdit()" hidden>Vazgeç</button><button id="settingsChecklistArchiveButton" type="button" class="btn btn-secondary btn-sm" data-onclick="archiveOpenSettingsChecklist()" hidden>Arşivle</button></div>
         </form>
-        <h3 class="checklist-saved-title">Kayıtlı listeler</h3>
-        <div id="settingsChecklistTemplatesList" class="settings-template-list"></div>
+        <div id="settingsChecklistHome">
+          <h3 class="checklist-saved-title">Kayıtlı listeler</h3>
+          <p class="sub-text">Bir listeye dokununca sayfası açılır. Temizlik listesi, o eve temizlikçi atanınca göreve kendiliğinden eklenir. <button type="button" class="lex-link-inline" data-onclick="goTo('operations:cleaning')">Temizlikte kullan</button></p>
+          <div id="settingsChecklistTemplatesList" class="settings-template-list tp-list"></div>
+        </div>
+      </section>
+
+      <!-- Gelir kategorileri (22.11.2026, phase125): yalniz "Diger gelir" kayitlari icin; sermaye girisi gelir degildir. -->
+      <section class="card settings-section" data-settings-section="income-categories" id="settingsIncomeCategoriesCard" data-lx-style="margin-bottom:24px;">
+        <div class="section-title-bar">
+          <div><h2>Gelir kategorileri</h2><p class="sub-text">Rezervasyon dışı gelirin türü (transfer, ekstra hizmet, hasar bedeli…). Finans → Gelirler'de kategoriye göre toplanır. Konaklama geliri rezervasyondan gelir; sermaye girişi gelir değildir, kategorisi yoktur.</p></div>
+        </div>
+        <form data-onsubmit="createSettingsIncomeCategory(event)" class="settings-source-form">
+          <div class="form-group"><label for="settingsIncomeCategoryName">Yeni kategori</label><input id="settingsIncomeCategoryName" maxlength="60" required placeholder="Örn: Tekne turu"></div>
+          <button type="submit" class="btn btn-primary btn-sm">+ Kategori ekle</button>
+        </form>
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead><tr><th>Kategori</th><th>Kullanım</th><th data-lx-style="text-align:right;">İşlem</th></tr></thead>
+            <tbody id="settingsIncomeCategoriesBody"></tbody>
+          </table>
+        </div>
       </section>
 
       <section class="card settings-section" data-settings-section="expense-categories" id="settingsExpenseCategoriesCard" data-lx-style="margin-bottom:24px;">
@@ -1721,6 +1751,10 @@
               <option value="CAPITAL">Sermaye / ortak girişi (yatırım, nakit dengeleme)</option>
             </select>
             <div id="incomeTypeHint" class="form-hint"></div>
+          </div>
+          <div class="form-group" id="incCategoryGroup">
+            <label for="incCategory">Kategori</label>
+            <select id="incCategory"><option value="">Kategori seçin (isteğe bağlı)</option></select>
           </div>
           <div class="form-group">
             <label for="incVilla">İlgili Mülk / Kapsam</label>
@@ -2802,7 +2836,7 @@
             <div class="step-num-icon">3</div>
             <div class="step-body">
               <h4>Yönetici kontrolü (M)</h4>
-              <p>Yönetici işi kontrol edip <strong>M Onayla</strong> der. Temizlik maliyeti ancak bu anda gider ve personele borç olur; tarihi temizliğin yapıldığı gündür.</p>
+              <p>Temizlik sayfasında her maddede iki kutu vardır: <strong>Temizlikçi</strong> (yaptım) ve <strong>Kontrol</strong> (sizin kontrolünüz); ikiniz de aynı anda işaretlersiniz, işaret karşı ekranda hemen görünür. Temizlikçi bitirince siz <strong>Onayla (gider oluşur)</strong> dersiniz. Temizlik maliyeti ancak bu anda gider ve personele borç olur; tarihi temizliğin yapıldığı gündür.</p>
             </div>
           </div>
           <div class="help-step-item">
@@ -3223,7 +3257,7 @@
         <div class="form-grid">
           <div class="form-group">
             <label>Villa / Mülk</label>
-            <select id="hkVilla" required>
+            <select id="hkVilla" required data-onchange="renderCleaningChecklistPreview()">
               <!-- updateAllVillaDropdowns() musterinin mulkleriyle doldurur -->
             </select>
           </div>
@@ -3233,13 +3267,14 @@
           </div>
           <div class="form-group">
             <label>Temizlik Personeli / Ekip</label>
-            <input type="text" id="hkCleaner" list="hkCleanerOptions" placeholder="Listeden seçin ya da adı yazın" required>
+            <input type="text" id="hkCleaner" list="hkCleanerOptions" placeholder="Listeden seçin ya da adı yazın" required data-onchange="renderCleaningChecklistPreview()">
             <datalist id="hkCleanerOptions"></datalist>
           </div>
           <div class="form-group">
             <label>Temizlik Ücreti (TL)</label>
             <input type="number" id="hkAmount" step="0.01" min="0" placeholder="1500" required data-lx-style="font-weight: 700; color: #409CFF; font-size: 15px;">
           </div>
+          <div class="form-group full-width cleaning-checklist-preview" id="hkChecklistPreview" aria-live="polite"></div>
           <div class="form-group full-width">
             <label>Açıklama / Misafir Çıkışı</label>
             <input type="text" id="hkDesc" placeholder="Örn: Hakan Demir çıkışı sonrası rutin temizlik ve nevresim">
@@ -3526,7 +3561,7 @@
   <script src="core/mobile_shell.js?v=8979ea0a"></script>
   <script src="core/notification_feed.js?v=941306f6"></script>
   <script src="core/command_search.js?v=1b9dbcc9"></script>
-  <script src="core/action_dispatch.js?v=eb0172ac"></script>
+  <script src="core/action_dispatch.js?v=04f014d1"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=9b3127c9"></script>
   <script src="core/permission_matrix.js?v=e3a3cef2"></script>
@@ -3536,8 +3571,8 @@
   <script src="core/lex_ui.js?v=950d5fdd"></script>
   <script src="core/color_picker.js?v=8457ca4c"></script>
   <script src="core/task_page.js?v=83a423dc"></script>
-  <script src="app.js?v=9d5f96fd"></script>
+  <script src="app.js?v=28b0a5b9"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
-  <script src="core/marketing_ui.js?v=26927afc"></script>
+  <script src="core/marketing_ui.js?v=18887ae8"></script>
 </body>
 </html>

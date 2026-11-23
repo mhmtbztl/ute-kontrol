@@ -451,6 +451,25 @@ function getCustomExpenseCategories() {
   }));
 }
 
+// Gelir kategorileri (phase125): tenant_settings 'income_categories' = [{ name }]. Standart
+// adlar gorunum varsayilanidir; gelir satiri adi metin olarak tasir (silinse de kayit korur).
+const STANDARD_INCOME_CATEGORIES = ['Ekstra hizmet', 'Transfer', 'Hasar bedeli', 'Erken giriş / geç çıkış'];
+
+function getIncomeCategories() {
+  const raw = (typeof appData !== 'undefined' && appData && appData.tenantSettings) ? appData.tenantSettings.income_categories : null;
+  const gorulen = new Set();
+  const liste = [];
+  STANDARD_INCOME_CATEGORIES.forEach(ad => { gorulen.add(expenseCategoryKey(ad)); liste.push({ name: ad, custom: false }); });
+  (Array.isArray(raw) ? raw : []).forEach(c => {
+    const ad = String(c && c.name || '').trim();
+    const k = expenseCategoryKey(ad);
+    if (!ad || !k || gorulen.has(k)) return;
+    gorulen.add(k);
+    liste.push({ name: ad, custom: true });
+  });
+  return liste;
+}
+
 function getExpenseCategories() {
   const diger = EXPENSE_CATEGORIES[EXPENSE_CATEGORIES.length - 1];
   return [...EXPENSE_CATEGORIES.slice(0, -1), ...getCustomExpenseCategories(), diger];
@@ -5657,6 +5676,23 @@ function renderFinanceModule() {
   // Gelirler karti (phase97): ayni defterden
   renderIncomeSection(ledger);
 
+  // Fox: sayfa satirlari ayni rakamlari tasir (tek kaynak: defter). Zarar kirmizi kartta.
+  const tlFox = v => `${Math.round(v || 0).toLocaleString('tr-TR')} TL`;
+  setEl('finIncomeLinkVal', tlFox(ledger.totalRevenue));
+  setEl('finIncomeLinkSub', [`Konaklama ${tlFox(ledger.netRoomRevenue)}`, ledger.cleaningRevenue > 0 ? `Temizlik ${tlFox(ledger.cleaningRevenue)}` : '', ledger.otherIncome > 0 ? `Diğer ${tlFox(ledger.otherIncome)}` : ''].filter(Boolean).join(' · '));
+  setEl('finExpensesLinkVal', tlFox(totalExpense));
+  setEl('finExpensesLinkSub', karOlculemez ? 'Bu dönem için gider kaydı yok' : `Operasyonel ${tlFox(totalOpex)} · Yatırım ${tlFox(totalCapex)}`);
+  if (typeof document !== 'undefined') {
+    const karKarti = document.getElementById('finProfitCard');
+    if (karKarti && karKarti.classList) {
+      const zarar = !karOlculemez && netCashProfit < 0;
+      karKarti.classList.toggle('fox-card--expense', zarar);
+      karKarti.classList.toggle('fox-card--income', !zarar && !karOlculemez);
+      karKarti.classList.toggle('fox-card--neutral', !!karOlculemez);
+    }
+  }
+  renderFinanceView();
+
   // Render Property Finance Scorecards
   renderPropertyFinanceCards(propStats, ciro);
 
@@ -5694,7 +5730,7 @@ function renderExpenseDonutAndTable(categoryTotals, totalExpense, totalRevenue, 
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     path.setAttribute('d', pathData);
     path.setAttribute('fill', cat.color);
-    path.setAttribute('stroke', '#1C1C1E');
+    path.style.stroke = 'var(--lx-bg)';
     path.setAttribute('stroke-width', '2');
     path.innerHTML = `<title>${escapeHtml(cat.name)}: ${amt.toLocaleString('tr-TR')} TL (%${((amt/totalExpense)*100).toFixed(1)})</title>`;
     svg.appendChild(path);
@@ -5707,7 +5743,7 @@ function renderExpenseDonutAndTable(categoryTotals, totalExpense, totalRevenue, 
   innerCircle.setAttribute('cx', cx);
   innerCircle.setAttribute('cy', cy);
   innerCircle.setAttribute('r', '50');
-  innerCircle.setAttribute('fill', '#1C1C1E');
+  innerCircle.style.fill = 'var(--lx-bg)';
   svg.appendChild(innerCircle);
 
   // Category Table
@@ -5726,39 +5762,73 @@ function renderExpenseDonutAndTable(categoryTotals, totalExpense, totalRevenue, 
     const shareRev = totalRevenue > 0 ? (amt / totalRevenue) * 100 : 0;
     const deltaStr = formatMoMDelta(amt, prevCategoryTotals[cat.name] || 0);
 
-    const acik = expandedExpenseCategory === cat.name;
     const tr = document.createElement('tr');
     tr.className = 'clickable-row';
-    tr.onclick = () => toggleExpenseCategoryRows(cat.name);
+    tr.setAttribute('data-onclick', `setFinanceView('category', decodeURIComponent('${encodeActionArg(cat.name)}'))`);
     tr.innerHTML = `
-      <td><span class="cat-dot" style="background:${cat.color};"></span> <strong>${escapeHtml(cat.name)}</strong> <span style="color: var(--text-muted); font-size: 11px;">${acik ? '▾' : '▸'}</span></td>
+      <td><span class="cat-dot" style="background:${cat.color};"></span> <strong>${escapeHtml(cat.name)}</strong></td>
       <td><strong>${Math.round(amt).toLocaleString('tr-TR')} TL</strong></td>
       <td>%${shareExpense.toFixed(1)}</td>
       <td>%${shareRev.toFixed(1)}</td>
       <td><span class="${deltaStr.includes('↑') ? 'text-rose' : 'text-emerald'}">${deltaStr}</span></td>
-      <td style="text-align: right;"><button class="btn-text" data-onclick="filterExpensesByCategory(decodeURIComponent('${encodeActionArg(cat.name)}'), event)">Detay ›</button></td>
+      <td style="text-align: right;"><span class="fox-chevron" aria-hidden="true">›</span></td>
     `;
     tbody.appendChild(tr);
-    if (acik) {
-      const detay = document.createElement('tr');
-      detay.className = 'expense-category-detail-row';
-      detay.innerHTML = `<td colspan="6">${expenseCategoryRowsHtml(cat.name)}</td>`;
-      tbody.appendChild(detay);
-    }
   });
 }
 
-// Gider analizinde kategori satiri yerinde acilir: kayitlar Giderler sayfasina
-// gitmeden duzenlenir/silinir (kullanici, 19.10.2026). Esleme grafikle ayni
-// (eslesenGiderKategorisi); otomatik kalemler (komisyon, temizlik maliyeti)
-// gider defterinde satir degildir, burada yalniz not olarak gecer.
-let expandedExpenseCategory = null;
+// =============================================================
+// FINANS ALT SAYFALARI (Fox, kullanici 22.11.2026): ana gorunum · Gelirler · Giderler ·
+// tek gider kategorisi. Her rakamin kayitlari kendi sayfasinda duzenlenir; ekleme
+// dugmesi sayfanin altindadir. Rakamlar yine renderFinanceModule'dan (tek defter).
+// =============================================================
+const FINANCE_VIEWS = ['main', 'income', 'expenses', 'category'];
+let financeView = 'main';
+let financeCategory = null;
 
-function toggleExpenseCategoryRows(catName) {
-  expandedExpenseCategory = expandedExpenseCategory === catName ? null : catName;
-  renderFinanceModule();
+function setFinanceView(view, key = null) {
+  if (!FINANCE_VIEWS.includes(view)) return false;
+  if (view === 'category' && !getExpenseCategories().some(c => c.name === key)) return false;
+  financeView = view;
+  financeCategory = view === 'category' ? key : null;
+  renderFinanceView();
+  if (typeof window !== 'undefined' && window.scrollTo) {
+    try { window.scrollTo({ top: 0 }); } catch (e) { /* eski tarayici */ }
+  }
+  return true;
 }
 
+function renderFinanceView() {
+  if (typeof document === 'undefined') return;
+  const goster = (id, acik) => { const el = document.getElementById(id); if (el) el.hidden = !acik; };
+  goster('finMain', financeView === 'main');
+  goster('finPropertySection', financeView === 'main');
+  goster('screenTasks_finance', financeView === 'main' && !!document.getElementById('screenTasks_finance')?.innerHTML);
+  goster('finSubIncome', financeView === 'income');
+  goster('finSubExpenses', financeView === 'expenses');
+  goster('finSubCategory', financeView === 'category');
+  if (financeView !== 'category' || !financeCategory) return;
+  const cat = getExpenseCategories().find(c => c.name === financeCategory);
+  setEl('finSubCategoryTitle', financeCategory);
+  setEl('finSubCategoryNote', cat ? `${cat.type === 'CAPEX' ? 'Yatırım (CAPEX)' : 'Operasyonel (OPEX)'} · seçili dönemin kayıtları. Bir kaydı düzenlemek için ✏️, silmek için 🗑️.` : '—');
+  const govde = document.getElementById('finSubCategoryBody');
+  if (govde) govde.innerHTML = expenseCategoryRowsHtml(financeCategory);
+}
+
+// Kategori sayfasindan "+ Gider ekle": form acilir, kategori secili gelir.
+function openExpenseForFinanceCategory() {
+  openExpenseModal();
+  const secici = typeof document !== 'undefined' ? document.getElementById('expCategory') : null;
+  if (secici && financeCategory && [...(secici.options || [])].some(o => o.value === financeCategory)) {
+    secici.value = financeCategory;
+    if (typeof secici.dispatchEvent === 'function' && typeof Event === 'function') secici.dispatchEvent(new Event('change'));
+  }
+  return true;
+}
+
+// Kategori sayfasi kayitlari: gider defterinden duzenlenir/silinir (kullanici, 19.10.2026).
+// Esleme grafikle ayni (eslesenGiderKategorisi); otomatik kalemler (komisyon, temizlik
+// maliyeti) gider defterinde satir degildir, burada yalniz not olarak gecer.
 function expenseCategoryRowsHtml(catName) {
   const rows = (appData.expenses || [])
     .filter(exp => isExpenseInFilter(exp) && eslesenGiderKategorisi(exp.category) === catName)
@@ -5766,7 +5836,11 @@ function expenseCategoryRowsHtml(catName) {
   const otomatik = catName === 'Temizlik'
     ? 'Yapılmış temizliklerin maliyeti Operasyon’dan gelir; burada düzenlenmez.'
     : (catName === 'Kredi Kartı / Komisyon' ? 'Rezervasyon ve ödeme komisyonları rezervasyondan gelir; burada düzenlenmez.' : '');
-  const not = otomatik ? `<p class="expense-category-detail-note">${escapeHtml(otomatik)}</p>` : '';
+  // Temizlik maliyeti gider defterinde durmaz (K-04): sayfa temizlik gecmisine baglanir.
+  const git = catName === 'Temizlik'
+    ? ` <button type="button" class="lex-link-inline" data-onclick="goTo('operations:cleaning')">Temizlik geçmişini aç</button>`
+    : (catName === 'Kredi Kartı / Komisyon' ? ` <button type="button" class="lex-link-inline" data-onclick="goTo('reservations')">Rezervasyonları aç</button>` : '');
+  const not = otomatik ? `<p class="expense-category-detail-note">${escapeHtml(otomatik)}${git}</p>` : '';
   if (!rows.length) return `${not}<p class="expense-category-detail-note">Bu kategoride elle girilmiş gider kaydı yok.</p>`;
   const yonetir = canManageTenantRole(activeTenant?.role);
   const satirlar = rows.map(exp => {
@@ -5811,7 +5885,8 @@ function mapIncomeEntryFromDb(row, villas) {
     date,
     month: date.slice(0, 7),
     amount: roundMoney(row.amount),
-    description: row.description || ''
+    description: row.description || '',
+    category: row.income_type === 'CAPITAL' ? null : (row.category || null)
   };
 }
 
@@ -5855,12 +5930,16 @@ function openIncomeModal(editId = null) {
   document.getElementById('incDate').value = kayit ? kayit.date : getTodayStr();
   document.getElementById('incAmount').value = kayit ? kayit.amount : '';
   document.getElementById('incDesc').value = kayit ? kayit.description : '';
+  renderIncomeCategoryOptions(kayit ? (kayit.category || '') : '');
   updateIncomeTypeHint(document.getElementById('incType').value);
   modal.classList.add('active');
   return true;
 }
 
 function updateIncomeTypeHint(type) {
+  // Sermaye gelir degildir: kategorisi yoktur.
+  const grup = typeof document !== 'undefined' ? document.getElementById('incCategoryGroup') : null;
+  if (grup) grup.hidden = type === 'CAPITAL';
   setEl('incomeTypeHint', type === 'CAPITAL'
     ? 'Sermaye gelir değildir: kâra ve ciroya girmez, ayrı "sermaye girişi" olarak görünür.'
     : 'Toplam gelire ve kâra girer; ciroya (konaklama geliri) girmez.');
@@ -5885,6 +5964,8 @@ async function saveIncomeEntry(event) {
       amount: roundMoney(document.getElementById('incAmount')?.value),
       description: (document.getElementById('incDesc')?.value || '').trim()
     };
+    const kategori = String(document.getElementById('incCategory')?.value || '').trim();
+    if (payload.income_type === 'OTHER_INCOME' && kategori) payload.category = kategori.slice(0, 60);
     if (villa !== 'ALL' && !payload.property_id) throw new Error('Seçilen mülk bulunamadı.');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(payload.income_date)) throw new Error('Geçerli bir tarih girin.');
     if (!(payload.amount > 0)) throw new Error('Tutar sıfırdan büyük olmalı.');
@@ -5893,11 +5974,19 @@ async function saveIncomeEntry(event) {
     const eski = editId ? (appData.incomeEntries || []).find(i => i.id === editId) : null;
     if (eski && isPeriodClosed(eski.date)) throw new Error(`Bu kayıt kapatılmış döneme (${eski.month}) ait; değiştirilemez.`);
 
-    const sorgu = editId
-      ? supabaseClient.from('income_entries').update(payload).eq('id', editId).eq('tenant_id', tenantId)
-      : supabaseClient.from('income_entries').insert({ ...payload, tenant_id: tenantId });
-    const { data, error } = await sorgu.select().single();
+    const yaz = body => (editId
+      ? supabaseClient.from('income_entries').update(body).eq('id', editId).eq('tenant_id', tenantId)
+      : supabaseClient.from('income_entries').insert({ ...body, tenant_id: tenantId })).select().single();
+    let { data, error } = await yaz(payload);
+    // phase125 yoksa (category sutunu yok) kayit kategorisiz yapilir ve soylenir; gelir kaydi kirilmaz.
+    let kategoriYok = false;
+    if (error && 'category' in payload && /category|42703|PGRST204/i.test(`${error.code || ''} ${error.message || ''}`)) {
+      const { category, ...kategorisiz } = payload;
+      ({ data, error } = await yaz(kategorisiz));
+      kategoriYok = !error;
+    }
     if (error) throw error;
+    if (kategoriYok && typeof showToast === 'function') showToast('Gelir kaydedildi; kategori için veritabanı güncellemesi (phase125) henüz uygulanmadı, kategori kaydedilmedi.', 'info');
     const kayit = mapIncomeEntryFromDb(data);
     appData.incomeEntries = [kayit, ...(appData.incomeEntries || []).filter(i => i.id !== kayit.id)];
     closeIncomeModal();
@@ -5943,6 +6032,13 @@ function renderIncomeSection(ledger) {
   if (temizlikSatiri) temizlikSatiri.hidden = !(ledger.cleaningRevenue > 0);
   setEl('incomeCleaningVal', tl(ledger.cleaningRevenue));
   setEl('incomeOtherVal', tl(ledger.otherIncome));
+  const kategoriToplam = {};
+  (appData.incomeEntries || []).filter(i => i.type === 'OTHER_INCOME' && isExpenseInFilter(i)).forEach(i => {
+    const ad = i.category || 'Kategorisiz';
+    kategoriToplam[ad] = (kategoriToplam[ad] || 0) + (Number(i.amount) || 0);
+  });
+  const dagilim = Object.entries(kategoriToplam).sort((x, y) => y[1] - x[1]).map(([ad, t]) => `${ad} ${tl(t)}`).join(' · ');
+  setEl('incomeOtherBreakdown', dagilim || 'Elle girilen');
   setEl('incomeTotalVal', tl(ledger.totalRevenue));
   setEl('incomeCapitalVal', tl(ledger.capitalIn));
 
@@ -5961,7 +6057,7 @@ function renderIncomeSection(ledger) {
   const yonetir = canWriteLedgerRole(activeTenant?.role);
   govde.innerHTML = satirlar.map(i => `<tr>
       <td>${formatTrDate(i.date)}</td>
-      <td><span class="badge ${i.type === 'CAPITAL' ? 'badge-amber' : 'badge-green'}">${escapeHtml(INCOME_TYPE_LABELS[i.type])}</span></td>
+      <td><span class="badge ${i.type === 'CAPITAL' ? 'badge-amber' : 'badge-green'}">${escapeHtml(INCOME_TYPE_LABELS[i.type])}</span>${i.category ? `<small class="income-category-label">${escapeHtml(i.category)}</small>` : ''}</td>
       <td>${escapeHtml(i.villa === 'ALL' ? 'Tüm Portföy' : (appData.villas[i.villa]?.name || i.villa))}</td>
       <td>${escapeHtml(i.description || '-')}</td>
       <td><strong>${Number(i.amount).toLocaleString('tr-TR')} TL</strong></td>
@@ -5970,22 +6066,6 @@ function renderIncomeSection(ledger) {
     </tr>`).join('');
 }
 
-function filterExpensesByCategory(catName, clickEvent) {
-  if (clickEvent && typeof clickEvent.stopPropagation === 'function') clickEvent.stopPropagation();
-  // Temizlik maliyeti gider defterinde durmaz; yapilmis temizlik gorevlerinden
-  // gelir (K-04). Eskiden bu satir gider defterine gidiyordu: orada silinecek
-  // satir yoktu ve ekranin ustunde sablon formu duruyordu.
-  if (catName === 'Temizlik') {
-    switchTab('operations');
-    setOperationsView('cleaning');
-    document.getElementById('opsCleaningHistory')?.scrollIntoView({ block: 'start' });
-    return;
-  }
-  switchTab('expenses');
-  document.getElementById('expSearchInput').value = catName;
-  renderExpensesTable();
-  document.getElementById('expensesTableBody')?.closest('section, .card')?.scrollIntoView({ block: 'start' });
-}
 
 
 function filterByVilla(vKey) {
@@ -6351,6 +6431,73 @@ async function saveCustomExpenseCategories(liste) {
   if (!appData.tenantSettings) appData.tenantSettings = {};
   appData.tenantSettings.expense_categories = liste;
   renderSettingsExpenseCategories();
+}
+
+function renderSettingsIncomeCategories() {
+  const body = typeof document !== 'undefined' ? document.getElementById('settingsIncomeCategoriesBody') : null;
+  if (!body) return;
+  const kullanim = {};
+  (appData?.incomeEntries || []).forEach(i => { if (i.category) { const k = expenseCategoryKey(i.category); kullanim[k] = (kullanim[k] || 0) + 1; } });
+  body.innerHTML = getIncomeCategories().map(cat => {
+    const adet = kullanim[expenseCategoryKey(cat.name)] || 0;
+    const islem = cat.custom
+      ? `<button type="button" class="btn btn-danger btn-sm" data-onclick="deleteCustomIncomeCategory(decodeURIComponent('${encodeActionArg(cat.name)}'))">Sil</button>`
+      : '<span class="sub-text">Standart</span>';
+    return `<tr><td><strong>${escapeHtml(cat.name)}</strong></td><td>${adet ? `${adet} kayıt` : '—'}</td><td style="text-align:right">${islem}</td></tr>`;
+  }).join('');
+}
+
+async function saveCustomIncomeCategories(liste) {
+  await cloudSaveTenantSetting('income_categories', liste);
+  if (!appData.tenantSettings) appData.tenantSettings = {};
+  appData.tenantSettings.income_categories = liste;
+  renderSettingsIncomeCategories();
+  renderIncomeCategoryOptions();
+}
+
+async function createSettingsIncomeCategory(event) {
+  if (event && typeof event.preventDefault === 'function') event.preventDefault();
+  const input = typeof document !== 'undefined' ? document.getElementById('settingsIncomeCategoryName') : null;
+  const ad = String(input?.value || '').trim().replace(/\s+/g, ' ');
+  if (!ad) { showToast('Kategori adı girin.', 'error'); return false; }
+  if (ad.length > 60) { showToast('Kategori adı en fazla 60 karakter olabilir.', 'error'); return false; }
+  const k = expenseCategoryKey(ad);
+  if (!k) { showToast('Kategori adı harf ya da rakam içermeli.', 'error'); return false; }
+  const mevcut = getIncomeCategories().find(c => expenseCategoryKey(c.name) === k);
+  if (mevcut) { showToast(`"${mevcut.name}" kategorisi zaten var.`, 'error'); return false; }
+  const liste = getIncomeCategories().filter(c => c.custom).map(c => ({ name: c.name })).concat({ name: ad });
+  if (liste.length > 40) { showToast('En fazla 40 özel kategori eklenebilir.', 'error'); return false; }
+  try {
+    await saveCustomIncomeCategories(liste);
+  } catch (error) {
+    showToast('Kategori kaydedilemedi: ' + kullaniciMesaji(error?.message || ''), 'error');
+    return false;
+  }
+  if (input) input.value = '';
+  showToast(`"${ad}" gelir kategorisi eklendi.`, 'success');
+  return true;
+}
+
+async function deleteCustomIncomeCategory(name) {
+  if (!(await uiAskConfirm({ message: `"${name}" kategorisi silinsin mi? Eski gelir kayıtları adını korur.`, okText: 'Kategoriyi sil', danger: true }))) return false;
+  const liste = getIncomeCategories().filter(c => c.custom && c.name !== name).map(c => ({ name: c.name }));
+  try {
+    await saveCustomIncomeCategories(liste);
+    showToast(`"${name}" kategorisi silindi.`, 'success');
+    return true;
+  } catch (error) {
+    showToast('Kategori silinemedi: ' + kullaniciMesaji(error?.message || ''), 'error');
+    return false;
+  }
+}
+
+function renderIncomeCategoryOptions(selected = null) {
+  const select = typeof document !== 'undefined' ? document.getElementById('incCategory') : null;
+  if (!select) return;
+  const secili = selected === null ? select.value : String(selected || '');
+  const adlar = getIncomeCategories().map(c => c.name);
+  if (secili && !adlar.includes(secili)) adlar.push(secili); // silinmis kategoriyi tasiyan eski kayit
+  select.innerHTML = '<option value="">Kategori seçin (isteğe bağlı)</option>' + adlar.map(ad => `<option value="${escapeHtml(ad)}"${ad === secili ? ' selected' : ''}>${escapeHtml(ad)}</option>`).join('');
 }
 
 function renderSettingsExpenseCategories() {
@@ -10824,6 +10971,7 @@ async function renderSettingsWorkspace() {
   renderBookingChannelSettings();
   renderSettingsTemplates();
   renderSettingsExpenseCategories();
+  renderSettingsIncomeCategories();
   renderSettingsLeadSources();
   // renderAll her cagrida 4 katalog istiyordu (L-148d). Yazmalar ve sekme
   // acilisi kendi yuklemesini yapar; burada 60 sn onbellek yeter.
@@ -11133,10 +11281,33 @@ function renderSettingsChecklistMergePreview() {
   return true;
 }
 
+// Kontrol listesi sayfasi: liste ve duzenleyici ayni anda gorunmez (Notion gibi sayfa).
+function showSettingsChecklistPage(open) {
+  if (typeof document === 'undefined') return false;
+  const form = document.getElementById('settingsChecklistTemplateForm');
+  const home = document.getElementById('settingsChecklistHome');
+  const yeni = document.getElementById('settingsChecklistNewButton');
+  if (form) form.hidden = !open;
+  if (home) home.hidden = !!open;
+  if (yeni) yeni.hidden = !!open;
+  const arsiv = document.getElementById('settingsChecklistArchiveButton');
+  if (arsiv && !open) arsiv.hidden = true;
+  return true;
+}
+
+function openSettingsChecklistPage() {
+  cancelSettingsChecklistEdit();
+  showSettingsChecklistPage(true);
+  const ad = typeof document !== 'undefined' ? document.getElementById('settingsChecklistName') : null;
+  if (ad && ad.focus) ad.focus();
+  return true;
+}
+
 function cancelSettingsChecklistEdit() {
   settingsChecklistEditorId = null;
   const form = typeof document !== 'undefined' ? document.getElementById('settingsChecklistTemplateForm') : null;
   if (!form) return false;
+  showSettingsChecklistPage(false);
   form.reset();
   renderSettingsChecklistPropertyOptions('');
   renderSettingsChecklistBuilder(defaultSettingsChecklistDraft());
@@ -11156,6 +11327,7 @@ function startEditingSettingsChecklist(id) {
   }
   const form = document.getElementById('settingsChecklistTemplateForm');
   if (!form) return false;
+  showSettingsChecklistPage(true);
   settingsChecklistEditorId = id;
   form.elements.template_name.value = item.template_name || '';
   form.elements.task_type.value = item.task_type === 'CHECKIN_PREP' ? 'CHECKIN_PREP' : 'CLEANING';
@@ -11166,8 +11338,16 @@ function startEditingSettingsChecklist(id) {
   const cancel = document.getElementById('settingsChecklistCancelButton');
   if (submit) submit.textContent = 'Değişiklikleri kaydet';
   if (cancel) cancel.hidden = false;
+  const arsiv = document.getElementById('settingsChecklistArchiveButton');
+  if (arsiv) { arsiv.hidden = false; arsiv.textContent = item.is_active === false ? 'Yeniden etkinleştir' : 'Arşivle'; }
   form.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
   return true;
+}
+
+function archiveOpenSettingsChecklist() {
+  const item = settingsChecklistEditorId ? getSettingsTemplate('checklist', settingsChecklistEditorId) : null;
+  if (!item) return false;
+  return archiveSettingsTemplate('checklist', item.id, item.is_active === false);
 }
 
 async function loadSettingsCatalogs() {
@@ -11185,6 +11365,12 @@ async function loadSettingsCatalogs() {
   appData.settingsLeadSources = sources || [];
   settingsCatalogsLoadedFor = { tenantId, at: Date.now() };
   return true;
+}
+
+// Notion tarzi satir: dokununca sayfa acilir; arsivleme sayfanin icinde.
+function settingsTemplatePageRowHtml(kind, item, title, meta) {
+  const kapali = item.is_active === false;
+  return `<button type="button" class="tp-list__row${kapali ? ' is-archived' : ''}" data-onclick="editSettingsTemplate(decodeURIComponent('${encodeActionArg(kind)}'), decodeURIComponent('${encodeActionArg(item.id)}'))"><span class="tp-list__title">${escapeHtml(title || 'Adsız şablon')}</span><span class="tp-list__meta">${escapeHtml(meta || '')}</span></button>`;
 }
 
 function settingsTemplateRowHtml(kind, item, title, meta) {
@@ -11212,19 +11398,79 @@ function renderSettingsTemplates() {
   const checklistBuilder = document.getElementById('settingsChecklistBuilder');
   if (checklistBuilder && checklistBuilder.dataset.ready !== 'true') renderSettingsChecklistBuilder(defaultSettingsChecklistDraft());
   if (messageList) messageList.innerHTML = messages.length
-    ? messages.map(item => settingsTemplateRowHtml('message', item, item.name, `${String(item.channel || 'WHATSAPP').toUpperCase() === 'WHATSAPP' ? 'WhatsApp' : (item.channel || '—')} · ${String(item.lifecycle_stage || 'MANUAL').toUpperCase() === 'MANUAL' ? 'elle gönderilir' : 'otomatik'} · ${String(item.message_type || '').toUpperCase() === 'MARKETING' ? 'pazarlama (kampanya izni gerekir)' : 'işlemsel'}${item.is_active === false ? ' · Kapalı' : ''}`)).join('')
+    ? messages.map(item => settingsTemplatePageRowHtml('message', item, item.name, `${String(item.channel || 'WHATSAPP').toUpperCase() === 'WHATSAPP' ? 'WhatsApp' : (item.channel || '—')} · ${String(item.lifecycle_stage || 'MANUAL').toUpperCase() === 'MANUAL' ? 'elle gönderilir' : 'otomatik'} · ${String(item.message_type || '').toUpperCase() === 'MARKETING' ? 'pazarlama (kampanya izni gerekir)' : 'işlemsel'}${item.is_active === false ? ' · Kapalı' : ''}`)).join('')
     : '<div class="empty-state">Mesaj şablonu yok.</div>';
   if (taskList) taskList.innerHTML = tasks.length
-    ? tasks.map(item => settingsTemplateRowHtml('task', item, item.title, `${TEMPLATE_TASK_TYPE_LABELS[item.task_type] || 'Genel'} · ${TEMPLATE_PRIORITY_LABELS[item.priority] || 'orta öncelik'}${item.is_active === false ? ' · Kapalı' : ''}`)).join('')
+    ? tasks.map(item => {
+      const madde = (getTaskPageApi()?.storedProgress(item.default_checklist) || { total: 0 }).total;
+      return settingsTemplatePageRowHtml('task', item, item.title, `${TEMPLATE_TASK_TYPE_LABELS[item.task_type] || 'Genel'} · ${TEMPLATE_PRIORITY_LABELS[item.priority] || 'orta öncelik'}${madde ? ` · ${madde} madde` : ''}${item.is_active === false ? ' · Kapalı' : ''}`);
+    }).join('')
     : '<div class="empty-state">Görev şablonu yok.</div>';
   if (checklistList) checklistList.innerHTML = checklists.length
     ? checklists.map(item => {
       const property = Object.values(appData?.villas || {}).find(candidate => candidate?.id === item.property_id);
       const typeLabel = item.task_type === 'CHECKIN_PREP' ? 'Misafir öncesi' : 'Temizlik';
       const scopeLabel = item.property_id ? (property?.name || 'Mülke özel') : 'Tüm mülkler';
-      return settingsTemplateRowHtml('checklist', item, item.template_name, `${typeLabel} · ${scopeLabel}${item.is_active === false ? ' · Kapalı' : ''}`);
+      const madde = (getTaskPageApi()?.storedProgress(item.items) || { total: 0 }).total;
+      return settingsTemplatePageRowHtml('checklist', item, item.template_name, `${typeLabel} · ${scopeLabel}${madde ? ` · ${madde} madde` : ''}${item.is_active === false ? ' · Kapalı' : ''}`);
     }).join('')
-    : '<div class="empty-state">Kontrol listesi şablonu yok.</div>';
+    : '<div class="empty-state">Kontrol listesi yok. "+ Yeni liste" ile başlayın.</div>';
+  // Acik sablon sayfasi yeniden cizimde kapanmaz (yazilanlar taslakta durur).
+  const sayfa = typeof document !== 'undefined' ? document.getElementById('settingsTemplatePage') : null;
+  if (sayfa && (!!settingsTemplatePage) === sayfa.hidden) renderSettingsTemplatePage();
+}
+
+let settingsTemplatePage = null; // { kind: 'message'|'task', id: string|null, draft? }
+
+function openSettingsTemplatePage(kind, id = null) {
+  if (!['message', 'task'].includes(kind)) return false;
+  const item = id ? getSettingsTemplate(kind, id) : null;
+  if (id && !item) return false;
+  const api = getTaskPageApi();
+  settingsTemplatePage = { kind, id: item ? item.id : null, sections: kind === 'task' && api ? api.fromStored(item?.default_checklist || {}) : [] };
+  renderSettingsTemplatePage();
+  return true;
+}
+
+function closeSettingsTemplatePage() {
+  settingsTemplatePage = null;
+  renderSettingsTemplatePage();
+  return true;
+}
+
+function renderSettingsTemplatePage() {
+  if (typeof document === 'undefined') return;
+  const home = document.getElementById('settingsTemplatesHome');
+  const page = document.getElementById('settingsTemplatePage');
+  if (!home || !page) return;
+  const p = settingsTemplatePage;
+  home.hidden = !!p;
+  page.hidden = !p;
+  if (!p) { page.innerHTML = ''; return; }
+  const item = p.id ? getSettingsTemplate(p.kind, p.id) : null;
+  const geri = '<button type="button" class="fox-back" data-onclick="closeSettingsTemplatePage()">← Şablonlar</button>';
+  const arsiv = item ? `<button type="button" class="lex-btn" data-onclick="archiveSettingsTemplate(decodeURIComponent('${encodeActionArg(p.kind)}'), decodeURIComponent('${encodeActionArg(item.id)}'), ${item.is_active === false ? 'true' : 'false'})">${item.is_active === false ? 'Yeniden etkinleştir' : 'Arşivle'}</button>` : '';
+  if (p.kind === 'message') {
+    const tur = String(item?.message_type || 'TRANSACTIONAL').toUpperCase();
+    page.innerHTML = `${geri}<form data-onsubmit="createSettingsMessageTemplate(event)" class="tp-page settings-template-form">
+      <input name="name" class="tp-title" maxlength="150" required placeholder="Şablon adı" aria-label="Şablon adı" value="${escapeHtml(item?.name || '')}">
+      <div class="tp-props"><label class="tp-prop"><span class="tp-prop__label">Tür</span><select name="message_type" class="lex-select" aria-label="Mesaj türü"><option value="TRANSACTIONAL"${tur !== 'MARKETING' ? ' selected' : ''}>İşlemsel — teklif, rezervasyon, giriş bilgisi</option><option value="MARKETING"${tur === 'MARKETING' ? ' selected' : ''}>Pazarlama — kampanya izni gerekir</option></select></label></div>
+      <textarea name="body" class="tp-doc" maxlength="4000" required rows="10" aria-label="Mesaj metni" placeholder="Örn: Merhaba, villamız için teklifimiz ektedir. Sorunuz olursa yazabilirsiniz.">${escapeHtml(item?.body || '')}</textarea>
+      <div class="fox-add-row"><button type="submit" class="lex-btn lex-btn--primary">${item ? 'Değişiklikleri kaydet' : 'Şablonu kaydet'}</button>${arsiv}</div>
+    </form>`;
+    return;
+  }
+  const tipler = Object.entries(TEMPLATE_TASK_TYPE_LABELS).map(([k, v]) => `<option value="${k}"${k === (item?.task_type || 'GENERAL') ? ' selected' : ''}>${escapeHtml(v)}</option>`).join('');
+  const oncelik = Object.entries(OPERATIONAL_TASK_PRIORITY_LABELS).map(([k, v]) => `<option value="${k}"${k === (item?.priority || 'MEDIUM') ? ' selected' : ''}>${escapeHtml(v)}</option>`).join('');
+  page.innerHTML = `${geri}<form data-onsubmit="createSettingsTaskTemplate(event)" class="tp-page settings-template-form">
+    <input name="title" class="tp-title" maxlength="200" required placeholder="Görev şablonu adı (örn. Havuz kontrolü)" aria-label="Görev şablonu adı" value="${escapeHtml(item?.title || '')}">
+    <div class="tp-props"><label class="tp-prop"><span class="tp-prop__label">Tür</span><select name="task_type" class="lex-select">${tipler}</select></label><label class="tp-prop"><span class="tp-prop__label">Öncelik</span><select name="priority" class="lex-select">${oncelik}</select></label></div>
+    <div id="settingsTaskTemplateBody" class="tp-body"></div>
+    <div class="fox-add-row"><button type="submit" class="lex-btn lex-btn--primary">${item ? 'Değişiklikleri kaydet' : 'Şablonu kaydet'}</button>${arsiv}</div>
+  </form>`;
+  const api = getTaskPageApi();
+  const body = document.getElementById('settingsTaskTemplateBody');
+  if (api && body && body.addEventListener) api.mount(body, { draft: p.sections, canEdit: true, onChange: () => {} });
 }
 
 async function createSettingsMessageTemplate(event) {
@@ -11234,11 +11480,17 @@ async function createSettingsMessageTemplate(event) {
     // Tur secilir (L-277): pazarlama sablonu yalniz kampanya izni olan
     // misafire gider; hep TRANSACTIONAL yazildigi icin izin kapisi hic calismiyordu.
     const tur = String(form.elements.message_type?.value || 'TRANSACTIONAL').toUpperCase() === 'MARKETING' ? 'MARKETING' : 'TRANSACTIONAL';
-    await createMessageTemplate({
-      name: String(form.elements.name.value || '').trim(), body: String(form.elements.body.value || '').trim(),
-      channel: 'WHATSAPP', lifecycle_stage: 'MANUAL', message_type: tur, language: 'tr', is_active: true
-    });
+    const name = String(form.elements.name.value || '').trim();
+    const body = String(form.elements.body.value || '').trim();
+    const duzenlenen = settingsTemplatePage?.kind === 'message' ? settingsTemplatePage.id : null;
+    if (duzenlenen) {
+      const failure = await updateSettingsRow('message_templates', duzenlenen, { name, body, message_type: tur });
+      if (failure) throw new Error(failure);
+    } else {
+      await createMessageTemplate({ name, body, channel: 'WHATSAPP', lifecycle_stage: 'MANUAL', message_type: tur, language: 'tr', is_active: true });
+    }
     form.reset();
+    settingsTemplatePage = null;
     await loadSettingsCatalogs();
     // Yeni sablon talep ve misafir penceresinde esitleme beklemeden gorunur (L-277).
     appData.messageTemplates = (appData.settingsMessageTemplates || []).filter(item => item.is_active !== false);
@@ -11254,16 +11506,25 @@ async function createSettingsMessageTemplate(event) {
 async function createSettingsTaskTemplate(event) {
   event.preventDefault();
   const form = event.currentTarget;
+  const api = getTaskPageApi();
+  const sayfa = settingsTemplatePage?.kind === 'task' ? settingsTemplatePage : null;
+  const onceki = sayfa?.id ? getSettingsTemplate('task', sayfa.id)?.default_checklist : null;
+  const liste = sayfa && api ? api.toStored(sayfa.sections, onceki) : {};
+  const priority = OPERATIONAL_TASK_PRIORITY_LABELS[form.elements.priority?.value] ? form.elements.priority.value : 'MEDIUM';
   const payload = {
     tenant_id: getActiveTenantId(), title: String(form.elements.title.value || '').trim(),
-    task_type: form.elements.task_type.value || 'GENERAL', priority: 'MEDIUM', is_active: true
+    task_type: form.elements.task_type.value || 'GENERAL', priority, is_active: true,
+    default_checklist: { sections: liste.sections || [], supplies: liste.supplies || [] }
   };
-  const { error } = await supabaseClient.from('task_templates').insert(payload);
-  if (error) {
-    showToast('Görev şablonu kaydedilemedi: ' + kullaniciMesaji(error.message), 'error');
+  const failure = sayfa?.id
+    ? await updateSettingsRow('task_templates', sayfa.id, { title: payload.title, task_type: payload.task_type, priority, default_checklist: payload.default_checklist })
+    : (await supabaseClient.from('task_templates').insert(payload)).error?.message;
+  if (failure) {
+    showToast('Görev şablonu kaydedilemedi: ' + kullaniciMesaji(failure), 'error');
     return false;
   }
   form.reset();
+  settingsTemplatePage = null;
   await loadSettingsCatalogs();
   renderSettingsTemplates();
   showToast('Görev şablonu kaydedildi.', 'success');
@@ -11331,6 +11592,7 @@ async function editSettingsTemplate(kind, id) {
   const item = getSettingsTemplate(kind, id);
   if (!item) return false;
   if (kind === 'checklist') return startEditingSettingsChecklist(id);
+  if (kind === 'message' || kind === 'task') return openSettingsTemplatePage(kind, id);
   const table = kind === 'message' ? 'message_templates' : kind === 'task' ? 'task_templates' : 'property_checklist_templates';
   const nameField = kind === 'message' ? 'name' : kind === 'task' ? 'title' : 'template_name';
   const nextName = (await uiAskText({ label: 'Şablon adı:', value: item[nameField] || '' }));
@@ -11372,6 +11634,8 @@ async function archiveSettingsTemplate(kind, id, isActive = false) {
     showToast(`Şablon ${isActive ? 'etkinleştirilemedi' : 'arşivlenemedi'}: ` + kullaniciMesaji(failure), 'error');
     return false;
   }
+  if (settingsTemplatePage && settingsTemplatePage.id === id) settingsTemplatePage = null;
+  if (kind === 'checklist' && settingsChecklistEditorId === id) cancelSettingsChecklistEdit();
   await loadSettingsCatalogs();
   renderSettingsTemplates();
   if (kind === 'checklist' && item.task_type === 'CLEANING') await refreshUnstartedCleaningChecklists();
@@ -13366,6 +13630,42 @@ function fillCleanerNameOptions() {
     .map(person => `<option value="${escapeHtml(person.full_name || '')}"></option>`).join('');
 }
 
+// Ev secilince o evin temizlik kontrol listesi gorunur (kullanici 22.11.2026). Liste
+// goreve atamayla eklenir (assign_cleaning_task: genel liste + eve ozel liste); giris
+// hesabi olan temizlikci secilirse kayitta otomatik atanir.
+function cleaningTemplatesFor(villaKey) {
+  const id = appData?.villas?.[villaKey]?.id;
+  const rows = (appData?.checklistTemplates || appData?.settingsChecklistTemplates || [])
+    .filter(t => t && t.is_active !== false && String(t.task_type || 'CLEANING').toUpperCase() === 'CLEANING');
+  const newest = list => list.slice().sort((x, y) => (Number(y.version) || 0) - (Number(x.version) || 0) || String(y.updated_at || '').localeCompare(String(x.updated_at || '')))[0] || null;
+  return [newest(rows.filter(t => !t.property_id)), newest(rows.filter(t => id && t.property_id === id))].filter(Boolean);
+}
+
+function cleaningPersonByName(name) {
+  const api = getOperationsApi();
+  const n = String(name || '').trim().toLocaleLowerCase('tr');
+  if (!api || !n) return null;
+  return api.eligibleCleaners(appData?.operationalPeople || []).find(p => String(p.full_name || '').trim().toLocaleLowerCase('tr') === n) || null;
+}
+
+function renderCleaningChecklistPreview() {
+  const box = typeof document !== 'undefined' ? document.getElementById('hkChecklistPreview') : null;
+  if (!box) return;
+  const villa = document.getElementById('hkVilla')?.value || '';
+  const sablonlar = cleaningTemplatesFor(villa);
+  const bolumler = sablonlar.flatMap(t => (t.items && t.items.sections) || []);
+  const madde = bolumler.reduce((n, s) => n + ((s.items || []).length), 0);
+  const kisi = cleaningPersonByName(document.getElementById('hkCleaner')?.value);
+  if (!sablonlar.length) {
+    box.innerHTML = `<p class="cleaning-preview__line">Bu ev için temizlik listesi yok. <button type="button" class="lex-link-inline" data-onclick="openSettingsSection('templates')">Liste oluştur</button></p>`;
+    return;
+  }
+  const ad = sablonlar.map(t => t.template_name || 'Liste').join(' + ');
+  const basliklar = bolumler.map(s => s.title).filter(Boolean).slice(0, 5).join(', ');
+  box.innerHTML = `<p class="cleaning-preview__line"><strong>Temizlik listesi:</strong> ${escapeHtml(ad)} · ${madde} madde${basliklar ? ` (${escapeHtml(basliklar)})` : ''}</p>`
+    + `<p class="cleaning-preview__sub">${kisi ? `Kaydedince ${escapeHtml(kisi.full_name)} kişisine atanır; liste ikinizin ekranında aynı anda işaretlenir.` : 'Giriş hesabı olan bir temizlikçi seçerseniz liste ona atanır ve ikinizin ekranında aynı anda işaretlenir.'}</p>`;
+}
+
 function openNewCleaningTaskModal() {
   fillCleanerNameOptions();
   document.getElementById('cleaningTaskModalTitle').innerText = '🧹 Yeni Temizlik / Borç Girişi';
@@ -13386,6 +13686,7 @@ function openNewCleaningTaskModal() {
   document.getElementById('hkDesc').value = '';
   document.getElementById('hkPaidStatus').value = 'PLANNED';
   document.getElementById('hkDeleteBtn').style.display = 'none';
+  renderCleaningChecklistPreview();
 
   document.getElementById('cleaningTaskModal').classList.add('active');
 }
@@ -13407,6 +13708,7 @@ function openEditCleaningTaskModal(taskId) {
   document.getElementById('hkPaidStatus').value = task.paid ? 'PAID'
     : (task.status === 'DONE' ? 'PENDING' : (task.status === 'SKIPPED' ? 'SKIPPED' : 'PLANNED'));
   document.getElementById('hkDeleteBtn').style.display = 'inline-block';
+  renderCleaningChecklistPreview();
 
   document.getElementById('cleaningTaskModal').classList.add('active');
 }
@@ -13488,6 +13790,13 @@ async function saveCleaningTask(e) {
 
   taskRecord = result.task;
   upsertCleaningTaskInMemory(taskRecord, editId);
+
+  // Planli temizlikte giris hesabi olan temizlikci secildiyse listeyle birlikte atanir.
+  const kisi = status === 'PLANNED' ? cleaningPersonByName(cleaner) : null;
+  const mevcut = (appData?.cleaningExecutions || []).find(x => x.cleaning_task_id === (taskRecord.dbId || taskRecord.id));
+  if (kisi && isCloudTenant(getActiveTenantId()) && (!mevcut || mevcut.person_id !== kisi.id)) {
+    await assignCleaningTask(taskRecord.id, kisi.id);
+  }
 
   closeCleaningTaskModal();
   saveAppData();
@@ -14603,8 +14912,8 @@ function analyticsMonthPerformance(monthKey, villa) {
 // Analiz modulleri acilista yuklenmez (acilis JS butcesi, L-163): Analiz ya da
 // fiyat ekrani ilk cizildiginde istenir, gelince acik ekran yeniden cizilir.
 // Sira onemli: analytics_ui yuklenirken BookingAnalytics'i alir.
-const ANALYTICS_ENGINE_URL = 'core/booking_analytics.js?v=c837f939';
-const ANALYTICS_UI_URL = 'core/analytics_ui.js?v=76af58bd';
+const ANALYTICS_ENGINE_URL = 'core/booking_analytics.js?v=619c6e43';
+const ANALYTICS_UI_URL = 'core/analytics_ui.js?v=39d5a762';
 let analyticsModulesLoading = null;
 function loadAnalyticsScript(src) {
   return new Promise((resolve, reject) => {
@@ -15540,6 +15849,7 @@ async function handleAuthenticatedSession(u) {
     if (activeTenant?.role === 'staff') {
       appData = getBlankTenantData(activeTenantId);
       await loadStaffFieldWork();
+      subscribeStaffRealtime(activeTenantId);
       switchTab('staff-field');
     } else {
       await loadTenantAppData(activeTenantId);
@@ -17034,7 +17344,9 @@ const TENANT_REALTIME_TABLES = [
   'maintenance_tickets',
   'operational_tasks',
   'guests',
-  'user_notifications'
+  'user_notifications',
+  // phase123: temizlikci isaretledikce yonetici ekraninda aninda gorunur.
+  'cleaning_task_executions'
 ];
 
 function getTenantRealtimeTables() {
@@ -17096,6 +17408,7 @@ function applyTenantRealtimePayload(table, payload) {
     monthly_targets: ['targets', row => row],
     maintenance_tickets: ['maintenance', row => mapMaintenanceTicketFromDb(row, propertyIdMap)],
     operational_tasks: ['operationalTasks', row => row],
+    cleaning_task_executions: ['cleaningExecutions', row => row],
     guests: ['guests', row => row],
     user_notifications: ['userNotifications', row => row]
   };
@@ -17108,6 +17421,7 @@ function applyTenantRealtimePayload(table, payload) {
 
 function renderTenantRealtimeChange(table) {
   if (typeof document === 'undefined') return;
+  if (table === 'cleaning_task_executions') { renderOperationsTab(); return; }
   if (table === 'properties') updateAllVillaDropdowns();
   if (table === 'bookings' && typeof syncBookingCleaningTasks === 'function') syncBookingCleaningTasks();
   renderAll();
@@ -18784,9 +19098,18 @@ async function markAllNotificationsAsRead() {
 
 let selectedPropertyProfileKey = null;
 let selectedPropertyProfileTab = 'GENERAL';
+// Alt sayfa (kullanici 22.11.2026): mulk listesi; mulke dokununca profil kendi sayfasinda acilir.
+let propertyPageOpen = false;
+
+function closePropertyPage() {
+  propertyPageOpen = false;
+  renderPropertiesTab();
+  return true;
+}
 
 function setPropertyProfile(villaKey) {
   if (!appData?.villas?.[villaKey]) return false;
+  propertyPageOpen = true;
   selectedPropertyProfileKey = villaKey;
   selectedPropertyProfileTab = 'GENERAL';
   propertyChannelForm = null;
@@ -18797,6 +19120,7 @@ function setPropertyProfile(villaKey) {
 function setPropertyProfileTab(tab) {
   if (!['GENERAL', 'PRICES', 'CHANNELS', 'HISTORY'].includes(tab)) return false;
   selectedPropertyProfileTab = tab;
+  propertyPageOpen = true; // profil sekmesi secmek profili acmaktir
   renderPropertiesTab();
   return true;
 }
@@ -19206,7 +19530,15 @@ function renderPropertiesTab() {
     `;
   }).join('');
   const profile = document.getElementById('propertyProfileWorkspace');
-  if (profile) profile.innerHTML = selectedPropertyProfileKey ? renderPropertyProfile(selectedPropertyProfileKey) : '<p class="empty-state">Henüz aktif mülk yok.</p>';
+  const acik = propertyPageOpen && !!selectedPropertyProfileKey;
+  grid.hidden = acik;
+  if (newButton) newButton.hidden = !canManage || acik;
+  if (profile) {
+    profile.hidden = !acik && propKeys.length > 0;
+    profile.innerHTML = acik
+      ? `<button type="button" class="fox-back" data-onclick="closePropertyPage()">← Mülkler</button>${renderPropertyProfile(selectedPropertyProfileKey)}`
+      : (propKeys.length ? '' : '<p class="empty-state">Henüz aktif mülk yok.</p>');
+  }
 }
 
 function getOperationsApi() {
@@ -19248,11 +19580,43 @@ async function loadStaffFieldWork() {
   return staffFieldWork;
 }
 
+let staffSaveTimers = {};
 function setStaffChecklistMark(executionId, key, checked) {
   const row = staffFieldWork.cleanings.find(item => item.execution_id === executionId);
   if (!row) return false;
   row.checklist_result = { ...(row.checklist_result || {}), [key]: { ...((row.checklist_result || {})[key] || {}), z: !!checked } };
+  // Ayni anda isaretleme (phase123): isaret yoneticinin ekranina aninda gitsin diye kaydedilir.
+  if (typeof setTimeout === 'function' && supabaseClient) {
+    clearTimeout(staffSaveTimers[executionId]);
+    staffSaveTimers[executionId] = setTimeout(() => { saveStaffCleaningProgress(executionId, { quiet: true }); }, 400);
+  }
   return true;
+}
+
+// Personelin canli kanali: kendi temizliklerindeki Kontrol isaretleri (RLS yalniz kendi
+// isini gosterir). Yayin yoksa (phase123 uygulanmamis) sessizce olay gelmez.
+let staffRealtimeChannel = null;
+function subscribeStaffRealtime(tenantId) {
+  if (staffRealtimeChannel && supabaseClient) { try { supabaseClient.removeChannel(staffRealtimeChannel); } catch (e) { /* yok */ } }
+  staffRealtimeChannel = null;
+  if (!isCloudTenant(tenantId) || !supabaseClient?.channel) return;
+  try {
+    staffRealtimeChannel = supabaseClient.channel(`staff-${tenantId}-cleaning`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'cleaning_task_executions', filter: `tenant_id=eq.${tenantId}` }, payload => {
+        const yeni = payload?.new;
+        const row = yeni && staffFieldWork.cleanings.find(item => item.execution_id === yeni.id);
+        if (!row) return;
+        const sunucu = yeni.checklist_result || {};
+        const birlesik = { ...(row.checklist_result || {}) };
+        Object.keys(sunucu).forEach(key => { birlesik[key] = { z: birlesik[key]?.z ?? sunucu[key]?.z ?? null, m: sunucu[key]?.m ?? null }; });
+        row.checklist_result = birlesik;
+        if (yeni.status) row.status = yeni.status;
+        renderStaffFieldWork();
+      })
+      .subscribe();
+  } catch (e) {
+    console.warn('Staff realtime:', e);
+  }
 }
 
 function setStaffSupplyStatus(executionId, key, value) {
@@ -19263,9 +19627,10 @@ function setStaffSupplyStatus(executionId, key, value) {
   return true;
 }
 
-async function saveStaffCleaningProgress(executionId) {
+async function saveStaffCleaningProgress(executionId, { quiet = false } = {}) {
   const row = staffFieldWork.cleanings.find(item => item.execution_id === executionId);
   if (!row) return false;
+  if (!['ASSIGNED', 'IN_PROGRESS', 'REOPENED'].includes(row.status || 'ASSIGNED')) return false;
   const note = document.getElementById(`staffNote-${executionId}`)?.value || '';
   const { error } = await supabaseClient.rpc('save_cleaning_progress', {
     p_execution_id: executionId,
@@ -19277,7 +19642,7 @@ async function saveStaffCleaningProgress(executionId) {
     if (typeof showToast === 'function') showToast('⚠️ İlerleme kaydedilemedi: ' + getFriendlyAuthErrorMessage(error), 'error');
     return false;
   }
-  if (typeof showToast === 'function') showToast('✅ Kontrol listesi kaydedildi.');
+  if (!quiet && typeof showToast === 'function') showToast('✅ Kontrol listesi kaydedildi.');
   return true;
 }
 
@@ -19423,6 +19788,10 @@ function renderStaffFieldWork() {
     return;
   }
   const rows = (staffFieldWork.cleanings || []).filter(isStaffCleaningVisible);
+  rows.forEach(row => {
+    const alan = document.getElementById(`staffNote-${row.execution_id}`);
+    if (alan && typeof alan.value === 'string') row.note = alan.value;
+  });
   container.innerHTML = rows.length ? rows.map(row => {
     const locked = row.status === 'CLEANED';
     const statusLabel = STAFF_CLEANING_STATUS_LABELS[row.status] || 'Açık';
@@ -19434,7 +19803,8 @@ function renderStaffFieldWork() {
         const subChecked = row.checklist_result?.[subKey]?.z === true;
         return `<label class="staff-check-item staff-check-sub"><input type="checkbox" ${subChecked ? 'checked' : ''} ${locked ? 'disabled' : ''} data-onchange="setStaffChecklistMark(decodeURIComponent('${encodeActionArg(row.execution_id)}'), decodeURIComponent('${encodeActionArg(subKey)}'), this.checked)"><span>${escapeHtml(subCheck)}</span></label>`;
       }).join('');
-      return `<label class="staff-check-item"><input type="checkbox" ${checked ? 'checked' : ''} ${locked ? 'disabled' : ''} data-onchange="setStaffChecklistMark(decodeURIComponent('${encodeActionArg(row.execution_id)}'), decodeURIComponent('${encodeActionArg(key)}'), this.checked)"><span>${escapeHtml(item.text || '—')}</span>${item.important ? '<em class="staff-check-required">zorunlu</em>' : ''}</label>${subChecks}`;
+      const kontrol = row.checklist_result?.[key]?.m === true ? '<span class="staff-check-m" title="Yönetici kontrol etti">Kontrol ✓</span>' : '';
+      return `<label class="staff-check-item"><input type="checkbox" ${checked ? 'checked' : ''} ${locked ? 'disabled' : ''} data-onchange="setStaffChecklistMark(decodeURIComponent('${encodeActionArg(row.execution_id)}'), decodeURIComponent('${encodeActionArg(key)}'), this.checked)"><span>${escapeHtml(item.text || '—')}</span>${item.important ? '<em class="staff-check-required">zorunlu</em>' : ''}${kontrol}</label>${subChecks}`;
     }).join('')}</fieldset>`).join('');
     const supplies = (row.checklist?.supplies || []).map((item, index) => {
       const current = row.supplies_result?.[String(index)] || '';
@@ -19728,7 +20098,7 @@ async function inspectCleaningExecution(executionId, approve) {
   const { error } = await supabaseClient.rpc('inspect_cleaning', {
     p_execution_id: executionId,
     p_approve: !!approve,
-    p_m_marks: execution?.manager_marks || {},
+    p_m_marks: execution?.manager_marks || {}, // phase123 varsa bos: isaretler aninda yazildi
     p_inspector_note: note || null
   });
   if (error) {
@@ -20350,11 +20720,57 @@ function renderCleaningExecutionFlags(execution) {
   return `<div class="ops-execution-flags">${flagged.length ? `<span><strong>Malzeme:</strong> ${escapeHtml(flagged.join(' · '))}</span>` : ''}${execution.note ? `<span><strong>Personel notu:</strong> ${escapeHtml(execution.note)}</span>` : ''}</div>`;
 }
 
-function setManagerChecklistMark(executionId, key, checked) {
+const PHASE123_SEMA_YOK = 'Kontrol işaretini anında kaydetmek için veritabanı güncellemesi (phase123) henüz uygulanmadı; işaret onayla birlikte kaydedilir.';
+
+async function setManagerChecklistMark(executionId, key, checked) {
   const execution = (appData?.cleaningExecutions || []).find(item => item.id === executionId);
   if (!execution) return false;
   execution.manager_marks = { ...(execution.manager_marks || {}), [key]: !!checked };
+  const onceki = execution.checklist_result?.[key];
+  execution.checklist_result = { ...(execution.checklist_result || {}), [key]: { z: onceki?.z ?? null, m: !!checked } };
+  if (!isCloudTenant(getActiveTenantId()) || !supabaseClient) return true;
+  const { data, error } = await supabaseClient.rpc('set_cleaning_manager_marks', { p_execution_id: executionId, p_marks: { [key]: !!checked } });
+  if (error) {
+    const yok = /PGRST202|Could not find the function/i.test(`${error.code || ''} ${error.message || ''}`);
+    if (typeof showToast === 'function') showToast(yok ? PHASE123_SEMA_YOK : '⚠️ Kontrol işareti kaydedilemedi: ' + getFriendlyAuthErrorMessage(error), yok ? 'info' : 'error');
+    if (!yok) await loadTenantAppData(getActiveTenantId());
+    return false;
+  }
+  if (data?.checklist_result) execution.checklist_result = data.checklist_result;
+  delete execution.manager_marks[key];
   return true;
+}
+
+function cleaningChecklistProgress(execution) {
+  const sections = execution?.checklist_snapshot?.sections || [];
+  const r = execution?.checklist_result || {};
+  let total = 0; let z = 0; let m = 0;
+  sections.forEach((section, si) => (section.items || []).forEach((item, ii) => {
+    const keys = [`s${si}.i${ii}`].concat((item.subChecks || []).map((_, k) => `s${si}.i${ii}.sub${k}`));
+    keys.forEach(key => { total += 1; if (r[key]?.z === true) z += 1; if (r[key]?.m === true) m += 1; });
+  }));
+  return { total, z, m };
+}
+
+// Temizlik sayfasi listesi: her satirda iki kutu. Temizlikcinin kutusu (Z) yonetici
+// ekraninda salt okunurdur (phase68); Kontrol (M) her an isaretlenir ve aninda yazilir.
+function renderCleaningTwoColumnChecklist(execution, { canMark = true } = {}) {
+  const sections = execution?.checklist_snapshot?.sections || [];
+  if (!sections.length) return '';
+  const r = execution.checklist_result || {};
+  const kilitli = execution.status === 'INSPECTED' || !canMark;
+  const satir = (key, text, important, sub) => {
+    const z = r[key]?.z === true;
+    const m = execution.manager_marks?.[key] ?? r[key]?.m;
+    return `<div class="cl2-row${sub ? ' cl2-row--sub' : ''}" data-cl-key="${escapeHtml(key)}">`
+      + `<span class="cl2-text">${escapeHtml(text || '—')}${important ? ' <span class="cl2-star" title="Zorunlu">★</span>' : ''}</span>`
+      + `<span class="cl2-cell${z ? ' is-on' : ''}" aria-label="Temizlikçi ${z ? 'işaretledi' : 'işaretlemedi'}">${z ? '✓' : ''}</span>`
+      + `<label class="cl2-cell cl2-cell--m"><input type="checkbox" aria-label="Kontrol: ${escapeHtml(text || '')}" ${m === true ? 'checked' : ''} ${kilitli ? 'disabled' : ''} data-onchange="setManagerChecklistMark(decodeURIComponent('${encodeActionArg(execution.id)}'), decodeURIComponent('${encodeActionArg(key)}'), this.checked)"></label></div>`;
+  };
+  return `<div class="cl2" role="table" aria-label="Temizlik kontrol listesi"><div class="cl2-head" role="row"><span>Madde</span><span>Temizlikçi</span><span>Kontrol</span></div>${sections.map((section, si) => `<div class="cl2-section"><h4>${escapeHtml(section.title || 'Kontrol')}</h4>${(section.items || []).map((item, ii) => {
+    const key = `s${si}.i${ii}`;
+    return satir(key, item.text, item.important, false) + (item.subChecks || []).map((sub, k) => satir(`${key}.sub${k}`, sub, false, true)).join('');
+  }).join('')}</div>`).join('')}</div>`;
 }
 
 function renderManagerChecklist(execution) {
@@ -20374,6 +20790,55 @@ function cleaningExecutionChecklistHintHtml(execution) {
   return `<span class="ops-checklist-hint">Kontrol listesi yok: atama, liste kaydedilmeden önce yapılmış.${button}</span>`;
 }
 
+// Sade temizlik ekrani (kullanici 22.11.2026: "cok daha minimal ve basit"): satir = ev ·
+// tarih · temizlikci · ilerleme · durum. Satira dokununca temizlik sayfasi acilir: iki
+// sutunlu liste, atama ve tum eylemler orada.
+let opsCleaningPageId = null;
+
+function openCleaningPage(taskId) {
+  opsCleaningPageId = taskId || null;
+  operationsViewState = 'cleaning';
+  renderOperationsTab();
+  return true;
+}
+
+function closeCleaningPage() {
+  opsCleaningPageId = null;
+  renderOperationsTab();
+  return true;
+}
+
+function cleaningPageHtml(task, eligible) {
+  const execution = task.execution;
+  const waiting = task.workflowState === 'AWAITING_INSPECTION';
+  const property = task.propertyName || appData?.villas?.[task.villa]?.name || task.villa || '—';
+  const acik = task.status !== 'DONE' && task.status !== 'SKIPPED';
+  const p = cleaningChecklistProgress(execution);
+  const options = eligible.map(person => `<option value="${escapeHtml(person.id)}"${execution?.person_id === person.id ? ' selected' : ''}>${escapeHtml(person.full_name)}</option>`).join('');
+  const ata = acik && !waiting && eligible.length
+    ? `<div class="cl-assign"><select id="opsCleaner-${escapeHtml(task.id)}" aria-label="Temizlikçi seç"><option value="">Temizlikçi seç…</option>${options}</select><button class="lex-btn" data-onclick="assignCleaningTaskFromSelect(decodeURIComponent('${encodeActionArg(task.id || task.dbId)}'))">${execution ? 'Yeniden ata' : 'Ata ve listeyi ekle'}</button></div>`
+    : '';
+  const liste = execution
+    ? (renderCleaningTwoColumnChecklist(execution, { canMark: canManageOperationsRole(activeTenant?.role) }) || cleaningExecutionChecklistHintHtml(execution) || '<p class="lex-note">Bu temizlik için kontrol listesi yok.</p>')
+    : `<p class="lex-note">Liste, giriş hesabı olan bir temizlikçiye atanınca eklenir (bu evin listesi + genel liste).</p>`;
+  const eylem = [
+    waiting ? `<button class="lex-btn lex-btn--primary" data-onclick="inspectCleaningExecution(decodeURIComponent('${encodeActionArg(execution.id)}'), true)">Onayla (gider oluşur)</button><button class="lex-btn" data-onclick="inspectCleaningExecution(decodeURIComponent('${encodeActionArg(execution.id)}'), false)">Yeniden aç</button>` : '',
+    acik && !waiting && !execution ? `<button class="lex-btn lex-btn--primary" data-onclick="markCleaningDone(decodeURIComponent('${encodeActionArg(task.id || task.dbId)}'))">Kontrol ettim, yapıldı</button>` : '',
+    acik && !waiting ? `<button class="lex-btn" data-onclick="markCleaningSkipped(decodeURIComponent('${encodeActionArg(task.id || task.dbId)}'))" title="Misafir gelmedi, iptal ya da ev kullanılmadı: gider ve borç oluşmaz">Gerek kalmadı</button>` : '',
+    `<button class="lex-btn" data-onclick="openEditCleaningTaskModal(decodeURIComponent('${encodeActionArg(task.id || task.dbId)}'))">Düzenle</button>`,
+    `<button class="lex-btn lex-btn--danger" data-onclick="deleteCleaningTask(decodeURIComponent('${encodeActionArg(task.id || task.dbId)}'))">Sil</button>`
+  ].join('');
+  return `<article class="fox-subpage cl-page" data-cleaning-task-id="${escapeHtml(task.id)}">
+    <button type="button" class="fox-back" data-onclick="closeCleaningPage()">← Temizlikler</button>
+    <h2 class="fox-subpage__title">${escapeHtml(property)} temizliği</h2>
+    <p class="cl-meta">${escapeHtml(task.date ? formatTrDate(task.date) : '—')} · ${escapeHtml(task.cleaner || 'Personel belirtilmedi')}${p.total ? ` · Temizlikçi ${p.z}/${p.total} · Kontrol ${p.m}/${p.total}` : ''}</p>
+    ${waiting ? renderCleaningExecutionFlags(execution) : ''}
+    ${ata}
+    ${liste}
+    <div class="fox-add-row cl-actions">${eylem}</div>
+  </article>`;
+}
+
 function renderOperationsCleaningView(tasks) {
   const api = getOperationsApi();
   if (!api) return '<div class="empty-state">Operasyon motoru yüklenemedi.</div>';
@@ -20390,43 +20855,39 @@ function renderOperationsCleaningView(tasks) {
     .filter(task => !listed.has(task.id) && (task.date || '') <= getTodayStr())
     .filter(task => taskMatchesVilla(task, currentFilter.villa) && (currentFilter.period === 'ALL' || isDateInFilter(task.date || '')))
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const sayfa = opsCleaningPageId ? withExecutions.find(t => t.id === opsCleaningPageId || t.dbId === opsCleaningPageId) : null;
+  if (opsCleaningPageId && !sayfa) opsCleaningPageId = null;
+  if (sayfa) return cleaningPageHtml(sayfa, eligible);
+  const satirHtml = task => {
+    const execution = task.execution;
+    const waiting = task.workflowState === 'AWAITING_INSPECTION';
+    const property = task.propertyName || appData?.villas?.[task.villa]?.name || task.villa || '—';
+    const status = waiting ? 'Denetim bekliyor' : task.status === 'DONE' ? (task.paid ? 'Ödendi' : 'Borç') : task.status === 'SKIPPED' ? 'Gerek kalmadı' : execution ? 'Atandı' : 'Planlı';
+    const tone = waiting ? 'up' : (isCleaningDebt(task) ? 'down' : (task.status === 'DONE' || task.status === 'SKIPPED' ? 'keep' : 'up'));
+    const p = cleaningChecklistProgress(execution);
+    const yuzde = p.total ? Math.round((p.z / p.total) * 100) : 0;
+    return `<button type="button" class="cl-row" data-cleaning-task-id="${escapeHtml(task.id)}" data-onclick="openCleaningPage(decodeURIComponent('${encodeActionArg(task.id || task.dbId)}'))">
+      <span class="cl-row__main"><span class="cl-row__title">${propertyNameHtml(task.villa, property)}</span><span class="cl-row__meta">${escapeHtml(task.date ? formatTrDate(task.date) : '—')} · ${escapeHtml(task.cleaner || 'Personel belirtilmedi')}</span></span>
+      ${p.total ? `<span class="cl-row__progress" title="Temizlikçi ${p.z}/${p.total} · Kontrol ${p.m}/${p.total}"><span class="tp-bar"><span class="tp-bar__fill" style="width:${yuzde}%"></span></span>${p.z}/${p.total}</span>` : '<span class="cl-row__progress"></span>'}
+      <span class="lex-tag lex-tag--${tone}">${escapeHtml(status)}</span>
+    </button>`;
+  };
   const groupHtml = (label, rows, id) => !rows.length ? '' : `
-    <section class="ops-group"${id ? ` id="${id}"` : ''}>
-      <h3>${escapeHtml(label)} <span class="badge">${rows.length}</span></h3>
-      ${rows.length ? rows.map(task => {
-        const execution = task.execution;
-        const waiting = task.workflowState === 'AWAITING_INSPECTION';
-        const property = task.propertyName || appData?.villas?.[task.villa]?.name || task.villa || '—';
-        const optionsHtml = eligible.map(person => `<option value="${escapeHtml(person.id)}"${execution?.person_id === person.id ? ' selected' : ''}>${escapeHtml(person.full_name)}</option>`).join('');
-        // Atama yalniz giris hesabi olan temizlikci varsa gosterilir.
-        const assignHtml = eligible.length ? `<select id="opsCleaner-${escapeHtml(task.id)}" aria-label="Temizlikçi seç" title="Yalnız uygulamaya giriş hesabı olan temizlikçiler listelenir"><option value="">Temizlikçi seç…</option>${optionsHtml}</select>
-              <button class="btn btn-secondary btn-sm" data-onclick="assignCleaningTaskFromSelect(decodeURIComponent('${encodeActionArg(task.id)}'))">Ata</button>` : '';
-        const status = waiting ? 'Denetim bekliyor' : task.status === 'DONE' ? (task.paid ? 'Ödendi' : 'Borç') : task.status === 'SKIPPED' ? 'Gerek kalmadı' : execution ? 'Atandı' : 'Planlı';
-        return `<article class="ops-row" data-cleaning-task-id="${escapeHtml(task.id)}">
-          <div class="ops-row-main"><strong>${escapeHtml(property)}</strong><span>${escapeHtml(task.date || '—')} · ${escapeHtml(task.cleaner || 'Personel belirtilmedi')}</span>${waiting ? renderCleaningExecutionFlags(execution) + renderManagerChecklist(execution) : ''}${cleaningExecutionChecklistHintHtml(execution)}</div>
-          <span class="badge ${waiting ? 'badge-blue' : (isCleaningDebt(task) ? 'badge-amber' : '')}">${escapeHtml(status)}</span>
-          <div class="ops-row-actions">
-            ${waiting ? `<button class="btn btn-primary btn-sm" data-onclick="inspectCleaningExecution(decodeURIComponent('${encodeActionArg(execution.id)}'), true)">M Onayla</button><button class="btn btn-secondary btn-sm" data-onclick="inspectCleaningExecution(decodeURIComponent('${encodeActionArg(execution.id)}'), false)">Yeniden aç</button>` : task.status !== 'DONE' && task.status !== 'SKIPPED' ? `
-              ${assignHtml}
-              ${!execution ? `<button class="btn btn-primary btn-sm" data-onclick="markCleaningDone(decodeURIComponent('${encodeActionArg(task.id)}'))">Kontrol ettim, yapıldı</button>` : ''}
-              <button class="btn btn-secondary btn-sm" data-onclick="markCleaningSkipped(decodeURIComponent('${encodeActionArg(task.id)}'))" title="Misafir gelmedi, iptal ya da ev kullanılmadı: gider ve borç oluşmaz">Gerek kalmadı</button>` : ''}
-            <button class="btn btn-secondary btn-sm" title="Ayrıntı / Düzenle" data-onclick="openEditCleaningTaskModal(decodeURIComponent('${encodeActionArg(task.id || task.dbId)}'))">Düzenle</button>
-            <button class="btn btn-danger btn-sm" title="Temizliği ve ona bağlı gideri sil" data-onclick="deleteCleaningTask(decodeURIComponent('${encodeActionArg(task.id || task.dbId)}'))">Sil</button>
-          </div>
-        </article>`;
-      }).join('') : ''}
+    <section class="cl-group"${id ? ` id="${id}"` : ''}>
+      <h3 class="cl-group__title">${escapeHtml(label)} <span class="lex-group__sub">${rows.length}</span></h3>
+      ${rows.map(satirHtml).join('')}
     </section>`;
 
   return `
     ${eligible.length ? '' : fieldTeamHintHtml('CLEANER')}
     <div class="ops-cleaning-layout">
       <div>${groupHtml('Geciken / denetim bekleyen', grouped.overdue)}${groupHtml('Bugün', grouped.today)}${groupHtml('Yarın', grouped.tomorrow)}${groupHtml('Bu hafta', grouped.week)}${groupHtml('Geçmiş temizlikler (seçili dönem)', history, 'opsCleaningHistory')}${[grouped.overdue, grouped.today, grouped.tomorrow, grouped.week, history].some(r => r.length) ? '' : '<div class="empty-state">Bu dönemde temizlik yok.</div>'}</div>
-      <aside class="ops-debt-panel"${debt.length ? '' : ' hidden'}><h3>Bekleyen Temizlik Borçları (${debt.reduce((sum, item) => sum + item.count, 0)})</h3>
-        ${debt.length ? debt.map(item => `<div class="ops-debt-row"><div><strong>${escapeHtml(item.cleaner)}</strong><span>${item.count} temizlik</span></div><strong>₺${item.amount.toLocaleString('tr-TR')}</strong>${item.taskIds.map(id => {
+      <aside class="ops-debt-panel cl-debt"${debt.length ? '' : ' hidden'}><h3 class="cl-group__title">Temizlik borcu <span class="lex-group__sub">${debt.reduce((sum, item) => sum + item.count, 0)} temizlik</span></h3>
+        ${debt.length ? debt.map(item => `<details class="ops-debt-row"><summary><strong>${escapeHtml(item.cleaner)}</strong><span>${item.count} temizlik</span><strong>₺${item.amount.toLocaleString('tr-TR')}</strong></summary>${item.taskIds.map(id => {
           const task = tasks.find(candidate => (candidate.id || candidate.dbId) === id);
           if (!task) return '';
           return `<div data-cleaning-task-id="${escapeHtml(task.id || task.dbId)}" class="ops-debt-detail"><strong>${escapeHtml(task.propertyName || appData?.villas?.[task.villa]?.name || task.villa || '—')}</strong><span>${escapeHtml(task.date ? formatTrDate(task.date) : '—')} · ${escapeHtml(task.cleaner || item.cleaner)} · ₺${Number(task.amount || 0).toLocaleString('tr-TR')} Ödenecek</span>${task.notes ? `<span>${escapeHtml(task.notes)}</span>` : ''}<button class="btn btn-secondary btn-sm" data-onclick="openEditCleaningTaskModal(decodeURIComponent('${encodeActionArg(task.id || task.dbId)}'))">Ayrıntı / Düzenle</button></div>`;
-        }).join('')}<button class="btn btn-secondary btn-sm" data-onclick="payCleanerDebt(decodeURIComponent('${encodeActionArg(item.cleaner)}'))">Toplu öde</button></div>`).join('') : '<div class="empty-state">Temizlik borcu yok.</div>'}
+        }).join('')}<button class="btn btn-secondary btn-sm" data-onclick="payCleanerDebt(decodeURIComponent('${encodeActionArg(item.cleaner)}'))">Toplu öde</button></details>`).join('') : '<div class="empty-state">Temizlik borcu yok.</div>'}
       </aside>
     </div>`;
 }
@@ -23277,7 +23738,9 @@ function goTo(spec) {
     if (b) setPropertyProfileTab(b);
     return true;
   }
+  if (where === 'finance') financeView = 'main';
   if (switchTab(where) === false) return false;
+  if (where === 'finance' && a) setFinanceView(a);
   if (where === 'operations' && a) setOperationsView(a);
   if (where === 'pricing' && a) setPricingView(a);
   if (where === 'marketing' && a && typeof LexBnBMarketingUI !== 'undefined' && LexBnBMarketingUI.openView) LexBnBMarketingUI.openView(a);
@@ -23380,6 +23843,26 @@ async function handleQuickActionTrigger(actionType, entityId) {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     goTo,
+    closePropertyPage,
+    getIncomeCategories,
+    renderSettingsIncomeCategories,
+    createSettingsIncomeCategory,
+    deleteCustomIncomeCategory,
+    renderIncomeCategoryOptions,
+    openSettingsTemplatePage,
+    closeSettingsTemplatePage,
+    openSettingsChecklistPage,
+    archiveOpenSettingsChecklist,
+    openCleaningPage,
+    closeCleaningPage,
+    renderCleaningChecklistPreview,
+    cleaningTemplatesFor,
+    cleaningChecklistProgress,
+    renderCleaningTwoColumnChecklist,
+    subscribeStaffRealtime,
+    setFinanceView,
+    renderFinanceView,
+    openExpenseForFinanceCategory,
     shouldRegisterServiceWorker,
     getMenuTabFor,
     TAB_MENU_PARENT,

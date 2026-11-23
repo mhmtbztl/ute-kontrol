@@ -193,7 +193,7 @@ async function operasyonKartiDavranisi() {
   // ayni cizimde (renderOperationsCleaningView) ayni gorevlerden hesaplanir.
   const govde = require('fs').readFileSync(require('path').join(__dirname, '..', 'app.js'), 'utf8');
   const cizim = govde.slice(govde.indexOf('function renderOperationsCleaningView('), govde.indexOf('function renderOperationsTab('));
-  check(/cleanerDebtSummary\(tasks\)/.test(cizim) && /Bekleyen Temizlik Borçları/.test(cizim), 'L-177 Operasyon listesi cizilince temizlik borcu da ayni cizimde guncellenir');
+  check(/cleanerDebtSummary\(tasks\)/.test(cizim) && /Temizlik borcu/.test(cizim), 'L-177 Operasyon listesi cizilince temizlik borcu da ayni cizimde guncellenir');
 }
 
 async function kritikEylemKartiDavranisi() {
@@ -1320,8 +1320,9 @@ async function bugunPerformansDavranisi() {
   const satirlar = functionBody(app, 'function expenseCategoryRowsHtml(');
   check(/eslesenGiderKategorisi\(exp\.category\) === catName/.test(satirlar) && /isExpenseInFilter\(exp\)/.test(satirlar)
     && /editExpense\(/.test(satirlar) && /deleteExpenseUI\(/.test(satirlar) && /canManageTenantRole/.test(satirlar)
-    && /toggleExpenseCategoryRows\(cat\.name\)/.test(functionBody(app, 'function renderExpenseDonutAndTable(')),
-    'L-224b Gider analizi kategorisi yerinde acilir; kayit oradan duzenlenir/silinir (yalniz yonetim rolu)');
+    && /setFinanceView\('category'/.test(functionBody(app, 'function renderExpenseDonutAndTable('))
+    && /expenseCategoryRowsHtml\(financeCategory\)/.test(functionBody(app, 'function renderFinanceView(')),
+    'L-224b Gider kategorisi kendi alt sayfasinda acilir (Fox); kayit oradan duzenlenir/silinir (yalniz yonetim rolu)');
   // Gelir ekleme (phase97, kullanici 19.10.2026): iki secenek, rezervasyon dogrudan rezervasyon formu
   check(/startIncomeEntry\('BOOKING'\)[^<]*Rezervasyon/.test(html) && /startIncomeEntry\('OTHER'\)/.test(html)
     && /if \(kind === 'BOOKING'\) return openBookingModal\(\);/.test(functionBody(app, 'function startIncomeEntry(')),

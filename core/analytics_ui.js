@@ -51,7 +51,10 @@
   // Seri kimligi sabittir: filtre bir seriyi kapatinca digerlerinin rengi
   // degismez. Sira koyu yuzeyde (#1C1C1E) renk korlugu dogrulamasindan gecti.
   const COMPARES = [
-    { key: 'yoy1', label: 'Geçen yıl', short: 'geçen yıla göre', slot: 2 },
+    // Birkac yilla kiyas (kullanici 22.11.2026): 1, 2 ve 3 yil oncenin ayni donemi.
+    { key: 'yoy1', label: '1 yıl önce', short: 'geçen yıla göre', slot: 2 },
+    { key: 'yoy2', label: '2 yıl önce', short: '2 yıl öncesine göre', slot: 3 },
+    { key: 'yoy3', label: '3 yıl önce', short: '3 yıl öncesine göre', slot: 6 },
     { key: 'prev', label: 'Önceki dönem', short: 'önceki döneme göre', slot: 4 },
     { key: 'portfolio', label: 'Portföy ortalaması', short: 'portföy ortalamasına göre', slot: 5 },
     { key: 'target', label: 'Hedef', short: 'hedefe göre', slot: 'target' }
@@ -459,7 +462,8 @@
       villa: opt.initialVilla || 'ALL',
       preset: 'month',
       anchor: null,
-      compare: { yoy1: true, yoy2: false, prev: true, portfolio: true, target: true },
+      start: null,
+      compare: { yoy1: true, yoy2: false, yoy3: false, prev: true, portfolio: true, target: true },
       metric: 'revenue',
       sort: { key: 'revenue', dir: 'desc' }
     };
@@ -491,7 +495,7 @@
       if (t.hasAttribute('data-ba-set')) {
         const k = t.getAttribute('data-ba-set');
         const v = t.getAttribute('data-ba-value');
-        if (k === 'preset') state.preset = v;
+        if (k === 'preset') { state.preset = v; state.start = null; }
         if (k === 'metric') state.metric = v;
         render();
       } else if (t.hasAttribute('data-ba-toggle')) {
@@ -511,7 +515,18 @@
       const t = ev.target;
       if (!t || !t.getAttribute) return;
       if (t.getAttribute('data-ba-select') === 'villa') setVilla(t.value);
-      if (t.getAttribute('data-ba-select') === 'anchor') { state.anchor = t.value; render(); }
+      // Tarih araligi (kullanici 22.11.2026): baslangic ve bitis ayi ayri secilir; gelecek aylar dahil.
+      if (t.getAttribute('data-ba-select') === 'anchor') {
+        state.anchor = t.value;
+        if (state.start && state.start > state.anchor) state.start = state.anchor;
+        render();
+      }
+      if (t.getAttribute('data-ba-select') === 'start') {
+        state.start = t.value;
+        state.preset = 'custom';
+        if (state.anchor && state.start > state.anchor) state.anchor = state.start;
+        render();
+      }
     }
 
     function setVilla(v) {
@@ -572,14 +587,13 @@
       const ayListesi = months();
       const bugunAy = typeof d.today === 'string' ? d.today.slice(0, 7) : null;
       if (!state.anchor || (ayListesi.length && !ayListesi.includes(state.anchor))) {
-        // Varsayilan: son TAMAMLANAN ay. Suren ay tam bir gecen yil ayiyla
-        // kiyaslanirsa her rozet yaniltici bicimde "dusus" der.
-        const gecenAy = bugunAy ? BookingAnalytics.shiftMonth(bugunAy, -1) : null;
-        const uygun = ayListesi.filter(m => !gecenAy || m <= gecenAy);
+        // Varsayilan (kullanici 22.11.2026): icinde bulunulan ay, bugun dahil. Suren ay
+        // "suruyor" notuyla gosterilir; kiyas rozetleri o notla okunur.
         state.anchor = ayListesi.length
-          ? (uygun.includes(gecenAy) ? gecenAy : (uygun[uygun.length - 1] || ayListesi[0]))
-          : gecenAy;
+          ? (ayListesi.includes(bugunAy) ? bugunAy : ayListesi.filter(m => !bugunAy || m <= bugunAy).pop() || ayListesi[0])
+          : bugunAy;
       }
+      if (state.start && ayListesi.length && !ayListesi.includes(state.start)) state.start = null;
       if (state.villa !== 'ALL' && !d.villas.some(v => v.key === state.villa)) state.villa = 'ALL';
       rootEl.textContent = '';
       rootEl.classList.add('ba-root');
@@ -587,7 +601,10 @@
         rootEl.appendChild(emptyState('Dönem seçilemedi', 'Bugünün tarihi okunamadı; sayfayı yenileyin.'));
         return;
       }
-      const period = presetPeriod(state.preset, state.anchor);
+      const period = state.preset === 'custom' && state.start
+        ? { start: state.start <= state.anchor ? state.start : state.anchor, end: state.anchor }
+        : presetPeriod(state.preset, state.anchor);
+      state.start = period.start;
       let report;
       try {
         report = BookingAnalytics.buildReport({
@@ -653,10 +670,17 @@
       const suruyor = bugunAy && report.period.start <= bugunAy && report.period.end >= bugunAy;
       if (yoy) ozet.push(`ciro geçen yıla göre ${yoy.value >= 0 ? '+' : '−'}%${nf1.format(Math.abs(yoy.value))}`);
 
-      const anchorSel = h('select', { class: 'ba-select', 'data-ba-select': 'anchor', 'aria-label': 'Dönemin son ayı' },
-        (ayListesi.length ? ayListesi : [state.anchor]).slice().reverse().map(m => h('option', {
-          value: m, selected: m === state.anchor, text: monthLong(m)
-        })));
+      const aylar = (ayListesi.length ? ayListesi : [state.anchor]).slice().reverse();
+      const ayEtiketi = m => monthLong(m) + (m === bugunAy ? ' (bu ay)' : (bugunAy && m > bugunAy ? ' · gelecek' : ''));
+      const startSel = h('select', { class: 'ba-select', 'data-ba-select': 'start', 'aria-label': 'Başlangıç ayı' },
+        aylar.map(m => h('option', { value: m, selected: m === report.period.start, text: ayEtiketi(m) })));
+      const anchorSel = h('select', { class: 'ba-select', 'data-ba-select': 'anchor', 'aria-label': 'Bitiş ayı' },
+        aylar.map(m => h('option', { value: m, selected: m === state.anchor, text: ayEtiketi(m) })));
+      const aralik = h('div', { class: 'ba-range', role: 'group', 'aria-label': 'Tarih aralığı' }, [
+        h('label', { class: 'ba-range-label' }, ['Başlangıç', startSel]),
+        h('span', { class: 'ba-range-sep', 'aria-hidden': 'true', text: '→' }),
+        h('label', { class: 'ba-range-label' }, ['Bitiş', anchorSel])
+      ]);
       const villaSel = h('select', { class: 'ba-select', 'data-ba-select': 'villa', 'aria-label': 'Mülk' },
         [h('option', { value: 'ALL', selected: report.villa === 'ALL', text: 'Tüm mülkler' })].concat(
           d.villas.map(v => h('option', { value: v.key, selected: report.villa === v.key, text: v.name || v.key }))));
@@ -681,13 +705,12 @@
             h('h2', { class: 'ba-title', text: 'Analiz' }),
             h('p', { class: 'ba-subtitle', text: ozet.join(' · ') }),
             suruyor ? h('p', { class: 'ba-running', text: `${monthLong(bugunAy)} sürüyor: rakamlar bugüne kadar girilmiş rezervasyonlardır, karşılaştırmalar tamamlanmış dönemlerle yapılır.` }) : null,
-            // D-07: diger sekmeler suren ayi gosterirken Analiz son tamamlanan ayla
-            // acilir; kullanici neden farkli ay gordugunu bilsin.
-            (!suruyor && bugunAy && report.period.end === BookingAnalytics.shiftMonth(bugunAy, -1))
-              ? h('p', { class: 'ba-period-note', text: `Son tamamlanan ay gösteriliyor (${monthLong(report.period.end)}). ${monthLong(bugunAy)} sürüyor; görmek için "Dönemin son ayı" seçicisinden seçin.` })
+            // Gelecek ay secilince rakamlar bugune kadar girilmis (gelecek) rezervasyonlardir.
+            (bugunAy && report.period.end > bugunAy)
+              ? h('p', { class: 'ba-period-note', text: `Aralık gelecek ayları içeriyor: ${monthLong(report.period.end)} dahil, şimdiye kadar alınmış rezervasyonlar gösterilir.` })
               : null
           ]),
-          h('div', { class: 'ba-filters' }, [villaSel, anchorSel, segmented('preset', PRESETS, state.preset, 'Dönem uzunluğu')])
+          h('div', { class: 'ba-filters' }, [villaSel, aralik, segmented('preset', PRESETS, state.preset, 'Hızlı seçim')])
         ]),
         chips
       ]);
@@ -827,8 +850,17 @@
           h('td', { class: 'num', text: fmt(r.cancelRate, 'pct') })
         ])))
       ]);
-      const body = h('div', { class: 'ba-donut-wrap' }, [donut(slices, 'Toplam', fmtAxis(ch.totalRevenue, 'money'), title), h('div', { class: 'ba-scroll' }, list)]);
-      return card('Kanal dağılımı', 'Konaklama cirosu payı · rezervasyon ve iptal girişe göre', null, body);
+      // Ciro var ama rezervasyon 0: tutar toplu aktarim ozetinden (kanali bilinmez,
+      // rezervasyon sayilmaz, L-103). Bunu soylemezsek tablo yaniltici gorunuyordu.
+      const topluNot = ch.rows.some(r => r.revenue > 0 && !r.bookings)
+        ? h('p', { class: 'ba-kpi-note', text: 'Rezervasyonu 0 görünen satırın cirosu aylık toplu girişten gelir: toplu girişte kanal ve rezervasyon sayısı yoktur, yalnız tutar vardır.' })
+        : null;
+      const body = h('div', {}, [
+        h('p', { class: 'ba-explain', text: 'Konaklama cirosunun hangi kanaldan (Airbnb, Booking, doğrudan…) geldiğini gösterir: her kanalın cirosu, payı, rezervasyon sayısı, gecelik ortalama fiyatı (ADR) ve iptal oranı.' }),
+        h('div', { class: 'ba-donut-wrap' }, [donut(slices, 'Toplam', fmtAxis(ch.totalRevenue, 'money'), title), h('div', { class: 'ba-scroll' }, list)]),
+        topluNot
+      ]);
+      return card('Kanal dağılımı', 'Ciro hangi kanaldan geliyor?', null, body);
     }
 
     // ------------------------------------------------------- ileriye --

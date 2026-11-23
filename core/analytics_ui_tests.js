@@ -120,6 +120,11 @@ function mountWith(bookings, extra) {
     monthOptions: () => ['2025-10', '2026-09', '2026-10', '2026-11']
   }, extra || {}));
   ui.render();
+  // Analiz icinde bulunulan ayla acilir (22.11.2026); fikstur verisi Ekim'dedir, testler Ekim'i secer.
+  if (!(extra && extra.keepDefault)) {
+    const bitis = root.querySelector('[data-ba-select="anchor"]');
+    if (bitis) change(root, bitis, '2026-10');
+  }
   return { root, ui };
 }
 const texts = root => root.all().filter(n => n.children.some(c => c.tagName === '#TEXT')).map(n => n.textContent);
@@ -145,11 +150,18 @@ test('U1. Bos isletme: bos durum yazilir, hicbir tutar ya da yuzde uydurulmaz', 
   assert.strictEqual(root.querySelectorAll('.ba-kpi').length, 0);
 });
 
-test('U2. Varsayilan donem son tamamlanan ay (Kasim surerken Ekim)', () => {
-  const { ui, root } = mountWith(BOOKINGS);
-  assert.strictEqual(ui.getState().anchor, '2026-10');
-  assert.ok(root.querySelector('.ba-subtitle').textContent.startsWith('Ekim 2026'));
-  assert.strictEqual(root.querySelector('.ba-running'), null, 'tamamlanmis ayda "suruyor" notu yok');
+test('U2. Varsayilan donem icinde bulunulan ay (bugun dahil, kullanici 22.11.2026); "suruyor" notu', () => {
+  const { ui, root } = mountWith(BOOKINGS, { keepDefault: true });
+  assert.strictEqual(ui.getState().anchor, '2026-11');
+  assert.ok(root.querySelector('.ba-subtitle').textContent.startsWith('Kasım 2026'));
+  assert.ok(root.querySelector('.ba-running'), 'suren ayda "suruyor" notu var');
+  // Tarih araligi: baslangic Eylul, bitis Kasim -> 3 aylik donem; baslangic bitisten sonra secilirse bitis kayar.
+  change(root, root.querySelector('[data-ba-select="start"]'), '2026-09');
+  assert.deepStrictEqual(ui.getReport().period, { start: '2026-09', end: '2026-11' });
+  assert.strictEqual(ui.getState().preset, 'custom');
+  change(root, root.querySelector('[data-ba-select="start"]'), '2026-11');
+  change(root, root.querySelector('[data-ba-select="anchor"]'), '2026-10');
+  assert.deepStrictEqual(ui.getReport().period, { start: '2026-10', end: '2026-10' });
 });
 
 test('U3. KPI degerleri raporla ayni; NaN/undefined/Infinity yazilmaz', () => {
@@ -182,7 +194,12 @@ test('U6. Kontroller: donem, karsilastirma, siralama, mulk', () => {
   click(root, root.querySelector('[data-ba-value="6m"]'));
   assert.strictEqual(ui.getState().preset, '6m');
   assert.ok(root.querySelector('.ba-subtitle').textContent.startsWith('Mayıs – Ekim 2026'));
-  assert.strictEqual(root.querySelector('[data-ba-toggle="yoy2"]'), null, '"2 yıl önce" karşılaştırması kalktı (sadelik 3. tur)');
+  // Birkac yilla kiyas (kullanici 22.11.2026): 2 ve 3 yil once secilebilir, varsayilan kapali.
+  assert.ok(root.querySelector('[data-ba-toggle="yoy2"]') && root.querySelector('[data-ba-toggle="yoy3"]'), '2 ve 3 yıl önce seçilebilir');
+  assert.strictEqual(ui.getState().compare.yoy2, false);
+  click(root, root.querySelector('[data-ba-toggle="yoy3"]'));
+  assert.strictEqual(ui.getState().compare.yoy3, true);
+  click(root, root.querySelector('[data-ba-toggle="yoy3"]'));
   click(root, root.querySelector('[data-ba-toggle="yoy1"]'));
   assert.strictEqual(ui.getState().compare.yoy1, false);
   click(root, root.querySelector('[data-ba-sort="name"]'));
@@ -202,7 +219,7 @@ test('U7. Portfoy ortalamasi tum mulklerde kapali; 12 aylik trendde onceki donem
   const { root } = mountWith(BOOKINGS);
   assert.strictEqual(root.querySelector('[data-ba-toggle="portfolio"]'), null, 'tum mulklerde portfoy cipi gosterilmez');
   const legend = root.querySelector('.ba-legend').querySelectorAll('li').map(li => li.textContent);
-  assert.ok(legend.includes('Geçen yıl'));
+  assert.ok(legend.includes('1 yıl önce'));
   assert.ok(!legend.includes('Önceki dönem'));
   assert.ok(root.textContent.includes('Önceki dönem 12 aylık pencerede geçen yılla aynıdır'));
 });

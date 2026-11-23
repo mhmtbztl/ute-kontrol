@@ -51,6 +51,13 @@ html:not(.lx-styles-ready) body { visibility: hidden; }
   --lx-keep-bg: #EAF3DE; --lx-keep-fg: #27500A;
   --lx-up-bg: #E6F1FB;   --lx-up-fg: #0C447C;
   --lx-down-bg: #FCEBEB; --lx-down-fg: #791F1F;
+  /* Fox Tasarimi (docs/FOX_TASARIMI.md): anlam renkleri, kenar + acik zemin */
+  --fox-revenue: #1F6FEB; --fox-revenue-bg: #EEF4FE;
+  --fox-income: #1A7F37;  --fox-income-bg: #EEF8F0;
+  --fox-expense: #CF222E; --fox-expense-bg: #FDEEEF;
+  --fox-capex: #BC4C00;   --fox-capex-bg: #FFF3E8;
+  --fox-info: #6E40C9;    --fox-info-bg: #F4F0FC;
+  --fox-neutral: #D3D1C7; --fox-neutral-bg: #FFFFFF;
 
   --bg-main: #FFFFFF;
   --bg-surface: #FFFFFF;
@@ -107,6 +114,12 @@ html:not(.lx-styles-ready) body { visibility: hidden; }
   --lx-keep-bg: #27500A; --lx-keep-fg: #C0DD97;
   --lx-up-bg: #0C447C;   --lx-up-fg: #B5D4F4;
   --lx-down-bg: #791F1F; --lx-down-fg: #F7C1C1;
+  --fox-revenue: #58A6FF; --fox-revenue-bg: #14263F;
+  --fox-income: #3FB950;  --fox-income-bg: #13301C;
+  --fox-expense: #F85149; --fox-expense-bg: #3A1618;
+  --fox-capex: #F0883E;   --fox-capex-bg: #3A2312;
+  --fox-info: #A371F7;    --fox-info-bg: #2A1F45;
+  --fox-neutral: #5F5E5A; --fox-neutral-bg: #2C2C2A;
 
   --bg-main: #2C2C2A;
   --bg-surface: #2C2C2A;
@@ -5020,7 +5033,8 @@ th,
 }
 .lex-screen .tape-chart-wrapper, .lex-screen .ops-group { border: 1px solid var(--lx-line); border-radius: 8px; }
 .lex-screen .daterange-trigger { border: 1px solid var(--lx-line); }
-.lex-screen .card :is(input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="file"]), select, textarea) { border: 1px solid var(--lx-line); border-radius: 8px; }
+/* Notion alanlari (tp-title, tp-text, tp-heading, tp-doc) bu cerceveyi almaz: duz sayfa. */
+.lex-screen .card :is(input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="file"]):not(.tp-title):not(.tp-text):not(.tp-heading), select, textarea:not(.tp-doc)) { border: 1px solid var(--lx-line); border-radius: 8px; }
 /* Telefonda ust cubugun backdrop-filter'i sabit menunun kapsayicisi olur; alt: 0 menuyu
    44 px'e sikistiriyordu (hesap, Hizli Ekle, bildirim). Yukseklik ust cizgiden olculur. */
 @media (max-width: 640px) {
@@ -5200,4 +5214,161 @@ th,
 .mk-steps { margin: 0 0 12px; padding-left: 20px; display: grid; gap: 6px; font-size: 14px; }
 @media (max-width: 640px) {
   .lex-link-inline { display: inline-flex; align-items: center; min-height: 36px; }
+}
+
+/* =====================================================================
+   FOX TASARIMI (kullanici 22.11.2026, docs/FOX_TASARIMI.md). Lex duzeninin
+   ustune renk katmani: kartin ust kenari ve acik zemini anlam rengini tasir,
+   rakam koyu kalir. Golge yok, iki kalinlik.
+   ===================================================================== */
+.fox-grid { gap: 12px; }
+.lex-screen .fox-card,
+.fox-card { --fox-c: var(--fox-neutral); --fox-bg: var(--fox-neutral-bg); background: var(--fox-bg); border: 1px solid var(--lx-line); border-top: 3px solid var(--fox-c); border-radius: 12px; padding: 14px 16px; color: var(--lx-text); text-align: left; }
+.lex-screen .fox-card--revenue, .fox-card--revenue { --fox-c: var(--fox-revenue); --fox-bg: var(--fox-revenue-bg); }
+.lex-screen .fox-card--income, .fox-card--income { --fox-c: var(--fox-income); --fox-bg: var(--fox-income-bg); }
+.lex-screen .fox-card--expense, .fox-card--expense { --fox-c: var(--fox-expense); --fox-bg: var(--fox-expense-bg); }
+.lex-screen .fox-card--capex, .fox-card--capex { --fox-c: var(--fox-capex); --fox-bg: var(--fox-capex-bg); }
+.lex-screen .fox-card--info, .fox-card--info { --fox-c: var(--fox-info); --fox-bg: var(--fox-info-bg); }
+.lex-screen .fox-card--neutral, .fox-card--neutral { --fox-c: var(--fox-neutral); --fox-bg: var(--fox-neutral-bg); }
+.lex-screen .fox-card .kpi-label, .fox-card .kpi-label { color: var(--lx-text-2); font-size: 13px; }
+.lex-screen .fox-card .kpi-value, .fox-card .kpi-value { color: var(--lx-text); font-size: 26px; font-weight: 500; }
+.lex-screen .fox-card .kpi-trend.positive, .fox-card .kpi-trend.positive { color: var(--fox-income); }
+.lex-screen .fox-card .kpi-trend.negative, .fox-card .kpi-trend.negative { color: var(--fox-expense); }
+.fox-card--link { cursor: pointer; font: inherit; }
+.fox-card--link:hover { border-color: var(--fox-c); }
+.fox-card small { display: block; font-size: 12px; color: var(--lx-text-2); margin-top: 2px; }
+
+.fox-pages { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 16px 0 8px; }
+.fox-page-link { --fox-c: var(--fox-neutral); --fox-bg: var(--fox-neutral-bg); position: relative; display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 2px 12px; width: 100%; font: inherit; text-align: left; color: var(--lx-text); background: var(--fox-bg); border: 1px solid var(--lx-line); border-left: 4px solid var(--fox-c); border-radius: 12px; padding: 14px 36px 14px 16px; cursor: pointer; }
+.fox-page-link::after { content: "\203A"; position: absolute; right: 14px; top: 50%; transform: translateY(-50%); font-size: 22px; color: var(--fox-c); }
+.fox-page-link:hover { border-color: var(--fox-c); }
+.fox-page-link:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.fox-page-link--revenue { --fox-c: var(--fox-revenue); --fox-bg: var(--fox-revenue-bg); }
+.fox-page-link--expense { --fox-c: var(--fox-expense); --fox-bg: var(--fox-expense-bg); }
+.fox-page-link__title { font-size: 16px; font-weight: 500; }
+.fox-page-link__value { font-size: 18px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.fox-page-link__sub { grid-column: 1 / -1; font-size: 12px; color: var(--lx-text-2); }
+
+.fox-subpage { --fox-c: var(--fox-neutral); padding: 4px 0 24px; }
+.fox-subpage--revenue { --fox-c: var(--fox-revenue); }
+.fox-subpage--expense { --fox-c: var(--fox-expense); }
+.fox-back { font: inherit; font-size: 14px; color: var(--lx-text-2); background: none; border: 0; padding: 6px 0; cursor: pointer; min-height: 36px; }
+.fox-back:hover { color: var(--lx-text); }
+.fox-subpage__title { font-size: 22px; font-weight: 500; margin: 4px 0 8px; padding-bottom: 8px; border-bottom: 3px solid var(--fox-c); color: var(--lx-text); }
+.fox-subpage .income-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin: 12px 0 16px; }
+.fox-subpage .income-summary-item { display: flex; flex-direction: column; gap: 4px; }
+.fox-subpage .income-summary-item strong { font-size: 20px; font-weight: 500; }
+.fox-add-row { position: relative; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--lx-line); }
+.fox-add { font: inherit; font-size: 15px; font-weight: 500; color: var(--fox-c, var(--lx-text)); background: none; border: 1px dashed var(--fox-c, var(--lx-line)); border-radius: 10px; padding: 10px 16px; cursor: pointer; min-height: 44px; }
+.fox-add:hover { background: var(--lx-weekend); }
+.fox-add--quiet { color: var(--lx-text-2); border-color: var(--lx-line); font-weight: 400; }
+.fox-add-row .income-add-menu { bottom: calc(100% + 4px); top: auto; left: 0; right: auto; }
+.fox-chevron { font-size: 18px; color: var(--lx-text-2); }
+#finSubExpenses .clickable-row { cursor: pointer; }
+#finSubExpenses .clickable-row:hover td { background: var(--lx-weekend); }
+@media (max-width: 640px) {
+  .fox-pages { grid-template-columns: 1fr; }
+  .lex-screen .fox-card .kpi-value, .fox-card .kpi-value { font-size: 22px; }
+  .fox-subpage .income-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ChatGPT'ye sor (ust cubuk, 22.11.2026): kisa etiket + isaret; ust cubuk tek satirda kalir. */
+.header-chatgpt-btn { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.header-chatgpt-icon { color: var(--fox-info); font-size: 15px; line-height: 1; }
+@media (max-width: 640px) { .app-header .header-actions .header-chatgpt-btn .header-btn-text { display: none; } .header-chatgpt-icon { font-size: 18px; } }
+
+/* Temizlik (sade, 22.11.2026): satir = ev · tarih · temizlikci · ilerleme · durum;
+   satira dokununca temizlik sayfasi (iki sutunlu canli liste, phase123). */
+.cl-group { margin: 0 0 18px; }
+.cl-group__title { font-size: 14px; font-weight: 500; margin: 0 0 4px; padding-bottom: 6px; border-bottom: 1px solid var(--lx-text); color: var(--lx-text); }
+.cl-row { display: grid; grid-template-columns: minmax(0, 1fr) 150px auto; align-items: center; gap: 12px; width: 100%; font: inherit; text-align: left; color: var(--lx-text); background: none; border: 0; border-bottom: 1px solid var(--lx-line); padding: 10px 4px; cursor: pointer; min-height: 52px; }
+.cl-row:hover { background: var(--lx-weekend); }
+.cl-row:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
+.cl-row__main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cl-row__title { font-size: 15px; font-weight: 500; }
+.cl-row__meta { font-size: 12px; color: var(--lx-text-2); }
+.cl-row__progress { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--lx-text-2); font-variant-numeric: tabular-nums; }
+.cl-debt details summary { display: flex; gap: 8px; align-items: baseline; cursor: pointer; list-style: none; }
+.cl-debt details summary::-webkit-details-marker { display: none; }
+.cl-debt details summary strong:last-child { margin-left: auto; }
+.cl-page .cl-meta { font-size: 13px; color: var(--lx-text-2); margin: 0 0 12px; }
+.cl-assign { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
+.cl-assign select { min-height: 36px; border-radius: 8px; border: 1px solid var(--lx-line); padding: 4px 8px; background: var(--lx-bg); color: var(--lx-text); }
+.lex-btn--danger { color: var(--fox-expense); border-color: var(--fox-expense); }
+.cl2 { border-top: 1px solid var(--lx-line); }
+.cl2-head, .cl2-row { display: grid; grid-template-columns: minmax(0, 1fr) 84px 84px; align-items: center; gap: 8px; }
+.cl2-head { font-size: 12px; color: var(--lx-text-2); padding: 8px 0; border-bottom: 1px solid var(--lx-line); }
+.cl2-head span:not(:first-child) { text-align: center; }
+.cl2-section h4 { font-size: 16px; font-weight: 500; margin: 14px 0 4px; color: var(--lx-text); }
+.cl2-row { min-height: 40px; border-bottom: 1px solid var(--lx-line); }
+.cl2-row--sub .cl2-text { padding-left: 24px; color: var(--lx-text-2); }
+.cl2-text { font-size: 15px; }
+.cl2-star { color: var(--fox-expense); }
+.cl2-cell { display: flex; justify-content: center; align-items: center; min-height: 36px; font-size: 16px; color: var(--fox-income); }
+.cl2-cell.is-on { font-weight: 500; }
+.cl2-cell--m input { width: 20px; height: 20px; accent-color: var(--fox-revenue); cursor: pointer; }
+.cleaning-checklist-preview { border-left: 3px solid var(--fox-revenue); padding: 8px 12px; background: var(--fox-revenue-bg); border-radius: 8px; }
+.cleaning-checklist-preview:empty { display: none; }
+.cleaning-preview__line { margin: 0; font-size: 14px; color: var(--lx-text); }
+.cleaning-preview__sub { margin: 4px 0 0; font-size: 12px; color: var(--lx-text-2); }
+.staff-check-m { margin-left: auto; font-size: 12px; color: var(--fox-revenue); white-space: nowrap; }
+@media (max-width: 640px) {
+  .cl-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .cl-row__progress { grid-column: 1 / -1; grid-row: 2; }
+  .cl2-head, .cl2-row { grid-template-columns: minmax(0, 1fr) 64px 64px; }
+  .cl2-row { min-height: 48px; }
+}
+.ops-cleaning-layout:has(> aside[hidden]) { grid-template-columns: minmax(0, 1fr); }
+
+/* Sablonlar ve kontrol listeleri: Notion tarzi sayfa (22.11.2026). */
+.tp-pane-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.tp-pane-head h3 { margin: 0; }
+.tp-pane-head .fox-add, #settingsChecklistNewButton { min-height: 36px; padding: 6px 14px; font-size: 14px; }
+.settings-template-list.tp-list { margin-top: 8px; }
+.tp-list__row.is-archived .tp-list__title { color: var(--lx-text-2); text-decoration: line-through; }
+.settings-template-page .tp-page, .settings-template-form { display: flex; flex-direction: column; gap: 8px; }
+.settings-template-page .tp-title, #settingsChecklistName.tp-title { border: 0; border-radius: 0; background: transparent; box-shadow: none; padding: 4px 0; font-size: 26px; font-weight: 500; color: var(--lx-text); width: 100%; }
+.settings-template-page .tp-title:focus, #settingsChecklistName.tp-title:focus { outline: none; box-shadow: inset 0 -1px 0 var(--lx-line); }
+.tp-doc { width: 100%; min-height: 220px; font: inherit; font-size: 15px; line-height: 1.6; color: var(--lx-text); background: transparent; border: 0; border-top: 1px solid var(--lx-line); padding: 12px 0; resize: vertical; }
+.tp-doc:focus { outline: none; }
+.settings-template-page .tp-props { grid-template-columns: repeat(2, minmax(0, 240px)); }
+/* Kontrol listesi duzenleyicisi: kutu/golge yok, kagit liste gibi duz satirlar. */
+#settingsChecklistTemplateForm .checklist-doc { background: transparent; box-shadow: none; border: 0; padding: 0; }
+#settingsChecklistTemplateForm .checklist-doc input[type="text"] { border: 0; border-radius: 0; background: transparent; box-shadow: none; padding: 6px 0; }
+#settingsChecklistTemplateForm .checklist-doc input[type="text"]:focus { outline: none; box-shadow: inset 0 -1px 0 var(--lx-line); }
+#settingsChecklistTemplateForm .checklist-doc-heading input { font-size: 18px; font-weight: 500; }
+#settingsChecklistTemplateForm .checklist-builder-section { border: 0; border-top: 1px solid var(--lx-line); padding-top: 8px; }
+#settingsChecklistTemplateForm .checklist-builder-actions { opacity: 0.4; }
+#settingsChecklistTemplateForm .checklist-builder-item:hover .checklist-builder-actions, #settingsChecklistTemplateForm .checklist-builder-item:focus-within .checklist-builder-actions { opacity: 1; }
+@media (max-width: 640px) {
+  .settings-template-page .tp-props { grid-template-columns: 1fr; }
+  #settingsChecklistTemplateForm .checklist-builder-actions { opacity: 1; }
+}
+/* Notion govdesi her yerde duz (Ayarlar'in genel form stili cerceve veriyordu). */
+.tp-body input.tp-text, .tp-body input.tp-heading, .settings-template-page input.tp-title { border: 0; border-radius: 0; background: transparent; box-shadow: none; padding-left: 0; padding-right: 0; min-height: 0; width: auto; }
+.settings-template-page input.tp-title { width: 100%; }
+.tp-body input.tp-text:focus, .tp-body input.tp-heading:focus { outline: none; box-shadow: inset 0 -1px 0 var(--lx-line); }
+#settingsChecklistTemplateForm > .fox-back { justify-self: start; align-self: flex-start; }
+.income-category-label { display: block; font-size: 12px; color: var(--lx-text-2); margin-top: 2px; }
+
+/* Pazarlama: Fox seridi + kampanya harcama grafigi (22.11.2026). */
+.mk-fox-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 12px 0 16px; }
+.mk-fox { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.mk-fox__label { font-size: 13px; color: var(--lx-text-2); margin: 0; }
+.mk-fox__row { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
+.mk-fox__value { font-size: 22px; font-weight: 500; margin: 0; color: var(--lx-text); font-variant-numeric: tabular-nums; }
+.mk-fox__note { font-size: 12px; color: var(--lx-text-2); margin: 0; }
+.mk-fox .ads-spark i { background: var(--fox-c); }
+.mk-chart { margin: 0 0 16px; padding: 14px 16px; border: 1px solid var(--lx-line); border-radius: 12px; }
+.mk-chart__title { font-size: 14px; font-weight: 500; color: var(--lx-text); margin: 0 0 10px; }
+.mk-bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.mk-bar { display: grid; grid-template-columns: minmax(0, 180px) minmax(0, 1fr) auto; align-items: center; gap: 10px; font-size: 13px; }
+.mk-bar__name { color: var(--lx-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mk-bar__track { height: 10px; border-radius: 5px; background: var(--fox-expense-bg); overflow: hidden; }
+.mk-bar__fill { display: block; height: 100%; border-radius: 5px; background: var(--fox-expense); }
+.mk-bar__val { color: var(--lx-text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+@media (max-width: 640px) {
+  .mk-fox-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mk-bar { grid-template-columns: minmax(0, 1fr) auto; }
+  .mk-bar__track { grid-column: 1 / -1; grid-row: 2; }
 }

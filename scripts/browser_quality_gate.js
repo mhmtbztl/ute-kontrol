@@ -699,7 +699,7 @@ async function main() {
         currentFilter.period = getTodayStr().slice(0, 7);
         switchTab('finance');
         handleFilterChange();
-        document.getElementById('financeIncomeDisclosure').open = true;
+        setFinanceView('income'); // Fox: gelirler alt sayfasi
       });
       await page.selectOption('#globalVillaFilter', 'test');
       const portfoy = await page.evaluate(() => ({ villa: currentFilter.villa, global: document.getElementById('globalVillaFilter').value }));
@@ -805,7 +805,7 @@ async function main() {
       // Word listesi yapistirilir, Enter yeni madde acar. Personel karti
       // onaylanan isi gostermez, bos listede Z'yi kilitlemez, giris bilgisini
       // gosterir. Menudeki Operasyon sayisi bugunun acik isi.
-      await page.evaluate(() => { appData.settingsChecklistTemplates = []; openSettingsSection('checklists'); renderSettingsTemplates(); });
+      await page.evaluate(() => { appData.settingsChecklistTemplates = []; openSettingsSection('checklists'); renderSettingsTemplates(); openSettingsChecklistPage(); });
       await page.waitForSelector('#settingsChecklistsCard #settingsChecklistTemplateForm', { state: 'visible' });
       await page.click('#settingsChecklistsCard .checklist-paste summary');
       await page.fill('#settingsChecklistPaste', 'Mutfak\n    Bulaşıklar yıkandı mı\n        Kireç kontrol edildi mi\n    Süpürüldü mü\nYatak odası\n    !Çarşaf yıkandı mı?\nMalzeme listesi\n    Çay\n    Kahve\n    Bulaşık deterjanı');
@@ -1071,7 +1071,7 @@ async function main() {
       // aylik KPI tablosu yana kayar ama ay sutunu sabit; kucuk hedef yok.
       await page.evaluate(() => {
         switchTab('finance');
-        ['financeIncomeDisclosure', 'financeExpensesDisclosure', 'financeMonthlyDisclosure'].forEach(id => { const d = document.getElementById(id); if (d) d.open = true; });
+        setFinanceView('main');
       });
       // Etiketleri tbody gozlemcisi yazar (mikrogorev): olcumden once bir tik beklenir.
       await page.waitForTimeout(50);
@@ -1207,6 +1207,8 @@ async function main() {
         appData.settingsChecklistTemplates = [];
         renderSettingsTemplates();
       });
+      // Notion sayfasi (22.11.2026): liste once, "+ Yeni liste" duzenleyiciyi acar.
+      await page.click('#settingsChecklistNewButton');
       await page.waitForSelector('#settingsChecklistTemplateForm', { state: 'visible' });
       await page.fill('#settingsChecklistName', 'Misafir öncesi tarayıcı kontrolü');
       await page.selectOption('#settingsChecklistType', 'CHECKIN_PREP');
