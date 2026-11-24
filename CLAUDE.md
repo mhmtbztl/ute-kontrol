@@ -1058,7 +1058,7 @@ Anon kapısı göçten önce de kapalı olduğundan anon sorgusu ayırt etmez; k
 Paket: `docs/PHASE115_DEPLOY_PACKAGE.md`.
 
 **phase123 (`migration_phase123_cleaning_live_checklist.sql`) ve phase125 (`migration_phase125_income_categories.sql`)
-22 Kasım 2026'da test projesine uygulandı; üretim kullanıcı onayı bekliyor.** phase123: yönetici Kontrol (M)
+22 Kasım 2026'da test projesine, 24 Kasım 2026'da kullanıcı tarafından üretime uygulandı; üretimde doğrulandı** (`production:readiness` BAŞARILI, `schema_migrations` 123 ve 125). phase123: yönetici Kontrol (M)
 işaretini temizlik sürerken yazar (`set_cleaning_manager_marks`, Z'ye dokunmaz) ve `cleaning_task_executions` canlı
 yayına eklenir; phase125: `income_entries.category`. İkisi de göç yokken istemciyi kırmaz. Canlı süitler 16/16 ve 7/7.
 
