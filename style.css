@@ -5372,3 +5372,13 @@ th,
   .mk-bar { grid-template-columns: minmax(0, 1fr) auto; }
   .mk-bar__track { grid-column: 1 / -1; grid-row: 2; }
 }
+
+/* Fiyatlandirma (Fox, 22.11.2026): dolu gun agir siyah kutu yerine acik mor (bilgi);
+   Takvim · Liste secimi ay seridinin yaninda. */
+.pricing-day.is-booked { background: var(--fox-info-bg); border-color: transparent; }
+.pricing-day.is-booked .pricing-day-num, .pricing-day.is-booked .pricing-day-state { color: var(--fox-info); }
+button.pricing-day.is-booked:hover { background: var(--fox-info-bg); border-color: var(--fox-info); }
+.pricing-mode-tabs .lex-chips { margin: 0; flex-wrap: nowrap; }
+.pricing-calendar-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.pricing-calendar-head .pricing-month-tabs { flex: 1 1 320px; min-width: 0; }
+#pricingManagerContainer .lex-table { margin-top: 4px; }

@@ -16,7 +16,7 @@
   <meta http-equiv="Expires" content="0">
   <!-- Gece/Gunduz: tema stil sayfasindan once secilir (yanip sonme olmaz); yazi tipi sistemindir -->
   <script src="core/theme.js?v=81e24fd9"></script>
-  <link rel="stylesheet" href="style.css?v=bc59f80f">
+  <link rel="stylesheet" href="style.css?v=9f0a439e">
   <link rel="stylesheet" href="analytics.css?v=35127907">
   <script src="supabase.umd.js?v=3810661a"></script>
   <script src="core/xlsx_import_worker.js?v=b0939d47"></script>
@@ -1482,12 +1482,12 @@
         <!-- TAKVIM: gunluk is. KPI seridi, ay izgarasi + ayrinti paneli. -->
         <section class="pricing-view" id="pricingView_calendar" role="tabpanel" aria-labelledby="pricingViewTab_calendar">
           <div class="pricing-kpis">
-            <button type="button" class="kpi-card pricing-kpi-action" id="pricingPendingCard" data-onclick="selectPricingDays('PENDING')" disabled>
+            <button type="button" class="kpi-card pricing-kpi-action fox-card fox-card--revenue" id="pricingPendingCard" data-onclick="selectPricingDays('PENDING')" disabled>
               <span class="kpi-label">Onay bekleyen gün</span>
               <span class="kpi-value" id="pricingPendingVal">—</span>
               <span class="kpi-meta" id="pricingPendingMeta">Önerisi olup fiyatı kaydedilmemiş günler</span>
             </button>
-            <div class="kpi-card">
+            <div class="kpi-card fox-card fox-card--capex">
               <span class="kpi-label">Boş gece</span>
               <div class="kpi-value" id="pricingGapCountVal">—</div>
               <div class="kpi-meta" id="pricingGapCountMeta">İki rezervasyon arasında kalan kısa boşluklar</div>
@@ -1499,6 +1499,7 @@
               <div class="pricing-calendar-head">
                 <h3 id="pricingCalendarTitle" class="sr-only">Fiyat takvimi</h3>
                 <div id="pricingMonthTabs" class="pricing-month-tabs" role="tablist" aria-label="Fiyat takvimi ayı"></div>
+                <div id="pricingModeTabs" class="pricing-mode-tabs"></div>
                 <div class="pricing-legend" aria-label="Lejant">
                   <span class="is-pending">Öneri</span><span class="is-saved">Onaylı</span><span class="is-gap">Boş gece</span><span class="is-special">Özel gün</span><span class="is-booked">Dolu</span><span class="is-blocked">Kapalı</span>
                 </div>
@@ -3561,7 +3562,7 @@
   <script src="core/mobile_shell.js?v=8979ea0a"></script>
   <script src="core/notification_feed.js?v=941306f6"></script>
   <script src="core/command_search.js?v=1b9dbcc9"></script>
-  <script src="core/action_dispatch.js?v=04f014d1"></script>
+  <script src="core/action_dispatch.js?v=555132ad"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=9b3127c9"></script>
   <script src="core/permission_matrix.js?v=e3a3cef2"></script>
@@ -3571,7 +3572,7 @@
   <script src="core/lex_ui.js?v=950d5fdd"></script>
   <script src="core/color_picker.js?v=8457ca4c"></script>
   <script src="core/task_page.js?v=83a423dc"></script>
-  <script src="app.js?v=28b0a5b9"></script>
+  <script src="app.js?v=1553215b"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/marketing_ui.js?v=18887ae8"></script>
 </body>
