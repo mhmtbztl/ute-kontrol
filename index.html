@@ -16,7 +16,7 @@
   <meta http-equiv="Expires" content="0">
   <!-- Gece/Gunduz: tema stil sayfasindan once secilir (yanip sonme olmaz); yazi tipi sistemindir -->
   <script src="core/theme.js?v=81e24fd9"></script>
-  <link rel="stylesheet" href="style.css?v=9f0a439e">
+  <link rel="stylesheet" href="style.css?v=1202b7b3">
   <link rel="stylesheet" href="analytics.css?v=35127907">
   <script src="supabase.umd.js?v=3810661a"></script>
   <script src="core/xlsx_import_worker.js?v=b0939d47"></script>
@@ -383,6 +383,11 @@
           <div id="todayVillaTabs"></div>
           <div id="todayTeamTabs"></div>
         </div>
+        <div id="todayPerformance" class="today-perf" hidden>
+          <div class="today-perf__head"><h2 class="lex-subtitle" id="todayPerformanceTitle">Bu ayın performansı</h2><span class="lex-note" id="todayPerformancePeriod">—</span></div>
+          <div id="todayPerformanceTable"></div>
+        </div>
+        <h2 class="lex-subtitle today-tasks-title">Yapılacaklar</h2>
         <p class="lex-summary" id="todaySummary" aria-live="polite">—</p>
         <p class="lex-note" id="todayNextArrival" hidden></p>
         <div id="todayTaskTable"></div>
@@ -397,11 +402,6 @@
         <div id="todayReadiness" hidden>
           <h2 class="lex-subtitle">Mülk satış hazırlığı</h2>
           <div id="portfolioHealthCardsGrid"></div>
-        </div>
-        <div id="todayPerformance" hidden>
-          <h2 class="lex-subtitle" id="todayPerformanceTitle">Bu ayın performansı</h2>
-          <p class="lex-note" id="todayPerformancePeriod">—</p>
-          <div id="todayPerformanceTable"></div>
         </div>
       </section>
 
@@ -1358,22 +1358,22 @@
           </div>
         </div>
         <div class="kpi-cards-grid" data-lx-style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); margin-bottom: 16px;">
-          <div class="kpi-card"><span class="kpi-label">Misafir profili</span><div class="kpi-value" id="guestKpiTotal">—</div><div class="kpi-meta">Gerçek kişi profili</div></div>
-          <div class="kpi-card"><span class="kpi-label">Tekrar eden</span><div class="kpi-value" id="guestKpiRepeat">—</div><div class="kpi-meta" id="guestKpiRepeatRate">—</div></div>
-          <div class="kpi-card"><span class="kpi-label">Tekrar cirosu</span><div class="kpi-value" id="guestKpiRepeatRevenue">—</div><div class="kpi-meta">Bağlı konaklamaların brütü</div></div>
-          <div class="kpi-card"><span class="kpi-label">Ulaşılabilir</span><div class="kpi-value" id="guestKpiContactable">—</div><div class="kpi-meta">Telefon veya e-posta var</div></div>
-          <div class="kpi-card"><span class="kpi-label">Yeniden rezervasyon</span><div class="kpi-value" id="guestKpiRebooking">—</div><div class="kpi-meta">İzinli ve gelecekte rezervasyonu yok</div></div>
-          <div class="kpi-card kpi-card--action" role="button" tabindex="0" aria-controls="guestUnlinkedPanel" data-onclick="openGuestUnlinkedPanel(event)" data-onkeydown="openGuestUnlinkedPanel(event)"><span class="kpi-label">Bağlantısız rez.</span><div class="kpi-value" id="guestKpiUnlinked">—</div><div class="kpi-meta">Profil eşleştirmesi bekliyor · eklemek için tıklayın</div></div>
+          <div class="kpi-card fox-card fox-card--info"><span class="kpi-label">Misafir profili</span><div class="kpi-value" id="guestKpiTotal">—</div><div class="kpi-meta">Gerçek kişi profili</div></div>
+          <div class="kpi-card fox-card fox-card--info"><span class="kpi-label">Tekrar eden</span><div class="kpi-value" id="guestKpiRepeat">—</div><div class="kpi-meta" id="guestKpiRepeatRate">—</div></div>
+          <div class="kpi-card fox-card fox-card--revenue"><span class="kpi-label">Tekrar cirosu</span><div class="kpi-value" id="guestKpiRepeatRevenue">—</div><div class="kpi-meta">Bağlı konaklamaların brütü</div></div>
+          <div class="kpi-card fox-card fox-card--income"><span class="kpi-label">Ulaşılabilir</span><div class="kpi-value" id="guestKpiContactable">—</div><div class="kpi-meta">Telefon veya e-posta var</div></div>
+          <div class="kpi-card fox-card fox-card--income"><span class="kpi-label">Yeniden rezervasyon</span><div class="kpi-value" id="guestKpiRebooking">—</div><div class="kpi-meta">İzinli ve gelecekte rezervasyonu yok</div></div>
+          <div class="kpi-card kpi-card--action fox-card fox-card--capex fox-card--link" role="button" tabindex="0" aria-controls="guestUnlinkedPanel" data-onclick="openGuestUnlinkedPanel(event)" data-onkeydown="openGuestUnlinkedPanel(event)"><span class="kpi-label">Bağlantısız rez.</span><div class="kpi-value" id="guestKpiUnlinked">—</div><div class="kpi-meta">Profil eşleştirmesi bekliyor · eklemek için tıklayın</div></div>
         </div>
         <div id="guestOpportunityNotice" data-lx-style="display:none; margin-bottom:12px; padding:12px; border-radius:10px; background:rgba(48, 209, 88,.08); border:1px solid rgba(48, 209, 88,.25); color:#D1FAE5; font-size:12px;"></div>
         <div id="guestDataNotice" data-lx-style="display:none; margin-bottom:12px; padding:10px 12px; border-radius:8px; background:rgba(255, 159, 10,.08); border:1px solid rgba(255, 159, 10,.25); color:#FDE68A; font-size:12px;"></div>
         <div id="guestUnlinkedPanel" class="guest-unlinked-panel" hidden></div>
         <div data-lx-style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
-          <input id="guestDirectorySearch" type="search" placeholder="İsim, telefon veya e-posta ara" data-oninput="setGuestDirectoryQuery(this.value)" data-lx-style="min-width:240px; flex:1;">
+          <input id="guestDirectorySearch" class="lex-select guest-filter-search" type="search" placeholder="İsim, telefon veya e-posta ara" data-oninput="setGuestDirectoryQuery(this.value)" data-lx-style="min-width:240px; flex:1;">
           <!-- Tek takvimde aralik (ENVANTER 27.09): ortak secici core/date_range_picker.js -->
           <div id="guestDirectoryDateRange" class="daterange-filter" aria-label="Konaklama tarih aralığı"></div>
           <button type="button" class="btn btn-secondary btn-sm" data-onclick="resetGuestDirectoryDateRange()">Tüm Tarihler</button>
-          <select id="guestDirectorySegment" data-onchange="setGuestDirectorySegment(this.value)" data-lx-style="min-width:160px;">
+          <select id="guestDirectorySegment" class="lex-select guest-filter-select" data-onchange="setGuestDirectorySegment(this.value)" data-lx-style="min-width:160px;">
             <option value="ALL">Tüm misafirler</option>
             <option value="REPEAT">Tekrar edenler</option>
             <option value="UPCOMING">Yaklaşanlar</option>
@@ -1384,17 +1384,17 @@
             <option value="CONTACTABLE">İletişim bilgisi olanlar</option>
             <option value="NO_CONTACT">İletişim bilgisi eksik</option>
           </select>
-          <select id="guestDirectoryProperty" data-onchange="setGuestDirectoryProperty(this.value)" data-lx-style="min-width:170px;" aria-label="Konaklanan mülk">
+          <select id="guestDirectoryProperty" class="lex-select guest-filter-select" data-onchange="setGuestDirectoryProperty(this.value)" data-lx-style="min-width:170px;" aria-label="Konaklanan mülk">
             <option value="">Tüm mülkler</option>
           </select>
-          <select id="guestDirectorySort" data-onchange="setGuestDirectorySort(this.value)" data-lx-style="min-width:160px;">
+          <select id="guestDirectorySort" class="lex-select guest-filter-select" data-onchange="setGuestDirectorySort(this.value)" data-lx-style="min-width:160px;">
             <option value="RECENT">Konaklama tarihi</option>
             <option value="STAYS">Konaklama sayısı</option>
             <option value="NIGHTS">Toplam gece</option>
             <option value="VALUE">Yaşam boyu ciro</option>
             <option value="NAME">İsme göre</option>
           </select>
-          <select id="guestDirectorySortDirection" data-onchange="setGuestDirectorySortDirection(this.value)" data-lx-style="min-width:140px;" aria-label="Sıralama yönü">
+          <select id="guestDirectorySortDirection" class="lex-select guest-filter-select" data-onchange="setGuestDirectorySortDirection(this.value)" data-lx-style="min-width:140px;" aria-label="Sıralama yönü">
             <option value="DESC">Çoktan aza</option>
             <option value="ASC">Azdan çoğa</option>
           </select>
@@ -3572,7 +3572,7 @@
   <script src="core/lex_ui.js?v=950d5fdd"></script>
   <script src="core/color_picker.js?v=8457ca4c"></script>
   <script src="core/task_page.js?v=83a423dc"></script>
-  <script src="app.js?v=1553215b"></script>
+  <script src="app.js?v=4406a99b"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/marketing_ui.js?v=18887ae8"></script>
 </body>

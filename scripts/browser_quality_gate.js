@@ -614,14 +614,14 @@ async function main() {
       // L-217 (M46) + Lex (21.11.2026): Bugun performansi 3 sutunlu tablo; mulk villa sekmesiyle secilir.
       await page.evaluate(() => { switchTab('executive'); setTodayVilla('ALL'); });
       const perfAll = await page.evaluate(() => ({ visible: !document.getElementById('todayPerformance').hidden && document.getElementById('todayPerformance').offsetHeight > 0,
-        rows: document.querySelectorAll('#todayPerformanceTable .lex-table tbody tr').length,
-        cols: document.querySelectorAll('#todayPerformanceTable .lex-table thead th').length }));
-      assert(perfAll.visible && perfAll.rows === 5 && perfAll.cols === 3, 'Bugun performans: ' + JSON.stringify(perfAll));
+        rows: document.querySelectorAll('#todayPerformanceTable .today-perf-card.fox-card').length,
+        cols: document.querySelectorAll('#todayPerformanceTable [data-onclick="goTo(\'goals\')"]').length }));
+      assert(perfAll.visible && perfAll.rows === 5 && perfAll.cols <= 1, 'Bugun performans: ' + JSON.stringify(perfAll));
       await page.evaluate(() => setTodayVilla('test'));
       const perfOne = await page.evaluate(() => document.getElementById('todayPerformancePeriod').textContent);
       assert(/Test Villası/.test(perfOne), 'Bugun mulk secimi: ' + perfOne);
       await page.evaluate(() => setTodayVilla('ALL'));
-      passed.push('25. Bugün: ciro, doluluk, ADR, RevPAR, net kâr 3 sütunlu tabloda; mülk sekmesi ev ev değiştirir');
+      passed.push('25. Bugün: ciro, doluluk, ADR, RevPAR, net kâr Fox kartlarında (tek Hedef gir); mülk sekmesi ev ev değiştirir');
       // G9 M47–M49 (L-218…L-220): talep ekrani — ek mulk adi okunur, hizli talep
       // pencerede kaydedilebilir (form gecerli), liste kanbanin yerinde acilir.
       await page.evaluate(() => {

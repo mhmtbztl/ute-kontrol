@@ -111,7 +111,7 @@ async function main() {
     ['takvim', /tape-villa-td"><strong>\$\{propertyNameHtml\(vKey, vName\)\}/],
     ['rezervasyon listesi', /data-label="Mülk"[^\n]*propertyNameHtml\(b\.villa, vName\)/],
     // Lex Bugun (21.11.2026): performans villa sekmesiyle secilir; hazirlik tablosunda mulk adi noktali.
-    ['Bugün satış hazırlığı tablosu', /c1Html: propertyNameHtml\(card\.propertyKey, card\.propertyName\)/],
+    ['Bugün satış hazırlığı listesi', /today-ready-row__name.*propertyNameHtml\(card\.propertyKey, card\.propertyName\)/],
     ['Finans mülk tablosu', /<h4>\$\{propertyNameHtml\(item\.key, item\.conf\.name\)\}<\/h4>/]
   ]) check(kalip.test(app), `B2. ${yer} mülk adını renkli noktayla yazar`);
   check(!/\['#38BDF8', '#A78BFA', '#30D158', '#FFB340', '#FB7185'\]\[villaIndex % 5\]/.test(app),
