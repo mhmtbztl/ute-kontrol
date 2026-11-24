@@ -18075,6 +18075,9 @@ function openTeamTask(taskId) {
 
 // Gorev satiri: Is (tiklaninca ilgili kayit) · Ne zaman · Talimat. Bugun'de satirlar
 // ekibe gore gruplanir (ekip basligi + is sayisi); ekip artik hucrede tekrar etmez.
+// Bugun panosu (Trello gibi): sutun ust cizgisinin Fox rengi.
+const TODAY_TEAM_FOX = Object.freeze({ SALES: 'revenue', MARKETING: 'info', OPERATIONS: 'capex', CLEANING: 'income', FINANCE: 'neutral' });
+
 function todayTaskRows(tasks, { grouped = true } = {}) {
   const T = getTeamTasksApi();
   const L = getLexUiApi();
@@ -18103,7 +18106,7 @@ function todayTaskRows(tasks, { grouped = true } = {}) {
   sira.forEach(key => {
     const grup = tasks.filter(t => t.team === key);
     if (!grup.length) return;
-    out.push({ group: teamLabel(key), groupSub: `${grup.length} iş` });
+    out.push({ group: teamLabel(key), groupSub: `${grup.length} iş`, groupTone: TODAY_TEAM_FOX[key] || 'neutral' });
     grup.forEach(t => out.push(satir(t)));
   });
   return out;
@@ -18191,8 +18194,7 @@ function renderTodayLex() {
 
   const table = document.getElementById('todayTaskTable');
   if (table) {
-    table.innerHTML = L.tableHtml({
-      head: TODAY_TASK_HEAD,
+    table.innerHTML = L.boardHtml({
       rows: todayTaskRows(shown),
       empty: !todayTeams ? 'Bugüne ait açık iş yok.' : 'Seçili ekiplerin bugüne ait açık işi yok.',
       caption: 'Ekip görevleri'

@@ -1000,20 +1000,21 @@ async function main() {
       // Bugun (Lex): kurulum adimlari dokunulabilir; tablo telefonda da 3 sutun ve ekrana sigar; sekmeler >=44 px.
       const bugun = await page.evaluate(() => {
         const gorunur = el => el && el.getClientRects().length > 0;
-        const tablo = document.querySelector('#todayTaskTable .lex-table');
-        const ilkSatir = tablo && tablo.querySelector('tbody tr');
+        // Pano (Trello gibi, 24.11.2026): telefonda sutunlar alt alta, tek sutun.
+        const tablo = document.querySelector('#todayTaskTable .lex-board');
+        const sutunlar = tablo ? [...tablo.querySelectorAll('.lex-board__col')] : [];
         return {
           adimlar: [...document.querySelectorAll('#onboardStepsList .onboard-step-btn')].filter(gorunur).map(b => Math.round(b.getBoundingClientRect().height)),
-          sutun: ilkSatir ? new Set([...ilkSatir.children].map(td => Math.round(td.getBoundingClientRect().top))).size : 1,
+          sutun: sutunlar.length > 1 ? new Set(sutunlar.map(c => Math.round(c.getBoundingClientRect().left))).size : 1,
           genis: tablo ? Math.round(tablo.getBoundingClientRect().width) <= Math.round(tablo.parentElement.clientWidth) + 1 : true,
           sekme: [...document.querySelectorAll('#todayVillaTabs .lex-tab')].filter(gorunur).map(b => Math.round(b.getBoundingClientRect().height))
         };
       });
       assert(bugun.adimlar.every(h => h >= 36), `Bugün kurulum adımları en az 36 px: ${bugun.adimlar}`);
-      assert.strictEqual(bugun.sutun, 1, 'Bugün görev tablosu telefonda 3 sütun yan yana (kart olmaz)');
+      assert.strictEqual(bugun.sutun, 1, 'Bugün görev panosu telefonda sütunlar alt alta');
       assert(bugun.genis, 'Bugün tablosu telefonda yatay taşmamalı');
       assert(bugun.sekme.every(h => h >= 44), `Bugün villa sekmeleri en az 44 px: ${bugun.sekme}`);
-      passed.push('35. Bugün telefonda: kurulum adımları ≥36 px, görev tablosu 3 sütun ve sığar, villa sekmeleri ≥44 px');
+      passed.push('35. Bugün telefonda: kurulum adımları ≥36 px, görev panosu alt alta ve sığar, villa sekmeleri ≥44 px');
       // Rezervasyonlar (PR 3): liste kart modunda ekrana sigar, donem dugmeleri tek satir.
       const rez = await page.evaluate(() => {
         switchTab('reservations');

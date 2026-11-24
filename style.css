@@ -5422,3 +5422,31 @@ button.pricing-day.is-booked:hover { background: var(--fox-info-bg); border-colo
 .lex-page--detail > div + div { margin-top: 24px; }
 #todayTaskTable .lex-table td { padding-top: 9px; padding-bottom: 9px; }
 #todayTaskTable { margin-bottom: 4px; }
+
+/* Bugun panosu (Trello gibi, kullanici 24.11.2026): ekip = sutun, is = kart.
+   Sutun ust cizgisi ekibin Fox rengi; kartin sol seridi talimat (Acil/Yap/Tamam). */
+.lex-board { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; align-items: start; margin: 4px 0 8px; }
+.lex-board__col { --fox-c: var(--fox-neutral); --fox-bg: var(--lx-weekend); background: var(--fox-bg); border: 1px solid var(--lx-line); border-top: 3px solid var(--fox-c); border-radius: 12px; padding: 10px; min-width: 0; }
+.lex-board__col--revenue { --fox-c: var(--fox-revenue); --fox-bg: var(--fox-revenue-bg); }
+.lex-board__col--income { --fox-c: var(--fox-income); --fox-bg: var(--fox-income-bg); }
+.lex-board__col--expense { --fox-c: var(--fox-expense); --fox-bg: var(--fox-expense-bg); }
+.lex-board__col--capex { --fox-c: var(--fox-capex); --fox-bg: var(--fox-capex-bg); }
+.lex-board__col--info { --fox-c: var(--fox-info); --fox-bg: var(--fox-info-bg); }
+.lex-board__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 4px 10px; }
+.lex-board__title { margin: 0; font-size: 15px; font-weight: 500; color: var(--lx-text); }
+.lex-board__count { font-size: 13px; color: var(--lx-text-2); background: var(--lx-bg); border: 1px solid var(--lx-line); border-radius: 999px; padding: 0 8px; min-width: 24px; text-align: center; }
+.lex-board__cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.lex-card { background: var(--lx-bg); border: 1px solid var(--lx-line); border-left: 4px solid var(--lx-up-fg); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.lex-card--down { border-left-color: var(--fox-expense); }
+.lex-card--keep { border-left-color: var(--fox-income); }
+.lex-card--up { border-left-color: var(--fox-revenue); }
+.lex-card__top { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.lex-card__when { font-size: 13px; color: var(--lx-text-2); }
+.lex-card__when.is-late { color: var(--fox-expense); font-weight: 500; }
+.lex-card__title { font-size: 15px; font-weight: 500; overflow-wrap: anywhere; }
+.lex-card__type { font-size: 12px; color: var(--lx-text-2); }
+.lex-card__reason { font-size: 13px; color: var(--lx-text); line-height: 1.4; overflow-wrap: anywhere; }
+.lex-board__empty { margin: 8px 0; color: var(--lx-text-2); }
+@media (max-width: 640px) {
+  .lex-board { grid-template-columns: 1fr; }
+}
