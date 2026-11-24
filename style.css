@@ -5382,3 +5382,43 @@ button.pricing-day.is-booked:hover { background: var(--fox-info-bg); border-colo
 .pricing-calendar-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .pricing-calendar-head .pricing-month-tabs { flex: 1 1 320px; min-width: 0; }
 #pricingManagerContainer .lex-table { margin-top: 4px; }
+
+/* ---- Fox: Rezervasyonlar, Talepler, Misafirler (24.11.2026) ---- */
+.fox-text-revenue { color: var(--fox-revenue); }
+.fox-text-expense { color: var(--fox-expense); }
+.lex-kpis.lex-kpis--fox { gap: 10px; padding: 0; border: 0; }
+.lex-kpis--fox .lex-kpi, .lex-kpis--fox .lex-kpi:first-child { padding: 10px 12px; border: 1px solid var(--lx-line); border-top: 3px solid var(--fox-c); border-radius: 12px; }
+.lex-kpis--fox .lex-kpi__value { font-size: 20px; }
+.lead-column { --fox-c: var(--fox-neutral); --fox-bg: var(--fox-neutral-bg); }
+.lead-column--info { --fox-c: var(--fox-info); --fox-bg: var(--fox-info-bg); }
+.lead-column--capex { --fox-c: var(--fox-capex); --fox-bg: var(--fox-capex-bg); }
+.lead-column--income { --fox-c: var(--fox-income); --fox-bg: var(--fox-income-bg); }
+.lead-column--expense { --fox-c: var(--fox-expense); --fox-bg: var(--fox-expense-bg); }
+.lex-screen .lead-column { background: var(--fox-bg); border-top: 3px solid var(--fox-c); }
+.lex-screen .lead-column h3 .badge { background: var(--lx-bg); color: var(--fox-c); }
+.guest-filter-select, .guest-filter-search { width: auto; margin-top: 0; min-height: 40px; }
+.guest-filter-search { flex: 1 1 240px; }
+/* Bugun: performans Fox kartlari (24.11.2026) */
+.today-perf { margin: 4px 0 24px; }
+.today-perf__head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.today-perf__head .lex-subtitle { margin: 0; }
+.today-perf-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.lex-screen .today-perf-card { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 10px 12px; }
+.today-perf-card__label { font-size: 12px; color: var(--lx-text-2); }
+.today-perf-card__value { font-size: 20px; font-weight: 500; color: var(--lx-text); font-variant-numeric: tabular-nums; }
+.today-perf-card .lex-tag { font-size: 11px; padding: 0 6px; }
+.today-perf-actions { display: flex; gap: 8px; margin-top: 8px; }
+.today-tasks-title { margin-top: 8px; }
+@media (max-width: 640px) {
+  .today-perf-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .today-perf-card:last-child:nth-child(odd) { grid-column: 1 / -1; }
+}
+.today-ready-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--lx-line); }
+.today-ready-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; padding: 10px 0; border-bottom: 1px solid var(--lx-line); }
+.today-ready-row__name { font-weight: 500; }
+.today-ready-row__status { color: var(--lx-text); }
+.today-ready-row__why { font-size: 12px; color: var(--lx-text-2); flex: 1 1 200px; }
+.today-ready-row__act { margin-left: auto; }
+.lex-page--detail > div + div { margin-top: 24px; }
+#todayTaskTable .lex-table td { padding-top: 9px; padding-bottom: 9px; }
+#todayTaskTable { margin-bottom: 4px; }

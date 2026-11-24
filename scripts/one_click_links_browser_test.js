@@ -30,9 +30,9 @@ const executablePath = [process.env.CHROME_PATH,
 
     // 1. Bugun performans satiri Finans'i acar; hedef yoksa "Hedef gir" hedef penceresini acar.
     await page.evaluate(() => switchTab('executive'));
-    await page.click('#todayPerformanceTable .lex-link >> nth=0');
+    await page.click('#todayPerformanceTable .today-perf-card >> nth=0');
     assert.strictEqual(await activeTab(), 'tab-finance');
-    pass('Bugün performans satırı Finans ekranını açar');
+    pass('Bugün performans kartı Finans ekranını açar');
     await page.evaluate(() => switchTab('executive'));
     const goalBtn = page.locator('#todayPerformanceTable [data-onclick="goTo(\'goals\')"]').first();
     assert(await goalBtn.count(), 'Hedefi olmayan satırda "Hedef gir" olmalı');

@@ -8569,13 +8569,13 @@ function renderManageBookingsTable() {
     // Sadelik 4. tur: uzun cumle yerine bes sade rakam; ayrinti rakamin altinda.
     // Tahsilat tarih araligina baglidir (mulk/durum/kanal suzgecine degil): altinda yazar.
     const ek = [ozetSayisi ? `+ ${ozetSayisi} toplu aktarım özeti` : '', iptalSayisi ? `${iptalSayisi} iptal hesaba girmez` : ''].filter(Boolean).join(' · ');
-    const kpi = (etiket, deger, alt = '') => `<div class="lex-kpi"><dt>${escapeHtml(etiket)}</dt><dd class="lex-kpi__value">${deger}</dd>${alt ? `<dd class="lex-kpi__sub">${escapeHtml(alt)}</dd>` : ''}</div>`;
-    summaryPill.innerHTML = `<dl class="lex-kpis">`
+    const kpi = (etiket, deger, alt = '', fox = 'info') => `<div class="lex-kpi fox-card fox-card--${fox}"><dt>${escapeHtml(etiket)}</dt><dd class="lex-kpi__value">${deger}</dd>${alt ? `<dd class="lex-kpi__sub">${escapeHtml(alt)}</dd>` : ''}</div>`;
+    summaryPill.innerHTML = `<dl class="lex-kpis lex-kpis--fox">`
       + kpi('Rezervasyon', `<strong>${rezSayisi}</strong>`, ek)
       + kpi('Satılan gece', escapeHtml(`${listSummary.soldNights} gece`))
-      + kpi('Ciro', escapeHtml(tl(listSummary.netRoomRevenue)), `Brüt ${tl(listSummary.gross)} · indirim sonrası oda geliri`)
-      + kpi('Kalan (tahmini)', escapeHtml(tl(listSummary.remaining)), `Kesintiler −${tl(listSummary.deductions)}`)
-      + kpi('Tahsilat', escapeHtml(collectionTotal == null ? '—' : tl(collectionTotal)), 'Tarih aralığındaki tüm ödemeler')
+      + kpi('Ciro', escapeHtml(tl(listSummary.netRoomRevenue)), `Brüt ${tl(listSummary.gross)} · indirim sonrası oda geliri`, 'revenue')
+      + kpi('Kalan (tahmini)', escapeHtml(tl(listSummary.remaining)), `Kesintiler −${tl(listSummary.deductions)}`, 'income')
+      + kpi('Tahsilat', escapeHtml(collectionTotal == null ? '—' : tl(collectionTotal)), 'Tarih aralığındaki tüm ödemeler', collectionTotal == null ? 'neutral' : 'income')
       + '</dl>';
   }
 
@@ -8603,7 +8603,7 @@ function renderManageBookingsTable() {
         : e.cleaning.inRange ? `Temizlik −${para(e.cleaning.amount)} (${e.cleaning.done ? 'yapıldı' : 'planlı'})`
         : `Temizlik ${para(e.cleaning.amount)} → ${formatTrDate(e.cleaning.date)} döneminde`
     ].filter(Boolean);
-    const kesintiHtml = kesintiler.length ? kesintiler.map(k => `<div class="reservation-sub">${escapeHtml(k)}</div>`).join('') : '—';
+    const kesintiHtml = kesintiler.length ? kesintiler.map(k => `<div class="reservation-sub${k.includes('−') ? ' fox-text-expense' : ''}">${escapeHtml(k)}</div>`).join('') : '—';
     const statusBadge = reservationStatusBadge(b.status);
     const markerHtml = [
       markers.todayCheckIn ? '<span class="reservation-marker marker-checkin">Bugün giriş</span>' : '',
@@ -8622,7 +8622,7 @@ function renderManageBookingsTable() {
       <td data-label="Kanal"><span class="badge ${b.channel === 'AIRBNB' ? 'badge-rose' : (b.channel === 'BOOKING' ? 'badge-blue' : 'badge-emerald')}">${escapeHtml(getChannelDisplayName(b.channel))}</span></td>
       <td data-label="Tarihler">${formatTrDate(b.checkIn)} – ${formatTrDate(b.checkOut)}</td>
       <td data-label="Brüt">${e.cancelled ? `<span class="reservation-sub">${para(e.fullGross)} · iptal, hesaba girmez</span>` : `<strong>${para(e.gross)}</strong>${payNotu}`}</td>
-      <td data-label="Ciro">${e.cancelled ? '—' : `<strong>${para(e.netRoomRevenue)}</strong>${e.cleaningRevenue > 0 ? `<div class="reservation-sub">+ temizlik geliri ${para(e.cleaningRevenue)}</div>` : ''}`}</td>
+      <td data-label="Ciro">${e.cancelled ? '—' : `<strong class="fox-text-revenue">${para(e.netRoomRevenue)}</strong>${e.cleaningRevenue > 0 ? `<div class="reservation-sub">+ temizlik geliri ${para(e.cleaningRevenue)}</div>` : ''}`}</td>
       <td data-label="Kesintiler">${kesintiHtml}</td>
       <td data-label="Kalan">${e.cancelled ? '—' : `<strong class="${e.remaining < 0 ? 'text-negative' : 'text-positive'}">${para(e.remaining)}</strong>`}</td>
       <td data-label="Durum">${statusBadge}</td>
@@ -11796,6 +11796,8 @@ function getLeadSalesView() {
 }
 
 // Talep durumlarinin ekrandaki adi: kanban, liste ve duzenleme penceresi ayni sozlugu kullanir.
+// Fox: acik is mor (bilgi), teklif/takip turuncu (bekleyen), kazanildi yesil, kaybedildi kirmizi.
+const LEAD_STAGE_FOX = { NEW: 'info', CONTACTED: 'info', QUOTE_SENT: 'capex', FOLLOW_UP: 'capex', WON: 'income', LOST: 'expense' };
 const LEAD_STATUS_LABELS = { NEW: 'Yeni', CONTACTED: 'Görüşüldü', QUOTE_SENT: 'Teklif', FOLLOW_UP: 'Takip', WON: 'Kazanıldı', LOST: 'Kaybedildi' };
 
 function leadQuoteLabel(lead) {
@@ -11880,7 +11882,7 @@ function renderLeadSalesWorkspace() {
   document.getElementById('leadViewList')?.classList.toggle('active', leadViewMode === 'LIST');
   kanban.innerHTML = stages.map(([code, label]) => {
     const rows = view.columns[code];
-    return `<section class="lead-column"><h3>${escapeHtml(label)} <span class="badge">${escapeHtml(rows.length)}</span></h3><div>${rows.length ? rows.map(renderLeadCard).join('') : '<p class="empty-state">Talep yok.</p>'}</div></section>`;
+    return `<section class="lead-column lead-column--${escapeHtml(LEAD_STAGE_FOX[code] || 'neutral')}"><h3>${escapeHtml(label)} <span class="badge">${escapeHtml(rows.length)}</span></h3><div>${rows.length ? rows.map(renderLeadCard).join('') : '<p class="empty-state">Talep yok.</p>'}</div></section>`;
   }).join('');
 
   const followUps = leadFollowUpScope === 'ALL' ? view.followUpsToday : view.myFollowUpsToday;
@@ -18333,9 +18335,31 @@ function renderTodayPerformance(can = teamTaskPermissions(), today = getTodayStr
   const { rows, perf } = todayPerformanceRows(month, todayVilla);
   const kapsam = todayVilla === 'ALL' ? 'Tüm mülkler' : (appData.villas[todayVilla]?.name || todayVilla);
   const kapasite = perf.available > 0 ? `${perf.nights} / ${perf.available} gece satıldı` : 'Kapasite yok: bu ay faaliyette görünmüyor';
-  setEl('todayPerformancePeriod', `${getPeriodDisplayName(month)} · ${kapsam} · ${kapasite} · Finans ekranıyla aynı hesap`);
+  setEl('todayPerformancePeriod', `${getPeriodDisplayName(month)} · ${kapsam} · ${kapasite}`);
   const table = document.getElementById('todayPerformanceTable');
-  if (table) table.innerHTML = L.tableHtml({ head: ['Ölçü', 'Bu ay', 'Talimat'], rows, caption: 'Bu ayın performansı' });
+  if (table) table.innerHTML = todayPerformanceCardsHtml(rows);
+}
+
+// Bugun yeniden tasarim (24.11.2026, kullanici: "cok karisik"): performans 5 satirlik tablo
+// degil, ustte tek sira Fox karti. Hesap ayni (todayPerformanceRows); kart Finans'i acar.
+// "Hedef gir" bes kez degil, hedefi olmayan olcu varsa bir kez yazilir.
+const TODAY_PERF_FOX = { 'Ciro': 'revenue', 'Doluluk': 'info', 'ADR (ort. gecelik)': 'revenue', 'RevPAR': 'info', 'Net kâr': 'income' };
+function todayPerformanceCardsHtml(rows) {
+  const kartlar = rows.map(r => {
+    let fox = TODAY_PERF_FOX[r.c1] || 'neutral';
+    if (r.c2 === '—') fox = 'neutral';
+    else if (r.c1 === 'Net kâr' && /^-|^−/.test(String(r.c2))) fox = 'expense';
+    const alt = r.tag ? `<span class="lex-tag lex-tag--${escapeHtml(r.tone || 'keep')}">${escapeHtml(r.tag)}</span> ${escapeHtml(r.reason || '')}` : escapeHtml(r.c2sub || (r.c2 === '—' ? (r.reason || '') : ''));
+    const hedef = r.c1sub && r.c1sub !== 'Hedef girilmedi' ? `<small>${escapeHtml(r.c1sub)}</small>` : '';
+    return `<button type="button" class="fox-card fox-card--${fox} fox-card--link today-perf-card" data-onclick="goTo('finance')"><span class="today-perf-card__label">${escapeHtml(r.c1)}</span><span class="today-perf-card__value">${escapeHtml(r.c2)}</span>${hedef}<small>${alt}</small></button>`;
+  }).join('');
+  const hedefYok = rows.some(r => r.c1sub === 'Hedef girilmedi') && rows.some(r => String(r.c3extraHtml || '').includes("goTo('goals')"));
+  const giderYok = rows.some(r => String(r.c3extraHtml || '').includes("goTo('expense')"));
+  const eylemler = [
+    hedefYok ? `<button type="button" class="lex-btn lex-btn--inline" data-onclick="goTo('goals')">Hedef gir</button>` : '',
+    giderYok ? `<button type="button" class="lex-btn lex-btn--inline" data-onclick="goTo('expense')">Gider ekle</button>` : ''
+  ].filter(Boolean).join('');
+  return `<div class="today-perf-grid">${kartlar}</div>${eylemler ? `<div class="today-perf-actions">${eylemler}</div>` : ''}`;
 }
 
 // Mulk satis hazirligi (Bugun sayfa 2). Durum yalniz buradan degistirilir
@@ -18394,7 +18418,6 @@ function renderTodayReadiness(can) {
   const api = getPropertySalesReadinessApi();
   box.hidden = !api || !(can.operations || can.sales) || activeTodayVillaKeys().length === 0;
   if (box.hidden) return;
-  const L = getLexUiApi();
   // Sadelik 4. tur: satisa hazir mulkler tek satirda; yalniz hazir olmayanlar satir olur.
   // Durum secici varsayilan kapali "Durumu değiştir" altindadir (her mulk icin).
   const cards = todayReadinessCards();
@@ -18403,20 +18426,20 @@ function renderTodayReadiness(can) {
   const ozet = hazir.length
     ? `<p class="lex-ready-line"><span class="lex-tag lex-tag--keep">Tamam</span> ${hazir.length === cards.length ? 'Tüm mülkler' : `${hazir.length} mülk`} satışa hazır: ${hazir.map(c => `<button type="button" class="lex-link-inline" data-onclick="goTo(decodeURIComponent('${encodeActionArg('property:' + c.propertyKey)}'))">${propertyNameHtml(c.propertyKey, c.propertyName)}</button>`).join(', ')}</p>`
     : '';
-  const rows = sorunlu.map(card => {
+  // Bugun yeniden tasarim (24.11.2026): sorunlu mulk 3 sutun tablo degil tek satir
+  // (etiket · mulk · durum · neden · tek eylem). Kurallar ve etiketler ayni.
+  const satirlar = sorunlu.map(card => {
     const meta = card.meta || api.STATUS_META.UNSET;
     const t = TODAY_READINESS_TAGS[card.status] || TODAY_READINESS_TAGS.UNSET;
     const acik = card.openIssueCount || 0;
-    return {
-      c1: card.propertyName, c1Html: propertyNameHtml(card.propertyKey, card.propertyName),
-      c1sub: acik ? `${acik} açık iş / arıza` : '',
-      c2: meta.label, c2sub: card.reason,
-      c2Attr: `data-onclick="goTo(decodeURIComponent('${encodeActionArg('property:' + card.propertyKey)}'))"`,
-      tone: t.tone, tag: t.tag, reason: t.reason,
-      c3extraHtml: todayReadinessJumpHtml(card)
-    };
-  });
-  const tablo = rows.length ? L.tableHtml({ head: ['Mülk', 'Durum', 'Ne yapılmalı'], rows, caption: 'Mülk satış hazırlığı' }) : '';
+    const neden = [card.reason, acik ? `${acik} açık iş / arıza` : ''].filter(Boolean).join(' · ');
+    return `<li class="today-ready-row"><span class="lex-tag lex-tag--${escapeHtml(t.tone)}">${escapeHtml(t.tag)}</span>`
+      + `<button type="button" class="lex-link today-ready-row__name" data-onclick="goTo(decodeURIComponent('${encodeActionArg('property:' + card.propertyKey)}'))">${propertyNameHtml(card.propertyKey, card.propertyName)}</button>`
+      + `<span class="today-ready-row__status">${escapeHtml(meta.label)}</span>`
+      + (neden ? `<span class="today-ready-row__why">${escapeHtml(neden)}</span>` : '')
+      + `<span class="today-ready-row__act">${todayReadinessJumpHtml(card)}</span></li>`;
+  }).join('');
+  const tablo = satirlar ? `<ul class="today-ready-list" aria-label="Satışa hazır olmayan mülkler">${satirlar}</ul>` : '';
   const duzenle = cards.length && canManagePropertyReadiness()
     ? `<details class="lex-inline-edit"><summary>Durumu değiştir</summary><ul class="lex-ready-edit">${cards.map(card => `<li><span class="lex-ready-edit__name">${propertyNameHtml(card.propertyKey, card.propertyName)}</span>${todayReadinessEditorHtml(card, api, { jump: false })}</li>`).join('')}</ul></details>`
     : '';
