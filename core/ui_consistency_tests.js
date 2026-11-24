@@ -302,7 +302,8 @@ try {
   app.renderExecutiveControlCenter();
   html = komutaHtml();
   // Dusuk onemli acik ariza "Yap"tir; sabit "Acil"/P1 yazilmaz.
-  const muslukSatiri = html.slice(html.lastIndexOf('<tr', html.indexOf('Musluk damlatiyor')), html.indexOf('</tr>', html.indexOf('Musluk damlatiyor')));
+  // Bugun panosu (24.11.2026): her is bir kart (<li class="lex-card ...">).
+  const muslukSatiri = html.slice(html.lastIndexOf('<li', html.indexOf('Musluk damlatiyor')), html.indexOf('</li>', html.indexOf('Musluk damlatiyor')));
   check(/Musluk damlatiyor/.test(html) && /lex-tag--up">Yap</.test(muslukSatiri) && !/Acil|P1/.test(muslukSatiri),
     'K2. Açık arıza satırı GERÇEK önceliği yansıtır (düşük önem → Yap; sabit "Acil/P1" yok)', muslukSatiri.slice(0, 400));
   check(!/Turnover Temizlik Görevi|Bugünkü temizlik/.test(html),

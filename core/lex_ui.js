@@ -107,6 +107,31 @@
     return `<table class="lex-table">${cap}${th}<tbody>${satirlarHtml}</tbody></table>`;
   }
 
+  // Pano (Trello gibi, kullanici 24.11.2026): tableHtml ile ayni gruplu satirlar; her grup
+  // bir sutun, her is bir kart. Kartin sol seridi talimat rengi (Acil/Yap/Tamam).
+  // groupTone: sutun ust cizgisinin Fox rengi (revenue|income|expense|capex|info|neutral).
+  const BOARD_TONES = ['revenue', 'income', 'expense', 'capex', 'info', 'neutral'];
+  function boardHtml({ rows = [], empty = 'Kayıt yok.', caption = '' } = {}) {
+    if (!rows.some(r => !r.group)) return `<p class="lex-board__empty">${escapeHtml(empty)}</p>`;
+    const sutunlar = [];
+    rows.forEach(r => {
+      if (r.group || !sutunlar.length) sutunlar.push({ title: r.group || '', tone: r.groupTone, cards: [] });
+      if (!r.group) sutunlar[sutunlar.length - 1].cards.push(r);
+    });
+    const kart = r => {
+      const t = TAG_TONES.includes(r.tone) ? r.tone : 'up';
+      const baslikHtml = r.c1Attr ? `<button type="button" class="lex-link lex-card__title" ${r.c1Attr}>${r.c1Html || escapeHtml(r.c1)}</button>` : `<span class="lex-card__title">${r.c1Html || escapeHtml(r.c1)}</span>`;
+      const gecti = /geçti/.test(String(r.c2sub || ''));
+      const zamanHtml = `<span class="lex-card__when${gecti ? ' is-late' : ''}">${escapeHtml(r.c2)}${r.c2sub ? ` · ${escapeHtml(r.c2sub)}` : ''}</span>`;
+      return `<li class="lex-card lex-card--${t}"${r.id ? ` data-task-id="${escapeHtml(r.id)}"` : ''}><div class="lex-card__top">${r.tag ? tagHtml(r.tone, r.tag) : ''}${zamanHtml}</div>${baslikHtml}${r.c1sub ? `<span class="lex-card__type">${escapeHtml(r.c1sub)}</span>` : ''}${r.reason && r.reason !== r.c1sub ? `<span class="lex-card__reason">${escapeHtml(r.reason)}</span>` : ''}${r.c3extraHtml || ''}</li>`;
+    };
+    const cols = sutunlar.filter(s => s.cards.length).map(s => {
+      const tone = BOARD_TONES.includes(s.tone) ? s.tone : 'neutral';
+      return `<section class="lex-board__col lex-board__col--${tone}" aria-label="${escapeHtml(s.title || caption)}"><header class="lex-board__head"><h3 class="lex-board__title">${escapeHtml(s.title)}</h3><span class="lex-board__count">${s.cards.length}</span></header><ul class="lex-board__cards">${s.cards.map(kart).join('')}</ul></section>`;
+    }).join('');
+    return `<div class="lex-board"${caption ? ` aria-label="${escapeHtml(caption)}"` : ''}>${cols}</div>`;
+  }
+
   // Ozet cumlesi parcalari: [{text}|{strong}] -> guvenli HTML.
   function summaryHtml(parts) {
     return (parts || []).map(p => (p.strong !== undefined ? `<strong>${escapeHtml(p.strong)}</strong>` : escapeHtml(p.text))).join('');
@@ -190,7 +215,7 @@
 
   const api = {
     escapeHtml, dayLabel, isWeekendNight, isMonday, roundPrice50, formatTl, markLevel, markHtml,
-    tagHtml, tableHtml, summaryHtml, tabsHtml, pickerHtml, footerHtml, buildWorkbook, printDocumentHtml, PRINT_CSS, TAG_TONES
+    tagHtml, tableHtml, boardHtml, summaryHtml, tabsHtml, pickerHtml, footerHtml, buildWorkbook, printDocumentHtml, PRINT_CSS, TAG_TONES
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.LexUi = api;
