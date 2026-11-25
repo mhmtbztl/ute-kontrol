@@ -10134,8 +10134,8 @@ function renderMonthCloseCard() {
 
   if (rozet) {
     rozet.textContent = kapali ? 'KAPALI' : 'AÇIK';
-    rozet.style.background = kapali ? 'rgba(255, 69, 58,0.18)' : 'rgba(52,211,153,0.15)';
-    rozet.style.color = kapali ? '#FCA5A5' : '#6EE7B7';
+    rozet.style.background = kapali ? 'var(--lx-down-bg)' : 'var(--lx-keep-bg)';
+    rozet.style.color = kapali ? 'var(--lx-down-fg)' : 'var(--lx-keep-fg)';
   }
 
   if (detay) {
@@ -19534,22 +19534,19 @@ function renderPropertiesTab() {
     const adHtml = canManage ? `<span class="property-name">${propertyColorPickerHtml(k)}${escapeHtml(v.name || 'Adsız mülk')}</span>` : propertyNameHtml(k, v.name || 'Adsız mülk');
     return `
       <div class="property-health-card status-HEALTHY">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div class="property-health-card__head">
           <div>
-            <strong style="font-size: 15px; color: #FFFFFF;">${adHtml}</strong>
-            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Kod: ${escapeHtml(k)} • Kapasite: ${escapeHtml(v.capacity || 'Belirtilmedi')}</div>
+            <strong class="property-health-card__name">${adHtml}</strong>
+            <div class="property-health-card__meta">Kod: ${escapeHtml(k)} · Kapasite: ${escapeHtml(v.capacity || 'Belirtilmedi')}</div>
           </div>
           <span class="badge badge-green">Aktif</span>
         </div>
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-size: 11px; margin: 6px 0;">
-          ${[['Baz fiyat', v.basePrice, '#30D158', 'Normal bir gecenin satış fiyatı'], ['Taban fiyat', v.floor ?? v.floorPrice, '#F5F5F7', 'Altına inilmeyen en düşük gecelik fiyat'], ['Hedef fiyat', v.target, '#F5F5F7', 'Ortalama hedeflediğiniz gecelik fiyat']].map(([label, value, color, title]) => `<div style="background: rgba(0,0,0,0.25); padding: 6px 8px; border-radius: 6px;" title="${escapeHtml(title)}">
-            <span style="color: #98989D; display: block;">${escapeHtml(label)}</span>
-            <strong style="color: ${color}; font-size: 12px;">${propertyMoney(value === '' ? null : value)}</strong>
-          </div>`).join('')}
+        <div class="property-health-card__prices">
+          ${[['Baz fiyat', v.basePrice, 'base', 'Normal bir gecenin satış fiyatı'], ['Taban fiyat', v.floor ?? v.floorPrice, 'floor', 'Altına inilmeyen en düşük gecelik fiyat'], ['Hedef fiyat', v.target, 'target', 'Ortalama hedeflediğiniz gecelik fiyat']].map(([label, value, tur, title]) => `<div class="property-health-card__price property-health-card__price--${tur}" title="${escapeHtml(title)}"><span>${escapeHtml(label)}</span><strong>${propertyMoney(value === '' ? null : value)}</strong></div>`).join('')}
         </div>
-        <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px;">
-          <button class="btn btn-secondary btn-sm" data-onclick="setPropertyProfile(decodeURIComponent('${encodeActionArg(k)}'))" style="font-size: 11px;">Profili Aç</button>
-          ${canManage ? `<button class="btn btn-secondary btn-sm" data-onclick="openPropertyModal(decodeURIComponent('${encodeActionArg(k)}'))" style="font-size: 11px;">Düzenle</button>` : ''}
+        <div class="property-health-card__actions">
+          <button class="btn btn-secondary btn-sm" data-onclick="setPropertyProfile(decodeURIComponent('${encodeActionArg(k)}'))">Profili Aç</button>
+          ${canManage ? `<button class="btn btn-secondary btn-sm" data-onclick="openPropertyModal(decodeURIComponent('${encodeActionArg(k)}'))">Düzenle</button>` : ''}
         </div>
       </div>
     `;
@@ -20897,6 +20894,39 @@ function renderOperationsCleaningView(tasks) {
       <span class="lex-tag lex-tag--${tone}">${escapeHtml(status)}</span>
     </button>`;
   };
+  // Ev ev pano (Trello gibi, kullanici 25.11.2026): her mulk bir sutun, her acik temizlik bir kart.
+  // Gruplar (geciken/bugun/yarin/bu hafta) kartin zaman etiketine iner; hesap groupCleaningTasks.
+  const zamanOf = new Map();
+  [['overdue', 'Gecikti'], ['today', 'Bugün'], ['tomorrow', 'Yarın'], ['week', '']].forEach(([k, ad]) => grouped[k].forEach(t => zamanOf.set(t.id, { k, ad })));
+  const acikGorevler = [...grouped.overdue, ...grouped.today, ...grouped.tomorrow, ...grouped.week];
+  const kartHtml = task => {
+    const execution = task.execution;
+    const waiting = task.workflowState === 'AWAITING_INSPECTION';
+    const status = waiting ? 'Denetim bekliyor' : task.status === 'DONE' ? (task.paid ? 'Ödendi' : 'Borç') : execution ? 'Atandı' : 'Planlı';
+    const tone = waiting ? 'up' : (isCleaningDebt(task) ? 'down' : (task.status === 'DONE' ? 'keep' : 'up'));
+    const z = zamanOf.get(task.id) || { k: 'week', ad: '' };
+    const serit = z.k === 'overdue' ? 'down' : (task.status === 'DONE' ? 'keep' : 'up');
+    const gun = task.date ? formatTrDate(task.date) : '—';
+    const p = cleaningChecklistProgress(execution);
+    const yuzde = p.total ? Math.round((p.z / p.total) * 100) : 0;
+    return `<li class="lex-card lex-card--${serit}"><button type="button" class="cl-card" data-cleaning-task-id="${escapeHtml(task.id)}" data-onclick="openCleaningPage(decodeURIComponent('${encodeActionArg(task.id || task.dbId)}'))">
+      <span class="lex-card__top"><span class="lex-tag lex-tag--${tone}">${escapeHtml(status)}</span><span class="lex-card__when${z.k === 'overdue' ? ' is-late' : ''}">${escapeHtml(z.ad ? `${z.ad} · ${gun}` : gun)}</span></span>
+      <span class="lex-card__title">Temizlik</span>
+      <span class="lex-card__type">${escapeHtml(task.cleaner || 'Personel belirtilmedi')}</span>
+      ${p.total ? `<span class="cl-card__progress" title="Temizlikçi ${p.z}/${p.total} · Kontrol ${p.m}/${p.total}"><span class="tp-bar"><span class="tp-bar__fill" style="width:${yuzde}%"></span></span>${p.z}/${p.total}</span>` : ''}
+    </button></li>`;
+  };
+  const evler = Object.keys(appData?.villas || {}).filter(k => {
+    const v = appData.villas[k];
+    return v && v.isActive !== false && !v.archivedAt && (!currentFilter.villa || currentFilter.villa === 'ALL' || currentFilter.villa === k);
+  });
+  acikGorevler.forEach(t => { if (t.villa && !evler.includes(t.villa)) evler.push(t.villa); });
+  const panoHtml = !evler.length ? '' : `<div class="lex-board ops-house-board" aria-label="Evlere göre temizlikler">${evler.map(k => {
+    const kartlar = acikGorevler.filter(t => t.villa === k);
+    const ad = appData?.villas?.[k]?.name || kartlar[0]?.propertyName || k;
+    const gecikti = kartlar.some(t => (zamanOf.get(t.id) || {}).k === 'overdue');
+    return `<section class="lex-board__col lex-board__col--${gecikti ? 'expense' : (kartlar.length ? 'revenue' : 'neutral')}" aria-label="${escapeHtml(ad)}"><header class="lex-board__head"><h3 class="lex-board__title">${propertyNameHtml(k, ad)}</h3><span class="lex-board__count">${kartlar.length}</span></header>${kartlar.length ? `<ul class="lex-board__cards">${kartlar.map(kartHtml).join('')}</ul>` : '<p class="lex-board__none">Bu hafta temizlik yok</p>'}</section>`;
+  }).join('')}</div>`;
   const groupHtml = (label, rows, id) => !rows.length ? '' : `
     <section class="cl-group"${id ? ` id="${id}"` : ''}>
       <h3 class="cl-group__title">${escapeHtml(label)} <span class="lex-group__sub">${rows.length}</span></h3>
@@ -20906,7 +20936,7 @@ function renderOperationsCleaningView(tasks) {
   return `
     ${eligible.length ? '' : fieldTeamHintHtml('CLEANER')}
     <div class="ops-cleaning-layout">
-      <div>${groupHtml('Geciken / denetim bekleyen', grouped.overdue)}${groupHtml('Bugün', grouped.today)}${groupHtml('Yarın', grouped.tomorrow)}${groupHtml('Bu hafta', grouped.week)}${groupHtml('Geçmiş temizlikler (seçili dönem)', history, 'opsCleaningHistory')}${[grouped.overdue, grouped.today, grouped.tomorrow, grouped.week, history].some(r => r.length) ? '' : '<div class="empty-state">Bu dönemde temizlik yok.</div>'}</div>
+      <div>${panoHtml}${groupHtml('Geçmiş temizlikler (seçili dönem)', history, 'opsCleaningHistory')}${evler.length || history.length ? '' : '<div class="empty-state">Bu dönemde temizlik yok.</div>'}</div>
       <aside class="ops-debt-panel cl-debt"${debt.length ? '' : ' hidden'}><h3 class="cl-group__title">Temizlik borcu <span class="lex-group__sub">${debt.reduce((sum, item) => sum + item.count, 0)} temizlik</span></h3>
         ${debt.length ? debt.map(item => `<details class="ops-debt-row"><summary><strong>${escapeHtml(item.cleaner)}</strong><span>${item.count} temizlik</span><strong>₺${item.amount.toLocaleString('tr-TR')}</strong></summary>${item.taskIds.map(id => {
           const task = tasks.find(candidate => (candidate.id || candidate.dbId) === id);
