@@ -10134,8 +10134,8 @@ function renderMonthCloseCard() {
 
   if (rozet) {
     rozet.textContent = kapali ? 'KAPALI' : 'AÇIK';
-    rozet.style.background = kapali ? 'rgba(255, 69, 58,0.18)' : 'rgba(52,211,153,0.15)';
-    rozet.style.color = kapali ? '#FCA5A5' : '#6EE7B7';
+    rozet.style.background = kapali ? 'var(--lx-down-bg)' : 'var(--lx-keep-bg)';
+    rozet.style.color = kapali ? 'var(--lx-down-fg)' : 'var(--lx-keep-fg)';
   }
 
   if (detay) {
@@ -19534,22 +19534,19 @@ function renderPropertiesTab() {
     const adHtml = canManage ? `<span class="property-name">${propertyColorPickerHtml(k)}${escapeHtml(v.name || 'Adsız mülk')}</span>` : propertyNameHtml(k, v.name || 'Adsız mülk');
     return `
       <div class="property-health-card status-HEALTHY">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div class="property-health-card__head">
           <div>
-            <strong style="font-size: 15px; color: #FFFFFF;">${adHtml}</strong>
-            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Kod: ${escapeHtml(k)} • Kapasite: ${escapeHtml(v.capacity || 'Belirtilmedi')}</div>
+            <strong class="property-health-card__name">${adHtml}</strong>
+            <div class="property-health-card__meta">Kod: ${escapeHtml(k)} · Kapasite: ${escapeHtml(v.capacity || 'Belirtilmedi')}</div>
           </div>
           <span class="badge badge-green">Aktif</span>
         </div>
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-size: 11px; margin: 6px 0;">
-          ${[['Baz fiyat', v.basePrice, '#30D158', 'Normal bir gecenin satış fiyatı'], ['Taban fiyat', v.floor ?? v.floorPrice, '#F5F5F7', 'Altına inilmeyen en düşük gecelik fiyat'], ['Hedef fiyat', v.target, '#F5F5F7', 'Ortalama hedeflediğiniz gecelik fiyat']].map(([label, value, color, title]) => `<div style="background: rgba(0,0,0,0.25); padding: 6px 8px; border-radius: 6px;" title="${escapeHtml(title)}">
-            <span style="color: #98989D; display: block;">${escapeHtml(label)}</span>
-            <strong style="color: ${color}; font-size: 12px;">${propertyMoney(value === '' ? null : value)}</strong>
-          </div>`).join('')}
+        <div class="property-health-card__prices">
+          ${[['Baz fiyat', v.basePrice, 'base', 'Normal bir gecenin satış fiyatı'], ['Taban fiyat', v.floor ?? v.floorPrice, 'floor', 'Altına inilmeyen en düşük gecelik fiyat'], ['Hedef fiyat', v.target, 'target', 'Ortalama hedeflediğiniz gecelik fiyat']].map(([label, value, tur, title]) => `<div class="property-health-card__price property-health-card__price--${tur}" title="${escapeHtml(title)}"><span>${escapeHtml(label)}</span><strong>${propertyMoney(value === '' ? null : value)}</strong></div>`).join('')}
         </div>
-        <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px;">
-          <button class="btn btn-secondary btn-sm" data-onclick="setPropertyProfile(decodeURIComponent('${encodeActionArg(k)}'))" style="font-size: 11px;">Profili Aç</button>
-          ${canManage ? `<button class="btn btn-secondary btn-sm" data-onclick="openPropertyModal(decodeURIComponent('${encodeActionArg(k)}'))" style="font-size: 11px;">Düzenle</button>` : ''}
+        <div class="property-health-card__actions">
+          <button class="btn btn-secondary btn-sm" data-onclick="setPropertyProfile(decodeURIComponent('${encodeActionArg(k)}'))">Profili Aç</button>
+          ${canManage ? `<button class="btn btn-secondary btn-sm" data-onclick="openPropertyModal(decodeURIComponent('${encodeActionArg(k)}'))">Düzenle</button>` : ''}
         </div>
       </div>
     `;
@@ -20897,6 +20894,39 @@ function renderOperationsCleaningView(tasks) {
       <span class="lex-tag lex-tag--${tone}">${escapeHtml(status)}</span>
     </button>`;
   };
+  // Ev ev pano (Trello gibi, kullanici 25.11.2026): her mulk bir sutun, her acik temizlik bir kart.
+  // Gruplar (geciken/bugun/yarin/bu hafta) kartin zaman etiketine iner; hesap groupCleaningTasks.
+  const zamanOf = new Map();
+  [['overdue', 'Gecikti'], ['today', 'Bugün'], ['tomorrow', 'Yarın'], ['week', '']].forEach(([k, ad]) => grouped[k].forEach(t => zamanOf.set(t.id, { k, ad })));
+  const acikGorevler = [...grouped.overdue, ...grouped.today, ...grouped.tomorrow, ...grouped.week];
+  const kartHtml = task => {
+    const execution = task.execution;
+    const waiting = task.workflowState === 'AWAITING_INSPECTION';
+    const status = waiting ? 'Denetim bekliyor' : task.status === 'DONE' ? (task.paid ? 'Ödendi' : 'Borç') : execution ? 'Atandı' : 'Planlı';
+    const tone = waiting ? 'up' : (isCleaningDebt(task) ? 'down' : (task.status === 'DONE' ? 'keep' : 'up'));
+    const z = zamanOf.get(task.id) || { k: 'week', ad: '' };
+    const serit = z.k === 'overdue' ? 'down' : (task.status === 'DONE' ? 'keep' : 'up');
+    const gun = task.date ? formatTrDate(task.date) : '—';
+    const p = cleaningChecklistProgress(execution);
+    const yuzde = p.total ? Math.round((p.z / p.total) * 100) : 0;
+    return `<li class="lex-card lex-card--${serit}"><button type="button" class="cl-card" data-cleaning-task-id="${escapeHtml(task.id)}" data-onclick="openCleaningPage(decodeURIComponent('${encodeActionArg(task.id || task.dbId)}'))">
+      <span class="lex-card__top"><span class="lex-tag lex-tag--${tone}">${escapeHtml(status)}</span><span class="lex-card__when${z.k === 'overdue' ? ' is-late' : ''}">${escapeHtml(z.ad ? `${z.ad} · ${gun}` : gun)}</span></span>
+      <span class="lex-card__title">Temizlik</span>
+      <span class="lex-card__type">${escapeHtml(task.cleaner || 'Personel belirtilmedi')}</span>
+      ${p.total ? `<span class="cl-card__progress" title="Temizlikçi ${p.z}/${p.total} · Kontrol ${p.m}/${p.total}"><span class="tp-bar"><span class="tp-bar__fill" style="width:${yuzde}%"></span></span>${p.z}/${p.total}</span>` : ''}
+    </button></li>`;
+  };
+  const evler = Object.keys(appData?.villas || {}).filter(k => {
+    const v = appData.villas[k];
+    return v && v.isActive !== false && !v.archivedAt && (!currentFilter.villa || currentFilter.villa === 'ALL' || currentFilter.villa === k);
+  });
+  acikGorevler.forEach(t => { if (t.villa && !evler.includes(t.villa)) evler.push(t.villa); });
+  const panoHtml = !evler.length ? '' : `<div class="lex-board ops-house-board" aria-label="Evlere göre temizlikler">${evler.map(k => {
+    const kartlar = acikGorevler.filter(t => t.villa === k);
+    const ad = appData?.villas?.[k]?.name || kartlar[0]?.propertyName || k;
+    const gecikti = kartlar.some(t => (zamanOf.get(t.id) || {}).k === 'overdue');
+    return `<section class="lex-board__col lex-board__col--${gecikti ? 'expense' : (kartlar.length ? 'revenue' : 'neutral')}" aria-label="${escapeHtml(ad)}"><header class="lex-board__head"><h3 class="lex-board__title">${propertyNameHtml(k, ad)}</h3><span class="lex-board__count">${kartlar.length}</span></header>${kartlar.length ? `<ul class="lex-board__cards">${kartlar.map(kartHtml).join('')}</ul>` : '<p class="lex-board__none">Bu hafta temizlik yok</p>'}</section>`;
+  }).join('')}</div>`;
   const groupHtml = (label, rows, id) => !rows.length ? '' : `
     <section class="cl-group"${id ? ` id="${id}"` : ''}>
       <h3 class="cl-group__title">${escapeHtml(label)} <span class="lex-group__sub">${rows.length}</span></h3>
@@ -20906,7 +20936,7 @@ function renderOperationsCleaningView(tasks) {
   return `
     ${eligible.length ? '' : fieldTeamHintHtml('CLEANER')}
     <div class="ops-cleaning-layout">
-      <div>${groupHtml('Geciken / denetim bekleyen', grouped.overdue)}${groupHtml('Bugün', grouped.today)}${groupHtml('Yarın', grouped.tomorrow)}${groupHtml('Bu hafta', grouped.week)}${groupHtml('Geçmiş temizlikler (seçili dönem)', history, 'opsCleaningHistory')}${[grouped.overdue, grouped.today, grouped.tomorrow, grouped.week, history].some(r => r.length) ? '' : '<div class="empty-state">Bu dönemde temizlik yok.</div>'}</div>
+      <div>${panoHtml}${groupHtml('Geçmiş temizlikler (seçili dönem)', history, 'opsCleaningHistory')}${evler.length || history.length ? '' : '<div class="empty-state">Bu dönemde temizlik yok.</div>'}</div>
       <aside class="ops-debt-panel cl-debt"${debt.length ? '' : ' hidden'}><h3 class="cl-group__title">Temizlik borcu <span class="lex-group__sub">${debt.reduce((sum, item) => sum + item.count, 0)} temizlik</span></h3>
         ${debt.length ? debt.map(item => `<details class="ops-debt-row"><summary><strong>${escapeHtml(item.cleaner)}</strong><span>${item.count} temizlik</span><strong>₺${item.amount.toLocaleString('tr-TR')}</strong></summary>${item.taskIds.map(id => {
           const task = tasks.find(candidate => (candidate.id || candidate.dbId) === id);
@@ -21509,6 +21539,91 @@ function getPricingResearchService() {
   if (typeof PricingResearchService !== 'undefined') return PricingResearchService;
   if (typeof require === 'function') return require('./core/pricing_research_service.js');
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Rakip analizinden aktarim (kullanici 25.11.2026): rakip-analizi skill'inin tarama
+// JSON'u -> competitor_price_research. Cevirme saf modulde (core/rival_scan_import.js);
+// burada dosya okuma, onizleme ve ayni kayit yolu (PricingResearchService.saveResearch).
+// ---------------------------------------------------------------------------
+let rivalScanPlan = null;
+
+function getRivalScanImportApi() {
+  if (typeof RivalScanImport !== 'undefined') return RivalScanImport;
+  if (typeof window !== 'undefined' && window.RivalScanImport) return window.RivalScanImport;
+  if (typeof require === 'function') return require('./core/rival_scan_import.js');
+  return null;
+}
+
+function planRivalScanFromJson(jsons) {
+  const R = getRivalScanImportApi();
+  const scan = jsons.find(j => R.isScan(j)) || null;
+  const settings = jsons.find(j => R.isSettings(j)) || null;
+  const properties = pricingActiveProperties().map(({ property }) => ({ id: property.id, name: property.name || property.slug, capacity: property.capacity }));
+  return R.plan({ scan, settings, properties, existing: appData.competitorPriceResearch || [], today: getTodayStr() });
+}
+
+async function handleRivalScanFiles(input) {
+  const files = [...(input?.files || [])];
+  const box = typeof document !== 'undefined' ? document.getElementById('rivalScanPreview') : null;
+  if (!files.length) return false;
+  try {
+    const jsons = await Promise.all(files.map(f => f.text().then(t => JSON.parse(t))));
+    rivalScanPlan = planRivalScanFromJson(jsons);
+  } catch (e) {
+    rivalScanPlan = { rows: [], unmatched: [], skipped: 0, error: 'Dosya okunamadı: geçerli bir JSON değil.' };
+  }
+  if (box) box.innerHTML = rivalScanPreviewHtml(rivalScanPlan);
+  return true;
+}
+
+function rivalScanPreviewHtml(plan) {
+  if (!plan) return '';
+  if (plan.error) return `<p class="rival-scan__msg is-error">${escapeHtml(plan.error)}</p>`;
+  const svc = getPricingResearchService();
+  const para = v => (v == null ? '—' : pricingMoney(v));
+  const satirlar = plan.rows.map(r => `<tr><td data-label="Ev">${escapeHtml(r.propertyName)}</td><td data-label="Rakip">${escapeHtml(r.competitorName)}<span class="lex-cell__sub">${Number(r.persons)} kişi</span></td><td data-label="${escapeHtml(svc.PRICE_TYPE_LABELS.WEEKDAY)}">${escapeHtml(para(r.values.WEEKDAY))}</td><td data-label="${escapeHtml(svc.PRICE_TYPE_LABELS.WEEKEND)}">${escapeHtml(para(r.values.WEEKEND))}</td><td data-label="${escapeHtml(svc.PRICE_TYPE_LABELS.SPECIAL)}">${escapeHtml(para(r.values.SPECIAL))}</td></tr>`).join('');
+  const notlar = [
+    plan.unmatched.length ? `Eşleşmeyen ev (aktarılmaz): ${plan.unmatched.join(', ')}. Adı Mülkler'dekiyle aynı olmalı.` : '',
+    plan.skipped ? `${plan.skipped} kayıt bu taramadan zaten aktarılmış; atlandı.` : ''
+  ].filter(Boolean).map(t => `<p class="rival-scan__msg">${escapeHtml(t)}</p>`).join('');
+  const canManage = canManageTenantRole(activeTenant?.role);
+  const dugme = plan.rows.length && canManage
+    ? `<button type="button" class="btn btn-primary btn-sm" data-onclick="importRivalScan()">${plan.rows.length} kaydı aktar</button>`
+    : (plan.rows.length ? '<p class="rival-scan__msg">Aktarmak yönetici yetkisi ister.</p>' : '');
+  return `<p class="rival-scan__msg">Tarama: ${escapeHtml(formatTrDate(plan.researchedOn))} · ${plan.rows.length} yeni kayıt (gece başı fiyat)</p>${notlar}
+    ${plan.rows.length ? `<div class="table-responsive"><table class="rival-scan__table mobile-cards"><thead><tr><th scope="col">Ev</th><th scope="col">Rakip</th><th scope="col">Hafta içi</th><th scope="col">Hafta sonu</th><th scope="col">Özel gün</th></tr></thead><tbody>${satirlar}</tbody></table></div>` : ''}
+    <div class="rival-scan__actions">${dugme}</div>`;
+}
+
+async function importRivalScan() {
+  if (!canManageTenantRole(activeTenant?.role) || !rivalScanPlan || !rivalScanPlan.rows.length) return false;
+  if (!appData.phase78SchemaReady) { uiNotify('Rakip araştırması kaydedilemedi: phase78 göçü bekleniyor.'); return false; }
+  const tenantId = getActiveTenantId();
+  try { requireCloudForWrite('Rakip analizi aktarımı', tenantId); } catch (e) { uiNotify(e.message); return false; }
+  const svc = getPricingResearchService();
+  const rows = rivalScanPlan.rows;
+  let ok = 0; const hatalar = [];
+  for (const r of rows) {
+    try {
+      const saved = await svc.saveResearch(supabaseClient, {
+        tenantId, propertyId: r.propertyId, researchedOn: rivalScanPlan.researchedOn, sourceKind: 'OTA',
+        sourceUrl: r.sourceUrl, values: r.values, rawNote: r.rawNote, competitorName: r.competitorName
+      });
+      appData.competitorPriceResearch = [saved, ...(appData.competitorPriceResearch || [])];
+      ok += 1;
+    } catch (error) {
+      hatalar.push(`${r.propertyName} · ${r.competitorName}: ${svc.errorText(error)}`);
+    }
+  }
+  rivalScanPlan = null;
+  const box = typeof document !== 'undefined' ? document.getElementById('rivalScanPreview') : null;
+  if (box) box.innerHTML = `<p class="rival-scan__msg${hatalar.length ? ' is-error' : ''}">${ok} / ${rows.length} kayıt aktarıldı.${hatalar.length ? ' Aktarılamayanlar: ' + escapeHtml(hatalar.slice(0, 5).join(' · ')) : ''}</p>`;
+  const input = typeof document !== 'undefined' ? document.getElementById('rivalScanFiles') : null;
+  if (input) input.value = '';
+  renderPricingTab();
+  if (ok && window.showToast) window.showToast(`${ok} rakip fiyatı aktarıldı.`, 'success');
+  return ok === rows.length;
 }
 
 function buildPricingWorkspace(input = {}) {
@@ -23296,8 +23411,157 @@ function pricingGridKey(event) {
 
 // Ic sekmeler (kullanici karari 07.11.2026): Takvim gunluk is, Kurallar
 // kurulum, Hedef ve Rakipler analiz. Durum oturumluktur; hesap degismez.
-const PRICING_VIEWS = ['calendar', 'rules', 'target', 'rivals', 'results'];
+// Yeniden tasarim (kullanici 25.11.2026: "fiyatlandirmayi hic anlamadim, musteri de anlamaz"):
+// menude dort sekme, musterinin dilinde: Fiyatlarim · Ciro plani · Rakipler · Ayarlar.
+// Hedef (ters hesap) ve Sonuclar menuden cikti; ilgili sekmenin altindaki baglantiyla acilir.
+const PRICING_VIEWS = ['calendar', 'plan', 'rivals', 'rules', 'target', 'results'];
+const PRICING_NAV_VIEWS = ['calendar', 'plan', 'rivals', 'rules'];
 let pricingView = 'calendar';
+
+// ---------------------------------------------------------------------------
+// Ciro plani (kullanici 25.11.2026): her ev icin doluluk orani ve gecelik fiyat
+// secilir; ev cirosu = satilabilir gece × doluluk × fiyat, en altta tum evlerin
+// toplami. Yaklasik bir hesap aracidir: kaydedilmez, fiyati ve hedefi degistirmez.
+// Satilabilir gece Bugun/Finans ile ayni kapasite kuralindan (computeMonthPerformance:
+// faaliyete baslama + takvimi kapatan bakim). Varsayilanlar uydurulmaz:
+// doluluk = kayitli aylik doluluk hedefi, yoksa gecen yilin ayni ayi, yoksa bos;
+// fiyat = o ayin acik gecelerindeki ortalama oneri, yoksa baz fiyat, yoksa bos.
+// ---------------------------------------------------------------------------
+let pricingPlanMonth = '';
+const pricingPlanDrafts = {};
+const PRICING_PLAN_OCC_STEPS = Array.from({ length: 19 }, (_, i) => 10 + i * 5);
+
+function pricingPlanDefaults(entry, monthKey, today = getTodayStr()) {
+  const id = entry.property.id;
+  const hedef = pricingOccupancyTargetOf(id, monthKey);
+  let occ = null; let occSource = null;
+  if (hedef && hedef.value > 0) { occ = Math.round(hedef.value * 100); occSource = 'Doluluk hedefiniz'; }
+  else {
+    const gecen = computeMonthPerformance(`${Number(monthKey.slice(0, 4)) - 1}${monthKey.slice(4)}`, entry.key);
+    if (gecen && gecen.occupancy != null && gecen.nights > 0) { occ = Math.max(5, Math.min(100, Math.round(gecen.occupancy / 5) * 5)); occSource = 'Geçen yıl bu ay'; }
+  }
+  let price = null; let priceSource = null;
+  try {
+    const takvim = computePricingCalendar(entry, today);
+    const acik = takvim.suggestions.days.filter(d => d.date.startsWith(monthKey + '-') && d.status === 'OPEN' && d.price > 0);
+    if (acik.length) { price = Math.round(acik.reduce((s, d) => s + d.price, 0) / acik.length / 50) * 50; priceSource = 'Ortalama önerimiz'; }
+  } catch (e) { /* takvim hesaplanamazsa baz fiyata duser */ }
+  if (price == null) { const base = pricingBasePriceOf(entry.property); if (base) { price = base; priceSource = 'Baz fiyat'; } }
+  return { occ, occSource, price, priceSource };
+}
+
+// Saf hesap (test yuzeyi): rows + toplam. Eksik deger varsa o evin cirosu null, toplama girmez.
+function pricingPlanRows(entries, monthKey, drafts = {}, today = getTodayStr()) {
+  const rows = entries.map(entry => {
+    const perf = computeMonthPerformance(monthKey, entry.key) || {};
+    const nights = Number.isFinite(perf.available) ? perf.available : null;
+    const def = pricingPlanDefaults(entry, monthKey, today);
+    const d = drafts[entry.property.id] || {};
+    const occ = d.occ !== undefined ? d.occ : def.occ;
+    const price = d.price !== undefined ? d.price : def.price;
+    const ok = nights != null && nights > 0 && Number.isFinite(occ) && occ > 0 && Number.isFinite(price) && price > 0;
+    return {
+      id: entry.property.id, key: entry.key, name: entry.property.name || entry.key,
+      nights, occ, price, occSource: d.occ !== undefined ? 'Sizin seçiminiz' : def.occSource,
+      priceSource: d.price !== undefined ? 'Sizin seçiminiz' : def.priceSource,
+      soldNights: perf.nights || 0, soldRevenue: perf.roomRevenue || 0,
+      plannedNights: ok ? Math.round(nights * occ / 100) : null,
+      revenue: ok ? Math.round(nights * (occ / 100) * price) : null
+    };
+  });
+  const sayilan = rows.filter(r => r.revenue != null);
+  const totalNights = rows.reduce((s, r) => s + (r.nights || 0), 0);
+  const plannedNights = sayilan.reduce((s, r) => s + r.plannedNights, 0);
+  return {
+    rows,
+    total: sayilan.length ? sayilan.reduce((s, r) => s + r.revenue, 0) : null,
+    counted: sayilan.length,
+    missing: rows.filter(r => r.revenue == null).map(r => r.name),
+    totalNights, plannedNights,
+    avgOcc: sayilan.length ? Math.round(plannedNights / sayilan.reduce((s, r) => s + r.nights, 0) * 100) : null,
+    avgPrice: plannedNights > 0 ? Math.round(sayilan.reduce((s, r) => s + r.revenue, 0) / plannedNights) : null
+  };
+}
+
+function pricingPlanMonthKey(today = getTodayStr()) {
+  const months = pricingHorizon(today).months;
+  if (!months.includes(pricingPlanMonth)) pricingPlanMonth = months[0];
+  return pricingPlanMonth;
+}
+
+function renderPricingPlan() {
+  if (typeof document === 'undefined') return;
+  const root = document.getElementById('pricingPlanRoot');
+  if (!root) return;
+  const today = getTodayStr();
+  const entries = pricingActiveProperties();
+  if (!entries.length) { root.innerHTML = '<div class="empty-state">Ciro planı için önce bir mülk ekleyin.</div>'; return; }
+  const monthKey = pricingPlanMonthKey(today);
+  const plan = pricingPlanRows(entries, monthKey, pricingPlanDrafts[monthKey] || {}, today);
+  const ayOps = pricingHorizon(today).months.map(k => `<option value="${escapeHtml(k)}"${k === monthKey ? ' selected' : ''}>${escapeHtml(pricingMonthLabel(k))}</option>`).join('');
+  const satir = r => {
+    const occOps = `<option value=""${r.occ == null ? ' selected' : ''}>Seçin</option>` + PRICING_PLAN_OCC_STEPS.map(v => `<option value="${v}"${v === r.occ ? ' selected' : ''}>%${v}</option>`).join('')
+      + (r.occ != null && !PRICING_PLAN_OCC_STEPS.includes(r.occ) ? `<option value="${Number(r.occ)}" selected>%${Number(r.occ)}</option>` : '');
+    const formul = r.revenue != null ? `${r.nights} gece × %${r.occ} × ${pricingMoney(r.price)}` : (r.nights ? 'Doluluk ve fiyat seçin' : 'Bu ay satılabilir gece yok');
+    return `<article class="pricing-plan-row fox-card fox-card--revenue" data-plan-id="${escapeHtml(r.id)}">
+      <header class="pricing-plan-row__head"><h3>${propertyNameHtml(r.key, r.name)}</h3><span class="pricing-plan-row__nights">${r.nights == null ? '—' : r.nights} satılabilir gece</span></header>
+      <div class="pricing-plan-row__inputs">
+        <label class="pricing-plan-field"><span>Doluluk</span><select class="lex-select" aria-label="${escapeHtml(r.name)} doluluk oranı" data-onchange="setPricingPlanValue(decodeURIComponent('${encodeActionArg(r.id)}'), 'occ', this.value)">${occOps}</select><small>${escapeHtml(r.occSource || 'Kayıtlı veri yok')}</small></label>
+        <label class="pricing-plan-field"><span>Gecelik fiyat (₺)</span><input class="lex-select" type="number" min="0" step="50" inputmode="numeric" value="${r.price == null ? '' : Number(r.price)}" placeholder="—" aria-label="${escapeHtml(r.name)} gecelik fiyat" data-oninput="setPricingPlanValue(decodeURIComponent('${encodeActionArg(r.id)}'), 'price', this.value)"><small>${escapeHtml(r.priceSource || 'Baz fiyat girilmemiş')}</small></label>
+      </div>
+      <footer class="pricing-plan-row__result"><span class="pricing-plan-row__formula" id="pricingPlanFormula_${escapeHtml(r.id)}">${escapeHtml(formul)}</span><strong class="fox-text-revenue" id="pricingPlanRevenue_${escapeHtml(r.id)}">${r.revenue == null ? '—' : escapeHtml(pricingMoney(r.revenue))}</strong></footer>
+      <p class="pricing-plan-row__sold">Şu ana kadar bu ay satılan: ${Number(r.soldNights)} gece · ${escapeHtml(pricingMoney(r.soldRevenue))}</p>
+    </article>`;
+  };
+  root.innerHTML = `
+    <div class="pricing-plan-head"><label class="pricing-plan-field pricing-plan-month"><span>Ay</span><select class="lex-select" data-onchange="setPricingPlanMonth(this.value)">${ayOps}</select></label>
+      <button type="button" class="lex-btn" data-onclick="resetPricingPlan()">Önerilere dön</button></div>
+    <div class="pricing-plan-grid">${plan.rows.map(satir).join('')}</div>
+    <section class="pricing-plan-total fox-card fox-card--income" aria-live="polite" id="pricingPlanTotal">${pricingPlanTotalHtml(plan, entries.length, monthKey)}</section>`;
+}
+
+function pricingPlanTotalHtml(plan, count, monthKey) {
+  const eksik = plan.missing.length ? `<p class="pricing-plan-total__note">Hesaba girmeyen ${plan.missing.length} ev: ${escapeHtml(plan.missing.join(', '))} (doluluk ya da fiyat seçilmedi).</p>` : '';
+  return `<span class="pricing-plan-total__label">${count} evin ${escapeHtml(pricingMonthLabel(monthKey))} toplam cirosu (yaklaşık)</span>
+    <strong class="pricing-plan-total__value">${plan.total == null ? '—' : escapeHtml(pricingMoney(plan.total))}</strong>
+    <span class="pricing-plan-total__meta">${plan.total == null ? 'Her ev için doluluk ve fiyat seçin.' : `${plan.plannedNights} gece satılır · ortalama doluluk %${plan.avgOcc} · ortalama gecelik ${escapeHtml(pricingMoney(plan.avgPrice))}`}</span>
+    ${eksik}
+    <p class="pricing-plan-total__note">Yaklaşık hesaptır: satılabilir gece × doluluk × fiyat. Kaydedilmez; takvimdeki fiyatları ve hedeflerinizi değiştirmez.</p>`;
+}
+
+function setPricingPlanValue(propertyId, field, raw) {
+  if (!['occ', 'price'].includes(field)) return false;
+  const monthKey = pricingPlanMonthKey();
+  const v = raw === '' || raw == null ? null : Number(raw);
+  const value = v == null || !Number.isFinite(v) || v <= 0 ? null : (field === 'occ' ? Math.min(100, v) : v);
+  pricingPlanDrafts[monthKey] = pricingPlanDrafts[monthKey] || {};
+  pricingPlanDrafts[monthKey][propertyId] = { ...(pricingPlanDrafts[monthKey][propertyId] || {}), [field]: value };
+  if (typeof document === 'undefined') return true;
+  // Fiyat yazilirken kutu yeniden cizilmez (odak kalir); yalniz o evin sonucu ve toplam guncellenir.
+  const entries = pricingActiveProperties();
+  const plan = pricingPlanRows(entries, monthKey, pricingPlanDrafts[monthKey], getTodayStr());
+  const r = plan.rows.find(x => x.id === propertyId);
+  if (r) {
+    setEl(`pricingPlanRevenue_${propertyId}`, r.revenue == null ? '—' : pricingMoney(r.revenue));
+    setEl(`pricingPlanFormula_${propertyId}`, r.revenue != null ? `${r.nights} gece × %${r.occ} × ${pricingMoney(r.price)}` : (r.nights ? 'Doluluk ve fiyat seçin' : 'Bu ay satılabilir gece yok'));
+  }
+  const total = document.getElementById('pricingPlanTotal');
+  if (total) total.innerHTML = pricingPlanTotalHtml(plan, entries.length, monthKey);
+  return true;
+}
+
+function setPricingPlanMonth(monthKey) {
+  if (!/^\d{4}-\d{2}$/.test(String(monthKey || ''))) return false;
+  pricingPlanMonth = monthKey;
+  renderPricingPlan();
+  return true;
+}
+
+function resetPricingPlan() {
+  delete pricingPlanDrafts[pricingPlanMonthKey()];
+  renderPricingPlan();
+  return true;
+}
 
 // Kullanim kilavuzu (kullanici 08.11.2026; sadelik 21.11.2026): hep kapali
 // baslar, takvim ilk ekranda kalir; ozet tek dokunusla acar. Hatirlanacak secim yok.
@@ -23319,6 +23583,9 @@ function openPricingGuideStep(view) {
 
 function applyPricingView() {
   if (typeof document === 'undefined') return;
+  // Ciro plani butun evleri kapsar; tek ev secicisi orada gizlenir.
+  const evSecici = document.querySelector?.('.pricing-property');
+  if (evSecici) evSecici.hidden = pricingView === 'plan';
   PRICING_VIEWS.forEach(id => {
     const on = id === pricingView;
     const tab = document.getElementById(`pricingViewTab_${id}`);
@@ -23337,14 +23604,17 @@ function setPricingView(view) {
   pricingView = view;
   applyPricingView();
   if (view === 'results') ensurePricingImportedIds();
+  if (view === 'plan') renderPricingPlan();
   return true;
 }
 
 function pricingSubnavKey(event) {
   const step = { ArrowLeft: -1, ArrowRight: 1, Home: -99, End: 99 }[event?.key];
   if (!step) return false;
-  const index = PRICING_VIEWS.indexOf(pricingView);
-  const next = PRICING_VIEWS[Math.max(0, Math.min(PRICING_VIEWS.length - 1, step === -99 ? 0 : step === 99 ? PRICING_VIEWS.length - 1 : (index + step + PRICING_VIEWS.length) % PRICING_VIEWS.length))];
+  // Ok tuslari yalniz menudeki sekmeler arasinda gezer (Hedef/Sonuclar baglantidan acilir).
+  const nav = PRICING_NAV_VIEWS;
+  const index = Math.max(0, nav.indexOf(pricingView));
+  const next = nav[Math.max(0, Math.min(nav.length - 1, step === -99 ? 0 : step === 99 ? nav.length - 1 : (index + step + nav.length) % nav.length))];
   event.preventDefault?.();
   setPricingView(next);
   document.getElementById(`pricingViewTab_${next}`)?.focus?.();
@@ -23727,6 +23997,7 @@ function renderPricingTab() {
   const govde = pricingCalendarMode === 'list' ? pricingListHtml(monthKey, monthDays, ctx) : pricingCalendarGridHtml(monthKey, monthDays, ctx);
   container.innerHTML = `${warningHtml}${pricingPaceStripHtml(entry, monthKey, today)}${govde}${pricingHistoryHintHtml(result.history, entry, monthKey)}`;
   if (pricingView === 'results') ensurePricingImportedIds();
+  if (pricingView === 'plan') renderPricingPlan();
 
   // Onay bekleyen gun: ufuktaki acik, onerisi olan ve kayitli fiyati olmayan gunler.
   const base = pricingBasePriceOf(entry.property);
@@ -23981,6 +24252,15 @@ if (typeof module !== 'undefined' && module.exports) {
     goTo,
     setPricingCalendarMode,
     pricingListRows,
+    pricingPlanRows,
+    planRivalScanFromJson,
+    rivalScanPreviewHtml,
+    importRivalScan,
+    handleRivalScanFiles,
+    setPricingPlanValue,
+    setPricingPlanMonth,
+    resetPricingPlan,
+    renderPricingPlan,
     pricingListPages,
     closePropertyPage,
     getIncomeCategories,
