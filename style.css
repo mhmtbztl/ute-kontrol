@@ -5472,3 +5472,42 @@ button.pricing-day.is-booked:hover { background: var(--fox-info-bg); border-colo
 .cl-card__progress { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--lx-text-2); }
 .cl-card__progress .tp-bar { flex: 1; }
 .lex-board__none { margin: 0; padding: 4px; font-size: 13px; color: var(--lx-text-2); }
+/* Ciro plani (Fiyatlandirma yeniden, 25.11.2026): ev basina doluluk + fiyat -> yaklasik ciro. */
+.pricing-plan-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 4px 0 12px; }
+.pricing-plan-month { max-width: 240px; }
+.pricing-plan-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.pricing-plan-row { display: flex; flex-direction: column; gap: 10px; }
+.pricing-plan-row__head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.pricing-plan-row__head h3 { margin: 0; font-size: 16px; font-weight: 500; color: var(--lx-text); }
+.pricing-plan-row__nights { font-size: 13px; color: var(--lx-text-2); }
+.pricing-plan-row__inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pricing-plan-field { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pricing-plan-field > span { font-size: 13px; color: var(--lx-text-2); }
+.pricing-plan-field .lex-select { margin-top: 2px; background: var(--lx-bg); }
+.pricing-plan-field small { font-size: 12px; color: var(--lx-text-2); }
+.pricing-plan-row__result { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; border-top: 1px solid var(--lx-line); padding-top: 8px; flex-wrap: wrap; }
+.pricing-plan-row__formula { font-size: 13px; color: var(--lx-text-2); }
+.pricing-plan-row__result strong { font-size: 20px; font-weight: 500; }
+.pricing-plan-row__sold { margin: 0; font-size: 12px; color: var(--lx-text-2); }
+.pricing-plan-total { margin-top: 16px; display: flex; flex-direction: column; gap: 4px; }
+.pricing-plan-total__label { font-size: 14px; color: var(--lx-text-2); }
+.pricing-plan-total__value { font-size: 30px; font-weight: 500; color: var(--fox-income); }
+.pricing-plan-total__meta { font-size: 14px; color: var(--lx-text); }
+.pricing-plan-total__note { margin: 4px 0 0; font-size: 12px; color: var(--lx-text-2); }
+.pricing-view-more { margin: 14px 0 0; }
+@media (max-width: 640px) {
+  .pricing-plan-grid { grid-template-columns: 1fr; }
+  .pricing-plan-field .lex-select { font-size: 16px; min-height: 44px; }
+}
+.pricing-property[hidden] { display: none; }
+/* Rakip analizinden aktarim (25.11.2026). */
+.rival-scan { margin: 12px 0; }
+.rival-scan__pick { display: inline-flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--lx-text-2); }
+.rival-scan__pick input { font: inherit; font-size: 14px; color: var(--lx-text); max-width: 100%; }
+.rival-scan__msg { margin: 8px 0 0; font-size: 13px; color: var(--lx-text-2); }
+.rival-scan__msg.is-error { color: var(--fox-expense); }
+.rival-scan__table { margin-top: 8px; width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+.rival-scan__table th { text-align: left; font-size: 13px; font-weight: 400; color: var(--lx-text-2); padding: 6px 8px 6px 0; border-bottom: 1px solid var(--lx-line); }
+.rival-scan__table td { padding: 8px 8px 8px 0; border-bottom: 1px solid var(--lx-line); vertical-align: top; color: var(--lx-text); }
+.rival-scan__table .lex-cell__sub { display: block; font-size: 12px; color: var(--lx-text-2); }
+.rival-scan__actions { margin-top: 10px; }

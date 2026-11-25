@@ -16,7 +16,7 @@
   <meta http-equiv="Expires" content="0">
   <!-- Gece/Gunduz: tema stil sayfasindan once secilir (yanip sonme olmaz); yazi tipi sistemindir -->
   <script src="core/theme.js?v=81e24fd9"></script>
-  <link rel="stylesheet" href="style.css?v=71e09c89">
+  <link rel="stylesheet" href="style.css?v=4d616b59">
   <link rel="stylesheet" href="analytics.css?v=35127907">
   <script src="supabase.umd.js?v=3810661a"></script>
   <script src="core/xlsx_import_worker.js?v=b0939d47"></script>
@@ -1445,26 +1445,26 @@
         </header>
 
         <div class="ads-subnav pricing-subnav" role="tablist" aria-label="Fiyatlandırma bölümleri" data-onkeydown="pricingSubnavKey(event)">
-          <button type="button" role="tab" class="ads-subnav-btn active" id="pricingViewTab_calendar" aria-controls="pricingView_calendar" aria-selected="true" tabindex="0" data-onclick="setPricingView('calendar')">Takvim <span class="pricing-subnav-count" id="pricingPendingBadge"></span></button>
-          <button type="button" role="tab" class="ads-subnav-btn" id="pricingViewTab_rules" aria-controls="pricingView_rules" aria-selected="false" tabindex="-1" data-onclick="setPricingView('rules')">Kurallar</button>
-          <button type="button" role="tab" class="ads-subnav-btn" id="pricingViewTab_target" aria-controls="pricingView_target" aria-selected="false" tabindex="-1" data-onclick="setPricingView('target')">Hedef</button>
+          <button type="button" role="tab" class="ads-subnav-btn active" id="pricingViewTab_calendar" aria-controls="pricingView_calendar" aria-selected="true" tabindex="0" data-onclick="setPricingView('calendar')">Fiyatlarım <span class="pricing-subnav-count" id="pricingPendingBadge"></span></button>
+          <button type="button" role="tab" class="ads-subnav-btn" id="pricingViewTab_plan" aria-controls="pricingView_plan" aria-selected="false" tabindex="-1" data-onclick="setPricingView('plan')">Ciro planı</button>
           <button type="button" role="tab" class="ads-subnav-btn" id="pricingViewTab_rivals" aria-controls="pricingView_rivals" aria-selected="false" tabindex="-1" data-onclick="setPricingView('rivals')">Rakipler</button>
-          <button type="button" role="tab" class="ads-subnav-btn" id="pricingViewTab_results" aria-controls="pricingView_results" aria-selected="false" tabindex="-1" data-onclick="setPricingView('results')">Sonuçlar</button>
+          <button type="button" role="tab" class="ads-subnav-btn" id="pricingViewTab_rules" aria-controls="pricingView_rules" aria-selected="false" tabindex="-1" data-onclick="setPricingView('rules')">Ayarlar</button>
+          <button type="button" role="tab" class="ads-subnav-btn" id="pricingViewTab_target" aria-controls="pricingView_target" aria-selected="false" tabindex="-1" data-onclick="setPricingView('target')" hidden>Hedef</button>
+          <button type="button" role="tab" class="ads-subnav-btn" id="pricingViewTab_results" aria-controls="pricingView_results" aria-selected="false" tabindex="-1" data-onclick="setPricingView('results')" hidden>Sonuçlar</button>
         </div>
 
         <!-- KILAVUZ: hep kapali baslar (sadelik 21.11.2026). -->
         <details class="pricing-guide" id="pricingGuide">
           <summary>Fiyatlandırma nasıl çalışır?</summary>
           <div class="pricing-guide-body">
-            <p>Sistem her gece için bir <strong>öneri</strong> hesaplar: mülkün baz fiyatı, üstüne kurallarınız (hafta sonu, özel gün, sezon, talep, son dakika, boş gece). Öneriyi siz onaylar ya da değiştirirsiniz; kaydedilen fiyat referanstır, OTA'ya kendiliğinden gönderilmez.</p>
+            <p>Lexbnb her eviniz için her gecenin <strong>önerilen fiyatını</strong> hesaplar. Öneri sizin verdiğiniz normal gece fiyatından başlar; hafta sonu, tatil ve sezonda artar, son dakika ve boş gecede iner, ama belirlediğiniz en düşük fiyatın altına hiç inmez. Fiyatı siz onaylarsınız; Airbnb ve Booking'e kendiliğinden gönderilmez.</p>
             <ol class="pricing-guide-steps">
-              <li><b>Fiyat tablosu</b><span>Her mülk için baz fiyatı (normal bir hafta içi gecesi) ve tabanı (inilemeyecek en düşük fiyat) girin.</span><button type="button" class="pricing-link" data-onclick="openPricingGuideStep('rules')">Kurallar'a git</button></li>
-              <li><b>Kurallar</b><span>Hafta sonu, özel gün ve sezon artışlarını; son dakika ve boş gece indirimlerini ayarlayın. Talep kuralı için Hedefleri Yönet'ten aylık doluluk hedefi girin.</span><button type="button" class="pricing-link" data-onclick="openPricingGuideStep('rules')">Kurallar'a git</button></li>
-              <li><b>Takvimde onay</b><span>Bir güne tıklayın: "Bu fiyat neden?" hesabı adım adım görünür. Öneriyi onaylayın ya da elle fiyat yazın; Shift ile birden çok gün seçin.</span><button type="button" class="pricing-link" data-onclick="openPricingGuideStep('calendar')">Takvim'e git</button></li>
-              <li><b>OTA'ya girin</b><span>Seçili günleri "CSV indir" ya da "Kopyala" ile alın; Airbnb, Booking gibi kanallara siz girersiniz.</span><button type="button" class="pricing-link" data-onclick="openPricingGuideStep('calendar')">Takvim'e git</button></li>
-              <li><b>Sonucu ölçün</b><span>Gün geçtikçe Sonuçlar sekmesi kaydettiğiniz fiyatla gecenin satılıp satılmadığını ve hangi fiyata satıldığını gösterir.</span><button type="button" class="pricing-link" data-onclick="openPricingGuideStep('results')">Sonuçlar'a git</button></li>
+              <li><b>1. Ayarlar</b><span>Her ev için iki fiyat girin: normal bir gecenin fiyatı (baz) ve asla altına inmeyeceğiniz fiyat (taban). Bir kez yapılır.</span><button type="button" class="pricing-link" data-onclick="openPricingGuideStep('rules')">Ayarlar'a git</button></li>
+              <li><b>2. Fiyatlarım</b><span>Takvimde bir güne dokunun: önerinin neden o rakam olduğu adım adım yazar. Öneriyi onaylayın ya da kendi fiyatınızı yazın.</span><button type="button" class="pricing-link" data-onclick="openPricingGuideStep('calendar')">Fiyatlarım'a git</button></li>
+              <li><b>3. Kanallara girin</b><span>Seçtiğiniz günleri "CSV indir" ya da "Kopyala" ile alın ve Airbnb, Booking gibi kanallara siz girin.</span><button type="button" class="pricing-link" data-onclick="openPricingGuideStep('calendar')">Fiyatlarım'a git</button></li>
+              <li><b>4. Ciro planı</b><span>Her ev için doluluk oranını ve gecelik fiyatı seçin; o ay her evin ve bütün evlerin yaklaşık cirosu çıkar.</span><button type="button" class="pricing-link" data-onclick="openPricingGuideStep('plan')">Ciro planı'na git</button></li>
+              <li><b>5. Rakipler</b><span>Benzer evlerin fiyatlarını kaydedin; takvimde fiyatınızın yanında rakip ortalaması görünür.</span><button type="button" class="pricing-link" data-onclick="openPricingGuideStep('rivals')">Rakipler'e git</button></li>
             </ol>
-            <p class="sub-text">Hedef sekmesi aylık ciro hedefine hangi fiyat–doluluk bileşimiyle ulaşılacağını, Rakipler sekmesi rakip fiyatlarını ve ortalamasını gösterir. İkisi de öneriyi değiştirmez.</p>
             <div class="pricing-guide-warnings">
               <h4>Takvimdeki uyarılar ne demek?</h4>
               <dl>
@@ -1511,11 +1511,19 @@
             </section>
             <aside class="pricing-card pricing-panel" id="pricingDayEditor" aria-live="polite" aria-label="Seçili gün"></aside>
           </div>
+          <p class="pricing-view-more"><button type="button" class="lex-link-inline" data-onclick="setPricingView('results')">Kaydettiğim fiyatlar nasıl sattı?</button></p>
+        </section>
+
+        <!-- CIRO PLANI (kullanici 25.11.2026): her ev icin doluluk + fiyat -> yaklasik ciro, en altta toplam. -->
+        <section class="pricing-view" id="pricingView_plan" role="tabpanel" aria-labelledby="pricingViewTab_plan" hidden>
+          <p class="pricing-view-intro">Bu ay kaç para kazanabilirim? Her ev için doluluk oranını ve gecelik fiyatı seçin. Ev cirosu = satılabilir gece × doluluk × fiyat; en altta bütün evlerin toplamı çıkar. Yaklaşık hesaptır, hiçbir şeyi değiştirmez.</p>
+          <div id="pricingPlanRoot"></div>
+          <p class="pricing-view-more"><button type="button" class="lex-link-inline" data-onclick="setPricingView('target')">Tersinden hesapla: hedef ciroma hangi fiyatla ulaşırım?</button></p>
         </section>
 
         <!-- KURALLAR: kurulum. Fiyat tablosu + oneri kurallari, sonra takvim kurallari. -->
         <section class="pricing-view" id="pricingView_rules" role="tabpanel" aria-labelledby="pricingViewTab_rules" hidden>
-          <p class="pricing-view-intro">Kurulum burada, genelde bir kez yapılır. Öneri = baz fiyat + kuralların yüzdeleri; taban fiyatın altına inmez. Her kuralın yanındaki çip değerin nereden geldiğini söyler: <b>Bu mülk</b> (yalnız bu mülke istisna) &gt; <b>Portföy</b> (tüm mülkler) &gt; <b>Sistem varsayılanı</b>.</p>
+          <p class="pricing-view-intro">Bir kez yapılır. Önce her ev için iki fiyat girin: <b>baz</b> (normal bir gecenin fiyatı) ve <b>taban</b> (asla altına inmeyeceğiniz fiyat). Altında hafta sonu, tatil ve sezon artışlarını, son dakika ve boş gece indirimlerini ayarlayın. Her ayar yalnız seçili eve (<b>Bu mülk</b>) ya da bütün evlere (<b>Portföy</b>) uygulanır; hiç ayar yoksa <b>Sistem varsayılanı</b> geçerlidir.</p>
           <div class="pricing-ready">
             <span class="pricing-ready-label">Fiyat tablosu hazır</span>
             <b id="pricingLadderReadyVal">—</b>
@@ -1608,6 +1616,7 @@
 
         <!-- HEDEF: hedef ciroya hangi fiyat-doluluk bilesimiyle ulasilir. -->
         <section class="pricing-view" id="pricingView_target" role="tabpanel" aria-labelledby="pricingViewTab_target" hidden>
+          <button type="button" class="fox-back" data-onclick="setPricingView('plan')">← Ciro planı</button>
           <p class="pricing-view-intro">Aylık ciro hedefine ulaşmak için kalan açık gecelerde hangi ortalama fiyatla kaç gece satmanız gerektiğini gösterir. Her satır farklı bir varsayımdır (önerilen fiyatlar, doluluk hedefiniz, geçen yılki doluluk, son 3 ay, taban/yoğun fiyat, rakip ortalaması); sarı uyarı o satırın gerçekçi olmayabileceğini söyler. Bu sekme fiyatı değiştirmez.</p>
           <section class="pricing-card pricing-target-card">
             <div class="pricing-card-head"><div><h3 id="pricingTargetTitle">Hedef ciroya hangi fiyatla ulaşılır?</h3><p>Seçili ayın hedefinden bu ay gerçekleşen ciroyu düşer, kalanı ayın açık geceleriyle karşılaştırır. <strong>Tüm mülkler</strong> Hedefleri Yönet'teki işletme hedefini ve Finans'taki ciroyu kullanır. Hedef doluluk boşsa bu ayın kayıtlı doluluk hedefi kullanılır; buraya yazılan oran yalnız bu hesabı değiştirir, takvimdeki talep kuralını değiştirmez.</p></div></div>
@@ -1627,6 +1636,11 @@
         <section class="pricing-view" id="pricingView_rivals" role="tabpanel" aria-labelledby="pricingViewTab_rivals" hidden>
           <p class="pricing-view-intro">Benzer evlerin fiyatlarını kaynağıyla kaydedin. Rakip ortalaması, son 90 günde araştırılmış en fazla 5 farklı rakibin son fiyatından hesaplanır; takvimde ve fiyat tablosunda bilgi olarak görünür, öneriyi değiştirmez.</p>
           <div id="pricingRivalSummary" aria-live="polite"></div>
+          <section class="pricing-card rival-scan" id="rivalScanPanel">
+            <div class="pricing-card-head"><div><h3>Rakip analizinden aktar</h3><p>Rakip analizi taramasının dosyasını (<b>tarama_YYYY-AA-GG.json</b>) seçin; ilan bağlantıları için yanına <b>ayarlar.json</b>'u da seçebilirsiniz. Her evinize kapasitesi en yakın en fazla 5 Airbnb rakibi, gece başı hafta içi / hafta sonu / özel gün fiyatıyla eklenir. Önce önizleme görürsünüz; aynı tarama ikinci kez aktarılmaz.</p></div></div>
+            <label class="rival-scan__pick"><span>Dosya seç</span><input type="file" id="rivalScanFiles" accept=".json,application/json" multiple data-onchange="handleRivalScanFiles(this)"></label>
+            <div id="rivalScanPreview" aria-live="polite"></div>
+          </section>
           <div class="pricing-two">
             <section class="pricing-card pricing-config-card" id="pricingResearchPanel">
               <div class="pricing-card-head"><div><h3>Rakip fiyatı ekle</h3><p>Yalnız tarihli ve bağlantılı kullanıcı onaylı araştırma kaydedilir. Takvimde bilgi olarak görünür; önerilen fiyatı değiştirmez.</p></div></div>
@@ -1670,6 +1684,7 @@
 
         <!-- SONUCLAR: kaydedilen fiyat -> gerceklesen (core/pricing_outcome.js). -->
         <section class="pricing-view" id="pricingView_results" role="tabpanel" aria-labelledby="pricingViewTab_results" hidden>
+          <button type="button" class="fox-back" data-onclick="setPricingView('calendar')">← Fiyatlarım</button>
           <p class="pricing-view-intro">Kaydettiğiniz fiyatların işe yarayıp yaramadığını ölçer. Yalnız fiyat kaydından <b>sonra</b> yapılan rezervasyonlar karşılaştırılır; daha önce satılmış gece fiyat kararından etkilenmediği için ayrı sayılır. Ölçülemeyen gün nedeniyle yazılır.</p>
           <section class="pricing-card pricing-results-card" id="pricingResultsRoot" aria-live="polite"></section>
         </section>
@@ -3541,6 +3556,7 @@
   <script src="core/marketing_channel_listing_service.js?v=515fe386"></script>
   <script src="core/sales_workflow_service.js?v=0305af5c"></script>
   <script src="core/pricing_research_service.js?v=6ce65ef3"></script>
+  <script src="core/rival_scan_import.js?v=bd4ec2a5"></script>
   <script src="core/suggested_price_engine.js?v=70bcb939"></script>
   <script src="core/target_revenue_calculator.js?v=b5c396d8"></script>
   <script src="core/monthly_goal_calculator.js?v=245a5fea"></script>
@@ -3562,7 +3578,7 @@
   <script src="core/mobile_shell.js?v=8979ea0a"></script>
   <script src="core/notification_feed.js?v=941306f6"></script>
   <script src="core/command_search.js?v=1b9dbcc9"></script>
-  <script src="core/action_dispatch.js?v=555132ad"></script>
+  <script src="core/action_dispatch.js?v=005f7ab6"></script>
   <script src="core/booking_finance.js?v=338de73f"></script>
   <script src="core/booking_finance_ui.js?v=9b3127c9"></script>
   <script src="core/permission_matrix.js?v=e3a3cef2"></script>
@@ -3572,7 +3588,7 @@
   <script src="core/lex_ui.js?v=d7b70a28"></script>
   <script src="core/color_picker.js?v=8457ca4c"></script>
   <script src="core/task_page.js?v=83a423dc"></script>
-  <script src="app.js?v=d179c1a8"></script>
+  <script src="app.js?v=87c6d5ba"></script>
   <script src="core/property_analysis_context_ui.js?v=cac26629"></script>
   <script src="core/marketing_ui.js?v=18887ae8"></script>
 </body>

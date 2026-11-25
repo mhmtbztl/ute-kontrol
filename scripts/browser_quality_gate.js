@@ -1103,12 +1103,12 @@ async function main() {
       passed.push('32b. fiyatlandırma 390 px mobilde taşmaz');
       // Fiyatlandirma (PR 8): ic sekmeler tek satir, kilavuz telefonda kapali baslar,
       // bes gorunumun hicbiri tasmaz, kucuk dugme yok (ay seridi bilerek kayar).
-      for (const v of ['rules', 'target', 'rivals', 'results', 'calendar']) {
+      for (const v of ['rules', 'plan', 'target', 'rivals', 'results', 'calendar']) {
         await page.evaluate(view => setPricingView(view), v);
         await assertNoHorizontalOverflow(page, `Fiyatlandirma ${v} mobil`);
       }
       const fiyat = await page.evaluate(() => {
-        const sekmeler = [...document.querySelectorAll('.pricing-subnav .ads-subnav-btn')].map(b => Math.round(b.getBoundingClientRect().top));
+        const sekmeler = [...document.querySelectorAll('.pricing-subnav .ads-subnav-btn')].filter(b => b.getClientRects().length).map(b => Math.round(b.getBoundingClientRect().top));
         return {
           tekSatir: new Set(sekmeler).size === 1,
           kilavuzAcik: document.getElementById('pricingGuide').open,
